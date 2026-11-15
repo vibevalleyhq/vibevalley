@@ -12,8 +12,9 @@ export function parsePairLink(text: string): PairLink | undefined {
   let u: URL;
   try {
     u = new URL(text.trim());
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (e instanceof TypeError) return undefined;
+    throw e;
   }
   const code = (u.searchParams.get("c") ?? "").trim();
   if (!code) return undefined;
@@ -30,8 +31,9 @@ function parseFarm(text: string): string | undefined {
   try {
     const u = new URL(text);
     return u.protocol === "http:" || u.protocol === "https:" ? u.origin : undefined;
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (e instanceof TypeError) return undefined;
+    throw e;
   }
 }
 
@@ -50,8 +52,9 @@ export const isPairPage = (farm: string, url: string) => {
   try {
     const u = new URL(url);
     return u.origin === farm && u.pathname === "/pair";
-  } catch {
-    return false;
+  } catch (e) {
+    if (e instanceof TypeError) return false;
+    throw e;
   }
 };
 

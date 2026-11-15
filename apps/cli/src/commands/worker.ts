@@ -67,7 +67,14 @@ export const workerCommand: Spec = group(
           throw refused();
         }
         if (reply.status !== 200) throw refused();
-        const body = decodedOr(Response, await reply.text().catch(() => ""));
+        let replyText: string;
+        try {
+          replyText = await reply.text();
+        } catch {
+          // Truncated MCP stream refuses without leaking endpoint details, matching fetch above.
+          throw refused();
+        }
+        const body = decodedOr(Response, replyText);
         if (body.error !== undefined || !body.result) throw refused();
         if (body.result.isError === true)
           throw new Failure({

@@ -1,6 +1,7 @@
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
+import { knownTypes, plainOf } from "@vibevalley/artifact/blocks";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ArtifactId, userId, type Suggestion, type TextSpan } from "@vibevalley/protocol";
 
@@ -14,7 +15,6 @@ import { hexColor, swatches } from "#/ui/domain/cast.ts";
 import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 
-import { knownTypes, plainOf } from "./blocks";
 import { BlockEditor, type EditBlock } from "./editor";
 
 /** The user's lines on the attribution bar. */
@@ -29,6 +29,8 @@ function authorColor(updatedBy: string, agent: Agent | undefined) {
   const trim = swatches.trim[h % swatches.trim.length];
   return trim === undefined ? userColor : hexColor(trim);
 }
+
+type BlockSnapshot = Pick<EditBlock, "id" | "rev" | "text">;
 
 /** A block as one drawing of the editor shows it; `block` is the editor's own, for its actions. */
 interface Row {
@@ -150,10 +152,14 @@ export function BlocksView(props: {
     setWorking(undefined);
   };
 
+  const blockSnapshots = createMemo((): BlockSnapshot[] => {
+    version();
+    return editor.blocks.map((b) => ({ id: b.id, rev: b.rev, text: b.text }));
+  });
   const suggestionsList = () => (
     <SuggestionsList
       list={suggestions()}
-      blocks={editor.blocks}
+      blocks={blockSnapshots()}
       agents={agents()}
       working={working()}
       onAccept={(suggestion) => void resolve(suggestion, true)}
@@ -197,7 +203,7 @@ export function BlocksView(props: {
 
 function SuggestionsList(props: {
   list: readonly Suggestion[];
-  blocks: readonly EditBlock[];
+  blocks: readonly BlockSnapshot[];
   agents: Map<string, Agent>;
   working: string | undefined;
   onAccept: (s: Suggestion) => void;
@@ -312,7 +318,7 @@ const attrText = (attrs: object) =>
     .map(([k, v]) => `${attrName(k)} ${String(v)}`)
     .join(" / ");
 
-function SuggestionDiff(props: { suggestion: Suggestion; block: EditBlock | undefined }) {
+function SuggestionDiff(props: { suggestion: Suggestion; block: BlockSnapshot | undefined }) {
   const change = () => props.suggestion.change;
   return (
     <Show

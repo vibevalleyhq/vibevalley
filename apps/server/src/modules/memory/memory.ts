@@ -6,7 +6,7 @@ import type * as T from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { type Actor, orchestrator, worker } from "#/base/actor.ts";
+import { type Actor, type ActorKind, orchestrator, worker } from "#/base/actor.ts";
 import { clip } from "#/base/clip.ts";
 import { BizCode, bizError, memoriesOf, missing } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
@@ -292,7 +292,7 @@ function makeMemoryStore(deps: { readonly clock: Clock; readonly db: Db; readonl
       ...(r.recalled_at !== null ? { recalledAt: r.recalled_at } : {}),
     }));
 
-  const insertNote = async (agent: string, body: string, repo: string | undefined, session: string | undefined, author: T.ActorKind) => {
+  const insertNote = async (agent: string, body: string, repo: string | undefined, session: string | undefined, author: ActorKind) => {
     const at = clock.now();
     const id = newId();
     await q.addNote(db.sql, {

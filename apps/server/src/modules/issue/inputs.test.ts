@@ -3,8 +3,9 @@ import { expect, test } from "vite-plus/test";
 import type * as T from "@vibevalley/protocol";
 
 import { goesOnFrom, holdReasonOf, readyInputs } from "./inputs.ts";
+import type { IssueMandate } from "./status.ts";
 
-const issue = (state: T.IssueStage["state"]) => ({ stage: { state } as T.IssueStage, mandate: { maxBotReviewRounds: 2 } as T.IssueMandate });
+const issue = (state: T.IssueStage["state"]) => ({ stage: { state } as T.IssueStage, mandate: { maxBotReviewRounds: 2 } as IssueMandate });
 const bot = (botRound?: number) => ({ meta: botRound === undefined ? {} : { botRound }, actor: { kind: "system" as const, id: "ci" } });
 const user = { meta: {}, actor: { kind: "user" as const, id: "user" } };
 

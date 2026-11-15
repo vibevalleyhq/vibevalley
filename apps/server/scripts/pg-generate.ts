@@ -16,7 +16,18 @@ interface Type {
   readonly nullable: boolean;
   /** A text column's closed set of words, by the name types.ts gives it. */
   readonly words?: string;
+  /** A primary or foreign key's protocol brand, by the name @vibevalley/protocol gives both its Schema and its type. */
+  readonly brand?: string;
 }
+
+const tableBrands: Readonly<Record<string, string>> = {
+  issue: "IssueId",
+  session: "SessionId",
+  artifact: "ArtifactId",
+  artifact_block: "BlockId",
+  artifact_suggestion: "SuggestionId",
+  channel_message: "MessageId",
+};
 
 const problems: string[] = [];
 const problem = (where: string, what: string, fix: string) => problems.push(`${where}: ${what}. Fix: ${fix}. See apps/server/scripts/pg-generate.ts`);
@@ -66,6 +77,44 @@ for (const m of schemaSql.matchAll(/create table (\w+) \(([\s\S]*?)\n\);/giu)) {
   }
 }
 
+const brandOf = new Map<string, string>();
+for (const row of (
+  await pg.query<{ table_name: string; col_name: string }>(
+    `select cls.relname as table_name, att.attname as col_name
+     from pg_constraint con
+     join pg_class cls on cls.oid = con.conrelid
+     join pg_namespace nsp on nsp.oid = cls.relnamespace
+     join pg_attribute att on att.attrelid = cls.oid and att.attnum = con.conkey[1]
+     where nsp.nspname = 'public' and con.contype = 'p' and cardinality(con.conkey) = 1`,
+  )
+).rows) {
+  const brand = tableBrands[row.table_name];
+  if (brand) brandOf.set(`${row.table_name}.${row.col_name}`, brand);
+}
+const fks = (
+  await pg.query<{ src_table: string; src_col: string; dst_table: string; dst_col: string }>(
+    `select src.relname as src_table, src_att.attname as src_col, dst.relname as dst_table, dst_att.attname as dst_col
+     from pg_constraint con
+     join pg_class src on src.oid = con.conrelid
+     join pg_namespace nsp on nsp.oid = src.relnamespace
+     join pg_attribute src_att on src_att.attrelid = src.oid and src_att.attnum = con.conkey[1]
+     join pg_class dst on dst.oid = con.confrelid
+     join pg_attribute dst_att on dst_att.attrelid = dst.oid and dst_att.attnum = con.confkey[1]
+     where nsp.nspname = 'public' and con.contype = 'f' and cardinality(con.conkey) = 1 and cardinality(con.confkey) = 1`,
+  )
+).rows;
+for (let more = true; more;) {
+  more = false;
+  for (const fk of fks) {
+    const src = `${fk.src_table}.${fk.src_col}`;
+    const brand = brandOf.get(`${fk.dst_table}.${fk.dst_col}`);
+    if (brand && !brandOf.has(src)) {
+      brandOf.set(src, brand);
+      more = true;
+    }
+  }
+}
+
 // Every table's and view's columns, by the table's oid and the column's number as a Describe names them.
 interface Column {
   readonly table: string;
@@ -83,18 +132,29 @@ for (const row of (
   )
 ).rows) {
   const base = baseOfType(row.typname);
-  const named = wordsOf.get(`${row.table_name}.${row.attname}`);
+  const key = `${row.table_name}.${row.attname}`;
+  const named = wordsOf.get(key);
+  const brand = brandOf.get(key);
   const column: Column = {
     table: row.table_name,
     name: row.attname,
     typname: row.typname,
-    type: base ? { base, nullable: !row.notnull, ...(named && base === "text" ? { words: named } : {}) } : undefined,
+    type: base
+      ? {
+          base,
+          nullable: !row.notnull,
+          ...(named && base === "text" ? { words: named } : {}),
+          ...(brand && base === "text" ? { brand } : {}),
+        }
+      : undefined,
   };
   byPlace.set(`${row.table_oid}.${row.attnum}`, column);
   const of = byName.get(row.table_name) ?? new Map<string, Column>();
   of.set(row.attname, column);
   byName.set(row.table_name, of);
 }
+for (const table of Object.keys(tableBrands))
+  if (!byName.has(table)) problem("tableBrands", `table ${table} does not exist`, "drop or rename it in tableBrands");
 
 interface Query {
   readonly file: string;
@@ -292,22 +352,25 @@ function columnOf(sql: string, ref: string, tables: Map<string, string>): Column
   return undefined;
 }
 
-/** A parameter's type is what Postgres made of it; its words, and whether it may be null, those of the column it is
- * compared with, written to or set to (a column that may be null makes a value written to it nullable). */
-function paramColumn(sql: string, i: number): { readonly words?: string; readonly nullable: boolean } {
+/** A parameter's type is what Postgres made of it; its words, brand, and whether it may be null, those of the column it
+ * is compared with, written to or set to (a column that may be null makes a value written to it nullable). */
+function paramColumn(sql: string, i: number): { readonly words?: string; readonly brand?: string; readonly nullable: boolean } {
   const tables = tablesOf(sql);
   const n = `\\$${i + 1}(?!\\d)`;
   const ref = '((?:\\w+\\.)?"?\\w+"?)';
   const op = "(?:=|<>|!=|<=|>=|<|>|\\bis not\\b|\\bis\\b|\\blike\\b)";
   let words: string | undefined;
+  let brand: string | undefined;
   let nullable = false;
   const written = (c: Column | undefined) => {
     if (!c?.type) return;
     words ??= c.type.words;
+    brand ??= c.type.brand;
     if (c.type.nullable) nullable = true;
   };
   const compared = (c: Column | undefined) => {
     words ??= c?.type?.words;
+    brand ??= c?.type?.brand;
   };
   const insert = /insert into (\w+)\s*\(([^)]*)\)\s*values\s*\(/iu.exec(sql);
   if (insert) {
@@ -320,7 +383,7 @@ function paramColumn(sql: string, i: number): { readonly words?: string; readonl
   for (const m of sql.matchAll(new RegExp(`,\\s*${ref}\\s*=\\s*${n}`, "giu"))) written(columnOf(sql, m[1] ?? "", tables));
   for (const m of sql.matchAll(new RegExp(`${ref}\\s*${op}\\s*${n}`, "giu"))) compared(columnOf(sql, m[1] ?? "", tables));
   for (const m of sql.matchAll(new RegExp(`${n}(?:::[\\w\\[\\]]+)*\\s*${op}\\s*${ref}`, "giu"))) compared(columnOf(sql, m[1] ?? "", tables));
-  return { ...(words ? { words } : {}), nullable };
+  return { ...(words ? { words } : {}), ...(brand ? { brand } : {}), nullable };
 }
 
 /** The comma-separated values of a values (…) list, up to its closing parenthesis. */
@@ -346,6 +409,7 @@ function splitTop(rest: string): string[] {
 const schemaOf = (t: Type) => {
   const base =
     t.words ??
+    t.brand ??
     (t.base === "int"
       ? "z.number().int()"
       : t.base === "real"
@@ -364,6 +428,7 @@ const schemaOf = (t: Type) => {
 const tsOf = (t: Type) => {
   const base =
     t.words ??
+    t.brand ??
     (t.base === "int" || t.base === "real"
       ? "number"
       : t.base === "bool"
@@ -405,6 +470,7 @@ await chain;
 
 const made = new Map<string, string>();
 const usedWords = new Set<string>();
+const usedBrands = new Set<string>();
 for (const file of files) {
   const parts: string[] = [];
   const imports = new Set<string>();
@@ -429,7 +495,11 @@ for (const file of files) {
         );
       const at = paramColumn(r.sql, i);
       const w = base === "text" ? at.words : undefined;
-      return { name: p.name, type: { base: base ?? "text", nullable: p.nullable || at.nullable, ...(w ? { words: w } : {}) } satisfies Type };
+      const b = base === "text" ? at.brand : undefined;
+      return {
+        name: p.name,
+        type: { base: base ?? "text", nullable: p.nullable || at.nullable, ...(w ? { words: w } : {}), ...(b ? { brand: b } : {}) } satisfies Type,
+      };
     });
     const outer = outerTables(r.sql);
     const result =
@@ -462,7 +532,16 @@ for (const file of files) {
             );
             return { name: f.name, type: { base, nullable: true } satisfies Type };
           });
-    for (const t of [...params.map((p) => p.type), ...result.map((c) => c.type)]) if (t.words) imports.add(t.words);
+    for (const t of [...params.map((p) => p.type), ...result.map((c) => c.type)]) {
+      if (t.words) {
+        imports.add(t.words);
+        usedWords.add(t.words);
+      }
+      if (t.brand) {
+        imports.add(t.brand);
+        usedBrands.add(t.brand);
+      }
+    }
     const field = (name: string, t: Type) => `  ["${name}"]: ${schemaOf(t)},`;
     parts.push(`export interface ${q.name}Params {\n${params.map((p) => `  readonly ["${p.name}"]: ${tsOf(p.type)}`).join("\n")}\n}\n`);
     if (q.kind !== "exec")
@@ -481,7 +560,6 @@ for (const file of files) {
           : `${head}: Promise<${q.name}Result[]> {\n  const rows = await sql.query(${q.name}Sql, ${args})\n  return rows.map((row) => rowOf("${q.name}", ${q.name}Result, row))\n}\n`,
     );
   }
-  for (const w of imports) usedWords.add(w);
   const fromTypes = ["rowOf", ...[...imports].toSorted()].join(", ");
   made.set(
     file.replace(/\.sql$/u, ".sql.ts"),
@@ -489,15 +567,23 @@ for (const file of files) {
   );
 }
 
+const sortedBrands = [...usedBrands].toSorted();
+const brandHeader = sortedBrands.length === 0 ? "" : `import type * as T from "@vibevalley/protocol"\nimport * as S from "@vibevalley/protocol/schema"\n\n`;
+const brandDecls =
+  sortedBrands.length === 0
+    ? ""
+    : `const branded = <B>(mint: (s: string) => B): z.ZodType<B, string> => z.string().transform(mint)\n\n${sortedBrands.map((b) => `export const ${b} = branded(S.${(b[0] ?? "").toLowerCase()}${b.slice(1)})\nexport type ${b} = T.${b}\n`).join("\n")}\n`;
 made.set(
   "types.ts",
   `// Generated by scripts/pg-generate.ts. DO NOT EDIT.\nimport { z } from "zod"\n\n` +
+    brandHeader +
     `/** A row as its query's result Schema reads it; a row of another shape is a defect, said with the query's name. */\n` +
     `export function rowOf<A>(query: string, schema: z.ZodType<A>, row: unknown): A {\n` +
     `  const got = schema.safeParse(row)\n` +
     `  if (!got.success) throw new Error(\`\${query}: a row not of its shape: \${got.error.issues.map((i) => \`\${i.path.join(".")} \${i.message}\`).join("; ")}\`, { cause: got.error })\n` +
     `  return got.data\n` +
     `}\n\n` +
+    brandDecls +
     [...words.entries()]
       .filter(([name]) => usedWords.has(name))
       .toSorted(([a], [b]) => a.localeCompare(b))

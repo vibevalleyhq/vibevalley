@@ -5,6 +5,8 @@ import type * as T from "@vibevalley/protocol";
 
 import { redact, redactedHead } from "#/base/redact.ts";
 
+export type ToolConnection = NonNullable<T.Session["toolConnections"]>[number];
+
 export function loopbackEnvironment<Env extends SessionOptions["env"]>(
   env: Env,
   inherited: { readonly NO_PROXY?: string; readonly no_proxy?: string },
@@ -35,7 +37,7 @@ export function observeToolConnections(
   session: Pick<RuntimeSession, "id" | "rawEvents">,
   runtime: string,
   servers: readonly string[],
-  observed: (connection: T.ToolConnection) => void,
+  observed: (connection: ToolConnection) => void,
 ) {
   for (const server of servers) observed({ server, status: "unknown" });
   if (runtime !== "codex") return () => {};

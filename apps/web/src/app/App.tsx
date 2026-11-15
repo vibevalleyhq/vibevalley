@@ -21,6 +21,7 @@ import { PkmPage } from "#/features/pkm/index.ts";
 import { ReposPage, sortRepos } from "#/features/repo/index.ts";
 import { RuntimesPage } from "#/features/runtime/index.ts";
 import { SettingsPage } from "#/features/setting/index.ts";
+import { TerminalPage } from "#/features/terminal/index.ts";
 import { ApprovePage, LoginPage } from "#/features/user/index.ts";
 import { ready, useRepos } from "#/infra/query.ts";
 import { Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useParams } from "#/infra/router.ts";
@@ -92,6 +93,7 @@ const routes: readonly RouteDefinition[] = [
       { path: "/farm/", meta: { skin: "farm" }, component: () => <FarmPage repo="" /> },
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
       page("/issues", "issues", (rest) => <IssuesPage rest={rest()} />, issueSearch),
+      page("/terminal", "terminal", () => <TerminalPage />),
       page("/chat", "chat", () => (
         <div class="h-full">
           <ChatPage />

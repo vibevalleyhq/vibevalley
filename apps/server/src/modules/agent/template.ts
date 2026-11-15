@@ -83,7 +83,7 @@ const readJson = <A>(textOf: TextOf, schema: z.ZodType<A>, dir: string, file: st
 
 /** A template folder read in the farm's language (English falls back to the Chinese file by file) through textOf. Throws
  * TemplateProblem. */
-export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplate["source"]): T.AgentTemplate => {
+export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplate["source"], locale: T.Locale = currentLocale()): T.AgentTemplate => {
   const item = readJson(textOf, TemplateFile, dir, "agent.json");
   const problem = (message: string) => new TemplateProblem(message);
   if (!item) throw problem(t("server.agent.template.noFile", { file: join(dir, "agent.json") }));
@@ -93,7 +93,7 @@ export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplat
   if (item.role === "orchestrator" && item.runtime !== undefined && item.runtime !== orchestratorRuntime)
     throw problem(t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime }));
   if (item.role === "worker" && !item.runtime) throw problem(t("server.agent.template.noRuntime", { file: join(dir, "agent.json") }));
-  const en = currentLocale() === "en";
+  const en = locale === "en";
   const words = en ? readJson(textOf, WordsFile, dir, "agent.en.json") : undefined;
   const text = (file: string) => textOf(join(dir, file))?.trim();
   const persona = (en ? text("persona.en.md") : undefined) ?? text("persona.md") ?? "";
@@ -130,7 +130,7 @@ export const templateFrom = (textOf: TextOf, dir: string, source: T.AgentTemplat
 };
 
 /** A template folder on disk (templateFrom): its own files are read first, a missing one read as none. Throws TemplateProblem. */
-export const readTemplate = async (dir: string, source: T.AgentTemplate["source"]): Promise<T.AgentTemplate> => {
+export const readTemplate = async (dir: string, source: T.AgentTemplate["source"], locale: T.Locale = currentLocale()): Promise<T.AgentTemplate> => {
   const texts = new Map<string, string>();
   for (const file of files) {
     const path = join(dir, file);
@@ -140,16 +140,16 @@ export const readTemplate = async (dir: string, source: T.AgentTemplate["source"
       if (errnoOf(e) !== "ENOENT") throw unreadable(path, messageOf(e));
     }
   }
-  return templateFrom((path) => texts.get(path), dir, source);
+  return templateFrom((path) => texts.get(path), dir, source, locale);
 };
 
 /** The ids of the built-in templates, in the order they are listed and installed. */
 export const builtInIds = async (): Promise<string[]> => z.array(z.string()).parse(JSON.parse(await readFile(join(builtInDir, "index.json"), "utf8")));
 
 /** Every built-in template; one that does not read is a broken build (templates.test.ts keeps them readable). */
-export const builtInTemplates = async (): Promise<T.AgentTemplate[]> => {
+export const builtInTemplates = async (locale: T.Locale = currentLocale()): Promise<T.AgentTemplate[]> => {
   const out: T.AgentTemplate[] = [];
-  for (const id of await builtInIds()) out.push(await readTemplate(join(builtInDir, id), "builtIn"));
+  for (const id of await builtInIds()) out.push(await readTemplate(join(builtInDir, id), "builtIn", locale));
   return out;
 };
 

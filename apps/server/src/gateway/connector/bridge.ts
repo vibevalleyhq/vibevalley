@@ -342,16 +342,24 @@ export const makeBridge = (env: BridgeEnv, adapter: Adapter, mail: { readonly ou
     }
   };
 
-  // What is held is tried again after retryFirst, then twice as long after each try that fails (up to retryMost), until
-  // one sends all.
+  // After maxHeldRetries per outage, held input parks until the next outbox wake.
+  const maxHeldRetries = 8;
   const held = new Error("held");
-  const heldTried = (signal: AbortSignal) =>
-    retry(
-      async () => {
-        if (!(await drain(false))) throw held;
-      },
-      { retries: Number.POSITIVE_INFINITY, delay: exponential(retryFirst, 2, retryMost), clock, signal },
-    );
+  const heldTried = async (signal: AbortSignal) => {
+    try {
+      await retry(
+        async () => {
+          if (!(await drain(false))) throw held;
+        },
+        { retries: maxHeldRetries, delay: exponential(retryFirst, 2, retryMost), clock, signal },
+      );
+    } catch (e) {
+      if (e !== held) throw e;
+      log.warn(`vibevalley: ${id}: outbox still held after ${maxHeldRetries} retries; waiting for next wake`);
+      await mail.outbox.take(signal);
+      await drain(false);
+    }
+  };
   const outboxRun = async (signal: AbortSignal) => {
     for (;;) {
       if (await wokeWithin(mail.outbox, retryFirst, signal)) await drain(false);

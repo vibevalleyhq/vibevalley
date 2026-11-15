@@ -4,12 +4,15 @@ import { app, BrowserWindow, nativeTheme, screen, shell, systemPreferences, WebC
 
 import { filledNear } from "@vibevalley/engine/framing";
 import { currentLocale } from "@vibevalley/i18n";
-import { farmFraming, type Opening } from "@vibevalley/protocol/host";
+import { farmFraming, type Host, type Opening } from "@vibevalley/protocol/host";
 
 import { ground, navigationOf, pagePermission, pageWebPreferences, trafficLights } from "../base/boundary";
 
+type FramingMode = Parameters<NonNullable<Host["framing"]>>[0];
+
 /** The smallest window: twice the farm. */
 const minSize = { w: farmFraming.picture.w * 2, h: farmFraming.picture.h * 2 };
+const minFreeSize = { w: 720, h: 480 };
 
 /** A load the next one replaced fails with ERR_ABORTED (-3): that is no failure. Any other is logged. */
 const loaded = (load: Promise<void>) =>
@@ -47,6 +50,27 @@ export function mainWindow(o: {
   let cover: OpeningView | undefined;
   let accepting = false;
   let shown = false;
+  let framingMode: FramingMode = "farm";
+
+  const snapToFarm = (w: BrowserWindow) => {
+    if (w.isDestroyed() || w.isFullScreen() || w.isMaximized()) return;
+    const [cw = 0, ch = 0] = w.getContentSize();
+    const area = screen.getDisplayMatching(w.getBounds()).workAreaSize;
+    const to = filledNear({ w: cw, h: ch }, farmFraming.picture, farmFraming.cut, minSize, { w: area.width, h: area.height });
+    if (to.w !== cw || to.h !== ch) w.setContentSize(to.w, to.h, true);
+  };
+
+  const applyFraming = (w: BrowserWindow) => {
+    if (w.isDestroyed()) return;
+    if (framingMode === "farm") {
+      w.setMinimumSize(minSize.w, minSize.h);
+      w.setAspectRatio(3 / 2);
+      snapToFarm(w);
+    } else {
+      w.setAspectRatio(0);
+      w.setMinimumSize(minFreeSize.w, minFreeSize.h);
+    }
+  };
 
   const dispose = (old: OpeningView) => {
     if (cover === old) cover = undefined;
@@ -144,14 +168,11 @@ export function mainWindow(o: {
       };
       void ask().catch(() => callback(false));
     });
-    made.setAspectRatio(3 / 2);
-    // A size between two whole scales leaves bars around the farm: once a resize ends, the window takes the nearest size the farm fills.
+    applyFraming(made);
+    // A size between two whole scales leaves bars around the farm: once a resize ends on `/farm`, the window takes the nearest size the farm fills.
     made.on("resized", () => {
-      if (made.isFullScreen() || made.isMaximized()) return;
-      const [w = 0, h = 0] = made.getContentSize();
-      const area = screen.getDisplayMatching(made.getBounds()).workAreaSize;
-      const to = filledNear({ w, h }, farmFraming.picture, farmFraming.cut, minSize, { w: area.width, h: area.height });
-      if (to.w !== w || to.h !== h) made.setContentSize(to.w, to.h, true);
+      if (framingMode !== "farm") return;
+      snapToFarm(made);
     });
     // The page stays on its origin; any other link opens in the browser.
     made.webContents.setWindowOpenHandler(({ url: to }) => {
@@ -256,6 +277,11 @@ export function mainWindow(o: {
     },
     /** The ground follows the theme the page chose (host.ts). */
     repaint: () => window?.setBackgroundColor(ground(nativeTheme.shouldUseDarkColors)),
+    framing: (mode: FramingMode) => {
+      if (framingMode === mode) return;
+      framingMode = mode;
+      if (window) applyFraming(window);
+    },
   };
 }
 

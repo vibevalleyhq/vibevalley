@@ -5,10 +5,10 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf } from "./types.js"
+import { rowOf, ArtifactId, MessageId } from "./types.js"
 
 export interface AddArtifactVersionParams {
-  readonly ["artifact_id"]: string
+  readonly ["artifact_id"]: ArtifactId
   readonly ["version"]: number
   readonly ["attachment_id"]: string
   readonly ["size"]: number
@@ -25,8 +25,8 @@ export async function addArtifactVersion(sql: Sql, params: AddArtifactVersionPar
 }
 
 export interface ArtifactVersionAnnouncedParams {
-  readonly ["message_id"]: string | null
-  readonly ["artifact_id"]: string
+  readonly ["message_id"]: MessageId | null
+  readonly ["artifact_id"]: ArtifactId
   readonly ["version"]: number
 }
 
@@ -37,18 +37,18 @@ export async function artifactVersionAnnounced(sql: Sql, params: ArtifactVersion
 }
 
 export interface ArtifactVersionsParams {
-  readonly ["artifact_id"]: string
+  readonly ["artifact_id"]: ArtifactId
 }
 
 export const ArtifactVersionsResult = z.object({
-  ["artifact_id"]: z.string(),
+  ["artifact_id"]: ArtifactId,
   ["version"]: z.number().int(),
   ["attachment_id"]: z.string(),
   ["size"]: z.number().int(),
   ["note"]: z.string().nullable(),
   ["by_id"]: z.string(),
   ["by_name"]: z.string(),
-  ["message_id"]: z.string().nullable(),
+  ["message_id"]: MessageId.nullable(),
   ["created_at"]: z.number(),
   ["message_channel"]: z.string().nullable(),
   ["message_number"]: z.number().int().nullable(),
@@ -63,19 +63,19 @@ export async function artifactVersions(sql: Sql, params: ArtifactVersionsParams)
 }
 
 export interface ArtifactVersionParams {
-  readonly ["artifact_id"]: string
+  readonly ["artifact_id"]: ArtifactId
   readonly ["version"]: number
 }
 
 export const ArtifactVersionResult = z.object({
-  ["artifact_id"]: z.string(),
+  ["artifact_id"]: ArtifactId,
   ["version"]: z.number().int(),
   ["attachment_id"]: z.string(),
   ["size"]: z.number().int(),
   ["note"]: z.string().nullable(),
   ["by_id"]: z.string(),
   ["by_name"]: z.string(),
-  ["message_id"]: z.string().nullable(),
+  ["message_id"]: MessageId.nullable(),
   ["created_at"]: z.number(),
 })
 export type ArtifactVersionResult = z.infer<typeof ArtifactVersionResult>

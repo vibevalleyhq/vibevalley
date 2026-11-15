@@ -1,6 +1,9 @@
 import { type StopReason } from "@earendil-works/pi-ai";
 import { describe, expect, test } from "vite-plus/test";
 
+import type { IssueId } from "@vibevalley/protocol";
+import { issueId, sessionId } from "@vibevalley/protocol/schema";
+
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 import { assistantMessage, text, thinking } from "#/testing/model.ts";
@@ -38,7 +41,7 @@ const issue = (farm: Farm, id: string) =>
 
 const records = async (farm: Farm) => {
   await qs.keepSession(farm.db.sql, {
-    id: "orchestrator",
+    id: sessionId("orchestrator"),
     role: "orchestrator",
     agent: "orchestrator",
     name: "助手",
@@ -54,7 +57,7 @@ const records = async (farm: Farm) => {
   const persisted = recording({ db: farm.db, clock: wallTime });
   const finished: RunFinished[] = [];
   /** The issues each run took, as the store tells them (IssueStarted): the one it started on, and those linked after. */
-  const took: (readonly [string, string])[] = [];
+  const took: (readonly [string, IssueId])[] = [];
   let current = () => "";
   const store: RunStore = {
     ...persisted,
@@ -96,7 +99,7 @@ describe("the orchestrator's runs", () => {
     ]);
     // The issues keep what they are told (issue/intake.ts ranOn): the run is one of each issue's.
     for (const [run, issue] of took) await farm.intake.ranOn(run, issue);
-    const runs = await farm.intake.runsOf("i2");
+    const runs = await farm.intake.runsOf(issueId("i2"));
     expect(runs[0]?.triggeredBy).toEqual({ kind: "issue", channel: "general", message: "m1" });
     expect(runs.map((r) => [r.issue, r.outcome, r.summary, r.heard])).toEqual([["i1", "completed", "看完了", ["m1"]]]);
     expect(journal.events().map((e) => e.type)).toEqual([
@@ -122,7 +125,7 @@ describe("the orchestrator's runs", () => {
     expect(finished.at(-1)!.outcome).toBe("interrupted");
 
     const failed = await x.failedStart({ by: { kind: "issue" }, issue: "i1" }, "派不出去的", "钥匙没填");
-    expect((await farm.intake.runsOf("i1")).find((r) => r.id === failed)?.outcome).toBe("failed");
+    expect((await farm.intake.runsOf(issueId("i1"))).find((r) => r.id === failed)?.outcome).toBe("failed");
   });
 
   test("close changes execution only when its effect runs", async () => {
@@ -139,7 +142,7 @@ describe("the orchestrator's runs", () => {
   test("restores each persisted run field by its own schema", () => {
     const row = {
       id: "r1",
-      session: "w1",
+      session: sessionId("w1"),
       triggered_by: `{"kind":"runtime"}`,
       heard: null,
       started_at: 0,

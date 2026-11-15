@@ -5,15 +5,15 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_artifact_block_type } from "./types.js"
+import { rowOf, ArtifactId, BlockId, Words_artifact_block_type } from "./types.js"
 
 export interface ArtifactBlocksParams {
-  readonly ["artifact_id"]: string
+  readonly ["artifact_id"]: ArtifactId
 }
 
 export const ArtifactBlocksResult = z.object({
-  ["id"]: z.string(),
-  ["artifact_id"]: z.string(),
+  ["id"]: BlockId,
+  ["artifact_id"]: ArtifactId,
   ["parent_id"]: z.string().nullable(),
   ["order_key"]: z.string(),
   ["type"]: Words_artifact_block_type,
@@ -34,11 +34,11 @@ export async function artifactBlocks(sql: Sql, params: ArtifactBlocksParams): Pr
 }
 
 export interface ArtifactBlockOwnerParams {
-  readonly ["id"]: string
+  readonly ["id"]: BlockId
 }
 
 export const ArtifactBlockOwnerResult = z.object({
-  ["artifact_id"]: z.string(),
+  ["artifact_id"]: ArtifactId,
 })
 export type ArtifactBlockOwnerResult = z.infer<typeof ArtifactBlockOwnerResult>
 
@@ -50,8 +50,8 @@ export async function artifactBlockOwner(sql: Sql, params: ArtifactBlockOwnerPar
 }
 
 export interface PutArtifactBlockParams {
-  readonly ["id"]: string
-  readonly ["artifact_id"]: string
+  readonly ["id"]: BlockId
+  readonly ["artifact_id"]: ArtifactId
   readonly ["parent_id"]: string | null
   readonly ["order_key"]: string
   readonly ["type"]: Words_artifact_block_type

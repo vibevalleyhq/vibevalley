@@ -1,5 +1,6 @@
 import { createEffect, createSignal, onSettled, Show } from "solid-js";
 
+import { shellPath } from "@vibevalley/artifact/shell";
 import { t } from "@vibevalley/i18n";
 import { htmlSandbox } from "@vibevalley/protocol/rules";
 
@@ -11,7 +12,6 @@ import { IconButton } from "#/ui/IconButton.tsx";
 
 import { useArtifact } from "./ArtifactCard";
 import { sendTo, useShown } from "./frame";
-import { shellPath } from "./shell";
 import { elapsedText, presenterOf, slidePostOf, slidesChannelName, stepped } from "./slides";
 
 /** The speaker's window of a deck: this slide, the next, its notes and the time. It and the workbench's tab follow each other. */

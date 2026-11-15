@@ -1,7 +1,11 @@
-import { type Clock, Hub, Queue, type Subscription } from "@vibevalley/async";
+import { type Clock, Hub, isAbort, Queue, type Subscription } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 
 import type { Logger } from "#/infra/log.ts";
+
+export type Fact = Exclude<T.ServerEvent, T.LiveEvent | { type: "snapshot" }>;
+export type CommitCount = NonNullable<T.SpaceState["commits"]>;
+export type SessionPlay = NonNullable<T.SpaceState["plays"]>[string];
 
 export const emptySpaceState = (): T.SpaceState => ({
   call: "idle",
@@ -17,9 +21,9 @@ export const emptySpaceState = (): T.SpaceState => ({
 /** How the state folds a fact and is shown: every module's rules, so it is given at assembly (projection/) and the core
  * reads none of the modules above it. */
 export interface Projection {
-  readonly reduce: (state: T.SpaceState, fact: T.Fact) => [T.SpaceState, boolean];
+  readonly reduce: (state: T.SpaceState, fact: Fact) => [T.SpaceState, boolean];
   /** What a fact sets off on the farm, from the state before it. */
-  readonly effects: (before: T.SpaceState, fact: T.Fact) => T.GameEffect[];
+  readonly effects: (before: T.SpaceState, fact: Fact) => T.GameEffect[];
   /** seq: the core's count of folds the state includes (StateFrame.seq). */
   readonly frame: (state: T.SpaceState, effects?: T.GameEffect[], seq?: number) => T.StateFrame;
 }
@@ -27,12 +31,12 @@ export interface Projection {
 export const stateEveryMs = 200;
 
 /** A fact as a service says it: the time is core's. */
-export type FactIn = T.Fact extends infer F ? (F extends T.Fact ? Omit<F, "at"> : never) : never;
+export type FactIn = Fact extends infer F ? (F extends Fact ? Omit<F, "at"> : never) : never;
 
 /** A fact with exactly the state it changed, even when it is read late. */
 export interface Transition {
   readonly before: T.SpaceState;
-  readonly fact: T.Fact;
+  readonly fact: Fact;
   readonly after: T.SpaceState;
 }
 
@@ -48,7 +52,7 @@ export interface Core {
   readonly apply: (...facts: FactIn[]) => void;
   /** How many commits apply has folded: one more with each that changed the state. */
   readonly seq: () => number;
-  readonly setCommits: (commits: T.CommitCount) => void;
+  readonly setCommits: (commits: CommitCount) => void;
   /** The farm opens when the user starts it or says something: the call goes live unless it is already. */
   readonly open: () => void;
   readonly sessionEvent: (id: T.SessionId, activity: T.SessionEvent) => void;
@@ -61,7 +65,7 @@ export interface Core {
   readonly events: (signal?: AbortSignal) => AsyncIterable<T.ServerEvent>;
   /** Every side event from now on: none applied after this returns is missed. */
   readonly subscribe: () => Subscription<T.ServerEvent>;
-  readonly facts: (signal?: AbortSignal) => AsyncIterable<T.Fact>;
+  readonly facts: (signal?: AbortSignal) => AsyncIterable<Fact>;
   readonly live: (signal?: AbortSignal) => AsyncIterable<T.LiveEvent>;
   /** What the user did from now on: none said after this returns is missed. */
   readonly user: () => Subscription<UserDid>;
@@ -82,7 +86,7 @@ const isLive = (e: T.ServerEvent): e is T.LiveEvent => {
   }
 };
 
-const isFact = (e: T.ServerEvent): e is T.Fact => {
+const isFact = (e: T.ServerEvent): e is Fact => {
   switch (e.type) {
     case "snapshot":
     case "event":
@@ -90,7 +94,7 @@ const isFact = (e: T.ServerEvent): e is T.Fact => {
     case "runtime":
       return false;
     default:
-      return (e satisfies T.Fact) !== undefined;
+      return (e satisfies Fact) !== undefined;
   }
 };
 
@@ -219,6 +223,8 @@ export async function* bounded<A>(source: AsyncIterable<A>, name: string, log: L
   } finally {
     queue.end();
     await it.return?.();
-    await pump.catch(() => undefined);
+    await pump.catch((e: unknown) => {
+      if (!isAbort(e)) log.warn(`${name}: subscription pump failed`, e);
+    });
   }
 }

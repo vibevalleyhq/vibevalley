@@ -19,6 +19,29 @@ export const wallTime: Time = {
   },
 };
 
+export function keyedLater(clock: Time) {
+  const timers = new Map<string, () => void>();
+  let closed = false;
+  return {
+    isClosed: () => closed,
+    schedule: (key: string, ms: number, fire: () => void) => {
+      if (closed || timers.has(key)) return;
+      timers.set(
+        key,
+        clock.after(ms, () => {
+          timers.delete(key);
+          if (!closed) fire();
+        }),
+      );
+    },
+    close: () => {
+      closed = true;
+      for (const cancel of timers.values()) cancel();
+      timers.clear();
+    },
+  };
+}
+
 /** A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and it keeps nothing alive. */
 export const withinRealTime = <A>(p: Promise<A>, ms: number, fallback: A): Promise<A> =>
   Promise.race([p.catch(() => fallback), new Promise<A>((resolve) => setTimeout(() => resolve(fallback), ms).unref())]);

@@ -1,5 +1,7 @@
 import type * as T from "@vibevalley/protocol";
 
+import type { Doing } from "./shapes.ts";
+
 // Finding and changing a session in the core state. Nothing here changes what it is given.
 
 /** On duty: the agent's one standing session, its id the profile's and there from startup. The others are hired for a
@@ -38,4 +40,4 @@ function changed(state: T.SpaceState, id: string, change: (h: T.Session) => T.Se
   return [{ ...state, sessions }, true];
 }
 
-export const doingOf = (h: T.Session): T.Doing => (h.phase._tag === "working" ? h.phase.doing : { action: "none", label: "" });
+export const doingOf = (h: T.Session): Doing => (h.phase._tag === "working" ? h.phase.doing : { action: "none", label: "" });

@@ -25,7 +25,7 @@ export const ArtifactDisplayValues = ["page", "slides", "motion"] as const;
 export type ArtifactDisplay = (typeof ArtifactDisplayValues)[number];
 
 /** Served over GET because <iframe src> cannot POST. */
-export const artifactPrefix = "/api/v1/artifact/";
+const artifactPrefix = "/api/v1/artifact/";
 export const artifactPath = (id: string, version: number) => `${artifactPrefix}${id}/${version}`;
 
 export interface ArtifactCard {

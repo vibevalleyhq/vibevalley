@@ -1,5 +1,5 @@
 import { Hub, Semaphore, type Subscription, TaskGroup } from "@vibevalley/async";
-import { type ChatMessage, type InboxItem } from "@vibevalley/protocol";
+import { type ChatMessage, type InboxItem, type MessageId } from "@vibevalley/protocol";
 import { freshOf } from "@vibevalley/protocol/rules";
 
 import type { Core } from "#/core/core.ts";
@@ -23,7 +23,7 @@ export interface UserInbox {
   readonly toUser: () => Subscription<ChatMessage>;
   /** One round of the patrol, now. */
   readonly patrol: () => Promise<void>;
-  readonly handoffState: (message: string) => Promise<"unseen" | "seen" | undefined>;
+  readonly handoffState: (message: MessageId) => Promise<"unseen" | "seen" | undefined>;
   /** Pending external deliveries changed: a later connector rereads them. */
   readonly externalChanges: () => Subscription<void>;
 }
@@ -50,7 +50,7 @@ export function userInbox(
   const turn = new Semaphore(1);
   const externalHub = new Hub<void>();
 
-  const handoffState = async (id: string) => {
+  const handoffState = async (id: MessageId) => {
     const receipt = await chat.userReceipt(id);
     if (!receipt) return undefined;
     const { message } = receipt;

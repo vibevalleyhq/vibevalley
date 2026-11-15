@@ -1,12 +1,11 @@
 import { z } from "zod";
 
 import { Semaphore, TaskGroup } from "@vibevalley/async";
-import type { Achievement, CommitCount, LedgerEntry } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
+import type { Achievement } from "@vibevalley/protocol";
 
 import { newId } from "#/base/ids.ts";
 import { jsonOrNone, jsonText } from "#/base/json.ts";
-import type { Core } from "#/core/core.ts";
+import type { CommitCount, Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { type Db, SqlError } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
@@ -15,7 +14,17 @@ import type { Repo } from "#/modules/repo/repo.ts";
 import { isHired } from "#/modules/session/roster.ts";
 import * as q from "#db/game_ledger.sql.ts";
 
-import { achievementsInWords, catchUp, entriesFor, type Entry, type Folded, progressFold, progressStep } from "./progress.ts";
+import {
+  achievementsInWords,
+  catchUp,
+  entriesFor,
+  type Entry,
+  type Folded,
+  type LedgerEntry,
+  LedgerEntrySchema,
+  progressFold,
+  progressStep,
+} from "./progress.ts";
 
 /** The person plants on an empty plot and then says what to do; the orchestrator hires a session for it some seconds later. */
 const wantStationForMs = 10_000;
@@ -64,7 +73,7 @@ export async function makeGame(deps: GameDeps): Promise<Game> {
   for (const row of rows) {
     const fields = payloadOf(row.payload);
     if (typeof fields !== "object" || fields === null) continue;
-    const entry = S.LedgerEntry.safeParse({ ...fields, kind: row.kind, at: row.at });
+    const entry = LedgerEntrySchema.safeParse({ ...fields, kind: row.kind, at: row.at });
     if (entry.success) entries.push(entry.data);
   }
   let folded: Folded = progressFold(entries);

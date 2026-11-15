@@ -5,11 +5,11 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf } from "./types.js"
+import { rowOf, MessageId } from "./types.js"
 
 export interface MarkSeenParams {
   readonly ["seen_at"]: number
-  readonly ["message_id"]: string
+  readonly ["message_id"]: MessageId
   readonly ["participant_id"]: string
 }
 

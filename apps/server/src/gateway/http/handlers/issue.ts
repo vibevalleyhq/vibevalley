@@ -29,7 +29,7 @@ export function issueHandlers(deps: IssueHandlersDeps): IssueHandlers {
   const createOnce = requestKeys<T.AppliedIssue>(deps.clock);
   const statusOnce = requestKeys<T.AppliedIssue>(deps.clock);
   return {
-    "issue.conversation.get": async ({ id }) => channels.issueThreadId((await issues.get(id)).id),
+    "issue.conversation.get": async ({ id }) => channels.threadAbout("issue", (await issues.get(id)).id) ?? null,
     "issue.list": (filter) => issues.query(filter),
     "issue.review": async ({ id: ref, ...body }) => issues.review(await issues.idOf(ref), body),
     "issue.split": async ({ id: ref, ...body }) => issues.split(await issues.idOf(ref), body.title ?? "", body.tasks, user),

@@ -80,10 +80,6 @@ export async function app(
   const lines = voiceLines({ voice: farm.voice, log: farm.log.child("http/voice") });
   server.on("upgrade", lines.upgrade);
   served = routes(farm, resolved);
-  // A free port (0) is known only now: sessions opened from here on reach /mcp there.
-  farm.session.setAddress(address);
-  // What the lan listener lets through goes to here.
-  farm.lan.setUpstream(address);
 
   let closing: Promise<void> | undefined;
   const close = () =>

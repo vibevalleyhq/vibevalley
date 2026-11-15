@@ -4,15 +4,15 @@ import type * as T from "@vibevalley/protocol";
 import { BizCode, refuseIn } from "#/base/errors.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { TranscriptionEvent } from "#/platform/provider/vendors.ts";
+import type { TranscriptionEvent, MediaAudioUsage } from "#/platform/provider/vendors.ts";
 
-import { untilAborted } from "./job.ts";
+import { untilAborted, type MediaAudioResult } from "./job.ts";
 
 const refused = refuseIn(BizCode.MediaRefused);
 
 export interface TranscriptionCheckpoint {
-  result: Extract<T.MediaAudioResult, { kind: "transcription" }>;
-  usage?: T.MediaAudioUsage;
+  result: Extract<MediaAudioResult, { kind: "transcription" }>;
+  usage?: MediaAudioUsage;
   complete: boolean;
 }
 interface Ports {
@@ -31,7 +31,7 @@ export async function receiveTranscriptionStream(
   let text = "";
   const segments: T.MediaAudioSegment[] = [];
   const indexes = new Set<number>();
-  let usage: T.MediaAudioUsage | undefined;
+  let usage: MediaAudioUsage | undefined;
   let dirty = false;
   let complete = false;
   let last = -Infinity;

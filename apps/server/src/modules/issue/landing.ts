@@ -6,7 +6,7 @@ import { ApiError, BizCode, lookIn, messageOf, missing, refuseIn } from "#/base/
 import type { Core } from "#/core/core.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import { issueBranch, type Repo } from "#/modules/repo/repo.ts";
+import { issueBranch, type Repo, type PullRequest, type PullRequestState } from "#/modules/repo/repo.ts";
 import { type CheckoutChecks, type Merged, MergeFailure, RepoError, type Workplace } from "#/modules/repo/workplace.ts";
 import { NotTakenIn, type Session } from "#/modules/session/session.ts";
 
@@ -77,10 +77,10 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
     use(await repos.checkout({ repo, issue, worktree: true, base: "" }));
 
   /** A pull request submitted for the issue: told in its thread and kept on it. Throws MergeFailure when it cannot be told. */
-  const pullRequestSubmitted = async (issue: T.Issue, pr: T.PullRequest) => {
+  const pullRequestSubmitted = async (issue: T.Issue, pr: PullRequest) => {
     let thread: string;
     try {
-      thread = await chat.issueThread(issue.id, issue.title);
+      thread = await chat.openThreadAbout("issue", issue.id, issue.title);
     } catch (e) {
       throw e instanceof ApiError ? MergeFailure.error(e.message) : e;
     }
@@ -94,7 +94,7 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
   };
 
   const pullRequestOf = async (place: Workplace, issue: T.Issue, said: string): Promise<Merged> => {
-    let pr: T.PullRequest;
+    let pr: PullRequest;
     try {
       pr = await repos.submitPullRequest(place, issue, pullRequestConclusion(said));
     } catch (e) {
@@ -167,7 +167,7 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
     return submitted.text;
   };
 
-  const finishPullRequest = async (issue: T.Issue, state: T.PullRequestState) => {
+  const finishPullRequest = async (issue: T.Issue, state: PullRequestState) => {
     const closed = state === "closed" ? "dismissed" : "merged";
     const id = latestSessionIdOf(issue);
     if (id && reachable(id)) {

@@ -5,18 +5,18 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf } from "./types.js"
+import { rowOf, IssueId } from "./types.js"
 
 export interface AddAssignmentParams {
   readonly ["id"]: string
-  readonly ["issue"]: string
+  readonly ["issue"]: IssueId
   readonly ["agent"]: string
   readonly ["assigned_at"]: number
 }
 
 export const AddAssignmentResult = z.object({
   ["id"]: z.string(),
-  ["issue"]: z.string(),
+  ["issue"]: IssueId,
   ["agent"]: z.string(),
   ["assigned_at"]: z.number(),
   ["ended_at"]: z.number().nullable(),
@@ -32,13 +32,13 @@ export async function addAssignment(sql: Sql, params: AddAssignmentParams): Prom
 
 export interface EndAssignmentsParams {
   readonly ["ended_at"]: number | null
-  readonly ["issue"]: string
+  readonly ["issue"]: IssueId
   readonly ["agent"]: string | null
 }
 
 export const EndAssignmentsResult = z.object({
   ["id"]: z.string(),
-  ["issue"]: z.string(),
+  ["issue"]: IssueId,
   ["agent"]: z.string(),
   ["assigned_at"]: z.number(),
   ["ended_at"]: z.number().nullable(),
@@ -74,7 +74,7 @@ export interface AllAssignmentsParams {
 
 export const AllAssignmentsResult = z.object({
   ["id"]: z.string(),
-  ["issue"]: z.string(),
+  ["issue"]: IssueId,
   ["agent"]: z.string(),
   ["assigned_at"]: z.number(),
   ["ended_at"]: z.number().nullable(),

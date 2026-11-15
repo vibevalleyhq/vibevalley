@@ -71,8 +71,10 @@ export function devMode(o: { readonly repo: string; readonly server: ServerKeepe
       try {
         const sessions = await new VibeValleyApi(url).session.list({});
         return sessions.filter((s) => s.phase._tag === "working").length;
-      } catch {
-        return 0;
+      } catch (e) {
+        // Unreachable or restarting dev server has no active local sessions.
+        if (e instanceof Error) return 0;
+        throw e;
       }
     },
     restartServer: async () => {

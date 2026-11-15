@@ -1,5 +1,7 @@
 import type * as T from "@vibevalley/protocol";
 
+import type { ActorKind } from "#/base/actor.ts";
+
 import type { DeliveryDraft } from "./deliveries.ts";
 import type { Delivery, DeliveryEvent, Urgency } from "./envelope.ts";
 import { deliveryScope, triggerPayload } from "./payload.ts";
@@ -25,7 +27,7 @@ function triggerEvent(trigger: Pick<Trigger, "actor" | "source" | "meta" | "addr
 
 interface UrgencyInput {
   readonly source: TriggerSource;
-  readonly actor: T.ActorKind;
+  readonly actor: ActorKind;
   readonly recipient: T.AgentRole;
   readonly event: DeliveryEvent;
   readonly canSteer: boolean;

@@ -2,13 +2,14 @@ import { z } from "zod";
 
 import { Hub, Semaphore, type Subscription, TaskGroup } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { Inconsistent } from "#/base/errors.ts";
 import { jsonOf } from "#/base/json.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
-import type { Time } from "#/infra/time.ts";
+import { keyedLater, type Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import * as qd from "#db/session_delivery.sql.ts";
 import * as qr from "#db/session_trigger.sql.ts";
@@ -36,7 +37,7 @@ import { makeWorkMailbox } from "./work.ts";
 export type { SourceEvent };
 
 export interface InsertDelivery {
-  readonly session: string;
+  readonly session: T.SessionId;
   readonly row: DeliveryDraft;
 }
 
@@ -92,7 +93,7 @@ export interface Mailbox {
   readonly news: () => Subscription<DeliveryNews>;
   readonly handBack: (session: string, envelope: string) => Promise<void>;
   /** A channel message's envelope taken back from every delivery that still waits on it. */
-  readonly withdrawEnvelope: (envelope: string) => Promise<void>;
+  readonly withdrawEnvelope: (envelope: T.MessageId) => Promise<void>;
   /** The chat the mailbox reads its places from, told by the layer above it; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
   /** Which waiting inputs may be handed now, told by the layer above it; until then, all. */
@@ -101,7 +102,7 @@ export interface Mailbox {
   readonly holdWakes: (session: string, held: boolean) => Promise<void>;
   /** What agents' words woke since the user last spoke, as kept: where the brakes start from at startup. */
   readonly agentWakes: () => Promise<AgentWakes>;
-  readonly waitingOn: (envelope: string) => Promise<number>;
+  readonly waitingOn: (envelope: T.MessageId) => Promise<number>;
   readonly close: () => Promise<void>;
 }
 
@@ -136,26 +137,17 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
   const writeLock = new Semaphore(1);
   // A write, once begun, runs to its end: none is handed a signal.
   const writtenLocked = <A>(work: () => Promise<A>) => writeLock.with(work);
-  /** One pending timer per key: a later() for a key already waiting is dropped. The key is free again once it fires. */
-  const timers = new Map<string, () => void>();
-  let closed = false;
-  const later = (key: string, ms: number, work: () => Promise<void>) => {
-    if (closed || timers.has(key)) return;
-    timers.set(
-      key,
-      clock.after(ms, () => {
-        timers.delete(key);
-        if (closed) return;
-        tasks.run(`mailbox: ${key}`, () =>
-          bestEffort(log, `mailbox: ${key}`, () =>
-            pumpLocked(async () => {
-              if (!closed) await work();
-            }),
-          ),
-        );
-      }),
-    );
-  };
+  const timers = keyedLater(clock);
+  const later = (key: string, ms: number, work: () => Promise<void>) =>
+    timers.schedule(key, ms, () => {
+      tasks.run(`mailbox: ${key}`, () =>
+        bestEffort(log, `mailbox: ${key}`, () =>
+          pumpLocked(async () => {
+            if (!timers.isClosed()) await work();
+          }),
+        ),
+      );
+    });
   const work = makeWorkMailbox({ db, clock, session: sessions, agent: agents }, { writtenLocked, stored, defaultChannel: defaultChannelOf, open });
   const dispatch = (session: string) => later(`trigger:${session}`, 0, () => pump.kick(session));
   const restore = () =>
@@ -202,7 +194,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     return { hired: session, ...(room.evicted ? { evicted: room.evicted } : {}) };
   };
 
-  const dropSession = (session: string, why: string) =>
+  const dropSession = (session: T.SessionId, why: string) =>
     db.tx(async () => {
       await qd.dropOpen(db.sql, { session_id: session, dropped_why: why });
       await db.afterCommit(() => {
@@ -221,13 +213,15 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
       after = last.seq;
     }
   };
-  const handBack = (session: string, envelope: string) =>
-    writtenLocked(() =>
+  const handBack = (rawSession: string, envelope: string) => {
+    const session = sessionId(rawSession);
+    return writtenLocked(() =>
       db.tx(async () => {
         await qd.rollbackOne(db.sql, { session_id: session, envelope_id: envelope });
         await db.afterCommit(() => open.handedBackOne(session, envelope));
       }),
     );
+  };
 
   const handToHost = async (recipient: string, messages: readonly Envelope[], primary: DeliveryRow) => {
     const meta = primary.payload.trigger.meta;
@@ -248,24 +242,28 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     { session: sessions, clock, log },
     {
       pending: (session) => open.of(session),
-      dropSession: (session, why) => writtenLocked(() => dropSession(session, why)),
+      dropSession: (session, why) => writtenLocked(() => dropSession(sessionId(session), why)),
       handBack,
       hand: work.hand,
-      consume: (session, envelope, at) =>
-        writtenLocked(() =>
+      consume: (rawSession, envelope, at) => {
+        const session = sessionId(rawSession);
+        return writtenLocked(() =>
           db.tx(async () => {
             await qd.consumeDelivery(db.sql, { session_id: session, envelope_id: envelope, consumed_at: at });
             await db.afterCommit(() => open.remove(session, envelope));
           }),
-        ),
-      returnHanded: (session) =>
-        writtenLocked(() =>
+        );
+      },
+      returnHanded: (rawSession) => {
+        const session = sessionId(rawSession);
+        return writtenLocked(() =>
           db.tx(async () => {
             const rows = await qd.rollbackHanded(db.sql, { session_id: session });
             await db.afterCommit(() => open.handedBack(session));
             return rows.map((row) => row.envelope_id);
           }),
-        ),
+        );
+      },
       emptyWake: (session) => newsHub.publish({ _tag: "EmptyWake", session }),
       braked: (session) => braked.has(session),
 
@@ -278,7 +276,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
         const ready = readiness(inputs);
         return rows.filter((_, i) => ready[i] === true);
       },
-      closed: () => closed,
+      closed: () => timers.isClosed(),
       isHosted: agents.isHosted,
       message: (row) => inputOf(row),
       wakeInput: async (recipient, _rows, messages) => {
@@ -362,8 +360,14 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
       readiness = ready;
     },
     holdWakes: async (session, held) => {
-      if (held) braked.add(session);
-      else if (braked.delete(session)) await pumpLocked(() => pump.kick(session));
+      const changed = await writtenLocked(async () => {
+        if (held) {
+          braked.add(session);
+          return false;
+        }
+        return braked.delete(session);
+      });
+      if (changed) await pumpLocked(() => pump.kick(session));
     },
     agentWakes: async () => {
       const [scopes, last] = await Promise.all([qd.agentWakesByScope(db.sql), qd.lastAgentWakes(db.sql)]);
@@ -374,9 +378,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     },
     waitingOn: async (envelope) => (await qd.waitingOn(db.sql, { message_id: envelope })).length,
     close: async () => {
-      closed = true;
-      for (const cancel of timers.values()) cancel();
-      timers.clear();
+      timers.close();
       await tasks.close();
       newsHub.end();
     },

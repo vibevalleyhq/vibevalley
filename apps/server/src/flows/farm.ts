@@ -3,6 +3,7 @@ import type { ScriptedTurn } from "@botiverse/oar/testing";
 
 import type * as T from "@vibevalley/protocol";
 
+import type { Fact } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { type Game, makeGame } from "#/modules/game/game.ts";
 import { makeOrchestrator } from "#/modules/orchestrator/orchestrator.ts";
@@ -63,11 +64,11 @@ export function farm(
   };
 }
 
-type Reported = Extract<T.Fact, { type: "sessionReported" }>;
+type Reported = Extract<Fact, { type: "sessionReported" }>;
 
 /** Every fact and notice from now on, kept as they come; it stops with the farm's core. */
 export function watch(w: { readonly core: World["core"] }) {
-  const facts: T.Fact[] = [];
+  const facts: Fact[] = [];
   const notes: string[] = [];
   const events = w.core.subscribe();
   const reading = (async () => {

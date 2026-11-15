@@ -26,3 +26,5 @@ export async function committedDelivery(db: Db, input: InsertDelivery): Promise<
     await qr.markRouted(db.sql, { envelope_id: input.row.payload.trigger.id, scope: input.row.scope, routed_at: input.row.created_at });
   });
 }
+
+export const allOpenDeliveries = (db: Db) => qd.allOpenDeliveries(db.sql);

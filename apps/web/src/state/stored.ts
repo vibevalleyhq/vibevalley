@@ -5,12 +5,13 @@ import { type Atom, onPage, type PageAtom } from "./atom";
 /** Every key the page keeps starts with this; public/opening.html reads `prefs` under it before any script. */
 const storedPrefix = "vibevalley.";
 
-// A storage that cannot be reached (none, a sandboxed frame's, a full one) throws: the choice then lives for the page's life.
 function attempt<T>(f: () => T): T | undefined {
   try {
     return f();
-  } catch {
-    return undefined;
+  } catch (e) {
+    // Unavailable, sandboxed, or quota-exceeded storage, or corrupt JSON: choice lives for the page's life.
+    if (e instanceof Error) return undefined;
+    throw e;
   }
 }
 

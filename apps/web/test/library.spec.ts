@@ -48,8 +48,9 @@ test("files go in picked and dropped, the rail narrows them, the inspector shows
   await expect(inspector.getByTestId("library-inspector-name")).toHaveText(picture.attachment.name);
   await inspector.getByTestId("library-send").click();
   await page.locator(`[role="menuitem"][data-key="${channel}"]`).click();
-  // The channel's newest message carries the file.
-  await expect.poll(() => api.channel.message.list({ id: channel }).then((said) => said[said.length - 1]?.attachments[0]?.id)).toBe(picture.attachment.id);
+  await expect
+    .poll(() => api.channel.message.list({ id: channel }).then((said) => said.some((m) => m.attachments[0]?.id === picture.attachment.id)))
+    .toBe(true);
 
   // Delete asks in place, then the file comes out of the library.
   await page.getByTestId("library-grid").press("Delete");

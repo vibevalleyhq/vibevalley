@@ -43,8 +43,10 @@ const writable = (path: string) => {
   try {
     accessSync(path, constants.W_OK);
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    // Unwritable app bundle location disables in-place self-update.
+    if (e instanceof Error) return false;
+    throw e;
   }
 };
 

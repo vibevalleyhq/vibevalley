@@ -1,8 +1,8 @@
 import { withTimeout } from "@vibevalley/async";
-import { attachmentMax } from "@vibevalley/protocol";
 
 import { type PublicFetch, publicHttps } from "#/infra/publicHttp.ts";
 import type { Time } from "#/infra/time.ts";
+import { attachmentMax } from "#/platform/attachment/attachment.ts";
 
 import { validPng } from "./png.ts";
 

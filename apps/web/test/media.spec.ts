@@ -93,7 +93,7 @@ test("regression: an image is generated, saved, published once and referenced by
   const published = page.waitForResponse((response) => response.url().endsWith("/api/v1/channel/message/send"));
   await card.getByTestId("media-publish").click();
   const receipt = await published;
-  expect(receipt.status(), await receipt.text()).toBe(204);
+  expect(receipt.status(), await receipt.text()).toBe(200);
   await expect(card.getByTestId("media-publish")).toHaveAttribute("data-published", "true");
   await page.reload();
   await expect(card).toHaveAttribute("data-phase", "ready");

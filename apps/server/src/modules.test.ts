@@ -61,6 +61,21 @@ const sources = () =>
     .filter((file) => !file.endsWith(".test.ts") && !outside.includes(rel(file).split("/")[0]!))
     .map((file) => inspect(file, readFileSync(file, "utf8"))));
 
+let testSnapshot: ReturnType<typeof inspect>[] | undefined;
+const moduleTests = () =>
+  (testSnapshot ??= ["platform", "modules"].flatMap((dir) =>
+    files(join(src, dir))
+      .filter((file) => file.endsWith(".test.ts"))
+      .map((file) => inspect(file, readFileSync(file, "utf8"))),
+  ));
+
+const testBoundaryLeaks = (source: ReturnType<typeof inspect>) => [
+  ...source.local
+    .filter((to) => (to.startsWith("platform/") || to.startsWith("modules/")) && moduleOf(to) !== moduleOf(source.from) && rank(to) > rank(source.from))
+    .map((to) => `${source.from} -> ${to}`),
+  ...foreignQueries(source.file, source.edges).map((query) => `${source.from} -> ${query}`),
+];
+
 const foreignReads: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {};
 const folders = containers.flatMap((c) => readdirSync(join(src, c)).filter((name) => statSync(join(src, c, name)).isDirectory()));
 const tableModule = (name: string) => {
@@ -317,5 +332,27 @@ describe("the modules", () => {
     expect(mailboxLeaks(inspect(payload, 'export { triggerJournal } from "./triggers.ts";'))).toEqual(["modules/session/triggers.ts"]);
     expect(mailboxLeaks(inspect(payload, 'import { Db } from "#/infra/db.ts";'))).toEqual(["infra/db.ts"]);
     expect(mailboxLeaks(inspect(payload, 'import * as q from "#db/session_trigger.sql.ts";')).toSorted()).toEqual(["#db/session_trigger.sql.ts"]);
+  });
+
+  it("keep module tests within their own module's order and table queries", () => {
+    const found = moduleTests().flatMap(testBoundaryLeaks);
+    expect(
+      found,
+      "a test under platform/ or modules/ imports a domain module ranked after its own in modules.ts or another module's #db/*.sql.ts queries. Fix: move cross-module test harnesses to src/testing/ (or full-stack tests to src/flows/), move misplaced unit assertions to the owning module's test, and keep direct #db/ queries to the module's own tables. See docs/style/module-design.md",
+    ).toEqual([]);
+  });
+
+  it("regression: module test check catches upward domain imports and foreign table queries", () => {
+    const agentTest = join(src, "modules/agent/agent.test.ts");
+    const issueTest = join(src, "modules/issue/github.test.ts");
+    expect(testBoundaryLeaks(inspect(agentTest, 'import { instructions } from "#/modules/session/briefing.ts";'))).toEqual([
+      "modules/agent/agent.test.ts -> modules/session/briefing.ts",
+    ]);
+    expect(testBoundaryLeaks(inspect(issueTest, 'import { allOpenDeliveries } from "#db/session_delivery.sql.ts";'))).toEqual([
+      "modules/issue/github.test.ts -> session_delivery.sql.ts:allOpenDeliveries",
+    ]);
+    expect(
+      testBoundaryLeaks(inspect(issueTest, 'import { moduleWorld } from "#/testing/world.ts";\nimport * as qe from "#db/issue_github_event.sql.ts";')),
+    ).toEqual([]);
   });
 });

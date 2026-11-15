@@ -31,8 +31,9 @@ export function FarmScreen({ farm, forgotten }: { farm: Farm; forgotten: () => v
     let m: unknown;
     try {
       m = JSON.parse(e.nativeEvent.data);
-    } catch {
-      return;
+    } catch (err) {
+      if (err instanceof SyntaxError) return;
+      throw err;
     }
     for (const fn of ears.current) fn(m);
   };

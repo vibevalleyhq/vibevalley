@@ -79,7 +79,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 | 跨异步的状态 | 普通的变量或字段；有 `await` 夹在读和写之间时，读改写包进同一把锁 |
 | 一条队列 | `Queue`（`unbounded`、`sliding`、`dropping`） |
 | 给很多读者的新闻 | `Hub`；读者 `using sub = hub.subscribe()`，`for await (const x of sub)` |
-| 一串值 | `AsyncIterable`，写成 `async function*`；`merge`、`map`、`lines`、`collect`、`mapConcurrent` |
+| 一串值 | `AsyncIterable`，写成 `async function*`；`merge`、`lines`、`collect`、`mapConcurrent` |
 | 等一个将来的值 | `Promise.withResolvers()` |
 | 现在几点、等一会儿 | `deps.clock.now()`、`await deps.clock.sleep(ms, signal)`；不直接 `Date.now()`、`setTimeout`（lint 查） |
 | 超时 | `await withTimeout((signal) => f(signal), ms, { clock })` |

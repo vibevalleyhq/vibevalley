@@ -26,8 +26,9 @@ export function internalUrl(to: string, base: string): URL | undefined {
     const url = new URL(to, base);
     const origin = new URL(base).origin;
     return (url.protocol === "http:" || url.protocol === "https:") && url.origin === origin ? url : undefined;
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (e instanceof TypeError) return undefined;
+    throw e;
   }
 }
 
@@ -37,8 +38,9 @@ export function linkHref(to: string, base: string): string | undefined {
     if (url.protocol === "mailto:" || url.protocol === "tel:") return url.href;
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
     return url.origin === new URL(base).origin ? locationOf(url).href : url.href;
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (e instanceof TypeError) return undefined;
+    throw e;
   }
 }
 

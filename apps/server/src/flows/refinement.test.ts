@@ -60,7 +60,7 @@ describe("a refined issue", () => {
     expect(drafted.status).toBe("backlog");
     expect(sessionIdsOf(drafted)).toEqual([]);
     expect(existsSync(join(f.config.workRoot, "repos", "board"))).toBe(false);
-    const thread = await chat.issueThread(issue.id, issue.title);
+    const thread = await chat.openThreadAbout("issue", issue.id, issue.title);
     const messages = await chat.history(thread);
     expect(messages.filter((m) => m.actor.kind === "user").map((m) => m.text)).toEqual(["只讨论桌面端，不做移动端", "看板拖卡", "用 8797"]);
     expect(messages.some((m) => m.text.includes("看板拖卡改用 8797"))).toBe(true);

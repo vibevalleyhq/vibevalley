@@ -186,6 +186,21 @@ test("regression: releasing a design preview keeps its channel attachment and a 
   expect([generations, clones]).toEqual([1, 1]);
 });
 
+const queuedVoiceDesignJob = (request: T.MediaVoiceDesignRequest, now: number) =>
+  newJob({
+    phase: "queued",
+    id: request.id,
+    kind: "voiceDesign",
+    request: JSON.stringify({ ...request, kind: "voiceDesign" }),
+    source: JSON.stringify({ kind: "user" }),
+    input: null,
+    connection: "moss",
+    revision: 1,
+    model: "moss-voice-generator-1.0",
+    fingerprint: "test",
+    now,
+  });
+
 test.each(["queued", "generating", "downloading"] as const)(
   "regression: %s audio jobs cannot release assets while local processing is active",
   async (phase) => {
@@ -194,22 +209,7 @@ test.each(["queued", "generating", "downloading"] as const)(
     const db = f.farm.db;
     const now = f.clock.now();
     const request: T.MediaVoiceDesignRequest = { id: "not-terminal", connection: "moss", revision: 1, text: "Hello.", instruction: "Warm.", format: "wav" };
-    await q.insertMediaJob(
-      db.sql,
-      newJob({
-        phase: "queued",
-        id: request.id,
-        kind: "voiceDesign",
-        request: JSON.stringify({ ...request, kind: "voiceDesign" }),
-        source: JSON.stringify({ kind: "user" }),
-        input: null,
-        connection: "moss",
-        revision: 1,
-        model: "moss-voice-generator-1.0",
-        fingerprint: "test",
-        now,
-      }),
-    );
+    await q.insertMediaJob(db.sql, queuedVoiceDesignJob(request, now));
     const row = await q.mediaJob(db.sql, { id: request.id });
     if (!row) throw new Error("Missing seeded job");
     await q.changeMediaJob(db.sql, { ...row, phase, now });
@@ -254,22 +254,7 @@ test.each(["unknown", "canceled", "download_failed"] as const)(
         content_type: "audio/pcm",
       };
       if ("instruction" in request) {
-        await q.insertMediaJob(
-          db.sql,
-          newJob({
-            phase: "queued",
-            id: request.id,
-            kind: "voiceDesign",
-            request: JSON.stringify({ ...request, kind: "voiceDesign" }),
-            source: JSON.stringify({ kind: "user" }),
-            input: null,
-            connection: "moss",
-            revision: 1,
-            model: "moss-voice-generator-1.0",
-            fingerprint: "test",
-            now,
-          }),
-        );
+        await q.insertMediaJob(db.sql, queuedVoiceDesignJob(request, now));
         const row = await q.mediaJob(db.sql, { id: request.id });
         if (!row) throw new Error("Missing design job");
         await q.changeMediaJob(db.sql, { ...row, ...patch });

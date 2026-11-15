@@ -5,15 +5,15 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf } from "./types.js"
+import { rowOf, IssueId } from "./types.js"
 
 export interface SubscribeIssueParams {
   readonly ["thread_key"]: string
-  readonly ["issue_id"]: string
+  readonly ["issue_id"]: IssueId
 }
 
 export const SubscribeIssueResult = z.object({
-  ["issue_id"]: z.string(),
+  ["issue_id"]: IssueId,
 })
 export type SubscribeIssueResult = z.infer<typeof SubscribeIssueResult>
 
@@ -29,7 +29,7 @@ export interface SubscribedIssuesParams {
 }
 
 export const SubscribedIssuesResult = z.object({
-  ["issue_id"]: z.string(),
+  ["issue_id"]: IssueId,
 })
 export type SubscribedIssuesResult = z.infer<typeof SubscribedIssuesResult>
 

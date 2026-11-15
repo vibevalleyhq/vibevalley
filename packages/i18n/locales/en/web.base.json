@@ -13,6 +13,10 @@
       "label": "Tickets",
       "hint": "Every ticket from written to closed"
     },
+    "terminal": {
+      "label": "Terminal",
+      "hint": "Local shells in repos and ticket worktrees"
+    },
     "agents": {
       "label": "Profiles",
       "hint": "Profiles: assistants and helpers"

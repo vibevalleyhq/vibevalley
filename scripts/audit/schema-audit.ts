@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import * as T from "@vibevalley/protocol";
@@ -14,6 +14,9 @@ const serverLiterals = (file: string, name: string): readonly string[] => {
   return [...list.matchAll(/\x22([^\x22]*)\x22/gu)].map((m) => m[1] ?? "");
 };
 const TriggerSourceValues = serverLiterals("apps/server/src/modules/session/shapes.ts", "TriggerSourceValues");
+const SessionCloseValues = serverLiterals("packages/protocol/src/session/shapes.ts", "SessionCloseValues");
+const MediaPhaseValues = serverLiterals("packages/protocol/src/media/shapes.ts", "MediaPhaseValues");
+const MediaUnderstandingPhaseValues = serverLiterals("packages/protocol/src/media/shapes.ts", "MediaUnderstandingPhaseValues");
 const sqlPath = "apps/server/db/migrations/0001_schema.up.sql";
 const boundaryDocs = "docs/subsystems/foundation.md#边界审计";
 
@@ -29,7 +32,7 @@ type ReviewCategory =
   | "json-parse-review";
 
 export interface Finding {
-  readonly category: ReviewCategory | "db-enum-mismatch" | "secret-exposure" | "unbranded-id" | "bizcode-registry";
+  readonly category: ReviewCategory | "db-enum-mismatch" | "db-unbranded-id" | "secret-exposure" | "unbranded-id" | "bizcode-registry";
   readonly location: string;
   readonly detail: string;
 }
@@ -50,19 +53,22 @@ export function formatFinding(finding: Finding): string {
   const advice =
     finding.category === "db-enum-mismatch"
       ? "Fix: align this column's CHECK with its named protocol enum; update the mapping only if the domain relationship changed"
-      : finding.category === "secret-exposure"
-        ? "Fix: keep a secret a `Secret` (secretOf(...)) on the way out: the protocol never calls `.reveal()`, and `Secret` keeps a `toJSON` that throws and a `toString` that prints [secret]"
-        : finding.category === "unbranded-id"
-          ? "Fix: use the branded entity ID (`IssueId`, `SessionId`, `ArtifactId`, `BlockId`, `SuggestionId`, `MessageId`) on domain shapes; keep raw `string` only on `*Request` / `*Input` boundaries"
-          : finding.category === "bizcode-registry"
-            ? "Fix: register each business error code in BizCode as a unique six-digit integer (100000..999999) with matching BizErrorCodeValues and bizCodeMeta entries"
-            : `Review: ${reviewAdvice[finding.category]}`;
+      : finding.category === "db-unbranded-id"
+        ? "Fix: keep tableBrands in apps/server/scripts/pg-generate.ts aligned with protocol entity IDs and run `vp run --filter @vibevalley/server db:generate`"
+        : finding.category === "secret-exposure"
+          ? "Fix: keep a secret a `Secret` (secretOf(...)) on the way out: the protocol never calls `.reveal()`, and `Secret` keeps a `toJSON` that throws and a `toString` that prints [secret]"
+          : finding.category === "unbranded-id"
+            ? "Fix: use the branded entity ID (`IssueId`, `SessionId`, `ArtifactId`, `BlockId`, `SuggestionId`, `MessageId`) on domain shapes; keep raw `string` only on `*Request` / `*Input` boundaries"
+            : finding.category === "bizcode-registry"
+              ? "Fix: register each business error code in BizCode as a unique six-digit integer (100000..999999) with matching BizErrorCodeValues and bizCodeMeta entries"
+              : `Review: ${reviewAdvice[finding.category]}`;
   return `${finding.category} at ${finding.location}: ${finding.detail}. ${advice}. See ${boundaryDocs}`;
 }
 
 export function isBoundaryViolation(finding: Finding): boolean {
   return (
     finding.category === "db-enum-mismatch" ||
+    finding.category === "db-unbranded-id" ||
     finding.category === "secret-exposure" ||
     finding.category === "unbranded-id" ||
     finding.category === "bizcode-registry"
@@ -203,7 +209,7 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "issue.canceled", protocol: "IssueCanceledValues", values: T.IssueCanceledValues },
   { column: "issue.deliver", protocol: "DeliverableValues", values: T.DeliverableValues },
   { column: "session.role", protocol: "AgentRoleValues", values: T.AgentRoleValues },
-  { column: "session.closed", protocol: "SessionCloseValues", values: T.SessionCloseValues },
+  { column: "session.closed", protocol: "SessionCloseValues", values: SessionCloseValues },
   { column: "session_run.outcome", protocol: "OutcomeValues", values: T.OutcomeValues },
   { column: "session_delivery.source", protocol: "TriggerSourceValues", values: TriggerSourceValues },
   { column: "issue_cron.set_by", protocol: "ActorKindValues", values: T.ActorKindValues },
@@ -218,7 +224,7 @@ const storedEnums: readonly StoredEnum[] = [
   {
     column: "media_job.phase",
     protocol: "MediaPhaseValues and MediaUnderstandingPhaseValues",
-    values: [...new Set([...T.MediaUnderstandingPhaseValues, ...T.MediaPhaseValues])],
+    values: [...new Set([...MediaUnderstandingPhaseValues, ...MediaPhaseValues])],
   },
   {
     column: "media_job.kind",
@@ -345,6 +351,87 @@ export function reviewSchemaSources(sources: ReadonlyMap<string, string>): Findi
   return findings;
 }
 
+export const brandedDbTables: Readonly<Record<string, string>> = {
+  issue: "IssueId",
+  session: "SessionId",
+  artifact: "ArtifactId",
+  artifact_block: "BlockId",
+  artifact_suggestion: "SuggestionId",
+  channel_message: "MessageId",
+};
+
+export function auditGeneratedDbBrands(
+  sql: string,
+  generatedSources: ReadonlyMap<string, string>,
+  tables: Readonly<Record<string, string>> = brandedDbTables,
+): Finding[] {
+  const source = sqlWithoutComments(sql);
+  const brandOf = new Map<string, string>();
+  const fks: { readonly src: string; readonly dst: string }[] = [];
+  for (const match of source.matchAll(/\bcreate\s+table\s+(\w+)\s*\(([\s\S]*?)\)\s*;/giu)) {
+    const table = match[1]!.toLowerCase();
+    const body = match[2]!;
+    const pkCol = (/(?:^|,)\s*(\w+)\s+text\b[^,]*?\bprimary\s+key\b/iu.exec(body)?.[1] ?? /\bprimary\s+key\s*\(\s*(\w+)\s*\)/iu.exec(body)?.[1])?.toLowerCase();
+    if (pkCol && tables[table]) brandOf.set(`${table}.${pkCol}`, tables[table]);
+    for (const fk of body.matchAll(/(?:^|,)\s*(\w+)\s+text\b[^,]*?\breferences\s+(\w+)(?:\s*\(\s*(\w+)\s*\))?/giu)) {
+      const col = fk[1]!.toLowerCase();
+      if (!["foreign", "primary", "unique", "check", "constraint"].includes(col))
+        fks.push({ src: `${table}.${col}`, dst: `${fk[2]!.toLowerCase()}.${(fk[3] ?? "id").toLowerCase()}` });
+    }
+    for (const fk of body.matchAll(/\bforeign\s+key\s*\(\s*(\w+)\s*\)\s*references\s+(\w+)\s*\(\s*(\w+)\s*\)/giu))
+      fks.push({ src: `${table}.${fk[1]!.toLowerCase()}`, dst: `${fk[2]!.toLowerCase()}.${fk[3]!.toLowerCase()}` });
+  }
+  for (let more = true; more;) {
+    more = false;
+    for (const fk of fks) {
+      const brand = brandOf.get(fk.dst);
+      if (brand && !brandOf.has(fk.src)) {
+        brandOf.set(fk.src, brand);
+        more = true;
+      }
+    }
+  }
+
+  const findings: Finding[] = [];
+  const typesPath = "apps/server/db/generated/types.ts";
+  const typesSource = generatedSources.get(typesPath);
+  if (typesSource !== undefined) {
+    for (const brand of new Set(Object.values(tables))) {
+      if (!new RegExp(`\\bexport\\s+const\\s+${brand}\\s*=\\s*branded\\(`, "u").test(typesSource)) {
+        findings.push({ category: "db-unbranded-id", location: `${typesPath}:1`, detail: `missing branded codec \`export const ${brand} = branded(...)\`` });
+      }
+    }
+  }
+
+  for (const [path, genSource] of generatedSources) {
+    const fileMatch = /^apps\/server\/db\/generated\/(\w+)\.sql\.ts$/u.exec(path);
+    if (!fileMatch) continue;
+    const table = fileMatch[1]!.toLowerCase();
+    for (const block of genSource.matchAll(/export const (\w+)Result = z\.object\(\{([\s\S]*?)\}\)[\s\S]*?export const \1Sql = ("(?:\\.|[^"\\])*")/gu)) {
+      const resultName = `${block[1]!}Result`;
+      const fields = block[2]!;
+      const fieldsOffset = block.index + block[0].indexOf("{") + 1;
+      const querySql = sqlWithoutComments(String(JSON.parse(block[3]!)));
+      if (/\bunion\b/iu.test(querySql)) continue;
+      const target = /\b(?:select\b[\s\S]*?\bfrom|insert\s+into|update|delete\s+from)\s+(\w+)/iu.exec(querySql)?.[1]?.toLowerCase();
+      if (target !== table) continue;
+      for (const [key, brand] of brandOf) {
+        const [colTable, col] = key.split(".");
+        if (colTable !== table) continue;
+        const fieldMatch = new RegExp(`\\["${col}"\\]:\\s*([^,\\n]+)`, "u").exec(fields);
+        if (!fieldMatch || fieldMatch[1]!.trim().startsWith(brand)) continue;
+        const line = genSource.slice(0, fieldsOffset + fieldMatch.index).split("\n").length;
+        findings.push({
+          category: "db-unbranded-id",
+          location: `${path}:${line}`,
+          detail: `${resultName}.${col} (${key}): expected ${brand}, got ${fieldMatch[1]!.trim()}`,
+        });
+      }
+    }
+  }
+  return findings;
+}
+
 export function scanSchemaBoundaries(): Finding[] {
   const files = execFileSync(
     "git",
@@ -367,7 +454,15 @@ export function scanSchemaBoundaries(): Finding[] {
         existsSync(resolve(root, path)),
     );
   const sources = new Map([...new Set(files)].toSorted().map((path) => [path, readFileSync(resolve(root, path), "utf8")]));
-  return [...reviewSchemaSources(sources), ...compareStoredEnums(readFileSync(resolve(root, sqlPath), "utf8"), storedEnums)];
+  const generatedDir = "apps/server/db/generated";
+  const generatedSources = new Map(
+    readdirSync(resolve(root, generatedDir))
+      .filter((name) => name.endsWith(".ts"))
+      .toSorted()
+      .map((name) => [`${generatedDir}/${name}`, readFileSync(resolve(root, generatedDir, name), "utf8")]),
+  );
+  const sql = readFileSync(resolve(root, sqlPath), "utf8");
+  return [...reviewSchemaSources(sources), ...compareStoredEnums(sql, storedEnums), ...auditGeneratedDbBrands(sql, generatedSources)];
 }
 
 if (import.meta.main) {

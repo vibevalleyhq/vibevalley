@@ -97,8 +97,9 @@ function resourceRef(uri: string): ResourceRef | undefined {
   let parsed: URL;
   try {
     parsed = new URL(uri);
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (e instanceof TypeError) return undefined;
+    throw e;
   }
   if (parsed.protocol !== "vv:" || parsed.username || parsed.password || parsed.port || parsed.search || parsed.hash) return undefined;
   let path: string[];
@@ -107,8 +108,9 @@ function resourceRef(uri: string): ResourceRef | undefined {
       .split("/")
       .filter(Boolean)
       .map((part) => decodeURIComponent(part));
-  } catch {
-    return undefined;
+  } catch (e) {
+    if (e instanceof URIError) return undefined;
+    throw e;
   }
   const [first, second, third, fourth, fifth] = path;
   switch (parsed.hostname) {
@@ -223,7 +225,9 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
       case "issue": {
         const issue = await issues.get(ref.id);
         if (!orchestrator && (session === undefined || !(await mayReadIssue(session, issue)))) throw refuse(resourceWords.forbidden(uri));
-        return textOf({ issue, runs: await issues.runs(issue.id), messages: await channels.issueMessages(issue.id) });
+        const thread = channels.threadAbout("issue", issue.id);
+        const messages = thread ? (await channels.recentRows(thread, 50)).map(channels.addressedOf) : [];
+        return textOf({ issue, runs: await issues.runs(issue.id), messages });
       }
       case "channel": {
         if (!orchestrator && (session === undefined || !(await mayReadChannel(session, ref.id)))) throw refuse(resourceWords.forbidden(uri));

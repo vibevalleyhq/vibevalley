@@ -13,7 +13,16 @@ import { GitError, gitQuiet, reason, run } from "./git.ts";
 import { hostedOrigin } from "./hosting.ts";
 import { repository } from "./repository.ts";
 import { lexists } from "./stats.ts";
-import { type Merged, RepoError, type RepoFolder, pullRequestFile, pullRequestText, type Workplace } from "./workplace.ts";
+import {
+  type Merged,
+  type PullRequest,
+  type PullRequestState,
+  RepoError,
+  type RepoFolder,
+  pullRequestFile,
+  pullRequestText,
+  type Workplace,
+} from "./workplace.ts";
 
 export const cloneTimeoutMs = 3 * 60_000;
 
@@ -132,7 +141,7 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
       capabilities = next;
       return probed;
     },
-    submitPullRequest: async (place: Workplace, issue: T.Issue, conclusion: string, signal?: AbortSignal): Promise<T.PullRequest> => {
+    submitPullRequest: async (place: Workplace, issue: T.Issue, conclusion: string, signal?: AbortSignal): Promise<PullRequest> => {
       const branch = place.branch;
       if (!branch || branch !== issueBranch(issue.number)) throw fail(t("server.repo.github.wrongBranch"));
       const path = join(root, place.repo);
@@ -165,7 +174,7 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
       if (!result.url || result.number === undefined) throw fail(t("server.repo.github.urlUnread"));
       return { url: result.url, number: result.number, state: "open" };
     },
-    pullRequestState: async (name: string, n: number): Promise<T.PullRequestState> => {
+    pullRequestState: async (name: string, n: number): Promise<PullRequestState> => {
       const repo = await githubRemote(name);
       const viewed = await gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
       if (!viewed.ok) throw fail(t("server.repo.github.viewFailed", { n }));
@@ -177,18 +186,6 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
       throw fail(t("server.repo.github.stateUnknown", { n }));
     },
     githubRemote,
-    resolveReviewThread: async (name: string, thread: string): Promise<void> => {
-      await githubRemote(name);
-      const resolved = await gh(
-        "api",
-        "graphql",
-        "-f",
-        "query=mutation($thread:ID!){resolveReviewThread(input:{threadId:$thread}){thread{id isResolved}}}",
-        "-F",
-        `thread=${thread}`,
-      );
-      if (!resolved.ok) throw fail(t("server.repo.github.resolveFailed"));
-    },
     finishPullRequest: (name: string, n: number): Promise<Merged> =>
       serially(name, async () => {
         if (usesPullRequests(name)) await syncMain(name);

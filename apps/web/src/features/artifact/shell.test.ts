@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { selectionOf, shellPath } from "./shell";
+import { selectionOf, shellPath } from "@vibevalley/artifact/shell";
 
 test("a frame's message is the shell's selection only in its one shape", () => {
   const anchor = { kind: "text", exact: "brave", prefix: "Hello ", suffix: " world" };

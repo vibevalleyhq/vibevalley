@@ -10,14 +10,14 @@ import { jsonOf } from "#/base/json.ts";
 
 import type { Envelope, Handed } from "./envelope.ts";
 import * as MS from "./schema.ts";
-import type { Trigger, TriggerAddressing, TriggerContext, TriggerMeta, TriggerSource } from "./shapes.ts";
+import type { Trigger, TriggerAddressing, TriggerContext, TriggerMeta, TriggerSource, ChannelType } from "./shapes.ts";
 
 export type InputContext = TriggerContext;
 export interface DeliveryPayload {
   readonly note?: string;
   readonly trigger: Trigger;
   readonly context: InputContext;
-  readonly channelType: T.ChannelType;
+  readonly channelType: ChannelType;
 }
 
 const Payload = z.object({

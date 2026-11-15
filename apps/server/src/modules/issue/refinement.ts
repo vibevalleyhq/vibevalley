@@ -76,7 +76,7 @@ export function refinement(d: RefinementDeps) {
     });
   };
 
-  const refined = (id: string, draftResult: IssueRefinement, questions: readonly T.Question[] | undefined) =>
+  const refined = (id: T.IssueId, draftResult: IssueRefinement, questions: readonly T.Question[] | undefined) =>
     saveRefinement(id, draftResult.title, refinementDescription(draftResult), kept(draftResult.criteria), questions);
 
   const draft = (id: string, word: string, channel: string): Promise<T.Issue> =>
@@ -88,7 +88,7 @@ export function refinement(d: RefinementDeps) {
       const chosen = await refiner(item);
       const where = item.repo ?? chosen.workdir.trim();
       const said = word.trim();
-      const thread = await chat.issueThread(item.id, item.title, channel || undefined);
+      const thread = await chat.openThreadAbout("issue", item.id, item.title, channel || undefined);
       const history = await chat.history(thread, undefined, 40);
       const brief = refinementBrief(item, said, where, history.map((message) => message.text).join("\n\n"));
       if (said) await chat.say({ text: said, channel: thread, sendKey: "" });

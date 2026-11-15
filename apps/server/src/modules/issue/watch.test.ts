@@ -9,7 +9,6 @@ import { makeFrameOf } from "#/gateway/projection/frame.ts";
 import { reduce } from "#/gateway/projection/reduce.ts";
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { effectsOf } from "#/modules/game/view.ts";
 
 import { watchIssue } from "./watch.ts";
 
@@ -33,7 +32,7 @@ const issue: T.Issue = {
   checks: [],
 };
 const event = (seq: number, revision = 0): T.SessionEvent => ({ seq, revision, time: 0, type: "assistant/message", text: "hello" });
-const newCore = () => makeCore({ projection: { reduce, effects: effectsOf, frame: makeFrameOf() }, clock: wallTime });
+const newCore = () => makeCore({ projection: { reduce, effects: () => [], frame: makeFrameOf() }, clock: wallTime });
 const log = keptLog();
 
 /** The first n rows the watch gives, or fewer if it ends first. */

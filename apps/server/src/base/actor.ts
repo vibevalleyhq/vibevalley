@@ -1,6 +1,7 @@
 import { type Actor, defaultOrchestrator, userId } from "@vibevalley/protocol";
 
 export type { Actor };
+export type ActorKind = Actor["kind"];
 
 /** Who calls a farm tool (the orchestrator or a session), read again at each call. */
 export interface Caller {

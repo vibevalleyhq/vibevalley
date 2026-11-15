@@ -174,8 +174,6 @@ export interface Voice {
 }
 
 export interface VoiceOptions {
-  /** Agora's REST calls; the farm's fetch when absent. */
-  readonly fetch?: typeof fetch;
   readonly tunnel?: (port: number) => Promise<Tunnel>;
   readonly gatherMs?: number;
   readonly moss?: RealtimeTransport;
@@ -207,7 +205,7 @@ export async function makeVoice(deps: VoiceDeps, options: VoiceOptions = {}): Pr
   const chat = deps.channel;
   const response = deps.orchestrator;
   const log = deps.log.child("voice");
-  const agoraFetch = options.fetch ?? deps.fetch;
+  const agoraFetch = deps.fetch;
   const tasks = new TaskGroup({ name: "voice", onError: (task, e) => log.warn(`vibevalley: voice: ${task}`, e) });
   const now = () => clock.now();
   const lineOf = (account: Account) => ({ connect: (on: RealtimeEvents) => account.realtime.connect(on, options.moss), redact: account.realtime.redact });

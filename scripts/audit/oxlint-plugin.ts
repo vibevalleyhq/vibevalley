@@ -1048,6 +1048,28 @@ const subpackageLayersRule = defineRule({
   },
 });
 
+const responseDoor = defineRule({
+  meta: {
+    messages: {
+      rawJson: says(
+        "`.json()` on an HTTP response in a page test returns the `{ bizCode, message, data }` envelope untyped, so reading fields directly gets `undefined`",
+        "query through the `api` fixture, or unwrap the intercepted response with `await replyData(response, S.TheShape)` from fixtures.ts",
+        "apps/web/test/fixtures.ts",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type === "MemberExpression" && !c.computed && c.property.type === "Identifier" && c.property.name === "json" && node.arguments.length === 0) {
+          context.report({ node, messageId: "rawJson" });
+        }
+      },
+    };
+  },
+});
+
 export default definePlugin({
   meta: { name: "vibevalley" },
   rules: {
@@ -1058,6 +1080,7 @@ export default definePlugin({
     "no-hex-color": noHexColor,
     "style-attrs": styleAttrs,
     "no-copy-selector": noCopySelector,
+    "response-door": responseDoor,
     "design-tokens": designTokens,
     "page-layers": pageLayersRule,
     "subpackage-layers": subpackageLayersRule,

@@ -128,7 +128,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 - **帮工（`session`）**：经 `Session` 的门（[帮工](docs/subsystems/session.md#对外的门)，`service-paths.json` 逐个记着）：派活（`hireWith`，子工单带上父工单号；`room` 问还能不能再开一个）、叫停放走（`stop`、`dismiss`）、借工作目录交付（`handOver`、`withWorkplace`、`withIdleWorkplace`）、工作目录（`discardWork`、`clearWorkplace`）、记下并投递触发（`recordTrigger`、`route`、`isRouted`、`unrouted`）、在场与查询（`hired`、`live`、`get`、`list`）、`news`（更新工单状态、问题与冲突，记下 `issue_run`），建好时交给信箱 `useReadiness`。蓄水池和投递一起提交的写在 `Delivery` 的 `prepare`、`commit` 里；`issue_input.sql`、`issue_run.sql` 读会话的投递和轮次（只读，join）。
 - **观察层、助手、工具（`watch`、`orchestrator`、`gateway/tool`）**：观察层和助手记下触发后交 `Issue.route`；工具的 `issue_handback` 经 `Issue.decline`，读触发时问 `Issue.ownerOf`，读一张工单的各轮经 `Issue.runs`。
 - **仓库（`repo`）**：14 个带类型的操作：交付前后读改动和冲突（`changes`、`branchChanges`、`conflict`），工单自己的检出（`checkout`），检查（`verifyCheckout`），合并（`merge`、`mergeInto`），PR（`usesPullRequests`、`submitPullRequest`、`pullRequestState`、`finishPullRequest`、`githubSnapshot`、`failedJobLog`），模板（`stack`）；没有裸的命令或 GitHub 请求。
-- **频道（`channel`）**：用户发言经 `Channel.userInThread` 清空问题并作废旧验收标记。
+- **频道（`channel`）**：经 `openThreadAbout` 开工单串；用户串内发言由工单订阅核心状态变更清空问题并作废旧验收标记。
 
 ## 为什么这样
 

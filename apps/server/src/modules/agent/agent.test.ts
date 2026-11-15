@@ -14,7 +14,6 @@ import type { ServerConfig } from "#/infra/config.ts";
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 import { defaultSettings } from "#/modules/agent/presets.ts";
-import { instructions } from "#/modules/session/briefing.ts";
 import { testConfig, starter } from "#/testing/layers.ts";
 
 import { makeProfileStore, withCast } from "./profile.ts";
@@ -280,17 +279,22 @@ describe("the built-in skills", () => {
     expect(skillOf(s.skills(), "reviewer")?.body).toBe(reviewer.body);
   });
 
-  test("say themselves in English when the farm does", async () => {
+  test("say themselves in English when the farm switches language after boot, and Chinese again", async () => {
+    const s = await open(testConfig());
+    for (const k of s.skills()) if (k.builtIn === true) expect(k.name + k.description).toMatch(han);
     setLocale("en");
     try {
-      const s = await open(testConfig());
       for (const k of s.skills()) if (k.builtIn === true) expect(k.name + k.description).not.toMatch(han);
+      for (const item of await s.templates())
+        if (item.source === "builtIn") expect(JSON.stringify([item.name, item.duty, item.tags, item.persona])).not.toMatch(han);
     } finally {
       setLocale("zh");
     }
+    for (const k of s.skills()) if (k.builtIn === true) expect(k.name + k.description).toMatch(han);
+    await s.close();
   });
 
-  test("a template ticks the ones it names, a helper's prompt carries a ticked one, and the user's own ticks stay", async () => {
+  test("a template ticks the ones it names, and the user's own ticks stay", async () => {
     const config = testConfig();
     const folder = join(config.home, "picked");
     mkdirSync(folder, { recursive: true });
@@ -299,11 +303,10 @@ describe("the built-in skills", () => {
     expect((await s.addTemplate(folder)).skills).toEqual(["reviewer"]);
     const made = await s.installTemplate("checker");
     expect(made.skills).toEqual(["reviewer"]);
-    expect(instructions(made, s.skills())).toContain(skillOf(s.skills(), "reviewer")!.body);
     const again = await s.updateFromTemplate((await s.save({ ...made, skills: ["slides"] })).id);
     expect(again.skills).toEqual(["slides", "reviewer"]);
     const hand = await s.create(draft({ skills: ["pages"] }));
-    expect(instructions(hand, s.skills())).toContain(skillOf(s.skills(), "pages")!.body);
+    expect(hand.skills).toEqual(["pages"]);
   });
 
   test("the slides, collector, pages and reviewer templates each come with their skill, ticked when installed", async () => {

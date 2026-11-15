@@ -3,14 +3,14 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import { attachmentMax } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 
 import { ApiError, BizCode, refuseIn } from "#/base/errors.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import { type PublicFetch, publicHttps } from "#/infra/publicHttp.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Attachment } from "#/platform/attachment/attachment.ts";
+import { type Attachment, attachmentMax } from "#/platform/attachment/attachment.ts";
+import type { MediaInputReference } from "#/platform/provider/vendors.ts";
 
 import { audioResultMax, type StagedAudioResult } from "./input.ts";
 import { bodyChunks, inTime } from "./job.ts";
@@ -20,7 +20,7 @@ const refused = refuseIn(BizCode.MediaRefused);
 
 export interface AudioSavedResult {
   readonly attachment?: T.Attachment;
-  readonly resultInput: T.MediaInputReference | null;
+  readonly resultInput: MediaInputReference | null;
   readonly metadata?: NonNullable<T.MediaSpeechJob["metadata"]>;
 }
 
@@ -32,7 +32,7 @@ export interface MediaInputs {
     source: AsyncIterable<Uint8Array>,
     signal?: AbortSignal,
   ) => Promise<StagedAudioResult & AsyncDisposable>;
-  readonly storeResult: (staged: StagedAudioResult, holder: string, retainSource?: boolean) => Promise<T.MediaInputReference>;
+  readonly storeResult: (staged: StagedAudioResult, holder: string, retainSource?: boolean) => Promise<MediaInputReference>;
   readonly release: (holder: string) => Promise<void>;
   readonly delete: (id: string) => Promise<void>;
 }

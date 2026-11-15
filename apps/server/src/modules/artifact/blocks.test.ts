@@ -66,12 +66,12 @@ function heldTime() {
 const make = async (config: ServerConfig = testConfig()) => {
   const db = await testDb(config);
   const clock = heldTime();
-  const row = async (id: string) => orMissing(id, [lookIn.artifact])(await qa.artifact(db.sql, { id }));
+  const row = async (id: ArtifactId) => orMissing(id, [lookIn.artifact])(await qa.artifact(db.sql, { id }));
   const blocks = await makeBlockStore({ db, clock: clock.time, log: keptLog() }, row);
   const get = async (id: ArtifactId) => {
     const list = await blocks.blocks(id);
     const r = await row(id);
-    return { artifact: { id: artifactId(r.id), title: r.title, seq: r.seq }, blocks: list };
+    return { artifact: { id: r.id, title: r.title, seq: r.seq }, blocks: list };
   };
   const create = async (title: string) => {
     const id = artifactId(newId());

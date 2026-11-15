@@ -2,6 +2,7 @@ import { scriptedRuntime } from "@botiverse/oar/testing";
 import { expect, test } from "vite-plus/test";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { type SourceEvent } from "#/modules/session/mailbox.ts";
 import { committedDelivery } from "#/testing/deliveries.ts";
@@ -31,7 +32,7 @@ test("regression: concurrent mailbox writes and restoration leave every committe
   const inputs = recorded.filter((input) => input !== undefined);
   const writes = inputs.map((trigger) =>
     committedDelivery(fw.db, {
-      session: defaultOrchestrator,
+      session: sessionId(defaultOrchestrator),
       row: {
         envelope_id: trigger.id,
         scope: `channel:${channel}`,
@@ -151,7 +152,7 @@ test("regression: an independent agent wake restores cooldown using receipt time
     const issue = await issues.add({ title: "work", agent: "lab", repo: "cooldown" });
     const started = await issues.start(issue.id, "");
     const threads = [`issue:${issue.id}`];
-    const thread = await fw.channel.issueThread(issue.id, issue.title);
+    const thread = await fw.channel.openThreadAbout("issue", issue.id, issue.title);
     const { target } = await fw.channel.addressOf(thread);
     await fw.channel.seat({ id: "w90", name: "别处的帮工", agent: "lab" });
     const call = async (text: string) => (await fw.channel.speak({ from: "w90", text: `@${started.session!} ${text}`, target, anyway: true })).message!;

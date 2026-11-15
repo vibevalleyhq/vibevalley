@@ -559,19 +559,21 @@ describe("an issue", () => {
     await until(() => turns.length >= 1, "the answer run");
     const issue2 = await issues.get(asked.id);
     const firstSession = latestSessionIdOf(issue2)!;
-    await sessions.report(firstSession, {
-      summary: "查清楚了",
-      questions: [],
-      checks: [],
-      remember: [],
-      prSubmit: false,
-      answer: {
-        conclusion: "打卡慢是因为每次都重读配置",
-        evidence: ["clock.ts:1 每次调用都读一遍配置"],
-        unsure: [],
-        next: ["把配置读一次缓存起来"],
-      },
-    });
+    const reportAnswer = (session: typeof firstSession) =>
+      sessions.report(session, {
+        summary: "查清楚了",
+        questions: [],
+        checks: [],
+        remember: [],
+        prSubmit: false,
+        answer: {
+          conclusion: "打卡慢是因为每次都重读配置",
+          evidence: ["clock.ts:1 每次调用都读一遍配置"],
+          unsure: [],
+          next: ["把配置读一次缓存起来"],
+        },
+      });
+    await reportAnswer(firstSession);
     gates[0]!.resolve();
     await w.nextReport();
     const answered = await await_(
@@ -623,19 +625,7 @@ describe("an issue", () => {
       "what was wrong with it, said",
     );
     await until(() => turns.length >= 3, "the corrected answer run");
-    await sessions.report(running, {
-      summary: "查清楚了",
-      questions: [],
-      checks: [],
-      remember: [],
-      prSubmit: false,
-      answer: {
-        conclusion: "打卡慢是因为每次都重读配置",
-        evidence: ["clock.ts:1 每次调用都读一遍配置"],
-        unsure: [],
-        next: ["把配置读一次缓存起来"],
-      },
-    });
+    await reportAnswer(running);
     gates[2]!.resolve();
     await w.nextReport();
     await await_(

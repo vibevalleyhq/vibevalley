@@ -7,6 +7,7 @@ import { createInterface } from "node:readline";
 import type { Locator, Page } from "@playwright/test";
 
 import { type Issue, type IssueAct, type IssueAction, readStream, type SessionId, type StateFrame, statePath, VibeValleyApi } from "@vibevalley/protocol";
+import { apiSuccessEnvelope } from "@vibevalley/protocol/api";
 
 import { test as base, expect } from "./browser";
 
@@ -157,4 +158,8 @@ export async function choose(trigger: Locator, value: string) {
   await trigger.click();
   await trigger.page().locator(`[role="option"][data-key="${value}"]`).click();
   await expect(trigger).toHaveAttribute("data-value", value);
+}
+
+export async function replyData<A>(response: { json(): Promise<unknown> }, schema: Parameters<typeof apiSuccessEnvelope<A, unknown>>[0]): Promise<A> {
+  return apiSuccessEnvelope(schema).parse(await response.json()).data;
 }

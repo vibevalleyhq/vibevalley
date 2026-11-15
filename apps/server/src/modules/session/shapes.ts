@@ -1,8 +1,32 @@
-import type { Actor, ChannelType, IssueId, QuotedBlock, RunTrigger } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
-import type { CardAttachment, CompactCard, ParentPreview } from "#/base/clip.ts";
+import type { CardAttachment, CompactCard, ParentPreview, QuotedBlock } from "#/base/clip.ts";
+import type { CriterionCheck } from "#/base/questions.ts";
 
-export type { CardAttachment, CompactCard, ParentPreview };
+export type { CardAttachment, CompactCard, ParentPreview, QuotedBlock };
+
+export type ChannelType = T.Channel["type"];
+export type Doing = Extract<T.Phase, { _tag: "working" }>["doing"];
+export type SessionClose = Extract<T.Phase, { _tag: "closed" }>["closed"];
+export type ToolConnection = NonNullable<T.Session["toolConnections"]>[number];
+export type Machine = T.SpaceState["machines"][number];
+
+export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
+type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
+
+export interface IssueReportMemory {
+  text: string;
+  scope: IssueReportMemoryScope;
+}
+
+export interface IssueReport {
+  summary: string;
+  questions: T.Question[];
+  checks: CriterionCheck[];
+  remember: IssueReportMemory[];
+  prSubmit: boolean;
+  answer?: T.IssueAnswer;
+}
 
 export const TriggerSourceValues = ["workbench", "channel", "connector", "voice", "github", "cron", "patrol"] as const;
 export type TriggerSource = (typeof TriggerSourceValues)[number];
@@ -32,9 +56,9 @@ export interface TriggerContext {
 }
 
 export interface TriggerMeta {
-  readonly issue?: IssueId;
+  readonly issue?: T.IssueId;
   readonly ingressRecipient?: string;
-  readonly trigger?: RunTrigger;
+  readonly trigger?: T.RunTrigger;
   readonly dispatch?: boolean;
   readonly cron?: string;
   readonly repo?: string;
@@ -45,7 +69,7 @@ export interface TriggerMeta {
   readonly failed?: boolean;
   readonly botRound?: number;
   readonly botRoundKey?: string;
-  readonly channelMessageId?: string;
+  readonly channelMessageId?: T.MessageId;
   readonly inputContext?: TriggerContext;
   readonly channelType?: ChannelType;
   readonly responsePort?: string;
@@ -55,7 +79,7 @@ export interface TriggerMeta {
 export interface Trigger {
   readonly id: string;
   readonly source: TriggerSource;
-  readonly actor: Actor;
+  readonly actor: T.Actor;
   readonly addressed: TriggerAddressing;
   readonly threads: readonly string[];
   readonly replyTo?: string;

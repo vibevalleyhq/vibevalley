@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { MediaPhaseValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -20,7 +19,7 @@ import { ImageFailure } from "#/platform/provider/vendors.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { downloadImage } from "./download.ts";
-import { jobsOf, newJob, type Row, storedAs } from "./job.ts";
+import { jobsOf, newJob, type Row, storedAs, MediaPhaseValues } from "./job.ts";
 import type { Machine } from "./machine.ts";
 import type { MediaCaller } from "./media.ts";
 

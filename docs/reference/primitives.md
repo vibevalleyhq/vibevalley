@@ -132,6 +132,7 @@
 | `publicHttps` | `publicHttp.ts` |  |
 | `publicFetch` | `publicHttp.ts` |  |
 | `wallTime` | `time.ts` | The wall clock, for code with no service to ask: a class tested on its own, the command line. |
+| `keyedLater` | `time.ts` |  |
 | `withinRealTime` | `time.ts` | A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and it keeps nothing alive. |
 | `afterRealTime` | `time.ts` | A deadline on a real process (a command's timeout, the grace before SIGKILL): runs f after ms of real time, whatever the Clock says. |
 | `localeMinute` | `time.ts` | To the minute, in this machine's zone: what an input says the time is, so that it does not change between two requests a |
@@ -150,6 +151,7 @@
 | `sample` | `artifact.ts` | Every kind of block, and inline marks, as the export writes them. |
 | `scriptedDeepSeek` | `deepseek.ts` |  |
 | `committedDelivery` | `deliveries.ts` | A delivery written and routed as the session module commits one, and nothing after: what a stop between commit and hand-off |
+| `allOpenDeliveries` | `deliveries.ts` |  |
 | `kinds` | `evals.ts` |  |
 | `orchestratorToolNames` | `evals.ts` | The orchestrator's tools by name, as its brain has them: the farm's and its own (no skills, subagents or crons). |
 | `problemOf` | `evals.ts` | "" when it is whole: the fields its kind reads are there. |
@@ -187,6 +189,9 @@
 | `lastUser` | `model.ts` |  |
 | `scriptedLLM` | `model.ts` | Each request takes the next step, its events a tick apart as a stream's; one past the script is a failed answer |
 | `network` | `network.ts` | Every vendor the media tests reach (MOSS's audio, images, files, understanding), answered offline; the public fetch |
+| `FakeSessions` | `played.ts` | Holds turns whose input contains "慢慢做" until release() when holds is true; inputs containing "必败" fail. |
+| `playedSessions` | `played.ts` |  |
+| `keepPlayedSession` | `played.ts` |  |
 | `realtimeFixture` | `realtime.ts` |  |
 | `refuse` | `refuse.ts` | A trigger named name refusing the write on says (before insert on t, before update of c on t), when when holds |
 | `allow` | `refuse.ts` | The write refuse stopped goes through again. |
@@ -417,6 +422,7 @@
 | `analyzeSource` | `source.ts` |  |
 | `calls` | `source.ts` | Whether the file calls object.method(…) anywhere. |
 | `tempDir` | `temp.ts` |  |
+| `WaitTimedOut` | `until.ts` |  |
 | `waitFor` | `until.ts` | What get answers once ok holds for it. what is said if it never does (a function: read when it is given up on). |
 | `untilGot` | `until.ts` | The value get gives once it is something. |
 | `until` | `until.ts` | Once ok holds. |

@@ -5,12 +5,12 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { dayMs, maxRunning } from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { worker as sessionActor } from "#/base/actor.ts";
 import { BizCode, errnoOf, messageOf, refuseIn } from "#/base/errors.ts";
 import { jsonText } from "#/base/json.ts";
-import type { Core } from "#/core/core.ts";
+import type { Core, Fact } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
@@ -30,11 +30,10 @@ import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
 import { NotRecorded } from "./inProcessRun.ts";
 import { makeLaunch, NotTakenIn, reasonText } from "./launch.ts";
 import type { Machine } from "./machine.ts";
-import { sourceBrief } from "./prompts.ts";
 import { type Hand, makeRegistry, type RunStore } from "./registry.ts";
 import { handsToUser } from "./report.ts";
 import { isHired, isOnDuty } from "./roster.ts";
-import type { Trigger } from "./shapes.ts";
+import type { Trigger, SessionClose, IssueReport } from "./shapes.ts";
 import { contextPlace, releaseContextPlace } from "./shell.ts";
 import { type Delivered, type DeliveryInput, DeliveryRefused, type RunFinished, type SessionNews } from "./signals.ts";
 import { makeWatch } from "./watch.ts";
@@ -88,6 +87,8 @@ export interface HireOptions {
   readonly issue?: string;
   readonly trigger?: T.RunTrigger;
   readonly refining?: boolean;
+  /** Prompt instructions appended to `brief` on initial launch without altering `session.brief`. */
+  readonly preamble?: string;
   /** Runs after the session row is written, before any report or hired fact is visible; throws NotRecorded when it cannot be kept. */
   readonly hiring?: (s: T.Session, launch: string) => Promise<void>;
 }
@@ -95,8 +96,7 @@ export interface HireOptions {
 interface SendOptions extends Omit<HireOptions, "issue"> {
   readonly envelopeIds?: readonly string[];
   readonly context:
-    /** source: the trigger the work came from, which its brief points the helper to. */
-    | { readonly kind: "issue"; readonly issue: { readonly id: string; readonly number: number; readonly source?: string } }
+    | { readonly kind: "issue"; readonly issue: { readonly id: T.IssueId; readonly number: number } }
     | { readonly kind: "channel"; readonly channel: string };
 }
 
@@ -127,9 +127,9 @@ export interface Lifecycle {
   /** Rejects `..` segments and symlinks escaping the session's working directory; throws NotWorkFile. */
   readonly workFile: (id: string, path: string, max: number) => Promise<{ readonly name: string; readonly bytes: Uint8Array }>;
   readonly runOf: (id: string) => string | undefined;
-  readonly report: (id: string, report: T.IssueReport) => Promise<void>;
+  readonly report: (id: string, report: IssueReport) => Promise<void>;
   /** Throws NotTakenIn when use fails (the session stays), ApiError when the session cannot hand over now. */
-  readonly handOver: (id: string, closed: T.SessionClose, use: (place: Workplace, lastText: string) => Promise<Merged>, settle?: Settle) => Promise<Merged>;
+  readonly handOver: (id: string, closed: SessionClose, use: (place: Workplace, lastText: string) => Promise<Merged>, settle?: Settle) => Promise<Merged>;
   /** Pass `""` for all agents. */
   readonly list: (agent: string) => Promise<T.Session[]>;
   readonly get: (id: string) => Promise<T.Session | undefined>;
@@ -138,7 +138,6 @@ export interface Lifecycle {
   readonly news: () => Subscription<SessionNews>;
   /** Session id owning `token`, or `""` when unrecognized. */
   readonly who: (token: string) => string;
-  readonly setAddress: (address: string) => void;
   /** An in-process agent's host; the caller owns it and closes it (`await using`). Throws NotRecorded. */
   readonly host: <R>(options: HostOptions<R>) => Promise<AgentHost<R>>;
   /** Brings back the sessions a restart left: their hands, their interrupted runs. */
@@ -176,7 +175,7 @@ const placeThere = (cwd: string, log: Logger) =>
     },
   );
 
-export function newsOf(fact: T.Fact, after: T.SpaceState): SessionNews | undefined {
+export function newsOf(fact: Fact, after: T.SpaceState): SessionNews | undefined {
   switch (fact.type) {
     case "sessionChanged": {
       const session = after.sessions.find((h) => h.id === fact.session.id);
@@ -213,7 +212,6 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
   const {
     flushRuns,
     later,
-    mcpEndpoint,
     trajectories,
     admission,
     newsHub,
@@ -346,7 +344,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
         id: session.id,
         stack,
         place: s.place,
-        issue: session.issue ?? "",
+        issue: session.issue,
         access: new Semaphore(1),
         journal,
         oarSessionId: s.oarSessionId,
@@ -490,7 +488,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
           id,
           stack: handScope,
           place,
-          issue: issue?.id ?? "",
+          issue: issue?.id,
           access: new Semaphore(1),
           journal,
           oarSessionId: "",
@@ -554,13 +552,12 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
           phase: { _tag: "working", since: hiredAt, doing: { action: "none", label: "" } },
           ...(channel ? { channel } : {}),
           refining: issue ? (opt.refining ?? false) : false,
-          ...(issue ? { issue: issueId(issue.id) } : {}),
+          ...(issue ? { issue: issue.id } : {}),
           ...(place.branch ? { branch: place.branch, worktree: place.cwd } : {}),
           machine: machines.here().id,
         };
         const initialText = initial.map((input) => `${input.id}\n${input.card.summary}\n${input.card.readUri}`).join("\n\n");
-        const source = issue?.source;
-        const prompt = [brief, source ? sourceBrief(source) : "", initialText].filter(Boolean).join("\n\n");
+        const prompt = [brief, opt.preamble ?? "", initialText].filter(Boolean).join("\n\n");
         const opened = await open(agent, session, h, place, withRecall(recall, prompt), "");
         if (!opened.execution) {
           if (opened.retained) startup.phase = "retained";
@@ -698,7 +695,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       return repos.clearCheckout(repo, number, work);
     });
 
-  const report = async (id: string, given: T.IssueReport) => {
+  const report = async (id: string, given: IssueReport) => {
     const noReport = () => refused(t("server.session.life.noHelper", { id }));
     if (!core.session(id)?.issue) throw noReport();
     await roster.withHand(
@@ -710,7 +707,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
         if (!core.session(id)?.issue || !h.run) throw noReport();
         await flushRuns();
         try {
-          await qs.setPendingReport(db.sql, { id, report: jsonText(given) });
+          await qs.setPendingReport(db.sql, { id: h.id, report: jsonText(given) });
         } catch (e) {
           if (e instanceof SqlError) throw refused(causeMessage(e));
           throw e;
@@ -785,9 +782,10 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       for (const row of rows) if (!out.some((s) => s.id === row.id)) out.push(endedSession(row, bySession.get(row.id) ?? []));
       return out.toSorted((a, b) => b.hiredAt - a.hiredAt);
     },
-    get: async (id) => {
-      const live = core.session(id);
+    get: async (rawId) => {
+      const live = core.session(rawId);
       if (live) return live;
+      const id = sessionId(rawId);
       const row = await qs.sessionByID(db.sql, { id });
       if (row === undefined || row.ended_at === null) return undefined;
       return endedSession(row, await qr.runsOfSession(db.sql, { session: id }));
@@ -806,7 +804,6 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
     report,
     news: () => newsHub.subscribe(),
     who: roster.who,
-    setAddress: (address) => void (mcpEndpoint.url = `http://${address}/mcp`),
     host,
     restore,
     boot: restore,

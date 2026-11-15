@@ -109,19 +109,18 @@ describe("repos", () => {
   test("a parent issue's branch: a child merges into it, it merges into main", () => {
     const root = reposDir();
     return repos(root, async (p) => {
-      await p.openBranch("task", "vibevalley/task-1");
-      const place = await p.checkout({ repo: "task", issue: 1, worktree: true, base: "vibevalley/task-1" });
+      const parent = await p.checkout({ repo: "task", issue: 1, worktree: true, base: "" });
+      const place = await p.checkout({ repo: "task", issue: 2, worktree: true, base: parent.branch! });
       writeFileSync(join(place.cwd, "a.txt"), "a\n");
       gitSync(place.cwd, "add", "a.txt");
       gitSync(place.cwd, "commit", "-qm", "a");
-      expect((await p.mergeInto(place, "vibevalley/task-1")).hashes).toHaveLength(1);
-      const changes = await p.branchChanges("task", "vibevalley/task-1");
+      expect((await p.mergeInto(place, parent.branch!, parent.cwd)).hashes).toHaveLength(1);
+      const changes = await p.branchChanges("task", parent.branch!);
       expect(changes!.files.map((f) => f.path)).toEqual(["a.txt"]);
       expect(changes!.files[0]!.patch).toMatch(/^diff --git a\/a.txt b\/a.txt\n/u);
       const branchChanges2 = await p.branchChanges("task", "vibevalley/missing");
       expect(branchChanges2).toBeUndefined();
-      const branchMerged = await p.mergeBranch("task", "vibevalley/task-1");
-      expect(branchMerged).toMatch(/1 个提交合进了 task 的 main/u);
+      await p.merge(parent);
       const outcome = await runCheck(join(root, "task"), "cat a.txt && exit 3");
       expect(outcome).toEqual({
         ok: false,
@@ -330,7 +329,10 @@ describe("repos", () => {
       [0, 6],
       [9, 6],
     ] as const) {
-      const maxSessions = await repos(reposDir(), (p) => Promise.resolve(p.maxSessions()), { repo: { maxSessions: limit, checkTimeoutSeconds: 1200 } });
+      const root = reposDir();
+      const maxSessions = await repos(root, async (p) => (await p.summary({ name: "app", path: join(root, "app"), git: false })).maxSessions, {
+        repo: { maxSessions: limit, checkTimeoutSeconds: 1200 },
+      });
       expect(maxSessions).toBe(want);
     }
   });

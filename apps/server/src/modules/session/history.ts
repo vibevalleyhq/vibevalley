@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type * as T from "@vibevalley/protocol";
-import { issueId, sessionId } from "@vibevalley/protocol/schema";
+import { issueId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
 import { jsonOf, jsonText, storedJsonOrUndefined } from "#/base/json.ts";
@@ -10,10 +10,11 @@ import type * as qs from "#db/session.sql.ts";
 import type * as qr from "#db/session_run.sql.ts";
 
 import { isOnDuty } from "./roster.ts";
+import { IssueReport as IssueReportSchema } from "./schema.ts";
 
 const triggerOf = storedJsonOrUndefined(S.RunTrigger, "session_run.triggered_by");
 export const heardOf = storedJsonOrUndefined(z.array(z.string()), "session_run.heard");
-export const pendingReportOf = storedJsonOrUndefined(S.IssueReport, "session.pending_report");
+export const pendingReportOf = storedJsonOrUndefined(IssueReportSchema, "session.pending_report");
 const spentOf = storedJsonOrUndefined(S.Spent, "session_run.spent");
 const phaseOf = jsonOf(S.Phase, "session.phase");
 const lastRunOf = jsonOf(S.LastRun, "session.last_run");
@@ -26,7 +27,7 @@ export const placeOf = storedJsonOrUndefined(
 export function runOf(r: qr.RunsOfSessionResult): T.Run {
   const run: T.Run = {
     id: r.id,
-    session: sessionId(r.session),
+    session: r.session,
     triggeredBy: triggerOf(r.triggered_by) ?? { kind: "runtime" },
     heard: heardOf(r.heard) ?? [],
     startedAt: r.started_at,
@@ -44,7 +45,7 @@ export function runOf(r: qr.RunsOfSessionResult): T.Run {
 
 export function endedSession(r: qs.SessionByIDResult, runs: readonly qr.RunsOfSessionResult[]): T.Session {
   const s: T.Session = {
-    id: sessionId(r.id),
+    id: r.id,
     role: r.role,
     name: r.name,
     agent: r.agent,
@@ -93,7 +94,7 @@ export function restoredSession(row: qs.ActiveSessionsResult): T.Session {
   const spent = row.spent === null ? undefined : strictSpentOf(row.spent);
   const place = row.place === null ? undefined : placeOf(row.place);
   return {
-    id: sessionId(row.id),
+    id: row.id,
     role: row.role,
     agent: row.agent,
     name: row.name,

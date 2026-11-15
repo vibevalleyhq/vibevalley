@@ -1,9 +1,9 @@
 import { expect, test } from "vite-plus/test";
 
+import { applied } from "@vibevalley/pkm/editing";
 import type { PkmBlock, PkmBlockOp, PkmPage } from "@vibevalley/protocol";
 import { whenTrue } from "@vibevalley/testkit/until";
 
-import { applied } from "./editing";
 import { PageWriter } from "./writer";
 
 const block = (id: string, body = id): PkmBlock => ({ id, depth: 0, body, props: {}, path: "" });

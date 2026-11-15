@@ -5,11 +5,11 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_session_run_outcome } from "./types.js"
+import { rowOf, SessionId, Words_session_run_outcome } from "./types.js"
 
 export interface StartRunParams {
   readonly ["id"]: string
-  readonly ["session"]: string
+  readonly ["session"]: SessionId
   readonly ["issue"]: string | null
   readonly ["triggered_by"]: string
   readonly ["started_at"]: number
@@ -52,7 +52,7 @@ export interface OpenRunsParams {
 
 export const OpenRunsResult = z.object({
   ["id"]: z.string(),
-  ["session"]: z.string(),
+  ["session"]: SessionId,
   ["issue"]: z.string().nullable(),
   ["triggered_by"]: z.string(),
   ["heard"]: z.string().nullable(),
@@ -72,12 +72,12 @@ export async function openRuns(sql: Sql): Promise<OpenRunsResult[]> {
 }
 
 export interface RunsOfSessionParams {
-  readonly ["session"]: string
+  readonly ["session"]: SessionId
 }
 
 export const RunsOfSessionResult = z.object({
   ["id"]: z.string(),
-  ["session"]: z.string(),
+  ["session"]: SessionId,
   ["issue"]: z.string().nullable(),
   ["triggered_by"]: z.string(),
   ["heard"]: z.string().nullable(),
@@ -102,7 +102,7 @@ export interface RunsOfSessionsParams {
 
 export const RunsOfSessionsResult = z.object({
   ["id"]: z.string(),
-  ["session"]: z.string(),
+  ["session"]: SessionId,
   ["issue"]: z.string().nullable(),
   ["triggered_by"]: z.string(),
   ["heard"]: z.string().nullable(),

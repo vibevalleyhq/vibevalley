@@ -175,8 +175,9 @@ function allowed(url: string, need: Need): boolean {
   if (/^(?:data|blob):/iu.test(u)) return need === "inline" || need === "font";
   try {
     return hosts[need].includes(new URL(u).origin);
-  } catch {
-    return false;
+  } catch (e) {
+    if (e instanceof TypeError) return false;
+    throw e;
   }
 }
 

@@ -1,12 +1,12 @@
 import { expect, test } from "vite-plus/test";
 
-import type * as T from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { lab } from "#/flows/farm.ts";
 
 import type { Execution, ExecutionObserver, Executions } from "./executor.ts";
 import { linked } from "./link.ts";
+import type { ToolConnection } from "./shapes.ts";
 
 const execution: Execution = {
   owner: { id: sessionId("w1"), agent: "lab", runtime: "pi" },
@@ -37,7 +37,7 @@ test("what crosses the link is a copy made of its JSON: nothing on one side is t
     expect(remote.find("w1")).not.toBe(execution);
     const started = await remote.start({ agent: lab(), owner: execution.owner, cwd: "/w", input: "", resume: "", options: {} });
     expect(started.execution).not.toBe(execution);
-    const heard: T.ToolConnection[] = [];
+    const heard: ToolConnection[] = [];
     remote.observe("w1", {
       event: () => {},
       connection: (connection) => heard.push(connection),
@@ -47,7 +47,7 @@ test("what crosses the link is a copy made of its JSON: nothing on one side is t
       stalled: () => {},
       stallMs: 1,
     });
-    const told: T.ToolConnection = { server: "vibevalley", status: "ready" };
+    const told: ToolConnection = { server: "vibevalley", status: "ready" };
     watching?.connection(told);
     expect(heard).toEqual([told]);
     expect(heard[0]).not.toBe(told);

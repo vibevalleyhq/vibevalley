@@ -3,11 +3,11 @@ import { expect, test } from "vite-plus/test";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
 import { type TriggerInput, triggerOf } from "#/modules/session/payload.ts";
+import { allOpenDeliveries } from "#/testing/deliveries.ts";
 import { testDb } from "#/testing/layers.ts";
 import { moduleWorld } from "#/testing/world.ts";
 import * as cursor from "#db/issue_github_cursor.sql.ts";
 import * as qe from "#db/issue_github_event.sql.ts";
-import { allOpenDeliveries } from "#db/session_delivery.sql.ts";
 
 import { checksVerdict } from "./github.ts";
 
@@ -70,7 +70,7 @@ test("regression: the source cursor and Mailbox trigger share commit and rollbac
   expect((await mailbox.readTrigger(id))?.trigger).toEqual(trigger);
   const registered2 = await mailbox.isRouted(id);
   expect(registered2).toBe(false);
-  const allOpenDeliveries2 = await allOpenDeliveries(db.sql);
+  const allOpenDeliveries2 = await allOpenDeliveries(db);
   expect(allOpenDeliveries2).toEqual([]);
   expect(mailbox.deliveriesOf(defaultOrchestrator)).toEqual([]);
   expect(core.state()).toBe(state);

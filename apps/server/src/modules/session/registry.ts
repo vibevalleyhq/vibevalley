@@ -21,6 +21,7 @@ import { NotRecorded, recording } from "./inProcessRun.ts";
 import { type Journal, makeTrajectories } from "./journal.ts";
 import type { Machine } from "./machine.ts";
 import { isOnDuty } from "./roster.ts";
+import type { SessionClose } from "./shapes.ts";
 import type { DeliveryInput, Consumed, LaunchActivity, RunFinished, SessionIdentity, SessionNews } from "./signals.ts";
 
 const refused = refuseIn(BizCode.SessionRefused);
@@ -30,9 +31,9 @@ export type { Hand };
 const saveAfterMs = 300;
 
 export interface RunStore {
-  readonly start: (id: string, session: string, issue: string, trigger: T.RunTrigger) => Promise<void>;
+  readonly start: (id: string, session: T.SessionId, issue: T.IssueId | undefined, trigger: T.RunTrigger) => Promise<void>;
   /** The run took an input of issue (told as IssueStarted). */
-  readonly link: (run: string, issue: string) => void;
+  readonly link: (run: string, issue: T.IssueId) => void;
   readonly heard: (run: string, heard: readonly string[]) => Promise<void>;
   readonly unended: (session: string) => Promise<{ readonly id: string; readonly startedAt: number } | undefined>;
   readonly finish: (id: string, outcome: T.Outcome, summary: string, spent?: T.Spent) => Promise<void>;
@@ -72,7 +73,7 @@ export async function makeRegistry(deps: RegistryDeps) {
   const flushRuns = () => runWrites;
   /** One timer per key (the save, each conversation's idle suspension): a new one stops the one before. */
   const later = (key: string, work: (signal: AbortSignal) => Promise<unknown>) => void tasks.keyed(key, work);
-  const mcpEndpoint = { url: `http://${serverAddress(config)}/mcp` };
+  const mcpUrl = `http://${serverAddress(config)}/mcp`;
   const trajectories = makeTrajectories(config.home, (id, e) => core.sessionEvent(sessionId(id), e), { clock, log });
   const admission = new Semaphore(1);
   const roster = makeHandRoster(admission);
@@ -127,22 +128,21 @@ export async function makeRegistry(deps: RegistryDeps) {
 
   const register = async (session: SessionIdentity) => {
     const hiredAt = clock.now();
+    const id = sessionId(session.id);
     await keepRow({
       ...session,
+      id,
       repo: null,
       issue: null,
       channel: null,
       hired_at: hiredAt,
       machine: null,
     });
-    const kept = core.session(session.id);
+    const kept = core.session(id);
     if (kept === undefined || kept.name !== session.name)
       core.apply({
         type: "sessionChanged",
-        session:
-          kept === undefined
-            ? { ...session, id: sessionId(session.id), hiredAt, runs: 0, refining: false, phase: { _tag: "resting" } }
-            : { ...kept, name: session.name },
+        session: kept === undefined ? { ...session, id, hiredAt, runs: 0, refining: false, phase: { _tag: "resting" } } : { ...kept, name: session.name },
       });
   };
 
@@ -178,10 +178,10 @@ export async function makeRegistry(deps: RegistryDeps) {
       machine: s.machine ?? null,
     });
 
-  const ended = (id: string, closed: T.SessionClose) =>
+  const ended = (id: T.SessionId, closed: SessionClose) =>
     bestEffort(log, `vibevalley: session ${id}'s end not kept`, () => qs.endSession(db.sql, { ended_at: clock.now(), closed, id }));
 
-  const forget = (id: string) => bestEffort(log, `vibevalley: unstarted session ${id} not forgotten`, () => qs.forgetSession(db.sql, { id }));
+  const forget = (id: T.SessionId) => bestEffort(log, `vibevalley: unstarted session ${id} not forgotten`, () => qs.forgetSession(db.sql, { id }));
 
   const logOf = async (s: T.Session, journal: Journal) => {
     await keep(s);
@@ -297,7 +297,7 @@ export async function makeRegistry(deps: RegistryDeps) {
     fire,
     flushRuns,
     later,
-    mcpEndpoint,
+    mcpUrl,
     trajectories,
     admission,
     newsHub,

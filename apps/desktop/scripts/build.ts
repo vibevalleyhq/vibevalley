@@ -19,10 +19,11 @@ await build({
 });
 
 if (process.platform === "darwin") {
-  try {
-    execFileSync("swift", ["build", "-c", "release", "--package-path", join(desktop, "../island")], { stdio: "inherit" });
-  } catch (e) {
-    // Without Swift (or with a broken build) the app still runs, without the island.
-    console.warn("vibevalley: the island was not built:", e instanceof Error ? e.message : e);
+  for (const helper of ["island", "pty"] as const) {
+    try {
+      execFileSync("swift", ["build", "-c", "release", "--package-path", join(desktop, "..", helper)], { stdio: "inherit" });
+    } catch (e) {
+      console.warn(`vibevalley: ${helper} was not built:`, e instanceof Error ? e.message : e);
+    }
   }
 }

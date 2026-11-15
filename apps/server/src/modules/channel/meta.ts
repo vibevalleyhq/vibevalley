@@ -4,7 +4,10 @@ import type * as T from "@vibevalley/protocol";
 import { type Wire } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
+import type { QuotedBlock } from "#/base/clip.ts";
 import { storedJsonOrUndefined, valueOf } from "#/base/json.ts";
+
+export type ChannelType = T.Channel["type"];
 
 /** How words said aloud came in: typed by dictation, said in a conversation, or sent through the voice API. */
 const VoiceModeValues = ["dictated", "conversation", "api"] as const;
@@ -29,7 +32,7 @@ export interface Meta {
   attachments?: T.Attachment[];
   embeds?: T.Embed[];
   artifact?: T.ArtifactCard;
-  blocks?: readonly T.QuotedBlock[];
+  blocks?: readonly QuotedBlock[];
   picked?: Picked;
   ingressSource?: (typeof IngressSourceValues)[number];
   ingressRecipient?: string;
@@ -72,7 +75,7 @@ export const metaText = (m: Meta | undefined) =>
         Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== "" && v !== false && !(Array.isArray(v) && v.length === 0))),
       );
 
-export const channelType = (type: string): T.ChannelType => S.ChannelType.safeParse(type).data ?? "channel";
+export const channelType = (type: string): ChannelType => S.ChannelType.safeParse(type).data ?? "channel";
 
 /** What an agent reads of a message besides who said what where: its reply, edits, files, artifact, quotes and how it came in. */
 export const envelopeMore = (

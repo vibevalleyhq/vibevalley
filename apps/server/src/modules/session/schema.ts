@@ -1,11 +1,25 @@
 import { z } from "zod";
 
-import { Actor, ChannelType, IssueId, QuotedBlock, RunTrigger, type Wire } from "@vibevalley/protocol/schema";
+import { Actor, ChannelType, CriterionCheck, IssueAnswer, IssueId, MessageId, Question, QuotedBlock, RunTrigger, type Wire } from "@vibevalley/protocol/schema";
 
 import type * as T from "./shapes.ts";
-import { GithubTriggerEventValues, TriggerAddressingValues, TriggerSourceValues, VoiceModeValues } from "./shapes.ts";
+import { GithubTriggerEventValues, IssueReportMemoryScopeValues, TriggerAddressingValues, TriggerSourceValues, VoiceModeValues } from "./shapes.ts";
 
 type Codec<A> = z.ZodType<A, Wire<A>>;
+
+export const IssueReportMemory = z.object({
+  text: z.string(),
+  scope: z.enum(IssueReportMemoryScopeValues),
+}) satisfies Codec<T.IssueReportMemory>;
+
+export const IssueReport = z.object({
+  summary: z.string(),
+  questions: z.array(Question),
+  checks: z.array(CriterionCheck),
+  remember: z.array(IssueReportMemory),
+  prSubmit: z.boolean(),
+  answer: z.exactOptional(IssueAnswer),
+}) satisfies Codec<T.IssueReport>;
 
 const CardAttachmentSchema = z.object({
   id: z.string(),
@@ -60,7 +74,7 @@ const TriggerMeta = z.object({
   failed: z.exactOptional(z.boolean()),
   botRound: z.exactOptional(z.number().int()),
   botRoundKey: z.exactOptional(z.string()),
-  channelMessageId: z.exactOptional(z.string()),
+  channelMessageId: z.exactOptional(MessageId),
   inputContext: z.exactOptional(TriggerContext),
   channelType: z.exactOptional(ChannelType),
   responsePort: z.exactOptional(z.string()),

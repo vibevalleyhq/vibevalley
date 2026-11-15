@@ -1,8 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 
+import { applied, commandAction, completed, completionAt, editAction, offered, pasteAction } from "@vibevalley/pkm/editing";
 import type { PkmBlock } from "@vibevalley/protocol";
-
-import { applied, commandAction, completed, completionAt, editAction, offered, pasteAction } from "./editing";
 
 const block = (id: string, body = id, depth = 0, parent?: string): PkmBlock => ({ id, depth, body, props: {}, path: "", ...(parent ? { parent } : {}) });
 const keys = { key: "", shiftKey: false, altKey: false, metaKey: false, ctrlKey: false };

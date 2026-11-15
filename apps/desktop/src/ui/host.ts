@@ -10,6 +10,7 @@ import { revealable } from "../base/boundary";
 import type { commandLine } from "../infra/commandLine";
 import { farmHome } from "../infra/paths";
 import { probe } from "../infra/probe";
+import { startTerminals } from "../infra/terminal";
 import { setAppMenu } from "./menu";
 import type { MainWindow } from "./window";
 
@@ -41,16 +42,31 @@ export function serveHost(o: {
   readonly updates: HostUpdates;
   /** Install CLI; absent in the app run from the repository, which has no command line of its own to link. */
   readonly commandLine: CommandLineInstaller | undefined;
+  readonly pty: {
+    readonly binary: string | undefined;
+    readonly env: () => NodeJS.ProcessEnv;
+    readonly roots: () => readonly string[];
+  };
 }) {
   const installer = () => {
     if (!o.commandLine) throw new Error("this app has no command line to install: it runs from the repository");
     return o.commandLine;
   };
-  return serve(
+  let pushData: Parameters<typeof startTerminals>[0]["onData"] | undefined;
+  let pushExit: Parameters<typeof startTerminals>[0]["onExit"] | undefined;
+  const terminals = startTerminals({
+    binary: o.pty.binary,
+    env: o.pty.env,
+    roots: o.pty.roots,
+    onData: (event) => pushData?.(event),
+    onExit: (event) => pushExit?.(event),
+  });
+  const served = serve(
     desktopBridge,
     mainLink(() => o.window.current()?.webContents),
     {
       opening: (update) => o.window.progress(update),
+      framing: (mode) => o.window.framing(mode),
       notify: (notice) => {
         probe?.notices.push(notice);
         if (Notification.isSupported()) new Notification({ title: notice.title, body: notice.body }).show();
@@ -80,6 +96,17 @@ export function serveHost(o: {
       cliState: () => installer().state(),
       cliInstall: () => installer().install(),
       cliRemove: () => installer().remove(),
+      ptySpawn: (input) => terminals.spawn(input),
+      ptyWrite: (input) => terminals.write(input),
+      ptyResize: (input) => terminals.resize(input),
+      ptyKill: (id) => terminals.kill(id),
+      ptyInspect: (id) => terminals.inspect(id),
     },
   );
+  pushData = (event) => served.push("ptyData", event);
+  pushExit = (event) => served.push("ptyExit", event);
+  return {
+    ...served,
+    stopTerminals: () => terminals.stop(),
+  };
 }

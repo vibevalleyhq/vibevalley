@@ -16,6 +16,7 @@ import { fileBlob } from "#/infra/files.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Attachment } from "#/platform/attachment/attachment.ts";
+import type { MediaInputReference } from "#/platform/provider/vendors.ts";
 import * as q from "#db/media_input.sql.ts";
 import * as pins from "#db/media_input_pin.sql.ts";
 
@@ -244,7 +245,7 @@ export function makeInputs(deps: InputsDeps, storage: MediaInputStorage = diskSt
   };
 
   // Not stopped by a caller: a result once being kept is kept, or its row rolled back.
-  const storeResult = (staged: StagedAudioResult, holder: string, retainSource = false): Promise<T.MediaInputReference> =>
+  const storeResult = (staged: StagedAudioResult, holder: string, retainSource = false): Promise<MediaInputReference> =>
     lock.with(async () => {
       const capacity = await capacityNow();
       const reservedHere = resultReservations.get(staged.path) ?? 0;

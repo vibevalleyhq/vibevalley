@@ -88,8 +88,7 @@ test("a call not answered in its time is refused, and a slow call waits as long 
     void client.call.wait().catch(() => (waited = true));
     vi.advanceTimersByTime(callTimeoutMs);
     await expect(hung).rejects.toThrow(new BridgeError(`add was not answered in ${callTimeoutMs} ms`));
-    vi.advanceTimersByTime(60 * 60_000);
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(60 * 60_000);
     expect(waited).toBe(false);
     client.close();
   } finally {

@@ -2,6 +2,7 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
+import { dayTitle, monthTitle, monthWeeks, weekdayNames } from "@vibevalley/pkm/days";
 import type { PkmPageSummary } from "@vibevalley/protocol";
 
 import { createExternal } from "#/base/external.ts";
@@ -14,7 +15,6 @@ import { createAct } from "#/ui/act.ts";
 import { Icon } from "#/ui/Icon.tsx";
 import { IconButton } from "#/ui/IconButton.tsx";
 
-import { dayTitle, monthTitle, monthWeeks, weekdayNames } from "./days";
 import { pkmHref, refreshVault } from "./vault";
 
 const unfolded = defineStored("pkm.calendar", z.boolean(), true);

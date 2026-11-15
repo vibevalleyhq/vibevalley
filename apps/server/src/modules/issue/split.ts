@@ -17,7 +17,7 @@ import type { IssueLanding } from "./landing.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
 import { childChecks } from "./merge.ts";
 import { needsUser } from "./prompts.ts";
-import { isClosed } from "./status.ts";
+import { isClosed, type IssueChildDraft } from "./status.ts";
 
 const refused = refuseIn(BizCode.IssueRefused);
 
@@ -35,7 +35,7 @@ export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
   const { changesOf } = landing;
   const { everyIssue, get, publish, issueWords, setConflict, asked, saveSplit, completeChild } = r;
   const splitting = new Semaphore(1);
-  const split = (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor): Promise<string> =>
+  const split = (id: string, title: string, drafts: readonly IssueChildDraft[], by: Actor): Promise<string> =>
     splitting.with(async () => {
       const parent = await get(id);
       if (by.kind === "agent" && by.role === "worker") {
@@ -87,7 +87,7 @@ export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
         if (changes && changes.uncommitted.length > 0) throw refused(t("server.issue.split.commitFirst"));
       }
       const channel = (await chat.topOf(session ? (sessions.live(session).session?.channel ?? "") : "")).id;
-      await saveSplit(id, title, channel, parent.mandate, rows);
+      await saveSplit(parent.id, title, channel, parent.mandate, rows);
       return (
         t("server.issue.split.created", { n: parent.number, count: rows.length }) +
         "\n" +

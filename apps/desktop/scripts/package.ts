@@ -26,6 +26,9 @@ sh(desktop, "pnpm", "exec", "vpx", "scripts/build.ts");
 const island = join(repo, "apps/island");
 sh(island, "swift", "build", "-c", "release");
 const islandBinary = join(execFileSync("swift", ["build", "-c", "release", "--show-bin-path"], { cwd: island, encoding: "utf8" }).trim(), "VibeValleyIsland");
+const pty = join(repo, "apps/pty");
+sh(pty, "swift", "build", "-c", "release");
+const ptyBinary = join(execFileSync("swift", ["build", "-c", "release", "--show-bin-path"], { cwd: pty, encoding: "utf8" }).trim(), "VibeValleyPty");
 
 rmSync(stage, { recursive: true, force: true });
 // Everything at the versions the lockfile pins, the workspace packages copied in.
@@ -89,6 +92,7 @@ await build({
     extraResources: [
       { from: join(repo, "apps/web/dist"), to: "web" },
       { from: islandBinary, to: "island/VibeValleyIsland" },
+      { from: ptyBinary, to: "pty/VibeValleyPty" },
       { from: join(stage, "bin"), to: "bin" },
       { from: cli, to: "cli" },
     ],
@@ -121,6 +125,7 @@ const previous = (() => {
   try {
     return git("describe", "--tags", "--abbrev=0", ...(stageOf(version) === "stable" ? ["--exclude", "*-*"] : []), "HEAD^");
   } catch {
+    // First release on a line with no prior matching tag.
     return undefined;
   }
 })();

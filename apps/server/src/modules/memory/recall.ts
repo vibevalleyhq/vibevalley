@@ -104,12 +104,14 @@ export function memoryIsNewNote(memories: readonly Pick<T.Memory, "kind" | "text
 
 export const noteMaxChars = noteMax;
 
+export type MemoryKind = T.Memory["kind"];
+
 /** What memory_search questions. agent "": every profile (only the orchestrator may ask so). */
 export interface SearchQuery {
   readonly agent: string;
   readonly repo: string;
   readonly text: string;
-  readonly kind: T.MemoryKind | "";
+  readonly kind: MemoryKind | "";
   readonly limit: number;
 }
 

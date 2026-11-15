@@ -21,7 +21,7 @@ import type { Due } from "./cron.ts";
 import { acceptanceAncestors, blockedIssues } from "./dependencies.ts";
 import type { Intake, QueuedInput } from "./intake.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
-import { workConstraints } from "./prompts.ts";
+import { sourceBrief, workConstraints } from "./prompts.ts";
 import type { IssueSplitting } from "./split.ts";
 import { isClosed, assignedOnDuty } from "./status.ts";
 
@@ -109,19 +109,20 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
           if (e instanceof RepoError) throw new HireRefused(e.message, undefined, { cause: e });
           throw e;
         }
+      const source = hiredIssue.mandate.originTriggerId ? sourceBrief(hiredIssue.mandate.originTriggerId) : "";
       const received = await sessions.hireWith({
         agent,
         brief: [brief, constraints].filter(Boolean).join("\n\n"),
         where,
         options: {
           ...sending,
+          ...(source ? { preamble: source } : {}),
           ...(base ? { base, worktree: true } : {}),
           context: {
             kind: "issue",
             issue: {
               id: hiredIssue.id,
               number: hiredIssue.number,
-              ...(hiredIssue.mandate.originTriggerId ? { source: hiredIssue.mandate.originTriggerId } : {}),
             },
           },
         },
@@ -179,7 +180,7 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
 
   const start = async (id: string, channel: string, by?: T.RunTrigger, said?: string, inputs: readonly Trigger[] = []): Promise<Dispatched> => {
     const mine = await get(id).catch(noneIfRefused);
-    const queued = inputs.length > 0 || mine === undefined ? undefined : await intake.inputsOf(id);
+    const queued = inputs.length > 0 || mine === undefined ? undefined : await intake.inputsOf(mine.id);
     const initial = queued ?? inputs;
     if (mine) {
       const children = (await everyIssue()).filter((child) => child.parent === mine.id);

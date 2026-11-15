@@ -1,16 +1,49 @@
+import { z } from "zod";
+
 import { dagLayers } from "@vibevalley/agent/dag";
 import { everyone, defaultOrchestrator, userId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import { actorRoleOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
+import { IssueId, SessionId } from "@vibevalley/protocol/schema";
 
+import type { Fact } from "#/core/core.ts";
 import { localParts } from "#/infra/time.ts";
 import { type AchievementDef, achievements } from "#/modules/agent/seed.ts";
 import { isHired, isOnDuty, sessionOf, sessionOnIssue } from "#/modules/session/roster.ts";
 
 import { achievementInWords, levelForCommits } from "./view.ts";
 
+const LedgerEntryMomentKindValues = ["opened", "split", "voice", "busy6"] as const;
+
+export const LedgerEntrySchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("harvested"),
+    at: z.number(),
+    session: SessionId,
+    agent: z.exactOptional(z.string()),
+    repo: z.string(),
+    runtime: z.string(),
+    commits: z.number(),
+    cny: z.exactOptional(z.number()),
+    runs: z.number(),
+  }),
+  z.object({ kind: z.literal("failed"), at: z.number(), session: SessionId, agent: z.exactOptional(z.string()) }),
+  z.object({ kind: z.literal("conflicted"), at: z.number(), session: SessionId }),
+  z.object({ kind: z.literal("told"), at: z.number(), session: SessionId }),
+  z.object({ kind: z.literal("reviewed"), at: z.number(), session: SessionId }),
+  z.object({ kind: z.literal("family"), at: z.number(), issue: IssueId, merged: z.number(), parallel: z.boolean() }),
+  z.object({ kind: z.literal("handoff"), at: z.number(), session: SessionId, to: z.string() }),
+  z.object({ kind: z.literal("called"), at: z.number(), session: SessionId }),
+  z.object({ kind: z.literal("hired"), at: z.number(), session: SessionId, agent: z.exactOptional(z.string()) }),
+  z.object({ kind: z.enum(LedgerEntryMomentKindValues), at: z.number() }),
+  z.object({ kind: z.literal("level"), at: z.number(), level: z.number() }),
+  z.object({ kind: z.literal("titled"), at: z.number(), achievement: z.exactOptional(z.string()), tier: z.exactOptional(z.number()) }),
+]);
+
+export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;
+
 /** An entry as a fact makes it: when is the clock's, set as it is written. */
-export type Entry = T.LedgerEntry extends infer E ? (E extends T.LedgerEntry ? Omit<E, "at"> : never) : never;
+export type Entry = LedgerEntry extends infer E ? (E extends LedgerEntry ? Omit<E, "at"> : never) : never;
 
 const achievementOf = (id: string) => achievements().find((a) => a.id === id);
 
@@ -51,7 +84,7 @@ const added = (list: readonly string[], item: string): readonly string[] => (lis
 const bump = (counts: Record<string, number>, id: string, by: number) => ({ ...counts, [id]: (counts[id] ?? 0) + by });
 const atLeast = (counts: Record<string, number>, id: string, value: number) => ((counts[id] ?? 0) >= value ? counts : { ...counts, [id]: value });
 
-function tallied(p: T.Progress, e: T.LedgerEntry): T.Progress {
+function tallied(p: T.Progress, e: LedgerEntry): T.Progress {
   const field = e.kind === "hired" ? "hired" : e.kind === "harvested" ? "harvested" : e.kind === "failed" ? "failed" : undefined;
   const agent = field && "agent" in e ? e.agent : undefined;
   if (!field || !agent) return p;
@@ -59,10 +92,10 @@ function tallied(p: T.Progress, e: T.LedgerEntry): T.Progress {
   return { ...p, agents: { ...p.agents, [agent]: { ...was, [field]: was[field] + 1 } } };
 }
 
-type News = NonNullable<Extract<T.Fact, { type: "progressChanged" }>["news"]>;
+type News = NonNullable<Extract<Fact, { type: "progressChanged" }>["news"]>;
 
 /** Night and weekend are told in the server's own time zone, as JavaScript's Date does. */
-export function progressStep(folded: Folded, entry: T.LedgerEntry): [Folded, News] {
+export function progressStep(folded: Folded, entry: LedgerEntry): [Folded, News] {
   let p = folded.progress;
   let seen = folded.seen;
   let counts = p.counts;
@@ -164,7 +197,7 @@ export function progressStep(folded: Folded, entry: T.LedgerEntry): [Folded, New
   return [{ progress: next, seen }, news];
 }
 
-export const progressFold = (entries: readonly T.LedgerEntry[], from: Folded = emptyFolded()) => entries.reduce((f, e) => progressStep(f, e)[0], from);
+export const progressFold = (entries: readonly LedgerEntry[], from: Folded = emptyFolded()) => entries.reduce((f, e) => progressStep(f, e)[0], from);
 
 const fullHouse = 6;
 
@@ -180,7 +213,7 @@ function familyEntry(id: T.IssueId, children: readonly T.Issue[]): Entry {
 
 /** Only what the person does in the app (a voice call, a review, a title) is recorded where it happens: everything the
  * farm does is told by its facts. */
-export function entriesFor(before: T.SpaceState, fact: T.Fact, after: T.SpaceState): Entry[] {
+export function entriesFor(before: T.SpaceState, fact: Fact, after: T.SpaceState): Entry[] {
   const out: Entry[] = [];
   switch (fact.type) {
     case "sessionReported": {

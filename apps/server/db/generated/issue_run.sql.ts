@@ -5,11 +5,11 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, Words_session_run_outcome } from "./types.js"
+import { rowOf, IssueId, SessionId, Words_session_run_outcome } from "./types.js"
 
 export interface LinkRunIssueParams {
   readonly ["run"]: string
-  readonly ["issue"]: string
+  readonly ["issue"]: IssueId
 }
 
 export const LinkRunIssueSql = "-- name: LinkRunIssue :exec\ninsert into issue_run (run, issue) values ($1, $2) on conflict do nothing;"
@@ -23,7 +23,7 @@ export interface RunIssuesParams {
 }
 
 export const RunIssuesResult = z.object({
-  ["issue"]: z.string(),
+  ["issue"]: IssueId,
 })
 export type RunIssuesResult = z.infer<typeof RunIssuesResult>
 
@@ -35,12 +35,12 @@ export async function runIssues(sql: Sql, params: RunIssuesParams): Promise<RunI
 }
 
 export interface RunsOfIssueParams {
-  readonly ["issue_id"]: string
+  readonly ["issue_id"]: IssueId
 }
 
 export const RunsOfIssueResult = z.object({
   ["id"]: z.string(),
-  ["session"]: z.string(),
+  ["session"]: SessionId,
   ["issue"]: z.string().nullable(),
   ["triggered_by"]: z.string(),
   ["heard"]: z.string().nullable(),

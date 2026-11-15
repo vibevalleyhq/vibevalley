@@ -134,9 +134,9 @@ const installed = (template: T.AgentTemplate, beside: readonly T.Agent[], id?: s
   );
 
 const builtInSkillsDir = serverFile("src/modules/agent/skills");
-const readBuiltInSkills = async (): Promise<T.Skill[]> => {
+const readBuiltInSkills = async (locale: T.Locale = currentLocale()): Promise<T.Skill[]> => {
   const ids = (await readdir(builtInSkillsDir)).toSorted();
-  const en = currentLocale() === "en";
+  const en = locale === "en";
   const out: T.Skill[] = [];
   for (const id of ids) {
     const english = join(builtInSkillsDir, id, "SKILL.en.md");
@@ -156,12 +156,20 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
   const log = deps.log.child("agent");
   const file = join(config.home, "config.json");
   const disk = keptFile(file, deps);
-  const builtIn = await builtInTemplates();
-  const builtInOf = (id: string) => builtIn.find((item) => item.id === id);
-  const ownSkills = await readBuiltInSkills();
-  const builtInSkillOf = (id: string) => ownSkills.find((k) => k.id === id);
+  const builtInByLocale: Record<T.Locale, T.AgentTemplate[]> = {
+    zh: await builtInTemplates("zh"),
+    en: await builtInTemplates("en"),
+  };
+  const builtIn = () => builtInByLocale[currentLocale()];
+  const builtInOf = (id: string) => builtIn().find((item) => item.id === id);
+  const ownSkillsByLocale: Record<T.Locale, T.Skill[]> = {
+    zh: await readBuiltInSkills("zh"),
+    en: await readBuiltInSkills("en"),
+  };
+  const ownSkills = () => ownSkillsByLocale[currentLocale()];
+  const builtInSkillOf = (id: string) => ownSkills().find((k) => k.id === id);
   const isBuiltInSkill = (id: string) => builtInSkillOf(id) !== undefined;
-  for (const item of builtIn)
+  for (const item of builtIn())
     for (const id of item.skills) if (!isBuiltInSkill(id)) throw new Inconsistent(`the built-in template ${item.id} names ${id}, not in agent/skills`);
   const starters: T.Agent[] = [];
   for (const id of config.agent.starters) {
@@ -229,7 +237,7 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
   const templates = async () => {
     const added = await addedTemplates(config.home);
     for (const why of added.problems) log.warn(`vibevalley: an added template is left out: ${why}`);
-    return [...builtIn, ...added.templates].map((item) => ({
+    return [...builtIn(), ...added.templates].map((item) => ({
       ...item,
       installed: s.agents.filter((a) => a.from?.template === item.id).map((a) => a.id),
     }));
@@ -251,7 +259,7 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
       return sendable().find((a) => a.id === k) ?? sendable().find((a) => a.name === k);
     },
     // Built-in skills shadow any legacy user skill saved under the same id before the built-in shipped.
-    skills: () => structuredClone([...ownSkills, ...s.skills.filter((k) => !isBuiltInSkill(k.id))]),
+    skills: () => structuredClone([...ownSkills(), ...s.skills.filter((k) => !isBuiltInSkill(k.id))]),
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     orchestrators: () => all().filter((a) => a.role === "orchestrator"),
     isOrchestrator,

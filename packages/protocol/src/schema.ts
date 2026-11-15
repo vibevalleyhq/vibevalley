@@ -127,8 +127,6 @@ export {
   IssueFilter,
   IssueHistory,
   IssueRefineRequest,
-  IssueReport,
-  IssueReportMemory,
   IssueRequest,
   IssueReviewRequest,
   IssueSplitRequest,
@@ -143,7 +141,7 @@ export {
 } from "./issue/schema";
 export { Cron, CronRequest, CronUpdate, CronWhen, CronWhenWeekly } from "./cron/schema";
 export { OrchestratorEval, OrchestratorEvalRequest } from "./orchestrator/schema";
-export { Achievement, AchievementCategory, ChooseTitleRequest, LedgerEntry } from "./game/schema";
+export { Achievement, AchievementCategory, ChooseTitleRequest } from "./game/schema";
 export { AnswerPairingRequest, LanPaired, LanPairRequest, LanStatus, SetOpenRequest } from "./lan/schema";
 export {
   ApprovalAnswerRequest,

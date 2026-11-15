@@ -2,6 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   auditBizCodeRegistry,
+  auditGeneratedDbBrands,
   auditSecretClass,
   compareStoredEnums,
   formatFinding,
@@ -201,6 +202,49 @@ describe("source review hints", () => {
 
     const missingMeta = validEndpoint.replace('  [BizCode.IssueRefused]: { status: 409, kind: "Refused", retryable: false },\n', "");
     expect(auditBizCodeRegistry(missingMeta)[0]?.detail).toContain('bizCodeMeta ↔ BizCode: missing ["IssueRefused"]');
+  });
+
+  test("enforces branded codecs on generated database primary and foreign key row schemas", () => {
+    const sql = [
+      "CREATE TABLE issue (id text primary key, parent text references issue(id));",
+      "CREATE TABLE issue_assignment (id text primary key, issue text not null references issue(id));",
+    ].join("\n");
+    const types = "export const IssueId = branded(S.issueId);";
+    const issueGen = [
+      "export const GetIssueResult = z.object({",
+      '  ["id"]: IssueId,',
+      '  ["parent"]: IssueId.nullable(),',
+      "})",
+      'export const GetIssueSql = "select * from issue where id = $1;"',
+    ].join("\n");
+    const assignGen = [
+      "export const AllAssignmentsResult = z.object({",
+      '  ["id"]: z.string(),',
+      '  ["issue"]: IssueId,',
+      "})",
+      'export const AllAssignmentsSql = "select * from issue_assignment;"',
+    ].join("\n");
+    const clean = new Map([
+      ["apps/server/db/generated/types.ts", types],
+      ["apps/server/db/generated/issue.sql.ts", issueGen],
+      ["apps/server/db/generated/issue_assignment.sql.ts", assignGen],
+    ]);
+    expect(auditGeneratedDbBrands(sql, clean, { issue: "IssueId" })).toEqual([]);
+
+    const unbrandedFk = new Map(clean).set(
+      "apps/server/db/generated/issue_assignment.sql.ts",
+      assignGen.replace('["issue"]: IssueId', '["issue"]: z.string()'),
+    );
+    const findings = auditGeneratedDbBrands(sql, unbrandedFk, { issue: "IssueId" });
+    expect(findings).toEqual([
+      {
+        category: "db-unbranded-id",
+        location: "apps/server/db/generated/issue_assignment.sql.ts:3",
+        detail: "AllAssignmentsResult.issue (issue_assignment.issue): expected IssueId, got z.string()",
+      },
+    ]);
+    expect(findings.every(isBoundaryViolation)).toBe(true);
+    expect(formatFinding(findings[0]!)).toContain("Fix: keep tableBrands in apps/server/scripts/pg-generate.ts");
   });
 });
 

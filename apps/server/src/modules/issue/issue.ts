@@ -1,8 +1,8 @@
-import { map, merge, type Subscription, TaskGroup } from "@vibevalley/async";
+import { merge, type Subscription, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, latestSessionIdOf, sessionIdsOf, shortTitle } from "@vibevalley/protocol/rules";
-import { issueId } from "@vibevalley/protocol/schema";
+import { sessionId } from "@vibevalley/protocol/schema";
 
 import { actsForUser, type Actor, user as userActor } from "#/base/actor.ts";
 import { ApiError, BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
@@ -36,7 +36,9 @@ import { needsUser } from "./prompts.ts";
 import { kept, refinement } from "./refinement.ts";
 import { issueSettling, type StatusOptions } from "./settle.ts";
 import { issueSplitting } from "./split.ts";
-import { conflictOf, isClosed, assignedOnDuty, pickIssues } from "./status.ts";
+import { assignedOnDuty, conflictOf, type Finding, isClosed, type IssueChildDraft, type IssueConstraints, type IssueMandate, pickIssues } from "./status.ts";
+
+export type { IssueChildDraft, IssueConstraints, IssueMandate };
 
 const refused = refuseIn(BizCode.IssueRefused);
 
@@ -72,7 +74,7 @@ export interface IssueCreateInput {
   readonly title: string;
   readonly parent?: string;
   readonly blockedBy?: readonly string[];
-  readonly constraints?: T.IssueConstraints;
+  readonly constraints?: IssueConstraints;
   readonly description?: string;
   readonly repo?: string;
   readonly agent?: string;
@@ -120,7 +122,7 @@ export interface Issue {
   readonly query: (f: T.IssueFilter) => Promise<T.Issue[]>;
   readonly onBoard: () => readonly T.Issue[];
   readonly get: (id: string) => Promise<T.Issue>;
-  readonly add: (req: T.IssueRequest, mandate: T.IssueMandate) => Promise<T.Issue>;
+  readonly add: (req: T.IssueRequest, mandate: IssueMandate) => Promise<T.Issue>;
   /** Throws ApiError or IssueCreateRefused. */
   readonly create: (input: IssueCreateInput) => Promise<IssueCreated>;
   /** Throws AgentChoiceRefused. */
@@ -128,13 +130,13 @@ export interface Issue {
   readonly edit: (id: string, upd: T.IssueUpdate, by: Actor) => Promise<T.Issue>;
   readonly remove: (id: string) => Promise<void>;
   readonly start: (id: string, channel: string) => Promise<Dispatched>;
-  readonly split: (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor) => Promise<string>;
+  readonly split: (id: string, title: string, drafts: readonly IssueChildDraft[], by: Actor) => Promise<string>;
   readonly setStatus: (id: string, to: T.IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Promise<T.Issue>;
   readonly stop: (id: string) => Promise<void>;
   readonly previewStatus: (id: string, to: T.IssueStatus, text: string, opt?: StatusOptions, edit?: T.IssueUpdate) => Promise<T.Preview>;
   readonly previewRemove: (id: string) => Promise<T.Preview>;
   /** Resolves `#41`, `41`, an issue id, or the name or id of a helper or session that worked it. */
-  readonly idOf: (ref: string) => Promise<string>;
+  readonly idOf: (ref: string) => Promise<T.IssueId>;
   readonly comment: (id: string, text: string, sendKey?: string, by?: Actor) => Promise<CommentReceipt>;
   readonly changes: (id: string, by: Actor) => Promise<T.Changes>;
   readonly review: (id: string, req: IssueReviewRequest) => Promise<T.Issue>;
@@ -148,7 +150,7 @@ export interface Issue {
    * watch braked them), else to the orchestrator it names or the one of its place (intake.ts). */
   readonly route: (trigger: Trigger, hearers?: readonly Hearer[]) => Promise<void>;
   /** The issue a trigger is an input of. */
-  readonly ownerOf: (trigger: string) => Promise<string | undefined>;
+  readonly ownerOf: (trigger: string) => Promise<T.IssueId | undefined>;
   /** A helper says an input is not its to take; the orchestrator is told why. */
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   /** Throws HireRefused. */
@@ -194,7 +196,7 @@ export interface IssueReviewRequest {
   readonly text?: string;
 }
 
-function failedText(findings: readonly T.Finding[], text: string): string {
+function failedText(findings: readonly Finding[], text: string): string {
   let out = t("server.issue.brief.failedHead");
   let n = 0;
   for (const f of findings) if (!f.resolved) out += `\n${++n}. ${f.text}`;
@@ -273,7 +275,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     let where = await chat.homeOf(session);
     if (!where && live.reachable && live.session?.issue) {
       const issue = await get(live.session.issue);
-      where = await chat.issueThread(issue.id, issue.title, live.session.channel);
+      where = await chat.openThreadAbout("issue", issue.id, issue.title, live.session.channel);
     }
     if (!where) throw missing(t("server.channel.noHelper", { id: session }), [lookIn.session]);
     const run = sessions.live(from).run;
@@ -305,7 +307,8 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     return chosen;
   };
 
-  const submitPullRequest = async (session: string, summary?: string) => {
+  const submitPullRequest = async (rawSession: string, summary?: string) => {
+    const session = sessionId(rawSession);
     const issue = issueOfSession(session);
     if (!issue) throw refused(t("server.issue.prSubmitNotCurrent"));
     const item = await get(issue);
@@ -325,7 +328,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       return { worker: session };
     }
     if (isClosed(issue.status)) throw refused(t("server.issue.closedReopen"));
-    const thread = await chat.issueThread(issue.id, issue.title, session?.channel);
+    const thread = await chat.openThreadAbout("issue", issue.id, issue.title, session?.channel);
     await chat.say({ text: text, channel: thread, sendKey: sendKey });
     return { thread, ...(session ? { worker: session } : {}) };
   };
@@ -372,7 +375,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       parent = await get(parentId);
     }
     const blockedBy: T.IssueId[] = [];
-    for (const ref of input.blockedBy ?? []) blockedBy.push(issueId(await idOf(ref)));
+    for (const ref of input.blockedBy ?? []) blockedBy.push(await idOf(ref));
     const repo = (input.repo ?? parent?.repo ?? "").trim() || channel.repo;
     if (input.start === true && !repo) throw new IssueCreateRefused("noDefaultRepo", { channel: channel.name });
     let agent: string | undefined = parent ? assignedAgentOf(parent) : undefined;
@@ -493,17 +496,23 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 
   await loadKept();
   const news = sessions.news();
-  const userWords = chat.userInThread();
+  const userFacts = core.subscribe();
   // Session reports and user thread replies are handled one at a time, in one loop, so they cannot race.
   tasks.run("issue: session news and the user's words", async (signal) => {
     const unsubscribe = () => {
       news.close();
-      userWords.close();
+      userFacts.close();
     };
     signal.addEventListener("abort", unsubscribe, { once: true });
     try {
-      const words = map(userWords, (w) => ({ _tag: "UserSaid" as const, thread: w.thread, message: w.message }));
-      for await (const n of merge<SessionNews | { readonly _tag: "UserSaid"; readonly thread: string; readonly message: T.ChatMessage }>(news, words)) {
+      const words = (async function* () {
+        for await (const e of userFacts) {
+          if (e.type === "messageChanged" && e.thread && e.message.actor.kind === "user" && e.message.kind === "chat") {
+            yield { _tag: "UserSaid" as const, thread: e.thread };
+          }
+        }
+      })();
+      for await (const n of merge<SessionNews | { readonly _tag: "UserSaid"; readonly thread: string }>(news, words)) {
         if (n._tag === "UserSaid") await bestEffort(log, `vibevalley: issues after the user's words in ${n.thread}`, () => onUserInThread(n.thread));
         else await bestEffort(log, `vibevalley: issues after ${n._tag}`, () => onSessionNews(n));
       }
@@ -561,7 +570,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     }
     const criteria = upd.criteria !== undefined ? kept(upd.criteria) : was.criteria;
     const agent = upd.agent ?? assignedAgentOf(was);
-    await saveEdit(id, {
+    await saveEdit(was.id, {
       title,
       description,
       repo: upd.repo ?? was.repo,
@@ -571,7 +580,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       agent,
       ...(upd.before !== undefined ? { before: upd.before } : {}),
     });
-    return get(id);
+    return get(was.id);
   };
 
   const review = async (id: string, req: IssueReviewRequest) => {
@@ -584,20 +593,20 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     if (why) throw refused(why, nextSteps(item));
     if (req.pass) {
       await judged(
-        id,
+        item.id,
         clock.now(),
         item.findings.map((f) => ({ ...f, resolved: true })),
       );
-      return get(id);
+      return get(item.id);
     }
     const fresh = kept(req.findings);
     const text = (req.text ?? "").trim();
     if (fresh.length === 0 && !text) throw refused(t("server.issue.failNeedsFindings"));
     const at = clock.now();
     const findings = [...item.findings, ...fresh.map((text) => ({ id: newId(), text, at, resolved: false }))];
-    await judged(id, 0, findings);
-    await comment(id, failedText(findings, text));
-    return get(id);
+    await judged(item.id, 0, findings);
+    await comment(item.id, failedText(findings, text));
+    return get(item.id);
   };
 
   const setStatus = async (ref: string, to: T.IssueStatus, text: string, channel: string, by: Actor, opt: StatusOptions = {}) => {
@@ -609,7 +618,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       case "start": {
         if (taker) await edit(id, { agent: taker.id }, by);
         await start(id, channel);
-        const issueThread2 = await chat.issueThread(id, item.title, channel || undefined);
+        const issueThread2 = await chat.openThreadAbout("issue", id, item.title, channel || undefined);
         await chat.notice({
           channel: issueThread2,
           text: t("server.issue.confirmedRequirements", { title: item.title, description: item.description, criteria: item.criteria.join("\n") }),
@@ -714,7 +723,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       const item = await unsent(id);
       const cleared = await clearRefinement(item);
       if (cleared.kept) throw refused(t("server.issue.cannotDelete", { n: item.number, why: cleared.reason }));
-      await remove(id);
+      await remove(item.id);
     },
     start: (id, channel) => start(id, channel),
     idOf,
@@ -743,7 +752,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       const item = await get(id);
       const changes = await changesOf(item);
       if (!changes) throw refused(t("server.issue.notStarted"));
-      await setConflict(id, conflictOf(changes));
+      await setConflict(item.id, conflictOf(changes));
       const session = latestSessionIdOf(item);
       if (by.kind === "user" && session && sessions.live(session).reachable) core.did({ kind: "reviewed", session });
       return changes;

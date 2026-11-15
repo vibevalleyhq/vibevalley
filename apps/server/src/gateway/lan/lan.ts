@@ -4,17 +4,7 @@ import type { Duplex } from "node:stream";
 
 import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
-import {
-  artifactPrefix,
-  attachmentPath,
-  deviceKeyCookie,
-  eventsPath,
-  type LanPaired,
-  type LanStatus,
-  livePath,
-  type Preview,
-  statePath,
-} from "@vibevalley/protocol";
+import { attachmentPath, deviceKeyCookie, eventsPath, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
 import { apiSuccessEnvelope, bizCodeMeta, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { subscriptionPath } from "@vibevalley/protocol/rpc";
 import * as S from "@vibevalley/protocol/schema";
@@ -25,6 +15,7 @@ import { hostName, serverAddress, type ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
+import { artifactPrefix } from "#/modules/artifact/policy.ts";
 import { sameSecret, tidyName, type User } from "#/platform/user/user.ts";
 import * as lanQ from "#db/lan.sql.ts";
 
@@ -64,7 +55,6 @@ export interface Lan {
   readonly previewStopPairing: () => Preview;
   readonly answer: (allow: boolean) => Promise<LanStatus>;
   readonly pair: (code: string, name: string) => Promise<LanPaired>;
-  readonly setUpstream: (address: string) => void;
   /** The listener shuts, and what it had open with it. */
   readonly close: () => Promise<void>;
 }
@@ -185,7 +175,7 @@ export async function makeLan(deps: LanDeps, options: LanOptions = {}): Promise<
   let pairing: PairingState = { _tag: "idle" };
   // Serialize open/shut so a concurrent shut cannot miss an in-flight port bind and leave it listening.
   const opening = new Semaphore(1);
-  let upstream = config.port > 0 ? serverAddress(config) : "";
+  const upstream = config.port > 0 ? serverAddress(config) : "";
   /** What cuts each of a device's open connections; forgetting the device cuts them. */
   const conns = new Map<string, Set<() => void>>();
   const held = (device: string) => {
@@ -491,9 +481,6 @@ export async function makeLan(deps: LanDeps, options: LanOptions = {}): Promise<
       return {
         does: [t("server.lan.dropCode", { code: p.code }), ...(p._tag === "awaitingApproval" ? [t("server.lan.dropAsking", { name: p.asking })] : [])],
       };
-    },
-    setUpstream: (a) => {
-      upstream = a;
     },
     close: async () => {
       await opening.with(shut);

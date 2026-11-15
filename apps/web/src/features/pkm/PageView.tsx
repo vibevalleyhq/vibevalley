@@ -2,6 +2,7 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
+import { dayKey, daysUntil, titleFor } from "@vibevalley/pkm/days";
 import type { PkmBacklink, PkmComment, PkmPageSummary, PkmPageView, PkmTier } from "@vibevalley/protocol";
 
 import { api } from "#/infra/api.ts";
@@ -19,7 +20,6 @@ import { toast } from "#/ui/toasts.ts";
 
 import { Body } from "./Body";
 import { Calendar } from "./Calendar";
-import { daysUntil, dayKey, titleFor } from "./days";
 import { tierOrder, wordDiff } from "./outline";
 import { Outline } from "./OutlineView";
 import { pkmHref, refreshPkm as refreshQueries, usePkmPage } from "./vault";

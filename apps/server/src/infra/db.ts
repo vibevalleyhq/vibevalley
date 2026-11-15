@@ -148,7 +148,7 @@ function dbOver(driver: Driver, log: Logger, clock: Clock): Db {
         await run("commit", [], true);
       } catch (e) {
         own.open = false;
-        await run("rollback", [], true).catch(() => undefined);
+        await run("rollback", [], true).catch((rollbackErr: unknown) => log.warn("rollback failed", rollbackErr));
         throw e;
       } finally {
         const took = clock.now() - started;
@@ -207,7 +207,10 @@ async function external(url: string): Promise<Driver> {
   const driver = pgDriver(client);
   try {
     const hash = baselineHash();
-    const kept = await driver.query(`select hash from ${baselineTable}`, []).catch(() => undefined);
+    const kept = await driver.query(`select hash from ${baselineTable}`, []).catch((e: unknown) => {
+      if (e instanceof pg.DatabaseError && e.code === "42P01") return undefined;
+      throw e;
+    });
     const kept0 = kept?.rows[0]?.["hash"];
     const was = typeof kept0 === "string" ? kept0 : undefined;
     if (was === hash) return driver;

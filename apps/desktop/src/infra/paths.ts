@@ -19,6 +19,7 @@ interface AppPaths {
   /** The built page, served at / on the server's origin; opening.html and the pictures are read from it too. */
   readonly web: string;
   readonly island: string;
+  readonly pty: string;
   /** Appended to: the server's stdout and stderr. */
   readonly log: string;
   /** The page's pixel font, which the island draws in. */
@@ -49,6 +50,7 @@ export function appPaths(): AppPaths {
     command: app.isPackaged ? [process.execPath, "dist/main.mjs"] : [join(repo, "server", "node_modules", ".bin", "vpx"), "src/main.ts"],
     web,
     island: app.isPackaged ? join(process.resourcesPath, "island", "VibeValleyIsland") : join(repo, "island", ".build", "release", "VibeValleyIsland"),
+    pty: app.isPackaged ? join(process.resourcesPath, "pty", "VibeValleyPty") : join(repo, "pty", ".build", "release", "VibeValleyPty"),
     log: join(home, "logs", "desktop-server.log"),
     font: join(web, "fonts", "fusion-pixel-12px-proportional-zh_hans.otf"),
     dockIcon: join(web, "icons", "app-256.png"),

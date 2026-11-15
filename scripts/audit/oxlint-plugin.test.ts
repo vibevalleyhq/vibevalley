@@ -112,6 +112,14 @@ tester.run("no-copy-selector", rule("no-copy-selector"), {
   ],
 });
 
+tester.run("response-door", rule("response-door"), {
+  valid: ["await replyData(response, S.MediaJob)", "await api.media.job.get({ id })", "c.json({ ok: true })"],
+  invalid: [
+    { code: "await response.json()", errors: [{ messageId: "rawJson" }] },
+    { code: "const body = (await fetch(url)).json()", errors: [{ messageId: "rawJson" }] },
+  ],
+});
+
 tester.run("design-tokens", rule("design-tokens"), {
   valid: [
     {

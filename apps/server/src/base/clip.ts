@@ -1,4 +1,7 @@
+import type { ChatMessage } from "@vibevalley/protocol";
 import { oneLine, slice } from "@vibevalley/protocol/rules";
+
+export type QuotedBlock = NonNullable<ChatMessage["blocks"]>[number];
 
 export interface CardAttachment {
   readonly id: string;

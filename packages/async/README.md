@@ -13,7 +13,7 @@ from, how a test drives the clock): [vv-typescript](.agents/skills/vv-typescript
 | `src/hub.ts` | `Hub`, `Subscription` | news for many readers: each subscription gets what was published after it subscribed |
 | `src/semaphore.ts` | `Semaphore` | n permits, first come first served; a lock is a semaphore of one |
 | `src/retry.ts` | `retry`, `exponential`, `withTimeout`, `timeoutError` | trying again with a delay (never after an abort), a deadline on a call |
-| `src/streams.ts` | `merge`, `map`, `lines`, `collect`, `mapConcurrent` | async iterables: several into one, text into lines, a list with bounded concurrency |
+| `src/streams.ts` | `merge`, `lines`, `collect`, `mapConcurrent` | async iterables: several into one, text into lines, a list with bounded concurrency |
 
 ```bash
 vp run test     # vitest: src/async.test.ts

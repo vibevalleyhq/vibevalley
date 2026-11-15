@@ -198,6 +198,7 @@ function templateOf(fn: Function): string | undefined {
       const r = (fn as (...a: unknown[]) => unknown)(...args);
       return typeof r === "string" ? r : undefined;
     } catch {
+      // A word function that rejects sentinel probes is not a plain template.
       return undefined;
     }
   };
@@ -223,6 +224,7 @@ function choiceOf(fn: Function): string | undefined {
       const r = (fn as (...a: unknown[]) => unknown)(...args);
       return typeof r === "string" && !/undefined|NaN|\[object /u.test(r) ? r : undefined;
     } catch {
+      // A word function that throws on probe inputs cannot be rendered as ICU select/plural.
       return undefined;
     }
   };

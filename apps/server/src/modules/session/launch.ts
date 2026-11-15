@@ -22,6 +22,7 @@ import type { Machine } from "./machine.ts";
 import { workerInstructions, channelRules, restartedContextNote, restartedNote, workplaceRules } from "./prompts.ts";
 import type { Hand, SessionRegistry } from "./registry.ts";
 import { isHired } from "./roster.ts";
+import type { SessionClose } from "./shapes.ts";
 import { type Delivered, type DeliveryInput, DeliveryRefused } from "./signals.ts";
 import type { SessionWatch } from "./watch.ts";
 import type { WorkerAccess } from "./worker.ts";
@@ -71,7 +72,7 @@ export function makeLaunch(r: SessionRegistry, wt: SessionWatch, cli: WorkerAcce
   const repos = deps.repo;
   const machines = deps.machine;
   const executor = machines.executions(machines.here());
-  const { flushRuns, tasks, mcpEndpoint, roster, save, ended, expect, unexpect, consume, release, closeExecution } = r;
+  const { flushRuns, tasks, mcpUrl, roster, save, ended, expect, unexpect, consume, release, closeExecution } = r;
   const { closedLaunch, attach } = wt;
   const revokeAccess = async (hand: Hand) => {
     roster.revokeToken(hand);
@@ -83,7 +84,7 @@ export function makeLaunch(r: SessionRegistry, wt: SessionWatch, cli: WorkerAcce
     const token = roster.issueToken(hand);
     let access: { readonly authenticated: boolean; readonly command: string } | undefined;
     try {
-      access = await cli.prepare(hand.id, mcpEndpoint.url, token);
+      access = await cli.prepare(hand.id, mcpUrl, token);
     } catch (e) {
       // Taken as not let in: the hire is refused with workerAuthenticationFailed.
       log.warn(`vibevalley: ${hand.id}'s worker credential was not prepared`, e);
@@ -99,10 +100,7 @@ export function makeLaunch(r: SessionRegistry, wt: SessionWatch, cli: WorkerAcce
     ]
       .filter((s) => s !== "")
       .join("\n\n");
-    const mcp = [
-      { name: "vibevalley", type: "http" as const, url: mcpEndpoint.url, headers: { authorization: "Bearer " + token } },
-      ...agent.mcpServers.map(toOarMcp),
-    ];
+    const mcp = [{ name: "vibevalley", type: "http" as const, url: mcpUrl, headers: { authorization: "Bearer " + token } }, ...agent.mcpServers.map(toOarMcp)];
     const options: Partial<SessionOptions> = {
       mcpServers: mcp,
       ...(text && agent.personaMode === "append" ? { appendSystemPrompt: text } : {}),
@@ -134,7 +132,7 @@ export function makeLaunch(r: SessionRegistry, wt: SessionWatch, cli: WorkerAcce
     }
   };
 
-  const leave = async (h: Hand, closed: T.SessionClose, merged: number) => {
+  const leave = async (h: Hand, closed: SessionClose, merged: number) => {
     await tasks.stop(`idle:${h.id}`);
     release(h);
     await flushRuns();
@@ -295,7 +293,7 @@ export function makeLaunch(r: SessionRegistry, wt: SessionWatch, cli: WorkerAcce
   /** The work taken in by use; NotTakenIn (the session stays) when use fails, whatever it failed with. */
   const handOver = async (
     id: string,
-    closed: T.SessionClose,
+    closed: SessionClose,
     use: (place: Workplace, lastText: string) => Promise<Merged>,
     settle: Settle = "user",
   ): Promise<Merged> =>

@@ -28,6 +28,8 @@
     "@vibevalley/protocol": "workspace:*",
     "@vibevalley/provider": "workspace:*",
     "@vibevalley/stories": "workspace:*",
+    "@xterm/addon-fit": "catalog:",
+    "@xterm/xterm": "catalog:",
     "agora-rtc-sdk-ng": "catalog:",
     "hast-util-to-dom": "catalog:",
     "pele": "catalog:",

@@ -5,21 +5,24 @@ import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
+import type { ActorKind } from "#/base/actor.ts";
+import type { QuotedBlock } from "#/base/clip.ts";
 import { Inconsistent } from "#/base/errors.ts";
 import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
-import { type Meta, metaOf, type Picked } from "./meta.ts";
+import { type ChannelType, type Meta, metaOf, type Picked } from "./meta.ts";
 import { type ChannelRow } from "./rooms.ts";
 
-export type { Meta, Picked } from "./meta.ts";
+export type { ChannelType, Meta, Picked } from "./meta.ts";
 export { channelType, envelopeMore, metaOf, metaText } from "./meta.ts";
+export type MessageKind = T.ChatMessage["kind"];
 
 export type MsgRow = qm.MessageByIDResult;
 
 /** Who said a message, as the page shows it: an agent's seat that speaks for a profile is a helper's, one that does not
  * is an orchestrator's (a profile speaking as itself). */
-export const actorOf = (kind: T.ActorKind, agent: string | null, id: string, name?: string): T.Actor =>
+export const actorOf = (kind: ActorKind, agent: string | null, id: string, name?: string): T.Actor =>
   kind === "agent"
     ? { kind: "agent", id, role: agent !== null ? "worker" : "orchestrator", ...(name !== undefined ? { name } : {}) }
     : { kind, id, ...(name !== undefined ? { name } : {}) };
@@ -33,7 +36,7 @@ export const reactionsText = (r: Reactions) => {
   return kept.length > 0 ? jsonText(Object.fromEntries(kept)) : null;
 };
 
-export const messageKind = (kind: string): T.MessageKind => S.MessageKind.safeParse(kind).data ?? "chat";
+export const messageKind = (kind: string): MessageKind => S.MessageKind.safeParse(kind).data ?? "chat";
 export const subjectKind = (kind: string | null): NonNullable<T.Channel["subjectKind"]> | undefined =>
   kind !== null ? S.SubjectKind.safeParse(kind).data : undefined;
 export const notifyOf = (n: string): T.Notify => S.Notify.safeParse(n).data ?? "all";
@@ -47,7 +50,7 @@ export const theRow = <A>(row: A | undefined, query: string): A => {
 export function toMessage(row: MsgRow): T.ChatMessage {
   const meta = metaOf(row.meta);
   return {
-    id: S.messageId(row.id),
+    id: row.id,
     number: row.number,
     channel: row.channel_id,
     from: row.sender_id,
@@ -99,7 +102,7 @@ export interface AddressedMessage {
   readonly deleted?: boolean;
   readonly attachments?: readonly { readonly name: string; readonly path: string }[];
   readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
-  readonly blocks?: readonly T.QuotedBlock[];
+  readonly blocks?: readonly QuotedBlock[];
   readonly picked?: Picked;
   readonly responsePort?: string;
   readonly voiceMode?: NonNullable<Meta["voiceMode"]>;
@@ -145,7 +148,7 @@ export interface Saying {
   readonly replyTo?: number;
   readonly attachments?: readonly string[];
   readonly picked?: Picked;
-  readonly blocks?: readonly T.QuotedBlock[];
+  readonly blocks?: readonly QuotedBlock[];
   /** Delivers only to this orchestrator instead of channel members. */
   readonly to?: string;
 }
@@ -216,7 +219,7 @@ export interface ThreadSubject {
 export interface Write {
   readonly channel: string;
   readonly from: string;
-  readonly kind: T.MessageKind;
+  readonly kind: MessageKind;
   readonly text: string;
   readonly meta?: Meta;
   readonly thread?: ThreadSubject;
@@ -240,7 +243,7 @@ export interface Seat {
 
 export interface Participant {
   readonly id: string;
-  readonly kind: T.ActorKind;
+  readonly kind: ActorKind;
   readonly name: string;
   /** The profile it speaks for; none for the user, the farm and the orchestrators. */
   readonly agent: string | null;
@@ -250,7 +253,7 @@ export interface Participant {
 
 export interface Place {
   readonly id: string;
-  readonly type: T.ChannelType;
+  readonly type: ChannelType;
   readonly peer: string | null;
   readonly parent: string | null;
   readonly name: string | null;
@@ -285,7 +288,7 @@ export interface ChannelEvent {
   readonly seq: number;
   readonly kind: "posted" | "removed";
   readonly channel: string;
-  readonly message: string;
+  readonly message: T.MessageId;
   readonly at: number;
 }
 
@@ -342,9 +345,7 @@ export interface ChannelService {
   readonly pin: (id: T.MessageId, on: boolean) => Promise<T.ChatMessage>;
   readonly pins: (channel: string) => Promise<T.ChatMessage[]>;
   readonly threadUnder: (id: T.MessageId) => Promise<string>;
-  readonly issueThread: (issue: string, title: string, channel?: string) => Promise<string>;
-  readonly issueThreadId: (issue: string) => Promise<string | null>;
-  readonly issueMessages: (issue: string) => Promise<AddressedMessage[]>;
+  readonly openThreadAbout: (kind: NonNullable<T.Channel["subjectKind"]>, id: string, title: string, channel?: string) => Promise<string>;
   readonly search: (text: string, channel?: string) => Promise<T.MessageHit[]>;
   /** `""` resolves to `from`'s own session thread, or the default channel. */
   readonly placeOf: (from: string, channel: string) => Promise<string>;
@@ -359,7 +360,9 @@ export interface ChannelService {
   readonly markRead: (channel: string, seq: number) => Promise<void>;
   /** A message as the user's notice of it stands: when the user read it (null: not yet), and whether a later message
    * there took its place (the user spoke after it, or its speaker reported again). None once it is deleted. */
-  readonly userReceipt: (id: string) => Promise<{ readonly message: T.ChatMessage; readonly readAt: number | null; readonly superseded: boolean } | undefined>;
+  readonly userReceipt: (
+    id: T.MessageId,
+  ) => Promise<{ readonly message: T.ChatMessage; readonly readAt: number | null; readonly superseded: boolean } | undefined>;
   /** Each speaker's newest report the user has read, and when the user read it. */
   readonly userReadReports: () => Promise<readonly { readonly from: string; readonly at: number; readonly readAt: number }[]>;
   /** The place an empty target means for a participant: the home the layers above gave it. */
@@ -370,7 +373,7 @@ export interface ChannelService {
   /** The events after `after`, oldest first, at most n. */
   readonly events: (after: number, n?: number) => Promise<ChannelEvent[]>;
   /** A posted message as it is now, told as when it was committed; none once it is deleted or its place is gone. */
-  readonly committedOf: (message: string) => Promise<Committed | undefined>;
+  readonly committedOf: (message: T.MessageId) => Promise<Committed | undefined>;
   /** A reader the chat's writes wait on: a message said, posted, spoken or noted, or a removal, returns once
    * `handled(seq)` has for its event (a throw fails the write; the event stays committed). A notice does not wait: it
    * wakes no one, and a reader may write one while it handles an event. */
@@ -389,7 +392,7 @@ export interface ChannelService {
   readonly place: (id: string) => Place | undefined;
   /** A message a participant took in outside the chat (handed to it): no longer unread or unseen for it. A message that
    * is not there marks nothing. */
-  readonly markSeen: (participant: string, message: string) => Promise<void>;
+  readonly markSeen: (participant: string, message: T.MessageId) => Promise<void>;
   /** Sets where a participant has read up to in a place. */
   readonly readUpTo: (participant: string, channel: string, number: number) => Promise<void>;
   /** The newest message number in a place, 0 for none. */
@@ -413,9 +416,7 @@ export interface ChannelService {
    * before any event. */
   readonly follow: (channel: string, after: number, signal?: AbortSignal) => AsyncIterable<T.ChannelEvent>;
   /** The reports after the one with id `after` (the newest ones without it), then each one from now on. */
-  readonly reports: (after?: string, signal?: AbortSignal) => AsyncIterable<T.ChannelEvent>;
-  /** What the user says in a thread, from now on: subscribed before it returns. */
-  readonly userInThread: () => Subscription<{ readonly thread: string; readonly message: T.ChatMessage }>;
+  readonly reports: (after?: T.MessageId, signal?: AbortSignal) => AsyncIterable<T.ChannelEvent>;
   readonly channels: () => Promise<Info[]>;
   readonly openChannel: (name: string, description: string, repo: string) => Promise<Info>;
   /** `description` undefined or `""` keeps existing; `repo` undefined keeps existing, `""` clears it. */

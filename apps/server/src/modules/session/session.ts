@@ -18,7 +18,7 @@ import { type Machine, makeMachine } from "./machine.ts";
 import { type DeliveryNews, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox } from "./mailbox.ts";
 import type { TriggerInput, TriggerResource } from "./payload.ts";
 import { summaryOf } from "./report.ts";
-import type { Trigger } from "./shapes.ts";
+import type { Trigger, IssueReport } from "./shapes.ts";
 
 export type { SessionOptions };
 export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
@@ -50,8 +50,8 @@ export interface Session {
   /** A helper hired with its first inputs; throws HireRefused. */
   readonly hireWith: (order: HireArrival) => Promise<HiredReceipt>;
   /** A channel message's envelope taken back from every delivery that still waits on it. */
-  readonly withdrawEnvelope: (envelope: string) => Promise<void>;
-  /** The chat the deliveries read their places from (the default channel, a place's orchestrator, a participant's unread),
+  readonly withdrawEnvelope: (envelope: T.MessageId) => Promise<void>;
+  /** The chat the deliveries read their places from (the default channel and a participant's unread),
    * told by the layer above the sessions; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
   /** Which of a session's waiting inputs may be handed to it now, told by the issues above the sessions; until then, all. */
@@ -94,11 +94,11 @@ export interface Session {
    * what a restart or a failed route left for the layer above to route again. */
   readonly unrouted: (consume: (trigger: Trigger, data: unknown) => Promise<void>) => Promise<void>;
   /** How many deliveries a message still waits in. */
-  readonly waitingOn: (envelope: string) => Promise<number>;
+  readonly waitingOn: (envelope: T.MessageId) => Promise<number>;
   /** What an orchestrator has not read yet. */
   readonly digest: (agent: string) => Promise<Envelope[]>;
   /** A helper's report for its run's issue; refused when it has none. */
-  readonly report: (id: string, report: T.IssueReport) => Promise<void>;
+  readonly report: (id: string, report: IssueReport) => Promise<void>;
   /** Rejects `..` segments and symlinks escaping the session's working directory; throws NotWorkFile. */
   readonly workFile: (id: string, path: string, max: number) => Promise<{ readonly name: string; readonly bytes: Uint8Array }>;
   /** Everything the sessions tell, subscribed before it returns: nothing told after is missed. */
@@ -107,7 +107,6 @@ export interface Session {
   readonly deliveries: () => Subscription<DeliveryNews>;
   /** Session id owning `token`, or `""` when unrecognized. */
   readonly who: (token: string) => string;
-  readonly setAddress: (address: string) => void;
   /** An in-process agent's host; the caller owns it and closes it (`await using`). Throws NotRecorded. */
   readonly host: <R>(options: HostOptions<R>) => Promise<AgentHost<R>>;
   /** At startup, after the modules below it started: the sessions back, then their open deliveries restored and who
@@ -186,7 +185,6 @@ export function sessionOver(parts: { readonly lifecycle: Lifecycle; readonly mai
     news: lifecycle.news,
     deliveries: mailbox.news,
     who: lifecycle.who,
-    setAddress: lifecycle.setAddress,
     host: lifecycle.host,
     boot: async () => {
       await lifecycle.boot();

@@ -3,13 +3,14 @@ import type * as T from "@vibevalley/protocol";
 import { executionsOf } from "@vibevalley/protocol/rules";
 
 import type { WrittenKind, WrittenTemplate } from "#/modules/agent/seed.ts";
+import type { RepoStack } from "#/modules/repo/repo.ts";
 import type { AddIssueParams } from "#db/issue.sql.ts";
 
-import { assignedOnDuty } from "./status.ts";
+import { assignedOnDuty, type IssueMandate } from "./status.ts";
 
 export const maxChildren = 12;
 
-export const issueRow = (id: string, req: T.IssueRequest, mandate: T.IssueMandate, at: number, cron?: string): AddIssueParams => ({
+export const issueRow = (id: T.IssueId, req: T.IssueRequest, mandate: IssueMandate, at: number, cron?: string): AddIssueParams => ({
   id,
   title: req.title,
   description: req.description ?? "",
@@ -38,15 +39,15 @@ export function mandateNoteFits(text: string): boolean {
   return true;
 }
 
-const mandate = (strength: T.IssueMandate["strength"], originTriggerId: string, autoSubmitPr: boolean): T.IssueMandate => ({
+const mandate = (strength: IssueMandate["strength"], originTriggerId: string, autoSubmitPr: boolean): IssueMandate => ({
   ...(originTriggerId === "" ? {} : { originTriggerId }),
   strength,
   maxBotReviewRounds: defaultBotReviewRounds,
   autoSubmitPr,
 });
 
-export const explicitMandate = (originTriggerId = "", autoSubmitPr = false): T.IssueMandate => mandate("explicit", originTriggerId, autoSubmitPr);
-export const inferredMandate = (originTriggerId = ""): T.IssueMandate => mandate("inferred", originTriggerId, false);
+export const explicitMandate = (originTriggerId = "", autoSubmitPr = false): IssueMandate => mandate("explicit", originTriggerId, autoSubmitPr);
+export const inferredMandate = (originTriggerId = ""): IssueMandate => mandate("inferred", originTriggerId, false);
 
 const recentTitles = 5;
 
@@ -70,7 +71,7 @@ export function sentTitles(all: readonly T.Issue[], repo: string, orchestrator: 
 const commandHoles = /\s?\{(test|lint|build)\}\s?/gu;
 
 /** A known command goes in as code, spaced from the words around it; an unknown one is a plain word, unspaced as Chinese is. */
-export function filledTemplate(s: WrittenTemplate, stack: Partial<T.RepoStack>): T.RepoTemplates["kinds"][number]["templates"][number] {
+export function filledTemplate(s: WrittenTemplate, stack: Partial<RepoStack>): T.RepoTemplates["kinds"][number]["templates"][number] {
   const commands: Record<string, string | undefined> = { test: stack.test, lint: stack.lint, build: stack.build };
   const done = s.done.replace(commandHoles, (hole, name: string) =>
     commands[name] ? hole.replace(`{${name}}`, "`" + commands[name] + "`") : (maybe(`server.issue.template.commands.${name}`) ?? hole),
@@ -80,7 +81,7 @@ export function filledTemplate(s: WrittenTemplate, stack: Partial<T.RepoStack>):
   return { id: s.id, title: s.title, done, text, ...(blank ? { blank } : {}) };
 }
 
-export const filledKinds = (kinds: readonly WrittenKind[], stack: Partial<T.RepoStack>): T.RepoTemplates["kinds"] =>
+export const filledKinds = (kinds: readonly WrittenKind[], stack: Partial<RepoStack>): T.RepoTemplates["kinds"] =>
   kinds.map((k) => ({ ...k, templates: k.templates.map((template) => filledTemplate(template, stack)) }));
 
 function firstBlank(text: string): NonNullable<T.RepoTemplates["kinds"][number]["templates"][number]["blank"]> | undefined {

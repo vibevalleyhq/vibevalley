@@ -1,7 +1,7 @@
 import { Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ArtifactDisplayValues, userId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -22,6 +22,7 @@ import { htmlEdit } from "./edit.ts";
 import { artifactProblem } from "./policy.ts";
 
 const refused = refuseIn(BizCode.ArtifactRefused);
+const ArtifactDisplayValues = S.Artifact.shape.display.unwrap().options;
 
 /** Who makes it. from: who says so in the channel (the user, a session, an orchestrator). */
 interface Maker {
@@ -61,8 +62,8 @@ export interface Artifact {
   readonly follow: (id: T.ArtifactId, after: number, signal?: AbortSignal) => AsyncIterable<T.ArtifactEvent>;
   readonly suggestions: (id: T.ArtifactId) => Promise<T.Suggestion[]>;
   readonly suggest: (id: T.ArtifactId, actor: string, req: T.SuggestionCreate) => Promise<T.Suggestion>;
-  readonly acceptSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Promise<T.Suggestion>;
-  readonly rejectSuggestion: (id: T.ArtifactId, suggestion: string, actor: string) => Promise<T.Suggestion>;
+  readonly acceptSuggestion: (id: T.ArtifactId, suggestion: T.SuggestionId, actor: string) => Promise<T.Suggestion>;
+  readonly rejectSuggestion: (id: T.ArtifactId, suggestion: T.SuggestionId, actor: string) => Promise<T.Suggestion>;
   readonly suggestionStream: (id: T.ArtifactId, signal?: AbortSignal) => AsyncIterable<T.SuggestionEvent>;
   /** Starts the demo and returns at once (blocks.ts). */
   readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Promise<void>;
@@ -98,7 +99,7 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
   const assemble = async (row: qa.ArtifactsResult): Promise<T.Artifact> => {
     const versions = row.body === "html" ? await qv.artifactVersions(db.sql, { artifact_id: row.id }) : [];
     return {
-      id: S.artifactId(row.id),
+      id: row.id,
       title: row.title,
       body: row.body,
       ...(row.display !== null && isOneOf(ArtifactDisplayValues, row.display) ? { display: row.display } : {}),
@@ -227,7 +228,7 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
     const next = row.version + 1;
     const note = req.note?.trim() || undefined;
     const shown = row.display !== null && isOneOf(ArtifactDisplayValues, row.display) ? { display: row.display } : {};
-    const card: T.ArtifactCard = { id: S.artifactId(row.id), title: row.title, body: "html", version: next, note: note ?? "", ...shown };
+    const card: T.ArtifactCard = { id: row.id, title: row.title, body: "html", version: next, note: note ?? "", ...shown };
     // Announced where the first one was: its comments stay in one place.
     const { message: said } = await chat.post({
       from: maker.from,
@@ -249,7 +250,7 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
     });
     await qv.artifactVersionAnnounced(db.sql, { artifact_id: row.id, version: next, message_id: said.id });
     await qa.artifactVersioned(db.sql, { id: row.id, version: next, updated_at: now });
-    return assemble(await found(S.artifactId(row.id)));
+    return assemble(await found(row.id));
   };
 
   const versionOf = async (id: T.ArtifactId, version: number | undefined) => {
