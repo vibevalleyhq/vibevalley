@@ -1,16 +1,16 @@
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
+import type { Around, EditAction, Focus } from "@vibevalley/pkm/editing";
+import { type DropAt, dropAt, dropOps, outlineText, pickAction, type Picked, pickedIds, stepped } from "@vibevalley/pkm/selection";
 import type { PkmBlock, PkmBlockOp, PkmPageSummary, PkmPageView } from "@vibevalley/protocol";
 
 import { useTimeout } from "#/base/timer.ts";
 import { useQueryClient } from "#/infra/query.ts";
 import { toast } from "#/ui/toasts.ts";
 
-import type { Around, EditAction, Focus } from "./editing";
 import { hasChildren, visibleBlocks } from "./outline";
 import { Editor, indentPx, newId, Row, Toolbar, type Writing } from "./OutlineEditor";
-import { type DropAt, dropAt, dropOps, outlineText, pickAction, type Picked, pickedIds, stepped } from "./selection";
 import { pkmPageQuery, refreshVault } from "./vault";
 import { PageWriter, pageServer } from "./writer";
 

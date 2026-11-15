@@ -18,7 +18,7 @@ import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
-import type { Time } from "#/infra/time.ts";
+import { keyedLater, type Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Accepted, Delivery, Hearer } from "#/modules/session/envelope.ts";
@@ -116,19 +116,11 @@ export function issueIntake(deps: IntakeDeps): Intake {
     return addressed !== undefined && agents.isOrchestrator(addressed) ? addressed : chat.orchestratorIn(placeOf(trigger));
   };
 
-  /** One pending timer per key: a later() for a key already waiting is dropped. The key is free again once it fires. */
-  const timers = new Map<string, () => void>();
-  let closed = false;
-  const later = (key: string, work: () => Promise<void>) => {
-    if (closed || timers.has(key)) return;
-    timers.set(
-      key,
-      clock.after(0, () => {
-        timers.delete(key);
-        if (!closed) tasks.run(`intake: ${key}`, () => bestEffort(log, `intake: ${key}`, work));
-      }),
-    );
-  };
+  const timers = keyedLater(clock);
+  const later = (key: string, work: () => Promise<void>) =>
+    timers.schedule(key, 0, () => {
+      tasks.run(`intake: ${key}`, () => bestEffort(log, `intake: ${key}`, work));
+    });
 
   /** The input goes back to the orchestrator to be routed again: its helper declined it (reason), or the issue closed
    * before its helper took the user's words in (unreadOnly). */
@@ -358,9 +350,7 @@ export function issueIntake(deps: IntakeDeps): Intake {
         });
     },
     close: async () => {
-      closed = true;
-      for (const cancel of timers.values()) cancel();
-      timers.clear();
+      timers.close();
       await tasks.close();
     },
   };

@@ -177,18 +177,6 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
       throw fail(t("server.repo.github.stateUnknown", { n }));
     },
     githubRemote,
-    resolveReviewThread: async (name: string, thread: string): Promise<void> => {
-      await githubRemote(name);
-      const resolved = await gh(
-        "api",
-        "graphql",
-        "-f",
-        "query=mutation($thread:ID!){resolveReviewThread(input:{threadId:$thread}){thread{id isResolved}}}",
-        "-F",
-        `thread=${thread}`,
-      );
-      if (!resolved.ok) throw fail(t("server.repo.github.resolveFailed"));
-    },
     finishPullRequest: (name: string, n: number): Promise<Merged> =>
       serially(name, async () => {
         if (usesPullRequests(name)) await syncMain(name);

@@ -132,6 +132,7 @@
 | `publicHttps` | `publicHttp.ts` |  |
 | `publicFetch` | `publicHttp.ts` |  |
 | `wallTime` | `time.ts` | The wall clock, for code with no service to ask: a class tested on its own, the command line. |
+| `keyedLater` | `time.ts` | Coalesces pending timers by key: scheduling a key already waiting is dropped until it fires; `close` cancels all pending timers. |
 | `withinRealTime` | `time.ts` | A deadline on a real process or network call (a runtime's probe of its CLI): real time, whatever the Clock says, and it keeps nothing alive. |
 | `afterRealTime` | `time.ts` | A deadline on a real process (a command's timeout, the grace before SIGKILL): runs f after ms of real time, whatever the Clock says. |
 | `localeMinute` | `time.ts` | To the minute, in this machine's zone: what an input says the time is, so that it does not change between two requests a |

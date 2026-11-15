@@ -178,7 +178,6 @@ export interface CheckoutAt {
 export interface Repo {
   readonly root: string;
   readonly limit: number;
-  readonly maxSessions: () => number;
   readonly validate: (req: T.NewRepo) => T.Validation;
   readonly create: (req: T.NewRepo, signal?: AbortSignal) => Promise<RepoFolder>;
   readonly list: () => Promise<RepoFolder[]>;
@@ -201,7 +200,6 @@ export interface Repo {
   readonly conflict: (place: Workplace, baseBranch?: string) => Promise<T.Conflict | undefined>;
   readonly merge: (place: Workplace, signal?: AbortSignal) => Promise<Merged>;
   readonly mergeInto: (place: Workplace, target: string, targetCwd?: string, signal?: AbortSignal) => Promise<Merged>;
-  readonly mergeBranch: (repo: string, branch: string, signal?: AbortSignal) => Promise<string>;
   readonly openBranch: (repo: string, branch: string, from?: string) => Promise<void>;
   /** The checks the checkout's work must pass against base (the branch it merges into); the files an acceptance check
    * freezes. Throws MergeFailure. */
@@ -216,7 +214,6 @@ export interface Repo {
   readonly githubSnapshot: (name: string, n: number) => Promise<GitHubPullSnapshot>;
   /** The last lines of the failed Actions job a check's URL points at; "" when it is not one or GitHub does not say. */
   readonly failedJobLog: (name: string, checkUrl: string) => Promise<string>;
-  readonly resolveReviewThread: (name: string, thread: string) => Promise<void>;
   readonly finishPullRequest: (name: string, n: number) => Promise<Merged>;
   /** As the server starts: a first look at GitHub, in the background; the page asks again with github.refresh. */
   readonly boot: () => Promise<void>;
@@ -641,22 +638,6 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
       );
     });
 
-  const mergeBranch = (repo: string, branch: string, signal?: AbortSignal): Promise<string> =>
-    toMergeFailure(() =>
-      serially(
-        repo,
-        async () => {
-          const path = join(root, repo);
-          const { main, ahead } = await mergeMain(path, branch, t("server.repo.keptBranch", { branch }), undefined, signal);
-          let said = ahead > 0 ? t("server.repo.merged", { ahead, repo, main }) : t("server.repo.nothingNewInPlan");
-          const deleted = await repository(path, signal).deleteBranch(branch);
-          if (deleted) said += t("server.repo.branchLeft", { branch, why: deleted });
-          return said;
-        },
-        signal,
-      ),
-    );
-
   const release = (place: Workplace): Promise<WorkplaceRelease> =>
     serially(place.repo, async (): Promise<WorkplaceRelease> => {
       if (!place.branch) return { kept: false };
@@ -728,7 +709,6 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
     root,
     submitBranch,
     limit: perRepo,
-    maxSessions,
     validate: (req) => ({ problem: repoProblem(req) }),
     create,
     list,
@@ -821,7 +801,6 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
     },
     merge,
     mergeInto,
-    mergeBranch,
     openBranch: (repo, branch, from = "") =>
       serially(repo, async () => {
         const path = await ensure(repo);

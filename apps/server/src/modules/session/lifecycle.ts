@@ -30,7 +30,6 @@ import { type AgentHost, type HostOptions, makeHost } from "./host.ts";
 import { NotRecorded } from "./inProcessRun.ts";
 import { makeLaunch, NotTakenIn, reasonText } from "./launch.ts";
 import type { Machine } from "./machine.ts";
-import { sourceBrief } from "./prompts.ts";
 import { type Hand, makeRegistry, type RunStore } from "./registry.ts";
 import { handsToUser } from "./report.ts";
 import { isHired, isOnDuty } from "./roster.ts";
@@ -88,6 +87,8 @@ export interface HireOptions {
   readonly issue?: string;
   readonly trigger?: T.RunTrigger;
   readonly refining?: boolean;
+  /** Prompt instructions appended to `brief` on initial launch without altering `session.brief`. */
+  readonly preamble?: string;
   /** Runs after the session row is written, before any report or hired fact is visible; throws NotRecorded when it cannot be kept. */
   readonly hiring?: (s: T.Session, launch: string) => Promise<void>;
 }
@@ -95,8 +96,7 @@ export interface HireOptions {
 interface SendOptions extends Omit<HireOptions, "issue"> {
   readonly envelopeIds?: readonly string[];
   readonly context:
-    /** source: the trigger the work came from, which its brief points the helper to. */
-    | { readonly kind: "issue"; readonly issue: { readonly id: string; readonly number: number; readonly source?: string } }
+    | { readonly kind: "issue"; readonly issue: { readonly id: string; readonly number: number } }
     | { readonly kind: "channel"; readonly channel: string };
 }
 
@@ -138,7 +138,6 @@ export interface Lifecycle {
   readonly news: () => Subscription<SessionNews>;
   /** Session id owning `token`, or `""` when unrecognized. */
   readonly who: (token: string) => string;
-  readonly setAddress: (address: string) => void;
   /** An in-process agent's host; the caller owns it and closes it (`await using`). Throws NotRecorded. */
   readonly host: <R>(options: HostOptions<R>) => Promise<AgentHost<R>>;
   /** Brings back the sessions a restart left: their hands, their interrupted runs. */
@@ -213,7 +212,6 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
   const {
     flushRuns,
     later,
-    mcpEndpoint,
     trajectories,
     admission,
     newsHub,
@@ -559,8 +557,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
           machine: machines.here().id,
         };
         const initialText = initial.map((input) => `${input.id}\n${input.card.summary}\n${input.card.readUri}`).join("\n\n");
-        const source = issue?.source;
-        const prompt = [brief, source ? sourceBrief(source) : "", initialText].filter(Boolean).join("\n\n");
+        const prompt = [brief, opt.preamble ?? "", initialText].filter(Boolean).join("\n\n");
         const opened = await open(agent, session, h, place, withRecall(recall, prompt), "");
         if (!opened.execution) {
           if (opened.retained) startup.phase = "retained";
@@ -806,7 +803,6 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
     report,
     news: () => newsHub.subscribe(),
     who: roster.who,
-    setAddress: (address) => void (mcpEndpoint.url = `http://${address}/mcp`),
     host,
     restore,
     boot: restore,

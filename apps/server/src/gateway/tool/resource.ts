@@ -223,7 +223,9 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
       case "issue": {
         const issue = await issues.get(ref.id);
         if (!orchestrator && (session === undefined || !(await mayReadIssue(session, issue)))) throw refuse(resourceWords.forbidden(uri));
-        return textOf({ issue, runs: await issues.runs(issue.id), messages: await channels.issueMessages(issue.id) });
+        const thread = channels.threadAbout("issue", issue.id);
+        const messages = thread ? (await channels.recentRows(thread, 50)).map(channels.addressedOf) : [];
+        return textOf({ issue, runs: await issues.runs(issue.id), messages });
       }
       case "channel": {
         if (!orchestrator && (session === undefined || !(await mayReadChannel(session, ref.id)))) throw refuse(resourceWords.forbidden(uri));

@@ -1,5 +1,6 @@
 import { createSignal, onSettled, Show } from "solid-js";
 
+import { selectionOf } from "@vibevalley/artifact/shell";
 import { t } from "@vibevalley/i18n";
 import type { Artifact, HtmlAnchor } from "@vibevalley/protocol";
 
@@ -12,7 +13,6 @@ import { TextArea } from "#/ui/Field.tsx";
 import { toast } from "#/ui/toasts.ts";
 
 import { artifactHref } from "./ArtifactCard";
-import { selectionOf } from "./shell";
 
 /** One version's frame: made again when another version is shown, so the words picked are always this version's. */
 export function PageWords(props: { artifact: Artifact; version: number; frame: HTMLIFrameElement }) {

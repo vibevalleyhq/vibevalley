@@ -1,6 +1,6 @@
 // Every message is written to the database with a numbered event; the event goes to the readers (the watch) once it is
 // committed, and the write returns once they have handled it.
-import { type Subscription, TaskGroup } from "@vibevalley/async";
+import { TaskGroup } from "@vibevalley/async";
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
@@ -65,36 +65,6 @@ export interface ChannelDeps {
   readonly db: Db;
   readonly core: Core;
   readonly attachment: Attachment;
-}
-
-/** A subscription's values that keep, as f makes them (undefined: dropped). */
-function mapped<A, B>(sub: Subscription<A>, f: (a: A) => B | undefined): Subscription<B> {
-  const next = async (signal?: AbortSignal): Promise<IteratorResult<B>> => {
-    for (;;) {
-      const r = await sub.next(signal);
-      if (r.done === true) return { done: true, value: undefined };
-      const b = f(r.value);
-      if (b !== undefined) return { done: false, value: b };
-    }
-  };
-  return {
-    next,
-    drain: () =>
-      sub.drain().flatMap((a) => {
-        const b = f(a);
-        return b === undefined ? [] : [b];
-      }),
-    size: () => sub.size(),
-    close: () => sub.close(),
-    [Symbol.dispose]: () => sub.close(),
-    [Symbol.asyncIterator]: () => ({
-      next: () => next(),
-      return: () => {
-        sub.close();
-        return Promise.resolve({ done: true, value: undefined });
-      },
-    }),
-  };
 }
 
 export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
@@ -207,10 +177,6 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
     return { message: toMessage(written.row), again: written.again };
   };
 
-  const recent = async (channel: string, n: number): Promise<AddressedMessage[]> => {
-    if (!store.channel(channel)) return [];
-    return [...(await qm.messagesBefore(db.sql, { channel_id: channel, number: 2147483647, n }))].toReversed().map(addressedOf);
-  };
   const speak = async ({ from, text, run, ...opt }: Speaking): Promise<Spoken> => {
     let written: Written | undefined;
     const spoken = await store.locked(async (): Promise<Spoken> => {
@@ -378,9 +344,9 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         await publishChannel(thread);
         return thread;
       }),
-    issueThread: (issue, title, channel) =>
+    openThreadAbout: (kind, id, title, channel) =>
       store.locked(async () => {
-        const existing = store.threadOfSubject("issue", issue);
+        const existing = store.threadOfSubject(kind, id);
         if (existing) return existing;
         const where = channel ?? store.defaultId();
         if (store.channel(where)?.type !== "channel") throw refused(t("server.channel.threadOnlyInChannel"));
@@ -389,16 +355,10 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
           from: "system",
           kind: "notice",
           text: title,
-          thread: { kind: "issue", id: issue, owner: "" },
+          thread: { kind, id, owner: "" },
         });
         return written.thread;
       }),
-    issueThreadId: async (issue) => store.threadOfSubject("issue", issue) ?? null,
-    issueMessages: async (issue) => {
-      const thread = store.threadOfSubject("issue", issue);
-      if (!thread) return [];
-      return recent(thread, 50);
-    },
     search: async (text, channel) => {
       const q = parseSearch(text);
       if (!q.words && !q.from && !q.in && q.has.length === 0 && q.before === undefined && q.after === undefined) throw refused(t("server.channel.empty"));
@@ -540,12 +500,6 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
       await handled(written);
       return { thread: written.thread };
     },
-    userInThread: () =>
-      mapped(core.subscribe(), (e) =>
-        e.type === "messageChanged" && e.thread && e.message.actor.kind === "user" && e.message.kind === "chat"
-          ? { thread: e.thread, message: e.message }
-          : undefined,
-      ),
     ...dir,
     close: async () => {
       await tasks.close();

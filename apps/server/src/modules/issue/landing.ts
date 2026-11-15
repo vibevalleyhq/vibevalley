@@ -80,7 +80,7 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
   const pullRequestSubmitted = async (issue: T.Issue, pr: T.PullRequest) => {
     let thread: string;
     try {
-      thread = await chat.issueThread(issue.id, issue.title);
+      thread = await chat.openThreadAbout("issue", issue.id, issue.title);
     } catch (e) {
       throw e instanceof ApiError ? MergeFailure.error(e.message) : e;
     }

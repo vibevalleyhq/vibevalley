@@ -238,7 +238,7 @@ describe("a pull request", () => {
           issue = await issues.setStatus(issue.id, "done", "", "", user);
           expect([creates, pushes]).toEqual([1, 3]);
           const chat = fw.channel;
-          const thread = await chat.issueThread(issue.id, issue.title);
+          const thread = await chat.openThreadAbout("issue", issue.id, issue.title);
           expect(
             (await chat.history(thread)).filter((message) => message.kind === "notice" && message.text.includes("https://github.com/test/clock/pull/7")),
           ).toHaveLength(1);

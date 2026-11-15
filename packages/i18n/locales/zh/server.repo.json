@@ -40,11 +40,8 @@
   "inRepoNoBranch": "它直接在仓库里干活，没有要合并的分支",
   "inRepoNothing": "它直接在仓库里干活，没有分支可合",
   "keptBoth": "{branch} 分支和 worktree 都留着",
-  "keptBranch": "{branch} 分支留着",
   "merged": "{ahead} 个提交合进了 {repo} 的 {main}",
   "nothingNew": "这一单没有新的提交",
-  "nothingNewInPlan": "计划分支上没有新的提交",
-  "branchLeft": "；改动已合并，分支 {branch} 尚未清理：{why}",
   "clear": {
     "uncommitted": "{branch} 还有没提交的改动，worktree 留在 {cwd}",
     "branchLeft": "{branch} 没清掉：{why}",
@@ -67,7 +64,6 @@
     "viewFailed": "查询 PR #{n} 失败",
     "stateUnread": "无法读取 PR #{n} 状态",
     "stateUnknown": "无法识别 PR #{n} 状态",
-    "resolveFailed": "解决 GitHub Review 讨论失败",
     "worktreeLeft": "PR 已结束，清理 worktree 失败：{why}",
     "branchLeft": "PR 已结束，清理本地分支失败：{why}"
   },

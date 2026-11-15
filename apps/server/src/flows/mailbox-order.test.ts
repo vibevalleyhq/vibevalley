@@ -151,7 +151,7 @@ test("regression: an independent agent wake restores cooldown using receipt time
     const issue = await issues.add({ title: "work", agent: "lab", repo: "cooldown" });
     const started = await issues.start(issue.id, "");
     const threads = [`issue:${issue.id}`];
-    const thread = await fw.channel.issueThread(issue.id, issue.title);
+    const thread = await fw.channel.openThreadAbout("issue", issue.id, issue.title);
     const { target } = await fw.channel.addressOf(thread);
     await fw.channel.seat({ id: "w90", name: "别处的帮工", agent: "lab" });
     const call = async (text: string) => (await fw.channel.speak({ from: "w90", text: `@${started.session!} ${text}`, target, anyway: true })).message!;

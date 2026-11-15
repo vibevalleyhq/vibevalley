@@ -1357,11 +1357,8 @@ export const catalogs = {
       inRepoNoBranch: "它直接在仓库里干活，没有要合并的分支",
       inRepoNothing: "它直接在仓库里干活，没有分支可合",
       keptBoth: "{branch} 分支和 worktree 都留着",
-      keptBranch: "{branch} 分支留着",
       merged: "{ahead} 个提交合进了 {repo} 的 {main}",
       nothingNew: "这一单没有新的提交",
-      nothingNewInPlan: "计划分支上没有新的提交",
-      branchLeft: "；改动已合并，分支 {branch} 尚未清理：{why}",
       clear: {
         uncommitted: "{branch} 还有没提交的改动，worktree 留在 {cwd}",
         branchLeft: "{branch} 没清掉：{why}",
@@ -1384,7 +1381,6 @@ export const catalogs = {
         viewFailed: "查询 PR #{n} 失败",
         stateUnread: "无法读取 PR #{n} 状态",
         stateUnknown: "无法识别 PR #{n} 状态",
-        resolveFailed: "解决 GitHub Review 讨论失败",
         worktreeLeft: "PR 已结束，清理 worktree 失败：{why}",
         branchLeft: "PR 已结束，清理本地分支失败：{why}",
       },
@@ -6128,11 +6124,8 @@ export const catalogs = {
       inRepoNoBranch: "It works right in the repo, so there is no branch to merge",
       inRepoNothing: "It works right in the repo, so there is no branch to merge",
       keptBoth: "the {branch} branch and its worktree are kept",
-      keptBranch: "the {branch} branch is kept",
       merged: "{ahead} commits merged into {repo}'s {main}",
       nothingNew: "This one has no new commits",
-      nothingNewInPlan: "The plan's branch has no new commits",
-      branchLeft: "; the changes are merged, the branch {branch} is not cleared yet: {why}",
       clear: {
         uncommitted: "{branch} has uncommitted changes; its worktree stays at {cwd}",
         branchLeft: "{branch} was not cleared: {why}",
@@ -6155,7 +6148,6 @@ export const catalogs = {
         viewFailed: "Looking up PR #{n} failed",
         stateUnread: "PR #{n}'s state could not be read",
         stateUnknown: "PR #{n}'s state is not one VibeValley knows",
-        resolveFailed: "Could not resolve the GitHub review thread",
         worktreeLeft: "The PR is over, but clearing the worktree failed: {why}",
         branchLeft: "The PR is over, but clearing the local branch failed: {why}",
       },
@@ -10867,7 +10859,6 @@ export interface Messages {
   "server.provider.voiceQuery": undefined;
   "server.repo.badGithub": undefined;
   "server.repo.badName": undefined;
-  "server.repo.branchLeft": { readonly branch: string | number; readonly why: string | number };
   "server.repo.branchMoved": undefined;
   "server.repo.check.exited": { readonly code: string | number };
   "server.repo.check.failed": { readonly why: string | number };
@@ -10898,7 +10889,6 @@ export interface Messages {
   "server.repo.github.noPermission": undefined;
   "server.repo.github.notGithub": undefined;
   "server.repo.github.readOnly": undefined;
-  "server.repo.github.resolveFailed": undefined;
   "server.repo.github.stateUnknown": { readonly n: string | number };
   "server.repo.github.stateUnread": { readonly n: string | number };
   "server.repo.github.unchecked": undefined;
@@ -10909,7 +10899,6 @@ export interface Messages {
   "server.repo.inRepoNoBranch": undefined;
   "server.repo.inRepoNothing": undefined;
   "server.repo.keptBoth": { readonly branch: string | number };
-  "server.repo.keptBranch": { readonly branch: string | number };
   "server.repo.mainMoved": undefined;
   "server.repo.mergeFailed": { readonly kept: string | number; readonly main: string | number; readonly why: string | number };
   "server.repo.mergeStuck": { readonly abort: string | number; readonly kept: string | number; readonly main: string | number; readonly why: string | number };
@@ -10924,7 +10913,6 @@ export interface Messages {
   "server.repo.notChecked": undefined;
   "server.repo.notRepoName": { readonly name: string | number };
   "server.repo.nothingNew": undefined;
-  "server.repo.nothingNewInPlan": undefined;
   "server.repo.outside": undefined;
   "server.repo.parentBranchChanged": undefined;
   "server.repo.parentHasChanges": undefined;

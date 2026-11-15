@@ -2,18 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
-import type { PkmBlock, PkmBlockOp, PkmMarker, PkmPageSummary, PkmPageView, PkmSearchHit } from "@vibevalley/protocol";
-
-import { spelled } from "#/base/search.ts";
-import { useTimeout } from "#/base/timer.ts";
-import { api } from "#/infra/api.ts";
-import { useLatest } from "#/state/atom.ts";
-import { Icon } from "#/ui/Icon.tsx";
-import type { IconName } from "#/ui/icons.ts";
-import { typeMarks } from "#/ui/markInput.ts";
-
-import { Body } from "./Body";
-import { dayKey } from "./days";
+import { dayKey } from "@vibevalley/pkm/days";
 import {
   type Around,
   type Caret,
@@ -30,8 +19,19 @@ import {
   offered,
   pasteAction,
   saved,
-} from "./editing";
-import type { DropAt } from "./selection";
+} from "@vibevalley/pkm/editing";
+import type { DropAt } from "@vibevalley/pkm/selection";
+import type { PkmBlock, PkmBlockOp, PkmMarker, PkmPageSummary, PkmPageView, PkmSearchHit } from "@vibevalley/protocol";
+
+import { spelled } from "#/base/search.ts";
+import { useTimeout } from "#/base/timer.ts";
+import { api } from "#/infra/api.ts";
+import { useLatest } from "#/state/atom.ts";
+import { Icon } from "#/ui/Icon.tsx";
+import type { IconName } from "#/ui/icons.ts";
+import { typeMarks } from "#/ui/markInput.ts";
+
+import { Body } from "./Body";
 
 export interface Writing {
   readonly block: string;

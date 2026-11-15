@@ -51,7 +51,7 @@ export interface Session {
   readonly hireWith: (order: HireArrival) => Promise<HiredReceipt>;
   /** A channel message's envelope taken back from every delivery that still waits on it. */
   readonly withdrawEnvelope: (envelope: string) => Promise<void>;
-  /** The chat the deliveries read their places from (the default channel, a place's orchestrator, a participant's unread),
+  /** The chat the deliveries read their places from (the default channel and a participant's unread),
    * told by the layer above the sessions; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
   /** Which of a session's waiting inputs may be handed to it now, told by the issues above the sessions; until then, all. */
@@ -107,7 +107,6 @@ export interface Session {
   readonly deliveries: () => Subscription<DeliveryNews>;
   /** Session id owning `token`, or `""` when unrecognized. */
   readonly who: (token: string) => string;
-  readonly setAddress: (address: string) => void;
   /** An in-process agent's host; the caller owns it and closes it (`await using`). Throws NotRecorded. */
   readonly host: <R>(options: HostOptions<R>) => Promise<AgentHost<R>>;
   /** At startup, after the modules below it started: the sessions back, then their open deliveries restored and who
@@ -186,7 +185,6 @@ export function sessionOver(parts: { readonly lifecycle: Lifecycle; readonly mai
     news: lifecycle.news,
     deliveries: mailbox.news,
     who: lifecycle.who,
-    setAddress: lifecycle.setAddress,
     host: lifecycle.host,
     boot: async () => {
       await lifecycle.boot();

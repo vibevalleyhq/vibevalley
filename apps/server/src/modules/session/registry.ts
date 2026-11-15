@@ -72,7 +72,7 @@ export async function makeRegistry(deps: RegistryDeps) {
   const flushRuns = () => runWrites;
   /** One timer per key (the save, each conversation's idle suspension): a new one stops the one before. */
   const later = (key: string, work: (signal: AbortSignal) => Promise<unknown>) => void tasks.keyed(key, work);
-  const mcpEndpoint = { url: `http://${serverAddress(config)}/mcp` };
+  const mcpUrl = `http://${serverAddress(config)}/mcp`;
   const trajectories = makeTrajectories(config.home, (id, e) => core.sessionEvent(sessionId(id), e), { clock, log });
   const admission = new Semaphore(1);
   const roster = makeHandRoster(admission);
@@ -297,7 +297,7 @@ export async function makeRegistry(deps: RegistryDeps) {
     fire,
     flushRuns,
     later,
-    mcpEndpoint,
+    mcpUrl,
     trajectories,
     admission,
     newsHub,

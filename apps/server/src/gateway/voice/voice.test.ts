@@ -248,8 +248,8 @@ const farm = async (
     const provider =
       options.fetch || options.clock ? await makeProvider({ ...w, fetch: options.fetch ?? w.fetch, clock: options.clock ?? w.clock }) : w.provider;
     const voice = await makeVoice(
-      { ...w, provider, orchestrator: options.brief ? { ...orchestrator, brief: options.brief } : orchestrator },
-      { fetch: capture.fetch, gatherMs: 30 },
+      { ...w, fetch: capture.fetch, provider, orchestrator: options.brief ? { ...orchestrator, brief: options.brief } : orchestrator },
+      { gatherMs: 30 },
     );
     w.closes.push(() => voice.close());
     return { world: w, voice, provider, setting: w.setting, [Symbol.asyncDispose]: () => w.close() };

@@ -69,7 +69,7 @@
 | `waitingOn`、`digest` | 一封信还在几处投递里；助手没读的摘要 | 观察层、助手 |
 | `room` | 这个农机在这个仓库上还能不能再开一个帮工 | 工单 |
 | `news`、`deliveries` | 会话的一切动静（`Hired`、`Reported`、`Left`、`IssueStarted`、`RunFinished`、回执和启动动静），投递的动静（`Handed`、`Consumed`、`EmptyWake`：叫醒了却没开口就交还了输入） | 工单、观察层、助手 |
-| `handBack`、`report`、`workFile`、`who`、`setAddress`、`host` | 助手退回、帮工交汇报、读帮工目录里的文件、令牌认人、`/mcp` 地址、助手的进程内宿主 | 工具、助手、媒体、`/mcp`、接口 |
+| `handBack`、`report`、`workFile`、`who`、`host` | 助手退回、帮工交汇报、读帮工目录里的文件、令牌认人、助手的进程内宿主 | 工具、助手、媒体、`/mcp`、接口 |
 | `boot`、`close` | 开机接回会话、恢复投递并叫醒；关门 | `services.ts` |
 
 - **测试经 `insideOf` 驱动里面的部分**（`hire`、`deliver`、`handOver`、`restore`…），模块不许用它（`modules.test.ts` 查）。

@@ -342,9 +342,7 @@ export interface ChannelService {
   readonly pin: (id: T.MessageId, on: boolean) => Promise<T.ChatMessage>;
   readonly pins: (channel: string) => Promise<T.ChatMessage[]>;
   readonly threadUnder: (id: T.MessageId) => Promise<string>;
-  readonly issueThread: (issue: string, title: string, channel?: string) => Promise<string>;
-  readonly issueThreadId: (issue: string) => Promise<string | null>;
-  readonly issueMessages: (issue: string) => Promise<AddressedMessage[]>;
+  readonly openThreadAbout: (kind: NonNullable<T.Channel["subjectKind"]>, id: string, title: string, channel?: string) => Promise<string>;
   readonly search: (text: string, channel?: string) => Promise<T.MessageHit[]>;
   /** `""` resolves to `from`'s own session thread, or the default channel. */
   readonly placeOf: (from: string, channel: string) => Promise<string>;
@@ -414,8 +412,6 @@ export interface ChannelService {
   readonly follow: (channel: string, after: number, signal?: AbortSignal) => AsyncIterable<T.ChannelEvent>;
   /** The reports after the one with id `after` (the newest ones without it), then each one from now on. */
   readonly reports: (after?: string, signal?: AbortSignal) => AsyncIterable<T.ChannelEvent>;
-  /** What the user says in a thread, from now on: subscribed before it returns. */
-  readonly userInThread: () => Subscription<{ readonly thread: string; readonly message: T.ChatMessage }>;
   readonly channels: () => Promise<Info[]>;
   readonly openChannel: (name: string, description: string, repo: string) => Promise<Info>;
   /** `description` undefined or `""` keeps existing; `repo` undefined keeps existing, `""` clears it. */

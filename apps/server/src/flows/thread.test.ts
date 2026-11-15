@@ -94,7 +94,7 @@ describe("an issue's thread", () => {
     const issue = await issues.add({ title: "等待派发", repo: "queued", agent: "lab" });
     await issues.comment(issue.id, "先记下验收要求", "queued-comment");
     await issues.comment(issue.id, "先记下验收要求", "queued-comment");
-    const thread = await channels.issueThread(issue.id, issue.title);
+    const thread = await channels.openThreadAbout("issue", issue.id, issue.title);
     expect((await channels.history(thread)).map((message) => message.text)).toEqual(["先记下验收要求"]);
     expect(sessions.hired()).toEqual([]);
     expect((await issues.get(issue.id)).status).toBe("backlog");

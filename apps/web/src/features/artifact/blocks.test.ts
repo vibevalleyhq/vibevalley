@@ -1,9 +1,8 @@
 import { expect, test } from "vite-plus/test";
 
+import { codePointOffset, editSpans, listNumbers, markdownShortcut, plainOf } from "@vibevalley/artifact/blocks";
 import { type TextSpan } from "@vibevalley/protocol";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
-
-import { codePointOffset, editSpans, listNumbers, markdownShortcut, plainOf } from "./blocks";
 
 const span = (t: string, bold = false): TextSpan => ({ t, marks: bold ? { bold: true } : {} });
 

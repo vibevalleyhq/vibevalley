@@ -101,6 +101,25 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
       });
     });
 
+  const commitHanded = async (session: string, launch: string, at: number, rows: readonly DeliveryDraft[]): Promise<void> => {
+    try {
+      await db.tx(async () => {
+        const committed: { added: qd.InsertDeliveryResult[]; row: DeliveryDraft }[] = [];
+        for (const row of rows) {
+          const added = await writeDelivery({ session, row });
+          await qd.markHanded(db.sql, { session_id: session, envelope_id: row.envelope_id, launch, handed_at: at });
+          await markRoute({ session, row });
+          committed.push({ added, row });
+        }
+        await db.afterCommit(() => {
+          for (const entry of committed) for (const added of entry.added) stored(session, { ...entry.row, position: added.position });
+        });
+      });
+    } catch (e) {
+      throw notRecorded(e);
+    }
+  };
+
   const registerInitialInputs = (session: T.Session, launch: string, inputs: readonly Trigger[]): Promise<void> =>
     writtenLocked(async () => {
       const at = clock.now();
@@ -121,22 +140,7 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
         created_at: at,
         payload: triggerPayload(trigger, session.issue),
       }));
-      try {
-        await db.tx(async () => {
-          const committed: { added: qd.InsertDeliveryResult[]; row: DeliveryDraft }[] = [];
-          for (const row of rows) {
-            const added = await writeDelivery({ session: session.id, row });
-            await qd.markHanded(db.sql, { session_id: session.id, envelope_id: row.envelope_id, launch, handed_at: at });
-            await markRoute({ session: session.id, row });
-            committed.push({ added, row });
-          }
-          await db.afterCommit(() => {
-            for (const entry of committed) for (const added of entry.added) stored(session.id, { ...entry.row, position: added.position });
-          });
-        });
-      } catch (e) {
-        throw notRecorded(e);
-      }
+      await commitHanded(session.id, launch, at, rows);
     });
 
   const hand = (session: string, envelope: string, launch: string, at: number): Promise<void> =>
@@ -180,22 +184,7 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
           },
         });
       }
-      try {
-        await db.tx(async () => {
-          const committed: { added: qd.InsertDeliveryResult[]; row: DeliveryDraft }[] = [];
-          for (const row of prepared) {
-            const added = await writeDelivery({ session, row });
-            await qd.markHanded(db.sql, { session_id: session, envelope_id: row.envelope_id, launch, handed_at: at });
-            await markRoute({ session, row });
-            committed.push({ row, added });
-          }
-          await db.afterCommit(() => {
-            for (const entry of committed) for (const added of entry.added) stored(session, { ...entry.row, position: added.position });
-          });
-        });
-      } catch (e) {
-        throw notRecorded(e);
-      }
+      await commitHanded(session, launch, at, prepared);
     });
 
   const isRouted = async (trigger: string): Promise<boolean> => (await qr.isRouted(db.sql, { envelope_id: trigger }))?.routed === true;

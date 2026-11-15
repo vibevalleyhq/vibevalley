@@ -1,8 +1,7 @@
 import { type Accessor, createSignal, onSettled } from "solid-js";
 
+import { shellMessageOf } from "@vibevalley/artifact/shell";
 import type { Artifact, HtmlShellCommand, HtmlShellMessage } from "@vibevalley/protocol";
-
-import { shellMessageOf } from "./shell";
 
 /** What the page's runtime last said: what it is (ready) and where it is (at). */
 export interface Shown {

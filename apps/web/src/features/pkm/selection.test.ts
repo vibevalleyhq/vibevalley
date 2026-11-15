@@ -1,9 +1,8 @@
 import { expect, test } from "vite-plus/test";
 
+import { applied } from "@vibevalley/pkm/editing";
+import { dropAt, dropOps, outlineText, pickAction, pickedIds, type Picked } from "@vibevalley/pkm/selection";
 import type { PkmBlock } from "@vibevalley/protocol";
-
-import { applied } from "./editing";
-import { dropAt, dropOps, outlineText, pickAction, pickedIds, type Picked } from "./selection";
 
 const keys = { key: "", shiftKey: false, altKey: false, metaKey: false, ctrlKey: false };
 const block = (id: string, depth = 0, parent?: string): PkmBlock => ({ id, depth, body: id, props: {}, path: "", ...(parent ? { parent } : {}) });

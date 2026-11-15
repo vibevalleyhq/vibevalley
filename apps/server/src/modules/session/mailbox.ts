@@ -8,7 +8,7 @@ import { jsonOf } from "#/base/json.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
-import type { Time } from "#/infra/time.ts";
+import { keyedLater, type Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
 import * as qd from "#db/session_delivery.sql.ts";
 import * as qr from "#db/session_trigger.sql.ts";
@@ -136,26 +136,17 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
   const writeLock = new Semaphore(1);
   // A write, once begun, runs to its end: none is handed a signal.
   const writtenLocked = <A>(work: () => Promise<A>) => writeLock.with(work);
-  /** One pending timer per key: a later() for a key already waiting is dropped. The key is free again once it fires. */
-  const timers = new Map<string, () => void>();
-  let closed = false;
-  const later = (key: string, ms: number, work: () => Promise<void>) => {
-    if (closed || timers.has(key)) return;
-    timers.set(
-      key,
-      clock.after(ms, () => {
-        timers.delete(key);
-        if (closed) return;
-        tasks.run(`mailbox: ${key}`, () =>
-          bestEffort(log, `mailbox: ${key}`, () =>
-            pumpLocked(async () => {
-              if (!closed) await work();
-            }),
-          ),
-        );
-      }),
-    );
-  };
+  const timers = keyedLater(clock);
+  const later = (key: string, ms: number, work: () => Promise<void>) =>
+    timers.schedule(key, ms, () => {
+      tasks.run(`mailbox: ${key}`, () =>
+        bestEffort(log, `mailbox: ${key}`, () =>
+          pumpLocked(async () => {
+            if (!timers.isClosed()) await work();
+          }),
+        ),
+      );
+    });
   const work = makeWorkMailbox({ db, clock, session: sessions, agent: agents }, { writtenLocked, stored, defaultChannel: defaultChannelOf, open });
   const dispatch = (session: string) => later(`trigger:${session}`, 0, () => pump.kick(session));
   const restore = () =>
@@ -278,7 +269,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
         const ready = readiness(inputs);
         return rows.filter((_, i) => ready[i] === true);
       },
-      closed: () => closed,
+      closed: () => timers.isClosed(),
       isHosted: agents.isHosted,
       message: (row) => inputOf(row),
       wakeInput: async (recipient, _rows, messages) => {
@@ -362,8 +353,14 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
       readiness = ready;
     },
     holdWakes: async (session, held) => {
-      if (held) braked.add(session);
-      else if (braked.delete(session)) await pumpLocked(() => pump.kick(session));
+      const changed = await writtenLocked(async () => {
+        if (held) {
+          braked.add(session);
+          return false;
+        }
+        return braked.delete(session);
+      });
+      if (changed) await pumpLocked(() => pump.kick(session));
     },
     agentWakes: async () => {
       const [scopes, last] = await Promise.all([qd.agentWakesByScope(db.sql), qd.lastAgentWakes(db.sql)]);
@@ -374,9 +371,7 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
     },
     waitingOn: async (envelope) => (await qd.waitingOn(db.sql, { message_id: envelope })).length,
     close: async () => {
-      closed = true;
-      for (const cancel of timers.values()) cancel();
-      timers.clear();
+      timers.close();
       await tasks.close();
       newsHub.end();
     },

@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { dayKey, daysUntil, dayTitle, monthWeeks } from "./days";
+import { dayKey, daysUntil, dayTitle, monthWeeks } from "@vibevalley/pkm/days";
 
 test("a journal's title in the user's words, with the year only when it is another", () => {
   expect(dayTitle("2026-11-03", "2026-11-04", "zh")).toBe("11月3日周二");

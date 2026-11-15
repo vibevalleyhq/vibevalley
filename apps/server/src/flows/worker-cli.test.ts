@@ -18,11 +18,18 @@ import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
 /** /mcp served on a free loopback port: its address, closed with await using. */
-async function listen(mcp: Mcp) {
-  const node = createAdaptorServer({ fetch: (request: Request) => mcp.handle(request) });
+async function listen(mcp: Mcp | (() => Mcp | undefined)) {
+  const resolveMcp = typeof mcp === "function" ? mcp : () => mcp;
+  const node = createAdaptorServer({
+    fetch: (request: Request) => {
+      const target = resolveMcp();
+      return target ? target.handle(request) : new Response("starting", { status: 503 });
+    },
+  });
   await new Promise<void>((resolve) => node.listen(0, "127.0.0.1", () => resolve()));
   const { port } = node.address() as AddressInfo;
   return {
+    port,
     endpoint: `127.0.0.1:${port}/mcp`,
     [Symbol.asyncDispose]: () =>
       new Promise<void>((resolve) => {
@@ -85,8 +92,10 @@ test("regression: worker CLI preserves returned tool errors and ignores unavaila
 });
 
 test("regression: a real worker CLI submits its authorized PR and report as its session", async () => {
+  let mcpTarget: Mcp | undefined;
+  await using served = await listen(() => mcpTarget);
   const base = testConfig();
-  const config = { ...base, github: { ...base.github, prRepos: ["demo"] } };
+  const config = { ...base, port: served.port, github: { ...base.github, prRepos: ["demo"] } };
   const gate = Promise.withResolvers<void>();
   let turns = 0;
   let token = "";
@@ -134,9 +143,8 @@ test("regression: a real worker CLI submits its authorized PR and report as its 
     },
   });
   try {
-    await using served = await listen(fw.mcp);
+    mcpTarget = fw.mcp;
     const sessions = fw.inside;
-    sessions.setAddress(new URL("http://" + served.endpoint).host);
     const issues = fw.issue;
     const agent = { ...starter("lab"), effort: "" };
     await fw.agent.save(agent);

@@ -65,7 +65,6 @@ describe("GitHub", () => {
 
   test("regression: GitHub snapshots read all collection pages and overflowing review threads", () => {
     const root = reposDir();
-    const resolved: string[] = [];
     let failReviews = false;
     const author = (login: string) => ({ login, __typename: login.endsWith("[bot]") ? "Bot" : "User" });
     const inline = Array.from({ length: 101 }, (_, i) => ({
@@ -105,19 +104,12 @@ describe("GitHub", () => {
         expect(snapshot.comments.find((comment) => comment.id === "SECOND")).toMatchObject({ threadId: "PRRT_second", resolved: true });
         failReviews = true;
         expect((await thrown(repo.githubSnapshot("sample", 7))).name).toBe("RepoError");
-        await repo.resolveReviewThread("sample", "PRRT_9");
-        expect(resolved).toEqual(["PRRT_9"]);
       },
       {},
       {
         gh: gh((args) => {
           if (args[0] === "pr") return { out: JSON.stringify({ headRefOid: "abc" }) };
           if (args[1] === "user") return { out: JSON.stringify({ login: "gardener" }) };
-          const thread = args.find((arg) => arg.startsWith("thread="))?.slice(7);
-          if (thread) {
-            resolved.push(thread);
-            return { out: JSON.stringify({ data: { resolveReviewThread: { thread: { id: thread, isResolved: true } } } }) };
-          }
           expect(args).toContain("--paginate");
           expect(args).toContain("--slurp");
           const query = args.find((arg) => arg.startsWith("query="))?.slice(6) ?? "";

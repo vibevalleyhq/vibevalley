@@ -1,4 +1,4 @@
-import { map, merge, type Subscription, TaskGroup } from "@vibevalley/async";
+import { merge, type Subscription, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { assignedAgentOf, latestSessionIdOf, sessionIdsOf, shortTitle } from "@vibevalley/protocol/rules";
@@ -273,7 +273,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     let where = await chat.homeOf(session);
     if (!where && live.reachable && live.session?.issue) {
       const issue = await get(live.session.issue);
-      where = await chat.issueThread(issue.id, issue.title, live.session.channel);
+      where = await chat.openThreadAbout("issue", issue.id, issue.title, live.session.channel);
     }
     if (!where) throw missing(t("server.channel.noHelper", { id: session }), [lookIn.session]);
     const run = sessions.live(from).run;
@@ -325,7 +325,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       return { worker: session };
     }
     if (isClosed(issue.status)) throw refused(t("server.issue.closedReopen"));
-    const thread = await chat.issueThread(issue.id, issue.title, session?.channel);
+    const thread = await chat.openThreadAbout("issue", issue.id, issue.title, session?.channel);
     await chat.say({ text: text, channel: thread, sendKey: sendKey });
     return { thread, ...(session ? { worker: session } : {}) };
   };
@@ -493,17 +493,23 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
 
   await loadKept();
   const news = sessions.news();
-  const userWords = chat.userInThread();
+  const userFacts = core.subscribe();
   // Session reports and user thread replies are handled one at a time, in one loop, so they cannot race.
   tasks.run("issue: session news and the user's words", async (signal) => {
     const unsubscribe = () => {
       news.close();
-      userWords.close();
+      userFacts.close();
     };
     signal.addEventListener("abort", unsubscribe, { once: true });
     try {
-      const words = map(userWords, (w) => ({ _tag: "UserSaid" as const, thread: w.thread, message: w.message }));
-      for await (const n of merge<SessionNews | { readonly _tag: "UserSaid"; readonly thread: string; readonly message: T.ChatMessage }>(news, words)) {
+      const words = (async function* () {
+        for await (const e of userFacts) {
+          if (e.type === "messageChanged" && e.thread && e.message.actor.kind === "user" && e.message.kind === "chat") {
+            yield { _tag: "UserSaid" as const, thread: e.thread };
+          }
+        }
+      })();
+      for await (const n of merge<SessionNews | { readonly _tag: "UserSaid"; readonly thread: string }>(news, words)) {
         if (n._tag === "UserSaid") await bestEffort(log, `vibevalley: issues after the user's words in ${n.thread}`, () => onUserInThread(n.thread));
         else await bestEffort(log, `vibevalley: issues after ${n._tag}`, () => onSessionNews(n));
       }
@@ -609,7 +615,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       case "start": {
         if (taker) await edit(id, { agent: taker.id }, by);
         await start(id, channel);
-        const issueThread2 = await chat.issueThread(id, item.title, channel || undefined);
+        const issueThread2 = await chat.openThreadAbout("issue", id, item.title, channel || undefined);
         await chat.notice({
           channel: issueThread2,
           text: t("server.issue.confirmedRequirements", { title: item.title, description: item.description, criteria: item.criteria.join("\n") }),

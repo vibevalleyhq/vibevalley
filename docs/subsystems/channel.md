@@ -88,7 +88,7 @@
 ## 和谁打交道
 
 - **帮工与助手（`session`、`orchestrator`）**：经观察层（`Watch`）交往，频道不 import 它们：观察层读事件、算听众、过刹车交 `Session`（[触发与投递](docs/subsystems/session.md#触发与投递)）蓄水与唤醒，并订阅 `Session` 事件维护工单串和看过的标记；助手经 `Channel.post` 写回复（在服务端里跑的 agent 一轮说的话，一整条；空的不写，写不进记日志）。
-- **工单与收件箱（`issue`、`watch`）**：向工单广播 `userInThread`，工单对帮工说的话 `post` 进帮工的家或工单串；收件箱读 `userMentions`、`userReceipt`、`userReadReports`，连接器消费 `Watch.toUser`。
+- **工单与收件箱（`issue`、`watch`）**：工单按主题开串（`openThreadAbout`）、对帮工说的话 `post` 进帮工的家或工单串；收件箱读 `userMentions`、`userReceipt`、`userReadReports`，连接器消费 `Watch.toUser`。
 
 ## 为什么这样
 

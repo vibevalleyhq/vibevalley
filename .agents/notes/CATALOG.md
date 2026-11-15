@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（26 篇）
+## proposed（24 篇）
 
 ### feature
 
@@ -21,11 +21,9 @@
 
 ### architecture
 
-- 2026-11-14 [原生的 VibeValley：照着 TypeScript 版一次重写成 Rust 和原生 macOS 应用](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)
-- 2026-11-12 [正交领域与事件观察：Channel 纯聊天、Session 纯执行、上层按事件观察驱动](.agents/notes/proposed/architecture/2026-11-12-orthogonal-domains-and-event-watch.md)
+- 2026-11-12 [会话执行策略解耦与透明归属（`Session.scope`）](.agents/notes/proposed/architecture/2026-11-12-orthogonal-domains-and-event-watch.md)
 - 2026-11-11 [扩展剩余跨模块品牌主键与 SQL 主外键自动品牌生成](.agents/notes/proposed/architecture/2026-11-11-type-driven-boundaries-and-branded-ids.md)
 - 2026-11-10 [拆出 apps/machine：一个服务端经出站长连接管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)
-- 2026-11-10 [邮箱收成一把锁、删掉回填地址的方法、页面不再深拷贝每一帧](.agents/notes/proposed/architecture/2026-11-10-atomic-commits-and-hot-paths.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)
 - 2026-11-06 [Space 核心业务概念模型（Space、Repo、Worktree、Issue、Pkm 与执行体）](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md)
 - 2026-10-28 [agent 带什么：工具集（toolsets）和技能（skill 模块），用户用 `/` 叫它们](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)

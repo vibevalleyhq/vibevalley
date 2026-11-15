@@ -1,5 +1,6 @@
 import { createEffect, For, onSettled, Show } from "solid-js";
 
+import { shellPath } from "@vibevalley/artifact/shell";
 import { t } from "@vibevalley/i18n";
 import { htmlSandbox } from "@vibevalley/protocol/rules";
 
@@ -7,7 +8,6 @@ import { shownTheme } from "#/state/prefs.ts";
 import { IconButton } from "#/ui/IconButton.tsx";
 
 import { type Controls, sendTo } from "./frame";
-import { shellPath } from "./shell";
 import { presenterHref, slidePostOf, slidesChannelName, stepped } from "./slides";
 
 /** A deck's controls: step, the slide's title, thumbnails, the whole screen, the speaker's window and the PDF. The speaker's

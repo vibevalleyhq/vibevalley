@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
+import { titleFor } from "@vibevalley/pkm/days";
 import type { PkmPageSummary, PkmSearchHit, PkmTier } from "@vibevalley/protocol";
 
 import { autofocus } from "#/base/dom.tsx";
@@ -12,7 +13,6 @@ import { defineAtom, useLatest } from "#/state/atom.ts";
 import { Dialog } from "#/ui/Dialog.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 
-import { titleFor } from "./days";
 import { tierOrder } from "./outline";
 import { pkmHref, usePkmVault } from "./vault";
 

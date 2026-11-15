@@ -27,10 +27,6 @@ export async function* merge<A>(...sources: readonly AsyncIterable<A>[]): AsyncG
   }
 }
 
-export async function* map<A, B>(source: AsyncIterable<A>, f: (a: A) => B | Promise<B>): AsyncGenerator<B> {
-  for await (const a of source) yield await f(a);
-}
-
 /** Text split into lines (\n or \r\n), the last kept only if the text ended with it or it is not empty. */
 export async function* lines(source: AsyncIterable<string | Uint8Array>): AsyncGenerator<string> {
   const decoder = new TextDecoder();

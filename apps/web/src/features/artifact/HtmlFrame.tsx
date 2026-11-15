@@ -1,13 +1,13 @@
 import type { JSX } from "@solidjs/web";
 import { createSignal } from "solid-js";
 
+import { shellPath } from "@vibevalley/artifact/shell";
 import type { Artifact, ArtifactDisplay } from "@vibevalley/protocol";
 import { htmlSandbox } from "@vibevalley/protocol/rules";
 
 import { shownTheme } from "#/state/prefs.ts";
 
 import { type Controls, useShown } from "./frame";
-import { shellPath } from "./shell";
 import { SlidesControls } from "./SlidesControls";
 
 /** The controls under each display; a page as it is has none. */

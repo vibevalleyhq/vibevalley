@@ -1,6 +1,7 @@
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
+import { knownTypes, plainOf } from "@vibevalley/artifact/blocks";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ArtifactId, userId, type Suggestion, type TextSpan } from "@vibevalley/protocol";
 
@@ -14,7 +15,6 @@ import { hexColor, swatches } from "#/ui/domain/cast.ts";
 import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 
-import { knownTypes, plainOf } from "./blocks";
 import { BlockEditor, type EditBlock } from "./editor";
 
 /** The user's lines on the attribution bar. */

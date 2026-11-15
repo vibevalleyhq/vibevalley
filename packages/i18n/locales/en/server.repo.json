@@ -40,11 +40,8 @@
   "inRepoNoBranch": "It works right in the repo, so there is no branch to merge",
   "inRepoNothing": "It works right in the repo, so there is no branch to merge",
   "keptBoth": "the {branch} branch and its worktree are kept",
-  "keptBranch": "the {branch} branch is kept",
   "merged": "{ahead} commits merged into {repo}'s {main}",
   "nothingNew": "This one has no new commits",
-  "nothingNewInPlan": "The plan's branch has no new commits",
-  "branchLeft": "; the changes are merged, the branch {branch} is not cleared yet: {why}",
   "clear": {
     "uncommitted": "{branch} has uncommitted changes; its worktree stays at {cwd}",
     "branchLeft": "{branch} was not cleared: {why}",
@@ -67,7 +64,6 @@
     "viewFailed": "Looking up PR #{n} failed",
     "stateUnread": "PR #{n}'s state could not be read",
     "stateUnknown": "PR #{n}'s state is not one VibeValley knows",
-    "resolveFailed": "Could not resolve the GitHub review thread",
     "worktreeLeft": "The PR is over, but clearing the worktree failed: {why}",
     "branchLeft": "The PR is over, but clearing the local branch failed: {why}"
   },
