@@ -8,7 +8,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 来源事件按 `(source, key)` 幂等记成不可变的 `Trigger`（`session_trigger`），轻量控制头和只读原始载荷分开 | 频道、串、消息的存储（[频道](docs/subsystems/channel.md)）；GitHub PR 的分页快照（[仓库](docs/subsystems/repo.md)） |
+| 来源事件按 `(source, key)` 幂等记成不可变的 `Trigger`（`session_trigger`），轻量控制头和只读原始载荷分开 | 频道、串、消息的存储（[频道](docs/subsystems/channel.md)）；GitHub PR 的分页快照（[PR 与分支发布](docs/subsystems/pull.md)） |
 | 按上层定下的收件会话（`Delivery`，带 `held_by`）写投递、四档紧急度、投递状态机（`session_delivery`）与叫醒，熔断时拦住叫醒（`holdWakes`），上层说还不能交的输入先不交（`useReadiness`） | 谁听见一句话、三道刹车（[观察层](docs/subsystems/watch.md)）；一句话是不是工单的、工单的蓄水池与订阅、派活的队列、工单状态机、验收，要不要合并、从哪合、怎么拆（[工单](docs/subsystems/issue.md#蓄水池和路由)） |
 | `Session` 的创建、恢复、带话、叫停、交接与离场；工作目录的开、借、清（经 `Repo.checkout`、`releaseCheckout`、`resetCheckout`、`clearCheckout`） | git worktree、分支与合并的实现（[仓库](docs/subsystems/repo.md)） |
 | 把帮工的工作目录借给上层：在会话锁内用一下（`withWorkplace`、`withIdleWorkplace`），或交接后放走帮工（`handOver`） | 交付：合并、提 PR、子工单合入父分支、跟 PR 与 CI、评审（[工单](docs/subsystems/issue.md#完成和交付)） |
@@ -29,7 +29,7 @@
 | `journal.ts`、`host.ts`、`inProcessRun.ts` | 轨迹日志文件读写、进程内 `AgentHost`（投递被拒抛 `SubmitRefused`）与 `InProcessRun`（`Run` 的落库） |
 | `worker.ts`、`shell.ts` | 帮工 CLI 的凭证文件与认证探测（[帮工 CLI 接入](docs/subsystems/session.md#帮工-cli-接入)）、私聊的上下文目录 |
 | `apps/server/src/modules/agent/` | 农机注册探测、价格表、额度与每日花费记账、VibeValley 自己的农机（`vibevalley.ts`） |
-| 表 `session`、`session_run`、`session_trigger`、`session_order`、`session_delivery`、`session_machine` | 会话（含 `pending_report`）、轮次、触发器、投递的统一次序、投递、机器 |
+| 表 `session`、`session_run`、`session_trigger`、`session_order`、`session_delivery`、`session_machine`，视图 `session_user_route` | 会话（含 `pending_report`）、轮次、触发器（含关系列 `actor_kind`、`is_channel_message`）、投递的统一次序、投递（含 `trigger_id` 外键与 `actor_kind`）、机器，以及用户消息路由视图 |
 | `apps/web/src/features/session/` | `WorkLog.tsx`、`Trajectory.tsx`、`runs.ts` 瀑布图与 `events.ts` 订阅 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`session.*`、`runtime.*`）。
@@ -156,7 +156,7 @@
 ## 为什么这样
 
 - **一件活的触发、投递、执行和工作目录放在一个模块**：信箱和会话各记着同一件活的一半状态（投递和执行），分开时任何一边收窄都得把另一半往外递；合起来以后别的模块只认一扇门，投递和执行之间的往来留在模块里。
-- **交付在工单，本模块只借出工作目录**：交付要的决定（要不要合、从哪合、子工单过哪些检查、PR 结了算不算完）和它写下的（冲突、PR、结局、冻结的文件）都是工单的；本模块只管工作目录在谁手里，给出 `handOver`、`withWorkplace`、`withIdleWorkplace` 三扇门，git 和 GitHub 由工单经仓库带类型的操作（`verifyCheckout`、`merge`、`mergeInto`、`submitPullRequest`、`failedJobLog`…）去做。曾把合并、提 PR 和跟 PR 的编排放在本模块，工单的记录经 `IssueRecord` 回调写回：下层回调上层，本模块的门也更宽（交付 7 个成员）。
+- **交付在工单与 PR 模块，本模块只借出工作目录**：交付要的决定（要不要合、从哪合、子工单过哪些检查、PR 结了算不算完）和它写下的（冲突、结局、冻结的文件）都是工单的；本模块只管工作目录在谁手里，给出 `handOver`、`withWorkplace`、`withIdleWorkplace` 三扇门，本地 git 合并由工单经 `Repo`（`verifyCheckout`、`merge`、`mergeInto`）去做，分支推送与 GitHub PR 轮询由 `Pull` 承载。曾把合并、提 PR 和跟 PR 的编排放在本模块，工单的记录经 `IssueRecord` 回调写回：下层回调上层，本模块的门也更宽（交付 7 个成员）。
 - **蓄水池、订阅和派活的队列在工单，本模块只投递**：一句话是不是工单的、工单能不能收、该给哪个会话，都看工单的状态；放在本模块时信箱得读看板（`IssueView`），还在同一个事务里写工单的蓄水池。现在工单决定投给谁，经 `route` 交下来；要和投递一起提交的（蓄水池记下转给了谁、退回了）放在 `Delivery` 的 `prepare`、`commit` 里，在投递的事务里跑，本模块不知道它们写的是什么。
 - **显式执行策略（`SessionPolicy`）加透明归属（`Session.scope`）**：曾经 `T.Session` 带着 `issue`、`refining`，本模块按「是不是在做工单」分叉检出目录、腾位放走或休眠、轮末歇下、规矩提示与汇报开关。现在这些由调用方在 `hireWith` 时经 `SessionPolicy` 显式传入并随行落盘，身份收敛为透明的 `Session.scope?: { kind: "issue" | "draft" | "channel" | "duty", id }`，`IssueAnswer` 也回到 `packages/protocol/src/issue/`；本模块只读 `policy` 开关，不再按上层域归属分支（`modules.test.ts` 守住）。
 - **一个成员答一个问题，不用标签把几件事并成一个**：曾把 `receive`、`withdraw`、`workplace`、`read` 做成带标签的大成员，成员数是少了，面却一样宽，路径表（`service-paths.json`）也看不出模块用的是哪一样（[一个名字只答一个问题](docs/style/naming.md)）。现在每件事一个名字，门窄靠的是只留别的模块真在用的成员：路径表里没人用的就删。
@@ -175,7 +175,7 @@
 
 - `apps/server/src/modules/session/report.test.ts`、`urgency.test.ts`、`journal.test.ts`、`inProcessRun.test.ts`：汇报解析与一轮结束时等不等、歇不歇，紧急度与投递行，轨迹版本追加与进程内 `Run`。
 - `executor.test.ts`、`access.test.ts`、`session.test.ts`、`apps/server/src/flows/work.test.ts`：执行器生命周期、派工、带话、静默告警、容量上限、合并交接与重启恢复。
-- `triggers.test.ts`、`source.test.ts`、`deliveries.test.ts`、`apps/server/src/flows/ingress.test.ts`、`mailbox-order.test.ts`、`returns.test.ts`：`(source, key)` 幂等、投递顺序、按给定的 `held_by` 写投递、工单蓄水（在工单）、换人退回与重启重放；刹车本身见[观察层](docs/subsystems/watch.md#怎么验证)，来源游标与触发器共同回滚在 `apps/server/src/modules/issue/github.test.ts`。
+- `triggers.test.ts`、`source.test.ts`、`deliveries.test.ts`、`apps/server/src/flows/ingress.test.ts`、`mailbox-order.test.ts`、`returns.test.ts`：`(source, key)` 幂等、投递顺序、按给定的 `held_by` 写投递、工单蓄水（在工单）、换人退回与重启重放；刹车本身见[观察层](docs/subsystems/watch.md#怎么验证)，来源游标与触发器共同回滚在 `apps/server/src/modules/pull/pull.test.ts`。
 - `apps/server/src/flows/pull_request.test.ts`、`pr-follow.test.ts`、`parent-pr.test.ts`、`split.test.ts`、`acceptance.test.ts`、`dependencies.test.ts`：经本模块交接的交付、跟 PR、子工单合入父分支（编排在工单）。
 - `apps/server/src/flows/restart.test.ts`：助手、帮工答到一半时崩溃或正常关门，重开后接着答完、记一轮。
 - `apps/server/src/modules.test.ts`：别的模块不碰投递的内部文件、共享契约不碰存储、只有测试用 `insideOf`、本模块不碰频道与工单且会话生命周期与协议不含工单或起草分支。

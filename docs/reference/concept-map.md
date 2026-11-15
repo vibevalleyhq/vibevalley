@@ -32,7 +32,7 @@
 | 概念 | 服务端 | 存储 | oar |
 |---|---|---|---|
 | Host、空间 | `infra/config.ts` 的 `ServerConfig`（`home`、`workRoot`）；`services.ts` 组装全部服务 | `$VIBEVALLEY_HOME`、`$VIBEVALLEY_WORK_ROOT` | — |
-| 仓库 | `Repo`（`repo/repo.ts`、`git.ts`、`workplace.ts`、`github.ts`） | Space 的 `repos/` 与工单检出 `worktrees/` | 会话的 `cwd` |
+| 仓库 | `Repo`（`repo/repo.ts`、`git.ts`、`workplace.ts`、`github.ts`）、`Pull`（`pull/pull.ts`、`publish.ts`） | Space 的 `repos/` 与工单检出 `worktrees/`、`pull` 与 `pull_event` 表 | 会话的 `cwd` |
 | 助手 | `Orchestrator`（每个助手档案一个 `AgentHost`，`Session.host` 开在 `session/host.ts`） | `session` 表、`durable.db`、`agent/<档案 id>/` | 不经 oar：跑在 pi-durable 上，`AgentHost` 的一个会话是 `agent/durable.ts` 开的 `Harness` 上的一个对话，工具来自 `packages/agent`（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
 | 档案、技能 | `Agent`（`agent/agent.ts`、`template.ts`） | `config.json`、`agent-templates/`、内置 `templates/` 与 `skills/` | — |
 | 农机 | `Agent` 的农机部分（`agent/runtime.ts`、`presets.ts`；接口仍是 `runtime.*`） | `config.json` 农机设置、`agent_spend` 表 | `Runtime`、`RuntimeRegistry` |
@@ -42,7 +42,7 @@
 | Artifact | `Artifact`（`artifact/artifact.ts`） | `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` 表 | — |
 | 笔记 | `Pkm`（`pkm/pkm.ts`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_change` 表 | — |
 | 记性 | `Memory`（`memory/memory.ts`） | `memory` 表 | — |
-| 定时任务 | 在 `Issue` 里（`issue/cron.ts`、`when.ts`） | `issue_cron` 表 | — |
+| 定时任务 | `Cron`（`cron/cron.ts`、`when.ts`） | `cron` 表 | — |
 | 机器、「连接到本机」 | 机器在 `Session` 里（`session/machine.ts`、`executor.ts`）、`Lan`（`lan/lan.ts`） | `session_machine`、`lan`、`user_device` 表 | 本机或远端执行后端 |
 
 ## oar 那一层

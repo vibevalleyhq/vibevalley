@@ -202,6 +202,20 @@
     "lintOff": 10,
     "swallowed": 1
   },
+  "server: Pull Requests": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "swallowed": 0
+  },
+  "server: Scheduling": {
+    "nonNull": 0,
+    "doubleCast": 0,
+    "cast": 0,
+    "lintOff": 0,
+    "swallowed": 0
+  },
   "server: Source Control": {
     "nonNull": 0,
     "doubleCast": 0,

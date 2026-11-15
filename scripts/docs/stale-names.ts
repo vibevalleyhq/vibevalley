@@ -410,7 +410,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a retired single-caller or pass-through server service",
     pattern: /["'`](?:\.\.?\/|#\/)(?:storage|executor|resource|ingress)\/|\b(Storage|Executor|Resource|Ingress|worldBelowIngress|ingress_github)\b/u,
-    says: "Attachment owns attachment/storage.ts, Session owns session/executor.ts, Tool owns tool/resource.ts (Tool.readResource), and Ingress split into Channel.{user,say}, Session.{record,accept}, Repo.githubSnapshot and Issue.pollGitHub (issue_github); module tests use moduleWorld",
+    says: "Attachment owns attachment/storage.ts, Session owns session/executor.ts, Tool owns tool/resource.ts (Tool.readResource), and Ingress split into Channel.{user,say}, Session.{recordTrigger,route}, and Pull.{snapshot,poll} (pull, pull_event); module tests use moduleWorld",
     dirs: ["apps/server/src"],
   },
   {

@@ -8,15 +8,15 @@ Plain TypeScript on Node 24 (async/await, AbortSignal, `@vibevalley/async`; Zod 
 src/main.ts          the server: loads the configuration, takes the home's lease, serves; --ready-json, --web
 src/chat/            the conversations in a terminal (a runtime, or the farm's own agent): the command line (apps/cli) hands its
                      terminal to this program, as they need the server's runtimes, models and config
-src/services.ts      every service in build order (`make<X>(deps)`; buildModules builds them to the issues, for the farm and
+src/services.ts      every service in build order (`make<X>(deps)`; buildModules builds them to the watch, for the farm and
                      the module tests), then each one's boot, and the closes in reverse
-src/modules.ts       which folders make up which part of the server (Platform, Agents, Issues, Gateway…), checked by modules.test.ts
+src/modules.ts       which folders make up which part of the server (Platform, Agents, Issues, Scheduling, Pull Requests, Gateway…), checked by modules.test.ts
 src/base/            what touches nothing outside: ids, JSON, order, redaction, errors
 src/infra/           what deals with the process and the machine: configuration, database, files, the home's lease, logs, time
 src/core/            the one core state: Core applies facts through gateway/projection
 src/platform/<name>/ the primitives below every module, one service each: setting user attachment provider
 src/modules/<name>/  one deep service each: agent (profiles, skills, templates and the runtimes) memory repo session (triggers,
-                     deliveries, sessions and runs, workplaces, executions) channel media artifact pkm issue cron inbox tool
+                     deliveries, sessions and runs, workplaces, executions) channel media artifact pkm issue cron pull watch
                      orchestrator game
 src/gateway/         what faces outside, built last: http/ (the router over the endpoint table, handlers/<concept>.ts, the SSE
                      streams, /mcp, the page), mcp/, lan/ (「连接到本机」), connector/ (WeChat, Feishu, QQ), voice/, and

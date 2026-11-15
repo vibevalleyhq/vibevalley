@@ -50,7 +50,7 @@
 
 架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)；本节记录现行结构与门禁。
 
-- **11 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
+- **13 个有序模块单向依赖**：模块顺序定义在 `apps/server/src/modules.ts`。下层不得 import 上层，不得直接读 `core.state()` 中其他模块的数据（`apps/server/src/modules.test.ts` 检查）。
 - **门禁共享一次源码分析**：`modules.test.ts` 在第一次检查内读取生产文件并用 `@vibevalley/testkit/source` 的 `analyzeSource` 各解析一次，依赖方向、表所有权与状态读取复用结果；同路径不同源码不共用缓存。读取和解析时间计入测试，提速按完整运行耗时与解析次数验证。
 - **单数概念名，拒绝单调用方顶层服务**：目录、表名和服务名均用单数概念词，协议同名类型统一写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）；仅有一个模块调用的内部设施留在调用方模块内（由 `scripts/audit/service-paths.ts` 扇入检查守住）。
 - **组装与启动分两阶段**：`services.ts` 的 `buildModules` 照模块次序一行一个 `await makeX({ … })` 建到观察层，`makeFarm` 接着建后面的，每个服务的依赖在调用处按名字写明（没有分层的阶段类型，也不把「下面的全部」交给上面），拼成 `Farm` 并完成订阅，再按次序调各模块的 `boot()`；`Farm` 是 `AsyncDisposable`，关的时候倒着调各服务的 `close()`，一个失败不挡别的，建到一半失败也照此关掉已建的。测试的 `testing/world.ts` 用同一个 `buildModules` 建到观察层（`moduleWorld`），再加工具和 `/mcp`（`world`）。HTTP 监听就绪后才将地址注入 `Session` 和 `Lan`。
