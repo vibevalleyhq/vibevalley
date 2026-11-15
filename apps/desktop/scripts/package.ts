@@ -19,30 +19,21 @@ const server = join(stage, "server");
 const cli = join(stage, "cli");
 
 const sh = (cwd: string, cmd: string, ...args: string[]) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
-sh(repo, "vp", "run", "--filter", "@vibevalley/web", "build");
-sh(desktop, "pnpm", "exec", "vpx", "scripts/build.ts");
-// The island, for this Mac's architecture as the rest of the package is; where SwiftPM puts it differs between its
-// versions, so it is asked.
-const island = join(repo, "apps/island");
-sh(island, "swift", "build", "-c", "release");
-const islandBinary = join(execFileSync("swift", ["build", "-c", "release", "--show-bin-path"], { cwd: island, encoding: "utf8" }).trim(), "VibeValleyIsland");
-const pty = join(repo, "apps/pty");
-sh(pty, "swift", "build", "-c", "release");
-const ptyBinary = join(execFileSync("swift", ["build", "-c", "release", "--show-bin-path"], { cwd: pty, encoding: "utf8" }).trim(), "VibeValleyPty");
+sh(repo, "vp", "run", "--filter", "@vibevalley/web", "--filter", "@vibevalley/desktop", "build");
+// Where SwiftPM puts each helper differs between its versions, so it is asked after the build task ran.
+const binaryOf = (dir: string, name: string) =>
+  join(execFileSync("swift", ["build", "-c", "release", "--show-bin-path"], { cwd: join(repo, dir), encoding: "utf8" }).trim(), name);
+const islandBinary = binaryOf("apps/island", "VibeValleyIsland");
+const ptyBinary = binaryOf("apps/pty", "VibeValleyPty");
 
 rmSync(stage, { recursive: true, force: true });
+const serverRoot = join(repo, "apps/server");
 // Everything at the versions the lockfile pins, the workspace packages copied in.
 sh(repo, "pnpm", "--filter", "@vibevalley/server", "deploy", "--prod", server);
-// The server is its bundle: src/main.ts and the workspace packages in one module, the other dependencies left as they are.
-sh(join(repo, "apps/server"), "vp", "pack", "--out-dir", join(server, "dist"));
-// Of what pnpm deployed beside it only those dependencies and the files the server reads stay.
-const assets = join(stage, "assets");
-for (const path of serverFiles) cpSync(join(server, path), join(assets, path), { recursive: true });
-for (const name of readdirSync(server))
-  if (!["dist", "node_modules", "package.json"].includes(name)) rmSync(join(server, name), { recursive: true, force: true });
-cpSync(assets, server, { recursive: true });
-rmSync(assets, { recursive: true, force: true });
+for (const name of readdirSync(server)) if (!["node_modules", "package.json"].includes(name)) rmSync(join(server, name), { recursive: true, force: true });
 rmSync(join(server, "node_modules", "@vibevalley"), { recursive: true, force: true });
+sh(serverRoot, "vp", "pack", "--out-dir", join(server, "dist"));
+for (const path of serverFiles) cpSync(join(serverRoot, path), join(server, path), { recursive: true });
 // The command line is one standalone bundle: it loads none of the server.
 sh(join(repo, "apps/cli"), "vp", "pack", "--out-dir", join(cli, "dist"));
 // Nor what only an editor reads: the dependencies' source maps and type declarations, a third of the server's files.

@@ -23,7 +23,6 @@ src/ui/host.ts             main's end of the page's host (desktopBridge): notice
 src/ui/menu.ts             the application menu and the menu bar's summary, in the farm's language
 src/ui/dev.ts              development: the server starts again when no helper is working (the page updates itself, from Vite)
 src/preload/preload.ts     the host interface, through contextBridge
-scripts/build.ts           build/main.cjs and build/preload.cjs; on macOS the island's release build too
 scripts/dev.ts             vp run dev: builds the shell and the page, starts Vite, the server and Electron
 scripts/package.ts         the macOS .app and .dmg in dist/: the shell, the page, the island, and the server with its production dependencies
 scripts/update-check.ts    an update walked through on two real packages

@@ -28,7 +28,7 @@ async function freePort(): Promise<number> {
 }
 
 if (import.meta.main) {
-  run("pnpm", ["exec", "vpx", "scripts/build.ts"], desktop);
+  run("vp", ["run", "build"], desktop);
   // The window's opening cover is dist/opening.html, shown before the page is asked for; one build writes it.
   await build({ root: web });
   const serverPort = await freePort();
