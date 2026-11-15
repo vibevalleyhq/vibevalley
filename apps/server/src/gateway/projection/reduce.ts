@@ -1,10 +1,12 @@
 import type * as T from "@vibevalley/protocol";
 import { farmOf, omitUndefined, same } from "@vibevalley/protocol/rules";
 
+import type { Fact } from "#/core/core.ts";
 import { withChannel, withMessage, withUserMentions } from "#/modules/channel/messages.ts";
 import { emptyPlay, freeStation, playedDoing, playedRun, playOf, stationed } from "#/modules/game/view.ts";
 import { withIssue, withIssueStatuses } from "#/modules/issue/status.ts";
 import { isOnDuty, sessionOf, withSession } from "#/modules/session/roster.ts";
+import type { Machine } from "#/modules/session/shapes.ts";
 
 const ended = (outcome: T.Outcome): T.Phase => (outcome === "completed" ? { _tag: "done" } : outcome === "failed" ? { _tag: "failed" } : { _tag: "resting" });
 
@@ -13,7 +15,7 @@ const phaseAffectsIssue = (before: T.Phase, after: T.Phase): boolean =>
   !(before._tag === "working" && after._tag === "working" && before.since === after.since && before.quietSince === after.quietSince);
 
 /** A fact that changes nothing says so (false), and is not sent. facts about sessions not on the farm change nothing. */
-export function reduce(state: T.SpaceState, fact: T.Fact): [T.SpaceState, boolean] {
+export function reduce(state: T.SpaceState, fact: Fact): [T.SpaceState, boolean] {
   const [next, changed] = fold(state, fact);
   if (!changed) return [next, false];
   if (fact.type === "sessionPhaseChanged") {
@@ -23,7 +25,7 @@ export function reduce(state: T.SpaceState, fact: T.Fact): [T.SpaceState, boolea
   return next.issues !== state.issues || next.sessions !== state.sessions ? [withIssueStatuses(next), true] : [next, true];
 }
 
-function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {
+function fold(state: T.SpaceState, f: Fact): [T.SpaceState, boolean] {
   switch (f.type) {
     case "mediaChanged":
       return same(state.media, f.jobs) ? [state, false] : [{ ...state, media: f.jobs }, true];
@@ -157,7 +159,7 @@ function fold(state: T.SpaceState, f: T.Fact): [T.SpaceState, boolean] {
       return [{ ...state, connectors: all }, true];
     }
     case "machineChanged": {
-      const all: T.Machine[] = [];
+      const all: Machine[] = [];
       let replaced = false;
       for (const m of state.machines) {
         if (m.id !== f.machine.id) all.push(m);

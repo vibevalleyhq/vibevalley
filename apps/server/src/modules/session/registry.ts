@@ -21,6 +21,7 @@ import { NotRecorded, recording } from "./inProcessRun.ts";
 import { type Journal, makeTrajectories } from "./journal.ts";
 import type { Machine } from "./machine.ts";
 import { isOnDuty } from "./roster.ts";
+import type { SessionClose } from "./shapes.ts";
 import type { DeliveryInput, Consumed, LaunchActivity, RunFinished, SessionIdentity, SessionNews } from "./signals.ts";
 
 const refused = refuseIn(BizCode.SessionRefused);
@@ -178,7 +179,7 @@ export async function makeRegistry(deps: RegistryDeps) {
       machine: s.machine ?? null,
     });
 
-  const ended = (id: string, closed: T.SessionClose) =>
+  const ended = (id: string, closed: SessionClose) =>
     bestEffort(log, `vibevalley: session ${id}'s end not kept`, () => qs.endSession(db.sql, { ended_at: clock.now(), closed, id }));
 
   const forget = (id: string) => bestEffort(log, `vibevalley: unstarted session ${id} not forgotten`, () => qs.forgetSession(db.sql, { id }));

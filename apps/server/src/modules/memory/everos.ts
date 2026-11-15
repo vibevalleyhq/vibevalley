@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import { isAbort, withTimeout } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
-import type { MemoryKind } from "@vibevalley/protocol";
 
 import { clip } from "#/base/clip.ts";
 import { newId } from "#/base/ids.ts";
@@ -12,7 +11,7 @@ import { redact, type RedactedString, redactedHead } from "#/base/redact.ts";
 import type { MemorySourceConfig } from "#/platform/setting/memorySources.ts";
 
 import { everosWords, recallWords } from "./prompts.ts";
-import { recallCount, type MemoryScope } from "./recall.ts";
+import { type MemoryKind, type MemoryScope, recallCount } from "./recall.ts";
 import { prefetchTimeoutMs, type Source, type SourceDeps, SourceError, sourceError, sourceLife } from "./sources.ts";
 
 /** app_id on everything written, so its memories can be told from another app's. */

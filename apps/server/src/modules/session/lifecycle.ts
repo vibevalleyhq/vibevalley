@@ -10,7 +10,7 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 import { worker as sessionActor } from "#/base/actor.ts";
 import { BizCode, errnoOf, messageOf, refuseIn } from "#/base/errors.ts";
 import { jsonText } from "#/base/json.ts";
-import type { Core } from "#/core/core.ts";
+import type { Core, Fact } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
@@ -33,7 +33,7 @@ import type { Machine } from "./machine.ts";
 import { type Hand, makeRegistry, type RunStore } from "./registry.ts";
 import { handsToUser } from "./report.ts";
 import { isHired, isOnDuty } from "./roster.ts";
-import type { Trigger } from "./shapes.ts";
+import type { Trigger, SessionClose, IssueReport } from "./shapes.ts";
 import { contextPlace, releaseContextPlace } from "./shell.ts";
 import { type Delivered, type DeliveryInput, DeliveryRefused, type RunFinished, type SessionNews } from "./signals.ts";
 import { makeWatch } from "./watch.ts";
@@ -127,9 +127,9 @@ export interface Lifecycle {
   /** Rejects `..` segments and symlinks escaping the session's working directory; throws NotWorkFile. */
   readonly workFile: (id: string, path: string, max: number) => Promise<{ readonly name: string; readonly bytes: Uint8Array }>;
   readonly runOf: (id: string) => string | undefined;
-  readonly report: (id: string, report: T.IssueReport) => Promise<void>;
+  readonly report: (id: string, report: IssueReport) => Promise<void>;
   /** Throws NotTakenIn when use fails (the session stays), ApiError when the session cannot hand over now. */
-  readonly handOver: (id: string, closed: T.SessionClose, use: (place: Workplace, lastText: string) => Promise<Merged>, settle?: Settle) => Promise<Merged>;
+  readonly handOver: (id: string, closed: SessionClose, use: (place: Workplace, lastText: string) => Promise<Merged>, settle?: Settle) => Promise<Merged>;
   /** Pass `""` for all agents. */
   readonly list: (agent: string) => Promise<T.Session[]>;
   readonly get: (id: string) => Promise<T.Session | undefined>;
@@ -175,7 +175,7 @@ const placeThere = (cwd: string, log: Logger) =>
     },
   );
 
-export function newsOf(fact: T.Fact, after: T.SpaceState): SessionNews | undefined {
+export function newsOf(fact: Fact, after: T.SpaceState): SessionNews | undefined {
   switch (fact.type) {
     case "sessionChanged": {
       const session = after.sessions.find((h) => h.id === fact.session.id);
@@ -695,7 +695,7 @@ export async function makeLifecycle(deps: LifecycleDeps, options: SessionOptions
       return repos.clearCheckout(repo, number, work);
     });
 
-  const report = async (id: string, given: T.IssueReport) => {
+  const report = async (id: string, given: IssueReport) => {
     const noReport = () => refused(t("server.session.life.noHelper", { id }));
     if (!core.session(id)?.issue) throw noReport();
     await roster.withHand(

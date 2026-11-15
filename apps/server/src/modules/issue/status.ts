@@ -6,6 +6,14 @@ import { sessionOf } from "#/modules/session/roster.ts";
 
 import { statusMoves } from "./moves.ts";
 
+export type Finding = T.Issue["findings"][number];
+export type IssueCanceled = NonNullable<T.Issue["canceled"]>;
+export type IssueChildDraft = T.IssueSplitRequest["tasks"][number];
+export type IssueConstraints = NonNullable<T.Issue["constraints"]>;
+export type IssueMandate = T.Issue["mandate"];
+export type IssueRefining = NonNullable<T.Issue["refining"]>;
+export type Landing = NonNullable<T.Issue["delivered"]>;
+
 const awaitsFeedback = (issue: Pick<T.Issue, "questions">, session: Pick<T.Session, "phase" | "lastRun"> | undefined) =>
   session?.phase._tag === "resting" && session.lastRun?.outcome === "completed" && issue.questions.length === 0;
 
@@ -152,13 +160,13 @@ export function withIssue(all: readonly T.Issue[] | undefined, t: T.Issue): T.Is
 
 interface StatusLookup {
   readonly sessions: ReadonlyMap<string, T.Session>;
-  readonly refining: ReadonlyMap<string, T.IssueRefining>;
+  readonly refining: ReadonlyMap<string, IssueRefining>;
   readonly children: ReadonlyMap<string, readonly T.Issue[]>;
 }
 
 function lookupOf(state: T.SpaceState): StatusLookup {
   const sessions = new Map<string, T.Session>();
-  const refining = new Map<string, T.IssueRefining>();
+  const refining = new Map<string, IssueRefining>();
   for (const h of state.sessions) {
     sessions.set(h.id, h);
     if (h.refining && h.issue !== undefined && !refining.has(h.issue)) refining.set(h.issue, { session: h.id, name: h.name });
@@ -195,7 +203,7 @@ function statusWithLookup(t: T.Issue, lookup: StatusLookup): T.IssueStatus {
   return t.queuedAt !== undefined ? "todo" : "backlog";
 }
 
-export function issueRefiningOf(t: T.Issue, state: T.SpaceState): T.IssueRefining | undefined {
+export function issueRefiningOf(t: T.Issue, state: T.SpaceState): IssueRefining | undefined {
   const h = state.sessions.find((h) => h.refining && h.issue === t.id);
   return h ? { session: h.id, name: h.name } : undefined;
 }

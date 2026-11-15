@@ -1,5 +1,7 @@
 import { list, t } from "@vibevalley/i18n";
-import type { AccountUsage, RuntimeQuota } from "@vibevalley/protocol";
+import type { AccountUsage, RuntimeInfo } from "@vibevalley/protocol";
+
+export type RuntimeQuota = NonNullable<RuntimeInfo["quota"]>;
 
 /** CNY in words; anything positive under a cent says so, so that a spent amount never reads as ¥0.00. */
 export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? t("server.runtime.lessThanCent") : "¥" + cny.toFixed(2));

@@ -36,7 +36,9 @@ import { needsUser } from "./prompts.ts";
 import { kept, refinement } from "./refinement.ts";
 import { issueSettling, type StatusOptions } from "./settle.ts";
 import { issueSplitting } from "./split.ts";
-import { conflictOf, isClosed, assignedOnDuty, pickIssues } from "./status.ts";
+import { assignedOnDuty, conflictOf, type Finding, isClosed, type IssueChildDraft, type IssueConstraints, type IssueMandate, pickIssues } from "./status.ts";
+
+export type { IssueChildDraft, IssueConstraints, IssueMandate };
 
 const refused = refuseIn(BizCode.IssueRefused);
 
@@ -72,7 +74,7 @@ export interface IssueCreateInput {
   readonly title: string;
   readonly parent?: string;
   readonly blockedBy?: readonly string[];
-  readonly constraints?: T.IssueConstraints;
+  readonly constraints?: IssueConstraints;
   readonly description?: string;
   readonly repo?: string;
   readonly agent?: string;
@@ -120,7 +122,7 @@ export interface Issue {
   readonly query: (f: T.IssueFilter) => Promise<T.Issue[]>;
   readonly onBoard: () => readonly T.Issue[];
   readonly get: (id: string) => Promise<T.Issue>;
-  readonly add: (req: T.IssueRequest, mandate: T.IssueMandate) => Promise<T.Issue>;
+  readonly add: (req: T.IssueRequest, mandate: IssueMandate) => Promise<T.Issue>;
   /** Throws ApiError or IssueCreateRefused. */
   readonly create: (input: IssueCreateInput) => Promise<IssueCreated>;
   /** Throws AgentChoiceRefused. */
@@ -128,7 +130,7 @@ export interface Issue {
   readonly edit: (id: string, upd: T.IssueUpdate, by: Actor) => Promise<T.Issue>;
   readonly remove: (id: string) => Promise<void>;
   readonly start: (id: string, channel: string) => Promise<Dispatched>;
-  readonly split: (id: string, title: string, drafts: readonly T.IssueChildDraft[], by: Actor) => Promise<string>;
+  readonly split: (id: string, title: string, drafts: readonly IssueChildDraft[], by: Actor) => Promise<string>;
   readonly setStatus: (id: string, to: T.IssueStatus, text: string, channel: string, by: Actor, opt?: StatusOptions) => Promise<T.Issue>;
   readonly stop: (id: string) => Promise<void>;
   readonly previewStatus: (id: string, to: T.IssueStatus, text: string, opt?: StatusOptions, edit?: T.IssueUpdate) => Promise<T.Preview>;
@@ -194,7 +196,7 @@ export interface IssueReviewRequest {
   readonly text?: string;
 }
 
-function failedText(findings: readonly T.Finding[], text: string): string {
+function failedText(findings: readonly Finding[], text: string): string {
   let out = t("server.issue.brief.failedHead");
   let n = 0;
   for (const f of findings) if (!f.resolved) out += `\n${++n}. ${f.text}`;

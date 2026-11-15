@@ -3,7 +3,7 @@ import { z } from "zod";
 import { abortable, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { MediaAudioFormatValues, MediaPhaseValues } from "@vibevalley/protocol";
+import { MediaAudioFormatValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -15,11 +15,11 @@ import type { PublicFetch } from "#/infra/publicHttp.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Attachment } from "#/platform/attachment/attachment.ts";
 import type { Account, Provider } from "#/platform/provider/provider.ts";
-import { AudioFailure, type SpeechRequest } from "#/platform/provider/vendors.ts";
+import { AudioFailure, type SpeechRequest, type MediaAudioUsage, type MediaInputReference } from "#/platform/provider/vendors.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { saveAudioResult, releaseAudioResult, type MediaInputs } from "./audioResult.ts";
-import { jobsOf, newJob, type Row, storedAs } from "./job.ts";
+import { jobsOf, newJob, type Row, storedAs, MediaPhaseValues } from "./job.ts";
 import type { Machine, Patch } from "./machine.ts";
 import type { MediaCaller } from "./media.ts";
 import { receiveSpeechStream, type SpeechStreamSaved } from "./speechStream.ts";
@@ -180,7 +180,7 @@ export function makeSpeech(deps: SpeechDeps, { inputs, machine }: Ports) {
     };
   };
   const get = async (id: string) => view(await machine.found(id, ["speech"]));
-  const audioFields = (made: { url: string; format: T.MediaAudioFormat; contentType: string; usage?: T.MediaAudioUsage }) =>
+  const audioFields = (made: { url: string; format: T.MediaAudioFormat; contentType: string; usage?: MediaAudioUsage }) =>
     ({
       result_url: made.url,
       result_format: made.format,
@@ -188,7 +188,7 @@ export function makeSpeech(deps: SpeechDeps, { inputs, machine }: Ports) {
       usage: made.usage === undefined ? null : jsonText(made.usage),
     }) satisfies Patch;
   /** What a saved result writes, kept or kept as an input for later use. */
-  const savedFields = (saved: { attachment?: T.Attachment; resultInput: T.MediaInputReference | null }) =>
+  const savedFields = (saved: { attachment?: T.Attachment; resultInput: MediaInputReference | null }) =>
     ({
       attachment: saved.attachment === undefined ? null : jsonText(saved.attachment),
       result_input: saved.resultInput === null ? null : jsonText(saved.resultInput),

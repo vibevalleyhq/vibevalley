@@ -9,6 +9,7 @@ import type { Workplace } from "#/modules/repo/workplace.ts";
 
 import type { Journal } from "./journal.ts";
 import type { Tracking } from "./reaction.ts";
+import type { IssueReport } from "./shapes.ts";
 
 /** The platform's AsyncDisposableStack (Node 24), as far as a hand uses it: cleanups run last-added first, once. */
 export interface HandStack extends AsyncDisposable {
@@ -56,7 +57,7 @@ export interface Hand {
   /** The run a restart left under way, for the turn that goes on with it to take up rather than start another. */
   goesOn?: string;
   heard: string[];
-  report: T.IssueReport | undefined;
+  report: IssueReport | undefined;
   settling?: { readonly report: SubagentReport; readonly completedBefore: number };
 }
 

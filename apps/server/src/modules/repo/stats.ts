@@ -12,6 +12,7 @@ import { jsonOrNone } from "#/base/json.ts";
 import { or } from "#/base/order.ts";
 
 import { gitQuiet } from "./git.ts";
+import type { RepoRecord } from "./workplace.ts";
 
 /** Not what a repo is written in: gitignore patterns, as tokei's --exclude takes them. */
 const leftOut = [
@@ -136,10 +137,10 @@ const repoDirs = async (dir: string, depth: number): Promise<string[]> => {
   return under.flat();
 };
 
-export async function contributionsOf(root: string, extra: readonly string[]): Promise<T.Repo[]> {
+export async function contributionsOf(root: string, extra: readonly string[]): Promise<RepoRecord[]> {
   const global = (await gitQuiet("", "config", "--global", "user.email")).toLowerCase();
   const seen = new Set<string>();
-  const out: T.Repo[] = [];
+  const out: RepoRecord[] = [];
   for (const dir of await repoDirs(root, 3)) {
     // Worktrees share their repository's history: one count per repository.
     const common = await gitQuiet("", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir");

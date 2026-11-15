@@ -26,8 +26,12 @@ import {
   type CheckoutChecks,
   type Merged,
   MergeFailure,
+  type PullRequest,
+  type PullRequestState,
   type RepoFolder,
   RepoError,
+  type RepoRecord,
+  type RepoStack,
   stackFiles,
   stackOf,
   type Workplace,
@@ -35,7 +39,7 @@ import {
   type WorkplaceRelease,
 } from "./workplace.ts";
 
-export { activityOf, countsOf, githubOrigin, type GitHubRun, probeGitHub, tokeiArgs };
+export { activityOf, countsOf, githubOrigin, type GitHubRun, probeGitHub, type PullRequest, type PullRequestState, type RepoRecord, type RepoStack, tokeiArgs };
 
 const fail = (message: string) => new RepoError(message);
 
@@ -183,10 +187,10 @@ export interface Repo {
   readonly list: () => Promise<RepoFolder[]>;
   readonly summary: (p: RepoFolder) => Promise<T.RepoSummary>;
   readonly summaries: () => Promise<T.RepoSummary[]>;
-  readonly stack: (name: string) => Promise<T.RepoStack | undefined>;
+  readonly stack: (name: string) => Promise<RepoStack | undefined>;
   readonly languages: (name: string, signal?: AbortSignal) => Promise<T.RepoLanguages | undefined>;
   readonly activity: (name: string) => Promise<T.RepoActivity | undefined>;
-  readonly contributions: (extra: readonly string[]) => Promise<T.Repo[]>;
+  readonly contributions: (extra: readonly string[]) => Promise<RepoRecord[]>;
   /** An issue's checkout, made when it is not there yet; only the session module makes and lets go of them. */
   readonly checkout: (at: CheckoutAt) => Promise<Workplace>;
   /** A checkout let go: kept when it holds work, and said why. */
@@ -209,8 +213,8 @@ export interface Repo {
   readonly refreshGitHub: () => Promise<T.GitHubStatus>;
   readonly usesPullRequests: (name: string) => boolean;
   readonly submitBranch: (req: T.SubmitBranch, signal?: AbortSignal) => Promise<T.BranchPublication>;
-  readonly submitPullRequest: (place: Workplace, issue: T.Issue, conclusion: string, signal?: AbortSignal) => Promise<T.PullRequest>;
-  readonly pullRequestState: (name: string, n: number) => Promise<T.PullRequestState>;
+  readonly submitPullRequest: (place: Workplace, issue: T.Issue, conclusion: string, signal?: AbortSignal) => Promise<PullRequest>;
+  readonly pullRequestState: (name: string, n: number) => Promise<PullRequestState>;
   readonly githubSnapshot: (name: string, n: number) => Promise<GitHubPullSnapshot>;
   /** The last lines of the failed Actions job a check's URL points at; "" when it is not one or GitHub does not say. */
   readonly failedJobLog: (name: string, checkUrl: string) => Promise<string>;

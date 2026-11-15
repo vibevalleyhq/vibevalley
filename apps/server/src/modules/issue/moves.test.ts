@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import type { Fact, Issue, IssueStatus, Session } from "@vibevalley/protocol";
+import type { Issue, IssueStatus, Session } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { emptySpaceState } from "#/core/core.ts";
+import { emptySpaceState, type Fact } from "#/core/core.ts";
 import { reduce } from "#/gateway/projection/reduce.ts";
 
 import { nextSteps, statusMove, statusMoves } from "./moves.ts";

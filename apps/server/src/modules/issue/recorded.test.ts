@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { type Issue, defaultOrchestrator, type RepoStack, type Run } from "@vibevalley/protocol";
+import { type Issue, defaultOrchestrator, type Run } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { templateCatalog } from "#/modules/agent/seed.ts";
+import type { RepoStack } from "#/modules/repo/repo.ts";
 
 import { issueBrief, milestonesOf, splitBrief } from "./brief.ts";
 import { filledKinds, filledTemplate, mandateNoteFits, sentTitles } from "./creation.ts";

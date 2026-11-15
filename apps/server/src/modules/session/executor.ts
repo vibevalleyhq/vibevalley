@@ -17,6 +17,8 @@ import { loopbackEnvironment, observeToolConnections } from "#/modules/agent/acc
 import type { Agent } from "#/modules/agent/agent.ts";
 import { probeInstallation } from "#/modules/agent/runtime.ts";
 
+import type { ToolConnection } from "./shapes.ts";
+
 const refused = refuseIn(BizCode.SessionRefused);
 
 type ExecutionOwner = Pick<T.Session, "id" | "agent" | "runtime" | "repo" | "issue" | "channel">;
@@ -41,7 +43,7 @@ export interface StartExecution {
 }
 
 export interface ExecutionObserver {
-  readonly connection: (connection: T.ToolConnection) => void;
+  readonly connection: (connection: ToolConnection) => void;
   readonly event: (event: Event) => void;
   readonly input: (input: ExecutionInput) => void;
   readonly report: (report: SubagentReport) => void;

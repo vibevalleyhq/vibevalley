@@ -2,11 +2,13 @@ import type { FailedTurn, FailureClass, TurnOutcome } from "@botiverse/oar";
 import { failureAdvice } from "@botiverse/oar/observe";
 
 import { list, maybe, t } from "@vibevalley/i18n";
-import type { EventTokens, Question, CriterionCheck, Outcome, IssueReport } from "@vibevalley/protocol";
+import type { EventTokens, Question, Outcome } from "@vibevalley/protocol";
 import { slice } from "@vibevalley/protocol/rules";
 
 import { clip } from "#/base/clip.ts";
-import { checksFromText, questionsFromText } from "#/base/questions.ts";
+import { checksFromText, questionsFromText, type CriterionCheck } from "#/base/questions.ts";
+
+import type { IssueReport } from "./shapes.ts";
 
 const summaryMax = 160;
 

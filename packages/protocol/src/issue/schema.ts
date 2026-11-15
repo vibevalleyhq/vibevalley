@@ -5,7 +5,6 @@ import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
 import { Conflict } from "../repo/schema";
 import { IssueAnswer, PhaseResting, Session, SessionEvent } from "../session/schema";
 import * as T from "./shapes";
-import { IssueReportMemoryScopeValues } from "./shapes";
 
 const Landing = z.enum(T.LandingValues) satisfies Codec<T.Landing>;
 const IssueCanceled = z.enum(T.IssueCanceledValues) satisfies Codec<T.IssueCanceled>;
@@ -105,17 +104,6 @@ const IssueMandate = z.object({
   maxBotReviewRounds: z.number().int(),
   autoSubmitPr: z.boolean(),
 }) satisfies Codec<T.IssueMandate>;
-
-export const IssueReportMemory = z.object({ text: z.string(), scope: z.enum(IssueReportMemoryScopeValues) }) satisfies Codec<T.IssueReportMemory>;
-
-export const IssueReport = z.object({
-  summary: z.string(),
-  questions: z.array(Question),
-  checks: z.array(CriterionCheck),
-  remember: z.array(IssueReportMemory),
-  prSubmit: z.boolean(),
-  answer: z.exactOptional(IssueAnswer),
-}) satisfies Codec<T.IssueReport>;
 
 export const IssueConstraints = z.object({
   check: z.exactOptional(z.string()),

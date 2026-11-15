@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { userId, MediaUnderstandingPhaseValues } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -13,11 +13,11 @@ import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Account, Provider } from "#/platform/provider/provider.ts";
-import { UnderstandingFailure } from "#/platform/provider/vendors.ts";
+import { UnderstandingFailure, type MediaInputReference } from "#/platform/provider/vendors.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import type { Inputs } from "./inputs.ts";
-import { type JobRow, jobsOf, newJob, type Row, storedAs } from "./job.ts";
+import { type JobRow, jobsOf, newJob, type Row, storedAs, type MediaUnderstandingPhase, MediaUnderstandingPhaseValues, type MediaSource } from "./job.ts";
 import type { Machine } from "./machine.ts";
 import type { MediaCaller } from "./media.ts";
 import type { RemoteFiles } from "./remoteFiles.ts";
@@ -45,7 +45,7 @@ const Authorization = z.object({
 });
 
 const jobs = jobsOf({ kinds: ["understanding"], phases: MediaUnderstandingPhaseValues });
-const terminal: readonly T.MediaUnderstandingPhase[] = ["ready", "incomplete", "failed", "unknown", "canceled"];
+const terminal: readonly MediaUnderstandingPhase[] = ["ready", "incomplete", "failed", "unknown", "canceled"];
 
 /** Understanding images and video: the user's inputs uploaded to the vendor, asked once, and deleted there afterwards.
  * A model may only start one the user authorized for its channel. */
@@ -126,7 +126,7 @@ export function makeUnderstanding(deps: UnderstandingDeps, { inputs, remote, mac
       }
     });
 
-  const approvedAccount = async (row: JobRow<T.MediaUnderstandingPhase>) => {
+  const approvedAccount = async (row: JobRow<MediaUnderstandingPhase>) => {
     const approval = authorization(row);
     const account = await provider.understanding();
     if (
@@ -146,9 +146,9 @@ export function makeUnderstanding(deps: UnderstandingDeps, { inputs, remote, mac
   };
 
   const ask = async (
-    row: JobRow<T.MediaUnderstandingPhase>,
+    row: JobRow<MediaUnderstandingPhase>,
     input: T.MediaUnderstandingRequest,
-    references: readonly T.MediaInputReference[],
+    references: readonly MediaInputReference[],
     account: Account,
     signal: AbortSignal,
   ) => {
@@ -164,7 +164,7 @@ export function makeUnderstanding(deps: UnderstandingDeps, { inputs, remote, mac
       }
     }
     if (!(await machine.change(input.id, ["queued"], { phase: "uploading" }))) return;
-    const media: { kind: T.MediaInputReference["kind"]; fileId: string }[] = [];
+    const media: { kind: MediaInputReference["kind"]; fileId: string }[] = [];
     for (const item of references) media.push({ kind: item.kind, fileId: await remote.upload(input.id, item.id, account, signal) });
     if (!(await machine.change(input.id, ["uploading"], { phase: "generating" }))) return;
     const result = await account.understanding.ask({ text: input.prompt, media, maxOutputTokens: input.maxOutputTokens }, signal);
@@ -179,7 +179,7 @@ export function makeUnderstanding(deps: UnderstandingDeps, { inputs, remote, mac
       await clean(input.id, signal);
   };
 
-  const enqueue = async (row: JobRow<T.MediaUnderstandingPhase>, account: Account) => {
+  const enqueue = async (row: JobRow<MediaUnderstandingPhase>, account: Account) => {
     const input = request(row);
     const references = (await view(row)).inputs;
     await machine.run(input.id, async (signal) => {
@@ -231,7 +231,7 @@ export function makeUnderstanding(deps: UnderstandingDeps, { inputs, remote, mac
       const account = await provider.understanding();
       if (input.connection !== account.connection || input.revision !== account.revision) throw refused(t("server.media.consentChanged"));
       if (channel !== null && (await channels.placeOf(userId, channel)) !== channel) throw invalid();
-      const references: T.MediaInputReference[] = [];
+      const references: MediaInputReference[] = [];
       for (const id of input.inputs) {
         let reference;
         try {
@@ -294,7 +294,7 @@ export function makeUnderstanding(deps: UnderstandingDeps, { inputs, remote, mac
         const row = own(await machine.found(id, ["understanding"]));
         const approval = authorization(row);
         if (!approval || approval.channel !== caller.channel) throw refused(t("server.media.authorizationRequired"));
-        const source: T.MediaSource = { kind: "orchestrator", agent: caller.agent, channel: caller.channel };
+        const source: MediaSource = { kind: "orchestrator", agent: caller.agent, channel: caller.channel };
         if (row.phase !== "authorized") {
           const existing = await view(row);
           if (existing.source.kind === "orchestrator" && !same(existing.source, source)) throw refused(t("server.media.authorizationRequired"));

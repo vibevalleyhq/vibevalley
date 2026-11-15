@@ -2,9 +2,10 @@ import { currentLocale, type Locale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { phaseWords } from "@vibevalley/protocol/rules";
 
-import type { Projection } from "#/core/core.ts";
+import type { Projection, CommitCount, SessionPlay } from "#/core/core.ts";
 import { effectsOf, viewOf } from "#/modules/game/view.ts";
 import { nextText, whenText } from "#/modules/issue/when.ts";
+import type { Doing } from "#/modules/session/shapes.ts";
 import { inbox } from "#/modules/watch/items.ts";
 
 import { reduce } from "./reduce.ts";
@@ -52,8 +53,8 @@ export function makeFrameOf(): (state: T.SpaceState, effects?: T.GameEffect[], s
     | {
         sessions: readonly T.Session[];
         issues: readonly T.Issue[];
-        plays: Readonly<Record<string, T.SessionPlay>> | undefined;
-        commits: T.CommitCount | undefined;
+        plays: Readonly<Record<string, SessionPlay>> | undefined;
+        commits: CommitCount | undefined;
         progress: T.Progress | undefined;
         locale: Locale;
         out: T.FarmView;
@@ -84,7 +85,7 @@ export function makeFrameOf(): (state: T.SpaceState, effects?: T.GameEffect[], s
   };
 
   const withWords = (state: T.SpaceState, locale: Locale): T.SpaceView => {
-    const doing = (d: T.Doing): T.DoingView => ({ ...d, actionText: t(`shared.action.${d.action}`) });
+    const doing = (d: Doing): T.DoingView => ({ ...d, actionText: t(`shared.action.${d.action}`) });
     const conflicts = new Map<string, T.Conflict | undefined>();
     for (const issue of state.issues) conflicts.set(issue.id, issue.conflict);
     const { plays: _plays, ...rest } = state;

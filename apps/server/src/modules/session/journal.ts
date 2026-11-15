@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { EventTokens, Outcome, SessionEvent, SessionEventType, ToolConnection } from "@vibevalley/protocol";
+import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
 import { cut } from "@vibevalley/protocol/rules";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 
@@ -15,6 +15,7 @@ import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 
 import type { From, ToolStart } from "./reaction.ts";
+import type { ToolConnection } from "./shapes.ts";
 
 const keepEvents = 240;
 const textMax = 6000;

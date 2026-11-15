@@ -10,10 +10,11 @@ import type * as qs from "#db/session.sql.ts";
 import type * as qr from "#db/session_run.sql.ts";
 
 import { isOnDuty } from "./roster.ts";
+import { IssueReport as IssueReportSchema } from "./schema.ts";
 
 const triggerOf = storedJsonOrUndefined(S.RunTrigger, "session_run.triggered_by");
 export const heardOf = storedJsonOrUndefined(z.array(z.string()), "session_run.heard");
-export const pendingReportOf = storedJsonOrUndefined(S.IssueReport, "session.pending_report");
+export const pendingReportOf = storedJsonOrUndefined(IssueReportSchema, "session.pending_report");
 const spentOf = storedJsonOrUndefined(S.Spent, "session_run.spent");
 const phaseOf = jsonOf(S.Phase, "session.phase");
 const lastRunOf = jsonOf(S.LastRun, "session.last_run");

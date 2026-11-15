@@ -1,9 +1,14 @@
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { RepoStack, PullRequest } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
 
 import { jsonOrNone } from "#/base/json.ts";
+
+export type RepoRecord = NonNullable<T.SpaceState["commits"]>["repos"][number];
+export type RepoStack = T.RepoTemplates["stack"];
+export type PullRequest = NonNullable<T.Issue["pullRequest"]>;
+export type PullRequestState = PullRequest["state"];
 
 export interface Workplace {
   readonly repo: string;

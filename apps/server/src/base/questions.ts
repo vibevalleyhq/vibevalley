@@ -1,4 +1,6 @@
-import type { CriterionCheck, Question } from "@vibevalley/protocol";
+import type * as T from "@vibevalley/protocol";
+
+export type CriterionCheck = T.Issue["checks"][number];
 
 const askLine = /^[\s>*#_-]*(?:\*\*)?要问用户(?:\*\*)?\s*[:：]\s*(?:\*\*)?(.+)$/u;
 const optionsTail = /\s*[（(]\s*选项\s*[:：]\s*(.+?)\s*[)）]\s*$/u;
@@ -20,7 +22,7 @@ export const checksFromText = (said: string): CriterionCheck[] =>
     return [{ criterion, result, proof: (m[3] ?? "").trim() }];
   });
 
-export const questionsFromText = (said: string): Question[] =>
+export const questionsFromText = (said: string): T.Question[] =>
   said.split("\n").flatMap((line) => {
     const raw = askLine.exec(line)?.[1]?.replace(/\*\*$/u, "").trim();
     if (!raw) return [];

@@ -1,7 +1,7 @@
 import { Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { ArtifactDisplayValues, userId } from "@vibevalley/protocol";
+import { userId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -22,6 +22,7 @@ import { htmlEdit } from "./edit.ts";
 import { artifactProblem } from "./policy.ts";
 
 const refused = refuseIn(BizCode.ArtifactRefused);
+const ArtifactDisplayValues = S.Artifact.shape.display.unwrap().options;
 
 /** Who makes it. from: who says so in the channel (the user, a session, an orchestrator). */
 interface Maker {

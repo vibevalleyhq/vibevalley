@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 
 import type { Locator, Page } from "@playwright/test";
-import type { z } from "zod";
 
 import { type Issue, type IssueAct, type IssueAction, readStream, type SessionId, type StateFrame, statePath, VibeValleyApi } from "@vibevalley/protocol";
 import { apiSuccessEnvelope } from "@vibevalley/protocol/api";
@@ -162,6 +161,6 @@ export async function choose(trigger: Locator, value: string) {
 }
 
 /** Decodes an intercepted /api/v1/* response through its `{ bizCode, message, data }` envelope and schema. */
-export async function replyData<A>(response: { json(): Promise<unknown> }, schema: z.ZodType<A>): Promise<A> {
+export async function replyData<A>(response: { json(): Promise<unknown> }, schema: Parameters<typeof apiSuccessEnvelope<A, unknown>>[0]): Promise<A> {
   return apiSuccessEnvelope(schema).parse(await response.json()).data;
 }

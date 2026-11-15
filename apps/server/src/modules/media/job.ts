@@ -2,14 +2,22 @@ import type { z } from "zod";
 
 import { abortable, anySignal, type Clock } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
-import { MediaPhaseValues, MediaUnderstandingPhaseValues } from "@vibevalley/protocol";
+import * as S from "@vibevalley/protocol/schema";
 
 import type { ApiError } from "#/base/errors.ts";
 import { jsonOrNone } from "#/base/json.ts";
 import type * as q from "#db/media_job.sql.ts";
 
+export type MediaPhase = T.MediaImageJob["phase"];
+export type MediaUnderstandingPhase = T.MediaUnderstandingJob["phase"];
+export const MediaPhaseValues = S.MediaImageJob.shape.phase.options;
+export const MediaUnderstandingPhaseValues = S.MediaUnderstandingJob.shape.phase.options;
+export type MediaSource = T.MediaImageJob["source"];
+export type MediaAudioRequest = z.infer<typeof S.MediaAudioRequest>;
+export type MediaAudioResult = NonNullable<T.MediaAudioJob["result"]>;
+
 /** Every phase a media job of some kind can be in. */
-export type MediaJobPhase = T.MediaPhase | T.MediaUnderstandingPhase;
+export type MediaJobPhase = MediaPhase | MediaUnderstandingPhase;
 export const mediaJobPhases: readonly MediaJobPhase[] = [...new Set<MediaJobPhase>([...MediaPhaseValues, ...MediaUnderstandingPhaseValues])];
 
 /** A media_job row as one kind's code reads it: its phase is one that kind has. */

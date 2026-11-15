@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { attachmentMax } from "@vibevalley/protocol";
 
 import { BizCode, messageOf, missing, refuseIn } from "#/base/errors.ts";
 import type { ServerConfig } from "#/infra/config.ts";
@@ -11,6 +10,8 @@ import type { Time } from "#/infra/time.ts";
 import * as q from "#db/attachment.sql.ts";
 
 import { makeStorage } from "./storage.ts";
+
+export const attachmentMax = 25 * 1024 * 1024;
 
 const refused = refuseIn(BizCode.AttachmentRefused);
 

@@ -1,7 +1,7 @@
 import type { Event } from "@botiverse/oar";
 import { describe, expect, it } from "vite-plus/test";
 
-import type { Doing, IssueReport, Session } from "@vibevalley/protocol";
+import type { Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { clip } from "#/base/clip.ts";
@@ -12,6 +12,7 @@ import { briefBreak, conflictBrief, noRoom, notTakenIn, sessionName, whoMakesRoo
 import { recallHead } from "./prompts.ts";
 import { reactionTo, type ReactionContext, near, since, type Tracking } from "./reaction.ts";
 import { readReport, restsAfter, settlesFirst, summaryOf } from "./report.ts";
+import type { Doing, IssueReport } from "./shapes.ts";
 import { shellCommand } from "./shell.ts";
 const ev = (body: object): Event => ({ sessionId: "s", agentPath: [], seq: 0, receivedAt: 0, ...body }) as unknown as Event;
 const ctx: ReactionContext = { id: sessionId("w1"), runtime: "pi", cwd: "/work/clock-in" };

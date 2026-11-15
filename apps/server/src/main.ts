@@ -2,8 +2,7 @@ import { access, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
-import { announce } from "@vibevalley/home";
-import type { ServerReady } from "@vibevalley/protocol";
+import { announce, type ServerReady } from "@vibevalley/home";
 
 import { app } from "#/gateway/http/app.ts";
 

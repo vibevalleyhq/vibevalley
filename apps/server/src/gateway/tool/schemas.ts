@@ -4,15 +4,7 @@ import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { JsonSchema } from "@vibevalley/agent/core/schema";
 import { runTool } from "@vibevalley/agent/core/tool";
 import { isAbort } from "@vibevalley/async";
-import {
-  ArtifactDisplayValues,
-  ArtifactKindValues,
-  CronWhenKindValues,
-  DeliverableValues,
-  LibraryFileKindValues,
-  LibraryOriginKindValues,
-  PkmTierValues,
-} from "@vibevalley/protocol";
+import { ArtifactKindValues, DeliverableValues, PkmTierValues } from "@vibevalley/protocol";
 import { isApiError, type Handlers } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -22,6 +14,8 @@ import { problemOf } from "#/base/json.ts";
 import { maxChildren as maxTasks } from "#/modules/issue/creation.ts";
 
 import { answers, descriptions, params, priorityNames, sessionDescriptions, statusNames } from "./prompts.ts";
+
+const CronWhenKindValues = ["once", "every", "daily", "weekly", "cron"] as const;
 /** A tool is an endpoint as a model sees it: its name is the endpoint's (toolName), its fields are the endpoint's. */
 export type Op = keyof Handlers;
 
@@ -46,8 +40,8 @@ export const agentOnly: Partial<Record<Op, readonly string[]>> = {
 };
 
 const libraryList = z.object({
-  origin: z.exactOptional(z.enum(LibraryOriginKindValues).describe(params.library.origin)),
-  type: z.exactOptional(z.enum(LibraryFileKindValues).describe(params.library.type)),
+  origin: z.exactOptional(S.LibraryListRequest.shape.origin.unwrap().describe(params.library.origin)),
+  type: z.exactOptional(S.LibraryListRequest.shape.type.unwrap().describe(params.library.type)),
   text: z.exactOptional(z.string().describe(params.library.text)),
 });
 const libraryName = z.exactOptional(z.string().describe(params.library.name));
@@ -57,7 +51,7 @@ const artifactText = {
   note: z.exactOptional(z.string().describe(params.artifact.note)),
 };
 const artifactKind = z.enum(ArtifactKindValues).describe(params.artifact.kind);
-const artifactDisplay = z.exactOptional(z.enum(ArtifactDisplayValues).describe(params.artifact.display));
+const artifactDisplay = z.exactOptional(S.Artifact.shape.display.unwrap().describe(params.artifact.display));
 const artifactId = z
   .string()
   .describe(params.artifact.id)

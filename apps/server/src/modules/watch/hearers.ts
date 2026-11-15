@@ -1,6 +1,7 @@
 import type * as T from "@vibevalley/protocol";
 import { everyone, userId } from "@vibevalley/protocol";
 
+import type { MessageKind } from "#/modules/channel/contracts.ts";
 import type { DeliveryEvent, DeliveryReason } from "#/modules/session/envelope.ts";
 
 import type { Recipient } from "./brakes.ts";
@@ -9,7 +10,7 @@ import type { Recipient } from "./brakes.ts";
 export interface ChannelAudience {
   readonly from: string;
   readonly actor: T.Actor;
-  readonly kind: T.MessageKind;
+  readonly kind: MessageKind;
   readonly mentions: readonly string[];
   readonly channel: Pick<T.Channel, "type" | "peer">;
   readonly orchestrator: string;

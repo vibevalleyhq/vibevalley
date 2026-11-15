@@ -11,6 +11,9 @@ import { mossUnderstandingModels } from "@vibevalley/provider/moss/understanding
 import { mossVisionModels } from "@vibevalley/provider/moss/vision-models";
 import { mossVoiceDesignModels } from "@vibevalley/provider/moss/voice-design-models";
 
+export type MediaAudioUsage = NonNullable<T.MediaAudioJob["usage"]>;
+export type MediaInputReference = NonNullable<T.MediaAudioJob["input"]>;
+
 export interface ImageRequest {
   readonly prompt: unknown;
   readonly width: number;
@@ -74,12 +77,12 @@ export interface CloneRequest {
 export type TranscriptionEvent =
   | { readonly type: "task.created"; readonly taskId: string }
   | { readonly type: "transcript.text.delta"; readonly text: string }
-  | { readonly type: "transcript.segment.done"; readonly index: number; readonly segment: T.MediaAudioSegment; readonly usage?: T.MediaAudioUsage }
-  | { readonly type: "transcript.text.done"; readonly text: string; readonly usage?: T.MediaAudioUsage };
+  | { readonly type: "transcript.segment.done"; readonly index: number; readonly segment: T.MediaAudioSegment; readonly usage?: MediaAudioUsage }
+  | { readonly type: "transcript.text.done"; readonly text: string; readonly usage?: MediaAudioUsage };
 
 export interface UnderstandingRequest {
   readonly text: string;
-  readonly media: readonly { readonly kind: T.MediaInputReference["kind"]; readonly fileId: string }[];
+  readonly media: readonly { readonly kind: MediaInputReference["kind"]; readonly fileId: string }[];
   readonly maxOutputTokens: number;
 }
 
@@ -116,7 +119,7 @@ export interface GeneratedAudio {
   readonly url: string;
   readonly format: T.MediaAudioFormat;
   readonly contentType: string;
-  readonly usage?: T.MediaAudioUsage;
+  readonly usage?: MediaAudioUsage;
 }
 
 export type AudioTask =
@@ -127,14 +130,14 @@ export type AudioTask =
       readonly status: "ready";
       readonly text: string;
       readonly segments?: readonly T.MediaAudioSegment[];
-      readonly usage?: T.MediaAudioUsage;
+      readonly usage?: MediaAudioUsage;
     };
 
 export type SpeechEvent =
   | { readonly type: "task.created"; readonly taskId: string }
   | { readonly type: "speech.created"; readonly sampleRate: number; readonly channels: number; readonly bitDepth: number }
   | { readonly type: "speech.audio.delta"; readonly audio: Uint8Array }
-  | { readonly type: "speech.audio.done"; readonly usage?: T.MediaAudioUsage; readonly durationSeconds?: number };
+  | { readonly type: "speech.audio.done"; readonly usage?: MediaAudioUsage; readonly durationSeconds?: number };
 
 export class AudioFailure extends Error {
   override readonly name = "AudioFailure";

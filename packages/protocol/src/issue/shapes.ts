@@ -37,23 +37,6 @@ export interface IssueMandate {
   autoSubmitPr: boolean;
 }
 
-export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
-type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
-
-export interface IssueReportMemory {
-  text: string;
-  scope: IssueReportMemoryScope;
-}
-
-export interface IssueReport {
-  summary: string;
-  questions: Question[];
-  checks: CriterionCheck[];
-  remember: IssueReportMemory[];
-  prSubmit: boolean;
-  answer?: IssueAnswer;
-}
-
 export interface IssueConstraints {
   check?: string;
   scope: string[];

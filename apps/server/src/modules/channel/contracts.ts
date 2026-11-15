@@ -5,21 +5,24 @@ import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
+import type { ActorKind } from "#/base/actor.ts";
+import type { QuotedBlock } from "#/base/clip.ts";
 import { Inconsistent } from "#/base/errors.ts";
 import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
 import type * as qm from "#db/channel_message.sql.ts";
 
-import { type Meta, metaOf, type Picked } from "./meta.ts";
+import { type ChannelType, type Meta, metaOf, type Picked } from "./meta.ts";
 import { type ChannelRow } from "./rooms.ts";
 
-export type { Meta, Picked } from "./meta.ts";
+export type { ChannelType, Meta, Picked } from "./meta.ts";
 export { channelType, envelopeMore, metaOf, metaText } from "./meta.ts";
+export type MessageKind = T.ChatMessage["kind"];
 
 export type MsgRow = qm.MessageByIDResult;
 
 /** Who said a message, as the page shows it: an agent's seat that speaks for a profile is a helper's, one that does not
  * is an orchestrator's (a profile speaking as itself). */
-export const actorOf = (kind: T.ActorKind, agent: string | null, id: string, name?: string): T.Actor =>
+export const actorOf = (kind: ActorKind, agent: string | null, id: string, name?: string): T.Actor =>
   kind === "agent"
     ? { kind: "agent", id, role: agent !== null ? "worker" : "orchestrator", ...(name !== undefined ? { name } : {}) }
     : { kind, id, ...(name !== undefined ? { name } : {}) };
@@ -33,7 +36,7 @@ export const reactionsText = (r: Reactions) => {
   return kept.length > 0 ? jsonText(Object.fromEntries(kept)) : null;
 };
 
-export const messageKind = (kind: string): T.MessageKind => S.MessageKind.safeParse(kind).data ?? "chat";
+export const messageKind = (kind: string): MessageKind => S.MessageKind.safeParse(kind).data ?? "chat";
 export const subjectKind = (kind: string | null): NonNullable<T.Channel["subjectKind"]> | undefined =>
   kind !== null ? S.SubjectKind.safeParse(kind).data : undefined;
 export const notifyOf = (n: string): T.Notify => S.Notify.safeParse(n).data ?? "all";
@@ -99,7 +102,7 @@ export interface AddressedMessage {
   readonly deleted?: boolean;
   readonly attachments?: readonly { readonly name: string; readonly path: string }[];
   readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
-  readonly blocks?: readonly T.QuotedBlock[];
+  readonly blocks?: readonly QuotedBlock[];
   readonly picked?: Picked;
   readonly responsePort?: string;
   readonly voiceMode?: NonNullable<Meta["voiceMode"]>;
@@ -145,7 +148,7 @@ export interface Saying {
   readonly replyTo?: number;
   readonly attachments?: readonly string[];
   readonly picked?: Picked;
-  readonly blocks?: readonly T.QuotedBlock[];
+  readonly blocks?: readonly QuotedBlock[];
   /** Delivers only to this orchestrator instead of channel members. */
   readonly to?: string;
 }
@@ -216,7 +219,7 @@ export interface ThreadSubject {
 export interface Write {
   readonly channel: string;
   readonly from: string;
-  readonly kind: T.MessageKind;
+  readonly kind: MessageKind;
   readonly text: string;
   readonly meta?: Meta;
   readonly thread?: ThreadSubject;
@@ -240,7 +243,7 @@ export interface Seat {
 
 export interface Participant {
   readonly id: string;
-  readonly kind: T.ActorKind;
+  readonly kind: ActorKind;
   readonly name: string;
   /** The profile it speaks for; none for the user, the farm and the orchestrators. */
   readonly agent: string | null;
@@ -250,7 +253,7 @@ export interface Participant {
 
 export interface Place {
   readonly id: string;
-  readonly type: T.ChannelType;
+  readonly type: ChannelType;
   readonly peer: string | null;
   readonly parent: string | null;
   readonly name: string | null;

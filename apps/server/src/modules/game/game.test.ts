@@ -2,12 +2,12 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, test, vi } from "vite-plus/test";
 
-import type { Repo as RepoRecord, Session } from "@vibevalley/protocol";
+import type { Session } from "@vibevalley/protocol";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import type { ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
-import type { Repo } from "#/modules/repo/repo.ts";
+import type { Repo, RepoRecord } from "#/modules/repo/repo.ts";
 import { sessionOf } from "#/modules/session/roster.ts";
 import { gitSync, repo } from "#/testing/git.ts";
 import { testConfig, waitFor as until } from "#/testing/layers.ts";

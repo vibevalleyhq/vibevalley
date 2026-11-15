@@ -4,17 +4,7 @@ import type { Duplex } from "node:stream";
 
 import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
-import {
-  artifactPrefix,
-  attachmentPath,
-  deviceKeyCookie,
-  eventsPath,
-  type LanPaired,
-  type LanStatus,
-  livePath,
-  type Preview,
-  statePath,
-} from "@vibevalley/protocol";
+import { attachmentPath, deviceKeyCookie, eventsPath, type LanPaired, type LanStatus, livePath, type Preview, statePath } from "@vibevalley/protocol";
 import { apiSuccessEnvelope, bizCodeMeta, endpoints, pathOf } from "@vibevalley/protocol/api";
 import { subscriptionPath } from "@vibevalley/protocol/rpc";
 import * as S from "@vibevalley/protocol/schema";
@@ -25,6 +15,7 @@ import { hostName, serverAddress, type ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
+import { artifactPrefix } from "#/modules/artifact/policy.ts";
 import { sameSecret, tidyName, type User } from "#/platform/user/user.ts";
 import * as lanQ from "#db/lan.sql.ts";
 

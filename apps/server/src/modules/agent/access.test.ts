@@ -1,9 +1,7 @@
 import type { Cursor, Frame, RawEvent } from "@botiverse/oar";
 import { describe, expect, it } from "vite-plus/test";
 
-import type { ToolConnection } from "@vibevalley/protocol";
-
-import { loopbackEnvironment, observeToolConnections } from "./access.ts";
+import { loopbackEnvironment, observeToolConnections, type ToolConnection } from "./access.ts";
 
 describe("worker proxy bypass", () => {
   it("regression: inherited bypasses are preserved in both child variables", () => {

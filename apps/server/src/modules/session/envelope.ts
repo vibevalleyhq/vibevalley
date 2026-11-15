@@ -1,14 +1,16 @@
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { type Trigger, type TriggerContext } from "./shapes.ts";
+import type { ActorKind } from "#/base/actor.ts";
 
-export const actorOfParticipant = (kind: T.ActorKind, role: T.AgentRole | null, id: string, name?: string): T.Actor =>
+import { type Trigger, type TriggerContext, type ChannelType } from "./shapes.ts";
+
+export const actorOfParticipant = (kind: ActorKind, role: T.AgentRole | null, id: string, name?: string): T.Actor =>
   kind === "agent"
     ? { kind: "agent", id, role: role ?? "worker", ...(name !== undefined ? { name } : {}) }
     : { kind, id, ...(name !== undefined ? { name } : {}) };
 
-export const channelType = (type: string): T.ChannelType => S.ChannelType.safeParse(type).data ?? "channel";
+export const channelType = (type: string): ChannelType => S.ChannelType.safeParse(type).data ?? "channel";
 
 export interface Picked {
   readonly agent?: string;
@@ -65,7 +67,7 @@ export interface ChannelEnvelopeRow {
   readonly reply_number: number | null;
   readonly created_at: number;
   readonly name: string;
-  readonly sender_kind: T.ActorKind;
+  readonly sender_kind: ActorKind;
   readonly sender_role: T.AgentRole | null;
   readonly channel_type: string;
   readonly root_id: string | null;
@@ -135,7 +137,7 @@ export interface Handed {
   readonly _tag: "Handed";
   readonly agent: string;
   readonly channel: string;
-  readonly type: T.ChannelType;
+  readonly type: ChannelType;
   readonly target: string;
   readonly messages: Envelope[];
   readonly source?: "issue" | "cron" | "patrol";

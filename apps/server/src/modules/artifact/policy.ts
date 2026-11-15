@@ -8,3 +8,5 @@ export {
   htmlPolicy,
   htmlSources,
 } from "@vibevalley/artifact/html";
+
+export const artifactPrefix = "/api/v1/artifact/";

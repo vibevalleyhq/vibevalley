@@ -4,7 +4,7 @@ import { Hono } from "hono";
 
 import { type Clock, isAbort, systemClock } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
-import { artifactPrefix, attachmentMax, attachmentPath } from "@vibevalley/protocol";
+import { attachmentPath } from "@vibevalley/protocol";
 import { ApiError, BizCode, type Endpoint, endpoints, type Handlers, pathOf } from "@vibevalley/protocol/api";
 import { artifactId } from "@vibevalley/protocol/schema";
 
@@ -13,9 +13,9 @@ import { problemOf, wireJson } from "#/base/json.ts";
 import type { Logger } from "#/infra/log.ts";
 import { counter } from "#/infra/metrics.ts";
 import type { Artifact } from "#/modules/artifact/artifact.ts";
-import { artifactHeaders, artifactPrintHeaders } from "#/modules/artifact/policy.ts";
+import { artifactHeaders, artifactPrefix, artifactPrintHeaders } from "#/modules/artifact/policy.ts";
 import { shellThemeOf, withShell } from "#/modules/artifact/shell.ts";
-import type { Attachment } from "#/platform/attachment/attachment.ts";
+import { type Attachment, attachmentMax } from "#/platform/attachment/attachment.ts";
 
 import { empty, fileResponse, notFound, replyError, textUpTo } from "./respond.ts";
 import { fromTheFarm } from "./rpc.ts";

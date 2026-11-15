@@ -6,13 +6,15 @@ import { issueId } from "@vibevalley/protocol/schema";
 import { BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { jsonText } from "#/base/json.ts";
+import type { CriterionCheck } from "#/base/questions.ts";
 import type { Core } from "#/core/core.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
+import type { PullRequest, PullRequestState } from "#/modules/repo/repo.ts";
 import { NotRecorded, type Session } from "#/modules/session/session.ts";
-import type { Trigger } from "#/modules/session/shapes.ts";
+import type { Trigger, SessionClose } from "#/modules/session/shapes.ts";
 import * as q from "#db/issue.sql.ts";
 
 import { issueBrief, splitBrief } from "./brief.ts";
@@ -21,13 +23,13 @@ import { dependencyProblems } from "./dependencies.ts";
 import type { Intake } from "./intake.ts";
 import { kept, openQuestions } from "./refinement.ts";
 import { jsonOrNull, nullText } from "./rows.ts";
-import { isClosed } from "./status.ts";
+import { isClosed, type Finding, type IssueCanceled, type IssueConstraints, type IssueMandate, type Landing } from "./status.ts";
 import { makeIssueStore } from "./store.ts";
 
 const refused = refuseIn(BizCode.IssueRefused);
 
 /** Only while the issue is still open: a completion the user chose (kept, none) is written before its session leaves, and a child issue merges into its parent, so it does not merge into main here. */
-const closingOf = (closed: T.SessionClose | undefined): { delivered: T.Landing } | { canceled: T.IssueCanceled } =>
+const closingOf = (closed: SessionClose | undefined): { delivered: Landing } | { canceled: IssueCanceled } =>
   closed === "merged" ? { delivered: "merged" } : closed === "completed" ? { delivered: "none" } : { canceled: closed === "lost" ? "lost" : "dismissed" };
 
 /** What every part of the issue module reads and writes the issues with. */
@@ -110,7 +112,7 @@ export async function issueLifecycle(deps: IssueParts) {
     return [title, description];
   };
 
-  const insert = async (req: T.IssueRequest, mandate: T.IssueMandate, cron?: string) => {
+  const insert = async (req: T.IssueRequest, mandate: IssueMandate, cron?: string) => {
     const [title, description] = issueWords(req);
     if (req.constraints?.acceptance === true && !req.constraints.check?.trim()) throw refused(t("server.issue.verification.acceptanceNeedsCheck"));
     const id = newId();
@@ -151,7 +153,7 @@ export async function issueLifecycle(deps: IssueParts) {
   };
 
   /** add, with the database refusing the row told as a refusal: hire tells it to the user. */
-  const attemptAdd = async (req: T.IssueRequest, mandate: T.IssueMandate, cron?: string) => {
+  const attemptAdd = async (req: T.IssueRequest, mandate: IssueMandate, cron?: string) => {
     try {
       return await insert(req, mandate, cron);
     } catch (e) {
@@ -161,7 +163,7 @@ export async function issueLifecycle(deps: IssueParts) {
   };
 
   /** The database failing here is not the caller's to tell: it goes up as it is. */
-  const add = (req: T.IssueRequest, mandate: T.IssueMandate, cron?: string) => insert(req, mandate, cron);
+  const add = (req: T.IssueRequest, mandate: IssueMandate, cron?: string) => insert(req, mandate, cron);
 
   const remove = async (id: string) => {
     await store.remove(id);
@@ -260,17 +262,17 @@ export async function issueLifecycle(deps: IssueParts) {
     await publish(id);
   };
 
-  const complete = async (id: string, delivered: T.Landing) => {
+  const complete = async (id: string, delivered: Landing) => {
     await q.completeIssue(db.sql, { closed_at: clock.now(), delivered, id });
     await publish(id);
   };
 
-  const cancelAs = async (id: string, canceled: T.IssueCanceled) => {
+  const cancelAs = async (id: string, canceled: IssueCanceled) => {
     await q.cancelIssue(db.sql, { closed_at: clock.now(), canceled, id });
     await publish(id);
   };
 
-  const closeIfOpen = async (sessionId: string, closed: T.SessionClose | undefined) => {
+  const closeIfOpen = async (sessionId: string, closed: SessionClose | undefined) => {
     const issue = store.issueOfSession(sessionId);
     if (!issue) return;
     const current = await store.byId(issue);
@@ -322,7 +324,7 @@ export async function issueLifecycle(deps: IssueParts) {
     sessionId: string,
     outcome: T.Outcome,
     questions: readonly T.Question[] | undefined,
-    checks: readonly T.CriterionCheck[],
+    checks: readonly CriterionCheck[],
     answer: T.IssueAnswer | undefined,
   ) => {
     const issue = store.issueOfSession(sessionId);
@@ -346,7 +348,7 @@ export async function issueLifecycle(deps: IssueParts) {
   };
 
   /** at 0 is not accepted (a fail, or another round started); the findings are written as they stand. */
-  const judged = async (id: string, at: number, findings: readonly T.Finding[]) => {
+  const judged = async (id: string, at: number, findings: readonly Finding[]) => {
     await q.reviewIssue(db.sql, { id, reviewed_at: at > 0 ? at : null, findings: jsonOrNull(findings, findings.length > 0) });
     await publish(id);
   };
@@ -422,12 +424,12 @@ export async function issueLifecycle(deps: IssueParts) {
     });
   };
 
-  const savePullRequest = async (id: string, pr: T.PullRequest) => {
+  const savePullRequest = async (id: string, pr: PullRequest) => {
     await q.setIssuePullRequest(db.sql, { id, pull_request: jsonText(pr) });
     await publish(id);
   };
 
-  const finishPullRequest = async (issue: T.Issue, state: T.PullRequestState) => {
+  const finishPullRequest = async (issue: T.Issue, state: PullRequestState) => {
     await db.tx(async () => {
       if (state === "closed") await q.cancelIssue(db.sql, { id: issue.id, canceled: "dismissed", closed_at: clock.now() });
       else await q.completeIssue(db.sql, { id: issue.id, delivered: "pull_request", closed_at: clock.now() });
@@ -440,7 +442,7 @@ export async function issueLifecycle(deps: IssueParts) {
     id: string,
     title: string,
     channel: string,
-    parentMandate: T.IssueMandate,
+    parentMandate: IssueMandate,
     rows: readonly { readonly id: T.IssueId; readonly req: T.IssueRequest }[],
   ) => {
     const at = clock.now();
@@ -484,7 +486,7 @@ export async function issueLifecycle(deps: IssueParts) {
     for (const row of rows) await publish(row.id);
   };
 
-  const completeChild = async (childId: string, constraints: T.IssueConstraints | undefined) => {
+  const completeChild = async (childId: string, constraints: IssueConstraints | undefined) => {
     await db.tx(async () => {
       if (constraints) await q.setIssueConstraints(db.sql, { id: childId, constraints: jsonText(constraints) });
       await q.completeIssue(db.sql, { closed_at: clock.now(), delivered: "merged_into_parent", id: childId });

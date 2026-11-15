@@ -14,6 +14,9 @@ const serverLiterals = (file: string, name: string): readonly string[] => {
   return [...list.matchAll(/\x22([^\x22]*)\x22/gu)].map((m) => m[1] ?? "");
 };
 const TriggerSourceValues = serverLiterals("apps/server/src/modules/session/shapes.ts", "TriggerSourceValues");
+const SessionCloseValues = serverLiterals("packages/protocol/src/session/shapes.ts", "SessionCloseValues");
+const MediaPhaseValues = serverLiterals("packages/protocol/src/media/shapes.ts", "MediaPhaseValues");
+const MediaUnderstandingPhaseValues = serverLiterals("packages/protocol/src/media/shapes.ts", "MediaUnderstandingPhaseValues");
 const sqlPath = "apps/server/db/migrations/0001_schema.up.sql";
 const boundaryDocs = "docs/subsystems/foundation.md#边界审计";
 
@@ -203,7 +206,7 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "issue.canceled", protocol: "IssueCanceledValues", values: T.IssueCanceledValues },
   { column: "issue.deliver", protocol: "DeliverableValues", values: T.DeliverableValues },
   { column: "session.role", protocol: "AgentRoleValues", values: T.AgentRoleValues },
-  { column: "session.closed", protocol: "SessionCloseValues", values: T.SessionCloseValues },
+  { column: "session.closed", protocol: "SessionCloseValues", values: SessionCloseValues },
   { column: "session_run.outcome", protocol: "OutcomeValues", values: T.OutcomeValues },
   { column: "session_delivery.source", protocol: "TriggerSourceValues", values: TriggerSourceValues },
   { column: "issue_cron.set_by", protocol: "ActorKindValues", values: T.ActorKindValues },
@@ -218,7 +221,7 @@ const storedEnums: readonly StoredEnum[] = [
   {
     column: "media_job.phase",
     protocol: "MediaPhaseValues and MediaUnderstandingPhaseValues",
-    values: [...new Set([...T.MediaUnderstandingPhaseValues, ...T.MediaPhaseValues])],
+    values: [...new Set([...MediaUnderstandingPhaseValues, ...MediaPhaseValues])],
   },
   {
     column: "media_job.kind",

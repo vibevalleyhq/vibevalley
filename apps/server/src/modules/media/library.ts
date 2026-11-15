@@ -1,6 +1,5 @@
 import { TaskGroup, withTimeout } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
-import { attachmentMax } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -8,6 +7,7 @@ import { ApiError, BizCode, lookIn, messageOf, missing, refuseIn } from "#/base/
 import { jsonOf } from "#/base/json.ts";
 import { publicHttps } from "#/infra/publicHttp.ts";
 import { NotWorkFile } from "#/modules/session/session.ts";
+import { attachmentMax } from "#/platform/attachment/attachment.ts";
 import * as q from "#db/media_library_item.sql.ts";
 
 import type { MediaDeps } from "./media.ts";

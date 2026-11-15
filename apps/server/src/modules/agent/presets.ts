@@ -27,7 +27,7 @@ export const defaultSettings = (): T.RuntimeSettings => ({ ...presets().defaultS
 export const runtimeIds = (): string[] => [...presets().runtimeIds];
 
 /** A runtime's name, look and blurb; one the farm has no look for gets the fallback, named by its id. */
-export function presetOf(runtime: string): T.RuntimePreset {
+export function presetOf(runtime: string): T.RuntimeInfo["preset"] {
   const found = presets().runtimePresets.find((p) => p.id === runtime);
   return structuredClone(found ?? { ...presets().fallbackPreset, id: runtime, label: runtime });
 }

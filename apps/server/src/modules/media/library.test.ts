@@ -7,6 +7,7 @@ import { waitFor } from "@vibevalley/testkit/until";
 
 import { world } from "#/testing/world.ts";
 
+import type { MediaPhase } from "./job.ts";
 import type { AddedBy } from "./library.ts";
 
 /** What p failed with; the test fails when it did not. */
@@ -20,7 +21,7 @@ const failure = async (p: Promise<unknown>) => {
 
 const file = (name: string, words: string, type = "text/plain") => ({ name, type, data: Buffer.from(words).toString("base64") });
 
-const image = (id: string, attachment: T.Attachment, phase: T.MediaPhase): T.MediaJob => ({
+const image = (id: string, attachment: T.Attachment, phase: MediaPhase): T.MediaJob => ({
   kind: "image",
   id,
   prompt: "一只橘猫",

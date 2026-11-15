@@ -44,7 +44,7 @@ function isolatedEnvironment(home: string, work: string): Record<string, string>
   };
 }
 
-// The child publishes this protocol.ServerReady receipt after binding its own port.
+// The child publishes this @vibevalley/home ServerReady receipt after binding its own port.
 export function readyAddress(line: string, pid: number): string | undefined {
   try {
     const ready = JSON.parse(line);

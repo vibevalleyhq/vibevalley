@@ -8,6 +8,7 @@ import { needOf } from "@vibevalley/protocol/rules";
 
 import { orchestrator, user } from "#/base/actor.ts";
 import { type Inside } from "#/modules/session/session.ts";
+import type { Machine } from "#/modules/session/shapes.ts";
 import type { DeliveryInput } from "#/modules/session/signals.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { sqlOf } from "#/testing/sql.ts";
@@ -152,7 +153,7 @@ describe("a session's work", () => {
   test("works on the server's own machine, the same one after a restart", async () => {
     const base = testConfig();
     const config = { ...base, db: join(base.home, "db") };
-    let first: T.Machine | undefined;
+    let first: Machine | undefined;
     // A farm on the same database, started for body and stopped after it.
     const started = async (body: (fw: FlowWorld) => Promise<void>) => {
       await using fw = await farm({ config }).open();

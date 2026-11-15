@@ -3,6 +3,7 @@ import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
 import { farmOf, needOf, omitUndefined, plotKeyOf } from "@vibevalley/protocol/rules";
 
+import type { Fact, SessionPlay } from "#/core/core.ts";
 import { type AchievementDef, achievements } from "#/modules/agent/seed.ts";
 import { openFindings } from "#/modules/issue/status.ts";
 import { isHired, isOnDuty, sessionOf } from "#/modules/session/roster.ts";
@@ -13,12 +14,12 @@ const fileLimit = 24;
 
 const commandLimit = 12;
 
-export const emptyPlay = (): T.SessionPlay => ({ station: -1, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] });
+export const emptyPlay = (): SessionPlay => ({ station: -1, history: [], toolsThisRun: 0, counts: {}, files: [], commands: [] });
 
-export const playOf = (plays: Readonly<Record<string, T.SessionPlay>> | undefined, id: string): T.SessionPlay => plays?.[id] ?? emptyPlay();
+export const playOf = (plays: Readonly<Record<string, SessionPlay>> | undefined, id: string): SessionPlay => plays?.[id] ?? emptyPlay();
 
 /** -1 when no station on this repo's farm is free. */
-export function freeStation(plays: Readonly<Record<string, T.SessionPlay>> | undefined, sessions: readonly T.Session[], repo: string, prefer?: number): number {
+export function freeStation(plays: Readonly<Record<string, SessionPlay>> | undefined, sessions: readonly T.Session[], repo: string, prefer?: number): number {
   const taken = new Set(sessions.filter((h) => farmOf(h) === repo).map((h) => playOf(plays, h.id).station));
   if (prefer !== undefined && prefer >= 0 && prefer < maxRunning && !taken.has(prefer)) return prefer;
   for (let i = 0; i < maxRunning; i++) if (!taken.has(i)) return i;
@@ -43,18 +44,18 @@ const isToolAction = (action: T.SessionAction) =>
   action === "wait" ||
   action === "other";
 
-export const playedRun = (p: T.SessionPlay, at: number): T.SessionPlay => ({
+export const playedRun = (p: SessionPlay, at: number): SessionPlay => ({
   ...p,
   toolsThisRun: 0,
   runStartedAt: at,
   history: lastN([...p.history, { at, action: "thinking", label: "" }], historyLimit),
 });
 
-export const playedDoing = (p: T.SessionPlay, f: { readonly at: number; readonly action: T.SessionAction; readonly label: string }): T.SessionPlay => {
+export const playedDoing = (p: SessionPlay, f: { readonly at: number; readonly action: T.SessionAction; readonly label: string }): SessionPlay => {
   const history = p.history;
   const last = history[history.length - 1];
   if (last && last.action === f.action && last.label === f.label) return p;
-  const next: T.SessionPlay = { ...p, history: lastN([...history, { at: f.at, action: f.action, label: f.label }], historyLimit) };
+  const next: SessionPlay = { ...p, history: lastN([...history, { at: f.at, action: f.action, label: f.label }], historyLimit) };
   if (!isToolAction(f.action)) return next;
   next.toolsThisRun = p.toolsThisRun + 1;
   next.counts = { ...p.counts, [f.action]: (p.counts[f.action] ?? 0) + 1 };
@@ -101,7 +102,7 @@ function fnv32a(s: string): number {
 /** The same session ripens to the same crop every time. */
 const ripeCrop = (h: T.Session): T.Crop => (fnv32a(h.id) % 2 === 1 ? "carrot" : "wheat");
 
-function growth(h: T.Session, play: T.SessionPlay): T.Crop {
+function growth(h: T.Session, play: SessionPlay): T.Crop {
   const since = play.runStartedAt ?? h.hiredAt;
   let crop: T.Crop = "sprout";
   for (const played of play.history) {
@@ -124,7 +125,7 @@ const badgeReview = (): NonNullable<T.PlotView["badge"]> => ({ text: t("shared.s
 const badgeQuestions = (): NonNullable<T.PlotView["badge"]> => ({ text: t("shared.stage.asking"), tone: "wait" });
 
 /** A plot is a picture of its issue's stage, never a second reading of it. the session only adds how far this round has grown. */
-export function plotOf(h: T.Session, issue: T.Issue | undefined, play: T.SessionPlay): T.PlotView {
+export function plotOf(h: T.Session, issue: T.Issue | undefined, play: SessionPlay): T.PlotView {
   if (!issue) return plotOfSession(h, play);
   const a = issue.stage;
   switch (a.state) {
@@ -163,7 +164,7 @@ export function plotOf(h: T.Session, issue: T.Issue | undefined, play: T.Session
 }
 
 /** A session that works no issue (a draft, the one splitting an issue): its own phase is all there is. */
-function plotOfSession(h: T.Session, play: T.SessionPlay): T.PlotView {
+function plotOfSession(h: T.Session, play: SessionPlay): T.PlotView {
   const need = needOf(h);
   const conflict = need?.kind === "conflict";
   switch (h.phase._tag) {
@@ -193,7 +194,7 @@ function levelUps(before: number | undefined, after: number): T.GameEffect[] {
   return out;
 }
 
-export function effectsOf(before: T.SpaceState, fact: T.Fact): T.GameEffect[] {
+export function effectsOf(before: T.SpaceState, fact: Fact): T.GameEffect[] {
   switch (fact.type) {
     case "progressChanged": {
       const out: T.GameEffect[] = [];

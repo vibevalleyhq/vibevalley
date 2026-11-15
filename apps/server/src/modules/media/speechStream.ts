@@ -4,7 +4,7 @@ import type * as T from "@vibevalley/protocol";
 
 import { BizCode, refuseIn } from "#/base/errors.ts";
 import { bestEffort } from "#/infra/log.ts";
-import type { SpeechEvent } from "#/platform/provider/vendors.ts";
+import type { SpeechEvent, MediaAudioUsage, MediaInputReference } from "#/platform/provider/vendors.ts";
 
 import { type AudioStreamDeps, releaseAudioResult, saveAudioStream, type MediaInputs } from "./audioResult.ts";
 import { inTime, untilAborted } from "./job.ts";
@@ -14,9 +14,9 @@ const streamMs = 5 * 60_000;
 
 export interface SpeechStreamSaved {
   attachment?: T.Attachment;
-  resultInput: T.MediaInputReference | null;
+  resultInput: MediaInputReference | null;
   metadata: NonNullable<T.MediaSpeechJob["metadata"]>;
-  usage?: T.MediaAudioUsage;
+  usage?: MediaAudioUsage;
   complete: boolean;
 }
 export interface SpeechStreamPorts {
@@ -41,7 +41,7 @@ export async function receiveSpeechStream(
   let sequence = 0;
   let pending: Uint8Array = new Uint8Array(0);
   let format: { sampleRate: number; channels: number; bitDepth: number } | undefined;
-  let usage: T.MediaAudioUsage | undefined;
+  let usage: MediaAudioUsage | undefined;
   let duration: number | undefined;
   let complete = false;
   /** What came so far, kept; only the staging is stopped by the signal, and a result the job will not take is let go. */

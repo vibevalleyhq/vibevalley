@@ -2,6 +2,7 @@ import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
 import { ApiError, type ChannelHandlers } from "@vibevalley/protocol/api";
 
+import type { QuotedBlock } from "#/base/clip.ts";
 import { lookIn, missing, reasonOf } from "#/base/errors.ts";
 import { requestKeys } from "#/gateway/http/api.ts";
 import type { Logger } from "#/infra/log.ts";
@@ -13,8 +14,8 @@ import type { Game } from "#/modules/game/game.ts";
 import type { Watch } from "#/modules/watch/watch.ts";
 
 /** Snapshots the blocks quoted by the user so later edits or deletions remain visible on the message. */
-async function quoteBlocks(artifacts: Artifact, refs: readonly T.BlockRef[] | undefined, log: Logger): Promise<T.QuotedBlock[]> {
-  const out: T.QuotedBlock[] = [];
+async function quoteBlocks(artifacts: Artifact, refs: readonly T.BlockRef[] | undefined, log: Logger): Promise<QuotedBlock[]> {
+  const out: QuotedBlock[] = [];
   for (const ref of refs ?? []) {
     try {
       const snapshot = await artifacts.blocks(ref.artifactId);
@@ -25,7 +26,7 @@ async function quoteBlocks(artifacts: Artifact, refs: readonly T.BlockRef[] | un
         rev: ref.rev,
         title: snapshot.artifact.title,
         ...(block ? { type: block.type, text: block.text.map((s) => s.t).join(""), nowRev: block.rev } : { deleted: true }),
-      } satisfies T.QuotedBlock);
+      } satisfies QuotedBlock);
     } catch (e) {
       // A block that cannot be read is left out of the quote: the message still goes.
       log.warn("quoting a block failed", e);

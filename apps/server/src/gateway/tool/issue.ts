@@ -10,6 +10,7 @@ import type { Who } from "#/base/actor.ts";
 import { head } from "#/base/clip.ts";
 import { AgentChoiceRefused, IssueCreateRefused } from "#/modules/issue/issue.ts";
 import { openFindings } from "#/modules/issue/status.ts";
+import { IssueReportMemory } from "#/modules/session/schema.ts";
 
 import {
   answers,
@@ -34,7 +35,7 @@ const IssueReportInput = z.object({
   summary: z.string(),
   questions: z.exactOptional(z.array(S.Question)),
   checks: z.exactOptional(z.array(S.CriterionCheck)),
-  remember: z.exactOptional(z.array(S.IssueReportMemory)),
+  remember: z.exactOptional(z.array(IssueReportMemory)),
   prSubmit: z.exactOptional(z.boolean()),
   answer: z.exactOptional(S.IssueAnswer),
 });

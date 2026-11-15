@@ -18,7 +18,7 @@ import { type Machine, makeMachine } from "./machine.ts";
 import { type DeliveryNews, type HireArrival, type HiredReceipt, type Mailbox, makeMailbox } from "./mailbox.ts";
 import type { TriggerInput, TriggerResource } from "./payload.ts";
 import { summaryOf } from "./report.ts";
-import type { Trigger } from "./shapes.ts";
+import type { Trigger, IssueReport } from "./shapes.ts";
 
 export type { SessionOptions };
 export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
@@ -98,7 +98,7 @@ export interface Session {
   /** What an orchestrator has not read yet. */
   readonly digest: (agent: string) => Promise<Envelope[]>;
   /** A helper's report for its run's issue; refused when it has none. */
-  readonly report: (id: string, report: T.IssueReport) => Promise<void>;
+  readonly report: (id: string, report: IssueReport) => Promise<void>;
   /** Rejects `..` segments and symlinks escaping the session's working directory; throws NotWorkFile. */
   readonly workFile: (id: string, path: string, max: number) => Promise<{ readonly name: string; readonly bytes: Uint8Array }>;
   /** Everything the sessions tell, subscribed before it returns: nothing told after is missed. */

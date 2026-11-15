@@ -1,4 +1,4 @@
-import type { IssueId, SessionId } from "../common/shapes";
+import type { SessionId } from "../common/shapes";
 import type { Repo } from "../repo/shapes";
 import type { Doing } from "../session/shapes";
 
@@ -114,21 +114,6 @@ export interface FarmView {
 /** Told apart by `kind`. */
 export type GameEffect = GameEffectReward | GameEffectPenalty | GameEffectLevelUp | GameEffectAchievement;
 
-/** Told apart by `kind`. */
-export type LedgerEntry =
-  | LedgerEntryHarvested
-  | LedgerEntryFailed
-  | LedgerEntryConflicted
-  | LedgerEntryTold
-  | LedgerEntryReviewed
-  | LedgerEntryFamily
-  | LedgerEntryHandoff
-  | LedgerEntryCalled
-  | LedgerEntryHired
-  | LedgerEntryMoment
-  | LedgerEntryLevel
-  | LedgerEntryTitled;
-
 export interface ProgressTitle {
   id: string;
   tier: number;
@@ -166,92 +151,6 @@ export interface GameEffectAchievement {
   detail: string;
   coins: number;
   oneOff: boolean;
-}
-
-export interface LedgerEntryHarvested {
-  kind: "harvested";
-  at: number;
-  session: SessionId;
-  agent?: string;
-  repo: string;
-  runtime: string;
-  commits: number;
-  cny?: number;
-  runs: number;
-}
-
-export interface LedgerEntryFailed {
-  kind: "failed";
-  at: number;
-  session: SessionId;
-  agent?: string;
-}
-
-export interface LedgerEntryConflicted {
-  kind: "conflicted";
-  at: number;
-  session: SessionId;
-}
-
-export interface LedgerEntryTold {
-  kind: "told";
-  at: number;
-  session: SessionId;
-}
-
-export interface LedgerEntryReviewed {
-  kind: "reviewed";
-  at: number;
-  session: SessionId;
-}
-
-export interface LedgerEntryFamily {
-  kind: "family";
-  at: number;
-  issue: IssueId;
-  merged: number;
-  parallel: boolean;
-}
-
-export interface LedgerEntryHandoff {
-  kind: "handoff";
-  at: number;
-  session: SessionId;
-  to: string;
-}
-
-export interface LedgerEntryCalled {
-  kind: "called";
-  at: number;
-  session: SessionId;
-}
-
-export interface LedgerEntryHired {
-  kind: "hired";
-  at: number;
-  session: SessionId;
-  agent?: string;
-}
-
-export const LedgerEntryMomentKindValues = ["opened", "split", "voice", "busy6"] as const;
-export type LedgerEntryMomentKind = (typeof LedgerEntryMomentKindValues)[number];
-
-export interface LedgerEntryMoment {
-  kind: LedgerEntryMomentKind;
-  at: number;
-}
-
-export interface LedgerEntryLevel {
-  kind: "level";
-  at: number;
-  level: number;
-}
-
-export interface LedgerEntryTitled {
-  kind: "titled";
-  at: number;
-  achievement?: string;
-  tier?: number;
 }
 
 export interface ChooseTitleRequest {

@@ -22,6 +22,7 @@ import type { Machine } from "./machine.ts";
 import { workerInstructions, channelRules, restartedContextNote, restartedNote, workplaceRules } from "./prompts.ts";
 import type { Hand, SessionRegistry } from "./registry.ts";
 import { isHired } from "./roster.ts";
+import type { SessionClose } from "./shapes.ts";
 import { type Delivered, type DeliveryInput, DeliveryRefused } from "./signals.ts";
 import type { SessionWatch } from "./watch.ts";
 import type { WorkerAccess } from "./worker.ts";
@@ -131,7 +132,7 @@ export function makeLaunch(r: SessionRegistry, wt: SessionWatch, cli: WorkerAcce
     }
   };
 
-  const leave = async (h: Hand, closed: T.SessionClose, merged: number) => {
+  const leave = async (h: Hand, closed: SessionClose, merged: number) => {
     await tasks.stop(`idle:${h.id}`);
     release(h);
     await flushRuns();
@@ -292,7 +293,7 @@ export function makeLaunch(r: SessionRegistry, wt: SessionWatch, cli: WorkerAcce
   /** The work taken in by use; NotTakenIn (the session stays) when use fails, whatever it failed with. */
   const handOver = async (
     id: string,
-    closed: T.SessionClose,
+    closed: SessionClose,
     use: (place: Workplace, lastText: string) => Promise<Merged>,
     settle: Settle = "user",
   ): Promise<Merged> =>

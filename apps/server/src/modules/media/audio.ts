@@ -1,6 +1,5 @@
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { MediaPhaseValues } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -13,12 +12,12 @@ import type { PublicFetch } from "#/infra/publicHttp.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Attachment } from "#/platform/attachment/attachment.ts";
 import type { Account, Provider } from "#/platform/provider/provider.ts";
-import { AudioFailure } from "#/platform/provider/vendors.ts";
+import { AudioFailure, type MediaInputReference } from "#/platform/provider/vendors.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { inspectAudio } from "./audioMetadata.ts";
 import { type AudioSavedResult, type MediaInputs, releaseAudioResult, saveAudioResult } from "./audioResult.ts";
-import { jobsOf, newJob, type Row, storedAs } from "./job.ts";
+import { jobsOf, newJob, type Row, storedAs, MediaPhaseValues, type MediaAudioRequest, type MediaAudioResult } from "./job.ts";
 import type { Machine, Patch, Words } from "./machine.ts";
 import type { MediaCaller } from "./media.ts";
 import { receiveTranscriptionStream, type TranscriptionCheckpoint } from "./transcriptionStream.ts";
@@ -264,7 +263,7 @@ export function makeAudio(deps: AudioDeps, { inputs, remote, machine }: AudioPor
       const undo = () => releaseAudioResult(deps, row.id, retained, inputs);
       try {
         // A short designed voice is also kept as an input, to clone from or listen to again.
-        let preview: T.MediaInputReference | undefined;
+        let preview: MediaInputReference | undefined;
         if (
           input.kind === "voiceDesign" &&
           ["wav", "mp3", "flac"].includes(format) &&
@@ -306,7 +305,7 @@ export function makeAudio(deps: AudioDeps, { inputs, remote, machine }: AudioPor
       done: async (_row, task) => {
         const usage = task.usage === undefined ? null : jsonText(task.usage);
         if (task.kind === "transcription") {
-          const result: T.MediaAudioResult = { kind: "transcription", text: task.text, segments: [...(task.segments ?? [])] };
+          const result: MediaAudioResult = { kind: "transcription", text: task.text, segments: [...(task.segments ?? [])] };
           return { phase: "ready" as const, result: jsonText(result), usage };
         }
         return { phase: "downloading" as const, result_url: task.url, result_format: task.format, content_type: task.contentType, usage };
@@ -320,7 +319,7 @@ export function makeAudio(deps: AudioDeps, { inputs, remote, machine }: AudioPor
   });
 
   // Not stopped by the caller: a job once admitted is written and started.
-  const create = async (given: T.MediaAudioRequest, caller: MediaCaller): Promise<T.MediaAudioJob> => {
+  const create = async (given: MediaAudioRequest, caller: MediaCaller): Promise<T.MediaAudioJob> => {
     if ((caller.kind === "orchestrator" && !caller.forUser) || ((given.kind === "clone" || given.kind === "transcription") && caller.kind !== "user"))
       throw refused(t("server.media.userRequired"));
     const source = S.MediaSource.safeParse(caller);
@@ -344,7 +343,7 @@ export function makeAudio(deps: AudioDeps, { inputs, remote, machine }: AudioPor
               ? await provider.transcription()
               : await provider.account({ connection: input.connection, model: "" });
       if (account.connection !== input.connection || account.revision !== input.revision) throw refused(words.accountChanged);
-      let reference: T.MediaInputReference | null = null;
+      let reference: MediaInputReference | null = null;
       if (input.kind === "clone" || input.kind === "transcription") {
         const local = await inputs.get(input.input);
         if (local.kind !== "audio" || local.phase !== "ready" || local.hash === null) throw invalid();

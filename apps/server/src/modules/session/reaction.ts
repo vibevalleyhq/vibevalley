@@ -8,7 +8,7 @@ import type * as T from "@vibevalley/protocol";
 import { isBusy } from "@vibevalley/protocol/rules";
 
 import { clip } from "#/base/clip.ts";
-import type { FactIn } from "#/core/core.ts";
+import type { FactIn, Fact } from "#/core/core.ts";
 import type { Rate } from "#/modules/agent/price.ts";
 import { goOn } from "#/modules/agent/vibevalley.ts";
 
@@ -106,7 +106,7 @@ export function phaseFact(
   session: Pick<T.Session, "id" | "channel">,
   phase: T.Phase,
   spent?: T.Spent,
-): Omit<Extract<T.Fact, { type: "sessionPhaseChanged" }>, "at"> {
+): Omit<Extract<Fact, { type: "sessionPhaseChanged" }>, "at"> {
   return {
     type: "sessionPhaseChanged",
     id: session.id,
