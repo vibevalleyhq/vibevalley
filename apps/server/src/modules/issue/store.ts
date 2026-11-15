@@ -3,6 +3,7 @@ import type * as T from "@vibevalley/protocol";
 import { Inconsistent } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
 import { type Db, SqlError } from "#/infra/db.ts";
+import type { PullRequest } from "#/modules/repo/workplace.ts";
 import * as q from "#db/issue.sql.ts";
 import * as qs from "#db/issue_assignment.sql.ts";
 import * as qe from "#db/issue_assignment_execution.sql.ts";
@@ -12,11 +13,14 @@ import { issueRows } from "./rows.ts";
 import { issueOrder, keepClosedIssues } from "./status.ts";
 
 /** Owns the in-memory `Assignments` index alongside the database's writes so callers never touch uncommitted responsibility state. */
-export async function makeIssueStore(deps: { readonly core: Core; readonly db: Db }) {
-  const { core, db } = deps;
+export async function makeIssueStore(deps: { readonly core: Core; readonly db: Db; readonly pullOfIssue?: (id: T.IssueId) => PullRequest | undefined }) {
+  const { core, db, pullOfIssue } = deps;
   const worked = new Assignments();
   let cronOfIssue: (id: T.IssueId) => string | undefined = () => undefined;
-  const hydrate = issueRows(core, (id) => cronOfIssue(id));
+  const hydrate = issueRows(core, {
+    cronOfIssue: (id) => cronOfIssue(id),
+    ...(pullOfIssue ? { pullOfIssue } : {}),
+  });
 
   await db.tx(async () => {
     const rows = await qs.allAssignments(db.sql);

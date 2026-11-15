@@ -218,7 +218,7 @@ describe("a pull request", () => {
             expect(existsSync(join(cwd, "uncommitted.txt"))).toBe(ending === "ACCEPTED");
             expect(git(path, "rev-parse", "main")).toBe(main);
             state = "MERGED";
-            await issues.refreshPullRequests();
+            await fw.pull.refresh();
             const refreshed = await issues.get(issue.id);
             expect([refreshed.status, refreshed.pullRequest?.state]).toEqual(["done", "merged"]);
             expect(existsSync(join(cwd, "uncommitted.txt"))).toBe(ending === "ACCEPTED");
@@ -265,8 +265,8 @@ describe("a pull request", () => {
           at: 1,
           meta: { repo: "clock", pr: 7, kind: "review", botRound: 1, botRoundKey: "review-bot[bot]:review:R1" },
         });
-        await fw.intake.pollGitHub();
-        await fw.intake.pollGitHub();
+        await fw.pull.poll();
+        await fw.pull.poll();
         const sql = sqlOf(fw.db);
         const inputs = await sql<{ key: string; kind: string; reason: string | null }>`
             select t.source_key as key, t.trigger_json::jsonb->'meta'->>'kind' as kind, m.reason
@@ -290,16 +290,16 @@ describe("a pull request", () => {
         expect(thread.threadId).toBe("PRRT_9");
         expect(thread.comments).toHaveLength(6);
         head = "head-8";
-        await fw.intake.pollGitHub();
+        await fw.pull.poll();
         const late = await sql<{
           round: number;
         }>`select (trigger_json::jsonb->'meta'->>'botRound')::int as round from session_trigger where source_key = 'clock#7:comment:PRRC_15'`;
         expect(late[0]?.round).toBe(1);
         expect(resolvedThreads).toEqual([]);
         conclusion = "SUCCESS";
-        await fw.intake.pollGitHub();
+        await fw.pull.poll();
         conclusion = "FAILURE";
-        await fw.intake.pollGitHub();
+        await fw.pull.poll();
         expect((await sql<{ n: number }>`select count(*) as n from session_trigger where trigger_json::jsonb->'meta'->>'kind' = 'ci'`)[0]?.n).toBe(4);
         expect(resolvedThreads).toEqual([]);
         const released = (
@@ -326,7 +326,7 @@ describe("a pull request", () => {
         );
         await until(() => sessions.sessionOf(id)?.phase._tag === "resting", "the review followup waiting for external events");
         state = ending;
-        await issues.refreshPullRequests();
+        await fw.pull.refresh();
         const closed = await issues.get(issue.id);
         expect([closed.delivered, closed.canceled]).toEqual(ending === "MERGED" ? ["pull_request", undefined] : [undefined, "dismissed"]);
         expect(sessions.sessionOf(id)).toBeUndefined();

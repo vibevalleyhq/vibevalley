@@ -3,8 +3,8 @@ import { z } from "zod";
 import { mapConcurrent, Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 
-import type { GitHubRun } from "./github.ts";
-import { RepoError } from "./workplace.ts";
+import type { GitHubRun } from "#/modules/repo/github.ts";
+import { RepoError } from "#/modules/repo/workplace.ts";
 
 interface GitHubCheck {
   readonly name: string;

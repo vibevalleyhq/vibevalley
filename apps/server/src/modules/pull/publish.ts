@@ -6,13 +6,13 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { messageOf } from "#/base/errors.ts";
+import { checkRepository } from "#/modules/repo/check.ts";
+import { GitError, type run } from "#/modules/repo/git.ts";
+import type { GitHubRun } from "#/modules/repo/github.ts";
+import { repository } from "#/modules/repo/repository.ts";
+import { MergeFailure, RepoError } from "#/modules/repo/workplace.ts";
 
-import { checkRepository } from "./check.ts";
-import { GitError, type run } from "./git.ts";
-import type { GitHubRun } from "./github.ts";
 import { hostedOrigin, hosting } from "./hosting.ts";
-import { repository } from "./repository.ts";
-import { MergeFailure, RepoError } from "./workplace.ts";
 
 export interface PublishNetwork {
   readonly tip: (cwd: string, url: string, branch: string) => Promise<string>;

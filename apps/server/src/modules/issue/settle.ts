@@ -32,6 +32,7 @@ export interface SettleDeps {
   readonly session: Session;
   readonly clock: Time;
   readonly landing: Pick<IssueLanding, "changesOf">;
+  readonly usesPullRequests: (repo: string) => boolean;
 }
 
 /** A status move settled before anything changes: what it is, the words it goes with, who takes the issue on. */
@@ -46,7 +47,7 @@ export interface SettledMove {
 }
 
 export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf">, deps: SettleDeps) {
-  const { agent: store, repo: repos, session: sessions, clock } = deps;
+  const { agent: store, repo: repos, session: sessions, clock, usesPullRequests } = deps;
   const { changesOf } = deps.landing;
   const { unsent } = r;
   const { readyOf } = d;
@@ -105,7 +106,7 @@ export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
     let commits = 0;
     if (move === "complete") {
       const needsPr = issue.deliver === "pull_request" && (!issue.pullRequest || issue.pullRequest.state === "closed");
-      if (needsPr && (!issue.repo || !repos.usesPullRequests(issue.repo))) throw refused(t("server.issue.deliveryNeedsPr"));
+      if (needsPr && (!issue.repo || !usesPullRequests(issue.repo))) throw refused(t("server.issue.deliveryNeedsPr"));
       commits = await commitsOf(issue);
       delivery = needsPr ? "submit" : issue.deliver === "pull_request" ? "submitted" : commits === 0 ? "none" : issue.deliver === "branch" ? "kept" : "merge";
     }
@@ -186,7 +187,7 @@ export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
         if (p.delivery === "kept")
           return [t("server.issue.does.completeKept", { n, commits: p.commits }), t("server.issue.does.helperLeaves", { helper: helperName(item) })];
         const changes = await changesOf(item);
-        const pr = item.repo !== undefined && (item.pullRequest?.state === "open" || repos.usesPullRequests(item.repo));
+        const pr = item.repo !== undefined && (item.pullRequest?.state === "open" || usesPullRequests(item.repo));
         const out: string[] = [];
         if (changes && changes.uncommitted.length > 0)
           out.push(t("server.issue.does.commitFirst", { helper: helperName(item), files: changes.uncommitted.length }));

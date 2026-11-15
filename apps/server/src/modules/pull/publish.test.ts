@@ -11,19 +11,30 @@ import { waitFor } from "@vibevalley/testkit/until";
 import type { ServerConfig } from "#/infra/config.ts";
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
+import { GitError, run } from "#/modules/repo/git.ts";
+import { type GitHubRun, makeRepo } from "#/modules/repo/repo.ts";
+import { repository } from "#/modules/repo/repository.ts";
 import { gitSync, repo, write } from "#/testing/git.ts";
-import { testConfig } from "#/testing/layers.ts";
+import { testConfig, testDb } from "#/testing/layers.ts";
 
-import { GitError, run } from "./git.ts";
-import { type GitHubRun } from "./github.ts";
-import { hostedOrigin } from "./hosting.ts";
-import { makeRepo, type RepoHooks } from "./repo.ts";
-import { repository } from "./repository.ts";
+import { hostedOrigin, makePull, type Pull, type PullHooks } from "./pull.ts";
 
 const fmt = (v: unknown) => JSON.stringify(v, null, 2);
 
-/** The repos of a farm with this config, as a test makes them. */
-const repos = (hooks: RepoHooks, config: ServerConfig = testConfig()) => makeRepo({ config, clock: wallTime, log: keptLog() }, hooks);
+async function withPull<A>(hooks: PullHooks, body: (pull: Pull) => Promise<A>, config: ServerConfig = testConfig()): Promise<A> {
+  await using db = await testDb();
+  const repos = await makeRepo(
+    { config, clock: wallTime, log: keptLog() },
+    { ...(hooks.gh ? { gh: hooks.gh } : {}), ...(hooks.command ? { command: hooks.command } : {}) },
+  );
+  const pull = await makePull({ config, clock: wallTime, log: keptLog(), db, repo: repos }, hooks);
+  try {
+    return await body(pull);
+  } finally {
+    await pull.close();
+    await repos.close();
+  }
+}
 
 function fixture(platform: T.BranchPublication["platform"] = "github", script = "#!/bin/sh\nexit 0\n", existing = false) {
   const dir = tempDir("publish-");
@@ -57,7 +68,7 @@ function fixture(platform: T.BranchPublication["platform"] = "github", script = 
       return { ok: true, missing: false, out: platform === "github" ? url : fmt(item) };
     });
   const pushed: string[][] = [];
-  const hooks: RepoHooks = {
+  const hooks: PullHooks = {
     command: (file, args, options) => run("sh", [file, ...args], options),
     gh: command,
     glab: command,
@@ -70,33 +81,35 @@ function fixture(platform: T.BranchPublication["platform"] = "github", script = 
       },
     },
   };
-  const made = () => repos(hooks, testConfig({ workRoot: join(dir, "space") }));
-  return { cwd, bare, req, calls, url, pushed, hooks, made };
+  const runWith = <A>(body: (pull: Pull) => Promise<A>) => withPull(hooks, body, testConfig({ workRoot: join(dir, "space") }));
+  return { cwd, bare, req, calls, url, pushed, hooks, runWith };
 }
 
 for (const platform of ["github", "gitlab"] as const) {
   for (const existing of [false, true]) {
     test(`${platform} publishes the checked SHA and ${existing ? "reuses" : "creates"} an open request`, async () => {
       const f = fixture(platform, "#!/bin/sh\nexit 0\n", existing);
-      {
-        const result = await (await f.made()).submitBranch(f.req);
+      await f.runWith(async (pull) => {
+        const result = await pull.publish(f.req);
         expect(result).toMatchObject({ url: f.url, check: "passed", pushed: true, reused: existing });
+        expect(pull.find("team/repo", 7)).toMatchObject({ platform, repo: "team/repo", number: 7, url: f.url, state: "open" });
         expect(f.pushed).toEqual([[`https://${platform}.com/team/repo.git`, f.req.branch, f.req.sha]]);
         expect(gitSync(f.bare, "rev-parse", f.req.branch)).toBe(f.req.sha);
         expect(gitSync(f.cwd, "status", "--porcelain")).toBe("");
-      }
+      });
     });
   }
 }
 
-test("preview does not run the check or contact the Git network", async () => {
+test("preview does not run the check, contact the Git network, or store a pull row", async () => {
   const f = fixture("github", "#!/bin/sh\nexit 1\n");
-  {
-    const branchSubmitted = await (await f.made()).submitBranch({ ...f.req, dryRun: true });
+  await f.runWith(async (pull) => {
+    const branchSubmitted = await pull.publish({ ...f.req, dryRun: true });
     expect(branchSubmitted).toMatchObject({ pushed: false, check: "preview" });
+    expect(pull.list()).toEqual([]);
     expect(f.pushed).toEqual([]);
     expect(f.calls.map((args) => args[0])).toEqual(["auth", "repo"]);
-  }
+  });
 });
 
 for (const scenario of [
@@ -138,13 +151,14 @@ for (const scenario of [
     if (scenario === "ambiguous") gitSync(f.cwd, "remote", "add", "other", "https://gitlab.com/other/repo.git");
     if (scenario === "rewrite") gitSync(f.cwd, "config", "url.https://github.com/other/.pushInsteadOf", "https://github.com/team/");
 
-    {
-      const e = await (await f.made()).submitBranch(req).catch((e: unknown) => e);
+    await f.runWith(async (pull) => {
+      const e = await pull.publish(req).catch((e: unknown) => e);
       expect(e).toBeInstanceOf(Error);
+      expect(pull.list()).toEqual([]);
       expect(f.pushed).toEqual([]);
       expect(existsSync(f.cwd)).toBe(true);
       expect(gitSync(f.bare, "branch", "--list", f.req.branch)).toBe("");
-    }
+    });
   });
 }
 
@@ -156,15 +170,15 @@ for (const stage of ["missing", "auth", "decode", "create"] as const) {
       stage === "create" && !args.includes("POST")
         ? original(...args)
         : Promise.resolve({ ok: stage === "decode", missing: stage === "missing", out: "untrusted token must stay private" });
-    {
-      const error = await (await repos({ ...f.hooks, glab })).submitBranch(f.req).then(
+    await withPull({ ...f.hooks, glab }, async (pull) => {
+      const error = await pull.publish(f.req).then(
         () => expect.unreachable("published"),
         (e: unknown) => (e instanceof Error ? e : expect.unreachable(String(e))),
       );
       expect(error.message).not.toContain("untrusted token");
       expect(f.pushed.length).toBe(stage === "create" ? 1 : 0);
       if (stage === "create") expect(error.message).toContain("已推送");
-    }
+    });
   });
 }
 
@@ -184,10 +198,9 @@ test("only known hosting domains are recognized", () => {
 test("canceling a running check kills its process and retains the checkout", async () => {
   const f = fixture("github", "#!/bin/sh\necho $$ > ../check.pid\nexec sleep 60\n");
   const pidFile = join(f.cwd, "..", "check.pid");
-  {
-    const service = await f.made();
+  await f.runWith(async (pull) => {
     const cancel = new AbortController();
-    const submitting = service.submitBranch(f.req, cancel.signal).catch((e: unknown) => e);
+    const submitting = pull.publish(f.req, cancel.signal).catch((e: unknown) => e);
     await waitFor(() => existsSync(pidFile), Boolean, "check started");
     const pid = readFileSync(pidFile, "utf8").trim();
     cancel.abort();
@@ -200,59 +213,59 @@ test("canceling a running check kills its process and retains the checkout", asy
     expect(f.pushed).toEqual([]);
     expect(existsSync(f.cwd)).toBe(true);
     expect(gitSync(f.cwd, "rev-parse", "HEAD")).toBe(f.req.sha);
-  }
+  });
 });
 
 test("a missing check is reported as not-run", async () => {
   const f = fixture();
   gitSync(f.cwd, "rm", ".vibevalley/check");
   gitSync(f.cwd, "commit", "-m", "no check");
-  {
-    const result = await (await f.made()).submitBranch({ ...f.req, sha: gitSync(f.cwd, "rev-parse", "HEAD") });
+  await f.runWith(async (pull) => {
+    const result = await pull.publish({ ...f.req, sha: gitSync(f.cwd, "rev-parse", "HEAD") });
     expect(result.check).toBe("not-run");
     expect(result.url).toBe(f.url);
-  }
+  });
 });
 
 test("a branch moved at the network boundary cannot change the pushed SHA", async () => {
   const f = fixture();
-  const made = await repos({
-    ...f.hooks,
-    publication: {
-      tip: (_cwd, _url, branch) => repository(f.bare).tip(branch),
-      fetch: (cwd, _url, branch) => repository(cwd).fetch(f.bare, branch),
-      push: (cwd, _url, branch, sha) => {
-        gitSync(cwd, "commit", "--allow-empty", "-m", "external process moved branch");
-        return repository(cwd).push(f.bare, branch, sha);
+  await withPull(
+    {
+      ...f.hooks,
+      publication: {
+        tip: (_cwd, _url, branch) => repository(f.bare).tip(branch),
+        fetch: (cwd, _url, branch) => repository(cwd).fetch(f.bare, branch),
+        push: (cwd, _url, branch, sha) => {
+          gitSync(cwd, "commit", "--allow-empty", "-m", "external process moved branch");
+          return repository(cwd).push(f.bare, branch, sha);
+        },
       },
     },
-  });
-  {
-    await made.submitBranch(f.req);
-    expect(gitSync(f.bare, "rev-parse", f.req.branch)).toBe(f.req.sha);
-    expect(gitSync(f.cwd, "rev-parse", "HEAD")).not.toBe(f.req.sha);
-  }
+    async (pull) => {
+      await pull.publish(f.req);
+      expect(gitSync(f.bare, "rev-parse", f.req.branch)).toBe(f.req.sha);
+      expect(gitSync(f.cwd, "rev-parse", "HEAD")).not.toBe(f.req.sha);
+    },
+  );
 });
 
 test("worktrees list their branch and safe removal preserves dirty files and the original checkout", async () => {
   const f = fixture();
   const other = join(f.cwd, "..", "other");
-  {
-    const r = repository(f.cwd);
-    await r.addWorktree(other, "feat/other", f.req.sha);
-    const worktrees2 = await r.worktrees();
-    expect(worktrees2).toContain("branch refs/heads/feat/other\0");
-    write(join(other, "keep"), "uncommitted");
-    const worktreeRemoved = await r.removeWorktree(other, false);
-    expect(worktreeRemoved).not.toBe("");
-    expect(readFileSync(join(other, "keep"), "utf8")).toBe("uncommitted");
-    await rm(join(other, "keep"));
-    const worktreeRemoved2 = await r.removeWorktree(other, false);
-    expect(worktreeRemoved2).toBe("");
-    expect(existsSync(f.cwd)).toBe(true);
-    const head2 = await r.head();
-    expect(head2).toBe(f.req.sha);
-  }
+  const r = repository(f.cwd);
+  await r.addWorktree(other, "feat/other", f.req.sha);
+  const worktrees = await r.worktrees();
+  expect(worktrees).toContain("branch refs/heads/feat/other\0");
+  write(join(other, "keep"), "uncommitted");
+  const worktreeRemoved = await r.removeWorktree(other, false);
+  expect(worktreeRemoved).not.toBe("");
+  expect(readFileSync(join(other, "keep"), "utf8")).toBe("uncommitted");
+  await rm(join(other, "keep"));
+  const worktreeRemoved2 = await r.removeWorktree(other, false);
+  expect(worktreeRemoved2).toBe("");
+  expect(existsSync(f.cwd)).toBe(true);
+  const head2 = await r.head();
+  expect(head2).toBe(f.req.sha);
 });
 
 test("conflicting base changes are refused before running a check or pushing", async () => {
@@ -263,32 +276,34 @@ test("conflicting base changes are refused before running a check or pushing", a
   gitSync(f.cwd, "commit", "-m", "base change");
   gitSync(f.cwd, "push", f.bare, "main");
   gitSync(f.cwd, "checkout", "feat/publish");
-  {
-    const error = await (await f.made()).submitBranch(f.req).catch((e: unknown) => e);
+  await f.runWith(async (pull) => {
+    const error = await pull.publish(f.req).catch((e: unknown) => e);
     expect(error).toMatchObject({ name: "MergeFailure", kind: "conflict" });
     expect(f.pushed).toEqual([]);
     expect(gitSync(f.cwd, "status", "--porcelain")).toBe("");
-  }
+  });
 });
 
 test("a failed push is reported separately from a failed PR creation", async () => {
   const f = fixture();
-  const made = await repos({
-    ...f.hooks,
-    publication: {
-      tip: (_cwd, _url, branch) => repository(f.bare).tip(branch),
-      fetch: (cwd, _url, branch) => repository(cwd).fetch(f.bare, branch),
-      push: () => Promise.reject(GitError.of(1, "transport closed")),
+  await withPull(
+    {
+      ...f.hooks,
+      publication: {
+        tip: (_cwd, _url, branch) => repository(f.bare).tip(branch),
+        fetch: (cwd, _url, branch) => repository(cwd).fetch(f.bare, branch),
+        push: () => Promise.reject(GitError.of(1, "transport closed")),
+      },
     },
-  });
-  {
-    const error = await made.submitBranch(f.req).then(
-      () => expect.unreachable("pushed"),
-      (e: unknown) => (e instanceof Error ? e : expect.unreachable(String(e))),
-    );
-    expect(error.message).toContain(f.req.sha);
-    expect(error.message).toContain("推送未确认成功");
-    expect(f.calls.some((args) => args[0] === "pr")).toBe(false);
-    expect(existsSync(f.cwd)).toBe(true);
-  }
+    async (pull) => {
+      const error = await pull.publish(f.req).then(
+        () => expect.unreachable("pushed"),
+        (e: unknown) => (e instanceof Error ? e : expect.unreachable(String(e))),
+      );
+      expect(error.message).toContain(f.req.sha);
+      expect(error.message).toContain("推送未确认成功");
+      expect(f.calls.some((args) => args[0] === "pr")).toBe(false);
+      expect(existsSync(f.cwd)).toBe(true);
+    },
+  );
 });

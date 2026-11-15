@@ -23,10 +23,9 @@ import { findingsOf, milestonesOf } from "./brief.ts";
 import { templateCatalog } from "./catalog.ts";
 import { explicitMandate, filledKinds, inferredMandate, mandateNoteFits, sentTitles } from "./creation.ts";
 import { type Dispatched, issueDispatch, type IssueHireOptions, type ScheduledIssue } from "./dispatch.ts";
-import { makeGitHubPoller } from "./github.ts";
 import { readyInputs } from "./inputs.ts";
 import { type Intake, issueIntake } from "./intake.ts";
-import { issueLanding } from "./landing.ts";
+import { issueLanding, type IssuePullPort, unattachedPullPort } from "./landing.ts";
 import { issueLifecycle } from "./lifecycle.ts";
 import { nextSteps } from "./moves.ts";
 import { needsUser } from "./prompts.ts";
@@ -35,7 +34,7 @@ import { issueSettling, type StatusOptions } from "./settle.ts";
 import { issueSplitting } from "./split.ts";
 import { assignedOnDuty, conflictOf, type Finding, isClosed, type IssueChildDraft, type IssueConstraints, type IssueMandate, pickIssues } from "./status.ts";
 
-export type { IssueChildDraft, IssueConstraints, IssueMandate, ScheduledIssue };
+export type { IssueChildDraft, IssueConstraints, IssueMandate, IssuePullPort, ScheduledIssue };
 
 const refused = refuseIn(BizCode.IssueRefused);
 
@@ -119,6 +118,7 @@ export interface Issue {
   readonly query: (f: T.IssueFilter) => Promise<T.Issue[]>;
   readonly onBoard: () => readonly T.Issue[];
   readonly get: (id: string) => Promise<T.Issue>;
+  readonly find: (id: T.IssueId) => Promise<T.Issue | undefined>;
   readonly add: (req: T.IssueRequest, mandate: IssueMandate) => Promise<T.Issue>;
   /** Throws ApiError or IssueCreateRefused. */
   readonly create: (input: IssueCreateInput) => Promise<IssueCreated>;
@@ -158,11 +158,14 @@ export interface Issue {
   readonly scheduled: (req: ScheduledIssue, input: Trigger) => Promise<T.Issue>;
   readonly useCronOfIssue: (cronOf: (id: T.IssueId) => string | undefined) => void;
   readonly refreshIssue: (id: T.IssueId) => Promise<void>;
-  readonly refreshPullRequests: () => Promise<void>;
   readonly refreshQueue: () => Promise<void>;
   readonly submitPullRequest: (session: string, summary?: string) => Promise<string>;
-  /** At startup, after the modules below it started: a first round of the queue, then the queue and the pull requests
-   * on their timers. (start is taken: it starts an issue.) */
+  readonly usePull: (port: IssuePullPort) => Promise<void>;
+  readonly refreshPull: (id: T.IssueId) => Promise<void>;
+  readonly settlePull: (id: T.IssueId, state: "merged" | "closed") => Promise<void>;
+  readonly subscribe: (issue: T.IssueId, threads: readonly string[]) => Promise<void>;
+  readonly subscribed: (threads: readonly string[]) => Promise<readonly T.IssueId[]>;
+  /** At startup, after the modules below it started: a first round of the queue, then the queue on its timer. */
   readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }
@@ -201,7 +204,7 @@ const channelUses =
     return queued !== 0 ? [t("server.channel.queuedThere", { n: queued })] : [];
   };
 
-export type IssueIntake = Intake & { readonly pollGitHub: () => Promise<void> };
+export type IssueIntake = Intake;
 
 const intakes = new WeakMap<Issue, IssueIntake>();
 
@@ -216,14 +219,26 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
   const { config, clock, core, agent: store, repo: repos, session: sessions, channel: chat, db } = deps;
   const log = deps.log.child("issue");
   const tasks = new TaskGroup({ name: "issue", onError: (task, e) => log.error(`${task} failed:`, e) });
+  let pullPort: IssuePullPort = unattachedPullPort;
   const intake = issueIntake({ config, clock, log, db, core, agent: store, session: sessions, channel: chat });
-  const r = await issueLifecycle({ core, agent: store, session: sessions, intake, db, clock, log });
+  const r = await issueLifecycle({
+    core,
+    agent: store,
+    session: sessions,
+    intake,
+    pullOfIssue: (id) => pullPort.ofIssue(id),
+    db,
+    clock,
+    log,
+  });
   const {
     issueOfSession,
     loadKept,
     everyIssue,
     idOf,
     get,
+    find,
+    publish,
     unsent,
     liveSession,
     issueWords,
@@ -242,6 +257,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     userSaid,
     setQueued,
     drop,
+    settlePull,
   } = r;
   /** Words for a session: said in its home, or in its issue's thread when it has none (the watch routes them). */
   const sayTo = async (from: string, session: string, text: string, sendKey = "") => {
@@ -257,8 +273,8 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     await chat.post({ from, channel: where, text, sendKey, ...(run ? { run } : {}) });
   };
 
-  const landing = issueLanding(r, { core, log, repo: repos, session: sessions, channel: chat, tell: sayTo });
-  const { changesOf, merge: mergeIssue, refreshPullRequests, submit } = landing;
+  const landing = issueLanding(r, { core, repo: repos, session: sessions, pullPort: () => pullPort, tell: sayTo });
+  const { changesOf, merge: mergeIssue, submit } = landing;
   const { split, joinChildren } = issueSplitting(r, { agent: store, session: sessions, channel: chat, landing });
   const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, session: sessions, intake, channel: chat, log });
   const { hire, start, refreshQueue, reopen, scheduled } = d;
@@ -270,10 +286,8 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     session: sessions,
     clock,
     landing,
+    usesPullRequests: (repo) => pullPort.usesPullRequests(repo),
   });
-
-  const gitHub = makeGitHubPoller({ db, repo: repos, clock, log, receive: intake.receive });
-  const pollGitHub = () => gitHub.pollOpen(core.state().issues);
 
   const chooseAgent = async (brief: string, name: string, picked: string): Promise<T.Agent> => {
     const key = name.trim();
@@ -298,7 +312,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     const item = await get(issue);
     if (latestSessionIdOf(item) !== session) throw refused(t("server.issue.prSubmitNotCurrent"));
     if (item.mandate.strength !== "explicit" || !item.mandate.autoSubmitPr) throw refused(t("server.issue.prSubmitNotAllowed"));
-    if (!item.repo || !repos.usesPullRequests(item.repo)) throw refused(t("server.issue.prSubmitUnavailable"));
+    if (!item.repo || !pullPort.usesPullRequests(item.repo)) throw refused(t("server.issue.prSubmitUnavailable"));
     return submit(item.id, session, summary);
   };
 
@@ -677,7 +691,6 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     return get(id);
   };
 
-  /** Startup's timers run here: the queue's wake-up and the pull requests' poll. */
   const startup = async () => {
     await intake.boot();
     await refreshQueue();
@@ -685,14 +698,6 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       for (;;) {
         await clock.sleep(config.chat.retryWakeMs, signal);
         await refreshQueue();
-      }
-    });
-    const pollEvery = config.github.prPollSeconds > 0 ? config.github.prPollSeconds * 1000 : 180_000;
-    tasks.run("issue: pull requests", async (signal) => {
-      for (;;) {
-        await clock.sleep(pollEvery, signal);
-        await bestEffort(log, "vibevalley: refresh pull requests", () => refreshPullRequests());
-        await pollGitHub();
       }
     });
   };
@@ -704,6 +709,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     list: () => everyIssue(),
     query: async (f) => pickIssues(await everyIssue(), f, clock.now()),
     get,
+    find,
     timeline,
     add: (req, mandate) => add(req, mandate),
     create,
@@ -776,14 +782,21 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     scheduled,
     useCronOfIssue: r.useCronOfIssue,
     refreshIssue: r.refreshBoardIssue,
-    refreshPullRequests,
     refreshQueue,
+    usePull: async (port) => {
+      pullPort = port;
+      await loadKept();
+    },
+    refreshPull: (id) => publish(id),
+    settlePull,
+    subscribe: intake.subscribe,
+    subscribed: intake.subscribed,
     boot: startup,
     close: async () => {
       await tasks.close();
       await intake.close();
     },
   };
-  intakes.set(issue, { ...intake, pollGitHub });
+  intakes.set(issue, intake);
   return issue;
 }

@@ -6,6 +6,7 @@ import * as S from "@vibevalley/protocol/schema";
 
 import { jsonText, storedJsonOrUndefined } from "#/base/json.ts";
 import { type Core } from "#/core/core.ts";
+import type { PullRequest } from "#/modules/repo/workplace.ts";
 import type * as q from "#db/issue.sql.ts";
 
 import { statusMoves } from "./moves.ts";
@@ -26,20 +27,24 @@ const column = {
   issueIds: storedJsonOrUndefined(z.array(S.IssueId), "issue.blocked_by"),
   strings: storedJsonOrUndefined(strings, "issue.criteria"),
   checks: storedJsonOrUndefined(z.array(S.CriterionCheck), "issue.checks"),
-  pullRequest: storedJsonOrUndefined(S.PullRequest, "issue.pull_request"),
   answer: storedJsonOrUndefined(S.IssueAnswer, "issue.answer"),
   findings: storedJsonOrUndefined(z.array(S.Finding), "issue.findings"),
   questions: storedJsonOrUndefined(z.array(S.Question), "issue.questions"),
 };
 
-export function issueRows(core: Core, cronOfIssue: (id: T.IssueId) => string | undefined = () => undefined) {
+export interface IssueRowLinks {
+  readonly cronOfIssue?: (id: T.IssueId) => string | undefined;
+  readonly pullOfIssue?: (id: T.IssueId) => PullRequest | undefined;
+}
+
+export function issueRows(core: Core, links: IssueRowLinks = {}) {
   return function issueOf(row: Row, assignments: readonly T.Assignment[]): T.Issue {
     const state = core.state();
     const blockedBy = column.issueIds(row.blocked_by);
     const criteria = column.strings(row.criteria);
     const checks = column.checks(row.checks);
-    const pullRequest = column.pullRequest(row.pull_request);
-    const cron = cronOfIssue(row.id);
+    const pullRequest = links.pullOfIssue?.(row.id);
+    const cron = links.cronOfIssue?.(row.id);
     const lastRun =
       row.run_started_at === null
         ? undefined

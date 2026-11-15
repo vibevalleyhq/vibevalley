@@ -140,8 +140,8 @@ function resourceRef(uri: string): ResourceRef | undefined {
 
 const textOf = (value: unknown): string => JSON.stringify(value, null, 2);
 
-export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "session" | "repo">) {
-  const { channel: channels, issue: issues, session: sessions, repo: repos } = deps;
+export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "session" | "pull">) {
+  const { channel: channels, issue: issues, session: sessions, pull: pulls } = deps;
   const cache = new TextCache(cacheBytes);
 
   const ownSession = (id: string) => sessions.live(id).session;
@@ -244,10 +244,13 @@ export function makeResourceReader(deps: Pick<ToolDeps, "channel" | "issue" | "s
         return textOf({ events });
       }
       case "github": {
-        const issue = (await issues.list()).find((item) => item.repo === ref.repo && item.pullRequest?.number === ref.pull);
-        if (!issue) throw refuse(resourceWords.missing(uri));
-        if (!orchestrator && (session === undefined || !(await mayReadIssue(session, issue)))) throw refuse(resourceWords.forbidden(uri));
-        const snapshot = await repos.githubSnapshot(ref.repo, ref.pull);
+        const tracked = pulls.find(ref.repo, ref.pull);
+        if (!tracked || tracked.platform !== "github") throw refuse(resourceWords.missing(uri));
+        if (!orchestrator) {
+          const linked = tracked.issueId ? await issues.find(tracked.issueId) : undefined;
+          if (!linked || session === undefined || !(await mayReadIssue(session, linked))) throw refuse(resourceWords.forbidden(uri));
+        }
+        const snapshot = await pulls.snapshot(ref.repo, ref.pull);
         if (ref.resource === "checks") return textOf({ head: snapshot.head, checks: snapshot.checks });
         const review = snapshot.reviews.find((item) => item.id === ref.id);
         const comment = snapshot.comments.find((item) => item.id === ref.id || item.databaseId === ref.id || item.threadId === ref.id);

@@ -69,8 +69,7 @@ export interface Intake {
   readonly subscribe: (issue: T.IssueId, threads: readonly string[]) => Promise<void>;
   /** Claims a recurring thread for `issue`, moving ownership if a previous issue held it. */
   readonly rebind: (issue: T.IssueId, thread: string) => Promise<void>;
-  /** The issues currently subscribed to any of `threads`. */
-  readonly subscribedTo: (threads: readonly string[]) => Promise<readonly T.IssueId[]>;
+  readonly subscribed: (threads: readonly string[]) => Promise<readonly T.IssueId[]>;
   /** A helper says an input is not its to take; the orchestrator is told why. */
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   /** A dispatch held in the issue's pool for its next helper, in the caller's transaction; routed once it commits. */
@@ -266,8 +265,7 @@ export function issueIntake(deps: IntakeDeps): Intake {
     if (!declined) throw missing(t("server.issue.issueRef", { ref: envelope }), [lookIn.issue]);
   };
 
-  const bindIssue = (issue: T.Issue) =>
-    subscribe(issue.id, [`issue:${issue.id}`, ...(issue.repo && issue.pullRequest ? [`github:${issue.repo}#${issue.pullRequest.number}`] : [])]);
+  const bindIssue = (issue: T.Issue) => subscribe(issue.id, [`issue:${issue.id}`]);
   const onFact = (fact: T.ServerEvent) =>
     bestEffort(log, "intake: issue routing", async () => {
       if (fact.type === "issueChanged") {
@@ -320,7 +318,7 @@ export function issueIntake(deps: IntakeDeps): Intake {
       if (!issueOf(issue)) throw missing(t("server.issue.issueRef", { ref: issue }), [lookIn.issue]);
       await qs.rebindThread(db.sql, { issue_id: issue, thread_key: thread });
     },
-    subscribedTo: async (threads) => (threads.length === 0 ? [] : (await qs.subscribedIssues(db.sql, { keys: [...threads] })).map((row) => row.issue_id)),
+    subscribed: async (threads) => (threads.length === 0 ? [] : (await qs.subscribedIssues(db.sql, { keys: [...threads] })).map((row) => row.issue_id)),
     decline,
     queueDispatch: async (d) => {
       const trigger = await sessions.recordTrigger({

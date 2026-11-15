@@ -14,6 +14,7 @@ import type { Issue } from "#/modules/issue/issue.ts";
 import type { Media } from "#/modules/media/media.ts";
 import type { Memory } from "#/modules/memory/memory.ts";
 import type { Pkm } from "#/modules/pkm/pkm.ts";
+import type { Pull } from "#/modules/pull/pull.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import type { ToolStart } from "#/modules/session/reaction.ts";
 import type { Session } from "#/modules/session/session.ts";
@@ -55,6 +56,7 @@ export interface ToolDeps {
   readonly media: Media;
   readonly artifact: Artifact;
   readonly repo: Repo;
+  readonly pull: Pull;
 }
 
 const named = ["id", "agent", "session", "repo", "name", "title", "text", "note", "goal"];

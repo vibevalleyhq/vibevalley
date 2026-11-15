@@ -4,10 +4,9 @@ import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
 import { jsonOrNone } from "#/base/json.ts";
-
-import { run } from "./git.ts";
-import type { GitHubRun } from "./github.ts";
-import { RepoError } from "./workplace.ts";
+import { run } from "#/modules/repo/git.ts";
+import type { GitHubRun } from "#/modules/repo/github.ts";
+import { type PullRequestState, RepoError } from "#/modules/repo/workplace.ts";
 
 export interface HostedRepo {
   readonly platform: T.BranchPublication["platform"];
@@ -38,6 +37,7 @@ const gitlabRepo = jsonOrNone(z.object({ default_branch: z.string() }));
 const githubPulls = jsonOrNone(
   z.array(z.object({ number: z.number().int(), url: z.string(), isCrossRepository: z.boolean(), state: z.enum(["OPEN", "MERGED", "CLOSED"]) })),
 );
+const githubPullView = jsonOrNone(z.object({ state: z.string(), mergedAt: z.string().nullable().optional() }));
 const gitlabMerge = z.object({
   iid: z.number().int(),
   web_url: z.string(),
@@ -47,6 +47,7 @@ const gitlabMerge = z.object({
 });
 const gitlabPulls = jsonOrNone(z.array(gitlabMerge));
 const gitlabPull = jsonOrNone(gitlabMerge);
+const gitlabStateView = jsonOrNone(z.object({ state: z.enum(["opened", "merged", "closed", "locked"]) }));
 const received = z.object({ number: z.number().int(), url: z.string().regex(/^https:\/\//u) });
 
 /** A request open on the platform, as it answered. */
@@ -57,6 +58,26 @@ export interface Receipt {
 }
 
 const failure = (stage: string) => new RepoError(t("server.repo.publish.platformFailed", { stage }));
+
+export async function remotePullState(repo: HostedRepo, n: number, command: GitHubRun): Promise<PullRequestState> {
+  if (repo.platform === "github") {
+    const viewed = await command("pr", "view", String(n), "--repo", repo.name, "--json", "state,mergedAt");
+    if (!viewed.ok) throw new RepoError(t("server.repo.github.viewFailed", { n }));
+    const result = githubPullView(viewed.out);
+    if (!result) throw new RepoError(t("server.repo.github.stateUnread", { n }));
+    if (result.mergedAt || result.state === "MERGED") return "merged";
+    if (result.state === "OPEN") return "open";
+    if (result.state === "CLOSED") return "closed";
+    throw new RepoError(t("server.repo.github.stateUnknown", { n }));
+  }
+  const viewed = await command("api", `projects/${encodeURIComponent(repo.name)}/merge_requests/${n}`);
+  if (!viewed.ok) throw new RepoError(t("server.repo.github.viewFailed", { n }));
+  const result = gitlabStateView(viewed.out);
+  if (!result) throw new RepoError(t("server.repo.github.stateUnread", { n }));
+  if (result.state === "merged") return "merged";
+  if (result.state === "closed") return "closed";
+  return "open";
+}
 
 export const hosting = (repo: HostedRepo, command: GitHubRun) => {
   const github = repo.platform === "github";
@@ -74,7 +95,7 @@ export const hosting = (repo: HostedRepo, command: GitHubRun) => {
   };
   const find = async (branch: string, base: string): Promise<Receipt | undefined> => {
     if (github) {
-      const response2 = await request(
+      const response = await request(
         "pr",
         "list",
         "--repo",
@@ -88,7 +109,7 @@ export const hosting = (repo: HostedRepo, command: GitHubRun) => {
         "--json",
         "url,number,isCrossRepository,state",
       );
-      const parsed = githubPulls(response2);
+      const parsed = githubPulls(response);
       if (!parsed || parsed.length > 1) throw failure("list decode");
       const first = parsed.find((pr) => !pr.isCrossRepository && pr.state === "OPEN");
       return first ? receipt(first.number, first.url) : undefined;

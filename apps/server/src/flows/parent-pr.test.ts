@@ -62,7 +62,7 @@ for (const ending of ["MERGED", "CLOSED"] as const) {
     const place = await repos.checkout({ repo: "family-pr", issue: parent.number, worktree: true, base: "" });
     expect(existsSync(place.cwd)).toBe(true);
     state = ending;
-    await issues.refreshPullRequests();
+    await fw.pull.refresh();
     const finished = await issues.get(parent.id);
     expect(finished.status).toBe(ending === "MERGED" ? "done" : "canceled");
     expect(finished.pullRequest?.state).toBe(ending === "MERGED" ? "merged" : "closed");

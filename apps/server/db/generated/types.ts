@@ -133,6 +133,12 @@ export type Words_memory_kind = z.infer<typeof Words_memory_kind>
 export const Words_pkm_comment_status = z.enum(["open","suggested","accepted","rejected"])
 export type Words_pkm_comment_status = z.infer<typeof Words_pkm_comment_status>
 
+export const Words_pull_platform = z.enum(["github","gitlab"])
+export type Words_pull_platform = z.infer<typeof Words_pull_platform>
+
+export const Words_pull_state = z.enum(["open","merged","closed"])
+export type Words_pull_state = z.infer<typeof Words_pull_state>
+
 export const Words_session_closed = z.enum(["merged","completed","dismissed","lost"])
 export type Words_session_closed = z.infer<typeof Words_session_closed>
 

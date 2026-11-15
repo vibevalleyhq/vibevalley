@@ -14,6 +14,7 @@ import { makeMedia, type Media } from "#/modules/media/media.ts";
 import { makeMemory, type Memory, type MemoryOptions } from "#/modules/memory/memory.ts";
 import { makeOrchestrator, type Orchestrator, type OrchestratorOptions } from "#/modules/orchestrator/orchestrator.ts";
 import { makePkm, type Pkm } from "#/modules/pkm/pkm.ts";
+import { makePull, type Pull, type PullHooks } from "#/modules/pull/pull.ts";
 import { makeRepo, type Repo, type RepoHooks } from "#/modules/repo/repo.ts";
 import { makeSession, type Session, type SessionOptions } from "#/modules/session/session.ts";
 import { makeWatch, type Watch } from "#/modules/watch/watch.ts";
@@ -32,7 +33,8 @@ import { type Time, wallTime } from "./infra/time.ts";
 /** What a test changes in a module: the farm's own otherwise. */
 export interface ServiceOptions {
   readonly agent?: AgentOptions;
-  readonly repo?: RepoHooks;
+  readonly repo?: RepoHooks & PullHooks;
+  readonly pull?: PullHooks;
   readonly memory?: MemoryOptions;
   readonly session?: SessionOptions;
   readonly orchestrator?: OrchestratorOptions;
@@ -77,6 +79,7 @@ export interface Farm extends AsyncDisposable {
   readonly pkm: Pkm;
   readonly issue: Issue;
   readonly cron: Cron;
+  readonly pull: Pull;
   readonly watch: Watch;
   readonly tool: Tool;
   readonly orchestrator: Orchestrator;
@@ -148,6 +151,7 @@ export type Modules = Pick<
   | "pkm"
   | "issue"
   | "cron"
+  | "pull"
   | "watch"
 >;
 
@@ -172,7 +176,6 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
   // Agents: the profiles and the runtimes they run on, then their memory.
   const agent = own(await makeAgent({ config, clock, log, db, core, setting, fetch }, options.agent));
   const memory = own(await makeMemory({ clock, log, fetch, db, setting, agent }, options.memory));
-  // Source Control: repositories, worktrees, checks, merges and pull requests.
   const repo = own(await makeRepo({ config, clock, log }, options.repo));
   // Agent Sessions: an agent profile at work: its triggers and deliveries, its sessions and runs, their workplaces and
   // the machine they run on.
@@ -182,9 +185,9 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
   const media = own(await makeMedia({ db, core, clock, log, attachment, session, channel, provider, publicFetch }));
   const artifact = own(await makeArtifact({ db, clock, log, attachment, channel }));
   const pkm = own(await makePkm({ config, clock, log, db }));
-  // Issues: the issues and what runs on a schedule.
   const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, session, channel }));
   const cron = own(await makeCron({ config, clock, log, db, core, agent, channel, session, issue }));
+  const pull = own(await makePull({ config, clock, log, db, repo, session, channel, issue }, { ...options.repo, ...options.pull }));
   // Watch: the chat's committed events routed to the sessions through the brakes, their threads, talks and receipts in
   // the chat; the user's inbox and the patrol.
   const watch = own(await makeWatch({ config, clock, log, db, core, agent, session, channel, issue }));
@@ -211,6 +214,7 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
     pkm,
     issue,
     cron,
+    pull,
     watch,
   };
 }
@@ -222,10 +226,10 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
   const own = owning(closes);
   try {
     const modules = await buildModules(config, options, closes);
-    const { clock, log, fetch, db, core, setting, user, agent, memory, repo, session, channel, media, artifact, pkm, watch, issue, cron } = modules;
+    const { clock, log, fetch, db, core, setting, user, agent, memory, repo, session, channel, media, artifact, pkm, watch, issue, cron, pull } = modules;
     const { provider } = modules;
     // Farm tools first (Tools layer in modules.ts): the orchestrator holds them (OrchestratorTools), and /mcp serves them to sessions.
-    const tool = own(await makeTool({ clock, log, agent, session, issue, cron, channel, memory, media, pkm, artifact, repo }));
+    const tool = own(await makeTool({ clock, log, agent, session, issue, cron, channel, memory, media, pkm, artifact, repo, pull }));
     // Orchestrator: the agent that hands the user's work to helpers.
     const orchestrator = own(
       await makeOrchestrator({ clock, log, config, agent, repo, pkm, session, channel, issue, cron, tools: tool }, options.orchestrator),
@@ -248,6 +252,7 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     await media.boot();
     await issue.boot();
     await cron.boot();
+    await pull.boot();
     // The sessions' threads, the chat's events after the watch's cursor (routed through the brakes, each once), then the
     // inbox as it stands and the patrol's rounds.
     await watch.boot();

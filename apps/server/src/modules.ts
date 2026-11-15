@@ -15,6 +15,7 @@ export const modules: readonly Module[] = [
   { name: "Collaboration", parts: ["modules/channel", "modules/media", "modules/artifact", "modules/pkm"] },
   { name: "Issues", parts: ["modules/issue"] },
   { name: "Scheduling", parts: ["modules/cron"] },
+  { name: "Pull Requests", parts: ["modules/pull"] },
   { name: "Watch", parts: ["modules/watch"] },
   { name: "Tools", parts: ["gateway/tool"] },
   { name: "Orchestrator", parts: ["modules/orchestrator"] },

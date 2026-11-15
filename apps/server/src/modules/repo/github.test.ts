@@ -1,21 +1,18 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
-import type { Issue } from "@vibevalley/protocol";
 import { tempDir } from "@vibevalley/testkit/temp";
 
 import type { ServerConfig } from "#/infra/config.ts";
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
-import { gitSync, reposDir, repo, write } from "#/testing/git.ts";
+import { gitSync, reposDir, repo } from "#/testing/git.ts";
 import { testConfig } from "#/testing/layers.ts";
 
-import { GitError, run } from "./git.ts";
-import { actionsJobOf } from "./pullSnapshot.ts";
+import { run } from "./git.ts";
 import { githubOrigin, type GitHubRun, makeRepo, probeGitHub, type Repo, type RepoHooks } from "./repo.ts";
-import { repository } from "./repository.ts";
 
 const noGitHub: GitHubRun = () => Promise.resolve({ out: "", ok: false, missing: true });
 const gh =
@@ -43,13 +40,6 @@ const repos = async <A>(root: string, body: (p: Repo) => Promise<A>, change: Par
   }
 };
 
-/** What work threw; it failing to throw fails the test. */
-const thrown = (work: Promise<unknown>): Promise<Error> =>
-  work.then(
-    () => expect.unreachable("it went through"),
-    (e: unknown) => (e instanceof Error ? e : expect.unreachable(String(e))),
-  );
-
 const loggedIn = (permission: () => string) =>
   gh((args) => {
     if (args[0] === "--version") return { out: "gh version 2.80.0" };
@@ -58,149 +48,6 @@ const loggedIn = (permission: () => string) =>
   });
 
 describe("GitHub", () => {
-  test("finds the Actions job in a check's URL, and none elsewhere", () => {
-    expect(actionsJobOf("https://github.com/o/r/actions/runs/1/job/127709499860")).toBe("127709499860");
-    expect(actionsJobOf("https://example.test/checks/1")).toBe("");
-  });
-
-  test("regression: GitHub snapshots read all collection pages and overflowing review threads", () => {
-    const root = reposDir();
-    let failReviews = false;
-    const author = (login: string) => ({ login, __typename: login.endsWith("[bot]") ? "Bot" : "User" });
-    const inline = Array.from({ length: 101 }, (_, i) => ({
-      id: `I${i}`,
-      fullDatabaseId: String(2_147_483_657 + i),
-      author: author("bob"),
-      body: `inline ${i}`,
-      url: `https://comments/${i}`,
-      createdAt: "2026-11-01T00:02:00Z",
-      path: "src/a.ts",
-      line: i + 1,
-      originalLine: i + 1,
-      diffHunk: "@@\n-old\n+new",
-      pullRequestReview: { id: "R1" },
-    }));
-    const pull = (key: string, nodes: unknown[]) => ({ data: { repository: { pullRequest: { [key]: { nodes } } } } });
-    repo(join(root, "sample"), 1, 0);
-    gitSync(join(root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
-    return repos(
-      root,
-      async (repo) => {
-        const snapshot = await repo.githubSnapshot("sample", 7);
-        expect(snapshot.viewer).toBe("gardener");
-        expect(snapshot.checks).toEqual([
-          { name: "test", status: "COMPLETED", conclusion: "FAILURE", url: "https://checks/1" },
-          { name: "legacy", status: "SUCCESS", conclusion: "", url: "https://checks/2" },
-        ]);
-        expect(snapshot.reviews.map((review) => review.id)).toEqual(["R1", "R2"]);
-        expect(snapshot.comments).toHaveLength(104);
-        expect(snapshot.comments.find((comment) => comment.id === "I100")).toMatchObject({
-          databaseId: "2147483757",
-          line: 101,
-          threadId: "PRRT_9",
-          reviewId: "R1",
-          diffHunk: "@@\n-old\n+new",
-        });
-        expect(snapshot.comments.find((comment) => comment.id === "SECOND")).toMatchObject({ threadId: "PRRT_second", resolved: true });
-        failReviews = true;
-        expect((await thrown(repo.githubSnapshot("sample", 7))).name).toBe("RepoError");
-      },
-      {},
-      {
-        gh: gh((args) => {
-          if (args[0] === "pr") return { out: JSON.stringify({ headRefOid: "abc" }) };
-          if (args[1] === "user") return { out: JSON.stringify({ login: "gardener" }) };
-          expect(args).toContain("--paginate");
-          expect(args).toContain("--slurp");
-          const query = args.find((arg) => arg.startsWith("query="))?.slice(6) ?? "";
-          expect(query).not.toContain("databaseId");
-          if (query.startsWith("query PullChecks("))
-            return {
-              out: JSON.stringify([
-                {
-                  data: {
-                    repository: {
-                      object: {
-                        statusCheckRollup: {
-                          contexts: {
-                            nodes: [{ __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: "FAILURE", detailsUrl: "https://checks/1" }],
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-                {
-                  data: {
-                    repository: {
-                      object: {
-                        statusCheckRollup: {
-                          contexts: { nodes: [{ __typename: "StatusContext", context: "legacy", state: "SUCCESS", targetUrl: "https://checks/2" }] },
-                        },
-                      },
-                    },
-                  },
-                },
-              ]),
-            };
-          if (query.startsWith("query PullReviews("))
-            return failReviews
-              ? { out: "not available", ok: false }
-              : {
-                  out: JSON.stringify(
-                    [1, 2].map((i) =>
-                      pull("reviews", [
-                        {
-                          id: `R${i}`,
-                          author: author("review-bot[bot]"),
-                          state: "CHANGES_REQUESTED",
-                          body: "fix it",
-                          submittedAt: "2026-11-01T00:00:00Z",
-                        },
-                      ]),
-                    ),
-                  ),
-                };
-          if (query.startsWith("query PullComments("))
-            return {
-              out: JSON.stringify(
-                [1, 2].map((i) =>
-                  pull("comments", [
-                    {
-                      id: `C${i}`,
-                      author: author("alice"),
-                      body: "general",
-                      url: `https://comments/${i}`,
-                      createdAt: "2026-11-01T00:01:00Z",
-                    },
-                  ]),
-                ),
-              ),
-            };
-          if (query.startsWith("query PullThreads("))
-            return {
-              out: JSON.stringify([
-                pull("reviewThreads", [
-                  {
-                    id: "PRRT_9",
-                    isResolved: false,
-                    comments: { totalCount: 101, edges: inline.slice(0, 100).map((node, i) => ({ cursor: `edge${i}`, node })) },
-                  },
-                ]),
-                pull("reviewThreads", [
-                  { id: "PRRT_second", isResolved: true, comments: { totalCount: 1, edges: [{ cursor: "last", node: { ...inline[0], id: "SECOND" } }] } },
-                ]),
-              ]),
-            };
-          expect(query.startsWith("query PullThreadComments(")).toBe(true);
-          expect(args).toContain("id=PRRT_9");
-          expect(args).toContain("endCursor=edge99");
-          return { out: JSON.stringify([{ data: { node: { comments: { nodes: [inline[100]] } } } }]) };
-        }),
-      },
-    );
-  });
-
   test("the probe says whether gh is there and logged in, and never what it printed", async () => {
     for (const [name, version, auth, want] of [
       ["missing", { out: "", ok: false, missing: true }, { out: "" }, { installed: false, loggedIn: false, reason: "没装 gh" }],
@@ -336,129 +183,6 @@ describe("GitHub", () => {
       { github: { prRepos: ["enabled"], prPollSeconds: 180 } },
       { gh: loggedIn(() => "WRITE") },
     ));
-
-  test("a pull request: the check first, then the push, and one already open is found again", () => {
-    let pushes = 0;
-    let calls = 0;
-    let pushFails = true;
-    const issue = { number: 1, title: "sample" } as Issue;
-    return repos(
-      reposDir(),
-      async (p) => {
-        const place = await p.checkout({ repo: "sample", issue: 1, worktree: true, base: "" });
-        gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
-        mkdirSync(join(place.cwd, ".vibevalley"));
-        const check = join(place.cwd, ".vibevalley/check");
-        write(check, "#!/bin/sh\necho check-failed\nexit 1\n", 0o755);
-        gitSync(place.cwd, "add", ".vibevalley/check");
-        gitSync(place.cwd, "commit", "-qm", "check");
-        await thrown(p.submitPullRequest(place, issue, "done"));
-        expect([pushes, calls]).toEqual([0, 0]);
-        write(check, "#!/bin/sh\nprintf changed > generated.ts\nexit 0\n", 0o755);
-        gitSync(place.cwd, "commit", "-qam", "check again");
-        await thrown(p.submitPullRequest(place, issue, "done"));
-        expect([pushes, calls]).toEqual([0, 0]);
-        write(check, "#!/bin/sh\nexit 0\n", 0o755);
-        gitSync(place.cwd, "commit", "-qam", "passing check");
-        await thrown(p.submitPullRequest(place, issue, "done"));
-        expect(calls).toBe(0);
-        gitSync(place.cwd, "clean", "-fd");
-        pushFails = false;
-        expect((await p.submitPullRequest(place, issue, "done")).number).toBe(4);
-        expect(calls).toBe(1);
-      },
-      {},
-      {
-        publication: {
-          tip: (cwd) => repository(cwd).tip("main"),
-          fetch: () => Promise.resolve(),
-          push: () => {
-            pushes++;
-            return pushFails ? Promise.reject(GitError.of(1, "push refused")) : Promise.resolve();
-          },
-        },
-        gh: gh((args) => {
-          calls++;
-          expect(args.slice(0, 2)).toEqual(["pr", "list"]);
-          return { out: `[{"url":"https://github.com/test/sample/pull/4","number":4,"isCrossRepository":false,"state":"OPEN"}]` };
-        }),
-      },
-    );
-  });
-
-  test("an answer from gh that is not the shape asked for is refused, not taken as a pull request", () => {
-    const issue = { number: 1, title: "sample" } as Issue;
-    return repos(
-      reposDir(),
-      async (p) => {
-        const place = await p.checkout({ repo: "sample", issue: 1, worktree: true, base: "" });
-        gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
-        expect((await thrown(p.submitPullRequest(place, issue, "done"))).message).toContain("已推送");
-        expect((await thrown(p.pullRequestState("sample", 3))).message).toBe("无法读取 PR #3 状态");
-      },
-      {},
-      {
-        publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Promise.resolve(), push: () => Promise.resolve() },
-        gh: gh((args) => ({ out: args[1] === "list" ? `[{"html_url":"https://github.com/test/sample/pull/4"}]` : "null" })),
-      },
-    );
-  });
-
-  test("the pull request's body says whether the check ran", async () => {
-    for (const hasCheck of [false, true]) {
-      let body = "";
-      await repos(
-        reposDir(),
-        async (p) => {
-          const place = await p.checkout({ repo: "sample", issue: 1, worktree: true, base: "" });
-          gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
-          if (hasCheck) {
-            mkdirSync(join(place.cwd, ".vibevalley"));
-            write(join(place.cwd, ".vibevalley/check"), "#!/bin/sh\nexit 0\n", 0o755);
-            gitSync(place.cwd, "add", ".vibevalley/check");
-            gitSync(place.cwd, "commit", "-qm", "check");
-          }
-          await p.submitPullRequest(place, { number: 1, title: "sample" } as Issue, "done");
-          expect(body).toBe("工单 #1\n\ndone\n\n" + (hasCheck ? ".vibevalley/check 通过。" : "这个仓库没有 .vibevalley/check，没跑检查。"));
-        },
-        {},
-        {
-          publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Promise.resolve(), push: () => Promise.resolve() },
-          gh: gh((args) => {
-            if (args[1] === "list") return { out: "[]" };
-            body = args.at(-1)!;
-            return { out: "https://github.com/test/sample/pull/1" };
-          }),
-        },
-      );
-    }
-  });
-
-  test("the helper's own title and body, left in the worktree's git directory, open the pull request", () => {
-    let args: string[] = [];
-    return repos(
-      reposDir(),
-      async (p) => {
-        const place = await p.checkout({ repo: "sample", issue: 1, worktree: true, base: "" });
-        gitSync(join(p.root, "sample"), "remote", "add", "origin", "https://github.com/test/sample.git");
-        const file = gitSync(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", "vibevalley-pr.md").trim();
-        writeFileSync(file, "# The board keeps its order\n\n## What changed\n\nIt does.\n");
-        await p.submitPullRequest(place, { number: 1, title: "看板不乱了" } as Issue, "done");
-        expect(args.slice(args.indexOf("--title"))).toEqual(["--title", "The board keeps its order", "--body", "## What changed\n\nIt does."]);
-        // Not committed: the tree is clean.
-        expect(gitSync(place.cwd, "status", "--porcelain").trim()).toBe("");
-      },
-      {},
-      {
-        publication: { tip: (cwd) => repository(cwd).tip("main"), fetch: () => Promise.resolve(), push: () => Promise.resolve() },
-        gh: gh((given) => {
-          if (given[1] === "list") return { out: "[]" };
-          args = given;
-          return { out: "https://github.com/test/sample/pull/1" };
-        }),
-      },
-    );
-  });
 
   test("a new issue starts from origin's main when it can be fast-forwarded to", async () => {
     for (const mode of ["checked-out", "other-branch", "dirty", "diverged", "fetch-failure", "not-enabled"]) {

@@ -198,8 +198,8 @@ describe("the modules", () => {
     expect(queries('import * as q from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:*"]);
     expect(queries('import { renameChannel } from "#db/channel.sql.ts";')).toEqual(["channel.sql.ts:renameChannel"]);
     expect(queries('export * from "#db/issue_assignment.sql.ts";')).toEqual(["issue_assignment.sql.ts:*"]);
-    const github = join(src, "modules/issue/github.ts");
-    expect(foreignQueries(github, inspect(github, 'import { recordTrigger } from "#db/session_trigger.sql.ts";').edges)).toEqual([
+    const pull = join(src, "modules/pull/pull.ts");
+    expect(foreignQueries(pull, inspect(pull, 'import { recordTrigger } from "#db/session_trigger.sql.ts";').edges)).toEqual([
       "session_trigger.sql.ts:recordTrigger",
     ]);
   });
@@ -338,16 +338,14 @@ describe("the modules", () => {
 
   it("regression: module test check catches upward domain imports and foreign table queries", () => {
     const agentTest = join(src, "modules/agent/agent.test.ts");
-    const issueTest = join(src, "modules/issue/github.test.ts");
+    const pullTest = join(src, "modules/pull/pull.test.ts");
     expect(testBoundaryLeaks(inspect(agentTest, 'import { instructions } from "#/modules/session/briefing.ts";'))).toEqual([
       "modules/agent/agent.test.ts -> modules/session/briefing.ts",
     ]);
-    expect(testBoundaryLeaks(inspect(issueTest, 'import { allOpenDeliveries } from "#db/session_delivery.sql.ts";'))).toEqual([
-      "modules/issue/github.test.ts -> session_delivery.sql.ts:allOpenDeliveries",
+    expect(testBoundaryLeaks(inspect(pullTest, 'import { allOpenDeliveries } from "#db/session_delivery.sql.ts";'))).toEqual([
+      "modules/pull/pull.test.ts -> session_delivery.sql.ts:allOpenDeliveries",
     ]);
-    expect(
-      testBoundaryLeaks(inspect(issueTest, 'import { moduleWorld } from "#/testing/world.ts";\nimport * as qe from "#db/issue_github_event.sql.ts";')),
-    ).toEqual([]);
+    expect(testBoundaryLeaks(inspect(pullTest, 'import { moduleWorld } from "#/testing/world.ts";\nimport * as qe from "#db/pull_event.sql.ts";'))).toEqual([]);
   });
 
   it("keep test harnesses out of platform, modules and gateway production files", () => {

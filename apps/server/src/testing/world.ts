@@ -15,6 +15,7 @@ import type { ModelAccess } from "#/modules/agent/durable.ts";
 import { registryOf } from "#/modules/agent/runtime.ts";
 import { explicitMandate } from "#/modules/issue/creation.ts";
 import { type Issue, type IssueIntake, intakeOf } from "#/modules/issue/issue.ts";
+import type { PullHooks } from "#/modules/pull/pull.ts";
 import { type GitHubRun, type RepoHooks } from "#/modules/repo/repo.ts";
 import { type Inside, insideOf } from "#/modules/session/session.ts";
 import { type WorkerAccess, type workerAccess } from "#/modules/session/worker.ts";
@@ -32,6 +33,7 @@ const noGitHub: GitHubRun = () => Promise.resolve({ out: "", ok: false, missing:
 export const quietApp = {
   agent: { background: false },
   repo: { gh: noGitHub },
+  pull: { gh: noGitHub },
   orchestrator: { listen: false },
   platform: offlineNetwork,
 } satisfies ServiceOptions;
@@ -43,7 +45,8 @@ export interface WorldOptions {
   readonly runtimes?: readonly Runtime[];
   /** VibeValley's own runtime too, on the farm's harness, probed as installed. */
   readonly ownRuntime?: boolean;
-  readonly repoHooks?: RepoHooks;
+  readonly repoHooks?: RepoHooks & PullHooks;
+  readonly pullHooks?: PullHooks;
   /** Repos made before the farm starts, each a git repository with one commit. */
   readonly repos?: readonly string[];
   readonly stallMs?: number;
@@ -101,7 +104,7 @@ export type ModuleWorld = Modules &
   AsyncDisposable & {
     /** The parts behind the session module, for the tests that drive them. */
     readonly inside: Inside;
-    /** The issues' intake (pools, subscriptions, routing) and GitHub poller, for the tests that drive them. */
+    /** The issues' intake (pools, subscriptions, routing), for the tests that drive them. */
     readonly intake: IssueIntake;
     readonly close: () => Promise<void>;
     /** What the test's own services close with, after the farm's closes; each is called the last added first. */
@@ -132,6 +135,7 @@ export async function moduleWorld(options: WorldOptions = {}): Promise<ModuleWor
       models: options.models ?? deepseek.models,
     },
     repo: { gh: noGitHub, ...options.repoHooks },
+    pull: { gh: noGitHub, ...options.repoHooks, ...options.pullHooks },
     session: { workerAccess: options.workerAccess ?? fakeWorkerAccess },
   };
   const network = options.network ?? offlineNetwork;
@@ -170,9 +174,9 @@ export type World = ModuleWorld & { readonly tool: Tool; readonly mcp: Mcp };
 export async function world(options: WorldOptions = {}): Promise<World> {
   const below = await moduleWorld(options);
   try {
-    const { clock, log, agent, memory, repo, session, channel, media, artifact, pkm, issue, cron, config } = below;
+    const { clock, log, agent, memory, repo, session, channel, media, artifact, pkm, issue, cron, pull, config } = below;
     const own = owning(below.closes);
-    const tool = own(await makeTool({ clock, log, agent, session, issue, cron, channel, memory, media, pkm, artifact, repo }));
+    const tool = own(await makeTool({ clock, log, agent, session, issue, cron, channel, memory, media, pkm, artifact, repo, pull }));
     const mcp = own(await makeMcp({ config, session, tool, log }, options.who ? { who: options.who } : {}));
     return { ...below, tool, mcp };
   } catch (e) {

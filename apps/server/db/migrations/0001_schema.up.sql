@@ -244,23 +244,6 @@ CREATE TABLE session_trigger (
          (routed_at is not null and routing_scope is not null and routing_position is not null)),
   unique (source, source_key)
 );
-CREATE TABLE issue_github_cursor (
-  repo text not null,
-  pr_number integer not null,
-  check_fingerprint text not null default '',
-  check_revision integer not null default 0,
-  primary key (repo, pr_number)
-);
--- A pull request's reviews and comments taken in, with the bot round each counted against.
-CREATE TABLE issue_github_event (
-  repo text not null,
-  pr_number integer not null,
-  key text not null,
-  bot_round_key text,
-  bot_round integer,
-  primary key (repo, pr_number, key)
-);
-
 CREATE TABLE issue (
   id          text primary key,
   number      integer not null unique,
@@ -282,7 +265,6 @@ CREATE TABLE issue (
   -- Closed, an issue is done with what it delivered, or canceled with why; never both.
   delivered   text check (delivered in ('merged', 'merged_into_parent', 'pull_request', 'submitted', 'kept', 'none')),
   canceled    text check (canceled in ('dismissed', 'lost')),
-  pull_request text,
   deliver text not null default 'change' check (deliver in ('change', 'branch', 'answer', 'pull_request')),
   reviewed_at double precision,
   findings    text,
@@ -301,6 +283,32 @@ CREATE TABLE issue_assignment (
   agent           text not null,
   assigned_at     double precision not null,
   ended_at        double precision
+);
+CREATE TABLE pull (
+  id text primary key,
+  platform text not null check (platform in ('github', 'gitlab')),
+  repo text not null,
+  number integer not null,
+  url text not null,
+  branch text not null default '',
+  base text not null default '',
+  state text not null check (state in ('open', 'merged', 'closed')),
+  issue_id text references issue (id) on delete set null,
+  check_fingerprint text not null default '',
+  check_revision integer not null default 0,
+  created_at double precision not null,
+  updated_at double precision not null,
+  unique (repo, number)
+);
+CREATE INDEX pull_by_issue on pull (issue_id) where issue_id is not null;
+CREATE INDEX pull_by_state on pull (state) where state = 'open';
+-- A pull request's reviews and comments taken in, with the bot round each counted against.
+CREATE TABLE pull_event (
+  pull_id text not null references pull (id) on delete cascade,
+  key text not null,
+  bot_round_key text,
+  bot_round integer,
+  primary key (pull_id, key)
 );
 -- The computers helpers work on (session/machine.ts): the server's own, and in time those let in from the command line.
 CREATE TABLE session_machine (

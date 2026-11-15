@@ -137,7 +137,6 @@ export {
   IssueTimeline,
   IssueUpdate,
   IssueWatch,
-  PullRequest,
   Question,
 } from "./issue/schema";
 export { Cron, CronRequest, CronUpdate, CronWhen, CronWhenWeekly } from "./cron/schema";

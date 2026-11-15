@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { z } from "zod";
@@ -9,32 +8,24 @@ import type * as T from "@vibevalley/protocol";
 
 import { jsonOrNone } from "#/base/json.ts";
 
-import { GitError, gitQuiet, reason, run } from "./git.ts";
-import { hostedOrigin } from "./hosting.ts";
+import { GitError, run } from "./git.ts";
 import { repository } from "./repository.ts";
-import { lexists } from "./stats.ts";
-import {
-  type Merged,
-  type PullRequest,
-  type PullRequestState,
-  RepoError,
-  type RepoFolder,
-  pullRequestFile,
-  pullRequestText,
-  type Workplace,
-} from "./workplace.ts";
+import { type Merged, RepoError, type RepoFolder, type Workplace } from "./workplace.ts";
 
 export const cloneTimeoutMs = 3 * 60_000;
 
 // What the gh commands below print with --json; anything else is not taken as their answer.
 const repoView = jsonOrNone(z.object({ viewerPermission: z.string().nullable().optional() }));
-const pullRequestView = jsonOrNone(z.object({ state: z.string(), mergedAt: z.string().nullable().optional() }));
 
 const ghVersion = /^gh version ([0-9]+\.[0-9]+\.[0-9]+)/mu;
 const ghAccount = /Logged in to github\.com account ([A-Za-z0-9-]+)(?:\s|$)/u;
+
 export function githubOrigin(origin: string): string {
-  const repo = hostedOrigin(origin.trim());
-  return repo?.platform === "github" ? repo.name : "";
+  const match = /^(?:https:\/\/github\.com\/|ssh:\/\/git@github\.com\/|git@github\.com:)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/?$/u.exec(origin.trim());
+  const name = match?.[1]?.replace(/\.git$/u, "");
+  if (!name) return "";
+  const parts = name.split("/");
+  return parts.length === 2 && parts.every((p) => p !== "" && p !== "." && p !== "..") ? name : "";
 }
 
 /** gh's combined output; failed when it exits non-zero or is not there. */
@@ -64,32 +55,20 @@ export async function probeGitHub(gh: GitHubRun, clock: Pick<Clock, "now">): Pro
 
 const fail = (message: string) => new RepoError(message);
 
-/** A GitError as the RepoError the caller is told. */
-const asRepoError = async <A>(work: Promise<A>): Promise<A> => {
-  try {
-    return await work;
-  } catch (e) {
-    if (e instanceof GitError) throw new RepoError(reason(e), { cause: e });
-    throw e;
-  }
-};
-
 interface RepoGitHubEnv {
   readonly root: string;
   readonly clock: Pick<Clock, "now">;
   readonly gh: GitHubRun;
-  readonly submitBranch: (req: T.SubmitBranch, signal?: AbortSignal) => Promise<T.BranchPublication>;
   readonly prRepos: ReadonlySet<string>;
   readonly list: () => Promise<RepoFolder[]>;
   readonly exists: (path: string) => Promise<boolean>;
   readonly serially: <A>(repo: string, work: () => Promise<A>, signal?: AbortSignal) => Promise<A>;
-  readonly issueBranch: (n: number) => string;
   readonly issueWorkplace: (name: string, n: number) => Workplace & { readonly branch: string };
   readonly syncMain: (name: string) => Promise<string>;
 }
 
 export const makeRepoGitHub = (env: RepoGitHubEnv) => {
-  const { root, clock, gh, submitBranch, prRepos, list, exists, serially, issueBranch, issueWorkplace, syncMain } = env;
+  const { root, clock, gh, prRepos, list, exists, serially, issueWorkplace, syncMain } = env;
   let status: T.GitHubStatus | undefined;
   let capabilities = new Map<string, T.RepoSummary["pullRequest"]>();
 
@@ -97,12 +76,6 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
     capabilities.get(name) ?? (status?.reason ? { available: false, reason: status.reason } : { available: false, reason: t("server.repo.notChecked") });
 
   const usesPullRequests = (name: string) => prRepos.has(name) && capability(name).available;
-
-  const githubRemote = async (name: string) => {
-    const repo = githubOrigin(await repository(join(root, name)).origin());
-    if (repo === "") throw fail(t("server.repo.github.notGithub"));
-    return repo;
-  };
 
   return {
     capability,
@@ -141,51 +114,6 @@ export const makeRepoGitHub = (env: RepoGitHubEnv) => {
       capabilities = next;
       return probed;
     },
-    submitPullRequest: async (place: Workplace, issue: T.Issue, conclusion: string, signal?: AbortSignal): Promise<PullRequest> => {
-      const branch = place.branch;
-      if (!branch || branch !== issueBranch(issue.number)) throw fail(t("server.repo.github.wrongBranch"));
-      const path = join(root, place.repo);
-      const sha = await asRepoError(repository(place.cwd, signal).head());
-      const base = await asRepoError(repository(path, signal).main());
-      const written = await gitQuiet(place.cwd, "rev-parse", "--path-format=absolute", "--git-path", pullRequestFile);
-      let given: ReturnType<typeof pullRequestText>;
-      if (written !== "") {
-        let raw = "";
-        try {
-          raw = await readFile(written, "utf8");
-        } catch {
-          // No file left by the helper: the issue's own title and body open the pull request.
-          raw = "";
-        }
-        given = pullRequestText(raw);
-      }
-      const check = (await lexists(join(place.cwd, ".vibevalley/check"))) ? t("server.repo.github.checked") : t("server.repo.github.noCheck");
-      const result = await submitBranch(
-        {
-          cwd: place.cwd,
-          branch,
-          sha,
-          base,
-          title: given?.title ?? issue.title,
-          body: given?.body || t("server.repo.github.body", { n: issue.number, conclusion, check }),
-        },
-        signal,
-      );
-      if (!result.url || result.number === undefined) throw fail(t("server.repo.github.urlUnread"));
-      return { url: result.url, number: result.number, state: "open" };
-    },
-    pullRequestState: async (name: string, n: number): Promise<PullRequestState> => {
-      const repo = await githubRemote(name);
-      const viewed = await gh("pr", "view", String(n), "--repo", repo, "--json", "state,mergedAt");
-      if (!viewed.ok) throw fail(t("server.repo.github.viewFailed", { n }));
-      const result = pullRequestView(viewed.out);
-      if (!result) throw fail(t("server.repo.github.stateUnread", { n }));
-      if (result.mergedAt || result.state === "MERGED") return "merged";
-      if (result.state === "OPEN") return "open";
-      if (result.state === "CLOSED") return "closed";
-      throw fail(t("server.repo.github.stateUnknown", { n }));
-    },
-    githubRemote,
     finishPullRequest: (name: string, n: number): Promise<Merged> =>
       serially(name, async () => {
         if (usesPullRequests(name)) await syncMain(name);

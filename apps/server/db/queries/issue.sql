@@ -102,8 +102,5 @@ update issue set closed_at = null, delivered = null, canceled = null, queued_at 
 -- name: SetIssueAnswer :exec
 update issue set answer = sqlc.narg(answer) where issue.id = sqlc.arg(id);
 
--- name: SetIssuePullRequest :exec
-update issue set pull_request = sqlc.narg(pull_request) where issue.id = sqlc.arg(id);
-
 -- name: SetIssueConflict :exec
 update issue set conflict = sqlc.narg(conflict) where issue.id = sqlc.arg(id);

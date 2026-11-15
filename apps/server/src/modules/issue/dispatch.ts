@@ -69,7 +69,7 @@ export interface DispatchDeps {
   readonly agent: Agent;
   readonly repo: Repo;
   readonly session: Session;
-  readonly intake: Pick<Intake, "inputsOf" | "queued" | "forwarded" | "rebind" | "subscribedTo">;
+  readonly intake: Pick<Intake, "inputsOf" | "queued" | "forwarded" | "rebind" | "subscribed">;
   readonly channel: Channel;
   readonly log: Logger;
 }
@@ -317,31 +317,31 @@ export function issueDispatch(r: IssueLifecycle, joinChildren: IssueSplitting["j
     return sent.session.id;
   };
 
-  const scheduled = async (plan: ScheduledIssue, input: Trigger) => {
-    const channel = await chat.topOf(plan.channel);
-    const candidateId = plan.issueId ?? (await intake.subscribedTo([plan.thread]))[0];
+  const scheduled = async (req: ScheduledIssue, input: Trigger) => {
+    const channel = await chat.topOf(req.channel);
+    const candidateId = req.issueId ?? (await intake.subscribed([req.thread]))[0];
     const existing = candidateId ? await get(candidateId).catch(noneIfRefused) : undefined;
     const reusable = existing?.status === "canceled" ? undefined : existing;
-    const repo = plan.repo ?? (channel.repo || undefined);
+    const repo = req.repo ?? (channel.repo || undefined);
     const issue =
       reusable ??
       (await add(
         {
-          title: plan.title,
-          description: plan.description,
+          title: req.title,
+          description: req.description,
           ...(repo ? { repo } : {}),
-          agent: plan.agent ?? chat.orchestratorIn(channel.id),
+          agent: req.agent ?? chat.orchestratorIn(channel.id),
         },
         inferredMandate(input.id),
       ));
-    await intake.rebind(issue.id, plan.thread);
+    await intake.rebind(issue.id, req.thread);
     if (assignedOnDuty(issue, store.isOrchestrator)) {
       if (!reusable || isClosed(issue.status) || issue.lastRun === undefined) await beginOnDuty(issue, channel.id);
     } else {
       const newest = latestSessionIdOf(issue);
       if (!reusable || issue.status === "backlog" || issue.status === "todo" || (!isClosed(issue.status) && newest === undefined))
-        await start(issue.id, channel.id, plan.by, undefined, [input]);
-      else if (isClosed(issue.status) || newest === undefined) await reopen(issue.id, input.card.summary, channel.id, plan.by, undefined, [input]);
+        await start(issue.id, channel.id, req.by, undefined, [input]);
+      else if (isClosed(issue.status) || newest === undefined) await reopen(issue.id, input.card.summary, channel.id, req.by, undefined, [input]);
     }
     return get(issue.id);
   };

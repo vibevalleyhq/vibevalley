@@ -1,4 +1,4 @@
-import { existsSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { scriptedRuntime } from "@botiverse/oar/testing";
@@ -12,16 +12,26 @@ import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { user } from "#/base/actor.ts";
 import { lookIn, messageOf, reasonOf } from "#/base/errors.ts";
-import type { Core } from "#/core/core.ts";
+import { type Core, makeCore } from "#/core/core.ts";
+import { makeFrameOf } from "#/gateway/projection/frame.ts";
+import { reduce } from "#/gateway/projection/reduce.ts";
 import { dbQueries, SqlError } from "#/infra/db.ts";
+import { wallTime } from "#/infra/time.ts";
+import { registryOf } from "#/modules/agent/runtime.ts";
+import { makeChannel } from "#/modules/channel/channel.ts";
 import { gitRuns } from "#/modules/repo/git.ts";
-import { HireRefused, workSessionPolicy } from "#/modules/session/session.ts";
-import { gitIn } from "#/testing/git.ts";
-import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
+import { makeRepo } from "#/modules/repo/repo.ts";
+import { HireRefused, makeSession, workSessionPolicy } from "#/modules/session/session.ts";
+import { makeAttachment } from "#/platform/attachment/attachment.ts";
+import { testAgent } from "#/testing/agent.ts";
+import { gitIn, repo } from "#/testing/git.ts";
+import { offlineNetwork, starter, testConfig, until, waitFor } from "#/testing/layers.ts";
+import { memoryWorld } from "#/testing/memory.ts";
 import { allow, refuse } from "#/testing/refuse.ts";
+import { installedOnly } from "#/testing/worker.ts";
 import { testIssues, world } from "#/testing/world.ts";
 
-import { IssueCreateRefused } from "./issue.ts";
+import { IssueCreateRefused, makeIssue } from "./issue.ts";
 
 const lab = (): T.Agent => ({ ...starter("lab"), effort: "" });
 
@@ -932,5 +942,71 @@ describe("issues", () => {
 
     const namedProfile = await issues.create({ title: "by profile name", agent: " Lab Two ", by: user });
     expect(assignedAgentOf(namedProfile.issue)).toBe("lab2");
+  });
+
+  it("runs local merges standalone when Pull is not constructed", async () => {
+    const c = config();
+    const repoDir = join(c.workRoot, "repos", "demo");
+    mkdirSync(repoDir, { recursive: true });
+    repo(repoDir, 1, 0);
+    const runtime = scriptedRuntime({
+      id: "pi",
+      turn: async (turn) => {
+        writeFileSync(join(turn.options.cwd, "standalone.txt"), "local merge only\n");
+        git(turn.options.cwd, "add", "standalone.txt");
+        git(turn.options.cwd, "-c", "user.name=session", "-c", "user.email=session@vibevalley.test", "commit", "-qm", "local work");
+        turn.say("done");
+      },
+    });
+    const clock = wallTime;
+    const { fetch } = offlineNetwork;
+    await using mw = await memoryWorld(c, { fetch });
+    const core = makeCore({ projection: { reduce, effects: () => [], frame: makeFrameOf() }, clock });
+    const attachment = await makeAttachment({ config: c, clock, db: mw.db });
+    const agent = await testAgent(
+      { config: c, clock, log: mw.log, db: mw.db, core, setting: mw.setting },
+      { registry: registryOf([runtime]), probe: installedOnly([runtime]), usageOf: async () => null },
+    );
+    const repos = await makeRepo({ config: c, clock, log: mw.log }, { gh: () => Promise.resolve({ out: "", ok: false, missing: true }) });
+    const closeWorkerAccess = async () => {};
+    const session = await makeSession(
+      { config: c, clock, log: mw.log, db: mw.db, core, agent, memory: mw.memory, repo: repos },
+      {
+        workerAccess: async () => ({
+          executableAvailable: async () => true,
+          command: "worker",
+          prepare: async () => ({ authenticated: true, command: "worker" }),
+          revoke: async () => {},
+          close: closeWorkerAccess,
+          [Symbol.asyncDispose]: closeWorkerAccess,
+        }),
+      },
+    );
+    const channel = await makeChannel({ clock, log: mw.log, fetch, db: mw.db, core, attachment });
+    const standaloneIssue = await makeIssue({ config: c, clock, log: mw.log, db: mw.db, core, agent, repo: repos, session, channel });
+    try {
+      await session.boot();
+      await standaloneIssue.boot();
+      await agent.save(lab());
+      const issues = testIssues(standaloneIssue);
+      const created = await issues.add({ title: "local standalone merge", repo: "demo", agent: "lab" });
+      await issues.start(created.id, channel.defaultChannel());
+      await waitFor(
+        () => issues.get(created.id),
+        (item) => item.status === "in_review",
+        "standalone issue ready for review",
+      );
+      const activeSession = latestSessionIdOf(await issues.get(created.id))!;
+      await flip(issues.submitPullRequest(activeSession), ApiError);
+      const completed = await issues.setStatus(created.id, "done", "", channel.defaultChannel(), user);
+      expect([completed.status, completed.delivered, completed.pullRequest]).toEqual(["done", "merged", undefined]);
+      expect(git(repoDir, "log", "-1", "--pretty=%s")).toBe("local work");
+    } finally {
+      await standaloneIssue.close();
+      await session.close();
+      await repos.close();
+      await agent.close();
+      core.close();
+    }
   });
 });

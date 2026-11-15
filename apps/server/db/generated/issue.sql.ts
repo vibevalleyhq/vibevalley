@@ -31,7 +31,6 @@ export const ListIssuesResult = z.object({
   ["closed_at"]: z.number().nullable(),
   ["delivered"]: Words_issue_delivered.nullable(),
   ["canceled"]: Words_issue_canceled.nullable(),
-  ["pull_request"]: z.string().nullable(),
   ["deliver"]: Words_issue_deliver,
   ["reviewed_at"]: z.number().nullable(),
   ["findings"]: z.string().nullable(),
@@ -77,7 +76,6 @@ export const GetIssueResult = z.object({
   ["closed_at"]: z.number().nullable(),
   ["delivered"]: Words_issue_delivered.nullable(),
   ["canceled"]: Words_issue_canceled.nullable(),
-  ["pull_request"]: z.string().nullable(),
   ["deliver"]: Words_issue_deliver,
   ["reviewed_at"]: z.number().nullable(),
   ["findings"]: z.string().nullable(),
@@ -139,7 +137,6 @@ export const IssueByNumberResult = z.object({
   ["closed_at"]: z.number().nullable(),
   ["delivered"]: Words_issue_delivered.nullable(),
   ["canceled"]: Words_issue_canceled.nullable(),
-  ["pull_request"]: z.string().nullable(),
   ["deliver"]: Words_issue_deliver,
   ["reviewed_at"]: z.number().nullable(),
   ["findings"]: z.string().nullable(),
@@ -381,7 +378,6 @@ export const KeptIssuesResult = z.object({
   ["closed_at"]: z.number().nullable(),
   ["delivered"]: Words_issue_delivered.nullable(),
   ["canceled"]: Words_issue_canceled.nullable(),
-  ["pull_request"]: z.string().nullable(),
   ["deliver"]: Words_issue_deliver,
   ["reviewed_at"]: z.number().nullable(),
   ["findings"]: z.string().nullable(),
@@ -427,7 +423,6 @@ export const FamilyResult = z.object({
   ["closed_at"]: z.number().nullable(),
   ["delivered"]: Words_issue_delivered.nullable(),
   ["canceled"]: Words_issue_canceled.nullable(),
-  ["pull_request"]: z.string().nullable(),
   ["deliver"]: Words_issue_deliver,
   ["reviewed_at"]: z.number().nullable(),
   ["findings"]: z.string().nullable(),
@@ -468,17 +463,6 @@ export const SetIssueAnswerSql = "-- name: SetIssueAnswer :exec\nupdate issue se
 
 export async function setIssueAnswer(sql: Sql, params: SetIssueAnswerParams): Promise<number> {
   return sql.exec(SetIssueAnswerSql, [params["answer"], params["id"]])
-}
-
-export interface SetIssuePullRequestParams {
-  readonly ["pull_request"]: string | null
-  readonly ["id"]: IssueId
-}
-
-export const SetIssuePullRequestSql = "-- name: SetIssuePullRequest :exec\nupdate issue set pull_request = $1 where issue.id = $2;"
-
-export async function setIssuePullRequest(sql: Sql, params: SetIssuePullRequestParams): Promise<number> {
-  return sql.exec(SetIssuePullRequestSql, [params["pull_request"], params["id"]])
 }
 
 export interface SetIssueConflictParams {

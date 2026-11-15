@@ -12,7 +12,7 @@ import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { ProfileStore } from "#/modules/agent/agent.ts";
-import type { PullRequest, PullRequestState } from "#/modules/repo/repo.ts";
+import type { PullRequest } from "#/modules/repo/workplace.ts";
 import { NotRecorded, type Session } from "#/modules/session/session.ts";
 import type { Trigger, SessionClose } from "#/modules/session/shapes.ts";
 import * as q from "#db/issue.sql.ts";
@@ -39,6 +39,7 @@ export interface IssueParts {
   readonly session: Session;
   /** The issues' pool: what a dispatch is kept in until the issue's helper is sent. */
   readonly intake: Pick<Intake, "queueDispatch" | "withdrawDispatches">;
+  readonly pullOfIssue?: (id: T.IssueId) => PullRequest | undefined;
   readonly db: Db;
   readonly clock: Time;
   readonly log: Logger;
@@ -47,8 +48,8 @@ export interface IssueParts {
 export type IssueLifecycle = Awaited<ReturnType<typeof issueLifecycle>>;
 
 export async function issueLifecycle(deps: IssueParts) {
-  const { core, agent: agents, session: sessions, intake, db, clock, log } = deps;
-  const store = await makeIssueStore({ core, db });
+  const { core, agent: agents, session: sessions, intake, pullOfIssue, db, clock, log } = deps;
+  const store = await makeIssueStore({ core, db, ...(pullOfIssue ? { pullOfIssue } : {}) });
 
   const loadKept = async () => {
     for (const issue of await store.kept()) core.apply({ type: "issueChanged", issue });
@@ -77,6 +78,8 @@ export async function issueLifecycle(deps: IssueParts) {
     if (!found) throw missing(t("server.issue.issueRef", { ref }), [lookIn.issue]);
     return found;
   };
+
+  const find = (id: T.IssueId): Promise<T.Issue | undefined> => store.byId(id);
 
   const publish = (id: T.IssueId) =>
     bestEffort(log, `vibevalley: issue ${id} changed but could not be read back for the board`, async () => {
@@ -433,17 +436,11 @@ export async function issueLifecycle(deps: IssueParts) {
     });
   };
 
-  const savePullRequest = async (id: T.IssueId, pr: PullRequest) => {
-    await q.setIssuePullRequest(db.sql, { id, pull_request: jsonText(pr) });
-    await publish(id);
-  };
-
-  const finishPullRequest = async (issue: T.Issue, state: PullRequestState) => {
+  const settlePull = async (id: T.IssueId, state: "merged" | "closed") => {
     await db.tx(async () => {
-      if (state === "closed") await q.cancelIssue(db.sql, { id: issue.id, canceled: "dismissed", closed_at: clock.now() });
-      else await q.completeIssue(db.sql, { id: issue.id, delivered: "pull_request", closed_at: clock.now() });
-      await q.setIssuePullRequest(db.sql, { id: issue.id, pull_request: jsonText({ ...issue.pullRequest, state }) });
-      await db.afterCommit(() => publish(issue.id));
+      if (state === "closed") await q.cancelIssue(db.sql, { id, canceled: "dismissed", closed_at: clock.now() });
+      else await q.completeIssue(db.sql, { id, delivered: "pull_request", closed_at: clock.now() });
+      await db.afterCommit(() => publish(id));
     });
   };
 
@@ -511,6 +508,7 @@ export async function issueLifecycle(deps: IssueParts) {
     everyIssue,
     idOf,
     get,
+    find,
     publish,
     refreshBoardIssue,
     unsent,
@@ -536,8 +534,7 @@ export async function issueLifecycle(deps: IssueParts) {
     recordOnDutyStart,
     setQueued,
     drop,
-    savePullRequest,
-    finishPullRequest,
+    settlePull,
     saveSplit,
     completeChild,
   };

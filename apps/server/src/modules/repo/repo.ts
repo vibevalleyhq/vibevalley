@@ -18,9 +18,6 @@ import type { Time } from "#/infra/time.ts";
 import { checkRepository } from "./check.ts";
 import { GitError, gitWith, reason, run } from "./git.ts";
 import { cloneTimeoutMs, githubOrigin, type GitHubRun, makeRepoGitHub, probeGitHub, runGitHub } from "./github.ts";
-import { runGitLab } from "./hosting.ts";
-import { publisher, type PublishNetwork } from "./publish.ts";
-import { actionsJobOf, type GitHubPullSnapshot, makeGithubSnapshot } from "./pullSnapshot.ts";
 import { asFarm, repository } from "./repository.ts";
 import { activityOf, contributionsOf, countsOf, lexists, secondsOf, tokeiArgs, yearDays } from "./stats.ts";
 import {
@@ -28,7 +25,6 @@ import {
   type Merged,
   MergeFailure,
   type PullRequest,
-  type PullRequestState,
   type RepoFolder,
   RepoError,
   type RepoRecord,
@@ -40,7 +36,7 @@ import {
   type WorkplaceRelease,
 } from "./workplace.ts";
 
-export { activityOf, countsOf, githubOrigin, type GitHubRun, probeGitHub, type PullRequest, type PullRequestState, type RepoRecord, type RepoStack, tokeiArgs };
+export { activityOf, countsOf, githubOrigin, type GitHubRun, probeGitHub, type PullRequest, type RepoRecord, type RepoStack, tokeiArgs };
 
 const fail = (message: string) => new RepoError(message);
 
@@ -213,13 +209,9 @@ export interface Repo {
   readonly githubStatus: () => T.GitHubStatus;
   readonly refreshGitHub: () => Promise<T.GitHubStatus>;
   readonly usesPullRequests: (name: string) => boolean;
-  readonly submitBranch: (req: T.SubmitBranch, signal?: AbortSignal) => Promise<T.BranchPublication>;
-  readonly submitPullRequest: (place: Workplace, issue: T.Issue, conclusion: string, signal?: AbortSignal) => Promise<PullRequest>;
-  readonly pullRequestState: (name: string, n: number) => Promise<PullRequestState>;
-  readonly githubSnapshot: (name: string, n: number) => Promise<GitHubPullSnapshot>;
-  /** The last lines of the failed Actions job a check's URL points at; "" when it is not one or GitHub does not say. */
-  readonly failedJobLog: (name: string, checkUrl: string) => Promise<string>;
   readonly finishPullRequest: (name: string, n: number) => Promise<Merged>;
+  /** Runs work under the repository's lock (a repo name under root, or an absolute git directory path). */
+  readonly serially: <A>(repo: string, work: () => Promise<A>, signal?: AbortSignal) => Promise<A>;
   /** As the server starts: a first look at GitHub, in the background; the page asks again with github.refresh. */
   readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
@@ -228,8 +220,6 @@ export interface Repo {
 /** What tests change: gh, and git's network. */
 export interface RepoHooks {
   readonly gh?: GitHubRun;
-  readonly publication?: PublishNetwork;
-  readonly glab?: GitHubRun;
   readonly command?: typeof run;
   readonly fetch?: (path: string, branch: string) => Promise<boolean>;
 }
@@ -454,47 +444,18 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
     return { main, ahead };
   };
 
-  const submitBranch = publisher({
-    gh,
-    glab: hooks.glab ?? runGitLab,
-    timeoutMs: checkTimeoutMs,
-    command: hooks.command ?? run,
-    network: hooks.publication,
-    serially,
-  });
   const github = makeRepoGitHub({
     root,
     clock,
     gh,
-    submitBranch,
     prRepos,
     list,
     exists,
     serially,
-    issueBranch,
     issueWorkplace,
     syncMain,
   });
-  const { capability: _capability, githubRemote, ...githubMethods } = github;
-  const githubSnapshot = makeGithubSnapshot(gh, githubRemote);
-
-  const failedJobLog = async (name: string, checkUrl: string) => {
-    const job = actionsJobOf(checkUrl);
-    if (!job) return "";
-    let remote: string;
-    try {
-      remote = await githubRemote(name);
-    } catch (e) {
-      // No GitHub remote: the check is told without its log.
-      if (!(e instanceof RepoError)) throw e;
-      log.debug(`no GitHub remote for ${name}: ${e.message}`);
-      return "";
-    }
-    if (!remote) return "";
-    const said = await gh("run", "view", "--job", job, "--log-failed", "--repo", remote);
-    if (!said.ok) return "";
-    return said.out.trim().split("\n").slice(-40).join("\n").slice(-4000);
-  };
+  const { capability: _capability, ...githubMethods } = github;
 
   const create = (req: T.NewRepo, signal?: AbortSignal): Promise<RepoFolder> =>
     serially(
@@ -710,9 +671,8 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
   };
 
   return {
-    githubSnapshot,
     root,
-    submitBranch,
+    serially,
     limit: perRepo,
     validate: (req) => ({ problem: repoProblem(req) }),
     create,
@@ -821,7 +781,6 @@ export async function makeRepo(deps: RepoDeps, hooks: RepoHooks = {}): Promise<R
       }
     },
     ...githubMethods,
-    failedJobLog,
     boot: () => {
       tasks.run("refreshGitHub", () => github.refreshGitHub());
       return Promise.resolve();
