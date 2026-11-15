@@ -41,7 +41,6 @@ export interface RunsOfIssueParams {
 export const RunsOfIssueResult = z.object({
   ["id"]: z.string(),
   ["session"]: SessionId,
-  ["issue"]: z.string().nullable(),
   ["triggered_by"]: z.string(),
   ["heard"]: z.string().nullable(),
   ["started_at"]: z.number(),
@@ -52,7 +51,7 @@ export const RunsOfIssueResult = z.object({
 })
 export type RunsOfIssueResult = z.infer<typeof RunsOfIssueResult>
 
-export const RunsOfIssueSql = "-- name: RunsOfIssue :many\n-- bound: one issue's runs.\nselect * from session_run\nwhere session_run.issue = $1 or session_run.id in (select run from issue_run where issue_run.issue = $1)\norder by started_at, id;"
+export const RunsOfIssueSql = "-- name: RunsOfIssue :many\n-- bound: one issue's runs.\nselect distinct r.* from session_run r\nleft join session s on s.id = r.session\nleft join issue_run ir on ir.run = r.id\nwhere (s.scope_kind in ('issue', 'draft') and s.scope_id = $1) or ir.issue = $1\norder by r.started_at, r.id;"
 
 export async function runsOfIssue(sql: Sql, params: RunsOfIssueParams): Promise<RunsOfIssueResult[]> {
   const rows = await sql.query(RunsOfIssueSql, [params["issue_id"]])

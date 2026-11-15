@@ -33,7 +33,6 @@ const helper: Session = {
   hiredAt: 0,
   runs: 0,
   phase: { _tag: "done" },
-  refining: false,
 };
 
 const phaseOf = (action: "thinking" | "speaking", since = 0): Session["phase"] => ({

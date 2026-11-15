@@ -5,7 +5,7 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, SessionId, Words_session_closed, Words_session_role } from "./types.js"
+import { rowOf, SessionId, Words_session_closed, Words_session_role, Words_session_scope_kind } from "./types.js"
 
 export interface KeepSessionParams {
   readonly ["id"]: SessionId
@@ -15,16 +15,18 @@ export interface KeepSessionParams {
   readonly ["runtime"]: string
   readonly ["brief"]: string
   readonly ["repo"]: string | null
-  readonly ["issue"]: string | null
+  readonly ["scope_kind"]: Words_session_scope_kind | null
+  readonly ["scope_id"]: string | null
+  readonly ["policy"]: string | null
   readonly ["channel"]: string | null
   readonly ["hired_at"]: number
   readonly ["machine"]: string | null
 }
 
-export const KeepSessionSql = "-- name: KeepSession :exec\ninsert into session (id, role, agent, name, runtime, brief, repo, issue, channel, hired_at, machine)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\non conflict (id) do nothing;"
+export const KeepSessionSql = "-- name: KeepSession :exec\ninsert into session (id, role, agent, name, runtime, brief, repo, scope_kind, scope_id, policy, channel, hired_at, machine)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)\non conflict (id) do nothing;"
 
 export async function keepSession(sql: Sql, params: KeepSessionParams): Promise<number> {
-  return sql.exec(KeepSessionSql, [params["id"], params["role"], params["agent"], params["name"], params["runtime"], params["brief"], params["repo"], params["issue"], params["channel"], params["hired_at"], params["machine"]])
+  return sql.exec(KeepSessionSql, [params["id"], params["role"], params["agent"], params["name"], params["runtime"], params["brief"], params["repo"], params["scope_kind"], params["scope_id"], params["policy"], params["channel"], params["hired_at"], params["machine"]])
 }
 
 export interface ForgetSessionParams {
@@ -61,7 +63,9 @@ export const SessionByIDResult = z.object({
   ["runtime"]: z.string(),
   ["brief"]: z.string(),
   ["repo"]: z.string().nullable(),
-  ["issue"]: z.string().nullable(),
+  ["scope_kind"]: Words_session_scope_kind.nullable(),
+  ["scope_id"]: z.string().nullable(),
+  ["policy"]: z.string().nullable(),
   ["channel"]: z.string().nullable(),
   ["hired_at"]: z.number(),
   ["ended_at"]: z.number().nullable(),
@@ -72,7 +76,6 @@ export const SessionByIDResult = z.object({
   ["recalled"]: z.string().nullable(),
   ["pending_report"]: z.string().nullable(),
   ["phase"]: z.string(),
-  ["refining"]: z.boolean(),
   ["runs"]: z.number().int(),
   ["last_run"]: z.string().nullable(),
   ["spent"]: z.string().nullable(),
@@ -100,7 +103,9 @@ export const EndedSessionsResult = z.object({
   ["runtime"]: z.string(),
   ["brief"]: z.string(),
   ["repo"]: z.string().nullable(),
-  ["issue"]: z.string().nullable(),
+  ["scope_kind"]: Words_session_scope_kind.nullable(),
+  ["scope_id"]: z.string().nullable(),
+  ["policy"]: z.string().nullable(),
   ["channel"]: z.string().nullable(),
   ["hired_at"]: z.number(),
   ["ended_at"]: z.number().nullable(),
@@ -111,7 +116,6 @@ export const EndedSessionsResult = z.object({
   ["recalled"]: z.string().nullable(),
   ["pending_report"]: z.string().nullable(),
   ["phase"]: z.string(),
-  ["refining"]: z.boolean(),
   ["runs"]: z.number().int(),
   ["last_run"]: z.string().nullable(),
   ["spent"]: z.string().nullable(),
@@ -205,7 +209,9 @@ export const ActiveSessionsResult = z.object({
   ["runtime"]: z.string(),
   ["brief"]: z.string(),
   ["repo"]: z.string().nullable(),
-  ["issue"]: z.string().nullable(),
+  ["scope_kind"]: Words_session_scope_kind.nullable(),
+  ["scope_id"]: z.string().nullable(),
+  ["policy"]: z.string().nullable(),
   ["channel"]: z.string().nullable(),
   ["hired_at"]: z.number(),
   ["ended_at"]: z.number().nullable(),
@@ -216,7 +222,6 @@ export const ActiveSessionsResult = z.object({
   ["recalled"]: z.string().nullable(),
   ["pending_report"]: z.string().nullable(),
   ["phase"]: z.string(),
-  ["refining"]: z.boolean(),
   ["runs"]: z.number().int(),
   ["last_run"]: z.string().nullable(),
   ["spent"]: z.string().nullable(),
@@ -233,7 +238,6 @@ export async function activeSessions(sql: Sql): Promise<ActiveSessionsResult[]> 
 
 export interface KeepSessionStateParams {
   readonly ["phase"]: string
-  readonly ["refining"]: boolean
   readonly ["runs"]: number
   readonly ["last_run"]: string | null
   readonly ["spent"]: string | null
@@ -241,8 +245,8 @@ export interface KeepSessionStateParams {
   readonly ["id"]: SessionId
 }
 
-export const KeepSessionStateSql = "-- name: KeepSessionState :exec\nupdate session set phase = $1, refining = $2, runs = $3,\n  last_run = $4, spent = $5, channel = $6\nwhere id = $7 and ended_at is null;"
+export const KeepSessionStateSql = "-- name: KeepSessionState :exec\nupdate session set phase = $1, runs = $2,\n  last_run = $3, spent = $4, channel = $5\nwhere id = $6 and ended_at is null;"
 
 export async function keepSessionState(sql: Sql, params: KeepSessionStateParams): Promise<number> {
-  return sql.exec(KeepSessionStateSql, [params["phase"], params["refining"], params["runs"], params["last_run"], params["spent"], params["channel"], params["id"]])
+  return sql.exec(KeepSessionStateSql, [params["phase"], params["runs"], params["last_run"], params["spent"], params["channel"], params["id"]])
 }

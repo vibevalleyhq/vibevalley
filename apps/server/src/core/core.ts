@@ -5,13 +5,11 @@ import type { Logger } from "#/infra/log.ts";
 
 export type Fact = Exclude<T.ServerEvent, T.LiveEvent | { type: "snapshot" }>;
 export type CommitCount = NonNullable<T.SpaceState["commits"]>;
-export type SessionPlay = NonNullable<T.SpaceState["plays"]>[string];
 
 export const emptySpaceState = (): T.SpaceState => ({
   call: "idle",
   callReason: "",
   sessions: [],
-  plays: {},
   crons: [],
   issues: [],
   connectors: [],

@@ -1,8 +1,8 @@
 -- Every session, on the farm or ended (session/sessions.ts).
 
 -- name: KeepSession :exec
-insert into session (id, role, agent, name, runtime, brief, repo, issue, channel, hired_at, machine)
-values (sqlc.arg(id), sqlc.arg(role), sqlc.arg(agent), sqlc.arg(name), sqlc.arg(runtime), sqlc.arg(brief), sqlc.narg(repo), sqlc.narg(issue), sqlc.narg(channel), sqlc.arg(hired_at), sqlc.narg(machine))
+insert into session (id, role, agent, name, runtime, brief, repo, scope_kind, scope_id, policy, channel, hired_at, machine)
+values (sqlc.arg(id), sqlc.arg(role), sqlc.arg(agent), sqlc.arg(name), sqlc.arg(runtime), sqlc.arg(brief), sqlc.narg(repo), sqlc.narg(scope_kind), sqlc.narg(scope_id), sqlc.narg(policy), sqlc.narg(channel), sqlc.arg(hired_at), sqlc.narg(machine))
 on conflict (id) do nothing;
 
 -- name: ForgetSession :exec
@@ -44,6 +44,6 @@ from session;
 select * from session where ended_at is null order by hired_at, id;
 
 -- name: KeepSessionState :exec
-update session set phase = sqlc.arg(phase), refining = sqlc.arg(refining), runs = sqlc.arg(runs),
+update session set phase = sqlc.arg(phase), runs = sqlc.arg(runs),
   last_run = sqlc.narg(last_run), spent = sqlc.narg(spent), channel = sqlc.narg(channel)
 where id = sqlc.arg(id) and ended_at is null;

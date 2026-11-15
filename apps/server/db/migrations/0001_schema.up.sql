@@ -317,7 +317,9 @@ CREATE TABLE session (
   runtime     text not null,
   brief       text not null,
   repo     text,
-  issue       text,
+  scope_kind  text check (scope_kind in ('issue', 'draft', 'channel', 'duty')),
+  scope_id    text,
+  policy      text,
   channel     text,
   hired_at    double precision not null,
   ended_at    double precision,
@@ -328,14 +330,15 @@ CREATE TABLE session (
   recalled    text,
   pending_report text,
   phase text not null default '{"_tag":"resting"}',
-  refining boolean not null default false,
   runs integer not null default 0,
   last_run text,
   spent text,
   -- The machine it works on; none for an agent hosted in the server's process.
-  machine text references session_machine (id)
+  machine text references session_machine (id),
+  check ((scope_kind is null) = (scope_id is null))
 );
 CREATE INDEX session_by_machine on session (machine) where machine is not null;
+CREATE INDEX session_by_scope on session (scope_kind, scope_id) where scope_kind is not null;
 CREATE TABLE issue_assignment_execution (
   assignment text not null references issue_assignment(id) on delete cascade,
   executor text not null references session(id),
@@ -405,7 +408,6 @@ CREATE INDEX session_delivery_scope_position on session_delivery (scope, positio
 CREATE TABLE session_run (
   id           text primary key,
   session      text not null references session(id) on delete cascade,
-  issue        text,
   triggered_by text not null,
   heard        text,
   started_at   double precision not null,
@@ -533,7 +535,6 @@ CREATE INDEX channel_message_by_channel on channel_message (channel_id, number);
 CREATE INDEX channel_message_by_sender on channel_message (sender_id, id);
 CREATE UNIQUE INDEX channel_message_send_key on channel_message (sender_id, send_key) where send_key is not null;
 CREATE INDEX session_delivery_open on session_delivery (session_id, envelope_id) where state in ('pending', 'handed');
-CREATE INDEX session_run_by_issue on session_run (issue, started_at);
 CREATE INDEX session_run_by_session on session_run (session, started_at);
 -- The runs that took an issue's inputs (issue/intake.ts), as the sessions told it: an in-process agent's one run can take several.
 CREATE TABLE issue_run (

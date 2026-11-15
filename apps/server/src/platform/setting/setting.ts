@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 
 import { Semaphore } from "@vibevalley/async";
-import { t, setLocale } from "@vibevalley/i18n";
+import { currentLocale, type Locale, setLocale, t } from "@vibevalley/i18n";
 import type { Validation, KeySource, KeyStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 import { Secret } from "@vibevalley/protocol/schema";
@@ -82,6 +82,7 @@ export interface AgoraCredentials {
 }
 
 export interface Setting {
+  readonly locale: () => Locale;
   readonly status: () => SettingsStatus;
   readonly validate: (u: SettingsUpdate) => Validation;
   /** A key missing from the update is kept, an empty one cleared; nothing is saved when something cannot be right. */
@@ -120,6 +121,17 @@ const storedText = (s: Stored) => JSON.stringify(z.encode(Stored, s), null, 2);
 /** The file's fields before decoding: keys as plain strings, so an update can be laid over them. */
 const plainStored = (s: Stored) => z.encode(Stored, s);
 
+const inLocale = <A>(locale: Locale, run: () => A): A => {
+  const was = currentLocale();
+  if (was === locale) return run();
+  setLocale(locale);
+  try {
+    return run();
+  } finally {
+    setLocale(was);
+  }
+};
+
 export async function makeSetting(deps: SettingDeps): Promise<Setting> {
   const { config } = deps;
   const log = deps.log.child("setting");
@@ -127,33 +139,48 @@ export async function makeSetting(deps: SettingDeps): Promise<Setting> {
   const disk = keptFile(file, { clock: deps.clock, log }, { mode: 0o600 });
   const saving = new Semaphore(1);
   const fromConfig = { deepseek: config.deepseek.apiKey, appId: config.agora.appId, certificate: config.agora.appCertificate };
+  const inEnv = (key: string) => config.fromEnv?.has(key) === true;
+  let stored: Stored = (await readOrSetAside(file, jsonOf(Stored), "the settings start empty", { clock: deps.clock, log })) ?? {};
+  const locale = (): Locale => stored.locale ?? "zh";
+  setLocale(locale());
+
   // Reset to defaults goes back to these.
   // In the farm's language, as it is when asked: the persona, greeting and failure line are words.
-  const defaults = (): VoiceSettings => {
-    const base = defaultVoice();
-    if (!config.voice.id) return base;
-    return { ...base, tts: { vendor: "minimax", model: base.tts.vendor === "minimax" ? base.tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };
-  };
-  let stored: Stored = (await readOrSetAside(file, jsonOf(Stored), "the settings start empty", { clock: deps.clock, log })) ?? {};
-  setLocale(stored.locale ?? "zh");
+  const defaults = (): VoiceSettings =>
+    inLocale(locale(), () => {
+      const base = defaultVoice();
+      if (!config.voice.id) return base;
+      return { ...base, tts: { vendor: "minimax", model: base.tts.vendor === "minimax" ? base.tts.model : "speech_2_6_turbo", voiceId: config.voice.id } };
+    });
 
-  const pick = (saved: string | undefined, given: string): [string, KeySource] | undefined =>
-    saved ? [saved, "settings"] : given ? [given, "config"] : undefined;
-  const pickKey = (saved: Secret | undefined, given: Secret): [Secret, KeySource] | undefined =>
-    saved !== undefined && saved.reveal() !== "" ? [saved, "settings"] : given.reveal() !== "" ? [given, "config"] : undefined;
-  const voiceOf = (s: Stored) => (s.voice ? voiceSettingsOver(defaults(), s.voice) : defaults());
+  const pick = (saved: string | undefined, given: string, envWins: boolean): [string, KeySource] | undefined => {
+    if (envWins && given !== "") return [given, "config"];
+    return saved ? [saved, "settings"] : given ? [given, "config"] : undefined;
+  };
+  const pickKey = (saved: Secret | undefined, given: Secret, envWins: boolean): [Secret, KeySource] | undefined => {
+    if (envWins && given.reveal() !== "") return [given, "config"];
+    return saved !== undefined && saved.reveal() !== "" ? [saved, "settings"] : given.reveal() !== "" ? [given, "config"] : undefined;
+  };
+  const pickedDeepseek = () => pickKey(stored.deepseekApiKey, fromConfig.deepseek, inEnv("deepseek.apiKey"));
+  const pickedAppId = () => pick(stored.agoraAppId, fromConfig.appId, inEnv("agora.appId"));
+  const pickedCertificate = () => pickKey(stored.agoraAppCertificate, fromConfig.certificate, inEnv("agora.appCertificate"));
+  const envVoiceOver = (v: VoiceSettings): VoiceSettings =>
+    inEnv("voice.id") && config.voice.id !== ""
+      ? { ...v, tts: { vendor: "minimax", model: v.tts.vendor === "minimax" ? v.tts.model : "speech_2_6_turbo", voiceId: config.voice.id } }
+      : v;
+  const voiceOf = (s: Stored) => envVoiceOver(s.voice ? voiceSettingsOver(defaults(), s.voice) : defaults());
 
   const status = (): SettingsStatus => {
     const s = stored;
-    const deepseek = pickKey(s.deepseekApiKey, fromConfig.deepseek);
-    const appId = pick(s.agoraAppId, fromConfig.appId);
-    const certificate = pickKey(s.agoraAppCertificate, fromConfig.certificate);
+    const deepseek = pickedDeepseek();
+    const appId = pickedAppId();
+    const certificate = pickedCertificate();
     return {
       file,
       home: config.home,
       paths: { repos: reposDir(config), worktrees: worktreesDir(config), pkm: pkmDir(config) },
       version: config.version,
-      locale: s.locale ?? "zh",
+      locale: locale(),
       deepseekApiKey: deepseek ? secret(deepseek[0], deepseek[1]) : { source: null },
       agoraAppId: appId ? { source: appId[1], value: appId[0] } : { source: null },
       agoraAppCertificate: certificate ? secret(certificate[0], certificate[1]) : { source: null },
@@ -190,7 +217,7 @@ export async function makeSetting(deps: SettingDeps): Promise<Setting> {
       throw bizError(BizCode.SettingRefused, t("server.setting.notSaved", { file, why: messageOf(e) }));
     }
     stored = next;
-    setLocale(next.locale ?? "zh");
+    setLocale(locale());
   };
 
   const save = (u: SettingsUpdate) =>
@@ -223,13 +250,14 @@ export async function makeSetting(deps: SettingDeps): Promise<Setting> {
     });
 
   return {
+    locale,
     status,
-    validate: (u) => ({ problem: settingsProblem(u) }),
+    validate: (u) => ({ problem: inLocale(locale(), () => settingsProblem(u)) }),
     save,
-    deepseekApiKey: () => pickKey(stored.deepseekApiKey, fromConfig.deepseek)?.[0],
+    deepseekApiKey: () => pickedDeepseek()?.[0],
     agora: () => {
-      const appId = pick(stored.agoraAppId, fromConfig.appId)?.[0];
-      const appCertificate = pickKey(stored.agoraAppCertificate, fromConfig.certificate)?.[0];
+      const appId = pickedAppId()?.[0];
+      const appCertificate = pickedCertificate()?.[0];
       return appId !== undefined && appCertificate !== undefined ? { appId, appCertificate } : undefined;
     },
     voice: () => voiceOf(stored),
@@ -249,7 +277,7 @@ export async function makeSetting(deps: SettingDeps): Promise<Setting> {
     voiceConfig: () => ({
       voice: voiceOf(stored),
       keys: { asrKey: keyOrEmpty(stored.asrKey), llmKey: keyOrEmpty(stored.llmKey), ttsKey: keyOrEmpty(stored.ttsKey) },
-      deepseekApiKey: pickKey(stored.deepseekApiKey, fromConfig.deepseek)?.[0],
+      deepseekApiKey: pickedDeepseek()?.[0],
     }),
     close: () => disk.close(),
   };

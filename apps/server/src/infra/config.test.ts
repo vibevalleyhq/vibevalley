@@ -19,6 +19,7 @@ test("the defaults, then the file, then the environment", async () => {
   const home = temp();
   let c: ServerConfig = await load("", { VIBEVALLEY_HOME: home });
   expect([c.home, c.port, c.repo.maxSessions, c.repo.checkTimeoutSeconds, dbDir(c)]).toEqual([home, 8787, 3, 1200, join(home, "db")]);
+  expect([...(c.fromEnv ?? [])]).toEqual([]);
   writeFileSync(join(home, "vibevalley.yaml"), "port: 9000\nsession:\n  stall_seconds: 60\nrepo: { max_sessions: 5 }\ngit_emails: [a@x, b@x]\ndb: memory\n");
   const env = {
     VIBEVALLEY_HOME: home,
@@ -37,9 +38,17 @@ test("the defaults, then the file, then the environment", async () => {
   expect(c.gitEmails).toEqual(["a@x", "b@x"]);
   expect(dbDir(c)).toBe("memory");
   expect(c.cron.tickMs).toBe(20_000);
+  expect([...(c.fromEnv ?? [])].toSorted()).toEqual(["deepseek.apiKey", "patrol.heartbeatMinutes", "port", "repo.checkTimeoutSeconds"]);
   expect((await load("", { ...env, VIBEVALLEY_GIT_EMAILS: "c@x, d@x,e@x" })).gitEmails).toEqual(["c@x", "d@x", "e@x"]);
-  const farm = await load("", { ...env, VIBEVALLEY_DEEPSEEK_API_KEY: "sk-farm" });
+  const farm = await load("", {
+    ...env,
+    VIBEVALLEY_DEEPSEEK_API_KEY: "sk-farm",
+    AGORA_APP_ID: "app-env",
+    AGORA_APP_CERTIFICATE: "cert-env",
+    VIBEVALLEY_VOICE_ID: "voice-env",
+  });
   expect(farm.deepseek.apiKey.reveal()).toBe("sk-farm");
+  expect([...(farm.fromEnv ?? [])]).toEqual(expect.arrayContaining(["deepseek.apiKey", "agora.appId", "agora.appCertificate", "voice.id"]));
   expect((await load("", { ...env, VIBEVALLEY_GIT_EMAILS: "" })).gitEmails).toEqual([]);
 });
 

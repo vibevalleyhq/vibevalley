@@ -126,7 +126,7 @@ export const AllChannelsResult = z.object({
 })
 export type AllChannelsResult = z.infer<typeof AllChannelsResult>
 
-export const AllChannelsSql = "-- name: AllChannels :many\n-- bound: a row per channel, what the chat keeps in memory.\n-- What the chat keeps in memory (channel/rooms.ts), loaded when it starts.\nselect * from channel order by id;"
+export const AllChannelsSql = "-- name: AllChannels :many\n-- bound: a row per channel, what the chat keeps in memory.\n-- What the chat keeps in memory (channel/store.ts), loaded when it starts.\nselect * from channel order by id;"
 
 export async function allChannels(sql: Sql): Promise<AllChannelsResult[]> {
   const rows = await sql.query(AllChannelsSql, [])

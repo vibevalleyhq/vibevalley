@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto";
 
-import { z } from "zod";
-
 import { isAbort } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import type { Secret } from "@vibevalley/protocol/schema";
+import { MossError } from "@vibevalley/provider/moss";
 import { getMossAudioTask, type MossAudioTask } from "@vibevalley/provider/moss/audio-tasks";
 import { deleteMossFile, uploadMossFile } from "@vibevalley/provider/moss/files";
 import { generateMossImage, prepareMossImage } from "@vibevalley/provider/moss/image";
@@ -122,39 +121,26 @@ export interface Account extends Calls {
 
 const fingerprint = (key: string) => createHash("sha256").update(key).digest("hex");
 
-/** What a vendor's own failure says (its error classes are the package's own); undefined for anything else, which goes on up as it is. */
-const VendorError = z.object({
-  reason: z.enum(["Credentials", "InvalidInput", "Network", "Timeout", "HttpStatus", "InvalidResponse", "TooLarge"]),
-  outcome: z.enum(["NotSubmitted", "Rejected", "Unknown"]),
-  status: z.number().optional(),
-});
-const vendorError = (e: unknown) => {
-  if (!(e instanceof Error)) return undefined;
-  const got = VendorError.safeParse(e);
-  return got.success ? got.data : undefined;
-};
-
 // NotSent means nothing reached the vendor, so nothing can have been billed.
-const outcomeOf = (error: { readonly outcome: string }) => (error.outcome === "Unknown" ? "Unknown" : "Rejected");
+const outcomeOf = (error: MossError) => (error.outcome === "Unknown" ? "Unknown" : "Rejected");
 
 /** work, a vendor's failure thrown as the module's own failure. */
-const mapped = async <A>(work: Promise<A>, as: (error: NonNullable<ReturnType<typeof vendorError>>) => Error): Promise<A> => {
+const mapped = async <A>(work: Promise<A>, as: (error: MossError) => Error): Promise<A> => {
   try {
     return await work;
   } catch (e) {
-    const error = vendorError(e);
-    throw error === undefined ? e : as(error);
+    throw e instanceof MossError ? as(e) : e;
   }
 };
 
-const audioFailure = (error: NonNullable<ReturnType<typeof vendorError>>) =>
+const audioFailure = (error: MossError) =>
   new AudioFailure({
     outcome: outcomeOf(error),
     retryable:
       error.reason === "Network" || error.reason === "Timeout" || (error.reason === "HttpStatus" && (error.status === 429 || (error.status ?? 0) >= 500)),
   });
 
-const fileFailure = (error: NonNullable<ReturnType<typeof vendorError>>) => new FileFailure({ outcome: outcomeOf(error) });
+const fileFailure = (error: MossError) => new FileFailure({ outcome: outcomeOf(error) });
 
 /** A check: whatever the vendor's preparation refuses is an InvalidRequest. */
 const checked = async (prepare: Promise<unknown>, also = true) => {
@@ -240,12 +226,11 @@ const vendorStream = (http: VendorHttp, site: CallSite) => (what: string) =>
   };
 
 /** A stream's vendor failures thrown as the module's own. */
-async function* mappedStream<A>(stream: AsyncIterable<A>, as: (error: NonNullable<ReturnType<typeof vendorError>>) => Error): AsyncGenerator<A> {
+async function* mappedStream<A>(stream: AsyncIterable<A>, as: (error: MossError) => Error): AsyncGenerator<A> {
   try {
     yield* stream;
   } catch (e) {
-    const error = vendorError(e);
-    throw error === undefined ? e : as(error);
+    throw e instanceof MossError ? as(e) : e;
   }
 }
 
@@ -388,10 +373,9 @@ const mossCalls = (http: VendorHttp) => {
           try {
             await sealed("files.delete")((h) => deleteMossFile(key, id, h), signal);
           } catch (e) {
-            const error = vendorError(e);
-            if (error === undefined) throw e;
-            if (error.status === 404) return;
-            throw fileFailure(error);
+            if (!(e instanceof MossError)) throw e;
+            if (e.status === 404) return;
+            throw fileFailure(e);
           }
         },
       },
@@ -403,10 +387,9 @@ const refuse = (reason: string): ApiError => bizError(BizCode.ProviderRefused, r
 
 /** A model or voice listing's failure, in the user's words; anything else goes on up as it is. */
 const refusal = (e: unknown): unknown => {
-  const error = vendorError(e) ?? (e instanceof Error && e.name === "MossModelError" ? vendorModelError(e) : undefined);
-  if (error === undefined) return e;
+  if (!(e instanceof MossError)) return e;
   const reason = () => {
-    switch (error.reason) {
+    switch (e.reason) {
       case "InvalidInput":
         return t("server.provider.voiceQuery");
       case "Credentials":
@@ -420,7 +403,7 @@ const refusal = (e: unknown): unknown => {
       case "TooLarge":
         return t("server.provider.tooLarge");
       case "HttpStatus":
-        switch (error.status) {
+        switch (e.status) {
           case 401:
             return t("server.provider.authentication");
           case 403:
@@ -428,17 +411,11 @@ const refusal = (e: unknown): unknown => {
           case 429:
             return t("server.provider.rateLimited");
           default:
-            return t("server.provider.httpStatus", { status: error.status ?? 0 });
+            return t("server.provider.httpStatus", { status: e.status ?? 0 });
         }
     }
   };
   return refuse(reason());
-};
-
-/** MossModelError has a reason and maybe a status, but no outcome. */
-const vendorModelError = (e: Error) => {
-  const got = VendorError.omit({ outcome: true }).safeParse(e);
-  return got.success ? got.data : undefined;
 };
 
 /** An image call checked now (it throws what the vendor's preparation refuses), to run later with the key. */

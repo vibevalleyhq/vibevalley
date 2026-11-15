@@ -26,7 +26,7 @@ export interface ServerConfig {
   /** starters: the built-in templates a new farm installs beside its default orchestrator, by id, in order; in the
    * environment, comma-separated. */
   readonly agent: { readonly model: string; readonly starters: readonly string[] };
-  /** Read from DEEPSEEK_API_KEY, AGORA_APP_ID and AGORA_APP_CERTIFICATE too. A key saved in the app wins. */
+  /** Read from DEEPSEEK_API_KEY, AGORA_APP_ID and AGORA_APP_CERTIFICATE too; env wins over settings.json, which wins over vibevalley.yaml. */
   readonly deepseek: { readonly apiKey: Secret };
   readonly agora: { readonly appId: string; readonly appCertificate: Secret };
   readonly voice: { readonly id: string; readonly line: { readonly port: number; readonly url: string } };
@@ -49,6 +49,8 @@ export interface ServerConfig {
   readonly otlp: { readonly url: string };
   /** The notes' vault (pkm/): its PARA folders and journals. Empty: <workRoot>/pkm. */
   readonly pkm: { readonly root: string };
+  /** Dotted ServerConfig paths ("deepseek.apiKey", "voice.id"…) supplied by environment variables. */
+  readonly fromEnv?: ReadonlySet<string>;
 }
 
 const noticeBatchMs = 3_000;
@@ -213,17 +215,19 @@ export async function loadConfig(file = "", env: Readonly<Record<string, string 
   const path = optional ? join(home, "vibevalley.yaml") : file;
   const given = await readYaml(path, optional);
   const read: Record<string, unknown> = { ...base };
+  const fromEnv = new Set<string>();
   for (const key of keys) {
     const dotted = key.name.join(".");
     const envName = `VIBEVALLEY_${key.name.map((n) => n.toUpperCase()).join("_")}`;
     const own = ownNames[dotted];
-    const fromEnv = env[envName] ?? (own === undefined ? undefined : env[own]);
-    const raw = fromEnv ?? inFile(given, key.name);
+    const envValue = env[envName] ?? (own === undefined ? undefined : env[own]);
+    const raw = envValue ?? inFile(given, key.name);
     if (raw === undefined || raw === null) continue;
-    setAt(read, key.at, valueOf(key.kind, raw, fromEnv !== undefined ? envName : `${path}: ${dotted}`));
+    if (envValue !== undefined) fromEnv.add(key.at.join("."));
+    setAt(read, key.at, valueOf(key.kind, raw, envValue !== undefined ? (env[envName] !== undefined ? envName : (own ?? envName)) : `${path}: ${dotted}`));
   }
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every key above set a value of its kind over the defaults' own
-  const config = { ...(read as unknown as ServerConfig), home };
+  const config: ServerConfig = { ...(read as unknown as ServerConfig), home, fromEnv };
   for (const [name, n] of [
     ["port", config.port],
     ["voice.line.port", config.voice.line.port],
