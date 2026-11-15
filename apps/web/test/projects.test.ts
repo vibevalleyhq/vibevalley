@@ -3,9 +3,8 @@ import { matchesGlob } from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import component from "../playwright.component.config";
 import all from "../playwright.config";
-import { artifactsFor, suites } from "./projects";
+import { artifactsFor, browserConfig, suites, suitesFor } from "./projects";
 
 describe("browser test boundaries", () => {
   it("regression: every spec belongs to exactly one suite, including visual captures", () => {
@@ -20,17 +19,18 @@ describe("browser test boundaries", () => {
   });
 
   it("builds only the artifacts used by the selected entry point", () => {
-    expect(artifactsFor(["component"])).toEqual(["stories"]);
-    expect(artifactsFor(["integration"])).toEqual(["app"]);
-    expect(artifactsFor(["visual"])).toEqual(["app"]);
-    expect(artifactsFor(["audit-stories", "audit-pages"])).toEqual(["stories", "app"]);
-    expect(artifactsFor(["component", "integration", "audit-stories", "audit-pages"])).toEqual(["stories", "app"]);
+    expect(artifactsFor(suitesFor("component"))).toEqual(["stories"]);
+    expect(artifactsFor(suitesFor("integration"))).toEqual(["app"]);
+    expect(artifactsFor(suitesFor("visual"))).toEqual(["app"]);
+    expect(artifactsFor(suitesFor("audit"))).toEqual(["stories", "app"]);
+    expect(artifactsFor(suitesFor())).toEqual(["stories", "app"]);
+    expect(() => suitesFor("unknown")).toThrow('Unknown browser entry "unknown"');
     expect(() => artifactsFor(["unknown"])).toThrow("Unknown browser suite");
   });
 
   it("separates full automated checks from visual captures without dropping audits", () => {
     expect(all.projects?.map((project) => project.name)).toEqual(["component", "integration", "audit-stories", "audit-pages"]);
-    expect(component.projects?.map((project) => project.name)).toEqual(["component"]);
+    expect(browserConfig(suitesFor("component")).projects?.map((project) => project.name)).toEqual(["component"]);
     expect(all.projects?.filter((project) => project.fullyParallel === true).map((project) => project.name)).toEqual(["audit-stories"]);
   });
 });

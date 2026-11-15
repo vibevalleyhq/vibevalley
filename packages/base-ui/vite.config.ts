@@ -2,6 +2,8 @@ import solid from "@solidjs/vite-plugin";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import { playwright } from "vite-plus/test/browser-playwright";
 
+import pkg from "./package.json" with { type: "json" };
+
 // The components' tests run in headless Chromium: a real <dialog> top layer, focus, keyboard and layout, which a fake DOM does not have.
 export default defineConfig({
   plugins: lazyPlugins(() => [solid()]),
@@ -11,7 +13,6 @@ export default defineConfig({
     include: ["test/**/*.test.tsx", "test/**/*.test.ts"],
     browser: { enabled: true, headless: true, provider: playwright(), instances: [{ browser: "chromium" }] },
   },
-  // The types other packages check against (package.json's exports.
-  pack: { entry: ["src/index.ts"], outDir: "dist", clean: true, fixedExtension: false, dts: { sourcemap: true, emitDtsOnly: true } },
+  pack: { entry: Object.values(pkg.exports).map((e) => e.default), fixedExtension: false, dts: { sourcemap: true, emitDtsOnly: true } },
   run: { tasks: { build: { command: "vp pack", cache: { input: [{ auto: true }, "!dist/**"] } }, test: "vp test run" } },
 });

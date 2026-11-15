@@ -73,13 +73,14 @@ export default defineConfig({
       "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/audit/built-types.ts"],
       "names:verify": "vpx scripts/docs/stale-names.ts",
       // db:check is a script: it reads db/migrations and db/queries through PGlite.
+      "server:packages":
+        "vp run --filter @vibevalley/protocol --filter @vibevalley/async --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact --filter @vibevalley/cli test",
       "server:check": [
         "vp run packages:build",
         "vp check",
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/async --filter @vibevalley/home --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/pkm --filter @vibevalley/artifact test",
         "vp run --filter @vibevalley/server db:check",
+        "vp run server:packages",
         "vp run --filter @vibevalley/server test",
-        "vp run --filter @vibevalley/cli test",
       ],
       "web:check": ["vp run packages:build", "vp check", "vp run web:test"],
       // web:check without its vp check: CI's web job runs this one, and its check job runs vp check.

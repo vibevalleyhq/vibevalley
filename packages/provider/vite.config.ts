@@ -1,42 +1,10 @@
 import { defineConfig } from "vite-plus";
 import { configDefaults } from "vite-plus/test/config";
 
+import pkg from "./package.json" with { type: "json" };
+
 export default defineConfig({
   test: { include: ["src/**/*.test.ts"], reporters: [...configDefaults.reporters, "@vibevalley/testkit/budgets"] },
-  pack: {
-    entry: [
-      "src/moss/index.ts",
-      "src/moss/server.ts",
-      "src/moss/models.ts",
-      "src/moss/speech-models.ts",
-      "src/moss/speech.ts",
-      "src/moss/speech-stream.ts",
-      "src/moss/transcription-stream.ts",
-      "src/moss/audio-tasks.ts",
-      "src/moss/voices.ts",
-      "src/moss/audio-submission.ts",
-      "src/moss/speakers-models.ts",
-      "src/moss/speakers.ts",
-      "src/moss/voice-design-models.ts",
-      "src/moss/voice-design.ts",
-      "src/moss/transcription-models.ts",
-      "src/moss/transcription.ts",
-      "src/moss/live-models.ts",
-      "src/moss/vision-models.ts",
-      "src/moss/vision.ts",
-      "src/moss/image-models.ts",
-      "src/moss/image.ts",
-      "src/moss/understanding-models.ts",
-      "src/moss/understanding.ts",
-      "src/moss/files.ts",
-      "src/agora/server.ts",
-      "src/agora/captions.ts",
-      "src/base/transcription.ts",
-    ],
-    outDir: "dist",
-    clean: true,
-    fixedExtension: false,
-    dts: { sourcemap: true, emitDtsOnly: true },
-  },
+  pack: { entry: Object.values(pkg.exports).map((e) => e.default), fixedExtension: false, dts: { sourcemap: true, emitDtsOnly: true } },
   run: { tasks: { build: { command: "vp pack", cache: { input: [{ auto: true }, "!dist/**"] } }, test: "vp test run" } },
 });

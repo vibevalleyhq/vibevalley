@@ -16,7 +16,7 @@ The shapes in `Messages.swift` are `Glance` and `IslandRow` in `apps/desktop/src
 
 ```bash
 vp run --filter @vibevalley/island test           # swift test; macOS only, run on the owner's Mac (CI does not run the island)
-swift build -c release --package-path apps/island # what apps/desktop scripts/build.ts runs; the app finds .build/release/VibeValleyIsland
+vp run --filter @vibevalley/island build          # swift build -c release; the app finds .build/release/VibeValleyIsland
 ```
 
 To see how it looks without the desktop app or screen recording, give it a glance and `--snapshot`: it draws the island

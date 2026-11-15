@@ -9,7 +9,7 @@ changed=$(git diff --name-only --no-renames "$base")
 server=false
 web=false
 while IFS= read -r path; do
-    case "$path" in apps/server/*|packages/protocol/*) server=true ;; esac
+    case "$path" in apps/server/*|apps/cli/*|packages/protocol/*|packages/async/*|packages/home/*|packages/testkit/*|packages/ai/*|packages/agent/*|packages/provider/*|packages/pkm/*|packages/artifact/*) server=true ;; esac
     case "$path" in apps/web/*|apps/desktop/*|packages/*) web=true ;; esac
 done <<PATHS
 $changed
@@ -22,7 +22,7 @@ for key in $(env | cut -d= -f1); do
     esac
 done
 
-# The same checks AGENTS.md asks for, narrowest first: a fresh worktree may not have installed yet.
+# Narrowest checks first; vp install's prepare hook runs packages:build, and docs:verify includes paths:check.
 vp install --frozen-lockfile
 vp check --deny-warnings
 if "$server"; then
@@ -31,5 +31,7 @@ fi
 if "$web"; then
     vp run web:check
 fi
-# Docs, the notes' catalog and our primitives drift with any change, not only a docs one.
 vp run docs:verify
+vp run practice:check
+vp run health:verify
+vp run deadcode

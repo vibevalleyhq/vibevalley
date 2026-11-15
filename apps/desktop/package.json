@@ -7,7 +7,6 @@
     "./releases": "./src/base/releases.ts"
   },
   "scripts": {
-    "build": "vpx scripts/build.ts",
     "dev": "vpx scripts/dev.ts",
     "package": "vpx scripts/package.ts",
     "update-check": "vpx scripts/update-check.ts"
@@ -27,7 +26,7 @@
     "@vibevalley/server": "workspace:*",
     "electron": "catalog:",
     "electron-builder": "catalog:",
-    "esbuild": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

@@ -1,11 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "lib": ["ES2024", "DOM", "DOM.Iterable"],
-    "allowImportingTsExtensions": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "types": ["node"]
-  },
+  "compilerOptions": { "lib": ["ES2024", "DOM", "DOM.Iterable"], "types": ["node"] },
   "include": ["src"]
 }

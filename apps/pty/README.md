@@ -12,5 +12,5 @@ Tests/PtyCoreTests/                message codec, shell I/O, UTF-8, resize, cwd 
 
 ```bash
 vp run --filter @vibevalley/pty test             # swift test; macOS only
-swift build -c release --package-path apps/pty   # built by apps/desktop/scripts/build.ts and package.ts
+vp run --filter @vibevalley/pty build            # swift build -c release
 ```

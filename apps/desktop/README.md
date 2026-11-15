@@ -16,14 +16,13 @@ src/infra/island.ts        the island at the notch (apps/island): the state stre
 src/infra/control.ts       the socket in the farm's home that `vibevalley app` talks to
 src/infra/commandLine.ts   installing the `vibevalley` command into ~/.local/bin
 src/infra/machine.ts       which running channel holds the Mac's shared things (the island, the shortcuts)
-src/infra/workspace.ts     the workspace packages the server needs, for packaging
+src/infra/workspace.ts     the workspace packages the server needs, for restarting it in dev
 src/infra/probe.ts         what the desktop test reads, only when it starts the app
 src/ui/window.ts           the one window: the bar, the page, the server's origin only, 3 : 2, brought to the front
 src/ui/host.ts             main's end of the page's host (desktopBridge): notices, the tray, theme, language, Finder
 src/ui/menu.ts             the application menu and the menu bar's summary, in the farm's language
 src/ui/dev.ts              development: the server starts again when no helper is working (the page updates itself, from Vite)
 src/preload/preload.ts     the host interface, through contextBridge
-scripts/build.ts           build/main.cjs and build/preload.cjs; on macOS the island's release build too
 scripts/dev.ts             vp run dev: builds the shell and the page, starts Vite, the server and Electron
 scripts/package.ts         the macOS .app and .dmg in dist/: the shell, the page, the island, and the server with its production dependencies
 scripts/update-check.ts    an update walked through on two real packages

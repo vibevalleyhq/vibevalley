@@ -414,7 +414,7 @@ test("the island follows the issues in flight and opens one", async () => {
     await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//u, { timeout: 45_000 });
     const api = new VibeValleyApi(new URL(page.url()).origin);
     await expect.poll(async () => (await probe())?.glance).toEqual({ working: 0, waiting: 0, strip: { working: "没在干", waiting: "0 等你" }, rows: [] });
-    // Built on macOS by scripts/build.ts; elsewhere there is no helper.
+    // Built on macOS by the build task; elsewhere there is no helper.
     expect((await probe())?.helper).toBe(process.platform === "darwin");
 
     const fox = await api.agent.create(scripted);

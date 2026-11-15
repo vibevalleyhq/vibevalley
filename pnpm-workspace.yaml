@@ -43,7 +43,6 @@ catalog:
   axe-core: "^4.14.0"
   electron: "^45.2.1"
   electron-builder: "^26.18.0"
-  esbuild: "^0.28.2"
   eslint-plugin-solid: "0.18.1"
   hast-util-to-dom: "^4.0.1"
   music-metadata: "12.3.5"
@@ -127,8 +126,8 @@ peerDependencyRules:
     "@botiverse/oar>@earendil-works/pi-durable": "1.5.2"
     "@botiverse/oar>@earendil-works/chord": "1.5.2"
 
-# Install scripts: esbuild fetches its binary in its; the others have never been run and are not needed. (Electron has
-# none: it downloads its binary the first time it runs.)
+# Install scripts: esbuild fetches its binary for tsx and chord; the others are not needed. (Electron has none: it
+# downloads its binary the first time it runs.)
 allowBuilds:
   esbuild: true
   "@google/genai": false

@@ -26,64 +26,36 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # No job pushes, so the token is not left in the checkout's git config. Two commits deep: a pull request's merge
-      # commit and its first parent, the base scripts/release/regression.ts compares it with.
+      # Two commits deep: a pull request's merge commit and its first parent, the base regression.ts compares it with.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false, fetch-depth: 2 }
-      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      # @v1 lags behind (no cache-toolchain).
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-        with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
-      # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
-      # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
-      - name: Restore Vite Task cache
-        id: vite-task-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-
+      - uses: ./.github/actions/setup
       - name: pull request title
         if: github.event_name == 'pull_request'
-        # Squash merging makes the title the commit's subject. Passed through the environment, never into the shell.
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: vpx scripts/docs/commit-msg.ts --title "$TITLE"
       - name: pull request body and branch
-        # Dependabot writes its own body (release notes) and branch name; its titles pass the title check above.
         if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
-        # The body becomes the squashed commit's message. Editing the title or body does not run CI again: vv-pr checks
-        # them once more before merging.
         env:
           BODY: ${{ github.event.pull_request.body }}
           BRANCH: ${{ github.head_ref }}
         run: vpx scripts/docs/commit-msg.ts --body "$BODY" && vpx scripts/docs/commit-msg.ts --branch "$BRANCH"
       - name: the contract this change touches
-        # For the reviewer: the protocol, schema, and service interface lines it changes, in the summary.
         if: github.event_name == 'pull_request'
         run: vpx scripts/release/contract-diff.ts --base HEAD^1 >> "$GITHUB_STEP_SUMMARY"
       - name: regression tests
-        # A pull request that removes or changes a test named "regression: …" names it in its body, and a fix adds one
-        # (scripts/release/regression.ts). HEAD^1 is the base the merge commit was made on.
         if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
         env:
           BODY: ${{ github.event.pull_request.body }}
           BRANCH: ${{ github.head_ref }}
         run: vpx scripts/release/regression.ts --base HEAD^1 --branch "$BRANCH" --body "$BODY"
-      # A warning fails too: none are let in to pile up.
       - run: vp check --deny-warnings
       - run: vp run docs:verify
       - run: vp run scripts:test
+      - run: vp run practice:check
       - run: vp run health:verify
       - run: vp run deadcode
-
-      # The server's tests in three parts at once; the types are the check job's (vp check covers every package).
-      - name: Save Vite Task cache
-        if: success()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
   server-tests:
     name: server ${{ matrix.shard }}/3
@@ -94,40 +66,17 @@ jobs:
       matrix:
         shard: [1, 2, 3]
     steps:
-      # No job pushes, so the token is not left in the checkout's git config.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      # @v1 lags behind (no cache-toolchain).
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-        with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
-      # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
-      # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
-      - name: Restore Vite Task cache
-        id: vite-task-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-
-      - run: git config --global user.name ci && git config --global user.email ci@example.com
-      # server:check's parts, spread over the shards: db/generated is current (scripts/pg-generate.ts, on PGlite), the
-      # packages' tests on the first, the server's tests on each.
+      - uses: ./.github/actions/setup
+        with: { shard: "${{ matrix.shard }}" }
       - if: matrix.shard == 1
         run: vp run --filter @vibevalley/server db:check
       - if: matrix.shard == 1
-        run: vp run --filter @vibevalley/protocol --filter @vibevalley/testkit --filter @vibevalley/ai --filter @vibevalley/agent --filter @vibevalley/provider --filter @vibevalley/cli test
-      # The test task with the shard as its argument: cached per shard.
+        run: vp run server:packages
       - run: vp run --filter @vibevalley/server test --shard=${{ matrix.shard }}/3
 
-      # The one check main requires for the server: it passes only when every part did.
-      - name: Save Vite Task cache
-        if: success()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
-
+  # The one check main requires for the server: it passes only when every shard did.
   server:
     name: server
     needs: server-tests
@@ -142,77 +91,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # No job pushes, so the token is not left in the checkout's git config.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      # @v1 lags behind (no cache-toolchain).
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-        with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
-      # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
-      # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
-      - name: Restore Vite Task cache
-        id: vite-task-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-
-      - run: git config --global user.name ci && git config --global user.email ci@example.com
-      # The page's Playwright suite (e2e) runs on the owner's machine: vp run --filter @vibevalley/web e2e.
-      # @vibevalley/base-ui's tests run in headless Chromium (vitest's browser mode).
+      - uses: ./.github/actions/setup
       - run: node_modules/.bin/playwright install --with-deps chromium
         working-directory: packages/base-ui
       - run: vp run web:test
-      - name: Save Vite Task cache
-        if: success()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
   desktop:
     name: desktop
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # No job pushes, so the token is not left in the checkout's git config.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      # @v1 lags behind (no cache-toolchain).
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-        with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
-      # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
-      # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
-      - name: Restore Vite Task cache
-        id: vite-task-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-
+      - uses: ./.github/actions/setup
       - run: xvfb-run -a vp run desktop:test
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with: { name: desktop-test-results, path: apps/desktop/test-results, retention-days: 7 }
-      - name: Save Vite Task cache
-        if: success()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: node_modules/.vite/task-cache
-          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
   site:
     name: site
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # No job pushes, so the token is not left in the checkout's git config.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      # The Node of .node-version, Vite+ with the pnpm of package.json's packageManager, then vp install (frozen on CI).
-      # @v1 lags behind (no cache-toolchain).
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-        with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
+      - uses: ./.github/actions/setup
       - run: vp run site:check && vp run site:build

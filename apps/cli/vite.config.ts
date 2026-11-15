@@ -6,13 +6,9 @@ export default defineConfig({
   // The packaged app's command line (apps/desktop/scripts/package.ts): src/main.ts and everything it uses in one module for Node 24.
   pack: {
     entry: ["src/main.ts", "src/worker.ts"],
-    format: "esm",
-    platform: "node",
     target: "node24",
-    outDir: "dist",
-    clean: true,
     dts: false,
-    deps: { alwaysBundle: [/./u] },
+    deps: { alwaysBundle: [/./u], onlyBundle: false as const },
   },
   run: {
     tasks: {
