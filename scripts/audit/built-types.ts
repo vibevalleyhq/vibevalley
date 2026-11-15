@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, globSync, readdirSync, readFileSync } from "node:fs";
+import { basename, join } from "node:path";
 
 import { z } from "zod";
 
@@ -12,7 +12,6 @@ const wrong: string[] = [];
 for (const name of readdirSync(packages)) {
   const manifest = join(packages, name, "package.json");
   if (!existsSync(manifest) || !existsSync(join(packages, name, "vite.config.ts"))) continue;
-  if (!readFileSync(join(packages, name, "vite.config.ts"), "utf8").includes("pack:")) continue;
   const { exports } = Manifest.parse(JSON.parse(readFileSync(manifest, "utf8")));
   for (const [path, target] of Object.entries(exports ?? {})) {
     if (path.endsWith(".css") && typeof target === "string") {
@@ -25,9 +24,18 @@ for (const name of readdirSync(packages)) {
       wrong.push(`packages/${name}: "${path}" is not { types: ./dist/….d.ts, default: ./src/… }`);
       continue;
     }
-    // A pattern export (./*) is checked by its folder: its types are there once anything is built.
-    const types = target.types.includes("*") ? dirname(target.types) : target.types;
-    if (!existsSync(join(packages, name, types))) wrong.push(`packages/${name}: "${path}" says its types are ${target.types}, which the build did not write`);
+    if (target.types.includes("*")) {
+      const files = globSync(target.default.replace(/^\.\//u, ""), { cwd: join(packages, name) }).filter((f) => !f.endsWith(".test.ts"));
+      for (const file of files) {
+        const expected = target.types.replace("*", basename(file, ".ts"));
+        if (!existsSync(join(packages, name, expected)))
+          wrong.push(`packages/${name}: "${file}" says its types are ${expected}, which the build did not write`);
+      }
+      continue;
+    }
+    if (!existsSync(join(packages, name, target.types))) {
+      wrong.push(`packages/${name}: "${path}" says its types are ${target.types}, which the build did not write`);
+    }
   }
 }
 if (wrong.length > 0) {

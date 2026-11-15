@@ -3,7 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "assets": "vpx scripts/prepare.ts",
     "deploy": "vp run build && vp dlx wrangler@4 deploy"
   },
   "dependencies": {

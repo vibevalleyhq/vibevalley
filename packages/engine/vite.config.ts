@@ -1,10 +1,11 @@
 import { defineConfig } from "vite-plus";
 
+import pkg from "./package.json" with { type: "json" };
+
 export default defineConfig({
   test: { include: ["test/**/*.test.ts"] },
-  // The types other packages check against (package.json's exports.
   pack: {
-    entry: ["src/pixi/index.ts", "src/nav/index.ts", "src/audio/index.ts", "src/clock.ts", "src/framing.ts"],
+    entry: Object.values(pkg.exports).map((e) => e.default),
     outDir: "dist",
     clean: true,
     fixedExtension: false,

@@ -11,10 +11,14 @@ export default defineConfig({
   test: { include: ["test/**/*.test.ts"], environment: "node" },
   run: {
     tasks: {
-      check: { command: "vp run assets && vp run test", cache: false },
-      build: { command: "vp run assets && vpx scripts/build.ts", cache: false },
+      assets: {
+        command: "vpx scripts/prepare.ts",
+        cache: { input: [{ auto: true }, "../web/public/**", "../../docs/images/**", "!src/base/images.generated.json"] },
+      },
+      check: { command: "vp test run", dependsOn: ["assets"], cache: false },
+      build: { command: "vpx scripts/build.ts", dependsOn: ["assets"], cache: false },
       "test:prerender": { command: "playwright test --config test/prerender/playwright.config.ts", cache: false },
-      "test:production": { command: "vp run build && playwright test --config test/production/playwright.config.ts", cache: false },
+      "test:production": { command: "playwright test --config test/production/playwright.config.ts", dependsOn: ["build"], cache: false },
       test: "vp test run",
     },
   },
