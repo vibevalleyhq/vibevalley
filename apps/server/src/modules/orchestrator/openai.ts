@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { type Clock, isAbort, systemClock } from "@vibevalley/async";
 
+import { readTextUpTo } from "#/base/stream.ts";
 import type { Logger } from "#/infra/log.ts";
 
 /** One turn's words as they come, ending with the turn. Breaking off the iteration (the asker went away) ends the
@@ -78,25 +79,6 @@ export const chatChunk = (id: string, created: number, model: string, content: s
   return "data: " + JSON.stringify(chunk) + "\n\n";
 };
 
-/** The body as text, or undefined past max bytes: read as it comes, so a long one is not read whole first. */
-async function textUpTo(request: Request, max: number): Promise<string | undefined> {
-  if (request.body === null) return "";
-  const reader: ReadableStreamDefaultReader<Uint8Array> = request.body.getReader();
-  const parts: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > max) {
-      await reader.cancel();
-      return undefined;
-    }
-    parts.push(value);
-  }
-  return new TextDecoder().decode(Buffer.concat(parts));
-}
-
 const readRequest = (text: string): { readonly ok: true; readonly value: ChatRequest } | { readonly ok: false; readonly problem: string } => {
   let value: unknown;
   try {
@@ -118,7 +100,7 @@ export const chatCompletions =
     const asked = clock.now();
     const length = Number(request.headers.get("content-length") ?? 0);
     if (length > bodyMax) return refuse(413, "invalid_request_error", "request_too_large", `the body is ${length} bytes, at most ${bodyMax}`);
-    const text = await textUpTo(request, bodyMax);
+    const text = await readTextUpTo(request.body, bodyMax);
     if (text === undefined) return refuse(413, "invalid_request_error", "request_too_large", `the body is more than ${bodyMax} bytes`);
     const decoded = readRequest(text);
     if (!decoded.ok) return refuse(400, "invalid_request_error", "invalid_json", decoded.problem);

@@ -9,7 +9,7 @@ import { ToolFailed } from "../core/errors.ts";
 import { coerceArguments, objectSchema } from "../core/schema.ts";
 import { runTool, type Tool } from "../core/tool.ts";
 import { readMcpConfig, connectAll, mcpContentText, mcpToolName } from "../infra/mcp.ts";
-import { forgetLine, readMemory } from "./memory.ts";
+import { readMemory } from "./memory.ts";
 import { selfTools } from "./self.ts";
 import { frontMatter, readSkill, scanSkills, skillBody } from "./skills.ts";
 import { memoryStore } from "./todoStore.ts";
@@ -143,8 +143,6 @@ describe("skills and memory", () => {
     expect(selfTools({ now: Date.now, home: dir, skills: async () => [], memory: false }).map((t) => t.name)).toEqual(["load_skill"]);
     const lines = (await memory()).lines;
     expect(lines.map((l) => l.text)).toEqual(["只说中文"]);
-    await forgetLine(dir, lines[0]!.id);
-    expect((await memory()).lines).toEqual([]);
   });
 });
 

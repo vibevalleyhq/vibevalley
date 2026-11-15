@@ -6,6 +6,7 @@ import { MediaInput } from "@vibevalley/protocol/schema";
 
 import { bizError } from "#/base/errors.ts";
 import { jsonText, wireJson } from "#/base/json.ts";
+import { streamBytesUpTo, StreamTooLargeError } from "#/base/stream.ts";
 import type { Logger } from "#/infra/log.ts";
 import type { Media } from "#/modules/media/media.ts";
 
@@ -16,24 +17,11 @@ const uploadMax = 512_000_000;
 
 /** The request's body as it comes, at most max bytes: a client that goes away, or a body past max, is the upload refused. */
 async function* bodyOf(request: Request, max: number): AsyncGenerator<Uint8Array> {
-  if (request.body === null) return;
-  const reader: ReadableStreamDefaultReader<Uint8Array> = request.body.getReader();
-  let size = 0;
   try {
-    for (;;) {
-      let r;
-      try {
-        r = await reader.read();
-      } catch (e) {
-        throw new ApiError(BizCode.MediaRefused, t("server.media.inputDisconnected"), { cause: e });
-      }
-      if (r.done) return;
-      size += r.value.byteLength;
-      if (size > max) throw bizError(BizCode.MediaRefused, t("server.media.inputDisconnected"));
-      yield r.value;
-    }
-  } finally {
-    reader.releaseLock();
+    for await (const chunk of streamBytesUpTo(request.body, max, { signal: request.signal })) yield chunk;
+  } catch (e) {
+    if (e instanceof StreamTooLargeError) throw bizError(BizCode.MediaRefused, t("server.media.inputDisconnected"));
+    throw new ApiError(BizCode.MediaRefused, t("server.media.inputDisconnected"), { cause: e });
   }
 }
 

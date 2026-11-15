@@ -1,6 +1,14 @@
 import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes";
 import type { Conflict } from "../repo/shapes";
-import type { IssueAnswer, PhaseResting, Run, Session, SessionEvent } from "../session/shapes";
+import type { PhaseResting, Run, Session, SessionEvent } from "../session/shapes";
+
+/** What an answer issue concludes, as its helper hands it back. */
+export interface IssueAnswer {
+  conclusion: string;
+  evidence: string[];
+  unsure: string[];
+  next: string[];
+}
 
 /** Retained across execution contexts and ended only by reassignment or unassignment. */
 export interface Assignment {

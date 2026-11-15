@@ -23,7 +23,7 @@ VibeValley 只有一份 Solid 2 页面（`apps/web`），由服务端在 `/` 提
 | `apps/web/src/infra/` | 外部通信层：`frame.ts`（状态流和窄流）、`gateway.ts`（订阅流）、`query.ts`、`host.ts`、`router.ts` |
 | `apps/web/src/state/` | 状态中间层：`atom.ts`（`AtomRegistry`）、`intent.ts`（乐观意图）、`stored.ts`（`localStorage` 门面）、`prefs.ts` |
 | `apps/web/src/ui/`、`ui/domain/`、`ui/pixel/` | 基于 `@vibevalley/base-ui` 的无样式组件封装、线条图标（`icons.ts`）、跨模块业务展示件与像素通用组件 |
-| `apps/web/src/features/<概念>/` | 按概念划分的业务模块，跨 feature 仅经 `index.ts` 导入且无环（`src/layers.test.ts` 检查） |
+| `apps/web/src/features/<概念>/` | 按概念划分的业务模块，跨 feature 仅经 `index.ts` 导入，且按 `featureLayers`（`Primitives → Domain → Workbench → Settings`）单向依赖无环（`src/layers.test.ts` 检查） |
 | `apps/web/src/farm/`、`tree/` | 像素农场与记忆树皮肤层 |
 | `apps/web/src/app/` | 顶层路由表（`App.tsx`）、侧栏导航（`places.ts`）与外框（`Shell.tsx`） |
 | `packages/stories/`、`apps/web/src/stories.tsx` | 按「设计体系 / 组件 / 交互 / 界面」四层组织的组件故事查看器 |

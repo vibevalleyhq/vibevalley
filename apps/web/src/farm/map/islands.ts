@@ -1,13 +1,13 @@
 import { t } from "@vibevalley/i18n";
-import { type Crop, type Issue, maxRunning, type PlotView, type RepoSummary, type Session } from "@vibevalley/protocol";
-import { isBusy, phaseText, plotKeyOf, roomLeft } from "@vibevalley/protocol/rules";
+import { type Crop, type Issue, maxRunning, type PlotView, type RepoSummary, type SessionView } from "@vibevalley/protocol";
+import { isBusy, issueScopeOf, phaseText, plotKeyOf, roomLeft } from "@vibevalley/protocol/rules";
 
 import { compareText, or } from "#/base/search.ts";
 import { type Recency, recencyOf } from "#/features/repo/index.ts";
 import type { Pose } from "#/ui/domain/cast.ts";
 
 type Spot =
-  | { readonly kind: "taken"; readonly session: Session; readonly plot: PlotView; readonly issue?: Issue }
+  | { readonly kind: "taken"; readonly session: SessionView; readonly plot: PlotView; readonly issue?: Issue }
   | { readonly kind: "open" }
   | { readonly kind: "shut" };
 
@@ -36,7 +36,7 @@ export function islandsOf({
   issues,
 }: {
   repos: readonly RepoSummary[];
-  sessions: readonly Session[];
+  sessions: readonly SessionView[];
   plots: Readonly<Record<string, PlotView>>;
   issues: readonly Issue[];
 }): Island[] {
@@ -54,7 +54,8 @@ export function islandsOf({
     const open = Math.min(room, left.farm);
     const spots: Spot[] = [
       ...mine.map((h): Spot => {
-        const issue = issues.find((issue) => issue.id === h.issue);
+        const issueId = issueScopeOf(h);
+        const issue = issueId ? issues.find((issue) => issue.id === issueId) : undefined;
         return { kind: "taken", session: h, plot: plots[plotKeyOf(h)] ?? { crop: "seeded" }, ...(issue ? { issue } : {}) };
       }),
       ...Array.from({ length: open }, (): Spot => ({ kind: "open" })),
@@ -66,7 +67,7 @@ export function islandsOf({
   return islands.toSorted((a, b) => or(quiet(a) - quiet(b), (b.summary?.last ?? 0) - (a.summary?.last ?? 0), compareText(a.repo, b.repo)));
 }
 
-export const homeless = (sessions: readonly Session[]) => sessions.filter((h) => h.repo === undefined);
+export const homeless = (sessions: readonly SessionView[]) => sessions.filter((h) => h.repo === undefined);
 
 export const mapTally = (islands: readonly Island[]) => ({
   peopled: islands.filter((i) => i.spots.some((s) => s.kind === "taken")).length,
@@ -111,9 +112,9 @@ export function plotsIn(yard: Rect, n: number): { x: number; y: number }[] {
 /** Where a helper stands from its plot's foot. */
 export const sessionInPlot = { x: 0, y: -10 };
 
-const handedBack = (h: Session) => h.phase._tag === "done" || h.phase._tag === "resting";
+const handedBack = (h: SessionView) => h.phase._tag === "done" || h.phase._tag === "resting";
 
-export function mapPose(h: Session, conflict = false): Pose {
+export function mapPose(h: SessionView, conflict = false): Pose {
   if ((handedBack(h) && conflict) || h.phase._tag === "failed") return "worry";
   switch (h.phase._tag) {
     case "working":
@@ -128,7 +129,7 @@ export function mapPose(h: Session, conflict = false): Pose {
 export function spotText(spot: Spot, now: number) {
   switch (spot.kind) {
     case "taken":
-      return `${spot.session.name} · ${phaseText(spot.session, now, spot.issue?.conflict)}${spot.session.branch ? t("web.farm.map.island.branch", { branch: spot.session.branch }) : ""}`;
+      return `${spot.session.name} · ${phaseText(spot.session, now)}${spot.session.branch ? t("web.farm.map.island.branch", { branch: spot.session.branch }) : ""}`;
     case "open":
       return t("web.farm.map.island.open");
     case "shut":

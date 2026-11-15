@@ -5,10 +5,10 @@ import { type Db, openDb } from "#/infra/db.ts";
 import { keptLog } from "#/infra/log.ts";
 import { type Time, wallTime } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
+import { makeMemory, type Memory, type MemoryOptions } from "#/modules/memory/memory.ts";
 import { makeSetting, type Setting } from "#/platform/setting/setting.ts";
-import { testAgent } from "#/testing/agent.ts";
 
-import { makeMemory, type Memory, type MemoryOptions } from "./memory.ts";
+import { testAgent } from "./agent.ts";
 
 /** The memory service and what it stands on, for a test: closed in reverse when disposed. */
 export interface MemoryWorld extends AsyncDisposable {

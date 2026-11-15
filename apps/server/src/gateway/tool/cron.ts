@@ -6,8 +6,8 @@ import { answers, cronLine, parseTime } from "./prompts.ts";
 import { answered, callerOf, refuse, tool, type Orchestrator } from "./schemas.ts";
 import type { ToolDeps } from "./tool.ts";
 
-export function cronTools(deps: Pick<ToolDeps, "channel" | "issue">) {
-  const { channel: chat, issue: issues } = deps;
+export function cronTools(deps: Pick<ToolDeps, "channel" | "cron">) {
+  const { channel: chat, cron: crons } = deps;
 
   const cronCreate = (who: Who) =>
     tool("cron.create", (p: Orchestrator<"cron.create">) =>
@@ -40,7 +40,7 @@ export function cronTools(deps: Pick<ToolDeps, "channel" | "issue">) {
           case "weekly":
             when = { kind: "weekly", days: (w.days ?? []).map((d) => Math.trunc(d)), time: w.time ?? "" };
         }
-        const made = await issues.addCron(
+        const made = await crons.add(
           {
             name: p.name,
             text: p.text,
@@ -58,14 +58,14 @@ export function cronTools(deps: Pick<ToolDeps, "channel" | "issue">) {
     );
 
   const cronList = tool("cron.list", async () => {
-    const all = issues.crons();
+    const all = crons.list();
     if (all.length === 0) return answers.listCrons.none;
     const names = new Map((await chat.channels()).map((c) => [c.id, c.name]));
     return all.map((s) => cronLine(s, names.get(s.channel) ?? "?")).join("\n");
   });
 
   const cronDelete = tool("cron.delete", (p: Orchestrator<"cron.delete">) =>
-    answered(async () => answers.cancelCron.canceled((await issues.removeCron(p.id)).name)),
+    answered(async () => answers.cancelCron.canceled((await crons.remove(p.id)).name)),
   );
   return { cronCreate, cronList, cronDelete };
 }

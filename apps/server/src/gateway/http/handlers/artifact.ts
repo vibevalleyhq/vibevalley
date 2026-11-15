@@ -1,11 +1,11 @@
 import { userId } from "@vibevalley/protocol";
 import type { ArtifactHandlers } from "@vibevalley/protocol/api";
 
-import type { Agent } from "#/modules/agent/agent.ts";
+import type { ProfileStore } from "#/modules/agent/agent.ts";
 import type { Artifact } from "#/modules/artifact/artifact.ts";
 import type { Issue } from "#/modules/issue/issue.ts";
 
-export function artifactHandlers(deps: { readonly agent: Agent; readonly artifact: Artifact; readonly issue: Issue }): ArtifactHandlers {
+export function artifactHandlers(deps: { readonly agent: ProfileStore; readonly artifact: Artifact; readonly issue: Issue }): ArtifactHandlers {
   const { agent: agents, artifact: artifacts, issue: issues } = deps;
   return {
     "artifact.list": async ({ channel, issue }) => {

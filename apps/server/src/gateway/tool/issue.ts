@@ -3,13 +3,14 @@ import { z } from "zod";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { isApiError } from "@vibevalley/protocol/api";
-import { assignedAgentOf, closedText, latestSessionIdOf, phaseText, shortTitle } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, closedText, issueScopeOf, latestSessionIdOf, shortTitle } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import type { Who } from "#/base/actor.ts";
 import { head } from "#/base/clip.ts";
 import { AgentChoiceRefused, IssueCreateRefused } from "#/modules/issue/issue.ts";
 import { openFindings } from "#/modules/issue/status.ts";
+import { phaseText } from "#/modules/session/report.ts";
 import { IssueReportMemory } from "#/modules/session/schema.ts";
 
 import {
@@ -108,7 +109,10 @@ export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "ses
 
   const nobodyOn = (item: T.Issue) => answers.nobodyOn(item.number);
 
-  const numberOf = (session: T.Session) => (session.issue ? issue.onBoard().find((item) => item.id === session.issue)?.number : undefined);
+  const numberOf = (session: T.Session) => {
+    const id = issueScopeOf(session);
+    return id ? issue.onBoard().find((item) => item.id === id)?.number : undefined;
+  };
 
   const roster = tool("session.list", () => {
     const all = run.hired();
@@ -288,19 +292,13 @@ export function issueTools(deps: Pick<ToolDeps, "clock" | "log" | "agent" | "ses
       try {
         const c = callerOf(who);
         return await withIssue(p.id, async (item) => {
-          let agent: string | undefined;
-          if (p.agent) {
-            const a = agents.named(p.agent);
-            if (!a) return answers.noProfileNamed(p.agent);
-            agent = a.id;
-          }
           const done = await issue.edit(
             item.id,
             {
               ...(p.title !== undefined ? { title: p.title } : {}),
               ...(p.description !== undefined ? { description: p.description } : {}),
               ...(p.repo !== undefined ? { repo: p.repo } : {}),
-              ...(agent ? { agent } : {}),
+              ...(p.agent ? { agent: p.agent } : {}),
               ...(p.priority ? { priority: p.priority } : {}),
               ...(p.deliver ? { deliver: p.deliver } : {}),
               ...(p.criteria !== undefined ? { criteria: p.criteria } : {}),

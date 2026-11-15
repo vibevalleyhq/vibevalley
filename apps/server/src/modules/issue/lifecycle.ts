@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { assignedAgentOf, executionsOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, issueScopeOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
@@ -11,7 +11,7 @@ import type { Core } from "#/core/core.ts";
 import { causeMessage, type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
+import type { ProfileStore } from "#/modules/agent/agent.ts";
 import type { PullRequest, PullRequestState } from "#/modules/repo/repo.ts";
 import { NotRecorded, type Session } from "#/modules/session/session.ts";
 import type { Trigger, SessionClose } from "#/modules/session/shapes.ts";
@@ -35,7 +35,7 @@ const closingOf = (closed: SessionClose | undefined): { delivered: Landing } | {
 /** What every part of the issue module reads and writes the issues with. */
 export interface IssueParts {
   readonly core: Core;
-  readonly agent: Agent;
+  readonly agent: ProfileStore;
   readonly session: Session;
   /** The issues' pool: what a dispatch is kept in until the issue's helper is sent. */
   readonly intake: Pick<Intake, "queueDispatch" | "withdrawDispatches">;
@@ -68,7 +68,7 @@ export async function issueLifecycle(deps: IssueParts) {
     if (bySession) return bySession;
     const hired = sessions.hired();
     const byName = hired.find((s) => s.name === r) ?? hired.find((s) => s.name !== "" && r.includes(s.name));
-    return byName?.issue ?? issueId(r);
+    return (byName ? issueScopeOf(byName) : undefined) ?? issueId(r);
   };
 
   const get = async (ref: string): Promise<T.Issue> => {
@@ -299,7 +299,7 @@ export async function issueLifecycle(deps: IssueParts) {
     await publish(id);
   };
 
-  const setConflict = async (id: T.IssueId, conflict: T.Conflict | undefined) => {
+  const setConflict = async (id: T.IssueId, conflict: T.Issue["conflict"]) => {
     const current = await store.byId(id);
     if (!current) return;
     const stored = conflict ? jsonOrNull(conflict, true) : null;

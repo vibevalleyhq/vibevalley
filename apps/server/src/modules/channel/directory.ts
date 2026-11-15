@@ -8,8 +8,7 @@ import type { Db } from "#/infra/db.ts";
 import type { Time } from "#/infra/time.ts";
 import * as qc from "#db/channel.sql.ts";
 
-import { type ChannelService, infoOf, notifyOf, optional, theRow } from "./contracts.ts";
-import { type ChannelHub, threadTitleMax } from "./hub.ts";
+import { type ChannelHub, type ChannelService, infoOf, notifyOf, optional, theRow, threadTitleMax } from "./contracts.ts";
 import { channelNameProblem } from "./mentions.ts";
 
 const refused = refuseIn(BizCode.ChannelRefused);

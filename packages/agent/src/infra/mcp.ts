@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -6,10 +8,9 @@ import { z } from "zod";
 
 import { isRecord } from "../base/json.ts";
 import { mcpConfig, mcp as mcpWords } from "../base/prompts.ts";
-import { AgentFailed, messageOf, ToolFailed } from "../core/errors.ts";
+import { AgentFailed, agentFailed, errnoOf, messageOf, ToolFailed } from "../core/errors.ts";
 import type { JsonSchema } from "../core/schema.ts";
 import { runTool, type Tool } from "../core/tool.ts";
-import { type AgentFs, agentFsOf } from "./fs.ts";
 import { type AgentLog, consoleLog } from "./log.ts";
 import { asTransport } from "./mcpTransport.ts";
 import { failAfterRealTime } from "./realTime.ts";
@@ -209,8 +210,13 @@ const McpEntrySchema = z.object({
 const McpConfigSchema = z.object({ mcpServers: z.exactOptional(z.record(z.string(), McpEntrySchema)) });
 
 /** A missing file has none; unreadable JSON or a wrong shape is an AgentFailed. */
-export async function readMcpConfig(path: string, fs?: AgentFs): Promise<McpServer[]> {
-  const raw = await agentFsOf(fs).readTextIfExists(path);
+export async function readMcpConfig(path: string): Promise<McpServer[]> {
+  let raw: string | undefined;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch (e) {
+    if (errnoOf(e) !== "ENOENT") throw agentFailed(e);
+  }
   const data = raw ?? "{}";
   if (data.trim() === "") throw new AgentFailed(mcpConfig.notJson(path));
   let json: unknown;

@@ -1,4 +1,5 @@
 import type { Issue, RepoSummary, Session } from "@vibevalley/protocol";
+import { issueScopeOf } from "@vibevalley/protocol/rules";
 
 export interface TerminalTab {
   readonly id: string;
@@ -73,8 +74,9 @@ export function workspaceFoldersOf(repos: readonly RepoSummary[], issues: readon
   const worktreesByRepo = new Map<string, Map<string, WorktreeFolder>>();
 
   for (const session of sessions) {
-    if (!session.worktree || !session.repo || !session.issue) continue;
-    const issue = issueById.get(session.issue);
+    const issueId = issueScopeOf(session);
+    if (!session.worktree || !session.repo || !issueId) continue;
+    const issue = issueById.get(issueId);
     if (!issue || issue.status === "done" || issue.status === "canceled") continue;
     let map = worktreesByRepo.get(session.repo);
     if (!map) {

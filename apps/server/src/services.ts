@@ -8,6 +8,7 @@ import { type Agent, type AgentOptions, makeAgent } from "#/modules/agent/agent.
 import { type Artifact, makeArtifact } from "#/modules/artifact/artifact.ts";
 import { type Channel, makeChannel } from "#/modules/channel/channel.ts";
 import { type Game, makeGame } from "#/modules/game/game.ts";
+import { type Cron, makeCron } from "#/modules/issue/cron.ts";
 import { type Issue, makeIssue } from "#/modules/issue/issue.ts";
 import { makeMedia, type Media } from "#/modules/media/media.ts";
 import { makeMemory, type Memory, type MemoryOptions } from "#/modules/memory/memory.ts";
@@ -75,6 +76,7 @@ export interface Farm extends AsyncDisposable {
   readonly artifact: Artifact;
   readonly pkm: Pkm;
   readonly issue: Issue;
+  readonly cron: Cron;
   readonly watch: Watch;
   readonly tool: Tool;
   readonly orchestrator: Orchestrator;
@@ -145,6 +147,7 @@ export type Modules = Pick<
   | "artifact"
   | "pkm"
   | "issue"
+  | "cron"
   | "watch"
 >;
 
@@ -159,10 +162,10 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
   const own = owning(closes);
   // Platform: the database first (closed last), then the core state and the services every module uses.
   const db = own(await openDb(config, log.child("db"), clock));
-  const projection = makeProjection();
+  const setting = own(await makeSetting({ config, clock, log }));
+  const projection = makeProjection({ locale: setting.locale });
   const core = own(makeCore({ projection, clock }));
   heard?.(core);
-  const setting = own(await makeSetting({ config, clock, log }));
   const user = own(await makeUser({ db, clock, log }));
   const attachment = own(await makeAttachment({ config, clock, db }));
   const provider = own(await makeProvider({ setting, fetch, clock, log }));
@@ -181,6 +184,7 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
   const pkm = own(await makePkm({ config, clock, log, db }));
   // Issues: the issues and what runs on a schedule.
   const issue = own(await makeIssue({ config, clock, log, db, core, agent, repo, session, channel }));
+  const cron = own(await makeCron({ config, clock, log, db, core, agent, channel, session, issue }));
   // Watch: the chat's committed events routed to the sessions through the brakes, their threads, talks and receipts in
   // the chat; the user's inbox and the patrol.
   const watch = own(await makeWatch({ config, clock, log, db, core, agent, session, channel, issue }));
@@ -206,6 +210,7 @@ export async function buildModules(config: ServerConfig, options: ServiceOptions
     artifact,
     pkm,
     issue,
+    cron,
     watch,
   };
 }
@@ -217,12 +222,14 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
   const own = owning(closes);
   try {
     const modules = await buildModules(config, options, closes);
-    const { clock, log, fetch, db, core, setting, user, agent, memory, repo, session, channel, media, artifact, pkm, watch, issue } = modules;
+    const { clock, log, fetch, db, core, setting, user, agent, memory, repo, session, channel, media, artifact, pkm, watch, issue, cron } = modules;
     const { provider } = modules;
-    // Gateway's tools first: the orchestrator holds them (OrchestratorTools), and /mcp serves them to sessions.
-    const tool = own(await makeTool({ clock, log, agent, session, issue, channel, memory, media, pkm, artifact, repo }));
+    // Farm tools first (Tools layer in modules.ts): the orchestrator holds them (OrchestratorTools), and /mcp serves them to sessions.
+    const tool = own(await makeTool({ clock, log, agent, session, issue, cron, channel, memory, media, pkm, artifact, repo }));
     // Orchestrator: the agent that hands the user's work to helpers.
-    const orchestrator = own(await makeOrchestrator({ clock, log, config, agent, repo, pkm, session, channel, issue, tools: tool }, options.orchestrator));
+    const orchestrator = own(
+      await makeOrchestrator({ clock, log, config, agent, repo, pkm, session, channel, issue, cron, tools: tool }, options.orchestrator),
+    );
     // Gamification: the ledger, progress and achievements, from events only.
     const game = own(await makeGame({ config, clock, log, db, core, repo }));
     // Gateway: every way in from outside; http/app.ts mounts the HTTP API on these services.
@@ -240,6 +247,7 @@ export async function makeFarm(config: ServerConfig, options: ServiceOptions = {
     // What media waited for.
     await media.boot();
     await issue.boot();
+    await cron.boot();
     // The sessions' threads, the chat's events after the watch's cursor (routed through the brakes, each once), then the
     // inbox as it stands and the patrol's rounds.
     await watch.boot();

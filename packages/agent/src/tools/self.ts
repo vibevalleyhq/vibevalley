@@ -3,7 +3,6 @@ import { z } from "zod";
 import { self as selfWords } from "../base/prompts.ts";
 import { ToolFailed, toolFailed } from "../core/errors.ts";
 import { schemaTool, type Tool } from "../core/tool.ts";
-import type { AgentFs } from "../infra/fs.ts";
 import { type AgentLog, consoleLog } from "../infra/log.ts";
 import { fileMemory, type MemoryPort } from "./memory.ts";
 import { readSkill, type SkillInfo } from "./skills.ts";
@@ -15,7 +14,6 @@ export interface SelfOptions {
   /** Scanned each time it asks. */
   readonly skills: () => Promise<SkillInfo[]>;
   readonly memory: boolean | MemoryPort;
-  readonly fs?: AgentFs;
   readonly log?: AgentLog;
 }
 
@@ -29,12 +27,12 @@ async function asTool<A>(f: () => Promise<A>): Promise<A> {
 }
 
 export function selfTools(o: SelfOptions): Tool[] {
-  const memory = o.memory === true ? fileMemory(o.home, o.now, o.fs, o.log ?? consoleLog) : o.memory === false ? undefined : o.memory;
+  const memory = o.memory === true ? fileMemory(o.home, o.now, o.log ?? consoleLog) : o.memory === false ? undefined : o.memory;
   const loadSkill = schemaTool({
     name: "load_skill",
     description: selfWords.loadSkillDescription,
     parameters: z.object({ name: z.string() }),
-    run: async (p) => readSkill(await o.skills(), p.name, o.fs),
+    run: async (p) => readSkill(await o.skills(), p.name),
   });
   const rememberTool = schemaTool({
     name: "remember",

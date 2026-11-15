@@ -1,8 +1,8 @@
 import type { JSX } from "@solidjs/web";
 import { For, Match, Show, Switch } from "solid-js";
 
-import { type ChatMessage, type Phase, type SessionView } from "@vibevalley/protocol";
-import { actorRoleOf, spanText } from "@vibevalley/protocol/rules";
+import { type ChatMessage, type Phase } from "@vibevalley/protocol";
+import { actorRoleOf } from "@vibevalley/protocol/rules";
 
 import { useAgent } from "#/infra/agents.ts";
 import { useCore } from "#/infra/frame.ts";
@@ -14,15 +14,9 @@ const viewStyles = {
   glyphSize: (size: number): JSX.CSSProperties => ({ width: `${size}px`, height: `${size}px` }),
   thinkingTiming: (delay: number): JSX.CSSProperties => ({ "animation-delay": `${delay}ms` }),
 };
-const span = spanText;
 
 export { Dot } from "#/ui/Tag.tsx";
-
-/** The server's words for what the session is doing, how long it has been quiet filled in by the clock. */
-export function phaseText(h: SessionView, now: number) {
-  const words = h.phaseText;
-  return h.phase._tag === "working" && h.phase.quietSince !== undefined ? words.replaceAll("{span}", span(now - h.phase.quietSince)) : words;
-}
+export { phaseText } from "@vibevalley/protocol/rules";
 
 export type DotTone = "leaf" | "berry" | "wheat";
 

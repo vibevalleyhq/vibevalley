@@ -1,12 +1,23 @@
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
-import { farmOf, needOf, omitUndefined, plotKeyOf } from "@vibevalley/protocol/rules";
+import { farmOf, issueScopeOf, omitUndefined, plotKeyOf, same } from "@vibevalley/protocol/rules";
 
-import type { Fact, SessionPlay } from "#/core/core.ts";
-import { type AchievementDef, achievements } from "#/modules/agent/seed.ts";
+import type { Fact } from "#/core/core.ts";
 import { openFindings } from "#/modules/issue/status.ts";
+import { needOf } from "#/modules/session/report.ts";
 import { isHired, isOnDuty, sessionOf } from "#/modules/session/roster.ts";
+import type { Doing } from "#/modules/session/shapes.ts";
+
+import { type AchievementDef, achievements } from "./seeds.ts";
+
+export interface PlayAction extends Doing {
+  readonly at: number;
+}
+
+export interface SessionPlay extends Omit<T.SessionPlayView, "history"> {
+  readonly history: readonly PlayAction[];
+}
 
 const historyLimit = 30;
 
@@ -19,7 +30,7 @@ export const emptyPlay = (): SessionPlay => ({ station: -1, history: [], toolsTh
 export const playOf = (plays: Readonly<Record<string, SessionPlay>> | undefined, id: string): SessionPlay => plays?.[id] ?? emptyPlay();
 
 /** -1 when no station on this repo's farm is free. */
-export function freeStation(plays: Readonly<Record<string, SessionPlay>> | undefined, sessions: readonly T.Session[], repo: string, prefer?: number): number {
+function freeStation(plays: Readonly<Record<string, SessionPlay>> | undefined, sessions: readonly T.Session[], repo: string, prefer?: number): number {
   const taken = new Set(sessions.filter((h) => farmOf(h) === repo).map((h) => playOf(plays, h.id).station));
   if (prefer !== undefined && prefer >= 0 && prefer < maxRunning && !taken.has(prefer)) return prefer;
   for (let i = 0; i < maxRunning; i++) if (!taken.has(i)) return i;
@@ -44,14 +55,14 @@ const isToolAction = (action: T.SessionAction) =>
   action === "wait" ||
   action === "other";
 
-export const playedRun = (p: SessionPlay, at: number): SessionPlay => ({
+const playedRun = (p: SessionPlay, at: number): SessionPlay => ({
   ...p,
   toolsThisRun: 0,
   runStartedAt: at,
   history: lastN([...p.history, { at, action: "thinking", label: "" }], historyLimit),
 });
 
-export const playedDoing = (p: SessionPlay, f: { readonly at: number; readonly action: T.SessionAction; readonly label: string }): SessionPlay => {
+const playedDoing = (p: SessionPlay, f: { readonly at: number; readonly action: T.SessionAction; readonly label: string }): SessionPlay => {
   const history = p.history;
   const last = history[history.length - 1];
   if (last && last.action === f.action && last.label === f.label) return p;
@@ -65,15 +76,63 @@ export const playedDoing = (p: SessionPlay, f: { readonly at: number; readonly a
 };
 
 /** Only to a bed that is free on its own farm; a session already there, or a bed taken, changes nothing. */
-export const stationed = (state: T.SpaceState, f: { readonly id: T.SessionId; readonly station: number }): [T.SpaceState, boolean] => {
-  const h = sessionOf(state, f.id);
-  const plays = state.plays ?? {};
+const stationed = (
+  plays: Readonly<Record<string, SessionPlay>>,
+  sessions: readonly T.Session[],
+  f: { readonly id: T.SessionId; readonly station: number },
+): [Readonly<Record<string, SessionPlay>>, boolean] => {
+  const h = sessions.find((x) => x.id === f.id);
   const play = playOf(plays, f.id);
-  if (!h || play.station === f.station) return [state, false];
-  const others = state.sessions.filter((x) => x.id !== f.id);
-  if (freeStation(state.plays, others, farmOf(h), f.station) !== f.station) return [state, false];
-  return [{ ...state, plays: { ...plays, [f.id]: { ...play, station: f.station } } }, true];
+  if (!h || play.station === f.station) return [plays, false];
+  const others = sessions.filter((x) => x.id !== f.id);
+  if (freeStation(plays, others, farmOf(h), f.station) !== f.station) return [plays, false];
+  return [{ ...plays, [f.id]: { ...play, station: f.station } }, true];
 };
+
+/** Folds a fact into the farm's per-session station and step history, from the sessions before the fact. */
+export function reducePlay(
+  plays: Readonly<Record<string, SessionPlay>>,
+  before: { readonly sessions: readonly T.Session[] },
+  f: Fact,
+): [Readonly<Record<string, SessionPlay>>, boolean] {
+  switch (f.type) {
+    case "sessionPhaseChanged": {
+      const session = before.sessions.find((h) => h.id === f.id);
+      if (
+        !session ||
+        (same(session.phase, f.phase) &&
+          session.channel === f.channel &&
+          (f.spent === undefined || same(session.spent, f.spent)) &&
+          (f.brief === undefined || f.brief === session.brief))
+      )
+        return [plays, false];
+      const prev = playOf(plays, f.id);
+      const play =
+        f.phase._tag === "working"
+          ? session.phase._tag === "working"
+            ? playedDoing(prev, { at: f.at, action: f.phase.doing.action, label: f.phase.doing.label })
+            : playedRun(prev, f.at)
+          : prev;
+      return [{ ...plays, [f.id]: play }, true];
+    }
+    case "sessionChanged": {
+      if (isOnDuty(f.session)) return [plays, false];
+      const others = before.sessions.filter((h) => h.id !== f.session.id);
+      const was = before.sessions.some((h) => h.id === f.session.id);
+      const play = was ? playOf(plays, f.session.id) : { ...emptyPlay(), station: freeStation(plays, others, farmOf(f.session)) };
+      return [{ ...plays, [f.session.id]: play }, true];
+    }
+    case "sessionLeft": {
+      const next = { ...plays };
+      delete next[f.id];
+      return [next, true];
+    }
+    case "progressChanged":
+      return f.station !== undefined ? stationed(plays, before.sessions, f.station) : [plays, false];
+    default:
+      return [plays, false];
+  }
+}
 
 const xpToNext = (level: number) => 10 * level;
 
@@ -218,7 +277,7 @@ export function effectsOf(before: T.SpaceState, fact: Fact): T.GameEffect[] {
 }
 
 /** A plot is its issue, so a reopened issue's new session draws on the same one; if two are here, the later hired. */
-export function viewOf(state: T.SpaceState): T.FarmView {
+export function viewOf(state: T.SpaceState, plays: Readonly<Record<string, SessionPlay>> = {}): T.FarmView {
   const latest = new Map<string, T.Session>();
   for (const h of state.sessions) {
     if (isOnDuty(h)) continue;
@@ -229,8 +288,10 @@ export function viewOf(state: T.SpaceState): T.FarmView {
   const issuesById = new Map<string, T.Issue>();
   for (const item of state.issues) issuesById.set(item.id, item);
   const plots: Record<string, T.PlotView> = {};
-  const plays = state.plays ?? {};
-  for (const [key, h] of latest) plots[key] = plotOf(h, h.issue === undefined ? undefined : issuesById.get(h.issue), playOf(plays, h.id));
+  for (const [key, h] of latest) {
+    const issue = issueScopeOf(h);
+    plots[key] = plotOf(h, issue === undefined ? undefined : issuesById.get(issue), playOf(plays, h.id));
+  }
   const played: Record<string, T.SessionPlayView> = {};
   for (const h of state.sessions) {
     const play = plays[h.id] ?? emptyPlay();

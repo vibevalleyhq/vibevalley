@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import { defaultOrchestrator } from "@vibevalley/protocol";
 import { ApiError, BizCode } from "@vibevalley/protocol/api";
-import { executionsOf } from "@vibevalley/protocol/rules";
+import { executionsOf, issueScopeOf } from "@vibevalley/protocol/rules";
 
 import { user } from "#/base/actor.ts";
 import type { ServerConfig } from "#/infra/config.ts";
@@ -510,7 +510,7 @@ describe("the orchestrator", () => {
     const lab = await enableLab(f.farm);
     const hired = await issues.hire({ ...lab, enabled: true, effort: "" }, "写个 hello", "notes");
     helper = hired.session.id;
-    const issueId = hired.session.issue!;
+    const issueId = issueScopeOf(hired.session)!;
     number = (await issues.get(issueId)).number;
     await until(() => sessions.hired().some((session) => session.id === helper && session.phase._tag === "done"), "the work handed back");
     await chat.speak({ from: helper, text: "@助手 用户同意了，直接收", anyway: true });
@@ -577,15 +577,15 @@ describe("the orchestrator", () => {
       if (line.includes("每天九点") || line.includes("定时任务")) return answer([toolCall("cron_create", daily)]);
       return respond(c);
     }, testConfig());
-    const { issue: crons, channel: chat } = f.farm;
+    const { cron: crons, channel: chat } = f.farm;
     const words = said(f.farm);
     // Woken by a cron, not the user: what it sets to come back daily waits.
-    await crons.addCron({ name: "看进度", text: "看看", when: { kind: "once", at: f.farm.clock.now() + 50 } }, user);
+    await crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: f.farm.clock.now() + 50 } }, user);
     // The farm's clock, not a wait, brings it due.
     clock.adjust(100);
-    await crons.tickCrons();
+    await crons.tick();
     await until(() => words().some((w) => w.startsWith("定时任务：定好了，等用户同意才生效")), "the orchestrator told it waits");
-    const mine = (enabled: boolean) => crons.crons().filter((s) => s.name === "每日测试" && s.enabled === enabled);
+    const mine = (enabled: boolean) => crons.list().filter((s) => s.name === "每日测试" && s.enabled === enabled);
     expect(mine(false)).toMatchObject([{ pending: true, by: "agent" }]);
     await chat.say({ text: "每天九点跑一遍测试", sendKey: "" });
     const on = await until(() => mine(true).length === 1 && mine(true), "the user's cron on");
@@ -597,11 +597,11 @@ describe("the orchestrator", () => {
   it("leaves its issue for the user to take as done", async () => {
     using clock = fakeDate();
     await using f = await farm(respond, testConfig());
-    const { issue: issues, core } = f.farm;
-    const s = await issues.addCron({ name: "看进度", text: "看看", when: { kind: "once", at: f.farm.clock.now() + 50 } }, user);
+    const { issue: issues, cron: crons, core } = f.farm;
+    const s = await crons.add({ name: "看进度", text: "看看", when: { kind: "once", at: f.farm.clock.now() + 50 } }, user);
     // The farm's clock, not a wait, brings it due.
     clock.adjust(100);
-    await issues.tickCrons();
+    await crons.tick();
     const handed = await until(() => core.state().issues.find((t) => t.cron === s.id && t.status === "in_review"), "handed back");
     const id = handed.id;
     expect(handed.closedAt).toBeUndefined();

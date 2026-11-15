@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { AgentRoleValues } from "../agent/shapes";
 import type { Codec } from "../codec";
-import { IssueId, Outcome, Retry, SessionId, Spent } from "../common/schema";
+import { Outcome, Retry, SessionId, Spent } from "../common/schema";
 import * as T from "./shapes";
 
 const SessionAction = z.enum(T.SessionActionValues) satisfies Codec<T.SessionAction>;
@@ -40,20 +40,17 @@ export const Phase = z.discriminatedUnion("_tag", [PhaseWorking, PhaseDone, Phas
 
 const PhaseView = z.discriminatedUnion("_tag", [PhaseWorkingView, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]) satisfies Codec<T.PhaseView>;
 
-export const IssueAnswer = z.object({
-  conclusion: z.string(),
-  evidence: z.array(z.string()),
-  unsure: z.array(z.string()),
-  next: z.array(z.string()),
-}) satisfies Codec<T.IssueAnswer>;
-
 export const LastRun = z.object({
   outcome: Outcome,
   summary: z.string(),
   at: z.number(),
   spent: z.exactOptional(Spent),
-  answer: z.exactOptional(IssueAnswer),
 }) satisfies Codec<T.LastRun>;
+
+const SessionScope = z.object({
+  kind: z.enum(T.SessionScopeKindValues),
+  id: z.string(),
+}) satisfies Codec<T.SessionScope>;
 
 const ToolConnection = z.object({
   server: z.string(),
@@ -76,8 +73,7 @@ const sessionFields = {
   lastRun: z.exactOptional(LastRun),
   spent: z.exactOptional(Spent),
   channel: z.exactOptional(z.string()),
-  issue: z.exactOptional(IssueId),
-  refining: z.boolean(),
+  scope: z.exactOptional(SessionScope),
   toolConnections: z.exactOptional(z.array(ToolConnection)),
   machine: z.exactOptional(z.string()),
 };
@@ -132,7 +128,6 @@ export const RunTrigger = z.object({
 export const Run = z.object({
   id: z.string(),
   session: SessionId,
-  issue: z.exactOptional(IssueId),
   triggeredBy: RunTrigger,
   heard: z.array(z.string()),
   startedAt: z.number(),

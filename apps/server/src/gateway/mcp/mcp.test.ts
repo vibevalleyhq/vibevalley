@@ -6,6 +6,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import type * as T from "@vibevalley/protocol";
 import { userId } from "@vibevalley/protocol";
+import { issueScopeOf } from "@vibevalley/protocol/rules";
 import { blockId, sessionId } from "@vibevalley/protocol/schema";
 
 import { user } from "#/base/actor.ts";
@@ -63,7 +64,6 @@ const hired = (core: Core, s: Partial<T.Session> & { id: string }) =>
       runs: 0,
       phase: { _tag: "working", since: 0, doing: { action: "thinking", label: "" } },
       ...s,
-      refining: false,
     },
   });
 
@@ -160,7 +160,7 @@ describe("mcp", () => {
     });
     expect(tool4).toContain("报告已记录");
     proceed.resolve();
-    const issue = got.session.issue!;
+    const issue = issueScopeOf(got.session)!;
     await waitFor(
       () => issues.get(issue),
       (item) => item.questions.length > 0,
@@ -254,7 +254,7 @@ describe("mcp", () => {
     await c.init();
     const made = await c.tool("artifact_create", { title: "两种详情", kind: "html", file: "out/two.html", note: "抽屉和整页" });
     expect(made).toContain("做好了");
-    const issue = sessions.live(id).session!.issue!;
+    const issue = issueScopeOf(sessions.live(id).session!)!;
     const [one] = await artifacts.list({ issue });
     expect(one).toMatchObject({ title: "两种详情", channel: thread, by: "lab", version: 1 });
     expect((await chat.history(thread!)).at(-1)!.artifact).toMatchObject({ id: one!.id, version: 1 });
@@ -371,9 +371,9 @@ describe("mcp", () => {
     expect(tool3).toContain("记下了（所有仓库）");
     // There is no profile to name: what it writes is its own, whatever it says.
     await tool("memory_create", { text: "冒名记一条", agent: "scout" });
-    expect((await memory.list("scout")).some((m) => m.text === "冒名记一条")).toBe(false);
+    expect((await memory.memoriesOf("scout")).memories.some((m) => m.text === "冒名记一条")).toBe(false);
     // What it wrote is its own, not the user's: the Memory tab says which helper wrote it.
-    for (const m of await memory.list("lab")) expect([m.author, m.session]).toEqual(["agent", "w1"]);
+    for (const m of (await memory.memoriesOf("lab")).memories) expect([m.author, m.session]).toEqual(["agent", "w1"]);
     const found = await tool("memory_search", { text: "测试" });
     expect(found).toContain("pnpm test");
     expect(found).not.toContain("make check");

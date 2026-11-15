@@ -2,19 +2,8 @@ import { z } from "zod";
 
 import { bodyChunks, bounded, type ProviderHttp, send } from "../base/http.ts";
 import { fromJson } from "../base/json.ts";
-import { badKey } from "./response.ts";
-
-class MossModelError extends Error {
-  override readonly name = "MossModelError";
-  readonly reason: "Credentials" | "Network" | "Timeout" | "HttpStatus" | "InvalidResponse" | "TooLarge";
-  declare readonly status?: number;
-
-  constructor(fields: { readonly reason: MossModelError["reason"]; readonly status?: number }) {
-    super(`MOSS models: ${fields.reason}`);
-    this.reason = fields.reason;
-    if (fields.status !== undefined) this.status = fields.status;
-  }
-}
+import { MossError } from "./error.ts";
+import { badKey, rejectedStatuses } from "./response.ts";
 
 const ModelList = z.object({
   object: z.literal("list"),
@@ -33,7 +22,7 @@ export const mossModels = (key: string, http: ProviderHttp): Promise<readonly { 
     15_000,
     http,
     async (signal) => {
-      if (badKey(key)) throw new MossModelError({ reason: "Credentials" });
+      if (badKey(key)) throw new MossError({ reason: "Credentials", outcome: "NotSubmitted" });
       const response = await send(
         http,
         "https://api.mosi.cn/v1/models",
@@ -46,20 +35,27 @@ export const mossModels = (key: string, http: ProviderHttp): Promise<readonly { 
           // The status is the answer; the body is only dropped.
           () => undefined,
         );
-        throw new MossModelError({ reason: "HttpStatus", status: response.status });
+        throw new MossError({
+          reason: "HttpStatus",
+          status: response.status,
+          outcome: rejectedStatuses.includes(response.status) ? "Rejected" : "Unknown",
+        });
       }
       let size = 0;
       const chunks: Uint8Array[] = [];
       for await (const chunk of bodyChunks(response, signal)) {
         size += chunk.byteLength;
-        if (size > 1 << 20) throw new MossModelError({ reason: "TooLarge" });
+        if (size > 1 << 20) throw new MossError({ reason: "TooLarge", outcome: "Unknown" });
         chunks.push(chunk);
       }
       const list = fromJson(ModelList, Buffer.concat(chunks).toString("utf8"));
-      if (list === undefined) throw new MossModelError({ reason: "InvalidResponse" });
-      if (list.data.length > 1000) throw new MossModelError({ reason: "TooLarge" });
+      if (list === undefined) throw new MossError({ reason: "InvalidResponse", outcome: "Unknown" });
+      if (list.data.length > 1000) throw new MossError({ reason: "TooLarge", outcome: "Unknown" });
       return list.data.map((model) => ({ id: model.id, owner: model.owned_by }));
     },
     // Transport errors contain authenticated requests; only safe classifications cross this boundary.
-    { timeout: () => new MossModelError({ reason: "Timeout" }), network: () => new MossModelError({ reason: "Network" }) },
+    {
+      timeout: () => new MossError({ reason: "Timeout", outcome: "Unknown" }),
+      network: () => new MossError({ reason: "Network", outcome: "Unknown" }),
+    },
   );

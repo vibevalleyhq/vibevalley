@@ -26,9 +26,8 @@ it("regression: a playground and call cannot own two connecting Live relays", as
   vi.stubGlobal("location", { href: "http://127.0.0.1/settings/moss", hostname: "127.0.0.1" });
   vi.stubGlobal("document", new EventTarget());
   vi.stubGlobal("window", Object.assign(new EventTarget(), { setInterval: () => 0 }));
-  const messages = { closed: () => "closed", noMic: () => "permission", formatError: String };
-  const playground = new MossLine(messages);
-  const call = new MossLine(messages);
+  const playground = new MossLine();
+  const call = new MossLine();
   try {
     await playground.start({ persona: "", instructions: "" });
     await call.start({ persona: "", instructions: "" });

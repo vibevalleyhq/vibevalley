@@ -5,9 +5,9 @@ import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { EventTokens, Outcome, SessionEvent, SessionEventType } from "@vibevalley/protocol";
-import { cut } from "@vibevalley/protocol/rules";
 import { SessionEvent as SessionEventSchema } from "@vibevalley/protocol/schema";
 
+import { cut } from "#/base/clip.ts";
 import { errnoOf } from "#/base/errors.ts";
 import { jsonOrNone } from "#/base/json.ts";
 import { type KeptFile, keptFile } from "#/infra/files.ts";

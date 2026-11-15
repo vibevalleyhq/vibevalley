@@ -80,11 +80,11 @@ describe("the plots", () => {
     plays: { s1: { station: 2 }, s2: { station: 2 }, s3: { station: 2 } },
     achievements: [],
   };
-  const session = { id: "s1", issue: "i1" } as never;
+  const session = { id: "s1", scope: { kind: "issue", id: "i1" } } as never;
   test("keyed by the issue; a bed shows its issue's crop, a reopened issue's new session too, a sprout before the view has it, cleared beds flower", () => {
     expect(cropOfBed(beds[2]!, [session], view as never)).toBe("leafy");
     expect(cropOfBed(beds[2]!, [{ ...(session as object), id: "s2" } as never], view as never)).toBe("leafy");
-    expect(cropOfBed(beds[2]!, [{ ...(session as object), id: "s3", issue: "i2" } as never], view as never)).toBe("sprout");
+    expect(cropOfBed(beds[2]!, [{ ...(session as object), id: "s3", scope: { kind: "issue", id: "i2" } } as never], view as never)).toBe("sprout");
     expect(cropOfBed(beds[0]!, [session], view as never)).toBe("empty");
     expect(cropOfBed(beds[6]!, [], view as never)).toBe("flowering");
     expect(cropOfBed(beds[7]!, [], view as never)).toBe("locked");

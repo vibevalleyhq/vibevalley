@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { htmlEdit } from "@vibevalley/artifact/html";
 import type { HtmlAnchor } from "@vibevalley/protocol";
-
-import { htmlEdit } from "./edit.ts";
 
 const words = (exact: string, prefix = "", suffix = ""): HtmlAnchor => ({ kind: "text", exact, prefix, suffix });
 const edited = (source: string, anchor: HtmlAnchor, text: string) => {

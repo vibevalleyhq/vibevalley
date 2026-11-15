@@ -1,4 +1,4 @@
-import { timeoutError } from "@vibevalley/async";
+import { withTimeout } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
@@ -7,7 +7,7 @@ import { bestEffort } from "#/infra/log.ts";
 import type { SpeechEvent, MediaAudioUsage, MediaInputReference } from "#/platform/provider/vendors.ts";
 
 import { type AudioStreamDeps, releaseAudioResult, saveAudioStream, type MediaInputs } from "./audioResult.ts";
-import { inTime, untilAborted } from "./job.ts";
+import { untilAborted } from "./job.ts";
 
 const refused = refuseIn(BizCode.MediaRefused);
 const streamMs = 5 * 60_000;
@@ -129,12 +129,12 @@ export async function receiveSpeechStream(
     }
   };
   try {
-    await inTime(
+    await withTimeout(
       async (within) => {
         for await (const event of untilAborted(events(within), within)) await take(event, within);
       },
       streamMs,
-      { clock: deps.clock, signal, timedOut: () => timeoutError(streamMs, "the speech stream") },
+      { clock: deps.clock, signal, what: "the speech stream" },
     );
   } catch (e) {
     if (signal.aborted) {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 
 import { answering, failure, hanging, shown, unreachable } from "../base/testing.ts";
-import { deleteMossFile, getMossFile, listMossFiles, uploadMossFile } from "./files.ts";
+import { deleteMossFile, uploadMossFile } from "./files.ts";
 import { understandMossMedia } from "./understanding.ts";
 
 const file = { id: "file-test", object: "file", bytes: 3, created_at: 42, filename: "image.png", purpose: "image", status: "processed" };
@@ -69,22 +69,13 @@ it.for([
   String.fromCharCode(0xd800),
   `file${String.fromCharCode(0)}`,
 ])("file IDs cannot escape the fixed endpoint %#", async (id) => {
-  const mossFileFailure = await failure(getMossFile("test-key", id, nowhere));
-  expect(mossFileFailure).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
   const mossFileDeletedFailure = await failure(deleteMossFile("test-key", id, nowhere));
   expect(mossFileDeletedFailure).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
 });
 
-it("lookup and deletion require receipts for the requested file", async () => {
-  const mossFile = await getMossFile("test-key", "file-test", answer(file));
-  expect(mossFile).toEqual(file);
+it("deletion requires a receipt for the requested file", async () => {
   const mossFileDeleted = await deleteMossFile("test-key", "file-test", answer({ id: "file-test", object: "file", deleted: true }));
   expect(mossFileDeleted).toEqual({ id: "file-test", object: "file", deleted: true });
-  const mossFileFailure = await failure(getMossFile("test-key", "file-other", answer(file)));
-  expect(mossFileFailure).toMatchObject({
-    reason: "InvalidResponse",
-    outcome: "Unknown",
-  });
   const mossFileDeletedFailure = await failure(deleteMossFile("test-key", "file-other", answer({ id: "file-test", object: "file", deleted: true })));
   expect(mossFileDeletedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
 });
@@ -92,19 +83,6 @@ it("lookup and deletion require receipts for the requested file", async () => {
 it.for([{ bytes: 4 }, { purpose: "video" }])("upload receipts must match the submitted bytes and purpose %#", async (change) => {
   const mossFileUploadedFailure = await failure(uploadMossFile("test-key", input, answer({ ...file, ...change })));
   expect(mossFileUploadedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
-});
-
-it.for([{ limit: 0 }, { limit: 201 }, { offset: -1 }, { offset: 100001 }, { limit: 1.5 }, { cursor: "arbitrary" }])(
-  "invalid pagination does not query %#",
-  async (page) => {
-    const mossFilesFailure = await failure(listMossFiles("test-key", page, nowhere));
-    expect(mossFilesFailure).toMatchObject({ reason: "InvalidInput", outcome: "NotSubmitted" });
-  },
-);
-
-it("list preserves empty purpose and unfamiliar file status rather than assuming readiness", async () => {
-  const listed = await listMossFiles("test-key", { limit: 1, offset: 0 }, answer({ object: "list", data: [{ ...file, purpose: "", status: "new-status" }] }));
-  expect(listed).toEqual([{ ...file, purpose: "", status: "new-status" }]);
 });
 
 it.for([400, 401, 403, 413, 429, 302, 404, 500])("file HTTP %s is sanitized and not retried", async (status) => {
@@ -137,11 +115,9 @@ it.for(["", " ", "key\nheader"])("file credentials are explicit and validated %#
   expect(mossFileUploadedFailure).toMatchObject({ reason: "Credentials", outcome: "NotSubmitted" });
 });
 
-it("file metadata and list responses are bounded", async () => {
-  const mossFileFailure = await failure(getMossFile("test-key", "file-test", answer({ ...file, filename: "x".repeat(1 << 20) })));
+it("file metadata and deletion responses are bounded", async () => {
+  const mossFileFailure = await failure(uploadMossFile("test-key", input, answer({ ...file, filename: "x".repeat(1 << 20) })));
   expect(mossFileFailure).toMatchObject({ reason: "TooLarge", outcome: "Unknown" });
-  const mossFilesFailure = await failure(listMossFiles("test-key", { limit: 1 }, answer({ object: "list", data: [file, file] })));
-  expect(mossFilesFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
   const mossFileDeletedFailure = await failure(deleteMossFile("test-key", "file-test", answer({ id: "file-test", object: "file", deleted: false })));
   expect(mossFileDeletedFailure).toMatchObject({ reason: "InvalidResponse", outcome: "Unknown" });
 });
@@ -188,7 +164,7 @@ it("an uploaded file can be referenced for understanding and explicitly deleted 
     }),
   };
   const uploaded = await uploadMossFile("test-key", input, http);
-  expect((await getMossFile("test-key", uploaded.id, http)).status).toBe("processed");
+  expect(uploaded.status).toBe("processed");
   const result = await understandMossMedia(
     "test-key",
     {
@@ -200,12 +176,7 @@ it("an uploaded file can be referenced for understanding and explicitly deleted 
   );
   expect(result.text).toBe("A farm");
   expect((await deleteMossFile("test-key", uploaded.id, http)).deleted).toBe(true);
-  expect(calls).toEqual([
-    "POST https://api.mosi.cn/v1/files",
-    "GET https://api.mosi.cn/v1/files/file-test",
-    "POST https://api.mosi.cn/v1/responses",
-    "DELETE https://api.mosi.cn/v1/files/file-test",
-  ]);
+  expect(calls).toEqual(["POST https://api.mosi.cn/v1/files", "POST https://api.mosi.cn/v1/responses", "DELETE https://api.mosi.cn/v1/files/file-test"]);
 });
 
 it("file request deadline includes response reading and cancels the stream", async () => {

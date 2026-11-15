@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { bounded, type ProviderHttp, send } from "../base/http.ts";
 import { codePoints, fromJson, httpsUrl, int } from "../base/json.ts";
-import { badKey, type MossErrorFields, MossResponseTooLarge, readMossResponse, rejectedStatuses } from "./response.ts";
+import { MossError } from "./error.ts";
+import { badKey, readMossResponse, rejectedStatuses } from "./response.ts";
 import { mossSpeechFormats } from "./speech-models.ts";
 
 export const AudioId = z.string().regex(/^[a-zA-Z0-9_-]{1,256}$/u);
@@ -17,24 +18,7 @@ const ErrorCode = z.enum([
   "rate_limit_exceeded",
   "concurrency_limit_exceeded",
 ]);
-type ErrorCode = z.output<typeof ErrorCode>;
 const ErrorBody = z.object({ error: z.object({ code: ErrorCode }) });
-
-export class MossAudioError extends Error {
-  override readonly name = "MossAudioError";
-  readonly reason: MossErrorFields["reason"];
-  readonly outcome: MossErrorFields["outcome"];
-  declare readonly status?: number;
-  declare readonly code?: ErrorCode;
-
-  constructor(fields: MossErrorFields & { readonly code?: ErrorCode }) {
-    super(`MOSS audio: ${fields.reason}`);
-    this.reason = fields.reason;
-    this.outcome = fields.outcome;
-    if (fields.status !== undefined) this.status = fields.status;
-    if (fields.code !== undefined) this.code = fields.code;
-  }
-}
 
 const UsageCount = int();
 export const AudioUsage = z.object({
@@ -81,8 +65,8 @@ export const audioResultShape = {
 export const audioMimeMatches = (result: { readonly response_format: (typeof mossSpeechFormats)[number]; readonly content_type: string }): boolean =>
   mimeTypes[result.response_format].includes(result.content_type.split(";")[0]?.trim().toLowerCase() ?? "");
 
-export const invalidAudioResponse = () => new MossAudioError({ reason: "InvalidResponse", outcome: "Unknown" });
-export const invalidAudioInput = () => new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" });
+export const invalidAudioResponse = () => new MossError({ reason: "InvalidResponse", outcome: "Unknown" });
+export const invalidAudioInput = () => new MossError({ reason: "InvalidInput", outcome: "NotSubmitted" });
 
 /** body as JSON text, or InvalidInput when JSON cannot hold it. */
 export function audioJson(body: unknown): string {
@@ -91,7 +75,7 @@ export function audioJson(body: unknown): string {
     if (text === undefined) throw invalidAudioInput();
     return text;
   } catch (e) {
-    if (e instanceof MossAudioError) throw e;
+    if (e instanceof MossError) throw e;
     throw invalidAudioInput();
   }
 }
@@ -104,9 +88,9 @@ export interface AudioRequest {
 }
 
 /** One request to the MOSS audio API with key, never following a redirect (it would carry the key); the raw body of a 2xx
- * answer, else a MossAudioError saying whether MOSS refused it. */
+ * answer, else a MossError saying whether MOSS refused it. */
 export async function audioRequest(key: string, request: AudioRequest, http: ProviderHttp, signal: AbortSignal): Promise<string> {
-  if (badKey(key)) throw new MossAudioError({ reason: "Credentials", outcome: "NotSubmitted" });
+  if (badKey(key)) throw new MossError({ reason: "Credentials", outcome: "NotSubmitted" });
   const response = await send(
     http,
     request.url,
@@ -122,16 +106,10 @@ export async function audioRequest(key: string, request: AudioRequest, http: Pro
     },
     signal,
   );
-  let raw: string;
-  try {
-    raw = await readMossResponse(response, signal);
-  } catch (e) {
-    if (e instanceof MossResponseTooLarge) throw new MossAudioError({ reason: "TooLarge", outcome: "Unknown" });
-    throw e;
-  }
+  const raw = await readMossResponse(response, signal);
   if (response.status < 200 || response.status >= 300) {
     const code = fromJson(ErrorBody, raw)?.error.code;
-    throw new MossAudioError({
+    throw new MossError({
       reason: "HttpStatus",
       status: response.status,
       outcome:
@@ -147,6 +125,6 @@ export async function audioRequest(key: string, request: AudioRequest, http: Pro
 /** An audio call under a deadline of ms: running out is Timeout, a transport failure Network, both of unknown outcome. */
 export const boundedAudio = <A>(ms: number, http: ProviderHttp, work: (signal: AbortSignal) => Promise<A>): Promise<A> =>
   bounded(ms, http, work, {
-    timeout: () => new MossAudioError({ reason: "Timeout", outcome: "Unknown" }),
-    network: () => new MossAudioError({ reason: "Network", outcome: "Unknown" }),
+    timeout: () => new MossError({ reason: "Timeout", outcome: "Unknown" }),
+    network: () => new MossError({ reason: "Network", outcome: "Unknown" }),
   });

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import type { Issue, Phase, RepoSummary, Session } from "@vibevalley/protocol";
+import type { Issue, Phase, RepoSummary, SessionView } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { growthOf, type Island, islandScale, islandsOf, islandText, homeless, mapPose, mapTally, plotsIn } from "./islands";
@@ -26,8 +26,8 @@ const repo = (name: string, last?: number, maxSessions = 3): RepoSummary => ({
 });
 const todo = (id: string, p: string, queuedAt?: number) =>
   ({ id, title: `活 ${id}`, repo: p, status: queuedAt === undefined ? "backlog" : "todo", ...(queuedAt !== undefined ? { queuedAt } : {}) }) as Issue;
-const hired = (id: string, p: string | undefined, phase: Phase, at = 0, more: Partial<Session> = {}) =>
-  ({ id, name: `帮工${id}`, agent: "a", hiredAt: at, phase, brief: "", ...(p ? { repo: p } : {}), ...more, refining: false }) as Session;
+const hired = (id: string, p: string | undefined, phase: Phase, at = 0, more: Partial<SessionView> = {}) =>
+  ({ id, name: `帮工${id}`, agent: "a", hiredAt: at, phase, phaseText: "", brief: "", ...(p ? { repo: p } : {}), ...more }) as SessionView;
 const kinds = (i: Island) => i.spots.map((s) => (s.kind === "taken" ? s.session.id : s.kind));
 
 describe("islands", () => {
@@ -37,7 +37,7 @@ describe("islands", () => {
       repos,
       sessions: [
         hired("w2", "clock-in", { _tag: "done" }, 2),
-        hired("w1", "clock-in", working, 1, { issue: issueId("t1") }),
+        hired("w1", "clock-in", working, 1, { scope: { kind: "issue", id: issueId("t1") } }),
         hired("w4", "clock-in", { _tag: "resting" }, 4),
         hired("w5", "docs", working),
         hired("w3", undefined, { _tag: "failed" }),

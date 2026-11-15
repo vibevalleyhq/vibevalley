@@ -1,3 +1,4 @@
+import type { RefusableSessionOption } from "@botiverse/oar";
 import { z } from "zod";
 
 import { list, t } from "@vibevalley/i18n";
@@ -66,6 +67,8 @@ export function moneyStop(info: T.RuntimeInfo | undefined): string {
   return "";
 }
 
+const sessionMcpServerCredentials: RefusableSessionOption = "mcpServerCredentials";
+
 const blank = (s: string | undefined) => (s ?? "").trim() === "";
 
 /** Both the dispatch check and session opening validate these choices; availability and spending only gate new work. */
@@ -89,6 +92,8 @@ export function sessionOptions(agent: T.Agent, settings: T.RuntimeSettings | und
   if (options.effort && refused[sessionEffort]) add("effort", "error", refused[sessionEffort]);
   if (Object.keys(options.env).length > 0 && refused[sessionEnv]) add("env", "error", refused[sessionEnv]);
   if (agent.mcpServers.length > 0 && refused[sessionMcpServers]) add("mcpServers", "error", refused[sessionMcpServers]);
+  else if (refused[sessionMcpServerCredentials] && agent.mcpServers.some((s) => Object.keys(s.type === "http" ? s.headers : s.env).length > 0))
+    add("mcpServers", "error", refused[sessionMcpServerCredentials]);
   if (agent.disallowedTools.length > 0 && refused[sessionDisallowedTools]) add("disallowedTools", "error", refused[sessionDisallowedTools]);
   if (runtime && options.missingModel) add("model", "warn", t("server.runtime.noModel", { runtime: runtime.id, model: options.missingModel }));
   if (runtime && models && options.effort) {

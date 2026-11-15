@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vite-plus/test";
 
+import { htmlPolicy } from "@vibevalley/artifact/html";
 import { artifactPath, userId } from "@vibevalley/protocol";
 
 import { remoteMay } from "#/gateway/lan/lan.ts";
-import { htmlPolicy } from "#/modules/artifact/policy.ts";
 import { app } from "#/testing/http.ts";
 import { testConfig } from "#/testing/layers.ts";
 import { quietApp } from "#/testing/world.ts";

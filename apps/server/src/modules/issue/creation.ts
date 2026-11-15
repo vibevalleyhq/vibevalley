@@ -2,10 +2,10 @@ import { maybe, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { executionsOf } from "@vibevalley/protocol/rules";
 
-import type { WrittenKind, WrittenTemplate } from "#/modules/agent/seed.ts";
 import type { RepoStack } from "#/modules/repo/repo.ts";
 import type { AddIssueParams } from "#db/issue.sql.ts";
 
+import type { WrittenKind, WrittenTemplate } from "./catalog.ts";
 import { assignedOnDuty, type IssueMandate } from "./status.ts";
 
 export const maxChildren = 12;

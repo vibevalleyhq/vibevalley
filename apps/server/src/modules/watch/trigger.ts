@@ -1,7 +1,33 @@
+import type * as T from "@vibevalley/protocol";
+
+import type { ActorKind } from "#/base/actor.ts";
 import { channelType, type Meta, metaOf, type MsgRow, type Place } from "#/modules/channel/contracts.ts";
-import { actorOfParticipant, type ChannelEnvelopeRow } from "#/modules/session/envelope.ts";
+import { actorOfParticipant } from "#/modules/session/envelope.ts";
 import type { InputContext, TriggerInput } from "#/modules/session/payload.ts";
 import type { TriggerSource } from "#/modules/session/shapes.ts";
+
+type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
+
+export interface ChannelEnvelopeRow {
+  readonly envelope_id: T.MessageId;
+  readonly number: number;
+  readonly channel_id: string;
+  readonly sender_id: string;
+  readonly kind: StoredMessageKind;
+  readonly body: string;
+  readonly meta: string | null;
+  readonly reply_number: number | null;
+  readonly created_at: number;
+  readonly name: string;
+  readonly sender_kind: ActorKind;
+  readonly sender_role: T.AgentRole | null;
+  readonly channel_type: string;
+  readonly root_id: string | null;
+  readonly root_number: number | null;
+  readonly subject_kind: string | null;
+  readonly subject_id: string | null;
+  readonly channel_name: string | null;
+}
 
 const sourceByPurpose: Record<NonNullable<Meta["ingressSource"]>, TriggerSource> = {
   issue: "workbench",

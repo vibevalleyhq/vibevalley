@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { dayKey, daysUntil } from "./days.ts";
 import {
   backlinks,
   carryIds,
-  dayKey,
-  daysUntil,
   edgesOf,
   exportMarkdown,
   fileOf,
@@ -13,7 +12,6 @@ import {
   type Page,
   pageOf,
   parse,
-  piecesOf,
   plainOf,
   print,
   radar,
@@ -25,11 +23,10 @@ import {
   titleOfFile,
   transclusions,
   type Vault,
-  visibleBlocks,
   walk,
-  wordDiff,
 } from "./index.ts";
 import { flatBlocks } from "./outline.ts";
+import { piecesOf, visibleBlocks, wordDiff } from "./view.ts";
 
 const samplePage = [
   "title:: Cetus Core Engine",

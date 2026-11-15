@@ -1,4 +1,4 @@
--- The members of a place: who is in a thread or a channel, why, and from which message number on (channel/hub.ts).
+-- The members of a place: who is in a thread or a channel, why, and from which message number on (channel/channel.ts).
 
 -- name: AddMember :exec
 insert into channel_member (channel_id, participant_id, reason, from_number)

@@ -9,6 +9,8 @@ select issue from issue_run where run = sqlc.arg(run) order by issue;
 
 -- name: RunsOfIssue :many
 -- bound: one issue's runs.
-select * from session_run
-where session_run.issue = sqlc.arg(issue_id) or session_run.id in (select run from issue_run where issue_run.issue = sqlc.arg(issue_id))
-order by started_at, id;
+select distinct r.* from session_run r
+left join session s on s.id = r.session
+left join issue_run ir on ir.run = r.id
+where (s.scope_kind in ('issue', 'draft') and s.scope_id = sqlc.arg(issue_id)) or ir.issue = sqlc.arg(issue_id)
+order by r.started_at, r.id;

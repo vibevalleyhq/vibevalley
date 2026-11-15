@@ -1,5 +1,4 @@
 import type * as T from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 
 import type { ActorKind } from "#/base/actor.ts";
 
@@ -9,8 +8,6 @@ export const actorOfParticipant = (kind: ActorKind, role: T.AgentRole | null, id
   kind === "agent"
     ? { kind: "agent", id, role: role ?? "worker", ...(name !== undefined ? { name } : {}) }
     : { kind, id, ...(name !== undefined ? { name } : {}) };
-
-export const channelType = (type: string): ChannelType => S.ChannelType.safeParse(type).data ?? "channel";
 
 export interface Picked {
   readonly agent?: string;
@@ -42,10 +39,11 @@ export interface ChatView {
   readonly unreadOf: (participant: string, channel: string) => Promise<readonly UnreadRow[]>;
 }
 
-/** A session's input waiting to be handed to it, as the layer above judges it: the issue it is for (its own, or the
- * session's), whether the user said it, and whether it is still pending (not handed yet). */
+/** A session's input waiting to be handed to it, as the layer above judges it: the issue it is for (when carried by
+ * the input), the session's own scope, whether the user said it, and whether it is still pending (not handed yet). */
 export interface WaitingInput {
   readonly issue?: string;
+  readonly sessionScope?: T.SessionScope;
   readonly fromUser: boolean;
   readonly pending: boolean;
 }
@@ -53,29 +51,6 @@ export interface WaitingInput {
 /** Which of a session's waiting inputs may be handed to it now, one answer per input, as the layer above decides (the
  * issues); until told, all of them. */
 export type Readiness = (inputs: readonly WaitingInput[]) => readonly boolean[];
-
-type StoredMessageKind = "chat" | "dispatch" | "report" | "notice";
-
-export interface ChannelEnvelopeRow {
-  readonly envelope_id: T.MessageId;
-  readonly number: number;
-  readonly channel_id: string;
-  readonly sender_id: string;
-  readonly kind: StoredMessageKind;
-  readonly body: string;
-  readonly meta: string | null;
-  readonly reply_number: number | null;
-  readonly created_at: number;
-  readonly name: string;
-  readonly sender_kind: ActorKind;
-  readonly sender_role: T.AgentRole | null;
-  readonly channel_type: string;
-  readonly root_id: string | null;
-  readonly root_number: number | null;
-  readonly subject_kind: string | null;
-  readonly subject_id: string | null;
-  readonly channel_name: string | null;
-}
 
 /** Why a delivery reaches its session. */
 export type DeliveryReason = "mention" | "everyone" | "own_thread" | "member" | "channel" | "direct" | "addressed";
@@ -87,21 +62,18 @@ export type DeliveryEvent = "stop" | "conversation" | "mention" | "assignment" |
 /** How a delivery reaches a busy session: stop it, steer its turn, wait for the next, or wait to be read with the rest. */
 export type Urgency = "interrupt" | "steer" | "queue" | "digest";
 
-/** A session that hears a routed trigger, as the layer above worked it out: why, whether it wakes, what held it back. */
-export interface Hearer {
-  readonly session: T.SessionId;
+/** Why a session heard a routed trigger, whether it wakes, and what brake held it back (Watch -> Session.route). */
+export interface Heard {
   readonly reason: DeliveryReason;
   readonly wakes: boolean;
   readonly heldBy?: HeldBy;
-  readonly role: T.AgentRole;
-  readonly event: DeliveryEvent;
 }
 
 /** A session a routed trigger is delivered to, as the layer above picked it (Session.route). */
 export interface Delivery {
   readonly session: T.SessionId;
   /** Why, whether it wakes and what held it back, as the watch heard it; else addressed, waking unless a digest. */
-  readonly heard?: Pick<Hearer, "reason" | "wakes" | "heldBy">;
+  readonly heard?: Heard;
   /** What the session is (its profile's role when not given) and what the delivery is to it: its urgency follows. */
   readonly role?: T.AgentRole;
   readonly event?: DeliveryEvent;

@@ -35,14 +35,14 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/issue/issue.ts`、`store.ts`、`lifecycle.ts` | 对外 `Issue` 服务、`IssueStore`（收拢工单表读写、家族子树级联删除与 `db.afterCommit` 下的 `Assignments` 内存同步）、生命周期写操作与事实发布 |
+| `apps/server/src/modules/issue/issue.ts`、`store.ts`、`lifecycle.ts` | 对外 `Issue` 服务（`pollGitHub` 收进内部并仅由 `intakeOf` 经 `IssueIntake` 暴露给测试）、`IssueStore`（收拢工单表读写、家族子树级联删除与 `db.afterCommit` 下的 `Assignments` 内存同步）、生命周期写操作与事实发布 |
 | `apps/server/src/modules/issue/dispatch.ts`、`settle.ts` | 派活、排队刷新、重开、定时触发、状态流转前置判定与试跑预览 |
 | `apps/server/src/modules/issue/intake.ts`、`inputs.ts` | 路由与蓄水池：订阅、进池、放行、退回、派活的队列、重放没路由的触发、记下哪一轮拿了工单的输入；放行（`holdReasonOf`）、会话能交哪些输入（`readyInputs`）、输入能不能从上一个会话转走（`goesOnFrom`）是纯函数；`intakeOf` 只给测试 |
-| `apps/server/src/modules/issue/refinement.ts`、`split.ts`、`merge.ts` | 工单起草、原生父子拆单（`childChecks` 算子工单要过的检查）、交付的决定（看板挪到完成走哪条路、PR 的锁、退回帮工的话，`finishesWithPullRequest`） |
-| `apps/server/src/modules/issue/landing.ts`、`github.ts` | 交付的编排：合并或提 PR（`landingRouteOf` 定从哪合、`goesByPullRequest`）、子工单检查后合入父分支、PR 结局，经 `Session.handOver`、`withWorkplace`、`withIdleWorkplace` 借帮工的工作目录，经仓库带类型的操作做 git 和 GitHub，结果直接写在工单上；开着的 PR 的 CI 指纹（`checksVerdict`）与新评审、评论记成触发 |
-| `apps/server/src/modules/issue/cron.ts`、`when.ts` | 定时任务：增删改、到期与补跑判定（`dueCrons`、`isMissed`、`needsOK`）、到期事务与重放；五种时间规格解析、`nextRun`、`whenText` 与 `nextText` |
+| `apps/server/src/modules/issue/refinement.ts`、`split.ts` | 工单起草与原生父子拆单 |
+| `apps/server/src/modules/issue/landing.ts`、`github.ts` | 交付的编排与决定：合并或提 PR（`landingRouteOf` 定从哪合、`goesByPullRequest`、`finishesWithPullRequest`）、PR 的锁、退回帮工的话、子工单检查（`childChecks`）后合入父分支、PR 结局，经 `Session.handOver`、`withWorkplace`、`withIdleWorkplace` 借帮工的工作目录，经仓库带类型的操作做 git 和 GitHub，结果直接写在工单上；开着的 PR 的 CI 指纹（`checksVerdict`）与新评审、评论记成触发 |
+| `apps/server/src/modules/issue/cron.ts`、`when.ts` | 外围定时触发服务 `Cron`（`makeCron`，在 `services.ts` 单独装配并后于 `Issue` 启动）：增删改、到期与补跑判定（`dueCrons`、`isMissed`、`needsOK`）、到期事务与重放，仅经 `Pick<Issue, "route" | "scheduled">` 驱动工单；五种时间规格解析、`nextRun`、`whenText` 与 `nextText` |
 | `apps/server/src/modules/issue/status.ts`、`moves.ts` | 状态派生（`issueStatusOf`）、展示阶段（`issueStageOf`）与合法挪动（`statusMove`） |
-| `apps/server/src/modules/issue/creation.ts`、`assignment.ts` | 建单（仓库推导、父单继承、选人）与档案指派 |
+| `apps/server/src/modules/issue/creation.ts`、`assignment.ts`、`catalog.ts` | 建单（仓库推导、父单继承、选人）、档案指派与播种表单模板目录（`templateCatalog`、`template_catalog.json`） |
 | `apps/server/src/modules/issue/dependencies.ts`、`brief.ts`、`rows.ts` | 依赖环检测与解锁、任务说明和时间线拼装、行转换 |
 | `packages/protocol/src/rules/issues.ts`、`stage.ts` | 前后端共用的 `shortTitle`、`closedText` 与 `stageWantsUser` |
 | 表 `issue`、`issue_assignment`、`issue_assignment_execution`、`issue_cron`、`issue_github_cursor`、`issue_github_event`、`issue_subscription`、`issue_input`、`issue_run` | 工单主表、档案责任关系、实际执行的 `Session` 关联、定时任务、PR 的 CI 指纹游标、收下过的评审和评论（带机器人轮次）、串的订阅、蓄水池、拿了工单输入的轮次 |
@@ -105,11 +105,11 @@
 
 ### 蓄水池和路由
 
-`intake.ts` 是一件活的入口：观察层（频道的话、巡查）、定时任务、跟 PR、派活和助手的简报记下 `Trigger` 以后都交给 `Issue.route`，一次一条（锁）。
+`intake.ts` 是一件活的入口：定时任务、跟 PR、派活和助手的简报记下 `Trigger` 以后交给 `Issue.route`；观察层路由的用户消息在投递前先问 `Issue.pool`，一次一条（锁）。
 
 1. 已在某张工单蓄水池里的（派活在排队时就进了池），补路由回执，`held` 的再按工单放一遍。
 2. 线程（`issue:<id>`、订阅的 `github:<repo>#<n>`、`cron:<id>`、工单串 `channel:<id>`）对上一张工单的，进它的蓄水池（`issue_input`），对上两张就拒绝；观察层交来的听众只在用户说话时看线程。
-3. 都不是的，投给观察层定下的听众；没给就投给它点名的助手，或那里的助手（`Channel.orchestratorIn`）。投递本身是 `Session.route`。
+3. 都不是的，投给它点名的助手，或那里的助手（`Channel.orchestratorIn`）。投递本身是 `Session.route`。
 
 - **放行看工单**：工单排队（`backlog` 不动）、没有能收的会话、在等用户（自动输入），或机器人评审过了轮数，输入保持 `held`（`holdReasonOf`；同一工单只留最新一条 cron 输入，`issue_input_one_held`）；工单变了（`issueChanged`、会话换了）就再放一遍，转给当前负责的会话或当值助手，在投递的事务里记下 `forwarded`。已经投进会话的，工单关了或在等用户时经 `Session.useReadiness` 先不交（`readyInputs`）。
 - **关单和拒收退回助手**：关单时帮工没收下的用户的话、帮工用 `issue_handback` 拒收的（`decline`），以另一封信投给助手重新分流，记 `returned`；转给新会话时前一个会话的那封作废（`previous`），已被收下或删了的不转（`goesOnFrom`）。
@@ -126,7 +126,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 ## 和谁打交道
 
 - **帮工（`session`）**：经 `Session` 的门（[帮工](docs/subsystems/session.md#对外的门)，`service-paths.json` 逐个记着）：派活（`hireWith`，子工单带上父工单号；`room` 问还能不能再开一个）、叫停放走（`stop`、`dismiss`）、借工作目录交付（`handOver`、`withWorkplace`、`withIdleWorkplace`）、工作目录（`discardWork`、`clearWorkplace`）、记下并投递触发（`recordTrigger`、`route`、`isRouted`、`unrouted`）、在场与查询（`hired`、`live`、`get`、`list`）、`news`（更新工单状态、问题与冲突，记下 `issue_run`），建好时交给信箱 `useReadiness`。蓄水池和投递一起提交的写在 `Delivery` 的 `prepare`、`commit` 里；`issue_input.sql`、`issue_run.sql` 读会话的投递和轮次（只读，join）。
-- **观察层、助手、工具（`watch`、`orchestrator`、`gateway/tool`）**：观察层和助手记下触发后交 `Issue.route`；工具的 `issue_handback` 经 `Issue.decline`，读触发时问 `Issue.ownerOf`，读一张工单的各轮经 `Issue.runs`。
+- **观察层、定时任务、助手、工具（`watch`、`cron`、`orchestrator`、`gateway/tool`）**：观察层遇用户消息先问 `Issue.pool`，定时任务（`Cron`）经 `Issue.scheduled` 与 `Issue.route` 建单/重开并入池，助手记下触发后交 `Issue.route`；工具的 `issue_handback` 经 `Issue.decline`，读触发时问 `Issue.ownerOf`，读一张工单的各轮经 `Issue.runs`。
 - **仓库（`repo`）**：14 个带类型的操作：交付前后读改动和冲突（`changes`、`branchChanges`、`conflict`），工单自己的检出（`checkout`），检查（`verifyCheckout`），合并（`merge`、`mergeInto`），PR（`usesPullRequests`、`submitPullRequest`、`pullRequestState`、`finishPullRequest`、`githubSnapshot`、`failedJobLog`），模板（`stack`）；没有裸的命令或 GitHub 请求。
 - **频道（`channel`）**：经 `openThreadAbout` 开工单串；用户串内发言由工单订阅核心状态变更清空问题并作废旧验收标记。
 
@@ -152,13 +152,13 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 定时任务
 
-定时任务（`T.Cron`，表 `issue_cron`）是工单的时间触发器：每次到期，在同一事务内更新运行时间并写入不可变 `Trigger`，随后准备它固定的那张工单（`scheduled`：最近建的那张，或重开，或新建），经 `Session` 路由给帮工或助手。接口见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放），聊天页的「定时任务」标签页在 `apps/web/src/features/channel/views/Tabs.tsx`；服务端经 `Issue` 的 `crons`、`addCron`、`setCronEnabled`、`removeCron`、`previewRemoveCron`、`tickCrons`、`cronsDue`。
+定时任务（`T.Cron`，表 `issue_cron`）是工单的时间触发器：每次到期，在同一事务内更新运行时间并写入不可变 `Trigger`，随后准备它固定的那张工单（`Issue.scheduled`：最近建的那张，或重开，或新建，并订阅 `cron:<id>` 串），经 `Issue.route` 路由给帮工或助手。接口见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放），聊天页的「定时任务」标签页在 `apps/web/src/features/channel/views/Tabs.tsx`；服务端由 `modules/issue/cron.ts` 导出的独立 `Cron` 服务（`list`、`add`、`setEnabled`、`remove`、`previewRemove`、`tick`、`due`、`boot`、`close`）承载，通过 `Pick<Issue, "route" | "scheduled">` 与工单边界解耦，直接服务 HTTP `cronHandlers`、`cronTools` 与 `Orchestrator`。
 
 - **五种时间规格（`CronWhen`）**：`once`、`every`、`daily`、`weekly` 与五段式 `cron`（`once` 跑完自动关闭）；每项携带 IANA 时区或偏移量，缺省取本机时区；8 年内无合法触发时刻的表达式（如 2 月 30 日）直接拒绝。
 - **下次运行时间不落库，实时从 `last_run` 推导**：`nextRun` 计算严格晚于 `last_run`（未运行过则取创建时间）的下一个匹配分钟；夏令时跳过的时刻顺延，重复的时刻取第一次；重新开启已关闭的周期任务时将 `last_run` 设为当前时间，不补跑关闭期间的时刻。
 - **助手非当轮授权创建的周期或派工任务须等用户同意（`needsOK`）**：用户创建、或助手在含用户原话的当轮（`Actor.forUser` 为真）创建的任务立即生效；助手在后台回合自行创建时，仅「不派帮工的 `once` 回头看」直接生效；其余存为 `enabled: false, pending: true`，在收件箱（[观察层](docs/subsystems/watch.md#收件箱)）生成 `cron-ask` 待用户点击同意。
 - **一个定时任务固定复用一张工单**：未指定帮工档案时指派给所属频道助手；指定帮工档案时必须同时指定仓库。若绑定工单在等用户，新到期输入在工单的蓄水池中保持 `held`（同一工单只留最新一条，`issue_input_one_held`）。
-- **扫描与补跑（`tickCrons`）**：开机（`Issue.boot` 的最后）后每 `cron.tick_ms` 在单锁内重放未路由的触发，并筛出 `nextRun <= now` 的已启用任务（错过多次只合并补跑一次）。
+- **扫描与补跑（`Cron.tick`）**：开机（`Cron.boot`，紧跟在 `Issue.boot` 之后）后每 `cron.tick_ms` 在单锁内重放未路由的触发，并筛出 `nextRun <= now` 的已启用任务（错过多次只合并补跑一次）。
 - **为什么一个定时任务绑定一张工单**：避免高频任务淹没看板，让历次运行记录归集在同一条工单串下；到期状态更新与 `Trigger` 同事务落库，防止更新 `last_run` 后崩溃漏跑，或投递后未更新 `last_run` 重复触发。
 
 ## 观察执行

@@ -5,7 +5,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { Secret } from "@vibevalley/protocol/schema";
 
-import type { ServerConfig } from "#/infra/config.ts";
+import { loadConfig, type ServerConfig } from "#/infra/config.ts";
 import { keptLog } from "#/infra/log.ts";
 import { wallTime } from "#/infra/time.ts";
 import { testConfig } from "#/testing/layers.ts";
@@ -189,5 +189,67 @@ describe("settings", () => {
       expect(kept).toHaveLength(1);
       expect(readFileSync(join(config.home, kept[0]!), "utf8")).toBe(raw);
     }
+  });
+
+  test("regression: environment overrides settings.json, which overrides vibevalley.yaml and defaults", async () => {
+    const home = testConfig().home;
+    const yamlAppId = "33333333333333333333333333333333";
+    const yamlCert = "44444444444444444444444444444444";
+    const envAppId = "55555555555555555555555555555555";
+    const envCert = "66666666666666666666666666666666";
+
+    await run(await loadConfig("", { VIBEVALLEY_HOME: home }), async (s) => {
+      expect(s.deepseekApiKey()).toBeUndefined();
+      expect(s.agora()).toBeUndefined();
+      expect(s.voice().tts).toEqual({ vendor: "minimax", model: "speech_2_6_turbo", voiceId: "Chinese (Mandarin)_Gentle_Youth" });
+    });
+
+    writeFileSync(
+      join(home, "vibevalley.yaml"),
+      `deepseek:\n  api_key: sk-from-yaml-1111\nagora:\n  app_id: "${yamlAppId}"\n  app_certificate: "${yamlCert}"\nvoice:\n  id: yaml-voice\n`,
+    );
+    await run(await loadConfig("", { VIBEVALLEY_HOME: home }), async (s) => {
+      expect(reveal(s.deepseekApiKey())).toBe("sk-from-yaml-1111");
+      expect(s.status().deepseekApiKey).toEqual({ source: "config", hint: "…1111" });
+      expect(s.agora()?.appId).toBe(yamlAppId);
+      expect(reveal(s.agora()?.appCertificate)).toBe(yamlCert);
+      expect(s.voice().tts).toEqual({ vendor: "minimax", model: "speech_2_6_turbo", voiceId: "yaml-voice" });
+
+      await s.save({
+        deepseekApiKey: "sk-from-settings-2222",
+        agoraAppId: appId,
+        agoraAppCertificate: cert,
+        voice: { tts: { vendor: "minimax", model: "speech_2_8_turbo", voiceId: "settings-voice" } },
+      });
+      expect(reveal(s.deepseekApiKey())).toBe("sk-from-settings-2222");
+      expect(s.status().deepseekApiKey).toEqual({ source: "settings", hint: "…2222" });
+      expect(s.agora()?.appId).toBe(appId);
+      expect(reveal(s.agora()?.appCertificate)).toBe(cert);
+      expect(s.voice().tts).toEqual({ vendor: "minimax", model: "speech_2_8_turbo", voiceId: "settings-voice" });
+    });
+
+    const envConfig = await loadConfig("", {
+      VIBEVALLEY_HOME: home,
+      VIBEVALLEY_DEEPSEEK_API_KEY: "sk-from-env-9999",
+      AGORA_APP_ID: envAppId,
+      AGORA_APP_CERTIFICATE: envCert,
+      VIBEVALLEY_VOICE_ID: "env-voice",
+    });
+    await run(envConfig, async (s) => {
+      expect(reveal(s.deepseekApiKey())).toBe("sk-from-env-9999");
+      expect(reveal(s.voiceConfig().deepseekApiKey)).toBe("sk-from-env-9999");
+      expect(s.status().deepseekApiKey).toEqual({ source: "config", hint: "…9999" });
+      expect(s.status().agoraAppId).toEqual({ source: "config", value: envAppId });
+      expect(s.status().agoraAppCertificate).toEqual({ source: "config", hint: "…6666" });
+      expect(s.agora()?.appId).toBe(envAppId);
+      expect(reveal(s.agora()?.appCertificate)).toBe(envCert);
+      expect(s.voice().tts).toEqual({ vendor: "minimax", model: "speech_2_8_turbo", voiceId: "env-voice" });
+    });
+
+    const emptyEnv = await loadConfig("", { VIBEVALLEY_HOME: home, VIBEVALLEY_DEEPSEEK_API_KEY: "" });
+    await run(emptyEnv, async (s) => {
+      expect(reveal(s.deepseekApiKey())).toBe("sk-from-settings-2222");
+      expect(s.status().deepseekApiKey).toEqual({ source: "settings", hint: "…2222" });
+    });
   });
 });

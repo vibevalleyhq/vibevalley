@@ -1,9 +1,8 @@
 import { t } from "@vibevalley/i18n";
 import { type Agent, everyone, defaultOrchestrator, userId, type Session, type SessionView } from "@vibevalley/protocol";
-import { mentionLead } from "@vibevalley/protocol/rules";
+import { mentionLead, phaseText } from "@vibevalley/protocol/rules";
 
 import { spelled } from "#/base/search.ts";
-import { phaseText } from "#/features/channel/views/presence.tsx";
 const mentionOf: Record<string, string> = {
   [defaultOrchestrator]: t("web.channel.names.mention.orchestrator"),
   [userId]: t("web.channel.names.mention.user"),

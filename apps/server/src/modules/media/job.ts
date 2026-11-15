@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import { abortable, anySignal, type Clock } from "@vibevalley/async";
+import { abortable } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -60,29 +60,6 @@ export const storedAs =
     if (got === undefined) throw refusal();
     return got;
   };
-
-/** work under a deadline: past ms its signal aborts, and once work has ended (cleaned up after itself) it rejects with
- * what timedOut gives. The caller's own abort goes on as it is. */
-export async function inTime<A>(
-  work: (signal: AbortSignal) => Promise<A>,
-  ms: number,
-  options: { readonly clock: Clock; readonly signal?: AbortSignal | undefined; readonly timedOut: () => unknown },
-): Promise<A> {
-  const deadline = new AbortController();
-  const stop = new AbortController();
-  options.clock.sleep(ms, stop.signal).then(
-    () => deadline.abort(options.timedOut()),
-    () => undefined,
-  );
-  try {
-    return await work(anySignal(deadline.signal, options.signal));
-  } catch (e) {
-    if (deadline.signal.aborted && options.signal?.aborted !== true) throw deadline.signal.reason;
-    throw e;
-  } finally {
-    stop.abort();
-  }
-}
 
 /** A response body's chunks; the body is canceled when the signal aborts, so a stalled one ends. */
 export async function* bodyChunks(response: Response, signal?: AbortSignal): AsyncGenerator<Uint8Array> {

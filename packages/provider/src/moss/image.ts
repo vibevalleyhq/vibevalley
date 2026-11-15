@@ -2,8 +2,9 @@ import { z } from "zod";
 
 import { bounded, type ProviderHttp, send } from "../base/http.ts";
 import { codePoints, fromJson, httpsUrl, int } from "../base/json.ts";
+import { MossError } from "./error.ts";
 import { mossImageModels } from "./image-models.ts";
-import { badKey, type MossErrorFields, MossResponseTooLarge, readMossResponse, rejectedStatuses } from "./response.ts";
+import { badKey, readMossResponse, rejectedStatuses } from "./response.ts";
 
 const Text = codePoints(1, 4000).regex(/\S/u);
 const Dimension = int(256, 2048).multipleOf(16);
@@ -49,7 +50,6 @@ const ErrorCode = z.enum([
   "prompt_enhancement_incomplete",
   "upstream_invalid_result",
 ]);
-type ErrorCode = z.output<typeof ErrorCode>;
 const ErrorResponse = z.object({ error: z.object({ code: ErrorCode }) });
 const ImageResponse = z.object({
   created: int(),
@@ -59,23 +59,7 @@ const ImageResponse = z.object({
     .refine((usage) => usage.output_width * usage.output_height <= 2097152),
 });
 
-class MossImageError extends Error {
-  override readonly name = "MossImageError";
-  readonly reason: MossErrorFields["reason"];
-  readonly outcome: MossErrorFields["outcome"];
-  declare readonly status?: number;
-  declare readonly code?: ErrorCode;
-
-  constructor(fields: MossErrorFields & { readonly code?: ErrorCode }) {
-    super(`MOSS image: ${fields.reason}`);
-    this.reason = fields.reason;
-    this.outcome = fields.outcome;
-    if (fields.status !== undefined) this.status = fields.status;
-    if (fields.code !== undefined) this.code = fields.code;
-  }
-}
-
-const invalidInput = () => new MossImageError({ reason: "InvalidInput", outcome: "NotSubmitted" });
+const invalidInput = () => new MossError({ reason: "InvalidInput", outcome: "NotSubmitted" });
 
 type ImageInput = z.output<typeof MossImageInput>;
 
@@ -109,7 +93,7 @@ export const generateMossImage = (key: string, input: unknown, http: ProviderHtt
     900_000,
     http,
     async (signal) => {
-      if (badKey(key)) throw new MossImageError({ reason: "Credentials", outcome: "NotSubmitted" });
+      if (badKey(key)) throw new MossError({ reason: "Credentials", outcome: "NotSubmitted" });
       const request = await prepareMossImage(input);
       const { prompt, size } = request;
       let body: string;
@@ -141,16 +125,10 @@ export const generateMossImage = (key: string, input: unknown, http: ProviderHtt
         },
         signal,
       );
-      let raw: string;
-      try {
-        raw = await readMossResponse(response, signal);
-      } catch (e) {
-        if (e instanceof MossResponseTooLarge) throw new MossImageError({ reason: "TooLarge", outcome: "Unknown" });
-        throw e;
-      }
+      const raw = await readMossResponse(response, signal);
       if (response.status < 200 || response.status >= 300) {
         const code = fromJson(ErrorResponse, raw)?.error.code;
-        throw new MossImageError({
+        throw new MossError({
           reason: "HttpStatus",
           status: response.status,
           outcome: rejectedStatuses.includes(response.status) ? "Rejected" : "Unknown",
@@ -159,13 +137,13 @@ export const generateMossImage = (key: string, input: unknown, http: ProviderHtt
       }
       const result = fromJson(ImageResponse, raw);
       if (result === undefined || result.usage.output_width !== size.width || result.usage.output_height !== size.height)
-        throw new MossImageError({ reason: "InvalidResponse", outcome: "Unknown" });
+        throw new MossError({ reason: "InvalidResponse", outcome: "Unknown" });
       // Persist this URL before downloading; a failed download must not trigger another generation.
       return { url: result.data[0].url.href, created: result.created, usage: result.usage };
     },
     // No request, prompt, signed URL or upstream error body may escape through failures.
     {
-      timeout: () => new MossImageError({ reason: "Timeout", outcome: "Unknown" }),
-      network: () => new MossImageError({ reason: "Network", outcome: "Unknown" }),
+      timeout: () => new MossError({ reason: "Timeout", outcome: "Unknown" }),
+      network: () => new MossError({ reason: "Network", outcome: "Unknown" }),
     },
   );

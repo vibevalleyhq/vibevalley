@@ -87,6 +87,6 @@ test("regression: an orchestrator assignment survives startup and an acknowledge
     started_at: number;
     ended_at: number;
     outcome: string;
-  }>`select started_at, ended_at, outcome from session_run where issue = ${issueId}`;
+  }>`select r.started_at, r.ended_at, r.outcome from session_run r join issue_run ir on ir.run = r.id where ir.issue = ${issueId}`;
   expect(done.lastRun).toEqual({ startedAt: runs[0]!.started_at, endedAt: runs[0]!.ended_at, outcome: runs[0]!.outcome });
 });

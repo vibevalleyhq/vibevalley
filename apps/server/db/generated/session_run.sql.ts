@@ -10,15 +10,14 @@ import { rowOf, SessionId, Words_session_run_outcome } from "./types.js"
 export interface StartRunParams {
   readonly ["id"]: string
   readonly ["session"]: SessionId
-  readonly ["issue"]: string | null
   readonly ["triggered_by"]: string
   readonly ["started_at"]: number
 }
 
-export const StartRunSql = "-- name: StartRun :exec\ninsert into session_run (id, session, issue, triggered_by, started_at)\nvalues ($1, $2, $3, $4, $5);"
+export const StartRunSql = "-- name: StartRun :exec\ninsert into session_run (id, session, triggered_by, started_at)\nvalues ($1, $2, $3, $4);"
 
 export async function startRun(sql: Sql, params: StartRunParams): Promise<number> {
-  return sql.exec(StartRunSql, [params["id"], params["session"], params["issue"], params["triggered_by"], params["started_at"]])
+  return sql.exec(StartRunSql, [params["id"], params["session"], params["triggered_by"], params["started_at"]])
 }
 
 export interface HeardInRunParams {
@@ -53,7 +52,6 @@ export interface OpenRunsParams {
 export const OpenRunsResult = z.object({
   ["id"]: z.string(),
   ["session"]: SessionId,
-  ["issue"]: z.string().nullable(),
   ["triggered_by"]: z.string(),
   ["heard"]: z.string().nullable(),
   ["started_at"]: z.number(),
@@ -78,7 +76,6 @@ export interface RunsOfSessionParams {
 export const RunsOfSessionResult = z.object({
   ["id"]: z.string(),
   ["session"]: SessionId,
-  ["issue"]: z.string().nullable(),
   ["triggered_by"]: z.string(),
   ["heard"]: z.string().nullable(),
   ["started_at"]: z.number(),
@@ -103,7 +100,6 @@ export interface RunsOfSessionsParams {
 export const RunsOfSessionsResult = z.object({
   ["id"]: z.string(),
   ["session"]: SessionId,
-  ["issue"]: z.string().nullable(),
   ["triggered_by"]: z.string(),
   ["heard"]: z.string().nullable(),
   ["started_at"]: z.number(),

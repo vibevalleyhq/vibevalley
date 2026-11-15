@@ -1,5 +1,5 @@
 import type * as T from "@vibevalley/protocol";
-import { assignedAgentOf, executionsOf, isBusy, latestSessionIdOf, omitUndefined, same, stageWantsUser } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, isBusy, issueScopeOf, latestSessionIdOf, omitUndefined, same, stageWantsUser } from "@vibevalley/protocol/rules";
 
 import { compare, compareText, or } from "#/base/order.ts";
 import { sessionOf } from "#/modules/session/roster.ts";
@@ -18,7 +18,7 @@ const awaitsFeedback = (issue: Pick<T.Issue, "questions">, session: Pick<T.Sessi
   session?.phase._tag === "resting" && session.lastRun?.outcome === "completed" && issue.questions.length === 0;
 
 /** The conflict a preview of the issue's branch shows; none when it goes in clean. */
-export const conflictOf = (changes: { readonly base: string; readonly conflicts?: readonly string[] }): T.Conflict | undefined =>
+export const conflictOf = (changes: { readonly base: string; readonly conflicts?: readonly string[] }): T.Issue["conflict"] =>
   changes.conflicts && changes.conflicts.length > 0 ? { base: changes.base, files: [...changes.conflicts] } : undefined;
 
 const move = (act: T.IssueAct, status: T.IssueStatus, words: T.ActWords = "none"): T.IssueAction => ({ act, does: "move", status, words });
@@ -73,7 +73,7 @@ export function issueStageOf(t: T.Issue, session: T.Session | undefined): T.Issu
         return { state: "stuck", stuck: "conflict", ...at(since), lead: "resolve", acts: [move("resolve", "todo"), say("tell"), close] };
       if (t.questions.length > 0) return { state: "asking", ...at(since), lead: "answer", acts: [say("answer"), close] };
       // An answer issue's round that handed back no answer it could read did not get it done either.
-      const unread = t.deliver === "answer" && last?.outcome === "completed" && last.answer === undefined;
+      const unread = t.deliver === "answer" && last?.outcome === "completed" && t.answer === undefined;
       if (last?.outcome === "failed" || unread)
         return { state: "stuck", stuck: "failed", ...at(since), lead: "cure", acts: [move("cure", "todo"), say("tell"), close] };
       // Stopped halfway (stopped or restarted): the work goes on first; what is there can still be completed.
@@ -111,27 +111,40 @@ export function pickIssues(all: readonly T.Issue[], f: T.IssueFilter, now: numbe
   return f.limit != null && f.limit > 0 ? found.slice(0, Math.trunc(f.limit)) : found;
 }
 
-export function issueStatusOf(t: T.Issue, state: T.SpaceState): T.IssueStatus {
+export const isClosed = (s: T.IssueStatus) => s === "done" || s === "canceled";
+
+interface StatusContext {
+  readonly sessionOf: (id: string) => T.Session | undefined;
+  readonly childrenOf: (id: string) => readonly T.Issue[] | undefined;
+}
+
+function statusIn(t: T.Issue, ctx: StatusContext): T.IssueStatus {
   // Closed, the verdict is written down: done with what it delivered, else canceled (a close that does not say how too).
   if (t.delivered !== undefined || t.canceled !== undefined || t.closedAt !== undefined) return t.delivered !== undefined ? "done" : "canceled";
-  const active = latestSessionIdOf(t);
-  if (active && sessionOf(state, active)?.phase._tag === "working") return "in_progress";
-  const children = state.issues.filter((child) => child.parent === t.id);
-  if (children.length > 0) {
-    const statuses = children.map((child) => issueStatusOf(child, state));
-    if (statuses.every((status) => status === "done" || status === "canceled")) return "in_review";
+  const latestSession = latestSessionIdOf(t);
+  const h = latestSession === undefined ? undefined : ctx.sessionOf(latestSession);
+  if (h?.phase._tag === "working") return "in_progress";
+  const children = ctx.childrenOf(t.id);
+  if (children && children.length > 0) {
+    const statuses = children.map((child) => statusIn(child, ctx));
+    if (statuses.every(isClosed)) return "in_review";
     if (statuses.some((status) => status !== "backlog")) return "in_progress";
   }
-  const latestSession = latestSessionIdOf(t);
   if (latestSession !== undefined) {
-    const h = sessionOf(state, latestSession);
     if (!h) return "todo";
-    const unfinished = t.questions.length > 0 || h.lastRun?.outcome !== "completed" || (t.deliver === "answer" && !h.lastRun.answer);
+    const unfinished = t.questions.length > 0 || h.lastRun?.outcome !== "completed" || (t.deliver === "answer" && t.answer === undefined);
     return isBusy(h) || awaitsFeedback(t, h) || unfinished ? "in_progress" : "in_review";
   }
   if (t.queuedAt !== undefined) return "todo";
   if (t.lastRun) return t.lastRun.endedAt === undefined || t.lastRun.outcome !== "completed" || t.questions.length > 0 ? "in_progress" : "in_review";
-  return t.queuedAt !== undefined ? "todo" : "backlog";
+  return "backlog";
+}
+
+export function issueStatusOf(t: T.Issue, state: T.SpaceState): T.IssueStatus {
+  return statusIn(t, {
+    sessionOf: (id) => sessionOf(state, id),
+    childrenOf: (id) => state.issues.filter((child) => child.parent === id),
+  });
 }
 
 export const keepClosedIssues = 50;
@@ -158,10 +171,11 @@ export function withIssue(all: readonly T.Issue[] | undefined, t: T.Issue): T.Is
   return next.toSorted(issueOrder);
 }
 
-interface StatusLookup {
-  readonly sessions: ReadonlyMap<string, T.Session>;
+const draftEntryOf = (h: T.Session): readonly [string, IssueRefining] | undefined =>
+  h.scope?.kind === "draft" ? [h.scope.id, { session: h.id, name: h.name }] : undefined;
+
+interface StatusLookup extends StatusContext {
   readonly refining: ReadonlyMap<string, IssueRefining>;
-  readonly children: ReadonlyMap<string, readonly T.Issue[]>;
 }
 
 function lookupOf(state: T.SpaceState): StatusLookup {
@@ -169,7 +183,8 @@ function lookupOf(state: T.SpaceState): StatusLookup {
   const refining = new Map<string, IssueRefining>();
   for (const h of state.sessions) {
     sessions.set(h.id, h);
-    if (h.refining && h.issue !== undefined && !refining.has(h.issue)) refining.set(h.issue, { session: h.id, name: h.name });
+    const draft = draftEntryOf(h);
+    if (draft && !refining.has(draft[0])) refining.set(draft[0], draft[1]);
   }
   const children = new Map<string, T.Issue[]>();
   for (const item of state.issues) {
@@ -178,34 +193,19 @@ function lookupOf(state: T.SpaceState): StatusLookup {
     if (list) list.push(item);
     else children.set(item.parent, [item]);
   }
-  return { sessions, refining, children };
-}
-
-function statusWithLookup(t: T.Issue, lookup: StatusLookup): T.IssueStatus {
-  if (t.delivered !== undefined || t.canceled !== undefined || t.closedAt !== undefined) return t.delivered !== undefined ? "done" : "canceled";
-  const active = latestSessionIdOf(t);
-  if (active && lookup.sessions.get(active)?.phase._tag === "working") return "in_progress";
-  const children = lookup.children.get(t.id);
-  if (children && children.length > 0) {
-    const statuses = children.map((child) => statusWithLookup(child, lookup));
-    if (statuses.every((status) => status === "done" || status === "canceled")) return "in_review";
-    if (statuses.some((status) => status !== "backlog")) return "in_progress";
-  }
-  const latestSession = latestSessionIdOf(t);
-  if (latestSession !== undefined) {
-    const h = lookup.sessions.get(latestSession);
-    if (!h) return "todo";
-    const unfinished = t.questions.length > 0 || h.lastRun?.outcome !== "completed" || (t.deliver === "answer" && !h.lastRun.answer);
-    return isBusy(h) || awaitsFeedback(t, h) || unfinished ? "in_progress" : "in_review";
-  }
-  if (t.queuedAt !== undefined) return "todo";
-  if (t.lastRun) return t.lastRun.endedAt === undefined || t.lastRun.outcome !== "completed" || t.questions.length > 0 ? "in_progress" : "in_review";
-  return t.queuedAt !== undefined ? "todo" : "backlog";
+  return {
+    sessionOf: (id) => sessions.get(id),
+    childrenOf: (id) => children.get(id),
+    refining,
+  };
 }
 
 export function issueRefiningOf(t: T.Issue, state: T.SpaceState): IssueRefining | undefined {
-  const h = state.sessions.find((h) => h.refining && h.issue === t.id);
-  return h ? { session: h.id, name: h.name } : undefined;
+  for (const h of state.sessions) {
+    const draft = draftEntryOf(h);
+    if (draft && draft[0] === t.id) return draft[1];
+  }
+  return undefined;
 }
 
 /** The same array when none changed. */
@@ -214,10 +214,10 @@ export function withIssueStatuses(state: T.SpaceState): T.SpaceState {
   const lookup = lookupOf(state);
   let next: T.Issue[] | undefined;
   state.issues.forEach((t, i) => {
-    const status = statusWithLookup(t, lookup);
+    const status = statusIn(t, lookup);
     const drafting = lookup.refining.get(t.id);
     const last = latestSessionIdOf(t);
-    const stage = issueStageOf(omitUndefined({ ...t, status, refining: drafting }), last === undefined ? undefined : lookup.sessions.get(last));
+    const stage = issueStageOf(omitUndefined({ ...t, status, refining: drafting }), last === undefined ? undefined : lookup.sessionOf(last));
     // The moves read the stage: a round that failed is not completed, from the moment it fails.
     const moves = statusMoves(omitUndefined({ ...t, status, refining: drafting, stage }));
     if (status === t.status && same(drafting, t.refining) && same(stage, t.stage) && same(moves, t.moves)) return;
@@ -227,10 +227,25 @@ export function withIssueStatuses(state: T.SpaceState): T.SpaceState {
   return next ? { ...state, issues: next } : state;
 }
 
+export function keepsSessionResting(issues: readonly T.Issue[], session: Pick<T.Session, "scope">): boolean {
+  const scopeIssue = issueScopeOf(session);
+  return scopeIssue !== undefined && issues.some((issue) => issue.id === scopeIssue && issue.pullRequest?.state === "open");
+}
+
+export function withReportedAnswer(
+  issues: T.Issue[],
+  session: Pick<T.Session, "id" | "scope">,
+  report: { readonly outcome: T.Outcome; readonly answer?: T.IssueAnswer },
+): T.Issue[] {
+  const scopeIssue = issueScopeOf(session);
+  if (!scopeIssue || report.outcome !== "completed") return issues;
+  const item = issues.find((issue) => issue.id === scopeIssue);
+  if (!item || item.deliver !== "answer" || latestSessionIdOf(item) !== session.id) return issues;
+  return withIssue(issues, omitUndefined({ ...item, answer: report.answer }));
+}
+
 /** The findings still open: a failed acceptance's, until the next acceptance passes. */
 export const openFindings = (t: T.Issue) => t.findings.filter((f) => !f.resolved).length;
 
 /** Assigned to an agent on duty (onDuty: whether a profile id is one's): its standing session answers it, none is hired for it. */
 export const assignedOnDuty = (t: T.Issue, onDuty: (id: string) => boolean) => onDuty(assignedAgentOf(t) ?? "");
-
-export const isClosed = (s: T.IssueStatus) => s === "done" || s === "canceled";

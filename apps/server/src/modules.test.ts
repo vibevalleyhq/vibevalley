@@ -94,13 +94,7 @@ const foreignQueries = (file: string, edges: readonly Edge[], named: typeof fore
 };
 
 /** The deliveries' machinery inside session: other modules reach it through mailbox.ts's types and session.ts. */
-const deliveryFiles = new Set([
-  "modules/session/deliveries.ts",
-  "modules/session/pump.ts",
-  "modules/session/routing.ts",
-  "modules/session/triggers.ts",
-  "modules/session/work.ts",
-]);
+const deliveryFiles = new Set(["modules/session/deliveries.ts", "modules/session/routing.ts", "modules/session/work.ts"]);
 const mailboxContracts = new Set([
   "modules/session/envelope.ts",
   "modules/session/payload.ts",
@@ -326,10 +320,10 @@ describe("the modules", () => {
     const channel = join(src, "modules/channel/writing.ts");
     expect(mailboxLeaks(inspect(channel, 'import { Mailbox } from "#/modules/session/mailbox.ts";'))).toEqual([]);
     expect(mailboxLeaks(inspect(channel, 'import { triggerOf } from "#/modules/session/payload.ts";'))).toEqual([]);
-    expect(mailboxLeaks(inspect(channel, 'export * from "../session/triggers.ts";'))).toEqual(["modules/session/triggers.ts"]);
-    expect(mailboxLeaks(inspect(channel, 'const journal = import("#/modules/session/triggers.ts");'))).toEqual(["modules/session/triggers.ts"]);
+    expect(mailboxLeaks(inspect(channel, 'export * from "../session/work.ts";'))).toEqual(["modules/session/work.ts"]);
+    expect(mailboxLeaks(inspect(channel, 'const work = import("#/modules/session/work.ts");'))).toEqual(["modules/session/work.ts"]);
     const payload = join(src, "modules/session/payload.ts");
-    expect(mailboxLeaks(inspect(payload, 'export { triggerJournal } from "./triggers.ts";'))).toEqual(["modules/session/triggers.ts"]);
+    expect(mailboxLeaks(inspect(payload, 'export { makeWorkMailbox } from "./work.ts";'))).toEqual(["modules/session/work.ts"]);
     expect(mailboxLeaks(inspect(payload, 'import { Db } from "#/infra/db.ts";'))).toEqual(["infra/db.ts"]);
     expect(mailboxLeaks(inspect(payload, 'import * as q from "#db/session_trigger.sql.ts";')).toSorted()).toEqual(["#db/session_trigger.sql.ts"]);
   });
@@ -354,5 +348,58 @@ describe("the modules", () => {
     expect(
       testBoundaryLeaks(inspect(issueTest, 'import { moduleWorld } from "#/testing/world.ts";\nimport * as qe from "#db/issue_github_event.sql.ts";')),
     ).toEqual([]);
+  });
+
+  it("keep test harnesses out of platform, modules and gateway production files", () => {
+    const found = sources()
+      .filter(({ from }) => containers.some((c) => from.startsWith(`${c}/`)))
+      .flatMap(({ from, local }) => local.filter((to) => outside.includes(to.split("/")[0]!)).map((to) => `${from} -> ${to}`));
+    expect(
+      found,
+      "a production file under platform/, modules/, or gateway/ imports from testing/ or flows/. Fix: move the test helper or fixture into src/testing/ so production modules stay free of test harness dependencies. See apps/server/src/modules.ts",
+    ).toEqual([]);
+  });
+
+  it("keep client-only package subpaths out of server production files", () => {
+    const clientOnly = new Set([
+      "@vibevalley/artifact/blocks",
+      "@vibevalley/artifact/editor",
+      "@vibevalley/pkm/days",
+      "@vibevalley/pkm/editing",
+      "@vibevalley/pkm/selection",
+      "@vibevalley/pkm/view",
+      "@vibevalley/pkm/writer",
+    ]);
+    const found = sources().flatMap(({ from, edges }) => edges.filter(({ from: spec }) => clientOnly.has(spec)).map(({ from: spec }) => `${from} -> ${spec}`));
+    expect(
+      found,
+      "a server production file imports a client-only subpath of @vibevalley/artifact or @vibevalley/pkm. Fix: use shared/server subpaths instead",
+    ).toEqual([]);
+  });
+
+  it("keep session lifecycle and protocol free of issue and refining branches", () => {
+    const lifecycleFiles = new Set(["executor.ts", "hands.ts", "history.ts", "lifecycle.ts", "report.ts", "roster.ts", "session.ts", "signals.ts"]);
+    const sessionLeakIn = (name: string, text: string): string[] => {
+      const hits: string[] = [];
+      if (/\brefining\b/u.test(text)) hits.push(`${name}: refining`);
+      if (/\.scope\??\.kind\b|\bscope_kind\s*[!=]==/u.test(text)) hits.push(`${name}: scope.kind branch`);
+      if (lifecycleFiles.has(name) && /\.(issue|refining)\b/u.test(text)) hits.push(`${name}: .issue/.refining`);
+      return hits;
+    };
+    const found = readdirSync(join(src, "modules/session"))
+      .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+      .flatMap((name) => sessionLeakIn(name, readFileSync(join(src, "modules/session", name), "utf8")));
+    const protocolSessionDir = join(src, "../../../packages/protocol/src/session");
+    for (const name of ["shapes.ts", "schema.ts"]) {
+      const text = readFileSync(join(protocolSessionDir, name), "utf8");
+      if (/\b(IssueId|IssueAnswer|refining)\b|\bissue\s*[?:]/u.test(text)) found.push(`protocol/session/${name}`);
+    }
+    expect(
+      found,
+      "session lifecycle or protocol branches on issue/refining or inspects scope.kind. Fix: express behavior via SessionPolicy and Session.scope instead of issue/refining special cases. See docs/subsystems/session.md",
+    ).toEqual([]);
+    expect(sessionLeakIn("lifecycle.ts", "if (h.issue) return;")).toEqual(["lifecycle.ts: .issue/.refining"]);
+    expect(sessionLeakIn("hands.ts", 'if (s.scope?.kind === "draft") return;')).toEqual(["hands.ts: scope.kind branch"]);
+    expect(sessionLeakIn("mailbox.ts", "const x = opt.refining;")).toEqual(["mailbox.ts: refining"]);
   });
 });

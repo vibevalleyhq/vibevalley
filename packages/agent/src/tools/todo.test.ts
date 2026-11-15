@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { add, begin, finished, readyTodos, requeue, settle, type Todo, TodoError, text, update } from "./todo.ts";
+import { add, finished, readyTodos, type Todo, TodoError, text, update } from "./todo.ts";
 
 const ids = (g: readonly Todo[]) => g.map((t) => t.id);
 
@@ -80,25 +80,5 @@ describe("an agent's own todos", () => {
       ].join("\n"),
     );
     expect(text([])).toBe("现在没有任务。");
-  });
-
-  test("a subagent's task goes out and comes back", () => {
-    let [g] = add(
-      [],
-      [
-        { id: "a", brief: "查 A", by: "subagent" },
-        { id: "b", brief: "查 B", by: "subagent", after: ["a"] },
-      ],
-    );
-    g = begin(g, "a");
-    expect([g[0]!.state, readyTodos(g).length]).toEqual(["working", 0]);
-    g = settle(g, "a", "超时了", true);
-    expect([g[0]!.state, g[0]!.tries]).toEqual(["waiting", 1]);
-    g = settle(begin(g, "a"), "a", "还是超时", true);
-    expect(g[0]!.state).toBe("failed");
-    g = update(g, "a", { state: "waiting" });
-    g = settle(begin(g, "a"), "a", "A 在 x.go", false);
-    expect([g[0]!.state, g[0]!.result, ids(readyTodos(g))]).toEqual(["done", "A 在 x.go", ["b"]]);
-    expect(requeue(begin(g, "b"), ["b"])[1]!.state).toBe("waiting");
   });
 });

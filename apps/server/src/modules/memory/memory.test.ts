@@ -10,11 +10,11 @@ import { ApiError, BizCode } from "@vibevalley/protocol/api";
 import { user, worker } from "#/base/actor.ts";
 import { agentHome } from "#/infra/config.ts";
 import { testConfig } from "#/testing/layers.ts";
+import { memoryWorld } from "#/testing/memory.ts";
 import { allow, refuse } from "#/testing/refuse.ts";
 import * as q from "#db/memory.sql.ts";
 
 import { memoryIsNewNote, issueMemoryText, recallChars } from "./recall.ts";
-import { memoryWorld } from "./testWorld.ts";
 
 const refusal = async (p: Promise<unknown>): Promise<ApiError> => {
   const e = await p.then(
@@ -70,7 +70,7 @@ describe("memory", () => {
       said: "记住：停下的不算",
       summary: "",
     });
-    const all = await m.list("lab");
+    const all = (await m.memoriesOf("lab")).memories;
     expect(all.map((x) => `${x.kind}:${x.text}`).toSorted()).toEqual([
       "issue:加分页 → 没做成：测试没过",
       "note:提交信息写中文",
@@ -80,7 +80,7 @@ describe("memory", () => {
     const picked = await m.recall({ agent: "lab", session: "w9", repo: "clock", text: "跑测试" });
     expect(picked.ids).toHaveLength(3);
     expect(picked.lines[0]).toBe("- （这个仓库）这个仓库用 pnpm test 跑测试");
-    for (const x of await m.list("lab")) expect([x.recalled, x.recalledAt !== undefined]).toEqual([1, true]);
+    for (const x of (await m.memoriesOf("lab")).memories) expect([x.recalled, x.recalledAt !== undefined]).toEqual([1, true]);
     const note = await m.write({ agent: "lab", text: "  周末别派夜班  ", repo: " clock ", by: user });
     expect([note.text, note.repo, note.kind]).toEqual(["周末别派夜班", "clock", "note"]);
     const writtenFailure = await refusal(m.write({ agent: "lab", text: "  ", repo: "", by: user }));
@@ -88,9 +88,9 @@ describe("memory", () => {
     await m.forget("lab", note.id);
     // One that is not there is missing, not silently passed over.
     expect((await refusal(m.forget("lab", "not-a-number"))).bizCode).toBe(BizCode.MemoryNotFound);
-    const ms = await m.list("lab");
+    const ms = (await m.memoriesOf("lab")).memories;
     expect(ms).toHaveLength(3);
-    const ms2 = await m.list("other");
+    const ms2 = (await m.memoriesOf("other")).memories;
     expect(ms2).toHaveLength(0);
   });
 
@@ -101,7 +101,7 @@ describe("memory", () => {
       const m = w.memory;
       const port = m.forAgent(defaultOrchestrator, defaultOrchestrator);
       await port.remember("agent note");
-      const written = await m.remember({ agent: defaultOrchestrator, text: "user note", repo: "", by: user });
+      const written = await m.write({ agent: defaultOrchestrator, text: "user note", repo: "", by: user });
       expect((await m.memoriesOf(defaultOrchestrator)).memories.map((note) => note.author)).toEqual(["user", "agent"]);
       expect((await port.read()).prompt).toContain("用户交代：user note");
       await port.rewrite("# notes\n- replacement note\n- 用户交代：user note");
@@ -124,10 +124,10 @@ describe("memory", () => {
     const preview = await m.recallOf("lab", "clock", "");
     expect(preview.lines).toEqual(["- （这个仓库）clock 的测试用 pnpm test", "- （所有仓库）提交前跑 lint"]);
     expect(preview.limit).toBe(recallChars);
-    for (const x of await m.list("lab")) expect([x.recalled, x.fading]).toEqual([0, false]);
+    for (const x of (await m.memoriesOf("lab")).memories) expect([x.recalled, x.fading]).toEqual([0, false]);
     expect((await m.recallOf("lab", "", "")).lines).toEqual([]);
     for (let i = 0; i < 300 - 10; i++) await m.write({ agent: "lab", text: `第 ${i} 条，各不相同 ${i * 7919}`, repo: "", by: user });
-    expect((await m.list("lab")).filter((x) => x.fading)).toHaveLength(2);
+    expect((await m.memoriesOf("lab")).memories.filter((x) => x.fading)).toHaveLength(2);
   });
 
   test("the search index follows the table", async () => {
@@ -169,13 +169,13 @@ describe("memory", () => {
     await using w = await memoryWorld(testConfig());
     const m = w.memory;
     await m.keep({ agent: "lab", session: "chat", repo: "demo", brief: "解释一下测试", outcome: "completed", said: "解释好了", summary: "解释好了" });
-    const ms = await m.list("lab");
+    const ms = (await m.memoriesOf("lab")).memories;
     expect(ms).toEqual([]);
     await m.write({ agent: "lab", text: "这个仓库用 pnpm test 跑测试", repo: "", by: worker("chat") });
-    expect((await m.list("lab")).map(({ kind, text, session }) => ({ kind, text, session }))).toEqual([
+    expect((await m.memoriesOf("lab")).memories.map(({ kind, text, session }) => ({ kind, text, session }))).toEqual([
       { kind: "note", text: "这个仓库用 pnpm test 跑测试", session: "chat" },
     ]);
-    expect((await m.list("lab"))[0]?.repo).toBeUndefined();
+    expect((await m.memoriesOf("lab")).memories[0]?.repo).toBeUndefined();
   });
 
   test("a run's notes go back when its issue memory cannot be written", async () => {
@@ -184,11 +184,11 @@ describe("memory", () => {
     const sql = w.db.sql;
     await refuse(sql, "fail_write", "before insert on memory", "new.kind = 'issue'", "write failed");
     await m.keep(run("s1", "记住：不要覆盖用户改动"));
-    const ms = await m.list("lab");
+    const ms = (await m.memoriesOf("lab")).memories;
     expect(ms).toEqual([]);
     await allow(sql, "fail_write");
     await m.keep(run("s1", "记住：不要覆盖用户改动"));
-    const ms2 = await m.list("lab");
+    const ms2 = (await m.memoriesOf("lab")).memories;
     expect(ms2).toHaveLength(1);
   });
 
@@ -197,7 +197,7 @@ describe("memory", () => {
     const m = w.memory;
     await m.write({ agent: "lab", text: "use pnpm test", repo: "demo", by: worker("s1") });
     await m.write({ agent: "lab", text: "use pnpm test", repo: "demo", by: worker("s1") });
-    const ms = await m.list("lab");
+    const ms = (await m.memoriesOf("lab")).memories;
     expect(ms).toHaveLength(2);
   });
 
@@ -211,13 +211,13 @@ describe("memory", () => {
         await q.addNote(w.db.sql, { id, agent: "lab", body: id, terms: "", terms_of: 0, repo: null, session: null, author: "agent", created_at: 1 });
       else await q.keepIssueMemory(w.db.sql, { id, agent: "lab", body: id, terms: "", terms_of: 0, repo: null, session: id, created_at: 1 });
     }
-    const before = await m.list("lab");
+    const before = (await m.memoriesOf("lab")).memories;
     const predicted = before.filter((x) => x.fading).map((x) => x.id);
     for (const [index, text] of ["apple", "banana", "cherry", "durian", "elephant", "flamingo", "giraffe", "hamster"].entries())
       await m.write({ agent: "lab", text, repo: "", by: worker(String(index)) });
     await m.keep(run("0", ""));
     await m.keep(run("1", ""));
-    const after = new Set((await m.list("lab")).map((x) => x.id));
+    const after = new Set((await m.memoriesOf("lab")).memories.map((x) => x.id));
     expect(predicted).toHaveLength(10);
     expect(before.filter((x) => !after.has(x.id)).map((x) => x.id)).toEqual(predicted);
   });
@@ -227,7 +227,7 @@ describe("memory", () => {
     mkdirSync(join(agentHome(config, defaultOrchestrator), "MEMORY.md"), { recursive: true });
     await using w = await memoryWorld(config);
     const m = w.memory;
-    const note = await m.remember({ agent: defaultOrchestrator, text: "database memory", repo: "", by: user });
+    const note = await m.write({ agent: defaultOrchestrator, text: "database memory", repo: "", by: user });
     expect((await m.memoriesOf(defaultOrchestrator)).memories[0]?.id).toBe(note.id);
     expect((await refusal(m.previewForget("orchestrator", "m1"))).bizCode).toBe(BizCode.MemoryNotFound);
     expect((await refusal(m.forget("orchestrator", "m1"))).bizCode).toBe(BizCode.MemoryNotFound);

@@ -9,7 +9,7 @@
 import { Semaphore, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { assignedAgentOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, issueScopeOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
 import { BizCode, lookIn, missing, refuseIn } from "#/base/errors.ts";
@@ -20,9 +20,9 @@ import type { ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import { keyedLater, type Time } from "#/infra/time.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
+import type { ProfileStore } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
-import type { Accepted, Delivery, Hearer } from "#/modules/session/envelope.ts";
+import type { Accepted, Delivery } from "#/modules/session/envelope.ts";
 import { deliveryScope, type SourceEvent } from "#/modules/session/payload.ts";
 import * as S from "#/modules/session/schema.ts";
 import { runOf, type Session } from "#/modules/session/session.ts";
@@ -57,10 +57,12 @@ export interface QueuedInput {
 }
 
 export interface Intake {
-  /** A recorded trigger routed: into the pool of the issue whose threads it is in (the user's words, or anything not
-   * heard by the watch), else to its hearers, else to the orchestrator it names or the one of its place. Refusals are
-   * ApiErrors (a trigger in two issues' threads). */
-  readonly route: (trigger: Trigger, hearers?: readonly Hearer[]) => Promise<void>;
+  /** If the trigger is in an issue's threads (or already held in its pool), pool it into that issue and flush when
+   * runnable; returns whether an issue took it. Refusals are ApiErrors (a trigger in two issues' threads). */
+  readonly pool: (trigger: Trigger) => Promise<boolean>;
+  /** A recorded non-watch trigger routed: into the pool of the issue whose threads it is in, else to the orchestrator it
+   * names or the one of its place. Refusals are ApiErrors (a trigger in two issues' threads). */
+  readonly route: (trigger: Trigger) => Promise<void>;
   /** A source's event recorded as a trigger and routed; the farm's own echo is neither. */
   readonly receive: (event: SourceEvent) => Promise<Accepted>;
   /** The threads whose words reach the issue's helper; a thread another issue has is refused. */
@@ -98,7 +100,7 @@ export interface IntakeDeps {
   readonly log: Logger;
   readonly db: Db;
   readonly core: Core;
-  readonly agent: Agent;
+  readonly agent: ProfileStore;
   readonly session: Session;
   readonly channel: Channel;
 }
@@ -192,42 +194,38 @@ export function issueIntake(deps: IntakeDeps): Intake {
   };
   const flushIssue = (issue: T.IssueId, human?: boolean) => locked(() => flush(issue, human));
 
-  const take = async (trigger: Trigger, hearers?: readonly Hearer[]): Promise<void> => {
+  const poolIn = async (trigger: Trigger): Promise<boolean> => {
     const existing = await qi.existingIssueInput(db.sql, { trigger_id: trigger.id });
     if (existing) {
       // A dispatch is in its pool before it is routed (queueDispatch).
       await sessions.route(trigger, [], deliveryScope(placeOf(trigger), existing.issue_id));
       if (existing.state === "held") await flush(existing.issue_id);
-      return;
+      return true;
     }
-    if (!hearers && (await sessions.isRouted(trigger.id))) return;
-    // What the watch heard is in an issue's threads only when the user said it.
-    const threads = hearers && trigger.actor.kind !== "user" ? [] : trigger.threads;
-    const matches = await qs.subscribedIssues(db.sql, { keys: [...threads] });
+    if (trigger.threads.length === 0) return false;
+    const matches = await qs.subscribedIssues(db.sql, { keys: [...trigger.threads] });
     const ids = new Set(matches.map((row) => row.issue_id));
-    for (const thread of threads.filter((thread) => thread.startsWith("issue:"))) {
+    for (const thread of trigger.threads.filter((thread) => thread.startsWith("issue:"))) {
       const id = issueId(thread.slice(6));
       if (issueOf(id) || (await issueQ.issueExists(db.sql, { id })) !== undefined) ids.add(id);
     }
     if (ids.size > 1) throw refused(t("server.mailbox.ambiguous"));
     const issue = ids.values().next().value;
-    if (issue) {
-      await qi.holdIssueTrigger(db.sql, { issue_id: issue, trigger_id: trigger.id, created_at: clock.now() });
-      await sessions.route(trigger, [], deliveryScope(placeOf(trigger), issue));
-      await flush(issue, trigger.actor.kind === "user");
-      return;
-    }
-    const to: readonly Delivery[] = hearers
-      ? hearers.map((h) => ({
-          session: h.session,
-          heard: { reason: h.reason, wakes: h.wakes, ...(h.heldBy ? { heldBy: h.heldBy } : {}) },
-          role: h.role,
-          event: h.event,
-        }))
-      : [{ session: sessionId(orchestratorFor(trigger)) }];
+    if (!issue) return false;
+    await qi.holdIssueTrigger(db.sql, { issue_id: issue, trigger_id: trigger.id, created_at: clock.now() });
+    await sessions.route(trigger, [], deliveryScope(placeOf(trigger), issue));
+    await flush(issue, trigger.actor.kind === "user");
+    return true;
+  };
+
+  const take = async (trigger: Trigger): Promise<void> => {
+    if (await poolIn(trigger)) return;
+    if (await sessions.isRouted(trigger.id)) return;
+    const to: readonly Delivery[] = [{ session: sessionId(orchestratorFor(trigger)) }];
     await sessions.route(trigger, to);
   };
-  const route = (trigger: Trigger, hearers?: readonly Hearer[]) => locked(() => take(trigger, hearers));
+  const pool = (trigger: Trigger) => locked(() => poolIn(trigger));
+  const route = (trigger: Trigger) => locked(() => take(trigger));
 
   const subscribe = async (issue: T.IssueId, threads: readonly string[]): Promise<void> => {
     if (!issueOf(issue)) throw missing(t("server.issue.issueRef", { ref: issue }), [lookIn.issue]);
@@ -258,16 +256,20 @@ export function issueIntake(deps: IntakeDeps): Intake {
   };
 
   const bindIssue = (issue: T.Issue) =>
-    subscribe(issue.id, [`issue:${issue.id}`, ...(issue.repo && issue.pullRequest ? [`github:${issue.repo}#${issue.pullRequest.number}`] : [])]);
+    subscribe(issue.id, [
+      `issue:${issue.id}`,
+      ...(issue.repo && issue.pullRequest ? [`github:${issue.repo}#${issue.pullRequest.number}`] : []),
+      ...(issue.cron ? [`cron:${issue.cron}`] : []),
+    ]);
   const onFact = (fact: T.ServerEvent) =>
     bestEffort(log, "intake: issue routing", async () => {
       if (fact.type === "issueChanged") {
         await bindIssue(fact.issue);
         if (fact.issue.status === "done" || fact.issue.status === "canceled") await flushIssue(fact.issue.id);
         else later(`issue:${fact.issue.id}`, () => flushIssue(fact.issue.id));
-      } else if (fact.type === "sessionChanged" && fact.session.issue && issueOf(fact.session.issue) !== undefined) {
-        const issue = fact.session.issue;
-        later(`issue:${issue}`, () => flushIssue(issue));
+      } else if (fact.type === "sessionChanged") {
+        const issue = issueScopeOf(fact.session);
+        if (issue && issueOf(issue) !== undefined) later(`issue:${issue}`, () => flushIssue(issue));
       } else if (
         fact.type === "channelChanged" &&
         fact.channel.subjectKind === "issue" &&
@@ -298,6 +300,7 @@ export function issueIntake(deps: IntakeDeps): Intake {
   });
 
   return {
+    pool,
     route,
     receive: async (event) => {
       if (event.selfEcho === true) return {};

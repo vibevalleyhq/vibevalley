@@ -2,12 +2,13 @@ import { spawn, spawnSync } from "node:child_process";
 import { createServer as createListener } from "node:net";
 import { join } from "node:path";
 
-import { build, createServer } from "vite-plus";
+import { createServer } from "vite-plus";
 
 import { devPageEnv } from "../src/base/devPage.ts";
 
 const desktop = join(import.meta.dirname, "..");
 const web = join(desktop, "..", "web");
+const repo = join(desktop, "../..");
 
 const run = (cmd: string, args: string[], cwd: string) => {
   const done = spawnSync(cmd, args, { cwd, stdio: "inherit" });
@@ -28,9 +29,8 @@ async function freePort(): Promise<number> {
 }
 
 if (import.meta.main) {
-  run("vp", ["run", "build"], desktop);
-  // The window's opening cover is dist/opening.html, shown before the page is asked for; one build writes it.
-  await build({ root: web });
+  // The window's opening cover is apps/web/dist/opening.html, shown before the page is asked for.
+  run("vp", ["run", "--filter", "@vibevalley/web", "--filter", "@vibevalley/desktop", "build"], repo);
   const serverPort = await freePort();
   // Loopback only, like the server. The page and its hot updates come from here; /api (its SSE and sockets too) goes to the server.
   const page = await createServer({
@@ -44,7 +44,7 @@ if (import.meta.main) {
     throw new Error("vibevalley dev: Vite's page server did not say where it listens");
   }
   const env = { ...process.env, VIBEVALLEY_DEV: "1", ...devPageEnv({ page: url, serverPort }) };
-  const electron = spawn("pnpm", ["exec", "electron", "."], { cwd: desktop, env, stdio: "inherit" });
+  const electron = spawn(join(desktop, "node_modules/.bin/electron"), ["."], { cwd: desktop, env, stdio: "inherit" });
   electron.on("exit", (code) => {
     void page.close().then(() => process.exit(code ?? 0));
   });

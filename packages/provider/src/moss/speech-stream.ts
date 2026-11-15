@@ -3,8 +3,9 @@ import { z } from "zod";
 import { boundedBody, Deadline, decodeText, mediaType, type ProviderHttp, ProviderTransportError, send } from "../base/http.ts";
 import { fromJson, int } from "../base/json.ts";
 import { SseRetry, SseTooLarge, type SseEvent, sseEvents } from "../base/sse.ts";
-import { AudioId, audioJson, AudioUsage, audioUsage, invalidAudioResponse, MossAudioError, type MossAudioUsage } from "./audio-response.ts";
-import { badKey, MossResponseTooLarge, readMossResponse, rejectedStatuses } from "./response.ts";
+import { AudioId, audioJson, AudioUsage, audioUsage, invalidAudioResponse, type MossAudioUsage } from "./audio-response.ts";
+import { MossError } from "./error.ts";
+import { badKey, readMossResponse, rejectedStatuses } from "./response.ts";
 import { prepareMossSpeech } from "./speech.ts";
 
 const maxEventSize = 1 << 20;
@@ -59,7 +60,7 @@ export type MossSpeechEvent =
   | { readonly type: "speech.audio.delta"; readonly audio: Uint8Array; readonly usage?: MossAudioUsage }
   | { readonly type: "speech.audio.done"; readonly usage?: MossAudioUsage; readonly durationSeconds?: number };
 
-const tooLarge = () => new MossAudioError({ reason: "TooLarge", outcome: "Unknown" });
+const tooLarge = () => new MossError({ reason: "TooLarge", outcome: "Unknown" });
 
 /** Strict Base64 (padding only at the end, length a multiple of 4; line breaks ignored), or undefined. */
 function base64(text: string): Uint8Array | undefined {
@@ -71,8 +72,8 @@ function base64(text: string): Uint8Array | undefined {
 async function* events(key: string, input: unknown, http: ProviderHttp, signal: AbortSignal): AsyncGenerator<MossSpeechEvent> {
   const request = await prepareMossSpeech(input);
   if (!FlashModel.safeParse(request.model).success || request.response_format !== "pcm")
-    throw new MossAudioError({ reason: "InvalidInput", outcome: "NotSubmitted" });
-  if (badKey(key)) throw new MossAudioError({ reason: "Credentials", outcome: "NotSubmitted" });
+    throw new MossError({ reason: "InvalidInput", outcome: "NotSubmitted" });
+  if (badKey(key)) throw new MossError({ reason: "Credentials", outcome: "NotSubmitted" });
   const { delivery_method: _delivery, ...prepared } = request;
   const body = audioJson({ ...prepared, stream: true, stream_format: "sse", async: false });
   const response = await send(
@@ -89,7 +90,7 @@ async function* events(key: string, input: unknown, http: ProviderHttp, signal: 
   if (response.status < 200 || response.status >= 300) {
     const raw = await readMossResponse(response, signal);
     const missingVoice = fromJson(VoiceNotFound, raw) !== undefined;
-    throw new MossAudioError({
+    throw new MossError({
       reason: "HttpStatus",
       status: response.status,
       outcome: rejectedStatuses.includes(response.status) || (response.status === 404 && missingVoice) ? "Rejected" : "Unknown",
@@ -168,9 +169,9 @@ export async function* streamMossSpeech(key: string, input: unknown, http: Provi
   try {
     yield* events(key, input, http, deadline.signal);
   } catch (e) {
-    if (deadline.expired) throw new MossAudioError({ reason: "Timeout", outcome: "Unknown" });
-    if (e instanceof ProviderTransportError) throw new MossAudioError({ reason: "Network", outcome: "Unknown" });
-    if (e instanceof MossResponseTooLarge || e instanceof SseTooLarge) throw tooLarge();
+    if (deadline.expired) throw new MossError({ reason: "Timeout", outcome: "Unknown" });
+    if (e instanceof ProviderTransportError) throw new MossError({ reason: "Network", outcome: "Unknown" });
+    if (e instanceof SseTooLarge) throw tooLarge();
     if (e instanceof SseRetry) throw invalidAudioResponse();
     throw e;
   } finally {

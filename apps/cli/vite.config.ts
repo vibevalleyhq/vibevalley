@@ -12,8 +12,7 @@ export default defineConfig({
   },
   run: {
     tasks: {
-      build: { command: "vp pack", cache: { input: [{ auto: true }, "!node_modules", "!dist/**"] } },
-      test: { command: "vp test run" },
+      test: "vp test run",
     },
   },
 });

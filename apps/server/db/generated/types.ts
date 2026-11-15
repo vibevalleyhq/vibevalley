@@ -151,5 +151,8 @@ export type Words_session_role = z.infer<typeof Words_session_role>
 export const Words_session_run_outcome = z.enum(["completed","failed","interrupted"])
 export type Words_session_run_outcome = z.infer<typeof Words_session_run_outcome>
 
+export const Words_session_scope_kind = z.enum(["issue","draft","channel","duty"])
+export type Words_session_scope_kind = z.infer<typeof Words_session_scope_kind>
+
 export const Words_user_device_came = z.enum(["paired","login"])
 export type Words_user_device_came = z.infer<typeof Words_user_device_came>

@@ -1,7 +1,7 @@
 import { list, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { IssueStatusValues } from "@vibevalley/protocol";
-import { assignmentOf, assignedAgentOf, isOneOf, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, isOneOf, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 
 import { BizCode, lookIn, refuseIn } from "#/base/errors.ts";
 import type { Time } from "#/infra/time.ts";
@@ -81,7 +81,7 @@ export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
     const { agent, ...fields } = edit;
     if (agent === undefined) return { ...issue, ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)) };
     const nextAgent = nullText(agent);
-    const current = assignmentOf(issue);
+    const current = issue.assignments.findLast((assignment) => assignment.endedAt === undefined);
     const at = clock.now();
     const assignments = [
       ...issue.assignments.map((assignment) => (assignment.id === current?.id && assignment.agent !== nextAgent ? { ...assignment, endedAt: at } : assignment)),
@@ -127,7 +127,7 @@ export function issueSettling(r: IssueLifecycle, d: Pick<IssueDispatch, "readyOf
       }
       case "failed": {
         const lastRun = last !== undefined ? sessions.live(last).session?.lastRun : undefined;
-        const unread = issue.deliver === "answer" && lastRun?.outcome === "completed" && !lastRun.answer;
+        const unread = issue.deliver === "answer" && lastRun?.outcome === "completed" && !issue.answer;
         return unread
           ? answerCureWords(t("server.session.answer.noBlock"))
           : cureWords((last !== undefined ? sessions.live(last).session?.brief : undefined) ?? issue.title);

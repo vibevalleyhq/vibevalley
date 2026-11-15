@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { demoJitter, demoPieces } from "@vibevalley/artifact/html";
+import { blocksOfMarkdown, inlineSpans, markdownOf } from "@vibevalley/artifact/markdown";
+import { ordered, Page, unmarked, wire } from "@vibevalley/artifact/ops";
 import { Hub, isAbort, mapConcurrent, Semaphore, TaskGroup } from "@vibevalley/async";
 import { list, t } from "@vibevalley/i18n";
 import { dayMs, userId } from "@vibevalley/protocol";
@@ -19,10 +22,6 @@ import * as qb from "#db/artifact_block.sql.ts";
 import * as qr from "#db/artifact_block_revision.sql.ts";
 import * as qc from "#db/artifact_change.sql.ts";
 import * as qs from "#db/artifact_suggestion.sql.ts";
-
-import { blocksOfMarkdown, inlineSpans, markdownOf } from "./markdown.ts";
-import { ordered, Page, unmarked, wire } from "./ops.ts";
-import { demoJitter, demoPieces } from "./policy.ts";
 
 const refused = refuseIn(BizCode.ArtifactRefused);
 
@@ -48,13 +47,6 @@ interface BlockStore {
     attrs: T.BlockAttrs,
     text: string,
   ) => Promise<[T.Block | undefined, T.BlockOpResult | undefined]>;
-  readonly updateText: (
-    id: T.ArtifactId,
-    actor: string,
-    block: T.BlockId,
-    baseRev: number,
-    text: string,
-  ) => Promise<[T.Block | undefined, T.BlockOpResult | undefined]>;
   readonly insertBlock: (id: T.ArtifactId, actor: string, req: T.BlockCreate) => Promise<T.BlockOpResult>;
   readonly updateBlock: (id: T.ArtifactId, actor: string, req: T.BlockUpdate) => Promise<T.BlockOpResult>;
   readonly deleteBlock: (id: T.ArtifactId, actor: string, req: T.BlockDelete) => Promise<T.BlockOpResult>;
@@ -66,7 +58,6 @@ interface BlockStore {
   readonly rejectSuggestion: (id: T.ArtifactId, suggestion: T.SuggestionId, actor: string) => Promise<T.Suggestion>;
   readonly suggestionStream: (id: T.ArtifactId, signal?: AbortSignal) => AsyncIterable<T.SuggestionEvent>;
   readonly demo: (id: T.ArtifactId, helpers: readonly T.Agent[]) => Promise<void>;
-  readonly demoRunning: () => boolean;
   /** Stops the demo and the daily prune. */
   readonly close: () => Promise<void>;
 }
@@ -612,13 +603,11 @@ export async function makeBlockStore(deps: BlockStoreDeps, found: (id: T.Artifac
   };
 
   return {
-    demoRunning: () => demoOn,
     blocks,
     fill,
     markdown: async (id) => markdownOf(await blocks(id)),
     submit,
     append,
-    updateText,
     insertBlock,
     updateBlock,
     deleteBlock,

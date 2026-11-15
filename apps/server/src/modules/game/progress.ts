@@ -8,9 +8,9 @@ import { IssueId, SessionId } from "@vibevalley/protocol/schema";
 
 import type { Fact } from "#/core/core.ts";
 import { localParts } from "#/infra/time.ts";
-import { type AchievementDef, achievements } from "#/modules/agent/seed.ts";
-import { isHired, isOnDuty, sessionOf, sessionOnIssue } from "#/modules/session/roster.ts";
+import { isHired, isOnDuty, sessionOf, sessionOnScope } from "#/modules/session/roster.ts";
 
+import { type AchievementDef, achievements } from "./seeds.ts";
 import { achievementInWords, levelForCommits } from "./view.ts";
 
 const LedgerEntryMomentKindValues = ["opened", "split", "voice", "busy6"] as const;
@@ -259,7 +259,7 @@ export function entriesFor(before: T.SpaceState, fact: Fact, after: T.SpaceState
     case "messageChanged": {
       if (fact.message.actor.kind === "user") {
         if (fact.thread) {
-          const h = sessionOnIssue(before, fact.thread);
+          const h = sessionOnScope(before, fact.thread);
           if (h) out.push({ kind: "told", session: h.id });
         }
         for (const named of fact.message.mentions) {

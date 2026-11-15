@@ -12,7 +12,7 @@ import { BizCode, bizError, memoriesOf, missing } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
 import { type Db, SqlError } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
+import type { ProfileStore } from "#/modules/agent/agent.ts";
 import type { Setting } from "#/platform/setting/setting.ts";
 import * as q from "#db/memory.sql.ts";
 
@@ -52,7 +52,6 @@ export interface Recalled {
 export interface Memory {
   readonly forAgent: (agent: string, session: string) => MemoryPort;
   readonly memoriesOf: (agent: string) => Promise<T.MemoryList>;
-  readonly remember: (n: Note) => Promise<T.Memory>;
   readonly forget: (agent: string, id: string) => Promise<void>;
   /** What forget would do, refused as it would be; nothing changes. */
   readonly previewForget: (agent: string, id: string) => Promise<T.Preview>;
@@ -65,8 +64,6 @@ export interface Memory {
   readonly keep: (run: FinishedRun) => Promise<void>;
   readonly endSession: (s: EndedSession) => Promise<void>;
   readonly write: (n: Note) => Promise<T.Memory>;
-  readonly list: (agent: string) => Promise<T.Memory[]>;
-  readonly sources: () => Promise<T.MemorySourceInfo[]>;
   /** Stops cutting terms again, then drains and stops the memory sources. */
   readonly close: () => Promise<void>;
 }
@@ -77,7 +74,7 @@ export interface MemoryDeps {
   readonly fetch: typeof fetch;
   readonly db: Db;
   readonly setting: Setting;
-  readonly agent: Agent;
+  readonly agent: ProfileStore;
 }
 
 /** Which outside source a configured one is; tests put their own. */
@@ -111,8 +108,6 @@ export async function makeMemory(deps: MemoryDeps, options: MemoryOptions = {}):
     await loadSegmenter();
     await local.recutTerms(signal);
   });
-
-  const list = async (agent: string) => (await sources.list(agent)).memories;
 
   const write = async (n: Note) => {
     const kept = await local.write(n);
@@ -179,7 +174,6 @@ export async function makeMemory(deps: MemoryDeps, options: MemoryOptions = {}):
       };
     },
     memoriesOf: (agent) => sources.list(agent),
-    remember: (n) => write(n),
     forget: async (agent, id) => {
       await forgettable(agent, id);
       await forget(agent, id);
@@ -218,8 +212,6 @@ export async function makeMemory(deps: MemoryDeps, options: MemoryOptions = {}):
     },
     endSession: (s) => sources.endSession(s),
     write,
-    list,
-    sources: () => sources.info(),
     close: async () => {
       await tasks.close();
       await sources.close();

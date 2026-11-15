@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（24 篇）
+## proposed（23 篇）
 
 ### feature
 
@@ -21,7 +21,6 @@
 
 ### architecture
 
-- 2026-11-12 [会话执行策略解耦与透明归属（`Session.scope`）](.agents/notes/proposed/architecture/2026-11-12-orthogonal-domains-and-event-watch.md)
 - 2026-11-11 [扩展剩余跨模块品牌主键与 SQL 主外键自动品牌生成](.agents/notes/proposed/architecture/2026-11-11-type-driven-boundaries-and-branded-ids.md)
 - 2026-11-10 [拆出 apps/machine：一个服务端经出站长连接管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)

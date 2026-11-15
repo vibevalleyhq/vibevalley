@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { z } from "zod";
 
+import { withTimeout } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 
@@ -13,7 +14,7 @@ import { type Attachment, attachmentMax } from "#/platform/attachment/attachment
 import type { MediaInputReference } from "#/platform/provider/vendors.ts";
 
 import { audioResultMax, type StagedAudioResult } from "./input.ts";
-import { bodyChunks, inTime } from "./job.ts";
+import { bodyChunks } from "./job.ts";
 import { validateSpeechBytes } from "./validateSpeechBytes.ts";
 
 const refused = refuseIn(BizCode.MediaRefused);
@@ -135,39 +136,44 @@ export async function saveAudioResult(
     throw failed();
   }
   if (!publicHttps(url)) throw failed();
-  return inTime(
-    async (within) => {
-      let response: Response;
-      try {
-        response = await deps.publicFetch(url, { headers: { accept: types[format].join(", ") }, redirect: "manual", signal: within });
-      } catch (e) {
-        if (within.aborted) throw e;
-        deps.log.warn(`media: audio for ${id} could not be fetched`, e);
-        throw failed();
-      }
-      if (response.status !== 200 || !types[format].includes(response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "")) {
-        await response.body?.cancel().catch(() => undefined);
-        throw failed();
-      }
-      const declared = response.headers.get("content-length");
-      let length: number | undefined;
-      if (declared !== null) {
-        const got = Length.safeParse(declared);
-        if (!got.success) {
+  try {
+    return await withTimeout(
+      async (within) => {
+        let response: Response;
+        try {
+          response = await deps.publicFetch(url, { headers: { accept: types[format].join(", ") }, redirect: "manual", signal: within });
+        } catch (e) {
+          if (within.aborted) throw e;
+          deps.log.warn(`media: audio for ${id} could not be fetched`, e);
+          throw failed();
+        }
+        if (response.status !== 200 || !types[format].includes(response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "")) {
           await response.body?.cancel().catch(() => undefined);
           throw failed();
         }
-        length = got.data;
-      }
-      try {
-        return await saveAudioStream(deps, id, format, checked(response, length, within), inputs, undefined, within);
-      } catch (e) {
-        // Given up before the body was read (a deadline while staging began): it is let go here, not left open.
-        if (!response.bodyUsed) await response.body?.cancel().catch(() => undefined);
-        throw e;
-      }
-    },
-    downloadMs,
-    { clock: deps.clock, signal, timedOut: failed },
-  );
+        const declared = response.headers.get("content-length");
+        let length: number | undefined;
+        if (declared !== null) {
+          const got = Length.safeParse(declared);
+          if (!got.success) {
+            await response.body?.cancel().catch(() => undefined);
+            throw failed();
+          }
+          length = got.data;
+        }
+        try {
+          return await saveAudioStream(deps, id, format, checked(response, length, within), inputs, undefined, within);
+        } catch (e) {
+          // Given up before the body was read (a deadline while staging began): it is let go here, not left open.
+          if (!response.bodyUsed) await response.body?.cancel().catch(() => undefined);
+          throw e;
+        }
+      },
+      downloadMs,
+      { clock: deps.clock, ...(signal === undefined ? {} : { signal }), what: "the audio download" },
+    );
+  } catch (e) {
+    if (signal?.aborted !== true && e instanceof DOMException && e.name === "TimeoutError") throw failed();
+    throw e;
+  }
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { flatBlocks } from "@vibevalley/pkm";
+import { type Page, parse } from "@vibevalley/pkm/markdown";
+import { flatBlocks } from "@vibevalley/pkm/outline";
 
 import { backlinks, exportMarkdown, keepLinks, pageOf, plainOf, radar, renameLinks, search, summaryOf, transclusions, type Vault } from "./graph.ts";
-import { type Page, parse } from "./outline.ts";
 
 const day = 24 * 60 * 60 * 1000;
 const now = Date.UTC(2026, 10, 3, 4);

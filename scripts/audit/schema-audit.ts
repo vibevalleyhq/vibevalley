@@ -15,6 +15,7 @@ const serverLiterals = (file: string, name: string): readonly string[] => {
 };
 const TriggerSourceValues = serverLiterals("apps/server/src/modules/session/shapes.ts", "TriggerSourceValues");
 const SessionCloseValues = serverLiterals("packages/protocol/src/session/shapes.ts", "SessionCloseValues");
+const SessionScopeKindValues = serverLiterals("packages/protocol/src/session/shapes.ts", "SessionScopeKindValues");
 const MediaPhaseValues = serverLiterals("packages/protocol/src/media/shapes.ts", "MediaPhaseValues");
 const MediaUnderstandingPhaseValues = serverLiterals("packages/protocol/src/media/shapes.ts", "MediaUnderstandingPhaseValues");
 const sqlPath = "apps/server/db/migrations/0001_schema.up.sql";
@@ -209,6 +210,7 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "issue.canceled", protocol: "IssueCanceledValues", values: T.IssueCanceledValues },
   { column: "issue.deliver", protocol: "DeliverableValues", values: T.DeliverableValues },
   { column: "session.role", protocol: "AgentRoleValues", values: T.AgentRoleValues },
+  { column: "session.scope_kind", protocol: "SessionScopeKindValues", values: SessionScopeKindValues },
   { column: "session.closed", protocol: "SessionCloseValues", values: SessionCloseValues },
   { column: "session_run.outcome", protocol: "OutcomeValues", values: T.OutcomeValues },
   { column: "session_delivery.source", protocol: "TriggerSourceValues", values: TriggerSourceValues },

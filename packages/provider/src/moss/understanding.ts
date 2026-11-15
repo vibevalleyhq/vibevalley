@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { bounded, type ProviderHttp, send } from "../base/http.ts";
 import { codePoints, fromJson, httpsUrl, int } from "../base/json.ts";
-import { badKey, type MossErrorFields, MossResponseTooLarge, readMossResponse, rejectedStatuses } from "./response.ts";
+import { MossError } from "./error.ts";
+import { badKey, readMossResponse, rejectedStatuses } from "./response.ts";
 import { mossUnderstandingModels } from "./understanding-models.ts";
 
 const FileId = codePoints(1, 256).regex(/\S/u);
@@ -31,21 +32,7 @@ const Answer = z.object({
   usage: z.object({ input_tokens: Tokens, output_tokens: Tokens, total_tokens: Tokens }),
 });
 
-class MossUnderstandingError extends Error {
-  override readonly name = "MossUnderstandingError";
-  readonly reason: MossErrorFields["reason"];
-  readonly outcome: MossErrorFields["outcome"];
-  declare readonly status?: number;
-
-  constructor(fields: MossErrorFields) {
-    super(`MOSS understanding: ${fields.reason}`);
-    this.reason = fields.reason;
-    this.outcome = fields.outcome;
-    if (fields.status !== undefined) this.status = fields.status;
-  }
-}
-
-const invalidInput = () => new MossUnderstandingError({ reason: "InvalidInput", outcome: "NotSubmitted" });
+const invalidInput = () => new MossError({ reason: "InvalidInput", outcome: "NotSubmitted" });
 
 export const prepareMossUnderstanding = async (input: unknown) => {
   const parsed = Input.safeParse(input);
@@ -83,7 +70,7 @@ export const understandMossMedia = (key: string, input: unknown, http: ProviderH
     180_000,
     http,
     async (signal) => {
-      if (badKey(key)) throw new MossUnderstandingError({ reason: "Credentials", outcome: "NotSubmitted" });
+      if (badKey(key)) throw new MossError({ reason: "Credentials", outcome: "NotSubmitted" });
       const request = await prepareMossUnderstanding(input);
       let body: string;
       try {
@@ -102,21 +89,15 @@ export const understandMossMedia = (key: string, input: unknown, http: ProviderH
         },
         signal,
       );
-      let raw: string;
-      try {
-        raw = await readMossResponse(response, signal);
-      } catch (e) {
-        if (e instanceof MossResponseTooLarge) throw new MossUnderstandingError({ reason: "TooLarge", outcome: "Unknown" });
-        throw e;
-      }
+      const raw = await readMossResponse(response, signal);
       if (response.status !== 200)
-        throw new MossUnderstandingError({
+        throw new MossError({
           reason: "HttpStatus",
           status: response.status,
           outcome: rejectedStatuses.includes(response.status) ? "Rejected" : "Unknown",
         });
       const result = fromJson(Answer, raw);
-      if (result === undefined) throw new MossUnderstandingError({ reason: "InvalidResponse", outcome: "Unknown" });
+      if (result === undefined) throw new MossError({ reason: "InvalidResponse", outcome: "Unknown" });
       const incompleteReason: "max_output_tokens" | null =
         result.status === "incomplete" && result.incomplete_details?.reason === "max_output_tokens" ? "max_output_tokens" : null;
       return {
@@ -129,7 +110,7 @@ export const understandMossMedia = (key: string, input: unknown, http: ProviderH
       };
     },
     {
-      timeout: () => new MossUnderstandingError({ reason: "Timeout", outcome: "Unknown" }),
-      network: () => new MossUnderstandingError({ reason: "Network", outcome: "Unknown" }),
+      timeout: () => new MossError({ reason: "Timeout", outcome: "Unknown" }),
+      network: () => new MossError({ reason: "Network", outcome: "Unknown" }),
     },
   );

@@ -6,8 +6,9 @@ import { isAbort, Semaphore, TaskGroup } from "@vibevalley/async";
 import { list as listText, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { maxRunning } from "@vibevalley/protocol";
-import { githubRepository, slice } from "@vibevalley/protocol/rules";
+import { githubRepository } from "@vibevalley/protocol/rules";
 
+import { slice } from "#/base/clip.ts";
 import { errnoOf } from "#/base/errors.ts";
 import { numberIn } from "#/base/order.ts";
 import { reposDir, type ServerConfig, worktreesDir } from "#/infra/config.ts";
@@ -201,7 +202,7 @@ export interface Repo {
   readonly clearCheckout: (repo: string, issue: number, work?: WorkplaceCleanup) => Promise<WorkplaceRelease>;
   readonly changes: (place: Workplace) => Promise<T.Changes>;
   readonly branchChanges: (repo: string, branch: string) => Promise<T.Changes | undefined>;
-  readonly conflict: (place: Workplace, baseBranch?: string) => Promise<T.Conflict | undefined>;
+  readonly conflict: (place: Workplace, baseBranch?: string) => Promise<T.Issue["conflict"]>;
   readonly merge: (place: Workplace, signal?: AbortSignal) => Promise<Merged>;
   readonly mergeInto: (place: Workplace, target: string, targetCwd?: string, signal?: AbortSignal) => Promise<Merged>;
   readonly openBranch: (repo: string, branch: string, from?: string) => Promise<void>;

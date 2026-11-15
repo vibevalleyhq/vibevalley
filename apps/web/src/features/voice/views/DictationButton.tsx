@@ -1,58 +1,13 @@
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 
 import { t } from "@vibevalley/i18n";
 
-import { createExternal } from "#/base/external.ts";
-import { dictation, type DictationPhase, insertDictated } from "#/features/voice/model/dictation.ts";
-import { ready, useSettings } from "#/infra/query.ts";
-import { useRouter } from "#/infra/router.ts";
+import { dictation, type Dictating, type DictationState, useDictation } from "#/features/voice/model/dictation.ts";
 import { Icon, type IconSize } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
 
-export type DictationState = "unset" | DictationPhase;
-
-/** One field's hold on the page's recorder: the words go into it at its caret, for the user to read before sending. */
-export function useDictation(field: {
-  input: () => HTMLTextAreaElement | HTMLInputElement | undefined;
-  value: () => string;
-  onValue: (v: string, caret: number) => void;
-}) {
-  const version = createExternal(dictation.subscribe, () => dictation.version);
-  const me = {};
-  onSettled(() => () => dictation.release(me));
-  // Unknown until the settings are read; the server says what is missing then.
-  const settings = useSettings();
-  const router = useRouter();
-  const off = () => ready(settings, undefined)?.readiness.dictation.ready === false;
-  const toggle = () =>
-    // Like an event handler, it reads the field as it is when the words come.
-    void dictation.toggle(me, (words) => {
-      const el = field.input();
-      const now = field.value();
-      const start = el?.selectionStart ?? now.length;
-      const end = el?.selectionEnd ?? now.length;
-      const next = insertDictated(now, start, end, words);
-      field.onValue(next.value, next.caret);
-      requestAnimationFrame(() => {
-        el?.focus();
-        el?.setSelectionRange(next.caret, next.caret);
-      });
-    });
-  return {
-    state: (): DictationState => (off() ? "unset" : (version(), dictation.phase)),
-    /** This field started what is going on now. */
-    mine: () => (version(), dictation.owns(me)),
-    problem: () => (version(), dictation.problemFor(me)),
-    toggle,
-    done: () => dictation.done(me),
-    cancel: () => dictation.cancel(me),
-    dismiss: () => dictation.dismiss(),
-    setUp: () => router.navigate("/settings/dictation"),
-  };
-}
-
-export type Dictating = ReturnType<typeof useDictation>;
+export type { DictationState };
 
 /** Held this long, letting go stops it: push to talk. A shorter press leaves it listening until the next. */
 const holdMs = 400;
@@ -262,16 +217,4 @@ export function DictationProblem(props: { dictating: Dictating }) {
       )}
     </Show>
   );
-}
-
-/** What a box's key does while its field listens: Esc drops the recording, Enter stops it and fills in the words. Gives
- * true when it took the key. */
-export function dictationKey(d: Dictating, e: KeyboardEvent): boolean {
-  if (e.isComposing || !d.mine() || d.state() !== "recording") return false;
-  if (e.key === "Escape") d.cancel();
-  else if (e.key === "Enter" && !e.shiftKey) d.done();
-  else return false;
-  e.preventDefault();
-  e.stopPropagation();
-  return true;
 }

@@ -8,11 +8,11 @@ import { BizCode } from "@vibevalley/protocol/api";
 
 import { mp3, wav } from "#/modules/media/testdata/audio.ts";
 import { testConfig, waitFor } from "#/testing/layers.ts";
+import { downloads, mediaFarm, type MediaFarmOptions, never, vendor } from "#/testing/media.ts";
 import * as q from "#db/media_job.sql.ts";
 
 import { newJob } from "./job.ts";
 import type { MediaCaller } from "./media.ts";
-import { downloads, mediaFarm, type MediaFarmOptions, never, vendor } from "./testing.ts";
 
 const notIn = (value: unknown, secret: string) => {
   expect(JSON.stringify(value)).not.toContain(secret);

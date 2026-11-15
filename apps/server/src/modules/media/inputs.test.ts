@@ -12,11 +12,11 @@ import { wav } from "#/modules/media/testdata/audio.ts";
 import { png } from "#/modules/media/testdata/png.ts";
 import { type Attachment, makeAttachment } from "#/platform/attachment/attachment.ts";
 import { testConfig, testDb } from "#/testing/layers.ts";
+import { allow, heldTime, hours, refuse } from "#/testing/media.ts";
 import * as q from "#db/media_input.sql.ts";
 
 import { diskStorage, type MediaInputStorage } from "./input.ts";
 import { type Inputs, makeInputs } from "./inputs.ts";
-import { allow, heldTime, hours, refuse } from "./testing.ts";
 
 const notIn = (value: unknown, secret: string) => {
   expect(JSON.stringify(value)).not.toContain(secret);

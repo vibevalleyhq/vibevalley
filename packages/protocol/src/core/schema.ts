@@ -5,7 +5,7 @@ import type { Codec } from "../codec";
 import { SessionId } from "../common/schema";
 import { ConnectorStatus, FactConnectorChanged } from "../connector/schema";
 import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema";
-import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/schema";
+import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress } from "../game/schema";
 import { InboxItem } from "../inbox/schema";
 import { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/schema";
 import { MediaJob, FactMediaChanged } from "../media/schema";
@@ -41,7 +41,6 @@ const SpaceState = z.object({
   ...spaceFields,
   sessions: z.array(Session),
   crons: z.array(Cron),
-  plays: z.exactOptional(z.record(z.string(), SessionPlay)),
 }) satisfies Codec<T.SpaceState>;
 
 const SpaceView = z.object({

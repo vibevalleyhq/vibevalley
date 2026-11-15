@@ -6,7 +6,7 @@ import pkg from "./package.json" with { type: "json" };
 
 // The components' tests run in headless Chromium: a real <dialog> top layer, focus, keyboard and layout, which a fake DOM does not have.
 export default defineConfig({
-  plugins: lazyPlugins(() => [solid()]),
+  plugins: lazyPlugins(() => [solid()]) ?? [],
   // Bundled before the first test: found mid-run, Vite reloads the page and the run fails on a cold cache (as on CI).
   optimizeDeps: { include: ["solid-js", "@solidjs/web", "@floating-ui/dom", "axe-core"] },
   test: {

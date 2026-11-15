@@ -1,6 +1,6 @@
 import { stories, story, type Story } from "@vibevalley/stories";
 
-import type { MossQos } from "#/features/voice/model/mossLine.ts";
+import type { MossQos } from "#/features/voice/model/moss-line.ts";
 
 import { MossLineView, type MossLineState } from "./MossPlayground";
 

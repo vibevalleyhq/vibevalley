@@ -15,6 +15,7 @@ import * as qm from "#db/channel_message.sql.ts";
 
 import {
   type ChannelEvent,
+  type ChannelHub,
   type Committed,
   channelType,
   metaOf,
@@ -27,7 +28,6 @@ import {
   theRow,
 } from "./contracts.ts";
 import { linksIn, readEmbed } from "./embeds.ts";
-import type { ChannelHub } from "./hub.ts";
 import { mentionsIn } from "./mentions.ts";
 
 export interface ChannelWritingDeps {

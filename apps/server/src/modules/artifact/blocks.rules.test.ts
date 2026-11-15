@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { normalSpans } from "@vibevalley/artifact";
+import { normalSpans } from "@vibevalley/artifact/blocks";
+import { blocksOfMarkdown, markdownOf, type MdBlock } from "@vibevalley/artifact/markdown";
+import { ordered, Page, plain, runeLen, sameText, splitAt } from "@vibevalley/artifact/ops";
 import type { Block, BlockAttrs, BlockOp, BlockOpStatus, BlockType, TextSpan } from "@vibevalley/protocol";
 import { keyBetween, validKey } from "@vibevalley/protocol/rules";
 import type { Wire } from "@vibevalley/protocol/schema";
 
 import { bold, para, sample, span } from "#/testing/artifact.ts";
-
-import { blocksOfMarkdown, markdownOf, type MdBlock } from "./markdown.ts";
-import { ordered, Page, plain, runeLen, sameText, splitAt } from "./ops.ts";
 
 // The cases write ids as the wire has them; the page takes them as read.
 const branded = <A>(wire: Wire<A>): A => wire as A;

@@ -20,7 +20,7 @@
 | `apps/server/src/platform/provider/provider.ts` | [AI 服务](docs/subsystems/provider.md)：连接与用途规则、模型目录；私有配置仍由 Setting 保存 |
 | `apps/server/src/platform/setting/` | `setting.ts`、`provider.ts`（`bindingOf`）、`readiness.ts`、`memorySources.ts`、`voice.ts` |
 | `apps/server/src/base/redact.ts` | 日志与出站文本密钥脱敏（`redact`、`redactOutput`） |
-| `apps/web/src/features/setting/` | 工作台设置页（`SettingsPage.tsx`、`SettingsForm.tsx`、`Readiness.tsx`） |
+| `apps/web/src/features/setting/` | 工作台设置页（`SettingsPage.tsx`、`SettingsForm.tsx`；跨功能共享的 `Readiness` 在 `apps/web/src/ui/domain/settings.tsx`） |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`setting.get`、`setting.validate`、`setting.update`）。
 

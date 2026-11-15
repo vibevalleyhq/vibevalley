@@ -247,11 +247,11 @@
       "inProcess": false
     },
     "antigravity": {
-      "steer": false,
+      "steer": true,
       "refused": {
         "systemPrompt": "Antigravity ACP cannot replace the system prompt",
-        "appendSystemPrompt": "Antigravity ACP cannot append to the system prompt",
-        "effort": "Antigravity has no channel for effort"
+        "disallowedTools": "Antigravity ACP has no per-session tool blocklist",
+        "mcpServerCredentials": "Antigravity stores MCP server env and headers in plain text in its conversation database; entries with env or headers cannot be attached"
       },
       "capabilities": ["listModels", "checkUpdate"],
       "inProcess": false

@@ -1,15 +1,24 @@
 import { expect, test } from "vite-plus/test";
 
 import type * as T from "@vibevalley/protocol";
+import { IssueStatusValues } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
 
 import { goesOnFrom, holdReasonOf, readyInputs } from "./inputs.ts";
 import type { IssueMandate } from "./status.ts";
 
-const issue = (state: T.IssueStage["state"]) => ({ stage: { state } as T.IssueStage, mandate: { maxBotReviewRounds: 2 } as IssueMandate });
+const defaultMandate: IssueMandate = { strength: "explicit", maxBotReviewRounds: 2, autoSubmitPr: false };
+const issue = (state: T.IssueStage["state"], status: T.IssueStatus = "in_progress") => ({
+  status,
+  stage: { state, acts: [] },
+  mandate: defaultMandate,
+});
 const bot = (botRound?: number) => ({ meta: botRound === undefined ? {} : { botRound }, actor: { kind: "system" as const, id: "ci" } });
 const user = { meta: {}, actor: { kind: "user" as const, id: "user" } };
 
-test("an issue's input stays held past its bot rounds, with no one to take it, or while the issue waits on the user", () => {
+test("an issue's input stays held when closed, past its bot rounds, with no one to take it, or while the issue waits on the user", () => {
+  expect(holdReasonOf(user, issue("done", "done"), "w1", true)).toBe("closed");
+  expect(holdReasonOf(bot(), issue("canceled", "canceled"), "w1", false)).toBe("closed");
   expect(holdReasonOf(bot(3), issue("working"), "w1", false)).toBe("budget");
   expect(holdReasonOf(bot(3), issue("working"), "w1", true)).toBeUndefined();
   expect(holdReasonOf(bot(2), issue("working"), "w1", false)).toBeUndefined();
@@ -22,9 +31,9 @@ test("an issue's input stays held past its bot rounds, with no one to take it, o
 
 test("a session is handed none of a closed issue's inputs, and while its issue waits on the user only the user's words or what waits with them", () => {
   const board: Record<string, Pick<T.Issue, "id" | "status" | "stage">> = {
-    open: { id: "open" as T.IssueId, status: "in_progress", stage: { state: "working" } as T.IssueStage },
-    asking: { id: "asking" as T.IssueId, status: "in_progress", stage: { state: "asking" } as T.IssueStage },
-    done: { id: "done" as T.IssueId, status: "done", stage: { state: "working" } as T.IssueStage },
+    open: { id: issueId("open"), status: "in_progress", stage: { state: "working", acts: [] } },
+    asking: { id: issueId("asking"), status: "in_progress", stage: { state: "asking", acts: [] } },
+    done: { id: issueId("done"), status: "done", stage: { state: "working", acts: [] } },
   };
   const of = (id: string) => board[id];
   const bots = { fromUser: false, pending: true };
@@ -57,6 +66,74 @@ test("a session is handed none of a closed issue's inputs, and while its issue w
       of,
     ),
   ).toEqual([true, true]);
+});
+
+test("holdReasonOf and readyInputs stay aligned across actor.kind x stage.state x open/closed", () => {
+  const actorsByKind: Record<T.Actor["kind"], T.Actor> = {
+    user: { kind: "user", id: "user" },
+    agent: { kind: "agent", id: "w2", role: "worker" },
+    system: { kind: "system", id: "ci" },
+  };
+  const stageWaitsForHuman: Record<T.IssueStageKind, boolean> = {
+    draft: false,
+    queued: false,
+    working: false,
+    asking: true,
+    reviewing: true,
+    stuck: true,
+    done: false,
+    canceled: false,
+  };
+  const openByStatus: Record<T.IssueStatus, boolean> = {
+    backlog: true,
+    todo: true,
+    in_progress: true,
+    in_review: true,
+    done: false,
+    canceled: false,
+  };
+  const actorKinds: readonly T.Actor["kind"][] = ["user", "agent", "system"];
+  const stageStates: readonly T.IssueStageKind[] = ["draft", "queued", "working", "asking", "reviewing", "stuck", "done", "canceled"];
+  const id = issueId("matrix");
+
+  for (const actorKind of actorKinds) {
+    const actor = actorsByKind[actorKind];
+    const fromUser = actor.kind === "user";
+    for (const stageState of stageStates) {
+      for (const status of IssueStatusValues) {
+        const item = { id, status, stage: { state: stageState, acts: [] }, mandate: defaultMandate };
+        const lookup = (target: string) => (target === id ? item : undefined);
+
+        const soloExpected = openByStatus[status] && (!stageWaitsForHuman[stageState] || fromUser);
+        const soloPoolPasses = holdReasonOf({ meta: {}, actor }, item, "w1", false) === undefined;
+        const [soloMailboxPasses] = readyInputs([{ issue: id, fromUser, pending: true }], lookup);
+        expect({ actorKind, stageState, status, soloPoolPasses, soloMailboxPasses }).toEqual({
+          actorKind,
+          stageState,
+          status,
+          soloPoolPasses: soloExpected,
+          soloMailboxPasses: soloExpected,
+        });
+
+        const withHumanExpected = openByStatus[status];
+        const withHumanPoolPasses = holdReasonOf({ meta: {}, actor }, item, "w1", true) === undefined;
+        const [withHumanMailboxPasses] = readyInputs(
+          [
+            { issue: id, fromUser, pending: true },
+            { issue: id, fromUser: true, pending: true },
+          ],
+          lookup,
+        );
+        expect({ actorKind, stageState, status, withHumanPoolPasses, withHumanMailboxPasses }).toEqual({
+          actorKind,
+          stageState,
+          status,
+          withHumanPoolPasses: withHumanExpected,
+          withHumanMailboxPasses: withHumanExpected,
+        });
+      }
+    }
+  }
 });
 
 test("an input goes on from its last session unless that session took it in or it was deleted", () => {

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { fromJson } from "../base/json.ts";
 
+export { MossError } from "./error.ts";
+
 export const mossRealtimeUrl = "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0";
 export const mossInRate = 16000;
 export const mossOutRate = 48000;

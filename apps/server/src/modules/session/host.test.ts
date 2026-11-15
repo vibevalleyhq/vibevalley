@@ -85,7 +85,7 @@ describe("AgentHost", () => {
     ]);
     farm.deepseek.use(llm);
     const memory = farm.memory;
-    await memory.remember({ agent: "orchestrator", text: "database preference", repo: "", by: user });
+    await memory.write({ agent: "orchestrator", text: "database preference", repo: "", by: user });
     const finished: Extract<SessionNews, { _tag: "RunFinished" }>[] = [];
     const consumed: Extract<SessionNews, { _tag: "Consumed" }>[] = [];
     const answeringRuns: (string | undefined)[] = [];
@@ -143,7 +143,7 @@ describe("AgentHost", () => {
     expect(consumed).toEqual([{ _tag: "Consumed", session: "orchestrator", envelopeIds: ["m1"] }]);
     expect(answeringRuns).toEqual([finished[0]!.id, finished[0]!.id]);
     expect(requests[0]!.system).toContain("database preference");
-    expect((await memory.list("orchestrator")).some((note) => note.text === "remembered in database")).toBe(true);
+    expect((await memory.memoriesOf("orchestrator")).memories.some((note) => note.text === "remembered in database")).toBe(true);
     expect(existsSync(join(config.home, "MEMORY.md"))).toBe(false);
     expect(sessions.runOf("orchestrator")).toBeUndefined();
     // A character at a time from the script: more pushes than answers.

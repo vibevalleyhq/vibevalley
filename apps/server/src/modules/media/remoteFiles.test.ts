@@ -8,11 +8,11 @@ import { makeAttachment } from "#/platform/attachment/attachment.ts";
 import { makeProvider } from "#/platform/provider/provider.ts";
 import { makeSetting } from "#/platform/setting/setting.ts";
 import { testConfig, testDb } from "#/testing/layers.ts";
+import { heldTime, never, vendor } from "#/testing/media.ts";
 import * as q from "#db/media_remote_file.sql.ts";
 
 import { makeInputs } from "./inputs.ts";
 import { makeRemoteFiles } from "./remoteFiles.ts";
-import { heldTime, never, vendor } from "./testing.ts";
 
 const notIn = (value: unknown, secret: string) => {
   expect(JSON.stringify(value)).not.toContain(secret);

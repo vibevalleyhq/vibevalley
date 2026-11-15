@@ -10,7 +10,7 @@ import { SkillsPage } from "#/features/runtime/index.ts";
 import { Account, Approvals, Devices } from "#/features/user/index.ts";
 import { MossPlayground, VoiceForm } from "#/features/voice/index.ts";
 import { Link as A, Navigate } from "#/infra/router.ts";
-import { SettingsPage as Page, SettingsSearch } from "#/ui/domain/settings.tsx";
+import { Readiness, SettingsPage as Page, SettingsSearch } from "#/ui/domain/settings.tsx";
 import { TextInput } from "#/ui/Field.tsx";
 import { Icon } from "#/ui/Icon.tsx";
 import type { IconName } from "#/ui/icons.ts";
@@ -19,7 +19,6 @@ import { Splitter, usePaneWidth } from "#/ui/Splitter.tsx";
 import { AboutPage } from "./AboutPage";
 import { AppearancePage } from "./AppearancePage";
 import { GeneralPage } from "./GeneralPage";
-import { Readiness } from "./Readiness.tsx";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
 
 /** The groups listed under their names. */

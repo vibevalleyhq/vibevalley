@@ -3,14 +3,13 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vite-plus/test";
 
+import { artifactMax } from "@vibevalley/artifact/html";
 import { sleep } from "@vibevalley/async";
 import { userId } from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
 import { artifactId } from "@vibevalley/protocol/schema";
 
 import { world } from "#/testing/world.ts";
-
-import { artifactMax } from "./policy.ts";
 
 const user = { from: userId, by: userId };
 const page = (words: string) => `<!doctype html><title>${words}</title><p>${words}</p>`;

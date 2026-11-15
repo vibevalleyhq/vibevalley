@@ -58,12 +58,6 @@ export interface MossSetup {
   readonly instructions: string;
 }
 
-export interface MossMessages {
-  readonly closed: () => string;
-  readonly noMic: () => string;
-  readonly formatError: (e: unknown) => string;
-}
-
 export const noisyMossActions: ReadonlySet<string> = new Set([
   "input.transcript.updated",
   "output.transcript.updated",

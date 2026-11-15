@@ -2,6 +2,7 @@ import { t } from "@vibevalley/i18n";
 import type { VoiceFix } from "@vibevalley/protocol/api";
 import type { Rtc, RtcLine } from "@vibevalley/protocol/host";
 
+import { createExternal } from "#/base/external.ts";
 import { messageOf } from "#/base/format.ts";
 import { api, faultOf, reasonOf } from "#/infra/api.ts";
 import { currentHost } from "#/infra/host.ts";
@@ -15,11 +16,7 @@ import { MossLine } from "./moss-line.ts";
 const mossRtc =
   (signal: AbortSignal): Rtc =>
   async (_grant, on) => {
-    const moss = new MossLine({
-      closed: () => t("web.voice.moss.closed"),
-      noMic: () => t("web.voice.call.noMic"),
-      formatError: messageOf,
-    });
+    const moss = new MossLine();
     let connected = false;
     let gone = false;
     let lastMic = 0;
@@ -422,3 +419,9 @@ export const voiceCall = new VoiceCall(() => {
   const pick = prefsNow().pick;
   return pick && pick !== "auto" ? pick : undefined;
 });
+
+/** The call as an accessor: the store counts its changes, so each read of the call goes through `version`. */
+export function createCall() {
+  const version = createExternal(voiceCall.subscribe, () => voiceCall.version);
+  return () => (version(), voiceCall);
+}

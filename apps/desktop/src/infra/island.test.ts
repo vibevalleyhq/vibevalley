@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import type { Issue, Session, StateFrame } from "@vibevalley/protocol";
+import type { Issue, SessionView, StateFrame } from "@vibevalley/protocol";
 
 import { glanceOf } from "./island";
 
@@ -25,9 +25,9 @@ const issue = (number: number, state: Issue["stage"]["state"], more: Partial<Iss
   }) as unknown as Issue;
 
 const working = (id: string, name: string, label: string) =>
-  ({ id, name, phase: { _tag: "working", since: 0, doing: { action: "run_command", label } } }) as unknown as Session;
+  ({ id, name, phase: { _tag: "working", since: 0, doing: { action: "run_command", label } }, phaseText: `在跑命令：${label}` }) as unknown as SessionView;
 
-const frame = (issues: Issue[], sessions: Session[] = []) => ({ state: { issues, sessions } }) as unknown as StateFrame;
+const frame = (issues: Issue[], sessions: SessionView[] = []) => ({ state: { issues, sessions } }) as unknown as StateFrame;
 
 describe("the island's glance", () => {
   test("shows the issues in flight, those waiting on the user first", () => {

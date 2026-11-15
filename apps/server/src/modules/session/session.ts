@@ -1,6 +1,7 @@
 import type { Subscription } from "@vibevalley/async";
 import type * as T from "@vibevalley/protocol";
 
+import { Inconsistent } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
 import type { ServerConfig } from "#/infra/config.ts";
 import type { Db } from "#/infra/db.ts";
@@ -22,7 +23,18 @@ import type { Trigger, IssueReport } from "./shapes.ts";
 
 export type { SessionOptions };
 export type { Hired, HireOptions, RunFinished, RunStore, SessionNews } from "./lifecycle.ts";
-export { DeliveryRefused, HireRefused, newsOf, NotRecorded, NotTakenIn, NotWorkFile, runOf } from "./lifecycle.ts";
+export {
+  channelSessionPolicy,
+  DeliveryRefused,
+  HireRefused,
+  newsOf,
+  NotRecorded,
+  NotTakenIn,
+  NotWorkFile,
+  refinementSessionPolicy,
+  runOf,
+  workSessionPolicy,
+} from "./lifecycle.ts";
 
 /** A session as this process has it now. */
 export interface Live {
@@ -52,9 +64,9 @@ export interface Session {
   /** A channel message's envelope taken back from every delivery that still waits on it. */
   readonly withdrawEnvelope: (envelope: T.MessageId) => Promise<void>;
   /** The chat the deliveries read their places from (the default channel and a participant's unread),
-   * told by the layer above the sessions; until then, an empty one. */
+   * told once before boot by the layer above the sessions; until then, an empty one. */
   readonly useChat: (view: ChatView) => void;
-  /** Which of a session's waiting inputs may be handed to it now, told by the issues above the sessions; until then, all. */
+  /** Which of a session's waiting inputs may be handed to it now, told once before boot by the layer above the sessions; until then, all. */
   readonly useReadiness: (ready: Readiness) => void;
   /** A session's pending inputs kept from waking it, or let wake it again (and it is woken): the wake breaker's call. */
   readonly holdWakes: (session: string, held: boolean) => Promise<void>;
@@ -75,8 +87,8 @@ export interface Session {
   readonly withIdleWorkplace: Lifecycle["withIdleWorkplace"];
   /** A session's branch reset to main while it stays. */
   readonly discardWork: (session: string) => Promise<void>;
-  /** An issue's checkout let go once no helper is on it. */
-  readonly clearWorkplace: (issue: string, repo: string, number: number, work?: WorkplaceCleanup) => Promise<WorkplaceRelease>;
+  /** A scope's checkout let go once no helper is on it. */
+  readonly clearWorkplace: (scopeId: string, repo: string, number: number, work?: WorkplaceCleanup) => Promise<WorkplaceRelease>;
   /** The helpers hired now. */
   readonly hired: () => readonly T.Session[];
   readonly live: (session: string) => Live;
@@ -139,13 +151,20 @@ export function insideOf(session: Session): Inside {
 /** The door over the parts: what makeSession returns, and what a test that plays the sessions builds over its own. */
 export function sessionOver(parts: { readonly lifecycle: Lifecycle; readonly mailbox: Mailbox; readonly close: () => Promise<void> }): Session {
   const { lifecycle, mailbox, close } = parts;
+  let booted = false;
   return {
     route: mailbox.route,
     recordTrigger: mailbox.recordTrigger,
     hireWith: mailbox.hireWith,
     withdrawEnvelope: mailbox.withdrawEnvelope,
-    useChat: mailbox.useChat,
-    useReadiness: mailbox.useReadiness,
+    useChat: (view) => {
+      if (booted) throw new Inconsistent("Session.useChat cannot be called after boot");
+      mailbox.useChat(view);
+    },
+    useReadiness: (ready) => {
+      if (booted) throw new Inconsistent("Session.useReadiness cannot be called after boot");
+      mailbox.useReadiness(ready);
+    },
     holdWakes: mailbox.holdWakes,
     agentWakes: mailbox.agentWakes,
     handBack: mailbox.handBack,
@@ -187,6 +206,7 @@ export function sessionOver(parts: { readonly lifecycle: Lifecycle; readonly mai
     who: lifecycle.who,
     host: lifecycle.host,
     boot: async () => {
+      booted = true;
       await lifecycle.boot();
       await mailbox.boot();
     },

@@ -15,6 +15,7 @@ export const modules: readonly Module[] = [
   { name: "Collaboration", parts: ["modules/channel", "modules/media", "modules/artifact", "modules/pkm"] },
   { name: "Issues", parts: ["modules/issue"] },
   { name: "Watch", parts: ["modules/watch"] },
+  { name: "Tools", parts: ["gateway/tool"] },
   { name: "Orchestrator", parts: ["modules/orchestrator"] },
   { name: "Gamification", parts: ["modules/game"] },
   {
@@ -22,7 +23,6 @@ export const modules: readonly Module[] = [
     parts: [
       "gateway/http",
       "gateway/mcp",
-      "gateway/tool",
       "gateway/lan",
       "gateway/connector",
       "gateway/voice",

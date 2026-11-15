@@ -1,10 +1,11 @@
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { everyone, userId, type Notify } from "@vibevalley/protocol";
-import { actorRoleOf, cut, defaultOf, latestSessionIdOf, needOf, omitUndefined, oneLine, slice } from "@vibevalley/protocol/rules";
+import { actorRoleOf, defaultOf, issueScopeOf, latestSessionIdOf, omitUndefined, oneLine } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
-import { clip } from "#/base/clip.ts";
+import { clip, cut, slice } from "#/base/clip.ts";
+import { needOf } from "#/modules/session/report.ts";
 import { isOnDuty } from "#/modules/session/roster.ts";
 
 import { patrolBrief, patrolWho } from "./prompts.ts";
@@ -107,7 +108,8 @@ function gathered(state: T.SpaceState): Unworded[] {
         });
         break;
       case "conflict": {
-        const files = (h.issue === undefined ? undefined : issuesById.get(h.issue)?.conflict?.files)?.length ?? 0;
+        const issue = issueScopeOf(h);
+        const files = (issue === undefined ? undefined : issuesById.get(issue)?.conflict?.files)?.length ?? 0;
         push({
           item: { id: `${h.id}:conflict:${h.runs}`, kind: "conflict", from, text: t("server.inbox.conflictFiles", { files }), at, target },
           channel,
@@ -189,7 +191,8 @@ type Want =
 
 /** What a session questions of the user. Its issue's stage says it, the one the issue page and the phone both read. */
 function wantOf(h: T.Session, issuesById: ReadonlyMap<string, T.Issue>): Want | undefined {
-  const candidate = h.issue === undefined ? undefined : issuesById.get(h.issue);
+  const scopeIssue = issueScopeOf(h);
+  const candidate = scopeIssue === undefined ? undefined : issuesById.get(scopeIssue);
   const issue = candidate && latestSessionIdOf(candidate) === h.id ? candidate : undefined;
   if (!issue) {
     const need = needOf(h);

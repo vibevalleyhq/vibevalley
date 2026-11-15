@@ -1,7 +1,8 @@
-import { merge, type Subscription, TaskGroup } from "@vibevalley/async";
+import { merge, TaskGroup } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { assignedAgentOf, latestSessionIdOf, sessionIdsOf, shortTitle } from "@vibevalley/protocol/rules";
+import { defaultOrchestrator } from "@vibevalley/protocol";
+import { assignedAgentOf, issueScopeOf, latestSessionIdOf, sessionIdsOf, shortTitle } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { actsForUser, type Actor, user as userActor } from "#/base/actor.ts";
@@ -13,30 +14,27 @@ import type { Db } from "#/infra/db.ts";
 import { bestEffort, type Logger } from "#/infra/log.ts";
 import type { Time } from "#/infra/time.ts";
 import type { Agent } from "#/modules/agent/agent.ts";
-import { templateCatalog } from "#/modules/agent/seed.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
-import type { Hearer } from "#/modules/session/envelope.ts";
-import type { Hired, HireOptions, SessionNews, Session } from "#/modules/session/session.ts";
+import type { Hired, SessionNews, Session } from "#/modules/session/session.ts";
 import type { Trigger } from "#/modules/session/shapes.ts";
-import * as cronQ from "#db/issue_cron.sql.ts";
 
 import { findingsOf, milestonesOf } from "./brief.ts";
+import { templateCatalog } from "./catalog.ts";
 import { explicitMandate, filledKinds, inferredMandate, mandateNoteFits, sentTitles } from "./creation.ts";
-import { type Due, issueCron } from "./cron.ts";
-import { type Dispatched, issueDispatch } from "./dispatch.ts";
+import { type Dispatched, issueDispatch, type IssueHireOptions } from "./dispatch.ts";
 import { makeGitHubPoller } from "./github.ts";
 import { readyInputs } from "./inputs.ts";
 import { type Intake, issueIntake } from "./intake.ts";
 import { issueLanding } from "./landing.ts";
 import { issueLifecycle } from "./lifecycle.ts";
-import { merging } from "./merge.ts";
 import { nextSteps } from "./moves.ts";
 import { needsUser } from "./prompts.ts";
 import { kept, refinement } from "./refinement.ts";
 import { issueSettling, type StatusOptions } from "./settle.ts";
 import { issueSplitting } from "./split.ts";
 import { assignedOnDuty, conflictOf, type Finding, isClosed, type IssueChildDraft, type IssueConstraints, type IssueMandate, pickIssues } from "./status.ts";
+import type { Due } from "./when.ts";
 
 export type { IssueChildDraft, IssueConstraints, IssueMandate };
 
@@ -146,34 +144,25 @@ export interface Issue {
   readonly templates: (repo: string) => Promise<T.RepoTemplates>;
   /** The runs that took the issue's inputs. */
   readonly runs: (id: string) => Promise<T.Run[]>;
-  /** A recorded trigger routed: into the pool of the issue whose threads it is in, else to the hearers given (as the
-   * watch braked them), else to the orchestrator it names or the one of its place (intake.ts). */
-  readonly route: (trigger: Trigger, hearers?: readonly Hearer[]) => Promise<void>;
+  /** If the trigger is in an issue's threads (or already held in its pool), pool it into that issue and flush when
+   * runnable; returns whether an issue took it (intake.ts). */
+  readonly pool: (trigger: Trigger) => Promise<boolean>;
+  /** A recorded non-watch trigger routed: into the pool of the issue whose threads it is in, else to the orchestrator it
+   * names or the one of its place (intake.ts). */
+  readonly route: (trigger: Trigger) => Promise<void>;
   /** The issue a trigger is an input of. */
   readonly ownerOf: (trigger: string) => Promise<T.IssueId | undefined>;
   /** A helper says an input is not its to take; the orchestrator is told why. */
   readonly decline: (session: string, envelope: string, reason: string) => Promise<void>;
   /** Throws HireRefused. */
-  readonly hire: (agent: T.Agent, brief: string, repo: string, opt?: HireOptions) => Promise<Hired>;
-  readonly pollGitHub: () => Promise<void>;
+  readonly hire: (agent: T.Agent, brief: string, repo: string, opt?: IssueHireOptions) => Promise<Hired>;
+  /** Creates or reopens the issue a due cron occurrence routes to, and subscribes its cron thread. */
+  readonly scheduled: (due: Due, input: Trigger) => Promise<T.Issue>;
   readonly refreshPullRequests: () => Promise<void>;
   readonly refreshQueue: () => Promise<void>;
   readonly submitPullRequest: (session: string, summary?: string) => Promise<string>;
-  /** The crons: each keeps one issue its due triggers go to. */
-  readonly crons: () => T.Cron[];
-  /** by is who asks, and on whose word (needsOK). */
-  readonly addCron: (req: T.CronRequest, by: Actor) => Promise<T.Cron>;
-  /** Turned on is the user's yes. */
-  readonly setCronEnabled: (id: string, enabled: boolean) => Promise<T.Cron>;
-  readonly removeCron: (id: string) => Promise<T.Cron>;
-  /** What removeCron would do, refused as it would be; nothing changes. */
-  readonly previewRemoveCron: (id: string) => Promise<T.Preview>;
-  /** The crons due now taken in, and those a restart left unrouted. */
-  readonly tickCrons: () => Promise<void>;
-  /** What comes due from now on, subscribed before it returns. */
-  readonly cronsDue: () => Subscription<Due>;
-  /** At startup, after the modules below it started: a first round of the queue, then the queue, the pull requests and
-   * the crons on their timers. (start is taken: it starts an issue.) */
+  /** At startup, after the modules below it started: a first round of the queue, then the queue and the pull requests
+   * on their timers. (start is taken: it starts an issue.) */
   readonly boot: () => Promise<void>;
   readonly close: () => Promise<void>;
 }
@@ -204,19 +193,20 @@ function failedText(findings: readonly Finding[], text: string): string {
   return out + t("server.issue.brief.failedEnd");
 }
 
-/** What of the issues' still points at a channel (its crons, the queued issues answering there), so deleting it is refused. */
-export const channelUses =
-  (deps: { readonly db: Db; readonly queued: () => Promise<readonly { readonly issue: string; readonly trigger: { readonly replyChannel?: string } }[]> }) =>
+/** What of the issues' still points at a channel (the queued issues answering there), so deleting it is refused. */
+const channelUses =
+  (deps: { readonly queued: () => Promise<readonly { readonly issue: string; readonly trigger: { readonly replyChannel?: string } }[]> }) =>
   async (id: string): Promise<readonly string[]> => {
-    const crons = (await cronQ.cronsIn(deps.db.sql, { channel_id: id }))?.n ?? 0;
     const queued = new Set((await deps.queued()).filter((q) => q.trigger.replyChannel === id).map((q) => q.issue)).size;
-    return [...(crons !== 0 ? [t("server.channel.cronsThere", { n: crons })] : []), ...(queued !== 0 ? [t("server.channel.queuedThere", { n: queued })] : [])];
+    return queued !== 0 ? [t("server.channel.queuedThere", { n: queued })] : [];
   };
 
-const intakes = new WeakMap<Issue, Intake>();
+export type IssueIntake = Intake & { readonly pollGitHub: () => Promise<void> };
+
+const intakes = new WeakMap<Issue, IssueIntake>();
 
 /** An issues module's intake (its pools, subscriptions and routing), for tests only (modules.test.ts keeps it so). */
-export function intakeOf(issue: Issue): Intake {
+export function intakeOf(issue: Issue): IssueIntake {
   const intake = intakes.get(issue);
   if (intake === undefined) throw new Error("not an issues module makeIssue made");
   return intake;
@@ -253,28 +243,13 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     setQueued,
     drop,
   } = r;
-  const landing = issueLanding(r, { core, log, repo: repos, session: sessions, channel: chat });
-  const { changesOf } = landing;
-  const { split, joinChildren } = issueSplitting(r, { agent: store, session: sessions, channel: chat, landing });
-  const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, session: sessions, intake, channel: chat, log });
-  const { hire, start, refreshQueue, reopen, scheduled } = d;
-  chat.guardRemoval(channelUses({ db, queued: () => intake.queued() }));
-  sessions.useReadiness((inputs) => readyInputs(inputs, (id) => core.state().issues.find((issue) => issue.id === id)));
-  const cron = await issueCron({ config, clock, log, db, core, agent: store, channel: chat, session: sessions, intake, scheduled });
-  const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, {
-    agent: store,
-    repo: repos,
-    session: sessions,
-    clock,
-    landing,
-  });
-
   /** Words for a session: said in its home, or in its issue's thread when it has none (the watch routes them). */
   const sayTo = async (from: string, session: string, text: string, sendKey = "") => {
     const live = sessions.live(session);
     let where = await chat.homeOf(session);
-    if (!where && live.reachable && live.session?.issue) {
-      const issue = await get(live.session.issue);
+    const liveIssue = live.reachable && live.session ? issueScopeOf(live.session) : undefined;
+    if (!where && liveIssue && live.session) {
+      const issue = await get(liveIssue);
       where = await chat.openThreadAbout("issue", issue.id, issue.title, live.session.channel);
     }
     if (!where) throw missing(t("server.channel.noHelper", { id: session }), [lookIn.session]);
@@ -282,18 +257,19 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     await chat.post({ from, channel: where, text, sendKey, ...(run ? { run } : {}) });
   };
 
-  const {
-    merge: mergeIssue,
-    refreshPullRequests,
-    submit,
-  } = merging({
-    core,
-    sessions,
-    tell: sayTo,
+  const landing = issueLanding(r, { core, log, repo: repos, session: sessions, channel: chat, tell: sayTo });
+  const { changesOf, merge: mergeIssue, refreshPullRequests, submit } = landing;
+  const { split, joinChildren } = issueSplitting(r, { agent: store, session: sessions, channel: chat, landing });
+  const d = issueDispatch(r, joinChildren, { core, agent: store, repo: repos, session: sessions, intake, channel: chat, log });
+  const { hire, start, refreshQueue, reopen, scheduled } = d;
+  chat.guardRemoval(channelUses({ queued: () => intake.queued() }));
+  sessions.useReadiness((inputs) => readyInputs(inputs, (id) => core.state().issues.find((issue) => issue.id === id)));
+  const { withEdit, settledMove, stuckWords, movesWords } = issueSettling(r, d, {
+    agent: store,
+    repo: repos,
+    session: sessions,
+    clock,
     landing,
-    get,
-    list: everyIssue,
-    setConflict,
   });
 
   const gitHub = makeGitHubPoller({ db, repo: repos, clock, log, receive: intake.receive });
@@ -305,6 +281,14 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
     if (!chosen) throw new AgentChoiceRefused("noneAvailable", key);
     if (key && chosen.id !== key && chosen.name !== key && chosen.runtime !== key) throw new AgentChoiceRefused("notFound", key);
     return chosen;
+  };
+
+  const resolveAssignee = (key: string): string => {
+    const k = key.trim();
+    if (k === "" || k === defaultOrchestrator) return k;
+    const found = store.named(k);
+    if (!found) throw refused(t("server.issue.noProfileNamed", { key }), [lookIn.agent]);
+    return found.id;
   };
 
   const submitPullRequest = async (rawSession: string, summary?: string) => {
@@ -393,8 +377,12 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       }
       agent = chosen.id;
     } else if (input.agent !== undefined) {
-      const trimmed = input.agent.trim();
-      agent = trimmed ? (store.named(trimmed)?.id ?? trimmed) : trimmed;
+      try {
+        agent = resolveAssignee(input.agent);
+      } catch (error) {
+        if (error instanceof ApiError) throw new IssueCreateRefused("notRecorded", { error });
+        throw error;
+      }
     }
     const mandate = actsForUser(input.by) ? explicitMandate(input.envelope ?? "", input.autoSubmitPr ?? false) : inferredMandate(input.envelope ?? "");
     let item: T.Issue;
@@ -473,10 +461,12 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         await bestEffort(log, `vibevalley: run ${n.run} on issue ${n.issue}`, () => intake.ranOn(n.run, n.issue));
         await unqueue(n.issue);
         return;
-      case "RunFinished":
+      case "RunFinished": {
+        const ownIssue = n.session ? issueOfSession(n.session) : undefined;
         // In-process orchestrator runs emit no `Reported`; move their issues to await user review when the turn ends.
-        for (const id of await intake.issuesOfRun(n.id, n.issue)) await bestEffort(log, `vibevalley: run ${n.id} finished on issue ${id}`, () => endRun(id));
+        for (const id of await intake.issuesOfRun(n.id, ownIssue)) await bestEffort(log, `vibevalley: run ${n.id} finished on issue ${id}`, () => endRun(id));
         return;
+      }
       default:
         return;
     }
@@ -540,7 +530,7 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         if (
           fact.type === "issueChanged"
             ? fact.issue.status === "backlog"
-            : fact.type !== "sessionLeft" && !(fact.type === "sessionChanged" && fact.session.issue !== undefined)
+            : fact.type !== "sessionLeft" && !(fact.type === "sessionChanged" && issueScopeOf(fact.session) !== undefined)
         )
           continue;
         await bestEffort(log, "issue: advance queued work", () => refreshQueue());
@@ -569,7 +559,8 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       if (released.kept) throw refused(t("server.issue.cannotMoveRepo", { n: was.number, why: released.reason }));
     }
     const criteria = upd.criteria !== undefined ? kept(upd.criteria) : was.criteria;
-    const agent = upd.agent ?? assignedAgentOf(was);
+    let agent = assignedAgentOf(was);
+    if (upd.agent !== undefined) agent = resolveAssignee(upd.agent);
     await saveEdit(was.id, {
       title,
       description,
@@ -704,7 +695,6 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
         await pollGitHub();
       }
     });
-    await cron.boot();
   };
 
   const issue: Issue = {
@@ -778,27 +768,20 @@ export async function makeIssue(deps: IssueDeps): Promise<Issue> {
       return { repo: name, stack, recent: sentTitles(all, name, store.isOrchestrator), kinds: filledKinds(templateCatalog(), stack) };
     },
     runs: async (id) => intake.runsOf((await get(id)).id),
+    pool: intake.pool,
     route: intake.route,
     ownerOf: intake.ownerOf,
     decline: intake.decline,
     hire,
-    pollGitHub,
+    scheduled,
     refreshPullRequests,
     refreshQueue,
-    crons: cron.list,
-    addCron: cron.add,
-    setCronEnabled: cron.setEnabled,
-    removeCron: cron.remove,
-    previewRemoveCron: cron.previewRemove,
-    tickCrons: cron.tick,
-    cronsDue: cron.due,
     boot: startup,
     close: async () => {
-      await cron.close();
       await tasks.close();
       await intake.close();
     },
   };
-  intakes.set(issue, intake);
+  intakes.set(issue, { ...intake, pollGitHub });
   return issue;
 }

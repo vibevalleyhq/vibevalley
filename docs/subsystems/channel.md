@@ -16,8 +16,8 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/channel/channel.ts`、`contracts.ts` | 对外 `Channel` 服务接口 |
-| `apps/server/src/modules/channel/store.ts`、`hub.ts`、`mutations.ts`、`rooms.ts` | `ChannelStore`（单写锁、`ChatModel` 内存镜像与 `db.afterCommit` 提交后同步、受管 `userReadHub` 发布）、频道增删改查与已读游标 |
+| `apps/server/src/modules/channel/channel.ts`、`contracts.ts` | 对外 `Channel` 服务接口、`ChannelHub`、消息修订与变更订阅流（`channel.follow`、`channel.reports`）与受管 `userReadHub` 发布 |
+| `apps/server/src/modules/channel/store.ts` | `ChannelStore`（单写锁、`Members`、`ChatModel` 内存镜像与 `db.afterCommit` 提交后同步）、频道增删改查与已读游标 |
 | `apps/server/src/modules/channel/writing.ts`、`directory.ts`、`meta.ts` | 消息、提及、串的成员、发言人的席位（`kind`、代谁说 `agent_id`）和消息附带的 `meta` 在一个事务里落库，连同带序号的事件（`channel_event`）；提交后把事件发给读者（`Channel.committed`），写话等读者处理完（`awaitReader`） |
 | `apps/server/src/modules/watch/` | 读者：[观察层](docs/subsystems/watch.md)按自己的游标读事件、排席位、路由、开串、回执 |
 | `apps/server/src/modules/channel/messages.ts`、`embeds.ts` | 地址解析、`@` 识别、搜索过滤与公网链接预览抓取 |
@@ -55,7 +55,7 @@
 
 用户发言可带 `to`（一个助手的档案 id）：只交给他，不交给成员，`to` 不是助手就拒绝；输入框的 `/imagegen` 用它把生图交给这里的助手（[媒体](docs/subsystems/media.md)）。
 
-「这里的助手」（`Channel.orchestratorIn`，`T.Channel.orchestrator`）由频道一处算（`hub.ts`，按助手的席位认谁是助手），信箱经 `Watch` 交给它的 `ChatView` 读同一个：私聊是对面（他是助手时），否则是频道成员里的默认助手或第一个助手，都没有就是默认助手；泛称的「@助手」、派活说明的署名、没指定人的工单和定时任务、没人收的机器事件都交给它。
+「这里的助手」（`Channel.orchestratorIn`，`T.Channel.orchestrator`）由频道一处算（`channel.ts`，按助手的席位认谁是助手），信箱经 `Watch` 交给它的 `ChatView` 读同一个：私聊是对面（他是助手时），否则是频道成员里的默认助手或第一个助手，都没有就是默认助手；泛称的「@助手」、派活说明的署名、没指定人的工单和定时任务、没人收的机器事件都交给它。
 
 | 发言者与位置 | 唤醒目标 | 被动通知（仅知晓） |
 |---|---|---|

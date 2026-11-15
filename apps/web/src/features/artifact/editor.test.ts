@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 
+import { BlockEditor } from "@vibevalley/artifact/editor";
 import { type Block, type BlockAck, type BlockSnapshot, userId } from "@vibevalley/protocol";
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
-import { api } from "#/infra/api.ts";
+import { api, reasonOf } from "#/infra/api.ts";
 import { deferred } from "#/state/testing.ts";
-
-import { BlockEditor } from "./editor";
 
 const id = artifactId("artifact");
 const block = (rev: number, text: string, by = "helper", key = "a"): Block => ({
@@ -36,7 +35,7 @@ afterEach(() => {
 });
 const opened = async (blocks = [block(1, "initial", userId)]) => {
   vi.spyOn(api.artifact.block, "list").mockResolvedValue(snapshot(blocks));
-  const editor = new BlockEditor(api, id);
+  const editor = new BlockEditor(api, id, reasonOf);
   editors.push(editor);
   await editor.load();
   editor.setLive(true);

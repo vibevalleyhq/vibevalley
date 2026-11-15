@@ -3,10 +3,9 @@ import { describe, expect, it, test } from "vite-plus/test";
 import type { Issue, IssueStage, Session } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 
-import { emptySpaceState } from "#/core/core.ts";
-import { reduce } from "#/gateway/projection/reduce.ts";
+import { emptySpaceState, type Fact } from "#/core/core.ts";
 
-import { emptyPlay, playOf, plotOf, viewOf } from "./view.ts";
+import { emptyPlay, playOf, plotOf, reducePlay, type SessionPlay, viewOf } from "./view.ts";
 
 const session = (phase: Session["phase"]): Session => ({
   id: sessionId("w1"),
@@ -18,8 +17,7 @@ const session = (phase: Session["phase"]): Session => ({
   hiredAt: 0,
   runs: 1,
   phase,
-  refining: false,
-  issue: issueId("t1"),
+  scope: { kind: "issue", id: issueId("t1") },
 });
 const issue = (stage: IssueStage, more: Partial<Issue> = {}): Issue =>
   ({ id: "t1", sessions: ["w1"], findings: [], questions: [], status: "in_review", stage, ...more }) as unknown as Issue;
@@ -96,11 +94,18 @@ describe("a bed", () => {
     hiredAt: 0,
     runs: 0,
     phase: { _tag: "working", since: 0 } as Session["phase"],
-    refining: false,
   });
 
-  const hire = (state = emptySpaceState(), h: Session) => reduce(state, { type: "sessionChanged", at: 0, session: h })[0];
-  const bed = (state: ReturnType<typeof emptySpaceState>, id: string) => playOf(state.plays, id).station;
+  type Farm = { readonly sessions: readonly Session[]; readonly plays: Readonly<Record<string, SessionPlay>> };
+  const emptyFarm = (): Farm => ({ sessions: [], plays: {} });
+  const applyFact = (farm: Farm, fact: Fact): [Farm, boolean] => {
+    const [plays, changed] = reducePlay(farm.plays, { sessions: farm.sessions }, fact);
+    const sessions = fact.type === "sessionChanged" ? [...farm.sessions.filter((h) => h.id !== fact.session.id), fact.session] : farm.sessions;
+    return [{ sessions, plays }, changed];
+  };
+  const hire = (farm = emptyFarm(), h: Session) => applyFact(farm, { type: "sessionChanged", at: 0, session: h })[0];
+  const move = (farm: Farm, id: string, station: number) => applyFact(farm, { type: "progressChanged", at: 0, station: { id: sessionId(id), station } });
+  const bed = (farm: Farm, id: string) => playOf(farm.plays, id).station;
 
   test("each repo's farm has its own beds: the first of each is on bed 0", () => {
     let s = hire(undefined, worker("a1", "alpha"));
@@ -113,20 +118,20 @@ describe("a bed", () => {
   test("a bed taken on another repo's farm is free on this one, and taken on its own is not", () => {
     let s = hire(undefined, worker("a1", "alpha"));
     s = hire(s, worker("b1", "beta"));
-    const [moved, changed] = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("b1"), station: 3 } });
+    const [moved, changed] = move(s, "b1", 3);
     expect(changed).toBe(true);
     // b1 holds bed 3 on beta's farm: b2 cannot take it, and stays on beta's first free bed.
-    const [again, took] = reduce(hire(moved, worker("b2", "beta")), { type: "progressChanged", at: 0, station: { id: sessionId("b2"), station: 3 } });
+    const [again, took] = move(hire(moved, worker("b2", "beta")), "b2", 3);
     expect(took).toBe(false);
     expect(bed(again, "b2")).toBe(0);
   });
 
   test("a saved bed another session of its farm holds moves to a free one", () => {
-    let s = emptySpaceState();
+    let s = emptyFarm();
     for (const h of [worker("a1", "alpha"), worker("a2", "alpha"), worker("b1", "beta")]) s = hire(s, h);
-    s = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("a1"), station: 3 } })[0];
-    s = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("a2"), station: 3 } })[0];
-    s = reduce(s, { type: "progressChanged", at: 0, station: { id: sessionId("b1"), station: 0 } })[0];
+    s = move(s, "a1", 3)[0];
+    s = move(s, "a2", 3)[0];
+    s = move(s, "b1", 0)[0];
     expect(["a1", "a2", "b1"].map((id) => bed(s, id))).toEqual([3, 1, 0]);
   });
 });

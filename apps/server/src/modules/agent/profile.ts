@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { frontMatter, skillBody } from "@vibevalley/agent/skills";
 import type { Clock } from "@vibevalley/async";
-import { currentLocale, list, t } from "@vibevalley/i18n";
+import { currentLocale, list, setLocale, t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
 import { defaultOrchestrator, orchestratorRuntime, SpeciesValues } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
@@ -28,27 +28,13 @@ interface Stored {
   readonly settings: Readonly<Record<string, T.RuntimeSettings>>;
 }
 
-// Backfill `build` and `head` before schema decoding for config.json files written prior to those fields.
-const readFileJson = jsonOf(
+const readStored = jsonOf(
   z.object({
-    agents: z.array(z.unknown()),
+    agents: z.array(S.Agent),
     skills: z.array(S.Skill),
     settings: z.record(z.string(), S.RuntimeSettings),
   }),
 );
-const isObject = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null;
-const lookFilled = (raw: unknown): unknown =>
-  isObject(raw) && isObject(raw.look)
-    ? {
-        ...raw,
-        look: { species: null, outfit: null, orchestrator: null, ...raw.look, build: raw.look.build ?? "biped", head: raw.look.head ?? "rounded" },
-      }
-    : raw;
-const readStored = (text: string): Stored => {
-  const file = readFileJson(text);
-  const agents = file.agents.map((a) => S.Agent.parse(lookFilled(a)));
-  return { agents, skills: file.skills, settings: file.settings };
-};
 
 /** Hashes each code point's leading UTF-16 code unit (32-bit unsigned) to match client avatar selection. */
 function castHash(s: string): number {
@@ -108,6 +94,7 @@ export interface ProfileStoreDeps {
   readonly config: ServerConfig;
   readonly clock: Clock;
   readonly log: Logger;
+  readonly locale?: () => T.Locale;
 }
 
 const free = (want: string, taken: readonly string[], join: string) => {
@@ -151,8 +138,21 @@ const readBuiltInSkills = async (locale: T.Locale = currentLocale()): Promise<T.
 const upsert = <T extends { id: string }>(list: readonly T[], item: T) =>
   list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
 
+const inLocale = <A>(locale: T.Locale, run: () => A): A => {
+  const was = currentLocale();
+  if (was === locale) return run();
+  setLocale(locale);
+  try {
+    return run();
+  } finally {
+    setLocale(was);
+  }
+};
+
 export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileStore> {
   const { config } = deps;
+  const localeOf = deps.locale ?? currentLocale;
+  const say: typeof t = (key, ...args) => inLocale(localeOf(), () => t(key, ...args));
   const log = deps.log.child("agent");
   const file = join(config.home, "config.json");
   const disk = keptFile(file, deps);
@@ -160,13 +160,13 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
     zh: await builtInTemplates("zh"),
     en: await builtInTemplates("en"),
   };
-  const builtIn = () => builtInByLocale[currentLocale()];
+  const builtIn = () => builtInByLocale[localeOf()];
   const builtInOf = (id: string) => builtIn().find((item) => item.id === id);
   const ownSkillsByLocale: Record<T.Locale, T.Skill[]> = {
     zh: await readBuiltInSkills("zh"),
     en: await readBuiltInSkills("en"),
   };
-  const ownSkills = () => ownSkillsByLocale[currentLocale()];
+  const ownSkills = () => ownSkillsByLocale[localeOf()];
   const builtInSkillOf = (id: string) => ownSkills().find((k) => k.id === id);
   const isBuiltInSkill = (id: string) => builtInSkillOf(id) !== undefined;
   for (const item of builtIn())
@@ -200,7 +200,7 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
     try {
       await disk.save(jsonText(next));
     } catch (e) {
-      throw refused(t("server.agent.notSaved", { file, why: messageOf(e) }));
+      throw refused(say("server.agent.notSaved", { file, why: messageOf(e) }));
     }
     s = next;
   };
@@ -211,25 +211,25 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
 
   /** Why a profile cannot be kept as it is: an orchestrator runs only on VibeValley's own agent, in the server, where it stays and is reached on a call. */
   const roleProblem = (a: T.Agent): string => {
-    if (a.id === defaultOrchestrator && a.role !== "orchestrator") return t("server.agent.defaultStaysOrchestrator");
-    if (a.role === "orchestrator" && a.runtime !== orchestratorRuntime) return t("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime });
+    if (a.id === defaultOrchestrator && a.role !== "orchestrator") return say("server.agent.defaultStaysOrchestrator");
+    if (a.role === "orchestrator" && a.runtime !== orchestratorRuntime) return say("server.agent.orchestratorRuntime", { runtime: orchestratorRuntime });
     return "";
   };
 
   const deletableAgent = (id: string): T.Agent => {
-    if (id === defaultOrchestrator) throw refused(t("server.agent.orchestratorStays"));
+    if (id === defaultOrchestrator) throw refused(say("server.agent.orchestratorStays"));
     const a = s.agents.find((x) => x.id === id);
-    if (!a) throw missing(t("server.agent.noAgent", { id }), [lookIn.agent]);
+    if (!a) throw missing(say("server.agent.noAgent", { id }), [lookIn.agent]);
     return a;
   };
   const notBuiltIn = (id: string) => {
     const k = builtInSkillOf(id);
-    if (k !== undefined) throw refused(t("server.agent.builtInSkill", { name: k.name }));
+    if (k !== undefined) throw refused(say("server.agent.builtInSkill", { name: k.name }));
   };
   const deletableSkill = (id: string): T.Skill => {
     notBuiltIn(id);
     const k = s.skills.find((x) => x.id === id);
-    if (!k) throw missing(t("server.agent.noSkill", { id }), [lookIn.skill]);
+    if (!k) throw missing(say("server.agent.noSkill", { id }), [lookIn.skill]);
     return k;
   };
 
@@ -245,8 +245,8 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
   const templateOf = async (id: string) => (await templates()).find((template) => template.id === id);
   const deletableTemplate = async (id: string) => {
     const item = await templateOf(id);
-    if (!item) throw missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]);
-    if (item.source === "builtIn") throw refused(t("server.agent.template.builtIn", { id }));
+    if (!item) throw missing(say("server.agent.template.noTemplate", { id }), [lookIn.template]);
+    if (item.source === "builtIn") throw refused(say("server.agent.template.builtIn", { id }));
     return item;
   };
 
@@ -258,8 +258,7 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
       const k = key.trim();
       return sendable().find((a) => a.id === k) ?? sendable().find((a) => a.name === k);
     },
-    // Built-in skills shadow any legacy user skill saved under the same id before the built-in shipped.
-    skills: () => structuredClone([...ownSkills(), ...s.skills.filter((k) => !isBuiltInSkill(k.id))]),
+    skills: () => structuredClone([...ownSkills(), ...s.skills]),
     settings: (runtime) => structuredClone(s.settings[runtime]) ?? defaultSettings(),
     orchestrators: () => all().filter((a) => a.role === "orchestrator"),
     isOrchestrator,
@@ -272,7 +271,7 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
       return saved(cast);
     },
     create: async (draft) => {
-      if (draft.id) throw refused(t("server.agent.newAgentId"));
+      if (draft.id) throw refused(say("server.agent.newAgentId"));
       const why = roleProblem(draft);
       if (why) throw refused(why);
       let n = 1;
@@ -287,7 +286,7 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
     },
     previewRemove: async (id) => {
       const a = deletableAgent(id);
-      return { does: [t("server.agent.removeAgent", { name: a.name, id: a.id, runtime: a.runtime })] };
+      return { does: [say("server.agent.removeAgent", { name: a.name, id: a.id, runtime: a.runtime })] };
     },
     saveSkill: async (skill) => {
       notBuiltIn(skill.id);
@@ -296,7 +295,7 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
       return kept;
     },
     createSkill: async (draft) => {
-      if (draft.id) throw refused(t("server.agent.newSkillId"));
+      if (draft.id) throw refused(say("server.agent.newSkillId"));
       const stem =
         draft.name
           .toLowerCase()
@@ -321,12 +320,12 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
     previewRemoveSkill: async (id) => {
       const k = deletableSkill(id);
       const holders = s.agents.filter((a) => a.skills.includes(id)).map((a) => a.name);
-      return {
+      return inLocale(localeOf(), () => ({
         does: [
           t("server.agent.removeSkill", { name: k.name }),
           ...(holders.length > 0 ? [t("server.agent.unequip", { holders: list(holders.map((name) => t("server.agent.quoted", { name }))) })] : []),
         ],
-      };
+      }));
     },
     saveSettings: async (runtime, settings) => {
       await change((x) => ({ ...x, settings: { ...x.settings, [runtime]: settings } }));
@@ -336,17 +335,17 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
     templates,
     installTemplate: async (id) => {
       const item = await templateOf(id);
-      if (!item) throw missing(t("server.agent.template.noTemplate", { id }), [lookIn.template]);
+      if (!item) throw missing(say("server.agent.template.noTemplate", { id }), [lookIn.template]);
       const made = withCast(installed(item, s.agents));
       await change((x) => ({ ...x, agents: [...x.agents, made] }));
       return saved(made);
     },
     updateFromTemplate: async (agent) => {
       const a = s.agents.find((x) => x.id === agent);
-      if (!a) throw missing(t("server.agent.noAgent", { id: agent }), [lookIn.agent]);
-      if (!a.from) throw refused(t("server.agent.template.notFrom", { name: a.name }));
+      if (!a) throw missing(say("server.agent.noAgent", { id: agent }), [lookIn.agent]);
+      if (!a.from) throw refused(say("server.agent.template.notFrom", { name: a.name }));
       const item = await templateOf(a.from.template);
-      if (!item) throw refused(t("server.agent.template.gone", { name: a.name, template: a.from.template }));
+      if (!item) throw refused(say("server.agent.template.gone", { name: a.name, template: a.from.template }));
       const next = withCast(updatedFrom(item, a));
       await change((x) => ({ ...x, agents: upsert(x.agents, next) }));
       return saved(next);
@@ -359,11 +358,11 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
         if (e instanceof TemplateProblem) throw refused(e.message);
         throw e;
       }
-      if (await templateOf(item.id)) throw refused(t("server.agent.template.taken", { id: item.id }));
+      if (await templateOf(item.id)) throw refused(say("server.agent.template.taken", { id: item.id }));
       try {
         await copyTemplate(path, config.home, item.id);
       } catch (e) {
-        throw refused(t("server.agent.notSaved", { file: path, why: messageOf(e) }));
+        throw refused(say("server.agent.notSaved", { file: path, why: messageOf(e) }));
       }
       return { ...item, installed: [] };
     },
@@ -372,7 +371,7 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
       try {
         await removeTemplate(config.home, item.id);
       } catch (e) {
-        throw refused(t("server.agent.notSaved", { file: id, why: messageOf(e) }));
+        throw refused(say("server.agent.notSaved", { file: id, why: messageOf(e) }));
       }
     },
     previewRemoveTemplate: async (id) => {
@@ -380,8 +379,8 @@ export async function makeProfileStore(deps: ProfileStoreDeps): Promise<ProfileS
       return {
         does: [
           item.installed.length > 0
-            ? t("server.agent.template.deleteKept", { name: item.name, installed: item.installed.length })
-            : t("server.agent.template.delete", { name: item.name }),
+            ? say("server.agent.template.deleteKept", { name: item.name, installed: item.installed.length })
+            : say("server.agent.template.delete", { name: item.name }),
         ],
       };
     },

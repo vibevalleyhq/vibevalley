@@ -6,11 +6,12 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { maxRunning } from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
+import { issueScopeOf } from "@vibevalley/protocol/rules";
 
 import { starter, testConfig, until, waitFor } from "#/testing/layers.ts";
 import { world } from "#/testing/world.ts";
 
-import { HireRefused, NotRecorded } from "./session.ts";
+import { channelSessionPolicy, HireRefused, NotRecorded } from "./session.ts";
 import type { DeliveryInput } from "./signals.ts";
 
 const profile = () => ({ ...starter("lab"), effort: "" });
@@ -44,9 +45,13 @@ describe("an agent's channel context", () => {
     const channel = farm.channel.defaultChannel();
     const agent = profile();
     await farm.agent.save(agent);
-    const { session } = await sessions.hire(agent, "discuss", "must-not-create", { context: { kind: "channel", channel } });
+    const { session } = await sessions.hire(agent, "discuss", "must-not-create", {
+      scope: { kind: "channel", id: channel },
+      policy: channelSessionPolicy,
+      channel,
+    });
     await until(() => core.session(session.id)?.phase._tag === "done", "the first answer");
-    expect(session.issue).toBeUndefined();
+    expect(issueScopeOf(session)).toBeUndefined();
     expect(session.repo).toBeUndefined();
     expect(session.channel).toBe(channel);
     expect(core.state().issues).toEqual([]);
@@ -101,7 +106,7 @@ describe("an agent's channel context", () => {
     const ids: string[] = [];
     for (let i = 0; i < maxRunning; i++) {
       const channel = (await chat.openChannel(`context-${i}`, "", "")).id;
-      const { session } = await sessions.hire(agent, "discuss", "", { context: { kind: "channel", channel } });
+      const { session } = await sessions.hire(agent, "discuss", "", { scope: { kind: "channel", id: channel }, policy: channelSessionPolicy, channel });
       const id = session.id;
       ids.push(id);
       await until(() => core.session(id)?.phase._tag === "done", "an answer");
@@ -123,7 +128,7 @@ describe("an agent's channel context", () => {
     const sessions = farm.inside;
     const channel = farm.channel.defaultChannel();
     const agent = { ...profile(), runtime: "not-installed" };
-    const hired = await failure(sessions.hire(agent, "discuss", "", { context: { kind: "channel", channel } }));
+    const hired = await failure(sessions.hire(agent, "discuss", "", { scope: { kind: "channel", id: channel }, policy: channelSessionPolicy, channel }));
     expect(hired).toBeInstanceOf(HireRefused);
     expect(hired).toMatchObject({ retainedWork: undefined });
     expect(readdirSync(join(config.workRoot, "contexts"))).toEqual([]);
@@ -159,7 +164,9 @@ describe("an agent's channel context", () => {
     await farm.agent.save(agent);
     const hired = await failure(
       sessions.hire(agent, "first", "", {
-        context: { kind: "channel", channel },
+        scope: { kind: "channel", id: channel },
+        policy: channelSessionPolicy,
+        channel,
         hiring: async () => {
           await written;
           throw new NotRecorded("registration failed");
@@ -169,7 +176,7 @@ describe("an agent's channel context", () => {
     expect(hired).toBeInstanceOf(HireRefused);
     expect(hired).toMatchObject({ retainedWork: true });
     expect(readFileSync(join(cwd, "kept.txt"), "utf8")).toBe("keep\n");
-    const again = await failure(sessions.hire(agent, "again", "", { context: { kind: "channel", channel } }));
+    const again = await failure(sessions.hire(agent, "again", "", { scope: { kind: "channel", id: channel }, policy: channelSessionPolicy, channel }));
     expect(again).toBeInstanceOf(HireRefused);
     expect(again).toMatchObject({ retainedWork: true });
     expect(opened).toBe(1);
@@ -201,7 +208,7 @@ describe("an agent's channel context", () => {
       const agent = profile();
       await farm.agent.save(agent);
       channel = farm.channel.defaultChannel();
-      const { session } = await sessions.hire(agent, "first", "", { context: { kind: "channel", channel } });
+      const { session } = await sessions.hire(agent, "first", "", { scope: { kind: "channel", id: channel }, policy: channelSessionPolicy, channel });
       id = session.id;
       expect(id).not.toBe("");
       await until(() => core.session(id)?.phase._tag === "done", "the answer before restart");
@@ -215,7 +222,7 @@ describe("an agent's channel context", () => {
       const core = farm.core;
       await sessions.restore();
       expect(sessions.sessionOf(id)?.channel).toBe(channel);
-      expect(sessions.sessionOf(id)?.issue).toBeUndefined();
+      expect(issueScopeOf(sessions.sessionOf(id)!)).toBeUndefined();
       expect(existsSync(join(cwd, "kept.txt"))).toBe(true);
       const delivered = await sessions.deliver(id, "after restart", delivery({ kind: "comment", channel }));
       expect(delivered).toMatchObject({ kind: "run", woke: true });
@@ -250,7 +257,9 @@ describe("an agent's channel context", () => {
       const channel = farm.channel.defaultChannel();
       const refused = await failure(
         sessions.hire(profile(), "first", "", {
-          context: { kind: "channel", channel },
+          scope: { kind: "channel", id: channel },
+          policy: channelSessionPolicy,
+          channel,
           hiring: async () => {
             await written;
             throw new NotRecorded("registration failed");
@@ -266,7 +275,11 @@ describe("an agent's channel context", () => {
       const core = farm.core;
       await sessions.restore();
       const channel = farm.channel.defaultChannel();
-      const { session } = await sessions.hire({ ...profile(), id: "other", name: "Other" }, "second", "", { context: { kind: "channel", channel } });
+      const { session } = await sessions.hire({ ...profile(), id: "other", name: "Other" }, "second", "", {
+        scope: { kind: "channel", id: channel },
+        policy: channelSessionPolicy,
+        channel,
+      });
       const id = session.id;
       await until(() => core.session(id)?.phase._tag === "done", "the new profile's answer");
       expect(directories).toHaveLength(2);

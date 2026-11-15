@@ -6,6 +6,7 @@ import { htmlSandbox, isOneOf } from "@vibevalley/protocol/rules";
 
 /** The largest artifact body, bytes, and title, characters. */
 export const artifactMax = 5 * 1024 * 1024;
+export const artifactPrefix = "/api/v1/artifact/";
 const artifactTitleMax = 80;
 
 /** Why a title, a kind or a hand-in's size is refused, in the user's words. "" when they are right. */

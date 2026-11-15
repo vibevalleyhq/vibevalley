@@ -8,21 +8,20 @@ import { issueId } from "@vibevalley/protocol/schema";
 import { actsForUser, type Actor } from "#/base/actor.ts";
 import { ApiError, BizCode, refuseIn } from "#/base/errors.ts";
 import { newId } from "#/base/ids.ts";
-import type { Agent } from "#/modules/agent/agent.ts";
+import type { ProfileStore } from "#/modules/agent/agent.ts";
 import type { Channel } from "#/modules/channel/channel.ts";
 import { NotTakenIn, type Session } from "#/modules/session/session.ts";
 
 import { maxChildren } from "./creation.ts";
-import type { IssueLanding } from "./landing.ts";
+import { childChecks, type IssueLanding } from "./landing.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
-import { childChecks } from "./merge.ts";
 import { needsUser } from "./prompts.ts";
 import { isClosed, type IssueChildDraft } from "./status.ts";
 
 const refused = refuseIn(BizCode.IssueRefused);
 
 export interface SplitDeps {
-  readonly agent: Agent;
+  readonly agent: ProfileStore;
   readonly session: Session;
   readonly channel: Channel;
   readonly landing: Pick<IssueLanding, "changesOf" | "mergeChild">;
@@ -40,7 +39,8 @@ export function issueSplitting(r: IssueLifecycle, deps: SplitDeps) {
       const parent = await get(id);
       if (by.kind === "agent" && by.role === "worker") {
         const caller = sessions.live(by.id).session;
-        if (!caller || caller.refining || latestSessionIdOf(parent) !== by.id || caller.issue !== parent.id) throw refused(t("server.issue.split.notCurrent"));
+        if (!caller || caller.scope?.kind !== "issue" || latestSessionIdOf(parent) !== by.id || caller.scope.id !== parent.id)
+          throw refused(t("server.issue.split.notCurrent"));
       } else if (!actsForUser(by)) throw refused(needsUser);
       if (isClosed(parent.status)) throw refused(t("server.issue.dependencies.closedParent"));
       const parentRepo = parent.repo;

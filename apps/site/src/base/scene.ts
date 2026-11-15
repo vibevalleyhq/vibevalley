@@ -1,4 +1,4 @@
-import sizes from "@game/title/sprites.json";
+import sizes from "@vibevalley/web/public/title/sprites.json" with { type: "json" };
 
 const SCENE = { w: 1536, h: 1024 } as const;
 

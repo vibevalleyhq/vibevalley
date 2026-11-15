@@ -1,8 +1,8 @@
 -- Runs: one go at the work each (session/runs.ts).
 
 -- name: StartRun :exec
-insert into session_run (id, session, issue, triggered_by, started_at)
-values (sqlc.arg(id), sqlc.arg(session), sqlc.narg(issue), sqlc.arg(triggered_by), sqlc.arg(started_at));
+insert into session_run (id, session, triggered_by, started_at)
+values (sqlc.arg(id), sqlc.arg(session), sqlc.arg(triggered_by), sqlc.arg(started_at));
 
 -- name: HeardInRun :exec
 update session_run set heard = sqlc.arg(heard) where id = sqlc.arg(id);

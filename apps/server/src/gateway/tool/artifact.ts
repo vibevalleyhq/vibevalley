@@ -1,11 +1,11 @@
+import { artifactMax, htmlCheck } from "@vibevalley/artifact/html";
 import type * as T from "@vibevalley/protocol";
 import { isApiError } from "@vibevalley/protocol/api";
+import { issueScopeOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
 import type { Caller, Who } from "#/base/actor.ts";
 import { BizCode, reasonOf, refuseIn } from "#/base/errors.ts";
-import { htmlCheck } from "#/modules/artifact/check.ts";
-import { artifactMax } from "#/modules/artifact/policy.ts";
 import { NotWorkFile } from "#/modules/session/session.ts";
 
 import { answers, blockLine } from "./prompts.ts";
@@ -38,7 +38,8 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
 
   const sessionArtifactScope = (session: string): { readonly channel?: string; readonly issue?: string } => {
     const own = run.live(session).session;
-    return own?.issue ? { issue: own.issue } : own?.channel ? { channel: own.channel } : {};
+    const issue = own ? issueScopeOf(own) : undefined;
+    return issue ? { issue } : own?.channel ? { channel: own.channel } : {};
   };
 
   /** A version's words: given as they are, or read from a file in the session's working directory. The path is resolved with its links, so neither .. */

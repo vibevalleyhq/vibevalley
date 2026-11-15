@@ -1,6 +1,8 @@
+import { Semaphore } from "@vibevalley/async";
 import { t } from "@vibevalley/i18n";
 import type * as T from "@vibevalley/protocol";
-import { isBusy, latestSessionIdOf } from "@vibevalley/protocol/rules";
+import { userId } from "@vibevalley/protocol";
+import { isBusy, issueScopeOf, latestSessionIdOf } from "@vibevalley/protocol/rules";
 
 import { ApiError, BizCode, lookIn, messageOf, missing, refuseIn } from "#/base/errors.ts";
 import type { Core } from "#/core/core.ts";
@@ -10,7 +12,9 @@ import { issueBranch, type Repo, type PullRequest, type PullRequestState } from 
 import { type CheckoutChecks, type Merged, MergeFailure, RepoError, type Workplace } from "#/modules/repo/workplace.ts";
 import { NotTakenIn, type Session } from "#/modules/session/session.ts";
 
+import { acceptanceAncestors } from "./dependencies.ts";
 import type { IssueLifecycle } from "./lifecycle.ts";
+import { statusMove } from "./moves.ts";
 
 const refused = refuseIn(BizCode.IssueRefused);
 
@@ -18,13 +22,31 @@ const refused = refuseIn(BizCode.IssueRefused);
 export const pullRequestConclusion = (text: string) => text.trim();
 
 /** An issue whose pull request is followed: finishes says its closing finishes the issue (else only its state is kept). */
-export interface FollowedPullRequest {
+interface FollowedPullRequest {
   readonly issue: T.Issue;
   readonly finishes: boolean;
 }
 
 /** The issue's work goes in as a pull request: one is open, or its repo goes by pull requests. */
 export const goesByPullRequest = (issue: Pick<T.Issue, "pullRequest">, usesPullRequests: boolean) => issue.pullRequest?.state === "open" || usesPullRequests;
+
+/** A followed pull request's end finishes its issue: one still open that delivers by merging (one that delivers the
+ * pull request itself is done already, and a closed one only keeps the state). */
+export const finishesWithPullRequest = (issue: Pick<T.Issue, "deliver" | "closedAt">) => issue.deliver !== "pull_request" && issue.closedAt === undefined;
+
+/** What a child's work must pass before it merges into its parent: its own check, the acceptance ancestors' frozen
+ * files, and (the last of its siblings) their checks. */
+export function childChecks(child: T.Issue, all: readonly T.Issue[]): CheckoutChecks {
+  const constraints = child.constraints;
+  const inherited = acceptanceAncestors(child, all);
+  if (constraints?.acceptance === true) return { acceptance: true, check: constraints.check ?? "" };
+  const frozen = [...new Set(inherited.flatMap((item) => item.constraints?.frozen ?? []))];
+  const leaf = !all.some((item) => item.parent === child.parent && item.status !== "canceled" && item.blockedBy.includes(child.id));
+  const checks = [
+    ...new Set([constraints?.check, ...(leaf ? inherited.map((item) => item.constraints?.check) : [])].flatMap((check) => (check ? [check] : []))),
+  ];
+  return { acceptance: false, frozen, checks };
+}
 
 /** How an issue's work goes in: from its own checkout (no helper holds it and its children merged into it), refused
  * (never started, or its helper is gone), or from its helper's workplace as a pull request or a merge into main. */
@@ -53,6 +75,8 @@ export interface LandingDeps {
   readonly repo: Repo;
   readonly session: Session;
   readonly channel: Channel;
+  /** Words for a session, said where it works (issue.ts sayTo). */
+  readonly tell: (from: string, session: string, text: string) => Promise<void>;
 }
 
 /** A repo's failure as a merge's: git or GitHub said no. */
@@ -66,11 +90,13 @@ const asRefusal = (e: unknown): unknown => (e instanceof MergeFailure || e insta
  * branch, from its helper's workplace (which then lets go) or from the issue's own checkout; and its pull request
  * followed to its end. What the delivery finds is written on the issue at each point, before its helper lets go, so
  * the issue reads it first. */
-export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRequest" | "finishPullRequest">, deps: LandingDeps) {
-  const { core, repo: repos, session: sessions, channel: chat } = deps;
+export function issueLanding(r: Pick<IssueLifecycle, "get" | "everyIssue" | "setConflict" | "savePullRequest" | "finishPullRequest">, deps: LandingDeps) {
+  const { core, repo: repos, session: sessions, channel: chat, tell } = deps;
   const log = deps.log.child("landing");
-  const { setConflict, savePullRequest } = r;
+  const { get, everyIssue, setConflict, savePullRequest } = r;
   const reachable = (id: string) => sessions.live(id).reachable;
+  /** Merges by pull request and the poll of their states, one at a time. */
+  const prLock = new Semaphore(1);
 
   /** An issue's own checkout in its repo, when no helper holds it; kept for the next helper. */
   const withCheckout = async <A>(repo: string, issue: number, use: (place: Workplace) => Promise<A>) =>
@@ -107,7 +133,8 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
   const handedOver = (id: string, use: (place: Workplace, said: string) => Promise<Merged>) =>
     sessions.handOver(id, "merged", async (place, said) => {
       const merged = await use(place, said);
-      const issue = sessions.live(id).session?.issue;
+      const own = sessions.live(id).session;
+      const issue = own ? issueScopeOf(own) : undefined;
       if (issue) await setConflict(issue, undefined);
       return merged;
     });
@@ -134,7 +161,7 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
   /** The issue's work merged into main, or submitted as its pull request (one is open, or its repo goes by pull
    * requests): from its helper's workplace, which then lets go; from the issue's own checkout when no helper holds it
    * and fromCheckout. Throws NotTakenIn when the helper's work does not go in (the helper stays). */
-  const merge = async (issue: T.Issue, fromCheckout: boolean): Promise<string> => {
+  const mergeDirect = async (issue: T.Issue, fromCheckout: boolean): Promise<string> => {
     const last = latestSessionIdOf(issue);
     const usesPullRequests = issue.repo ? repos.usesPullRequests(issue.repo) : false;
     const route = landingRouteOf(issue, { last, reachable: last !== undefined && reachable(last) }, fromCheckout, usesPullRequests);
@@ -157,6 +184,44 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
     }
   };
 
+  const notTaken = async (id: string, n: NotTakenIn) => {
+    const own = sessions.live(id).session;
+    const issue = own ? issueScopeOf(own) : undefined;
+    if (issue && n.failure.kind === "conflict") await setConflict(issue, { base: n.failure.base, files: [...n.failure.files] });
+    let [user, line] = [n.user, n.notice];
+    if (n.fix) {
+      let untold = "";
+      try {
+        await tell(userId, id, n.fix);
+      } catch (e) {
+        if (!(e instanceof ApiError)) throw e;
+        untold = t("server.issue.merge.tellFailed", { why: e.message });
+      }
+      [user, line] = [user + untold, line + untold];
+    }
+    core.notice("warn", line);
+    return refused(user);
+  };
+
+  const merge = (id: string, accepted: boolean = false): Promise<string> =>
+    prLock.with(async () => {
+      const issue = await get(id);
+      // Whoever asks (the board, the command line, the orchestrator's tool) is held to the same table.
+      if (!accepted) {
+        const [m, why] = statusMove(issue, "done");
+        if (m === "none") throw refused(why);
+      }
+      // A parent's children merged into its branch: it goes from its own checkout once its helper is gone.
+      const fromCheckout = (await everyIssue()).some((child) => child.parent === issue.id);
+      try {
+        return await mergeDirect(issue, fromCheckout);
+      } catch (e) {
+        const last = latestSessionIdOf(issue);
+        if (e instanceof NotTakenIn && last !== undefined) throw await notTaken(last, e);
+        throw e;
+      }
+    });
+
   /** The helper's work submitted as the issue's pull request while it stays; read gives the issue under the helper's
    * workplace lock (refused when it is closed). Throws MergeFailure. */
   const submitPullRequest = async (session: string, read: () => Promise<T.Issue>, summary: string | undefined) => {
@@ -166,6 +231,24 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
     });
     return submitted.text;
   };
+
+  const submit = (id: string, session: string, summary?: string): Promise<string> =>
+    prLock.with(async () => {
+      try {
+        return await submitPullRequest(
+          session,
+          async () => {
+            const issue = await get(id);
+            if (issue.status === "done" || issue.status === "canceled") throw refused(t("server.issue.closedReopen"));
+            return issue;
+          },
+          summary,
+        );
+      } catch (error) {
+        if (error instanceof MergeFailure) throw refused(error.message);
+        throw error;
+      }
+    });
 
   const finishPullRequest = async (issue: T.Issue, state: PullRequestState) => {
     const closed = state === "closed" ? "dismissed" : "merged";
@@ -189,21 +272,23 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
 
   /** Each followed pull request's state read; one merged or closed is kept, or finishes its issue. One that cannot be
    * read or finished now is tried again next time. */
-  const refreshPullRequests = async (followed: readonly FollowedPullRequest[]) => {
-    for (const { issue, finishes } of followed) {
-      if (issue.pullRequest?.state !== "open" || !issue.repo) continue;
-      try {
-        const state = await repos.pullRequestState(issue.repo, issue.pullRequest.number);
-        if (state === "open") continue;
-        if (finishes) await finishPullRequest(issue, state);
-        else await savePullRequest(issue.id, { ...issue.pullRequest, state });
-      } catch (e) {
-        // One pull request that cannot be read or finished now is tried again on the next round; the rest go on.
-        if (!(e instanceof RepoError || e instanceof ApiError || e instanceof MergeFailure)) throw e;
-        log.warn(`vibevalley: refresh pull requests: issue #${issue.number}: ${e.message}`);
+  const refreshPullRequests = (): Promise<void> =>
+    prLock.with(async () => {
+      const followed: FollowedPullRequest[] = (await everyIssue()).map((issue) => ({ issue, finishes: finishesWithPullRequest(issue) }));
+      for (const { issue, finishes } of followed) {
+        if (issue.pullRequest?.state !== "open" || !issue.repo) continue;
+        try {
+          const state = await repos.pullRequestState(issue.repo, issue.pullRequest.number);
+          if (state === "open") continue;
+          if (finishes) await finishPullRequest(issue, state);
+          else await savePullRequest(issue.id, { ...issue.pullRequest, state });
+        } catch (e) {
+          // One pull request that cannot be read or finished now is tried again on the next round; the rest go on.
+          if (!(e instanceof RepoError || e instanceof ApiError || e instanceof MergeFailure)) throw e;
+          log.warn(`vibevalley: refresh pull requests: issue #${issue.number}: ${e.message}`);
+        }
       }
-    }
-  };
+    });
 
   /** A child's work checked and merged into its parent's branch (the parent's helper's workplace, else its checkout),
    * then its helper lets go; merged runs before it does. Undefined when it waits: the child's helper is gone or the
@@ -255,8 +340,8 @@ export function issueLanding(r: Pick<IssueLifecycle, "setConflict" | "savePullRe
 
   return {
     merge,
-    submitPullRequest,
     refreshPullRequests,
+    submit,
     mergeChild,
     changesOf,
     /** Whether the session's work still conflicts with base. */
