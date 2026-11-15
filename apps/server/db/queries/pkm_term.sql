@@ -9,7 +9,10 @@ delete from pkm_term;
 -- name: AddTerms :exec
 -- rows: JSON [{"block", "page", "terms"}], a page's blocks in one statement.
 insert into pkm_term (block, page, terms)
-select value ->> 'block', value ->> 'page', value ->> 'terms' from jsonb_array_elements(sqlc.arg(rows)::text::jsonb) as value;
+select distinct on (value ->> 'page', value ->> 'block') value ->> 'block', value ->> 'page', value ->> 'terms'
+from jsonb_array_elements(sqlc.arg(rows)::text::jsonb) with ordinality as r(value, ord)
+order by value ->> 'page', value ->> 'block', ord desc
+on conflict (page, block) do update set terms = excluded.terms;
 
 -- name: MatchTerms :many
 -- bound: the best 500 blocks that share a word, best first. term_query quotes each word, so none reads as an operator;

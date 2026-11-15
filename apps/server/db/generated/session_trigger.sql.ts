@@ -5,21 +5,23 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf } from "./types.js"
+import { rowOf, Words_session_trigger_actor_kind } from "./types.js"
 
 export interface RecordTriggerParams {
   readonly ["id"]: string
   readonly ["source"]: string
   readonly ["source_key"]: string
+  readonly ["actor_kind"]: Words_session_trigger_actor_kind
+  readonly ["is_channel_message"]: boolean
   readonly ["trigger_json"]: string
   readonly ["payload_json"]: string
   readonly ["occurred_at"]: number
 }
 
-export const RecordTriggerSql = "-- name: RecordTrigger :exec\ninsert into session_trigger (id, source, source_key, trigger_json, payload_json, occurred_at)\nvalues ($1, $2, $3, $4, $5, $6)\non conflict do nothing;"
+export const RecordTriggerSql = "-- name: RecordTrigger :exec\ninsert into session_trigger (id, source, source_key, actor_kind, is_channel_message, trigger_json, payload_json, occurred_at)\nvalues ($1, $2, $3, $4, $5, $6,\n        $7, $8)\non conflict do nothing;"
 
 export async function recordTrigger(sql: Sql, params: RecordTriggerParams): Promise<number> {
-  return sql.exec(RecordTriggerSql, [params["id"], params["source"], params["source_key"], params["trigger_json"], params["payload_json"], params["occurred_at"]])
+  return sql.exec(RecordTriggerSql, [params["id"], params["source"], params["source_key"], params["actor_kind"], params["is_channel_message"], params["trigger_json"], params["payload_json"], params["occurred_at"]])
 }
 
 export interface TriggerByIdParams {
@@ -51,7 +53,7 @@ export const UnroutedTriggersResult = z.object({
 })
 export type UnroutedTriggersResult = z.infer<typeof UnroutedTriggersResult>
 
-export const UnroutedTriggersSql = "-- name: UnroutedTriggers :many\n-- bound: a page; the chat's messages are not here (the watch reads them again from its own cursor).\nselect t.id, t.seq, t.trigger_json, t.payload_json from session_trigger t\nwhere t.seq > $1\n  and t.payload_json::jsonb -> 'data' ->> 'kind' is distinct from 'channel_message'\n  and t.routed_at is null\norder by t.seq limit 1000;"
+export const UnroutedTriggersSql = "-- name: UnroutedTriggers :many\n-- bound: a page; the chat's messages are not here (the watch reads them again from its own cursor).\nselect t.id, t.seq, t.trigger_json, t.payload_json from session_trigger t\nwhere t.seq > $1\n  and not t.is_channel_message\n  and t.routed_at is null\norder by t.seq limit 1000;"
 
 export async function unroutedTriggers(sql: Sql, params: UnroutedTriggersParams): Promise<UnroutedTriggersResult[]> {
   const rows = await sql.query(UnroutedTriggersSql, [params["after"]])
@@ -67,11 +69,11 @@ export interface MarkRoutedParams {
 export const MarkRoutedResult = z.object({
   ["position"]: z.number().int().nullable(),
   ["scope"]: z.string().nullable(),
-  ["from_user"]: z.boolean().nullable(),
+  ["from_user"]: z.boolean(),
 })
 export type MarkRoutedResult = z.infer<typeof MarkRoutedResult>
 
-export const MarkRoutedSql = "-- name: MarkRouted :one\nupdate session_trigger set\n  routing_position = case when routed_at is null then (select coalesce(max(id), 0) + 1 from session_order) else routing_position end,\n  routing_scope = coalesce(routing_scope, $1),\n  routed_at = coalesce(routed_at, $2)\nwhere id = $3\nreturning routing_position as position, routing_scope as scope,\n  (trigger_json::jsonb -> 'actor' ->> 'kind' = 'user')::bool as from_user;"
+export const MarkRoutedSql = "-- name: MarkRouted :one\nupdate session_trigger set\n  routing_position = case when routed_at is null then (select coalesce(max(id), 0) + 1 from session_order) else routing_position end,\n  routing_scope = coalesce(routing_scope, $1),\n  routed_at = coalesce(routed_at, $2)\nwhere id = $3\nreturning routing_position as position, routing_scope as scope,\n  (actor_kind = 'user')::bool as from_user;"
 
 export async function markRouted(sql: Sql, params: MarkRoutedParams): Promise<MarkRoutedResult | undefined> {
   const [row] = await sql.query(MarkRoutedSql, [params["scope"], params["routed_at"], params["envelope_id"]])

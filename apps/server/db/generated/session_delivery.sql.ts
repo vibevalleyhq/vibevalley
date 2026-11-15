@@ -5,11 +5,13 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, MessageId, SessionId, Words_session_delivery_held_by, Words_session_delivery_source, Words_session_delivery_state, Words_session_delivery_urgency } from "./types.js"
+import { rowOf, MessageId, SessionId, Words_session_delivery_actor_kind, Words_session_delivery_held_by, Words_session_delivery_source, Words_session_delivery_state, Words_session_delivery_urgency } from "./types.js"
 
 export interface InsertDeliveryParams {
   readonly ["session_id"]: SessionId
   readonly ["envelope_id"]: string
+  readonly ["trigger_id"]: string | null
+  readonly ["actor_kind"]: Words_session_delivery_actor_kind
   readonly ["scope"]: string
   readonly ["channel_id"]: string | null
   readonly ["message_id"]: MessageId | null
@@ -27,10 +29,10 @@ export const InsertDeliveryResult = z.object({
 })
 export type InsertDeliveryResult = z.infer<typeof InsertDeliveryResult>
 
-export const InsertDeliverySql = "-- name: InsertDelivery :many\n-- bound: at most one newly inserted delivery.\n-- The position is taken here, not by a trigger: RETURNING does not see what an AFTER trigger changes.\ninsert into session_delivery (position, session_id, envelope_id, scope, channel_id, message_id, source, urgency, reason, wakes, held_by, payload_json,\n                              created_at)\nvalues ((select coalesce(max(id), 0) + 1 from session_order), $1, $2, $3, $4,\n        $5, $6, $7, $8, $9, $10, $11,\n        $12) on conflict do nothing\nreturning position;"
+export const InsertDeliverySql = "-- name: InsertDelivery :many\n-- bound: at most one newly inserted delivery.\n-- The position is taken here, not by a trigger: RETURNING does not see what an AFTER trigger changes.\ninsert into session_delivery (position, session_id, envelope_id, trigger_id, actor_kind, scope, channel_id, message_id, source, urgency, reason, wakes, held_by,\n                              payload_json, created_at)\nvalues ((select coalesce(max(id), 0) + 1 from session_order), $1, $2, $3, $4,\n        $5, $6, $7, $8, $9, $10, $11,\n        $12, $13, $14) on conflict do nothing\nreturning position;"
 
 export async function insertDelivery(sql: Sql, params: InsertDeliveryParams): Promise<InsertDeliveryResult[]> {
-  const rows = await sql.query(InsertDeliverySql, [params["session_id"], params["envelope_id"], params["scope"], params["channel_id"], params["message_id"], params["source"], params["urgency"], params["reason"], params["wakes"], params["held_by"], params["payload_json"], params["created_at"]])
+  const rows = await sql.query(InsertDeliverySql, [params["session_id"], params["envelope_id"], params["trigger_id"], params["actor_kind"], params["scope"], params["channel_id"], params["message_id"], params["source"], params["urgency"], params["reason"], params["wakes"], params["held_by"], params["payload_json"], params["created_at"]])
   return rows.map((row) => rowOf("InsertDelivery", InsertDeliveryResult, row))
 }
 
@@ -163,7 +165,7 @@ export const AgentWakesByScopeResult = z.object({
 })
 export type AgentWakesByScopeResult = z.infer<typeof AgentWakesByScopeResult>
 
-export const AgentWakesByScopeSql = "-- name: AgentWakesByScope :many\n-- bound: a row per routing scope.\nwith users as (\n  select scope, max(position) as position from session_user_route group by scope\n)\nselect d.scope, count(*)::int as n from session_delivery d\nleft join users o on o.scope = d.scope\nwhere d.position > coalesce(o.position, 0)\n  and d.payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null\ngroup by d.scope;"
+export const AgentWakesByScopeSql = "-- name: AgentWakesByScope :many\n-- bound: a row per routing scope.\nwith users as (\n  select scope, max(position) as position from session_user_route group by scope\n)\nselect d.scope, count(*)::int as n from session_delivery d\nleft join users o on o.scope = d.scope\nwhere d.position > coalesce(o.position, 0)\n  and d.actor_kind = 'agent' and d.wakes and d.held_by is null\ngroup by d.scope;"
 
 export async function agentWakesByScope(sql: Sql): Promise<AgentWakesByScopeResult[]> {
   const rows = await sql.query(AgentWakesByScopeSql, [])
@@ -180,7 +182,7 @@ export const LastAgentWakesResult = z.object({
 })
 export type LastAgentWakesResult = z.infer<typeof LastAgentWakesResult>
 
-export const LastAgentWakesSql = "-- name: LastAgentWakes :many\n-- bound: a row per participant.\nselect d.session_id, max(d.created_at)::float8 as at from session_delivery d\nwhere d.payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null\ngroup by d.session_id;"
+export const LastAgentWakesSql = "-- name: LastAgentWakes :many\n-- bound: a row per participant.\nselect d.session_id, max(d.created_at)::float8 as at from session_delivery d\nwhere d.actor_kind = 'agent' and d.wakes and d.held_by is null\ngroup by d.session_id;"
 
 export async function lastAgentWakes(sql: Sql): Promise<LastAgentWakesResult[]> {
   const rows = await sql.query(LastAgentWakesSql, [])

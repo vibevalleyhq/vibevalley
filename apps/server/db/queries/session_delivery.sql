@@ -3,11 +3,11 @@
 -- name: InsertDelivery :many
 -- bound: at most one newly inserted delivery.
 -- The position is taken here, not by a trigger: RETURNING does not see what an AFTER trigger changes.
-insert into session_delivery (position, session_id, envelope_id, scope, channel_id, message_id, source, urgency, reason, wakes, held_by, payload_json,
-                              created_at)
-values ((select coalesce(max(id), 0) + 1 from session_order), sqlc.arg(session_id), sqlc.arg(envelope_id), sqlc.arg(scope), sqlc.narg(channel_id),
-        sqlc.narg(message_id), sqlc.arg(source), sqlc.arg(urgency), sqlc.arg(reason), sqlc.arg(wakes), sqlc.narg(held_by), sqlc.arg(payload_json),
-        sqlc.arg(created_at)) on conflict do nothing
+insert into session_delivery (position, session_id, envelope_id, trigger_id, actor_kind, scope, channel_id, message_id, source, urgency, reason, wakes, held_by,
+                              payload_json, created_at)
+values ((select coalesce(max(id), 0) + 1 from session_order), sqlc.arg(session_id), sqlc.arg(envelope_id), sqlc.narg(trigger_id), sqlc.arg(actor_kind),
+        sqlc.arg(scope), sqlc.narg(channel_id), sqlc.narg(message_id), sqlc.arg(source), sqlc.arg(urgency), sqlc.arg(reason), sqlc.arg(wakes),
+        sqlc.narg(held_by), sqlc.arg(payload_json), sqlc.arg(created_at)) on conflict do nothing
 returning position;
 
 -- name: MarkHanded :exec
@@ -52,13 +52,13 @@ with users as (
 select d.scope, count(*)::int as n from session_delivery d
 left join users o on o.scope = d.scope
 where d.position > coalesce(o.position, 0)
-  and d.payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null
+  and d.actor_kind = 'agent' and d.wakes and d.held_by is null
 group by d.scope;
 
 -- name: LastAgentWakes :many
 -- bound: a row per participant.
 select d.session_id, max(d.created_at)::float8 as at from session_delivery d
-where d.payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'agent' and d.wakes and d.held_by is null
+where d.actor_kind = 'agent' and d.wakes and d.held_by is null
 group by d.session_id;
 
 -- name: AllOpenDeliveries :many

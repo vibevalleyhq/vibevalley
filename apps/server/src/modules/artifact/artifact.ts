@@ -105,7 +105,7 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       ...(row.display !== null && isOneOf(ArtifactDisplayValues, row.display) ? { display: row.display } : {}),
       ...(row.channel_id !== null ? { channel: row.channel_id } : {}),
       ...(row.said_channel !== null && row.said_number !== null ? { said: { channel: row.said_channel, number: row.said_number } } : {}),
-      ...(row.issue !== null ? { issue: S.issueId(row.issue) } : {}),
+      ...(row.issue !== null ? { issue: row.issue } : {}),
       by: row.by_id,
       byName: row.by_name,
       version: row.version,
@@ -195,7 +195,7 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       body,
       display,
       channel_id: said.channel,
-      issue: req.issue ?? null,
+      issue: req.issue ? S.issueId(req.issue) : null,
       by_id: maker.by,
       by_name: said.name,
       version,
@@ -276,7 +276,7 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
   return {
     list: async (q) => {
       const rows = q.issue
-        ? await qa.artifactsForIssue(db.sql, { issue: q.issue })
+        ? await qa.artifactsForIssue(db.sql, { issue: S.issueId(q.issue) })
         : q.channel
           ? await qa.artifactsInChannel(db.sql, { channel_id: q.channel })
           : await qa.artifacts(db.sql, { limit_n: listedMax });

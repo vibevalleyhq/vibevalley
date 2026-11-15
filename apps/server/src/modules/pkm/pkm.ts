@@ -172,8 +172,15 @@ export async function makePkm(deps: PkmDeps): Promise<Pkm> {
   /** A page's blocks in the full-text index (pkm_term), as they read now. */
   const indexed = async (page: Page) => {
     await terms.clearPageTerms(db.sql, { page: page.slug });
-    const rows = flatBlocks(page.blocks).map((b) => ({ block: b.id, page: page.slug, terms: termsList(`${page.title}\n${b.path}\n${b.body}`).join(" ") }));
-    await terms.addTerms(db.sql, { rows: jsonText(rows) });
+    const byBlock = new Map<string, { readonly block: string; readonly page: string; readonly terms: string }>();
+    for (const b of flatBlocks(page.blocks)) {
+      const next = termsList(`${page.title}\n${b.path}\n${b.body}`);
+      const prev = byBlock.get(b.id);
+      const words = prev ? [...new Set([...prev.terms.split(" ").filter(Boolean), ...next])] : [...new Set(next)];
+      byBlock.set(b.id, { block: b.id, page: page.slug, terms: words.join(" ") });
+    }
+    if (byBlock.size === 0) return;
+    await terms.addTerms(db.sql, { rows: jsonText([...byBlock.values()]) });
   };
   const unindexed = (slug: string) => terms.clearPageTerms(db.sql, { page: slug });
 

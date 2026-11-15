@@ -5,7 +5,7 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, ArtifactId, MessageId, Words_artifact_body } from "./types.js"
+import { rowOf, ArtifactId, IssueId, MessageId, Words_artifact_body } from "./types.js"
 
 export interface AddArtifactParams {
   readonly ["id"]: ArtifactId
@@ -13,7 +13,7 @@ export interface AddArtifactParams {
   readonly ["body"]: Words_artifact_body
   readonly ["display"]: string | null
   readonly ["channel_id"]: string | null
-  readonly ["issue"]: string | null
+  readonly ["issue"]: IssueId | null
   readonly ["by_id"]: string
   readonly ["by_name"]: string
   readonly ["version"]: number
@@ -37,7 +37,7 @@ export const ArtifactResult = z.object({
   ["display"]: z.string().nullable(),
   ["channel_id"]: z.string().nullable(),
   ["message_id"]: MessageId.nullable(),
-  ["issue"]: z.string().nullable(),
+  ["issue"]: IssueId.nullable(),
   ["by_id"]: z.string(),
   ["by_name"]: z.string(),
   ["version"]: z.number().int(),
@@ -67,7 +67,7 @@ export const ArtifactsInChannelResult = z.object({
   ["display"]: z.string().nullable(),
   ["channel_id"]: z.string().nullable(),
   ["message_id"]: MessageId.nullable(),
-  ["issue"]: z.string().nullable(),
+  ["issue"]: IssueId.nullable(),
   ["by_id"]: z.string(),
   ["by_name"]: z.string(),
   ["version"]: z.number().int(),
@@ -87,7 +87,7 @@ export async function artifactsInChannel(sql: Sql, params: ArtifactsInChannelPar
 }
 
 export interface ArtifactsForIssueParams {
-  readonly ["issue"]: string
+  readonly ["issue"]: IssueId
 }
 
 export const ArtifactsForIssueResult = z.object({
@@ -97,7 +97,7 @@ export const ArtifactsForIssueResult = z.object({
   ["display"]: z.string().nullable(),
   ["channel_id"]: z.string().nullable(),
   ["message_id"]: MessageId.nullable(),
-  ["issue"]: z.string().nullable(),
+  ["issue"]: IssueId.nullable(),
   ["by_id"]: z.string(),
   ["by_name"]: z.string(),
   ["version"]: z.number().int(),
@@ -127,7 +127,7 @@ export const ArtifactsResult = z.object({
   ["display"]: z.string().nullable(),
   ["channel_id"]: z.string().nullable(),
   ["message_id"]: MessageId.nullable(),
-  ["issue"]: z.string().nullable(),
+  ["issue"]: IssueId.nullable(),
   ["by_id"]: z.string(),
   ["by_name"]: z.string(),
   ["version"]: z.number().int(),

@@ -31,7 +31,7 @@ export interface AddTermsParams {
   readonly ["rows"]: string
 }
 
-export const AddTermsSql = "-- name: AddTerms :exec\n-- rows: JSON [{\"block\", \"page\", \"terms\"}], a page's blocks in one statement.\ninsert into pkm_term (block, page, terms)\nselect value ->> 'block', value ->> 'page', value ->> 'terms' from jsonb_array_elements($1::text::jsonb) as value;"
+export const AddTermsSql = "-- name: AddTerms :exec\n-- rows: JSON [{\"block\", \"page\", \"terms\"}], a page's blocks in one statement.\ninsert into pkm_term (block, page, terms)\nselect distinct on (value ->> 'page', value ->> 'block') value ->> 'block', value ->> 'page', value ->> 'terms'\nfrom jsonb_array_elements($1::text::jsonb) with ordinality as r(value, ord)\norder by value ->> 'page', value ->> 'block', ord desc\non conflict (page, block) do update set terms = excluded.terms;"
 
 export async function addTerms(sql: Sql, params: AddTermsParams): Promise<number> {
   return sql.exec(AddTermsSql, [params["rows"]])

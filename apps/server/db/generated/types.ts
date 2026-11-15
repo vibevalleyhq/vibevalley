@@ -133,6 +133,9 @@ export type Words_pkm_comment_status = z.infer<typeof Words_pkm_comment_status>
 export const Words_session_closed = z.enum(["merged","completed","dismissed","lost"])
 export type Words_session_closed = z.infer<typeof Words_session_closed>
 
+export const Words_session_delivery_actor_kind = z.enum(["user","agent","system"])
+export type Words_session_delivery_actor_kind = z.infer<typeof Words_session_delivery_actor_kind>
+
 export const Words_session_delivery_held_by = z.enum(["hop_limit","cooldown","wake_breaker"])
 export type Words_session_delivery_held_by = z.infer<typeof Words_session_delivery_held_by>
 
@@ -153,6 +156,9 @@ export type Words_session_run_outcome = z.infer<typeof Words_session_run_outcome
 
 export const Words_session_scope_kind = z.enum(["issue","draft","channel","duty"])
 export type Words_session_scope_kind = z.infer<typeof Words_session_scope_kind>
+
+export const Words_session_trigger_actor_kind = z.enum(["user","agent","system"])
+export type Words_session_trigger_actor_kind = z.infer<typeof Words_session_trigger_actor_kind>
 
 export const Words_user_device_came = z.enum(["paired","login"])
 export type Words_user_device_came = z.infer<typeof Words_user_device_came>

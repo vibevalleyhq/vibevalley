@@ -245,6 +245,8 @@ describe("pkm", () => {
     await edit(pkm.root, "02_Areas/写在外面.md", "- 外面写的解析器笔记\n");
     await pkm.scan();
     expect((await pkm.search({ text: "外面" })).map((h) => h.body)).toEqual(["外面写的解析器笔记"]);
+    await pkm.save({ title: "重复块页", markdown: "- 第一段\n  id:: dup-block\n- 新段落\n  id:: dup-block\n" });
+    expect((await pkm.search({ text: "新段落" })).map((h) => h.body)).toEqual(["新段落", "第一段"]);
   });
 
   test("answers for a page that is not there, or whose file is gone", async () => {

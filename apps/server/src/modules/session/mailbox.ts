@@ -35,6 +35,8 @@ export interface InsertDelivery {
 const refused = refuseIn(BizCode.ChannelRefused);
 const readTrigger = jsonOf(S.Trigger);
 const readSource = jsonOf(z.object({ text: z.string(), data: z.unknown() }));
+const isChannelMessageData = (data: unknown): boolean =>
+  typeof data === "object" && data !== null && !Array.isArray(data) && "kind" in data && data.kind === "channel_message";
 
 export interface TalkOrder {
   readonly envelope: Envelope;
@@ -175,6 +177,8 @@ export async function makeMailbox(deps: MailboxDeps): Promise<Mailbox> {
         id: trigger.id,
         source: trigger.source,
         source_key: key,
+        actor_kind: trigger.actor.kind,
+        is_channel_message: isChannelMessageData(payload.data),
         occurred_at: trigger.at,
         trigger_json: jsonText(S.Trigger.parse(trigger)),
         payload_json: jsonText(payload),

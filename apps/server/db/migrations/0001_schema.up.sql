@@ -232,6 +232,8 @@ CREATE TABLE session_trigger (
   seq integer not null default 0, -- the order they were recorded in (session_trigger_seq)
   source text not null,
   source_key text not null,
+  actor_kind text not null check (actor_kind in ('user', 'agent', 'system')),
+  is_channel_message boolean not null default false,
   trigger_json text not null,
   payload_json text not null,
   occurred_at double precision not null,
@@ -355,6 +357,8 @@ CREATE TABLE session_delivery (
   scope text not null,
   session_id     text not null references session (id) on delete cascade,
   envelope_id    text not null,
+  trigger_id     text references session_trigger (id) on delete cascade,
+  actor_kind     text not null check (actor_kind in ('user', 'agent', 'system')),
   channel_id     text references channel (id) on delete cascade,
   message_id     text references channel_message (id) on delete cascade,
   source         text not null check (source in ('workbench', 'channel', 'connector', 'voice', 'github', 'cron', 'patrol')),
@@ -373,6 +377,7 @@ CREATE TABLE session_delivery (
   check ((held_by is null) or wakes),
   check ((state = 'handed') = (launch is not null) or state in ('consumed', 'dropped'))
 );
+CREATE INDEX session_delivery_by_trigger on session_delivery (trigger_id) where trigger_id is not null;
 -- The threads whose words go to an issue (issue/intake.ts): one issue per thread.
 CREATE TABLE issue_subscription (
   thread_key text primary key,
@@ -573,7 +578,7 @@ CREATE TABLE artifact (
   channel_id  text references channel (id),
   -- The message that first announced it: a blocks one's comments are the replies to it (an html one's are each version's).
   message_id  text references channel_message (id) on delete set null,
-  issue       text,
+  issue       text references issue (id) on delete set null,
   -- Its maker, a profile's id or the user's, and the name it went by then.
   by_id       text not null,
   by_name     text not null,
@@ -672,12 +677,12 @@ CREATE INDEX artifact_by_message on artifact (message_id) where message_id is no
 CREATE INDEX artifact_version_by_message on artifact_version (message_id) where message_id is not null;
 
 CREATE VIEW session_user_route AS
-select routing_scope as scope, routing_position as position from session_trigger
-where routed_at is not null and trigger_json::jsonb -> 'actor' ->> 'kind' = 'user'
+select t.routing_scope as scope, t.routing_position as position from session_trigger t
+where t.routed_at is not null and t.actor_kind = 'user'
 union all
-select scope, position from session_delivery
-where payload_json::jsonb -> 'trigger' -> 'actor' ->> 'kind' = 'user'
-  and envelope_id <> payload_json::jsonb -> 'trigger' ->> 'id';
+select d.scope, d.position from session_delivery d
+where d.actor_kind = 'user'
+  and d.trigger_id is not null and d.envelope_id <> d.trigger_id;
 
 CREATE TABLE agent_spend (
   day text NOT NULL,
@@ -709,10 +714,10 @@ CREATE INDEX pkm_comment_by_page ON pkm_comment (page, created_at);
 CREATE TABLE pkm_term (
   block  text not null,
   page   text not null,
-  terms  text not null
+  terms  text not null,
+  primary key (page, block)
 );
 CREATE INDEX pkm_term_terms ON pkm_term USING gin (term_vector(terms));
-CREATE INDEX pkm_term_by_page ON pkm_term (page);
 
 -- Each file a change wrote, as it was before (none: the change made it) and after: pkm.undo puts back the newest.
 CREATE TABLE pkm_change (

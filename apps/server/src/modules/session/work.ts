@@ -48,6 +48,8 @@ export function makeWorkMailbox(deps: WorkDeps, options: WorkOptions) {
     qd.insertDelivery(db.sql, {
       session_id: input.session,
       envelope_id: input.row.envelope_id,
+      trigger_id: input.row.payload.trigger.id || null,
+      actor_kind: input.row.payload.trigger.actor.kind,
       scope: input.row.scope,
       channel_id: input.row.channel_id || null,
       message_id: input.row.message_id,

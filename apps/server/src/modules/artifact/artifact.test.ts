@@ -9,7 +9,7 @@ import { userId } from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
 import { artifactId } from "@vibevalley/protocol/schema";
 
-import { world } from "#/testing/world.ts";
+import { testIssues, world } from "#/testing/world.ts";
 
 const user = { from: userId, by: userId };
 const page = (words: string) => `<!doctype html><title>${words}</title><p>${words}</p>`;
@@ -39,10 +39,16 @@ describe("an artifact", () => {
 
     // A later created_at: the channel lists the newest first.
     await sleep(2);
-    const forIssue = await artifacts.create(user, { title: "调研", kind: "markdown", content: "# 结论\n\n用抽屉。", issue: "issue-1" });
-    expect((await artifacts.list({ issue: "issue-1" })).map((a) => a.id)).toEqual([forIssue.id]);
+    const issue = await testIssues(farm.issue).add({ title: "抽屉调研" });
+    const forIssue = await artifacts.create(user, { title: "调研", kind: "markdown", content: "# 结论\n\n用抽屉。", issue: issue.id });
+    expect((await artifacts.list({ issue: issue.id })).map((a) => a.id)).toEqual([forIssue.id]);
     expect((await artifacts.list({ channel: general })).map((a) => a.id)).toEqual([forIssue.id, made.id]);
     expect((await artifacts.list({})).length).toBe(2);
+    await farm.db.sql.exec("delete from issue where id = $1", [issue.id]);
+    expect((await artifacts.get(forIssue.id)).issue).toBeUndefined();
+    await expect(artifacts.create(user, { title: "孤儿", kind: "markdown", content: "# 无工单", issue: "missing-issue" })).rejects.toThrow(
+      /artifact_issue_fkey|foreign key/iu,
+    );
   });
 
   test("handed in as Markdown is read into blocks to write on together, and takes no new version", async () => {
