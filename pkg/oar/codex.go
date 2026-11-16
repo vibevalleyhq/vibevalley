@@ -65,11 +65,15 @@ func (d CodexDriver) Open(ctx context.Context, opts SessionOptions) (Session, er
 		opts:         opts,
 		proc:         proc,
 		stream:       newRecordStream(initialID, opts.nowMillis),
+		rootThreadID: opts.ResumeSessionID,
 		resumed:      opts.ResumeSessionID != "",
 		baselineCh:   make(chan struct{}),
 		threadPaths:  make(map[string][]string),
 		threadTokens: make(map[string]TokenTotals),
 		doneCh:       make(chan struct{}),
+	}
+	if opts.ResumeSessionID != "" {
+		s.threadPaths[opts.ResumeSessionID] = []string{}
 	}
 	s.peer = newRPCPeer(proc.Stdin(), s.onNotification, s.onServerRequest, s.onEOF)
 
@@ -195,6 +199,14 @@ func (s *codexSession) handshake(ctx context.Context) error {
 		}
 		if len(rawTU) > 0 {
 			if tot, ok := parseCodexTokenTotals(rawTU); ok {
+				s.baseline = tot
+				s.baselineKnown = true
+				s.baselineOnce.Do(func() { close(s.baselineCh) })
+			}
+		}
+		if !s.baselineKnown && !s.seenTurnStarted {
+			if tot, ok := s.threadTokens[threadID]; ok {
+				delete(s.threadTokens, threadID)
 				s.baseline = tot
 				s.baselineKnown = true
 				s.baselineOnce.Do(func() { close(s.baselineCh) })
