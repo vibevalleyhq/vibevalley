@@ -141,7 +141,13 @@ export function auditProtocolSurface() {
   const leakedSchemas = publicSchemaNames.filter((name) => name !== "Wire" && !usedSchemas.has(name));
   const serverOnlyShapeNames = publicShapeNames.filter((name) => usedShapesInServer.has(name) && !usedShapesOutsideServer.has(name));
 
-  const protocolSourceFiles = files.filter((f) => f.startsWith("packages/protocol/src/") && !f.endsWith(".test.ts") && f !== "packages/protocol/src/client.ts");
+  const protocolSourceFiles = files.filter(
+    (f) =>
+      f.startsWith("packages/protocol/src/") &&
+      !f.endsWith(".test.ts") &&
+      f !== "packages/protocol/src/client.ts" &&
+      !f.startsWith("packages/protocol/src/go-contract/"),
+  );
   let totalProtocolExports = 0;
   for (const file of protocolSourceFiles) {
     const text = readFileSync(resolve(root, file), "utf8");

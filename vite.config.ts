@@ -64,6 +64,7 @@ export default defineConfig({
         "vpx scripts/gen/capabilities.ts --check",
         "vpx scripts/gen/api-client.ts --check",
         "vpx scripts/gen/primitives.ts --check",
+        "vpx scripts/gen/go-contract.ts --check",
       ],
       "notes:verify": "vpx scripts/docs/agent-notes.ts",
       "site:check": "vp run --filter @vibevalley/site check",

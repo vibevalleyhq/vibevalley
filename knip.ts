@@ -69,8 +69,8 @@ const config: KnipConfig = {
       ignoreDependencies: ["@vitest/browser-playwright"],
     },
   },
-  // Programs on the machine, not packages: Xcode's swift, macOS's plutil and ditto, and the voice line's tunnel.
-  ignoreBinaries: ["swift", "plutil", "ditto", "cloudflared"],
+  // Programs on the machine, not packages: Xcode's swift, macOS's plutil and ditto, the voice line's tunnel, and the Go toolchain.
+  ignoreBinaries: ["swift", "plutil", "ditto", "cloudflared", "go"],
   // Swift, with its own tools.
   ignoreWorkspaces: ["apps/island", "apps/pty"],
 };
