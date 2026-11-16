@@ -671,3 +671,161 @@ func TestRedactAndMarshalRedactedYAML(t *testing.T) {
 		t.Fatal("MarshalRedactedYAML(nil) should return error")
 	}
 }
+
+func TestEmptyGetenvDoesNotFallbackToOSUserHomeDir(t *testing.T) {
+	fakeHostHome := t.TempDir()
+	hostYAML := filepath.Join(fakeHostHome, ".vibevalley", "vibevalley.yaml")
+	writeTestFile(t, hostYAML, "bogus_section:\n  fail: true\n")
+	t.Setenv("HOME", fakeHostHome)
+	t.Setenv("USERPROFILE", fakeHostHome)
+
+	emptyEnv := func(string) string { return "" }
+	resolved, explicit := config.ResolvePath("", emptyEnv)
+	if explicit {
+		t.Fatalf("expected explicit=false, got true (path=%q)", resolved)
+	}
+	if strings.HasPrefix(resolved, fakeHostHome) {
+		t.Fatalf("ResolvePath with empty Getenv leaked host home %q: %q", fakeHostHome, resolved)
+	}
+
+	def := config.DefaultConfig(emptyEnv)
+	if strings.HasPrefix(def.HomeDir, fakeHostHome) {
+		t.Fatalf("DefaultConfig with empty Getenv leaked host home %q: %q", fakeHostHome, def.HomeDir)
+	}
+
+	cfg, loadedPath, err := config.Load(config.LoadOptions{Getenv: emptyEnv})
+	if err != nil {
+		t.Fatalf("Load with empty Getenv unexpectedly read host YAML %q: %v", hostYAML, err)
+	}
+	if loadedPath != "" || strings.HasPrefix(cfg.HomeDir, fakeHostHome) {
+		t.Fatalf("Load with empty Getenv leaked host home: loaded=%q cfg=%+v", loadedPath, cfg)
+	}
+
+	// nil Getenv uses process env / os.UserHomeDir normally.
+	nilResolved, _ := config.ResolvePath("", nil)
+	if nilResolved != hostYAML {
+		t.Fatalf("ResolvePath with nil Getenv = %q, want %q", nilResolved, hostYAML)
+	}
+}
+
+func TestOfficialTSVibeValleyYAMLCompatibilityAndStrictTypoChecks(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	vibeHome := filepath.Join(tmp, "vibe-home")
+	getenv := mapGetenv(map[string]string{"VIBEVALLEY_HOME": vibeHome})
+
+	tsYAML := filepath.Join(tmp, "ts-vibevalley.yaml")
+	writeTestFile(t, tsYAML, `
+port: 9091
+db: memory
+web: /srv/web/dist
+tokei: /usr/local/bin/tokei
+cny_per_usd: 7.25
+git_emails:
+  - dev@vibevalley.dev
+  - ci@vibevalley.dev
+database:
+  url: postgres://localhost/vibevalley
+agent:
+  model: deepseek-chat
+  starters: [architect, reviewer]
+agora:
+  app_id: app-123
+  app_certificate: cert-456
+voice:
+  id: v1
+  line:
+    port: 8788
+    url: ""
+lan:
+  port: 8790
+patrol:
+  heartbeat_minutes: 10
+cron:
+  tick_ms: 20000
+session:
+  stall_seconds: 240
+  trajectory_days: 30
+repo:
+  max_sessions: 3
+  check_timeout_seconds: 1200
+github:
+  pr_repos: [vibevalleyhq/vibevalley]
+  pr_poll_seconds: 180
+chat:
+  notice_batch_ms: 3000
+  retry_wake_ms: 3000
+otlp:
+  url: http://127.0.0.1:4318
+pkm:
+  root: /tmp/pkm
+`)
+	cfg, loadedPath, err := config.Load(config.LoadOptions{ConfigFile: tsYAML, Getenv: getenv})
+	if err != nil {
+		t.Fatalf("Load official TS YAML failed: %v", err)
+	}
+	if loadedPath != tsYAML {
+		t.Fatalf("loadedPath = %q, want %q", loadedPath, tsYAML)
+	}
+	if cfg.Server.Addr != "127.0.0.1:9091" {
+		t.Fatalf("Server.Addr = %q, want 127.0.0.1:9091", cfg.Server.Addr)
+	}
+	if cfg.Server.DBPath != ":memory:" {
+		t.Fatalf("Server.DBPath = %q, want :memory:", cfg.Server.DBPath)
+	}
+	if cfg.Desktop.WebDist != "/srv/web/dist" {
+		t.Fatalf("Desktop.WebDist = %q, want /srv/web/dist", cfg.Desktop.WebDist)
+	}
+
+	// Explicit canonical server/desktop fields take precedence over top-level port/db/web.
+	overrideYAML := filepath.Join(tmp, "override.yaml")
+	writeTestFile(t, overrideYAML, `
+port: 9091
+db: /ts/pglite
+web: /ts/web
+server:
+  addr: 127.0.0.1:9999
+  db_path: /canonical/server.db
+desktop:
+  web_dist: /canonical/web
+`)
+	overrideCfg, _, err := config.Load(config.LoadOptions{ConfigFile: overrideYAML, Getenv: getenv})
+	if err != nil {
+		t.Fatalf("Load override YAML failed: %v", err)
+	}
+	if overrideCfg.Server.Addr != "127.0.0.1:9999" ||
+		overrideCfg.Server.DBPath != "/canonical/server.db" ||
+		overrideCfg.Desktop.WebDist != "/canonical/web" {
+		t.Fatalf("canonical section fields were overwritten by TS top-level aliases: %+v", overrideCfg)
+	}
+
+	// Non-"memory" db maps verbatim to server.db_path when server.db_path is unset.
+	pathDBYAML := filepath.Join(tmp, "path-db.yaml")
+	writeTestFile(t, pathDBYAML, "db: /data/pglite-dir\n")
+	pathDBCfg, _, err := config.Load(config.LoadOptions{ConfigFile: pathDBYAML, Getenv: getenv})
+	if err != nil {
+		t.Fatalf("Load path db YAML failed: %v", err)
+	}
+	if pathDBCfg.Server.DBPath != "/data/pglite-dir" {
+		t.Fatalf("Server.DBPath = %q, want /data/pglite-dir", pathDBCfg.Server.DBPath)
+	}
+
+	// Typos and non-mapping auxiliary sections must still fail cleanly.
+	for _, bad := range []struct {
+		name    string
+		yaml    string
+		wantErr string
+	}{
+		{"unknown top-level", "bogus_section:\n  foo: bar\n", "bogus_section"},
+		{"unknown nested server", "server:\n  unknown_opt: true\n", "server.unknown_opt"},
+		{"non-map voice section", "voice: scalar\n", "voice"},
+		{"invalid port out of range", "port: 70000\n", "port"},
+	} {
+		badPath := filepath.Join(tmp, bad.name+".yaml")
+		writeTestFile(t, badPath, bad.yaml)
+		if _, _, err := config.Load(config.LoadOptions{ConfigFile: badPath, Getenv: getenv}); err == nil || !strings.Contains(err.Error(), bad.wantErr) {
+			t.Fatalf("%s: expected error containing %q, got %v", bad.name, bad.wantErr, err)
+		}
+	}
+}

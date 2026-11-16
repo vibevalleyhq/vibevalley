@@ -79,11 +79,72 @@ func TestCLIValidationErrors(t *testing.T) {
 		{},
 		{"--write", "--check"},
 		{"--write", "extra"},
+		{"generate", "extra"},
+		{"check", "extra"},
+		{"version", "extra"},
 	} {
 		out.Reset()
 		errBuf.Reset()
 		if err := run(args, &out, &errBuf); err == nil {
 			t.Errorf("expected error for args %v", args)
 		}
+	}
+}
+
+func TestSubcommandsGenerateCheckVersion(t *testing.T) {
+	tmp := copyContractToTempRoot(t)
+
+	var out, errBuf bytes.Buffer
+	if err := run([]string{"version"}, &out, &errBuf); err != nil {
+		t.Fatalf("version subcommand failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "vibe-tsgen") {
+		t.Fatalf("unexpected version output: %q", out.String())
+	}
+
+	out.Reset()
+	if err := run([]string{"--version"}, &out, &errBuf); err != nil {
+		t.Fatalf("--version flag failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "vibe-tsgen") {
+		t.Fatalf("unexpected --version output: %q", out.String())
+	}
+
+	out.Reset()
+	if err := run([]string{"check", "--root", tmp}, &out, &errBuf); err == nil {
+		t.Fatal("expected check subcommand to fail before files are generated")
+	}
+
+	out.Reset()
+	errBuf.Reset()
+	if err := run([]string{"generate", "--root", tmp}, &out, &errBuf); err != nil {
+		t.Fatalf("generate subcommand failed: %v (stderr=%s)", err, errBuf.String())
+	}
+	if !strings.Contains(out.String(), "shapes.ts") || !strings.Contains(out.String(), "schema.ts") {
+		t.Fatalf("unexpected generate output: %q", out.String())
+	}
+
+	out.Reset()
+	if err := run([]string{"check", "--root", tmp}, &out, &errBuf); err != nil {
+		t.Fatalf("check subcommand after generate failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "up to date") {
+		t.Fatalf("unexpected check output: %q", out.String())
+	}
+
+	out.Reset()
+	if err := run([]string{"--root", tmp, "check"}, &out, &errBuf); err != nil {
+		t.Fatalf("--root before check subcommand failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "up to date") {
+		t.Fatalf("unexpected --root check output: %q", out.String())
+	}
+
+	shapesPath := filepath.Join(tmp, "packages", "protocol", "src", "go-contract", "shapes.ts")
+	if err := os.WriteFile(shapesPath, []byte("// drifted\n"), 0o644); err != nil {
+		t.Fatalf("corrupt shapes.ts: %v", err)
+	}
+	if err := run([]string{"check", "--root", tmp}, &out, &errBuf); err == nil {
+		t.Fatal("expected check subcommand to fail after shapes.ts drifted")
 	}
 }

@@ -2,14 +2,17 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+
 	"github.com/vibevalleyhq/vibevalley/pkg/contract/tsgen"
 )
+
+const version = "0.1.0-dev"
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
@@ -18,23 +21,84 @@ func main() {
 	}
 }
 
-func run(args []string, stdout io.Writer, stderr io.Writer) error {
-	fs := flag.NewFlagSet("vibe-tsgen", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	write := fs.Bool("write", false, "write generated TypeScript files")
-	check := fs.Bool("check", false, "verify generated TypeScript files are up to date")
-	root := fs.String("root", "", "repository root path (defaults to auto-discovered root from cwd)")
-	if err := fs.Parse(args); err != nil {
-		return err
+func newRootCommand(stdout, stderr io.Writer) *cobra.Command {
+	if stdout == nil {
+		stdout = os.Stdout
 	}
-	if fs.NArg() > 0 {
-		return fmt.Errorf("unexpected positional arguments: %v", fs.Args())
-	}
-	if *write == *check {
-		return errors.New("specify exactly one of --write or --check")
+	if stderr == nil {
+		stderr = os.Stderr
 	}
 
-	repoRoot := *root
+	var (
+		write    bool
+		check    bool
+		rootPath string
+	)
+
+	rootCmd := &cobra.Command{
+		Use:           "vibe-tsgen",
+		Short:         "Generate TypeScript contracts and Zod schemas from pkg/contract",
+		Version:       version,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if write == check {
+				return errors.New("specify exactly one of --write or --check")
+			}
+			return executeTSGen(rootPath, check, stdout)
+		},
+	}
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+	rootCmd.SetVersionTemplate("vibe-tsgen {{.Version}}\n")
+
+	rootCmd.PersistentFlags().StringVar(&rootPath, "root", "", "repository root path (defaults to auto-discovered root from cwd)")
+	rootCmd.Flags().BoolVar(&write, "write", false, "write generated TypeScript files")
+	rootCmd.Flags().BoolVar(&check, "check", false, "verify generated TypeScript files are up to date")
+
+	generateCmd := &cobra.Command{
+		Use:   "generate",
+		Short: "Write generated TypeScript files",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return executeTSGen(rootPath, false, stdout)
+		},
+	}
+
+	checkCmd := &cobra.Command{
+		Use:   "check",
+		Short: "Verify generated TypeScript files are up to date",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return executeTSGen(rootPath, true, stdout)
+		},
+	}
+
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print vibe-tsgen version",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			_, err := fmt.Fprintf(stdout, "vibe-tsgen %s\n", version)
+			return err
+		},
+	}
+
+	rootCmd.AddCommand(generateCmd, checkCmd, versionCmd)
+	return rootCmd
+}
+
+func run(args []string, stdout io.Writer, stderr io.Writer) error {
+	rootCmd := newRootCommand(stdout, stderr)
+	if args == nil {
+		args = []string{}
+	}
+	rootCmd.SetArgs(args)
+	return rootCmd.Execute()
+}
+
+func executeTSGen(rootPath string, check bool, stdout io.Writer) error {
+	repoRoot := rootPath
 	if repoRoot == "" {
 		discovered, err := findRepoRoot()
 		if err != nil {
@@ -49,10 +113,10 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 		repoRoot = abs
 	}
 
-	if err := tsgen.Run(tsgen.Options{RepoRoot: repoRoot, Check: *check}); err != nil {
+	if err := tsgen.Run(tsgen.Options{RepoRoot: repoRoot, Check: check}); err != nil {
 		return err
 	}
-	if *check {
+	if check {
 		fmt.Fprintln(stdout, "go-contract: up to date")
 	} else {
 		fmt.Fprintf(stdout, "go-contract: wrote %s and %s\n", tsgen.ShapesRelPath, tsgen.SchemaRelPath)

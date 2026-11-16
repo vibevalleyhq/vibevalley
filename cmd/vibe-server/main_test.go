@@ -43,6 +43,18 @@ func buildGoBinary(t *testing.T, pkg, outName string) string {
 	return binPath
 }
 
+func isolatedVibeEnv(vibeHome string) []string {
+	base := os.Environ()
+	out := make([]string, 0, len(base)+1)
+	for _, entry := range base {
+		if strings.HasPrefix(entry, "VIBEVALLEY_HOME=") || strings.HasPrefix(entry, "VIBE_CONFIG=") {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return append(out, "VIBEVALLEY_HOME="+vibeHome)
+}
+
 func TestVibeServerSubprocessReadyJSONAndMachineConnect(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -61,6 +73,7 @@ func TestVibeServerSubprocessReadyJSONAndMachineConnect(t *testing.T) {
 		"--work-root", workRoot,
 		"--ready-json",
 	)
+	srvCmd.Env = isolatedVibeEnv(filepath.Join(tmp, "srv-home"))
 	stdout, err := srvCmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -125,6 +138,7 @@ func TestVibeServerSubprocessReadyJSONAndMachineConnect(t *testing.T) {
 		"--work-root", machWork,
 		"--label", "e2e",
 	)
+	machCmd.Env = isolatedVibeEnv(filepath.Join(tmp, "mach-home"))
 	machOut, err := machCmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -340,6 +354,7 @@ caughtUp:
 		"--work-root", filepath.Join(tmp, "mach-exec-work"),
 		"--label", "linux-or-mac",
 	)
+	machCmd.Env = isolatedVibeEnv(filepath.Join(tmp, "mach-exec-home"))
 	if err := machCmd.Start(); err != nil {
 		t.Fatalf("start vibe-machine: %v", err)
 	}

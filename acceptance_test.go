@@ -89,6 +89,18 @@ func (b *syncBuffer) String() string {
 	return b.buf.String()
 }
 
+func isolatedVibeEnv(vibeHome string) []string {
+	base := os.Environ()
+	out := make([]string, 0, len(base)+1)
+	for _, entry := range base {
+		if strings.HasPrefix(entry, "VIBEVALLEY_HOME=") || strings.HasPrefix(entry, "VIBE_CONFIG=") {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return append(out, "VIBEVALLEY_HOME="+vibeHome)
+}
+
 func startCmdWaiter(cmd *exec.Cmd) (<-chan struct{}, *error) {
 	done := make(chan struct{})
 	var waitErr error
@@ -650,6 +662,7 @@ func TestAcceptanceGate3_SandboxDecoupling(t *testing.T) {
 		"--work-root", filepath.Join(tmp, "gate3-srv-work"),
 		"--ready-json",
 	)
+	srvCmd.Env = isolatedVibeEnv(filepath.Join(tmp, "gate3-srv-home"))
 	srvOut, err := srvCmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -699,6 +712,7 @@ func TestAcceptanceGate3_SandboxDecoupling(t *testing.T) {
 		"--work-root", machWork,
 		"--label", "sandbox",
 	)
+	machCmd.Env = isolatedVibeEnv(filepath.Join(tmp, "gate3-mach1-home"))
 	var machErr syncBuffer
 	machCmd.Stderr = &machErr
 	if err := machCmd.Start(); err != nil {
@@ -760,6 +774,7 @@ func TestAcceptanceGate3_SandboxDecoupling(t *testing.T) {
 		"--machine-id", "mach-g3-2",
 		"--work-root", mach2Work,
 	)
+	mach2Cmd.Env = isolatedVibeEnv(filepath.Join(tmp, "gate3-mach2-home"))
 	if err := mach2Cmd.Start(); err != nil {
 		t.Fatal(err)
 	}

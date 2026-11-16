@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"net"
 	"net/url"
 	"os"
@@ -116,9 +117,32 @@ var (
 		"deepseek": true,
 		"secrets":  true,
 	}
+	auxiliarySections = map[string]bool{
+		"database": true,
+		"agent":    true,
+		"agora":    true,
+		"voice":    true,
+		"lan":      true,
+		"patrol":   true,
+		"cron":     true,
+		"session":  true,
+		"repo":     true,
+		"github":   true,
+		"chat":     true,
+		"otlp":     true,
+		"pkm":      true,
+	}
 	topLevelScalars = map[string]bool{
-		"home_dir":  true,
-		"work_root": true,
+		"home_dir":    true,
+		"work_root":   true,
+		"port":        true,
+		"db":          true,
+		"web":         true,
+		"tokei":       true,
+		"cny_per_usd": true,
+	}
+	topLevelLists = map[string]bool{
+		"git_emails": true,
 	}
 	sectionFields = map[string]map[string]bool{
 		"server": {
@@ -171,8 +195,12 @@ var (
 
 // DefaultConfig returns a new AppConfig populated with VibeValley defaults for the given env lookup.
 func DefaultConfig(getenv func(string) string) *AppConfig {
+	return defaultConfig(getenv, getenv == nil)
+}
+
+func defaultConfig(getenv func(string) string, allowUserHomeFallback bool) *AppConfig {
 	getenv = normalizeGetenv(getenv)
-	homeDir, hasHome := resolveHomeDir(getenv)
+	homeDir, hasHome := resolveHomeDir(getenv, allowUserHomeFallback)
 	workRoot := defaultWorkRoot(homeDir, hasHome)
 
 	return &AppConfig{
@@ -205,19 +233,23 @@ func DefaultConfig(getenv func(string) string) *AppConfig {
 
 // DefaultMap returns DefaultConfig serialized as a nested map suitable for koanf confmap.Provider.
 func DefaultMap(getenv func(string) string) map[string]any {
-	return configToMap(DefaultConfig(getenv), false)
+	return configToMap(defaultConfig(getenv, getenv == nil), false)
 }
 
 // ResolvePath determines the YAML configuration path and whether it was explicitly requested.
 func ResolvePath(configFile string, getenv func(string) string) (path string, explicit bool) {
+	return resolvePath(configFile, getenv, getenv == nil)
+}
+
+func resolvePath(configFile string, getenv func(string) string, allowUserHomeFallback bool) (path string, explicit bool) {
 	getenv = normalizeGetenv(getenv)
 	if trimmed := strings.TrimSpace(configFile); trimmed != "" {
-		return expandTilde(trimmed, getenv), true
+		return expandTilde(trimmed, getenv, allowUserHomeFallback), true
 	}
 	if envPath := strings.TrimSpace(getenv("VIBE_CONFIG")); envPath != "" {
-		return expandTilde(envPath, getenv), true
+		return expandTilde(envPath, getenv, allowUserHomeFallback), true
 	}
-	homeDir, _ := resolveHomeDir(getenv)
+	homeDir, _ := resolveHomeDir(getenv, allowUserHomeFallback)
 	return filepath.Join(homeDir, defaultConfigFilename), false
 }
 
@@ -225,14 +257,16 @@ func ResolvePath(configFile string, getenv func(string) string) (path string, ex
 // Changed CLI Flags > Environment Variables > YAML file > Defaults.
 // It returns the validated AppConfig and the YAML path actually loaded (empty if none).
 func Load(opts LoadOptions) (*AppConfig, string, error) {
+	customEnv := opts.Getenv != nil
+	allowUserHomeFallback := !customEnv
 	getenv := normalizeGetenv(opts.Getenv)
 
 	k := koanf.New(".")
-	if err := k.Load(confmap.Provider(DefaultMap(getenv), "."), nil); err != nil {
+	if err := k.Load(confmap.Provider(configToMap(defaultConfig(getenv, allowUserHomeFallback), false), "."), nil); err != nil {
 		return nil, "", fmt.Errorf("load default config: %w", err)
 	}
 
-	resolvedPath, explicit := ResolvePath(opts.ConfigFile, getenv)
+	resolvedPath, explicit := resolvePath(opts.ConfigFile, getenv, allowUserHomeFallback)
 	loadedPath := ""
 
 	info, statErr := os.Stat(resolvedPath)
@@ -451,26 +485,106 @@ func loadAndNormalizeYAML(path string) (map[string]any, error) {
 	}
 	// Propagate top-level work_root to server/machine sections unless YAML specified overrides.
 	if workRoot, ok := raw["work_root"]; ok {
-		if srv, ok := raw["server"].(map[string]any); ok {
-			if _, exists := srv["work_root"]; !exists {
-				srv["work_root"] = workRoot
-			}
-		} else {
-			raw["server"] = map[string]any{"work_root": workRoot}
+		setSectionDefault(raw, "server", "work_root", workRoot)
+		setSectionDefault(raw, "machine", "work_root", workRoot)
+	}
+	// Map official TS vibevalley.yaml top-level keys into canonical Go sections when not overridden.
+	if portVal, ok := raw["port"]; ok {
+		portNum, err := parseYAMLPort(portVal)
+		if err != nil {
+			return nil, fmt.Errorf("load config %q: port: %w", path, err)
 		}
-		if mach, ok := raw["machine"].(map[string]any); ok {
-			if _, exists := mach["work_root"]; !exists {
-				mach["work_root"] = workRoot
-			}
-		} else {
-			raw["machine"] = map[string]any{"work_root": workRoot}
+		setSectionDefault(raw, "server", "addr", fmt.Sprintf("127.0.0.1:%d", portNum))
+		delete(raw, "port")
+	}
+	if dbVal, ok := raw["db"]; ok {
+		dbStr, ok := dbVal.(string)
+		if !ok {
+			return nil, fmt.Errorf("load config %q: key %q must be a string", path, "db")
 		}
+		if trimmed := strings.TrimSpace(dbStr); trimmed != "" {
+			if trimmed == "memory" {
+				trimmed = ":memory:"
+			}
+			setSectionDefault(raw, "server", "db_path", trimmed)
+		}
+		delete(raw, "db")
+	}
+	if webVal, ok := raw["web"]; ok {
+		webStr, ok := webVal.(string)
+		if !ok {
+			return nil, fmt.Errorf("load config %q: key %q must be a string", path, "web")
+		}
+		if trimmed := strings.TrimSpace(webStr); trimmed != "" {
+			setSectionDefault(raw, "desktop", "web_dist", trimmed)
+		}
+		delete(raw, "web")
+	}
+	delete(raw, "tokei")
+	delete(raw, "cny_per_usd")
+	delete(raw, "git_emails")
+	for aux := range auxiliarySections {
+		delete(raw, aux)
 	}
 	return raw, nil
 }
 
+func setSectionDefault(raw map[string]any, section, field string, val any) {
+	if sec, ok := raw[section].(map[string]any); ok {
+		if _, exists := sec[field]; !exists {
+			sec[field] = val
+		}
+		return
+	}
+	raw[section] = map[string]any{field: val}
+}
+
+func parseYAMLPort(val any) (int, error) {
+	var port int
+	switch v := val.(type) {
+	case int:
+		port = v
+	case int64:
+		port = int(v)
+	case uint64:
+		if v > 65535 {
+			return 0, fmt.Errorf("out of range %d (must be 0..65535)", v)
+		}
+		port = int(v)
+	case float64:
+		if math.IsNaN(v) || math.IsInf(v, 0) || v != math.Trunc(v) {
+			return 0, fmt.Errorf("must be an integer, got %v", v)
+		}
+		port = int(v)
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil {
+			return 0, fmt.Errorf("invalid port %q", v)
+		}
+		port = parsed
+	default:
+		return 0, fmt.Errorf("must be an integer in 0..65535, got %T", val)
+	}
+	if port < 0 || port > 65535 {
+		return 0, fmt.Errorf("out of range %d (must be 0..65535)", port)
+	}
+	return port, nil
+}
+
 func validateAndNormalizeYAML(raw map[string]any, path string) error {
 	for key, val := range raw {
+		if topLevelLists[key] {
+			if val == nil {
+				delete(raw, key)
+				continue
+			}
+			list, err := normalizeStringSlice(val, key, path)
+			if err != nil {
+				return err
+			}
+			raw[key] = list
+			continue
+		}
 		if topLevelScalars[key] {
 			if val == nil {
 				delete(raw, key)
@@ -481,6 +595,16 @@ func validateAndNormalizeYAML(raw map[string]any, path string) error {
 			}
 			if _, isSlice := val.([]any); isSlice {
 				return fmt.Errorf("load config %q: key %q must be a scalar value", path, key)
+			}
+			continue
+		}
+		if auxiliarySections[key] {
+			if val == nil {
+				delete(raw, key)
+				continue
+			}
+			if _, ok := val.(map[string]any); !ok {
+				return fmt.Errorf("load config %q: section %q must be a mapping", path, key)
 			}
 			continue
 		}
@@ -765,17 +889,17 @@ func normalizeGetenv(getenv func(string) string) func(string) string {
 	return getenv
 }
 
-func resolveHomeDir(getenv func(string) string) (string, bool) {
+func resolveHomeDir(getenv func(string) string, allowUserHomeFallback bool) (string, bool) {
 	if h := strings.TrimSpace(getenv("VIBEVALLEY_HOME")); h != "" {
-		return filepath.Clean(expandTilde(h, getenv)), true
+		return filepath.Clean(expandTilde(h, getenv, allowUserHomeFallback)), true
 	}
-	if h := userHomeDir(getenv); h != "" {
+	if h := userHomeDir(getenv, allowUserHomeFallback); h != "" {
 		return filepath.Join(h, ".vibevalley"), true
 	}
 	return ".vibevalley", false
 }
 
-func userHomeDir(getenv func(string) string) string {
+func userHomeDir(getenv func(string) string, allowUserHomeFallback bool) string {
 	if h := strings.TrimSpace(getenv("HOME")); h != "" {
 		return filepath.Clean(h)
 	}
@@ -784,21 +908,23 @@ func userHomeDir(getenv func(string) string) string {
 			return filepath.Clean(h)
 		}
 	}
-	if h, err := os.UserHomeDir(); err == nil && strings.TrimSpace(h) != "" {
-		return filepath.Clean(h)
+	if allowUserHomeFallback {
+		if h, err := os.UserHomeDir(); err == nil && strings.TrimSpace(h) != "" {
+			return filepath.Clean(h)
+		}
 	}
 	return ""
 }
 
-func expandTilde(path string, getenv func(string) string) string {
+func expandTilde(path string, getenv func(string) string, allowUserHomeFallback bool) string {
 	if path == "~" {
-		if h := userHomeDir(getenv); h != "" {
+		if h := userHomeDir(getenv, allowUserHomeFallback); h != "" {
 			return h
 		}
 		return path
 	}
 	if strings.HasPrefix(path, "~/") || (runtime.GOOS == "windows" && strings.HasPrefix(path, `~\`)) {
-		if h := userHomeDir(getenv); h != "" {
+		if h := userHomeDir(getenv, allowUserHomeFallback); h != "" {
 			return filepath.Join(h, path[2:])
 		}
 	}
