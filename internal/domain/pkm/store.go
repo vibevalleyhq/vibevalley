@@ -3,6 +3,7 @@ package pkm
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,9 @@ import (
 	"github.com/viant/sqlite-vec/vector"
 	_ "modernc.org/sqlite"
 
+	"github.com/vibevalleyhq/vibevalley/internal/domain/pkm/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
 const (
@@ -33,83 +36,10 @@ var (
 	nextMemDatasetSeq    atomic.Int64
 )
 
-var schemaDDL = []string{
-	`CREATE TABLE IF NOT EXISTS pkm_notes (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		rel_path TEXT NOT NULL UNIQUE,
-		slug TEXT NOT NULL,
-		title TEXT NOT NULL,
-		tier TEXT NOT NULL,
-		sha256 TEXT NOT NULL,
-		frontmatter_json TEXT NOT NULL DEFAULT '{}',
-		tags_json TEXT NOT NULL DEFAULT '[]',
-		body TEXT NOT NULL,
-		updated_at_ms INTEGER NOT NULL
-	)`,
-	`CREATE INDEX IF NOT EXISTS pkm_notes_slug_idx ON pkm_notes(slug)`,
-	`CREATE INDEX IF NOT EXISTS pkm_notes_tier_idx ON pkm_notes(tier)`,
-
-	`CREATE TABLE IF NOT EXISTS pkm_aliases (
-		alias_slug TEXT NOT NULL,
-		rel_path TEXT NOT NULL,
-		PRIMARY KEY(alias_slug, rel_path)
-	)`,
-	`CREATE INDEX IF NOT EXISTS pkm_aliases_path_idx ON pkm_aliases(rel_path)`,
-
-	`CREATE TABLE IF NOT EXISTS pkm_blocks (
-		block_id TEXT PRIMARY KEY,
-		rel_path TEXT NOT NULL,
-		page_title TEXT NOT NULL,
-		line INTEGER NOT NULL,
-		byte_start INTEGER NOT NULL,
-		byte_end INTEGER NOT NULL,
-		body TEXT NOT NULL
-	)`,
-	`CREATE INDEX IF NOT EXISTS pkm_blocks_path_idx ON pkm_blocks(rel_path)`,
-
-	`CREATE TABLE IF NOT EXISTS pkm_links (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		source_path TEXT NOT NULL,
-		kind TEXT NOT NULL,
-		target_title TEXT NOT NULL,
-		target_slug TEXT NOT NULL,
-		block_id TEXT NOT NULL DEFAULT '',
-		source_block_id TEXT NOT NULL DEFAULT '',
-		line INTEGER NOT NULL,
-		byte_start INTEGER NOT NULL,
-		byte_end INTEGER NOT NULL,
-		snippet TEXT NOT NULL
-	)`,
-	`CREATE INDEX IF NOT EXISTS pkm_links_source_idx ON pkm_links(source_path)`,
-	`CREATE INDEX IF NOT EXISTS pkm_links_target_idx ON pkm_links(target_slug)`,
-	`CREATE INDEX IF NOT EXISTS pkm_links_block_idx ON pkm_links(block_id)`,
-
-	`CREATE VIRTUAL TABLE IF NOT EXISTS pkm_notes_fts USING fts5(
-		rel_path UNINDEXED,
-		title,
-		tags,
-		body,
-		tokenize='trigram'
-	)`,
-
-	`CREATE TABLE IF NOT EXISTS vector_storage (
-		shadow_table_name TEXT NOT NULL,
-		dataset_id TEXT NOT NULL DEFAULT '',
-		"index" BLOB,
-		PRIMARY KEY (shadow_table_name, dataset_id)
-	)`,
-
-	`CREATE TABLE IF NOT EXISTS _vec_` + vecTableName + ` (
-		dataset_id TEXT NOT NULL,
-		id TEXT NOT NULL,
-		content TEXT,
-		meta TEXT,
-		embedding BLOB,
-		PRIMARY KEY(dataset_id, id)
-	)`,
-
-	`CREATE VIRTUAL TABLE IF NOT EXISTS ` + vecTableName + ` USING vec(doc_id)`,
-}
+// MigrationsFS holds the embedded SQLite migration scripts for the PKM domain store.
+//
+//go:embed migrations/*.sql
+var MigrationsFS embed.FS
 
 // StoreOption configures a PKM SQLite store.
 type StoreOption func(*storeConfig)
@@ -132,6 +62,7 @@ func WithDatasetID(datasetID string) StoreOption {
 type Store struct {
 	writeDB   *sql.DB
 	readDB    *sql.DB
+	readQ     *sqlcgen.Queries
 	sameDB    bool
 	isMem     bool
 	datasetID string
@@ -198,11 +129,14 @@ func OpenStore(ctx context.Context, dsn string, opts ...StoreOption) (*Store, er
 		}
 	}
 
-	for _, ddl := range schemaDDL {
-		if _, err := writeDB.ExecContext(ctx, ddl); err != nil {
-			_ = writeDB.Close()
-			return nil, fmt.Errorf("pkm: apply schema: %w", err)
-		}
+	runner, err := migrate.New(writeDB, "pkm", MigrationsFS)
+	if err != nil {
+		_ = writeDB.Close()
+		return nil, fmt.Errorf("pkm: init migrations: %w", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		_ = writeDB.Close()
+		return nil, fmt.Errorf("pkm: apply schema: %w", err)
 	}
 
 	var readDB *sql.DB
@@ -227,6 +161,7 @@ func OpenStore(ctx context.Context, dsn string, opts ...StoreOption) (*Store, er
 	return &Store{
 		writeDB:   writeDB,
 		readDB:    readDB,
+		readQ:     sqlcgen.New(readDB),
 		sameDB:    sameDB,
 		isMem:     isMem,
 		datasetID: cfg.datasetID,
@@ -303,16 +238,22 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	existingIDs, err := loadExistingNoteIDs(ctx, tx)
+	txQ, err := sqlcgen.Prepare(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = txQ.Close() }()
 
-	stmts, err := prepareBatchStmts(ctx, tx)
+	ftsStmts, err := prepareFTSBatchStmts(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	defer stmts.close()
+	defer ftsStmts.close()
+
+	existingIDs, err := loadExistingNoteIDs(ctx, txQ)
+	if err != nil {
+		return nil, err
+	}
 
 	wroteVectors := false
 	pendingBlocks := make([]pendingBlockRow, 0, len(notes))
@@ -324,7 +265,7 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 		}
 		noteID, exists := existingIDs[note.RelPath]
 		if exists {
-			if err := deleteNoteDetails(ctx, stmts, note.RelPath, noteID); err != nil {
+			if err := deleteNoteDetails(ctx, txQ, ftsStmts, note.RelPath, noteID); err != nil {
 				return nil, err
 			}
 		}
@@ -340,18 +281,32 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 
 		var assignedID int64
 		if exists {
-			if _, err := stmts.updateNote.ExecContext(ctx,
-				note.Slug, note.Title, string(note.Tier), note.SHA256,
-				string(fmJSON), string(tagsJSON), note.Body, note.UpdatedAtMs, noteID,
-			); err != nil {
+			if err := txQ.UpdateNote(ctx, sqlcgen.UpdateNoteParams{
+				Slug:            note.Slug,
+				Title:           note.Title,
+				Tier:            string(note.Tier),
+				Sha256:          note.SHA256,
+				FrontmatterJson: string(fmJSON),
+				TagsJson:        string(tagsJSON),
+				Body:            note.Body,
+				UpdatedAtMs:     note.UpdatedAtMs,
+				ID:              noteID,
+			}); err != nil {
 				return nil, err
 			}
 			assignedID = noteID
 		} else {
-			res, err := stmts.insertNote.ExecContext(ctx,
-				note.RelPath, note.Slug, note.Title, string(note.Tier), note.SHA256,
-				string(fmJSON), string(tagsJSON), note.Body, note.UpdatedAtMs,
-			)
+			res, err := txQ.InsertNote(ctx, sqlcgen.InsertNoteParams{
+				RelPath:         note.RelPath,
+				Slug:            note.Slug,
+				Title:           note.Title,
+				Tier:            string(note.Tier),
+				Sha256:          note.SHA256,
+				FrontmatterJson: string(fmJSON),
+				TagsJson:        string(tagsJSON),
+				Body:            note.Body,
+				UpdatedAtMs:     note.UpdatedAtMs,
+			})
 			if err != nil {
 				return nil, err
 			}
@@ -364,7 +319,10 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 
 		for _, alias := range note.Frontmatter.Aliases {
 			if aliasSlug := SlugOf(alias); aliasSlug != "" {
-				if _, err := stmts.insertAlias.ExecContext(ctx, aliasSlug, note.RelPath); err != nil {
+				if err := txQ.InsertAlias(ctx, sqlcgen.InsertAliasParams{
+					AliasSlug: aliasSlug,
+					RelPath:   note.RelPath,
+				}); err != nil {
 					return nil, err
 				}
 			}
@@ -403,7 +361,7 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 		if note.Frontmatter.TLDR != "" {
 			ftsBody = note.Frontmatter.TLDR + "\n" + ftsBody
 		}
-		if _, err := stmts.insertFTS.ExecContext(ctx, assignedID, note.RelPath, ftsTitle, ftsTags, ftsBody); err != nil {
+		if err := ftsStmts.insert(ctx, assignedID, note.RelPath, ftsTitle, ftsTags, ftsBody); err != nil {
 			return nil, err
 		}
 
@@ -419,16 +377,25 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 			if err != nil {
 				return nil, err
 			}
-			if _, err := stmts.upsertVec.ExecContext(ctx, s.datasetID, note.RelPath, note.Title, string(metaJSON), blob); err != nil {
+			if err := txQ.UpsertVector(ctx, sqlcgen.UpsertVectorParams{
+				DatasetID: s.datasetID,
+				ID:        note.RelPath,
+				Content:   sql.NullString{String: note.Title, Valid: true},
+				Meta:      sql.NullString{String: string(metaJSON), Valid: true},
+				Embedding: blob,
+			}); err != nil {
 				return nil, err
 			}
 			wroteVectors = true
 		} else if exists {
-			res, err := stmts.deleteVec.ExecContext(ctx, s.datasetID, note.RelPath)
+			n, err := txQ.DeleteVectorByID(ctx, sqlcgen.DeleteVectorByIDParams{
+				DatasetID: s.datasetID,
+				ID:        note.RelPath,
+			})
 			if err != nil {
 				return nil, err
 			}
-			if n, _ := res.RowsAffected(); n > 0 {
+			if n > 0 {
 				wroteVectors = true
 			}
 		}
@@ -442,7 +409,10 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 	}
 
 	if wroteVectors {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM vector_storage WHERE shadow_table_name = ? AND dataset_id = ?`, vecShadowName, s.datasetID); err != nil {
+		if err := txQ.DeleteVectorStorage(ctx, sqlcgen.DeleteVectorStorageParams{
+			ShadowTableName: vecShadowName,
+			DatasetID:       s.datasetID,
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -543,8 +513,8 @@ func (s *Store) DeleteNote(ctx context.Context, relPath string) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var noteID int64
-	err = tx.QueryRowContext(ctx, `SELECT id FROM pkm_notes WHERE rel_path = ?`, clean).Scan(&noteID)
+	txQ := sqlcgen.New(tx)
+	noteID, err := txQ.GetNoteIDByPath(ctx, clean)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -552,21 +522,32 @@ func (s *Store) DeleteNote(ctx context.Context, relPath string) error {
 		return err
 	}
 
-	for _, q := range []struct {
-		sql  string
-		args []any
-	}{
-		{`DELETE FROM pkm_aliases WHERE rel_path = ?`, []any{clean}},
-		{`DELETE FROM pkm_blocks WHERE rel_path = ?`, []any{clean}},
-		{`DELETE FROM pkm_links WHERE source_path = ?`, []any{clean}},
-		{`DELETE FROM pkm_notes_fts WHERE rowid = ?`, []any{noteID}},
-		{`DELETE FROM _vec_` + vecTableName + ` WHERE dataset_id = ? AND id = ?`, []any{s.datasetID, clean}},
-		{`DELETE FROM vector_storage WHERE shadow_table_name = ? AND dataset_id = ?`, []any{vecShadowName, s.datasetID}},
-		{`DELETE FROM pkm_notes WHERE id = ?`, []any{noteID}},
-	} {
-		if _, err := tx.ExecContext(ctx, q.sql, q.args...); err != nil {
-			return err
-		}
+	if err := txQ.DeleteAliasesByPath(ctx, clean); err != nil {
+		return err
+	}
+	if err := txQ.DeleteBlocksByPath(ctx, clean); err != nil {
+		return err
+	}
+	if err := txQ.DeleteLinksBySourcePath(ctx, clean); err != nil {
+		return err
+	}
+	if err := deleteNoteFTS(ctx, tx, noteID); err != nil {
+		return err
+	}
+	if _, err := txQ.DeleteVectorByID(ctx, sqlcgen.DeleteVectorByIDParams{
+		DatasetID: s.datasetID,
+		ID:        clean,
+	}); err != nil {
+		return err
+	}
+	if err := txQ.DeleteVectorStorage(ctx, sqlcgen.DeleteVectorStorageParams{
+		ShadowTableName: vecShadowName,
+		DatasetID:       s.datasetID,
+	}); err != nil {
+		return err
+	}
+	if err := txQ.DeleteNoteByID(ctx, noteID); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -589,26 +570,31 @@ func (s *Store) GetNote(ctx context.Context, pathOrRef string) (Note, bool, erro
 
 	clean := normalizeRelSlash(pathOrRef)
 	slug := SlugOf(pathOrRef)
-	row := s.readDB.QueryRowContext(ctx, `
-		SELECT rel_path, slug, title, tier, sha256, frontmatter_json, tags_json, body, updated_at_ms
-		FROM pkm_notes
-		WHERE rel_path = ? OR slug = ? OR lower(title) = lower(?)
-		LIMIT 1`, clean, slug, strings.TrimSpace(pathOrRef),
-	)
-	var n Note
-	var tierStr, fmJSON, tagsJSON string
-	err := row.Scan(&n.RelPath, &n.Slug, &n.Title, &tierStr, &n.SHA256, &fmJSON, &tagsJSON, &n.Body, &n.UpdatedAtMs)
+	row, err := s.readQ.GetNoteByPathOrRef(ctx, sqlcgen.GetNoteByPathOrRefParams{
+		RelPath: clean,
+		Slug:    slug,
+		LOWER:   strings.TrimSpace(pathOrRef),
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return Note{}, false, nil
 	}
 	if err != nil {
 		return Note{}, false, err
 	}
-	n.Tier = Tier(tierStr)
-	if err := json.Unmarshal([]byte(fmJSON), &n.Frontmatter); err != nil {
+
+	n := Note{
+		RelPath:     row.RelPath,
+		Slug:        row.Slug,
+		Title:       row.Title,
+		Tier:        Tier(row.Tier),
+		SHA256:      row.Sha256,
+		Body:        row.Body,
+		UpdatedAtMs: row.UpdatedAtMs,
+	}
+	if err := json.Unmarshal([]byte(row.FrontmatterJson), &n.Frontmatter); err != nil {
 		return Note{}, false, err
 	}
-	if err := json.Unmarshal([]byte(tagsJSON), &n.Tags); err != nil {
+	if err := json.Unmarshal([]byte(row.TagsJson), &n.Tags); err != nil {
 		return Note{}, false, err
 	}
 
@@ -678,20 +664,23 @@ func (s *Store) BlockBacklinks(ctx context.Context, blockID string) ([]contract.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rows, err := s.readDB.QueryContext(ctx, `
-		SELECT l.source_path,
-		       COALESCE(NULLIF(l.target_title, ''), b.page_title, ''),
-		       l.block_id, l.line, l.byte_start, l.byte_end, l.snippet
-		FROM pkm_links l
-		LEFT JOIN pkm_blocks b ON b.block_id = l.block_id
-		WHERE l.block_id = ?
-		ORDER BY l.source_path ASC, l.byte_start ASC`, bid,
-	)
+	rows, err := s.readQ.ListBlockBacklinks(ctx, bid)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	return scanBacklinkViews(rows)
+	out := make([]contract.BacklinkView, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, contract.BacklinkView{
+			SourcePath:  r.SourcePath,
+			TargetTitle: r.TargetTitle,
+			BlockID:     r.BlockID,
+			Line:        int(r.Line),
+			ByteStart:   int(r.ByteStart),
+			ByteEnd:     int(r.ByteEnd),
+			Snippet:     r.Snippet,
+		})
+	}
+	return out, nil
 }
 
 // TagBacklinks returns all backlink spans referencing #tag (with or without leading '#').
@@ -714,20 +703,20 @@ func (s *Store) ResolveBlock(ctx context.Context, blockID string) (BlockDef, str
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var bd BlockDef
-	var relPath string
-	err := s.readDB.QueryRowContext(ctx, `
-		SELECT block_id, rel_path, body, line, byte_start, byte_end
-		FROM pkm_blocks
-		WHERE block_id = ?`, strings.TrimSpace(blockID),
-	).Scan(&bd.ID, &relPath, &bd.Body, &bd.Line, &bd.ByteStart, &bd.ByteEnd)
+	row, err := s.readQ.ResolveBlock(ctx, strings.TrimSpace(blockID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return BlockDef{}, "", false, nil
 	}
 	if err != nil {
 		return BlockDef{}, "", false, err
 	}
-	return bd, relPath, true, nil
+	return BlockDef{
+		ID:        row.BlockID,
+		Body:      row.Body,
+		Line:      int(row.Line),
+		ByteStart: int(row.ByteStart),
+		ByteEnd:   int(row.ByteEnd),
+	}, row.RelPath, true, nil
 }
 
 // Search executes hybrid search combining SQLite FTS5 trigram matching, sqlite-vec cosine recall,
@@ -930,62 +919,13 @@ func (s *Store) searchFTS5TrigramLocked(ctx context.Context, queryText string, l
 
 	// Full phrase FTS5 trigram MATCH boost when the complete query is at least 3 runes.
 	if utf8.RuneCountInString(queryText) >= 3 {
-		expr := ftsPhraseQuote(queryText)
-		rows, err := s.readDB.QueryContext(ctx, `
-			SELECT rel_path, -bm25(pkm_notes_fts, 4.0, 2.0, 1.0) AS rank_score
-			FROM pkm_notes_fts
-			WHERE pkm_notes_fts MATCH ?
-			ORDER BY rank_score DESC
-			LIMIT ?`, expr, limit,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("pkm: fts5 trigram phrase search: %w", err)
-		}
-		for rows.Next() {
-			var p string
-			var sc float64
-			if err := rows.Scan(&p, &sc); err != nil {
-				_ = rows.Close()
-				return nil, err
-			}
-			// Exact phrase matches get a +5.0 bonus over split-term OR matches.
-			if cur := sc + 5.0; cur > scores[p] {
-				scores[p] = cur
-			}
-		}
-		if err := rows.Close(); err != nil {
+		if err := searchFTS5Phrase(ctx, s.readDB, queryText, limit, scores); err != nil {
 			return nil, err
 		}
 	}
 
 	if len(trigramTerms) > 0 && (len(trigramTerms) > 1 || len(scores) < limit) {
-		var quoted []string
-		for _, t := range trigramTerms {
-			quoted = append(quoted, ftsPhraseQuote(t))
-		}
-		expr := strings.Join(quoted, " OR ")
-		rows, err := s.readDB.QueryContext(ctx, `
-			SELECT rel_path, -bm25(pkm_notes_fts, 4.0, 2.0, 1.0) AS rank_score
-			FROM pkm_notes_fts
-			WHERE pkm_notes_fts MATCH ?
-			ORDER BY rank_score DESC
-			LIMIT ?`, expr, limit,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("pkm: fts5 trigram term search: %w", err)
-		}
-		for rows.Next() {
-			var p string
-			var sc float64
-			if err := rows.Scan(&p, &sc); err != nil {
-				_ = rows.Close()
-				return nil, err
-			}
-			if _, ok := scores[p]; !ok {
-				scores[p] = sc
-			}
-		}
-		if err := rows.Close(); err != nil {
+		if err := searchFTS5Terms(ctx, s.readDB, trigramTerms, limit, scores); err != nil {
 			return nil, err
 		}
 	}
@@ -993,31 +933,15 @@ func (s *Store) searchFTS5TrigramLocked(ctx context.Context, queryText string, l
 	// Short (<3 rune) CJK/English tokens cannot form a 3-rune trigram in FTS5 MATCH;
 	// supplement with exact substring matching via INSTR so 1-2 char queries work seamlessly.
 	for _, st := range shortTerms {
-		lower := strings.ToLower(st)
-		rows, err := s.readDB.QueryContext(ctx, `
-			SELECT rel_path,
-			       (CASE WHEN INSTR(lower(title), ?) > 0 THEN 4.0 ELSE 0.0 END) +
-			       (CASE WHEN INSTR(lower(tags_json), ?) > 0 THEN 2.0 ELSE 0.0 END) +
-			       (CASE WHEN INSTR(lower(body), ?) > 0 THEN 1.0 ELSE 0.0 END) AS s
-			FROM pkm_notes
-			WHERE INSTR(lower(title), ?) > 0 OR INSTR(lower(tags_json), ?) > 0 OR INSTR(lower(body), ?) > 0
-			ORDER BY s DESC
-			LIMIT ?`, lower, lower, lower, lower, lower, lower, limit,
-		)
+		rows, err := s.readQ.SearchShortTerms(ctx, sqlcgen.SearchShortTermsParams{
+			Term:       strings.ToLower(st),
+			LimitCount: int64(limit),
+		})
 		if err != nil {
 			return nil, err
 		}
-		for rows.Next() {
-			var p string
-			var sc float64
-			if err := rows.Scan(&p, &sc); err != nil {
-				_ = rows.Close()
-				return nil, err
-			}
-			scores[p] += sc
-		}
-		if err := rows.Close(); err != nil {
-			return nil, err
+		for _, r := range rows {
+			scores[r.RelPath] += r.S
 		}
 	}
 
@@ -1040,10 +964,6 @@ func (s *Store) searchFTS5TrigramLocked(ctx context.Context, queryText string, l
 	return out, nil
 }
 
-func ftsPhraseQuote(s string) string {
-	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
-}
-
 func (s *Store) queryBacklinks(ctx context.Context, target string, kind LinkKind) ([]contract.BacklinkView, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -1063,38 +983,100 @@ func (s *Store) queryBacklinks(ctx context.Context, target string, kind LinkKind
 	if err != nil {
 		return nil, err
 	}
-
-	slugPlaceholders, slugArgs := inClause(targetSlugs)
-	args := make([]any, 0, len(slugArgs)+len(targetPaths)+2)
-	args = append(args, slugArgs...)
-
-	var query strings.Builder
-	query.WriteString(`
-		SELECT l.source_path,
-		       COALESCE(NULLIF(l.target_title, ''), b.page_title, ''),
-		       l.block_id, l.line, l.byte_start, l.byte_end, l.snippet
-		FROM pkm_links l
-		LEFT JOIN pkm_blocks b ON b.block_id = l.block_id
-		WHERE (`)
-	query.WriteString(`l.target_slug IN (` + slugPlaceholders + `)`)
-	if len(targetPaths) > 0 && kind != KindTag {
-		pathPlaceholders, pathArgs := inClause(targetPaths)
-		query.WriteString(` OR (l.block_id <> '' AND b.rel_path IN (` + pathPlaceholders + `))`)
-		args = append(args, pathArgs...)
+	if len(targetSlugs) == 0 && (len(targetPaths) == 0 || kind == KindTag) {
+		return nil, nil
 	}
-	query.WriteString(`)`)
-	if kind != "" {
-		query.WriteString(` AND l.kind = ?`)
-		args = append(args, string(kind))
-	}
-	query.WriteString(` ORDER BY l.source_path ASC, l.byte_start ASC`)
 
-	rows, err := s.readDB.QueryContext(ctx, query.String(), args...)
-	if err != nil {
-		return nil, err
+	usePaths := len(targetPaths) > 0 && kind != KindTag
+	kindStr := string(kind)
+
+	switch {
+	case usePaths && kindStr != "":
+		rows, err := s.readQ.QueryBacklinksBySlugsOrPathsAndKind(ctx, sqlcgen.QueryBacklinksBySlugsOrPathsAndKindParams{
+			Kind:        kindStr,
+			TargetSlugs: targetSlugs,
+			TargetPaths: targetPaths,
+		})
+		if err != nil {
+			return nil, err
+		}
+		out := make([]contract.BacklinkView, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, contract.BacklinkView{
+				SourcePath:  r.SourcePath,
+				TargetTitle: r.TargetTitle,
+				BlockID:     r.BlockID,
+				Line:        int(r.Line),
+				ByteStart:   int(r.ByteStart),
+				ByteEnd:     int(r.ByteEnd),
+				Snippet:     r.Snippet,
+			})
+		}
+		return out, nil
+
+	case usePaths:
+		rows, err := s.readQ.QueryBacklinksBySlugsOrPaths(ctx, sqlcgen.QueryBacklinksBySlugsOrPathsParams{
+			TargetSlugs: targetSlugs,
+			TargetPaths: targetPaths,
+		})
+		if err != nil {
+			return nil, err
+		}
+		out := make([]contract.BacklinkView, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, contract.BacklinkView{
+				SourcePath:  r.SourcePath,
+				TargetTitle: r.TargetTitle,
+				BlockID:     r.BlockID,
+				Line:        int(r.Line),
+				ByteStart:   int(r.ByteStart),
+				ByteEnd:     int(r.ByteEnd),
+				Snippet:     r.Snippet,
+			})
+		}
+		return out, nil
+
+	case kindStr != "":
+		rows, err := s.readQ.QueryBacklinksBySlugsAndKind(ctx, sqlcgen.QueryBacklinksBySlugsAndKindParams{
+			Kind:        kindStr,
+			TargetSlugs: targetSlugs,
+		})
+		if err != nil {
+			return nil, err
+		}
+		out := make([]contract.BacklinkView, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, contract.BacklinkView{
+				SourcePath:  r.SourcePath,
+				TargetTitle: r.TargetTitle,
+				BlockID:     r.BlockID,
+				Line:        int(r.Line),
+				ByteStart:   int(r.ByteStart),
+				ByteEnd:     int(r.ByteEnd),
+				Snippet:     r.Snippet,
+			})
+		}
+		return out, nil
+
+	default:
+		rows, err := s.readQ.QueryBacklinksBySlugs(ctx, targetSlugs)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]contract.BacklinkView, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, contract.BacklinkView{
+				SourcePath:  r.SourcePath,
+				TargetTitle: r.TargetTitle,
+				BlockID:     r.BlockID,
+				Line:        int(r.Line),
+				ByteStart:   int(r.ByteStart),
+				ByteEnd:     int(r.ByteEnd),
+				Snippet:     r.Snippet,
+			})
+		}
+		return out, nil
 	}
-	defer rows.Close()
-	return scanBacklinkViews(rows)
 }
 
 func (s *Store) resolveTargetIdentitiesLocked(ctx context.Context, rawTarget string) (slugs []string, relPaths []string, err error) {
@@ -1118,54 +1100,30 @@ func (s *Store) resolveTargetIdentitiesLocked(ctx context.Context, rawTarget str
 	sort.Strings(seedSlugs)
 
 	if len(seedSlugs) > 0 {
-		ph, args := inClause(seedSlugs)
-		args = append(args, normalizeRelSlash(rawTarget))
-		rows, err := s.readDB.QueryContext(ctx, `
-			SELECT rel_path, slug FROM pkm_notes
-			WHERE slug IN (`+ph+`) OR rel_path = ?`, args...,
-		)
+		noteRows, err := s.readQ.FindNotesBySlugsOrPath(ctx, sqlcgen.FindNotesBySlugsOrPathParams{
+			RelPath: normalizeRelSlash(rawTarget),
+			Slugs:   seedSlugs,
+		})
 		if err != nil {
 			return nil, nil, err
 		}
-		for rows.Next() {
-			var p, sl string
-			if err := rows.Scan(&p, &sl); err != nil {
-				_ = rows.Close()
-				return nil, nil, err
+		for _, r := range noteRows {
+			pathSet[r.RelPath] = struct{}{}
+			if r.Slug != "" {
+				slugSet[r.Slug] = struct{}{}
 			}
-			pathSet[p] = struct{}{}
-			if sl != "" {
-				slugSet[sl] = struct{}{}
-			}
-		}
-		if err := rows.Close(); err != nil {
-			return nil, nil, err
 		}
 
 		// Also match pages whose alias matches the requested target.
-		ph2, args2 := inClause(seedSlugs)
-		aliasRows, err := s.readDB.QueryContext(ctx, `
-			SELECT a.rel_path, n.slug
-			FROM pkm_aliases a
-			JOIN pkm_notes n ON n.rel_path = a.rel_path
-			WHERE a.alias_slug IN (`+ph2+`)`, args2...,
-		)
+		aliasRows, err := s.readQ.FindNotesByAliasSlugs(ctx, seedSlugs)
 		if err != nil {
 			return nil, nil, err
 		}
-		for aliasRows.Next() {
-			var p, sl string
-			if err := aliasRows.Scan(&p, &sl); err != nil {
-				_ = aliasRows.Close()
-				return nil, nil, err
+		for _, r := range aliasRows {
+			pathSet[r.RelPath] = struct{}{}
+			if r.Slug != "" {
+				slugSet[r.Slug] = struct{}{}
 			}
-			pathSet[p] = struct{}{}
-			if sl != "" {
-				slugSet[sl] = struct{}{}
-			}
-		}
-		if err := aliasRows.Close(); err != nil {
-			return nil, nil, err
 		}
 	}
 
@@ -1176,25 +1134,14 @@ func (s *Store) resolveTargetIdentitiesLocked(ctx context.Context, rawTarget str
 			paths = append(paths, p)
 		}
 		sort.Strings(paths)
-		ph, args := inClause(paths)
-		rows, err := s.readDB.QueryContext(ctx, `
-			SELECT alias_slug FROM pkm_aliases WHERE rel_path IN (`+ph+`)`, args...,
-		)
+		aliases, err := s.readQ.ListAliasSlugsByPaths(ctx, paths)
 		if err != nil {
 			return nil, nil, err
 		}
-		for rows.Next() {
-			var as string
-			if err := rows.Scan(&as); err != nil {
-				_ = rows.Close()
-				return nil, nil, err
-			}
+		for _, as := range aliases {
 			if as != "" {
 				slugSet[as] = struct{}{}
 			}
-		}
-		if err := rows.Close(); err != nil {
-			return nil, nil, err
 		}
 	}
 
@@ -1213,91 +1160,60 @@ func (s *Store) resolveTargetIdentitiesLocked(ctx context.Context, rawTarget str
 }
 
 func (s *Store) queryForwardLinksLocked(ctx context.Context, sourcePath string) ([]LinkSpan, error) {
-	rows, err := s.readDB.QueryContext(ctx, `
-		SELECT l.kind,
-		       COALESCE(NULLIF(l.target_title, ''), b.page_title, ''),
-		       l.target_slug,
-		       l.block_id,
-		       l.source_block_id,
-		       l.line,
-		       l.byte_start,
-		       l.byte_end,
-		       l.snippet
-		FROM pkm_links l
-		LEFT JOIN pkm_blocks b ON b.block_id = l.block_id
-		WHERE l.source_path = ?
-		ORDER BY l.byte_start ASC`, sourcePath,
-	)
+	rows, err := s.readQ.ListForwardLinks(ctx, sourcePath)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var out []LinkSpan
-	for rows.Next() {
-		var kindStr, targetTitle, targetSlug, blockID, srcBlockID, snippet string
-		var line, byteStart, byteEnd int
-		if err := rows.Scan(&kindStr, &targetTitle, &targetSlug, &blockID, &srcBlockID, &line, &byteStart, &byteEnd, &snippet); err != nil {
-			return nil, err
-		}
+	out := make([]LinkSpan, 0, len(rows))
+	for _, r := range rows {
 		out = append(out, LinkSpan{
-			Kind:          LinkKind(kindStr),
-			TargetSlug:    targetSlug,
-			SourceBlockID: srcBlockID,
+			Kind:          LinkKind(r.Kind),
+			TargetSlug:    r.TargetSlug,
+			SourceBlockID: r.SourceBlockID,
 			Backlink: contract.BacklinkView{
 				SourcePath:  sourcePath,
-				TargetTitle: targetTitle,
-				BlockID:     blockID,
-				Line:        line,
-				ByteStart:   byteStart,
-				ByteEnd:     byteEnd,
-				Snippet:     snippet,
+				TargetTitle: r.TargetTitle,
+				BlockID:     r.BlockID,
+				Line:        int(r.Line),
+				ByteStart:   int(r.ByteStart),
+				ByteEnd:     int(r.ByteEnd),
+				Snippet:     r.Snippet,
 			},
 		})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *Store) queryBlocksForPathLocked(ctx context.Context, relPath string) ([]BlockDef, error) {
-	rows, err := s.readDB.QueryContext(ctx, `
-		SELECT block_id, body, line, byte_start, byte_end
-		FROM pkm_blocks
-		WHERE rel_path = ?
-		ORDER BY byte_start ASC`, relPath,
-	)
+	rows, err := s.readQ.ListBlocksByPath(ctx, relPath)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var out []BlockDef
-	for rows.Next() {
-		var b BlockDef
-		if err := rows.Scan(&b.ID, &b.Body, &b.Line, &b.ByteStart, &b.ByteEnd); err != nil {
-			return nil, err
-		}
-		out = append(out, b)
+	out := make([]BlockDef, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, BlockDef{
+			ID:        r.BlockID,
+			Body:      r.Body,
+			Line:      int(r.Line),
+			ByteStart: int(r.ByteStart),
+			ByteEnd:   int(r.ByteEnd),
+		})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *Store) noteSHAs(ctx context.Context) (map[string]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rows, err := s.readDB.QueryContext(ctx, `SELECT rel_path, sha256 FROM pkm_notes`)
+	rows, err := s.readQ.ListNoteSHAs(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := make(map[string]string)
-	for rows.Next() {
-		var p, sha string
-		if err := rows.Scan(&p, &sha); err != nil {
-			return nil, err
-		}
-		out[p] = sha
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.RelPath] = r.Sha256
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *Store) filterLinkedPathsLocked(ctx context.Context, linkedTo string) (map[string]bool, error) {
@@ -1312,28 +1228,24 @@ func (s *Store) filterLinkedPathsLocked(ctx context.Context, linkedTo string) (m
 	if len(slugs) == 0 && len(paths) == 0 {
 		return map[string]bool{}, nil
 	}
-	ph, args := inClause(slugs)
-	var q strings.Builder
-	q.WriteString(`SELECT DISTINCT l.source_path FROM pkm_links l LEFT JOIN pkm_blocks b ON b.block_id = l.block_id WHERE l.target_slug IN (` + ph + `)`)
+
+	var sourcePaths []string
 	if len(paths) > 0 {
-		ph2, args2 := inClause(paths)
-		q.WriteString(` OR (l.block_id <> '' AND b.rel_path IN (` + ph2 + `))`)
-		args = append(args, args2...)
+		sourcePaths, err = s.readQ.ListSourcePathsByTargetSlugsOrPaths(ctx, sqlcgen.ListSourcePathsByTargetSlugsOrPathsParams{
+			TargetSlugs: slugs,
+			TargetPaths: paths,
+		})
+	} else {
+		sourcePaths, err = s.readQ.ListSourcePathsByTargetSlugs(ctx, slugs)
 	}
-	rows, err := s.readDB.QueryContext(ctx, q.String(), args...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := make(map[string]bool)
-	for rows.Next() {
-		var p string
-		if err := rows.Scan(&p); err != nil {
-			return nil, err
-		}
+	out := make(map[string]bool, len(sourcePaths))
+	for _, p := range sourcePaths {
 		out[p] = true
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 type noteSearchMeta struct {
@@ -1352,61 +1264,37 @@ func (s *Store) loadSearchMetaLocked(ctx context.Context, paths []string) (map[s
 	const chunk = 500
 	for start := 0; start < len(paths); start += chunk {
 		end := min(start+chunk, len(paths))
-		ph, args := inClause(paths[start:end])
-		rows, err := s.readDB.QueryContext(ctx, `
-			SELECT rel_path, title, slug, tier, tags_json, body
-			FROM pkm_notes
-			WHERE rel_path IN (`+ph+`)`, args...,
-		)
+		rows, err := s.readQ.LoadSearchMetaByPaths(ctx, paths[start:end])
 		if err != nil {
 			return nil, err
 		}
-		for rows.Next() {
-			var rel, title, slug, tierStr, tagsJSON, body string
-			if err := rows.Scan(&rel, &title, &slug, &tierStr, &tagsJSON, &body); err != nil {
-				_ = rows.Close()
-				return nil, err
-			}
+		for _, r := range rows {
 			var tags []string
-			if tagsJSON != "" {
-				_ = json.Unmarshal([]byte(tagsJSON), &tags)
+			if r.TagsJson != "" {
+				_ = json.Unmarshal([]byte(r.TagsJson), &tags)
 			}
-			out[rel] = noteSearchMeta{
-				title: title,
-				slug:  slug,
-				tier:  Tier(tierStr),
+			out[r.RelPath] = noteSearchMeta{
+				title: r.Title,
+				slug:  r.Slug,
+				tier:  Tier(r.Tier),
 				tags:  tags,
-				body:  body,
+				body:  r.Body,
 			}
-		}
-		if err := rows.Close(); err != nil {
-			return nil, err
 		}
 	}
 	return out, nil
 }
 
 func (s *Store) loadBacklinkCountsLocked(ctx context.Context) (map[string]int, error) {
-	rows, err := s.readDB.QueryContext(ctx, `
-		SELECT target_slug, COUNT(*)
-		FROM pkm_links
-		WHERE target_slug <> ''
-		GROUP BY target_slug`,
-	)
+	rows, err := s.readQ.LoadBacklinkCounts(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := make(map[string]int)
-	for rows.Next() {
-		var sl string
-		var cnt int
-		if err := rows.Scan(&sl, &cnt); err != nil {
-			return nil, err
-		}
-		out[sl] = cnt
+	out := make(map[string]int, len(rows))
+	for _, r := range rows {
+		out[r.TargetSlug] = int(r.Cnt)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *Store) listFilteredHitsLocked(ctx context.Context, q SearchQuery, limit int) ([]SearchHit, error) {
@@ -1418,51 +1306,38 @@ func (s *Store) listFilteredHitsLocked(ctx context.Context, q SearchQuery, limit
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.readDB.QueryContext(ctx, `
-		SELECT rel_path, title, slug, tier, tags_json, body, updated_at_ms
-		FROM pkm_notes
-		ORDER BY updated_at_ms DESC, rel_path ASC`,
-	)
+	rows, err := s.readQ.ListAllNotesForSearch(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	cleanTag := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(q.Tag, "#")))
 	var hits []SearchHit
-	for rows.Next() {
-		var rel, title, slug, tierStr, tagsJSON, body string
-		var updatedAt int64
-		if err := rows.Scan(&rel, &title, &slug, &tierStr, &tagsJSON, &body, &updatedAt); err != nil {
-			return nil, err
-		}
-		tier := Tier(tierStr)
+	for _, r := range rows {
+		tier := Tier(r.Tier)
 		if q.Tier != "" && tier != q.Tier {
 			continue
 		}
 		var tags []string
-		if tagsJSON != "" {
-			_ = json.Unmarshal([]byte(tagsJSON), &tags)
+		if r.TagsJson != "" {
+			_ = json.Unmarshal([]byte(r.TagsJson), &tags)
 		}
 		if cleanTag != "" && !containsTagFold(tags, cleanTag) {
 			continue
 		}
-		if linkedPaths != nil && !linkedPaths[rel] {
+		if linkedPaths != nil && !linkedPaths[r.RelPath] {
 			continue
 		}
 		hits = append(hits, SearchHit{
-			RelPath:       rel,
-			Title:         title,
-			Slug:          slug,
+			RelPath:       r.RelPath,
+			Title:         r.Title,
+			Slug:          r.Slug,
 			Tier:          tier,
 			Score:         TierWeight(tier),
-			Snippet:       extractSnippet(body, ""),
+			Snippet:       extractSnippet(r.Body, ""),
 			Tags:          tags,
-			BacklinkCount: backlinkCounts[slug],
+			BacklinkCount: backlinkCounts[r.Slug],
 		})
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 	sort.Slice(hits, func(i, j int) bool {
 		if hits[i].Score != hits[j].Score {
@@ -1476,192 +1351,29 @@ func (s *Store) listFilteredHitsLocked(ctx context.Context, q SearchQuery, limit
 	return hits, nil
 }
 
-type batchStmts struct {
-	updateNote  *sql.Stmt
-	insertNote  *sql.Stmt
-	deleteAlias *sql.Stmt
-	insertAlias *sql.Stmt
-	deleteBlock *sql.Stmt
-	deleteLink  *sql.Stmt
-	deleteFTS   *sql.Stmt
-	insertFTS   *sql.Stmt
-	deleteVec   *sql.Stmt
-	upsertVec   *sql.Stmt
-}
-
-type pendingBlockRow struct {
-	blockID   string
-	relPath   string
-	pageTitle string
-	line      int
-	byteStart int
-	byteEnd   int
-	body      string
-}
-
-type pendingLinkRow struct {
-	sourcePath    string
-	kind          string
-	targetTitle   string
-	targetSlug    string
-	blockID       string
-	sourceBlockID string
-	line          int
-	byteStart     int
-	byteEnd       int
-	snippet       string
-}
-
-func flushBlockRows(ctx context.Context, tx *sql.Tx, rows []pendingBlockRow) error {
-	const batchSize = 100
-	for start := 0; start < len(rows); start += batchSize {
-		end := min(start+batchSize, len(rows))
-		chunk := rows[start:end]
-		var q strings.Builder
-		q.WriteString(`INSERT INTO pkm_blocks (block_id, rel_path, page_title, line, byte_start, byte_end, body) VALUES `)
-		args := make([]any, 0, len(chunk)*7)
-		for i, r := range chunk {
-			if i > 0 {
-				q.WriteByte(',')
-			}
-			q.WriteString(`(?,?,?,?,?,?,?)`)
-			args = append(args, r.blockID, r.relPath, r.pageTitle, r.line, r.byteStart, r.byteEnd, r.body)
-		}
-		q.WriteString(` ON CONFLICT(block_id) DO UPDATE SET rel_path=excluded.rel_path, page_title=excluded.page_title, line=excluded.line, byte_start=excluded.byte_start, byte_end=excluded.byte_end, body=excluded.body`)
-		if _, err := tx.ExecContext(ctx, q.String(), args...); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func flushLinkRows(ctx context.Context, tx *sql.Tx, rows []pendingLinkRow) error {
-	const batchSize = 100
-	for start := 0; start < len(rows); start += batchSize {
-		end := min(start+batchSize, len(rows))
-		chunk := rows[start:end]
-		var q strings.Builder
-		q.WriteString(`INSERT INTO pkm_links (source_path, kind, target_title, target_slug, block_id, source_block_id, line, byte_start, byte_end, snippet) VALUES `)
-		args := make([]any, 0, len(chunk)*10)
-		for i, r := range chunk {
-			if i > 0 {
-				q.WriteByte(',')
-			}
-			q.WriteString(`(?,?,?,?,?,?,?,?,?,?)`)
-			args = append(args, r.sourcePath, r.kind, r.targetTitle, r.targetSlug, r.blockID, r.sourceBlockID, r.line, r.byteStart, r.byteEnd, r.snippet)
-		}
-		if _, err := tx.ExecContext(ctx, q.String(), args...); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func prepareBatchStmts(ctx context.Context, tx *sql.Tx) (*batchStmts, error) {
-	var s batchStmts
-	var err error
-	closeOnErr := func() { s.close() }
-
-	if s.updateNote, err = tx.PrepareContext(ctx, `
-		UPDATE pkm_notes
-		SET slug = ?, title = ?, tier = ?, sha256 = ?, frontmatter_json = ?, tags_json = ?, body = ?, updated_at_ms = ?
-		WHERE id = ?`); err != nil {
-		closeOnErr()
-		return nil, err
-	}
-	if s.insertNote, err = tx.PrepareContext(ctx, `
-		INSERT INTO pkm_notes (rel_path, slug, title, tier, sha256, frontmatter_json, tags_json, body, updated_at_ms)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
-		closeOnErr()
-		return nil, err
-	}
-	if s.deleteAlias, err = tx.PrepareContext(ctx, `DELETE FROM pkm_aliases WHERE rel_path = ?`); err != nil {
-		closeOnErr()
-		return nil, err
-	}
-	if s.insertAlias, err = tx.PrepareContext(ctx, `INSERT OR IGNORE INTO pkm_aliases (alias_slug, rel_path) VALUES (?, ?)`); err != nil {
-		closeOnErr()
-		return nil, err
-	}
-	if s.deleteBlock, err = tx.PrepareContext(ctx, `DELETE FROM pkm_blocks WHERE rel_path = ?`); err != nil {
-		closeOnErr()
-		return nil, err
-	}
-	if s.deleteLink, err = tx.PrepareContext(ctx, `DELETE FROM pkm_links WHERE source_path = ?`); err != nil {
-		closeOnErr()
-		return nil, err
-	}
-	if s.deleteFTS, err = tx.PrepareContext(ctx, `DELETE FROM pkm_notes_fts WHERE rowid = ?`); err != nil {
-		closeOnErr()
-		return nil, err
-	}
-	if s.insertFTS, err = tx.PrepareContext(ctx, `
-		INSERT INTO pkm_notes_fts (rowid, rel_path, title, tags, body)
-		VALUES (?, ?, ?, ?, ?)`); err != nil {
-		closeOnErr()
-		return nil, err
-	}
-	if s.deleteVec, err = tx.PrepareContext(ctx, `DELETE FROM _vec_`+vecTableName+` WHERE dataset_id = ? AND id = ?`); err != nil {
-		closeOnErr()
-		return nil, err
-	}
-	if s.upsertVec, err = tx.PrepareContext(ctx, `
-		INSERT INTO _vec_`+vecTableName+` (dataset_id, id, content, meta, embedding)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT(dataset_id, id) DO UPDATE SET
-			content = excluded.content,
-			meta = excluded.meta,
-			embedding = excluded.embedding`); err != nil {
-		closeOnErr()
-		return nil, err
-	}
-	return &s, nil
-}
-
-func (s *batchStmts) close() {
-	for _, st := range []*sql.Stmt{
-		s.updateNote, s.insertNote, s.deleteAlias, s.insertAlias,
-		s.deleteBlock, s.deleteLink,
-		s.deleteFTS, s.insertFTS, s.deleteVec, s.upsertVec,
-	} {
-		if st != nil {
-			_ = st.Close()
-		}
-	}
-}
-
-func deleteNoteDetails(ctx context.Context, stmts *batchStmts, relPath string, noteID int64) error {
-	if _, err := stmts.deleteAlias.ExecContext(ctx, relPath); err != nil {
+func deleteNoteDetails(ctx context.Context, q *sqlcgen.Queries, fts *ftsBatchStmts, relPath string, noteID int64) error {
+	if err := q.DeleteAliasesByPath(ctx, relPath); err != nil {
 		return err
 	}
-	if _, err := stmts.deleteBlock.ExecContext(ctx, relPath); err != nil {
+	if err := q.DeleteBlocksByPath(ctx, relPath); err != nil {
 		return err
 	}
-	if _, err := stmts.deleteLink.ExecContext(ctx, relPath); err != nil {
+	if err := q.DeleteLinksBySourcePath(ctx, relPath); err != nil {
 		return err
 	}
-	if _, err := stmts.deleteFTS.ExecContext(ctx, noteID); err != nil {
-		return err
-	}
-	return nil
+	return fts.deleteByNoteID(ctx, noteID)
 }
 
-func loadExistingNoteIDs(ctx context.Context, tx *sql.Tx) (map[string]int64, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT id, rel_path FROM pkm_notes`)
+func loadExistingNoteIDs(ctx context.Context, q *sqlcgen.Queries) (map[string]int64, error) {
+	rows, err := q.LoadExistingNoteIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := make(map[string]int64)
-	for rows.Next() {
-		var id int64
-		var relPath string
-		if err := rows.Scan(&id, &relPath); err != nil {
-			return nil, err
-		}
-		out[relPath] = id
+	out := make(map[string]int64, len(rows))
+	for _, r := range rows {
+		out[r.RelPath] = r.ID
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func parseInputsParallel(ctx context.Context, inputs []NoteInput) ([]Note, error) {
@@ -1718,28 +1430,6 @@ func parseInputsParallel(ctx context.Context, inputs []NoteInput) ([]Note, error
 		return nil, err
 	}
 	return notes, nil
-}
-
-func scanBacklinkViews(rows *sql.Rows) ([]contract.BacklinkView, error) {
-	var out []contract.BacklinkView
-	for rows.Next() {
-		var bv contract.BacklinkView
-		if err := rows.Scan(&bv.SourcePath, &bv.TargetTitle, &bv.BlockID, &bv.Line, &bv.ByteStart, &bv.ByteEnd, &bv.Snippet); err != nil {
-			return nil, err
-		}
-		out = append(out, bv)
-	}
-	return out, rows.Err()
-}
-
-func inClause(vals []string) (string, []any) {
-	placeholders := make([]string, len(vals))
-	args := make([]any, len(vals))
-	for i, v := range vals {
-		placeholders[i] = "?"
-		args[i] = v
-	}
-	return strings.Join(placeholders, ","), args
 }
 
 func containsTagFold(tags []string, cleanLower string) bool {

@@ -3,6 +3,7 @@ package memory
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/vibevalleyhq/vibevalley/internal/machine"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
 func TestImmutableHistoryAndConflictPreservation(t *testing.T) {
@@ -522,5 +524,111 @@ func TestMemoryConcurrentRaceStress(t *testing.T) {
 	}
 	if len(conflicts) == 0 {
 		t.Fatal("expected concurrent stale-base updates to preserve conflict branches")
+	}
+}
+
+func TestMemoryMigrationsUpStatusDownAllUp(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	dbPath := filepath.Join(t.TempDir(), "memory-mig.sqlite")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
+
+	runner, err := migrate.New(db, "memory", MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 1 {
+		t.Fatalf("Up: applied=%d err=%v", applied, err)
+	}
+	if again, err := runner.Up(ctx); err != nil || again != 0 {
+		t.Fatalf("idempotent Up: applied=%d err=%v", again, err)
+	}
+
+	statuses, err := runner.Status(ctx)
+	if err != nil || len(statuses) != 1 || !statuses[0].Applied || statuses[0].Scope != "memory" || statuses[0].Version != 1 {
+		t.Fatalf("unexpected status after Up: %+v err=%v", statuses, err)
+	}
+
+	expectedTables := []string{
+		"memory_heads",
+		"memory_versions",
+		"memory_version_files",
+		"memory_conflicts",
+		"memory_dreams",
+		"memory_inbox",
+	}
+	for _, tbl := range expectedTables {
+		var name string
+		if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name); err != nil {
+			t.Fatalf("expected table %s after Up: %v", tbl, err)
+		}
+	}
+
+	reverted, err := runner.DownAll(ctx)
+	if err != nil || reverted != 1 {
+		t.Fatalf("DownAll: reverted=%d err=%v", reverted, err)
+	}
+	statusesAfterDown, err := runner.Status(ctx)
+	if err != nil || len(statusesAfterDown) != 1 || statusesAfterDown[0].Applied {
+		t.Fatalf("unexpected status after DownAll: %+v err=%v", statusesAfterDown, err)
+	}
+	for _, tbl := range expectedTables {
+		var name string
+		err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name)
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Fatalf("expected table %s dropped after DownAll, got name=%q err=%v", tbl, name, err)
+		}
+	}
+
+	reapplied, err := runner.Up(ctx)
+	if err != nil || reapplied != 1 {
+		t.Fatalf("re-Up after DownAll: applied=%d err=%v", reapplied, err)
+	}
+	_ = db.Close()
+
+	// Store opened against migrated file operates with full parity.
+	st, err := OpenStore(ctx, dbPath)
+	if err != nil {
+		t.Fatalf("OpenStore after re-Up: %v", err)
+	}
+	defer st.Close()
+
+	snap, err := st.CommitFiles(ctx, CommitRequest{
+		ScopeID: "mig-scope",
+		Files:   []MemoryFileInput{{RelPath: "facts.md", Content: []byte("- migrated\n")}},
+	})
+	if err != nil || snap.Version != 1 {
+		t.Fatalf("CommitFiles after re-Up: snap=%+v err=%v", snap, err)
+	}
+
+	// Exercise ListVersions, ListDreamProposals, and ListInbox(includeResolved=true).
+	prop, err := st.RunDream(ctx, DreamRequest{
+		ScopeID:          "mig-scope",
+		SessionSummaries: []SessionSummary{{SessionID: "s-mig", Facts: []string{"extra migrated fact"}}},
+	})
+	if err != nil {
+		t.Fatalf("RunDream after re-Up: %v", err)
+	}
+	if _, err := st.ApproveDream(ctx, prop.ProposalID); err != nil {
+		t.Fatalf("ApproveDream after re-Up: %v", err)
+	}
+	props, err := st.ListDreamProposals(ctx, "mig-scope")
+	if err != nil || len(props) != 1 || props[0].ProposalID != prop.ProposalID || props[0].Status != string(DreamApproved) {
+		t.Fatalf("ListDreamProposals: props=%+v err=%v", props, err)
+	}
+	vers, err := st.ListVersions(ctx, "mig-scope")
+	if err != nil || len(vers) != 2 {
+		t.Fatalf("ListVersions: len=%d err=%v", len(vers), err)
+	}
+	allInbox, err := st.ListInbox(ctx, "mig-scope", true)
+	if err != nil || len(allInbox) != 1 || !allInbox[0].Resolved {
+		t.Fatalf("ListInbox(includeResolved=true): inbox=%+v err=%v", allInbox, err)
 	}
 }

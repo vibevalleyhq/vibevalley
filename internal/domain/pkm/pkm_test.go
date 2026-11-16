@@ -3,6 +3,8 @@ package pkm
 import (
 	"bytes"
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -12,9 +14,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/viant/sqlite-vec/engine"
+	"github.com/viant/sqlite-vec/vec"
 	"github.com/viant/sqlite-vec/vector"
 
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
 func lineNumberInSource(src []byte, offset int) int {
@@ -189,6 +194,40 @@ func TestGraphSSOTForwardAndBacklinks(t *testing.T) {
 	}
 	if len(aliasBls) != len(bls) {
 		t.Fatalf("alias backlink parity mismatch: got %d want %d", len(aliasBls), len(bls))
+	}
+
+	// Filtered BacklinksByKind (resolved page + unresolved target), GetNote, ResolveBlock, and Search LinkedTo/Tier/Tag filters.
+	embedBls, err := store.BacklinksByKind(ctx, "Cetus Engine", KindEmbed)
+	if err != nil || len(embedBls) != 2 {
+		t.Fatalf("BacklinksByKind(Cetus Engine, KindEmbed): got %d (%+v) err=%v", len(embedBls), embedBls, err)
+	}
+	unresolvedBls, err := store.Backlinks(ctx, "Roadmap")
+	if err != nil || len(unresolvedBls) != 1 {
+		t.Fatalf("Backlinks(Roadmap): got %d (%+v) err=%v", len(unresolvedBls), unresolvedBls, err)
+	}
+	unresolvedWiki, err := store.BacklinksByKind(ctx, "Roadmap", KindWikiLink)
+	if err != nil || len(unresolvedWiki) != 1 {
+		t.Fatalf("BacklinksByKind(Roadmap, KindWikiLink): got %d (%+v) err=%v", len(unresolvedWiki), unresolvedWiki, err)
+	}
+	if gotNote, ok, err := store.GetNote(ctx, "Whale"); err != nil || ok {
+		// GetNote looks up by path, slug, or title (not alias); verify title lookup works.
+		t.Fatalf("GetNote(Whale): ok=%v note=%+v err=%v", ok, gotNote, err)
+	}
+	gotCetus, ok, err := store.GetNote(ctx, "Cetus Engine")
+	if err != nil || !ok || gotCetus.RelPath != "01_Projects/Cetus-Engine.md" || len(gotCetus.Blocks) != 1 {
+		t.Fatalf("GetNote(Cetus Engine): ok=%v note=%+v err=%v", ok, gotCetus, err)
+	}
+	blk, blkPath, blkOK, err := store.ResolveBlock(ctx, "blk-cetus-1")
+	if err != nil || !blkOK || blkPath != "01_Projects/Cetus-Engine.md" || blk.ID != "blk-cetus-1" {
+		t.Fatalf("ResolveBlock: blk=%+v path=%q ok=%v err=%v", blk, blkPath, blkOK, err)
+	}
+	linkedHits, err := store.Search(ctx, SearchQuery{LinkedTo: "Whale", Tier: TierJournal, Tag: "daily"})
+	if err != nil || len(linkedHits) != 1 || linkedHits[0].RelPath != "journals/2026_11_16.md" {
+		t.Fatalf("Search(LinkedTo=Whale, Tier=journal, Tag=daily): hits=%+v err=%v", linkedHits, err)
+	}
+	textLinkedHits, err := store.Search(ctx, SearchQuery{Text: "Cetus", LinkedTo: "Roadmap"})
+	if err != nil || len(textLinkedHits) != 1 || textLinkedHits[0].RelPath != "01_Projects/Cetus-Engine.md" {
+		t.Fatalf("Search(Text=Cetus, LinkedTo=Roadmap): hits=%+v err=%v", textLinkedHits, err)
 	}
 
 	// Block backlinks query.
@@ -634,4 +673,102 @@ func TestFilePersistenceSyncDirAndConcurrency(t *testing.T) {
 		}(g)
 	}
 	wg.Wait()
+}
+
+func TestPKMMigrationsUpStatusDownAllUp(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	_ = engine.RegisterVectorFunctions(nil)
+	dbPath := filepath.Join(t.TempDir(), "pkm-mig.sqlite")
+	db, err := engine.Open(dbPath)
+	if err != nil {
+		t.Fatalf("engine.Open: %v", err)
+	}
+	defer db.Close()
+
+	if err := vec.Register(db); err != nil {
+		t.Fatalf("vec.Register: %v", err)
+	}
+
+	runner, err := migrate.New(db, "pkm", MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 1 {
+		t.Fatalf("Up: applied=%d err=%v", applied, err)
+	}
+	if again, err := runner.Up(ctx); err != nil || again != 0 {
+		t.Fatalf("idempotent Up: applied=%d err=%v", again, err)
+	}
+
+	statuses, err := runner.Status(ctx)
+	if err != nil || len(statuses) != 1 || !statuses[0].Applied || statuses[0].Scope != "pkm" || statuses[0].Version != 1 {
+		t.Fatalf("unexpected status after Up: %+v err=%v", statuses, err)
+	}
+
+	expectedTables := []string{
+		"pkm_notes",
+		"pkm_aliases",
+		"pkm_blocks",
+		"pkm_links",
+		"pkm_notes_fts",
+		"vector_storage",
+		"_vec_pkm_vectors",
+		"pkm_vectors",
+	}
+	for _, tbl := range expectedTables {
+		var name string
+		if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name); err != nil {
+			t.Fatalf("expected table %s after Up: %v", tbl, err)
+		}
+	}
+
+	reverted, err := runner.DownAll(ctx)
+	if err != nil || reverted != 1 {
+		t.Fatalf("DownAll: reverted=%d err=%v", reverted, err)
+	}
+	statusesAfterDown, err := runner.Status(ctx)
+	if err != nil || len(statusesAfterDown) != 1 || statusesAfterDown[0].Applied {
+		t.Fatalf("unexpected status after DownAll: %+v err=%v", statusesAfterDown, err)
+	}
+	for _, tbl := range expectedTables {
+		var name string
+		err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name)
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Fatalf("expected table %s dropped after DownAll, got name=%q err=%v", tbl, name, err)
+		}
+	}
+
+	reapplied, err := runner.Up(ctx)
+	if err != nil || reapplied != 1 {
+		t.Fatalf("re-Up after DownAll: applied=%d err=%v", reapplied, err)
+	}
+	_ = db.Close()
+
+	// Store opened against migrated file indexes and runs hybrid FTS5+vector search cleanly.
+	st, err := OpenStore(ctx, dbPath)
+	if err != nil {
+		t.Fatalf("OpenStore after re-Up: %v", err)
+	}
+	defer st.Close()
+
+	if _, err := st.UpsertNote(ctx, NoteInput{
+		RelPath:     "01_Projects/MigCheck.md",
+		Content:     []byte("---\ntitle: 迁移验证笔记\ntags: [migrate]\n---\n\n- 验证 [[TargetNote]] 与 FTS5 trigram 向量混合检索。\n"),
+		Embedding:   []float32{0.9, 0.1, 0.0, 0.0},
+		UpdatedAtMs: 1234,
+	}); err != nil {
+		t.Fatalf("UpsertNote after re-Up: %v", err)
+	}
+	hits, err := st.Search(ctx, SearchQuery{
+		Text:        "向量混合检索",
+		QueryVector: []float32{0.9, 0.1, 0.0, 0.0},
+		Limit:       5,
+	})
+	if err != nil || len(hits) != 1 || hits[0].RelPath != "01_Projects/MigCheck.md" {
+		t.Fatalf("Search after re-Up: hits=%+v err=%v", hits, err)
+	}
 }

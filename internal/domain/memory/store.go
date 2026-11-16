@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"errors"
 	"fmt"
 	"sort"
@@ -13,88 +14,16 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/vibevalleyhq/vibevalley/internal/domain/memory/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/internal/machine"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
-var memorySchemaDDL = []string{
-	`CREATE TABLE IF NOT EXISTS memory_heads (
-		scope_id TEXT PRIMARY KEY,
-		active_version INTEGER NOT NULL DEFAULT 0,
-		next_version INTEGER NOT NULL DEFAULT 1,
-		updated_at_ms INTEGER NOT NULL
-	)`,
-
-	`CREATE TABLE IF NOT EXISTS memory_versions (
-		scope_id TEXT NOT NULL,
-		version INTEGER NOT NULL,
-		parent_version INTEGER NOT NULL DEFAULT 0,
-		kind TEXT NOT NULL,
-		status TEXT NOT NULL,
-		summary TEXT NOT NULL DEFAULT '',
-		session_id TEXT NOT NULL DEFAULT '',
-		created_at_ms INTEGER NOT NULL,
-		PRIMARY KEY (scope_id, version)
-	)`,
-
-	`CREATE TABLE IF NOT EXISTS memory_version_files (
-		scope_id TEXT NOT NULL,
-		version INTEGER NOT NULL,
-		rel_path TEXT NOT NULL,
-		file_version INTEGER NOT NULL,
-		sha256 TEXT NOT NULL,
-		content BLOB NOT NULL,
-		updated_at_ms INTEGER NOT NULL,
-		PRIMARY KEY (scope_id, version, rel_path)
-	)`,
-
-	`CREATE TABLE IF NOT EXISTS memory_conflicts (
-		conflict_id TEXT PRIMARY KEY,
-		scope_id TEXT NOT NULL,
-		rel_path TEXT NOT NULL,
-		base_version INTEGER NOT NULL,
-		server_version INTEGER NOT NULL,
-		conflict_rel_path TEXT NOT NULL,
-		uploaded_sha256 TEXT NOT NULL,
-		content BLOB NOT NULL,
-		session_id TEXT NOT NULL DEFAULT '',
-		resolved INTEGER NOT NULL DEFAULT 0,
-		resolution TEXT NOT NULL DEFAULT '',
-		created_at_ms INTEGER NOT NULL,
-		resolved_at_ms INTEGER NOT NULL DEFAULT 0
-	)`,
-	`CREATE INDEX IF NOT EXISTS memory_conflicts_scope_idx ON memory_conflicts(scope_id, resolved, created_at_ms)`,
-
-	`CREATE TABLE IF NOT EXISTS memory_dreams (
-		proposal_id TEXT PRIMARY KEY,
-		scope_id TEXT NOT NULL,
-		base_version INTEGER NOT NULL,
-		candidate_version INTEGER NOT NULL,
-		deduplicated_count INTEGER NOT NULL DEFAULT 0,
-		summary TEXT NOT NULL,
-		status TEXT NOT NULL,
-		runner_session_id TEXT NOT NULL DEFAULT '',
-		previous_active_version INTEGER NOT NULL DEFAULT 0,
-		created_at_ms INTEGER NOT NULL,
-		resolved_at_ms INTEGER NOT NULL DEFAULT 0
-	)`,
-	`CREATE INDEX IF NOT EXISTS memory_dreams_scope_idx ON memory_dreams(scope_id, created_at_ms)`,
-
-	`CREATE TABLE IF NOT EXISTS memory_inbox (
-		id TEXT PRIMARY KEY,
-		scope_id TEXT NOT NULL,
-		kind TEXT NOT NULL,
-		title TEXT NOT NULL,
-		summary TEXT NOT NULL,
-		session_id TEXT NOT NULL DEFAULT '',
-		issue_id TEXT NOT NULL DEFAULT '',
-		proposal_id TEXT NOT NULL DEFAULT '',
-		conflict_id TEXT NOT NULL DEFAULT '',
-		resolved INTEGER NOT NULL DEFAULT 0,
-		created_at_ms INTEGER NOT NULL
-	)`,
-	`CREATE INDEX IF NOT EXISTS memory_inbox_scope_idx ON memory_inbox(scope_id, resolved, created_at_ms)`,
-}
+// MigrationsFS holds the embedded SQLite migration scripts for the memory domain store.
+//
+//go:embed migrations/*.sql
+var MigrationsFS embed.FS
 
 // StoreOption configures a versioned memory Store.
 type StoreOption func(*storeConfig)
@@ -125,6 +54,7 @@ func WithBeforeCommitHook(fn func() error) StoreOption {
 type Store struct {
 	writeDB      *sql.DB
 	readDB       *sql.DB
+	readQ        *sqlcgen.Queries
 	sameDB       bool
 	now          func() int64
 	beforeCommit func() error
@@ -176,11 +106,14 @@ func OpenStore(ctx context.Context, dsn string, opts ...StoreOption) (*Store, er
 		}
 	}
 
-	for _, ddl := range memorySchemaDDL {
-		if _, err := writeDB.ExecContext(ctx, ddl); err != nil {
-			_ = writeDB.Close()
-			return nil, fmt.Errorf("memory: apply schema: %w", err)
-		}
+	runner, err := migrate.New(writeDB, "memory", MigrationsFS)
+	if err != nil {
+		_ = writeDB.Close()
+		return nil, fmt.Errorf("memory: init migrations: %w", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		_ = writeDB.Close()
+		return nil, fmt.Errorf("memory: apply schema: %w", err)
 	}
 
 	var readDB *sql.DB
@@ -205,6 +138,7 @@ func OpenStore(ctx context.Context, dsn string, opts ...StoreOption) (*Store, er
 	return &Store{
 		writeDB:      writeDB,
 		readDB:       readDB,
+		readQ:        sqlcgen.New(readDB),
 		sameDB:       sameDB,
 		now:          cfg.now,
 		beforeCommit: cfg.beforeCommit,
@@ -256,7 +190,7 @@ func (s *Store) ActiveSnapshot(ctx context.Context, scopeID string) (Snapshot, e
 	if s.closed.Load() {
 		return Snapshot{}, ErrClosed
 	}
-	return s.loadActiveSnapshotLocked(ctx, s.readDB, scope)
+	return s.loadActiveSnapshotLocked(ctx, s.readQ, scope)
 }
 
 // GetVersion returns a specific immutable snapshot version for scopeID.
@@ -277,7 +211,7 @@ func (s *Store) GetVersion(ctx context.Context, scopeID string, version int64) (
 	if s.closed.Load() {
 		return Snapshot{}, ErrClosed
 	}
-	return s.loadVersionLocked(ctx, s.readDB, scope, version)
+	return s.loadVersionLocked(ctx, s.readQ, scope, version)
 }
 
 // ListVersions returns all immutable snapshot versions for scopeID ordered by version ascending.
@@ -296,35 +230,27 @@ func (s *Store) ListVersions(ctx context.Context, scopeID string) ([]Snapshot, e
 		return nil, ErrClosed
 	}
 
-	rows, err := s.readDB.QueryContext(ctx, `
-		SELECT version, parent_version, kind, status, summary, session_id, created_at_ms
-		FROM memory_versions
-		WHERE scope_id = ?
-		ORDER BY version ASC`, scope,
-	)
+	rows, err := s.readQ.ListVersionsByScope(ctx, scope)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var out []Snapshot
-	for rows.Next() {
-		var snap Snapshot
-		var kindStr, statusStr string
-		snap.ScopeID = scope
-		if err := rows.Scan(&snap.Version, &snap.ParentVersion, &kindStr, &statusStr, &snap.Summary, &snap.SessionID, &snap.CreatedAtMs); err != nil {
-			return nil, err
-		}
-		snap.Kind = VersionKind(kindStr)
-		snap.Status = VersionStatus(statusStr)
-		out = append(out, snap)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
+	out := make([]Snapshot, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, Snapshot{
+			ScopeID:       scope,
+			Version:       r.Version,
+			ParentVersion: r.ParentVersion,
+			Kind:          VersionKind(r.Kind),
+			Status:        VersionStatus(r.Status),
+			Summary:       r.Summary,
+			SessionID:     r.SessionID,
+			CreatedAtMs:   r.CreatedAtMs,
+		})
 	}
 
 	for i := range out {
-		files, err := loadVersionFiles(ctx, s.readDB, scope, out[i].Version)
+		files, err := loadVersionFiles(ctx, s.readQ, scope, out[i].Version)
 		if err != nil {
 			return nil, err
 		}
@@ -385,9 +311,10 @@ func (s *Store) CommitFiles(ctx context.Context, req CommitRequest) (Snapshot, e
 		return Snapshot{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	q := sqlcgen.New(tx)
 
 	nowMs := s.now()
-	head, err := ensureHeadTx(ctx, tx, scope, nowMs)
+	head, err := ensureHeadTx(ctx, q, scope, nowMs)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -395,7 +322,7 @@ func (s *Store) CommitFiles(ctx context.Context, req CommitRequest) (Snapshot, e
 		return Snapshot{}, fmt.Errorf("%w: expected version %d, active is %d", ErrConflict, req.ExpectedVersion, head.activeVersion)
 	}
 
-	curFiles, err := loadActiveFileMapTx(ctx, tx, scope, head.activeVersion)
+	curFiles, err := loadActiveFileMapTx(ctx, q, scope, head.activeVersion)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -440,7 +367,7 @@ func (s *Store) CommitFiles(ctx context.Context, req CommitRequest) (Snapshot, e
 	if head.activeVersion == 0 {
 		kind = VersionInit
 	}
-	snap, err := writeNewActiveVersionTx(ctx, tx, scope, head, kind, req.Summary, req.SessionID, nextFiles, nowMs)
+	snap, err := writeNewActiveVersionTx(ctx, q, scope, head, kind, req.Summary, req.SessionID, nextFiles, nowMs)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -550,13 +477,14 @@ func (s *Store) ReconcileMounts(ctx context.Context, scopeID, sessionID string, 
 		return machine.MountPushAck{}, nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	q := sqlcgen.New(tx)
 
 	nowMs := s.now()
-	head, err := ensureHeadTx(ctx, tx, scope, nowMs)
+	head, err := ensureHeadTx(ctx, q, scope, nowMs)
 	if err != nil {
 		return machine.MountPushAck{}, nil, err
 	}
-	curFiles, err := loadActiveFileMapTx(ctx, tx, scope, head.activeVersion)
+	curFiles, err := loadActiveFileMapTx(ctx, q, scope, head.activeVersion)
 	if err != nil {
 		return machine.MountPushAck{}, nil, err
 	}
@@ -623,29 +551,32 @@ func (s *Store) ReconcileMounts(ctx context.Context, scopeID, sessionID string, 
 				Resolved:        false,
 				CreatedAtMs:     nowMs,
 			}
-			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO memory_conflicts (
-					conflict_id, scope_id, rel_path, base_version, server_version,
-					conflict_rel_path, uploaded_sha256, content, session_id,
-					resolved, resolution, created_at_ms, resolved_at_ms
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '', ?, 0)`,
-				cb.ConflictID, cb.ScopeID, cb.RelPath, cb.BaseVersion, cb.ServerVersion,
-				cb.ConflictRelPath, cb.UploadedSHA256, cb.Content, cb.SessionID, cb.CreatedAtMs,
-			); err != nil {
+			if err := q.InsertConflict(ctx, sqlcgen.InsertConflictParams{
+				ConflictID:      cb.ConflictID,
+				ScopeID:         cb.ScopeID,
+				RelPath:         cb.RelPath,
+				BaseVersion:     cb.BaseVersion,
+				ServerVersion:   cb.ServerVersion,
+				ConflictRelPath: cb.ConflictRelPath,
+				UploadedSha256:  cb.UploadedSHA256,
+				Content:         cb.Content,
+				SessionID:       cb.SessionID,
+				CreatedAtMs:     cb.CreatedAtMs,
+			}); err != nil {
 				return machine.MountPushAck{}, nil, err
 			}
 
 			inboxID := s.nextID("inbox")
-			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO memory_inbox (
-					id, scope_id, kind, title, summary, session_id, issue_id,
-					proposal_id, conflict_id, resolved, created_at_ms
-				) VALUES (?, ?, ?, ?, ?, ?, '', '', ?, 0, ?)`,
-				inboxID, scope, string(contract.InboxMountConflict),
-				"Memory mount conflict: "+u.relPath,
-				fmt.Sprintf("Preserved concurrent edit at %s (base v%d vs server v%d)", conflictPath, u.baseVersion, serverVer),
-				sessionID, cb.ConflictID, nowMs,
-			); err != nil {
+			if err := q.InsertConflictInbox(ctx, sqlcgen.InsertConflictInboxParams{
+				ID:          inboxID,
+				ScopeID:     scope,
+				Kind:        string(contract.InboxMountConflict),
+				Title:       "Memory mount conflict: " + u.relPath,
+				Summary:     fmt.Sprintf("Preserved concurrent edit at %s (base v%d vs server v%d)", conflictPath, u.baseVersion, serverVer),
+				SessionID:   sessionID,
+				ConflictID:  cb.ConflictID,
+				CreatedAtMs: nowMs,
+			}); err != nil {
 				return machine.MountPushAck{}, nil, err
 			}
 
@@ -671,7 +602,7 @@ func (s *Store) ReconcileMounts(ctx context.Context, scopeID, sessionID string, 
 
 	if mutatedActive {
 		summary := fmt.Sprintf("mount sync from session %s", sessionID)
-		if _, err := writeNewActiveVersionTx(ctx, tx, scope, head, VersionMountSync, summary, sessionID, nextFiles, nowMs); err != nil {
+		if _, err := writeNewActiveVersionTx(ctx, q, scope, head, VersionMountSync, summary, sessionID, nextFiles, nowMs); err != nil {
 			return machine.MountPushAck{}, nil, err
 		}
 	}
@@ -703,40 +634,40 @@ func (s *Store) ListConflicts(ctx context.Context, scopeID string, includeResolv
 		return nil, ErrClosed
 	}
 
-	query := `
-		SELECT conflict_id, scope_id, rel_path, base_version, server_version,
-		       conflict_rel_path, uploaded_sha256, content, session_id,
-		       resolved, resolution, created_at_ms, resolved_at_ms
-		FROM memory_conflicts
-		WHERE scope_id = ?`
-	if !includeResolved {
-		query += ` AND resolved = 0`
+	var rows []sqlcgen.MemoryConflict
+	var err error
+	if includeResolved {
+		rows, err = s.readQ.ListAllConflictsByScope(ctx, scope)
+	} else {
+		rows, err = s.readQ.ListUnresolvedConflictsByScope(ctx, scope)
 	}
-	query += ` ORDER BY created_at_ms ASC, conflict_id ASC`
-
-	rows, err := s.readDB.QueryContext(ctx, query, scope)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var out []ConflictBranch
-	for rows.Next() {
-		var cb ConflictBranch
-		var resolvedInt int
-		var resStr string
-		if err := rows.Scan(
-			&cb.ConflictID, &cb.ScopeID, &cb.RelPath, &cb.BaseVersion, &cb.ServerVersion,
-			&cb.ConflictRelPath, &cb.UploadedSHA256, &cb.Content, &cb.SessionID,
-			&resolvedInt, &resStr, &cb.CreatedAtMs, &cb.ResolvedAtMs,
-		); err != nil {
-			return nil, err
-		}
-		cb.Resolved = resolvedInt != 0
-		cb.Resolution = ConflictResolution(resStr)
-		out = append(out, cb)
+	out := make([]ConflictBranch, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, conflictFromRow(r))
 	}
-	return out, rows.Err()
+	return out, nil
+}
+
+func conflictFromRow(r sqlcgen.MemoryConflict) ConflictBranch {
+	return ConflictBranch{
+		ConflictID:      r.ConflictID,
+		ScopeID:         r.ScopeID,
+		RelPath:         r.RelPath,
+		BaseVersion:     r.BaseVersion,
+		ServerVersion:   r.ServerVersion,
+		ConflictRelPath: r.ConflictRelPath,
+		UploadedSHA256:  r.UploadedSha256,
+		Content:         r.Content,
+		SessionID:       r.SessionID,
+		Resolved:        r.Resolved != 0,
+		Resolution:      ConflictResolution(r.Resolution),
+		CreatedAtMs:     r.CreatedAtMs,
+		ResolvedAtMs:    r.ResolvedAtMs,
+	}
 }
 
 // ResolveConflict resolves a preserved conflict branch either keeping the server version,
@@ -768,44 +699,33 @@ func (s *Store) ResolveConflict(ctx context.Context, conflictID string, resoluti
 		return Snapshot{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	q := sqlcgen.New(tx)
 
-	var cb ConflictBranch
-	var resolvedInt int
-	var resStr string
-	err = tx.QueryRowContext(ctx, `
-		SELECT conflict_id, scope_id, rel_path, base_version, server_version,
-		       conflict_rel_path, uploaded_sha256, content, session_id,
-		       resolved, resolution, created_at_ms, resolved_at_ms
-		FROM memory_conflicts
-		WHERE conflict_id = ?`, conflictID,
-	).Scan(
-		&cb.ConflictID, &cb.ScopeID, &cb.RelPath, &cb.BaseVersion, &cb.ServerVersion,
-		&cb.ConflictRelPath, &cb.UploadedSHA256, &cb.Content, &cb.SessionID,
-		&resolvedInt, &resStr, &cb.CreatedAtMs, &cb.ResolvedAtMs,
-	)
+	row, err := q.GetConflictByID(ctx, conflictID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Snapshot{}, ErrNotFound
 	}
 	if err != nil {
 		return Snapshot{}, err
 	}
-	if resolvedInt != 0 {
+	if row.Resolved != 0 {
 		return Snapshot{}, fmt.Errorf("%w: conflict %s already resolved", ErrInvalidTransition, conflictID)
 	}
+	cb := conflictFromRow(row)
 
 	nowMs := s.now()
-	head, err := ensureHeadTx(ctx, tx, cb.ScopeID, nowMs)
+	head, err := ensureHeadTx(ctx, q, cb.ScopeID, nowMs)
 	if err != nil {
 		return Snapshot{}, err
 	}
-	curFiles, err := loadActiveFileMapTx(ctx, tx, cb.ScopeID, head.activeVersion)
+	curFiles, err := loadActiveFileMapTx(ctx, q, cb.ScopeID, head.activeVersion)
 	if err != nil {
 		return Snapshot{}, err
 	}
 
 	var resultSnap Snapshot
 	if resolution == ResolutionKeepServer {
-		resultSnap, err = s.loadVersionLocked(ctx, tx, cb.ScopeID, head.activeVersion)
+		resultSnap, err = s.loadVersionLocked(ctx, q, cb.ScopeID, head.activeVersion)
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return Snapshot{}, err
 		}
@@ -833,7 +753,7 @@ func (s *Store) ResolveConflict(ctx context.Context, conflictID string, resoluti
 			UpdatedAtMs: nowMs,
 		}
 		resultSnap, err = writeNewActiveVersionTx(
-			ctx, tx, cb.ScopeID, head, VersionConflictResolution,
+			ctx, q, cb.ScopeID, head, VersionConflictResolution,
 			fmt.Sprintf("resolved conflict %s (%s)", cb.ConflictID, resolution),
 			cb.SessionID, nextFiles, nowMs,
 		)
@@ -842,17 +762,14 @@ func (s *Store) ResolveConflict(ctx context.Context, conflictID string, resoluti
 		}
 	}
 
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE memory_conflicts
-		SET resolved = 1, resolution = ?, resolved_at_ms = ?
-		WHERE conflict_id = ?`,
-		string(resolution), nowMs, cb.ConflictID,
-	); err != nil {
+	if err := q.MarkConflictResolved(ctx, sqlcgen.MarkConflictResolvedParams{
+		Resolution:   string(resolution),
+		ResolvedAtMs: nowMs,
+		ConflictID:   cb.ConflictID,
+	}); err != nil {
 		return Snapshot{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE memory_inbox SET resolved = 1 WHERE conflict_id = ?`, cb.ConflictID,
-	); err != nil {
+	if err := q.ResolveInboxByConflict(ctx, cb.ConflictID); err != nil {
 		return Snapshot{}, err
 	}
 
@@ -883,43 +800,40 @@ func (s *Store) ListInbox(ctx context.Context, scopeID string, includeResolved b
 		return nil, ErrClosed
 	}
 
-	query := `
-		SELECT id, kind, title, summary, session_id, issue_id, resolved, created_at_ms
-		FROM memory_inbox
-		WHERE scope_id = ?`
-	if !includeResolved {
-		query += ` AND resolved = 0`
+	if includeResolved {
+		rows, err := s.readQ.ListAllInboxByScope(ctx, scope)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]contract.InboxItemView, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, toInboxItemView(r.ID, r.Kind, r.Title, r.Summary, r.SessionID, r.IssueID, r.Resolved, r.CreatedAtMs))
+		}
+		return out, nil
 	}
-	query += ` ORDER BY created_at_ms ASC, id ASC`
 
-	rows, err := s.readDB.QueryContext(ctx, query, scope)
+	rows, err := s.readQ.ListUnresolvedInboxByScope(ctx, scope)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var out []contract.InboxItemView
-	for rows.Next() {
-		var item contract.InboxItemView
-		var kindStr string
-		var resolvedInt int
-		if err := rows.Scan(
-			&item.ID, &kindStr, &item.Title, &item.Summary,
-			&item.SessionID, &item.IssueID, &resolvedInt, &item.CreatedAtMs,
-		); err != nil {
-			return nil, err
-		}
-		item.Kind = contract.InboxItemKind(kindStr)
-		item.Resolved = resolvedInt != 0
-		out = append(out, item)
+	out := make([]contract.InboxItemView, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, toInboxItemView(r.ID, r.Kind, r.Title, r.Summary, r.SessionID, r.IssueID, r.Resolved, r.CreatedAtMs))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
-type queryable interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+func toInboxItemView(id, kind, title, summary, sessionID, issueID string, resolved, createdAtMs int64) contract.InboxItemView {
+	return contract.InboxItemView{
+		ID:          id,
+		Kind:        contract.InboxItemKind(kind),
+		Title:       title,
+		Summary:     summary,
+		SessionID:   sessionID,
+		IssueID:     issueID,
+		Resolved:    resolved != 0,
+		CreatedAtMs: createdAtMs,
+	}
 }
 
 type headRow struct {
@@ -927,27 +841,25 @@ type headRow struct {
 	nextVersion   int64
 }
 
-func ensureHeadTx(ctx context.Context, q queryable, scope string, nowMs int64) (headRow, error) {
-	if _, err := q.ExecContext(ctx, `
-		INSERT OR IGNORE INTO memory_heads (scope_id, active_version, next_version, updated_at_ms)
-		VALUES (?, 0, 1, ?)`, scope, nowMs,
-	); err != nil {
+func ensureHeadTx(ctx context.Context, q *sqlcgen.Queries, scope string, nowMs int64) (headRow, error) {
+	if err := q.EnsureHead(ctx, sqlcgen.EnsureHeadParams{
+		ScopeID:     scope,
+		UpdatedAtMs: nowMs,
+	}); err != nil {
 		return headRow{}, err
 	}
-	var h headRow
-	if err := q.QueryRowContext(ctx, `
-		SELECT active_version, next_version
-		FROM memory_heads
-		WHERE scope_id = ?`, scope,
-	).Scan(&h.activeVersion, &h.nextVersion); err != nil {
+	row, err := q.GetHead(ctx, scope)
+	if err != nil {
 		return headRow{}, err
 	}
-	return h, nil
+	return headRow{
+		activeVersion: row.ActiveVersion,
+		nextVersion:   row.NextVersion,
+	}, nil
 }
 
-func (s *Store) loadActiveSnapshotLocked(ctx context.Context, q queryable, scope string) (Snapshot, error) {
-	var activeVer int64
-	err := q.QueryRowContext(ctx, `SELECT active_version FROM memory_heads WHERE scope_id = ?`, scope).Scan(&activeVer)
+func (s *Store) loadActiveSnapshotLocked(ctx context.Context, q *sqlcgen.Queries, scope string) (Snapshot, error) {
+	activeVer, err := q.GetActiveVersion(ctx, scope)
 	if errors.Is(err, sql.ErrNoRows) || activeVer == 0 {
 		return Snapshot{ScopeID: scope, Version: 0, Status: VersionStatusActive}, nil
 	}
@@ -957,56 +869,56 @@ func (s *Store) loadActiveSnapshotLocked(ctx context.Context, q queryable, scope
 	return s.loadVersionLocked(ctx, q, scope, activeVer)
 }
 
-func (s *Store) loadVersionLocked(ctx context.Context, q queryable, scope string, version int64) (Snapshot, error) {
-	var snap Snapshot
-	var kindStr, statusStr string
-	err := q.QueryRowContext(ctx, `
-		SELECT scope_id, version, parent_version, kind, status, summary, session_id, created_at_ms
-		FROM memory_versions
-		WHERE scope_id = ? AND version = ?`, scope, version,
-	).Scan(&snap.ScopeID, &snap.Version, &snap.ParentVersion, &kindStr, &statusStr, &snap.Summary, &snap.SessionID, &snap.CreatedAtMs)
+func (s *Store) loadVersionLocked(ctx context.Context, q *sqlcgen.Queries, scope string, version int64) (Snapshot, error) {
+	v, err := q.GetVersion(ctx, sqlcgen.GetVersionParams{
+		ScopeID: scope,
+		Version: version,
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return Snapshot{}, ErrNotFound
 	}
 	if err != nil {
 		return Snapshot{}, err
 	}
-	snap.Kind = VersionKind(kindStr)
-	snap.Status = VersionStatus(statusStr)
-
 	files, err := loadVersionFiles(ctx, q, scope, version)
 	if err != nil {
 		return Snapshot{}, err
 	}
-	snap.Files = files
-	return snap, nil
+	return Snapshot{
+		ScopeID:       v.ScopeID,
+		Version:       v.Version,
+		ParentVersion: v.ParentVersion,
+		Kind:          VersionKind(v.Kind),
+		Status:        VersionStatus(v.Status),
+		Summary:       v.Summary,
+		SessionID:     v.SessionID,
+		CreatedAtMs:   v.CreatedAtMs,
+		Files:         files,
+	}, nil
 }
 
-func loadVersionFiles(ctx context.Context, q queryable, scope string, version int64) ([]MemoryFile, error) {
-	rows, err := q.QueryContext(ctx, `
-		SELECT rel_path, file_version, sha256, content, updated_at_ms
-		FROM memory_version_files
-		WHERE scope_id = ? AND version = ?
-		ORDER BY rel_path ASC`, scope, version,
-	)
+func loadVersionFiles(ctx context.Context, q *sqlcgen.Queries, scope string, version int64) ([]MemoryFile, error) {
+	rows, err := q.ListVersionFiles(ctx, sqlcgen.ListVersionFilesParams{
+		ScopeID: scope,
+		Version: version,
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var files []MemoryFile
-	for rows.Next() {
-		var f MemoryFile
-		if err := rows.Scan(&f.RelPath, &f.Version, &f.SHA256, &f.Content, &f.UpdatedAtMs); err != nil {
-			return nil, err
-		}
-		f.Content = cloneBytes(f.Content)
-		files = append(files, f)
+	files := make([]MemoryFile, 0, len(rows))
+	for _, r := range rows {
+		files = append(files, MemoryFile{
+			RelPath:     r.RelPath,
+			Version:     r.FileVersion,
+			SHA256:      r.Sha256,
+			Content:     cloneBytes(r.Content),
+			UpdatedAtMs: r.UpdatedAtMs,
+		})
 	}
-	return files, rows.Err()
+	return files, nil
 }
 
-func loadActiveFileMapTx(ctx context.Context, q queryable, scope string, activeVersion int64) (map[string]MemoryFile, error) {
+func loadActiveFileMapTx(ctx context.Context, q *sqlcgen.Queries, scope string, activeVersion int64) (map[string]MemoryFile, error) {
 	out := make(map[string]MemoryFile)
 	if activeVersion <= 0 {
 		return out, nil
@@ -1023,7 +935,7 @@ func loadActiveFileMapTx(ctx context.Context, q queryable, scope string, activeV
 
 func writeNewActiveVersionTx(
 	ctx context.Context,
-	tx *sql.Tx,
+	q *sqlcgen.Queries,
 	scope string,
 	head headRow,
 	kind VersionKind,
@@ -1034,20 +946,25 @@ func writeNewActiveVersionTx(
 ) (Snapshot, error) {
 	newVer := head.nextVersion
 	if head.activeVersion > 0 {
-		if _, err := tx.ExecContext(ctx, `
-			UPDATE memory_versions SET status = ? WHERE scope_id = ? AND version = ?`,
-			string(VersionStatusSuperseded), scope, head.activeVersion,
-		); err != nil {
+		if err := q.UpdateVersionStatus(ctx, sqlcgen.UpdateVersionStatusParams{
+			Status:  string(VersionStatusSuperseded),
+			ScopeID: scope,
+			Version: head.activeVersion,
+		}); err != nil {
 			return Snapshot{}, err
 		}
 	}
 
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO memory_versions (
-			scope_id, version, parent_version, kind, status, summary, session_id, created_at_ms
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		scope, newVer, head.activeVersion, string(kind), string(VersionStatusActive), summary, sessionID, nowMs,
-	); err != nil {
+	if err := q.InsertVersion(ctx, sqlcgen.InsertVersionParams{
+		ScopeID:       scope,
+		Version:       newVer,
+		ParentVersion: head.activeVersion,
+		Kind:          string(kind),
+		Status:        string(VersionStatusActive),
+		Summary:       summary,
+		SessionID:     sessionID,
+		CreatedAtMs:   nowMs,
+	}); err != nil {
 		return Snapshot{}, err
 	}
 
@@ -1060,23 +977,26 @@ func writeNewActiveVersionTx(
 	sliceFiles := make([]MemoryFile, 0, len(orderedPaths))
 	for _, p := range orderedPaths {
 		f := files[p]
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO memory_version_files (
-				scope_id, version, rel_path, file_version, sha256, content, updated_at_ms
-			) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			scope, newVer, f.RelPath, f.Version, f.SHA256, f.Content, f.UpdatedAtMs,
-		); err != nil {
+		if err := q.InsertVersionFile(ctx, sqlcgen.InsertVersionFileParams{
+			ScopeID:     scope,
+			Version:     newVer,
+			RelPath:     f.RelPath,
+			FileVersion: f.Version,
+			Sha256:      f.SHA256,
+			Content:     f.Content,
+			UpdatedAtMs: f.UpdatedAtMs,
+		}); err != nil {
 			return Snapshot{}, err
 		}
 		sliceFiles = append(sliceFiles, cloneMemoryFile(f))
 	}
 
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE memory_heads
-		SET active_version = ?, next_version = ?, updated_at_ms = ?
-		WHERE scope_id = ?`,
-		newVer, newVer+1, nowMs, scope,
-	); err != nil {
+	if err := q.UpdateHeadVersions(ctx, sqlcgen.UpdateHeadVersionsParams{
+		ActiveVersion: newVer,
+		NextVersion:   newVer + 1,
+		UpdatedAtMs:   nowMs,
+		ScopeID:       scope,
+	}); err != nil {
 		return Snapshot{}, err
 	}
 
