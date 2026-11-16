@@ -140,14 +140,22 @@ test("the inspector shows the newest understanding of its file", () => {
   expect(understoodText("c")(jobs)).toBeUndefined();
 });
 
-test("artifacts filter by display kind, search, sort, and facet counts", () => {
-  const make = (id: string, title: string, body: Artifact["body"], display?: Artifact["display"], updated = 0): Artifact => ({
+test("artifacts filter by display kind, origin, channel, search, sort, and facet counts", () => {
+  const make = (
+    id: string,
+    title: string,
+    body: Artifact["body"],
+    display?: Artifact["display"],
+    updated = 0,
+    more?: { readonly by?: string; readonly byName?: string; readonly channel?: string },
+  ): Artifact => ({
     id: artifactId(id),
     title,
     body,
     ...(display === undefined ? {} : { display }),
-    by: "user",
-    byName: "农场主",
+    ...(more?.channel === undefined ? {} : { channel: more.channel }),
+    by: more?.by ?? "user",
+    byName: more?.byName ?? "农场主",
     version: body === "html" ? 1 : 0,
     seq: body === "blocks" ? 1 : 0,
     versions: [],
@@ -155,7 +163,7 @@ test("artifacts filter by display kind, search, sort, and facet counts", () => {
     updated,
   });
   const all = [
-    make("1", "poster.visual.html", "html", "canvas", 30),
+    make("1", "poster.visual.html", "html", "canvas", 30, { by: "lab", byName: "实验员", channel: "c1" }),
     make("2", "metrics.dashboard.html", "html", "dashboard", 50),
     make("3", "flow.whiteboard", "html", "whiteboard", 40),
     make("4", "deck.slide.html", "html", "slides", 20),
@@ -166,8 +174,56 @@ test("artifacts filter by display kind, search, sort, and facet counts", () => {
     all: 5,
     byKind: { canvas: 1, slides: 1, dashboard: 1, whiteboard: 1, page: 1 },
   });
+  expect(artifactCountsOf(all, { where: { by: "origin", origin: "generated" }, search: "" })).toEqual({
+    all: 1,
+    byKind: { canvas: 1, slides: 0, dashboard: 0, whiteboard: 0, page: 0 },
+  });
   expect(shownArtifacts(all, { artifactKind: "all", search: "", sort: "recent" }).map((a) => a.id)).toEqual(["2", "3", "1", "4", "5"]);
   expect(shownArtifacts(all, { artifactKind: "whiteboard", search: "", sort: "recent" }).map((a) => a.id)).toEqual(["3"]);
   expect(shownArtifacts(all, { artifactKind: "page", search: "", sort: "name" }).map((a) => a.id)).toEqual(["5"]);
   expect(shownArtifacts(all, { artifactKind: "all", search: "DASH", sort: "recent" }).map((a) => a.id)).toEqual(["2"]);
+  expect(shownArtifacts(all, { where: { by: "origin", origin: "generated" }, search: "", sort: "recent" }).map((a) => a.id)).toEqual(["1"]);
+
+  const combined = countsOf({
+    items: [song],
+    artifacts: all,
+    where: { by: "all" },
+    kind: "all",
+  });
+  expect(combined.where).toEqual(
+    new Map([
+      ["all", 6],
+      ["uploaded", 5],
+      ["generated", 1],
+      ["channel:c1", 1],
+      ["agent:lab", 1],
+    ]),
+  );
+  expect(combined.kind).toEqual(
+    new Map([
+      ["all", 6],
+      ["audio", 1],
+    ]),
+  );
+  expect([combined.channels, combined.agents]).toEqual([["c1"], ["lab"]]);
+
+  const artifactFiltered = countsOf({
+    items: [song],
+    artifacts: all,
+    where: { by: "origin", origin: "uploaded" },
+    kind: "all",
+    artifactKind: "whiteboard",
+  });
+  expect(artifactFiltered.where).toEqual(
+    new Map([
+      ["all", 1],
+      ["uploaded", 1],
+    ]),
+  );
+  expect(artifactFiltered.kind).toEqual(
+    new Map([
+      ["all", 5],
+      ["audio", 1],
+    ]),
+  );
 });

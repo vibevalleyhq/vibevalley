@@ -122,10 +122,22 @@ test("unified library discovers .whiteboard and compound deliverables, filters t
 
   await page.goto("/library");
   const rail = page.getByTestId("library-rail");
-  await rail.locator('[data-testid="library-artifact-kind"][data-kind="whiteboard"]').click();
-
   const tile = page.locator(`[data-testid="library-artifact-item"][data-key="${wb.id}"]`);
   await expect(tile).toBeVisible();
+  const [allArtifacts, allItems] = await Promise.all([api.artifact.list({}), api.library.item.list({})]);
+  const totalCount = allArtifacts.length + allItems.length;
+  const whiteboardCount = allArtifacts.filter((a) => a.display === "whiteboard").length;
+  const uploadedWhiteboardCount = allArtifacts.filter((a) => a.display === "whiteboard" && a.by === "user").length;
+  await expect(rail.locator('[data-testid="library-where"][data-key="all"] span').last()).toHaveText(String(totalCount));
+  await expect(rail.locator('[data-testid="library-kind"][data-key="all"] span').last()).toHaveText(String(totalCount));
+  await expect(rail.locator('[data-testid="library-artifact-kind"][data-kind="all"] span').last()).toHaveText(String(allArtifacts.length));
+
+  await rail.locator('[data-testid="library-artifact-kind"][data-kind="whiteboard"]').click();
+
+  await expect(tile).toBeVisible();
+  await expect(page.getByTestId("library-artifact-item")).toHaveCount(whiteboardCount);
+  await expect(rail.locator('[data-testid="library-where"][data-key="all"] span').last()).toHaveText(String(whiteboardCount));
+  await expect(rail.locator('[data-testid="library-where"][data-key="uploaded"] span').last()).toHaveText(String(uploadedWhiteboardCount));
   await expect(tile.getByTestId("library-artifact-suffix")).toHaveText(".whiteboard");
 
   await tile.click();

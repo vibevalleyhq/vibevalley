@@ -65,7 +65,7 @@ export function Rail(props: {
   onArtifactKind?: ((kind: ArtifactKindFilter | undefined) => void) | undefined;
 }) {
   const inArtifacts = () => props.artifactKind !== undefined;
-  const here = (where: Where) => !inArtifacts() && whereKey(where) === whereKey(props.where);
+  const here = (where: Where) => whereKey(where) === whereKey(props.where);
   const wheres = (): readonly { readonly where: Where; readonly label: string }[] => {
     const names = props.names;
     return [
@@ -79,15 +79,15 @@ export function Rail(props: {
     ];
   };
   const n = (key: string) => props.counts.where.get(key) ?? 0;
-  const whereRow = (where: Where, icon: IconName, label: string) => (
+  const WhereRow = (row: { where: Where; icon: IconName; label: string }) => (
     <Row
       testid="library-where"
-      dataKey={whereKey(where)}
-      icon={icon}
-      label={label}
-      count={n(whereKey(where))}
-      here={here(where)}
-      onPick={() => props.onWhere(where)}
+      dataKey={whereKey(row.where)}
+      icon={row.icon}
+      label={row.label}
+      count={n(whereKey(row.where))}
+      here={here(row.where)}
+      onPick={() => props.onWhere(row.where)}
     />
   );
   return (
@@ -98,9 +98,9 @@ export function Rail(props: {
     >
       <div role="group" aria-label={t("web.library.rail.where")} class="flex max-sm:hidden shrink-0 flex-col max-sm:flex-row gap-px max-sm:gap-1">
         <p class="block max-sm:hidden px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.where")}</p>
-        {whereRow({ by: "all" }, "media", t("web.library.origin.all"))}
+        <WhereRow where={{ by: "all" }} icon="media" label={t("web.library.origin.all")} />
         <For each={["generated", "uploaded", "fetched"] as const}>
-          {(origin) => whereRow({ by: "origin", origin: origin }, originIcons[origin], t(`web.library.origin.${origin}`))}
+          {(origin) => <WhereRow where={{ by: "origin", origin: origin }} icon={originIcons[origin]} label={t(`web.library.origin.${origin}`)} />}
         </For>
       </div>
       <div role="group" aria-label={t("web.library.rail.kind")} class="flex max-sm:hidden shrink-0 flex-col max-sm:flex-row gap-px max-sm:gap-1">
@@ -141,13 +141,15 @@ export function Rail(props: {
       <Show when={props.counts.channels.length > 0}>
         <div role="group" aria-label={t("web.library.rail.channels")} class="flex max-sm:hidden shrink-0 flex-col max-sm:flex-row gap-px max-sm:gap-1">
           <p class="block max-sm:hidden px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.channels")}</p>
-          <For each={props.counts.channels}>{(channel) => whereRow({ by: "channel", channel: channel }, "chat", props.names.channel(channel))}</For>
+          <For each={props.counts.channels}>
+            {(channel) => <WhereRow where={{ by: "channel", channel }} icon="chat" label={props.names.channel(channel)} />}
+          </For>
         </div>
       </Show>
       <Show when={props.counts.agents.length > 0}>
         <div role="group" aria-label={t("web.library.rail.agents")} class="flex max-sm:hidden shrink-0 flex-col max-sm:flex-row gap-px max-sm:gap-1">
           <p class="block max-sm:hidden px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.agents")}</p>
-          <For each={props.counts.agents}>{(agent) => whereRow({ by: "agent", agent: agent }, "agents", props.names.agent(agent))}</For>
+          <For each={props.counts.agents}>{(agent) => <WhereRow where={{ by: "agent", agent }} icon="agents" label={props.names.agent(agent)} />}</For>
         </div>
       </Show>
       <div class="hidden max-sm:flex min-w-0 flex-1 gap-2">

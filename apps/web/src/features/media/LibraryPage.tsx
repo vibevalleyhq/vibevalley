@@ -85,16 +85,18 @@ export function LibraryPage() {
   const jobs = (): readonly MediaJob[] => core()?.media ?? [];
   const working = () => making(jobs());
   const list = createMemo(() => shown({ items: all(), where: where(), kind: kind() }));
-  const filteredArtifacts = createMemo(() => shownArtifacts(allArtifacts(), { artifactKind: artifactKind(), search: typed(), sort: sort() }));
-  const artifactCounts = createMemo(() => artifactCountsOf(allArtifacts()));
-  const showArtifacts = () => artifactKind() !== undefined || (where().by === "all" && kind() === "all");
+  const filteredArtifacts = createMemo(() => shownArtifacts(allArtifacts(), { where: where(), artifactKind: artifactKind(), search: typed(), sort: sort() }));
+  const artifactCounts = createMemo(() => artifactCountsOf(allArtifacts(), { where: where(), search: typed() }));
+  const showArtifacts = () => artifactKind() !== undefined || kind() === "all";
   const shownArtifactList = createMemo(() => (showArtifacts() ? filteredArtifacts() : []));
   const pickedArtifact = createMemo(() => {
     const id = pickedArtifactId();
     return id === undefined ? undefined : allArtifacts().find((a) => a.id === id);
   });
   const ids = createMemo(() => list().map((item) => item.attachment.id));
-  const counts = createMemo(() => countsOf({ items: all(), where: where(), kind: kind() }));
+  const counts = createMemo(() =>
+    countsOf({ items: all(), artifacts: allArtifacts(), where: where(), kind: kind(), artifactKind: artifactKind(), search: typed() }),
+  );
   const area = useWidth();
   const inner = () => Math.max(0, area.width() - 2 * 16);
   const rows = createMemo(() => {
@@ -319,7 +321,6 @@ export function LibraryPage() {
         artifactKind={artifactKind()}
         artifactCounts={artifactCounts()}
         onWhere={(w) => {
-          setArtifactKind(undefined);
           setPickedArtifactId(undefined);
           setWhere(w);
           setAsking(false);
@@ -332,7 +333,6 @@ export function LibraryPage() {
         }}
         onArtifactKind={(ak) => {
           setArtifactKind(ak);
-          setWhere({ by: "all" });
           setKind("all");
           setPicked([]);
           setPickedArtifactId(undefined);

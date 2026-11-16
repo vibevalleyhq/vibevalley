@@ -1,15 +1,16 @@
 import { t } from "@vibevalley/i18n";
-import type {
-  Artifact,
-  ArtifactBody,
-  ArtifactDisplay,
-  LibraryFileKind,
-  LibraryItem,
-  LibraryOrigin,
-  LibraryOriginKind,
-  LibrarySort,
-  MediaJob,
-  MediaUnderstandingJob,
+import {
+  type Artifact,
+  type ArtifactBody,
+  type ArtifactDisplay,
+  type LibraryFileKind,
+  type LibraryItem,
+  type LibraryOrigin,
+  type LibraryOriginKind,
+  type LibrarySort,
+  type MediaJob,
+  type MediaUnderstandingJob,
+  userId,
 } from "@vibevalley/protocol";
 
 export type KindFilter = LibraryFileKind | "all";
@@ -57,6 +58,34 @@ const isKind = (kind: KindFilter) => (item: LibraryItem) => kind === "all" || ki
 export const shown = (given: { readonly items: readonly LibraryItem[]; readonly where: Where; readonly kind: KindFilter }): LibraryItem[] =>
   given.items.filter((item) => isIn(given.where)(item) && isKind(given.kind)(item));
 
+const pushUnique = (list: string[], value: string | undefined) => {
+  if (value !== undefined && !list.includes(value)) list.push(value);
+};
+
+const artifactAgentOf = (a: Artifact): string | undefined => (a.by !== userId && a.by !== "system" && a.by !== "" ? a.by : undefined);
+
+const isArtifactIn =
+  (where: Where) =>
+  (a: Artifact): boolean => {
+    switch (where.by) {
+      case "all":
+        return true;
+      case "origin":
+        if (where.origin === "generated") return artifactAgentOf(a) !== undefined;
+        if (where.origin === "uploaded") return a.by === userId;
+        return false;
+      case "channel":
+        return a.channel === where.channel;
+      case "agent":
+        return artifactAgentOf(a) === where.agent;
+    }
+  };
+
+const artifactMatchesSearch = (a: Artifact, search: string): boolean => {
+  const q = search.trim().toLowerCase();
+  return !q || a.title.toLowerCase().includes(q) || a.byName.toLowerCase().includes(q);
+};
+
 export interface Counts {
   readonly where: ReadonlyMap<string, number>;
   readonly kind: ReadonlyMap<KindFilter, number>;
@@ -65,28 +94,47 @@ export interface Counts {
 }
 
 /** Cross-filtered facet counts: each group applies the other group's active filter. */
-export const countsOf = (given: { readonly items: readonly LibraryItem[]; readonly where: Where; readonly kind: KindFilter }): Counts => {
-  const { items, where, kind } = given;
+export const countsOf = (given: {
+  readonly items: readonly LibraryItem[];
+  readonly artifacts?: readonly Artifact[] | undefined;
+  readonly where: Where;
+  readonly kind: KindFilter;
+  readonly artifactKind?: ArtifactKindFilter | undefined;
+  readonly search?: string | undefined;
+}): Counts => {
+  const { items, where, kind, artifactKind } = given;
+  const search = given.search ?? "";
   const byWhere = new Map<string, number>();
   const byKind = new Map<KindFilter, number>();
   const channels: string[] = [];
   const agents: string[] = [];
   const bump = <K>(m: Map<K, number>, k: K) => m.set(k, (m.get(k) ?? 0) + 1);
+  const recordWhere = (origin: LibraryOriginKind, channel: string | undefined, agent: string | undefined) => {
+    bump(byWhere, "all");
+    bump(byWhere, origin);
+    if (channel !== undefined) bump(byWhere, `channel:${channel}`);
+    if (agent !== undefined) bump(byWhere, `agent:${agent}`);
+  };
   for (const item of items) {
     const channel = channelOf(item.origin);
     const agent = agentOf(item.origin);
-    if (channel !== undefined && !channels.includes(channel)) channels.push(channel);
-    if (agent !== undefined && !agents.includes(agent)) agents.push(agent);
-    if (isKind(kind)(item)) {
-      bump(byWhere, "all");
-      bump(byWhere, item.origin.kind);
-      if (channel !== undefined) bump(byWhere, `channel:${channel}`);
-      if (agent !== undefined) bump(byWhere, `agent:${agent}`);
-    }
+    pushUnique(channels, channel);
+    pushUnique(agents, agent);
+    if (artifactKind === undefined && isKind(kind)(item)) recordWhere(item.origin.kind, channel, agent);
     if (isIn(where)(item)) {
       bump(byKind, "all");
       bump(byKind, kindOf(item.attachment.type));
     }
+  }
+  const inWhere = isArtifactIn(where);
+  for (const artifact of given.artifacts ?? []) {
+    if (!artifactMatchesSearch(artifact, search)) continue;
+    const agent = artifactAgentOf(artifact);
+    pushUnique(channels, artifact.channel);
+    pushUnique(agents, agent);
+    const matchesRight = artifactKind !== undefined ? artifactMatchesKind(artifact, artifactKind) : kind === "all";
+    if (matchesRight) recordWhere(agent !== undefined ? "generated" : "uploaded", artifact.channel, agent);
+    if (inWhere(artifact)) bump(byKind, "all");
   }
   return { where: byWhere, kind: byKind, channels, agents };
 };
@@ -246,15 +294,16 @@ const artifactMatchesKind = (a: { readonly body: ArtifactBody; readonly display?
 
 export const shownArtifacts = (
   all: readonly Artifact[],
-  filter: { readonly artifactKind?: ArtifactKindFilter | undefined; readonly search: string; readonly sort: LibrarySort },
+  filter: {
+    readonly where?: Where | undefined;
+    readonly artifactKind?: ArtifactKindFilter | undefined;
+    readonly search: string;
+    readonly sort: LibrarySort;
+  },
 ): Artifact[] => {
   const kind = filter.artifactKind ?? "all";
-  const q = filter.search.trim().toLowerCase();
-  const filtered = all.filter((a) => {
-    if (!artifactMatchesKind(a, kind)) return false;
-    if (!q) return true;
-    return a.title.toLowerCase().includes(q) || a.byName.toLowerCase().includes(q);
-  });
+  const inWhere = isArtifactIn(filter.where ?? { by: "all" });
+  const filtered = all.filter((a) => inWhere(a) && artifactMatchesKind(a, kind) && artifactMatchesSearch(a, filter.search));
   if (filter.sort === "name") return filtered.toSorted((a, b) => a.title.localeCompare(b.title));
   return filtered.toSorted((a, b) => b.updated - a.updated);
 };
@@ -264,13 +313,21 @@ export interface ArtifactCounts {
   readonly byKind: Record<Exclude<ArtifactKindFilter, "all">, number>;
 }
 
-export const artifactCountsOf = (all: readonly Artifact[]): ArtifactCounts => ({
-  all: all.length,
-  byKind: {
-    canvas: all.filter((a) => artifactMatchesKind(a, "canvas")).length,
-    slides: all.filter((a) => artifactMatchesKind(a, "slides")).length,
-    dashboard: all.filter((a) => artifactMatchesKind(a, "dashboard")).length,
-    whiteboard: all.filter((a) => artifactMatchesKind(a, "whiteboard")).length,
-    page: all.filter((a) => artifactMatchesKind(a, "page")).length,
-  },
-});
+export const artifactCountsOf = (
+  all: readonly Artifact[],
+  filter?: { readonly where?: Where | undefined; readonly search?: string | undefined },
+): ArtifactCounts => {
+  const inWhere = isArtifactIn(filter?.where ?? { by: "all" });
+  const q = filter?.search ?? "";
+  const scoped = all.filter((a) => inWhere(a) && artifactMatchesSearch(a, q));
+  return {
+    all: scoped.length,
+    byKind: {
+      canvas: scoped.filter((a) => artifactMatchesKind(a, "canvas")).length,
+      slides: scoped.filter((a) => artifactMatchesKind(a, "slides")).length,
+      dashboard: scoped.filter((a) => artifactMatchesKind(a, "dashboard")).length,
+      whiteboard: scoped.filter((a) => artifactMatchesKind(a, "whiteboard")).length,
+      page: scoped.filter((a) => artifactMatchesKind(a, "page")).length,
+    },
+  };
+};
