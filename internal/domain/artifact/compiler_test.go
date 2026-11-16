@@ -68,8 +68,8 @@ if (el) createRoot(el).render(<App />);
 	if err != nil {
 		t.Fatalf("CompileBundle failed: %v", err)
 	}
-	if res.Duration >= 10*time.Millisecond {
-		t.Fatalf("expected compile duration < 10ms, got %v", res.Duration)
+	if res.Duration >= maxCompileLatency {
+		t.Fatalf("expected compile duration < %v, got %v", maxCompileLatency, res.Duration)
 	}
 	if !strings.Contains(res.CSS, ".dashboard") || !strings.Contains(res.CSS, ".card") {
 		t.Fatalf("expected CSS bundle output, got: %q", res.CSS)
@@ -126,8 +126,8 @@ export const App = () => <Widget />;
 	if pubErr == nil {
 		t.Fatal("expected compile error for syntax mistake, got nil")
 	}
-	if elapsed >= 10*time.Millisecond {
-		t.Fatalf("expected compile failure returned in < 10ms, got %v", elapsed)
+	if elapsed >= maxCompileLatency {
+		t.Fatalf("expected compile failure returned in < %v, got %v", maxCompileLatency, elapsed)
 	}
 	if !errors.Is(pubErr, artifact.ErrCompileFailed) {
 		t.Fatalf("expected errors.Is(ErrCompileFailed), got %v", pubErr)
@@ -216,8 +216,8 @@ export const App = () => <Widget />;
 	if err != nil {
 		t.Fatalf("self-healing second compile failed: %v", err)
 	}
-	if time.Since(t1) >= 10*time.Millisecond {
-		t.Fatalf("expected second compile < 10ms, got %v", time.Since(t1))
+	if time.Since(t1) >= maxCompileLatency {
+		t.Fatalf("expected second compile < %v, got %v", maxCompileLatency, time.Since(t1))
 	}
 	if pubRes.Version.Version != 1 || pubRes.Card.Display != contract.ArtifactDisplayDashboard {
 		t.Fatalf("unexpected published card/version: %+v", pubRes)
@@ -236,8 +236,8 @@ export const App = () => <Widget />;
 	if err != nil {
 		t.Fatalf("JSX compile failed: %v", err)
 	}
-	if jsxRes.Duration >= 10*time.Millisecond || !strings.Contains(jsxRes.CSS, ".board") || !strings.Contains(jsxRes.JS, "Idea") {
-		t.Fatalf("unexpected JSX compile output: dur=%v", jsxRes.Duration)
+	if jsxRes.Duration >= maxCompileLatency || !strings.Contains(jsxRes.CSS, ".board") || !strings.Contains(jsxRes.JS, "Idea") {
+		t.Fatalf("unexpected JSX compile output: dur=%v (budget=%v)", jsxRes.Duration, maxCompileLatency)
 	}
 }
 
