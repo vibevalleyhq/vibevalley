@@ -57,7 +57,7 @@ export interface ToolDeps {
   readonly repo: Repo;
 }
 
-const named = ["id", "agent", "session", "repo", "name", "title", "text", "note", "goal"];
+const named = ["id", "agent", "session", "repo", "name", "title", "text", "note", "goal", "type", "path"];
 
 export function toolStart(name: string, args: unknown): ToolStart {
   let about = "";
@@ -114,6 +114,11 @@ export async function makeTool(deps: ToolDeps): Promise<Tool> {
     orchestratorBlockUpdate,
     blockDelete,
     orchestratorBlockDelete,
+    artifactTypeList,
+    artifactTypeRead,
+    artifactEntryList,
+    artifactEntryGet,
+    artifactEntryBatch,
   } = artifactTools(deps, findIssue);
   const { memorySearch, memoryCreate } = memoryTools(deps);
   const notes = pkmTools(deps);
@@ -158,6 +163,11 @@ export async function makeTool(deps: ToolDeps): Promise<Tool> {
       orchestratorBlockCreate(who),
       orchestratorBlockUpdate(who),
       orchestratorBlockDelete(who),
+      artifactTypeList("orchestrator")(who),
+      artifactTypeRead("orchestrator")(who),
+      artifactEntryList("orchestrator")(who),
+      artifactEntryGet("orchestrator")(who),
+      artifactEntryBatch("orchestrator")(who),
     ],
     session: (who) => [
       messageSend(who),
@@ -180,6 +190,11 @@ export async function makeTool(deps: ToolDeps): Promise<Tool> {
       artifactContent("session")(who),
       sessionArtifactCreate(who),
       artifactVersion("session")(who),
+      artifactTypeList("session")(who),
+      artifactTypeRead("session")(who),
+      artifactEntryList("session")(who),
+      artifactEntryGet("session")(who),
+      artifactEntryBatch("session")(who),
       ...library.session(who),
     ],
     readResource,

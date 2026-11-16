@@ -524,6 +524,7 @@ export async function makeChannel(deps: ChannelDeps): Promise<Channel> {
         ...(files.length > 0 ? { attachments: files } : {}),
         ...(picked.agent || picked.repo ? { picked } : {}),
         ...((more.blocks?.length ?? 0) > 0 ? { blocks: more.blocks } : {}),
+        ...(more.viewContext ? { viewContext: more.viewContext } : {}),
         ...(source ? { ingressSource: source } : {}),
         ...(source === "voice" ? { spoken: true } : {}),
         ...(responsePort ? { responsePort } : {}),

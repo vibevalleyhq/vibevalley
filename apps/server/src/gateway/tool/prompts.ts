@@ -164,9 +164,12 @@ const htmlRules = `页面在沙箱里显示：连不了网、调不了农场的�
 export const params = {
   artifact: {
     title: "标题：用户在卡片上看到的那一行，最多 80 个字",
-    kind: `html 是一整页，一稿一稿换（${htmlRules}）；markdown 读成一块一块的，用户和你都能接着改（artifact_block_create、artifact_block_update）`,
+    kind: `html 是一整页，一稿一稿换（${htmlRules}）；markdown 读成一块一块的，用户和你都能接着改（artifact_block_create、artifact_block_update）；store 是结构化多条目作品（配合 artifactType 使用）`,
+    artifactType:
+      "结构化 Artifact 类型：docs（协作块文档）、slides（多文件演示稿）、dashboard（数据集+溯源看板）、motion（时间轴动态图形短片）、whiteboard（无限画布白板）、design（多画板 .dc.html 设计稿）、design-system（常驻设计令牌体系）。动笔前先调 artifact_type_read 读规范",
+    isDefault: "仅用于 design-system：设为全农场常驻默认令牌，视觉类 Artifact 会自动注入它的 CSS 变量",
     display:
-      '网页（html）怎么看，不填是 page：page 是一整页照原样；slides 是幻灯片：每页一个顶层 <section>，版式 class 有 title、two-col、image、quote，备注写在 <aside class="notes">，工作台负责排成 16:9、翻页、放映和存成 PDF，别给 section 写 position、transform、width、height、display；颜色和字体用 --vv-ink、--vv-accent、--vv-font-sans 这类变量。一起写的（markdown）不填',
+      '网页（html）怎么看，不填是 page：page 是一整页照原样；slides 是幻灯片：每页一个顶层 <section>，版式 class 有 title、two-col、image、quote，备注写在 <aside class="notes">，工作台负责排成 16:9、翻页、放映和存成 PDF，别给 section 写 position、transform、width、height、display；motion 是时间轴动画页（调 vv.timeline）；颜色和字体用 --vv-ink、--vv-accent、--vv-font-sans 这类变量。一起写的（markdown）或结构化 store 不填',
     content: "这一稿的全文；和 file 二选一",
     file: "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
     note: "这一稿改了什么，一句话；第一稿可以写这是什么",
@@ -174,6 +177,24 @@ export const params = {
     issue: "它是为哪张工单做的：编号（#12）；不填就不挂在工单上",
     id: "Artifact 的 id：卡片上、artifact_list 的回答里有",
     version: "第几稿；不填是最新的",
+  },
+  artifactType: {
+    type: "要读规范的类型：docs、slides、dashboard、motion、whiteboard、design、design-system",
+    reference: "可选的参考分册名（从 artifact_type_read 或 artifact_type_list 返回的 references 里挑）；不填读该类型的主 SKILL",
+    filter: "只列某一种结构化 ArtifactType；不填列全部",
+  },
+  artifactEntry: {
+    prefix: "只列这个路径前缀下的条目（比如 project/slides/ 或 elements/）；不填列全部",
+    includeValues: "是否顺带返回每个条目的文本内容；默认 false 只列路径、类型、版本号和大小",
+    path: "相对条目路径，比如 project/deck.json、files/index.html、elements/node-1（不以 / 开头）",
+    writes: "一组原子写入操作：全部通过乐观锁校验才一起提交，任一冲突则整批不落库并返回冲突详情",
+    op: "操作：set（整条写入/覆盖）、patch（RFC 7396 JSON 合并修改，null 删除键）、delete（删除条目）、copy（从 from 复制）",
+    kind: "条目种类：text、json、asset（value 填附件 id）；不填按路径自动推断",
+    value: "set/patch 时的内容字符串（asset 填附件 id）",
+    from: "op 为 copy 时的源条目路径",
+    mime: "可选 MIME 类型；不填按路径后缀推断",
+    ifRev: "乐观并发锁：0 要求该路径尚不存在；>0 要求当前版本号等于 ifRev",
+    announce: "提交后是否在频道里发一张更新卡片通知用户",
   },
   library: {
     url: "一个公网的 https 地址，服务端去下载；和 path 二选一",
@@ -409,6 +430,13 @@ export const descriptions = {
   "artifact.block.update":
     "改一块的字、类型或属性：text 是整段新字，type 换类型，level/checked/language 是标题级别、待办勾选、代码语言。baseRev 是你读到或写下它时的版本；这之后别人改过它的字，就不改，回答里有现在的字和版本。",
   "artifact.block.delete": "删一块（子块一起删），置成墓碑；用户要删掉哪一段、或你写的某一块不要了时用。",
+  "artifact.type.list":
+    "列出工作台支持的 7 种结构化 ArtifactType（docs、slides、dashboard、motion、whiteboard、design、design-system）、各自简介、可用参考分册以及当前默认的 Design System。",
+  "artifact.type.read":
+    "按需读取某一种结构化 ArtifactType 的创作规范（SKILL）或指定参考分册（reference），并告知农场当前默认的 Design System。做结构化作品前先调它。",
+  "artifact.entry.list": "列出一个结构化 store Artifact 里的条目清单（路径、类型、rev 版本号、字节数；includeValues 为 true 时附带内容）。",
+  "artifact.entry.get": "读取一个结构化 store Artifact 里某一条目的当前内容、类型与 rev 版本号。",
+  "artifact.entry.batch": "对一个结构化 store Artifact 原子提交一批条目修改（set/patch/delete/copy，支持 ifRev 乐观锁与 announce 发卡片）。",
   "library.item.list":
     "列出素材库：生成的图和声音、用户上传的文件、帮工和助手拿回来的文件，最近的在前。每行是 id、名字、类型、大小、来路。要用户以前给过的图或文件，先在这里找。",
   "library.item.add":
@@ -449,6 +477,11 @@ export const sessionDescriptions = {
   "artifact.create":
     "写一份 Artifact：要交给用户看、代码改动说不清的一整页，比如两种设计让用户挑、调研报告、对比表、带图的说明。先把它写成你工作目录里的一个文件，再用 file 交上来（或者直接给 content）。它挂在你的工单上，你会在工单串里说一句带卡片的话，用户在工作台里点开看、回复卡片评论，评论会叫醒你。",
   "artifact.version.create": `给一个网页（html）Artifact 出新的一稿（旧的留着）：照用户的评论改完以后用，note 写这一稿改了什么。会在第一稿说过的地方再说一句带卡片的话。一起写的 Artifact 不出新稿，一块一块改它。${htmlRules}。`,
+  "artifact.type.list": descriptions["artifact.type.list"],
+  "artifact.type.read": descriptions["artifact.type.read"],
+  "artifact.entry.list": descriptions["artifact.entry.list"],
+  "artifact.entry.get": descriptions["artifact.entry.get"],
+  "artifact.entry.batch": descriptions["artifact.entry.batch"],
   "issue.split": (maxTasks: number) =>
     `把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 ${maxTasks} 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。`,
 };
@@ -468,7 +501,9 @@ export const answers = {
     made: (a: T.Artifact) =>
       a.body === "html"
         ? `做好了「${a.title}」第 ${a.version} 稿（id=${a.id}），已经在对话里带着卡片说了，用户在工作台点开看；用户回复那张卡片就是评论`
-        : `做好了「${a.title}」（id=${a.id}），读成了一块一块的，已经在对话里带着卡片说了；要改哪一段，先用 artifact_content_get 读到块的 id 和版本，再 artifact_block_update；用户回复那张卡片就是评论`,
+        : a.body === "store"
+          ? `建好了结构化作品「${a.title}」（type=${a.artifactType ?? "store"}，id=${a.id}，seq=${a.seq}）${a.said ? "，已经在对话里带着卡片说了" : ""}；后续增改条目用 artifact_entry_batch`
+          : `做好了「${a.title}」（id=${a.id}），读成了一块一块的，已经在对话里带着卡片说了；要改哪一段，先用 artifact_content_get 读到块的 id 和版本，再 artifact_block_update；用户回复那张卡片就是评论`,
     warned: (ws: readonly HtmlWarning[]) =>
       ws.length === 0
         ? ""
@@ -477,20 +512,66 @@ export const answers = {
     none: "还没有 Artifact",
     line: (a: T.Artifact) => {
       const note = a.versions.at(-1)?.note;
-      const what = a.body === "html" ? `网页 · 第 ${a.version} 稿` : "一起写的";
+      const what =
+        a.body === "html"
+          ? `网页 · 第 ${a.version} 稿`
+          : a.body === "store"
+            ? `${a.artifactType ?? "store"} · seq ${a.seq}${a.isDefault ? " · 默认" : ""}`
+            : "一起写的";
       return `- 〔${a.id}〕「${a.title}」${what} · ${a.byName}${note ? " · " + note : ""}`;
     },
     detail: (a: T.Artifact) =>
       [
         a.body === "html"
           ? `「${a.title}」（id=${a.id}）网页，${a.byName} 做的，最新是第 ${a.version} 稿：`
-          : `「${a.title}」（id=${a.id}）一起写的，${a.byName} 起的头；用 artifact_content_get 读它的每一块`,
+          : a.body === "store"
+            ? `「${a.title}」（id=${a.id}）结构化作品（type=${a.artifactType ?? "store"}，seq=${a.seq}${a.isDefault ? "，农场默认" : ""}），${a.byName} 做的；用 artifact_entry_list 和 artifact_entry_get 读条目`
+            : `「${a.title}」（id=${a.id}）一起写的，${a.byName} 起的头；用 artifact_content_get 读它的每一块`,
         ...a.versions.map(
           (v) =>
             `- 第 ${v.version} 稿 · ${v.byName}${v.note ? " · " + v.note : ""}${v.number !== undefined ? ` · 卡片是 msg=${v.number}，用户的评论是对它的回复` : ""}`,
         ),
       ].join("\n"),
     content: (title: string, version: number, content: string) => `「${title}」第 ${version} 稿的全文：\n\n${content}`,
+    types: (items: readonly T.ArtifactTypeInfo[]) =>
+      items
+        .map(
+          (x) =>
+            `- ${x.type}（${x.title}，body=${x.body}）：${x.summary}` +
+            (x.references.length > 0 ? ` · 分册：${x.references.join("、")}` : "") +
+            (x.defaultArtifactId ? ` · 默认 id=${x.defaultArtifactId}` : ""),
+        )
+        .join("\n"),
+    typeGuide: (g: T.ArtifactTypeGuide) =>
+      [
+        `# ${g.type} · ${g.title}${g.reference ? `（分册 ${g.reference}）` : ""}`,
+        ...(g.references.length > 0 ? [`可用分册：${g.references.join("、")}`] : []),
+        ...(g.defaultArtifactId
+          ? [`农场当前默认 Design System：「${g.defaultArtifactTitle ?? ""}」id=${g.defaultArtifactId}（可用 artifact_entry_get 读 project/tokens.json）`]
+          : []),
+        "",
+        g.content,
+      ].join("\n"),
+    entryList: (snap: T.ArtifactEntrySnapshot) =>
+      [
+        `「${snap.artifact.title}」（id=${snap.artifact.id}，type=${snap.artifact.artifactType ?? "store"}，seq=${snap.seq}）共 ${snap.entries.length} 条：`,
+        ...(snap.entries.length === 0
+          ? ["（空）"]
+          : snap.entries.map(
+              (e) =>
+                `- ${e.path} · ${e.kind} · rev ${e.rev} · ${e.size} B${e.attachmentId ? ` · attachment=${e.attachmentId}` : ""}${
+                  e.value !== undefined ? `\n  ${e.value.replaceAll("\n", "\n  ")}` : ""
+                }`,
+            )),
+      ].join("\n"),
+    entryDetail: (e: T.ArtifactEntry) =>
+      `[${e.path} · ${e.kind} · mime=${e.mime} · rev=${e.rev} · ${e.size} B${e.attachmentId ? ` · attachment=${e.attachmentId}` : ""}]\n${e.value ?? ""}`,
+    entryBatch: (r: T.ArtifactEntryBatchResult) =>
+      r.applied
+        ? `已提交：seq=${r.seq}，写入 ${r.entries.length} 条（${r.entries.map((e) => `${e.path}@rev${e.rev}`).join("、") || "仅删除/无变更"}）。`
+        : [`未提交（ifRev 冲突，当前 seq=${r.seq}）：`, ...r.conflicts.map((c) => `- ${c.path}：期望 rev=${c.expectedRev}，实际 rev=${c.actualRev}`)].join(
+            "\n",
+          ),
     noPlace: "找不到你的工作目录：用 content 直接给全文",
     outside: (file: string) => `${file} 不在你的工作目录里：只能交工作目录里的文件`,
     notFile: (file: string) => `${file} 不是一个文件`,

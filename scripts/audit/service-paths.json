@@ -23,7 +23,7 @@
   "Attachment.get": ["media"],
   "Attachment.keep": ["artifact"],
   "Attachment.keepStaged": ["media"],
-  "Attachment.of": ["channel", "media"],
+  "Attachment.of": ["artifact", "channel", "media"],
   "Attachment.pathOf": ["artifact", "channel", "media"],
   "Attachment.staging": ["media"],
   "Channel.addFollower": ["watch"],

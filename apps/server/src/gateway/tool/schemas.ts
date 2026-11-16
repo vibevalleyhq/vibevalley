@@ -4,7 +4,7 @@ import { ToolFailed } from "@vibevalley/agent/core/errors";
 import type { JsonSchema } from "@vibevalley/agent/core/schema";
 import { runTool } from "@vibevalley/agent/core/tool";
 import { isAbort } from "@vibevalley/async";
-import { ArtifactKindValues, DeliverableValues, PkmTierValues } from "@vibevalley/protocol";
+import { ArtifactKindValues, ArtifactTypeValues, DeliverableValues, PkmTierValues } from "@vibevalley/protocol";
 import { isApiError, type Handlers } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -50,12 +50,55 @@ const artifactText = {
   content: z.exactOptional(z.string().describe(params.artifact.content)),
   note: z.exactOptional(z.string().describe(params.artifact.note)),
 };
-const artifactKind = z.enum(ArtifactKindValues).describe(params.artifact.kind);
+const artifactKind = z.exactOptional(z.enum(ArtifactKindValues).describe(params.artifact.kind));
+const artifactTypeField = z.exactOptional(z.enum(ArtifactTypeValues).describe(params.artifact.artifactType));
 const artifactDisplay = z.exactOptional(S.Artifact.shape.display.unwrap().describe(params.artifact.display));
 const artifactId = z
   .string()
   .describe(params.artifact.id)
   .transform((s) => S.artifactId(s.trim()));
+const entryWriteParameters = z
+  .object({
+    op: S.ArtifactEntryOp.describe(params.artifactEntry.op),
+    path: z.string().describe(params.artifactEntry.path),
+    kind: z.exactOptional(S.ArtifactEntryKind.describe(params.artifactEntry.kind)),
+    value: z.exactOptional(z.string().describe(params.artifactEntry.value)),
+    from: z.exactOptional(z.string().describe(params.artifactEntry.from)),
+    mime: z.exactOptional(z.string().describe(params.artifactEntry.mime)),
+    ifRev: z.exactOptional(z.number().int().describe(params.artifactEntry.ifRev)),
+  })
+  .meta({ requiredOrder: ["op", "path"] });
+
+const artifactStoreToolParameters = {
+  "artifact.type.list": z.object({}),
+  "artifact.type.read": z
+    .object({
+      type: z.enum(ArtifactTypeValues).describe(params.artifactType.type),
+      reference: z.exactOptional(z.string().describe(params.artifactType.reference)),
+    })
+    .meta({ requiredOrder: ["type"] }),
+  "artifact.entry.list": z
+    .object({
+      id: artifactId,
+      prefix: z.exactOptional(z.string().describe(params.artifactEntry.prefix)),
+      includeValues: z.exactOptional(z.boolean().describe(params.artifactEntry.includeValues)),
+    })
+    .meta({ requiredOrder: ["id"] }),
+  "artifact.entry.get": z
+    .object({
+      id: artifactId,
+      path: z.string().describe(params.artifactEntry.path),
+    })
+    .meta({ requiredOrder: ["id", "path"] }),
+  "artifact.entry.batch": z
+    .object({
+      id: artifactId,
+      writes: z.array(entryWriteParameters).describe(params.artifactEntry.writes),
+      note: z.exactOptional(z.string().describe(params.artifact.note)),
+      announce: z.exactOptional(z.boolean().describe(params.artifactEntry.announce)),
+    })
+    .meta({ requiredOrder: ["id", "writes"] }),
+};
 const blockId = (description: string) => z.string().describe(description).transform(S.blockId);
 const aliasOf =
   <A extends string>(names: Readonly<Record<string, A>>) =>
@@ -149,15 +192,20 @@ export const parameters = {
   "artifact.create": z
     .object({
       ...artifactText,
+      announce: z.exactOptional(z.boolean().describe(params.artifactEntry.announce)),
+      artifactType: artifactTypeField,
       channel: z.exactOptional(z.string().describe(params.artifact.channel)),
+      display: artifactDisplay,
+      entries: z.exactOptional(z.array(entryWriteParameters).describe(params.artifactEntry.writes)),
+      isDefault: z.exactOptional(z.boolean().describe(params.artifact.isDefault)),
       issue: z.exactOptional(z.string().describe(params.artifact.issue)),
       kind: artifactKind,
-      display: artifactDisplay,
       title: z.string().describe(params.artifact.title),
     })
-    .meta({ requiredOrder: ["title", "kind"] }),
+    .meta({ requiredOrder: ["title"] }),
   "artifact.get": z.object({ id: artifactId }),
   "artifact.list": z.object({
+    artifactType: z.exactOptional(z.enum(ArtifactTypeValues).describe(params.artifactType.filter)),
     channel: z.exactOptional(z.string().describe(params.artifact.channel)),
     issue: z.exactOptional(z.string().describe(params.artifact.issue)),
   }),
@@ -165,6 +213,7 @@ export const parameters = {
   "artifact.block.create": blockCreateParameters,
   "artifact.block.update": blockUpdateParameters,
   "artifact.block.delete": blockDeleteParameters,
+  ...artifactStoreToolParameters,
   "channel.create": z.object({
     description: z.exactOptional(z.string()),
     name: z.string(),
@@ -285,14 +334,19 @@ export const sessionParameters = {
   "artifact.create": z
     .object({
       ...artifactText,
-      file: z.exactOptional(z.string().describe(params.artifact.file)),
-      kind: artifactKind,
+      announce: z.exactOptional(z.boolean().describe(params.artifactEntry.announce)),
+      artifactType: artifactTypeField,
       display: artifactDisplay,
+      entries: z.exactOptional(z.array(entryWriteParameters).describe(params.artifactEntry.writes)),
+      file: z.exactOptional(z.string().describe(params.artifact.file)),
+      isDefault: z.exactOptional(z.boolean().describe(params.artifact.isDefault)),
+      kind: artifactKind,
       title: z.string().describe(params.artifact.title),
     })
-    .meta({ requiredOrder: ["title", "kind"] }),
+    .meta({ requiredOrder: ["title"] }),
   "artifact.get": z.object({ id: artifactId }),
   "artifact.list": z.object({
+    artifactType: z.exactOptional(z.enum(ArtifactTypeValues).describe(params.artifactType.filter)),
     channel: z.exactOptional(z.string().describe(params.artifact.channel)),
   }),
   "artifact.version.create": z.object({
@@ -300,6 +354,7 @@ export const sessionParameters = {
     file: z.exactOptional(z.string().describe(params.artifact.file)),
     id: artifactId,
   }),
+  ...artifactStoreToolParameters,
   "channel.message.list": channelRead,
   "channel.message.send": z.object({
     anyway: z.exactOptional(z.boolean().describe(params.channelMessageSend.anyway)),

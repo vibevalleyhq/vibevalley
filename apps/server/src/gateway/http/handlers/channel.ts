@@ -38,6 +38,7 @@ export function channelHandlers(deps: ChannelHandlersDeps): ChannelHandlers {
         ...(body.replyTo !== undefined ? { replyTo: body.replyTo } : {}),
         ...(body.attachments ? { attachments: body.attachments } : {}),
         ...(blocks.length > 0 ? { blocks } : {}),
+        ...(body.viewContext ? { viewContext: body.viewContext } : {}),
         ...(body.to !== undefined ? { to: body.to } : {}),
       });
     },

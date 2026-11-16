@@ -10,6 +10,7 @@ export const serverFiles = [
   "src/modules/agent/templates",
   "src/modules/agent/skills",
   "src/modules/orchestrator/skills",
+  "src/modules/artifact/types",
 ] as const;
 
 export const serverFile = (path: `${(typeof serverFiles)[number]}${string}`) => resolve(serverRoot, path);

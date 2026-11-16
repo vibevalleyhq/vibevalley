@@ -133,6 +133,26 @@ export function attachments(deps: { readonly attachment: Attachment; readonly lo
 // A GET since an <iframe src> can only GET. a version never changes once made, so it is cached for good.
 export function artifactContent(deps: { readonly artifact: Artifact; readonly log: Logger }): Hono {
   const app = new Hono();
+  app.get("/api/v1/artifact/:id/view", async (c) => {
+    try {
+      const url = new URL(c.req.url);
+      const id = c.req.param("id");
+      if (!/^[0-9a-f-]{36}$/u.test(id)) return notFound();
+      const asked = url.searchParams;
+      const rendered = await deps.artifact.renderView(artifactId(id), {
+        theme: asked.get("theme"),
+        path: asked.get("path"),
+        elementId: asked.get("elementId"),
+        print: asked.get("print") === "1",
+        origin: url.origin,
+      });
+      return new Response(rendered.html, { headers: rendered.headers });
+    } catch (e) {
+      if (e instanceof ApiError && (e.kind === "Missing" || e.bizCode === BizCode.ArtifactRefused)) return notFound();
+      deps.log.error("vibevalley: artifact view failed", e);
+      return new Response(messageOf(e) + "\n", { status: 500 });
+    }
+  });
   app.get("/api/v1/artifact/:id/:version", async (c) => {
     try {
       const url = new URL(c.req.url);

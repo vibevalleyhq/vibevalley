@@ -5,13 +5,15 @@ import { z } from "zod"
 
 import type { Sql } from "#/infra/db.ts"
 
-import { rowOf, ArtifactId, MessageId, Words_artifact_body } from "./types.js"
+import { rowOf, ArtifactId, MessageId, Words_artifact_artifact_type, Words_artifact_body, Words_artifact_display } from "./types.js"
 
 export interface AddArtifactParams {
   readonly ["id"]: ArtifactId
   readonly ["title"]: string
   readonly ["body"]: Words_artifact_body
-  readonly ["display"]: string | null
+  readonly ["artifact_type"]: Words_artifact_artifact_type | null
+  readonly ["is_default"]: boolean
+  readonly ["display"]: Words_artifact_display | null
   readonly ["channel_id"]: string | null
   readonly ["issue"]: string | null
   readonly ["by_id"]: string
@@ -20,10 +22,10 @@ export interface AddArtifactParams {
   readonly ["created_at"]: number
 }
 
-export const AddArtifactSql = "-- name: AddArtifact :exec\ninsert into artifact (id, title, body, display, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0,\n        $10, $10);"
+export const AddArtifactSql = "-- name: AddArtifact :exec\ninsert into artifact (id, title, body, artifact_type, is_default, display, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)\nvalues ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0,\n        $12, $12);"
 
 export async function addArtifact(sql: Sql, params: AddArtifactParams): Promise<number> {
-  return sql.exec(AddArtifactSql, [params["id"], params["title"], params["body"], params["display"], params["channel_id"], params["issue"], params["by_id"], params["by_name"], params["version"], params["created_at"]])
+  return sql.exec(AddArtifactSql, [params["id"], params["title"], params["body"], params["artifact_type"], params["is_default"], params["display"], params["channel_id"], params["issue"], params["by_id"], params["by_name"], params["version"], params["created_at"]])
 }
 
 export interface ArtifactParams {
@@ -34,7 +36,9 @@ export const ArtifactResult = z.object({
   ["id"]: ArtifactId,
   ["title"]: z.string(),
   ["body"]: Words_artifact_body,
-  ["display"]: z.string().nullable(),
+  ["artifact_type"]: Words_artifact_artifact_type.nullable(),
+  ["is_default"]: z.boolean(),
+  ["display"]: Words_artifact_display.nullable(),
   ["channel_id"]: z.string().nullable(),
   ["message_id"]: MessageId.nullable(),
   ["issue"]: z.string().nullable(),
@@ -49,11 +53,65 @@ export const ArtifactResult = z.object({
 })
 export type ArtifactResult = z.infer<typeof ArtifactResult>
 
-export const ArtifactSql = "-- name: Artifact :one\n-- With the announcing message's channel and number, where a blocks one's comments are.\nselect a.*, m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id where a.id = $1;"
+export const ArtifactSql = "-- name: Artifact :one\n-- With the announcing message's channel and number, where a blocks or store one's comments are.\nselect a.*, m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id where a.id = $1;"
 
 export async function artifact(sql: Sql, params: ArtifactParams): Promise<ArtifactResult | undefined> {
   const [row] = await sql.query(ArtifactSql, [params["id"]])
   return row === undefined ? undefined : rowOf("Artifact", ArtifactResult, row)
+}
+
+export interface DefaultDesignSystemArtifactParams {
+
+}
+
+export const DefaultDesignSystemArtifactResult = z.object({
+  ["id"]: ArtifactId,
+  ["title"]: z.string(),
+  ["body"]: Words_artifact_body,
+  ["artifact_type"]: Words_artifact_artifact_type.nullable(),
+  ["is_default"]: z.boolean(),
+  ["display"]: Words_artifact_display.nullable(),
+  ["channel_id"]: z.string().nullable(),
+  ["message_id"]: MessageId.nullable(),
+  ["issue"]: z.string().nullable(),
+  ["by_id"]: z.string(),
+  ["by_name"]: z.string(),
+  ["version"]: z.number().int(),
+  ["seq"]: z.number().int(),
+  ["created_at"]: z.number(),
+  ["updated_at"]: z.number(),
+  ["said_channel"]: z.string().nullable(),
+  ["said_number"]: z.number().int().nullable(),
+})
+export type DefaultDesignSystemArtifactResult = z.infer<typeof DefaultDesignSystemArtifactResult>
+
+export const DefaultDesignSystemArtifactSql = "-- name: DefaultDesignSystemArtifact :one\nselect a.*, m.channel_id as said_channel, m.number as said_number\nfrom artifact a left join channel_message m on m.id = a.message_id\nwhere a.artifact_type = 'design-system' and a.is_default = true\nlimit 1;"
+
+export async function defaultDesignSystemArtifact(sql: Sql): Promise<DefaultDesignSystemArtifactResult | undefined> {
+  const [row] = await sql.query(DefaultDesignSystemArtifactSql, [])
+  return row === undefined ? undefined : rowOf("DefaultDesignSystemArtifact", DefaultDesignSystemArtifactResult, row)
+}
+
+export interface ClearDefaultDesignSystemParams {
+  readonly ["updated_at"]: number
+}
+
+export const ClearDefaultDesignSystemSql = "-- name: ClearDefaultDesignSystem :exec\nupdate artifact set is_default = false, updated_at = $1 where is_default = true;"
+
+export async function clearDefaultDesignSystem(sql: Sql, params: ClearDefaultDesignSystemParams): Promise<number> {
+  return sql.exec(ClearDefaultDesignSystemSql, [params["updated_at"]])
+}
+
+export interface SetArtifactDefaultParams {
+  readonly ["is_default"]: boolean
+  readonly ["updated_at"]: number
+  readonly ["id"]: ArtifactId
+}
+
+export const SetArtifactDefaultSql = "-- name: SetArtifactDefault :exec\nupdate artifact set is_default = $1, updated_at = $2 where id = $3;"
+
+export async function setArtifactDefault(sql: Sql, params: SetArtifactDefaultParams): Promise<number> {
+  return sql.exec(SetArtifactDefaultSql, [params["is_default"], params["updated_at"], params["id"]])
 }
 
 export interface ArtifactsInChannelParams {
@@ -64,7 +122,9 @@ export const ArtifactsInChannelResult = z.object({
   ["id"]: ArtifactId,
   ["title"]: z.string(),
   ["body"]: Words_artifact_body,
-  ["display"]: z.string().nullable(),
+  ["artifact_type"]: Words_artifact_artifact_type.nullable(),
+  ["is_default"]: z.boolean(),
+  ["display"]: Words_artifact_display.nullable(),
   ["channel_id"]: z.string().nullable(),
   ["message_id"]: MessageId.nullable(),
   ["issue"]: z.string().nullable(),
@@ -94,7 +154,9 @@ export const ArtifactsForIssueResult = z.object({
   ["id"]: ArtifactId,
   ["title"]: z.string(),
   ["body"]: Words_artifact_body,
-  ["display"]: z.string().nullable(),
+  ["artifact_type"]: Words_artifact_artifact_type.nullable(),
+  ["is_default"]: z.boolean(),
+  ["display"]: Words_artifact_display.nullable(),
   ["channel_id"]: z.string().nullable(),
   ["message_id"]: MessageId.nullable(),
   ["issue"]: z.string().nullable(),
@@ -124,7 +186,9 @@ export const ArtifactsResult = z.object({
   ["id"]: ArtifactId,
   ["title"]: z.string(),
   ["body"]: Words_artifact_body,
-  ["display"]: z.string().nullable(),
+  ["artifact_type"]: Words_artifact_artifact_type.nullable(),
+  ["is_default"]: z.boolean(),
+  ["display"]: Words_artifact_display.nullable(),
   ["channel_id"]: z.string().nullable(),
   ["message_id"]: MessageId.nullable(),
   ["issue"]: z.string().nullable(),
@@ -164,7 +228,7 @@ export interface ArtifactAcceptedParams {
   readonly ["id"]: ArtifactId
 }
 
-export const ArtifactAcceptedSql = "-- name: ArtifactAccepted :exec\n-- A batch of a blocks artifact was taken: its seq is the batch's.\nupdate artifact set seq = $1, updated_at = $2 where id = $3;"
+export const ArtifactAcceptedSql = "-- name: ArtifactAccepted :exec\n-- A batch of a blocks or store artifact was taken: its seq is the batch's.\nupdate artifact set seq = $1, updated_at = $2 where id = $3;"
 
 export async function artifactAccepted(sql: Sql, params: ArtifactAcceptedParams): Promise<number> {
   return sql.exec(ArtifactAcceptedSql, [params["seq"], params["updated_at"], params["id"]])
@@ -194,7 +258,7 @@ export async function artifactRenamed(sql: Sql, params: ArtifactRenamedParams): 
 }
 
 export interface ArtifactShownParams {
-  readonly ["display"]: string | null
+  readonly ["display"]: Words_artifact_display | null
   readonly ["updated_at"]: number
   readonly ["id"]: ArtifactId
 }

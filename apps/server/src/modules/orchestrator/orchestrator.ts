@@ -27,6 +27,7 @@ import type { Pkm } from "#/modules/pkm/pkm.ts";
 import type { Repo } from "#/modules/repo/repo.ts";
 import type { Handed, Picked } from "#/modules/session/envelope.ts";
 import { type AgentHost, SubmitRefused } from "#/modules/session/host.ts";
+import { formatArtifactViewContext } from "#/modules/session/prompts.ts";
 import type { Session } from "#/modules/session/session.ts";
 
 import type { Answer } from "./openai.ts";
@@ -226,11 +227,12 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
     return situationWords.recalled(hits.map(pkmHitLine));
   };
 
-  const pickedNote = (picked: Picked) => {
+  const pickedNote = (picked: Picked, viewContext?: T.ArtifactViewContext) => {
     let note = "";
     const a = picked.agent ? store.agent(picked.agent) : undefined;
     if (a) note += lineWords.pickedAgent(a.name);
     if (picked.repo) note += lineWords.pickedRepo(picked.repo);
+    if (viewContext) note += formatArtifactViewContext(viewContext) + "\n";
     return note;
   };
 
@@ -239,6 +241,7 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
     const fromPerson = n.messages.every((m) => m.from === userId);
     const user = n.messages.some((m) => m.from === userId);
     const picked: Picked = n.messages.findLast((m) => m.picked)?.picked ?? {};
+    const viewContext = n.messages.findLast((m) => m.viewContext)?.viewContext;
     const response = n.messages.findLast((message) => message.responsePort);
     const voice = n.messages.findLast((message) => message.voiceMode);
     const caller = response?.responsePort ? responses.take(response.responsePort) : undefined;
@@ -247,13 +250,13 @@ export async function makeOrchestrator(deps: OrchestratorDeps, options: Orchestr
     const line = n.source
       ? n.messages.map((message) => message.text.replace(new RegExp(`^@${n.agent}\\s*`, "u"), "")).join("\n")
       : voice?.voiceMode === "dictated"
-        ? pickedNote(picked) + lineWords.dictated + lineWords.user(n.messages.map((message) => message.text).join("\n"))
+        ? pickedNote(picked, viewContext) + lineWords.dictated + lineWords.user(n.messages.map((message) => message.text).join("\n"))
         : voice?.voiceMode === "conversation"
           ? voiceNote + "\n" + lineWords.user(n.messages.map((message) => message.text).join("\n"))
           : n.messages.every((message) => message.number === 0)
             ? pickedNote(picked) + lineWords.events(orchestratorEnvelopeLines(n.messages))
             : fromPerson && (n.type === "direct" || n.channel === chat.defaultChannel())
-              ? pickedNote(picked) + lineWords.user(n.messages.map((m) => m.text).join("\n"))
+              ? pickedNote(picked, viewContext) + lineWords.user(n.messages.map((m) => m.text).join("\n"))
               : pickedNote(picked) + lineWords.chat(n.target, orchestratorEnvelopeLines(n.messages));
     const asked = rule.head + line;
     const envelopes = n.messages.map((message) => message.id);

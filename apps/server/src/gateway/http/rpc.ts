@@ -46,6 +46,10 @@ export function subscriptions(deps: SseDeps & { readonly channel: Channel; reado
       const { id, after } = contracts["artifact.follow"].payload.parse(p);
       return artifact.follow(S.artifactId(id), after, signal);
     },
+    "artifact.entry.follow": (p, signal) => {
+      const { id, after } = contracts["artifact.entry.follow"].payload.parse(p);
+      return artifact.followEntries(S.artifactId(id), after, signal);
+    },
     "artifact.suggestion.follow": (p, signal) => artifact.suggestionStream(S.artifactId(contracts["artifact.suggestion.follow"].payload.parse(p).id), signal),
   };
   const isName = (name: string): name is SubscriptionName => Object.hasOwn(contracts, name);

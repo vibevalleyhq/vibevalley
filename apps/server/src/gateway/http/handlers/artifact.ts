@@ -8,9 +8,13 @@ import type { Issue } from "#/modules/issue/issue.ts";
 export function artifactHandlers(deps: { readonly agent: ProfileStore; readonly artifact: Artifact; readonly issue: Issue }): ArtifactHandlers {
   const { agent: agents, artifact: artifacts, issue: issues } = deps;
   return {
-    "artifact.list": async ({ channel, issue }) => {
+    "artifact.list": async ({ channel, issue, artifactType }) => {
       const id = issue ? await issues.idOf(issue) : undefined;
-      return artifacts.list({ ...(channel ? { channel } : {}), ...(id ? { issue: id } : {}) });
+      return artifacts.list({
+        ...(channel ? { channel } : {}),
+        ...(id ? { issue: id } : {}),
+        ...(artifactType ? { artifactType } : {}),
+      });
     },
     "artifact.get": ({ id }) => artifacts.get(id),
     "artifact.content.get": async ({ id, version }) => {
@@ -26,6 +30,11 @@ export function artifactHandlers(deps: { readonly agent: ProfileStore; readonly 
     "artifact.update": (req) => artifacts.update(req),
     "artifact.delete": ({ id }) => artifacts.remove(id),
     "artifact.previewDelete": ({ id }) => artifacts.previewRemove(id),
+    "artifact.type.list": () => artifacts.listTypes(),
+    "artifact.type.read": (req) => artifacts.readType(req),
+    "artifact.entry.list": (req) => artifacts.listEntries(req),
+    "artifact.entry.get": (req) => artifacts.getEntry(req),
+    "artifact.entry.batch": (req) => artifacts.batchEntries({ from: userId, by: userId }, req),
     "artifact.block.list": ({ id }) => artifacts.blocks(id),
     "artifact.submit": ({ id, ...body }) => artifacts.submit(id, userId, body),
     "artifact.block.create": ({ id, ...body }) => artifacts.insertBlock(id, userId, body),

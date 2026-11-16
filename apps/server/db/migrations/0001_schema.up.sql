@@ -563,29 +563,34 @@ CREATE INDEX agent_todo_by_keeper on agent_todo (keeper, finished_at);
 -- Artifacts (artifact/artifact.ts). A blocks one's blocks are a flat list, nested by parent_id and ordered by
 -- (order_key, id); every change is an op, and a batch of ops is one artifact_change with the artifact's next seq.
 CREATE TABLE artifact (
-  id          text primary key,
-  title       text not null,
-  -- blocks: written together, block by block (artifact_block); html: a whole page, version by version (artifact_version).
-  body        text not null check (body in ('blocks', 'html')),
-  -- html: how the workbench shows it (page, slides, motion); blocks: none.
-  display     text check ((body = 'html') = (display is not null) and (display is null or display in ('page', 'slides', 'motion'))),
+  id            text primary key,
+  title         text not null,
+  -- blocks: written together, block by block (artifact_block); html: a whole page, version by version (artifact_version); store: named entries (artifact_entry).
+  body          text not null check (body in ('blocks', 'html', 'store')),
+  artifact_type text check (artifact_type in ('docs', 'slides', 'dashboard', 'motion', 'whiteboard', 'design', 'design-system')),
+  is_default    boolean not null default false,
+  -- html: how the workbench shows it (page, slides, motion); blocks and store: none.
+  display       text check (display in ('page', 'slides', 'motion')),
   -- The channel or thread it was announced in, none for one the user started on the page; the issue it was made for, if any.
-  channel_id  text references channel (id),
-  -- The message that first announced it: a blocks one's comments are the replies to it (an html one's are each version's).
-  message_id  text references channel_message (id) on delete set null,
-  issue       text,
+  channel_id    text references channel (id),
+  -- The message that first announced it: a blocks or store one's comments are the replies to it (an html one's are each version's).
+  message_id    text references channel_message (id) on delete set null,
+  issue         text,
   -- Its maker, a profile's id or the user's, and the name it went by then.
-  by_id       text not null,
-  by_name     text not null,
-  -- html: the latest version; blocks: 0.
-  version     integer not null,
-  -- blocks: the batches taken (artifact_change); html: 0.
-  seq         integer not null default 0,
-  created_at  double precision not null,
-  updated_at  double precision not null
+  by_id         text not null,
+  by_name       text not null,
+  -- html: the latest version; blocks and store: 0.
+  version       integer not null,
+  -- blocks and store: the batches taken (artifact_change / artifact_entry_change); html: 0.
+  seq           integer not null default 0,
+  created_at    double precision not null,
+  updated_at    double precision not null,
+  check ((body = 'html') = (display is not null)),
+  check (not is_default or artifact_type = 'design-system')
 );
 CREATE INDEX artifact_by_channel on artifact (channel_id, updated_at);
 CREATE INDEX artifact_by_issue on artifact (issue, updated_at);
+CREATE UNIQUE INDEX artifact_default_design_system on artifact (artifact_type) where is_default;
 CREATE TABLE artifact_version (
   artifact_id text not null references artifact (id) on delete cascade,
   version     integer not null,
@@ -655,6 +660,32 @@ CREATE TABLE artifact_suggestion (
 CREATE INDEX artifact_suggestion_by_artifact on artifact_suggestion (artifact_id, created_at);
 CREATE INDEX artifact_suggestion_open on artifact_suggestion (artifact_id, status);
 CREATE INDEX artifact_suggestion_by_block on artifact_suggestion (block_id);
+
+CREATE TABLE artifact_entry (
+  artifact_id   text not null references artifact (id) on delete cascade,
+  path          text not null,
+  kind          text not null check (kind in ('text', 'json', 'asset')),
+  mime          text not null,
+  value         text,
+  attachment_id text references attachment (id),
+  size          integer not null,
+  rev           integer not null,
+  updated_by    text not null,
+  updated_at    double precision not null,
+  check ((kind = 'asset') = (attachment_id is not null)),
+  primary key (artifact_id, path)
+);
+CREATE INDEX artifact_entry_by_attachment on artifact_entry (attachment_id) where attachment_id is not null;
+
+CREATE TABLE artifact_entry_change (
+  artifact_id text not null references artifact (id) on delete cascade,
+  seq         integer not null,
+  actor       text not null,
+  paths       text not null,
+  deleted     text not null,
+  created_at  double precision not null,
+  primary key (artifact_id, seq)
+);
 
 CREATE INDEX channel_by_parent on channel (parent_id) where parent_id is not null;
 CREATE INDEX channel_event_by_message on channel_event (message_id);

@@ -81,6 +81,7 @@ export function toMessage(row: MsgRow): T.ChatMessage {
     embeds: meta.embeds ?? [],
     ...(meta.artifact && row.deleted_at === null ? { artifact: meta.artifact } : {}),
     ...(meta.blocks && meta.blocks.length > 0 && row.deleted_at === null ? { blocks: meta.blocks } : {}),
+    ...(meta.viewContext && row.deleted_at === null ? { viewContext: meta.viewContext } : {}),
   };
 }
 
@@ -107,6 +108,7 @@ export interface AddressedMessage {
   readonly attachments?: readonly { readonly name: string; readonly path: string }[];
   readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
   readonly blocks?: readonly QuotedBlock[];
+  readonly viewContext?: T.ArtifactViewContext;
   readonly picked?: Picked;
   readonly responsePort?: string;
   readonly voiceMode?: NonNullable<Meta["voiceMode"]>;
@@ -153,6 +155,7 @@ export interface Saying {
   readonly attachments?: readonly string[];
   readonly picked?: Picked;
   readonly blocks?: readonly QuotedBlock[];
+  readonly viewContext?: T.ArtifactViewContext;
   /** Delivers only to this orchestrator instead of channel members. */
   readonly to?: string;
 }

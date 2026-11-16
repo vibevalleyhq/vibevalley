@@ -80,6 +80,8 @@ const make = async (config: ServerConfig = testConfig()) => {
       title: title.trim() || t("server.artifact.untitled"),
       display: null,
       body: "blocks",
+      artifact_type: "docs",
+      is_default: false,
       channel_id: null,
       issue: null,
       by_id: "user",

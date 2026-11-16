@@ -1,6 +1,18 @@
 import { z } from "zod";
 
-import { Actor, ChannelType, CriterionCheck, IssueAnswer, IssueId, MessageId, Question, QuotedBlock, RunTrigger, type Wire } from "@vibevalley/protocol/schema";
+import {
+  Actor,
+  ArtifactViewContext,
+  ChannelType,
+  CriterionCheck,
+  IssueAnswer,
+  IssueId,
+  MessageId,
+  Question,
+  QuotedBlock,
+  RunTrigger,
+  type Wire,
+} from "@vibevalley/protocol/schema";
 
 import type * as T from "./shapes.ts";
 import {
@@ -71,6 +83,7 @@ export const TriggerContext = z.object({
   attachments: z.exactOptional(z.array(z.object({ name: z.string(), path: z.string() }))),
   artifact: z.exactOptional(z.object({ id: z.string(), title: z.string(), version: z.number().int() })),
   blocks: z.exactOptional(z.array(QuotedBlock)),
+  viewContext: z.exactOptional(ArtifactViewContext),
   picked: z.exactOptional(Picked),
   responsePort: z.exactOptional(z.string()),
   voiceMode: z.exactOptional(z.enum(VoiceModeValues)),

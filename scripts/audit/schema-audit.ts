@@ -18,6 +18,7 @@ const SessionCloseValues = serverLiterals("packages/protocol/src/session/shapes.
 const SessionScopeKindValues = serverLiterals("packages/protocol/src/session/shapes.ts", "SessionScopeKindValues");
 const MediaPhaseValues = serverLiterals("packages/protocol/src/media/shapes.ts", "MediaPhaseValues");
 const MediaUnderstandingPhaseValues = serverLiterals("packages/protocol/src/media/shapes.ts", "MediaUnderstandingPhaseValues");
+const ArtifactEntryKindValues = serverLiterals("packages/protocol/src/artifact/shapes.ts", "ArtifactEntryKindValues");
 const sqlPath = "apps/server/db/migrations/0001_schema.up.sql";
 const boundaryDocs = "docs/subsystems/foundation.md#边界审计";
 
@@ -219,6 +220,9 @@ const storedEnums: readonly StoredEnum[] = [
   { column: "memory.author", protocol: "ActorKindValues", values: T.ActorKindValues },
   { column: "connector_account.connector", protocol: "ConnectorIDValues", values: T.ConnectorIDValues },
   { column: "artifact.body", protocol: "ArtifactBodyValues", values: T.ArtifactBodyValues },
+  { column: "artifact.artifact_type", protocol: "ArtifactTypeValues", values: T.ArtifactTypeValues },
+  { column: "artifact.display", protocol: "ArtifactDisplayValues", values: T.ArtifactDisplayValues },
+  { column: "artifact_entry.kind", protocol: "ArtifactEntryKindValues", values: ArtifactEntryKindValues },
   { column: "artifact_block.type", protocol: "BlockTypeValues", values: T.BlockTypeValues },
   { column: "artifact_suggestion.status", protocol: "SuggestionStatusValues", values: T.SuggestionStatusValues },
   { column: "pkm_comment.status", protocol: "PkmCommentStatusValues", values: T.PkmCommentStatusValues },

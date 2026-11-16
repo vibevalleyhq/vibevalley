@@ -37,14 +37,23 @@ export type Words_agent_todo_executor = z.infer<typeof Words_agent_todo_executor
 export const Words_agent_todo_state = z.enum(["waiting","working","done","failed","skipped"])
 export type Words_agent_todo_state = z.infer<typeof Words_agent_todo_state>
 
+export const Words_artifact_artifact_type = z.enum(["docs","slides","dashboard","motion","whiteboard","design","design-system"])
+export type Words_artifact_artifact_type = z.infer<typeof Words_artifact_artifact_type>
+
 export const Words_artifact_block_revision_kind = z.enum(["normal","conflict"])
 export type Words_artifact_block_revision_kind = z.infer<typeof Words_artifact_block_revision_kind>
 
 export const Words_artifact_block_type = z.enum(["paragraph","heading","bulleted","numbered","todo","quote","code","divider","image","issue_ref","memory_item"])
 export type Words_artifact_block_type = z.infer<typeof Words_artifact_block_type>
 
-export const Words_artifact_body = z.enum(["blocks","html"])
+export const Words_artifact_body = z.enum(["blocks","html","store"])
 export type Words_artifact_body = z.infer<typeof Words_artifact_body>
+
+export const Words_artifact_display = z.enum(["page","slides","motion"])
+export type Words_artifact_display = z.infer<typeof Words_artifact_display>
+
+export const Words_artifact_entry_kind = z.enum(["text","json","asset"])
+export type Words_artifact_entry_kind = z.infer<typeof Words_artifact_entry_kind>
 
 export const Words_artifact_suggestion_status = z.enum(["open","accepted","rejected"])
 export type Words_artifact_suggestion_status = z.infer<typeof Words_artifact_suggestion_status>

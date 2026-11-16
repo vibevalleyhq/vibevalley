@@ -1,3 +1,4 @@
+import type * as T from "@vibevalley/protocol";
 import { actorRoleOf } from "@vibevalley/protocol/rules";
 
 import { usersLanguage } from "#/base/prompts.ts";
@@ -81,6 +82,12 @@ export const hostWords = {
   memoryNews: (lines: string) => "【记性有更新】\n" + lines,
 };
 
+/** Formats untrusted client view state inside a fenced XML block so titles or summaries cannot break out. */
+export function formatArtifactViewContext(vc: T.ArtifactViewContext): string {
+  const safeJson = JSON.stringify(vc).replaceAll("</", "<\\/");
+  return `<artifact-view-context>\n${safeJson}\n</artifact-view-context>`;
+}
+
 /** Line breaks are marked, so no message can pass for a header. */
 export function messageLine(m: Envelope): string {
   const from = actorRoleOf(m.actor) === "worker" ? m.from + " " + m.name : m.name;
@@ -97,7 +104,8 @@ export function messageLine(m: Envelope): string {
       return `\n  │ [指着 Artifact「${b.title}」的块：artifact=${b.artifactId} block=${b.blockId} 引用时第 ${b.rev} 版，${now}]${b.text ? "\n  │ " + b.text.replaceAll("\n", "\n  │ ") : ""}`;
     })
     .join("");
-  return `${head}${m.edited === true ? "（改过）" : ""} ${m.text.trim().replaceAll("\n", "\n  │ ")}${files}${made}${quoted}`;
+  const view = m.viewContext ? `\n  │ ${formatArtifactViewContext(m.viewContext).replaceAll("\n", "\n  │ ")}` : "";
+  return `${head}${m.edited === true ? "（改过）" : ""} ${m.text.trim().replaceAll("\n", "\n  │ ")}${files}${made}${quoted}${view}`;
 }
 
 export const envelopeLines = (messages: readonly Envelope[]) => messages.map(messageLine).join("\n");

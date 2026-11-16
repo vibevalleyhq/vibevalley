@@ -67,7 +67,7 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
     }
   };
 
-  const listedText = async (where: { readonly channel?: string; readonly issue?: string }) => {
+  const listedText = async (where: T.ArtifactListRequest) => {
     const all = await artifacts.list(where);
     return all.length === 0 ? answers.artifact.none : all.map(answers.artifact.line).join("\n");
   };
@@ -89,7 +89,12 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
       answered(async () => {
         callerOf(who);
         const issueId = p.issue ? (await findIssue(p.issue)).id : undefined;
-        const listed = (channel?: string) => listedText({ ...(issueId ? { issue: issueId } : {}), ...(channel ? { channel } : {}) });
+        const listed = (channel?: string) =>
+          listedText({
+            ...(issueId ? { issue: issueId } : {}),
+            ...(channel ? { channel } : {}),
+            ...(p.artifactType ? { artifactType: p.artifactType } : {}),
+          });
         if (!p.channel) return listed();
         return placed("", p.channel, listed);
       }),
@@ -98,8 +103,9 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
   const sessionArtifactList = (who: Who) =>
     sessionSchemaTool("artifact.list", async (p: SessionInput<"artifact.list">) => {
       const c = callerOf(who);
-      if (!p.channel) return listedText(sessionArtifactScope(c.session));
-      return placed(c.session, p.channel, (channel) => listedText({ channel }));
+      const typeFilter = p.artifactType ? { artifactType: p.artifactType } : {};
+      if (!p.channel) return listedText({ ...sessionArtifactScope(c.session), ...typeFilter });
+      return placed(c.session, p.channel, (channel) => listedText({ channel, ...typeFilter }));
     });
 
   const artifactGet = (table: "orchestrator" | "session") => (who: Who) =>
@@ -122,19 +128,50 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
       });
     });
 
+  const isStoreCreate = (p: {
+    readonly artifactType?: T.ArtifactType | undefined;
+    readonly kind?: "html" | "markdown" | "store" | undefined;
+    readonly entries?: readonly T.ArtifactEntryWriteInput[] | undefined;
+    readonly content?: string | undefined;
+    readonly file?: string | undefined;
+  }) =>
+    (p.artifactType !== undefined && p.artifactType !== "docs") ||
+    p.kind === "store" ||
+    (p.entries !== undefined && p.content === undefined && p.file === undefined);
+
   const artifactCreate = (who: Who) =>
     tool("artifact.create", (p: Orchestrator<"artifact.create">) =>
       answered(async () => {
         const c = callerOf(who);
         const issueId = p.issue ? (await findIssue(p.issue)).id : undefined;
         return refusalAnswered(async () => {
+          if (isStoreCreate(p) || (p.artifactType === "docs" && p.content === undefined)) {
+            const made = await artifacts.create(
+              { from: c.agent, by: c.agent, ...runOf(c.agent) },
+              {
+                title: p.title,
+                ...(p.kind !== undefined ? { kind: p.kind } : {}),
+                ...(p.artifactType !== undefined ? { artifactType: p.artifactType } : {}),
+                ...(p.display !== undefined ? { display: p.display } : {}),
+                ...(p.entries !== undefined ? { entries: p.entries } : {}),
+                ...(p.isDefault !== undefined ? { isDefault: p.isDefault } : {}),
+                ...(p.announce !== undefined ? { announce: p.announce } : {}),
+                ...(p.note ? { note: p.note } : {}),
+                channel: p.channel ?? c.here,
+                ...(issueId ? { issue: issueId } : {}),
+              },
+            );
+            return answers.artifact.made(made);
+          }
           const content = await artifactWords(c, p.content, undefined);
           const made = await artifacts.create(
             { from: c.agent, by: c.agent, ...runOf(c.agent) },
             {
               title: p.title,
-              kind: p.kind,
+              kind: p.kind ?? "markdown",
+              ...(p.artifactType !== undefined ? { artifactType: p.artifactType } : {}),
               ...(p.display !== undefined ? { display: p.display } : {}),
+              ...(p.isDefault !== undefined ? { isDefault: p.isDefault } : {}),
               content,
               ...(p.note ? { note: p.note } : {}),
               channel: p.channel ?? c.here,
@@ -150,13 +187,33 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
     sessionSchemaTool("artifact.create", (p: SessionInput<"artifact.create">) => {
       const c = callerOf(who);
       return refusalAnswered(async () => {
+        if (isStoreCreate(p) || (p.artifactType === "docs" && p.content === undefined && (p.file === undefined || p.file.trim() === ""))) {
+          if (p.content !== undefined && p.file !== undefined) throw refused(answers.artifact.both);
+          const made = await artifacts.create(
+            { from: c.session, by: c.agent, ...runOf(c.session) },
+            {
+              title: p.title,
+              ...(p.kind !== undefined ? { kind: p.kind } : {}),
+              ...(p.artifactType !== undefined ? { artifactType: p.artifactType } : {}),
+              ...(p.display !== undefined ? { display: p.display } : {}),
+              ...(p.entries !== undefined ? { entries: p.entries } : {}),
+              ...(p.isDefault !== undefined ? { isDefault: p.isDefault } : {}),
+              ...(p.announce !== undefined ? { announce: p.announce } : {}),
+              ...(p.note ? { note: p.note } : {}),
+              ...sessionArtifactScope(c.session),
+            },
+          );
+          return answers.artifact.made(made);
+        }
         const content = await artifactWords(c, p.content, p.file);
         const made = await artifacts.create(
           { from: c.session, by: c.agent, ...runOf(c.session) },
           {
             title: p.title,
-            kind: p.kind,
+            kind: p.kind ?? "markdown",
+            ...(p.artifactType !== undefined ? { artifactType: p.artifactType } : {}),
             ...(p.display !== undefined ? { display: p.display } : {}),
+            ...(p.isDefault !== undefined ? { isDefault: p.isDefault } : {}),
             content,
             ...(p.note ? { note: p.note } : {}),
             ...sessionArtifactScope(c.session),
@@ -260,6 +317,50 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
   const blockDelete = (who: Who) => sessionSchemaTool("artifact.block.delete", (p: SessionInput<"artifact.block.delete">) => remove(callerOf(who), p));
   const orchestratorBlockDelete = (who: Who) => tool("artifact.block.delete", (p: Orchestrator<"artifact.block.delete">) => remove(callerOf(who), p));
 
+  const artifactTypeList = (table: "orchestrator" | "session") => (who: Who) =>
+    (table === "orchestrator" ? tool : sessionSchemaTool)("artifact.type.list", () => {
+      callerOf(who);
+      return refusalAnswered(async () => answers.artifact.types(await artifacts.listTypes()));
+    });
+
+  const artifactTypeRead = (table: "orchestrator" | "session") => (who: Who) =>
+    (table === "orchestrator" ? tool : sessionSchemaTool)("artifact.type.read", (p: { readonly type: T.ArtifactType; readonly reference?: string }) => {
+      callerOf(who);
+      return refusalAnswered(async () =>
+        answers.artifact.typeGuide(await artifacts.readType({ type: p.type, ...(p.reference ? { reference: p.reference } : {}) })),
+      );
+    });
+
+  const artifactEntryList = (table: "orchestrator" | "session") => (who: Who) =>
+    (table === "orchestrator" ? tool : sessionSchemaTool)(
+      "artifact.entry.list",
+      (p: { readonly id: T.ArtifactId; readonly prefix?: string; readonly includeValues?: boolean }) => {
+        callerOf(who);
+        return refusalAnswered(async () =>
+          answers.artifact.entryList(
+            await artifacts.listEntries({
+              id: p.id,
+              ...(p.prefix !== undefined ? { prefix: p.prefix } : {}),
+              ...(p.includeValues !== undefined ? { includeValues: p.includeValues } : {}),
+            }),
+          ),
+        );
+      },
+    );
+
+  const artifactEntryGet = (table: "orchestrator" | "session") => (who: Who) =>
+    (table === "orchestrator" ? tool : sessionSchemaTool)("artifact.entry.get", (p: { readonly id: T.ArtifactId; readonly path: string }) => {
+      callerOf(who);
+      return refusalAnswered(async () => answers.artifact.entryDetail(await artifacts.getEntry({ id: p.id, path: p.path })));
+    });
+
+  const artifactEntryBatch = (table: "orchestrator" | "session") => (who: Who) =>
+    (table === "orchestrator" ? tool : sessionSchemaTool)("artifact.entry.batch", (p: T.ArtifactEntryBatchRequest) => {
+      const c = callerOf(who);
+      const from = c.session || c.agent;
+      return refusalAnswered(async () => answers.artifact.entryBatch(await artifacts.batchEntries({ from, by: c.agent, ...runOf(from) }, p)));
+    });
+
   return {
     artifactList,
     sessionArtifactList,
@@ -274,5 +375,10 @@ export function artifactTools(deps: Pick<ToolDeps, "session" | "channel" | "arti
     orchestratorBlockUpdate,
     blockDelete,
     orchestratorBlockDelete,
+    artifactTypeList,
+    artifactTypeRead,
+    artifactEntryList,
+    artifactEntryGet,
+    artifactEntryBatch,
   };
 }

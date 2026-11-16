@@ -1,8 +1,8 @@
 import { artifactProblem, htmlCheck, htmlEdit, htmlProblem } from "@vibevalley/artifact/html";
 import { Semaphore } from "@vibevalley/async";
-import { t } from "@vibevalley/i18n";
+import { list, t } from "@vibevalley/i18n";
+import { ArtifactTypeValues, userId } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
-import { userId } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -18,6 +18,8 @@ import * as qa from "#db/artifact.sql.ts";
 import * as qv from "#db/artifact_version.sql.ts";
 
 import { makeBlockStore } from "./blocks.ts";
+import { makeEntryStore, type StoreViewInput, type StoreViewResult } from "./entries.ts";
+import { makeTypeRegistry } from "./types.ts";
 
 const refused = refuseIn(BizCode.ArtifactRefused);
 const ArtifactDisplayValues = S.Artifact.shape.display.unwrap().options;
@@ -33,20 +35,28 @@ interface Maker {
 export interface Artifact {
   readonly list: (q: T.ArtifactListRequest) => Promise<T.Artifact[]>;
   readonly get: (id: T.ArtifactId) => Promise<T.Artifact>;
-  /** An html one's version as made; a blocks one's Markdown now, its version its seq. */
+  /** An html one's version as made; a blocks one's Markdown now; a store one's manifest summary. */
   readonly content: (id: T.ArtifactId, version?: number) => Promise<T.ArtifactContent & { readonly body: T.ArtifactBody }>;
   /** An html version's file on disk, for the route that serves it; undefined when there is none. */
   readonly file: (id: T.ArtifactId, version: number) => Promise<string | undefined>;
-  /** Without content, an empty blocks one, not announced. With content, a hand-in: html kept whole, Markdown read into blocks, announced with its card. */
+  /** Renders a store artifact's sandboxed HTML viewer document and CSP headers. */
+  readonly renderView: (id: T.ArtifactId, input: StoreViewInput) => Promise<StoreViewResult>;
+  readonly listTypes: () => Promise<T.ArtifactTypeInfo[]>;
+  readonly readType: (req: T.ArtifactTypeReadRequest) => Promise<T.ArtifactTypeGuide>;
+  readonly listEntries: (req: T.ArtifactEntryListRequest) => Promise<T.ArtifactEntrySnapshot>;
+  readonly getEntry: (req: T.ArtifactEntryGetRequest) => Promise<T.ArtifactEntry>;
+  readonly batchEntries: (maker: Maker, req: T.ArtifactEntryBatchRequest) => Promise<T.ArtifactEntryBatchResult>;
+  readonly followEntries: (id: T.ArtifactId, after: number, signal?: AbortSignal) => AsyncIterable<T.ArtifactEntryEvent>;
+  /** Without content, an empty blocks or store one. With content or entries, a hand-in, announced when appropriate. */
   readonly create: (maker: Maker, req: T.ArtifactRequest) => Promise<T.Artifact>;
-  /** An html one's next version; a blocks one is refused, it is changed block by block. */
+  /** An html one's next version; a blocks or store one is refused. */
   readonly version: (maker: Maker, req: T.ArtifactVersionRequest) => Promise<T.Artifact>;
   /** The user's words in place of some in an html one's latest version (edit.ts), kept as its next version. */
   readonly htmlEdit: (maker: Maker, req: T.ArtifactHtmlEdit) => Promise<T.Artifact>;
-  /** Its title, or how an html one is shown. */
+  /** Its title, how an html one is shown, or whether a design-system is the farm's default. */
   readonly update: (req: T.ArtifactUpdateRequest) => Promise<T.Artifact>;
   readonly previewRemove: (id: T.ArtifactId) => Promise<T.Preview>;
-  /** It and its versions or blocks go; the versions' attachments stay. */
+  /** It and its versions, blocks or entries go; the versions' attachments stay. */
   readonly remove: (id: T.ArtifactId) => Promise<void>;
   readonly blocks: (id: T.ArtifactId) => Promise<T.BlockSnapshot>;
   /** Snapshots the blocks quoted by the user so later edits or deletions remain visible on the message. */
@@ -102,6 +112,8 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       id: row.id,
       title: row.title,
       body: row.body,
+      ...(row.artifact_type !== null && isOneOf(ArtifactTypeValues, row.artifact_type) ? { artifactType: row.artifact_type } : {}),
+      isDefault: row.is_default,
       ...(row.display !== null && isOneOf(ArtifactDisplayValues, row.display) ? { display: row.display } : {}),
       ...(row.channel_id !== null ? { channel: row.channel_id } : {}),
       ...(row.said_channel !== null && row.said_number !== null ? { said: { channel: row.said_channel, number: row.said_number } } : {}),
@@ -138,20 +150,24 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
   };
 
   const blocks = await makeBlockStore({ db, clock, log }, foundBlocks);
+  const entries = await makeEntryStore({ db, clock, log, attachment: kept, channel: chat, found, assemble });
+  const types = makeTypeRegistry({ db });
 
   const words = (base: string, note: string | undefined) => (note ? t("server.artifact.withNote", { said: base, note }) : base);
 
   /** An empty blocks one the user starts on the page: nowhere to announce, nothing to read in. */
-  const start = async (maker: Maker, title: string) => {
+  const startBlocks = async (maker: Maker, title: string, artifactType: T.ArtifactType | undefined, channel: string | null, issue: string | null) => {
     const id = S.artifactId(newId());
     const name = maker.by === userId ? t("server.channel.name.user") : maker.by;
     await qa.addArtifact(db.sql, {
       id,
       title,
       body: "blocks",
+      artifact_type: artifactType ?? null,
+      is_default: false,
       display: null,
-      channel_id: null,
-      issue: null,
+      channel_id: channel,
+      issue,
       by_id: maker.by,
       by_name: name,
       version: 0,
@@ -160,13 +176,99 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
     return assemble(await found(id));
   };
 
+  const createStore = async (maker: Maker, req: T.ArtifactRequest, title: string, artifactType: T.ArtifactType | undefined) => {
+    const problem = artifactProblem({ title: req.title.trim() ? req.title : title });
+    if (problem) throw refused(problem);
+    if (req.display !== undefined) throw refused(t("server.artifact.displayHtmlOnly"));
+    const isDefault = req.isDefault === true;
+    if (isDefault && artifactType !== "design-system") throw refused(t("server.artifact.defaultDesignSystemOnly"));
+
+    const hasEntries = (req.entries?.length ?? 0) > 0;
+    const shouldAnnounce = req.announce ?? ((maker.by !== userId && hasEntries) || req.channel !== undefined);
+    const resolvedChannel = shouldAnnounce || req.channel !== undefined || maker.by !== userId ? await chat.placeOf(maker.from, req.channel ?? "") : null;
+
+    const id = S.artifactId(newId());
+    const now = clock.now();
+    const initialName = maker.by === userId ? t("server.channel.name.user") : maker.by;
+
+    await db.tx(async () => {
+      if (isDefault) await qa.clearDefaultDesignSystem(db.sql, { updated_at: now });
+      await qa.addArtifact(db.sql, {
+        id,
+        title,
+        body: "store",
+        artifact_type: artifactType ?? null,
+        is_default: isDefault,
+        display: null,
+        channel_id: resolvedChannel,
+        issue: req.issue ?? null,
+        by_id: maker.by,
+        by_name: initialName,
+        version: 0,
+        created_at: now,
+      });
+    });
+
+    let seq = 0;
+    if (req.entries && req.entries.length > 0) {
+      const seeded = await entries.batch(
+        { from: maker.from, by: maker.by, ...(maker.run ? { run: maker.run } : {}) },
+        { id, writes: req.entries, announce: false },
+      );
+      seq = seeded.seq;
+    }
+
+    if (shouldAnnounce && resolvedChannel !== null) {
+      const note = req.note?.trim() || undefined;
+      const card: T.ArtifactCard = {
+        id,
+        title,
+        body: "store",
+        version: seq,
+        note: note ?? "",
+        ...(artifactType !== undefined ? { artifactType } : {}),
+      };
+      const { message: said } = await chat.post({
+        from: maker.from,
+        channel: resolvedChannel,
+        text: words(t("server.artifact.made", { title }), note),
+        made: { card },
+        ...(maker.run ? { run: maker.run } : {}),
+      });
+      await qa.artifactSaid(db.sql, { id, message_id: said.id });
+    }
+
+    return assemble(await found(id));
+  };
+
   const create = async (maker: Maker, req: T.ArtifactRequest) => {
     const title = req.title.trim() || t("server.artifact.untitled");
+    if (req.artifactType !== undefined && !isOneOf(ArtifactTypeValues, req.artifactType)) {
+      throw refused(t("server.artifact.badType", { type: String(req.artifactType), types: list(ArtifactTypeValues) }));
+    }
+    if (req.isDefault === true && req.artifactType !== "design-system") {
+      throw refused(t("server.artifact.defaultDesignSystemOnly"));
+    }
+
+    const wantsStore =
+      (req.artifactType !== undefined && req.artifactType !== "docs") ||
+      req.kind === "store" ||
+      (req.entries !== undefined && req.content === undefined && req.kind !== "html" && req.kind !== "markdown");
+
+    if (wantsStore) {
+      const storeType = req.artifactType && req.artifactType !== "docs" ? req.artifactType : undefined;
+      return createStore(maker, req, title, storeType);
+    }
+
+    const docsType: T.ArtifactType | undefined = req.artifactType === "docs" ? "docs" : undefined;
     if (req.content === undefined) {
       const problem = artifactProblem({ title });
       if (problem) throw refused(problem);
-      return start(maker, title);
+      if (req.display !== undefined) throw refused(t("server.artifact.displayHtmlOnly"));
+      const channel = req.channel !== undefined ? await chat.placeOf(maker.from, req.channel) : null;
+      return startBlocks(maker, title, docsType, channel, req.issue ?? null);
     }
+
     const kind = req.kind ?? "markdown";
     const bytes = Buffer.from(req.content, "utf8");
     const problem = artifactProblem({ title: req.title, kind, size: bytes.length }) || (kind === "html" ? htmlProblem(htmlCheck(req.content)) : "");
@@ -174,12 +276,21 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
     const body: T.ArtifactBody = kind === "html" ? "html" : "blocks";
     if (body === "blocks" && req.display !== undefined) throw refused(t("server.artifact.displayHtmlOnly"));
     const display = body === "html" ? (req.display ?? "page") : null;
+    const artifactType = body === "blocks" ? docsType : undefined;
     const channel = await chat.placeOf(maker.from, req.channel ?? "");
     const file = body === "html" ? await keep(bytes, title) : "";
     const id = S.artifactId(newId());
     const note = req.note?.trim() || undefined;
     const version = body === "html" ? 1 : 0;
-    const card: T.ArtifactCard = { id, title, body, version, note: note ?? "", ...(display === null ? {} : { display }) };
+    const card: T.ArtifactCard = {
+      id,
+      title,
+      body,
+      version,
+      note: note ?? "",
+      ...(display === null ? {} : { display }),
+      ...(artifactType !== undefined ? { artifactType } : {}),
+    };
     // Said first: the name it goes by is the one the channel knows its maker by.
     const { message: said } = await chat.post({
       from: maker.from,
@@ -193,6 +304,8 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       id,
       title,
       body,
+      artifact_type: artifactType ?? null,
+      is_default: false,
       display,
       channel_id: said.channel,
       issue: req.issue ?? null,
@@ -282,13 +395,18 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
           : await qa.artifacts(db.sql, { limit_n: listedMax });
       const out: T.Artifact[] = [];
       // Both given: the issue's, in that channel.
-      for (const r of rows) if (!q.channel || r.channel_id === q.channel) out.push(await assemble(r));
+      for (const r of rows) {
+        if (q.channel && r.channel_id !== q.channel) continue;
+        if (q.artifactType && r.artifact_type !== q.artifactType) continue;
+        out.push(await assemble(r));
+      }
       return out;
     },
     get: async (id) => assemble(await found(id)),
     content: async (id, version) => {
       const row = await found(id);
       if (row.body === "blocks") return { version: row.seq, content: await blocks.markdown(id), body: "blocks" as const };
+      if (row.body === "store") return { version: row.seq, content: await entries.summary(row), body: "store" as const };
       const { v } = await versionOf(id, version);
       return { version: v.version, content: await pageOf(row, v), body: "html" as const };
     },
@@ -297,6 +415,13 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       const v = row?.body === "html" ? await qv.artifactVersion(db.sql, { artifact_id: id, version }) : undefined;
       return v ? kept.pathOf(v.attachment_id) : undefined;
     },
+    renderView: entries.renderView,
+    listTypes: types.listTypes,
+    readType: types.readType,
+    listEntries: entries.list,
+    getEntry: entries.get,
+    batchEntries: entries.batch,
+    followEntries: entries.follow,
     create: locked(create),
     version: locked(version),
     htmlEdit: locked(async (maker: Maker, req: T.ArtifactHtmlEdit) => {
@@ -317,9 +442,18 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
         if (problem) throw refused(problem);
       }
       if (req.display !== undefined && row.body !== "html") throw refused(t("server.artifact.displayHtmlOnly"));
+      if (req.isDefault === true && row.artifact_type !== "design-system") {
+        throw refused(t("server.artifact.defaultDesignSystemOnly"));
+      }
       const now = clock.now();
-      if (req.title !== undefined) await qa.artifactRenamed(db.sql, { id: req.id, title: req.title.trim(), updated_at: now });
-      if (req.display !== undefined) await qa.artifactShown(db.sql, { id: req.id, display: req.display, updated_at: now });
+      await db.tx(async () => {
+        if (req.title !== undefined) await qa.artifactRenamed(db.sql, { id: req.id, title: req.title.trim(), updated_at: now });
+        if (req.display !== undefined) await qa.artifactShown(db.sql, { id: req.id, display: req.display, updated_at: now });
+        if (req.isDefault !== undefined) {
+          if (req.isDefault) await qa.clearDefaultDesignSystem(db.sql, { updated_at: now });
+          await qa.setArtifactDefault(db.sql, { id: req.id, is_default: req.isDefault, updated_at: now });
+        }
+      });
       return assemble(await found(req.id));
     }),
     previewRemove: async (id) => {
@@ -327,7 +461,9 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
       const what =
         row.body === "html"
           ? t("server.artifact.preview.remove", { title: row.title, n: row.version })
-          : t("server.artifact.preview.removeBlocks", { title: row.title, n: (await blocks.blocks(id)).length });
+          : row.body === "store"
+            ? t("server.artifact.preview.removeEntries", { title: row.title, n: await entries.count(id) })
+            : t("server.artifact.preview.removeBlocks", { title: row.title, n: (await blocks.blocks(id)).length });
       return { does: row.channel_id !== null ? [what, t("server.artifact.preview.cards")] : [what] };
     },
     remove: locked(async (id: T.ArtifactId) => {
@@ -374,6 +510,8 @@ export async function makeArtifact(deps: ArtifactDeps): Promise<Artifact> {
     rejectSuggestion: blocks.rejectSuggestion,
     suggestionStream: blocks.suggestionStream,
     demo: blocks.demo,
-    close: blocks.close,
+    close: async () => {
+      await Promise.all([blocks.close(), entries.close()]);
+    },
   };
 }

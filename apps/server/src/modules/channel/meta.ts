@@ -33,6 +33,7 @@ export interface Meta {
   embeds?: T.Embed[];
   artifact?: T.ArtifactCard;
   blocks?: readonly QuotedBlock[];
+  viewContext?: T.ArtifactViewContext;
   picked?: Picked;
   ingressSource?: (typeof IngressSourceValues)[number];
   ingressRecipient?: string;
@@ -54,6 +55,7 @@ const MetaSchema = z.object({
   embeds: z.exactOptional(z.array(S.Embed)),
   artifact: z.exactOptional(S.ArtifactCard),
   blocks: z.exactOptional(z.array(S.QuotedBlock)),
+  viewContext: z.exactOptional(S.ArtifactViewContext),
   picked: z.exactOptional(z.object({ agent: z.exactOptional(z.string()), repo: z.exactOptional(z.string()) })),
   ingressSource: z.exactOptional(z.enum(IngressSourceValues)),
   ingressRecipient: z.exactOptional(z.string()),
@@ -93,6 +95,7 @@ export const envelopeMore = (
       ? { artifact: { id: meta.artifact.id, title: meta.artifact.title, version: meta.artifact.version } }
       : {}),
     ...(meta.blocks && meta.blocks.length > 0 && (row.deleted_at == null || row.deleted_at === 0) ? { blocks: meta.blocks } : {}),
+    ...(meta.viewContext && (row.deleted_at == null || row.deleted_at === 0) ? { viewContext: meta.viewContext } : {}),
     ...(meta.picked ? { picked: meta.picked } : {}),
     ...(meta.responsePort ? { responsePort: meta.responsePort } : {}),
     ...(meta.voiceMode ? { voiceMode: meta.voiceMode } : {}),

@@ -97,6 +97,7 @@ export interface TriggerContext {
   readonly attachments?: readonly { readonly name: string; readonly path: string }[];
   readonly artifact?: { readonly id: string; readonly title: string; readonly version: number };
   readonly blocks?: readonly QuotedBlock[];
+  readonly viewContext?: T.ArtifactViewContext;
   readonly picked?: { readonly agent?: string; readonly repo?: string };
   readonly responsePort?: string;
   readonly voiceMode?: VoiceMode;

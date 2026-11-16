@@ -7,7 +7,9 @@ import { arg, command, group, opt } from "#/infra/command.ts";
 import { ask } from "#/infra/farm.ts";
 
 const artifactLine = (a: T.Artifact) =>
-  [a.id, a.title, a.body, `@${a.byName}`, a.issue === undefined ? "" : `issue ${a.issue}`].filter((x) => x !== "").join("  ");
+  [a.id, a.title, a.artifactType ? `${a.body}:${a.artifactType}` : a.body, `@${a.byName}`, a.issue === undefined ? "" : `issue ${a.issue}`]
+    .filter((x) => x !== "")
+    .join("  ");
 const artifactArg = arg.decoded("artifact", ArtifactId, "cli.arg.artifact");
 
 export const artifactCommand = group("artifact", t("cli.group.artifact.about"), [
