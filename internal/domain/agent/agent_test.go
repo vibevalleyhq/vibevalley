@@ -2,12 +2,16 @@ package agent_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"slices"
 	"testing"
 
+	_ "modernc.org/sqlite"
+
 	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
 func TestAgentRegistryProfilesSkillsPresetsAndPersistence(t *testing.T) {
@@ -117,5 +121,70 @@ func TestAgentRegistryProfilesSkillsPresetsAndPersistence(t *testing.T) {
 	reopened, err := reg2.GetProfile(ctx, "backend-zhou")
 	if err != nil || reopened.Name != "Backend Zhou" || !slices.Equal(reopened.Skills, []string{"reviewer"}) {
 		t.Fatalf("reopened profile mismatch: %+v err=%v", reopened, err)
+	}
+}
+
+func TestAgentMigrationsUpStatusDownAllUp(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "agent-mig.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
+
+	runner, err := migrate.New(db, "agent", agent.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 1 {
+		t.Fatalf("Up: applied=%d err=%v", applied, err)
+	}
+	statuses, err := runner.Status(ctx)
+	if err != nil || len(statuses) != 1 || !statuses[0].Applied || statuses[0].Scope != "agent" || statuses[0].Version != 1 {
+		t.Fatalf("Status after Up: %+v err=%v", statuses, err)
+	}
+	for _, tbl := range []string{"agent_profile", "agent_skill", "agent_runtime"} {
+		var name string
+		if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl).Scan(&name); err != nil {
+			t.Fatalf("expected table %s after Up: %v", tbl, err)
+		}
+	}
+
+	reverted, err := runner.DownAll(ctx)
+	if err != nil || reverted != 1 {
+		t.Fatalf("DownAll: reverted=%d err=%v", reverted, err)
+	}
+	statusesAfterDown, err := runner.Status(ctx)
+	if err != nil || len(statusesAfterDown) != 1 || statusesAfterDown[0].Applied {
+		t.Fatalf("Status after DownAll: %+v err=%v", statusesAfterDown, err)
+	}
+	var remaining int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'agent_%'`).Scan(&remaining); err != nil {
+		t.Fatalf("count remaining agent_* tables: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("expected 0 agent_* tables after DownAll, found %d", remaining)
+	}
+
+	reapplied, err := runner.Up(ctx)
+	if err != nil || reapplied != 1 {
+		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
+	}
+	_ = db.Close()
+
+	reg, err := agent.OpenSQLiteRegistry(ctx, dbPath)
+	if err != nil {
+		t.Fatalf("OpenSQLiteRegistry after re-Up: %v", err)
+	}
+	defer reg.Close()
+	if _, err := reg.SaveProfile(ctx, agent.Profile{ID: "worker-1", Name: "Worker 1", Role: agent.RoleWorker}); err != nil {
+		t.Fatalf("SaveProfile after re-Up: %v", err)
+	}
+	got, err := reg.GetProfile(ctx, "worker-1")
+	if err != nil || got.Name != "Worker 1" {
+		t.Fatalf("GetProfile after re-Up: %+v err=%v", got, err)
 	}
 }

@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,30 +13,20 @@ import (
 	"sync"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/vibevalleyhq/vibevalley/internal/domain/repo/sqlcgen"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
-var repoSchemaDDL = []string{
-	`CREATE TABLE IF NOT EXISTS repo_repository (
-		id TEXT PRIMARY KEY,
-		name TEXT NOT NULL UNIQUE,
-		state_json TEXT NOT NULL,
-		created_at_ms INTEGER NOT NULL,
-		updated_at_ms INTEGER NOT NULL
-	)`,
-	`CREATE TABLE IF NOT EXISTS repo_worktree (
-		repo_id TEXT NOT NULL,
-		issue_id TEXT NOT NULL,
-		status TEXT NOT NULL,
-		state_json TEXT NOT NULL,
-		created_at_ms INTEGER NOT NULL,
-		updated_at_ms INTEGER NOT NULL,
-		PRIMARY KEY (repo_id, issue_id)
-	)`,
-}
+// MigrationsFS embeds the SQLite migration scripts for the repo registry.
+//
+//go:embed migrations/*.sql
+var MigrationsFS embed.FS
 
 type sqliteRepoBackend struct {
 	mu     sync.Mutex
 	db     *sql.DB
+	q      *sqlcgen.Queries
 	ownsDB bool
 }
 
@@ -70,13 +61,22 @@ func openSQLiteRepoBackend(ctx context.Context, path string) (*sqliteRepoBackend
 			return nil, fmt.Errorf("repo: %s: %w", p, err)
 		}
 	}
-	for _, ddl := range repoSchemaDDL {
-		if _, err := db.ExecContext(ctx, ddl); err != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("repo: apply schema: %w", err)
-		}
+
+	runner, err := migrate.New(db, "repo", MigrationsFS)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("repo: init migrator: %w", err)
 	}
-	return &sqliteRepoBackend{db: db, ownsDB: true}, nil
+	if _, err := runner.Up(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("repo: apply migrations: %w", err)
+	}
+
+	return &sqliteRepoBackend{
+		db:     db,
+		q:      sqlcgen.New(db),
+		ownsDB: true,
+	}, nil
 }
 
 func (b *sqliteRepoBackend) saveRepo(ctx context.Context, r Repository) error {
@@ -86,84 +86,84 @@ func (b *sqliteRepoBackend) saveRepo(ctx context.Context, r Repository) error {
 	if err != nil {
 		return err
 	}
-	_, err = b.db.ExecContext(ctx, `INSERT INTO repo_repository (id, name, state_json, created_at_ms, updated_at_ms)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT (id) DO UPDATE SET
-			name = excluded.name,
-			state_json = excluded.state_json,
-			updated_at_ms = excluded.updated_at_ms`,
-		r.ID, r.Name, string(raw), r.CreatedAtMs, r.UpdatedAtMs,
-	)
-	return err
+	return b.q.SaveRepo(ctx, sqlcgen.SaveRepoParams{
+		ID:          r.ID,
+		Name:        r.Name,
+		StateJson:   string(raw),
+		CreatedAtMs: r.CreatedAtMs,
+		UpdatedAtMs: r.UpdatedAtMs,
+	})
+}
+
+func decodeOneJSON[T any](raw string, err error) (T, bool, error) {
+	var zero T
+	if errors.Is(err, sql.ErrNoRows) {
+		return zero, false, nil
+	}
+	if err != nil {
+		return zero, false, err
+	}
+	var out T
+	if unmarshalErr := json.Unmarshal([]byte(raw), &out); unmarshalErr != nil {
+		return zero, false, unmarshalErr
+	}
+	return out, true, nil
+}
+
+func decodeManyJSON[T any](raws []string) ([]T, error) {
+	var out []T
+	for _, raw := range raws {
+		var item T
+		if err := json.Unmarshal([]byte(raw), &item); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
 }
 
 func (b *sqliteRepoBackend) getRepo(ctx context.Context, id string) (Repository, bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	var raw string
-	err := b.db.QueryRowContext(ctx, `SELECT state_json FROM repo_repository WHERE id = ?`, id).Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Repository{}, false, nil
-	}
-	if err != nil {
-		return Repository{}, false, err
-	}
-	var r Repository
-	if err := json.Unmarshal([]byte(raw), &r); err != nil {
-		return Repository{}, false, err
-	}
-	return r, true, nil
+	raw, err := b.q.GetRepo(ctx, id)
+	return decodeOneJSON[Repository](raw, err)
 }
 
 func (b *sqliteRepoBackend) getRepoByName(ctx context.Context, name string) (Repository, bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	var raw string
-	err := b.db.QueryRowContext(ctx, `SELECT state_json FROM repo_repository WHERE name = ?`, name).Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Repository{}, false, nil
-	}
-	if err != nil {
-		return Repository{}, false, err
-	}
-	var r Repository
-	if err := json.Unmarshal([]byte(raw), &r); err != nil {
-		return Repository{}, false, err
-	}
-	return r, true, nil
+	raw, err := b.q.GetRepoByName(ctx, name)
+	return decodeOneJSON[Repository](raw, err)
 }
 
 func (b *sqliteRepoBackend) listRepos(ctx context.Context) ([]Repository, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	rows, err := b.db.QueryContext(ctx, `SELECT state_json FROM repo_repository ORDER BY created_at_ms ASC, id ASC`)
+	raws, err := b.q.ListRepos(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Repository
-	for rows.Next() {
-		var raw string
-		if err := rows.Scan(&raw); err != nil {
-			return nil, err
-		}
-		var r Repository
-		if err := json.Unmarshal([]byte(raw), &r); err != nil {
-			return nil, err
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
+	return decodeManyJSON[Repository](raws)
 }
 
 func (b *sqliteRepoBackend) deleteRepo(ctx context.Context, id string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if _, err := b.db.ExecContext(ctx, `DELETE FROM repo_worktree WHERE repo_id = ?`, id); err != nil {
+	tx, err := b.db.BeginTx(ctx, nil)
+	if err != nil {
 		return err
 	}
-	_, err := b.db.ExecContext(ctx, `DELETE FROM repo_repository WHERE id = ?`, id)
-	return err
+	defer func() {
+		_ = tx.Rollback()
+	}()
+	qtx := b.q.WithTx(tx)
+	if err := qtx.DeleteWorktreesByRepo(ctx, id); err != nil {
+		return err
+	}
+	if err := qtx.DeleteRepo(ctx, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (b *sqliteRepoBackend) saveWorktree(ctx context.Context, wt Worktree) error {
@@ -173,62 +173,40 @@ func (b *sqliteRepoBackend) saveWorktree(ctx context.Context, wt Worktree) error
 	if err != nil {
 		return err
 	}
-	_, err = b.db.ExecContext(ctx, `INSERT INTO repo_worktree (repo_id, issue_id, status, state_json, created_at_ms, updated_at_ms)
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT (repo_id, issue_id) DO UPDATE SET
-			status = excluded.status,
-			state_json = excluded.state_json,
-			updated_at_ms = excluded.updated_at_ms`,
-		wt.RepoID, wt.IssueID, string(wt.Status), string(raw), wt.CreatedAtMs, wt.UpdatedAtMs,
-	)
-	return err
+	return b.q.SaveWorktree(ctx, sqlcgen.SaveWorktreeParams{
+		RepoID:      wt.RepoID,
+		IssueID:     wt.IssueID,
+		Status:      string(wt.Status),
+		StateJson:   string(raw),
+		CreatedAtMs: wt.CreatedAtMs,
+		UpdatedAtMs: wt.UpdatedAtMs,
+	})
 }
 
 func (b *sqliteRepoBackend) getWorktree(ctx context.Context, repoID, issueID string) (Worktree, bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	var raw string
-	err := b.db.QueryRowContext(ctx, `SELECT state_json FROM repo_worktree WHERE repo_id = ? AND issue_id = ?`, repoID, issueID).Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Worktree{}, false, nil
-	}
-	if err != nil {
-		return Worktree{}, false, err
-	}
-	var wt Worktree
-	if err := json.Unmarshal([]byte(raw), &wt); err != nil {
-		return Worktree{}, false, err
-	}
-	return wt, true, nil
+	raw, err := b.q.GetWorktree(ctx, sqlcgen.GetWorktreeParams{
+		RepoID:  repoID,
+		IssueID: issueID,
+	})
+	return decodeOneJSON[Worktree](raw, err)
 }
 
 func (b *sqliteRepoBackend) listWorktrees(ctx context.Context, repoID string) ([]Worktree, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	var rows *sql.Rows
+	var raws []string
 	var err error
 	if repoID != "" {
-		rows, err = b.db.QueryContext(ctx, `SELECT state_json FROM repo_worktree WHERE repo_id = ? ORDER BY created_at_ms ASC, issue_id ASC`, repoID)
+		raws, err = b.q.ListWorktreesByRepo(ctx, repoID)
 	} else {
-		rows, err = b.db.QueryContext(ctx, `SELECT state_json FROM repo_worktree ORDER BY created_at_ms ASC, repo_id ASC, issue_id ASC`)
+		raws, err = b.q.ListAllWorktrees(ctx)
 	}
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Worktree
-	for rows.Next() {
-		var raw string
-		if err := rows.Scan(&raw); err != nil {
-			return nil, err
-		}
-		var wt Worktree
-		if err := json.Unmarshal([]byte(raw), &wt); err != nil {
-			return nil, err
-		}
-		out = append(out, wt)
-	}
-	return out, rows.Err()
+	return decodeManyJSON[Worktree](raws)
 }
 
 func (b *sqliteRepoBackend) close() error {

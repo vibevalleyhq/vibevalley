@@ -3,6 +3,7 @@ package game
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -12,7 +13,15 @@ import (
 	"sync"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/vibevalleyhq/vibevalley/internal/domain/game/sqlcgen"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
+
+// MigrationsFS embeds the SQLite migration scripts for the game progression ledger.
+//
+//go:embed migrations/*.sql
+var MigrationsFS embed.FS
 
 // LedgerKind identifies append-only farm progression events.
 type LedgerKind string
@@ -96,6 +105,7 @@ type Ledger struct {
 	entries []LedgerEntry
 	nextSeq int64
 	db      *sql.DB
+	q       *sqlcgen.Queries
 }
 
 // NewMemoryLedger creates an in-memory progression Ledger.
@@ -126,30 +136,27 @@ func OpenSQLiteLedger(ctx context.Context, path string) (*Ledger, error) {
 	}
 	_, _ = db.ExecContext(ctx, "PRAGMA synchronous=NORMAL")
 	_, _ = db.ExecContext(ctx, "PRAGMA busy_timeout=5000")
-	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS game_ledger (
-		seq INTEGER PRIMARY KEY,
-		kind TEXT NOT NULL,
-		payload_json TEXT NOT NULL,
-		created_at_ms INTEGER NOT NULL
-	)`); err != nil {
+
+	runner, err := migrate.New(db, "game", MigrationsFS)
+	if err != nil {
 		_ = db.Close()
-		return nil, err
+		return nil, fmt.Errorf("game: init migrator: %w", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("game: apply migrations: %w", err)
 	}
 
-	rows, err := db.QueryContext(ctx, `SELECT payload_json FROM game_ledger ORDER BY seq ASC`)
+	q := sqlcgen.New(db)
+	payloads, err := q.ListLedgerPayloads(ctx)
 	if err != nil {
 		_ = db.Close()
 		return nil, err
 	}
-	defer rows.Close()
+
 	var entries []LedgerEntry
 	var maxSeq int64
-	for rows.Next() {
-		var raw string
-		if err := rows.Scan(&raw); err != nil {
-			_ = db.Close()
-			return nil, err
-		}
+	for _, raw := range payloads {
 		var e LedgerEntry
 		if err := json.Unmarshal([]byte(raw), &e); err != nil {
 			_ = db.Close()
@@ -164,6 +171,7 @@ func OpenSQLiteLedger(ctx context.Context, path string) (*Ledger, error) {
 		entries: entries,
 		nextSeq: maxSeq,
 		db:      db,
+		q:       q,
 	}, nil
 }
 
@@ -173,14 +181,18 @@ func (l *Ledger) Append(ctx context.Context, entry LedgerEntry) (Progress, error
 	defer l.mu.Unlock()
 	l.nextSeq++
 	entry.Seq = l.nextSeq
-	if l.db != nil {
+	if l.q != nil {
 		raw, err := json.Marshal(entry)
 		if err != nil {
 			l.nextSeq--
 			return Progress{}, err
 		}
-		if _, err := l.db.ExecContext(ctx, `INSERT INTO game_ledger (seq, kind, payload_json, created_at_ms) VALUES (?, ?, ?, ?)`,
-			entry.Seq, string(entry.Kind), string(raw), entry.CreatedAtMs); err != nil {
+		if err := l.q.InsertLedgerEntry(ctx, sqlcgen.InsertLedgerEntryParams{
+			Seq:         entry.Seq,
+			Kind:        string(entry.Kind),
+			PayloadJson: string(raw),
+			CreatedAtMs: entry.CreatedAtMs,
+		}); err != nil {
 			l.nextSeq--
 			return Progress{}, err
 		}

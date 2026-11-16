@@ -9,13 +9,17 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	_ "modernc.org/sqlite"
+
 	"github.com/vibevalleyhq/vibevalley/internal/vault"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
 type memSQLRow struct {
@@ -99,8 +103,20 @@ func (c *memSQLConn) targetMap() map[string]memSQLRow {
 	return c.db.rows
 }
 
-func (c *memSQLConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+func stripLeadingSQLComments(query string) string {
 	q := strings.TrimSpace(query)
+	for strings.HasPrefix(q, "--") {
+		if idx := strings.IndexByte(q, '\n'); idx >= 0 {
+			q = strings.TrimSpace(q[idx+1:])
+		} else {
+			return ""
+		}
+	}
+	return q
+}
+
+func (c *memSQLConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	q := stripLeadingSQLComments(query)
 	if !c.inTx {
 		c.db.mu.Lock()
 		defer c.db.mu.Unlock()
@@ -165,7 +181,7 @@ func (c *memSQLConn) ExecContext(_ context.Context, query string, args []driver.
 }
 
 func (c *memSQLConn) QueryContext(_ context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	q := strings.TrimSpace(query)
+	q := stripLeadingSQLComments(query)
 	c.db.mu.Lock()
 	defer c.db.mu.Unlock()
 	if !c.db.hasTbl {
@@ -346,5 +362,123 @@ func TestSQLBackendBothDialects(t *testing.T) {
 		if _, err := store.Get(ctx, cred.ID); !errors.Is(err, vault.ErrSecretNotFound) {
 			t.Fatalf("expected ErrSecretNotFound after Delete, got %v", err)
 		}
+	}
+}
+
+func TestVaultSQLiteMigrationsAndRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "vault-mig.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+
+	runner, err := migrate.New(db, "vault", vault.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 1 {
+		t.Fatalf("Up: applied=%d err=%v", applied, err)
+	}
+	statuses, err := runner.Status(ctx)
+	if err != nil || len(statuses) != 1 || !statuses[0].Applied || statuses[0].Scope != "vault" || statuses[0].Version != 1 {
+		t.Fatalf("Status after Up: %+v err=%v", statuses, err)
+	}
+
+	var tblName string
+	if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='vault_secret'`).Scan(&tblName); err != nil {
+		t.Fatalf("expected table vault_secret after Up: %v", err)
+	}
+
+	reverted, err := runner.DownAll(ctx)
+	if err != nil || reverted != 1 {
+		t.Fatalf("DownAll: reverted=%d err=%v", reverted, err)
+	}
+	statusesAfterDown, err := runner.Status(ctx)
+	if err != nil || len(statusesAfterDown) != 1 || statusesAfterDown[0].Applied {
+		t.Fatalf("Status after DownAll: %+v err=%v", statusesAfterDown, err)
+	}
+	var remaining int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='vault_secret'`).Scan(&remaining); err != nil {
+		t.Fatalf("count remaining vault_secret: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("expected 0 vault_secret tables after DownAll, got %d", remaining)
+	}
+
+	reapplied, err := runner.Up(ctx)
+	if err != nil || reapplied != 1 {
+		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
+	}
+
+	// Verify SQLBackend.EnsureSchema and full vault.Store roundtrip over real SQLite.
+	backend, err := vault.NewSQLBackend(db, vault.DialectSQLite)
+	if err != nil {
+		t.Fatalf("NewSQLBackend: %v", err)
+	}
+	if err := backend.EnsureSchema(ctx); err != nil {
+		t.Fatalf("EnsureSchema on migrated SQLite: %v", err)
+	}
+	rk1, err := vault.GenerateRootKey("sqlite-rk-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rk2, err := vault.GenerateRootKey("sqlite-rk-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	kr, err := vault.NewKeyRing(rk1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := vault.NewStore(kr, backend,
+		vault.WithStoreLogger(slog.New(slog.NewJSONHandler(io.Discard, nil))),
+		vault.WithStoreClock(func() time.Time { return time.UnixMilli(1700000001000).UTC() }),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exp := time.UnixMilli(1800000000000).UTC()
+	cred := vault.Credential{
+		ID:          "real-sqlite-cred-1",
+		Kind:        vault.KindProviderAPIKey,
+		Name:        "anthropic",
+		TargetHosts: []string{"api.anthropic.com"},
+		Provider:    "anthropic",
+		ExpiresAt:   &exp,
+		Value:       vault.NewSecret("sk-ant-real-sqlite-test"),
+	}
+	if err := st.Put(ctx, cred); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	gotByID, err := st.Get(ctx, cred.ID)
+	if err != nil || !gotByID.Value.Equal(cred.Value) {
+		t.Fatalf("Get: %+v err=%v", gotByID, err)
+	}
+	gotByName, err := st.GetByName(ctx, vault.KindProviderAPIKey, "anthropic")
+	if err != nil || !gotByName.Value.Equal(cred.Value) {
+		t.Fatalf("GetByName: %+v err=%v", gotByName, err)
+	}
+	meta, err := st.ListMetadata(ctx)
+	if err != nil || len(meta) != 1 || meta[0].ID != cred.ID {
+		t.Fatalf("ListMetadata: %+v err=%v", meta, err)
+	}
+	if err := st.RotateRootKey(ctx, rk2); err != nil {
+		t.Fatalf("RotateRootKey: %v", err)
+	}
+	gotAfterRot, err := st.Get(ctx, cred.ID)
+	if err != nil || !gotAfterRot.Value.Equal(cred.Value) {
+		t.Fatalf("Get after rotation: %+v err=%v", gotAfterRot, err)
+	}
+	if err := st.Delete(ctx, cred.ID); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if _, err := st.Get(ctx, cred.ID); !errors.Is(err, vault.ErrSecretNotFound) {
+		t.Fatalf("expected ErrSecretNotFound after delete, got %v", err)
 	}
 }

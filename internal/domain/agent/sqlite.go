@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,29 +12,20 @@ import (
 	"sync"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/vibevalleyhq/vibevalley/internal/domain/agent/sqlcgen"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
-var agentSchemaDDL = []string{
-	`CREATE TABLE IF NOT EXISTS agent_profile (
-		id TEXT PRIMARY KEY,
-		state_json TEXT NOT NULL,
-		updated_at_ms INTEGER NOT NULL
-	)`,
-	`CREATE TABLE IF NOT EXISTS agent_skill (
-		id TEXT PRIMARY KEY,
-		built_in INTEGER NOT NULL DEFAULT 0,
-		state_json TEXT NOT NULL,
-		updated_at_ms INTEGER NOT NULL
-	)`,
-	`CREATE TABLE IF NOT EXISTS agent_runtime (
-		id TEXT PRIMARY KEY,
-		state_json TEXT NOT NULL
-	)`,
-}
+// MigrationsFS embeds the SQLite migration scripts for the agent registry.
+//
+//go:embed migrations/*.sql
+var MigrationsFS embed.FS
 
 type sqliteAgentBackend struct {
 	mu     sync.Mutex
 	db     *sql.DB
+	q      *sqlcgen.Queries
 	ownsDB bool
 }
 
@@ -68,78 +60,66 @@ func openSQLiteAgentBackend(ctx context.Context, path string) (*sqliteAgentBacke
 			return nil, fmt.Errorf("agent: %s: %w", p, err)
 		}
 	}
-	for _, ddl := range agentSchemaDDL {
-		if _, err := db.ExecContext(ctx, ddl); err != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("agent: apply schema: %w", err)
-		}
+
+	runner, err := migrate.New(db, "agent", MigrationsFS)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("agent: init migrator: %w", err)
 	}
-	return &sqliteAgentBackend{db: db, ownsDB: true}, nil
+	if _, err := runner.Up(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("agent: apply migrations: %w", err)
+	}
+
+	return &sqliteAgentBackend{
+		db:     db,
+		q:      sqlcgen.New(db),
+		ownsDB: true,
+	}, nil
+}
+
+func decodeJSONStates[T any](rawStates []string) ([]T, error) {
+	out := make([]T, 0, len(rawStates))
+	for _, raw := range rawStates {
+		var item T
+		if err := json.Unmarshal([]byte(raw), &item); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
 }
 
 func (b *sqliteAgentBackend) loadAll(ctx context.Context) ([]Profile, []Skill, []RuntimeInfo, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	var profiles []Profile
-	pRows, err := b.db.QueryContext(ctx, `SELECT state_json FROM agent_profile`)
+	rawProfiles, err := b.q.ListProfiles(ctx)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	for pRows.Next() {
-		var raw string
-		if err := pRows.Scan(&raw); err != nil {
-			_ = pRows.Close()
-			return nil, nil, nil, err
-		}
-		var p Profile
-		if err := json.Unmarshal([]byte(raw), &p); err != nil {
-			_ = pRows.Close()
-			return nil, nil, nil, err
-		}
-		profiles = append(profiles, p)
+	profiles, err := decodeJSONStates[Profile](rawProfiles)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	_ = pRows.Close()
 
-	var skills []Skill
-	sRows, err := b.db.QueryContext(ctx, `SELECT state_json FROM agent_skill`)
+	rawSkills, err := b.q.ListSkills(ctx)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	for sRows.Next() {
-		var raw string
-		if err := sRows.Scan(&raw); err != nil {
-			_ = sRows.Close()
-			return nil, nil, nil, err
-		}
-		var sk Skill
-		if err := json.Unmarshal([]byte(raw), &sk); err != nil {
-			_ = sRows.Close()
-			return nil, nil, nil, err
-		}
-		skills = append(skills, sk)
+	skills, err := decodeJSONStates[Skill](rawSkills)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	_ = sRows.Close()
 
-	var runtimes []RuntimeInfo
-	rRows, err := b.db.QueryContext(ctx, `SELECT state_json FROM agent_runtime`)
+	rawRuntimes, err := b.q.ListRuntimes(ctx)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	for rRows.Next() {
-		var raw string
-		if err := rRows.Scan(&raw); err != nil {
-			_ = rRows.Close()
-			return nil, nil, nil, err
-		}
-		var rt RuntimeInfo
-		if err := json.Unmarshal([]byte(raw), &rt); err != nil {
-			_ = rRows.Close()
-			return nil, nil, nil, err
-		}
-		runtimes = append(runtimes, rt)
+	runtimes, err := decodeJSONStates[RuntimeInfo](rawRuntimes)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	_ = rRows.Close()
 
 	return profiles, skills, runtimes, nil
 }
@@ -151,18 +131,17 @@ func (b *sqliteAgentBackend) saveProfile(ctx context.Context, p Profile) error {
 	if err != nil {
 		return err
 	}
-	_, err = b.db.ExecContext(ctx, `INSERT INTO agent_profile (id, state_json, updated_at_ms) VALUES (?, ?, ?)
-		ON CONFLICT (id) DO UPDATE SET state_json = excluded.state_json, updated_at_ms = excluded.updated_at_ms`,
-		p.ID, string(raw), p.UpdatedAtMs,
-	)
-	return err
+	return b.q.SaveProfile(ctx, sqlcgen.SaveProfileParams{
+		ID:          p.ID,
+		StateJson:   string(raw),
+		UpdatedAtMs: p.UpdatedAtMs,
+	})
 }
 
 func (b *sqliteAgentBackend) deleteProfile(ctx context.Context, id string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	_, err := b.db.ExecContext(ctx, `DELETE FROM agent_profile WHERE id = ?`, id)
-	return err
+	return b.q.DeleteProfile(ctx, id)
 }
 
 func (b *sqliteAgentBackend) saveSkill(ctx context.Context, s Skill) error {
@@ -172,22 +151,22 @@ func (b *sqliteAgentBackend) saveSkill(ctx context.Context, s Skill) error {
 	if err != nil {
 		return err
 	}
-	bi := 0
+	var bi int64
 	if s.BuiltIn {
 		bi = 1
 	}
-	_, err = b.db.ExecContext(ctx, `INSERT INTO agent_skill (id, built_in, state_json, updated_at_ms) VALUES (?, ?, ?, ?)
-		ON CONFLICT (id) DO UPDATE SET built_in = excluded.built_in, state_json = excluded.state_json, updated_at_ms = excluded.updated_at_ms`,
-		s.ID, bi, string(raw), s.UpdatedAtMs,
-	)
-	return err
+	return b.q.SaveSkill(ctx, sqlcgen.SaveSkillParams{
+		ID:          s.ID,
+		BuiltIn:     bi,
+		StateJson:   string(raw),
+		UpdatedAtMs: s.UpdatedAtMs,
+	})
 }
 
 func (b *sqliteAgentBackend) deleteSkill(ctx context.Context, id string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	_, err := b.db.ExecContext(ctx, `DELETE FROM agent_skill WHERE id = ?`, id)
-	return err
+	return b.q.DeleteSkill(ctx, id)
 }
 
 func (b *sqliteAgentBackend) saveRuntime(ctx context.Context, r RuntimeInfo) error {
@@ -197,11 +176,10 @@ func (b *sqliteAgentBackend) saveRuntime(ctx context.Context, r RuntimeInfo) err
 	if err != nil {
 		return err
 	}
-	_, err = b.db.ExecContext(ctx, `INSERT INTO agent_runtime (id, state_json) VALUES (?, ?)
-		ON CONFLICT (id) DO UPDATE SET state_json = excluded.state_json`,
-		r.ID, string(raw),
-	)
-	return err
+	return b.q.SaveRuntime(ctx, sqlcgen.SaveRuntimeParams{
+		ID:        r.ID,
+		StateJson: string(raw),
+	})
 }
 
 func (b *sqliteAgentBackend) close() error {

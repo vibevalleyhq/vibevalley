@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -12,7 +13,11 @@ import (
 	"testing"
 	"time"
 
+	_ "modernc.org/sqlite"
+
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
+	"github.com/vibevalleyhq/vibevalley/internal/durable/store/sqlcgen"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
 type backendFactory struct {
@@ -71,12 +76,18 @@ func TestSQLitePragmasAndDialectPortableSchema(t *testing.T) {
 		t.Fatalf("expected synchronous=1 (NORMAL), got %d", syncMode)
 	}
 
+	migs, err := migrate.ParseFS(store.MigrationsFS, "migrations")
+	if err != nil {
+		t.Fatalf("ParseFS(MigrationsFS): %v", err)
+	}
 	forbiddenJSONOps := []string{"json_extract", "json_set", "json_replace", "json_patch", "->>", "#>>"}
-	for _, ddl := range store.SchemaDDL {
-		lower := strings.ToLower(ddl)
-		for _, op := range forbiddenJSONOps {
-			if strings.Contains(lower, op) {
-				t.Fatalf("schema DDL contains dialect-specific JSON operator %q: %s", op, ddl)
+	for _, mig := range migs {
+		for _, ddl := range migrate.SplitStatements(mig.UpSQL) {
+			lower := strings.ToLower(ddl)
+			for _, op := range forbiddenJSONOps {
+				if strings.Contains(lower, op) {
+					t.Fatalf("schema migration %d contains dialect-specific JSON operator %q: %s", mig.Version, op, ddl)
+				}
 			}
 		}
 	}
@@ -559,5 +570,102 @@ func TestStoreParityEarlySignalsAndTaskDedup(t *testing.T) {
 				t.Fatalf("expected FIFO exact-once [k-1, k-2], got %v", popped)
 			}
 		})
+	}
+}
+
+func TestDurableMigrationsUpStatusDownAllUp(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "durable-mig.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
+
+	runner, err := migrate.New(db, "durable", store.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 1 {
+		t.Fatalf("Up: applied=%d err=%v", applied, err)
+	}
+	statuses, err := runner.Status(ctx)
+	if err != nil || len(statuses) != 1 || !statuses[0].Applied || statuses[0].Scope != "durable" || statuses[0].Version != 1 {
+		t.Fatalf("Status after Up: %+v err=%v", statuses, err)
+	}
+
+	expectedTables := []string{
+		"durable_conversation",
+		"durable_entry",
+		"durable_document",
+		"durable_submission",
+		"durable_task",
+		"durable_signal",
+	}
+	for _, tbl := range expectedTables {
+		var name string
+		if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl).Scan(&name); err != nil {
+			t.Fatalf("expected table %s after Up: %v", tbl, err)
+		}
+	}
+
+	// Verify sqlcgen works directly against migrated tables including sqlc.slice and ListSignals.
+	q := sqlcgen.New(db)
+	if err := q.InsertTask(ctx, sqlcgen.InsertTaskParams{
+		ID: "t-1", Kind: "worker", Status: "pending", RestartLimit: 5,
+		CheckpointJson: "{}", WaitTaskIdsJson: "[]", MemoJson: "{}", ResultJson: "{}",
+		CreatedAtMs: 100, UpdatedAtMs: 100,
+	}); err != nil {
+		t.Fatalf("InsertTask: %v", err)
+	}
+	if err := q.InsertTask(ctx, sqlcgen.InsertTaskParams{
+		ID: "t-2", Kind: "worker", Status: "running", RestartLimit: 5,
+		CheckpointJson: "{}", WaitTaskIdsJson: "[]", MemoJson: "{}", ResultJson: "{}",
+		CreatedAtMs: 200, UpdatedAtMs: 200,
+	}); err != nil {
+		t.Fatalf("InsertTask 2: %v", err)
+	}
+	tasks, err := q.ListTasksByStatus(ctx, []string{"running", "sleeping"})
+	if err != nil || len(tasks) != 1 || tasks[0].ID != "t-2" {
+		t.Fatalf("ListTasksByStatus slice mismatch: %+v err=%v", tasks, err)
+	}
+
+	// DownAll drops all package tables and indexes.
+	reverted, err := runner.DownAll(ctx)
+	if err != nil || reverted != 1 {
+		t.Fatalf("DownAll: reverted=%d err=%v", reverted, err)
+	}
+	statusesAfterDown, err := runner.Status(ctx)
+	if err != nil || len(statusesAfterDown) != 1 || statusesAfterDown[0].Applied {
+		t.Fatalf("Status after DownAll: %+v err=%v", statusesAfterDown, err)
+	}
+	var remaining int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'durable_%'`).Scan(&remaining); err != nil {
+		t.Fatalf("count remaining tables: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("expected 0 durable_* tables after DownAll, found %d", remaining)
+	}
+
+	// Re-Up restores full schema and store.OpenSQLite runs cleanly on top.
+	reapplied, err := runner.Up(ctx)
+	if err != nil || reapplied != 1 {
+		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
+	}
+	_ = db.Close()
+
+	st, err := store.OpenSQLite(ctx, dbPath)
+	if err != nil {
+		t.Fatalf("OpenSQLite after re-Up: %v", err)
+	}
+	defer st.Close()
+	if _, err := st.CreateTask(ctx, store.Task{ID: "t-after-up", Kind: "worker"}); err != nil {
+		t.Fatalf("CreateTask after re-Up: %v", err)
+	}
+	listAll, err := st.ListTasksByStatus(ctx)
+	if err != nil || len(listAll) != 1 || listAll[0].ID != "t-after-up" {
+		t.Fatalf("ListTasksByStatus(all) after re-Up: %+v err=%v", listAll, err)
 	}
 }

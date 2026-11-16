@@ -2,13 +2,17 @@ package repo_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
+	_ "modernc.org/sqlite"
+
 	"github.com/vibevalleyhq/vibevalley/internal/domain/repo"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
 func gitExec(t *testing.T, dir string, args ...string) {
@@ -129,5 +133,75 @@ func TestRepoGitWorktreeLifecycleMergeConflictAndPersistence(t *testing.T) {
 	reopenedWt, err := reg2.GetWorktree(ctx, rp.ID, "42")
 	if err != nil || reopenedWt.Status != repo.WorktreeMerged {
 		t.Fatalf("reopened worktree 42 mismatch: %+v err=%v", reopenedWt, err)
+	}
+}
+
+func TestRepoMigrationsUpStatusDownAllUp(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "repo-mig.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
+
+	runner, err := migrate.New(db, "repo", repo.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 1 {
+		t.Fatalf("Up: applied=%d err=%v", applied, err)
+	}
+	statuses, err := runner.Status(ctx)
+	if err != nil || len(statuses) != 1 || !statuses[0].Applied || statuses[0].Scope != "repo" || statuses[0].Version != 1 {
+		t.Fatalf("Status after Up: %+v err=%v", statuses, err)
+	}
+	for _, tbl := range []string{"repo_repository", "repo_worktree"} {
+		var name string
+		if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl).Scan(&name); err != nil {
+			t.Fatalf("expected table %s after Up: %v", tbl, err)
+		}
+	}
+
+	reverted, err := runner.DownAll(ctx)
+	if err != nil || reverted != 1 {
+		t.Fatalf("DownAll: reverted=%d err=%v", reverted, err)
+	}
+	statusesAfterDown, err := runner.Status(ctx)
+	if err != nil || len(statusesAfterDown) != 1 || statusesAfterDown[0].Applied {
+		t.Fatalf("Status after DownAll: %+v err=%v", statusesAfterDown, err)
+	}
+	var remaining int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'repo_%'`).Scan(&remaining); err != nil {
+		t.Fatalf("count remaining repo_* tables: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("expected 0 repo_* tables after DownAll, found %d", remaining)
+	}
+
+	reapplied, err := runner.Up(ctx)
+	if err != nil || reapplied != 1 {
+		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
+	}
+	_ = db.Close()
+
+	reg, err := repo.OpenSQLiteRegistry(ctx, dbPath, repo.WithWorkRoot(filepath.Join(tmpDir, "work")))
+	if err != nil {
+		t.Fatalf("OpenSQLiteRegistry after re-Up: %v", err)
+	}
+	defer reg.Close()
+	rp, err := reg.RegisterRepo(ctx, repo.Repository{ID: "r1", Name: "r1", RootPath: filepath.Join(tmpDir, "work", "repos", "r1")})
+	if err != nil || rp.ID != "r1" {
+		t.Fatalf("RegisterRepo after re-Up: %+v err=%v", rp, err)
+	}
+	got, err := reg.GetRepo(ctx, "r1")
+	if err != nil || got.Name != "r1" {
+		t.Fatalf("GetRepo after re-Up: %+v err=%v", got, err)
+	}
+	if err := reg.DeleteRepo(ctx, "r1"); err != nil {
+		t.Fatalf("DeleteRepo after re-Up: %v", err)
 	}
 }

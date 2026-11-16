@@ -2,11 +2,14 @@ package game_test
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
 	"time"
+
+	_ "modernc.org/sqlite"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/game"
 	"github.com/vibevalleyhq/vibevalley/internal/durable"
@@ -14,6 +17,7 @@ import (
 	"github.com/vibevalleyhq/vibevalley/pkg/chord/delta"
 	"github.com/vibevalleyhq/vibevalley/pkg/chord/watch"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
 func TestSpaceViewProjectorChordDeltaPushAndDurableObserver(t *testing.T) {
@@ -216,5 +220,65 @@ func TestGameLedgerAndCommitLevels(t *testing.T) {
 	reopened := ledger2.Progress()
 	if reopened.Coins != 40 || reopened.Streak != 0 || reopened.MergedCount != 1 {
 		t.Fatalf("reopened game ledger mismatch: %+v", reopened)
+	}
+}
+
+func TestGameMigrationsUpStatusDownAllUp(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "game-mig.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
+
+	runner, err := migrate.New(db, "game", game.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 1 {
+		t.Fatalf("Up: applied=%d err=%v", applied, err)
+	}
+	statuses, err := runner.Status(ctx)
+	if err != nil || len(statuses) != 1 || !statuses[0].Applied || statuses[0].Scope != "game" || statuses[0].Version != 1 {
+		t.Fatalf("Status after Up: %+v err=%v", statuses, err)
+	}
+	var tblName string
+	if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='game_ledger'`).Scan(&tblName); err != nil {
+		t.Fatalf("expected table game_ledger after Up: %v", err)
+	}
+
+	reverted, err := runner.DownAll(ctx)
+	if err != nil || reverted != 1 {
+		t.Fatalf("DownAll: reverted=%d err=%v", reverted, err)
+	}
+	statusesAfterDown, err := runner.Status(ctx)
+	if err != nil || len(statusesAfterDown) != 1 || statusesAfterDown[0].Applied {
+		t.Fatalf("Status after DownAll: %+v err=%v", statusesAfterDown, err)
+	}
+	var remaining int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='game_ledger'`).Scan(&remaining); err != nil {
+		t.Fatalf("count remaining game_ledger: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("expected 0 game_ledger tables after DownAll, found %d", remaining)
+	}
+
+	reapplied, err := runner.Up(ctx)
+	if err != nil || reapplied != 1 {
+		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
+	}
+	_ = db.Close()
+
+	ledger, err := game.OpenSQLiteLedger(ctx, dbPath)
+	if err != nil {
+		t.Fatalf("OpenSQLiteLedger after re-Up: %v", err)
+	}
+	defer ledger.Close()
+	p, err := ledger.Append(ctx, game.LedgerEntry{Kind: game.LedgerTitleSet, Title: "Master Farmer", CreatedAtMs: 500})
+	if err != nil || p.ActiveTitle != "Master Farmer" {
+		t.Fatalf("Append after re-Up: %+v err=%v", p, err)
 	}
 }

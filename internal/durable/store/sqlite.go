@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,105 +13,15 @@ import (
 	"sync/atomic"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/vibevalleyhq/vibevalley/internal/durable/store/sqlcgen"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
-// SchemaDDL lists the six dialect-portable tables and indexes without SQL-level JSON path mutations.
-var SchemaDDL = []string{
-	`CREATE TABLE IF NOT EXISTS durable_conversation (
-		id TEXT PRIMARY KEY,
-		owner_task_id TEXT NOT NULL DEFAULT '',
-		parent_id TEXT NOT NULL DEFAULT '',
-		fork_entry_seq INTEGER NOT NULL DEFAULT 0,
-		head_seq INTEGER NOT NULL DEFAULT 1,
-		next_seq INTEGER NOT NULL DEFAULT 1,
-		provider_affinity TEXT NOT NULL DEFAULT '',
-		metadata_json TEXT NOT NULL DEFAULT '{}',
-		created_at_ms INTEGER NOT NULL,
-		updated_at_ms INTEGER NOT NULL
-	)`,
-	`CREATE INDEX IF NOT EXISTS durable_conversation_owner_idx ON durable_conversation(owner_task_id)`,
-
-	`CREATE TABLE IF NOT EXISTS durable_entry (
-		conversation_id TEXT NOT NULL,
-		seq INTEGER NOT NULL,
-		kind TEXT NOT NULL,
-		payload_json TEXT NOT NULL,
-		created_at_ms INTEGER NOT NULL,
-		PRIMARY KEY (conversation_id, seq)
-	)`,
-
-	`CREATE TABLE IF NOT EXISTS durable_document (
-		scope_kind TEXT NOT NULL,
-		scope_id TEXT NOT NULL,
-		doc_kind TEXT NOT NULL,
-		rev INTEGER NOT NULL,
-		state_json TEXT NOT NULL,
-		updated_at_ms INTEGER NOT NULL,
-		PRIMARY KEY (scope_kind, scope_id, doc_kind)
-	)`,
-
-	`CREATE TABLE IF NOT EXISTS durable_submission (
-		id TEXT PRIMARY KEY,
-		conversation_id TEXT NOT NULL,
-		request_id TEXT NOT NULL,
-		kind TEXT NOT NULL,
-		status TEXT NOT NULL,
-		payload_json TEXT NOT NULL,
-		notify_task_id TEXT NOT NULL DEFAULT '',
-		result_json TEXT NOT NULL DEFAULT '{}',
-		created_at_ms INTEGER NOT NULL,
-		updated_at_ms INTEGER NOT NULL,
-		UNIQUE(conversation_id, request_id)
-	)`,
-
-	`CREATE TABLE IF NOT EXISTS durable_task (
-		id TEXT PRIMARY KEY,
-		conversation_id TEXT NOT NULL DEFAULT '',
-		owner_task_id TEXT NOT NULL DEFAULT '',
-		dedup_key TEXT NOT NULL DEFAULT '',
-		kind TEXT NOT NULL,
-		is_model_task INTEGER NOT NULL DEFAULT 0,
-		status TEXT NOT NULL,
-		terminal_reason TEXT NOT NULL DEFAULT '',
-		restart_count INTEGER NOT NULL DEFAULT 0,
-		restart_limit INTEGER NOT NULL DEFAULT 5,
-		phase_name TEXT NOT NULL DEFAULT '',
-		checkpoint_json TEXT NOT NULL DEFAULT '{}',
-		wake_until_ms INTEGER NOT NULL DEFAULT 0,
-		wait_mode TEXT NOT NULL DEFAULT '',
-		wait_task_ids_json TEXT NOT NULL DEFAULT '[]',
-		wait_signal_name TEXT NOT NULL DEFAULT '',
-		memo_json TEXT NOT NULL DEFAULT '{}',
-		result_json TEXT NOT NULL DEFAULT '{}',
-		error_text TEXT NOT NULL DEFAULT '',
-		created_at_ms INTEGER NOT NULL,
-		updated_at_ms INTEGER NOT NULL
-	)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS durable_task_owner_dedup ON durable_task(owner_task_id, dedup_key) WHERE dedup_key <> ''`,
-	`CREATE INDEX IF NOT EXISTS durable_task_owner_idx ON durable_task(owner_task_id)`,
-	`CREATE INDEX IF NOT EXISTS durable_task_status_idx ON durable_task(status)`,
-	`CREATE INDEX IF NOT EXISTS durable_task_conv_idx ON durable_task(conversation_id)`,
-
-	`CREATE TABLE IF NOT EXISTS durable_signal (
-		id TEXT PRIMARY KEY,
-		insert_seq INTEGER NOT NULL,
-		task_id TEXT NOT NULL,
-		signal_name TEXT NOT NULL,
-		signal_key TEXT NOT NULL DEFAULT '',
-		payload_json TEXT NOT NULL DEFAULT '{}',
-		consumed INTEGER NOT NULL DEFAULT 0,
-		consumed_at_ms INTEGER NOT NULL DEFAULT 0,
-		created_at_ms INTEGER NOT NULL
-	)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS durable_signal_task_key ON durable_signal(task_id, signal_name, signal_key) WHERE signal_key <> ''`,
-	`CREATE INDEX IF NOT EXISTS durable_signal_task_pending_idx ON durable_signal(task_id, signal_name, consumed)`,
-}
-
-type queryExecutor interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
+// MigrationsFS embeds the SQLite migration scripts for the durable store.
+//
+//go:embed migrations/*.sql
+var MigrationsFS embed.FS
 
 type sqliteBackend struct {
 	writeDB      *sql.DB
@@ -153,15 +64,18 @@ func openSQLiteBackend(ctx context.Context, path string) (*sqliteBackend, error)
 		}
 	}
 
-	for _, ddl := range SchemaDDL {
-		if _, err := writeDB.ExecContext(ctx, ddl); err != nil {
-			_ = writeDB.Close()
-			return nil, fmt.Errorf("durable/store: apply schema: %w", err)
-		}
+	runner, err := migrate.New(writeDB, "durable", MigrationsFS)
+	if err != nil {
+		_ = writeDB.Close()
+		return nil, fmt.Errorf("durable/store: init migrator: %w", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		_ = writeDB.Close()
+		return nil, fmt.Errorf("durable/store: apply migrations: %w", err)
 	}
 
-	var maxSig int64
-	if err := writeDB.QueryRowContext(ctx, `SELECT COALESCE(MAX(insert_seq), 0) FROM durable_signal`).Scan(&maxSig); err != nil {
+	maxSig, err := sqlcgen.New(writeDB).ReadMaxSignalInsertSeq(ctx)
+	if err != nil {
 		_ = writeDB.Close()
 		return nil, fmt.Errorf("durable/store: read signal sequence: %w", err)
 	}
@@ -209,11 +123,11 @@ func (b *sqliteBackend) beginTx(ctx context.Context) (backendTx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &sqliteTx{backend: b, tx: tx}, nil
+	return &sqliteTx{backend: b, tx: tx, q: sqlcgen.New(tx)}, nil
 }
 
 func (b *sqliteBackend) read(_ context.Context) backendReader {
-	return &sqliteReader{q: b.readDB}
+	return &sqliteReader{q: sqlcgen.New(b.readDB)}
 }
 
 func (b *sqliteBackend) close() error {
@@ -232,7 +146,7 @@ func (b *sqliteBackend) close() error {
 }
 
 type sqliteReader struct {
-	q queryExecutor
+	q *sqlcgen.Queries
 }
 
 func (r *sqliteReader) getConversation(ctx context.Context, id string) (Conversation, bool, error) {
@@ -290,6 +204,7 @@ func (r *sqliteReader) listSignals(ctx context.Context, taskID, signalName strin
 type sqliteTx struct {
 	backend *sqliteBackend
 	tx      *sql.Tx
+	q       *sqlcgen.Queries
 }
 
 func (t *sqliteTx) savepoint(ctx context.Context, name string) error {
@@ -314,80 +229,84 @@ func (t *sqliteTx) commit(_ context.Context) error { return t.tx.Commit() }
 func (t *sqliteTx) rollback() error                { return t.tx.Rollback() }
 
 func (t *sqliteTx) getConversation(ctx context.Context, id string) (Conversation, bool, error) {
-	return sqlGetConversation(ctx, t.tx, id)
+	return sqlGetConversation(ctx, t.q, id)
 }
 
 func (t *sqliteTx) listConversationsByOwnerTask(ctx context.Context, ownerTaskID string) ([]Conversation, error) {
-	return sqlListConversationsByOwnerTask(ctx, t.tx, ownerTaskID)
+	return sqlListConversationsByOwnerTask(ctx, t.q, ownerTaskID)
 }
 
 func (t *sqliteTx) listEntries(ctx context.Context, conversationID string, fromSeq, maxSeq int64) ([]Entry, error) {
-	return sqlListEntries(ctx, t.tx, conversationID, fromSeq, maxSeq)
+	return sqlListEntries(ctx, t.q, conversationID, fromSeq, maxSeq)
 }
 
 func (t *sqliteTx) getDocument(ctx context.Context, key DocKey) (Document, bool, error) {
-	return sqlGetDocument(ctx, t.tx, key)
+	return sqlGetDocument(ctx, t.q, key)
 }
 
 func (t *sqliteTx) listDocumentsByScope(ctx context.Context, scopeKind, scopeID string) ([]Document, error) {
-	return sqlListDocumentsByScope(ctx, t.tx, scopeKind, scopeID)
+	return sqlListDocumentsByScope(ctx, t.q, scopeKind, scopeID)
 }
 
 func (t *sqliteTx) getSubmission(ctx context.Context, id string) (Submission, bool, error) {
-	return sqlGetSubmission(ctx, t.tx, id)
+	return sqlGetSubmission(ctx, t.q, id)
 }
 
 func (t *sqliteTx) getSubmissionByRequestID(ctx context.Context, conversationID, requestID string) (Submission, bool, error) {
-	return sqlGetSubmissionByRequestID(ctx, t.tx, conversationID, requestID)
+	return sqlGetSubmissionByRequestID(ctx, t.q, conversationID, requestID)
 }
 
 func (t *sqliteTx) getTask(ctx context.Context, id string) (Task, bool, error) {
-	return sqlGetTask(ctx, t.tx, id)
+	return sqlGetTask(ctx, t.q, id)
 }
 
 func (t *sqliteTx) getTaskByDedupKey(ctx context.Context, ownerTaskID, dedupKey string) (Task, bool, error) {
-	return sqlGetTaskByDedupKey(ctx, t.tx, ownerTaskID, dedupKey)
+	return sqlGetTaskByDedupKey(ctx, t.q, ownerTaskID, dedupKey)
 }
 
 func (t *sqliteTx) listTasksByOwner(ctx context.Context, ownerTaskID string) ([]Task, error) {
-	return sqlListTasksByOwner(ctx, t.tx, ownerTaskID)
+	return sqlListTasksByOwner(ctx, t.q, ownerTaskID)
 }
 
 func (t *sqliteTx) listTasksByStatus(ctx context.Context, statuses []TaskStatus) ([]Task, error) {
-	return sqlListTasksByStatus(ctx, t.tx, statuses)
+	return sqlListTasksByStatus(ctx, t.q, statuses)
 }
 
 func (t *sqliteTx) listTasksByConversation(ctx context.Context, conversationID string) ([]Task, error) {
-	return sqlListTasksByConversation(ctx, t.tx, conversationID)
+	return sqlListTasksByConversation(ctx, t.q, conversationID)
 }
 
 func (t *sqliteTx) listSignals(ctx context.Context, taskID, signalName string, onlyUnconsumed bool) ([]Signal, error) {
-	return sqlListSignals(ctx, t.tx, taskID, signalName, onlyUnconsumed)
+	return sqlListSignals(ctx, t.q, taskID, signalName, onlyUnconsumed)
 }
 
 func (t *sqliteTx) insertConversation(ctx context.Context, conv Conversation) error {
-	_, err := t.tx.ExecContext(ctx, `
-		INSERT INTO durable_conversation (
-			id, owner_task_id, parent_id, fork_entry_seq, head_seq, next_seq,
-			provider_affinity, metadata_json, created_at_ms, updated_at_ms
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		conv.ID, conv.OwnerTaskID, conv.ParentID, conv.ForkEntrySeq, conv.HeadSeq, conv.NextSeq,
-		conv.ProviderAffinity, string(conv.MetadataJSON), conv.CreatedAtMs, conv.UpdatedAtMs,
-	)
+	err := t.q.InsertConversation(ctx, sqlcgen.InsertConversationParams{
+		ID:               conv.ID,
+		OwnerTaskID:      conv.OwnerTaskID,
+		ParentID:         conv.ParentID,
+		ForkEntrySeq:     conv.ForkEntrySeq,
+		HeadSeq:          conv.HeadSeq,
+		NextSeq:          conv.NextSeq,
+		ProviderAffinity: conv.ProviderAffinity,
+		MetadataJson:     string(conv.MetadataJSON),
+		CreatedAtMs:      conv.CreatedAtMs,
+		UpdatedAtMs:      conv.UpdatedAtMs,
+	})
 	return classifySQLiteErr(err)
 }
 
 func (t *sqliteTx) updateConversation(ctx context.Context, conv Conversation) error {
-	res, err := t.tx.ExecContext(ctx, `
-		UPDATE durable_conversation
-		SET head_seq = ?, next_seq = ?, metadata_json = ?, updated_at_ms = ?
-		WHERE id = ?`,
-		conv.HeadSeq, conv.NextSeq, string(conv.MetadataJSON), conv.UpdatedAtMs, conv.ID,
-	)
+	n, err := t.q.UpdateConversation(ctx, sqlcgen.UpdateConversationParams{
+		HeadSeq:      conv.HeadSeq,
+		NextSeq:      conv.NextSeq,
+		MetadataJson: string(conv.MetadataJSON),
+		UpdatedAtMs:  conv.UpdatedAtMs,
+		ID:           conv.ID,
+	})
 	if err != nil {
 		return classifySQLiteErr(err)
 	}
-	n, _ := res.RowsAffected()
 	if n == 0 {
 		return ErrNotFound
 	}
@@ -395,34 +314,41 @@ func (t *sqliteTx) updateConversation(ctx context.Context, conv Conversation) er
 }
 
 func (t *sqliteTx) insertEntry(ctx context.Context, entry Entry) error {
-	_, err := t.tx.ExecContext(ctx, `
-		INSERT INTO durable_entry (conversation_id, seq, kind, payload_json, created_at_ms)
-		VALUES (?, ?, ?, ?, ?)`,
-		entry.ConversationID, entry.Seq, entry.Kind, string(entry.PayloadJSON), entry.CreatedAtMs,
-	)
+	err := t.q.InsertEntry(ctx, sqlcgen.InsertEntryParams{
+		ConversationID: entry.ConversationID,
+		Seq:            entry.Seq,
+		Kind:           entry.Kind,
+		PayloadJson:    string(entry.PayloadJSON),
+		CreatedAtMs:    entry.CreatedAtMs,
+	})
 	return classifySQLiteErr(err)
 }
 
 func (t *sqliteTx) upsertDocument(ctx context.Context, doc Document) (Document, error) {
-	existing, found, err := sqlGetDocument(ctx, t.tx, DocKey{ScopeKind: doc.ScopeKind, ScopeID: doc.ScopeID, DocKind: doc.DocKind})
+	existing, found, err := sqlGetDocument(ctx, t.q, DocKey{ScopeKind: doc.ScopeKind, ScopeID: doc.ScopeID, DocKind: doc.DocKind})
 	if err != nil {
 		return Document{}, err
 	}
 	if found {
 		doc.Rev = existing.Rev + 1
-		_, err = t.tx.ExecContext(ctx, `
-			UPDATE durable_document
-			SET rev = ?, state_json = ?, updated_at_ms = ?
-			WHERE scope_kind = ? AND scope_id = ? AND doc_kind = ?`,
-			doc.Rev, string(doc.StateJSON), doc.UpdatedAtMs, doc.ScopeKind, doc.ScopeID, doc.DocKind,
-		)
+		err = t.q.UpdateDocument(ctx, sqlcgen.UpdateDocumentParams{
+			Rev:         doc.Rev,
+			StateJson:   string(doc.StateJSON),
+			UpdatedAtMs: doc.UpdatedAtMs,
+			ScopeKind:   doc.ScopeKind,
+			ScopeID:     doc.ScopeID,
+			DocKind:     doc.DocKind,
+		})
 	} else {
 		doc.Rev = 1
-		_, err = t.tx.ExecContext(ctx, `
-			INSERT INTO durable_document (scope_kind, scope_id, doc_kind, rev, state_json, updated_at_ms)
-			VALUES (?, ?, ?, ?, ?, ?)`,
-			doc.ScopeKind, doc.ScopeID, doc.DocKind, doc.Rev, string(doc.StateJSON), doc.UpdatedAtMs,
-		)
+		err = t.q.InsertDocument(ctx, sqlcgen.InsertDocumentParams{
+			ScopeKind:   doc.ScopeKind,
+			ScopeID:     doc.ScopeID,
+			DocKind:     doc.DocKind,
+			Rev:         doc.Rev,
+			StateJson:   string(doc.StateJSON),
+			UpdatedAtMs: doc.UpdatedAtMs,
+		})
 	}
 	if err != nil {
 		return Document{}, classifySQLiteErr(err)
@@ -431,41 +357,43 @@ func (t *sqliteTx) upsertDocument(ctx context.Context, doc Document) (Document, 
 }
 
 func (t *sqliteTx) deleteDocument(ctx context.Context, key DocKey) (bool, error) {
-	res, err := t.tx.ExecContext(ctx, `
-		DELETE FROM durable_document
-		WHERE scope_kind = ? AND scope_id = ? AND doc_kind = ?`,
-		key.ScopeKind, key.ScopeID, key.DocKind,
-	)
+	n, err := t.q.DeleteDocument(ctx, sqlcgen.DeleteDocumentParams{
+		ScopeKind: key.ScopeKind,
+		ScopeID:   key.ScopeID,
+		DocKind:   key.DocKind,
+	})
 	if err != nil {
 		return false, classifySQLiteErr(err)
 	}
-	n, _ := res.RowsAffected()
 	return n > 0, nil
 }
 
 func (t *sqliteTx) insertSubmission(ctx context.Context, sub Submission) error {
-	_, err := t.tx.ExecContext(ctx, `
-		INSERT INTO durable_submission (
-			id, conversation_id, request_id, kind, status, payload_json,
-			notify_task_id, result_json, created_at_ms, updated_at_ms
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		sub.ID, sub.ConversationID, sub.RequestID, sub.Kind, sub.Status, string(sub.PayloadJSON),
-		sub.NotifyTaskID, string(sub.ResultJSON), sub.CreatedAtMs, sub.UpdatedAtMs,
-	)
+	err := t.q.InsertSubmission(ctx, sqlcgen.InsertSubmissionParams{
+		ID:             sub.ID,
+		ConversationID: sub.ConversationID,
+		RequestID:      sub.RequestID,
+		Kind:           sub.Kind,
+		Status:         sub.Status,
+		PayloadJson:    string(sub.PayloadJSON),
+		NotifyTaskID:   sub.NotifyTaskID,
+		ResultJson:     string(sub.ResultJSON),
+		CreatedAtMs:    sub.CreatedAtMs,
+		UpdatedAtMs:    sub.UpdatedAtMs,
+	})
 	return classifySQLiteErr(err)
 }
 
 func (t *sqliteTx) updateSubmission(ctx context.Context, sub Submission) error {
-	res, err := t.tx.ExecContext(ctx, `
-		UPDATE durable_submission
-		SET status = ?, result_json = ?, updated_at_ms = ?
-		WHERE id = ?`,
-		sub.Status, string(sub.ResultJSON), sub.UpdatedAtMs, sub.ID,
-	)
+	n, err := t.q.UpdateSubmission(ctx, sqlcgen.UpdateSubmissionParams{
+		Status:      sub.Status,
+		ResultJson:  string(sub.ResultJSON),
+		UpdatedAtMs: sub.UpdatedAtMs,
+		ID:          sub.ID,
+	})
 	if err != nil {
 		return classifySQLiteErr(err)
 	}
-	n, _ := res.RowsAffected()
 	if n == 0 {
 		return ErrNotFound
 	}
@@ -477,18 +405,29 @@ func (t *sqliteTx) insertTask(ctx context.Context, task Task) error {
 	if err != nil {
 		return err
 	}
-	_, err = t.tx.ExecContext(ctx, `
-		INSERT INTO durable_task (
-			id, conversation_id, owner_task_id, dedup_key, kind, is_model_task,
-			status, terminal_reason, restart_count, restart_limit, phase_name,
-			checkpoint_json, wake_until_ms, wait_mode, wait_task_ids_json, wait_signal_name,
-			memo_json, result_json, error_text, created_at_ms, updated_at_ms
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		task.ID, task.ConversationID, task.OwnerTaskID, task.DedupKey, task.Kind, boolToInt(task.IsModelTask),
-		string(task.Status), task.TerminalReason, task.RestartCount, task.RestartLimit, task.PhaseName,
-		string(task.CheckpointJSON), task.WakeUntilMs, string(task.WaitMode), string(waitIDsJSON), task.WaitSignalName,
-		string(task.MemoJSON), string(task.ResultJSON), task.ErrorText, task.CreatedAtMs, task.UpdatedAtMs,
-	)
+	err = t.q.InsertTask(ctx, sqlcgen.InsertTaskParams{
+		ID:              task.ID,
+		ConversationID:  task.ConversationID,
+		OwnerTaskID:     task.OwnerTaskID,
+		DedupKey:        task.DedupKey,
+		Kind:            task.Kind,
+		IsModelTask:     int64(boolToInt(task.IsModelTask)),
+		Status:          string(task.Status),
+		TerminalReason:  task.TerminalReason,
+		RestartCount:    int64(task.RestartCount),
+		RestartLimit:    int64(task.RestartLimit),
+		PhaseName:       task.PhaseName,
+		CheckpointJson:  string(task.CheckpointJSON),
+		WakeUntilMs:     task.WakeUntilMs,
+		WaitMode:        string(task.WaitMode),
+		WaitTaskIdsJson: string(waitIDsJSON),
+		WaitSignalName:  task.WaitSignalName,
+		MemoJson:        string(task.MemoJSON),
+		ResultJson:      string(task.ResultJSON),
+		ErrorText:       task.ErrorText,
+		CreatedAtMs:     task.CreatedAtMs,
+		UpdatedAtMs:     task.UpdatedAtMs,
+	})
 	return classifySQLiteErr(err)
 }
 
@@ -497,20 +436,26 @@ func (t *sqliteTx) updateTask(ctx context.Context, task Task) error {
 	if err != nil {
 		return err
 	}
-	res, err := t.tx.ExecContext(ctx, `
-		UPDATE durable_task
-		SET status = ?, terminal_reason = ?, restart_count = ?, restart_limit = ?, phase_name = ?,
-		    checkpoint_json = ?, wake_until_ms = ?, wait_mode = ?, wait_task_ids_json = ?, wait_signal_name = ?,
-		    memo_json = ?, result_json = ?, error_text = ?, updated_at_ms = ?
-		WHERE id = ?`,
-		string(task.Status), task.TerminalReason, task.RestartCount, task.RestartLimit, task.PhaseName,
-		string(task.CheckpointJSON), task.WakeUntilMs, string(task.WaitMode), string(waitIDsJSON), task.WaitSignalName,
-		string(task.MemoJSON), string(task.ResultJSON), task.ErrorText, task.UpdatedAtMs, task.ID,
-	)
+	n, err := t.q.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
+		Status:          string(task.Status),
+		TerminalReason:  task.TerminalReason,
+		RestartCount:    int64(task.RestartCount),
+		RestartLimit:    int64(task.RestartLimit),
+		PhaseName:       task.PhaseName,
+		CheckpointJson:  string(task.CheckpointJSON),
+		WakeUntilMs:     task.WakeUntilMs,
+		WaitMode:        string(task.WaitMode),
+		WaitTaskIdsJson: string(waitIDsJSON),
+		WaitSignalName:  task.WaitSignalName,
+		MemoJson:        string(task.MemoJSON),
+		ResultJson:      string(task.ResultJSON),
+		ErrorText:       task.ErrorText,
+		UpdatedAtMs:     task.UpdatedAtMs,
+		ID:              task.ID,
+	})
 	if err != nil {
 		return classifySQLiteErr(err)
 	}
-	n, _ := res.RowsAffected()
 	if n == 0 {
 		return ErrNotFound
 	}
@@ -519,14 +464,17 @@ func (t *sqliteTx) updateTask(ctx context.Context, task Task) error {
 
 func (t *sqliteTx) insertSignal(ctx context.Context, sig Signal) error {
 	seqOrder := t.backend.nextSigOrder.Add(1)
-	_, err := t.tx.ExecContext(ctx, `
-		INSERT INTO durable_signal (
-			id, insert_seq, task_id, signal_name, signal_key, payload_json,
-			consumed, consumed_at_ms, created_at_ms
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		sig.ID, seqOrder, sig.TaskID, sig.SignalName, sig.SignalKey, string(sig.PayloadJSON),
-		boolToInt(sig.Consumed), sig.ConsumedAtMs, sig.CreatedAtMs,
-	)
+	err := t.q.InsertSignal(ctx, sqlcgen.InsertSignalParams{
+		ID:           sig.ID,
+		InsertSeq:    seqOrder,
+		TaskID:       sig.TaskID,
+		SignalName:   sig.SignalName,
+		SignalKey:    sig.SignalKey,
+		PayloadJson:  string(sig.PayloadJSON),
+		Consumed:     int64(boolToInt(sig.Consumed)),
+		ConsumedAtMs: sig.ConsumedAtMs,
+		CreatedAtMs:  sig.CreatedAtMs,
+	})
 	return classifySQLiteErr(err)
 }
 
@@ -534,238 +482,226 @@ func (t *sqliteTx) getSignalByKey(ctx context.Context, taskID, signalName, signa
 	if signalKey == "" {
 		return Signal{}, false, nil
 	}
-	row := t.tx.QueryRowContext(ctx, `
-		SELECT id, task_id, signal_name, signal_key, payload_json, consumed, consumed_at_ms, created_at_ms
-		FROM durable_signal
-		WHERE task_id = ? AND signal_name = ? AND signal_key = ?`,
-		taskID, signalName, signalKey,
-	)
-	sig, err := scanSignal(row)
+	row, err := t.q.GetSignalByKey(ctx, sqlcgen.GetSignalByKeyParams{
+		TaskID:     taskID,
+		SignalName: signalName,
+		SignalKey:  signalKey,
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return Signal{}, false, nil
 	}
 	if err != nil {
 		return Signal{}, false, err
 	}
-	return sig, true, nil
+	return Signal{
+		ID:           row.ID,
+		TaskID:       row.TaskID,
+		SignalName:   row.SignalName,
+		SignalKey:    row.SignalKey,
+		PayloadJSON:  []byte(row.PayloadJson),
+		Consumed:     row.Consumed != 0,
+		ConsumedAtMs: row.ConsumedAtMs,
+		CreatedAtMs:  row.CreatedAtMs,
+	}, true, nil
 }
 
 func (t *sqliteTx) markSignalConsumed(ctx context.Context, signalID string, consumedAtMs int64) error {
-	res, err := t.tx.ExecContext(ctx, `
-		UPDATE durable_signal
-		SET consumed = 1, consumed_at_ms = ?
-		WHERE id = ? AND consumed = 0`,
-		consumedAtMs, signalID,
-	)
+	n, err := t.q.MarkSignalConsumed(ctx, sqlcgen.MarkSignalConsumedParams{
+		ConsumedAtMs: consumedAtMs,
+		ID:           signalID,
+	})
 	if err != nil {
 		return classifySQLiteErr(err)
 	}
-	n, _ := res.RowsAffected()
 	if n == 0 {
-		var exists int
-		err2 := t.tx.QueryRowContext(ctx, `SELECT 1 FROM durable_signal WHERE id = ?`, signalID).Scan(&exists)
+		_, err2 := t.q.SignalExists(ctx, signalID)
 		if errors.Is(err2, sql.ErrNoRows) {
 			return ErrNotFound
+		}
+		if err2 != nil {
+			return classifySQLiteErr(err2)
 		}
 		return ErrConflict
 	}
 	return nil
 }
 
-func sqlGetConversation(ctx context.Context, q queryExecutor, id string) (Conversation, bool, error) {
-	row := q.QueryRowContext(ctx, `
-		SELECT id, owner_task_id, parent_id, fork_entry_seq, head_seq, next_seq,
-		       provider_affinity, metadata_json, created_at_ms, updated_at_ms
-		FROM durable_conversation
-		WHERE id = ?`, id)
-	var conv Conversation
-	var meta string
-	err := row.Scan(
-		&conv.ID, &conv.OwnerTaskID, &conv.ParentID, &conv.ForkEntrySeq, &conv.HeadSeq, &conv.NextSeq,
-		&conv.ProviderAffinity, &meta, &conv.CreatedAtMs, &conv.UpdatedAtMs,
-	)
+func convFromModel(m sqlcgen.DurableConversation) Conversation {
+	return Conversation{
+		ID:               m.ID,
+		OwnerTaskID:      m.OwnerTaskID,
+		ParentID:         m.ParentID,
+		ForkEntrySeq:     m.ForkEntrySeq,
+		HeadSeq:          m.HeadSeq,
+		NextSeq:          m.NextSeq,
+		ProviderAffinity: m.ProviderAffinity,
+		MetadataJSON:     []byte(m.MetadataJson),
+		CreatedAtMs:      m.CreatedAtMs,
+		UpdatedAtMs:      m.UpdatedAtMs,
+	}
+}
+
+func sqlGetConversation(ctx context.Context, q *sqlcgen.Queries, id string) (Conversation, bool, error) {
+	m, err := q.GetConversation(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Conversation{}, false, nil
 	}
 	if err != nil {
 		return Conversation{}, false, err
 	}
-	conv.MetadataJSON = []byte(meta)
-	return conv, true, nil
+	return convFromModel(m), true, nil
 }
 
-func sqlListConversationsByOwnerTask(ctx context.Context, q queryExecutor, ownerTaskID string) ([]Conversation, error) {
-	rows, err := q.QueryContext(ctx, `
-		SELECT id, owner_task_id, parent_id, fork_entry_seq, head_seq, next_seq,
-		       provider_affinity, metadata_json, created_at_ms, updated_at_ms
-		FROM durable_conversation
-		WHERE owner_task_id = ?
-		ORDER BY created_at_ms ASC, id ASC`, ownerTaskID)
+func sqlListConversationsByOwnerTask(ctx context.Context, q *sqlcgen.Queries, ownerTaskID string) ([]Conversation, error) {
+	rows, err := q.ListConversationsByOwnerTask(ctx, ownerTaskID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	var out []Conversation
-	for rows.Next() {
-		var conv Conversation
-		var meta string
-		if err := rows.Scan(
-			&conv.ID, &conv.OwnerTaskID, &conv.ParentID, &conv.ForkEntrySeq, &conv.HeadSeq, &conv.NextSeq,
-			&conv.ProviderAffinity, &meta, &conv.CreatedAtMs, &conv.UpdatedAtMs,
-		); err != nil {
-			return nil, err
-		}
-		conv.MetadataJSON = []byte(meta)
-		out = append(out, conv)
+	for _, m := range rows {
+		out = append(out, convFromModel(m))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
-func sqlListEntries(ctx context.Context, q queryExecutor, conversationID string, fromSeq, maxSeq int64) ([]Entry, error) {
-	var rows *sql.Rows
+func sqlListEntries(ctx context.Context, q *sqlcgen.Queries, conversationID string, fromSeq, maxSeq int64) ([]Entry, error) {
+	var rows []sqlcgen.DurableEntry
 	var err error
 	if maxSeq > 0 {
-		rows, err = q.QueryContext(ctx, `
-			SELECT conversation_id, seq, kind, payload_json, created_at_ms
-			FROM durable_entry
-			WHERE conversation_id = ? AND seq >= ? AND seq <= ?
-			ORDER BY seq ASC`, conversationID, fromSeq, maxSeq)
+		rows, err = q.ListEntriesRange(ctx, sqlcgen.ListEntriesRangeParams{
+			ConversationID: conversationID,
+			Seq:            fromSeq,
+			Seq_2:          maxSeq,
+		})
 	} else {
-		rows, err = q.QueryContext(ctx, `
-			SELECT conversation_id, seq, kind, payload_json, created_at_ms
-			FROM durable_entry
-			WHERE conversation_id = ? AND seq >= ?
-			ORDER BY seq ASC`, conversationID, fromSeq)
+		rows, err = q.ListEntriesFrom(ctx, sqlcgen.ListEntriesFromParams{
+			ConversationID: conversationID,
+			Seq:            fromSeq,
+		})
 	}
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	var out []Entry
-	for rows.Next() {
-		var e Entry
-		var payload string
-		if err := rows.Scan(&e.ConversationID, &e.Seq, &e.Kind, &payload, &e.CreatedAtMs); err != nil {
-			return nil, err
-		}
-		e.PayloadJSON = []byte(payload)
-		out = append(out, e)
+	for _, m := range rows {
+		out = append(out, Entry{
+			ConversationID: m.ConversationID,
+			Seq:            m.Seq,
+			Kind:           m.Kind,
+			PayloadJSON:    []byte(m.PayloadJson),
+			CreatedAtMs:    m.CreatedAtMs,
+		})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
-func sqlGetDocument(ctx context.Context, q queryExecutor, key DocKey) (Document, bool, error) {
-	row := q.QueryRowContext(ctx, `
-		SELECT scope_kind, scope_id, doc_kind, rev, state_json, updated_at_ms
-		FROM durable_document
-		WHERE scope_kind = ? AND scope_id = ? AND doc_kind = ?`,
-		key.ScopeKind, key.ScopeID, key.DocKind,
-	)
-	var doc Document
-	var state string
-	err := row.Scan(&doc.ScopeKind, &doc.ScopeID, &doc.DocKind, &doc.Rev, &state, &doc.UpdatedAtMs)
+func docFromModel(m sqlcgen.DurableDocument) Document {
+	return Document{
+		ScopeKind:   m.ScopeKind,
+		ScopeID:     m.ScopeID,
+		DocKind:     m.DocKind,
+		Rev:         m.Rev,
+		StateJSON:   []byte(m.StateJson),
+		UpdatedAtMs: m.UpdatedAtMs,
+	}
+}
+
+func sqlGetDocument(ctx context.Context, q *sqlcgen.Queries, key DocKey) (Document, bool, error) {
+	m, err := q.GetDocument(ctx, sqlcgen.GetDocumentParams{
+		ScopeKind: key.ScopeKind,
+		ScopeID:   key.ScopeID,
+		DocKind:   key.DocKind,
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return Document{}, false, nil
 	}
 	if err != nil {
 		return Document{}, false, err
 	}
-	doc.StateJSON = []byte(state)
-	return doc, true, nil
+	return docFromModel(m), true, nil
 }
 
-func sqlListDocumentsByScope(ctx context.Context, q queryExecutor, scopeKind, scopeID string) ([]Document, error) {
-	rows, err := q.QueryContext(ctx, `
-		SELECT scope_kind, scope_id, doc_kind, rev, state_json, updated_at_ms
-		FROM durable_document
-		WHERE scope_kind = ? AND scope_id = ?
-		ORDER BY doc_kind ASC`, scopeKind, scopeID)
+func sqlListDocumentsByScope(ctx context.Context, q *sqlcgen.Queries, scopeKind, scopeID string) ([]Document, error) {
+	rows, err := q.ListDocumentsByScope(ctx, sqlcgen.ListDocumentsByScopeParams{
+		ScopeKind: scopeKind,
+		ScopeID:   scopeID,
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	var out []Document
-	for rows.Next() {
-		var doc Document
-		var state string
-		if err := rows.Scan(&doc.ScopeKind, &doc.ScopeID, &doc.DocKind, &doc.Rev, &state, &doc.UpdatedAtMs); err != nil {
-			return nil, err
-		}
-		doc.StateJSON = []byte(state)
-		out = append(out, doc)
+	for _, m := range rows {
+		out = append(out, docFromModel(m))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
-func sqlGetSubmission(ctx context.Context, q queryExecutor, id string) (Submission, bool, error) {
-	row := q.QueryRowContext(ctx, `
-		SELECT id, conversation_id, request_id, kind, status, payload_json,
-		       notify_task_id, result_json, created_at_ms, updated_at_ms
-		FROM durable_submission
-		WHERE id = ?`, id)
-	return scanSubmissionRow(row)
+func submissionFromModel(m sqlcgen.DurableSubmission) Submission {
+	return Submission{
+		ID:             m.ID,
+		ConversationID: m.ConversationID,
+		RequestID:      m.RequestID,
+		Kind:           m.Kind,
+		Status:         m.Status,
+		PayloadJSON:    []byte(m.PayloadJson),
+		NotifyTaskID:   m.NotifyTaskID,
+		ResultJSON:     []byte(m.ResultJson),
+		CreatedAtMs:    m.CreatedAtMs,
+		UpdatedAtMs:    m.UpdatedAtMs,
+	}
 }
 
-func sqlGetSubmissionByRequestID(ctx context.Context, q queryExecutor, conversationID, requestID string) (Submission, bool, error) {
-	row := q.QueryRowContext(ctx, `
-		SELECT id, conversation_id, request_id, kind, status, payload_json,
-		       notify_task_id, result_json, created_at_ms, updated_at_ms
-		FROM durable_submission
-		WHERE conversation_id = ? AND request_id = ?`, conversationID, requestID)
-	return scanSubmissionRow(row)
-}
-
-func scanSubmissionRow(row *sql.Row) (Submission, bool, error) {
-	var sub Submission
-	var payload, result string
-	err := row.Scan(
-		&sub.ID, &sub.ConversationID, &sub.RequestID, &sub.Kind, &sub.Status, &payload,
-		&sub.NotifyTaskID, &result, &sub.CreatedAtMs, &sub.UpdatedAtMs,
-	)
+func sqlGetSubmission(ctx context.Context, q *sqlcgen.Queries, id string) (Submission, bool, error) {
+	m, err := q.GetSubmission(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Submission{}, false, nil
 	}
 	if err != nil {
 		return Submission{}, false, err
 	}
-	sub.PayloadJSON = []byte(payload)
-	sub.ResultJSON = []byte(result)
-	return sub, true, nil
+	return submissionFromModel(m), true, nil
 }
 
-const selectTaskCols = `
-	id, conversation_id, owner_task_id, dedup_key, kind, is_model_task,
-	status, terminal_reason, restart_count, restart_limit, phase_name,
-	checkpoint_json, wake_until_ms, wait_mode, wait_task_ids_json, wait_signal_name,
-	memo_json, result_json, error_text, created_at_ms, updated_at_ms
-`
-
-type rowScanner interface {
-	Scan(dest ...any) error
-}
-
-func scanTask(s rowScanner) (Task, error) {
-	var t Task
-	var isModel int
-	var statusStr, waitModeStr string
-	var cp, waitIDs, memo, result string
-	if err := s.Scan(
-		&t.ID, &t.ConversationID, &t.OwnerTaskID, &t.DedupKey, &t.Kind, &isModel,
-		&statusStr, &t.TerminalReason, &t.RestartCount, &t.RestartLimit, &t.PhaseName,
-		&cp, &t.WakeUntilMs, &waitModeStr, &waitIDs, &t.WaitSignalName,
-		&memo, &result, &t.ErrorText, &t.CreatedAtMs, &t.UpdatedAtMs,
-	); err != nil {
-		return Task{}, err
+func sqlGetSubmissionByRequestID(ctx context.Context, q *sqlcgen.Queries, conversationID, requestID string) (Submission, bool, error) {
+	m, err := q.GetSubmissionByRequestID(ctx, sqlcgen.GetSubmissionByRequestIDParams{
+		ConversationID: conversationID,
+		RequestID:      requestID,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return Submission{}, false, nil
 	}
-	t.IsModelTask = isModel != 0
-	t.Status = TaskStatus(statusStr)
-	t.WaitMode = WaitMode(waitModeStr)
-	t.CheckpointJSON = []byte(cp)
-	t.MemoJSON = []byte(memo)
-	t.ResultJSON = []byte(result)
-	if waitIDs != "" {
+	if err != nil {
+		return Submission{}, false, err
+	}
+	return submissionFromModel(m), true, nil
+}
+
+func taskFromModel(m sqlcgen.DurableTask) (Task, error) {
+	t := Task{
+		ID:             m.ID,
+		ConversationID: m.ConversationID,
+		OwnerTaskID:    m.OwnerTaskID,
+		DedupKey:       m.DedupKey,
+		Kind:           m.Kind,
+		IsModelTask:    m.IsModelTask != 0,
+		Status:         TaskStatus(m.Status),
+		TerminalReason: m.TerminalReason,
+		RestartCount:   int(m.RestartCount),
+		RestartLimit:   int(m.RestartLimit),
+		PhaseName:      m.PhaseName,
+		CheckpointJSON: []byte(m.CheckpointJson),
+		WakeUntilMs:    m.WakeUntilMs,
+		WaitMode:       WaitMode(m.WaitMode),
+		WaitSignalName: m.WaitSignalName,
+		MemoJSON:       []byte(m.MemoJson),
+		ResultJSON:     []byte(m.ResultJson),
+		ErrorText:      m.ErrorText,
+		CreatedAtMs:    m.CreatedAtMs,
+		UpdatedAtMs:    m.UpdatedAtMs,
+	}
+	if m.WaitTaskIdsJson != "" {
 		var ids []string
-		if err := json.Unmarshal([]byte(waitIDs), &ids); err != nil {
+		if err := json.Unmarshal([]byte(m.WaitTaskIdsJson), &ids); err != nil {
 			return Task{}, err
 		}
 		if len(ids) > 0 {
@@ -775,143 +711,115 @@ func scanTask(s rowScanner) (Task, error) {
 	return t, nil
 }
 
-func sqlGetTask(ctx context.Context, q queryExecutor, id string) (Task, bool, error) {
-	row := q.QueryRowContext(ctx, `SELECT `+selectTaskCols+` FROM durable_task WHERE id = ?`, id)
-	t, err := scanTask(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Task{}, false, nil
-	}
-	if err != nil {
-		return Task{}, false, err
-	}
-	return t, true, nil
-}
-
-func sqlGetTaskByDedupKey(ctx context.Context, q queryExecutor, ownerTaskID, dedupKey string) (Task, bool, error) {
-	if dedupKey == "" {
-		return Task{}, false, nil
-	}
-	row := q.QueryRowContext(ctx, `
-		SELECT `+selectTaskCols+`
-		FROM durable_task
-		WHERE owner_task_id = ? AND dedup_key = ?`, ownerTaskID, dedupKey)
-	t, err := scanTask(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Task{}, false, nil
-	}
-	if err != nil {
-		return Task{}, false, err
-	}
-	return t, true, nil
-}
-
-func sqlListTasksByOwner(ctx context.Context, q queryExecutor, ownerTaskID string) ([]Task, error) {
-	rows, err := q.QueryContext(ctx, `
-		SELECT `+selectTaskCols+`
-		FROM durable_task
-		WHERE owner_task_id = ?
-		ORDER BY created_at_ms ASC, id ASC`, ownerTaskID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanTasksRows(rows)
-}
-
-func sqlListTasksByStatus(ctx context.Context, q queryExecutor, statuses []TaskStatus) ([]Task, error) {
-	var rows *sql.Rows
-	var err error
-	if len(statuses) == 0 {
-		rows, err = q.QueryContext(ctx, `SELECT `+selectTaskCols+` FROM durable_task ORDER BY created_at_ms ASC, id ASC`)
-	} else {
-		placeholders := make([]string, len(statuses))
-		args := make([]any, len(statuses))
-		for i, st := range statuses {
-			placeholders[i] = "?"
-			args[i] = string(st)
-		}
-		rows, err = q.QueryContext(ctx, `
-			SELECT `+selectTaskCols+`
-			FROM durable_task
-			WHERE status IN (`+strings.Join(placeholders, ",")+`)
-			ORDER BY created_at_ms ASC, id ASC`, args...)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanTasksRows(rows)
-}
-
-func sqlListTasksByConversation(ctx context.Context, q queryExecutor, conversationID string) ([]Task, error) {
-	rows, err := q.QueryContext(ctx, `
-		SELECT `+selectTaskCols+`
-		FROM durable_task
-		WHERE conversation_id = ?
-		ORDER BY created_at_ms ASC, id ASC`, conversationID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanTasksRows(rows)
-}
-
-func scanTasksRows(rows *sql.Rows) ([]Task, error) {
+func tasksFromModels(rows []sqlcgen.DurableTask) ([]Task, error) {
 	var out []Task
-	for rows.Next() {
-		t, err := scanTask(rows)
+	for _, m := range rows {
+		t, err := taskFromModel(m)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, t)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
-func sqlListSignals(ctx context.Context, q queryExecutor, taskID, signalName string, onlyUnconsumed bool) ([]Signal, error) {
-	query := `
-		SELECT id, task_id, signal_name, signal_key, payload_json, consumed, consumed_at_ms, created_at_ms
-		FROM durable_signal
-		WHERE task_id = ?`
-	args := []any{taskID}
-	if signalName != "" {
-		query += ` AND signal_name = ?`
-		args = append(args, signalName)
+func sqlGetTask(ctx context.Context, q *sqlcgen.Queries, id string) (Task, bool, error) {
+	m, err := q.GetTask(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Task{}, false, nil
 	}
-	if onlyUnconsumed {
-		query += ` AND consumed = 0`
+	if err != nil {
+		return Task{}, false, err
 	}
-	query += ` ORDER BY created_at_ms ASC, insert_seq ASC`
+	t, err := taskFromModel(m)
+	if err != nil {
+		return Task{}, false, err
+	}
+	return t, true, nil
+}
 
-	rows, err := q.QueryContext(ctx, query, args...)
+func sqlGetTaskByDedupKey(ctx context.Context, q *sqlcgen.Queries, ownerTaskID, dedupKey string) (Task, bool, error) {
+	if dedupKey == "" {
+		return Task{}, false, nil
+	}
+	m, err := q.GetTaskByDedupKey(ctx, sqlcgen.GetTaskByDedupKeyParams{
+		OwnerTaskID: ownerTaskID,
+		DedupKey:    dedupKey,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return Task{}, false, nil
+	}
+	if err != nil {
+		return Task{}, false, err
+	}
+	t, err := taskFromModel(m)
+	if err != nil {
+		return Task{}, false, err
+	}
+	return t, true, nil
+}
+
+func sqlListTasksByOwner(ctx context.Context, q *sqlcgen.Queries, ownerTaskID string) ([]Task, error) {
+	rows, err := q.ListTasksByOwner(ctx, ownerTaskID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Signal
-	for rows.Next() {
-		sig, err := scanSignal(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, sig)
-	}
-	return out, rows.Err()
+	return tasksFromModels(rows)
 }
 
-func scanSignal(s rowScanner) (Signal, error) {
-	var sig Signal
-	var payload string
-	var consumedInt int
-	if err := s.Scan(
-		&sig.ID, &sig.TaskID, &sig.SignalName, &sig.SignalKey, &payload,
-		&consumedInt, &sig.ConsumedAtMs, &sig.CreatedAtMs,
-	); err != nil {
-		return Signal{}, err
+func sqlListTasksByStatus(ctx context.Context, q *sqlcgen.Queries, statuses []TaskStatus) ([]Task, error) {
+	var rows []sqlcgen.DurableTask
+	var err error
+	if len(statuses) == 0 {
+		rows, err = q.ListAllTasks(ctx)
+	} else {
+		strStatuses := make([]string, len(statuses))
+		for i, st := range statuses {
+			strStatuses[i] = string(st)
+		}
+		rows, err = q.ListTasksByStatus(ctx, strStatuses)
 	}
-	sig.PayloadJSON = []byte(payload)
-	sig.Consumed = consumedInt != 0
-	return sig, nil
+	if err != nil {
+		return nil, err
+	}
+	return tasksFromModels(rows)
+}
+
+func sqlListTasksByConversation(ctx context.Context, q *sqlcgen.Queries, conversationID string) ([]Task, error) {
+	rows, err := q.ListTasksByConversation(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	return tasksFromModels(rows)
+}
+
+func sqlListSignals(ctx context.Context, q *sqlcgen.Queries, taskID, signalName string, onlyUnconsumed bool) ([]Signal, error) {
+	var onlyUncons int64
+	if onlyUnconsumed {
+		onlyUncons = 1
+	}
+	rows, err := q.ListSignals(ctx, sqlcgen.ListSignalsParams{
+		TaskID:         taskID,
+		SignalName:     signalName,
+		OnlyUnconsumed: onlyUncons,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var out []Signal
+	for _, r := range rows {
+		out = append(out, Signal{
+			ID:           r.ID,
+			TaskID:       r.TaskID,
+			SignalName:   r.SignalName,
+			SignalKey:    r.SignalKey,
+			PayloadJSON:  []byte(r.PayloadJson),
+			Consumed:     r.Consumed != 0,
+			ConsumedAtMs: r.ConsumedAtMs,
+			CreatedAtMs:  r.CreatedAtMs,
+		})
+	}
+	return out, nil
 }
 
 func classifySQLiteErr(err error) error {
