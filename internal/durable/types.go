@@ -19,6 +19,7 @@ var (
 	ErrStepQuotaExceeded        = errors.New("durable: codemode step quota exceeded")
 	ErrScriptSyntax             = errors.New("durable: codemode script syntax error")
 	ErrScriptQuotaExceeded      = errors.New("durable: codemode memory or variable quota exceeded")
+	ErrScriptTimeout            = errors.New("durable: codemode execution timeout")
 	ErrUnknownTool              = errors.New("durable: unknown tool")
 )
 

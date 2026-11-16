@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"math"
-	"reflect"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
-	"unicode"
+
+	"github.com/dop251/goja"
+	"github.com/dop251/goja/ast"
+	"github.com/dop251/goja/file"
+	"github.com/dop251/goja/token"
+	"github.com/dop251/goja/unistring"
 
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
 )
@@ -25,10 +30,14 @@ const (
 
 	defaultCodeMaxSteps       = 10_000
 	defaultCodeMaxVars        = 256
-	defaultCodeMaxOutputBytes = 1 << 20 // 1 MiB
+	defaultCodeMaxOutputBytes = 1 << 20      // 1 MiB
+	defaultCodeMaxMemoryBytes = 16 << 20     // 16 MiB
+	defaultCodeMaxStringBytes = 1 << 20      // 1 MiB
+	defaultCodeTimeoutMs      = int64(5_000) // 5s watchdog timeout
+	defaultCodeMaxCallStack   = 512
 )
 
-// CodeModeSpec configures deterministic replay execution of a pure-Go orchestrated script.
+// CodeModeSpec configures deterministic replay execution of a Goja JavaScript script.
 type CodeModeSpec struct {
 	Script         string `json:"script"`
 	Seed           uint64 `json:"seed"`
@@ -36,6 +45,9 @@ type CodeModeSpec struct {
 	MaxSteps       int    `json:"maxSteps,omitempty"`
 	MaxVars        int    `json:"maxVars,omitempty"`
 	MaxOutputBytes int    `json:"maxOutputBytes,omitempty"`
+	MaxMemoryBytes int64  `json:"maxMemoryBytes,omitempty"`
+	MaxStringBytes int    `json:"maxStringBytes,omitempty"`
+	TimeoutMs      int64  `json:"timeoutMs,omitempty"`
 }
 
 // CodeModeResult is committed as the final result of a CodeMode task.
@@ -56,6 +68,13 @@ type codeSleepCheckpoint struct {
 type codeToolCheckpoint struct {
 	ToolName string `json:"toolName"`
 	Args     any    `json:"args"`
+}
+
+type codeToolMemoRecord struct {
+	ToolName string          `json:"toolName"`
+	OK       bool            `json:"ok"`
+	Result   json.RawMessage `json:"result,omitempty"`
+	Error    string          `json:"error,omitempty"`
 }
 
 // CodeToolFunc executes a durable tool call spawned by a CodeMode script step.
@@ -81,6 +100,9 @@ func makeCodeToolRunPhase(toolFn CodeToolFunc) PhaseFunc {
 		if err != nil {
 			return Transition{}, err
 		}
+		if out == nil {
+			return TransComplete(json.RawMessage("null")), nil
+		}
 		return TransComplete(out), nil
 	}
 }
@@ -101,14 +123,12 @@ func makeCodeSleepWakePhase() PhaseFunc {
 	}
 }
 
+var errVMYield = errors.New("codemode: yield")
+
 func makeCodeExecPhase() PhaseFunc {
 	return func(ctx context.Context, tc *TaskContext) (Transition, error) {
 		var spec CodeModeSpec
 		if err := tc.UnmarshalCheckpoint(&spec); err != nil {
-			return Transition{}, err
-		}
-		stmts, err := parseCodeScript(spec.Script)
-		if err != nil {
 			return Transition{}, err
 		}
 
@@ -120,9 +140,33 @@ func makeCodeExecPhase() PhaseFunc {
 		if maxVars <= 0 {
 			maxVars = defaultCodeMaxVars
 		}
-		maxBytes := spec.MaxOutputBytes
-		if maxBytes <= 0 {
-			maxBytes = defaultCodeMaxOutputBytes
+		maxOutputBytes := spec.MaxOutputBytes
+		if maxOutputBytes <= 0 {
+			maxOutputBytes = defaultCodeMaxOutputBytes
+		}
+		maxMemoryBytes := spec.MaxMemoryBytes
+		if maxMemoryBytes <= 0 {
+			maxMemoryBytes = defaultCodeMaxMemoryBytes
+		}
+		maxStringBytes := spec.MaxStringBytes
+		if maxStringBytes <= 0 {
+			maxStringBytes = defaultCodeMaxStringBytes
+		}
+		if int64(maxStringBytes) > maxMemoryBytes {
+			maxStringBytes = int(maxMemoryBytes)
+		}
+		timeoutMs := spec.TimeoutMs
+		if timeoutMs <= 0 {
+			timeoutMs = defaultCodeTimeoutMs
+		}
+
+		seed := spec.Seed
+		if seed == 0 {
+			seed = 0x9e3779b97f4a7c15
+		}
+		virtualNowMs := spec.StartTimeMs
+		if virtualNowMs == 0 && tc.Task().CreatedAtMs != 0 {
+			virtualNowMs = tc.Task().CreatedAtMs
 		}
 
 		memo, err := decodeMemoMap(tc.Task().MemoJSON)
@@ -130,17 +174,31 @@ func makeCodeExecPhase() PhaseFunc {
 			return Transition{}, err
 		}
 
-		vm := &codeVM{
-			seed:           spec.Seed,
-			virtualNowMs:   spec.StartTimeMs,
+		compiled, tickIdent, chkIdent, err := compileCodeScript(spec.Script, seed, maxVars)
+		if err != nil {
+			return Transition{}, err
+		}
+
+		rt := goja.New()
+		rt.SetMaxCallStackSize(defaultCodeMaxCallStack)
+
+		prng := splitMix64{state: seed}
+		rt.SetTimeSource(func() time.Time {
+			return time.UnixMilli(virtualNowMs).UTC()
+		})
+		rt.SetRandSource(prng.next)
+
+		guard := &codeGuard{
+			rt:             rt,
 			maxSteps:       maxSteps,
 			maxVars:        maxVars,
-			maxOutputBytes: maxBytes,
-			env:            make(map[string]any),
+			maxMemoryBytes: maxMemoryBytes,
+			maxStringBytes: maxStringBytes,
 		}
-		if vm.seed == 0 {
-			vm.seed = 0x9e3779b97f4a7c15
-		}
+
+		jsonObj := rt.Get("JSON").ToObject(rt)
+		jsonParseFn, _ := goja.AssertFunction(jsonObj.Get("parse"))
+		jsonStringifyFn, _ := goja.AssertFunction(jsonObj.Get("stringify"))
 
 		var callSeq int
 		var sleepSeq int
@@ -148,1352 +206,1740 @@ func makeCodeExecPhase() PhaseFunc {
 		var replayedSleeps int
 		var yieldTransition *Transition
 
-		vm.onCall = func(toolName string, args any) (any, bool, error) {
+		replayToolRecord := func(toolName string, rec codeToolMemoRecord) goja.Value {
+			replayedCalls++
+			if !rec.OK {
+				panic(rt.NewGoError(fmt.Errorf("codemode tool %s failed: %s", toolName, rec.Error)))
+			}
+			v, pErr := parseJSONToJSValue(rt, jsonObj, jsonParseFn, rec.Result)
+			if pErr != nil {
+				guard.interrupt(pErr)
+				return goja.Undefined()
+			}
+			return v
+		}
+
+		invokeTool := func(call goja.FunctionCall) goja.Value {
+			if len(call.Arguments) < 1 {
+				panic(rt.NewGoError(fmt.Errorf("%w: call() requires tool name", ErrScriptSyntax)))
+			}
+			nameVal := call.Arguments[0]
+			if !goja.IsString(nameVal) {
+				panic(rt.NewGoError(fmt.Errorf("%w: call() first arg must be string", ErrScriptSyntax)))
+			}
+			toolName := nameVal.String()
+			if toolName == "" {
+				panic(rt.NewGoError(fmt.Errorf("%w: call() tool name must be non-empty", ErrScriptSyntax)))
+			}
+
+			var toolArg any
+			if len(call.Arguments) > 1 && !goja.IsUndefined(call.Arguments[1]) {
+				var convErr error
+				toolArg, convErr = jsValueToGoAny(rt, jsonObj, jsonStringifyFn, call.Arguments[1])
+				if convErr != nil {
+					rethrowGojaError(rt, convErr)
+				}
+			}
+
 			callSeq++
 			dedupKey := fmt.Sprintf("%s:call:%d:%s", tc.Task().ID, callSeq, toolName)
+
+			if rawMemo, ok := memo[dedupKey]; ok {
+				var rec codeToolMemoRecord
+				if uErr := json.Unmarshal(rawMemo, &rec); uErr == nil && rec.ToolName == toolName {
+					return replayToolRecord(toolName, rec)
+				}
+			}
+
 			existing, ok, err := tc.Store().GetTaskByDedupKey(ctx, tc.Task().ID, dedupKey)
 			if err != nil {
-				return nil, false, err
+				guard.interrupt(err)
+				return goja.Undefined()
 			}
 			if ok && existing.Status == store.TaskTerminal {
+				rec := codeToolMemoRecord{ToolName: toolName}
 				if existing.TerminalReason != store.ReasonCompleted {
 					errMsg := existing.ErrorText
 					if errMsg == "" {
 						errMsg = existing.TerminalReason
 					}
-					return nil, false, fmt.Errorf("codemode tool %s failed: %s", toolName, errMsg)
-				}
-				var val any
-				if len(existing.ResultJSON) > 0 {
-					if err := json.Unmarshal(existing.ResultJSON, &val); err != nil {
-						return nil, false, err
+					rec.OK = false
+					rec.Error = errMsg
+				} else {
+					rec.OK = true
+					if len(existing.ResultJSON) > 0 {
+						rec.Result = existing.ResultJSON
+					} else {
+						rec.Result = json.RawMessage("null")
 					}
 				}
-				replayedCalls++
-				return val, true, nil
+				if mErr := tc.Memo(ctx, dedupKey, func() (any, error) {
+					return rec, nil
+				}, nil); mErr != nil {
+					guard.interrupt(mErr)
+					return goja.Undefined()
+				}
+				if encoded, mErr := json.Marshal(rec); mErr == nil {
+					memo[dedupKey] = encoded
+				}
+				return replayToolRecord(toolName, rec)
 			}
 
 			child, _, err := tc.SpawnChild(ctx, ChildTaskSpec{
 				DedupKey:   dedupKey,
 				Kind:       TaskKindCodeModeTool,
 				PhaseName:  PhaseCodeToolRun,
-				Checkpoint: codeToolCheckpoint{ToolName: toolName, Args: args},
+				Checkpoint: codeToolCheckpoint{ToolName: toolName, Args: toolArg},
 			})
 			if err != nil {
-				return nil, false, err
+				guard.interrupt(err)
+				return goja.Undefined()
 			}
 			tr := TransWaitTasks(PhaseCodeExec, spec, store.WaitFailFast, []string{child.ID})
 			yieldTransition = &tr
-			return nil, false, errVMYield
+			guard.interrupt(errVMYield)
+			return goja.Undefined()
 		}
 
-		vm.onSleep = func(ms int64) (bool, error) {
-			if ms < 0 {
-				ms = 0
+		invokeSleep := func(call goja.FunctionCall) goja.Value {
+			var ms int64
+			if len(call.Arguments) > 0 && !goja.IsUndefined(call.Arguments[0]) {
+				f := call.Arguments[0].ToFloat()
+				if math.IsNaN(f) || f < 0 {
+					ms = 0
+				} else if math.IsInf(f, 1) || f >= float64(math.MaxInt64/int64(time.Millisecond)) {
+					panicNewJSError(rt, "RangeError", "sleep duration overflow")
+				} else {
+					ms = int64(f)
+				}
 			}
 			sleepSeq++
 			sleepKey := fmt.Sprintf("__cm_sleep_%d", sleepSeq)
 			if _, done := memo[sleepKey]; done {
-				vm.virtualNowMs += ms
+				virtualNowMs += ms
 				replayedSleeps++
-				return true, nil
+				return goja.Undefined()
+			}
+			opts := SleepOptions{WakeAfter: time.Duration(ms) * time.Millisecond}
+			if ms <= 0 {
+				// Ensure 0ms sleeps still wake immediately instead of sleeping indefinitely.
+				opts = SleepOptions{WakeUntilMs: tc.Clock().NowMs()}
 			}
 			tr := TransSleep(PhaseCodeSleepWake, codeSleepCheckpoint{
 				Spec:     spec,
 				SleepKey: sleepKey,
 				SleepMs:  ms,
-			}, SleepOptions{WakeAfter: time.Duration(ms) * time.Millisecond})
+			}, opts)
 			yieldTransition = &tr
-			return false, errVMYield
+			guard.interrupt(errVMYield)
+			return goja.Undefined()
 		}
 
-		retVal, returned, runErr := vm.execBlock(stmts)
-		if errors.Is(runErr, errVMYield) && yieldTransition != nil {
-			return *yieldTransition, nil
+		nowFn := func(goja.FunctionCall) goja.Value {
+			return rt.ToValue(virtualNowMs)
 		}
+		randFn := func(goja.FunctionCall) goja.Value {
+			return rt.ToValue(prng.next())
+		}
+
+		vibeObj := rt.NewObject()
+		_ = vibeObj.Set("call", invokeTool)
+		_ = vibeObj.Set("sleep", invokeSleep)
+		_ = vibeObj.Set("now", nowFn)
+		_ = vibeObj.Set("random", randFn)
+
+		clockObj := rt.NewObject()
+		_ = clockObj.Set("now", nowFn)
+
+		_ = rt.Set("callTool", invokeTool)
+		_ = rt.Set("call", invokeTool)
+		_ = rt.Set("sleep", invokeSleep)
+		_ = rt.Set("rand", randFn)
+		_ = rt.Set("clock", clockObj)
+		_ = rt.Set("vibe", vibeObj)
+
+		installAllocationGuards(rt, guard, jsonObj, jsonStringifyFn)
+		installDynamicEvalGuards(rt, guard, tickIdent, chkIdent)
+
+		if err := rt.GlobalObject().DefineDataProperty(
+			tickIdent,
+			rt.ToValue(guard.tickFunc()),
+			goja.FLAG_FALSE,
+			goja.FLAG_FALSE,
+			goja.FLAG_FALSE,
+		); err != nil {
+			return Transition{}, err
+		}
+		if err := rt.GlobalObject().DefineDataProperty(
+			chkIdent,
+			rt.ToValue(guard.checkValueFunc()),
+			goja.FLAG_FALSE,
+			goja.FLAG_FALSE,
+			goja.FLAG_FALSE,
+		); err != nil {
+			return Transition{}, err
+		}
+		guard.initialGlobalKeys = len(rt.GlobalObject().Keys())
+
+		watchdog := time.AfterFunc(time.Duration(timeoutMs)*time.Millisecond, func() {
+			guard.interrupt(fmt.Errorf("%w: execution exceeded %dms", ErrScriptTimeout, timeoutMs))
+		})
+		defer watchdog.Stop()
+
+		stopCtx := context.AfterFunc(ctx, func() {
+			if err := ctx.Err(); err != nil {
+				guard.interrupt(err)
+			} else {
+				guard.interrupt(context.Canceled)
+			}
+		})
+		defer stopCtx()
+
+		val, runErr := rt.RunProgram(compiled)
+		watchdog.Stop()
+		stopCtx()
+
 		if runErr != nil {
+			var intErr *goja.InterruptedError
+			if errors.As(runErr, &intErr) {
+				cause := guard.cause()
+				if cause == nil {
+					cause = intErr.Unwrap()
+				}
+				if errors.Is(cause, errVMYield) && yieldTransition != nil {
+					return *yieldTransition, nil
+				}
+				if cause != nil {
+					return Transition{}, cause
+				}
+				return Transition{}, intErr
+			}
+			var stackErr *goja.StackOverflowError
+			if errors.As(runErr, &stackErr) {
+				return Transition{}, fmt.Errorf("%w: %v", ErrScriptQuotaExceeded, stackErr)
+			}
 			return Transition{}, runErr
 		}
-		if !returned {
-			retVal = nil
+
+		if maxVars > 0 {
+			if added := len(rt.GlobalObject().Keys()) - guard.initialGlobalKeys; added > maxVars {
+				return Transition{}, fmt.Errorf("%w: global variable limit %d exceeded (%d)", ErrScriptQuotaExceeded, maxVars, added)
+			}
+		}
+
+		retVal, err := jsValueToGoAny(rt, jsonObj, jsonStringifyFn, val)
+		if err != nil {
+			return Transition{}, err
 		}
 		encoded, err := json.Marshal(retVal)
 		if err != nil {
 			return Transition{}, err
 		}
-		if len(encoded) > maxBytes {
-			return Transition{}, fmt.Errorf("%w: result size %d > %d", ErrScriptQuotaExceeded, len(encoded), maxBytes)
+		if len(encoded) > maxOutputBytes {
+			return Transition{}, fmt.Errorf("%w: result size %d > %d", ErrScriptQuotaExceeded, len(encoded), maxOutputBytes)
 		}
 
 		return TransComplete(CodeModeResult{
 			Value:          retVal,
-			ExecutedSteps:  vm.steps,
+			ExecutedSteps:  guard.steps,
 			ReplayedCalls:  replayedCalls,
 			ReplayedSleeps: replayedSleeps,
-			VirtualNowMs:   vm.virtualNowMs,
+			VirtualNowMs:   virtualNowMs,
 		}), nil
 	}
 }
 
-var errVMYield = errors.New("codemode: yield")
-
-// --- Pure Go Deterministic JS-subset Lexer, Parser & Step-Quota VM ---
-
-type cmTokenKind int
-
-const (
-	tokEOF cmTokenKind = iota
-	tokIdent
-	tokNumber
-	tokString
-	tokLet
-	tokConst
-	tokIf
-	tokElse
-	tokWhile
-	tokFor
-	tokReturn
-	tokTrue
-	tokFalse
-	tokNull
-	tokLParen
-	tokRParen
-	tokLBrace
-	tokRBrace
-	tokLBracket
-	tokRBracket
-	tokComma
-	tokColon
-	tokSemi
-	tokDot
-	tokAssign
-	tokPlus
-	tokMinus
-	tokStar
-	tokSlash
-	tokPercent
-	tokEq
-	tokNeq
-	tokLt
-	tokLe
-	tokGt
-	tokGe
-	tokAnd
-	tokOr
-	tokBang
-)
-
-type cmToken struct {
-	kind cmTokenKind
-	val  string
+type splitMix64 struct {
+	state uint64
 }
 
-func tokenizeCodeScript(src string) ([]cmToken, error) {
-	var out []cmToken
-	i := 0
-	n := len(src)
-	for i < n {
-		ch := src[i]
-		if unicode.IsSpace(rune(ch)) {
-			i++
-			continue
-		}
-		if ch == '/' && i+1 < n && src[i+1] == '/' {
-			i += 2
-			for i < n && src[i] != '\n' {
-				i++
-			}
-			continue
-		}
-		if ch == '/' && i+1 < n && src[i+1] == '*' {
-			i += 2
-			closed := false
-			for i+1 < n {
-				if src[i] == '*' && src[i+1] == '/' {
-					i += 2
-					closed = true
-					break
-				}
-				i++
-			}
-			if !closed {
-				return nil, fmt.Errorf("%w: unterminated block comment", ErrScriptSyntax)
-			}
-			continue
-		}
-		if ch == '"' || ch == '\'' {
-			quote := ch
-			i++
-			var sb strings.Builder
-			closed := false
-			for i < n {
-				c := src[i]
-				if c == '\\' && i+1 < n {
-					i++
-					esc := src[i]
-					switch esc {
-					case 'n':
-						sb.WriteByte('\n')
-					case 't':
-						sb.WriteByte('\t')
-					case 'r':
-						sb.WriteByte('\r')
-					default:
-						sb.WriteByte(esc)
-					}
-					i++
-					continue
-				}
-				if c == quote {
-					i++
-					closed = true
-					break
-				}
-				sb.WriteByte(c)
-				i++
-			}
-			if !closed {
-				return nil, fmt.Errorf("%w: unterminated string", ErrScriptSyntax)
-			}
-			out = append(out, cmToken{kind: tokString, val: sb.String()})
-			continue
-		}
-		if unicode.IsDigit(rune(ch)) {
-			start := i
-			hasDot := false
-			for i < n && (unicode.IsDigit(rune(src[i])) || (src[i] == '.' && !hasDot)) {
-				if src[i] == '.' {
-					hasDot = true
-				}
-				i++
-			}
-			out = append(out, cmToken{kind: tokNumber, val: src[start:i]})
-			continue
-		}
-		if unicode.IsLetter(rune(ch)) || ch == '_' || ch == '$' {
-			start := i
-			for i < n && (unicode.IsLetter(rune(src[i])) || unicode.IsDigit(rune(src[i])) || src[i] == '_' || src[i] == '$') {
-				i++
-			}
-			word := src[start:i]
-			switch word {
-			case "let":
-				out = append(out, cmToken{kind: tokLet, val: word})
-			case "const":
-				out = append(out, cmToken{kind: tokConst, val: word})
-			case "if":
-				out = append(out, cmToken{kind: tokIf, val: word})
-			case "else":
-				out = append(out, cmToken{kind: tokElse, val: word})
-			case "while":
-				out = append(out, cmToken{kind: tokWhile, val: word})
-			case "for":
-				out = append(out, cmToken{kind: tokFor, val: word})
-			case "return":
-				out = append(out, cmToken{kind: tokReturn, val: word})
-			case "true":
-				out = append(out, cmToken{kind: tokTrue, val: word})
-			case "false":
-				out = append(out, cmToken{kind: tokFalse, val: word})
-			case "null":
-				out = append(out, cmToken{kind: tokNull, val: word})
-			default:
-				out = append(out, cmToken{kind: tokIdent, val: word})
-			}
-			continue
-		}
-
-		// Multi-char operators.
-		if strings.HasPrefix(src[i:], "===") {
-			out = append(out, cmToken{kind: tokEq, val: "==="})
-			i += 3
-			continue
-		}
-		if strings.HasPrefix(src[i:], "!==") {
-			out = append(out, cmToken{kind: tokNeq, val: "!=="})
-			i += 3
-			continue
-		}
-		if strings.HasPrefix(src[i:], "==") {
-			out = append(out, cmToken{kind: tokEq, val: "=="})
-			i += 2
-			continue
-		}
-		if strings.HasPrefix(src[i:], "!=") {
-			out = append(out, cmToken{kind: tokNeq, val: "!="})
-			i += 2
-			continue
-		}
-		if strings.HasPrefix(src[i:], "<=") {
-			out = append(out, cmToken{kind: tokLe, val: "<="})
-			i += 2
-			continue
-		}
-		if strings.HasPrefix(src[i:], ">=") {
-			out = append(out, cmToken{kind: tokGe, val: ">="})
-			i += 2
-			continue
-		}
-		if strings.HasPrefix(src[i:], "&&") {
-			out = append(out, cmToken{kind: tokAnd, val: "&&"})
-			i += 2
-			continue
-		}
-		if strings.HasPrefix(src[i:], "||") {
-			out = append(out, cmToken{kind: tokOr, val: "||"})
-			i += 2
-			continue
-		}
-
-		single := map[byte]cmTokenKind{
-			'(': tokLParen,
-			')': tokRParen,
-			'{': tokLBrace,
-			'}': tokRBrace,
-			'[': tokLBracket,
-			']': tokRBracket,
-			',': tokComma,
-			':': tokColon,
-			';': tokSemi,
-			'.': tokDot,
-			'=': tokAssign,
-			'+': tokPlus,
-			'-': tokMinus,
-			'*': tokStar,
-			'/': tokSlash,
-			'%': tokPercent,
-			'<': tokLt,
-			'>': tokGt,
-			'!': tokBang,
-		}
-		if kind, ok := single[ch]; ok {
-			out = append(out, cmToken{kind: kind, val: string(ch)})
-			i++
-			continue
-		}
-		return nil, fmt.Errorf("%w: unexpected character %q", ErrScriptSyntax, ch)
-	}
-	out = append(out, cmToken{kind: tokEOF})
-	return out, nil
-}
-
-type cmStmt interface{ isStmt() }
-type cmExpr interface{ isExpr() }
-
-type stmtAssign struct {
-	name string
-	expr cmExpr
-}
-
-func (stmtAssign) isStmt() {}
-
-type stmtIf struct {
-	cond cmExpr
-	then []cmStmt
-	els  []cmStmt
-}
-
-func (stmtIf) isStmt() {}
-
-type stmtWhile struct {
-	cond cmExpr
-	body []cmStmt
-}
-
-func (stmtWhile) isStmt() {}
-
-type stmtFor struct {
-	init cmStmt
-	cond cmExpr
-	post cmStmt
-	body []cmStmt
-}
-
-func (stmtFor) isStmt() {}
-
-type stmtReturn struct {
-	expr cmExpr
-}
-
-func (stmtReturn) isStmt() {}
-
-type stmtExpr struct {
-	expr cmExpr
-}
-
-func (stmtExpr) isStmt() {}
-
-type exprLit struct{ val any }
-type exprIdent struct{ name string }
-type exprArray struct{ elems []cmExpr }
-type exprObjField struct {
-	key string
-	val cmExpr
-}
-type exprObj struct{ fields []exprObjField }
-type exprMember struct {
-	obj   cmExpr
-	field string
-}
-type exprIndex struct {
-	obj cmExpr
-	idx cmExpr
-}
-type exprCall struct {
-	callee cmExpr
-	args   []cmExpr
-}
-type exprUnary struct {
-	op   cmTokenKind
-	expr cmExpr
-}
-type exprBinary struct {
-	op    cmTokenKind
-	left  cmExpr
-	right cmExpr
-}
-
-func (exprLit) isExpr()    {}
-func (exprIdent) isExpr()  {}
-func (exprArray) isExpr()  {}
-func (exprObj) isExpr()    {}
-func (exprMember) isExpr() {}
-func (exprIndex) isExpr()  {}
-func (exprCall) isExpr()   {}
-func (exprUnary) isExpr()  {}
-func (exprBinary) isExpr() {}
-
-type cmParser struct {
-	toks []cmToken
-	pos  int
-}
-
-func parseCodeScript(src string) ([]cmStmt, error) {
-	toks, err := tokenizeCodeScript(src)
-	if err != nil {
-		return nil, err
-	}
-	p := &cmParser{toks: toks}
-	var stmts []cmStmt
-	for p.peek().kind != tokEOF {
-		st, err := p.parseStmt()
-		if err != nil {
-			return nil, err
-		}
-		stmts = append(stmts, st)
-	}
-	return stmts, nil
-}
-
-func (p *cmParser) peek() cmToken {
-	if p.pos >= len(p.toks) {
-		return cmToken{kind: tokEOF}
-	}
-	return p.toks[p.pos]
-}
-
-func (p *cmParser) next() cmToken {
-	t := p.peek()
-	if p.pos < len(p.toks) {
-		p.pos++
-	}
-	return t
-}
-
-func (p *cmParser) match(k cmTokenKind) bool {
-	if p.peek().kind == k {
-		p.pos++
-		return true
-	}
-	return false
-}
-
-func (p *cmParser) expect(k cmTokenKind, msg string) (cmToken, error) {
-	t := p.peek()
-	if t.kind != k {
-		return cmToken{}, fmt.Errorf("%w: expected %s, got %q", ErrScriptSyntax, msg, t.val)
-	}
-	p.pos++
-	return t, nil
-}
-
-func (p *cmParser) consumeSemiOptional() {
-	_ = p.match(tokSemi)
-}
-
-func (p *cmParser) parseBlock() ([]cmStmt, error) {
-	if _, err := p.expect(tokLBrace, "{"); err != nil {
-		return nil, err
-	}
-	var stmts []cmStmt
-	for p.peek().kind != tokRBrace && p.peek().kind != tokEOF {
-		st, err := p.parseStmt()
-		if err != nil {
-			return nil, err
-		}
-		stmts = append(stmts, st)
-	}
-	if _, err := p.expect(tokRBrace, "}"); err != nil {
-		return nil, err
-	}
-	return stmts, nil
-}
-
-func (p *cmParser) parseStmt() (cmStmt, error) {
-	switch p.peek().kind {
-	case tokLet, tokConst:
-		p.next()
-		id, err := p.expect(tokIdent, "identifier")
-		if err != nil {
-			return nil, err
-		}
-		if _, err := p.expect(tokAssign, "="); err != nil {
-			return nil, err
-		}
-		ex, err := p.parseExpr()
-		if err != nil {
-			return nil, err
-		}
-		p.consumeSemiOptional()
-		return stmtAssign{name: id.val, expr: ex}, nil
-
-	case tokIf:
-		p.next()
-		if _, err := p.expect(tokLParen, "("); err != nil {
-			return nil, err
-		}
-		cond, err := p.parseExpr()
-		if err != nil {
-			return nil, err
-		}
-		if _, err := p.expect(tokRParen, ")"); err != nil {
-			return nil, err
-		}
-		thenBlock, err := p.parseBlock()
-		if err != nil {
-			return nil, err
-		}
-		var elseBlock []cmStmt
-		if p.match(tokElse) {
-			if p.peek().kind == tokIf {
-				nested, err := p.parseStmt()
-				if err != nil {
-					return nil, err
-				}
-				elseBlock = []cmStmt{nested}
-			} else {
-				elseBlock, err = p.parseBlock()
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
-		return stmtIf{cond: cond, then: thenBlock, els: elseBlock}, nil
-
-	case tokWhile:
-		p.next()
-		if _, err := p.expect(tokLParen, "("); err != nil {
-			return nil, err
-		}
-		cond, err := p.parseExpr()
-		if err != nil {
-			return nil, err
-		}
-		if _, err := p.expect(tokRParen, ")"); err != nil {
-			return nil, err
-		}
-		body, err := p.parseBlock()
-		if err != nil {
-			return nil, err
-		}
-		return stmtWhile{cond: cond, body: body}, nil
-
-	case tokFor:
-		p.next()
-		if _, err := p.expect(tokLParen, "("); err != nil {
-			return nil, err
-		}
-		var initStmt cmStmt
-		if !p.match(tokSemi) {
-			var err error
-			initStmt, err = p.parseSimpleAssignOrExpr()
-			if err != nil {
-				return nil, err
-			}
-			if _, err := p.expect(tokSemi, ";"); err != nil {
-				return nil, err
-			}
-		}
-		var cond cmExpr = exprLit{val: true}
-		if !p.match(tokSemi) {
-			var err error
-			cond, err = p.parseExpr()
-			if err != nil {
-				return nil, err
-			}
-			if _, err := p.expect(tokSemi, ";"); err != nil {
-				return nil, err
-			}
-		}
-		var postStmt cmStmt
-		if p.peek().kind != tokRParen {
-			var err error
-			postStmt, err = p.parseSimpleAssignOrExpr()
-			if err != nil {
-				return nil, err
-			}
-		}
-		if _, err := p.expect(tokRParen, ")"); err != nil {
-			return nil, err
-		}
-		body, err := p.parseBlock()
-		if err != nil {
-			return nil, err
-		}
-		return stmtFor{init: initStmt, cond: cond, post: postStmt, body: body}, nil
-
-	case tokReturn:
-		p.next()
-		var ex cmExpr
-		if p.peek().kind != tokSemi && p.peek().kind != tokRBrace && p.peek().kind != tokEOF {
-			var err error
-			ex, err = p.parseExpr()
-			if err != nil {
-				return nil, err
-			}
-		}
-		p.consumeSemiOptional()
-		return stmtReturn{expr: ex}, nil
-
-	default:
-		st, err := p.parseSimpleAssignOrExpr()
-		if err != nil {
-			return nil, err
-		}
-		p.consumeSemiOptional()
-		return st, nil
-	}
-}
-
-func (p *cmParser) parseSimpleAssignOrExpr() (cmStmt, error) {
-	if p.peek().kind == tokLet || p.peek().kind == tokConst {
-		p.next()
-		id, err := p.expect(tokIdent, "identifier")
-		if err != nil {
-			return nil, err
-		}
-		if _, err := p.expect(tokAssign, "="); err != nil {
-			return nil, err
-		}
-		ex, err := p.parseExpr()
-		if err != nil {
-			return nil, err
-		}
-		return stmtAssign{name: id.val, expr: ex}, nil
-	}
-	if p.peek().kind == tokIdent && p.pos+1 < len(p.toks) && p.toks[p.pos+1].kind == tokAssign {
-		id := p.next()
-		p.next()
-		ex, err := p.parseExpr()
-		if err != nil {
-			return nil, err
-		}
-		return stmtAssign{name: id.val, expr: ex}, nil
-	}
-	ex, err := p.parseExpr()
-	if err != nil {
-		return nil, err
-	}
-	return stmtExpr{expr: ex}, nil
-}
-
-func (p *cmParser) parseExpr() (cmExpr, error) { return p.parseOr() }
-
-func (p *cmParser) parseOr() (cmExpr, error) {
-	left, err := p.parseAnd()
-	if err != nil {
-		return nil, err
-	}
-	for p.match(tokOr) {
-		right, err := p.parseAnd()
-		if err != nil {
-			return nil, err
-		}
-		left = exprBinary{op: tokOr, left: left, right: right}
-	}
-	return left, nil
-}
-
-func (p *cmParser) parseAnd() (cmExpr, error) {
-	left, err := p.parseEq()
-	if err != nil {
-		return nil, err
-	}
-	for p.match(tokAnd) {
-		right, err := p.parseEq()
-		if err != nil {
-			return nil, err
-		}
-		left = exprBinary{op: tokAnd, left: left, right: right}
-	}
-	return left, nil
-}
-
-func (p *cmParser) parseEq() (cmExpr, error) {
-	left, err := p.parseCmp()
-	if err != nil {
-		return nil, err
-	}
-	for p.peek().kind == tokEq || p.peek().kind == tokNeq {
-		op := p.next().kind
-		right, err := p.parseCmp()
-		if err != nil {
-			return nil, err
-		}
-		left = exprBinary{op: op, left: left, right: right}
-	}
-	return left, nil
-}
-
-func (p *cmParser) parseCmp() (cmExpr, error) {
-	left, err := p.parseAdd()
-	if err != nil {
-		return nil, err
-	}
-	for p.peek().kind == tokLt || p.peek().kind == tokLe || p.peek().kind == tokGt || p.peek().kind == tokGe {
-		op := p.next().kind
-		right, err := p.parseAdd()
-		if err != nil {
-			return nil, err
-		}
-		left = exprBinary{op: op, left: left, right: right}
-	}
-	return left, nil
-}
-
-func (p *cmParser) parseAdd() (cmExpr, error) {
-	left, err := p.parseMul()
-	if err != nil {
-		return nil, err
-	}
-	for p.peek().kind == tokPlus || p.peek().kind == tokMinus {
-		op := p.next().kind
-		right, err := p.parseMul()
-		if err != nil {
-			return nil, err
-		}
-		left = exprBinary{op: op, left: left, right: right}
-	}
-	return left, nil
-}
-
-func (p *cmParser) parseMul() (cmExpr, error) {
-	left, err := p.parseUnary()
-	if err != nil {
-		return nil, err
-	}
-	for p.peek().kind == tokStar || p.peek().kind == tokSlash || p.peek().kind == tokPercent {
-		op := p.next().kind
-		right, err := p.parseUnary()
-		if err != nil {
-			return nil, err
-		}
-		left = exprBinary{op: op, left: left, right: right}
-	}
-	return left, nil
-}
-
-func (p *cmParser) parseUnary() (cmExpr, error) {
-	if p.peek().kind == tokMinus || p.peek().kind == tokBang {
-		op := p.next().kind
-		ex, err := p.parseUnary()
-		if err != nil {
-			return nil, err
-		}
-		return exprUnary{op: op, expr: ex}, nil
-	}
-	return p.parsePostfix()
-}
-
-func (p *cmParser) parsePostfix() (cmExpr, error) {
-	ex, err := p.parsePrimary()
-	if err != nil {
-		return nil, err
-	}
-	for {
-		switch p.peek().kind {
-		case tokDot:
-			p.next()
-			id, err := p.expect(tokIdent, "field name")
-			if err != nil {
-				return nil, err
-			}
-			ex = exprMember{obj: ex, field: id.val}
-		case tokLBracket:
-			p.next()
-			idx, err := p.parseExpr()
-			if err != nil {
-				return nil, err
-			}
-			if _, err := p.expect(tokRBracket, "]"); err != nil {
-				return nil, err
-			}
-			ex = exprIndex{obj: ex, idx: idx}
-		case tokLParen:
-			p.next()
-			var args []cmExpr
-			for p.peek().kind != tokRParen && p.peek().kind != tokEOF {
-				arg, err := p.parseExpr()
-				if err != nil {
-					return nil, err
-				}
-				args = append(args, arg)
-				if !p.match(tokComma) {
-					break
-				}
-			}
-			if _, err := p.expect(tokRParen, ")"); err != nil {
-				return nil, err
-			}
-			ex = exprCall{callee: ex, args: args}
-		default:
-			return ex, nil
-		}
-	}
-}
-
-func (p *cmParser) parsePrimary() (cmExpr, error) {
-	t := p.next()
-	switch t.kind {
-	case tokNumber:
-		if strings.Contains(t.val, ".") {
-			f, err := strconv.ParseFloat(t.val, 64)
-			if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
-				return nil, fmt.Errorf("%w: invalid number %q", ErrScriptSyntax, t.val)
-			}
-			return exprLit{val: f}, nil
-		}
-		v, err := strconv.ParseInt(t.val, 10, 64)
-		if err != nil {
-			f, err2 := strconv.ParseFloat(t.val, 64)
-			if err2 != nil {
-				return nil, fmt.Errorf("%w: invalid integer %q", ErrScriptSyntax, t.val)
-			}
-			return exprLit{val: f}, nil
-		}
-		return exprLit{val: v}, nil
-
-	case tokString:
-		return exprLit{val: t.val}, nil
-	case tokTrue:
-		return exprLit{val: true}, nil
-	case tokFalse:
-		return exprLit{val: false}, nil
-	case tokNull:
-		return exprLit{val: nil}, nil
-	case tokIdent:
-		return exprIdent{name: t.val}, nil
-
-	case tokLParen:
-		ex, err := p.parseExpr()
-		if err != nil {
-			return nil, err
-		}
-		if _, err := p.expect(tokRParen, ")"); err != nil {
-			return nil, err
-		}
-		return ex, nil
-
-	case tokLBracket:
-		var elems []cmExpr
-		for p.peek().kind != tokRBracket && p.peek().kind != tokEOF {
-			el, err := p.parseExpr()
-			if err != nil {
-				return nil, err
-			}
-			elems = append(elems, el)
-			if !p.match(tokComma) {
-				break
-			}
-		}
-		if _, err := p.expect(tokRBracket, "]"); err != nil {
-			return nil, err
-		}
-		return exprArray{elems: elems}, nil
-
-	case tokLBrace:
-		var fields []exprObjField
-		for p.peek().kind != tokRBrace && p.peek().kind != tokEOF {
-			var key string
-			switch p.peek().kind {
-			case tokIdent, tokString:
-				key = p.next().val
-			default:
-				return nil, fmt.Errorf("%w: expected object key, got %q", ErrScriptSyntax, p.peek().val)
-			}
-			if _, err := p.expect(tokColon, ":"); err != nil {
-				return nil, err
-			}
-			val, err := p.parseExpr()
-			if err != nil {
-				return nil, err
-			}
-			fields = append(fields, exprObjField{key: key, val: val})
-			if !p.match(tokComma) {
-				break
-			}
-		}
-		if _, err := p.expect(tokRBrace, "}"); err != nil {
-			return nil, err
-		}
-		return exprObj{fields: fields}, nil
-
-	default:
-		return nil, fmt.Errorf("%w: unexpected token %q", ErrScriptSyntax, t.val)
-	}
-}
-
-type codeVM struct {
-	seed           uint64
-	virtualNowMs   int64
-	steps          int
-	maxSteps       int
-	maxVars        int
-	maxOutputBytes int
-	env            map[string]any
-	onCall         func(toolName string, args any) (val any, replayed bool, err error)
-	onSleep        func(ms int64) (replayed bool, err error)
-}
-
-func (vm *codeVM) tick() error {
-	vm.steps++
-	if vm.steps > vm.maxSteps {
-		return fmt.Errorf("%w: %d steps > %d", ErrStepQuotaExceeded, vm.steps, vm.maxSteps)
-	}
-	return nil
-}
-
-// nextRand implements deterministic SplitMix64 PRNG returning [0, 1).
-func (vm *codeVM) nextRand() float64 {
-	vm.seed += 0x9e3779b97f4a7c15
-	z := vm.seed
+// next implements deterministic SplitMix64 PRNG returning [0, 1).
+func (s *splitMix64) next() float64 {
+	s.state += 0x9e3779b97f4a7c15
+	z := s.state
 	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9
 	z = (z ^ (z >> 27)) * 0x94d049bb133111eb
 	z = z ^ (z >> 31)
-	// Map top 53 bits to [0, 1).
 	return float64(z>>11) / float64(uint64(1)<<53)
 }
 
-func (vm *codeVM) setVar(name string, val any) error {
-	if _, exists := vm.env[name]; !exists && len(vm.env) >= vm.maxVars {
-		return fmt.Errorf("%w: variable limit %d exceeded", ErrScriptQuotaExceeded, vm.maxVars)
-	}
-	vm.env[name] = val
-	return nil
+type codeGuard struct {
+	rt                *goja.Runtime
+	steps             int
+	maxSteps          int
+	maxVars           int
+	initialGlobalKeys int
+	allocBytes        int64
+	maxMemoryBytes    int64
+	maxStringBytes    int
+
+	mu           sync.Mutex
+	interruptErr error
 }
 
-func (vm *codeVM) execBlock(stmts []cmStmt) (any, bool, error) {
-	for _, st := range stmts {
-		if err := vm.tick(); err != nil {
-			return nil, false, err
-		}
-		switch s := st.(type) {
-		case stmtAssign:
-			val, err := vm.evalExpr(s.expr)
-			if err != nil {
-				return nil, false, err
-			}
-			if err := vm.setVar(s.name, val); err != nil {
-				return nil, false, err
-			}
-		case stmtExpr:
-			if _, err := vm.evalExpr(s.expr); err != nil {
-				return nil, false, err
-			}
-		case stmtReturn:
-			if s.expr == nil {
-				return nil, true, nil
-			}
-			val, err := vm.evalExpr(s.expr)
-			if err != nil {
-				return nil, false, err
-			}
-			return val, true, nil
-		case stmtIf:
-			cond, err := vm.evalExpr(s.cond)
-			if err != nil {
-				return nil, false, err
-			}
-			if isTruthy(cond) {
-				v, ret, err := vm.execBlock(s.then)
-				if err != nil || ret {
-					return v, ret, err
-				}
-			} else if len(s.els) > 0 {
-				v, ret, err := vm.execBlock(s.els)
-				if err != nil || ret {
-					return v, ret, err
-				}
-			}
-		case stmtWhile:
-			for {
-				if err := vm.tick(); err != nil {
-					return nil, false, err
-				}
-				cond, err := vm.evalExpr(s.cond)
-				if err != nil {
-					return nil, false, err
-				}
-				if !isTruthy(cond) {
-					break
-				}
-				v, ret, err := vm.execBlock(s.body)
-				if err != nil || ret {
-					return v, ret, err
-				}
-			}
-		case stmtFor:
-			if s.init != nil {
-				if _, ret, err := vm.execBlock([]cmStmt{s.init}); err != nil || ret {
-					return nil, ret, err
-				}
-			}
-			for {
-				if err := vm.tick(); err != nil {
-					return nil, false, err
-				}
-				cond, err := vm.evalExpr(s.cond)
-				if err != nil {
-					return nil, false, err
-				}
-				if !isTruthy(cond) {
-					break
-				}
-				v, ret, err := vm.execBlock(s.body)
-				if err != nil || ret {
-					return v, ret, err
-				}
-				if s.post != nil {
-					if _, ret, err := vm.execBlock([]cmStmt{s.post}); err != nil || ret {
-						return nil, ret, err
-					}
-				}
-			}
-		}
+func (g *codeGuard) interrupt(err error) {
+	if err == nil {
+		return
 	}
-	return nil, false, nil
+	g.mu.Lock()
+	first := g.interruptErr == nil
+	if first {
+		g.interruptErr = err
+	}
+	g.mu.Unlock()
+	if first {
+		g.rt.Interrupt(err)
+	}
 }
 
-func (vm *codeVM) evalExpr(ex cmExpr) (any, error) {
-	if err := vm.tick(); err != nil {
-		return nil, err
-	}
-	switch e := ex.(type) {
-	case exprLit:
-		return e.val, nil
-	case exprIdent:
-		if e.name == "clock" {
-			return map[string]any{"__clock": true}, nil
-		}
-		return vm.env[e.name], nil
-	case exprArray:
-		out := make([]any, len(e.elems))
-		for i, el := range e.elems {
-			v, err := vm.evalExpr(el)
-			if err != nil {
-				return nil, err
-			}
-			out[i] = v
-		}
-		return out, nil
-	case exprObj:
-		out := make(map[string]any, len(e.fields))
-		for _, f := range e.fields {
-			v, err := vm.evalExpr(f.val)
-			if err != nil {
-				return nil, err
-			}
-			out[f.key] = v
-		}
-		return out, nil
-	case exprMember:
-		if id, ok := e.obj.(exprIdent); ok && id.name == "clock" && e.field == "now" {
-			return "clock.now", nil
-		}
-		obj, err := vm.evalExpr(e.obj)
-		if err != nil {
-			return nil, err
-		}
-		if m, ok := obj.(map[string]any); ok {
-			return m[e.field], nil
-		}
-		return nil, nil
-	case exprIndex:
-		obj, err := vm.evalExpr(e.obj)
-		if err != nil {
-			return nil, err
-		}
-		idxVal, err := vm.evalExpr(e.idx)
-		if err != nil {
-			return nil, err
-		}
-		switch col := obj.(type) {
-		case []any:
-			idx, ok := toInt64(idxVal)
-			if ok && idx >= 0 && int(idx) < len(col) {
-				return col[idx], nil
-			}
-			return nil, nil
-		case map[string]any:
-			return col[fmt.Sprint(idxVal)], nil
-		default:
-			return nil, nil
-		}
-	case exprUnary:
-		v, err := vm.evalExpr(e.expr)
-		if err != nil {
-			return nil, err
-		}
-		if e.op == tokBang {
-			return !isTruthy(v), nil
-		}
-		if e.op == tokMinus {
-			if iv, ok := toInt64(v); ok {
-				return -iv, nil
-			}
-			if fv, ok := toFloat64(v); ok {
-				return -fv, nil
-			}
-		}
-		return nil, nil
-	case exprBinary:
-		if e.op == tokAnd {
-			l, err := vm.evalExpr(e.left)
-			if err != nil {
-				return nil, err
-			}
-			if !isTruthy(l) {
-				return false, nil
-			}
-			r, err := vm.evalExpr(e.right)
-			if err != nil {
-				return nil, err
-			}
-			return isTruthy(r), nil
-		}
-		if e.op == tokOr {
-			l, err := vm.evalExpr(e.left)
-			if err != nil {
-				return nil, err
-			}
-			if isTruthy(l) {
-				return l, nil
-			}
-			return vm.evalExpr(e.right)
-		}
-		l, err := vm.evalExpr(e.left)
-		if err != nil {
-			return nil, err
-		}
-		r, err := vm.evalExpr(e.right)
-		if err != nil {
-			return nil, err
-		}
-		return evalBinary(e.op, l, r)
-	case exprCall:
-		var fnName string
-		switch c := e.callee.(type) {
-		case exprIdent:
-			fnName = c.name
-		case exprMember:
-			if id, ok := c.obj.(exprIdent); ok && id.name == "clock" && c.field == "now" {
-				fnName = "clock.now"
-			}
-		}
-		args := make([]any, len(e.args))
-		for i, a := range e.args {
-			v, err := vm.evalExpr(a)
-			if err != nil {
-				return nil, err
-			}
-			args[i] = v
-		}
-		switch fnName {
-		case "clock.now":
-			return vm.virtualNowMs, nil
-		case "rand":
-			return vm.nextRand(), nil
-		case "sleep":
-			var ms int64
-			if len(args) > 0 {
-				if v, ok := toInt64(args[0]); ok {
-					ms = v
-				} else if f, ok := toFloat64(args[0]); ok {
-					ms = int64(f)
-				}
-			}
-			if vm.onSleep != nil {
-				_, err := vm.onSleep(ms)
-				return nil, err
-			}
-			vm.virtualNowMs += ms
-			return nil, nil
-		case "call":
-			if len(args) < 1 {
-				return nil, fmt.Errorf("%w: call() requires tool name", ErrScriptSyntax)
-			}
-			toolName, ok := args[0].(string)
-			if !ok {
-				return nil, fmt.Errorf("%w: call() first arg must be string", ErrScriptSyntax)
-			}
-			var toolArg any
-			if len(args) > 1 {
-				toolArg = args[1]
-			}
-			if vm.onCall == nil {
-				return nil, fmt.Errorf("%w: %s", ErrUnknownTool, toolName)
-			}
-			val, _, err := vm.onCall(toolName, toolArg)
-			return val, err
-		default:
-			return nil, fmt.Errorf("%w: unknown builtin %q", ErrScriptSyntax, fnName)
-		}
-	}
-	return nil, nil
+func (g *codeGuard) cause() error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.interruptErr
 }
 
-func evalBinary(op cmTokenKind, l, r any) (any, error) {
-	switch op {
-	case tokPlus:
-		_, lok := l.(string)
-		_, rok := r.(string)
-		if lok || rok {
-			return fmt.Sprint(l) + fmt.Sprint(r), nil
+func (g *codeGuard) tickFunc() func(goja.FunctionCall) goja.Value {
+	return func(goja.FunctionCall) goja.Value {
+		g.steps++
+		if g.steps > g.maxSteps {
+			g.interrupt(fmt.Errorf("%w: %d steps > %d", ErrStepQuotaExceeded, g.steps, g.maxSteps))
+			return goja.Undefined()
 		}
-		if li, ok1 := toInt64(l); ok1 {
-			if ri, ok2 := toInt64(r); ok2 {
-				return li + ri, nil
+		if g.maxVars > 0 && g.steps&15 == 0 {
+			added := len(g.rt.GlobalObject().Keys()) - g.initialGlobalKeys
+			if added > g.maxVars {
+				g.interrupt(fmt.Errorf("%w: global variable limit %d exceeded (%d)", ErrScriptQuotaExceeded, g.maxVars, added))
 			}
 		}
-		lf, ok1 := toFloat64(l)
-		rf, ok2 := toFloat64(r)
-		if ok1 && ok2 {
-			return lf + rf, nil
-		}
-		return fmt.Sprint(l) + fmt.Sprint(r), nil
-	case tokMinus:
-		if li, ok1 := toInt64(l); ok1 {
-			if ri, ok2 := toInt64(r); ok2 {
-				return li - ri, nil
-			}
-		}
-		lf, _ := toFloat64(l)
-		rf, _ := toFloat64(r)
-		return lf - rf, nil
-	case tokStar:
-		if li, ok1 := toInt64(l); ok1 {
-			if ri, ok2 := toInt64(r); ok2 {
-				return li * ri, nil
-			}
-		}
-		lf, _ := toFloat64(l)
-		rf, _ := toFloat64(r)
-		return lf * rf, nil
-	case tokSlash:
-		rf, _ := toFloat64(r)
-		if rf == 0 {
-			return nil, fmt.Errorf("%w: division by zero", ErrScriptSyntax)
-		}
-		if li, ok1 := toInt64(l); ok1 {
-			if ri, ok2 := toInt64(r); ok2 && li%ri == 0 {
-				return li / ri, nil
-			}
-		}
-		lf, _ := toFloat64(l)
-		return lf / rf, nil
-	case tokPercent:
-		li, _ := toInt64(l)
-		ri, _ := toInt64(r)
-		if ri == 0 {
-			return nil, fmt.Errorf("%w: modulo by zero", ErrScriptSyntax)
-		}
-		return li % ri, nil
-	case tokEq:
-		return valuesEqual(l, r), nil
-	case tokNeq:
-		return !valuesEqual(l, r), nil
-	case tokLt:
-		lf, _ := toFloat64(l)
-		rf, _ := toFloat64(r)
-		return lf < rf, nil
-	case tokLe:
-		lf, _ := toFloat64(l)
-		rf, _ := toFloat64(r)
-		return lf <= rf, nil
-	case tokGt:
-		lf, _ := toFloat64(l)
-		rf, _ := toFloat64(r)
-		return lf > rf, nil
-	case tokGe:
-		lf, _ := toFloat64(l)
-		rf, _ := toFloat64(r)
-		return lf >= rf, nil
+		return goja.Undefined()
 	}
-	return nil, nil
 }
 
-func isTruthy(v any) bool {
-	if v == nil {
-		return false
+func (g *codeGuard) checkValueFunc() func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		if len(call.Arguments) == 0 {
+			return goja.Undefined()
+		}
+		v := call.Arguments[0]
+		if s, ok := v.(goja.String); ok {
+			g.checkStringLen(int64(s.Length()))
+		}
+		return v
 	}
-	switch x := v.(type) {
-	case bool:
-		return x
-	case int64:
-		return x != 0
-	case float64:
-		return x != 0 && !math.IsNaN(x)
-	case string:
-		return x != ""
-	default:
+}
+
+func (g *codeGuard) checkStringLen(n int64) bool {
+	if n <= 0 {
 		return true
 	}
+	if n > int64(g.maxStringBytes) {
+		g.interrupt(fmt.Errorf("%w: string length %d > %d", ErrScriptQuotaExceeded, n, g.maxStringBytes))
+		return false
+	}
+	return g.charge(n)
 }
 
-func toInt64(v any) (int64, bool) {
-	switch x := v.(type) {
-	case int64:
-		return x, true
-	case int:
-		return int64(x), true
-	case float64:
-		if float64(int64(x)) == x {
-			return int64(x), true
+func (g *codeGuard) charge(n int64) bool {
+	if n <= 0 {
+		return true
+	}
+	if n > g.maxMemoryBytes-g.allocBytes {
+		g.interrupt(fmt.Errorf("%w: memory quota exceeded (%d + %d > %d)", ErrScriptQuotaExceeded, g.allocBytes, n, g.maxMemoryBytes))
+		return false
+	}
+	g.allocBytes += n
+	return true
+}
+
+func installAllocationGuards(rt *goja.Runtime, guard *codeGuard, jsonObj *goja.Object, jsonStringifyFn goja.Callable) {
+	wrapProtoMethod := func(proto *goja.Object, name string, wrapper func(orig goja.Callable, call goja.FunctionCall) goja.Value) {
+		if proto == nil {
+			return
 		}
-		return 0, false
-	default:
-		return 0, false
+		origVal := proto.Get(name)
+		origFn, ok := goja.AssertFunction(origVal)
+		if !ok {
+			return
+		}
+		origObj := origVal.ToObject(rt)
+		proxy := rt.NewProxy(origObj, &goja.ProxyTrapConfig{
+			Apply: func(_ *goja.Object, this goja.Value, args []goja.Value) goja.Value {
+				return wrapper(origFn, goja.FunctionCall{This: this, Arguments: args})
+			},
+		})
+		_ = proto.Set(name, proxy)
+	}
+
+	strProto := rt.Get("String").ToObject(rt).Get("prototype").ToObject(rt)
+	wrapProtoMethod(strProto, "repeat", func(orig goja.Callable, call goja.FunctionCall) goja.Value {
+		if len(call.Arguments) > 0 && !goja.IsUndefined(call.This) && !goja.IsNull(call.This) {
+			thisStr := call.This.ToString()
+			sLen := jsValueStrLen(thisStr)
+			cnt := call.Arguments[0].ToFloat()
+			if cnt > 0 && !math.IsNaN(cnt) {
+				if math.IsInf(cnt, 1) || cnt > float64(guard.maxStringBytes) {
+					guard.interrupt(fmt.Errorf("%w: repeat count exceeds quota", ErrScriptQuotaExceeded))
+					return goja.Undefined()
+				}
+				c := int64(cnt)
+				if sLen > 0 && c > int64(guard.maxStringBytes)/sLen {
+					guard.interrupt(fmt.Errorf("%w: string repeat exceeds quota", ErrScriptQuotaExceeded))
+					return goja.Undefined()
+				}
+				if !guard.checkStringLen(sLen * c) {
+					return goja.Undefined()
+				}
+			}
+			res, err := orig(thisStr, rt.ToValue(cnt))
+			if err != nil {
+				rethrowGojaError(rt, err)
+			}
+			return res
+		}
+		res, err := orig(call.This, call.Arguments...)
+		if err != nil {
+			rethrowGojaError(rt, err)
+		}
+		return res
+	})
+
+	padGuard := func(orig goja.Callable, call goja.FunctionCall) goja.Value {
+		if len(call.Arguments) > 0 && !goja.IsUndefined(call.This) && !goja.IsNull(call.This) {
+			thisStr := call.This.ToString()
+			target := call.Arguments[0].ToFloat()
+			if target > 0 && !math.IsNaN(target) {
+				if math.IsInf(target, 1) || target > float64(guard.maxStringBytes) {
+					guard.interrupt(fmt.Errorf("%w: string pad exceeds quota", ErrScriptQuotaExceeded))
+					return goja.Undefined()
+				}
+				if !guard.checkStringLen(int64(target)) {
+					return goja.Undefined()
+				}
+			}
+			args := append([]goja.Value(nil), call.Arguments...)
+			args[0] = rt.ToValue(target)
+			if len(args) > 1 && !goja.IsUndefined(args[1]) {
+				args[1] = args[1].ToString()
+			}
+			res, err := orig(thisStr, args...)
+			if err != nil {
+				rethrowGojaError(rt, err)
+			}
+			return res
+		}
+		res, err := orig(call.This, call.Arguments...)
+		if err != nil {
+			rethrowGojaError(rt, err)
+		}
+		return res
+	}
+	wrapProtoMethod(strProto, "padStart", padGuard)
+	wrapProtoMethod(strProto, "padEnd", padGuard)
+
+	wrapProtoMethod(strProto, "concat", func(orig goja.Callable, call goja.FunctionCall) goja.Value {
+		if !goja.IsUndefined(call.This) && !goja.IsNull(call.This) {
+			thisStr := call.This.ToString()
+			total := jsValueStrLen(thisStr)
+			args := make([]goja.Value, len(call.Arguments))
+			for i, a := range call.Arguments {
+				s := a.ToString()
+				args[i] = s
+				total += jsValueStrLen(s)
+				if total > int64(guard.maxStringBytes) {
+					guard.interrupt(fmt.Errorf("%w: string concat exceeds quota", ErrScriptQuotaExceeded))
+					return goja.Undefined()
+				}
+			}
+			if !guard.checkStringLen(total) {
+				return goja.Undefined()
+			}
+			res, err := orig(thisStr, args...)
+			if err != nil {
+				rethrowGojaError(rt, err)
+			}
+			return res
+		}
+		res, err := orig(call.This, call.Arguments...)
+		if err != nil {
+			rethrowGojaError(rt, err)
+		}
+		return res
+	})
+
+	arrProto := rt.Get("Array").ToObject(rt).Get("prototype").ToObject(rt)
+	wrapProtoMethod(arrProto, "join", func(orig goja.Callable, call goja.FunctionCall) goja.Value {
+		args := call.Arguments
+		if obj, ok := call.This.(*goja.Object); ok {
+			length := obj.Get("length").ToInteger()
+			if length > int64(guard.maxStringBytes)+1 {
+				guard.interrupt(fmt.Errorf("%w: array join length %d exceeds quota", ErrScriptQuotaExceeded, length))
+				return goja.Undefined()
+			}
+			if len(args) > 0 && !goja.IsUndefined(args[0]) {
+				sep := args[0].ToString()
+				sepLen := jsValueStrLen(sep)
+				if length > 1 && sepLen > 0 && length-1 > int64(guard.maxStringBytes)/sepLen {
+					guard.interrupt(fmt.Errorf("%w: array join size exceeds quota", ErrScriptQuotaExceeded))
+					return goja.Undefined()
+				}
+				args = append([]goja.Value(nil), args...)
+				args[0] = sep
+			}
+		}
+		res, err := orig(call.This, args...)
+		if err != nil {
+			rethrowGojaError(rt, err)
+		}
+		if s, ok := res.(goja.String); ok {
+			if !guard.checkStringLen(int64(s.Length())) {
+				return goja.Undefined()
+			}
+		}
+		return res
+	})
+
+	wrapProtoMethod(arrProto, "fill", func(orig goja.Callable, call goja.FunctionCall) goja.Value {
+		if obj, ok := call.This.(*goja.Object); ok {
+			length := obj.Get("length").ToInteger()
+			if length > 0 && !guard.charge(length*16) {
+				return goja.Undefined()
+			}
+		}
+		res, err := orig(call.This, call.Arguments...)
+		if err != nil {
+			rethrowGojaError(rt, err)
+		}
+		return res
+	})
+
+	for _, name := range []string{"push", "unshift", "concat", "splice"} {
+		wrapProtoMethod(arrProto, name, func(orig goja.Callable, call goja.FunctionCall) goja.Value {
+			if !guard.charge(int64(len(call.Arguments)+1) * 16) {
+				return goja.Undefined()
+			}
+			res, err := orig(call.This, call.Arguments...)
+			if err != nil {
+				rethrowGojaError(rt, err)
+			}
+			return res
+		})
+	}
+
+	// Guard ArrayBuffer and ArrayBuffer.prototype methods.
+	abVal := rt.Get("ArrayBuffer")
+	abCtor, _ := abVal.(*goja.Object)
+	if abCtor != nil {
+		abProto := abCtor.Get("prototype").ToObject(rt)
+		for _, m := range []string{"slice", "transfer", "transferToFixedLength", "resize"} {
+			wrapProtoMethod(abProto, m, func(orig goja.Callable, call goja.FunctionCall) goja.Value {
+				if obj, ok := call.This.(*goja.Object); ok {
+					sz := obj.Get("byteLength").ToInteger()
+					if len(call.Arguments) > 0 && !goja.IsUndefined(call.Arguments[0]) {
+						arg0 := call.Arguments[0].ToInteger()
+						if m == "resize" || m == "transfer" || m == "transferToFixedLength" {
+							sz = arg0
+						}
+					}
+					if sz > 0 && !guard.charge(sz) {
+						return goja.Undefined()
+					}
+				}
+				res, err := orig(call.This, call.Arguments...)
+				if err != nil {
+					rethrowGojaError(rt, err)
+				}
+				return res
+			})
+		}
+
+		abProxy := rt.NewProxy(abCtor, &goja.ProxyTrapConfig{
+			Construct: func(target *goja.Object, args []goja.Value, _ *goja.Object) *goja.Object {
+				if len(args) > 0 {
+					n := args[0].ToFloat()
+					if n > 0 && !math.IsNaN(n) {
+						if math.IsInf(n, 1) || n > float64(guard.maxMemoryBytes) {
+							guard.interrupt(fmt.Errorf("%w: ArrayBuffer size exceeds quota", ErrScriptQuotaExceeded))
+							return rt.NewObject()
+						}
+						if !guard.charge(int64(n)) {
+							return rt.NewObject()
+						}
+					}
+					args = append([]goja.Value(nil), args...)
+					args[0] = rt.ToValue(n)
+				}
+				obj, err := rt.New(target, args...)
+				if err != nil {
+					rethrowGojaError(rt, err)
+				}
+				return obj
+			},
+		})
+		_ = rt.Set("ArrayBuffer", abProxy)
+	}
+
+	// Guard TypedArrays (Uint8Array, Float64Array, etc.).
+	typedArrays := []struct {
+		name     string
+		elemSize int64
+	}{
+		{"Int8Array", 1},
+		{"Uint8Array", 1},
+		{"Uint8ClampedArray", 1},
+		{"Int16Array", 2},
+		{"Uint16Array", 2},
+		{"Float16Array", 2},
+		{"Int32Array", 4},
+		{"Uint32Array", 4},
+		{"Float32Array", 4},
+		{"Float64Array", 8},
+		{"BigInt64Array", 8},
+		{"BigUint64Array", 8},
+	}
+	for _, ta := range typedArrays {
+		taVal := rt.Get(ta.name)
+		taCtor, ok := taVal.(*goja.Object)
+		if !ok || taCtor == nil {
+			continue
+		}
+		elemSize := ta.elemSize
+		taProxy := rt.NewProxy(taCtor, &goja.ProxyTrapConfig{
+			Construct: func(target *goja.Object, args []goja.Value, _ *goja.Object) *goja.Object {
+				if len(args) > 0 {
+					var chargeBytes int64
+					if goja.IsNumber(args[0]) {
+						n := args[0].ToFloat()
+						if n > 0 && !math.IsNaN(n) {
+							if math.IsInf(n, 1) || n > float64(guard.maxMemoryBytes/elemSize) {
+								guard.interrupt(fmt.Errorf("%w: TypedArray size exceeds quota", ErrScriptQuotaExceeded))
+								return rt.NewObject()
+							}
+							chargeBytes = int64(n) * elemSize
+						}
+					} else if abCtor == nil || !rt.InstanceOf(args[0], abCtor) {
+						if o, isObj := args[0].(*goja.Object); isObj {
+							l := o.Get("length").ToInteger()
+							if l > 0 {
+								if l > guard.maxMemoryBytes/elemSize {
+									guard.interrupt(fmt.Errorf("%w: TypedArray size exceeds quota", ErrScriptQuotaExceeded))
+									return rt.NewObject()
+								}
+								chargeBytes = l * elemSize
+							}
+						}
+					}
+					if chargeBytes > 0 && !guard.charge(chargeBytes) {
+						return rt.NewObject()
+					}
+				}
+				obj, err := rt.New(target, args...)
+				if err != nil {
+					rethrowGojaError(rt, err)
+				}
+				return obj
+			},
+		})
+		_ = rt.Set(ta.name, taProxy)
+	}
+
+	// Guard Array(...) / new Array(...).
+	if arrCtor, ok := rt.Get("Array").(*goja.Object); ok && arrCtor != nil {
+		checkArrArgs := func(args []goja.Value) bool {
+			if len(args) > 1 {
+				return guard.charge(int64(len(args)) * 16)
+			}
+			return true
+		}
+		arrProxy := rt.NewProxy(arrCtor, &goja.ProxyTrapConfig{
+			Apply: func(target *goja.Object, _ goja.Value, args []goja.Value) goja.Value {
+				if !checkArrArgs(args) {
+					return goja.Undefined()
+				}
+				obj, err := rt.New(target, args...)
+				if err != nil {
+					rethrowGojaError(rt, err)
+				}
+				return obj
+			},
+			Construct: func(target *goja.Object, args []goja.Value, _ *goja.Object) *goja.Object {
+				if !checkArrArgs(args) {
+					return rt.NewObject()
+				}
+				obj, err := rt.New(target, args...)
+				if err != nil {
+					rethrowGojaError(rt, err)
+				}
+				return obj
+			},
+		})
+		_ = rt.Set("Array", arrProxy)
+	}
+
+	// Guard JSON.stringify output length.
+	if jsonStringifyFn != nil {
+		origStringifyObj := jsonObj.Get("stringify").ToObject(rt)
+		stringifyProxy := rt.NewProxy(origStringifyObj, &goja.ProxyTrapConfig{
+			Apply: func(_ *goja.Object, this goja.Value, args []goja.Value) goja.Value {
+				res, err := jsonStringifyFn(this, args...)
+				if err != nil {
+					rethrowGojaError(rt, err)
+				}
+				if s, ok := res.(goja.String); ok {
+					if !guard.checkStringLen(int64(s.Length())) {
+						return goja.Undefined()
+					}
+				}
+				return res
+			},
+		})
+		_ = jsonObj.Set("stringify", stringifyProxy)
 	}
 }
 
-func toFloat64(v any) (float64, bool) {
-	switch x := v.(type) {
-	case float64:
-		return x, true
-	case int64:
-		return float64(x), true
-	case int:
-		return float64(x), true
-	default:
-		return 0, false
+func jsValueStrLen(v goja.Value) int64 {
+	if s, ok := v.(goja.String); ok {
+		return int64(s.Length())
 	}
+	if s, ok := v.ToString().(goja.String); ok {
+		return int64(s.Length())
+	}
+	return int64(len(v.String()))
 }
 
-func valuesEqual(a, b any) bool {
-	if af, ok1 := toFloat64(a); ok1 {
-		if bf, ok2 := toFloat64(b); ok2 {
-			return af == bf
+func panicNewJSError(rt *goja.Runtime, ctorName, msg string) {
+	if ctor := rt.Get(ctorName); ctor != nil && !goja.IsUndefined(ctor) {
+		if obj, err := rt.New(ctor, rt.ToValue(msg)); err == nil {
+			panic(obj)
 		}
 	}
-	return reflect.DeepEqual(a, b)
+	panic(rt.NewTypeError(msg))
+}
+
+func rethrowGojaError(rt *goja.Runtime, err error) {
+	if err == nil {
+		return
+	}
+	var ex *goja.Exception
+	if errors.As(err, &ex) {
+		panic(ex)
+	}
+	var intErr *goja.InterruptedError
+	if errors.As(err, &intErr) {
+		panic(intErr)
+	}
+	var stackErr *goja.StackOverflowError
+	if errors.As(err, &stackErr) {
+		panic(stackErr)
+	}
+	panic(rt.NewGoError(err))
+}
+
+func installDynamicEvalGuards(rt *goja.Runtime, guard *codeGuard, tickIdent, chkIdent string) {
+	syntaxErrCtor := rt.Get("SyntaxError")
+	throwSyntax := func(err error) {
+		if obj, nErr := rt.New(syntaxErrCtor, rt.ToValue(err.Error())); nErr == nil {
+			panic(obj)
+		}
+		panic(rt.NewGoError(err))
+	}
+
+	compileAndInstrument := func(src string) *goja.Program {
+		prg, err := goja.Parse("eval.js", src)
+		if err != nil {
+			throwSyntax(err)
+		}
+		instrumentProgramAST(prg, tickIdent, chkIdent)
+		compiled, err := goja.CompileAST(prg, false)
+		if err != nil {
+			throwSyntax(err)
+		}
+		return compiled
+	}
+
+	evalFn := func(call goja.FunctionCall) goja.Value {
+		if len(call.Arguments) == 0 {
+			return goja.Undefined()
+		}
+		srcStr, ok := call.Arguments[0].(goja.String)
+		if !ok {
+			return call.Arguments[0]
+		}
+		compiled := compileAndInstrument(srcStr.String())
+		res, err := rt.RunProgram(compiled)
+		if err != nil {
+			rethrowGojaError(rt, err)
+		}
+		return res
+	}
+	_ = rt.Set("eval", evalFn)
+
+	origFuncCtor, ok := rt.Get("Function").(*goja.Object)
+	if !ok || origFuncCtor == nil {
+		return
+	}
+	buildDynamicFuncWithPrefix := func(prefix string, args []goja.Value) goja.Value {
+		var params []string
+		body := ""
+		if len(args) > 0 {
+			body = args[len(args)-1].ToString().String()
+			for i := 0; i < len(args)-1; i++ {
+				params = append(params, args[i].ToString().String())
+			}
+		}
+		fnSrc := "(" + prefix + "(" + strings.Join(params, ",") + ") {\n" + body + "\n})"
+		compiled := compileAndInstrument(fnSrc)
+		res, err := rt.RunProgram(compiled)
+		if err != nil {
+			rethrowGojaError(rt, err)
+		}
+		return res
+	}
+	wrapFuncCtor := func(orig *goja.Object, prefix string) goja.Proxy {
+		return rt.NewProxy(orig, &goja.ProxyTrapConfig{
+			Apply: func(_ *goja.Object, _ goja.Value, args []goja.Value) goja.Value {
+				return buildDynamicFuncWithPrefix(prefix, args)
+			},
+			Construct: func(_ *goja.Object, args []goja.Value, _ *goja.Object) *goja.Object {
+				v := buildDynamicFuncWithPrefix(prefix, args)
+				return v.ToObject(rt)
+			},
+		})
+	}
+	funcProxy := wrapFuncCtor(origFuncCtor, "function")
+	_ = rt.Set("Function", funcProxy)
+	if fnProto, ok := origFuncCtor.Get("prototype").(*goja.Object); ok && fnProto != nil {
+		_ = fnProto.Set("constructor", funcProxy)
+	}
+	for _, spec := range []struct {
+		probe  string
+		prefix string
+	}{
+		{"(function*(){}).constructor", "function*"},
+		{"(async function(){}).constructor", "async function"},
+		{"(async function*(){}).constructor", "async function*"},
+	} {
+		if ctorVal, err := rt.RunString(spec.probe); err == nil {
+			if ctorObj, ok := ctorVal.(*goja.Object); ok && ctorObj != nil {
+				if proto, ok := ctorObj.Get("prototype").(*goja.Object); ok && proto != nil {
+					_ = proto.Set("constructor", wrapFuncCtor(ctorObj, spec.prefix))
+				}
+			}
+		}
+	}
+}
+
+func jsValueToGoAny(rt *goja.Runtime, jsonObj *goja.Object, jsonStringifyFn goja.Callable, val goja.Value) (any, error) {
+	if val == nil || goja.IsUndefined(val) || goja.IsNull(val) {
+		return nil, nil
+	}
+	if goja.IsNaN(val) || goja.IsInfinity(val) {
+		return nil, nil
+	}
+	if obj, ok := val.(*goja.Object); ok {
+		raw, err := obj.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		var out any
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return nil, err
+		}
+		return out, nil
+	}
+	if goja.IsBigInt(val) {
+		if jsonStringifyFn != nil {
+			if _, err := jsonStringifyFn(jsonObj, val); err != nil {
+				return nil, err
+			}
+		}
+		return nil, fmt.Errorf("%w: cannot serialize BigInt to JSON", ErrScriptSyntax)
+	}
+	return val.Export(), nil
+}
+
+func parseJSONToJSValue(rt *goja.Runtime, jsonObj *goja.Object, jsonParseFn goja.Callable, raw []byte) (goja.Value, error) {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return goja.Null(), nil
+	}
+	if jsonParseFn == nil {
+		var v any
+		if err := json.Unmarshal(raw, &v); err != nil {
+			return nil, err
+		}
+		return rt.ToValue(v), nil
+	}
+	return jsonParseFn(jsonObj, rt.ToValue(trimmed))
+}
+
+// --- AST Parsing & Deterministic Quota / Memory Instrumentation ---
+
+func compileCodeScript(src string, seed uint64, maxVars int) (compiled *goja.Program, tickIdent string, chkIdent string, err error) {
+	prg, err := goja.Parse("codemode.js", src)
+	if err != nil && strings.Contains(err.Error(), "Illegal return statement") {
+		wrapped := "(function() {\n" + src + "\n})()"
+		prg, err = goja.Parse("codemode.js", wrapped)
+	}
+	if err != nil {
+		return nil, "", "", fmt.Errorf("%w: %v", ErrScriptSyntax, err)
+	}
+
+	seen, varCount := collectASTIdentsAndVars(prg)
+	if maxVars > 0 && varCount > maxVars {
+		return nil, "", "", fmt.Errorf("%w: variable limit %d exceeded (%d declared)", ErrScriptQuotaExceeded, maxVars, varCount)
+	}
+
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(src))
+	tag := h.Sum64() ^ seed
+
+	tickIdent = pickFreshIdent(seen, fmt.Sprintf("__vv_tick_%x", tag))
+	chkIdent = pickFreshIdent(seen, fmt.Sprintf("__vv_chk_%x", tag))
+
+	instrumentProgramAST(prg, tickIdent, chkIdent)
+
+	compiled, err = goja.CompileAST(prg, false)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("%w: %v", ErrScriptSyntax, err)
+	}
+	return compiled, tickIdent, chkIdent, nil
+}
+
+func pickFreshIdent(seen map[string]bool, base string) string {
+	if !seen[base] {
+		seen[base] = true
+		return base
+	}
+	for i := 0; ; i++ {
+		cand := fmt.Sprintf("%s_%d", base, i)
+		if !seen[cand] {
+			seen[cand] = true
+			return cand
+		}
+	}
+}
+
+func collectASTIdentsAndVars(prg *ast.Program) (map[string]bool, int) {
+	seen := make(map[string]bool)
+	var varCount int
+
+	recordIdent := func(id *ast.Identifier) {
+		if id != nil {
+			seen[id.Name.String()] = true
+		}
+	}
+
+	var scanPattern func(p ast.Expression, isDecl bool)
+	var scanExpr func(ex ast.Expression)
+	var scanStmt func(st ast.Statement)
+	var scanStmts func(stmts []ast.Statement)
+
+	scanPattern = func(p ast.Expression, isDecl bool) {
+		if p == nil {
+			return
+		}
+		switch node := p.(type) {
+		case *ast.Identifier:
+			recordIdent(node)
+			if isDecl {
+				varCount++
+			}
+		case *ast.Binding:
+			scanPattern(node.Target, isDecl)
+			scanExpr(node.Initializer)
+		case *ast.ArrayPattern:
+			for _, el := range node.Elements {
+				scanPattern(el, isDecl)
+			}
+			scanPattern(node.Rest, isDecl)
+		case *ast.ObjectPattern:
+			for _, prop := range node.Properties {
+				switch pr := prop.(type) {
+				case *ast.PropertyShort:
+					recordIdent(&pr.Name)
+					if isDecl {
+						varCount++
+					}
+					scanExpr(pr.Initializer)
+				case *ast.PropertyKeyed:
+					if pr.Computed {
+						scanExpr(pr.Key)
+					} else if id, ok := pr.Key.(*ast.Identifier); ok {
+						recordIdent(id)
+					}
+					scanPattern(pr.Value, isDecl)
+				case *ast.SpreadElement:
+					scanPattern(pr.Expression, isDecl)
+				}
+			}
+			scanPattern(node.Rest, isDecl)
+		default:
+			scanExpr(p)
+		}
+	}
+
+	scanFunc := func(fn *ast.FunctionLiteral) {
+		if fn == nil {
+			return
+		}
+		recordIdent(fn.Name)
+		if fn.ParameterList != nil {
+			for _, b := range fn.ParameterList.List {
+				scanPattern(b, true)
+			}
+			if fn.ParameterList.Rest != nil {
+				scanPattern(fn.ParameterList.Rest, true)
+			}
+		}
+		if fn.Body != nil {
+			scanStmt(fn.Body)
+		}
+	}
+
+	scanClass := func(cl *ast.ClassLiteral) {
+		if cl == nil {
+			return
+		}
+		recordIdent(cl.Name)
+		scanExpr(cl.SuperClass)
+		for _, el := range cl.Body {
+			switch e := el.(type) {
+			case *ast.FieldDefinition:
+				scanExpr(e.Key)
+				scanExpr(e.Initializer)
+			case *ast.MethodDefinition:
+				scanExpr(e.Key)
+				scanFunc(e.Body)
+			case *ast.ClassStaticBlock:
+				scanStmt(e.Block)
+			}
+		}
+	}
+
+	scanExpr = func(ex ast.Expression) {
+		if ex == nil {
+			return
+		}
+		switch e := ex.(type) {
+		case *ast.Identifier:
+			recordIdent(e)
+		case *ast.ArrayLiteral:
+			for _, v := range e.Value {
+				scanExpr(v)
+			}
+		case *ast.ObjectLiteral:
+			for _, prop := range e.Value {
+				switch pr := prop.(type) {
+				case *ast.PropertyShort:
+					recordIdent(&pr.Name)
+					scanExpr(pr.Initializer)
+				case *ast.PropertyKeyed:
+					scanExpr(pr.Key)
+					scanExpr(pr.Value)
+				case *ast.SpreadElement:
+					scanExpr(pr.Expression)
+				}
+			}
+		case *ast.AssignExpression:
+			scanExpr(e.Left)
+			scanExpr(e.Right)
+		case *ast.BinaryExpression:
+			scanExpr(e.Left)
+			scanExpr(e.Right)
+		case *ast.BracketExpression:
+			scanExpr(e.Left)
+			scanExpr(e.Member)
+		case *ast.CallExpression:
+			scanExpr(e.Callee)
+			for _, a := range e.ArgumentList {
+				scanExpr(a)
+			}
+		case *ast.NewExpression:
+			scanExpr(e.Callee)
+			for _, a := range e.ArgumentList {
+				scanExpr(a)
+			}
+		case *ast.ConditionalExpression:
+			scanExpr(e.Test)
+			scanExpr(e.Consequent)
+			scanExpr(e.Alternate)
+		case *ast.DotExpression:
+			scanExpr(e.Left)
+			recordIdent(&e.Identifier)
+		case *ast.PrivateDotExpression:
+			scanExpr(e.Left)
+		case *ast.OptionalChain:
+			scanExpr(e.Expression)
+		case *ast.Optional:
+			scanExpr(e.Expression)
+		case *ast.FunctionLiteral:
+			scanFunc(e)
+		case *ast.ClassLiteral:
+			scanClass(e)
+		case *ast.ArrowFunctionLiteral:
+			if e.ParameterList != nil {
+				for _, b := range e.ParameterList.List {
+					scanPattern(b, true)
+				}
+				if e.ParameterList.Rest != nil {
+					scanPattern(e.ParameterList.Rest, true)
+				}
+			}
+			switch b := e.Body.(type) {
+			case *ast.BlockStatement:
+				scanStmt(b)
+			case *ast.ExpressionBody:
+				scanExpr(b.Expression)
+			}
+		case *ast.SequenceExpression:
+			for _, item := range e.Sequence {
+				scanExpr(item)
+			}
+		case *ast.TemplateLiteral:
+			scanExpr(e.Tag)
+			for _, item := range e.Expressions {
+				scanExpr(item)
+			}
+		case *ast.UnaryExpression:
+			scanExpr(e.Operand)
+		case *ast.YieldExpression:
+			scanExpr(e.Argument)
+		case *ast.AwaitExpression:
+			scanExpr(e.Argument)
+		case *ast.SpreadElement:
+			scanExpr(e.Expression)
+		case *ast.Binding:
+			scanPattern(e, false)
+		case *ast.ArrayPattern:
+			scanPattern(e, false)
+		case *ast.ObjectPattern:
+			scanPattern(e, false)
+		}
+	}
+
+	scanStmt = func(st ast.Statement) {
+		if st == nil {
+			return
+		}
+		switch s := st.(type) {
+		case *ast.BlockStatement:
+			scanStmts(s.List)
+		case *ast.BranchStatement:
+			recordIdent(s.Label)
+		case *ast.CaseStatement:
+			scanExpr(s.Test)
+			scanStmts(s.Consequent)
+		case *ast.CatchStatement:
+			scanPattern(s.Parameter, true)
+			scanStmt(s.Body)
+		case *ast.DoWhileStatement:
+			scanStmt(s.Body)
+			scanExpr(s.Test)
+		case *ast.ExpressionStatement:
+			scanExpr(s.Expression)
+		case *ast.ForInStatement:
+			switch into := s.Into.(type) {
+			case *ast.ForIntoVar:
+				scanPattern(into.Binding, true)
+			case *ast.ForDeclaration:
+				scanPattern(into.Target, true)
+			case *ast.ForIntoExpression:
+				scanExpr(into.Expression)
+			}
+			scanExpr(s.Source)
+			scanStmt(s.Body)
+		case *ast.ForOfStatement:
+			switch into := s.Into.(type) {
+			case *ast.ForIntoVar:
+				scanPattern(into.Binding, true)
+			case *ast.ForDeclaration:
+				scanPattern(into.Target, true)
+			case *ast.ForIntoExpression:
+				scanExpr(into.Expression)
+			}
+			scanExpr(s.Source)
+			scanStmt(s.Body)
+		case *ast.ForStatement:
+			switch init := s.Initializer.(type) {
+			case *ast.ForLoopInitializerExpression:
+				scanExpr(init.Expression)
+			case *ast.ForLoopInitializerVarDeclList:
+				for _, b := range init.List {
+					scanPattern(b, true)
+				}
+			case *ast.ForLoopInitializerLexicalDecl:
+				for _, b := range init.LexicalDeclaration.List {
+					scanPattern(b, true)
+				}
+			}
+			scanExpr(s.Test)
+			scanExpr(s.Update)
+			scanStmt(s.Body)
+		case *ast.IfStatement:
+			scanExpr(s.Test)
+			scanStmt(s.Consequent)
+			scanStmt(s.Alternate)
+		case *ast.LabelledStatement:
+			recordIdent(s.Label)
+			scanStmt(s.Statement)
+		case *ast.ReturnStatement:
+			scanExpr(s.Argument)
+		case *ast.SwitchStatement:
+			scanExpr(s.Discriminant)
+			for _, cs := range s.Body {
+				scanStmt(cs)
+			}
+		case *ast.ThrowStatement:
+			scanExpr(s.Argument)
+		case *ast.TryStatement:
+			scanStmt(s.Body)
+			if s.Catch != nil {
+				scanStmt(s.Catch)
+			}
+			if s.Finally != nil {
+				scanStmt(s.Finally)
+			}
+		case *ast.VariableStatement:
+			for _, b := range s.List {
+				scanPattern(b, true)
+			}
+		case *ast.LexicalDeclaration:
+			for _, b := range s.List {
+				scanPattern(b, true)
+			}
+		case *ast.WhileStatement:
+			scanExpr(s.Test)
+			scanStmt(s.Body)
+		case *ast.WithStatement:
+			scanExpr(s.Object)
+			scanStmt(s.Body)
+		case *ast.FunctionDeclaration:
+			if s.Function != nil && s.Function.Name != nil {
+				varCount++
+			}
+			scanFunc(s.Function)
+		case *ast.ClassDeclaration:
+			if s.Class != nil && s.Class.Name != nil {
+				varCount++
+			}
+			scanClass(s.Class)
+		}
+	}
+
+	scanStmts = func(stmts []ast.Statement) {
+		for _, s := range stmts {
+			scanStmt(s)
+		}
+	}
+
+	scanStmts(prg.Body)
+	return seen, varCount
+}
+
+func instrumentProgramAST(prg *ast.Program, tickIdent, chkIdent string) {
+	safePos := func(idx file.Idx) file.Idx {
+		if idx < 1 {
+			return 1
+		}
+		return idx
+	}
+	makeTickCall := func(pos file.Idx) ast.Expression {
+		p := safePos(pos)
+		return &ast.CallExpression{
+			Callee:           &ast.Identifier{Name: unistring.String(tickIdent), Idx: p},
+			LeftParenthesis:  p,
+			RightParenthesis: p,
+		}
+	}
+	makeTickStmt := func(pos file.Idx) ast.Statement {
+		return &ast.ExpressionStatement{
+			Expression: makeTickCall(pos),
+		}
+	}
+	wrapChk := func(ex ast.Expression) ast.Expression {
+		p := safePos(ex.Idx0())
+		return &ast.CallExpression{
+			Callee:           &ast.Identifier{Name: unistring.String(chkIdent), Idx: p},
+			LeftParenthesis:  p,
+			ArgumentList:     []ast.Expression{ex},
+			RightParenthesis: safePos(ex.Idx1()),
+		}
+	}
+
+	var instExpr func(ex ast.Expression) ast.Expression
+	var instLValue func(ex ast.Expression)
+	var instBinding func(b *ast.Binding)
+	var instPatternTarget func(ex ast.Expression)
+	var instFunc func(fn *ast.FunctionLiteral)
+	var instClass func(cl *ast.ClassLiteral)
+	var instStmt func(st ast.Statement) ast.Statement
+	var instStmtList func(stmts []ast.Statement, skipPrologue bool, ensureTick bool, fallbackPos file.Idx) []ast.Statement
+	var instLoopBody func(body ast.Statement, fallbackPos file.Idx) ast.Statement
+
+	instPatternTarget = func(ex ast.Expression) {
+		if ex == nil {
+			return
+		}
+		switch node := ex.(type) {
+		case *ast.Binding:
+			instBinding(node)
+		case *ast.ArrayPattern:
+			for _, el := range node.Elements {
+				instPatternTarget(el)
+			}
+			instPatternTarget(node.Rest)
+		case *ast.ObjectPattern:
+			for _, prop := range node.Properties {
+				switch pr := prop.(type) {
+				case *ast.PropertyShort:
+					if pr.Initializer != nil {
+						pr.Initializer = instExpr(pr.Initializer)
+					}
+				case *ast.PropertyKeyed:
+					if pr.Computed {
+						pr.Key = instExpr(pr.Key)
+					}
+					instPatternTarget(pr.Value)
+				case *ast.SpreadElement:
+					instPatternTarget(pr.Expression)
+				}
+			}
+			instPatternTarget(node.Rest)
+		default:
+			instLValue(ex)
+		}
+	}
+
+	instBinding = func(b *ast.Binding) {
+		if b == nil {
+			return
+		}
+		instPatternTarget(b.Target)
+		if b.Initializer != nil {
+			b.Initializer = instExpr(b.Initializer)
+		}
+	}
+
+	instLValue = func(ex ast.Expression) {
+		if ex == nil {
+			return
+		}
+		switch e := ex.(type) {
+		case *ast.BracketExpression:
+			e.Left = instExpr(e.Left)
+			e.Member = instExpr(e.Member)
+		case *ast.DotExpression:
+			e.Left = instExpr(e.Left)
+		case *ast.PrivateDotExpression:
+			e.Left = instExpr(e.Left)
+		case *ast.ArrayPattern, *ast.ObjectPattern, *ast.Binding:
+			instPatternTarget(e)
+		}
+	}
+
+	instFunc = func(fn *ast.FunctionLiteral) {
+		if fn == nil {
+			return
+		}
+		if fn.ParameterList != nil {
+			for _, b := range fn.ParameterList.List {
+				instBinding(b)
+			}
+			if fn.ParameterList.Rest != nil {
+				instPatternTarget(fn.ParameterList.Rest)
+			}
+		}
+		if fn.Body != nil {
+			fn.Body.List = instStmtList(fn.Body.List, true, true, fn.Body.Idx0())
+		}
+	}
+
+	instClass = func(cl *ast.ClassLiteral) {
+		if cl == nil {
+			return
+		}
+		if cl.SuperClass != nil {
+			cl.SuperClass = instExpr(cl.SuperClass)
+		}
+		for _, el := range cl.Body {
+			switch e := el.(type) {
+			case *ast.FieldDefinition:
+				if e.Computed && e.Key != nil {
+					e.Key = instExpr(e.Key)
+				}
+				if e.Initializer != nil {
+					e.Initializer = instExpr(e.Initializer)
+				}
+			case *ast.MethodDefinition:
+				if e.Computed && e.Key != nil {
+					e.Key = instExpr(e.Key)
+				}
+				instFunc(e.Body)
+			case *ast.ClassStaticBlock:
+				if e.Block != nil {
+					e.Block.List = instStmtList(e.Block.List, false, true, e.Block.Idx0())
+				}
+			}
+		}
+	}
+
+	instExpr = func(ex ast.Expression) ast.Expression {
+		if ex == nil {
+			return nil
+		}
+		switch e := ex.(type) {
+		case *ast.ArrayLiteral:
+			for i, v := range e.Value {
+				e.Value[i] = instExpr(v)
+			}
+			return e
+		case *ast.ObjectLiteral:
+			for _, prop := range e.Value {
+				switch pr := prop.(type) {
+				case *ast.PropertyShort:
+					if pr.Initializer != nil {
+						pr.Initializer = instExpr(pr.Initializer)
+					}
+				case *ast.PropertyKeyed:
+					if pr.Computed && pr.Key != nil {
+						pr.Key = instExpr(pr.Key)
+					}
+					if pr.Value != nil {
+						pr.Value = instExpr(pr.Value)
+					}
+				case *ast.SpreadElement:
+					pr.Expression = instExpr(pr.Expression)
+				}
+			}
+			return e
+		case *ast.AssignExpression:
+			instLValue(e.Left)
+			e.Right = instExpr(e.Right)
+			if e.Operator == token.PLUS {
+				return wrapChk(e)
+			}
+			return e
+		case *ast.BinaryExpression:
+			e.Left = instExpr(e.Left)
+			e.Right = instExpr(e.Right)
+			if e.Operator == token.PLUS {
+				return wrapChk(e)
+			}
+			return e
+		case *ast.BracketExpression:
+			e.Left = instExpr(e.Left)
+			e.Member = instExpr(e.Member)
+			return e
+		case *ast.CallExpression:
+			switch c := e.Callee.(type) {
+			case *ast.DotExpression:
+				c.Left = instExpr(c.Left)
+			case *ast.PrivateDotExpression:
+				c.Left = instExpr(c.Left)
+			case *ast.BracketExpression:
+				c.Left = instExpr(c.Left)
+				c.Member = instExpr(c.Member)
+			default:
+				e.Callee = instExpr(e.Callee)
+			}
+			for i, a := range e.ArgumentList {
+				e.ArgumentList[i] = instExpr(a)
+			}
+			return e
+		case *ast.NewExpression:
+			e.Callee = instExpr(e.Callee)
+			for i, a := range e.ArgumentList {
+				e.ArgumentList[i] = instExpr(a)
+			}
+			return e
+		case *ast.ConditionalExpression:
+			e.Test = instExpr(e.Test)
+			e.Consequent = instExpr(e.Consequent)
+			e.Alternate = instExpr(e.Alternate)
+			return e
+		case *ast.DotExpression:
+			e.Left = instExpr(e.Left)
+			return e
+		case *ast.PrivateDotExpression:
+			e.Left = instExpr(e.Left)
+			return e
+		case *ast.OptionalChain:
+			e.Expression = instExpr(e.Expression)
+			return e
+		case *ast.Optional:
+			e.Expression = instExpr(e.Expression)
+			return e
+		case *ast.FunctionLiteral:
+			instFunc(e)
+			return e
+		case *ast.ClassLiteral:
+			instClass(e)
+			return e
+		case *ast.ArrowFunctionLiteral:
+			if e.ParameterList != nil {
+				for _, b := range e.ParameterList.List {
+					instBinding(b)
+				}
+				if e.ParameterList.Rest != nil {
+					instPatternTarget(e.ParameterList.Rest)
+				}
+			}
+			switch b := e.Body.(type) {
+			case *ast.BlockStatement:
+				b.List = instStmtList(b.List, true, true, b.Idx0())
+			case *ast.ExpressionBody:
+				pos := safePos(b.Idx0())
+				expr := instExpr(b.Expression)
+				e.Body = &ast.BlockStatement{
+					LeftBrace: pos,
+					List: []ast.Statement{
+						makeTickStmt(pos),
+						&ast.ReturnStatement{
+							Return:   pos,
+							Argument: expr,
+						},
+					},
+					RightBrace: safePos(b.Idx1()),
+				}
+			}
+			return e
+		case *ast.SequenceExpression:
+			for i, item := range e.Sequence {
+				e.Sequence[i] = instExpr(item)
+			}
+			return e
+		case *ast.TemplateLiteral:
+			if e.Tag != nil {
+				e.Tag = instExpr(e.Tag)
+			}
+			for i, item := range e.Expressions {
+				e.Expressions[i] = instExpr(item)
+			}
+			if e.Tag == nil {
+				return wrapChk(e)
+			}
+			return e
+		case *ast.UnaryExpression:
+			if e.Operator == token.DELETE || e.Operator == token.INCREMENT || e.Operator == token.DECREMENT {
+				instLValue(e.Operand)
+			} else {
+				e.Operand = instExpr(e.Operand)
+			}
+			return e
+		case *ast.YieldExpression:
+			e.Argument = instExpr(e.Argument)
+			return e
+		case *ast.AwaitExpression:
+			e.Argument = instExpr(e.Argument)
+			return e
+		case *ast.SpreadElement:
+			e.Expression = instExpr(e.Expression)
+			return e
+		case *ast.Binding:
+			instBinding(e)
+			return e
+		case *ast.ArrayPattern, *ast.ObjectPattern:
+			instPatternTarget(e)
+			return e
+		default:
+			return ex
+		}
+	}
+
+	instLoopBody = func(body ast.Statement, fallbackPos file.Idx) ast.Statement {
+		if body == nil {
+			pos := safePos(fallbackPos)
+			return &ast.BlockStatement{
+				LeftBrace:  pos,
+				List:       []ast.Statement{makeTickStmt(pos)},
+				RightBrace: pos,
+			}
+		}
+		if blk, ok := body.(*ast.BlockStatement); ok {
+			blk.List = instStmtList(blk.List, false, true, blk.Idx0())
+			return blk
+		}
+		inst := instStmt(body)
+		pos := safePos(body.Idx0())
+		return &ast.BlockStatement{
+			LeftBrace:  pos,
+			List:       []ast.Statement{makeTickStmt(pos), inst},
+			RightBrace: safePos(body.Idx1()),
+		}
+	}
+
+	instStmt = func(st ast.Statement) ast.Statement {
+		if st == nil {
+			return nil
+		}
+		switch s := st.(type) {
+		case *ast.BlockStatement:
+			s.List = instStmtList(s.List, false, false, s.Idx0())
+			return s
+		case *ast.CaseStatement:
+			if s.Test != nil {
+				s.Test = instExpr(s.Test)
+			}
+			s.Consequent = instStmtList(s.Consequent, false, false, s.Idx0())
+			return s
+		case *ast.CatchStatement:
+			if s.Parameter != nil {
+				instPatternTarget(s.Parameter)
+			}
+			if s.Body != nil {
+				s.Body.List = instStmtList(s.Body.List, false, false, s.Body.Idx0())
+			}
+			return s
+		case *ast.DoWhileStatement:
+			s.Body = instLoopBody(s.Body, s.Idx0())
+			s.Test = instExpr(s.Test)
+			return s
+		case *ast.ExpressionStatement:
+			s.Expression = instExpr(s.Expression)
+			return s
+		case *ast.ForInStatement:
+			switch into := s.Into.(type) {
+			case *ast.ForIntoVar:
+				instBinding(into.Binding)
+			case *ast.ForDeclaration:
+				instPatternTarget(into.Target)
+			case *ast.ForIntoExpression:
+				instLValue(into.Expression)
+			}
+			s.Source = instExpr(s.Source)
+			s.Body = instLoopBody(s.Body, s.Idx0())
+			return s
+		case *ast.ForOfStatement:
+			switch into := s.Into.(type) {
+			case *ast.ForIntoVar:
+				instBinding(into.Binding)
+			case *ast.ForDeclaration:
+				instPatternTarget(into.Target)
+			case *ast.ForIntoExpression:
+				instLValue(into.Expression)
+			}
+			s.Source = instExpr(s.Source)
+			s.Body = instLoopBody(s.Body, s.Idx0())
+			return s
+		case *ast.ForStatement:
+			switch init := s.Initializer.(type) {
+			case *ast.ForLoopInitializerExpression:
+				init.Expression = instExpr(init.Expression)
+			case *ast.ForLoopInitializerVarDeclList:
+				for _, b := range init.List {
+					instBinding(b)
+				}
+			case *ast.ForLoopInitializerLexicalDecl:
+				for _, b := range init.LexicalDeclaration.List {
+					instBinding(b)
+				}
+			}
+			if s.Test != nil {
+				s.Test = instExpr(s.Test)
+			}
+			if s.Update != nil {
+				s.Update = instExpr(s.Update)
+			}
+			s.Body = instLoopBody(s.Body, s.Idx0())
+			return s
+		case *ast.IfStatement:
+			s.Test = instExpr(s.Test)
+			s.Consequent = instStmt(s.Consequent)
+			s.Alternate = instStmt(s.Alternate)
+			return s
+		case *ast.LabelledStatement:
+			s.Statement = instStmt(s.Statement)
+			return s
+		case *ast.ReturnStatement:
+			if s.Argument != nil {
+				s.Argument = instExpr(s.Argument)
+			}
+			return s
+		case *ast.SwitchStatement:
+			s.Discriminant = instExpr(s.Discriminant)
+			for _, cs := range s.Body {
+				_ = instStmt(cs)
+			}
+			return s
+		case *ast.ThrowStatement:
+			s.Argument = instExpr(s.Argument)
+			return s
+		case *ast.TryStatement:
+			if s.Body != nil {
+				s.Body.List = instStmtList(s.Body.List, false, false, s.Body.Idx0())
+			}
+			if s.Catch != nil {
+				_ = instStmt(s.Catch)
+			}
+			if s.Finally != nil {
+				s.Finally.List = instStmtList(s.Finally.List, false, false, s.Finally.Idx0())
+			}
+			return s
+		case *ast.VariableStatement:
+			for _, b := range s.List {
+				instBinding(b)
+			}
+			return s
+		case *ast.LexicalDeclaration:
+			for _, b := range s.List {
+				instBinding(b)
+			}
+			return s
+		case *ast.WhileStatement:
+			s.Test = instExpr(s.Test)
+			s.Body = instLoopBody(s.Body, s.Idx0())
+			return s
+		case *ast.WithStatement:
+			s.Object = instExpr(s.Object)
+			s.Body = instStmt(s.Body)
+			return s
+		case *ast.FunctionDeclaration:
+			instFunc(s.Function)
+			return s
+		case *ast.ClassDeclaration:
+			instClass(s.Class)
+			return s
+		default:
+			return st
+		}
+	}
+
+	instStmtList = func(stmts []ast.Statement, skipPrologue bool, ensureTick bool, fallbackPos file.Idx) []ast.Statement {
+		out := make([]ast.Statement, 0, len(stmts)*2+1)
+		i := 0
+		if skipPrologue {
+			for i < len(stmts) {
+				es, ok := stmts[i].(*ast.ExpressionStatement)
+				if !ok {
+					break
+				}
+				if _, isStr := es.Expression.(*ast.StringLiteral); !isStr {
+					break
+				}
+				out = append(out, stmts[i])
+				i++
+			}
+		}
+		tickInserted := false
+		for ; i < len(stmts); i++ {
+			s := stmts[i]
+			switch s.(type) {
+			case *ast.FunctionDeclaration, *ast.EmptyStatement:
+				out = append(out, instStmt(s))
+			default:
+				out = append(out, makeTickStmt(s.Idx0()), instStmt(s))
+				tickInserted = true
+			}
+		}
+		if ensureTick && !tickInserted {
+			out = append(out, makeTickStmt(fallbackPos))
+		}
+		return out
+	}
+
+	var progPos file.Idx = 1
+	if len(prg.Body) > 0 {
+		progPos = safePos(prg.Body[0].Idx0())
+	}
+	prg.Body = instStmtList(prg.Body, true, false, progPos)
 }
