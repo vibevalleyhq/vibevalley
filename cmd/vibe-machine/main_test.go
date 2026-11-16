@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -129,8 +130,9 @@ func TestVibeMachineStaticBinaryUnder15MB(t *testing.T) {
 		{"default", []string{"build", "-o", filepath.Join(outDir, "vibe-machine-default"), "."}},
 		{"stripped", []string{"build", "-ldflags=-s -w", "-o", filepath.Join(outDir, "vibe-machine-stripped"), "."}},
 	} {
-		cmd := exec.Command("go", tc.args...)
-		cmd.Env = append(removeEnvKey(os.Environ(), "GOROOT"), "CGO_ENABLED=0")
+		goBin := filepath.Join(runtime.GOROOT(), "bin", "go")
+		cmd := exec.Command(goBin, tc.args...)
+		cmd.Env = append(removeEnvKey(os.Environ(), "GOROOT"), "GOROOT="+runtime.GOROOT(), "CGO_ENABLED=0")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("go %v failed: %v\n%s", tc.args, err, string(out))
