@@ -7,6 +7,7 @@ import { userId } from "@vibevalley/protocol";
 import type { BlockRef, Channel } from "@vibevalley/protocol";
 
 import { aria } from "#/base/dom.tsx";
+import { activeArtifactViewContext } from "#/features/artifact/index.ts";
 import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying } from "#/features/channel/model/composing.ts";
 import { followed } from "#/features/channel/model/follow.ts";
 import { DictationBar, DictationKey, dictationKey, DictationProblem, useDictation } from "#/features/voice/index.ts";
@@ -54,11 +55,13 @@ export function Composer(props: {
     target: () => {
       const d = draft();
       const reply = replying();
+      const viewContext = activeArtifactViewContext.get();
       return {
         id: props.channel?.id ?? "",
         ...(reply ? { replyTo: reply.number } : {}),
         ...(d.files.length > 0 ? { attachments: d.files.map((f) => f.id) } : {}),
         ...((props.quoted?.length ?? 0) > 0 ? { blocks: (props.quoted ?? []).map((q) => q.ref) } : {}),
+        ...(viewContext ? { viewContext } : {}),
       };
     },
     failed: (reason) => {

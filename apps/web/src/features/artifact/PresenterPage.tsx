@@ -1,6 +1,7 @@
 import { createEffect, createSignal, onSettled, Show } from "solid-js";
 
 import { shellPath } from "@vibevalley/artifact/shell";
+import { storeViewUrl } from "@vibevalley/artifact/viewers";
 import { t } from "@vibevalley/i18n";
 import { htmlSandbox } from "@vibevalley/protocol/rules";
 
@@ -55,6 +56,13 @@ function Presenter(props: { id: string; version: number }) {
   });
   createEffect(at, (page) => channel?.postMessage({ page }));
   const title = () => artifact.data()?.title ?? "";
+  const isStore = () => artifact.data()?.body === "store";
+  const currentSrc = () =>
+    isStore() ? storeViewUrl(props.id, { theme: shownTheme(), seq: props.version }) : shellPath(props.id, props.version, "slides", shownTheme());
+  const nextSrc = () =>
+    isStore()
+      ? storeViewUrl(props.id, { theme: shownTheme(), seq: props.version, at: at() + 1, still: true })
+      : shellPath(props.id, props.version, "slides", shownTheme(), { at: at() + 1, still: true });
   createEffect(title, (words) => {
     document.title = t("web.artifact.presenter.title", { title: words });
   });
@@ -71,7 +79,7 @@ function Presenter(props: { id: string; version: number }) {
           ref={setFrame}
           data-testid="presenter-current"
           title={t("web.artifact.presenter.current")}
-          src={shellPath(props.id, props.version, "slides", shownTheme())}
+          src={currentSrc()}
           sandbox={htmlSandbox}
           referrerpolicy="no-referrer"
           class="w-full aspect-video rounded-lg border border-line bg-page"
@@ -114,7 +122,7 @@ function Presenter(props: { id: string; version: number }) {
             data-testid="presenter-next-slide"
             title={t("web.artifact.presenter.next")}
             tabindex={-1}
-            src={shellPath(props.id, props.version, "slides", shownTheme(), { at: at() + 1, still: true })}
+            src={nextSrc()}
             sandbox={htmlSandbox}
             referrerpolicy="no-referrer"
             class="w-full aspect-video pointer-events-none rounded-md border border-line bg-page"

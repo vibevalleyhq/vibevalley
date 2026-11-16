@@ -1,19 +1,21 @@
-import { createMemo, createSignal, For, Show, untrack } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
 import { z } from "zod";
 
 import type { BlockEditor } from "@vibevalley/artifact/editor";
+import { storeViewUrl } from "@vibevalley/artifact/viewers";
 import { t } from "@vibevalley/i18n";
-import { type Artifact, type ArtifactVersion, artifactPath, userId, type SayRequest } from "@vibevalley/protocol";
+import { type Artifact, type ArtifactType, type ArtifactVersion, artifactPath, type SayRequest, userId } from "@vibevalley/protocol";
 
 import { Keyed, useNow } from "#/base/dom.tsx";
 import { ago } from "#/base/format.ts";
 import { spelled } from "#/base/search.ts";
 import { api, reasonOf } from "#/infra/api.ts";
 import { useCore } from "#/infra/frame.ts";
-import { useQueryClient, ready } from "#/infra/query.ts";
-import { useRouter, useSearch, Link as A } from "#/infra/router.ts";
+import { ready, useQueryClient } from "#/infra/query.ts";
+import { Link as A, useRouter, useSearch } from "#/infra/router.ts";
 import { defineAtom } from "#/state/atom.ts";
 import { type IntentType, sendOnce, useIntents } from "#/state/intent.ts";
+import { shownTheme } from "#/state/prefs.ts";
 import { defineStored } from "#/state/stored.ts";
 import { createAct } from "#/ui/act.ts";
 import { Button } from "#/ui/Button.tsx";
@@ -24,10 +26,12 @@ import { Empty } from "#/ui/layout.tsx";
 import { type MoreItem, MoreMenu } from "#/ui/MoreMenu.tsx";
 import { toast } from "#/ui/toasts.ts";
 
-import { artifactHref, bodyIcon, useArtifact, useArtifacts } from "./ArtifactCard";
+import { artifactHref, artifactIcon, artifactTypeIcon, kindLabel, useArtifact, useArtifacts } from "./ArtifactCard";
 import { BlocksView } from "./BlocksView";
 import { HtmlFrame } from "./HtmlFrame";
 import { PageWords } from "./PageWords";
+import { activeArtifactViewContext, createTypedArtifact, exportMarkdownFile } from "./store";
+import { StoreArtifactView } from "./StoreArtifactView";
 
 const messageHref = (at: { readonly channel: string; readonly number?: number }) =>
   at.number !== undefined ? `/chat/${at.channel}?m=${at.number}` : `/chat/${at.channel}`;
@@ -56,13 +60,28 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
   const id = () => (props.rest ? decodeURIComponent(props.rest) : undefined);
   const open = () => id() ?? list()[0]?.id;
   const making = createAct();
-  const create = () =>
+  const create = (choice: ArtifactType | "html" = "docs") =>
     making.run(async () => {
-      const made = await api.artifact.create({ title: t("web.artifact.page.untitled"), kind: "markdown" });
+      const made = await createTypedArtifact(choice, t("web.artifact.page.untitled"));
       justMade.set(made.id);
       await queries.invalidate({ prefix: ["artifacts"] });
       router.navigate(artifactHref(made.id));
     });
+  const newTypeItems = (): MoreItem[] => [
+    { key: "docs", label: t("web.artifact.types.docs"), icon: artifactTypeIcon.docs, onSelect: () => void create("docs") },
+    { key: "slides", label: t("web.artifact.types.slides"), icon: artifactTypeIcon.slides, onSelect: () => void create("slides") },
+    { key: "dashboard", label: t("web.artifact.types.dashboard"), icon: artifactTypeIcon.dashboard, onSelect: () => void create("dashboard") },
+    { key: "motion", label: t("web.artifact.types.motion"), icon: artifactTypeIcon.motion, onSelect: () => void create("motion") },
+    { key: "whiteboard", label: t("web.artifact.types.whiteboard"), icon: artifactTypeIcon.whiteboard, onSelect: () => void create("whiteboard") },
+    { key: "design", label: t("web.artifact.types.design"), icon: artifactTypeIcon.design, onSelect: () => void create("design") },
+    {
+      key: "design-system",
+      label: t("web.artifact.types.designSystem"),
+      icon: artifactTypeIcon["design-system"],
+      onSelect: () => void create("design-system"),
+    },
+    { key: "html", label: t("web.artifact.types.html"), icon: "web", onSelect: () => void create("html") },
+  ];
   const groups = () => {
     const list = shown();
     return [
@@ -98,7 +117,8 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
             />
           </label>
           {/* Beside the search, not a green button over the page being read: a new one is not what this page is for. */}
-          <IconButton icon="add" label={t("web.artifact.page.new")} testid="new-artifact" disabled={making.busy()} onClick={() => void create()} />
+          <IconButton icon="add" label={t("web.artifact.page.new")} testid="new-artifact" disabled={making.busy()} onClick={() => void create("docs")} />
+          <MoreMenu icon="choose" label={t("web.artifact.types.pick")} testid="new-artifact-type" items={newTypeItems()} />
         </div>
         <Show when={all.error()}>
           <p class="px-2 text-xs text-berry">{reasonOf(all.error())}</p>
@@ -133,18 +153,19 @@ export function ArtifactsPage(props: { rest: string; say: ChatSay }) {
                             data-testid="artifact-row"
                             data-key={a().id}
                             data-body={a().body}
+                            data-type={a().artifactType}
                             aria-current={a().id === open() ? "page" : undefined}
                             class={[
                               "flex items-start gap-2 rounded-md px-2 py-1.5 transition-[color,background-color,border-color] ease-out duration-120",
                               a().id === id() ? "bg-selected" : a().id === open() ? "hover:bg-hover lg:bg-selected" : "hover:bg-hover",
                             ]}
                           >
-                            <Icon name={bodyIcon[a().body]} size={16} class="mt-0.5 shrink-0 text-muted" />
+                            <Icon name={artifactIcon(a())} size={16} class="mt-0.5 shrink-0 text-muted" />
                             <span class="flex min-w-0 flex-col">
                               <span class="truncate text-sm font-medium">{a().title}</span>
                               {/* On the selected row's darker ground the line takes more ink, to stay readable. */}
                               <span class={["truncate text-xs", a().id === open() ? "text-ink/75" : "text-muted"]}>
-                                {a().byName} · {ago(a().updated, now())}
+                                {kindLabel(a())} · {ago(a().updated, now())}
                               </span>
                             </span>
                           </A>
@@ -260,6 +281,8 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
   const now = useNow();
   const [asking, setAsking] = createSignal(false);
   const html = () => props.artifact.body === "html";
+  const blocks = () => props.artifact.body === "blocks";
+  const store = () => props.artifact.body === "store";
   const asked = () => Number(search().get("v"));
   const version = createMemo(() => props.artifact.versions.find((v) => v.version === asked()) ?? props.artifact.versions.at(-1));
   const issue = () => (props.artifact.issue ? (core()?.issues ?? []).find((i) => i.id === props.artifact.issue) : undefined);
@@ -271,6 +294,7 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
     toast(t("web.artifact.page.copied"));
   };
   const removing = createAct();
+  const exporting = createAct();
   const remove = () => {
     const { id, title } = props.artifact;
     return removing.run(async () => {
@@ -282,15 +306,24 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
     });
   };
   const openTab = () => {
+    if (store()) {
+      window.open(storeViewUrl(props.artifact.id, { theme: shownTheme(), seq: props.artifact.seq }), "_blank", "noopener");
+      return;
+    }
     const v = version();
     if (v) window.open(artifactPath(props.artifact.id, v.version), "_blank", "noopener");
+  };
+  const downloadMarkdown = () => {
+    const { id, title } = props.artifact;
+    void exporting.run(() => exportMarkdownFile(id, title));
   };
   let editor: BlockEditor | undefined;
   const demo = () => void editor?.demo();
   const more = (): MoreItem[] => [
-    ...(html() ? [{ key: "open", label: t("web.artifact.page.open"), icon: "open" as const, onSelect: openTab }] : []),
+    ...(html() || store() ? [{ key: "open", label: t("web.artifact.page.open"), icon: "open" as const, onSelect: openTab }] : []),
+    ...(blocks() ? [{ key: "export-md", label: t("web.artifact.types.exportMarkdown"), icon: "download" as const, onSelect: downloadMarkdown }] : []),
     { key: "copy-link", label: t("web.artifact.page.copyLink"), icon: "copy", onSelect: () => void copyLink() },
-    ...(html() ? [] : [{ key: "demo", label: t("web.artifact.blocks.demo"), icon: "play" as const, onSelect: demo }]),
+    ...(blocks() ? [{ key: "demo", label: t("web.artifact.blocks.demo"), icon: "play" as const, onSelect: demo }] : []),
     { key: "delete", label: t("web.artifact.page.delete"), icon: "delete", danger: true, onSelect: () => setAsking(true) },
   ];
   const [suggestionsAt, setSuggestionsAt] = createSignal<HTMLElement>();
@@ -310,15 +343,15 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
       class="flex min-h-0 flex-1 flex-col xl:flex-row overflow-y-auto xl:overflow-y-hidden xl:overflow-x-hidden"
     >
       <section class="flex min-h-[70vh] xl:min-h-0 min-w-0 flex-[0_0_auto] xl:flex-1 flex-col px-4 py-4">
-        {/* A page is shown as wide as there is room; written blocks read in a column. */}
-        <div class={["flex min-h-0 w-full flex-1 flex-col gap-3", html() ? "" : "mx-auto max-w-3xl"]}>
+        {/* A page or structured store is shown as wide as there is room; written blocks read in a column. */}
+        <div class={["flex min-h-0 w-full flex-1 flex-col gap-3", blocks() ? "mx-auto max-w-3xl" : ""]}>
           <div class="lg:hidden">
             <Button icon="back" onClick={() => router.navigate("/artifacts")}>
               {t("web.artifact.page.all")}
             </Button>
           </div>
           {/* A blocks one's header lines up with its text, past the gutter of faces and author bars (BlocksView). */}
-          <header class={["flex flex-col gap-1", html() ? "" : "lg:pl-8.75"]}>
+          <header class={["flex flex-col gap-1", blocks() ? "lg:pl-8.75" : ""]}>
             <div class="flex items-center gap-2">
               <Title artifact={props.artifact} />
               <IconButton
@@ -331,6 +364,12 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
               <MoreMenu label={t("web.artifact.page.more")} testid="artifact-more" items={more()} />
             </div>
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+              <span>{kindLabel(props.artifact)}</span>
+              <span aria-hidden="true">·</span>
+              <Show when={props.artifact.isDefault}>
+                <span class="font-medium text-ok-ink">{t("web.artifact.types.defaultBadge")}</span>
+                <span aria-hidden="true">·</span>
+              </Show>
               <Show when={html() ? version() : undefined}>
                 {(v) => (
                   <>
@@ -374,28 +413,30 @@ function Shown(props: { artifact: Artifact; say: ChatSay }) {
               </div>
             </Show>
           </header>
-          <Show
-            when={html() ? version() : undefined}
-            fallback={<BlocksView id={props.artifact.id} onEditor={(e) => (editor = e)} suggestionsAt={rail.get() ? suggestionsAt() : undefined} />}
-          >
-            {(v) => (
-              <>
-                <HtmlFrame
-                  artifact={props.artifact}
-                  version={v().version}
-                  title={t("web.artifact.page.frame", { title: props.artifact.title, version: v().version })}
-                  testId="artifact-frame"
-                  frameStyle={"min-h-[60vh] xl:min-h-0 w-full flex-1 rounded-lg border border-line bg-page"}
-                  rootStyle={"min-h-auto xl:min-h-0 shrink-0 xl:shrink"}
-                  onFrame={setFrame}
-                />
-                {/* Words are changed in place only on the latest version: the hint shows only there, with the rail. */}
-                <Show when={rail.get() && v().version === props.artifact.version}>
-                  <p class="text-xs text-faint">{t("web.artifact.edit.hint")}</p>
-                </Show>
-              </>
-            )}
-          </Show>
+          <Switch fallback={<BlocksView id={props.artifact.id} onEditor={(e) => (editor = e)} suggestionsAt={rail.get() ? suggestionsAt() : undefined} />}>
+            <Match when={store()}>
+              <StoreArtifactView artifact={props.artifact} />
+            </Match>
+            <Match when={html() ? version() : undefined}>
+              {(v) => (
+                <>
+                  <HtmlFrame
+                    artifact={props.artifact}
+                    version={v().version}
+                    title={t("web.artifact.page.frame", { title: props.artifact.title, version: v().version })}
+                    testId="artifact-frame"
+                    frameStyle={"min-h-[60vh] xl:min-h-0 w-full flex-1 rounded-lg border border-line bg-page"}
+                    rootStyle={"min-h-auto xl:min-h-0 shrink-0 xl:shrink"}
+                    onFrame={setFrame}
+                  />
+                  {/* Words are changed in place only on the latest version: the hint shows only there, with the rail. */}
+                  <Show when={rail.get() && v().version === props.artifact.version}>
+                    <p class="text-xs text-faint">{t("web.artifact.edit.hint")}</p>
+                  </Show>
+                </>
+              )}
+            </Match>
+          </Switch>
         </div>
       </section>
       <Show when={rail.get()}>
@@ -477,7 +518,13 @@ function Reply(props: { at: { readonly channel: string; readonly number?: number
     const words = text().trim();
     if (!words || busy()) return;
     setBusy(true);
-    const end = await sendOnce(says, { id: props.at.channel, text: words, ...(props.at.number !== undefined ? { replyTo: props.at.number } : {}) });
+    const viewContext = activeArtifactViewContext.get();
+    const end = await sendOnce(says, {
+      id: props.at.channel,
+      text: words,
+      ...(props.at.number !== undefined ? { replyTo: props.at.number } : {}),
+      ...(viewContext ? { viewContext } : {}),
+    });
     setBusy(false);
     if (end?.phase === "failed") return toast(end.fault.reason, "bad");
     setText("");

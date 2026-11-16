@@ -296,6 +296,7 @@
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
 | `followReports` | `gateway.ts` | The farm's reports after the one with this id (the newest when absent), then each from now on. |
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
+| `followArtifactEntries` | `gateway.ts` | A structured store artifact's entry changes after this seq, then each batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `currentHost` | `host.ts` |  |
 | `nextLocalMidnight` | `local-day.ts` |  |

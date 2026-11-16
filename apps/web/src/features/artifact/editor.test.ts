@@ -20,7 +20,20 @@ const block = (rev: number, text: string, by = "helper", key = "a"): Block => ({
   updated: rev,
 });
 const snapshot = (blocks: Block[], seq = 1): BlockSnapshot => ({
-  artifact: { id, title: "shared", body: "blocks", by: userId, byName: "user", version: 0, seq, versions: [], at: 0, updated: 0 },
+  artifact: {
+    id,
+    title: "shared",
+    body: "blocks",
+    artifactType: "docs",
+    isDefault: false,
+    by: userId,
+    byName: "user",
+    version: 0,
+    seq,
+    versions: [],
+    at: 0,
+    updated: 0,
+  },
   blocks,
 });
 const editors: BlockEditor[] = [];

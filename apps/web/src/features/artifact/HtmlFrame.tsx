@@ -8,13 +8,15 @@ import { htmlSandbox } from "@vibevalley/protocol/rules";
 import { shownTheme } from "#/state/prefs.ts";
 
 import { type Controls, useShown } from "./frame";
+import { MotionControls } from "./MotionControls";
 import { SlidesControls } from "./SlidesControls";
+import { useReportViewContext } from "./store";
 
 /** The controls under each display; a page as it is has none. */
 const controlsFor: Record<ArtifactDisplay, (c: Controls) => JSX.Element> = {
   page: () => undefined,
   slides: (c) => <SlidesControls {...c} />,
-  motion: () => undefined,
+  motion: (c) => <MotionControls {...c} />,
 };
 
 /** One html version in its sandbox, with the controls its display asks for. A page's messages only change what the
@@ -32,6 +34,19 @@ export function HtmlFrame(props: {
   const [frame, setFrame] = createSignal<HTMLIFrameElement>();
   const shown = useShown(frame);
   const display = () => props.artifact.display ?? "page";
+  useReportViewContext(
+    () => props.artifact.id,
+    () => {
+      const page = shown().at?.page;
+      const atTime = shown().at?.time;
+      return {
+        title: props.artifact.title,
+        version: props.version,
+        ...(display() === "slides" && page !== undefined ? { slideIndex: page } : {}),
+        ...(display() === "motion" && atTime !== undefined ? { time: Math.round(atTime * 100) / 100 } : {}),
+      };
+    },
+  );
   return (
     <div data-display={display()} class={["flex min-h-0 min-w-0 flex-1 flex-col", props.rootStyle]}>
       <iframe

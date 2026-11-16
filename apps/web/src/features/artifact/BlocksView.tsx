@@ -5,6 +5,7 @@ import { knownTypes, plainOf } from "@vibevalley/artifact/blocks";
 import { BlockEditor, type EditBlock } from "@vibevalley/artifact/editor";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ArtifactId, userId, type Suggestion, type TextSpan } from "@vibevalley/protocol";
+import { blockId as brandBlockId } from "@vibevalley/protocol/schema";
 
 import { createExternal } from "#/base/external.ts";
 import { api, reasonOf } from "#/infra/api.ts";
@@ -15,6 +16,8 @@ import { Checkbox } from "#/ui/Checkbox.tsx";
 import { hexColor, swatches } from "#/ui/domain/cast.ts";
 import { AgentFace } from "#/ui/domain/Face.tsx";
 import { Icon } from "#/ui/Icon.tsx";
+
+import { useReportViewContext } from "./store";
 
 /** The user's lines on the attribution bar. */
 const userColor = "var(--color-cream-300)";
@@ -99,6 +102,19 @@ export function BlocksView(props: {
   });
   // The editor changes its blocks in place and bumps its version; each version is drawn as fresh rows, matched by id.
   const version = createExternal(editor.subscribe, () => editor.version);
+  useReportViewContext(
+    () => props.id,
+    () => {
+      version();
+      const focused = editor.focusId;
+      return {
+        artifactType: "docs",
+        title: editor.artifact?.title ?? "",
+        ...(editor.artifact?.seq !== undefined ? { seq: editor.artifact.seq } : {}),
+        ...(focused ? { selectedBlockIds: [brandBlockId(focused)] } : {}),
+      };
+    },
+  );
   const all = useAgents();
   const agents = createMemo(() => new Map(ready(all, []).map((a) => [a.id, a])));
   const rows = createMemo((): Row[] => {

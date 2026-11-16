@@ -4,3 +4,4 @@ export type { QuoteTarget } from "./BlocksView";
 export { ArtifactsPage } from "./ArtifactsPage";
 export { IssueArtifacts } from "./IssueArtifacts";
 export { PresenterPage } from "./PresenterPage";
+export { activeArtifactViewContext } from "./store";
