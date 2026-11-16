@@ -1,4 +1,4 @@
-import type { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/shapes";
+import type { ArtifactCard, ArtifactViewContext, BlockRef, QuotedBlock } from "../artifact/shapes";
 import type { Attachment } from "../attachment/shapes";
 import type { Actor, MessageId, Outcome, SessionId, Spent } from "../common/shapes";
 
@@ -36,6 +36,7 @@ export interface ChatMessage {
   embeds: Embed[];
   artifact?: ArtifactCard;
   blocks?: readonly QuotedBlock[];
+  viewContext?: ArtifactViewContext;
 }
 
 export interface Embed {
@@ -134,6 +135,7 @@ export interface SayRequest {
   id: string;
   text: string;
   blocks?: BlockRef[];
+  viewContext?: ArtifactViewContext;
   replyTo?: number;
   attachments?: string[];
   station?: number;

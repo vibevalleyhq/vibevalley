@@ -30,12 +30,29 @@
     "./shell": {
       "types": "./dist/shell.d.ts",
       "default": "./src/shell.ts"
+    },
+    "./starters": {
+      "types": "./dist/starters.d.ts",
+      "default": "./src/starters.ts"
+    },
+    "./store": {
+      "types": "./dist/store.d.ts",
+      "default": "./src/store.ts"
+    },
+    "./tokens": {
+      "types": "./dist/tokens.d.ts",
+      "default": "./src/tokens.ts"
+    },
+    "./viewers": {
+      "types": "./dist/viewers.d.ts",
+      "default": "./src/viewers.ts"
     }
   },
   "dependencies": {
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
-    "parse5": "catalog:"
+    "parse5": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

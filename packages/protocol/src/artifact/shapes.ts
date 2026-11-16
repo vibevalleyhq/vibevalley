@@ -15,28 +15,39 @@ export const BlockTypeValues = [
 ] as const;
 export type BlockType = (typeof BlockTypeValues)[number];
 
-export const ArtifactBodyValues = ["blocks", "html"] as const;
+export const ArtifactBodyValues = ["blocks", "html", "store"] as const;
 export type ArtifactBody = (typeof ArtifactBodyValues)[number];
 
-export const ArtifactKindValues = ["html", "markdown"] as const;
+export const ArtifactKindValues = ["html", "markdown", "store"] as const;
 export type ArtifactKind = (typeof ArtifactKindValues)[number];
+
+export const ArtifactTypeValues = ["docs", "slides", "dashboard", "motion", "whiteboard", "design", "design-system"] as const;
+export type ArtifactType = (typeof ArtifactTypeValues)[number];
 
 export const ArtifactDisplayValues = ["page", "slides", "motion"] as const;
 export type ArtifactDisplay = (typeof ArtifactDisplayValues)[number];
 
+export const ArtifactEntryKindValues = ["text", "json", "asset"] as const;
+export type ArtifactEntryKind = (typeof ArtifactEntryKindValues)[number];
+
+export const ArtifactEntryOpValues = ["set", "patch", "delete", "copy"] as const;
+export type ArtifactEntryOp = (typeof ArtifactEntryOpValues)[number];
+
 /** Served over GET because <iframe src> cannot POST. */
 const artifactPrefix = "/api/v1/artifact/";
 export const artifactPath = (id: string, version: number) => `${artifactPrefix}${id}/${version}`;
+export const artifactViewPath = (id: string) => `${artifactPrefix}${id}/view`;
 
 export interface ArtifactCard {
   id: ArtifactId;
   title: string;
   body: ArtifactBody;
-  /** Announced version for html; 0 for blocks. */
+  /** Announced version for html; seq for store; 0 for blocks. */
   version: number;
   note: string;
   /** Omit defaults to "page" for cards created before display modes existed. */
   display?: ArtifactDisplay;
+  artifactType?: ArtifactType;
 }
 
 export interface ArtifactVersion {
@@ -54,30 +65,145 @@ export interface Artifact {
   id: ArtifactId;
   title: string;
   body: ArtifactBody;
-  /** html only; absent on blocks. */
+  artifactType?: ArtifactType;
+  /** True on the standing default design-system artifact consumed when creating visual artifacts. */
+  isDefault: boolean;
+  /** html only; absent on blocks and store. */
   display?: ArtifactDisplay;
   channel?: string;
   said?: { channel: string; number: number };
   issue?: IssueId;
   by: string;
   byName: string;
-  /** Latest version for html; 0 for blocks. */
+  /** Latest version for html; 0 for blocks and store. */
   version: number;
-  /** Committed batch count for blocks; 0 for html. */
+  /** Committed batch count for blocks and store; 0 for html. */
   seq: number;
-  /** Oldest first for html; empty on blocks. */
+  /** Oldest first for html; empty on blocks and store. */
   versions: ArtifactVersion[];
   at: number;
   updated: number;
 }
 
-/** Omit content to create an unannounced empty blocks artifact. */
+export interface ArtifactEntryWriteInput {
+  op: ArtifactEntryOp;
+  path: string;
+  kind?: ArtifactEntryKind;
+  /** UTF-8 text for text, JSON text for json/patch, or attachment id for asset. */
+  value?: string;
+  from?: string;
+  mime?: string;
+  /** Optimistic concurrency guard: 0 requires the path not to exist; >0 must match current rev. */
+  ifRev?: number;
+}
+
+export interface ArtifactEntry {
+  artifactId: ArtifactId;
+  path: string;
+  kind: ArtifactEntryKind;
+  mime: string;
+  size: number;
+  rev: number;
+  updatedBy: string;
+  updated: number;
+  value?: string;
+  attachmentId?: string;
+}
+
+export interface ArtifactEntrySnapshot {
+  artifact: Artifact;
+  seq: number;
+  entries: ArtifactEntry[];
+}
+
+export interface ArtifactEntryConflict {
+  path: string;
+  expectedRev: number;
+  actualRev: number;
+  current: ArtifactEntry | null;
+}
+
+export interface ArtifactEntryBatchResult {
+  applied: boolean;
+  seq: number;
+  entries: ArtifactEntry[];
+  conflicts: ArtifactEntryConflict[];
+}
+
+export interface ArtifactEntryListRequest {
+  id: ArtifactId;
+  prefix?: string;
+  includeValues?: boolean;
+}
+
+export interface ArtifactEntryGetRequest {
+  id: ArtifactId;
+  path: string;
+}
+
+export interface ArtifactEntryBatchRequest {
+  id: ArtifactId;
+  writes: ArtifactEntryWriteInput[];
+  note?: string;
+  announce?: boolean;
+}
+
+export type ArtifactEntryEvent =
+  | { readonly _tag: "Entries"; readonly seq: number; readonly entries: ArtifactEntry[]; readonly deleted: string[] }
+  | { readonly _tag: "Reset" };
+
+export interface ArtifactTypeInfo {
+  type: ArtifactType;
+  body: ArtifactBody;
+  title: string;
+  summary: string;
+  references: string[];
+  defaultArtifactId: ArtifactId | null;
+}
+
+export interface ArtifactTypeReadRequest {
+  type: ArtifactType;
+  reference?: string;
+}
+
+export interface ArtifactTypeGuide {
+  type: ArtifactType;
+  title: string;
+  reference: string | null;
+  content: string;
+  references: string[];
+  defaultArtifactId: ArtifactId | null;
+  defaultArtifactTitle: string | null;
+}
+
+export interface ArtifactViewContext {
+  artifactId: ArtifactId;
+  artifactType?: ArtifactType;
+  title: string;
+  seq?: number;
+  version?: number;
+  slideId?: string;
+  slideIndex?: number;
+  time?: number;
+  activeArtboard?: string;
+  activeDataset?: string;
+  activeTab?: string;
+  selectedIds?: string[];
+  selectedBlockIds?: BlockId[];
+  summary?: string;
+}
+
+/** Omit content to create an unannounced empty blocks or store artifact. */
 export interface ArtifactRequest {
   title: string;
-  kind: ArtifactKind;
+  kind?: ArtifactKind;
+  artifactType?: ArtifactType;
   /** html only; defaults to "page". */
   display?: ArtifactDisplay;
   content?: string;
+  entries?: ArtifactEntryWriteInput[];
+  isDefault?: boolean;
+  announce?: boolean;
   note?: string;
   channel?: string;
   issue?: string;
@@ -108,21 +234,40 @@ export interface ArtifactUpdateRequest {
   id: ArtifactId;
   title?: string;
   display?: ArtifactDisplay;
+  isDefault?: boolean;
 }
 
 // Untrusted iframe scripts can forge these messages; treat payloads strictly as UI display hints.
 export type HtmlShellMessage =
-  | { vibevalley: "selection"; anchor: HtmlAnchor }
+  | { vibevalley: "selection"; anchor: HtmlAnchor; path?: string }
   /** duration is in seconds. */
-  | { vibevalley: "ready"; display: ArtifactDisplay; pages?: number; titles?: string[]; notes?: string[]; duration?: number }
-  /** page is 0-based; time is in seconds. */
-  | { vibevalley: "at"; page?: number; time?: number };
+  | {
+      vibevalley: "ready";
+      display: ArtifactDisplay;
+      pages?: number;
+      titles?: string[];
+      notes?: string[];
+      fragments?: number[];
+      duration?: number;
+      fps?: number;
+      chapters?: { at: number; label: string }[];
+    }
+  /** page and fragment are 0-based; time is in seconds. */
+  | { vibevalley: "at"; page?: number; fragment?: number; time?: number; playing?: boolean }
+  | { vibevalley: "recorded"; ok: boolean; mimeType?: string; base64?: string; reason?: string };
 
-export type HtmlShellCommand = { vibevalley: "goto"; page: number } | { vibevalley: "seek"; time: number } | { vibevalley: "play" } | { vibevalley: "pause" };
+export type HtmlShellCommand =
+  | { vibevalley: "goto"; page: number; fragment?: number }
+  | { vibevalley: "step"; delta: number }
+  | { vibevalley: "seek"; time: number }
+  | { vibevalley: "play" }
+  | { vibevalley: "pause" }
+  | { vibevalley: "record"; fps?: number };
 
 export interface ArtifactListRequest {
   channel?: string;
   issue?: string;
+  artifactType?: ArtifactType;
 }
 
 export interface ArtifactReadRequest {

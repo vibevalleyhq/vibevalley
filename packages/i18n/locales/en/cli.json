@@ -209,6 +209,11 @@
       "create": "Create an artifact: an empty one to write in, or a hand-in",
       "delete": "Delete an artifact",
       "demo": "Start the demo: several helpers write one artifact at once, no model spending",
+      "entry": {
+        "batch": "Atomically set, merge, copy or delete entries in a store artifact with revision checks",
+        "get": "Read one entry and its revision from a store artifact",
+        "list": "List entries in a store artifact, optionally filtered by path prefix"
+      },
       "get": "Get an artifact",
       "html": {
         "edit": "Replace some words in an HTML artifact, as its next version"
@@ -225,7 +230,11 @@
         "list": "List an artifact's suggestions, open and resolved",
         "reject": "Reject a suggested change"
       },
-      "update": "Rename an artifact",
+      "type": {
+        "list": "List all structured artifact types and the standing default design system",
+        "read": "Read an artifact type's guide or one of its reference chapters"
+      },
+      "update": "Rename an artifact or update its default status",
       "version": {
         "create": "Hand in a new version of an HTML artifact; the old ones stay"
       }

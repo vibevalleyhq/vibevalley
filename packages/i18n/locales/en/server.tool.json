@@ -36,7 +36,12 @@
     "memory_create": "Remember for a helper",
     "artifact_block_create": "Add to an artifact",
     "artifact_block_update": "Change an artifact's block",
-    "artifact_block_delete": "Delete an artifact's block"
+    "artifact_block_delete": "Delete an artifact's block",
+    "artifact_type_list": "List artifact types",
+    "artifact_type_read": "Read an artifact type guide",
+    "artifact_entry_list": "List artifact entries",
+    "artifact_entry_get": "Read an artifact entry",
+    "artifact_entry_batch": "Write artifact entries"
   },
   "about": "{label}: {about}"
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/schema";
+import { ArtifactCard, ArtifactViewContext, BlockRef, QuotedBlock } from "../artifact/schema";
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { Actor, MessageId, Outcome, SessionId, Spent } from "../common/schema";
@@ -48,6 +48,7 @@ export const ChatMessage = z.object({
   embeds: z.array(Embed),
   artifact: z.exactOptional(ArtifactCard),
   blocks: z.exactOptional(z.array(QuotedBlock)),
+  viewContext: z.exactOptional(ArtifactViewContext),
 }) satisfies Codec<T.ChatMessage>;
 
 export const ChannelType = z.enum(T.ChannelTypeValues) satisfies Codec<T.ChannelType>;
@@ -102,6 +103,7 @@ export const SayRequest = z.object({
   id: z.string(),
   text: z.string(),
   blocks: z.exactOptional(z.array(BlockRef)),
+  viewContext: z.exactOptional(ArtifactViewContext),
   replyTo: z.exactOptional(z.number()),
   attachments: z.exactOptional(z.array(z.string())),
   station: z.exactOptional(z.number()),
