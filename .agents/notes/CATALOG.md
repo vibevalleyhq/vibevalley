@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（23 篇）
+## proposed（28 篇）
 
 ### feature
 
@@ -21,6 +21,11 @@
 
 ### architecture
 
+- 2026-11-16 [VibeValley 全域纯 Go 收敛（笔记、Artifact）与 MyGo 双模桌面壳](.agents/notes/proposed/architecture/2026-11-16-go-vibevalley-domains-and-mygo-desktop.md)
+- 2026-11-16 [纯 Go 受管平台总架构、模块边界与四阶段演进路线](.agents/notes/proposed/architecture/2026-11-16-go-managed-platform-roadmap.md)
+- 2026-11-16 [零密钥远程执行节点、Go 版 OAR 农机驱动与目录双向挂载](.agents/notes/proposed/architecture/2026-11-16-go-machine-oar-and-mounts.md)
+- 2026-11-16 [Go 版 Durable 持久状态机、凭据代理与会话治理闭环](.agents/notes/proposed/architecture/2026-11-16-go-durable-vault-and-governance.md)
+- 2026-11-16 [Go 版 Chord 状态增量同步与跨进程多路复用链路](.agents/notes/proposed/architecture/2026-11-16-go-chord-sync-and-link.md)
 - 2026-11-11 [扩展剩余跨模块品牌主键与 SQL 主外键自动品牌生成](.agents/notes/proposed/architecture/2026-11-11-type-driven-boundaries-and-branded-ids.md)
 - 2026-11-10 [拆出 apps/machine：一个服务端经出站长连接管多台机器](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)
