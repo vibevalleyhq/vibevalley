@@ -44,8 +44,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/viant/sqlite-vec v0.3.1 h1:vwpDhDQzhiODBuTtkXe4qQms8Dpg/L+3HjAg9hHk9n4=
 github.com/viant/sqlite-vec v0.3.1/go.mod h1:SA89LGdU/cxpc/gsvat2MYtJYrv3bg9mtW/uHMs2nBs=
-github.com/viant/vec v0.1.1-0.20240628004145-aad750556278 h1:t/x3ZoccWTkshYEwzhnW/VZe/enASwqs9IKcJPfI3cs=
-github.com/viant/vec v0.1.1-0.20240628004145-aad750556278/go.mod h1:d1coA6/d5WBePJe0nDhgE7aRYkMd7CMiRWSNid3tvds=
+github.com/viant/vec v0.2.4 h1:0CdKJpy+hRXf/EdeTUSxRkQ1g6p5w2buG03Y8WtlG2w=
+github.com/viant/vec v0.2.4/go.mod h1:wp6A6yiMvm8MRo6WDbqYkZ33tkWLYdYFHwfqWZ9En+I=
 github.com/yuin/goldmark v1.8.7 h1:XT/tNqCIbabh0ln675w4x3dv04kQBKi8NwYqi9IJaxI=
 github.com/yuin/goldmark v1.8.7/go.mod h1:ip/1k0VRfGynBgxOz0yCqHrbZXhcjxyuS66Brc7iBKg=
 go.abhg.dev/goldmark/frontmatter v0.3.0 h1:ZOrMkeyyYzhlbenFNmOXyGFx1dFE8TgBWAgZfs9D5RA=

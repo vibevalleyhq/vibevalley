@@ -177,6 +177,10 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 		return err
 	}
 
+	if node.ServerURL() != "" {
+		return serveChordLinkWS(ctx, node, opts.Config.Labels)
+	}
+
 	<-ctx.Done()
 	return nil
 }

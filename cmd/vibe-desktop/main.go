@@ -95,9 +95,10 @@ type DesktopApp struct {
 	Automation *AutomationEndpoint
 	Stack      EmbeddedStack
 
-	closeOnce sync.Once
-	autoLn    io.Closer
-	autoDone  <-chan struct{}
+	closeOnce   sync.Once
+	autoLn      io.Closer
+	autoDone    <-chan struct{}
+	detachStack func()
 }
 
 func main() {
@@ -180,7 +181,7 @@ func NewDesktopApp(ctx context.Context, cfg DesktopConfig, deps DesktopDeps) (*D
 		if err != nil {
 			return nil, fmt.Errorf("embedded stack launcher: %w", err)
 		}
-		if cfg.ServerURL == "" && stack.ServerURL() != "" {
+		if stack != nil && cfg.ServerURL == "" && stack.ServerURL() != "" {
 			cfg.ServerURL = stack.ServerURL()
 		}
 	}
@@ -198,7 +199,9 @@ func NewDesktopApp(ctx context.Context, cfg DesktopConfig, deps DesktopDeps) (*D
 				_ = stack.ResolveApproval(ctx, prompt, approved)
 			},
 			OnBudgetRaise: func(alert BudgetAlert, newMax int64) {
-				_ = stack.RaiseBudget(ctx, alert, newMax)
+				if stack.RaiseBudget(ctx, alert, newMax) == nil {
+					island.ClearBudget(alert.ID)
+				}
 			},
 		})
 	}
@@ -224,6 +227,7 @@ func NewDesktopApp(ctx context.Context, cfg DesktopConfig, deps DesktopDeps) (*D
 		Automation: auto,
 		Stack:      stack,
 	}
+	app.detachStack = attachEmbeddedStackToApp(app)
 
 	if cfg.AutomationSocket != "" && cfg.HeadlessCheck {
 		ln, done, err := auto.ListenUnix(ctx, cfg.AutomationSocket)
@@ -311,6 +315,9 @@ func (a *DesktopApp) Close() error {
 		}
 		if err := a.Terminals.CloseAll(); err != nil && closeErr == nil {
 			closeErr = err
+		}
+		if a.detachStack != nil {
+			a.detachStack()
 		}
 		if err := a.Bridge.Close(); err != nil && closeErr == nil {
 			closeErr = err
