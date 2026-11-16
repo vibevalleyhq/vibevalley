@@ -11,6 +11,7 @@
     "release": "vpx scripts/release/release.ts",
     "capabilities": "vpx scripts/gen/capabilities.ts",
     "api:client": "vpx scripts/gen/api-client.ts",
+    "go:sqlc": "vpx scripts/gen/go-sqlc.ts --write",
     "i18n:gen": "vpx scripts/gen/i18n.ts gen",
     "health": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts",
     "health:write": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts --write",

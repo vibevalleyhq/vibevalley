@@ -1,15 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/signal"
 	"strings"
@@ -17,6 +16,10 @@ import (
 	"syscall"
 
 	"github.com/egoist/mygo"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
+	"github.com/vibevalleyhq/vibevalley/internal/config"
 	"github.com/vibevalleyhq/vibevalley/internal/vault"
 	"github.com/vibevalleyhq/vibevalley/pkg/chord/link"
 	"github.com/vibevalleyhq/vibevalley/pkg/chord/watch"
@@ -25,20 +28,19 @@ import (
 
 const desktopVersion = "0.1.0-dev"
 
-type stringListFlag []string
-
-func (s *stringListFlag) String() string { return strings.Join(*s, ",") }
-
-func (s *stringListFlag) Set(val string) error {
-	for part := range strings.SplitSeq(val, ",") {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			*s = append(*s, trimmed)
-		}
-	}
-	return nil
+var desktopFlagKeyMap = map[string]string{
+	"server":            "desktop.server_url",
+	"web-dist":          "desktop.web_dist",
+	"scheme":            "desktop.scheme",
+	"automation-socket": "desktop.automation_socket",
+	"repo-root":         "desktop.repo_roots",
+	"headless-check":    "desktop.headless_check",
+	"root-key-id":       "desktop.root_key_id",
+	"keychain-service":  "desktop.keychain_service",
+	"db":                "desktop.db_path",
 }
 
-// DesktopConfig holds parsed CLI and environment configuration for vibe-desktop.
+// DesktopConfig holds parsed CLI, environment, and YAML configuration for vibe-desktop.
 type DesktopConfig struct {
 	ServerURL        string
 	WebDistDir       string
@@ -49,6 +51,8 @@ type DesktopConfig struct {
 	ShowVersion      bool
 	RootKeyID        string
 	KeychainService  string
+	DBPath           string
+	dbExplicit       bool
 }
 
 // EmbeddedStack is the optional in-process VibeValley server/durable/vault runtime
@@ -111,29 +115,288 @@ func main() {
 	}
 }
 
-func parseCLI(args []string, getenv func(string) string, stderr io.Writer) (DesktopConfig, error) {
-	fsFlags := flag.NewFlagSet("vibe-desktop", flag.ContinueOnError)
-	fsFlags.SetOutput(stderr)
+func run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer, deps DesktopDeps) error {
+	rootCmd := newRootCommand(getenv, stdout, stderr, deps)
+	if args == nil {
+		args = []string{}
+	}
+	rootCmd.SetArgs(args)
+	return rootCmd.ExecuteContext(ctx)
+}
+
+func newRootCommand(getenv func(string) string, stdout, stderr io.Writer, deps DesktopDeps) *cobra.Command {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	if stdout == nil {
+		stdout = os.Stdout
+	}
+	if stderr == nil {
+		stderr = os.Stderr
+	}
+
+	defaults := config.DefaultConfig(getenv)
 
 	var (
-		cfg       DesktopConfig
-		repoRoots stringListFlag
+		configFile       string
+		showVersion      bool
+		serverURL        string
+		webDist          string
+		scheme           string
+		automationSocket string
+		repoRoots        []string
+		headlessCheck    bool
+		rootKeyID        string
+		keychainService  string
+		dbPath           string
 	)
-	fsFlags.StringVar(&cfg.ServerURL, "server", strings.TrimSpace(getenv("VIBE_SERVER_URL")), "remote or local control-plane server URL")
-	fsFlags.StringVar(&cfg.WebDistDir, "web-dist", strings.TrimSpace(getenv("VIBE_WEB_DIST")), "path to built apps/web/dist directory")
-	fsFlags.StringVar(&cfg.WebScheme, "scheme", defaultWebScheme, "custom MyGo URL scheme for workbench assets")
-	fsFlags.StringVar(&cfg.AutomationSocket, "automation-socket", strings.TrimSpace(getenv("MYGO_AUTOMATION")), "optional Unix domain socket path for automation endpoint")
-	fsFlags.Var(&repoRoots, "repo-root", "allowed repository/worktree root path for terminal sessions (repeatable)")
-	fsFlags.BoolVar(&cfg.HeadlessCheck, "headless-check", false, "verify island, IPC, webview assets, keychain, and automation without opening windows")
-	fsFlags.BoolVar(&cfg.ShowVersion, "version", false, "print version and exit")
-	fsFlags.StringVar(&cfg.RootKeyID, "root-key-id", "desktop-master-v1", "Vault root key identifier stored in system keychain")
-	fsFlags.StringVar(&cfg.KeychainService, "keychain-service", defaultKeychainService, "system keychain service namespace")
 
-	if err := fsFlags.Parse(args); err != nil {
-		return DesktopConfig{}, err
+	rootCmd := &cobra.Command{
+		Use:           "vibe-desktop",
+		Short:         "VibeValley desktop GUI host and embedded runtime",
+		Version:       desktopVersion,
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printDesktopVersion(stdout)
+			}
+			return executeDesktop(cmd.Context(), cmd.Flags(), configFile, getenv, stdout, deps, false)
+		},
 	}
-	cfg.RepoRoots = []string(repoRoots)
-	return cfg, nil
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+	rootCmd.SetVersionTemplate("vibe-desktop {{.Version}}\n")
+
+	pflags := rootCmd.PersistentFlags()
+	pflags.StringVarP(&configFile, "config", "c", "", "path to vibevalley.yaml config file (or VIBE_CONFIG)")
+	pflags.BoolVar(&showVersion, "version", false, "print version and exit")
+	pflags.StringVar(&serverURL, "server", defaults.Desktop.ServerURL, "remote or local control-plane server URL")
+	pflags.StringVar(&webDist, "web-dist", defaults.Desktop.WebDist, "path to built apps/web/dist directory")
+	pflags.StringVar(&scheme, "scheme", defaults.Desktop.Scheme, "custom MyGo URL scheme for workbench assets")
+	pflags.StringVar(&automationSocket, "automation-socket", defaults.Desktop.AutomationSocket, "optional Unix domain socket path for automation endpoint")
+	pflags.StringSliceVar(&repoRoots, "repo-root", nil, "allowed repository/worktree root path for terminal sessions (repeatable or comma-separated)")
+	pflags.BoolVar(&headlessCheck, "headless-check", defaults.Desktop.HeadlessCheck, "verify island, IPC, webview assets, keychain, and automation without opening windows")
+	pflags.StringVar(&rootKeyID, "root-key-id", defaults.Desktop.RootKeyID, "Vault root key identifier stored in system keychain")
+	pflags.StringVar(&keychainService, "keychain-service", defaults.Desktop.KeychainService, "system keychain service namespace")
+	pflags.StringVar(&dbPath, "db", defaults.Desktop.DBPath, "SQLite WAL database path or :memory:")
+
+	runCmd := &cobra.Command{
+		Use:   "run",
+		Short: "Launch the VibeValley desktop workbench and notch island",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printDesktopVersion(stdout)
+			}
+			return executeDesktop(cmd.Context(), cmd.Flags(), configFile, getenv, stdout, deps, false)
+		},
+	}
+
+	checkCmd := &cobra.Command{
+		Use:   "check",
+		Short: "Run headless subsystem validation without opening GUI windows",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printDesktopVersion(stdout)
+			}
+			return executeDesktop(cmd.Context(), cmd.Flags(), configFile, getenv, stdout, deps, true)
+		},
+	}
+
+	migrateCmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "Run SQLite schema migrations for the embedded desktop stack",
+	}
+
+	migrateUpCmd := &cobra.Command{
+		Use:   "up",
+		Short: "Apply pending migrations across all 10 embedded SQLite scopes",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printDesktopVersion(stdout)
+			}
+			_, _, deskCfg, err := loadDesktopConfig(cmd.Flags(), configFile, getenv)
+			if err != nil {
+				return err
+			}
+			return runDesktopMigrateUp(cmd.Context(), deskCfg.DBPath, stdout)
+		},
+	}
+
+	var (
+		downSteps int
+		downAll   bool
+	)
+	migrateDownCmd := &cobra.Command{
+		Use:   "down",
+		Short: "Revert migrations across all 10 embedded SQLite scopes",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printDesktopVersion(stdout)
+			}
+			if downAll && cmd.Flags().Changed("steps") {
+				return errors.New("cannot specify both --steps and --all")
+			}
+			if !downAll && downSteps < 0 {
+				return fmt.Errorf("--steps must be non-negative, got %d", downSteps)
+			}
+			_, _, deskCfg, err := loadDesktopConfig(cmd.Flags(), configFile, getenv)
+			if err != nil {
+				return err
+			}
+			return runDesktopMigrateDown(cmd.Context(), deskCfg.DBPath, downSteps, downAll, stdout)
+		},
+	}
+	migrateDownCmd.Flags().IntVar(&downSteps, "steps", 1, "number of migrations to revert per scope")
+	migrateDownCmd.Flags().BoolVar(&downAll, "all", false, "revert all applied migrations per scope")
+
+	migrateStatusCmd := &cobra.Command{
+		Use:   "status",
+		Short: "Show migration status across all 10 embedded SQLite scopes",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printDesktopVersion(stdout)
+			}
+			_, _, deskCfg, err := loadDesktopConfig(cmd.Flags(), configFile, getenv)
+			if err != nil {
+				return err
+			}
+			return runDesktopMigrateStatus(cmd.Context(), deskCfg.DBPath, stdout)
+		},
+	}
+
+	configCmd := &cobra.Command{
+		Use:   "config",
+		Short: "Inspect and validate resolved configuration",
+	}
+
+	configCheckCmd := &cobra.Command{
+		Use:   "check",
+		Short: "Validate resolved configuration",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printDesktopVersion(stdout)
+			}
+			_, loadedPath, _, err := loadDesktopConfig(cmd.Flags(), configFile, getenv)
+			if err != nil {
+				return err
+			}
+			if loadedPath != "" {
+				_, err = fmt.Fprintf(stdout, "config ok: %s\n", loadedPath)
+				return err
+			}
+			_, err = fmt.Fprintln(stdout, "config ok: defaults (no yaml file)")
+			return err
+		},
+	}
+
+	configPrintCmd := &cobra.Command{
+		Use:   "print",
+		Short: "Print resolved configuration as YAML with secrets redacted",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printDesktopVersion(stdout)
+			}
+			cfg, _, _, err := loadDesktopConfig(cmd.Flags(), configFile, getenv)
+			if err != nil {
+				return err
+			}
+			rawYAML, err := config.MarshalRedactedYAML(cfg)
+			if err != nil {
+				return err
+			}
+			if _, err := stdout.Write(rawYAML); err != nil {
+				return err
+			}
+			if len(rawYAML) > 0 && !bytes.HasSuffix(rawYAML, []byte("\n")) {
+				_, err = io.WriteString(stdout, "\n")
+				return err
+			}
+			return nil
+		},
+	}
+
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print vibe-desktop version",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return printDesktopVersion(stdout)
+		},
+	}
+
+	migrateCmd.AddCommand(migrateUpCmd, migrateDownCmd, migrateStatusCmd)
+	configCmd.AddCommand(configCheckCmd, configPrintCmd)
+	rootCmd.AddCommand(runCmd, checkCmd, migrateCmd, configCmd, versionCmd)
+	return rootCmd
+}
+
+func printDesktopVersion(stdout io.Writer) error {
+	_, err := fmt.Fprintf(stdout, "vibe-desktop %s\n", desktopVersion)
+	return err
+}
+
+func loadDesktopConfig(flags *pflag.FlagSet, configFile string, getenv func(string) string) (*config.AppConfig, string, DesktopConfig, error) {
+	cfg, loadedPath, err := config.Load(config.LoadOptions{
+		ConfigFile: configFile,
+		Getenv:     getenv,
+		FlagSet:    flags,
+		FlagKeyMap: desktopFlagKeyMap,
+	})
+	if err != nil {
+		return nil, "", DesktopConfig{}, err
+	}
+
+	repoRoots := make([]string, 0, len(cfg.Desktop.RepoRoots))
+	for _, r := range cfg.Desktop.RepoRoots {
+		if trimmed := strings.TrimSpace(r); trimmed != "" {
+			repoRoots = append(repoRoots, trimmed)
+		}
+	}
+
+	dbExplicit := (flags != nil && flags.Changed("db")) || strings.TrimSpace(getenv("VIBE_DB_PATH")) != ""
+	deskCfg := DesktopConfig{
+		ServerURL:        cfg.Desktop.ServerURL,
+		WebDistDir:       cfg.Desktop.WebDist,
+		WebScheme:        cfg.Desktop.Scheme,
+		AutomationSocket: cfg.Desktop.AutomationSocket,
+		RepoRoots:        repoRoots,
+		HeadlessCheck:    cfg.Desktop.HeadlessCheck,
+		RootKeyID:        cfg.Desktop.RootKeyID,
+		KeychainService:  cfg.Desktop.KeychainService,
+		DBPath:           cfg.Desktop.DBPath,
+		dbExplicit:       dbExplicit,
+	}
+	return cfg, loadedPath, deskCfg, nil
+}
+
+func executeDesktop(ctx context.Context, flags *pflag.FlagSet, configFile string, getenv func(string) string, stdout io.Writer, deps DesktopDeps, forceHeadlessCheck bool) error {
+	_, _, deskCfg, err := loadDesktopConfig(flags, configFile, getenv)
+	if err != nil {
+		return err
+	}
+	if forceHeadlessCheck {
+		deskCfg.HeadlessCheck = true
+	}
+
+	app, err := NewDesktopApp(ctx, deskCfg, deps)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = app.Close() }()
+
+	if deskCfg.HeadlessCheck {
+		return app.RunHeadlessCheck(ctx, stdout)
+	}
+	return app.RunGUI(ctx)
 }
 
 // NewDesktopApp initializes all desktop subsystems cleanly without starting the GUI event loop.
@@ -254,10 +517,14 @@ func (a *DesktopApp) RunHeadlessCheck(ctx context.Context, out io.Writer) error 
 	if a.Bridge.Ping(ctx) != "pong" {
 		return errors.New("headless-check: chord bridge ping failed")
 	}
-	rec := httptest.NewRecorder()
-	a.WebHandler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
-	if rec.Code != http.StatusOK {
-		return fmt.Errorf("headless-check: web handler returned status %d", rec.Code)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/", nil)
+	if err != nil {
+		return err
+	}
+	rec := &headlessResponseRecorder{header: make(http.Header)}
+	a.WebHandler.ServeHTTP(rec, req)
+	if rec.code != http.StatusOK {
+		return fmt.Errorf("headless-check: web handler returned status %d", rec.code)
 	}
 	payload := map[string]any{
 		"ok":           true,
@@ -269,6 +536,24 @@ func (a *DesktopApp) RunHeadlessCheck(ctx context.Context, out io.Writer) error 
 		"uiNodes":      len(snap.Nodes),
 	}
 	return json.NewEncoder(out).Encode(payload)
+}
+
+type headlessResponseRecorder struct {
+	header http.Header
+	code   int
+}
+
+func (r *headlessResponseRecorder) Header() http.Header { return r.header }
+func (r *headlessResponseRecorder) Write(p []byte) (int, error) {
+	if r.code == 0 {
+		r.code = http.StatusOK
+	}
+	return len(p), nil
+}
+func (r *headlessResponseRecorder) WriteHeader(statusCode int) {
+	if r.code == 0 {
+		r.code = statusCode
+	}
 }
 
 // RunGUI registers MyGo IPC/scheme handlers, creates the Workbench & Notch Island windows, and runs App.Run.
@@ -329,29 +614,4 @@ func (a *DesktopApp) Close() error {
 		}
 	})
 	return closeErr
-}
-
-func run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer, deps DesktopDeps) error {
-	cfg, err := parseCLI(args, getenv, stderr)
-	if err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return nil
-		}
-		return err
-	}
-	if cfg.ShowVersion {
-		_, err := fmt.Fprintf(stdout, "vibe-desktop %s\n", desktopVersion)
-		return err
-	}
-
-	app, err := NewDesktopApp(ctx, cfg, deps)
-	if err != nil {
-		return err
-	}
-	defer app.Close()
-
-	if cfg.HeadlessCheck {
-		return app.RunHeadlessCheck(ctx, stdout)
-	}
-	return app.RunGUI(ctx)
 }

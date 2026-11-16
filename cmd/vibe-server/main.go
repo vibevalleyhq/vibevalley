@@ -1,10 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -16,15 +16,29 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
+	"github.com/vibevalleyhq/vibevalley/internal/config"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/artifact"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/issue"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
 )
 
 const (
+	version            = "0.1.0-dev"
 	defaultListenAddr  = "127.0.0.1:8787"
 	defaultPreviewAddr = "127.0.0.1:0"
 )
+
+var serverFlagKeyMap = map[string]string{
+	"addr":                  "server.addr",
+	"preview-addr":          "server.preview_addr",
+	"db":                    "server.db_path",
+	"work-root":             "server.work_root",
+	"ready-json":            "server.ready_json",
+	"allow-loopback-egress": "server.allow_loopback_egress",
+}
 
 // Config configures the headless VibeValley control-plane and isolated preview daemon.
 type Config struct {
@@ -32,6 +46,8 @@ type Config struct {
 	PreviewAddr         string
 	DBPath              string
 	WorkRoot            string
+	ArtifactDir         string
+	MediaDir            string
 	ReadyJSON           bool
 	AllowLoopbackEgress bool
 }
@@ -66,14 +82,273 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer) error {
-	cfg, helpText, showHelp, err := parseArgs(args, getenv)
-	if err != nil {
-		_, _ = fmt.Fprintln(stderr, helpText)
-		return err
+	rootCmd := newRootCommand(getenv, stdout, stderr)
+	if args == nil {
+		args = []string{}
 	}
-	if showHelp {
-		_, _ = fmt.Fprintln(stdout, helpText)
-		return nil
+	rootCmd.SetArgs(args)
+	return rootCmd.ExecuteContext(ctx)
+}
+
+func newRootCommand(getenv func(string) string, stdout, stderr io.Writer) *cobra.Command {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	if stdout == nil {
+		stdout = os.Stdout
+	}
+	if stderr == nil {
+		stderr = os.Stderr
+	}
+
+	defaults := config.DefaultConfig(getenv)
+
+	var (
+		configFile          string
+		showVersion         bool
+		addr                string
+		previewAddr         string
+		dbPath              string
+		workRoot            string
+		readyJSON           bool
+		allowLoopbackEgress bool
+	)
+
+	rootCmd := &cobra.Command{
+		Use:           "vibe-server",
+		Short:         "VibeValley control-plane and isolated preview daemon",
+		Version:       version,
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printVersion(stdout)
+			}
+			return executeServe(cmd.Context(), cmd.Flags(), configFile, getenv, stdout)
+		},
+	}
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+	rootCmd.SetVersionTemplate("vibe-server {{.Version}}\n")
+
+	pflags := rootCmd.PersistentFlags()
+	pflags.StringVarP(&configFile, "config", "c", "", "path to vibevalley.yaml config file (or VIBE_CONFIG)")
+	pflags.BoolVar(&showVersion, "version", false, "print version and exit")
+	pflags.StringVar(&addr, "addr", defaults.Server.Addr, "HTTP and WebSocket control-plane listen address")
+	pflags.StringVar(&previewAddr, "preview-addr", defaults.Server.PreviewAddr, "Isolated artifact preview HTTP listen address (set 'disabled' to turn off)")
+	pflags.StringVar(&dbPath, "db", defaults.Server.DBPath, "SQLite WAL database path or :memory:")
+	pflags.StringVar(&workRoot, "work-root", defaults.Server.WorkRoot, "Workspace root directory")
+	pflags.BoolVar(&readyJSON, "ready-json", defaults.Server.ReadyJSON, "Emit single-line readiness JSON once listeners are bound")
+	pflags.BoolVar(&allowLoopbackEgress, "allow-loopback-egress", defaults.Server.AllowLoopbackEgress, "Allow vault egress proxy to target loopback addresses")
+
+	serveCmd := &cobra.Command{
+		Use:   "serve",
+		Short: "Start the VibeValley control-plane and preview HTTP daemon",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printVersion(stdout)
+			}
+			return executeServe(cmd.Context(), cmd.Flags(), configFile, getenv, stdout)
+		},
+	}
+
+	migrateCmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "Run SQLite schema migrations across all platform modules",
+	}
+
+	migrateUpCmd := &cobra.Command{
+		Use:   "up",
+		Short: "Apply pending migrations across all 10 SQLite scopes",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printVersion(stdout)
+			}
+			_, _, srvCfg, err := loadServerConfig(cmd.Flags(), configFile, getenv)
+			if err != nil {
+				return err
+			}
+			results, err := stack.MigrateUp(cmd.Context(), srvCfg.DBPath)
+			if err != nil {
+				return err
+			}
+			for _, r := range results {
+				if _, err := fmt.Fprintf(stdout, "migrate up scope=%s before=%d after=%d applied=%d pending=%d db=%s\n",
+					r.Scope, r.BeforeVersion, r.AfterVersion, r.Applied, r.Pending, r.DBPath); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+
+	var (
+		downSteps int
+		downAll   bool
+	)
+	migrateDownCmd := &cobra.Command{
+		Use:   "down",
+		Short: "Revert migrations across all 10 SQLite scopes",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printVersion(stdout)
+			}
+			if downAll && cmd.Flags().Changed("steps") {
+				return errors.New("cannot specify both --steps and --all")
+			}
+			if !downAll && downSteps < 0 {
+				return fmt.Errorf("--steps must be non-negative, got %d", downSteps)
+			}
+			_, _, srvCfg, err := loadServerConfig(cmd.Flags(), configFile, getenv)
+			if err != nil {
+				return err
+			}
+			results, err := stack.MigrateDown(cmd.Context(), srvCfg.DBPath, downSteps, downAll)
+			if err != nil {
+				return err
+			}
+			for _, r := range results {
+				if _, err := fmt.Fprintf(stdout, "migrate down scope=%s before=%d after=%d reverted=%d pending=%d db=%s\n",
+					r.Scope, r.BeforeVersion, r.AfterVersion, r.Reverted, r.Pending, r.DBPath); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+	migrateDownCmd.Flags().IntVar(&downSteps, "steps", 1, "number of migrations to revert per scope")
+	migrateDownCmd.Flags().BoolVar(&downAll, "all", false, "revert all applied migrations per scope")
+
+	migrateStatusCmd := &cobra.Command{
+		Use:   "status",
+		Short: "Show migration status across all 10 SQLite scopes",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printVersion(stdout)
+			}
+			_, _, srvCfg, err := loadServerConfig(cmd.Flags(), configFile, getenv)
+			if err != nil {
+				return err
+			}
+			statuses, err := stack.MigrateStatus(cmd.Context(), srvCfg.DBPath)
+			if err != nil {
+				return err
+			}
+			for _, st := range statuses {
+				if _, err := fmt.Fprintf(stdout, "scope=%s version=%d name=%s applied=%t\n",
+					st.Scope, st.Version, st.Name, st.Applied); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+
+	configCmd := &cobra.Command{
+		Use:   "config",
+		Short: "Inspect and validate resolved configuration",
+	}
+
+	configCheckCmd := &cobra.Command{
+		Use:   "check",
+		Short: "Validate resolved configuration",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printVersion(stdout)
+			}
+			_, loadedPath, _, err := loadServerConfig(cmd.Flags(), configFile, getenv)
+			if err != nil {
+				return err
+			}
+			if loadedPath != "" {
+				_, err = fmt.Fprintf(stdout, "config ok: %s\n", loadedPath)
+				return err
+			}
+			_, err = fmt.Fprintln(stdout, "config ok: defaults (no yaml file)")
+			return err
+		},
+	}
+
+	configPrintCmd := &cobra.Command{
+		Use:   "print",
+		Short: "Print resolved configuration as YAML with secrets redacted",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if showVersion {
+				return printVersion(stdout)
+			}
+			cfg, _, _, err := loadServerConfig(cmd.Flags(), configFile, getenv)
+			if err != nil {
+				return err
+			}
+			rawYAML, err := config.MarshalRedactedYAML(cfg)
+			if err != nil {
+				return err
+			}
+			if _, err := stdout.Write(rawYAML); err != nil {
+				return err
+			}
+			if len(rawYAML) > 0 && !bytes.HasSuffix(rawYAML, []byte("\n")) {
+				_, err = io.WriteString(stdout, "\n")
+				return err
+			}
+			return nil
+		},
+	}
+
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print vibe-server version",
+		Args:  cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return printVersion(stdout)
+		},
+	}
+
+	migrateCmd.AddCommand(migrateUpCmd, migrateDownCmd, migrateStatusCmd)
+	configCmd.AddCommand(configCheckCmd, configPrintCmd)
+	rootCmd.AddCommand(serveCmd, migrateCmd, configCmd, versionCmd)
+	return rootCmd
+}
+
+func printVersion(stdout io.Writer) error {
+	_, err := fmt.Fprintf(stdout, "vibe-server %s\n", version)
+	return err
+}
+
+func loadServerConfig(flags *pflag.FlagSet, configFile string, getenv func(string) string) (*config.AppConfig, string, Config, error) {
+	cfg, loadedPath, err := config.Load(config.LoadOptions{
+		ConfigFile: configFile,
+		Getenv:     getenv,
+		FlagSet:    flags,
+		FlagKeyMap: serverFlagKeyMap,
+	})
+	if err != nil {
+		return nil, "", Config{}, err
+	}
+	srvCfg := Config{
+		Addr:                cfg.Server.Addr,
+		PreviewAddr:         cfg.Server.PreviewAddr,
+		DBPath:              cfg.Server.DBPath,
+		WorkRoot:            cfg.Server.WorkRoot,
+		ArtifactDir:         cfg.Server.ArtifactDir,
+		MediaDir:            cfg.Server.MediaDir,
+		ReadyJSON:           cfg.Server.ReadyJSON,
+		AllowLoopbackEgress: cfg.Server.AllowLoopbackEgress,
+	}
+	return cfg, loadedPath, srvCfg, nil
+}
+
+func executeServe(ctx context.Context, flags *pflag.FlagSet, configFile string, getenv func(string) string, stdout io.Writer) error {
+	_, _, cfg, err := loadServerConfig(flags, configFile, getenv)
+	if err != nil {
+		return err
 	}
 
 	srv, err := NewServer(ctx, cfg)
@@ -107,49 +382,6 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	}
 }
 
-func parseArgs(args []string, getenv func(string) string) (Config, string, bool, error) {
-	if getenv == nil {
-		getenv = func(string) string { return "" }
-	}
-	defaultAddr := strings.TrimSpace(getenv("VIBE_SERVER_ADDR"))
-	if defaultAddr == "" {
-		defaultAddr = defaultListenAddr
-	}
-	defaultPreview := strings.TrimSpace(getenv("VIBE_PREVIEW_ADDR"))
-	if defaultPreview == "" {
-		defaultPreview = defaultPreviewAddr
-	}
-	defaultDB := strings.TrimSpace(getenv("VIBE_DB_PATH"))
-	if defaultDB == "" {
-		defaultDB = ":memory:"
-	}
-	defaultWork := strings.TrimSpace(getenv("VIBEVALLEY_WORK_ROOT"))
-	defaultLoopback := strings.TrimSpace(getenv("VIBE_ALLOW_LOOPBACK_EGRESS")) == "1"
-
-	fs := flag.NewFlagSet("vibe-server", flag.ContinueOnError)
-	var helpBuf strings.Builder
-	fs.SetOutput(&helpBuf)
-
-	var cfg Config
-	fs.StringVar(&cfg.Addr, "addr", defaultAddr, "HTTP and WebSocket control-plane listen address")
-	fs.StringVar(&cfg.PreviewAddr, "preview-addr", defaultPreview, "Isolated artifact preview HTTP listen address (set 'disabled' to turn off)")
-	fs.StringVar(&cfg.DBPath, "db", defaultDB, "SQLite WAL database path or :memory:")
-	fs.StringVar(&cfg.WorkRoot, "work-root", defaultWork, "Workspace root directory")
-	fs.BoolVar(&cfg.ReadyJSON, "ready-json", false, "Emit single-line readiness JSON once listeners are bound")
-	fs.BoolVar(&cfg.AllowLoopbackEgress, "allow-loopback-egress", defaultLoopback, "Allow vault egress proxy to target loopback addresses")
-
-	err := fs.Parse(args)
-	if errors.Is(err, flag.ErrHelp) {
-		fs.PrintDefaults()
-		return Config{}, helpBuf.String(), true, nil
-	}
-	if err != nil {
-		fs.PrintDefaults()
-		return Config{}, helpBuf.String(), false, err
-	}
-	return cfg, "", false, nil
-}
-
 // NewServer binds listeners, initializes the full VibeValley Platform Stack, and starts serving requests.
 func NewServer(ctx context.Context, cfg Config) (*Server, error) {
 	if strings.TrimSpace(cfg.Addr) == "" {
@@ -178,6 +410,8 @@ func NewServer(ctx context.Context, cfg Config) (*Server, error) {
 	stCfg := stack.Config{
 		DBPath:              cfg.DBPath,
 		WorkRoot:            cfg.WorkRoot,
+		ArtifactDir:         cfg.ArtifactDir,
+		MediaDir:            cfg.MediaDir,
 		ServerURL:           "http://" + mainLn.Addr().String(),
 		PreviewHost:         previewHost,
 		WorkbenchHosts:      []string{mainLn.Addr().String()},

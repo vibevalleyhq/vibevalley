@@ -288,8 +288,8 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 		if err != nil {
 			return nil, fmt.Errorf("stack: vault sql backend: %w", err)
 		}
-		if err := sb.EnsureSchema(ctx); err != nil {
-			return nil, fmt.Errorf("stack: vault schema: %w", err)
+		if err := sb.Migrate(ctx); err != nil {
+			return nil, fmt.Errorf("stack: vault migrate: %w", err)
 		}
 		vBackend = sb
 	}

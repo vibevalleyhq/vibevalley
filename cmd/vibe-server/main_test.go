@@ -18,9 +18,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vibevalleyhq/vibevalley/internal/config"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/artifact"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/issue"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/media"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
 	"github.com/vibevalleyhq/vibevalley/internal/machine"
 	"github.com/vibevalleyhq/vibevalley/internal/vault"
 	"github.com/vibevalleyhq/vibevalley/pkg/chord/delta"
@@ -475,4 +477,253 @@ caughtUp:
 	if badResp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 when workbench Host hits preview listener, got %d", badResp.StatusCode)
 	}
+}
+
+func mapGetenv(vars map[string]string) func(string) string {
+	return func(key string) string {
+		if vars == nil {
+			return ""
+		}
+		return vars[key]
+	}
+}
+
+func writeServerTestYAML(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func TestVibeServerCobraConfigMigrateAndServeSubcommands(t *testing.T) {
+	t.Parallel()
+
+	t.Run("precedence Flag > Env > vibevalley.yaml > Defaults", func(t *testing.T) {
+		t.Parallel()
+		tmp := t.TempDir()
+		vibeHome := filepath.Join(tmp, "vibe-home")
+		yamlWork := filepath.Join(tmp, "yaml-work")
+		yamlDB := filepath.Join(tmp, "yaml.db")
+		writeServerTestYAML(t, filepath.Join(vibeHome, "vibevalley.yaml"), `
+work_root: `+yamlWork+`
+server:
+  addr: 127.0.0.1:9111
+  preview_addr: 127.0.0.1:9112
+  db_path: `+yamlDB+`
+  ready_json: true
+  allow_loopback_egress: false
+`)
+		getenv := mapGetenv(map[string]string{
+			"VIBEVALLEY_HOME":            vibeHome,
+			"VIBE_PREVIEW_ADDR":          "127.0.0.1:9222",
+			"VIBE_ALLOW_LOOPBACK_EGRESS": "true",
+		})
+
+		rootCmd := newRootCommand(getenv, io.Discard, io.Discard)
+		if err := rootCmd.ParseFlags([]string{
+			"--addr", "127.0.0.1:9333",
+		}); err != nil {
+			t.Fatalf("ParseFlags: %v", err)
+		}
+		_, loadedPath, srvCfg, err := loadServerConfig(rootCmd.Flags(), "", getenv)
+		if err != nil {
+			t.Fatalf("loadServerConfig: %v", err)
+		}
+		if loadedPath != filepath.Join(vibeHome, "vibevalley.yaml") {
+			t.Fatalf("loadedPath = %q", loadedPath)
+		}
+		if srvCfg.Addr != "127.0.0.1:9333" {
+			t.Fatalf("Addr = %q, want CLI override 127.0.0.1:9333", srvCfg.Addr)
+		}
+		if srvCfg.PreviewAddr != "127.0.0.1:9222" || !srvCfg.AllowLoopbackEgress {
+			t.Fatalf("expected env overrides for PreviewAddr and AllowLoopbackEgress, got %+v", srvCfg)
+		}
+		if srvCfg.DBPath != yamlDB || srvCfg.WorkRoot != yamlWork || !srvCfg.ReadyJSON {
+			t.Fatalf("expected YAML values when env/flag unset, got %+v", srvCfg)
+		}
+	})
+
+	t.Run("version, config check, and config print redaction", func(t *testing.T) {
+		t.Parallel()
+		tmp := t.TempDir()
+		vibeHome := filepath.Join(tmp, "vibe-home")
+		yamlPath := filepath.Join(vibeHome, "vibevalley.yaml")
+		dbPath := filepath.Join(tmp, "srv.db")
+		writeServerTestYAML(t, yamlPath, `
+server:
+  addr: 127.0.0.1:8899
+  db_path: `+dbPath+`
+deepseek:
+  api_key: sk-yaml-secret-srv
+secrets:
+  github_token: ghp-yaml-token-srv
+`)
+		getenv := mapGetenv(map[string]string{
+			"VIBEVALLEY_HOME":  vibeHome,
+			"DEEPSEEK_API_KEY": "sk-env-secret-srv",
+		})
+
+		var out, errBuf bytes.Buffer
+		missingPath := filepath.Join(tmp, "missing.yaml")
+		if err := run(context.Background(), []string{"--version", "--config", missingPath}, getenv, &out, &errBuf); err != nil {
+			t.Fatalf("--version with missing --config failed: %v", err)
+		}
+		if !strings.Contains(out.String(), "vibe-server "+version) {
+			t.Fatalf("unexpected --version output: %q", out.String())
+		}
+
+		out.Reset()
+		if err := run(context.Background(), []string{"version"}, getenv, &out, &errBuf); err != nil {
+			t.Fatalf("version subcommand failed: %v", err)
+		}
+		if !strings.Contains(out.String(), "vibe-server "+version) {
+			t.Fatalf("unexpected version subcommand output: %q", out.String())
+		}
+
+		out.Reset()
+		if err := run(context.Background(), []string{"config", "check"}, getenv, &out, &errBuf); err != nil {
+			t.Fatalf("config check failed: %v", err)
+		}
+		if !strings.Contains(out.String(), "config ok:") || !strings.Contains(out.String(), yamlPath) {
+			t.Fatalf("unexpected config check output: %q", out.String())
+		}
+
+		badYAML := filepath.Join(tmp, "bad.yaml")
+		writeServerTestYAML(t, badYAML, "server:\n  addr: not-a-host-port\n")
+		if err := run(context.Background(), []string{"config", "check", "-c", badYAML}, getenv, &out, &errBuf); err == nil {
+			t.Fatal("expected config check to reject invalid server.addr")
+		}
+
+		out.Reset()
+		if err := run(context.Background(), []string{"config", "print", "--addr", "127.0.0.1:9444"}, getenv, &out, &errBuf); err != nil {
+			t.Fatalf("config print failed: %v", err)
+		}
+		printed := out.String()
+		for _, secret := range []string{"sk-yaml-secret-srv", "sk-env-secret-srv", "ghp-yaml-token-srv"} {
+			if strings.Contains(printed, secret) {
+				t.Fatalf("config print leaked secret %q:\n%s", secret, printed)
+			}
+		}
+		if !strings.Contains(printed, config.RedactedValue) {
+			t.Fatalf("config print missing %q:\n%s", config.RedactedValue, printed)
+		}
+		if !strings.Contains(printed, "127.0.0.1:9444") {
+			t.Fatalf("config print missing flag override addr:\n%s", printed)
+		}
+	})
+
+	t.Run("migrate up, status, down --all, up", func(t *testing.T) {
+		t.Parallel()
+		tmp := t.TempDir()
+		vibeHome := filepath.Join(tmp, "vibe-home")
+		dbPath := filepath.Join(tmp, "mig.db")
+		getenv := mapGetenv(map[string]string{"VIBEVALLEY_HOME": vibeHome})
+
+		var out, errBuf bytes.Buffer
+		if err := run(context.Background(), []string{"migrate", "up", "--db", dbPath}, getenv, &out, &errBuf); err != nil {
+			t.Fatalf("migrate up failed: %v", err)
+		}
+		for _, scope := range stack.MigrationScopes() {
+			if !strings.Contains(out.String(), "scope="+scope) {
+				t.Fatalf("migrate up output missing scope %s:\n%s", scope, out.String())
+			}
+		}
+
+		out.Reset()
+		if err := run(context.Background(), []string{"migrate", "status", "--db", dbPath}, getenv, &out, &errBuf); err != nil {
+			t.Fatalf("migrate status failed: %v", err)
+		}
+		if strings.Count(out.String(), "applied=true") != len(stack.MigrationScopes()) {
+			t.Fatalf("expected all %d scopes applied=true:\n%s", len(stack.MigrationScopes()), out.String())
+		}
+
+		if err := run(context.Background(), []string{"migrate", "down", "--db", dbPath, "--all", "--steps", "1"}, getenv, &out, &errBuf); err == nil {
+			t.Fatal("expected error combining --all and --steps")
+		}
+
+		out.Reset()
+		if err := run(context.Background(), []string{"migrate", "down", "--db", dbPath, "--all"}, getenv, &out, &errBuf); err != nil {
+			t.Fatalf("migrate down --all failed: %v", err)
+		}
+		if strings.Count(out.String(), "reverted=1") != len(stack.MigrationScopes()) {
+			t.Fatalf("expected all scopes reverted=1:\n%s", out.String())
+		}
+
+		out.Reset()
+		if err := run(context.Background(), []string{"migrate", "status", "--db", dbPath}, getenv, &out, &errBuf); err != nil {
+			t.Fatalf("migrate status after down failed: %v", err)
+		}
+		if strings.Count(out.String(), "applied=false") != len(stack.MigrationScopes()) {
+			t.Fatalf("expected all scopes applied=false after down --all:\n%s", out.String())
+		}
+
+		out.Reset()
+		if err := run(context.Background(), []string{"migrate", "up", "--db", dbPath}, getenv, &out, &errBuf); err != nil {
+			t.Fatalf("migrate re-up failed: %v", err)
+		}
+		if strings.Count(out.String(), "applied=1") != len(stack.MigrationScopes()) {
+			t.Fatalf("expected all scopes applied=1 on re-up:\n%s", out.String())
+		}
+	})
+
+	t.Run("serve --ready-json subcommand", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		tmp := t.TempDir()
+		vibeHome := filepath.Join(tmp, "vibe-home")
+		yamlPath := filepath.Join(vibeHome, "vibevalley.yaml")
+		dbPath := filepath.Join(tmp, "serve.db")
+		workRoot := filepath.Join(tmp, "serve-work")
+		writeServerTestYAML(t, yamlPath, `
+work_root: `+workRoot+`
+server:
+  addr: 127.0.0.1:0
+  preview_addr: 127.0.0.1:0
+  db_path: `+dbPath+`
+`)
+		getenv := mapGetenv(map[string]string{"VIBEVALLEY_HOME": vibeHome})
+
+		pr, pw := io.Pipe()
+		var errBuf bytes.Buffer
+		runCtx, stopRun := context.WithCancel(ctx)
+		defer stopRun()
+
+		doneCh := make(chan error, 1)
+		go func() {
+			err := run(runCtx, []string{"serve", "--ready-json"}, getenv, pw, &errBuf)
+			_ = pw.Close()
+			doneCh <- err
+		}()
+
+		sc := bufio.NewScanner(pr)
+		if !sc.Scan() {
+			t.Fatalf("expected ready json line from serve --ready-json; err=%v stderr=%s", sc.Err(), errBuf.String())
+		}
+		var ready ReadyInfo
+		if err := json.Unmarshal(sc.Bytes(), &ready); err != nil {
+			t.Fatalf("decode ready json %q: %v", sc.Text(), err)
+		}
+		if ready.Addr == "" || ready.PreviewAddr == "" {
+			t.Fatalf("expected bound addr and preview_addr, got %+v", ready)
+		}
+
+		resp, err := http.Get("http://" + ready.Addr + "/healthz")
+		if err != nil {
+			t.Fatalf("GET /healthz: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("GET /healthz status = %d", resp.StatusCode)
+		}
+
+		stopRun()
+		if err := <-doneCh; err != nil {
+			t.Fatalf("serve subcommand shutdown error: %v", err)
+		}
+	})
 }

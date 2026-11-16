@@ -70,7 +70,7 @@ const config: KnipConfig = {
     },
   },
   // Programs on the machine, not packages: Xcode's swift, macOS's plutil and ditto, the voice line's tunnel, and the Go toolchain.
-  ignoreBinaries: ["swift", "plutil", "ditto", "cloudflared", "go"],
+  ignoreBinaries: ["swift", "plutil", "ditto", "cloudflared", "go", "sqlc"],
   // Swift, with its own tools.
   ignoreWorkspaces: ["apps/island", "apps/pty"],
 };

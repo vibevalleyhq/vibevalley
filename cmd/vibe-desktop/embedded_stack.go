@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -48,16 +49,14 @@ func launchEmbeddedStack(ctx context.Context, cfg DesktopConfig, rootKey vault.R
 
 	dbPath := ":memory:"
 	workRoot := ""
-	if !cfg.HeadlessCheck {
-		if envDB := strings.TrimSpace(os.Getenv("VIBE_DB_PATH")); envDB != "" {
-			dbPath = envDB
-		} else if confDir, err := os.UserConfigDir(); err == nil && confDir != "" {
+	if trimmedDB := strings.TrimSpace(cfg.DBPath); trimmedDB != "" && (trimmedDB != ":memory:" || cfg.dbExplicit) {
+		dbPath = trimmedDB
+	} else if !cfg.HeadlessCheck {
+		if confDir, err := os.UserConfigDir(); err == nil && confDir != "" {
 			dbPath = filepath.Join(confDir, "vibevalley", "desktop.db")
 		}
-		if len(cfg.RepoRoots) > 0 {
-			workRoot = cfg.RepoRoots[0]
-		}
-	} else if len(cfg.RepoRoots) > 0 {
+	}
+	if len(cfg.RepoRoots) > 0 {
 		workRoot = cfg.RepoRoots[0]
 	}
 
@@ -275,4 +274,46 @@ func firstNonEmptyStr(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+func runDesktopMigrateUp(ctx context.Context, dbPath string, stdout io.Writer) error {
+	results, err := stack.MigrateUp(ctx, dbPath)
+	if err != nil {
+		return err
+	}
+	for _, r := range results {
+		if _, err := fmt.Fprintf(stdout, "migrate up scope=%s before=%d after=%d applied=%d pending=%d db=%s\n",
+			r.Scope, r.BeforeVersion, r.AfterVersion, r.Applied, r.Pending, r.DBPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runDesktopMigrateDown(ctx context.Context, dbPath string, steps int, all bool, stdout io.Writer) error {
+	results, err := stack.MigrateDown(ctx, dbPath, steps, all)
+	if err != nil {
+		return err
+	}
+	for _, r := range results {
+		if _, err := fmt.Fprintf(stdout, "migrate down scope=%s before=%d after=%d reverted=%d pending=%d db=%s\n",
+			r.Scope, r.BeforeVersion, r.AfterVersion, r.Reverted, r.Pending, r.DBPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runDesktopMigrateStatus(ctx context.Context, dbPath string, stdout io.Writer) error {
+	statuses, err := stack.MigrateStatus(ctx, dbPath)
+	if err != nil {
+		return err
+	}
+	for _, st := range statuses {
+		if _, err := fmt.Fprintf(stdout, "scope=%s version=%d name=%s applied=%t\n",
+			st.Scope, st.Version, st.Name, st.Applied); err != nil {
+			return err
+		}
+	}
+	return nil
 }
