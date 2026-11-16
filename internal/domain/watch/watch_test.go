@@ -2,18 +2,23 @@ package watch_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/watch"
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
+	_ "modernc.org/sqlite"
 )
 
 type fixedClock struct {
@@ -551,5 +556,216 @@ func TestWatchWakeBreakerTripAndUserReset(t *testing.T) {
 	}
 	if woken != 1 {
 		t.Fatalf("expected user message to reset wake breaker and dispatch, woken=%d", woken)
+	}
+}
+
+func TestWatchMigrationsUpStatusDownAllUp(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "watch-migrate.db")
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	if _, err := db.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
+		t.Fatalf("pragma: %v", err)
+	}
+
+	runner, err := migrate.New(db, "watch", watch.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+	st0, err := runner.Status(ctx)
+	if err != nil || len(st0) != 1 || st0[0].Applied || st0[0].Version != 1 || st0[0].Scope != "watch" {
+		t.Fatalf("unexpected initial status: %+v err=%v", st0, err)
+	}
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 1 {
+		t.Fatalf("Up: applied=%d err=%v", applied, err)
+	}
+	st1, err := runner.Status(ctx)
+	if err != nil || len(st1) != 1 || !st1[0].Applied || st1[0].AppliedAtMs <= 0 {
+		t.Fatalf("unexpected status after Up: %+v err=%v", st1, err)
+	}
+	assertWatchObjectsExist(t, db, true)
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Open SQLite watch service on the migrated DB and exercise all sqlcgen queries.
+	clk := newFixedClock()
+	ch := channel.NewMemoryStore(channel.WithClock(clk))
+	defer ch.Close()
+	if _, err := ch.CreateChannel(ctx, channel.Channel{ID: "general", Type: channel.TypePublic, Name: "general", DefaultAgentID: "orch"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ch.CreateChannel(ctx, channel.Channel{ID: "th-1", Type: channel.TypeThread, Name: "Thread 1"}); err != nil {
+		t.Fatal(err)
+	}
+
+	w1, err := watch.OpenSQLiteService(ctx, ch, dbPath, watch.WithClock(clk), watch.WithSeatLimits(1, 2))
+	if err != nil {
+		t.Fatalf("OpenSQLiteService: %v", err)
+	}
+	if err := w1.SeatAgent(ctx, watch.Seat{ChannelID: "general", AgentID: "orch", Role: channel.RoleOrchestrator}); err != nil {
+		t.Fatalf("SeatAgent orch: %v", err)
+	}
+	if err := w1.SeatAgent(ctx, watch.Seat{ChannelID: "th-1", AgentID: "w1", Role: channel.RoleWorker, ThreadOwner: true}); err != nil {
+		t.Fatalf("SeatAgent w1: %v", err)
+	}
+	if err := w1.SeatAgent(ctx, watch.Seat{ChannelID: "th-1", AgentID: "w2", Role: channel.RoleWorker}); !errors.Is(err, watch.ErrSeatCapacityReached) {
+		t.Fatalf("expected ErrSeatCapacityReached, got %v", err)
+	}
+	if seat, err := w1.GetSeat(ctx, "th-1", "w1"); err != nil || !seat.Active || !seat.ThreadOwner {
+		t.Fatalf("GetSeat: %+v err=%v", seat, err)
+	}
+	if allSeats, err := w1.ListSeats(ctx, ""); err != nil || len(allSeats) != 2 {
+		t.Fatalf("ListSeats(''): %+v err=%v", allSeats, err)
+	}
+	if thSeats, err := w1.ListSeats(ctx, "th-1"); err != nil || len(thSeats) != 1 || thSeats[0].AgentID != "w1" {
+		t.Fatalf("ListSeats('th-1'): %+v err=%v", thSeats, err)
+	}
+	if home, err := w1.HomeOf(ctx, "w1"); err != nil || home != "th-1" {
+		t.Fatalf("HomeOf: %q err=%v", home, err)
+	}
+	if _, _, err := w1.RecordEmptyWake(ctx, "w1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w1.RecordSpoke(ctx, "w1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w1.UpsertInboxItem(ctx, contract.InboxItemView{
+		ID:      "inbox-1",
+		Kind:    contract.InboxApproval,
+		Title:   "Approve?",
+		Summary: "Needs ok",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if openItems, err := w1.ListInboxItems(ctx, false); err != nil || len(openItems) != 1 {
+		t.Fatalf("ListInboxItems(false): %+v err=%v", openItems, err)
+	}
+	if resolved, err := w1.ResolveInboxItem(ctx, "inbox-1"); err != nil || !resolved {
+		t.Fatalf("ResolveInboxItem(existing): resolved=%v err=%v", resolved, err)
+	}
+	if resolved, err := w1.ResolveInboxItem(ctx, "missing"); err != nil || resolved {
+		t.Fatalf("ResolveInboxItem(missing): resolved=%v err=%v", resolved, err)
+	}
+	if allItems, err := w1.ListInboxItems(ctx, true); err != nil || len(allItems) != 1 || !allItems[0].Resolved {
+		t.Fatalf("ListInboxItems(true): %+v err=%v", allItems, err)
+	}
+	if err := w1.VacateSeat(ctx, "th-1", "w1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w1.SyncReadCursor(ctx, "th-1", 10); err != nil {
+		t.Fatal(err)
+	}
+	_ = w1.Close()
+
+	// Reopen DB for DownAll -> Up + checksum mismatch checks.
+	db2, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("reopen sqlite: %v", err)
+	}
+	defer db2.Close()
+	db2.SetMaxOpenConns(1)
+	if _, err := db2.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
+		t.Fatalf("pragma: %v", err)
+	}
+
+	runner2, err := migrate.New(db2, "watch", watch.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New 2: %v", err)
+	}
+	if again, err := runner2.Up(ctx); err != nil || again != 0 {
+		t.Fatalf("idempotent Up after OpenSQLiteService: applied=%d err=%v", again, err)
+	}
+
+	upOrig, err := fs.ReadFile(watch.MigrationsFS, "migrations/0001_init.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	downOrig, err := fs.ReadFile(watch.MigrationsFS, "migrations/0001_init.down.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tamperedFS := fstest.MapFS{
+		"migrations/0001_init.up.sql":   {Data: append(upOrig, []byte("\n-- tampered\n")...)},
+		"migrations/0001_init.down.sql": {Data: downOrig},
+	}
+	tamperedRunner, err := migrate.New(db2, "watch", tamperedFS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tamperedRunner.Up(ctx); !errors.Is(err, migrate.ErrChecksumMismatch) {
+		t.Fatalf("expected ErrChecksumMismatch, got %v", err)
+	}
+
+	reverted, err := runner2.DownAll(ctx)
+	if err != nil || reverted != 1 {
+		t.Fatalf("DownAll: reverted=%d err=%v", reverted, err)
+	}
+	st2, err := runner2.Status(ctx)
+	if err != nil || len(st2) != 1 || st2[0].Applied {
+		t.Fatalf("unexpected status after DownAll: %+v err=%v", st2, err)
+	}
+	assertWatchObjectsExist(t, db2, false)
+
+	reapplied, err := runner2.Up(ctx)
+	if err != nil || reapplied != 1 {
+		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
+	}
+	st3, err := runner2.Status(ctx)
+	if err != nil || len(st3) != 1 || !st3[0].Applied {
+		t.Fatalf("unexpected status after re-Up: %+v err=%v", st3, err)
+	}
+	assertWatchObjectsExist(t, db2, true)
+	if err := db2.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	w2, err := watch.OpenSQLiteService(ctx, ch, dbPath, watch.WithClock(clk))
+	if err != nil {
+		t.Fatalf("OpenSQLiteService after re-Up: %v", err)
+	}
+	defer w2.Close()
+	if cur, err := w2.Cursor(ctx); err != nil || cur != 0 {
+		t.Fatalf("expected clean cursor=0 after DownAll+Up, got %d err=%v", cur, err)
+	}
+	if seats, err := w2.ListSeats(ctx, ""); err != nil || len(seats) != 0 {
+		t.Fatalf("expected 0 seats after DownAll+Up, got %+v err=%v", seats, err)
+	}
+	if items, err := w2.ListInboxItems(ctx, true); err != nil || len(items) != 0 {
+		t.Fatalf("expected 0 inbox items after DownAll+Up, got %+v err=%v", items, err)
+	}
+}
+
+func assertWatchObjectsExist(t *testing.T, db *sql.DB, want bool) {
+	t.Helper()
+	objects := []struct {
+		typ  string
+		name string
+	}{
+		{"table", "watch_cursor"},
+		{"table", "watch_seat"},
+		{"table", "watch_agent_home"},
+		{"table", "watch_brake_state"},
+		{"table", "watch_inbox"},
+		{"index", "watch_inbox_chan_seq_idx"},
+	}
+	for _, obj := range objects {
+		var cnt int
+		err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, obj.typ, obj.name).Scan(&cnt)
+		if err != nil {
+			t.Fatalf("query sqlite_master (%s %s): %v", obj.typ, obj.name, err)
+		}
+		if want && cnt != 1 {
+			t.Fatalf("expected %s %q to exist, count=%d", obj.typ, obj.name, cnt)
+		}
+		if !want && cnt != 0 {
+			t.Fatalf("expected %s %q to be dropped, count=%d", obj.typ, obj.name, cnt)
+		}
 	}
 }

@@ -1,0 +1,9 @@
+DROP TRIGGER IF EXISTS channel_event_no_delete;
+DROP TRIGGER IF EXISTS channel_event_no_update;
+DROP INDEX IF EXISTS channel_event_chan_seq_idx;
+DROP INDEX IF EXISTS channel_event_send_key_idx;
+DROP INDEX IF EXISTS channel_issue_thread_idx;
+DROP TABLE IF EXISTS channel_read_cursor;
+DROP TABLE IF EXISTS channel_event;
+DROP TABLE IF EXISTS channel_member;
+DROP TABLE IF EXISTS channel;

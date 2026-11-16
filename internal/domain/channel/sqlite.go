@@ -11,83 +11,16 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/vibevalleyhq/vibevalley/internal/domain/channel/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 	_ "modernc.org/sqlite"
 )
-
-var channelSchemaDDL = []string{
-	`CREATE TABLE IF NOT EXISTS channel (
-		id TEXT PRIMARY KEY,
-		type TEXT NOT NULL,
-		name TEXT NOT NULL DEFAULT '',
-		topic TEXT NOT NULL DEFAULT '',
-		repo_id TEXT NOT NULL DEFAULT '',
-		default_agent_id TEXT NOT NULL DEFAULT '',
-		peer_id TEXT NOT NULL DEFAULT '',
-		parent_channel_id TEXT NOT NULL DEFAULT '',
-		parent_event_seq INTEGER NOT NULL DEFAULT 0,
-		issue_id TEXT NOT NULL DEFAULT '',
-		is_default INTEGER NOT NULL DEFAULT 0,
-		notify_mode TEXT NOT NULL DEFAULT 'all',
-		created_at_ms INTEGER NOT NULL,
-		updated_at_ms INTEGER NOT NULL
-	)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS channel_issue_thread_idx ON channel(issue_id) WHERE type = 'thread' AND issue_id <> ''`,
-
-	`CREATE TABLE IF NOT EXISTS channel_member (
-		channel_id TEXT NOT NULL,
-		member_id TEXT NOT NULL,
-		added_at_ms INTEGER NOT NULL,
-		PRIMARY KEY (channel_id, member_id)
-	)`,
-
-	`CREATE TABLE IF NOT EXISTS channel_event (
-		global_seq INTEGER PRIMARY KEY,
-		channel_id TEXT NOT NULL,
-		seq INTEGER NOT NULL,
-		kind TEXT NOT NULL,
-		author_id TEXT NOT NULL,
-		actor_kind TEXT NOT NULL,
-		actor_role TEXT NOT NULL DEFAULT '',
-		text TEXT NOT NULL DEFAULT '',
-		session_id TEXT NOT NULL DEFAULT '',
-		issue_id TEXT NOT NULL DEFAULT '',
-		mentions_json TEXT NOT NULL DEFAULT '[]',
-		target_agent_id TEXT NOT NULL DEFAULT '',
-		send_key TEXT NOT NULL DEFAULT '',
-		question_json TEXT NOT NULL DEFAULT '',
-		report_json TEXT NOT NULL DEFAULT '',
-		reaction_json TEXT NOT NULL DEFAULT '',
-		created_at_ms INTEGER NOT NULL,
-		UNIQUE (channel_id, seq)
-	)`,
-	`CREATE UNIQUE INDEX IF NOT EXISTS channel_event_send_key_idx ON channel_event(channel_id, author_id, send_key) WHERE send_key <> ''`,
-	`CREATE INDEX IF NOT EXISTS channel_event_chan_seq_idx ON channel_event(channel_id, seq)`,
-
-	`CREATE TRIGGER IF NOT EXISTS channel_event_no_update
-	 BEFORE UPDATE ON channel_event
-	 BEGIN
-	     SELECT RAISE(ABORT, 'channel_event is append-only');
-	 END`,
-
-	`CREATE TRIGGER IF NOT EXISTS channel_event_no_delete
-	 BEFORE DELETE ON channel_event
-	 BEGIN
-	     SELECT RAISE(ABORT, 'channel_event is append-only');
-	 END`,
-
-	`CREATE TABLE IF NOT EXISTS channel_read_cursor (
-		channel_id TEXT NOT NULL,
-		actor_id TEXT NOT NULL,
-		read_seq INTEGER NOT NULL,
-		updated_at_ms INTEGER NOT NULL,
-		PRIMARY KEY (channel_id, actor_id)
-	)`,
-}
 
 type sqliteBackend struct {
 	mu      sync.Mutex
 	db      *sql.DB
+	queries *sqlcgen.Queries
 	ownsDB  bool
 	nextSeq int64
 }
@@ -130,16 +63,22 @@ func openSQLiteFromDB(ctx context.Context, db *sql.DB, ownsDB bool) (*sqliteBack
 	if db == nil {
 		return nil, fmtInvalid("sql.DB is required")
 	}
-	for _, ddl := range channelSchemaDDL {
-		if _, err := db.ExecContext(ctx, ddl); err != nil {
-			if ownsDB {
-				_ = db.Close()
-			}
-			return nil, fmt.Errorf("channel: apply schema: %w", err)
+	runner, err := migrate.New(db, "channel", MigrationsFS)
+	if err != nil {
+		if ownsDB {
+			_ = db.Close()
 		}
+		return nil, fmt.Errorf("channel: init migrations: %w", err)
 	}
-	var maxGlobal int64
-	if err := db.QueryRowContext(ctx, `SELECT COALESCE(MAX(global_seq), 0) FROM channel_event`).Scan(&maxGlobal); err != nil {
+	if _, err := runner.Up(ctx); err != nil {
+		if ownsDB {
+			_ = db.Close()
+		}
+		return nil, fmt.Errorf("channel: apply migrations: %w", err)
+	}
+	queries := sqlcgen.New(db)
+	maxGlobal, err := queries.MaxGlobalSeq(ctx)
+	if err != nil {
 		if ownsDB {
 			_ = db.Close()
 		}
@@ -147,6 +86,7 @@ func openSQLiteFromDB(ctx context.Context, db *sql.DB, ownsDB bool) (*sqliteBack
 	}
 	return &sqliteBackend{
 		db:      db,
+		queries: queries,
 		ownsDB:  ownsDB,
 		nextSeq: maxGlobal,
 	}, nil
@@ -192,20 +132,26 @@ func (b *sqliteBackend) ensureChannel(ctx context.Context, ch Channel) (Channel,
 }
 
 func (b *sqliteBackend) insertChannelLocked(ctx context.Context, ch Channel) error {
-	isDefault := 0
+	var isDefault int64
 	if ch.IsDefault {
 		isDefault = 1
 	}
-	_, err := b.db.ExecContext(ctx, `INSERT INTO channel (
-		id, type, name, topic, repo_id, default_agent_id, peer_id,
-		parent_channel_id, parent_event_seq, issue_id, is_default, notify_mode,
-		created_at_ms, updated_at_ms
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		ch.ID, string(ch.Type), ch.Name, ch.Topic, ch.RepoID, ch.DefaultAgentID, ch.PeerID,
-		ch.ParentChannelID, ch.ParentEventSeq, ch.IssueID, isDefault, ch.NotifyMode,
-		ch.CreatedAtMs, ch.UpdatedAtMs,
-	)
-	return err
+	return b.queries.InsertChannel(ctx, sqlcgen.InsertChannelParams{
+		ID:              ch.ID,
+		Type:            string(ch.Type),
+		Name:            ch.Name,
+		Topic:           ch.Topic,
+		RepoID:          ch.RepoID,
+		DefaultAgentID:  ch.DefaultAgentID,
+		PeerID:          ch.PeerID,
+		ParentChannelID: ch.ParentChannelID,
+		ParentEventSeq:  ch.ParentEventSeq,
+		IssueID:         ch.IssueID,
+		IsDefault:       isDefault,
+		NotifyMode:      ch.NotifyMode,
+		CreatedAtMs:     ch.CreatedAtMs,
+		UpdatedAtMs:     ch.UpdatedAtMs,
+	})
 }
 
 func (b *sqliteBackend) getChannel(ctx context.Context, id string) (Channel, bool, error) {
@@ -215,12 +161,14 @@ func (b *sqliteBackend) getChannel(ctx context.Context, id string) (Channel, boo
 }
 
 func (b *sqliteBackend) getChannelLocked(ctx context.Context, id string) (Channel, bool, error) {
-	row := b.db.QueryRowContext(ctx, `SELECT
-		id, type, name, topic, repo_id, default_agent_id, peer_id,
-		parent_channel_id, parent_event_seq, issue_id, is_default, notify_mode,
-		created_at_ms, updated_at_ms
-	FROM channel WHERE id = ?`, id)
-	return scanChannel(row)
+	row, err := b.queries.GetChannel(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Channel{}, false, nil
+	}
+	if err != nil {
+		return Channel{}, false, err
+	}
+	return channelFromRow(row), true, nil
 }
 
 func (b *sqliteBackend) getThreadByIssue(ctx context.Context, issueID string) (Channel, bool, error) {
@@ -230,35 +178,28 @@ func (b *sqliteBackend) getThreadByIssue(ctx context.Context, issueID string) (C
 }
 
 func (b *sqliteBackend) getThreadByIssueLocked(ctx context.Context, issueID string) (Channel, bool, error) {
-	row := b.db.QueryRowContext(ctx, `SELECT
-		id, type, name, topic, repo_id, default_agent_id, peer_id,
-		parent_channel_id, parent_event_seq, issue_id, is_default, notify_mode,
-		created_at_ms, updated_at_ms
-	FROM channel WHERE type = 'thread' AND issue_id = ?`, issueID)
-	return scanChannel(row)
+	row, err := b.queries.GetThreadByIssue(ctx, issueID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Channel{}, false, nil
+	}
+	if err != nil {
+		return Channel{}, false, err
+	}
+	return channelFromRow(row), true, nil
 }
 
 func (b *sqliteBackend) listChannels(ctx context.Context) ([]Channel, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	rows, err := b.db.QueryContext(ctx, `SELECT
-		id, type, name, topic, repo_id, default_agent_id, peer_id,
-		parent_channel_id, parent_event_seq, issue_id, is_default, notify_mode,
-		created_at_ms, updated_at_ms
-	FROM channel ORDER BY created_at_ms ASC, id ASC`)
+	rows, err := b.queries.ListChannels(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	var out []Channel
-	for rows.Next() {
-		ch, _, err := scanChannel(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, ch)
+	for _, row := range rows {
+		out = append(out, channelFromRow(row))
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (b *sqliteBackend) addMember(ctx context.Context, channelID, memberID string, nowMs int64) error {
@@ -269,18 +210,20 @@ func (b *sqliteBackend) addMember(ctx context.Context, channelID, memberID strin
 	} else if !ok {
 		return fmt.Errorf("%w: channel %q", ErrNotFound, channelID)
 	}
-	_, err := b.db.ExecContext(ctx, `INSERT INTO channel_member (channel_id, member_id, added_at_ms)
-		VALUES (?, ?, ?) ON CONFLICT (channel_id, member_id) DO NOTHING`,
-		channelID, memberID, nowMs,
-	)
-	return err
+	return b.queries.AddChannelMember(ctx, sqlcgen.AddChannelMemberParams{
+		ChannelID: channelID,
+		MemberID:  memberID,
+		AddedAtMs: nowMs,
+	})
 }
 
 func (b *sqliteBackend) removeMember(ctx context.Context, channelID, memberID string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	_, err := b.db.ExecContext(ctx, `DELETE FROM channel_member WHERE channel_id = ? AND member_id = ?`, channelID, memberID)
-	return err
+	return b.queries.RemoveChannelMember(ctx, sqlcgen.RemoveChannelMemberParams{
+		ChannelID: channelID,
+		MemberID:  memberID,
+	})
 }
 
 func (b *sqliteBackend) listMembers(ctx context.Context, channelID string) ([]string, error) {
@@ -291,20 +234,7 @@ func (b *sqliteBackend) listMembers(ctx context.Context, channelID string) ([]st
 	} else if !ok {
 		return nil, fmt.Errorf("%w: channel %q", ErrNotFound, channelID)
 	}
-	rows, err := b.db.QueryContext(ctx, `SELECT member_id FROM channel_member WHERE channel_id = ? ORDER BY member_id ASC`, channelID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		out = append(out, id)
-	}
-	return out, rows.Err()
+	return b.queries.ListChannelMembers(ctx, channelID)
 }
 
 func (b *sqliteBackend) appendEvent(ctx context.Context, req AppendRequest, nowMs int64) (AppendResult, error) {
@@ -316,9 +246,9 @@ func (b *sqliteBackend) appendEvent(ctx context.Context, req AppendRequest, nowM
 		return AppendResult{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	qtx := b.queries.WithTx(tx)
 
-	var exists int
-	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM channel WHERE id = ?`, req.ChannelID).Scan(&exists); err != nil {
+	if _, err := qtx.ChannelExists(ctx, req.ChannelID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return AppendResult{}, fmt.Errorf("%w: channel %q", ErrNotFound, req.ChannelID)
 		}
@@ -326,19 +256,25 @@ func (b *sqliteBackend) appendEvent(ctx context.Context, req AppendRequest, nowM
 	}
 
 	if req.SendKey != "" {
-		row := tx.QueryRowContext(ctx, `SELECT `+eventColumns+` FROM channel_event WHERE channel_id = ? AND author_id = ? AND send_key = ?`,
-			req.ChannelID, req.AuthorID, req.SendKey)
-		existing, ok, err := scanEvent(row)
-		if err != nil {
-			return AppendResult{}, err
-		}
-		if ok {
+		row, err := qtx.GetChannelEventBySendKey(ctx, sqlcgen.GetChannelEventBySendKeyParams{
+			ChannelID: req.ChannelID,
+			AuthorID:  req.AuthorID,
+			SendKey:   req.SendKey,
+		})
+		if err == nil {
+			existing, convErr := eventFromRow(row)
+			if convErr != nil {
+				return AppendResult{}, convErr
+			}
 			return AppendResult{Event: existing, Deduplicated: true}, nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return AppendResult{}, err
 		}
 	}
 
-	var curChanSeq int64
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(seq), 0) FROM channel_event WHERE channel_id = ?`, req.ChannelID).Scan(&curChanSeq); err != nil {
+	curChanSeq, err := qtx.MaxChannelSeq(ctx, req.ChannelID)
+	if err != nil {
 		return AppendResult{}, err
 	}
 	if req.Kind == contract.ChannelEventReaction && req.Reaction != nil {
@@ -380,29 +316,41 @@ func (b *sqliteBackend) appendEvent(ctx context.Context, req AppendRequest, nowM
 		reactionJSON = string(raw)
 	}
 
-	if _, err := tx.ExecContext(ctx, `INSERT INTO channel_event (
-		global_seq, channel_id, seq, kind, author_id, actor_kind, actor_role,
-		text, session_id, issue_id, mentions_json, target_agent_id, send_key,
-		question_json, report_json, reaction_json, created_at_ms
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		nextGlobal, req.ChannelID, nextChanSeq, string(req.Kind), req.AuthorID, string(req.ActorKind), string(req.ActorRole),
-		req.Text, req.SessionID, req.IssueID, string(mentionsJSON), req.TargetAgentID, req.SendKey,
-		questionJSON, reportJSON, reactionJSON, nowMs,
-	); err != nil {
+	if err := qtx.InsertChannelEvent(ctx, sqlcgen.InsertChannelEventParams{
+		GlobalSeq:     nextGlobal,
+		ChannelID:     req.ChannelID,
+		Seq:           nextChanSeq,
+		Kind:          string(req.Kind),
+		AuthorID:      req.AuthorID,
+		ActorKind:     string(req.ActorKind),
+		ActorRole:     string(req.ActorRole),
+		Text:          req.Text,
+		SessionID:     req.SessionID,
+		IssueID:       req.IssueID,
+		MentionsJson:  string(mentionsJSON),
+		TargetAgentID: req.TargetAgentID,
+		SendKey:       req.SendKey,
+		QuestionJson:  questionJSON,
+		ReportJson:    reportJSON,
+		ReactionJson:  reactionJSON,
+		CreatedAtMs:   nowMs,
+	}); err != nil {
 		return AppendResult{}, err
 	}
 
-	if _, err := tx.ExecContext(ctx, `UPDATE channel SET updated_at_ms = ? WHERE id = ?`, nowMs, req.ChannelID); err != nil {
+	if err := qtx.TouchChannelUpdatedAt(ctx, sqlcgen.TouchChannelUpdatedAtParams{
+		UpdatedAtMs: nowMs,
+		ID:          req.ChannelID,
+	}); err != nil {
 		return AppendResult{}, err
 	}
 
-	if _, err := tx.ExecContext(ctx, `INSERT INTO channel_read_cursor (channel_id, actor_id, read_seq, updated_at_ms)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT (channel_id, actor_id) DO UPDATE SET
-			read_seq = CASE WHEN excluded.read_seq > channel_read_cursor.read_seq THEN excluded.read_seq ELSE channel_read_cursor.read_seq END,
-			updated_at_ms = CASE WHEN excluded.read_seq > channel_read_cursor.read_seq THEN excluded.updated_at_ms ELSE channel_read_cursor.updated_at_ms END`,
-		req.ChannelID, req.AuthorID, nextChanSeq, nowMs,
-	); err != nil {
+	if err := qtx.UpsertReadCursor(ctx, sqlcgen.UpsertReadCursorParams{
+		ChannelID:   req.ChannelID,
+		ActorID:     req.AuthorID,
+		ReadSeq:     nextChanSeq,
+		UpdatedAtMs: nowMs,
+	}); err != nil {
 		return AppendResult{}, err
 	}
 
@@ -436,8 +384,21 @@ func (b *sqliteBackend) appendEvent(ctx context.Context, req AppendRequest, nowM
 func (b *sqliteBackend) getEvent(ctx context.Context, channelID string, seq int64) (Event, bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	row := b.db.QueryRowContext(ctx, `SELECT `+eventColumns+` FROM channel_event WHERE channel_id = ? AND seq = ?`, channelID, seq)
-	return scanEvent(row)
+	row, err := b.queries.GetChannelEvent(ctx, sqlcgen.GetChannelEventParams{
+		ChannelID: channelID,
+		Seq:       seq,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return Event{}, false, nil
+	}
+	if err != nil {
+		return Event{}, false, err
+	}
+	ev, err := eventFromRow(row)
+	if err != nil {
+		return Event{}, false, err
+	}
+	return ev, true, nil
 }
 
 func (b *sqliteBackend) listEvents(ctx context.Context, channelID string, afterSeq int64, limit int) ([]Event, error) {
@@ -448,55 +409,43 @@ func (b *sqliteBackend) listEvents(ctx context.Context, channelID string, afterS
 	} else if !ok {
 		return nil, fmt.Errorf("%w: channel %q", ErrNotFound, channelID)
 	}
-	query := `SELECT ` + eventColumns + ` FROM channel_event WHERE channel_id = ? AND seq > ? ORDER BY seq ASC`
-	var rows *sql.Rows
+	var rows []sqlcgen.ChannelEvent
 	var err error
 	if limit > 0 {
-		query += ` LIMIT ?`
-		rows, err = b.db.QueryContext(ctx, query, channelID, afterSeq, limit)
+		rows, err = b.queries.ListChannelEventsLimit(ctx, sqlcgen.ListChannelEventsLimitParams{
+			ChannelID: channelID,
+			Seq:       afterSeq,
+			Limit:     int64(limit),
+		})
 	} else {
-		rows, err = b.db.QueryContext(ctx, query, channelID, afterSeq)
+		rows, err = b.queries.ListChannelEvents(ctx, sqlcgen.ListChannelEventsParams{
+			ChannelID: channelID,
+			Seq:       afterSeq,
+		})
 	}
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Event
-	for rows.Next() {
-		ev, _, err := scanEvent(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, ev)
-	}
-	return out, rows.Err()
+	return eventsFromRows(rows)
 }
 
 func (b *sqliteBackend) eventsAfterGlobal(ctx context.Context, afterGlobalSeq int64, limit int) ([]Event, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	query := `SELECT ` + eventColumns + ` FROM channel_event WHERE global_seq > ? ORDER BY global_seq ASC`
-	var rows *sql.Rows
+	var rows []sqlcgen.ChannelEvent
 	var err error
 	if limit > 0 {
-		query += ` LIMIT ?`
-		rows, err = b.db.QueryContext(ctx, query, afterGlobalSeq, limit)
+		rows, err = b.queries.ListEventsAfterGlobalLimit(ctx, sqlcgen.ListEventsAfterGlobalLimitParams{
+			GlobalSeq: afterGlobalSeq,
+			Limit:     int64(limit),
+		})
 	} else {
-		rows, err = b.db.QueryContext(ctx, query, afterGlobalSeq)
+		rows, err = b.queries.ListEventsAfterGlobal(ctx, afterGlobalSeq)
 	}
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Event
-	for rows.Next() {
-		ev, _, err := scanEvent(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, ev)
-	}
-	return out, rows.Err()
+	return eventsFromRows(rows)
 }
 
 func (b *sqliteBackend) advanceReadCursor(ctx context.Context, channelID, actorID string, seq, nowMs int64) (ReadCursor, error) {
@@ -507,13 +456,12 @@ func (b *sqliteBackend) advanceReadCursor(ctx context.Context, channelID, actorI
 	} else if !ok {
 		return ReadCursor{}, fmt.Errorf("%w: channel %q", ErrNotFound, channelID)
 	}
-	if _, err := b.db.ExecContext(ctx, `INSERT INTO channel_read_cursor (channel_id, actor_id, read_seq, updated_at_ms)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT (channel_id, actor_id) DO UPDATE SET
-			read_seq = CASE WHEN excluded.read_seq > channel_read_cursor.read_seq THEN excluded.read_seq ELSE channel_read_cursor.read_seq END,
-			updated_at_ms = CASE WHEN excluded.read_seq > channel_read_cursor.read_seq THEN excluded.updated_at_ms ELSE channel_read_cursor.updated_at_ms END`,
-		channelID, actorID, seq, nowMs,
-	); err != nil {
+	if err := b.queries.UpsertReadCursor(ctx, sqlcgen.UpsertReadCursorParams{
+		ChannelID:   channelID,
+		ActorID:     actorID,
+		ReadSeq:     seq,
+		UpdatedAtMs: nowMs,
+	}); err != nil {
 		return ReadCursor{}, err
 	}
 	rc, _, err := b.getReadCursorLocked(ctx, channelID, actorID)
@@ -532,17 +480,22 @@ func (b *sqliteBackend) getReadCursor(ctx context.Context, channelID, actorID st
 }
 
 func (b *sqliteBackend) getReadCursorLocked(ctx context.Context, channelID, actorID string) (ReadCursor, bool, error) {
-	var rc ReadCursor
-	err := b.db.QueryRowContext(ctx, `SELECT channel_id, actor_id, read_seq, updated_at_ms
-		FROM channel_read_cursor WHERE channel_id = ? AND actor_id = ?`, channelID, actorID).
-		Scan(&rc.ChannelID, &rc.ActorID, &rc.ReadSeq, &rc.UpdatedAtMs)
+	row, err := b.queries.GetReadCursor(ctx, sqlcgen.GetReadCursorParams{
+		ChannelID: channelID,
+		ActorID:   actorID,
+	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return ReadCursor{}, false, nil
 	}
 	if err != nil {
 		return ReadCursor{}, false, err
 	}
-	return rc, true, nil
+	return ReadCursor{
+		ChannelID:   row.ChannelID,
+		ActorID:     row.ActorID,
+		ReadSeq:     row.ReadSeq,
+		UpdatedAtMs: row.UpdatedAtMs,
+	}, true, nil
 }
 
 func (b *sqliteBackend) listReadCursors(ctx context.Context, channelID string) ([]ReadCursor, error) {
@@ -553,21 +506,20 @@ func (b *sqliteBackend) listReadCursors(ctx context.Context, channelID string) (
 	} else if !ok {
 		return nil, fmt.Errorf("%w: channel %q", ErrNotFound, channelID)
 	}
-	rows, err := b.db.QueryContext(ctx, `SELECT channel_id, actor_id, read_seq, updated_at_ms
-		FROM channel_read_cursor WHERE channel_id = ? ORDER BY actor_id ASC`, channelID)
+	rows, err := b.queries.ListReadCursors(ctx, channelID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	var out []ReadCursor
-	for rows.Next() {
-		var rc ReadCursor
-		if err := rows.Scan(&rc.ChannelID, &rc.ActorID, &rc.ReadSeq, &rc.UpdatedAtMs); err != nil {
-			return nil, err
-		}
-		out = append(out, rc)
+	for _, row := range rows {
+		out = append(out, ReadCursor{
+			ChannelID:   row.ChannelID,
+			ActorID:     row.ActorID,
+			ReadSeq:     row.ReadSeq,
+			UpdatedAtMs: row.UpdatedAtMs,
+		})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (b *sqliteBackend) unreadCount(ctx context.Context, channelID, actorID string) (int64, error) {
@@ -582,12 +534,10 @@ func (b *sqliteBackend) unreadCount(ctx context.Context, channelID, actorID stri
 	if err != nil {
 		return 0, err
 	}
-	var count int64
-	if err := b.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM channel_event WHERE channel_id = ? AND seq > ? AND kind <> 'reaction'`,
-		channelID, rc.ReadSeq).Scan(&count); err != nil {
-		return 0, err
-	}
-	return count, nil
+	return b.queries.CountUnreadEvents(ctx, sqlcgen.CountUnreadEventsParams{
+		ChannelID: channelID,
+		Seq:       rc.ReadSeq,
+	})
 }
 
 func (b *sqliteBackend) close() error {
@@ -597,75 +547,76 @@ func (b *sqliteBackend) close() error {
 	return nil
 }
 
-const eventColumns = `global_seq, channel_id, seq, kind, author_id, actor_kind, actor_role,
-	text, session_id, issue_id, mentions_json, target_agent_id, send_key,
-	question_json, report_json, reaction_json, created_at_ms`
-
-type rowScanner interface {
-	Scan(dest ...any) error
+func channelFromRow(r sqlcgen.Channel) Channel {
+	return Channel{
+		ID:              r.ID,
+		Type:            ChannelType(r.Type),
+		Name:            r.Name,
+		Topic:           r.Topic,
+		RepoID:          r.RepoID,
+		DefaultAgentID:  r.DefaultAgentID,
+		PeerID:          r.PeerID,
+		ParentChannelID: r.ParentChannelID,
+		ParentEventSeq:  r.ParentEventSeq,
+		IssueID:         r.IssueID,
+		IsDefault:       r.IsDefault != 0,
+		NotifyMode:      r.NotifyMode,
+		CreatedAtMs:     r.CreatedAtMs,
+		UpdatedAtMs:     r.UpdatedAtMs,
+	}
 }
 
-func scanChannel(r rowScanner) (Channel, bool, error) {
-	var ch Channel
-	var typ string
-	var isDef int
-	err := r.Scan(
-		&ch.ID, &typ, &ch.Name, &ch.Topic, &ch.RepoID, &ch.DefaultAgentID, &ch.PeerID,
-		&ch.ParentChannelID, &ch.ParentEventSeq, &ch.IssueID, &isDef, &ch.NotifyMode,
-		&ch.CreatedAtMs, &ch.UpdatedAtMs,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Channel{}, false, nil
+func eventsFromRows(rows []sqlcgen.ChannelEvent) ([]Event, error) {
+	var out []Event
+	for _, row := range rows {
+		ev, err := eventFromRow(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ev)
 	}
-	if err != nil {
-		return Channel{}, false, err
-	}
-	ch.Type = ChannelType(typ)
-	ch.IsDefault = isDef != 0
-	return ch, true, nil
+	return out, nil
 }
 
-func scanEvent(r rowScanner) (Event, bool, error) {
-	var ev Event
-	var kind, actorKind, actorRole string
-	var mentionsJSON, questionJSON, reportJSON, reactionJSON string
-	err := r.Scan(
-		&ev.GlobalSeq, &ev.ChannelID, &ev.Seq, &kind, &ev.AuthorID, &actorKind, &actorRole,
-		&ev.Text, &ev.SessionID, &ev.IssueID, &mentionsJSON, &ev.TargetAgentID, &ev.SendKey,
-		&questionJSON, &reportJSON, &reactionJSON, &ev.CreatedAtMs,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Event{}, false, nil
+func eventFromRow(r sqlcgen.ChannelEvent) (Event, error) {
+	ev := Event{
+		GlobalSeq:     r.GlobalSeq,
+		ChannelID:     r.ChannelID,
+		Seq:           r.Seq,
+		Kind:          contract.ChannelEventKind(r.Kind),
+		AuthorID:      r.AuthorID,
+		ActorKind:     ActorKind(r.ActorKind),
+		ActorRole:     ActorRole(r.ActorRole),
+		Text:          r.Text,
+		SessionID:     r.SessionID,
+		IssueID:       r.IssueID,
+		TargetAgentID: r.TargetAgentID,
+		SendKey:       r.SendKey,
+		CreatedAtMs:   r.CreatedAtMs,
 	}
-	if err != nil {
-		return Event{}, false, err
+	if r.MentionsJson != "" {
+		_ = json.Unmarshal([]byte(r.MentionsJson), &ev.Mentions)
 	}
-	ev.Kind = contract.ChannelEventKind(kind)
-	ev.ActorKind = ActorKind(actorKind)
-	ev.ActorRole = ActorRole(actorRole)
-	if mentionsJSON != "" {
-		_ = json.Unmarshal([]byte(mentionsJSON), &ev.Mentions)
-	}
-	if questionJSON != "" {
+	if r.QuestionJson != "" {
 		var q QuestionCard
-		if err := json.Unmarshal([]byte(questionJSON), &q); err != nil {
-			return Event{}, false, err
+		if err := json.Unmarshal([]byte(r.QuestionJson), &q); err != nil {
+			return Event{}, err
 		}
 		ev.Question = &q
 	}
-	if reportJSON != "" {
+	if r.ReportJson != "" {
 		var rep ReportSummary
-		if err := json.Unmarshal([]byte(reportJSON), &rep); err != nil {
-			return Event{}, false, err
+		if err := json.Unmarshal([]byte(r.ReportJson), &rep); err != nil {
+			return Event{}, err
 		}
 		ev.Report = &rep
 	}
-	if reactionJSON != "" {
+	if r.ReactionJson != "" {
 		var rc ReactionMeta
-		if err := json.Unmarshal([]byte(reactionJSON), &rc); err != nil {
-			return Event{}, false, err
+		if err := json.Unmarshal([]byte(r.ReactionJson), &rc); err != nil {
+			return Event{}, err
 		}
 		ev.Reaction = &rc
 	}
-	return ev, true, nil
+	return ev, nil
 }

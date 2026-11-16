@@ -2,18 +2,23 @@ package issue_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/issue"
 	"github.com/vibevalleyhq/vibevalley/internal/durable"
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
+	_ "modernc.org/sqlite"
 )
 
 type fixedClock struct {
@@ -565,5 +570,200 @@ func TestIssueGenerationResultSignalAndAsyncPRCheck(t *testing.T) {
 	}
 	if len(reqIDs) != 2 || reqIDs[0] != "issue:iss-sig:iter:1" || reqIDs[1] != "issue:iss-sig:iter:2" {
 		t.Fatalf("unexpected dispatch requestIds: %v", reqIDs)
+	}
+}
+
+func TestIssueMigrationsUpStatusDownAllUp(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "issue-migrate.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	if _, err := db.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
+		t.Fatalf("pragma: %v", err)
+	}
+
+	runner, err := migrate.New(db, "issue", issue.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+
+	st0, err := runner.Status(ctx)
+	if err != nil || len(st0) != 1 || st0[0].Applied || st0[0].Version != 1 || st0[0].Scope != "issue" {
+		t.Fatalf("unexpected initial status: %+v err=%v", st0, err)
+	}
+
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 1 {
+		t.Fatalf("Up: applied=%d err=%v", applied, err)
+	}
+	st1, err := runner.Status(ctx)
+	if err != nil || len(st1) != 1 || !st1[0].Applied || st1[0].AppliedAtMs <= 0 {
+		t.Fatalf("unexpected status after Up: %+v err=%v", st1, err)
+	}
+	if again, err := runner.Up(ctx); err != nil || again != 0 {
+		t.Fatalf("idempotent Up: applied=%d err=%v", again, err)
+	}
+
+	assertIssueObjectsExist(t, db, true)
+
+	clk := newFixedClock(time.Unix(1_700_000_000, 0).UTC())
+	svc1, err := issue.OpenDBService(ctx, db, issue.WithClock(clk))
+	if err != nil {
+		t.Fatalf("OpenDBService after Up: %v", err)
+	}
+
+	// Exercise sqlcgen queries: CreateIssue, ListIssues (all + sqlc.slice status filter), FindByConversation/Session, Crons.
+	if _, err := svc1.CreateIssue(ctx, issue.Issue{
+		ID:             "iss-1",
+		Title:          "Draft issue",
+		Status:         contract.IssueDraft,
+		RepoID:         "repo-1",
+		ConversationID: "conv-1",
+		SessionID:      "sess-1",
+	}); err != nil {
+		t.Fatalf("CreateIssue 1: %v", err)
+	}
+	if _, err := svc1.CreateIssue(ctx, issue.Issue{
+		ID:     "iss-2",
+		Title:  "InProgress issue",
+		Status: contract.IssueInProgress,
+		RepoID: "repo-1",
+	}); err != nil {
+		t.Fatalf("CreateIssue 2: %v", err)
+	}
+	if _, err := svc1.CreateIssue(ctx, issue.Issue{
+		ID:     "iss-3",
+		Title:  "Review issue",
+		Status: contract.IssueReview,
+		RepoID: "repo-1",
+	}); err != nil {
+		t.Fatalf("CreateIssue 3: %v", err)
+	}
+
+	allIssues, err := svc1.ListIssues(ctx)
+	if err != nil || len(allIssues) != 3 {
+		t.Fatalf("ListIssues(): len=%d err=%v", len(allIssues), err)
+	}
+	filtered, err := svc1.ListIssues(ctx, contract.IssueDraft, contract.IssueReview)
+	if err != nil || len(filtered) != 2 || filtered[0].ID != "iss-1" || filtered[1].ID != "iss-3" {
+		t.Fatalf("ListIssues(draft, review): %+v err=%v", filtered, err)
+	}
+	none, err := svc1.ListIssues(ctx, contract.IssueDone)
+	if err != nil || len(none) != 0 {
+		t.Fatalf("ListIssues(done): len=%d err=%v", len(none), err)
+	}
+	outSettle, err := svc1.HandleSettlement(ctx, issue.Settlement{
+		ConversationID: "conv-1",
+		SubmissionID:   "sub-1",
+		Status:         store.SubmissionDone,
+	})
+	if err != nil || outSettle.Issue.ID != "iss-1" || outSettle.Issue.Status != contract.IssueDone {
+		t.Fatalf("HandleSettlement by conversation: %+v err=%v", outSettle, err)
+	}
+	if _, err := svc1.CreateCron(ctx, issue.CronSchedule{
+		ID:           "cron-1",
+		Name:         "Check",
+		Title:        "Check",
+		Prompt:       "Check",
+		RepoID:       "repo-1",
+		Kind:         issue.CronEvery,
+		EveryMinutes: 10,
+		Enabled:      true,
+	}); err != nil {
+		t.Fatalf("CreateCron: %v", err)
+	}
+	if crons, err := svc1.ListCrons(ctx); err != nil || len(crons) != 1 {
+		t.Fatalf("ListCrons: %+v err=%v", crons, err)
+	}
+	if _, err := svc1.SetCronEnabled(ctx, "cron-1", false); err != nil {
+		t.Fatalf("SetCronEnabled: %v", err)
+	}
+	_ = svc1.Close()
+
+	// Checksum mismatch detection when applied up script is modified.
+	upOrig, err := fs.ReadFile(issue.MigrationsFS, "migrations/0001_init.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	downOrig, err := fs.ReadFile(issue.MigrationsFS, "migrations/0001_init.down.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tamperedFS := fstest.MapFS{
+		"migrations/0001_init.up.sql":   {Data: append(upOrig, []byte("\n-- tampered\n")...)},
+		"migrations/0001_init.down.sql": {Data: downOrig},
+	}
+	tamperedRunner, err := migrate.New(db, "issue", tamperedFS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tamperedRunner.Up(ctx); !errors.Is(err, migrate.ErrChecksumMismatch) {
+		t.Fatalf("expected ErrChecksumMismatch, got %v", err)
+	}
+
+	// DownAll drops all issue tables and indexes cleanly.
+	reverted, err := runner.DownAll(ctx)
+	if err != nil || reverted != 1 {
+		t.Fatalf("DownAll: reverted=%d err=%v", reverted, err)
+	}
+	st2, err := runner.Status(ctx)
+	if err != nil || len(st2) != 1 || st2[0].Applied {
+		t.Fatalf("unexpected status after DownAll: %+v err=%v", st2, err)
+	}
+	assertIssueObjectsExist(t, db, false)
+
+	// Re-Up restores full parity cleanly.
+	reapplied, err := runner.Up(ctx)
+	if err != nil || reapplied != 1 {
+		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
+	}
+	st3, err := runner.Status(ctx)
+	if err != nil || len(st3) != 1 || !st3[0].Applied {
+		t.Fatalf("unexpected status after re-Up: %+v err=%v", st3, err)
+	}
+	assertIssueObjectsExist(t, db, true)
+
+	svc2, err := issue.OpenDBService(ctx, db, issue.WithClock(clk))
+	if err != nil {
+		t.Fatalf("OpenDBService after re-Up: %v", err)
+	}
+	defer svc2.Close()
+	if afterDown, err := svc2.ListIssues(ctx); err != nil || len(afterDown) != 0 {
+		t.Fatalf("expected 0 issues after DownAll+Up, got %+v err=%v", afterDown, err)
+	}
+	if _, err := svc2.CreateIssue(ctx, issue.Issue{ID: "iss-fresh", Title: "Fresh", RepoID: "repo-1"}); err != nil {
+		t.Fatalf("CreateIssue after re-Up: %v", err)
+	}
+}
+
+func assertIssueObjectsExist(t *testing.T, db *sql.DB, want bool) {
+	t.Helper()
+	objects := []struct {
+		typ  string
+		name string
+	}{
+		{"table", "issue"},
+		{"table", "issue_cron"},
+		{"index", "issue_status_idx"},
+		{"index", "issue_conv_idx"},
+		{"index", "issue_session_idx"},
+		{"index", "issue_cron_due_idx"},
+	}
+	for _, obj := range objects {
+		var cnt int
+		err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, obj.typ, obj.name).Scan(&cnt)
+		if err != nil {
+			t.Fatalf("query sqlite_master (%s %s): %v", obj.typ, obj.name, err)
+		}
+		if want && cnt != 1 {
+			t.Fatalf("expected %s %q to exist, count=%d", obj.typ, obj.name, cnt)
+		}
+		if !want && cnt != 0 {
+			t.Fatalf("expected %s %q to be dropped, count=%d", obj.typ, obj.name, cnt)
+		}
 	}
 }

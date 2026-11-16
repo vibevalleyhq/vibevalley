@@ -4,14 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io/fs"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 	_ "modernc.org/sqlite"
 )
 
@@ -302,6 +306,206 @@ func TestChannelConcurrentAppendsRace(t *testing.T) {
 	for i, v := range views {
 		if v.Seq != int64(i+1) {
 			t.Fatalf("expected seq %d at index %d, got %d", i+1, i, v.Seq)
+		}
+	}
+}
+
+func TestChannelMigrationsUpStatusDownAllUp(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "channel-migrate.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	if _, err := db.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
+		t.Fatalf("pragma: %v", err)
+	}
+
+	runner, err := migrate.New(db, "channel", channel.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+
+	// Initial Status: 1 pending migration.
+	st0, err := runner.Status(ctx)
+	if err != nil || len(st0) != 1 || st0[0].Applied || st0[0].Version != 1 || st0[0].Scope != "channel" {
+		t.Fatalf("unexpected initial status: %+v err=%v", st0, err)
+	}
+
+	// Up applies 0001_init.up.sql.
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 1 {
+		t.Fatalf("Up: applied=%d err=%v", applied, err)
+	}
+	st1, err := runner.Status(ctx)
+	if err != nil || len(st1) != 1 || !st1[0].Applied || st1[0].AppliedAtMs <= 0 {
+		t.Fatalf("unexpected status after Up: %+v err=%v", st1, err)
+	}
+	if again, err := runner.Up(ctx); err != nil || again != 0 {
+		t.Fatalf("idempotent Up: applied=%d err=%v", again, err)
+	}
+
+	// Verify all 4 tables, 3 indexes, and 2 triggers exist.
+	assertChannelObjectsExist(t, db, true)
+
+	// Attach Store via OpenDB and exercise sqlcgen queries + append-only triggers.
+	clk := newFixedClock()
+	store1, err := channel.OpenDB(ctx, db, channel.WithClock(clk))
+	if err != nil {
+		t.Fatalf("OpenDB after Up: %v", err)
+	}
+	if _, err := store1.CreateChannel(ctx, channel.Channel{ID: "general", Type: channel.TypePublic, Name: "general"}); err != nil {
+		t.Fatalf("CreateChannel: %v", err)
+	}
+	if err := store1.AddMember(ctx, "general", "alice"); err != nil {
+		t.Fatalf("AddMember: %v", err)
+	}
+	if err := store1.AddMember(ctx, "general", "bob"); err != nil {
+		t.Fatalf("AddMember: %v", err)
+	}
+	if err := store1.RemoveMember(ctx, "general", "bob"); err != nil {
+		t.Fatalf("RemoveMember: %v", err)
+	}
+	if members, err := store1.ListMembers(ctx, "general"); err != nil || !slices.Equal(members, []string{"alice"}) {
+		t.Fatalf("ListMembers: %v err=%v", members, err)
+	}
+	if chs, err := store1.ListChannels(ctx); err != nil || len(chs) != 1 || chs[0].ID != "general" {
+		t.Fatalf("ListChannels: %+v err=%v", chs, err)
+	}
+	if _, err := store1.GetChannel(ctx, "general"); err != nil {
+		t.Fatalf("GetChannel: %v", err)
+	}
+	ev1, err := store1.PostMessage(ctx, "general", "alice", channel.ActorUser, "hello", "bob")
+	if err != nil || ev1.Event.Seq != 1 || ev1.Event.GlobalSeq != 1 {
+		t.Fatalf("PostMessage 1: %+v err=%v", ev1, err)
+	}
+	ev2, err := store1.PostMessage(ctx, "general", "bob", channel.ActorUser, "world")
+	if err != nil || ev2.Event.Seq != 2 || ev2.Event.GlobalSeq != 2 {
+		t.Fatalf("PostMessage 2: %+v err=%v", ev2, err)
+	}
+	if got, err := store1.GetEvent(ctx, "general", 1); err != nil || got.Text != "hello" {
+		t.Fatalf("GetEvent: %+v err=%v", got, err)
+	}
+	if listAll, err := store1.ListEvents(ctx, "general", 0, 0); err != nil || len(listAll) != 2 {
+		t.Fatalf("ListEvents unlimited: len=%d err=%v", len(listAll), err)
+	}
+	if listLim, err := store1.ListEvents(ctx, "general", 0, 1); err != nil || len(listLim) != 1 {
+		t.Fatalf("ListEvents limited: len=%d err=%v", len(listLim), err)
+	}
+	if globAll, err := store1.EventsAfterGlobal(ctx, 0, 0); err != nil || len(globAll) != 2 {
+		t.Fatalf("EventsAfterGlobal unlimited: len=%d err=%v", len(globAll), err)
+	}
+	if globLim, err := store1.EventsAfterGlobal(ctx, 0, 1); err != nil || len(globLim) != 1 {
+		t.Fatalf("EventsAfterGlobal limited: len=%d err=%v", len(globLim), err)
+	}
+	if cursors, err := store1.ListReadCursors(ctx, "general"); err != nil || len(cursors) != 2 {
+		t.Fatalf("ListReadCursors: %+v err=%v", cursors, err)
+	}
+	if rc, err := store1.GetReadCursor(ctx, "general", "alice"); err != nil || rc.ReadSeq != 1 {
+		t.Fatalf("GetReadCursor: %+v err=%v", rc, err)
+	}
+
+	// Verify append-only triggers reject UPDATE and DELETE after Up.
+	if _, err := db.ExecContext(ctx, `UPDATE channel_event SET text = 'tampered' WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
+		t.Fatalf("expected append-only trigger error on UPDATE, got %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM channel_event WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
+		t.Fatalf("expected append-only trigger error on DELETE, got %v", err)
+	}
+	_ = store1.Close()
+
+	// Checksum mismatch detection when applied up script is modified.
+	upOrig, err := fs.ReadFile(channel.MigrationsFS, "migrations/0001_init.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	downOrig, err := fs.ReadFile(channel.MigrationsFS, "migrations/0001_init.down.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tamperedFS := fstest.MapFS{
+		"migrations/0001_init.up.sql":   {Data: append(upOrig, []byte("\n-- tampered\n")...)},
+		"migrations/0001_init.down.sql": {Data: downOrig},
+	}
+	tamperedRunner, err := migrate.New(db, "channel", tamperedFS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tamperedRunner.Up(ctx); !errors.Is(err, migrate.ErrChecksumMismatch) {
+		t.Fatalf("expected ErrChecksumMismatch, got %v", err)
+	}
+
+	// DownAll cleanly drops triggers, indexes, and tables.
+	reverted, err := runner.DownAll(ctx)
+	if err != nil || reverted != 1 {
+		t.Fatalf("DownAll: reverted=%d err=%v", reverted, err)
+	}
+	st2, err := runner.Status(ctx)
+	if err != nil || len(st2) != 1 || st2[0].Applied {
+		t.Fatalf("unexpected status after DownAll: %+v err=%v", st2, err)
+	}
+	assertChannelObjectsExist(t, db, false)
+
+	// Re-Up restores full parity cleanly.
+	reapplied, err := runner.Up(ctx)
+	if err != nil || reapplied != 1 {
+		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
+	}
+	st3, err := runner.Status(ctx)
+	if err != nil || len(st3) != 1 || !st3[0].Applied {
+		t.Fatalf("unexpected status after re-Up: %+v err=%v", st3, err)
+	}
+	assertChannelObjectsExist(t, db, true)
+
+	store2, err := channel.OpenDB(ctx, db, channel.WithClock(clk))
+	if err != nil {
+		t.Fatalf("OpenDB after re-Up: %v", err)
+	}
+	defer store2.Close()
+	if _, err := store2.CreateChannel(ctx, channel.Channel{ID: "general", Type: channel.TypePublic, Name: "general"}); err != nil {
+		t.Fatalf("CreateChannel after re-Up: %v", err)
+	}
+	evFresh, err := store2.PostMessage(ctx, "general", "alice", channel.ActorUser, "after re-up")
+	if err != nil || evFresh.Event.Seq != 1 || evFresh.Event.GlobalSeq != 1 {
+		t.Fatalf("expected fresh seq=1, globalSeq=1 after DownAll+Up, got %+v err=%v", evFresh, err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE channel_event SET text = 'tampered' WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
+		t.Fatalf("expected append-only trigger error after re-Up UPDATE, got %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM channel_event WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
+		t.Fatalf("expected append-only trigger error after re-Up DELETE, got %v", err)
+	}
+}
+
+func assertChannelObjectsExist(t *testing.T, db *sql.DB, want bool) {
+	t.Helper()
+	objects := []struct {
+		typ  string
+		name string
+	}{
+		{"table", "channel"},
+		{"table", "channel_member"},
+		{"table", "channel_event"},
+		{"table", "channel_read_cursor"},
+		{"index", "channel_issue_thread_idx"},
+		{"index", "channel_event_send_key_idx"},
+		{"index", "channel_event_chan_seq_idx"},
+		{"trigger", "channel_event_no_update"},
+		{"trigger", "channel_event_no_delete"},
+	}
+	for _, obj := range objects {
+		var cnt int
+		err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, obj.typ, obj.name).Scan(&cnt)
+		if err != nil {
+			t.Fatalf("query sqlite_master (%s %s): %v", obj.typ, obj.name, err)
+		}
+		if want && cnt != 1 {
+			t.Fatalf("expected %s %q to exist, count=%d", obj.typ, obj.name, cnt)
+		}
+		if !want && cnt != 0 {
+			t.Fatalf("expected %s %q to be dropped, count=%d", obj.typ, obj.name, cnt)
 		}
 	}
 }
