@@ -17,7 +17,7 @@
 |---|---|
 | `internal/durable/driver.go`、`generation.go`、`scheduler.go` | 持久驱动器、多轮流式生成、工具并行与并发调度 |
 | `internal/durable/budget.go`、`compaction.go`、`permission.go`、`grader.go`、`codemode.go` | 成本与 Token 预算、上下文压缩、工具权限门禁（`PermissionEvaluator` / `Park`）、评分器与 JS 代码执行器 |
-| `internal/durable/store/` | `store.go`、`sqlite.go`、`memory.go`、`tx.go`、`clock.go`、`migrations/0001_init.up.sql`、`queries.sql` |
+| `internal/durable/store/` | `store.go`、`sqlite.go`、`memory.go`、`tx.go`、`clock.go`（表与查询在 `pkg/db/migrations/0001_durable.up.sql`、`pkg/db/queries/durable.sql`） |
 | `internal/provider/` | `router.go`、`anthropic_sse.go`、`openai_sse.go`、`types.go` |
 | `internal/domain/stack/` | `orchestrator.go`、`tools.go`、`prompts.go`、`llm_adapter.go`、`dispatch.go`、`stack.go` |
 | `cmd/vibe/chat.go` | 终端 `vibe chat` 交互入口 |
@@ -41,7 +41,7 @@
 ### 提示、恢复与去重
 
 - 提示词分节组织于 `internal/domain/stack/prompts.go`，动态变化的环境现状随每轮输入注入，保持稳定的前置缓存前缀。
-- 每一轮输入、模型回答、工具调用与权限判决先行写入 SQLite（`internal/durable/store/migrations/0001_init.up.sql`），服务重启或从异常停机恢复后按状态对账继续或结算，不重复计数与重放有副作用的操作。
+- 每一轮输入、模型回答、工具调用与权限判决先行写入 SQLite（`pkg/db/migrations/0001_durable.up.sql`），服务重启或从异常停机恢复后按状态对账继续或结算，不重复计数与重放有副作用的操作。
 
 ## 怎么走
 

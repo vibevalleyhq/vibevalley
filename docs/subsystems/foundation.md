@@ -18,14 +18,14 @@ Go 服务端与客户端共用的工程骨架：Go module（`cmd/*`、`internal/
 | 位置 | 职责 |
 |---|---|
 | `pnpm-workspace.yaml`、`vite.config.ts` | 工作区包列表、依赖版本 catalog、oxfmt、oxlint 与任务编排配置 |
-| `go.mod`、`sqlc.yaml`、`arch_test.go`、`sqlc_migrate_test.go` | Go 依赖、SQL 生成配置、领域包依赖拓扑断言与各域 SQL 迁移校验 |
+| `go.mod`、`sqlc.yaml`、`arch_test.go`、`sqlc_migrate_test.go` | Go 依赖、SQL 生成配置、领域包依赖拓扑断言与平台 SQL 迁移校验 |
 | `scripts/{gen,audit,docs,release}/` | 工程脚本：`gen/`（TS 客户端、`pkg/contract`、`sqlc`、词典生成）、`audit/`（AST / lint / 类型 / 边界门禁）、`docs/`（笔记、链接、术语与旧名检查）、`release/`（Go 沙箱验证与发版） |
 | `tsconfig.base.json`、`scripts/audit/oxlint-plugin.ts` | TypeScript 严格选项与仓库自定义 lint 规则 |
 | `packages/async/` | 打断、后台任务、队列、广播、锁、重试与超时：TypeScript 包与页面共用的异步原语 |
 | `scripts/audit/practice-audit.ts`、`protocol-surface.ts`、`schema-audit.ts` | 语法树实践棘轮、根协议导出面棘轮、品牌主键 / `Secret` / `BizCode` 注册表边界审计 |
 | `internal/config/`、`internal/vault/`、`internal/durable/`、`internal/machine/`、`internal/provider/` | Go 配置解析、密钥信封与代理、持久代理运行引擎、机器沙箱与模型路由 |
 | `internal/domain/<概念>/` | Go 领域模块与入口服务（装配汇总在 `internal/domain/stack/stack.go`） |
-| `pkg/{oar,chord,contract,migrate}/` | Go 独立核心包：农机驱动（仅标准库）、状态增量同步与双向多路复用链路、跨端视图契约与作用域迁移器 |
+| `pkg/{db,oar,chord,contract,migrate}/` | Go 独立核心包：统一平台 SQLite WAL 池与 11 模块迁移/生成绑定、农机驱动（仅标准库）、状态增量同步与双向多路复用链路、跨端视图契约与作用域迁移器 |
 | `packages/protocol/src/<概念>/` | 按概念划分的 `shapes.ts`、`schema.ts`（Zod）、`api.ts` |
 | `packages/protocol/src/rules/` | 服务端与页面共用的纯函数规则 |
 | `packages/protocol/src/client.ts` | 由 `scripts/gen/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
@@ -50,7 +50,7 @@ Go 服务端与客户端共用的工程骨架：Go module（`cmd/*`、`internal/
 架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)；本节记录现行结构与门禁。
 
 - **Go 五层 DAG 与 `arch_test.go` 四道编译期红线**：
-  - 依赖层级严格单向：`pkg/chord`（第 0 层）← `pkg/{contract,oar,migrate}`（第 1 层）← `internal/{config,durable,vault,machine,provider}`（第 2 层）← `internal/domain/*`（第 3 层）← `cmd/*`（第 4 层）；第 3 层以下同层不同子系统之间禁止互引，包路径禁用 `brain`、`hands`、`common`、`utils`、`manager`。
+  - 依赖层级严格单向：`pkg/chord`（第 0 层）← `pkg/{contract,oar,migrate,db}`（第 1 层）← `internal/{config,durable,vault,machine,provider}`（第 2 层）← `internal/domain/*`（第 3 层）← `cmd/*`（第 4 层）；第 3 层以下同层不同子系统之间禁止互引，包路径禁用 `brain`、`hands`、`common`、`utils`、`manager`。
   - `cmd/vibe-machine` 纯净性：传递依赖禁止出现数据库驱动（`modernc.org/sqlite`、`pgx`）、模型 SDK（`anthropic`、`openai`、`genai`）、`internal/durable`、`internal/vault` 与 `github.com/egoist/mygo`。
   - `pkg/oar` 完全自治：仅允许依赖 Go 标准库，确保离线回放测试套件零外部依赖独立运行。
   - `github.com/egoist/mygo` 隔离：仅允许在 `cmd/vibe-desktop` 中引用，保证服务端与执行节点构建零图形库依赖。
@@ -75,8 +75,8 @@ TypeScript 包的写法细节在 [vv-typescript](.agents/skills/vv-typescript/SK
 ### 契约、规则和数据库
 
 - **按概念组织契约，根桶只导出跨端契约**：`packages/protocol/src/<概念>/` 包含 `shapes.ts`、`schema.ts`（`Codec<T.X>`）和 `api.ts`，由 `schema.test.ts` 校验。根入口 `packages/protocol/src/{shapes,schema}.ts` 禁止 `export *`，仅显式重导出跨端引用契约，由 `scripts/audit/protocol-surface.ts`（`docs:verify`）棘轮守住导出上限。
-- **生成文件不手改**：`sqlcgen/`、`pkg/contract/tsgen`、`packages/protocol/src/client.ts`、[capabilities.md](docs/reference/capabilities.md)、[primitives.md](docs/reference/primitives.md) 与 `packages/i18n/src/catalogs.ts` 均由脚本写出，由 `server:check` 与 `docs:verify` 校验最新。
-- **11 个作用域 SQLite + `sqlc` + `pkg/migrate` 自洽迁移**：`sqlc.yaml` 与 `internal/domain/stack/migrate.go` 统一管理 11 个持久化作用域：`durable`（`internal/durable/store`）、`vault`（`internal/vault`）、`agent`、`repo`、`channel`、`issue`、`watch`、`game`、`memory`、`pkm`（启用 `sqlite-vec`）与 `gateway`（`internal/domain/gateway` 叠加态存储，通过 `stack.GatewayMigrationsFS()` 嵌入避免循环导入）。非内存模式中 `durable` 使用主库路径，其余 10 个作用域各自使用 sidecar WAL 文件（`<前缀>.<作用域>.db`）；每个作用域自带 `migrations/0001_init.up.sql` 与 `queries.sql`，经 `sqlc` 生成类型安全的 `sqlcgen` 代码，并由 `pkg/migrate` 提供版本化 `up`/`down`/`status` 管理；全仓 `sqlc_migrate_test.go` 校验迁移幂等、可建表与 `stack` 嵌入一致，内部演进直接修改基线，不留兼容补丁。
+- **生成文件不手改**：`pkg/db/generated/`、`pkg/contract/tsgen`、`packages/protocol/src/client.ts`、[capabilities.md](docs/reference/capabilities.md)、[primitives.md](docs/reference/primitives.md) 与 `packages/i18n/src/catalogs.ts` 均由脚本写出，由 `server:check` 与 `docs:verify` 校验最新。
+- **统一平台 SQLite WAL + `pkg/db` + `sqlc` + `pkg/migrate`**：11 个持久化模块按序收口在 `pkg/db/migrations/`（`0001_durable`–`0011_gateway` `{up,down}.sql`，嵌入为 `db.MigrationsFS` 并另提供 `db.ScopeFS` 单模块视图）与 `pkg/db/queries/`（`{durable,vault,agent,repo,game,issue,channel,watch,memory,pkm,gateway}.sql`），单块根目录 `sqlc.yaml` 生成 `pkg/db/generated/`（`package generated`）。运行时（`stack.New`）所有 11 个持久域共享同一份 SQLite WAL 数据库（`vibevalley.db` / `platform.db`，迁移追踪作用域 `platform`，无分库文件），由 `pkg/db.OpenPool` 统一配置单写连接（`WriteDB`，`MaxOpenConns(1)`）与并发 WAL 读连接池（`ReadDB`，`MaxOpenConns(4)`，内存 DSN 复用写连接）并全局启用 `sqlite-vec` 向量函数，各域在装配时接收共享连接且不独自关库；`pkg/migrate` 与 `internal/domain/stack/migrate.go` 负责版本化 `up`/`down`/`status`，全仓 `sqlc_migrate_test.go` 校验迁移幂等与可建表，内部演进直接修改对应模块基线，不留兼容补丁。
 
 ### 边界审计
 
@@ -112,8 +112,8 @@ TypeScript 包的写法细节在 [vv-typescript](.agents/skills/vv-typescript/SK
 
 **新增或修改表结构**
 
-1. 修改所属 Go 领域下的 `migrations/0001_*.up.sql` 与 `queries.sql`。
-2. 运行 `vp run go:sqlc` 重写 `sqlcgen`。
+1. 修改 `pkg/db/migrations/` 下对应模块的 `{up,down}.sql` 与 `pkg/db/queries/*.sql`。
+2. 运行 `vp run go:sqlc`（或 `vpx scripts/gen/go-sqlc.ts --write`）重写 `pkg/db/generated/`。
 3. 运行 `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./...`（包含 `sqlc_migrate_test.go`）验证。
 
 **新增或修改协议接口**
@@ -137,7 +137,7 @@ TypeScript 包的写法细节在 [vv-typescript](.agents/skills/vv-typescript/SK
 
 - **后端、CLI 与桌面壳全面迁移到 Go，共用包与页面保留 TypeScript**：服务端持久运行、SQLite 单文件嵌入式分发、跨平台 CLI 与原生桌面壳（`cmd/vibe-desktop`）需要零 Node 运行时依赖的单二进制交付；界面（Solid 2 + Vite）、PWA/桌面 Web 资源和跨端 Schema 契约（`packages/protocol`）留在 TypeScript 中直接由 Tailwind v4 与 Vite+ 构建。
 - **TypeScript 侧不用 Effect，坚持普通 TS + `@vibevalley/async` + Zod**：共享包和脚本保持最浅抽象，只用 `AbortSignal`、`await using` 与 `TaskGroup` 就能解决资源与并发，Zod 一次解码并生成 `VibeValleyApi`。
-- **SQLite + `sqlc` 按域拥有自己的迁移与查询**：每个有状态的 Go 域独立拥有 `migrations/` 与 `queries.sql`，编译器确保参数与返回字段精确到列，无需在运行时维持手写 SQL 映射或重型 WASM Postgres。
+- **统一 `pkg/db` 单库 SQLite WAL + 分模块 SQL**：表迁移与查询按模块拆文件集中于 `pkg/db/`，单块 `sqlc.yaml` 生成同一个 `pkg/db/generated` 包，既保证跨模块共享同一 WAL 连接池、消除多库写锁碎片与循环嵌入，又由编译器确保 SQL 参数与返回字段精确到列，无需手写映射或重型 WASM Postgres。
 - **规则用手写的例子测，不录庞大黄金数据**：最小场景单元测试和 `pkg/oar/replaytest` 清晰可审，不靠几十 MB 黑盒归档掩盖规则回归。
 - **话进 JSON 词典并生成类型，提示词保持中文**：由 `scripts/gen/i18n.ts` 统一查漏翻与死键；提示词集中维护，避免双份提示调优漂移。
 

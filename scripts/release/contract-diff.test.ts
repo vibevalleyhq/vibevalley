@@ -7,20 +7,22 @@ describe("the contract diff", () => {
     const changed = numstatOf(
       [
         "10\t2\tpackages/protocol/src/shapes.ts",
-        "3\t0\tinternal/domain/issue/migrations/0001_init.up.sql",
+        "3\t0\tpkg/db/migrations/0006_issue.up.sql",
+        "4\t1\tpkg/db/queries/issue.sql",
+        "20\t10\tpkg/db/generated/issue.sql.go",
         "40\t20\tinternal/domain/issue/service.go",
         "5\t5\tapps/web/src/features/issue/Board.tsx",
       ].join("\n"),
     );
     const s = summaryOf(changed, 4);
-    expect(s.total).toBe(85);
+    expect(s.total).toBe(120);
     expect(s.contract.map((c) => [c.kind, c.lines])).toEqual([
       ["protocol", 12],
-      ["schema", 3],
+      ["schema", 8],
       ["service interfaces", 4],
     ]);
-    expect(s.areas).toEqual(["domain/issue", "packages/protocol", "web/issue"]);
-    expect(markdownOf(s)).toContain("85 lines changed; 19 of them in the contract (4.5 lines for each contract line).");
+    expect(s.areas).toEqual(["domain/issue", "packages/protocol", "pkg/db", "web/issue"]);
+    expect(markdownOf(s)).toContain("120 lines changed; 24 of them in the contract (5.0 lines for each contract line).");
   });
 
   it("knows an area and a service's interface line", () => {

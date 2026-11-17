@@ -19,7 +19,7 @@
 |---|---|
 | `packages/provider/src/moss/image.ts` | 固定端点、参数与布局校验、URL 响应、安全错误 |
 | `packages/protocol/src/media/` | 媒体任务、输入与素材库（`LibraryItem`、`LibraryOrigin`、`LibraryListRequest`、`LibraryAddRequest`）形状、Schema 与接口权限 |
-| `internal/domain/media/` | `Media` 服务与存储（`store.go`、`vendor_jobs.go`、`errors.go`、`migrations/`、`queries.sql`）：媒体输入预留、任务记录、配额校验、素材库及 `VendorRunner` 真实厂商 HTTP 适配器 |
+| `internal/domain/media/` | `Media` 服务与存储（`store.go`、`vendor_jobs.go`、`errors.go`，持久化表由 `pkg/db/migrations/0011_gateway.up.sql` 承载）：媒体输入预留、任务记录、配额校验、素材库及 `VendorRunner` 真实厂商 HTTP 适配器 |
 | `internal/domain/gateway/handlers_media.go`、`provider_resolve.go`、`media_offline.go`、`gateway.go` | HTTP 接口、连接配置解析、真实厂商调用、`PUT /api/v1/media/input/:id/content` 上传、语音流响应与 `VIBEVALLEY_TEST_RUNTIMES=1` 测试替身 |
 | `internal/domain/stack/tools.go` | 助手和帮工媒体、理解与 `library_item_*` 工具绑定 |
 | `apps/web/src/features/media/` | `/library`：`Rail.tsx` 筛选栏、`Tiles.tsx` 缩略图、`Inspector.tsx` 详情栏、`LibraryPage.tsx` 工具条、上传、键盘和对话框（`?make=` 生成，`?understand=<附件 id>` 理解）；排法、计数、筛选和键盘落点在 `items.ts` 纯函数；「生成」对话框里的表单（生图、单人语音、音频工作台）与理解面板：任务、预览、保存与频道发布 |

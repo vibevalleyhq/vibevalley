@@ -74,7 +74,7 @@
 - **进门一次解析**：前端与公共包经 Zod（`z.object`、`.check`、`.transform`、`jsonString`）窄化为带约束的领域值；Go 端在网关解码、配置加载（`internal/config/config.go`）与工具入参（`internal/domain/stack/tools.go`）入口完成校验，格式错误当场失败。门内 TS 造品牌主键用协议的铸造函数（`issueId(s)`），不写 `as` 断言；含密钥的值在协议中有 `Secret`（`toJSON` 抛错、打印成 `[secret]`），在 Go 端由 `internal/vault/secret.go`（`Secret`）护持（[schema-audit.ts](scripts/audit/schema-audit.ts) 检查）。
 - **共用契约 Fail-Fast**：前端通过 `packages/protocol` 解码服务端响应与流（SSE 流经 [stream.ts](packages/protocol/src/stream.ts) 解码，HTTP 客户端 [client.ts](packages/protocol/src/client.ts) 按 `Endpoint.result` 与 `ApiError` 信封解码）。`packages/protocol` 通过 `satisfies Codec<T.X>`（[codec.ts](packages/protocol/src/codec.ts)）锁死形状与解码器；Go 与 TS 的一致性由 `internal/domain/gateway/contract_parity_test.go` 与 `vpx scripts/gen/go-contract.ts --check` 对账。
 - **未解析引用与品牌主键分离**：TS 侧持久实体主键使用品牌标称类型（如 `IssueId`、`SessionId`、`ArtifactId`、`BlockId`、`SuggestionId`、`MessageId`），不应跨概念混传同为 `string` 的 ID。
-- **存储迁移与 SQLc 绑定**：库表结构在各域 `migrations/0001_init.up.sql` 维护，查询在 `queries.sql`，经 `vpx scripts/gen/go-sqlc.ts` 生成 `sqlcgen/` 强类型 Go 绑定，不手写 SQL 拼接或忽略扫描错误。
+- **存储迁移与 SQLc 绑定**：库表结构在 `pkg/db/migrations/` 按模块顺序维护，查询在 `pkg/db/queries/`，经 `vpx scripts/gen/go-sqlc.ts` 生成 `pkg/db/generated/`（`package generated`）强类型 Go 绑定，不手写 SQL 拼接或忽略扫描错误。
 
 ### 显式状态
 

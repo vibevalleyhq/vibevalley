@@ -47,16 +47,15 @@ describe("package-mac helpers", () => {
     expect(plist).toContain("<key>NSMicrophoneUsageDescription</key>");
   });
 
-  it("computes deterministic schema SHA-256 over sorted internal migration up scripts", () => {
+  it("computes deterministic schema SHA-256 over sorted pkg/db migration up scripts", () => {
     const tmp = mkdtempSync(join(tmpdir(), "vv-pack-schema-"));
     try {
-      const m1 = join(tmp, "internal", "domain", "issue", "migrations");
-      const m2 = join(tmp, "internal", "vault", "migrations");
-      mkdirSync(m1, { recursive: true });
-      mkdirSync(m2, { recursive: true });
-      writeFileSync(join(m1, "0001_init.up.sql"), "CREATE TABLE issue (id TEXT PRIMARY KEY);\n");
-      writeFileSync(join(m1, "0001_init.down.sql"), "DROP TABLE issue;\n");
-      writeFileSync(join(m2, "0001_init.up.sql"), "CREATE TABLE vault_secret (id TEXT PRIMARY KEY);\n");
+      const migrationsDir = join(tmp, "pkg", "db", "migrations");
+      mkdirSync(migrationsDir, { recursive: true });
+      writeFileSync(join(migrationsDir, "0001_durable.up.sql"), "CREATE TABLE durable_task (id TEXT PRIMARY KEY);\n");
+      writeFileSync(join(migrationsDir, "0001_durable.down.sql"), "DROP TABLE durable_task;\n");
+      writeFileSync(join(migrationsDir, "0002_vault.up.sql"), "CREATE TABLE vault_secret (id TEXT PRIMARY KEY);\n");
+      writeFileSync(join(migrationsDir, "0002_vault.down.sql"), "DROP TABLE vault_secret;\n");
 
       const h1 = computeSchemaHash(tmp);
       const h2 = computeSchemaHash(tmp);
@@ -64,10 +63,10 @@ describe("package-mac helpers", () => {
       expect(h1).toBe(h2);
 
       // Down migrations do not change schema baseline hash; up migrations do.
-      writeFileSync(join(m1, "0001_init.down.sql"), "DROP TABLE IF EXISTS issue;\n");
+      writeFileSync(join(migrationsDir, "0001_durable.down.sql"), "DROP TABLE IF EXISTS durable_task;\n");
       expect(computeSchemaHash(tmp)).toBe(h1);
 
-      writeFileSync(join(m2, "0001_init.up.sql"), "CREATE TABLE vault_secret (id TEXT PRIMARY KEY, kind TEXT);\n");
+      writeFileSync(join(migrationsDir, "0002_vault.up.sql"), "CREATE TABLE vault_secret (id TEXT PRIMARY KEY, kind TEXT);\n");
       expect(computeSchemaHash(tmp)).not.toBe(h1);
 
       // Real repository migration hash matches deterministic SHA-256 format.

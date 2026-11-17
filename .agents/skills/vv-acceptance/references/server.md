@@ -6,7 +6,7 @@
 
 - 改了 `internal/domain/gateway/**`、`packages/protocol/src/api.ts`：新的或改过的接口。
 - 改了某个服务的行为（`issue`、`channel`、`setting`、`cron`……），想看它经接口和 `/api/v1/state` 出来的样子。
-- 改了 `internal/domain/*/migrations`、`queries.sql` 或 `internal/durable/store/{migrations,queries.sql}`：新库能建、能读写。
+- 改了 `pkg/db/migrations/*.sql` 或 `pkg/db/queries/*.sql`：新库能建、能读写。
 - 改了开机的流程（`cmd/vibe-server/main.go`、`internal/domain/stack/stack.go`、`internal/domain/gateway/gateway.go`）。
 
 真的帮工要本机登录的农机（`claude`、`codex`、`pi`……）或模型钥匙，会花钱，要先问用户；这里用 `--scripted-helper`：沙箱挂接 `scripts/release/verify-server.ts` 里的脚本帮工（设好 `VIBEVALLEY_AGENT_STARTERS`）。帮工与回放的更多行为照样写 Go 测试（[地基](docs/subsystems/foundation.md)「测试」）。

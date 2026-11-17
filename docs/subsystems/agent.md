@@ -18,7 +18,7 @@
 | 位置 | 职责 |
 |---|---|
 | `internal/domain/agent/registry.go` | `Agent` 注册表、档案与农机预设解析、可派性检查与挑人规则 |
-| `internal/domain/agent/sqlite.go`、`migrations/0001_init.up.sql`、`queries.sql` | 档案、技能库与运行记录的 SQLite 持久化与 `sqlc` 查询 |
+| `internal/domain/agent/sqlite.go`、`pkg/db/migrations/0003_agent.up.sql`、`pkg/db/queries/agent.sql` | 档案、技能库与运行记录的 SQLite 持久化与 `sqlc` 查询 |
 | `internal/domain/agent/presets.go` | 农机预设、支持项与平台选项兼容检查 |
 | `internal/domain/gateway/seed_catalog.go` | 内置档案模板、自带技能目录与 starter（`VIBEVALLEY_AGENT_STARTERS`）安装 |
 | `pkg/oar/`、`internal/domain/stack/machine_hub.go` | 纯 Go 标准库编码农机适配器（`claude`、`codex`、`acp`、`qwen`、`qoder` 与 `replaytest` 离线回放）及远端节点调度 |

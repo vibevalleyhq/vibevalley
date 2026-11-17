@@ -43,7 +43,7 @@
 | 2.2 高阶骨架 | 已有、以后做 | `pkg/oar` 起编码 agent；`internal/domain/connector/connector.go`；骨架见提案 |
 | 2.3 单一状态机和事件总线 | 已有 | `pkg/oar` 会话事件经 `internal/domain/gateway/projection.go` 折进 `SpaceState`；游戏 `internal/domain/game/projector.go` 只读事件（[农场的皮](docs/subsystems/farm.md)）；投递与会话持久化由领域包自管 |
 | 2.4 三级上下文和原语词典 | 已有、已做、不做 | `CLAUDE.md` 只引 `AGENTS.md`；子目录的 `AGENTS.md` 和各包 README；[primitives.md](docs/reference/primitives.md) 从导出生成；不做 `@invariant`、`@primitive` 标记；重复代码 lint 见提案 |
-| 3.1 三层只读契约墙 | 已有、改写 | 形状在 `packages/protocol`（`Codec<T.X>` 对不上就编不过）与 `pkg/contract`（`vpx scripts/gen/go-contract.ts --check`）；表结构在 `internal/**/migrations/0001_*.up.sql`（`go:sqlc --check`）；`regression: ` 点名；`refactor/` 禁改契约见提案 |
+| 3.1 三层只读契约墙 | 已有、改写 | 形状在 `packages/protocol`（`Codec<T.X>` 对不上就编不过）与 `pkg/contract`（`vpx scripts/gen/go-contract.ts --check`）；表结构在 `pkg/db/migrations/*.up.sql`（`vpx scripts/gen/go-sqlc.ts --check`）；`regression: ` 点名；`refactor/` 禁改契约见提案 |
 | 3.2 内存假实现和属性测试 | 已有、以后做 | 假的只在端口上（`pkg/oar/replaytest`、内存 store 替身），git 和 SQLite 用真的（[地基](docs/subsystems/foundation.md)）；`reduce` / 投影属性测试见提案 |
 | 3.3 确定性混沌和启动对账 | 已有、以后做 | 开机接回与恢复在 `internal/durable` 与 `internal/domain/stack`（`acceptance_test.go`、`migrate_test.go`）；流按任意切片测见提案 |
 | 3.4 历史存档的黄金快照 | 不做 | 内部不留兼容，旧库开机时挪开；对外 HTTP 的 v1 例外 |

@@ -5,7 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { planRelease, type Stage } from "./release-plan.ts";
 
 const root = resolve(import.meta.dirname, "../..");
-const baseline = ":(glob)internal/**/migrations/*.sql";
+const baseline = ":(glob)pkg/db/migrations/*.sql";
 
 const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 /** git's exit code, for the commands whose answer is it (diff --quiet, a ref that may not be there). */

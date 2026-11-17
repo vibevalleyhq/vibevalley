@@ -19,7 +19,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `internal/domain/game/progress.go`、`migrations/0001_init.up.sql`、`queries.sql` | 账本持久化（`game_ledger`）、金币与成就进度重折与等级计算 |
+| `internal/domain/game/progress.go`、`pkg/db/migrations/0005_game.up.sql`、`pkg/db/queries/game.sql` | 账本持久化（`game_ledger`）、金币与成就进度重折与等级计算 |
 | `internal/domain/game/projector.go` | 地块视图计算（`plotOf`）、游玩态投影（`FarmView`）与单次画面特效 |
 | `internal/domain/gateway/projection.go` | 将工单、帮工、成就进展装配进每帧 `StateFrame` |
 | `apps/web/src/farm/panels/Achievements.tsx`、`apps/web/src/farm/hud/FxLayer.tsx` | 任务与成就面板、称号佩戴与画面特效层 |

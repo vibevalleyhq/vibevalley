@@ -35,8 +35,8 @@
 
 | 位置 | 职责 |
 |---|---|
-| `internal/domain/issue/service.go`、`types.go`、`migrations.go` | 对外 `Issue` 服务：状态流转、`dispatch` / `settle` / 验收意见 / 父子工单依赖与事实发布 |
-| `internal/domain/issue/sqlite.go`、`memory.go`、`migrations/0001_init.up.sql`、`queries.sql` | 工单表、指派记录、定时任务、蓄水池、订阅与输入记录的 SQLite 持久化与内存替身 |
+| `internal/domain/issue/service.go`、`types.go` | 对外 `Issue` 服务：状态流转、`dispatch` / `settle` / 验收意见 / 父子工单依赖与事实发布 |
+| `internal/domain/issue/sqlite.go`、`memory.go`、`pkg/db/migrations/0006_issue.up.sql`、`pkg/db/queries/issue.sql` | 工单表、指派记录、定时任务、蓄水池、订阅与输入记录的 SQLite 持久化与内存替身 |
 | `internal/domain/issue/cron.go`、`internal/domain/gateway/cron_runner.go` | 定时任务模型、到期判定与后台时区感知的 cron 调度循环（`Start`、`RunDueCrons`、`ComputeNextRun`） |
 | `internal/domain/gateway/handlers_work.go`、`issue_helpers.go`、`seed_catalog.go` | 工单与定时任务 HTTP/工具接口处理、改动/PR/交付辅助逻辑与播种模板目录 |
 | `packages/protocol/src/rules/issues.ts`、`stage.ts` | 前后端共用的 `shortTitle`、`closedText` 与 `stageWantsUser` |

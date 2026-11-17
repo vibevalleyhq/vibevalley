@@ -16,7 +16,7 @@
 | 位置 | 职责 |
 |---|---|
 | [`packages/pkm/`](packages/pkm/README.md) | 独立 PKM 与双链大纲纯领域包（`@vibevalley/pkm`）：Logseq 式 Markdown 解析与打印（`markdown.ts`）、PARA 目录映射（`para.ts`）、双链反链与块引用图谱（`graph.ts`）、前端大纲视图与行内切片（`view.ts`）、键盘编辑与补全状态机（`editing.ts`）、多块框选与拖拽（`selection.ts`）、日历日期（`days.ts`）与乐观写入队列（`writer.ts`） |
-| `internal/domain/pkm/` | 服务端笔记存储（`store.go`、`parser.go`、`fts_raw.go`、`migrations/`、`queries.sql`）：`yuin/goldmark` 唯一 AST 解析、并发锁、FTS5 `trigram` 与 `sqlite-vec` 混合检索、批注与撤销记录 |
+| `internal/domain/pkm/` | 服务端笔记存储（`store.go`、`parser.go`、`fts_raw.go`；表与查询在 `pkg/db/migrations/0010_pkm.up.sql`、`pkg/db/queries/pkm.sql`）：`yuin/goldmark` 唯一 AST 解析、并发锁、FTS5 `trigram` 与 `sqlite-vec` 混合检索、批注与撤销记录 |
 | `internal/domain/gateway/pkm_helpers.go`、`handlers_collab.go` | `pkm.*` 接口适配、图谱摘要与话题关联查询 |
 | `packages/protocol/src/pkm/`、`packages/pkm/src/outline.ts` | 笔记契约与前后端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |
 | `$VIBEVALLEY_WORK_ROOT/pkm/` | 默认笔记根目录（`00_Inbox`–`04_Archives`、`journals/`、`.pkm/snapshots/`） |

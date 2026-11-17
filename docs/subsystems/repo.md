@@ -16,7 +16,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `internal/domain/repo/registry.go`、`sqlite.go`、`types.go` | 对外 `Repo` 注册表与 SQLite 持久化（`repo` 迁移与 `sqlcgen`）：新建/克隆、worktree、检查与合并 |
+| `internal/domain/repo/registry.go`、`sqlite.go`、`types.go` | 对外 `Repo` 注册表与 SQLite 持久化（`pkg/db/migrations/0004_repo.up.sql`、`pkg/db/queries/repo.sql` 与 `pkg/db/generated/`）：新建/克隆、worktree、检查与合并 |
 | `internal/domain/repo/git.go`、`github_cli.go`、`stats.go` | 底层 git 命令拼装（`merge-tree`、`commit-tree`、`update-ref`、清理）、`gh` CLI 探测/PR 推送（`ProbeGitHubCLI`、`SubmitPullRequest`）与纯 Go 提交统计 |
 | `internal/domain/gateway/issue_helpers.go`、`handlers_work.go` | 工单改动快照、冲突检查、已有分支提 PR 与 GitHub/GitLab 交互接口处理 |
 | `apps/web/src/features/repo/ReposPage.tsx` | 工作台仓库页（新建、概况、语言占比、提交日历） |

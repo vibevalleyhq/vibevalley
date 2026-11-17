@@ -120,11 +120,11 @@ export function renderInfoPlist(version: string): string {
 }
 
 export function computeSchemaHash(repoRoot: string): string {
-  const migrationFiles = globSync("internal/**/migrations/*.up.sql", { cwd: repoRoot })
+  const migrationFiles = globSync("pkg/db/migrations/*.up.sql", { cwd: repoRoot })
     .map((file) => file.replaceAll("\\", "/"))
     .toSorted();
   if (migrationFiles.length === 0) {
-    throw new Error(`No migration files matched internal/**/migrations/*.up.sql under ${repoRoot}`);
+    throw new Error(`No migration files matched pkg/db/migrations/*.up.sql under ${repoRoot}`);
   }
   const hash = createHash("sha256");
   for (const relPath of migrationFiles) {
