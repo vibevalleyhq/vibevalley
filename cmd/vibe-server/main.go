@@ -77,6 +77,8 @@ type Server struct {
 	serveErrCh  chan error
 	shutdownCtx context.Context
 	cancel      context.CancelFunc
+	newConnsMu  sync.Mutex
+	newConns    map[net.Conn]struct{}
 	closeOnce   sync.Once
 }
 
@@ -510,11 +512,14 @@ func NewServer(ctx context.Context, cfg Config) (*Server, error) {
 		serveErrCh:  make(chan error, 2),
 		shutdownCtx: shutCtx,
 		cancel:      cancel,
+		newConns:    make(map[net.Conn]struct{}),
 	}
 
 	s.mainSrv = &http.Server{
 		Handler:           s.newControlPlaneMux(),
 		ReadHeaderTimeout: 10 * time.Second,
+		BaseContext:       func(net.Listener) context.Context { return shutCtx },
+		ConnState:         s.trackConnState,
 	}
 
 	go func() {
@@ -527,6 +532,8 @@ func NewServer(ctx context.Context, cfg Config) (*Server, error) {
 		s.previewSrv = &http.Server{
 			Handler:           s.stack.Artifacts.Preview,
 			ReadHeaderTimeout: 10 * time.Second,
+			BaseContext:       func(net.Listener) context.Context { return shutCtx },
+			ConnState:         s.trackConnState,
 		}
 		go func() {
 			if err := s.previewSrv.Serve(previewLn); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -583,17 +590,89 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	var shutErr error
 	s.closeOnce.Do(func() {
 		s.cancel()
+
+		shutDone := make(chan struct{})
+		reapDone := make(chan struct{})
+		go func() {
+			defer close(reapDone)
+			s.reapIdleNewConns(ctx, shutDone)
+		}()
+
+		var wg sync.WaitGroup
+		var previewErr, mainErr error
 		if s.previewSrv != nil {
-			shutErr = errors.Join(shutErr, s.previewSrv.Shutdown(ctx))
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				previewErr = s.previewSrv.Shutdown(ctx)
+			}()
 		}
 		if s.mainSrv != nil {
-			shutErr = errors.Join(shutErr, s.mainSrv.Shutdown(ctx))
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				mainErr = s.mainSrv.Shutdown(ctx)
+			}()
 		}
+		wg.Wait()
+		close(shutDone)
+		<-reapDone
+
+		shutErr = errors.Join(previewErr, mainErr)
 		if s.stack != nil {
 			shutErr = errors.Join(shutErr, s.stack.Close())
 		}
 	})
 	return shutErr
+}
+
+func (s *Server) trackConnState(c net.Conn, st http.ConnState) {
+	s.newConnsMu.Lock()
+	if st == http.StateNew {
+		s.newConns[c] = struct{}{}
+	} else {
+		delete(s.newConns, c)
+	}
+	s.newConnsMu.Unlock()
+}
+
+func (s *Server) expireIdleNewConns() {
+	s.newConnsMu.Lock()
+	conns := make([]net.Conn, 0, len(s.newConns))
+	for c := range s.newConns {
+		conns = append(conns, c)
+	}
+	s.newConnsMu.Unlock()
+	for _, c := range conns {
+		// Force idle StateNew sockets (browser preconnects or Transport dial leftovers) out of readRequest.
+		_ = c.SetReadDeadline(time.Unix(0, 1))
+	}
+}
+
+func (s *Server) reapIdleNewConns(ctx context.Context, done <-chan struct{}) {
+	timer := time.NewTimer(100 * time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-done:
+		return
+	case <-ctx.Done():
+		return
+	case <-timer.C:
+	}
+
+	s.expireIdleNewConns()
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.expireIdleNewConns()
+		}
+	}
 }
 
 func (s *Server) newControlPlaneMux() http.Handler {

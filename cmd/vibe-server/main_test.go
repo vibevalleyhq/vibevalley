@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -843,4 +844,103 @@ server:
 			t.Fatalf("serve shutdown error: %v", err)
 		}
 	})
+}
+
+func TestVibeServerRegressionShutdownCancelsActiveSSE(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	tmp := t.TempDir()
+	srv, err := NewServer(ctx, Config{
+		Addr:        "127.0.0.1:0",
+		PreviewAddr: "127.0.0.1:0",
+		DBPath:      ":memory:",
+		WorkRoot:    filepath.Join(tmp, "work"),
+	})
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+	defer func() { _ = srv.Close() }()
+
+	client := &http.Client{}
+	defer client.CloseIdleConnections()
+
+	sseReq, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+srv.Addr()+"/api/v1/state", nil)
+	if err != nil {
+		t.Fatalf("NewRequestWithContext: %v", err)
+	}
+	sseReq.Header.Set("Accept", "text/event-stream")
+	sseResp, err := client.Do(sseReq)
+	if err != nil {
+		t.Fatalf("GET SSE /api/v1/state: %v", err)
+	}
+	defer sseResp.Body.Close()
+
+	sseSc := bufio.NewScanner(sseResp.Body)
+	if !sseSc.Scan() || !strings.HasPrefix(sseSc.Text(), "data: ") {
+		t.Fatalf("expected initial SSE data line, got %q err=%v", sseSc.Text(), sseSc.Err())
+	}
+
+	// Regression: Shutdown must cancel active request contexts via BaseContext
+	// so open SSE handlers exit without waiting for the shutdown deadline.
+	shutCtx, shutCancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer shutCancel()
+	if err := srv.Shutdown(shutCtx); err != nil {
+		t.Fatalf("Shutdown with active SSE client failed: %v", err)
+	}
+	for sseSc.Scan() {
+		if line := sseSc.Text(); line != "" {
+			t.Fatalf("expected no extra SSE frames after Shutdown, got %q", line)
+		}
+	}
+	if err := sseSc.Err(); err != nil {
+		t.Fatalf("expected clean SSE EOF after Shutdown, got err=%v", err)
+	}
+}
+
+func TestVibeServerRegressionShutdownWithIdleNewConn(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	tmp := t.TempDir()
+	srv, err := NewServer(ctx, Config{
+		Addr:        "127.0.0.1:0",
+		PreviewAddr: "127.0.0.1:0",
+		DBPath:      ":memory:",
+		WorkRoot:    filepath.Join(tmp, "work"),
+	})
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+	defer func() { _ = srv.Close() }()
+
+	// Hold an unused TCP connection open (0 bytes sent) to reproduce StateNew sockets
+	// left by browser preconnects or net/http Transport dial-vs-idle races.
+	rawConn, err := net.DialTimeout("tcp", srv.Addr(), 2*time.Second)
+	if err != nil {
+		t.Fatalf("net.DialTimeout: %v", err)
+	}
+	defer rawConn.Close()
+
+	for {
+		srv.newConnsMu.Lock()
+		count := len(srv.newConns)
+		srv.newConnsMu.Unlock()
+		if count > 0 {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("timed out waiting for StateNew connection tracking")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+
+	shutCtx, shutCancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer shutCancel()
+	if err := srv.Shutdown(shutCtx); err != nil {
+		t.Fatalf("Shutdown with idle StateNew conn failed: %v", err)
+	}
 }
