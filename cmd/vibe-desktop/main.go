@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -45,6 +46,8 @@ type DesktopConfig struct {
 	ServerURL        string
 	WebDistDir       string
 	WebScheme        string
+	HomeDir          string
+	ControlSocket    string
 	AutomationSocket string
 	RepoRoots        []string
 	HeadlessCheck    bool
@@ -96,12 +99,15 @@ type DesktopApp struct {
 	WebHandler http.Handler
 	WebConfig  WebViewConfig
 	Terminals  *TerminalController
+	Host       *DesktopHostService
 	Automation *AutomationEndpoint
 	Stack      EmbeddedStack
 
 	closeOnce   sync.Once
 	autoLn      io.Closer
 	autoDone    <-chan struct{}
+	ctrlLn      io.Closer
+	ctrlDone    <-chan struct{}
 	detachStack func()
 }
 
@@ -367,6 +373,8 @@ func loadDesktopConfig(flags *pflag.FlagSet, configFile string, getenv func(stri
 		ServerURL:        cfg.Desktop.ServerURL,
 		WebDistDir:       cfg.Desktop.WebDist,
 		WebScheme:        cfg.Desktop.Scheme,
+		HomeDir:          cfg.HomeDir,
+		ControlSocket:    strings.TrimSpace(getenv("VIBEVALLEY_DESKTOP_SOCKET")),
 		AutomationSocket: cfg.Desktop.AutomationSocket,
 		RepoRoots:        repoRoots,
 		HeadlessCheck:    cfg.Desktop.HeadlessCheck,
@@ -477,6 +485,15 @@ func NewDesktopApp(ctx context.Context, cfg DesktopConfig, deps DesktopDeps) (*D
 		PreloadJS: ChordBridgePreloadScript(),
 	}
 	auto := NewAutomationEndpoint(island, terms, webCfg)
+	host := NewDesktopHostService(island, terms, DesktopHostConfig{
+		Version:          desktopVersion,
+		Channel:          defaultChannel,
+		ServerURL:        cfg.ServerURL,
+		BasePageURL:      WorkbenchURL(webCfg),
+		HomeDir:          cfg.HomeDir,
+		RepoRoots:        cfg.RepoRoots,
+		HasEmbeddedStack: stack != nil,
+	})
 
 	app := &DesktopApp{
 		Config:     cfg,
@@ -487,10 +504,18 @@ func NewDesktopApp(ctx context.Context, cfg DesktopConfig, deps DesktopDeps) (*D
 		WebHandler: webHandler,
 		WebConfig:  webCfg,
 		Terminals:  terms,
+		Host:       host,
 		Automation: auto,
 		Stack:      stack,
 	}
 	app.detachStack = attachEmbeddedStackToApp(app)
+	if app.Stack != nil {
+		serverURL := app.Config.ServerURL
+		if serverURL == "" {
+			serverURL = app.Stack.ServerURL()
+		}
+		host.SyncStack(true, serverURL)
+	}
 
 	if cfg.AutomationSocket != "" && cfg.HeadlessCheck {
 		ln, done, err := auto.ListenUnix(ctx, cfg.AutomationSocket)
@@ -561,6 +586,11 @@ func (a *DesktopApp) RunGUI(ctx context.Context) error {
 	if err := RegisterChordBridge(a.Bridge); err != nil {
 		return err
 	}
+	if a.Host != nil {
+		if err := RegisterDesktopHost(a.Host); err != nil {
+			return err
+		}
+	}
 	if err := RegisterWebProtocol(a.WebConfig.Scheme, a.WebHandler); err != nil {
 		return err
 	}
@@ -570,6 +600,10 @@ func (a *DesktopApp) RunGUI(ctx context.Context) error {
 		displayWidth := mygo.Screen.PrimaryDisplay().Bounds.Width
 		mainWin := mygo.NewWindow(WorkbenchWindowOptions(a.WebConfig))
 		a.Bridge.ServerTransport().AttachWindow(mainWin)
+		if a.Host != nil {
+			a.Host.AttachWindow(mainWin)
+			_ = a.Host.RegisterVoiceShortcut()
+		}
 
 		islandWin := mygo.NewWindow(a.Island.WindowOptions(displayWidth))
 		a.Island.SetWindow(islandWin)
@@ -579,6 +613,19 @@ func (a *DesktopApp) RunGUI(ctx context.Context) error {
 			if err == nil {
 				a.autoLn = ln
 				a.autoDone = done
+			}
+		}
+		if a.Host != nil {
+			ctrlSock := a.Config.ControlSocket
+			if ctrlSock == "" && a.Config.HomeDir != "" {
+				ctrlSock = filepath.Join(a.Config.HomeDir, "desktop.sock")
+			}
+			if ctrlSock != "" {
+				ln, done, err := a.Host.ListenControlUnix(ctx, ctrlSock)
+				if err == nil {
+					a.ctrlLn = ln
+					a.ctrlDone = done
+				}
 			}
 		}
 	})
@@ -597,6 +644,15 @@ func (a *DesktopApp) Close() error {
 		}
 		if a.autoDone != nil {
 			<-a.autoDone
+		}
+		if a.ctrlLn != nil {
+			_ = a.ctrlLn.Close()
+		}
+		if a.ctrlDone != nil {
+			<-a.ctrlDone
+		}
+		if a.Host != nil {
+			a.Host.Close()
 		}
 		if err := a.Terminals.CloseAll(); err != nil && closeErr == nil {
 			closeErr = err
