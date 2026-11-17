@@ -151,10 +151,6 @@ func newChannelCommand(rt *appRuntime) *cobra.Command {
 		Short: "Send a message to a channel",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client, _, err := rt.newClient()
-			if err != nil {
-				return err
-			}
 			channelID := args[0]
 			text := strings.Join(args[1:], " ")
 			req := map[string]any{
@@ -173,8 +169,8 @@ func newChannelCommand(rt *appRuntime) *cobra.Command {
 			if sendKey != "" {
 				req["sendKey"] = sendKey
 			}
-			raw, err := client.CallWithFallback(cmd.Context(), "channel.message.send", "channel.send", req, req, nil)
-			if err != nil {
+			raw, dry, err := rt.callMutateWithFallback(cmd.Context(), "channel.message.send", "channel.send", req, req, nil)
+			if err != nil || dry {
 				return err
 			}
 			return rt.writeOutput(
