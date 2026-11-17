@@ -19,6 +19,7 @@ import (
 	"github.com/viant/sqlite-vec/vector"
 
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
@@ -681,17 +682,22 @@ func TestPKMMigrationsUpStatusDownAllUp(t *testing.T) {
 
 	_ = engine.RegisterVectorFunctions(nil)
 	dbPath := filepath.Join(t.TempDir(), "pkm-mig.sqlite")
-	db, err := engine.Open(dbPath)
+	conn, err := engine.Open(dbPath)
 	if err != nil {
 		t.Fatalf("engine.Open: %v", err)
 	}
-	defer db.Close()
+	defer conn.Close()
 
-	if err := vec.Register(db); err != nil {
+	if err := vec.Register(conn); err != nil {
 		t.Fatalf("vec.Register: %v", err)
 	}
 
-	runner, err := migrate.New(db, "pkm", MigrationsFS)
+	fsys, err := db.ScopeFS("pkm")
+	if err != nil {
+		t.Fatalf("db.ScopeFS(pkm): %v", err)
+	}
+
+	runner, err := migrate.New(conn, "pkm", fsys)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
 	}
@@ -721,7 +727,7 @@ func TestPKMMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 	for _, tbl := range expectedTables {
 		var name string
-		if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name); err != nil {
+		if err := conn.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name); err != nil {
 			t.Fatalf("expected table %s after Up: %v", tbl, err)
 		}
 	}
@@ -736,7 +742,7 @@ func TestPKMMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 	for _, tbl := range expectedTables {
 		var name string
-		err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name)
+		err := conn.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name)
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Fatalf("expected table %s dropped after DownAll, got name=%q err=%v", tbl, name, err)
 		}
@@ -746,7 +752,7 @@ func TestPKMMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || reapplied != 1 {
 		t.Fatalf("re-Up after DownAll: applied=%d err=%v", reapplied, err)
 	}
-	_ = db.Close()
+	_ = conn.Close()
 
 	// Store opened against migrated file indexes and runs hybrid FTS5+vector search cleanly.
 	st, err := OpenStore(ctx, dbPath)
@@ -770,5 +776,151 @@ func TestPKMMigrationsUpStatusDownAllUp(t *testing.T) {
 	})
 	if err != nil || len(hits) != 1 || hits[0].RelPath != "01_Projects/MigCheck.md" {
 		t.Fatalf("Search after re-Up: hits=%+v err=%v", hits, err)
+	}
+}
+
+func TestOpenStoreFromPoolNonOwning(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	if _, err := OpenStoreFromPool(ctx, nil, nil, true); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected ErrInvalidArgument for nil writeDB, got %v", err)
+	}
+
+	canceledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := OpenStoreFromPool(canceledCtx, nil, nil, true); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+
+	// Blank DSN in standalone OpenStore defaults to :memory: and closes owned DB on Close.
+	ownedMem, err := OpenStore(ctx, "")
+	if err != nil {
+		t.Fatalf("OpenStore blank dsn: %v", err)
+	}
+	ownedDB := ownedMem.DB()
+	if err := ownedMem.Close(); err != nil {
+		t.Fatalf("ownedMem.Close: %v", err)
+	}
+	if err := ownedDB.PingContext(ctx); err == nil {
+		t.Fatal("expected owned DB to be closed after OpenStore.Close()")
+	}
+
+	// Shared :memory: pool migrated with ScopeFS("pkm") only + nil readDB fallback.
+	memPool, err := db.OpenPool(ctx, ":memory:")
+	if err != nil {
+		t.Fatalf("db.OpenPool(:memory:): %v", err)
+	}
+	defer func() { _ = memPool.Close() }()
+
+	pkmFS, err := db.ScopeFS("pkm")
+	if err != nil {
+		t.Fatalf("db.ScopeFS(pkm): %v", err)
+	}
+	pkmRunner, err := migrate.New(memPool.WriteDB, "pkm", pkmFS)
+	if err != nil {
+		t.Fatalf("migrate.New(pkm): %v", err)
+	}
+	if _, err := pkmRunner.Up(ctx); err != nil {
+		t.Fatalf("pkmRunner.Up: %v", err)
+	}
+
+	memStore, err := OpenStoreFromPool(ctx, memPool.WriteDB, nil, true)
+	if err != nil {
+		t.Fatalf("OpenStoreFromPool(mem, nil readDB): %v", err)
+	}
+	if memStore.DB() != memPool.WriteDB {
+		t.Fatalf("expected readDB to default to writeDB when nil")
+	}
+	if _, err := memStore.UpsertNote(ctx, NoteInput{
+		RelPath:     "01_Projects/PoolNote.md",
+		Content:     []byte("---\ntitle: Shared Pool Note\n---\n\n- Testing [[Target]] and FTS5 trigram.\n"),
+		Embedding:   []float32{0.8, 0.2, 0.0, 0.0},
+		UpdatedAtMs: 100,
+	}); err != nil {
+		t.Fatalf("memStore.UpsertNote: %v", err)
+	}
+	if err := memStore.Close(); err != nil {
+		t.Fatalf("memStore.Close: %v", err)
+	}
+	if _, err := memStore.Search(ctx, SearchQuery{Text: "Shared"}); !errors.Is(err, ErrClosed) {
+		t.Fatalf("expected ErrClosed after memStore.Close, got %v", err)
+	}
+	if err := memPool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared memPool.WriteDB closed unexpectedly: %v", err)
+	}
+
+	// Shared file-backed WAL pool with distinct writeDB and readDB and full PlatformScope migration.
+	walPath := filepath.Join(t.TempDir(), "platform.db")
+	walPool, err := db.OpenPool(ctx, walPath)
+	if err != nil {
+		t.Fatalf("db.OpenPool(wal): %v", err)
+	}
+	defer func() { _ = walPool.Close() }()
+
+	walRunner, err := migrate.New(walPool.WriteDB, db.PlatformScope, db.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New(wal): %v", err)
+	}
+	if _, err := walRunner.Up(ctx); err != nil {
+		t.Fatalf("walRunner.Up: %v", err)
+	}
+
+	datasetOpt := WithDatasetID("pkm-pool-test")
+	walStore, err := OpenStoreFromPool(ctx, walPool.WriteDB, walPool.ReadDB, walPool.IsMem, datasetOpt)
+	if err != nil {
+		t.Fatalf("OpenStoreFromPool(wal): %v", err)
+	}
+	if walStore.DB() != walPool.ReadDB {
+		t.Fatalf("expected walStore.DB() == walPool.ReadDB")
+	}
+	if _, err := walStore.UpsertNote(ctx, NoteInput{
+		RelPath:     "01_Projects/WalPool.md",
+		Content:     []byte("---\ntitle: WAL Pool Search\n---\n\n- 共享数据库池向量混合检索测试。\n"),
+		Embedding:   []float32{0.95, 0.05, 0.0, 0.0},
+		UpdatedAtMs: 200,
+	}); err != nil {
+		t.Fatalf("walStore.UpsertNote: %v", err)
+	}
+	walHits, err := walStore.Search(ctx, SearchQuery{
+		Text:        "向量混合检索",
+		QueryVector: []float32{0.95, 0.05, 0.0, 0.0},
+		Limit:       5,
+	})
+	if err != nil || len(walHits) != 1 || walHits[0].RelPath != "01_Projects/WalPool.md" {
+		t.Fatalf("walStore.Search: hits=%+v err=%v", walHits, err)
+	}
+
+	// Close must invalidate sqlite-vec cache without closing shared pool handles.
+	if err := walStore.Close(); err != nil {
+		t.Fatalf("walStore.Close: %v", err)
+	}
+	if err := walStore.Close(); err != nil {
+		t.Fatalf("idempotent walStore.Close: %v", err)
+	}
+	if _, err := walStore.Search(ctx, SearchQuery{Text: "WAL"}); !errors.Is(err, ErrClosed) {
+		t.Fatalf("expected ErrClosed after walStore.Close, got %v", err)
+	}
+	if err := walPool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared walPool.WriteDB closed unexpectedly: %v", err)
+	}
+	if err := walPool.ReadDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared walPool.ReadDB closed unexpectedly: %v", err)
+	}
+
+	// Reopening another non-owning Store over the still-open pool succeeds and reads persisted vectors.
+	walStore2, err := OpenStoreFromPool(ctx, walPool.WriteDB, walPool.ReadDB, walPool.IsMem, datasetOpt)
+	if err != nil {
+		t.Fatalf("reopen OpenStoreFromPool(wal): %v", err)
+	}
+	defer func() { _ = walStore2.Close() }()
+
+	walHits2, err := walStore2.Search(ctx, SearchQuery{
+		Text:        "向量混合检索",
+		QueryVector: []float32{0.95, 0.05, 0.0, 0.0},
+		Limit:       5,
+	})
+	if err != nil || len(walHits2) != 1 || walHits2[0].RelPath != "01_Projects/WalPool.md" {
+		t.Fatalf("walStore2.Search after Close/reopen: hits=%+v err=%v", walHits2, err)
 	}
 }

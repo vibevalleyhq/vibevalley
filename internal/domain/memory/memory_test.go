@@ -14,6 +14,7 @@ import (
 
 	"github.com/vibevalleyhq/vibevalley/internal/machine"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
@@ -532,13 +533,18 @@ func TestMemoryMigrationsUpStatusDownAllUp(t *testing.T) {
 	ctx := context.Background()
 
 	dbPath := filepath.Join(t.TempDir(), "memory-mig.sqlite")
-	db, err := sql.Open("sqlite", dbPath)
+	conn, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("sql.Open: %v", err)
 	}
-	defer db.Close()
+	defer conn.Close()
 
-	runner, err := migrate.New(db, "memory", MigrationsFS)
+	fsys, err := db.ScopeFS("memory")
+	if err != nil {
+		t.Fatalf("db.ScopeFS(memory): %v", err)
+	}
+
+	runner, err := migrate.New(conn, "memory", fsys)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
 	}
@@ -566,7 +572,7 @@ func TestMemoryMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 	for _, tbl := range expectedTables {
 		var name string
-		if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name); err != nil {
+		if err := conn.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name); err != nil {
 			t.Fatalf("expected table %s after Up: %v", tbl, err)
 		}
 	}
@@ -581,7 +587,7 @@ func TestMemoryMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 	for _, tbl := range expectedTables {
 		var name string
-		err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name)
+		err := conn.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, tbl).Scan(&name)
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Fatalf("expected table %s dropped after DownAll, got name=%q err=%v", tbl, name, err)
 		}
@@ -591,7 +597,7 @@ func TestMemoryMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || reapplied != 1 {
 		t.Fatalf("re-Up after DownAll: applied=%d err=%v", reapplied, err)
 	}
-	_ = db.Close()
+	_ = conn.Close()
 
 	// Store opened against migrated file operates with full parity.
 	st, err := OpenStore(ctx, dbPath)
@@ -630,5 +636,130 @@ func TestMemoryMigrationsUpStatusDownAllUp(t *testing.T) {
 	allInbox, err := st.ListInbox(ctx, "mig-scope", true)
 	if err != nil || len(allInbox) != 1 || !allInbox[0].Resolved {
 		t.Fatalf("ListInbox(includeResolved=true): inbox=%+v err=%v", allInbox, err)
+	}
+}
+
+func TestOpenStoreFromPoolNonOwning(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	if _, err := OpenStoreFromPool(ctx, nil, nil, true); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected ErrInvalidArgument for nil writeDB, got %v", err)
+	}
+
+	canceledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := OpenStoreFromPool(canceledCtx, nil, nil, true); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+
+	// Blank DSN in standalone OpenStore defaults to :memory: and closes owned DB on Close.
+	ownedMem, err := OpenStore(ctx, "")
+	if err != nil {
+		t.Fatalf("OpenStore blank dsn: %v", err)
+	}
+	ownedDB := ownedMem.DB()
+	if err := ownedMem.Close(); err != nil {
+		t.Fatalf("ownedMem.Close: %v", err)
+	}
+	if err := ownedDB.PingContext(ctx); err == nil {
+		t.Fatal("expected owned DB to be closed after OpenStore.Close()")
+	}
+
+	// Shared :memory: pool with readDB == nil defaults readDB to writeDB and leaves pool open on Close.
+	memPool, err := db.OpenPool(ctx, ":memory:")
+	if err != nil {
+		t.Fatalf("db.OpenPool(:memory:): %v", err)
+	}
+	defer func() { _ = memPool.Close() }()
+
+	memRunner, err := migrate.New(memPool.WriteDB, db.PlatformScope, db.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New(mem): %v", err)
+	}
+	if _, err := memRunner.Up(ctx); err != nil {
+		t.Fatalf("memRunner.Up: %v", err)
+	}
+
+	memStore, err := OpenStoreFromPool(ctx, memPool.WriteDB, nil, true)
+	if err != nil {
+		t.Fatalf("OpenStoreFromPool(mem, nil readDB): %v", err)
+	}
+	if memStore.DB() != memPool.WriteDB {
+		t.Fatalf("expected readDB to default to writeDB when nil")
+	}
+	if _, err := memStore.CommitFiles(ctx, CommitRequest{
+		ScopeID: "pool-mem",
+		Files:   []MemoryFileInput{{RelPath: "facts.md", Content: []byte("- shared pool\n")}},
+	}); err != nil {
+		t.Fatalf("memStore.CommitFiles: %v", err)
+	}
+	if err := memStore.Close(); err != nil {
+		t.Fatalf("memStore.Close: %v", err)
+	}
+	if _, err := memStore.ActiveSnapshot(ctx, "pool-mem"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("expected ErrClosed after memStore.Close, got %v", err)
+	}
+	if err := memPool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared memPool.WriteDB closed unexpectedly: %v", err)
+	}
+
+	// Shared file-backed WAL pool with distinct writeDB and readDB.
+	walPath := filepath.Join(t.TempDir(), "platform.db")
+	walPool, err := db.OpenPool(ctx, walPath)
+	if err != nil {
+		t.Fatalf("db.OpenPool(wal): %v", err)
+	}
+	defer func() { _ = walPool.Close() }()
+
+	walRunner, err := migrate.New(walPool.WriteDB, db.PlatformScope, db.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New(wal): %v", err)
+	}
+	if _, err := walRunner.Up(ctx); err != nil {
+		t.Fatalf("walRunner.Up: %v", err)
+	}
+
+	var tick atomic.Int64
+	tick.Store(1700000500000)
+	walStore, err := OpenStoreFromPool(ctx, walPool.WriteDB, walPool.ReadDB, walPool.IsMem, WithClock(func() int64 {
+		return tick.Add(1000)
+	}))
+	if err != nil {
+		t.Fatalf("OpenStoreFromPool(wal): %v", err)
+	}
+	if walStore.DB() != walPool.ReadDB {
+		t.Fatalf("expected walStore.DB() == walPool.ReadDB")
+	}
+	if _, err := walStore.CommitFiles(ctx, CommitRequest{
+		ScopeID: "pool-wal",
+		Files:   []MemoryFileInput{{RelPath: "facts.md", Content: []byte("- wal fact\n")}},
+	}); err != nil {
+		t.Fatalf("walStore.CommitFiles: %v", err)
+	}
+	prop, err := walStore.RunDream(ctx, DreamRequest{
+		ScopeID:          "pool-wal",
+		SessionSummaries: []SessionSummary{{SessionID: "s-pool", Facts: []string{"dream via pool"}}},
+	})
+	if err != nil {
+		t.Fatalf("walStore.RunDream: %v", err)
+	}
+	if _, err := walStore.ApproveDream(ctx, prop.ProposalID); err != nil {
+		t.Fatalf("walStore.ApproveDream: %v", err)
+	}
+	if err := walStore.Close(); err != nil {
+		t.Fatalf("walStore.Close: %v", err)
+	}
+	if err := walStore.Close(); err != nil {
+		t.Fatalf("idempotent walStore.Close: %v", err)
+	}
+	if _, err := walStore.ActiveSnapshot(ctx, "pool-wal"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("expected ErrClosed after walStore.Close, got %v", err)
+	}
+	if err := walPool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared walPool.WriteDB closed unexpectedly: %v", err)
+	}
+	if err := walPool.ReadDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared walPool.ReadDB closed unexpectedly: %v", err)
 	}
 }

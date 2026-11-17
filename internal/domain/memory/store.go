@@ -3,7 +3,6 @@ package memory
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"errors"
 	"fmt"
 	"sort"
@@ -12,18 +11,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	_ "modernc.org/sqlite"
-
-	"github.com/vibevalleyhq/vibevalley/internal/domain/memory/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/internal/machine"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
-
-// MigrationsFS holds the embedded SQLite migration scripts for the memory domain store.
-//
-//go:embed migrations/*.sql
-var MigrationsFS embed.FS
 
 // StoreOption configures a versioned memory Store.
 type StoreOption func(*storeConfig)
@@ -54,13 +47,54 @@ func WithBeforeCommitHook(fn func() error) StoreOption {
 type Store struct {
 	writeDB      *sql.DB
 	readDB       *sql.DB
-	readQ        *sqlcgen.Queries
+	readQ        *dbgen.Queries
 	sameDB       bool
+	ownsDB       bool
 	now          func() int64
 	beforeCommit func() error
 	idSeq        atomic.Int64
 	mu           sync.Mutex
 	closed       atomic.Bool
+}
+
+func newStoreConfig(opts ...StoreOption) storeConfig {
+	cfg := storeConfig{
+		now: func() int64 { return time.Now().UnixMilli() },
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+	return cfg
+}
+
+// OpenStoreFromPool constructs a versioned memory Store backed by a caller-owned SQLite pool.
+// Callers retain ownership of writeDB and readDB; Close marks the Store closed without closing either handle.
+func OpenStoreFromPool(ctx context.Context, writeDB, readDB *sql.DB, isMem bool, opts ...StoreOption) (*Store, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if writeDB == nil {
+		return nil, fmt.Errorf("%w: writeDB is required", ErrInvalidArgument)
+	}
+	if readDB == nil {
+		readDB = writeDB
+	}
+
+	cfg := newStoreConfig(opts...)
+	return &Store{
+		writeDB:      writeDB,
+		readDB:       readDB,
+		readQ:        dbgen.New(readDB),
+		sameDB:       isMem || readDB == writeDB,
+		ownsDB:       false,
+		now:          cfg.now,
+		beforeCommit: cfg.beforeCommit,
+	}, nil
 }
 
 // OpenStore opens or creates a SQLite-backed versioned memory Store.
@@ -75,79 +109,43 @@ func OpenStore(ctx context.Context, dsn string, opts ...StoreOption) (*Store, er
 		dsn = ":memory:"
 	}
 
-	cfg := storeConfig{
-		now: func() int64 { return time.Now().UnixMilli() },
-	}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&cfg)
-		}
-	}
+	cfg := newStoreConfig(opts...)
 
-	isMem := dsn == ":memory:" || strings.Contains(dsn, "mode=memory") || strings.Contains(dsn, ":memory:")
-	writeDB, err := sql.Open("sqlite", dsn)
+	pool, err := db.OpenPool(ctx, dsn)
 	if err != nil {
-		return nil, fmt.Errorf("memory: open sqlite writer: %w", err)
-	}
-	writeDB.SetMaxOpenConns(1)
-
-	pragmas := []string{
-		"PRAGMA busy_timeout=5000",
-		"PRAGMA foreign_keys=ON",
-		"PRAGMA synchronous=NORMAL",
-	}
-	if !isMem {
-		pragmas = append([]string{"PRAGMA journal_mode=WAL"}, pragmas...)
-	}
-	for _, p := range pragmas {
-		if _, err := writeDB.ExecContext(ctx, p); err != nil {
-			_ = writeDB.Close()
-			return nil, fmt.Errorf("memory: %s: %w", p, err)
-		}
+		return nil, fmt.Errorf("memory: %w", err)
 	}
 
-	runner, err := migrate.New(writeDB, "memory", MigrationsFS)
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
 	if err != nil {
-		_ = writeDB.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("memory: init migrations: %w", err)
 	}
 	if _, err := runner.Up(ctx); err != nil {
-		_ = writeDB.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("memory: apply schema: %w", err)
 	}
 
-	var readDB *sql.DB
-	sameDB := false
-	if isMem {
-		readDB = writeDB
-		sameDB = true
-	} else {
-		sep := "?"
-		if strings.Contains(dsn, "?") {
-			sep = "&"
-		}
-		readDSN := dsn + sep + "_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)"
-		readDB, err = sql.Open("sqlite", readDSN)
-		if err != nil {
-			_ = writeDB.Close()
-			return nil, fmt.Errorf("memory: open sqlite reader: %w", err)
-		}
-		readDB.SetMaxOpenConns(4)
-	}
-
 	return &Store{
-		writeDB:      writeDB,
-		readDB:       readDB,
-		readQ:        sqlcgen.New(readDB),
-		sameDB:       sameDB,
+		writeDB:      pool.WriteDB,
+		readDB:       pool.ReadDB,
+		readQ:        dbgen.New(pool.ReadDB),
+		sameDB:       pool.SameDB,
+		ownsDB:       true,
 		now:          cfg.now,
 		beforeCommit: cfg.beforeCommit,
 	}, nil
 }
 
-// Close closes the underlying SQLite connections.
+// Close marks the Store closed and, when owned, closes the underlying SQLite connections.
 func (s *Store) Close() error {
+	if s == nil {
+		return nil
+	}
 	if s.closed.Swap(true) {
+		return nil
+	}
+	if !s.ownsDB {
 		return nil
 	}
 	var firstErr error
@@ -311,7 +309,7 @@ func (s *Store) CommitFiles(ctx context.Context, req CommitRequest) (Snapshot, e
 		return Snapshot{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	q := sqlcgen.New(tx)
+	q := dbgen.New(tx)
 
 	nowMs := s.now()
 	head, err := ensureHeadTx(ctx, q, scope, nowMs)
@@ -477,7 +475,7 @@ func (s *Store) ReconcileMounts(ctx context.Context, scopeID, sessionID string, 
 		return machine.MountPushAck{}, nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	q := sqlcgen.New(tx)
+	q := dbgen.New(tx)
 
 	nowMs := s.now()
 	head, err := ensureHeadTx(ctx, q, scope, nowMs)
@@ -551,7 +549,7 @@ func (s *Store) ReconcileMounts(ctx context.Context, scopeID, sessionID string, 
 				Resolved:        false,
 				CreatedAtMs:     nowMs,
 			}
-			if err := q.InsertConflict(ctx, sqlcgen.InsertConflictParams{
+			if err := q.InsertConflict(ctx, dbgen.InsertConflictParams{
 				ConflictID:      cb.ConflictID,
 				ScopeID:         cb.ScopeID,
 				RelPath:         cb.RelPath,
@@ -567,7 +565,7 @@ func (s *Store) ReconcileMounts(ctx context.Context, scopeID, sessionID string, 
 			}
 
 			inboxID := s.nextID("inbox")
-			if err := q.InsertConflictInbox(ctx, sqlcgen.InsertConflictInboxParams{
+			if err := q.InsertConflictInbox(ctx, dbgen.InsertConflictInboxParams{
 				ID:          inboxID,
 				ScopeID:     scope,
 				Kind:        string(contract.InboxMountConflict),
@@ -634,7 +632,7 @@ func (s *Store) ListConflicts(ctx context.Context, scopeID string, includeResolv
 		return nil, ErrClosed
 	}
 
-	var rows []sqlcgen.MemoryConflict
+	var rows []dbgen.MemoryConflict
 	var err error
 	if includeResolved {
 		rows, err = s.readQ.ListAllConflictsByScope(ctx, scope)
@@ -652,7 +650,7 @@ func (s *Store) ListConflicts(ctx context.Context, scopeID string, includeResolv
 	return out, nil
 }
 
-func conflictFromRow(r sqlcgen.MemoryConflict) ConflictBranch {
+func conflictFromRow(r dbgen.MemoryConflict) ConflictBranch {
 	return ConflictBranch{
 		ConflictID:      r.ConflictID,
 		ScopeID:         r.ScopeID,
@@ -699,7 +697,7 @@ func (s *Store) ResolveConflict(ctx context.Context, conflictID string, resoluti
 		return Snapshot{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	q := sqlcgen.New(tx)
+	q := dbgen.New(tx)
 
 	row, err := q.GetConflictByID(ctx, conflictID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -762,7 +760,7 @@ func (s *Store) ResolveConflict(ctx context.Context, conflictID string, resoluti
 		}
 	}
 
-	if err := q.MarkConflictResolved(ctx, sqlcgen.MarkConflictResolvedParams{
+	if err := q.MarkConflictResolved(ctx, dbgen.MarkConflictResolvedParams{
 		Resolution:   string(resolution),
 		ResolvedAtMs: nowMs,
 		ConflictID:   cb.ConflictID,
@@ -841,8 +839,8 @@ type headRow struct {
 	nextVersion   int64
 }
 
-func ensureHeadTx(ctx context.Context, q *sqlcgen.Queries, scope string, nowMs int64) (headRow, error) {
-	if err := q.EnsureHead(ctx, sqlcgen.EnsureHeadParams{
+func ensureHeadTx(ctx context.Context, q *dbgen.Queries, scope string, nowMs int64) (headRow, error) {
+	if err := q.EnsureHead(ctx, dbgen.EnsureHeadParams{
 		ScopeID:     scope,
 		UpdatedAtMs: nowMs,
 	}); err != nil {
@@ -858,7 +856,7 @@ func ensureHeadTx(ctx context.Context, q *sqlcgen.Queries, scope string, nowMs i
 	}, nil
 }
 
-func (s *Store) loadActiveSnapshotLocked(ctx context.Context, q *sqlcgen.Queries, scope string) (Snapshot, error) {
+func (s *Store) loadActiveSnapshotLocked(ctx context.Context, q *dbgen.Queries, scope string) (Snapshot, error) {
 	activeVer, err := q.GetActiveVersion(ctx, scope)
 	if errors.Is(err, sql.ErrNoRows) || activeVer == 0 {
 		return Snapshot{ScopeID: scope, Version: 0, Status: VersionStatusActive}, nil
@@ -869,8 +867,8 @@ func (s *Store) loadActiveSnapshotLocked(ctx context.Context, q *sqlcgen.Queries
 	return s.loadVersionLocked(ctx, q, scope, activeVer)
 }
 
-func (s *Store) loadVersionLocked(ctx context.Context, q *sqlcgen.Queries, scope string, version int64) (Snapshot, error) {
-	v, err := q.GetVersion(ctx, sqlcgen.GetVersionParams{
+func (s *Store) loadVersionLocked(ctx context.Context, q *dbgen.Queries, scope string, version int64) (Snapshot, error) {
+	v, err := q.GetVersion(ctx, dbgen.GetVersionParams{
 		ScopeID: scope,
 		Version: version,
 	})
@@ -897,8 +895,8 @@ func (s *Store) loadVersionLocked(ctx context.Context, q *sqlcgen.Queries, scope
 	}, nil
 }
 
-func loadVersionFiles(ctx context.Context, q *sqlcgen.Queries, scope string, version int64) ([]MemoryFile, error) {
-	rows, err := q.ListVersionFiles(ctx, sqlcgen.ListVersionFilesParams{
+func loadVersionFiles(ctx context.Context, q *dbgen.Queries, scope string, version int64) ([]MemoryFile, error) {
+	rows, err := q.ListVersionFiles(ctx, dbgen.ListVersionFilesParams{
 		ScopeID: scope,
 		Version: version,
 	})
@@ -918,7 +916,7 @@ func loadVersionFiles(ctx context.Context, q *sqlcgen.Queries, scope string, ver
 	return files, nil
 }
 
-func loadActiveFileMapTx(ctx context.Context, q *sqlcgen.Queries, scope string, activeVersion int64) (map[string]MemoryFile, error) {
+func loadActiveFileMapTx(ctx context.Context, q *dbgen.Queries, scope string, activeVersion int64) (map[string]MemoryFile, error) {
 	out := make(map[string]MemoryFile)
 	if activeVersion <= 0 {
 		return out, nil
@@ -935,7 +933,7 @@ func loadActiveFileMapTx(ctx context.Context, q *sqlcgen.Queries, scope string, 
 
 func writeNewActiveVersionTx(
 	ctx context.Context,
-	q *sqlcgen.Queries,
+	q *dbgen.Queries,
 	scope string,
 	head headRow,
 	kind VersionKind,
@@ -946,7 +944,7 @@ func writeNewActiveVersionTx(
 ) (Snapshot, error) {
 	newVer := head.nextVersion
 	if head.activeVersion > 0 {
-		if err := q.UpdateVersionStatus(ctx, sqlcgen.UpdateVersionStatusParams{
+		if err := q.UpdateVersionStatus(ctx, dbgen.UpdateVersionStatusParams{
 			Status:  string(VersionStatusSuperseded),
 			ScopeID: scope,
 			Version: head.activeVersion,
@@ -955,7 +953,7 @@ func writeNewActiveVersionTx(
 		}
 	}
 
-	if err := q.InsertVersion(ctx, sqlcgen.InsertVersionParams{
+	if err := q.InsertVersion(ctx, dbgen.InsertVersionParams{
 		ScopeID:       scope,
 		Version:       newVer,
 		ParentVersion: head.activeVersion,
@@ -977,7 +975,7 @@ func writeNewActiveVersionTx(
 	sliceFiles := make([]MemoryFile, 0, len(orderedPaths))
 	for _, p := range orderedPaths {
 		f := files[p]
-		if err := q.InsertVersionFile(ctx, sqlcgen.InsertVersionFileParams{
+		if err := q.InsertVersionFile(ctx, dbgen.InsertVersionFileParams{
 			ScopeID:     scope,
 			Version:     newVer,
 			RelPath:     f.RelPath,
@@ -991,7 +989,7 @@ func writeNewActiveVersionTx(
 		sliceFiles = append(sliceFiles, cloneMemoryFile(f))
 	}
 
-	if err := q.UpdateHeadVersions(ctx, sqlcgen.UpdateHeadVersionsParams{
+	if err := q.UpdateHeadVersions(ctx, dbgen.UpdateHeadVersionsParams{
 		ActiveVersion: newVer,
 		NextVersion:   newVer + 1,
 		UpdatedAtMs:   nowMs,

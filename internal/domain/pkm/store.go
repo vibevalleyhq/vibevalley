@@ -3,7 +3,6 @@ package pkm
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,13 +12,12 @@ import (
 	"sync/atomic"
 	"unicode/utf8"
 
-	"github.com/viant/sqlite-vec/engine"
 	"github.com/viant/sqlite-vec/vec"
 	"github.com/viant/sqlite-vec/vector"
-	_ "modernc.org/sqlite"
 
-	"github.com/vibevalleyhq/vibevalley/internal/domain/pkm/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
@@ -31,15 +29,7 @@ const (
 	defaultRRFK        = 60.0
 )
 
-var (
-	registerVecFuncsOnce sync.Once
-	nextMemDatasetSeq    atomic.Int64
-)
-
-// MigrationsFS holds the embedded SQLite migration scripts for the PKM domain store.
-//
-//go:embed migrations/*.sql
-var MigrationsFS embed.FS
+var nextMemDatasetSeq atomic.Int64
 
 // StoreOption configures a PKM SQLite store.
 type StoreOption func(*storeConfig)
@@ -62,13 +52,69 @@ func WithDatasetID(datasetID string) StoreOption {
 type Store struct {
 	writeDB   *sql.DB
 	readDB    *sql.DB
-	readQ     *sqlcgen.Queries
+	readQ     *dbgen.Queries
 	sameDB    bool
+	ownsDB    bool
 	isMem     bool
 	datasetID string
 
 	mu     sync.Mutex
 	closed atomic.Bool
+}
+
+func newStoreConfig(isMem bool, opts ...StoreOption) storeConfig {
+	var cfg storeConfig
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+	if cfg.datasetID == "" {
+		if isMem {
+			cfg.datasetID = fmt.Sprintf("pkm-mem-%d", nextMemDatasetSeq.Add(1))
+		} else {
+			cfg.datasetID = "pkm"
+		}
+	}
+	return cfg
+}
+
+// OpenStoreFromPool constructs a PKM Store backed by a caller-owned SQLite pool.
+// Callers retain ownership of writeDB and readDB; Close invalidates sqlite-vec caches without closing either handle.
+func OpenStoreFromPool(ctx context.Context, writeDB, readDB *sql.DB, isMem bool, opts ...StoreOption) (*Store, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if writeDB == nil {
+		return nil, fmt.Errorf("%w: writeDB is required", ErrInvalidArgument)
+	}
+	if readDB == nil {
+		readDB = writeDB
+	}
+
+	db.RegisterVec()
+	if err := vec.Register(writeDB); err != nil {
+		return nil, fmt.Errorf("pkm: register sqlite-vec writer: %w", err)
+	}
+	if readDB != writeDB {
+		if err := vec.Register(readDB); err != nil {
+			return nil, fmt.Errorf("pkm: register sqlite-vec reader: %w", err)
+		}
+	}
+
+	cfg := newStoreConfig(isMem, opts...)
+	return &Store{
+		writeDB:   writeDB,
+		readDB:    readDB,
+		readQ:     dbgen.New(readDB),
+		sameDB:    isMem || readDB == writeDB,
+		ownsDB:    false,
+		isMem:     isMem,
+		datasetID: cfg.datasetID,
+	}, nil
 }
 
 // OpenStore opens or creates a SQLite-backed PKM Store with FTS5 trigram and sqlite-vec enabled.
@@ -83,97 +129,45 @@ func OpenStore(ctx context.Context, dsn string, opts ...StoreOption) (*Store, er
 		dsn = ":memory:"
 	}
 
-	var cfg storeConfig
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&cfg)
-		}
-	}
-
-	registerVecFuncsOnce.Do(func() {
-		_ = engine.RegisterVectorFunctions(nil)
-	})
-
-	isMem := dsn == ":memory:" || strings.Contains(dsn, "mode=memory") || strings.Contains(dsn, ":memory:")
-	if cfg.datasetID == "" {
-		if isMem {
-			cfg.datasetID = fmt.Sprintf("pkm-mem-%d", nextMemDatasetSeq.Add(1))
-		} else {
-			cfg.datasetID = "pkm"
-		}
-	}
-
-	writeDB, err := engine.Open(dsn)
+	pool, err := db.OpenPool(ctx, dsn)
 	if err != nil {
-		return nil, fmt.Errorf("pkm: open sqlite writer: %w", err)
-	}
-	writeDB.SetMaxOpenConns(1)
-
-	if err := vec.Register(writeDB); err != nil {
-		_ = writeDB.Close()
-		return nil, fmt.Errorf("pkm: register sqlite-vec: %w", err)
+		return nil, fmt.Errorf("pkm: %w", err)
 	}
 
-	pragmas := []string{
-		"PRAGMA busy_timeout=5000",
-		"PRAGMA foreign_keys=ON",
-		"PRAGMA synchronous=NORMAL",
-	}
-	if !isMem {
-		pragmas = append([]string{"PRAGMA journal_mode=WAL"}, pragmas...)
-	}
-	for _, p := range pragmas {
-		if _, err := writeDB.ExecContext(ctx, p); err != nil {
-			_ = writeDB.Close()
-			return nil, fmt.Errorf("pkm: %s: %w", p, err)
-		}
-	}
-
-	runner, err := migrate.New(writeDB, "pkm", MigrationsFS)
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
 	if err != nil {
-		_ = writeDB.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("pkm: init migrations: %w", err)
 	}
 	if _, err := runner.Up(ctx); err != nil {
-		_ = writeDB.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("pkm: apply schema: %w", err)
 	}
 
-	var readDB *sql.DB
-	sameDB := false
-	if isMem {
-		readDB = writeDB
-		sameDB = true
-	} else {
-		sep := "?"
-		if strings.Contains(dsn, "?") {
-			sep = "&"
-		}
-		readDSN := dsn + sep + "_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)"
-		readDB, err = engine.Open(readDSN)
-		if err != nil {
-			_ = writeDB.Close()
-			return nil, fmt.Errorf("pkm: open sqlite reader: %w", err)
-		}
-		readDB.SetMaxOpenConns(4)
-	}
-
+	cfg := newStoreConfig(pool.IsMem, opts...)
 	return &Store{
-		writeDB:   writeDB,
-		readDB:    readDB,
-		readQ:     sqlcgen.New(readDB),
-		sameDB:    sameDB,
-		isMem:     isMem,
+		writeDB:   pool.WriteDB,
+		readDB:    pool.ReadDB,
+		readQ:     dbgen.New(pool.ReadDB),
+		sameDB:    pool.SameDB,
+		ownsDB:    true,
+		isMem:     pool.IsMem,
 		datasetID: cfg.datasetID,
 	}, nil
 }
 
-// Close releases SQLite connections and invalidates cached sqlite-vec indices.
+// Close invalidates cached sqlite-vec indices and, when owned, releases SQLite connections.
 func (s *Store) Close() error {
+	if s == nil {
+		return nil
+	}
 	if s.closed.Swap(true) {
 		return nil
 	}
 	vec.InvalidateCache(vecShadowName, s.datasetID)
+	if !s.ownsDB {
+		return nil
+	}
 	var firstErr error
 	if !s.sameDB && s.readDB != nil {
 		if err := s.readDB.Close(); err != nil {
@@ -238,11 +232,7 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	txQ, err := sqlcgen.Prepare(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = txQ.Close() }()
+	txQ := dbgen.New(tx)
 
 	ftsStmts, err := prepareFTSBatchStmts(ctx, tx)
 	if err != nil {
@@ -281,7 +271,7 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 
 		var assignedID int64
 		if exists {
-			if err := txQ.UpdateNote(ctx, sqlcgen.UpdateNoteParams{
+			if err := txQ.UpdateNote(ctx, dbgen.UpdateNoteParams{
 				Slug:            note.Slug,
 				Title:           note.Title,
 				Tier:            string(note.Tier),
@@ -296,7 +286,7 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 			}
 			assignedID = noteID
 		} else {
-			res, err := txQ.InsertNote(ctx, sqlcgen.InsertNoteParams{
+			res, err := txQ.InsertNote(ctx, dbgen.InsertNoteParams{
 				RelPath:         note.RelPath,
 				Slug:            note.Slug,
 				Title:           note.Title,
@@ -319,7 +309,7 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 
 		for _, alias := range note.Frontmatter.Aliases {
 			if aliasSlug := SlugOf(alias); aliasSlug != "" {
-				if err := txQ.InsertAlias(ctx, sqlcgen.InsertAliasParams{
+				if err := txQ.InsertAlias(ctx, dbgen.InsertAliasParams{
 					AliasSlug: aliasSlug,
 					RelPath:   note.RelPath,
 				}); err != nil {
@@ -377,7 +367,7 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 			if err != nil {
 				return nil, err
 			}
-			if err := txQ.UpsertVector(ctx, sqlcgen.UpsertVectorParams{
+			if err := txQ.UpsertVector(ctx, dbgen.UpsertVectorParams{
 				DatasetID: s.datasetID,
 				ID:        note.RelPath,
 				Content:   sql.NullString{String: note.Title, Valid: true},
@@ -388,7 +378,7 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 			}
 			wroteVectors = true
 		} else if exists {
-			n, err := txQ.DeleteVectorByID(ctx, sqlcgen.DeleteVectorByIDParams{
+			n, err := txQ.DeleteVectorByID(ctx, dbgen.DeleteVectorByIDParams{
 				DatasetID: s.datasetID,
 				ID:        note.RelPath,
 			})
@@ -409,7 +399,7 @@ func (s *Store) IndexBatch(ctx context.Context, inputs []NoteInput) ([]Note, err
 	}
 
 	if wroteVectors {
-		if err := txQ.DeleteVectorStorage(ctx, sqlcgen.DeleteVectorStorageParams{
+		if err := txQ.DeleteVectorStorage(ctx, dbgen.DeleteVectorStorageParams{
 			ShadowTableName: vecShadowName,
 			DatasetID:       s.datasetID,
 		}); err != nil {
@@ -513,7 +503,7 @@ func (s *Store) DeleteNote(ctx context.Context, relPath string) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	txQ := sqlcgen.New(tx)
+	txQ := dbgen.New(tx)
 	noteID, err := txQ.GetNoteIDByPath(ctx, clean)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
@@ -534,13 +524,13 @@ func (s *Store) DeleteNote(ctx context.Context, relPath string) error {
 	if err := deleteNoteFTS(ctx, tx, noteID); err != nil {
 		return err
 	}
-	if _, err := txQ.DeleteVectorByID(ctx, sqlcgen.DeleteVectorByIDParams{
+	if _, err := txQ.DeleteVectorByID(ctx, dbgen.DeleteVectorByIDParams{
 		DatasetID: s.datasetID,
 		ID:        clean,
 	}); err != nil {
 		return err
 	}
-	if err := txQ.DeleteVectorStorage(ctx, sqlcgen.DeleteVectorStorageParams{
+	if err := txQ.DeleteVectorStorage(ctx, dbgen.DeleteVectorStorageParams{
 		ShadowTableName: vecShadowName,
 		DatasetID:       s.datasetID,
 	}); err != nil {
@@ -570,7 +560,7 @@ func (s *Store) GetNote(ctx context.Context, pathOrRef string) (Note, bool, erro
 
 	clean := normalizeRelSlash(pathOrRef)
 	slug := SlugOf(pathOrRef)
-	row, err := s.readQ.GetNoteByPathOrRef(ctx, sqlcgen.GetNoteByPathOrRefParams{
+	row, err := s.readQ.GetNoteByPathOrRef(ctx, dbgen.GetNoteByPathOrRefParams{
 		RelPath: clean,
 		Slug:    slug,
 		LOWER:   strings.TrimSpace(pathOrRef),
@@ -933,7 +923,7 @@ func (s *Store) searchFTS5TrigramLocked(ctx context.Context, queryText string, l
 	// Short (<3 rune) CJK/English tokens cannot form a 3-rune trigram in FTS5 MATCH;
 	// supplement with exact substring matching via INSTR so 1-2 char queries work seamlessly.
 	for _, st := range shortTerms {
-		rows, err := s.readQ.SearchShortTerms(ctx, sqlcgen.SearchShortTermsParams{
+		rows, err := s.readQ.SearchShortTerms(ctx, dbgen.SearchShortTermsParams{
 			Term:       strings.ToLower(st),
 			LimitCount: int64(limit),
 		})
@@ -992,7 +982,7 @@ func (s *Store) queryBacklinks(ctx context.Context, target string, kind LinkKind
 
 	switch {
 	case usePaths && kindStr != "":
-		rows, err := s.readQ.QueryBacklinksBySlugsOrPathsAndKind(ctx, sqlcgen.QueryBacklinksBySlugsOrPathsAndKindParams{
+		rows, err := s.readQ.QueryBacklinksBySlugsOrPathsAndKind(ctx, dbgen.QueryBacklinksBySlugsOrPathsAndKindParams{
 			Kind:        kindStr,
 			TargetSlugs: targetSlugs,
 			TargetPaths: targetPaths,
@@ -1015,7 +1005,7 @@ func (s *Store) queryBacklinks(ctx context.Context, target string, kind LinkKind
 		return out, nil
 
 	case usePaths:
-		rows, err := s.readQ.QueryBacklinksBySlugsOrPaths(ctx, sqlcgen.QueryBacklinksBySlugsOrPathsParams{
+		rows, err := s.readQ.QueryBacklinksBySlugsOrPaths(ctx, dbgen.QueryBacklinksBySlugsOrPathsParams{
 			TargetSlugs: targetSlugs,
 			TargetPaths: targetPaths,
 		})
@@ -1037,7 +1027,7 @@ func (s *Store) queryBacklinks(ctx context.Context, target string, kind LinkKind
 		return out, nil
 
 	case kindStr != "":
-		rows, err := s.readQ.QueryBacklinksBySlugsAndKind(ctx, sqlcgen.QueryBacklinksBySlugsAndKindParams{
+		rows, err := s.readQ.QueryBacklinksBySlugsAndKind(ctx, dbgen.QueryBacklinksBySlugsAndKindParams{
 			Kind:        kindStr,
 			TargetSlugs: targetSlugs,
 		})
@@ -1100,7 +1090,7 @@ func (s *Store) resolveTargetIdentitiesLocked(ctx context.Context, rawTarget str
 	sort.Strings(seedSlugs)
 
 	if len(seedSlugs) > 0 {
-		noteRows, err := s.readQ.FindNotesBySlugsOrPath(ctx, sqlcgen.FindNotesBySlugsOrPathParams{
+		noteRows, err := s.readQ.FindNotesBySlugsOrPath(ctx, dbgen.FindNotesBySlugsOrPathParams{
 			RelPath: normalizeRelSlash(rawTarget),
 			Slugs:   seedSlugs,
 		})
@@ -1231,7 +1221,7 @@ func (s *Store) filterLinkedPathsLocked(ctx context.Context, linkedTo string) (m
 
 	var sourcePaths []string
 	if len(paths) > 0 {
-		sourcePaths, err = s.readQ.ListSourcePathsByTargetSlugsOrPaths(ctx, sqlcgen.ListSourcePathsByTargetSlugsOrPathsParams{
+		sourcePaths, err = s.readQ.ListSourcePathsByTargetSlugsOrPaths(ctx, dbgen.ListSourcePathsByTargetSlugsOrPathsParams{
 			TargetSlugs: slugs,
 			TargetPaths: paths,
 		})
@@ -1351,7 +1341,7 @@ func (s *Store) listFilteredHitsLocked(ctx context.Context, q SearchQuery, limit
 	return hits, nil
 }
 
-func deleteNoteDetails(ctx context.Context, q *sqlcgen.Queries, fts *ftsBatchStmts, relPath string, noteID int64) error {
+func deleteNoteDetails(ctx context.Context, q *dbgen.Queries, fts *ftsBatchStmts, relPath string, noteID int64) error {
 	if err := q.DeleteAliasesByPath(ctx, relPath); err != nil {
 		return err
 	}
@@ -1364,7 +1354,7 @@ func deleteNoteDetails(ctx context.Context, q *sqlcgen.Queries, fts *ftsBatchStm
 	return fts.deleteByNoteID(ctx, noteID)
 }
 
-func loadExistingNoteIDs(ctx context.Context, q *sqlcgen.Queries) (map[string]int64, error) {
+func loadExistingNoteIDs(ctx context.Context, q *dbgen.Queries) (map[string]int64, error) {
 	rows, err := q.LoadExistingNoteIDs(ctx)
 	if err != nil {
 		return nil, err

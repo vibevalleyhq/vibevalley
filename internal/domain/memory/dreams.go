@@ -9,8 +9,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/vibevalleyhq/vibevalley/internal/domain/memory/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 )
 
 // DreamInput passes an immutable copy of the active memory snapshot and recent completed
@@ -126,7 +126,7 @@ func (s *Store) RunDream(ctx context.Context, req DreamRequest) (contract.DreamP
 		return contract.DreamProposalView{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	q := sqlcgen.New(tx)
+	q := dbgen.New(tx)
 
 	nowMs := s.now()
 	head, err := ensureHeadTx(ctx, q, scope, nowMs)
@@ -148,7 +148,7 @@ func (s *Store) RunDream(ctx context.Context, req DreamRequest) (contract.DreamP
 		summary = fmt.Sprintf("Consolidated %d files (%d duplicates merged)", len(cleanFiles), out.DeduplicatedCount)
 	}
 
-	if err := q.InsertVersion(ctx, sqlcgen.InsertVersionParams{
+	if err := q.InsertVersion(ctx, dbgen.InsertVersionParams{
 		ScopeID:       scope,
 		Version:       candVer,
 		ParentVersion: baseSnap.Version,
@@ -180,7 +180,7 @@ func (s *Store) RunDream(ctx context.Context, req DreamRequest) (contract.DreamP
 				fileVer = prev.Version + 1
 			}
 		}
-		if err := q.InsertVersionFile(ctx, sqlcgen.InsertVersionFileParams{
+		if err := q.InsertVersionFile(ctx, dbgen.InsertVersionFileParams{
 			ScopeID:     scope,
 			Version:     candVer,
 			RelPath:     p,
@@ -194,7 +194,7 @@ func (s *Store) RunDream(ctx context.Context, req DreamRequest) (contract.DreamP
 	}
 
 	// Reserve candidateVersion while keeping active_version untouched.
-	if err := q.UpdateHeadNextVersion(ctx, sqlcgen.UpdateHeadNextVersionParams{
+	if err := q.UpdateHeadNextVersion(ctx, dbgen.UpdateHeadNextVersionParams{
 		NextVersion: candVer + 1,
 		UpdatedAtMs: nowMs,
 		ScopeID:     scope,
@@ -203,7 +203,7 @@ func (s *Store) RunDream(ctx context.Context, req DreamRequest) (contract.DreamP
 	}
 
 	proposalID := s.nextID("dream")
-	if err := q.InsertDreamProposal(ctx, sqlcgen.InsertDreamProposalParams{
+	if err := q.InsertDreamProposal(ctx, dbgen.InsertDreamProposalParams{
 		ProposalID:        proposalID,
 		ScopeID:           scope,
 		BaseVersion:       baseSnap.Version,
@@ -218,7 +218,7 @@ func (s *Store) RunDream(ctx context.Context, req DreamRequest) (contract.DreamP
 	}
 
 	inboxID := s.nextID("inbox")
-	if err := q.InsertDreamInbox(ctx, sqlcgen.InsertDreamInboxParams{
+	if err := q.InsertDreamInbox(ctx, dbgen.InsertDreamInboxParams{
 		ID:          inboxID,
 		ScopeID:     scope,
 		Kind:        string(contract.InboxDreamProposal),
@@ -277,7 +277,7 @@ func (s *Store) ApproveDream(ctx context.Context, proposalID string) (contract.D
 		return contract.DreamProposalView{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	q := sqlcgen.New(tx)
+	q := dbgen.New(tx)
 
 	rec, err := loadDreamRecordTx(ctx, q, proposalID)
 	if err != nil {
@@ -297,7 +297,7 @@ func (s *Store) ApproveDream(ctx context.Context, proposalID string) (contract.D
 	}
 
 	if rec.view.BaseVersion > 0 {
-		if err := q.UpdateVersionStatus(ctx, sqlcgen.UpdateVersionStatusParams{
+		if err := q.UpdateVersionStatus(ctx, dbgen.UpdateVersionStatusParams{
 			Status:  string(VersionStatusSuperseded),
 			ScopeID: rec.scopeID,
 			Version: rec.view.BaseVersion,
@@ -305,21 +305,21 @@ func (s *Store) ApproveDream(ctx context.Context, proposalID string) (contract.D
 			return contract.DreamProposalView{}, err
 		}
 	}
-	if err := q.UpdateVersionStatus(ctx, sqlcgen.UpdateVersionStatusParams{
+	if err := q.UpdateVersionStatus(ctx, dbgen.UpdateVersionStatusParams{
 		Status:  string(VersionStatusActive),
 		ScopeID: rec.scopeID,
 		Version: rec.view.CandidateVersion,
 	}); err != nil {
 		return contract.DreamProposalView{}, err
 	}
-	if err := q.UpdateHeadActiveVersion(ctx, sqlcgen.UpdateHeadActiveVersionParams{
+	if err := q.UpdateHeadActiveVersion(ctx, dbgen.UpdateHeadActiveVersionParams{
 		ActiveVersion: rec.view.CandidateVersion,
 		UpdatedAtMs:   nowMs,
 		ScopeID:       rec.scopeID,
 	}); err != nil {
 		return contract.DreamProposalView{}, err
 	}
-	if err := q.ApproveDreamProposal(ctx, sqlcgen.ApproveDreamProposalParams{
+	if err := q.ApproveDreamProposal(ctx, dbgen.ApproveDreamProposalParams{
 		Status:                string(DreamApproved),
 		PreviousActiveVersion: rec.view.BaseVersion,
 		ResolvedAtMs:          nowMs,
@@ -370,7 +370,7 @@ func (s *Store) RejectDream(ctx context.Context, proposalID string) (contract.Dr
 		return contract.DreamProposalView{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	q := sqlcgen.New(tx)
+	q := dbgen.New(tx)
 
 	rec, err := loadDreamRecordTx(ctx, q, proposalID)
 	if err != nil {
@@ -381,14 +381,14 @@ func (s *Store) RejectDream(ctx context.Context, proposalID string) (contract.Dr
 	}
 
 	nowMs := s.now()
-	if err := q.UpdateVersionStatus(ctx, sqlcgen.UpdateVersionStatusParams{
+	if err := q.UpdateVersionStatus(ctx, dbgen.UpdateVersionStatusParams{
 		Status:  string(VersionStatusRejected),
 		ScopeID: rec.scopeID,
 		Version: rec.view.CandidateVersion,
 	}); err != nil {
 		return contract.DreamProposalView{}, err
 	}
-	if err := q.UpdateDreamProposalStatus(ctx, sqlcgen.UpdateDreamProposalStatusParams{
+	if err := q.UpdateDreamProposalStatus(ctx, dbgen.UpdateDreamProposalStatusParams{
 		Status:       string(DreamRejected),
 		ResolvedAtMs: nowMs,
 		ProposalID:   proposalID,
@@ -438,7 +438,7 @@ func (s *Store) RollbackDream(ctx context.Context, proposalID string) (contract.
 		return contract.DreamProposalView{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	q := sqlcgen.New(tx)
+	q := dbgen.New(tx)
 
 	rec, err := loadDreamRecordTx(ctx, q, proposalID)
 	if err != nil {
@@ -462,7 +462,7 @@ func (s *Store) RollbackDream(ctx context.Context, proposalID string) (contract.
 		targetVer = rec.view.BaseVersion
 	}
 
-	if err := q.UpdateVersionStatus(ctx, sqlcgen.UpdateVersionStatusParams{
+	if err := q.UpdateVersionStatus(ctx, dbgen.UpdateVersionStatusParams{
 		Status:  string(VersionStatusRolledBack),
 		ScopeID: rec.scopeID,
 		Version: rec.view.CandidateVersion,
@@ -470,7 +470,7 @@ func (s *Store) RollbackDream(ctx context.Context, proposalID string) (contract.
 		return contract.DreamProposalView{}, err
 	}
 	if targetVer > 0 {
-		if err := q.UpdateVersionStatus(ctx, sqlcgen.UpdateVersionStatusParams{
+		if err := q.UpdateVersionStatus(ctx, dbgen.UpdateVersionStatusParams{
 			Status:  string(VersionStatusActive),
 			ScopeID: rec.scopeID,
 			Version: targetVer,
@@ -478,14 +478,14 @@ func (s *Store) RollbackDream(ctx context.Context, proposalID string) (contract.
 			return contract.DreamProposalView{}, err
 		}
 	}
-	if err := q.UpdateHeadActiveVersion(ctx, sqlcgen.UpdateHeadActiveVersionParams{
+	if err := q.UpdateHeadActiveVersion(ctx, dbgen.UpdateHeadActiveVersionParams{
 		ActiveVersion: targetVer,
 		UpdatedAtMs:   nowMs,
 		ScopeID:       rec.scopeID,
 	}); err != nil {
 		return contract.DreamProposalView{}, err
 	}
-	if err := q.UpdateDreamProposalStatus(ctx, sqlcgen.UpdateDreamProposalStatusParams{
+	if err := q.UpdateDreamProposalStatus(ctx, dbgen.UpdateDreamProposalStatusParams{
 		Status:       string(DreamRolledBack),
 		ResolvedAtMs: nowMs,
 		ProposalID:   proposalID,
@@ -569,7 +569,7 @@ type dreamRecord struct {
 	view                  contract.DreamProposalView
 }
 
-func loadDreamRecordTx(ctx context.Context, q *sqlcgen.Queries, proposalID string) (dreamRecord, error) {
+func loadDreamRecordTx(ctx context.Context, q *dbgen.Queries, proposalID string) (dreamRecord, error) {
 	row, err := q.GetDreamProposal(ctx, proposalID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return dreamRecord{}, ErrNotFound
