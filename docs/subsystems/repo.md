@@ -1,6 +1,6 @@
 # 仓库
 
-仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。`apps/server/src/modules/repo` 负责仓库新建与克隆、工单 worktree 与分支管理、冲突预检、`.vibevalley/check` 执行、分支合并、GitHub PR / GitLab.com MR 发布及提交统计。
+仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。`internal/domain/repo/` 负责仓库新建与克隆、工单 worktree 与分支管理、冲突预检、`.vibevalley/check` 执行、分支合并、GitHub PR / GitLab.com MR 发布及提交统计。
 
 ## 管什么，不管什么
 
@@ -16,11 +16,9 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/repo/repo.ts` | 对外 `Repo` 服务：新建/克隆、worktree、检查（`verifyCheckout`）与合并、PR 提交、GitHub 检测、失败的 Actions 日志（`failedJobLog`）与 commit 计数 |
-| `apps/server/src/modules/repo/repository.ts`、`git.ts` | 底层 git 命令拼装（`merge-tree`、`commit-tree`、`update-ref`、清理）与子进程限时执行 |
-| `apps/server/src/modules/repo/publish.ts`、`hosting.ts`、`check.ts` | 已有分支与工单共用的检查、按 SHA 推送、平台适配与检查脚本执行 |
-| `apps/server/src/modules/repo/pullSnapshot.ts` | GitHub PR 检查、评审、评论与行内评审线程的 GraphQL/REST 分页快照（`Repo.githubSnapshot`）及失败 Actions 日志提取 |
-| `apps/server/src/modules/repo/workplace.ts` | 仓库技术栈识别、PR 标题正文读取（`vibevalley-pr.md`）与对外形状（`Workplace`、`MergeFailure`） |
+| `internal/domain/repo/registry.go`、`sqlite.go`、`types.go` | 对外 `Repo` 注册表与 SQLite 持久化（`repo` 迁移与 `sqlcgen`）：新建/克隆、worktree、检查与合并 |
+| `internal/domain/repo/git.go` | 底层 git 命令拼装（`merge-tree`、`commit-tree`、`update-ref`、清理）与子进程限时执行 |
+| `internal/domain/gateway/issue_helpers.go`、`handlers_work.go` | 工单改动快照、冲突检查、已有分支提 PR 与 GitHub/GitLab 交互接口处理 |
 | `apps/web/src/features/repo/ReposPage.tsx` | 工作台仓库页（新建、概况、语言占比、提交日历） |
 | `apps/web/src/farm/map/RepoMap.tsx`、`islands.ts` | 像素农场群岛地图与岛屿空位计算 |
 
@@ -49,7 +47,7 @@
 
 **本地合并**
 
-1. **锁外准备**：要求工作树干净，用 `merge-tree` 预检冲突，执行目标仓库自己提供的 `.vibevalley/check`（`repo/check.ts`：没有这个文件记 `not-run`，退出码非 0 就把末尾 40 行交回帮工）并记录当前分支 commit。
+1. **锁外准备**：要求工作树干净，用 `merge-tree` 预检冲突，执行目标仓库自己提供的 `.vibevalley/check`（没有这个文件记 `not-run`，退出码非 0 就把末尾输出交回帮工）并记录当前分支 commit。
 2. **进锁复核与执行**：确认分支 commit 未变、主分支无新增未检提交且无冲突：
    - **本地合并（`merge`）**：在仓库主检出执行 `git merge --no-edit`，成功后强制删除工单 worktree 与分支。
    - **合入父分支（`mergeInto`）**：通过 `commit-tree` 与 `update-ref` 原子推进父分支引用，清理子工单 worktree 与分支。
@@ -71,7 +69,7 @@
 
 - **帮工（`session`）**：用 `checkout`、`releaseCheckout`、`resetCheckout`、`clearCheckout` 开、放、重置、清帮工的检出，读 `houseRules`、`limit`、`usesPullRequests`。
 - **工单（`issue`）**：交付用 `changes`、`branchChanges`、`conflict`、`checkout`（没有帮工时工单自己的检出）、`verifyCheckout`、`merge`、`mergeInto`、`usesPullRequests`、`submitPullRequest`、`pullRequestState`、`finishPullRequest`，跟 PR 用 `githubSnapshot`、`failedJobLog`，模板读 `stack`。
-- **工具与游戏（`tool`、`game`）**：向 `tool/resource.ts` 提供 `vv://github/...` 评审线程快照读取；向 Game 提供用户名下的 `contributions` commit 计数。
+- **工具与游戏（`stack`、`game`）**：向 `resource_read` 提供 `vv://github/...` 评审线程快照读取；向 Game 提供用户名下的 `contributions` commit 计数。
 
 ## 为什么这样
 
@@ -87,5 +85,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/modules/repo/repo.test.ts`、`github.test.ts`、`stack.test.ts`：仓库创建与克隆、worktree 复用与释放回执、未提交改动拒绝合并、`.vibevalley/check` 门禁、无检出合入父分支与 commit 统计测试。
-- `apps/server/src/flows/pull_request.test.ts`、`apps/server/src/flows/pr-follow.test.ts`、`apps/web/test/repos.spec.ts`：PR 提交与合入全流程、CI 回流、工作台仓库新建与群岛地图测试。
+- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/repo/... ./internal/domain/gateway/...`：仓库创建与克隆、worktree 复用与释放回执、未提交改动拒绝合并、`.vibevalley/check` 门禁、无检出合入父分支、PR 提交与 commit 统计测试。
+- `apps/web/test/repos.spec.ts`：工作台仓库新建与群岛地图测试。

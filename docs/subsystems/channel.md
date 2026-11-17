@@ -16,16 +16,12 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/channel/channel.ts`、`contracts.ts` | 对外 `Channel` 服务接口、`ChannelHub`、消息修订与变更订阅流（`channel.follow`、`channel.reports`）与受管 `userReadHub` 发布 |
-| `apps/server/src/modules/channel/store.ts` | `ChannelStore`（单写锁、`Members`、`ChatModel` 内存镜像与 `db.afterCommit` 提交后同步）、频道增删改查与已读游标 |
-| `apps/server/src/modules/channel/writing.ts`、`directory.ts`、`meta.ts` | 消息、提及、串的成员、发言人的席位（`kind`、代谁说 `agent_id`）和消息附带的 `meta` 在一个事务里落库，连同带序号的事件（`channel_event`）；提交后把事件发给读者（`Channel.committed`），写话等读者处理完（`awaitReader`） |
-| `apps/server/src/modules/watch/` | 读者：[观察层](docs/subsystems/watch.md)按自己的游标读事件、排席位、路由、开串、回执 |
-| `apps/server/src/modules/channel/messages.ts`、`embeds.ts` | 地址解析、`@` 识别、搜索过滤与公网链接预览抓取 |
-| `packages/protocol/src/rpc.ts`、`apps/server/src/gateway/http/rpc.ts` | 频道与 Artifact 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)）的契约与服务端挂载 |
-| `apps/server/src/gateway/connector/` | `connector.ts` 桥接协调器、`digest.ts`、`weixin.ts`、`feishu.ts`、`qq.ts` |
-| 表 `channel`、`channel_participant`、`channel_message`、`channel_mention`、`channel_member`、`channel_read_cursor`、`channel_seen`、`channel_event` | 频道与消息存储表；`channel_seen` 是参与者在聊天之外收下的消息，`channel_event` 是按提交次序编号的事件（`posted`、`removed`） |
+| `internal/domain/channel/store.go`、`sqlite.go`、`memory.go`、`types.go`、`migrations.go` | `Channel` 服务与存储：频道、私聊、串、消息、提及、未读游标与并发写锁 |
+| `internal/domain/watch/` | 读者：[观察层](docs/subsystems/watch.md)按游标读事件、排席位、路由、开串、回执 |
+| `packages/protocol/src/rpc.ts`、`internal/domain/gateway/streams.go`、`handlers_collab.go` | 频道与 Artifact 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)）及 HTTP 接口挂接 |
+| `internal/domain/connector/connector.go` | 微信、飞书、QQ 连接器桥接协调、去重与收发调度 |
+| 表 `channel`、`channel_participant`、`channel_message`、`channel_mention`、`channel_member`、`channel_read_cursor`、`channel_seen`、`channel_event` | 频道与消息存储表（`internal/domain/channel/migrations/0001_init.up.sql`）；`channel_seen` 是参与者在聊天之外收下的消息，`channel_event` 是按提交次序编号的事件 |
 | 表 `watch_cursor` | 观察者读到 `channel_event` 的哪一号 |
-| 表 `connector_account`、`connector_inbound`、`connector_outbox` | 外部聊天软件账号、入站去重与出站队列 |
 | `apps/web/src/features/channel/`、`apps/web/src/farm/chat/` | 工作台聊天页、输入框 `composing.ts`、订阅 `follow.ts` 与农场田头窗 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`channel.*`、`connector.*`；附件见[附件](docs/subsystems/attachment.md)）。
@@ -44,9 +40,9 @@
   - 调读取接口、自己说话推进 `channel_read_cursor.read_number`。
   - 会话收下投递的消息记进 `channel_seen`（`Channel.markSeen`）：`Watch` 收到信箱的 `Consumed` 先记它、再贴 👀，按收下的次序，帮工收下输入马上说话不会被它拦。未读（`UnreadOf`）和说话前的新鲜度（`UnseenIn`）都排除这两样，不再查 `session_delivery`。
 - **参与者只记谁在说话，线上读 `ChatMessage.actor`**：一个农场只有一个人。`channel_participant` 记 `kind`（`user`、`agent`、`system`）、名字、「家」，和 agent 的席位代哪个档案说话（`agent_id`）：助手是档案自己说话（没有），帮工（会话、私聊里档案的席位）代它的档案说。消息的 `Actor` 由此得出（代档案说的是 `worker`，否则是 `orchestrator`）。农机、会话里的角色是 `Session` 的事，不记在聊天里；席位由观察层排（`Channel.seat`：助手在开机和档案保存时，帮工在被雇、开串时），频道不依赖 `Agent`。
-- **写话按要做的事分四个门，都落进 `writing.ts` 的 `write`**：`say`（用户的话，页面、连接器和通话都走它，农场随之上线）、`speak`（agent 经说话工具说的话：同样的话 60 秒内是同一条，有没看过的新话先给它看、不发，读完串立刻发顶层频道要确认）、`post`（以谁的名义写进一处：它的家、带上做出来的 Artifact 或图片、服务端里跑的 agent 一轮说的话、通话里说的、工单对它的帮工说的；说话的人读到自己这句）、`notice`（农场的通知，尽力而为、不会失败；`untilUserSpeaks` 的在一处只说一次，直到用户再在那里说话）。消息的 `run` 由调用方给（工具、Artifact 的 `Maker`），频道不问会话。
-- **频道只靠底座，静态检查守着**：`modules/channel` 下的文件（测试也算）只 import 底座（`base`、`infra`、`core`、`setting`、`user`、`attachment`、`provider`）和自己，不读别的模块的表（`modules.test.ts`）。一个帮工的话回应了谁（`messageChanged` 的 `answers`）由频道在写下时算：自它上次在那里说话后点过它名的人里，最近的一个帮工的席位（助手说的话不回应谁）。
-- **频道不认识会话，事件交给读者**：每条消息和每次删除在同一个事务里记一条 `channel_event`（单调的 `seq`）；提交以后按提交的次序发给读者（`Channel.committed`），读者漏了的从 `Channel.events`、`committedOf` 读回。`say`、`speak`、`post`、`note`、`remove` 提交并放开频道的锁以后，等读者处理完这个事件才返回（`Channel.awaitReader`；读者失败就让写话失败，事件留着），`notice` 不等。读者是[观察层](docs/subsystems/watch.md#读频道的事件)，它自己记读到哪（`watch_cursor`）。参与者的「家」（`channel_participant.home_id`，`Channel.homeOf`）是空目标的去处，由观察层在开串、拉起私聊时给。删频道时查谁还指着它：频道只数自己的话题串，工单（定时任务、排队的工单）、连接器（账号）、观察层（在那里的帮工）各自登记 `Channel.guardRemoval`。
+- **写话入口统一收口**：`say`（用户的话，页面、连接器和通话都走它，农场随之上线）、`speak`（agent 经说话工具说的话：同样的话 60 秒内去重，目标有没看过的新话先给它看并按规矩拦截）、`post`（以谁的名义写进一处：带上做出来的 Artifact 或图片、服务端里跑的 agent 一轮说的话、通话或工单对它的帮工说的话）、`notice`（农场的通知，尽力而为；`untilUserSpeaks` 的在一处只说一次）。消息的 `run` 由调用方传入，频道不反查会话。
+- **频道只靠底座，架构测试守边界**：`internal/domain/channel` 只依赖纯配置与底层持久化/公共类型，不反向 import 业务决策模块（由 `arch_test.go` 检查）。
+- **频道不认识会话，事件交给读者**：每条消息和每次删除在同一个事务里记一条 `channel_event`（单调 `seq`）；提交后推送给[观察层](docs/subsystems/watch.md#读频道的事件)，观察层自己维护 `watch_cursor`。删频道前核对话题串与引用保护。
 - **发送幂等键 `sendKey`**：用户发言带 `sendKey`（唯一索引 `(sender, send_key)`），重发返回原消息；帮工 60 秒内向同处发相同正文也自动去重。
 
 ### 受众计算与说话防撞
@@ -103,7 +99,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/modules/watch/watch.test.ts`、`apps/server/src/flows/mention.test.ts`、`apps/server/src/modules/channel/messages.test.ts`：写话等路由、席位、看过的标记、修订号补齐、新鲜度拦截与 `userMentions` 测试；`apps/server/src/modules.test.ts` 查频道只靠底座。
-- `apps/server/src/flows/thread.test.ts`、`talk.test.ts`：工单串跨重开复用与私聊休眠恢复测试。
-- `apps/server/src/gateway/connector/connector.test.ts`、`weixin.test.ts`、`qq.test.ts`：微信/飞书/QQ 收发去重、退避与配对测试。
+- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/channel/... ./internal/domain/watch/... ./internal/domain/connector/...` 和根包 `arch_test.go`：频道读写锁、事件游标、席位、新鲜度拦截、连接器与包依赖边界测试。
 - `apps/web/test/chat.spec.ts`、`chat-messages.spec.ts`、`chat-rest.spec.ts`、`channel-follow.spec.ts`：聊天界面与实时订阅端到端测试。

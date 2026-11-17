@@ -1,6 +1,5 @@
 export {
   type Actor,
-  ActorKindValues,
   type Applied,
   type ArtifactId,
   type BlockId,
@@ -16,7 +15,6 @@ export {
   type MessageId,
   orchestratorRuntime,
   type Outcome,
-  OutcomeValues,
   type Preview,
   type SessionId,
   type Spent,
@@ -40,7 +38,6 @@ export {
   type Agent,
   type AgentProblem,
   type AgentRole,
-  AgentRoleValues,
   type AgentTemplate,
   type AgentValidateRequest,
   type AgentValidation,
@@ -75,7 +72,7 @@ export {
   sessionSystemPrompt,
   type UsageWindow,
 } from "./runtime/shapes";
-export { type Memory, memoryKeep, MemoryKindValues, type MemoryList, type MemoryRequest, type MemorySearch, type RecallPreview } from "./memory/shapes";
+export { type Memory, memoryKeep, type MemoryList, type MemoryRequest, type MemorySearch, type RecallPreview } from "./memory/shapes";
 export type {
   BranchPublication,
   ChangedFile,
@@ -109,7 +106,6 @@ export {
   type Channel,
   type ChannelEvent,
   type ChannelRequest,
-  ChannelTypeValues,
   type ChannelUnread,
   type ChannelUpdate,
   type Chat,
@@ -118,26 +114,21 @@ export {
   type Embed,
   type MessageEdit,
   type MessageHit,
-  MessageKindValues,
   type MessageSearch,
   type Notify,
   type NotifyRequest,
-  NotifyValues,
   type OnSet,
   type ReactionSet,
   type SayRequest,
-  SubjectKindValues,
 } from "./channel/shapes";
 export {
   type Artifact,
   type ArtifactBody,
-  ArtifactBodyValues,
   type ArtifactCard,
   type ArtifactContent,
   type ArtifactDisplay,
   type ArtifactEvent,
   type ArtifactHtmlEdit,
-  ArtifactKindValues,
   type ArtifactListRequest,
   type ArtifactMarkdown,
   artifactPath,
@@ -172,7 +163,6 @@ export {
   type Suggestion,
   type SuggestionCreate,
   type SuggestionEvent,
-  SuggestionStatusValues,
   type TextSpan,
 } from "./artifact/shapes";
 export {
@@ -186,7 +176,6 @@ export {
   type PkmCluster,
   type PkmClusterRequest,
   type PkmComment,
-  PkmCommentStatusValues,
   type PkmJournalRequest,
   type PkmMarkdown,
   type PkmMarker,
@@ -217,7 +206,6 @@ export {
   type PkmVault,
 } from "./pkm/shapes";
 export {
-  type ActWords,
   type AppliedIssue,
   type Assignment,
   type CommentRequest,
@@ -227,7 +215,6 @@ export {
   type IssueAct,
   type IssueAction,
   type IssueAnswer,
-  IssueCanceledValues,
   type IssueFilter,
   type IssueHistory,
   type IssueRefineRequest,
@@ -241,15 +228,12 @@ export {
   IssueStatusValues,
   type IssueTimeline,
   type IssueUpdate,
-  type IssueWatch,
-  LandingValues,
-  MandateStrengthValues,
   type Milestone,
   type Priority,
   PriorityValues,
   type Question,
 } from "./issue/shapes";
-export type { Cron, CronRequest, CronUpdate, CronView, CronWhen } from "./cron/shapes";
+export type { Cron, CronRequest, CronUpdate, CronView } from "./cron/shapes";
 export type { InboxItem, InboxKind } from "./inbox/shapes";
 export type { OrchestratorEval, OrchestratorEvalRequest } from "./orchestrator/shapes";
 export type {
@@ -376,7 +360,6 @@ export {
 export {
   type MediaAudioAccountRequest,
   type MediaAudioJob,
-  MediaAudioKindValues,
   type MediaAudioSegment,
   type MediaCloneRequest,
   type MediaSpeakersRequest,

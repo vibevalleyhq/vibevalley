@@ -25,7 +25,7 @@ export interface Skill {
   name: string;
   description: string;
   body: string;
-  /** Shipped with VibeValley (apps/server/src/agent/skills): read-only, changed only by updating VibeValley. */
+  /** Shipped with VibeValley (`internal/domain/gateway` built-in starter catalog): read-only, changed only by updating VibeValley. */
   builtIn?: boolean;
 }
 

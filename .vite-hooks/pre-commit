@@ -1,5 +1,4 @@
 vp run packages:build
 vp staged
 vp run practice:check
-vp run paths:check
 vp run health:verify

@@ -1,8 +1,8 @@
 # @vibevalley/protocol
 
-The contracts: between the server and the page (the shapes on the wire, their Schemas, the endpoints, the subscriptions,
-and the few pure rules both sides run), and between the page and the program around it (the host). A rule only the server runs belongs to its module in `apps/server/src`, and so do the core
-state's fold and the frame (`apps/server/src/gateway/projection`). No files, no network.
+The contracts: between the Go server (`cmd/vibe-server`) and the page (the shapes on the wire, their Schemas, the endpoints, the subscriptions,
+and the few pure rules both sides run), and between the page and the program around it (the host). A rule only the server runs belongs to its Go package under `internal/domain/`, and so do the core
+state's fold and the frame (`internal/domain/gateway`). No files, no network.
 
 | Entry | What |
 |---|---|
@@ -20,7 +20,7 @@ Every host gives the whole `Host`; a capability it lacks is null, and the page d
 it is in. The page finds its host in `apps/web/src/infra/host.ts` (`currentHost()`: the desktop preload's, the phone's built
 over the bridge, `browserHost` otherwise).
 
-| Member | Desktop (`apps/desktop`) | Phone (`apps/mobile`) | Browser |
+| Member | Desktop (`cmd/vibe-desktop`) | Phone (`apps/mobile`) | Browser |
 |---|---|---|---|
 | `notify(notice)` | a system notification | a local notification | null |
 | `tray(summary)` | the menu bar's title and lines | null | null |

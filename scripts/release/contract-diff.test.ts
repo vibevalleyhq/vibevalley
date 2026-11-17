@@ -7,8 +7,8 @@ describe("the contract diff", () => {
     const changed = numstatOf(
       [
         "10\t2\tpackages/protocol/src/shapes.ts",
-        "3\t0\tapps/server/db/migrations/0001_schema.up.sql",
-        "40\t20\tapps/server/src/issue/issue.ts",
+        "3\t0\tinternal/domain/issue/migrations/0001_init.up.sql",
+        "40\t20\tinternal/domain/issue/service.go",
         "5\t5\tapps/web/src/features/issue/Board.tsx",
       ].join("\n"),
     );
@@ -19,16 +19,16 @@ describe("the contract diff", () => {
       ["schema", 3],
       ["service interfaces", 4],
     ]);
-    expect(s.areas).toEqual(["apps/server", "packages/protocol", "server/issue", "web/issue"]);
+    expect(s.areas).toEqual(["domain/issue", "packages/protocol", "web/issue"]);
     expect(markdownOf(s)).toContain("85 lines changed; 19 of them in the contract (4.5 lines for each contract line).");
   });
 
   it("knows an area and a service's interface line", () => {
-    expect([areaOf("apps/server/src/channel/channel.ts"), areaOf("apps/web/src/features/board/X.tsx"), areaOf("scripts/a.ts")]).toEqual([
-      "server/channel",
+    expect([areaOf("internal/domain/channel/channel.go"), areaOf("apps/web/src/features/board/X.tsx"), areaOf("scripts/a.ts")]).toEqual([
+      "domain/channel",
       "web/board",
       "scripts",
     ]);
-    expect([isServiceLine("    readonly list: () => Effect.Effect<T.Issue[]>;"), isServiceLine("const x = 1;")]).toEqual([true, false]);
+    expect([isServiceLine("type Service interface {"), isServiceLine("const x = 1;")]).toEqual([true, false]);
   });
 });

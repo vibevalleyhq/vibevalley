@@ -30,11 +30,6 @@ export interface MediaTranscriptionRequest extends MediaAudioAccountRequest {
   keyterms?: string[];
   streaming?: boolean;
 }
-export type MediaAudioRequest =
-  | ({ kind: "speakers" } & MediaSpeakersRequest)
-  | ({ kind: "voiceDesign" } & MediaVoiceDesignRequest)
-  | ({ kind: "clone" } & MediaCloneRequest)
-  | ({ kind: "transcription" } & MediaTranscriptionRequest);
 
 export interface MediaAudioVoice {
   id: string;

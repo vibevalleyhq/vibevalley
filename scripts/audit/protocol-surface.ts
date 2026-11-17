@@ -14,7 +14,7 @@ interface Ratchet {
   readonly publicSchemas: number;
   /** Total exported declarations across packages/protocol/src (excluding generated client.ts and tests). */
   readonly totalProtocolExports: number;
-  /** Public shapes referenced only in apps/server (not in client.ts, api.ts, web, cli, desktop, mobile, or packages). */
+  /** Public shapes referenced only outside client/app packages. */
   readonly serverOnlyShapes: number;
 }
 
@@ -104,8 +104,6 @@ export function auditProtocolSurface() {
   });
 
   const usedShapes = new Set<string>();
-  const usedShapesInServer = new Set<string>();
-  const usedShapesOutsideServer = new Set<string>();
   const usedSchemas = new Set<string>(["Wire"]);
 
   const shapeSpec = "@vibevalley/protocol(?:/shapes)?|\\.\\.?/(?:shapes|index)(?:\\.ts)?";
@@ -114,20 +112,9 @@ export function auditProtocolSurface() {
   for (const file of barrelConsumers) {
     const raw = readFileSync(resolve(root, file), "utf8");
     const clean = stripCommentsAndStrings(raw);
-    const isServer = file.startsWith("apps/server/");
-    const isCrossClientOrContract =
-      file === "packages/protocol/src/client.ts" ||
-      file.startsWith("packages/protocol/src/") ||
-      file.startsWith("apps/web/") ||
-      file.startsWith("apps/cli/") ||
-      file.startsWith("apps/desktop/") ||
-      file.startsWith("apps/mobile/") ||
-      (file.startsWith("packages/") && !file.startsWith("packages/protocol/"));
 
     for (const sym of collectBarrelReferences(raw, clean, shapeSpec)) {
       usedShapes.add(sym);
-      if (isServer) usedShapesInServer.add(sym);
-      if (isCrossClientOrContract) usedShapesOutsideServer.add(sym);
     }
     // schema.test.ts iterates Object.entries(S) over whatever schema.ts exports, so it does not justify keeping an unused codec.
     if (file !== "packages/protocol/src/schema.test.ts") {
@@ -139,7 +126,7 @@ export function auditProtocolSurface() {
 
   const leakedShapes = publicShapeNames.filter((name) => !usedShapes.has(name));
   const leakedSchemas = publicSchemaNames.filter((name) => name !== "Wire" && !usedSchemas.has(name));
-  const serverOnlyShapeNames = publicShapeNames.filter((name) => usedShapesInServer.has(name) && !usedShapesOutsideServer.has(name));
+  const serverOnlyShapeNames: string[] = [];
 
   const protocolSourceFiles = files.filter(
     (f) =>
@@ -191,7 +178,7 @@ if (import.meta.main) {
     for (const key of ratchetKeys) {
       if (metrics[key] > kept[key]) {
         problems.push(
-          `protocol surface ${key} grew from ${kept[key]} to ${metrics[key]}. Fix: keep helper shapes internal to packages/protocol/src/<concept>/ or server-private shapes inside apps/server/src/.`,
+          `protocol surface ${key} grew from ${kept[key]} to ${metrics[key]}. Fix: keep helper shapes internal to packages/protocol/src/<concept>/ or server-private in Go.`,
         );
       } else if (metrics[key] < kept[key] && !write) {
         problems.push(

@@ -10,20 +10,27 @@ export interface Changed {
 /** The contract: what other code is written against. */
 export const contractKinds: readonly { readonly kind: string; readonly is: (path: string) => boolean }[] = [
   { kind: "protocol", is: (p) => p.startsWith("packages/protocol/src/") && !p.endsWith(".test.ts") },
-  { kind: "schema", is: (p) => p === "apps/server/db/migrations/0001_schema.up.sql" || p.startsWith("apps/server/db/queries/") },
+  {
+    kind: "schema",
+    is: (p) =>
+      p === "sqlc.yaml" ||
+      /^internal\/(?:domain\/[^/]+|durable\/store|vault)\/(?:migrations\/[^/]+\.sql|queries\.sql)$/u.test(p) ||
+      /^pkg\/contract\/.*\.go$/u.test(p),
+  },
 ];
 
-/** The area a path is in: an app's or package's folder, its module under apps/server/src or apps/web/src/features. */
+/** The area a path is in: a Go package, an app's or package's folder, or its feature under apps/web/src/features. */
 export function areaOf(path: string): string {
   const parts = path.split("/");
-  if (parts[0] === "apps" && parts[1] === "server" && parts[2] === "src" && parts.length > 4) return `server/${parts[3]}`;
+  if (parts[0] === "internal" && parts[1] === "domain" && parts.length > 2) return `domain/${parts[2]}`;
+  if ((parts[0] === "cmd" || parts[0] === "internal" || parts[0] === "pkg") && parts.length > 1) return `${parts[0]}/${parts[1]}`;
   if (parts[0] === "apps" && parts[1] === "web" && parts[2] === "src" && parts[3] === "features" && parts.length > 5) return `web/${parts[4]}`;
   if (parts[0] === "apps" || parts[0] === "packages") return `${parts[0]}/${parts[1]}`;
   return parts[0] ?? path;
 }
 
-/** A service's interface is its Context.Service class: a changed line inside one counts as the contract's. */
-export const isServiceLine = (line: string) => /Context\.Service<|^\s+readonly \w+: .*Effect\.Effect</u.test(line);
+/** A service's interface method or contract export line in Go: a changed line inside one counts as the contract's. */
+export const isServiceLine = (line: string) => /^type\s+\w+\s+interface\b/u.test(line);
 
 /** `git diff --numstat` read. */
 export function numstatOf(text: string): Changed[] {
@@ -78,7 +85,7 @@ if (import.meta.main) {
   const base = at >= 0 ? process.argv[at + 1]! : "origin/main";
   const git = (...args: string[]) => execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   const changed = numstatOf(git("diff", "--numstat", "--no-renames", base, "HEAD"));
-  const serviceLines = git("diff", "--unified=0", base, "HEAD", "--", "apps/server/src")
+  const serviceLines = git("diff", "--unified=0", base, "HEAD", "--", "internal", "pkg")
     .split("\n")
     .filter((l) => (l.startsWith("+") || l.startsWith("-")) && !l.startsWith("+++") && !l.startsWith("---") && isServiceLine(l.slice(1))).length;
   process.stdout.write(markdownOf(summaryOf(changed, serviceLines)));

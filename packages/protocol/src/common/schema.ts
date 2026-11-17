@@ -25,7 +25,6 @@ export const issueId = mint("IssueId");
 export const sessionId = mint("SessionId");
 export const artifactId = mint("ArtifactId");
 export const blockId = mint("BlockId");
-export const suggestionId = mint("SuggestionId");
 export const messageId = mint("MessageId");
 
 /** JSON text read as x: a stored column, a file, a line. Not JSON, or JSON not of x's shape, fails the parse. */

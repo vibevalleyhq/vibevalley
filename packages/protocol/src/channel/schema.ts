@@ -6,11 +6,11 @@ import type { Codec } from "../codec";
 import { Actor, MessageId, Outcome, SessionId, Spent } from "../common/schema";
 import * as T from "./shapes";
 
-export const MessageKind = z.enum(T.MessageKindValues) satisfies Codec<T.MessageKind>;
+const MessageKind = z.enum(T.MessageKindValues) satisfies Codec<T.MessageKind>;
 
-export const Notify = z.enum(T.NotifyValues) satisfies Codec<T.Notify>;
+const Notify = z.enum(T.NotifyValues) satisfies Codec<T.Notify>;
 
-export const Embed = z.object({
+const Embed = z.object({
   url: z.string(),
   title: z.string(),
   description: z.string(),
@@ -50,9 +50,9 @@ export const ChatMessage = z.object({
   blocks: z.exactOptional(z.array(QuotedBlock)),
 }) satisfies Codec<T.ChatMessage>;
 
-export const ChannelType = z.enum(T.ChannelTypeValues) satisfies Codec<T.ChannelType>;
+const ChannelType = z.enum(T.ChannelTypeValues) satisfies Codec<T.ChannelType>;
 
-export const SubjectKind = z.enum(T.SubjectKindValues) satisfies Codec<T.SubjectKind>;
+const SubjectKind = z.enum(T.SubjectKindValues) satisfies Codec<T.SubjectKind>;
 
 export const Channel = z.object({
   id: z.string(),

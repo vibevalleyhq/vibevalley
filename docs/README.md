@@ -69,16 +69,16 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 助手 | assistant | orchestrator（角色是 `orchestrator` 的档案） | 管家（指这个角色时）、manager、工头（指助手时）、主 agent |
 | 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 工人、子 agent、worker、执行（指帮工时） |
 | 在场 | here | `Session.hired`（核心状态里雇来的会话） | 地里 |
-| 一轮 | a round of work | `Run`（`session_run` 表） | 一次干活、turn（指一轮时） |
+| 一轮 | a round of work | `Run` | 一次干活、turn（指一轮时） |
 | 档案 | profile | agent（`Agent`） | 帮工档案、角色（指档案时） |
 | 农机 | machine | runtime（`RuntimeInfo`） | harness、引擎、runtime（中文界面） |
 | 工单 | ticket | issue（`Issue`） | job、ticket |
 | Artifact | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 稿子、草稿（指 Artifact 时）、产出、文档（指 Artifact 时）、doc（指 Artifact 时） |
-| 笔记 | notes | pkm（`Pkm`，一页 `PkmPage`，一块 `PkmBlock`） |  |
+| 笔记 | notes | pkm（`pkm`，一页 `PkmPage`，一块 `PkmBlock`） |  |
 | 仓库 | repo | repo（`RepoSummary`） | 一块地 |
-| 空间 | space | `SpaceState`；目录是 `ServerConfig` 的 `workRoot` | 世界、全图 |
-| 宿主 | host | `ServerConfig.home`（`$VIBEVALLEY_HOME`） |  |
-| 空位 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.room`；每台农机另有 `maxWorking` | 并发位、空地 |
+| 空间 | space | `SpaceState`；目录是 `AppConfig` 的 `workRoot` | 世界、全图 |
+| 宿主 | host | `AppConfig`（`$VIBEVALLEY_HOME`） |  |
+| 空位 | spot | `maxSessions`、`Room`；每台农机另有 `maxWorking` | 并发位、空地 |
 | 档案模板 | profile template | `AgentTemplate`（`agent.template.*`） | 种子、预设 |
 | 工单模板 | ticket template | issue template（`IssueTemplate`、`repo.template.list`） | seed |
 | 阶段 | what it is doing | phase（`Session.phase`） | 状态（指阶段时） |
@@ -94,18 +94,18 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 验收意见 | review note | finding（`Issue.findings`） | 草（农场的皮里用） |
 | 验收标准 | criteria | `Issue.criteria`、`CriterionCheck`、`CheckResult` |  |
 | 问题 | question | questions（`Issue.questions`、`Question`） | 缺肥 |
-| 轨迹 | trajectory | `SessionEvent`（服务端由 `Journal` 记，页面由 `Trajectory`、`WorkLog` 画） | 干活过程、日志（指轨迹时）、trace |
+| 轨迹 | trajectory | `SessionEvent`（页面由 `Trajectory`、`WorkLog` 画） | 干活过程、日志（指轨迹时）、trace |
 | 记性 | memory | memory（`Memory`） | 记忆库 |
 | 技能 | skill | skill（`Skill`） | 插件（指技能时） |
-| 人设 | persona | `persona.md`、`PersonaMode` |  |
-| 帮手 | subagent | subagent（`agent_todo.executor` 的 `subagent`） |  |
-| 自己的任务 | todo | `Todo`（`agent_todo` 表，工具 `todo_add`、`todo_update`、`todo_list`） |  |
+| 人设 | persona | `Persona`、`PersonaMode` |  |
+| 帮手 | subagent | subagent（`Subagent`） |  |
+| 自己的任务 | todo | 持久化任务（`durable_task` 表） |  |
 | 父工单 | parent issue | `Issue`（有子工单） | 计划图、TaskGraph |
 | 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | Task、步骤状态机 |
 | 派活 | dispatch | hire（`Issue.hire`、事实 `FactSessionChanged`） |  |
 | 派工关联 | assignment | `Assignment`（`issue_assignment`） |  |
-| 执行器 | executor | `Executions`（`executor.ts`） |  |
-| 起草 | refine | refine（`IssueRefinement`、`issue.refine`） |  |
+| 执行器 | executor | `Executions`（`internal/machine/exec.go`） |  |
+| 起草 | refine | refine（`issue.refine`） |  |
 | 用户 | user | user（`User`、`userId`） | 主人、owner |
 | 田头 | the farm chat | 默认频道（`Channel.defaultChannel`） | 群（指默认频道时） |
 | 私聊 | direct message | direct | 私信 |
@@ -113,12 +113,12 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 频道 | channel | channel（`Channel`） | 群（指频道时）、群聊 |
 | 串 | thread | thread | 子频道 |
 | 附件 | attachment | `Attachment`（`attachment` 表） |  |
-| 素材库 | library | `Media` 的 `libraryItems` 等（`media_library_item` 表） | 媒体（指这一页时） |
-| 工作目录 | working folder | `Workplace`（`workdir`） | 工作区 |
+| 素材库 | library | `LibraryItem`、`LibraryItems` | 媒体（指这一页时） |
+| 工作目录 | working folder | `Worktree`、`WorkRoot` | 工作区 |
 | 定时任务 | scheduled task | cron（`Cron`） | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
 | Inbox | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 通知（指 Inbox 时）、来电（农场的皮里用） |
 | 提醒 | notice | `Core.notice`、`NoticeLevel`（事件流里是 `LiveEventNotice`） |  |
-| 巡查 | patrol | `patrolStep`（`Inbox.patrol`） |  |
+| 巡查 | patrol | `patrol` |  |
 | 通话 | call | `VoiceCall`（`voice.call.*`） |  |
 | 听写 | dictation | dictation（`Dictation`） |  |
 | 连接器 | connector | `Connector` |  |
@@ -127,12 +127,12 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 ### 农场的皮
 
-农场把上面的东西画成种地。这些词只在农场的画面（`apps/web/src/farm`）和游戏（`apps/server/src/modules/game`、账本、成就）里用，工单的状态、动作、拒绝、提醒、工具和助手的话都不用；代码由 `scripts/docs/stale-names.ts` 查，词典由 `vpx scripts/gen/i18n.ts check` 查（皮的命名空间除外）。地长什么样见[农场的皮](docs/subsystems/farm.md)。
+农场把上面的东西画成种地。这些词只在农场的画面（`apps/web/src/farm`）和游戏（`internal/domain/game`、账本、成就）里用，工单的状态、动作、拒绝、提醒、工具和助手的话都不用；代码由 `scripts/docs/stale-names.ts` 查，词典由 `vpx scripts/gen/i18n.ts check` 查（皮的命名空间除外）。地长什么样见[农场的皮](docs/subsystems/farm.md)。
 
 | 农场里 | English | 实际是 | 代码里 |
 |---|---|---|---|
 | 地 | plot | 一张工单（开 worktree 的代码工单带一个 worktree）；一座岛上的空位是这个仓库的空位 | `FarmView.plots` 按工单的 id 做键（`plotKeyOf`：重开的工单还是这块地）；像素村里的位置是 station，画出来的那块地在客户端叫 `Bed` |
-| 种子袋 | seed bag | 待办（排队等空位的工单） | `todo`、`queued_at` |
+| 种子袋 | seed bag | 待办（排队等空位的工单） | `todo` |
 | 播种袋里的种子 | seeds | 工单模板 | `IssueTemplate` |
 | 播种、发芽、长叶 | sow, sprout, leafy | 处理中 | `in_progress`，帮工 `working` |
 | 开花 | flowering | 等你看 | `in_review`，帮工 `done` |

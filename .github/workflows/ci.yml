@@ -57,34 +57,19 @@ jobs:
       - run: vp run health:verify
       - run: vp run deadcode
 
-  server-tests:
-    name: server ${{ matrix.shard }}/3
+  server:
+    name: server
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
       - uses: ./.github/actions/setup
-        with: { shard: "${{ matrix.shard }}" }
-      - if: matrix.shard == 1
-        run: vp run --filter @vibevalley/server db:check
-      - if: matrix.shard == 1
-        run: vp run server:packages
-      - run: vp run --filter @vibevalley/server test --shard=${{ matrix.shard }}/3
-
-  # The one check main requires for the server: it passes only when every shard did.
-  server:
-    name: server
-    needs: server-tests
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - run: test "${{ needs.server-tests.result }}" = success
+      - run: vp run packages:build
+      - run: vpx scripts/gen/go-sqlc.ts --check
+      - run: vpx scripts/gen/go-contract.ts --check
+      - run: env -u GOROOT CGO_ENABLED=0 go vet ./...
+      - run: env -u GOROOT CGO_ENABLED=0 go test -count=1 ./...
 
   web:
     name: web
@@ -106,10 +91,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
       - uses: ./.github/actions/setup
-      - run: xvfb-run -a vp run desktop:test
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure()
-        with: { name: desktop-test-results, path: apps/desktop/test-results, retention-days: 7 }
+      - run: vp run desktop:test
 
   site:
     name: site

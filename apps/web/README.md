@@ -1,8 +1,6 @@
 # apps/web
 
-The page, in Solid 2 (`solid-js`, `@solidjs/web`, pinned to one RC): the workbench every host shows (Electron in
-`apps/desktop`, a browser, the phone's WebView). The server serves it at `/` (`vp run start --web ../web/dist` in
-`apps/server`), so the page and the API share one origin.
+The page, in Solid 2 (`solid-js`, `@solidjs/web`, pinned to one RC): the workbench every host shows (the Go desktop shell in `cmd/vibe-desktop`, a browser, the phone's WebView). The Go server (`cmd/vibe-server`) serves it at `/` (`--web apps/web/dist`), so the page and the API share one origin.
 
 ```
 src/main.tsx        sends an unpaired remote browser to /pair, then renders App

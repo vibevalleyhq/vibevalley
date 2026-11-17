@@ -84,7 +84,15 @@ export async function runVerification(command: string[] = [], options: Verificat
   const work = join(evidence, "work");
   const binaries = join(evidence, "bin");
   for (const path of [home, work, binaries]) mkdirSync(path);
-  const env: Record<string, string> = { ...isolatedEnvironment(home, work), ...(options.scriptedHelper === true ? { VIBEVALLEY_TEST_RUNTIMES: "1" } : {}) };
+  const env: Record<string, string> = {
+    ...isolatedEnvironment(home, work),
+    ...(options.scriptedHelper === true
+      ? {
+          VIBEVALLEY_TEST_RUNTIMES: "1",
+          VIBEVALLEY_AGENT_STARTERS: "backend,tester,frontend,docs,scout,night,claude,codex,lab,slides,collector,pages,reviewer",
+        }
+      : {}),
+  };
   const serverBin = join(binaries, "vibe-server");
   const cli = join(binaries, "vibe");
   buildGoBinary(root, "./cmd/vibe-server", serverBin);

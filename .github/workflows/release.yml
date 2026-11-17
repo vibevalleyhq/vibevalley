@@ -1,6 +1,5 @@
-# A version tag (v0.2.0) builds the macOS app and puts it in a draft release: the .dmg for a first install, the .zip and
-# release.json the desktop app updates itself from (apps/desktop src/update.ts). The draft is published by hand once
-# someone has looked at it; until then the app's latest/download does not see it.
+# A version tag (v0.2.0) builds the macOS desktop binary and puts it in a draft release. The draft is published by
+# hand once someone has looked at it.
 name: release
 
 on:
@@ -35,6 +34,6 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           version="${TAG#v}"
-          jq -r '.notes | map("- " + .) | join("\n")' apps/desktop/dist/release.json > notes.md
+          printf '- Release %s\n' "$TAG" > notes.md
           gh release create "$TAG" --draft --verify-tag --title "VibeValley $version" --notes-file notes.md \
-            apps/desktop/dist/VibeValley-"$version"-*.dmg apps/desktop/dist/VibeValley-"$version"-*.zip apps/desktop/dist/release.json
+            dist/vibe-desktop

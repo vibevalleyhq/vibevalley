@@ -10,7 +10,7 @@
 | MOSS 账号模型目录查询、用途模型校验和解析 | 录音设备、通话、中继与字幕（[语音](docs/subsystems/voice.md)） |
 | 脱敏的公共状态、配置版本冲突与迟到查询结果 | 外部编码农机的登录、模型和凭据（[档案和农机](docs/subsystems/agent.md)） |
 
-当前适配器为 MOSS；供应商目录（`apps/server/src/platform/provider/vendors.ts`）还列出 DeepSeek（助手的对话模型）与声网（通话线路），它们的钥匙仍在各自的设置里。用的地方只拿到不认供应商的账号：连接、revision、模型、Key 的指纹，和封着 Key 与 Provider 自己 `fetch` 的调用。自建兼容转写地址仍由听写设置配置，Provider 统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
+当前适配器为 MOSS；供应商目录（`internal/domain/setting/catalog.go`）还列出 DeepSeek 等对话模型与声网（通话线路），它们的钥匙统一受设置与 `vault` 保护。用的地方只拿到脱敏后的账号视图与版本快照：连接、revision、模型与 Key 提示；自建兼容转写地址仍由听写设置配置，服务端统一解析调用配置，不把任意地址当成 MOSS 官方连接。媒体任务由 Media 管；Provider 只选择账号和模型、查询目录与音色，不因保存设置自动发起生成或上传。
 
 ## 在哪
 
@@ -18,13 +18,13 @@
 |---|---|
 | `packages/provider/src/moss/models.ts` | 官方模型目录的认证请求、响应解码和安全错误分类 |
 | `packages/provider/src/moss/image-models.ts` | 已适配的生图模型与快照；配置校验与生图协议共用唯一列表 |
-| `packages/provider/src/base/transcription.ts` | 支持的 MOSS 转写模型、官方地址、唯一的兼容转写客户端 |
-| `apps/server/src/platform/provider/` | `Provider` 服务、供应商目录 `vendors.ts`、连接变更规则与不认供应商的能力出口 |
-| `apps/server/src/platform/setting/provider.ts` | `settings.json.providers` 的私有 Schema 与单一绑定规则 `bindingOf` |
+| `packages/provider/src/base/transcription.ts` | 支持的 MOSS 转写模型、官方地址、转写客户端定义 |
+| `internal/domain/setting/setting.go`、`catalog.go` | `settings.json` 连接与九种用途绑定存储、版本号校验与脱敏目录 |
+| `internal/domain/gateway/handlers_platform.go` | `provider.*` 接口处理、目录/音色查询转发与冲突返回 |
 | `packages/protocol/src/provider/` | 公共形状、Schema 和接口权限 |
 | `apps/web/src/features/provider/` | `/settings/providers` 的连接与默认用途表单 |
 
-接口清单见 [capabilities.md](docs/reference/capabilities.md)。Provider 在 Platform 中、Setting 之后组装；后层 Voice 依赖 Provider，Provider 不依赖 Voice。
+接口清单见 [capabilities.md](docs/reference/capabilities.md)。Setting 存储层排在依赖链底座，后层 Voice 与 Media 读取账号配置与版本快照。
 
 ## 模型和不变量
 
@@ -56,7 +56,7 @@
 ## 为什么这样
 
 - **Provider 管选择，Setting 管存储**：目录与用途被多种能力使用，不放进 Voice；私有配置留在现有原子文件中，避免两个存储所有者互相同步。
-- **能力挂在单一 `Provider` 服务上，供应商作数据目录（`vendors.ts`）**：遵循一模块一服务，不为每个能力另起服务，也不在启动时定死供应商（绑定可在运行期切换）；调用方只拿不认供应商的 `Account` 快照（连接、revision、模型、Key 指纹和封着 `Provider` 自身 `fetch` 的调用）与能力自己的错误类型，Media 等模块不直接依赖 `@vibevalley/provider/moss/*`。
+- **能力挂在单一配置与版本快照上，供应商作为数据目录（`internal/domain/setting/catalog.go`）**：Media 与 Voice 等业务域不耦合底层厂商细节，通过版本化账号配置获取凭据与绑定状态。
 - **整组配置加版本检查**：连接数量有上限，用户可在一次保存中解绑再删除，引用校验不会出现中间失效状态；不为小目录引入多表事务或事件流。
 - **不自动迁移散置凭据**：内部格式直接采用连接与用途，不保留两套 Key 的回退优先级。已有旧配置需由用户重新填写，开发和验收只使用隔离家目录。
 - **目录查询不复用实时握手验证**：查询账号模型不需要建立语音会话；MOSS Live 的握手检查留在语音页，只验证绑定的实时连接。
@@ -65,10 +65,7 @@
 
 - `packages/provider/src/moss/models.test.ts`：认证头、未知模型、重定向、响应上限、错误分类、超时、取消与凭据保护。
 - `packages/provider/src/moss/speech.test.ts`、`audio-tasks.test.ts`、`voices.test.ts`：同步／异步提交、状态读取、分页、响应上限、取消、超时和脱敏；只证明协议，不证明生成产品或真实厂商可用。
-- `apps/server/src/platform/provider/speech.test.ts`：四个单人语音模型的独立绑定、凭据轮换、不可变快照、引用保护与账号音色分页；配置变化后拒绝迟到结果。
-- `apps/server/src/platform/provider/provider.test.ts`：凭据更新、用途引用、账号隔离、版本冲突、并发保存、迟到目录结果。
-- `apps/server/src/platform/setting/setting.test.ts`：权限 `0600`、私有配置重启后保留、公共设置只暴露就绪状态。
-- `apps/server/src/gateway/voice/voice.test.ts`、`http/moss.test.ts`：听写使用选择的模型与连接、MOSS Live 使用绑定密钥、自建转写与实时中继回归。
+- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/setting/... ./internal/domain/voice/... ./internal/domain/gateway/...`：凭据更新、用途引用、版本冲突、密钥 `0600` 保护、听写与 MOSS Live 配置隔离回归。
 - `apps/web/test/providers.spec.ts`：真实隔离服务端上的表单保存、刷新、密钥脱敏、冲突草稿、用途解绑清除与空选项显示。
 - `apps/web/test/a11y.spec.ts`：已绑定生图与理解模型的浅深主题无障碍检查、390px 窄屏与截图；模型与语音网络适配由不联网协议测试覆盖，不当作真实厂商效果验收。
 

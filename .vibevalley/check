@@ -11,9 +11,9 @@ web=false
 while IFS= read -r path; do
     case "$path" in
         packages/base-ui/*|packages/engine/*|packages/stories/*|packages/health/*|packages/tsrs/*) ;;
-        apps/server/*|apps/cli/*|packages/*) server=true ;;
+        cmd/*|internal/*|pkg/*|go.mod|go.sum|sqlc.yaml|arch_test.go|packages/*) server=true ;;
     esac
-    case "$path" in apps/web/*|apps/desktop/*|apps/mobile/*|packages/*) web=true ;; esac
+    case "$path" in apps/web/*|apps/mobile/*|packages/*) web=true ;; esac
 done <<PATHS
 $changed
 PATHS
@@ -25,7 +25,7 @@ for key in $(env | cut -d= -f1); do
     esac
 done
 
-# Narrowest checks first; vp install's prepare hook runs packages:build, and docs:verify includes paths:check.
+# Narrowest checks first; vp install's prepare hook runs packages:build.
 vp install --frozen-lockfile
 vp check --deny-warnings
 if "$server"; then

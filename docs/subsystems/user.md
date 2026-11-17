@@ -1,25 +1,25 @@
 # 用户和设备
 
-一个服务端只有一个用户（`User`，`apps/server/src/platform/user/user.ts`）。在跑服务端的那台电脑上，来自本机的请求就是这个用户，不用登录；从别处来的只经[那道门](docs/subsystems/lan.md)进来，每台设备凭自己的一把钥匙。用户有名字（界面和提示词称呼他用它，能改）和一个密码（只在本机设）。
+一个服务端只有一个用户（`User`，`internal/domain/user/user.go`）。在跑服务端的那台电脑上，来自本机的请求就是这个用户，不用登录；从别处来的只经[那道门](docs/subsystems/lan.md)进来，每台设备凭自己的一把钥匙。用户有名字（界面和提示词称呼他用它，能改）和一个密码（只在本机设）。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 账号（`user_account`，至多一行）：名字、密码的 scrypt 哈希 | 门的监听、按来路放行、Cookie（[连接到本机](docs/subsystems/lan.md)） |
-| 设备（`user_device`）：每台一把钥匙，来路 `paired` 或 `login`，最近一次来、收回、久不用作废 | 配对码与本机点头的状态机（`Lan`） |
+| 账号（名字与密码哈希） | 门的监听、按来路放行、Cookie（[连接到本机](docs/subsystems/lan.md)） |
+| 设备（`internal/domain/user/device.go`）：每台一把钥匙，来路 `paired` 或 `login`，最近一次来、收回、久不用作废 | 配对码与本机点头的状态机（`Lan`） |
 | 凭密码登录：限次、锁定 | 帮工的会话令牌和 `/mcp`（[帮工](docs/subsystems/session.md)） |
-| 凭确认码登录（命令行的 `vibevalley auth login`）：请求、同意、取钥匙 | 命令行把钥匙存在哪、带给谁（`apps/cli/README.md`，`@vibevalley/home` 的 `auth.json`） |
+| 凭确认码登录（`cmd/vibe/auth.go` 的 `vibe auth login`）：请求、同意、取钥匙 | 命令行把钥匙存在 `@vibevalley/home` 的 `auth.json` |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/platform/user/user.ts` | 服务 `User`：账号、设备、钥匙的哈希比对、登录请求；收回时发 `revoked` 流 |
-| `apps/server/src/gateway/http/handlers/user.ts` | `user.*` 接口；从门转来的请求头（`x-vibevalley-outside`、`x-vibevalley-lan-device`、`x-vibevalley-from`）读出 `Caller` |
+| `internal/domain/user/user.go`、`device.go`、`approval.go` | 账号、设备管理、钥匙校验、设备授权确认码状态机 |
+| `internal/domain/gateway/handlers_platform.go`、`auth.go` | `user.*` 接口与 `lan` 转发请求头（`x-vibevalley-outside`、`x-vibevalley-lan-device`、`x-vibevalley-from`）解析 |
 | `packages/protocol/src/user/` | 形状和接口（`UserStatus`、`UserDevice`、`Approval…`、`deviceKeyCookie`） |
 | `apps/web/src/features/user/` | `/login`、`/approve`、设置「设备」页里的名字和密码、等你同意的登录、全部设备；门外打开的页面先去哪（`entry.ts`） |
-| `apps/cli/src/commands/auth.ts` | `vibevalley auth login|status|logout` |
+| `cmd/vibe/auth.go` | `vibe auth login|status|logout` |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`user.*`）。
 
@@ -44,15 +44,15 @@
 
 **终端登录**：
 
-1. `vibevalley auth login <服务端>` 先问 `user.get`：`here` 就说不用登录。
+1. `vibe auth login <服务端>` 先问 `user.get`：`here` 就说不用登录。
 2. 否则 `user.approval.create`，打印确认码和 `<服务端>/approve?code=…`，在终端里时打开浏览器。
 3. 用户在那一页（或设置「设备」页）点同意。
 4. 命令行取到钥匙，连同服务端地址存进家目录的 `auth.json`（`0600`）；之后的命令默认连它，带着钥匙。
 
 ## 和谁打交道
 
-- **门（`Lan`）**：用 `byKey` 认钥匙、用 `pair` 为配对来的设备签钥匙、订阅 `revoked` 断流；把请求方的地址写进 `x-vibevalley-from`。
-- **命令行**：`askAt` 和事件流只把钥匙发给 `auth.json` 里的那个服务端（`apps/cli/README.md`）。
+- **门（`Lan`）**：认钥匙、为配对设备签钥匙、收回设备断流；将请求方地址写进 `x-vibevalley-from`。
+- **命令行**：`cmd/vibe/client.go` 与 `auth.go` 只把钥匙发给 `auth.json` 记录的对应服务端。
 
 ## 为什么这样
 
@@ -65,7 +65,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/platform/user/user.test.ts`：钥匙的前缀、90 天作废（测试时钟）、请求方的地址、`slow_down`。
-- `apps/server/src/gateway/lan/lan.test.ts`：经门的密码登录与锁定、Cookie、登录来的设备的放行、确认码登录与拒绝、请求上限。
-- `apps/cli/src/commands/auth.test.ts`：`auth login` 等同意、照 `slow_down` 放慢、存钥匙、只带给那个服务端，`auth logout`。
+- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/user/... ./internal/domain/lan/... ./cmd/vibe/...`：钥匙格式与 90 天回收、经门密码登录锁定、Cookie、确认码轮询与 CLI `auth` 命令测试。
 - `apps/web/test/login.spec.ts`：本机设名字和密码，门外登录、回原处、退出，`/approve` 上同意一个终端。

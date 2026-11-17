@@ -1,5 +1,0 @@
-{
-  "notOwned": "This input does not belong to the current session and cannot be returned",
-  "subscriptionTaken": "Thread {thread} already belongs to another issue",
-  "ambiguous": "This input matches multiple issues and needs to be told which one it belongs to"
-}

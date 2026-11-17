@@ -10,16 +10,16 @@ flowchart LR
     RTC[Agora Web SDK<br/>音频和字幕]
   end
 
-  subgraph Server[apps/server · Hono · 127.0.0.1:8787]
-    API[handlers<br/>VibeValleyApi、SSE 流]
+  subgraph Server[Go 服务端 cmd/vibe-server · 127.0.0.1:8787]
+    API[gateway handlers<br/>HTTP API、SSE 流]
     SITE[Core<br/>核心状态 SpaceState]
-    FM[助手<br/>VibeValley agent + 派活工具]
-    CHAT[频道<br/>群聊 · Postgres]
-    TK[工单<br/>派活、排队、父子依赖、合并]
-    CREW[帮工<br/>触发、投递、oar 子 agent]
-    PRJ[仓库<br/>git worktree]
-    RT[农机<br/>探测、额度、花费]
-    MCP[农场工具<br/>/mcp]
+    FM[助手<br/>internal/domain/stack + internal/durable]
+    CHAT[频道<br/>internal/domain/channel · SQLite]
+    TK[工单<br/>internal/domain/issue]
+    CREW[帮工<br/>pkg/oar · internal/machine]
+    PRJ[仓库<br/>internal/domain/repo · git worktree]
+    RT[农机<br/>internal/domain/agent]
+    MCP[助手与帮工工具<br/>internal/domain/stack/tools]
   end
 
   subgraph Agora[Agora 云]
@@ -58,30 +58,18 @@ flowchart LR
 
 仓库目录结构见根目录 [AGENTS.md](AGENTS.md#目录)。
 
-- **契约（`packages/protocol`）**：服务端与客户端唯一的共享契约。每个概念一个目录 `src/<概念>/`，包含 `shapes.ts`（类型）、`schema.ts`（`Codec<T.X>` 解码器）和 `api.ts`（接口行与 `Handlers`）。`src/rules/` 只放服务端与页面共用的纯函数；仅服务端使用的规则留在各自模块（[地基](docs/subsystems/foundation.md)）。
-- **服务（`apps/server/src/`）**：一块业务一个单数目录（底座原语在 `platform/`，业务在 `modules/`，对外的门在 `gateway/`），归入 11 个有序模块（见 `apps/server/src/modules.ts`）：
-  1. `Platform`（`base`、`infra`、`core`，及 `platform/` 下的 `setting`、`user`、`attachment`、`provider`：不含业务规则的底座）
-  2. `Agents`（`agent`：档案、技能、模板和农机是一个 `Agent` 服务，表 `agent_spend`、`agent_todo`；`memory`；循环和持久是 pi-durable 的，`agent/durable.ts` 开它的 `Harness`，我们自己的工具在 `packages/agent`）
-  3. `Source Control`（`repo`）
-  4. `Agent Sessions`（`session`：触发和投递、会话和每一轮、工作目录、执行器；不 import 频道、工单和观察层，`modules.test.ts` 查）
-  5. `Collaboration`（`channel`、`media`（含素材库）、`artifact`、`pkm`；`channel` 只靠 `Platform`，不 import 别的业务模块，`modules.test.ts` 查）
-  6. `Issues`（`issue`，含定时任务、蓄水池和一件活的路由；哪些输入能交经 `Session.useReadiness` 交给信箱）
-  7. `Watch`（`watch`：按自己的游标读频道已提交的事件，算谁听见、过三道刹车交给帮工；排席位、开帮工的串、拉起私聊帮工、贴汇报、记看过和 👀，把聊天的默认频道、助手和未读交给 `Session`；用户的收件箱和巡查）
-  8. `Tools`（`gateway/tool`）
-  9. `Orchestrator`（`orchestrator`）
-  10. `Gamification`（`game`）
-  11. `Gateway`（`http`、`mcp`、`lan`、`connector`、`voice`、`chat`、`projection`，及顶层入口 `main.ts`、`services.ts`、`modules.ts`）
-  模块只可 import 排在它前面的模块，不直接读其他模块在 `SpaceState` 里的字段（`apps/server/src/modules.test.ts` 检查）。反向通知走订阅（`AsyncIterable`）或窄端口。`apps/server/src/services.ts` 的 `buildModules` 照模块次序一行一个 `makeX({ … })`、依赖在调用处写明，建到观察层（模块测试的 `moduleWorld` 也用它）；`makeFarm` 接着建后面的，再按模块顺序调各模块的 `boot()`，每个一次；建到一半失败就倒着关掉已建的。
-- **网关与工具（`apps/server/src/gateway/http`、`mcp`、`tool`）**：`http/api.ts` 按 `endpoints` 挂载路由，`http/handlers/<概念>.ts` 实现接口，`http/streams.ts`、`http/rpc.ts` 提供 SSE 流；`gateway/tool/` 在模块序列里置于 `Orchestrator` 之前的 `Tools` 层，同时供助手（`OrchestratorTools = Pick<Tool, ...>`）与帮工 `/mcp` 使用（[核心状态](docs/subsystems/core.md)、[助手](docs/subsystems/orchestrator.md)）。
-- **存储（Postgres + 文件）**：配了 `database.url` 连那个 Postgres，否则是进程内的 PGlite，同一种方言；表结构基线为 `apps/server/db/migrations/0001_schema.up.sql`，查询在 `apps/server/db/queries/<表>.sql`，由 `apps/server/scripts/pg-generate.ts` 生成 `apps/server/db/generated/`（[地基](docs/subsystems/foundation.md)）。
-- **客户端（`apps/web`、`apps/desktop`、`apps/mobile`、`apps/cli`）**：`apps/web` 按概念分 feature，层间单向依赖（`base` → `infra` → `state` → `ui` → `ui/domain` → `ui/pixel` → `features` → `farm`/`tree` → `app`）。桌面壳（Electron）、浏览器和手机壳（Expo WebView）共用同一份页面（[客户端](docs/subsystems/app.md)）。
+- **契约（`packages/protocol`）**：服务端与客户端唯一的共享契约。每个概念一个目录 `src/<概念>/`，包含 `shapes.ts`（类型）、`schema.ts`（`Codec<T.X>` 解码器）和 `api.ts`（接口行与 `Handlers`）。`src/rules/` 只放服务端与页面共用的纯函数；Go 导出结构经 `cmd/vibe-tsgen` 与 `scripts/gen/go-contract.ts` 对账；仅服务端使用的规则留在 Go 各自域里（[地基](docs/subsystems/foundation.md)）。
+- **服务端（`internal/domain/` 与 `cmd/vibe-server/`）**：按单数概念划分域包（`agent`、`artifact`、`attachment`、`channel`、`connector`、`game`、`gateway`、`issue`、`lan`、`media`、`memory`、`pkm`、`repo`、`setting`、`stack`、`user`、`voice`、`watch`），由根目录 `arch_test.go` 静态约束依赖方向。`internal/domain/stack/stack.go` 按序装配并管理生命周期，底层可恢复执行在 `internal/durable/`，节点运行在 `internal/machine/`，凭据与代理在 `internal/vault/`。
+- **网关与工具（`internal/domain/gateway/`、`internal/domain/stack/tools.go`）**：`gateway.go` 与 `handlers_*.go` 挂载 `/api/v1/*` 路由，`streams.go` 提供 SSE 流；`internal/domain/stack` 同时供助手与帮工工具调用（[核心状态](docs/subsystems/core.md)、[助手](docs/subsystems/orchestrator.md)）。
+- **存储（SQLite + SQLc）**：各域独立迁移脚本位于各自 `migrations/0001_init.up.sql`，查询写在 `queries.sql`，由根目录 `sqlc.yaml` 经 `vpx scripts/gen/go-sqlc.ts` 生成 `sqlcgen/` 强类型 Go 绑定（[地基](docs/subsystems/foundation.md)）。
+- **客户端（`apps/web`、`cmd/vibe-desktop`、`apps/mobile`、`cmd/vibe`）**：`apps/web` 按概念分 feature，层间单向依赖（`base` → `infra` → `state` → `ui` → `ui/domain` → `ui/pixel` → `features` → `farm`/`tree` → `app`）。Go 原生桌面壳（`cmd/vibe-desktop`）、浏览器、手机壳（Expo WebView）共用同一份页面（[客户端](docs/subsystems/app.md)）。
 
 ## 核心状态
 
 `SpaceState`（`packages/protocol/src/core/shapes.ts`）汇总农场实时状态：通话、在场会话（助手与帮工）、最近 100 个频道和串、开着的与最近关闭的 50 张工单、定时任务、commit 数、游戏进度与地块动作（[核心状态](docs/subsystems/core.md)）。
 
-- **唯一修改入口**：只有 `Core.apply` 可修改 `SpaceState`。纯函数 `reduce(state, fact)`（`apps/server/src/gateway/projection/reduce.ts`）计算新状态；不改变状态的事实不发送。
-- **派生帧 `StateFrame`**：`GET /api/v1/state` 至多每 200 毫秒推送一帧。纯函数 `frameOf`（`apps/server/src/gateway/projection/frame.ts`）在状态副本上填入界面文案（`phaseText`、`whenText`、工单 `stage` 与可执行动作 `acts`），并计算 `inbox`、`view` 和 `effects`。持久层和 `reduce` 不保存界面文案。
+- **唯一修改入口**：核心状态折叠与投影集中在 `internal/domain/gateway/projection.go`（与 `overlay.go`），页面和客户端只读帧、不折叠。
+- **派生帧 `StateFrame`**：`GET /api/v1/state` 由 `internal/domain/gateway/streams.go` 推送，并填入工单阶段、可执行动作与界面派生视图；持久层不保存派生文案。
 
 ## 事件流和接口
 
@@ -101,11 +89,9 @@ Host：
 | `agent-templates/<id>/` | 从本机导入的档案模板（`agent.json`、`persona.md`） |
 | `settings.json` | 密钥、语音设置、记忆来源配置（权限 `0600`） |
 | `vibevalley.yaml` | 可选的静态配置文件 |
-| `db/` | PGlite 的数据目录（配了 `database.url` 时不用它）：会话、运行、触发和投递（`session`、`session_run`、`session_trigger`、`session_order`、`session_delivery`、`session_machine`）、工单和它的串的订阅、蓄水池、拿了它输入的轮次（`issue`、`issue_subscription`、`issue_input`、`issue_run`）、PR 的 GitHub 观察游标和收下过的评审（`issue_github_cursor`、`issue_github_event`）、频道、媒体任务与素材库（`media_job`、`media_input`、`media_library_item`）、Artifact、游戏账本、记忆、定时任务、连接器、用户的账号和设备、笔记批注与撤销 |
-| `events/<id>.json` | 会话轨迹日志（帮工离开后保留 30 天） |
-| `durable.db` | pi-durable 的对话：助手的，和 `vibevalley` 农机上帮工的（一个 oar 会话一个）（测试农场在内存里） |
-| `agent/<档案 id>/` | 助手的评测样例 `evals/`；终端对话 `chat` 的 `durable.db`（它自己的，对话开着时租着这个目录）、`MEMORY.md` 和 `mcp.json` |
-| `logs/` | 帮工原始运行日志与桌面端服务端日志 |
+| `vibevalley.db` | 主 SQLite 数据库与各域 sidecar SQLite 数据库（存储工单、频道、记忆、笔记、会话与定时任务等） |
+| `events/` | 会话轨迹事件持久化数据 |
+| `logs/` | 帮工运行日志与服务端日志 |
 
 Space `$VIBEVALLEY_WORK_ROOT`（默认 `~/vibevalley-dev`）下：
 - `repos/`：仓库的 git 仓库。

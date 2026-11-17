@@ -75,7 +75,7 @@ export function UpdateRow() {
   );
 }
 
-/** Install CLI: the app's command line linked into ~/.local/bin (apps/desktop src/commandLine.ts); nothing where the
+/** Install CLI: the app's command line linked into ~/.local/bin (cmd/vibe-desktop); nothing where the
  * host has none to install. */
 export function CommandLineRow() {
   const cli = currentHost().commandLine;

@@ -89,7 +89,7 @@ const scripted: Agent = {
   look: { orchestrator: null, species: "fox", outfit: "farmer", build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "" },
 };
 
-// The test helper's words (apps/server/src/testing/helper.ts).
+// The test helper's words (internal/domain/gateway/issue_helpers.go).
 const asksWithOptions = "打卡页先问清楚，给选项";
 const answer = "用 8797";
 

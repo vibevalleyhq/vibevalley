@@ -11,7 +11,7 @@ const AgentProblem = z.object({
   text: z.string(),
 }) satisfies Codec<T.AgentProblem>;
 
-export const PersonaMode = z.enum(T.PersonaModeValues) satisfies Codec<T.PersonaMode>;
+const PersonaMode = z.enum(T.PersonaModeValues) satisfies Codec<T.PersonaMode>;
 
 const MCPServerStdio = z.object({
   type: z.literal("stdio"),
@@ -30,13 +30,13 @@ const MCPServerHTTP = z.object({
 
 const MCPServer = z.discriminatedUnion("type", [MCPServerStdio, MCPServerHTTP]) satisfies Codec<T.MCPServer>;
 
-export const Species = z.enum(T.SpeciesValues) satisfies Codec<T.Species>;
+const Species = z.enum(T.SpeciesValues) satisfies Codec<T.Species>;
 
-export const Outfit = z.enum(T.OutfitValues) satisfies Codec<T.Outfit>;
+const Outfit = z.enum(T.OutfitValues) satisfies Codec<T.Outfit>;
 
-export const Build = z.enum(T.BuildValues) satisfies Codec<T.Build>;
+const Build = z.enum(T.BuildValues) satisfies Codec<T.Build>;
 
-export const Head = z.enum(T.HeadValues) satisfies Codec<T.Head>;
+const Head = z.enum(T.HeadValues) satisfies Codec<T.Head>;
 
 export const Look = z.object({
   species: Species.nullable(),

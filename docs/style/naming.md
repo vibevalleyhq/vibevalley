@@ -14,7 +14,7 @@
 
 | 不用 | 它说的是 | 换成 |
 |---|---|---|
-| `rules.ts` | 能在测试的规则层测 | 它决定的事：`due.ts`、`patrol.ts`、`report.ts`；解析某个概念的，合进那个概念的文件（`parseRefinement` 在 `issue/refinement.ts`） |
+| `rules.ts` | 能在测试的规则层测 | 它决定的事：`due.ts`、`patrol.ts`、`report.ts`；解析某个概念的，合进那个概念的文件（如 `issue` 域内） |
 | `state.ts`、`data.ts`、`hooks.ts` | 在框架里的角色 | 它管的东西：`groups.ts`、`calendar.ts`、`lanes.ts` |
 | `utils`、`helpers`、`common`、`misc`、`lib` | 没有归属 | 用它的概念；两个模块都用的，放进下层拥有它的模块 |
 | `text.ts` | 形式是文字 | 说给谁、说什么：`digest.ts`、`mentions.ts` |
@@ -26,7 +26,7 @@
 |---|---|
 | 纯不纯、能在哪一层测 | 测试金字塔按 import 认层（`@vibevalley/testkit/pyramid`） |
 | 页面和服务端都跑 | `packages/protocol/src/rules/contract.test.ts` |
-| 模块的先后 | `apps/server/src/modules.test.ts` |
+| 模块的先后 | Go 根目录 `arch_test.go` |
 | 页面的分层 | lint 的 `vibevalley/page-layers` |
 
 名字说性质，说的是写的人怎么实现、怎么测，读的人要找的却是哪件事；性质变了，名字也跟着错。位置本身就是约定、而且有检查守着的，可以用：`prompts.ts`（对模型说的话，lint 在这里放行中文）、`index.ts`（一个 feature 对外的入口，`page-layers` 查）、`packages/protocol/src/rules`（两边都跑的，`contract.test.ts` 查）、`testing/` 和 `testing.ts`（测试用的，金字塔认它们）。
@@ -78,8 +78,8 @@
 
 | 什么 | 形状 | 例子 |
 |---|---|---|
-| 服务端的模块 | 单数，概念的词 | `apps/server/src/modules/issue`、`channel` |
-| 页面的 feature | 和服务端的模块同名 | `apps/web/src/features/issue` |
+| 服务端的域 | 单数，概念的词 | `internal/domain/issue`、`channel` |
+| 页面的 feature | 和服务端的域同名 | `apps/web/src/features/issue` |
 | 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/health` 是 `@vibevalley/health` |
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
@@ -97,8 +97,8 @@
 |---|---|---|
 | 接口 | `<模块>[.<名词>].<动词>`，单数；路径是 `POST /api/v1/<模块>[/<名词>]/<动词>` | `channel.message.send`、`issue.list` |
 | 接口的动词 | 先用这几个：`list`、`get`、`create`、`update`、`delete`、`previewDelete`、`set`、`toggle`、`start`、`stop`；别的动作用它在领域里的词 | `channel.markRead`、`lan.pair` |
-| 表 | `<模块>` 或 `<模块>_<概念>`，单数；索引以表名开头（`src/infra/schema.test.ts` 查） | `issue`、`channel_message`、`session_run` |
-| 词典的键 | `<宿主>.<模块>.…`，两边都说的在 `shared` | `web.issue.boardLabels.lane.todo`、`server.connector.qqKeys` |
+| 表 | `<模块>` 或 `<模块>_<概念>`，单数；索引以表名开头 | `issue`、`channel_event`、`watch_inbox` |
+| 词典的键 | `<宿主>.<模块>.…`，两边都说的在 `shared` | `web.issue.boardLabels.lane.todo`、`shared.status.todo` |
 | 页面测试的标记 | `data-testid` 说它是什么，小写加连字符；状态写成属性 | `issue-card`、`desk-status`；`data-state` |
 | 分支 | `<类>/<主题>`，主题是英文小写加连字符 | `chore/repo-health` |
 

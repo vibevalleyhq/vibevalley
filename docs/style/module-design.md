@@ -15,8 +15,8 @@
 当代码主要由 agent 编写与演进时，口头约定与长文档最先失效。设计模块与接口时，应把不变量依次推进三道防线：
 
 - **类型化（让非法状态不可表达）**：用 Zod Schema、品牌主键（`T.Branded<K>`）、进门就解过的受约束值、判别联合（`kind`、`type`）和返回联合的预期结果（合进去或冲突）把业务前提与输出承诺写进签名。不在模块间传递未区分的裸 `string` 主键，不用多个松散布尔拼状态，也不在成功返回值里夹带 `{ ok: boolean }`。
-- **静态化（让拓扑与归属在构建期确定）**：模块依赖次序（[modules.ts](apps/server/src/modules.ts)）、服务的依赖（`makeX(deps: XDeps)` 的 `deps` 只列它用到的、排在它前面的服务）、错误类名（`name` 与类名同名、全仓唯一）以及生命周期接线（`services.ts` 照次序 `await makeX(deps)`、各模块的 `boot()` 在全部建好以后照模块次序调、`close()` 倒着调）应保持静态词法结构。不应在运行期拼装依赖、把整个农场交给一个模块，或在调用时才建本该在 `make` 里建一次的缓存与连接。
-- **可分析化（让架构边界可由语法树与契约表对账）**：架构约束应写成单遍语法树或契约元数据即可判定的命题——跨模块服务调用收进 [service-paths.json](scripts/audit/service-paths.json)，根协议导出面收进 [protocol-surface.ratchet.json](scripts/audit/protocol-surface.ratchet.json)，SQL `CHECK` 与协议枚举由 [schema-audit.ts](scripts/audit/schema-audit.ts) 集合对账，跨文件重复的错误类名与生命周期误用由 [practice-audit.ts](scripts/audit/practice-audit.ts) 全仓扫描，无需启动运行时或通读上下文即可定位违规。
+- **静态化（让拓扑与归属在构建期确定）**：Go 域间依赖方向（根目录 `arch_test.go`）、模块装配次序（`internal/domain/stack/stack.go`）与清晰依赖构造应保持静态结构。不应在运行期拼装循环依赖、把整个系统隐式交给全局单例。
+- **可分析化（让架构边界可由语法树、编译期校验与契约表对账）**：架构约束应写成单遍即可判定的命题——Go 跨层依赖进 `arch_test.go`，Go 与协议一致性进 `internal/domain/gateway/contract_parity_test.go` 与 `vpx scripts/gen/go-contract.ts --check`，SQL 迁移与绑定进 `vpx scripts/gen/go-sqlc.ts --check`，根协议导出面收进 [protocol-surface.ratchet.json](scripts/audit/protocol-surface.ratchet.json)，枚举与边界检查进 [schema-audit.ts](scripts/audit/schema-audit.ts)，全仓语法与生命周期误用进 [practice-audit.ts](scripts/audit/practice-audit.ts)。
 
 ### 可控制、可观察、可关闭共同决定可测试性
 
@@ -63,7 +63,7 @@
 
 三者不必拆成三个服务。只有职责可独立命名且能降低耦合时才提取，保留在原业务模块内；不新建一个收集所有规则的技术层。
 
-以定时任务为例，[到期计算](apps/server/src/modules/issue/when.ts)与[服务执行](apps/server/src/modules/issue/cron.ts)应分别承担日期决定和持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
+以定时任务为例，`internal/domain/issue/cron.go` 划分日期决定与持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
 
 提取纯决定时，应保留「读取、判断、提交」的并发边界。把判断挪到锁外可能引入过期快照；函数变纯不代表整个流程变正确。
 
@@ -71,14 +71,14 @@
 
 让不变量住进类型，在系统入口一次性完成解析（Parse, don't validate），不在业务内部散落防御性判断或裸字符串约定：
 
-- **进门一次解析，门内靠铸造函数构造**：HTTP、CLI、工具参数、配置、落盘 JSON 与外部响应在边界经 Zod（`z.object`、`.check`、`.transform`、`jsonString`）一步窄化为带约束的领域值（如 [tool/schemas.ts](apps/server/src/gateway/tool/schemas.ts) 将状态别名直接解码为 `S.IssueStatus`）；配置由 [config.ts](apps/server/src/infra/config.ts) 的键表一次解出，数字不放行 `NaN` / `Infinity`，格式错误当场失败、不兜底成默认值。门内造品牌主键用协议的铸造函数（`issueId(s)`），不写 `as` 断言；含密钥的值是 `Secret`（`toJSON` 抛错、打印成 `[secret]`），落盘的经 `z.codec` 解进来（[schema-audit.ts](scripts/audit/schema-audit.ts) 检查）。
-- **全栈共用 Zod 契约，边界一律 Fail-Fast**：前后端均直接运行在同一份 Zod 契约之上（SSE 流经 [stream.ts](packages/protocol/src/stream.ts) 解码，HTTP 客户端 [client.ts](packages/protocol/src/client.ts) 按 `Endpoint.result` 与 `ApiError` 信封解码，SQL 查询的每一行经生成的结果 Schema 解码，工具与配置进门窄化）。边界外进来的值直接 `X.parse`、不符即错（要自己处理错的用 `safeParse`，JSON 文本用 `jsonOf`）；不在内部散落防御性守卫。`packages/protocol` 通过 `satisfies Codec<T.X>`（[codec.ts](packages/protocol/src/codec.ts)）锁死形状与解码器，其余模块直接用 `z.infer<typeof X>` 派生编译期类型；闭合词集统一导出 `XValues`，Schema 写 `z.enum(T.XValues)`，不重复内联字面量。
-- **未解析引用与品牌主键分离**：持久实体主键使用品牌标称类型（如 `IssueId`、`SessionId`、`ChannelId`、`AgentId`），不应跨概念混传同为 `string` 的 ID。用户、CLI 或模型传入的名称、编号与地址（如 `#41`、频道名、`vv://`）按引用建模，在所属服务的入口（如 `Issue.idOf`、`Channel.placeOf`、`Agent.named`）一次性解析为品牌主键；服务内部与存储层只传递已解析的品牌主键。
-- **存储解码区分「缺省」与「损坏」**：库表 `CHECK` 枚举由 [pg-generate.ts](apps/server/scripts/pg-generate.ts) 生成字面量联合并经 [schema-audit.ts](scripts/audit/schema-audit.ts) 与协议枚举对账。服务端自有表的可空 JSON 列统一用 `storedJsonOrUndefined(Schema, "表.列")`（`null` 归 `undefined`，非空损坏立即抛 `Inconsistent` fail-fast），非空 JSON 列用 `jsonOf(Schema, "表.列")`，不用 `jsonOrNone` 把数据损坏静默吞成缺省；仅外部不可信 CLI / Webhook 载荷才用 `jsonOrNone` 容错。
+- **进门一次解析**：前端与公共包经 Zod（`z.object`、`.check`、`.transform`、`jsonString`）窄化为带约束的领域值；Go 端在网关解码、配置加载（`internal/config/config.go`）与工具入参（`internal/domain/stack/tools.go`）入口完成校验，格式错误当场失败。门内 TS 造品牌主键用协议的铸造函数（`issueId(s)`），不写 `as` 断言；含密钥的值在协议中有 `Secret`（`toJSON` 抛错、打印成 `[secret]`），在 Go 端由 `internal/vault/secret.go`（`Secret`）护持（[schema-audit.ts](scripts/audit/schema-audit.ts) 检查）。
+- **共用契约 Fail-Fast**：前端通过 `packages/protocol` 解码服务端响应与流（SSE 流经 [stream.ts](packages/protocol/src/stream.ts) 解码，HTTP 客户端 [client.ts](packages/protocol/src/client.ts) 按 `Endpoint.result` 与 `ApiError` 信封解码）。`packages/protocol` 通过 `satisfies Codec<T.X>`（[codec.ts](packages/protocol/src/codec.ts)）锁死形状与解码器；Go 与 TS 的一致性由 `internal/domain/gateway/contract_parity_test.go` 与 `vpx scripts/gen/go-contract.ts --check` 对账。
+- **未解析引用与品牌主键分离**：TS 侧持久实体主键使用品牌标称类型（如 `IssueId`、`SessionId`、`ArtifactId`、`BlockId`、`SuggestionId`、`MessageId`），不应跨概念混传同为 `string` 的 ID。
+- **存储迁移与 SQLc 绑定**：库表结构在各域 `migrations/0001_init.up.sql` 维护，查询在 `queries.sql`，经 `vpx scripts/gen/go-sqlc.ts` 生成 `sqlcgen/` 强类型 Go 绑定，不手写 SQL 拼接或忽略扫描错误。
 
 ### 显式状态
 
-一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/web/src/state/intent.ts)的 `IntentAt`、[语音](apps/server/src/gateway/voice/voice.ts)的 `GrantPhase` 与 `MossPhase`、[记性源](apps/server/src/modules/memory/sources.ts)的 `Held`、帮工招人时的 `startup.phase`（[帮工](apps/server/src/modules/session/session.ts)）。
+一件事沿一条线走（等着、就绪、关了），就用一个联合或枚举状态表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`），存在一个 `let`、信号或结构体里。例子：[意图](apps/web/src/state/intent.ts)的 `IntentAt`、`internal/domain/voice` 的通话状态与 `internal/domain/memory` 的记忆版本生命周期。
 
 - **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/web/src/infra/form/form.ts)）；MOSS 回答的音频发完、回答结束和被切断（[MOSS](packages/ai/src/realtime/moss.ts)）。硬并只会得到它们的乘积。
 - **永远同值的删掉副本。** 读源头：通话的「在结束」就是它 `life` 的 abort。
@@ -154,14 +154,14 @@ Clock 的读取不应推进时间；同刻事件的顺序应由业务已有的�
 | 要表达或验证的边界 | 已有工具 | 使用限制 |
 |---|---|---|
 | 形状、品牌与进门解码 | TypeScript 联合、Zod（`branded`、`jsonString`、`satisfies Codec<T.X>`）、`Error` 子类、[schema-audit.ts](scripts/audit/schema-audit.ts) | 类型不能独自表达事务、完成与取消语义；页面主包不直接打包全量接口 Schema |
-| 依赖与组合 | 工厂函数与 `deps` 参数；[服务装配](apps/server/src/services.ts)、[测试农场](apps/server/src/testing/world.ts) | 在服务建好前替换依赖；不另建一套测试业务装配 |
-| 业务时间 | `Clock`（`deps.clock`）、[shiftedTime](apps/server/src/testing/layers.ts)、`vi.useFakeTimers()` | 固定起点先于会捕获或读取时间的构建；不负责外部 I/O 完成 |
-| 任务与资源 | `AbortSignal`、`await using`、`AsyncDisposableStack`、`TaskGroup`（`run`、`keyed`、`spawn`） | 关闭语义由业务定义，工具只实现归属与释放 |
-| 交错控制 | `Promise.withResolvers()`、[gate](packages/testkit/src/until.ts) | 挡住明确的一步；不靠缩短业务超时制造竞争 |
-| 状态与事件观察 | `Subscription`、`AsyncIterable`、[whenState](apps/server/src/testing/layers.ts) | 确认订阅和匹配目标；不假设全系统能被 drain |
-| 真实边界等待 | [waitFor 与 within](packages/testkit/src/until.ts) | 有界等待和防挂死，不替代业务完成契约 |
-| 外部 agent 与模型 | oar 的 scriptedRuntime、[模型替身](apps/server/src/testing/model.ts)（经 [testing/deepseek.ts](apps/server/src/testing/deepseek.ts) 坐上 Harness） | 控制端口协议，不复制业务；意外调用应失败 |
+| 依赖与组合 | 工厂函数与依赖注入；Go 栈装配 `internal/domain/stack/stack.go` | 在装配前替换依赖；不另建一套测试业务装配 |
+| 业务时间 | TS `Clock`（`@vibevalley/async`、`deps.clock`）、`vi.useFakeTimers()`；Go 注入时钟 | 固定起点先于会捕获时间的构建；不负责外部 I/O 完成 |
+| 任务与资源 | `AbortSignal`、`await using`、`AsyncDisposableStack`、`TaskGroup`；Go `context.Context` | 关闭语义由业务定义，工具只实现归属与释放 |
+| 交错控制 | `Promise.withResolvers()`、[until.ts](packages/testkit/src/until.ts) | 挡住明确的一步；不靠缩短业务超时制造竞争 |
+| 状态与事件观察 | `Subscription`、`AsyncIterable`、Go 状态订阅 | 确认订阅和匹配目标；不假设全系统能被 drain |
+| 真实边界等待 | [waitFor 与 until](packages/testkit/src/until.ts) | 有界等待和防挂死，不替代业务完成契约 |
+| 外部 agent 与模型 | Go `pkg/oar/replaytest`、`internal/domain/gateway/issue_helpers.go` 脚本帮工 | 控制端口协议，不复制业务；意外调用应失败 |
 | 浏览器时间与交互 | Playwright Clock、组件与页面测试 | 浏览器时间独立于服务端；截图不证明动态行为 |
-| 边界防退化 | [lint](scripts/audit/oxlint-plugin.ts)、[全仓实践审计](scripts/audit/practice-audit.ts)、[服务路径](scripts/audit/service-paths.ts)与[协议导出面](scripts/audit/protocol-surface.ts)棘轮、[模块检查](apps/server/src/modules.test.ts)与 health 棘轮 | 检查守住已确定的边界，不用行数或覆盖率指标代替设计判断 |
+| 边界防退化 | [lint](scripts/audit/oxlint-plugin.ts)、[全仓实践审计](scripts/audit/practice-audit.ts)、[协议导出面](scripts/audit/protocol-surface.ts)棘轮、Go `arch_test.go` 与 health 棘轮 | 检查守住已确定的边界，不用行数或覆盖率指标代替设计判断 |
 
 工具使用中的失败也可能是架构反馈：大量依赖替换可能来自过宽依赖，持续增加 gate 可能来自过度耦合的流程，越来越复杂的观察器可能来自缺失的结果契约。应先回到边界审查，不继续堆工具。

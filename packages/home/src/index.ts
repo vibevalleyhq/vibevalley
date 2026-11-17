@@ -23,8 +23,8 @@ const alive = (pid: number) => {
 };
 
 /** server.json and --ready-json: where the server using this home listens, and its process. */
-export const ServerReady = z.object({ url: z.string(), pid: z.number() });
-export type ServerReady = z.infer<typeof ServerReady>;
+const ServerReady = z.object({ url: z.string(), pid: z.number() });
+type ServerReady = z.infer<typeof ServerReady>;
 
 /** text as JSON decoded by schema; undefined when it is missing, not JSON, or not that shape (a file another version left). */
 const decoded = <A>(schema: z.ZodType<A>, text: string | undefined): A | undefined => {
@@ -67,15 +67,12 @@ export function announced(home: string): string | undefined {
 
 const Settings = z.object({ locale: z.exactOptional(z.string()) });
 
-/** The language saved in the home's settings.json (the server's, apps/server/src/setting), for a program that speaks before it reaches the server. */
+/** The language saved in the home's settings.json (the server's settings), for a program that speaks before it reaches the server. */
 export function savedLocale(home: string): Locale {
   return decoded(Settings, read(join(home, "settings.json")))?.locale === "en" ? "en" : "zh";
 }
 
-/** The desktop app's socket in the home: the command line asks the app over it (desktopControl). */
-export const controlSocketOf = (home: string) => join(home, "desktop.sock");
-
-/** auth.json: the server the command line signed in to (`vibevalley auth login`) and the key it was given. */
+/** auth.json: the server the command line signed in to (`vibe auth login`) and the key it was given. */
 const SignIn = z.object({ server: z.string(), key: z.string(), device: z.string() });
 export type SignIn = z.infer<typeof SignIn>;
 

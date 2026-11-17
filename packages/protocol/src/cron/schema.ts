@@ -19,7 +19,7 @@ const CronWhenDaily = z.object({
   time: z.string(),
 }) satisfies Codec<T.CronWhenDaily>;
 
-export const CronWhenWeekly = z.object({
+const CronWhenWeekly = z.object({
   kind: z.literal("weekly"),
   days: z.array(z.number().int().min(0).max(6)),
   time: z.string(),
@@ -30,7 +30,7 @@ const CronWhenExpr = z.object({
   expr: z.string(),
 }) satisfies Codec<T.CronWhenExpr>;
 
-export const CronWhen = z.discriminatedUnion("kind", [CronWhenOnce, CronWhenEvery, CronWhenDaily, CronWhenWeekly, CronWhenExpr]) satisfies Codec<T.CronWhen>;
+const CronWhen = z.discriminatedUnion("kind", [CronWhenOnce, CronWhenEvery, CronWhenDaily, CronWhenWeekly, CronWhenExpr]) satisfies Codec<T.CronWhen>;
 
 const cronFields = {
   id: z.string(),

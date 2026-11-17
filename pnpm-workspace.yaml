@@ -24,28 +24,16 @@ catalog:
   "@formatjs/intl-pluralrules": "7.0.2"
   base64-js: "1.5.1"
   "@axe-core/playwright": "^4.14.0"
-  "@botiverse/oar": "0.101.0"
-  "@earendil-works/chord": "1.5.2"
-  "@earendil-works/pi-ai": "1.5.2"
-  "@earendil-works/pi-durable": "1.5.2"
-  "@electric-sql/pglite": "0.5.16"
   "@floating-ui/dom": "^1.8.0"
-  "@larksuiteoapi/node-sdk": "^1.76.0"
-  "@modelcontextprotocol/sdk": "^1.32.2"
   "@playwright/test": "^1.64.1"
   "@solidjs/vite-plugin": "3.0.0-next.56"
   "@solidjs/web": "2.0.0-rc.21"
   "@types/node": "^26.6.6"
   "@vitest/browser-playwright": "5.1.0"
-  agora-agents: "2.13.0"
   agora-rtc-sdk-ng: "4.24.9"
-  agora-token: "2.0.7"
   axe-core: "^4.14.0"
-  electron: "^45.2.1"
-  electron-builder: "^26.18.0"
   eslint-plugin-solid: "0.18.1"
   hast-util-to-dom: "^4.0.1"
-  music-metadata: "12.3.5"
   pixi.js: "^8.22.0"
   playwright: "^1.64.1"
   react-native-agora: "^4.6.4"
@@ -67,17 +55,9 @@ catalog:
   yaml: "^2.9.1"
   knip: 6.44.1
   parse5: 8.1.0
-  undici: "8.12.3"
   zod: ^4.6.7
-  "@hono/node-server": ^2.1.6
-  hono: ^4.13.17
-  pg: ^8.23.1
-  "@types/pg": ^8.23.1
-  commander: ^15.1.0
   "@tailwindcss/vite": ^4.3.5
   tailwindcss: ^4.3.5
-  ws: ^8.22.2
-  "@types/ws": ^8.18.2
   "@xterm/addon-fit": ^0.11.0
   "@xterm/xterm": ^6.0.0
 
@@ -105,9 +85,6 @@ overrides:
   "framer-motion>react": "-"
   "framer-motion>react-dom": "-"
   "react-native-agora@4.6.4>base64-js": "catalog:"
-  # One undici 8 for the server and its dependencies (oar, pi-ai, openai): two copies would install those once for each,
-  # tens of MB more in the app. Electron's build tools keep their undici 6 and 7.
-  "undici@8": 8.12.3
   vite@*: "catalog:"
   vitest@*: "catalog:"
   # oxlint's type-aware lint and type check on tsrs instead of tsgolint (packages/tsrs/README.md).
@@ -121,17 +98,11 @@ peerDependencyRules:
   allowedVersions:
     vite: "*"
     vitest: "*"
-    # oar's own pi-durable runtime is written against 1.4 and is not used: the server's runtime/durable.ts runs
-    # pi-durable 1.5 itself (apps/server/src/modules/agent/durable.ts). Drop these once oar's peer reaches 1.5.
-    "@botiverse/oar>@earendil-works/pi-durable": "1.5.2"
-    "@botiverse/oar>@earendil-works/chord": "1.5.2"
 
-# Install scripts: esbuild fetches its binary for tsx and chord; the others are not needed. (Electron has none: it
-# downloads its binary the first time it runs.)
+# Install scripts: esbuild fetches its binary for tsx and chord; the others are not needed.
 allowBuilds:
   esbuild: true
   "@google/genai": false
-  electron-winstaller: false
   protobufjs: false
 
 # The packages' files live once, in pnpm's global virtual store (~/Library/pnpm/store/…/links), and every checkout's
@@ -152,7 +123,3 @@ packageExtensions:
   expo-camera:
     dependencies:
       "@types/react": "~19.3.0"
-
-# Releases newer than pnpm's minimumReleaseAge (a day) that the catalog takes on purpose; drop each once it is older.
-minimumReleaseAgeExclude:
-  - "@botiverse/oar@0.101.0"

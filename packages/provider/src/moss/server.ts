@@ -1,11 +1,7 @@
-import { WebSocket } from "undici";
-
-import { type Clock, systemClock, withTimeout } from "@vibevalley/async";
+import { type Clock, systemClock } from "@vibevalley/async";
 
 import { jsonText } from "../base/json.ts";
-import { decodeMossFrame, mossErrorMessage, mossRealtimeUrl } from "./index.ts";
-import { mossLiveModels } from "./live-models.ts";
-import { mossVisionModels } from "./vision-models.ts";
+import { decodeMossFrame, mossErrorMessage } from "./index.ts";
 
 /** Real time: the handshake and the first answer each come within a few hundred ms. */
 const mossDeadlineMs = 8_000;
@@ -38,42 +34,6 @@ export interface MossTransport {
   /** The HTTP status of a plain request with the key and its body; rejects with why nothing answered. */
   readonly status: (key: string, model?: string) => Promise<{ readonly code: number; readonly body: string }>;
 }
-
-export const makeMossTransport = (fetcher: typeof fetch, clock: Clock = systemClock): MossTransport => ({
-  connect: (key, on, model = "moss-live-1.0") => {
-    if (!mossLiveModels.some((supported) => supported === model) && !mossVisionModels.some((supported) => supported === model))
-      throw new Error("Unsupported MOSS realtime model");
-    const url = new URL(mossRealtimeUrl);
-    url.searchParams.set("model", model);
-    const ws = new WebSocket(url, { headers: { Authorization: `Bearer ${key}` } });
-    ws.binaryType = "arraybuffer";
-    ws.addEventListener("open", on.open);
-    ws.addEventListener("message", (e) => {
-      if (typeof e.data === "string") on.text(e.data);
-      else if (e.data instanceof ArrayBuffer) on.binary?.(new Uint8Array(e.data));
-    });
-    ws.addEventListener("close", (e) => on.down(e.reason));
-    ws.addEventListener("error", () => on.down(""));
-    return { send: (text) => ws.send(text), close: () => ws.close(), bufferedAmount: () => ws.bufferedAmount };
-  },
-  status: async (key, model = "moss-live-1.0") => {
-    const url = new URL(mossRealtimeUrl.replace(/^wss:/u, "https:"));
-    url.searchParams.set("model", model);
-    try {
-      return await withTimeout(
-        async (signal) => {
-          const r = await fetcher(url.href, { headers: { authorization: `Bearer ${key}` }, signal });
-          return { code: r.status, body: await r.text() };
-        },
-        mossDeadlineMs,
-        { clock },
-      );
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "TimeoutError") throw new Error("timed out", { cause: e });
-      throw e;
-    }
-  },
-});
 
 type Handshake = "attached" | { readonly error: string } | { readonly down: string } | "silent";
 

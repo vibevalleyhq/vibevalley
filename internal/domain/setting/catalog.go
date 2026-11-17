@@ -248,7 +248,7 @@ var FeatureList = []string{
 	"call",
 }
 
-// ReadinessInput feeds readinessOf matching apps/server/src/platform/setting/readiness.ts.
+// ReadinessInput feeds readinessOf matching internal/domain/setting configuration readiness rules.
 type ReadinessInput struct {
 	Providers   storedProviders
 	DeepSeekKey bool

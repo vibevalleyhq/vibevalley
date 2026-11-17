@@ -19,10 +19,9 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/game/game.ts` | 账本持久化（`game_ledger`）、订阅 `Core`、commit 统计调度、称号设置与空地预约 |
-| `apps/server/src/modules/game/progress.ts` | 账本条目提取（`entriesFor`）、进度折叠纯函数（`progressFold`）与成就文案组装 |
-| `apps/server/src/modules/game/view.ts` | 等级公式（`xpToNext`）、游玩状态折叠（`reducePlay`）、地块映射（`plotOf`）、帧视图（`viewOf`）、特效（`effectsOf`）与地块分配（`freeStation`、`stationed`） |
-| `apps/server/src/modules/game/seeds.json` | 内置成就定义（`achievements`） |
+| `internal/domain/game/progress.go`、`migrations/0001_init.up.sql`、`queries.sql` | 账本持久化（`game_ledger`）、金币与成就进度重折与等级计算 |
+| `internal/domain/game/projector.go` | 地块视图计算（`plotOf`）、游玩态投影（`FarmView`）与单次画面特效 |
+| `internal/domain/gateway/projection.go` | 将工单、帮工、成就进展装配进每帧 `StateFrame` |
 | `apps/web/src/farm/panels/Achievements.tsx`、`apps/web/src/farm/hud/FxLayer.tsx` | 任务与成就面板、称号佩戴与画面特效层 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`game.achievement.list`、`game.title.set`）。
@@ -70,5 +69,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/modules/game/progress.test.ts`、`game.test.ts`：账本折叠、金币倍率、成就解锁与等级测试。
+- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/game/...`：账本重折、金币倍率、成就解锁与等级测试。
 - `apps/web/test/farm-hud.spec.ts`：任务与成就面板、称号佩戴与仓库展示测试。

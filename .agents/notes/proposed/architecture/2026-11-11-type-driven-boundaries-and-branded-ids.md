@@ -9,10 +9,10 @@ Status: proposed
 在已锁死的 6 个核心品牌主键（`IssueId`、`SessionId`、`ArtifactId`、`BlockId`、`SuggestionId`、`MessageId`）之外，全仓还剩两项跨表结构与生成器的增量演进：
 
 1. **其余跨模块实体主键仍使用裸 `string`**：
-   - [0001_schema.up.sql](apps/server/db/migrations/0001_schema.up.sql) 共 27 张表使用 `text primary key`，`packages/protocol/src/**/shapes.ts` 中频道、档案、触发器、定时任务、运行记录、附件、媒体作业、连接与机器（`ChannelId`、`AgentId`、`TriggerId`、`CronId`、`RunId`、`AttachmentId`、`MediaInputId`、`MediaJobId`、`ConnectionId`、`DeviceId`、`MachineId`）仍声明为裸 `string`。
+   - `apps/server/db/migrations/0001_schema.up.sql` 共 27 张表使用 `text primary key`，`packages/protocol/src/**/shapes.ts` 中频道、档案、触发器、定时任务、运行记录、附件、媒体作业、连接与机器（`ChannelId`、`AgentId`、`TriggerId`、`CronId`、`RunId`、`AttachmentId`、`MediaInputId`、`MediaJobId`、`ConnectionId`、`DeviceId`、`MachineId`）仍声明为裸 `string`。
    - 对这些尚未品牌化的实体，用户与模型输入的未解析引用（如频道名、档案名、`vv://` 地址）与已解析主键在函数签名上仍共用 `string`。
 2. **SQL 生成器尚未从主键与外键约束自动派生品牌类型**：
-   - [pg-generate.ts](apps/server/scripts/pg-generate.ts) 已自动将 `CHECK (col IN (...))` 转为字面量联合，但所有 `text` 主键与外键列仍生成裸 `z.string()`，查库返回后需在业务层手工调用 [common/schema.ts](packages/protocol/src/common/schema.ts) 的 `issueId(row.id)`、`sessionId(row.session)` 这类铸造函数补标（`issue/rows.ts`、`issue/assignment.ts`、`artifact/artifact.ts`）。
+   - `apps/server/scripts/pg-generate.ts` 已自动将 `CHECK (col IN (...))` 转为字面量联合，但所有 `text` 主键与外键列仍生成裸 `z.string()`，查库返回后需在业务层手工调用 [common/schema.ts](packages/protocol/src/common/schema.ts) 的 `issueId(row.id)`、`sessionId(row.session)` 这类铸造函数补标（`issue/rows.ts`、`issue/assignment.ts`、`artifact/artifact.ts`）。
 
 ## Proposal
 
@@ -26,7 +26,7 @@ Status: proposed
 
 ### 2. 让 `pg-generate.ts` 读取 `pg_constraint` 直接生成品牌主外键
 
-1. 在 [pg-generate.ts](apps/server/scripts/pg-generate.ts) 读取 Postgres 系统表 `pg_constraint` 的主键（`p`）与外键（`f`）元数据，将已登记品牌的表主键及引用它的外键列（含查询参数与返回列）直接生成为对应的品牌 Zod schema（如 `IssueId`、`SessionId`、`ChannelId`），不再写 `z.string()`。
+1. 在 `apps/server/scripts/pg-generate.ts` 读取 Postgres 系统表 `pg_constraint` 的主键（`p`）与外键（`f`）元数据，将已登记品牌的表主键及引用它的外键列（含查询参数与返回列）直接生成为对应的品牌 Zod schema（如 `IssueId`、`SessionId`、`ChannelId`），不再写 `z.string()`。
 2. 重新生成 `apps/server/db/generated/*.sql.ts` 后，清理服务端 `issue/rows.ts`、`issue/assignment.ts`、`artifact/artifact.ts` 等处手工补标的 `issueId(row.id)` / `sessionId(row.session)` 转换。
 
 ## Alternatives considered
@@ -38,7 +38,7 @@ Status: proposed
 ## Acceptance criteria
 
 - `ChannelId`、`AgentId`、`TriggerId`、`CronId`、`RunId`、`AttachmentId` 等跨模块主键分批完成品牌化，并纳入 [schema-audit.ts](scripts/audit/schema-audit.ts) 的 `unbranded-id` 硬门禁。
-- [pg-generate.ts](apps/server/scripts/pg-generate.ts) 对已登记品牌的主外键自动产出品牌 Zod schema，业务层手工品牌重标代码清零。
+- `apps/server/scripts/pg-generate.ts` 对已登记品牌的主外键自动产出品牌 Zod schema，业务层手工品牌重标代码清零。
 - 将 SQL 主外键品牌生成规则沉淀进 [地基](docs/subsystems/foundation.md) 后删除本 Note 并更新 `CATALOG.md`。
 
 ## Risks

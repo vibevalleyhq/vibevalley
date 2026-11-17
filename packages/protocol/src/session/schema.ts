@@ -36,11 +36,11 @@ const SessionClose = z.enum(T.SessionCloseValues) satisfies Codec<T.SessionClose
 
 const PhaseClosed = z.object({ _tag: z.literal("closed"), at: z.number(), closed: SessionClose }) satisfies Codec<T.PhaseClosed>;
 
-export const Phase = z.discriminatedUnion("_tag", [PhaseWorking, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]) satisfies Codec<T.Phase>;
+const Phase = z.discriminatedUnion("_tag", [PhaseWorking, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]) satisfies Codec<T.Phase>;
 
 const PhaseView = z.discriminatedUnion("_tag", [PhaseWorkingView, PhaseDone, PhaseFailed, PhaseResting, PhaseClosed]) satisfies Codec<T.PhaseView>;
 
-export const LastRun = z.object({
+const LastRun = z.object({
   outcome: Outcome,
   summary: z.string(),
   at: z.number(),
@@ -117,7 +117,7 @@ export const SessionEvent = z.object({
 
 const RunTriggerKind = z.enum(T.RunTriggerKindValues) satisfies Codec<T.RunTriggerKind>;
 
-export const RunTrigger = z.object({
+const RunTrigger = z.object({
   kind: RunTriggerKind,
   message: z.exactOptional(z.string()),
   channel: z.exactOptional(z.string()),

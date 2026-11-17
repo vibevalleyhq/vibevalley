@@ -3,7 +3,7 @@ import { transcribe, type TranscriptionEndEvent, type TranscriptionModel } from 
 import { TranscriptionFormat } from "@vibevalley/provider/transcription";
 
 /** A recording in a format transcription does not take. */
-export class UnsupportedFormat extends Error {
+class UnsupportedFormat extends Error {
   override readonly name = "UnsupportedFormat";
   readonly _tag = "UnsupportedFormat";
   readonly format: string;
@@ -14,7 +14,7 @@ export class UnsupportedFormat extends Error {
 }
 
 /** No audio, or not base64. */
-export class EmptyAudio extends Error {
+class EmptyAudio extends Error {
   override readonly name = "EmptyAudio";
   readonly _tag = "EmptyAudio";
   constructor() {
@@ -22,7 +22,7 @@ export class EmptyAudio extends Error {
   }
 }
 
-export class AudioTooLong extends Error {
+class AudioTooLong extends Error {
   override readonly name = "AudioTooLong";
   readonly _tag = "AudioTooLong";
   constructor() {

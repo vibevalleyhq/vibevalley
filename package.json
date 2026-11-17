@@ -4,10 +4,10 @@
   "type": "module",
   "scripts": {
     "prepare": "vp config --hooks --no-agent && vp run packages:build",
-    "desktop:dev": "vp run --filter @vibevalley/desktop dev",
+    "desktop:dev": "env -u GOROOT CGO_ENABLED=0 go run ./cmd/vibe-desktop",
     "notes:catalog": "vpx scripts/docs/agent-notes.ts --write",
     "site:deploy": "vp run --filter @vibevalley/site deploy",
-    "package:mac": "vp run --filter @vibevalley/desktop package",
+    "package:mac": "env -u GOROOT CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o dist/vibe-desktop ./cmd/vibe-desktop",
     "release": "vpx scripts/release/release.ts",
     "capabilities": "vpx scripts/gen/capabilities.ts",
     "api:client": "vpx scripts/gen/api-client.ts",
@@ -15,16 +15,13 @@
     "i18n:gen": "vpx scripts/gen/i18n.ts gen",
     "health": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts",
     "health:write": "vpx packages/health/src/cli.ts --config scripts/audit/health.config.ts --write",
-    "practice:write": "vpx scripts/audit/practice-audit.ts --write",
-    "paths:write": "vpx scripts/audit/service-paths.ts --write"
+    "practice:write": "vpx scripts/audit/practice-audit.ts --write"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@vibevalley/desktop": "workspace:*",
     "@vibevalley/health": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
-    "@vibevalley/server": "workspace:*",
     "@vibevalley/testkit": "workspace:*",
     "eslint-plugin-solid": "catalog:",
     "knip": "catalog:",

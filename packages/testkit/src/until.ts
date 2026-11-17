@@ -45,24 +45,3 @@ export const untilGot = async <A>(get: () => A | undefined | false | Promise<A |
 export const until = async (ok: () => boolean | Promise<boolean>, what: string | (() => string) = "it", ms = 5_000): Promise<void> => {
   await waitFor(ok, (held) => held, what, ms);
 };
-
-/** until under the name the promise-written tests (a fake runtime, a fake model) already use. */
-export const whenTrue = (ok: () => boolean | Promise<boolean>, what: string, ms = 5_000): Promise<void> => until(ok, what, ms);
-
-/** What p settles to, or a rejection naming what took longer than ms (real time): a deadline on something the test
- * cannot see the end of otherwise. */
-export const within = <A>(p: Promise<A>, ms: number, what: string): Promise<A> =>
-  new Promise<A>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${what} took longer than ${ms} ms`)), ms);
-    p.finally(() => clearTimeout(timer)).then(resolve, reject);
-  });
-
-/** A gate a fake waits at until the test opens it: a fake that should be busy is busy until the test says, not for a
- * guessed while. */
-export const gate = () => {
-  const { promise: opened, resolve: open } = Promise.withResolvers<void>();
-  return { opened, open };
-};
-
-/** One turn of the event loop: whatever was set going before it (a publish taken by a forked reader, a promise already resolved) has run. */
-export const nextTurn = () => new Promise<void>((resolve) => setImmediate(resolve));

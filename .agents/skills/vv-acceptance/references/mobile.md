@@ -6,7 +6,7 @@
 
 - 改了 `apps/mobile` 的任何代码或 `app.json`。
 - 改了宿主接口 `packages/protocol/src/host.ts`（桥的形状）、页面找宿主的 `apps/web/src/infra/host.ts`（`currentHost`），或页面里调宿主的地方。
-- 改了 `apps/server/src/gateway/lan`（配对、cookie、放行页面）。
+- 改了 `internal/domain/lan`、`internal/domain/gateway`（配对、cookie、放行页面）。
 
 不用它：只改了 `apps/mobile/src/infra/pairing.ts` 的纯函数、`vp run --filter @vibevalley/mobile test` 已经覆盖的。
 

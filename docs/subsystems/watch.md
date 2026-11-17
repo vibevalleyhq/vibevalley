@@ -1,6 +1,6 @@
 # 观察层
 
-`Watch`（`modules/watch`）站在频道、帮工和工单之上，按事件驱动 agent：读频道提交的事件，算出谁听见、过三道刹车、交给 `Session` 投递；给帮工开串、拉起私聊帮工、贴汇报、记看过和 👀；它也是用户的收件箱（`Inbox`，农场里画成手机来电）和巡查。频道只管说话，帮工只管干活，两边都不认识对方，中间的规矩都在这里。
+`Watch`（`internal/domain/watch/`）站在频道、帮工和工单之上，按事件驱动 agent：读频道提交的事件，算出谁听见、过三道刹车、交给路由与投递；给帮工开串、拉起私聊帮工、贴汇报、记看过和 👀；同时维护用户的收件箱（`Inbox`，农场里画成手机来电）和巡查。频道只管说话，帮工只管干活，两边都不认识对方，中间的规矩都在这里。
 
 ## 管什么，不管什么
 
@@ -15,14 +15,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/watch/watch.ts` | `Watch` 服务：读事件、路由、席位与串、私聊帮工、汇报、回执，组装收件箱 |
-| `apps/server/src/modules/watch/brakes.ts` | 三道刹车的纯函数 `brakes`，跳数与冷却的记账 `Reach`、熔断 `WakeBreaker` |
-| `apps/server/src/modules/watch/hearers.ts` | 谁听见一句话（`whoHears`）、这次投递对它算什么（`eventOf`），纯函数 |
-| `apps/server/src/modules/watch/trigger.ts` | 一条消息记成的 `Trigger`（`channelTrigger`）和信箱要的行（`envelopeRowOf`） |
-| `apps/server/src/modules/watch/inbox.ts` | 收件箱：`inboxNews`、`toUser`、`handoffState`、`externalChanges`、巡查循环与开机的 `prime` |
-| `apps/server/src/modules/watch/items.ts`、`patrol.ts`、`prompts.ts` | 纯函数 `inbox`、`inboxEntries`、外推资格 `forUser`；巡查的 `patrolStep`（宽限期与已读延期）；巡查对模型说的话 |
+| `internal/domain/watch/service.go`、`types.go` | `Watch` 服务：事件游标消费、路由、刹车裁决、席位与串、汇报协调与巡查推进 |
+| `internal/domain/watch/brakes.go` | 三道刹车的纯函数 `EvaluateBrakes`，跳数、冷却与熔断状态计算 |
+| `internal/domain/watch/sqlite.go`、`memory.go`、`migrations/0001_init.up.sql`、`queries.sql` | 观察游标 `watch_cursor`、刹车状态及投递的 SQLite 持久化与内存实现 |
+| `internal/domain/gateway/projection.go` | 按当前 `SpaceState` 计算每帧 `InboxEntry[]`、`patrol` 等投影视图 |
 | `packages/protocol/src/rules/inbox.ts` | 前后端共用的新事项识别 `freshOf` |
-| 表 `watch_cursor` | 观察层读到 `channel_event` 的哪一号（只往前） |
 | `apps/web/src/farm/phone/calls.ts`、`apps/web/src/features/inbox/` | 农场手机来电、系统通知（`Follow.tsx`）与菜单栏托盘摘要（`tray.ts`） |
 
 ## 模型和不变量
@@ -93,7 +90,7 @@
 
 ## 为什么这样
 
-- **频道纯聊天，帮工纯干活，规矩在中间一层**：频道不 import 业务模块、帮工不 import 频道和工单（`modules.test.ts` 查）；谁听见、刹车、开串和回执都要同时知道聊天和会话，放在这两者之上，两边都不用回调对方。
+- **频道纯聊天，帮工纯干活，规矩在中间一层**：频道不依赖业务与调度决策域（`arch_test.go` 守住包边界）；谁听见、刹车、开串和回执都要同时知道聊天和会话，放在中间观察与调度层协调，两边不相互回调。
 - **用持久的游标读事件，不用内存里的回调**：提交和路由分属两个事务，中间崩溃时游标还在路由前面，开机接着读；路由按触发的 id 幂等，读两遍不会投两遍。
 - **写话等观察层处理完再返回**：页面、工具和测试都靠「说完就已经路由了」：跳数通知紧跟着那句话、删消息立刻撤回投递。等待放在提交和放锁以后，观察层处理事件时可以随便用频道。
 - **一处算刹车**：叫醒是从聊天进来的（或观察层自己的巡查），刹车放在它进来的地方，用户的话在同一处清零；`Session` 只照 `held_by` 写信、照 `holdWakes` 不叫醒，不再自己判断。
@@ -104,8 +101,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/modules/watch/watch.test.ts`：路由、席位、串、私聊、看过、👀、熔断、跳数、游标断点续读与失败重放、查询预算。
-- `apps/server/src/modules/watch/brakes.test.ts`：三道刹车的次序、跳数和冷却的记账、熔断，与多个助手时的听众。
-- `apps/server/src/flows/brakes.test.ts`：两个帮工互相 `@` 停在跳数上限，用户说话后重新开始；`flows/mailbox-order.test.ts`：重启后跳数和冷却从投递读回。
-- `apps/server/src/modules/watch/items.test.ts`、`patrol.test.ts`、`flows/handoff.test.ts`、`flows/mention.test.ts`：八种事项、宽限期、已读撤回与外推门禁。
+- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/watch/... ./internal/domain/stack/...`：路由、席位、串、三道刹车（跳数、冷却、熔断）、游标断点续读、外推门禁与巡查测试。
 - `apps/web/src/farm/phone/calls.test.ts`、`apps/web/src/features/inbox/tray.test.ts`、`apps/web/test/farm-phone.spec.ts`：来电去重、托盘摘要与接听。
