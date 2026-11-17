@@ -35,6 +35,8 @@ import (
 	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/user"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/voice"
+	pkgdb "github.com/vibevalleyhq/vibevalley/pkg/db"
+	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
 func newTestGateway(t *testing.T, opts ...gateway.Option) (*stack.Stack, *gateway.Handler, *httptest.Server) {
@@ -768,11 +770,19 @@ func TestGatewaySQLiteRestartPersistenceAndDiskBlobs(t *testing.T) {
 		t.Fatalf("expected 0 gateway.overlay rows in durable_document, got %d", docCount)
 	}
 
-	// Inspect sidecar platform.gateway.db directly.
-	gwDBPath := stack.ScopeDBPath(dbPath, "gateway")
-	gwDB, err := sql.Open("sqlite", gwDBPath)
+	// Assert zero platform.*.db* sidecar files exist on disk alongside platform.db.
+	sidecars, err := filepath.Glob(filepath.Join(tmpDir, "platform.*.db*"))
 	if err != nil {
-		t.Fatalf("open gateway db: %v", err)
+		t.Fatalf("glob sidecar dbs: %v", err)
+	}
+	if len(sidecars) != 0 {
+		t.Fatalf("expected zero sidecar DB files alongside %s, found %v", dbPath, sidecars)
+	}
+
+	// Inspect gateway_* tables directly inside unified platform.db.
+	gwDB, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open platform db: %v", err)
 	}
 	for _, tbl := range []string{"gateway_kv", "gateway_issue", "gateway_channel", "gateway_cron", "gateway_artifact", "gateway_media_input", "gateway_pkm_comment", "gateway_pkm_clip"} {
 		var cnt int
@@ -1393,4 +1403,54 @@ func writeMaskedTestWSFrame(w io.Writer, op byte, payload []byte) error {
 	}
 	_, err := w.Write(out)
 	return err
+}
+
+func TestGatewayOverlayDBOwnershipAndOptions(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// 1. Standalone Handler(nil) opens and owns an :memory: platform pool.
+	standalone := gateway.NewHandler(nil)
+	if err := standalone.Close(); err != nil {
+		t.Fatalf("standalone.Close: %v", err)
+	}
+
+	// 2. WithOverlayDB on an unmigrated *sql.DB auto-migrates gateway_* tables and does not close caller DB.
+	customDB, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open customDB: %v", err)
+	}
+	customDB.SetMaxOpenConns(1)
+	defer func() { _ = customDB.Close() }()
+
+	gwCustom := gateway.NewHandler(nil, gateway.WithOverlayDB(customDB, filepath.Join(t.TempDir(), "blobs1")))
+	if err := gwCustom.Close(); err != nil {
+		t.Fatalf("gwCustom.Close: %v", err)
+	}
+	var tblCount int
+	if err := customDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='gateway_kv'`).Scan(&tblCount); err != nil || tblCount != 1 {
+		t.Fatalf("expected customDB still open with gateway_kv table, cnt=%d err=%v", tblCount, err)
+	}
+
+	// 3. WithSharedOverlayDB uses pre-migrated platform DB without re-migrating or closing caller pool.
+	pool, err := pkgdb.OpenPool(ctx, ":memory:")
+	if err != nil {
+		t.Fatalf("OpenPool: %v", err)
+	}
+	defer func() { _ = pool.Close() }()
+	runner, err := migrate.New(pool.WriteDB, pkgdb.PlatformScope, pkgdb.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		t.Fatalf("runner.Up: %v", err)
+	}
+
+	gwShared := gateway.NewHandler(nil, gateway.WithSharedOverlayDB(pool.WriteDB, filepath.Join(t.TempDir(), "blobs2")))
+	if err := gwShared.Close(); err != nil {
+		t.Fatalf("gwShared.Close: %v", err)
+	}
+	if err := pool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("expected caller shared pool WriteDB still open after gwShared.Close: %v", err)
+	}
 }

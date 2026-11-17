@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -18,23 +19,9 @@ import (
 	"time"
 
 	koanfyaml "github.com/knadh/koanf/parsers/yaml"
-	"github.com/viant/sqlite-vec/engine"
-	"github.com/viant/sqlite-vec/vec"
-	_ "modernc.org/sqlite"
 
 	"github.com/vibevalleyhq/vibevalley/internal/config"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/game"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/gateway"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/issue"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/memory"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/pkm"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/repo"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
-	domainwatch "github.com/vibevalleyhq/vibevalley/internal/domain/watch"
-	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
-	"github.com/vibevalleyhq/vibevalley/internal/vault"
+	pkgdb "github.com/vibevalleyhq/vibevalley/pkg/db"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
@@ -43,7 +30,7 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	// 1. Verify root sqlc.yaml covers all 11 SQL modules and matching .up.sql/.down.sql scripts.
+	// 1. Verify root sqlc.yaml has a single unified pkg/db block covering all 11 query and migration files.
 	sqlcBytes, err := os.ReadFile("sqlc.yaml")
 	if err != nil {
 		t.Fatalf("read root sqlc.yaml: %v", err)
@@ -59,235 +46,184 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 	if !ok {
 		t.Fatalf("sqlc.yaml sql section has unexpected type %T", parsedYAML["sql"])
 	}
-
-	expectedPackages := []string{
-		"internal/durable/store",
-		"internal/vault",
-		"internal/domain/agent",
-		"internal/domain/repo",
-		"internal/domain/game",
-		"internal/domain/issue",
-		"internal/domain/channel",
-		"internal/domain/watch",
-		"internal/domain/memory",
-		"internal/domain/pkm",
-		"internal/domain/gateway",
+	if len(rawSQLBlocks) != 1 {
+		t.Fatalf("sqlc.yaml must have exactly 1 unified sql block, got %d", len(rawSQLBlocks))
 	}
 
-	configuredOutDirs := make(map[string]map[string]any, len(rawSQLBlocks))
-	for i, item := range rawSQLBlocks {
-		block, ok := item.(map[string]any)
-		if !ok {
-			t.Fatalf("sqlc.yaml sql[%d] is %T, want mapping", i, item)
-		}
-		if eng, _ := block["engine"].(string); eng != "sqlite" {
-			t.Fatalf("sqlc.yaml sql[%d].engine = %q, want sqlite", i, eng)
-		}
-		schemaPath, _ := block["schema"].(string)
-		queriesPath, _ := block["queries"].(string)
-		genMap, _ := block["gen"].(map[string]any)
-		goMap, _ := genMap["go"].(map[string]any)
-		outDir, _ := goMap["out"].(string)
-		pkgName, _ := goMap["package"].(string)
-		if pkgName != "sqlcgen" {
-			t.Fatalf("sqlc.yaml sql[%d].gen.go.package = %q, want sqlcgen", i, pkgName)
-		}
-		if _, err := os.Stat(queriesPath); err != nil {
-			t.Fatalf("sqlc.yaml sql[%d] queries missing (%q): %v", i, queriesPath, err)
-		}
-		verifyMigrationPairsOnDisk(t, schemaPath)
-		pkgRoot := filepath.ToSlash(filepath.Dir(outDir))
-		configuredOutDirs[pkgRoot] = goMap
+	block, ok := rawSQLBlocks[0].(map[string]any)
+	if !ok {
+		t.Fatalf("sqlc.yaml sql[0] is %T, want mapping", rawSQLBlocks[0])
+	}
+	if eng, _ := block["engine"].(string); eng != "sqlite" {
+		t.Fatalf("sqlc.yaml sql[0].engine = %q, want sqlite", eng)
+	}
+	if queriesPath, _ := block["queries"].(string); queriesPath != "pkg/db/queries" {
+		t.Fatalf("sqlc.yaml sql[0].queries = %q, want %q", queriesPath, "pkg/db/queries")
+	}
+	if schemaPath, _ := block["schema"].(string); schemaPath != "pkg/db/migrations" {
+		t.Fatalf("sqlc.yaml sql[0].schema = %q, want %q", schemaPath, "pkg/db/migrations")
+	}
+	genMap, _ := block["gen"].(map[string]any)
+	goMap, _ := genMap["go"].(map[string]any)
+	if pkgName, _ := goMap["package"].(string); pkgName != "generated" {
+		t.Fatalf("sqlc.yaml sql[0].gen.go.package = %q, want generated", pkgName)
+	}
+	if outDir, _ := goMap["out"].(string); outDir != "pkg/db/generated" {
+		t.Fatalf("sqlc.yaml sql[0].gen.go.out = %q, want %q", outDir, "pkg/db/generated")
+	}
+	if emitEmpty, _ := goMap["emit_empty_slices"].(bool); !emitEmpty {
+		t.Fatal("sqlc.yaml sql[0].gen.go.emit_empty_slices must be true")
+	}
+	if emitPrep, _ := goMap["emit_prepared_queries"].(bool); !emitPrep {
+		t.Fatal("sqlc.yaml sql[0].gen.go.emit_prepared_queries must be true")
 	}
 
-	for _, pkg := range expectedPackages {
-		goMap, exists := configuredOutDirs[pkg]
-		if !exists {
-			t.Fatalf("sqlc.yaml missing SQL package %q", pkg)
+	verifyMigrationPairsOnDisk(t, "pkg/db/migrations")
+	orderedModules := pkgdb.OrderedModules()
+	if len(orderedModules) != 11 {
+		t.Fatalf("pkgdb.OrderedModules() len = %d, want 11", len(orderedModules))
+	}
+	for i, mod := range orderedModules {
+		qFile := filepath.Join("pkg/db/queries", mod+".sql")
+		if _, err := os.Stat(qFile); err != nil {
+			t.Fatalf("missing query file %s: %v", qFile, err)
 		}
-		if pkg == "internal/domain/memory" || pkg == "internal/domain/pkm" || pkg == "internal/domain/gateway" {
-			if emitEmpty, _ := goMap["emit_empty_slices"].(bool); !emitEmpty {
-				t.Fatalf("sqlc.yaml for %q must set emit_empty_slices: true", pkg)
-			}
-		}
-		if pkg == "internal/domain/pkm" {
-			if emitPrep, _ := goMap["emit_prepared_queries"].(bool); !emitPrep {
-				t.Fatalf("sqlc.yaml for %q must set emit_prepared_queries: true", pkg)
+		prefix := fmt.Sprintf("%04d_%s", i+1, mod)
+		for _, suffix := range []string{".up.sql", ".down.sql"} {
+			migFile := filepath.Join("pkg/db/migrations", prefix+suffix)
+			if _, err := os.Stat(migFile); err != nil {
+				t.Fatalf("missing migration file %s: %v", migFile, err)
 			}
 		}
 	}
 
-	// 2. ParseFS and run full SQLite Up -> Status -> DownAll -> Up on all 11 MigrationsFS variables.
-	type moduleSpec struct {
-		scope            string
-		fsys             fs.FS
-		useVec           bool
-		expectedTables   []string
-		expectedTriggers []string
+	// 2. Run full SQLite Up -> Status -> DownAll -> Up on unified pkg/db and test pkgdb.ScopeFS per module.
+	expectedTables := []string{
+		"durable_conversation", "durable_entry", "durable_document", "durable_submission", "durable_task", "durable_signal",
+		"vault_secret",
+		"agent_profile", "agent_skill", "agent_runtime",
+		"repo_repository", "repo_worktree",
+		"game_ledger",
+		"issue", "issue_cron",
+		"channel", "channel_member", "channel_event", "channel_read_cursor",
+		"watch_cursor", "watch_seat", "watch_agent_home", "watch_brake_state", "watch_inbox",
+		"memory_heads", "memory_versions", "memory_version_files", "memory_conflicts", "memory_dreams", "memory_inbox",
+		"pkm_notes", "pkm_aliases", "pkm_blocks", "pkm_links", "pkm_notes_fts", "vector_storage", "_vec_pkm_vectors", "pkm_vectors",
+		"gateway_kv", "gateway_issue", "gateway_channel", "gateway_agent",
+		"gateway_template", "gateway_runtime", "gateway_cron", "gateway_artifact",
+		"gateway_library_item", "gateway_media_input", "gateway_media_job",
+		"gateway_pkm_page", "gateway_pkm_comment", "gateway_pkm_clip",
+		"gateway_session", "gateway_session_event", "gateway_request_key",
 	}
-	modules := []moduleSpec{
-		{
-			scope:          "durable",
-			fsys:           store.MigrationsFS,
-			expectedTables: []string{"durable_conversation", "durable_entry", "durable_document", "durable_submission", "durable_task", "durable_signal"},
-		},
-		{
-			scope:          "vault",
-			fsys:           vault.MigrationsFS,
-			expectedTables: []string{"vault_secret"},
-		},
-		{
-			scope:          "agent",
-			fsys:           agent.MigrationsFS,
-			expectedTables: []string{"agent_profile", "agent_skill", "agent_runtime"},
-		},
-		{
-			scope:          "repo",
-			fsys:           repo.MigrationsFS,
-			expectedTables: []string{"repo_repository", "repo_worktree"},
-		},
-		{
-			scope:          "game",
-			fsys:           game.MigrationsFS,
-			expectedTables: []string{"game_ledger"},
-		},
-		{
-			scope:          "issue",
-			fsys:           issue.MigrationsFS,
-			expectedTables: []string{"issue", "issue_cron"},
-		},
-		{
-			scope:            "channel",
-			fsys:             channel.MigrationsFS,
-			expectedTables:   []string{"channel", "channel_member", "channel_event", "channel_read_cursor"},
-			expectedTriggers: []string{"channel_event_no_update", "channel_event_no_delete"},
-		},
-		{
-			scope:          "watch",
-			fsys:           domainwatch.MigrationsFS,
-			expectedTables: []string{"watch_cursor", "watch_seat", "watch_agent_home", "watch_brake_state", "watch_inbox"},
-		},
-		{
-			scope:          "memory",
-			fsys:           memory.MigrationsFS,
-			expectedTables: []string{"memory_heads", "memory_versions", "memory_version_files", "memory_conflicts", "memory_dreams", "memory_inbox"},
-		},
-		{
-			scope:          "pkm",
-			fsys:           pkm.MigrationsFS,
-			useVec:         true,
-			expectedTables: []string{"pkm_notes", "pkm_aliases", "pkm_blocks", "pkm_links", "pkm_notes_fts", "vector_storage", "_vec_pkm_vectors", "pkm_vectors"},
-		},
-		{
-			scope: "gateway",
-			fsys:  gateway.MigrationsFS,
-			expectedTables: []string{
-				"gateway_kv", "gateway_issue", "gateway_channel", "gateway_agent",
-				"gateway_template", "gateway_runtime", "gateway_cron", "gateway_artifact",
-				"gateway_library_item", "gateway_media_input", "gateway_media_job",
-				"gateway_pkm_page", "gateway_pkm_comment", "gateway_pkm_clip",
-				"gateway_session", "gateway_session_event", "gateway_request_key",
-			},
-		},
-	}
-	for _, fname := range []string{"migrations/0001_init.up.sql", "migrations/0001_init.down.sql"} {
-		gwBytes, gErr := fs.ReadFile(gateway.MigrationsFS, fname)
-		stkBytes, sErr := fs.ReadFile(stack.GatewayMigrationsFS(), fname)
-		if gErr != nil || sErr != nil || !bytes.Equal(gwBytes, stkBytes) {
-			t.Fatalf("gateway/stack migration %s mismatch: gErr=%v sErr=%v equal=%t", fname, gErr, sErr, bytes.Equal(gwBytes, stkBytes))
-		}
-	}
+	expectedTriggers := []string{"channel_event_no_update", "channel_event_no_delete"}
 
 	tmpMigDir := t.TempDir()
-	for _, mod := range modules {
-		migs, err := migrate.ParseFS(mod.fsys, "migrations")
-		if err != nil || len(migs) == 0 {
-			t.Fatalf("migrate.ParseFS(%s): migs=%d err=%v", mod.scope, len(migs), err)
-		}
+	unifiedDBPath := filepath.Join(tmpMigDir, "platform.db")
+	pool, err := pkgdb.OpenPool(ctx, unifiedDBPath)
+	if err != nil {
+		t.Fatalf("pkgdb.OpenPool(%s): %v", unifiedDBPath, err)
+	}
+	defer func() { _ = pool.Close() }()
 
-		dbPath := filepath.Join(tmpMigDir, mod.scope+".db")
-		db := openTestSQLite(t, dbPath, mod.useVec)
-
-		runner, err := migrate.New(db, mod.scope, mod.fsys)
-		if err != nil {
-			_ = db.Close()
-			t.Fatalf("migrate.New(%s): %v", mod.scope, err)
-		}
-
-		applied, err := runner.Up(ctx)
-		if err != nil || applied != len(migs) {
-			_ = db.Close()
-			t.Fatalf("%s Up: applied=%d want=%d err=%v", mod.scope, applied, len(migs), err)
-		}
-		if again, err := runner.Up(ctx); err != nil || again != 0 {
-			_ = db.Close()
-			t.Fatalf("%s idempotent Up: applied=%d err=%v", mod.scope, again, err)
-		}
-
-		statuses, err := runner.Status(ctx)
-		if err != nil || len(statuses) != len(migs) {
-			_ = db.Close()
-			t.Fatalf("%s Status after Up: len=%d err=%v", mod.scope, len(statuses), err)
-		}
-		for _, st := range statuses {
-			if !st.Applied || st.Scope != mod.scope {
-				_ = db.Close()
-				t.Fatalf("%s Status expected applied: %+v", mod.scope, st)
-			}
-		}
-
-		assertSQLiteObjectsPresent(t, ctx, db, mod.scope, "table", mod.expectedTables)
-		assertSQLiteObjectsPresent(t, ctx, db, mod.scope, "trigger", mod.expectedTriggers)
-
-		reverted, err := runner.DownAll(ctx)
-		if err != nil || reverted != len(migs) {
-			_ = db.Close()
-			t.Fatalf("%s DownAll: reverted=%d want=%d err=%v", mod.scope, reverted, len(migs), err)
-		}
-		statusesDown, err := runner.Status(ctx)
-		if err != nil {
-			_ = db.Close()
-			t.Fatalf("%s Status after DownAll: %v", mod.scope, err)
-		}
-		for _, st := range statusesDown {
-			if st.Applied {
-				_ = db.Close()
-				t.Fatalf("%s Status expected unapplied after DownAll: %+v", mod.scope, st)
-			}
-		}
-		assertZeroNonTrackingObjects(t, ctx, db, mod.scope)
-
-		reApplied, err := runner.Up(ctx)
-		if err != nil || reApplied != len(migs) {
-			_ = db.Close()
-			t.Fatalf("%s re-Up after DownAll: applied=%d want=%d err=%v", mod.scope, reApplied, len(migs), err)
-		}
-		assertSQLiteObjectsPresent(t, ctx, db, mod.scope, "table", mod.expectedTables)
-		assertSQLiteObjectsPresent(t, ctx, db, mod.scope, "trigger", mod.expectedTriggers)
-		_ = db.Close()
+	runner, err := migrate.New(pool.WriteDB, pkgdb.PlatformScope, pkgdb.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New(%s): %v", pkgdb.PlatformScope, err)
 	}
 
-	// 3. Scan non-generated .go files in the 10 SQLite-only store packages for forbidden raw CREATE DDL.
-	sqliteOnlyPackages := []string{
-		"internal/durable/store",
-		"internal/domain/agent",
-		"internal/domain/repo",
-		"internal/domain/game",
-		"internal/domain/issue",
-		"internal/domain/channel",
-		"internal/domain/watch",
-		"internal/domain/memory",
-		"internal/domain/pkm",
-		"internal/domain/gateway",
+	applied, err := runner.Up(ctx)
+	if err != nil || applied != 11 {
+		t.Fatalf("%s Up: applied=%d want=11 err=%v", pkgdb.PlatformScope, applied, err)
 	}
+	if again, err := runner.Up(ctx); err != nil || again != 0 {
+		t.Fatalf("%s idempotent Up: applied=%d err=%v", pkgdb.PlatformScope, again, err)
+	}
+
+	statuses, err := runner.Status(ctx)
+	if err != nil || len(statuses) != 11 {
+		t.Fatalf("%s Status after Up: len=%d err=%v", pkgdb.PlatformScope, len(statuses), err)
+	}
+	for i, st := range statuses {
+		if !st.Applied || st.Scope != pkgdb.PlatformScope || st.Version != int64(i+1) || st.Name != orderedModules[i] {
+			t.Fatalf("%s Status[%d] = %+v, want scope=%q version=%d name=%q applied=true",
+				pkgdb.PlatformScope, i, st, pkgdb.PlatformScope, i+1, orderedModules[i])
+		}
+	}
+
+	assertSQLiteObjectsPresent(t, ctx, pool.ReadDB, pkgdb.PlatformScope, "table", expectedTables)
+	assertSQLiteObjectsPresent(t, ctx, pool.ReadDB, pkgdb.PlatformScope, "trigger", expectedTriggers)
+
+	reverted, err := runner.DownAll(ctx)
+	if err != nil || reverted != 11 {
+		t.Fatalf("%s DownAll: reverted=%d want=11 err=%v", pkgdb.PlatformScope, reverted, err)
+	}
+	statusesDown, err := runner.Status(ctx)
+	if err != nil || len(statusesDown) != 11 {
+		t.Fatalf("%s Status after DownAll: len=%d err=%v", pkgdb.PlatformScope, len(statusesDown), err)
+	}
+	for _, st := range statusesDown {
+		if st.Applied {
+			t.Fatalf("%s Status expected unapplied after DownAll: %+v", pkgdb.PlatformScope, st)
+		}
+	}
+	assertZeroNonTrackingObjects(t, ctx, pool.WriteDB, pkgdb.PlatformScope)
+
+	reApplied, err := runner.Up(ctx)
+	if err != nil || reApplied != 11 {
+		t.Fatalf("%s re-Up after DownAll: applied=%d want=11 err=%v", pkgdb.PlatformScope, reApplied, err)
+	}
+	assertSQLiteObjectsPresent(t, ctx, pool.ReadDB, pkgdb.PlatformScope, "table", expectedTables)
+	assertSQLiteObjectsPresent(t, ctx, pool.ReadDB, pkgdb.PlatformScope, "trigger", expectedTriggers)
+
+	for _, mod := range orderedModules {
+		scopeFS, err := pkgdb.ScopeFS(mod)
+		if err != nil {
+			t.Fatalf("pkgdb.ScopeFS(%q): %v", mod, err)
+		}
+		migs, err := migrate.ParseFS(scopeFS, "migrations")
+		if err != nil || len(migs) != 1 {
+			t.Fatalf("migrate.ParseFS(ScopeFS(%q)): migs=%d err=%v", mod, len(migs), err)
+		}
+		modPool, err := pkgdb.OpenPool(ctx, ":memory:")
+		if err != nil {
+			t.Fatalf("OpenPool(%q): %v", mod, err)
+		}
+		modRunner, err := migrate.New(modPool.WriteDB, mod, scopeFS)
+		if err != nil {
+			_ = modPool.Close()
+			t.Fatalf("migrate.New(ScopeFS(%q)): %v", mod, err)
+		}
+		if n, err := modRunner.Up(ctx); err != nil || n != 1 {
+			_ = modPool.Close()
+			t.Fatalf("ScopeFS(%q) Up: applied=%d err=%v", mod, n, err)
+		}
+		if n, err := modRunner.DownAll(ctx); err != nil || n != 1 {
+			_ = modPool.Close()
+			t.Fatalf("ScopeFS(%q) DownAll: reverted=%d err=%v", mod, n, err)
+		}
+		assertZeroNonTrackingObjects(t, ctx, modPool.WriteDB, "ScopeFS("+mod+")")
+		if n, err := modRunner.Up(ctx); err != nil || n != 1 {
+			_ = modPool.Close()
+			t.Fatalf("ScopeFS(%q) re-Up: applied=%d err=%v", mod, n, err)
+		}
+		_ = modPool.Close()
+	}
+
+	// 3. Scan pkg/db, internal/durable/store, internal/vault, and internal/domain/* for forbidden raw DDL
+	// and assert zero leftover sqlcgen/, queries.sql, migrations/, migrations.go, or gatewaymigrations/ under internal/.
 	forbiddenDDL := []string{"CREATE TABLE", "CREATE VIRTUAL TABLE", "CREATE TRIGGER"}
-	for _, pkgDir := range sqliteOnlyPackages {
-		err := filepath.WalkDir(pkgDir, func(path string, d fs.DirEntry, walkErr error) error {
+	scanRoots := []string{
+		"pkg/db",
+		"internal/durable/store",
+		"internal/vault",
+		"internal/domain",
+	}
+	for _, root := range scanRoots {
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
 			}
 			if d.IsDir() {
-				if d.Name() == "sqlcgen" {
+				if root == "pkg/db" && filepath.ToSlash(path) == "pkg/db/generated" {
 					return filepath.SkipDir
 				}
 				return nil
@@ -300,6 +236,18 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 				return err
 			}
 			upper := strings.ToUpper(string(src))
+			// internal/vault/sqlstore.go retains SchemaStatements strictly for DialectPostgres; SQLite uses pkg/db.ScopeFS("vault").
+			if filepath.ToSlash(path) == "internal/vault/sqlstore.go" {
+				for _, kw := range []string{"CREATE VIRTUAL TABLE", "CREATE TRIGGER"} {
+					if strings.Contains(upper, kw) {
+						t.Errorf("non-generated store file %s contains %q", path, kw)
+					}
+				}
+				if strings.Count(upper, "CREATE TABLE") > 1 {
+					t.Errorf("internal/vault/sqlstore.go contains unexpected extra CREATE TABLE outside SchemaStatements")
+				}
+				return nil
+			}
 			for _, kw := range forbiddenDDL {
 				if strings.Contains(upper, kw) {
 					t.Errorf("non-generated store file %s still contains %q", path, kw)
@@ -308,8 +256,27 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatalf("scan %s: %v", pkgDir, err)
+			t.Fatalf("scan %s: %v", root, err)
 		}
+	}
+
+	forbiddenInternalNames := map[string]bool{
+		"sqlcgen":           true,
+		"queries.sql":       true,
+		"migrations":        true,
+		"migrations.go":     true,
+		"gatewaymigrations": true,
+	}
+	if err := filepath.WalkDir("internal", func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if forbiddenInternalNames[d.Name()] {
+			t.Errorf("leftover per-package SQLite artifact under internal/: %s", path)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("walk internal/: %v", err)
 	}
 
 	// 4. End-to-end vibe-server CLI subprocess test with VIBEVALLEY_HOME + vibevalley.yaml + env + flag overrides.
@@ -328,7 +295,8 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 
 	vibeHome := filepath.Join(tmpCLI, "vibe-home")
 	workRoot := filepath.Join(tmpCLI, "work")
-	dbPath := filepath.Join(tmpCLI, "data", "platform.db")
+	dbDir := filepath.Join(tmpCLI, "data")
+	dbPath := filepath.Join(dbDir, "platform.db")
 	yamlPath := filepath.Join(vibeHome, "vibevalley.yaml")
 	if err := os.MkdirAll(vibeHome, 0o755); err != nil {
 		t.Fatal(err)
@@ -347,6 +315,7 @@ deepseek:
 secrets:
   github_token: ` + mapSecret + `
 `
+
 	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -381,23 +350,31 @@ secrets:
 
 	// migrate up -> status -> down --all -> up (using db_path from vibevalley.yaml)
 	migUpOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "up")
-	if err != nil || strings.Count(migUpOut, "applied=1") != 11 {
+	if err != nil || !strings.Contains(migUpOut, "scope=platform") || !strings.Contains(migUpOut, "after=11") || !strings.Contains(migUpOut, "applied=11") {
 		t.Fatalf("vibe-server migrate up failed: err=%v out=%q", err, migUpOut)
 	}
 
 	migStatusOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "status")
-	if err != nil || strings.Count(migStatusOut, "applied=true") != 11 {
+	if err != nil || strings.Count(migStatusOut, "scope=platform") != 11 || strings.Count(migStatusOut, "applied=true") != 11 {
 		t.Fatalf("vibe-server migrate status failed: err=%v out=%q", err, migStatusOut)
 	}
 
 	migDownOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "down", "--all")
-	if err != nil || strings.Count(migDownOut, "reverted=1") != 11 {
+	if err != nil || !strings.Contains(migDownOut, "scope=platform") || !strings.Contains(migDownOut, "after=0") || !strings.Contains(migDownOut, "reverted=11") {
 		t.Fatalf("vibe-server migrate down --all failed: err=%v out=%q", err, migDownOut)
 	}
 
 	migReUpOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "up")
-	if err != nil || strings.Count(migReUpOut, "applied=1") != 11 {
+	if err != nil || !strings.Contains(migReUpOut, "scope=platform") || !strings.Contains(migReUpOut, "after=11") || !strings.Contains(migReUpOut, "applied=11") {
 		t.Fatalf("vibe-server migrate re-up failed: err=%v out=%q", err, migReUpOut)
+	}
+
+	sidecars, globErr := filepath.Glob(filepath.Join(dbDir, "platform.*.db*"))
+	if globErr != nil {
+		t.Fatalf("glob sidecar dbs: %v", globErr)
+	}
+	if len(sidecars) != 0 {
+		t.Fatalf("expected zero sidecar DB files alongside %s, found %v", dbPath, sidecars)
 	}
 
 	// serve --ready-json with CLI --addr override
@@ -475,6 +452,14 @@ secrets:
 			t.Fatalf("timed out waiting for serve graceful exit")
 		}
 	}
+
+	sidecarsAfterServe, globErr := filepath.Glob(filepath.Join(dbDir, "platform.*.db*"))
+	if globErr != nil {
+		t.Fatalf("glob sidecar dbs after serve: %v", globErr)
+	}
+	if len(sidecarsAfterServe) != 0 {
+		t.Fatalf("expected zero sidecar DB files alongside %s after serve, found %v", dbPath, sidecarsAfterServe)
+	}
 }
 
 func verifyMigrationPairsOnDisk(t *testing.T, dir string) {
@@ -512,32 +497,6 @@ func verifyMigrationPairsOnDisk(t *testing.T, dir string) {
 			t.Fatalf("missing matching .up.sql for %s.down.sql in %q", stem, dir)
 		}
 	}
-}
-
-func openTestSQLite(t *testing.T, dbPath string, useVec bool) *sql.DB {
-	t.Helper()
-	var (
-		db  *sql.DB
-		err error
-	)
-	if useVec {
-		_ = engine.RegisterVectorFunctions(nil)
-		db, err = engine.Open(dbPath)
-		if err != nil {
-			t.Fatalf("engine.Open %s: %v", dbPath, err)
-		}
-		if err := vec.Register(db); err != nil {
-			_ = db.Close()
-			t.Fatalf("vec.Register %s: %v", dbPath, err)
-		}
-	} else {
-		db, err = sql.Open("sqlite", dbPath)
-		if err != nil {
-			t.Fatalf("sql.Open %s: %v", dbPath, err)
-		}
-	}
-	db.SetMaxOpenConns(1)
-	return db
 }
 
 func assertSQLiteObjectsPresent(t *testing.T, ctx context.Context, db *sql.DB, scope, objType string, names []string) {

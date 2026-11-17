@@ -18,8 +18,8 @@ import (
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/gateway/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 )
 
 const (
@@ -263,14 +263,15 @@ type artifactBroadcast struct {
 	Seq         int64
 }
 
-func newGatewayHub(st *stack.Stack, overlayDB *sql.DB, mediaBlobDir string) *gatewayHub {
-	if overlayDB == nil && st != nil {
+func newGatewayHub(st *stack.Stack, overlayDB *sql.DB, overlayShared bool, mediaBlobDir string) *gatewayHub {
+	if overlayDB == nil && st != nil && st.GatewayDB != nil {
 		overlayDB = st.GatewayDB
+		overlayShared = true
 	}
 	if strings.TrimSpace(mediaBlobDir) == "" && st != nil {
 		mediaBlobDir = st.MediaBlobDir
 	}
-	sqlStore, err := newOverlaySQLStore(overlayDB, mediaBlobDir)
+	sqlStore, err := newOverlaySQLStore(overlayDB, overlayShared, mediaBlobDir)
 	h := &gatewayHub{
 		st:         st,
 		sqlStore:   sqlStore,
@@ -603,20 +604,20 @@ func (h *gatewayHub) prepareSnapshotLocked(
 	if s.PKMUndo != nil {
 		kvRaw["pkm_undo_json"] = s.PKMUndo
 	}
-	kvRows := make([]sqlcgen.UpsertGatewayKVParams, 0, len(kvRaw))
+	kvRows := make([]dbgen.UpsertGatewayKVParams, 0, len(kvRaw))
 	for k, v := range kvRaw {
 		raw, err := mustMarshalJSON(v)
 		if err != nil {
 			return preparedOverlaySnapshot{}, err
 		}
-		kvRows = append(kvRows, sqlcgen.UpsertGatewayKVParams{
+		kvRows = append(kvRows, dbgen.UpsertGatewayKVParams{
 			Key:       k,
 			ValueJson: raw,
 			UpdatedAt: nowStr,
 		})
 	}
 
-	issues := make(map[string]sqlcgen.UpsertGatewayIssueParams, len(s.Issues))
+	issues := make(map[string]dbgen.UpsertGatewayIssueParams, len(s.Issues))
 	for id, ov := range s.Issues {
 		if ov == nil {
 			continue
@@ -633,7 +634,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		if st == "" {
 			st = "backlog"
 		}
-		issues[id] = sqlcgen.UpsertGatewayIssueParams{
+		issues[id] = dbgen.UpsertGatewayIssueParams{
 			ID:          id,
 			Identifier:  ident,
 			Status:      st,
@@ -642,7 +643,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		}
 	}
 
-	channels := make(map[string]sqlcgen.UpsertGatewayChannelParams, len(s.Channels))
+	channels := make(map[string]dbgen.UpsertGatewayChannelParams, len(s.Channels))
 	for id, ov := range s.Channels {
 		if ov == nil {
 			continue
@@ -655,7 +656,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		if strings.HasPrefix(id, "dm:") {
 			kind = "dm"
 		}
-		channels[id] = sqlcgen.UpsertGatewayChannelParams{
+		channels[id] = dbgen.UpsertGatewayChannelParams{
 			ID:          id,
 			Kind:        kind,
 			UpdatedAt:   formatTS(ov.LastAt),
@@ -663,7 +664,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		}
 	}
 
-	agents := make(map[string]sqlcgen.UpsertGatewayAgentParams, len(s.Agents))
+	agents := make(map[string]dbgen.UpsertGatewayAgentParams, len(s.Agents))
 	for id, ov := range s.Agents {
 		if ov == nil {
 			continue
@@ -672,7 +673,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		if err != nil {
 			return preparedOverlaySnapshot{}, err
 		}
-		agents[id] = sqlcgen.UpsertGatewayAgentParams{
+		agents[id] = dbgen.UpsertGatewayAgentParams{
 			ID:          id,
 			Name:        firstNonEmpty(agentNames[id], id),
 			UpdatedAt:   nowStr,
@@ -680,7 +681,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		}
 	}
 
-	templates := make(map[string]sqlcgen.UpsertGatewayTemplateParams, len(s.Templates))
+	templates := make(map[string]dbgen.UpsertGatewayTemplateParams, len(s.Templates))
 	for id, rec := range s.Templates {
 		if rec == nil {
 			continue
@@ -689,14 +690,14 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		if err != nil {
 			return preparedOverlaySnapshot{}, err
 		}
-		templates[id] = sqlcgen.UpsertGatewayTemplateParams{
+		templates[id] = dbgen.UpsertGatewayTemplateParams{
 			ID:          id,
 			UpdatedAt:   nowStr,
 			PayloadJson: raw,
 		}
 	}
 
-	runtimes := make(map[string]sqlcgen.UpsertGatewayRuntimeParams, len(s.RuntimeSettings))
+	runtimes := make(map[string]dbgen.UpsertGatewayRuntimeParams, len(s.RuntimeSettings))
 	for id, rt := range s.RuntimeSettings {
 		if rt == nil {
 			continue
@@ -705,14 +706,14 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		if err != nil {
 			return preparedOverlaySnapshot{}, err
 		}
-		runtimes[id] = sqlcgen.UpsertGatewayRuntimeParams{
+		runtimes[id] = dbgen.UpsertGatewayRuntimeParams{
 			ID:          id,
 			UpdatedAt:   nowStr,
 			PayloadJson: raw,
 		}
 	}
 
-	crons := make(map[string]sqlcgen.UpsertGatewayCronParams, len(s.Crons))
+	crons := make(map[string]dbgen.UpsertGatewayCronParams, len(s.Crons))
 	for id, ov := range s.Crons {
 		if ov == nil {
 			continue
@@ -739,7 +740,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		if nextMs > 0 {
 			nextNull = sql.NullString{String: formatTS(nextMs), Valid: true}
 		}
-		crons[id] = sqlcgen.UpsertGatewayCronParams{
+		crons[id] = dbgen.UpsertGatewayCronParams{
 			ID:          id,
 			Enabled:     enabledInt,
 			NextRunAt:   nextNull,
@@ -748,7 +749,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		}
 	}
 
-	artifacts := make(map[string]sqlcgen.UpsertGatewayArtifactParams, len(s.Artifacts))
+	artifacts := make(map[string]dbgen.UpsertGatewayArtifactParams, len(s.Artifacts))
 	for id, ov := range s.Artifacts {
 		if ov == nil {
 			continue
@@ -761,7 +762,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		if ts <= 0 {
 			ts = ov.At
 		}
-		artifacts[id] = sqlcgen.UpsertGatewayArtifactParams{
+		artifacts[id] = dbgen.UpsertGatewayArtifactParams{
 			ID:          id,
 			Kind:        firstNonEmpty(ov.Body, "blocks"),
 			UpdatedAt:   formatTS(ts),
@@ -769,7 +770,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		}
 	}
 
-	library := make(map[string]sqlcgen.UpsertGatewayLibraryItemParams, len(s.Library))
+	library := make(map[string]dbgen.UpsertGatewayLibraryItemParams, len(s.Library))
 	for _, item := range s.Library {
 		id := item.Attachment.ID
 		if id == "" {
@@ -779,7 +780,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		if err != nil {
 			return preparedOverlaySnapshot{}, err
 		}
-		library[id] = sqlcgen.UpsertGatewayLibraryItemParams{
+		library[id] = dbgen.UpsertGatewayLibraryItemParams{
 			ID:          id,
 			Kind:        firstNonEmpty(item.Attachment.Type, "application/octet-stream"),
 			CreatedAt:   formatTS(item.AddedAt),
@@ -797,7 +798,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 			return preparedOverlaySnapshot{}, err
 		}
 		mediaInputs[id] = preparedMediaInput{
-			row: sqlcgen.UpsertGatewayMediaInputParams{
+			row: dbgen.UpsertGatewayMediaInputParams{
 				ID:          id,
 				MimeType:    firstNonEmpty(rec.Mime, "application/octet-stream"),
 				ByteSize:    rec.Size,
@@ -810,7 +811,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		}
 	}
 
-	mediaJobs := make(map[string]sqlcgen.UpsertGatewayMediaJobParams, len(s.MediaJobs))
+	mediaJobs := make(map[string]dbgen.UpsertGatewayMediaJobParams, len(s.MediaJobs))
 	for id, rec := range s.MediaJobs {
 		if rec == nil {
 			continue
@@ -824,7 +825,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 			CreatedAt int64  `json:"createdAt"`
 		}
 		_ = json.Unmarshal(rec.Raw, &jobMeta)
-		mediaJobs[id] = sqlcgen.UpsertGatewayMediaJobParams{
+		mediaJobs[id] = dbgen.UpsertGatewayMediaJobParams{
 			ID:          id,
 			Kind:        rec.Kind,
 			Status:      firstNonEmpty(jobMeta.Phase, "queued"),
@@ -833,7 +834,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		}
 	}
 
-	pkmPages := make(map[string]sqlcgen.UpsertGatewayPKMPageParams, len(s.PKMPages))
+	pkmPages := make(map[string]dbgen.UpsertGatewayPKMPageParams, len(s.PKMPages))
 	for p, rec := range s.PKMPages {
 		if rec == nil {
 			continue
@@ -842,20 +843,20 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		if err != nil {
 			return preparedOverlaySnapshot{}, err
 		}
-		pkmPages[p] = sqlcgen.UpsertGatewayPKMPageParams{
+		pkmPages[p] = dbgen.UpsertGatewayPKMPageParams{
 			Path:        p,
 			UpdatedAt:   formatTS(rec.Updated),
 			PayloadJson: raw,
 		}
 	}
 
-	pkmComments := make(map[string]sqlcgen.UpsertGatewayPKMCommentParams, len(s.PKMComments))
+	pkmComments := make(map[string]dbgen.UpsertGatewayPKMCommentParams, len(s.PKMComments))
 	for _, c := range s.PKMComments {
 		raw, err := mustMarshalJSON(c)
 		if err != nil {
 			return preparedOverlaySnapshot{}, err
 		}
-		pkmComments[c.ID] = sqlcgen.UpsertGatewayPKMCommentParams{
+		pkmComments[c.ID] = dbgen.UpsertGatewayPKMCommentParams{
 			ID:          c.ID,
 			PagePath:    c.Page,
 			CreatedAt:   formatTS(c.Created),
@@ -863,20 +864,20 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		}
 	}
 
-	pkmClips := make(map[string]sqlcgen.UpsertGatewayPKMClipParams, len(s.PKMClips))
+	pkmClips := make(map[string]dbgen.UpsertGatewayPKMClipParams, len(s.PKMClips))
 	for urlKey, pageSlug := range s.PKMClips {
 		raw, err := mustMarshalJSON(map[string]string{"url": urlKey, "page": pageSlug})
 		if err != nil {
 			return preparedOverlaySnapshot{}, err
 		}
-		pkmClips[urlKey] = sqlcgen.UpsertGatewayPKMClipParams{
+		pkmClips[urlKey] = dbgen.UpsertGatewayPKMClipParams{
 			ID:          urlKey,
 			CreatedAt:   nowStr,
 			PayloadJson: raw,
 		}
 	}
 
-	sessions := make(map[string]sqlcgen.UpsertGatewaySessionParams, len(s.Sessions))
+	sessions := make(map[string]dbgen.UpsertGatewaySessionParams, len(s.Sessions))
 	for id, sess := range s.Sessions {
 		if sess == nil {
 			continue
@@ -889,7 +890,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		if sess.Scope != nil && sess.Scope.Kind == "issue" {
 			issueID = sess.Scope.ID
 		}
-		sessions[id] = sqlcgen.UpsertGatewaySessionParams{
+		sessions[id] = dbgen.UpsertGatewaySessionParams{
 			ID:          id,
 			IssueID:     issueID,
 			Status:      firstNonEmpty(sess.Phase.Tag, "idle"),
@@ -918,7 +919,7 @@ func (h *gatewayHub) prepareSnapshotLocked(
 			}
 			list = append(list, preparedSessionEvent{
 				seq: rowSeq,
-				row: sqlcgen.UpsertGatewaySessionEventParams{
+				row: dbgen.UpsertGatewaySessionEventParams{
 					SessionID:   sessID,
 					Seq:         rowSeq,
 					CreatedAt:   formatTS(ev.Time),
@@ -929,13 +930,13 @@ func (h *gatewayHub) prepareSnapshotLocked(
 		sessionEvents[sessID] = list
 	}
 
-	requestKeys := make(map[string]sqlcgen.UpsertGatewayRequestKeyParams, len(s.RequestKeys))
+	requestKeys := make(map[string]dbgen.UpsertGatewayRequestKeyParams, len(s.RequestKeys))
 	for k, v := range s.RequestKeys {
 		raw, err := mustMarshalJSON(v)
 		if err != nil {
 			return preparedOverlaySnapshot{}, err
 		}
-		requestKeys[k] = sqlcgen.UpsertGatewayRequestKeyParams{
+		requestKeys[k] = dbgen.UpsertGatewayRequestKeyParams{
 			ScopeKey:     k,
 			CreatedAt:    nowStr,
 			ResponseJson: raw,

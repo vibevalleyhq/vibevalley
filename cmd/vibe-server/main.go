@@ -169,12 +169,12 @@ func newRootCommand(getenv func(string) string, stdout, stderr io.Writer) *cobra
 
 	migrateCmd := &cobra.Command{
 		Use:   "migrate",
-		Short: "Run SQLite schema migrations across all platform modules",
+		Short: "Run SQLite schema migrations for the unified platform SQLite database",
 	}
 
 	migrateUpCmd := &cobra.Command{
 		Use:   "up",
-		Short: "Apply pending migrations across all 11 SQLite scopes",
+		Short: "Apply pending migrations for the unified platform SQLite database",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if showVersion {
@@ -204,7 +204,7 @@ func newRootCommand(getenv func(string) string, stdout, stderr io.Writer) *cobra
 	)
 	migrateDownCmd := &cobra.Command{
 		Use:   "down",
-		Short: "Revert migrations across all 11 SQLite scopes",
+		Short: "Revert migrations for the unified platform SQLite database",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if showVersion {
@@ -233,12 +233,12 @@ func newRootCommand(getenv func(string) string, stdout, stderr io.Writer) *cobra
 			return nil
 		},
 	}
-	migrateDownCmd.Flags().IntVar(&downSteps, "steps", 1, "number of migrations to revert per scope")
-	migrateDownCmd.Flags().BoolVar(&downAll, "all", false, "revert all applied migrations per scope")
+	migrateDownCmd.Flags().IntVar(&downSteps, "steps", 1, "number of migrations to revert")
+	migrateDownCmd.Flags().BoolVar(&downAll, "all", false, "revert all applied migrations")
 
 	migrateStatusCmd := &cobra.Command{
 		Use:   "status",
-		Short: "Show migration status across all 11 SQLite scopes",
+		Short: "Show migration status for the unified platform SQLite database",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if showVersion {

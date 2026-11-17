@@ -11,9 +11,27 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
+
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
 
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
@@ -126,7 +144,7 @@ func TestRealVibeValleyProtocolZodContractParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var srvErr bytes.Buffer
+	var srvErr syncBuffer
 	srvCmd.Stderr = &srvErr
 	if err := srvCmd.Start(); err != nil {
 		t.Fatalf("start vibe-server: %v", err)

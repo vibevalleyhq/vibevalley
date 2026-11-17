@@ -14,8 +14,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	_ "modernc.org/sqlite"
-
 	"github.com/vibevalleyhq/vibevalley/internal/config"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/artifact"
@@ -40,6 +38,7 @@ import (
 	"github.com/vibevalleyhq/vibevalley/internal/vault"
 	"github.com/vibevalleyhq/vibevalley/pkg/chord/link"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	pkgdb "github.com/vibevalleyhq/vibevalley/pkg/db"
 )
 
 var (
@@ -52,7 +51,6 @@ var (
 // Config configures an assembled VibeValley runtime stack.
 type Config struct {
 	// DBPath is ":memory:" (default) for ephemeral runs or a SQLite WAL path for durable persistence.
-	// Sidecar WAL databases for independent module pools derive from DBPath to avoid SQLITE_BUSY.
 	DBPath string
 
 	// WorkRoot is the root directory used for repo/worktree clones and local state fallback.
@@ -130,10 +128,11 @@ type Stack struct {
 	Grader      *durable.OutcomeGrader
 	Compactor   *durable.Compactor
 
-	VaultDB *sql.DB
-	Vault   *vault.Store
-	Tokens  *vault.TokenService
-	Egress  *vault.EgressProxy
+	DBPool *pkgdb.Pool
+
+	Vault  *vault.Store
+	Tokens *vault.TokenService
+	Egress *vault.EgressProxy
 
 	GatewayDB    *sql.DB
 	MediaBlobDir string
@@ -202,11 +201,8 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 		clk = store.RealClock{}
 	}
 
-	dbPath := strings.TrimSpace(cfg.DBPath)
-	if dbPath == "" {
-		dbPath = ":memory:"
-	}
-	isMem := dbPath == ":memory:"
+	dbPath := normalizeBaseDBPath(cfg.DBPath)
+	isMem := pkgdb.IsMemoryDSN(dbPath)
 
 	workRoot := strings.TrimSpace(cfg.WorkRoot)
 	var ownsWork bool
@@ -251,6 +247,17 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 		}
 	}()
 
+	// Unified SQLite WAL (or :memory:) pool migrated once under the "platform" scope.
+	pool, err := pkgdb.OpenPool(ctx, dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("stack: open db pool: %w", err)
+	}
+	s.DBPool = pool
+	s.GatewayDB = pool.WriteDB
+	if _, err := MigrateUpDB(ctx, pool.WriteDB, dbPath); err != nil {
+		return nil, fmt.Errorf("stack: migrate db: %w", err)
+	}
+
 	// Game reactive SpaceView projector & progression ledger.
 	proj, err := game.NewProjector()
 	if err != nil {
@@ -261,10 +268,7 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 	if isMem {
 		s.Ledger = game.NewMemoryLedger()
 	} else {
-		if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
-			return nil, fmt.Errorf("stack: mkdir db dir: %w", err)
-		}
-		ledger, err := game.OpenSQLiteLedger(ctx, sidecarDBPath(dbPath, "game"))
+		ledger, err := game.OpenSQLiteLedgerFromDB(ctx, pool.WriteDB)
 		if err != nil {
 			return nil, fmt.Errorf("stack: open ledger: %w", err)
 		}
@@ -275,7 +279,7 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 	if isMem {
 		s.Store = store.NewMemory(store.WithClock(clk))
 	} else {
-		st, err := store.OpenSQLite(ctx, dbPath, store.WithClock(clk))
+		st, err := store.OpenSQLiteFromPool(ctx, pool.WriteDB, pool.ReadDB, store.WithClock(clk))
 		if err != nil {
 			return nil, fmt.Errorf("stack: open durable sqlite: %w", err)
 		}
@@ -324,23 +328,9 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 	if isMem {
 		vBackend = vault.NewMemoryBackend()
 	} else {
-		vPath := sidecarDBPath(dbPath, "vault")
-		vDB, err := sql.Open("sqlite", vPath)
-		if err != nil {
-			return nil, fmt.Errorf("stack: open vault db: %w", err)
-		}
-		vDB.SetMaxOpenConns(1)
-		if _, err := vDB.ExecContext(ctx, `PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;`); err != nil {
-			_ = vDB.Close()
-			return nil, fmt.Errorf("stack: vault pragmas: %w", err)
-		}
-		s.VaultDB = vDB
-		sb, err := vault.NewSQLBackend(vDB, vault.DialectSQLite)
+		sb, err := vault.NewSQLBackend(pool.WriteDB, vault.DialectSQLite)
 		if err != nil {
 			return nil, fmt.Errorf("stack: vault sql backend: %w", err)
-		}
-		if err := sb.Migrate(ctx); err != nil {
-			return nil, fmt.Errorf("stack: vault migrate: %w", err)
 		}
 		vBackend = sb
 	}
@@ -422,45 +412,32 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 	}
 	s.MediaBlobDir = mediaBlobDir
 
-	gwDSN := ":memory:"
-	if !isMem {
-		gwDSN = sidecarDBPath(dbPath, "gateway")
-	}
-	gwDB, err := openScopeMigrationDB(ctx, gwDSN, isMem, false)
-	if err != nil {
-		return nil, fmt.Errorf("stack: open gateway db: %w", err)
-	}
-	s.GatewayDB = gwDB
-	if _, err := migrateScopeUp(ctx, gwDB, "gateway", GatewayMigrationsFS(), gwDSN); err != nil {
-		return nil, fmt.Errorf("stack: migrate gateway db: %w", err)
-	}
-
 	// Agents, Repositories, PKM, and Memory domain stores.
 	if isMem {
 		s.Agents = agent.NewMemoryRegistry(agent.WithClock(clk))
 		s.Repos = repo.NewMemoryRegistry(repo.WithClock(clk), repo.WithWorkRoot(workRoot))
-		s.PKM, err = pkm.OpenStore(ctx, ":memory:")
+		s.PKM, err = pkm.OpenStoreFromPool(ctx, pool.WriteDB, pool.ReadDB, true)
 		if err != nil {
 			return nil, fmt.Errorf("stack: open pkm memory store: %w", err)
 		}
-		s.Memory, err = memory.OpenStore(ctx, ":memory:", memory.WithClock(clk.NowMs))
+		s.Memory, err = memory.OpenStoreFromPool(ctx, pool.WriteDB, pool.ReadDB, true, memory.WithClock(clk.NowMs))
 		if err != nil {
 			return nil, fmt.Errorf("stack: open memory store: %w", err)
 		}
 	} else {
-		s.Agents, err = agent.OpenSQLiteRegistry(ctx, sidecarDBPath(dbPath, "agent"), agent.WithClock(clk))
+		s.Agents, err = agent.OpenSQLiteRegistryFromDB(ctx, pool.WriteDB, agent.WithClock(clk))
 		if err != nil {
 			return nil, fmt.Errorf("stack: open agent sqlite: %w", err)
 		}
-		s.Repos, err = repo.OpenSQLiteRegistry(ctx, sidecarDBPath(dbPath, "repo"), repo.WithClock(clk), repo.WithWorkRoot(workRoot))
+		s.Repos, err = repo.OpenSQLiteRegistryFromDB(ctx, pool.WriteDB, repo.WithClock(clk), repo.WithWorkRoot(workRoot))
 		if err != nil {
 			return nil, fmt.Errorf("stack: open repo sqlite: %w", err)
 		}
-		s.PKM, err = pkm.OpenStore(ctx, sidecarDBPath(dbPath, "pkm"))
+		s.PKM, err = pkm.OpenStoreFromPool(ctx, pool.WriteDB, pool.ReadDB, false)
 		if err != nil {
 			return nil, fmt.Errorf("stack: open pkm sqlite: %w", err)
 		}
-		s.Memory, err = memory.OpenStore(ctx, sidecarDBPath(dbPath, "memory"), memory.WithClock(clk.NowMs))
+		s.Memory, err = memory.OpenStoreFromPool(ctx, pool.WriteDB, pool.ReadDB, false, memory.WithClock(clk.NowMs))
 		if err != nil {
 			return nil, fmt.Errorf("stack: open memory sqlite: %w", err)
 		}
@@ -470,7 +447,7 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 	if isMem {
 		s.Channels = channel.NewMemoryStore(channel.WithClock(clk))
 	} else {
-		s.Channels, err = channel.OpenSQLite(ctx, sidecarDBPath(dbPath, "channel"), channel.WithClock(clk))
+		s.Channels, err = channel.OpenSQLiteFromDB(ctx, pool.WriteDB, channel.WithClock(clk))
 		if err != nil {
 			return nil, fmt.Errorf("stack: open channel sqlite: %w", err)
 		}
@@ -490,7 +467,7 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 	if isMem {
 		s.Watch = domainwatch.NewMemoryService(s.Channels, watchOpts...)
 	} else {
-		s.Watch, err = domainwatch.OpenSQLiteService(ctx, s.Channels, sidecarDBPath(dbPath, "watch"), watchOpts...)
+		s.Watch, err = domainwatch.OpenSQLiteServiceFromDB(ctx, s.Channels, pool.WriteDB, watchOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("stack: open watch sqlite: %w", err)
 		}
@@ -511,7 +488,7 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 	if isMem {
 		s.Issues = issue.NewMemoryService(issueOpts...)
 	} else {
-		s.Issues, err = issue.OpenSQLiteService(ctx, sidecarDBPath(dbPath, "issue"), issueOpts...)
+		s.Issues, err = issue.OpenSQLiteServiceFromDB(ctx, pool.WriteDB, issueOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("stack: open issue sqlite: %w", err)
 		}
@@ -858,11 +835,8 @@ func (s *Stack) Close() error {
 		if s.Store != nil {
 			closeErr = errors.Join(closeErr, s.Store.Close())
 		}
-		if s.VaultDB != nil {
-			closeErr = errors.Join(closeErr, s.VaultDB.Close())
-		}
-		if s.GatewayDB != nil {
-			closeErr = errors.Join(closeErr, s.GatewayDB.Close())
+		if s.DBPool != nil {
+			closeErr = errors.Join(closeErr, s.DBPool.Close())
 		}
 		if s.ownsWork && s.workRoot != "" {
 			closeErr = errors.Join(closeErr, os.RemoveAll(s.workRoot))
@@ -1113,15 +1087,6 @@ func (s *Stack) RaiseBudget(ctx context.Context, conversationID, taskID string, 
 	return s.Budget.UpdateBudgetAndResume(ctx, s.Scheduler, conversationID, taskID, contract.BudgetSpec{
 		MaxCostMicros: newMaxCostMicros,
 	})
-}
-
-func sidecarDBPath(baseDBPath, module string) string {
-	ext := filepath.Ext(baseDBPath)
-	prefix := strings.TrimSuffix(baseDBPath, ext)
-	if ext == "" {
-		ext = ".db"
-	}
-	return prefix + "." + module + ext
 }
 
 type stackMCPCatalog struct {

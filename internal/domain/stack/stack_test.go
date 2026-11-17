@@ -112,6 +112,7 @@ func TestStackSQLitePersistenceAndRestart(t *testing.T) {
 	if err := s1.Close(); err != nil {
 		t.Fatalf("s1.Close: %v", err)
 	}
+	assertZeroSidecarDBFiles(t, dir, "platform")
 
 	// Reopen Stack on the same DBPath & VaultRootKey.
 	s2, err := stack.New(ctx, stack.Config{
@@ -123,6 +124,7 @@ func TestStackSQLitePersistenceAndRestart(t *testing.T) {
 		t.Fatalf("stack.New(2): %v", err)
 	}
 	defer func() { _ = s2.Close() }()
+	assertZeroSidecarDBFiles(t, dir, "platform")
 
 	cred, err := s2.Vault.Get(ctx, "cred-openai")
 	if err != nil || cred.Value.Reveal() != secretPlain {

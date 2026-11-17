@@ -302,33 +302,39 @@ func TestVibeDesktopEmbeddedMigrateSubcommands(t *testing.T) {
 	if err := run(ctx, []string{"migrate", "up", "--db", dbPath}, getenv, &out, &errBuf, DesktopDeps{}); err != nil {
 		t.Fatalf("vibe-desktop migrate up failed: %v", err)
 	}
-	for _, scope := range stack.MigrationScopes() {
-		if !strings.Contains(out.String(), "scope="+scope) {
-			t.Fatalf("migrate up missing scope %s:\n%s", scope, out.String())
-		}
+	if !strings.Contains(out.String(), "scope=platform") || !strings.Contains(out.String(), "after=11") || !strings.Contains(out.String(), "applied=11") {
+		t.Fatalf("unexpected migrate up output:\n%s", out.String())
 	}
 
 	out.Reset()
 	if err := run(ctx, []string{"migrate", "status", "--db", dbPath}, getenv, &out, &errBuf, DesktopDeps{}); err != nil {
 		t.Fatalf("vibe-desktop migrate status failed: %v", err)
 	}
-	if strings.Count(out.String(), "applied=true") != len(stack.MigrationScopes()) {
-		t.Fatalf("expected all scopes applied=true:\n%s", out.String())
+	if strings.Count(out.String(), "scope=platform") != 11 || strings.Count(out.String(), "applied=true") != 11 {
+		t.Fatalf("expected 11 applied=true platform status lines:\n%s", out.String())
 	}
 
 	out.Reset()
 	if err := run(ctx, []string{"migrate", "down", "--db", dbPath, "--all"}, getenv, &out, &errBuf, DesktopDeps{}); err != nil {
 		t.Fatalf("vibe-desktop migrate down --all failed: %v", err)
 	}
-	if strings.Count(out.String(), "reverted=1") != len(stack.MigrationScopes()) {
-		t.Fatalf("expected all scopes reverted=1:\n%s", out.String())
+	if !strings.Contains(out.String(), "scope=platform") || !strings.Contains(out.String(), "after=0") || !strings.Contains(out.String(), "reverted=11") {
+		t.Fatalf("unexpected migrate down --all output:\n%s", out.String())
 	}
 
 	out.Reset()
 	if err := run(ctx, []string{"migrate", "up", "--db", dbPath}, getenv, &out, &errBuf, DesktopDeps{}); err != nil {
 		t.Fatalf("vibe-desktop migrate re-up failed: %v", err)
 	}
-	if strings.Count(out.String(), "applied=1") != len(stack.MigrationScopes()) {
-		t.Fatalf("expected all scopes applied=1 on re-up:\n%s", out.String())
+	if !strings.Contains(out.String(), "scope=platform") || !strings.Contains(out.String(), "after=11") || !strings.Contains(out.String(), "applied=11") {
+		t.Fatalf("unexpected migrate re-up output:\n%s", out.String())
+	}
+
+	sidecars, globErr := filepath.Glob(filepath.Join(tmp, "desktop-mig.*.db*"))
+	if globErr != nil {
+		t.Fatalf("glob sidecar dbs: %v", globErr)
+	}
+	if len(sidecars) != 0 {
+		t.Fatalf("expected zero sidecar DB files alongside %s, found %v", dbPath, sidecars)
 	}
 }

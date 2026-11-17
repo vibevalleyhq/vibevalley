@@ -3,30 +3,29 @@ package gateway
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	_ "modernc.org/sqlite"
-
-	"github.com/vibevalleyhq/vibevalley/internal/domain/gateway/sqlcgen"
+	pkgdb "github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
-//go:embed migrations/*.sql
-var MigrationsFS embed.FS
-
 type overlaySQLStore struct {
+	pool         *pkgdb.Pool
 	db           *sql.DB
-	q            *sqlcgen.Queries
+	q            *dbgen.Queries
 	ownsDB       bool
 	mediaBlobDir string
 	ownsBlobDir  bool
+	closed       atomic.Bool
 
 	writeMu      sync.Mutex
 	lastSavedGen uint64
@@ -51,66 +50,86 @@ type overlaySQLStore struct {
 }
 
 type preparedMediaInput struct {
-	row      sqlcgen.UpsertGatewayMediaInputParams
+	row      dbgen.UpsertGatewayMediaInputParams
 	rawBytes []byte
 }
 
 type preparedSessionEvent struct {
 	seq int64
-	row sqlcgen.UpsertGatewaySessionEventParams
+	row dbgen.UpsertGatewaySessionEventParams
 }
 
 type preparedOverlaySnapshot struct {
 	gen           uint64
-	kv            []sqlcgen.UpsertGatewayKVParams
-	issues        map[string]sqlcgen.UpsertGatewayIssueParams
-	channels      map[string]sqlcgen.UpsertGatewayChannelParams
-	agents        map[string]sqlcgen.UpsertGatewayAgentParams
-	templates     map[string]sqlcgen.UpsertGatewayTemplateParams
-	runtimes      map[string]sqlcgen.UpsertGatewayRuntimeParams
-	crons         map[string]sqlcgen.UpsertGatewayCronParams
-	artifacts     map[string]sqlcgen.UpsertGatewayArtifactParams
-	library       map[string]sqlcgen.UpsertGatewayLibraryItemParams
+	kv            []dbgen.UpsertGatewayKVParams
+	issues        map[string]dbgen.UpsertGatewayIssueParams
+	channels      map[string]dbgen.UpsertGatewayChannelParams
+	agents        map[string]dbgen.UpsertGatewayAgentParams
+	templates     map[string]dbgen.UpsertGatewayTemplateParams
+	runtimes      map[string]dbgen.UpsertGatewayRuntimeParams
+	crons         map[string]dbgen.UpsertGatewayCronParams
+	artifacts     map[string]dbgen.UpsertGatewayArtifactParams
+	library       map[string]dbgen.UpsertGatewayLibraryItemParams
 	mediaInputs   map[string]preparedMediaInput
-	mediaJobs     map[string]sqlcgen.UpsertGatewayMediaJobParams
-	pkmPages      map[string]sqlcgen.UpsertGatewayPKMPageParams
-	pkmComments   map[string]sqlcgen.UpsertGatewayPKMCommentParams
-	pkmClips      map[string]sqlcgen.UpsertGatewayPKMClipParams
-	sessions      map[string]sqlcgen.UpsertGatewaySessionParams
+	mediaJobs     map[string]dbgen.UpsertGatewayMediaJobParams
+	pkmPages      map[string]dbgen.UpsertGatewayPKMPageParams
+	pkmComments   map[string]dbgen.UpsertGatewayPKMCommentParams
+	pkmClips      map[string]dbgen.UpsertGatewayPKMClipParams
+	sessions      map[string]dbgen.UpsertGatewaySessionParams
 	sessionEvents map[string][]preparedSessionEvent
-	requestKeys   map[string]sqlcgen.UpsertGatewayRequestKeyParams
+	requestKeys   map[string]dbgen.UpsertGatewayRequestKeyParams
 }
 
-func newOverlaySQLStore(db *sql.DB, mediaBlobDir string) (*overlaySQLStore, error) {
+func ensureGatewayOverlayTables(ctx context.Context, sqlDB *sql.DB) error {
+	var existing string
+	err := sqlDB.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'gateway_kv'`).Scan(&existing)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("gateway: inspect overlay schema: %w", err)
+	}
+	fsys, err := pkgdb.ScopeFS("gateway")
+	if err != nil {
+		return fmt.Errorf("gateway: load overlay migrations: %w", err)
+	}
+	runner, err := migrate.New(sqlDB, "gateway", fsys)
+	if err != nil {
+		return fmt.Errorf("gateway: init overlay migrator: %w", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		return fmt.Errorf("gateway: migrate overlay db: %w", err)
+	}
+	return nil
+}
+
+func newOverlaySQLStore(sqlDB *sql.DB, shared bool, mediaBlobDir string) (*overlaySQLStore, error) {
 	ctx := context.Background()
-	ownsDB := false
-	if db == nil {
-		opened, err := sql.Open("sqlite", ":memory:")
+	var (
+		pool   *pkgdb.Pool
+		ownsDB bool
+	)
+	if sqlDB == nil {
+		openedPool, err := pkgdb.OpenPool(ctx, ":memory:")
 		if err != nil {
 			return nil, fmt.Errorf("gateway: open memory overlay db: %w", err)
 		}
-		opened.SetMaxOpenConns(1)
-		for _, pragma := range []string{
-			"PRAGMA busy_timeout=5000",
-			"PRAGMA foreign_keys=ON",
-			"PRAGMA synchronous=NORMAL",
-		} {
-			if _, err := opened.ExecContext(ctx, pragma); err != nil {
-				_ = opened.Close()
-				return nil, fmt.Errorf("gateway: %s: %w", pragma, err)
-			}
-		}
-		runner, err := migrate.New(opened, "gateway", MigrationsFS)
+		runner, err := migrate.New(openedPool.WriteDB, pkgdb.PlatformScope, pkgdb.MigrationsFS)
 		if err != nil {
-			_ = opened.Close()
+			_ = openedPool.Close()
 			return nil, fmt.Errorf("gateway: init overlay migrator: %w", err)
 		}
 		if _, err := runner.Up(ctx); err != nil {
-			_ = opened.Close()
+			_ = openedPool.Close()
 			return nil, fmt.Errorf("gateway: migrate overlay db: %w", err)
 		}
-		db = opened
+		pool = openedPool
+		sqlDB = openedPool.WriteDB
 		ownsDB = true
+	} else if !shared {
+		if err := ensureGatewayOverlayTables(ctx, sqlDB); err != nil {
+			return nil, err
+		}
 	}
 
 	blobDir := strings.TrimSpace(mediaBlobDir)
@@ -118,23 +137,24 @@ func newOverlaySQLStore(db *sql.DB, mediaBlobDir string) (*overlaySQLStore, erro
 	if blobDir == "" {
 		dir, err := os.MkdirTemp("", "vv-gateway-media-*")
 		if err != nil {
-			if ownsDB {
-				_ = db.Close()
+			if ownsDB && pool != nil {
+				_ = pool.Close()
 			}
 			return nil, fmt.Errorf("gateway: create temp media blob dir: %w", err)
 		}
 		blobDir = dir
 		ownsBlobDir = true
 	} else if err := os.MkdirAll(blobDir, 0o755); err != nil {
-		if ownsDB {
-			_ = db.Close()
+		if ownsDB && pool != nil {
+			_ = pool.Close()
 		}
 		return nil, fmt.Errorf("gateway: mkdir media blob dir: %w", err)
 	}
 
 	return &overlaySQLStore{
-		db:              db,
-		q:               sqlcgen.New(db),
+		pool:            pool,
+		db:              sqlDB,
+		q:               dbgen.New(sqlDB),
 		ownsDB:          ownsDB,
 		mediaBlobDir:    blobDir,
 		ownsBlobDir:     ownsBlobDir,
@@ -159,9 +179,16 @@ func newOverlaySQLStore(db *sql.DB, mediaBlobDir string) (*overlaySQLStore, erro
 }
 
 func (s *overlaySQLStore) close() error {
+	if s == nil || s.closed.Swap(true) {
+		return nil
+	}
 	var firstErr error
-	if s.ownsDB && s.db != nil {
-		firstErr = s.db.Close()
+	if s.ownsDB {
+		if s.pool != nil {
+			firstErr = s.pool.Close()
+		} else if s.db != nil {
+			firstErr = s.db.Close()
+		}
 	}
 	if s.ownsBlobDir && s.mediaBlobDir != "" {
 		_ = os.RemoveAll(s.mediaBlobDir)

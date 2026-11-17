@@ -25,6 +25,7 @@ type handlerConfig struct {
 	webDist         string
 	bindLAN         bool
 	overlayDB       *sql.DB
+	overlayShared   bool
 	mediaBlobDir    string
 	cronInterval    time.Duration
 	mediaRunner     *media.VendorRunner
@@ -50,6 +51,17 @@ func WithBindLAN(bind bool) Option {
 func WithOverlayDB(db *sql.DB, mediaBlobDir string) Option {
 	return func(c *handlerConfig) {
 		c.overlayDB = db
+		c.overlayShared = false
+		c.mediaBlobDir = strings.TrimSpace(mediaBlobDir)
+	}
+}
+
+// WithSharedOverlayDB configures a caller-owned, pre-migrated shared SQLite *sql.DB
+// and media blob directory for gateway overlay persistence.
+func WithSharedOverlayDB(db *sql.DB, mediaBlobDir string) Option {
+	return func(c *handlerConfig) {
+		c.overlayDB = db
+		c.overlayShared = true
 		c.mediaBlobDir = strings.TrimSpace(mediaBlobDir)
 	}
 }
@@ -130,7 +142,7 @@ func NewHandler(st *stack.Stack, opts ...Option) *Handler {
 
 	h := &Handler{
 		st:              st,
-		hub:             newGatewayHub(st, cfg.overlayDB, cfg.mediaBlobDir),
+		hub:             newGatewayHub(st, cfg.overlayDB, cfg.overlayShared, cfg.mediaBlobDir),
 		webDist:         cfg.webDist,
 		cronInterval:    cfg.cronInterval,
 		mediaRunner:     cfg.mediaRunner,

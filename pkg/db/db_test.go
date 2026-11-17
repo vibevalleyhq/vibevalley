@@ -1,3 +1,5 @@
+//go:build !thin_desktop
+
 package db_test
 
 import (
