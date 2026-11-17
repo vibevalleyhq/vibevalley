@@ -12,10 +12,7 @@ export const contractKinds: readonly { readonly kind: string; readonly is: (path
   { kind: "protocol", is: (p) => p.startsWith("packages/protocol/src/") && !p.endsWith(".test.ts") },
   {
     kind: "schema",
-    is: (p) =>
-      p === "sqlc.yaml" ||
-      /^internal\/(?:domain\/[^/]+|durable\/store|vault)\/(?:migrations\/[^/]+\.sql|queries\.sql)$/u.test(p) ||
-      /^pkg\/contract\/.*\.go$/u.test(p),
+    is: (p) => p === "sqlc.yaml" || /^pkg\/db\/(?:migrations\/[^/]+\.sql|queries\/[^/]+\.sql)$/u.test(p) || /^pkg\/contract\/.*\.go$/u.test(p),
   },
 ];
 

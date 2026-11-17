@@ -60,7 +60,7 @@
 - **暴露当前空间的实际路径**：`SettingsStatus.paths` 给出 `repos`、`worktrees` 与 `pkm` 的绝对路径，关于页逐行显示。
 - **密钥隔离，不回传明文，损坏文件保留备份**：
   - 静态和动态密钥经 `internal/vault` 信封加密与协议 `Secret`（`packages/protocol/src/common/schema.ts`）双重隔离；`setting.get` 仅返回来源和末四位提示（`…xxxx`）。
-  - `internal/vault`（11 个 `sqlc` 作用域之一）使用 256 位 `RootKey` 经 AES-256-GCM 封装 DEK 落盘 `vault_secret` 表（`provider_api_key`、`git_credential`、`mcp_oauth_token`），并通过 `Secret` 类型在格式化、日志与 JSON 序列化时自动打码。
+  - `internal/vault`（`pkg/db/migrations/0002_vault.up.sql`、`pkg/db/queries/vault.sql`）使用 256 位 `RootKey` 经 AES-256-GCM 封装 DEK 落盘 `vault_secret` 表（`provider_api_key`、`git_credential`、`mcp_oauth_token`），并通过 `Secret` 类型在格式化、日志与 JSON 序列化时自动打码。
   - **短期能力令牌与出站白名单代理（`vault/token.go`、`proxy.go`、`hostpolicy.go`）**：签发 `vvcap1.` 前缀 HMAC-SHA256 短期令牌（默认 `15` 分钟），绑定 `PrincipalID`、`SessionID`、能力集与 `AllowedHosts`；控制面在 `/egress` 挂载 `EgressProxy`，拦截 `CONNECT`/`TRACE`、校验域名白名单与自定义解析 IP 策略（阻断私网、链路本地、云元数据及未授权环回地址），核验通过后在控制面出口代填真实凭据转发并写入脱敏审计日志。
   - `settings.json` 以 `0600` 权限原子改名写入；启动时若文件损坏，保留备份并从空设置启动。
 - **每个功能的准备状态由服务端统一计算（`SettingsStatus.readiness`）**：

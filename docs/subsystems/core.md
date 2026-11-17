@@ -15,7 +15,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `internal/domain/gateway/projection.go`、`overlay.go`、`overlay_sql_store.go` | 核心状态 `SpaceState` 维护、投影折叠、出帧拼装（`StateFrame`）及 `gateway` SQLite 叠加态持久化（11 个 `sqlc` 作用域之一） |
+| `internal/domain/gateway/projection.go`、`overlay.go`、`overlay_sql_store.go` | 核心状态 `SpaceState` 维护、投影折叠、出帧拼装（`StateFrame`）及 `gateway` 叠加态持久化（`pkg/db/migrations/0011_gateway.up.sql`、`pkg/db/queries/gateway.sql`） |
 | `packages/protocol/src/core/shapes.ts` | `SpaceState`、`Fact`、`StateFrame`、`ServerEvent`、`LiveEvent` |
 | `packages/protocol/src/api.ts`、`endpoint.ts` | 汇总各概念的 `endpoints`、`Endpoint`、六位业务码 `BizCode`、`bizCodeMeta`、全信封 Schema 与 `ApiError` |
 | `internal/domain/gateway/` | `gateway.go`（路由注册、鉴权、`/api/v1/*` 命令处理分发）；`handlers_{work,collab,media,platform}.go`；`streams.go`（SSE 与订阅流）；`cron_runner.go`（后台定时调度） |

@@ -12,9 +12,9 @@ cmd/vibe/                  Go 命令行（vibe）：照领域模型一条命令�
 cmd/vibe-tsgen/            Go 协议形状生成器：向 packages/protocol/src/go-contract/ 生成类型并保持与 Go 结构体对账
 internal/domain/           Go 业务域模块，按单数概念划分：agent、artifact、attachment、channel、connector、game、gateway、
                            issue、lan、mcp、media、memory、pkm、repo、setting、stack、user、voice、watch；arch_test.go 强制分层与依赖方向
-internal/durable/          可恢复 agent 执行循环与调度（含 store/ SQLite 持久化与 sqlcgen）
+internal/durable/          可恢复 agent 执行循环与调度（含 store/ SQLite 持久化）
 internal/machine/          节点执行、worktree/目录挂载、租约与隧道；internal/provider/ 厂商 SSE；internal/vault/ 密钥与代理；internal/config/ 配置
-pkg/                       Go 共享底座：oar（编码 agent 驱动与回放测试）、chord（实时同步链路与状态差值）、contract（委托契约与 tsgen）、migrate（嵌入迁移器）
+pkg/                       Go 共享底座：db（统一平台 SQLite WAL 池、11 模块迁移与生成绑定）、oar（编码 agent 驱动与回放测试）、chord（实时同步链路与状态差值）、contract（委托契约与 tsgen）、migrate（嵌入迁移器）
 apps/web/                  页面（Solid 2 + Vite）：桌面、浏览器、手机三个宿主共用的一份，由服务端（--web）在 / 提供；/ 打开工作台，/farm 是像素农场
                            （src/farm，PixiJS），其余是工作台：一个概念一个 src/features/<概念>，与服务域同名；分层
                            base（纯的）→ infra（服务端、宿主、浏览器）→ state（中间层）→ ui → ui/domain → ui/pixel → features → 皮（farm、tree）→ app，lint 查；public/ 是全部的图、像素字、指针和样音
@@ -57,7 +57,7 @@ env -u GOROOT CGO_ENABLED=0 go run ./cmd/vibe-server --web apps/web/dist   # Go 
 env -u GOROOT CGO_ENABLED=0 go run ./cmd/vibe issue list        # Go 命令行：照领域模型操作（issue、repo、agent、session、runtime、memory、cron、artifact、worker、channel、pkm、auth、doctor、app、chat、version）
 vp run server:check                                             # 改完 Go 代码、SQL 或 packages/protocol：packages:build、vp check、go-sqlc --check、go-contract --check、go vet、go test
 vp run packages:build                                           # 改了 packages/ 的导出或类型、单跑 vp check 以前：打出各库给别人的声明（dist/，带缓存）
-vpx scripts/gen/go-sqlc.ts                                      # 改完 internal/**/migrations 或 queries.sql：重生成 SQLc 代码并校验最新（--check 只查）
+vpx scripts/gen/go-sqlc.ts                                      # 改完 pkg/db/migrations/*.sql 或 pkg/db/queries/*.sql：重生成 pkg/db/generated 并校验最新（--check 只查）
 vpx scripts/gen/go-contract.ts                                  # 改完 Go pkg/contract 导出：同步生成 packages/protocol/src/go-contract（--check 只查）
 vp run web:check                                                # 改完 apps/、packages/：类型（vp check），engine、宿主的桥、手机壳和页面规则的测试，页面构建
 vp run --filter @vibevalley/web e2e                              # 页面全量自动检查；定点先用 e2e:component / e2e:integration / e2e:audit，纯截图用 e2e:visual（apps/web/README.md）
@@ -103,10 +103,10 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **先有概念，再有皮**：服务端按实际概念分域（[概念](docs/concepts.md)）；农场只画它们，游戏规则（`internal/domain/game`）只读事件算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）。
 - **核心状态只有一份**：帮工或农场的新状态加在 `packages/protocol/src/<概念>/shapes.ts` 与 `core/shapes.ts` 事实里，在 `internal/domain/gateway/projection.go` 折叠，不在前端另存一份（[核心状态](docs/subsystems/core.md)）。
 - **`packages/protocol` 只放跨端契约**：按 `src/<概念>/{shapes,schema,api}.ts` 组织（`Schema` 写 `satisfies Codec<T.X>`），根入口只显式重导出跨端契约（`protocol-surface.ts` 棘轮守住）；`src/rules` 只放双端共用的纯函数（`rules/contract.test.ts` 查），仅服务端跑的规则归 Go 各自域（[契约、规则和数据库](docs/subsystems/foundation.md#契约规则和数据库)）。
-- **生成的不手改**：SQLc 产物（`internal/**/sqlcgen`、`vpx scripts/gen/go-sqlc.ts --check`）、Go 导出契约（`packages/protocol/src/go-contract`、`vpx scripts/gen/go-contract.ts --check`）、`packages/protocol/src/client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）与生成的参考表均由脚本写出，`server:check` 和 `docs:verify` 校验最新（[契约、规则和数据库](docs/subsystems/foundation.md#契约规则和数据库)）。
+- **生成的不手改**：SQLc 产物（`pkg/db/generated/`、`vpx scripts/gen/go-sqlc.ts --check`）、Go 导出契约（`packages/protocol/src/go-contract`、`vpx scripts/gen/go-contract.ts --check`）、`packages/protocol/src/client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）与生成的参考表均由脚本写出，`server:check` 和 `docs:verify` 校验最新（[契约、规则和数据库](docs/subsystems/foundation.md#契约规则和数据库)）。
 - **包之间只经包名**：跨包只经 `package.json` 的 `exports` 写 `@vibevalley/*`（`no-cross-package-path` 查），包内跨目录写 `#/…`（`parent-import` 查）；库对外给 `dist/` 声明、运行读源码（[仓库和包](docs/subsystems/foundation.md#仓库和包)）。
-- **表名是「模块_概念」**：单数 `<模块>` 或 `<模块>_<概念>`，索引以表名开头；SQL 写在 11 个作用域（`durable`、`vault`、`agent`、`repo`、`channel`、`issue`、`watch`、`game`、`memory`、`pkm`、`gateway`）各自的 `migrations/0001_init.up.sql` 与 `queries.sql`，代码经 `sqlcgen` 访问，由根目录 `sqlc_migrate_test.go` 与 `vpx scripts/gen/go-sqlc.ts --check` 校验（[契约、规则和数据库](docs/subsystems/foundation.md#契约规则和数据库)）。
-- **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层或旧数据兜底；表结构直接修改各自域的 `0001_init.up.sql`；对外 HTTP `v1` 是唯一例外（[地基](docs/subsystems/foundation.md#为什么这样)、[接口版本](docs/subsystems/core.md#为什么这样)）。
+- **表名是「模块_概念」**：单数 `<模块>` 或 `<模块>_<概念>`，索引以表名开头；11 个模块迁移对（`0001_durable`–`0011_gateway` `{up,down}.sql`）写在 `pkg/db/migrations/`，查询写在 `pkg/db/queries/*.sql`，单块 `sqlc.yaml` 生成 `pkg/db/generated/`（`package generated`），运行时经 `pkg/db.OpenPool` 共用单个 SQLite WAL 库（`platform` 作用域），由根目录 `sqlc_migrate_test.go` 与 `vpx scripts/gen/go-sqlc.ts --check` 校验（[契约、规则和数据库](docs/subsystems/foundation.md#契约规则和数据库)）。
+- **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层或旧数据兜底；表结构直接修改 `pkg/db/migrations/` 对应模块迁移；对外 HTTP `v1` 是唯一例外（[地基](docs/subsystems/foundation.md#为什么这样)、[接口版本](docs/subsystems/core.md#为什么这样)）。
 - **页面不折事实**：页面只读 `GET /api/v1/state` 推来的 `StateFrame`（`useCore()`、`useFrames()`）并写画面摆法；缺数据就补进契约与 `internal/domain/gateway/projection.go` 或调接口问服务端，不在页面重写服务端业务规则（[客户端](docs/subsystems/app.md)）。
 - **封闭的联合穷尽处理**：按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员或显式 `default`（`switch-exhaustiveness-check` 查）；枚举全表映射用 `Record<X, …>`（[检查管着的写法](docs/style/code.md#检查管着的写法)）。
 - **类型驱动，境界 Fail-Fast**：TypeScript 运行时校验只用 Zod，边界一次解码为品牌主键、受约束值与判别联合，不符当场失败；Go 侧由结构体、显式错误与 `internal/vault/secret.go`（`Secret`）护持边界（[类型驱动与进门解码](docs/style/module-design.md#类型驱动与进门解码)）。

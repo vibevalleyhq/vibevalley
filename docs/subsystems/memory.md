@@ -19,7 +19,7 @@
 |---|---|
 | `internal/domain/memory/store.go`、`types.go` | `Memory` 服务、增删改查、检索与重合度去重、多来源合并接口 |
 | `internal/domain/memory/dreams.go` | 后台记忆提炼与整理规则 |
-| `internal/domain/memory/migrations/0001_init.up.sql`、`queries.sql`、`sqlcgen/` | SQLite `memory` 表迁移、查询定义与生成的访问代码 |
+| `pkg/db/migrations/0009_memory.up.sql`、`pkg/db/queries/memory.sql`、`pkg/db/generated/` | SQLite `memory` 表迁移、查询定义与生成的访问代码 |
 | `apps/web/src/features/memory/Memory.tsx`、`apps/web/src/tree/` | 工作台「记忆」页与记忆树视图 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`memory.*`）。

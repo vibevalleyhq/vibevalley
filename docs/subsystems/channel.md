@@ -16,11 +16,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `internal/domain/channel/store.go`、`sqlite.go`、`memory.go`、`types.go`、`migrations.go` | `Channel` 服务与存储：频道、私聊、串、消息、提及、未读游标与并发写锁 |
+| `internal/domain/channel/store.go`、`sqlite.go`、`memory.go`、`types.go` | `Channel` 服务与存储：频道、私聊、串、消息、提及、未读游标与并发写锁 |
 | `internal/domain/watch/` | 读者：[观察层](docs/subsystems/watch.md)按游标读事件、排席位、路由、开串、回执 |
 | `packages/protocol/src/rpc.ts`、`internal/domain/gateway/streams.go`、`handlers_collab.go` | 频道与 Artifact 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)）及 HTTP 接口挂接 |
 | `internal/domain/connector/connector.go`、`adapters_live.go`、`inbound.go` | 微信、飞书（Lark）、QQ、Telegram、Discord、Slack 真实 HTTP/Webhook 连接器适配、去重与收发调度（`VIBEVALLEY_TEST_RUNTIMES=1` 走离线替身） |
-| 表 `channel`、`channel_participant`、`channel_message`、`channel_mention`、`channel_member`、`channel_read_cursor`、`channel_seen`、`channel_event` | 频道与消息存储表（`internal/domain/channel/migrations/0001_init.up.sql`）；`channel_seen` 是参与者在聊天之外收下的消息，`channel_event` 是按提交次序编号的事件 |
+| 表 `channel`、`channel_participant`、`channel_message`、`channel_mention`、`channel_member`、`channel_read_cursor`、`channel_seen`、`channel_event` | 频道与消息存储表（`pkg/db/migrations/0007_channel.up.sql`、`pkg/db/queries/channel.sql`）；`channel_seen` 是参与者在聊天之外收下的消息，`channel_event` 是按提交次序编号的事件 |
 | 表 `watch_cursor` | 观察者读到 `channel_event` 的哪一号 |
 | `apps/web/src/features/channel/`、`apps/web/src/farm/chat/` | 工作台聊天页、输入框 `composing.ts`、订阅 `follow.ts` 与农场田头窗 |
 

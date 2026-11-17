@@ -16,8 +16,8 @@ vp run desktop:dev                           # 桌面版：运行 Go 原生桌�
 - **目录**：帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下运行，仓库在 `repos/`，worktree 在 `worktrees/`；设置与数据在 `~/.vibevalley`（`VIBEVALLEY_HOME`），详情见[设置和配置](docs/subsystems/setting.md#模型和不变量)。
 - **语音**：凭据配置见 [语音](docs/subsystems/voice.md)，未配置时仍可文字交互。
 - **重载**：Go 服务端不自动重载，修改 Go 代码后需重启；页面修改后需重新构建（或开发模式下开 Vite dev server）。
-- **表结构**：按域编辑 `sqlc.yaml` 涵盖的 11 个作用域（`internal/durable/store/`、`internal/vault/`、`internal/domain/{agent,repo,channel,issue,watch,game,memory,pkm,gateway}/`）下的 `migrations/0001_init.up.sql` 与 `queries.sql`，并运行 `vpx scripts/gen/go-sqlc.ts` 生成 `sqlcgen/` 绑定（`sqlc_migrate_test.go` 与 `go-sqlc.ts --check` 校验）。
-- **子命令**：`vibe-server`、`vibe-desktop` 与 `vibe-machine` 均基于 Cobra + Koanf 提供 `config check|print` 校验与脱敏打印，控制面与桌面壳另提供 `migrate up|down|status` 管理全部 11 个 SQLite 作用域。
+- **表结构**：按模块编辑 `pkg/db/migrations/` 下的迁移对（`0001_durable`–`0011_gateway` `{up,down}.sql`）与 `pkg/db/queries/*.sql`，并运行 `vpx scripts/gen/go-sqlc.ts` 生成单块 `sqlc.yaml` 对应的 `pkg/db/generated/`（`package generated`）绑定（`sqlc_migrate_test.go` 与 `go-sqlc.ts --check` 校验）。
+- **子命令**：`vibe-server`、`vibe-desktop` 与 `vibe-machine` 均基于 Cobra + Koanf 提供 `config check|print` 校验与脱敏打印，控制面与桌面壳另提供 `migrate up|down|status` 管理统一 SQLite 数据库的 `platform` 迁移（涵盖 11 个模块）。
 
 ## 桌面可执行文件与发版
 
@@ -32,7 +32,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
   - `alpha`：自用，功能可变。
   - `beta`：冻结功能只修缺陷，同一 `release/x.y` 线内表结构不变；修复先进 `main` 再 cherry-pick 到 `release/x.y`。
   - `final`：与最后一个 beta 使用同一份代码。
-- **发布脚本**（`scripts/release/release.ts`）：校验工作区干净、分支与 origin 一致，由已有 tag 推算下一版本号（`scripts/release/release-plan.ts`）；beta 与正式版先跑 `vp run release:verify` 并比对迁移脚本目录（`internal/**/migrations/*.sql`），确认后打 tag 推送，由 `.github/workflows/release.yml` 打包并建草稿 Release。
+- **发布脚本**（`scripts/release/release.ts`）：校验工作区干净、分支与 origin 一致，由已有 tag 推算下一版本号（`scripts/release/release-plan.ts`）；beta 与正式版先跑 `vp run release:verify` 并比对迁移脚本目录（`pkg/db/migrations/*.sql`），确认后打 tag 推送，由 `.github/workflows/release.yml` 打包并建草稿 Release。
 
 ## 检查和测试
 
@@ -62,7 +62,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 
 - **形状**：改 `packages/protocol/src/<概念>/shapes.ts`、`schema.ts`（`Codec<T.X>`）和 `api.ts`；改接口后运行 `vp run api:client` 和 `vp run capabilities`；改了 Go `pkg/contract` 结构后运行 `vpx scripts/gen/go-contract.ts` 并跑 `internal/domain/gateway/contract_parity_test.go`。
 - **规则**：改所属包内的纯函数（跨端共用的放 `packages/protocol/src/rules`），在旁边的测试里用手写的例子写出改了的行为（[客户端问服务端](docs/subsystems/app.md)）。
-- **表和查询**：改各 Go 域 `migrations/0001_init.up.sql` 与 `queries.sql`，运行 `vpx scripts/gen/go-sqlc.ts`。
+- **表和查询**：改 `pkg/db/migrations/` 与 `pkg/db/queries/` 下对应模块 SQL，运行 `vpx scripts/gen/go-sqlc.ts`。
 - **旧名字**：`vp run names:verify` 检查代码与词典中的废弃命名；重命名后将旧名登记到 `scripts/docs/stale-names.ts`。
 
 ## 调试台

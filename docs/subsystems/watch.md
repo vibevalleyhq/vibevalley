@@ -17,7 +17,7 @@
 |---|---|
 | `internal/domain/watch/service.go`、`types.go` | `Watch` 服务：事件游标消费、路由、刹车裁决、席位与串、汇报协调与巡查推进 |
 | `internal/domain/watch/brakes.go` | 三道刹车的纯函数 `EvaluateBrakes`，跳数、冷却与熔断状态计算 |
-| `internal/domain/watch/sqlite.go`、`memory.go`、`migrations/0001_init.up.sql`、`queries.sql` | 观察游标 `watch_cursor`、刹车状态及投递的 SQLite 持久化与内存实现 |
+| `internal/domain/watch/sqlite.go`、`memory.go`、`pkg/db/migrations/0008_watch.up.sql`、`pkg/db/queries/watch.sql` | 观察游标 `watch_cursor`、刹车状态及投递的 SQLite 持久化与内存实现 |
 | `internal/domain/gateway/projection.go` | 按当前 `SpaceState` 计算每帧 `InboxEntry[]`、`patrol` 等投影视图 |
 | `packages/protocol/src/rules/inbox.ts` | 前后端共用的新事项识别 `freshOf` |
 | `apps/web/src/farm/phone/calls.ts`、`apps/web/src/features/inbox/` | 农场手机来电、系统通知（`Follow.tsx`）与菜单栏托盘摘要（`tray.ts`） |
