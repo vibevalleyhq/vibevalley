@@ -1113,7 +1113,7 @@ func (h *Handler) buildRuntimeInfo(ctx context.Context, rt agent.RuntimeInfo) Pr
 		Tools:        nil,
 		Settings:     settings,
 		Stop:         "",
-		CheckedAt:    h.hub.nowMs(),
+		CheckedAt:    h.hub.getOrInitRuntimeCheckedAt(rt.ID),
 	}
 }
 
@@ -1143,6 +1143,8 @@ func (h *Handler) handleRuntimeRefresh(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, BizRuntimeNotFound)
 		return
 	}
+	h.hub.refreshRuntimeCheckedAt(req.ID)
+	_ = h.hub.persist()
 	writeSuccess(w, h.buildRuntimeInfo(r.Context(), rt))
 }
 

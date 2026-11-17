@@ -2,10 +2,12 @@ package gateway_test
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +15,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/gateway"
 )
@@ -475,5 +478,110 @@ func TestOfflineVoiceWebSocketRelaysAndCookie(t *testing.T) {
 	}
 	if !sawDone {
 		t.Fatal("expected session.done from vision WS on final prompt")
+	}
+}
+
+func TestRuntimeListCheckedAtStabilityAndStateSSECoalescing(t *testing.T) {
+	st, _, ts := newTestGateway(t)
+
+	type rtInfo struct {
+		ID        string `json:"id"`
+		CheckedAt int64  `json:"checkedAt"`
+	}
+
+	var first []rtInfo
+	resp, raw := doPOST(t, ts.URL, "/api/v1/runtime/list", map[string]any{}, nil)
+	mustSuccessEnvelope(t, "/api/v1/runtime/list", resp, raw, &first)
+	if len(first) == 0 {
+		t.Fatal("expected runtimes from /api/v1/runtime/list")
+	}
+
+	// Sleep > 2ms and confirm runtime/list preserves cached checkedAt values cleanly.
+	time.Sleep(10 * time.Millisecond)
+
+	var second []rtInfo
+	resp, raw = doPOST(t, ts.URL, "/api/v1/runtime/list", map[string]any{}, nil)
+	mustSuccessEnvelope(t, "/api/v1/runtime/list", resp, raw, &second)
+	if len(second) != len(first) {
+		t.Fatalf("runtime count changed %d -> %d", len(first), len(second))
+	}
+	var piFirst int64
+	for i := range first {
+		if first[i].ID != second[i].ID || first[i].CheckedAt != second[i].CheckedAt {
+			t.Fatalf("runtime[%d] (%s) checkedAt drifted across list calls: %d -> %d", i, first[i].ID, first[i].CheckedAt, second[i].CheckedAt)
+		}
+		if first[i].ID == "pi" {
+			piFirst = first[i].CheckedAt
+		}
+	}
+	if piFirst == 0 {
+		t.Fatal("expected pi runtime with non-zero checkedAt")
+	}
+
+	// Refreshing pi updates checkedAt and subsequent runtime/list calls preserve that new value.
+	time.Sleep(5 * time.Millisecond)
+	var refreshed rtInfo
+	resp, raw = doPOST(t, ts.URL, "/api/v1/runtime/refresh", map[string]any{"id": "pi"}, nil)
+	mustSuccessEnvelope(t, "/api/v1/runtime/refresh", resp, raw, &refreshed)
+	if refreshed.CheckedAt <= piFirst {
+		t.Fatalf("expected runtime/refresh to advance checkedAt (%d -> %d)", piFirst, refreshed.CheckedAt)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	var third []rtInfo
+	resp, raw = doPOST(t, ts.URL, "/api/v1/runtime/list", map[string]any{}, nil)
+	mustSuccessEnvelope(t, "/api/v1/runtime/list", resp, raw, &third)
+	for _, rt := range third {
+		if rt.ID == "pi" && rt.CheckedAt != refreshed.CheckedAt {
+			t.Fatalf("expected pi checkedAt %d preserved after refresh, got %d", refreshed.CheckedAt, rt.CheckedAt)
+		}
+	}
+
+	// Verify /api/v1/state SSE pushes initial frame immediately and coalesces bursts across ~200ms.
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	sseReq, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/api/v1/state", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sseReq.Header.Set("Accept", "text/event-stream")
+	sseResp, err := http.DefaultClient.Do(sseReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sseResp.Body.Close()
+
+	sc := bufio.NewScanner(sseResp.Body)
+	sc.Buffer(make([]byte, 64*1024), 4*1024*1024)
+	readSSEFrame := func() int64 {
+		for sc.Scan() {
+			line := sc.Text()
+			if strings.HasPrefix(line, "data: ") {
+				var frame struct {
+					Seq int64 `json:"seq"`
+				}
+				if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &frame); err != nil {
+					t.Fatalf("unmarshal SSE frame: %v", err)
+				}
+				return frame.Seq
+			}
+		}
+		t.Fatalf("SSE stream ended unexpectedly: %v", sc.Err())
+		return 0
+	}
+
+	initSeq := readSSEFrame()
+	t0 := time.Now()
+	st.NotifyStateChange()
+	st.NotifyStateChange()
+	st.NotifyStateChange()
+
+	nextSeq := readSSEFrame()
+	elapsed := time.Since(t0)
+	if elapsed < 150*time.Millisecond {
+		t.Fatalf("expected burst coalescing delay (~200ms), got %v", elapsed)
+	}
+	if nextSeq < initSeq+3 {
+		t.Fatalf("expected coalesced SSE frame seq >= %d, got %d", initSeq+3, nextSeq)
 	}
 }

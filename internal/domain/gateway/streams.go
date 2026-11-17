@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-const sseHeartbeatInterval = 15 * time.Second
+const (
+	sseHeartbeatInterval = 15 * time.Second
+	stateEveryInterval   = 200 * time.Millisecond
+)
 
 func initSSEHeaders(w http.ResponseWriter) (http.Flusher, bool) {
 	flusher, ok := w.(http.Flusher)
@@ -121,7 +124,14 @@ func (h *Handler) handleStateStreamOrJSON(w http.ResponseWriter, r *http.Request
 				return
 			}
 		case <-notifyCh:
-			// Coalesce bursty notifications before serializing a fresh frame.
+			// Coalesce bursty notifications over stateEveryInterval (matching TS core.ts stateEveryMs).
+			timer := time.NewTimer(stateEveryInterval)
+			select {
+			case <-r.Context().Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
 			for len(notifyCh) > 0 {
 				<-notifyCh
 			}

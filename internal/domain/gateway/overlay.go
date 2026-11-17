@@ -195,31 +195,32 @@ type cronOverlay struct {
 }
 
 type overlayState struct {
-	NextIssueNumber int                              `json:"nextIssueNumber"`
-	NextMsgSeq      int64                            `json:"nextMsgSeq"`
-	DefaultChannel  string                           `json:"defaultChannel,omitempty"`
-	StartersSeeded  bool                             `json:"startersSeeded,omitempty"`
-	Issues          map[string]*issueOverlay         `json:"issues"`
-	Channels        map[string]*channelOverlay       `json:"channels"`
-	Agents          map[string]*agentOverlay         `json:"agents"`
-	Templates       map[string]*agentTemplateRecord  `json:"templates"`
-	DeletedSkills   map[string]bool                  `json:"deletedSkills"`
-	RuntimeSettings map[string]*ProtoRuntimeSettings `json:"runtimeSettings"`
-	Crons           map[string]*cronOverlay          `json:"crons"`
-	Artifacts       map[string]*artifactOverlay      `json:"artifacts"`
-	Library         []ProtoLibraryItem               `json:"library"`
-	MediaInputs     map[string]*mediaInputRecord     `json:"mediaInputs"`
-	MediaJobs       map[string]*mediaJobRecord       `json:"mediaJobs"`
-	PKMPages        map[string]*pkmPageExtra         `json:"pkmPages"`
-	PKMComments     []ProtoPkmComment                `json:"pkmComments"`
-	PKMClips        map[string]string                `json:"pkmClips"` // url -> page slug
-	PKMUndo         *pkmUndoRecord                   `json:"pkmUndo,omitempty"`
-	RequestKeys     map[string]string                `json:"requestKeys"`
-	Sessions        map[string]*ProtoSession         `json:"sessions"`
-	SessionEvents   map[string][]ProtoSessionEvent   `json:"sessionEvents"`
-	OrchNoKeySent   map[string]bool                  `json:"orchNoKeySent,omitempty"`
-	FailedRuns      map[string]bool                  `json:"failedRuns,omitempty"`
-	GitHub          *ProtoGitHubStatus               `json:"github,omitempty"`
+	NextIssueNumber  int                              `json:"nextIssueNumber"`
+	NextMsgSeq       int64                            `json:"nextMsgSeq"`
+	DefaultChannel   string                           `json:"defaultChannel,omitempty"`
+	StartersSeeded   bool                             `json:"startersSeeded,omitempty"`
+	Issues           map[string]*issueOverlay         `json:"issues"`
+	Channels         map[string]*channelOverlay       `json:"channels"`
+	Agents           map[string]*agentOverlay         `json:"agents"`
+	Templates        map[string]*agentTemplateRecord  `json:"templates"`
+	DeletedSkills    map[string]bool                  `json:"deletedSkills"`
+	RuntimeSettings  map[string]*ProtoRuntimeSettings `json:"runtimeSettings"`
+	RuntimeCheckedAt map[string]int64                 `json:"runtimeCheckedAt,omitempty"`
+	Crons            map[string]*cronOverlay          `json:"crons"`
+	Artifacts        map[string]*artifactOverlay      `json:"artifacts"`
+	Library          []ProtoLibraryItem               `json:"library"`
+	MediaInputs      map[string]*mediaInputRecord     `json:"mediaInputs"`
+	MediaJobs        map[string]*mediaJobRecord       `json:"mediaJobs"`
+	PKMPages         map[string]*pkmPageExtra         `json:"pkmPages"`
+	PKMComments      []ProtoPkmComment                `json:"pkmComments"`
+	PKMClips         map[string]string                `json:"pkmClips"` // url -> page slug
+	PKMUndo          *pkmUndoRecord                   `json:"pkmUndo,omitempty"`
+	RequestKeys      map[string]string                `json:"requestKeys"`
+	Sessions         map[string]*ProtoSession         `json:"sessions"`
+	SessionEvents    map[string][]ProtoSessionEvent   `json:"sessionEvents"`
+	OrchNoKeySent    map[string]bool                  `json:"orchNoKeySent,omitempty"`
+	FailedRuns       map[string]bool                  `json:"failedRuns,omitempty"`
+	GitHub           *ProtoGitHubStatus               `json:"github,omitempty"`
 }
 
 type gatewayHub struct {
@@ -312,6 +313,9 @@ func normalizeLoadedOverlay(s *overlayState) {
 	}
 	if s.RuntimeSettings == nil {
 		s.RuntimeSettings = make(map[string]*ProtoRuntimeSettings)
+	}
+	if s.RuntimeCheckedAt == nil {
+		s.RuntimeCheckedAt = make(map[string]int64)
 	}
 	if s.Crons == nil {
 		s.Crons = make(map[string]*cronOverlay)
@@ -535,6 +539,37 @@ func (h *gatewayHub) persist() error {
 
 func (h *gatewayHub) nowMs() int64 {
 	return time.Now().UnixMilli()
+}
+
+func (h *gatewayHub) getOrInitRuntimeCheckedAt(id string) int64 {
+	h.mu.RLock()
+	ts := h.state.RuntimeCheckedAt[id]
+	h.mu.RUnlock()
+	if ts > 0 {
+		return ts
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if ts = h.state.RuntimeCheckedAt[id]; ts > 0 {
+		return ts
+	}
+	ts = h.nowMs()
+	if h.state.RuntimeCheckedAt == nil {
+		h.state.RuntimeCheckedAt = make(map[string]int64)
+	}
+	h.state.RuntimeCheckedAt[id] = ts
+	return ts
+}
+
+func (h *gatewayHub) refreshRuntimeCheckedAt(id string) int64 {
+	ts := h.nowMs()
+	h.mu.Lock()
+	if h.state.RuntimeCheckedAt == nil {
+		h.state.RuntimeCheckedAt = make(map[string]int64)
+	}
+	h.state.RuntimeCheckedAt[id] = ts
+	h.mu.Unlock()
+	return ts
 }
 
 func (h *gatewayHub) notifyAllState() {
