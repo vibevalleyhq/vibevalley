@@ -63,7 +63,7 @@ func newChatCommand(rt *appRuntime) *cobra.Command {
 						{Role: "user", Content: prompt},
 					},
 				}, func(delta string) error {
-					if rt.jsonOut {
+					if rt.isJSON() {
 						return nil
 					}
 					wroteDelta = true
@@ -76,7 +76,7 @@ func newChatCommand(rt *appRuntime) *cobra.Command {
 					}
 					return err
 				}
-				if rt.jsonOut {
+				if rt.isJSON() {
 					return rt.writeJSON(map[string]any{
 						"model":    model,
 						"content":  fullText,

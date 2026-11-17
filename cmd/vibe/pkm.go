@@ -270,13 +270,9 @@ func newPKMCommand(rt *appRuntime) *cobra.Command {
 			if capturePage != "" {
 				req["page"] = capturePage
 			}
-			client, _, err := rt.newClient()
-			if err != nil {
-				return err
-			}
 			var page pkmPageDetail
-			raw, err := client.Call(cmd.Context(), "pkm.capture", req, &page)
-			if err != nil {
+			raw, dry, err := rt.callMutate(cmd.Context(), "pkm.capture", req, &page)
+			if err != nil || dry {
 				return err
 			}
 			return rt.writeOutput(rawOrValue(raw, page), func() string {

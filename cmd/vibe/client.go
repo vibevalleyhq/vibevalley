@@ -385,6 +385,160 @@ func (c *Client) CallWithFallback(ctx context.Context, primaryOp, fallbackOp str
 	return nil, err
 }
 
+// GetJSON invokes GET <path> and decodes the JSON response into dst (when non-nil).
+func (c *Client) GetJSON(ctx context.Context, path string, dst any) (json.RawMessage, error) {
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	endpoint := strings.TrimRight(normalizeBaseURL(c.BaseURL), "/") + path
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("GET %s: build request: %w", path, err)
+	}
+	req.Header.Set("Accept", "application/json")
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+
+	resp, err := c.http().Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GET %s: request %s: %w", path, endpoint, err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxRPCBodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("GET %s: read response: %w", path, err)
+	}
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) > 0 {
+		var env RPCEnvelope
+		if jErr := json.Unmarshal(trimmed, &env); jErr == nil && env.BizCode != 0 {
+			return nil, &APIError{
+				Op:          "GET " + path,
+				HTTPStatus:  resp.StatusCode,
+				BizCode:     env.BizCode,
+				Message:     env.Message,
+				ErrorDetail: env.Error,
+			}
+		}
+	}
+	if resp.StatusCode >= 400 {
+		msg := strings.TrimSpace(string(trimmed))
+		if msg == "" {
+			msg = resp.Status
+		}
+		return nil, &APIError{
+			Op:         "GET " + path,
+			HTTPStatus: resp.StatusCode,
+			Message:    msg,
+		}
+	}
+	if len(trimmed) == 0 {
+		return nil, nil
+	}
+	if dst != nil {
+		if err := json.Unmarshal(trimmed, dst); err != nil {
+			return nil, fmt.Errorf("GET %s: decode response: %w", path, err)
+		}
+	}
+	return json.RawMessage(trimmed), nil
+}
+
+// OpenSSE opens a long-lived GET text/event-stream connection to path.
+func (c *Client) OpenSSE(ctx context.Context, path string) (*http.Response, error) {
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	endpoint := strings.TrimRight(normalizeBaseURL(c.BaseURL), "/") + path
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("SSE %s: build request: %w", path, err)
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+
+	resp, err := c.streamHTTPClient().Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("SSE %s: request %s: %w", path, endpoint, err)
+	}
+	if resp.StatusCode >= 400 {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		resp.Body.Close()
+		trimmed := bytes.TrimSpace(raw)
+		if len(trimmed) > 0 {
+			var env RPCEnvelope
+			if jErr := json.Unmarshal(trimmed, &env); jErr == nil && (env.BizCode != 0 || env.Message != "") {
+				return nil, &APIError{
+					Op:          "SSE " + path,
+					HTTPStatus:  resp.StatusCode,
+					BizCode:     env.BizCode,
+					Message:     env.Message,
+					ErrorDetail: env.Error,
+				}
+			}
+		}
+		msg := strings.TrimSpace(string(trimmed))
+		if msg == "" {
+			msg = resp.Status
+		}
+		return nil, &APIError{
+			Op:         "SSE " + path,
+			HTTPStatus: resp.StatusCode,
+			Message:    msg,
+		}
+	}
+	return resp, nil
+}
+
+func readSSEEvents(ctx context.Context, body io.Reader, onEvent func(eventType, data string) error) error {
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	var eventType string
+	var dataLines []string
+	flush := func() error {
+		if len(dataLines) == 0 {
+			eventType = ""
+			return nil
+		}
+		data := strings.Join(dataLines, "\n")
+		ev := eventType
+		eventType = ""
+		dataLines = nil
+		return onEvent(ev, data)
+	}
+	for scanner.Scan() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		line := strings.TrimRight(scanner.Text(), "\r")
+		if line == "" {
+			if err := flush(); err != nil {
+				return err
+			}
+			continue
+		}
+		if strings.HasPrefix(line, ":") {
+			continue
+		}
+		if field, value, ok := strings.Cut(line, ":"); ok {
+			value = strings.TrimPrefix(value, " ")
+			switch field {
+			case "event":
+				eventType = value
+			case "data":
+				dataLines = append(dataLines, value)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	return flush()
+}
+
 // Healthz checks GET /healthz and falls back to POST /api/v1/server/health/get if /healthz is 404.
 func (c *Client) Healthz(ctx context.Context) (json.RawMessage, error) {
 	base := strings.TrimRight(normalizeBaseURL(c.BaseURL), "/")
@@ -437,7 +591,7 @@ type ChatCompletionRequest struct {
 	Messages []ChatCompletionMessage `json:"messages"`
 }
 
-func (c *Client) chatHTTPClient() *http.Client {
+func (c *Client) streamHTTPClient() *http.Client {
 	if c.HTTP != nil && c.HTTP.Transport != nil {
 		return &http.Client{Transport: c.HTTP.Transport}
 	}
@@ -510,7 +664,7 @@ func (c *Client) StreamChatCompletions(ctx context.Context, reqBody ChatCompleti
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
 
-	resp, err := c.chatHTTPClient().Do(req)
+	resp, err := c.streamHTTPClient().Do(req)
 	if err != nil {
 		return "", err
 	}

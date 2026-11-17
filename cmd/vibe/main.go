@@ -40,7 +40,20 @@ type appRuntime struct {
 	configFile string
 	serverFlag string
 	tokenFlag  string
+	dryRun     bool
+	formatFlag string
 	jsonOut    bool
+}
+
+type dryRunPlan struct {
+	DryRun bool   `json:"dryRun"`
+	Method string `json:"method"`
+	Path   string `json:"path"`
+	Body   any    `json:"body,omitempty"`
+}
+
+func (rt *appRuntime) isJSON() bool {
+	return rt.jsonOut || strings.EqualFold(strings.TrimSpace(rt.formatFlag), "json")
 }
 
 func main() {
@@ -90,7 +103,7 @@ func run(
 	}
 	rootCmd.SetArgs(args)
 	err := rootCmd.ExecuteContext(ctx)
-	if err != nil && rt.jsonOut {
+	if err != nil && rt.isJSON() {
 		rt.writeJSONError(err)
 	}
 	return err
@@ -103,6 +116,21 @@ func newRootCommand(rt *appRuntime) *cobra.Command {
 		Version:       vibeVersion,
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			if rt.jsonOut {
+				rt.formatFlag = "json"
+				return nil
+			}
+			f := strings.ToLower(strings.TrimSpace(rt.formatFlag))
+			if f == "" {
+				f = "text"
+			}
+			if f != "text" && f != "json" {
+				return fmt.Errorf("invalid --format %q (expected text or json)", rt.formatFlag)
+			}
+			rt.formatFlag = f
+			return nil
+		},
 	}
 	rootCmd.SetOut(rt.stdout)
 	rootCmd.SetErr(rt.stderr)
@@ -112,7 +140,9 @@ func newRootCommand(rt *appRuntime) *cobra.Command {
 	pflags.StringVarP(&rt.configFile, "config", "c", "", "path to vibevalley.yaml config file (or VIBE_CONFIG)")
 	pflags.StringVar(&rt.serverFlag, "server", "", "control-plane server URL")
 	pflags.StringVar(&rt.tokenFlag, "token", "", "bearer authentication token")
-	pflags.BoolVar(&rt.jsonOut, "json", false, "output machine-readable JSON")
+	pflags.BoolVar(&rt.dryRun, "dry-run", false, "preview mutating requests without executing them")
+	pflags.StringVar(&rt.formatFlag, "format", "text", "output format (text|json)")
+	pflags.BoolVar(&rt.jsonOut, "json", false, "output machine-readable JSON (overrides --format)")
 
 	versionCmd := &cobra.Command{
 		Use:   "version",
@@ -128,6 +158,14 @@ func newRootCommand(rt *appRuntime) *cobra.Command {
 
 	rootCmd.AddCommand(
 		newIssueCommand(rt),
+		newRepoCommand(rt),
+		newAgentCommand(rt),
+		newSessionCommand(rt),
+		newRuntimeCommand(rt),
+		newMemoryCommand(rt),
+		newCronCommand(rt),
+		newArtifactCommand(rt),
+		newWorkerCommand(rt),
 		newChannelCommand(rt),
 		newPKMCommand(rt),
 		newAuthCommand(rt),
@@ -190,7 +228,7 @@ func (rt *appRuntime) writeJSON(v any) error {
 }
 
 func (rt *appRuntime) writeOutput(jsonVal any, textFn func() string) error {
-	if rt.jsonOut {
+	if rt.isJSON() {
 		return rt.writeJSON(jsonVal)
 	}
 	text := strings.TrimRight(textFn(), "\n")
@@ -199,6 +237,51 @@ func (rt *appRuntime) writeOutput(jsonVal any, textFn func() string) error {
 	}
 	_, err := fmt.Fprintln(rt.stdout, text)
 	return err
+}
+
+func (rt *appRuntime) writeDryRun(method, path string, body any) error {
+	plan := dryRunPlan{
+		DryRun: true,
+		Method: method,
+		Path:   path,
+		Body:   body,
+	}
+	return rt.writeOutput(plan, func() string {
+		var b strings.Builder
+		fmt.Fprintf(&b, "DRY RUN: %s %s", method, path)
+		if body != nil {
+			encoded, err := json.MarshalIndent(body, "", "  ")
+			if err == nil && len(encoded) > 0 && string(encoded) != "null" {
+				b.WriteByte('\n')
+				b.Write(encoded)
+			}
+		}
+		return b.String()
+	})
+}
+
+func (rt *appRuntime) callMutate(ctx context.Context, op string, reqBody, dst any) (json.RawMessage, bool, error) {
+	if rt.dryRun {
+		return nil, true, rt.writeDryRun(http.MethodPost, opPath(op), reqBody)
+	}
+	client, _, err := rt.newClient()
+	if err != nil {
+		return nil, false, err
+	}
+	raw, err := client.Call(ctx, op, reqBody, dst)
+	return raw, false, err
+}
+
+func (rt *appRuntime) callMutateWithFallback(ctx context.Context, primaryOp, fallbackOp string, primaryBody, fallbackBody, dst any) (json.RawMessage, bool, error) {
+	if rt.dryRun {
+		return nil, true, rt.writeDryRun(http.MethodPost, opPath(primaryOp), primaryBody)
+	}
+	client, _, err := rt.newClient()
+	if err != nil {
+		return nil, false, err
+	}
+	raw, err := client.CallWithFallback(ctx, primaryOp, fallbackOp, primaryBody, fallbackBody, dst)
+	return raw, false, err
 }
 
 func (rt *appRuntime) writeJSONError(err error) {
