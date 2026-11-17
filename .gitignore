@@ -36,6 +36,9 @@ packages/*/dist/
 /vibe-server
 /vibe-machine
 /vibe-desktop
+/vibe
+/vibe-tsgen
+/dist/
 *.test
 coverage.out
 

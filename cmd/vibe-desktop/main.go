@@ -27,7 +27,7 @@ import (
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
 )
 
-const desktopVersion = "0.1.0-dev"
+var desktopVersion = "0.1.0-dev"
 
 var desktopFlagKeyMap = map[string]string{
 	"server":            "desktop.server_url",
@@ -79,6 +79,8 @@ type DesktopDeps struct {
 	EmbeddedWebFS   fs.FS
 	StackLauncher   StackLauncher
 	LiquidGlass     bool
+	ExecPath        string
+	WorkDir         string
 }
 
 var defaultStackLauncher StackLauncher
@@ -419,6 +421,22 @@ func NewDesktopApp(ctx context.Context, cfg DesktopConfig, deps DesktopDeps) (*D
 		cfg.KeychainService = defaultKeychainService
 	}
 
+	execPath := strings.TrimSpace(deps.ExecPath)
+	if execPath == "" {
+		if exe, exeErr := os.Executable(); exeErr == nil {
+			execPath = exe
+		}
+	}
+	cwd := strings.TrimSpace(deps.WorkDir)
+	if cwd == "" {
+		if wd, wdErr := os.Getwd(); wdErr == nil {
+			cwd = wd
+		}
+	}
+	if !cfg.HeadlessCheck && strings.TrimSpace(cfg.WebDistDir) == "" && deps.EmbeddedWebFS == nil {
+		cfg.WebDistDir = ResolveBundledWebDist(cfg.WebDistDir, execPath, cwd)
+	}
+
 	assetFS, err := NewWebAssetFS(cfg.WebDistDir, deps.EmbeddedWebFS)
 	if err != nil {
 		return nil, err
@@ -493,6 +511,8 @@ func NewDesktopApp(ctx context.Context, cfg DesktopConfig, deps DesktopDeps) (*D
 		HomeDir:          cfg.HomeDir,
 		RepoRoots:        cfg.RepoRoots,
 		HasEmbeddedStack: stack != nil,
+		ExecPath:         execPath,
+		WorkDir:          cwd,
 	})
 
 	app := &DesktopApp{

@@ -1,5 +1,5 @@
 name: setup
-description: Install Node, Vite+, workspace dependencies, and restore/save the Vite Task cache
+description: Install Node, Vite+, Go, sqlc, workspace dependencies, and restore/save the Vite Task cache
 
 inputs:
   shard:
@@ -19,5 +19,36 @@ runs:
         path: node_modules/.vite/task-cache
         key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ inputs.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
         restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ inputs.shard }}-
+    - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      with:
+        go-version-file: go.mod
+        cache: true
+    - name: Install sqlc v1.31.1
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "$(uname -s)" in
+          Linux) os="linux" ;;
+          Darwin) os="darwin" ;;
+          *) echo "Unsupported OS for sqlc: $(uname -s)" >&2; exit 1 ;;
+        esac
+        case "$(uname -m)" in
+          x86_64|amd64) arch="amd64" ;;
+          aarch64|arm64) arch="arm64" ;;
+          *) echo "Unsupported arch for sqlc: $(uname -m)" >&2; exit 1 ;;
+        esac
+        sqlc_ver="1.31.1"
+        sqlc_dir="$RUNNER_TEMP/sqlc-bin"
+        archive="sqlc_${sqlc_ver}_${os}_${arch}.tar.gz"
+        mkdir -p "$sqlc_dir"
+        if ! curl -fsSL "https://downloads.sqlc.dev/${archive}" -o "$RUNNER_TEMP/${archive}"; then
+          curl -fsSL "https://github.com/sqlc-dev/sqlc/releases/download/v${sqlc_ver}/${archive}" -o "$RUNNER_TEMP/${archive}"
+        fi
+        tar -xzf "$RUNNER_TEMP/${archive}" -C "$sqlc_dir" sqlc
+        chmod +x "$sqlc_dir/sqlc"
+        rm -f "$RUNNER_TEMP/${archive}"
+        echo "$sqlc_dir" >> "$GITHUB_PATH"
+        PATH="$sqlc_dir:$PATH"
+        go version && sqlc version
     - shell: bash
       run: git config --global user.name ci && git config --global user.email ci@example.com

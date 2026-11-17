@@ -81,16 +81,24 @@ func launchEmbeddedStack(ctx context.Context, cfg DesktopConfig, rootKey vault.R
 		return nil, err
 	}
 
-	return newEmbeddedStackFromRuntime(st), nil
+	var gwOpts []gateway.Option
+	if strings.TrimSpace(cfg.WebDistDir) != "" {
+		gwOpts = append(gwOpts, gateway.WithWebDist(cfg.WebDistDir))
+	}
+	return newEmbeddedStackWithOptions(st, gwOpts...), nil
 }
 
 func newEmbeddedStackFromRuntime(st *stack.Stack) *embeddedStack {
+	return newEmbeddedStackWithOptions(st)
+}
+
+func newEmbeddedStackWithOptions(st *stack.Stack, gwOpts ...gateway.Option) *embeddedStack {
 	desktopEnd, serverEnd := link.NewMemoryPipe()
 	attachCtx, attachCancel := context.WithCancel(context.Background())
 
 	es := &embeddedStack{
 		runtime:      st,
-		gw:           gateway.NewHandler(st),
+		gw:           gateway.NewHandler(st, gwOpts...),
 		desktopEnd:   desktopEnd,
 		serverEnd:    serverEnd,
 		attachCtx:    attachCtx,

@@ -7,7 +7,7 @@
     "desktop:dev": "env -u GOROOT CGO_ENABLED=0 go run ./cmd/vibe-desktop",
     "notes:catalog": "vpx scripts/docs/agent-notes.ts --write",
     "site:deploy": "vp run --filter @vibevalley/site deploy",
-    "package:mac": "env -u GOROOT CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o dist/vibe-desktop ./cmd/vibe-desktop",
+    "package:mac": "vpx scripts/release/package-mac.ts",
     "release": "vpx scripts/release/release.ts",
     "capabilities": "vpx scripts/gen/capabilities.ts",
     "api:client": "vpx scripts/gen/api-client.ts",

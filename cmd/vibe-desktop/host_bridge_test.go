@@ -758,3 +758,125 @@ func TestDesktopHostControlUnixSocketAndDesktopAppClose(t *testing.T) {
 		t.Fatalf("DesktopApp.Close: %v", err)
 	}
 }
+
+func TestResolveBundledCLIBinaryAndHostSymlinkDiscovery(t *testing.T) {
+	t.Parallel()
+
+	cliName := "vibe"
+	if runtime.GOOS == "windows" {
+		cliName += ".exe"
+	}
+
+	root := t.TempDir()
+	execPath := filepath.Join(root, "VibeValley.app", "Contents", "MacOS", "vibe-desktop")
+	cwd := filepath.Join(root, "repo")
+	bundleBin := filepath.Join(root, "VibeValley.app", "Contents", "Resources", "bin", cliName)
+	siblingBin := filepath.Join(filepath.Dir(execPath), cliName)
+	distBin := filepath.Join(cwd, "dist", cliName)
+	cwdBin := filepath.Join(cwd, cliName)
+
+	if got := ResolveBundledCLIBinary(execPath, cwd); got != "" {
+		t.Fatalf("expected empty when no CLI binary exists, got %q", got)
+	}
+	if got := ResolveBundledCLIBinary("", ""); got != "" {
+		t.Fatalf("expected empty for blank execPath and cwd, got %q", got)
+	}
+
+	// Directories named vibe must be ignored.
+	if err := os.MkdirAll(cwdBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolveBundledCLIBinary(execPath, cwd); got != "" {
+		t.Fatalf("expected directory %q to be ignored, got %q", cwdBin, got)
+	}
+	if err := os.RemoveAll(cwdBin); err != nil {
+		t.Fatal(err)
+	}
+
+	writeFakeBin := func(p string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("#!/bin/sh\necho vibe\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Lowest precedence: <cwd>/vibe -> <cwd>/dist/vibe -> <dir(execPath)>/vibe -> <dir(execPath)>/../Resources/bin/vibe.
+	writeFakeBin(cwdBin)
+	if got := ResolveBundledCLIBinary(execPath, cwd); got != cwdBin {
+		t.Fatalf("got %q, want cwd binary %q", got, cwdBin)
+	}
+
+	writeFakeBin(distBin)
+	if got := ResolveBundledCLIBinary(execPath, cwd); got != distBin {
+		t.Fatalf("got %q, want dist binary %q", got, distBin)
+	}
+
+	writeFakeBin(siblingBin)
+	if got := ResolveBundledCLIBinary(execPath, cwd); got != siblingBin {
+		t.Fatalf("got %q, want sibling binary %q", got, siblingBin)
+	}
+
+	writeFakeBin(bundleBin)
+	if got := ResolveBundledCLIBinary(execPath, cwd); got != bundleBin {
+		t.Fatalf("got %q, want bundle Resources/bin binary %q", got, bundleBin)
+	}
+
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	// Verify DesktopHostService uses ResolveBundledCLIBinary and defaults to ~/.local/bin/vibe.
+	homeDir := filepath.Join(root, "home")
+	localBinDir := filepath.Join(homeDir, ".local", "bin")
+	host := NewDesktopHostService(nil, nil, DesktopHostConfig{
+		ExecPath: execPath,
+		WorkDir:  cwd,
+		Getenv: func(k string) string {
+			switch k {
+			case "HOME":
+				return homeDir
+			case "PATH":
+				return localBinDir + string(os.PathListSeparator) + "/usr/bin"
+			default:
+				return ""
+			}
+		},
+	})
+	defer host.Close()
+
+	ctx := context.Background()
+	st, err := host.CliState(ctx)
+	if err != nil {
+		t.Fatalf("CliState: %v", err)
+	}
+	wantLink := filepath.Join(localBinDir, "vibe")
+	if st.Command != "vibe" || st.Link != wantLink || st.Installed || st.Taken || !st.OnPath {
+		t.Fatalf("unexpected initial CliState: %+v", st)
+	}
+
+	st, err = host.CliInstall(ctx)
+	if err != nil {
+		t.Fatalf("CliInstall: %v", err)
+	}
+	if !st.Installed || st.Taken || st.Link != wantLink {
+		t.Fatalf("unexpected CliState after CliInstall: %+v", st)
+	}
+	target, err := os.Readlink(wantLink)
+	if err != nil {
+		t.Fatalf("Readlink %s: %v", wantLink, err)
+	}
+	if target != bundleBin {
+		t.Fatalf("symlink target = %q, want %q", target, bundleBin)
+	}
+
+	st, err = host.CliRemove(ctx)
+	if err != nil {
+		t.Fatalf("CliRemove: %v", err)
+	}
+	if st.Installed || st.Taken {
+		t.Fatalf("expected uninstalled after CliRemove, got %+v", st)
+	}
+}

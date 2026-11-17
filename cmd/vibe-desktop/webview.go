@@ -48,6 +48,36 @@ var extraMimeTypes = map[string]string{
 	".wasm":  "application/wasm",
 }
 
+// ResolveBundledWebDist resolves the built frontend directory from an explicit override,
+// a macOS .app bundle's Contents/Resources/web directory, or a repository apps/web/dist checkout.
+func ResolveBundledWebDist(explicitDir, execPath, cwd string) string {
+	if trimmed := strings.TrimSpace(explicitDir); trimmed != "" {
+		return trimmed
+	}
+	var candidates []string
+	if trimmedExe := strings.TrimSpace(execPath); trimmedExe != "" {
+		candidates = append(candidates, filepath.Clean(filepath.Join(filepath.Dir(trimmedExe), "..", "Resources", "web")))
+	}
+	if trimmedCwd := strings.TrimSpace(cwd); trimmedCwd != "" {
+		candidates = append(candidates, filepath.Clean(filepath.Join(trimmedCwd, "apps", "web", "dist")))
+	}
+	for _, candidate := range candidates {
+		if hasWebDistIndex(candidate) {
+			return candidate
+		}
+	}
+	return ""
+}
+
+func hasWebDistIndex(dir string) bool {
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		return false
+	}
+	idx, err := os.Stat(filepath.Join(dir, "index.html"))
+	return err == nil && !idx.IsDir()
+}
+
 // NewWebAssetFS resolves the frontend fs.FS from diskDir (when provided), embedded, or
 // the built-in fallback shell. An explicit non-existent diskDir returns an error.
 func NewWebAssetFS(diskDir string, embedded fs.FS) (fs.FS, error) {

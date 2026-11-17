@@ -24,7 +24,7 @@ import (
 const (
 	desktopAppName       = "VibeValley"
 	desktopVoiceShortcut = "Alt+Shift+Space"
-	desktopCLICommand    = "vibevalley"
+	desktopCLICommand    = "vibe"
 
 	farmBaseWidth    = 384
 	farmBaseHeight   = 256
@@ -159,6 +159,8 @@ type DesktopHostConfig struct {
 	CLICommand  string
 	CLILauncher string
 	CLIBinDir   string
+	ExecPath    string
+	WorkDir     string
 	Getenv      func(string) string
 
 	UpdateDriver HostUpdateDriver
@@ -775,6 +777,35 @@ func (s *DesktopHostService) UpdateInstall(ctx context.Context) error {
 	return nil
 }
 
+// ResolveBundledCLIBinary locates the bundled `vibe` CLI binary across .app bundle
+// Resources/bin, sibling executable directory, and repository dist/working outputs.
+func ResolveBundledCLIBinary(execPath, cwd string) string {
+	name := "vibe"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	var candidates []string
+	if trimmedExe := strings.TrimSpace(execPath); trimmedExe != "" {
+		exeDir := filepath.Dir(trimmedExe)
+		candidates = append(candidates,
+			filepath.Clean(filepath.Join(exeDir, "..", "Resources", "bin", name)),
+			filepath.Clean(filepath.Join(exeDir, name)),
+		)
+	}
+	if trimmedCwd := strings.TrimSpace(cwd); trimmedCwd != "" {
+		candidates = append(candidates,
+			filepath.Clean(filepath.Join(trimmedCwd, "dist", name)),
+			filepath.Clean(filepath.Join(trimmedCwd, name)),
+		)
+	}
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	return ""
+}
+
 func (s *DesktopHostService) resolveCLIPaths() (command, launcher, binDir string) {
 	command = s.cfg.CLICommand
 	if command == "" {
@@ -782,19 +813,32 @@ func (s *DesktopHostService) resolveCLIPaths() (command, launcher, binDir string
 	}
 	launcher = strings.TrimSpace(s.cfg.CLILauncher)
 	if launcher == "" {
-		if exe, err := os.Executable(); err == nil {
-			candidate := filepath.Join(filepath.Dir(exe), "vibe")
-			if runtime.GOOS == "windows" {
-				candidate += ".exe"
-			}
-			if info, stErr := os.Stat(candidate); stErr == nil && !info.IsDir() {
-				launcher = candidate
+		execPath := strings.TrimSpace(s.cfg.ExecPath)
+		if execPath == "" {
+			if exe, err := os.Executable(); err == nil {
+				execPath = exe
 			}
 		}
+		cwd := strings.TrimSpace(s.cfg.WorkDir)
+		if cwd == "" {
+			if wd, err := os.Getwd(); err == nil {
+				cwd = wd
+			}
+		}
+		launcher = ResolveBundledCLIBinary(execPath, cwd)
 	}
 	binDir = strings.TrimSpace(s.cfg.CLIBinDir)
 	if binDir == "" {
-		if home, err := os.UserHomeDir(); err == nil && home != "" {
+		home := ""
+		if s.cfg.Getenv != nil {
+			home = strings.TrimSpace(s.cfg.Getenv("HOME"))
+		}
+		if home == "" {
+			if h, err := os.UserHomeDir(); err == nil {
+				home = strings.TrimSpace(h)
+			}
+		}
+		if home != "" {
 			binDir = filepath.Join(home, ".local", "bin")
 		}
 	}
@@ -817,7 +861,7 @@ func pathContainsDir(pathEnv, dir string) bool {
 	return false
 }
 
-// CliState inspects the symlink installation status of the vibevalley CLI command.
+// CliState inspects the symlink installation status of the vibe CLI command.
 func (s *DesktopHostService) CliState(_ context.Context) (HostCommandLineState, error) {
 	command, launcher, binDir := s.resolveCLIPaths()
 	if binDir == "" {
@@ -862,7 +906,7 @@ func (s *DesktopHostService) CliState(_ context.Context) (HostCommandLineState, 
 	}, nil
 }
 
-// CliInstall creates the symlink at ~/.local/bin/vibevalley -> launcher unless already taken by another binary.
+// CliInstall creates the symlink at ~/.local/bin/vibe -> launcher unless already taken by another binary.
 func (s *DesktopHostService) CliInstall(ctx context.Context) (HostCommandLineState, error) {
 	st, err := s.CliState(ctx)
 	if err != nil {

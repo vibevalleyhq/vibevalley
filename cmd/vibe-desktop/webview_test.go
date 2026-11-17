@@ -104,3 +104,55 @@ func TestWebViewAssetHandlerDiskEmbeddedAndProtocol(t *testing.T) {
 		t.Fatal("WindowOptions missing Chord Bridge preload script")
 	}
 }
+
+func TestResolveBundledWebDistDiscovery(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	appMacOSDir := filepath.Join(root, "VibeValley.app", "Contents", "MacOS")
+	appWebDir := filepath.Join(root, "VibeValley.app", "Contents", "Resources", "web")
+	repoWebDir := filepath.Join(root, "repo", "apps", "web", "dist")
+	execPath := filepath.Join(appMacOSDir, "vibe-desktop")
+	cwd := filepath.Join(root, "repo")
+
+	// Nothing exists yet -> "".
+	if got := ResolveBundledWebDist("", execPath, cwd); got != "" {
+		t.Fatalf("expected empty when no web dist exists, got %q", got)
+	}
+	if got := ResolveBundledWebDist("", "", ""); got != "" {
+		t.Fatalf("expected empty for blank execPath and cwd, got %q", got)
+	}
+
+	// Repository apps/web/dist fallback when only cwd has index.html.
+	if err := os.MkdirAll(repoWebDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoWebDir, "index.html"), []byte("<html>repo</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolveBundledWebDist("", execPath, cwd); got != repoWebDir {
+		t.Fatalf("expected repo web dist %q, got %q", repoWebDir, got)
+	}
+
+	// .app/Contents/Resources/web without index.html is skipped in favor of cwd/apps/web/dist.
+	if err := os.MkdirAll(appWebDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolveBundledWebDist("", execPath, cwd); got != repoWebDir {
+		t.Fatalf("expected repo fallback when bundle web lacks index.html, got %q", got)
+	}
+
+	// .app/Contents/Resources/web with index.html takes priority over cwd/apps/web/dist.
+	if err := os.WriteFile(filepath.Join(appWebDir, "index.html"), []byte("<html>bundle</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolveBundledWebDist("", execPath, cwd); got != appWebDir {
+		t.Fatalf("expected bundle web dist %q, got %q", appWebDir, got)
+	}
+
+	// Explicit override always wins.
+	explicit := filepath.Join(root, "custom-web")
+	if got := ResolveBundledWebDist(explicit, execPath, cwd); got != explicit {
+		t.Fatalf("expected explicit web dist %q, got %q", explicit, got)
+	}
+}

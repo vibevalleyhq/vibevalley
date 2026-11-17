@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -258,4 +260,79 @@ secrets:
 			t.Fatalf("unexpected run --headless-check output %q err=%v", out.String(), err)
 		}
 	})
+}
+
+func TestDesktopAppAutoResolvesBundledWebDistOutsideHeadlessCheck(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmp := t.TempDir()
+	execPath := filepath.Join(tmp, "VibeValley.app", "Contents", "MacOS", "vibe-desktop")
+	bundleWebDir := filepath.Join(tmp, "VibeValley.app", "Contents", "Resources", "web")
+	if err := os.MkdirAll(bundleWebDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bundleWebDir, "index.html"), []byte("<!doctype html><html><body>Bundled UI</body></html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Non-headless launch resolves bundled web dist for both WebHandler and EmbeddedStack.
+	var seenWebDist string
+	app, err := NewDesktopApp(ctx, DesktopConfig{
+		HomeDir:       filepath.Join(tmp, "home"),
+		HeadlessCheck: false,
+	}, DesktopDeps{
+		Keychain: NewMemoryKeychainDriver(),
+		ExecPath: execPath,
+		WorkDir:  tmp,
+		StackLauncher: func(_ context.Context, cfg DesktopConfig, rk vault.RootKey) (EmbeddedStack, error) {
+			seenWebDist = cfg.WebDistDir
+			return &fakeEmbeddedStack{rootKey: rk, serverURL: "chord://embedded"}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewDesktopApp GUI bundle resolution: %v", err)
+	}
+	defer func() { _ = app.Close() }()
+
+	if seenWebDist != bundleWebDir || app.Config.WebDistDir != bundleWebDir || app.WebConfig.DiskDir != bundleWebDir {
+		t.Fatalf("bundled WebDistDir not propagated: seen=%q cfg=%q webCfg=%q want=%q", seenWebDist, app.Config.WebDistDir, app.WebConfig.DiskDir, bundleWebDir)
+	}
+
+	rec := httptest.NewRecorder()
+	app.WebHandler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Bundled UI") {
+		t.Fatalf("expected bundled index.html, got status=%d body=%q", rec.Code, rec.Body.String())
+	}
+
+	// Headless check keeps WebDistDir empty (uses lightweight embedded fallback) when not explicitly given.
+	var headlessSeenWebDist string
+	headlessApp, err := NewDesktopApp(ctx, DesktopConfig{
+		HomeDir:       filepath.Join(tmp, "home-headless"),
+		HeadlessCheck: true,
+	}, DesktopDeps{
+		Keychain: NewMemoryKeychainDriver(),
+		ExecPath: execPath,
+		WorkDir:  tmp,
+		StackLauncher: func(_ context.Context, cfg DesktopConfig, rk vault.RootKey) (EmbeddedStack, error) {
+			headlessSeenWebDist = cfg.WebDistDir
+			return &fakeEmbeddedStack{rootKey: rk, serverURL: "chord://embedded"}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewDesktopApp headless: %v", err)
+	}
+	defer func() { _ = headlessApp.Close() }()
+
+	if headlessSeenWebDist != "" || headlessApp.Config.WebDistDir != "" {
+		t.Fatalf("expected headless-check to skip auto web dist discovery, got seen=%q cfg=%q", headlessSeenWebDist, headlessApp.Config.WebDistDir)
+	}
+	var chk bytes.Buffer
+	if err := headlessApp.RunHeadlessCheck(ctx, &chk); err != nil {
+		t.Fatalf("RunHeadlessCheck: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(chk.Bytes(), &parsed); err != nil || parsed["ok"] != true {
+		t.Fatalf("unexpected headless check JSON %q err=%v", chk.String(), err)
+	}
 }
