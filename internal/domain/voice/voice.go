@@ -585,8 +585,8 @@ func (s *Service) Dictate(ctx context.Context, req DictateRequest) (Dictated, er
 		return Dictated{}, fmt.Errorf("%w: dictation endpoint is not configured", ErrVoiceUnavailable)
 	}
 	target, ok := s.dictationCfgFn()
-	if !ok || strings.TrimSpace(target.URL) == "" || strings.TrimSpace(target.Key) == "" {
-		return Dictated{}, fmt.Errorf("%w: dictation endpoint or key is missing", ErrVoiceUnavailable)
+	if !ok || strings.TrimSpace(target.URL) == "" {
+		return Dictated{}, fmt.Errorf("%w: dictation endpoint is missing", ErrVoiceUnavailable)
 	}
 
 	fmtNorm := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(req.Format), "."))
@@ -641,7 +641,9 @@ func (s *Service) Dictate(ctx context.Context, req DictateRequest) (Dictated, er
 		return Dictated{}, err
 	}
 	httpReq.Header.Set("Content-Type", mw.FormDataContentType())
-	httpReq.Header.Set("Authorization", "Bearer "+target.Key)
+	if strings.TrimSpace(target.Key) != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+target.Key)
+	}
 	httpReq.Header.Set("Accept", "application/json")
 
 	resp, err := s.httpClient.Do(httpReq)

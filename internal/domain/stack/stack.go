@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -574,7 +575,7 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 		DictationConfig: func() (voice.DictationTarget, bool) {
 			d := s.Setting.Dictation()
 			target := voice.DictationTarget{URL: d.URL, Model: d.Model, Key: d.Key}
-			return target, strings.TrimSpace(d.URL) != "" && strings.TrimSpace(d.Key) != ""
+			return target, strings.TrimSpace(d.URL) != "" && (d.Via == "own" || strings.TrimSpace(d.Key) != "")
 		},
 		MOSSKey: func() (string, bool) {
 			st := s.Setting.ProviderStatus()
@@ -589,7 +590,7 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 			s.NotifyStateChange()
 		},
 	})
-	s.LAN, err = lan.NewService(lan.Options{
+	lanOpts := lan.Options{
 		HomeDir: homeDir,
 		Clock:   clk,
 		Upstream: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -614,8 +615,20 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 			}
 			return lan.AuthenticatedDevice{ID: dev.ID, Name: dev.Name, Came: string(dev.Came)}, true
 		},
-		AddressResolver: func() string { return s.ServerURL() },
-	})
+	}
+	envLookup := cfg.Getenv
+	if envLookup == nil {
+		envLookup = os.Getenv
+	}
+	if rawPort := strings.TrimSpace(envLookup("VIBEVALLEY_LAN_PORT")); rawPort != "" {
+		if parsedPort, pErr := strconv.Atoi(rawPort); pErr == nil && parsedPort >= 0 && parsedPort <= 65535 {
+			lanOpts.Port = parsedPort
+			if parsedPort == 0 {
+				lanOpts.EphemeralPort = true
+			}
+		}
+	}
+	s.LAN, err = lan.NewService(lanOpts)
 	if err != nil {
 		return nil, fmt.Errorf("stack: lan service: %w", err)
 	}

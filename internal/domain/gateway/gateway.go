@@ -148,6 +148,12 @@ func (h *Handler) serveAPIv1(w http.ResponseWriter, r *http.Request, cleanPath s
 	case "/api/v1/events":
 		h.handleEventsSSE(w, r)
 		return
+	case "/api/v1/voice/moss/line":
+		h.handleOfflineVoiceWS(w, r, "live")
+		return
+	case "/api/v1/voice/vision/line":
+		h.handleOfflineVoiceWS(w, r, "vision")
+		return
 	}
 
 	switch {
@@ -490,7 +496,7 @@ func (h *Handler) buildPostRoutes() map[string]postHandler {
 		"/api/v1/media/input/delete":                 h.handleMediaInputDelete,
 		"/api/v1/media/image/create":                 noCaller(h.handleMediaImageCreate),
 		"/api/v1/media/understanding/create":         noCaller(h.handleMediaUnderstandingCreate),
-		"/api/v1/media/understanding/authorize":      noCaller(h.handleMediaUnderstandingCreate),
+		"/api/v1/media/understanding/authorize":      noCaller(h.handleMediaUnderstandingAuthorize),
 		"/api/v1/media/understanding/start":          noCaller(h.handleMediaJobAction("start")),
 		"/api/v1/media/speech/create":                noCaller(h.handleMediaSpeechCreate),
 		"/api/v1/media/speech/resume":                noCaller(h.handleMediaJobAction("resume")),

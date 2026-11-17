@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/attachment"
@@ -24,12 +25,44 @@ func (h *Handler) handleHealthGet(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+func normalizeSettingsStatus(st setting.SettingsStatus) setting.SettingsStatus {
+	if st.Locale == "en" {
+		const expectedEN = "Hey there! What shall we grow today?"
+		const oldEN = "Hi there! What are we working on today?"
+		if st.VoiceDefaults.Greeting == "" || st.VoiceDefaults.Greeting == oldEN {
+			st.VoiceDefaults.Greeting = expectedEN
+		}
+		if st.Voice.Greeting == oldEN {
+			st.Voice.Greeting = expectedEN
+		}
+	}
+	return st
+}
+
+func setDeviceKeyCookie(w http.ResponseWriter, r *http.Request, key string, maxAge int) {
+	age := maxAge
+	val := url.PathEscape(key)
+	if maxAge <= 0 {
+		age = -1
+		val = ""
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     user.DeviceKeyCookie,
+		Value:    val,
+		Path:     "/",
+		MaxAge:   age,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https"),
+	})
+}
+
 func (h *Handler) handleSettingGet(w http.ResponseWriter, _ *http.Request) {
 	if h.st == nil || h.st.Setting == nil {
 		writeError(w, newBizError(BizServiceUnavailable, "setting service unavailable"), BizServiceUnavailable)
 		return
 	}
-	writeSuccess(w, h.st.Setting.Get())
+	writeSuccess(w, normalizeSettingsStatus(h.st.Setting.Get()))
 }
 
 func (h *Handler) handleSettingValidate(w http.ResponseWriter, r *http.Request) {
@@ -64,8 +97,11 @@ func (h *Handler) handleSettingUpdate(w http.ResponseWriter, r *http.Request, ca
 		writeError(w, err, BizSettingRefused)
 		return
 	}
+	h.hub.mu.Lock()
+	h.hub.state.OrchNoKeySent = make(map[string]bool)
+	h.hub.mu.Unlock()
 	h.hub.notifyAllState()
-	writeSuccess(w, res)
+	writeSuccess(w, normalizeSettingsStatus(res))
 }
 
 func (h *Handler) handleProviderGet(w http.ResponseWriter, _ *http.Request, caller user.Caller) {
@@ -140,6 +176,17 @@ func (h *Handler) handleProviderVoiceList(w http.ResponseWriter, r *http.Request
 	var req setting.ProviderVoiceRequest
 	if err := decodeJSONBody(w, r, &req, true); err != nil {
 		writeError(w, err, BizInvalidInput)
+		return
+	}
+	if off, handled, oErr := h.offlineVoiceList(r.Context(), req); handled {
+		if oErr != nil {
+			writeError(w, oErr, BizProviderRefused)
+			return
+		}
+		if off.Voices == nil {
+			off.Voices = []setting.ProviderVoice{}
+		}
+		writeSuccess(w, off)
 		return
 	}
 	res, err := h.st.Setting.ListProviderVoices(r.Context(), req)
@@ -227,10 +274,13 @@ func (h *Handler) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, BizAuthRefused)
 		return
 	}
+	if r.Header.Get(lan.HeaderOutside) == "1" {
+		setDeviceKeyCookie(w, r, login.Key, 10*365*24*3600)
+	}
 	writeSuccess(w, login)
 }
 
-func (h *Handler) handleUserLogout(w http.ResponseWriter, _ *http.Request, caller user.Caller) {
+func (h *Handler) handleUserLogout(w http.ResponseWriter, r *http.Request, caller user.Caller) {
 	if h.st == nil || h.st.User == nil {
 		writeError(w, newBizError(BizServiceUnavailable, "user service unavailable"), BizServiceUnavailable)
 		return
@@ -238,6 +288,9 @@ func (h *Handler) handleUserLogout(w http.ResponseWriter, _ *http.Request, calle
 	if err := h.st.User.Logout(caller); err != nil {
 		writeError(w, err, BizAuthRefused)
 		return
+	}
+	if r.Header.Get(lan.HeaderOutside) == "1" {
+		setDeviceKeyCookie(w, r, "", 0)
 	}
 	writeVoid(w)
 }

@@ -1,5 +1,5 @@
-import { type ChildProcess, spawn } from "node:child_process";
-import { closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -13,14 +13,28 @@ export interface VerificationResult {
   address: string;
 }
 
-/** Every built-in template but the default orchestrator's (apps/server/src/modules/agent/templates/index.json). */
 const errorCode = (error: unknown): unknown => (typeof error === "object" && error !== null && "code" in error ? error.code : undefined);
 
-const starters = () =>
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the starters' index, a list of names
-  (JSON.parse(readFileSync(join(import.meta.dirname, "../..", "apps", "server", "src", "modules", "agent", "templates", "index.json"), "utf8")) as string[])
-    .filter((id) => id !== "orchestrator")
-    .join(",");
+function goBuildEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && key !== "GOROOT") env[key] = value;
+  }
+  env.CGO_ENABLED = "0";
+  return env;
+}
+
+function buildGoBinary(root: string, pkg: string, outPath: string): void {
+  const res = spawnSync("go", ["build", "-o", outPath, pkg], {
+    cwd: root,
+    env: goBuildEnv(),
+    encoding: "utf8",
+  });
+  if (res.error) throw res.error;
+  if (res.status !== 0) {
+    throw new Error(`go build ${pkg} failed (${res.status}): ${res.stderr || res.stdout}`);
+  }
+}
 
 function isolatedEnvironment(home: string, work: string): Record<string, string> {
   const env: Record<string, string> = {};
@@ -28,7 +42,10 @@ function isolatedEnvironment(home: string, work: string): Record<string, string>
   for (const [key, value] of Object.entries(process.env)) {
     if (
       value !== undefined &&
+      key !== "GOROOT" &&
       (!key.startsWith("VIBEVALLEY_") || screenOptions.has(key)) &&
+      !key.startsWith("VIBE_") &&
+      !key.startsWith("MYGO_") &&
       !["DEEPSEEK_API_KEY", "AGORA_APP_ID", "AGORA_APP_CERTIFICATE"].includes(key)
     )
       env[key] = value;
@@ -37,10 +54,6 @@ function isolatedEnvironment(home: string, work: string): Record<string, string>
     ...env,
     VIBEVALLEY_HOME: home,
     VIBEVALLEY_WORK_ROOT: work,
-    VIBEVALLEY_PORT: "0",
-    VIBEVALLEY_VOICE_LINE_PORT: "0",
-    VIBEVALLEY_PATROL_HEARTBEAT_MINUTES: "0",
-    VIBEVALLEY_AGENT_STARTERS: starters(),
   };
 }
 
@@ -72,12 +85,10 @@ export async function runVerification(command: string[] = [], options: Verificat
   const binaries = join(evidence, "bin");
   for (const path of [home, work, binaries]) mkdirSync(path);
   const env: Record<string, string> = { ...isolatedEnvironment(home, work), ...(options.scriptedHelper === true ? { VIBEVALLEY_TEST_RUNTIMES: "1" } : {}) };
-  const serverDir = join(root, "apps", "server");
-  // The command line from any folder, on the command line's own vpx (its #/ imports are its package.json's).
-  const cli = join(binaries, "vv");
-  const cliDir = join(root, "apps", "cli");
-  const vpx = [join(cliDir, "node_modules", ".bin", "vpx"), join(cliDir, "src", "main.ts")];
-  writeFileSync(cli, `#!/bin/sh\nexec ${vpx.map((a) => JSON.stringify(a)).join(" ")} "$@"\n`, { mode: 0o755 });
+  const serverBin = join(binaries, "vibe-server");
+  const cli = join(binaries, "vibe");
+  buildGoBinary(root, "./cmd/vibe-server", serverBin);
+  buildGoBinary(root, "./cmd/vibe", cli);
   const log = join(evidence, "server.stdout.log");
   /** A child in a process group of its own; exited settles with its exit code. */
   interface Child {
@@ -141,19 +152,26 @@ export async function runVerification(command: string[] = [], options: Verificat
   };
   try {
     if (interrupted) throw new Error("verification interrupted before startup");
-    // vpx execs node in its own process, so the receipt's pid is the child's. it logs to stdout.
     const web = join(root, "apps", "web", "dist");
     const serverErr = openSync(join(evidence, "server.stderr.log"), "w");
-    const spawned = spawn(
-      join(serverDir, "node_modules", ".bin", "vpx"),
-      ["src/main.ts", "--ready-json", ...(existsSync(join(web, "index.html")) ? ["--web", web] : [])],
-      {
-        cwd: serverDir,
-        env,
-        detached: true,
-        stdio: ["ignore", "pipe", serverErr],
-      },
-    );
+    const serverArgs = [
+      "--addr",
+      "127.0.0.1:0",
+      "--preview-addr",
+      "127.0.0.1:0",
+      "--db",
+      join(home, "vibevalley.db"),
+      "--work-root",
+      work,
+      "--ready-json",
+      ...(existsSync(join(web, "index.html")) ? ["--web", web] : []),
+    ];
+    const spawned = spawn(serverBin, serverArgs, {
+      cwd: root,
+      env,
+      detached: true,
+      stdio: ["ignore", "pipe", serverErr],
+    });
     closeSync(serverErr);
     const running = own(spawned);
     owned.add(running);

@@ -252,13 +252,20 @@ func (h *Handler) handleIssueWatchSSE(w http.ResponseWriter, r *http.Request) {
 		dto := h.hub.buildProtoIssue(iss)
 		sessIDs := []string{}
 		sessions := []ProtoSession{}
+		seen := map[string]bool{}
+		h.hub.mu.RLock()
 		for _, a := range dto.Assignments {
 			for _, ex := range a.Executions {
-				if ex.Kind == "worker" && ex.Session != "" {
+				if ex.Kind == "worker" && ex.Session != "" && !seen[ex.Session] {
+					seen[ex.Session] = true
 					sessIDs = append(sessIDs, ex.Session)
+					if s := h.hub.state.Sessions[ex.Session]; s != nil {
+						sessions = append(sessions, *s)
+					}
 				}
 			}
 		}
+		h.hub.mu.RUnlock()
 		settled := dto.Status == "done" || dto.Status == "canceled" || dto.Status == "in_review"
 		return writeSSEData(w, flusher, map[string]any{
 			"kind":            "state",

@@ -479,8 +479,10 @@ func TestGatewayBinaryMediaAttachmentAndArtifactRoutes(t *testing.T) {
 	prevBody, _ := io.ReadAll(prevResp.Body)
 	prevResp.Body.Close()
 	if prevResp.StatusCode != http.StatusOK ||
-		prevResp.Header.Get("Content-Security-Policy") != "sandbox allow-scripts" ||
-		!strings.Contains(string(prevBody), `theme=dark data-print="1"`) ||
+		!strings.Contains(prevResp.Header.Get("Content-Security-Policy"), "sandbox allow-scripts") ||
+		!strings.Contains(prevResp.Header.Get("Content-Security-Policy"), "allow-modals") ||
+		!strings.Contains(string(prevBody), "color-scheme:dark") ||
+		!strings.Contains(string(prevBody), `vibevalley: "selection"`) ||
 		!strings.Contains(string(prevBody), "<h1>Hello Artifact</h1>") {
 		t.Fatalf("unexpected artifact preview status=%d csp=%q body=%s", prevResp.StatusCode, prevResp.Header.Get("Content-Security-Policy"), string(prevBody))
 	}

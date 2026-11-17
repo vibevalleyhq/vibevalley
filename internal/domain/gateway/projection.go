@@ -272,6 +272,11 @@ type ProtoIssueStage struct {
 	Acts  []ProtoIssueAction `json:"acts"`
 }
 
+type ProtoIssueRefining struct {
+	Session string `json:"session"`
+	Name    string `json:"name"`
+}
+
 type ProtoIssue struct {
 	Constraints *ProtoIssueConstraints  `json:"constraints,omitempty"`
 	ID          string                  `json:"id"`
@@ -301,6 +306,7 @@ type ProtoIssue struct {
 	Questions   []ProtoQuestion         `json:"questions"`
 	Criteria    []string                `json:"criteria"`
 	Checks      []ProtoCriterionCheck   `json:"checks"`
+	Refining    *ProtoIssueRefining     `json:"refining,omitempty"`
 	LastRun     *ProtoIssueLastRun      `json:"lastRun,omitempty"`
 	Answer      *ProtoIssueAnswer       `json:"answer,omitempty"`
 	Stage       ProtoIssueStage         `json:"stage"`
@@ -809,11 +815,29 @@ func mapContractIssueStatus(s string) contract.IssueStatus {
 	}
 }
 
-func computeIssueStage(protoStatus string, iss issue.Issue, meta *issueOverlay) ProtoIssueStage {
+func computeIssueStage(protoStatus string, iss issue.Issue, meta *issueOverlay, sess *ProtoSession) ProtoIssueStage {
+	deliver := "change"
+	if meta != nil && meta.Deliver != "" {
+		deliver = meta.Deliver
+	}
+	finishAct := "complete"
+	if deliver == "answer" {
+		finishAct = "acknowledge"
+	}
+	sent := iss.SessionID != "" || (meta != nil && (len(meta.AgentHistory) > 0 || len(meta.Runs) > 0))
+	reopenAct := ProtoIssueAction{Act: "reopen", Does: "move", Status: "backlog", Words: "none"}
+	if sent {
+		reopenAct = ProtoIssueAction{Act: "reopen", Does: "move", Status: "todo", Words: "required"}
+	}
+
 	switch protoStatus {
 	case "backlog":
+		if meta != nil && meta.Refining != nil {
+			return ProtoIssueStage{State: "draft", Since: &iss.CreatedAtMs, Acts: []ProtoIssueAction{}}
+		}
 		return ProtoIssueStage{
 			State: "draft",
+			Since: &iss.CreatedAtMs,
 			Lead:  "start",
 			Acts: []ProtoIssueAction{
 				{Act: "start", Does: "move", Status: "todo", Words: "optional"},
@@ -828,18 +852,18 @@ func computeIssueStage(protoStatus string, iss issue.Issue, meta *issueOverlay) 
 			},
 		}
 	case "in_progress":
-		if strings.TrimSpace(iss.FailureReason) != "" {
+		if strings.TrimSpace(iss.FailureReason) != "" || (meta != nil && meta.LastRunOutcome == "failed") {
 			return ProtoIssueStage{
 				State: "stuck",
 				Stuck: "failed",
-				Lead:  "resume",
+				Lead:  "cure",
 				Acts: []ProtoIssueAction{
-					{Act: "resume", Does: "move", Status: "todo", Words: "optional"},
+					{Act: "cure", Does: "move", Status: "todo", Words: "optional"},
 					{Act: "close", Does: "move", Status: "canceled", Words: "none"},
 				},
 			}
 		}
-		if len(meta.Questions) > 0 {
+		if meta != nil && len(meta.Questions) > 0 {
 			return ProtoIssueStage{
 				State: "asking",
 				Lead:  "answer",
@@ -862,29 +886,84 @@ func computeIssueStage(protoStatus string, iss issue.Issue, meta *issueOverlay) 
 			Acts:  acts,
 		}
 	case "in_review":
+		if meta != nil && meta.Conflict != nil && deliver == "change" {
+			return ProtoIssueStage{
+				State: "stuck",
+				Stuck: "conflict",
+				Since: &iss.UpdatedAtMs,
+				Lead:  "resolve",
+				Acts: []ProtoIssueAction{
+					{Act: "resolve", Does: "move", Status: "todo", Words: "none"},
+					{Act: "tell", Does: "say"},
+					{Act: "close", Does: "move", Status: "canceled", Words: "none"},
+				},
+			}
+		}
+		if meta != nil && len(meta.Questions) > 0 {
+			return ProtoIssueStage{
+				State: "asking",
+				Since: &iss.UpdatedAtMs,
+				Lead:  "answer",
+				Acts: []ProtoIssueAction{
+					{Act: "answer", Does: "say"},
+					{Act: "close", Does: "move", Status: "canceled", Words: "none"},
+				},
+			}
+		}
+		if strings.TrimSpace(iss.FailureReason) != "" || (meta != nil && meta.LastRunOutcome == "failed") || (sess != nil && sess.Phase.Tag == "failed") {
+			acts := []ProtoIssueAction{
+				{Act: "close", Does: "move", Status: "canceled", Words: "none"},
+			}
+			if sess != nil {
+				acts = []ProtoIssueAction{
+					{Act: "cure", Does: "move", Status: "todo", Words: "none"},
+					{Act: "tell", Does: "say"},
+					{Act: "close", Does: "move", Status: "canceled", Words: "none"},
+				}
+			}
+			return ProtoIssueStage{
+				State: "stuck",
+				Stuck: "failed",
+				Since: &iss.UpdatedAtMs,
+				Lead: firstNonEmpty(func() string {
+					if sess != nil {
+						return "cure"
+					}
+					return "close"
+				}()),
+				Acts: acts,
+			}
+		}
+		acts := []ProtoIssueAction{
+			{Act: finishAct, Does: "move", Status: "done", Words: "none"},
+		}
+		if sess != nil {
+			if meta == nil || meta.ReviewedAt == nil {
+				acts = append(acts, ProtoIssueAction{Act: "reject", Does: "move", Status: "todo", Words: "required"})
+			}
+			acts = append(acts, ProtoIssueAction{Act: "tell", Does: "say"})
+		}
+		acts = append(acts, ProtoIssueAction{Act: "close", Does: "move", Status: "canceled", Words: "none"})
 		return ProtoIssueStage{
 			State: "reviewing",
 			Since: &iss.UpdatedAtMs,
-			Lead:  "complete",
-			Acts: []ProtoIssueAction{
-				{Act: "complete", Does: "move", Status: "done", Words: "none"},
-				{Act: "reject", Does: "move", Status: "todo", Words: "required"},
-				{Act: "close", Does: "move", Status: "canceled", Words: "none"},
-			},
+			Lead:  finishAct,
+			Acts:  acts,
 		}
 	case "done":
+		acts := []ProtoIssueAction{reopenAct}
+		if meta != nil && meta.Delivered == "merged_into_parent" {
+			acts = []ProtoIssueAction{}
+		}
 		return ProtoIssueStage{
 			State: "done",
-			Acts: []ProtoIssueAction{
-				{Act: "reopen", Does: "move", Status: "todo", Words: "optional"},
-			},
+			Acts:  acts,
 		}
 	case "canceled":
 		return ProtoIssueStage{
 			State: "canceled",
-			Acts: []ProtoIssueAction{
-				{Act: "reopen", Does: "move", Status: "todo", Words: "optional"},
-			},
+			Lead:  "reopen",
+			Acts:  []ProtoIssueAction{reopenAct},
 		}
 	default:
 		return ProtoIssueStage{State: "draft", Acts: []ProtoIssueAction{}}
@@ -893,13 +972,16 @@ func computeIssueStage(protoStatus string, iss issue.Issue, meta *issueOverlay) 
 
 func (h *gatewayHub) buildProtoIssue(iss issue.Issue) ProtoIssue {
 	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.buildProtoIssueLocked(iss)
+}
+
+func (h *gatewayHub) buildProtoIssueLocked(iss issue.Issue) ProtoIssue {
 	meta := h.ensureIssueMetaLocked(iss.ID)
 	metaCp := *meta
-	h.mu.Unlock()
 
 	protoStatus := mapProtocolIssueStatus(iss.Status)
 	blockedBy := copyStrings(metaCp.BlockedBy)
-	moves := copyStrings(metaCp.Moves)
 	findings := append([]ProtoFinding{}, metaCp.Findings...)
 	questions := append([]ProtoQuestion{}, metaCp.Questions...)
 	criteria := copyStrings(metaCp.Criteria)
@@ -931,6 +1013,21 @@ func (h *gatewayHub) buildProtoIssue(iss issue.Issue) ProtoIssue {
 			Executions: execs,
 		})
 	}
+	var latestSess *ProtoSession
+	for i := len(assignments) - 1; i >= 0 && latestSess == nil; i-- {
+		for j := len(assignments[i].Executions) - 1; j >= 0; j-- {
+			ex := assignments[i].Executions[j]
+			if ex.Session != "" {
+				if s := h.state.Sessions[ex.Session]; s != nil {
+					latestSess = s
+					break
+				}
+			}
+		}
+	}
+	if latestSess == nil && iss.SessionID != "" {
+		latestSess = h.state.Sessions[iss.SessionID]
+	}
 
 	var pr *ProtoPullRequest
 	if strings.TrimSpace(iss.PRURL) != "" {
@@ -951,8 +1048,22 @@ func (h *gatewayHub) buildProtoIssue(iss issue.Issue) ProtoIssue {
 		lastRun = &ProtoIssueLastRun{StartedAt: lr.StartedAt, EndedAt: lr.EndedAt, Outcome: lr.Outcome}
 	}
 
-	return ProtoIssue{
+	hasExec := false
+	for _, a := range assignments {
+		if len(a.Executions) > 0 {
+			hasExec = true
+			break
+		}
+	}
+	var rank *int
+	if !hasExec && metaCp.Rank != nil && *metaCp.Rank != 0 {
+		r := *metaCp.Rank
+		rank = &r
+	}
+
+	dto := ProtoIssue{
 		Constraints: metaCp.Constraints,
+		Conflict:    metaCp.Conflict,
 		ID:          iss.ID,
 		Number:      metaCp.Number,
 		Title:       iss.Title,
@@ -965,7 +1076,7 @@ func (h *gatewayHub) buildProtoIssue(iss issue.Issue) ProtoIssue {
 		Repo:        iss.RepoID,
 		Assignments: assignments,
 		Priority:    priority,
-		Rank:        metaCp.Rank,
+		Rank:        rank,
 		CreatedAt:   iss.CreatedAtMs,
 		QueuedAt:    metaCp.QueuedAt,
 		ClosedAt:    metaCp.ClosedAt,
@@ -975,7 +1086,7 @@ func (h *gatewayHub) buildProtoIssue(iss issue.Issue) ProtoIssue {
 		BlockedBy:   blockedBy,
 		Cron:        metaCp.Cron,
 		Status:      protoStatus,
-		Moves:       moves,
+		Moves:       []string{},
 		PullRequest: pr,
 		Deliver:     deliver,
 		ReviewedAt:  metaCp.ReviewedAt,
@@ -983,10 +1094,13 @@ func (h *gatewayHub) buildProtoIssue(iss issue.Issue) ProtoIssue {
 		Questions:   questions,
 		Criteria:    criteria,
 		Checks:      checks,
+		Refining:    metaCp.Refining,
 		LastRun:     lastRun,
 		Answer:      metaCp.Answer,
-		Stage:       computeIssueStage(protoStatus, iss, &metaCp),
+		Stage:       computeIssueStage(protoStatus, iss, &metaCp, latestSess),
 	}
+	dto.Moves = computeIssueMoves(dto)
+	return dto
 }
 
 func (h *gatewayHub) buildChatMessage(ev channel.Event) ProtoChatMessage {
@@ -998,6 +1112,11 @@ func (h *gatewayHub) buildChatMessage(ev channel.Event) ProtoChatMessage {
 	var pinnedAt *int64
 	var reactions []ProtoReaction
 	var attIDs []string
+	var replyTo *int64
+	var storedRev int64
+	var artCard *ProtoArtifactCard
+	var quotedBlocks []ProtoQuotedBlock
+	var storedKind string
 	if meta != nil {
 		if e, ok := meta.Edits[msgID]; ok {
 			cp := e
@@ -1015,8 +1134,70 @@ func (h *gatewayHub) buildChatMessage(ev channel.Event) ProtoChatMessage {
 		if aList, ok := meta.Attachments[msgID]; ok {
 			attIDs = copyStrings(aList)
 		}
+		if rt, ok := meta.ReplyTo[msgID]; ok && rt > 0 {
+			cp := rt
+			replyTo = &cp
+		}
+		if sr, ok := meta.Revisions[msgID]; ok {
+			storedRev = sr
+		}
+		if c, ok := meta.ArtifactCards[msgID]; ok && c.ID != "" {
+			cp := c
+			artCard = &cp
+		}
+		if qbList, ok := meta.QuotedBlocks[msgID]; ok && len(qbList) > 0 {
+			quotedBlocks = append([]ProtoQuotedBlock{}, qbList...)
+		}
+		storedKind = meta.MsgKinds[msgID]
 	}
 	h.mu.RUnlock()
+
+	if len(quotedBlocks) > 0 && deletedAt == nil {
+		hydrated := make([]ProtoQuotedBlock, 0, len(quotedBlocks))
+		for _, qb := range quotedBlocks {
+			outQB := qb
+			if h.st != nil && h.st.Artifacts != nil {
+				if snap, err := h.st.Artifacts.Pages.Snapshot(context.Background(), qb.ArtifactID); err == nil {
+					h.mu.RLock()
+					ov := h.state.Artifacts[qb.ArtifactID]
+					if ov != nil && strings.TrimSpace(ov.Title) != "" {
+						outQB.Title = ov.Title
+					} else if strings.TrimSpace(snap.Title) != "" {
+						outQB.Title = snap.Title
+					}
+					h.mu.RUnlock()
+					foundBlk := false
+					for _, b := range snap.Ordered {
+						if b.ID == qb.BlockID && !b.Deleted {
+							foundBlk = true
+							outQB.Type = string(b.Type)
+							var txt strings.Builder
+							for _, sp := range b.Text {
+								txt.WriteString(sp.Text)
+							}
+							outQB.Text = txt.String()
+							rev := b.Rev
+							outQB.NowRev = &rev
+							outQB.Deleted = nil
+							break
+						}
+					}
+					if !foundBlk {
+						del := true
+						outQB.Deleted = &del
+						outQB.NowRev = nil
+					}
+				}
+			}
+			hydrated = append(hydrated, outQB)
+		}
+		quotedBlocks = hydrated
+	} else if deletedAt != nil {
+		quotedBlocks = nil
+	}
+	if deletedAt != nil {
+		artCard = nil
+	}
 
 	if reactions == nil {
 		reactions = []ProtoReaction{}
@@ -1042,27 +1223,46 @@ func (h *gatewayHub) buildChatMessage(ev channel.Event) ProtoChatMessage {
 	case contract.ChannelEventReaction:
 		kind = "notice"
 	}
+	if storedKind != "" {
+		kind = storedKind
+	}
 
 	actorKind := string(ev.ActorKind)
 	if actorKind != "user" && actorKind != "agent" && actorKind != "system" {
 		actorKind = "user"
 	}
-	actor := ProtoActor{
-		Kind: actorKind,
-		ID:   firstNonEmpty(ev.AuthorID, "user"),
-		Name: firstNonEmpty(ev.AuthorID, "owner"),
-	}
+	actorName := firstNonEmpty(ev.AuthorID, "owner")
+	actorRole := ""
 	if actorKind == "agent" {
 		role := string(ev.ActorRole)
+		if h.st != nil && h.st.Agents != nil && ev.AuthorID != "" {
+			if prof, err := h.st.Agents.GetProfile(context.Background(), ev.AuthorID); err == nil {
+				if strings.TrimSpace(prof.Name) != "" {
+					actorName = prof.Name
+				}
+				if role == "" {
+					role = string(prof.Role)
+				}
+			}
+		}
 		if role != "orchestrator" && role != "worker" {
 			role = "worker"
 		}
-		actor.Role = role
+		actorRole = role
+	}
+	actor := ProtoActor{
+		Kind: actorKind,
+		ID:   firstNonEmpty(ev.AuthorID, "user"),
+		Name: actorName,
+		Role: actorRole,
 	}
 
 	text := ev.Text
 	var editedAt *int64
 	rev := ev.Seq
+	if storedRev > rev {
+		rev = storedRev
+	}
 	if editRec != nil {
 		text = editRec.Text
 		editedAt = &editRec.EditedAt
@@ -1085,7 +1285,7 @@ func (h *gatewayHub) buildChatMessage(ev channel.Event) ProtoChatMessage {
 		Channel:     ev.ChannelID,
 		From:        firstNonEmpty(ev.AuthorID, "user"),
 		Actor:       actor,
-		Name:        firstNonEmpty(ev.AuthorID, "owner"),
+		Name:        actorName,
 		Agent:       agentField,
 		Kind:        kind,
 		Text:        text,
@@ -1096,12 +1296,15 @@ func (h *gatewayHub) buildChatMessage(ev channel.Event) ProtoChatMessage {
 		SendKey:     ev.SendKey,
 		At:          ev.CreatedAtMs,
 		Revision:    rev,
+		ReplyTo:     replyTo,
 		Edited:      editedAt,
 		Deleted:     deletedAt,
 		Pinned:      pinnedAt,
 		Reactions:   reactions,
 		Attachments: atts,
 		Embeds:      []ProtoEmbed{},
+		Artifact:    artCard,
+		Blocks:      quotedBlocks,
 	}
 }
 
@@ -1164,9 +1367,11 @@ func (h *gatewayHub) buildChannelDTO(ctx context.Context, ch channel.Channel) Pr
 	}
 
 	readSeq := metaCp.ReadNum
-	if cur, err := h.st.Channels.GetReadCursor(ctx, ch.ID, "user"); err == nil && cur.ReadSeq > 0 {
-		r := cur.ReadSeq
-		readSeq = &r
+	if !metaCp.HasReadNum {
+		if cur, err := h.st.Channels.GetReadCursor(ctx, ch.ID, "user"); err == nil && cur.ReadSeq > 0 {
+			r := cur.ReadSeq
+			readSeq = &r
+		}
 	}
 	var unreadPtr *int
 	if lastNum != nil {
@@ -1185,17 +1390,26 @@ func (h *gatewayHub) buildChannelDTO(ctx context.Context, ch channel.Channel) Pr
 		}
 	}
 
-	name := firstNonEmpty(ch.Name, ch.ID)
+	name := firstNonEmpty(metaCp.Name, ch.Name, ch.ID)
 	title := firstNonEmpty(metaCp.Title, name)
 	members := copyStrings(metaCp.Members)
-	if len(members) == 0 {
+	if !metaCp.HasMembers && len(members) == 0 {
 		if m, err := h.st.Channels.ListMembers(ctx, ch.ID); err == nil && len(m) > 0 {
 			members = m
 		}
 	}
 	var membersOut []string
-	if len(members) > 0 {
+	if metaCp.HasMembers {
+		membersOut = copyStrings(members)
+	} else if len(members) > 0 {
 		membersOut = members
+	}
+
+	orchestratorID := ""
+	if len(membersOut) > 0 {
+		orchestratorID = membersOut[0]
+	} else if !metaCp.HasMembers {
+		orchestratorID = firstNonEmpty(metaCp.Orchestrator, ch.DefaultAgentID)
 	}
 
 	var rootID string
@@ -1211,7 +1425,7 @@ func (h *gatewayHub) buildChannelDTO(ctx context.Context, ch channel.Channel) Pr
 		Type:         chType,
 		Default:      isDef,
 		Peer:         ch.PeerID,
-		Orchestrator: firstNonEmpty(metaCp.Orchestrator, ch.DefaultAgentID),
+		Orchestrator: orchestratorID,
 		Members:      membersOut,
 		Parent:       ch.ParentChannelID,
 		Category:     metaCp.Category,
@@ -1240,6 +1454,24 @@ func maxInt64(a, b int64) int64 {
 		return a
 	}
 	return b
+}
+
+func sortProtoChannels(channels []ProtoChannel) {
+	sort.SliceStable(channels, func(i, j int) bool {
+		a, b := channels[i], channels[j]
+		if a.Default != b.Default {
+			return a.Default
+		}
+		aPlaced := a.Position != nil
+		bPlaced := b.Position != nil
+		if aPlaced != bPlaced {
+			return aPlaced
+		}
+		if aPlaced && bPlaced && *a.Position != *b.Position {
+			return *a.Position < *b.Position
+		}
+		return a.ID < b.ID
+	})
 }
 
 func filterProtocolConnectors(list []ProtoConnectorState) []ProtoConnectorState {
@@ -1299,9 +1531,7 @@ func (h *gatewayHub) buildSpaceState(ctx context.Context) ProtoSpaceState {
 			issuesOut = append(issuesOut, h.buildProtoIssue(iss))
 		}
 	}
-	sort.SliceStable(issuesOut, func(i, j int) bool {
-		return issuesOut[i].Number > issuesOut[j].Number
-	})
+	sortProtoIssuesOrder(issuesOut)
 
 	channelsOut := []ProtoChannel{}
 	if h.st != nil && h.st.Channels != nil {
@@ -1314,12 +1544,7 @@ func (h *gatewayHub) buildSpaceState(ctx context.Context) ProtoSpaceState {
 			channelsOut = append(channelsOut, dto)
 		}
 	}
-	sort.SliceStable(channelsOut, func(i, j int) bool {
-		if channelsOut[i].Default != channelsOut[j].Default {
-			return channelsOut[i].Default
-		}
-		return channelsOut[i].ID < channelsOut[j].ID
-	})
+	sortProtoChannels(channelsOut)
 
 	cronsOut := []ProtoCron{}
 	if h.st != nil && h.st.Issues != nil {
@@ -1379,7 +1604,7 @@ func (h *gatewayHub) buildSpaceState(ctx context.Context) ProtoSpaceState {
 	h.mu.RLock()
 	sessionsOut := make([]ProtoSession, 0, len(h.state.Sessions))
 	for _, s := range h.state.Sessions {
-		if s != nil {
+		if s != nil && s.Phase.Tag != "closed" {
 			sessionsOut = append(sessionsOut, *s)
 		}
 	}
@@ -1390,7 +1615,12 @@ func (h *gatewayHub) buildSpaceState(ctx context.Context) ProtoSpaceState {
 		}
 	}
 	h.mu.RUnlock()
-	sort.Slice(sessionsOut, func(i, j int) bool { return sessionsOut[i].ID < sessionsOut[j].ID })
+	sort.Slice(sessionsOut, func(i, j int) bool {
+		if sessionsOut[i].HiredAt != sessionsOut[j].HiredAt {
+			return sessionsOut[i].HiredAt < sessionsOut[j].HiredAt
+		}
+		return sessionsOut[i].ID < sessionsOut[j].ID
+	})
 
 	var prog *ProtoProgress
 	if h.st != nil && h.st.Ledger != nil {
@@ -1481,9 +1711,128 @@ func (h *gatewayHub) buildStateFrame(ctx context.Context) ProtoStateFrame {
 	}
 
 	inboxItems := []ProtoInboxItem{}
+	seenTargets := map[string]bool{}
+	issuesByID := make(map[string]ProtoIssue, len(space.Issues))
+	childrenByParent := make(map[string][]ProtoIssue)
+	for _, iss := range space.Issues {
+		issuesByID[iss.ID] = iss
+		if iss.Parent != "" {
+			childrenByParent[iss.Parent] = append(childrenByParent[iss.Parent], iss)
+		}
+	}
+	sessSet := make(map[string]bool, len(space.Sessions))
+	for _, s := range space.Sessions {
+		sessSet[s.ID] = true
+		if s.Role == "orchestrator" {
+			continue
+		}
+		if s.Scope == nil || s.Scope.Kind != "issue" {
+			continue
+		}
+		iss, ok := issuesByID[s.Scope.ID]
+		if !ok {
+			continue
+		}
+		at := s.HiredAt
+		if s.LastRun != nil {
+			at = s.LastRun.At
+		}
+		from := ProtoInboxFrom{Kind: "session", ID: s.ID, Name: s.Name, Agent: s.Agent}
+		target := ProtoInboxTarget{Kind: "session", ID: s.ID}
+		summary := s.Brief
+		if s.LastRun != nil && s.LastRun.Summary != "" {
+			summary = s.LastRun.Summary
+		}
+		switch iss.Stage.State {
+		case "asking":
+			qText := iss.Title
+			if len(iss.Questions) > 0 && iss.Questions[0].Question != "" {
+				qText = iss.Questions[0].Question
+			}
+			inboxItems = append(inboxItems, ProtoInboxItem{
+				ID:     fmt.Sprintf("%s:ask:%d", s.ID, s.Runs),
+				Kind:   "ask",
+				From:   from,
+				Who:    s.Name,
+				Text:   qText,
+				At:     at,
+				Target: target,
+				Words:  ProtoInboxWords{Label: "Ask", Title: s.Name + " asked", Body: qText, Tray: ""},
+			})
+			seenTargets["session:"+s.ID] = true
+			seenTargets["issue:"+iss.ID] = true
+		case "reviewing":
+			if iss.Parent != "" {
+				continue
+			}
+			inboxItems = append(inboxItems, ProtoInboxItem{
+				ID:     fmt.Sprintf("%s:review:%d", s.ID, s.Runs),
+				Kind:   "review",
+				From:   from,
+				Who:    s.Name,
+				Text:   summary,
+				At:     at,
+				Target: target,
+				Words:  ProtoInboxWords{Label: "Review", Title: s.Name + " waiting review", Body: summary, Tray: s.Name + ": review"},
+			})
+			seenTargets["session:"+s.ID] = true
+			seenTargets["issue:"+iss.ID] = true
+		case "stuck":
+			kind := "fix"
+			if iss.Stage.Stuck == "conflict" {
+				kind = "conflict"
+			} else if iss.Stage.Stuck == "interrupted" {
+				kind = "interrupted"
+			}
+			inboxItems = append(inboxItems, ProtoInboxItem{
+				ID:     fmt.Sprintf("%s:%s:%d", s.ID, kind, s.Runs),
+				Kind:   kind,
+				From:   from,
+				Who:    s.Name,
+				Text:   summary,
+				At:     at,
+				Target: target,
+				Words:  ProtoInboxWords{Label: kind, Title: s.Name + " needs help", Body: summary, Tray: s.Name + ": " + kind},
+			})
+			seenTargets["session:"+s.ID] = true
+			seenTargets["issue:"+iss.ID] = true
+		}
+	}
+	for _, iss := range space.Issues {
+		if seenTargets["issue:"+iss.ID] {
+			continue
+		}
+		if iss.Stage.State != "reviewing" && !(iss.Stage.State == "stuck" && iss.Stage.Stuck == "conflict") {
+			continue
+		}
+		if len(childrenByParent[iss.ID]) == 0 {
+			continue
+		}
+		kind := "review"
+		if iss.Stage.Stuck == "conflict" {
+			kind = "conflict"
+		}
+		inboxItems = append(inboxItems, ProtoInboxItem{
+			ID:     fmt.Sprintf("%s:%s:%d", iss.ID, kind, iss.CreatedAt),
+			Kind:   kind,
+			From:   ProtoInboxFrom{Kind: "orchestrator"},
+			Who:    "Orchestrator",
+			Text:   iss.Title,
+			At:     iss.CreatedAt,
+			Target: ProtoInboxTarget{Kind: "issue", ID: iss.ID},
+			Words:  ProtoInboxWords{Label: kind, Title: iss.Title, Body: iss.Title, Tray: iss.Title},
+		})
+		seenTargets["issue:"+iss.ID] = true
+	}
 	if h.st != nil && h.st.Watch != nil {
 		rawInbox, _ := h.st.Watch.ListInboxItems(ctx, false)
 		for _, it := range rawInbox {
+			if it.SessionID != "" && seenTargets["session:"+it.SessionID] {
+				continue
+			}
+			if it.IssueID != "" && seenTargets["issue:"+it.IssueID] {
+				continue
+			}
 			kind := mapInboxKind(it.Kind)
 			target := ProtoInboxTarget{Kind: "issue", ID: firstNonEmpty(it.IssueID, it.ID)}
 			if it.IssueID == "" && it.SessionID != "" {
@@ -1510,6 +1859,9 @@ func (h *gatewayHub) buildStateFrame(ctx context.Context) ProtoStateFrame {
 			})
 		}
 	}
+	sort.SliceStable(inboxItems, func(i, j int) bool {
+		return inboxItems[i].At > inboxItems[j].At
+	})
 
 	lvl := game.LevelForCommits(0)
 	if space.Commits != nil {
@@ -1518,6 +1870,25 @@ func (h *gatewayHub) buildStateFrame(ctx context.Context) ProtoStateFrame {
 	plots := make(map[string]ProtoPlotView, len(space.Issues))
 	for _, iss := range space.Issues {
 		plots[iss.ID] = ProtoPlotView{Crop: cropForIssueStatus(iss.Status)}
+	}
+	plays := make(map[string]ProtoSessionPlayView, len(space.Sessions))
+	nextStationByRepo := make(map[string]int)
+	for _, s := range space.Sessions {
+		if s.Role != "worker" {
+			continue
+		}
+		st := nextStationByRepo[s.Repo]
+		if st >= 6 {
+			continue
+		}
+		nextStationByRepo[s.Repo] = st + 1
+		plays[s.ID] = ProtoSessionPlayView{
+			Station:  st,
+			Counts:   map[string]int{},
+			Files:    []string{},
+			Commands: []string{},
+			History:  []ProtoPlayActionView{},
+		}
 	}
 
 	seq := int64(1)
@@ -1548,7 +1919,7 @@ func (h *gatewayHub) buildStateFrame(ctx context.Context) ProtoStateFrame {
 				Need:  lvl.Need,
 			},
 			Plots:        plots,
-			Plays:        map[string]ProtoSessionPlayView{},
+			Plays:        plays,
 			Achievements: []ProtoAchievementStanding{},
 		},
 		Effects: []json.RawMessage{},

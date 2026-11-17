@@ -66,6 +66,7 @@ type TokenVerifier func(token string) (AuthenticatedDevice, bool)
 type Options struct {
 	HomeDir         string
 	Port            int
+	EphemeralPort   bool
 	BindHost        string
 	Label           string
 	Clock           store.Clock
@@ -160,7 +161,7 @@ func NewService(opts Options) (*Service, error) {
 		clk = store.RealClock{}
 	}
 	port := opts.Port
-	if port <= 0 {
+	if port < 0 || (port == 0 && !opts.EphemeralPort) {
 		port = defaultLANPort
 	}
 	bindHost := strings.TrimSpace(opts.BindHost)

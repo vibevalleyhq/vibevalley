@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
@@ -31,58 +32,72 @@ const (
 
 // issueOverlay holds protocol Issue fields not stored directly on internal/domain/issue.Issue.
 type issueOverlay struct {
-	Number       int                     `json:"number"`
-	Parent       string                  `json:"parent,omitempty"`
-	BlockedBy    []string                `json:"blockedBy,omitempty"`
-	Priority     string                  `json:"priority,omitempty"`
-	Rank         *int                    `json:"rank,omitempty"`
-	Deliver      string                  `json:"deliver,omitempty"`
-	AutoSubmitPR bool                    `json:"autoSubmitPr,omitempty"`
-	Strength     string                  `json:"strength,omitempty"`
-	Criteria     []string                `json:"criteria,omitempty"`
-	Moves        []string                `json:"moves,omitempty"`
-	Findings     []ProtoFinding          `json:"findings,omitempty"`
-	Questions    []ProtoQuestion         `json:"questions,omitempty"`
-	Checks       []ProtoCriterionCheck   `json:"checks,omitempty"`
-	Constraints  *ProtoIssueConstraints  `json:"constraints,omitempty"`
-	QueuedAt     *int64                  `json:"queuedAt,omitempty"`
-	ClosedAt     *int64                  `json:"closedAt,omitempty"`
-	Delivered    string                  `json:"delivered,omitempty"`
-	Canceled     string                  `json:"canceled,omitempty"`
-	ReviewedAt   *int64                  `json:"reviewedAt,omitempty"`
-	Cron         string                  `json:"cron,omitempty"`
-	Deleted      bool                    `json:"deleted,omitempty"`
-	Milestones   []ProtoMilestone        `json:"milestones,omitempty"`
-	Answer       *ProtoIssueAnswer       `json:"answer,omitempty"`
-	AgentHistory []ProtoAssignmentRecord `json:"agentHistory,omitempty"`
-	Runs         []ProtoRun              `json:"runs,omitempty"`
-	AgentHint    string                  `json:"agentHint,omitempty"`
+	Number         int                     `json:"number"`
+	Parent         string                  `json:"parent,omitempty"`
+	BlockedBy      []string                `json:"blockedBy,omitempty"`
+	Priority       string                  `json:"priority,omitempty"`
+	Rank           *int                    `json:"rank,omitempty"`
+	Deliver        string                  `json:"deliver,omitempty"`
+	AutoSubmitPR   bool                    `json:"autoSubmitPr,omitempty"`
+	Strength       string                  `json:"strength,omitempty"`
+	Criteria       []string                `json:"criteria,omitempty"`
+	Moves          []string                `json:"moves,omitempty"`
+	Findings       []ProtoFinding          `json:"findings,omitempty"`
+	Questions      []ProtoQuestion         `json:"questions,omitempty"`
+	Checks         []ProtoCriterionCheck   `json:"checks,omitempty"`
+	Constraints    *ProtoIssueConstraints  `json:"constraints,omitempty"`
+	QueuedAt       *int64                  `json:"queuedAt,omitempty"`
+	ClosedAt       *int64                  `json:"closedAt,omitempty"`
+	Delivered      string                  `json:"delivered,omitempty"`
+	Canceled       string                  `json:"canceled,omitempty"`
+	ReviewedAt     *int64                  `json:"reviewedAt,omitempty"`
+	Cron           string                  `json:"cron,omitempty"`
+	Deleted        bool                    `json:"deleted,omitempty"`
+	Milestones     []ProtoMilestone        `json:"milestones,omitempty"`
+	Answer         *ProtoIssueAnswer       `json:"answer,omitempty"`
+	AgentHistory   []ProtoAssignmentRecord `json:"agentHistory,omitempty"`
+	Runs           []ProtoRun              `json:"runs,omitempty"`
+	AgentHint      string                  `json:"agentHint,omitempty"`
+	Refining       *ProtoIssueRefining     `json:"refining,omitempty"`
+	WorktreePath   string                  `json:"worktreePath,omitempty"`
+	Branch         string                  `json:"branch,omitempty"`
+	BaseBranch     string                  `json:"baseBranch,omitempty"`
+	LastRunOutcome string                  `json:"lastRunOutcome,omitempty"`
+	Conflict       *ProtoConflict          `json:"conflict,omitempty"`
 }
 
 type channelOverlay struct {
-	Default      bool                         `json:"default,omitempty"`
-	HasDefault   bool                         `json:"hasDefault,omitempty"`
-	Category     string                       `json:"category,omitempty"`
-	Position     *int                         `json:"position,omitempty"`
-	Archived     *int64                       `json:"archived,omitempty"`
-	Notify       string                       `json:"notify,omitempty"`
-	Orchestrator string                       `json:"orchestrator,omitempty"`
-	Members      []string                     `json:"members,omitempty"`
-	Description  string                       `json:"description,omitempty"`
-	HasDesc      bool                         `json:"hasDesc,omitempty"`
-	Repo         string                       `json:"repo,omitempty"`
-	Deleted      bool                         `json:"deleted,omitempty"`
-	Title        string                       `json:"title,omitempty"`
-	SubjectKind  string                       `json:"subjectKind,omitempty"`
-	SubjectID    string                       `json:"subjectId,omitempty"`
-	ReadNum      *int64                       `json:"readNum,omitempty"`
-	LastAt       int64                        `json:"lastAt,omitempty"`
-	Pins         map[string]int64             `json:"pins,omitempty"`
-	Edits        map[string]messageEditRecord `json:"edits,omitempty"`
-	MsgDeletes   map[string]int64             `json:"msgDeletes,omitempty"`
-	Reactions    map[string][]ProtoReaction   `json:"reactions,omitempty"`
-	Attachments  map[string][]string          `json:"attachments,omitempty"`
-	ExtraMsgs    []ProtoChatMessage           `json:"extraMsgs,omitempty"`
+	Default       bool                          `json:"default,omitempty"`
+	HasDefault    bool                          `json:"hasDefault,omitempty"`
+	Name          string                        `json:"name,omitempty"`
+	Category      string                        `json:"category,omitempty"`
+	Position      *int                          `json:"position,omitempty"`
+	Archived      *int64                        `json:"archived,omitempty"`
+	Notify        string                        `json:"notify,omitempty"`
+	Orchestrator  string                        `json:"orchestrator,omitempty"`
+	HasMembers    bool                          `json:"hasMembers,omitempty"`
+	Members       []string                      `json:"members,omitempty"`
+	Description   string                        `json:"description,omitempty"`
+	HasDesc       bool                          `json:"hasDesc,omitempty"`
+	Repo          string                        `json:"repo,omitempty"`
+	Deleted       bool                          `json:"deleted,omitempty"`
+	Title         string                        `json:"title,omitempty"`
+	SubjectKind   string                        `json:"subjectKind,omitempty"`
+	SubjectID     string                        `json:"subjectId,omitempty"`
+	HasReadNum    bool                          `json:"hasReadNum,omitempty"`
+	ReadNum       *int64                        `json:"readNum,omitempty"`
+	LastAt        int64                         `json:"lastAt,omitempty"`
+	Pins          map[string]int64              `json:"pins,omitempty"`
+	Edits         map[string]messageEditRecord  `json:"edits,omitempty"`
+	MsgDeletes    map[string]int64              `json:"msgDeletes,omitempty"`
+	Reactions     map[string][]ProtoReaction    `json:"reactions,omitempty"`
+	Attachments   map[string][]string           `json:"attachments,omitempty"`
+	ReplyTo       map[string]int64              `json:"replyTo,omitempty"`
+	Revisions     map[string]int64              `json:"revisions,omitempty"`
+	ArtifactCards map[string]ProtoArtifactCard  `json:"artifactCards,omitempty"`
+	QuotedBlocks  map[string][]ProtoQuotedBlock `json:"quotedBlocks,omitempty"`
+	MsgKinds      map[string]string             `json:"msgKinds,omitempty"`
+	ExtraMsgs     []ProtoChatMessage            `json:"extraMsgs,omitempty"`
 }
 
 type messageEditRecord struct {
@@ -123,20 +138,21 @@ type agentTemplateRecord struct {
 }
 
 type artifactOverlay struct {
-	ID       string         `json:"id"`
-	Title    string         `json:"title"`
-	Body     string         `json:"body"` // "blocks" | "html"
-	Display  string         `json:"display,omitempty"`
-	Channel  string         `json:"channel,omitempty"`
-	SaidCh   string         `json:"saidCh,omitempty"`
-	SaidNum  int64          `json:"saidNum,omitempty"`
-	Issue    string         `json:"issue,omitempty"`
-	By       string         `json:"by"`
-	ByName   string         `json:"byName"`
-	Deleted  bool           `json:"deleted,omitempty"`
-	At       int64          `json:"at"`
-	Updated  int64          `json:"updated"`
-	RawNotes map[int]string `json:"rawNotes,omitempty"`
+	ID          string         `json:"id"`
+	Title       string         `json:"title"`
+	Body        string         `json:"body"` // "blocks" | "html"
+	Display     string         `json:"display,omitempty"`
+	Channel     string         `json:"channel,omitempty"`
+	SaidCh      string         `json:"saidCh,omitempty"`
+	SaidNum     int64          `json:"saidNum,omitempty"`
+	Issue       string         `json:"issue,omitempty"`
+	By          string         `json:"by"`
+	ByName      string         `json:"byName"`
+	Deleted     bool           `json:"deleted,omitempty"`
+	At          int64          `json:"at"`
+	Updated     int64          `json:"updated"`
+	RawNotes    map[int]string `json:"rawNotes,omitempty"`
+	VersionMsgs map[int]int64  `json:"versionMsgs,omitempty"`
 }
 
 type mediaInputRecord struct {
@@ -182,6 +198,7 @@ type overlayState struct {
 	NextIssueNumber int                              `json:"nextIssueNumber"`
 	NextMsgSeq      int64                            `json:"nextMsgSeq"`
 	DefaultChannel  string                           `json:"defaultChannel,omitempty"`
+	StartersSeeded  bool                             `json:"startersSeeded,omitempty"`
 	Issues          map[string]*issueOverlay         `json:"issues"`
 	Channels        map[string]*channelOverlay       `json:"channels"`
 	Agents          map[string]*agentOverlay         `json:"agents"`
@@ -200,6 +217,8 @@ type overlayState struct {
 	RequestKeys     map[string]string                `json:"requestKeys"`
 	Sessions        map[string]*ProtoSession         `json:"sessions"`
 	SessionEvents   map[string][]ProtoSessionEvent   `json:"sessionEvents"`
+	OrchNoKeySent   map[string]bool                  `json:"orchNoKeySent,omitempty"`
+	FailedRuns      map[string]bool                  `json:"failedRuns,omitempty"`
 	GitHub          *ProtoGitHubStatus               `json:"github,omitempty"`
 }
 
@@ -327,6 +346,12 @@ func normalizeLoadedOverlay(s *overlayState) {
 	if s.SessionEvents == nil {
 		s.SessionEvents = make(map[string][]ProtoSessionEvent)
 	}
+	if s.OrchNoKeySent == nil {
+		s.OrchNoKeySent = make(map[string]bool)
+	}
+	if s.FailedRuns == nil {
+		s.FailedRuns = make(map[string]bool)
+	}
 }
 
 func (h *gatewayHub) seedDefaults() {
@@ -336,63 +361,161 @@ func (h *gatewayHub) seedDefaults() {
 	ctx := context.Background()
 	if h.st.Channels != nil {
 		chs, err := h.st.Channels.ListChannels(ctx)
-		if err == nil && len(chs) == 0 {
-			_, _, _ = h.st.Channels.EnsureChannel(ctx, channel.Channel{
-				ID:        defaultChannelID,
-				Type:      channel.TypePublic,
-				Name:      defaultChannelName,
-				IsDefault: true,
-			})
-			h.mu.Lock()
-			if h.state.DefaultChannel == "" {
-				h.state.DefaultChannel = defaultChannelID
+		if err == nil {
+			hasDefault := false
+			hasOrchDM := false
+			for _, ch := range chs {
+				if ch.ID == defaultChannelID || ch.IsDefault {
+					hasDefault = true
+				}
+				if ch.Type == channel.TypeDirect && ch.PeerID == "orchestrator" {
+					hasOrchDM = true
+				}
 			}
-			chMeta := h.ensureChannelMetaLocked(defaultChannelID)
-			chMeta.Default = true
-			chMeta.HasDefault = true
-			h.mu.Unlock()
+			if !hasDefault {
+				_, _, _ = h.st.Channels.EnsureChannel(ctx, channel.Channel{
+					ID:             defaultChannelID,
+					Type:           channel.TypePublic,
+					Name:           defaultChannelName,
+					DefaultAgentID: "orchestrator",
+					IsDefault:      true,
+				})
+				h.mu.Lock()
+				if h.state.DefaultChannel == "" {
+					h.state.DefaultChannel = defaultChannelID
+				}
+				chMeta := h.ensureChannelMetaLocked(defaultChannelID)
+				chMeta.Default = true
+				chMeta.HasDefault = true
+				if !chMeta.HasMembers {
+					chMeta.Members = []string{"orchestrator"}
+					chMeta.HasMembers = true
+					chMeta.Orchestrator = "orchestrator"
+				}
+				h.mu.Unlock()
+			} else {
+				h.mu.Lock()
+				chMeta := h.ensureChannelMetaLocked(defaultChannelID)
+				if !chMeta.HasMembers {
+					chMeta.Members = []string{"orchestrator"}
+					chMeta.HasMembers = true
+					if chMeta.Orchestrator == "" {
+						chMeta.Orchestrator = "orchestrator"
+					}
+				}
+				h.mu.Unlock()
+			}
+			if !hasOrchDM {
+				_, _, _ = h.st.Channels.EnsureChannel(ctx, channel.Channel{
+					ID:             "dm:orchestrator",
+					Type:           channel.TypeDirect,
+					Name:           "orchestrator",
+					PeerID:         "orchestrator",
+					DefaultAgentID: "orchestrator",
+				})
+				h.mu.Lock()
+				dmMeta := h.ensureChannelMetaLocked("dm:orchestrator")
+				dmMeta.Title = "orchestrator"
+				dmMeta.Orchestrator = "orchestrator"
+				h.mu.Unlock()
+			}
 		}
 	}
 	h.mu.Lock()
+	seeded := h.state.StartersSeeded
 	if len(h.state.Templates) == 0 {
-		h.state.Templates["builtin-orchestrator"] = &agentTemplateRecord{
-			ID:          "builtin-orchestrator",
-			Version:     1,
-			Role:        "orchestrator",
-			Name:        "Farm Assistant",
-			Duty:        "Coordinate farm tasks, dispatch worker sessions, and report results.",
-			Tags:        []string{"assistant", "coordinator"},
-			Runtime:     "vibevalley",
-			Model:       "deepseek-chat",
-			Effort:      "medium",
-			PersonaMode: "append",
-			Worktree:    false,
-			Look:        defaultLook("orchestrator", "vibevalley"),
-			Persona:     "Coordinate VibeValley work cleanly.",
-			Source:      "builtIn",
-			Skills:      []string{},
-			Installed:   []string{"orchestrator"},
-		}
-		h.state.Templates["builtin-coder"] = &agentTemplateRecord{
-			ID:          "builtin-coder",
-			Version:     1,
-			Role:        "worker",
-			Name:        "Coder",
-			Duty:        "Write, refactor, and test code in repository worktrees.",
-			Tags:        []string{"coding", "testing"},
-			Runtime:     "claude",
-			Model:       "",
-			Effort:      "high",
-			PersonaMode: "append",
-			Worktree:    true,
-			Look:        defaultLook("worker", "claude"),
-			Persona:     "Ship well-tested changes.",
-			Source:      "builtIn",
-			Skills:      []string{"vibevalley"},
-			Installed:   []string{},
+		for _, def := range builtinStarters {
+			rec := def.record("zh")
+			if def.id == "orchestrator" {
+				rec.Installed = []string{"orchestrator"}
+			}
+			cp := rec
+			h.state.Templates[def.id] = &cp
 		}
 	}
 	h.mu.Unlock()
+
+	if !seeded {
+		locale := "zh"
+		if h.st.Setting != nil && h.st.Setting.Get().Locale == "en" {
+			locale = "en"
+		}
+		if h.st.Agents != nil {
+			if orchDef, ok := findBuiltinStarter("orchestrator"); ok {
+				rec := orchDef.record(locale)
+				if existing, err := h.st.Agents.GetProfile(ctx, "orchestrator"); err == nil && (existing.Name == "Orchestrator" || existing.Name == "" || existing.Name == "orchestrator") {
+					_, _ = h.st.Agents.SaveProfile(ctx, agent.Profile{
+						ID:          "orchestrator",
+						Name:        rec.Name,
+						Role:        agent.RoleOrchestrator,
+						Duty:        rec.Duty,
+						Tags:        copyStrings(rec.Tags),
+						Runtime:     "vibevalley",
+						Persona:     rec.Persona,
+						PersonaMode: agent.PersonaAppend,
+						Skills:      copyStrings(rec.Skills),
+						UseWorktree: rec.Worktree,
+					})
+				}
+				h.mu.Lock()
+				meta := h.ensureAgentMetaLocked("orchestrator")
+				if meta.Look == nil {
+					lk := rec.Look
+					meta.Look = &lk
+				}
+				if meta.From == nil {
+					meta.From = &ProtoAgentFrom{Template: "orchestrator", Version: rec.Version}
+				}
+				h.mu.Unlock()
+			}
+			if rawStarters := strings.TrimSpace(os.Getenv("VIBEVALLEY_AGENT_STARTERS")); rawStarters != "" {
+				for _, part := range strings.Split(rawStarters, ",") {
+					tid := strings.TrimSpace(part)
+					if tid == "" {
+						continue
+					}
+					def, ok := findBuiltinStarter(tid)
+					if !ok {
+						continue
+					}
+					if _, existsErr := h.st.Agents.GetProfile(ctx, tid); existsErr == nil {
+						continue
+					}
+					rec := def.record(locale)
+					saved, sErr := h.st.Agents.SaveProfile(ctx, agent.Profile{
+						ID:          tid,
+						Name:        firstNonEmpty(rec.Name, tid),
+						Role:        agent.Role(firstNonEmpty(rec.Role, "worker")),
+						Duty:        rec.Duty,
+						Tags:        copyStrings(rec.Tags),
+						Runtime:     firstNonEmpty(rec.Runtime, "claude"),
+						Model:       rec.Model,
+						Effort:      rec.Effort,
+						Persona:     rec.Persona,
+						PersonaMode: agent.PersonaMode(firstNonEmpty(rec.PersonaMode, "append")),
+						Skills:      copyStrings(rec.Skills),
+						UseWorktree: rec.Worktree,
+					})
+					if sErr == nil {
+						h.mu.Lock()
+						meta := h.ensureAgentMetaLocked(saved.ID)
+						lk := rec.Look
+						meta.Look = &lk
+						meta.From = &ProtoAgentFrom{Template: tid, Version: rec.Version}
+						if tpl := h.state.Templates[tid]; tpl != nil {
+							if !slices.Contains(tpl.Installed, saved.ID) {
+								tpl.Installed = append(tpl.Installed, saved.ID)
+							}
+						}
+						h.mu.Unlock()
+					}
+				}
+			}
+		}
+		h.mu.Lock()
+		h.state.StartersSeeded = true
+		h.mu.Unlock()
+	}
 	_ = h.persist()
 }
 
@@ -601,18 +724,47 @@ func (h *gatewayHub) ensureChannelMetaLocked(channelID string) *channelOverlay {
 		if m.Attachments == nil {
 			m.Attachments = make(map[string][]string)
 		}
+		if m.ReplyTo == nil {
+			m.ReplyTo = make(map[string]int64)
+		}
+		if m.Revisions == nil {
+			m.Revisions = make(map[string]int64)
+		}
+		if m.ArtifactCards == nil {
+			m.ArtifactCards = make(map[string]ProtoArtifactCard)
+		}
+		if m.QuotedBlocks == nil {
+			m.QuotedBlocks = make(map[string][]ProtoQuotedBlock)
+		}
+		if m.MsgKinds == nil {
+			m.MsgKinds = make(map[string]string)
+		}
 		return m
 	}
 	m := &channelOverlay{
-		Notify:      "all",
-		Pins:        make(map[string]int64),
-		Edits:       make(map[string]messageEditRecord),
-		MsgDeletes:  make(map[string]int64),
-		Reactions:   make(map[string][]ProtoReaction),
-		Attachments: make(map[string][]string),
+		Notify:        "all",
+		Pins:          make(map[string]int64),
+		Edits:         make(map[string]messageEditRecord),
+		MsgDeletes:    make(map[string]int64),
+		Reactions:     make(map[string][]ProtoReaction),
+		Attachments:   make(map[string][]string),
+		ReplyTo:       make(map[string]int64),
+		Revisions:     make(map[string]int64),
+		ArtifactCards: make(map[string]ProtoArtifactCard),
+		QuotedBlocks:  make(map[string][]ProtoQuotedBlock),
+		MsgKinds:      make(map[string]string),
 	}
 	h.state.Channels[channelID] = m
 	return m
+}
+
+func (h *gatewayHub) allocMsgRevLocked(curSeq int64) int64 {
+	if h.state.NextMsgSeq <= curSeq {
+		h.state.NextMsgSeq = curSeq + 1
+	}
+	seq := h.state.NextMsgSeq
+	h.state.NextMsgSeq++
+	return seq
 }
 
 func (h *gatewayHub) ensureAgentMetaLocked(agentID string) *agentOverlay {

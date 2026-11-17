@@ -13,9 +13,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/artifact"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/attachment"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/user"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
 )
@@ -189,6 +191,11 @@ func (h *Handler) buildProtoArtifact(id string) (protoArtifact, bool) {
 			if ov != nil && ovCp.RawNotes[v.Version] != "" {
 				note = ovCp.RawNotes[v.Version]
 			}
+			var msgNum *int64
+			if ov != nil && ovCp.VersionMsgs[v.Version] > 0 {
+				n := ovCp.VersionMsgs[v.Version]
+				msgNum = &n
+			}
 			versions = append(versions, protoArtifactVersion{
 				Version: v.Version,
 				Size:    v.Size,
@@ -197,6 +204,7 @@ func (h *Handler) buildProtoArtifact(id string) (protoArtifact, bool) {
 				ByName:  firstNonEmpty(v.Author, byName),
 				At:      v.CreatedAtMs,
 				Channel: chID,
+				Number:  msgNum,
 			})
 		}
 		return protoArtifact{
@@ -224,6 +232,7 @@ func (h *Handler) buildProtoArtifact(id string) (protoArtifact, bool) {
 		by := "user"
 		byName := "owner"
 		at := snap.UpdatedAtMs
+		var said *protoArtifactSaid
 		if ov != nil {
 			title = firstNonEmpty(ovCp.Title, title)
 			chID = ovCp.Channel
@@ -233,12 +242,16 @@ func (h *Handler) buildProtoArtifact(id string) (protoArtifact, bool) {
 			if ovCp.At > 0 {
 				at = ovCp.At
 			}
+			if ovCp.SaidCh != "" && ovCp.SaidNum > 0 {
+				said = &protoArtifactSaid{Channel: ovCp.SaidCh, Number: ovCp.SaidNum}
+			}
 		}
 		return protoArtifact{
 			ID:       snap.ArtifactID,
 			Title:    title,
 			Body:     "blocks",
 			Channel:  chID,
+			Said:     said,
 			Issue:    issID,
 			By:       by,
 			ByName:   byName,
@@ -313,13 +326,38 @@ func (h *Handler) handleArtifactGet(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, art)
 }
 
+func renderInlineMarkdown(spans []artifact.TextSpan) string {
+	var sb strings.Builder
+	for _, s := range spans {
+		t := s.Text
+		if s.Marks.Code {
+			t = "`" + t + "`"
+		} else {
+			if s.Marks.Italic {
+				t = "*" + t + "*"
+			}
+			if s.Marks.Bold {
+				t = "**" + t + "**"
+			}
+			if s.Marks.Strike {
+				t = "~~" + t + "~~"
+			}
+		}
+		if s.Marks.Link != "" {
+			t = "[" + t + "](" + s.Marks.Link + ")"
+		}
+		sb.WriteString(t)
+	}
+	return sb.String()
+}
+
 func renderBlocksMarkdown(blocks []artifact.Block) string {
 	var lines []string
 	for _, b := range blocks {
 		if b.Deleted {
 			continue
 		}
-		txt := artifact.PlainText(b.Text)
+		txt := renderInlineMarkdown(b.Text)
 		switch b.Type {
 		case artifact.BlockHeading:
 			lvl := 2
@@ -340,9 +378,15 @@ func renderBlocksMarkdown(blocks []artifact.Block) string {
 		case artifact.BlockQuote:
 			lines = append(lines, "> "+txt)
 		case artifact.BlockCode:
-			lines = append(lines, "```"+b.Attrs.Language+"\n"+txt+"\n```")
+			lines = append(lines, "```"+b.Attrs.Language+"\n"+artifact.PlainText(b.Text)+"\n```")
 		case artifact.BlockDivider:
 			lines = append(lines, "---")
+		case artifact.BlockImage:
+			title := ""
+			if b.Attrs.Width != nil && b.Attrs.Height != nil {
+				title = fmt.Sprintf(` "%dx%d"`, *b.Attrs.Width, *b.Attrs.Height)
+			}
+			lines = append(lines, fmt.Sprintf("![%s](%s%s)", b.Attrs.Alt, b.Attrs.Src, title))
 		default:
 			lines = append(lines, txt)
 		}
@@ -387,34 +431,132 @@ func (h *Handler) handleArtifactContentGet(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+func (h *Handler) resolveArtifactIssueID(ctx context.Context, raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || h.st == nil || h.st.Issues == nil {
+		return ""
+	}
+	if iss, err := h.st.Issues.GetIssue(ctx, trimmed); err == nil {
+		return iss.ID
+	}
+	numStr := strings.TrimPrefix(trimmed, "#")
+	if num, err := strconv.Atoi(numStr); err == nil && num > 0 {
+		issues, _ := h.st.Issues.ListIssues(ctx)
+		h.hub.mu.RLock()
+		for _, iss := range issues {
+			if im := h.hub.state.Issues[iss.ID]; im != nil && im.Number == num {
+				h.hub.mu.RUnlock()
+				return iss.ID
+			}
+		}
+		h.hub.mu.RUnlock()
+	}
+	return trimmed
+}
+
+func (h *Handler) defaultArtifactChannelID() string {
+	h.hub.mu.RLock()
+	def := h.hub.state.DefaultChannel
+	h.hub.mu.RUnlock()
+	return firstNonEmpty(def, defaultChannelID)
+}
+
+func (h *Handler) resolveArtifactChannelID(ctx context.Context, raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return h.defaultArtifactChannelID(), nil
+	}
+	ch, err := h.resolveChannel(ctx, trimmed)
+	if err != nil {
+		return "", err
+	}
+	return ch.ID, nil
+}
+
+func (h *Handler) announceArtifactCard(ctx context.Context, chID string, card ProtoArtifactCard) (string, int64) {
+	if h.st == nil || h.st.Channels == nil {
+		return "", 0
+	}
+	if strings.TrimSpace(chID) == "" {
+		chID = h.defaultArtifactChannelID()
+	}
+	txt := card.Title
+	if strings.TrimSpace(card.Note) != "" {
+		txt = card.Title + "\n" + card.Note
+	}
+	res, _, err := h.st.PostAndPumpChannel(ctx, channel.AppendRequest{
+		ChannelID: chID,
+		Kind:      contract.ChannelEventMessage,
+		AuthorID:  "user",
+		ActorKind: channel.ActorUser,
+		Text:      txt,
+	})
+	if err != nil {
+		return "", 0
+	}
+	msgID := formatMessageID(chID, res.Event.Seq)
+	h.hub.mu.Lock()
+	meta := h.hub.ensureChannelMetaLocked(chID)
+	meta.LastAt = res.Event.CreatedAtMs
+	meta.ArtifactCards[msgID] = card
+	h.hub.mu.Unlock()
+	msg := h.hub.buildChatMessage(res.Event)
+	h.hub.emitChannelMessage(chID, msg.Revision, msg)
+	return chID, res.Event.Seq
+}
+
 func (h *Handler) handleArtifactCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Title   string `json:"title"`
-		Kind    string `json:"kind"`
-		Display string `json:"display"`
-		Content string `json:"content"`
-		Note    string `json:"note"`
-		Channel string `json:"channel"`
-		Issue   string `json:"issue"`
+		Title   string  `json:"title"`
+		Kind    string  `json:"kind"`
+		Display string  `json:"display"`
+		Content *string `json:"content"`
+		Note    string  `json:"note"`
+		Channel string  `json:"channel"`
+		Issue   string  `json:"issue"`
 	}
 	if err := decodeJSONBody(w, r, &req, true); err != nil {
 		writeError(w, err, BizInvalidInput)
 		return
 	}
+	kind := firstNonEmpty(strings.TrimSpace(req.Kind), "markdown")
+	if kind != "html" && kind != "markdown" {
+		writeError(w, newBizError(BizArtifactRefused, "unsupported artifact kind"), BizArtifactRefused)
+		return
+	}
+	if kind != "html" && strings.TrimSpace(req.Display) != "" {
+		writeError(w, newBizError(BizArtifactRefused, "display mode is only valid for html artifacts"), BizArtifactRefused)
+		return
+	}
 	id := randomID("art")
 	nowMs := h.hub.nowMs()
-	if req.Kind == "html" {
-		rawHTML := req.Content
+	issueID := h.resolveArtifactIssueID(r.Context(), req.Issue)
+
+	if kind == "html" {
+		if strings.TrimSpace(req.Title) == "" {
+			writeError(w, newBizError(BizArtifactRefused, "title is required"), BizArtifactRefused)
+			return
+		}
+		rawHTML := ""
+		if req.Content != nil {
+			rawHTML = *req.Content
+		}
 		if strings.TrimSpace(rawHTML) == "" {
-			rawHTML = "<!doctype html><html><body></body></html>"
+			writeError(w, newBizError(BizArtifactRefused, "html content is required"), BizArtifactRefused)
+			return
+		}
+		chID, chErr := h.resolveArtifactChannelID(r.Context(), req.Channel)
+		if chErr != nil {
+			writeError(w, chErr, BizChannelNotFound)
+			return
 		}
 		disp := contractDisplayOf(req.Display)
 		res, err := h.st.Artifacts.Deliverables.Publish(r.Context(), artifact.PublishRequest{
 			ID:        id,
-			Title:     req.Title,
+			Title:     strings.TrimSpace(req.Title),
 			Display:   disp,
-			ChannelID: req.Channel,
-			IssueID:   req.Issue,
+			ChannelID: chID,
+			IssueID:   issueID,
 			Note:      req.Note,
 			Author:    "user",
 			RawHTML:   rawHTML,
@@ -423,67 +565,96 @@ func (h *Handler) handleArtifactCreate(w http.ResponseWriter, r *http.Request) {
 			writeError(w, err, BizArtifactRefused)
 			return
 		}
-		h.hub.mu.Lock()
-		h.hub.state.Artifacts[res.Deliverable.ID] = &artifactOverlay{
+		display := firstNonEmpty(req.Display, "page")
+		saidCh, saidNum := h.announceArtifactCard(r.Context(), chID, ProtoArtifactCard{
 			ID:      res.Deliverable.ID,
-			Title:   req.Title,
+			Title:   strings.TrimSpace(req.Title),
 			Body:    "html",
-			Display: firstNonEmpty(req.Display, "page"),
-			Channel: req.Channel,
-			Issue:   req.Issue,
-			By:      "user",
-			ByName:  "owner",
-			At:      nowMs,
-			Updated: nowMs,
+			Version: res.Version.Version,
+			Note:    strings.TrimSpace(req.Note),
+			Display: display,
+		})
+		h.hub.mu.Lock()
+		ov := &artifactOverlay{
+			ID:          res.Deliverable.ID,
+			Title:       strings.TrimSpace(req.Title),
+			Body:        "html",
+			Display:     display,
+			Channel:     chID,
+			SaidCh:      saidCh,
+			SaidNum:     saidNum,
+			Issue:       issueID,
+			By:          "user",
+			ByName:      "owner",
+			At:          nowMs,
+			Updated:     nowMs,
+			RawNotes:    map[int]string{},
+			VersionMsgs: map[int]int64{},
 		}
+		if strings.TrimSpace(req.Note) != "" {
+			ov.RawNotes[res.Version.Version] = req.Note
+		}
+		if saidNum > 0 {
+			ov.VersionMsgs[res.Version.Version] = saidNum
+		}
+		h.hub.state.Artifacts[res.Deliverable.ID] = ov
 		h.hub.mu.Unlock()
 		_ = h.hub.persist()
+		h.hub.emitServerEvent(map[string]any{"type": "artifactChanged", "at": h.hub.nowMs(), "id": res.Deliverable.ID})
+		h.hub.notifyAllState()
 		out, _ := h.buildProtoArtifact(res.Deliverable.ID)
 		writeSuccess(w, out)
 		return
 	}
 
-	// markdown / blocks artifact
-	snap, err := h.st.Artifacts.Pages.CreateDocument(r.Context(), id, req.Title)
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		if req.Content != nil {
+			writeError(w, newBizError(BizArtifactRefused, "title is required"), BizArtifactRefused)
+			return
+		}
+		title = "Untitled"
+	}
+	chID := ""
+	if req.Content != nil {
+		var chErr error
+		chID, chErr = h.resolveArtifactChannelID(r.Context(), req.Channel)
+		if chErr != nil {
+			writeError(w, chErr, BizChannelNotFound)
+			return
+		}
+	}
+	snap, err := h.st.Artifacts.Pages.CreateDocument(r.Context(), id, title)
 	if err != nil {
 		writeError(w, err, BizArtifactRefused)
 		return
 	}
-	if strings.TrimSpace(req.Content) != "" {
-		lines := strings.Split(strings.ReplaceAll(req.Content, "\r\n", "\n"), "\n")
-		var ops []artifact.BlockOp
-		prevKey := ""
-		for i, line := range lines {
-			t := strings.TrimSpace(line)
-			if t == "" {
-				continue
-			}
-			key, kErr := artifact.KeyBetween(prevKey, "")
-			if kErr != nil {
-				key = fmt.Sprintf("a%d1", i+1)
-			}
-			prevKey = key
-			ops = append(ops, artifact.BlockOp{
-				Op: artifact.OpInsertBlock,
-				Block: &artifact.BlockInput{
-					ID:       fmt.Sprintf("%s-blk-%d", id, i+1),
-					OrderKey: key,
-					Type:     artifact.BlockParagraph,
-					Text:     []artifact.TextSpan{{Text: t}},
-				},
-			})
-		}
+	if req.Content != nil && strings.TrimSpace(*req.Content) != "" {
+		ops := markdownToBlockOps(id, *req.Content)
 		if len(ops) > 0 {
 			_, _ = h.st.Artifacts.Pages.SubmitBatch(r.Context(), id, artifact.UserActor, randomID("batch"), ops)
 		}
 	}
+	var saidCh string
+	var saidNum int64
+	if req.Content != nil {
+		saidCh, saidNum = h.announceArtifactCard(r.Context(), chID, ProtoArtifactCard{
+			ID:      snap.ArtifactID,
+			Title:   title,
+			Body:    "blocks",
+			Version: 0,
+			Note:    strings.TrimSpace(req.Note),
+		})
+	}
 	h.hub.mu.Lock()
 	h.hub.state.Artifacts[snap.ArtifactID] = &artifactOverlay{
 		ID:      snap.ArtifactID,
-		Title:   req.Title,
+		Title:   title,
 		Body:    "blocks",
-		Channel: req.Channel,
-		Issue:   req.Issue,
+		Channel: chID,
+		SaidCh:  saidCh,
+		SaidNum: saidNum,
+		Issue:   issueID,
 		By:      "user",
 		ByName:  "owner",
 		At:      nowMs,
@@ -491,6 +662,8 @@ func (h *Handler) handleArtifactCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.hub.mu.Unlock()
 	_ = h.hub.persist()
+	h.hub.emitServerEvent(map[string]any{"type": "artifactChanged", "at": h.hub.nowMs(), "id": snap.ArtifactID})
+	h.hub.notifyAllState()
 	out, _ := h.buildProtoArtifact(snap.ArtifactID)
 	writeSuccess(w, out)
 }
@@ -510,7 +683,7 @@ func (h *Handler) handleArtifactVersionCreate(w http.ResponseWriter, r *http.Req
 		writeError(w, err, BizArtifactNotFound)
 		return
 	}
-	_, err = h.st.Artifacts.Deliverables.Publish(r.Context(), artifact.PublishRequest{
+	res, err := h.st.Artifacts.Deliverables.Publish(r.Context(), artifact.PublishRequest{
 		ID:        cur.ID,
 		Title:     cur.Title,
 		Display:   cur.Display,
@@ -524,6 +697,48 @@ func (h *Handler) handleArtifactVersionCreate(w http.ResponseWriter, r *http.Req
 		writeError(w, err, BizArtifactRefused)
 		return
 	}
+	h.hub.mu.RLock()
+	ov := h.hub.state.Artifacts[cur.ID]
+	chID := cur.ChannelID
+	title := cur.Title
+	display := protoDisplayOf(cur.Display)
+	if ov != nil {
+		chID = firstNonEmpty(ov.Channel, chID)
+		title = firstNonEmpty(ov.Title, title)
+		display = firstNonEmpty(ov.Display, display)
+	}
+	h.hub.mu.RUnlock()
+	_, msgNum := h.announceArtifactCard(r.Context(), chID, ProtoArtifactCard{
+		ID:      cur.ID,
+		Title:   title,
+		Body:    "html",
+		Version: res.Version.Version,
+		Note:    strings.TrimSpace(req.Note),
+		Display: display,
+	})
+	h.hub.mu.Lock()
+	ov = h.hub.state.Artifacts[cur.ID]
+	if ov == nil {
+		ov = &artifactOverlay{ID: cur.ID, Title: title, Body: "html", Display: display, Channel: chID, By: "user", ByName: "owner", At: cur.CreatedAtMs}
+		h.hub.state.Artifacts[cur.ID] = ov
+	}
+	if ov.RawNotes == nil {
+		ov.RawNotes = map[int]string{}
+	}
+	if ov.VersionMsgs == nil {
+		ov.VersionMsgs = map[int]int64{}
+	}
+	if strings.TrimSpace(req.Note) != "" {
+		ov.RawNotes[res.Version.Version] = req.Note
+	}
+	if msgNum > 0 {
+		ov.VersionMsgs[res.Version.Version] = msgNum
+	}
+	ov.Updated = h.hub.nowMs()
+	h.hub.mu.Unlock()
+	_ = h.hub.persist()
+	h.hub.emitServerEvent(map[string]any{"type": "artifactChanged", "at": h.hub.nowMs(), "id": cur.ID})
+	h.hub.notifyAllState()
 	out, _ := h.buildProtoArtifact(cur.ID)
 	writeSuccess(w, out)
 }
@@ -549,29 +764,75 @@ func (h *Handler) handleArtifactHTMLEdit(w http.ResponseWriter, r *http.Request)
 		writeError(w, err, BizArtifactNotFound)
 		return
 	}
+	if req.Version != cur.LatestVersion {
+		writeError(w, newBizError(BizArtifactRefused, "can only edit the latest version"), BizArtifactRefused)
+		return
+	}
 	_, htmlBytes, err := h.st.Artifacts.Deliverables.GetVersion(r.Context(), req.ID, req.Version)
 	if err != nil {
 		writeError(w, err, BizArtifactNotFound)
 		return
 	}
-	src := string(htmlBytes)
-	updated := strings.Replace(src, req.Anchor.Exact, req.Text, 1)
-	if updated == src && req.Anchor.Exact != "" {
-		writeError(w, newBizError(BizArtifactRefused, "anchor text not found in HTML"), BizArtifactRefused)
+	updated, reason, ok := applyHTMLAnchorEdit(string(htmlBytes), req.Anchor.Prefix, req.Anchor.Exact, req.Anchor.Suffix, req.Text)
+	if !ok {
+		writeError(w, newBizError(BizArtifactRefused, reason), BizArtifactRefused)
 		return
 	}
-	if _, err := h.st.Artifacts.Deliverables.Publish(r.Context(), artifact.PublishRequest{
+	note := strings.TrimSpace(req.Anchor.Exact) + " -> " + strings.TrimSpace(req.Text)
+	res, err := h.st.Artifacts.Deliverables.Publish(r.Context(), artifact.PublishRequest{
 		ID:        cur.ID,
 		Title:     cur.Title,
 		Display:   cur.Display,
 		ChannelID: cur.ChannelID,
 		IssueID:   cur.IssueID,
+		Note:      note,
 		Author:    "user",
 		RawHTML:   updated,
-	}); err != nil {
+	})
+	if err != nil {
 		writeError(w, err, BizArtifactRefused)
 		return
 	}
+	h.hub.mu.RLock()
+	ov := h.hub.state.Artifacts[cur.ID]
+	chID := cur.ChannelID
+	title := cur.Title
+	display := protoDisplayOf(cur.Display)
+	if ov != nil {
+		chID = firstNonEmpty(ov.Channel, chID)
+		title = firstNonEmpty(ov.Title, title)
+		display = firstNonEmpty(ov.Display, display)
+	}
+	h.hub.mu.RUnlock()
+	_, msgNum := h.announceArtifactCard(r.Context(), chID, ProtoArtifactCard{
+		ID:      cur.ID,
+		Title:   title,
+		Body:    "html",
+		Version: res.Version.Version,
+		Note:    note,
+		Display: display,
+	})
+	h.hub.mu.Lock()
+	ov = h.hub.state.Artifacts[cur.ID]
+	if ov == nil {
+		ov = &artifactOverlay{ID: cur.ID, Title: title, Body: "html", Display: display, Channel: chID, By: "user", ByName: "owner", At: cur.CreatedAtMs}
+		h.hub.state.Artifacts[cur.ID] = ov
+	}
+	if ov.RawNotes == nil {
+		ov.RawNotes = map[int]string{}
+	}
+	if ov.VersionMsgs == nil {
+		ov.VersionMsgs = map[int]int64{}
+	}
+	ov.RawNotes[res.Version.Version] = note
+	if msgNum > 0 {
+		ov.VersionMsgs[res.Version.Version] = msgNum
+	}
+	ov.Updated = h.hub.nowMs()
+	h.hub.mu.Unlock()
+	_ = h.hub.persist()
+	h.hub.emitServerEvent(map[string]any{"type": "artifactChanged", "at": h.hub.nowMs(), "id": cur.ID})
+	h.hub.notifyAllState()
 	out, _ := h.buildProtoArtifact(cur.ID)
 	writeSuccess(w, out)
 }
@@ -591,10 +852,14 @@ func (h *Handler) handleArtifactUpdate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, newBizError(BizArtifactNotFound, "artifact not found"), BizArtifactNotFound)
 		return
 	}
+	if req.Display != nil && art.Body != "html" {
+		writeError(w, newBizError(BizArtifactRefused, "display mode is only valid for html artifacts"), BizArtifactRefused)
+		return
+	}
 	h.hub.mu.Lock()
 	ov := h.hub.state.Artifacts[req.ID]
 	if ov == nil {
-		ov = &artifactOverlay{ID: req.ID, Body: art.Body, By: art.By, ByName: art.ByName, At: art.At}
+		ov = &artifactOverlay{ID: req.ID, Title: art.Title, Body: art.Body, By: art.By, ByName: art.ByName, At: art.At}
 		h.hub.state.Artifacts[req.ID] = ov
 	}
 	if req.Title != nil {
@@ -606,6 +871,8 @@ func (h *Handler) handleArtifactUpdate(w http.ResponseWriter, r *http.Request) {
 	ov.Updated = h.hub.nowMs()
 	h.hub.mu.Unlock()
 	_ = h.hub.persist()
+	h.hub.emitServerEvent(map[string]any{"type": "artifactChanged", "at": h.hub.nowMs(), "id": req.ID})
+	h.hub.notifyAllState()
 	out, _ := h.buildProtoArtifact(req.ID)
 	writeSuccess(w, out)
 }
@@ -631,6 +898,8 @@ func (h *Handler) handleArtifactDelete(w http.ResponseWriter, r *http.Request) {
 	ov.Deleted = true
 	h.hub.mu.Unlock()
 	_ = h.hub.persist()
+	h.hub.emitServerEvent(map[string]any{"type": "artifactRemoved", "at": h.hub.nowMs(), "id": req.ID})
+	h.hub.notifyAllState()
 	writeVoid(w)
 }
 
@@ -716,14 +985,14 @@ func (h *Handler) handleArtifactSubmit(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleArtifactBlockCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ID         string `json:"id"`
-		Type       string `json:"type"`
-		Level      *int   `json:"level"`
-		Checked    *bool  `json:"checked"`
-		Language   string `json:"language"`
-		Text       string `json:"text"`
-		AfterBlock string `json:"afterBlock"`
-		ParentID   string `json:"parentId"`
+		ID         string  `json:"id"`
+		Type       string  `json:"type"`
+		Level      *int    `json:"level"`
+		Checked    *bool   `json:"checked"`
+		Language   string  `json:"language"`
+		Text       string  `json:"text"`
+		AfterBlock *string `json:"afterBlock"`
+		ParentID   string  `json:"parentId"`
 	}
 	if err := decodeJSONBody(w, r, &req, true); err != nil {
 		writeError(w, err, BizInvalidInput)
@@ -734,11 +1003,40 @@ func (h *Handler) handleArtifactBlockCreate(w http.ResponseWriter, r *http.Reque
 		writeError(w, err, BizArtifactNotFound)
 		return
 	}
-	lastKey := ""
+	var siblings []artifact.Block
 	for _, b := range snap.Ordered {
-		lastKey = b.OrderKey
+		if !b.Deleted && b.ParentID == req.ParentID {
+			siblings = append(siblings, b)
+		}
 	}
-	newKey, err := artifact.KeyBetween(lastKey, "")
+	afterKey := ""
+	beforeKey := ""
+	if req.AfterBlock == nil {
+		if len(siblings) > 0 {
+			afterKey = siblings[len(siblings)-1].OrderKey
+		}
+	} else if *req.AfterBlock == "" {
+		if len(siblings) > 0 {
+			beforeKey = siblings[0].OrderKey
+		}
+	} else {
+		idx := -1
+		for i, b := range siblings {
+			if b.ID == *req.AfterBlock {
+				idx = i
+				break
+			}
+		}
+		if idx < 0 {
+			writeError(w, newBizError(BizArtifactRefused, "afterBlock not found among siblings"), BizArtifactRefused)
+			return
+		}
+		afterKey = siblings[idx].OrderKey
+		if idx+1 < len(siblings) {
+			beforeKey = siblings[idx+1].OrderKey
+		}
+	}
+	newKey, err := artifact.KeyBetween(afterKey, beforeKey)
 	if err != nil {
 		newKey = "z"
 	}
@@ -966,10 +1264,107 @@ func (h *Handler) handleArtifactDemo(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, BizInvalidInput)
 		return
 	}
-	if _, err := h.st.Artifacts.Pages.Snapshot(r.Context(), req.ID); err != nil {
+	snap, err := h.st.Artifacts.Pages.Snapshot(r.Context(), req.ID)
+	if err != nil {
 		writeError(w, err, BizArtifactNotFound)
 		return
 	}
+	var writers []string
+	if h.st != nil && h.st.Agents != nil {
+		profiles, _ := h.st.Agents.ListProfiles(r.Context())
+		for _, p := range profiles {
+			pa := h.hub.buildProtoAgent(p)
+			if pa.ID != "" && pa.Enabled && pa.Role != "orchestrator" {
+				writers = append(writers, pa.ID)
+			}
+		}
+		if len(writers) == 0 {
+			for _, p := range profiles {
+				pa := h.hub.buildProtoAgent(p)
+				if pa.ID != "" && pa.Enabled {
+					writers = append(writers, pa.ID)
+				}
+			}
+		}
+	}
+	if len(writers) == 0 {
+		writeError(w, newBizError(BizArtifactRefused, "no enabled agent writer available"), BizArtifactRefused)
+		return
+	}
+	writer := writers[0]
+	lastKey := ""
+	for _, b := range snap.Ordered {
+		lastKey = b.OrderKey
+	}
+	k1, err := artifact.KeyBetween(lastKey, "")
+	if err != nil {
+		k1 = "z1"
+	}
+	k2, err := artifact.KeyBetween(k1, "")
+	if err != nil {
+		k2 = "z2"
+	}
+	hBlk := randomID("blk")
+	pBlk := randomID("blk")
+	lvl := 2
+	ack, err := h.st.Artifacts.Pages.SubmitBatch(r.Context(), req.ID, writer, randomID("demo"), []artifact.BlockOp{
+		{
+			Op: artifact.OpInsertBlock,
+			Block: &artifact.BlockInput{
+				ID:       hBlk,
+				OrderKey: k1,
+				Type:     artifact.BlockHeading,
+				Attrs:    artifact.BlockAttrs{Level: &lvl},
+				Text:     []artifact.TextSpan{{Text: "Draft outline"}},
+			},
+		},
+		{
+			Op: artifact.OpInsertBlock,
+			Block: &artifact.BlockInput{
+				ID:       pBlk,
+				OrderKey: k2,
+				Type:     artifact.BlockParagraph,
+				Text:     []artifact.TextSpan{{Text: "Drafting section..."}},
+			},
+		},
+	})
+	if err != nil {
+		writeError(w, err, BizArtifactRefused)
+		return
+	}
+	h.hub.emitArtifactChange(req.ID, false, ack.Seq)
+	baseRev := int64(1)
+	for _, res := range ack.Results {
+		if res.BlockID == pBlk && res.Rev > 0 {
+			baseRev = res.Rev
+		}
+	}
+	go func(artID, actor, blkID string, rev int64) {
+		steps := []string{
+			"Drafting section with collaborator notes...",
+			"Drafting section with collaborator notes and verified points.",
+		}
+		for _, txt := range steps {
+			time.Sleep(150 * time.Millisecond)
+			stepAck, stepErr := h.st.Artifacts.Pages.SubmitBatch(context.Background(), artID, actor, randomID("demo"), []artifact.BlockOp{
+				{
+					Op:      artifact.OpUpdateText,
+					BlockID: blkID,
+					BaseRev: rev,
+					Text:    []artifact.TextSpan{{Text: txt}},
+				},
+			})
+			if stepErr != nil {
+				return
+			}
+			for _, r := range stepAck.Results {
+				if r.BlockID == blkID && r.Rev > 0 {
+					rev = r.Rev
+				}
+			}
+			h.hub.emitArtifactChange(artID, false, stepAck.Seq)
+		}
+	}(req.ID, writer, pBlk, baseRev)
 	writeVoid(w)
 }
 
@@ -989,26 +1384,40 @@ func (h *Handler) handleArtifactPreviewHTTP(w http.ResponseWriter, r *http.Reque
 		writeError(w, newBizError(BizInvalidInput, "invalid version"), BizInvalidInput)
 		return
 	}
+	cur, err := h.st.Artifacts.Deliverables.Get(r.Context(), parts[0])
+	if err != nil {
+		writeError(w, err, BizArtifactNotFound)
+		return
+	}
 	_, payload, err := h.st.Artifacts.Deliverables.GetVersion(r.Context(), parts[0], ver)
 	if err != nil {
 		writeError(w, err, BizArtifactNotFound)
 		return
 	}
+	csp := artifact.StrictPreviewCSP
+	if r.URL.Query().Get("print") == "1" {
+		csp = artifact.StrictPrintPreviewCSP
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Security-Policy", "sandbox allow-scripts")
+	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 	if r.URL.Query().Get("shell") == "1" {
 		theme := r.URL.Query().Get("theme")
 		if theme != "dark" {
 			theme = "light"
 		}
-		printAttr := ""
-		if r.URL.Query().Get("print") == "1" {
-			printAttr = ` data-print="1"`
+		display := r.URL.Query().Get("display")
+		if display == "" {
+			display = protoDisplayOf(cur.Display)
+			h.hub.mu.RLock()
+			if ov := h.hub.state.Artifacts[parts[0]]; ov != nil && ov.Display != "" {
+				display = ov.Display
+			}
+			h.hub.mu.RUnlock()
 		}
-		wrapped := fmt.Sprintf("<!-- shell theme=%s%s -->\n%s", theme, printAttr, string(payload))
-		payload = []byte(wrapped)
+		payload = []byte(withHTMLShell(string(payload), display, theme))
 	}
 	w.WriteHeader(http.StatusOK)
 	if r.Method == http.MethodHead {
@@ -1308,6 +1717,9 @@ func (h *Handler) handleMediaSpeechStream(w http.ResponseWriter, r *http.Request
 		writeError(w, newBizError(BizMediaNotFound, "speech job not found"), BizMediaNotFound)
 		return
 	}
+	if h.handleOfflineSpeechStream(w, r, id) {
+		return
+	}
 	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"type":"done"}` + "\n"))
@@ -1329,11 +1741,29 @@ func (h *Handler) saveMediaJob(kind string, jobMap map[string]any) (json.RawMess
 
 func (h *Handler) handleMediaImageCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ID     string `json:"id"`
-		Prompt string `json:"prompt"`
+		ID             string   `json:"id"`
+		Prompt         string   `json:"prompt"`
+		Format         string   `json:"format"`
+		Width          int      `json:"width"`
+		Height         int      `json:"height"`
+		Seed           *int     `json:"seed"`
+		Steps          *int     `json:"steps"`
+		Guidance       *float64 `json:"guidance"`
+		NegativePrompt string   `json:"negativePrompt"`
+		Enhance        bool     `json:"enhance"`
+		Watermark      bool     `json:"watermark"`
 	}
 	if err := decodeJSONBody(w, r, &req, true); err != nil {
 		writeError(w, err, BizInvalidInput)
+		return
+	}
+	if offlineMediaEnabled() {
+		raw, oErr := h.handleOfflineImageCreate(r.Context(), req)
+		if oErr != nil {
+			writeError(w, oErr, BizMediaRefused)
+			return
+		}
+		writeSuccess(w, raw)
 		return
 	}
 	now := h.hub.nowMs()
@@ -1361,15 +1791,35 @@ func (h *Handler) handleMediaImageCreate(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) handleMediaUnderstandingCreate(w http.ResponseWriter, r *http.Request) {
+	h.handleMediaUnderstandingSubmit(w, r, false)
+}
+
+func (h *Handler) handleMediaUnderstandingAuthorize(w http.ResponseWriter, r *http.Request) {
+	h.handleMediaUnderstandingSubmit(w, r, true)
+}
+
+func (h *Handler) handleMediaUnderstandingSubmit(w http.ResponseWriter, r *http.Request, authorize bool) {
 	var req struct {
-		ID         string `json:"id"`
-		Prompt     string `json:"prompt"`
-		Connection string `json:"connection"`
-		Revision   int    `json:"revision"`
-		Channel    string `json:"channel"`
+		ID              string   `json:"id"`
+		Prompt          string   `json:"prompt"`
+		Inputs          []string `json:"inputs"`
+		Connection      string   `json:"connection"`
+		Revision        int      `json:"revision"`
+		AllowUpload     bool     `json:"allowUpload"`
+		MaxOutputTokens int      `json:"maxOutputTokens"`
+		Channel         string   `json:"channel"`
 	}
 	if err := decodeJSONBody(w, r, &req, true); err != nil {
 		writeError(w, err, BizInvalidInput)
+		return
+	}
+	if offlineMediaEnabled() {
+		raw, oErr := h.handleOfflineUnderstandingCreate(r.Context(), req, authorize)
+		if oErr != nil {
+			writeError(w, oErr, BizMediaRefused)
+			return
+		}
+		writeSuccess(w, raw)
 		return
 	}
 	now := h.hub.nowMs()
@@ -1404,15 +1854,26 @@ func (h *Handler) handleMediaUnderstandingCreate(w http.ResponseWriter, r *http.
 
 func (h *Handler) handleMediaSpeechCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ID         string `json:"id"`
-		Text       string `json:"text"`
-		Voice      string `json:"voice"`
-		Format     string `json:"format"`
-		Connection string `json:"connection"`
-		Revision   int    `json:"revision"`
+		ID           string `json:"id"`
+		Text         string `json:"text"`
+		Voice        string `json:"voice"`
+		Format       string `json:"format"`
+		Asynchronous bool   `json:"asynchronous"`
+		Streaming    bool   `json:"streaming"`
+		Connection   string `json:"connection"`
+		Revision     int    `json:"revision"`
 	}
 	if err := decodeJSONBody(w, r, &req, true); err != nil {
 		writeError(w, err, BizInvalidInput)
+		return
+	}
+	if offlineMediaEnabled() {
+		raw, oErr := h.handleOfflineSpeechCreate(r.Context(), req)
+		if oErr != nil {
+			writeError(w, oErr, BizMediaRefused)
+			return
+		}
+		writeSuccess(w, raw)
 		return
 	}
 	now := h.hub.nowMs()
@@ -1448,6 +1909,15 @@ func (h *Handler) handleMediaAudioCreate(kind string) http.HandlerFunc {
 		var bodyMap map[string]any
 		if err := decodeJSONBody(w, r, &bodyMap, true); err != nil {
 			writeError(w, err, BizInvalidInput)
+			return
+		}
+		if offlineMediaEnabled() {
+			raw, oErr := h.handleOfflineAudioCreate(r.Context(), kind, bodyMap)
+			if oErr != nil {
+				writeError(w, oErr, BizMediaRefused)
+				return
+			}
+			writeSuccess(w, raw)
 			return
 		}
 		now := h.hub.nowMs()
@@ -1504,6 +1974,14 @@ func (h *Handler) handleMediaJobAction(action string) http.HandlerFunc {
 			writeError(w, err, BizInvalidInput)
 			return
 		}
+		if raw, handled, oErr := h.handleOfflineMediaJobAction(r.Context(), action, req.ID); handled {
+			if oErr != nil {
+				writeError(w, oErr, BizMediaNotFound)
+				return
+			}
+			writeSuccess(w, json.RawMessage(raw))
+			return
+		}
 		h.hub.mu.Lock()
 		rec := h.hub.state.MediaJobs[req.ID]
 		if rec == nil {
@@ -1523,19 +2001,39 @@ func (h *Handler) handleMediaJobAction(action string) http.HandlerFunc {
 		rec.Raw = raw
 		h.hub.mu.Unlock()
 		_ = h.hub.persist()
-		writeSuccess(w, raw)
+		writeSuccess(w, json.RawMessage(raw))
 	}
 }
 
 func (h *Handler) handleMediaJobList(w http.ResponseWriter, _ *http.Request) {
+	type jobSortEntry struct {
+		raw       json.RawMessage
+		createdAt int64
+		id        string
+	}
 	h.hub.mu.RLock()
-	out := make([]json.RawMessage, 0, len(h.hub.state.MediaJobs))
-	for _, rec := range h.hub.state.MediaJobs {
-		if rec != nil && len(rec.Raw) > 0 {
-			out = append(out, rec.Raw)
+	entries := make([]jobSortEntry, 0, len(h.hub.state.MediaJobs))
+	for id, rec := range h.hub.state.MediaJobs {
+		if rec == nil || len(rec.Raw) == 0 {
+			continue
 		}
+		var meta struct {
+			CreatedAt int64 `json:"createdAt"`
+		}
+		_ = json.Unmarshal(rec.Raw, &meta)
+		entries = append(entries, jobSortEntry{raw: rec.Raw, createdAt: meta.CreatedAt, id: id})
 	}
 	h.hub.mu.RUnlock()
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].createdAt != entries[j].createdAt {
+			return entries[i].createdAt < entries[j].createdAt
+		}
+		return entries[i].id < entries[j].id
+	})
+	out := make([]json.RawMessage, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, e.raw)
+	}
 	writeSuccess(w, out)
 }
 
