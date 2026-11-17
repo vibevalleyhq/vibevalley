@@ -18,12 +18,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| [`packages/provider/`](packages/provider/README.md) | 显式转写模型、MOSS 帧与鉴权连接、Agora SDK/RTC token、字幕分片；无应用设置、业务工具或 UI |
+| [`packages/provider/`](packages/provider/README.md) | 显式转写模型、MOSS 帧与鉴权连接、字幕分片；无应用设置、业务工具或 UI |
 | [`packages/ai/`](packages/ai/README.md) | Core 转写调用、WAV/RMS、MOSS 会话与 `Playback` 样本级打断对账；浏览器入口不加载服务端模型工厂 |
-| `apps/server/src/gateway/voice/voice.ts` | 农场侧薄消费层：绑定 `Setting`、`Orchestrator`、`Channel`、`Watch`（收件箱）、`Core`，管理 RTC/MOSS 授予与通话内 `speak` |
-| `apps/server/src/gateway/voice/moss-relay.ts`、`moss-tools.ts` | MOSS Live WebSocket 双向透传、会话指令改写与 `ask_orchestrator` 工具提取 |
-| `apps/server/src/gateway/voice/line.ts` | 语音线路（`8788` 回环监听）与 `cloudflared` 隧道管理 |
-| `apps/server/src/platform/setting/voice.ts` | 语音默认配置 `defaultVoice`、校验 `voiceProblem` 与差异提取 `voiceOverrides` |
+| `internal/domain/voice/` | `voice.go`、`agora_token.go`、`realtime_relay.go`：RTC/MOSS 授予管理、通话状态、令牌签发与纯 Go 标准库 RFC 6455 实时 WebSocket 中继 |
+| `internal/domain/gateway/` | `handlers_media.go`（`voice.*` 接口、听写代理）、`provider_resolve.go`（实时连接解析）、`voice_ws_offline.go`（WebSocket 离线替身）、`gateway.go` |
+| `internal/domain/setting/setting.go` | 语音默认配置、校验与差异持久化（`$VIBEVALLEY_HOME/settings.json`） |
 | `apps/web/src/features/voice/model/`、`views/` | `model/` 里 `call.ts`、`dictation.ts`、`moss-line.ts` 管设备与宿主，`moss-worker.ts`/`moss-worklets.ts` 保持 PCM 绕开 UI 主线程，`captions.ts` 管展示轮次，`contract.ts` 定义应用会话接口；`views/` 是表单与 playground |
 | `apps/mobile/src/infra/rtc.ts` | 手机壳原生声网 RTC 适配（锁屏不断线） |
 
@@ -31,8 +30,8 @@
 
 ## 模型和不变量
 
-- **声网 SDK 严格收敛在三处**：
-  - 服务端仅经 `packages/provider/src/agora/server.ts` 调 `agora-token` 与 `agora-agents`；应用 voice 管授予和通话编排。
+- **声网 RTC 与令牌边界严格收敛在三处**：
+  - 服务端仅经 `internal/domain/voice/agora_token.go` 与 `voice.go` 签发和撤销通话令牌；网关仅负责接口与流转发。
   - Web 端仅在 `features/voice/model/call.ts` 动态加载 `agora-rtc-sdk-ng`；手机端仅在 `apps/mobile/src/infra/rtc.ts` 调 `react-native-agora`。
 - **授予（`AgoraGrant`）绑定凭据快照与单次认领**：`voice.grant.create` 生成 `channel + uid`、签发 3600 秒令牌并快照当时的 Agora 凭据（MOSS 模式签发本机占位授予）。同一份授予只能被 `voice.call.start` 认领一次，续期与挂断均使用该快照。
 - **一通电话固定建立时的接听模式**：
@@ -44,14 +43,14 @@
   - 通话中若 `Watch.inboxNews` 出现新事项，先等 3 秒合并同批事项，经 `Orchestrator.brief` 生成口语摘要，再调声网 `session.say`（`APPEND` 排在当前话音后，按句切分为 480 字节以内）播报。
   - 未通话时手机按收件箱响铃；用户接听时带该事项启动通话，跳过开场白直接由助手播报该事项。
 - **一段听写绑定唯一输入框目标**：录音开始时锁定发起的输入框；切换焦点或在别处点停止不会写错目标，组件卸载时自动取消在途转写。
-- **MOSS Live 经服务端隐藏密钥中继**：页面连 `/api/v1/voice/moss/line`（校验同源 `Origin` 与回环 `Host`），服务端向 Provider 要 MOSS Live 绑定的账号，用它封着 Key 的线路握手（Key 由 Provider 注入，回传的帧里也由它抹掉），双向透传帧。
+- **实时 WebSocket 密钥中继（`realtime_relay.go`）**：页面连接 `/api/v1/voice/realtime`、`/api/v1/voice/moss/line` 与 `/api/v1/voice/vision/line`（校验同源 `Origin` 与回环 `Host`），网关经 `provider_resolve.go` 取出 Live/Vision 绑定账号，由 `ServeRealtimeWS`（纯 Go 标准库 RFC 6455 实现）在服务端注入认证头后双向透传并脱敏回传帧，测试模式由 `voice_ws_offline.go` 接管。
 
 ## 怎么走
 
 **拨通与挂断电话**
 
 1. 页面获取麦克风权限，调 `voice.grant.create` 拿到 `AgoraGrant`，经 `host.rtc` 或 Web SDK 加入频道。
-2. 调 `voice.call.start`：服务端认领授予，创建 `callScope`（`gateway/voice/voice.ts`）依次挂入线路钥匙和声网 ConvoAI 会话的释放，挂断信号是它的 `hungUp`（`AbortSignal`），并施加 `callChanged(live)` 事实；启动失败或中断时关闭 `callScope`，按挂入的逆序释放。
+2. 调 `voice.call.start`：服务端认领授予并创建通话会话作用域，绑定中止信号并更新状态投影；启动失败或中断时逆序释放授予与线路密钥。
 3. 通话中页面从 data stream 拼接实时字幕（`captions.ts`），句子定稿并落入频道后自动替换。
 4. 挂断时调 `voice.call.stop`，中止 `hungUp` 并关闭 `callScope`，撤销授予、销毁线路钥匙并请声网 agent 离开频道。
 
@@ -73,7 +72,7 @@ Vision 的帧要先等 `input.frame.ready` 再发送二进制，等 `input.frame
 | 宿主 | 实时视觉边界 |
 |---|---|
 | 本机安全上下文浏览器 | 支持摄像头与浏览器屏幕选择器，仍需用户授权和可用设备 |
-| Electron 桌面壳 | 支持摄像头／麦克风权限；没有屏幕选择器，屏幕来源禁用 |
+| Go 原生桌面壳（`cmd/vibe-desktop`） | 支持摄像头／麦克风权限；没有桌面端屏幕选择器，屏幕来源禁用 |
 | 配对页面、手机壳 | 不支持实时视觉，本机地址与宿主能力检查禁用入口，不借配对线路绕过中继限制 |
 
 停止会话释放媒体轨道、采集定时器、WebSocket、Worker、Worklet 与 AudioContext；清掉回调和页面监听，下一次开始使用新会话。宿主支持表描述代码边界，不代表真实浏览器、桌面或手机权限已逐项验收。
@@ -101,5 +100,5 @@ Vision 的帧要先等 `input.frame.ready` 再发送二进制，等 `input.frame
 ## 怎么验证
 
 - `packages/provider/src/moss/moss.test.ts`、`packages/ai/src/realtime/moss.test.ts`、`sdk.test.ts`：握手、tagged-v1、完成回执、样本级打断与 SDK 替代边界。
-- `apps/server/src/gateway/voice/voice.test.ts`、`moss-tools.test.ts`、`apps/server/src/gateway/http/moss.test.ts`：授予认领、多事项合并播报、512 字节切段、挂断拒收字幕与 MOSS 中继测试。
+- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/voice/... ./internal/domain/gateway/...`：授予认领、令牌签发、挂断拒收与 MOSS 中继离线测试。
 - `apps/web/src/features/voice/model/captions.test.ts`、`apps/web/test/voice.spec.ts`、`farm-phone.spec.ts`：分块字幕拼接、缺钥匙提示、听写与来电接听测试。

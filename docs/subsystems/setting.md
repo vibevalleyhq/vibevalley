@@ -1,48 +1,46 @@
 # 设置和配置
 
 服务端的运行参数与凭据来自两类入口：
-- **静态配置（`ServerConfig`）**：开机时从默认值、`vibevalley.yaml` 和环境变量一次性加载，运行期只读。
-- **动态设置（`Setting`）**：用户在工作台 `/settings` 保存的密钥、语言、语音与记忆来源，以 `0600` 权限存于 `$VIBEVALLEY_HOME/settings.json`，保存即生效。
+- **静态配置（`AppConfig`）**：开机时从默认值、`vibevalley.yaml` 和环境变量一次性加载（`internal/config/config.go`），运行期只读。
+- **动态设置（`Setting`）**：用户在工作台 `/settings` 保存的密钥、语言、语音与记忆来源，以 `0600` 权限存于 `$VIBEVALLEY_HOME/settings.json`，保存即生效；明文凭据统一受 `internal/vault` 密钥信封保护。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| `ServerConfig` 的加载优先级、类型转换、开机校验与配置键定义 | 各农机自身的配置文件（如 `pi` 的 `models.json`） |
+| `AppConfig` 的加载优先级、类型转换、开机校验与配置键定义 | 各农机自身的配置文件（如 `pi` 的 `models.json`） |
 | `settings.json` 的原子读写、格式校验、密钥优先级（设置 > 配置）与末四位掩码 | 语音通话与记忆来源的业务实现（[语音](docs/subsystems/voice.md)、[记性](docs/subsystems/memory.md)） |
-| 全局日志与出站文本的密钥脱敏（`base/redact.ts`） | 档案、技能书与农机并发设置（存于 `config.json`，归[档案和农机](docs/subsystems/agent.md)） |
+| `internal/vault` 密钥存储、脱敏边界与日志输出隔离 | 档案、技能书与农机并发设置（归[档案和农机](docs/subsystems/agent.md)） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/infra/config.ts` | `ServerConfig`、`defaults`、`loadConfig`、`serverAddress`、`dbDir`、`reposDir`、`worktreesDir`、`pkmDir` |
-| `apps/server/src/platform/provider/provider.ts` | [AI 服务](docs/subsystems/provider.md)：连接与用途规则、模型目录；私有配置仍由 Setting 保存 |
-| `apps/server/src/platform/setting/` | `setting.ts`、`provider.ts`（`bindingOf`）、`readiness.ts`、`memorySources.ts`、`voice.ts` |
-| `apps/server/src/base/redact.ts` | 日志与出站文本密钥脱敏（`redact`、`redactOutput`） |
+| `internal/config/config.go` | `AppConfig` 加载优先级解析、环境变量与 `vibevalley.yaml` 校验、`work_root` / `home` / `repos` / `worktrees` / `pkm` 解析 |
+| `internal/domain/setting/` | `setting.go`（原子读写、版本校验与状态汇总）、`catalog.go`（供应商连接与九种用途默认绑定目录） |
+| `internal/vault/` | `secret.go`、`envelope.go`、`store.go`、`sqlstore.go`、`hostpolicy.go`、`proxy.go`：密钥加密封装、主密钥保护与脱敏出站隔离 |
 | `apps/web/src/features/setting/` | 工作台设置页（`SettingsPage.tsx`、`SettingsForm.tsx`；跨功能共享的 `Readiness` 在 `apps/web/src/ui/domain/settings.tsx`） |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`setting.get`、`setting.validate`、`setting.update`）。
 
 ## 模型和不变量
 
-### 静态配置（`ServerConfig`）
+### 静态配置（`AppConfig`）
 
-- **优先级与命名**：
-  - 优先级固定为 `环境变量 > vibevalley.yaml > defaults()`。
-  - 环境变量名由配置键加 `VIBEVALLEY_` 前缀并将 `.` 换为 `_` 得出。
-  - 额外支持直接读取 `DEEPSEEK_API_KEY`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`；家目录由 `VIBEVALLEY_HOME` 指定（默认 `~/.vibevalley`）。
-- **错误配置拒绝开机**：配置文件不存在、数字解析失败或端口越界时，`loadConfig` 直接报错退出，不静默回退默认值。
-- **配置键清单**：
+- **优先级与命名（Koanf + Cobra）**：
+  - 由 `internal/config/config.go` 通过 Koanf（`yaml` + `confmap` + `posflag`）加载，优先级严格为 `已变更 CLI 标志 > 环境变量 > vibevalley.yaml > DefaultConfig()`。
+  - 各二进制（`vibe-server`、`vibe-machine`、`vibe-desktop`）均内置 `config check` 与 `config print` 子命令，后者通过 `config.MarshalRedactedYAML` 将 `deepseek.api_key`、`secrets` 及敏感键替换为 `***REDACTED***`。
+  - 环境变量映射：`VIBEVALLEY_HOME`、`VIBEVALLEY_WORK_ROOT`、`VIBE_CONFIG`、`VIBE_SERVER_ADDR`、`VIBE_PREVIEW_ADDR`、`VIBE_DB_PATH`、`VIBE_ALLOW_LOOPBACK_EGRESS`、`VIBE_SERVER_URL`、`VIBE_MACHINE_ID`、`VIBE_WEB_DIST`、`MYGO_AUTOMATION`、`DEEPSEEK_API_KEY`。
+- **错误配置拒绝开机**：配置文件解析失败、存在未知键、端口越界或 `machine.exec_grace` 超出 `(0s, 3s]` 时直接报错退出，不静默回退默认值。
+- **配置键清单**（核心分节 `server.*`、`machine.*`、`desktop.*`、`deepseek.api_key`、`secrets` 与兼容顶层键）：
 
 | 配置键 | 用途 | 默认值 |
 |---|---|---|
 | `work_root` | 空间：仓库（`repos/`）、工单 `worktrees/` 与笔记 `pkm/` 的根目录 | `~/vibevalley-dev` |
-| `db` | PGlite 的数据目录（设为 `memory` 则使用内存库；配了 `database.url` 时不用） | `$VIBEVALLEY_HOME/db` |
-| `database.url` | 一个 Postgres（`postgres://…`）：库放在那里；可能带密码，按密钥读 | 空：用 PGlite |
+| `db` | SQLite 数据库路径（测试模式下支持 `:memory:`） | `$VIBEVALLEY_HOME/db/vibevalley.db` |
 | `port` | 主 HTTP 与 `/mcp` 监听端口（仅绑定 `127.0.0.1`，`0` 为随机端口） | `8787` |
 | `web` | 在 `/` 托管的前端静态产物目录（也可由 `--web` 指定） | 无 |
-| `agent.model` / `agent.starters` | CLI 对话默认模型、新农场自动安装的内置模板 ID 列表 | 空 / 空 |
+| `agent.model` / `agent.starters` | CLI 对话默认模型、新农场自动安装的内置模板 ID 列表（支持 `VIBEVALLEY_AGENT_STARTERS`） | 空 / 空 |
 | `deepseek.api_key` | DeepSeek API Key（`DEEPSEEK_API_KEY`） | 空 |
 | `agora.app_id` / `agora.app_certificate` | 声网 RTC 凭据（`AGORA_APP_ID` / `AGORA_APP_CERTIFICATE`） | 空 |
 | `voice.id` / `voice.line.port` / `voice.line.url` | 默认音色、语音线路端口与固定公网隧道地址 | 默认音色 / `8788` / 空 |
@@ -58,38 +56,39 @@
 
 ### 动态设置（`Setting`）与脱敏
 
-- **设置优先于配置，按需实时读取**：`deepseekApiKey()` 与 `agora()` 优先取 `settings.json`，为空时回退 `ServerConfig`，保存后立即生效。
+- **设置优先于配置，按需实时读取**：动态设置里的凭据与语音配置保存后立即生效，为空时回退 `AppConfig`。
 - **暴露当前空间的实际路径**：`SettingsStatus.paths` 给出 `repos`、`worktrees` 与 `pkm` 的绝对路径，关于页逐行显示。
-- **密钥在内存里为 `Secret`，不出服务端，损坏文件保留备份**：
-  - `settings.json` 在磁盘上是普通字符串，读进内存经 `StoredKey`（Zod 的 `z.codec`）封成 `Secret`（启动配置的钥匙由 `infra/config.ts` 同样封好），`JSON.stringify` 会抛错、日志里打印成 `[secret]`，只在发请求处 `reveal()` 取明文；`setting.get` 仅返回来源 `settings`/`config` 与末四位提示（`…xxxx`）。
-  - `settings.json` 以 `0600` 权限经临时文件原子改名写入；启动时若文件损坏，改名为 `settings.json.unreadable-<毫秒>` 备份并从空设置启动。
+- **密钥隔离，不回传明文，损坏文件保留备份**：
+  - 静态和动态密钥经 `internal/vault` 信封加密与协议 `Secret`（`packages/protocol/src/common/schema.ts`）双重隔离；`setting.get` 仅返回来源和末四位提示（`…xxxx`）。
+  - `internal/vault`（`pkg/db/migrations/0002_vault.up.sql`、`pkg/db/queries/vault.sql`）使用 256 位 `RootKey` 经 AES-256-GCM 封装 DEK 落盘 `vault_secret` 表（`provider_api_key`、`git_credential`、`mcp_oauth_token`），并通过 `Secret` 类型在格式化、日志与 JSON 序列化时自动打码。
+  - **短期能力令牌与出站白名单代理（`vault/token.go`、`proxy.go`、`hostpolicy.go`）**：签发 `vvcap1.` 前缀 HMAC-SHA256 短期令牌（默认 `15` 分钟），绑定 `PrincipalID`、`SessionID`、能力集与 `AllowedHosts`；控制面在 `/egress` 挂载 `EgressProxy`，拦截 `CONNECT`/`TRACE`、校验域名白名单与自定义解析 IP 策略（阻断私网、链路本地、云元数据及未授权环回地址），核验通过后在控制面出口代填真实凭据转发并写入脱敏审计日志。
+  - `settings.json` 以 `0600` 权限原子改名写入；启动时若文件损坏，保留备份并从空设置启动。
 - **每个功能的准备状态由服务端统一计算（`SettingsStatus.readiness`）**：
-  - `setting/readiness.ts`（复用 `setting/provider.ts` 的 `bindingOf`）为 11 项功能（`orchestrator`、`image`、`understanding`、`speech`、`speakers`、`voiceDesign`、`transcription`、`dictation`、`live`、`vision`、`call`）给出 `{ ready: true }` 或 `{ ready: false, missing }`。
+  - 服务端为 11 项功能（`orchestrator`、`image`、`understanding`、`speech`、`speakers`、`voiceDesign`、`transcription`、`dictation`、`live`、`vision`、`call`）给出 `{ ready: true }` 或 `{ ready: false, missing }`。
   - 页面钥匙集中在 `/settings/accounts`（「账号与钥匙」：DeepSeek、MOSS 连接与模型、声网），各功能页只绑账号模型并在顶部用 `Readiness` 指路；输入框 `/imagegen` 在生图未就绪时直接打开对应设置，不发给助手。
-- **语音设置只存差异**：`settings.json` 的 `voice` 字段仅保存与 `defaultVoice()` 不同的覆盖项。
-- **统一输出脱敏（`redact`）**：所有日志与外部记忆出站文本均经 `base/redact.ts` 将私钥、`sk-*`、`ghp_*`、JWT、`hb_*` 及敏感键值对替换为 `[redacted]`。
+- **统一输出脱敏**：所有日志、Vault 代理出站与记忆同步输出均过滤凭据，防止私钥、`sk-*`、`ghp_*` 等密钥外泄。
 
 ## 怎么走
 
-1. **启动加载**：`loadConfig` 解析环境变量与 `vibevalley.yaml` 生成 `ServerConfig`；`Setting` 读取并校验 `settings.json`。
+1. **启动加载**：`internal/config/config.go` 解析环境变量与 `vibevalley.yaml` 生成 `AppConfig`；`Setting` 读取并校验 `settings.json`。
 2. **校验与保存**：前端实时调用 `setting.validate` 检查格式；保存时调用 `setting.update`（`can` 只有 `user`）原子写盘。
 
 ## 和谁打交道
 
-- **全部服务端模块**：注入 `ServerConfig` 读取静态参数。
-- **助手、农机、语音与记性（`orchestrator`、`agent`、`voice`、`memory`）**：注入 `Setting` 实时获取最新密钥、语音与记忆来源。
+- **全部服务端模块**：注入 `AppConfig` 读取静态参数。
+- **助手、农机、语音与记性（`stack`、`agent`、`voice`、`memory`）**：读取最新密钥、语音与记忆来源。
 
 ### 供应商配置
 
-Setting 在 `settings.json.providers` 保存供应商私有配置，普通设置与供应商修改共用一把锁，完整覆盖读、写盘与内存替换。`SettingsStatus.readiness` 给出各功能的就绪与缺项；连接及脱敏凭据经 Provider 接口读取。版本冲突、用途引用和密钥更新语义见 [AI 服务](docs/subsystems/provider.md)。
+Setting 保存供应商私有配置与用途绑定，普通设置与供应商修改并发加锁保护；`SettingsStatus.readiness` 给出各功能就绪与缺项。版本冲突、用途引用和密钥更新语义见 [AI 服务](docs/subsystems/provider.md)。
 
 ## 为什么这样
 
-- **静态配置与动态设置分离，两类钥匙内存统一 `Secret`**：`vibevalley.yaml` 只在启动时读一次（`loadConfig`），`settings.json` 在运行期由界面原子更新（`StoredKey`），互不覆盖且明文不进日志。
-- **准备状态由服务端算一份，钥匙放一页**：连接启用、凭据与用途绑定规则只在 `bindingOf` 和 `readiness.ts` 写一次，避免页面再推一份或等发出去才报错；三家钥匙收在「账号与钥匙」一页，避免四处翻找。
-- **单一 `ServerConfig` 入口与统一 `redact` 出口**：禁止业务模块直接读 `process.env`；日志与外部记忆共用同一套脱敏规则，防止密钥外泄。
+- **静态配置与动态设置分离**：`vibevalley.yaml` 只在启动时读一次，`settings.json` 在运行期由界面原子更新，互不覆盖且明文不进日志。
+- **准备状态由服务端算一份，钥匙放一页**：连接启用、凭据与用途绑定规则只在服务端算一次，避免页面再推一份或等发出去才报错。
+- **单一 `AppConfig` 入口与 `vault` 密钥信封**：禁止业务模块直接读取全局环境或绕过 `vault` 明文存储密钥。
 
 ## 怎么验证
 
-- `apps/server/src/infra/config.test.ts`、`apps/server/src/platform/setting/*.test.ts`：配置优先级、非法值拦截、密钥掩码测试。
-- `apps/server/src/base/base.test.ts`、`apps/web/test/settings.spec.ts`：密钥脱敏与设置页端到端测试。
+- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/config/... ./internal/domain/setting/... ./internal/vault/...`：配置优先级、非法值拦截、密钥信封、代理隔离与脱敏掩码测试。
+- `apps/web/test/settings.spec.ts`：设置页端到端测试。

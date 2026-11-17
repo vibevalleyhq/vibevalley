@@ -1,6 +1,6 @@
 ---
 name: vv-acceptance
-description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的服务端，看接口和 /api/v1/state（apps/server/**、apps/server/db、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、apps/server/src/gateway/lan）、在真的打包上走桌面版的自己更新（apps/desktop/src/infra/update.ts、apps/desktop/scripts/package.ts）、用真模型重放助手的评测（助手的提示、工具描述、packages/agent，花钱，先问用户）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下助手的评测」；改了接口、服务、表结构、开机流程、页面、手机壳、桌面的更新之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
+description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的服务端，看接口和 /api/v1/state（cmd/vibe-server/**、internal/**、packages/protocol）、截页面的图（apps/web/**）、在模拟器上走手机壳的配对（apps/mobile/**、packages/protocol/src/host.ts、internal/domain/lan）、在真构建上走桌面版无头与打包校验（cmd/vibe-desktop/**、.github/workflows/release.yml）、验助手提示与工具回放（助手的提示、工具描述、internal/domain/stack，联网测真模型前先问用户）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」「手机上看看」「跑一下助手的评测」；改了接口、服务、表结构、开机流程、页面、手机壳、桌面版打包后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
 ---
 
 # 验收
@@ -13,12 +13,12 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 
 | 改了什么 | 读哪份 | 证明什么 |
 |---|---|---|
-| `apps/server/src/**`、`apps/server/db`、`packages/protocol` 的接口或形状；开机的流程 | [server.md](.agents/skills/vv-acceptance/references/server.md) | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动；工单能派、交回、完成 |
+| `cmd/vibe-server/**`、`internal/**`、`pkg/db/migrations/**`、`pkg/db/queries/**`、`packages/protocol` 的接口或形状；开机的流程 | [server.md](.agents/skills/vv-acceptance/references/server.md) | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动；工单能派、交回、完成 |
 | `apps/web/src/**`、`apps/web/public` 的画面、组件、贴图 | [page.md](.agents/skills/vv-acceptance/references/page.md) | 对着真的服务端，页面画出来是对的（截图） |
 | `media`、生图协议、结果下载、助手媒体工具、素材库 `/library` 页 | [media.md](.agents/skills/vv-acceptance/references/media.md) | 隔离程序的生成、落盘、预览、发布与 Artifact 引用真的接通；费用和未知结果边界不变 |
-| `apps/mobile/**`、`packages/protocol/src/host.ts`、`apps/server/src/gateway/lan`、页面里调宿主的地方 | [mobile.md](.agents/skills/vv-acceptance/references/mobile.md) | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
-| `apps/desktop/src/infra/update.ts`、`releases.ts`、`apps/desktop/scripts/package.ts`、`.github/workflows/release.yml` | [desktop-update.md](.agents/skills/vv-acceptance/references/desktop-update.md) | 打包的应用查到新版、核对、退出时换上，SHA-512 不对时不换 |
-| 助手的提示、`apps/server/src/gateway/tool` 的工具描述、`packages/agent` 拼提示和压缩的办法；加了助手的样例 | [orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md) | 用真模型重放每个样例 5 次，以前修好的错没回来，新的修好了 |
+| `apps/mobile/**`、`packages/protocol/src/host.ts`、`internal/domain/lan`、页面里调宿主的地方 | [mobile.md](.agents/skills/vv-acceptance/references/mobile.md) | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
+| `cmd/vibe-desktop/**`、`scripts/release/package-mac.ts`、`package.json` 的 `package:mac`、`.github/workflows/release.yml` | [desktop-update.md](.agents/skills/vv-acceptance/references/desktop-update.md) | 桌面版内嵌栈与 `thin_desktop` 测试通过，无头校验与 `VibeValley.app`、`.dmg`/`.zip` 及 `release.json` 打包能起能跑 |
+| `internal/domain/stack/prompts.go`、`tools.go`、`orchestrator.go`、对话预算与压缩（`internal/durable`）；助手评测样例 | [orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md) | 离线评测录轮接口、工具声明与提示结构通过验证（联网用真模型前先问用户） |
 
 一次改动碰了几块，就读几份，在同一个沙箱子命令里一起做（造数据、调接口、截图）。
 
@@ -40,7 +40,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
    vpx scripts/release/verify-server.ts [--scripted-helper] -- <这一轮的子命令>
    ```
 
-   它用服务端的 `vpx` 从 `apps/server` 起服务端，临时的家目录和工作目录、回环地址的空闲端口，环境里去掉一切钥匙，不碰 `~/.vibevalley`，也不占用户的 8787；`apps/web/dist` 在的话一起提供页面。子命令拿到 `VIBEVALLEY_SERVER`（服务端的地址）和 `VIBEVALLEY_VERIFY_CLI`（连着它的命令行，`help` 列出全部接口）。每次调用是一个新农场，要的数据在同一个子命令里造。
+   它用 `cmd/vibe-server` 起服务端（连同临时编好的 `cmd/vibe` CLI），分配临时的家目录和工作目录、回环地址的空闲端口，环境里去掉一切钥匙，不碰 `~/.vibevalley`，也不占用户的 8787；`apps/web/dist` 在的话一起提供页面。子命令拿到 `VIBEVALLEY_SERVER`（服务端的地址）和 `VIBEVALLEY_VERIFY_CLI`（连着它的命令行，`--help` 列出全部接口）。每次调用是一个新农场，要的数据在同一个子命令里造。
 
 3. 照分册的「步骤」写子命令、跑。
 4. 读脚本打印的证据目录：`command.stdout.log`、`command.stderr.log`、`server.stdout.log`、`server.stderr.log`，核对结果。只有启动成功的 `health.json` 不能证明改动生效。
@@ -58,7 +58,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 - **服务端起不来或健康检查超时**：看 `server.stdout.log`、`server.stderr.log`（类型错误、表结构对不上、端口）。脚本已经停掉它起的进程。
 - **子命令失败**：看 `command.stderr.log` 和 `command.stdout.log`；脚本不会把非零退出码改成成功。
 - **清理失败**：看 `result.json` 的 `cleanupErrors`；`stopped` 为 false 时临时目录会留着，不要当成已收拾。
-- **接口或形状对不上**：跑 `vp run server:check` 和 `vp run web:check`；服务端每次从源码起，没有旧的构建。
+- **接口或形状对不上**：跑 `vp run server:check` 和 `vp run web:check`；服务端和 CLI 每次按当前源码编译，没有旧的构建。
 - 各块自己的失败在分册的「出错时」。
 
 ## 收拾

@@ -4,8 +4,6 @@
   "duplicated-setup": {},
   "expect-in-floating-promise": {},
   "failure-without-reason": {
-    "apps/desktop": 3,
-    "apps/server": 24,
     "apps/site": 1,
     "apps/web": 19,
     "packages/protocol": 1,

@@ -1,23 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-
-import * as T from "@vibevalley/protocol";
 
 const root = resolve(import.meta.dirname, "../..");
 
-/** Read as text: a script may not import the server's files by path (no-cross-package-path), and the server does not export them. */
-const serverLiterals = (file: string, name: string): readonly string[] => {
-  const source = readFileSync(resolve(root, file), "utf8");
-  const list = new RegExp(`export const ${name} = \\[([^\\]]*)\\] as const`, "u").exec(source)?.[1];
-  if (list === undefined) throw new Error(`${file} no longer declares ${name} as a literal array`);
-  return [...list.matchAll(/\x22([^\x22]*)\x22/gu)].map((m) => m[1] ?? "");
-};
-const TriggerSourceValues = serverLiterals("apps/server/src/modules/session/shapes.ts", "TriggerSourceValues");
-const SessionCloseValues = serverLiterals("packages/protocol/src/session/shapes.ts", "SessionCloseValues");
-const SessionScopeKindValues = serverLiterals("packages/protocol/src/session/shapes.ts", "SessionScopeKindValues");
-const MediaPhaseValues = serverLiterals("packages/protocol/src/media/shapes.ts", "MediaPhaseValues");
-const MediaUnderstandingPhaseValues = serverLiterals("packages/protocol/src/media/shapes.ts", "MediaUnderstandingPhaseValues");
 const sqlPath = "apps/server/db/migrations/0001_schema.up.sql";
 const boundaryDocs = "docs/subsystems/foundation.md#边界审计";
 
@@ -192,49 +178,11 @@ export function auditSecretClass(source: string, path = secretPath): Finding[] {
   return missing.length === 0 ? [] : [{ category: "secret-exposure", location, detail: `Secret lacks ${missing.join(", ")}` }];
 }
 
-interface StoredEnum {
+export interface StoredEnum {
   readonly column: string;
   readonly protocol: string;
   readonly values: readonly string[];
 }
-
-const storedEnums: readonly StoredEnum[] = [
-  { column: "channel.type", protocol: "ChannelTypeValues", values: T.ChannelTypeValues },
-  { column: "channel.subject_kind", protocol: "SubjectKindValues", values: T.SubjectKindValues },
-  { column: "channel.notify", protocol: "NotifyValues", values: T.NotifyValues },
-  { column: "channel_participant.kind", protocol: "ActorKindValues", values: T.ActorKindValues },
-  { column: "channel_message.kind", protocol: "MessageKindValues", values: T.MessageKindValues },
-  { column: "issue.mandate_strength", protocol: "MandateStrengthValues", values: T.MandateStrengthValues },
-  { column: "issue.priority", protocol: "PriorityValues", values: T.PriorityValues },
-  { column: "issue.delivered", protocol: "LandingValues", values: T.LandingValues },
-  { column: "issue.canceled", protocol: "IssueCanceledValues", values: T.IssueCanceledValues },
-  { column: "issue.deliver", protocol: "DeliverableValues", values: T.DeliverableValues },
-  { column: "session.role", protocol: "AgentRoleValues", values: T.AgentRoleValues },
-  { column: "session.scope_kind", protocol: "SessionScopeKindValues", values: SessionScopeKindValues },
-  { column: "session.closed", protocol: "SessionCloseValues", values: SessionCloseValues },
-  { column: "session_run.outcome", protocol: "OutcomeValues", values: T.OutcomeValues },
-  { column: "session_delivery.source", protocol: "TriggerSourceValues", values: TriggerSourceValues },
-  { column: "issue_cron.set_by", protocol: "ActorKindValues", values: T.ActorKindValues },
-  { column: "memory.kind", protocol: "MemoryKindValues", values: T.MemoryKindValues },
-  { column: "memory.author", protocol: "ActorKindValues", values: T.ActorKindValues },
-  { column: "connector_account.connector", protocol: "ConnectorIDValues", values: T.ConnectorIDValues },
-  { column: "artifact.body", protocol: "ArtifactBodyValues", values: T.ArtifactBodyValues },
-  { column: "artifact_block.type", protocol: "BlockTypeValues", values: T.BlockTypeValues },
-  { column: "artifact_suggestion.status", protocol: "SuggestionStatusValues", values: T.SuggestionStatusValues },
-  { column: "pkm_comment.status", protocol: "PkmCommentStatusValues", values: T.PkmCommentStatusValues },
-  // One table for every kind of media job: its phases are every kind's.
-  {
-    column: "media_job.phase",
-    protocol: "MediaPhaseValues and MediaUnderstandingPhaseValues",
-    values: [...new Set([...MediaUnderstandingPhaseValues, ...MediaPhaseValues])],
-  },
-  {
-    column: "media_job.kind",
-    protocol: "image, understanding, speech and MediaAudioKindValues",
-    values: ["image", "understanding", "speech", ...T.MediaAudioKindValues],
-  },
-  { column: "media_job.result_format", protocol: "MediaAudioFormatValues", values: T.MediaAudioFormatValues },
-];
 
 // Preserve quoted words and line numbers; a CHECK in a comment is not a constraint.
 const sqlWithoutComments = (sql: string) =>
@@ -456,15 +404,7 @@ export function scanSchemaBoundaries(): Finding[] {
         existsSync(resolve(root, path)),
     );
   const sources = new Map([...new Set(files)].toSorted().map((path) => [path, readFileSync(resolve(root, path), "utf8")]));
-  const generatedDir = "apps/server/db/generated";
-  const generatedSources = new Map(
-    readdirSync(resolve(root, generatedDir))
-      .filter((name) => name.endsWith(".ts"))
-      .toSorted()
-      .map((name) => [`${generatedDir}/${name}`, readFileSync(resolve(root, generatedDir, name), "utf8")]),
-  );
-  const sql = readFileSync(resolve(root, sqlPath), "utf8");
-  return [...reviewSchemaSources(sources), ...compareStoredEnums(sql, storedEnums), ...auditGeneratedDbBrands(sql, generatedSources)];
+  return reviewSchemaSources(sources);
 }
 
 if (import.meta.main) {

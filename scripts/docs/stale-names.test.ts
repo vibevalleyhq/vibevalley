@@ -2,7 +2,7 @@ import { expect, it } from "vite-plus/test";
 
 import { staleNamesIn } from "./stale-names.ts";
 
-const source = "apps/server/src/machine/executor.ts";
+const source = "apps/web/src/features/issue/model/display.ts";
 
 it("regression: browser worker feature detection is not a stale domain name", () => {
   const browser = "apps/web/src/features/voice/moss-worker.ts";
@@ -42,6 +42,6 @@ it("regression: stale service names are rejected while the config and the Settin
   expect(staleNamesIn(source, "const home = deps.config.home;")).toEqual([]);
   expect(staleNamesIn(source, "const key = await deps.setting.get();")).toEqual([]);
   expect(staleNamesIn(source, "agents.saveAgent(input)")).toHaveLength(1);
-  for (const line of ['import { Storage } from "#/storage/storage.ts";', "const ingress: Ingress = deps.ingress;", "worldBelowIngress()"])
+  for (const line of ['t("web.notice.title")', "const on = onFarm(s);", 'import "@/features/issue/lanes.ts";'])
     expect(staleNamesIn(source, line)).toHaveLength(1);
 });

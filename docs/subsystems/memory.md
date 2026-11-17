@@ -8,20 +8,18 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 档案记忆的增删查、去重、300 条容量淘汰与中英文分词（`gse`）与 Postgres 全文索引（`term_vector` 上的 GIN 索引） | 召回文本如何拼入会话提示与轨迹事件（[帮工](docs/subsystems/session.md)） |
-| 开工前相关性召回（`pick`）及页面「下回想起什么」预览（`memory.recall`） | 单个 `Session` 已召回记忆 ID 的记录（`session.recalled` 列，[帮工](docs/subsystems/session.md)） |
-| 本地的库与 Nowledge Mem、EverOS 并发读取、按名次合并与后台异步写入 | 外部来源地址与密钥在 `settings.json` 中的保存与校验（[设置和配置](docs/subsystems/setting.md)） |
-| 助手与帮工共用的 `MemoryPort` | 程序性操作手册与技能书（[档案和农机](docs/subsystems/agent.md)） |
+| 档案记忆的增删查、去重、300 条容量淘汰与本地检索索引（`internal/domain/memory/`） | 召回文本如何拼入会话提示与轨迹事件（[帮工](docs/subsystems/session.md)） |
+| 开工前相关性召回与页面「下回想起什么」预览（`memory.recall`） | 单个 `Session` 已召回记忆 ID 的记录（[帮工](docs/subsystems/session.md)） |
+| 本地的库与 Nowledge Mem、EverOS 并发读取、按名次合并与后台异步写入 | 外部来源地址与密钥在设置中的保存与校验（[设置和配置](docs/subsystems/setting.md)） |
+| 记忆整理与梦境提炼（`internal/domain/memory/dreams.go`） | 程序性操作手册与技能书（[档案和农机](docs/subsystems/agent.md)） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/modules/memory/memory.ts` | `Memory` 服务、`MemoryPort` 实现、`memory` 表与它的全文索引（`term_vector`）读写 |
-| `apps/server/src/modules/memory/recall.ts` | 纯函数评分挑选（`pick`）、中英文切词归一化（`termsList`）与检索排序 |
-| `apps/server/src/modules/memory/gse.ts` | 简体中文底层分词词典加载与切分（`cutWords`） |
-| `apps/server/src/modules/memory/sources.ts` | 多记忆来源聚合、2 秒读超时与后台异步写队列 |
-| `apps/server/src/modules/memory/nowledge.ts`、`everos.ts` | Nowledge Mem（MCP）与 EverOS（HTTP）外部来源适配器 |
+| `internal/domain/memory/store.go`、`types.go` | `Memory` 服务、增删改查、检索与重合度去重、多来源合并接口 |
+| `internal/domain/memory/dreams.go` | 后台记忆提炼与整理规则 |
+| `pkg/db/migrations/0009_memory.up.sql`、`pkg/db/queries/memory.sql`、`pkg/db/generated/` | SQLite `memory` 表迁移、查询定义与生成的访问代码 |
 | `apps/web/src/features/memory/Memory.tsx`、`apps/web/src/tree/` | 工作台「记忆」页与记忆树视图 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`memory.*`）。
@@ -36,13 +34,14 @@
   - `issue`：帮工完成工单回合时由服务端自动生成的工单经历（每个 `Session` 更新同一条）。
   - 单条上限 300 字符（UTF-16），每个档案最多保留 300 条，超出时在同一事务内淘汰最久未召回的条目。
 - **高重合度自动去重**：同一仓库范围内若已存在完全相同、或分词重合度（`memoryLikeness`）≥ `0.8` 的条目，则跳过不重复记。
+- **离线记忆整理提案（`dreams.go`）**：`Store.RunDream` 克隆当前活跃记忆快照与近期完成会话摘要，在写锁外通过隔离上下文的 `DreamConsolidator` 生成去重合并后的候选记忆版本与 `DreamProposalView`，单事务写入待审提案且不改变原活跃快照，直到用户确认（`ApproveDream`）才原子切换或回退。
 - **纯函数评分召回（`pick`）**：
   - 排除当前 `Session` 已召回过的 ID 及自己写下的条目；跨仓库条目须共享至少 3 个词才进入候选。
   - 评分公式：`种类分 + 范围分 + min(共有词数, 8)×0.5 + min(ts_rank, 5)×0.3 + exp(-距上次召回天数 / 30)`。
   - 每次召回最多 8 条、总长不超过 1600 字（其中 `issue` 类最多 3 条）。
 - **外部来源读限时、写异步，出站强制脱敏**：
   - 读取时本地库与外部来源并发查询，外部来源限时 2 秒；超时或失败只记日志，多来源结果按名次交错抽取并去重。
-  - 写入时本地库当场落盘，外部来源放入后台队列串行发送；所有出站文本均经 `base/redact.ts` 抹除密钥。
+  - 写入时本地库当场落盘，外部来源放入后台队列串行发送；所有出站文本均经 `internal/vault` 脱敏边界防止密钥外泄。
 
 ## 怎么走
 
@@ -56,8 +55,8 @@
 
 ## 为什么这样
 
-- **显式字段提交 + 纯函数分词召回，不调额外模型**：结构化提交省去回合后调模型总结的延迟；`gse` 分词加 Postgres 全文索引毫秒级完成且可确定性回归。
-- **多来源按名次轮流合并，慢来源不挡干活**：本地评分与外部向量量纲不同，按名次交错最稳妥；2 秒读超时与异步写队列隔离外部故障。
+- **显式字段提交 + 轻量检索召回，减少额外模型开销**：结构化提交配合 SQLite 查询即可完成确定性回归。
+- **多来源按名次轮流合并，慢来源不挡干活**：本地评分与外部向量量纲不同，按名次交错最稳妥；读超时与异步写队列隔离外部故障。
 
 ## 还没做的
 
@@ -65,5 +64,4 @@
 
 ## 怎么验证
 
-- `apps/server/src/modules/memory/*.test.ts`：分词与召回、重合去重、容量淘汰、多来源超时隔离与出站脱敏测试。
-- `apps/server/src/flows/memory.test.ts`：跨会话、跨仓库、跨重启的记忆写入与不重复召回流程测试。
+- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/memory/...`：记忆存储、去重、容量淘汰、梦境提炼与检索测试。

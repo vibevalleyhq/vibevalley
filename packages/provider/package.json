@@ -15,14 +15,6 @@
       "types": "./dist/moss/vision.d.ts",
       "default": "./src/moss/vision.ts"
     },
-    "./moss/vision-models": {
-      "types": "./dist/moss/vision-models.d.ts",
-      "default": "./src/moss/vision-models.ts"
-    },
-    "./moss/live-models": {
-      "types": "./dist/moss/live-models.d.ts",
-      "default": "./src/moss/live-models.ts"
-    },
     "./moss/speakers-models": {
       "types": "./dist/moss/speakers-models.d.ts",
       "default": "./src/moss/speakers-models.ts"
@@ -50,10 +42,6 @@
     "./moss/audio-submission": {
       "types": "./dist/moss/audio-submission.d.ts",
       "default": "./src/moss/audio-submission.ts"
-    },
-    "./agora/server": {
-      "types": "./dist/agora/server.d.ts",
-      "default": "./src/agora/server.ts"
     },
     "./agora/captions": {
       "types": "./dist/agora/captions.d.ts",
@@ -115,9 +103,6 @@
   "dependencies": {
     "@ai-sdk/provider": "catalog:",
     "@vibevalley/async": "workspace:*",
-    "agora-agents": "catalog:",
-    "agora-token": "catalog:",
-    "undici": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

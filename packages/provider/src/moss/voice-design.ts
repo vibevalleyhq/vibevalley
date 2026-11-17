@@ -15,7 +15,7 @@ const Input = z.strictObject({
   format: z.enum(mossSpeechFormats),
 });
 
-export const prepareMossVoiceDesign = async (input: unknown) => {
+const prepareMossVoiceDesign = async (input: unknown) => {
   const parsed = Input.safeParse(input);
   if (!parsed.success) throw invalidAudioInput();
   const request = parsed.data;

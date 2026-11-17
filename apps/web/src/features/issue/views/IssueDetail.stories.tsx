@@ -28,7 +28,7 @@ const lastRun = (outcome: "completed" | "failed" | "interrupted", summary: strin
 const base = (more: SampleIssue) =>
   sampleIssue(18, "修好登录过期", "in_review", "high", omitUndefined({ description, criteria, repo: "vibevalley", agent: "老周", ...more }));
 
-// Each state as the server sends it; the buttons follow apps/server/src/issue/stage.ts.
+// Each state as the server sends it; the buttons follow internal/domain/gateway/overlay.go.
 const pages: Record<string, Page> = {
   草稿: {
     note: "写下来还没派：主动作是开始。",

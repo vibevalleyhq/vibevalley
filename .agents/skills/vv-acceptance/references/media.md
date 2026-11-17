@@ -4,19 +4,19 @@
 
 ## 什么时候用
 
-改了 `apps/server/src/modules/media`、音频协议、下载与附件、理解授权、助手的媒体工具、素材库 `/library` 页（生成 `?make=`、理解 `?understand=<附件 id>`），或 MOSS Live／Vision 的实时视觉、播放与资源回收。模型列表能查、用途能绑定，不等于生成能用。
+改了 `internal/domain/media`、`internal/domain/gateway`（`handlers_media.go`、`media_offline.go`、`voice_ws_offline.go`）、音频协议、下载与附件、理解授权、助手的媒体工具、素材库 `/library` 页（生成 `?make=`、理解 `?understand=<附件 id>`），或 MOSS Live／Vision 的实时视觉、播放与资源回收。模型列表能查、用途能绑定，不等于生成能用。
 
 ## 准备
 
-- 不使用用户的家目录、钥匙或媒体。下面的 Playwright 自己起隔离的服务端；`VIBEVALLEY_TEST_RUNTIMES=1` 下 `apps/server/src/testing/network.ts` 只替换 MOSS 的厂商请求和结果下载，任务、库、文件、状态流、频道和 Artifact 都走真的模块。不手工拼成功帧。
+- 不使用用户的家目录、钥匙或媒体。下面的 Playwright 自己起隔离的 `cmd/vibe-server`；在 `VIBEVALLEY_TEST_RUNTIMES=1` 下，`internal/domain/gateway/media_offline.go` 和 `voice_ws_offline.go` 只替换 MOSS 的厂商请求、实时流与结果下载，任务、库、文件、状态流、频道和 Artifact 都走真的模块。不手工拼成功帧。
 - 证据分三类：协议离线、隔离程序、真实厂商。替身给的是确定的 PNG 和合成音调，不证明账号权限、模型质量或实际费用。
 
 ## 步骤
 
-1. 在 `apps/server` 跑定点测试：
+1. 跑服务端媒体、附件与网关定点测试：
 
    ```bash
-   vp test src/modules/media src/gateway/http/media.test.ts src/infra/publicHttp.test.ts src/infra/files.test.ts src/infra/db.test.ts src/flows/media.test.ts
+   env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/media/... ./internal/domain/attachment/... ./internal/domain/gateway/...
    ```
 
 2. 跑 `vp run server:check`、`vp run web:check`。

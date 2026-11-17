@@ -175,7 +175,7 @@ tester.run("page-layers", rule("page-layers"), {
     { code: "import { a } from '../issue';", filename: page("features/channel/Chat.tsx") },
     { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
     { code: "import { a } from '../../features/issue';", filename: page("farm/panels/Board.tsx") },
-    { code: "import { a } from '../ui/A';", filename: "/repo/apps/server/src/x.ts" },
+    { code: "import { a } from '../ui/A';", filename: "/repo/apps/site/src/x.ts" },
     { code: "import { a } from '#/infra/router';", filename: page("ui/A.tsx") },
     { code: "import { a } from '#/features/issue';", filename: page("farm/panels/Board.tsx") },
     { code: "import { a } from '#/infra/frame';", filename: page("state/atom.ts") },
@@ -198,16 +198,10 @@ tester.run("parent-import", rule("parent-import"), {
   valid: [
     { code: "import { a } from './rules';", filename: page("features/issue/Board.tsx") },
     { code: "import { a } from '#/infra/router';", filename: page("ui/A.tsx") },
-    { code: "import { a } from '../../../db/x.ts';", filename: "/repo/apps/server/src/modules/issue/issue.ts" },
-    { code: "import { a } from '../x';", filename: "/repo/packages/agent/src/core/loop.ts" },
+    { code: "import { a } from '../../package.json';", filename: page("ui/A.tsx") },
+    { code: "import { a } from '../x';", filename: "/repo/packages/pkm/src/core/loop.ts" },
   ],
   invalid: [
-    {
-      code: "import { a } from '../../db/generated/x.sql.ts';",
-      filename: "/repo/apps/server/src/issue/issue.ts",
-      errors: [{ messageId: "parent" }],
-      output: "import { a } from '#db/x.sql.ts';",
-    },
     {
       code: "import { a } from '../infra/router';",
       filename: page("ui/A.tsx"),
@@ -216,9 +210,9 @@ tester.run("parent-import", rule("parent-import"), {
     },
     {
       code: "export * from '../issue/rules.ts';",
-      filename: "/repo/apps/server/src/task/x.ts",
+      filename: page("features/channel/x.ts"),
       errors: [{ messageId: "parent" }],
-      output: "export * from '#/issue/rules.ts';",
+      output: "export * from '#/features/issue/rules.ts';",
     },
     {
       code: "const m = import('../../ui/A');",
@@ -235,42 +229,13 @@ const inRepo = (path: string) => join(import.meta.dirname, "../..", path);
 tester.run("no-cross-package-path", rule("no-cross-package-path"), {
   valid: [
     { code: "import { a } from './api-client.ts';", filename: inRepo("scripts/gen/capabilities.ts") },
-    { code: "import { a } from '../infra/lease.ts';", filename: inRepo("apps/server/src/chat/chat.ts") },
+    { code: "import { a } from '../base/format.ts';", filename: inRepo("apps/web/src/infra/api.ts") },
     { code: "import { a } from '@vibevalley/protocol/api';", filename: inRepo("scripts/gen/capabilities.ts") },
   ],
   invalid: [
     { code: "import { a } from '../../packages/protocol/src/api.ts';", filename: inRepo("scripts/gen/capabilities.ts"), errors: [{ messageId: "cross" }] },
-    { code: "export * from '../../server/src/assets.ts';", filename: inRepo("apps/desktop/scripts/package.ts"), errors: [{ messageId: "cross" }] },
+    { code: "export * from '../../web/src/App.tsx';", filename: inRepo("apps/site/scripts/prepare.ts"), errors: [{ messageId: "cross" }] },
     { code: "const m = import('../../../packages/i18n/src/format.ts');", filename: inRepo("apps/web/src/base/x.ts"), errors: [{ messageId: "cross" }] },
-  ],
-});
-
-tester.run("db-door", rule("db-door"), {
-  valid: [
-    { code: 'import { getIssue } from "#/db/generated/issue.sql.ts";', filename: "/repo/apps/server/src/modules/issue/issue.ts" },
-    { code: 'import { type Db, SqlError } from "#/infra/db.ts";', filename: "/repo/apps/server/src/modules/session/session.ts" },
-    { code: 'import { PGlite } from "@electric-sql/pglite";\nimport pg from "pg";', filename: "/repo/apps/server/src/infra/db.ts" },
-    { code: 'import { pgliteSomething } from "pglite-adjacent";', filename: "/repo/apps/server/src/modules/issue/issue.ts" },
-  ],
-  invalid: [
-    { code: 'import pg from "pg";', filename: "/repo/apps/server/src/modules/issue/issue.ts", errors: [{ messageId: "driver", data: { source: "pg" } }] },
-    { code: 'import type { PoolClient } from "pg";', filename: "/repo/apps/server/src/modules/memory/store.ts", errors: [{ messageId: "driver" }] },
-    { code: 'import { PGlite } from "@electric-sql/pglite";', filename: "/repo/apps/server/src/infra/baseline.ts", errors: [{ messageId: "driver" }] },
-    {
-      code: 'import { vector } from "@electric-sql/pglite/vector";',
-      filename: "/repo/apps/server/src/modules/memory/memory.ts",
-      errors: [{ messageId: "driver" }],
-    },
-    { code: 'export * from "pg";', filename: "/repo/apps/server/src/base/sql.ts", errors: [{ messageId: "driver" }] },
-    { code: 'const pg = await import("pg");', filename: "/repo/apps/server/src/main.ts", errors: [{ messageId: "driver" }] },
-  ],
-});
-
-tester.run("sync-fs", rule("sync-fs"), {
-  valid: ['import { readFile } from "node:fs/promises";', 'import { join } from "node:path";', 'import { constants } from "node:fs";'],
-  invalid: [
-    { code: 'import { readFileSync, writeFileSync } from "node:fs";', errors: [{ messageId: "sync" }, { messageId: "sync" }] },
-    { code: 'import { existsSync } from "fs";', errors: [{ messageId: "sync" }] },
   ],
 });
 
@@ -362,10 +327,10 @@ tester.run("failure-tone", rule("failure-tone"), {
 
 tester.run("one-absent", rule("one-absent"), {
   valid: [
-    { code: "let a: string | undefined;", filename: "/repo/apps/server/src/a.ts" },
-    { code: "let a: string | null;", filename: "/repo/apps/server/src/a.ts" },
+    { code: "let a: string | undefined;", filename: page("a.ts") },
+    { code: "let a: string | null;", filename: page("a.ts") },
   ],
-  invalid: [{ code: "let a: string | null | undefined;", filename: "/repo/apps/server/src/a.ts", errors: [{ messageId: "both" }] }],
+  invalid: [{ code: "let a: string | null | undefined;", filename: page("a.ts"), errors: [{ messageId: "both" }] }],
 });
 
 tester.run("global-doors", rule("global-doors"), {
@@ -385,57 +350,6 @@ tester.run("global-doors", rule("global-doors"), {
   ],
 });
 
-const server = "/repo/apps/server/src/a.ts";
-
-tester.run("singular-service", rule("singular-service"), {
-  valid: [
-    { code: "export interface Issue {}\nexport async function makeIssue() {}", filename: "/repo/apps/server/src/modules/issue/issue.ts" },
-    { code: "export type Channel = {};\nexport async function makeChannel() {}", filename: "/repo/apps/server/src/modules/channel/channel.ts" },
-    { code: "export interface Core {}\nexport function makeCore() {}", filename: "/repo/apps/server/src/core/core.ts" },
-    { code: "export interface Lan {}\nexport async function makeLan() {}", filename: "/repo/apps/server/src/gateway/lan/lan.ts" },
-    { code: "export interface Progress {}\nexport async function makeProgress() {}", filename: "/repo/apps/server/src/modules/progress/progress.ts" },
-    { code: "export function makeSources() {}", filename: "/repo/apps/server/src/modules/memory/sources.ts" },
-    { code: "export function makeThings() {}", filename: "/repo/apps/server/src/infra/infra.ts" },
-  ],
-  invalid: [
-    {
-      code: "export interface Issues {}\nexport async function makeIssues() {}",
-      filename: "/repo/apps/server/src/modules/issues/issues.ts",
-      errors: [{ messageId: "plural", data: { folder: "issues", singular: "issue", Singular: "Issue" } }],
-    },
-    {
-      code: "export interface Memory {}\nexport async function makeMemories() {}",
-      filename: "/repo/apps/server/src/modules/memory/memory.ts",
-      errors: [{ messageId: "factory", data: { name: "makeMemories", folder: "memory", Service: "Memory" } }],
-    },
-    {
-      code: "export async function makeGame() {}",
-      filename: "/repo/apps/server/src/modules/game/game.ts",
-      errors: [{ messageId: "missing", data: { folder: "game", Service: "Game" } }],
-    },
-  ],
-});
-
-tester.run("protocol-namespace", rule("protocol-namespace"), {
-  valid: [
-    { code: 'import type * as T from "@vibevalley/protocol";', filename: server },
-    { code: 'import { type IssueStatus, userId } from "@vibevalley/protocol";', filename: server },
-    { code: 'import { Issue } from "#/issue/issue.ts";', filename: server },
-    { code: 'import * as S from "@vibevalley/protocol/schema";', filename: server },
-  ],
-  invalid: [
-    { code: 'import type { Issue } from "@vibevalley/protocol";', filename: server, errors: [{ messageId: "named", data: { name: "Issue" } }] },
-    {
-      code: 'import { type Session as Run, userId, type Channel } from "@vibevalley/protocol";',
-      filename: server,
-      errors: [
-        { messageId: "named", data: { name: "Session" } },
-        { messageId: "named", data: { name: "Channel" } },
-      ],
-    },
-  ],
-});
-
 const root = resolve(import.meta.dirname, "../..");
 
 describe("what a rule says", () => {
@@ -446,7 +360,6 @@ describe("what a rule says", () => {
 
   it("says what is wrong, how to fix it, and a file here that shows it", () => {
     for (const { where, text } of messages) {
-      // A path the rule fills in names one file per value: apps/{{app}}/tsconfig.json is apps/web's and apps/server's.
       const see = / See (\S+)$/u.exec(text)?.[1]?.replaceAll("{{app}}", "web");
       expect(text, where).toMatch(/\. Fix: .+\. See \S+$/u);
       expect(existsSync(resolve(root, see ?? "")), `${where}: ${see}`).toBe(true);
@@ -458,12 +371,10 @@ describe("what a rule says", () => {
   });
 
   it("names the catalog the file's words belong in", () => {
-    expect(catalogOf("/repo/apps/server/src/issue/issue.ts")).toBe("server.issue");
     expect(catalogOf("/repo/apps/web/src/features/issue/views/Board.tsx")).toBe("web.issue");
-    expect(catalogOf("/repo/apps/server/src/gateway/lan/lan.ts")).toBe("server.lan");
     expect(catalogOf("/repo/apps/web/src/farm/phone/screens.tsx")).toBe("web.farm.phone");
     expect(catalogOf("/repo/apps/web/src/farm/hud/Hud.tsx")).toBe("web.farm");
-    expect(catalogOf("/repo/apps/server/src/flows/farm.ts")).toBe("server");
-    expect(catalogOf("/repo/packages/agent/src/brain.ts")).toBe("shared");
+    expect(catalogOf("/repo/apps/mobile/src/App.tsx")).toBe("mobile");
+    expect(catalogOf("/repo/packages/pkm/src/outline.ts")).toBe("shared");
   });
 });

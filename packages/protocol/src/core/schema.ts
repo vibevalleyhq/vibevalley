@@ -64,28 +64,6 @@ export const Health = z.object({
   version: z.string(),
 }) satisfies Codec<T.Health>;
 
-export const Fact = z.discriminatedUnion("type", [
-  FactCallChanged,
-  FactSessionToolChanged,
-  FactSessionToolsReset,
-  FactSessionPhaseChanged,
-  FactMessageChanged,
-  FactChannelChanged,
-  FactUserMentionsChanged,
-  FactSessionChanged,
-  FactSessionReported,
-  FactSessionLeft,
-  FactProgressChanged,
-  FactIssueChanged,
-  FactIssueRemoved,
-  FactChannelRemoved,
-  FactCronChanged,
-  FactCronRemoved,
-  FactConnectorChanged,
-  FactMachineChanged,
-  FactMediaChanged,
-]) satisfies Codec<T.Fact>;
-
 const ServerEventSnapshot = z.object({
   type: z.literal("snapshot"),
   at: z.number(),

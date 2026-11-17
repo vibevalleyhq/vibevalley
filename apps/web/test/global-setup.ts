@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import type { FullConfig } from "@playwright/test";
@@ -13,8 +13,22 @@ export default function setup(config: FullConfig) {
   process.env.VIBEVALLEY_TEST_OUT = out;
   const dev = process.env.VIBEVALLEY_WEB_DEV === "1";
   const clean = () => rmSync(out, { recursive: true, force: true });
+  const exe = process.platform === "win32" ? ".exe" : "";
   try {
-    for (const artifact of artifactsFor(config.projects.map((project) => project.name))) {
+    const artifacts = artifactsFor(config.projects.map((project) => project.name));
+    if (artifacts.includes("app")) {
+      const binDir = join(out, "bin");
+      mkdirSync(binDir, { recursive: true });
+      const goEnv: NodeJS.ProcessEnv = { ...process.env, CGO_ENABLED: "0" };
+      delete goEnv.GOROOT;
+      console.log("[go build] vibe-server");
+      execFileSync("go", ["build", "-o", join(binDir, `vibe-server${exe}`), "./cmd/vibe-server"], {
+        cwd: join(web, "../.."),
+        env: goEnv,
+        stdio: "inherit",
+      });
+    }
+    for (const artifact of artifacts) {
       console.log(`[browser build] ${artifact} (${dev ? "development" : "production"})`);
       execFileSync(
         "vp",

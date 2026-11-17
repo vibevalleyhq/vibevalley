@@ -3,10 +3,8 @@ import { z } from "zod";
 
 import { type Clock, isAbort, systemClock, withTimeout } from "@vibevalley/async";
 
-import { mossTranscriptionModels } from "../moss/transcription-models.ts";
 import { fromJson } from "./json.ts";
 
-export const mossTranscription = { url: "https://api.mosi.cn/v1", models: mossTranscriptionModels } as const;
 const transcriptionFormats = {
   wav: "audio/wav",
   m4a: "audio/mp4",
@@ -18,7 +16,7 @@ const transcriptionFormats = {
 export const TranscriptionFormat = z.enum(["wav", "m4a", "mp3", "webm", "ogg", "flac"]);
 export type TranscriptionFormat = z.output<typeof TranscriptionFormat>;
 
-export class TranscriptionRequestError extends Error {
+class TranscriptionRequestError extends Error {
   override readonly name = "TranscriptionRequestError";
   readonly reason: "Unreachable" | "Cut" | "HttpStatus" | "InvalidResponse";
   declare readonly status?: number;

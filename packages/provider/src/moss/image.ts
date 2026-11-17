@@ -63,7 +63,7 @@ const invalidInput = () => new MossError({ reason: "InvalidInput", outcome: "Not
 
 type ImageInput = z.output<typeof MossImageInput>;
 
-export const prepareMossImage = async (
+const prepareMossImage = async (
   input: unknown,
 ): Promise<Omit<ImageInput, "prompt" | "size"> & { readonly prompt: string; readonly size: { readonly width: number; readonly height: number } }> => {
   const parsed = MossImageInput.safeParse(input);

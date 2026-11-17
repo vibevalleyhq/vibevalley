@@ -1,13 +1,13 @@
 # 工程流程
 
-管理代码库周边的工程约束：文档分层与 Agent Notes 沉淀、`docs:verify` 十一项检查、多层静态与语法树门禁、代码体检与逃生口棘轮（`packages/health`）、验证 skill 规范，以及像素素材流水线。
+管理代码库周边的工程约束：文档分层与 Agent Notes 沉淀、`docs:verify` 十二项检查、多层静态与语法树门禁、代码体检与逃生口棘轮（`packages/health`）、验证 skill 规范，以及像素素材流水线。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
 | 「代码 → 静态检查 → 文字 → 人审」四层防错原则 | 根目录常驻规则条文（[AGENTS.md](AGENTS.md#规矩)） |
-| 文档分层、Agent Notes 沉淀流程与 `docs:verify` 十一项检查 | 文档目录规矩（[docs/AGENTS.md](docs/AGENTS.md)）与 Note 格式（[.agents/notes/README.md](.agents/notes/README.md)） |
+| 文档分层、Agent Notes 沉淀流程与 `docs:verify` 十二项检查 | 文档目录规矩（[docs/AGENTS.md](docs/AGENTS.md)）与 Note 格式（[.agents/notes/README.md](.agents/notes/README.md)） |
 | 代码体检（`packages/health`）、逃生口棘轮、死代码检查与回归测试保护 | 服务端与前端业务测试（[地基](docs/subsystems/foundation.md)、[客户端](docs/subsystems/app.md)） |
 | 仓库 skill 结构（`.agents/skills/`）与验证 skill 六节规范 | 各 skill 的具体执行步骤（[.agents/skills/README.md](.agents/skills/README.md)） |
 | 像素素材生成（`design/pixel/gen.sh`）与切图流水线（`process.py`） | 页面贴图加载（[农场的皮](docs/subsystems/farm.md)）与命令速查（[开发](docs/development.md#素材音效和官网)） |
@@ -18,7 +18,7 @@
 |---|---|
 | `scripts/docs/agent-notes.ts`、`skills.ts`、`doc-links.ts` | 校验 Note 目录格式并生成 `CATALOG.md`、校验 skill 结构、校验文档链接与反引号路径 |
 | `scripts/docs/stale-names.ts`、`glossary.ts` | 拦截已废弃旧名字、校验用语表代码名 |
-| `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts`、`i18n.ts` | 生成并校验 `capabilities.md`、`client.ts`、`primitives.md` 与双语词典的 `catalogs.ts` |
+| `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts`、`i18n.ts`、`go-contract.ts`、`go-sqlc.ts` | 生成并校验 `capabilities.md`、`client.ts`、`primitives.md`、双语词典 `catalogs.ts`、Go 契约与 `sqlc` 绑定 |
 | `scripts/audit/oxlint-plugin.ts`、`deadcode.ts` | 仓库自定义 lint 规则、`knip` 死代码检查 |
 | `scripts/release/regression.ts`、`verify-server.ts` | PR 回归测试修改门禁、启动隔离沙箱服务端 |
 | `scripts/audit/practice-audit.ts`、`service-paths.ts`、`protocol-surface.ts`、`schema-audit.ts` | 全仓语法树实践棘轮、服务调用矩阵与扇入检查、根协议导出面棘轮、SQL 枚举与 `Secret` 契约审计 |
@@ -81,6 +81,6 @@
 
 ## 怎么验证
 
-- `vp run docs:verify`：依次执行 11 项文档、拓扑面与生成物同步检查。
+- `vp run docs:verify`：依次执行 12 项文档、拓扑面与生成物同步检查。
 - `vp run health:verify`、`vp run deadcode`：逃生口棘轮测试与死代码扫描。
 - `vp test run scripts/audit/oxlint-plugin.test.ts scripts/release/verify-server.test.ts scripts/audit/comment-review.test.ts scripts/release/regression.test.ts`：验证 lint 报错格式、沙箱、注释审查与回归门禁。

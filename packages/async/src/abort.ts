@@ -7,11 +7,6 @@ export function isAbort(e: unknown, signal?: AbortSignal): boolean {
   return e instanceof DOMException && (e.name === "AbortError" || e.name === "TimeoutError");
 }
 
-/** The signal's reason as a thrown value: an Error as it is, anything else an AbortError. */
-export function throwIfAborted(signal: AbortSignal | undefined): void {
-  if (signal?.aborted === true) throw reasonOf(signal);
-}
-
 export const reasonOf = (signal: AbortSignal): unknown =>
   signal.reason instanceof Error || signal.reason instanceof DOMException ? signal.reason : abortError();
 

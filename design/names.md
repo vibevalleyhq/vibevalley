@@ -17,7 +17,7 @@
 | 文档员 Kimi、情报 Grok、夜班反重力 | 职业 + 农机名 | 猫、猫头鹰、浣熊 |
 | 管家 | 助手 | （没有动物） |
 
-档案在 `apps/server/src/modules/agent/templates/<id>/agent.json`（英文在同目录的 `agent.en.json`，次序在 `templates/index.json`），样子写在 `look` 里；动物和衣服的取值是 `packages/protocol/src/agent/shapes.ts` 的 `SpeciesValues`、`OutfitValues`。
+档案在 `internal/domain/gateway/seed_catalog.go` 中定义，样子写在 `look` 里；动物和衣服的取值是 `packages/protocol/src/agent/shapes.ts` 的 `SpeciesValues`、`OutfitValues`。
 
 ## 谐音人名
 

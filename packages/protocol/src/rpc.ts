@@ -6,7 +6,7 @@ import * as S from "./schema";
  * answered `text/event-stream`: each event one `data: <JSON>` line decoded with its `event` Schema. A payload that does
  * not decode, or a refusal before the first event (no such channel…), is answered as any route is: a JSON ApiError
  * envelope with its status, not a stream. Once streaming, the server ends the stream rather than send an error. */
-export const subscriptionPath = "/api/v1/subscribe";
+const subscriptionPath = "/api/v1/subscribe";
 
 /** Each subscription's payload and the Schema of each event it then sends, by name. */
 export const subscriptions = {

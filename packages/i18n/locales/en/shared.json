@@ -1,17 +1,4 @@
 {
-  "action": {
-    "run_command": "running a command",
-    "read_file": "reading a file",
-    "edit_file": "editing a file",
-    "search": "searching",
-    "web": "on the web",
-    "mcp": "using an MCP tool",
-    "wait": "waiting",
-    "other": "using a tool",
-    "thinking": "thinking",
-    "speaking_text": "writing its report",
-    "none": ""
-  },
   "outcome": {
     "completed": "done",
     "failed": "failed",
@@ -81,18 +68,6 @@
     "close": "Cancel",
     "reopen": "Reopen"
   },
-  "phase": {
-    "quiet": "{what} (quiet for {span})",
-    "done": "this round is done, for you to see{conflict}",
-    "failed": "this round failed",
-    "resting": "resting (last round {last}){conflict}",
-    "rested": "resting{conflict}",
-    "conflict": "; merging into {base} would conflict ({files})",
-    "working": "{action}",
-    "workingOn": "{action}: {label}",
-    "retrying": "{what} (the model call failed, retry {attempt})",
-    "retryingOf": "{what} (the model call failed, retry {attempt}/{of})"
-  },
   "order": {
     "invalid": "not a valid order key",
     "unordered": "order key {a} is not before {b}"
@@ -106,7 +81,6 @@
     "aside": "{text} ({aside})",
     "sentence": "{text}.",
     "and": "{a}, {b}",
-    "clauses": "{a}; {b}",
     "separator": ", "
   }
 }

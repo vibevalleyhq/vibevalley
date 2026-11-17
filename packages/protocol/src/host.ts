@@ -233,10 +233,6 @@ declare global {
   }
 }
 
-export const hostKey = "vibevalleyHost" satisfies keyof Window;
-
-export const desktopVoiceShortcut = "Alt+Shift+Space";
-
 export const desktopBridge = {
   notify: call({ input: Notice, output: z.void() }),
   tray: call({ input: TraySummary, output: z.void() }),

@@ -1,7 +1,6 @@
 import type { Health } from "@vibevalley/health/readings";
-import { moduleOf } from "@vibevalley/server/modules";
 
-const generated = ["apps/server/db/generated/", "packages/i18n/src/catalogs.ts", "packages/protocol/src/client.ts"];
+const generated = ["packages/i18n/src/catalogs.ts", "packages/protocol/src/client.ts", "packages/protocol/src/go-contract/"];
 
 const health: Health = {
   counted: (path) =>
@@ -12,7 +11,6 @@ const health: Health = {
     !generated.some((g) => path.startsWith(g)),
   areaOf: (path) => {
     const parts = path.split("/");
-    if (path.startsWith("apps/server/src/")) return `server: ${moduleOf(parts.slice(3).join("/"))?.name ?? parts[3]}`;
     if (path.startsWith("apps/web/src/features/") && parts.length > 5) return `web: features/${parts[4]}`;
     if (path.startsWith("apps/web/src/")) return `web: ${parts.length > 4 ? parts[3] : "app"}`;
     return parts.slice(0, 2).join("/");

@@ -1,72 +1,59 @@
 # 验收助手的评测
 
-[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册，不用沙箱。助手的测试用照脚本回答的模型（`apps/server/src/testing/model.ts`），只验证 harness。模型拿到这样的输入会不会做对，要用真模型重放用户标出的那些轮：每个样例采 5 次，至少过 4 次算过。设计和理由见 [助手的错变成评测](docs/subsystems/orchestrator.md)。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册，不用沙箱。助手的单元测试使用内存与录好的假模型答复验证 harness（`internal/domain/stack/tools_test.go`、`stack_test.go`）；运行时通过 `/api/v1/orchestrator/eval/create`（`internal/domain/gateway/handlers_work.go`）把错轮录到 `$VIBEVALLEY_WORK_ROOT/evals/<id>.json`。设计和理由见 [助手的错变成评测](docs/subsystems/orchestrator.md)。
 
 ## 什么时候用
 
-- 改了 `systemPrompt`、`agentPrompt`、`apps/server/src/gateway/tool` 里助手工具的名字、描述、参数或顺序。
-- 改了助手的提示怎么拼、对话怎么压缩（`session/host.ts` 的扩展、`agent/durable.ts` 的压缩门槛），或升级了 pi-durable、pi-ai。
-- 往 `apps/server/src/modules/orchestrator/testdata/evals/` 加了样例。
+- 改了 `internal/domain/stack/prompts.go`、`tools.go`、`orchestrator.go` 里助手工具的名字、描述、参数或顺序。
+- 改了助手对话预算、权限门槛与压缩机制（`internal/durable/budget.go`、`compaction.go`、`permission.go`）。
+- 改了 `/api/v1/orchestrator/eval/create` 的写入格式。
 
-不用它：只改了助手的 harness（输入怎么排队、话发到哪个频道、工具怎么调农场），`vp run --filter @vibevalley/server test src/modules/orchestrator` 就够。
+不用它：只改了助手之外的网关转发，跑 `vp run server:check` 即可。
 
-重放连网、花钱（一个样例约等于助手一轮的 token 乘 5），**跑之前先问用户**。没有钥匙或用户没同意时，只做「准备」的第 1 步，并在汇报里写明在线的那半没跑。
+在联网测真模型、消耗额度前，**必须先问用户**。没有钥匙或用户没同意时，只做「准备」和「步骤」的离线检查，并在汇报里写明在线模型重放未运行。
 
 ## 准备
 
-1. 先过离线的检查：每个样例能解开、`expect` 不空、每条 `expect` 写全了它那一种要的字段、录下的那一轮过不了它的 `expect`。
+1. 跑 Go 类型检查、合约检查与 `stack`/`durable` 单元测试：
 
    ```bash
-   vp check && vp run --filter @vibevalley/server test src/modules/orchestrator/evals.test.ts
+   vp run server:check
+   env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/stack/... ./internal/durable/... ./internal/domain/gateway/...
    ```
 
-2. 要加新样例时，从家目录拿用户标出的那一轮：
-
-   ```bash
-   ls ~/.vibevalley/agent/orchestrator/evals/
-   ```
-
-   读 `want`，在 `expect` 里写几条判断（`kind` 只有 `called`、`notCalled`、`silent`、`says`、`saysNot`，字段见 `apps/server/src/testing/evals.ts` 的 `Expect`）。去掉私人的内容（名字、路径、仓库、钥匙），文件名起成一句话的英文（`think-before-dispatch.json`），放进 `apps/server/src/modules/orchestrator/testdata/evals/`，再跑第 1 步：它报这个样例的 `missed` 是 `false`，说明 `expect` 抓不住录下的错，重写它。
-
-3. 钥匙在环境变量里：`DEEPSEEK_API_KEY`。不要把它写进命令、日志或汇报。
+2. 如需检查已录下的错轮 JSON，看工作根目录的 `evals/` 目录，去掉私人路径与钥匙后保存到单独证据目录。
+3. 如用户同意并提供了测试钥匙，环境变量里只放所需 Provider 钥匙，不写进命令日志或仓库文件。
 
 ## 步骤
 
-1. 在**改之前**的代码上跑一遍，记下表：
+1. 先运行离线单元测试，确认工具 Schema、提示拼接、权限判断与 `/api/v1/orchestrator/eval/create` 行为全绿：
 
    ```bash
-   vp run --filter @vibevalley/server evals
+   env -u GOROOT CGO_ENABLED=0 go test -v -count=1 -run 'TestOrchestrator|TestTools|TestBudget|TestCompaction' ./internal/domain/stack/... ./internal/durable/...
    ```
 
-   最后打出一张表：`| case | model | passed | tokens |`，每个样例一行，`passed` 是 `过了几次/5`。没过的每一次都打出 `missed` 和那一轮的对话。新样例在改之前应当不过。
-
-2. 改提示、工具描述或 harness。
-3. 再跑第 1 步的命令。新样例过了（至少 4/5），以前的样例也都还过，vitest 报 `pass on the real model` 通过。
-4. 只想少采几次省钱、换模型、把家目录里的样例也跑上，或改了提示以后只重放没过的那几个（`VIBEVALLEY_EVAL_ONLY` 写样例名的开头，逗号分开；合之前全套还要过一次）：
+2. 在沙箱中验证错轮录入接口（需在已结算模型轮次上调用）：
 
    ```bash
-   VIBEVALLEY_EVAL_N=2 VIBEVALLEY_EVAL_MODEL=deepseek-flash VIBEVALLEY_EVALS=~/.vibevalley/agent/orchestrator/evals vp run --filter @vibevalley/server evals
-   VIBEVALLEY_EVAL_ONLY=hand-over-in-place vp run --filter @vibevalley/server evals
+   vpx scripts/release/verify-server.ts --scripted-helper -- sh -c '"$VIBEVALLEY_VERIFY_CLI" doctor --json'
    ```
 
-   还没写 `expect` 的样例会跳过（`no expect yet, skipped`）。
+3. 若用户明确要求联网测试真实模型，经配置好的 Provider 启动独立沙箱复现对比，并记录每轮模型输出与 token 消耗；改完后确认原失败场景不再出现。
 
 ## 证据
 
 说「验证过了」时，给用户看：
 
-- 第 1 步和第 3 步的两张表，提交说明里也附上第 3 步的那张。
-- 第 3 步 vitest 的通过行。
-- 有没过的样例时，它的 `missed` 和那一轮的对话，说明为什么接受（或者接着改）。
+- 第 1 步 `go test` 的完整通过输出与命令。
+- 沙箱 `result.json` 与请求日志；未联网跑真模型时明写「在线重放未运行」。
+- 如有失败或边界放宽尝试，列出具体原因，不通过修改断言来凑绿。
 
 ## 出错时
 
-- **测试被跳过**：环境里没有 `DEEPSEEK_API_KEY`，或没经 `vp run --filter @vibevalley/server evals`（它设 `VIBEVALLEY_EVALS_LIVE=1`）。钥匙问用户要，不要自己去找用户的配置文件。
-- **模型报错**：DeepSeek 返回了错（钥匙不对、余额不够、限流）。照原话告诉用户。
-- **`the turn took too long`**：一轮超过 5 分钟，多半是网络。再跑一次；还这样就告诉用户。
-- **一个样例时过时不过（比如 3/5）**：模型在两种做法之间摇摆。看没过的几次的对话，改提示让规矩更明确；不要为了过而放宽 `expect`。
-- **离线的检查报某条 `expect` 缺字段**：照 `problemOf` 说的补上；工具改了名，样例里的 `tool` 跟着改。
+- **`cannot evaluate a round that did not complete a model turn`**：`handlers_work.go` 要求目标轮次存在、未失败且含模型回答；确认 `roundId` 与对话轮次状态后再调 `/api/v1/orchestrator/eval/create`。
+- **工具参数校验失败**：检查 `internal/domain/stack/tools.go` 的参数 Schema 与 `internal/domain/gateway` 导出定义。
+- **网络超时**：检查外部 Provider 端点或代理设置，不私自读取用户真实配置文件里的钥匙。
 
 ## 收拾
 
-重放用的是临时目录，跑完自己删；不起服务端、不留进程，没有要收拾的。
+沙箱跑完自动清理；单独导出的临时证据与录轮文件不放进仓库。

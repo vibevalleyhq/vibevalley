@@ -28,7 +28,7 @@ export interface Located {
   readonly block: T.PkmBlock;
 }
 
-export function blockOf(vault: Vault, id: string): Located | undefined {
+function blockOf(vault: Vault, id: string): Located | undefined {
   for (const page of vault.values()) {
     const node = find(page.blocks, id);
     const block = node && flatBlocks(page.blocks).find((b) => b.id === id);
@@ -38,13 +38,6 @@ export function blockOf(vault: Vault, id: string): Located | undefined {
 }
 
 const allEdges = (vault: Vault) => [...vault.values()].map((page) => ({ page, edges: edgesOf(page) }));
-
-/** The ids some block refers to with ((id)): their files keep an id:: line so the ref survives a reading. */
-export function refsInto(vault: Vault): Set<string> {
-  const ids = new Set<string>();
-  for (const { edges } of allEdges(vault)) for (const e of edges) if (e.target) ids.add(e.target);
-  return ids;
-}
 
 export interface RefWords {
   readonly circular: (id: string) => string;
@@ -148,21 +141,10 @@ export function plainOf(vault: Vault, body: string): string {
   return plainText(linksOut);
 }
 
-export const wireOf = (page: Page): T.PkmPage => ({
-  slug: page.slug,
-  title: page.title,
-  tier: page.tier,
-  file: page.file,
-  props: { ...page.props },
-  tldr: page.props.tldr ?? "",
-  blocks: flatBlocks(page.blocks),
-  updated: page.mtime,
-});
-
 const defaultTokenize = (text: string): readonly string[] => text.toLowerCase().match(/[\p{Script=Han}]{2,}|[a-z0-9_][a-z0-9_.\-/]*[a-z0-9_]/gu) ?? [];
 
 /** The words a search matches on: the whole query, its space-separated words and the words the tokenizer cuts it into. */
-export const queryWords = (text: string, tokenize: (s: string) => readonly string[] = defaultTokenize): string[] => {
+const queryWords = (text: string, tokenize: (s: string) => readonly string[] = defaultTokenize): string[] => {
   const lower = text.trim().toLowerCase();
   return [...new Set([...lower.split(/\s+/u), ...tokenize(text)].filter((w) => w !== ""))];
 };
@@ -322,18 +304,3 @@ export function keepLinks(old: string, proposed: string): { readonly text: strin
     }
   return { text, kept, restored };
 }
-
-/** The inbox, journal and resource blocks about a topic (in their text or their page's title), newest page first. */
-export function clustered(vault: Vault, topic: string): { readonly page: Page; readonly node: Node }[] {
-  const lower = topic.trim().toLowerCase();
-  const out: { page: Page; node: Node }[] = [];
-  for (const page of [...vault.values()].toSorted((a, b) => b.mtime - a.mtime)) {
-    if (page.tier !== "inbox" && page.tier !== "journal" && page.tier !== "resource") continue;
-    const titled = page.title.toLowerCase().includes(lower);
-    for (const node of walk(page.blocks)) if (titled || node.body.toLowerCase().includes(lower)) out.push({ page, node });
-  }
-  return out;
-}
-
-/** The page whose source-url:: is url, a clip of it already. */
-export const clipOf = (vault: Vault, url: string) => [...vault.values()].find((p) => p.props["source-url"] === url);

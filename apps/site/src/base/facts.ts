@@ -5,7 +5,7 @@ export const FACTS = [
   { key: "looks", n: 28, icon: "bear-farmer-side" },
   // Helpers at work at once (maxRunning, packages/protocol/src/common/shapes.ts).
   { key: "plots", n: 6, icon: "plot-wheat" },
-  // The achievements in apps/server/src/modules/game/seeds.json.
+  // The farm game achievements catalog.
   { key: "achievements", n: 21, icon: "icon-trophy" },
   // The games on the farm phone (apps/web/src/farm/phone/screens.tsx).
   { key: "games", n: 5, icon: "icon-star" },

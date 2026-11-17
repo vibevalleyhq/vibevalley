@@ -14,7 +14,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `apps/server/src/gateway/lan/lan.ts` | 门的监听、配对状态机、请求守卫 `guard`、放行表 `remoteMay`、登录和退出时的 Cookie、HTTP/SSE 代理转发 |
+| `internal/domain/lan/lan.go`、`pairing.go` | 门的监听、配对状态机、请求守卫、放行表、登录和退出时的 Cookie、HTTP/SSE 代理转发 |
 | `apps/web/src/features/lan/LanPage.tsx`、`PairPage.tsx` | 设置「设备」页里「连接到本机」的卡片与远端设备的 `/pair` 配对页 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`lan.*`）。
@@ -44,8 +44,8 @@
 
 ## 和谁打交道
 
-- **主监听**：`http/app.ts` 接收通过守卫的转发请求；`user.*` 的处理凭门注入的头认出外来的请求、设备和地址。
-- **用户（`User`）**：认钥匙（`byKey`）、签发配对的钥匙（`pair`）、收回设备（`revoked` 流）。
+- **主监听**：`internal/domain/gateway/gateway.go` 接收通过守卫的转发请求；`user.*` 的处理凭门注入的头认出外来的请求、设备和地址。
+- **用户（`User`）**：认钥匙、签发配对钥匙、收回设备。
 - **协议（`packages/protocol`）**：从 `endpoints` 构建 `remoteMay` 放行表，共用 `deviceKeyCookie` 名称。
 
 ## 为什么这样
@@ -55,5 +55,5 @@
 
 ## 怎么验证
 
-- `apps/server/src/gateway/lan/lan.test.ts`、`apps/web/src/features/lan/device.test.ts`：配对审批、5 次错码作废、`remote` 权限拦截、登录来的设备的放行和 Cookie、订阅流转发与收回设备断流。
+- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/lan/...`、`apps/web/src/features/lan/device.test.ts`：配对审批、5 次错码作废、`remote` 权限拦截、登录来的设备的放行和 Cookie、订阅流转发与收回设备断流。
 - `apps/web/test/pair.spec.ts`：远端浏览器自动跳转 `/pair`、本机批准后进入工单页。

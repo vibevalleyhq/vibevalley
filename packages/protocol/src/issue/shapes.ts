@@ -1,6 +1,6 @@
 import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes";
 import type { Conflict } from "../repo/shapes";
-import type { PhaseResting, Run, Session, SessionEvent } from "../session/shapes";
+import type { PhaseResting, Run, Session } from "../session/shapes";
 
 /** What an answer issue concludes, as its helper hands it back. */
 export interface IssueAnswer {
@@ -301,10 +301,3 @@ export interface FactIssueRemoved {
   at: number;
   id: IssueId;
 }
-
-export type IssueWatch =
-  | { kind: "history"; session: SessionId; events: SessionEvent[] }
-  | { kind: "state"; issue: Issue; sessions: Session[]; sessionIds: SessionId[]; settled: boolean; omittedSessions: number }
-  | { kind: "event"; session: SessionId; event: SessionEvent }
-  | { kind: "gap"; session: SessionId; before?: number }
-  | { kind: "missing"; issue: IssueId };

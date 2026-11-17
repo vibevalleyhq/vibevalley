@@ -20,7 +20,7 @@ const decoders: { readonly [P in keyof Streams]: z.ZodType<Streams[P], string> }
   [livePath]: jsonString(S.LiveEvent),
 };
 
-/** The server writes a comment line on every stream this often, however quiet it is (apps/server/src/http/streams.ts). */
+/** The server writes a comment line on every stream this often, however quiet it is (internal/domain/gateway/streams.go). */
 export const streamHeartbeatMs = 20_000;
 
 /** Nothing at all for this long, not even a heartbeat. Two heartbeats missed, and a margin for a slow one. */

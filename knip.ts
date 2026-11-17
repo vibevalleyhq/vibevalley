@@ -2,7 +2,7 @@
  * What is dead: files nothing reaches, exports nothing imports, dependencies nothing uses (`vp run deadcode`, through
  * scripts/audit/deadcode.ts, which says what to do about each). A file is alive when an entry reaches it. knip finds most
  * entries itself (package.json's scripts, index.html, the Vite, Vitest, Playwright and Expo configs); the ones listed
- * below are run some other way: scripts by vpx, the stories' page, the desktop shell's main and preload. A package's
+ * below are run some other way: scripts by vpx and the stories' page. A package's
  * exports are entries too, and includeEntryExports reports the ones no other workspace imports: the packages are ours,
  * nobody outside uses them. An app's entries keep theirs: a config's default export is read by its tool.
  */
@@ -18,18 +18,6 @@ const config: KnipConfig = {
       entry: ["scripts/*/*.ts"],
       project: ["scripts/**/*.ts"],
     },
-    "apps/server": {
-      // main.ts runs through vpx (`vp run start`, the desktop app and the e2e), which knip does not read in a script; it
-      // is the pack block's entry (knip finds the chat's src/chat/main.ts there itself).
-      entry: ["scripts/*.ts", "src/main.ts"],
-      project: ["src/**/*.ts", "scripts/**/*.ts"],
-    },
-    "apps/cli": {
-      // main.ts runs through vpx (`vp run start`, the acceptance sandbox) and is the pack block's entry.
-      // Session launches worker.ts directly; the desktop package includes its standalone worker.mjs bundle.
-      entry: ["src/main.ts", "src/worker.ts"],
-      project: ["src/**/*.ts"],
-    },
     "apps/web": {
       entry: ["index.html", "stories.html", "src/stories.tsx", "vite.stories.config.ts", "test/**/*.ts"],
       project: ["src/**/*.{ts,tsx}", "test/**/*.ts"],
@@ -41,10 +29,6 @@ const config: KnipConfig = {
       project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
       // Imported by src/ui/global.css (@import "tailwindcss"), which knip does not read.
       ignoreDependencies: ["tailwindcss"],
-    },
-    "apps/desktop": {
-      entry: ["src/main.ts", "src/preload/preload.ts", "scripts/*.ts", "test/**/*.ts"],
-      project: ["src/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
     },
     "apps/mobile": {
       entry: ["scripts/*.ts"],
@@ -69,10 +53,8 @@ const config: KnipConfig = {
       ignoreDependencies: ["@vitest/browser-playwright"],
     },
   },
-  // Programs on the machine, not packages: Xcode's swift, macOS's plutil and ditto, and the voice line's tunnel.
-  ignoreBinaries: ["swift", "plutil", "ditto", "cloudflared"],
-  // Swift, with its own tools.
-  ignoreWorkspaces: ["apps/island", "apps/pty"],
+  // Programs on the machine, not packages: the voice line's tunnel and the Go toolchain.
+  ignoreBinaries: ["cloudflared", "go", "sqlc"],
 };
 
 export default config;

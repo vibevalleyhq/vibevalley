@@ -26,9 +26,9 @@ const or = (...c: number[]) => c.find((x) => x !== 0) ?? 0;
 
 export const plain = (spans: readonly TextSpan[]) => spans.map((s) => s.t).join("");
 
-export const runeLen = (spans: readonly TextSpan[]) => spans.reduce((n, s) => n + chars(s.t).length, 0);
+const runeLen = (spans: readonly TextSpan[]) => spans.reduce((n, s) => n + chars(s.t).length, 0);
 
-export function sameText(a: readonly TextSpan[], b: readonly TextSpan[]): boolean {
+function sameText(a: readonly TextSpan[], b: readonly TextSpan[]): boolean {
   const x = normalSpans(a);
   const y = normalSpans(b);
   return (
@@ -119,7 +119,7 @@ function patched(attrs: BlockAttrs, patch: BlockAttrs, unset: readonly string[] 
 }
 
 /** A block as the wire has it: no parent, and not deleted, are left out. */
-export function wire(b: Block): Block {
+function wire(b: Block): Block {
   const { parentId, deleted, ...rest } = b;
   return { ...rest, ...(parentId !== undefined ? { parentId } : {}), ...(deleted === true ? { deleted: true } : {}) };
 }

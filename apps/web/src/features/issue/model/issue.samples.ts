@@ -72,7 +72,7 @@ export const working = (since: number, quietSince?: number): PhaseView => ({
   ...(quietSince === undefined ? {} : { quietSince }),
 });
 
-// The buttons as the server gives them for each state (apps/server/src/issue/stage.ts): data here, not a rule.
+// The buttons as the server gives them for each state (internal/domain/gateway/overlay.go): data here, not a rule.
 const move = (act: IssueAction["act"], status: IssueStatus, words: "none" | "required" = "none"): IssueAction => ({ act, does: "move", status, words });
 export const acts = {
   start: move("start", "todo"),

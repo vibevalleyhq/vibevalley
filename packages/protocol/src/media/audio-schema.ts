@@ -67,12 +67,6 @@ export const MediaTranscriptionRequest = z.object({
   keyterms: z.exactOptional(z.array(z.string().check(codePoints(1, 30)).regex(/\S/u)).max(20)),
   streaming: z.exactOptional(z.boolean()),
 }) satisfies Codec<T.MediaTranscriptionRequest>;
-export const MediaAudioRequest = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("speakers"), ...SpeakersFields }).refine(validSpeakers),
-  z.object({ kind: z.literal("voiceDesign"), ...MediaVoiceDesignRequest.shape }),
-  z.object({ kind: z.literal("clone"), ...MediaCloneRequest.shape }),
-  z.object({ kind: z.literal("transcription"), ...MediaTranscriptionRequest.shape }),
-]) satisfies Codec<T.MediaAudioRequest>;
 const MediaAudioVoice = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -86,7 +80,7 @@ const MediaAudioSegment = z
     end: z.number().min(0),
   })
   .refine((segment) => segment.end >= segment.start) satisfies Codec<T.MediaAudioSegment>;
-export const MediaAudioResult = z.discriminatedUnion("kind", [
+const MediaAudioResult = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("clone"), voice: MediaAudioVoice }),
   z.object({ kind: z.literal("transcription"), text: z.string(), segments: z.array(MediaAudioSegment) }),
 ]) satisfies Codec<T.MediaAudioResult>;

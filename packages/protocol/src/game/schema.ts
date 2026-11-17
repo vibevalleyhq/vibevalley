@@ -6,7 +6,7 @@ import { Repo } from "../repo/schema";
 import { doingFields } from "../session/schema";
 import * as T from "./shapes";
 
-export const AchievementCategory = z.enum(T.AchievementCategoryValues) satisfies Codec<T.AchievementCategory>;
+const AchievementCategory = z.enum(T.AchievementCategoryValues) satisfies Codec<T.AchievementCategory>;
 
 const AchievementTier = z.object({
   need: z.number(),

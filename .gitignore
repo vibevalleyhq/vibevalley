@@ -31,3 +31,14 @@ design/mockups/v2
 
 # What a workspace package builds for the others (its vite.config.ts pack block).
 packages/*/dist/
+
+# Go build and test outputs
+/vibe-server
+/vibe-machine
+/vibe-desktop
+/vibe
+/vibe-tsgen
+/dist/
+*.test
+coverage.out
+

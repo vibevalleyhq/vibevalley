@@ -1,4 +1,4 @@
-import { existsSync, globSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import { definePlugin, defineRule, type ESTree, type Context, type Scope } from "vite-plus/lint/plugins";
@@ -36,8 +36,8 @@ const noWallClock = defineRule({
     messages: {
       wallClock: says(
         "this reads or waits on the wall clock, which a test's clock cannot move",
-        "read and wait through the clock the module was handed: `deps.clock.now()`, `await deps.clock.sleep(ms, signal)`, `withTimeout(…, { clock })` (@vibevalley/async); only infra/time.ts touches the real one",
-        "apps/server/src/infra/time.ts",
+        "read and wait through the clock the module was handed: `clock.now()`, `await clock.sleep(ms, signal)`, `withTimeout(…, { clock })` (@vibevalley/async)",
+        "packages/async/src/clock.ts",
       ),
     },
   },
@@ -318,14 +318,14 @@ const han = /[\p{Script=Han}、，。：；（）！？「」【】〔〕]/u;
 
 /** The catalog a file's words belong in. */
 export function catalogOf(filename: string): string {
-  const at = /\/apps\/(server|web|desktop|mobile|cli)\/(?:src\/)?(.*)$/u.exec(filename.replaceAll("\\", "/"));
+  const at = /\/apps\/(web|mobile)\/(?:src\/)?(.*)$/u.exec(filename.replaceAll("\\", "/"));
   const host = at?.[1];
   const rest = at?.[2];
   if (host === undefined || rest === undefined) return "shared";
   const folders = rest
     .split("/")
     .slice(0, -1)
-    .filter((f) => f !== "features" && f !== "platform" && f !== "modules" && f !== "gateway");
+    .filter((f) => f !== "features");
   for (let n = folders.length; n > 0; n--) {
     const name = [host, ...folders.slice(0, n)].join(".");
     if (existsSync(resolve(repo, "packages/i18n/locales/zh", `${name}.json`))) return name;
@@ -547,55 +547,6 @@ const globalDoors = defineRule({
   },
 });
 
-const dbDrivers = new Set(["pg", "@electric-sql/pglite"]);
-const isDbDriver = (spec: string) => [...dbDrivers].some((d) => spec === d || spec.startsWith(`${d}/`));
-
-const dbDoor = defineRule({
-  meta: {
-    messages: {
-      driver: says(
-        "`{{source}}` is the database's driver: a module that opens or queries it by hand bypasses Db, its transactions, its afterCommit hooks and the query count, and decides again what a failed statement becomes",
-        "take `db: Db` from the module's deps and call the generated query with it (`getIssue(db.sql, …)`, `await db.tx(async () => …)`); only `apps/server/src/infra/db.ts` imports the driver",
-        "apps/server/src/infra/db.ts",
-      ),
-    },
-  },
-  create(context) {
-    if (context.filename.replaceAll("\\", "/").endsWith("apps/server/src/infra/db.ts")) return {};
-    const check = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
-      if (typeof spec === "string" && isDbDriver(spec)) context.report({ node, messageId: "driver", data: { source: spec } });
-    };
-    return {
-      ImportDeclaration: (node) => check(node, node.source.value),
-      ExportNamedDeclaration: (node) => check(node, node.source?.value),
-      ExportAllDeclaration: (node) => check(node, node.source.value),
-      ImportExpression: (node) => (node.source.type === "Literal" ? check(node, node.source.value) : undefined),
-    };
-  },
-});
-
-const syncFs = defineRule({
-  meta: {
-    messages: {
-      sync: says(
-        "{{name}} holds the event loop while it reads or writes, so every helper's stream and every request waits on the disk",
-        "`await` node:fs/promises (`readFile`, `writeFile`, `rename`, `readdir`…); a file the server keeps is a `keptFile` (infra/files.ts)",
-        "apps/server/src/infra/files.ts",
-      ),
-    },
-  },
-  create(context) {
-    return {
-      ImportDeclaration(node) {
-        if (node.source.value !== "node:fs" && node.source.value !== "fs") return;
-        for (const s of node.specifiers)
-          if (s.type === "ImportSpecifier" && s.imported.type === "Identifier" && s.imported.name.endsWith("Sync"))
-            context.report({ node: s, messageId: "sync", data: { name: s.imported.name } });
-      },
-    };
-  },
-});
-
 const droppedTimer = defineRule({
   meta: {
     messages: {
@@ -622,7 +573,7 @@ const childProcessDoor = defineRule({
     messages: {
       spawn: says(
         "a process started here is one more place that must kill its whole group on a timeout and keep what it printed, which the doors already do",
-        "git through `apps/server/src/modules/repo/git.ts` (tests: `gitSync`, `gitIn` in `apps/server/src/testing/git.ts`), a helper's command through `runtime/dsh.ts`; a new kind of process gets its own door, added to the list in vite.config.ts",
+        "route child processes through a dedicated door listed in the exclude list in vite.config.ts",
         "docs/subsystems/foundation.md",
       ),
     },
@@ -800,18 +751,15 @@ const parentImportRule = defineRule({
     fixable: "code",
   },
   create(context) {
-    const [, app, at] = /\/apps\/(web|server|cli)\/src\/(.+)$/u.exec(context.filename.replaceAll("\\", "/")) ?? [];
+    const [, app, at] = /\/apps\/(web)\/src\/(.+)$/u.exec(context.filename.replaceAll("\\", "/")) ?? [];
     if (app === undefined || at === undefined) return {};
     // The string itself is replaced, quotes kept, so the fix is the same for every kind of import.
     const check = (source: { type: string; value?: unknown; range: [number, number] } | null | undefined) => {
       if (source?.type !== "Literal" || typeof source.value !== "string" || !source.value.startsWith("../")) return;
       const spec = source.value;
       const ups = spec.split("/").filter((p) => p === "..").length;
-      // Out of src: the server's generated queries are #db/ (its package.json imports); nothing else is reached.
-      const out = ups >= at.split("/").length;
-      const generated = /^(?:\.\.\/)+db\/generated\/(.+)$/u.exec(spec)?.[1];
-      if (out && (app !== "server" || generated === undefined)) return;
-      const alias = out ? `#db/${generated}` : `#/${withExtension(context.filename, spec, joinPath(at, spec))}`;
+      if (ups >= at.split("/").length) return;
+      const alias = `#/${withExtension(context.filename, spec, joinPath(at, spec))}`;
       const [start, end] = source.range;
       context.report({ node: source, messageId: "parent", data: { alias, app }, fix: (fixer) => fixer.replaceTextRange([start + 1, end - 1], alias) });
     };
@@ -866,119 +814,8 @@ const noCrossPackagePath = defineRule({
   },
 });
 
-/** Words that end in s and still name one thing; a service named for one of them is singular. */
-const singularInS = new Set(["Status", "Alias", "Canvas", "Lens", "Progress", "Access", "Address", "Ingress"]);
-const lastWord = (name: string) => /[A-Z][a-z0-9]*$/u.exec(name)?.[0] ?? name;
-const looksPlural = (name: string) => name.endsWith("s") && !singularInS.has(lastWord(name));
-const pascal = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
-
-/** The folder of a server module's service file (apps/server/src/{core,platform/x,modules/x,gateway/x}/x.ts), or undefined. */
-const serviceFolderOf = (filename: string): string | undefined => {
-  const [, folder, file] = /\/apps\/server\/src\/(?:platform\/|modules\/|gateway\/)?([^/]+)\/([^/]+)\.ts$/u.exec(filename.replaceAll("\\", "/")) ?? [];
-  const inModules = /\/apps\/server\/src\/(?:platform|modules|gateway)\/[^/]+\/[^/]+\.ts$/u.test(filename.replaceAll("\\", "/"));
-  return folder !== undefined && folder === file && (inModules || folder === "core") ? folder : undefined;
-};
-const singularOf = (word: string) => word.replace(/(ies|s)$/u, (e) => (e === "ies" ? "y" : ""));
-
-const singularService = defineRule({
-  meta: {
-    messages: {
-      plural: says(
-        "the module {{folder}} is named in the plural, but a service is one thing: the one that manages its concept",
-        "name the folder, the file, the service's interface and its factory with the concept's singular word, the same as its table (`modules/{{singular}}/{{singular}}.ts`, `export interface {{Singular}}`, `make{{Singular}}`)",
-        ".agents/skills/vv-typescript/SKILL.md",
-      ),
-      factory: says(
-        "`{{name}}` in the module {{folder}} makes a service under another name than its folder's",
-        "the module's one factory is `make{{Service}}(deps)`, returning `{{Service}}`; a helper factory lives in another file of the module",
-        ".agents/skills/vv-typescript/SKILL.md",
-      ),
-      missing: says(
-        "the module {{folder}} has a factory but no interface named after it, so other modules cannot name the service's type",
-        "`export interface {{Service}} { … }` (or `export type {{Service}} = …`) next to `make{{Service}}`; a protocol shape of that name is read as `T.{{Service}}`",
-        ".agents/skills/vv-typescript/SKILL.md",
-      ),
-    },
-  },
-  create(context) {
-    const folder = serviceFolderOf(context.filename);
-    if (folder === undefined) return {};
-    const service = pascal(folder);
-    let factory: ESTree.Node | undefined;
-    let declared = false;
-    return {
-      Program(node) {
-        if (looksPlural(service))
-          context.report({ node, messageId: "plural", data: { folder, singular: singularOf(folder), Singular: pascal(singularOf(folder)) } });
-      },
-      ExportNamedDeclaration(node) {
-        const d = node.declaration;
-        if (d?.type === "FunctionDeclaration" && d.id && /^make[A-Z]/u.test(d.id.name)) {
-          factory = d.id;
-          if (d.id.name !== `make${service}`) context.report({ node: d.id, messageId: "factory", data: { name: d.id.name, folder, Service: service } });
-        }
-        if ((d?.type === "TSInterfaceDeclaration" || d?.type === "TSTypeAliasDeclaration") && d.id.name === service) declared = true;
-      },
-      "Program:exit"() {
-        if (factory !== undefined && !declared) context.report({ node: factory, messageId: "missing", data: { folder, Service: service } });
-      },
-    };
-  },
-});
-
-/** The server's services, read once when the plugin loads. */
-const serviceNames = new Set(
-  globSync("apps/server/src/{core,platform/*,modules/*,gateway/*}/*.ts", { cwd: repo })
-    .filter((f) => {
-      const parts = f.split("/");
-      return parts.at(-1)?.slice(0, -3) === parts.at(-2);
-    })
-    .flatMap((f) => [...readFileSync(resolve(repo, f), "utf8").matchAll(/^export (?:async )?function make(\w+)\b/gmu)].map((m) => m[1] ?? "")),
-);
-
-const protocolNamespace = defineRule({
-  meta: {
-    messages: {
-      named: says(
-        "{{name}} is both a protocol shape and a server service, so importing the shape by name takes the service's name in this file",
-        '`import type * as T from "@vibevalley/protocol"` and write `T.{{name}}` (the file\'s other protocol types too, so they read alike)',
-        "docs/style/naming.md",
-      ),
-    },
-  },
-  create(context) {
-    return {
-      ImportDeclaration(node) {
-        if (node.source.value !== "@vibevalley/protocol") return;
-        for (const s of node.specifiers) {
-          if (s.type !== "ImportSpecifier") continue;
-          const name = s.imported.type === "Identifier" ? s.imported.name : s.imported.value;
-          if (serviceNames.has(name)) context.report({ node: s, messageId: "named", data: { name } });
-        }
-      },
-    };
-  },
-});
-
-const hostIoModules = new Set(["node:fs", "node:fs/promises", "node:child_process", "node:net", "node:http", "node:https", "electron"]);
-const nonBaseFolders = new Set([
-  "infra",
-  "ui",
-  "state",
-  "features",
-  "platform",
-  "modules",
-  "gateway",
-  "commands",
-  "screens",
-  "sections",
-  "preload",
-  "brain",
-  "tools",
-  "llm",
-  "realtime",
-  "primitives",
-]);
+const hostIoModules = new Set(["node:fs", "node:fs/promises", "node:child_process", "node:net", "node:http", "node:https"]);
+const nonBaseFolders = new Set(["infra", "ui", "state", "features", "screens", "sections", "llm", "realtime", "primitives"]);
 
 const subpackageLayersRule = defineRule({
   meta: {
@@ -993,11 +830,6 @@ const subpackageLayersRule = defineRule({
         "move the shared pure definition down into src/base, or move this caller up into {{target}}",
         "docs/style/module-design.md",
       ),
-      preloadLeak: says(
-        "the Electron preload bridge runs in a sandboxed renderer context and cannot import {{source}}",
-        "keep preload limited to electron's contextBridge/ipcRenderer, @vibevalley/* contracts, and ../base/* pure helpers",
-        "docs/subsystems/app.md",
-      ),
     },
   },
   create(context) {
@@ -1005,36 +837,21 @@ const subpackageLayersRule = defineRule({
     if (/\.(?:test|spec|stories)\.tsx?$/u.test(normalized)) return {};
     const match = /\/(apps|packages)\/([^/]+)\/src\/(.+)$/u.exec(normalized);
     if (!match) return {};
-    const [, kind, pkg, at] = match;
+    const [, , , at] = match;
     const top = at?.split("/")[0];
-    if (top !== "base" && !(kind === "apps" && pkg === "desktop" && top === "preload")) return {};
+    if (top !== "base") return {};
 
     const checkSpec = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
       if (typeof spec !== "string" || at === undefined) return;
-      if (top === "base") {
-        if (hostIoModules.has(spec)) {
-          context.report({ node, messageId: "baseIo", data: { source: spec } });
-          return;
-        }
-        if (spec.startsWith(".") || spec.startsWith("#/")) {
-          const target = spec.startsWith("#/") ? spec.slice(2) : joinPath(at, spec);
-          const targetTop = target.split("/")[0] ?? "";
-          if (nonBaseFolders.has(targetTop)) {
-            context.report({ node, messageId: "baseUpward", data: { target: `src/${targetTop}` } });
-          }
-        }
-        return;
-      }
-      // apps/desktop/src/preload/**
-      if (hostIoModules.has(spec) && spec !== "electron") {
-        context.report({ node, messageId: "preloadLeak", data: { source: spec } });
+      if (hostIoModules.has(spec)) {
+        context.report({ node, messageId: "baseIo", data: { source: spec } });
         return;
       }
       if (spec.startsWith(".") || spec.startsWith("#/")) {
         const target = spec.startsWith("#/") ? spec.slice(2) : joinPath(at, spec);
         const targetTop = target.split("/")[0] ?? "";
-        if (targetTop !== "preload" && targetTop !== "base") {
-          context.report({ node, messageId: "preloadLeak", data: { source: spec } });
+        if (nonBaseFolders.has(targetTop)) {
+          context.report({ node, messageId: "baseUpward", data: { target: `src/${targetTop}` } });
         }
       }
     };
@@ -1086,10 +903,8 @@ export default definePlugin({
     "subpackage-layers": subpackageLayersRule,
     "parent-import": parentImportRule,
     "no-cross-package-path": noCrossPackagePath,
-    "db-door": dbDoor,
     "child-process-door": childProcessDoor,
     "dropped-timer": droppedTimer,
-    "sync-fs": syncFs,
     "page-store": pageStore,
     "stored-door": storedDoor,
     "act-door": actDoor,
@@ -1097,7 +912,5 @@ export default definePlugin({
     "one-absent": oneAbsent,
     "global-doors": globalDoors,
     "native-control": nativeControl,
-    "singular-service": singularService,
-    "protocol-namespace": protocolNamespace,
   },
 });
