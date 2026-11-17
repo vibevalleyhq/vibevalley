@@ -21,8 +21,8 @@
 |---|---|
 | `internal/domain/stack/dispatch.go`、`stack.go`、`machine_hub.go` | 会话派活编排、机器执行调度、工作目录与执行周期对接及服务装配 |
 | `internal/domain/watch/service.go`、`sqlite.go`、`memory.go`、`types.go` | 触发、投递队列、唤醒调度、熔断与游标持久化 |
-| `internal/machine/`、`cmd/vibe-machine/` | 机器进程（`node.go`、`exec.go`、`env.go`、`lease.go`、`mounts.go`、`tunnel.go`）与子进程安全隔离 |
-| `pkg/oar/` | Go 原生编码代理适配器（`claude.go`、`codex.go`、`qoder.go`、`qwen.go`、`acp.go`、`session.go`、`registry.go`、`subagent.go`） |
+| `internal/machine/`、`cmd/vibe-machine/` | 零密钥机器进程（`node.go`、`exec.go`、`env.go`、`lease.go`、`mounts.go`、`tunnel.go`、`image.go`）与子进程安全隔离 |
+| `pkg/oar/` | 纯 Go 标准库农机适配层（`claude.go`、`codex.go`、`qoder.go`、`qwen.go`、`acp.go`、`session.go`、`registry.go`、`subagent.go`、`replaytest/`） |
 | `internal/domain/agent/`、`internal/durable/` | 农机预设登记、每日花费记账与原生持久对话引擎 |
 | `apps/web/src/features/session/` | `WorkLog.tsx`、`Trajectory.tsx`、`runs.ts` 瀑布图与 `events.ts` 订阅 |
 
@@ -112,6 +112,13 @@
 
 - `env -u GOROOT CGO_ENABLED=0 go test -count=1 -race ./internal/domain/stack/... ./internal/domain/watch/... ./internal/machine/... ./pkg/oar/... ./cmd/vibe-machine/...`：帮工派发、机器沙箱、投递顺序与熔断刹车、`pkg/oar` 协议与回放、重启恢复及跨边界隔离测试。
 - 根包 `arch_test.go`：验证领域层与基础层依赖方向不回流。
+
+### 远程节点、目录挂载与纯 Go 农机适配（`internal/machine`、`pkg/oar`）
+
+- **零密钥反向链路与按需租约（`cmd/vibe-machine`、`stack/machine_hub.go`）**：`vibe-machine` 主动外连 `vibe-server` 的 `/machine/ws` 通道建立 `Chord Link`，节点内不持持久密钥（受 `arch_test.go` 纯净性门禁守卫）；纯对话首轮推理不占机器租约，仅当工具需要执行环境时由 `MachineHub` 按标签匹配签发与追踪按需租约（`active`、`released`、`disconnected`）。
+- **并发文件锁与无 Shell 进程组清理（`internal/machine/`）**：`LocalEnv` 按规范化路径加细粒度锁串行化原子写入与补丁编辑（同目录临时文件 + `os.Rename`）；`Exec` 直接传参给 `os/exec` 并开启独立进程组（Unix `Setpgid: true`），调用取消或链路断开时先发 `SIGTERM` 并在宽限期（`exec_grace`，默认 `2 s`、上限 `3 s`）后补发 `SIGKILL` 清理整棵进程树。纯 Go `image.go` 基于标准库按 EXIF 自动旋正并缩放图片至默认 `2000×2000` 像素、`4.5 MiB` 上限以内。
+- **`.vibe/` 挂载与私有 MCP 隧道（`mounts.go`、`tunnel.go`）**：认领租约时将技能只读物化至 `.vibe/skills/`（`0444`），`.vibe/memory/` 按周期（默认 `15 s`）与回合末刷盘限时（默认 `30 s`）双向同步，检测基线变更时不覆盖而保存冲突记录；写入 `.vibe/outputs/` 的交付物按 SHA-256 流式上传至服务端；`TunnelHandler` 复用出站 `Chord Link` 代理访问节点登记的内网 `--mcp-target`（限 `16 MiB` 响应，禁止重定向）。
+- **纯 Go 农机适配与诚实花费核算（`pkg/oar`）**：仅依赖 Go 标准库，产出带单调 `seq`、原生 `sessionId`、`spanId`、`agentPath` 谱系与原始帧 `raw` 的 `RecordEnvelope`（兼容 `oar-voyage/3`）。驱动静态声明 `RefusedOptions`，遇到不支持参数在拉起进程前直接返回 `UnsupportedOptionError`；`Prompt`/`Steer`/`Queue`/`Withdraw`/`Abort`/`Compact`/`StopTask` 统一返回类型化 `ControlOutcome`；子代理深度受 `OAR_SUBAGENT_DEPTH` 限制（默认深度 `1`、并发上限 `4`）。内置 `claude`（`stream-json`、`get_usage` 基线扣减）、`codex`（JSON-RPC 线程、扣除 `cacheRead`/`cacheWrite`/`reasoning` 历史重报，压缩期拒新 `Queue`）、`acp`（承载 OpenCode、Grok、Kimi、CodeBuddy 等）、`qwen`（首帧 `initialize`）与 `qoder`（`QODER_EXPOSE_TOKEN_USAGE=1`、`0700`/`0600` 临时文件传提示与配置）；基线未知时总量置 `nil` 绝不虚报，并由 `pkg/oar/replaytest` 离线回放验证。
 
 ## 代理和 MCP 连接
 

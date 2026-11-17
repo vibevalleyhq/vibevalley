@@ -8,10 +8,10 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 cmd/vibe-server/           Go 控制平面服务端（127.0.0.1:8787；--web apps/web/dist 同时提供页面）
 cmd/vibe-desktop/          Go 原生桌面壳：内置控制平面服务，打开工作台与农场页面；thin_desktop 构建标签可连独立服务端
 cmd/vibe-machine/          Go 远端执行节点守护进程：向控制平面注册执行节点与目录，运行节点上的编码 agent
-cmd/vibe/                  Go 命令行（vibe）：照领域模型一条命令一个操作（issue、channel、auth、doctor、pkm、app、chat）
+cmd/vibe/                  Go 命令行（vibe）：照领域模型一条命令一个操作（issue、repo、agent、session、runtime、memory、cron、artifact、worker、channel、pkm、auth、doctor、app、chat、version）
 cmd/vibe-tsgen/            Go 协议形状生成器：向 packages/protocol/src/go-contract/ 生成类型并保持与 Go 结构体对账
 internal/domain/           Go 业务域模块，按单数概念划分：agent、artifact、attachment、channel、connector、game、gateway、
-                           issue、lan、media、memory、pkm、repo、setting、stack、user、voice、watch；arch_test.go 强制分层与依赖方向
+                           issue、lan、mcp、media、memory、pkm、repo、setting、stack、user、voice、watch；arch_test.go 强制分层与依赖方向
 internal/durable/          可恢复 agent 执行循环与调度（含 store/ SQLite 持久化与 sqlcgen）
 internal/machine/          节点执行、worktree/目录挂载、租约与隧道；internal/provider/ 厂商 SSE；internal/vault/ 密钥与代理；internal/config/ 配置
 pkg/                       Go 共享底座：oar（编码 agent 驱动与回放测试）、chord（实时同步链路与状态差值）、contract（委托契约与 tsgen）、migrate（嵌入迁移器）
@@ -54,7 +54,7 @@ vp install                                                      # 根目录：�
 vp check                                                        # 改完任何 TS/前端代码：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和全部包的类型；--fix 改格式
 vpx scripts/audit/comment-review.ts                             # 提 PR 前：模型照 docs/style/code.md 审这个分支新加的注释，逐条核实再删或改（vv-comments；--all <目录> 清存量）
 env -u GOROOT CGO_ENABLED=0 go run ./cmd/vibe-server --web apps/web/dist   # Go 服务端，127.0.0.1:8787，同时提供页面
-env -u GOROOT CGO_ENABLED=0 go run ./cmd/vibe issue list        # Go 命令行：照领域模型一条命令一个操作（issue、channel、auth、doctor、pkm、app、chat）
+env -u GOROOT CGO_ENABLED=0 go run ./cmd/vibe issue list        # Go 命令行：照领域模型操作（issue、repo、agent、session、runtime、memory、cron、artifact、worker、channel、pkm、auth、doctor、app、chat、version）
 vp run server:check                                             # 改完 Go 代码、SQL 或 packages/protocol：packages:build、vp check、go-sqlc --check、go-contract --check、go vet、go test
 vp run packages:build                                           # 改了 packages/ 的导出或类型、单跑 vp check 以前：打出各库给别人的声明（dist/，带缓存）
 vpx scripts/gen/go-sqlc.ts                                      # 改完 internal/**/migrations 或 queries.sql：重生成 SQLc 代码并校验最新（--check 只查）
@@ -66,7 +66,7 @@ vp run --filter @vibevalley/web e2e:dev                          # 改了页面�
 vp run desktop:test                                             # 改完 cmd/vibe-desktop：同时测试内嵌与 -tags thin_desktop 模式
 vp run desktop:dev                                              # 桌面版开发：运行 Go 桌面壳 ./cmd/vibe-desktop
 vp run --filter @vibevalley/mobile test                          # 改完手机壳（类型在 vp check）；原生工程与模拟器端到端见 apps/mobile/README.md
-vp run package:mac                                              # 构建并剥离符号的桌面可执行文件到 dist/vibe-desktop
+vp run package:mac                                              # 构建 dist/vibe-desktop、VibeValley.app（含 web 与 vibe）、.dmg/.zip 与 dist 下的 release.json
 vp run release alpha|beta|final                                 # 发版：算版本、跑校验（表结构不变），问过才打 tag 推送（docs/development.md）
 vp run capabilities                                             # 改了 <概念>/api.ts 的接口或 can：重写 docs/reference/capabilities.md（docs:verify 查它）
 vp run api:client                                               # 改了 <概念>/api.ts 的接口：重写 packages/protocol/src/client.ts 的 VibeValleyApi（docs:verify 查它）
@@ -81,7 +81,7 @@ vp run site:check && vp run site:build                          # 改完 apps/si
 
 Node 24（`.node-version` 定的那个）、Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务）与 Go（`env -u GOROOT CGO_ENABLED=0 go …`，零 CGO，跨平台编译）；`sqlc` 照根目录 `sqlc.yaml` 生成 SQL 绑定。先跑和改动有关的最窄的检查。
 
-一件事的主线：oar 会话事件 → `internal/domain/gateway/projection.go` 与各域状态归约 → 核心状态经 `GET /api/v1/state`（`internal/domain/gateway/streams.go`）SSE 推给页面；对话轨迹与持久化由 `internal/durable` 记录（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
+一件事的主线：oar 会话事件 → `internal/domain/gateway/projection.go` 与各域状态归约 → 核心状态经 `GET /api/v1/state`（`internal/domain/gateway/streams.go`）SSE 及 `pkg/chord` 增量链路推给页面；对话轨迹与持久化由 `internal/durable` 记录（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
 
 ## 怎么让 agent 做对
 
@@ -105,7 +105,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **`packages/protocol` 只放跨端契约**：按 `src/<概念>/{shapes,schema,api}.ts` 组织（`Schema` 写 `satisfies Codec<T.X>`），根入口只显式重导出跨端契约（`protocol-surface.ts` 棘轮守住）；`src/rules` 只放双端共用的纯函数（`rules/contract.test.ts` 查），仅服务端跑的规则归 Go 各自域（[契约、规则和数据库](docs/subsystems/foundation.md#契约规则和数据库)）。
 - **生成的不手改**：SQLc 产物（`internal/**/sqlcgen`、`vpx scripts/gen/go-sqlc.ts --check`）、Go 导出契约（`packages/protocol/src/go-contract`、`vpx scripts/gen/go-contract.ts --check`）、`packages/protocol/src/client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）与生成的参考表均由脚本写出，`server:check` 和 `docs:verify` 校验最新（[契约、规则和数据库](docs/subsystems/foundation.md#契约规则和数据库)）。
 - **包之间只经包名**：跨包只经 `package.json` 的 `exports` 写 `@vibevalley/*`（`no-cross-package-path` 查），包内跨目录写 `#/…`（`parent-import` 查）；库对外给 `dist/` 声明、运行读源码（[仓库和包](docs/subsystems/foundation.md#仓库和包)）。
-- **表名是「模块_概念」**：单数 `<模块>` 或 `<模块>_<概念>`，索引以表名开头；SQL 写在各域 `migrations/0001_init.up.sql` 与 `queries.sql`，代码经 `sqlcgen` 访问，由根目录 `sqlc_migrate_test.go` 与 `vpx scripts/gen/go-sqlc.ts --check` 校验（[契约、规则和数据库](docs/subsystems/foundation.md#契约规则和数据库)）。
+- **表名是「模块_概念」**：单数 `<模块>` 或 `<模块>_<概念>`，索引以表名开头；SQL 写在 11 个作用域（`durable`、`vault`、`agent`、`repo`、`channel`、`issue`、`watch`、`game`、`memory`、`pkm`、`gateway`）各自的 `migrations/0001_init.up.sql` 与 `queries.sql`，代码经 `sqlcgen` 访问，由根目录 `sqlc_migrate_test.go` 与 `vpx scripts/gen/go-sqlc.ts --check` 校验（[契约、规则和数据库](docs/subsystems/foundation.md#契约规则和数据库)）。
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层或旧数据兜底；表结构直接修改各自域的 `0001_init.up.sql`；对外 HTTP `v1` 是唯一例外（[地基](docs/subsystems/foundation.md#为什么这样)、[接口版本](docs/subsystems/core.md#为什么这样)）。
 - **页面不折事实**：页面只读 `GET /api/v1/state` 推来的 `StateFrame`（`useCore()`、`useFrames()`）并写画面摆法；缺数据就补进契约与 `internal/domain/gateway/projection.go` 或调接口问服务端，不在页面重写服务端业务规则（[客户端](docs/subsystems/app.md)）。
 - **封闭的联合穷尽处理**：按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员或显式 `default`（`switch-exhaustiveness-check` 查）；枚举全表映射用 `Record<X, …>`（[检查管着的写法](docs/style/code.md#检查管着的写法)）。

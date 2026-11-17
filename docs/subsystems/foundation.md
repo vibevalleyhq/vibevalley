@@ -25,7 +25,7 @@ Go 服务端与客户端共用的工程骨架：Go module（`cmd/*`、`internal/
 | `scripts/audit/practice-audit.ts`、`protocol-surface.ts`、`schema-audit.ts` | 语法树实践棘轮、根协议导出面棘轮、品牌主键 / `Secret` / `BizCode` 注册表边界审计 |
 | `internal/config/`、`internal/vault/`、`internal/durable/`、`internal/machine/`、`internal/provider/` | Go 配置解析、密钥信封与代理、持久代理运行引擎、机器沙箱与模型路由 |
 | `internal/domain/<概念>/` | Go 领域模块与入口服务（装配汇总在 `internal/domain/stack/stack.go`） |
-| `pkg/{oar,chord,contract,migrate}/` | Go 独立核心包：农机驱动、通信链路与监控、跨端视图契约与分段存储迁移 |
+| `pkg/{oar,chord,contract,migrate}/` | Go 独立核心包：农机驱动（仅标准库）、状态增量同步与双向多路复用链路、跨端视图契约与作用域迁移器 |
 | `packages/protocol/src/<概念>/` | 按概念划分的 `shapes.ts`、`schema.ts`（Zod）、`api.ts` |
 | `packages/protocol/src/rules/` | 服务端与页面共用的纯函数规则 |
 | `packages/protocol/src/client.ts` | 由 `scripts/gen/api-client.ts` 生成的 HTTP 客户端 `VibeValleyApi` |
@@ -49,10 +49,20 @@ Go 服务端与客户端共用的工程骨架：Go module（`cmd/*`、`internal/
 
 架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)；本节记录现行结构与门禁。
 
-- **Go 领域包单向拓扑与分层约束**：`arch_test.go` 检查 `pkg/*` 与 `internal/domain/*` 之间禁止越层反向导入，`internal/domain/channel` 与基础设施域不耦合上层工单/调度细节。
+- **Go 五层 DAG 与 `arch_test.go` 四道编译期红线**：
+  - 依赖层级严格单向：`pkg/chord`（第 0 层）← `pkg/{contract,oar,migrate}`（第 1 层）← `internal/{config,durable,vault,machine,provider}`（第 2 层）← `internal/domain/*`（第 3 层）← `cmd/*`（第 4 层）；第 3 层以下同层不同子系统之间禁止互引，包路径禁用 `brain`、`hands`、`common`、`utils`、`manager`。
+  - `cmd/vibe-machine` 纯净性：传递依赖禁止出现数据库驱动（`modernc.org/sqlite`、`pgx`）、模型 SDK（`anthropic`、`openai`、`genai`）、`internal/durable`、`internal/vault` 与 `github.com/egoist/mygo`。
+  - `pkg/oar` 完全自治：仅允许依赖 Go 标准库，确保离线回放测试套件零外部依赖独立运行。
+  - `github.com/egoist/mygo` 隔离：仅允许在 `cmd/vibe-desktop` 中引用，保证服务端与执行节点构建零图形库依赖。
 - **组装与启动**：`internal/domain/stack/stack.go` 按序初始化配置、`vault`、各 `internal/domain/*` 服务与持久引擎并在关闭时释放。
 - **单数概念名与协议命名空间**：目录、表名和领域包均用单数概念词，TypeScript 引用同名的协议类型写为 `T.Issue`（由 `singular-service` 与 `protocol-namespace` 规则检查）。
 - **Go 契约与 SQL 代码生成保持同步**：`vpx scripts/gen/go-contract.ts --check` 校验 `packages/protocol` 与 `pkg/contract` 一致性，`vpx scripts/gen/go-sqlc.ts --check`、`sqlc diff -f sqlc.yaml` 与 `sqlc compile -f sqlc.yaml` 校验表结构与查询编译最新。
+
+### Chord 增量同步与多路复用链路（`pkg/chord`）
+
+- **严格 JSON 增量折叠（`pkg/chord/delta`）**：同步快照限定为严格 JSON 值（拒绝 `NaN` 与 `±Inf`），写路径产生 `r`（替换）、`d`（删除）、`a`（字符串追加）与 `s`（数组切片）四类操作码。`PendingOps` 在消费或传输拥塞时执行四条在线折叠规则（同路径连续追加拼合、子树替换覆盖消除、新建接追加原地合并），一旦挂起数超过 `10,000` 条（`DefaultMaxPendingOps`）立即熔断并退化为单条全量根替换 `[["r", latestRoot]]`。
+- **单飞订阅句柄（`pkg/chord/watch`）**：`WatchHandle[T]` 串行投递变更，在上一次消费回调返回前绝不并发重入，期间提交在 `PendingOps` 合并；文档回收时发送 `retired: true` 而不断开句柄，重建后自动以根替换恢复，并支持携带 `WithFromRev` 游标续传。
+- **双向多路复用 `Link`（`pkg/chord/link`）**：在单一 `FrameTransport` 上复用双向 RPC（`rpc_req`/`rpc_res`/`rpc_cancel`）与视图订阅（`watch_open`/`watch_push`/`watch_stop`/`watch_end`），握手绑定 `Principal`，默认 15 秒心跳探测与 45 秒超时自动取消在途 RPC 上下文；超过 `64 KiB`（`MaxFrameBytes`）的负载自动拆分为交错分块帧传输以避免队头阻塞（重组上限 `32 MiB`），统一提供 WebSocket 与进程内内存管道（`link.NewMemoryPipe`）两种传输实现。
 
 ### 异步、资源与错误
 
@@ -66,7 +76,7 @@ TypeScript 包的写法细节在 [vv-typescript](.agents/skills/vv-typescript/SK
 
 - **按概念组织契约，根桶只导出跨端契约**：`packages/protocol/src/<概念>/` 包含 `shapes.ts`、`schema.ts`（`Codec<T.X>`）和 `api.ts`，由 `schema.test.ts` 校验。根入口 `packages/protocol/src/{shapes,schema}.ts` 禁止 `export *`，仅显式重导出跨端引用契约，由 `scripts/audit/protocol-surface.ts`（`docs:verify`）棘轮守住导出上限。
 - **生成文件不手改**：`sqlcgen/`、`pkg/contract/tsgen`、`packages/protocol/src/client.ts`、[capabilities.md](docs/reference/capabilities.md)、[primitives.md](docs/reference/primitives.md) 与 `packages/i18n/src/catalogs.ts` 均由脚本写出，由 `server:check` 与 `docs:verify` 校验最新。
-- **SQLite + `sqlc` 单域自洽迁移**：各需要持久化的领域包与 `internal/durable/store`、`internal/vault` 自带 `migrations/0001_*.up.sql` 与 `queries.sql`，经 `sqlc` 生成类型安全的 `sqlcgen` 代码；全仓 `sqlc_migrate_test.go` 校验迁移幂等与可建表，内部演进直接修改基线，不留兼容补丁。
+- **11 个作用域 SQLite + `sqlc` + `pkg/migrate` 自洽迁移**：`sqlc.yaml` 与 `internal/domain/stack/migrate.go` 统一管理 11 个持久化作用域：`durable`（`internal/durable/store`）、`vault`（`internal/vault`）、`agent`、`repo`、`channel`、`issue`、`watch`、`game`、`memory`、`pkm`（启用 `sqlite-vec`）与 `gateway`（`internal/domain/gateway` 叠加态存储，通过 `stack.GatewayMigrationsFS()` 嵌入避免循环导入）。非内存模式中 `durable` 使用主库路径，其余 10 个作用域各自使用 sidecar WAL 文件（`<前缀>.<作用域>.db`）；每个作用域自带 `migrations/0001_init.up.sql` 与 `queries.sql`，经 `sqlc` 生成类型安全的 `sqlcgen` 代码，并由 `pkg/migrate` 提供版本化 `up`/`down`/`status` 管理；全仓 `sqlc_migrate_test.go` 校验迁移幂等、可建表与 `stack` 嵌入一致，内部演进直接修改基线，不留兼容补丁。
 
 ### 边界审计
 

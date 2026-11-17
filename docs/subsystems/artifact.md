@@ -17,7 +17,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 | 位置 | 职责 |
 |---|---|
 | [`packages/artifact/`](packages/artifact/README.md) | 独立 Artifact 纯领域包（`@vibevalley/artifact`）：块状态机 `Page` 与码点切分（`ops.ts`）、Markdown 互转（`markdown.ts`）、HTML 前缀与划词改字（`html.ts`）、外壳运行时与主题（`shell.ts`）、前端块跨度计算与协同编辑器状态机（`blocks.ts`、`editor.ts`） |
-| `internal/domain/artifact/` | Artifact 服务（`service.go`）、块状态与顺序键（`page.go`、`order.go`）、CAS 存储（`cas.go`）、HTML 静态检查（`compiler.go`）、预览壳（`preview.go`）与交付物索引（`deliverables.go`） |
+| `internal/domain/artifact/` | Artifact 服务（`service.go`）、块状态与顺序键（`page.go`、`order.go`）、`gotextdiff` 差异与 CAS 存储（`cas.go`）、原生 `esbuild` 编译校验（`compiler.go`）、独立隔离预览（`preview.go`）与交付物索引（`deliverables.go`） |
 | `internal/domain/gateway/artifact_shell.go`、`handlers_collab.go` | HTTP 与订阅流接口挂接、`GET /api/v1/artifact/<id>/<version>` 响应头与外壳脚本注入 |
 | `packages/protocol/src/rules/order.ts`、`display.ts` | 前后端共用的分数顺序键 `keyBetween` 与沙箱常量 `htmlSandbox` |
 | `apps/web/src/features/artifact/` | `ArtifactsPage.tsx`、`ArtifactCanvas.tsx`、`BlocksView.tsx` 及消费 `@vibevalley/artifact` 的薄层适配 |
@@ -29,7 +29,8 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 ### 网页 Artifact（`html`）
 
 - **每一稿是一个附件，版本不可变**：单版上限 5MB，字节经 `Attachment.keep` 存一次，`artifact_version.attachment_id` 指向它；提交新版追加 `artifact_version` 记录，不覆盖旧版；删掉 Artifact 不删附件。
-- **双层沙箱隔离**：`GET /api/v1/artifact/<id>/<version>` 响应头携带严格 CSP（`sandbox` 不含 `allow-same-origin`，`connect-src 'none'`），前端 `iframe` 同步设 `sandbox={htmlSandbox}`。
+- **双层沙箱与独立源预览监听（`preview.go`）**：`GET /api/v1/artifact/<id>/<version>` 响应头携带严格 CSP（`sandbox` 不含 `allow-same-origin`，`connect-src 'none'`），前端 `iframe` 同步设 `sandbox={htmlSandbox}`；`vibe-server` 另起独立预览 HTTP 监听（`preview_addr`，默认 `127.0.0.1:0`），由 `PreviewHandler` 服务 `/preview/sha256/<sha>` 与 `/preview/artifact/<id>/<version>`，施加 `StrictPreviewCSP`（`?print=1` 为 `StrictPrintPreviewCSP`）、拒绝带 `Authorization` 请求与同源主机混访，防止预览脚本读取主工作台凭据。
+- **内嵌 `esbuild` 进程内编译与 `gotextdiff` 差异（`compiler.go`、`cas.go`）**：`CompileBundle` 直接调用 Go 版 [`github.com/evanw/esbuild/pkg/api`](https://pkg.go.dev/github.com/evanw/esbuild/pkg/api) 与内存虚拟文件系统编译多文件 TSX/JSX/TS/JS/CSS 产物，编译错误返回精确文件路径与行列号 `*CompileError` 反馈给 `durable` 循环当场自愈；修订按 SHA-256 去重存 CAS，行级补丁使用 `hexops/gotextdiff` 计算。
 - **提交前静态白名单检查（`@vibevalley/artifact/html`）**：仅放行 `cdn.jsdelivr.net`、`cdnjs.cloudflare.com`、`fonts.googleapis.com`、`fonts.gstatic.com`，且媒体必须内联為 `data:` 或 `blob:`；含表外外链、表单提交或嵌套页面的直接拒绝并报错行号。
 - **怎么看（`display`）**：网页 Artifact 带 `display`：`page`（整页，没有约定）、`slides`、`motion`，建的时候定（不填是 `page`），`artifact.update` 能改，一稿不变只换看法；一起写的没有这一项。
 - **外壳和消息约定（`@vibevalley/artifact/shell`）**：工作台看一稿时请求 `?shell=1&display=…&theme=…`，服务端在页面后面接上主题变量（`--vv-page`、`--vv-ink`…，和 `style.css` 的取值一致）、划词脚本和 `vv` 运行时；样式用 `:where()`，页面自己写的总是赢。运行时只对父窗口说话、只听父窗口：页面报 `ready`（种类、页数和每页的标题、备注，或时长）和 `at`（第几页、第几秒），外壳发 `goto`、`seek`、`play`、`pause`。两头都按 `HtmlShellMessage`、`HtmlShellCommand` 的 Schema 认，不认的丢掉；页面的话只改外壳显示的东西，不能让工作台做框外的事。显示和主题写在地址里，因为一稿的响应永久缓存。

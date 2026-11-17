@@ -19,8 +19,8 @@
 |---|---|
 | `packages/provider/src/moss/image.ts` | 固定端点、参数与布局校验、URL 响应、安全错误 |
 | `packages/protocol/src/media/` | 媒体任务、输入与素材库（`LibraryItem`、`LibraryOrigin`、`LibraryListRequest`、`LibraryAddRequest`）形状、Schema 与接口权限 |
-| `internal/domain/media/` | `Media` 服务与存储（`store.go`、`errors.go`、`migrations/`、`queries.sql`）：媒体输入预留、任务记录、配额校验与素材库 |
-| `internal/domain/gateway/handlers_media.go`、`media_offline.go`、`gateway.go` | HTTP 接口、`PUT /api/v1/media/input/:id/content` 上传、语音流响应与 `VIBEVALLEY_TEST_RUNTIMES=1` 测试替身 |
+| `internal/domain/media/` | `Media` 服务与存储（`store.go`、`vendor_jobs.go`、`errors.go`、`migrations/`、`queries.sql`）：媒体输入预留、任务记录、配额校验、素材库及 `VendorRunner` 真实厂商 HTTP 适配器 |
+| `internal/domain/gateway/handlers_media.go`、`provider_resolve.go`、`media_offline.go`、`gateway.go` | HTTP 接口、连接配置解析、真实厂商调用、`PUT /api/v1/media/input/:id/content` 上传、语音流响应与 `VIBEVALLEY_TEST_RUNTIMES=1` 测试替身 |
 | `internal/domain/stack/tools.go` | 助手和帮工媒体、理解与 `library_item_*` 工具绑定 |
 | `apps/web/src/features/media/` | `/library`：`Rail.tsx` 筛选栏、`Tiles.tsx` 缩略图、`Inspector.tsx` 详情栏、`LibraryPage.tsx` 工具条、上传、键盘和对话框（`?make=` 生成，`?understand=<附件 id>` 理解）；排法、计数、筛选和键盘落点在 `items.ts` 纯函数；「生成」对话框里的表单（生图、单人语音、音频工作台）与理解面板：任务、预览、保存与频道发布 |
 
@@ -39,6 +39,7 @@ Media 在 Collaboration 中、Channel 之后组装；启动时在频道恢复后
 - **未知不重做**：厂商响应不完整、超时或网络错误可能已经计费，记为 `unknown`。重启取消未发出的 `queued`；没有远端任务 ID 的生成及中断的流式请求记为未知。已保存远端任务 ID 的异步任务恢复状态查询，已取得 URL 的任务恢复下载，都不重新提交生成。
 - **取消不承诺停计费**：取消改变本机状态并中断对应工作，不代表厂商停止。旧工作的取消不能中断之后明确重试的下载。
 - **可用意味着落盘**：小音频与图片经 `Attachment.attach` 存成附件；超过附件上限的音频由 Media 输入存储持有，不强塞 Base64 附件。内容以 SHA256 寻址，完整写临时文件后原子发布，取消或写失败不暴露半文件。
+- **真实厂商 HTTP 执行与离线测试开关（`vendor_jobs.go`、`provider_resolve.go`）**：网关按用途从 `settings.json` 或环境变量解析绑定连接，`VendorRunner` 直接调用 OpenAI/MOSS 兼容端点执行生图（`/images/generations`）、多模态流式/JSON 理解（`/chat/completions`）与语音合成（`/audio/speech`）；`VIBEVALLEY_TEST_RUNTIMES=1` 时统一由 `media_offline.go` 提供离线确定性替身。
 - **页面不折事实**：每次状态变化由 `Core.apply(mediaChanged)` 投影；`phaseText`、可取消和可重试下载均由服务端给出。页面不在本地猜任务是否完成。
 
 **助手在频道里生的图自动发回。** 用户在频道里打 `/imagegen <描述>`，页面把这一行带 `to`（这里的助手）发出去，只交给这个助手；助手按内置 `imagegen` 技能（`internal/domain/gateway/seed_catalog.go`），调 `media.image.create`。来源是助手、带来源频道的生图任务下载完成后，Media 以那个助手的名义在来源频道发一条带图的消息，`sendKey` 为 `media:<任务 id>`，重试与重启只发一次；用户在本页发起的任务不自动发。

@@ -57,11 +57,15 @@ Go 桌面壳（`cmd/vibe-desktop`）通过两个构建标签在同一源码上�
 
 | 形态 | 构建命令 | 运行方式 | 家目录 / 服务端 | CLI 命令 |
 |---|---|---|---|---|
-| 独立单二进制 | `vp run package:mac`（内嵌栈） | 直接启动 `dist/vibe-desktop`，可选提供 `--web-dist` 与 `--db` | `~/.vibevalley`、默认内嵌启动平台服务栈（`embedded_stack.go`） | `vibe`（`cmd/vibe`） |
-| `thin_desktop` 瘦壳 | `env -u GOROOT CGO_ENABLED=0 go build -tags thin_desktop ./cmd/vibe-desktop` | 连向 `--server` 指定的外部 `vibe-server` 实例 | 由外部 `vibe-server` 拥有家目录与仓库数据 | `vibe`（`cmd/vibe`） |
+| 独立应用包与二进制 | `vp run package:mac`（内嵌栈） | 生成 `dist/vibe-desktop` 与 `dist/VibeValley.app`（`Contents/Resources/` 含 `web`、`bin/vibe`、`icon.icns`），可选 `--web-dist` 与 `--db` | `~/.vibevalley`、默认内嵌启动平台服务栈（`embedded_stack.go`） | `vibe`（`cmd/vibe`，包内自带） |
+| `thin_desktop` 瘦壳 | `env -u GOROOT CGO_ENABLED=0 go build -tags thin_desktop ./cmd/vibe-desktop` | 通过 `embedded_stack_stub.go` 剔除内嵌栈，连向 `--server` 指定的外部 `vibe-server` 实例 | 由外部 `vibe-server` 拥有家目录与仓库数据 | `vibe`（`cmd/vibe`） |
 | 开发模式 | `vp run desktop:dev` | 运行 `./cmd/vibe-desktop`，配合前端开发构建调试 | 临时或开发环境变量 `$VIBEVALLEY_HOME` | `go run ./cmd/vibe` |
 
-- **桌面端内置能力集成在单一二进制里**：WebView（`webview.go`）、刘海灵动岛（`island.go`）、多仓库终端（`terminal.go`）、Keychain 根密钥（`keychain.go`）、桌面控制 IPC（`ipc.go`）与宿主桥（`host_bridge.go`）均由 `cmd/vibe-desktop` 直接托管，不再维护单独的 Electron 或 Swift 子进程。
+- **桌面端内置能力集成在单一 Go 二进制里**：基于 [`egoist/mygo`](https://github.com/egoist/mygo) 构建双模桌面壳，全部 GUI 依赖经 `arch_test.go` 隔离在 `cmd/vibe-desktop`，不再维护单独的 Electron 或 Swift 子进程：
+  - **系统 WebView 与资源解析（`webview.go`）**：主窗口使用系统自带 WebView（macOS `WKWebView`、Windows `WebView2`、Linux `WebKitGTK`）经自定义 Scheme（默认 `vibe://localhost`）加载资源，按 `--web-dist` → `.app` 包内 `Contents/Resources/web` → 仓库 `apps/web/dist` → 内嵌降级页 `web_fallback.html` 顺序解析。
+  - **进程内 `Chord Link`（`ipc.go`、`embedded_stack.go`）**：单机嵌栈模式通过内存管道 `BridgeTransport` 与 `ChordFrameEvent`（`chord:frame`）直连 `EmbeddedStack`，零回环 TCP 监听开销。
+  - **GPU 原生灵动岛（`island.go`）**：使用 `mygo/ui` 与 `plugins/glass` 事件驱动渲染（静止时零后台定时器），直接响应 `always_ask` 权限审批与 `budget_reached` 一键提额信号。
+  - **钥匙串、多仓库终端与自动化（`keychain.go`、`terminal.go`、`automation.go`、`host_bridge.go`）**：调用系统钥匙串托管 `vault.RootKey`（`--headless-check` 自动切内存替身）；受白名单根目录约束的终端控制器支持进程组清理；自动化套接字（`--automation-socket` / `MYGO_AUTOMATION`）配 `ui.Tester` 支撑无头 UI 检查；控制套接字 `$VIBEVALLEY_HOME/desktop.sock` 响应 `vibe app` 指令并安装包内 `vibe` 命令。
 
 ## 怎么走
 
@@ -81,7 +85,7 @@ Go 桌面壳（`cmd/vibe-desktop`）通过两个构建标签在同一源码上�
 
 **发布构建**
 
-- `vp run package:mac` 编译剥离符号的 `dist/vibe-desktop` 二进制，`.github/workflows/release.yml` 在版本 tag 推送时构造草稿发布并上传产物。
+- `vp run package:mac`（`scripts/release/package-mac.ts`）编译 stripped `dist/vibe-desktop`（强制小于 `40 MiB`）与 `vibe` CLI，组装 `dist/VibeValley.app`（`Info.plist` 按渠道设 Bundle ID，`Contents/Resources/` 嵌入 `web`、`bin/vibe` 与 `icon.icns`），在 macOS 上执行 ad-hoc 签名并运行 `--headless-check` 验证，再生成 `.zip`、`.dmg` 与 `dist/` 下的 `release.json`（含 `version`、`notes`、迁移表结构 SHA-256 `schema`、`page` 与 `builds` 校验）；`.github/workflows/release.yml` 在版本 tag 推送时构造草稿发布并上传产物。
 
 ## 和谁打交道
 
@@ -106,4 +110,4 @@ Go 桌面壳（`cmd/vibe-desktop`）通过两个构建标签在同一源码上�
 
 - `vp run web:check`、`vp test run apps/web/src/layers.test.ts apps/web/src/stories.test.ts`：页面类型、Tailwind 的编译、令牌/门禁规则（`vibevalley/style-attrs`、`vibevalley/no-hex-color`、`vibevalley/design-tokens`）、分层方向与故事覆盖测试。
 - `vp run --filter @vibevalley/web e2e`（`apps/web/test/*.spec.ts`）：各页面 Playwright 端到端与 axe 无障碍测试。
-- `vp run desktop:test` 与 `vp run package:mac`：Go 桌面端全套测试（含 `-tags thin_desktop`）与剥离二进制打包、`--headless-check` 自检。
+- `vp run desktop:test` 与 `vp run package:mac`：Go 桌面端全套测试（含 `-tags thin_desktop`）与 `VibeValley.app`/`.dmg`/`.zip` 打包、`--headless-check` 自检。

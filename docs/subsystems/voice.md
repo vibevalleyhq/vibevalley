@@ -20,8 +20,8 @@
 |---|---|
 | [`packages/provider/`](packages/provider/README.md) | 显式转写模型、MOSS 帧与鉴权连接、字幕分片；无应用设置、业务工具或 UI |
 | [`packages/ai/`](packages/ai/README.md) | Core 转写调用、WAV/RMS、MOSS 会话与 `Playback` 样本级打断对账；浏览器入口不加载服务端模型工厂 |
-| `internal/domain/voice/` | `voice.go`、`agora_token.go`：RTC/MOSS 授予管理、通话状态与令牌签发 |
-| `internal/domain/gateway/` | `handlers_media.go`（`voice.*` 接口、听写代理）、`voice_ws_offline.go`（WebSocket 中继与测试替身）、`gateway.go` |
+| `internal/domain/voice/` | `voice.go`、`agora_token.go`、`realtime_relay.go`：RTC/MOSS 授予管理、通话状态、令牌签发与纯 Go 标准库 RFC 6455 实时 WebSocket 中继 |
+| `internal/domain/gateway/` | `handlers_media.go`（`voice.*` 接口、听写代理）、`provider_resolve.go`（实时连接解析）、`voice_ws_offline.go`（WebSocket 离线替身）、`gateway.go` |
 | `internal/domain/setting/setting.go` | 语音默认配置、校验与差异持久化（`$VIBEVALLEY_HOME/settings.json`） |
 | `apps/web/src/features/voice/model/`、`views/` | `model/` 里 `call.ts`、`dictation.ts`、`moss-line.ts` 管设备与宿主，`moss-worker.ts`/`moss-worklets.ts` 保持 PCM 绕开 UI 主线程，`captions.ts` 管展示轮次，`contract.ts` 定义应用会话接口；`views/` 是表单与 playground |
 | `apps/mobile/src/infra/rtc.ts` | 手机壳原生声网 RTC 适配（锁屏不断线） |
@@ -43,7 +43,7 @@
   - 通话中若 `Watch.inboxNews` 出现新事项，先等 3 秒合并同批事项，经 `Orchestrator.brief` 生成口语摘要，再调声网 `session.say`（`APPEND` 排在当前话音后，按句切分为 480 字节以内）播报。
   - 未通话时手机按收件箱响铃；用户接听时带该事项启动通话，跳过开场白直接由助手播报该事项。
 - **一段听写绑定唯一输入框目标**：录音开始时锁定发起的输入框；切换焦点或在别处点停止不会写错目标，组件卸载时自动取消在途转写。
-- **MOSS Live 经服务端隐藏密钥中继**：页面连 `/api/v1/voice/moss/line`（校验同源 `Origin` 与回环 `Host`），服务端向 Provider 要 MOSS Live 绑定的账号，用它封着 Key 的线路握手（Key 由 Provider 注入，回传的帧里也由它抹掉），双向透传帧。
+- **实时 WebSocket 密钥中继（`realtime_relay.go`）**：页面连接 `/api/v1/voice/realtime`、`/api/v1/voice/moss/line` 与 `/api/v1/voice/vision/line`（校验同源 `Origin` 与回环 `Host`），网关经 `provider_resolve.go` 取出 Live/Vision 绑定账号，由 `ServeRealtimeWS`（纯 Go 标准库 RFC 6455 实现）在服务端注入认证头后双向透传并脱敏回传帧，测试模式由 `voice_ws_offline.go` 接管。
 
 ## 怎么走
 

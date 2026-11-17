@@ -15,10 +15,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `internal/domain/gateway/projection.go`、`overlay.go` | 核心状态 `SpaceState` 维护、投影折叠与向页面出帧拼装（`StateFrame`） |
+| `internal/domain/gateway/projection.go`、`overlay.go`、`overlay_sql_store.go` | 核心状态 `SpaceState` 维护、投影折叠、出帧拼装（`StateFrame`）及 `gateway` SQLite 叠加态持久化（11 个 `sqlc` 作用域之一） |
 | `packages/protocol/src/core/shapes.ts` | `SpaceState`、`Fact`、`StateFrame`、`ServerEvent`、`LiveEvent` |
 | `packages/protocol/src/api.ts`、`endpoint.ts` | 汇总各概念的 `endpoints`、`Endpoint`、六位业务码 `BizCode`、`bizCodeMeta`、全信封 Schema 与 `ApiError` |
-| `internal/domain/gateway/` | `gateway.go`（路由注册、鉴权、`/api/v1/*` 命令处理分发）；`handlers_{work,collab,media,platform}.go`；`streams.go`（SSE 与订阅流） |
+| `internal/domain/gateway/` | `gateway.go`（路由注册、鉴权、`/api/v1/*` 命令处理分发）；`handlers_{work,collab,media,platform}.go`；`streams.go`（SSE 与订阅流）；`cron_runner.go`（后台定时调度） |
+| `internal/domain/stack/link_server.go`、`machine_hub.go` | `/chord/ws` 客户端 Chord 增量链接与 `/machine/ws` 远程 `vibe-machine` 反向链路 |
 | `pkg/contract/`、`pkg/contract/tsgen/` | Go 侧协议视图定义，与 `packages/protocol` 通过 `scripts/gen/go-contract.ts` 保持双向契约一致 |
 | `packages/protocol/src/rpc.ts` | 订阅的名字、入参和事件 Schema |
 | `cmd/vibe/` | CLI 入口（`main.go`、`client.go`）与按领域拆分的子命令 |
@@ -53,6 +54,9 @@ SSE 以外的路由：
 - WebSocket `/api/v1/voice/moss/line`、`/api/v1/voice/vision/line`：页面的实时语音线路，HTTP 服务端只接这两条升级（[语音](docs/subsystems/voice.md)）。
 - `/mcp` 与内置工具调度（[频道](docs/subsystems/channel.md)）。
 - `POST /v1/chat/completions`：OpenAI 兼容的助手入口（[助手](docs/subsystems/orchestrator.md)）。
+- WebSocket `/chord/ws`（`Stack.HandleClientWebSocket`）与 `/machine/ws`（`MachineHub.HandleWebSocket`）：基于 `pkg/chord` 的双向多路复用 RPC 与实时增量订阅链路（[地基](docs/subsystems/foundation.md#chord-增量同步与多路复用链路pkgchord)）。
+- `/egress`（`vault.EgressProxy`）：经短期能力令牌鉴权的受控出站代理入口（[设置和配置](docs/subsystems/setting.md#模型和不变量)）。
+- **定时调度循环（`gateway/cron_runner.go`）**：网关随启动拉起时区感知的 cron 轮询（支持五段式 `cron` 与 DST 跳过处理），到期执行 `RunDueCrons` 派单并落盘更新运行游标（[定时任务](docs/subsystems/issue.md#定时任务)）。
 
 - **客户端拥有连接的完整生命周期**：`packages/protocol/src/stream.ts` 在坏帧、回调抛错、HTTP 拒绝、取消和静默超时退出时中止请求并释放 reader；清理失败不覆盖原始错误。重连不留下旧连接。
 - **有界中继与心跳**：每条 SSE 连接（含工单观察流和订阅流）经有界队列与定时心跳维持，积压超出上限时主动断开释放源订阅，客户端重连后重拉快照或最新帧。

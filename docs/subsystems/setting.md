@@ -27,12 +27,12 @@
 
 ### 静态配置（`AppConfig`）
 
-- **优先级与命名**：
-  - 优先级固定为 `环境变量 > vibevalley.yaml > defaults()`。
-  - 环境变量名由配置键加 `VIBEVALLEY_` 前缀并将 `.` 换为 `_` 得出。
-  - 额外支持直接读取 `DEEPSEEK_API_KEY`、`AGORA_APP_ID`、`AGORA_APP_CERTIFICATE`；家目录由 `VIBEVALLEY_HOME` 指定（默认 `~/.vibevalley`）。
-- **错误配置拒绝开机**：配置文件解析失败或端口越界时直接报错退出，不静默回退默认值。
-- **配置键清单**：
+- **优先级与命名（Koanf + Cobra）**：
+  - 由 `internal/config/config.go` 通过 Koanf（`yaml` + `confmap` + `posflag`）加载，优先级严格为 `已变更 CLI 标志 > 环境变量 > vibevalley.yaml > DefaultConfig()`。
+  - 各二进制（`vibe-server`、`vibe-machine`、`vibe-desktop`）均内置 `config check` 与 `config print` 子命令，后者通过 `config.MarshalRedactedYAML` 将 `deepseek.api_key`、`secrets` 及敏感键替换为 `***REDACTED***`。
+  - 环境变量映射：`VIBEVALLEY_HOME`、`VIBEVALLEY_WORK_ROOT`、`VIBE_CONFIG`、`VIBE_SERVER_ADDR`、`VIBE_PREVIEW_ADDR`、`VIBE_DB_PATH`、`VIBE_ALLOW_LOOPBACK_EGRESS`、`VIBE_SERVER_URL`、`VIBE_MACHINE_ID`、`VIBE_WEB_DIST`、`MYGO_AUTOMATION`、`DEEPSEEK_API_KEY`。
+- **错误配置拒绝开机**：配置文件解析失败、存在未知键、端口越界或 `machine.exec_grace` 超出 `(0s, 3s]` 时直接报错退出，不静默回退默认值。
+- **配置键清单**（核心分节 `server.*`、`machine.*`、`desktop.*`、`deepseek.api_key`、`secrets` 与兼容顶层键）：
 
 | 配置键 | 用途 | 默认值 |
 |---|---|---|
@@ -59,7 +59,9 @@
 - **设置优先于配置，按需实时读取**：动态设置里的凭据与语音配置保存后立即生效，为空时回退 `AppConfig`。
 - **暴露当前空间的实际路径**：`SettingsStatus.paths` 给出 `repos`、`worktrees` 与 `pkm` 的绝对路径，关于页逐行显示。
 - **密钥隔离，不回传明文，损坏文件保留备份**：
-  - 静态和动态密钥经 `internal/vault` 加密信封与协议 `Secret`（`packages/protocol/src/common/schema.ts`）双重隔离；`setting.get` 仅返回来源和末四位提示（`…xxxx`）。
+  - 静态和动态密钥经 `internal/vault` 信封加密与协议 `Secret`（`packages/protocol/src/common/schema.ts`）双重隔离；`setting.get` 仅返回来源和末四位提示（`…xxxx`）。
+  - `internal/vault`（11 个 `sqlc` 作用域之一）使用 256 位 `RootKey` 经 AES-256-GCM 封装 DEK 落盘 `vault_secret` 表（`provider_api_key`、`git_credential`、`mcp_oauth_token`），并通过 `Secret` 类型在格式化、日志与 JSON 序列化时自动打码。
+  - **短期能力令牌与出站白名单代理（`vault/token.go`、`proxy.go`、`hostpolicy.go`）**：签发 `vvcap1.` 前缀 HMAC-SHA256 短期令牌（默认 `15` 分钟），绑定 `PrincipalID`、`SessionID`、能力集与 `AllowedHosts`；控制面在 `/egress` 挂载 `EgressProxy`，拦截 `CONNECT`/`TRACE`、校验域名白名单与自定义解析 IP 策略（阻断私网、链路本地、云元数据及未授权环回地址），核验通过后在控制面出口代填真实凭据转发并写入脱敏审计日志。
   - `settings.json` 以 `0600` 权限原子改名写入；启动时若文件损坏，保留备份并从空设置启动。
 - **每个功能的准备状态由服务端统一计算（`SettingsStatus.readiness`）**：
   - 服务端为 11 项功能（`orchestrator`、`image`、`understanding`、`speech`、`speakers`、`voiceDesign`、`transcription`、`dictation`、`live`、`vision`、`call`）给出 `{ ready: true }` 或 `{ ready: false, missing }`。

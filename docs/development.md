@@ -16,12 +16,13 @@ vp run desktop:dev                           # 桌面版：运行 Go 原生桌�
 - **目录**：帮工在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下运行，仓库在 `repos/`，worktree 在 `worktrees/`；设置与数据在 `~/.vibevalley`（`VIBEVALLEY_HOME`），详情见[设置和配置](docs/subsystems/setting.md#模型和不变量)。
 - **语音**：凭据配置见 [语音](docs/subsystems/voice.md)，未配置时仍可文字交互。
 - **重载**：Go 服务端不自动重载，修改 Go 代码后需重启；页面修改后需重新构建（或开发模式下开 Vite dev server）。
-- **表结构**：按域编辑 `internal/domain/<域>/migrations/0001_init.up.sql`（及 `internal/durable/store/`、`internal/vault/`）与对应 `queries.sql`，并运行 `vpx scripts/gen/go-sqlc.ts` 生成 `sqlcgen/` 绑定（`sqlc_migrate_test.go` 与 `go-sqlc.ts --check` 校验）。
+- **表结构**：按域编辑 `sqlc.yaml` 涵盖的 11 个作用域（`internal/durable/store/`、`internal/vault/`、`internal/domain/{agent,repo,channel,issue,watch,game,memory,pkm,gateway}/`）下的 `migrations/0001_init.up.sql` 与 `queries.sql`，并运行 `vpx scripts/gen/go-sqlc.ts` 生成 `sqlcgen/` 绑定（`sqlc_migrate_test.go` 与 `go-sqlc.ts --check` 校验）。
+- **子命令**：`vibe-server`、`vibe-desktop` 与 `vibe-machine` 均基于 Cobra + Koanf 提供 `config check|print` 校验与脱敏打印，控制面与桌面壳另提供 `migrate up|down|status` 管理全部 11 个 SQLite 作用域。
 
 ## 桌面可执行文件与发版
 
 ```bash
-vp run package:mac       # 编译并剥离符号输出至 dist/vibe-desktop
+vp run package:mac       # 编译 dist/vibe-desktop 与 vibe，组装 dist/VibeValley.app、.dmg/.zip 与 dist 下的 release.json
 vp run release alpha     # 在 main 上打下一个 alpha
 vp run release beta      # 首次在 main 切出 release/x.y 并打 beta.1；之后在 release/x.y 打下一个 beta
 vp run release final     # 在 release/x.y 打正式版（须先有同版本 beta）
@@ -72,10 +73,10 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 
 命令行在 `cmd/vibe/`，仓库内通过 `env -u GOROOT CGO_ENABLED=0 go run ./cmd/vibe` 运行。默认连接 `$VIBEVALLEY_HOME/server.json` 记录的服务端或 `http://127.0.0.1:8787`，可用 `--server` 覆盖。
 
-- **设计原则**：基于 cobra（`cmd/vibe/main.go`）与 HTTP API 客户端（`cmd/vibe/client.go`），支持 `--json` 输出。路径为 `<资源> [<子资源>] <动词>`（如 `issue`、`channel`、`pkm`、`auth`、`doctor`、`app`、`chat`）。
-- **工单**：`vibe issue list|get|create|status|delete`。
-- **笔记**：`vibe pkm capture`、`vibe pkm search`、`vibe pkm page list|show`。
-- **桌面与诊断**：`vibe doctor` 检查家目录、`server.json`、`/healthz`、`git` 与 `PATH` 上农机；`vibe app` 控制本地桌面端。
+- **设计原则**：基于 Cobra（`cmd/vibe/main.go`）与 HTTP API 客户端（`cmd/vibe/client.go`），支持 `--json` / `--format json` 与 `--dry-run`。路径为 `<资源> [<子资源>] <动词>`，完整子命令包括 `issue`、`repo`、`agent`、`session`、`runtime`、`memory`、`cron`、`artifact`、`worker`、`channel`、`pkm`、`auth`、`doctor`、`app`、`chat` 与 `version`。
+- **工单与协作**：`vibe issue list|get|create|status|delete|watch|assign|act|refine`、`vibe repo|agent|session|runtime|memory|cron|artifact|worker|channel ...`。
+- **笔记**：`vibe pkm list|get|search|capture`。
+- **桌面、鉴权与诊断**：`vibe doctor` 检查家目录、`server.json`、`/healthz`、`git` 与 `PATH` 上农机；`vibe auth login|status|logout` 登录远程控制面；`vibe app status|open` 控制本地桌面端；`vibe chat` 终端直连助手。
 
 ```bash
 vibe issue create … --repo clock --agent docs --json

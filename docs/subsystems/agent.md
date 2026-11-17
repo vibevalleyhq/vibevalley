@@ -21,7 +21,7 @@
 | `internal/domain/agent/sqlite.go`、`migrations/0001_init.up.sql`、`queries.sql` | 档案、技能库与运行记录的 SQLite 持久化与 `sqlc` 查询 |
 | `internal/domain/agent/presets.go` | 农机预设、支持项与平台选项兼容检查 |
 | `internal/domain/gateway/seed_catalog.go` | 内置档案模板、自带技能目录与 starter（`VIBEVALLEY_AGENT_STARTERS`）安装 |
-| `pkg/oar/`、`internal/domain/stack/machine_hub.go` | 外部编码农机（`claude`、`codex`、`pi` 等）探测、会话拉起与事件订阅 |
+| `pkg/oar/`、`internal/domain/stack/machine_hub.go` | 纯 Go 标准库编码农机适配器（`claude`、`codex`、`acp`、`qwen`、`qoder` 与 `replaytest` 离线回放）及远端节点调度 |
 | `internal/durable/`、`internal/domain/stack/` | 原生持久对话引擎、模型路由（`llm_adapter.go`）与帮工工具挂载（`tools.go`） |
 | `apps/web/src/features/agent/`、`apps/web/src/features/runtime/` | 档案列表、模板目录、捏帮工页、助手档案页、农具页与技能书页 |
 

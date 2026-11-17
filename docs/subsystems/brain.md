@@ -24,11 +24,19 @@
 
 ## 模型和不变量
 
-### 模型边界
+### 持久存储与显式阶段状态机（`internal/durable`）
 
-- `internal/provider/router.go` 统一接入兼容的流式模型后端（Anthropic / OpenAI SSE），密钥从设置或环境变量注入并在每次请求边界组装，不在持久化层明文泄露密钥。
-- 工具权限评估由 `internal/durable/permission.go` 在每轮工具调用前执行：拒绝但不可客户端覆盖时直接将结果标为拒绝；需要审批时 `Park` 挂起当前轮次并经工作台审批接口恢复或拒绝。
-- Token 预算（`budget.go`）与上下文压缩（`compaction.go`）均在同一持久引擎状态机内推进，重启后按库中记录的回合与轨迹恢复。
+- **六张正交表与单一写者组提交（`internal/durable/store`）**：存储兼容内存后端与零 CGO `modernc.org/sqlite`（WAL + `synchronous=NORMAL`），收敛为 `durable_conversation`、`durable_entry`（只追加不可变账本，压缩和重置推进 `head_seq`）、`durable_document`（按 `(scope_kind, scope_id, doc_kind)` 存 `pi.agent`、`pi.live`、`pi.inbox`、`pi.usage`、`pi.governance`）、`durable_submission`（`UNIQUE(conversation_id, request_id)` 保障跨重启幂等）、`durable_task` 与 `durable_signal` 六张表。写路径经单一写协程执行批量组提交（上限 `64` 项），事务落盘后才更新内存文档与通知 `SubscribeDocuments` 观察者；仅 `pi.live` 流式输出允许 `deferred` 合批（`100 ms` 推内存视图、`1,000 ms` 合并落盘）。
+- **零空转阶段迁移与熔断**：休眠（`TransSleep`）与子任务汇合（`TransWaitTasks`，支持 `allSettled`、`failFast`、`any`）均落盘释放 Goroutine；早到信号在 `durable_signal` 持久缓存并单次消费。重启后未推进检查点的非模型任务递增 `restart_count`，达到 `restartLimit`（默认 `5` 次）即熔断并自底向上级联中止子任务。
+- **缓存亲和与四级压缩（`compaction.go`）**：透传固定 `provider_affinity`，工具或提示变化仅在尾部追加 `pi.system` 增量条目以保住前缀缓存，内置四级上下文压缩。
+- **`CodeMode` 确定性 JS 重放（`codemode.go`）**：内嵌纯 Go [`dop251/goja`](https://github.com/dop251/goja) 引擎并限制默认步数（`10,000`）、变量数（`256`）、内存（`16 MiB`）、输出（`1 MiB`）与 `5 s` 看门狗超时，锁定虚拟时钟与种子；脚本工具调用映射为带 `dedup_key` 的持久化子任务 `pi.codemode.tool`，崩溃重启可零耗时快进跳过已完成步骤。
+
+### 模型路由与三大治理闭环
+
+- **SSE 模型路由（`internal/provider/`）**：`Router` 封装 Anthropic 与 OpenAI（兼容 OpenAI / DeepSeek / 自定义端点）SSE 客户端，按显式供应商或模型前缀路由，密钥仅在请求边界注入。
+- **会话花费硬熔断（`budget.go`）**：`BudgetGate` 核算会话及派生子任务在 `pi.usage` 的累计花费；在发起新模型请求前检查 `maxCostMicros`，跨线后发出 `budget_reached` 告警并将任务转入 `sleeping`（保留工作目录租约），用户调高额度后投递 `budget.updated` 信号恢复执行。
+- **三态工具权限风控（`permission.go`）**：内置工具默认 `always_allow`，外部 MCP 工具默认 `always_ask`，支持按单工具覆写。`always_ask` 通过 `Park` 挂起并推送审批卡片至收件箱与灵动岛，由 `permission.decision` 信号唤醒；`auto` 模式经 `ExtractTrustedUserIntent` 严格只提取 `pi.user` 意图与工具参数（剔除 `pi.tool_result`、网页与 MCP 返回内容以阻断间接提示词注入），交 `RiskClassifier` 判定：`safe` 放行、`high_risk` 硬拒且禁止客户端绕过、`indeterminate` 降级为 `ask`。
+- **独立上下文验收裁判（`grader.go`）**：当会话配置验收标准 `RubricSpec` 时，`OutcomeGrader` 在 `pi.generation` 的 `onYield` 拦截点创建无任何写工具的只读独立裁判会话（仅传入任务描述、`RubricMarkdown` 与交付产物，隔离主会话推理路径），最多评估 `maxIterations`（默认 `3` 轮），返回 `needs_revision` 时将未达标项注入主会话返工。
 
 ### 提示、恢复与去重
 

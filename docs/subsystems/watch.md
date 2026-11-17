@@ -6,10 +6,10 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| 按自己的游标（`watch_cursor`）读频道的 `channel_event`，每个事件路由一次，开机接着读 | 消息、席位、未读与看过的存储（[频道](docs/subsystems/channel.md)） |
+| 按自己的游标（`watch_cursor`）读频道的 `channel_event`，每个事件路由一次，开机接着读（与负责状态增量订阅的 `pkg/chord/watch` 分层隔离） | 消息、席位、未读与看过的存储（[频道](docs/subsystems/channel.md)）；状态快照与增量传输（[地基](docs/subsystems/foundation.md#chord-增量同步与多路复用链路pkgchord)） |
 | 谁听见一句话（`whoHears`）、三道刹车（`brakes.ts`）、用户消息先问 `Issue.pool` 其余直接交给 `Session.route` | 一句话是不是工单的、蓄水池（[工单](docs/subsystems/issue.md#蓄水池和路由)）；投递行、四档紧急度、叫醒与重投（[帮工](docs/subsystems/session.md#触发与投递)） |
 | 给助手和档案排席位、开私聊（`direct`）、帮工的串和「家」、贴汇报、看过的标记与 👀、熔断与跳数通知 | 工单的状态机、派活与交付（[工单](docs/subsystems/issue.md)） |
-| 用户的收件箱：从 `SpaceState` 现算要用户处理的事、刚来的（`inboxNews`）、外推门禁（`toUser`、`handoffState`）、巡查（`patrol`） | 手机来电、系统通知、托盘和电话播报的画法（[农场的皮](docs/subsystems/farm.md)、[客户端](docs/subsystems/app.md)、[语音](docs/subsystems/voice.md)）；连接器的发送与退避（[频道](docs/subsystems/channel.md#外部连接器微信飞书qq)） |
+| 用户的收件箱：从 `SpaceState` 现算要用户处理的事、刚来的（`inboxNews`）、外推门禁（`toUser`、`handoffState`）、巡查（`patrol`） | 手机来电、系统通知、托盘和电话播报的画法（[农场的皮](docs/subsystems/farm.md)、[客户端](docs/subsystems/app.md)、[语音](docs/subsystems/voice.md)）；连接器的发送与退避（[频道](docs/subsystems/channel.md#外部连接器)） |
 
 ## 在哪
 

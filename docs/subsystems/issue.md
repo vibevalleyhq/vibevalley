@@ -37,7 +37,7 @@
 |---|---|
 | `internal/domain/issue/service.go`、`types.go`、`migrations.go` | 对外 `Issue` 服务：状态流转、`dispatch` / `settle` / 验收意见 / 父子工单依赖与事实发布 |
 | `internal/domain/issue/sqlite.go`、`memory.go`、`migrations/0001_init.up.sql`、`queries.sql` | 工单表、指派记录、定时任务、蓄水池、订阅与输入记录的 SQLite 持久化与内存替身 |
-| `internal/domain/issue/cron.go` | 定时任务管理与到期/补跑判定，绑定所属工单与路由调度 |
+| `internal/domain/issue/cron.go`、`internal/domain/gateway/cron_runner.go` | 定时任务模型、到期判定与后台时区感知的 cron 调度循环（`Start`、`RunDueCrons`、`ComputeNextRun`） |
 | `internal/domain/gateway/handlers_work.go`、`issue_helpers.go`、`seed_catalog.go` | 工单与定时任务 HTTP/工具接口处理、改动/PR/交付辅助逻辑与播种模板目录 |
 | `packages/protocol/src/rules/issues.ts`、`stage.ts` | 前后端共用的 `shortTitle`、`closedText` 与 `stageWantsUser` |
 | `cmd/vibe/issue.go` | 命令行工单创建、状态更新、查询与详情子命令 |
@@ -149,7 +149,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 - **下次运行时间不落库，实时从 `last_run` 推导**：严格晚于 `last_run`（未运行过则取创建时间）的下一个匹配分钟；夏令时跳过的时刻顺延，重复的时刻取第一次；重新开启已关闭的周期任务时将 `last_run` 设为当前时间。
 - **助手非当轮授权创建的周期或派工任务须等用户同意（`needsOK`）**：用户创建、或助手在含用户原话的当轮（`Actor.forUser` 为真）创建的任务立即生效；助手在后台回合自行创建时，仅「不派帮工的 `once` 回头看」直接生效；其余存为 `enabled: false, pending: true`，在收件箱（[观察层](docs/subsystems/watch.md#收件箱)）生成 `cron-ask` 待用户点击同意。
 - **一个定时任务固定复用一张工单**：未指定帮工档案时指派给所属频道助手；指定帮工档案时必须同时指定仓库。若绑定工单在等用户，新到期输入在工单的蓄水池中保持 `held`。
-- **扫描与补跑**：开机后定期检查未路由触发与已启用到期任务（错过多次只合并补跑一次）。
+- **扫描与补跑（`gateway/cron_runner.go`）**：网关启动时协调 `nextRunAt` 并拉起后台调度协程周期检查到期任务（支持 IANA 时区、`GMT±HH:MM` 与夏令时跳过处理，错过多次只合并补跑一次），触发后更新 `lastRunAt` 并计算下一运行时间。
 - **为什么一个定时任务绑定一张工单**：避免高频任务淹没看板，让历次运行记录归集在同一条工单串下；到期状态更新与 `Trigger` 同事务落库，防止漏跑或重复触发。
 
 ## 观察执行

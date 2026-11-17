@@ -17,7 +17,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 | `apps/web/src/**`、`apps/web/public` 的画面、组件、贴图 | [page.md](.agents/skills/vv-acceptance/references/page.md) | 对着真的服务端，页面画出来是对的（截图） |
 | `media`、生图协议、结果下载、助手媒体工具、素材库 `/library` 页 | [media.md](.agents/skills/vv-acceptance/references/media.md) | 隔离程序的生成、落盘、预览、发布与 Artifact 引用真的接通；费用和未知结果边界不变 |
 | `apps/mobile/**`、`packages/protocol/src/host.ts`、`internal/domain/lan`、页面里调宿主的地方 | [mobile.md](.agents/skills/vv-acceptance/references/mobile.md) | 安卓模拟器上的真应用配对、经「连接到本机」打开页面、桥让手机弹通知、重开直接回农场 |
-| `cmd/vibe-desktop/**`、`package.json` 的 `package:mac`、`.github/workflows/release.yml` | [desktop-update.md](.agents/skills/vv-acceptance/references/desktop-update.md) | 桌面版内嵌栈与 `thin_desktop` 测试通过，无头校验与 `dist/vibe-desktop` 打包能起能跑 |
+| `cmd/vibe-desktop/**`、`scripts/release/package-mac.ts`、`package.json` 的 `package:mac`、`.github/workflows/release.yml` | [desktop-update.md](.agents/skills/vv-acceptance/references/desktop-update.md) | 桌面版内嵌栈与 `thin_desktop` 测试通过，无头校验与 `VibeValley.app`、`.dmg`/`.zip` 及 `release.json` 打包能起能跑 |
 | `internal/domain/stack/prompts.go`、`tools.go`、`orchestrator.go`、对话预算与压缩（`internal/durable`）；助手评测样例 | [orchestrator-evals.md](.agents/skills/vv-acceptance/references/orchestrator-evals.md) | 离线评测录轮接口、工具声明与提示结构通过验证（联网用真模型前先问用户） |
 
 一次改动碰了几块，就读几份，在同一个沙箱子命令里一起做（造数据、调接口、截图）。

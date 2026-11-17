@@ -11,12 +11,12 @@ flowchart LR
   end
 
   subgraph Server[Go 服务端 cmd/vibe-server · 127.0.0.1:8787]
-    API[gateway handlers<br/>HTTP API、SSE 流]
+    API[gateway · stack/link_server<br/>HTTP API、SSE、/chord/ws、/machine/ws]
     SITE[Core<br/>核心状态 SpaceState]
     FM[助手<br/>internal/domain/stack + internal/durable]
     CHAT[频道<br/>internal/domain/channel · SQLite]
     TK[工单<br/>internal/domain/issue]
-    CREW[帮工<br/>pkg/oar · internal/machine]
+    CREW[帮工与节点<br/>pkg/oar · internal/machine · vibe-machine]
     PRJ[仓库<br/>internal/domain/repo · git worktree]
     RT[农机<br/>internal/domain/agent]
     MCP[助手与帮工工具<br/>internal/domain/stack/tools]
@@ -50,19 +50,19 @@ flowchart LR
 
 系统交互走三条线：
 
-- **命令**：页面和命令行通过 HTTP `POST` 调 `VibeValleyApi`（`packages/protocol/src/api.ts` 的 `endpoints`）。帮工通过服务端的 `/mcp` 调工具（[频道](docs/subsystems/channel.md)）。
-- **状态**：服务端持有唯一的核心状态 `SpaceState`。状态每变一次产生一条事实（`Fact`），页面只收折好的帧 `GET /api/v1/state`。
-- **语音**：页面与 Agora 频道收发音频和字幕；服务端签发令牌并接入语音线路（[语音](docs/subsystems/voice.md)）。
+- **命令**：页面和命令行通过 HTTP `POST` 调 `VibeValleyApi`（`packages/protocol/src/api.ts` 的 `endpoints`），或经 `pkg/chord` 多路复用 `Link`（客户端 `/chord/ws` 与桌面端进程内管道）执行。帮工通过服务端的 `/mcp` 调工具（[频道](docs/subsystems/channel.md)）。
+- **状态与远程执行**：服务端持有唯一的核心状态 `SpaceState`，状态每变一次产生一条事实（`Fact`），经 `GET /api/v1/state` 与 `/api/v1/live` SSE 推给页面；`pkg/chord` 负责增量折叠订阅及 `/machine/ws` 上对零密钥 `cmd/vibe-machine` 节点的反向调用、挂载同步与 `/egress` 代理（[帮工](docs/subsystems/session.md)）。
+- **语音**：页面与 Agora 频道收发音频和字幕；服务端签发令牌并接入语音线路与 `/api/v1/voice/*` WebSocket 中继（[语音](docs/subsystems/voice.md)）。
 
 ## 分层
 
 仓库目录结构见根目录 [AGENTS.md](AGENTS.md#目录)。
 
 - **契约（`packages/protocol`）**：服务端与客户端唯一的共享契约。每个概念一个目录 `src/<概念>/`，包含 `shapes.ts`（类型）、`schema.ts`（`Codec<T.X>` 解码器）和 `api.ts`（接口行与 `Handlers`）。`src/rules/` 只放服务端与页面共用的纯函数；Go 导出结构经 `cmd/vibe-tsgen` 与 `scripts/gen/go-contract.ts` 对账；仅服务端使用的规则留在 Go 各自域里（[地基](docs/subsystems/foundation.md)）。
-- **服务端（`internal/domain/` 与 `cmd/vibe-server/`）**：按单数概念划分域包（`agent`、`artifact`、`attachment`、`channel`、`connector`、`game`、`gateway`、`issue`、`lan`、`media`、`memory`、`pkm`、`repo`、`setting`、`stack`、`user`、`voice`、`watch`），由根目录 `arch_test.go` 静态约束依赖方向。`internal/domain/stack/stack.go` 按序装配并管理生命周期，底层可恢复执行在 `internal/durable/`，节点运行在 `internal/machine/`，凭据与代理在 `internal/vault/`。
-- **网关与工具（`internal/domain/gateway/`、`internal/domain/stack/tools.go`）**：`gateway.go` 与 `handlers_*.go` 挂载 `/api/v1/*` 路由，`streams.go` 提供 SSE 流；`internal/domain/stack` 同时供助手与帮工工具调用（[核心状态](docs/subsystems/core.md)、[助手](docs/subsystems/orchestrator.md)）。
-- **存储（SQLite + SQLc）**：各域独立迁移脚本位于各自 `migrations/0001_init.up.sql`，查询写在 `queries.sql`，由根目录 `sqlc.yaml` 经 `vpx scripts/gen/go-sqlc.ts` 生成 `sqlcgen/` 强类型 Go 绑定（[地基](docs/subsystems/foundation.md)）。
-- **客户端（`apps/web`、`cmd/vibe-desktop`、`apps/mobile`、`cmd/vibe`）**：`apps/web` 按概念分 feature，层间单向依赖（`base` → `infra` → `state` → `ui` → `ui/domain` → `ui/pixel` → `features` → `farm`/`tree` → `app`）。Go 原生桌面壳（`cmd/vibe-desktop`）、浏览器、手机壳（Expo WebView）共用同一份页面（[客户端](docs/subsystems/app.md)）。
+- **Go 五层 DAG 与拓扑（`arch_test.go`）**：严格单向依赖 `pkg/chord` ← `pkg/{contract,oar,migrate}` ← `internal/{config,durable,vault,machine,provider}`（同层跨子系统严禁互引）← `internal/domain/*`（19 个单数概念业务域，`internal/domain/stack/stack.go` 负责装配与恢复）← `cmd/*`。`pkg/oar` 仅依赖 Go 标准库，`cmd/vibe-machine` 隔离数据库驱动、模型 SDK、`durable`、`vault` 与 `mygo`，`github.com/egoist/mygo` 仅限于 `cmd/vibe-desktop`（[地基](docs/subsystems/foundation.md#模块与包边界)）。
+- **网关与工具（`internal/domain/gateway/`、`internal/domain/stack/tools.go`）**：`gateway.go` 与 `handlers_*.go` 挂载 `/api/v1/*` 路由，`streams.go` 提供 SSE 流，`cron_runner.go` 运行定时调度循环；另挂 `/chord/ws`、`/machine/ws`、`/egress`（`vault.EgressProxy`）与独立预览 HTTP 监听（`preview_addr`）；`internal/domain/stack` 同时供助手与帮工工具调用（[核心状态](docs/subsystems/core.md)、[助手](docs/subsystems/orchestrator.md)）。
+- **存储（SQLite + SQLc + `pkg/migrate`）**：跨 `durable`、`vault`、`agent`、`repo`、`channel`、`issue`、`watch`、`game`、`memory`、`pkm`（含 `sqlite-vec`）与 `gateway` 共 11 个持久化作用域。各域迁移脚本位于 `migrations/0001_init.up.sql`，查询写在 `queries.sql`，由根目录 `sqlc.yaml` 经 `vpx scripts/gen/go-sqlc.ts` 生成 `sqlcgen/` 强类型 Go 绑定，非内存模式中除主库 `durable` 外各域独立使用 sidecar WAL 文件（`<前缀>.<作用域>.db`）以避免写锁争用（[地基](docs/subsystems/foundation.md#契约规则和数据库)）。
+- **客户端与节点（`apps/web`、`cmd/vibe-desktop`、`apps/mobile`、`cmd/vibe`、`cmd/vibe-machine`）**：`apps/web` 按概念分 feature，层间单向依赖（`base` → `infra` → `state` → `ui` → `ui/domain` → `ui/pixel` → `features` → `farm`/`tree` → `app`）。MyGo 原生桌面壳（`cmd/vibe-desktop`）、浏览器与手机壳（Expo WebView）共用同一份页面（[客户端](docs/subsystems/app.md)）；`cmd/vibe-machine` 作为零密钥远程节点外连控制面（[帮工](docs/subsystems/session.md)）。
 
 ## 核心状态
 
@@ -88,8 +88,8 @@ Host：
 | `config.json` | 档案（助手和帮工）、技能书、农机设置 |
 | `agent-templates/<id>/` | 从本机导入的档案模板（`agent.json`、`persona.md`） |
 | `settings.json` | 密钥、语音设置、记忆来源配置（权限 `0600`） |
-| `vibevalley.yaml` | 可选的静态配置文件 |
-| `vibevalley.db` | 主 SQLite 数据库与各域 sidecar SQLite 数据库（存储工单、频道、记忆、笔记、会话与定时任务等） |
+| `vibevalley.yaml` | 可选静态配置文件（由 `internal/config` 经 Koanf 加载，[设置和配置](docs/subsystems/setting.md#静态配置appconfig)） |
+| `vibevalley.db` | 主 SQLite 数据库（`durable`）及 10 个 sidecar WAL 数据库（`agent`、`repo`、`channel`、`issue`、`watch`、`game`、`memory`、`pkm`、`vault`、`gateway`） |
 | `events/` | 会话轨迹事件持久化数据 |
 | `logs/` | 帮工运行日志与服务端日志 |
 

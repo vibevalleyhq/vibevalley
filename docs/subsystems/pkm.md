@@ -16,7 +16,7 @@
 | 位置 | 职责 |
 |---|---|
 | [`packages/pkm/`](packages/pkm/README.md) | 独立 PKM 与双链大纲纯领域包（`@vibevalley/pkm`）：Logseq 式 Markdown 解析与打印（`markdown.ts`）、PARA 目录映射（`para.ts`）、双链反链与块引用图谱（`graph.ts`）、前端大纲视图与行内切片（`view.ts`）、键盘编辑与补全状态机（`editing.ts`）、多块框选与拖拽（`selection.ts`）、日历日期（`days.ts`）与乐观写入队列（`writer.ts`） |
-| `internal/domain/pkm/` | 服务端笔记存储（`store.go`、`parser.go`、`fts_raw.go`、`migrations/`、`queries.sql`）：文件读写、并发锁、FTS5 全文索引、批注与撤销记录 |
+| `internal/domain/pkm/` | 服务端笔记存储（`store.go`、`parser.go`、`fts_raw.go`、`migrations/`、`queries.sql`）：`yuin/goldmark` 唯一 AST 解析、并发锁、FTS5 `trigram` 与 `sqlite-vec` 混合检索、批注与撤销记录 |
 | `internal/domain/gateway/pkm_helpers.go`、`handlers_collab.go` | `pkm.*` 接口适配、图谱摘要与话题关联查询 |
 | `packages/protocol/src/pkm/`、`packages/pkm/src/outline.ts` | 笔记契约与前后端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |
 | `$VIBEVALLEY_WORK_ROOT/pkm/` | 默认笔记根目录（`00_Inbox`–`04_Archives`、`journals/`、`.pkm/snapshots/`） |
@@ -27,6 +27,9 @@
 
 ## 模型和不变量
 
+- **唯一 AST 图谱解析与混合检索（`parser.go`、`fts_raw.go`、`store.go`）**：
+  - 服务端使用纯 Go [`yuin/goldmark`](https://github.com/yuin/goldmark) 与 `goldmark-frontmatter`（保留精确源码字节跨度 `byte_start`/`byte_end` 与 `LinkASTNode`）解析双链 `[[...]]`、块引用 `((...))`、嵌入 `![[...]]` 与标签，作为正反向链接与图谱的唯一事实源。
+  - 全文虚拟表 `pkm_notes_fts` 采用 `tokenize='trigram'` 原生切分中英文词组，结合纯 Go `github.com/viant/sqlite-vec`（`pkm_vectors`）通过倒数排名融合（RRF）做混合召回，并经 `fts_raw.go` 批量预处理语句支持大规模索引重建。
 - **文件是唯一真相，读写字节幂等**：
   - 一个 `.md` 文件对应一页，所在 PARA 文件夹决定分类层级。
   - 每个 `- ` 开头是一块，两空格缩进表示层级。
