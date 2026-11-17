@@ -3,30 +3,22 @@ package repo
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
-	_ "modernc.org/sqlite"
-
-	"github.com/vibevalleyhq/vibevalley/internal/domain/repo/sqlcgen"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
-// MigrationsFS embeds the SQLite migration scripts for the repo registry.
-//
-//go:embed migrations/*.sql
-var MigrationsFS embed.FS
-
 type sqliteRepoBackend struct {
 	mu     sync.Mutex
+	pool   *db.Pool
 	db     *sql.DB
-	q      *sqlcgen.Queries
+	q      *dbgen.Queries
 	ownsDB bool
 }
 
@@ -34,48 +26,40 @@ func openSQLiteRepoBackend(ctx context.Context, path string) (*sqliteRepoBackend
 	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf("%w: empty sqlite path", ErrInvalidArgument)
 	}
-	isMem := path == ":memory:" || strings.Contains(path, "mode=memory") || strings.Contains(path, ":memory:")
-	if !isMem && !strings.HasPrefix(path, "file:") {
-		if dir := filepath.Dir(path); dir != "" && dir != "." {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return nil, fmt.Errorf("repo: mkdir %s: %w", dir, err)
-			}
-		}
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	db, err := sql.Open("sqlite", path)
+	pool, err := db.OpenPool(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("repo: open sqlite: %w", err)
 	}
-	db.SetMaxOpenConns(1)
-	pragmas := []string{
-		"PRAGMA busy_timeout=5000",
-		"PRAGMA foreign_keys=ON",
-		"PRAGMA synchronous=NORMAL",
-	}
-	if !isMem {
-		pragmas = append([]string{"PRAGMA journal_mode=WAL"}, pragmas...)
-	}
-	for _, p := range pragmas {
-		if _, err := db.ExecContext(ctx, p); err != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("repo: %s: %w", p, err)
-		}
-	}
 
-	runner, err := migrate.New(db, "repo", MigrationsFS)
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
 	if err != nil {
-		_ = db.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("repo: init migrator: %w", err)
 	}
 	if _, err := runner.Up(ctx); err != nil {
-		_ = db.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("repo: apply migrations: %w", err)
 	}
 
 	return &sqliteRepoBackend{
-		db:     db,
-		q:      sqlcgen.New(db),
+		pool:   pool,
+		db:     pool.WriteDB,
+		q:      dbgen.New(pool.WriteDB),
 		ownsDB: true,
+	}, nil
+}
+
+func openSQLiteRepoFromDB(sqlDB *sql.DB) (*sqliteRepoBackend, error) {
+	if sqlDB == nil {
+		return nil, fmt.Errorf("%w: sql.DB is required", ErrInvalidArgument)
+	}
+	return &sqliteRepoBackend{
+		db:     sqlDB,
+		q:      dbgen.New(sqlDB),
+		ownsDB: false,
 	}, nil
 }
 
@@ -86,7 +70,7 @@ func (b *sqliteRepoBackend) saveRepo(ctx context.Context, r Repository) error {
 	if err != nil {
 		return err
 	}
-	return b.q.SaveRepo(ctx, sqlcgen.SaveRepoParams{
+	return b.q.SaveRepo(ctx, dbgen.SaveRepoParams{
 		ID:          r.ID,
 		Name:        r.Name,
 		StateJson:   string(raw),
@@ -173,7 +157,7 @@ func (b *sqliteRepoBackend) saveWorktree(ctx context.Context, wt Worktree) error
 	if err != nil {
 		return err
 	}
-	return b.q.SaveWorktree(ctx, sqlcgen.SaveWorktreeParams{
+	return b.q.SaveWorktree(ctx, dbgen.SaveWorktreeParams{
 		RepoID:      wt.RepoID,
 		IssueID:     wt.IssueID,
 		Status:      string(wt.Status),
@@ -186,7 +170,7 @@ func (b *sqliteRepoBackend) saveWorktree(ctx context.Context, wt Worktree) error
 func (b *sqliteRepoBackend) getWorktree(ctx context.Context, repoID, issueID string) (Worktree, bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	raw, err := b.q.GetWorktree(ctx, sqlcgen.GetWorktreeParams{
+	raw, err := b.q.GetWorktree(ctx, dbgen.GetWorktreeParams{
 		RepoID:  repoID,
 		IssueID: issueID,
 	})
@@ -210,7 +194,13 @@ func (b *sqliteRepoBackend) listWorktrees(ctx context.Context, repoID string) ([
 }
 
 func (b *sqliteRepoBackend) close() error {
-	if b.ownsDB && b.db != nil {
+	if !b.ownsDB {
+		return nil
+	}
+	if b.pool != nil {
+		return b.pool.Close()
+	}
+	if b.db != nil {
 		return b.db.Close()
 	}
 	return nil

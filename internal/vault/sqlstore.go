@@ -3,21 +3,16 @@ package vault
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
-	"github.com/vibevalleyhq/vibevalley/internal/vault/sqlcgen"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
-
-// MigrationsFS embeds the SQLite migration scripts for the vault store.
-//
-//go:embed migrations/*.sql
-var MigrationsFS embed.FS
 
 // SQLDialect selects parameter placeholder and binary column syntax for SQLBackend.
 type SQLDialect int
@@ -31,18 +26,18 @@ const (
 type SQLBackend struct {
 	db      *sql.DB
 	dialect SQLDialect
-	q       *sqlcgen.Queries
+	q       *dbgen.Queries
 }
 
-// NewSQLBackend creates a Backend backed by db using the specified SQL dialect.
-func NewSQLBackend(db *sql.DB, dialect SQLDialect) (*SQLBackend, error) {
-	if db == nil {
+// NewSQLBackend creates a Backend backed by sqlDB using the specified SQL dialect.
+func NewSQLBackend(sqlDB *sql.DB, dialect SQLDialect) (*SQLBackend, error) {
+	if sqlDB == nil {
 		return nil, errors.New("vault: sql.DB is required")
 	}
 	return &SQLBackend{
-		db:      db,
+		db:      sqlDB,
 		dialect: dialect,
-		q:       sqlcgen.New(db),
+		q:       dbgen.New(sqlDB),
 	}, nil
 }
 
@@ -73,11 +68,11 @@ func SchemaStatements(dialect SQLDialect) []string {
 	}
 }
 
-func isSQLiteDriver(db *sql.DB) bool {
-	if db == nil || db.Driver() == nil {
+func isSQLiteDriver(sqlDB *sql.DB) bool {
+	if sqlDB == nil || sqlDB.Driver() == nil {
 		return false
 	}
-	return strings.Contains(strings.ToLower(fmt.Sprintf("%T", db.Driver())), "sqlite")
+	return strings.Contains(strings.ToLower(fmt.Sprintf("%T", sqlDB.Driver())), "sqlite")
 }
 
 func (b *SQLBackend) ensureStatements(ctx context.Context) error {
@@ -94,7 +89,11 @@ func (b *SQLBackend) Migrate(ctx context.Context) error {
 	if b.dialect == DialectPostgres {
 		return b.ensureStatements(ctx)
 	}
-	runner, err := migrate.New(b.db, "vault", MigrationsFS)
+	fsys, err := db.ScopeFS("vault")
+	if err != nil {
+		return fmt.Errorf("vault: load migrations: %w", err)
+	}
+	runner, err := migrate.New(b.db, "vault", fsys)
 	if err != nil {
 		return fmt.Errorf("vault: init migrator: %w", err)
 	}
@@ -135,7 +134,7 @@ func marshalTargetHosts(hosts []string) (string, error) {
 	return string(hostsJSON), nil
 }
 
-func (b *SQLBackend) putEnvelopeSQLite(ctx context.Context, q *sqlcgen.Queries, env SealedEnvelope) error {
+func (b *SQLBackend) putEnvelopeSQLite(ctx context.Context, q *dbgen.Queries, env SealedEnvelope) error {
 	hostsJSON, err := marshalTargetHosts(env.TargetHosts)
 	if err != nil {
 		return err
@@ -144,7 +143,7 @@ func (b *SQLBackend) putEnvelopeSQLite(ctx context.Context, q *sqlcgen.Queries, 
 	if env.ExpiresAtMs != nil {
 		expiresAt = sql.NullInt64{Int64: *env.ExpiresAtMs, Valid: true}
 	}
-	return q.PutEnvelope(ctx, sqlcgen.PutEnvelopeParams{
+	return q.PutEnvelope(ctx, dbgen.PutEnvelopeParams{
 		ID:              env.SecretID,
 		Kind:            string(env.Kind),
 		Name:            env.Name,
@@ -252,7 +251,7 @@ func (b *SQLBackend) GetEnvelope(ctx context.Context, id string) (SealedEnvelope
 
 func (b *SQLBackend) GetEnvelopeByName(ctx context.Context, kind SecretKind, name string) (SealedEnvelope, error) {
 	if b.dialect == DialectSQLite {
-		row, err := b.q.GetEnvelopeByName(ctx, sqlcgen.GetEnvelopeByNameParams{
+		row, err := b.q.GetEnvelopeByName(ctx, dbgen.GetEnvelopeByNameParams{
 			Kind: string(kind),
 			Name: name,
 		})
@@ -431,7 +430,7 @@ func buildEnvelope(
 	return cloneEnvelope(env), nil
 }
 
-func envelopeFromModel(m sqlcgen.VaultSecret) (SealedEnvelope, error) {
+func envelopeFromModel(m dbgen.VaultSecret) (SealedEnvelope, error) {
 	return buildEnvelope(
 		m.ID,
 		m.Kind,

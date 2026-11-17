@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -145,6 +146,21 @@ func NewMemoryRegistry(opts ...Option) *Registry {
 // OpenSQLiteRegistry creates or reopens a SQLite WAL-backed repo & worktree Registry at path.
 func OpenSQLiteRegistry(ctx context.Context, path string, opts ...Option) (*Registry, error) {
 	b, err := openSQLiteRepoBackend(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return newRegistry(b, opts...), nil
+}
+
+// OpenSQLiteRegistryFromDB attaches a repo & worktree Registry to an already-migrated *sql.DB
+// without running migrations or closing sqlDB on Close.
+func OpenSQLiteRegistryFromDB(ctx context.Context, sqlDB *sql.DB, opts ...Option) (*Registry, error) {
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+	}
+	b, err := openSQLiteRepoFromDB(sqlDB)
 	if err != nil {
 		return nil, err
 	}

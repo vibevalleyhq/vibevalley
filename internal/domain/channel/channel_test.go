@@ -15,6 +15,7 @@ import (
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 	_ "modernc.org/sqlite"
 )
@@ -313,17 +314,21 @@ func TestChannelConcurrentAppendsRace(t *testing.T) {
 func TestChannelMigrationsUpStatusDownAllUp(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "channel-migrate.db")
-	db, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer db.Close()
-	db.SetMaxOpenConns(1)
-	if _, err := db.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
+	defer sqlDB.Close()
+	sqlDB.SetMaxOpenConns(1)
+	if _, err := sqlDB.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
 		t.Fatalf("pragma: %v", err)
 	}
 
-	runner, err := migrate.New(db, "channel", channel.MigrationsFS)
+	scopeFS, err := db.ScopeFS("channel")
+	if err != nil {
+		t.Fatalf("ScopeFS(channel): %v", err)
+	}
+	runner, err := migrate.New(sqlDB, "channel", scopeFS)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
 	}
@@ -334,7 +339,7 @@ func TestChannelMigrationsUpStatusDownAllUp(t *testing.T) {
 		t.Fatalf("unexpected initial status: %+v err=%v", st0, err)
 	}
 
-	// Up applies 0001_init.up.sql.
+	// Up applies 0001_channel.up.sql.
 	applied, err := runner.Up(ctx)
 	if err != nil || applied != 1 {
 		t.Fatalf("Up: applied=%d err=%v", applied, err)
@@ -348,11 +353,11 @@ func TestChannelMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 
 	// Verify all 4 tables, 3 indexes, and 2 triggers exist.
-	assertChannelObjectsExist(t, db, true)
+	assertChannelObjectsExist(t, sqlDB, true)
 
-	// Attach Store via OpenDB and exercise sqlcgen queries + append-only triggers.
+	// Attach Store via OpenDB and exercise dbgen queries + append-only triggers.
 	clk := newFixedClock()
-	store1, err := channel.OpenDB(ctx, db, channel.WithClock(clk))
+	store1, err := channel.OpenDB(ctx, sqlDB, channel.WithClock(clk))
 	if err != nil {
 		t.Fatalf("OpenDB after Up: %v", err)
 	}
@@ -408,28 +413,28 @@ func TestChannelMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 
 	// Verify append-only triggers reject UPDATE and DELETE after Up.
-	if _, err := db.ExecContext(ctx, `UPDATE channel_event SET text = 'tampered' WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
+	if _, err := sqlDB.ExecContext(ctx, `UPDATE channel_event SET text = 'tampered' WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
 		t.Fatalf("expected append-only trigger error on UPDATE, got %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `DELETE FROM channel_event WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
+	if _, err := sqlDB.ExecContext(ctx, `DELETE FROM channel_event WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
 		t.Fatalf("expected append-only trigger error on DELETE, got %v", err)
 	}
 	_ = store1.Close()
 
 	// Checksum mismatch detection when applied up script is modified.
-	upOrig, err := fs.ReadFile(channel.MigrationsFS, "migrations/0001_init.up.sql")
+	upOrig, err := fs.ReadFile(scopeFS, "migrations/0001_channel.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	downOrig, err := fs.ReadFile(channel.MigrationsFS, "migrations/0001_init.down.sql")
+	downOrig, err := fs.ReadFile(scopeFS, "migrations/0001_channel.down.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
 	tamperedFS := fstest.MapFS{
-		"migrations/0001_init.up.sql":   {Data: append(upOrig, []byte("\n-- tampered\n")...)},
-		"migrations/0001_init.down.sql": {Data: downOrig},
+		"migrations/0001_channel.up.sql":   {Data: append(upOrig, []byte("\n-- tampered\n")...)},
+		"migrations/0001_channel.down.sql": {Data: downOrig},
 	}
-	tamperedRunner, err := migrate.New(db, "channel", tamperedFS)
+	tamperedRunner, err := migrate.New(sqlDB, "channel", tamperedFS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,7 +451,7 @@ func TestChannelMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || len(st2) != 1 || st2[0].Applied {
 		t.Fatalf("unexpected status after DownAll: %+v err=%v", st2, err)
 	}
-	assertChannelObjectsExist(t, db, false)
+	assertChannelObjectsExist(t, sqlDB, false)
 
 	// Re-Up restores full parity cleanly.
 	reapplied, err := runner.Up(ctx)
@@ -457,9 +462,9 @@ func TestChannelMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || len(st3) != 1 || !st3[0].Applied {
 		t.Fatalf("unexpected status after re-Up: %+v err=%v", st3, err)
 	}
-	assertChannelObjectsExist(t, db, true)
+	assertChannelObjectsExist(t, sqlDB, true)
 
-	store2, err := channel.OpenDB(ctx, db, channel.WithClock(clk))
+	store2, err := channel.OpenDB(ctx, sqlDB, channel.WithClock(clk))
 	if err != nil {
 		t.Fatalf("OpenDB after re-Up: %v", err)
 	}
@@ -471,15 +476,60 @@ func TestChannelMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || evFresh.Event.Seq != 1 || evFresh.Event.GlobalSeq != 1 {
 		t.Fatalf("expected fresh seq=1, globalSeq=1 after DownAll+Up, got %+v err=%v", evFresh, err)
 	}
-	if _, err := db.ExecContext(ctx, `UPDATE channel_event SET text = 'tampered' WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
+	if _, err := sqlDB.ExecContext(ctx, `UPDATE channel_event SET text = 'tampered' WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
 		t.Fatalf("expected append-only trigger error after re-Up UPDATE, got %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `DELETE FROM channel_event WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
+	if _, err := sqlDB.ExecContext(ctx, `DELETE FROM channel_event WHERE seq = 1`); err == nil || !strings.Contains(err.Error(), "channel_event is append-only") {
 		t.Fatalf("expected append-only trigger error after re-Up DELETE, got %v", err)
 	}
 }
 
-func assertChannelObjectsExist(t *testing.T, db *sql.DB, want bool) {
+func TestOpenSQLiteFromDBNonOwning(t *testing.T) {
+	ctx := context.Background()
+	pool, err := db.OpenPool(ctx, filepath.Join(t.TempDir(), "shared.db"))
+	if err != nil {
+		t.Fatalf("OpenPool: %v", err)
+	}
+	defer pool.Close()
+
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+
+	clk := newFixedClock()
+	st, err := channel.OpenSQLiteFromDB(ctx, pool.WriteDB, channel.WithClock(clk))
+	if err != nil {
+		t.Fatalf("OpenSQLiteFromDB: %v", err)
+	}
+	if _, err := st.CreateChannel(ctx, channel.Channel{ID: "general", Type: channel.TypePublic, Name: "general"}); err != nil {
+		t.Fatalf("CreateChannel: %v", err)
+	}
+	if _, err := st.PostMessage(ctx, "general", "user", channel.ActorUser, "shared hello"); err != nil {
+		t.Fatalf("PostMessage: %v", err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatalf("st.Close: %v", err)
+	}
+	if err := pool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared WriteDB closed by Store.Close: %v", err)
+	}
+
+	st2, err := channel.OpenSQLiteFromDB(ctx, pool.WriteDB, channel.WithClock(clk))
+	if err != nil {
+		t.Fatalf("reattach OpenSQLiteFromDB: %v", err)
+	}
+	defer st2.Close()
+	ev2, err := st2.PostMessage(ctx, "general", "user", channel.ActorUser, "second")
+	if err != nil || ev2.Event.GlobalSeq != 2 || ev2.Event.Seq != 2 {
+		t.Fatalf("expected monotonic seq=2 after reattach, got %+v err=%v", ev2, err)
+	}
+}
+
+func assertChannelObjectsExist(t *testing.T, sqlDB *sql.DB, want bool) {
 	t.Helper()
 	objects := []struct {
 		typ  string
@@ -497,7 +547,7 @@ func assertChannelObjectsExist(t *testing.T, db *sql.DB, want bool) {
 	}
 	for _, obj := range objects {
 		var cnt int
-		err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, obj.typ, obj.name).Scan(&cnt)
+		err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, obj.typ, obj.name).Scan(&cnt)
 		if err != nil {
 			t.Fatalf("query sqlite_master (%s %s): %v", obj.typ, obj.name, err)
 		}

@@ -46,8 +46,18 @@ func OpenSQLiteService(ctx context.Context, path string, opts ...Option) (*Servi
 }
 
 // OpenDBService attaches an issue & cron Service to an existing *sql.DB.
-func OpenDBService(ctx context.Context, db *sql.DB, opts ...Option) (*Service, error) {
-	b, err := openSQLiteIssueFromDB(ctx, db, false)
+func OpenDBService(ctx context.Context, sqlDB *sql.DB, opts ...Option) (*Service, error) {
+	b, err := openSQLiteIssueFromDB(ctx, sqlDB, true, false)
+	if err != nil {
+		return nil, err
+	}
+	return newService(b, opts...), nil
+}
+
+// OpenSQLiteServiceFromDB attaches an issue & cron Service to an already-migrated *sql.DB
+// without running migrations or closing sqlDB on Close.
+func OpenSQLiteServiceFromDB(ctx context.Context, sqlDB *sql.DB, opts ...Option) (*Service, error) {
+	b, err := openSQLiteIssueFromDB(ctx, sqlDB, false, false)
 	if err != nil {
 		return nil, err
 	}

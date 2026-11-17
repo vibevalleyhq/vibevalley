@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -99,6 +100,16 @@ func NewMemory(opts ...Option) *Store {
 // OpenSQLite opens (or creates) a SQLite WAL Store with synchronous=NORMAL.
 func OpenSQLite(ctx context.Context, path string, opts ...Option) (*Store, error) {
 	b, err := openSQLiteBackend(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return newStore(b, opts...), nil
+}
+
+// OpenSQLiteFromPool attaches a Store to an already-migrated SQLite write/read pool
+// without running migrations or closing the injected connections on Close.
+func OpenSQLiteFromPool(ctx context.Context, writeDB, readDB *sql.DB, opts ...Option) (*Store, error) {
+	b, err := openSQLiteFromPool(ctx, writeDB, readDB)
 	if err != nil {
 		return nil, err
 	}

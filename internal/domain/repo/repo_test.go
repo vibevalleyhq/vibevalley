@@ -12,6 +12,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/repo"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
@@ -140,13 +141,17 @@ func TestRepoMigrationsUpStatusDownAllUp(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "repo-mig.db")
-	db, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("sql.Open: %v", err)
 	}
-	defer db.Close()
+	defer sqlDB.Close()
 
-	runner, err := migrate.New(db, "repo", repo.MigrationsFS)
+	scopeFS, err := db.ScopeFS("repo")
+	if err != nil {
+		t.Fatalf("ScopeFS(repo): %v", err)
+	}
+	runner, err := migrate.New(sqlDB, "repo", scopeFS)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
 	}
@@ -161,7 +166,7 @@ func TestRepoMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 	for _, tbl := range []string{"repo_repository", "repo_worktree"} {
 		var name string
-		if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl).Scan(&name); err != nil {
+		if err := sqlDB.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl).Scan(&name); err != nil {
 			t.Fatalf("expected table %s after Up: %v", tbl, err)
 		}
 	}
@@ -175,7 +180,7 @@ func TestRepoMigrationsUpStatusDownAllUp(t *testing.T) {
 		t.Fatalf("Status after DownAll: %+v err=%v", statusesAfterDown, err)
 	}
 	var remaining int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'repo_%'`).Scan(&remaining); err != nil {
+	if err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'repo_%'`).Scan(&remaining); err != nil {
 		t.Fatalf("count remaining repo_* tables: %v", err)
 	}
 	if remaining != 0 {
@@ -186,7 +191,7 @@ func TestRepoMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || reapplied != 1 {
 		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
 	}
-	_ = db.Close()
+	_ = sqlDB.Close()
 
 	reg, err := repo.OpenSQLiteRegistry(ctx, dbPath, repo.WithWorkRoot(filepath.Join(tmpDir, "work")))
 	if err != nil {
@@ -203,5 +208,47 @@ func TestRepoMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 	if err := reg.DeleteRepo(ctx, "r1"); err != nil {
 		t.Fatalf("DeleteRepo after re-Up: %v", err)
+	}
+}
+
+func TestOpenSQLiteRegistryFromDBNonOwning(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	pool, err := db.OpenPool(ctx, filepath.Join(tmpDir, "shared.db"))
+	if err != nil {
+		t.Fatalf("OpenPool: %v", err)
+	}
+	defer pool.Close()
+
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+
+	reg, err := repo.OpenSQLiteRegistryFromDB(ctx, pool.WriteDB, repo.WithWorkRoot(filepath.Join(tmpDir, "work")))
+	if err != nil {
+		t.Fatalf("OpenSQLiteRegistryFromDB: %v", err)
+	}
+	if _, err := reg.RegisterRepo(ctx, repo.Repository{ID: "shared-r1", Name: "shared-r1", RootPath: filepath.Join(tmpDir, "work", "repos", "shared-r1")}); err != nil {
+		t.Fatalf("RegisterRepo: %v", err)
+	}
+	if err := reg.Close(); err != nil {
+		t.Fatalf("reg.Close: %v", err)
+	}
+	if err := pool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared WriteDB closed by Registry.Close: %v", err)
+	}
+
+	reg2, err := repo.OpenSQLiteRegistryFromDB(ctx, pool.WriteDB)
+	if err != nil {
+		t.Fatalf("reattach OpenSQLiteRegistryFromDB: %v", err)
+	}
+	defer reg2.Close()
+	got, err := reg2.GetRepo(ctx, "shared-r1")
+	if err != nil || got.Name != "shared-r1" {
+		t.Fatalf("reattached GetRepo: %+v err=%v", got, err)
 	}
 }
