@@ -8,11 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/vibevalleyhq/vibevalley/internal/domain/gateway"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
 	"github.com/vibevalleyhq/vibevalley/internal/durable"
 	"github.com/vibevalleyhq/vibevalley/internal/vault"
@@ -30,6 +32,7 @@ func init() {
 // with zero listening TCP sockets.
 type embeddedStack struct {
 	runtime      *stack.Stack
+	gw           *gateway.Handler
 	desktopEnd   *link.PipeTransport
 	serverEnd    *link.PipeTransport
 	attachCtx    context.Context
@@ -60,10 +63,17 @@ func launchEmbeddedStack(ctx context.Context, cfg DesktopConfig, rootKey vault.R
 		workRoot = cfg.RepoRoots[0]
 	}
 
+	homeDir := ""
+	if dbPath != ":memory:" {
+		homeDir = strings.TrimSpace(cfg.HomeDir)
+	}
+
 	rk := rootKey
 	st, err := stack.New(ctx, stack.Config{
 		DBPath:       dbPath,
 		WorkRoot:     workRoot,
+		HomeDir:      homeDir,
+		Version:      desktopVersion,
 		VaultRootKey: &rk,
 		ServerURL:    "chord://embedded",
 	})
@@ -80,6 +90,7 @@ func newEmbeddedStackFromRuntime(st *stack.Stack) *embeddedStack {
 
 	es := &embeddedStack{
 		runtime:      st,
+		gw:           gateway.NewHandler(st),
 		desktopEnd:   desktopEnd,
 		serverEnd:    serverEnd,
 		attachCtx:    attachCtx,
@@ -143,6 +154,13 @@ func (e *embeddedStack) ResolveApproval(ctx context.Context, prompt contract.App
 func (e *embeddedStack) RaiseBudget(ctx context.Context, alert BudgetAlert, newMaxCostMicros int64) error {
 	_, err := e.runtime.RaiseBudget(ctx, alert.ConversationID, alert.TaskID, newMaxCostMicros)
 	return err
+}
+
+func (e *embeddedStack) GatewayHandler() http.Handler {
+	if e == nil || e.gw == nil {
+		return nil
+	}
+	return e.gw
 }
 
 func (e *embeddedStack) ServerURL() string {
@@ -228,6 +246,20 @@ func attachEmbeddedStackToApp(app *DesktopApp) func() {
 		})
 		if err == nil {
 			spaceHandle = h
+		}
+	}
+
+	if gwSrc, ok := app.Stack.(interface{ GatewayHandler() http.Handler }); ok && app.WebHandler != nil {
+		if gw := gwSrc.GatewayHandler(); gw != nil {
+			baseWeb := app.WebHandler
+			app.WebHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				p := r.URL.Path
+				if strings.HasPrefix(p, "/api/v1/") || p == "/mcp" || strings.HasPrefix(p, "/mcp/") || p == "/v1/chat/completions" {
+					gw.ServeHTTP(w, r)
+					return
+				}
+				baseWeb.ServeHTTP(w, r)
+			})
 		}
 	}
 

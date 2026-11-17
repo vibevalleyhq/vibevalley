@@ -15,18 +15,27 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/vibevalleyhq/vibevalley/internal/config"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/artifact"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/attachment"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/connector"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/game"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/issue"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/lan"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/mcp"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/media"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/memory"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/pkm"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/repo"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/setting"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/user"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/voice"
 	domainwatch "github.com/vibevalleyhq/vibevalley/internal/domain/watch"
 	"github.com/vibevalleyhq/vibevalley/internal/durable"
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
+	"github.com/vibevalleyhq/vibevalley/internal/provider"
 	"github.com/vibevalleyhq/vibevalley/internal/vault"
 	"github.com/vibevalleyhq/vibevalley/pkg/chord/link"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
@@ -47,6 +56,11 @@ type Config struct {
 
 	// WorkRoot is the root directory used for repo/worktree clones and local state fallback.
 	// When empty for ephemeral runs, a temporary directory is provisioned and removed on Close.
+	HomeDir     string
+	Version     string
+	AppConfig   *config.AppConfig
+	Getenv      func(string) string
+	StrictKeys  bool
 	WorkRoot    string
 	ArtifactDir string
 	MediaDir    string
@@ -84,6 +98,7 @@ type Config struct {
 	// Link & alert callbacks.
 	LinkAuthenticator link.Authenticator
 	AlertHandler      func(durable.Alert)
+	OnStateChange     func(seq int64)
 	OnChannelWake     func(ctx context.Context, req domainwatch.DispatchRequest, sub store.Submission) error
 	OnIssueDispatch   func(ctx context.Context, cmd issue.DispatchCommand, sub store.Submission) error
 	DisableIssueAuto  bool
@@ -93,6 +108,8 @@ type Config struct {
 type Stack struct {
 	cfg        Config
 	clock      store.Clock
+	homeDir    string
+	version    string
 	ownsWork   bool
 	workRoot   string
 	serverURL  string
@@ -125,6 +142,17 @@ type Stack struct {
 	PKM      *pkm.Store
 	Memory   *memory.Store
 
+	Setting      *setting.Service
+	User         *user.Service
+	Attachments  *attachment.Store
+	LAN          *lan.Service
+	MCP          *mcp.Handler
+	Connectors   *connector.Service
+	Voice        *voice.Service
+	Provider     *provider.Router
+	DomainTools  *DomainToolRegistry
+	Orchestrator *Orchestrator
+
 	Artifacts *artifact.Service
 	Media     *media.Store
 	Game      *game.Projector
@@ -134,6 +162,13 @@ type Stack struct {
 	model      durable.ModelClient
 	tools      durable.ToolExecutor
 	customDelv durable.DeliverablesFunc
+
+	lanUpstream atomic.Pointer[http.Handler]
+
+	stateSeq   atomic.Int64
+	stateMu    sync.RWMutex
+	stateSubs  map[uint64]func(int64)
+	stateSubID atomic.Uint64
 
 	alertMu   sync.RWMutex
 	alertSubs map[uint64]func(durable.Alert)
@@ -180,18 +215,27 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 	}
 
 	bgCtx, bgCancel := context.WithCancel(context.Background())
+	version := strings.TrimSpace(cfg.Version)
+	if version == "" {
+		version = "0.1.0-dev"
+	}
+	homeDir := strings.TrimSpace(cfg.HomeDir)
 	s := &Stack{
 		cfg:         cfg,
 		clock:       clk,
+		homeDir:     homeDir,
+		version:     version,
 		ownsWork:    ownsWork,
 		workRoot:    workRoot,
 		serverURL:   strings.TrimSpace(cfg.ServerURL),
 		bgCtx:       bgCtx,
 		bgCancel:    bgCancel,
 		customDelv:  cfg.Deliverables,
+		stateSubs:   make(map[uint64]func(int64)),
 		alertSubs:   make(map[uint64]func(durable.Alert)),
 		clientLinks: make(map[*link.Link]struct{}),
 	}
+	s.stateSeq.Store(1)
 
 	cleanupOnErr := true
 	defer func() {
@@ -440,15 +484,171 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 		}
 	}
 
-	// Register durable task phases (generation, codemode, issue.watch).
+	// Wire platform-level Wave 1 services (Settings, User, Attachments, Connectors, Voice).
+	s.Setting, err = setting.NewService(setting.Options{
+		HomeDir:   homeDir,
+		AppConfig: cfg.AppConfig,
+		Getenv:    cfg.Getenv,
+		Clock:     clk,
+		Version:   version,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("stack: setting service: %w", err)
+	}
+	s.User, err = user.NewService(user.Options{
+		HomeDir: homeDir,
+		Clock:   clk,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("stack: user service: %w", err)
+	}
+	attDir := ""
+	if homeDir != "" {
+		attDir = filepath.Join(homeDir, "attachments")
+	} else if !isMem {
+		attDir = filepath.Join(filepath.Dir(dbPath), "attachments")
+	}
+	s.Attachments, err = attachment.NewStore(attachment.Config{
+		Dir:   attDir,
+		Clock: clk,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("stack: attachment store: %w", err)
+	}
+	s.Connectors, err = connector.NewService(connector.Options{
+		HomeDir: homeDir,
+		Clock:   clk,
+		ChannelValidator: func(vCtx context.Context, name string) (string, bool, error) {
+			chs, lErr := s.Channels.ListChannels(vCtx)
+			if lErr != nil {
+				return "", false, lErr
+			}
+			clean := strings.TrimSpace(strings.TrimPrefix(name, "#"))
+			if clean == "" {
+				for _, ch := range chs {
+					return ch.ID, true, nil
+				}
+				return "", false, fmt.Errorf("channel %q not found", name)
+			}
+			for _, ch := range chs {
+				if ch.ID == clean || strings.EqualFold(ch.Name, clean) {
+					return ch.ID, false, nil
+				}
+			}
+			return "", false, fmt.Errorf("channel %q not found", name)
+		},
+		OnChange: func(_ connector.ConnectorStatus) {
+			s.NotifyStateChange()
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("stack: connector service: %w", err)
+	}
+	s.Voice = voice.NewService(voice.Options{
+		Clock: clk,
+		VoiceConfig: func() voice.VoiceConfigSnapshot {
+			v := s.Setting.Voice()
+			return voice.VoiceConfigSnapshot{
+				Area:           v.Area,
+				Language:       v.Language,
+				AnswerVendor:   v.Answer.Vendor,
+				Greeting:       v.Greeting,
+				FailureMessage: v.FailureMessage,
+				Persona:        v.Persona,
+				SilenceMs:      v.SilenceMs,
+				InterruptMs:    v.InterruptMs,
+				IdleSeconds:    v.IdleSeconds,
+			}
+		},
+		AgoraCredentials: func() (voice.AgoraCredentials, bool) {
+			appID, cert, ok := s.Setting.ResolveAgora()
+			if !ok {
+				return voice.AgoraCredentials{}, false
+			}
+			return voice.AgoraCredentials{
+				AppID:          appID,
+				AppCertificate: cert,
+				Area:           s.Setting.Voice().Area,
+			}, true
+		},
+		DictationConfig: func() (voice.DictationTarget, bool) {
+			d := s.Setting.Dictation()
+			target := voice.DictationTarget{URL: d.URL, Model: d.Model, Key: d.Key}
+			return target, strings.TrimSpace(d.URL) != "" && strings.TrimSpace(d.Key) != ""
+		},
+		MOSSKey: func() (string, bool) {
+			st := s.Setting.ProviderStatus()
+			for _, c := range st.Connections {
+				if c.Adapter == "moss" && c.Enabled && c.Key.Source != nil {
+					return c.ID, true
+				}
+			}
+			return "", false
+		},
+		OnStateChanged: func(_ voice.FactCallChanged) {
+			s.NotifyStateChange()
+		},
+	})
+	s.LAN, err = lan.NewService(lan.Options{
+		HomeDir: homeDir,
+		Clock:   clk,
+		Upstream: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ptr := s.lanUpstream.Load()
+			if ptr == nil || *ptr == nil {
+				http.NotFound(w, r)
+				return
+			}
+			(*ptr).ServeHTTP(w, r)
+		}),
+		DeviceMinter: func(_ context.Context, deviceName string) (lan.DeviceMinted, error) {
+			res, mErr := s.User.MintDevice(deviceName, user.DeviceCamePaired)
+			if mErr != nil {
+				return lan.DeviceMinted{}, mErr
+			}
+			return lan.DeviceMinted{Device: res.Device, Key: res.Key}, nil
+		},
+		TokenVerifier: func(raw string) (lan.AuthenticatedDevice, bool) {
+			dev, ok := s.User.VerifyToken(raw)
+			if !ok {
+				return lan.AuthenticatedDevice{}, false
+			}
+			return lan.AuthenticatedDevice{ID: dev.ID, Name: dev.Name, Came: string(dev.Came)}, true
+		},
+		AddressResolver: func() string { return s.ServerURL() },
+	})
+	if err != nil {
+		return nil, fmt.Errorf("stack: lan service: %w", err)
+	}
+
+	// Register durable task phases (generation, codemode, issue.watch) and orchestrator runtime.
+	settingsLookup := func(_ context.Context, prov provider.ProviderKind) (string, string, error) {
+		key, _, _ := s.Setting.ResolveAPIKey(string(prov))
+		return key, "", nil
+	}
+	defaultModelClient := NewModelClient(ModelClientDeps{
+		Vault:          s.Vault,
+		Tokens:         s.Tokens,
+		Getenv:         cfg.Getenv,
+		SettingsLookup: settingsLookup,
+		StrictKeys:     cfg.StrictKeys,
+	})
+	if rb, ok := defaultModelClient.(interface{ Router() *provider.Router }); ok {
+		s.Provider = rb.Router()
+	}
+
+	s.DomainTools = NewDomainToolRegistry(s)
 	s.model = cfg.Model
 	if s.model == nil {
-		s.model = defaultModelClient{}
+		s.model = defaultModelClient
 	}
-	s.tools = s.wrapToolExecutor(cfg.Tools)
+	baseTools := cfg.Tools
+	if baseTools == nil {
+		baseTools = s.DomainTools.Executor()
+	}
+	s.tools = s.wrapToolExecutor(baseTools)
 	codeTool := cfg.CodeTool
 	if codeTool == nil {
-		codeTool = defaultCodeTool
+		codeTool = s.DomainTools.CodeToolFunc()
 	}
 	durable.RegisterGenerationPhases(s.Scheduler, durable.GenerationDeps{
 		Store:        s.Store,
@@ -462,6 +662,46 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 	})
 	durable.RegisterCodeModePhases(s.Scheduler, codeTool)
 	issue.RegisterIssueWatchPhase(s.Scheduler, s.Issues)
+
+	orchCfg := OrchestratorConfig{
+		Model:          s.model,
+		SettingsLookup: settingsLookup,
+		Getenv:         cfg.Getenv,
+		StrictKeys:     cfg.StrictKeys,
+	}
+	if cfg.Tools == nil {
+		orchCfg.Tools = s.DomainTools
+	}
+	s.Orchestrator, err = NewOrchestrator(s, orchCfg)
+	if err != nil {
+		return nil, fmt.Errorf("stack: orchestrator: %w", err)
+	}
+	s.MCP = mcp.NewHandler(mcp.Config{
+		ServerName:    "vibevalley",
+		ServerVersion: version,
+		Catalog:       &stackMCPCatalog{tools: s.DomainTools},
+	})
+
+	// Bridge device revocations to active LAN connections.
+	revokedCh, unsubRevoked := s.User.SubscribeRevoked()
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		defer unsubRevoked()
+		for {
+			select {
+			case <-bgCtx.Done():
+				return
+			case devID, ok := <-revokedCh:
+				if !ok {
+					return
+				}
+				if s.LAN != nil && devID != "" {
+					s.LAN.DisconnectDevice(devID)
+				}
+			}
+		}
+	}()
 
 	// Machine Hub for outbound vibe-machine connections.
 	s.Machines = newMachineHub(s, cfg.LinkAuthenticator)
@@ -501,6 +741,12 @@ func (s *Stack) Close() error {
 		s.closeAllClientLinks()
 		if s.Machines != nil {
 			s.Machines.closeAll()
+		}
+		if s.LAN != nil {
+			closeErr = errors.Join(closeErr, s.LAN.Close())
+		}
+		if s.MCP != nil {
+			closeErr = errors.Join(closeErr, s.MCP.Close())
 		}
 		if s.Watch != nil {
 			s.Watch.Stop()
@@ -553,8 +799,60 @@ func (s *Stack) Close() error {
 	return closeErr
 }
 
+// HomeDir returns the configured VibeValley home directory, if any.
+func (s *Stack) HomeDir() string { return s.homeDir }
+
+// Version returns the server/platform build version string.
+func (s *Stack) Version() string { return s.version }
+
 // WorkRoot returns the workspace root path configured or provisioned for this stack.
 func (s *Stack) WorkRoot() string { return s.workRoot }
+
+// StateSeq returns the monotonic control-plane projection sequence counter.
+func (s *Stack) StateSeq() int64 { return s.stateSeq.Load() }
+
+// NotifyStateChange increments StateSeq and notifies registered state listeners.
+func (s *Stack) NotifyStateChange() int64 {
+	seq := s.stateSeq.Add(1)
+	if s.cfg.OnStateChange != nil {
+		s.cfg.OnStateChange(seq)
+	}
+	s.stateMu.RLock()
+	subs := make([]func(int64), 0, len(s.stateSubs))
+	for _, fn := range s.stateSubs {
+		subs = append(subs, fn)
+	}
+	s.stateMu.RUnlock()
+	for _, fn := range subs {
+		fn(seq)
+	}
+	return seq
+}
+
+// SubscribeStateChange registers a listener invoked whenever Stack control-plane state changes.
+func (s *Stack) SubscribeStateChange(fn func(int64)) func() {
+	if fn == nil {
+		return func() {}
+	}
+	id := s.stateSubID.Add(1)
+	s.stateMu.Lock()
+	s.stateSubs[id] = fn
+	s.stateMu.Unlock()
+	return func() {
+		s.stateMu.Lock()
+		delete(s.stateSubs, id)
+		s.stateMu.Unlock()
+	}
+}
+
+// SetLANUpstream configures the gateway handler fronted by the optional LAN isolated listener.
+func (s *Stack) SetLANUpstream(h http.Handler) {
+	if h == nil {
+		s.lanUpstream.Store(nil)
+		return
+	}
+	s.lanUpstream.Store(&h)
+}
 
 // SetServerURL sets the advertised HTTP control-plane URL.
 func (s *Stack) SetServerURL(raw string) {
@@ -720,16 +1018,50 @@ func sidecarDBPath(baseDBPath, module string) string {
 	return prefix + "." + module + ext
 }
 
-type noopModelClient struct{}
-
-type defaultModelClient = noopModelClient
-
-func (noopModelClient) Generate(_ context.Context, _ durable.ModelRequest, _ func(string)) (durable.ModelResponse, error) {
-	return durable.ModelResponse{Text: "ok"}, nil
+type stackMCPCatalog struct {
+	tools *DomainToolRegistry
 }
 
-func defaultCodeTool(_ context.Context, toolName string, _ any) (any, error) {
-	return nil, fmt.Errorf("stack: code tool %q not configured", toolName)
+func (c *stackMCPCatalog) ListTools(_ context.Context, _ mcp.CallerContext) ([]mcp.ToolSpec, error) {
+	if c.tools == nil {
+		return nil, nil
+	}
+	specs := c.tools.Specs()
+	out := make([]mcp.ToolSpec, 0, len(specs))
+	for _, sp := range specs {
+		schemaRaw, err := json.Marshal(sp.InputSchema)
+		if err != nil {
+			schemaRaw = json.RawMessage(`{"type":"object"}`)
+		}
+		out = append(out, mcp.ToolSpec{
+			Name:        sp.Name,
+			Description: sp.Description,
+			InputSchema: schemaRaw,
+		})
+	}
+	return out, nil
+}
+
+func (c *stackMCPCatalog) CallTool(ctx context.Context, caller mcp.CallerContext, name string, args json.RawMessage) (mcp.ToolResult, error) {
+	if c.tools == nil {
+		return mcp.ToolResult{
+			Content: []mcp.ContentBlock{{Type: "text", Text: "mcp tool registry unavailable"}},
+			IsError: true,
+		}, nil
+	}
+	res, err := c.tools.Executor().Execute(ctx, caller.SessionID, durable.ToolCall{
+		ToolName: name,
+		ArgsJSON: args,
+	})
+	if err != nil {
+		return mcp.ToolResult{
+			Content: []mcp.ContentBlock{{Type: "text", Text: err.Error()}},
+			IsError: true,
+		}, nil
+	}
+	return mcp.ToolResult{
+		Content: []mcp.ContentBlock{{Type: "text", Text: string(res)}},
+	}, nil
 }
 
 func defaultPassGrader(_ context.Context, _ string, in durable.GraderInput) (contract.RubricVerdict, error) {

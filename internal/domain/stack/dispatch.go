@@ -53,6 +53,7 @@ func (s *Stack) SyncSpaceProjection(ctx context.Context) error {
 			return err
 		}
 	}
+	s.NotifyStateChange()
 	return nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/vibevalleyhq/vibevalley/internal/config"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/artifact"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/gateway"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/issue"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
 )
@@ -36,6 +38,7 @@ var serverFlagKeyMap = map[string]string{
 	"preview-addr":          "server.preview_addr",
 	"db":                    "server.db_path",
 	"work-root":             "server.work_root",
+	"web":                   "server.web_dist",
 	"ready-json":            "server.ready_json",
 	"allow-loopback-egress": "server.allow_loopback_egress",
 }
@@ -46,21 +49,27 @@ type Config struct {
 	PreviewAddr         string
 	DBPath              string
 	WorkRoot            string
+	HomeDir             string
+	WebDist             string
 	ArtifactDir         string
 	MediaDir            string
 	ReadyJSON           bool
 	AllowLoopbackEgress bool
+	AppConfig           *config.AppConfig
 }
 
 // ReadyInfo is serialized as one line when --ready-json is enabled after listeners bind.
 type ReadyInfo struct {
+	PID         int    `json:"pid"`
+	URL         string `json:"url"`
 	Addr        string `json:"addr"`
 	PreviewAddr string `json:"preview_addr,omitempty"`
 }
 
-// Server wraps the assembled Platform Stack plus control-plane and isolated preview HTTP servers.
+// Server wraps the assembled Platform Stack plus control-plane, protocol gateway, and isolated preview HTTP servers.
 type Server struct {
 	stack       *stack.Stack
+	gw          *gateway.Handler
 	mainLn      net.Listener
 	mainSrv     *http.Server
 	previewLn   net.Listener
@@ -110,6 +119,7 @@ func newRootCommand(getenv func(string) string, stdout, stderr io.Writer) *cobra
 		previewAddr         string
 		dbPath              string
 		workRoot            string
+		webDist             string
 		readyJSON           bool
 		allowLoopbackEgress bool
 	)
@@ -139,6 +149,7 @@ func newRootCommand(getenv func(string) string, stdout, stderr io.Writer) *cobra
 	pflags.StringVar(&previewAddr, "preview-addr", defaults.Server.PreviewAddr, "Isolated artifact preview HTTP listen address (set 'disabled' to turn off)")
 	pflags.StringVar(&dbPath, "db", defaults.Server.DBPath, "SQLite WAL database path or :memory:")
 	pflags.StringVar(&workRoot, "work-root", defaults.Server.WorkRoot, "Workspace root directory")
+	pflags.StringVar(&webDist, "web", defaults.Server.WebDist, "Directory containing built web SPA assets to host at /")
 	pflags.BoolVar(&readyJSON, "ready-json", defaults.Server.ReadyJSON, "Emit single-line readiness JSON once listeners are bound")
 	pflags.BoolVar(&allowLoopbackEgress, "allow-loopback-egress", defaults.Server.AllowLoopbackEgress, "Allow vault egress proxy to target loopback addresses")
 
@@ -332,15 +343,22 @@ func loadServerConfig(flags *pflag.FlagSet, configFile string, getenv func(strin
 	if err != nil {
 		return nil, "", Config{}, err
 	}
+	homeDir := strings.TrimSpace(cfg.Server.HomeDir)
+	if homeDir == "" {
+		homeDir = strings.TrimSpace(cfg.HomeDir)
+	}
 	srvCfg := Config{
 		Addr:                cfg.Server.Addr,
 		PreviewAddr:         cfg.Server.PreviewAddr,
 		DBPath:              cfg.Server.DBPath,
 		WorkRoot:            cfg.Server.WorkRoot,
+		HomeDir:             homeDir,
+		WebDist:             cfg.Server.WebDist,
 		ArtifactDir:         cfg.Server.ArtifactDir,
 		MediaDir:            cfg.Server.MediaDir,
 		ReadyJSON:           cfg.Server.ReadyJSON,
 		AllowLoopbackEgress: cfg.Server.AllowLoopbackEgress,
+		AppConfig:           cfg,
 	}
 	return cfg, loadedPath, srvCfg, nil
 }
@@ -350,14 +368,24 @@ func executeServe(ctx context.Context, flags *pflag.FlagSet, configFile string, 
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(cfg.HomeDir) == "" && getenv != nil {
+		cfg.HomeDir = strings.TrimSpace(getenv("VIBEVALLEY_HOME"))
+	}
 
 	srv, err := NewServer(ctx, cfg)
 	if err != nil {
 		return err
 	}
 
+	url := "http://" + srv.Addr()
+	pid := os.Getpid()
+	cleanupServerJSON := writeHomeServerJSON(cfg.HomeDir, pid, srv.Port(), url)
+	defer cleanupServerJSON()
+
 	if cfg.ReadyJSON {
 		readyBytes, err := json.Marshal(ReadyInfo{
+			PID:         pid,
+			URL:         url,
 			Addr:        srv.Addr(),
 			PreviewAddr: srv.PreviewAddr(),
 		})
@@ -379,6 +407,44 @@ func executeServe(ctx context.Context, flags *pflag.FlagSet, configFile string, 
 	case serveErr := <-srv.ServeErr():
 		_ = srv.Close()
 		return serveErr
+	}
+}
+
+type homeServerReceipt struct {
+	PID  int    `json:"pid"`
+	Port int    `json:"port"`
+	URL  string `json:"url"`
+}
+
+func writeHomeServerJSON(homeDir string, pid, port int, serverURL string) func() {
+	homeDir = strings.TrimSpace(homeDir)
+	if homeDir == "" {
+		return func() {}
+	}
+	if err := os.MkdirAll(homeDir, 0o700); err != nil {
+		return func() {}
+	}
+	path := filepath.Join(homeDir, "server.json")
+	raw, err := json.Marshal(homeServerReceipt{
+		PID:  pid,
+		Port: port,
+		URL:  serverURL,
+	})
+	if err != nil {
+		return func() {}
+	}
+	if err := os.WriteFile(path, append(raw, '\n'), 0o600); err != nil {
+		return func() {}
+	}
+	return func() {
+		data, rErr := os.ReadFile(path)
+		if rErr != nil {
+			return
+		}
+		var receipt homeServerReceipt
+		if json.Unmarshal(data, &receipt) == nil && receipt.PID == pid {
+			_ = os.Remove(path)
+		}
 	}
 }
 
@@ -410,12 +476,15 @@ func NewServer(ctx context.Context, cfg Config) (*Server, error) {
 	stCfg := stack.Config{
 		DBPath:              cfg.DBPath,
 		WorkRoot:            cfg.WorkRoot,
+		HomeDir:             cfg.HomeDir,
+		Version:             version,
 		ArtifactDir:         cfg.ArtifactDir,
 		MediaDir:            cfg.MediaDir,
 		ServerURL:           "http://" + mainLn.Addr().String(),
 		PreviewHost:         previewHost,
 		WorkbenchHosts:      []string{mainLn.Addr().String()},
 		AllowLoopbackEgress: cfg.AllowLoopbackEgress,
+		AppConfig:           cfg.AppConfig,
 	}
 	st, err := stack.New(ctx, stCfg)
 	if err != nil {
@@ -426,9 +495,16 @@ func NewServer(ctx context.Context, cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("initialize stack: %w", err)
 	}
 
+	var gwOpts []gateway.Option
+	if strings.TrimSpace(cfg.WebDist) != "" {
+		gwOpts = append(gwOpts, gateway.WithWebDist(cfg.WebDist))
+	}
+	gw := gateway.NewHandler(st, gwOpts...)
+
 	shutCtx, cancel := context.WithCancel(context.Background())
 	s := &Server{
 		stack:       st,
+		gw:          gw,
 		mainLn:      mainLn,
 		previewLn:   previewLn,
 		serveErrCh:  make(chan error, 2),
@@ -468,6 +544,17 @@ func (s *Server) Addr() string {
 		return ""
 	}
 	return s.mainLn.Addr().String()
+}
+
+// Port returns the bound TCP port of the control-plane listener.
+func (s *Server) Port() int {
+	if s.mainLn == nil {
+		return 0
+	}
+	if tcpAddr, ok := s.mainLn.Addr().(*net.TCPAddr); ok {
+		return tcpAddr.Port
+	}
+	return 0
 }
 
 // PreviewAddr returns the bound isolated preview host:port, or empty when disabled.
@@ -516,10 +603,11 @@ func (s *Server) newControlPlaneMux() http.Handler {
 	mux.HandleFunc("/machine/ws", s.stack.Machines.HandleWebSocket)
 	mux.Handle("/egress", s.stack.Egress)
 	mux.Handle("/egress/", s.stack.Egress)
-	mux.HandleFunc("/api/v1/state", s.handleAPIState)
+	mux.HandleFunc("/api/v1/state", s.gw.HandleState)
 	mux.HandleFunc("/api/v1/issues", s.handleAPIIssues)
 	mux.HandleFunc("/api/v1/machines", s.handleAPIMachines)
 	mux.HandleFunc("/api/v1/artifacts/publish", s.handleAPIArtifactPublish)
+	mux.Handle("/", s.gw)
 	return mux
 }
 
@@ -533,18 +621,6 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 		"addr":            s.Addr(),
 		"preview_addr":    s.PreviewAddr(),
 		"online_machines": s.stack.Machines.OnlineIDs(),
-	})
-}
-
-func (s *Server) handleAPIState(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	rev, view := s.stack.Game.Snapshot()
-	writeJSON(w, http.StatusOK, map[string]any{
-		"rev":   rev,
-		"space": view,
 	})
 }
 

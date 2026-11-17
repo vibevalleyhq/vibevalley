@@ -829,3 +829,53 @@ desktop:
 		}
 	}
 }
+
+func TestServerWebDistAndHomeDirAwareness(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	getenv := mapGetenv(map[string]string{"HOME": tmp})
+
+	// Top-level web populates both server.web_dist and desktop.web_dist.
+	webYAML := filepath.Join(tmp, "web.yaml")
+	writeTestFile(t, webYAML, "web: /srv/web/dist\nhome_dir: /srv/home\n")
+	cfg, _, err := config.Load(config.LoadOptions{ConfigFile: webYAML, Getenv: getenv})
+	if err != nil {
+		t.Fatalf("Load web.yaml failed: %v", err)
+	}
+	if cfg.Server.WebDist != "/srv/web/dist" || cfg.Desktop.WebDist != "/srv/web/dist" {
+		t.Fatalf("WebDist mismatch: server=%q desktop=%q", cfg.Server.WebDist, cfg.Desktop.WebDist)
+	}
+	if cfg.Server.HomeDir != "/srv/home" || cfg.HomeDir != "/srv/home" {
+		t.Fatalf("HomeDir mismatch: server=%q top=%q", cfg.Server.HomeDir, cfg.HomeDir)
+	}
+
+	// server.web alias normalizes to server.web_dist and VIBE_WEB_DIST overrides both.
+	srvYAML := filepath.Join(tmp, "srv.yaml")
+	writeTestFile(t, srvYAML, "server:\n  web: /srv/nested/web\n")
+	srvCfg, _, err := config.Load(config.LoadOptions{ConfigFile: srvYAML, Getenv: getenv})
+	if err != nil {
+		t.Fatalf("Load srv.yaml failed: %v", err)
+	}
+	if srvCfg.Server.WebDist != "/srv/nested/web" {
+		t.Fatalf("Server.WebDist = %q, want /srv/nested/web", srvCfg.Server.WebDist)
+	}
+
+	envCfg, _, err := config.Load(config.LoadOptions{
+		ConfigFile: srvYAML,
+		Getenv: mapGetenv(map[string]string{
+			"HOME":            tmp,
+			"VIBE_WEB_DIST":   "/env/web/dist",
+			"VIBEVALLEY_HOME": "/env/home",
+		}),
+	})
+	if err != nil {
+		t.Fatalf("Load env override failed: %v", err)
+	}
+	if envCfg.Server.WebDist != "/env/web/dist" || envCfg.Desktop.WebDist != "/env/web/dist" {
+		t.Fatalf("env WebDist mismatch: server=%q desktop=%q", envCfg.Server.WebDist, envCfg.Desktop.WebDist)
+	}
+	if envCfg.Server.HomeDir != "/env/home" || envCfg.HomeDir != "/env/home" {
+		t.Fatalf("env HomeDir mismatch: server=%q top=%q", envCfg.Server.HomeDir, envCfg.HomeDir)
+	}
+}

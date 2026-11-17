@@ -708,8 +708,26 @@ server:
 		if err := json.Unmarshal(sc.Bytes(), &ready); err != nil {
 			t.Fatalf("decode ready json %q: %v", sc.Text(), err)
 		}
-		if ready.Addr == "" || ready.PreviewAddr == "" {
-			t.Fatalf("expected bound addr and preview_addr, got %+v", ready)
+		if ready.Addr == "" || ready.PreviewAddr == "" || ready.PID <= 0 || ready.URL != "http://"+ready.Addr {
+			t.Fatalf("expected bound addr, preview_addr, pid, and url, got %+v", ready)
+		}
+
+		// Verify $VIBEVALLEY_HOME/server.json was written while running.
+		serverJSONPath := filepath.Join(vibeHome, "server.json")
+		rawReceipt, err := os.ReadFile(serverJSONPath)
+		if err != nil {
+			t.Fatalf("expected server.json at %s: %v", serverJSONPath, err)
+		}
+		var receipt struct {
+			PID  int    `json:"pid"`
+			Port int    `json:"port"`
+			URL  string `json:"url"`
+		}
+		if err := json.Unmarshal(rawReceipt, &receipt); err != nil {
+			t.Fatalf("decode server.json: %v", err)
+		}
+		if receipt.PID != ready.PID || receipt.Port <= 0 || receipt.URL != ready.URL {
+			t.Fatalf("unexpected server.json receipt: %+v vs ready=%+v", receipt, ready)
 		}
 
 		resp, err := http.Get("http://" + ready.Addr + "/healthz")
@@ -724,6 +742,105 @@ server:
 		stopRun()
 		if err := <-doneCh; err != nil {
 			t.Fatalf("serve subcommand shutdown error: %v", err)
+		}
+		if _, err := os.Stat(serverJSONPath); !os.IsNotExist(err) {
+			t.Fatalf("expected server.json removed on clean shutdown, stat err=%v", err)
+		}
+	})
+
+	t.Run("serve --web SPA hosting and gateway /api/v1/state negotiation", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		tmp := t.TempDir()
+		vibeHome := filepath.Join(tmp, "vibe-home")
+		webDir := filepath.Join(tmp, "web-dist")
+		if err := os.MkdirAll(filepath.Join(webDir, "assets"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(webDir, "index.html"), []byte("<!doctype html><html><body>SPA</body></html>"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(webDir, "assets", "app.js"), []byte("console.log('ok');"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		getenv := mapGetenv(map[string]string{
+			"VIBEVALLEY_HOME": vibeHome,
+			"VIBE_DB_PATH":    ":memory:",
+			"VIBE_WORK_ROOT":  filepath.Join(tmp, "work"),
+		})
+
+		pr, pw := io.Pipe()
+		var errBuf bytes.Buffer
+		runCtx, stopRun := context.WithCancel(ctx)
+		defer stopRun()
+		doneCh := make(chan error, 1)
+		go func() {
+			err := run(runCtx, []string{"--addr", "127.0.0.1:0", "--preview-addr", "disabled", "--web", webDir, "--ready-json"}, getenv, pw, &errBuf)
+			_ = pw.Close()
+			doneCh <- err
+		}()
+
+		sc := bufio.NewScanner(pr)
+		if !sc.Scan() {
+			t.Fatalf("expected ready json; err=%v stderr=%s", sc.Err(), errBuf.String())
+		}
+		var ready ReadyInfo
+		if err := json.Unmarshal(sc.Bytes(), &ready); err != nil {
+			t.Fatalf("decode ready json: %v", err)
+		}
+
+		// SPA HTML root + locale rewriting.
+		htmlResp, err := http.Get(ready.URL + "/issues/1")
+		if err != nil {
+			t.Fatalf("GET SPA route: %v", err)
+		}
+		htmlBytes, _ := io.ReadAll(htmlResp.Body)
+		htmlResp.Body.Close()
+		if htmlResp.StatusCode != http.StatusOK || !strings.Contains(string(htmlBytes), `data-locale="zh"`) {
+			t.Fatalf("unexpected SPA fallback response status=%d body=%s", htmlResp.StatusCode, string(htmlBytes))
+		}
+
+		// Asset immutable cache header.
+		assetResp, err := http.Get(ready.URL + "/assets/app.js")
+		if err != nil {
+			t.Fatalf("GET asset: %v", err)
+		}
+		assetResp.Body.Close()
+		if assetResp.StatusCode != http.StatusOK || !strings.Contains(assetResp.Header.Get("Cache-Control"), "immutable") {
+			t.Fatalf("expected immutable Cache-Control on asset, got %q", assetResp.Header.Get("Cache-Control"))
+		}
+
+		// Non-SSE /api/v1/state returns JSON with rev + space + frame.
+		stateResp, err := http.Get(ready.URL + "/api/v1/state")
+		if err != nil {
+			t.Fatalf("GET /api/v1/state: %v", err)
+		}
+		var stateBody map[string]any
+		_ = json.NewDecoder(stateResp.Body).Decode(&stateBody)
+		stateResp.Body.Close()
+		if stateBody["frame"] == nil || stateBody["space"] == nil || stateBody["rev"] == nil {
+			t.Fatalf("expected rev, space, frame on non-SSE /api/v1/state, got %v", stateBody)
+		}
+
+		// SSE /api/v1/state streams StateFrame data line.
+		sseReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, ready.URL+"/api/v1/state", nil)
+		sseReq.Header.Set("Accept", "text/event-stream")
+		sseResp, err := http.DefaultClient.Do(sseReq)
+		if err != nil {
+			t.Fatalf("GET SSE /api/v1/state: %v", err)
+		}
+		sseSc := bufio.NewScanner(sseResp.Body)
+		if !sseSc.Scan() || !strings.HasPrefix(sseSc.Text(), "data: ") {
+			sseResp.Body.Close()
+			t.Fatalf("expected initial SSE data line, got %q err=%v", sseSc.Text(), sseSc.Err())
+		}
+		sseResp.Body.Close()
+
+		stopRun()
+		if err := <-doneCh; err != nil {
+			t.Fatalf("serve shutdown error: %v", err)
 		}
 	})
 }

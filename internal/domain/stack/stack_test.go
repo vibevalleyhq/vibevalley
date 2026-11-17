@@ -2,6 +2,7 @@ package stack_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -10,11 +11,13 @@ import (
 	"time"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/attachment"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/issue"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/media"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/memory"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/pkm"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/setting"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
 	"github.com/vibevalleyhq/vibevalley/internal/durable"
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
@@ -397,5 +400,69 @@ approvalSeen:
 	}
 	if err := lazy.Close(); err != nil {
 		t.Fatalf("lazy.Close: %v", err)
+	}
+}
+
+func TestStackWave1WiringEphemeralZeroNetwork(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	s, err := stack.New(ctx, stack.Config{
+		DBPath:   ":memory:",
+		WorkRoot: t.TempDir(),
+		Version:  "0.1.0-test",
+		Getenv:   func(string) string { return "" },
+	})
+	if err != nil {
+		t.Fatalf("stack.New(:memory:): %v", err)
+	}
+	defer func() { _ = s.Close() }()
+
+	if s.Setting == nil || s.User == nil || s.Attachments == nil || s.LAN == nil ||
+		s.MCP == nil || s.Connectors == nil || s.Voice == nil || s.Provider == nil ||
+		s.DomainTools == nil || s.Orchestrator == nil {
+		t.Fatalf("expected all Wave 1 modules wired on Stack")
+	}
+	if s.HomeDir() != "" {
+		t.Fatalf("expected empty HomeDir for ephemeral :memory: stack, got %q", s.HomeDir())
+	}
+	if s.Version() != "0.1.0-test" {
+		t.Fatalf("Version() = %q", s.Version())
+	}
+
+	gotCh := make(chan int64, 4)
+	unsub := s.SubscribeStateChange(func(seq int64) {
+		gotCh <- seq
+	})
+	defer unsub()
+
+	seq := s.NotifyStateChange()
+	if seq <= 0 || s.StateSeq() != seq {
+		t.Fatalf("expected positive monotonic StateSeq, got %d vs %d", seq, s.StateSeq())
+	}
+	select {
+	case notified := <-gotCh:
+		if notified != seq {
+			t.Fatalf("expected notified seq %d, got %d", seq, notified)
+		}
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for StateChange notification")
+	}
+
+	// Verify DomainTools list non-empty specs and Attachment/Setting work with zero network.
+	if specs := s.DomainTools.Specs(); len(specs) == 0 {
+		t.Fatal("expected registered domain tools on DomainToolRegistry")
+	}
+	localeEn := "en"
+	if _, err := s.Setting.Update(ctx, setting.SettingsUpdate{Locale: &localeEn}); err != nil {
+		t.Fatalf("Setting.Update: %v", err)
+	}
+	if _, err := s.Attachments.CreateFromBase64(ctx, attachment.AttachmentUpload{
+		Name: "note.txt",
+		Type: "text/plain",
+		Data: base64.StdEncoding.EncodeToString([]byte("hello wave2")),
+	}); err != nil {
+		t.Fatalf("Attachments.CreateFromBase64: %v", err)
 	}
 }

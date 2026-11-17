@@ -125,6 +125,32 @@ func (s *Service) GetIssue(ctx context.Context, id string) (Issue, error) {
 	return iss, nil
 }
 
+// UpdateIssue atomically loads an issue by ID, applies mutate, updates UpdatedAtMs, and persists it.
+func (s *Service) UpdateIssue(ctx context.Context, id string, mutate func(*Issue) error) (Issue, error) {
+	if s.closed.Load() {
+		return Issue{}, ErrStoreClosed
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	iss, ok, err := s.backend.getIssue(ctx, id)
+	if err != nil {
+		return Issue{}, err
+	}
+	if !ok {
+		return Issue{}, fmt.Errorf("%w: issue %q", ErrNotFound, id)
+	}
+	if mutate != nil {
+		if err := mutate(&iss); err != nil {
+			return Issue{}, err
+		}
+	}
+	iss.UpdatedAtMs = s.clock.NowMs()
+	if err := s.backend.upsertIssue(ctx, iss); err != nil {
+		return Issue{}, err
+	}
+	return cloneIssue(iss), nil
+}
+
 // ListIssues returns issues matching statuses (or all issues if empty).
 func (s *Service) ListIssues(ctx context.Context, statuses ...contract.IssueStatus) ([]Issue, error) {
 	if s.closed.Load() {

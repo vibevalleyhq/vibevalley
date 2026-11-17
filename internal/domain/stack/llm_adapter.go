@@ -77,6 +77,11 @@ func NewModelClient(deps ModelClientDeps) durable.ModelClient {
 	return adapter
 }
 
+// Router returns the underlying *provider.Router backing this ModelClient.
+func (a *durableModelAdapter) Router() *provider.Router {
+	return a.router
+}
+
 func (a *durableModelAdapter) resolveKey(ctx context.Context, prov provider.ProviderKind) (string, string, error) {
 	var apiKey string
 	var baseURL string

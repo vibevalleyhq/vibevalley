@@ -58,9 +58,11 @@ type ServerSection struct {
 	Addr                string `koanf:"addr" yaml:"addr"`
 	PreviewAddr         string `koanf:"preview_addr" yaml:"preview_addr"`
 	DBPath              string `koanf:"db_path" yaml:"db_path"`
+	HomeDir             string `koanf:"home_dir" yaml:"home_dir"`
 	WorkRoot            string `koanf:"work_root" yaml:"work_root"`
 	ArtifactDir         string `koanf:"artifact_dir" yaml:"artifact_dir"`
 	MediaDir            string `koanf:"media_dir" yaml:"media_dir"`
+	WebDist             string `koanf:"web_dist" yaml:"web"`
 	ReadyJSON           bool   `koanf:"ready_json" yaml:"ready_json"`
 	AllowLoopbackEgress bool   `koanf:"allow_loopback_egress" yaml:"allow_loopback_egress"`
 }
@@ -149,9 +151,11 @@ var (
 			"addr":                  true,
 			"preview_addr":          true,
 			"db_path":               true,
+			"home_dir":              true,
 			"work_root":             true,
 			"artifact_dir":          true,
 			"media_dir":             true,
+			"web_dist":              true,
 			"ready_json":            true,
 			"allow_loopback_egress": true,
 		},
@@ -210,6 +214,7 @@ func defaultConfig(getenv func(string) string, allowUserHomeFallback bool) *AppC
 			Addr:        defaultServerAddr,
 			PreviewAddr: defaultPreviewAddr,
 			DBPath:      defaultDBPath,
+			HomeDir:     homeDir,
 		},
 		Machine: MachineSection{
 			MachineID:    defaultMachineID(),
@@ -480,10 +485,21 @@ func loadAndNormalizeYAML(path string) (map[string]any, error) {
 		return nil, fmt.Errorf("load config %q: %w", path, err)
 	}
 	raw := yk.Raw()
+	if srvSec, ok := raw["server"].(map[string]any); ok {
+		if w, exists := srvSec["web"]; exists {
+			if _, hasDist := srvSec["web_dist"]; !hasDist {
+				srvSec["web_dist"] = w
+			}
+			delete(srvSec, "web")
+		}
+	}
 	if err := validateAndNormalizeYAML(raw, path); err != nil {
 		return nil, err
 	}
-	// Propagate top-level work_root to server/machine sections unless YAML specified overrides.
+	// Propagate top-level home_dir and work_root to sections unless YAML specified overrides.
+	if homeDir, ok := raw["home_dir"]; ok {
+		setSectionDefault(raw, "server", "home_dir", homeDir)
+	}
 	if workRoot, ok := raw["work_root"]; ok {
 		setSectionDefault(raw, "server", "work_root", workRoot)
 		setSectionDefault(raw, "machine", "work_root", workRoot)
@@ -516,6 +532,7 @@ func loadAndNormalizeYAML(path string) (map[string]any, error) {
 			return nil, fmt.Errorf("load config %q: key %q must be a string", path, "web")
 		}
 		if trimmed := strings.TrimSpace(webStr); trimmed != "" {
+			setSectionDefault(raw, "server", "web_dist", trimmed)
 			setSectionDefault(raw, "desktop", "web_dist", trimmed)
 		}
 		delete(raw, "web")
@@ -759,7 +776,7 @@ func envOverrides(getenv func(string) string) (map[string]any, error) {
 		}
 	}
 
-	setIfPresent("VIBEVALLEY_HOME", "home_dir")
+	setIfPresent("VIBEVALLEY_HOME", "home_dir", "server.home_dir")
 	setIfPresent("VIBEVALLEY_WORK_ROOT", "work_root", "server.work_root", "machine.work_root")
 	setIfPresent("VIBE_SERVER_ADDR", "server.addr")
 	setIfPresent("VIBE_PREVIEW_ADDR", "server.preview_addr")
@@ -773,7 +790,7 @@ func envOverrides(getenv func(string) string) (map[string]any, error) {
 	}
 	setIfPresent("VIBE_SERVER_URL", "machine.server_url", "desktop.server_url")
 	setIfPresent("VIBE_MACHINE_ID", "machine.machine_id")
-	setIfPresent("VIBE_WEB_DIST", "desktop.web_dist")
+	setIfPresent("VIBE_WEB_DIST", "server.web_dist", "desktop.web_dist")
 	setIfPresent("MYGO_AUTOMATION", "desktop.automation_socket")
 	setIfPresent("DEEPSEEK_API_KEY", "deepseek.api_key")
 
@@ -817,9 +834,11 @@ func configToMap(cfg *AppConfig, stringDurations bool) map[string]any {
 			"addr":                  cfg.Server.Addr,
 			"preview_addr":          cfg.Server.PreviewAddr,
 			"db_path":               cfg.Server.DBPath,
+			"home_dir":              cfg.Server.HomeDir,
 			"work_root":             cfg.Server.WorkRoot,
 			"artifact_dir":          cfg.Server.ArtifactDir,
 			"media_dir":             cfg.Server.MediaDir,
+			"web_dist":              cfg.Server.WebDist,
 			"ready_json":            cfg.Server.ReadyJSON,
 			"allow_loopback_egress": cfg.Server.AllowLoopbackEgress,
 		},
