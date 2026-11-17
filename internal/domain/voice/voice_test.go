@@ -1,14 +1,23 @@
 package voice
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha1"
+	"crypto/tls"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -285,5 +294,366 @@ func TestSpeakPiecesUTF8BoundarySplitting(t *testing.T) {
 		if !strings.HasSuffix(p, "。") {
 			t.Fatalf("expected sentence-boundary split on piece %d: %q", i, p)
 		}
+	}
+}
+
+func testDialClientWS(t *testing.T, serverURL, path string) *wsConn {
+	t.Helper()
+	u, err := url.Parse(serverURL)
+	if err != nil {
+		t.Fatalf("parse url %q: %v", serverURL, err)
+	}
+	conn, err := net.DialTimeout("tcp", u.Host, 5*time.Second)
+	if err != nil {
+		t.Fatalf("dial %s: %v", u.Host, err)
+	}
+	var nonce [16]byte
+	_, _ = rand.Read(nonce[:])
+	key := base64.StdEncoding.EncodeToString(nonce[:])
+	reqText := "GET " + path + " HTTP/1.1\r\n" +
+		"Host: " + u.Host + "\r\n" +
+		"Upgrade: websocket\r\n" +
+		"Connection: Upgrade\r\n" +
+		"Sec-WebSocket-Key: " + key + "\r\n" +
+		"Sec-WebSocket-Version: 13\r\n\r\n"
+	if err := writeAll(conn, []byte(reqText)); err != nil {
+		conn.Close()
+		t.Fatalf("write upgrade: %v", err)
+	}
+	br := bufio.NewReader(conn)
+	resp, err := http.ReadResponse(br, &http.Request{Method: http.MethodGet})
+	if err != nil {
+		conn.Close()
+		t.Fatalf("read upgrade response: %v", err)
+	}
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		conn.Close()
+		t.Fatalf("unexpected upgrade status %d", resp.StatusCode)
+	}
+	sum := sha1.Sum([]byte(key + wsGUID))
+	wantAccept := base64.StdEncoding.EncodeToString(sum[:])
+	if got := resp.Header.Get("Sec-WebSocket-Accept"); got != wantAccept {
+		conn.Close()
+		t.Fatalf("Sec-WebSocket-Accept = %q, want %q", got, wantAccept)
+	}
+	return &wsConn{
+		netConn:  conn,
+		r:        br,
+		isClient: true,
+		maxFrame: defaultMaxWSFrameBytes,
+	}
+}
+
+func readWireMaskedFlag(r *bufio.Reader) (fin bool, masked bool, opcode byte, payload []byte, err error) {
+	var hdr [2]byte
+	if _, err = io.ReadFull(r, hdr[:]); err != nil {
+		return false, false, 0, nil, err
+	}
+	fin = (hdr[0] & 0x80) != 0
+	opcode = hdr[0] & 0x0F
+	masked = (hdr[1] & 0x80) != 0
+	length := uint64(hdr[1] & 0x7F)
+	switch length {
+	case 126:
+		var ext [2]byte
+		if _, err = io.ReadFull(r, ext[:]); err != nil {
+			return false, false, 0, nil, err
+		}
+		length = uint64(binary.BigEndian.Uint16(ext[:]))
+	case 127:
+		var ext [8]byte
+		if _, err = io.ReadFull(r, ext[:]); err != nil {
+			return false, false, 0, nil, err
+		}
+		length = binary.BigEndian.Uint64(ext[:])
+	}
+	var mask [4]byte
+	if masked {
+		if _, err = io.ReadFull(r, mask[:]); err != nil {
+			return false, false, 0, nil, err
+		}
+	}
+	payload = make([]byte, int(length))
+	if length > 0 {
+		if _, err = io.ReadFull(r, payload); err != nil {
+			return false, false, 0, nil, err
+		}
+		if masked {
+			for i := range payload {
+				payload[i] ^= mask[i%4]
+			}
+		}
+	}
+	return fin, masked, opcode, payload, nil
+}
+
+func TestServeRealtimeWSBidirectionalFramesMaskingAndLengths(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu          sync.Mutex
+		gotAuth     string
+		gotCustom   string
+		gotSubproto string
+		sawUnmasked bool
+		upFrames    int
+	)
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		gotAuth = r.Header.Get("Authorization")
+		gotCustom = r.Header.Get("X-Vibe-Custom")
+		gotSubproto = r.Header.Get("Sec-WebSocket-Protocol")
+		mu.Unlock()
+
+		wsKey := r.Header.Get("Sec-WebSocket-Key")
+		upConn, err := upgradeBrowserWS(w, wsKey, "realtime-v1", defaultMaxWSFrameBytes)
+		if err != nil {
+			return
+		}
+		defer upConn.netConn.Close()
+
+		for {
+			_, masked, op, data, err := readWireMaskedFlag(upConn.r)
+			if err != nil {
+				return
+			}
+			if op == wsOpClose {
+				_ = upConn.writeClose(1000, "upstream bye")
+				return
+			}
+			if op == wsOpPing {
+				_ = upConn.writeFrame(true, wsOpPong, data)
+				continue
+			}
+			mu.Lock()
+			upFrames++
+			if !masked {
+				sawUnmasked = true
+			}
+			mu.Unlock()
+
+			// Echo back unmasked (isClient=false).
+			if err := upConn.writeFrame(true, op, data); err != nil {
+				return
+			}
+		}
+	}))
+	defer upstream.Close()
+
+	upstreamWS := "ws" + strings.TrimPrefix(upstream.URL, "http")
+	proxyDone := make(chan error, 1)
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		err := ServeRealtimeWS(w, r, RelayConfig{
+			UpstreamURL: upstreamWS + "/v1/realtime?model=moss-live-1.0",
+			APIKey:      "secret-moss-key",
+			Headers:     http.Header{"X-Vibe-Custom": []string{"relay-1"}},
+		})
+		proxyDone <- err
+	}))
+	defer proxy.Close()
+
+	client := testDialClientWS(t, proxy.URL, "/api/v1/voice/moss/line")
+	defer client.netConn.Close()
+
+	// 1. Ping -> Pong directly from relay.
+	if err := client.writeFrame(true, wsOpPing, []byte("hb")); err != nil {
+		t.Fatalf("write ping: %v", err)
+	}
+	_, maskedPong, opPong, pongData, err := readWireMaskedFlag(client.r)
+	if err != nil || opPong != wsOpPong || maskedPong || string(pongData) != "hb" {
+		t.Fatalf("expected unmasked pong 'hb', got op=%d masked=%v data=%q err=%v", opPong, maskedPong, string(pongData), err)
+	}
+
+	// 2. 7-bit text frame (<=125 bytes).
+	smallText := []byte(`{"action":"attach_session"}`)
+	if err := client.writeFrame(true, wsOpText, smallText); err != nil {
+		t.Fatalf("write small text: %v", err)
+	}
+	_, masked1, op1, got1, err := readWireMaskedFlag(client.r)
+	if err != nil || op1 != wsOpText || masked1 || !bytes.Equal(got1, smallText) {
+		t.Fatalf("7-bit text mismatch: op=%d masked=%v len=%d err=%v", op1, masked1, len(got1), err)
+	}
+
+	// 3. 16-bit (126) binary frame (1024 bytes).
+	medBin := bytes.Repeat([]byte{0xAB, 0xCD}, 512)
+	if err := client.writeFrame(true, wsOpBinary, medBin); err != nil {
+		t.Fatalf("write 16-bit binary: %v", err)
+	}
+	_, masked2, op2, got2, err := readWireMaskedFlag(client.r)
+	if err != nil || op2 != wsOpBinary || masked2 || !bytes.Equal(got2, medBin) {
+		t.Fatalf("16-bit binary mismatch: op=%d masked=%v len=%d err=%v", op2, masked2, len(got2), err)
+	}
+
+	// 4. 64-bit (127) binary frame (70,000 bytes).
+	bigBin := make([]byte, 70_000)
+	for i := range bigBin {
+		bigBin[i] = byte(i % 251)
+	}
+	if err := client.writeFrame(true, wsOpBinary, bigBin); err != nil {
+		t.Fatalf("write 64-bit binary: %v", err)
+	}
+	_, masked3, op3, got3, err := readWireMaskedFlag(client.r)
+	if err != nil || op3 != wsOpBinary || masked3 || !bytes.Equal(got3, bigBin) {
+		t.Fatalf("64-bit binary mismatch: op=%d masked=%v len=%d err=%v", op3, masked3, len(got3), err)
+	}
+
+	// 5. Fragmented text frame (FIN=0 -> continuation FIN=1).
+	if err := client.writeFrame(false, wsOpText, []byte("hello ")); err != nil {
+		t.Fatalf("write frag 1: %v", err)
+	}
+	if err := client.writeFrame(true, wsOpContinuation, []byte("fragment")); err != nil {
+		t.Fatalf("write frag 2: %v", err)
+	}
+	_, _, op4, got4, err := readWireMaskedFlag(client.r)
+	if err != nil || op4 != wsOpText || string(got4) != "hello fragment" {
+		t.Fatalf("fragmented text mismatch: op=%d data=%q err=%v", op4, string(got4), err)
+	}
+
+	// 6. Clean Close propagation.
+	_ = client.writeClose(1000, "done")
+	_, _, opClose, _, _ := readWireMaskedFlag(client.r)
+	if opClose != wsOpClose {
+		t.Fatalf("expected close frame back, got op=%d", opClose)
+	}
+
+	select {
+	case pErr := <-proxyDone:
+		if pErr != nil {
+			t.Fatalf("ServeRealtimeWS returned unexpected error: %v", pErr)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("ServeRealtimeWS did not exit promptly after close")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if gotAuth != "Bearer secret-moss-key" || gotCustom != "relay-1" {
+		t.Fatalf("upstream headers mismatch: auth=%q custom=%q subproto=%q", gotAuth, gotCustom, gotSubproto)
+	}
+	if sawUnmasked || upFrames != 4 {
+		t.Fatalf("expected 4 masked client frames at upstream, got frames=%d sawUnmasked=%v", upFrames, sawUnmasked)
+	}
+}
+
+func TestServeRealtimeWSTLSAndServiceRelay(t *testing.T) {
+	t.Parallel()
+
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer tls-moss-key" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		upConn, err := upgradeBrowserWS(w, r.Header.Get("Sec-WebSocket-Key"), "", defaultMaxWSFrameBytes)
+		if err != nil {
+			return
+		}
+		defer upConn.netConn.Close()
+
+		op, data, err := upConn.readMessage()
+		if err != nil {
+			return
+		}
+		_ = upConn.writeFrame(true, op, append([]byte("wss:"), data...))
+		_ = upConn.writeClose(1000, "ok")
+	}))
+	defer upstream.Close()
+
+	wssURL := "wss" + strings.TrimPrefix(upstream.URL, "https")
+	tlsCfg := upstream.Client().Transport.(*http.Transport).TLSClientConfig
+	if tlsCfg == nil {
+		tlsCfg = &tls.Config{InsecureSkipVerify: true}
+	}
+
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = ServeRealtimeWS(w, r, RelayConfig{
+			UpstreamURL: wssURL + "/v1/realtime",
+			APIKey:      "tls-moss-key",
+			TLSConfig:   tlsCfg,
+		})
+	}))
+	defer proxy.Close()
+
+	client := testDialClientWS(t, proxy.URL, "/wss")
+	defer client.netConn.Close()
+	if err := client.writeFrame(true, wsOpText, []byte("ping")); err != nil {
+		t.Fatalf("write text: %v", err)
+	}
+	op, got, err := client.readMessage()
+	if err != nil || op != wsOpText || string(got) != "wss:ping" {
+		t.Fatalf("wss relay mismatch: op=%d data=%q err=%v", op, string(got), err)
+	}
+
+	// Verify Service.ServeMOSSRelay rejects cleanly when MOSS key is missing and proxies when configured.
+	noKeySvc := NewService(Options{})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/voice/moss/line", nil)
+	if err := noKeySvc.ServeMOSSRelay(rec, req); !errors.Is(err, ErrVoiceUnavailable) || rec.Code != http.StatusConflict {
+		t.Fatalf("expected ErrVoiceUnavailable & 409 when key missing, got err=%v code=%d", err, rec.Code)
+	}
+}
+
+func TestServeRealtimeWSErrorRedactionAndContextCancel(t *testing.T) {
+	t.Parallel()
+
+	// 1. Upstream rejects with 401 echoing key -> relay returns HTTP 502 and redacts APIKey.
+	badUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "invalid bearer secret-api-key-999", http.StatusUnauthorized)
+	}))
+	defer badUpstream.Close()
+
+	badWS := "ws" + strings.TrimPrefix(badUpstream.URL, "http")
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/line", nil)
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	req.Header.Set("Sec-WebSocket-Version", "13")
+
+	err := ServeRealtimeWS(rec, req, RelayConfig{
+		UpstreamURL: badWS,
+		APIKey:      "secret-api-key-999",
+	})
+	if !errors.Is(err, ErrRealtimeHandshake) || rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected ErrRealtimeHandshake & 502, got err=%v code=%d", err, rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "secret-api-key-999") {
+		t.Fatalf("relay leaked APIKey in error body: %q", rec.Body.String())
+	}
+
+	// 2. Context cancellation terminates active bidirectional pump cleanly.
+	upConnected := make(chan struct{})
+	idleUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upConn, err := upgradeBrowserWS(w, r.Header.Get("Sec-WebSocket-Key"), "", defaultMaxWSFrameBytes)
+		if err != nil {
+			return
+		}
+		close(upConnected)
+		defer upConn.netConn.Close()
+		_, _, _ = upConn.readMessage()
+	}))
+	defer idleUpstream.Close()
+
+	idleWS := "ws" + strings.TrimPrefix(idleUpstream.URL, "http")
+	ctx, cancel := context.WithCancel(context.Background())
+	relayDone := make(chan error, 1)
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(ctx)
+		relayDone <- ServeRealtimeWS(w, r, RelayConfig{UpstreamURL: idleWS})
+	}))
+	defer proxy.Close()
+
+	client := testDialClientWS(t, proxy.URL, "/idle")
+	defer client.netConn.Close()
+	<-upConnected
+	cancel()
+
+	select {
+	case err := <-relayDone:
+		if err != nil {
+			t.Fatalf("expected clean nil exit on cancel, got %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("ServeRealtimeWS hung on context cancellation")
 	}
 }

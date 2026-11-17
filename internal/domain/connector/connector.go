@@ -77,11 +77,12 @@ type ConnectorStatus struct {
 
 // ConnectorLogin carries login credentials or force-relogin options.
 type ConnectorLogin struct {
-	Force    bool   `json:"force,omitempty"`
-	AppID    string `json:"appId,omitempty"`
-	Secret   string `json:"secret,omitempty"`
-	BotToken string `json:"botToken,omitempty"`
-	Domain   string `json:"domain,omitempty"`
+	Force      bool   `json:"force,omitempty"`
+	AppID      string `json:"appId,omitempty"`
+	Secret     string `json:"secret,omitempty"`
+	BotToken   string `json:"botToken,omitempty"`
+	Domain     string `json:"domain,omitempty"`
+	APIBaseURL string `json:"apiBaseUrl,omitempty"`
 }
 
 // LoginOutcome is returned by Adapter.Login and Adapter.Verify.
@@ -100,6 +101,11 @@ type Adapter interface {
 	Send(ctx context.Context, secrets map[string]string, to, text, replyCtx string) (string, error)
 }
 
+// CredentialVerifier is optionally implemented by Adapter implementations supporting live credential checks.
+type CredentialVerifier interface {
+	VerifyCredentials(ctx context.Context, input ConnectorLogin, secrets map[string]string) (CredentialCheckResult, error)
+}
+
 // ChannelValidator resolves and validates a target channel name during SetChannel.
 type ChannelValidator func(ctx context.Context, name string) (resolvedChannel string, isDefault bool, err error)
 
@@ -108,9 +114,12 @@ type Options struct {
 	HomeDir          string
 	Clock            store.Clock
 	HTTPClient       *http.Client
+	APIBaseURL       string
+	APIBaseURLs      map[ConnectorID]string
 	Adapters         []Adapter
 	ChannelValidator ChannelValidator
 	OnChange         func(ConnectorStatus)
+	OnInbound        InboundHandler
 }
 
 type storedAccount struct {
@@ -138,13 +147,16 @@ type Service struct {
 	filePath         string
 	clock            store.Clock
 	httpClient       *http.Client
+	apiBaseURL       string
+	apiBaseURLs      map[ConnectorID]string
 	channelValidator ChannelValidator
 	onChange         func(ConnectorStatus)
 
-	mu       sync.RWMutex
-	order    []ConnectorID
-	adapters map[ConnectorID]Adapter
-	accounts map[ConnectorID]storedAccount
+	mu        sync.RWMutex
+	order     []ConnectorID
+	adapters  map[ConnectorID]Adapter
+	accounts  map[ConnectorID]storedAccount
+	onInbound InboundHandler
 }
 
 // NewService constructs a Connector Service, reloading $VIBEVALLEY_HOME/connectors.json when homeDir is set.
@@ -157,11 +169,18 @@ func NewService(opts Options) (*Service, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
+	baseURLs := make(map[ConnectorID]string, len(opts.APIBaseURLs))
+	for k, v := range opts.APIBaseURLs {
+		if cleaned := cleanBaseURL(v); cleaned != "" {
+			baseURLs[k] = cleaned
+		}
+	}
+	defaultBase := cleanBaseURL(opts.APIBaseURL)
 
 	adapters := make(map[ConnectorID]Adapter)
 	var order []ConnectorID
 	for _, id := range DefaultConnectors {
-		adapters[id] = newBuiltinAdapter(id, httpClient)
+		adapters[id] = newBuiltinAdapter(id, httpClient, firstNonEmpty(baseURLs[id], defaultBase))
 		order = append(order, id)
 	}
 	for _, a := range opts.Adapters {
@@ -179,8 +198,11 @@ func NewService(opts Options) (*Service, error) {
 		homeDir:          strings.TrimSpace(opts.HomeDir),
 		clock:            clk,
 		httpClient:       httpClient,
+		apiBaseURL:       defaultBase,
+		apiBaseURLs:      baseURLs,
 		channelValidator: opts.ChannelValidator,
 		onChange:         opts.OnChange,
+		onInbound:        opts.OnInbound,
 		order:            order,
 		adapters:         adapters,
 		accounts:         make(map[ConnectorID]storedAccount),
@@ -376,6 +398,35 @@ func (s *Service) SetChannel(ctx context.Context, id ConnectorID, channelName st
 	return st, nil
 }
 
+// VerifyCredentials validates connector credentials against the real platform API (or offline test fallback
+// when VIBEVALLEY_TEST_RUNTIMES=1 and no custom apiBaseUrl is configured). When input omits fields, stored
+// credentials for id are consulted.
+func (s *Service) VerifyCredentials(ctx context.Context, id ConnectorID, input ConnectorLogin) (CredentialCheckResult, error) {
+	if err := ctx.Err(); err != nil {
+		return CredentialCheckResult{}, err
+	}
+	s.mu.RLock()
+	adapter, ok := s.adapters[id]
+	existing, hasExisting := s.accounts[id]
+	s.mu.RUnlock()
+	if !ok {
+		return CredentialCheckResult{}, fmt.Errorf("%w: unknown connector %q", ErrConnectorRefused, id)
+	}
+	var stored map[string]string
+	if hasExisting {
+		stored = cloneStringMap(existing.Secrets)
+	}
+	verifier, ok := adapter.(CredentialVerifier)
+	if !ok {
+		return CredentialCheckResult{ConnectorID: id, OK: true, Offline: true}, nil
+	}
+	res, err := verifier.VerifyCredentials(ctx, input, stored)
+	if err != nil {
+		return CredentialCheckResult{}, fmt.Errorf("%w: %v", ErrConnectorRefused, err)
+	}
+	return res, nil
+}
+
 // Send dispatches an outbound text message through connector id using its persisted credentials.
 func (s *Service) Send(ctx context.Context, id ConnectorID, to, text, replyCtx string) (string, error) {
 	s.mu.RLock()
@@ -393,6 +444,29 @@ func (s *Service) Send(ctx context.Context, id ConnectorID, to, text, replyCtx s
 		target = acc.User
 	}
 	return adapter.Send(ctx, cloneStringMap(acc.Secrets), target, text, replyCtx)
+}
+
+// SendOutbound delivers an outbound text message through connector id to targetChatID via the platform HTTP API.
+func (s *Service) SendOutbound(ctx context.Context, id ConnectorID, targetChatID, text, replyToID string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	s.mu.RLock()
+	adapter, ok := s.adapters[id]
+	acc, hasAcc := s.accounts[id]
+	s.mu.RUnlock()
+	if !ok {
+		return "", fmt.Errorf("%w: unknown connector %q", ErrConnectorRefused, id)
+	}
+	target, err := validateSendState(acc, hasAcc, id, targetChatID, text)
+	if err != nil {
+		return "", err
+	}
+	msgID, err := adapter.Send(ctx, cloneStringMap(acc.Secrets), target, text, replyToID)
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrConnectorRefused, err)
+	}
+	return msgID, nil
 }
 
 func (s *Service) applyOutcome(id ConnectorID, outcome LoginOutcome, existingChannel string) (ConnectorStatus, error) {
@@ -505,7 +579,7 @@ func (s *Service) loadFromDisk() error {
 			acc.ID = id
 		}
 		if _, ok := s.adapters[id]; !ok {
-			s.adapters[id] = newBuiltinAdapter(id, s.httpClient)
+			s.adapters[id] = newBuiltinAdapter(id, s.httpClient, firstNonEmpty(s.apiBaseURLs[id], s.apiBaseURL))
 			s.order = append(s.order, id)
 		}
 		s.accounts[id] = acc
@@ -557,131 +631,6 @@ func (s *Service) persistLocked() error {
 	}
 	cleanup = false
 	return nil
-}
-
-type builtinAdapter struct {
-	id         ConnectorID
-	httpClient *http.Client
-}
-
-func newBuiltinAdapter(id ConnectorID, httpClient *http.Client) Adapter {
-	return &builtinAdapter{id: id, httpClient: httpClient}
-}
-
-func (a *builtinAdapter) ID() ConnectorID { return a.id }
-
-func (a *builtinAdapter) Login(_ context.Context, input ConnectorLogin) (LoginOutcome, error) {
-	appID := strings.TrimSpace(input.AppID)
-	secret := strings.TrimSpace(input.Secret)
-	botToken := strings.TrimSpace(input.BotToken)
-	if botToken == "" && (a.id == ConnectorTelegram || a.id == ConnectorDiscord || a.id == ConnectorSlack) {
-		botToken = secret
-	}
-
-	switch a.id {
-	case ConnectorTelegram, ConnectorDiscord, ConnectorSlack:
-		if botToken == "" {
-			return LoginOutcome{}, fmt.Errorf("%s bot token or secret is required", a.id)
-		}
-		return LoginOutcome{
-			State: StateConnected,
-			User:  string(a.id) + "-bot",
-			Secrets: map[string]string{
-				"botToken": botToken,
-				"appId":    appID,
-			},
-		}, nil
-
-	case ConnectorQQ:
-		if appID == "" || secret == "" {
-			return LoginOutcome{}, errors.New("qq requires appId and secret")
-		}
-		return LoginOutcome{
-			State: StatePairing,
-			Secrets: map[string]string{
-				"appId":  appID,
-				"secret": secret,
-			},
-		}, nil
-
-	case ConnectorFeishu:
-		if appID != "" && secret != "" {
-			domain := strings.TrimSpace(input.Domain)
-			if domain == "" {
-				domain = "feishu"
-			}
-			return LoginOutcome{
-				State: StatePairing,
-				Secrets: map[string]string{
-					"appId":     appID,
-					"appSecret": secret,
-					"domain":    domain,
-				},
-			}, nil
-		}
-		return LoginOutcome{
-			State:   StateWaiting,
-			QR:      fmt.Sprintf("https://open.feishu.cn/page/cli?connector=%s", a.id),
-			Secrets: map[string]string{},
-		}, nil
-
-	case ConnectorWeixin:
-		if botToken != "" {
-			return LoginOutcome{
-				State: StateConnected,
-				User:  "wx-user",
-				Secrets: map[string]string{
-					"botToken": botToken,
-				},
-			}, nil
-		}
-		return LoginOutcome{
-			State:   StateWaiting,
-			QR:      "https://liteapp.weixin.qq.com/q/vibevalley",
-			Secrets: map[string]string{},
-		}, nil
-
-	default:
-		if appID == "" && secret == "" && botToken == "" {
-			return LoginOutcome{
-				State:   StateWaiting,
-				QR:      fmt.Sprintf("vibevalley://connector/%s/login", a.id),
-				Secrets: map[string]string{},
-			}, nil
-		}
-		return LoginOutcome{
-			State: StateConnected,
-			User:  string(a.id) + "-account",
-			Secrets: map[string]string{
-				"appId":    appID,
-				"secret":   secret,
-				"botToken": botToken,
-			},
-		}, nil
-	}
-}
-
-func (a *builtinAdapter) Verify(_ context.Context, secrets map[string]string, code string) (LoginOutcome, error) {
-	if strings.TrimSpace(code) == "" {
-		return LoginOutcome{}, errors.New("verification code cannot be empty")
-	}
-	nextSecrets := cloneStringMap(secrets)
-	nextSecrets["verifiedCode"] = code
-	return LoginOutcome{
-		State:   StateConnected,
-		User:    string(a.id) + "-verified",
-		Secrets: nextSecrets,
-	}, nil
-}
-
-func (a *builtinAdapter) Send(_ context.Context, secrets map[string]string, to, text, _ string) (string, error) {
-	if len(secrets) == 0 {
-		return "", errors.New("connector has no credentials")
-	}
-	if strings.TrimSpace(text) == "" {
-		return "", errors.New("message text is empty")
-	}
-	return fmt.Sprintf("%s:%s", a.id, to), nil
 }
 
 func generate6DigitPairCode() (string, error) {
