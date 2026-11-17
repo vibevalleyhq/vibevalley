@@ -17,6 +17,7 @@ import (
 	"github.com/vibevalleyhq/vibevalley/internal/durable"
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 	_ "modernc.org/sqlite"
 )
@@ -576,17 +577,21 @@ func TestIssueGenerationResultSignalAndAsyncPRCheck(t *testing.T) {
 func TestIssueMigrationsUpStatusDownAllUp(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "issue-migrate.db")
-	db, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer db.Close()
-	db.SetMaxOpenConns(1)
-	if _, err := db.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
+	defer sqlDB.Close()
+	sqlDB.SetMaxOpenConns(1)
+	if _, err := sqlDB.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
 		t.Fatalf("pragma: %v", err)
 	}
 
-	runner, err := migrate.New(db, "issue", issue.MigrationsFS)
+	scopeFS, err := db.ScopeFS("issue")
+	if err != nil {
+		t.Fatalf("ScopeFS(issue): %v", err)
+	}
+	runner, err := migrate.New(sqlDB, "issue", scopeFS)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
 	}
@@ -608,15 +613,15 @@ func TestIssueMigrationsUpStatusDownAllUp(t *testing.T) {
 		t.Fatalf("idempotent Up: applied=%d err=%v", again, err)
 	}
 
-	assertIssueObjectsExist(t, db, true)
+	assertIssueObjectsExist(t, sqlDB, true)
 
 	clk := newFixedClock(time.Unix(1_700_000_000, 0).UTC())
-	svc1, err := issue.OpenDBService(ctx, db, issue.WithClock(clk))
+	svc1, err := issue.OpenDBService(ctx, sqlDB, issue.WithClock(clk))
 	if err != nil {
 		t.Fatalf("OpenDBService after Up: %v", err)
 	}
 
-	// Exercise sqlcgen queries: CreateIssue, ListIssues (all + sqlc.slice status filter), FindByConversation/Session, Crons.
+	// Exercise dbgen queries: CreateIssue, ListIssues (all + sqlc.slice status filter), FindByConversation/Session, Crons.
 	if _, err := svc1.CreateIssue(ctx, issue.Issue{
 		ID:             "iss-1",
 		Title:          "Draft issue",
@@ -685,19 +690,19 @@ func TestIssueMigrationsUpStatusDownAllUp(t *testing.T) {
 	_ = svc1.Close()
 
 	// Checksum mismatch detection when applied up script is modified.
-	upOrig, err := fs.ReadFile(issue.MigrationsFS, "migrations/0001_init.up.sql")
+	upOrig, err := fs.ReadFile(scopeFS, "migrations/0001_issue.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	downOrig, err := fs.ReadFile(issue.MigrationsFS, "migrations/0001_init.down.sql")
+	downOrig, err := fs.ReadFile(scopeFS, "migrations/0001_issue.down.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
 	tamperedFS := fstest.MapFS{
-		"migrations/0001_init.up.sql":   {Data: append(upOrig, []byte("\n-- tampered\n")...)},
-		"migrations/0001_init.down.sql": {Data: downOrig},
+		"migrations/0001_issue.up.sql":   {Data: append(upOrig, []byte("\n-- tampered\n")...)},
+		"migrations/0001_issue.down.sql": {Data: downOrig},
 	}
-	tamperedRunner, err := migrate.New(db, "issue", tamperedFS)
+	tamperedRunner, err := migrate.New(sqlDB, "issue", tamperedFS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -714,7 +719,7 @@ func TestIssueMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || len(st2) != 1 || st2[0].Applied {
 		t.Fatalf("unexpected status after DownAll: %+v err=%v", st2, err)
 	}
-	assertIssueObjectsExist(t, db, false)
+	assertIssueObjectsExist(t, sqlDB, false)
 
 	// Re-Up restores full parity cleanly.
 	reapplied, err := runner.Up(ctx)
@@ -725,9 +730,9 @@ func TestIssueMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || len(st3) != 1 || !st3[0].Applied {
 		t.Fatalf("unexpected status after re-Up: %+v err=%v", st3, err)
 	}
-	assertIssueObjectsExist(t, db, true)
+	assertIssueObjectsExist(t, sqlDB, true)
 
-	svc2, err := issue.OpenDBService(ctx, db, issue.WithClock(clk))
+	svc2, err := issue.OpenDBService(ctx, sqlDB, issue.WithClock(clk))
 	if err != nil {
 		t.Fatalf("OpenDBService after re-Up: %v", err)
 	}
@@ -740,7 +745,48 @@ func TestIssueMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 }
 
-func assertIssueObjectsExist(t *testing.T, db *sql.DB, want bool) {
+func TestOpenSQLiteServiceFromDBNonOwning(t *testing.T) {
+	ctx := context.Background()
+	pool, err := db.OpenPool(ctx, filepath.Join(t.TempDir(), "shared.db"))
+	if err != nil {
+		t.Fatalf("OpenPool: %v", err)
+	}
+	defer pool.Close()
+
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+
+	svc, err := issue.OpenSQLiteServiceFromDB(ctx, pool.WriteDB)
+	if err != nil {
+		t.Fatalf("OpenSQLiteServiceFromDB: %v", err)
+	}
+	if _, err := svc.CreateIssue(ctx, issue.Issue{ID: "shared-iss-1", Title: "Shared", RepoID: "repo-1"}); err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	if err := svc.Close(); err != nil {
+		t.Fatalf("svc.Close: %v", err)
+	}
+	if err := pool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared WriteDB closed by Service.Close: %v", err)
+	}
+
+	svc2, err := issue.OpenSQLiteServiceFromDB(ctx, pool.WriteDB)
+	if err != nil {
+		t.Fatalf("reattach OpenSQLiteServiceFromDB: %v", err)
+	}
+	defer svc2.Close()
+	got, err := svc2.GetIssue(ctx, "shared-iss-1")
+	if err != nil || got.Title != "Shared" {
+		t.Fatalf("reattached GetIssue: %+v err=%v", got, err)
+	}
+}
+
+func assertIssueObjectsExist(t *testing.T, sqlDB *sql.DB, want bool) {
 	t.Helper()
 	objects := []struct {
 		typ  string
@@ -755,7 +801,7 @@ func assertIssueObjectsExist(t *testing.T, db *sql.DB, want bool) {
 	}
 	for _, obj := range objects {
 		var cnt int
-		err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, obj.typ, obj.name).Scan(&cnt)
+		err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, obj.typ, obj.name).Scan(&cnt)
 		if err != nil {
 			t.Fatalf("query sqlite_master (%s %s): %v", obj.typ, obj.name, err)
 		}

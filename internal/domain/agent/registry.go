@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -154,7 +155,26 @@ func NewMemoryRegistry(opts ...Option) *Registry {
 
 // OpenSQLiteRegistry creates or reopens a SQLite WAL-backed agent Registry at path.
 func OpenSQLiteRegistry(ctx context.Context, path string, opts ...Option) (*Registry, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	b, err := openSQLiteAgentBackend(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return newRegistry(ctx, b, opts...)
+}
+
+// OpenSQLiteRegistryFromDB attaches an agent Registry to an already-migrated *sql.DB
+// without running migrations or closing sqlDB on Close.
+func OpenSQLiteRegistryFromDB(ctx context.Context, sqlDB *sql.DB, opts ...Option) (*Registry, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	b, err := openSQLiteAgentFromDB(sqlDB)
 	if err != nil {
 		return nil, err
 	}

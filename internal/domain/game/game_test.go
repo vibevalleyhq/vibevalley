@@ -17,6 +17,7 @@ import (
 	"github.com/vibevalleyhq/vibevalley/pkg/chord/delta"
 	"github.com/vibevalleyhq/vibevalley/pkg/chord/watch"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
@@ -226,13 +227,17 @@ func TestGameLedgerAndCommitLevels(t *testing.T) {
 func TestGameMigrationsUpStatusDownAllUp(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "game-mig.db")
-	db, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("sql.Open: %v", err)
 	}
-	defer db.Close()
+	defer sqlDB.Close()
 
-	runner, err := migrate.New(db, "game", game.MigrationsFS)
+	scopeFS, err := db.ScopeFS("game")
+	if err != nil {
+		t.Fatalf("ScopeFS(game): %v", err)
+	}
+	runner, err := migrate.New(sqlDB, "game", scopeFS)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
 	}
@@ -246,7 +251,7 @@ func TestGameMigrationsUpStatusDownAllUp(t *testing.T) {
 		t.Fatalf("Status after Up: %+v err=%v", statuses, err)
 	}
 	var tblName string
-	if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='game_ledger'`).Scan(&tblName); err != nil {
+	if err := sqlDB.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='game_ledger'`).Scan(&tblName); err != nil {
 		t.Fatalf("expected table game_ledger after Up: %v", err)
 	}
 
@@ -259,7 +264,7 @@ func TestGameMigrationsUpStatusDownAllUp(t *testing.T) {
 		t.Fatalf("Status after DownAll: %+v err=%v", statusesAfterDown, err)
 	}
 	var remaining int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='game_ledger'`).Scan(&remaining); err != nil {
+	if err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='game_ledger'`).Scan(&remaining); err != nil {
 		t.Fatalf("count remaining game_ledger: %v", err)
 	}
 	if remaining != 0 {
@@ -270,7 +275,7 @@ func TestGameMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || reapplied != 1 {
 		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
 	}
-	_ = db.Close()
+	_ = sqlDB.Close()
 
 	ledger, err := game.OpenSQLiteLedger(ctx, dbPath)
 	if err != nil {
@@ -280,5 +285,45 @@ func TestGameMigrationsUpStatusDownAllUp(t *testing.T) {
 	p, err := ledger.Append(ctx, game.LedgerEntry{Kind: game.LedgerTitleSet, Title: "Master Farmer", CreatedAtMs: 500})
 	if err != nil || p.ActiveTitle != "Master Farmer" {
 		t.Fatalf("Append after re-Up: %+v err=%v", p, err)
+	}
+}
+
+func TestOpenSQLiteLedgerFromDBNonOwning(t *testing.T) {
+	ctx := context.Background()
+	pool, err := db.OpenPool(ctx, filepath.Join(t.TempDir(), "shared.db"))
+	if err != nil {
+		t.Fatalf("OpenPool: %v", err)
+	}
+	defer pool.Close()
+
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+
+	ledger, err := game.OpenSQLiteLedgerFromDB(ctx, pool.WriteDB)
+	if err != nil {
+		t.Fatalf("OpenSQLiteLedgerFromDB: %v", err)
+	}
+	p, err := ledger.Append(ctx, game.LedgerEntry{Kind: game.LedgerIssueMerged, IssueID: "i1", Commits: 1, CreatedAtMs: 100})
+	if err != nil || p.Coins != 35 {
+		t.Fatalf("Append: %+v err=%v", p, err)
+	}
+	if err := ledger.Close(); err != nil {
+		t.Fatalf("ledger.Close: %v", err)
+	}
+	if err := pool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared WriteDB closed by Ledger.Close: %v", err)
+	}
+	ledger2, err := game.OpenSQLiteLedgerFromDB(ctx, pool.WriteDB)
+	if err != nil {
+		t.Fatalf("reattach OpenSQLiteLedgerFromDB: %v", err)
+	}
+	defer ledger2.Close()
+	if got := ledger2.Progress(); got.Coins != 35 || got.MergedCount != 1 {
+		t.Fatalf("reattached progress mismatch: %+v", got)
 	}
 }

@@ -6,21 +6,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
-	"github.com/vibevalleyhq/vibevalley/internal/domain/issue/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
-	_ "modernc.org/sqlite"
 )
 
 type sqliteIssueBackend struct {
 	mu      sync.Mutex
+	pool    *db.Pool
 	db      *sql.DB
-	queries *sqlcgen.Queries
+	queries *dbgen.Queries
 	ownsDB  bool
 }
 
@@ -28,56 +27,65 @@ func openSQLiteIssueBackend(ctx context.Context, path string) (*sqliteIssueBacke
 	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf("%w: empty sqlite path", ErrInvalidArgument)
 	}
-	isMem := path == ":memory:" || strings.Contains(path, "mode=memory") || strings.Contains(path, ":memory:")
-	if !isMem && !strings.HasPrefix(path, "file:") {
-		if dir := filepath.Dir(path); dir != "" && dir != "." {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return nil, fmt.Errorf("issue: mkdir %s: %w", dir, err)
-			}
-		}
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	db, err := sql.Open("sqlite", path)
+	pool, err := db.OpenPool(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("issue: open sqlite: %w", err)
 	}
-	db.SetMaxOpenConns(1)
-	pragmas := []string{
-		"PRAGMA busy_timeout=5000",
-		"PRAGMA foreign_keys=ON",
-		"PRAGMA synchronous=NORMAL",
-	}
-	if !isMem {
-		pragmas = append([]string{"PRAGMA journal_mode=WAL"}, pragmas...)
-	}
-	for _, p := range pragmas {
-		if _, err := db.ExecContext(ctx, p); err != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("issue: %s: %w", p, err)
-		}
-	}
-	return openSQLiteIssueFromDB(ctx, db, true)
-}
-
-func openSQLiteIssueFromDB(ctx context.Context, db *sql.DB, ownsDB bool) (*sqliteIssueBackend, error) {
-	if db == nil {
-		return nil, fmt.Errorf("%w: sql.DB is required", ErrInvalidArgument)
-	}
-	runner, err := migrate.New(db, "issue", MigrationsFS)
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
 	if err != nil {
-		if ownsDB {
-			_ = db.Close()
-		}
+		_ = pool.Close()
 		return nil, fmt.Errorf("issue: init migrations: %w", err)
 	}
 	if _, err := runner.Up(ctx); err != nil {
-		if ownsDB {
-			_ = db.Close()
-		}
+		_ = pool.Close()
 		return nil, fmt.Errorf("issue: apply migrations: %w", err)
 	}
 	return &sqliteIssueBackend{
-		db:      db,
-		queries: sqlcgen.New(db),
+		pool:    pool,
+		db:      pool.WriteDB,
+		queries: dbgen.New(pool.WriteDB),
+		ownsDB:  true,
+	}, nil
+}
+
+func openSQLiteIssueFromDB(ctx context.Context, sqlDB *sql.DB, runMigrate, ownsDB bool) (*sqliteIssueBackend, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if sqlDB == nil {
+		return nil, fmt.Errorf("%w: sql.DB is required", ErrInvalidArgument)
+	}
+	if runMigrate {
+		fsys, err := db.ScopeFS("issue")
+		if err != nil {
+			if ownsDB {
+				_ = sqlDB.Close()
+			}
+			return nil, fmt.Errorf("issue: load migrations: %w", err)
+		}
+		runner, err := migrate.New(sqlDB, "issue", fsys)
+		if err != nil {
+			if ownsDB {
+				_ = sqlDB.Close()
+			}
+			return nil, fmt.Errorf("issue: init migrations: %w", err)
+		}
+		if _, err := runner.Up(ctx); err != nil {
+			if ownsDB {
+				_ = sqlDB.Close()
+			}
+			return nil, fmt.Errorf("issue: apply migrations: %w", err)
+		}
+	}
+	return &sqliteIssueBackend{
+		db:      sqlDB,
+		queries: dbgen.New(sqlDB),
 		ownsDB:  ownsDB,
 	}, nil
 }
@@ -109,12 +117,12 @@ func (b *sqliteIssueBackend) upsertIssue(ctx context.Context, iss Issue) error {
 	return saveIssueWith(ctx, b.queries, iss)
 }
 
-func saveIssueWith(ctx context.Context, q *sqlcgen.Queries, iss Issue) error {
+func saveIssueWith(ctx context.Context, q *dbgen.Queries, iss Issue) error {
 	raw, err := json.Marshal(iss)
 	if err != nil {
 		return err
 	}
-	return q.UpsertIssue(ctx, sqlcgen.UpsertIssueParams{
+	return q.UpsertIssue(ctx, dbgen.UpsertIssueParams{
 		ID:             iss.ID,
 		Title:          iss.Title,
 		Status:         string(iss.Status),
@@ -248,7 +256,7 @@ func (b *sqliteIssueBackend) updateCron(ctx context.Context, c CronSchedule) err
 	return tx.Commit()
 }
 
-func saveCronWith(ctx context.Context, q *sqlcgen.Queries, c CronSchedule) error {
+func saveCronWith(ctx context.Context, q *dbgen.Queries, c CronSchedule) error {
 	raw, err := json.Marshal(c)
 	if err != nil {
 		return err
@@ -260,7 +268,7 @@ func saveCronWith(ctx context.Context, q *sqlcgen.Queries, c CronSchedule) error
 	if c.PendingApproval {
 		pending = 1
 	}
-	return q.UpsertCron(ctx, sqlcgen.UpsertCronParams{
+	return q.UpsertCron(ctx, dbgen.UpsertCronParams{
 		ID:              c.ID,
 		Enabled:         enabled,
 		PendingApproval: pending,
@@ -310,7 +318,13 @@ func (b *sqliteIssueBackend) dueCrons(ctx context.Context, nowMs int64) ([]CronS
 }
 
 func (b *sqliteIssueBackend) close() error {
-	if b.ownsDB && b.db != nil {
+	if !b.ownsDB {
+		return nil
+	}
+	if b.pool != nil {
+		return b.pool.Close()
+	}
+	if b.db != nil {
 		return b.db.Close()
 	}
 	return nil

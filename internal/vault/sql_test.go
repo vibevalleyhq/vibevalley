@@ -19,6 +19,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/vibevalleyhq/vibevalley/internal/vault"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
@@ -368,14 +369,18 @@ func TestSQLBackendBothDialects(t *testing.T) {
 func TestVaultSQLiteMigrationsAndRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "vault-mig.db")
-	db, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("sql.Open: %v", err)
 	}
-	defer db.Close()
-	db.SetMaxOpenConns(1)
+	defer sqlDB.Close()
+	sqlDB.SetMaxOpenConns(1)
 
-	runner, err := migrate.New(db, "vault", vault.MigrationsFS)
+	fsys, err := db.ScopeFS("vault")
+	if err != nil {
+		t.Fatalf("ScopeFS(vault): %v", err)
+	}
+	runner, err := migrate.New(sqlDB, "vault", fsys)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
 	}
@@ -390,7 +395,7 @@ func TestVaultSQLiteMigrationsAndRoundTrip(t *testing.T) {
 	}
 
 	var tblName string
-	if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='vault_secret'`).Scan(&tblName); err != nil {
+	if err := sqlDB.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='vault_secret'`).Scan(&tblName); err != nil {
 		t.Fatalf("expected table vault_secret after Up: %v", err)
 	}
 
@@ -403,7 +408,7 @@ func TestVaultSQLiteMigrationsAndRoundTrip(t *testing.T) {
 		t.Fatalf("Status after DownAll: %+v err=%v", statusesAfterDown, err)
 	}
 	var remaining int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='vault_secret'`).Scan(&remaining); err != nil {
+	if err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='vault_secret'`).Scan(&remaining); err != nil {
 		t.Fatalf("count remaining vault_secret: %v", err)
 	}
 	if remaining != 0 {
@@ -416,7 +421,7 @@ func TestVaultSQLiteMigrationsAndRoundTrip(t *testing.T) {
 	}
 
 	// Verify SQLBackend.EnsureSchema and full vault.Store roundtrip over real SQLite.
-	backend, err := vault.NewSQLBackend(db, vault.DialectSQLite)
+	backend, err := vault.NewSQLBackend(sqlDB, vault.DialectSQLite)
 	if err != nil {
 		t.Fatalf("NewSQLBackend: %v", err)
 	}

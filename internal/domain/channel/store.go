@@ -44,8 +44,18 @@ func OpenSQLite(ctx context.Context, path string, opts ...Option) (*Store, error
 }
 
 // OpenDB attaches a channel Store to an existing *sql.DB (creating tables if missing).
-func OpenDB(ctx context.Context, db *sql.DB, opts ...Option) (*Store, error) {
-	b, err := openSQLiteFromDB(ctx, db, false)
+func OpenDB(ctx context.Context, sqlDB *sql.DB, opts ...Option) (*Store, error) {
+	b, err := openSQLiteFromDB(ctx, sqlDB, true, false)
+	if err != nil {
+		return nil, err
+	}
+	return newStore(b, opts...), nil
+}
+
+// OpenSQLiteFromDB attaches a channel Store to an already-migrated *sql.DB
+// without running migrations or closing sqlDB on Close.
+func OpenSQLiteFromDB(ctx context.Context, sqlDB *sql.DB, opts ...Option) (*Store, error) {
+	b, err := openSQLiteFromDB(ctx, sqlDB, false, false)
 	if err != nil {
 		return nil, err
 	}

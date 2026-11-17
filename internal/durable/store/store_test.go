@@ -16,7 +16,8 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
-	"github.com/vibevalleyhq/vibevalley/internal/durable/store/sqlcgen"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
@@ -76,9 +77,13 @@ func TestSQLitePragmasAndDialectPortableSchema(t *testing.T) {
 		t.Fatalf("expected synchronous=1 (NORMAL), got %d", syncMode)
 	}
 
-	migs, err := migrate.ParseFS(store.MigrationsFS, "migrations")
+	scopeFS, err := db.ScopeFS("durable")
 	if err != nil {
-		t.Fatalf("ParseFS(MigrationsFS): %v", err)
+		t.Fatalf("ScopeFS(durable): %v", err)
+	}
+	migs, err := migrate.ParseFS(scopeFS, "migrations")
+	if err != nil {
+		t.Fatalf("ParseFS(ScopeFS(durable)): %v", err)
 	}
 	forbiddenJSONOps := []string{"json_extract", "json_set", "json_replace", "json_patch", "->>", "#>>"}
 	for _, mig := range migs {
@@ -576,13 +581,17 @@ func TestStoreParityEarlySignalsAndTaskDedup(t *testing.T) {
 func TestDurableMigrationsUpStatusDownAllUp(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "durable-mig.db")
-	db, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("sql.Open: %v", err)
 	}
-	defer db.Close()
+	defer sqlDB.Close()
 
-	runner, err := migrate.New(db, "durable", store.MigrationsFS)
+	scopeFS, err := db.ScopeFS("durable")
+	if err != nil {
+		t.Fatalf("ScopeFS(durable): %v", err)
+	}
+	runner, err := migrate.New(sqlDB, "durable", scopeFS)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
 	}
@@ -606,21 +615,21 @@ func TestDurableMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 	for _, tbl := range expectedTables {
 		var name string
-		if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl).Scan(&name); err != nil {
+		if err := sqlDB.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl).Scan(&name); err != nil {
 			t.Fatalf("expected table %s after Up: %v", tbl, err)
 		}
 	}
 
-	// Verify sqlcgen works directly against migrated tables including sqlc.slice and ListSignals.
-	q := sqlcgen.New(db)
-	if err := q.InsertTask(ctx, sqlcgen.InsertTaskParams{
+	// Verify dbgen works directly against migrated tables including sqlc.slice and ListSignals.
+	q := dbgen.New(sqlDB)
+	if err := q.InsertTask(ctx, dbgen.InsertTaskParams{
 		ID: "t-1", Kind: "worker", Status: "pending", RestartLimit: 5,
 		CheckpointJson: "{}", WaitTaskIdsJson: "[]", MemoJson: "{}", ResultJson: "{}",
 		CreatedAtMs: 100, UpdatedAtMs: 100,
 	}); err != nil {
 		t.Fatalf("InsertTask: %v", err)
 	}
-	if err := q.InsertTask(ctx, sqlcgen.InsertTaskParams{
+	if err := q.InsertTask(ctx, dbgen.InsertTaskParams{
 		ID: "t-2", Kind: "worker", Status: "running", RestartLimit: 5,
 		CheckpointJson: "{}", WaitTaskIdsJson: "[]", MemoJson: "{}", ResultJson: "{}",
 		CreatedAtMs: 200, UpdatedAtMs: 200,
@@ -642,7 +651,7 @@ func TestDurableMigrationsUpStatusDownAllUp(t *testing.T) {
 		t.Fatalf("Status after DownAll: %+v err=%v", statusesAfterDown, err)
 	}
 	var remaining int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'durable_%'`).Scan(&remaining); err != nil {
+	if err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'durable_%'`).Scan(&remaining); err != nil {
 		t.Fatalf("count remaining tables: %v", err)
 	}
 	if remaining != 0 {
@@ -654,7 +663,7 @@ func TestDurableMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || reapplied != 1 {
 		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
 	}
-	_ = db.Close()
+	_ = sqlDB.Close()
 
 	st, err := store.OpenSQLite(ctx, dbPath)
 	if err != nil {
@@ -667,5 +676,62 @@ func TestDurableMigrationsUpStatusDownAllUp(t *testing.T) {
 	listAll, err := st.ListTasksByStatus(ctx)
 	if err != nil || len(listAll) != 1 || listAll[0].ID != "t-after-up" {
 		t.Fatalf("ListTasksByStatus(all) after re-Up: %+v err=%v", listAll, err)
+	}
+}
+
+func TestOpenSQLiteFromPoolNonOwning(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "shared.db")
+	pool, err := db.OpenPool(ctx, dbPath)
+	if err != nil {
+		t.Fatalf("OpenPool: %v", err)
+	}
+	defer pool.Close()
+
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+
+	st, err := store.OpenSQLiteFromPool(ctx, pool.WriteDB, pool.ReadDB)
+	if err != nil {
+		t.Fatalf("OpenSQLiteFromPool: %v", err)
+	}
+	t1, err := st.CreateTask(ctx, store.Task{ID: "shared-t1", Kind: "worker"})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := st.Mutate(ctx, func(tx *store.Tx) error {
+		_, err := tx.SendSignal(ctx, store.Signal{TaskID: t1.Task.ID, SignalName: "ping", SignalKey: "k1"})
+		return err
+	}); err != nil {
+		t.Fatalf("SendSignal: %v", err)
+	}
+
+	if err := st.Close(); err != nil {
+		t.Fatalf("st.Close: %v", err)
+	}
+
+	// Shared pool connections MUST remain open after non-owning Store.Close().
+	if err := pool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared WriteDB closed by Store.Close: %v", err)
+	}
+	if err := pool.ReadDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared ReadDB closed by Store.Close: %v", err)
+	}
+	// Re-attaching picks up persisted signal sequence without colliding.
+	st2, err := store.OpenSQLiteFromPool(ctx, pool.WriteDB, pool.ReadDB)
+	if err != nil {
+		t.Fatalf("reattach OpenSQLiteFromPool: %v", err)
+	}
+	defer st2.Close()
+	if err := st2.Mutate(ctx, func(tx *store.Tx) error {
+		_, err := tx.SendSignal(ctx, store.Signal{TaskID: t1.Task.ID, SignalName: "ping", SignalKey: "k2"})
+		return err
+	}); err != nil {
+		t.Fatalf("SendSignal k2 after reattach: %v", err)
 	}
 }

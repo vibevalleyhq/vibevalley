@@ -17,6 +17,7 @@ import (
 	"github.com/vibevalleyhq/vibevalley/internal/domain/watch"
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 	_ "modernc.org/sqlite"
 )
@@ -564,16 +565,20 @@ func TestWatchMigrationsUpStatusDownAllUp(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "watch-migrate.db")
 
-	db, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	db.SetMaxOpenConns(1)
-	if _, err := db.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
+	sqlDB.SetMaxOpenConns(1)
+	if _, err := sqlDB.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
 		t.Fatalf("pragma: %v", err)
 	}
 
-	runner, err := migrate.New(db, "watch", watch.MigrationsFS)
+	scopeFS, err := db.ScopeFS("watch")
+	if err != nil {
+		t.Fatalf("ScopeFS(watch): %v", err)
+	}
+	runner, err := migrate.New(sqlDB, "watch", scopeFS)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
 	}
@@ -589,12 +594,12 @@ func TestWatchMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || len(st1) != 1 || !st1[0].Applied || st1[0].AppliedAtMs <= 0 {
 		t.Fatalf("unexpected status after Up: %+v err=%v", st1, err)
 	}
-	assertWatchObjectsExist(t, db, true)
-	if err := db.Close(); err != nil {
+	assertWatchObjectsExist(t, sqlDB, true)
+	if err := sqlDB.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	// Open SQLite watch service on the migrated DB and exercise all sqlcgen queries.
+	// Open SQLite watch service on the migrated DB and exercise all dbgen queries.
 	clk := newFixedClock()
 	ch := channel.NewMemoryStore(channel.WithClock(clk))
 	defer ch.Close()
@@ -665,17 +670,17 @@ func TestWatchMigrationsUpStatusDownAllUp(t *testing.T) {
 	_ = w1.Close()
 
 	// Reopen DB for DownAll -> Up + checksum mismatch checks.
-	db2, err := sql.Open("sqlite", dbPath)
+	sqlDB2, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("reopen sqlite: %v", err)
 	}
-	defer db2.Close()
-	db2.SetMaxOpenConns(1)
-	if _, err := db2.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
+	defer sqlDB2.Close()
+	sqlDB2.SetMaxOpenConns(1)
+	if _, err := sqlDB2.ExecContext(ctx, "PRAGMA busy_timeout=5000"); err != nil {
 		t.Fatalf("pragma: %v", err)
 	}
 
-	runner2, err := migrate.New(db2, "watch", watch.MigrationsFS)
+	runner2, err := migrate.New(sqlDB2, "watch", scopeFS)
 	if err != nil {
 		t.Fatalf("migrate.New 2: %v", err)
 	}
@@ -683,19 +688,19 @@ func TestWatchMigrationsUpStatusDownAllUp(t *testing.T) {
 		t.Fatalf("idempotent Up after OpenSQLiteService: applied=%d err=%v", again, err)
 	}
 
-	upOrig, err := fs.ReadFile(watch.MigrationsFS, "migrations/0001_init.up.sql")
+	upOrig, err := fs.ReadFile(scopeFS, "migrations/0001_watch.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	downOrig, err := fs.ReadFile(watch.MigrationsFS, "migrations/0001_init.down.sql")
+	downOrig, err := fs.ReadFile(scopeFS, "migrations/0001_watch.down.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
 	tamperedFS := fstest.MapFS{
-		"migrations/0001_init.up.sql":   {Data: append(upOrig, []byte("\n-- tampered\n")...)},
-		"migrations/0001_init.down.sql": {Data: downOrig},
+		"migrations/0001_watch.up.sql":   {Data: append(upOrig, []byte("\n-- tampered\n")...)},
+		"migrations/0001_watch.down.sql": {Data: downOrig},
 	}
-	tamperedRunner, err := migrate.New(db2, "watch", tamperedFS)
+	tamperedRunner, err := migrate.New(sqlDB2, "watch", tamperedFS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -711,7 +716,7 @@ func TestWatchMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || len(st2) != 1 || st2[0].Applied {
 		t.Fatalf("unexpected status after DownAll: %+v err=%v", st2, err)
 	}
-	assertWatchObjectsExist(t, db2, false)
+	assertWatchObjectsExist(t, sqlDB2, false)
 
 	reapplied, err := runner2.Up(ctx)
 	if err != nil || reapplied != 1 {
@@ -721,8 +726,8 @@ func TestWatchMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || len(st3) != 1 || !st3[0].Applied {
 		t.Fatalf("unexpected status after re-Up: %+v err=%v", st3, err)
 	}
-	assertWatchObjectsExist(t, db2, true)
-	if err := db2.Close(); err != nil {
+	assertWatchObjectsExist(t, sqlDB2, true)
+	if err := sqlDB2.Close(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -742,7 +747,55 @@ func TestWatchMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 }
 
-func assertWatchObjectsExist(t *testing.T, db *sql.DB, want bool) {
+func TestOpenSQLiteServiceFromDBNonOwning(t *testing.T) {
+	ctx := context.Background()
+	pool, err := db.OpenPool(ctx, filepath.Join(t.TempDir(), "shared.db"))
+	if err != nil {
+		t.Fatalf("OpenPool: %v", err)
+	}
+	defer pool.Close()
+
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+
+	clk := newFixedClock()
+	ch, err := channel.OpenSQLiteFromDB(ctx, pool.WriteDB, channel.WithClock(clk))
+	if err != nil {
+		t.Fatalf("channel.OpenSQLiteFromDB: %v", err)
+	}
+	defer ch.Close()
+
+	w, err := watch.OpenSQLiteServiceFromDB(ctx, ch, pool.WriteDB, watch.WithClock(clk))
+	if err != nil {
+		t.Fatalf("OpenSQLiteServiceFromDB: %v", err)
+	}
+	if err := w.SeatAgent(ctx, watch.Seat{ChannelID: "general", AgentID: "orch", Role: channel.RoleOrchestrator}); err != nil {
+		t.Fatalf("SeatAgent: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("w.Close: %v", err)
+	}
+	if err := pool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared WriteDB closed by watch.Service.Close: %v", err)
+	}
+
+	w2, err := watch.OpenSQLiteServiceFromDB(ctx, ch, pool.WriteDB, watch.WithClock(clk))
+	if err != nil {
+		t.Fatalf("reattach OpenSQLiteServiceFromDB: %v", err)
+	}
+	defer w2.Close()
+	seat, err := w2.GetSeat(ctx, "general", "orch")
+	if err != nil || !seat.Active {
+		t.Fatalf("reattached GetSeat: %+v err=%v", seat, err)
+	}
+}
+
+func assertWatchObjectsExist(t *testing.T, sqlDB *sql.DB, want bool) {
 	t.Helper()
 	objects := []struct {
 		typ  string
@@ -757,7 +810,7 @@ func assertWatchObjectsExist(t *testing.T, db *sql.DB, want bool) {
 	}
 	for _, obj := range objects {
 		var cnt int
-		err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, obj.typ, obj.name).Scan(&cnt)
+		err := sqlDB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, obj.typ, obj.name).Scan(&cnt)
 		if err != nil {
 			t.Fatalf("query sqlite_master (%s %s): %v", obj.typ, obj.name, err)
 		}

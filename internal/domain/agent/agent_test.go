@@ -11,6 +11,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
@@ -127,13 +128,17 @@ func TestAgentRegistryProfilesSkillsPresetsAndPersistence(t *testing.T) {
 func TestAgentMigrationsUpStatusDownAllUp(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "agent-mig.db")
-	db, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("sql.Open: %v", err)
 	}
-	defer db.Close()
+	defer sqlDB.Close()
 
-	runner, err := migrate.New(db, "agent", agent.MigrationsFS)
+	scopeFS, err := db.ScopeFS("agent")
+	if err != nil {
+		t.Fatalf("ScopeFS(agent): %v", err)
+	}
+	runner, err := migrate.New(sqlDB, "agent", scopeFS)
 	if err != nil {
 		t.Fatalf("migrate.New: %v", err)
 	}
@@ -148,7 +153,7 @@ func TestAgentMigrationsUpStatusDownAllUp(t *testing.T) {
 	}
 	for _, tbl := range []string{"agent_profile", "agent_skill", "agent_runtime"} {
 		var name string
-		if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl).Scan(&name); err != nil {
+		if err := sqlDB.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl).Scan(&name); err != nil {
 			t.Fatalf("expected table %s after Up: %v", tbl, err)
 		}
 	}
@@ -162,7 +167,7 @@ func TestAgentMigrationsUpStatusDownAllUp(t *testing.T) {
 		t.Fatalf("Status after DownAll: %+v err=%v", statusesAfterDown, err)
 	}
 	var remaining int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'agent_%'`).Scan(&remaining); err != nil {
+	if err := sqlDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'agent_%'`).Scan(&remaining); err != nil {
 		t.Fatalf("count remaining agent_* tables: %v", err)
 	}
 	if remaining != 0 {
@@ -173,7 +178,7 @@ func TestAgentMigrationsUpStatusDownAllUp(t *testing.T) {
 	if err != nil || reapplied != 1 {
 		t.Fatalf("re-Up: applied=%d err=%v", reapplied, err)
 	}
-	_ = db.Close()
+	_ = sqlDB.Close()
 
 	reg, err := agent.OpenSQLiteRegistry(ctx, dbPath)
 	if err != nil {
@@ -186,5 +191,46 @@ func TestAgentMigrationsUpStatusDownAllUp(t *testing.T) {
 	got, err := reg.GetProfile(ctx, "worker-1")
 	if err != nil || got.Name != "Worker 1" {
 		t.Fatalf("GetProfile after re-Up: %+v err=%v", got, err)
+	}
+}
+
+func TestOpenSQLiteRegistryFromDBNonOwning(t *testing.T) {
+	ctx := context.Background()
+	pool, err := db.OpenPool(ctx, filepath.Join(t.TempDir(), "shared.db"))
+	if err != nil {
+		t.Fatalf("OpenPool: %v", err)
+	}
+	defer pool.Close()
+
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
+	if err != nil {
+		t.Fatalf("migrate.New: %v", err)
+	}
+	if _, err := runner.Up(ctx); err != nil {
+		t.Fatalf("Up: %v", err)
+	}
+
+	reg, err := agent.OpenSQLiteRegistryFromDB(ctx, pool.WriteDB)
+	if err != nil {
+		t.Fatalf("OpenSQLiteRegistryFromDB: %v", err)
+	}
+	if _, err := reg.SaveProfile(ctx, agent.Profile{ID: "shared-worker", Name: "Shared Worker", Role: agent.RoleWorker}); err != nil {
+		t.Fatalf("SaveProfile: %v", err)
+	}
+	if err := reg.Close(); err != nil {
+		t.Fatalf("reg.Close: %v", err)
+	}
+	if err := pool.WriteDB.PingContext(ctx); err != nil {
+		t.Fatalf("shared WriteDB closed by Registry.Close: %v", err)
+	}
+
+	reg2, err := agent.OpenSQLiteRegistryFromDB(ctx, pool.WriteDB)
+	if err != nil {
+		t.Fatalf("reattach OpenSQLiteRegistryFromDB: %v", err)
+	}
+	defer reg2.Close()
+	got, err := reg2.GetProfile(ctx, "shared-worker")
+	if err != nil || got.Name != "Shared Worker" {
+		t.Fatalf("reattached GetProfile: %+v err=%v", got, err)
 	}
 }

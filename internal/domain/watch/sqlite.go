@@ -6,22 +6,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
-	"github.com/vibevalleyhq/vibevalley/internal/domain/watch/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
-	_ "modernc.org/sqlite"
 )
 
 type sqliteWatchBackend struct {
 	mu      sync.Mutex
+	pool    *db.Pool
 	db      *sql.DB
-	queries *sqlcgen.Queries
+	queries *dbgen.Queries
 	ownsDB  bool
 }
 
@@ -29,57 +28,43 @@ func openSQLiteWatchBackend(ctx context.Context, path string) (*sqliteWatchBacke
 	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf("%w: empty sqlite path", ErrInvalidArgument)
 	}
-	isMem := path == ":memory:" || strings.Contains(path, "mode=memory") || strings.Contains(path, ":memory:")
-	if !isMem && !strings.HasPrefix(path, "file:") {
-		if dir := filepath.Dir(path); dir != "" && dir != "." {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return nil, fmt.Errorf("watch: mkdir %s: %w", dir, err)
-			}
-		}
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	db, err := sql.Open("sqlite", path)
+	pool, err := db.OpenPool(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("watch: open sqlite: %w", err)
 	}
-	db.SetMaxOpenConns(1)
-	pragmas := []string{
-		"PRAGMA busy_timeout=5000",
-		"PRAGMA foreign_keys=ON",
-		"PRAGMA synchronous=NORMAL",
-	}
-	if !isMem {
-		pragmas = append([]string{"PRAGMA journal_mode=WAL"}, pragmas...)
-	}
-	for _, p := range pragmas {
-		if _, err := db.ExecContext(ctx, p); err != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("watch: %s: %w", p, err)
-		}
-	}
-	return openSQLiteWatchFromDB(ctx, db, true)
-}
-
-func openSQLiteWatchFromDB(ctx context.Context, db *sql.DB, ownsDB bool) (*sqliteWatchBackend, error) {
-	if db == nil {
-		return nil, fmt.Errorf("%w: sql.DB is required", ErrInvalidArgument)
-	}
-	runner, err := migrate.New(db, "watch", MigrationsFS)
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
 	if err != nil {
-		if ownsDB {
-			_ = db.Close()
-		}
+		_ = pool.Close()
 		return nil, fmt.Errorf("watch: init migrations: %w", err)
 	}
 	if _, err := runner.Up(ctx); err != nil {
-		if ownsDB {
-			_ = db.Close()
-		}
+		_ = pool.Close()
 		return nil, fmt.Errorf("watch: apply migrations: %w", err)
 	}
 	return &sqliteWatchBackend{
-		db:      db,
-		queries: sqlcgen.New(db),
-		ownsDB:  ownsDB,
+		pool:    pool,
+		db:      pool.WriteDB,
+		queries: dbgen.New(pool.WriteDB),
+		ownsDB:  true,
+	}, nil
+}
+
+func openSQLiteWatchFromDB(ctx context.Context, sqlDB *sql.DB) (*sqliteWatchBackend, error) {
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+	}
+	if sqlDB == nil {
+		return nil, fmt.Errorf("%w: sql.DB is required", ErrInvalidArgument)
+	}
+	return &sqliteWatchBackend{
+		db:      sqlDB,
+		queries: dbgen.New(sqlDB),
+		ownsDB:  false,
 	}, nil
 }
 
@@ -96,7 +81,7 @@ func (b *sqliteWatchBackend) getCursor(ctx context.Context) (int64, error) {
 func (b *sqliteWatchBackend) setCursor(ctx context.Context, globalSeq, nowMs int64) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.queries.UpsertCursor(ctx, sqlcgen.UpsertCursorParams{
+	return b.queries.UpsertCursor(ctx, dbgen.UpsertCursorParams{
 		LastGlobalSeq: globalSeq,
 		UpdatedAtMs:   nowMs,
 	})
@@ -113,7 +98,7 @@ func (b *sqliteWatchBackend) upsertSeat(ctx context.Context, seat Seat, maxPerCh
 	defer func() { _ = tx.Rollback() }()
 	qtx := b.queries.WithTx(tx)
 
-	prevActive, err := qtx.GetSeatActive(ctx, sqlcgen.GetSeatActiveParams{
+	prevActive, err := qtx.GetSeatActive(ctx, dbgen.GetSeatActiveParams{
 		ChannelID: seat.ChannelID,
 		AgentID:   seat.AgentID,
 	})
@@ -150,7 +135,7 @@ func (b *sqliteWatchBackend) upsertSeat(ctx context.Context, seat Seat, maxPerCh
 	if seat.Active {
 		active = 1
 	}
-	if err := qtx.UpsertSeat(ctx, sqlcgen.UpsertSeatParams{
+	if err := qtx.UpsertSeat(ctx, dbgen.UpsertSeatParams{
 		ChannelID:      seat.ChannelID,
 		AgentID:        seat.AgentID,
 		Role:           string(seat.Role),
@@ -169,7 +154,7 @@ func (b *sqliteWatchBackend) upsertSeat(ctx context.Context, seat Seat, maxPerCh
 		homeChan = seat.ChannelID
 	}
 	if homeChan != "" {
-		if err := qtx.UpsertAgentHome(ctx, sqlcgen.UpsertAgentHomeParams{
+		if err := qtx.UpsertAgentHome(ctx, dbgen.UpsertAgentHomeParams{
 			AgentID:   seat.AgentID,
 			ChannelID: homeChan,
 		}); err != nil {
@@ -182,7 +167,7 @@ func (b *sqliteWatchBackend) upsertSeat(ctx context.Context, seat Seat, maxPerCh
 func (b *sqliteWatchBackend) vacateSeat(ctx context.Context, channelID, agentID string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.queries.VacateSeat(ctx, sqlcgen.VacateSeatParams{
+	return b.queries.VacateSeat(ctx, dbgen.VacateSeatParams{
 		ChannelID: channelID,
 		AgentID:   agentID,
 	})
@@ -191,7 +176,7 @@ func (b *sqliteWatchBackend) vacateSeat(ctx context.Context, channelID, agentID 
 func (b *sqliteWatchBackend) getSeat(ctx context.Context, channelID, agentID string) (Seat, bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	row, err := b.queries.GetSeat(ctx, sqlcgen.GetSeatParams{
+	row, err := b.queries.GetSeat(ctx, dbgen.GetSeatParams{
 		ChannelID: channelID,
 		AgentID:   agentID,
 	})
@@ -207,7 +192,7 @@ func (b *sqliteWatchBackend) getSeat(ctx context.Context, channelID, agentID str
 func (b *sqliteWatchBackend) listSeats(ctx context.Context, channelID string) ([]Seat, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	var rows []sqlcgen.WatchSeat
+	var rows []dbgen.WatchSeat
 	var err error
 	if channelID != "" {
 		rows, err = b.queries.ListWatchSeatsByChannel(ctx, channelID)
@@ -275,7 +260,7 @@ func (b *sqliteWatchBackend) upsertInboxWithChannel(ctx context.Context, item co
 	if item.Resolved {
 		resolved = 1
 	}
-	return b.queries.UpsertInbox(ctx, sqlcgen.UpsertInboxParams{
+	return b.queries.UpsertInbox(ctx, dbgen.UpsertInboxParams{
 		ID:          item.ID,
 		Kind:        string(item.Kind),
 		Title:       item.Title,
@@ -302,7 +287,7 @@ func (b *sqliteWatchBackend) resolveInbox(ctx context.Context, id string) (bool,
 func (b *sqliteWatchBackend) resolveChannelInboxUpTo(ctx context.Context, channelID string, maxSeq int64) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.queries.ResolveChannelInboxUpTo(ctx, sqlcgen.ResolveChannelInboxUpToParams{
+	return b.queries.ResolveChannelInboxUpTo(ctx, dbgen.ResolveChannelInboxUpToParams{
 		ChannelID: channelID,
 		EventSeq:  maxSeq,
 	})
@@ -334,13 +319,19 @@ func (b *sqliteWatchBackend) listInbox(ctx context.Context, includeResolved bool
 }
 
 func (b *sqliteWatchBackend) close() error {
-	if b.ownsDB && b.db != nil {
+	if !b.ownsDB {
+		return nil
+	}
+	if b.pool != nil {
+		return b.pool.Close()
+	}
+	if b.db != nil {
 		return b.db.Close()
 	}
 	return nil
 }
 
-func seatFromRow(r sqlcgen.WatchSeat) Seat {
+func seatFromRow(r dbgen.WatchSeat) Seat {
 	return Seat{
 		ChannelID:      r.ChannelID,
 		AgentID:        r.AgentID,

@@ -3,25 +3,16 @@ package game
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
-	_ "modernc.org/sqlite"
-
-	"github.com/vibevalleyhq/vibevalley/internal/domain/game/sqlcgen"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
-
-// MigrationsFS embeds the SQLite migration scripts for the game progression ledger.
-//
-//go:embed migrations/*.sql
-var MigrationsFS embed.FS
 
 // LedgerKind identifies append-only farm progression events.
 type LedgerKind string
@@ -104,8 +95,10 @@ type Ledger struct {
 	mu      sync.Mutex
 	entries []LedgerEntry
 	nextSeq int64
+	pool    *db.Pool
 	db      *sql.DB
-	q       *sqlcgen.Queries
+	q       *dbgen.Queries
+	ownsDB  bool
 }
 
 // NewMemoryLedger creates an in-memory progression Ledger.
@@ -118,39 +111,49 @@ func OpenSQLiteLedger(ctx context.Context, path string) (*Ledger, error) {
 	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf("game: empty sqlite path")
 	}
-	isMem := path == ":memory:" || strings.Contains(path, "mode=memory")
-	if !isMem && !strings.HasPrefix(path, "file:") {
-		if dir := filepath.Dir(path); dir != "" && dir != "." {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return nil, err
-			}
-		}
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	db, err := sql.Open("sqlite", path)
+	pool, err := db.OpenPool(ctx, path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("game: open sqlite pool: %w", err)
 	}
-	db.SetMaxOpenConns(1)
-	if !isMem {
-		_, _ = db.ExecContext(ctx, "PRAGMA journal_mode=WAL")
-	}
-	_, _ = db.ExecContext(ctx, "PRAGMA synchronous=NORMAL")
-	_, _ = db.ExecContext(ctx, "PRAGMA busy_timeout=5000")
-
-	runner, err := migrate.New(db, "game", MigrationsFS)
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
 	if err != nil {
-		_ = db.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("game: init migrator: %w", err)
 	}
 	if _, err := runner.Up(ctx); err != nil {
-		_ = db.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("game: apply migrations: %w", err)
 	}
+	ledger, err := openLedgerFromDB(ctx, pool.WriteDB, pool, true)
+	if err != nil {
+		_ = pool.Close()
+		return nil, err
+	}
+	return ledger, nil
+}
 
-	q := sqlcgen.New(db)
+// OpenSQLiteLedgerFromDB attaches a progression Ledger to an already-migrated *sql.DB
+// without running migrations or taking ownership of closing sqlDB.
+func OpenSQLiteLedgerFromDB(ctx context.Context, sqlDB *sql.DB) (*Ledger, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if sqlDB == nil {
+		return nil, fmt.Errorf("game: sql.DB is required")
+	}
+	return openLedgerFromDB(ctx, sqlDB, nil, false)
+}
+
+func openLedgerFromDB(ctx context.Context, sqlDB *sql.DB, pool *db.Pool, ownsDB bool) (*Ledger, error) {
+	q := dbgen.New(sqlDB)
 	payloads, err := q.ListLedgerPayloads(ctx)
 	if err != nil {
-		_ = db.Close()
 		return nil, err
 	}
 
@@ -159,7 +162,6 @@ func OpenSQLiteLedger(ctx context.Context, path string) (*Ledger, error) {
 	for _, raw := range payloads {
 		var e LedgerEntry
 		if err := json.Unmarshal([]byte(raw), &e); err != nil {
-			_ = db.Close()
 			return nil, err
 		}
 		entries = append(entries, e)
@@ -170,8 +172,10 @@ func OpenSQLiteLedger(ctx context.Context, path string) (*Ledger, error) {
 	return &Ledger{
 		entries: entries,
 		nextSeq: maxSeq,
-		db:      db,
+		pool:    pool,
+		db:      sqlDB,
 		q:       q,
+		ownsDB:  ownsDB,
 	}, nil
 }
 
@@ -187,7 +191,7 @@ func (l *Ledger) Append(ctx context.Context, entry LedgerEntry) (Progress, error
 			l.nextSeq--
 			return Progress{}, err
 		}
-		if err := l.q.InsertLedgerEntry(ctx, sqlcgen.InsertLedgerEntryParams{
+		if err := l.q.InsertLedgerEntry(ctx, dbgen.InsertLedgerEntryParams{
 			Seq:         entry.Seq,
 			Kind:        string(entry.Kind),
 			PayloadJson: string(raw),
@@ -208,12 +212,24 @@ func (l *Ledger) Progress() Progress {
 	return FoldProgress(l.entries)
 }
 
-// Close closes the backing SQLite connection if present.
+// Close closes the backing SQLite connection when owned by this Ledger.
 func (l *Ledger) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if !l.ownsDB {
+		return nil
+	}
+	var err error
+	if l.pool != nil {
+		err = l.pool.Close()
+		l.pool = nil
+		l.db = nil
+		return err
+	}
 	if l.db != nil {
-		return l.db.Close()
+		err = l.db.Close()
+		l.db = nil
+		return err
 	}
 	return nil
 }

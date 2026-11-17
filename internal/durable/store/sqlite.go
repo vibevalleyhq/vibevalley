@@ -3,106 +3,90 @@ package store
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 
-	_ "modernc.org/sqlite"
-
-	"github.com/vibevalleyhq/vibevalley/internal/durable/store/sqlcgen"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
 )
 
-// MigrationsFS embeds the SQLite migration scripts for the durable store.
-//
-//go:embed migrations/*.sql
-var MigrationsFS embed.FS
-
 type sqliteBackend struct {
+	pool         *db.Pool
 	writeDB      *sql.DB
 	readDB       *sql.DB
 	sameDB       bool
+	ownsDB       bool
 	nextSigOrder atomic.Int64
 }
 
 func openSQLiteBackend(ctx context.Context, path string) (*sqliteBackend, error) {
-	if path == "" {
+	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf("%w: empty sqlite path", ErrInvalidArgument)
 	}
-	isMem := path == ":memory:" || strings.Contains(path, "mode=memory") || strings.Contains(path, ":memory:")
-	if !isMem && !strings.HasPrefix(path, "file:") {
-		if dir := filepath.Dir(path); dir != "" && dir != "." {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return nil, fmt.Errorf("durable/store: mkdir %s: %w", dir, err)
-			}
-		}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	writeDB, err := sql.Open("sqlite", path)
+	pool, err := db.OpenPool(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("durable/store: open sqlite writer: %w", err)
-	}
-	writeDB.SetMaxOpenConns(1)
-
-	pragmas := []string{
-		"PRAGMA busy_timeout=5000",
-		"PRAGMA foreign_keys=ON",
-		"PRAGMA synchronous=NORMAL",
-	}
-	if !isMem {
-		pragmas = append([]string{"PRAGMA journal_mode=WAL"}, pragmas...)
-	}
-	for _, p := range pragmas {
-		if _, err := writeDB.ExecContext(ctx, p); err != nil {
-			_ = writeDB.Close()
-			return nil, fmt.Errorf("durable/store: %s: %w", p, err)
-		}
+		return nil, fmt.Errorf("durable/store: open sqlite pool: %w", err)
 	}
 
-	runner, err := migrate.New(writeDB, "durable", MigrationsFS)
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
 	if err != nil {
-		_ = writeDB.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("durable/store: init migrator: %w", err)
 	}
 	if _, err := runner.Up(ctx); err != nil {
-		_ = writeDB.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("durable/store: apply migrations: %w", err)
 	}
 
-	maxSig, err := sqlcgen.New(writeDB).ReadMaxSignalInsertSeq(ctx)
+	maxSig, err := dbgen.New(pool.WriteDB).ReadMaxSignalInsertSeq(ctx)
 	if err != nil {
-		_ = writeDB.Close()
+		_ = pool.Close()
 		return nil, fmt.Errorf("durable/store: read signal sequence: %w", err)
 	}
 
-	var readDB *sql.DB
-	sameDB := false
-	if isMem {
+	b := &sqliteBackend{
+		pool:    pool,
+		writeDB: pool.WriteDB,
+		readDB:  pool.ReadDB,
+		sameDB:  pool.SameDB,
+		ownsDB:  true,
+	}
+	b.nextSigOrder.Store(maxSig)
+	return b, nil
+}
+
+func openSQLiteFromPool(ctx context.Context, writeDB, readDB *sql.DB) (*sqliteBackend, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if writeDB == nil {
+		return nil, fmt.Errorf("%w: writeDB is required", ErrInvalidArgument)
+	}
+	if readDB == nil {
 		readDB = writeDB
-		sameDB = true
-	} else {
-		sep := "?"
-		if strings.Contains(path, "?") {
-			sep = "&"
-		}
-		readDSN := path + sep + "_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)"
-		readDB, err = sql.Open("sqlite", readDSN)
-		if err != nil {
-			_ = writeDB.Close()
-			return nil, fmt.Errorf("durable/store: open sqlite reader: %w", err)
-		}
-		readDB.SetMaxOpenConns(4)
+	}
+
+	maxSig, err := dbgen.New(writeDB).ReadMaxSignalInsertSeq(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("durable/store: read signal sequence: %w", err)
 	}
 
 	b := &sqliteBackend{
 		writeDB: writeDB,
 		readDB:  readDB,
-		sameDB:  sameDB,
+		sameDB:  writeDB == readDB,
+		ownsDB:  false,
 	}
 	b.nextSigOrder.Store(maxSig)
 	return b, nil
@@ -123,14 +107,20 @@ func (b *sqliteBackend) beginTx(ctx context.Context) (backendTx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &sqliteTx{backend: b, tx: tx, q: sqlcgen.New(tx)}, nil
+	return &sqliteTx{backend: b, tx: tx, q: dbgen.New(tx)}, nil
 }
 
 func (b *sqliteBackend) read(_ context.Context) backendReader {
-	return &sqliteReader{q: sqlcgen.New(b.readDB)}
+	return &sqliteReader{q: dbgen.New(b.readDB)}
 }
 
 func (b *sqliteBackend) close() error {
+	if !b.ownsDB {
+		return nil
+	}
+	if b.pool != nil {
+		return b.pool.Close()
+	}
 	var firstErr error
 	if !b.sameDB && b.readDB != nil {
 		if err := b.readDB.Close(); err != nil {
@@ -146,7 +136,7 @@ func (b *sqliteBackend) close() error {
 }
 
 type sqliteReader struct {
-	q *sqlcgen.Queries
+	q *dbgen.Queries
 }
 
 func (r *sqliteReader) getConversation(ctx context.Context, id string) (Conversation, bool, error) {
@@ -204,7 +194,7 @@ func (r *sqliteReader) listSignals(ctx context.Context, taskID, signalName strin
 type sqliteTx struct {
 	backend *sqliteBackend
 	tx      *sql.Tx
-	q       *sqlcgen.Queries
+	q       *dbgen.Queries
 }
 
 func (t *sqliteTx) savepoint(ctx context.Context, name string) error {
@@ -281,7 +271,7 @@ func (t *sqliteTx) listSignals(ctx context.Context, taskID, signalName string, o
 }
 
 func (t *sqliteTx) insertConversation(ctx context.Context, conv Conversation) error {
-	err := t.q.InsertConversation(ctx, sqlcgen.InsertConversationParams{
+	err := t.q.InsertConversation(ctx, dbgen.InsertConversationParams{
 		ID:               conv.ID,
 		OwnerTaskID:      conv.OwnerTaskID,
 		ParentID:         conv.ParentID,
@@ -297,7 +287,7 @@ func (t *sqliteTx) insertConversation(ctx context.Context, conv Conversation) er
 }
 
 func (t *sqliteTx) updateConversation(ctx context.Context, conv Conversation) error {
-	n, err := t.q.UpdateConversation(ctx, sqlcgen.UpdateConversationParams{
+	n, err := t.q.UpdateConversation(ctx, dbgen.UpdateConversationParams{
 		HeadSeq:      conv.HeadSeq,
 		NextSeq:      conv.NextSeq,
 		MetadataJson: string(conv.MetadataJSON),
@@ -314,7 +304,7 @@ func (t *sqliteTx) updateConversation(ctx context.Context, conv Conversation) er
 }
 
 func (t *sqliteTx) insertEntry(ctx context.Context, entry Entry) error {
-	err := t.q.InsertEntry(ctx, sqlcgen.InsertEntryParams{
+	err := t.q.InsertEntry(ctx, dbgen.InsertEntryParams{
 		ConversationID: entry.ConversationID,
 		Seq:            entry.Seq,
 		Kind:           entry.Kind,
@@ -331,7 +321,7 @@ func (t *sqliteTx) upsertDocument(ctx context.Context, doc Document) (Document, 
 	}
 	if found {
 		doc.Rev = existing.Rev + 1
-		err = t.q.UpdateDocument(ctx, sqlcgen.UpdateDocumentParams{
+		err = t.q.UpdateDocument(ctx, dbgen.UpdateDocumentParams{
 			Rev:         doc.Rev,
 			StateJson:   string(doc.StateJSON),
 			UpdatedAtMs: doc.UpdatedAtMs,
@@ -341,7 +331,7 @@ func (t *sqliteTx) upsertDocument(ctx context.Context, doc Document) (Document, 
 		})
 	} else {
 		doc.Rev = 1
-		err = t.q.InsertDocument(ctx, sqlcgen.InsertDocumentParams{
+		err = t.q.InsertDocument(ctx, dbgen.InsertDocumentParams{
 			ScopeKind:   doc.ScopeKind,
 			ScopeID:     doc.ScopeID,
 			DocKind:     doc.DocKind,
@@ -357,7 +347,7 @@ func (t *sqliteTx) upsertDocument(ctx context.Context, doc Document) (Document, 
 }
 
 func (t *sqliteTx) deleteDocument(ctx context.Context, key DocKey) (bool, error) {
-	n, err := t.q.DeleteDocument(ctx, sqlcgen.DeleteDocumentParams{
+	n, err := t.q.DeleteDocument(ctx, dbgen.DeleteDocumentParams{
 		ScopeKind: key.ScopeKind,
 		ScopeID:   key.ScopeID,
 		DocKind:   key.DocKind,
@@ -369,7 +359,7 @@ func (t *sqliteTx) deleteDocument(ctx context.Context, key DocKey) (bool, error)
 }
 
 func (t *sqliteTx) insertSubmission(ctx context.Context, sub Submission) error {
-	err := t.q.InsertSubmission(ctx, sqlcgen.InsertSubmissionParams{
+	err := t.q.InsertSubmission(ctx, dbgen.InsertSubmissionParams{
 		ID:             sub.ID,
 		ConversationID: sub.ConversationID,
 		RequestID:      sub.RequestID,
@@ -385,7 +375,7 @@ func (t *sqliteTx) insertSubmission(ctx context.Context, sub Submission) error {
 }
 
 func (t *sqliteTx) updateSubmission(ctx context.Context, sub Submission) error {
-	n, err := t.q.UpdateSubmission(ctx, sqlcgen.UpdateSubmissionParams{
+	n, err := t.q.UpdateSubmission(ctx, dbgen.UpdateSubmissionParams{
 		Status:      sub.Status,
 		ResultJson:  string(sub.ResultJSON),
 		UpdatedAtMs: sub.UpdatedAtMs,
@@ -405,7 +395,7 @@ func (t *sqliteTx) insertTask(ctx context.Context, task Task) error {
 	if err != nil {
 		return err
 	}
-	err = t.q.InsertTask(ctx, sqlcgen.InsertTaskParams{
+	err = t.q.InsertTask(ctx, dbgen.InsertTaskParams{
 		ID:              task.ID,
 		ConversationID:  task.ConversationID,
 		OwnerTaskID:     task.OwnerTaskID,
@@ -436,7 +426,7 @@ func (t *sqliteTx) updateTask(ctx context.Context, task Task) error {
 	if err != nil {
 		return err
 	}
-	n, err := t.q.UpdateTask(ctx, sqlcgen.UpdateTaskParams{
+	n, err := t.q.UpdateTask(ctx, dbgen.UpdateTaskParams{
 		Status:          string(task.Status),
 		TerminalReason:  task.TerminalReason,
 		RestartCount:    int64(task.RestartCount),
@@ -464,7 +454,7 @@ func (t *sqliteTx) updateTask(ctx context.Context, task Task) error {
 
 func (t *sqliteTx) insertSignal(ctx context.Context, sig Signal) error {
 	seqOrder := t.backend.nextSigOrder.Add(1)
-	err := t.q.InsertSignal(ctx, sqlcgen.InsertSignalParams{
+	err := t.q.InsertSignal(ctx, dbgen.InsertSignalParams{
 		ID:           sig.ID,
 		InsertSeq:    seqOrder,
 		TaskID:       sig.TaskID,
@@ -482,7 +472,7 @@ func (t *sqliteTx) getSignalByKey(ctx context.Context, taskID, signalName, signa
 	if signalKey == "" {
 		return Signal{}, false, nil
 	}
-	row, err := t.q.GetSignalByKey(ctx, sqlcgen.GetSignalByKeyParams{
+	row, err := t.q.GetSignalByKey(ctx, dbgen.GetSignalByKeyParams{
 		TaskID:     taskID,
 		SignalName: signalName,
 		SignalKey:  signalKey,
@@ -506,7 +496,7 @@ func (t *sqliteTx) getSignalByKey(ctx context.Context, taskID, signalName, signa
 }
 
 func (t *sqliteTx) markSignalConsumed(ctx context.Context, signalID string, consumedAtMs int64) error {
-	n, err := t.q.MarkSignalConsumed(ctx, sqlcgen.MarkSignalConsumedParams{
+	n, err := t.q.MarkSignalConsumed(ctx, dbgen.MarkSignalConsumedParams{
 		ConsumedAtMs: consumedAtMs,
 		ID:           signalID,
 	})
@@ -526,7 +516,7 @@ func (t *sqliteTx) markSignalConsumed(ctx context.Context, signalID string, cons
 	return nil
 }
 
-func convFromModel(m sqlcgen.DurableConversation) Conversation {
+func convFromModel(m dbgen.DurableConversation) Conversation {
 	return Conversation{
 		ID:               m.ID,
 		OwnerTaskID:      m.OwnerTaskID,
@@ -541,7 +531,7 @@ func convFromModel(m sqlcgen.DurableConversation) Conversation {
 	}
 }
 
-func sqlGetConversation(ctx context.Context, q *sqlcgen.Queries, id string) (Conversation, bool, error) {
+func sqlGetConversation(ctx context.Context, q *dbgen.Queries, id string) (Conversation, bool, error) {
 	m, err := q.GetConversation(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Conversation{}, false, nil
@@ -552,7 +542,7 @@ func sqlGetConversation(ctx context.Context, q *sqlcgen.Queries, id string) (Con
 	return convFromModel(m), true, nil
 }
 
-func sqlListConversationsByOwnerTask(ctx context.Context, q *sqlcgen.Queries, ownerTaskID string) ([]Conversation, error) {
+func sqlListConversationsByOwnerTask(ctx context.Context, q *dbgen.Queries, ownerTaskID string) ([]Conversation, error) {
 	rows, err := q.ListConversationsByOwnerTask(ctx, ownerTaskID)
 	if err != nil {
 		return nil, err
@@ -564,17 +554,17 @@ func sqlListConversationsByOwnerTask(ctx context.Context, q *sqlcgen.Queries, ow
 	return out, nil
 }
 
-func sqlListEntries(ctx context.Context, q *sqlcgen.Queries, conversationID string, fromSeq, maxSeq int64) ([]Entry, error) {
-	var rows []sqlcgen.DurableEntry
+func sqlListEntries(ctx context.Context, q *dbgen.Queries, conversationID string, fromSeq, maxSeq int64) ([]Entry, error) {
+	var rows []dbgen.DurableEntry
 	var err error
 	if maxSeq > 0 {
-		rows, err = q.ListEntriesRange(ctx, sqlcgen.ListEntriesRangeParams{
+		rows, err = q.ListEntriesRange(ctx, dbgen.ListEntriesRangeParams{
 			ConversationID: conversationID,
 			Seq:            fromSeq,
 			Seq_2:          maxSeq,
 		})
 	} else {
-		rows, err = q.ListEntriesFrom(ctx, sqlcgen.ListEntriesFromParams{
+		rows, err = q.ListEntriesFrom(ctx, dbgen.ListEntriesFromParams{
 			ConversationID: conversationID,
 			Seq:            fromSeq,
 		})
@@ -595,7 +585,7 @@ func sqlListEntries(ctx context.Context, q *sqlcgen.Queries, conversationID stri
 	return out, nil
 }
 
-func docFromModel(m sqlcgen.DurableDocument) Document {
+func docFromModel(m dbgen.DurableDocument) Document {
 	return Document{
 		ScopeKind:   m.ScopeKind,
 		ScopeID:     m.ScopeID,
@@ -606,8 +596,8 @@ func docFromModel(m sqlcgen.DurableDocument) Document {
 	}
 }
 
-func sqlGetDocument(ctx context.Context, q *sqlcgen.Queries, key DocKey) (Document, bool, error) {
-	m, err := q.GetDocument(ctx, sqlcgen.GetDocumentParams{
+func sqlGetDocument(ctx context.Context, q *dbgen.Queries, key DocKey) (Document, bool, error) {
+	m, err := q.GetDocument(ctx, dbgen.GetDocumentParams{
 		ScopeKind: key.ScopeKind,
 		ScopeID:   key.ScopeID,
 		DocKind:   key.DocKind,
@@ -621,8 +611,8 @@ func sqlGetDocument(ctx context.Context, q *sqlcgen.Queries, key DocKey) (Docume
 	return docFromModel(m), true, nil
 }
 
-func sqlListDocumentsByScope(ctx context.Context, q *sqlcgen.Queries, scopeKind, scopeID string) ([]Document, error) {
-	rows, err := q.ListDocumentsByScope(ctx, sqlcgen.ListDocumentsByScopeParams{
+func sqlListDocumentsByScope(ctx context.Context, q *dbgen.Queries, scopeKind, scopeID string) ([]Document, error) {
+	rows, err := q.ListDocumentsByScope(ctx, dbgen.ListDocumentsByScopeParams{
 		ScopeKind: scopeKind,
 		ScopeID:   scopeID,
 	})
@@ -636,7 +626,7 @@ func sqlListDocumentsByScope(ctx context.Context, q *sqlcgen.Queries, scopeKind,
 	return out, nil
 }
 
-func submissionFromModel(m sqlcgen.DurableSubmission) Submission {
+func submissionFromModel(m dbgen.DurableSubmission) Submission {
 	return Submission{
 		ID:             m.ID,
 		ConversationID: m.ConversationID,
@@ -651,7 +641,7 @@ func submissionFromModel(m sqlcgen.DurableSubmission) Submission {
 	}
 }
 
-func sqlGetSubmission(ctx context.Context, q *sqlcgen.Queries, id string) (Submission, bool, error) {
+func sqlGetSubmission(ctx context.Context, q *dbgen.Queries, id string) (Submission, bool, error) {
 	m, err := q.GetSubmission(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Submission{}, false, nil
@@ -662,8 +652,8 @@ func sqlGetSubmission(ctx context.Context, q *sqlcgen.Queries, id string) (Submi
 	return submissionFromModel(m), true, nil
 }
 
-func sqlGetSubmissionByRequestID(ctx context.Context, q *sqlcgen.Queries, conversationID, requestID string) (Submission, bool, error) {
-	m, err := q.GetSubmissionByRequestID(ctx, sqlcgen.GetSubmissionByRequestIDParams{
+func sqlGetSubmissionByRequestID(ctx context.Context, q *dbgen.Queries, conversationID, requestID string) (Submission, bool, error) {
+	m, err := q.GetSubmissionByRequestID(ctx, dbgen.GetSubmissionByRequestIDParams{
 		ConversationID: conversationID,
 		RequestID:      requestID,
 	})
@@ -676,7 +666,7 @@ func sqlGetSubmissionByRequestID(ctx context.Context, q *sqlcgen.Queries, conver
 	return submissionFromModel(m), true, nil
 }
 
-func taskFromModel(m sqlcgen.DurableTask) (Task, error) {
+func taskFromModel(m dbgen.DurableTask) (Task, error) {
 	t := Task{
 		ID:             m.ID,
 		ConversationID: m.ConversationID,
@@ -711,7 +701,7 @@ func taskFromModel(m sqlcgen.DurableTask) (Task, error) {
 	return t, nil
 }
 
-func tasksFromModels(rows []sqlcgen.DurableTask) ([]Task, error) {
+func tasksFromModels(rows []dbgen.DurableTask) ([]Task, error) {
 	var out []Task
 	for _, m := range rows {
 		t, err := taskFromModel(m)
@@ -723,7 +713,7 @@ func tasksFromModels(rows []sqlcgen.DurableTask) ([]Task, error) {
 	return out, nil
 }
 
-func sqlGetTask(ctx context.Context, q *sqlcgen.Queries, id string) (Task, bool, error) {
+func sqlGetTask(ctx context.Context, q *dbgen.Queries, id string) (Task, bool, error) {
 	m, err := q.GetTask(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Task{}, false, nil
@@ -738,11 +728,11 @@ func sqlGetTask(ctx context.Context, q *sqlcgen.Queries, id string) (Task, bool,
 	return t, true, nil
 }
 
-func sqlGetTaskByDedupKey(ctx context.Context, q *sqlcgen.Queries, ownerTaskID, dedupKey string) (Task, bool, error) {
+func sqlGetTaskByDedupKey(ctx context.Context, q *dbgen.Queries, ownerTaskID, dedupKey string) (Task, bool, error) {
 	if dedupKey == "" {
 		return Task{}, false, nil
 	}
-	m, err := q.GetTaskByDedupKey(ctx, sqlcgen.GetTaskByDedupKeyParams{
+	m, err := q.GetTaskByDedupKey(ctx, dbgen.GetTaskByDedupKeyParams{
 		OwnerTaskID: ownerTaskID,
 		DedupKey:    dedupKey,
 	})
@@ -759,7 +749,7 @@ func sqlGetTaskByDedupKey(ctx context.Context, q *sqlcgen.Queries, ownerTaskID, 
 	return t, true, nil
 }
 
-func sqlListTasksByOwner(ctx context.Context, q *sqlcgen.Queries, ownerTaskID string) ([]Task, error) {
+func sqlListTasksByOwner(ctx context.Context, q *dbgen.Queries, ownerTaskID string) ([]Task, error) {
 	rows, err := q.ListTasksByOwner(ctx, ownerTaskID)
 	if err != nil {
 		return nil, err
@@ -767,8 +757,8 @@ func sqlListTasksByOwner(ctx context.Context, q *sqlcgen.Queries, ownerTaskID st
 	return tasksFromModels(rows)
 }
 
-func sqlListTasksByStatus(ctx context.Context, q *sqlcgen.Queries, statuses []TaskStatus) ([]Task, error) {
-	var rows []sqlcgen.DurableTask
+func sqlListTasksByStatus(ctx context.Context, q *dbgen.Queries, statuses []TaskStatus) ([]Task, error) {
+	var rows []dbgen.DurableTask
 	var err error
 	if len(statuses) == 0 {
 		rows, err = q.ListAllTasks(ctx)
@@ -785,7 +775,7 @@ func sqlListTasksByStatus(ctx context.Context, q *sqlcgen.Queries, statuses []Ta
 	return tasksFromModels(rows)
 }
 
-func sqlListTasksByConversation(ctx context.Context, q *sqlcgen.Queries, conversationID string) ([]Task, error) {
+func sqlListTasksByConversation(ctx context.Context, q *dbgen.Queries, conversationID string) ([]Task, error) {
 	rows, err := q.ListTasksByConversation(ctx, conversationID)
 	if err != nil {
 		return nil, err
@@ -793,12 +783,12 @@ func sqlListTasksByConversation(ctx context.Context, q *sqlcgen.Queries, convers
 	return tasksFromModels(rows)
 }
 
-func sqlListSignals(ctx context.Context, q *sqlcgen.Queries, taskID, signalName string, onlyUnconsumed bool) ([]Signal, error) {
+func sqlListSignals(ctx context.Context, q *dbgen.Queries, taskID, signalName string, onlyUnconsumed bool) ([]Signal, error) {
 	var onlyUncons int64
 	if onlyUnconsumed {
 		onlyUncons = 1
 	}
-	rows, err := q.ListSignals(ctx, sqlcgen.ListSignalsParams{
+	rows, err := q.ListSignals(ctx, dbgen.ListSignalsParams{
 		TaskID:         taskID,
 		SignalName:     signalName,
 		OnlyUnconsumed: onlyUncons,

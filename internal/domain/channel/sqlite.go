@@ -6,21 +6,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
-	"github.com/vibevalleyhq/vibevalley/internal/domain/channel/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/pkg/contract"
+	"github.com/vibevalleyhq/vibevalley/pkg/db"
+	dbgen "github.com/vibevalleyhq/vibevalley/pkg/db/generated"
 	"github.com/vibevalleyhq/vibevalley/pkg/migrate"
-	_ "modernc.org/sqlite"
 )
 
 type sqliteBackend struct {
 	mu      sync.Mutex
+	pool    *db.Pool
 	db      *sql.DB
-	queries *sqlcgen.Queries
+	queries *dbgen.Queries
 	ownsDB  bool
 	nextSeq int64
 }
@@ -29,63 +28,79 @@ func openSQLiteBackend(ctx context.Context, path string) (*sqliteBackend, error)
 	if strings.TrimSpace(path) == "" {
 		return nil, fmtInvalid("empty sqlite path")
 	}
-	isMem := path == ":memory:" || strings.Contains(path, "mode=memory") || strings.Contains(path, ":memory:")
-	if !isMem && !strings.HasPrefix(path, "file:") {
-		if dir := filepath.Dir(path); dir != "" && dir != "." {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return nil, fmt.Errorf("channel: mkdir %s: %w", dir, err)
-			}
-		}
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	db, err := sql.Open("sqlite", path)
+	pool, err := db.OpenPool(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("channel: open sqlite: %w", err)
 	}
-	db.SetMaxOpenConns(1)
-	pragmas := []string{
-		"PRAGMA busy_timeout=5000",
-		"PRAGMA foreign_keys=ON",
-		"PRAGMA synchronous=NORMAL",
-	}
-	if !isMem {
-		pragmas = append([]string{"PRAGMA journal_mode=WAL"}, pragmas...)
-	}
-	for _, p := range pragmas {
-		if _, err := db.ExecContext(ctx, p); err != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("channel: %s: %w", p, err)
-		}
-	}
-	return openSQLiteFromDB(ctx, db, true)
-}
-
-func openSQLiteFromDB(ctx context.Context, db *sql.DB, ownsDB bool) (*sqliteBackend, error) {
-	if db == nil {
-		return nil, fmtInvalid("sql.DB is required")
-	}
-	runner, err := migrate.New(db, "channel", MigrationsFS)
+	runner, err := migrate.New(pool.WriteDB, db.PlatformScope, db.MigrationsFS)
 	if err != nil {
-		if ownsDB {
-			_ = db.Close()
-		}
+		_ = pool.Close()
 		return nil, fmt.Errorf("channel: init migrations: %w", err)
 	}
 	if _, err := runner.Up(ctx); err != nil {
-		if ownsDB {
-			_ = db.Close()
-		}
+		_ = pool.Close()
 		return nil, fmt.Errorf("channel: apply migrations: %w", err)
 	}
-	queries := sqlcgen.New(db)
+	queries := dbgen.New(pool.WriteDB)
+	maxGlobal, err := queries.MaxGlobalSeq(ctx)
+	if err != nil {
+		_ = pool.Close()
+		return nil, fmt.Errorf("channel: read max global_seq: %w", err)
+	}
+	return &sqliteBackend{
+		pool:    pool,
+		db:      pool.WriteDB,
+		queries: queries,
+		ownsDB:  true,
+		nextSeq: maxGlobal,
+	}, nil
+}
+
+func openSQLiteFromDB(ctx context.Context, sqlDB *sql.DB, runMigrate, ownsDB bool) (*sqliteBackend, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if sqlDB == nil {
+		return nil, fmtInvalid("sql.DB is required")
+	}
+	if runMigrate {
+		fsys, err := db.ScopeFS("channel")
+		if err != nil {
+			if ownsDB {
+				_ = sqlDB.Close()
+			}
+			return nil, fmt.Errorf("channel: load migrations: %w", err)
+		}
+		runner, err := migrate.New(sqlDB, "channel", fsys)
+		if err != nil {
+			if ownsDB {
+				_ = sqlDB.Close()
+			}
+			return nil, fmt.Errorf("channel: init migrations: %w", err)
+		}
+		if _, err := runner.Up(ctx); err != nil {
+			if ownsDB {
+				_ = sqlDB.Close()
+			}
+			return nil, fmt.Errorf("channel: apply migrations: %w", err)
+		}
+	}
+	queries := dbgen.New(sqlDB)
 	maxGlobal, err := queries.MaxGlobalSeq(ctx)
 	if err != nil {
 		if ownsDB {
-			_ = db.Close()
+			_ = sqlDB.Close()
 		}
 		return nil, fmt.Errorf("channel: read max global_seq: %w", err)
 	}
 	return &sqliteBackend{
-		db:      db,
+		db:      sqlDB,
 		queries: queries,
 		ownsDB:  ownsDB,
 		nextSeq: maxGlobal,
@@ -136,7 +151,7 @@ func (b *sqliteBackend) insertChannelLocked(ctx context.Context, ch Channel) err
 	if ch.IsDefault {
 		isDefault = 1
 	}
-	return b.queries.InsertChannel(ctx, sqlcgen.InsertChannelParams{
+	return b.queries.InsertChannel(ctx, dbgen.InsertChannelParams{
 		ID:              ch.ID,
 		Type:            string(ch.Type),
 		Name:            ch.Name,
@@ -210,7 +225,7 @@ func (b *sqliteBackend) addMember(ctx context.Context, channelID, memberID strin
 	} else if !ok {
 		return fmt.Errorf("%w: channel %q", ErrNotFound, channelID)
 	}
-	return b.queries.AddChannelMember(ctx, sqlcgen.AddChannelMemberParams{
+	return b.queries.AddChannelMember(ctx, dbgen.AddChannelMemberParams{
 		ChannelID: channelID,
 		MemberID:  memberID,
 		AddedAtMs: nowMs,
@@ -220,7 +235,7 @@ func (b *sqliteBackend) addMember(ctx context.Context, channelID, memberID strin
 func (b *sqliteBackend) removeMember(ctx context.Context, channelID, memberID string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.queries.RemoveChannelMember(ctx, sqlcgen.RemoveChannelMemberParams{
+	return b.queries.RemoveChannelMember(ctx, dbgen.RemoveChannelMemberParams{
 		ChannelID: channelID,
 		MemberID:  memberID,
 	})
@@ -256,7 +271,7 @@ func (b *sqliteBackend) appendEvent(ctx context.Context, req AppendRequest, nowM
 	}
 
 	if req.SendKey != "" {
-		row, err := qtx.GetChannelEventBySendKey(ctx, sqlcgen.GetChannelEventBySendKeyParams{
+		row, err := qtx.GetChannelEventBySendKey(ctx, dbgen.GetChannelEventBySendKeyParams{
 			ChannelID: req.ChannelID,
 			AuthorID:  req.AuthorID,
 			SendKey:   req.SendKey,
@@ -316,7 +331,7 @@ func (b *sqliteBackend) appendEvent(ctx context.Context, req AppendRequest, nowM
 		reactionJSON = string(raw)
 	}
 
-	if err := qtx.InsertChannelEvent(ctx, sqlcgen.InsertChannelEventParams{
+	if err := qtx.InsertChannelEvent(ctx, dbgen.InsertChannelEventParams{
 		GlobalSeq:     nextGlobal,
 		ChannelID:     req.ChannelID,
 		Seq:           nextChanSeq,
@@ -338,14 +353,14 @@ func (b *sqliteBackend) appendEvent(ctx context.Context, req AppendRequest, nowM
 		return AppendResult{}, err
 	}
 
-	if err := qtx.TouchChannelUpdatedAt(ctx, sqlcgen.TouchChannelUpdatedAtParams{
+	if err := qtx.TouchChannelUpdatedAt(ctx, dbgen.TouchChannelUpdatedAtParams{
 		UpdatedAtMs: nowMs,
 		ID:          req.ChannelID,
 	}); err != nil {
 		return AppendResult{}, err
 	}
 
-	if err := qtx.UpsertReadCursor(ctx, sqlcgen.UpsertReadCursorParams{
+	if err := qtx.UpsertReadCursor(ctx, dbgen.UpsertReadCursorParams{
 		ChannelID:   req.ChannelID,
 		ActorID:     req.AuthorID,
 		ReadSeq:     nextChanSeq,
@@ -384,7 +399,7 @@ func (b *sqliteBackend) appendEvent(ctx context.Context, req AppendRequest, nowM
 func (b *sqliteBackend) getEvent(ctx context.Context, channelID string, seq int64) (Event, bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	row, err := b.queries.GetChannelEvent(ctx, sqlcgen.GetChannelEventParams{
+	row, err := b.queries.GetChannelEvent(ctx, dbgen.GetChannelEventParams{
 		ChannelID: channelID,
 		Seq:       seq,
 	})
@@ -409,16 +424,16 @@ func (b *sqliteBackend) listEvents(ctx context.Context, channelID string, afterS
 	} else if !ok {
 		return nil, fmt.Errorf("%w: channel %q", ErrNotFound, channelID)
 	}
-	var rows []sqlcgen.ChannelEvent
+	var rows []dbgen.ChannelEvent
 	var err error
 	if limit > 0 {
-		rows, err = b.queries.ListChannelEventsLimit(ctx, sqlcgen.ListChannelEventsLimitParams{
+		rows, err = b.queries.ListChannelEventsLimit(ctx, dbgen.ListChannelEventsLimitParams{
 			ChannelID: channelID,
 			Seq:       afterSeq,
 			Limit:     int64(limit),
 		})
 	} else {
-		rows, err = b.queries.ListChannelEvents(ctx, sqlcgen.ListChannelEventsParams{
+		rows, err = b.queries.ListChannelEvents(ctx, dbgen.ListChannelEventsParams{
 			ChannelID: channelID,
 			Seq:       afterSeq,
 		})
@@ -432,10 +447,10 @@ func (b *sqliteBackend) listEvents(ctx context.Context, channelID string, afterS
 func (b *sqliteBackend) eventsAfterGlobal(ctx context.Context, afterGlobalSeq int64, limit int) ([]Event, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	var rows []sqlcgen.ChannelEvent
+	var rows []dbgen.ChannelEvent
 	var err error
 	if limit > 0 {
-		rows, err = b.queries.ListEventsAfterGlobalLimit(ctx, sqlcgen.ListEventsAfterGlobalLimitParams{
+		rows, err = b.queries.ListEventsAfterGlobalLimit(ctx, dbgen.ListEventsAfterGlobalLimitParams{
 			GlobalSeq: afterGlobalSeq,
 			Limit:     int64(limit),
 		})
@@ -456,7 +471,7 @@ func (b *sqliteBackend) advanceReadCursor(ctx context.Context, channelID, actorI
 	} else if !ok {
 		return ReadCursor{}, fmt.Errorf("%w: channel %q", ErrNotFound, channelID)
 	}
-	if err := b.queries.UpsertReadCursor(ctx, sqlcgen.UpsertReadCursorParams{
+	if err := b.queries.UpsertReadCursor(ctx, dbgen.UpsertReadCursorParams{
 		ChannelID:   channelID,
 		ActorID:     actorID,
 		ReadSeq:     seq,
@@ -480,7 +495,7 @@ func (b *sqliteBackend) getReadCursor(ctx context.Context, channelID, actorID st
 }
 
 func (b *sqliteBackend) getReadCursorLocked(ctx context.Context, channelID, actorID string) (ReadCursor, bool, error) {
-	row, err := b.queries.GetReadCursor(ctx, sqlcgen.GetReadCursorParams{
+	row, err := b.queries.GetReadCursor(ctx, dbgen.GetReadCursorParams{
 		ChannelID: channelID,
 		ActorID:   actorID,
 	})
@@ -534,20 +549,26 @@ func (b *sqliteBackend) unreadCount(ctx context.Context, channelID, actorID stri
 	if err != nil {
 		return 0, err
 	}
-	return b.queries.CountUnreadEvents(ctx, sqlcgen.CountUnreadEventsParams{
+	return b.queries.CountUnreadEvents(ctx, dbgen.CountUnreadEventsParams{
 		ChannelID: channelID,
 		Seq:       rc.ReadSeq,
 	})
 }
 
 func (b *sqliteBackend) close() error {
-	if b.ownsDB && b.db != nil {
+	if !b.ownsDB {
+		return nil
+	}
+	if b.pool != nil {
+		return b.pool.Close()
+	}
+	if b.db != nil {
 		return b.db.Close()
 	}
 	return nil
 }
 
-func channelFromRow(r sqlcgen.Channel) Channel {
+func channelFromRow(r dbgen.Channel) Channel {
 	return Channel{
 		ID:              r.ID,
 		Type:            ChannelType(r.Type),
@@ -566,7 +587,7 @@ func channelFromRow(r sqlcgen.Channel) Channel {
 	}
 }
 
-func eventsFromRows(rows []sqlcgen.ChannelEvent) ([]Event, error) {
+func eventsFromRows(rows []dbgen.ChannelEvent) ([]Event, error) {
 	var out []Event
 	for _, row := range rows {
 		ev, err := eventFromRow(row)
@@ -578,7 +599,7 @@ func eventsFromRows(rows []sqlcgen.ChannelEvent) ([]Event, error) {
 	return out, nil
 }
 
-func eventFromRow(r sqlcgen.ChannelEvent) (Event, error) {
+func eventFromRow(r dbgen.ChannelEvent) (Event, error) {
 	ev := Event{
 		GlobalSeq:     r.GlobalSeq,
 		ChannelID:     r.ChannelID,
