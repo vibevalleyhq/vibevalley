@@ -174,7 +174,7 @@ func newRootCommand(getenv func(string) string, stdout, stderr io.Writer) *cobra
 
 	migrateUpCmd := &cobra.Command{
 		Use:   "up",
-		Short: "Apply pending migrations across all 10 SQLite scopes",
+		Short: "Apply pending migrations across all 11 SQLite scopes",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if showVersion {
@@ -204,7 +204,7 @@ func newRootCommand(getenv func(string) string, stdout, stderr io.Writer) *cobra
 	)
 	migrateDownCmd := &cobra.Command{
 		Use:   "down",
-		Short: "Revert migrations across all 10 SQLite scopes",
+		Short: "Revert migrations across all 11 SQLite scopes",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if showVersion {
@@ -238,7 +238,7 @@ func newRootCommand(getenv func(string) string, stdout, stderr io.Writer) *cobra
 
 	migrateStatusCmd := &cobra.Command{
 		Use:   "status",
-		Short: "Show migration status across all 10 SQLite scopes",
+		Short: "Show migration status across all 11 SQLite scopes",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if showVersion {

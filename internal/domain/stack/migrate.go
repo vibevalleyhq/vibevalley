@@ -3,6 +3,7 @@ package stack
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -45,6 +46,19 @@ type migrationScopeSpec struct {
 	EnableVec bool
 }
 
+//go:embed gatewaymigrations/migrations/*.sql
+var gatewayStackMigrationsRaw embed.FS
+
+// GatewayMigrationsFS returns the embedded gateway SQLite migration filesystem used by stack.
+// Kept inside stack to avoid an import cycle with internal/domain/gateway (verified identical in sqlc_migrate_test.go).
+func GatewayMigrationsFS() fs.FS {
+	sub, err := fs.Sub(gatewayStackMigrationsRaw, "gatewaymigrations")
+	if err != nil {
+		panic(err)
+	}
+	return sub
+}
+
 var stackMigrationScopes = []migrationScopeSpec{
 	{Scope: "durable", FS: store.MigrationsFS},
 	{Scope: "vault", FS: vault.MigrationsFS},
@@ -56,6 +70,7 @@ var stackMigrationScopes = []migrationScopeSpec{
 	{Scope: "game", FS: game.MigrationsFS},
 	{Scope: "memory", FS: memory.MigrationsFS},
 	{Scope: "pkm", FS: pkm.MigrationsFS, EnableVec: true},
+	{Scope: "gateway", FS: GatewayMigrationsFS()},
 }
 
 var registerMigrateVecFuncsOnce sync.Once
@@ -87,7 +102,7 @@ func isMemorySQLiteDSN(dsn string) bool {
 	return dsn == ":memory:" || strings.Contains(dsn, "mode=memory") || strings.Contains(dsn, ":memory:")
 }
 
-// MigrateUp applies all pending SQL migrations across all 10 platform module scopes.
+// MigrateUp applies all pending SQL migrations across all 11 platform module scopes.
 func MigrateUp(ctx context.Context, dbPath string) ([]ScopeMigrationResult, error) {
 	ctx, err := normalizeMigrateContext(ctx)
 	if err != nil {
@@ -117,7 +132,7 @@ func MigrateUp(ctx context.Context, dbPath string) ([]ScopeMigrationResult, erro
 	return results, nil
 }
 
-// MigrateDown reverts migrations across all 10 platform module scopes (either all applied versions or up to steps).
+// MigrateDown reverts migrations across all 11 platform module scopes (either all applied versions or up to steps).
 func MigrateDown(ctx context.Context, dbPath string, steps int, all bool) ([]ScopeMigrationResult, error) {
 	ctx, err := normalizeMigrateContext(ctx)
 	if err != nil {
@@ -150,7 +165,7 @@ func MigrateDown(ctx context.Context, dbPath string, steps int, all bool) ([]Sco
 	return results, nil
 }
 
-// MigrateStatus returns the ordered migration statuses across all 10 platform module scopes.
+// MigrateStatus returns the ordered migration statuses across all 11 platform module scopes.
 func MigrateStatus(ctx context.Context, dbPath string) ([]migrate.MigrationStatus, error) {
 	ctx, err := normalizeMigrateContext(ctx)
 	if err != nil {
@@ -180,7 +195,7 @@ func MigrateStatus(ctx context.Context, dbPath string) ([]migrate.MigrationStatu
 	return statuses, nil
 }
 
-// MigrateUpDB applies all pending migrations for all 10 scopes against a single shared SQLite *sql.DB.
+// MigrateUpDB applies all pending migrations for all 11 scopes against a single shared SQLite *sql.DB.
 func MigrateUpDB(ctx context.Context, db *sql.DB, dbLabel string) ([]ScopeMigrationResult, error) {
 	ctx, err := normalizeMigrateContext(ctx)
 	if err != nil {
@@ -200,7 +215,7 @@ func MigrateUpDB(ctx context.Context, db *sql.DB, dbLabel string) ([]ScopeMigrat
 	return results, nil
 }
 
-// MigrateDownDB reverts migrations for all 10 scopes against a single shared SQLite *sql.DB.
+// MigrateDownDB reverts migrations for all 11 scopes against a single shared SQLite *sql.DB.
 func MigrateDownDB(ctx context.Context, db *sql.DB, dbLabel string, steps int, all bool) ([]ScopeMigrationResult, error) {
 	ctx, err := normalizeMigrateContext(ctx)
 	if err != nil {
@@ -223,7 +238,7 @@ func MigrateDownDB(ctx context.Context, db *sql.DB, dbLabel string, steps int, a
 	return results, nil
 }
 
-// MigrateStatusDB reports migration status for all 10 scopes against a single shared SQLite *sql.DB.
+// MigrateStatusDB reports migration status for all 11 scopes against a single shared SQLite *sql.DB.
 func MigrateStatusDB(ctx context.Context, db *sql.DB) ([]migrate.MigrationStatus, error) {
 	ctx, err := normalizeMigrateContext(ctx)
 	if err != nil {

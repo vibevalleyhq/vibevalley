@@ -622,23 +622,25 @@ func (h *Handler) handleConnectorLogin(w http.ResponseWriter, r *http.Request, c
 		return
 	}
 	var req struct {
-		ID       connector.ConnectorID `json:"id"`
-		Force    bool                  `json:"force"`
-		AppID    string                `json:"appId"`
-		Secret   string                `json:"secret"`
-		BotToken string                `json:"botToken"`
-		Domain   string                `json:"domain"`
+		ID         connector.ConnectorID `json:"id"`
+		Force      bool                  `json:"force"`
+		AppID      string                `json:"appId"`
+		Secret     string                `json:"secret"`
+		BotToken   string                `json:"botToken"`
+		Domain     string                `json:"domain"`
+		APIBaseURL string                `json:"apiBaseUrl"`
 	}
 	if err := decodeJSONBody(w, r, &req, true); err != nil {
 		writeError(w, err, BizInvalidInput)
 		return
 	}
 	st, err := h.st.Connectors.Login(r.Context(), req.ID, connector.ConnectorLogin{
-		Force:    req.Force,
-		AppID:    req.AppID,
-		Secret:   req.Secret,
-		BotToken: req.BotToken,
-		Domain:   req.Domain,
+		Force:      req.Force,
+		AppID:      req.AppID,
+		Secret:     req.Secret,
+		BotToken:   req.BotToken,
+		Domain:     req.Domain,
+		APIBaseURL: req.APIBaseURL,
 	})
 	if err != nil {
 		writeError(w, err, BizConnectorRefused)
@@ -658,11 +660,36 @@ func (h *Handler) handleConnectorVerify(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	var req struct {
-		ID   connector.ConnectorID `json:"id"`
-		Code string                `json:"code"`
+		ID         connector.ConnectorID `json:"id"`
+		Code       string                `json:"code"`
+		AppID      string                `json:"appId"`
+		Secret     string                `json:"secret"`
+		BotToken   string                `json:"botToken"`
+		Domain     string                `json:"domain"`
+		APIBaseURL string                `json:"apiBaseUrl"`
 	}
 	if err := decodeJSONBody(w, r, &req, true); err != nil {
 		writeError(w, err, BizInvalidInput)
+		return
+	}
+	if strings.TrimSpace(req.Code) == "" {
+		if _, err := h.st.Connectors.VerifyCredentials(r.Context(), req.ID, connector.ConnectorLogin{
+			AppID:      req.AppID,
+			Secret:     req.Secret,
+			BotToken:   req.BotToken,
+			Domain:     req.Domain,
+			APIBaseURL: req.APIBaseURL,
+		}); err != nil {
+			writeError(w, err, BizConnectorRefused)
+			return
+		}
+		st, err := h.st.Connectors.Get(req.ID)
+		if err != nil {
+			writeError(w, err, BizConnectorRefused)
+			return
+		}
+		h.hub.notifyAllState()
+		writeSuccess(w, st)
 		return
 	}
 	st, err := h.st.Connectors.Verify(r.Context(), req.ID, req.Code)

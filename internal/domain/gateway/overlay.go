@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -17,15 +18,11 @@ import (
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/gateway/sqlcgen"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
-	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
 )
 
 const (
-	overlayScopeKind = store.ScopeGlobal
-	overlayScopeID   = "gateway"
-	overlayDocKind   = "gateway.overlay"
-
 	defaultChannelID   = "general"
 	defaultChannelName = "general"
 )
@@ -157,7 +154,8 @@ type artifactOverlay struct {
 
 type mediaInputRecord struct {
 	ProtoMediaInput
-	Bytes []byte `json:"bytes,omitempty"`
+	BlobPath string `json:"-"`
+	Bytes    []byte `json:"-"`
 }
 
 type mediaJobRecord struct {
@@ -184,14 +182,19 @@ type pkmUndoRecord struct {
 }
 
 type cronOverlay struct {
-	Channel string          `json:"channel"`
-	Agent   string          `json:"agent,omitempty"`
-	Repo    string          `json:"repo,omitempty"`
-	TZ      string          `json:"tz"`
-	By      string          `json:"by"`
-	Pending bool            `json:"pending,omitempty"`
-	When    json.RawMessage `json:"when,omitempty"`
-	Deleted bool            `json:"deleted,omitempty"`
+	Name        string          `json:"name,omitempty"`
+	Text        string          `json:"text,omitempty"`
+	Channel     string          `json:"channel"`
+	Agent       string          `json:"agent,omitempty"`
+	Repo        string          `json:"repo,omitempty"`
+	TZ          string          `json:"tz"`
+	By          string          `json:"by"`
+	Enabled     *bool           `json:"enabled,omitempty"`
+	Pending     bool            `json:"pending,omitempty"`
+	LastRunAtMs int64           `json:"lastRunAtMs,omitempty"`
+	NextRunAtMs int64           `json:"nextRunAtMs,omitempty"`
+	When        json.RawMessage `json:"when,omitempty"`
+	Deleted     bool            `json:"deleted,omitempty"`
 }
 
 type overlayState struct {
@@ -224,7 +227,9 @@ type overlayState struct {
 }
 
 type gatewayHub struct {
-	st *stack.Stack
+	st         *stack.Stack
+	sqlStore   *overlaySQLStore
+	persistSeq atomic.Uint64
 
 	mu    sync.RWMutex
 	state overlayState
@@ -258,23 +263,29 @@ type artifactBroadcast struct {
 	Seq         int64
 }
 
-func newGatewayHub(st *stack.Stack) *gatewayHub {
+func newGatewayHub(st *stack.Stack, overlayDB *sql.DB, mediaBlobDir string) *gatewayHub {
+	if overlayDB == nil && st != nil {
+		overlayDB = st.GatewayDB
+	}
+	if strings.TrimSpace(mediaBlobDir) == "" && st != nil {
+		mediaBlobDir = st.MediaBlobDir
+	}
+	sqlStore, err := newOverlaySQLStore(overlayDB, mediaBlobDir)
 	h := &gatewayHub{
 		st:         st,
+		sqlStore:   sqlStore,
 		liveSubs:   make(map[uint64]chan json.RawMessage),
 		eventsSubs: make(map[uint64]chan json.RawMessage),
 		chanSubs:   make(map[uint64]chan channelBroadcast),
 		artSubs:    make(map[uint64]chan artifactBroadcast),
 	}
 	h.state = emptyOverlayState()
-	if st != nil && st.Store != nil {
-		if doc, err := st.Store.GetDocument(context.Background(), overlayScopeKind, overlayScopeID, overlayDocKind); err == nil && len(doc.StateJSON) > 0 {
-			var loaded overlayState
-			if json.Unmarshal(doc.StateJSON, &loaded) == nil {
-				normalizeLoadedOverlay(&loaded)
-				h.state = loaded
-			}
+	if err == nil && sqlStore != nil {
+		if loaded, lErr := sqlStore.load(context.Background()); lErr == nil {
+			h.state = loaded
 		}
+	}
+	if st != nil {
 		h.seedDefaults()
 	}
 	return h
@@ -524,17 +535,433 @@ func (h *gatewayHub) seedDefaults() {
 }
 
 func (h *gatewayHub) persist() error {
-	if h.st == nil || h.st.Store == nil {
+	if h.sqlStore == nil {
 		return nil
 	}
+	ctx := context.Background()
+	issueStatuses := make(map[string]string)
+	agentNames := make(map[string]string)
+	cronEnabled := make(map[string]bool)
+	cronNextRun := make(map[string]int64)
+	if h.st != nil {
+		if h.st.Issues != nil {
+			if issues, err := h.st.Issues.ListIssues(ctx); err == nil {
+				for _, iss := range issues {
+					issueStatuses[iss.ID] = string(iss.Status)
+				}
+			}
+			if crons, err := h.st.Issues.ListCrons(ctx); err == nil {
+				for _, c := range crons {
+					cronEnabled[c.ID] = c.Enabled
+					cronNextRun[c.ID] = c.NextRunAtMs
+				}
+			}
+		}
+		if h.st.Agents != nil {
+			if profiles, err := h.st.Agents.ListProfiles(ctx); err == nil {
+				for _, p := range profiles {
+					agentNames[p.ID] = p.Name
+				}
+			}
+		}
+	}
+
 	h.mu.RLock()
-	raw, err := json.Marshal(h.state)
+	prep, err := h.prepareSnapshotLocked(issueStatuses, agentNames, cronEnabled, cronNextRun)
 	h.mu.RUnlock()
 	if err != nil {
 		return err
 	}
-	_, err = h.st.Store.PutDocument(context.Background(), overlayScopeKind, overlayScopeID, overlayDocKind, raw)
-	return err
+	return h.sqlStore.savePrepared(ctx, prep)
+}
+
+func (h *gatewayHub) prepareSnapshotLocked(
+	issueStatuses map[string]string,
+	agentNames map[string]string,
+	cronEnabled map[string]bool,
+	cronNextRun map[string]int64,
+) (preparedOverlaySnapshot, error) {
+	nowStr := formatTS(h.nowMs())
+	gen := h.persistSeq.Add(1)
+	s := h.state
+
+	kvRaw := map[string]any{
+		"seq_counters_json": map[string]any{
+			"nextIssueNumber": s.NextIssueNumber,
+			"nextMsgSeq":      s.NextMsgSeq,
+		},
+		"default_channel":       s.DefaultChannel,
+		"bootstrapped_seed":     s.StartersSeeded,
+		"deleted_skills_json":   s.DeletedSkills,
+		"runtime_checked_at":    s.RuntimeCheckedAt,
+		"orch_no_key_sent_json": s.OrchNoKeySent,
+		"failed_runs_json":      s.FailedRuns,
+	}
+	if s.GitHub != nil {
+		kvRaw["github_status_json"] = s.GitHub
+	}
+	if s.PKMUndo != nil {
+		kvRaw["pkm_undo_json"] = s.PKMUndo
+	}
+	kvRows := make([]sqlcgen.UpsertGatewayKVParams, 0, len(kvRaw))
+	for k, v := range kvRaw {
+		raw, err := mustMarshalJSON(v)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		kvRows = append(kvRows, sqlcgen.UpsertGatewayKVParams{
+			Key:       k,
+			ValueJson: raw,
+			UpdatedAt: nowStr,
+		})
+	}
+
+	issues := make(map[string]sqlcgen.UpsertGatewayIssueParams, len(s.Issues))
+	for id, ov := range s.Issues {
+		if ov == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(ov)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		ident := fmt.Sprintf("VIBE-%d", ov.Number)
+		if ov.Number <= 0 {
+			ident = id
+		}
+		st := issueStatuses[id]
+		if st == "" {
+			st = "backlog"
+		}
+		issues[id] = sqlcgen.UpsertGatewayIssueParams{
+			ID:          id,
+			Identifier:  ident,
+			Status:      st,
+			UpdatedAt:   nowStr,
+			PayloadJson: raw,
+		}
+	}
+
+	channels := make(map[string]sqlcgen.UpsertGatewayChannelParams, len(s.Channels))
+	for id, ov := range s.Channels {
+		if ov == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(ov)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		kind := firstNonEmpty(ov.SubjectKind, "channel")
+		if strings.HasPrefix(id, "dm:") {
+			kind = "dm"
+		}
+		channels[id] = sqlcgen.UpsertGatewayChannelParams{
+			ID:          id,
+			Kind:        kind,
+			UpdatedAt:   formatTS(ov.LastAt),
+			PayloadJson: raw,
+		}
+	}
+
+	agents := make(map[string]sqlcgen.UpsertGatewayAgentParams, len(s.Agents))
+	for id, ov := range s.Agents {
+		if ov == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(ov)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		agents[id] = sqlcgen.UpsertGatewayAgentParams{
+			ID:          id,
+			Name:        firstNonEmpty(agentNames[id], id),
+			UpdatedAt:   nowStr,
+			PayloadJson: raw,
+		}
+	}
+
+	templates := make(map[string]sqlcgen.UpsertGatewayTemplateParams, len(s.Templates))
+	for id, rec := range s.Templates {
+		if rec == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(rec)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		templates[id] = sqlcgen.UpsertGatewayTemplateParams{
+			ID:          id,
+			UpdatedAt:   nowStr,
+			PayloadJson: raw,
+		}
+	}
+
+	runtimes := make(map[string]sqlcgen.UpsertGatewayRuntimeParams, len(s.RuntimeSettings))
+	for id, rt := range s.RuntimeSettings {
+		if rt == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(rt)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		runtimes[id] = sqlcgen.UpsertGatewayRuntimeParams{
+			ID:          id,
+			UpdatedAt:   nowStr,
+			PayloadJson: raw,
+		}
+	}
+
+	crons := make(map[string]sqlcgen.UpsertGatewayCronParams, len(s.Crons))
+	for id, ov := range s.Crons {
+		if ov == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(ov)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		enabled := !ov.Deleted
+		if known, ok := cronEnabled[id]; ok {
+			enabled = known && !ov.Deleted
+		} else if ov.Enabled != nil {
+			enabled = *ov.Enabled && !ov.Deleted
+		}
+		var enabledInt int64
+		if enabled {
+			enabledInt = 1
+		}
+		nextMs := ov.NextRunAtMs
+		if knownNext := cronNextRun[id]; knownNext > 0 {
+			nextMs = knownNext
+		}
+		var nextNull sql.NullString
+		if nextMs > 0 {
+			nextNull = sql.NullString{String: formatTS(nextMs), Valid: true}
+		}
+		crons[id] = sqlcgen.UpsertGatewayCronParams{
+			ID:          id,
+			Enabled:     enabledInt,
+			NextRunAt:   nextNull,
+			UpdatedAt:   nowStr,
+			PayloadJson: raw,
+		}
+	}
+
+	artifacts := make(map[string]sqlcgen.UpsertGatewayArtifactParams, len(s.Artifacts))
+	for id, ov := range s.Artifacts {
+		if ov == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(ov)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		ts := ov.Updated
+		if ts <= 0 {
+			ts = ov.At
+		}
+		artifacts[id] = sqlcgen.UpsertGatewayArtifactParams{
+			ID:          id,
+			Kind:        firstNonEmpty(ov.Body, "blocks"),
+			UpdatedAt:   formatTS(ts),
+			PayloadJson: raw,
+		}
+	}
+
+	library := make(map[string]sqlcgen.UpsertGatewayLibraryItemParams, len(s.Library))
+	for _, item := range s.Library {
+		id := item.Attachment.ID
+		if id == "" {
+			continue
+		}
+		raw, err := mustMarshalJSON(item)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		library[id] = sqlcgen.UpsertGatewayLibraryItemParams{
+			ID:          id,
+			Kind:        firstNonEmpty(item.Attachment.Type, "application/octet-stream"),
+			CreatedAt:   formatTS(item.AddedAt),
+			PayloadJson: raw,
+		}
+	}
+
+	mediaInputs := make(map[string]preparedMediaInput, len(s.MediaInputs))
+	for id, rec := range s.MediaInputs {
+		if rec == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(rec.ProtoMediaInput)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		mediaInputs[id] = preparedMediaInput{
+			row: sqlcgen.UpsertGatewayMediaInputParams{
+				ID:          id,
+				MimeType:    firstNonEmpty(rec.Mime, "application/octet-stream"),
+				ByteSize:    rec.Size,
+				BlobPath:    rec.BlobPath,
+				ExpiresAt:   formatTS(rec.ExpiresAt),
+				CreatedAt:   formatTS(rec.CreatedAt),
+				PayloadJson: raw,
+			},
+			rawBytes: rec.Bytes,
+		}
+	}
+
+	mediaJobs := make(map[string]sqlcgen.UpsertGatewayMediaJobParams, len(s.MediaJobs))
+	for id, rec := range s.MediaJobs {
+		if rec == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(rec)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		var jobMeta struct {
+			Phase     string `json:"phase"`
+			CreatedAt int64  `json:"createdAt"`
+		}
+		_ = json.Unmarshal(rec.Raw, &jobMeta)
+		mediaJobs[id] = sqlcgen.UpsertGatewayMediaJobParams{
+			ID:          id,
+			Kind:        rec.Kind,
+			Status:      firstNonEmpty(jobMeta.Phase, "queued"),
+			CreatedAt:   formatTS(jobMeta.CreatedAt),
+			PayloadJson: raw,
+		}
+	}
+
+	pkmPages := make(map[string]sqlcgen.UpsertGatewayPKMPageParams, len(s.PKMPages))
+	for p, rec := range s.PKMPages {
+		if rec == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(rec)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		pkmPages[p] = sqlcgen.UpsertGatewayPKMPageParams{
+			Path:        p,
+			UpdatedAt:   formatTS(rec.Updated),
+			PayloadJson: raw,
+		}
+	}
+
+	pkmComments := make(map[string]sqlcgen.UpsertGatewayPKMCommentParams, len(s.PKMComments))
+	for _, c := range s.PKMComments {
+		raw, err := mustMarshalJSON(c)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		pkmComments[c.ID] = sqlcgen.UpsertGatewayPKMCommentParams{
+			ID:          c.ID,
+			PagePath:    c.Page,
+			CreatedAt:   formatTS(c.Created),
+			PayloadJson: raw,
+		}
+	}
+
+	pkmClips := make(map[string]sqlcgen.UpsertGatewayPKMClipParams, len(s.PKMClips))
+	for urlKey, pageSlug := range s.PKMClips {
+		raw, err := mustMarshalJSON(map[string]string{"url": urlKey, "page": pageSlug})
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		pkmClips[urlKey] = sqlcgen.UpsertGatewayPKMClipParams{
+			ID:          urlKey,
+			CreatedAt:   nowStr,
+			PayloadJson: raw,
+		}
+	}
+
+	sessions := make(map[string]sqlcgen.UpsertGatewaySessionParams, len(s.Sessions))
+	for id, sess := range s.Sessions {
+		if sess == nil {
+			continue
+		}
+		raw, err := mustMarshalJSON(sess)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		issueID := ""
+		if sess.Scope != nil && sess.Scope.Kind == "issue" {
+			issueID = sess.Scope.ID
+		}
+		sessions[id] = sqlcgen.UpsertGatewaySessionParams{
+			ID:          id,
+			IssueID:     issueID,
+			Status:      firstNonEmpty(sess.Phase.Tag, "idle"),
+			UpdatedAt:   formatTS(sess.HiredAt),
+			PayloadJson: raw,
+		}
+	}
+
+	sessionEvents := make(map[string][]preparedSessionEvent, len(s.SessionEvents))
+	for sessID, evs := range s.SessionEvents {
+		list := make([]preparedSessionEvent, 0, len(evs))
+		used := make(map[int64]bool, len(evs))
+		var maxSeq int64
+		for _, ev := range evs {
+			rowSeq := ev.Seq
+			if rowSeq <= 0 || used[rowSeq] {
+				rowSeq = maxSeq + 1
+			}
+			used[rowSeq] = true
+			if rowSeq > maxSeq {
+				maxSeq = rowSeq
+			}
+			raw, err := mustMarshalJSON(ev)
+			if err != nil {
+				return preparedOverlaySnapshot{}, err
+			}
+			list = append(list, preparedSessionEvent{
+				seq: rowSeq,
+				row: sqlcgen.UpsertGatewaySessionEventParams{
+					SessionID:   sessID,
+					Seq:         rowSeq,
+					CreatedAt:   formatTS(ev.Time),
+					PayloadJson: raw,
+				},
+			})
+		}
+		sessionEvents[sessID] = list
+	}
+
+	requestKeys := make(map[string]sqlcgen.UpsertGatewayRequestKeyParams, len(s.RequestKeys))
+	for k, v := range s.RequestKeys {
+		raw, err := mustMarshalJSON(v)
+		if err != nil {
+			return preparedOverlaySnapshot{}, err
+		}
+		requestKeys[k] = sqlcgen.UpsertGatewayRequestKeyParams{
+			ScopeKey:     k,
+			CreatedAt:    nowStr,
+			ResponseJson: raw,
+		}
+	}
+
+	return preparedOverlaySnapshot{
+		gen:           gen,
+		kv:            kvRows,
+		issues:        issues,
+		channels:      channels,
+		agents:        agents,
+		templates:     templates,
+		runtimes:      runtimes,
+		crons:         crons,
+		artifacts:     artifacts,
+		library:       library,
+		mediaInputs:   mediaInputs,
+		mediaJobs:     mediaJobs,
+		pkmPages:      pkmPages,
+		pkmComments:   pkmComments,
+		pkmClips:      pkmClips,
+		sessions:      sessions,
+		sessionEvents: sessionEvents,
+		requestKeys:   requestKeys,
+	}, nil
 }
 
 func (h *gatewayHub) nowMs() int64 {

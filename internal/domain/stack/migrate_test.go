@@ -24,13 +24,13 @@ func TestStackMigrateUpStatusDownUpWALDirectory(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "platform.db")
 
-	// Initial MigrateUp applies version 1 across all 10 scopes.
+	// Initial MigrateUp applies version 1 across all 11 scopes.
 	upRes, err := stack.MigrateUp(ctx, dbPath)
 	if err != nil {
 		t.Fatalf("MigrateUp(1): %v", err)
 	}
-	if len(upRes) != 10 {
-		t.Fatalf("expected 10 scope results, got %d", len(upRes))
+	if len(upRes) != 11 {
+		t.Fatalf("expected 11 scope results, got %d", len(upRes))
 	}
 
 	seenScopes := make(map[string]stack.ScopeMigrationResult, len(upRes))
@@ -49,6 +49,9 @@ func TestStackMigrateUpStatusDownUpWALDirectory(t *testing.T) {
 	if seenScopes["vault"].DBPath != filepath.Join(dir, "platform.vault.db") {
 		t.Fatalf("vault DBPath = %q, want sidecar", seenScopes["vault"].DBPath)
 	}
+	if seenScopes["gateway"].DBPath != filepath.Join(dir, "platform.gateway.db") {
+		t.Fatalf("gateway DBPath = %q, want sidecar", seenScopes["gateway"].DBPath)
+	}
 
 	// Second MigrateUp is idempotent.
 	upAgain, err := stack.MigrateUp(ctx, dbPath)
@@ -61,13 +64,13 @@ func TestStackMigrateUpStatusDownUpWALDirectory(t *testing.T) {
 		}
 	}
 
-	// MigrateStatus shows all 10 scopes applied at version 1.
+	// MigrateStatus shows all 11 scopes applied at version 1.
 	statuses, err := stack.MigrateStatus(ctx, dbPath)
 	if err != nil {
 		t.Fatalf("MigrateStatus after Up: %v", err)
 	}
-	if len(statuses) != 10 {
-		t.Fatalf("expected 10 status rows, got %d", len(statuses))
+	if len(statuses) != 11 {
+		t.Fatalf("expected 11 status rows, got %d", len(statuses))
 	}
 	for _, st := range statuses {
 		if !st.Applied || st.Version != 1 {
@@ -75,7 +78,7 @@ func TestStackMigrateUpStatusDownUpWALDirectory(t *testing.T) {
 		}
 	}
 
-	// MigrateDown(steps=1, all=false) reverts all 10 scopes back to version 0.
+	// MigrateDown(steps=1, all=false) reverts all 11 scopes back to version 0.
 	downStepRes, err := stack.MigrateDown(ctx, dbPath, 1, false)
 	if err != nil {
 		t.Fatalf("MigrateDown(steps=1): %v", err)
@@ -147,8 +150,8 @@ func TestStackMigrateMemorySharedDBAndValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MigrateUp(:memory:): %v", err)
 	}
-	if len(memUp) != 10 {
-		t.Fatalf("expected 10 memory scope results, got %d", len(memUp))
+	if len(memUp) != 11 {
+		t.Fatalf("expected 11 memory scope results, got %d", len(memUp))
 	}
 
 	sharedPath := filepath.Join(t.TempDir(), "shared.db")
@@ -163,20 +166,20 @@ func TestStackMigrateMemorySharedDBAndValidation(t *testing.T) {
 	}
 
 	sharedUp, err := stack.MigrateUpDB(ctx, db, sharedPath)
-	if err != nil || len(sharedUp) != 10 {
+	if err != nil || len(sharedUp) != 11 {
 		t.Fatalf("MigrateUpDB: len=%d err=%v", len(sharedUp), err)
 	}
 	statuses, err := stack.MigrateStatusDB(ctx, db)
-	if err != nil || len(statuses) != 10 {
+	if err != nil || len(statuses) != 11 {
 		t.Fatalf("MigrateStatusDB: len=%d err=%v", len(statuses), err)
 	}
 	for _, st := range statuses {
 		if !st.Applied {
-			t.Fatalf("expected all 10 scopes applied in shared DB, got %+v", st)
+			t.Fatalf("expected all 11 scopes applied in shared DB, got %+v", st)
 		}
 	}
 	sharedDown, err := stack.MigrateDownDB(ctx, db, sharedPath, 0, true)
-	if err != nil || len(sharedDown) != 10 {
+	if err != nil || len(sharedDown) != 11 {
 		t.Fatalf("MigrateDownDB: len=%d err=%v", len(sharedDown), err)
 	}
 	if _, err := stack.MigrateUpDB(ctx, db, sharedPath); err != nil {

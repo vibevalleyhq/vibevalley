@@ -73,3 +73,11 @@ sql:
         out: "internal/domain/pkm/sqlcgen"
         emit_empty_slices: true
         emit_prepared_queries: true
+  - engine: "sqlite"
+    queries: "internal/domain/gateway/queries.sql"
+    schema: "internal/domain/gateway/migrations"
+    gen:
+      go:
+        package: "sqlcgen"
+        out: "internal/domain/gateway/sqlcgen"
+        emit_empty_slices: true

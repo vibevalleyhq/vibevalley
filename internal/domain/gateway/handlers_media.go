@@ -1488,9 +1488,19 @@ func (h *Handler) handleMediaInputAdopt(w http.ResponseWriter, r *http.Request, 
 		kind = "video"
 	}
 	now := h.hub.nowMs()
+	inID := randomID("in")
+	blobPath := ""
+	if h.hub.sqlStore != nil && len(data) > 0 {
+		bp, bErr := h.hub.sqlStore.writeMediaBlob(inID, data)
+		if bErr != nil {
+			writeError(w, bErr, BizMediaRefused)
+			return
+		}
+		blobPath = bp
+	}
 	hash := att.ID
 	in := ProtoMediaInput{
-		ID:        randomID("in"),
+		ID:        inID,
 		Kind:      kind,
 		Name:      att.Name,
 		Mime:      att.Type,
@@ -1502,7 +1512,7 @@ func (h *Handler) handleMediaInputAdopt(w http.ResponseWriter, r *http.Request, 
 		CanDelete: true,
 	}
 	h.hub.mu.Lock()
-	h.hub.state.MediaInputs[in.ID] = &mediaInputRecord{ProtoMediaInput: in, Bytes: data}
+	h.hub.state.MediaInputs[in.ID] = &mediaInputRecord{ProtoMediaInput: in, BlobPath: blobPath, Bytes: data}
 	h.hub.mu.Unlock()
 	_ = h.hub.persist()
 	writeSuccess(w, in)
@@ -1610,9 +1620,19 @@ func (h *Handler) handleMediaInputContent(w http.ResponseWriter, r *http.Request
 		}
 		sum := sha256.Sum256(data)
 		hashHex := hex.EncodeToString(sum[:])
+		blobPath := ""
+		if h.hub.sqlStore != nil {
+			bp, bErr := h.hub.sqlStore.writeMediaBlob(id, data)
+			if bErr != nil {
+				writeError(w, bErr, BizMediaRefused)
+				return
+			}
+			blobPath = bp
+		}
 		h.hub.mu.Lock()
 		var updated ProtoMediaInput
 		if cur := h.hub.state.MediaInputs[id]; cur != nil {
+			cur.BlobPath = blobPath
 			cur.Bytes = data
 			cur.Size = int64(len(data))
 			cur.Phase = "ready"
@@ -1627,14 +1647,21 @@ func (h *Handler) handleMediaInputContent(w http.ResponseWriter, r *http.Request
 		rec := h.hub.state.MediaInputs[id]
 		var data []byte
 		var mimeType string
+		var blobPath string
 		if rec != nil {
 			data = rec.Bytes
+			blobPath = rec.BlobPath
 			mimeType = rec.Mime
 		}
 		h.hub.mu.RUnlock()
 		if rec == nil {
 			writeError(w, newBizError(BizMediaNotFound, "media input not found"), BizMediaNotFound)
 			return
+		}
+		if len(data) == 0 && blobPath != "" && h.hub.sqlStore != nil {
+			if diskData, rErr := h.hub.sqlStore.readMediaBlob(blobPath); rErr == nil {
+				data = diskData
+			}
 		}
 		total := int64(len(data))
 		w.Header().Set("Content-Type", firstNonEmpty(mimeType, "application/octet-stream"))
@@ -1720,6 +1747,9 @@ func (h *Handler) handleMediaSpeechStream(w http.ResponseWriter, r *http.Request
 	if h.handleOfflineSpeechStream(w, r, id) {
 		return
 	}
+	if h.runLiveSpeechStream(w, r, id) {
+		return
+	}
 	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"type":"done"}` + "\n"))
@@ -1761,6 +1791,14 @@ func (h *Handler) handleMediaImageCreate(w http.ResponseWriter, r *http.Request)
 		raw, oErr := h.handleOfflineImageCreate(r.Context(), req)
 		if oErr != nil {
 			writeError(w, oErr, BizMediaRefused)
+			return
+		}
+		writeSuccess(w, raw)
+		return
+	}
+	if raw, handled, lErr := h.runLiveImageCreate(r.Context(), req); handled {
+		if lErr != nil {
+			writeError(w, lErr, BizMediaRefused)
 			return
 		}
 		writeSuccess(w, raw)
@@ -1822,6 +1860,14 @@ func (h *Handler) handleMediaUnderstandingSubmit(w http.ResponseWriter, r *http.
 		writeSuccess(w, raw)
 		return
 	}
+	if raw, handled, lErr := h.runLiveUnderstandingSubmit(r.Context(), req, authorize); handled {
+		if lErr != nil {
+			writeError(w, lErr, BizMediaRefused)
+			return
+		}
+		writeSuccess(w, raw)
+		return
+	}
 	now := h.hub.nowMs()
 	raw, err := h.saveMediaJob("understanding", map[string]any{
 		"kind":             "understanding",
@@ -1871,6 +1917,14 @@ func (h *Handler) handleMediaSpeechCreate(w http.ResponseWriter, r *http.Request
 		raw, oErr := h.handleOfflineSpeechCreate(r.Context(), req)
 		if oErr != nil {
 			writeError(w, oErr, BizMediaRefused)
+			return
+		}
+		writeSuccess(w, raw)
+		return
+	}
+	if raw, handled, lErr := h.runLiveSpeechCreate(r.Context(), req); handled {
+		if lErr != nil {
+			writeError(w, lErr, BizMediaRefused)
 			return
 		}
 		writeSuccess(w, raw)
@@ -1982,6 +2036,16 @@ func (h *Handler) handleMediaJobAction(action string) http.HandlerFunc {
 			writeSuccess(w, json.RawMessage(raw))
 			return
 		}
+		if action == "start" {
+			if raw, handled, lErr := h.runLiveUnderstandingStart(r.Context(), req.ID); handled {
+				if lErr != nil {
+					writeError(w, lErr, BizMediaRefused)
+					return
+				}
+				writeSuccess(w, json.RawMessage(raw))
+				return
+			}
+		}
 		h.hub.mu.Lock()
 		rec := h.hub.state.MediaJobs[req.ID]
 		if rec == nil {
@@ -1991,10 +2055,20 @@ func (h *Handler) handleMediaJobAction(action string) http.HandlerFunc {
 		}
 		var m map[string]any
 		_ = json.Unmarshal(rec.Raw, &m)
-		if action == "cancel" {
+		switch action {
+		case "cancel":
 			m["phase"] = "canceled"
 			m["phaseText"] = "canceled"
 			m["canCancel"] = false
+			m["updatedAt"] = h.hub.nowMs()
+		case "release":
+			m["canRelease"] = false
+			if ri, ok := m["resultInput"].(map[string]any); ok {
+				if rid, _ := ri["id"].(string); rid != "" {
+					delete(h.hub.state.MediaInputs, rid)
+				}
+			}
+			m["resultInput"] = nil
 			m["updatedAt"] = h.hub.nowMs()
 		}
 		raw, _ := json.Marshal(m)

@@ -26,10 +26,12 @@ import (
 	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/channel"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/game"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/gateway"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/issue"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/memory"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/pkm"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/repo"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
 	domainwatch "github.com/vibevalleyhq/vibevalley/internal/domain/watch"
 	"github.com/vibevalleyhq/vibevalley/internal/durable/store"
 	"github.com/vibevalleyhq/vibevalley/internal/vault"
@@ -41,7 +43,7 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	// 1. Verify root sqlc.yaml covers all 10 SQL modules and matching .up.sql/.down.sql scripts.
+	// 1. Verify root sqlc.yaml covers all 11 SQL modules and matching .up.sql/.down.sql scripts.
 	sqlcBytes, err := os.ReadFile("sqlc.yaml")
 	if err != nil {
 		t.Fatalf("read root sqlc.yaml: %v", err)
@@ -69,6 +71,7 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 		"internal/domain/watch",
 		"internal/domain/memory",
 		"internal/domain/pkm",
+		"internal/domain/gateway",
 	}
 
 	configuredOutDirs := make(map[string]map[string]any, len(rawSQLBlocks))
@@ -102,7 +105,7 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 		if !exists {
 			t.Fatalf("sqlc.yaml missing SQL package %q", pkg)
 		}
-		if pkg == "internal/domain/memory" || pkg == "internal/domain/pkm" {
+		if pkg == "internal/domain/memory" || pkg == "internal/domain/pkm" || pkg == "internal/domain/gateway" {
 			if emitEmpty, _ := goMap["emit_empty_slices"].(bool); !emitEmpty {
 				t.Fatalf("sqlc.yaml for %q must set emit_empty_slices: true", pkg)
 			}
@@ -114,7 +117,7 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 		}
 	}
 
-	// 2. ParseFS and run full SQLite Up -> Status -> DownAll -> Up on all 10 MigrationsFS variables.
+	// 2. ParseFS and run full SQLite Up -> Status -> DownAll -> Up on all 11 MigrationsFS variables.
 	type moduleSpec struct {
 		scope            string
 		fsys             fs.FS
@@ -175,6 +178,24 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 			useVec:         true,
 			expectedTables: []string{"pkm_notes", "pkm_aliases", "pkm_blocks", "pkm_links", "pkm_notes_fts", "vector_storage", "_vec_pkm_vectors", "pkm_vectors"},
 		},
+		{
+			scope: "gateway",
+			fsys:  gateway.MigrationsFS,
+			expectedTables: []string{
+				"gateway_kv", "gateway_issue", "gateway_channel", "gateway_agent",
+				"gateway_template", "gateway_runtime", "gateway_cron", "gateway_artifact",
+				"gateway_library_item", "gateway_media_input", "gateway_media_job",
+				"gateway_pkm_page", "gateway_pkm_comment", "gateway_pkm_clip",
+				"gateway_session", "gateway_session_event", "gateway_request_key",
+			},
+		},
+	}
+	for _, fname := range []string{"migrations/0001_init.up.sql", "migrations/0001_init.down.sql"} {
+		gwBytes, gErr := fs.ReadFile(gateway.MigrationsFS, fname)
+		stkBytes, sErr := fs.ReadFile(stack.GatewayMigrationsFS(), fname)
+		if gErr != nil || sErr != nil || !bytes.Equal(gwBytes, stkBytes) {
+			t.Fatalf("gateway/stack migration %s mismatch: gErr=%v sErr=%v equal=%t", fname, gErr, sErr, bytes.Equal(gwBytes, stkBytes))
+		}
 	}
 
 	tmpMigDir := t.TempDir()
@@ -246,7 +267,7 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 		_ = db.Close()
 	}
 
-	// 3. Scan non-generated .go files in the 9 SQLite-only store packages for forbidden raw CREATE DDL.
+	// 3. Scan non-generated .go files in the 10 SQLite-only store packages for forbidden raw CREATE DDL.
 	sqliteOnlyPackages := []string{
 		"internal/durable/store",
 		"internal/domain/agent",
@@ -257,6 +278,7 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 		"internal/domain/watch",
 		"internal/domain/memory",
 		"internal/domain/pkm",
+		"internal/domain/gateway",
 	}
 	forbiddenDDL := []string{"CREATE TABLE", "CREATE VIRTUAL TABLE", "CREATE TRIGGER"}
 	for _, pkgDir := range sqliteOnlyPackages {
@@ -359,22 +381,22 @@ secrets:
 
 	// migrate up -> status -> down --all -> up (using db_path from vibevalley.yaml)
 	migUpOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "up")
-	if err != nil || strings.Count(migUpOut, "applied=1") != 10 {
+	if err != nil || strings.Count(migUpOut, "applied=1") != 11 {
 		t.Fatalf("vibe-server migrate up failed: err=%v out=%q", err, migUpOut)
 	}
 
 	migStatusOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "status")
-	if err != nil || strings.Count(migStatusOut, "applied=true") != 10 {
+	if err != nil || strings.Count(migStatusOut, "applied=true") != 11 {
 		t.Fatalf("vibe-server migrate status failed: err=%v out=%q", err, migStatusOut)
 	}
 
 	migDownOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "down", "--all")
-	if err != nil || strings.Count(migDownOut, "reverted=1") != 10 {
+	if err != nil || strings.Count(migDownOut, "reverted=1") != 11 {
 		t.Fatalf("vibe-server migrate down --all failed: err=%v out=%q", err, migDownOut)
 	}
 
 	migReUpOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "up")
-	if err != nil || strings.Count(migReUpOut, "applied=1") != 10 {
+	if err != nil || strings.Count(migReUpOut, "applied=1") != 11 {
 		t.Fatalf("vibe-server migrate re-up failed: err=%v out=%q", err, migReUpOut)
 	}
 

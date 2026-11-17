@@ -135,6 +135,9 @@ type Stack struct {
 	Tokens  *vault.TokenService
 	Egress  *vault.EgressProxy
 
+	GatewayDB    *sql.DB
+	MediaBlobDir string
+
 	Channels *channel.Store
 	Watch    *domainwatch.Service
 	Issues   *issue.Service
@@ -177,6 +180,9 @@ type Stack struct {
 
 	clientLinksMu sync.Mutex
 	clientLinks   map[*link.Link]struct{}
+
+	closeHooksMu sync.Mutex
+	closeHooks   []func()
 
 	urlMu sync.RWMutex
 }
@@ -403,6 +409,32 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 		return nil, fmt.Errorf("stack: media store: %w", err)
 	}
 
+	mediaBlobDir := filepath.Join(workRoot, "media-blobs")
+	if !isMem {
+		if mediaDir != "" {
+			mediaBlobDir = filepath.Join(mediaDir, "blobs")
+		} else {
+			mediaBlobDir = filepath.Join(filepath.Dir(dbPath), "media-blobs")
+		}
+	}
+	if err := os.MkdirAll(mediaBlobDir, 0o755); err != nil {
+		return nil, fmt.Errorf("stack: mkdir media blobs: %w", err)
+	}
+	s.MediaBlobDir = mediaBlobDir
+
+	gwDSN := ":memory:"
+	if !isMem {
+		gwDSN = sidecarDBPath(dbPath, "gateway")
+	}
+	gwDB, err := openScopeMigrationDB(ctx, gwDSN, isMem, false)
+	if err != nil {
+		return nil, fmt.Errorf("stack: open gateway db: %w", err)
+	}
+	s.GatewayDB = gwDB
+	if _, err := migrateScopeUp(ctx, gwDB, "gateway", GatewayMigrationsFS(), gwDSN); err != nil {
+		return nil, fmt.Errorf("stack: migrate gateway db: %w", err)
+	}
+
 	// Agents, Repositories, PKM, and Memory domain stores.
 	if isMem {
 		s.Agents = agent.NewMemoryRegistry(agent.WithClock(clk))
@@ -578,6 +610,29 @@ func New(ctx context.Context, cfg Config) (*Stack, error) {
 			return target, strings.TrimSpace(d.URL) != "" && (d.Via == "own" || strings.TrimSpace(d.Key) != "")
 		},
 		MOSSKey: func() (string, bool) {
+			if fp := strings.TrimSpace(s.Setting.FilePath()); fp != "" {
+				if raw, rErr := os.ReadFile(fp); rErr == nil {
+					var parsed struct {
+						Providers *struct {
+							Connections []struct {
+								Adapter string `json:"adapter"`
+								Enabled bool   `json:"enabled"`
+								Key     string `json:"key"`
+							} `json:"connections"`
+						} `json:"providers"`
+					}
+					if json.Unmarshal(raw, &parsed) == nil && parsed.Providers != nil {
+						for _, c := range parsed.Providers.Connections {
+							if c.Adapter == "moss" && c.Enabled && strings.TrimSpace(c.Key) != "" {
+								return c.Key, true
+							}
+						}
+					}
+				}
+			}
+			if envKey := strings.TrimSpace(os.Getenv("MOSS_API_KEY")); envKey != "" {
+				return envKey, true
+			}
 			st := s.Setting.ProviderStatus()
 			for _, c := range st.Connections {
 				if c.Adapter == "moss" && c.Enabled && c.Key.Source != nil {
@@ -751,6 +806,7 @@ func (s *Stack) Close() error {
 	s.closeOnce.Do(func() {
 		s.closed.Store(true)
 		s.bgCancel()
+		s.runCloseHooks()
 		s.closeAllClientLinks()
 		if s.Machines != nil {
 			s.Machines.closeAll()
@@ -805,6 +861,9 @@ func (s *Stack) Close() error {
 		if s.VaultDB != nil {
 			closeErr = errors.Join(closeErr, s.VaultDB.Close())
 		}
+		if s.GatewayDB != nil {
+			closeErr = errors.Join(closeErr, s.GatewayDB.Close())
+		}
 		if s.ownsWork && s.workRoot != "" {
 			closeErr = errors.Join(closeErr, os.RemoveAll(s.workRoot))
 		}
@@ -817,6 +876,40 @@ func (s *Stack) HomeDir() string { return s.homeDir }
 
 // Version returns the server/platform build version string.
 func (s *Stack) Version() string { return s.version }
+
+// BackgroundContext returns the stack-scoped background context cancelled on Close.
+func (s *Stack) BackgroundContext() context.Context {
+	if s == nil {
+		return context.Background()
+	}
+	return s.bgCtx
+}
+
+// RegisterCloseHook schedules fn to run during Stack.Close (before databases close).
+func (s *Stack) RegisterCloseHook(fn func()) {
+	if s == nil || fn == nil {
+		return
+	}
+	if s.closed.Load() {
+		fn()
+		return
+	}
+	s.closeHooksMu.Lock()
+	s.closeHooks = append(s.closeHooks, fn)
+	s.closeHooksMu.Unlock()
+}
+
+func (s *Stack) runCloseHooks() {
+	s.closeHooksMu.Lock()
+	hooks := s.closeHooks
+	s.closeHooks = nil
+	s.closeHooksMu.Unlock()
+	for i := len(hooks) - 1; i >= 0; i-- {
+		if hooks[i] != nil {
+			hooks[i]()
+		}
+	}
+}
 
 // WorkRoot returns the workspace root path configured or provisioned for this stack.
 func (s *Stack) WorkRoot() string { return s.workRoot }

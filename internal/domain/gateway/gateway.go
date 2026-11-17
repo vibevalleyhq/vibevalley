@@ -2,23 +2,34 @@ package gateway
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/vibevalleyhq/vibevalley/internal/domain/media"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/stack"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/user"
+	"github.com/vibevalleyhq/vibevalley/internal/domain/voice"
 )
 
 // Option configures a gateway Handler.
 type Option func(*handlerConfig)
 
 type handlerConfig struct {
-	webDist string
-	bindLAN bool
+	webDist         string
+	bindLAN         bool
+	overlayDB       *sql.DB
+	mediaBlobDir    string
+	cronInterval    time.Duration
+	mediaRunner     *media.VendorRunner
+	mediaConfigs    map[string]media.VendorConfig
+	realtimeConfigs map[string]voice.RelayConfig
 }
 
 // WithWebDist enables built SPA hosting from webDist when non-empty.
@@ -35,6 +46,50 @@ func WithBindLAN(bind bool) Option {
 	}
 }
 
+// WithOverlayDB overrides the SQLite *sql.DB and media blob directory used for gateway overlay persistence.
+func WithOverlayDB(db *sql.DB, mediaBlobDir string) Option {
+	return func(c *handlerConfig) {
+		c.overlayDB = db
+		c.mediaBlobDir = strings.TrimSpace(mediaBlobDir)
+	}
+}
+
+// WithCronTickInterval configures the background cron scheduler polling interval.
+func WithCronTickInterval(d time.Duration) Option {
+	return func(c *handlerConfig) {
+		if d > 0 {
+			c.cronInterval = d
+		}
+	}
+}
+
+// WithMediaVendorRunner sets an explicit media.VendorRunner used when VIBEVALLEY_TEST_RUNTIMES != "1".
+func WithMediaVendorRunner(r *media.VendorRunner) Option {
+	return func(c *handlerConfig) {
+		c.mediaRunner = r
+	}
+}
+
+// WithMediaVendorConfig configures a media.VendorConfig for a specific media capability ("image", "speech", "understanding").
+func WithMediaVendorConfig(use string, cfg media.VendorConfig) Option {
+	return func(c *handlerConfig) {
+		if c.mediaConfigs == nil {
+			c.mediaConfigs = make(map[string]media.VendorConfig)
+		}
+		c.mediaConfigs[strings.TrimSpace(use)] = cfg
+	}
+}
+
+// WithRealtimeRelayConfig configures an upstream voice.RelayConfig for "live" or "vision" WebSocket proxying.
+func WithRealtimeRelayConfig(kind string, cfg voice.RelayConfig) Option {
+	return func(c *handlerConfig) {
+		if c.realtimeConfigs == nil {
+			c.realtimeConfigs = make(map[string]voice.RelayConfig)
+		}
+		c.realtimeConfigs[strings.TrimSpace(kind)] = cfg
+	}
+}
+
 type postHandler func(w http.ResponseWriter, r *http.Request, caller user.Caller)
 
 // Handler serves the complete packages/protocol HTTP/SSE control plane, /mcp, /v1/chat/completions,
@@ -44,6 +99,22 @@ type Handler struct {
 	hub     *gatewayHub
 	webDist string
 	posts   map[string]postHandler
+
+	cronInterval  time.Duration
+	cronStartOnce sync.Once
+	cronCancelMu  sync.Mutex
+	cronCancel    context.CancelFunc
+	cronWG        sync.WaitGroup
+
+	mediaRunner     *media.VendorRunner
+	mediaConfigs    map[string]media.VendorConfig
+	realtimeConfigs map[string]voice.RelayConfig
+
+	connRoutesMu sync.Mutex
+	connRoutes   map[string]*connectorReplyRoute
+
+	unsubMu      sync.Mutex
+	unsubChannel func()
 }
 
 var htmlTagRe = regexp.MustCompile(`(?i)<html[^>]*>`)
@@ -58,11 +129,28 @@ func NewHandler(st *stack.Stack, opts ...Option) *Handler {
 	}
 
 	h := &Handler{
-		st:      st,
-		hub:     newGatewayHub(st),
-		webDist: cfg.webDist,
+		st:              st,
+		hub:             newGatewayHub(st, cfg.overlayDB, cfg.mediaBlobDir),
+		webDist:         cfg.webDist,
+		cronInterval:    cfg.cronInterval,
+		mediaRunner:     cfg.mediaRunner,
+		mediaConfigs:    cfg.mediaConfigs,
+		realtimeConfigs: cfg.realtimeConfigs,
+		connRoutes:      make(map[string]*connectorReplyRoute),
 	}
 	h.posts = h.buildPostRoutes()
+	h.setupConnectorBridging()
+
+	var parentCtx context.Context
+	if st != nil {
+		parentCtx = st.BackgroundContext()
+		st.RegisterCloseHook(func() {
+			_ = h.Close()
+		})
+	} else {
+		parentCtx = context.Background()
+	}
+	h.Start(parentCtx)
 
 	if cfg.bindLAN && st != nil && st.LAN != nil {
 		st.SetLANUpstream(h)
@@ -148,15 +236,21 @@ func (h *Handler) serveAPIv1(w http.ResponseWriter, r *http.Request, cleanPath s
 	case "/api/v1/events":
 		h.handleEventsSSE(w, r)
 		return
+	case "/api/v1/voice/realtime":
+		h.handleVoiceRealtimeWS(w, r, "live")
+		return
 	case "/api/v1/voice/moss/line":
-		h.handleOfflineVoiceWS(w, r, "live")
+		h.handleVoiceRealtimeWS(w, r, "live")
 		return
 	case "/api/v1/voice/vision/line":
-		h.handleOfflineVoiceWS(w, r, "vision")
+		h.handleVoiceRealtimeWS(w, r, "vision")
 		return
 	}
 
 	switch {
+	case strings.HasPrefix(cleanPath, "/api/v1/connector/webhook/") && r.Method == http.MethodPost:
+		h.handleConnectorWebhook(w, r, cleanPath)
+		return
 	case strings.HasPrefix(cleanPath, "/api/v1/attachment/") && r.Method != http.MethodPost:
 		h.handleAttachmentGet(w, r)
 		return
@@ -388,6 +482,7 @@ func (h *Handler) buildPostRoutes() map[string]postHandler {
 		"/api/v1/cron/update":        noCaller(h.handleCronUpdate),
 		"/api/v1/cron/delete":        noCaller(h.handleCronDelete),
 		"/api/v1/cron/previewDelete": noCaller(h.handleCronPreviewDelete),
+		"/api/v1/cron/run":           noCaller(h.handleCronRun),
 
 		// Orchestrator
 		"/api/v1/orchestrator/open":        noCaller(h.handleOrchestratorOpen),

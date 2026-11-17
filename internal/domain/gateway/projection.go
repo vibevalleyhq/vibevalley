@@ -1557,13 +1557,20 @@ func (h *gatewayHub) buildSpaceState(ctx context.Context) ProtoSpaceState {
 				continue
 			}
 			var lastRun *int64
-			if c.LastRunAtMs > 0 {
-				lr := c.LastRunAtMs
+			lr := c.LastRunAtMs
+			if cm != nil && cm.LastRunAtMs > lr {
+				lr = cm.LastRunAtMs
+			}
+			if lr > 0 {
 				lastRun = &lr
 			}
 			whenRaw := json.RawMessage(fmt.Sprintf(`{"kind":"cron","expr":%q}`, c.Expr))
 			if cm != nil && len(cm.When) > 0 {
 				whenRaw = cm.When
+			}
+			enabled := c.Enabled
+			if cm != nil && cm.Enabled != nil {
+				enabled = *cm.Enabled
 			}
 			chName := defaultChannelID
 			if cm != nil && cm.Channel != "" {
@@ -1592,7 +1599,7 @@ func (h *gatewayHub) buildSpaceState(ctx context.Context) ProtoSpaceState {
 				Repo:    repoID,
 				When:    whenRaw,
 				TZ:      tz,
-				Enabled: c.Enabled,
+				Enabled: enabled,
 				Created: c.NextRunAtMs,
 				LastRun: lastRun,
 				By:      by,

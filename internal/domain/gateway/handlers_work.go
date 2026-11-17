@@ -12,6 +12,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/vibevalleyhq/vibevalley/internal/domain/agent"
 	"github.com/vibevalleyhq/vibevalley/internal/domain/game"
@@ -40,16 +41,33 @@ func (h *Handler) handleGithubRefresh(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handler) probeGitHub() ProtoGitHubStatus {
-	nowMs := h.hub.nowMs()
-	res := ProtoGitHubStatus{
-		Installed: false,
-		LoggedIn:  false,
-		Reason:    "gh CLI not installed",
-		CheckedAt: nowMs,
-	}
-	if _, err := exec.LookPath("gh"); err == nil {
-		res.Installed = true
-		res.Reason = "not logged in"
+	var res ProtoGitHubStatus
+	if offlineMediaEnabled() {
+		nowMs := h.hub.nowMs()
+		res = ProtoGitHubStatus{
+			Installed: false,
+			LoggedIn:  false,
+			Reason:    "gh CLI not installed",
+			CheckedAt: nowMs,
+		}
+		if _, err := exec.LookPath("gh"); err == nil {
+			res.Installed = true
+			res.Reason = "not logged in"
+		}
+	} else {
+		workDir := ""
+		if h.st != nil {
+			workDir = h.st.WorkRoot()
+		}
+		cliSt := repo.ProbeGitHubCLI(context.Background(), workDir)
+		res = ProtoGitHubStatus{
+			Installed: cliSt.Installed,
+			Version:   cliSt.Version,
+			LoggedIn:  cliSt.LoggedIn,
+			Account:   cliSt.Account,
+			Reason:    cliSt.Reason,
+			CheckedAt: cliSt.CheckedAt,
+		}
 	}
 	h.hub.mu.Lock()
 	cp := res
@@ -173,16 +191,83 @@ func (h *Handler) handleRepoPRSubmit(w http.ResponseWriter, r *http.Request, cal
 		return
 	}
 	var req struct {
-		Cwd    string `json:"cwd"`
-		Branch string `json:"branch"`
-		SHA    string `json:"sha"`
-		Base   string `json:"base"`
-		Title  string `json:"title"`
-		Body   string `json:"body"`
-		DryRun bool   `json:"dryRun"`
+		Cwd     string `json:"cwd"`
+		Branch  string `json:"branch"`
+		SHA     string `json:"sha"`
+		Base    string `json:"base"`
+		Title   string `json:"title"`
+		Body    string `json:"body"`
+		DryRun  bool   `json:"dryRun"`
+		Draft   bool   `json:"draft"`
+		IssueID string `json:"issueId"`
 	}
 	if err := decodeJSONBody(w, r, &req, true); err != nil {
 		writeError(w, err, BizInvalidInput)
+		return
+	}
+	cwd := strings.TrimSpace(req.Cwd)
+	branch := strings.TrimSpace(req.Branch)
+	base := firstNonEmpty(req.Base, "main")
+	if req.IssueID != "" && h.st != nil && h.st.Issues != nil {
+		if iss, err := h.st.Issues.GetIssue(r.Context(), req.IssueID); err == nil {
+			h.hub.mu.RLock()
+			io := h.hub.state.Issues[iss.ID]
+			if io != nil {
+				if cwd == "" {
+					cwd = io.WorktreePath
+				}
+				if branch == "" {
+					branch = io.Branch
+				}
+				if req.Base == "" && io.BaseBranch != "" {
+					base = io.BaseBranch
+				}
+			}
+			h.hub.mu.RUnlock()
+			if cwd == "" && iss.RepoID != "" && h.st.Repos != nil {
+				if rp, rErr := h.st.Repos.GetRepo(r.Context(), iss.RepoID); rErr == nil {
+					cwd = rp.RootPath
+				}
+			}
+		}
+	}
+	isGitDir := false
+	if cwd != "" {
+		if _, err := os.Stat(filepath.Join(cwd, ".git")); err == nil {
+			isGitDir = true
+		}
+	}
+	if !offlineMediaEnabled() && isGitDir {
+		res, err := repo.SubmitPullRequest(r.Context(), repo.PRRequest{
+			RepoPath: cwd,
+			WorkDir:  cwd,
+			Branch:   branch,
+			Base:     base,
+			Title:    req.Title,
+			Body:     req.Body,
+			Draft:    req.Draft,
+			DryRun:   req.DryRun,
+		})
+		if err != nil {
+			writeError(w, err, BizRepoRefused)
+			return
+		}
+		check := "passed"
+		if res.DryRun {
+			check = "preview"
+		}
+		writeSuccess(w, map[string]any{
+			"platform":   "github",
+			"repository": filepath.Base(cwd),
+			"branch":     firstNonEmpty(res.Branch, branch),
+			"sha":        firstNonEmpty(res.HeadSHA, req.SHA),
+			"base":       firstNonEmpty(res.Base, base),
+			"check":      check,
+			"pushed":     res.Pushed,
+			"url":        res.URL,
+			"number":     res.Number,
+			"state":      "open",
+		})
 		return
 	}
 	check := "passed"
@@ -191,10 +276,10 @@ func (h *Handler) handleRepoPRSubmit(w http.ResponseWriter, r *http.Request, cal
 	}
 	writeSuccess(w, map[string]any{
 		"platform":   "github",
-		"repository": filepath.Base(req.Cwd),
-		"branch":     req.Branch,
+		"repository": filepath.Base(cwd),
+		"branch":     branch,
 		"sha":        req.SHA,
-		"base":       firstNonEmpty(req.Base, "main"),
+		"base":       base,
 		"check":      check,
 		"pushed":     !req.DryRun,
 		"state":      "open",
@@ -214,10 +299,26 @@ func (h *Handler) handleRepoLanguageList(w http.ResponseWriter, r *http.Request)
 		writeError(w, err, BizRepoNotFound)
 		return
 	}
+	languages := []any{}
+	if strings.TrimSpace(rp.RootPath) != "" {
+		if st, sErr := os.Stat(rp.RootPath); sErr == nil && st.IsDir() {
+			if scan, scanErr := repo.ScanLanguages(r.Context(), rp.RootPath); scanErr == nil {
+				for _, l := range scan.Languages {
+					languages = append(languages, map[string]any{
+						"name":     l.Name,
+						"files":    l.Files,
+						"code":     l.Code,
+						"comments": l.Comments,
+						"blanks":   l.Blanks,
+					})
+				}
+			}
+		}
+	}
 	writeSuccess(w, map[string]any{
 		"repo":      firstNonEmpty(rp.Name, rp.ID),
 		"at":        h.hub.nowMs(),
-		"languages": []any{},
+		"languages": languages,
 	})
 }
 
@@ -262,12 +363,28 @@ func (h *Handler) handleRepoActivityGet(w http.ResponseWriter, r *http.Request) 
 		writeError(w, err, BizRepoNotFound)
 		return
 	}
+	days := []repo.DayCount{}
+	authors := []repo.AuthorCount{}
+	total := 0
+	if strings.TrimSpace(rp.RootPath) != "" {
+		if _, sErr := os.Stat(filepath.Join(rp.RootPath, ".git")); sErr == nil {
+			if act, actErr := repo.ScanActivity(r.Context(), rp.RootPath, 365); actErr == nil {
+				if len(act.Days) > 0 {
+					days = act.Days
+				}
+				if len(act.Authors) > 0 {
+					authors = act.Authors
+				}
+				total = act.TotalCommits
+			}
+		}
+	}
 	writeSuccess(w, map[string]any{
 		"repo":    firstNonEmpty(rp.Name, rp.ID),
 		"at":      h.hub.nowMs(),
-		"days":    []any{},
-		"authors": []any{},
-		"total":   0,
+		"days":    days,
+		"authors": authors,
+		"total":   total,
 	})
 }
 
@@ -2276,19 +2393,35 @@ func (h *Handler) handleCronCreate(w http.ResponseWriter, r *http.Request) {
 		Enabled:    true,
 	}
 	applyCronWhen(req.When, &schedIn)
+	if schedIn.Kind == issue.CronExpr {
+		if _, err := ComputeNextRun(schedIn.Expr, tz, time.UnixMilli(h.hub.nowMs())); err != nil {
+			writeError(w, newBizError(BizCronRefused, err.Error()), BizCronRefused)
+			return
+		}
+	}
 	sched, err := h.st.Issues.CreateCron(r.Context(), schedIn)
 	if err != nil {
 		writeError(w, err, BizCronRefused)
 		return
 	}
+	nowMs := h.hub.nowMs()
+	nextMs, _ := computeCronScheduleNextRunMs(sched, tz, time.UnixMilli(nowMs))
+	if nextMs <= 0 {
+		nextMs = sched.NextRunAtMs
+	}
+	enabledVal := sched.Enabled
 	h.hub.mu.Lock()
 	h.hub.state.Crons[sched.ID] = &cronOverlay{
-		Channel: chName,
-		Agent:   req.Agent,
-		Repo:    req.Repo,
-		TZ:      tz,
-		By:      "user",
-		When:    req.When,
+		Name:        sched.Name,
+		Text:        sched.Prompt,
+		Channel:     chName,
+		Agent:       req.Agent,
+		Repo:        req.Repo,
+		TZ:          tz,
+		By:          "user",
+		Enabled:     &enabledVal,
+		NextRunAtMs: nextMs,
+		When:        req.When,
 	}
 	h.hub.mu.Unlock()
 	_ = h.hub.persist()
@@ -2304,7 +2437,7 @@ func (h *Handler) handleCronCreate(w http.ResponseWriter, r *http.Request) {
 		When:    req.When,
 		TZ:      tz,
 		Enabled: sched.Enabled,
-		Created: h.hub.nowMs(),
+		Created: nowMs,
 		By:      "user",
 		Pending: false,
 	}
@@ -2331,13 +2464,17 @@ func (h *Handler) handleCronList(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		var lastRun *int64
-		if c.LastRunAtMs > 0 {
-			lr := c.LastRunAtMs
+		lr := c.LastRunAtMs
+		if cm != nil && cm.LastRunAtMs > lr {
+			lr = cm.LastRunAtMs
+		}
+		if lr > 0 {
 			lastRun = &lr
 		}
 		when := json.RawMessage(fmt.Sprintf(`{"kind":"cron","expr":%q}`, c.Expr))
 		chName := defaultChannelID
 		tz := "UTC"
+		enabled := c.Enabled
 		var agentID, repoID string
 		if cm != nil {
 			if len(cm.When) > 0 {
@@ -2345,6 +2482,9 @@ func (h *Handler) handleCronList(w http.ResponseWriter, r *http.Request) {
 			}
 			chName = firstNonEmpty(cm.Channel, chName)
 			tz = firstNonEmpty(cm.TZ, tz)
+			if cm.Enabled != nil {
+				enabled = *cm.Enabled
+			}
 			agentID = cm.Agent
 			repoID = cm.Repo
 		}
@@ -2357,8 +2497,8 @@ func (h *Handler) handleCronList(w http.ResponseWriter, r *http.Request) {
 			Repo:    repoID,
 			When:    when,
 			TZ:      tz,
-			Enabled: c.Enabled,
-			Created: c.NextRunAtMs,
+			Enabled: enabled,
+			Created: c.CreatedAtMs,
 			LastRun: lastRun,
 			By:      "user",
 			Pending: false,
@@ -2377,10 +2517,28 @@ func (h *Handler) handleCronUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Enabled != nil {
-		if _, err := h.st.Issues.SetCronEnabled(r.Context(), req.ID, *req.Enabled); err != nil {
+		updated, err := h.st.Issues.SetCronEnabled(r.Context(), req.ID, *req.Enabled)
+		if err != nil {
 			writeError(w, err, BizCronNotFound)
 			return
 		}
+		h.hub.mu.Lock()
+		cm := h.hub.state.Crons[req.ID]
+		if cm == nil {
+			cm = &cronOverlay{Channel: firstNonEmpty(updated.ChannelID, defaultChannelID), TZ: firstNonEmpty(updated.Timezone, "UTC"), By: "user"}
+			h.hub.state.Crons[req.ID] = cm
+		}
+		en := *req.Enabled
+		cm.Enabled = &en
+		if en {
+			if nextMs, nErr := computeCronScheduleNextRunMs(updated, cm.TZ, time.UnixMilli(h.hub.nowMs())); nErr == nil {
+				cm.NextRunAtMs = nextMs
+			}
+		} else {
+			cm.NextRunAtMs = 0
+		}
+		h.hub.mu.Unlock()
+		_ = h.hub.persist()
 	}
 	h.hub.notifyAllState()
 	writeVoid(w)

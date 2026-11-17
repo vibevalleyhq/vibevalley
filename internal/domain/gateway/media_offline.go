@@ -243,8 +243,13 @@ func (h *Handler) registerResultMediaInput(jobKind, name, mime string, data []by
 	sum := sha256.Sum256(data)
 	hashHex := hex.EncodeToString(sum[:])
 	now := h.hub.nowMs()
+	inID := randomID("in")
+	blobPath := ""
+	if h.hub.sqlStore != nil && len(data) > 0 {
+		blobPath, _ = h.hub.sqlStore.writeMediaBlob(inID, data)
+	}
 	in := ProtoMediaInput{
-		ID:        randomID("in"),
+		ID:        inID,
 		Kind:      jobKind,
 		Name:      name,
 		Mime:      mime,
@@ -256,7 +261,7 @@ func (h *Handler) registerResultMediaInput(jobKind, name, mime string, data []by
 		CanDelete: false,
 	}
 	h.hub.mu.Lock()
-	h.hub.state.MediaInputs[in.ID] = &mediaInputRecord{ProtoMediaInput: in, Bytes: data}
+	h.hub.state.MediaInputs[in.ID] = &mediaInputRecord{ProtoMediaInput: in, BlobPath: blobPath, Bytes: data}
 	h.hub.mu.Unlock()
 	return map[string]any{
 		"id":   in.ID,
@@ -812,8 +817,13 @@ func (h *Handler) registerResultMediaInputUnlocked(name, mime string, data []byt
 	sum := sha256.Sum256(data)
 	hashHex := hex.EncodeToString(sum[:])
 	now := h.hub.nowMs()
+	inID := randomID("in")
+	blobPath := ""
+	if h.hub.sqlStore != nil && len(data) > 0 {
+		blobPath, _ = h.hub.sqlStore.writeMediaBlob(inID, data)
+	}
 	in := ProtoMediaInput{
-		ID:        randomID("in"),
+		ID:        inID,
 		Kind:      "audio",
 		Name:      name,
 		Mime:      mime,
@@ -824,7 +834,7 @@ func (h *Handler) registerResultMediaInputUnlocked(name, mime string, data []byt
 		ExpiresAt: now + 3600_000,
 		CanDelete: false,
 	}
-	h.hub.state.MediaInputs[in.ID] = &mediaInputRecord{ProtoMediaInput: in, Bytes: data}
+	h.hub.state.MediaInputs[in.ID] = &mediaInputRecord{ProtoMediaInput: in, BlobPath: blobPath, Bytes: data}
 	return map[string]any{
 		"id":   in.ID,
 		"kind": in.Kind,
