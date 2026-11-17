@@ -58,11 +58,11 @@ func isolatedVibeEnv(vibeHome string) []string {
 }
 
 func TestVibeServerSubprocessReadyJSONAndMachineConnect(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-
 	serverBin := buildGoBinary(t, "./", "vibe-server")
 	machineBin := buildGoBinary(t, "../vibe-machine", "vibe-machine")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
 
 	tmp := t.TempDir()
 	dbPath := filepath.Join(tmp, "srv.db")
@@ -214,7 +214,9 @@ connected:
 }
 
 func TestVibeServerChordWatchCatchupMachineEgressAndPreview(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	machineBin := buildGoBinary(t, "../vibe-machine", "vibe-machine")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	tmp := t.TempDir()
@@ -349,7 +351,6 @@ func TestVibeServerChordWatchCatchupMachineEgressAndPreview(t *testing.T) {
 caughtUp:
 
 	// 2. Real machine binary connecting to /machine/ws + lazy lease + exec + output harvest.
-	machineBin := buildGoBinary(t, "../vibe-machine", "vibe-machine")
 	machCmd := exec.CommandContext(ctx, machineBin,
 		"--server", "ws://"+srv.Addr()+"/machine/ws",
 		"--machine-id", "mach-srv-exec",

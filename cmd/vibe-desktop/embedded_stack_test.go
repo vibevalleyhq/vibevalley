@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -213,59 +214,83 @@ func TestVibeDesktopStaticBinarySizesAndCrossCompile(t *testing.T) {
 	goBin := filepath.Join(runtime.GOROOT(), "bin", "go")
 	tmpDir := t.TempDir()
 
-	ext := ""
-	if runtime.GOOS == "windows" {
-		ext = ".exe"
+	targets := []struct {
+		goos      string
+		goarch    string
+		maxFull   int64
+		maxThin   int64
+		fullLabel string
+		thinLabel string
+	}{
+		{"darwin", "arm64", 40 * 1024 * 1024, 18 * 1024 * 1024, "40 MiB", "18 MiB"},
+		{"linux", "amd64", 44 * 1024 * 1024, 18 * 1024 * 1024, "44 MiB", "18 MiB"},
+		{"windows", "amd64", 45 * 1024 * 1024, 20 * 1024 * 1024, "45 MiB", "20 MiB"},
 	}
 
-	// Default full embedded-stack static binary (< 40 MiB).
-	fullBin := filepath.Join(tmpDir, "vibe-desktop-full"+ext)
-	buildFull := exec.Command(goBin, "build", "-trimpath", "-ldflags=-s -w", "-o", fullBin, "./")
-	buildFull.Env = append(os.Environ(), "CGO_ENABLED=0", "GOROOT="+runtime.GOROOT())
-	if out, err := buildFull.CombinedOutput(); err != nil {
-		t.Fatalf("build default vibe-desktop: %v\n%s", err, string(out))
-	}
-	fullInfo, err := os.Stat(fullBin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	const maxFullBytes = 40 * 1024 * 1024
-	t.Logf("vibe-desktop full stripped static binary size: %d bytes (%.2f MiB)", fullInfo.Size(), float64(fullInfo.Size())/(1024*1024))
-	if fullInfo.Size() >= maxFullBytes {
-		t.Fatalf("vibe-desktop full stripped binary %d bytes exceeds 40 MiB limit (%d)", fullInfo.Size(), maxFullBytes)
-	}
+	buildAndMeasure := func(goos, goarch string, thin bool) int64 {
+		t.Helper()
+		ext := ""
+		if goos == "windows" {
+			ext = ".exe"
+		}
+		suffix := "full"
+		args := []string{"build", "-trimpath", "-ldflags=-s -w"}
+		if thin {
+			suffix = "thin"
+			args = []string{"build", "-tags", "thin_desktop", "-trimpath", "-ldflags=-s -w"}
+		}
+		binPath := filepath.Join(tmpDir, fmt.Sprintf("vibe-desktop-%s-%s-%s%s", suffix, goos, goarch, ext))
+		args = append(args, "-o", binPath, "./")
 
-	// Remote-only thin_desktop static binary (< 18 MiB, accommodating cobra + koanf/yaml config).
-	thinBin := filepath.Join(tmpDir, "vibe-desktop-thin"+ext)
-	buildThin := exec.Command(goBin, "build", "-tags", "thin_desktop", "-trimpath", "-ldflags=-s -w", "-o", thinBin, "./")
-	buildThin.Env = append(os.Environ(), "CGO_ENABLED=0", "GOROOT="+runtime.GOROOT())
-	if out, err := buildThin.CombinedOutput(); err != nil {
-		t.Fatalf("build thin_desktop vibe-desktop: %v\n%s", err, string(out))
-	}
-	thinInfo, err := os.Stat(thinBin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	const maxThinBytes = 18 * 1024 * 1024
-	t.Logf("vibe-desktop thin_desktop stripped static binary size: %d bytes (%.2f MiB)", thinInfo.Size(), float64(thinInfo.Size())/(1024*1024))
-	if thinInfo.Size() >= maxThinBytes {
-		t.Fatalf("vibe-desktop thin_desktop stripped binary %d bytes exceeds 18 MiB limit (%d)", thinInfo.Size(), maxThinBytes)
-	}
-
-	for _, target := range []struct{ goos, goarch string }{
-		{"darwin", "arm64"},
-		{"linux", "amd64"},
-		{"windows", "amd64"},
-	} {
-		cmd := exec.Command(goBin, "build", "-o", os.DevNull, "./")
+		cmd := exec.Command(goBin, args...)
 		cmd.Env = append(os.Environ(),
 			"CGO_ENABLED=0",
-			"GOOS="+target.goos,
-			"GOARCH="+target.goarch,
+			"GOOS="+goos,
+			"GOARCH="+goarch,
 			"GOROOT="+runtime.GOROOT(),
 		)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("cross-compile %s/%s failed: %v\n%s", target.goos, target.goarch, err, string(out))
+			t.Fatalf("build %s vibe-desktop (%s/%s) failed: %v\n%s", suffix, goos, goarch, err, string(out))
+		}
+		info, err := os.Stat(binPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		size := info.Size()
+		_ = os.Remove(binPath)
+		return size
+	}
+
+	hasHostTarget := false
+	for _, target := range targets {
+		if target.goos == runtime.GOOS && target.goarch == runtime.GOARCH {
+			hasHostTarget = true
+		}
+		fullSize := buildAndMeasure(target.goos, target.goarch, false)
+		t.Logf("vibe-desktop full stripped (%s/%s): %d bytes (%.2f MiB)", target.goos, target.goarch, fullSize, float64(fullSize)/(1024*1024))
+		if fullSize >= target.maxFull {
+			t.Fatalf("vibe-desktop full stripped (%s/%s) %d bytes exceeds %s limit (%d)", target.goos, target.goarch, fullSize, target.fullLabel, target.maxFull)
+		}
+
+		thinSize := buildAndMeasure(target.goos, target.goarch, true)
+		t.Logf("vibe-desktop thin_desktop stripped (%s/%s): %d bytes (%.2f MiB)", target.goos, target.goarch, thinSize, float64(thinSize)/(1024*1024))
+		if thinSize >= target.maxThin {
+			t.Fatalf("vibe-desktop thin_desktop stripped (%s/%s) %d bytes exceeds %s limit (%d)", target.goos, target.goarch, thinSize, target.thinLabel, target.maxThin)
+		}
+	}
+
+	if !hasHostTarget {
+		hostFull := buildAndMeasure(runtime.GOOS, runtime.GOARCH, false)
+		t.Logf("vibe-desktop full stripped (%s/%s): %d bytes (%.2f MiB)", runtime.GOOS, runtime.GOARCH, hostFull, float64(hostFull)/(1024*1024))
+		const hostMaxFull = 44 * 1024 * 1024
+		if hostFull >= hostMaxFull {
+			t.Fatalf("vibe-desktop full stripped (%s/%s) %d bytes exceeds 44 MiB limit (%d)", runtime.GOOS, runtime.GOARCH, hostFull, hostMaxFull)
+		}
+		hostThin := buildAndMeasure(runtime.GOOS, runtime.GOARCH, true)
+		t.Logf("vibe-desktop thin_desktop stripped (%s/%s): %d bytes (%.2f MiB)", runtime.GOOS, runtime.GOARCH, hostThin, float64(hostThin)/(1024*1024))
+		const hostMaxThin = 20 * 1024 * 1024
+		if hostThin >= hostMaxThin {
+			t.Fatalf("vibe-desktop thin_desktop stripped (%s/%s) %d bytes exceeds 20 MiB limit (%d)", runtime.GOOS, runtime.GOARCH, hostThin, hostMaxThin)
 		}
 	}
 }

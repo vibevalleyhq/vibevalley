@@ -287,11 +287,17 @@ func TestSQLCMigrationsAndConfigCLI(t *testing.T) {
 	}
 	serverBin := filepath.Join(tmpCLI, "vibe-server"+binExt)
 	goBin := filepath.Join(runtime.GOROOT(), "bin", "go")
-	buildCmd := exec.CommandContext(ctx, goBin, "build", "-o", serverBin, "./cmd/vibe-server")
+	buildCtx, buildCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	buildCmd := exec.CommandContext(buildCtx, goBin, "build", "-o", serverBin, "./cmd/vibe-server")
 	buildCmd.Env = append(cleanCLIEnv(tmpCLI), "CGO_ENABLED=0", "GOROOT="+runtime.GOROOT())
-	if out, err := buildCmd.CombinedOutput(); err != nil {
-		t.Fatalf("build ./cmd/vibe-server: %v\n%s", err, string(out))
+	buildOut, buildErr := buildCmd.CombinedOutput()
+	buildCancel()
+	if buildErr != nil {
+		t.Fatalf("build ./cmd/vibe-server: %v\n%s", buildErr, string(buildOut))
 	}
+
+	cliCtx, cliCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cliCancel()
 
 	vibeHome := filepath.Join(tmpCLI, "vibe-home")
 	workRoot := filepath.Join(tmpCLI, "work")
@@ -326,13 +332,13 @@ secrets:
 	)
 
 	// config check
-	chkOut, err := runCLI(ctx, serverBin, cliEnv, "config", "check")
+	chkOut, err := runCLI(cliCtx, serverBin, cliEnv, "config", "check")
 	if err != nil || !strings.Contains(chkOut, "config ok:") || !strings.Contains(chkOut, yamlPath) {
 		t.Fatalf("vibe-server config check failed: err=%v out=%q", err, chkOut)
 	}
 
 	// config print (asserts raw secrets are absent, redacted value present, and CLI/env overrides applied)
-	printOut, err := runCLI(ctx, serverBin, cliEnv, "config", "print", "--addr", "127.0.0.1:0")
+	printOut, err := runCLI(cliCtx, serverBin, cliEnv, "config", "print", "--addr", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("vibe-server config print failed: %v\n%s", err, printOut)
 	}
@@ -349,22 +355,22 @@ secrets:
 	}
 
 	// migrate up -> status -> down --all -> up (using db_path from vibevalley.yaml)
-	migUpOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "up")
+	migUpOut, err := runCLI(cliCtx, serverBin, cliEnv, "migrate", "up")
 	if err != nil || !strings.Contains(migUpOut, "scope=platform") || !strings.Contains(migUpOut, "after=11") || !strings.Contains(migUpOut, "applied=11") {
 		t.Fatalf("vibe-server migrate up failed: err=%v out=%q", err, migUpOut)
 	}
 
-	migStatusOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "status")
+	migStatusOut, err := runCLI(cliCtx, serverBin, cliEnv, "migrate", "status")
 	if err != nil || strings.Count(migStatusOut, "scope=platform") != 11 || strings.Count(migStatusOut, "applied=true") != 11 {
 		t.Fatalf("vibe-server migrate status failed: err=%v out=%q", err, migStatusOut)
 	}
 
-	migDownOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "down", "--all")
+	migDownOut, err := runCLI(cliCtx, serverBin, cliEnv, "migrate", "down", "--all")
 	if err != nil || !strings.Contains(migDownOut, "scope=platform") || !strings.Contains(migDownOut, "after=0") || !strings.Contains(migDownOut, "reverted=11") {
 		t.Fatalf("vibe-server migrate down --all failed: err=%v out=%q", err, migDownOut)
 	}
 
-	migReUpOut, err := runCLI(ctx, serverBin, cliEnv, "migrate", "up")
+	migReUpOut, err := runCLI(cliCtx, serverBin, cliEnv, "migrate", "up")
 	if err != nil || !strings.Contains(migReUpOut, "scope=platform") || !strings.Contains(migReUpOut, "after=11") || !strings.Contains(migReUpOut, "applied=11") {
 		t.Fatalf("vibe-server migrate re-up failed: err=%v out=%q", err, migReUpOut)
 	}
@@ -378,7 +384,7 @@ secrets:
 	}
 
 	// serve --ready-json with CLI --addr override
-	srvCmd := exec.CommandContext(ctx, serverBin, "serve", "--addr", "127.0.0.1:0", "--ready-json")
+	srvCmd := exec.CommandContext(cliCtx, serverBin, "serve", "--addr", "127.0.0.1:0", "--ready-json")
 	srvCmd.Env = cliEnv
 	stdoutPipe, err := srvCmd.StdoutPipe()
 	if err != nil {
@@ -423,7 +429,7 @@ secrets:
 		if err := json.Unmarshal([]byte(line), &ready); err != nil {
 			t.Fatalf("decode ready-json %q: %v", line, err)
 		}
-	case <-ctx.Done():
+	case <-cliCtx.Done():
 		t.Fatalf("timed out waiting for serve --ready-json; stderr=%s", srvErr.String())
 	}
 	if ready.Addr == "" || ready.PreviewAddr == "" {
@@ -448,7 +454,7 @@ secrets:
 			if waitErr != nil {
 				t.Fatalf("serve graceful shutdown error: %v (stderr=%s)", waitErr, srvErr.String())
 			}
-		case <-ctx.Done():
+		case <-cliCtx.Done():
 			t.Fatalf("timed out waiting for serve graceful exit")
 		}
 	}

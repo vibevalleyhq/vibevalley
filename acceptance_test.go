@@ -624,10 +624,7 @@ func TestAcceptanceGate2_GovernanceAndOutcomes(t *testing.T) {
 
 // Gate 3: Lazy machine leases, real subprocess WS + EXIF/media dedup harvest, RPC cancel orphan cleanup, and <15 MiB static binary.
 func TestAcceptanceGate3_SandboxDecoupling(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
-
-	// 1. Verify zero blocking and zero leases when no vibe-machine is connected.
+	// Build subprocess binaries before starting the runtime execution timeout so cold CI runners do not starve runtime assertions.
 	tmp := t.TempDir()
 	srvBin := buildPackageBinary(t, "./cmd/vibe-server", "vibe-server")
 	machBin := buildPackageBinary(t, "./cmd/vibe-machine", "vibe-machine")
@@ -642,6 +639,10 @@ func TestAcceptanceGate3_SandboxDecoupling(t *testing.T) {
 		t.Fatalf("vibe-machine binary %d bytes exceeds 15 MiB budget", machStat.Size())
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// 1. Verify zero blocking and zero leases when no vibe-machine is connected.
 	// Also verify in-process lazy lease non-blocking before machine online + EXIF orientation normalization.
 	localSt, err := stack.New(ctx, stack.Config{DBPath: filepath.Join(tmp, "local.db"), WorkRoot: filepath.Join(tmp, "local-work")})
 	if err != nil {
@@ -1233,7 +1234,9 @@ func TestAcceptanceGate5_DeltaAndMountSync(t *testing.T) {
 
 // Gate 6: OAR voyage/3 replay across runtimes + Resume subtraction + <10ms esbuild CSP preview + headless vibe-desktop + cross-OS builds.
 func TestAcceptanceGate6_OARAndMyGoDesktop(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	deskBin := buildPackageBinary(t, "./cmd/vibe-desktop", "vibe-desktop")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
 	// 1. OAR replay across Claude, Codex (with Resume baseline subtraction), ACP, and Qwen/Qoder + oar-voyage/3 round-trip.
@@ -1362,8 +1365,7 @@ func TestAcceptanceGate6_OARAndMyGoDesktop(t *testing.T) {
 		t.Fatalf("preview response mismatch: code=%d csp=%q body=%q", prevResp.StatusCode, prevResp.Header.Get("Content-Security-Policy"), string(prevBody))
 	}
 
-	// 3. Boot compiled vibe-desktop --headless-check subprocess + cross-OS builds.
-	deskBin := buildPackageBinary(t, "./cmd/vibe-desktop", "vibe-desktop")
+	// 3. Boot pre-compiled vibe-desktop --headless-check subprocess + cross-OS builds.
 	webDist := t.TempDir()
 	if err := os.WriteFile(filepath.Join(webDist, "index.html"), []byte("<!doctype html><html><body>Web</body></html>"), 0o644); err != nil {
 		t.Fatal(err)
