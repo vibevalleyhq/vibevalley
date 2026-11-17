@@ -1,83 +1,11 @@
 version: "2"
 sql:
   - engine: "sqlite"
-    queries: "internal/durable/store/queries.sql"
-    schema: "internal/durable/store/migrations"
+    queries: "pkg/db/queries"
+    schema: "pkg/db/migrations"
     gen:
       go:
-        package: "sqlcgen"
-        out: "internal/durable/store/sqlcgen"
-  - engine: "sqlite"
-    queries: "internal/vault/queries.sql"
-    schema: "internal/vault/migrations"
-    gen:
-      go:
-        package: "sqlcgen"
-        out: "internal/vault/sqlcgen"
-  - engine: "sqlite"
-    queries: "internal/domain/agent/queries.sql"
-    schema: "internal/domain/agent/migrations"
-    gen:
-      go:
-        package: "sqlcgen"
-        out: "internal/domain/agent/sqlcgen"
-  - engine: "sqlite"
-    queries: "internal/domain/repo/queries.sql"
-    schema: "internal/domain/repo/migrations"
-    gen:
-      go:
-        package: "sqlcgen"
-        out: "internal/domain/repo/sqlcgen"
-  - engine: "sqlite"
-    queries: "internal/domain/game/queries.sql"
-    schema: "internal/domain/game/migrations"
-    gen:
-      go:
-        package: "sqlcgen"
-        out: "internal/domain/game/sqlcgen"
-  - engine: "sqlite"
-    queries: "internal/domain/issue/queries.sql"
-    schema: "internal/domain/issue/migrations"
-    gen:
-      go:
-        package: "sqlcgen"
-        out: "internal/domain/issue/sqlcgen"
-  - engine: "sqlite"
-    queries: "internal/domain/channel/queries.sql"
-    schema: "internal/domain/channel/migrations"
-    gen:
-      go:
-        package: "sqlcgen"
-        out: "internal/domain/channel/sqlcgen"
-  - engine: "sqlite"
-    queries: "internal/domain/watch/queries.sql"
-    schema: "internal/domain/watch/migrations"
-    gen:
-      go:
-        package: "sqlcgen"
-        out: "internal/domain/watch/sqlcgen"
-  - engine: "sqlite"
-    queries: "internal/domain/memory/queries.sql"
-    schema: "internal/domain/memory/migrations"
-    gen:
-      go:
-        package: "sqlcgen"
-        out: "internal/domain/memory/sqlcgen"
-        emit_empty_slices: true
-  - engine: "sqlite"
-    queries: "internal/domain/pkm/queries.sql"
-    schema: "internal/domain/pkm/migrations"
-    gen:
-      go:
-        package: "sqlcgen"
-        out: "internal/domain/pkm/sqlcgen"
+        package: "generated"
+        out: "pkg/db/generated"
         emit_empty_slices: true
         emit_prepared_queries: true
-  - engine: "sqlite"
-    queries: "internal/domain/gateway/queries.sql"
-    schema: "internal/domain/gateway/migrations"
-    gen:
-      go:
-        package: "sqlcgen"
-        out: "internal/domain/gateway/sqlcgen"
-        emit_empty_slices: true
