@@ -307,33 +307,115 @@ func RegisterChordBridge(b *ChordBridge) (err error) {
 }
 
 // ChordBridgePreloadScript installs a lightweight Chord Link frame transport shim on
-// window.__vibevalleyChordTransport backed by window.mygo without touching TCP sockets.
+// window.__vibevalleyChordTransport and the Host bridge on window.vibevalleyHost backed by window.mygo.
 func ChordBridgePreloadScript() string {
 	return `(function(){
-  if (window.__vibevalleyChordTransport) return;
-  window.__vibevalleyChordTransport = {
-    open: function(onFrame, onClose) {
-      if (!window.mygo || typeof window.mygo.channel !== "function") {
-        throw new Error("mygo bridge unavailable");
-      }
-      var ch = window.mygo.channel(function(raw) {
-        if (onFrame) onFrame(raw);
-      });
-      ch.onclose = function() {
-        if (onClose) onClose();
-      };
-      var streamPromise = window.mygo.call("ChordLink.StreamFrames", ch);
-      streamPromise.catch(function() { if (onClose) onClose(); });
-      return {
-        send: function(frame) {
-          var payload = typeof frame === "string" ? frame : JSON.stringify(frame);
-          return window.mygo.call("ChordLink.SendFrame", payload);
-        },
-        close: function() {
-          ch.close();
+  if (!window.__vibevalleyChordTransport) {
+    window.__vibevalleyChordTransport = {
+      open: function(onFrame, onClose) {
+        if (!window.mygo || typeof window.mygo.channel !== "function") {
+          throw new Error("mygo bridge unavailable");
         }
-      };
+        var ch = window.mygo.channel(function(raw) {
+          if (onFrame) onFrame(raw);
+        });
+        ch.onclose = function() {
+          if (onClose) onClose();
+        };
+        var streamPromise = window.mygo.call("ChordLink.StreamFrames", ch);
+        streamPromise.catch(function() { if (onClose) onClose(); });
+        return {
+          send: function(frame) {
+            var payload = typeof frame === "string" ? frame : JSON.stringify(frame);
+            return window.mygo.call("ChordLink.SendFrame", payload);
+          },
+          close: function() {
+            ch.close();
+          }
+        };
+      }
+    };
+  }
+})();
+` + DesktopHostPreloadScript()
+}
+
+// DesktopHostPreloadScript installs window.vibevalleyHost matching packages/protocol/src/host.ts Host
+// on top of window.mygo DesktopHost RPC calls and desktop:* event streams.
+func DesktopHostPreloadScript() string {
+	return `(function(){
+  if (window.vibevalleyHost) return;
+  function invoke(method) {
+    if (!window.mygo || typeof window.mygo.call !== "function") {
+      return Promise.reject(new Error("mygo bridge unavailable"));
+    }
+    if (arguments.length > 1) {
+      return window.mygo.call("DesktopHost." + method, arguments[1]);
+    }
+    return window.mygo.call("DesktopHost." + method);
+  }
+  function told(p) {
+    if (p && typeof p.catch === "function") {
+      p.catch(function(err) {
+        if (typeof console !== "undefined" && console.error) {
+          console.error("vibevalley:", err);
+        }
+      });
+    }
+  }
+  function subscribe(eventName, fn) {
+    if (typeof fn !== "function") {
+      throw new TypeError("listener must be a function");
+    }
+    if (!window.mygo || typeof window.mygo.on !== "function") {
+      return function() {};
+    }
+    return window.mygo.on(eventName, fn);
+  }
+  var isDarwin = (window.mygo && window.mygo.platform === "darwin") ||
+    (typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || ""));
+  var host = {
+    name: "desktop",
+    notify: function(notice) { return invoke("Notify", notice); },
+    tray: function(summary) { return invoke("Tray", summary); },
+    opening: function(opening) { return invoke("Opening", opening); },
+    locale: function(locale) { told(invoke("Locale", locale)); },
+    reveal: function(path) { told(invoke("Reveal", path)); },
+    theme: function(theme) { told(invoke("Theme", theme)); },
+    framing: function(mode) { told(invoke("Framing", mode)); },
+    voiceShortcut: {
+      accelerator: "Alt+Shift+Space",
+      on: function(fn) { return subscribe("desktop:voiceShortcut", fn); }
+    },
+    update: {
+      watch: function(fn) {
+        if (typeof fn !== "function") {
+          throw new TypeError("listener must be a function");
+        }
+        told(invoke("UpdateState").then(function(state) { fn(state); }));
+        return subscribe("desktop:update", fn);
+      },
+      check: function() { return invoke("UpdateCheck"); },
+      install: function() { return invoke("UpdateInstall"); }
+    },
+    commandLine: {
+      state: function() { return invoke("CliState"); },
+      install: function() { return invoke("CliInstall"); },
+      remove: function() { return invoke("CliRemove"); }
+    },
+    terminal: {
+      spawn: function(input) { return invoke("PtySpawn", input); },
+      write: function(input) { told(invoke("PtyWrite", input)); },
+      resize: function(input) { told(invoke("PtyResize", input)); },
+      kill: function(id) { told(invoke("PtyKill", id)); },
+      inspect: function(id) { return invoke("PtyInspect", id); },
+      onData: function(fn) { return subscribe("desktop:ptyData", fn); },
+      onExit: function(fn) { return subscribe("desktop:ptyExit", fn); }
     }
   };
+  if (isDarwin) {
+    host.titleBar = { top: 28, left: 76 };
+  }
+  window.vibevalleyHost = host;
 })();`
 }
