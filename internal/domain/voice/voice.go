@@ -160,6 +160,7 @@ type Options struct {
 	HTTPClient       *http.Client
 	AgoraBaseURLs    map[string]string
 	MOSSStatusURL    string
+	MOSSRealtimeURL  string
 	VoiceConfig      func() VoiceConfigSnapshot
 	AgoraCredentials func() (AgoraCredentials, bool)
 	DictationConfig  func() (DictationTarget, bool)
@@ -198,19 +199,20 @@ type activeCall struct {
 
 // Service manages Agora AccessToken2 voice grants, call lifecycle, dictation, and MOSS probes.
 type Service struct {
-	clock          store.Clock
-	httpClient     *http.Client
-	agoraBaseURLs  map[string]string
-	mossStatusURL  string
-	voiceConfigFn  func() VoiceConfigSnapshot
-	agoraCredsFn   func() (AgoraCredentials, bool)
-	dictationCfgFn func() (DictationTarget, bool)
-	mossKeyFn      func() (string, bool)
-	mossVerifyHook func(ctx context.Context, key string) Validation
-	onHear         func(ctx context.Context, heard VoiceHeard) error
-	onSay          func(ctx context.Context, said VoiceSaid) error
-	onStateChanged func(FactCallChanged)
-	tokenSeconds   uint32
+	clock           store.Clock
+	httpClient      *http.Client
+	agoraBaseURLs   map[string]string
+	mossStatusURL   string
+	mossRealtimeURL string
+	voiceConfigFn   func() VoiceConfigSnapshot
+	agoraCredsFn    func() (AgoraCredentials, bool)
+	dictationCfgFn  func() (DictationTarget, bool)
+	mossKeyFn       func() (string, bool)
+	mossVerifyHook  func(ctx context.Context, key string) Validation
+	onHear          func(ctx context.Context, heard VoiceHeard) error
+	onSay           func(ctx context.Context, said VoiceSaid) error
+	onStateChanged  func(FactCallChanged)
+	tokenSeconds    uint32
 
 	mu        sync.Mutex
 	grants    map[string]*activeGrant
@@ -245,6 +247,10 @@ func NewService(opts Options) *Service {
 	if mossStatusURL == "" {
 		mossStatusURL = strings.Replace(defaultMOSSRealtimeURL, "wss://", "https://", 1)
 	}
+	mossRealtimeURL := strings.TrimSpace(opts.MOSSRealtimeURL)
+	if mossRealtimeURL == "" {
+		mossRealtimeURL = defaultMOSSRealtimeURL
+	}
 	voiceCfgFn := opts.VoiceConfig
 	if voiceCfgFn == nil {
 		voiceCfgFn = func() VoiceConfigSnapshot {
@@ -260,21 +266,22 @@ func NewService(opts Options) *Service {
 	}
 
 	return &Service{
-		clock:          clk,
-		httpClient:     httpClient,
-		agoraBaseURLs:  baseURLs,
-		mossStatusURL:  mossStatusURL,
-		voiceConfigFn:  voiceCfgFn,
-		agoraCredsFn:   opts.AgoraCredentials,
-		dictationCfgFn: opts.DictationConfig,
-		mossKeyFn:      opts.MOSSKey,
-		mossVerifyHook: opts.MOSSVerifyHook,
-		onHear:         opts.OnHear,
-		onSay:          opts.OnSay,
-		onStateChanged: opts.OnStateChanged,
-		tokenSeconds:   tokenSec,
-		grants:         make(map[string]*activeGrant),
-		calls:          make(map[string]*activeCall),
+		clock:           clk,
+		httpClient:      httpClient,
+		agoraBaseURLs:   baseURLs,
+		mossStatusURL:   mossStatusURL,
+		mossRealtimeURL: mossRealtimeURL,
+		voiceConfigFn:   voiceCfgFn,
+		agoraCredsFn:    opts.AgoraCredentials,
+		dictationCfgFn:  opts.DictationConfig,
+		mossKeyFn:       opts.MOSSKey,
+		mossVerifyHook:  opts.MOSSVerifyHook,
+		onHear:          opts.OnHear,
+		onSay:           opts.OnSay,
+		onStateChanged:  opts.OnStateChanged,
+		tokenSeconds:    tokenSec,
+		grants:          make(map[string]*activeGrant),
+		calls:           make(map[string]*activeCall),
 		callState: FactCallChanged{
 			Type:  "callChanged",
 			At:    clk.NowMs(),
@@ -701,6 +708,24 @@ func (s *Service) MossVerify(ctx context.Context) Validation {
 		return Validation{Problem: fmt.Sprintf("MOSS Live HTTP %d: %s", resp.StatusCode, redactKey(strings.TrimSpace(string(body)), key))}
 	}
 	return Validation{}
+}
+
+// ServeMOSSRelay proxies a browser WebSocket connection to the configured MOSS Realtime endpoint,
+// injecting the stored MOSS API key server-side and redacting it from error/close text.
+func (s *Service) ServeMOSSRelay(w http.ResponseWriter, r *http.Request) error {
+	if s.mossKeyFn == nil {
+		http.Error(w, "MOSS Live key is not configured", http.StatusConflict)
+		return fmt.Errorf("%w: MOSS key is not configured", ErrVoiceUnavailable)
+	}
+	key, ok := s.mossKeyFn()
+	if !ok || strings.TrimSpace(key) == "" {
+		http.Error(w, "MOSS Live key is not configured", http.StatusConflict)
+		return fmt.Errorf("%w: MOSS key is not configured", ErrVoiceUnavailable)
+	}
+	return ServeRealtimeWS(w, r, RelayConfig{
+		UpstreamURL: s.mossRealtimeURL,
+		APIKey:      key,
+	})
 }
 
 // SpeakPieces splits text into UTF-8 chunks of at most maxBytes (default 480) on sentence boundaries.
