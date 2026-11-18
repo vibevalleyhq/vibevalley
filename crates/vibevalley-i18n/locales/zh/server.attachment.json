@@ -1,0 +1,5 @@
+{
+  "noAttachment": "没有 {id} 这个附件：先上传，再带着它说话",
+  "emptyFile": "这个文件是空的",
+  "fileTooBig": "文件太大了：至多 {mb} MB"
+}

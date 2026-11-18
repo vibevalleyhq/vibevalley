@@ -3,8 +3,8 @@ import { z } from "zod";
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { codePoints } from "../common/schema";
-import type * as T from "./audio-shapes";
 import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
+import type * as T from "./shapes";
 import { MediaAudioFormatValues } from "./shapes";
 
 const Id = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/u);
@@ -67,6 +67,12 @@ export const MediaTranscriptionRequest = z.object({
   keyterms: z.exactOptional(z.array(z.string().check(codePoints(1, 30)).regex(/\S/u)).max(20)),
   streaming: z.exactOptional(z.boolean()),
 }) satisfies Codec<T.MediaTranscriptionRequest>;
+export const MediaAudioRequest = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("speakers"), ...SpeakersFields }).refine(validSpeakers),
+  z.object({ kind: z.literal("voiceDesign"), ...MediaVoiceDesignRequest.shape }),
+  z.object({ kind: z.literal("clone"), ...MediaCloneRequest.shape }),
+  z.object({ kind: z.literal("transcription"), ...MediaTranscriptionRequest.shape }),
+]) satisfies Codec<T.MediaAudioRequest>;
 const MediaAudioVoice = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -80,7 +86,7 @@ const MediaAudioSegment = z
     end: z.number().min(0),
   })
   .refine((segment) => segment.end >= segment.start) satisfies Codec<T.MediaAudioSegment>;
-const MediaAudioResult = z.discriminatedUnion("kind", [
+export const MediaAudioResult = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("clone"), voice: MediaAudioVoice }),
   z.object({ kind: z.literal("transcription"), text: z.string(), segments: z.array(MediaAudioSegment) }),
 ]) satisfies Codec<T.MediaAudioResult>;

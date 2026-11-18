@@ -10,52 +10,49 @@
 
 | 概念 | 农场里 | 页面 | 协议 | HTTP |
 |---|---|---|---|---|
-| Host | — | — | `ServerConfig` 的 `home`（`$VIBEVALLEY_HOME`，不进协议） | — |
-| 空间 | 大地图 | `/repos` 的「全部」（`farm/map/RepoMap.tsx`） | `SpaceState`；目录是服务端 `ServerConfig` 的 `workRoot` | `/api/v1/state`、`/api/v1/events` |
+| Host | — | — | 服务端 `ServerConfig` 的 `home`（`$VIBEVALLEY_HOME`，不进协议） | — |
+| 空间 | 大地图（`apps/mac/src/pixel/farm/islands.rs`） | `/repos` | `SpaceState`；目录是服务端 `ServerConfig` 的 `work_root` | `/api/v1/state`、`/api/v1/events` |
 | 仓库 | 大地图上的一座岛 | `/repos/:repo`（`features/repo`） | `RepoSummary`、`RepoActivity`、`RepoLanguages` | `/api/v1/repo/…` |
 | 助手 | 田头的助手 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"`）、`Channel.orchestrator` | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
 | 档案、技能 | 小动物、技能书 | `/agents`（`features/agent`）、`/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Agent`、`AgentTemplate`、`Skill` | `/api/v1/agent/…`、`/api/v1/skill/…` |
 | 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |
-| 工单、父子工单 | 图纸桌卡片、一块地 | `/issues`（`features/issue`、`FamilyDetail.tsx`）、地块详情（`farm/issue/IssueView.tsx`） | `Issue`（`assignments`、`parent`、`blockedBy`）、`Changes`、`Landing` | `/api/v1/issue/…` |
-| 帮工、一轮 | 地里干活的小动物、一季庄稼 | 地块详情、`features/session/WorkLog.tsx`、`Trajectory.tsx` | `Session`、`Run`、`RunTrigger`、`SessionEvent` | `/api/v1/session/…`、`/api/v1/issue/run/list` |
-| 频道、私聊、工单串 | 田头、频道、工单串 | 田头窗（`farm/chat`）、`/chat`（`features/channel`） | `Channel`（`type`：`channel`、`direct`、`thread`）、`ChatMessage`（`actor: Actor`）、`Attachment` | `/api/v1/channel/…`、`/api/v1/attachment/…` |
+| 工单、父子工单 | 图纸桌卡片、一块地 | `/issues`（`features/issue`、`FamilyDetail.tsx`） | `Issue`（`assignments`、`parent`、`blockedBy`）、`Changes`、`Landing` | `/api/v1/issue/…` |
+| 帮工、一轮 | 地里干活的小动物、一季庄稼 | `features/session/WorkLog.tsx`、`Trajectory.tsx` | `Session`、`Run`、`RunTrigger`、`SessionEvent` | `/api/v1/session/…`、`/api/v1/issue/run/list` |
+| 频道、私聊、工单串 | 田头、频道、工单串 | `/chat`（`features/channel`） | `Channel`（`type`：`channel`、`direct`、`thread`）、`ChatMessage`（`actor: Actor`）、`Attachment` | `/api/v1/channel/…`、`/api/v1/attachment/…` |
 | Artifact | — | `/artifacts`（`features/artifact`） | `Artifact`、`Block`、`Suggestion` | `/api/v1/artifact/…` |
 | 笔记 | — | `/pkm`（`features/pkm`） | `PkmPage`、`PkmBlock` | `/api/v1/pkm/…` |
 | 记性 | 记性 | 档案页与助手页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…` |
 | 定时任务 | 定时任务 | 频道菜单、看板带「定时任务」标签的工单 | `Cron`（`Issue.cron`） | `/api/v1/cron/…` |
-| 机器、「连接到本机」 | — | `/settings/devices`（`features/lan/LanPage.tsx`）、`/pair` | `Machine`、`LanStatus`、`UserDevice` | `/api/v1/lan/…` |
 
 ## 服务端以下
 
-Go 领域包、存储和 oar 的对照；存储只列主要归属，完整存盘见[架构](docs/architecture.md#存了什么)。
+服务、存储和 oar 的对照；服务端的模块在 `crates/vibevalley-server/src/modules/`，存储只列主要归属，完整存盘见[架构](docs/architecture.md#存了什么)。
 
-| 概念 | Go 服务端 | 存储 | oar（`pkg/oar`） |
+| 概念 | 服务端 | 存储 | oar |
 |---|---|---|---|
-| Host、空间 | `internal/config/config.go`（`AppConfig`、`WorkRoot`）；`internal/domain/stack/stack.go` 组装 | `$VIBEVALLEY_HOME`、`$VIBEVALLEY_WORK_ROOT` | — |
-| 仓库 | `internal/domain/repo` | Space 的 `repos/` 与工单检出 `worktrees/`、`repo_repository` / `repo_worktree` 表 | 会话的 `cwd` |
-| 助手 | `internal/domain/stack/orchestrator.go` + `internal/durable` | `durable_conversation`、`durable_entry` 表 | 进程内可恢复循环，工具在 `internal/domain/stack/tools.go`（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
-| 档案、技能 | `internal/domain/agent`（`registry.go`）与 `internal/domain/gateway/seed_catalog.go` | `agent_profile`、`agent_skill` 表 | — |
-| 农机 | `internal/domain/agent/presets.go` | `agent_runtime` 表 | `Runtime`、`Registry` |
-| 工单、父子工单 | `internal/domain/issue`（`service.go`） | `issue` 表、`internal/durable/store` | 任务与调度边界在 `internal/durable` |
-| 帮工、一轮 | `internal/machine` + `internal/domain/stack/dispatch.go` | `events/`、网关状态 | 一个帮工对应一个 `Subagent` / oar 会话 |
-| 频道、附件、信箱 | `internal/domain/channel`、`internal/domain/attachment`、`internal/domain/watch` | `channel`、`channel_member`、`channel_event`、`watch_inbox` 表 | 投递由 `watch` 过刹车后送入执行节点 |
-| Artifact | `internal/domain/artifact` | `artifact` 服务与网关投影（`artifact_shell.go`） | — |
-| 笔记 | `internal/domain/pkm` | `pkm/` 下的 Markdown 页面、`pkm_notes`、`pkm_blocks`、`pkm_links` 表 | — |
-| 记性 | `internal/domain/memory` | `memory_heads`、`memory_versions`、`memory_inbox` 表 | — |
-| 定时任务 | `internal/domain/issue/cron.go` | `issue_cron` 表 | — |
-| 机器、「连接到本机」 | `cmd/vibe-machine` + `internal/domain/stack/machine_hub.go`、`internal/domain/lan` | `internal/domain/user` 设备密钥与配对状态 | 本机或远端执行节点 |
+| Host、空间 | `ServerConfig`（`home`、`work_root`，`crates/vibevalley-server/src/start.rs` 照次序打开全部模块） | `$VIBEVALLEY_HOME`、`$VIBEVALLEY_WORK_ROOT` | — |
+| 仓库 | `Repos`（`repo.rs`），git 经 `crates/vibevalley-git` | Space 的 `repos/` 与工单检出 `worktrees/` | 会话的 `cwd` |
+| 助手 | `Orchestrator`（`orchestrator/mod.rs`） | `agent/<档案 id>/conversation.jsonl` | 不经 oar：跑在 `crates/vibevalley-agent` 的对话循环上（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
+| 档案、技能 | `Agents`（`agent/profile.rs`、`presets.rs`） | `config.json`、`agent-templates/` | — |
+| 农机 | `Agents` 的农机部分（`agent/runtime.rs`；接口仍是 `runtime.*`） | `config.json` 农机设置 | `Runtime`、`Registry` |
+| 工单、父子工单 | `Board`（`crates/vibevalley-server/src/modules/issue/board.rs`），接口在 `issue/mod.rs` | `server.db`、`issues/` | — |
+| 帮工、一轮 | `Sessions`（`session/sessions.rs`）与 `runs.rs`，农机经 `drivers.rs` 开会话；轨迹在 `session/journal.rs` | `server.db`、`events/` | 一个帮工是一个 oar `Session`，一轮对应一个 turn |
+| 频道、附件 | `Chat`（`channel/mod.rs`）、`Attachments`（`attachment.rs`）；谁听见与投递在 `Watch`（`watch/mod.rs`） | `server.db` 的 `channel*`、`attachment`、`watch_cursor` 表 | 投递成帮工会话里的一段话 |
+| Artifact | `Artifacts`（`artifact/mod.rs`） | `server.db` 的 `artifact*` 表 | — |
+| 笔记 | `Pkm`（`pkm/mod.rs`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_change` 表 | — |
+| 记性 | `Memories`（`memory.rs`，规则在 `crates/vibevalley-memory`） | `memory` 表 | — |
+| 定时任务 | `Crons`（`cron.rs`，什么时候跑在 `crates/vibevalley-cron`） | `crons.json` | — |
 
 ## oar 那一层
 
-oar（`@botiverse/oar`）是驱动各家编码 agent 的运行时。它的术语和 VibeValley 的用法对照：
+oar 是驱动各家编码 agent 的运行时；VibeValley 用的是它的 Rust 实现 `crates/vibevalley-oar`（Claude Code、Codex、ACP、scripted 和自研的 `vibevalley`）。它的术语和 VibeValley 的用法对照：
 
 | oar | 是什么 | 我们这边用在哪 |
 |---|---|---|
-| `Runtime`、`RuntimeRegistry` | 一种编码 agent 程序和它的安装 | `Runtime` 探测、算额度和花费 |
-| session | 农机原生的一个会话，可以接着上回的 | 一个帮工的会话；会话 id 存在 `session.oar_session` |
-| turn | 会话里的一轮：一个 prompt 开始，农机说结束时结束，结果是完成、中止或失败 | 帮工的一次 run 包着一个 oar turn |
-| event | 一轮里的文字、思考、工具调用、用量、任务 | 读成事实和轨迹 |
-| `prompt`、`steer`、`queue`、`withdraw`、`abort` | 往会话里送话、插话、排队、撤回、叫停 | 带话、叫停 |
-| `Subagents`、`Subagent`、`SubagentReport`（`@botiverse/oar/agents`） | 宿主在任意农机上开的子会话，每结束一轮交一份报告；oar 把这种用法叫 crew | 每个帮工是一个 `Subagent` |
+| `Runtime`、`Registry` | 一种编码 agent 程序和它的安装 | 农机的探测和额度 |
+| `Session` | 农机原生的一个会话，可以接着上回的 | 一个帮工的会话 |
+| turn | 会话里的一轮：一个 prompt 开始，农机说结束时结束，结果是完成、中止或失败 | 帮工的一轮包着一个 turn |
+| `Event` | 一轮里的文字、思考、工具调用、用量 | 读成事实和轨迹 |
+| `prompt`、`steer`、`queue`、`abort` | 往会话里送话、插话、排队、叫停 | 带话、叫停 |
 
 档案怎么进 oar 会话见[帮工](docs/subsystems/session.md#模型和不变量)，农机接受哪些选项见[档案和农机](docs/subsystems/agent.md#模型和不变量)。

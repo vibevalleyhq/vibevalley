@@ -1,0 +1,492 @@
+{
+ "GitHubStatus": [
+  {
+   "installed": true,
+   "version": "s477",
+   "loggedIn": true,
+   "account": "s479",
+   "reason": "s480",
+   "checkedAt": 481
+  },
+  {
+   "installed": true,
+   "loggedIn": false,
+   "reason": "s484",
+   "checkedAt": 485
+  }
+ ],
+ "DayCount": [
+  {
+   "day": "s486",
+   "commits": 487
+  },
+  {
+   "day": "s488",
+   "commits": 489
+  }
+ ],
+ "Author": [
+  {
+   "name": "s490",
+   "commits": 491
+  },
+  {
+   "name": "s492",
+   "commits": 493
+  }
+ ],
+ "RepoActivity": [
+  {
+   "repo": "s494",
+   "at": 495,
+   "days": [
+    {
+     "day": "s496",
+     "commits": 497
+    }
+   ],
+   "authors": [
+    {
+     "name": "s498",
+     "commits": 499
+    }
+   ],
+   "total": 500,
+   "first": 501,
+   "last": 502
+  },
+  {
+   "repo": "s503",
+   "at": 504,
+   "days": [
+    {
+     "day": "s505",
+     "commits": 506
+    }
+   ],
+   "authors": [
+    {
+     "name": "s507",
+     "commits": 508
+    }
+   ],
+   "total": 509
+  }
+ ],
+ "LanguageCount": [
+  {
+   "name": "s510",
+   "files": 511,
+   "code": 512,
+   "comments": 513,
+   "blanks": 514
+  },
+  {
+   "name": "s515",
+   "files": 516,
+   "code": 517,
+   "comments": 518,
+   "blanks": 519
+  }
+ ],
+ "RepoLanguages": [
+  {
+   "repo": "s520",
+   "at": 521,
+   "languages": [
+    {
+     "name": "s522",
+     "files": 523,
+     "code": 524,
+     "comments": 525,
+     "blanks": 526
+    }
+   ]
+  },
+  {
+   "repo": "s527",
+   "at": 528,
+   "languages": [
+    {
+     "name": "s529",
+     "files": 530,
+     "code": 531,
+     "comments": 532,
+     "blanks": 533
+    }
+   ]
+  }
+ ],
+ "RepoStack": [
+  {
+   "name": "s534",
+   "label": "s535",
+   "test": "s536",
+   "lint": "s537",
+   "build": "s538"
+  },
+  {
+   "name": "s539",
+   "label": "s540"
+  }
+ ],
+ "TemplateBlank": [
+  {
+   "start": 541,
+   "end": 542
+  },
+  {
+   "start": 543,
+   "end": 544
+  }
+ ],
+ "IssueTemplate": [
+  {
+   "id": "s545",
+   "title": "s546",
+   "done": "s547",
+   "text": "s548",
+   "blank": {
+    "start": 549,
+    "end": 550
+   }
+  },
+  {
+   "id": "s551",
+   "title": "s552",
+   "done": "s553",
+   "text": "s554"
+  }
+ ],
+ "TemplateKind": [
+  {
+   "id": "s555",
+   "name": "s556",
+   "icon": "s557",
+   "templates": [
+    {
+     "id": "s558",
+     "title": "s559",
+     "done": "s560",
+     "text": "s561",
+     "blank": {
+      "start": 562,
+      "end": 563
+     }
+    }
+   ]
+  },
+  {
+   "id": "s564",
+   "name": "s565",
+   "icon": "s566",
+   "templates": [
+    {
+     "id": "s567",
+     "title": "s568",
+     "done": "s569",
+     "text": "s570"
+    }
+   ]
+  }
+ ],
+ "RepoTemplates": [
+  {
+   "repo": "s571",
+   "stack": {
+    "name": "s572",
+    "label": "s573",
+    "test": "s574",
+    "lint": "s575",
+    "build": "s576"
+   },
+   "recent": [
+    "s577"
+   ],
+   "kinds": [
+    {
+     "id": "s578",
+     "name": "s579",
+     "icon": "s580",
+     "templates": [
+      {
+       "id": "s581",
+       "title": "s582",
+       "done": "s583",
+       "text": "s584"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "repo": "s585",
+   "stack": {
+    "name": "s586",
+    "label": "s587"
+   },
+   "recent": [
+    "s588"
+   ],
+   "kinds": [
+    {
+     "id": "s589",
+     "name": "s590",
+     "icon": "s591",
+     "templates": [
+      {
+       "id": "s592",
+       "title": "s593",
+       "done": "s594",
+       "text": "s595"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "PullRequestCapability": [
+  {
+   "available": true,
+   "reason": "s597"
+  },
+  {
+   "available": true,
+   "reason": "s599"
+  }
+ ],
+ "RepoSummary": [
+  {
+   "name": "s600",
+   "path": "s601",
+   "git": true,
+   "last": 603,
+   "maxSessions": 604,
+   "pullRequest": {
+    "available": false,
+    "reason": "s606"
+   }
+  },
+  {
+   "name": "s607",
+   "path": "s608",
+   "git": false,
+   "maxSessions": 610,
+   "pullRequest": {
+    "available": false,
+    "reason": "s612"
+   }
+  }
+ ],
+ "NewRepo": [
+  {
+   "name": "s613",
+   "github": "s614"
+  },
+  {
+   "name": "s615"
+  }
+ ],
+ "Commit": [
+  {
+   "hash": "s616",
+   "subject": "s617",
+   "at": 618
+  },
+  {
+   "hash": "s619",
+   "subject": "s620",
+   "at": 621
+  }
+ ],
+ "UncommittedItem": [
+  {
+   "path": "s622",
+   "status": "s623"
+  },
+  {
+   "path": "s624",
+   "status": "s625"
+  }
+ ],
+ "SubmitBranch": [
+  {
+   "cwd": "s626",
+   "branch": "s627",
+   "sha": "s628",
+   "base": "s629",
+   "title": "s630",
+   "body": "s631",
+   "dryRun": true
+  },
+  {
+   "cwd": "s633",
+   "branch": "s634",
+   "sha": "s635",
+   "base": "s636",
+   "title": "s637",
+   "body": "s638"
+  }
+ ],
+ "BranchPublication": [
+  {
+   "platform": "github",
+   "repository": "s639",
+   "branch": "s640",
+   "sha": "s641",
+   "base": "s642",
+   "check": "preview",
+   "pushed": false,
+   "url": "s644",
+   "number": 645,
+   "reused": true,
+   "state": "open"
+  },
+  {
+   "platform": "github",
+   "repository": "s647",
+   "branch": "s648",
+   "sha": "s649",
+   "base": "s650",
+   "check": "preview",
+   "pushed": false
+  }
+ ],
+ "PublishPlatform": [
+  "github",
+  "gitlab"
+ ],
+ "BranchCheck": [
+  "preview",
+  "passed",
+  "not-run"
+ ],
+ "BranchPublicationState": [
+  "open"
+ ],
+ "Repo": [
+  {
+   "path": "s652",
+   "commits": 653
+  },
+  {
+   "path": "s654",
+   "commits": 655
+  }
+ ],
+ "Conflict": [
+  {
+   "base": "s656",
+   "files": [
+    "s657"
+   ]
+  },
+  {
+   "base": "s658",
+   "files": [
+    "s659"
+   ]
+  }
+ ],
+ "ChangedFile": [
+  {
+   "path": "s660",
+   "status": "s661",
+   "added": 662,
+   "removed": 663,
+   "patch": "s664"
+  },
+  {
+   "path": "s665",
+   "status": "s666",
+   "added": 667,
+   "removed": 668
+  }
+ ],
+ "Changes": [
+  {
+   "repo": "s669",
+   "base": "s670",
+   "branch": "s671",
+   "commits": [
+    {
+     "hash": "s672",
+     "subject": "s673",
+     "at": 674
+    }
+   ],
+   "files": [
+    {
+     "path": "s675",
+     "status": "s676",
+     "added": 677,
+     "removed": 678,
+     "patch": "s679"
+    }
+   ],
+   "uncommitted": [
+    {
+     "path": "s680",
+     "status": "s681"
+    }
+   ],
+   "conflicts": [
+    "s682"
+   ],
+   "behind": 683
+  },
+  {
+   "repo": "s684",
+   "base": "s685",
+   "commits": [
+    {
+     "hash": "s686",
+     "subject": "s687",
+     "at": 688
+    }
+   ],
+   "files": [
+    {
+     "path": "s689",
+     "status": "s690",
+     "added": 691,
+     "removed": 692
+    }
+   ],
+   "uncommitted": [
+    {
+     "path": "s693",
+     "status": "s694"
+    }
+   ],
+   "conflicts": [
+    "s695"
+   ],
+   "behind": 696
+  }
+ ],
+ "RepoLanguageListInput": [
+  {
+   "id": "s6967"
+  },
+  {
+   "id": "s6968"
+  }
+ ],
+ "RepoTemplateListInput": [
+  {
+   "id": "s6969"
+  },
+  {
+   "id": "s6970"
+  }
+ ],
+ "RepoActivityGetInput": [
+  {
+   "id": "s6971"
+  },
+  {
+   "id": "s6972"
+  }
+ ]
+}

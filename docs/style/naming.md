@@ -14,7 +14,7 @@
 
 | 不用 | 它说的是 | 换成 |
 |---|---|---|
-| `rules.ts` | 能在测试的规则层测 | 它决定的事：`due.ts`、`patrol.ts`、`report.ts`；解析某个概念的，合进那个概念的文件（如 `issue` 域内） |
+| `rules.ts` | 能在测试的规则层测 | 它决定的事：`due.ts`、`patrol.ts`、`report.ts`；解析某个概念的，合进那个概念的文件（工单的细化在 `crates/vibevalley-core/src/refine.rs`） |
 | `state.ts`、`data.ts`、`hooks.ts` | 在框架里的角色 | 它管的东西：`groups.ts`、`calendar.ts`、`lanes.ts` |
 | `utils`、`helpers`、`common`、`misc`、`lib` | 没有归属 | 用它的概念；两个模块都用的，放进下层拥有它的模块 |
 | `text.ts` | 形式是文字 | 说给谁、说什么：`digest.ts`、`mentions.ts` |
@@ -26,7 +26,6 @@
 |---|---|
 | 纯不纯、能在哪一层测 | 测试金字塔按 import 认层（`@vibevalley/testkit/pyramid`） |
 | 页面和服务端都跑 | `packages/protocol/src/rules/contract.test.ts` |
-| 模块的先后 | Go 根目录 `arch_test.go` |
 | 页面的分层 | lint 的 `vibevalley/page-layers` |
 
 名字说性质，说的是写的人怎么实现、怎么测，读的人要找的却是哪件事；性质变了，名字也跟着错。位置本身就是约定、而且有检查守着的，可以用：`prompts.ts`（对模型说的话，lint 在这里放行中文）、`index.ts`（一个 feature 对外的入口，`page-layers` 查）、`packages/protocol/src/rules`（两边都跑的，`contract.test.ts` 查）、`testing/` 和 `testing.ts`（测试用的，金字塔认它们）。
@@ -59,47 +58,45 @@
 | 检查一份输入 | `xProblem`：没问题返回 `""`，有问题返回用户读的理由 | `cronProblem`、`channelNameProblem` |
 | 给用户看的一句话 | `xText` | `quotaText`、`dueText` |
 | 只说会怎样、不改东西 | `previewX` | `previewDelete`、`previewForget` |
-| 改东西 | 动词 | `issues.edit`、`channels.react`、`lan.forget` |
+| 改东西 | 动词 | `issues.edit`、`channels.react` |
 | 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channels.create`、`agents.delete`、`previewDelete` |
-| 服务开机时做的事 | `boot`（`services.ts` 在全部服务建好以后按次序调）；`start` 只指开始干一件事 | `session.boot()`；`issue.start(id)`、`executor.start(…)` |
-| 一个服务往外说发生了什么 | 一个订阅，叫 `news`，类型 `<概念>News`，成员按 `_tag` 用领域里的过去时（`Hired`、`Left`、`Consumed`） | `session.news()`（`SessionNews`） |
+| 一个模块往外说发生了什么 | 事实（`Fact`），经 `Hub::apply` 折进核心状态，别的模块读转变（`Watcher`）；成员用领域里的过去时 | `FactCronChanged`、`FactCronRemoved` |
 
 两条容易犯的：
 
-- **一个名字只答一个问题**：带标签的参数只用来给同一个动作不同的输入（`Session.hireWith` 的 `envelopes` 是 `Talk` 或 `Queued`：都是帮工开工时带上的输入）；两个不同的问题（筛法、排序、结果不同）起两个名字，不用标签把它们并成一个（`Session` 的 `withdrawEnvelope`、`withdrawDeliveries`、`stop`、`dismiss` 各是一个名字，不并成一个 `withdraw`）。
+- **一个名字只答一个问题**：带标签的参数只用来给同一个动作不同的输入（一个 enum 参数的各变体都是同一个动作的输入）；两个不同的问题（筛法、排序、结果不同）起两个名字，不用标签把它们并成一个（撤回一封信、撤回投递、停下、辞退各是一个名字，不并成一个 `withdraw`）。
 - **命令不只答一个是非**：做没做成要么抛一个说得出为什么的错误，要么返回做成的结果；只返回 `boolean` 的命令，调用方不知道没做成的原因。
 
 ## 单位、时刻和长短
 
-- 时长带单位：`stalePauseMs`、`weixinPollMs`、`idleWaitMs`；时刻用 `At`：`createdAt`、`closedAt`、`endedAt`，本身就说一刻的词（`since`、`until`）不另加。只写 `timeout`、`time` 时，读的人不知道是毫秒还是秒、是一段还是一刻。
+- 时长带单位：`stalePauseMs`、`idleWaitMs`（Rust 里用 `Duration`）；时刻用 `At`：`createdAt`、`closedAt`、`endedAt`，本身就说一刻的词（`since`、`until`）不另加。只写 `timeout`、`time` 时，读的人不知道是毫秒还是秒、是一段还是一刻。
 - 名字的长短跟作用域走：三行的回调里用 `c`、`p`、`e`，模块级的、导出的写全。
 
 ## 文件和代码的形状
 
 | 什么 | 形状 | 例子 |
 |---|---|---|
-| 服务端的域 | 单数，概念的词 | `internal/domain/issue`、`channel` |
-| 页面的 feature | 和服务端的域同名 | `apps/web/src/features/issue` |
-| 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/health` 是 `@vibevalley/health` |
+| 服务端的模块 | 单数，概念的词 | `crates/vibevalley-server/src/modules/issue/`、`channel/` |
+| 页面的 feature | 和服务端的模块同名 | `apps/mac/ui/vv/web/features/issue` |
+| 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/testkit` 是 `@vibevalley/testkit` |
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
-| 测试和故事 | 挨着被测的文件 | `moves.test.ts`、`Board.stories.tsx` |
-| 服务 | 接口是概念的单数词，和模块的文件夹、表同一个词；工厂叫 `make<服务>`，依赖的类型叫 `<服务>Deps`；别的服务的 `deps` 里它的键是小驼峰（`deps.issue`） | `Issue`、`makeIssue`、`IssueDeps`；`Core`、`Orchestrator` |
-| 服务端代码里和服务同名的线上形状 | 经命名空间读：`import type * as T from "@vibevalley/protocol"`，写 `T.Issue`；这样的文件里协议的类型都写成 `T.X`（lint 的 `vibevalley/protocol-namespace` 查） | `issue: T.Issue`、`(s: T.Session) => …` |
-| 带牌子的 id | `XId` | `IssueId`、`SessionId` |
+| 测试 | 挨着被测的文件 | `outline.test.ts` |
+| 服务端模块对外的结构体 | 按它管的东西叫，不叫 `XService`、`XManager` | `Agents`、`Chat`、`Crons`、`Repos` |
+| 带牌子的 id（页面） | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |
 
-服务的接口不另起名：接口就叫 `Issue`，不叫 `IssueService`、`IssueShape`。服务和线上的形状都用概念的词，撞了让形状退一步：服务在服务端处处用，形状经 `T.` 读一眼就知道是线上的那个；别的库撞名的，导入时起别名（oar 的 `Runtime` 是 `OarRuntime`，循环的 `Tool` 是 `LoopTool`）。
+服务端模块和线上的形状撞名时，线上的形状用契约里的名字（`vibevalley_protocol::Issue`），模块的结构体用复数或它管的事；别的库撞名的，导入时起别名（`use … as`）。
 
 ## 线上和存盘的形状
 
 | 什么 | 形状 | 例子 |
 |---|---|---|
 | 接口 | `<模块>[.<名词>].<动词>`，单数；路径是 `POST /api/v1/<模块>[/<名词>]/<动词>` | `channel.message.send`、`issue.list` |
-| 接口的动词 | 先用这几个：`list`、`get`、`create`、`update`、`delete`、`previewDelete`、`set`、`toggle`、`start`、`stop`；别的动作用它在领域里的词 | `channel.markRead`、`lan.pair` |
-| 表 | `<模块>` 或 `<模块>_<概念>`，单数；索引以表名开头 | `issue`、`channel_event`、`watch_inbox` |
-| 词典的键 | `<宿主>.<模块>.…`，两边都说的在 `shared` | `web.issue.boardLabels.lane.todo`、`shared.status.todo` |
-| 页面测试的标记 | `data-testid` 说它是什么，小写加连字符；状态写成属性 | `issue-card`、`desk-status`；`data-state` |
+| 接口的动词 | 先用这几个：`list`、`get`、`create`、`update`、`delete`、`previewDelete`、`set`、`toggle`、`start`、`stop`；别的动作用它在领域里的词 | `channel.markRead`、`issue.refine` |
+| 表 | `<模块>` 或 `<模块>_<概念>`，单数；索引以表名开头 | `channel_message`、`media_job` |
+| 词典的键 | `<宿主>.<模块>.…`，两边都说的在 `shared` | `web.issue.boardLabels.lane.todo`、`server.connector.qqKeys` |
+| 页面测试的标记 | `testID` 说它是什么，小写加连字符 | `route-missing`、`native-workspace` |
 | 分支 | `<类>/<主题>`，主题是英文小写加连字符 | `chore/repo-health` |
 
 ## 现有的双关

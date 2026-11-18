@@ -1,0 +1,71 @@
+{
+  "panel": {
+    "shop": "商店",
+    "warehouse": "仓库",
+    "graphs": "任务与成就",
+    "log": "农场日志",
+    "orchestrator": "助手和宠物",
+    "shopClosed": "商店还在装修，下一版开张。现在有 {coins} 金币，先攒着。"
+  },
+  "menu": {
+    "agents": "帮工名册",
+    "runtimes": "农具",
+    "skills": "技能书",
+    "issues": "工单"
+  },
+  "tool": {
+    "hand": {
+      "hint": "点一块地看详情，点空地播种"
+    },
+    "water": {
+      "hint": "给帮工带句话，正在干活的会中途收到"
+    },
+    "bug": {
+      "hint": "活没做成（地里有虫）：让它接着修"
+    },
+    "weed": {
+      "hint": "没过验收的意见会长成杂草：帮工修完、下一次验收通过就拔掉"
+    },
+    "harvest": {
+      "hint": "熟了的地：收下成果，帮工收工"
+    },
+    "shovel": {
+      "hint": "正在干活的叫停；没在干活的请它收工"
+    }
+  },
+  "native": {
+    "ledger": "账本与时间",
+    "achievements": "任务与成就",
+    "log": "农场日志",
+    "warehouse": "仓库里的工单",
+    "shop": "小摊",
+    "chat": "田头",
+    "workbench": "工作台",
+    "map": "群岛",
+    "tree": "记忆树",
+    "phone": "像素手机",
+    "noMessages": "还没有消息",
+    "empty": "这里还没有记录",
+    "progress": "Lv.{level} · 经验 {xp}/{need}",
+    "coins": "金币 {coins}",
+    "workers": "在田帮工 {count} 名",
+    "dawn": "清晨",
+    "noon": "正午",
+    "dusk": "黄昏",
+    "night": "夜晚",
+    "previous": "上一页",
+    "next": "下一页 · {page}/{pages}",
+    "score": "得分 {score}",
+    "restart": "点击或按空格重开",
+    "steer": "方向键 / WASD 控制",
+    "pending": "正在发送…",
+    "accepted": "已收到",
+    "close": "关闭",
+    "loading": "载入中…",
+    "treeCounts": "叶 {leaves} · 果 {fruits} · 种 {seeds}",
+    "treeGrowth": "{rounds} 轮 · 长到 {growth}%",
+    "leaf": "叶片记忆",
+    "fruit": "果实原则",
+    "seed": "种子习惯"
+  }
+}

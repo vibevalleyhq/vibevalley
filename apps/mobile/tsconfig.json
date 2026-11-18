@@ -1,5 +1,0 @@
-{
-  "extends": "./node_modules/expo/tsconfig.base.json",
-  "compilerOptions": { "strict": true, "types": ["node"] },
-  "include": ["App.tsx", "index.ts", "src", "scripts"]
-}

@@ -8,7 +8,6 @@ import { type CronHandlers, cronEndpoints } from "./cron/api";
 import type { Endpoint } from "./endpoint";
 import { type GameHandlers, gameEndpoints } from "./game/api";
 import { type IssueHandlers, issueEndpoints } from "./issue/api";
-import { type LanHandlers, lanEndpoints } from "./lan/api";
 import { type MediaHandlers, mediaEndpoints } from "./media/api";
 import { type MemoryHandlers, memoryEndpoints } from "./memory/api";
 import { type OrchestratorHandlers, orchestratorEndpoints } from "./orchestrator/api";
@@ -18,7 +17,6 @@ import { type RepoHandlers, repoEndpoints } from "./repo/api";
 import { type RuntimeHandlers, runtimeEndpoints } from "./runtime/api";
 import { type SessionHandlers, sessionEndpoints } from "./session/api";
 import { type SettingHandlers, settingEndpoints } from "./setting/api";
-import { type UserHandlers, userEndpoints } from "./user/api";
 import { type VoiceHandlers, voiceEndpoints } from "./voice/api";
 
 export * from "./endpoint";
@@ -30,9 +28,7 @@ export type { CoreHandlers } from "./core/api";
 export type { CronHandlers } from "./cron/api";
 export type { GameHandlers } from "./game/api";
 export type { IssueHandlers } from "./issue/api";
-export type { LanHandlers } from "./lan/api";
 export type { AttachmentHandlers } from "./attachment/api";
-export type { UserHandlers } from "./user/api";
 export type { MemoryHandlers } from "./memory/api";
 export type { OrchestratorHandlers } from "./orchestrator/api";
 export type { PkmHandlers } from "./pkm/api";
@@ -65,8 +61,6 @@ export interface Handlers
     PkmHandlers,
     MemoryHandlers,
     ConnectorHandlers,
-    LanHandlers,
-    UserHandlers,
     AttachmentHandlers {}
 
 export const endpoints: readonly Endpoint[] = [
@@ -88,7 +82,5 @@ export const endpoints: readonly Endpoint[] = [
   ...pkmEndpoints,
   ...memoryEndpoints,
   ...connectorEndpoints,
-  ...lanEndpoints,
-  ...userEndpoints,
   ...attachmentEndpoints,
 ];

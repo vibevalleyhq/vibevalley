@@ -1,0 +1,94 @@
+[
+  {
+    "seq": 1,
+    "agent_path": [],
+    "at_ms": 1794499420000,
+    "kind": {
+      "type": "session_started",
+      "session_id": "long",
+      "model": "claude-fable-5-2"
+    }
+  },
+  {
+    "seq": 2,
+    "agent_path": [],
+    "at_ms": 1794499420010,
+    "kind": {
+      "type": "turn_started",
+      "prompt": "把终端面板在窗口缩放时的回滚内容保留下来，并且在助手往里面持续输出很长的工具结果时保持光标所在行稳定，在一百二十赫兹的显示器上也不要掉帧；同时检查中文输入法在终端里候选框的位置是否跟着光标走，切换项目以后焦点要回到上一次的终端，关闭再打开窗口时布局要恢复成用户离开时的样子，分屏比例也要记住，字体大小改了以后要重新排版但不能丢掉选区。另外标签页标题要显示当前目录和正在跑的命令，太长就从中间省略掉一段"
+    }
+  },
+  {
+    "seq": 3,
+    "agent_path": [],
+    "at_ms": 1794499420810,
+    "kind": {
+      "type": "thinking_delta",
+      "text": "Make the terminal pane keep its scrollback when the window is resized, and keep the cursor row stable while the agent streams long tool output into it, without dropping frames on a 120 Hz display okay"
+    }
+  },
+  {
+    "seq": 4,
+    "agent_path": [],
+    "at_ms": 1794499421710,
+    "kind": {
+      "type": "tool_call_started",
+      "id": "toolu_l1",
+      "name": "mcp:nowledge-mem/search_memories",
+      "input": {
+        "query": "把终端面板在窗口缩放时的回滚内容保留下来，并且在助手往里面持续输出很长的工具结果时保持光标所在行稳定，在一百二十赫兹的显示器上也不要掉帧；同时检查中文输入法在终端里候选框的位置是否跟着光标走，切换项目以后焦点要回到上一次的终端，关闭再打开窗口时布局要恢复成用户离开时的样子，分屏比例也要记住，字体大小改了以后要重新排版但不能丢掉选区。另外标签页标题要显示当前目录和正在跑的命令，太长就从中间省略掉一段",
+        "limit": 5
+      }
+    }
+  },
+  {
+    "seq": 5,
+    "agent_path": [],
+    "at_ms": 1794499423210,
+    "kind": {
+      "type": "tool_call_finished",
+      "id": "toolu_l1",
+      "ok": true,
+      "output": "   1  第 1 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 1 snapped to the pixel grid\n   2  第 2 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 2 snapped to the pixel grid\n   3  第 3 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 3 snapped to the pixel grid\n   4  第 4 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 4 snapped to the pixel grid\n   5  第 5 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 5 snapped to the pixel grid\n   6  第 6 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 6 snapped to the pixel grid\n   7  第 7 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 7 snapped to the pixel grid\n   8  第 8 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 8 snapped to the pixel grid\n   9  第 9 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 9 snapped to the pixel grid\n  10  第 10 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 10 snapped to the pixel grid\n  11  第 11 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 11 snapped to the pixel grid\n  12  第 12 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 12 snapped to the pixel grid\n  13  第 13 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 13 snapped to the pixel grid\n  14  第 14 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 14 snapped to the pixel grid\n  15  第 15 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 15 snapped to the pixel grid\n  16  第 16 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 16 snapped to the pixel grid\n  17  第 17 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 17 snapped to the pixel grid\n  18  第 18 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 18 snapped to the pixel grid\n  19  第 19 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 19 snapped to the pixel grid\n  20  第 20 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 20 snapped to the pixel grid\n  21  第 21 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 21 snapped to the pixel grid\n  22  第 22 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 22 snapped to the pixel grid\n  23  第 23 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 23 snapped to the pixel grid\n  24  第 24 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 24 snapped to the pixel grid\n  25  第 25 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 25 snapped to the pixel grid\n  26  第 26 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 26 snapped to the pixel grid\n  27  第 27 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 27 snapped to the pixel grid\n  28  第 28 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 28 snapped to the pixel grid\n  29  第 29 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 29 snapped to the pixel grid\n  30  第 30 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 30 snapped to the pixel grid\n  31  第 31 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 31 snapped to the pixel grid\n  32  第 32 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 32 snapped to the pixel grid\n  33  第 33 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 33 snapped to the pixel grid\n  34  第 34 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 34 snapped to the pixel grid\n  35  第 35 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 35 snapped to the pixel grid\n  36  第 36 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 36 snapped to the pixel grid\n  37  第 37 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 37 snapped to the pixel grid\n  38  第 38 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 38 snapped to the pixel grid\n  39  第 39 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 39 snapped to the pixel grid\n  40  第 40 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 40 snapped to the pixel grid\n  41  第 41 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 41 snapped to the pixel grid\n  42  第 42 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 42 snapped to the pixel grid\n  43  第 43 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 43 snapped to the pixel grid\n  44  第 44 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 44 snapped to the pixel grid\n  45  第 45 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 45 snapped to the pixel grid\n  46  第 46 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 46 snapped to the pixel grid\n  47  第 47 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 47 snapped to the pixel grid\n  48  第 48 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 48 snapped to the pixel grid\n  49  第 49 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 49 snapped to the pixel grid\n  50  第 50 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 50 snapped to the pixel grid\n  51  第 51 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 51 snapped to the pixel grid\n  52  第 52 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 52 snapped to the pixel grid\n  53  第 53 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 53 snapped to the pixel grid\n  54  第 54 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 54 snapped to the pixel grid\n  55  第 55 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 55 snapped to the pixel grid\n  56  第 56 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 56 snapped to the pixel grid\n  57  第 57 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 57 snapped to the pixel grid\n  58  第 58 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 58 snapped to the pixel grid\n  59  第 59 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 59 snapped to the pixel grid\n  60  第 60 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 60 snapped to the pixel grid\n  61  第 61 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 61 snapped to the pixel grid\n  62  第 62 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 62 snapped to the pixel grid\n  63  第 63 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 63 snapped to the pixel grid\n  64  第 64 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 64 snapped to the pixel grid\n  65  第 65 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 65 snapped to the pixel grid\n  66  第 66 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 66 snapped to the pixel grid\n  67  第 67 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 67 snapped to the pixel grid\n  68  第 68 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 68 snapped to the pixel grid\n  69  第 69 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 69 snapped to the pixel grid\n  70  第 70 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 70 snapped to the pixel grid\n  71  第 71 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 71 snapped to the pixel grid\n  72  第 72 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 72 snapped to the pixel grid\n  73  第 73 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 73 snapped to the pixel grid\n  74  第 74 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 74 snapped to the pixel grid\n  75  第 75 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 75 snapped to the pixel grid\n  76  第 76 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 76 snapped to the pixel grid\n  77  第 77 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 77 snapped to the pixel grid\n  78  第 78 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 78 snapped to the pixel grid\n  79  第 79 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 79 snapped to the pixel grid\n  80  第 80 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 80 snapped to the pixel grid\n  81  第 81 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 81 snapped to the pixel grid\n  82  第 82 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 82 snapped to the pixel grid\n  83  第 83 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 83 snapped to the pixel grid\n  84  第 84 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 84 snapped to the pixel grid\n  85  第 85 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 85 snapped to the pixel grid\n  86  第 86 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 86 snapped to the pixel grid\n  87  第 87 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 87 snapped to the pixel grid\n  88  第 88 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 88 snapped to the pixel grid\n  89  第 89 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 89 snapped to the pixel grid\n  90  第 90 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 90 snapped to the pixel grid\n  91  第 91 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 91 snapped to the pixel grid\n  92  第 92 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 92 snapped to the pixel grid\n  93  第 93 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 93 snapped to the pixel grid\n  94  第 94 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 94 snapped to the pixel grid\n  95  第 95 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 95 snapped to the pixel grid\n  96  第 96 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 96 snapped to the pixel grid\n  97  第 97 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 97 snapped to the pixel grid\n  98  第 98 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 98 snapped to the pixel grid\n  99  第 99 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 99 snapped to the pixel grid\n 100  第 100 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 100 snapped to the pixel grid\n 101  第 101 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 101 snapped to the pixel grid\n 102  第 102 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 102 snapped to the pixel grid\n 103  第 103 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 103 snapped to the pixel grid\n 104  第 104 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 104 snapped to the pixel grid\n 105  第 105 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 105 snapped to the pixel grid\n 106  第 106 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 106 snapped to the pixel grid\n 107  第 107 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 107 snapped to the pixel grid\n 108  第 108 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 108 snapped to the pixel grid\n 109  第 109 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 109 snapped to the pixel grid\n 110  第 110 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 110 snapped to the pixel grid\n 111  第 111 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 111 snapped to the pixel grid\n 112  第 112 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 112 snapped to the pixel grid\n 113  第 113 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 113 snapped to the pixel grid\n 114  第 114 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 114 snapped to the pixel grid\n 115  第 115 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 115 snapped to the pixel grid\n 116  第 116 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 116 snapped to the pixel grid\n 117  第 117 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 117 snapped to the pixel grid\n 118  第 118 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 118 snapped to the pixel grid\n 119  第 119 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 119 snapped to the pixel grid\n 120  第 120 行：渲染终端网格时每个字形都要对齐到像素边界 / glyph 120 snapped to the pixel grid\n"
+    }
+  },
+  {
+    "seq": 6,
+    "agent_path": [],
+    "at_ms": 1794499423510,
+    "kind": {
+      "type": "tool_call_started",
+      "id": "toolu_l2",
+      "name": "WebFetch",
+      "input": {
+        "url": "https://nsh.dev/docs/gpui",
+        "prompt": "Make the terminal pane keep its scrollback when the window is resized, and keep the cursor row stable while the agent streams long tool output into it, without dropping frames on a 120 Hz display okay"
+      }
+    }
+  },
+  {
+    "seq": 7,
+    "agent_path": [],
+    "at_ms": 1794499427510,
+    "kind": {
+      "type": "tool_call_finished",
+      "id": "toolu_l2",
+      "ok": false,
+      "output": "把终端面板在窗口缩放时的回滚内容保留下来，并且在助手往里面持续输出很长的工具结果时保持光标所在行稳定，在一百二十赫兹的显示器上也不要掉帧；同时检查中文输入法在终端里候选框的位置是否跟着光标走，切换项目以后焦点要回到上一次的终端，关闭再打开窗口时布局要恢复成用户离开时的样子，分屏比例也要记住，字体大小改了以后要重新排版但不能丢掉选区。另外标签页标题要显示当前目录和正在跑的命令，太长就从中间省略掉一段"
+    }
+  },
+  {
+    "seq": 8,
+    "agent_path": [],
+    "at_ms": 1794499427710,
+    "kind": {
+      "type": "permission_requested",
+      "request_id": "perm-long",
+      "tool": "Bash",
+      "input": {
+        "command": "git commit -m \"Make the terminal pane keep its scrollback when the window is resized, and keep the cursor row stable while the agent streams long tool output into it, without dropping frames on a 120 Hz display okay\""
+      },
+      "summary": "Run: git commit -m \"把终端面板在窗口缩放时的回滚内容保留下来，并且在助手往里面持续输出很长的工具结果时保持光标所在行稳定，在一百二十赫兹的显示器上也不要掉帧；同时检查中文输入法在终端里候选框的位置是否跟着光标走，切换项目以后焦点要回到上一次的终端，关闭再打开窗口时布局要恢复成用户离开时的样子，分屏比例也要记住，字体大小改了以后要重新排版但不能丢掉选区。另外标签页标题要显示当前目录和正在跑的命令，太长就从中间省略掉一段\""
+    }
+  }
+]

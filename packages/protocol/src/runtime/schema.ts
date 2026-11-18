@@ -9,7 +9,7 @@ const RuntimeQuota = z.object({
   text: z.string(),
 }) satisfies Codec<T.RuntimeQuota>;
 
-const RuntimePreset = z.object({
+export const RuntimePreset = z.object({
   id: z.string(),
   label: z.string(),
   blurb: z.string(),
@@ -18,7 +18,7 @@ const RuntimePreset = z.object({
 
 const RuntimeCapability = z.enum(T.RuntimeCapabilityValues) satisfies Codec<T.RuntimeCapability>;
 
-const RuntimeSupport = z.object({
+export const RuntimeSupport = z.object({
   steer: z.boolean(),
   refused: z.record(z.string(), z.string()),
   capabilities: z.array(RuntimeCapability),

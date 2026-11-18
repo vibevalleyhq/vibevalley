@@ -1,0 +1,20 @@
+{
+  "id": "night",
+  "version": 1,
+  "role": "worker",
+  "name": "夜班反重力",
+  "duty": "杂活、小改动、夜里补班",
+  "tags": ["杂活", "小改", "补"],
+  "runtime": "pi",
+  "worktree": true,
+  "look": {
+    "eye": "#9dffb0",
+    "build": "hopper",
+    "head": "dome",
+    "body": "#2a2e33",
+    "trim": "#b0503f",
+    "hat": "#2f3438",
+    "species": "raccoon",
+    "outfit": "rain"
+  }
+}

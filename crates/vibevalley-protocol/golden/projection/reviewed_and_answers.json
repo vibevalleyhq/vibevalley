@@ -1,0 +1,4370 @@
+{
+ "folds": [
+  {
+   "fact": {
+    "type": "sessionChanged",
+    "at": 1794500000000,
+    "session": {
+     "id": "w50",
+     "role": "worker",
+     "name": "Helper w50",
+     "agent": "lab",
+     "runtime": "claude",
+     "brief": "work on i50",
+     "repo": "demo",
+     "branch": "vibevalley/issue-50",
+     "worktree": "/tmp/worktrees/demo.50",
+     "hiredAt": 1794500000000,
+     "runs": 0,
+     "phase": {
+      "_tag": "working",
+      "since": 1794500000000,
+      "doing": {
+       "action": "run_command",
+       "label": "vp test"
+      }
+     },
+     "refining": false,
+     "issue": "i50"
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "working",
+       "since": 1794500000000,
+       "doing": {
+        "action": "run_command",
+        "label": "vp test"
+       }
+      },
+      "refining": false,
+      "issue": "i50"
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "issueChanged",
+    "at": 1794500000000,
+    "issue": {
+     "id": "i50",
+     "number": 50,
+     "title": "Issue 50",
+     "priority": "medium",
+     "status": "todo",
+     "createdAt": 1794389000000,
+     "assignments": [
+      {
+       "id": "a50",
+       "issue": "i50",
+       "agent": "lab",
+       "assignedAt": 1794497000000,
+       "executions": [
+        {
+         "kind": "worker",
+         "session": "w50",
+         "startedAt": 1794500000000
+        }
+       ]
+      }
+     ],
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 3,
+      "autoSubmitPr": false
+     },
+     "moves": [],
+     "deliver": "change",
+     "findings": [],
+     "questions": [],
+     "description": "",
+     "blockedBy": [],
+     "criteria": [],
+     "checks": [],
+     "stage": {
+      "state": "queued",
+      "acts": []
+     },
+     "reviewedAt": 1794500060000
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "working",
+       "since": 1794500000000,
+       "doing": {
+        "action": "run_command",
+        "label": "vp test"
+       }
+      },
+      "refining": false,
+      "issue": "i50"
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_progress",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500000000,
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "stop",
+         "does": "stop"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "sessionReported",
+    "at": 1794500120000,
+    "id": "w50",
+    "outcome": "completed",
+    "summary": "done",
+    "runs": 1,
+    "questions": [],
+    "checks": []
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "sessionChanged",
+    "at": 1794500000000,
+    "session": {
+     "id": "w51",
+     "role": "worker",
+     "name": "Helper w51",
+     "agent": "lab",
+     "runtime": "claude",
+     "brief": "work on i51",
+     "repo": "demo",
+     "branch": "vibevalley/issue-51",
+     "worktree": "/tmp/worktrees/demo.51",
+     "hiredAt": 1794500000000,
+     "runs": 0,
+     "phase": {
+      "_tag": "working",
+      "since": 1794500000000,
+      "doing": {
+       "action": "run_command",
+       "label": "vp test"
+      }
+     },
+     "refining": false,
+     "issue": "i51"
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w51",
+      "role": "worker",
+      "name": "Helper w51",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i51",
+      "repo": "demo",
+      "branch": "vibevalley/issue-51",
+      "worktree": "/tmp/worktrees/demo.51",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "working",
+       "since": 1794500000000,
+       "doing": {
+        "action": "run_command",
+        "label": "vp test"
+       }
+      },
+      "refining": false,
+      "issue": "i51"
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w51": {
+      "station": 1,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "issueChanged",
+    "at": 1794500000000,
+    "issue": {
+     "id": "i51",
+     "number": 51,
+     "title": "Issue 51",
+     "priority": "high",
+     "status": "todo",
+     "createdAt": 1794386780000,
+     "assignments": [
+      {
+       "id": "a51",
+       "issue": "i51",
+       "agent": "lab",
+       "assignedAt": 1794496940000,
+       "executions": [
+        {
+         "kind": "worker",
+         "session": "w51",
+         "startedAt": 1794500000000
+        }
+       ]
+      }
+     ],
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 3,
+      "autoSubmitPr": false
+     },
+     "moves": [],
+     "deliver": "answer",
+     "findings": [],
+     "questions": [],
+     "description": "",
+     "blockedBy": [],
+     "criteria": [],
+     "checks": [],
+     "stage": {
+      "state": "queued",
+      "acts": []
+     }
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w51",
+      "role": "worker",
+      "name": "Helper w51",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i51",
+      "repo": "demo",
+      "branch": "vibevalley/issue-51",
+      "worktree": "/tmp/worktrees/demo.51",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "working",
+       "since": 1794500000000,
+       "doing": {
+        "action": "run_command",
+        "label": "vp test"
+       }
+      },
+      "refining": false,
+      "issue": "i51"
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w51": {
+      "station": 1,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     },
+     {
+      "id": "i51",
+      "number": 51,
+      "title": "Issue 51",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794386780000,
+      "assignments": [
+       {
+        "id": "a51",
+        "issue": "i51",
+        "agent": "lab",
+        "assignedAt": 1794496940000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w51",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "answer",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500000000,
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "stop",
+         "does": "stop"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "sessionReported",
+    "at": 1794500120000,
+    "id": "w51",
+    "outcome": "completed",
+    "summary": "no answer block",
+    "runs": 1,
+    "questions": [],
+    "checks": []
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w51",
+      "role": "worker",
+      "name": "Helper w51",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i51",
+      "repo": "demo",
+      "branch": "vibevalley/issue-51",
+      "worktree": "/tmp/worktrees/demo.51",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i51",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "no answer block",
+       "at": 1794500120000
+      }
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w51": {
+      "station": 1,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     },
+     {
+      "id": "i51",
+      "number": 51,
+      "title": "Issue 51",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794386780000,
+      "assignments": [
+       {
+        "id": "a51",
+        "issue": "i51",
+        "agent": "lab",
+        "assignedAt": 1794496940000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w51",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "canceled"
+      ],
+      "deliver": "answer",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "stuck",
+       "stuck": "failed",
+       "since": 1794500120000,
+       "lead": "cure",
+       "acts": [
+        {
+         "act": "cure",
+         "does": "move",
+         "status": "todo",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "sessionChanged",
+    "at": 1794500000000,
+    "session": {
+     "id": "w52",
+     "role": "worker",
+     "name": "Helper w52",
+     "agent": "lab",
+     "runtime": "claude",
+     "brief": "work on i52",
+     "repo": "demo",
+     "branch": "vibevalley/issue-52",
+     "worktree": "/tmp/worktrees/demo.52",
+     "hiredAt": 1794500000000,
+     "runs": 0,
+     "phase": {
+      "_tag": "working",
+      "since": 1794500000000,
+      "doing": {
+       "action": "run_command",
+       "label": "vp test"
+      }
+     },
+     "refining": false,
+     "issue": "i52"
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w51",
+      "role": "worker",
+      "name": "Helper w51",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i51",
+      "repo": "demo",
+      "branch": "vibevalley/issue-51",
+      "worktree": "/tmp/worktrees/demo.51",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i51",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "no answer block",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w52",
+      "role": "worker",
+      "name": "Helper w52",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i52",
+      "repo": "demo",
+      "branch": "vibevalley/issue-52",
+      "worktree": "/tmp/worktrees/demo.52",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "working",
+       "since": 1794500000000,
+       "doing": {
+        "action": "run_command",
+        "label": "vp test"
+       }
+      },
+      "refining": false,
+      "issue": "i52"
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w51": {
+      "station": 1,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w52": {
+      "station": 2,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     },
+     {
+      "id": "i51",
+      "number": 51,
+      "title": "Issue 51",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794386780000,
+      "assignments": [
+       {
+        "id": "a51",
+        "issue": "i51",
+        "agent": "lab",
+        "assignedAt": 1794496940000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w51",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "canceled"
+      ],
+      "deliver": "answer",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "stuck",
+       "stuck": "failed",
+       "since": 1794500120000,
+       "lead": "cure",
+       "acts": [
+        {
+         "act": "cure",
+         "does": "move",
+         "status": "todo",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "issueChanged",
+    "at": 1794500000000,
+    "issue": {
+     "id": "i52",
+     "number": 52,
+     "title": "Issue 52",
+     "priority": "medium",
+     "status": "todo",
+     "createdAt": 1794384560000,
+     "assignments": [
+      {
+       "id": "a52",
+       "issue": "i52",
+       "agent": "lab",
+       "assignedAt": 1794496880000,
+       "executions": [
+        {
+         "kind": "worker",
+         "session": "w52",
+         "startedAt": 1794500000000
+        }
+       ]
+      }
+     ],
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 3,
+      "autoSubmitPr": false
+     },
+     "moves": [],
+     "deliver": "change",
+     "findings": [],
+     "questions": [],
+     "description": "",
+     "blockedBy": [],
+     "criteria": [],
+     "checks": [],
+     "stage": {
+      "state": "queued",
+      "acts": []
+     },
+     "pullRequest": {
+      "url": "https://github.com/a/b/pull/1",
+      "number": 1,
+      "state": "open"
+     }
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w51",
+      "role": "worker",
+      "name": "Helper w51",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i51",
+      "repo": "demo",
+      "branch": "vibevalley/issue-51",
+      "worktree": "/tmp/worktrees/demo.51",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i51",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "no answer block",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w52",
+      "role": "worker",
+      "name": "Helper w52",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i52",
+      "repo": "demo",
+      "branch": "vibevalley/issue-52",
+      "worktree": "/tmp/worktrees/demo.52",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "working",
+       "since": 1794500000000,
+       "doing": {
+        "action": "run_command",
+        "label": "vp test"
+       }
+      },
+      "refining": false,
+      "issue": "i52"
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w51": {
+      "station": 1,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w52": {
+      "station": 2,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     },
+     {
+      "id": "i51",
+      "number": 51,
+      "title": "Issue 51",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794386780000,
+      "assignments": [
+       {
+        "id": "a51",
+        "issue": "i51",
+        "agent": "lab",
+        "assignedAt": 1794496940000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w51",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "canceled"
+      ],
+      "deliver": "answer",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "stuck",
+       "stuck": "failed",
+       "since": 1794500120000,
+       "lead": "cure",
+       "acts": [
+        {
+         "act": "cure",
+         "does": "move",
+         "status": "todo",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     },
+     {
+      "id": "i52",
+      "number": 52,
+      "title": "Issue 52",
+      "priority": "medium",
+      "status": "in_progress",
+      "createdAt": 1794384560000,
+      "assignments": [
+       {
+        "id": "a52",
+        "issue": "i52",
+        "agent": "lab",
+        "assignedAt": 1794496880000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w52",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500000000,
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "stop",
+         "does": "stop"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "pullRequest": {
+       "url": "https://github.com/a/b/pull/1",
+       "number": 1,
+       "state": "open"
+      }
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "sessionReported",
+    "at": 1794500120000,
+    "id": "w52",
+    "outcome": "completed",
+    "summary": "pr open",
+    "runs": 1,
+    "phase": {
+     "_tag": "resting"
+    },
+    "questions": [],
+    "checks": []
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w51",
+      "role": "worker",
+      "name": "Helper w51",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i51",
+      "repo": "demo",
+      "branch": "vibevalley/issue-51",
+      "worktree": "/tmp/worktrees/demo.51",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i51",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "no answer block",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w52",
+      "role": "worker",
+      "name": "Helper w52",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i52",
+      "repo": "demo",
+      "branch": "vibevalley/issue-52",
+      "worktree": "/tmp/worktrees/demo.52",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "resting"
+      },
+      "refining": false,
+      "issue": "i52",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "pr open",
+       "at": 1794500120000
+      }
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w51": {
+      "station": 1,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w52": {
+      "station": 2,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     },
+     {
+      "id": "i51",
+      "number": 51,
+      "title": "Issue 51",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794386780000,
+      "assignments": [
+       {
+        "id": "a51",
+        "issue": "i51",
+        "agent": "lab",
+        "assignedAt": 1794496940000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w51",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "canceled"
+      ],
+      "deliver": "answer",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "stuck",
+       "stuck": "failed",
+       "since": 1794500120000,
+       "lead": "cure",
+       "acts": [
+        {
+         "act": "cure",
+         "does": "move",
+         "status": "todo",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     },
+     {
+      "id": "i52",
+      "number": 52,
+      "title": "Issue 52",
+      "priority": "medium",
+      "status": "in_progress",
+      "createdAt": 1794384560000,
+      "assignments": [
+       {
+        "id": "a52",
+        "issue": "i52",
+        "agent": "lab",
+        "assignedAt": 1794496880000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w52",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500120000,
+       "lead": "tell",
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "pullRequest": {
+       "url": "https://github.com/a/b/pull/1",
+       "number": 1,
+       "state": "open"
+      }
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "sessionChanged",
+    "at": 1794500000000,
+    "session": {
+     "id": "w53",
+     "role": "worker",
+     "name": "Helper w53",
+     "agent": "lab",
+     "runtime": "claude",
+     "brief": "work on i53",
+     "repo": "demo",
+     "branch": "vibevalley/issue-53",
+     "worktree": "/tmp/worktrees/demo.53",
+     "hiredAt": 1794500000000,
+     "runs": 0,
+     "phase": {
+      "_tag": "working",
+      "since": 1794500000000,
+      "doing": {
+       "action": "run_command",
+       "label": "vp test"
+      }
+     },
+     "refining": false,
+     "issue": "i53"
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w51",
+      "role": "worker",
+      "name": "Helper w51",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i51",
+      "repo": "demo",
+      "branch": "vibevalley/issue-51",
+      "worktree": "/tmp/worktrees/demo.51",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i51",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "no answer block",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w52",
+      "role": "worker",
+      "name": "Helper w52",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i52",
+      "repo": "demo",
+      "branch": "vibevalley/issue-52",
+      "worktree": "/tmp/worktrees/demo.52",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "resting"
+      },
+      "refining": false,
+      "issue": "i52",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "pr open",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w53",
+      "role": "worker",
+      "name": "Helper w53",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i53",
+      "repo": "demo",
+      "branch": "vibevalley/issue-53",
+      "worktree": "/tmp/worktrees/demo.53",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "working",
+       "since": 1794500000000,
+       "doing": {
+        "action": "run_command",
+        "label": "vp test"
+       }
+      },
+      "refining": false,
+      "issue": "i53"
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w51": {
+      "station": 1,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w52": {
+      "station": 2,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w53": {
+      "station": 3,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     },
+     {
+      "id": "i51",
+      "number": 51,
+      "title": "Issue 51",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794386780000,
+      "assignments": [
+       {
+        "id": "a51",
+        "issue": "i51",
+        "agent": "lab",
+        "assignedAt": 1794496940000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w51",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "canceled"
+      ],
+      "deliver": "answer",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "stuck",
+       "stuck": "failed",
+       "since": 1794500120000,
+       "lead": "cure",
+       "acts": [
+        {
+         "act": "cure",
+         "does": "move",
+         "status": "todo",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     },
+     {
+      "id": "i52",
+      "number": 52,
+      "title": "Issue 52",
+      "priority": "medium",
+      "status": "in_progress",
+      "createdAt": 1794384560000,
+      "assignments": [
+       {
+        "id": "a52",
+        "issue": "i52",
+        "agent": "lab",
+        "assignedAt": 1794496880000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w52",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500120000,
+       "lead": "tell",
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "pullRequest": {
+       "url": "https://github.com/a/b/pull/1",
+       "number": 1,
+       "state": "open"
+      }
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "issueChanged",
+    "at": 1794500000000,
+    "issue": {
+     "id": "i53",
+     "number": 53,
+     "title": "Issue 53",
+     "priority": "high",
+     "status": "todo",
+     "createdAt": 1794382340000,
+     "assignments": [
+      {
+       "id": "a53",
+       "issue": "i53",
+       "agent": "lab",
+       "assignedAt": 1794496820000,
+       "executions": [
+        {
+         "kind": "worker",
+         "session": "w53",
+         "startedAt": 1794500000000
+        }
+       ]
+      }
+     ],
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 3,
+      "autoSubmitPr": false
+     },
+     "moves": [],
+     "deliver": "change",
+     "findings": [
+      {
+       "id": "f1",
+       "text": "fix the test",
+       "at": 1794500000000,
+       "resolved": false
+      }
+     ],
+     "questions": [],
+     "description": "",
+     "blockedBy": [],
+     "criteria": [],
+     "checks": [],
+     "stage": {
+      "state": "queued",
+      "acts": []
+     }
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w51",
+      "role": "worker",
+      "name": "Helper w51",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i51",
+      "repo": "demo",
+      "branch": "vibevalley/issue-51",
+      "worktree": "/tmp/worktrees/demo.51",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i51",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "no answer block",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w52",
+      "role": "worker",
+      "name": "Helper w52",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i52",
+      "repo": "demo",
+      "branch": "vibevalley/issue-52",
+      "worktree": "/tmp/worktrees/demo.52",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "resting"
+      },
+      "refining": false,
+      "issue": "i52",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "pr open",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w53",
+      "role": "worker",
+      "name": "Helper w53",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i53",
+      "repo": "demo",
+      "branch": "vibevalley/issue-53",
+      "worktree": "/tmp/worktrees/demo.53",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "working",
+       "since": 1794500000000,
+       "doing": {
+        "action": "run_command",
+        "label": "vp test"
+       }
+      },
+      "refining": false,
+      "issue": "i53"
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w51": {
+      "station": 1,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w52": {
+      "station": 2,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w53": {
+      "station": 3,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     },
+     {
+      "id": "i51",
+      "number": 51,
+      "title": "Issue 51",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794386780000,
+      "assignments": [
+       {
+        "id": "a51",
+        "issue": "i51",
+        "agent": "lab",
+        "assignedAt": 1794496940000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w51",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "canceled"
+      ],
+      "deliver": "answer",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "stuck",
+       "stuck": "failed",
+       "since": 1794500120000,
+       "lead": "cure",
+       "acts": [
+        {
+         "act": "cure",
+         "does": "move",
+         "status": "todo",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     },
+     {
+      "id": "i52",
+      "number": 52,
+      "title": "Issue 52",
+      "priority": "medium",
+      "status": "in_progress",
+      "createdAt": 1794384560000,
+      "assignments": [
+       {
+        "id": "a52",
+        "issue": "i52",
+        "agent": "lab",
+        "assignedAt": 1794496880000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w52",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500120000,
+       "lead": "tell",
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "pullRequest": {
+       "url": "https://github.com/a/b/pull/1",
+       "number": 1,
+       "state": "open"
+      }
+     },
+     {
+      "id": "i53",
+      "number": 53,
+      "title": "Issue 53",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794382340000,
+      "assignments": [
+       {
+        "id": "a53",
+        "issue": "i53",
+        "agent": "lab",
+        "assignedAt": 1794496820000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w53",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [
+       {
+        "id": "f1",
+        "text": "fix the test",
+        "at": 1794500000000,
+        "resolved": false
+       }
+      ],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500000000,
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "stop",
+         "does": "stop"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "issueChanged",
+    "at": 1794500000000,
+    "issue": {
+     "id": "i54",
+     "number": 54,
+     "title": "Issue 54",
+     "priority": "medium",
+     "status": "todo",
+     "createdAt": 1794380120000,
+     "assignments": [],
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 3,
+      "autoSubmitPr": false
+     },
+     "moves": [],
+     "deliver": "change",
+     "findings": [],
+     "questions": [],
+     "description": "",
+     "blockedBy": [],
+     "criteria": [],
+     "checks": [],
+     "stage": {
+      "state": "queued",
+      "acts": []
+     },
+     "lastRun": {
+      "startedAt": 1794500000000,
+      "endedAt": 1794500060000,
+      "outcome": "interrupted"
+     }
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w51",
+      "role": "worker",
+      "name": "Helper w51",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i51",
+      "repo": "demo",
+      "branch": "vibevalley/issue-51",
+      "worktree": "/tmp/worktrees/demo.51",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i51",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "no answer block",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w52",
+      "role": "worker",
+      "name": "Helper w52",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i52",
+      "repo": "demo",
+      "branch": "vibevalley/issue-52",
+      "worktree": "/tmp/worktrees/demo.52",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "resting"
+      },
+      "refining": false,
+      "issue": "i52",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "pr open",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w53",
+      "role": "worker",
+      "name": "Helper w53",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i53",
+      "repo": "demo",
+      "branch": "vibevalley/issue-53",
+      "worktree": "/tmp/worktrees/demo.53",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "working",
+       "since": 1794500000000,
+       "doing": {
+        "action": "run_command",
+        "label": "vp test"
+       }
+      },
+      "refining": false,
+      "issue": "i53"
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w51": {
+      "station": 1,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w52": {
+      "station": 2,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w53": {
+      "station": 3,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i54",
+      "number": 54,
+      "title": "Issue 54",
+      "priority": "medium",
+      "status": "in_progress",
+      "createdAt": 1794380120000,
+      "assignments": [],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "stuck",
+       "stuck": "interrupted",
+       "since": 1794500060000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "lastRun": {
+       "startedAt": 1794500000000,
+       "endedAt": 1794500060000,
+       "outcome": "interrupted"
+      }
+     },
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     },
+     {
+      "id": "i51",
+      "number": 51,
+      "title": "Issue 51",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794386780000,
+      "assignments": [
+       {
+        "id": "a51",
+        "issue": "i51",
+        "agent": "lab",
+        "assignedAt": 1794496940000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w51",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "canceled"
+      ],
+      "deliver": "answer",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "stuck",
+       "stuck": "failed",
+       "since": 1794500120000,
+       "lead": "cure",
+       "acts": [
+        {
+         "act": "cure",
+         "does": "move",
+         "status": "todo",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     },
+     {
+      "id": "i52",
+      "number": 52,
+      "title": "Issue 52",
+      "priority": "medium",
+      "status": "in_progress",
+      "createdAt": 1794384560000,
+      "assignments": [
+       {
+        "id": "a52",
+        "issue": "i52",
+        "agent": "lab",
+        "assignedAt": 1794496880000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w52",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500120000,
+       "lead": "tell",
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "pullRequest": {
+       "url": "https://github.com/a/b/pull/1",
+       "number": 1,
+       "state": "open"
+      }
+     },
+     {
+      "id": "i53",
+      "number": 53,
+      "title": "Issue 53",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794382340000,
+      "assignments": [
+       {
+        "id": "a53",
+        "issue": "i53",
+        "agent": "lab",
+        "assignedAt": 1794496820000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w53",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [
+       {
+        "id": "f1",
+        "text": "fix the test",
+        "at": 1794500000000,
+        "resolved": false
+       }
+      ],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500000000,
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "stop",
+         "does": "stop"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  },
+  {
+   "fact": {
+    "type": "sessionChanged",
+    "at": 1794500000000,
+    "session": {
+     "id": "w55",
+     "role": "worker",
+     "name": "Helper w55",
+     "agent": "lab",
+     "runtime": "claude",
+     "brief": "work on i55",
+     "repo": "demo",
+     "branch": "vibevalley/issue-55",
+     "worktree": "/tmp/worktrees/demo.55",
+     "hiredAt": 1794500000000,
+     "runs": 0,
+     "phase": {
+      "_tag": "closed",
+      "at": 1794500000000,
+      "closed": "merged"
+     },
+     "refining": false,
+     "issue": "i55"
+    }
+   },
+   "changed": true,
+   "effects": [],
+   "state": {
+    "call": "idle",
+    "callReason": "",
+    "sessions": [
+     {
+      "id": "w50",
+      "role": "worker",
+      "name": "Helper w50",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i50",
+      "repo": "demo",
+      "branch": "vibevalley/issue-50",
+      "worktree": "/tmp/worktrees/demo.50",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i50",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "done",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w51",
+      "role": "worker",
+      "name": "Helper w51",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i51",
+      "repo": "demo",
+      "branch": "vibevalley/issue-51",
+      "worktree": "/tmp/worktrees/demo.51",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "done"
+      },
+      "refining": false,
+      "issue": "i51",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "no answer block",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w52",
+      "role": "worker",
+      "name": "Helper w52",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i52",
+      "repo": "demo",
+      "branch": "vibevalley/issue-52",
+      "worktree": "/tmp/worktrees/demo.52",
+      "hiredAt": 1794500000000,
+      "runs": 1,
+      "phase": {
+       "_tag": "resting"
+      },
+      "refining": false,
+      "issue": "i52",
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "pr open",
+       "at": 1794500120000
+      }
+     },
+     {
+      "id": "w53",
+      "role": "worker",
+      "name": "Helper w53",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i53",
+      "repo": "demo",
+      "branch": "vibevalley/issue-53",
+      "worktree": "/tmp/worktrees/demo.53",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "working",
+       "since": 1794500000000,
+       "doing": {
+        "action": "run_command",
+        "label": "vp test"
+       }
+      },
+      "refining": false,
+      "issue": "i53"
+     },
+     {
+      "id": "w55",
+      "role": "worker",
+      "name": "Helper w55",
+      "agent": "lab",
+      "runtime": "claude",
+      "brief": "work on i55",
+      "repo": "demo",
+      "branch": "vibevalley/issue-55",
+      "worktree": "/tmp/worktrees/demo.55",
+      "hiredAt": 1794500000000,
+      "runs": 0,
+      "phase": {
+       "_tag": "closed",
+       "at": 1794500000000,
+       "closed": "merged"
+      },
+      "refining": false,
+      "issue": "i55"
+     }
+    ],
+    "plays": {
+     "w50": {
+      "station": 0,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w51": {
+      "station": 1,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w52": {
+      "station": 2,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w53": {
+      "station": 3,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     },
+     "w55": {
+      "station": 4,
+      "history": [],
+      "toolsThisRun": 0,
+      "counts": {},
+      "files": [],
+      "commands": []
+     }
+    },
+    "crons": [],
+    "issues": [
+     {
+      "id": "i54",
+      "number": 54,
+      "title": "Issue 54",
+      "priority": "medium",
+      "status": "in_progress",
+      "createdAt": 1794380120000,
+      "assignments": [],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "stuck",
+       "stuck": "interrupted",
+       "since": 1794500060000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "lastRun": {
+       "startedAt": 1794500000000,
+       "endedAt": 1794500060000,
+       "outcome": "interrupted"
+      }
+     },
+     {
+      "id": "i50",
+      "number": 50,
+      "title": "Issue 50",
+      "priority": "medium",
+      "status": "in_review",
+      "createdAt": 1794389000000,
+      "assignments": [
+       {
+        "id": "a50",
+        "issue": "i50",
+        "agent": "lab",
+        "assignedAt": 1794497000000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w50",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "done",
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "reviewing",
+       "since": 1794500120000,
+       "lead": "complete",
+       "acts": [
+        {
+         "act": "complete",
+         "does": "move",
+         "status": "done",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "reviewedAt": 1794500060000
+     },
+     {
+      "id": "i51",
+      "number": 51,
+      "title": "Issue 51",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794386780000,
+      "assignments": [
+       {
+        "id": "a51",
+        "issue": "i51",
+        "agent": "lab",
+        "assignedAt": 1794496940000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w51",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "todo",
+       "canceled"
+      ],
+      "deliver": "answer",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "stuck",
+       "stuck": "failed",
+       "since": 1794500120000,
+       "lead": "cure",
+       "acts": [
+        {
+         "act": "cure",
+         "does": "move",
+         "status": "todo",
+         "words": "none"
+        },
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     },
+     {
+      "id": "i52",
+      "number": 52,
+      "title": "Issue 52",
+      "priority": "medium",
+      "status": "in_progress",
+      "createdAt": 1794384560000,
+      "assignments": [
+       {
+        "id": "a52",
+        "issue": "i52",
+        "agent": "lab",
+        "assignedAt": 1794496880000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w52",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500120000,
+       "lead": "tell",
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      },
+      "pullRequest": {
+       "url": "https://github.com/a/b/pull/1",
+       "number": 1,
+       "state": "open"
+      }
+     },
+     {
+      "id": "i53",
+      "number": 53,
+      "title": "Issue 53",
+      "priority": "high",
+      "status": "in_progress",
+      "createdAt": 1794382340000,
+      "assignments": [
+       {
+        "id": "a53",
+        "issue": "i53",
+        "agent": "lab",
+        "assignedAt": 1794496820000,
+        "executions": [
+         {
+          "kind": "worker",
+          "session": "w53",
+          "startedAt": 1794500000000
+         }
+        ]
+       }
+      ],
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 3,
+       "autoSubmitPr": false
+      },
+      "moves": [
+       "canceled"
+      ],
+      "deliver": "change",
+      "findings": [
+       {
+        "id": "f1",
+        "text": "fix the test",
+        "at": 1794500000000,
+        "resolved": false
+       }
+      ],
+      "questions": [],
+      "description": "",
+      "blockedBy": [],
+      "criteria": [],
+      "checks": [],
+      "stage": {
+       "state": "working",
+       "since": 1794500000000,
+       "acts": [
+        {
+         "act": "tell",
+         "does": "say"
+        },
+        {
+         "act": "stop",
+         "does": "stop"
+        },
+        {
+         "act": "close",
+         "does": "move",
+         "status": "canceled",
+         "words": "none"
+        }
+       ]
+      }
+     }
+    ],
+    "connectors": [],
+    "machines": []
+   }
+  }
+ ],
+ "frame": {
+  "seq": 13,
+  "state": {
+   "call": "idle",
+   "callReason": "",
+   "issues": [
+    {
+     "id": "i54",
+     "number": 54,
+     "title": "Issue 54",
+     "description": "",
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 3,
+      "autoSubmitPr": false
+     },
+     "assignments": [],
+     "priority": "medium",
+     "createdAt": 1794380120000,
+     "blockedBy": [],
+     "status": "in_progress",
+     "moves": [
+      "todo",
+      "done",
+      "canceled"
+     ],
+     "deliver": "change",
+     "findings": [],
+     "questions": [],
+     "criteria": [],
+     "checks": [],
+     "lastRun": {
+      "startedAt": 1794500000000,
+      "endedAt": 1794500060000,
+      "outcome": "interrupted"
+     },
+     "stage": {
+      "state": "stuck",
+      "since": 1794500060000,
+      "stuck": "interrupted",
+      "lead": "complete",
+      "acts": [
+       {
+        "act": "complete",
+        "does": "move",
+        "status": "done",
+        "words": "none"
+       },
+       {
+        "act": "close",
+        "does": "move",
+        "status": "canceled",
+        "words": "none"
+       }
+      ]
+     }
+    },
+    {
+     "id": "i50",
+     "number": 50,
+     "title": "Issue 50",
+     "description": "",
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 3,
+      "autoSubmitPr": false
+     },
+     "assignments": [
+      {
+       "id": "a50",
+       "issue": "i50",
+       "agent": "lab",
+       "assignedAt": 1794497000000,
+       "executions": [
+        {
+         "kind": "worker",
+         "session": "w50",
+         "startedAt": 1794500000000
+        }
+       ]
+      }
+     ],
+     "priority": "medium",
+     "createdAt": 1794389000000,
+     "blockedBy": [],
+     "status": "in_review",
+     "moves": [
+      "todo",
+      "done",
+      "canceled"
+     ],
+     "deliver": "change",
+     "reviewedAt": 1794500060000,
+     "findings": [],
+     "questions": [],
+     "criteria": [],
+     "checks": [],
+     "stage": {
+      "state": "reviewing",
+      "since": 1794500120000,
+      "lead": "complete",
+      "acts": [
+       {
+        "act": "complete",
+        "does": "move",
+        "status": "done",
+        "words": "none"
+       },
+       {
+        "act": "tell",
+        "does": "say"
+       },
+       {
+        "act": "close",
+        "does": "move",
+        "status": "canceled",
+        "words": "none"
+       }
+      ]
+     }
+    },
+    {
+     "id": "i51",
+     "number": 51,
+     "title": "Issue 51",
+     "description": "",
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 3,
+      "autoSubmitPr": false
+     },
+     "assignments": [
+      {
+       "id": "a51",
+       "issue": "i51",
+       "agent": "lab",
+       "assignedAt": 1794496940000,
+       "executions": [
+        {
+         "kind": "worker",
+         "session": "w51",
+         "startedAt": 1794500000000
+        }
+       ]
+      }
+     ],
+     "priority": "high",
+     "createdAt": 1794386780000,
+     "blockedBy": [],
+     "status": "in_progress",
+     "moves": [
+      "todo",
+      "canceled"
+     ],
+     "deliver": "answer",
+     "findings": [],
+     "questions": [],
+     "criteria": [],
+     "checks": [],
+     "stage": {
+      "state": "stuck",
+      "since": 1794500120000,
+      "stuck": "failed",
+      "lead": "cure",
+      "acts": [
+       {
+        "act": "cure",
+        "does": "move",
+        "status": "todo",
+        "words": "none"
+       },
+       {
+        "act": "tell",
+        "does": "say"
+       },
+       {
+        "act": "close",
+        "does": "move",
+        "status": "canceled",
+        "words": "none"
+       }
+      ]
+     }
+    },
+    {
+     "id": "i52",
+     "number": 52,
+     "title": "Issue 52",
+     "description": "",
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 3,
+      "autoSubmitPr": false
+     },
+     "assignments": [
+      {
+       "id": "a52",
+       "issue": "i52",
+       "agent": "lab",
+       "assignedAt": 1794496880000,
+       "executions": [
+        {
+         "kind": "worker",
+         "session": "w52",
+         "startedAt": 1794500000000
+        }
+       ]
+      }
+     ],
+     "priority": "medium",
+     "createdAt": 1794384560000,
+     "blockedBy": [],
+     "status": "in_progress",
+     "moves": [
+      "canceled"
+     ],
+     "pullRequest": {
+      "url": "https://github.com/a/b/pull/1",
+      "number": 1,
+      "state": "open"
+     },
+     "deliver": "change",
+     "findings": [],
+     "questions": [],
+     "criteria": [],
+     "checks": [],
+     "stage": {
+      "state": "working",
+      "since": 1794500120000,
+      "lead": "tell",
+      "acts": [
+       {
+        "act": "tell",
+        "does": "say"
+       },
+       {
+        "act": "close",
+        "does": "move",
+        "status": "canceled",
+        "words": "none"
+       }
+      ]
+     }
+    },
+    {
+     "id": "i53",
+     "number": 53,
+     "title": "Issue 53",
+     "description": "",
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 3,
+      "autoSubmitPr": false
+     },
+     "assignments": [
+      {
+       "id": "a53",
+       "issue": "i53",
+       "agent": "lab",
+       "assignedAt": 1794496820000,
+       "executions": [
+        {
+         "kind": "worker",
+         "session": "w53",
+         "startedAt": 1794500000000
+        }
+       ]
+      }
+     ],
+     "priority": "high",
+     "createdAt": 1794382340000,
+     "blockedBy": [],
+     "status": "in_progress",
+     "moves": [
+      "canceled"
+     ],
+     "deliver": "change",
+     "findings": [
+      {
+       "id": "f1",
+       "text": "fix the test",
+       "at": 1794500000000,
+       "resolved": false
+      }
+     ],
+     "questions": [],
+     "criteria": [],
+     "checks": [],
+     "stage": {
+      "state": "working",
+      "since": 1794500000000,
+      "acts": [
+       {
+        "act": "tell",
+        "does": "say"
+       },
+       {
+        "act": "stop",
+        "does": "stop"
+       },
+       {
+        "act": "close",
+        "does": "move",
+        "status": "canceled",
+        "words": "none"
+       }
+      ]
+     }
+    }
+   ],
+   "connectors": [],
+   "machines": [],
+   "sessions": [
+    {
+     "id": "w50",
+     "role": "worker",
+     "name": "Helper w50",
+     "agent": "lab",
+     "runtime": "claude",
+     "brief": "work on i50",
+     "repo": "demo",
+     "branch": "vibevalley/issue-50",
+     "worktree": "/tmp/worktrees/demo.50",
+     "hiredAt": 1794500000000,
+     "runs": 1,
+     "lastRun": {
+      "outcome": "completed",
+      "summary": "done",
+      "at": 1794500120000
+     },
+     "issue": "i50",
+     "refining": false,
+     "phase": {
+      "_tag": "done"
+     },
+     "phaseText": "这一轮做完了，等你看"
+    },
+    {
+     "id": "w51",
+     "role": "worker",
+     "name": "Helper w51",
+     "agent": "lab",
+     "runtime": "claude",
+     "brief": "work on i51",
+     "repo": "demo",
+     "branch": "vibevalley/issue-51",
+     "worktree": "/tmp/worktrees/demo.51",
+     "hiredAt": 1794500000000,
+     "runs": 1,
+     "lastRun": {
+      "outcome": "completed",
+      "summary": "no answer block",
+      "at": 1794500120000
+     },
+     "issue": "i51",
+     "refining": false,
+     "phase": {
+      "_tag": "done"
+     },
+     "phaseText": "这一轮做完了，等你看"
+    },
+    {
+     "id": "w52",
+     "role": "worker",
+     "name": "Helper w52",
+     "agent": "lab",
+     "runtime": "claude",
+     "brief": "work on i52",
+     "repo": "demo",
+     "branch": "vibevalley/issue-52",
+     "worktree": "/tmp/worktrees/demo.52",
+     "hiredAt": 1794500000000,
+     "runs": 1,
+     "lastRun": {
+      "outcome": "completed",
+      "summary": "pr open",
+      "at": 1794500120000
+     },
+     "issue": "i52",
+     "refining": false,
+     "phase": {
+      "_tag": "resting"
+     },
+     "phaseText": "歇着（上一轮做完了）"
+    },
+    {
+     "id": "w53",
+     "role": "worker",
+     "name": "Helper w53",
+     "agent": "lab",
+     "runtime": "claude",
+     "brief": "work on i53",
+     "repo": "demo",
+     "branch": "vibevalley/issue-53",
+     "worktree": "/tmp/worktrees/demo.53",
+     "hiredAt": 1794500000000,
+     "runs": 0,
+     "issue": "i53",
+     "refining": false,
+     "phase": {
+      "_tag": "working",
+      "since": 1794500000000,
+      "doing": {
+       "action": "run_command",
+       "label": "vp test",
+       "actionText": "跑命令"
+      }
+     },
+     "phaseText": "在跑命令：vp test"
+    },
+    {
+     "id": "w55",
+     "role": "worker",
+     "name": "Helper w55",
+     "agent": "lab",
+     "runtime": "claude",
+     "brief": "work on i55",
+     "repo": "demo",
+     "branch": "vibevalley/issue-55",
+     "worktree": "/tmp/worktrees/demo.55",
+     "hiredAt": 1794500000000,
+     "runs": 0,
+     "issue": "i55",
+     "refining": false,
+     "phase": {
+      "_tag": "closed",
+      "at": 1794500000000,
+      "closed": "merged"
+     },
+     "phaseText": ""
+    }
+   ],
+   "crons": []
+  },
+  "inbox": [
+   {
+    "id": "w50:review:1",
+    "kind": "review",
+    "from": {
+     "kind": "session",
+     "id": "w50",
+     "name": "Helper w50",
+     "agent": "lab"
+    },
+    "who": "Helper w50",
+    "text": "done",
+    "at": 1794500120000,
+    "target": {
+     "kind": "session",
+     "id": "w50"
+    },
+    "words": {
+     "label": "等你看",
+     "title": "Helper w50 做完了",
+     "body": "done",
+     "tray": "Helper w50 做完了，等你看"
+    }
+   },
+   {
+    "id": "w51:fix:1",
+    "kind": "fix",
+    "from": {
+     "kind": "session",
+     "id": "w51",
+     "name": "Helper w51",
+     "agent": "lab"
+    },
+    "who": "Helper w51",
+    "text": "no answer block",
+    "at": 1794500120000,
+    "target": {
+     "kind": "session",
+     "id": "w51"
+    },
+    "words": {
+     "label": "活没做成",
+     "title": "Helper w51 没做成",
+     "body": "no answer block",
+     "tray": "Helper w51 没做成"
+    }
+   }
+  ],
+  "view": {
+   "level": {
+    "level": 1,
+    "xp": 0,
+    "need": 10
+   },
+   "plots": {
+    "i50": {
+     "crop": "carrot",
+     "badge": {
+      "text": "可收获",
+      "tone": "ripe"
+     }
+    },
+    "i51": {
+     "crop": "withered",
+     "badge": {
+      "text": "有虫",
+      "tone": "bug"
+     }
+    },
+    "i52": {
+     "crop": "sprout"
+    },
+    "i53": {
+     "crop": "weeds",
+     "badge": {
+      "text": "除草中 1",
+      "tone": "bug"
+     }
+    },
+    "i55": {
+     "crop": "empty"
+    }
+   },
+   "plays": {
+    "w50": {
+     "station": 0,
+     "toolsThisRun": 0,
+     "counts": {},
+     "files": [],
+     "commands": [],
+     "history": []
+    },
+    "w51": {
+     "station": 1,
+     "toolsThisRun": 0,
+     "counts": {},
+     "files": [],
+     "commands": [],
+     "history": []
+    },
+    "w52": {
+     "station": 2,
+     "toolsThisRun": 0,
+     "counts": {},
+     "files": [],
+     "commands": [],
+     "history": []
+    },
+    "w53": {
+     "station": 3,
+     "toolsThisRun": 0,
+     "counts": {},
+     "files": [],
+     "commands": [],
+     "history": []
+    },
+    "w55": {
+     "station": 4,
+     "toolsThisRun": 0,
+     "counts": {},
+     "files": [],
+     "commands": [],
+     "history": []
+    }
+   },
+   "achievements": [
+    {
+     "id": "s_open",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_hire",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_tell",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_review",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_voice",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_split",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "s_call",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "harvests",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "first_try",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "big_graph",
+     "tier": 0,
+     "count": 0,
+     "next": 3
+    },
+    {
+     "id": "farm_level",
+     "tier": 0,
+     "count": 0,
+     "next": 5
+    },
+    {
+     "id": "steady",
+     "tier": 0,
+     "count": 0,
+     "next": 5
+    },
+    {
+     "id": "untangle",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "comeback",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "thrifty",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "every_machine",
+     "tier": 0,
+     "count": 0,
+     "next": 2
+    },
+    {
+     "id": "handoff",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "parallel_graph",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "night_owl",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "weekend",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    },
+    {
+     "id": "full_house",
+     "tier": 0,
+     "count": 0,
+     "next": 1
+    }
+   ]
+  },
+  "effects": []
+ }
+}

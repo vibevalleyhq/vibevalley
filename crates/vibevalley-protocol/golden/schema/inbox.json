@@ -1,0 +1,117 @@
+{
+ "InboxKind": [
+  "review",
+  "ask",
+  "fix",
+  "interrupted",
+  "conflict",
+  "quiet",
+  "mention",
+  "cron-ask"
+ ],
+ "InboxFrom": [
+  {
+   "kind": "session",
+   "id": "s1464",
+   "name": "s1465",
+   "agent": "s1466"
+  },
+  {
+   "kind": "session",
+   "id": "s1467",
+   "name": "s1468",
+   "agent": "s1469"
+  },
+  {
+   "kind": "orchestrator"
+  }
+ ],
+ "InboxTarget": [
+  {
+   "kind": "session",
+   "id": "s1470"
+  },
+  {
+   "kind": "session",
+   "id": "s1471"
+  },
+  {
+   "kind": "issue",
+   "id": "s1472"
+  },
+  {
+   "kind": "issue",
+   "id": "s1473"
+  },
+  {
+   "kind": "chat",
+   "channel": "s1474"
+  },
+  {
+   "kind": "chat",
+   "channel": "s1475"
+  }
+ ],
+ "InboxWords": [
+  {
+   "label": "s1476",
+   "title": "s1477",
+   "body": "s1478",
+   "tray": "s1479"
+  },
+  {
+   "label": "s1480",
+   "title": "s1481",
+   "body": "s1482",
+   "tray": "s1483"
+  }
+ ],
+ "InboxItem": [
+  {
+   "id": "s1484",
+   "kind": "review",
+   "from": {
+    "kind": "session",
+    "id": "s1485",
+    "name": "s1486",
+    "agent": "s1487"
+   },
+   "who": "s1488",
+   "text": "s1489",
+   "at": 1490,
+   "target": {
+    "kind": "session",
+    "id": "s1491"
+   },
+   "words": {
+    "label": "s1492",
+    "title": "s1493",
+    "body": "s1494",
+    "tray": "s1495"
+   }
+  },
+  {
+   "id": "s1496",
+   "kind": "review",
+   "from": {
+    "kind": "session",
+    "id": "s1497",
+    "name": "s1498",
+    "agent": "s1499"
+   },
+   "who": "s1500",
+   "text": "s1501",
+   "at": 1502,
+   "target": {
+    "kind": "session",
+    "id": "s1503"
+   },
+   "words": {
+    "label": "s1504",
+    "title": "s1505",
+    "body": "s1506",
+    "tray": "s1507"
+   }
+  }
+ ]
+}

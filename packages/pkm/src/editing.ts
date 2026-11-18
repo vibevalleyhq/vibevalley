@@ -144,7 +144,7 @@ export interface Completion {
 }
 
 /** The completion the caret is in; none once a line break comes between, or for a caret before the text. */
-export function completionAt(value: string, caret: number): Completion | undefined {
+function completionAt(value: string, caret: number): Completion | undefined {
   if (caret < 0) return undefined;
   const before = value.slice(0, caret);
   const open = (opening: string, closing: string, kind: CompletionKind): Completion | undefined => {

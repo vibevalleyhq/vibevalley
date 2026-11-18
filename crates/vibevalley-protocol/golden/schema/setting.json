@@ -1,0 +1,430 @@
+{
+ "MemorySourceInfo": [
+  {
+   "name": "s462",
+   "label": "s463",
+   "on": true,
+   "off": "s465",
+   "canList": true,
+   "canForget": false,
+   "transcripts": true
+  },
+  {
+   "name": "s469",
+   "label": "s470",
+   "on": false,
+   "off": "s472",
+   "canList": false,
+   "canForget": true,
+   "transcripts": false
+  }
+ ],
+ "MemorySourceKind": [
+  "nowledge",
+  "everos"
+ ],
+ "MemorySource": [
+  {
+   "kind": "nowledge",
+   "url": "s4623",
+   "enabled": true,
+   "read": false,
+   "write": true,
+   "everything": false,
+   "user": "s4628",
+   "key": {
+    "source": "settings",
+    "hint": "s4629"
+   }
+  },
+  {
+   "kind": "nowledge",
+   "url": "s4630",
+   "enabled": false,
+   "read": true,
+   "write": false,
+   "everything": true,
+   "key": {
+    "source": null
+   }
+  }
+ ],
+ "SpacePaths": [
+  {
+   "repos": "s4635",
+   "worktrees": "s4636",
+   "pkm": "s4637"
+  },
+  {
+   "repos": "s4638",
+   "worktrees": "s4639",
+   "pkm": "s4640"
+  }
+ ],
+ "Readiness": [
+  {
+   "ready": true
+  },
+  {
+   "ready": false,
+   "missing": "mossAccount"
+  }
+ ],
+ "Missing": [
+  "deepseekKey",
+  "mossAccount",
+  "mossKey",
+  "mossOff",
+  "binding",
+  "agora",
+  "dictationUrl"
+ ],
+ "SettingsStatus": [
+  {
+   "file": "s4641",
+   "home": "s4642",
+   "paths": {
+    "repos": "s4643",
+    "worktrees": "s4644",
+    "pkm": "s4645"
+   },
+   "version": "s4646",
+   "locale": "zh",
+   "deepseekApiKey": {
+    "source": "settings",
+    "hint": "s4647"
+   },
+   "agoraAppId": {
+    "source": "settings",
+    "value": "s4648"
+   },
+   "agoraAppCertificate": {
+    "source": "settings",
+    "hint": "s4649"
+   },
+   "voice": {
+    "area": "US",
+    "language": "zh-CN",
+    "asr": {
+     "vendor": "ares"
+    },
+    "answer": {
+     "vendor": "orchestrator"
+    },
+    "tts": {
+     "vendor": "minimax",
+     "model": "speech_2_6_turbo",
+     "voiceId": "s4650"
+    },
+    "persona": "s4651",
+    "greeting": "s4652",
+    "failureMessage": "s4653",
+    "silenceMs": 4654,
+    "interruptMs": 4655,
+    "idleSeconds": 4656
+   },
+   "voiceDefaults": {
+    "area": "US",
+    "language": "zh-CN",
+    "asr": {
+     "vendor": "ares"
+    },
+    "answer": {
+     "vendor": "orchestrator"
+    },
+    "tts": {
+     "vendor": "minimax",
+     "model": "speech_2_6_turbo",
+     "voiceId": "s4657"
+    },
+    "persona": "s4658",
+    "greeting": "s4659",
+    "failureMessage": "s4660",
+    "silenceMs": 4661,
+    "interruptMs": 4662,
+    "idleSeconds": 4663
+   },
+   "asrKey": {
+    "source": "settings",
+    "hint": "s4664"
+   },
+   "llmKey": {
+    "source": "settings",
+    "hint": "s4665"
+   },
+   "ttsKey": {
+    "source": "settings",
+    "hint": "s4666"
+   },
+   "dictation": {
+    "via": "moss",
+    "url": "s4667",
+    "model": "s4668"
+   },
+   "dictationKey": {
+    "source": "settings",
+    "hint": "s4669"
+   },
+   "readiness": {
+    "orchestrator": {
+     "ready": true
+    },
+    "image": {
+     "ready": true
+    },
+    "understanding": {
+     "ready": true
+    },
+    "speech": {
+     "ready": true
+    },
+    "speakers": {
+     "ready": true
+    },
+    "voiceDesign": {
+     "ready": true
+    },
+    "transcription": {
+     "ready": true
+    },
+    "dictation": {
+     "ready": true
+    },
+    "live": {
+     "ready": true
+    },
+    "vision": {
+     "ready": true
+    },
+    "call": {
+     "ready": true
+    }
+   },
+   "memorySources": [
+    {
+     "kind": "nowledge",
+     "url": "s4670",
+     "enabled": false,
+     "read": true,
+     "write": false,
+     "everything": true,
+     "user": "s4675",
+     "key": {
+      "source": "settings",
+      "hint": "s4676"
+     }
+    }
+   ]
+  },
+  {
+   "file": "s4677",
+   "home": "s4678",
+   "paths": {
+    "repos": "s4679",
+    "worktrees": "s4680",
+    "pkm": "s4681"
+   },
+   "version": "s4682",
+   "locale": "zh",
+   "deepseekApiKey": {
+    "source": null
+   },
+   "agoraAppId": {
+    "source": null
+   },
+   "agoraAppCertificate": {
+    "source": null
+   },
+   "voice": {
+    "area": "US",
+    "language": "zh-CN",
+    "asr": {
+     "vendor": "ares"
+    },
+    "answer": {
+     "vendor": "orchestrator"
+    },
+    "tts": {
+     "vendor": "minimax",
+     "model": "speech_2_6_turbo",
+     "voiceId": "s4683"
+    },
+    "persona": "s4684",
+    "greeting": "s4685",
+    "failureMessage": "s4686",
+    "silenceMs": 4687,
+    "interruptMs": 4688,
+    "idleSeconds": 4689
+   },
+   "voiceDefaults": {
+    "area": "US",
+    "language": "zh-CN",
+    "asr": {
+     "vendor": "ares"
+    },
+    "answer": {
+     "vendor": "orchestrator"
+    },
+    "tts": {
+     "vendor": "minimax",
+     "model": "speech_2_6_turbo",
+     "voiceId": "s4690"
+    },
+    "persona": "s4691",
+    "greeting": "s4692",
+    "failureMessage": "s4693",
+    "silenceMs": 4694,
+    "interruptMs": 4695,
+    "idleSeconds": 4696
+   },
+   "asrKey": {
+    "source": null
+   },
+   "llmKey": {
+    "source": null
+   },
+   "ttsKey": {
+    "source": null
+   },
+   "dictation": {
+    "via": "moss",
+    "url": "s4697",
+    "model": "s4698"
+   },
+   "dictationKey": {
+    "source": null
+   },
+   "readiness": {
+    "orchestrator": {
+     "ready": true
+    },
+    "image": {
+     "ready": true
+    },
+    "understanding": {
+     "ready": true
+    },
+    "speech": {
+     "ready": true
+    },
+    "speakers": {
+     "ready": true
+    },
+    "voiceDesign": {
+     "ready": true
+    },
+    "transcription": {
+     "ready": true
+    },
+    "dictation": {
+     "ready": true
+    },
+    "live": {
+     "ready": true
+    },
+    "vision": {
+     "ready": true
+    },
+    "call": {
+     "ready": true
+    }
+   },
+   "memorySources": [
+    {
+     "kind": "nowledge",
+     "url": "s4699",
+     "enabled": true,
+     "read": false,
+     "write": true,
+     "everything": false,
+     "key": {
+      "source": null
+     }
+    }
+   ]
+  }
+ ],
+ "Feature": [
+  "orchestrator",
+  "image",
+  "understanding",
+  "speech",
+  "speakers",
+  "voiceDesign",
+  "transcription",
+  "dictation",
+  "live",
+  "vision",
+  "call"
+ ],
+ "MemorySourceUpdate": [
+  {
+   "kind": "nowledge",
+   "url": "s4704",
+   "enabled": false,
+   "read": true,
+   "write": false,
+   "everything": true,
+   "user": "s4709",
+   "key": "s4710"
+  },
+  {
+   "kind": "nowledge",
+   "url": "s4711",
+   "enabled": true,
+   "read": false,
+   "write": true
+  }
+ ],
+ "SettingsUpdate": [
+  {
+   "locale": "zh",
+   "deepseekApiKey": "s4715",
+   "agoraAppId": "s4716",
+   "agoraAppCertificate": "s4717",
+   "voice": {
+    "area": "US",
+    "language": "zh-CN",
+    "asr": {
+     "vendor": "ares"
+    },
+    "answer": {
+     "vendor": "orchestrator"
+    },
+    "tts": {
+     "vendor": "minimax",
+     "model": "speech_2_6_turbo",
+     "voiceId": "s4718"
+    },
+    "persona": "s4719",
+    "greeting": "s4720",
+    "failureMessage": "s4721",
+    "silenceMs": 4722,
+    "interruptMs": 4723,
+    "idleSeconds": 4724
+   },
+   "asrKey": "s4725",
+   "llmKey": "s4726",
+   "ttsKey": "s4727",
+   "dictation": {
+    "via": "moss",
+    "url": "s4728",
+    "model": "s4729"
+   },
+   "dictationKey": "s4730",
+   "memorySources": [
+    {
+     "kind": "nowledge",
+     "url": "s4731",
+     "enabled": true,
+     "read": false,
+     "write": true,
+     "everything": false,
+     "user": "s4736",
+     "key": "s4737"
+    }
+   ]
+  },
+  {}
+ ]
+}

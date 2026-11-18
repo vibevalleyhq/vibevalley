@@ -1,0 +1,16 @@
+{
+  "noRoom": {
+    "farm": "已经有 {max} 个帮工在干活了",
+    "repo": "仓库 {repo} 里已经有 {on} 个帮工在干活，最多同时 {max} 个：人多了容易改到同一个文件"
+  },
+  "log": {
+    "clipped": "… 省略 {n} 个字 …"
+  },
+  "host": {
+    "failed": "{label}出错了：{why}",
+    "markNeedsWords": "写一句它应该怎样",
+    "noStep": "{label}轨迹里没有第 {on} 步",
+    "notAsked": "第 {on} 步不是{label}收到的话",
+    "notInConversation": "第 {on} 步收到的话没进{label}的对话（那时{label}没起来？）"
+  }
+}

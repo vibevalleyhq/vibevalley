@@ -1,0 +1,31 @@
+{
+  "open": "打开 VibeValley",
+  "quit": "退出",
+  "waiting": "{n} 等你",
+  "working": "{n} 在干",
+  "menu": {
+    "about": "关于 {app}",
+    "settings": "设置…",
+    "hide": "隐藏 {app}",
+    "hideOthers": "隐藏其他",
+    "unhide": "全部显示",
+    "quit": "退出 {app}",
+    "edit": "编辑",
+    "undo": "撤销",
+    "redo": "重做",
+    "cut": "剪切",
+    "copy": "拷贝",
+    "paste": "粘贴",
+    "selectAll": "全选",
+    "view": "显示",
+    "toggleSidebar": "切换侧边栏",
+    "toggleTheme": "切换主题",
+    "resetZoom": "实际大小",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "fullScreen": "进入全屏幕",
+    "window": "窗口",
+    "close": "关闭窗口",
+    "closeTab": "关闭标签页"
+  }
+}

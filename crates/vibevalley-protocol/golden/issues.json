@@ -1,0 +1,647 @@
+[
+ {
+  "id": "i11",
+  "number": 11,
+  "title": "Issue 11",
+  "description": "",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "assignments": [
+   {
+    "id": "a11",
+    "issue": "i11",
+    "agent": "lab",
+    "assignedAt": 1794499340000,
+    "executions": []
+   }
+  ],
+  "priority": "high",
+  "createdAt": 1794475580000,
+  "blockedBy": [],
+  "status": "in_review",
+  "moves": [
+   "todo",
+   "done",
+   "canceled"
+  ],
+  "deliver": "change",
+  "findings": [],
+  "questions": [],
+  "criteria": [],
+  "checks": [],
+  "lastRun": {
+   "startedAt": 1794500000000,
+   "endedAt": 1794500060000,
+   "outcome": "completed"
+  },
+  "stage": {
+   "state": "reviewing",
+   "since": 1794500060000,
+   "lead": "complete",
+   "acts": [
+    {
+     "act": "complete",
+     "does": "move",
+     "status": "done",
+     "words": "none"
+    },
+    {
+     "act": "close",
+     "does": "move",
+     "status": "canceled",
+     "words": "none"
+    }
+   ]
+  }
+ },
+ {
+  "id": "i10",
+  "number": 10,
+  "title": "Issue 10",
+  "description": "",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "assignments": [
+   {
+    "id": "a10",
+    "issue": "i10",
+    "agent": "lab",
+    "assignedAt": 1794499400000,
+    "executions": []
+   }
+  ],
+  "priority": "medium",
+  "createdAt": 1794477800000,
+  "closedAt": 1794500000000,
+  "canceled": "dismissed",
+  "blockedBy": [],
+  "status": "canceled",
+  "moves": [
+   "backlog"
+  ],
+  "deliver": "change",
+  "findings": [],
+  "questions": [],
+  "criteria": [],
+  "checks": [],
+  "stage": {
+   "state": "canceled",
+   "since": 1794500000000,
+   "lead": "reopen",
+   "acts": [
+    {
+     "act": "reopen",
+     "does": "move",
+     "status": "backlog",
+     "words": "none"
+    }
+   ]
+  }
+ },
+ {
+  "id": "i9",
+  "number": 9,
+  "title": "Issue 9",
+  "description": "",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "assignments": [
+   {
+    "id": "a9",
+    "issue": "i9",
+    "agent": "lab",
+    "assignedAt": 1794499460000,
+    "executions": []
+   }
+  ],
+  "priority": "high",
+  "createdAt": 1794480020000,
+  "closedAt": 1794500000000,
+  "delivered": "merged",
+  "blockedBy": [],
+  "status": "done",
+  "moves": [
+   "backlog"
+  ],
+  "deliver": "change",
+  "findings": [],
+  "questions": [],
+  "criteria": [],
+  "checks": [],
+  "stage": {
+   "state": "done",
+   "since": 1794500000000,
+   "acts": [
+    {
+     "act": "reopen",
+     "does": "move",
+     "status": "backlog",
+     "words": "none"
+    }
+   ]
+  }
+ },
+ {
+  "id": "i8",
+  "number": 8,
+  "title": "Issue 8",
+  "description": "",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "assignments": [
+   {
+    "id": "a8",
+    "issue": "i8",
+    "agent": "lab",
+    "assignedAt": 1794499520000,
+    "executions": []
+   }
+  ],
+  "priority": "medium",
+  "createdAt": 1794482240000,
+  "queuedAt": 1794500000000,
+  "blockedBy": [],
+  "status": "todo",
+  "moves": [
+   "backlog",
+   "canceled"
+  ],
+  "deliver": "change",
+  "findings": [],
+  "questions": [],
+  "criteria": [],
+  "checks": [],
+  "stage": {
+   "state": "queued",
+   "since": 1794500000000,
+   "acts": [
+    {
+     "act": "close",
+     "does": "move",
+     "status": "canceled",
+     "words": "none"
+    }
+   ]
+  }
+ },
+ {
+  "id": "i7",
+  "number": 7,
+  "title": "Issue 7",
+  "description": "",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "assignments": [
+   {
+    "id": "a7",
+    "issue": "i7",
+    "agent": "lab",
+    "assignedAt": 1794499580000,
+    "executions": []
+   }
+  ],
+  "priority": "high",
+  "rank": 1024,
+  "createdAt": 1794484460000,
+  "blockedBy": [],
+  "status": "backlog",
+  "moves": [
+   "todo",
+   "canceled"
+  ],
+  "deliver": "change",
+  "findings": [],
+  "questions": [],
+  "criteria": [],
+  "checks": [],
+  "stage": {
+   "state": "draft",
+   "since": 1794484460000,
+   "lead": "start",
+   "acts": [
+    {
+     "act": "start",
+     "does": "move",
+     "status": "todo",
+     "words": "none"
+    },
+    {
+     "act": "close",
+     "does": "move",
+     "status": "canceled",
+     "words": "none"
+    }
+   ]
+  }
+ },
+ {
+  "id": "i1",
+  "number": 1,
+  "title": "Issue 1",
+  "description": "Fix the login",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "assignments": [
+   {
+    "id": "a1",
+    "issue": "i1",
+    "agent": "lab",
+    "assignedAt": 1794499940000,
+    "executions": [
+     {
+      "kind": "worker",
+      "session": "w1",
+      "startedAt": 1794500000000
+     }
+    ]
+   }
+  ],
+  "priority": "high",
+  "createdAt": 1794497780000,
+  "blockedBy": [],
+  "status": "in_progress",
+  "moves": [
+   "canceled"
+  ],
+  "deliver": "change",
+  "findings": [],
+  "questions": [],
+  "criteria": [
+   "logs in"
+  ],
+  "checks": [],
+  "stage": {
+   "state": "working",
+   "since": 1794500000000,
+   "acts": [
+    {
+     "act": "tell",
+     "does": "say"
+    },
+    {
+     "act": "stop",
+     "does": "stop"
+    },
+    {
+     "act": "close",
+     "does": "move",
+     "status": "canceled",
+     "words": "none"
+    }
+   ]
+  }
+ },
+ {
+  "id": "i2",
+  "number": 2,
+  "title": "Issue 2",
+  "description": "",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "assignments": [
+   {
+    "id": "a2",
+    "issue": "i2",
+    "agent": "lab",
+    "assignedAt": 1794499880000,
+    "executions": [
+     {
+      "kind": "worker",
+      "session": "w2",
+      "startedAt": 1794500000000
+     }
+    ]
+   }
+  ],
+  "priority": "medium",
+  "createdAt": 1794495560000,
+  "blockedBy": [],
+  "status": "in_progress",
+  "moves": [
+   "todo",
+   "canceled"
+  ],
+  "deliver": "change",
+  "findings": [],
+  "questions": [
+   {
+    "question": "Which port?",
+    "options": [
+     "8080",
+     "9090"
+    ]
+   }
+  ],
+  "criteria": [],
+  "checks": [],
+  "stage": {
+   "state": "asking",
+   "since": 1794500120000,
+   "lead": "answer",
+   "acts": [
+    {
+     "act": "answer",
+     "does": "say"
+    },
+    {
+     "act": "close",
+     "does": "move",
+     "status": "canceled",
+     "words": "none"
+    }
+   ]
+  }
+ },
+ {
+  "id": "i3",
+  "number": 3,
+  "title": "Issue 3",
+  "description": "",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "conflict": {
+   "base": "main",
+   "files": [
+    "a.ts"
+   ]
+  },
+  "assignments": [
+   {
+    "id": "a3",
+    "issue": "i3",
+    "agent": "lab",
+    "assignedAt": 1794499820000,
+    "executions": [
+     {
+      "kind": "worker",
+      "session": "w3",
+      "startedAt": 1794500000000
+     }
+    ]
+   }
+  ],
+  "priority": "high",
+  "createdAt": 1794493340000,
+  "blockedBy": [],
+  "status": "in_review",
+  "moves": [
+   "todo",
+   "done",
+   "canceled"
+  ],
+  "deliver": "change",
+  "findings": [],
+  "questions": [],
+  "criteria": [],
+  "checks": [],
+  "stage": {
+   "state": "stuck",
+   "since": 1794500180000,
+   "stuck": "conflict",
+   "lead": "resolve",
+   "acts": [
+    {
+     "act": "resolve",
+     "does": "move",
+     "status": "todo",
+     "words": "none"
+    },
+    {
+     "act": "tell",
+     "does": "say"
+    },
+    {
+     "act": "close",
+     "does": "move",
+     "status": "canceled",
+     "words": "none"
+    }
+   ]
+  }
+ },
+ {
+  "id": "i4",
+  "number": 4,
+  "title": "Issue 4",
+  "description": "",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "assignments": [
+   {
+    "id": "a4",
+    "issue": "i4",
+    "agent": "lab",
+    "assignedAt": 1794499760000,
+    "executions": [
+     {
+      "kind": "worker",
+      "session": "w4",
+      "startedAt": 1794500000000
+     }
+    ]
+   }
+  ],
+  "priority": "medium",
+  "createdAt": 1794491120000,
+  "blockedBy": [],
+  "status": "in_review",
+  "moves": [
+   "todo",
+   "done",
+   "canceled"
+  ],
+  "deliver": "answer",
+  "findings": [],
+  "questions": [],
+  "criteria": [],
+  "checks": [],
+  "stage": {
+   "state": "reviewing",
+   "since": 1794500240000,
+   "lead": "acknowledge",
+   "acts": [
+    {
+     "act": "acknowledge",
+     "does": "move",
+     "status": "done",
+     "words": "none"
+    },
+    {
+     "act": "reject",
+     "does": "move",
+     "status": "todo",
+     "words": "required"
+    },
+    {
+     "act": "tell",
+     "does": "say"
+    },
+    {
+     "act": "close",
+     "does": "move",
+     "status": "canceled",
+     "words": "none"
+    }
+   ]
+  }
+ },
+ {
+  "id": "i5",
+  "number": 5,
+  "title": "Issue 5",
+  "description": "",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "repo": "demo",
+  "assignments": [
+   {
+    "id": "a5",
+    "issue": "i5",
+    "agent": "lab",
+    "assignedAt": 1794499700000,
+    "executions": [
+     {
+      "kind": "worker",
+      "session": "w5",
+      "startedAt": 1794500000000
+     }
+    ]
+   }
+  ],
+  "priority": "high",
+  "createdAt": 1794488900000,
+  "blockedBy": [],
+  "status": "in_progress",
+  "moves": [
+   "canceled"
+  ],
+  "deliver": "change",
+  "findings": [],
+  "questions": [],
+  "criteria": [],
+  "checks": [],
+  "stage": {
+   "state": "stuck",
+   "since": 1794500300000,
+   "stuck": "quiet",
+   "lead": "stop",
+   "acts": [
+    {
+     "act": "stop",
+     "does": "stop"
+    },
+    {
+     "act": "tell",
+     "does": "say"
+    },
+    {
+     "act": "close",
+     "does": "move",
+     "status": "canceled",
+     "words": "none"
+    }
+   ]
+  }
+ },
+ {
+  "constraints": {
+   "check": "sh check.sh",
+   "scope": [
+    "check.sh"
+   ],
+   "acceptance": true,
+   "frozen": []
+  },
+  "id": "i6",
+  "number": 6,
+  "title": "Issue 6",
+  "description": "",
+  "mandate": {
+   "strength": "explicit",
+   "maxBotReviewRounds": 3,
+   "autoSubmitPr": false
+  },
+  "assignments": [
+   {
+    "id": "a6",
+    "issue": "i6",
+    "agent": "lab",
+    "assignedAt": 1794499640000,
+    "executions": [
+     {
+      "kind": "worker",
+      "session": "w6",
+      "startedAt": 1794500000000
+     }
+    ]
+   }
+  ],
+  "priority": "medium",
+  "createdAt": 1794486680000,
+  "blockedBy": [],
+  "status": "in_progress",
+  "moves": [
+   "todo",
+   "canceled"
+  ],
+  "deliver": "change",
+  "findings": [],
+  "questions": [],
+  "criteria": [],
+  "checks": [],
+  "stage": {
+   "state": "stuck",
+   "since": 1794500300000,
+   "stuck": "failed",
+   "lead": "cure",
+   "acts": [
+    {
+     "act": "cure",
+     "does": "move",
+     "status": "todo",
+     "words": "none"
+    },
+    {
+     "act": "tell",
+     "does": "say"
+    },
+    {
+     "act": "close",
+     "does": "move",
+     "status": "canceled",
+     "words": "none"
+    }
+   ]
+  }
+ }
+]

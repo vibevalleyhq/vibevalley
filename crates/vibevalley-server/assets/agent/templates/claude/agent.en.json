@@ -1,0 +1,5 @@
+{
+  "name": "Master Claude",
+  "duty": "Reads big code bases, refactors, chases nasty bugs",
+  "tags": ["refactor", "hard", "bug", "debug", "root cause", "architecture", "claude"]
+}

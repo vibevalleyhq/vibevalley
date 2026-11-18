@@ -57,4 +57,17 @@ describe("regression tests", () => {
     ).toEqual([]);
     expect(regressionProblems({ before: file(""), after: file(""), branch: "feat/x", body: body() })).toEqual([]);
   });
+
+  test("finds Rust #[test] fn regression_* functions with their full body", () => {
+    const rs = [
+      "#[test]",
+      "fn ordinary_case() { assert_eq!(1, 1); }",
+      "",
+      "#[test]",
+      'fn regression_closing_window_keeps_app_alive() {\n    let s = "{ not a brace }";\n    assert!(!s.is_empty());\n}',
+    ].join("\n");
+    const found = regressionTestsIn("crates/vibevalley-server/tests/flow.rs", rs);
+    expect([...found.keys()]).toEqual(["regression_closing_window_keeps_app_alive"]);
+    expect(regressionProblems({ before: new Map(), after: found, branch: "fix/window-close", body: body() })).toEqual([]);
+  });
 });

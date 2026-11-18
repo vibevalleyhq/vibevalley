@@ -1,0 +1,46 @@
+[package]
+name = "vibevalley-mac"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+vibevalley-server-api = { version = "0.1.0", path = "../../crates/vibevalley-server-api" }
+base64 = "0.23.1"
+vibevalley-i18n = { version = "0.1.0", path = "../../crates/vibevalley-i18n" }
+vibevalley-protocol = { version = "0.1.0", path = "../../crates/vibevalley-protocol" }
+vibevalley-bridge = { version = "0.1.0", path = "../../crates/vibevalley-bridge" }
+vibevalley-files = { version = "0.1.0", path = "../../crates/vibevalley-files", features = ["highlight"] }
+vibevalley-git = { version = "0.1.0", path = "../../crates/vibevalley-git" }
+vibevalley-server = { version = "0.1.0", path = "../../crates/vibevalley-server" }
+vibevalley-http = { version = "0.1.0", path = "../../crates/vibevalley-http" }
+vibevalley-store = { version = "0.1.0", path = "../../crates/vibevalley-store" }
+vibevalley-terminal = { version = "0.1.0", path = "../../crates/vibevalley-terminal" }
+vibevalley-workspace = { version = "0.1.0", path = "../../crates/vibevalley-workspace" }
+flume = "0.12.0"
+gpui-kit = { version = "0.9.1", features = ["gpui-fast"] }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+nsh-engine = { version = "0.5.0", default-features = false }
+nsh-platform-gpui = "0.5.0"
+objc2 = "0.6.5"
+objc2-app-kit = { version = "0.3.2", features = ["NSApplication", "NSImage"] }
+objc2-foundation = { version = "0.3.2", features = ["NSString"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+smallvec = "1.16.5"
+unicode-segmentation = "1.13.3"
+unicode-width = "0.2.3"
+
+tokio = { version = "1.54.1", features = ["rt", "time", "net", "sync", "macros"] }
+tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["sink"] }
+
+[features]
+default = []
+# Load hosted views from `nsh dev --server-only` (VIBEVALLEY_UI_DEV=ws://...) with hot reload.
+nsh-dev = ["nsh-platform-gpui/dev"]
+# `shot:<png>` in debug scripts: draws the window and reads the Metal frame back (works while the screen is locked).
+shot = ["gpui-kit/test-support"]
+
+[dev-dependencies]
+tempfile = "3.27.0"

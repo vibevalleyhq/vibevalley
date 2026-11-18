@@ -1,0 +1,169 @@
+{
+ "CronWhen": [
+  {
+   "kind": "once",
+   "at": 1508
+  },
+  {
+   "kind": "once",
+   "at": 1509
+  },
+  {
+   "kind": "every",
+   "minutes": 1510
+  },
+  {
+   "kind": "every",
+   "minutes": 1511
+  },
+  {
+   "kind": "daily",
+   "time": "s1512"
+  },
+  {
+   "kind": "daily",
+   "time": "s1513"
+  },
+  {
+   "kind": "weekly",
+   "days": [
+    2
+   ],
+   "time": "s1515"
+  },
+  {
+   "kind": "weekly",
+   "days": [
+    4
+   ],
+   "time": "s1517"
+  },
+  {
+   "kind": "cron",
+   "expr": "s1518"
+  },
+  {
+   "kind": "cron",
+   "expr": "s1519"
+  }
+ ],
+ "Cron": [
+  {
+   "id": "s1520",
+   "name": "s1521",
+   "text": "s1522",
+   "channel": "s1523",
+   "agent": "s1524",
+   "repo": "s1525",
+   "when": {
+    "kind": "once",
+    "at": 1526
+   },
+   "tz": "s1527",
+   "enabled": true,
+   "created": 1529,
+   "lastRun": 1530,
+   "by": "user",
+   "pending": false
+  },
+  {
+   "id": "s1532",
+   "name": "s1533",
+   "text": "s1534",
+   "channel": "s1535",
+   "when": {
+    "kind": "once",
+    "at": 1536
+   },
+   "tz": "s1537",
+   "enabled": true,
+   "created": 1539,
+   "by": "user",
+   "pending": true
+  }
+ ],
+ "CronView": [
+  {
+   "id": "s1541",
+   "name": "s1542",
+   "text": "s1543",
+   "channel": "s1544",
+   "agent": "s1545",
+   "repo": "s1546",
+   "when": {
+    "kind": "once",
+    "at": 1547
+   },
+   "tz": "s1548",
+   "enabled": false,
+   "created": 1550,
+   "lastRun": 1551,
+   "by": "user",
+   "pending": true,
+   "whenText": "s1553",
+   "nextText": "s1554"
+  },
+  {
+   "id": "s1555",
+   "name": "s1556",
+   "text": "s1557",
+   "channel": "s1558",
+   "when": {
+    "kind": "once",
+    "at": 1559
+   },
+   "tz": "s1560",
+   "enabled": false,
+   "created": 1562,
+   "by": "user",
+   "pending": false,
+   "whenText": "s1564",
+   "nextText": "s1565"
+  }
+ ],
+ "CronRequest": [
+  {
+   "name": "s1566",
+   "text": "s1567",
+   "channel": "s1568",
+   "agent": "s1569",
+   "repo": "s1570",
+   "when": {
+    "kind": "once",
+    "at": 1571
+   },
+   "tz": "s1572"
+  },
+  {
+   "name": "s1573",
+   "text": "s1574",
+   "when": {
+    "kind": "once",
+    "at": 1575
+   }
+  }
+ ],
+ "CronUpdate": [
+  {
+   "enabled": true
+  },
+  {}
+ ],
+ "CronUpdateInput": [
+  {
+   "id": "s7045",
+   "enabled": true
+  },
+  {
+   "id": "s7047"
+  }
+ ],
+ "CronDeleteInput": [
+  {
+   "id": "s7048"
+  },
+  {
+   "id": "s7049"
+  }
+ ]
+}

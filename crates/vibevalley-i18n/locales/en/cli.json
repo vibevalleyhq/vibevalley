@@ -1,0 +1,865 @@
+{
+  "about": "VibeValley's command line: one command is one operation of the server's, <resource> [<sub-resource>] <verb>",
+  "flag": {
+    "model": "The model",
+    "effort": "How hard to think",
+    "server": "The server's address; VIBEVALLEY_SERVER when empty, else the one running on this machine (the home's server.json), else {fallback}",
+    "dryRun": "Only say what it would do, without doing it (commands that delete, merge, close or send a helper away)",
+    "format": "text: lines to read (the default); json: the endpoint's answer",
+    "capturePage": "At the end of this page (its title, slug or an alias); none: today's journal",
+    "day": "Which day's journal, YYYY-MM-DD; none: today",
+    "agent": "A profile: its id or name",
+    "at": "When to run once, such as 2026-11-05T09:00",
+    "before": "Read those before this number",
+    "channel": "Which channel to say it in",
+    "criterion": "An acceptance criterion; give it more than once",
+    "cronExpr": "A cron expression, such as '0 9 * * 1-5'",
+    "daily": "What time each day, HH:MM",
+    "every": "Every so many minutes",
+    "issue": "The issue's number",
+    "issueStatus": "Only those in this status",
+    "key": "A request key: sent again with the same key, it is done once",
+    "limit": "At most this many",
+    "priority": "The priority",
+    "repo": "The GitHub repository's address",
+    "reply": "Reply to this message number",
+    "text": "Words the title or description contains",
+    "timeout": "Wait at most this many seconds",
+    "closed": "Only closed ones (done, canceled)",
+    "criteria": "An acceptance criterion, may be given more than once; given, they replace the old ones",
+    "description": "The description; - reads stdin",
+    "enabled": "On (true) or off (false)",
+    "fail": "Fail it",
+    "finding": "What is wrong, one a flag, may be given more than once",
+    "pass": "Pass it",
+    "reviewComment": "Words with the review",
+    "statusComment": "Words with the move: what to change, when it goes for another round",
+    "title": "The new title",
+    "wantsUser": "Only those waiting on you, the longest waiting first",
+    "issueWatch": "Follow it until in_review, done or canceled, then show it; each status on stderr",
+    "tier": "The PARA tier",
+    "marker": "The task marker",
+    "runtime": "The runtime",
+    "role": "The profile's role",
+    "duty": "What the profile does",
+    "follow": "Keep observing after handoff",
+    "jsonl": "Write the versioned JSONL event stream",
+    "run": "Only events from this round",
+    "locale": "Display language (zh or en)",
+    "deepseekKey": "DeepSeek API key (empty string clears)",
+    "agoraAppId": "Agora App ID",
+    "agoraCertificate": "Agora App Certificate",
+    "asrKey": "Speech recognition key",
+    "llmKey": "Voice dialogue model key",
+    "ttsKey": "Speech synthesis key",
+    "dictationKey": "Dictation key",
+    "cwd": "Working folder for the coding session",
+    "resume": "Resume an earlier session by id",
+    "plan": "Read-only planning mode",
+    "orchestrator": "Talk with the assistant in a channel instead of a local machine"
+  },
+  "command": {
+    "doctor": "Check this computer's VibeValley setup: home folder, server, machines and model key",
+    "chat": "Talk with a local coding machine or the assistant",
+    "pkm": {
+      "capture": "Note something in today's journal (--page: on that page); no words reads stdin, lines split into blocks by indentation",
+      "radar": "What wants a look: the inbox, repos left alone, what is overdue",
+      "journalShow": "A day's journal (--day for another), made when there is none",
+      "pageEdit": "Edit a whole page's file in $EDITOR; it is saved when the editor closes",
+      "pageExport": "A page as Markdown to read: refs read out, remarks taken off",
+      "pageList": "List notes pages, the latest changed first",
+      "pageShow": "A page's outline: each block at its depth",
+      "search": "Search the notes: a hit a line, page › where: block",
+      "pageSave": "Create a page, or set the folder and outline of the one with that title"
+    },
+    "agent": {
+      "list": "List profiles: id, name, role, runtime",
+      "create": "Create a profile",
+      "delete": "Delete a profile"
+    },
+    "artifact": {
+      "list": "List drafts (--issue: only one issue's)",
+      "show": "Show a draft: its title, version and where it belongs",
+      "read": "Read a draft's words"
+    },
+    "channel": {
+      "list": "List channels and direct chats",
+      "messageList": "List a channel's latest messages",
+      "messageSearch": "Search the messages of every channel",
+      "messageSend": "Send a message to a channel"
+    },
+    "cron": {
+      "list": "List scheduled tasks",
+      "create": "Make a scheduled task: give one of --every, --daily, --cron, --at",
+      "delete": "Delete a scheduled task",
+      "edit": "Turn a scheduled task on or off"
+    },
+    "issue": {
+      "edit": "Change an issue's title, description, repo, profile or priority",
+      "list": "List issues: one a line, number first",
+      "show": "Show an issue: its status, where it is now, its questions and criteria, the commands it takes now (--watch follows it first)",
+      "comment": "Comment on an issue: the answer when its helper asks, read by it in its next round otherwise",
+      "create": "Write a new issue",
+      "delete": "Delete an issue",
+      "diff": "An issue's change: its commits and files",
+      "review": "Review what was handed back: pass or fail; completing it is issue status … done",
+      "status": "Move an issue's status: todo sends it out or for another round, done completes it, canceled closes it; the server says which it takes",
+      "timeline": "An issue's timeline and cost",
+      "watch": "Observe issue state and execution history"
+    },
+    "memory": {
+      "create": "Keep a memory for a profile",
+      "delete": "Delete one of a profile's memories",
+      "list": "List a profile's memories",
+      "search": "Search the memories; every profile's when none is named"
+    },
+    "repo": {
+      "list": "List repos",
+      "create": "Make a repo (--repo clones it from GitHub)"
+    },
+    "runtime": {
+      "list": "List the runtimes: installed or not, their versions",
+      "refresh": "Look for a runtime again, after installing or upgrading it"
+    },
+    "session": {
+      "list": "List helpers: id, name, profile, what it is doing",
+      "show": "Show a helper",
+      "events": "Read a helper's trajectory events",
+      "stop": "Stop a helper's round"
+    }
+  },
+  "next": {
+    "help": "See how this command is written",
+    "startServer": "Open VibeValley or start the server first (cargo run -p vibevalley-server), or point --server at one that runs"
+  },
+  "failure": {
+    "unreachable": "Cannot reach {base}: {why}",
+    "gone": "Ticket #{n} is gone: it was deleted",
+    "noDryRun": "{command} has no dry run: drop --dry-run to do it"
+  },
+  "op": {
+    "user": {
+      "approval": {
+        "create": "Ask to sign this device in: get a code and wait for approval on a page",
+        "collect": "Collect the key once approved; nothing while it waits",
+        "list": "List the sign-in requests waiting for approval",
+        "answer": "Approve or refuse a sign-in request"
+      },
+      "get": "The user's name, whether a password is set, and which device this request comes from",
+      "update": "Change the user's name",
+      "password": {
+        "set": "Set the password (only on the computer running VibeValley)"
+      },
+      "login": "Sign in with the password and get this device a key",
+      "logout": "Sign out: take back this device's key",
+      "device": {
+        "list": "List the user's devices, paired and signed in",
+        "delete": "Take back a device's key",
+        "previewDelete": "Preview taking back a device's key: say what would happen, without doing it"
+      }
+    },
+    "attachment": {
+      "create": "Upload a file, to say with a message or keep in the library"
+    },
+    "library": {
+      "item": {
+        "list": "List the library: generated files, your uploads, and what helpers fetched; filter by origin and type",
+        "add": "Put a file in the library: your uploaded attachment, or a url or working-directory file from an assistant or helper",
+        "delete": "Take a file out of the library (messages that have it still open it)",
+        "previewDelete": "Try taking it out: say what would happen, change nothing"
+      }
+    },
+    "agent": {
+      "create": "Create a profile",
+      "delete": "Delete a profile",
+      "list": "List every profile",
+      "previewDelete": "Preview deleting a profile: say what would go, without deleting",
+      "template": {
+        "add": "Add a template folder from this machine, without installing it",
+        "delete": "Delete an added template; the profiles installed from it stay",
+        "install": "Install a new profile from a template",
+        "list": "List the profile templates: the built-in ones, then those added",
+        "previewDelete": "Preview deleting a profile template: say what would go, without deleting",
+        "update": "Remake a profile from its template's current version, keeping this machine's settings"
+      },
+      "update": "Update a profile (the whole profile is written)",
+      "validate": "Check what would stop each profile from being dispatched now, unsaved drafts too"
+    },
+    "artifact": {
+      "block": {
+        "create": "Insert one block into an artifact",
+        "delete": "Delete a block of an artifact and its children",
+        "list": "List an artifact's live blocks, in order",
+        "previewDelete": "Preview deleting a block: say what would go, without deleting",
+        "update": "Change a block's words, type or attributes"
+      },
+      "content": {
+        "get": "Read an artifact's content: an HTML version, or its blocks as Markdown"
+      },
+      "create": "Create an artifact: an empty one to write in, or a hand-in",
+      "delete": "Delete an artifact",
+      "demo": "Start the demo: several helpers write one artifact at once, no model spending",
+      "get": "Get an artifact",
+      "html": {
+        "edit": "Replace some words in an HTML artifact, as its next version"
+      },
+      "list": "List the artifacts of a channel or ticket, or every one",
+      "markdown": {
+        "get": "Read a block artifact as Markdown"
+      },
+      "previewDelete": "Preview deleting an artifact: say what would go, without deleting",
+      "submit": "Submit a batch of block operations as you, applied in order at once",
+      "suggestion": {
+        "accept": "Accept a suggested change",
+        "create": "Suggest a change to a block you wrote",
+        "list": "List an artifact's suggestions, open and resolved",
+        "reject": "Reject a suggested change"
+      },
+      "update": "Rename an artifact",
+      "version": {
+        "create": "Hand in a new version of an HTML artifact; the old ones stay"
+      }
+    },
+    "channel": {
+      "archive": {
+        "set": "Archive a channel or bring it back; its messages stay"
+      },
+      "create": "Create a channel",
+      "default": {
+        "set": "Make a channel the default: where anything unaddressed goes"
+      },
+      "delete": "Delete a channel with its threads and messages",
+      "direct": {
+        "create": "Open a direct message with a profile, made if there is none"
+      },
+      "list": "List every channel and direct message, the default first",
+      "markRead": "Mark read up to a message",
+      "markUnread": "Mark unread from a message on",
+      "message": {
+        "delete": "Delete a message: its words go, its number stays",
+        "list": "Read a channel's messages, paging back",
+        "previewDelete": "Preview deleting a message: say what would go, without deleting",
+        "search": "Search messages",
+        "send": "Send a message to a channel or thread",
+        "update": "Edit one of your own messages; nobody is told again"
+      },
+      "notify": {
+        "set": "Set a channel's notifications: all, mentions or none"
+      },
+      "pin": {
+        "list": "List a channel's pinned messages, newest pinned first",
+        "set": "Pin or unpin a message"
+      },
+      "previewDelete": "Preview deleting a channel: say what would go, without deleting",
+      "reaction": {
+        "set": "Add or take back a reaction on a message"
+      },
+      "thread": {
+        "create": "Open the thread under a message, made if there is none"
+      },
+      "unread": {
+        "list": "List the places with unread messages, newest first"
+      },
+      "update": "Update a channel"
+    },
+    "connector": {
+      "channel": {
+        "set": "Choose the channel a connector's messages go to"
+      },
+      "list": "List the WeChat, Feishu and QQ connectors and how they stand",
+      "login": "Log a connector in",
+      "logout": "Log a connector out",
+      "verify": "Hand in a verification code to go on with a connector's login"
+    },
+    "cron": {
+      "create": "Create a scheduled task",
+      "delete": "Delete a scheduled task",
+      "list": "List every scheduled task",
+      "previewDelete": "Preview deleting a scheduled task: say what would go, without deleting",
+      "update": "Update a scheduled task; only what is given changes"
+    },
+    "game": {
+      "achievement": {
+        "list": "List every achievement"
+      },
+      "title": {
+        "set": "Pick the title shown on the farm card"
+      }
+    },
+    "github": {
+      "get": "Whether gh is installed and logged in",
+      "refresh": "Check GitHub again and refresh the open PRs"
+    },
+    "issue": {
+      "comment": {
+        "create": "Comment on a ticket; its newest helper hears it"
+      },
+      "create": "Create a ticket",
+      "delete": "Delete a ticket",
+      "diff": {
+        "get": "A ticket's changes: commits, files and diff"
+      },
+      "get": "Get a ticket",
+      "history": {
+        "list": "Tickets with their helper history, missing records included"
+      },
+      "list": "List tickets: the open ones by default, newest first",
+      "previewDelete": "Preview deleting a ticket: say what would go, without deleting",
+      "refine": "Have a helper read the code and refine a backlog ticket",
+      "review": "Review what was handed back: pass or send back; completing is a separate move",
+      "run": {
+        "list": "List a ticket's rounds of work"
+      },
+      "split": "Split a ticket into child tickets, started at once",
+      "status": {
+        "previewUpdate": "Preview moving a ticket: say what would happen, without moving it",
+        "update": "Move a ticket: dispatch it, another round, complete or cancel"
+      },
+      "timeline": {
+        "get": "A ticket's milestones and what all its rounds cost"
+      },
+      "update": "Update a ticket",
+      "conversation": {
+        "get": "The issue conversation location"
+      }
+    },
+    "lan": {
+      "get": "Whether connect to this machine is on, its address and pairing code",
+      "pair": "Pair this device with a pairing code",
+      "pairing": {
+        "answer": "Allow or refuse the device asking to pair",
+        "previewStop": "Preview stopping pairing: say what would happen, without stopping it",
+        "start": "Start pairing and give a pairing code",
+        "stop": "Stop pairing"
+      },
+      "update": "Turn connect to this machine on or off"
+    },
+    "memory": {
+      "create": "Add a memory to a profile",
+      "delete": "Delete one of a profile's memories",
+      "list": "List a profile's memories, from the database and its sources",
+      "previewDelete": "Preview deleting a memory: say what would go, without deleting",
+      "recall": "What a profile would recall for this repo and text",
+      "search": "Search memories by words, every profile's if none is named"
+    },
+    "orchestrator": {
+      "eval": {
+        "create": "Save an assistant turn that went wrong as an eval case, with what it should have done"
+      },
+      "open": "Bring the assistant online",
+      "stop": "Stop the assistant's current round; the helpers it sent keep working"
+    },
+    "pkm": {
+      "block": {
+        "apply": "Apply block operations to a page in order, written back once"
+      },
+      "capture": "Note a line in today's journal, tagged #inbox",
+      "clip": {
+        "create": "Clip a web page into a resource page"
+      },
+      "cluster": {
+        "create": "Gather the blocks about a topic into a resource page"
+      },
+      "comment": {
+        "list": "List remarks and suggested rewrites, one page's if given",
+        "resolve": "Accept or reject a suggested rewrite",
+        "suggest": "Suggest a rewrite of a block, keeping its links and refs"
+      },
+      "journal": {
+        "open": "Open a day's journal, made if there is none"
+      },
+      "page": {
+        "export": "Export a page as plain Markdown",
+        "get": "Get a page with its refs read out, its backlinks and open remarks",
+        "list": "List every page in the notes, newest first",
+        "move": "Move a page to another PARA folder",
+        "rename": "Rename a page or merge it into one of that name; links follow",
+        "save": "Create a page, or set the properties and folder of the one with that title"
+      },
+      "radar": {
+        "get": "The review radar: inbox pages, stale repos, overdue blocks"
+      },
+      "scan": "Read again every note file changed on disk",
+      "search": "Search the notes",
+      "undo": "Undo the last change to the notes",
+      "source": {
+        "get": "A page's file as written, block ids and all, and when it was last written",
+        "update": "Write a page anew from its edited text; refused if the file changed meanwhile"
+      }
+    },
+    "repo": {
+      "activity": {
+        "get": "A repo's commits: how many per day, and by whom"
+      },
+      "create": "Create a repo",
+      "language": {
+        "list": "The languages a repo is written in"
+      },
+      "list": "List every repo",
+      "template": {
+        "list": "A repo's ticket templates, filled in for its stack"
+      },
+      "validate": "The first thing creating a repo would refuse, without creating it",
+      "pr": {
+        "submit": "Publish an existing local branch"
+      }
+    },
+    "runtime": {
+      "list": "List every machine",
+      "refresh": "Probe a machine again",
+      "setting": {
+        "update": "Update a machine's settings: on or off, path, default model, budget"
+      }
+    },
+    "server": {
+      "health": {
+        "get": "Whether the server is up, and its version"
+      }
+    },
+    "session": {
+      "event": {
+        "list": "Read a helper's trajectory, oldest first"
+      },
+      "get": "Get a helper",
+      "list": "List helpers, one profile's if given",
+      "stop": "Stop a helper's round; the helper stays"
+    },
+    "media": {
+      "input": {
+        "create": "Reserve bounded local storage for a media input without uploading to a provider",
+        "adopt": "Take a library file as a media input, checked as an upload is",
+        "get": "Read a local media input",
+        "list": "List local media inputs",
+        "delete": "Delete a local media input not retained by a task",
+        "previewDelete": "Preview deleting a local media input without changing it"
+      },
+      "understanding": {
+        "authorize": "Freeze an understanding request for one execution by the selected channel's assistant",
+        "start": "Execute an authorized understanding task by ID without accepting new input or self-declared consent",
+        "create": "Understand selected local inputs with explicit account and upload approval",
+        "cleanup": "Clean known remote files without repeating understanding",
+        "previewCleanup": "Preview remote cleanup and local retention release without changing either"
+      },
+      "image": {
+        "create": "Create an image task without resubmitting the same request ID"
+      },
+      "speech": {
+        "create": "Create single-speaker speech and download it locally without repeating the same request ID",
+        "resume": "Resume polling the same known speech task without resubmitting it"
+      },
+      "dialogue": {
+        "create": "Create a dialogue using the selected account's voices"
+      },
+      "voiceDesign": {
+        "create": "Design a synthetic voice preview without saving a reusable voice"
+      },
+      "clone": {
+        "create": "Clone an explicitly authorized local voice sample"
+      },
+      "transcription": {
+        "create": "Transcribe an approved audio input with optional speaker labels"
+      },
+      "audio": {
+        "resume": "Resume the same known audio task without submitting another generation",
+        "previewCleanup": "Preview cleanup of known remote audio files without changing them",
+        "cleanup": "Clean known remote audio files without repeating transcription or synthesis"
+      },
+      "job": {
+        "get": "Read a generation task",
+        "list": "List recent generation tasks",
+        "cancel": "Stop local waiting without guaranteeing provider cancellation",
+        "download": "Retry result download without generating again",
+        "previewRelease": "Preview releasing local audio assets and abandoning further recovery",
+        "release": "Release this task's local audio assets without deleting shared assets or canceling provider billing"
+      }
+    },
+    "provider": {
+      "voice": {
+        "list": "Read one page of voices from the selected MOSS account without generating audio"
+      },
+      "get": "Read provider connections and default uses with masked credentials",
+      "update": "Save provider connections and default uses at the expected revision",
+      "model": {
+        "list": "Query available models for the configured MOSS account without inference"
+      }
+    },
+    "setting": {
+      "get": "Get the settings",
+      "update": "Update the settings",
+      "validate": "The first thing saving these settings would refuse, without saving"
+    },
+    "skill": {
+      "create": "Create a skill",
+      "delete": "Delete a skill",
+      "list": "List every skill",
+      "previewDelete": "Preview deleting a skill: say what would go, without deleting",
+      "update": "Update a skill"
+    },
+    "voice": {
+      "call": {
+        "hear": "Hand in a line you said on a call",
+        "say": "Hand in what the assistant said on a call",
+        "start": "Start a call with the assistant",
+        "stop": "Hang up a call"
+      },
+      "dictate": "Dictate: turn a recording into text",
+      "grant": {
+        "create": "Get an Agora token for a call",
+        "renew": "Renew a call's Agora token"
+      },
+      "hear": "Hand in a line heard on the call that is on",
+      "moss": {
+        "verify": "Check whether MOSS Live takes the key, saying nothing"
+      }
+    }
+  },
+  "group": {
+    "agent": {
+      "about": "Profiles: whom work is given to"
+    },
+    "artifact": {
+      "about": "Artifacts: written together, or handed in as web pages"
+    },
+    "channel": {
+      "about": "Channels and direct talks, and their messages",
+      "message": {
+        "about": "A channel's messages: read, send, search"
+      }
+    },
+    "connector": {
+      "about": "Connectors: WeChat, Feishu and QQ, each into a channel"
+    },
+    "cron": {
+      "about": "Scheduled tasks"
+    },
+    "game": {
+      "about": "Achievements and titles"
+    },
+    "github": {
+      "about": "GitHub: whether gh is installed and logged in"
+    },
+    "issue": {
+      "about": "Issues: write, edit, move, comment, review"
+    },
+    "lan": {
+      "about": "Connect to this machine: on or off, pairing, devices"
+    },
+    "memory": {
+      "about": "A profile's memories"
+    },
+    "orchestrator": {
+      "about": "The assistant: online, stop, evals"
+    },
+    "pkm": {
+      "about": "Notes: note a line, search, the radar, journals and pages",
+      "page": {
+        "about": "Notes pages: list, outline, export, edit the file"
+      },
+      "journal": {
+        "about": "Journals: a page a day"
+      }
+    },
+    "repo": {
+      "about": "Repos: the git repositories in the working folder"
+    },
+    "runtime": {
+      "about": "Machines: the coding agents on this computer"
+    },
+    "server": {
+      "about": "The server itself"
+    },
+    "session": {
+      "about": "Helpers"
+    },
+    "setting": {
+      "about": "Settings: models, keys, folders and the rest"
+    },
+    "skill": {
+      "about": "Skills"
+    },
+    "voice": {
+      "about": "Calls and dictation"
+    }
+  },
+  "doctor": {
+    "unreachable": "The farm at {base} does not answer; the rest was not checked",
+    "noRuntime": "No runtime is installed: helpers have nothing to work with",
+    "installRuntime": "Install a coding agent (Claude Code, Codex…), then have the farm look again",
+    "noModelKey": "No DeepSeek key: the assistant and your own agent cannot start",
+    "setModelKey": "Fill in the DeepSeek key under Settings › Models",
+    "wrong": "These are not right: {checks}"
+  },
+  "pkm": {
+    "captured": "Noted in \"{page}\"",
+    "inbox": "{n} pages in the inbox",
+    "stale": "\"{page}\" untouched for {days} days",
+    "overdue": "Overdue since {deadline}: {words}",
+    "editorFailed": "Could not open the editor {editor}: {why}",
+    "editorExited": "The editor {editor} exited with {code}; nothing saved, your edit is in {file}",
+    "unchanged": "\"{page}\" is unchanged",
+    "saved": "Saved \"{page}\"",
+    "keptAt": "{why}; your edit is in {file}"
+  },
+  "arg": {
+    "agent": "A profile: its id or name",
+    "artifact": "The draft's id",
+    "channel": "A channel: its name (general or #general) or id",
+    "cron": "The scheduled task's id",
+    "cronName": "The scheduled task's name",
+    "issue": "An issue: its number (12 or #12)",
+    "page": "A page: its title, slug or an alias",
+    "repoName": "The new repo's name",
+    "session": "The helper's id, such as w3",
+    "capture": "What to note; stdin if none",
+    "comment": "The comment",
+    "cronText": "What is said when it comes due: the work for the assistant or a profile",
+    "memory": "The memory to keep",
+    "memoryId": "The memory's id, as memory list shows it",
+    "message": "The message",
+    "runtime": "The runtime's id, such as claude",
+    "search": "The words to find",
+    "status": "The status to move it to",
+    "title": "The issue's title",
+    "pageTitle": "The page's title",
+    "agentName": "The profile's name"
+  },
+  "channel": {
+    "sent": "Sent to {channel}"
+  },
+  "cron": {
+    "when": "When to run: give exactly one of --every, --daily, --cron, --at",
+    "invalidAt": "Cannot read --at \"{at}\": give a timestamp such as 2026-11-05T09:00 or 2026-11-05T09:00:00Z",
+    "deleted": "Deleted the scheduled task {cron}",
+    "edited": "Changed the scheduled task {cron}"
+  },
+  "example": {
+    "agentList": {
+      "about": "Which profiles can take work"
+    },
+    "artifactList": {
+      "about": "An issue's drafts"
+    },
+    "artifactShow": {
+      "about": "Which draft a1 is, and its version"
+    },
+    "channelList": {
+      "about": "Which channels there are"
+    },
+    "cronList": {
+      "about": "Which tasks are scheduled"
+    },
+    "issueDiff": {
+      "about": "#12's change"
+    },
+    "issueEdit": {
+      "about": "Raise #12's priority"
+    },
+    "issueList": {
+      "about": "The open issues"
+    },
+    "issueShow": {
+      "about": "What #12 takes now"
+    },
+    "pkmCapture": {
+      "run": "vibevalley pkm capture 'a remember-me box on the login page'",
+      "about": "Note a line in today's journal"
+    },
+    "pkmCapturePage": {
+      "run": "pbpaste | vibevalley pkm capture --page Reading",
+      "about": "Put the outline on the clipboard on the Reading page"
+    },
+    "pkmRadar": {
+      "about": "What wants a look"
+    },
+    "repoList": {
+      "about": "Which repos there are"
+    },
+    "runtimeList": {
+      "about": "Which runtimes are installed"
+    },
+    "sessionList": {
+      "about": "The helpers at work"
+    },
+    "sessionShow": {
+      "about": "Helper w3"
+    },
+    "sessionEvents": {
+      "about": "Helper w3's trajectory"
+    },
+    "sessionStop": {
+      "about": "Stop w3's round"
+    },
+    "settingGet": {
+      "about": "Show current settings and feature readiness"
+    },
+    "settingUpdate": {
+      "about": "Switch the display language to English"
+    },
+    "settingValidate": {
+      "about": "Check whether a change would be accepted"
+    },
+    "chatLocal": {
+      "run": "vibevalley chat 'explain Cargo.toml'",
+      "about": "Run one round with the default coding machine"
+    },
+    "chatOrchestrator": {
+      "run": "vibevalley chat --orchestrator 'what is waiting on me?'",
+      "about": "Ask the assistant in #general and wait for its answer"
+    },
+    "issue": {
+      "comment": {
+        "run": "vibevalley issue comment 12 'use 8797'",
+        "about": "Answer what #12 asks, or pass a word to its helper"
+      }
+    },
+    "doctor": {
+      "about": "How this machine's farm is"
+    },
+    "artifactRead": {
+      "about": "Read a1's words"
+    },
+    "channelMessageList": {
+      "about": "Read #general's last ten"
+    },
+    "channelMessageSearch": {
+      "run": "vibevalley channel message search port",
+      "about": "Find “port” in every channel"
+    },
+    "channelMessageSend": {
+      "run": "vibevalley channel message send general '@w3 look at the login page first'",
+      "about": "Ask w3 in #general to look at the login page first"
+    },
+    "cronCreate": {
+      "run": "vibevalley cron create morning 'look at yesterday\\'s changes' --daily 09:00",
+      "about": "Have the assistant look at yesterday's changes every morning at nine"
+    },
+    "cronDelete": {
+      "about": "Try it first: what it would delete"
+    },
+    "cronEdit": {
+      "about": "Turn c1 off for now"
+    },
+    "issueCreate": {
+      "run": "vibevalley issue create 'fix the login page' --repo web --agent docs --criterion 'an expired session goes back to login'",
+      "about": "Write an issue for docs"
+    },
+    "issueDelete": {
+      "about": "Try it first: what it would delete"
+    },
+    "issueDone": {
+      "about": "Try completing it first: how it would be delivered"
+    },
+    "issueReviewFail": {
+      "run": "vibevalley issue review 12 --fail --finding 'expired sessions do not go back to login'",
+      "about": "Fail it, saying what is wrong"
+    },
+    "issueReviewPass": {
+      "about": "#12 passes review"
+    },
+    "issueStatus": {
+      "about": "Send #12 out (or for another round)"
+    },
+    "issueTimeline": {
+      "about": "#12's timeline and cost"
+    },
+    "issueWantsUser": {
+      "about": "The issues waiting on you, the longest waiting first"
+    },
+    "issueWatch": {
+      "about": "Follow #12 until it is handed back or over, then show it; ten minutes at most"
+    },
+    "memoryCreate": {
+      "run": "vibevalley memory create docs 'the port is 8797'",
+      "about": "Have docs remember the port is 8797"
+    },
+    "memoryDelete": {
+      "about": "Try deleting docs' m1 first"
+    },
+    "memoryList": {
+      "about": "What docs remembers"
+    },
+    "memorySearch": {
+      "run": "vibevalley memory search port",
+      "about": "Search every profile's memories for “port”"
+    },
+    "pkmJournal": {
+      "about": "Today's journal"
+    },
+    "pkmPageEdit": {
+      "run": "vibevalley pkm page edit reading",
+      "about": "Edit the page “reading” in your editor"
+    },
+    "pkmPageExport": {
+      "run": "vibevalley pkm page export reading",
+      "about": "The page “reading” as Markdown"
+    },
+    "pkmPageList": {
+      "about": "The pages changed last"
+    },
+    "pkmPageShow": {
+      "run": "vibevalley pkm page show reading",
+      "about": "The page “reading” as its outline"
+    },
+    "pkmSearch": {
+      "run": "vibevalley pkm search 'reading list'",
+      "about": "Find “reading list” in the notes"
+    },
+    "repoCreate": {
+      "about": "Clone a repo from GitHub"
+    },
+    "runtimeRefresh": {
+      "about": "Look again after installing a new Claude Code"
+    },
+    "pkmPageSave": {
+      "run": "vibevalley pkm page save Reading -- \"- bulbs\"",
+      "about": "Create or update the Reading page"
+    },
+    "agentCreate": {
+      "about": "Create a profile on Claude Code"
+    },
+    "agentDelete": {
+      "about": "Try it first: what it would delete"
+    },
+    "issueObserve": {
+      "about": "Follow execution as JSONL"
+    }
+  },
+  "issue": {
+    "can": "What can be done:",
+    "conflicts": "Conflicts: {files}",
+    "criteria": "Criteria",
+    "noChanges": "No change yet",
+    "none": "No issues",
+    "questions": "Questions",
+    "spent": "Spent: {tokens} tokens, ¥{cny}",
+    "timeout": "{issue} was not handed back within {seconds} seconds",
+    "commented": "Commented on {issue}",
+    "deleted": "Deleted {issue}",
+    "passOrFail": "Give --pass or --fail, one of them",
+    "stage": "Now: {stage}",
+    "watchGap": "{session}: history before seq {before} is unavailable",
+    "watchMissing": "Issue {issue} is no longer available",
+    "watchFormat": "Use --jsonl for issue watch; --format json remains a single document",
+    "watchUnavailable": "{session}: no retained journal is available"
+  },
+  "more": "There is more: {flag}",
+  "session": {
+    "stopped": "Stopped helper {session}"
+  },
+  "memory": {
+    "deleted": "Deleted the memory {memory}"
+  },
+  "agent": {
+    "deleted": "Deleted the profile {agent}"
+  },
+  "repo.publish": "Publish an existing branch as a GitHub PR or GitLab MR",
+  "repo.check": "Repository check: {check}",
+  "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run",
+  "setting": {
+    "nothingGiven": "Give at least one setting flag to update",
+    "valid": "Settings are valid"
+  },
+  "chat": {
+    "session": "Session {session} (/exit or Ctrl-D to leave)"
+  }
+}

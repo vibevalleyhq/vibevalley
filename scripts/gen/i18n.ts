@@ -6,10 +6,12 @@ import { pathToFileURL } from "node:url";
 import { format, placeholderKinds, placeholders } from "@vibevalley/i18n/format";
 
 import { readGlossary, wordProblems } from "../docs/glossary.ts";
+import { messageUses } from "./i18n-uses.ts";
 
 const root = join(import.meta.dirname, "../..");
 const pkg = join(root, "packages/i18n");
-const localesDir = join(pkg, "locales");
+const dictionaries = join(root, "crates/vibevalley-i18n");
+const localesDir = join(dictionaries, "locales");
 const catalogsFile = join(pkg, "src/catalogs.ts");
 const locales = ["zh", "en"] as const;
 type Locale = (typeof locales)[number];
@@ -21,7 +23,7 @@ interface Nested {
 const han = /\p{Script=Han}/u;
 /** Messages every language says the same way (a language's own name): Han in English is meant there. */
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
-const same = new Set((JSON.parse(readFileSync(join(pkg, "same.json"), "utf8")) as { keys: string[] }).keys);
+const same = new Set((JSON.parse(readFileSync(join(dictionaries, "same.json"), "utf8")) as { keys: string[] }).keys);
 const placeholdersOf = (text: string) => placeholders(text).toSorted();
 
 const namespaces = (locale: Locale) =>
@@ -53,7 +55,7 @@ function generated(): string {
   const zh = messages("zh");
   const all = locales.map(messages);
   // The catalogs are written in as data, not imported as JSON: every bundler and Node read a .ts the same way.
-  const lines = ["// Written by `vpx scripts/gen/i18n.ts gen` from packages/i18n/locales: do not edit.", ""];
+  const lines = ["// Written by `vpx scripts/gen/i18n.ts gen` from crates/vibevalley-i18n/locales: do not edit.", ""];
   lines.push("/** Each language's catalogs by namespace. */", "export const catalogs = {");
   for (const locale of locales) {
     lines.push(`  ${locale}: {`);
@@ -83,32 +85,24 @@ function gen() {
 }
 
 const sources = () =>
-  execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "apps", "packages", "scripts/gen/capabilities.ts"], { cwd: root, encoding: "utf8" })
+  execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "apps", "packages", "crates", "scripts/gen/capabilities.ts"], {
+    cwd: root,
+    encoding: "utf8",
+  })
     .split("\n")
     .filter(
       (f) =>
-        (/^(apps|packages)\/[^/]+\/(src|scripts)\/.*\.tsx?$/u.test(f) || /^apps\/[^/]+\/vite\.config\.ts$/u.test(f) || f === "scripts/gen/capabilities.ts") &&
+        (/^(apps|packages)\/[^/]+\/(src|scripts)\/.*\.tsx?$/u.test(f) ||
+          /^apps\/[^/]+\/vite\.config\.ts$/u.test(f) ||
+          // The Rust server, the command line and the native app say theirs from the same catalogs.
+          /^(crates\/[^/]+\/src\/.*|apps\/mac\/src\/.*)\.rs$/u.test(f) ||
+          /^apps\/mac\/ui\/(?!build\/).*\.tsx?$/u.test(f) ||
+          f === "scripts/gen/capabilities.ts") &&
         !f.endsWith("packages/i18n/src/catalogs.ts") &&
         existsSync(join(root, f)),
     );
 
-interface Use {
-  readonly file: string;
-  readonly line: number;
-  readonly key: string;
-  readonly prefix: boolean;
-}
-
-function scan(): Use[] {
-  const uses: Use[] = [];
-  for (const file of sources()) {
-    const text = readFileSync(join(root, file), "utf8");
-    const lineOf = (i: number) => text.slice(0, i).split("\n").length;
-    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*"([a-z][\w.-]*\.[\w.$/-]+)"/gu)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: false });
-    for (const m of text.matchAll(/\b(?:t|maybe)\(\s*`([a-z][\w.-]*\.[^`$]*)\$\{/gu)) uses.push({ file, line: lineOf(m.index), key: m[1]!, prefix: true });
-  }
-  return uses;
-}
+const scan = () => sources().flatMap((file) => messageUses(file, readFileSync(join(root, file), "utf8")));
 
 function check(): string[] {
   const problems: string[] = [];
@@ -198,7 +192,6 @@ function templateOf(fn: Function): string | undefined {
       const r = (fn as (...a: unknown[]) => unknown)(...args);
       return typeof r === "string" ? r : undefined;
     } catch {
-      // A word function that rejects sentinel probes is not a plain template.
       return undefined;
     }
   };
@@ -224,7 +217,6 @@ function choiceOf(fn: Function): string | undefined {
       const r = (fn as (...a: unknown[]) => unknown)(...args);
       return typeof r === "string" && !/undefined|NaN|\[object /u.test(r) ? r : undefined;
     } catch {
-      // A word function that throws on probe inputs cannot be rendered as ICU select/plural.
       return undefined;
     }
   };
@@ -484,6 +476,7 @@ switch (command) {
   case "check": {
     const problems = check();
     for (const p of problems) console.log(p);
+
     console.log(problems.length > 0 ? `i18n: ${problems.length} problems` : `i18n: ${messages("zh").size} messages ok`);
     if (problems.length > 0) process.exit(1);
     break;

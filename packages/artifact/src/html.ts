@@ -1,7 +1,26 @@
 import { type DefaultTreeAdapterTypes as P, parse, parseFragment } from "parse5";
 
-import { t } from "@vibevalley/i18n";
-import type { HtmlAnchor } from "@vibevalley/protocol";
+import { list, t } from "@vibevalley/i18n";
+import { ArtifactKindValues, type HtmlAnchor } from "@vibevalley/protocol";
+import { isOneOf } from "@vibevalley/protocol/rules";
+
+/** The largest artifact body, bytes, and title, characters. */
+const artifactMax = 5 * 1024 * 1024;
+const artifactTitleMax = 80;
+
+/** Why a title, a kind or a hand-in's size is refused, in the user's words. "" when they are right. */
+export function artifactProblem(a: { readonly title?: string; readonly kind?: string; readonly size?: number }): string {
+  if (a.title !== undefined) {
+    const n = [...a.title.trim()].length;
+    if (n === 0) return t("server.artifact.noTitle");
+    if (n > artifactTitleMax) return t("server.artifact.longTitle", { max: artifactTitleMax });
+  }
+  if (a.kind !== undefined && !isOneOf(ArtifactKindValues, a.kind)) return t("server.artifact.badKind", { kind: a.kind, kinds: ArtifactKindValues.join(", ") });
+  if (a.size === undefined) return "";
+  if (a.size === 0) return t("server.artifact.empty");
+  if (a.size > artifactMax) return t("server.artifact.tooBig", { mb: artifactMax / 1024 / 1024 });
+  return "";
+}
 
 const libraries = ["https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"];
 
@@ -125,9 +144,8 @@ function allowed(url: string, need: Need): boolean {
   if (/^(?:data|blob):/iu.test(u)) return need === "inline" || need === "font";
   try {
     return hosts[need].includes(new URL(u).origin);
-  } catch (e) {
-    if (e instanceof TypeError) return false;
-    throw e;
+  } catch {
+    return false;
   }
 }
 
@@ -254,4 +272,39 @@ export function htmlCheck(source: string): HtmlCheck {
   };
   walk(parse(source, { sourceCodeLocationInfo: true }).childNodes);
   return { refused: refused.toSorted((a, b) => a.line - b.line), warned };
+}
+
+const hostList = (need: Need) => list(hosts[need].map((h) => new URL(h).host));
+
+const loadText: Record<Need, (line: number, url: string) => string> = {
+  script: (line, url) => t("server.artifact.check.script", { line, url, hosts: hostList("script") }),
+  style: (line, url) => t("server.artifact.check.style", { line, url, hosts: hostList("style") }),
+  font: (line, url) => t("server.artifact.check.font", { line, url, hosts: hostList("font") }),
+  inline: (line, url) => t("server.artifact.check.inline", { line, url }),
+  link: (line, url) => t("server.artifact.check.link", { line, url, hosts: hostList("link") }),
+};
+
+function refusalText(f: HtmlRefusal): string {
+  switch (f.kind) {
+    case "load":
+      return loadText[f.need](f.line, f.url);
+    case "form":
+      return t("server.artifact.check.form", { line: f.line, url: f.url });
+    case "refresh":
+      return t("server.artifact.check.refresh", { line: f.line });
+    case "base":
+      return t("server.artifact.check.base", { line: f.line });
+    case "frame":
+      return t("server.artifact.check.frame", { line: f.line, tag: f.tag });
+  }
+}
+
+const shownMax = 8;
+
+/** Why a page is refused, in the user's words; "" when it may be kept. */
+export function htmlProblem(check: HtmlCheck): string {
+  if (check.refused.length === 0) return "";
+  const shown = check.refused.slice(0, shownMax).map((f) => "\n- " + refusalText(f));
+  const more = check.refused.length > shownMax ? "\n" + t("server.artifact.check.more", { n: check.refused.length - shownMax }) : "";
+  return t("server.artifact.check.refused", { n: check.refused.length }) + shown.join("") + more;
 }

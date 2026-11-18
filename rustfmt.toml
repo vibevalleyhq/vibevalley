@@ -1,0 +1,3 @@
+# The same width as the TypeScript (vite.config.ts fmt.printWidth).
+max_width = 160
+edition = "2024"

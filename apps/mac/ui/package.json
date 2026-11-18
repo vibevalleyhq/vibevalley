@@ -1,0 +1,16 @@
+{
+  "name": "@vibevalley/mac-ui",
+  "private": true,
+  "description": "The native app's views (nsh TSX): nsh resolves bare imports from node_modules and @vibevalley/* through nsh.json's aliases.",
+  "type": "module",
+  "dependencies": {
+    "@vibevalley/artifact": "workspace:*",
+    "@vibevalley/i18n": "workspace:*",
+    "@vibevalley/pkm": "workspace:*",
+    "@vibevalley/protocol": "workspace:*",
+    "pele": "catalog:",
+    "pinyin-pro": "catalog:",
+    "uqr": "catalog:",
+    "zod": "catalog:"
+  }
+}

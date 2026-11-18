@@ -15,7 +15,7 @@ export const MemorySourceInfo = z.object({
   transcripts: z.boolean(),
 }) satisfies Codec<T.MemorySourceInfo>;
 
-const MemorySourceKind = z.enum(T.MemorySourceKindValues) satisfies Codec<T.MemorySourceKind>;
+export const MemorySourceKind = z.enum(T.MemorySourceKindValues) satisfies Codec<T.MemorySourceKind>;
 
 const MemorySource = z.object({
   kind: MemorySourceKind,

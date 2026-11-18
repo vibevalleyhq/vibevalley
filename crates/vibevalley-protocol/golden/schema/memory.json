@@ -1,0 +1,262 @@
+{
+ "RecallPreview": [
+  {
+   "lines": [
+    "s364"
+   ],
+   "chars": 365,
+   "limit": 366
+  },
+  {
+   "lines": [
+    "s367"
+   ],
+   "chars": 368,
+   "limit": 369
+  }
+ ],
+ "MemoryKind": [
+  "note",
+  "issue"
+ ],
+ "Memory": [
+  {
+   "id": "s370",
+   "agent": "s371",
+   "kind": "note",
+   "text": "s372",
+   "author": "user",
+   "repo": "s373",
+   "session": "s374",
+   "at": 375,
+   "recalled": 376,
+   "recalledAt": 377,
+   "fading": true,
+   "source": "s379"
+  },
+  {
+   "id": "s380",
+   "agent": "s381",
+   "kind": "note",
+   "text": "s382",
+   "author": "user",
+   "at": 383,
+   "recalled": 384,
+   "fading": false
+  }
+ ],
+ "MemoryRequest": [
+  {
+   "text": "s386",
+   "repo": "s387",
+   "requestKey": "s388"
+  },
+  {
+   "text": "s389"
+  }
+ ],
+ "MemoryScope": [
+  {
+   "kind": "global"
+  },
+  {
+   "kind": "repo",
+   "repo": "s390"
+  },
+  {
+   "kind": "repo",
+   "repo": "s391"
+  },
+  {
+   "kind": "unknown"
+  }
+ ],
+ "MemoryFound": [
+  {
+   "id": "s392",
+   "agent": "s393",
+   "kind": "note",
+   "text": "s394",
+   "author": "user",
+   "repo": "s395",
+   "session": "s396",
+   "at": 397,
+   "recalled": 398,
+   "recalledAt": 399,
+   "fading": true,
+   "source": "s401",
+   "score": 402,
+   "scope": {
+    "kind": "global"
+   }
+  },
+  {
+   "id": "s403",
+   "agent": "s404",
+   "kind": "note",
+   "text": "s405",
+   "author": "user",
+   "at": 406,
+   "recalled": 407,
+   "fading": true,
+   "source": "s409",
+   "score": 410,
+   "scope": {
+    "kind": "global"
+   }
+  }
+ ],
+ "MemorySearch": [
+  {
+   "found": [
+    {
+     "id": "s411",
+     "agent": "s412",
+     "kind": "note",
+     "text": "s413",
+     "author": "user",
+     "repo": "s414",
+     "session": "s415",
+     "at": 416,
+     "recalled": 417,
+     "recalledAt": 418,
+     "fading": false,
+     "source": "s420",
+     "score": 421,
+     "scope": {
+      "kind": "global"
+     }
+    }
+   ],
+   "coverage": [
+    "s422"
+   ]
+  },
+  {
+   "found": [
+    {
+     "id": "s423",
+     "agent": "s424",
+     "kind": "note",
+     "text": "s425",
+     "author": "user",
+     "at": 426,
+     "recalled": 427,
+     "fading": true,
+     "source": "s429",
+     "score": 430,
+     "scope": {
+      "kind": "global"
+     }
+    }
+   ],
+   "coverage": [
+    "s431"
+   ]
+  }
+ ],
+ "MemoryList": [
+  {
+   "memories": [
+    {
+     "id": "s432",
+     "agent": "s433",
+     "kind": "note",
+     "text": "s434",
+     "author": "user",
+     "repo": "s435",
+     "session": "s436",
+     "at": 437,
+     "recalled": 438,
+     "recalledAt": 439,
+     "fading": true,
+     "source": "s441"
+    }
+   ],
+   "sources": [
+    {
+     "name": "s442",
+     "label": "s443",
+     "on": true,
+     "off": "s445",
+     "canList": true,
+     "canForget": false,
+     "transcripts": true
+    }
+   ]
+  },
+  {
+   "memories": [
+    {
+     "id": "s449",
+     "agent": "s450",
+     "kind": "note",
+     "text": "s451",
+     "author": "user",
+     "at": 452,
+     "recalled": 453,
+     "fading": true
+    }
+   ],
+   "sources": [
+    {
+     "name": "s455",
+     "label": "s456",
+     "on": false,
+     "off": "s458",
+     "canList": false,
+     "canForget": true,
+     "transcripts": false
+    }
+   ]
+  }
+ ],
+ "MemoryListInput": [
+  {
+   "agent": "s6948"
+  },
+  {
+   "agent": "s6949"
+  }
+ ],
+ "MemoryRecallInput": [
+  {
+   "agent": "s6950",
+   "repo": "s6951",
+   "text": "s6952"
+  },
+  {
+   "agent": "s6953"
+  }
+ ],
+ "MemoryCreateInput": [
+  {
+   "agent": "s6954",
+   "text": "s6955",
+   "repo": "s6956",
+   "requestKey": "s6957"
+  },
+  {
+   "agent": "s6958",
+   "text": "s6959"
+  }
+ ],
+ "MemorySearchInput": [
+  {
+   "agent": "s6960",
+   "repo": "s6961",
+   "text": "s6962"
+  },
+  {}
+ ],
+ "MemoryDeleteInput": [
+  {
+   "agent": "s6963",
+   "memory": "s6964"
+  },
+  {
+   "agent": "s6965",
+   "memory": "s6966"
+  }
+ ]
+}

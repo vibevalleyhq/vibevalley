@@ -24,7 +24,7 @@ const walkers = byName(
   }),
 );
 
-/** A pixel sprite by its name in apps/web/public/pixel (icon-seeds, act-run_command, logo-claude, plot-wheat…). */
+/** A pixel sprite by its name in assets/pixel (icon-seeds, act-run_command, logo-claude, plot-wheat…). */
 export function pixelArt(name: string): string {
   const url = pixel[`${name}.png`];
   if (!url) throw new Error(`no sprite ${name}`);

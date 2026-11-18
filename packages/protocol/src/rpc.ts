@@ -2,12 +2,6 @@ import { z } from "zod";
 
 import * as S from "./schema";
 
-/** Where the subscriptions are served. One is read as `GET <subscriptionPath>/<name>?payload=<JSON of its payload>`,
- * answered `text/event-stream`: each event one `data: <JSON>` line decoded with its `event` Schema. A payload that does
- * not decode, or a refusal before the first event (no such channel…), is answered as any route is: a JSON ApiError
- * envelope with its status, not a stream. Once streaming, the server ends the stream rather than send an error. */
-const subscriptionPath = "/api/v1/subscribe";
-
 /** Each subscription's payload and the Schema of each event it then sends, by name. */
 export const subscriptions = {
   /** What changed in a channel after the revision after, then each change from now on, each the message as it now is. */
@@ -22,15 +16,3 @@ export const subscriptions = {
 } as const;
 
 export type SubscriptionName = keyof typeof subscriptions;
-
-/** Each subscription's payload and event, as types. */
-export type Subscriptions = {
-  readonly [K in SubscriptionName]: {
-    readonly payload: z.output<(typeof subscriptions)[K]["payload"]>;
-    readonly event: z.output<(typeof subscriptions)[K]["event"]>;
-  };
-};
-
-/** The URL path one subscription with this payload is read at. */
-export const subscriptionUrl = <K extends SubscriptionName>(name: K, payload: Subscriptions[K]["payload"]): string =>
-  `${subscriptionPath}/${name}?payload=${encodeURIComponent(JSON.stringify(payload))}`;

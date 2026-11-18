@@ -8,7 +8,7 @@
 |---|---|
 | 笔记库目录管理、Markdown 与大纲树互转（`parse` / `print`） | 帮工和助手交付的文档与网页（[Artifact](docs/subsystems/artifact.md)） |
 | 块操作（`PkmBlockOp`）、双链、标签、块引用、反链与全文检索 | 档案的经验记忆存储（[记性](docs/subsystems/memory.md)） |
-| 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 助手与帮工的 `pkm_*` 工具封装（`internal/domain/stack/tools.go`） |
+| 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 助手与帮工的 `pkm_*` 工具（`crates/vibevalley-server/src/modules/tool/notes.rs`） |
 | 行内批注与改写建议（`pkm_comment`）的创建、接受与拒绝 | |
 
 ## 在哪
@@ -16,20 +16,17 @@
 | 位置 | 职责 |
 |---|---|
 | [`packages/pkm/`](packages/pkm/README.md) | 独立 PKM 与双链大纲纯领域包（`@vibevalley/pkm`）：Logseq 式 Markdown 解析与打印（`markdown.ts`）、PARA 目录映射（`para.ts`）、双链反链与块引用图谱（`graph.ts`）、前端大纲视图与行内切片（`view.ts`）、键盘编辑与补全状态机（`editing.ts`）、多块框选与拖拽（`selection.ts`）、日历日期（`days.ts`）与乐观写入队列（`writer.ts`） |
-| `internal/domain/pkm/` | 服务端笔记存储（`store.go`、`parser.go`、`fts_raw.go`；表与查询在 `pkg/db/migrations/0010_pkm.up.sql`、`pkg/db/queries/pkm.sql`）：`yuin/goldmark` 唯一 AST 解析、并发锁、FTS5 `trigram` 与 `sqlite-vec` 混合检索、批注与撤销记录 |
-| `internal/domain/gateway/pkm_helpers.go`、`handlers_collab.go` | `pkm.*` 接口适配、图谱摘要与话题关联查询 |
+| `crates/vibevalley-server/src/modules/pkm/mod.rs`、`db.rs` | `Pkm`：文件读写、单写锁、文件监听（外部编辑器改了就重扫）、批注、全文索引与撤销记录（`server.db`） |
+| `crates/vibevalley-pkm/src/` | 服务端跑的那份大纲引擎：解析与打印、PARA、双链图谱（`graph.rs`）；和 `packages/pkm` 对着 `crates/vibevalley-pkm/golden` 的测例 |
+| `crates/vibevalley-cli/src/commands/pkm.rs` | `vibevalley pkm ...` |
 | `packages/protocol/src/pkm/`、`packages/pkm/src/outline.ts` | 笔记契约与前后端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |
 | `$VIBEVALLEY_WORK_ROOT/pkm/` | 默认笔记根目录（`00_Inbox`–`04_Archives`、`journals/`、`.pkm/snapshots/`） |
-| `cmd/vibe/pkm.go` | CLI 笔记子命令（`vibe pkm ...`） |
-| `apps/web/src/features/pkm/` | 工作台笔记页、大纲编辑器组件（消费 `@vibevalley/pkm`） |
+| `apps/mac/ui/vv/web/features/pkm/` | 工作台笔记页、大纲编辑器组件（消费 `@vibevalley/pkm`） |
 
-接口清单见 [capabilities.md](docs/reference/capabilities.md)（`pkm.*`），CLI 命令见 `cmd/vibe/pkm.go`（`vibe pkm ...`）。
+接口清单见 [capabilities.md](docs/reference/capabilities.md)（`pkm.*`），CLI 命令为 `vibevalley pkm ...`。
 
 ## 模型和不变量
 
-- **唯一 AST 图谱解析与混合检索（`parser.go`、`fts_raw.go`、`store.go`）**：
-  - 服务端使用纯 Go [`yuin/goldmark`](https://github.com/yuin/goldmark) 与 `goldmark-frontmatter`（保留精确源码字节跨度 `byte_start`/`byte_end` 与 `LinkASTNode`）解析双链 `[[...]]`、块引用 `((...))`、嵌入 `![[...]]` 与标签，作为正反向链接与图谱的唯一事实源。
-  - 全文虚拟表 `pkm_notes_fts` 采用 `tokenize='trigram'` 原生切分中英文词组，结合纯 Go `github.com/viant/sqlite-vec`（`pkm_vectors`）通过倒数排名融合（RRF）做混合召回，并经 `fts_raw.go` 批量预处理语句支持大规模索引重建。
 - **文件是唯一真相，读写字节幂等**：
   - 一个 `.md` 文件对应一页，所在 PARA 文件夹决定分类层级。
   - 每个 `- ` 开头是一块，两空格缩进表示层级。
@@ -52,12 +49,12 @@
 ## 怎么走
 
 1. **闪念捕获（`pkm.capture`）**：未指定页面时追加到今日日记 `journals/YYYY_MM_DD.md` 并标 `LATER #inbox`；指定页面时追加到该页末尾。
-2. **全文检索（`pkm.search`）**：加载或写回时更新 SQLite FTS5 全文索引（`internal/domain/pkm/fts_raw.go`），查询按命中度、整句匹配与 PARA 层级权重排序。
+2. **全文检索（`pkm.search`）**：加载或写回时用 `gse` 分词写进 `pkm_term` 表的 `terms` 列，表在 `server.db`（SQLite），匹配和打分在 Rust 里做（前缀匹配，照 TS 版 `ts_rank` 的算法）；按分数、整句命中与 PARA 层级权重排序（`crates/vibevalley-server/src/modules/pkm/db.rs`）。
 3. **改名与合并（`pkm.page.rename`）**：目标页不存在时重命名并记 `alias::`；目标页已存在时合并块并删除旧文件，同时更新全库 `[[旧名]]`。
 
 ## 和谁打交道
 
-- **记性（`memory`）**：调用 `termsList` 对中英文块文本分词。
+- **记性（`memory`）**：共用它的中英文分词（`crates/vibevalley-memory/src/gse.rs`）。
 - **助手与工具（`orchestrator`、`tool`）**：助手现状含 `01_Projects` 活跃项目；当轮纯用户发言自动附入最多 3 个相关笔记块。
 
 ## 为什么这样
@@ -71,5 +68,7 @@
 
 ## 怎么验证
 
-- `packages/pkm/src/outline.test.ts` 与 `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/pkm/... ./internal/domain/gateway/...`：大纲无损往返、按需 `id::`、反链、FTS5 检索与批注保留链接测试。
-- `apps/web/src/features/pkm/*.test.ts`、`apps/web/test/pkm.spec.ts`：键盘大纲编辑、多块选择与拖拽、搜索跳转与日记视图测试。
+- `packages/pkm/src/outline.test.ts`、`crates/vibevalley-pkm/src/tests.rs`：大纲无损往返、按需 `id::`、反链展开（Rust 一侧对着 golden）。
+- `crates/vibevalley-server/tests/pkm.rs`：建页与挪页、读外部编辑器写的、按操作改块保留 id 并撤销、闪念进今天的日记。
+- `packages/pkm/src/pkm.test.ts`：编辑、选择与日记视图的纯函数。
+- `apps/mac/ui/vv/app/notes.test.tsx`、`apps/mac/ui/vv/app/pkm.test.ts`：笔记页在样例数据上的页面测试（`nsh/test`）。

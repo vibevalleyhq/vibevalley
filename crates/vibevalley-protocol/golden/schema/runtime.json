@@ -1,0 +1,424 @@
+{
+ "RuntimeQuota": [
+  {
+   "left": 211,
+   "text": "s212"
+  },
+  {
+   "text": "s213"
+  }
+ ],
+ "RuntimePreset": [
+  {
+   "id": "s214",
+   "label": "s215",
+   "blurb": "s216",
+   "look": {
+    "species": "bear",
+    "outfit": "farmer",
+    "orchestrator": "farmer",
+    "build": "biped",
+    "head": "rounded",
+    "body": "s217",
+    "trim": "s218",
+    "hat": "s219",
+    "eye": "s220"
+   }
+  },
+  {
+   "id": "s221",
+   "label": "s222",
+   "blurb": "s223",
+   "look": {
+    "species": null,
+    "outfit": null,
+    "orchestrator": null,
+    "build": "biped",
+    "head": "rounded",
+    "body": "s224",
+    "trim": "s225",
+    "hat": "s226",
+    "eye": "s227"
+   }
+  }
+ ],
+ "RuntimeCapability": [
+  "listModels",
+  "accountUsage",
+  "checkUpdate",
+  "upgrade",
+  "skills",
+  "mcpServers",
+  "tools"
+ ],
+ "RuntimeSupport": [
+  {
+   "steer": true,
+   "refused": {
+    "k229": "s230"
+   },
+   "capabilities": [
+    "listModels"
+   ],
+   "inProcess": false
+  },
+  {
+   "steer": true,
+   "refused": {
+    "k233": "s234"
+   },
+   "capabilities": [
+    "listModels"
+   ],
+   "inProcess": false
+  }
+ ],
+ "Via": [
+  "executable",
+  "bundled"
+ ],
+ "Installation": [
+  {
+   "status": "available",
+   "via": "executable",
+   "command": "s236",
+   "version": "s237"
+  },
+  {
+   "status": "available",
+   "via": "executable",
+   "command": "s238",
+   "version": null
+  },
+  {
+   "status": "not_found"
+  },
+  {
+   "status": "checking"
+  },
+  {
+   "status": "unsupported",
+   "reason": "s239"
+  },
+  {
+   "status": "unsupported",
+   "reason": "s240"
+  }
+ ],
+ "ModelEntry": [
+  {
+   "id": "s241",
+   "name": "s242",
+   "effortLevels": [
+    "s243"
+   ],
+   "isDefault": true
+  },
+  {
+   "id": "s245",
+   "name": "s246",
+   "effortLevels": [
+    "s247"
+   ],
+   "isDefault": true
+  }
+ ],
+ "UsageWindow": [
+  {
+   "label": "s249",
+   "usedPercent": 250,
+   "resetsAt": 251
+  },
+  {
+   "label": "s252",
+   "usedPercent": 253,
+   "resetsAt": null
+  }
+ ],
+ "Balance": [
+  {
+   "currency": "s254",
+   "amount": 255
+  },
+  {
+   "currency": "s256",
+   "amount": 257
+  }
+ ],
+ "AccountUsage": [
+  {
+   "status": "ok",
+   "subscription": "s258",
+   "windows": [
+    {
+     "label": "s259",
+     "usedPercent": 260,
+     "resetsAt": 261
+    }
+   ]
+  },
+  {
+   "status": "ok",
+   "subscription": null,
+   "windows": [
+    {
+     "label": "s262",
+     "usedPercent": 263,
+     "resetsAt": null
+    }
+   ]
+  },
+  {
+   "status": "balance",
+   "provider": "s264",
+   "available": false,
+   "balances": [
+    {
+     "currency": "s266",
+     "amount": 267
+    }
+   ]
+  },
+  {
+   "status": "balance",
+   "provider": "s268",
+   "available": false,
+   "balances": [
+    {
+     "currency": "s270",
+     "amount": 271
+    }
+   ]
+  },
+  {
+   "status": "login_required"
+  },
+  {
+   "status": "unavailable",
+   "reason": "s272"
+  },
+  {
+   "status": "unavailable",
+   "reason": "s273"
+  }
+ ],
+ "InventoryEntry": [
+  {
+   "name": "s274",
+   "description": "s275",
+   "source": "s276",
+   "enabled": false
+  },
+  {
+   "name": "s278",
+   "description": "s279",
+   "source": "s280",
+   "enabled": false
+  }
+ ],
+ "RuntimeSettings": [
+  {
+   "enabled": true,
+   "binPath": "s283",
+   "defaultModel": "s284",
+   "defaultEffort": "s285",
+   "env": {
+    "k286": "s287"
+   },
+   "dailyBudget": 288,
+   "maxWorking": 289
+  },
+  {
+   "enabled": true,
+   "binPath": "s291",
+   "defaultModel": "s292",
+   "defaultEffort": "s293",
+   "env": {
+    "k294": "s295"
+   }
+  }
+ ],
+ "RuntimeInfo": [
+  {
+   "id": "s296",
+   "preset": {
+    "id": "s297",
+    "label": "s298",
+    "blurb": "s299",
+    "look": {
+     "species": "bear",
+     "outfit": "farmer",
+     "orchestrator": "farmer",
+     "build": "biped",
+     "head": "rounded",
+     "body": "s300",
+     "trim": "s301",
+     "hat": "s302",
+     "eye": "s303"
+    }
+   },
+   "support": {
+    "steer": true,
+    "refused": {
+     "k305": "s306"
+    },
+    "capabilities": [
+     "listModels"
+    ],
+    "inProcess": false
+   },
+   "installation": {
+    "status": "available",
+    "via": "executable",
+    "command": "s308",
+    "version": "s309"
+   },
+   "models": [
+    {
+     "id": "s310",
+     "name": "s311",
+     "effortLevels": [
+      "s312"
+     ],
+     "isDefault": false
+    }
+   ],
+   "usage": {
+    "status": "ok",
+    "subscription": "s314",
+    "windows": [
+     {
+      "label": "s315",
+      "usedPercent": 316,
+      "resetsAt": 317
+     }
+    ]
+   },
+   "skills": [
+    {
+     "name": "s318",
+     "description": "s319",
+     "source": "s320",
+     "enabled": false
+    }
+   ],
+   "mcpServers": [
+    {
+     "name": "s322",
+     "description": "s323",
+     "source": "s324",
+     "enabled": false
+    }
+   ],
+   "tools": [
+    {
+     "name": "s326",
+     "description": "s327",
+     "source": "s328",
+     "enabled": false
+    }
+   ],
+   "settings": {
+    "enabled": true,
+    "binPath": "s331",
+    "defaultModel": "s332",
+    "defaultEffort": "s333",
+    "env": {
+     "k334": "s335"
+    },
+    "dailyBudget": 336,
+    "maxWorking": 337
+   },
+   "spentToday": 338,
+   "quota": {
+    "left": 339,
+    "text": "s340"
+   },
+   "stop": "s341",
+   "checkedAt": 342
+  },
+  {
+   "id": "s343",
+   "preset": {
+    "id": "s344",
+    "label": "s345",
+    "blurb": "s346",
+    "look": {
+     "species": null,
+     "outfit": null,
+     "orchestrator": null,
+     "build": "biped",
+     "head": "rounded",
+     "body": "s347",
+     "trim": "s348",
+     "hat": "s349",
+     "eye": "s350"
+    }
+   },
+   "support": {
+    "steer": false,
+    "refused": {
+     "k352": "s353"
+    },
+    "capabilities": [
+     "listModels"
+    ],
+    "inProcess": true
+   },
+   "installation": {
+    "status": "available",
+    "via": "executable",
+    "command": "s355",
+    "version": null
+   },
+   "models": null,
+   "usage": null,
+   "skills": null,
+   "mcpServers": null,
+   "tools": null,
+   "settings": {
+    "enabled": true,
+    "binPath": "s357",
+    "defaultModel": "s358",
+    "defaultEffort": "s359",
+    "env": {
+     "k360": "s361"
+    }
+   },
+   "stop": "s362",
+   "checkedAt": 363
+  }
+ ],
+ "RuntimeRefreshInput": [
+  {
+   "id": "s6930"
+  },
+  {
+   "id": "s6931"
+  }
+ ],
+ "RuntimeSettingUpdateInput": [
+  {
+   "id": "s6932",
+   "enabled": false,
+   "binPath": "s6934",
+   "defaultModel": "s6935",
+   "defaultEffort": "s6936",
+   "env": {
+    "k6937": "s6938"
+   },
+   "dailyBudget": 6939,
+   "maxWorking": 6940
+  },
+  {
+   "id": "s6941",
+   "enabled": true,
+   "binPath": "s6943",
+   "defaultModel": "s6944",
+   "defaultEffort": "s6945",
+   "env": {
+    "k6946": "s6947"
+   }
+  }
+ ]
+}

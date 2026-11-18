@@ -1,0 +1,765 @@
+[
+ {
+  "op": "channel.message.send",
+  "name": "channel_message_send",
+  "description": "在群聊里发一条消息。id 不填就是你自己的工单串；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@助手、@用户 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "anyway": {
+     "description": "看过新消息、仍要原样发",
+     "type": "boolean"
+    },
+    "confirm": {
+     "description": "确实要发到频道的顶层，而不是刚读的那个串",
+     "type": "boolean"
+    },
+    "id": {
+     "type": "string"
+    },
+    "replyTo": {
+     "description": "回复同一处的哪一条：它的消息号（msg=）",
+     "type": "integer"
+    },
+    "text": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "text"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "resource.read",
+  "name": "resource_read",
+  "description": "按 URI 分页读取完整资源。输入里只有摘要和 vv:// 指针时用；offset 是 UTF-16 字符偏移，第一页从 0 开始，后续照回答的 nextOffset 继续。同一会话从 offset 0 读到的动态内容会固定成快照。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "uri": {
+     "description": "要读取的 vv:// URI。",
+     "type": "string"
+    },
+    "offset": {
+     "description": "UTF-16 字符偏移；默认 0。",
+     "type": "integer"
+    },
+    "limit": {
+     "description": "这一页最多返回多少字符；默认 4000，上限 16000。",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "uri"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "channel.message.list",
+  "name": "channel_message_list",
+  "description": "读一个频道或一个串里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），助手读和用户的私聊写 @user；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "before": {
+     "type": "number"
+    },
+    "id": {
+     "description": "#general、#clock-in，或 #general:<消息号>；助手和用户的私聊是 @user",
+     "type": "string"
+    },
+    "limit": {
+     "type": "number"
+    },
+    "unread": {
+     "type": "boolean"
+    }
+   },
+   "type": "object"
+  }
+ },
+ {
+  "op": "channel.unread.list",
+  "name": "channel_unread_list",
+  "description": "列出你还没读的对话：在哪、几条、有没有提到你、最后是谁说的。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {},
+   "type": "object"
+  }
+ },
+ {
+  "op": "session.list",
+  "name": "session_list",
+  "description": "现在谁在场：每个帮工的编号、名字、农机、在哪个仓库、在做什么。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {},
+   "type": "object"
+  }
+ },
+ {
+  "op": "memory.search",
+  "name": "memory_search",
+  "description": "在你的记性里找：你和用户以前替你的档案记下的话、做过的活。不填 repo 只找这个仓库的和所有仓库都用的；repo 写空字符串也找别的仓库的。干到一半想知道「这个仓库的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "repo": {
+     "description": "不填找你现在干活的仓库和所有仓库都用的；写空字符串也找别的仓库的",
+     "type": "string"
+    },
+    "text": {
+     "description": "要找什么，几个词或一句话；不填就列出最新的",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  }
+ },
+ {
+  "op": "memory.create",
+  "name": "memory_create",
+  "description": "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。不填 repo 记这个仓库的；repo 写空字符串记成所有仓库都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "repo": {
+     "description": "不填记在你现在干活的仓库；写空字符串是所有仓库都用得上",
+     "type": "string"
+    },
+    "text": {
+     "description": "一句以后还用得上的话：约定、坑、命令",
+     "type": "string"
+    }
+   },
+   "required": [
+    "text"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "pkm.search",
+  "name": "pkm_search",
+  "description": "在用户的笔记里找：用户自己记的项目、领域、资料、日记，每条是哪一页、在哪一块下面、块的 id。用户提到以前记过的事、一个仓库的来龙去脉、某个人或某个想法，先在这里找；只是你自己干活的经验去 memory_search。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "limit": {
+     "description": "最多几条，默认 10",
+     "type": "integer"
+    },
+    "text": {
+     "description": "要找什么，几个词或一句话",
+     "type": "string"
+    },
+    "tier": {
+     "description": "只找这一层的页：project（在做的项目）、area（长期负责的领域）、resource（资料）、inbox（收件箱）、journal（日记）、archive（归档）",
+     "enum": [
+      "inbox",
+      "project",
+      "area",
+      "resource",
+      "archive",
+      "journal"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "text"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "pkm.page.get",
+  "name": "pkm_page_get",
+  "description": "读用户笔记里的一页：每一块一行，带块的 id 和层级。pkm_search 找到了想看整页、或要对某一块提改写之前用。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "page": {
+     "description": "页的标题（或别名）",
+     "type": "string"
+    }
+   },
+   "required": [
+    "page"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "pkm.capture",
+  "name": "pkm_capture",
+  "description": "往用户今天的日记里记一句，标成 LATER #inbox，写上是你记的：用户让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "text": {
+     "description": "要记的一句话：写清楚是什么、为什么值得记",
+     "type": "string"
+    }
+   },
+   "required": [
+    "text"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "pkm.comment.suggest",
+  "name": "pkm_comment_suggest",
+  "description": "对用户笔记里的一块提一个改写：不直接改，用户在笔记页看到差异、接受了才换。用户让你整理、改写、纠正他记的东西时用；先用 pkm_page_get 读到块的 id 和现在的字。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "block": {
+     "description": "块的 id：pkm_search、pkm_page_get 的回答里〔〕中的那串",
+     "type": "string"
+    },
+    "rationale": {
+     "description": "为什么这样改，一句话，用户接受前会看到",
+     "type": "string"
+    },
+    "suggested": {
+     "description": "这一块改成的整段字；原来的 [[链接]] 和 ((引用)) 都要留着，漏了的会补在末尾",
+     "type": "string"
+    }
+   },
+   "required": [
+    "block",
+    "suggested"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.block.create",
+  "name": "artifact_block_create",
+  "description": "在一个一起写的 Artifact 里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 artifact_block_update。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "type": "string"
+    },
+    "afterBlock": {
+     "description": "插在这一块后面（同一层里）；空字符串是这一层最前面，不填是最后面",
+     "type": "string"
+    },
+    "checked": {
+     "description": "todo 的勾选状态；默认 false",
+     "type": "boolean"
+    },
+    "language": {
+     "description": "code 的语言，比如 ts、sql",
+     "type": "string"
+    },
+    "level": {
+     "description": "标题的级别 1–3，只给 heading 用；默认 2",
+     "type": "integer"
+    },
+    "parentId": {
+     "description": "插在哪个父块下面；不填是顶层",
+     "type": "string"
+    },
+    "text": {
+     "description": "这一块的字；可以用 **粗**、_斜_、行内代码、~~删~~ 和链接；代码块照原样存",
+     "type": "string"
+    },
+    "type": {
+     "description": "块的类型：paragraph（默认）、heading、bulleted、numbered、todo、quote、code",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "text"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.block.update",
+  "name": "artifact_block_update",
+  "description": "改一块的字、类型或属性：text 是整段新字，type 换类型，level/checked/language 是标题级别、待办勾选、代码语言。baseRev 是你读到或写下它时的版本；这之后别人改过它的字，就不改，回答里有现在的字和版本，看过再决定要不要照着重写。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "baseRev": {
+     "description": "你读到或写下这一块时它是第几版",
+     "type": "integer"
+    },
+    "block": {
+     "description": "块的 id",
+     "type": "string"
+    },
+    "checked": {
+     "description": "todo 的勾选状态",
+     "type": "boolean"
+    },
+    "id": {
+     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "type": "string"
+    },
+    "language": {
+     "description": "code 的语言，比如 ts、sql",
+     "type": "string"
+    },
+    "level": {
+     "description": "标题的级别 1–3",
+     "type": "integer"
+    },
+    "text": {
+     "description": "这一块完整的新字，不是增量；不填就不改字",
+     "type": "string"
+    },
+    "type": {
+     "description": "换成这个类型；和 level、checked、language 一起用",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "block",
+    "baseRev"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.block.delete",
+  "name": "artifact_block_delete",
+  "description": "删一块（子块一起删），置成墓碑；用户要删掉哪一段、或你写的某一块不要了时用。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "block": {
+     "description": "要删的块的 id；子块一起删",
+     "type": "string"
+    },
+    "id": {
+     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "block"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "issue.split",
+  "name": "issue_split",
+  "description": "把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 12 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "tasks": {
+     "description": "子工单，每张一个帮工在自己的分支上做完、提交、单独验证",
+     "items": {
+      "additionalProperties": false,
+      "properties": {
+       "acceptance": {
+        "description": "这张只写现在会失败的测试，别的都等它，合进去以后冻结",
+        "type": "boolean"
+       },
+       "agent": {
+        "description": "帮工档案 id 或名字；不填继承父工单的帮工",
+        "type": "string"
+       },
+       "brief": {
+        "description": "这张子工单：目标、改哪里、做到什么算完、留给后面的步骤什么；做它的帮工只看得到它和前面步骤的结论",
+        "type": "string"
+       },
+       "check": {
+        "description": "做完在它的分支上跑的检查命令，比如 go test ./...",
+        "type": "string"
+       },
+       "id": {
+        "description": "简短的英文小写 id，比如 schema、api",
+        "type": "string"
+       },
+       "needs": {
+        "description": "要等哪几张做完（填 id）；不互相依赖的会同时做",
+        "items": {
+         "type": "string"
+        },
+        "type": [
+         "null",
+         "array"
+        ]
+       },
+       "scope": {
+        "description": "它要改的文件或目录；同时做的几张尽量不重叠",
+        "items": {
+         "type": "string"
+        },
+        "type": [
+         "null",
+         "array"
+        ]
+       },
+       "title": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "id",
+       "brief"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "title": {
+     "description": "父工单的新标题；不填保留原标题",
+     "type": "string"
+    }
+   },
+   "required": [
+    "tasks"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "issue.report",
+  "name": "issue_report",
+  "description": "结构化报告当前工单的一轮：summary 是净结果。prSubmit=true 提交 PR 后继续跟随 CI/评审；最终交给用户验收用 prSubmit=false。有问题或未满足的验收项则等用户。问题、验收凭据和记性只认这些字段，不从正文猜。用用户的语言填写。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "summary": {
+     "type": "string"
+    },
+    "questions": {
+     "items": {
+      "additionalProperties": true,
+      "properties": {
+       "question": {
+        "type": "string"
+       },
+       "options": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "question",
+       "options"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "checks": {
+     "items": {
+      "additionalProperties": true,
+      "properties": {
+       "criterion": {
+        "type": "number"
+       },
+       "result": {
+        "enum": [
+         "met",
+         "unmet",
+         "unsure"
+        ],
+        "type": "string"
+       },
+       "proof": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "criterion",
+       "result",
+       "proof"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "remember": {
+     "items": {
+      "additionalProperties": true,
+      "properties": {
+       "text": {
+        "type": "string"
+       },
+       "scope": {
+        "enum": [
+         "repo",
+         "all"
+        ],
+        "type": "string"
+       }
+      },
+      "required": [
+       "text",
+       "scope"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "prSubmit": {
+     "type": "boolean"
+    },
+    "answer": {
+     "additionalProperties": true,
+     "properties": {
+      "conclusion": {
+       "type": "string"
+      },
+      "evidence": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "unsure": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "next": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      }
+     },
+     "required": [
+      "conclusion",
+      "evidence",
+      "unsure",
+      "next"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "summary"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "issue.pr.submit",
+  "name": "issue_pr_submit",
+  "description": "在当前工单获用户明确授权、仓库启用 PR 且本地检查通过后，在本轮运行中推送分支并开立或更新 PR。summary 可填写这次实际改动，作为 PR 说明。它不会合并主分支或结束当前会话。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "summary": {
+     "type": "string"
+    }
+   },
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.list",
+  "name": "artifact_list",
+  "description": "列出 Artifact：不填就是为你这张工单做的；channel 填 #<频道> 是在那里说过的。每行是 id、标题、是一起写的还是网页、第几稿、谁做的、最新这一稿改了什么。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "channel": {
+     "description": "在哪说：#<频道>，或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.get",
+  "name": "artifact_get",
+  "description": "看一份 Artifact：每一稿是谁做的、改了什么、在对话里哪条消息（用户的评论就是对它的回复）。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.content.get",
+  "name": "artifact_content_get",
+  "description": "读一份 Artifact：网页读某一稿的全文，照用户的评论改下一稿前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "type": "string"
+    },
+    "version": {
+     "description": "第几稿；不填是最新的",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.create",
+  "name": "artifact_create",
+  "description": "写一份 Artifact：要交给用户看、代码改动说不清的一整页，比如两种设计让用户挑、调研报告、对比表、带图的说明。先把它写成你工作目录里的一个文件，再用 file 交上来（或者直接给 content）。它挂在你的工单上，你会在工单串里说一句带卡片的话，用户在工作台里点开看、回复卡片评论，评论会叫醒你。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "content": {
+     "description": "这一稿的全文；和 file 二选一",
+     "type": "string"
+    },
+    "note": {
+     "description": "这一稿改了什么，一句话；第一稿可以写这是什么",
+     "type": "string"
+    },
+    "file": {
+     "description": "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
+     "type": "string"
+    },
+    "kind": {
+     "description": "html 是一整页，一稿一稿换（页面在沙箱里显示：连不了网、调不了农场的接口、不能提交表单、不能再嵌一个页面；样式和脚本写在这一个文件里，库只能从 cdn.jsdelivr.net、cdnjs.cloudflare.com 加载，字体和它的样式还能从 fonts.googleapis.com、fonts.gstatic.com 加载；图片、音视频内联成 data:；一稿最多 5 MB。交上来先查，从别处加载的会被退回，说哪一行、怎么改）；markdown 读成一块一块的，用户和你都能接着改（artifact_block_create、artifact_block_update）",
+     "enum": [
+      "html",
+      "markdown"
+     ],
+     "type": "string"
+    },
+    "display": {
+     "description": "网页（html）怎么看，不填是 page：page 是一整页照原样；slides 是幻灯片：每页一个顶层 <section>，版式 class 有 title、two-col、image、quote，备注写在 <aside class=\"notes\">，工作台负责排成 16:9、翻页、放映和存成 PDF，别给 section 写 position、transform、width、height、display；颜色和字体用 --vv-ink、--vv-accent、--vv-font-sans 这类变量。一起写的（markdown）不填",
+     "enum": [
+      "page",
+      "slides",
+      "motion"
+     ],
+     "type": "string"
+    },
+    "title": {
+     "description": "标题：用户在卡片上看到的那一行，最多 80 个字",
+     "type": "string"
+    }
+   },
+   "required": [
+    "title",
+    "kind"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.version.create",
+  "name": "artifact_version_create",
+  "description": "给一个网页（html）Artifact 出新的一稿（旧的留着）：照用户的评论改完以后用，note 写这一稿改了什么。会在第一稿说过的地方再说一句带卡片的话。一起写的 Artifact 不出新稿，一块一块改它。页面在沙箱里显示：连不了网、调不了农场的接口、不能提交表单、不能再嵌一个页面；样式和脚本写在这一个文件里，库只能从 cdn.jsdelivr.net、cdnjs.cloudflare.com 加载，字体和它的样式还能从 fonts.googleapis.com、fonts.gstatic.com 加载；图片、音视频内联成 data:；一稿最多 5 MB。交上来先查，从别处加载的会被退回，说哪一行、怎么改。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "content": {
+     "description": "这一稿的全文；和 file 二选一",
+     "type": "string"
+    },
+    "note": {
+     "description": "这一稿改了什么，一句话；第一稿可以写这是什么",
+     "type": "string"
+    },
+    "file": {
+     "description": "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
+     "type": "string"
+    },
+    "id": {
+     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "library.item.list",
+  "name": "library_item_list",
+  "description": "列出素材库：生成的图和声音、用户上传的文件、帮工和助手拿回来的文件，最近的在前。每行是 id、名字、类型、大小、来路。要用户以前给过的图或文件，先在这里找。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "origin": {
+     "description": "只列哪一种来路：generated 生成的、uploaded 用户上传的、fetched 帮工和助手拿回来的；不填列全部",
+     "enum": [
+      "generated",
+      "uploaded",
+      "fetched"
+     ],
+     "type": "string"
+    },
+    "type": {
+     "description": "只列哪一类文件：image、audio、video、other；不填列全部",
+     "enum": [
+      "image",
+      "audio",
+      "video",
+      "other"
+     ],
+     "type": "string"
+    },
+    "text": {
+     "description": "只列名字里带这几个字的，不分大小写；不填不筛",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  }
+ },
+ {
+  "op": "library.item.add",
+  "name": "library_item_add",
+  "description": "把一个值得留的文件放进素材库，用户在素材库页能看到、下载、发到频道：用户要你找的图和文件，或者干活时找到、以后还用得上的。给公网的 https 网址（url），或你工作目录里的一个文件（path）。不要放中间产物、临时文件和代码。回答是它的 id，在消息里提到它用这个 id。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "name": {
+     "description": "放进去叫什么名字；不填用文件自己的名字",
+     "type": "string"
+    },
+    "path": {
+     "description": "你工作目录里的一个文件（相对路径），服务端去读；和 url 二选一",
+     "type": "string"
+    },
+    "url": {
+     "description": "一个公网的 https 地址，服务端去下载；和 path 二选一",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  }
+ }
+]

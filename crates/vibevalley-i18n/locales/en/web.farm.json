@@ -1,0 +1,71 @@
+{
+  "panel": {
+    "shop": "Shop",
+    "warehouse": "Warehouse",
+    "graphs": "Tasks and achievements",
+    "log": "Farm log",
+    "orchestrator": "Assistant and pets",
+    "shopClosed": "The shop is being done up and opens in the next version. You have {coins} coins: save them for now."
+  },
+  "menu": {
+    "agents": "Helper roster",
+    "runtimes": "Machines",
+    "skills": "Skill book",
+    "issues": "Tickets"
+  },
+  "tool": {
+    "hand": {
+      "hint": "Click a plot for its details, an empty one to sow"
+    },
+    "water": {
+      "hint": "Pass a helper a word; one at work hears it on the way"
+    },
+    "bug": {
+      "hint": "The job failed (bugs in the plot): have it go on fixing"
+    },
+    "weed": {
+      "hint": "Review notes that did not pass grow as weeds: pulled when the helper fixes them and the next review passes"
+    },
+    "harvest": {
+      "hint": "A ripe plot: bring in the result and let the helper go"
+    },
+    "shovel": {
+      "hint": "Stops one at work; lets one not at work go"
+    }
+  },
+  "native": {
+    "ledger": "Ledger & clock",
+    "achievements": "Achievements",
+    "log": "Farm log",
+    "warehouse": "Stored issues",
+    "shop": "Shop",
+    "chat": "Chat",
+    "workbench": "Workbench",
+    "map": "Islands",
+    "tree": "Memory tree",
+    "phone": "Pixel phone",
+    "noMessages": "No messages yet",
+    "empty": "No records yet",
+    "progress": "Lv.{level} · XP {xp}/{need}",
+    "coins": "Coins {coins}",
+    "workers": "Helpers here: {count}",
+    "dawn": "Dawn",
+    "noon": "Noon",
+    "dusk": "Dusk",
+    "night": "Night",
+    "previous": "Previous",
+    "next": "Next · {page}/{pages}",
+    "score": "Score {score}",
+    "restart": "Click or Space to restart",
+    "steer": "Arrow keys / WASD",
+    "pending": "Sending…",
+    "accepted": "Accepted",
+    "close": "Close",
+    "loading": "Loading…",
+    "treeCounts": "Leaves {leaves} · Fruits {fruits} · Seeds {seeds}",
+    "treeGrowth": "{rounds} rounds · {growth}% grown",
+    "leaf": "Memory",
+    "fruit": "Principle",
+    "seed": "Habit"
+  }
+}

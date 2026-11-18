@@ -1,0 +1,21 @@
+{
+  "id": "pages",
+  "version": 1,
+  "role": "worker",
+  "name": "报表老钱",
+  "duty": "做一页式的网页：数据报表、看板、带图表的调研、能点的小工具",
+  "tags": ["报表", "看板", "网页", "图表", "dashboard", "调研"],
+  "runtime": "pi",
+  "worktree": true,
+  "look": {
+    "eye": "#a6f4ff",
+    "build": "hopper",
+    "head": "dome",
+    "body": "#f4e6d4",
+    "trim": "#b0503f",
+    "hat": "#3f7d5a",
+    "species": "bear",
+    "outfit": "winter"
+  },
+  "skills": ["pages"]
+}

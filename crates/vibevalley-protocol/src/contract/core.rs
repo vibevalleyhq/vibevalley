@@ -1,0 +1,325 @@
+#![allow(clippy::large_enum_variant, clippy::enum_variant_names)]
+
+#[allow(unused_imports)]
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
+#[cfg(feature = "ts-gen")]
+use ts_rs::TS;
+
+#[allow(unused_imports)]
+use super::*;
+#[allow(unused_imports)]
+use crate::wire::*;
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SpaceState {
+    pub call: CallState,
+    pub call_reason: String,
+    pub media: Option<Vec<MediaJob>>,
+    pub chat: Option<Chat>,
+    pub commits: Option<CommitCount>,
+    pub progress: Option<Progress>,
+    pub issues: Vec<Issue>,
+    /// Each chat app's status, as the connectors say it whenever it changes; their home is the connectors, not state.json.
+    pub connectors: Vec<ConnectorStatus>,
+    /// The machines helpers work on, as the machine module says them.
+    pub machines: Vec<Machine>,
+    /// Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle.
+    pub sessions: Vec<Session>,
+    pub crons: Vec<Cron>,
+    /// The farm's pixel-only station and step history, by session; no business rule reads it.
+    pub plays: Option<BTreeMap<String, SessionPlay>>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SpaceView {
+    pub call: CallState,
+    pub call_reason: String,
+    pub media: Option<Vec<MediaJob>>,
+    pub chat: Option<Chat>,
+    pub commits: Option<CommitCount>,
+    pub progress: Option<Progress>,
+    pub issues: Vec<Issue>,
+    pub connectors: Vec<ConnectorStatus>,
+    pub machines: Vec<Machine>,
+    pub sessions: Vec<SessionView>,
+    pub crons: Vec<CronView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum NoticeLevel {
+    #[serde(rename = "info")]
+    Info,
+    #[serde(rename = "warn")]
+    Warn,
+    #[serde(rename = "error")]
+    Error,
+}
+
+impl NoticeLevel {
+    pub const ALL: [NoticeLevel; 3] = [NoticeLevel::Info, NoticeLevel::Warn, NoticeLevel::Error];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            NoticeLevel::Info => "info",
+            NoticeLevel::Warn => "warn",
+            NoticeLevel::Error => "error",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct StateFrame {
+    /// Goes up by one with every commit the core folds (Core.apply that changed the state): this frame shows every fold up to it.
+    pub seq: i64,
+    pub state: SpaceView,
+    pub inbox: Vec<InboxItem>,
+    pub view: FarmView,
+    pub effects: Vec<GameEffect>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct Health {
+    pub ok: bool,
+    pub version: String,
+}
+
+/// Told apart by `type`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "type")]
+pub enum Fact {
+    #[serde(rename = "callChanged")]
+    CallChanged(FactCallChanged),
+    #[serde(rename = "sessionToolChanged")]
+    SessionToolChanged(FactSessionToolChanged),
+    #[serde(rename = "sessionToolsReset")]
+    SessionToolsReset(FactSessionToolsReset),
+    #[serde(rename = "sessionPhaseChanged")]
+    SessionPhaseChanged(FactSessionPhaseChanged),
+    #[serde(rename = "messageChanged")]
+    MessageChanged(FactMessageChanged),
+    #[serde(rename = "channelChanged")]
+    ChannelChanged(FactChannelChanged),
+    #[serde(rename = "userMentionsChanged")]
+    UserMentionsChanged(FactUserMentionsChanged),
+    #[serde(rename = "sessionChanged")]
+    SessionChanged(FactSessionChanged),
+    #[serde(rename = "sessionReported")]
+    SessionReported(FactSessionReported),
+    #[serde(rename = "sessionLeft")]
+    SessionLeft(FactSessionLeft),
+    #[serde(rename = "progressChanged")]
+    ProgressChanged(FactProgressChanged),
+    #[serde(rename = "issueChanged")]
+    IssueChanged(FactIssueChanged),
+    #[serde(rename = "issueRemoved")]
+    IssueRemoved(FactIssueRemoved),
+    #[serde(rename = "channelRemoved")]
+    ChannelRemoved(FactChannelRemoved),
+    #[serde(rename = "cronChanged")]
+    CronChanged(FactCronChanged),
+    #[serde(rename = "cronRemoved")]
+    CronRemoved(FactCronRemoved),
+    #[serde(rename = "connectorChanged")]
+    ConnectorChanged(FactConnectorChanged),
+    #[serde(rename = "machineChanged")]
+    MachineChanged(FactMachineChanged),
+    #[serde(rename = "mediaChanged")]
+    MediaChanged(FactMediaChanged),
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ServerEventSnapshot {
+    pub at: i64,
+    pub state: SpaceState,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct LiveEventSession {
+    pub at: i64,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+    pub id: SessionId,
+    pub activity: SessionEvent,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct LiveEventNotice {
+    pub at: i64,
+    pub level: NoticeLevel,
+    pub text: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct LiveEventRuntime {
+    pub at: i64,
+    pub info: RuntimeInfo,
+}
+
+/// Told apart by `type`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "type")]
+pub enum LiveEvent {
+    #[serde(rename = "event")]
+    Event(LiveEventSession),
+    #[serde(rename = "notice")]
+    Notice(LiveEventNotice),
+    #[serde(rename = "runtime")]
+    Runtime(LiveEventRuntime),
+}
+
+/// Told apart by `type`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "type")]
+pub enum ServerEvent {
+    #[serde(rename = "callChanged")]
+    CallChanged(FactCallChanged),
+    #[serde(rename = "sessionToolChanged")]
+    SessionToolChanged(FactSessionToolChanged),
+    #[serde(rename = "sessionToolsReset")]
+    SessionToolsReset(FactSessionToolsReset),
+    #[serde(rename = "sessionPhaseChanged")]
+    SessionPhaseChanged(FactSessionPhaseChanged),
+    #[serde(rename = "messageChanged")]
+    MessageChanged(FactMessageChanged),
+    #[serde(rename = "channelChanged")]
+    ChannelChanged(FactChannelChanged),
+    #[serde(rename = "userMentionsChanged")]
+    UserMentionsChanged(FactUserMentionsChanged),
+    #[serde(rename = "sessionChanged")]
+    SessionChanged(FactSessionChanged),
+    #[serde(rename = "sessionReported")]
+    SessionReported(FactSessionReported),
+    #[serde(rename = "sessionLeft")]
+    SessionLeft(FactSessionLeft),
+    #[serde(rename = "progressChanged")]
+    ProgressChanged(FactProgressChanged),
+    #[serde(rename = "issueChanged")]
+    IssueChanged(FactIssueChanged),
+    #[serde(rename = "issueRemoved")]
+    IssueRemoved(FactIssueRemoved),
+    #[serde(rename = "channelRemoved")]
+    ChannelRemoved(FactChannelRemoved),
+    #[serde(rename = "cronChanged")]
+    CronChanged(FactCronChanged),
+    #[serde(rename = "cronRemoved")]
+    CronRemoved(FactCronRemoved),
+    #[serde(rename = "connectorChanged")]
+    ConnectorChanged(FactConnectorChanged),
+    #[serde(rename = "machineChanged")]
+    MachineChanged(FactMachineChanged),
+    #[serde(rename = "mediaChanged")]
+    MediaChanged(FactMediaChanged),
+    #[serde(rename = "snapshot")]
+    Snapshot(ServerEventSnapshot),
+    #[serde(rename = "event")]
+    Event(LiveEventSession),
+    #[serde(rename = "notice")]
+    Notice(LiveEventNotice),
+    #[serde(rename = "runtime")]
+    Runtime(LiveEventRuntime),
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelFollowPayload {
+    pub id: String,
+    pub after: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelReportsPayload {
+    pub after: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactFollowPayload {
+    pub id: String,
+    pub after: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactSuggestionFollowPayload {
+    pub id: String,
+}
+
+#[cfg(feature = "ts-gen")]
+crate::typescript::module! {
+    "core";
+    types: [SpaceState,
+    SpaceView,
+    NoticeLevel,
+    StateFrame,
+    Health,
+    Fact,
+    ServerEventSnapshot,
+    LiveEventSession,
+    LiveEventNotice,
+    LiveEventRuntime,
+    LiveEvent,
+    ServerEvent,
+    ChannelFollowPayload,
+    ChannelReportsPayload,
+    ArtifactFollowPayload,
+    ArtifactSuggestionFollowPayload];
+    aliases: [];
+}

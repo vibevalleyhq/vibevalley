@@ -1,0 +1,549 @@
+{
+ "SessionAction": [
+  "run_command",
+  "read_file",
+  "edit_file",
+  "search",
+  "web",
+  "mcp",
+  "wait",
+  "other",
+  "thinking",
+  "speaking_text",
+  "none"
+ ],
+ "Doing": [
+  {
+   "action": "run_command",
+   "label": "s697"
+  },
+  {
+   "action": "run_command",
+   "label": "s698"
+  }
+ ],
+ "DoingView": [
+  {
+   "action": "run_command",
+   "label": "s699",
+   "actionText": "s700"
+  },
+  {
+   "action": "run_command",
+   "label": "s701",
+   "actionText": "s702"
+  }
+ ],
+ "SessionClose": [
+  "merged",
+  "completed",
+  "dismissed",
+  "lost"
+ ],
+ "Phase": [
+  {
+   "_tag": "working",
+   "since": 703,
+   "quietSince": 704,
+   "retry": {
+    "attempt": 705,
+    "of": 706
+   },
+   "doing": {
+    "action": "run_command",
+    "label": "s707"
+   }
+  },
+  {
+   "_tag": "working",
+   "since": 708,
+   "doing": {
+    "action": "run_command",
+    "label": "s709"
+   }
+  },
+  {
+   "_tag": "done"
+  },
+  {
+   "_tag": "failed"
+  },
+  {
+   "_tag": "resting"
+  },
+  {
+   "_tag": "closed",
+   "at": 710,
+   "closed": "merged"
+  },
+  {
+   "_tag": "closed",
+   "at": 711,
+   "closed": "merged"
+  }
+ ],
+ "PhaseView": [
+  {
+   "_tag": "working",
+   "since": 712,
+   "quietSince": 713,
+   "retry": {
+    "attempt": 714,
+    "of": 715
+   },
+   "doing": {
+    "action": "run_command",
+    "label": "s716",
+    "actionText": "s717"
+   }
+  },
+  {
+   "_tag": "working",
+   "since": 718,
+   "doing": {
+    "action": "run_command",
+    "label": "s719",
+    "actionText": "s720"
+   }
+  },
+  {
+   "_tag": "done"
+  },
+  {
+   "_tag": "failed"
+  },
+  {
+   "_tag": "resting"
+  },
+  {
+   "_tag": "closed",
+   "at": 721,
+   "closed": "merged"
+  },
+  {
+   "_tag": "closed",
+   "at": 722,
+   "closed": "merged"
+  }
+ ],
+ "IssueAnswer": [
+  {
+   "conclusion": "s723",
+   "evidence": [
+    "s724"
+   ],
+   "unsure": [
+    "s725"
+   ],
+   "next": [
+    "s726"
+   ]
+  },
+  {
+   "conclusion": "s727",
+   "evidence": [
+    "s728"
+   ],
+   "unsure": [
+    "s729"
+   ],
+   "next": [
+    "s730"
+   ]
+  }
+ ],
+ "LastRun": [
+  {
+   "outcome": "completed",
+   "summary": "s731",
+   "at": 732,
+   "spent": {
+    "tokens": 733,
+    "cny": 734
+   },
+   "answer": {
+    "conclusion": "s735",
+    "evidence": [
+     "s736"
+    ],
+    "unsure": [
+     "s737"
+    ],
+    "next": [
+     "s738"
+    ]
+   }
+  },
+  {
+   "outcome": "completed",
+   "summary": "s739",
+   "at": 740
+  }
+ ],
+ "ToolConnection": [
+  {
+   "server": "s741",
+   "status": "unknown",
+   "reason": "s742"
+  },
+  {
+   "server": "s743",
+   "status": "unknown"
+  }
+ ],
+ "ToolConnectionStatus": [
+  "unknown",
+  "starting",
+  "ready",
+  "failed",
+  "cancelled"
+ ],
+ "Session": [
+  {
+   "id": "s744",
+   "role": "orchestrator",
+   "name": "s745",
+   "agent": "s746",
+   "runtime": "s747",
+   "brief": "s748",
+   "repo": "s749",
+   "branch": "s750",
+   "worktree": "s751",
+   "hiredAt": 752,
+   "runs": 753,
+   "lastRun": {
+    "outcome": "completed",
+    "summary": "s754",
+    "at": 755,
+    "spent": {
+     "tokens": 756,
+     "cny": 757
+    },
+    "answer": {
+     "conclusion": "s758",
+     "evidence": [
+      "s759"
+     ],
+     "unsure": [
+      "s760"
+     ],
+     "next": [
+      "s761"
+     ]
+    }
+   },
+   "spent": {
+    "tokens": 762,
+    "cny": 763
+   },
+   "channel": "s764",
+   "issue": "s765",
+   "refining": true,
+   "toolConnections": [
+    {
+     "server": "s767",
+     "status": "unknown",
+     "reason": "s768"
+    }
+   ],
+   "machine": "s769",
+   "phase": {
+    "_tag": "working",
+    "since": 770,
+    "quietSince": 771,
+    "retry": {
+     "attempt": 772,
+     "of": 773
+    },
+    "doing": {
+     "action": "run_command",
+     "label": "s774"
+    }
+   }
+  },
+  {
+   "id": "s775",
+   "role": "orchestrator",
+   "name": "s776",
+   "agent": "s777",
+   "runtime": "s778",
+   "brief": "s779",
+   "hiredAt": 780,
+   "runs": 781,
+   "refining": true,
+   "phase": {
+    "_tag": "working",
+    "since": 783,
+    "doing": {
+     "action": "run_command",
+     "label": "s784"
+    }
+   }
+  }
+ ],
+ "SessionView": [
+  {
+   "id": "s785",
+   "role": "orchestrator",
+   "name": "s786",
+   "agent": "s787",
+   "runtime": "s788",
+   "brief": "s789",
+   "repo": "s790",
+   "branch": "s791",
+   "worktree": "s792",
+   "hiredAt": 793,
+   "runs": 794,
+   "lastRun": {
+    "outcome": "completed",
+    "summary": "s795",
+    "at": 796,
+    "spent": {
+     "tokens": 797,
+     "cny": 798
+    },
+    "answer": {
+     "conclusion": "s799",
+     "evidence": [
+      "s800"
+     ],
+     "unsure": [
+      "s801"
+     ],
+     "next": [
+      "s802"
+     ]
+    }
+   },
+   "spent": {
+    "tokens": 803,
+    "cny": 804
+   },
+   "channel": "s805",
+   "issue": "s806",
+   "refining": false,
+   "toolConnections": [
+    {
+     "server": "s808",
+     "status": "unknown",
+     "reason": "s809"
+    }
+   ],
+   "machine": "s810",
+   "phase": {
+    "_tag": "working",
+    "since": 811,
+    "quietSince": 812,
+    "retry": {
+     "attempt": 813,
+     "of": 814
+    },
+    "doing": {
+     "action": "run_command",
+     "label": "s815",
+     "actionText": "s816"
+    }
+   },
+   "phaseText": "s817"
+  },
+  {
+   "id": "s818",
+   "role": "orchestrator",
+   "name": "s819",
+   "agent": "s820",
+   "runtime": "s821",
+   "brief": "s822",
+   "hiredAt": 823,
+   "runs": 824,
+   "refining": false,
+   "phase": {
+    "_tag": "working",
+    "since": 826,
+    "doing": {
+     "action": "run_command",
+     "label": "s827",
+     "actionText": "s828"
+    }
+   },
+   "phaseText": "s829"
+  }
+ ],
+ "SessionEventType": [
+  "run/start",
+  "user/message",
+  "memory/recalled",
+  "assistant/thinking",
+  "assistant/message",
+  "tool/call",
+  "tool/result",
+  "llm/retry",
+  "llm/usage",
+  "run/error",
+  "run/end"
+ ],
+ "ToolAction": [
+  "run_command",
+  "read_file",
+  "edit_file",
+  "search",
+  "web",
+  "mcp",
+  "wait",
+  "other"
+ ],
+ "EventTokens": [
+  {
+   "input": 830,
+   "cacheRead": 831,
+   "output": 832
+  },
+  {
+   "input": 833,
+   "cacheRead": 834,
+   "output": 835
+  }
+ ],
+ "SessionEvent": [
+  {
+   "seq": 836,
+   "revision": 837,
+   "time": 838,
+   "type": "run/start",
+   "run": "s839",
+   "call": 840,
+   "under": 841,
+   "text": "s842",
+   "action": "run_command",
+   "actionText": "s843",
+   "tool": "s844",
+   "input": "s845",
+   "output": "s846",
+   "ok": false,
+   "tokens": {
+    "input": 848,
+    "cacheRead": 849,
+    "output": 850
+   },
+   "connection": {
+    "server": "s851",
+    "status": "unknown",
+    "reason": "s852"
+   }
+  },
+  {
+   "seq": 853,
+   "revision": 854,
+   "time": 855,
+   "type": "run/start",
+   "text": "s856"
+  }
+ ],
+ "RunTriggerKind": [
+  "issue",
+  "comment",
+  "cron",
+  "refine",
+  "runtime"
+ ],
+ "RunTrigger": [
+  {
+   "kind": "issue",
+   "message": "s857",
+   "channel": "s858",
+   "cron": "s859",
+   "missed": true
+  },
+  {
+   "kind": "issue"
+  }
+ ],
+ "Run": [
+  {
+   "id": "s861",
+   "session": "s862",
+   "issue": "s863",
+   "triggeredBy": {
+    "kind": "issue",
+    "message": "s864",
+    "channel": "s865",
+    "cron": "s866",
+    "missed": false
+   },
+   "heard": [
+    "s868"
+   ],
+   "startedAt": 869,
+   "endedAt": 870,
+   "outcome": "completed",
+   "summary": "s871",
+   "spent": {
+    "tokens": 872,
+    "cny": 873
+   }
+  },
+  {
+   "id": "s874",
+   "session": "s875",
+   "triggeredBy": {
+    "kind": "issue"
+   },
+   "heard": [
+    "s876"
+   ],
+   "startedAt": 877,
+   "summary": "s878"
+  }
+ ],
+ "Machine": [
+  {
+   "id": "s879",
+   "name": "s880",
+   "here": false,
+   "online": true,
+   "joinedAt": 883
+  },
+  {
+   "id": "s884",
+   "name": "s885",
+   "here": true,
+   "online": false,
+   "joinedAt": 888
+  }
+ ],
+ "SessionStopInput": [
+  {
+   "id": "s6973"
+  },
+  {
+   "id": "s6974"
+  }
+ ],
+ "SessionListInput": [
+  {
+   "agent": "s6975"
+  },
+  {}
+ ],
+ "SessionGetInput": [
+  {
+   "id": "s6976"
+  },
+  {
+   "id": "s6977"
+  }
+ ],
+ "SessionEventListInput": [
+  {
+   "id": "s6978",
+   "run": "s6979"
+  },
+  {
+   "id": "s6980"
+  }
+ ],
+ "PhaseRestingOnly": [
+  {
+   "_tag": "resting"
+  }
+ ]
+}

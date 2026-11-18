@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": { "lib": ["ES2024", "DOM"], "types": ["node"] },
-  "include": ["scripts", "vite.config.ts", "knip.ts"]
+  "compilerOptions": { "lib": ["ES2023", "DOM"], "types": ["node"], "allowImportingTsExtensions": true },
+  "include": ["scripts"]
 }

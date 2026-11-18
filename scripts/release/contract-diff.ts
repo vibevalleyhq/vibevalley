@@ -9,25 +9,30 @@ export interface Changed {
 
 /** The contract: what other code is written against. */
 export const contractKinds: readonly { readonly kind: string; readonly is: (path: string) => boolean }[] = [
-  { kind: "protocol", is: (p) => p.startsWith("packages/protocol/src/") && !p.endsWith(".test.ts") },
+  {
+    kind: "protocol",
+    is: (p) =>
+      p.startsWith("crates/vibevalley-protocol/src/contract/") || (p.startsWith("packages/protocol/src/") && !p.endsWith(".test.ts") && !p.endsWith(".gen.ts")),
+  },
   {
     kind: "schema",
-    is: (p) => p === "sqlc.yaml" || /^pkg\/db\/(?:migrations\/[^/]+\.sql|queries\/[^/]+\.sql)$/u.test(p) || /^pkg\/contract\/.*\.go$/u.test(p),
+    is: (p) => p === "crates/vibevalley-server/src/base/db.rs" || (p.startsWith("crates/vibevalley-server/src/modules/") && p.endsWith("store.rs")),
   },
 ];
 
-/** The area a path is in: a Go package, an app's or package's folder, or its feature under apps/web/src/features. */
+/** The area a path is in: a crate, an app or package's folder, a server module or a UI feature. */
 export function areaOf(path: string): string {
   const parts = path.split("/");
-  if (parts[0] === "internal" && parts[1] === "domain" && parts.length > 2) return `domain/${parts[2]}`;
-  if ((parts[0] === "cmd" || parts[0] === "internal" || parts[0] === "pkg") && parts.length > 1) return `${parts[0]}/${parts[1]}`;
-  if (parts[0] === "apps" && parts[1] === "web" && parts[2] === "src" && parts[3] === "features" && parts.length > 5) return `web/${parts[4]}`;
-  if (parts[0] === "apps" || parts[0] === "packages") return `${parts[0]}/${parts[1]}`;
+  if (parts[0] === "crates" && parts[1] === "vibevalley-server" && parts[2] === "src" && parts[3] === "modules" && parts.length > 4)
+    return `server/${parts[4]}`;
+  if (parts[0] === "apps" && parts[1] === "mac" && parts[2] === "ui" && parts[3] === "vv" && parts[4] === "web" && parts[5] === "features" && parts.length > 6)
+    return `mac/${parts[6]}`;
+  if (parts[0] === "crates" || parts[0] === "apps" || parts[0] === "packages") return `${parts[0]}/${parts[1]}`;
   return parts[0] ?? path;
 }
 
-/** A service's interface method or contract export line in Go: a changed line inside one counts as the contract's. */
-export const isServiceLine = (line: string) => /^type\s+\w+\s+interface\b/u.test(line);
+/** A service's public boundary line in `vibevalley-server-api` or a server module. */
+export const isServiceLine = (line: string) => /^\s*pub (?:trait|fn) \w+/u.test(line);
 
 /** `git diff --numstat` read. */
 export function numstatOf(text: string): Changed[] {
@@ -82,7 +87,7 @@ if (import.meta.main) {
   const base = at >= 0 ? process.argv[at + 1]! : "origin/main";
   const git = (...args: string[]) => execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   const changed = numstatOf(git("diff", "--numstat", "--no-renames", base, "HEAD"));
-  const serviceLines = git("diff", "--unified=0", base, "HEAD", "--", "internal", "pkg")
+  const serviceLines = git("diff", "--unified=0", base, "HEAD", "--", "crates/vibevalley-server-api/src", "crates/vibevalley-server/src/modules")
     .split("\n")
     .filter((l) => (l.startsWith("+") || l.startsWith("-")) && !l.startsWith("+++") && !l.startsWith("---") && isServiceLine(l.slice(1))).length;
   process.stdout.write(markdownOf(summaryOf(changed, serviceLines)));

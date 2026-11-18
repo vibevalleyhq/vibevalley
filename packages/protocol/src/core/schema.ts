@@ -5,7 +5,7 @@ import type { Codec } from "../codec";
 import { SessionId } from "../common/schema";
 import { ConnectorStatus, FactConnectorChanged } from "../connector/schema";
 import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema";
-import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress } from "../game/schema";
+import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/schema";
 import { InboxItem } from "../inbox/schema";
 import { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/schema";
 import { MediaJob, FactMediaChanged } from "../media/schema";
@@ -41,6 +41,7 @@ const SpaceState = z.object({
   ...spaceFields,
   sessions: z.array(Session),
   crons: z.array(Cron),
+  plays: z.exactOptional(z.record(z.string(), SessionPlay)),
 }) satisfies Codec<T.SpaceState>;
 
 const SpaceView = z.object({
@@ -63,6 +64,28 @@ export const Health = z.object({
   ok: z.boolean(),
   version: z.string(),
 }) satisfies Codec<T.Health>;
+
+export const Fact = z.discriminatedUnion("type", [
+  FactCallChanged,
+  FactSessionToolChanged,
+  FactSessionToolsReset,
+  FactSessionPhaseChanged,
+  FactMessageChanged,
+  FactChannelChanged,
+  FactUserMentionsChanged,
+  FactSessionChanged,
+  FactSessionReported,
+  FactSessionLeft,
+  FactProgressChanged,
+  FactIssueChanged,
+  FactIssueRemoved,
+  FactChannelRemoved,
+  FactCronChanged,
+  FactCronRemoved,
+  FactConnectorChanged,
+  FactMachineChanged,
+  FactMediaChanged,
+]) satisfies Codec<T.Fact>;
 
 const ServerEventSnapshot = z.object({
   type: z.literal("snapshot"),

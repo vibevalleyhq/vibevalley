@@ -3,15 +3,9 @@ import { z } from "zod";
 import type { Codec } from "../codec";
 import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
 import { Conflict } from "../repo/schema";
-import { PhaseResting, Session } from "../session/schema";
+import { IssueAnswer, PhaseResting, Session, SessionEvent } from "../session/schema";
 import * as T from "./shapes";
-
-const IssueAnswer = z.object({
-  conclusion: z.string(),
-  evidence: z.array(z.string()),
-  unsure: z.array(z.string()),
-  next: z.array(z.string()),
-}) satisfies Codec<T.IssueAnswer>;
+import { IssueReportMemoryScopeValues } from "./shapes";
 
 const Landing = z.enum(T.LandingValues) satisfies Codec<T.Landing>;
 const IssueCanceled = z.enum(T.IssueCanceledValues) satisfies Codec<T.IssueCanceled>;
@@ -22,13 +16,13 @@ export const IssueStatus = z.enum(T.IssueStatusValues) satisfies Codec<T.IssueSt
 
 const PullRequestState = z.enum(T.PullRequestStateValues) satisfies Codec<T.PullRequestState>;
 
-const PullRequest = z.object({
+export const PullRequest = z.object({
   url: z.string(),
   number: z.number(),
   state: PullRequestState,
 }) satisfies Codec<T.PullRequest>;
 
-const Finding = z.object({
+export const Finding = z.object({
   id: z.string(),
   text: z.string(),
   at: z.number(),
@@ -40,20 +34,20 @@ const IssueRefining = z.object({
   name: z.string(),
 }) satisfies Codec<T.IssueRefining>;
 
-const Question = z.object({
+export const Question = z.object({
   question: z.string(),
   options: z.array(z.string()),
 }) satisfies Codec<T.Question>;
 
 const CheckResult = z.enum(T.CheckResultValues) satisfies Codec<T.CheckResult>;
 
-const CriterionCheck = z.object({
+export const CriterionCheck = z.object({
   criterion: z.number(),
   result: CheckResult,
   proof: z.string(),
 }) satisfies Codec<T.CriterionCheck>;
 
-const IssueStageKind = z.enum(T.IssueStageKindValues) satisfies Codec<T.IssueStageKind>;
+export const IssueStageKind = z.enum(T.IssueStageKindValues) satisfies Codec<T.IssueStageKind>;
 const StuckReason = z.enum(T.StuckReasonValues) satisfies Codec<T.StuckReason>;
 const IssueAct = z.enum(T.IssueActValues) satisfies Codec<T.IssueAct>;
 
@@ -112,7 +106,18 @@ const IssueMandate = z.object({
   autoSubmitPr: z.boolean(),
 }) satisfies Codec<T.IssueMandate>;
 
-const IssueConstraints = z.object({
+export const IssueReportMemory = z.object({ text: z.string(), scope: z.enum(IssueReportMemoryScopeValues) }) satisfies Codec<T.IssueReportMemory>;
+
+export const IssueReport = z.object({
+  summary: z.string(),
+  questions: z.array(Question),
+  checks: z.array(CriterionCheck),
+  remember: z.array(IssueReportMemory),
+  prSubmit: z.boolean(),
+  answer: z.exactOptional(IssueAnswer),
+}) satisfies Codec<T.IssueReport>;
+
+export const IssueConstraints = z.object({
   check: z.exactOptional(z.string()),
   scope: z.array(z.string()),
   acceptance: z.boolean(),
@@ -271,3 +276,18 @@ export const FactIssueRemoved = z.object({
   at: z.number(),
   id: IssueId,
 }) satisfies Codec<T.FactIssueRemoved>;
+
+export const IssueWatch = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("history"), session: SessionId, events: z.array(SessionEvent) }),
+  z.object({
+    kind: z.literal("state"),
+    issue: Issue,
+    sessions: z.array(Session),
+    sessionIds: z.array(SessionId),
+    settled: z.boolean(),
+    omittedSessions: z.number().int(),
+  }),
+  z.object({ kind: z.literal("event"), session: SessionId, event: SessionEvent }),
+  z.object({ kind: z.literal("gap"), session: SessionId, before: z.exactOptional(z.number().int()) }),
+  z.object({ kind: z.literal("missing"), issue: IssueId }),
+]) satisfies Codec<T.IssueWatch>;

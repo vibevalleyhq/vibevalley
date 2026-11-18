@@ -1,0 +1,34 @@
+[
+ {
+  "title": "",
+  "problem": "Artifact 要有个标题"
+ },
+ {
+  "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "problem": "标题太长了，最多 80 个字"
+ },
+ {
+  "title": "ok",
+  "kind": "pdf",
+  "size": 1,
+  "problem": "认不得 pdf 这种 Artifact，只认 html, markdown"
+ },
+ {
+  "title": "ok",
+  "kind": "html",
+  "size": 0,
+  "problem": "Artifact 是空的"
+ },
+ {
+  "title": "ok",
+  "kind": "markdown",
+  "size": 6291456,
+  "problem": "一稿最多 5 MB"
+ },
+ {
+  "title": "ok",
+  "kind": "markdown",
+  "size": 6,
+  "problem": ""
+ }
+]

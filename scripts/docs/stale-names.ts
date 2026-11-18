@@ -2,7 +2,18 @@ import { existsSync, globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
-const DIRS = ["apps/web/src", "apps/web/test", "packages/protocol/src"];
+const TS_DIRS = [
+  "apps/mac/ui/vv/web",
+  "packages/protocol/src",
+  "packages/artifact/src",
+  "packages/pkm/src",
+  "apps/server/src",
+  "apps/web/src",
+  "apps/web/test",
+];
+// The native port keeps oar's and its own Rust/workspace words where rules do not name `dirs`.
+const NATIVE_DIRS = ["crates", "apps/mac/src", "apps/mac/ui"];
+const DIRS = [...TS_DIRS, ...NATIVE_DIRS];
 
 interface Rule {
   /** What the hit is. */
@@ -18,16 +29,25 @@ interface Rule {
 
 const RULES: readonly Rule[] = [
   {
+    name: "the name the native port had before it moved in",
+    pattern: /epona|Epona|EPONA/u,
+    says: "it is VibeValley: crates are vibevalley-<concept>, the app is apps/mac, variables are VIBEVALLEY_* (.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)",
+    dirs: DIRS,
+  },
+  {
     name: "the farm's person under the owner name",
     pattern:
       /\bowner_?[iI]d\b|(?:\b(?:for|wants|by|on|from|needs|stopped|hands|source|conflict)|For|Wants|By|On|From|Needs|Stopped|Hands|Source|Conflict)Owner|\bowner(?:Mentions?|Required|Read|Last|Line|Late|Spoke|Said|Seen|Event|Only|AgentWord|sLanguage)|Owner(?:Mention|Face|Unread|Read|Did|Required|Only|Ask)|["']owner["']/u,
     says: "the one person a farm has is the user in code, tables and values: userId, actsForUser, stageWantsUser, the actor kind \"user\" (docs/subsystems/user.md); a thread's, a block's or a trigger's owner (ownerOf, threadOwnerOf) is another word and stays",
+    // oar's acquired-session key, and the EverOS sender id that memories already stored outside are filed under.
+    except: /^apps\/server\/src\/modules\/(session\/executor\.test|memory\/everos|memory\/outside\.test)\.ts$/u,
   },
   {
     name: "a delivery name the one-door plan retired",
     pattern:
       /\b(openDeliveries|returnOne|returnInput|registerTalk|registerInitialInputs|deliverDirect|breakerNotices|dropEnvelope|retireDispatches|queuedInputs|issueInputs|DeliveryChange|recordChannelTrigger|forOrchestrator|OrchestratorNews|ChannelMail|ChannelRouteInput|InboxMessage|asInbox|inboxLines|orchestratorInboxLines|inboxMore|InputConsumed|InputReturned|startedIssues|finishedRuns|inputsConsumed|inputsReturned|launchesHub)\b|\bsessions\.(register|launches|present|presentSessions|workers)\b|\b(presentSessions|registerOrchestrator|orchestratorOfRow|orchestratorForChannel|OrchestratorForChannel|setOrchestrator|SetOrchestrator|channel_follow|Follows|isForOrchestrator|beginOrchestrator|recordOrchestratorStart|recordWorkerStart|publishOrchestrator|orchestratorSays|tellSession|runSays)\b/u,
-    says: "the session door: recordTrigger, route, unrouted, hireWith, withdrawEnvelope, digest, handBack, deliveries; an issue's pool is the issues'; everything a session does is one Session news stream (docs/subsystems/session.md)",
+    says: "the session module's door: receive (a Trigger with the watch's braked Hearers, a Record, an Event, or a Hire), withdraw, read (IssueTriggers, Queued, Digest…), handBack, decline, deliveries (Handed, Consumed, EmptyWake); an envelope as its helper reads it is Envelope; an orchestrator's session is registered by Session itself whenever its profile is kept (Agent.whenKept); everything a session does is one Session.news (Hired, Reported, Left, IssueStarted, RunFinished, Consumed, Returned and its launch's Spoke, Ended, HandedOff, Settling, Closed, Compacting) (docs/subsystems/session.md); the deliveries' own steps inside apps/server/src/modules/session are their business",
+    except: /^apps\/server\/src\/modules\/session\/(mailbox|work|pump|deliveries|routing|triggers|envelope|payload)(\.test)?\.ts$/u,
   },
   {
     name: "send for hiring a helper",
@@ -38,17 +58,20 @@ const RULES: readonly Rule[] = [
     name: "主人 for the user",
     pattern: /主人/u,
     says: "the person is 你 when spoken to, 用户 when spoken about (to a model, in docs), and called by the name they set; docs/README.md 用语",
+    dirs: DIRS,
   },
   {
     name: "管家 for the assistant",
     // 管家 is the built-in assistant's default name (templates/orchestrator/agent.json) and a look's (机器人管家), not the role.
     pattern: /(?<!机器人)管家/u,
     says: "the agent the user talks to is 助手 in the page, the prompts and the docs (assistant in English); 管家 is only the default assistant's name, which the user can change; the code name stays orchestrator (docs/README.md 用语)",
+    dirs: DIRS,
   },
   {
     name: "产出 or 稿子 for an artifact",
     pattern: /产出|稿子/u,
     says: "the page and the prompts call an artifact Artifact, and an html one's versions 第 N 稿 (a block's revisions are 第 N 版) (docs/README.md 用语)",
+    dirs: DIRS,
   },
   {
     name: "a fact split from sessionPhase or gameProgress",
@@ -87,6 +110,8 @@ const RULES: readonly Rule[] = [
     name: "playbook or plan for a task",
     pattern: /[Pp]laybook|\b[a-z_]*[Pp]lan(s|ner|ners|ning|ned)?\b|\b[A-Z][A-Za-z]*Plan(?![te])[A-Za-z]*\b/u,
     says: "a task (Task, task.*, task_split …), split for breaking one into steps, step for one of its steps",
+    // A compaction's plan of what to fold, and oar's own usage.Plan: other meanings of the word.
+    except: /^apps\/server\/src\/modules\/(agent\/brain\/(compaction|agent|.*\.test)\.ts|agent\/runtime\.ts)$/u,
   },
   {
     name: "a task graph under its old name",
@@ -97,6 +122,8 @@ const RULES: readonly Rule[] = [
     name: "an API path without its version",
     pattern: /["'`]\/api\/(?!v1\/)/u,
     says: "every route is under /api/v1",
+    // EverOS's own API, which the memory source speaks: its versions are its own.
+    except: /^apps\/server\/src\/modules\/memory\/(everos|outside|source-lifetime)(\.test)?\.ts$/u,
   },
   {
     name: "the word ticket",
@@ -128,7 +155,9 @@ const RULES: readonly Rule[] = [
     name: "an agent tool under its name before it was its endpoint's",
     pattern:
       /\b(channel_say|channel_read|read_chat|channel_inbox|channel_settings|open_channel|list_crons|cancel_cron|issue_status|graph_action|task_action|task_edit|task_add|task_update|task_graph|memory_add|doc_read|doc_append|doc_update|wants_owner|all_repos|base_rev)\b/u,
-    says: "a tool is named by its endpoint: channel_message_send, channel_message_list, channel_unread_list, channel_update, channel_create, cron_list, cron_delete, issue_status_update, graph_act, graph_task_act, graph_task_update, memory_create, doc_get, doc_block_create, doc_block_update; an agent's own todo is todo_add, todo_update, todo_list; fields as the endpoint's (wantsUser, repo, baseRev)",
+    says: "a tool is named by its endpoint (tool/schemas.ts toolName): channel_message_send, channel_message_list, channel_unread_list, channel_update, channel_create, cron_list, cron_delete, issue_status_update, graph_act, graph_task_act, graph_task_update, memory_create, doc_get, doc_block_create, doc_block_update; an agent's own todo is todo_add, todo_update, todo_list; fields as the endpoint's (wantsUser, repo, baseRev)",
+    // Nowledge Mem's own tools, which the memory source calls.
+    except: /^apps\/server\/src\/modules\/memory\/(nowledge|outside)(\.test)?\.ts$/u,
   },
   {
     name: "an old protocol name",
@@ -141,6 +170,12 @@ const RULES: readonly Rule[] = [
     name: "the old helper agent role",
     pattern: /\brole\s*(?::|===?|!==?)\s*["'`]helper["'`]|\bagent\.role\.helper\b/u,
     says: 'an agent role is "orchestrator" or "worker" (AgentRoleValues); its words are web.agent.role.worker',
+  },
+  {
+    name: "channel-owned delivery storage",
+    pattern: /\bchannel_delivery\b/u,
+    says: "session_delivery: delivery belongs to the session module",
+    dirs: ["apps/server/src"],
   },
   {
     name: "an old home file or its mover",
@@ -188,6 +223,8 @@ const RULES: readonly Rule[] = [
     name: "a helper's question under the ask name",
     pattern: /\b(Ask|Asks|openAsks|asksOf|setIssueAsks|SetIssueAsks|OwnerAsk|badgeAsks)\b|\.asks\b/u,
     says: "Question, questions, openQuestions, questionsOf; the inbox kind ask and the verb ask stay",
+    // The marker a helper writing English may put before a question (question).
+    except: /^apps\/server\/src\/modules\/session\/report\.ts$/u,
   },
   {
     name: "the read model under the core name",
@@ -199,7 +236,7 @@ const RULES: readonly Rule[] = [
     pattern: /\b(Standing|StandingValues|IssueStanding|standingLabel|standingOf|standingIn|standingTone|standingWantsOwner)\b|\.standing\b/u,
     says: "IssueStageKind, IssueStage, issueStageOf, issueStageIn; an achievement's standing (AchievementStanding) stays",
     // The achievements panel's standings are an achievement's tier.
-    except: /^apps\/web\/src\/farm\/panels\/Achievements\.tsx$/u,
+    except: /^apps\/(web\/src|mac\/ui\/vv\/web)\/farm\/panels\/Achievements\.tsx$/u,
   },
   {
     name: "an issue's stage under the attention type name",
@@ -237,7 +274,7 @@ const RULES: readonly Rule[] = [
     pattern: /\b(Manager|Manager[A-Z]\w*|manager[A-Z]\w*|\w+Manager\w*)\b/u,
     says: "Orchestrator, defaultOrchestrator, OrchestratorShape, forOrchestrator; the farm's art and map keep their manager names (manager-face, Manager)",
     // The village map's entity is Manager (public/village.ldtk).
-    except: /^apps\/web\/src\/farm\/world\/(level|world)\.ts$/u,
+    except: /^apps\/(web\/src|mac\/ui\/vv\/web)\/farm\/world\/(level|world)\.ts$/u,
   },
   {
     name: "the orchestrator under the assistant name",
@@ -248,14 +285,15 @@ const RULES: readonly Rule[] = [
     name: "an issue's state in farm words",
     pattern: /收获|收成|缺肥|种植计划|活熟了|\bPhaseRipe\b|_tag (?:===|!==|:) "ripe"|"graph-ripe"|act: "harvest"|\bHarvest(?:Deps|Review)\b|\bharvesting\(/u,
     says: "the issue's own words (docs/subsystems/issue.md 状态和用语): 完成 (complete) and what it delivered (合进了主分支…), 改动, 问题 (等你回答), 计划; phase done, graph ready; farm words are for the farm's skin",
-    // The farm's skin (with the pixel pieces the skins share) keeps its words.
-    except: /^apps\/(web\/src\/(farm|ui\/pixel)\/|web\/test\/farm-)/u,
+    // The farm's skin (with the pixel pieces the skins share) and the game say it their way.
+    except:
+      /^(apps\/(web\/src|mac\/ui\/vv\/web)\/(farm|ui\/pixel)\/|apps\/web\/test\/farm-|apps\/server\/src\/modules\/game\/|crates\/vibevalley-server\/src\/modules\/game\/)/u,
   },
   {
     name: "a word list for an issue's or a session's state outside the protocol's rules",
     pattern:
       /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|IssueStageKind|IssueAct|Landing|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/u,
-    says: "the shared catalog's words (packages/i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
+    says: "the shared catalog's words (crates/vibevalley-i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
     except: /^packages\/protocol\/src\/rules\//u,
   },
 
@@ -263,15 +301,30 @@ const RULES: readonly Rule[] = [
     name: "presence or the system in farm words, where agents and the workbench read them",
     pattern: /地里|【农场|农场现状|not_on_farm/u,
     says: "在场 (present sessions: presentSessions, session_list), 现状 (the orchestrator's situation), VibeValley for the system; 地里 and 农场 are the farm's own words",
-    dirs: ["apps/web/src/features", "apps/web/src/base", "apps/web/src/ui"],
+    dirs: [
+      "apps/server/src/issue",
+      "apps/server/src/session",
+      "apps/server/src/task",
+      "apps/server/src/tool",
+      "apps/server/src/orchestrator",
+      "apps/server/src/channel",
+      "apps/server/src/mcp",
+      "apps/server/src/inbox",
+      "apps/web/src/features",
+      "apps/web/src/base",
+      "apps/web/src/ui",
+      "apps/mac/ui/vv/web/features",
+      "apps/mac/ui/vv/web/base",
+      "apps/mac/ui/vv/web/ui",
+    ],
     // What the user types in a test is the user's words; the pixel pieces are the skins' own.
-    except: /\.test\.ts$|^apps\/web\/src\/ui\/pixel\//u,
+    except: /\.test\.ts$|^apps\/(web\/src|mac\/ui\/vv\/web)\/ui\/pixel\//u,
   },
   {
     name: "the repo map's farm words in the workbench",
     pattern: /\b(growthOf|Growth|TillingCalendar|Deed|Planted|logoInBed|SowHere|plotsIn|sessionInPlot|onSow)\b|web\.repo\.(map|repo|growth)\b/u,
-    says: "the repos page says recency (recencyOf, Recency), Overview, Languages, CommitCalendar, logoInBar; the map, its plots and its sowing are the farm's (apps/web/src/farm/map, web.farm.map.*), handed in as ReposSkin",
-    dirs: ["apps/web/src/features", "apps/web/src/base", "apps/web/src/ui"],
+    says: "the repos page says recency (recencyOf, Recency), Overview, Languages, CommitCalendar, logoInBar; the map, its plots and its sowing are the farm's (apps/mac/ui/vv/web/farm/map, web.farm.map.*), handed in as ReposSkin",
+    dirs: ["apps/web/src/features", "apps/web/src/base", "apps/web/src/ui", "apps/mac/ui/vv/web/features", "apps/mac/ui/vv/web/base", "apps/mac/ui/vv/web/ui"],
   },
   {
     name: "the one orchestrator under its old names",
@@ -282,24 +335,36 @@ const RULES: readonly Rule[] = [
     name: "a profile called a helper's where the user reads it",
     pattern: /帮工档案/u,
     says: "档案 (a profile): its role is 助手 or 帮工; the tools' words for a model may still say 帮工档案 for the profiles work goes to",
-    dirs: ["apps/web/src"],
+    dirs: ["apps/web/src", "apps/mac/ui/vv/web", "apps/server/src"],
+    // On the server only user catalogs (locales/server.*.json) are the user's; orchestrator/words.rs and prompts.ts are a model's.
+    except: /^apps\/server\/src\/(?!.*\/words\.ts$)/u,
   },
   {
     name: "a profile seeded in code",
     pattern: /\b(seedAgents|orchestratorProfile)\b/u,
-    says: "a template: a new farm installs the default orchestrator from its template, and agent.starters",
+    says: "a template (agent/template.ts: builtInTemplates, profileOf); a new farm installs the default orchestrator from its template, and agent.starters",
   },
   {
     name: "a place to talk under another name",
     pattern: /\b(Conversation\w*|conversation_id|channel_conversation|Rooms|RoomEvent|roomsPath|useRoom|followRoom)\b/u,
-    says: "Channel (channel_id): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
+    says: "Channel (channel_id, the Channel service): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
+    // pi-durable's Conversation is a model's: the server uses its API in these four files only.
+    except: /^apps\/server\/src\/modules\/(agent\/durable|agent\/vibevalley|agent\/helperExtension|session\/host)\.ts$/u,
   },
   {
     name: "a business name in farm words",
     pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/u,
     says: "presentSessions, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",
     // The client's onFarm is the skin it is on.
-    dirs: ["apps/web/src/features", "apps/web/src/base", "apps/web/src/ui"],
+    dirs: [
+      "apps/server/src",
+      "apps/web/src/features",
+      "apps/web/src/base",
+      "apps/web/src/ui",
+      "apps/mac/ui/vv/web/features",
+      "apps/mac/ui/vv/web/base",
+      "apps/mac/ui/vv/web/ui",
+    ],
   },
   {
     name: "a voice call under session or agent",
@@ -330,36 +395,36 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "the inbox module under the notice name",
-    pattern: /\bNotices\b|"vibevalley\/Notice"|features\/notice\b|web\.notice\./u,
-    says: "the user's inbox is the watch's (features/inbox, web.inbox.*); a notice is a one-line alert to the user",
+    pattern: /@\/notice\/|apps\/server\/src\/notice\b|\bNotices\b|"vibevalley\/Notice"|server\.notice\.|features\/notice\b|web\.notice\./u,
+    says: "the user's inbox is the watch's (apps/server/src/modules/watch/inbox.ts, Watch.inboxNews, server.inbox.*; the page's features/inbox, web.inbox.*); a notice is Core.notice, a one-line word to the user",
   },
   {
     name: "the page's log split into rounds or turns of its own",
     pattern:
       /\b(Round|RoundView|roundsOf|roundLabel|roundMs|liveRound|failedRound|finishedRound|TurnSteps|turnLabel)\b|features\/session\/rounds\b|web\.session\.rounds\.|web\.session\.trajectory\.rounds?\b|web\.issue\.card\.turns?\b/u,
     says: "the log shows the server's runs, one view each (runs.ts: RunView, runsOf, runTitle, runMs, RunSteps, runLabel; web.session.runs.*, web.issue.card.run(s)); 一轮 is the user's word for a Run",
-    dirs: ["apps/web/src", "apps/web/test"],
+    dirs: ["apps/web/src", "apps/web/test", "apps/mac/ui/vv/web"],
   },
   {
     name: "an agent's own todo under the task name",
     pattern:
       /\b(AgentTask|AgentTaskStore|AgentTaskRunner|AgentTaskError|makeTaskRunner|taskTools|tasks_changed)\b|agentTask(Store|Tools)?(\.ts)?["']|agent\/taskStore\b|"vibevalley\/tasks"|\bagent_task\w*|\b\w*AgentTasks?\b/u,
-    says: "an agent's own todo list is Todo (todoTools, todos_changed, table agent_todo); a task is only a plan's",
+    says: "an agent's own todo list is Todo (packages/agent todo.ts, todoStore.ts, todoTools.ts: TodoStore, TodoRunner, makeTodoRunner, todoTools, todos_changed); the server keeps it in agent/vibevalley.ts (dbTodoStores), table agent_todo (queries OpenTodos, AddTodo, FinishTodos); a task is only a plan's (Task)",
   },
   {
     name: "the runtimes as a module of their own",
     pattern: /\bruntime_(spend|todo)\b|modules\/runtime\b|\bmakeRuntime\b|\b(farm|deps|w)\.runtime\./u,
-    says: "the runtimes are part of the agent domain (tables agent_spend and agent_todo)",
+    says: "the runtimes are part of the agent module: one Agent service (apps/server/src/modules/agent: runtimes, refreshRuntime, runtimeInfo, updateRuntime, resolve, durable…), tables agent_spend and agent_todo",
   },
   {
     name: "the text given to a helper as a task",
     pattern: /\breopenTask\b/u,
-    says: "the text a helper is given is its brief (reopenBrief)",
+    says: "the text a helper is given is its brief (reopenBrief, Session.send(agent, brief, …), Issue.hire(agent, brief, …), chooseAgent(candidates, brief, …))",
   },
   {
     name: "a runtime's preset read from the agent's seeds",
     pattern: /\b(presetOf|supportOf|runtimeIds|runtimeLabel|defaultSettings)\b.*["']@\/agent\/seed(\.ts)?["']/u,
-    says: "the runtimes' presets, facts, order and default settings come from runtime presets; seeds keep achievements and templates",
+    says: "the runtimes' presets, facts, order and default settings are runtime/presets.ts (presets.json); agent/seed.ts keeps the achievements and the issue templates",
   },
   {
     name: "the orchestrator in a local called manager",
@@ -368,36 +433,56 @@ const RULES: readonly Rule[] = [
     says: "orchestrator (or the profile's id): manager is only the English page's word for 助手",
   },
   {
+    name: "a service under a plural name",
+    pattern:
+      /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
+    says: "a service takes its concept's singular word (Agent, Artifact, Channel, Connector, Cron, Issue, Memory, Repo, Runtime, Session, Task, Tool; its deps key is the same word in lower case, deps.issue); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)",
+    dirs: ["apps/server/src"],
+  },
+  {
+    name: "a retired single-caller or pass-through server service",
+    pattern: /["'`](?:\.\.?\/|#\/)(?:storage|executor|resource|ingress)\/|\b(Storage|Executor|Resource|Ingress|worldBelowIngress|ingress_github)\b/u,
+    says: "Attachment owns attachment/storage.ts, Session owns session/executor.ts, Tool owns tool/resource.ts (Tool.readResource), and Ingress split into Channel.{user,say}, Session.{record,accept}, Repo.githubSnapshot and Issue.pollGitHub (issue_github); module tests use moduleWorld",
+    dirs: ["apps/server/src"],
+  },
+  {
     name: "an issue's landing under the delivery type name",
     pattern: /\b(DeliveryValues|T\.Delivery)\b|\bexport\s+(?:const|type)\s+Delivery\b/u,
-    says: "an issue's completion landing is Landing (LandingValues, T.Landing; Issue.delivered keeps its wire field name)",
+    says: "an issue's completion landing is Landing (LandingValues, T.Landing; Issue.delivered keeps its wire field name); delivery is the session module's session_delivery",
   },
   {
     name: "a split sender or trigger actor shape",
     pattern: /\b(TriggerActor|TriggerActorKind|TriggerActorKindValues|StoredSenderKind|speakerOf|actorKindOf|fromKind|fromRole)\b/u,
-    says: "one Actor across protocol and channel (T.Actor, ChatMessage.actor, actorRoleOf); channel_participant stores kind ('user' | 'agent' | 'system') and role ('orchestrator' | 'worker')",
+    says: "one Actor across protocol, channel, trigger and mailbox (T.Actor, ChatMessage.actor, actorRoleOf); channel_participant stores kind ('user' | 'agent' | 'system') and role ('orchestrator' | 'worker')",
   },
   {
     name: "a module under its retired grab-bag or metaphor filename",
     pattern:
       /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model|records)|issue\/records|mailbox\/chat|session\/(?:takeIn|shapes|records)|farm\/support|base\/util|ui\/richRules|repo\/shapes|testing\/(?:helper|until|issues|said|agents)|farm\/world\/places|features\/voice\/(?:agora|moss)|features\/channel\/(?:emoji|feed|switcher|draft)|features\/issue\/(?:lanes|rows|queries)|features\/artifact\/queries|memory\/store|artifact\/spans|tool\/(?:cron|memory|channel|definition)|infra\/live|state\/latest)(?:\.tsx?)?["'`]|\b(issueRecords|IssueRecords|sessionRecords|SessionRecords|channelRecords|ChannelRecords)\b/u,
-    says: "farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts, features/issue/{history,cards}.ts, features/artifact/ArtifactCard.tsx, farm/world/world.ts, features/voice/{call,mossLine}.ts, features/channel/{EmojiPicker.tsx,places.ts,composing.ts}, infra/frame.ts, state/atom.ts",
-    // The retired files were the page's; the contract's concept folders (session/shapes.ts) are today's.
-    dirs: ["apps/web/src"],
+    says: "channel/{channel,messages,rooms,hub}.ts, issue/lifecycle.ts, mailbox/envelope.ts, session/{briefing,registry,signals}.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts, repo/workplace.ts, features/issue/{history,cards}.ts, features/artifact/ArtifactCard.tsx, testing/{worker,layers,world}.ts, farm/world/world.ts, features/voice/{call,mossLine}.ts, features/channel/{EmojiPicker.tsx,places.ts,composing.ts}, memory/memory.ts, artifact/ops.ts, tool/{tool,schemas}.ts, infra/frame.ts, state/atom.ts",
+    // The retired files were the server's and the page's; the contract's concept folders (session/shapes.ts) are today's.
+    dirs: ["apps/server/src", "apps/web/src", "apps/mac/ui/vv/web"],
   },
 ];
 
-// A catalog (and the test that reads the English page) says what the user reads, in the glossary's English column (docs/README.md glossary.
-const userWords = (source: string) => source.startsWith("packages/i18n/locales/") || source === "apps/web/test/english.spec.ts";
+// A catalog says what the user reads, in the glossary's words (docs/README.md).
+const userWords = (source: string) => source.startsWith("crates/vibevalley-i18n/locales/") || source === "apps/web/test/english.spec.ts";
 const han = /\p{Script=Han}/u;
 
-/** Where a catalog's words are said: web.farm.phone is apps/web/src/farm/phone's, web.setting apps/web/src/features/setting's, shared both sides'. */
+/** Where a catalog's words are said: web.farm.phone is apps/mac/ui/vv/web/farm/phone's, web.setting apps/mac/ui/vv/web/features/setting's, server.game the Rust server's game module's, shared both sides'. */
 function placeOf(ns: string): string {
-  if (ns === "shared") return "packages/i18n/locales/shared.json";
+  if (ns === "shared") return "packages/protocol/src/rules/words.ts";
+  if (ns === "cli") return "crates/vibevalley-cli/src/words.rs";
+  if (ns === "mac") return "apps/mac/src/words.rs";
   const [host, ...parts] = ns.split(".");
-  if (parts.length > 0) {
-    const candidate = `apps/${host}/src/features/${parts[0]}`;
-    if (existsSync(resolve(root, candidate))) return `${candidate}/${parts.slice(1).concat("words.ts").join("/")}`;
+  if (host === "server") {
+    if (parts[0] === "game") return "crates/vibevalley-server/src/modules/game/words.rs";
+    return `apps/server/src/${[...parts, "words.ts"].join("/")}`;
+  }
+  if (host === "web" && parts.length > 0) {
+    const feature = `apps/mac/ui/vv/web/features/${parts[0]}`;
+    if (existsSync(resolve(root, feature))) return `${feature}/${parts.slice(1).concat("words.ts").join("/")}`;
+    return `apps/mac/ui/vv/web/${[...parts, "words.ts"].join("/")}`;
   }
   return `apps/${host}/src/${[...parts, "words.ts"].join("/")}`;
 }
@@ -405,12 +490,14 @@ function placeOf(ns: string): string {
 export function staleNamesIn(source: string, text: string): string[] {
   const hits: string[] = [];
   const lines = text.split("\n");
-  const file = source.startsWith("packages/i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
+  const isCatalog = userWords(source);
+  const file = source.startsWith("crates/vibevalley-i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
-      if (rule.dirs && !rule.dirs.some((dir) => file.startsWith(dir + "/"))) continue;
+      const inScope = rule.dirs ? rule.dirs.some((dir) => file.startsWith(dir + "/")) : isCatalog || TS_DIRS.some((dir) => file.startsWith(dir + "/"));
+      if (!inScope) continue;
       if (rule.except?.test(file) === true) continue;
-      if (userWords(source) && !han.test(rule.pattern.source)) continue;
+      if (isCatalog && !han.test(rule.pattern.source)) continue;
       if (rule.pattern.test(line)) hits.push(`${source}:${i + 1}: ${rule.name} — ${rule.says}`);
     }
   }
@@ -418,8 +505,10 @@ export function staleNamesIn(source: string, text: string): string[] {
 }
 
 if (import.meta.main) {
-  const catalogs = globSync("packages/i18n/locales/*/*.json", { cwd: root }).toSorted();
-  const files = DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx}`, { cwd: root })).toSorted();
+  const catalogs = globSync("crates/vibevalley-i18n/locales/*/*.json", { cwd: root }).toSorted();
+  const files = [
+    ...new Set(DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx,rs}`, { cwd: root, exclude: (f) => f.includes("node_modules") || f.endsWith("/build") }))),
+  ].toSorted();
   const hits = [...files, ...catalogs].flatMap((source) => staleNamesIn(source, readFileSync(resolve(root, source), "utf8")));
   for (const hit of hits) console.error(`stale names: ${hit}`);
   if (hits.length > 0) process.exit(1);

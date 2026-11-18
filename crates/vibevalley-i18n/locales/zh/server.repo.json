@@ -1,0 +1,41 @@
+{
+  "badName": "仓库名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符",
+  "badGithub": "请填 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source",
+  "noTokei": "统计代码要用 tokei，这台机器上没找到：装一个（brew install tokei，或 cargo install tokei）再点统计",
+  "noName": "无名",
+  "gh": {
+    "missing": "没装 gh",
+    "failed": "gh 检测失败",
+    "signedOut": "没登录 GitHub",
+    "noAccount": "无法确认 GitHub 登录账号"
+  },
+  "notRepoName": "「{name}」不能当仓库名：用一个简单的英文文件夹名，比如 clock-in",
+  "outside": "仓库必须在工作目录里面，不能链接到外面",
+  "commit": {
+    "initial": "初始提交（VibeValley 建的仓库）",
+    "initialShort": "初始提交"
+  },
+  "notChecked": "尚未检测仓库，请刷新 GitHub 状态",
+  "check": {
+    "timedOut": "仓库检查 .vibevalley/check 超时（{seconds}s）",
+    "failed": "仓库检查 .vibevalley/check 没通过：{why}",
+    "exited": "仓库检查 .vibevalley/check 没通过：exit status {code}"
+  },
+  "exists": "「{name}」已经存在，请换个仓库名",
+  "cloneFailedGh": "下载失败：请确认 GitHub 登录、仓库权限和网络后重试",
+  "cloneFailed": "下载失败：请确认仓库公开、地址正确且网络可用；超过 3 分钟会停止，可重试",
+  "tokeiFailed": "tokei 没数完：{why}",
+  "tokeiUnread": "tokei 的输出读不懂：换个新一点的 tokei 试试",
+  "github": {
+    "unchecked": "尚未检测 GitHub",
+    "notGithub": "不是 GitHub 仓库",
+    "noPermission": "无法检测 GitHub 仓库权限",
+    "readOnly": "没有写权限"
+  },
+  "conflict": "合进 {base} 有冲突",
+  "publish.refused": "分支发布被拒绝：{detail}",
+  "publish.platformFailed": "托管平台调用失败：{stage}。请检查工具安装与登录状态。",
+  "publish.pushedWithoutLink": "SHA {sha} 已推送，但未确认 PR/MR 链接：{why}。可重试查询已有请求。",
+  "publish.userOnly": "只有本机的用户可以发布已有分支",
+  "publish.pushUnconfirmed": "SHA {sha} 的推送未确认成功。尚未尝试创建 PR/MR；重试前请核对远端。"
+}

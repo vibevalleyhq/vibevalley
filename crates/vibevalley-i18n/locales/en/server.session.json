@@ -1,0 +1,16 @@
+{
+  "noRoom": {
+    "farm": "{max} helpers are already at work",
+    "repo": "{on} helpers are already at work in {repo}, at most {max} at once: more would edit the same files"
+  },
+  "log": {
+    "clipped": "… {n} characters left out …"
+  },
+  "host": {
+    "failed": "{label} failed: {why}",
+    "markNeedsWords": "Write a line on what it should be",
+    "noStep": "{label}'s log has no step {on}",
+    "notAsked": "Step {on} is not something {label} was told",
+    "notInConversation": "What step {on} told {label} did not reach its conversation (was {label} not up then?)"
+  }
+}

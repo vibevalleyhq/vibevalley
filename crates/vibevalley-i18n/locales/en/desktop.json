@@ -1,0 +1,31 @@
+{
+  "open": "Open VibeValley",
+  "quit": "Quit",
+  "waiting": "{n} for you",
+  "working": "{n} working",
+  "menu": {
+    "about": "About {app}",
+    "settings": "Settings…",
+    "hide": "Hide {app}",
+    "hideOthers": "Hide Others",
+    "unhide": "Show All",
+    "quit": "Quit {app}",
+    "edit": "Edit",
+    "undo": "Undo",
+    "redo": "Redo",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "selectAll": "Select All",
+    "view": "View",
+    "toggleSidebar": "Toggle Sidebar",
+    "toggleTheme": "Toggle Theme",
+    "resetZoom": "Actual Size",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "fullScreen": "Toggle Full Screen",
+    "window": "Window",
+    "close": "Close Window",
+    "closeTab": "Close Tab"
+  }
+}

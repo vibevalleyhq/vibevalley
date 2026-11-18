@@ -1,0 +1,135 @@
+{
+ "IssueId": [
+  "s1",
+  "s2"
+ ],
+ "SessionId": [
+  "s3",
+  "s4"
+ ],
+ "ArtifactId": [
+  "s5",
+  "s6"
+ ],
+ "BlockId": [
+  "s7",
+  "s8"
+ ],
+ "SuggestionId": [
+  "s9",
+  "s10"
+ ],
+ "MessageId": [
+  "s11",
+  "s12"
+ ],
+ "Validation": [
+  {
+   "problem": "s13"
+  },
+  {
+   "problem": "s14"
+  }
+ ],
+ "ActorKind": [
+  "user",
+  "agent",
+  "system"
+ ],
+ "AgentRole": [
+  "orchestrator",
+  "worker"
+ ],
+ "Actor": [
+  {
+   "kind": "user",
+   "id": "s15",
+   "name": "s16"
+  },
+  {
+   "kind": "user",
+   "id": "s17"
+  },
+  {
+   "kind": "agent",
+   "id": "s18",
+   "role": "worker",
+   "name": "s19",
+   "forUser": true
+  },
+  {
+   "kind": "agent",
+   "id": "s21",
+   "role": "worker"
+  },
+  {
+   "kind": "system",
+   "id": "s22",
+   "name": "s23"
+  },
+  {
+   "kind": "system",
+   "id": "s24"
+  }
+ ],
+ "Outcome": [
+  "completed",
+  "failed",
+  "interrupted"
+ ],
+ "Spent": [
+  {
+   "tokens": 25,
+   "cny": 26
+  },
+  {
+   "tokens": 27
+  }
+ ],
+ "Retry": [
+  {
+   "attempt": 28,
+   "of": 29
+  },
+  {
+   "attempt": 30
+  }
+ ],
+ "Preview": [
+  {
+   "does": [
+    "s31"
+   ]
+  },
+  {
+   "does": [
+    "s32"
+   ]
+  }
+ ],
+ "Applied": [
+  {
+   "seq": 33
+  },
+  {
+   "seq": 34
+  }
+ ],
+ "KeySource": [
+  "settings",
+  "config"
+ ],
+ "KeyStatus": [
+  {
+   "source": "settings",
+   "hint": "s35"
+  },
+  {
+   "source": null
+  }
+ ],
+ "Locale": [
+  "zh",
+  "en"
+ ]
+}

@@ -1,0 +1,26 @@
+[package]
+name = "vibevalley-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autotests = false
+description = "VibeValley's wire protocol: the contract's shapes and endpoints, and the TypeScript written from them"
+
+[features]
+default = []
+ts-gen = ["dep:ts-rs"]
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_with = "3.24.0"
+ts-rs = { version = "12.0.1", features = ["no-serde-warnings"], optional = true }
+
+[[test]]
+name = "suite"
+path = "tests/suite.rs"
+
+[[test]]
+name = "typescript"
+path = "tests/typescript.rs"
+required-features = ["ts-gen"]

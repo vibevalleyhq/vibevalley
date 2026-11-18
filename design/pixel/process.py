@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Shrink the generated pictures (gen.sh) to true pixel art for the pixel village (apps/web/public/pixel).
+"""Shrink the generated pictures (gen.sh) to true pixel art for the pixel village (assets/pixel).
 
 The image tool paints "pixel art" whose pixels are blocks of roughly 4 to 8 image pixels, not quite on a grid.
 Every picture is shrunk to the size it is drawn at in the game (one art pixel = one canvas pixel), with box
 averaging, then snapped to a small palette with hard alpha, so the game can scale it up by whole numbers.
 
 Usage: python3 process.py [map plots manager char-bear ui-icons look-farmer ...]   (default: everything in raw/)
-Writes apps/web/public/pixel/<name>.png and the manifest sprites.json: per sprite its size and anchor
+Writes assets/pixel/<name>.png and the manifest sprites.json: per sprite its size and anchor
 (the point that stands on the ground, from its top-left: the middle of its lowest row, or of its feet when it holds a
 tool to the ground; a character also records hx, hy, the middle of its head), and the sheet it was cut from.
 Sprites take the painted farm's names where they replace one (icon-coin, act-search, manager-face); the client reads
-them through apps/web/src/ui/pixel/atlas.ts. ui-cursors becomes the pixel cursors in apps/web/public/cursors.
+them through apps/web/src/ui/pixel/atlas.ts. ui-cursors becomes the pixel cursors in assets/cursors.
 """
 
 from __future__ import annotations

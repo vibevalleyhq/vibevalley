@@ -4,33 +4,25 @@
 
 ## 什么时候用
 
-改了 `internal/domain/media`、`internal/domain/gateway`（`handlers_media.go`、`media_offline.go`、`voice_ws_offline.go`）、音频协议、下载与附件、理解授权、助手的媒体工具、素材库 `/library` 页（生成 `?make=`、理解 `?understand=<附件 id>`），或 MOSS Live／Vision 的实时视觉、播放与资源回收。模型列表能查、用途能绑定，不等于生成能用。
+改了 `crates/vibevalley-server/src/modules/media`、音频协议、下载与附件、助手的媒体工具或素材库。模型列表能查、用途能绑定，不等于生成能用。
 
 ## 准备
 
-- 不使用用户的家目录、钥匙或媒体。下面的 Playwright 自己起隔离的 `cmd/vibe-server`；在 `VIBEVALLEY_TEST_RUNTIMES=1` 下，`internal/domain/gateway/media_offline.go` 和 `voice_ws_offline.go` 只替换 MOSS 的厂商请求、实时流与结果下载，任务、库、文件、状态流、频道和 Artifact 都走真的模块。不手工拼成功帧。
+- 不使用用户的家目录、钥匙或媒体。沙箱起隔离的服务端；`VIBEVALLEY_TEST_RUNTIMES=1` 下 [testing.rs](crates/vibevalley-server/src/testing.rs) 的 `OfflineImages` 只替换 MOSS 的生图请求和结果下载，任务、库、文件、状态流、频道和 Artifact 都走真的模块。不手工拼成功帧。
 - 证据分三类：协议离线、隔离程序、真实厂商。替身给的是确定的 PNG 和合成音调，不证明账号权限、模型质量或实际费用。
 
 ## 步骤
 
-1. 跑服务端媒体、附件与网关定点测试：
+1. 跑定点测试：
 
    ```bash
-   env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/media/... ./internal/domain/attachment/... ./internal/domain/gateway/...
+   cargo test -p vibevalley-server --test media_jobs --test media_inputs --test library --test publish
+   cargo test -p vibevalley-http
    ```
 
-2. 跑 `vp run server:check`、`vp run web:check`。
-3. 在根目录跑浏览器用例，开发版再跑一遍（不应有 Solid 响应式警告）：
-
-   ```bash
-   vp run --filter @vibevalley/web e2e:integration 'test/(media|understanding|speech|providers|audio|flash|moss|vision).spec.ts$'
-   VIBEVALLEY_WEB_DEV=1 vp run --filter @vibevalley/web e2e:integration 'test/(media|understanding|speech|providers).spec.ts$'
-   vp run --filter @vibevalley/web e2e:audit 'test/a11y.spec.ts$' --grep 'image task results|understanding results'
-   ```
-
-4. 读截图 `apps/web/.screens/{media,understanding,speech}-*-{light,dark}-{1280,390}.png`：没有横向溢出，费用未知、取消、截断的含义看得清，结果和动作都在图里，没被页头遮住（截图步骤见[页面分册](.agents/skills/vv-acceptance/references/page.md)）。
-5. 改了接口时，照[服务端分册](.agents/skills/vv-acceptance/references/server.md)用 `verify-server.ts -- <脚本>`（理解和语音加 `--scripted-helper`）在隔离程序上走一遍：脚本自己生成 PNG，`media.input.create` 后向 `/api/v1/media/input/:id/content` PUT 二进制，再走要验的那条接口到 `ready`，接一次 `/api/v1/state` 核对状态流里没有钥匙和签名 URL。
-6. 改了 Live／Vision 或宿主：`moss.spec.ts` 的虚拟生命周期用例禁用 Worker，只证明替身协议；真实 Worker／Worklet 播放、摄像头／屏幕、Electron 和手机的入口要在真的宿主上看（[宿主边界](docs/subsystems/voice.md)），没走通的列为未验收。
+2. 跑 `vp run rust:check`。
+3. 改了素材库的页面时，照[应用分册](.agents/skills/vv-acceptance/references/app.md)打开 `/library` 截图，浅色、深色各一张：没有横向溢出，费用未知、取消、截断的含义看得清，结果和动作都在图里。
+4. 改了接口时，照[服务端分册](.agents/skills/vv-acceptance/references/server.md)用 `verify-server.ts -- <脚本>`（理解和语音加 `--scripted-helper`）在隔离程序上走一遍：脚本自己生成 PNG，`media.input.create` 后向 `/api/v1/media/input/:id/content` PUT 二进制，再走要验的那条接口到 `ready`，接一次 `/api/v1/state` 核对状态流里没有钥匙和签名 URL。
 
 ## 真实厂商
 
@@ -45,8 +37,8 @@
 
 ## 证据
 
-- 第 1、3 步的命令和通过数，第 4 步看过的截图。
-- 第 5 步的 `command.stdout.log` 和 `result.json`（`code: 0`、`stopped: true`、空的 `cleanupErrors`）。
+- 第 1 步的命令和通过数，第 3 步看过的截图。
+- 第 4 步的 `command.stdout.log` 和 `result.json`（`code: 0`、`stopped: true`、空的 `cleanupErrors`）。
 - 逐项写明是离线协议、隔离程序、真实 Worker、真实账号还是真实宿主；没覆盖的写「未验收」和阻碍，不用替身的结果顶。
 - 真实调用另附授权范围、预算台账、实际用量和播放回执；播放超时、部分结果、清理失败和 DNS 拒绝照实写。
 
@@ -59,4 +51,4 @@
 
 ## 收拾
 
-Playwright 自己停掉进程、删临时农场；截图不进 git。手动会话关掉媒体轨道、AudioContext、Worker 和 WebSocket，再停隔离的服务端。真实调用照授权范围清理合成的输入和已知的远端文件。不碰用户原有的数据。
+沙箱自己停掉进程、删临时农场；截图不进 git。真实调用照授权范围清理合成的输入和已知的远端文件。不碰用户原有的数据。

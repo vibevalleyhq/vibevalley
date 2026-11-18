@@ -4,9 +4,11 @@ import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { codePoints, MessageId, SessionId } from "../common/schema";
 import { MediaAudioJob } from "./audio-schema";
-import { MediaAudioKindValues } from "./audio-shapes";
 import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
+import { MediaAudioKindValues } from "./shapes";
 import * as T from "./shapes";
+
+export { MediaAudioMetadata, MediaInputReference, MediaSource, MediaAudioUsage } from "./common-schema";
 
 const MediaImageMimeValues = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff"] as const;
 const MediaVideoMimeValues = ["video/mp4", "video/x-m4v", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"] as const;
@@ -62,7 +64,7 @@ export const MediaImageRequest = z.object({
   enhance: z.boolean(),
   watermark: z.boolean(),
 }) satisfies Codec<T.MediaImageRequest>;
-const MediaImageUsage = z.object({
+export const MediaImageUsage = z.object({
   images: z.literal(1),
   width: z.number().int().min(256).max(2048),
   height: z.number().int().min(256).max(2048),
@@ -107,7 +109,7 @@ const MediaUnderstandingAuthorization = z.object({
   expiresAt: z.number(),
 }) satisfies Codec<T.MediaUnderstandingAuthorization>;
 const Tokens = z.number().int().min(0);
-const MediaUnderstandingResult = z.object({
+export const MediaUnderstandingResult = z.object({
   model: z.string().min(1),
   text: z.string(),
   status: z.enum(T.MediaUnderstandingStatusValues),
@@ -197,7 +199,7 @@ export const FactMediaChanged = z.object({
 const MediaJobKindValues = ["image", "understanding", "speech", ...MediaAudioKindValues] as const;
 const JobKind = z.enum(MediaJobKindValues);
 
-const LibraryOrigin = z.discriminatedUnion("kind", [
+export const LibraryOrigin = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("generated"), job: z.string(), jobKind: JobKind }),
   z.object({ kind: z.literal("uploaded"), channel: z.exactOptional(z.string()), message: z.exactOptional(MessageId) }),
   z.object({

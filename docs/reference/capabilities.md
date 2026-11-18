@@ -5,9 +5,9 @@
 | 谁 | 是谁 | 从哪个入口 |
 |---|---|---|
 | 用户 | 用户在农场那台电脑上 | 页面、命令行 |
-| 连进来的设备 | 用户配对过的手机、另一台电脑 | 经「连接到本机」只放这一列打了 ✓ 的 |
-| 助手 | 助手 | 它的工具：打了 ✓ 的每个接口是它的一个工具（`channel.message.list` 是 `channel_message_list`），`internal/domain/stack/tools.go` 照这一列给 |
-| 帮工 | 在干活的帮工 | 经 `/mcp` 拿的工具，同上 |
+| 连进来的设备 | 用户配对过的手机、另一台电脑 | 「连接到本机」随手机壳砍掉了，Rust 服务端没有这道门；这一列留在契约里 |
+| 助手 | 助手 | 它的工具；Rust 服务端的工具清单在 `crates/vibevalley-server/assets/tools/orchestrator.json`，以那份为准 |
+| 帮工 | 在干活的帮工 | 经 `/mcp` 拿的工具，清单在 `crates/vibevalley-server/assets/tools/helper.json` |
 
 `GET /api/v1/state`、`GET /api/v1/events` 和 `GET /api/v1/live` 是 SSE，不在 `endpoints` 里：用户和连进来的设备都能读；`/state` 给折好的帧，`/live` 只给页面要的三种 side event，`/events` 留给调试。接口都在 `/api/v1` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
 
@@ -174,7 +174,7 @@
 | `issue.previewDelete` | 试删一张工单：说会删掉什么，不真删 | `/api/v1/issue/previewDelete` | ✓ | ✓ |   |   |
 | `issue.status.update` | 挪工单的状态：派活、再来一轮、完成或取消 | `/api/v1/issue/status/update` | ✓ | ✓ | ✓ |   |
 | `issue.status.previewUpdate` | 试挪工单的状态：说会发生什么，不动手 | `/api/v1/issue/status/previewUpdate` | ✓ | ✓ | ✓ |   |
-| `issue.refine` | 让一个帮工读代码，把备选的工单起草好 | `/api/v1/issue/refine` | ✓ | ✓ |   |   |
+| `issue.refine` | 让一个帮工读代码，把备选的工单起草好 | `/api/v1/issue/refine` | ✓ | ✓ | ✓ |   |
 
 ## session
 
@@ -339,39 +339,6 @@ GitHub 的检测：gh 装没装、登没登录
 | `connector.verify` | 交验证码，接着连接器的登录 | `/api/v1/connector/verify` | ✓ |   |   |   |
 | `connector.logout` | 退出一个连接器的登录 | `/api/v1/connector/logout` | ✓ |   |   |   |
 | `connector.channel.set` | 设连接器的消息进哪个频道 | `/api/v1/connector/channel/set` | ✓ |   |   |   |
-
-## lan
-
-连接到本机：开关、配对、设备
-
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
-|---|---|---|---|---|---|---|
-| `lan.get` | 看「连接到本机」开没开、地址和配对码 | `/api/v1/lan/get` | ✓ |   |   |   |
-| `lan.update` | 打开或关上「连接到本机」 | `/api/v1/lan/update` | ✓ |   |   |   |
-| `lan.pairing.start` | 开始配对，给出配对码 | `/api/v1/lan/pairing/start` | ✓ |   |   |   |
-| `lan.pairing.stop` | 停止配对 | `/api/v1/lan/pairing/stop` | ✓ |   |   |   |
-| `lan.pairing.previewStop` | 试停配对：说会怎样，不真停 | `/api/v1/lan/pairing/previewStop` | ✓ |   |   |   |
-| `lan.pairing.answer` | 放行或拒绝来配对的设备 | `/api/v1/lan/pairing/answer` | ✓ |   |   |   |
-| `lan.pair` | 用配对码把这台设备配上 | `/api/v1/lan/pair` | ✓ | ✓ |   |   |
-
-## user
-
-
-
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |
-|---|---|---|---|---|---|---|
-| `user.get` | 看用户叫什么、设没设密码、这个请求是从哪台设备来的 | `/api/v1/user/get` | ✓ | ✓ |   |   |
-| `user.update` | 改用户的名字 | `/api/v1/user/update` | ✓ |   |   |   |
-| `user.password.set` | 设密码（只能在跑着 VibeValley 的那台电脑上） | `/api/v1/user/password/set` | ✓ |   |   |   |
-| `user.login` | 用密码登录，给这台设备一把钥匙 | `/api/v1/user/login` | ✓ | ✓ |   |   |
-| `user.logout` | 退出：收回这台设备的钥匙 | `/api/v1/user/logout` | ✓ | ✓ |   |   |
-| `user.device.list` | 列出用户的设备：配对来的和登录来的 | `/api/v1/user/device/list` | ✓ |   |   |   |
-| `user.device.delete` | 收回一台设备的钥匙 | `/api/v1/user/device/delete` | ✓ |   |   |   |
-| `user.device.previewDelete` | 试收回一台设备：说会怎样，不真收回 | `/api/v1/user/device/previewDelete` | ✓ |   |   |   |
-| `user.approval.create` | 请求登录这台设备：拿到确认码，等你在页面上同意 | `/api/v1/user/approval/create` | ✓ | ✓ |   |   |
-| `user.approval.collect` | 取回同意后的钥匙；还在等时什么都不给 | `/api/v1/user/approval/collect` | ✓ | ✓ |   |   |
-| `user.approval.list` | 列出等着你同意的登录请求 | `/api/v1/user/approval/list` | ✓ |   |   |   |
-| `user.approval.answer` | 同意或拒绝一个登录请求 | `/api/v1/user/approval/answer` | ✓ |   |   |   |
 
 ## attachment
 

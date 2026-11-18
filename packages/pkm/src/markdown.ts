@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { PkmMarkerValues } from "@vibevalley/protocol";
 import type * as T from "@vibevalley/protocol";
 
-import { pkmTag, slugOf } from "./outline.ts";
+import { applyBlockOps, pkmTag, slugOf } from "./outline.ts";
 import { tierOfFile, titleOfFile } from "./para.ts";
 
 /** A block as the server holds it: the page's outline is a tree of these. */
@@ -317,3 +317,7 @@ export function outlineOf(text: string, newId: () => string): Node[] {
   const fresh = (nodes: readonly Node[]): Node[] => nodes.map((n) => ({ ...n, id: newId(), explicit: false, children: fresh(n.children) }));
   return fresh(parse(markdown.join("\n") + "\n", "captured.md", 0).blocks);
 }
+
+/** The blocks after the ops in order (a copy: blocks is not changed). newId makes the id of a block inserted without one. */
+export const applyOps = (blocks: readonly Node[], ops: readonly T.PkmBlockOp[], newId: () => string): Node[] =>
+  applyBlockOps(blocks, ops, (fields): Node => ({ ...fields, explicit: false, children: [] }), newId);

@@ -137,12 +137,12 @@ const SpanMarks = z.object({
   link: z.exactOptional(z.string()),
 }) satisfies Codec<T.SpanMarks>;
 
-const TextSpan = z.object({
+export const TextSpan = z.object({
   t: z.string(),
   marks: SpanMarks,
 }) satisfies Codec<T.TextSpan>;
 
-const BlockAttrs = z.object({
+export const BlockAttrs = z.object({
   level: z.exactOptional(z.number()),
   checked: z.exactOptional(z.boolean()),
   language: z.exactOptional(z.string()),
@@ -308,7 +308,7 @@ export const ArtifactEvent = z.discriminatedUnion("_tag", [
 
 const SuggestionStatus = z.enum(T.SuggestionStatusValues) satisfies Codec<T.SuggestionStatus>;
 
-const SuggestionChange = z.object({
+export const SuggestionChange = z.object({
   text: z.exactOptional(z.array(TextSpan)),
   type: z.exactOptional(BlockType),
   attrs: z.exactOptional(BlockAttrs),

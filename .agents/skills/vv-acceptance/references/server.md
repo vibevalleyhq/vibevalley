@@ -1,20 +1,20 @@
 # 验收服务端
 
-[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：在沙箱里调接口，看折好的核心状态；改了工单的走法，用命令行和接口把一张工单派出去、交回来、完成。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：在沙箱里调接口，看折好的核心状态；改了工单的走法，用命令行把一张工单派出去、交回来、完成。
 
 ## 什么时候用
 
-- 改了 `internal/domain/gateway/**`、`packages/protocol/src/api.ts`：新的或改过的接口。
-- 改了某个服务的行为（`issue`、`channel`、`setting`、`cron`……），想看它经接口和 `/api/v1/state` 出来的样子。
-- 改了 `pkg/db/migrations/*.sql` 或 `pkg/db/queries/*.sql`：新库能建、能读写。
-- 改了开机的流程（`cmd/vibe-server/main.go`、`internal/domain/stack/stack.go`、`internal/domain/gateway/gateway.go`）。
+- 改了 `crates/vibevalley-server`（模块、端点、开机的 [start.rs](crates/vibevalley-server/src/start.rs)、[main.rs](crates/vibevalley-server/src/main.rs)）、`crates/vibevalley-core`、`crates/vibevalley-http`：新的或改过的接口、服务的行为、表结构。
+- 改了 `crates/vibevalley-protocol` 的接口或形状（生成到 `packages/protocol`）。
+- 改了命令行 `crates/vibevalley-cli`。
 
-真的帮工要本机登录的农机（`claude`、`codex`、`pi`……）或模型钥匙，会花钱，要先问用户；这里用 `--scripted-helper`：沙箱挂接 `scripts/release/verify-server.ts` 里的脚本帮工（设好 `VIBEVALLEY_AGENT_STARTERS`）。帮工与回放的更多行为照样写 Go 测试（[地基](docs/subsystems/foundation.md)「测试」）。
+真的帮工要本机登录的农机（`claude`、`codex`……）或 DeepSeek 的钥匙，会花钱，要先问用户；这里用 `--scripted-helper`：沙箱设 `VIBEVALLEY_TEST_RUNTIMES=1`，服务端只装一个照工单字眼干活的替身农机 `pi`（[testing.rs](crates/vibevalley-server/src/testing.rs)），别的农机都当没装。帮工的更多行为照样写测试（`crates/vibevalley-server/tests/`）。
 
 ## 准备
 
-1. `vp run server:check`。
-2. 改了 SQL 查询或表结构，先 `vp run go:sqlc`；改了契约或接口，先 `vpx scripts/gen/go-contract.ts --write` 与 `vp run capabilities`。
+1. `vp run rust:check`（至少跑改动所在 crate 的 `cargo test -p <crate>`）。
+2. `cargo build -p vibevalley-server -p vibevalley-cli`：沙箱用 `${CARGO_TARGET_DIR:-target}/debug` 下的两个二进制（`VIBEVALLEY_SERVER_BIN` 可指定别的服务端），不会替你构建；改了代码没重新构建，验的就是旧的。
+3. 改了接口，先 `vp run capabilities`。
 
 ## 步骤
 
@@ -27,66 +27,48 @@
 2. 调这次改动的接口、看状态：
 
    ```bash
-   vpx scripts/release/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" issue list --json'
+   vpx scripts/release/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" issue list --format json'
    ```
 
    要造数据或断言，写进同一个子命令。
 
-3. 改了工单怎么派、怎么走、怎么交付，在沙箱里走一遍（与 `scripts/release/verify-server.test.ts` 同路）：
+3. 改了工单怎么派、怎么走、怎么交付，只用命令行走一遍：
 
    ```bash
    vpx scripts/release/verify-server.ts --scripted-helper -- sh -c '
      vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
      set -e
-     curl -fsS -H "Content-Type: application/json" -d "{\"name\":\"clock\"}" "$VIBEVALLEY_SERVER/api/v1/repo/create" >/dev/null
-     created=$(vv issue create 写打卡并提交 --repo clock --agent docs --json)
-     id=$(printf "%s" "$created" | jq -r .id)
-     vv issue status "$id" todo --json >/dev/null
-     until [ "$(vv issue get "$id" --json | jq -r .status)" = "in_review" ]; do sleep 0.2; done
-     curl -fsS -H "Content-Type: application/json" -d "{\"id\":\"$id\"}" "$VIBEVALLEY_SERVER/api/v1/issue/diff/get"
-     curl -fsS -H "Content-Type: application/json" -d "{\"id\":\"$id\",\"status\":\"done\"}" "$VIBEVALLEY_SERVER/api/v1/issue/status/previewUpdate"
-     vv issue status "$id" done --json
+     vv issue create 写打卡并提交 --repo clock --agent docs
+     vv issue status 1 todo
+     vv issue show 1 --watch --timeout 60
+     vv issue diff 1 --format json
+     vv issue status 1 done --dry-run --format json
+     vv issue status 1 done --format json
+     git -C "$(vv repo list --format json | jq -r ".[0].path")" log --oneline main
    '
    ```
 
-   带 `--json` 的命令 stdout 是 JSON 文档（不带是短文字）：`issue status "$id" todo` 派出去，轮询 `issue get` 等帮工交回（进入 `in_review`），`/api/v1/issue/diff/get` 看改动，`/api/v1/issue/status/previewUpdate` 预演交付、`issue status "$id" done` 真正合入交付；详情以 `scripts/release/verify-server.ts` 与 `scripts/release/verify-server.test.ts` 为准。
+   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue status 1 todo` 派出去，`issue show --watch` 等帮工交回来（经过的状态在 stderr），`issue diff` 是改动，`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「提交」写 `clock.ts` 并提交，别的字眼见 [testing.rs](crates/vibevalley-server/src/testing.rs)）。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/release/verify-server.test.ts` 跑着同样的一遍。
 
-4. 页面也改了的，在同一个子命令末尾接上 [page.md](.agents/skills/vv-acceptance/references/page.md) 的截图命令。
+4. 页面也改了的，再照 [app.md](.agents/skills/vv-acceptance/references/app.md) 起应用截图。
 
-### 真实帮工的 CLI 与连接观测
+### 真实帮工的 MCP
 
-仅在用户已授权真实农机验收时执行；需要本机 Codex 登录，会消耗模型额度。普通规则先跑 Go 侧测试：`env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/agent/... ./internal/domain/stack/... ./internal/domain/gateway/... ./cmd/vibe/... ./pkg/oar/...`。
+仅在用户已授权真实农机验收时执行；需要本机登录的 Codex 或 Claude Code，会消耗模型额度。先跑最低层的测试：`cargo test -p vibevalley-server --test session --test mcp`、`cargo test -p vibevalley-cli`。
 
-1. 把下列脚本存到独立临时证据目录的 `worker.sh`。它只创建沙箱项目，不读取外部账号配置文件。
-
-```sh
-#!/bin/sh
-set -eu
-vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
-vv runtime list --json
-curl -fsS -H 'Content-Type: application/json' -d '{"name":"acceptance"}' "$VIBEVALLEY_SERVER/api/v1/repo/create" >/dev/null
-agent_id=$(curl -fsS -H 'Content-Type: application/json' -d '{"name":"acceptance","runtime":"codex"}' "$VIBEVALLEY_SERVER/api/v1/agent/create" | jq -r .id)
-vv doctor --json
-vv issue create 'Verify isolated worker access' --repo acceptance --agent "$agent_id" --description 'This is an authorized acceptance test. Do not edit code or commit. Run doctor, print NO_PROXY and no_proxy, and verify loopback bypass variables include 127.0.0.1,localhost,::1. Do not launch other agents.' --json
-```
-
-2. 派工、跟踪状态流与完成工单时，对照 `/api/v1/state`、会话轨迹及 `vibe doctor --json` 输出；清除代理环境变量只影响沙箱命令：
-
-```sh
-env -u NO_PROXY -u no_proxy -u OAR_SUBAGENT_DEPTH vpx scripts/release/verify-server.ts -- sh <证据目录>/worker.sh
-```
-
-3. 核对 `command.stdout.log`、`server.stderr.log` 与 `result.json`（`code: 0`、`stopped: true` 和空 `cleanupErrors`）。健康检查或 agent 自述不能替代上述轨迹与状态。日志留在临时目录，不放进工作树。
+1. 子命令里建仓库和用真农机的档案（`vv repo create acceptance`、`vv agent create acceptance --runtime codex`），建一张只让帮工经 `vibevalley` MCP 调 `session_list` 再调 `issue_report` 交回的工单，派出去，`vv issue watch 1 --jsonl` 看到工具调用与交回。
+2. 非法 Bearer 令牌请求 `POST /mcp` 被拒（401/403 或 JSON-RPC 鉴权错误），响应不回显有效凭证。
+3. 不带 `--scripted-helper` 执行：`env -u OAR_SUBAGENT_DEPTH vpx scripts/release/verify-server.ts -- sh <证据目录>/worker.sh`，保存命令、HEAD、stdout、stderr 和退出码。健康检查、agent 自述或单独的退出码不能替代工单的轨迹与状态。
 
 ## 证据
 
-- 只用命令行和接口走的，附上每步输出（`command.stdout.log`）。
+- 只用命令行走的，附上每条命令打出的 JSON（`command.stdout.log`）。
 - `ready.json`、`health.json`、`result.json`，以及与改动有关的接口或状态片段。
 
 ## 出错时
 
-- **starter agent（如 `docs`）不存在**：`verify-server.ts` 仅在 `--scripted-helper` 时写入 `VIBEVALLEY_AGENT_STARTERS`（默认含 `docs`）；不用该开关时需先调 `/api/v1/agent/create` 建档案。
-- **表结构或生成产物对不上**：先跑 `vp run go:sqlc`、`vpx scripts/gen/go-contract.ts --write` 与 `vp run server:check`。
+- **`issue status 1 todo` 被拒或帮工不动**：没带 `--scripted-helper`，或标题里没有帮工认得的字眼（见 [testing.rs](crates/vibevalley-server/src/testing.rs)）。
+- **行为还是旧的**：没重新 `cargo build -p vibevalley-server -p vibevalley-cli`，或 `CARGO_TARGET_DIR` 和构建时不同。
 
 ## 收拾
 

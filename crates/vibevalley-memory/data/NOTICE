@@ -1,0 +1,6 @@
+zh_s.txt.gz and hmm_emit.json.gz are copied from
+apps/server/src/modules/memory/data. zh_s.txt.gz is gse's data/dict/zh/s_1.txt
+(https://github.com/go-ego/gse, v1.1.0, Apache License 2.0), compressed; that
+dictionary comes from jieba (https://github.com/fxsjy/jieba), MIT License,
+Copyright (c) 2013 Sun Junyi. The segmentation in src/gse.rs follows gse's
+algorithm as VibeValley's apps/server/src/modules/memory/gse.ts does.

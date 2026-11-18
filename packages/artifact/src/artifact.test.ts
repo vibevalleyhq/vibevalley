@@ -3,8 +3,20 @@ import { describe, expect, it } from "vite-plus/test";
 import { keyBetween } from "@vibevalley/protocol/rules";
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
-import { codePointOffset, editSpans, markdownShortcut } from "./blocks.ts";
-import { blocksOfMarkdown, htmlCheck, htmlEdit, inlineSpans, markdownOf, ordered, Page, selectionOf, splitAt } from "./index.ts";
+import {
+  blocksOfMarkdown,
+  codePointOffset,
+  editSpans,
+  htmlCheck,
+  htmlEdit,
+  inlineSpans,
+  markdownOf,
+  markdownShortcut,
+  ordered,
+  Page,
+  selectionOf,
+  splitAt,
+} from "./index.ts";
 import { shellMessageOf, shellPath, withShell } from "./shell.ts";
 
 describe("@vibevalley/artifact domain engine", () => {

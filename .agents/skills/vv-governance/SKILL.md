@@ -21,7 +21,7 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 1. 说清它挡的是哪一类问题，对上六种病里的哪一种（[六种病](.agents/skills/vv-governance/references/whitepaper.md#六种病)）。说不出一类、只是一次的事，不立规矩：规矩越多越容易漏读。
 2. 按顺序选手段，能用前面的就不用后面的：代码（类型、结构、边界，把这一类整个消掉）→ 检查（lint、测试、CI、棘轮）→ 文字（规矩、skill）→ 人看。
 3. 写成检查时，失败的话写三样：错在哪和为什么、`Fix:` 能照抄的改法、`See` 仓库里一个文件（[写法](docs/style/code.md#检查管着的写法)）。agent 读到的只有这句话，只说「不许」它就猜，猜的常常是绕过去。lint 规则用 `scripts/audit/oxlint-plugin.ts` 的 `says`，`no-restricted-imports` 的话写进 `vite.config.ts` 的 `refused`；规则算得出改法的就算出来（`parent-import` 给出 `#/…`），能机械改对的给自动修复。
-4. 只许减不许增、数得清、又没有动机去刷的，做成棘轮（`packages/health` 的逃生口，`escapeAdvice` 写每种该怎么改）；会被刷的读数（行数、测试数、覆盖率）只出报告，不做门槛，否则 agent 学会的是凑数。
+4. 只许减不许增、数得清、又没有动机去刷的，做成棘轮；会被刷的读数（行数、测试数、覆盖率）只出报告，不做门槛，否则 agent 学会的是凑数。
 5. 给检查写测试：一个该拦的、一个不该拦的，加上报错的格式。
 6. 写不成检查的才进文字：一句规矩放进 `AGENTS.md` 并链到它的家，理由写进对应子系统的「为什么这样」。
 
@@ -31,12 +31,12 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 
 | 病 | 问 | 怎么查 |
 |---|---|---|
-| 局部缝合 | 同一段逻辑是不是抄了第二份？加一个渠道、工具、runtime 时，有没有把超时、重试、清理又写一遍？ | 搜这段逻辑的关键调用；看扩展点（`internal/domain/connector/`、`internal/domain/stack/tools.go`、`pkg/oar/`）有没有自己重写的超时、退避或重试循环 |
+| 局部缝合 | 同一段逻辑是不是抄了第二份？加一个渠道、工具、runtime 时，有没有把超时、重试、清理又写一遍？ | 搜这段逻辑的关键调用；看扩展点（`crates/vibevalley-server/src/modules/tool/` 的各工具、`crates/vibevalley-oar` 的各农机、`crates/vibevalley-server/src/modules/media/` 的各种类）有没有自己的超时、`sleep`、重试循环 |
 | 只加不删 | 换了新写法，旧的删了没有？ | `vp run deadcode`；搜旧函数名；内部不留兼容：不留旧路、不写兜底 |
-| 绕开约束 | 有没有 `as`、`as unknown as`、`!`、关 lint 的注释、空的 `catch`、`.catch(() => undefined)`？测试的断言是不是改松了？ | `vp run health:verify`（逃生口的棘轮）；diff 里的测试改动；`regression: ` 开头的测试被动了要在 `## Regression` 里点名 |
+| 绕开约束 | 有没有 `as`、`as unknown as`、`!`、关 lint 的注释、空的 `catch`、`.catch(() => undefined)`？测试的断言是不是改松了？ | lint（`no-explicit-any`、`no-unsafe-type-assertion`、`reportUnusedDisableDirectives`）和 clippy；diff 里的测试改动；`regression: ` 开头的测试被动了要在 `## Regression` 里点名 |
 | 温室假设 | 循环里有没有逐个查库、逐个起 git？流是不是假设一次到一整行？写盘是不是每来一点就写一次？ | 读循环体；`docs/subsystems/foundation.md`「贵的东西归拥有它的模块管」；测试里有没有大一点的数据 |
-| 架构漂移 | 有没有新加依赖？有没有跨层、跨模块、穿过别人 `index.ts` 的 import？ | `pnpm-workspace.yaml` 的 catalog 与 `go.mod` 的 diff；`vp check`（`page-layers`、`import/no-cycle`、`no-restricted-imports`）；`arch_test.go` |
-| 看不过来 | 用户要读哪几行才能放心合？契约（`packages/protocol`、`pkg/contract`、SQL、服务接口）改了什么？ | 把契约的 diff 单独列在 PR 正文最前；一批工作一个 PR，不同的事分成不同的提交（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节） |
+| 架构漂移 | 有没有新加依赖？有没有跨层、跨模块、穿过别人 `index.ts` 的 import？ | `pnpm-workspace.yaml` 的 catalog 的 diff；`vp check`（`page-layers`、`import/no-cycle`、`no-restricted-imports`）；Rust 的 `Cargo.toml` 依赖的 diff、`mod`/`use` 有没有绕过模块对外的结构体 |
+| 看不过来 | 用户要读哪几行才能放心合？契约（`packages/protocol`、表结构、模块对外的接口）改了什么？ | 把契约的 diff 单独列在 PR 正文最前；一批工作一个 PR，不同的事分成不同的提交（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节） |
 
 查到的照 [vv-simplify](.agents/skills/vv-simplify/SKILL.md) 的格式列给用户：每处带证据（文件和行号、命令的输出）、怎么改、靠哪个测试证明没变坏。只列不改，用户点了再改。
 
@@ -55,7 +55,7 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 
 agent 加功能时只在局部补，不会顺手提炼；提炼要单独一道工序，而且这道工序不改行为，用户才能只看「行为没变」的证据就合。
 
-1. 靶子来自读数，不来自印象：`vp run health` 的热点、`vp run deadcode`、[vv-simplify](.agents/skills/vv-simplify/SKILL.md) 找到的重复。凭印象挑的常常不是最该清的。
+1. 靶子来自读数，不来自印象：`vp run deadcode`、[vv-simplify](.agents/skills/vv-simplify/SKILL.md) 找到的重复。凭印象挑的常常不是最该清的。
 2. 分开不变的和变的：几处一样的控制流（截断、退避、重试、失败时发什么）收进一个地方（拥有它的模块的服务，或一个骨架函数），各处只留自己不同的那一点（报文怎么拼、怎么签名），作为参数或窄接口传进去。
 3. 重构自成一个或几个提交，不和功能的改动混在同一个提交里；单独做的重构分支用 `refactor/`，和同一批的功能一起交时放在同一个 PR，用户要求才拆（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节）。行为不变：测试只因改名、挪地方而变，断言不减；`regression: ` 开头的测试不动。
 4. 结果要可量：删了多少行、调用方少知道了什么、哪个测试证明行为没变，写进那个提交的说明和 PR 的 `## What changed`。行数不设门槛（会被刷），但一张重构单没有让代码变少或变简单，就不该合。

@@ -1,0 +1,287 @@
+{
+  "tab": {
+    "chat": "Chat",
+    "issues": "Tickets",
+    "crons": "Scheduled tasks"
+  },
+  "defaultRepo": "default repo {repo}",
+  "channels": "Channels",
+  "defaultHint": "The default channel: you, the assistant and the helpers are all here",
+  "findHint": "Find in this channel…",
+  "find": "Find in this channel",
+  "findMessages": "Find messages",
+  "settings": "Channel settings",
+  "inChannel": "In the channel",
+  "empty": "Nobody has spoken in {label}: tell the assistant something to do.",
+  "sendTo": "Message {label}",
+  "side": "Channels and helpers",
+  "channelsTitle": "Channels",
+  "directsTitle": "Direct messages",
+  "newChannel": "Create a channel",
+  "helpers": "Helpers",
+  "noHelpers": "No helpers here",
+  "mood": {
+    "idle": "resting",
+    "listening": "listening",
+    "thinking": "thinking",
+    "speaking": "speaking"
+  },
+  "orchestrator": "Assistant",
+  "nobodyOnIt": "No helper is on it now; the thread stays",
+  "replies": "{n, plural, one {# reply} other {# replies}}",
+  "thread": "Thread",
+  "closeThread": "Close the thread",
+  "threadEmpty": "Nobody has spoken in this thread yet. Its helper sees what is said here.",
+  "sayInThread": "Say it in the thread; {name} sees it",
+  "reply": "Reply in this thread",
+  "dialog": {
+    "repoExample": "such as clock-in",
+    "cancel": "Cancel",
+    "name": "Name",
+    "nameHint": "Letters, digits, Chinese characters, - and _, up to 24",
+    "nameExample": "such as clock-in",
+    "description": "Description (optional)",
+    "descriptionHint": "What is this channel for?",
+    "repo": "Default repo (optional)",
+    "repoHint": "Work sent in this channel without a repo goes to this one",
+    "repoNone": "Empty means none: the assistant asks which repo when sending work",
+    "settingsOf": "Settings of # {name}",
+    "save": "Save"
+  },
+  "issues": {
+    "empty": "No tickets in this channel yet. Tell the assistant something to do in the chat; it sends a helper, and the ticket is listed here.",
+    "thread": "Ticket thread"
+  },
+  "crons": {
+    "empty": "No scheduled tasks: tell the assistant \"run the tests every day at nine\".",
+    "next": "next {next}",
+    "direct": "straight to {agent}",
+    "byOrchestrator": "set by the assistant",
+    "label": "Scheduled task \"{name}\"",
+    "on": "On",
+    "off": "Off",
+    "removeWhich": "Delete the scheduled task \"{name}\"",
+    "sure": "Delete it?",
+    "approveWhich": "Approve the scheduled task \"{name}\"",
+    "approve": "Approve",
+    "refuseWhich": "Refuse the scheduled task \"{name}\"",
+    "refuse": "Refuse"
+  },
+  "messages": {
+    "quotedBlock": "On a block of “{title}”: {text}",
+    "quotedGone": "it was deleted",
+    "label": "Messages",
+    "containing": "Messages with \"{text}\"",
+    "start": "The start of the messages",
+    "older": "Older messages",
+    "notFound": "Nothing found",
+    "thinking": "thinking…",
+    "typing": "typing…",
+    "foldDispatch": "Fold the dispatch",
+    "unfoldDispatch": "Unfold the dispatch",
+    "user": "You",
+    "dispatch": "Sent work",
+    "spent": "This round spent {spent}",
+    "unread": "{n} new",
+    "edited": "(edited)",
+    "deleted": "This message was deleted",
+    "replyGone": "The original message was deleted",
+    "pinned": "Pinned",
+    "newMessages": "New messages",
+    "searching": "Searching…",
+    "inThread": "in {address}",
+    "file": "File · {size}",
+    "reactedBy": "{names} reacted with {emoji}",
+    "linked": "Go to message {number} in {where}",
+    "newBelow": "{n} new below",
+    "toLatest": "Back to the newest",
+    "roundFor": "{what} · {took}",
+    "sentTo": "Sent {who} on",
+    "sending": "Sending…",
+    "notSent": "Not sent",
+    "retrySend": "Send again",
+    "dropSend": "Drop it",
+    "searchFailed": "The search failed: {why}",
+    "readFailed": "Could not read the messages: {why}; trying again shortly"
+  },
+  "tools": {
+    "label": "What this message offers",
+    "react": "React",
+    "reply": "Reply",
+    "thread": "Open a thread",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "edit": "Edit",
+    "remove": "Delete",
+    "sure": "Press again to delete",
+    "pick": "Pick a reaction",
+    "editHint": "Enter saves · Esc cancels"
+  },
+  "pins": {
+    "open": "Pinned messages",
+    "title": "Pinned",
+    "none": "Nothing is pinned here yet",
+    "failed": "Could not read the pins: {why}"
+  },
+  "members": {
+    "open": "Members",
+    "title": "Members",
+    "user": "You",
+    "none": "No helpers here yet",
+    "inChannel": "An assistant in the channel"
+  },
+  "composer": {
+    "notSent": "Not sent: {why}",
+    "who": "Who",
+    "mention": "Mention someone",
+    "stopHint": "Stops the assistant's round; helpers already sent keep working",
+    "send": "Send",
+    "sendHint": "Enter sends · Shift+Enter for a new line",
+    "replying": "Replying to {name}",
+    "quotedBlock": "Pointing at: {text}",
+    "cancelQuote": "Stop pointing at it",
+    "cancelReply": "Cancel the reply",
+    "attach": "Attach a file",
+    "uploadFailed": "Not uploaded: {why}",
+    "command": "Commands"
+  },
+  "manage": {
+    "name": "Name",
+    "category": "Group (optional)",
+    "categoryHint": "The sidebar lists channels by group",
+    "members": "Assistants in the channel",
+    "membersHint": "The assistants in the channel see what is said here without @ anyone, and the reports; with none in it, @ someone to get an answer",
+    "notify": "Notify",
+    "notifyAll": "All",
+    "notifyMentions": "Only @user",
+    "notifyNone": "Nothing",
+    "notifyHint": "Nothing means no unread count, no Inbox and nothing forwarded to WeChat",
+    "archive": "Archive",
+    "unarchive": "Unarchive",
+    "archiveHint": "An archived channel leaves the sidebar; its messages and address stay",
+    "remove": "Delete channel",
+    "removeSure": "Delete it",
+    "removeWill": "Deleting it:",
+    "archivedTitle": "Archived",
+    "muted": "Muted",
+    "mentionsOnly": "Only @",
+    "drag": "Drop on another channel to place it before that one"
+  },
+  "threadList": {
+    "title": "This channel's threads",
+    "none": "No threads in this channel yet",
+    "archived": "Archived threads ({n})",
+    "rename": "Rename \"{title}\"",
+    "archive": "Archive \"{title}\"",
+    "unarchive": "Unarchive \"{title}\"",
+    "notify": "Thread notifications"
+  },
+  "more": {
+    "label": "More",
+    "copyLink": "Copy link",
+    "copied": "Link copied",
+    "markUnread": "Mark unread from here",
+    "jump": "Jump to it"
+  },
+  "switcher": {
+    "open": "Jump to…",
+    "title": "Jump to a channel, thread or direct message",
+    "hint": "Type a name; # finds channels and threads, @ direct messages",
+    "none": "Nothing found",
+    "direct": "Direct message",
+    "newDirect": "New direct message",
+    "note": "Note · {tier}",
+    "searchNotes": "Search notes for “{q}”"
+  },
+  "farmSearch": {
+    "open": "Search everything",
+    "title": "Search everything",
+    "hint": "Find messages…",
+    "filters": "from:user  in:#channel  has:file / image / link  before: / after:2026-10-01",
+    "none": "Nothing found",
+    "searching": "Searching…",
+    "failed": "The search failed: {why}"
+  },
+  "direct": {
+    "add": "New direct message",
+    "pick": "Talk with",
+    "none": "No profiles yet",
+    "open": "Talk with {name}"
+  },
+  "emoji": {
+    "open": "Emoji",
+    "groups": {
+      "frequent": "Frequent",
+      "faces": "Faces",
+      "hands": "Hands",
+      "things": "Things",
+      "nature": "Nature",
+      "signs": "Signs"
+    },
+    "more": "More emoji"
+  },
+  "media": {
+    "pdf": "PDF · opens in a new tab",
+    "drop": "Drop to upload here",
+    "uploadingFile": "{name} {percent}%",
+    "keep": "Keep {name}",
+    "takeOff": "Take off {name}",
+    "preview": "Link preview"
+  },
+  "names": {
+    "issueThread": "Ticket thread",
+    "talkThread": "{who}'s thread",
+    "thread": "Thread",
+    "mention": {
+      "orchestrator": "@assistant",
+      "user": "@user",
+      "everyone": "@everyone"
+    },
+    "orchestratorNote": "sends work, splits plans, answers how it goes",
+    "everyone": "Everyone",
+    "everyoneNote": "wakes every helper here"
+  },
+  "threadWidth": "Thread width (drag; double-click for the default)",
+  "commands": {
+    "issue": {
+      "name": "Write a ticket",
+      "args": "title",
+      "note": "Kept as a draft, in this channel's repository",
+      "needs": "Write the ticket's title after /issue"
+    },
+    "remember": {
+      "name": "Have the assistant remember",
+      "args": "a line",
+      "note": "Kept in the memory of the assistant here",
+      "needs": "Write what it should remember after /remember"
+    },
+    "stop": {
+      "name": "Stop the assistant",
+      "args": "",
+      "note": "The assistant here stops this turn; helpers it sent keep working",
+      "needs": ""
+    },
+    "dm": {
+      "name": "Direct message",
+      "args": "name",
+      "note": "Opens the direct channel with this profile",
+      "needs": "Write the profile's name or id after /dm"
+    },
+    "imagegen": {
+      "name": "Make an image",
+      "args": "description",
+      "note": "The assistant here draws it with MOSS and posts it here",
+      "needs": "Write what to draw after /imagegen",
+      "nowhere": "Open a channel first to make an image",
+      "notReady": "Images aren't set up: {why}. Press Enter to set it up"
+    },
+    "done": {
+      "issue": "Written down as #{n}",
+      "remember": "Remembered",
+      "stop": "Stopped",
+      "imagegen": "Handed to the assistant; the image will be posted here"
+    }
+  },
+  "lacks": "cannot answer: {why}",
+  "lacksFix": "Settings"
+}

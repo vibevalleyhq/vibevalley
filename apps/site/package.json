@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "assets": "vpx scripts/prepare.ts",
     "deploy": "vp run build && vp dlx wrangler@4 deploy"
   },
   "dependencies": {
@@ -17,7 +18,6 @@
     "@solidjs/vite-plugin": "catalog:",
     "@types/node": "catalog:",
     "@types/opentype.js": "catalog:",
-    "@vibevalley/web": "workspace:*",
     "opentype.js": "catalog:",
     "sharp": "catalog:",
     "subset-font": "catalog:",

@@ -1,0 +1,1843 @@
+{
+ "Id": [
+  "s2383",
+  "s2384"
+ ],
+ "VoiceId": [
+  "s2385",
+  "s2386"
+ ],
+ "SpeakerId": [
+  "s2387",
+  "s2388"
+ ],
+ "MediaAudioFormat": [
+  "wav",
+  "mp3",
+  "flac",
+  "aac",
+  "opus",
+  "pcm"
+ ],
+ "MediaAudioAccountRequest": [
+  {
+   "id": "s2389",
+   "connection": "s2390",
+   "revision": 2391
+  },
+  {
+   "id": "s2392",
+   "connection": "s2393",
+   "revision": 2394
+  }
+ ],
+ "MediaSpeakersRequestSpeakers": [
+  {
+   "id": "s2409",
+   "voice": "s2410"
+  },
+  {
+   "id": "s2411",
+   "voice": "s2412"
+  }
+ ],
+ "MediaSpeakersRequestSegments": [
+  {
+   "speaker": "s2413",
+   "text": "s2414"
+  },
+  {
+   "speaker": "s2415",
+   "text": "s2416"
+  }
+ ],
+ "MediaVoiceDesignRequest": [
+  {
+   "id": "s2417",
+   "connection": "s2418",
+   "revision": 2419,
+   "text": "s2420",
+   "instruction": "s2421",
+   "format": "wav"
+  },
+  {
+   "id": "s2422",
+   "connection": "s2423",
+   "revision": 2424,
+   "text": "s2425",
+   "instruction": "s2426",
+   "format": "wav"
+  }
+ ],
+ "MediaCloneRequest": [
+  {
+   "id": "s2427",
+   "connection": "s2428",
+   "revision": 2429,
+   "input": "s2430",
+   "name": "s2431",
+   "consent": true
+  },
+  {
+   "id": "s2432",
+   "connection": "s2433",
+   "revision": 2434,
+   "input": "s2435",
+   "consent": true
+  }
+ ],
+ "MediaTranscriptionRequest": [
+  {
+   "id": "s2436",
+   "connection": "s2437",
+   "revision": 2438,
+   "input": "s2439",
+   "allowUpload": true,
+   "diarize": true,
+   "keyterms": [
+    "s2441"
+   ],
+   "streaming": true
+  },
+  {
+   "id": "s2443",
+   "connection": "s2444",
+   "revision": 2445,
+   "input": "s2446",
+   "allowUpload": true
+  }
+ ],
+ "MediaAudioRequest": [
+  {
+   "kind": "voiceDesign",
+   "id": "s2461",
+   "connection": "s2462",
+   "revision": 2463,
+   "text": "s2464",
+   "instruction": "s2465",
+   "format": "mp3"
+  },
+  {
+   "kind": "voiceDesign",
+   "id": "s2466",
+   "connection": "s2467",
+   "revision": 2468,
+   "text": "s2469",
+   "instruction": "s2470",
+   "format": "mp3"
+  },
+  {
+   "kind": "clone",
+   "id": "s2471",
+   "connection": "s2472",
+   "revision": 2473,
+   "input": "s2474",
+   "name": "s2475",
+   "consent": true
+  },
+  {
+   "kind": "clone",
+   "id": "s2476",
+   "connection": "s2477",
+   "revision": 2478,
+   "input": "s2479",
+   "consent": true
+  },
+  {
+   "kind": "transcription",
+   "id": "s2480",
+   "connection": "s2481",
+   "revision": 2482,
+   "input": "s2483",
+   "allowUpload": true,
+   "diarize": true,
+   "keyterms": [
+    "s2485"
+   ],
+   "streaming": true
+  },
+  {
+   "kind": "transcription",
+   "id": "s2487",
+   "connection": "s2488",
+   "revision": 2489,
+   "input": "s2490",
+   "allowUpload": true
+  }
+ ],
+ "MediaAudioVoice": [
+  {
+   "id": "s2491",
+   "name": "s2492",
+   "createdAtSeconds": 2493
+  },
+  {
+   "id": "s2494",
+   "name": "s2495",
+   "createdAtSeconds": 2496
+  }
+ ],
+ "MediaAudioSegment": [
+  {
+   "speaker": "s2497",
+   "text": "s2498",
+   "start": 2499,
+   "end": 2500
+  },
+  {
+   "speaker": "s2501",
+   "text": "s2502",
+   "start": 2503,
+   "end": 2504
+  }
+ ],
+ "MediaAudioResult": [
+  {
+   "kind": "clone",
+   "voice": {
+    "id": "s2505",
+    "name": "s2506",
+    "createdAtSeconds": 2507
+   }
+  },
+  {
+   "kind": "clone",
+   "voice": {
+    "id": "s2508",
+    "name": "s2509",
+    "createdAtSeconds": 2510
+   }
+  },
+  {
+   "kind": "transcription",
+   "text": "s2511",
+   "segments": [
+    {
+     "speaker": "s2512",
+     "text": "s2513",
+     "start": 2514,
+     "end": 2515
+    }
+   ]
+  },
+  {
+   "kind": "transcription",
+   "text": "s2516",
+   "segments": [
+    {
+     "speaker": "s2517",
+     "text": "s2518",
+     "start": 2519,
+     "end": 2520
+    }
+   ]
+  }
+ ],
+ "MediaAudioJob": [
+  {
+   "id": "s2591",
+   "prompt": "s2592",
+   "model": "s2593",
+   "connection": "s2594",
+   "revision": 2595,
+   "source": {
+    "kind": "orchestrator",
+    "agent": "s2596",
+    "channel": "s2597"
+   },
+   "phase": "generating",
+   "phaseText": "s2598",
+   "problem": "s2599",
+   "format": "mp3",
+   "contentType": "s2600",
+   "metadata": {
+    "source": "provider",
+    "sampleRate": 2602,
+    "duration": 2603,
+    "channels": 2604,
+    "bitDepth": 2605
+   },
+   "usage": {
+    "inputCharacters": 2605,
+    "promptTokens": 2606,
+    "completionTokens": 2607,
+    "totalTokens": 2608,
+    "inputAudioSeconds": 2609
+   },
+   "input": {
+    "id": "s2610",
+    "kind": "video",
+    "name": "s2611",
+    "mime": "s2612",
+    "size": 2613,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000a36"
+   },
+   "resultInput": {
+    "id": "s2615",
+    "kind": "video",
+    "name": "s2616",
+    "mime": "s2617",
+    "size": 2618,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000a3b"
+   },
+   "attachment": {
+    "id": "s2620",
+    "name": "s2621",
+    "type": "s2622",
+    "size": 2623
+   },
+   "previewInput": "s2624",
+   "result": {
+    "kind": "transcription",
+    "text": "s2625",
+    "segments": [
+     {
+      "speaker": "s2626",
+      "text": "s2627",
+      "start": 2628,
+      "end": 2629
+     }
+    ]
+   },
+   "canCancel": true,
+   "canRetryDownload": false,
+   "canResume": true,
+   "canCleanup": false,
+   "canRelease": true,
+   "createdAt": 2635,
+   "updatedAt": 2636,
+   "kind": "voiceDesign",
+   "request": {
+    "id": "s2637",
+    "connection": "s2638",
+    "revision": 2639,
+    "text": "s2640",
+    "instruction": "s2641",
+    "format": "mp3"
+   }
+  },
+  {
+   "id": "s2642",
+   "prompt": "s2643",
+   "model": "s2644",
+   "connection": "s2645",
+   "revision": 2646,
+   "source": {
+    "kind": "orchestrator",
+    "agent": "s2647",
+    "channel": "s2648"
+   },
+   "phase": "generating",
+   "phaseText": "s2649",
+   "problem": "s2650",
+   "format": null,
+   "contentType": null,
+   "input": null,
+   "resultInput": null,
+   "previewInput": null,
+   "result": null,
+   "canCancel": false,
+   "canRetryDownload": true,
+   "canResume": false,
+   "canCleanup": true,
+   "canRelease": false,
+   "createdAt": 2656,
+   "updatedAt": 2657,
+   "kind": "voiceDesign",
+   "request": {
+    "id": "s2658",
+    "connection": "s2659",
+    "revision": 2660,
+    "text": "s2661",
+    "instruction": "s2662",
+    "format": "mp3"
+   }
+  },
+  {
+   "id": "s2663",
+   "prompt": "s2664",
+   "model": "s2665",
+   "connection": "s2666",
+   "revision": 2667,
+   "source": {
+    "kind": "user"
+   },
+   "phase": "downloading",
+   "phaseText": "s2668",
+   "problem": "s2669",
+   "format": "flac",
+   "contentType": "s2670",
+   "metadata": {
+    "source": "file",
+    "sampleRate": 2672,
+    "duration": 2673,
+    "channels": 2674,
+    "bitDepth": 2675
+   },
+   "usage": {
+    "inputCharacters": 2675,
+    "promptTokens": 2676,
+    "completionTokens": 2677,
+    "totalTokens": 2678,
+    "inputAudioSeconds": 2679
+   },
+   "input": {
+    "id": "s2680",
+    "kind": "audio",
+    "name": "s2681",
+    "mime": "s2682",
+    "size": 2683,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000a7c"
+   },
+   "resultInput": {
+    "id": "s2685",
+    "kind": "audio",
+    "name": "s2686",
+    "mime": "s2687",
+    "size": 2688,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000a81"
+   },
+   "attachment": {
+    "id": "s2690",
+    "name": "s2691",
+    "type": "s2692",
+    "size": 2693
+   },
+   "previewInput": "s2694",
+   "result": {
+    "kind": "clone",
+    "voice": {
+     "id": "s2695",
+     "name": "s2696",
+     "createdAtSeconds": 2697
+    }
+   },
+   "canCancel": true,
+   "canRetryDownload": false,
+   "canResume": true,
+   "canCleanup": false,
+   "canRelease": true,
+   "createdAt": 2703,
+   "updatedAt": 2704,
+   "kind": "clone",
+   "request": {
+    "id": "s2705",
+    "connection": "s2706",
+    "revision": 2707,
+    "input": "s2708",
+    "name": "s2709",
+    "consent": true
+   }
+  },
+  {
+   "id": "s2710",
+   "prompt": "s2711",
+   "model": "s2712",
+   "connection": "s2713",
+   "revision": 2714,
+   "source": {
+    "kind": "user"
+   },
+   "phase": "downloading",
+   "phaseText": "s2715",
+   "problem": "s2716",
+   "format": null,
+   "contentType": null,
+   "input": null,
+   "resultInput": null,
+   "previewInput": null,
+   "result": null,
+   "canCancel": false,
+   "canRetryDownload": true,
+   "canResume": false,
+   "canCleanup": true,
+   "canRelease": false,
+   "createdAt": 2722,
+   "updatedAt": 2723,
+   "kind": "clone",
+   "request": {
+    "id": "s2724",
+    "connection": "s2725",
+    "revision": 2726,
+    "input": "s2727",
+    "consent": true
+   }
+  },
+  {
+   "id": "s2728",
+   "prompt": "s2729",
+   "model": "s2730",
+   "connection": "s2731",
+   "revision": 2732,
+   "source": {
+    "kind": "orchestrator",
+    "agent": "s2733",
+    "channel": "s2734"
+   },
+   "phase": "ready",
+   "phaseText": "s2735",
+   "problem": "s2736",
+   "format": "aac",
+   "contentType": "s2737",
+   "metadata": {
+    "source": "provider",
+    "sampleRate": 2739,
+    "duration": 2740,
+    "channels": 2741,
+    "bitDepth": 2742
+   },
+   "usage": {
+    "inputCharacters": 2742,
+    "promptTokens": 2743,
+    "completionTokens": 2744,
+    "totalTokens": 2745,
+    "inputAudioSeconds": 2746
+   },
+   "input": {
+    "id": "s2747",
+    "kind": "image",
+    "name": "s2748",
+    "mime": "s2749",
+    "size": 2750,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000abf"
+   },
+   "resultInput": {
+    "id": "s2752",
+    "kind": "image",
+    "name": "s2753",
+    "mime": "s2754",
+    "size": 2755,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000ac4"
+   },
+   "attachment": {
+    "id": "s2757",
+    "name": "s2758",
+    "type": "s2759",
+    "size": 2760
+   },
+   "previewInput": "s2761",
+   "result": {
+    "kind": "transcription",
+    "text": "s2762",
+    "segments": [
+     {
+      "speaker": "s2763",
+      "text": "s2764",
+      "start": 2765,
+      "end": 2766
+     }
+    ]
+   },
+   "canCancel": false,
+   "canRetryDownload": true,
+   "canResume": false,
+   "canCleanup": true,
+   "canRelease": false,
+   "createdAt": 2772,
+   "updatedAt": 2773,
+   "kind": "transcription",
+   "request": {
+    "id": "s2774",
+    "connection": "s2775",
+    "revision": 2776,
+    "input": "s2777",
+    "allowUpload": true,
+    "diarize": true,
+    "keyterms": [
+     "s2779"
+    ],
+    "streaming": true
+   }
+  },
+  {
+   "id": "s2781",
+   "prompt": "s2782",
+   "model": "s2783",
+   "connection": "s2784",
+   "revision": 2785,
+   "source": {
+    "kind": "orchestrator",
+    "agent": "s2786",
+    "channel": "s2787"
+   },
+   "phase": "ready",
+   "phaseText": "s2788",
+   "problem": "s2789",
+   "format": null,
+   "contentType": null,
+   "input": null,
+   "resultInput": null,
+   "previewInput": null,
+   "result": null,
+   "canCancel": true,
+   "canRetryDownload": false,
+   "canResume": true,
+   "canCleanup": false,
+   "canRelease": true,
+   "createdAt": 2795,
+   "updatedAt": 2796,
+   "kind": "transcription",
+   "request": {
+    "id": "s2797",
+    "connection": "s2798",
+    "revision": 2799,
+    "input": "s2800",
+    "allowUpload": true
+   }
+  }
+ ],
+ "MediaSource": [
+  {
+   "kind": "user"
+  },
+  {
+   "kind": "orchestrator",
+   "agent": "s2801",
+   "channel": "s2802"
+  },
+  {
+   "kind": "orchestrator",
+   "agent": "s2803",
+   "channel": "s2804"
+  }
+ ],
+ "MediaPhase": [
+  "queued",
+  "generating",
+  "downloading",
+  "ready",
+  "failed",
+  "unknown",
+  "canceled",
+  "download_failed"
+ ],
+ "MediaAudioMetadata": [
+  {
+   "source": "file",
+   "sampleRate": 2806,
+   "duration": 2807,
+   "channels": 2808,
+   "bitDepth": 2809
+  },
+  {
+   "source": "file"
+  }
+ ],
+ "MediaAudioMetadataSource": [
+  "file",
+  "provider"
+ ],
+ "MediaAudioUsage": [
+  {
+   "inputCharacters": 2809,
+   "promptTokens": 2810,
+   "completionTokens": 2811,
+   "totalTokens": 2812,
+   "inputAudioSeconds": 2813
+  },
+  {}
+ ],
+ "MediaInputReference": [
+  {
+   "id": "s2814",
+   "kind": "image",
+   "name": "s2815",
+   "mime": "s2816",
+   "size": 2817,
+   "hash": "0000000000000000000000000000000000000000000000000000000000000b02"
+  },
+  {
+   "id": "s2819",
+   "kind": "image",
+   "name": "s2820",
+   "mime": "s2821",
+   "size": 2822,
+   "hash": "0000000000000000000000000000000000000000000000000000000000000b07"
+  }
+ ],
+ "MediaInputKind": [
+  "image",
+  "video",
+  "audio"
+ ],
+ "InputName": [
+  "s2824",
+  "s2825"
+ ],
+ "MediaInput": [
+  {
+   "id": "s2832",
+   "kind": "image",
+   "name": "s2833",
+   "mime": "s2834",
+   "size": 2835,
+   "phase": "reserved",
+   "hash": "s2836",
+   "createdAt": 2837,
+   "expiresAt": 2838,
+   "canDelete": false
+  },
+  {
+   "id": "s2840",
+   "kind": "image",
+   "name": "s2841",
+   "mime": "s2842",
+   "size": 2843,
+   "phase": "reserved",
+   "hash": null,
+   "createdAt": 2844,
+   "expiresAt": 2845,
+   "canDelete": true
+  }
+ ],
+ "MediaInputPhase": [
+  "reserved",
+  "uploading",
+  "ready",
+  "failed",
+  "deleting"
+ ],
+ "MediaImageRequest": [
+  {
+   "id": "s2847",
+   "prompt": "s2848",
+   "format": "text",
+   "width": 2849,
+   "height": 2850,
+   "seed": 2851,
+   "steps": 2852,
+   "guidance": 2853,
+   "negativePrompt": "s2854",
+   "enhance": false,
+   "watermark": true
+  },
+  {
+   "id": "s2857",
+   "prompt": "s2858",
+   "format": "text",
+   "width": 2859,
+   "height": 2860,
+   "enhance": false,
+   "watermark": true
+  }
+ ],
+ "MediaImageFormat": [
+  "text",
+  "layout"
+ ],
+ "MediaImageUsage": [
+  {
+   "images": 1,
+   "width": 1326,
+   "height": 1327
+  },
+  {
+   "images": 1,
+   "width": 1328,
+   "height": 1329
+  }
+ ],
+ "MediaImageJob": [
+  {
+   "kind": "image",
+   "id": "s2867",
+   "prompt": "s2868",
+   "model": "s2869",
+   "connection": "s2870",
+   "revision": 2871,
+   "source": {
+    "kind": "user"
+   },
+   "usage": {
+    "images": 1,
+    "width": 1335,
+    "height": 1336
+   },
+   "phase": "queued",
+   "phaseText": "s2874",
+   "problem": "s2875",
+   "attachment": {
+    "id": "s2876",
+    "name": "s2877",
+    "type": "s2878",
+    "size": 2879
+   },
+   "canCancel": true,
+   "canRetryDownload": false,
+   "createdAt": 2882,
+   "updatedAt": 2883
+  },
+  {
+   "kind": "image",
+   "id": "s2884",
+   "prompt": "s2885",
+   "model": "s2886",
+   "connection": "s2887",
+   "revision": 2888,
+   "source": {
+    "kind": "user"
+   },
+   "phase": "queued",
+   "phaseText": "s2889",
+   "problem": "s2890",
+   "canCancel": false,
+   "canRetryDownload": true,
+   "createdAt": 2893,
+   "updatedAt": 2894
+  }
+ ],
+ "MediaImageJobKind": [
+  "image"
+ ],
+ "MediaUnderstandingRequest": [
+  {
+   "id": "s2895",
+   "prompt": "s2896",
+   "inputs": [
+    "s2897"
+   ],
+   "connection": "s2898",
+   "revision": 2899,
+   "allowUpload": true,
+   "maxOutputTokens": 2901
+  },
+  {
+   "id": "s2901",
+   "prompt": "s2902",
+   "inputs": [
+    "s2903"
+   ],
+   "connection": "s2904",
+   "revision": 2905,
+   "allowUpload": true,
+   "maxOutputTokens": 2907
+  }
+ ],
+ "MediaUnderstandingAuthorizationRequest": [
+  {
+   "id": "s2907",
+   "prompt": "s2908",
+   "inputs": [
+    "s2909"
+   ],
+   "connection": "s2910",
+   "revision": 2911,
+   "allowUpload": true,
+   "maxOutputTokens": 2913,
+   "channel": "s2913"
+  },
+  {
+   "id": "s2914",
+   "prompt": "s2915",
+   "inputs": [
+    "s2916"
+   ],
+   "connection": "s2917",
+   "revision": 2918,
+   "allowUpload": true,
+   "maxOutputTokens": 2920,
+   "channel": "s2920"
+  }
+ ],
+ "MediaUnderstandingAuthorization": [
+  {
+   "channel": "s2921",
+   "expiresAt": 2922
+  },
+  {
+   "channel": "s2923",
+   "expiresAt": 2924
+  }
+ ],
+ "Tokens": [
+  2925,
+  2926
+ ],
+ "MediaUnderstandingResult": [
+  {
+   "model": "s2927",
+   "text": "s2928",
+   "status": "completed",
+   "incompleteReason": "max_output_tokens",
+   "usage": {
+    "inputTokens": 2929,
+    "outputTokens": 2930,
+    "totalTokens": 2931
+   }
+  },
+  {
+   "model": "s2932",
+   "text": "s2933",
+   "status": "completed",
+   "incompleteReason": null,
+   "usage": {
+    "inputTokens": 2934,
+    "outputTokens": 2935,
+    "totalTokens": 2936
+   }
+  }
+ ],
+ "MediaUnderstandingStatus": [
+  "completed",
+  "incomplete"
+ ],
+ "MediaUnderstandingResultIncompleteReason": [
+  "max_output_tokens"
+ ],
+ "MediaUnderstandingResultUsage": [
+  {
+   "inputTokens": 2937,
+   "outputTokens": 2938,
+   "totalTokens": 2939
+  },
+  {
+   "inputTokens": 2940,
+   "outputTokens": 2941,
+   "totalTokens": 2942
+  }
+ ],
+ "MediaUnderstandingJob": [
+  {
+   "kind": "understanding",
+   "id": "s2943",
+   "prompt": "s2944",
+   "inputs": [
+    {
+     "id": "s2945",
+     "kind": "image",
+     "name": "s2946",
+     "mime": "s2947",
+     "size": 2948,
+     "hash": "0000000000000000000000000000000000000000000000000000000000000b85"
+    }
+   ],
+   "model": "s2950",
+   "connection": "s2951",
+   "revision": 2952,
+   "source": {
+    "kind": "user"
+   },
+   "authorization": {
+    "channel": "s2953",
+    "expiresAt": 2954
+   },
+   "phase": "authorized",
+   "phaseText": "s2955",
+   "problem": "s2956",
+   "result": {
+    "model": "s2957",
+    "text": "s2958",
+    "status": "completed",
+    "incompleteReason": "max_output_tokens",
+    "usage": {
+     "inputTokens": 2959,
+     "outputTokens": 2960,
+     "totalTokens": 2961
+    }
+   },
+   "cleanup": "pending",
+   "cleanupText": "s2962",
+   "canCancel": false,
+   "canCleanup": true,
+   "canRetryDownload": false,
+   "createdAt": 2965,
+   "updatedAt": 2966
+  },
+  {
+   "kind": "understanding",
+   "id": "s2967",
+   "prompt": "s2968",
+   "inputs": [
+    {
+     "id": "s2969",
+     "kind": "image",
+     "name": "s2970",
+     "mime": "s2971",
+     "size": 2972,
+     "hash": "0000000000000000000000000000000000000000000000000000000000000b9d"
+    }
+   ],
+   "model": "s2974",
+   "connection": "s2975",
+   "revision": 2976,
+   "source": {
+    "kind": "user"
+   },
+   "authorization": null,
+   "phase": "authorized",
+   "phaseText": "s2977",
+   "problem": "s2978",
+   "result": null,
+   "cleanup": "pending",
+   "cleanupText": "s2979",
+   "canCancel": true,
+   "canCleanup": false,
+   "canRetryDownload": false,
+   "createdAt": 2982,
+   "updatedAt": 2983
+  }
+ ],
+ "MediaUnderstandingJobKind": [
+  "understanding"
+ ],
+ "MediaUnderstandingPhase": [
+  "authorized",
+  "queued",
+  "uploading",
+  "generating",
+  "ready",
+  "incomplete",
+  "failed",
+  "unknown",
+  "canceled"
+ ],
+ "MediaCleanup": [
+  "pending",
+  "running",
+  "done",
+  "blocked",
+  "unknown"
+ ],
+ "MediaSpeechEvent": [
+  {
+   "type": "format",
+   "sampleRate": 10984,
+   "channels": 2,
+   "bitDepth": 16
+  },
+  {
+   "type": "format",
+   "sampleRate": 10986,
+   "channels": 4,
+   "bitDepth": 16
+  },
+  {
+   "type": "audio",
+   "sequence": 2988,
+   "audio": "s2989"
+  },
+  {
+   "type": "audio",
+   "sequence": 2990,
+   "audio": "s2991"
+  },
+  {
+   "type": "done"
+  },
+  {
+   "type": "failed"
+  }
+ ],
+ "MediaSpeechRequest": [
+  {
+   "id": "s2992",
+   "text": "s2993",
+   "voice": "s2994",
+   "format": "wav",
+   "asynchronous": false,
+   "streaming": true,
+   "connection": "s2997",
+   "revision": 2998
+  },
+  {
+   "id": "s2999",
+   "text": "s3000",
+   "voice": "s3001",
+   "format": "wav",
+   "connection": "s3002",
+   "revision": 3003
+  }
+ ],
+ "MediaSpeechJob": [
+  {
+   "kind": "speech",
+   "id": "s3004",
+   "prompt": "s3005",
+   "model": "s3006",
+   "connection": "s3007",
+   "revision": 3008,
+   "source": {
+    "kind": "user"
+   },
+   "voice": "s3009",
+   "format": "wav",
+   "contentType": "s3010",
+   "metadata": {
+    "source": "file",
+    "sampleRate": 3012,
+    "duration": 3013,
+    "channels": 3014,
+    "bitDepth": 3015
+   },
+   "usage": {
+    "inputCharacters": 3015,
+    "promptTokens": 3016,
+    "completionTokens": 3017,
+    "totalTokens": 3018,
+    "inputAudioSeconds": 3019
+   },
+   "canResume": true,
+   "canRelease": false,
+   "phase": "queued",
+   "phaseText": "s3022",
+   "problem": "s3023",
+   "attachment": {
+    "id": "s3024",
+    "name": "s3025",
+    "type": "s3026",
+    "size": 3027
+   },
+   "resultInput": {
+    "id": "s3028",
+    "kind": "image",
+    "name": "s3029",
+    "mime": "s3030",
+    "size": 3031,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000bd8"
+   },
+   "canCancel": false,
+   "canRetryDownload": true,
+   "createdAt": 3035,
+   "updatedAt": 3036
+  },
+  {
+   "kind": "speech",
+   "id": "s3037",
+   "prompt": "s3038",
+   "model": "s3039",
+   "connection": "s3040",
+   "revision": 3041,
+   "source": {
+    "kind": "user"
+   },
+   "voice": "s3042",
+   "format": "wav",
+   "canRelease": false,
+   "phase": "queued",
+   "phaseText": "s3044",
+   "problem": "s3045",
+   "resultInput": null,
+   "canCancel": true,
+   "canRetryDownload": false,
+   "createdAt": 3048,
+   "updatedAt": 3049
+  }
+ ],
+ "MediaSpeechJobKind": [
+  "speech"
+ ],
+ "MediaJob": [
+  {
+   "kind": "image",
+   "id": "s3050",
+   "prompt": "s3051",
+   "model": "s3052",
+   "connection": "s3053",
+   "revision": 3054,
+   "source": {
+    "kind": "user"
+   },
+   "usage": {
+    "images": 1,
+    "width": 1518,
+    "height": 1519
+   },
+   "phase": "queued",
+   "phaseText": "s3057",
+   "problem": "s3058",
+   "attachment": {
+    "id": "s3059",
+    "name": "s3060",
+    "type": "s3061",
+    "size": 3062
+   },
+   "canCancel": false,
+   "canRetryDownload": true,
+   "createdAt": 3065,
+   "updatedAt": 3066
+  },
+  {
+   "kind": "image",
+   "id": "s3067",
+   "prompt": "s3068",
+   "model": "s3069",
+   "connection": "s3070",
+   "revision": 3071,
+   "source": {
+    "kind": "user"
+   },
+   "phase": "queued",
+   "phaseText": "s3072",
+   "problem": "s3073",
+   "canCancel": true,
+   "canRetryDownload": false,
+   "createdAt": 3076,
+   "updatedAt": 3077
+  },
+  {
+   "kind": "understanding",
+   "id": "s3078",
+   "prompt": "s3079",
+   "inputs": [
+    {
+     "id": "s3080",
+     "kind": "video",
+     "name": "s3081",
+     "mime": "s3082",
+     "size": 3083,
+     "hash": "0000000000000000000000000000000000000000000000000000000000000c0c"
+    }
+   ],
+   "model": "s3085",
+   "connection": "s3086",
+   "revision": 3087,
+   "source": {
+    "kind": "orchestrator",
+    "agent": "s3088",
+    "channel": "s3089"
+   },
+   "authorization": {
+    "channel": "s3090",
+    "expiresAt": 3091
+   },
+   "phase": "queued",
+   "phaseText": "s3092",
+   "problem": "s3093",
+   "result": {
+    "model": "s3094",
+    "text": "s3095",
+    "status": "incomplete",
+    "incompleteReason": "max_output_tokens",
+    "usage": {
+     "inputTokens": 3096,
+     "outputTokens": 3097,
+     "totalTokens": 3098
+    }
+   },
+   "cleanup": "running",
+   "cleanupText": "s3099",
+   "canCancel": true,
+   "canCleanup": false,
+   "canRetryDownload": false,
+   "createdAt": 3102,
+   "updatedAt": 3103
+  },
+  {
+   "kind": "understanding",
+   "id": "s3104",
+   "prompt": "s3105",
+   "inputs": [
+    {
+     "id": "s3106",
+     "kind": "video",
+     "name": "s3107",
+     "mime": "s3108",
+     "size": 3109,
+     "hash": "0000000000000000000000000000000000000000000000000000000000000c26"
+    }
+   ],
+   "model": "s3111",
+   "connection": "s3112",
+   "revision": 3113,
+   "source": {
+    "kind": "orchestrator",
+    "agent": "s3114",
+    "channel": "s3115"
+   },
+   "authorization": null,
+   "phase": "queued",
+   "phaseText": "s3116",
+   "problem": "s3117",
+   "result": null,
+   "cleanup": "running",
+   "cleanupText": "s3118",
+   "canCancel": false,
+   "canCleanup": true,
+   "canRetryDownload": false,
+   "createdAt": 3121,
+   "updatedAt": 3122
+  },
+  {
+   "kind": "speech",
+   "id": "s3123",
+   "prompt": "s3124",
+   "model": "s3125",
+   "connection": "s3126",
+   "revision": 3127,
+   "source": {
+    "kind": "user"
+   },
+   "voice": "s3128",
+   "format": "flac",
+   "contentType": "s3129",
+   "metadata": {
+    "source": "file",
+    "sampleRate": 3131,
+    "duration": 3132,
+    "channels": 3133,
+    "bitDepth": 3134
+   },
+   "usage": {
+    "inputCharacters": 3134,
+    "promptTokens": 3135,
+    "completionTokens": 3136,
+    "totalTokens": 3137,
+    "inputAudioSeconds": 3138
+   },
+   "canResume": false,
+   "canRelease": true,
+   "phase": "downloading",
+   "phaseText": "s3141",
+   "problem": "s3142",
+   "attachment": {
+    "id": "s3143",
+    "name": "s3144",
+    "type": "s3145",
+    "size": 3146
+   },
+   "resultInput": {
+    "id": "s3147",
+    "kind": "audio",
+    "name": "s3148",
+    "mime": "s3149",
+    "size": 3150,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000c4f"
+   },
+   "canCancel": true,
+   "canRetryDownload": false,
+   "createdAt": 3154,
+   "updatedAt": 3155
+  },
+  {
+   "kind": "speech",
+   "id": "s3156",
+   "prompt": "s3157",
+   "model": "s3158",
+   "connection": "s3159",
+   "revision": 3160,
+   "source": {
+    "kind": "user"
+   },
+   "voice": "s3161",
+   "format": "flac",
+   "canRelease": true,
+   "phase": "downloading",
+   "phaseText": "s3163",
+   "problem": "s3164",
+   "resultInput": null,
+   "canCancel": false,
+   "canRetryDownload": true,
+   "createdAt": 3167,
+   "updatedAt": 3168
+  },
+  {
+   "id": "s3169",
+   "prompt": "s3170",
+   "model": "s3171",
+   "connection": "s3172",
+   "revision": 3173,
+   "source": {
+    "kind": "orchestrator",
+    "agent": "s3174",
+    "channel": "s3175"
+   },
+   "phase": "ready",
+   "phaseText": "s3176",
+   "problem": "s3177",
+   "format": "aac",
+   "contentType": "s3178",
+   "metadata": {
+    "source": "provider",
+    "sampleRate": 3180,
+    "duration": 3181,
+    "channels": 3182,
+    "bitDepth": 3183
+   },
+   "usage": {
+    "inputCharacters": 3183,
+    "promptTokens": 3184,
+    "completionTokens": 3185,
+    "totalTokens": 3186,
+    "inputAudioSeconds": 3187
+   },
+   "input": {
+    "id": "s3188",
+    "kind": "image",
+    "name": "s3189",
+    "mime": "s3190",
+    "size": 3191,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000c78"
+   },
+   "resultInput": {
+    "id": "s3193",
+    "kind": "image",
+    "name": "s3194",
+    "mime": "s3195",
+    "size": 3196,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000c7d"
+   },
+   "attachment": {
+    "id": "s3198",
+    "name": "s3199",
+    "type": "s3200",
+    "size": 3201
+   },
+   "previewInput": "s3202",
+   "result": {
+    "kind": "transcription",
+    "text": "s3203",
+    "segments": [
+     {
+      "speaker": "s3204",
+      "text": "s3205",
+      "start": 3206,
+      "end": 3207
+     }
+    ]
+   },
+   "canCancel": true,
+   "canRetryDownload": false,
+   "canResume": true,
+   "canCleanup": false,
+   "canRelease": true,
+   "createdAt": 3213,
+   "updatedAt": 3214,
+   "kind": "transcription",
+   "request": {
+    "id": "s3215",
+    "connection": "s3216",
+    "revision": 3217,
+    "input": "s3218",
+    "allowUpload": true,
+    "diarize": false,
+    "keyterms": [
+     "s3220"
+    ],
+    "streaming": false
+   }
+  },
+  {
+   "id": "s3222",
+   "prompt": "s3223",
+   "model": "s3224",
+   "connection": "s3225",
+   "revision": 3226,
+   "source": {
+    "kind": "orchestrator",
+    "agent": "s3227",
+    "channel": "s3228"
+   },
+   "phase": "ready",
+   "phaseText": "s3229",
+   "problem": "s3230",
+   "format": null,
+   "contentType": null,
+   "input": null,
+   "resultInput": null,
+   "previewInput": null,
+   "result": null,
+   "canCancel": false,
+   "canRetryDownload": true,
+   "canResume": false,
+   "canCleanup": true,
+   "canRelease": false,
+   "createdAt": 3236,
+   "updatedAt": 3237,
+   "kind": "transcription",
+   "request": {
+    "id": "s3238",
+    "connection": "s3239",
+    "revision": 3240,
+    "input": "s3241",
+    "allowUpload": true
+   }
+  },
+  {
+   "kind": "image",
+   "id": "s3242",
+   "prompt": "s3243",
+   "model": "s3244",
+   "connection": "s3245",
+   "revision": 3246,
+   "source": {
+    "kind": "user"
+   },
+   "usage": {
+    "images": 1,
+    "width": 1710,
+    "height": 1711
+   },
+   "phase": "failed",
+   "phaseText": "s3249",
+   "problem": "s3250",
+   "attachment": {
+    "id": "s3251",
+    "name": "s3252",
+    "type": "s3253",
+    "size": 3254
+   },
+   "canCancel": false,
+   "canRetryDownload": true,
+   "createdAt": 3257,
+   "updatedAt": 3258
+  },
+  {
+   "kind": "image",
+   "id": "s3259",
+   "prompt": "s3260",
+   "model": "s3261",
+   "connection": "s3262",
+   "revision": 3263,
+   "source": {
+    "kind": "user"
+   },
+   "phase": "failed",
+   "phaseText": "s3264",
+   "problem": "s3265",
+   "canCancel": true,
+   "canRetryDownload": false,
+   "createdAt": 3268,
+   "updatedAt": 3269
+  },
+  {
+   "kind": "understanding",
+   "id": "s3270",
+   "prompt": "s3271",
+   "inputs": [
+    {
+     "id": "s3272",
+     "kind": "audio",
+     "name": "s3273",
+     "mime": "s3274",
+     "size": 3275,
+     "hash": "0000000000000000000000000000000000000000000000000000000000000ccc"
+    }
+   ],
+   "model": "s3277",
+   "connection": "s3278",
+   "revision": 3279,
+   "source": {
+    "kind": "orchestrator",
+    "agent": "s3280",
+    "channel": "s3281"
+   },
+   "authorization": {
+    "channel": "s3282",
+    "expiresAt": 3283
+   },
+   "phase": "incomplete",
+   "phaseText": "s3284",
+   "problem": "s3285",
+   "result": {
+    "model": "s3286",
+    "text": "s3287",
+    "status": "incomplete",
+    "incompleteReason": "max_output_tokens",
+    "usage": {
+     "inputTokens": 3288,
+     "outputTokens": 3289,
+     "totalTokens": 3290
+    }
+   },
+   "cleanup": "pending",
+   "cleanupText": "s3291",
+   "canCancel": true,
+   "canCleanup": false,
+   "canRetryDownload": false,
+   "createdAt": 3294,
+   "updatedAt": 3295
+  },
+  {
+   "kind": "understanding",
+   "id": "s3296",
+   "prompt": "s3297",
+   "inputs": [
+    {
+     "id": "s3298",
+     "kind": "audio",
+     "name": "s3299",
+     "mime": "s3300",
+     "size": 3301,
+     "hash": "0000000000000000000000000000000000000000000000000000000000000ce6"
+    }
+   ],
+   "model": "s3303",
+   "connection": "s3304",
+   "revision": 3305,
+   "source": {
+    "kind": "orchestrator",
+    "agent": "s3306",
+    "channel": "s3307"
+   },
+   "authorization": null,
+   "phase": "incomplete",
+   "phaseText": "s3308",
+   "problem": "s3309",
+   "result": null,
+   "cleanup": "pending",
+   "cleanupText": "s3310",
+   "canCancel": false,
+   "canCleanup": true,
+   "canRetryDownload": false,
+   "createdAt": 3313,
+   "updatedAt": 3314
+  },
+  {
+   "kind": "speech",
+   "id": "s3315",
+   "prompt": "s3316",
+   "model": "s3317",
+   "connection": "s3318",
+   "revision": 3319,
+   "source": {
+    "kind": "user"
+   },
+   "voice": "s3320",
+   "format": "wav",
+   "contentType": "s3321",
+   "metadata": {
+    "source": "file",
+    "sampleRate": 3323,
+    "duration": 3324,
+    "channels": 3325,
+    "bitDepth": 3326
+   },
+   "usage": {
+    "inputCharacters": 3326,
+    "promptTokens": 3327,
+    "completionTokens": 3328,
+    "totalTokens": 3329,
+    "inputAudioSeconds": 3330
+   },
+   "canResume": false,
+   "canRelease": true,
+   "phase": "canceled",
+   "phaseText": "s3333",
+   "problem": "s3334",
+   "attachment": {
+    "id": "s3335",
+    "name": "s3336",
+    "type": "s3337",
+    "size": 3338
+   },
+   "resultInput": {
+    "id": "s3339",
+    "kind": "image",
+    "name": "s3340",
+    "mime": "s3341",
+    "size": 3342,
+    "hash": "0000000000000000000000000000000000000000000000000000000000000d0f"
+   },
+   "canCancel": true,
+   "canRetryDownload": false,
+   "createdAt": 3346,
+   "updatedAt": 3347
+  },
+  {
+   "kind": "speech",
+   "id": "s3348",
+   "prompt": "s3349",
+   "model": "s3350",
+   "connection": "s3351",
+   "revision": 3352,
+   "source": {
+    "kind": "user"
+   },
+   "voice": "s3353",
+   "format": "wav",
+   "canRelease": true,
+   "phase": "canceled",
+   "phaseText": "s3355",
+   "problem": "s3356",
+   "resultInput": null,
+   "canCancel": false,
+   "canRetryDownload": true,
+   "createdAt": 3359,
+   "updatedAt": 3360
+  }
+ ],
+ "MediaJobRequest": [
+  {
+   "id": "s3361"
+  },
+  {
+   "id": "s3362"
+  }
+ ],
+ "JobKind": [
+  "image",
+  "understanding",
+  "speech",
+  "speakers",
+  "voiceDesign",
+  "clone",
+  "transcription"
+ ],
+ "LibraryOrigin": [
+  {
+   "kind": "generated",
+   "job": "s3363",
+   "jobKind": "image"
+  },
+  {
+   "kind": "generated",
+   "job": "s3364",
+   "jobKind": "image"
+  },
+  {
+   "kind": "uploaded",
+   "channel": "s3365",
+   "message": "s3366"
+  },
+  {
+   "kind": "uploaded"
+  },
+  {
+   "kind": "fetched",
+   "agent": "s3367",
+   "session": "s3368",
+   "from": {
+    "url": "s3369"
+   }
+  },
+  {
+   "kind": "fetched",
+   "agent": "s3370",
+   "from": {
+    "url": "s3371"
+   }
+  }
+ ],
+ "LibraryOriginFetchedFrom": [
+  {
+   "url": "s3372"
+  },
+  {
+   "url": "s3373"
+  },
+  {
+   "path": "s3374"
+  },
+  {
+   "path": "s3375"
+  }
+ ],
+ "LibraryItem": [
+  {
+   "attachment": {
+    "id": "s3376",
+    "name": "s3377",
+    "type": "s3378",
+    "size": 3379
+   },
+   "origin": {
+    "kind": "generated",
+    "job": "s3380",
+    "jobKind": "image"
+   },
+   "addedAt": 3381,
+   "lastAt": 3382
+  },
+  {
+   "attachment": {
+    "id": "s3383",
+    "name": "s3384",
+    "type": "s3385",
+    "size": 3386
+   },
+   "origin": {
+    "kind": "generated",
+    "job": "s3387",
+    "jobKind": "image"
+   },
+   "addedAt": 3388,
+   "lastAt": 3389
+  }
+ ],
+ "LibraryItems": [
+  [
+   {
+    "attachment": {
+     "id": "s3390",
+     "name": "s3391",
+     "type": "s3392",
+     "size": 3393
+    },
+    "origin": {
+     "kind": "generated",
+     "job": "s3394",
+     "jobKind": "image"
+    },
+    "addedAt": 3395,
+    "lastAt": 3396
+   }
+  ],
+  [
+   {
+    "attachment": {
+     "id": "s3397",
+     "name": "s3398",
+     "type": "s3399",
+     "size": 3400
+    },
+    "origin": {
+     "kind": "generated",
+     "job": "s3401",
+     "jobKind": "image"
+    },
+    "addedAt": 3402,
+    "lastAt": 3403
+   }
+  ]
+ ],
+ "LibraryListRequest": [
+  {
+   "origin": "generated",
+   "type": "image",
+   "text": "s3404",
+   "sort": "recent"
+  },
+  {}
+ ],
+ "LibraryOriginKind": [
+  "generated",
+  "uploaded",
+  "fetched"
+ ],
+ "LibraryFileKind": [
+  "image",
+  "audio",
+  "video",
+  "other"
+ ],
+ "LibrarySort": [
+  "recent",
+  "name",
+  "size"
+ ],
+ "LibraryAddRequest": [
+  {
+   "attachment": "s3405",
+   "url": "s3406",
+   "path": "s3407",
+   "name": "s3408"
+  },
+  {}
+ ],
+ "MediaInputAdoptInput": [
+  {
+   "attachment": "s7100"
+  },
+  {
+   "attachment": "s7101"
+  }
+ ],
+ "LibraryItemDeleteInput": [
+  {
+   "id": "s7102"
+  },
+  {
+   "id": "s7103"
+  }
+ ]
+}
