@@ -425,6 +425,10 @@ struct McpTool {
 }
 
 impl Tool for McpTool {
+    fn is_mcp(&self) -> bool {
+        true
+    }
+
     fn spec(&self) -> ToolSpec {
         self.spec.clone()
     }

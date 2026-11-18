@@ -4,6 +4,8 @@
 
 pub use vibevalley_protocol::{ApiError, BizCode, Envelope, LiveEvent};
 
+pub use vibevalley_chord::watch::Document;
+
 pub mod media;
 
 /// The helpers' MCP door (`POST /mcp`): one JSON-RPC message from a helper
@@ -30,6 +32,16 @@ pub trait Server: Send + Sync {
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
     fn subscribe(&self, name: &str, payload: serde_json::Value) -> Result<(u64, flume::Receiver<serde_json::Value>), Envelope>;
     fn unsubscribe(&self, id: u64);
+    fn resolve_approval(&self, _input: serde_json::Value) -> Envelope {
+        refusal(BizCode::Refused, "durable approvals unavailable")
+    }
+    fn raise_budget(&self, _input: serde_json::Value) -> Envelope {
+        refusal(BizCode::Refused, "durable budgets unavailable")
+    }
+    fn space_document(&self) -> Option<Document> {
+        None
+    }
+
     /// Optional local binary media transport.
     fn media_inputs(&self) -> Option<media::SharedMediaInputs> {
         None

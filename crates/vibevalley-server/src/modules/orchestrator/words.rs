@@ -72,7 +72,7 @@ pub fn tail(s: &str, n: usize) -> String {
 }
 
 /// Who woke the orchestrator: what the input's words are worth.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Source {
     User,
     Chat,

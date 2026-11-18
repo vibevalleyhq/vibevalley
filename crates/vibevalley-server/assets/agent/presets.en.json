@@ -185,6 +185,9 @@
     }
   ],
   "runtimeSupport": {
+    "qwen": {"steer": false, "refused": {"effort": "This runtime has no effort setting"}, "capabilities": [], "inProcess": false},
+    "qoder": {"steer": false, "refused": {"effort": "This runtime has no effort setting"}, "capabilities": [], "inProcess": false},
+    "codebuddy": {"steer": false, "refused": {"systemPrompt": "CodeBuddy ACP has no session prompt or individual tool list", "appendSystemPrompt": "CodeBuddy ACP has no session prompt or individual tool list", "disallowedTools": "CodeBuddy ACP has no session prompt or individual tool list"}, "capabilities": ["listModels"], "inProcess": false},
     "claude": {
       "steer": true,
       "refused": {},
@@ -267,5 +270,5 @@
       "inProcess": false
     }
   },
-  "runtimeIds": ["claude", "codex", "opencode", "vibevalley", "pi", "cursor", "grok", "kimi", "antigravity", "dsh"]
+  "runtimeIds": ["claude", "codex", "opencode", "qwen", "qoder", "codebuddy", "vibevalley", "pi", "cursor", "grok", "kimi", "antigravity", "dsh"]
 }

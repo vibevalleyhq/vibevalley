@@ -207,6 +207,7 @@ pub(crate) struct Spawn<'a> {
     pub args: Vec<String>,
     pub cwd: &'a Path,
     pub env: &'a [(String, String)],
+    pub options: Option<&'a crate::SessionOptions>,
     pub env_remove: &'a [&'a str],
 }
 
@@ -237,6 +238,14 @@ impl LineChild {
             .stderr(Stdio::piped())
             // Its own group, so stopping it reaches the tools it started.
             .process_group(0);
+        if let Some(opts) = spec.options {
+            if let Some(base) = &opts.base_env {
+                command.env_clear().envs(base.iter().map(|(k, v)| (k, v)));
+            }
+            for name in &opts.unset_env {
+                command.env_remove(name);
+            }
+        }
         for name in spec.env_remove {
             command.env_remove(name);
         }

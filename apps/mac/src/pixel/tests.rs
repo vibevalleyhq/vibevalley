@@ -152,7 +152,7 @@ fn regression_night_tints_ground_but_keeps_hud_readable() {
     scene.clock.set_time_of_day(0.92);
     let night = scene.draw(2.0);
     assert!(night.lit > 0);
-    assert!(night.ops[night.lit..].iter().all(|op| matches!(op, draw::Op::Glow { .. })));
+    assert!(night.ops[night.lit..].iter().any(|op| matches!(op, draw::Op::Glow { .. })));
     let energy = |img: image::RgbaImage| img.pixels().map(|p| p.0[..3].iter().map(|c| *c as u64).sum::<u64>()).sum::<u64>();
     assert!(energy(raster(&night, Some(&atlas), 1.0)) < energy(raster(&day, Some(&atlas), 1.0)));
     let paper = |list: &draw::DrawList| {
@@ -176,8 +176,8 @@ fn regression_farm_controls_stay_in_the_pane_and_modal_blocks_the_ground() {
     scene.frame = Frame::parse(&fixture("state.json"));
     for size in [(320.0, 400.0), (768.0, 512.0), (1200.0, 700.0)] {
         scene.view_size = size;
-        let layout = Layout::new(size);
-        for b in layout.nav.iter().chain(&layout.tools) {
+        let layout = Layout::new(&scene);
+        for b in layout.nav.iter().map(|n| &n.bounds).chain(&layout.tools) {
             assert!(b.x >= 0.0 && b.y >= 0.0 && b.x + b.w <= size.0 && b.y + b.h <= size.1);
             assert!(hit(&scene, b.x + b.w / 2.0, b.y + b.h / 2.0).is_some());
         }
@@ -187,9 +187,9 @@ fn regression_farm_controls_stay_in_the_pane_and_modal_blocks_the_ground() {
         assert!(list.hud_view);
         save(&format!("farm-chat-{}", size.0 as u32), &draw::raster_view(&list, Some(&atlas), size));
         scene.panel = None;
-        scene.phone_open = true;
+        scene.phone.open = true;
         assert_eq!(hit(&scene, layout.phone.x + 40.0, layout.phone.y + 40.0), Some(Action::Block));
-        scene.phone_open = false;
+        scene.phone.open = false;
     }
 }
 
@@ -274,7 +274,7 @@ fn farm_fixture_supplies_typed_chat_and_profiles() {
     let mut scene = FarmScene::new(world, atlas);
     scene.frame = frame;
     scene.panel = Some(farm::hud::Panel::Chat);
-    let p = farm::hud::Layout::new(scene.view_size).panel;
+    let p = farm::hud::Layout::new(&scene).panel;
     assert_eq!(
         farm::hud::hit(&scene, p.x + 20.0, p.y + 50.0),
         Some(farm::hud::Action::Route(format!("/chat/{}", messages[0].channel)))

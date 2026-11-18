@@ -242,6 +242,7 @@ pub(crate) enum ServerRequest {
 /// app-server notifications → events, as a pure fold (tests feed it fixtures).
 pub(crate) struct Projector {
     root_thread: String,
+    relatives: HashMap<String, Vec<String>>,
     streamed_items: HashSet<String>,
     items: HashMap<String, Value>,
     total: Option<(u64, u64)>,
@@ -254,6 +255,7 @@ impl Projector {
     pub(crate) fn new(root_thread: &str) -> Self {
         Self {
             root_thread: root_thread.to_string(),
+            relatives: HashMap::new(),
             streamed_items: HashSet::new(),
             items: HashMap::new(),
             total: None,
@@ -263,11 +265,58 @@ impl Projector {
         }
     }
 
+    fn thread_path(&self, id: &str) -> Vec<String> {
+        self.relatives
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| if id == self.root_thread { vec![] } else { vec![id.into()] })
+    }
     fn path(&self, params: &Value) -> Vec<String> {
-        match str_of(params, "threadId") {
-            Some(thread) if thread != self.root_thread => vec![thread.to_string()],
-            _ => Vec::new(),
+        let id = params
+            .pointer("/subAgentActivity/agentThreadId")
+            .and_then(Value::as_str)
+            .or_else(|| str_of(params, "threadId"))
+            .or_else(|| params.pointer("/thread/id").and_then(Value::as_str))
+            .unwrap_or(&self.root_thread);
+        self.thread_path(id)
+    }
+    fn associate(&mut self, method: &str, params: &Value) -> Vec<(String, String, Vec<String>)> {
+        let thread = str_of(params, "threadId")
+            .or_else(|| params.pointer("/thread/id").and_then(Value::as_str))
+            .unwrap_or(&self.root_thread)
+            .to_string();
+        let mut candidates = vec![];
+        if let Some(child) = params.pointer("/subAgentActivity/agentThreadId").and_then(Value::as_str) {
+            candidates.push((thread.as_str(), child));
         }
+        if method == "thread/started"
+            && let Some(parent) = str_of(params, "parentThreadId")
+                .or_else(|| params.pointer("/thread/parentThreadId").and_then(Value::as_str))
+                .or_else(|| params.pointer("/thread/source/subagent/parentThreadId").and_then(Value::as_str))
+        {
+            candidates.push((parent, thread.as_str()));
+        }
+        let item = &params["item"];
+        if item["type"] == "collabAgentToolCall" {
+            for child in [item["agentThreadId"].as_str(), item["newThreadId"].as_str()]
+                .into_iter()
+                .flatten()
+                .chain(item["receiverThreadIds"].as_array().into_iter().flatten().filter_map(Value::as_str))
+            {
+                candidates.push((thread.as_str(), child));
+            }
+        }
+        let mut added = vec![];
+        for (parent, child) in candidates {
+            if child == self.root_thread || child == parent || self.relatives.contains_key(child) || child.is_empty() {
+                continue;
+            }
+            let mut path = self.thread_path(parent);
+            path.push(child.into());
+            self.relatives.insert(child.into(), path.clone());
+            added.push((parent.into(), child.into(), path));
+        }
+        added
     }
 
     pub(crate) fn notification(&mut self, method: &str, params: &Value) -> Vec<(Vec<String>, EventKind)> {
@@ -529,7 +578,7 @@ struct Shared {
     /// Set once the thread exists; lines before that are only RPC replies.
     session: OnceLock<SessionState>,
     /// Notifications that arrived before `session` was set, in wire order.
-    early: Mutex<Vec<(String, Value)>>,
+    early: Mutex<Vec<(String, Value, String)>>,
     exit: Mutex<Option<String>>,
 }
 
@@ -543,6 +592,7 @@ struct SessionState {
     turns_finished: AtomicU64,
     approvals: Mutex<HashMap<String, PendingApproval>>,
     cwd: PathBuf,
+    output_schema: Option<Value>,
 }
 
 impl Shared {
@@ -613,18 +663,23 @@ impl Shared {
                     match self.session.get() {
                         Some(session) => session,
                         None => {
-                            early.push((method.to_string(), params));
+                            early.push((method.to_string(), params, line.to_string()));
                             return;
                         }
                     }
                 };
-                self.on_notification(session, method, &params);
+                self.on_notification(session, method, &params, line);
             }
             (None, None) => {}
         }
     }
 
-    fn on_notification(&self, session: &SessionState, method: &str, params: &Value) {
+    fn on_notification(&self, session: &SessionState, method: &str, params: &Value, line: &str) {
+        for (parent, child, path) in lock(&session.projector).associate(method, params) {
+            session.core.child_session(&parent, &child, &path);
+        }
+        let path = lock(&session.projector).path(params);
+        let _frame = session.core.record_raw(method, path, line, params);
         let events = lock(&session.projector).notification(method, params);
         let root = str_of(params, "threadId").is_none_or(|thread| thread == session.thread_id);
         if root && method == "turn/started" {
@@ -774,9 +829,13 @@ impl Driver for CodexDriver {
         let session = self.session();
         let input = user_input(&session.cwd, &content)?;
         let shared = self.shared.clone();
+        let mut params = json!({ "threadId": session.thread_id, "input": input });
+        if let Some(schema) = &session.output_schema {
+            params["outputSchema"] = schema.clone();
+        }
         self.shared.call_async(
             "turn/start",
-            json!({ "threadId": session.thread_id, "input": input }),
+            params,
             Box::new(move |result| {
                 let Some(session) = shared.session.get() else { return };
                 match result {
@@ -855,6 +914,11 @@ impl Driver for CodexDriver {
         Ok(())
     }
 
+    fn compact(&self) -> Result<()> {
+        self.shared
+            .call("thread/compact/start", json!({"threadId":self.session().thread_id}))
+            .map(|_| ())
+    }
     fn dispose(&self) {
         if let Some(child) = self.shared.child.get() {
             child.kill();
@@ -862,7 +926,7 @@ impl Driver for CodexDriver {
     }
 }
 
-fn connect(binary: &Path, cwd: &Path, env: &[(String, String)]) -> Result<Arc<Shared>> {
+fn connect(binary: &Path, cwd: &Path, opts: Option<&SessionOptions>) -> Result<Arc<Shared>> {
     let shared = Arc::new(Shared {
         child: OnceLock::new(),
         next_id: AtomicU64::new(1),
@@ -885,7 +949,8 @@ fn connect(binary: &Path, cwd: &Path, env: &[(String, String)]) -> Result<Arc<Sh
             binary,
             args: vec!["app-server".into(), "--listen".into(), "stdio://".into()],
             cwd,
-            env,
+            env: opts.map_or(&[], |o| o.env.as_slice()),
+            options: opts,
             env_remove: &[],
         },
         on_line,
@@ -935,7 +1000,7 @@ impl Runtime for CodexRuntime {
 
     fn account_usage(&self) -> Result<AccountUsage> {
         let binary = require_binary(ID)?;
-        let shared = connect(&binary, &std::env::temp_dir(), &[])?;
+        let shared = connect(&binary, &std::env::temp_dir(), None)?;
         // Account first: an API-key login has no subscription windows, and
         // the rate-limit read would wrongly say to log in again.
         let account = shared.call("account/read", json!({})).ok();
@@ -961,7 +1026,7 @@ impl Runtime for CodexRuntime {
 
     fn list_models(&self) -> Result<Vec<ModelInfo>> {
         let binary = require_binary(ID)?;
-        let shared = connect(&binary, &std::env::temp_dir(), &[])?;
+        let shared = connect(&binary, &std::env::temp_dir(), None)?;
         let mut models = Vec::new();
         let mut cursor = Value::Null;
         let result = loop {
@@ -1003,6 +1068,7 @@ impl Runtime for CodexRuntime {
     /// `permission_mode`). A model codex does not end up running, or a
     /// `resume` id it does not know, fails the open before a session exists.
     fn open(&self, opts: SessionOptions) -> Result<Arc<dyn Session>> {
+        opts.validate_for(ID)?;
         check_cwd(&opts.cwd)?;
         if !opts.disallowed_tools.is_empty() {
             return Err(AgentError::Unsupported {
@@ -1010,9 +1076,9 @@ impl Runtime for CodexRuntime {
                 reason: "codex has no setting that forbids single tools".into(),
             });
         }
-        let binary = require_binary(ID)?;
+        let binary = opts.binary(ID)?;
         let file = record::open_file(opts.record_to.as_deref())?;
-        let shared = connect(&binary, &opts.cwd, &opts.env)?;
+        let shared = connect(&binary, &opts.cwd, Some(&opts))?;
         let kill = |error: AgentError| {
             if let Some(child) = shared.child.get() {
                 child.kill();
@@ -1040,6 +1106,9 @@ impl Runtime for CodexRuntime {
         }
         let recorder = Recorder::start(file, ID, &thread_id, &opts.cwd, model.as_deref());
         let core = SessionCore::new(ID, &thread_id, recorder);
+        if opts.resume.is_some() {
+            core.resume_meter(&reply, "missing_codex_resume_baseline");
+        }
         core.emit_root(EventKind::SessionStarted {
             session_id: thread_id.clone(),
             model,
@@ -1054,11 +1123,12 @@ impl Runtime for CodexRuntime {
             turns_finished: AtomicU64::new(0),
             approvals: Mutex::new(HashMap::new()),
             cwd: opts.cwd.clone(),
+            output_schema: opts.output_schema.clone(),
         });
         if let Some(session) = shared.session.get() {
-            let held: Vec<(String, Value)> = std::mem::take(&mut *lock(&shared.early));
-            for (method, params) in held {
-                shared.on_notification(session, &method, &params);
+            let held: Vec<(String, Value, String)> = std::mem::take(&mut *lock(&shared.early));
+            for (method, params, line) in held {
+                shared.on_notification(session, &method, &params, &line);
             }
             let exited = lock(&shared.exit).clone();
             if let Some(message) = exited {

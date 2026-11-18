@@ -508,3 +508,39 @@ fn spawn_agent_runs_a_helper_and_a_replay_does_not_run_it_twice() {
     assert_eq!(client.seen.lock().unwrap().len(), 1);
     assert!(tool.execute(&json!({"brief": " "})).is_error);
 }
+
+#[test]
+fn reopening_after_a_torn_write_keeps_new_entries_readable() {
+    use std::io::Write;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("assistant.jsonl");
+    let client = Scripted::new(vec![say("first"), say("second")]);
+    Conversation::open(&path, brain(client.clone(), vec![]))
+        .unwrap()
+        .send("one", &mut |_| {})
+        .unwrap();
+    std::fs::OpenOptions::new().append(true).open(&path).unwrap().write_all(b"{\"entry\":").unwrap();
+    Conversation::open(&path, brain(client, vec![])).unwrap().send("two", &mut |_| {}).unwrap();
+    let entries = read_entries(&path).unwrap();
+    assert_eq!(entries.iter().filter(|e| matches!(e, Entry::TurnFinished { .. })).count(), 2);
+}
+
+#[test]
+fn recovery_settles_a_committed_answer_without_a_second_generation() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("assistant.jsonl");
+    let answer = say("done");
+    let entries = [
+        Entry::TurnStarted { input: "finish".into() },
+        Entry::Message {
+            message: answer.message,
+            usage: Some(answer.usage),
+        },
+    ];
+    std::fs::write(&path, entries.iter().map(|e| serde_json::to_string(e).unwrap()).collect::<Vec<_>>().join("\n")).unwrap();
+    let mut conv = Conversation::open(&path, brain(Scripted::new(vec![]), vec![])).unwrap();
+    let mut events = vec![];
+    assert_eq!(conv.resume(&mut |e| events.push(e)).unwrap().unwrap(), TurnOutcome::Completed);
+    assert!(matches!(events.last(),Some(BrainEvent::TurnFinished { text,usage,.. }) if text=="done" && *usage==answer.usage));
+    assert_eq!(read_entries(&path).unwrap().len(), 3);
+}

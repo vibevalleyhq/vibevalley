@@ -15,6 +15,8 @@ name = "publish"
 path = "tests/publish.rs"
 
 [dependencies]
+vibevalley-durable = { version = "0.1.0", path = "../vibevalley-durable" }
+vibevalley-chord = { version = "0.1.0", path = "../vibevalley-chord" }
 base64 = "0.23.1"
 vibevalley-oar = { version = "0.1.0", path = "../vibevalley-oar" }
 vibevalley-artifact = { version = "0.1.0", path = "../vibevalley-artifact" }

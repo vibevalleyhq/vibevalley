@@ -4,7 +4,7 @@
 // shortcut sheet.
 // The orchestrator's pixel face at the rail's top is the farm's icon while
 // the art is not installed.
-import { host, keymap, Scroll, Text, View, windowSize, type JSX } from "nsh";
+import { effect, host, keymap, Scroll, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -79,14 +79,18 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
   const settings = settingsPlace;
   const atSettings = () => props.here === settings;
   const location = useLocation();
+  const width = () => (props.farm ? (small() ? 56 : 72) : small() ? 68 : 76);
+  if (host.params.globalShell === true) {
+    effect(() => host.post("action", { type: "global_rail", rail_width: width() }));
+  }
   return (
     <View
       accessibilityLabel={t("web.base.rail")}
       testID="rail"
       class={`${small() ? "w-14" : "w-18"} shrink-0 border-r border-line bg-rail`}
-      style={host.params.globalShell === true ? { width: small() ? 68 : 76 } : undefined}
+      style={host.params.globalShell === true ? { width: width() } : undefined}
     >
-      <If when={host.params.globalShell === true}>
+      <If when={host.params.globalShell === true && !props.farm}>
         <View class="h-7 shrink-0" />
       </If>
       <Scroll class="flex-1" contentClass="items-center pb-3">
@@ -108,19 +112,20 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
                 >
                   <OrchestratorFace size={38} />
                 </If>
-                {/* The link to the server, on the face: a ring of the rail's colour sets it off the picture. */}
-                <View
-                  testID="link"
-                  accessibilityLabel={linkWords[frames.link]}
-                  accessible
-                  class={`absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-rail ${frames.link === "open" ? "bg-leaf" : frames.link === "lost" ? "bg-berry" : "bg-faint"}`}
-                />
+                <If when={!props.farm}>
+                  <View
+                    testID="link"
+                    accessibilityLabel={linkWords[frames.link]}
+                    accessible
+                    class={`absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-rail ${frames.link === "open" ? "bg-leaf" : frames.link === "lost" ? "bg-berry" : "bg-faint"}`}
+                  />
+                </If>
               </View>
             )}
           />
         </View>
         <View class="items-center gap-1">
-          <If when={host.params.globalShell === true}>
+          <If when={host.params.globalShell === true && !props.farm}>
             <Slot
               to="/workspace"
               place="workspace"
@@ -182,6 +187,11 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
           current={props.farm}
           icon={railIcon("farm", () => props.farm)}
         />
+        <If when={props.farm}>
+          <View testID="link" accessibilityLabel={linkWords[frames.link]} accessible class="h-4 items-center justify-center">
+            <View class={`h-2 w-2 rounded-full ${frames.link === "open" ? "bg-leaf" : frames.link === "lost" ? "bg-berry" : "bg-faint"}`} />
+          </View>
+        </If>
       </View>
     </View>
   );

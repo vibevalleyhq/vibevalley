@@ -5,7 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-axum = "0.8.9"
+vibevalley-chord = { version = "0.1.0", path = "../vibevalley-chord" }
+axum = { version = "0.8.9", features = ["ws"] }
 vibevalley-bridge = { version = "0.1.0", path = "../vibevalley-bridge" }
 vibevalley-protocol = { version = "0.1.0", path = "../vibevalley-protocol" }
 vibevalley-server-api = { version = "0.1.0", path = "../vibevalley-server-api" }

@@ -160,6 +160,9 @@ impl FlexDir for gpui_kit::Div {
 /// the program set, else the shell and its folder. A shell's default title
 /// (`user@host:path`) says nothing and is not used.
 pub fn terminal_name(t: &crate::terminal::TerminalView) -> String {
+    if let Some(title) = t.link_title() {
+        return title.to_owned();
+    }
     if let Some((_, label)) = t.running_status() {
         return label;
     }

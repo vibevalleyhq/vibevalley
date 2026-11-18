@@ -1,6 +1,4 @@
-//! The village drawn from the latest frame and kept moving: VibeValley's
-//! `farm/canvas/scene.ts` without the normal-mapped light (a flat sky tint,
-//! lamp and lantern glows instead) and without the critters.
+//! Draws the active repository from the latest frame and advances its helpers between frames.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -12,7 +10,7 @@ use super::super::nav::{Facing, Walker, frame_at};
 use super::super::sky::{DayClock, clock_text, flat_light, sky_at};
 use super::frame::{Crop, Frame, Session};
 use super::hud::{self, Panel};
-use super::snake::SnakeGame;
+use super::phone::Phone;
 use super::world::{
     BEDS, Bed, Goal, GoalInput, PLOT_H, PLOT_W, Pose, PoseHold, REST_SPOTS, Stroll, StrollSpot, VillageHit, VillageWorld, Whereabouts, YARD_PLACES,
     bed_of_station, place_of_action, plot_calls, pose_of, spots_for, village_hit_at,
@@ -129,8 +127,11 @@ impl FarmTool {
         use vibevalley_protocol::{IssueAct, IssueAction};
         let wanted = match self {
             Self::Bug => IssueAct::Cure,
+            Self::Water => IssueAct::Tell,
+            Self::Harvest => IssueAct::Complete,
+            Self::Shovel if !stage.acts.iter().any(|a| matches!(a, IssueAction::Stop { act: IssueAct::Stop })) => IssueAct::Close,
             Self::Shovel => IssueAct::Stop,
-            Self::Hand | Self::Water | Self::Weed | Self::Harvest => return None,
+            Self::Hand | Self::Weed => return None,
         };
         stage.acts.iter().find(|action| match action {
             IssueAction::Move { act, .. } | IssueAction::Say { act } | IssueAction::Stop { act } => *act == wanted,
@@ -171,14 +172,16 @@ pub struct FarmScene {
     pub atlas: Arc<Atlas>,
     pub clock: DayClock,
     pub frame: Frame,
+    pub profiles: Vec<vibevalley_protocol::Agent>,
+    pub runtimes: Vec<vibevalley_protocol::RuntimeInfo>,
+    pub reveal_names: bool,
     pub agent_looks: HashMap<String, (String, String)>,
     pub tool: FarmTool,
     pub panel: Option<Panel>,
     pub panel_page: usize,
     pub view_size: (f32, f32),
     pub achievements: Vec<vibevalley_protocol::Achievement>,
-    pub phone_open: bool,
-    pub snake: SnakeGame,
+    pub phone: Phone,
     pub bed_fx: Option<(usize, u32, f32)>,
     pub toast: Option<(String, f32)>,
     actors: HashMap<String, Actor>,
@@ -186,7 +189,11 @@ pub struct FarmScene {
     where_at: f32,
     stroll_at: f32,
     pub hover: Option<VillageHit>,
-    pet_at: f32,
+    dog: super::dog::Dog,
+    life: super::life::Life,
+    pointer: Option<Point>,
+    sounds: Vec<&'static str>,
+    heard_seq: Option<u64>,
     rng: u64,
     /// The farm on the page: only this repo's helpers, when set.
     pub repo: Option<String>,
@@ -194,19 +201,23 @@ pub struct FarmScene {
 
 impl FarmScene {
     pub fn new(world: VillageWorld, atlas: Arc<Atlas>) -> FarmScene {
+        let life = super::life::Life::new(&world, &atlas);
         FarmScene {
+            life,
             world,
             atlas,
             clock: DayClock::default(),
             frame: Frame::default(),
+            profiles: Vec::new(),
+            runtimes: Vec::new(),
+            reveal_names: false,
             agent_looks: HashMap::new(),
             tool: FarmTool::Hand,
             panel: None,
             panel_page: 0,
             view_size: (768.0, 512.0),
             achievements: Vec::new(),
-            phone_open: false,
-            snake: SnakeGame::new(),
+            phone: Phone::default(),
             bed_fx: None,
             toast: None,
             actors: HashMap::new(),
@@ -214,10 +225,76 @@ impl FarmScene {
             where_at: 0.0,
             stroll_at: 0.0,
             hover: None,
-            pet_at: -10.0,
+            dog: super::dog::Dog::default(),
+            pointer: None,
+            sounds: Vec::new(),
+            heard_seq: None,
             rng: 0x9e3779b97f4a7c15,
             repo: None,
         }
+    }
+
+    pub fn drain_sounds(&mut self) -> impl Iterator<Item = &'static str> + '_ {
+        self.sounds.drain(..)
+    }
+
+    pub fn apply_frame(&mut self, frame: Frame) {
+        use vibevalley_protocol::{GameEffect, IssueStageKind, StuckReason};
+        if self.heard_seq != Some(frame.seq) {
+            if self.heard_seq.is_some() {
+                for session in &frame.state.sessions {
+                    if !self.frame.state.sessions.iter().any(|s| s.id == session.id) {
+                        self.sounds.push("arrive");
+                    }
+                }
+                for issue in &frame.state.issues {
+                    let Some(now) = &issue.stage else {
+                        continue;
+                    };
+                    let Some(was) = self.frame.state.issues.iter().find(|i| i.id == issue.id).and_then(|i| i.stage.as_ref()) else {
+                        continue;
+                    };
+                    if now.state == IssueStageKind::Reviewing && was.state != now.state {
+                        self.sounds.push("ripe");
+                    }
+                    if now.state == IssueStageKind::Stuck
+                        && matches!(now.stuck, Some(StuckReason::Failed | StuckReason::Conflict))
+                        && (was.state != now.state || was.stuck != now.stuck)
+                    {
+                        self.sounds.push("bug");
+                    }
+                }
+                if self.frame.state.call != frame.state.call {
+                    if frame.state.call == "live" {
+                        self.sounds.push("voiceOn");
+                    } else if frame.state.call == "idle" && matches!(self.frame.state.call.as_str(), "live" | "ending") {
+                        self.sounds.push("voiceOff");
+                    }
+                }
+            }
+            for effect in &frame.effects {
+                match effect {
+                    GameEffect::Reward(r) => {
+                        self.sounds.push("coin");
+                        if let Some(s) = r.session_id.as_ref().and_then(|id| frame.state.sessions.iter().find(|s| &s.id == id))
+                            && let Some(b) = bed_of_station(frame.station_of(s))
+                        {
+                            self.life.coin(self.world.plot_at(b.index) + pt(0., -PLOT_H / 2.));
+                        }
+                    }
+                    GameEffect::LevelUp(_) => self.sounds.push("levelUp"),
+                    GameEffect::Achievement(_) => self.sounds.push("achievement"),
+                    GameEffect::Penalty(_) => {}
+                }
+            }
+            self.heard_seq = Some(frame.seq);
+        }
+        self.frame = frame;
+    }
+
+    pub fn helper_feet(&self, id: &str) -> Option<Point> {
+        let a = self.actors.get(id)?;
+        a.left_at.is_none().then_some(pt(a.walker.x.round(), a.walker.y.round()))
     }
 
     pub fn show_toast(&mut self, text: impl Into<String>) {
@@ -225,7 +302,8 @@ impl FarmScene {
     }
 
     pub fn play_bed_fx(&mut self, bed: usize, color: u32) {
-        self.bed_fx = Some((bed, color, self.t + 1.2));
+        self.bed_fx = Some((bed, color, self.t + 0.15));
+        self.life.bed(self.world.plot_at(bed) + pt(0., -PLOT_H / 2.), self.tool);
     }
 
     fn random(&mut self) -> f32 {
@@ -279,9 +357,9 @@ impl FarmScene {
         let dt = dt.min(0.1);
         self.t += dt;
         self.clock.advance(dt);
-        if self.phone_open {
-            self.snake.tick(self.t, self.rng);
-        }
+        let dog_random = self.random();
+        self.dog.advance(self.t, self.frame.state.call == "live", dog_random);
+        self.phone.tick(std::time::Instant::now());
         let t = self.t;
         let move_on = t - self.where_at >= WHERE_TICK;
         if move_on {
@@ -398,6 +476,28 @@ impl FarmScene {
             }
             true
         });
+        let on_site = |place: &str| self.actors.values().any(|a| a.left_at.is_none() && !a.walker.walking() && a.goal.key == place);
+        let walkers = self
+            .actors
+            .values()
+            .filter(|a| a.walker.walking())
+            .map(|a| pt(a.walker.x, a.walker.y))
+            .collect::<Vec<_>>();
+        let ripe = BEDS
+            .iter()
+            .filter(|b| b.station >= 0 && super::world::is_ripe(self.crop_of_bed(**b, false)))
+            .map(|b| self.world.plot_box(b.index))
+            .collect::<Vec<_>>();
+        let activity = super::life::Activity {
+            walkers: &walkers,
+            library: on_site("library"),
+            workshop: on_site("workshop"),
+            mast: on_site("mast"),
+            bench: on_site("bench"),
+            ripe: &ripe,
+            sleeping: self.dog_picture() == "dog-sleep",
+        };
+        self.life.step(&self.world, t, dt, 1. - super::super::sky::sun_of(self.clock.tod), activity);
     }
 
     fn sessions_hit_boxes(&self) -> Vec<(String, Box2)> {
@@ -431,6 +531,7 @@ impl FarmScene {
     /// The pointer moved to `p` (art pixels), or left.
     pub fn point(&mut self, p: Option<Point>) {
         self.hover = p.and_then(|p| self.hit_at(p));
+        self.pointer = p;
     }
 
     pub fn tap(&mut self, p: Point) -> FarmTap {
@@ -451,10 +552,16 @@ impl FarmScene {
                 opens: YARD_PLACES.iter().find(|p| p.id == id).map(|p| p.opens).unwrap_or(""),
             },
             Some(VillageHit::Dog) => {
-                self.pet_at = self.t;
+                self.sounds.push(self.dog.pet(self.t));
+                self.life.heart(self.world.dog + pt(1., -20.));
                 FarmTap::Dog
             }
-            None => FarmTap::Ground,
+            None => {
+                if let Some(sound) = self.life.poke(p) {
+                    self.sounds.push(sound);
+                }
+                FarmTap::Ground
+            }
         }
     }
 
@@ -469,16 +576,48 @@ impl FarmScene {
     }
 
     fn dog_picture(&self) -> &'static str {
-        let since = self.t - self.pet_at;
-        if since < 2.0 {
-            if frame_at(since, 2, 4.0) == 0 { "dog-wag-1" } else { "dog-wag-2" }
-        } else if self.frame.state.call == "live" {
-            "dog-stand"
-        } else {
-            "dog-sleep"
-        }
+        self.dog.look(self.t, self.hover == Some(VillageHit::Dog)).sprite
     }
 
+    fn manager_picture(&self, list: &mut DrawList, id: &str, at: Point) {
+        let pose = self.frame.state.sessions.iter().find(|s| s.role == "orchestrator" && s.agent == id);
+        let speaking = pose.is_some_and(|s| s.doing() == Some("speaking_text"));
+        let listening = pose.is_some_and(|s| !matches!(s.phase.tag.as_str(), "working" | "closed"));
+        let look = self
+            .profiles
+            .iter()
+            .find(|p| p.id == id)
+            .and_then(|p| p.look.orchestrator)
+            .map(|l| l.as_str())
+            .unwrap_or("farmer");
+        let candidate = format!("manager-{look}");
+        let base = if look != "farmer" && self.atlas.has(&candidate) {
+            candidate.as_str()
+        } else {
+            "manager"
+        };
+        let suffix = if speaking {
+            "-talk"
+        } else if listening {
+            "-listen"
+        } else {
+            ""
+        };
+        let named = format!("{base}{suffix}");
+        let name = if self.atlas.has(&named) { named.as_str() } else { base };
+        if let (Some(image), Some(info), Some((x, y))) = (self.atlas.image(name), self.atlas.get(name), self.atlas.top_left(name, at.x, at.y, false)) {
+            let breathe = frame_at(self.t, 2, if speaking { 4. } else { 0.6 }) as f32;
+            list.ops.push(Op::Image {
+                key: name.into(),
+                image,
+                x,
+                y: y - breathe,
+                w: info.w,
+                h: info.h + breathe,
+                alpha: 1.,
+            });
+        }
+    }
     /// The scene's draw list; `scale` is view pixels per art pixel (for the HUD).
     pub fn draw(&mut self, scale: f32) -> DrawList {
         let w = &self.world;
@@ -552,21 +691,51 @@ impl FarmScene {
             }
             let lift = if hover_spot == Some(p.spot.as_str()) { 1.0 } else { 0.0 };
             let mut l = DrawList::default();
-            shadow(&mut l, p.at, 18.0, 0.25);
+            contact_shadow(
+                &mut l,
+                p.at + pt(0., -1.),
+                (atlas.get(&p.sprite).map_or(10., |s| s.w * 0.9)).round().max(10.),
+                5.,
+                0.5,
+                1.,
+            );
             l.sprite(&atlas, &p.sprite, p.at.x, p.at.y - lift, false, 1.0);
             ground.push((p.at.y, l.ops));
         }
         {
             let mut l = DrawList::default();
-            shadow(&mut l, w.orchestrator, 14.0, 0.3);
+            footing(&mut l, w.orchestrator, 14., self.clock.tod, 1.);
             let lift = if hover_spot == Some("manager") { 1.0 } else { 0.0 };
-            l.sprite(&atlas, "manager", w.orchestrator.x, w.orchestrator.y - lift, false, 1.0);
+            self.manager_picture(&mut l, "orchestrator", w.orchestrator + pt(0., -lift));
             ground.push((w.orchestrator.y, l.ops));
+        }
+        for (i, profile) in self
+            .profiles
+            .iter()
+            .filter(|p| p.role == vibevalley_protocol::AgentRole::Orchestrator && p.id != "orchestrator")
+            .enumerate()
+        {
+            let at = w.orchestrator + pt(if i % 2 == 0 { 1. } else { -1. } * 18. * (i / 2 + 1) as f32, 2.);
+            let mut l = DrawList::default();
+            self.manager_picture(&mut l, &profile.id, at);
+            ground.push((at.y, l.ops));
         }
         {
             let mut l = DrawList::default();
-            shadow(&mut l, w.dog, 16.0, 0.3);
-            l.sprite(&atlas, self.dog_picture(), w.dog.x, w.dog.y, false, 1.0);
+            footing(&mut l, w.dog, 16., self.clock.tod, 1.);
+            let look = self.dog.look(self.t, self.hover == Some(VillageHit::Dog));
+            let (x, y) = atlas.top_left(look.sprite, w.dog.x, w.dog.y - look.lift, false).unwrap_or((w.dog.x, w.dog.y));
+            if let (Some(info), Some(image)) = (atlas.get(look.sprite), atlas.image(look.sprite)) {
+                l.ops.push(Op::Image {
+                    key: look.sprite.into(),
+                    image,
+                    x,
+                    y: y - look.grow,
+                    w: info.w,
+                    h: info.h + look.grow,
+                    alpha: 1.,
+                });
+            }
             ground.push((w.dog.y, l.ops));
         }
         let t = self.t;
@@ -583,7 +752,7 @@ impl FarmScene {
             }
             let (x, y) = (a.walker.x.round(), a.walker.y.round());
             let mut l = DrawList::default();
-            shadow(&mut l, pt(x, y), 12.0, 0.3 * alpha);
+            footing(&mut l, pt(x, y), 12., self.clock.tod, alpha);
             l.sprite(&atlas, &name, x, y - lift, flip, alpha);
             if let (Some(info), Some((x0, y0))) = (atlas.get(&name), atlas.top_left(&name, x, y - lift, flip)) {
                 boxes.push((
@@ -607,37 +776,9 @@ impl FarmScene {
         for (_, ops) in ground {
             list.ops.extend(ops);
         }
-        // Ambient critters & chimney smoke (life.ts / fx.ts)
-        for i in 0..4 {
-            let phase = (t * 0.45 + i as f32 * 0.25).fract();
-            let sx = 148.0 + (phase * 7.0 + (t * 1.6 + i as f32).sin() * 2.5);
-            let sy = 22.0 - phase * 18.0;
-            let sa = (1.0 - phase) * 0.45;
-            list.rect(sx.round(), sy.round(), 3.0, 2.0, rgba(0xfdf6e3, sa));
-        }
-        if (0.26..=0.76).contains(&self.clock.tod) {
-            let b_colors = [0xffe066u32, 0xff99c8, 0x90e0ef, 0xffb703];
-            for (i, c) in b_colors.iter().enumerate() {
-                let bx = 95.0 + (i as f32 * 48.0) + (t * 1.1 + i as f32 * 1.7).sin() * 18.0;
-                let by = 72.0 + (i as f32 * 14.0) + (t * 2.3 + i as f32).cos() * 9.0;
-                let flap = if ((t * 9.0 + i as f32) as i32) % 2 == 0 { 2.0 } else { 1.0 };
-                list.rect(bx.round(), by.round(), 2.0, flap, rgba(*c, 0.92));
-            }
-        }
-        if let Some((bed_idx, fx_color, until)) = self.bed_fx
-            && t < until
-            && bed_idx < BEDS.len()
-        {
-            let at = self.world.plot_at(bed_idx);
-            let prog = 1.0 - (until - t) / 1.2;
-            for p_i in 0..8 {
-                let ang = p_i as f32 * 0.785;
-                let px = at.x + ang.cos() * (4.0 + prog * 14.0);
-                let py = at.y - PLOT_H / 2.0 - prog * 16.0 + ang.sin() * 5.0;
-                list.rect(px.round(), py.round(), 2.0, 2.0, rgba(fx_color, (1.0 - prog).max(0.0)));
-            }
-        }
+        self.life.draw_ground(&mut list, &atlas, t, 1. - super::super::sky::sun_of(self.clock.tod));
         let w = &self.world;
+        let foreground_start = list.ops.len();
         let near = [
             ("fg-branch-left", -20.0, -30.0, 0.0, 0.0),
             ("fg-branch-right", w.level.width + 20.0, -32.0, 1.0, 0.0),
@@ -646,18 +787,29 @@ impl FarmScene {
             ("fg-grass", w.level.width * 0.34, w.level.height + 16.0, 0.5, 1.0),
             ("fg-fern", w.level.width * 0.6, w.level.height + 24.0, 0.5, 1.0),
         ];
+        let lean = self
+            .pointer
+            .map(|p| {
+                pt(
+                    ((p.x / w.level.width * 2. - 1.).clamp(-1., 1.) * 3.).round(),
+                    ((p.y / w.level.height * 2. - 1.).clamp(-1., 1.) * 3.).round(),
+                )
+            })
+            .unwrap_or_default();
         for (name, x, y, ax, ay) in near {
             if let Some(info) = atlas.get(name) {
                 list.ops.push(Op::Sprite {
                     name: name.into(),
-                    x: x - ax * info.w,
-                    y: y - ay * info.h,
+                    x: x - ax * info.w + lean.x,
+                    y: y - ay * info.h + lean.y,
                     flip: false,
                     alpha: 1.0,
                 });
             }
         }
         // Light: the sky darkens the picture, lamps and lanterns shine through.
+        let foreground_end = list.ops.len();
+        let mut lamps = Vec::new();
         let sky = sky_at(self.clock.tod);
         let flat = flat_light(&sky);
         list.light = Some(flat);
@@ -666,6 +818,14 @@ impl FarmScene {
         if night > 0.02 {
             for (i, (at, r)) in w.lights.iter().enumerate() {
                 let flicker = 0.9 + 0.1 * frame_at(t + i as f32 * 0.37, 2, 3.0) as f32;
+                lamps.push(vibevalley_pixel::PointLight {
+                    x: at.x,
+                    y: at.y,
+                    z: 14.,
+                    radius: r * 2.6,
+                    color: rgba(LAMP, 1.)[..3].try_into().unwrap(),
+                    intensity: 1.3 * night * flicker,
+                });
                 list.ops.push(Op::Glow {
                     x: at.x,
                     y: at.y,
@@ -680,6 +840,14 @@ impl FarmScene {
                 let alpha = (1.0 - a.gone_for / FADE_S).max(0.0) * shine;
                 let side = if a.walker.facing == Facing::Left { -5.0 } else { 5.0 };
                 let (x, y) = (a.walker.x.round() + side, a.walker.y.round() - 11.0);
+                lamps.push(vibevalley_pixel::PointLight {
+                    x,
+                    y,
+                    z: 10.,
+                    radius: 34.,
+                    color: rgba(LANTERN, 1.)[..3].try_into().unwrap(),
+                    intensity: 0.6 * alpha,
+                });
                 list.ops.push(Op::Glow {
                     x,
                     y,
@@ -690,6 +858,21 @@ impl FarmScene {
                 list.rect(x - 1.0, y, 2.0, 1.0, rgba(0xfff1c2, alpha));
             }
         }
+        self.life.draw_lights(&mut list, &atlas, t, night, &mut lamps);
+        lamps.sort_by(|a, b| (b.intensity * b.radius).total_cmp(&(a.intensity * a.radius)));
+        list.farm_light = Some(super::super::draw::FarmLight {
+            lighting: vibevalley_pixel::Lighting {
+                ambient: sky.ambient,
+                sun: sky.sun,
+                dir: sky.sun_dir,
+                clouds: sky.clouds,
+                mist: sky.mist,
+                grade: sky.grade,
+                time: t,
+                lamps,
+            },
+            foreground: foreground_start..foreground_end,
+        });
         hud::draw(self, &mut list, scale);
         list
     }
@@ -767,8 +950,46 @@ fn actor_picture(a: &Actor, t: f32, atlas: &Atlas) -> (String, bool, f32) {
     }
 }
 
-fn shadow(l: &mut DrawList, at: Point, w: f32, alpha: f32) {
-    let c = rgba(0x1a1408, alpha);
-    l.rect((at.x - w / 2.0).round(), at.y - 1.0, w.round(), 2.0, c);
-    l.rect((at.x - w / 2.0 + 2.0).round(), at.y - 2.0, (w - 4.0).round(), 1.0, c);
+fn contact_shadow(list: &mut DrawList, at: Point, w: f32, h: f32, alpha: f32, stretch: f32) {
+    let width = w as u32;
+    let height = h as u32;
+    let image = image::RgbaImage::from_fn(width, height, |x, y| {
+        let dx = (x as f32 + 0.5) / w * 2. - 1.;
+        let dy = (y as f32 + 0.5) / h * 2. - 1.;
+        let d = dx.hypot(dy);
+        image::Rgba([
+            0x1f,
+            0x16,
+            0x0c,
+            if d < 0.6 {
+                255
+            } else if d < 1. {
+                140
+            } else {
+                0
+            },
+        ])
+    });
+    list.ops.push(Op::Image {
+        key: format!("footing:{width}:{height}"),
+        image: Arc::new(image),
+        x: at.x - w * stretch / 2.,
+        y: at.y - h / 2.,
+        w: w * stretch,
+        h,
+        alpha,
+    });
+}
+fn footing(list: &mut DrawList, at: Point, w: f32, tod: f32, fade: f32) {
+    let sky = sky_at(tod);
+    let reach = (-sky.sun_dir[0] / sky.sun_dir[2].max(0.35) * 2.5).clamp(-6., 6.);
+    contact_shadow(
+        list,
+        at + pt((reach / 2.).round(), 0.),
+        w + 4.,
+        4.,
+        fade * 0.3 * (0.35 + 0.65 * (1. - sky.night)),
+        1. + reach.abs() / 8.,
+    );
+    contact_shadow(list, at, w, 4., fade * 0.5, 1.);
 }

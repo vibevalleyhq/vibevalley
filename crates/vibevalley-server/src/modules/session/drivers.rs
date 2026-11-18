@@ -37,6 +37,15 @@ pub struct Drive {
     pub disallowed_tools: Vec<String>,
 }
 
+impl Drive {
+    pub(super) fn work_instructions(&self, rules: String, prompt: String) -> (Option<String>, String) {
+        match self.runtime.id() {
+            "kimi" | "codebuddy" => (None, format!("{rules}\n\n---\n\n{prompt}")),
+            _ => (Some(rules), prompt),
+        }
+    }
+}
+
 pub trait Drivers: Send + Sync {
     /// Refuses an agent named on an issue that cannot be named.
     fn check(&self, agent: &str) -> Result<()>;

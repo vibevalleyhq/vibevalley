@@ -7,4 +7,7 @@ pub mod islands;
 pub mod scene;
 pub mod world;
 
-pub mod snake;
+pub mod phone;
+
+mod dog;
+mod life;

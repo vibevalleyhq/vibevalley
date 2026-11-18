@@ -6,6 +6,7 @@ license.workspace = true
 description = "The in-process server's contract: the Server trait the bridge and the HTTP adapter serve views through"
 
 [dependencies]
+vibevalley-chord = { version = "0.1.0", path = "../vibevalley-chord" }
 vibevalley-protocol = { version = "0.1.0", path = "../vibevalley-protocol" }
 flume = "0.12.0"
 serde_json = "1.0.154"

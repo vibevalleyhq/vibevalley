@@ -2,10 +2,11 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（17 篇）
+## proposed（19 篇）
 
 ### feature
 
+- 2026-11-19 [把农场帮工做成可以转身和拿工具的像素 3D 角色](.agents/notes/proposed/feature/2026-11-19-voxel-farmhands.md)
 - 2026-11-11 [用户和帮工的名字由人定](.agents/notes/proposed/feature/2026-11-11-names-people-set.md)
 - 2026-11-11 [工单详情的经过合成一条活动流](.agents/notes/proposed/feature/2026-11-11-issue-activity-stream.md)
 - 2026-11-10 [网页 Artifact 的 motion 动画时间轴与导出视频](.agents/notes/proposed/feature/2026-11-10-html-artifact-kinds.md)
@@ -19,6 +20,7 @@
 
 ### architecture
 
+- 2026-11-18 [在原生版复刻 Chord、持久执行、oar 和 Web 农场](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)
 - 2026-11-14 [原生的 VibeValley：Rust 服务端为准，激进重构，删掉 Electron、TS 服务端、页面和手机壳](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)
 - 2026-11-06 [Space 核心业务概念模型（Space、Repo、Worktree、Issue、Pkm 与执行体）](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md)

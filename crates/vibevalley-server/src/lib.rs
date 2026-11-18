@@ -25,6 +25,7 @@ use vibevalley_protocol::{
 pub use vibevalley_server_api::{Server, refusal};
 
 pub mod base;
+mod chord_space;
 pub use vibevalley_home as home;
 pub mod modules;
 pub mod offline;
@@ -91,6 +92,8 @@ struct Streams {
 /// (`Arc<Hub>`).
 pub struct Hub {
     core: Mutex<Core>,
+    space: chord_space::Space,
+    execution: std::sync::OnceLock<std::sync::Weak<modules::orchestrator::Orchestrator>>,
     handlers: RwLock<HashMap<&'static str, Handler>>,
     openers: RwLock<HashMap<&'static str, Opener>>,
     watchers: RwLock<Vec<Watcher>>,
@@ -127,8 +130,12 @@ impl Hub {
     /// thread ends when the last `Arc<Hub>` is dropped.
     pub fn new(state: SpaceState) -> Arc<Hub> {
         let (kicks, kicked) = flume::unbounded();
+        let core = Core::new(state);
+        let space = chord_space::Space::new(&core.frame(vec![]));
         let hub = Arc::new(Hub {
-            core: Mutex::new(Core::new(state)),
+            core: Mutex::new(core),
+            space,
+            execution: std::sync::OnceLock::new(),
             handlers: RwLock::default(),
             openers: RwLock::default(),
             watchers: RwLock::default(),
@@ -173,7 +180,14 @@ impl Hub {
     /// transition, the frame thread the effects. Owners store first, then
     /// apply.
     pub fn apply(&self, facts: Vec<Fact>) -> Applied {
-        let applied = lock(&self.core).apply(facts);
+        let applied = {
+            let mut core = lock(&self.core);
+            let changes = core.apply(facts);
+            if !changes.transitions.is_empty() {
+                self.space.update(&core.frame(vec![]), &changes.transitions);
+            }
+            changes
+        };
         if applied.transitions.is_empty() {
             return applied;
         }
@@ -379,6 +393,22 @@ impl modules::ledger::Facts for std::sync::Weak<Hub> {
 }
 
 impl Server for Hub {
+    fn resolve_approval(&self, input: Value) -> Envelope {
+        self.execution.get().and_then(std::sync::Weak::upgrade).map_or_else(
+            || vibevalley_server_api::refusal(BizCode::Refused, "durable execution unavailable"),
+            |o| o.execution.resolve_approval(input),
+        )
+    }
+    fn raise_budget(&self, input: Value) -> Envelope {
+        self.execution.get().and_then(std::sync::Weak::upgrade).map_or_else(
+            || vibevalley_server_api::refusal(BizCode::Refused, "durable execution unavailable"),
+            |o| o.execution.raise_budget(input),
+        )
+    }
+    fn space_document(&self) -> Option<vibevalley_server_api::Document> {
+        Some(self.space.document())
+    }
+
     fn speech_streams(&self) -> Option<vibevalley_server_api::media::SharedSpeechStreams> {
         self.speech.read().unwrap_or_else(|e| e.into_inner()).clone()
     }

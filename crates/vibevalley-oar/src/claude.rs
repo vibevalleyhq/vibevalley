@@ -116,10 +116,14 @@ pub(crate) fn launch_args(session_id: &str, opts: &SessionOptions) -> Vec<String
         args.push("--effort".into());
         args.push(effort.clone());
     }
-    if !opts.mcp_servers.is_empty() {
-        // Claude Code takes the config as a JSON string as well as a file.
-        args.push("--mcp-config".into());
-        args.push(crate::mcp_config(&opts.mcp_servers).to_string());
+    if !opts.allowed_tools.is_empty() {
+        args.extend(["--allowed-tools".into(), opts.allowed_tools.join(",")]);
+    }
+    for dir in &opts.additional_directories {
+        args.extend(["--add-dir".into(), dir.to_string_lossy().into_owned()]);
+    }
+    if let Some(schema) = &opts.output_schema {
+        args.extend(["--json-schema".into(), schema.to_string()]);
     }
     if !opts.disallowed_tools.is_empty() {
         args.push("--disallowed-tools".into());
@@ -458,6 +462,7 @@ struct Shared {
     abort_killed: AtomicBool,
     turns_finished: AtomicU64,
     cwd: PathBuf,
+    secrets: Mutex<Option<tempfile::TempDir>>,
 }
 
 impl Shared {
@@ -483,6 +488,20 @@ impl Shared {
 
     fn on_line(&self, line: &str) {
         let Ok(message) = serde_json::from_str::<Value>(line) else { return };
+        if self.core.runtime_id() != ID
+            && message.get("parent_tool_use_id").is_none_or(Value::is_null)
+            && let Some(id) = str_of(&message, "session_id").filter(|id| !id.is_empty())
+            && self.core.identify(id)
+        {
+            self.core.emit_root(EventKind::SessionStarted {
+                session_id: id.into(),
+                model: str_of(&message, "model").map(String::from),
+            });
+        }
+        let path = lock(&self.projector).agent_path(&message);
+        let ty = str_of(&message, "type").unwrap_or("unknown");
+        let kind = str_of(&message, "subtype").map_or_else(|| ty.to_owned(), |s| format!("{ty}/{s}"));
+        let _frame = self.core.record_raw(&kind, path, line, &message);
         let outs = lock(&self.projector).feed(&message);
         for out in outs {
             match out {
@@ -562,9 +581,11 @@ impl Shared {
     }
 
     fn on_exit(&self, code: Option<i32>, stderr: String) {
+        lock(&self.secrets).take();
+        let runtime = self.core.runtime_id();
         let mut message = match code {
-            Some(code) => format!("claude exited with status {code}"),
-            None => "claude exited".to_string(),
+            Some(code) => format!("{runtime} exited with status {code}"),
+            None => format!("{runtime} exited"),
         };
         if !stderr.trim().is_empty() {
             message.push_str(": ");
@@ -636,11 +657,16 @@ struct ClaudeDriver {
 
 impl ClaudeDriver {
     fn send_user(&self, content: &[ContentBlock]) -> Result<()> {
-        let blocks = user_content(&self.shared.cwd, content)?;
+        let blocks = if content.iter().all(|b| matches!(b, ContentBlock::Text(_))) {
+            json!(crate::core::render_text(content))
+        } else {
+            json!(user_content(&self.shared.cwd, content)?)
+        };
         self.shared.child()?.write_json(&json!({
             "type": "user",
             "message": { "role": "user", "content": blocks },
             "parent_tool_use_id": null,
+            "uuid": self.shared.core.span_id(),
             "session_id": self.shared.core.session_id(),
         }))
     }
@@ -712,10 +738,30 @@ impl Driver for ClaudeDriver {
         self.shared.answer(request_id, response)
     }
 
+    fn compact(&self) -> Result<()> {
+        if self.shared.core.runtime_id() == "qwen" {
+            return Err(AgentError::Unsupported {
+                option: "compact".into(),
+                reason: "Qwen has no manual compact operation".into(),
+            });
+        }
+        self.shared
+            .child()?
+            .write_json(&json!({"type":"user","session_id":self.shared.core.session_id(),"message":{"role":"user","content":"/compact"}}))
+    }
+    fn stop_task(&self, id: &str) -> Result<()> {
+        self.shared
+            .control_request(json!({"subtype":"stop_task","task_id":id}))?
+            .recv_timeout(OPEN_TIMEOUT)
+            .map_err(|_| AgentError::Protocol("timed out stopping task".into()))?
+            .map(|_| ())
+            .map_err(|e| rejected("stop_task_failed", e))
+    }
     fn dispose(&self) {
         if let Some(child) = self.shared.child.get() {
             child.kill();
         }
+        lock(&self.shared.secrets).take();
     }
 }
 
@@ -724,8 +770,40 @@ struct Started {
     init: Value,
 }
 
+pub(super) struct StreamLaunch {
+    pub runtime: &'static str,
+    pub args: Vec<String>,
+    pub initialize: Option<Value>,
+    pub secrets: Option<tempfile::TempDir>,
+}
+
+pub(crate) fn claude_launch(session_id: &str, opts: &SessionOptions) -> Result<StreamLaunch> {
+    let mut args = launch_args(session_id, opts);
+    let secrets = if opts.mcp_servers.is_empty() {
+        None
+    } else {
+        let dir = crate::sdk::private_dir("oar-claude-")?;
+        args.extend([
+            "--mcp-config".into(),
+            crate::sdk::secret(dir.path(), "mcp.json", crate::mcp_config(&opts.mcp_servers).to_string().as_bytes())?,
+        ]);
+        Some(dir)
+    };
+    Ok(StreamLaunch {
+        runtime: ID,
+        args,
+        initialize: Some(json!({"subtype":"initialize","hooks":null})),
+        secrets,
+    })
+}
+
 fn start(binary: &Path, session_id: &str, opts: &SessionOptions, recorder: Option<Recorder>) -> Result<Started> {
-    let core = SessionCore::new(ID, session_id, recorder);
+    let launch = claude_launch(session_id, opts)?;
+    start_stream(binary, session_id, opts, recorder, launch)
+}
+
+fn start_stream(binary: &Path, session_id: &str, opts: &SessionOptions, recorder: Option<Recorder>, launch: StreamLaunch) -> Result<Started> {
+    let core = SessionCore::new(launch.runtime, session_id, recorder);
     let shared = Arc::new(Shared {
         core,
         child: OnceLock::new(),
@@ -739,6 +817,7 @@ fn start(binary: &Path, session_id: &str, opts: &SessionOptions, recorder: Optio
         abort_killed: AtomicBool::new(false),
         turns_finished: AtomicU64::new(0),
         cwd: opts.cwd.clone(),
+        secrets: Mutex::new(launch.secrets),
     });
     let on_line = {
         let shared = shared.clone();
@@ -750,21 +829,25 @@ fn start(binary: &Path, session_id: &str, opts: &SessionOptions, recorder: Optio
     };
     let child = LineChild::spawn(
         Spawn {
-            label: ID,
+            label: launch.runtime,
             binary,
-            args: launch_args(session_id, opts),
+            args: launch.args,
             cwd: &opts.cwd,
             env: &opts.env,
-            env_remove: PARENT_SESSION_MARKERS,
+            options: Some(opts),
+            env_remove: if launch.runtime == ID { PARENT_SESSION_MARKERS } else { &[] },
         },
         on_line,
         on_exit,
     )?;
     let _ = shared.child.set(child.clone());
-    let ready = shared.control_request(json!({ "subtype": "initialize", "hooks": null }));
+    let Some(initialize) = launch.initialize else {
+        return Ok(Started { shared, init: Value::Null });
+    };
+    let ready = shared.control_request(initialize);
     let init = match ready.and_then(|rx| {
         rx.recv_timeout(OPEN_TIMEOUT)
-            .map_err(|_| AgentError::Protocol("claude did not answer `initialize` in time".into()))
+            .map_err(|_| AgentError::Protocol(format!("{} did not answer `initialize` in time", launch.runtime)))
     }) {
         Ok(Ok(init)) => init,
         Ok(Err(message)) => {
@@ -776,6 +859,16 @@ fn start(binary: &Path, session_id: &str, opts: &SessionOptions, recorder: Optio
             return Err(error);
         }
     };
+    if opts.resume.is_some() && launch.runtime == ID {
+        let baseline = shared
+            .control_request(json!({"subtype":"get_usage"}))
+            .ok()
+            .and_then(|rx| rx.recv_timeout(opts.baseline_timeout.unwrap_or(Duration::from_secs(5))).ok())
+            .and_then(|r| r.ok());
+        shared
+            .core
+            .resume_meter(baseline.as_ref().unwrap_or(&Value::Null), "missing_resume_usage_fields");
+    }
     Ok(Started { shared, init })
 }
 
@@ -869,6 +962,7 @@ impl Runtime for ClaudeRuntime {
     /// refused here beyond an unusable `cwd`. A `resume` id claude does not
     /// know fails the open (`Rejected("session_not_found: ...")`).
     fn open(&self, opts: SessionOptions) -> Result<Arc<dyn Session>> {
+        opts.validate_for(ID)?;
         check_cwd(&opts.cwd)?;
         if let Some(resume) = &opts.resume
             && uuid::Uuid::parse_str(resume).is_err()
@@ -878,24 +972,35 @@ impl Runtime for ClaudeRuntime {
                 reason: format!("claude session ids are UUIDs; `{resume}` is not one"),
             });
         }
-        let binary = require_binary(ID)?;
+        let binary = opts.binary(ID)?;
         let file = record::open_file(opts.record_to.as_deref())?;
         let session_id = opts.resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         let recorder = Recorder::start(file, ID, &session_id, &opts.cwd, opts.model.as_deref());
         let started = start(&binary, &session_id, &opts, recorder)?;
-        let shared = started.shared;
-        shared.core.emit_root(EventKind::SessionStarted {
-            session_id,
-            model: resolved_model(&started.init, opts.model.as_deref()),
-        });
-        shared.opened.store(true, Ordering::SeqCst);
-        let exited = lock(&shared.exit).clone();
-        if let Some(message) = exited {
-            shared.finish(message);
-        }
-        let core = shared.core.clone();
-        Ok(CoreSession::new(core, ClaudeDriver { shared }, self.capabilities()))
+        Ok(running(started, &opts, self.capabilities()))
     }
+}
+
+pub(super) fn open_sdk(binary: &Path, opts: &SessionOptions, caps: Capabilities, launch: StreamLaunch) -> Result<Arc<dyn Session>> {
+    let id = opts.resume.clone().unwrap_or_else(|| format!("{}-pending", launch.runtime));
+    let file = record::open_file(opts.record_to.as_deref())?;
+    let recorder = Recorder::start(file, launch.runtime, &id, &opts.cwd, opts.model.as_deref());
+    let started = start_stream(binary, &id, opts, recorder, launch)?;
+    Ok(running(started, opts, caps))
+}
+
+fn running(started: Started, opts: &SessionOptions, caps: Capabilities) -> Arc<dyn Session> {
+    let shared = started.shared;
+    shared.core.emit_root(EventKind::SessionStarted {
+        session_id: shared.core.session_id(),
+        model: resolved_model(&started.init, opts.model.as_deref()),
+    });
+    shared.opened.store(true, Ordering::SeqCst);
+    if let Some(message) = lock(&shared.exit).clone() {
+        shared.finish(message);
+    }
+    let core = shared.core.clone();
+    CoreSession::new(core, ClaudeDriver { shared }, caps)
 }
 
 /// `get_usage`'s answer as oar projects it (`claudeAccountUsage`).
@@ -979,6 +1084,7 @@ pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
             .to_vec(),
             cwd: &std::env::temp_dir(),
             env: &[],
+            options: None,
             env_remove: PARENT_SESSION_MARKERS,
         },
         move |line| {

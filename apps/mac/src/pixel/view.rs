@@ -6,8 +6,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use gpui_kit::{
-    App, Bounds, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent,
-    MouseMoveEvent, ParentElement as _, Pixels, Point, Render, Styled as _, Window, canvas, div,
+    App, AppContext as _, Bounds, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent,
+    MouseMoveEvent, ParentElement as _, Pixels, Point, Render, Styled as _, Subscription, Window, canvas, div, px,
 };
 use serde_json::{Value, json};
 
@@ -23,13 +23,15 @@ use super::level::{Point as ArtPoint, pt};
 use super::opening::OpeningScene;
 use super::sky::Framing;
 use super::tree::TreeScene;
-use crate::hosted::BridgeHub;
+use crate::hosted::{BridgeHub, HostedEvent, HostedView};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ActWords, IssueAction};
 
 /// What a scene asks the shell for.
 #[derive(Debug, Clone)]
 pub enum PixelEvent {
+    Sound(&'static str),
+    HostCall { op: String, payload: Value, reply: crate::hosted::Replier },
     /// A VibeValley page (`/issues/<id>`, `/agents`…), hosted.
     Route(String),
     /// VibeValley's addition: a terminal in a session's worktree or a repo.
@@ -77,6 +79,9 @@ pub struct PixelView {
     pub taps: Vec<String>,
     pub unpainted_draws: u64,
     /// A phase set before the scene loaded.
+    phone: Option<(Entity<HostedView>, Subscription)>,
+    sheet_request: Option<Value>,
+    sheet: Option<(Entity<HostedView>, Subscription)>,
     pending_phase: Option<(super::opening::Phase, f32)>,
     command_pending: bool,
 }
@@ -118,6 +123,7 @@ impl PixelView {
                 }
                 if matches!(v.scene, Scene::Farm(_)) {
                     v.fetch_agents(cx);
+                    v.fetch_runtimes(cx);
                 }
                 if matches!(v.scene, Scene::Map(_)) {
                     v.fetch_repos(cx);
@@ -143,6 +149,9 @@ impl PixelView {
             taps: Vec::new(),
             unpainted_draws: 0,
             pending_phase: None,
+            phone: None,
+            sheet_request: None,
+            sheet: None,
             command_pending: false,
         }
     }
@@ -160,7 +169,10 @@ impl PixelView {
             o.progress = 40.0;
         }
         match &mut self.scene {
-            Scene::Farm(f) => f.frame = Frame::parse(&value),
+            Scene::Farm(f) => {
+                f.apply_frame(Frame::parse(&value));
+                f.phone.feed(&f.frame.inbox, Instant::now());
+            },
             Scene::Map(m) => m.frame = Frame::parse(&value),
             _ => {}
         }
@@ -199,12 +211,13 @@ impl PixelView {
                         None => match serde_json::from_value::<Vec<vibevalley_protocol::Agent>>(envelope.data.unwrap_or(Value::Null)) {
                             Ok(agents) => {
                                 f.agent_looks.clear();
-                                for agent in agents {
+                                for agent in &agents {
                                     if let Some(species) = agent.look.species {
                                         let outfit = agent.look.outfit.map(|o| o.as_str()).unwrap_or("farmer");
-                                        f.agent_looks.insert(agent.id, (species.as_str().into(), outfit.into()));
+                                        f.agent_looks.insert(agent.id.clone(), (species.as_str().into(), outfit.into()));
                                     }
                                 }
+                                f.profiles = agents;
                             }
                             Err(e) => f.show_toast(e.to_string()),
                         },
@@ -214,6 +227,23 @@ impl PixelView {
             });
         })
         .detach();
+    }
+
+    fn fetch_runtimes(&mut self, cx: &mut Context<Self>) {
+        let server = cx.global::<BridgeHub>().0.server().clone();
+        let task = cx.background_executor().spawn(async move { server.call("runtime.list", json!({})) });
+        cx.spawn(async move |this, cx| {
+            let reply = task.await;
+            let _ = this.update(cx, |v, cx| {
+                if let Scene::Farm(f) = &mut v.scene
+                    && let Some(data) = reply.data
+                    && let Ok(runtimes) = serde_json::from_value::<Vec<vibevalley_protocol::RuntimeInfo>>(data)
+                {
+                    f.runtimes = runtimes.into_iter().filter(|info| info.settings.enabled && matches!(info.installation, vibevalley_protocol::Installation::Available(_))).collect();
+                    cx.notify();
+                }
+            });
+        }).detach();
     }
 
     /// `memory.list` from the server so the memory tree reflects real stored memories when present.
@@ -248,6 +278,57 @@ impl PixelView {
         .detach();
     }
 
+    fn overlay(&mut self, name: &'static str, request: Value, window: &mut Window, cx: &mut Context<Self>) -> (Entity<HostedView>, Subscription) {
+        let params = request.as_object().cloned().unwrap_or_default();
+        let view = cx.new(|cx| HostedView::new(name, params, false, window, cx));
+        let sub = cx.subscribe_in(&view, window, move |this, _, event: &HostedEvent, window, cx| {
+            match event {
+                HostedEvent::Action(crate::hosted::Action::DismissFarmForm) => {
+                    if name == "farm-phone" {
+                        if let Scene::Farm(f)=&mut this.scene { f.phone.close(); }
+                    } else { this.sheet = None; }
+                    window.focus(&this.focus, cx);
+                    cx.notify();
+                }
+                HostedEvent::Action(crate::hosted::Action::GlobalRoute {path}) => {
+                    this.sheet = None;
+                    cx.emit(PixelEvent::Route(path.clone()));
+                }
+                HostedEvent::Action(crate::hosted::Action::FarmHandset {unfolded,large,game,active_call}) if name == "farm-phone" => {
+                    if let Scene::Farm(f)=&mut this.scene {
+                        f.phone.unfolded=*unfolded; f.phone.large=*large; f.phone.game=*game; f.phone.active_call=*active_call;
+                    }
+                    cx.notify();
+                }
+                HostedEvent::Action(crate::hosted::Action::SilenceFarmPhone) => {
+                    if let Scene::Farm(f)=&mut this.scene {f.phone.silence();}
+                    cx.notify();
+                }
+                HostedEvent::Action(crate::hosted::Action::FarmCall {id,answered}) => {
+                    if let Scene::Farm(f)=&mut this.scene && let Some(call)=f.frame.inbox.iter().find(|c|&c.id==id).cloned() {
+                        f.phone.settle(call,*answered);
+                    }
+                    cx.notify();
+                }
+                HostedEvent::HostCall {op,payload,reply} => cx.emit(PixelEvent::HostCall {op:op.clone(),payload:payload.clone(),reply:reply.clone()}),
+                _ => {}
+            }
+        });
+        (view, sub)
+    }
+
+    fn mount_sheet(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(request) = self.sheet_request.take() {
+            self.sheet = Some(self.overlay("farm-form", request, window, cx));
+        }
+        let Scene::Farm(f) = &self.scene else { return };
+        let calls = json!({"open":f.phone.open,"narrow":f.view_size.0-16.0<640.0, "ringing":f.phone.ringing, "missed":f.phone.missed(&f.frame.inbox).collect::<Vec<_>>(),"log":f.phone.log});
+        if self.phone.is_none() && f.phone.open {
+            self.phone = Some(self.overlay("farm-phone", json!({"calls":calls,"unfolded":f.phone.unfolded}),window,cx));
+        }
+        if let Some((view,_))=&self.phone {view.update(cx,|v,cx|v.push("calls",calls,cx));}
+    }
+
     fn hud_point(&self, at: Point<Pixels>) -> Option<(f32, f32)> {
         let (bounds, _) = self.placed.get()?;
         Some((f32::from(at.x - bounds.origin.x), f32::from(at.y - bounds.origin.y)))
@@ -256,13 +337,15 @@ impl PixelView {
     fn tap_farm_hud(&mut self, x: f32, y: f32, cx: &mut Context<Self>) -> bool {
         let Scene::Farm(f) = &mut self.scene else { return false };
         let Some(action) = hud::hit(f, x, y) else { return false };
+        match action {
+            Action::Tool(tool) if f.tool != tool => cx.emit(PixelEvent::Sound("pick")),
+            Action::Panel(_) | Action::Phone => cx.emit(PixelEvent::Sound("open")),
+            Action::Close => cx.emit(PixelEvent::Sound("close")),
+            _ => {}
+        }
         self.taps.push(format!("{action:?}"));
         match action {
             Action::Route(route) => cx.emit(PixelEvent::Route(route)),
-            Action::Map => cx.emit(PixelEvent::Pixel {
-                scene: "map".into(),
-                props: json!({}),
-            }),
             Action::Tree => cx.emit(PixelEvent::Pixel {
                 scene: "tree".into(),
                 props: json!({}),
@@ -270,12 +353,16 @@ impl PixelView {
             Action::Panel(panel) => {
                 f.panel = Some(panel);
                 f.panel_page = 0;
-                self.fetch_agents(cx);
+                match panel {
+                    Panel::Achievements => self.fetch_achievements(cx),
+                    Panel::Quota => self.fetch_runtimes(cx),
+                    Panel::Orchestrator | Panel::Friends => self.fetch_agents(cx),
+                    _ => {}
+                }
             }
             Action::Close => f.panel = None,
             Action::Page(by) => hud::page(f, by),
-            Action::Phone => f.phone_open = !f.phone_open,
-            Action::RestartSnake => f.snake = super::farm::snake::SnakeGame::new(),
+            Action::Phone => if f.phone.open {f.phone.close()} else {f.phone.open=true;},
             Action::Tool(tool) => f.tool = tool,
             Action::Clock(tod) => f.clock.set_time_of_day(tod),
             Action::Block => {}
@@ -344,20 +431,30 @@ impl PixelView {
                 if let Some(cwd) = cwd {
                     cx.emit(PixelEvent::Terminal {
                         cwd,
-                        title: issue.unwrap_or(id),
+                        title: issue.as_ref().and_then(|id| f.frame.state.issues.iter().find(|i| &i.id==id)).and_then(|i|i.number).map(|n|format!("#{n}")).or(issue).unwrap_or(id),
                     });
                 }
             }
             FarmTap::Plot {
                 bed, session: Some(id), issue, ..
             } => {
-                let route = issue.as_ref().map(|i| format!("/issues/{i}")).unwrap_or_else(|| format!("/sessions/{id}"));
                 let action = issue
                     .as_ref()
                     .and_then(|id| f.frame.state.issues.iter().find(|i| &i.id == id))
                     .and_then(|i| i.stage.as_ref())
                     .and_then(|stage| f.tool.action(stage))
                     .cloned();
+                let requested = match (f.tool, &action) {
+                    (FarmTool::Hand, _) => Some("inspect"),
+                    (FarmTool::Harvest, Some(_)) => Some("harvest"),
+                    (FarmTool::Water, Some(_)) => Some("water"),
+                    _ => None,
+                };
+                if let Some(kind) = requested {
+                    self.sheet_request = Some(json!({"kind": kind, "repo": f.repo, "station":bed, "session":id, "issue":issue}));
+                    cx.notify();
+                    return;
+                }
                 match (action, issue) {
                     (
                         Some(IssueAction::Move {
@@ -370,15 +467,15 @@ impl PixelView {
                         self.command("issue.status.update", json!({ "id": issue, "status": status }), bed, cx);
                     }
                     (Some(IssueAction::Stop { .. }), _) => self.command("session.stop", json!({ "id": id }), bed, cx),
-                    _ => cx.emit(PixelEvent::Route(route)),
+                    _ => f.show_toast(f.tool.label()),
                 }
             }
             FarmTap::Plot { bed, session: None, .. } if bed < 6 => {
-                let route = match f.repo.as_deref().filter(|r| !r.is_empty()) {
-                    Some(repo) => format!("/issues/new?repo={repo}"),
-                    None => "/issues/new".to_string(),
-                };
-                cx.emit(PixelEvent::Route(route));
+                if f.tool == FarmTool::Hand {
+                    self.sheet_request = Some(json!({"kind":"sow","station":bed,"repo":f.repo}));
+                } else {
+                    f.show_toast(f.tool.label());
+                }
             }
             FarmTap::Spot { opens, .. } => match opens {
                 "panel:graphs" | "panel:achievements" => {
@@ -399,8 +496,9 @@ impl PixelView {
                     f.panel_page = 0;
                 }
                 "chat" => {
-                    f.panel = Some(Panel::Chat);
-                    f.panel_page = 0;
+                    f.phone.open = true;
+                    f.phone.unfolded = true;
+                    if let Some((phone,_))=&self.phone {phone.update(cx,|v,cx|v.push("unfold",json!(self.taps.len()),cx));}
                 }
                 other => cx.emit(PixelEvent::Route(other.to_string())),
             },
@@ -591,7 +689,9 @@ fn load(kind: &str) -> Scene {
 
 impl Render for PixelView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.mount_sheet(window, cx);
         let list = self.draw();
+        if let Scene::Farm(f) = &mut self.scene { for cue in f.drain_sounds() { cx.emit(PixelEvent::Sound(cue)); } }
         self.last_list = list.clone();
         let message = match &self.scene {
             Scene::Loading => Some(t("web.farm.native.loading", &[])),
@@ -604,7 +704,7 @@ impl Render for PixelView {
         let atlas = self.scene.atlas();
         let placed = self.placed.clone();
         let entity = cx.entity();
-        div()
+        let canvas_layer = div()
             .id("pixel")
             .track_focus(&self.focus)
             .size_full()
@@ -620,40 +720,29 @@ impl Render for PixelView {
                         }
                     }
                     "p" => {
-                        f.phone_open = !f.phone_open;
-                        cx.notify();
-                    }
-                    "up" | "w" if f.phone_open => {
-                        f.snake.steer(0, -1);
-                        cx.notify();
-                    }
-                    "down" | "s" if f.phone_open => {
-                        f.snake.steer(0, 1);
-                        cx.notify();
-                    }
-                    "left" | "a" if f.phone_open => {
-                        f.snake.steer(-1, 0);
-                        cx.notify();
-                    }
-                    "right" | "d" if f.phone_open => {
-                        f.snake.steer(1, 0);
-                        cx.notify();
-                    }
-                    "space" | "enter" if f.phone_open && f.snake.over => {
-                        f.snake = super::farm::snake::SnakeGame::new();
+                        if f.phone.open {f.phone.close()} else {f.phone.open=true;}
                         cx.notify();
                     }
                     "escape" => {
-                        if f.phone_open {
-                            f.phone_open = false;
+                        if f.phone.open {
+                            f.phone.close();
                         } else if f.panel.is_some() {
                             f.panel = None;
+                        } else if f.tool == FarmTool::Hand {
+                            f.panel = Some(Panel::Menu);
+                            f.panel_page = 0;
                         } else {
                             f.tool = FarmTool::Hand;
                         }
                         cx.notify();
                     }
                     _ => {}
+                }
+            }))
+            .on_modifiers_changed(cx.listener(|v, event: &gpui_kit::ModifiersChangedEvent, _, cx| {
+                if let Scene::Farm(f) = &mut v.scene && f.reveal_names != event.modifiers.alt {
+                    f.reveal_names = event.modifiers.alt;
+                    cx.notify();
                 }
             }))
             .on_mouse_move(cx.listener(|v, e: &MouseMoveEvent, _, cx| {
@@ -703,6 +792,17 @@ impl Render for PixelView {
                     },
                 )
                 .size_full()
-            }))
+            }));
+        let sheet = self.sheet.as_ref().map(|(view,_)| view.clone());
+        let phone = self.phone.as_ref().and_then(|(view,_)| {
+            let Scene::Farm(f) = &self.scene else {return None};
+            if !f.phone.open {return None;}
+            let b=hud::Layout::new(f).phone;
+            Some(div().absolute().left(px(b.x)).top(px(b.y)).w(px(b.w)).h(px(b.h)).child(view.clone()))
+        });
+        div().relative().size_full().child(canvas_layer).children(phone).children(sheet.map(|view| {
+            div().absolute().inset_0().flex().items_center().justify_center().bg(gpui_kit::rgba(0x2f1f134d))
+                .child(div().w(px(540.0)).max_w_full().h(px(430.0)).max_h_full().child(view))
+        }))
     }
 }

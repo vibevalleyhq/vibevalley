@@ -1,3 +1,5 @@
+mod chrome;
+
 use vibevalley_i18n::t;
 
 use super::scene::{FarmScene, FarmTool};
@@ -5,12 +7,16 @@ use super::world::{BEDS, PLOT_H, VillageHit, YARD_PLACES};
 use crate::pixel::draw::{Color, DrawList, HudOp, rgba};
 use crate::pixel::sky::{FARM_CUT, clock_text, frame_whole};
 
-const INK: Color = [0.23, 0.16, 0.10, 1.0];
+const INK: Color = rgba(0x3a2a18, 1.0);
 const PAPER: Color = [0.99, 0.96, 0.88, 0.98];
 const SELECTED: Color = [0.72, 0.85, 0.55, 1.0];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Panel {
+    Menu,
+    Friends,
+    Orchestrator,
+    Quota,
     Ledger,
     Achievements,
     Log,
@@ -23,6 +29,10 @@ impl Panel {
     pub fn title(self) -> String {
         t(
             match self {
+                Self::Menu => "web.farm.panel.menu",
+                Self::Friends => "web.farm.friends.helpers",
+                Self::Orchestrator => "web.farm.panel.orchestrator",
+                Self::Quota => "web.farm.quota.left",
                 Self::Ledger => "web.farm.native.ledger",
                 Self::Achievements => "web.farm.native.achievements",
                 Self::Log => "web.farm.native.log",
@@ -38,13 +48,11 @@ impl Panel {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     Route(String),
-    Map,
     Tree,
     Panel(Panel),
     Close,
     Page(i32),
     Phone,
-    RestartSnake,
     Tool(FarmTool),
     Clock(f32),
     Block,
@@ -67,23 +75,17 @@ fn rect(x: f32, y: f32, w: f32, h: f32) -> Rect {
 }
 
 pub struct Layout {
-    pub nav: Vec<Rect>,
+    pub nav: Vec<chrome::Control>,
     pub tools: Vec<Rect>,
     pub panel: Rect,
     pub phone: Rect,
     pub rows: usize,
 }
 impl Layout {
-    pub fn new(view: (f32, f32)) -> Self {
-        let (w, h) = view;
-        let columns = if w >= 650.0 { 6 } else { 3 };
-        let nw = ((w - 24.0 - (columns - 1) as f32 * 4.0) / columns as f32).clamp(1.0, 100.0);
-        let nav = (0..6)
-            .map(|i| rect(12.0 + (i % columns) as f32 * (nw + 4.0), 74.0 + (i / columns) as f32 * 34.0, nw, 30.0))
-            .collect();
-        let sw = ((w - 24.0 - 20.0) / 6.0).clamp(1.0, 48.0);
-        let start = (w - sw * 6.0 - 20.0) / 2.0;
-        let tools = (0..6).map(|i| rect(start + i as f32 * (sw + 4.0), (h - 50.0).max(150.0), sw, 38.0)).collect();
+    pub fn new(f: &FarmScene) -> Self {
+        let (w, h) = f.view_size;
+        let frame = frame_whole(f.view_size, (f.world.level.width, f.world.level.height), FARM_CUT);
+        let (nav, tools, phone) = chrome::layout(f, frame);
         let pw = (w - 24.0).clamp(1.0, 430.0);
         let ph = (h - 40.0).clamp(1.0, 360.0);
         let panel = rect((w - pw) / 2.0, (h - ph) / 2.0, pw, ph);
@@ -91,25 +93,14 @@ impl Layout {
             nav,
             tools,
             panel,
-            phone: rect(12.0, (h - 236.0).max(12.0), 216.0_f32.min(w - 24.0), 224.0),
+            phone,
             rows: ((ph - 90.0) / 42.0).max(1.0) as usize,
         }
     }
 }
 
-fn nav() -> [(Action, &'static str, &'static str); 6] {
-    [
-        (Action::Route("/issues".into()), "icon-tasks", "web.farm.native.workbench"),
-        (Action::Map, "icon-map", "web.farm.native.map"),
-        (Action::Tree, "icon-tree", "web.farm.native.tree"),
-        (Action::Panel(Panel::Chat), "icon-board", "web.farm.native.chat"),
-        (Action::Panel(Panel::Ledger), "icon-trophy", "web.farm.native.ledger"),
-        (Action::Phone, "icon-bell", "web.farm.native.phone"),
-    ]
-}
-
 pub fn hit(f: &FarmScene, x: f32, y: f32) -> Option<Action> {
-    let l = Layout::new(f.view_size);
+    let l = Layout::new(f);
     if let Some(panel) = f.panel {
         let p = l.panel;
         if rect(p.x + p.w - 32.0, p.y, 32.0, 32.0).contains(x, y) {
@@ -136,19 +127,15 @@ pub fn hit(f: &FarmScene, x: f32, y: f32) -> Option<Action> {
         }
         return Some(Action::Block);
     }
-    if f.phone_open && l.phone.contains(x, y) {
-        return Some(if rect(l.phone.x + l.phone.w - 28.0, l.phone.y, 28.0, 24.0).contains(x, y) {
-            Action::Phone
-        } else if f.snake.over {
-            Action::RestartSnake
-        } else {
-            Action::Block
-        });
-    }
-    for (i, b) in l.nav.iter().enumerate() {
-        if b.contains(x, y) {
-            return Some(nav()[i].0.clone());
+    if f.phone.open && l.phone.contains(x,y) { return Some(Action::Block); }
+    for control in &l.nav {
+        if control.bounds.contains(x, y) {
+            return Some(control.action.clone());
         }
+    }
+    let fr = frame_whole(f.view_size, (f.world.level.width, f.world.level.height), FARM_CUT);
+    if chrome::repo_sign(f, fr).contains(x, y) {
+        return Some(Action::Route("/repos".into()));
     }
     for (i, b) in l.tools.iter().enumerate() {
         if b.contains(x, y) {
@@ -198,6 +185,46 @@ fn clock_button(p: Rect, i: usize) -> Rect {
 type Row = (String, String, Option<String>);
 fn rows(f: &FarmScene, panel: Panel) -> Vec<Row> {
     match panel {
+        Panel::Menu => [
+            ("web.farm.menu.chat", "/chat"),
+            ("web.farm.menu.agents", "/agents"),
+            ("web.farm.menu.runtimes", "/runtimes"),
+            ("web.farm.menu.skills", "/settings/skills"),
+            ("web.farm.menu.connectors", "/settings/chat"),
+            ("web.farm.menu.repos", "/repos"),
+            ("web.farm.menu.catalog", "/catalog"),
+            ("web.farm.menu.issues", "/issues"),
+        ]
+        .into_iter()
+        .map(|(key, path)| (t(key, &[]), String::new(), Some(path.into())))
+        .collect(),
+        Panel::Friends | Panel::Orchestrator => f
+            .profiles
+            .iter()
+            .filter(|a| (a.role == vibevalley_protocol::AgentRole::Orchestrator) == (panel == Panel::Orchestrator))
+            .map(|a| {
+                (
+                    a.name.clone(),
+                    a.duty.clone(),
+                    Some(if panel == Panel::Orchestrator {
+                        "/orchestrator".into()
+                    } else {
+                        format!("/agents/{}", a.id)
+                    }),
+                )
+            })
+            .collect(),
+        Panel::Quota => f
+            .runtimes
+            .iter()
+            .map(|r| {
+                (
+                    r.preset.label.clone(),
+                    r.quota.as_ref().map(|q| q.text.clone()).unwrap_or_default(),
+                    Some("/runtimes".into()),
+                )
+            })
+            .collect(),
         Panel::Chat | Panel::Log => {
             let mut channels: Vec<_> = f
                 .frame
@@ -231,7 +258,7 @@ fn rows(f: &FarmScene, panel: Panel) -> Vec<Row> {
             .state
             .issues
             .iter()
-            .filter(|i| f.repo.is_none() || i.repo == f.repo)
+            .filter(|i| matches!(i.delivered.as_deref(), Some("merged" | "pull_request")) && (f.repo.is_none() || i.repo == f.repo))
             .map(|i| {
                 (
                     format!("#{} {}", i.number.unwrap_or(0), i.title),
@@ -272,76 +299,19 @@ fn rows(f: &FarmScene, panel: Panel) -> Vec<Row> {
     }
 }
 
-pub fn draw(f: &FarmScene, list: &mut DrawList, scale: f32) {
-    let l = Layout::new(f.view_size);
+pub fn draw(f: &FarmScene, list: &mut DrawList, _scale: f32) {
+    let l = Layout::new(f);
     let fr = frame_whole(f.view_size, (list.width, list.height), FARM_CUT);
     list.hud_view = true;
-    let width = (f.view_size.0 - 24.0).clamp(1.0, 380.0);
-    box_(list, rect(12.0, 12.0, width, 54.0), false);
     let level = &f.frame.view.level;
-    text(
-        list,
-        rect(22.0, 18.0, width - 20.0, 18.0),
-        t(
-            "web.farm.native.progress",
-            &[("level", level.level.into()), ("xp", level.xp.into()), ("need", level.need.into())],
-        ),
-        16.0,
-    );
-    text(
-        list,
-        rect(22.0, 42.0, width - 20.0, 16.0),
-        format!("{} · {}", clock_text(f.clock.tod), f.repo.as_deref().unwrap_or("VibeValley")),
-        12.0,
-    );
-    for (i, (_, image, key)) in nav().iter().enumerate() {
-        let b = l.nav[i];
-        box_(list, b, false);
-        icon(f, list, image, rect(b.x + 5.0, b.y + 6.0, 18.0, 18.0));
-        text(list, rect(b.x + 26.0, b.y + 9.0, b.w - 30.0, 16.0), t(key, &[]), 12.0);
-    }
-    for bed in BEDS {
-        let at = f.world.plot_at(bed.index);
-        if let Some(s) = f.frame.session_at_station(bed.station).filter(|s| f.repo.is_none() || s.repo == f.repo) {
-            let badge = f.frame.plot_of(s).and_then(|p| p.badge.as_ref());
-            let label = badge.map(|b| format!("{} · {}", s.name, b.text)).unwrap_or_else(|| s.name.clone());
-            let w = (56.0 * scale).min(160.0).min(f.view_size.0 - 24.0);
-            let b = rect(
-                (fr.bx.x + at.x * scale - w / 2.0).clamp(12.0, (f.view_size.0 - w - 12.0).max(12.0)),
-                fr.bx.y + (at.y - PLOT_H - 6.0) * scale - 20.0,
-                w,
-                18.0,
-            );
-            box_(list, b, false);
-            text(list, rect(b.x + 4.0, b.y + 2.0, b.w - 8.0, 14.0), label, 12.0);
-        }
-    }
-    if let Some(VillageHit::Spot(id)) = &f.hover
-        && let Some(place) = YARD_PLACES.iter().find(|p| p.id == *id)
+    chrome::draw_overlay(f, list, fr);
+    chrome::draw_controls(f, list, &l);
+    if let Some((message, until)) = &f.toast
+        && f.t < *until
     {
-        text(
-            list,
-            rect(12.0, if f.view_size.0 >= 650.0 { 112.0 } else { 146.0 }, f.view_size.0 - 24.0, 18.0),
-            t(place.label, &[]),
-            12.0,
-        );
-    }
-    let b = l.tools[0];
-    let status = f
-        .toast
-        .as_ref()
-        .filter(|(_, until)| f.t < *until)
-        .map(|(s, _)| s.clone())
-        .unwrap_or_else(|| f.tool.label());
-    box_(list, rect(12.0, b.y - 26.0, f.view_size.0 - 24.0, 22.0), false);
-    text(list, rect(20.0, b.y - 22.0, f.view_size.0 - 40.0, 16.0), status, 12.0);
-    for (i, b) in l.tools.iter().enumerate() {
-        box_(list, *b, f.tool == FarmTool::ALL[i]);
-        text(list, rect(b.x + 4.0, b.y + 4.0, 10.0, 12.0), (i + 1).to_string(), 11.0);
-        icon(f, list, FarmTool::ALL[i].icon(), rect(b.x + b.w - 26.0, b.y + 9.0, 22.0, 22.0));
-    }
-    if f.phone_open {
-        phone(f, list, l.phone);
+        let b = rect((f.view_size.0 - 240.0).max(0.0) / 2.0, l.tools[0].y - 30.0, 240.0_f32.min(f.view_size.0), 24.0);
+        box_(list, b, false);
+        text(list, rect(b.x + 8.0, b.y + 4.0, b.w - 16.0, 16.0), message, 12.0);
     }
     if let Some(panel) = f.panel {
         list.hud.push(HudOp::Rect {
@@ -418,52 +388,7 @@ pub fn draw(f: &FarmScene, list: &mut DrawList, scale: f32) {
 
 pub fn page(f: &mut FarmScene, by: i32) {
     let Some(panel) = f.panel else { return };
-    let last = rows(f, panel).len().saturating_sub(1) / Layout::new(f.view_size).rows;
+    let last = rows(f, panel).len().saturating_sub(1) / Layout::new(f).rows;
     f.panel_page = f.panel_page.saturating_add_signed(by as isize).min(last);
 }
 
-fn phone(f: &FarmScene, list: &mut DrawList, p: Rect) {
-    box_(list, p, false);
-    text(list, rect(p.x + 10.0, p.y + 8.0, p.w - 40.0, 16.0), t("web.farm.native.phone", &[]), 12.0);
-    text(list, rect(p.x + p.w - 38.0, p.y + 8.0, 32.0, 16.0), t("web.farm.native.close", &[]), 12.0);
-    let cell = ((p.w - 24.0) / 16.0).min(12.0);
-    let (x, y) = (p.x + 12.0, p.y + 30.0);
-    list.hud.push(HudOp::Rect {
-        x,
-        y,
-        w: 16.0 * cell,
-        h: 10.0 * cell,
-        color: rgba(0x9bbc0f, 1.0),
-        border: Some(INK),
-    });
-    for (bx, by) in &f.snake.body {
-        list.hud.push(HudOp::Rect {
-            x: x + *bx as f32 * cell + 1.0,
-            y: y + *by as f32 * cell + 1.0,
-            w: cell - 2.0,
-            h: cell - 2.0,
-            color: INK,
-            border: None,
-        });
-    }
-    list.hud.push(HudOp::Rect {
-        x: x + f.snake.bug.0 as f32 * cell + 1.0,
-        y: y + f.snake.bug.1 as f32 * cell + 1.0,
-        w: cell - 2.0,
-        h: cell - 2.0,
-        color: rgba(0xc4320a, 1.0),
-        border: None,
-    });
-    text(
-        list,
-        rect(p.x + 12.0, p.y + 164.0, p.w - 24.0, 16.0),
-        t("web.farm.native.score", &[("score", (f.snake.score as i64).into())]),
-        12.0,
-    );
-    text(
-        list,
-        rect(p.x + 12.0, p.y + 190.0, p.w - 24.0, 16.0),
-        t(if f.snake.over { "web.farm.native.restart" } else { "web.farm.native.steer" }, &[]),
-        12.0,
-    );
-}

@@ -46,6 +46,8 @@ impl Crop {
 #[serde(default, rename_all = "camelCase")]
 pub struct Frame {
     pub seq: u64,
+    pub effects: Vec<vibevalley_protocol::GameEffect>,
+    pub inbox: Vec<vibevalley_protocol::InboxItem>,
     pub state: SpaceView,
     pub view: FarmView,
 }
@@ -72,6 +74,7 @@ pub struct Session {
     pub worktree: Option<String>,
     pub issue: Option<String>,
     pub hired_at: f64,
+    pub runs: i64,
     pub phase: Phase,
 }
 
@@ -113,6 +116,8 @@ pub struct Issue {
     pub title: String,
     pub repo: Option<String>,
     pub status: String,
+    pub delivered: Option<String>,
+    pub closed_at: Option<f64>,
     pub queued_at: Option<f64>,
     pub stage: Option<vibevalley_protocol::IssueStage>,
 }
@@ -179,13 +184,6 @@ impl Frame {
     /// 0..5, or -1 while every bed is taken.
     pub fn station_of(&self, s: &Session) -> i32 {
         self.view.plays.get(&s.id).map(|p| p.station.round() as i32).unwrap_or(-1)
-    }
-
-    pub fn session_at_station(&self, station: i32) -> Option<&Session> {
-        if station < 0 {
-            return None;
-        }
-        self.state.sessions.iter().find(|s| self.station_of(s) == station)
     }
 
     pub fn plot_of(&self, s: &Session) -> Option<&PlotView> {

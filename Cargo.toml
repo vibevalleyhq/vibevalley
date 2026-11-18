@@ -20,3 +20,6 @@ debug = false
 [profile.dev.build-override]
 opt-level = 0
 debug = false
+
+[profile.dev.package.vibevalley-pixel]
+opt-level = 3

@@ -37,6 +37,7 @@ use serde_json::{Value, json};
 use vibevalley_protocol::{ApiError, BizCode, Envelope};
 use vibevalley_server_api::Server;
 
+mod chord;
 mod media;
 
 const HEARTBEAT: Duration = Duration::from_secs(20);
@@ -113,6 +114,7 @@ pub fn router(server: Shared) -> Router {
         .route("/api/v1/media/input/{id}/content", get(media::content).put(media::upload).post(command))
         .route("/api/v1/media/speech/{id}/stream", get(media::speech).post(command))
         .route("/api/v1/{*path}", post(command).get(not_allowed))
+        .route("/chord/ws", get(chord::upgrade))
         .route("/mcp", post(mcp).get(not_allowed))
         .fallback(not_found)
         .with_state(server)

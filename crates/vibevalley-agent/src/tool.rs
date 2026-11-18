@@ -33,6 +33,9 @@ impl ToolOutput {
 
 pub trait Tool: Send + Sync {
     fn spec(&self) -> ToolSpec;
+    fn is_mcp(&self) -> bool {
+        false
+    }
     /// Safe to run again if the process died while it ran (reads only).
     fn replay_safe(&self) -> bool {
         false

@@ -1,0 +1,4 @@
+{"format":"oar-voyage/3","version":3,"runtime":"claude","sessionId":"s1"}
+{"seq":0,"kind":"frame","sessionId":"s1","agentPath":[],"receivedAt":0,"raw":"AAH/","events":[{"kind":"text_delta","text":"试"}]}
+{"seq":4,"kind":"control","sessionId":"s1","agentPath":["child"],"receivedAt":0,"control":{"action":"queue","inputId":"q","outcome":{"action":"queue","status":"accepted","inputId":"q"}}}
+{"seq":9,"kind":"marker","sessionId":"s1","agentPath":[],"receivedAt":0,"marker":{"name":"closed"}}

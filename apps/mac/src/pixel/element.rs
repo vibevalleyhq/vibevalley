@@ -52,6 +52,8 @@ struct Key {
 #[derive(Default)]
 pub struct SpriteCache {
     images: HashMap<Key, Arc<RenderImage>>,
+    farm_texture: Option<gpui_kit::DynamicTexture>,
+    farm_size: (u32, u32),
     /// Pictures made per frame (Op::Image): dropped once a paint does not use them.
     dynamic: HashMap<Key, bool>,
     device_scale: f32,
@@ -67,6 +69,14 @@ fn bgra(mut img: RgbaImage) -> Arc<RenderImage> {
         p.0.swap(0, 2);
     }
     Arc::new(RenderImage::new(SmallVec::from_elem(image::Frame::new(img), 1)))
+}
+
+impl Drop for SpriteCache {
+    fn drop(&mut self) {
+        if let Some(texture) = self.farm_texture {
+            texture.remove();
+        }
+    }
 }
 
 impl SpriteCache {
@@ -99,6 +109,39 @@ impl SpriteCache {
             }
             self.light = light;
         }
+    }
+
+    fn paint_farm(&mut self, picture: &RgbaImage, bounds: Bounds<Pixels>, window: &mut Window) -> bool {
+        use gpui_kit::DevicePixels;
+        let w = (f32::from(bounds.size.width) * window.scale_factor()).round() as u32;
+        let h = (f32::from(bounds.size.height) * window.scale_factor()).round() as u32;
+        if w == 0 || h == 0 {
+            return false;
+        }
+        let sz = size(DevicePixels(w as i32), DevicePixels(h as i32));
+        if self.farm_size != (w, h) {
+            if let Some(texture) = self.farm_texture.take() {
+                window.remove_dynamic_texture(texture);
+            }
+            self.farm_size = (w, h);
+        }
+        let bgra = vibevalley_pixel::nearest(picture, w, h, true);
+        let texture = if let Some(texture) = self.farm_texture {
+            if window
+                .update_dynamic_texture(texture, Bounds::new(point(DevicePixels(0), DevicePixels(0)), sz), bgra.as_raw(), w * 4)
+                .is_err()
+            {
+                return false;
+            }
+            texture
+        } else {
+            let Ok(texture) = window.create_dynamic_texture(sz, bgra.as_raw(), w * 4) else {
+                return false;
+            };
+            self.farm_texture = Some(texture);
+            texture
+        };
+        window.paint_dynamic_texture(bounds, texture).is_ok()
     }
 
     pub fn len(&self) -> usize {
@@ -141,8 +184,40 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
     let dev = |v: f32| (v * device).round().max(1.0) as u32;
     window.with_content_mask(Some(gpui_kit::ContentMask { bounds }), |window| {
         let pic = Bounds::new(at(0.0, 0.0), size(px(list.width * s), px(list.height * s)));
+        if list.farm_light.is_some()
+            && let Some(atlas) = atlas
+            && let Some(map) = atlas.image("map")
+        {
+            window.paint_quad(fill(bounds, hsla(list.background)));
+            let cover = (f32::from(bounds.size.width) / list.width).max(f32::from(bounds.size.height) / list.height);
+            let (mw, mh) = (list.width * cover, list.height * cover);
+            let (dw, dh) = (
+                (mw * window.scale_factor()).round().max(1.) as u32,
+                (mh * window.scale_factor()).round().max(1.) as u32,
+            );
+            let key = Key {
+                name: "village-backdrop".into(),
+                flip: false,
+                alpha: 8,
+                w: dw,
+                h: dh,
+            };
+            cache.dynamic.insert(key.clone(), true);
+            if let Some(image) = cache.get(key, || Some(vibevalley_pixel::nearest(&map, dw, dh, false))) {
+                let back = Bounds::new(bounds.center() - point(px(mw / 2.), px(mh / 2.)), size(px(mw), px(mh)));
+                let _ = window.paint_image(back, back, Corners::default(), image, 0, false);
+            }
+            let mut veil = list.background;
+            veil[3] = 0.7;
+            window.paint_quad(fill(bounds, hsla(veil)));
+        }
         window.paint_quad(fill(pic, hsla(background)));
-        for (index, op) in list.ops.iter().enumerate() {
+        let painted = if let (Some(light), Some(atlas)) = (&list.farm_light, atlas) {
+            cache.paint_farm(&super::draw::farm_picture(list, atlas, light), pic, window)
+        } else {
+            false
+        };
+        for (index, op) in list.ops.iter().enumerate().filter(|_| !painted) {
             let light = list.light_on(index);
             let lit = |name: &str| if light.is_some() { format!("{LIT}{name}") } else { name.to_string() };
             let shaded = |mut img: RgbaImage| {

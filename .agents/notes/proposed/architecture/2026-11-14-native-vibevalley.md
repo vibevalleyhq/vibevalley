@@ -17,6 +17,8 @@ VibeValley 现在是 Node 服务端（`apps/server`）+ Solid 页面（`apps/web
 
 ## Proposal
 
+Go 分支中可用于补强执行恢复的行为、oar 驱动对照与首条故障验收见[持久执行提案](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
+
 ### 原则
 
 - **Rust 为准。**服务端的行为以 Rust 为准；TS 服务端只在删除前用作对照和 e2e 安全网，不再追逐它的新改动。契约在 TS 服务端删掉后翻转为 Rust 生成 TS（见 R5）。

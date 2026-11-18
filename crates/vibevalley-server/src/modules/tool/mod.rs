@@ -42,7 +42,7 @@ static ORCHESTRATOR: LazyLock<Vec<Words>> = LazyLock::new(|| words_of(include_st
 static HELPER: LazyLock<Vec<Words>> = LazyLock::new(|| words_of(include_str!("../../../assets/tools/helper.json")));
 
 /// Where the orchestrator is answering now (`HostContext`).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Route {
     pub agent: String,
     pub channel: String,

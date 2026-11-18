@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+vibevalley-pixel = { version = "0.1.0", path = "../../crates/vibevalley-pixel" }
 vibevalley-server-api = { version = "0.1.0", path = "../../crates/vibevalley-server-api" }
 base64 = "0.23.1"
 vibevalley-i18n = { version = "0.1.0", path = "../../crates/vibevalley-i18n" }

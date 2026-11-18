@@ -14,14 +14,20 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+mod accounting;
 pub mod acp;
+pub use accounting::TokenTotals;
 mod claude;
 mod codex;
 mod core;
+mod frames;
 mod process;
 pub mod record;
 pub mod scripted;
+mod sdk;
+pub mod subagent;
 pub mod vibevalley;
+pub mod voyage;
 
 pub use crate::core::{StatusFold, derive_status, rejection};
 pub use crate::record::{RecordHeader, read_record_with_header};
@@ -131,6 +137,17 @@ pub enum PermissionMode {
 
 #[derive(Debug, Clone, Default)]
 pub struct SessionOptions {
+    pub baseline_timeout: Option<std::time::Duration>,
+    pub request_timeout: Option<std::time::Duration>,
+    pub bin_path: Option<PathBuf>,
+    pub base_env: Option<Vec<(String, String)>>,
+    pub unset_env: Vec<String>,
+    pub name: Option<String>,
+    pub service_tier: Option<String>,
+    pub additional_directories: Vec<PathBuf>,
+    pub output_schema: Option<serde_json::Value>,
+    pub launch_args: Vec<String>,
+    pub allowed_tools: Vec<String>,
     pub cwd: PathBuf,
     pub model: Option<String>,
     /// Resume an earlier session by its id (works across processes).
@@ -149,6 +166,38 @@ pub struct SessionOptions {
     /// Replaces the runtime's own system prompt (VibeValley's persona mode
     /// `replace`); `append_system_prompt` still goes after it.
     pub system_prompt: Option<String>,
+}
+
+impl SessionOptions {
+    fn binary(&self, name: &str) -> Result<PathBuf> {
+        self.bin_path.clone().map_or_else(|| process::require_binary(name), Ok)
+    }
+
+    pub fn validate_for(&self, runtime: &str) -> Result<()> {
+        for (option, supplied) in [
+            ("name", self.name.as_ref().is_some_and(|v| !v.is_empty())),
+            ("service_tier", self.service_tier.as_ref().is_some_and(|v| !v.is_empty())),
+            ("launch_args", !self.launch_args.is_empty()),
+            (
+                "allowed_tools",
+                !self.allowed_tools.is_empty() && !matches!(runtime, "claude" | "qwen" | "qoder"),
+            ),
+            (
+                "additional_directories",
+                !self.additional_directories.is_empty() && !matches!(runtime, "claude" | "qwen"),
+            ),
+            ("output_schema", self.output_schema.is_some() && !matches!(runtime, "claude" | "codex")),
+            ("effort", self.effort.is_some() && matches!(runtime, "qwen" | "qoder")),
+        ] {
+            if supplied {
+                return Err(AgentError::Unsupported {
+                    option: option.into(),
+                    reason: format!("{runtime} does not support {option}"),
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 /// One usage bucket of an account (oar's `AccountUsageWindow`).
@@ -358,9 +407,66 @@ pub enum SessionStatus {
     Failed,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlAction {
+    Prompt,
+    Steer,
+    Queue,
+    Withdraw,
+    Abort,
+    Compact,
+    StopTask,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlStatus {
+    Accepted,
+    Rejected,
+    Unsupported,
+    NotRunning,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlOutcome {
+    pub action: ControlAction,
+    pub status: ControlStatus,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub code: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub span_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub input_id: String,
+}
 /// One conversation with a runtime.
 pub trait Session: Send + Sync {
     fn id(&self) -> String;
+    fn control(&self, action: ControlAction, arg: &str, input_id: &str, span_id: &str) -> Result<ControlOutcome>;
+    fn usage(&self) -> Option<TokenTotals> {
+        self.records()
+            .iter()
+            .rev()
+            .filter(|r| r.agent_path.is_empty())
+            .flat_map(|r| r.events.iter().rev())
+            .find(|e| e["kind"] == "usage")
+            .and_then(|e| serde_json::from_value(e["usage"]["tokens"].clone()).ok())
+    }
+    fn records(&self) -> Vec<voyage::Record>;
+    fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<voyage::Record>;
+    fn wait(&self) -> Result<()> {
+        let events = self.events();
+        for e in events {
+            if matches!(e.kind, EventKind::SessionEnded) {
+                break;
+            }
+        }
+        Ok(())
+    }
+    fn resume_id(&self) -> Option<String> {
+        Some(self.id())
+    }
     fn runtime_id(&self) -> &str;
     fn status(&self) -> SessionStatus;
     /// A new receiver that yields every event from now on. May be called
@@ -414,7 +520,11 @@ impl Registry {
     }
 
     pub fn register(&mut self, runtime: Arc<dyn Runtime>) {
-        self.runtimes.push(runtime);
+        if let Some(slot) = self.runtimes.iter_mut().find(|r| r.id() == runtime.id()) {
+            *slot = runtime;
+        } else {
+            self.runtimes.push(runtime);
+        }
     }
 
     pub fn list(&self) -> &[Arc<dyn Runtime>] {
@@ -422,7 +532,11 @@ impl Registry {
     }
 
     pub fn get(&self, id: &str) -> Option<Arc<dyn Runtime>> {
-        self.runtimes.iter().find(|r| r.id() == id).cloned()
+        self.runtimes
+            .iter()
+            .find(|r| r.id() == id)
+            .or_else(|| self.runtimes.iter().find(|r| r.id().strip_prefix("acp:") == Some(id)))
+            .cloned()
     }
 
     pub fn require(&self, id: &str) -> Result<Arc<dyn Runtime>> {
@@ -445,6 +559,8 @@ pub fn default_runtimes() -> Registry {
     for spec in acp::builtin_agents() {
         registry.register(Arc::new(acp::AcpRuntime::new(spec)));
     }
+    registry.register(Arc::new(sdk::SdkRuntime::Qwen));
+    registry.register(Arc::new(sdk::SdkRuntime::Qoder));
     registry.register(Arc::new(vibevalley::VibeValleyRuntime::from_env()));
     registry.register(Arc::new(scripted::ScriptedRuntime::demo()));
     registry

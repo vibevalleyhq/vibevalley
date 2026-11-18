@@ -288,12 +288,13 @@ impl Sessions {
         let mut mcp_servers: Vec<McpServer> = self.door_for(&session.id).into_iter().collect();
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
         #[allow(clippy::needless_update, reason = "fields vibevalley-oar adds later")]
+        let (append_system_prompt, prompt) = drive.work_instructions(instructions, prompt);
         let opts = SessionOptions {
             cwd,
             model: drive.model.clone(),
             resume: if resume { self.extra(&session.id).agent_session } else { None },
             permission_mode: self.0.config.permission,
-            append_system_prompt: Some(instructions),
+            append_system_prompt,
             env: drive.env.clone(),
             record_to: Some(self.record_path(&session.id)),
             effort: drive.effort.clone(),
@@ -322,8 +323,8 @@ impl Sessions {
     /// `session` on the board, driven by `agent` from now on: its events
     /// pumped into facts. The issue it works changes in the same commit.
     pub(super) fn go_live(&self, agent: Arc<dyn vibevalley_oar::Session>, session: Session, issue: Option<(&str, IssueChange)>) -> Result<()> {
-        self.set_extra(&session.id, |e| e.agent_session = Some(agent.id()))?;
         let events = agent.events();
+        self.set_extra(&session.id, |e| e.agent_session = agent.resume_id())?;
         let generation = self.0.generation.fetch_add(1, Ordering::SeqCst) + 1;
         lock(&self.0.live).insert(session.id.clone(), Live { agent, generation });
         let id = session.id.clone();
@@ -472,6 +473,9 @@ impl Sessions {
             self.record(session_id, Step::Agent(event.clone()));
             let root = event.agent_path.is_empty();
             match event.kind {
+                EventKind::SessionStarted { session_id: vendor, .. } if root => {
+                    let _ = self.set_extra(session_id, |e| e.agent_session = Some(vendor));
+                }
                 EventKind::TurnStarted { .. } if root => {
                     said.clear();
                     asked.clear();

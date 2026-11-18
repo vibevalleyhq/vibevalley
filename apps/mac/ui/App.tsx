@@ -8,6 +8,8 @@ import { MarkdownPane } from "./surfaces/MarkdownPane";
 import { Palette } from "./surfaces/Palette";
 import { Sidebar } from "./surfaces/Sidebar";
 import { tok } from "./tokens";
+import { FarmForm } from "./vv/farm/FarmForm";
+import { FarmPhone } from "./vv/farm/FarmPhone";
 import { VibeValley } from "./vv/VibeValley";
 
 function Unknown() {
@@ -19,6 +21,8 @@ function Unknown() {
 }
 
 const views: Record<string, Component> = {
+  "farm-form": FarmForm,
+  "farm-phone": FarmPhone,
   sidebar: Sidebar,
   palette: Palette,
   markdown: MarkdownPane,

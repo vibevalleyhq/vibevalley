@@ -7,7 +7,8 @@ pub mod frames;
 use std::collections::HashMap;
 
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement as _, Render, Styled as _, Window, div,
+    App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _,
+    Window, div,
 };
 use nsh_platform_gpui::{App as NshApp, AppOptions, AppView, Appearance, Bundle};
 use serde_json::{Map, Value, json};
@@ -325,6 +326,10 @@ impl HostedView {
         }
     }
 
+    pub fn play_farm_sound(&self, name: &str, cx: &App) {
+        let _ = self.app.read(cx).host().send("farm-sound", json!(name));
+    }
+
     pub fn navigate(&self, route: &str, cx: &App) {
         let _ = self.app.read(cx).host().send("route", json!(route));
     }
@@ -395,7 +400,17 @@ impl Focusable for HostedView {
 }
 
 impl Render for HostedView {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().size_full().child(self.app.clone())
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let view = div().size_full().child(self.app.clone());
+        if self.view != "farm-phone" {
+            return view;
+        }
+        // nsh keymaps deliver presses; the runner also needs to know when a held duck key is released.
+        view.capture_key_up(cx.listener(|this, event: &gpui_kit::KeyUpEvent, _, cx| {
+            let key = event.keystroke.key.as_ref();
+            if matches!(key, "down" | "x") {
+                let _ = this.app.read(cx).host().send("farm-key-up", json!(key));
+            }
+        }))
     }
 }

@@ -638,15 +638,18 @@ fn session_options_reach_claude_and_codex() {
         ],
         ..opts()
     };
-    let args = crate::claude::launch_args("s1", &opts);
+    let launch = crate::claude::claude_launch("s1", &opts).unwrap();
+    let args = &launch.args;
     let after = |flag: &str| args.iter().position(|a| a == flag).map(|i| args[i + 1].clone());
     assert_eq!(after("--effort").as_deref(), Some("high"));
     assert_eq!(after("--system-prompt").as_deref(), Some("own"));
-    let config: Value = serde_json::from_str(&after("--mcp-config").unwrap()).unwrap();
+    let config: Value = serde_json::from_slice(&std::fs::read(after("--mcp-config").unwrap()).unwrap()).unwrap();
     assert_eq!(config["mcpServers"]["fs"]["command"], "mcp-fs");
     assert_eq!(config["mcpServers"]["web"]["type"], "http");
     assert_eq!(config["mcpServers"]["web"]["headers"]["Authorization"], "Bearer t");
-    assert_eq!(&args[args.len() - 2..], ["Bash", "Write"]);
+    assert_eq!(after("--disallowed-tools").as_deref(), Some("Bash"));
+    assert!(args.contains(&"Write".into()));
+    assert!(!args.iter().any(|a| a.contains("Bearer t")));
 
     let (_, params) = crate::codex::open_request(&opts);
     assert_eq!(params["baseInstructions"], "own");

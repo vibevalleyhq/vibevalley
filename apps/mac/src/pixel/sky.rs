@@ -71,6 +71,9 @@ pub fn clock_text(tod: f32) -> String {
 }
 
 pub struct Sky {
+    pub clouds: f32,
+    pub mist: f32,
+    pub grade: vibevalley_pixel::Grade,
     pub ambient: Rgb,
     pub sun_dir: [f32; 3],
     pub sun: Rgb,
@@ -96,6 +99,31 @@ fn scale(a: Rgb, k: f32) -> Rgb {
     [a[0] * k, a[1] * k, a[2] * k]
 }
 
+const DAY_GRADE: vibevalley_pixel::Grade = vibevalley_pixel::Grade {
+    exposure: 1.06,
+    saturation: 1.18,
+    lift: 0.04,
+    shadows: [0.02, 0.06, 0.1],
+    highlights: [0.05, 0.035, -0.01],
+    vignette: 0.16,
+};
+const DUSK_GRADE: vibevalley_pixel::Grade = vibevalley_pixel::Grade {
+    exposure: 1.06,
+    saturation: 1.22,
+    lift: 0.05,
+    shadows: [0.14, 0.05, 0.02],
+    highlights: [0.1, 0.04, -0.05],
+    vignette: 0.22,
+};
+const NIGHT_GRADE: vibevalley_pixel::Grade = vibevalley_pixel::Grade {
+    exposure: 1.08,
+    saturation: 1.2,
+    lift: 0.045,
+    shadows: [0.01, 0.05, 0.14],
+    highlights: [0.03, 0.05, 0.06],
+    vignette: 0.3,
+};
+
 pub fn sky_at(tod: f32) -> Sky {
     let day = sun_of(tod);
     let dusk = dusk_of(tod);
@@ -108,6 +136,9 @@ pub fn sky_at(tod: f32) -> Sky {
     let sun_color = scale(mix(SUN, LOW_SUN, dusk), gain);
     let moon_dir = normal([0.35, -0.55, 0.75]);
     Sky {
+        clouds: 0.22 * day,
+        mist: 0.3 * (1. - (tod - 0.29).abs() / 0.07).max(0.),
+        grade: NIGHT_GRADE.mix(DAY_GRADE.mix(DUSK_GRADE, dusk), day),
         ambient: mix(NIGHT_AMBIENT, day_ambient, day),
         sun_dir: normal(mix(moon_dir, sun_dir, day)),
         sun: mix(scale(MOON, MOONLIGHT), sun_color, day),

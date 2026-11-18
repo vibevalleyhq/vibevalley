@@ -146,6 +146,21 @@ fn prompt_text(content: &[ContentBlock]) -> String {
 }
 
 impl Session for HookSession {
+    fn records(&self) -> Vec<vibevalley_oar::voyage::Record> {
+        self.inner.records()
+    }
+    fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<vibevalley_oar::voyage::Record> {
+        self.inner.subscribe_records(after)
+    }
+    fn control(
+        &self,
+        action: vibevalley_oar::ControlAction,
+        arg: &str,
+        input_id: &str,
+        span_id: &str,
+    ) -> vibevalley_oar::Result<vibevalley_oar::ControlOutcome> {
+        self.inner.control(action, arg, input_id, span_id)
+    }
     fn id(&self) -> String {
         self.inner.id()
     }

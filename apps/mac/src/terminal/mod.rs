@@ -170,8 +170,12 @@ impl TerminalView {
         self.session().map(|s| s.snapshot())
     }
 
+    pub fn link_title(&self) -> Option<&str> {
+        self.spec.title.as_deref().filter(|title| !title.trim().is_empty())
+    }
+
     pub fn title(&self) -> Option<&str> {
-        self.title.as_deref()
+        self.link_title().or(self.title.as_deref())
     }
 
     /// Detects whether an agent (`codex`, `claude`, `opencode`, ...) or command
@@ -245,6 +249,22 @@ impl TerminalView {
             }
         }
         None
+    }
+
+    pub fn directory(&self) -> PathBuf {
+        self.session()
+            .and_then(TermSession::cwd)
+            .filter(|p| p.is_dir())
+            .unwrap_or_else(|| self.spec.cwd.clone())
+    }
+
+    pub fn matches_link(&self, target: &SpawnSpec) -> bool {
+        if self.exited || matches!(self.state, State::Failed(_)) || target.program.is_some() || self.spec.program.is_some()
+            || target.title.is_none() || self.spec.title != target.title {
+            return false;
+        }
+        let Some(started_here) = self.spec.cwd.canonicalize().ok().filter(|path| *path == target.cwd) else { return false; };
+        self.directory().canonicalize().is_ok_and(|cwd| cwd.starts_with(started_here))
     }
 
     pub fn has_exited(&self) -> bool {

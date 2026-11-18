@@ -202,6 +202,7 @@ impl Started {
         self.voice.close();
         self.watch.close();
         self.orchestrator.close();
+        self.hub.space.stop();
         self.agents.fleet.close();
         self.repos.close();
         self.artifacts.close();
@@ -231,7 +232,11 @@ fn failed(what: &str) -> impl Fn(&dyn std::fmt::Display) -> StartError + '_ {
 }
 
 /// Every built-in runtime, VibeValley's own on the settings' DeepSeek key.
-fn runtimes(setting: &Arc<Setting>, home: &std::path::Path) -> Registry {
+fn runtimes(
+    setting: &Arc<Setting>,
+    home: &std::path::Path,
+    execution: Arc<std::sync::OnceLock<vibevalley_agent::generation::workers::SharedExecution>>,
+) -> Registry {
     let mut registry = Registry::new();
     for r in vibevalley_oar::default_runtimes().list() {
         if r.id() != vibevalley_oar::vibevalley::ID {
@@ -239,10 +244,9 @@ fn runtimes(setting: &Arc<Setting>, home: &std::path::Path) -> Registry {
         }
     }
     let s = setting.clone();
-    registry.register(Arc::new(vibevalley_oar::vibevalley::VibeValleyRuntime::new(
-        Arc::new(move || s.deepseek_api_key()),
-        home.join("conversations"),
-    )));
+    registry.register(Arc::new(
+        vibevalley_oar::vibevalley::VibeValleyRuntime::new(Arc::new(move || s.deepseek_api_key()), home.join("conversations")).with_execution(execution),
+    ));
     registry
 }
 
@@ -284,7 +288,11 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     };
     modules::provider::install(&hub, Arc::new(modules::provider::Provider::new(setting.clone(), vendor.clone())));
     let voice_fetch = vendor.clone();
-    let registry = config.registry.clone().unwrap_or_else(|| Arc::new(runtimes(&setting, &config.home)));
+    let execution = Arc::new(std::sync::OnceLock::new());
+    let registry = config
+        .registry
+        .clone()
+        .unwrap_or_else(|| Arc::new(runtimes(&setting, &config.home, execution.clone())));
     let agents = Agents::open(&hub, &config.home, &config.starters, registry.clone(), config.probe_runtimes).map_err(|e| failed("the profiles")(&e))?;
     modules::agent::install(&hub, agents.clone());
     let board_config = BoardConfig {
@@ -321,7 +329,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     )
     .map_err(|e| failed("the board")(&e))?;
     modules::publish::install_with_board(&hub, publisher.clone(), Some(board.clone()));
-    board.refresh_queue().map_err(|e| failed("the queue")(&e))?;
     modules::issue::install_on(&hub, board.clone(), Some(agents.clone()));
     modules::session::install(&hub, board.clone(), trajectories.clone());
     modules::repo::install_templates(&hub, repos.clone(), board.clone(), agents.clone());
@@ -396,8 +403,16 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         trajectories: trajectories.clone(),
         key: Arc::new(move || key.deepseek_api_key()),
         client: config.model_client.clone(),
+    })
+    .map_err(|e| failed("durable execution")(&e))?;
+    let _ = execution.set(vibevalley_agent::generation::workers::SharedExecution {
+        generation: orchestrator.execution.generation.clone(),
+        scheduler: orchestrator.execution.scheduler.clone(),
     });
+    let _ = hub.execution.set(Arc::downgrade(&orchestrator));
+    hub.space.attach(orchestrator.execution.store()).map_err(|e| failed("durable projection")(&e))?;
     modules::orchestrator::install(&hub, orchestrator.clone());
+    board.refresh_queue().map_err(|e| failed("the queue")(&e))?;
     let listening = config.orchestrator_listens.then(|| orchestrator.clone());
     if let Some(o) = &listening {
         crons.attach_orchestrator(o);
