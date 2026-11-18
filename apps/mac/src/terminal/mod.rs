@@ -259,11 +259,18 @@ impl TerminalView {
     }
 
     pub fn matches_link(&self, target: &SpawnSpec) -> bool {
-        if self.exited || matches!(self.state, State::Failed(_)) || target.program.is_some() || self.spec.program.is_some()
-            || target.title.is_none() || self.spec.title != target.title {
+        if self.exited
+            || matches!(self.state, State::Failed(_))
+            || target.program.is_some()
+            || self.spec.program.is_some()
+            || target.title.is_none()
+            || self.spec.title != target.title
+        {
             return false;
         }
-        let Some(started_here) = self.spec.cwd.canonicalize().ok().filter(|path| *path == target.cwd) else { return false; };
+        let Some(started_here) = self.spec.cwd.canonicalize().ok().filter(|path| *path == target.cwd) else {
+            return false;
+        };
         self.directory().canonicalize().is_ok_and(|cwd| cwd.starts_with(started_here))
     }
 

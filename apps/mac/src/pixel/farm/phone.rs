@@ -1,6 +1,6 @@
+use serde::Serialize;
 use std::collections::{HashSet, VecDeque};
 use std::time::{Duration, Instant};
-use serde::Serialize;
 use vibevalley_protocol::InboxItem;
 
 #[derive(Debug, Clone, Serialize)]
@@ -26,10 +26,15 @@ pub struct Phone {
 
 impl Phone {
     pub fn feed(&mut self, calls: &[InboxItem], now: Instant) {
-        let ids = calls.iter().map(|call|call.id.clone()).collect::<HashSet<_>>();
-        let fresh = self.known.as_ref().and_then(|known| calls.iter().find(|c| !known.contains(&c.id) && !self.handled.contains(&c.id)));
+        let ids = calls.iter().map(|call| call.id.clone()).collect::<HashSet<_>>();
+        let fresh = self
+            .known
+            .as_ref()
+            .and_then(|known| calls.iter().find(|c| !known.contains(&c.id) && !self.handled.contains(&c.id)));
         self.known = Some(ids);
-        if let Some(call) = fresh && !self.active_call {
+        if let Some(call) = fresh
+            && !self.active_call
+        {
             self.opened_by_ring |= !self.open;
             self.open = true;
             self.ringing = Some(call.clone());
@@ -40,11 +45,17 @@ impl Phone {
     }
 
     fn end_ring(&mut self) {
-        if self.opened_by_ring { self.close(); } else { self.silence(); }
+        if self.opened_by_ring {
+            self.close();
+        } else {
+            self.silence();
+        }
     }
 
     pub fn tick(&mut self, now: Instant) {
-        if self.until.is_some_and(|until| now >= until) { self.end_ring(); }
+        if self.until.is_some_and(|until| now >= until) {
+            self.end_ring();
+        }
     }
 
     pub fn close(&mut self) {
@@ -62,15 +73,21 @@ impl Phone {
     }
 
     pub fn settle(&mut self, call: InboxItem, answered: bool) {
-        if !self.handled.insert(call.id.clone()) { return }
-        if self.ringing.as_ref().is_some_and(|r|r.id == call.id) {
-            if answered { self.silence(); } else { self.end_ring(); }
+        if !self.handled.insert(call.id.clone()) {
+            return;
         }
-        self.log.push_front(CallLog {call,answered});
+        if self.ringing.as_ref().is_some_and(|r| r.id == call.id) {
+            if answered {
+                self.silence();
+            } else {
+                self.end_ring();
+            }
+        }
+        self.log.push_front(CallLog { call, answered });
         self.log.truncate(40);
     }
 
-    pub fn missed<'a>(&'a self, calls: &'a [InboxItem]) -> impl Iterator<Item=&'a InboxItem> {
-        calls.iter().filter(|c|!self.handled.contains(&c.id))
+    pub fn missed<'a>(&'a self, calls: &'a [InboxItem]) -> impl Iterator<Item = &'a InboxItem> {
+        calls.iter().filter(|c| !self.handled.contains(&c.id))
     }
 }

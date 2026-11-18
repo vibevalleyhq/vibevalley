@@ -10,11 +10,7 @@
   "declined": "挂了",
   "noMissed": "没有未接来电。地里都好好的。",
   "phase": {
-    "connecting": "正在接通……",
     "live": "通话中：说吧，助手在听",
-    "coming": "通话中：助手在路上",
-    "ending": "挂断中……",
-    "failed": "没接通：{why}",
     "idle": "有事直接说，工单交回来、卡住了，助手也会打过来。"
   },
   "manager": "助手",
@@ -32,17 +28,8 @@
     "merge": "种田 2048"
   },
   "phone": "手机",
-  "phoneRinging": "手机：来电",
-  "phoneMissed": "手机，{n} 个未接来电",
-  "phoneUnread": "手机，田头 {n} 条新消息",
-  "ring": "来电",
-  "new": "新",
-  "label": "农场手机",
-  "home": "主屏",
-  "homeHint": "回主屏",
   "brand": "农场通",
   "openChat": "展开田头",
-  "openChatUnread": "展开田头，{n} 条新消息",
   "key": {
     "up": "上",
     "left": "左",
@@ -90,7 +77,6 @@
     "overKeys": "按 A 再来 · B 悔一步",
     "reached": "种到 {stage}",
     "field": "田里：{n} 株，最高 {top}",
-    "stages": "收成图鉴",
     "help": "方向键或划一下：一样的两株长成下一样",
     "help2": "B 悔一步 · A 重开",
     "stage": {

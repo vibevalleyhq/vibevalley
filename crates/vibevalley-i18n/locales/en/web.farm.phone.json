@@ -10,11 +10,7 @@
   "declined": "declined",
   "noMissed": "No missed calls. All is well in the field.",
   "phase": {
-    "connecting": "Connecting…",
     "live": "On the call: go ahead, the assistant is listening",
-    "coming": "On the call: the assistant is on the way",
-    "ending": "Hanging up…",
-    "failed": "Not connected: {why}",
     "idle": "Just say it. When a ticket comes back or gets stuck, the assistant calls you too."
   },
   "manager": "Assistant",
@@ -32,17 +28,8 @@
     "merge": "Farm 2048"
   },
   "phone": "Phone",
-  "phoneRinging": "Phone: incoming call",
-  "phoneMissed": "Phone, {n} missed calls",
-  "phoneUnread": "Phone, {n} new in the farm chat",
-  "ring": "Call",
-  "new": "new",
-  "label": "Farm phone",
-  "home": "Home",
-  "homeHint": "Back to the home screen",
   "brand": "FarmTel",
   "openChat": "Open the farm chat",
-  "openChatUnread": "Open the farm chat, {n} new",
   "key": {
     "up": "Up",
     "left": "Left",
@@ -90,7 +77,6 @@
     "overKeys": "A again · B take back a move",
     "reached": "Grew {stage}",
     "field": "In the field: {n} plants, best {top}",
-    "stages": "Harvest catalog",
     "help": "Arrows or a swipe: two of a kind grow into the next",
     "help2": "B take back · A restart",
     "stage": {

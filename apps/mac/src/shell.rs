@@ -1034,7 +1034,12 @@ impl Shell {
                 }
                 cx.notify();
             }
-            Action::Applied { .. } | Action::Ready | Action::DismissFarmForm | Action::FarmHandset { .. } | Action::FarmCall { .. } | Action::SilenceFarmPhone => {}
+            Action::Applied { .. }
+            | Action::Ready
+            | Action::DismissFarmForm
+            | Action::FarmHandset { .. }
+            | Action::FarmCall { .. }
+            | Action::SilenceFarmPhone => {}
             Action::Probe { results } => {
                 eprintln!("bridge probe: {results}");
                 self.probe = Some(results);
@@ -1164,11 +1169,18 @@ impl Shell {
             self.show_workspace(cx);
             let repo = Repo::discover(&directory).ok().flatten();
             let root = repo.as_ref().map(|r| r.root()).unwrap_or(&directory);
-            let target = self.ws.projects().iter().filter_map(|p| {
-                let path = p.root().canonicalize().ok()?;
-                (path == root || (repo.is_none() && directory.starts_with(&path))).then(|| (path.components().count(), p.id()))
-            }).max_by_key(|(depth, _)| *depth).map(|(_, id)| id)
-                .or_else(|| self.ensure_project_at(root, cx)).ok_or_else(no_project)?;
+            let target = self
+                .ws
+                .projects()
+                .iter()
+                .filter_map(|p| {
+                    let path = p.root().canonicalize().ok()?;
+                    (path == root || (repo.is_none() && directory.starts_with(&path))).then(|| (path.components().count(), p.id()))
+                })
+                .max_by_key(|(depth, _)| *depth)
+                .map(|(_, id)| id)
+                .or_else(|| self.ensure_project_at(root, cx))
+                .ok_or_else(no_project)?;
             self.ws.activate(target);
             self.ensure_project_view(target, cx);
             directory

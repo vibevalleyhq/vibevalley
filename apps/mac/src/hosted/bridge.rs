@@ -67,8 +67,16 @@ impl Panel {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Action {
     DismissFarmForm,
-    FarmHandset { unfolded: bool, large: bool, game: bool, active_call: bool },
-    FarmCall { id: String, answered: bool },
+    FarmHandset {
+        unfolded: bool,
+        large: bool,
+        game: bool,
+        active_call: bool,
+    },
+    FarmCall {
+        id: String,
+        answered: bool,
+    },
     SilenceFarmPhone,
     /// The single application router selects a native content surface.
     GlobalRoute {

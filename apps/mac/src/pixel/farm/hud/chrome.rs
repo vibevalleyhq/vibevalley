@@ -191,13 +191,31 @@ pub fn layout(f: &FarmScene, frame: Framing) -> (Vec<Control>, Vec<Rect>, Rect) 
     let narrow = b.w - 16.0 < 640.0;
     let chat_only = narrow && f.phone.unfolded;
     let game = f.phone.game && !chat_only;
-    let chrome_h = if game {90.0} else {34.0};
-    let preferred: f32 = if f.phone.unfolded && f.phone.large {680.0} else if game || f.phone.unfolded || f.phone.ringing.is_some() {440.0} else {300.0};
-    let screen_h = preferred.min(room-chrome_h).max(200.0);
-    let apps_w = if game {332.0} else if f.phone.unfolded {296.0} else {212.0};
-    let width = if chat_only {b.w-16.0} else if f.phone.unfolded {24.0+apps_w+2.0+if f.phone.large {(b.w-396.0).clamp(320.0,560.0)}else{320.0}} else {24.0+apps_w+32.0};
+    let chrome_h = if game { 90.0 } else { 34.0 };
+    let preferred: f32 = if f.phone.unfolded && f.phone.large {
+        680.0
+    } else if game || f.phone.unfolded || f.phone.ringing.is_some() {
+        440.0
+    } else {
+        300.0
+    };
+    let screen_h = preferred.min(room - chrome_h).max(200.0);
+    let apps_w = if game {
+        332.0
+    } else if f.phone.unfolded {
+        296.0
+    } else {
+        212.0
+    };
+    let width = if chat_only {
+        b.w - 16.0
+    } else if f.phone.unfolded {
+        24.0 + apps_w + 2.0 + if f.phone.large { (b.w - 396.0).clamp(320.0, 560.0) } else { 320.0 }
+    } else {
+        24.0 + apps_w + 32.0
+    };
     let phone_h = screen_h + chrome_h;
-    let phone = rect(left, (button_y - 48.0 - phone_h).max(0.0), width.min(b.w-16.0), phone_h);
+    let phone = rect(left, (button_y - 48.0 - phone_h).max(0.0), width.min(b.w - 16.0), phone_h);
     let width = if compact { 44.0 } else { 52.0 };
     let span = 6.0 * width + 5.0 * 6.0 + 2.0;
     let start = (b.x + (b.w - span) / 2.0).round();

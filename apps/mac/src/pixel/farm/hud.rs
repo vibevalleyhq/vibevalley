@@ -127,7 +127,9 @@ pub fn hit(f: &FarmScene, x: f32, y: f32) -> Option<Action> {
         }
         return Some(Action::Block);
     }
-    if f.phone.open && l.phone.contains(x,y) { return Some(Action::Block); }
+    if f.phone.open && l.phone.contains(x, y) {
+        return Some(Action::Block);
+    }
     for control in &l.nav {
         if control.bounds.contains(x, y) {
             return Some(control.action.clone());
@@ -391,4 +393,3 @@ pub fn page(f: &mut FarmScene, by: i32) {
     let last = rows(f, panel).len().saturating_sub(1) / Layout::new(f).rows;
     f.panel_page = f.panel_page.saturating_add_signed(by as isize).min(last);
 }
-

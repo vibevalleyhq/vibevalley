@@ -9,26 +9,11 @@
     "sow": "Sow · plot {plot}",
     "water": "Water {name}",
     "menu": "Menu",
-    "pickLook": "Pick an assistant you like; the farm and the chat change at once.",
-    "drawing": "Still being drawn…",
-    "pets": "Pets",
     "shopItems": {
-      "scarecrow": {
-        "name": "Scarecrow",
-        "note": "Scares off crows, looks nice"
-      },
-      "seeds": {
-        "name": "Seed pack",
-        "note": "Common ticket templates"
-      },
-      "bunting": {
-        "name": "Bunting",
-        "note": "Hangs on the fence"
-      },
-      "doghouse": {
-        "name": "Doghouse",
-        "note": "For the assistant's dog"
-      }
+      "scarecrow": {},
+      "seeds": {},
+      "bunting": {},
+      "doghouse": {}
     },
     "shopClosed": "The shop is being done up and opens in the next version. You have {coins} coins: save them for now."
   },
@@ -102,8 +87,7 @@
     "enlarge": "Enlarge the chat window",
     "fold": "Fold the chat",
     "greeting": "This is the farm chat, where you, the assistant and the helpers talk. Tell me something to do, such as \"have the tester run the tests\".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.",
-    "send": "Send",
-    "restore": "Restore the chat window"
+    "send": "Send"
   },
   "friends": {
     "helpers": "Helpers"
@@ -127,21 +111,16 @@
     "repo": "Repo"
   },
   "sow": {
-    "notDrafted": "Not drafted",
     "homeless": "This farm belongs to no repo",
     "toMap": "To plant, enter a repo's farm first: go back to the map and pick an island.",
     "noRepos": "No repos in the workbench yet: make one on the Repos page first.",
-    "map": "Go to the map",
     "makeRepo": "Make a repo",
     "plantIn": "Planting in {repo}",
-    "rummaging": "Rummaging in the seed bags…",
-    "noSeeds": "The seed bags could not be fetched: ",
     "retry": "Fetch the seed bags again",
     "recent": "Recent",
     "kinds": "Common jobs",
     "own": "Write your own",
     "jobHint": "What to do, and what counts as done",
-    "job": "Ticket",
     "who": "Who plants it",
     "orchestratorPicks": "Assistant picks",
     "how": "Start: the assistant hands this to a helper, who starts in {repo} at once. Draft: a helper reads the code and writes it up as a ticket for you to look over before starting.",
@@ -158,26 +137,16 @@
     "working": "It is working: it hears this before its next step.",
     "idle": "It is not working: this has it work another round.",
     "thread": "This is kept in its ticket thread, with its replies.",
-    "job": "Its job now: {brief}",
     "hint": "A word to pass on…",
     "water": "Water",
     "moved": "The ticket's status changed: go back to the plot and see what it asks of you."
   },
   "harvest": {
-    "reading": "Looking at what it changed…",
     "repo": "Repo {repo}",
     "counts": "{commits} commits · {files} files",
-    "none": "This one has no changes. Harvesting just lets it go.",
-    "conflict": "Merging into {base} would conflict, so it cannot be harvested yet",
-    "resolveHow": "Have it merge {base} into its own branch, resolve the conflicts, run the tests and commit; then harvest it.",
-    "behind": "While it worked, {base} got {n} more commits; harvesting joins them (with one merge commit).",
-    "uncommitted": "{n} files are not committed yet; harvesting commits them first:",
     "letGo": "Let it go",
     "take": "Harvest, merge into {base}",
-    "resolve": "Have it resolve the conflict",
-    "files": "Changed files",
-    "empty": "The warehouse is empty. Work harvested into main is kept here.",
-    "taken": "harvested {ago}"
+    "resolve": "Have it resolve the conflict"
   },
   "plotOf": "{name}'s plot"
 }
