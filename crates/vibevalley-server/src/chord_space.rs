@@ -27,8 +27,10 @@ struct Projection {
 impl Space {
     pub fn new(frame: &StateFrame) -> Self {
         let mut f = fields(frame, &HashMap::new());
-        let mut state = Projection::default();
-        state.mentions = f["inbox"].as_array().cloned().unwrap_or_default();
+        let state = Projection {
+            mentions: f["inbox"].as_array().cloned().unwrap_or_default(),
+            ..Default::default()
+        };
         f.insert("rev", json!(1));
         f.insert("approvals", json!([]));
         f.insert("dreams", json!([]));

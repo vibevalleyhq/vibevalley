@@ -115,7 +115,7 @@ pub fn nearest(src: &RgbaImage, w: u32, h: u32, bgra: bool) -> RgbaImage {
         let sy = (2 * y + 1) * src.height() as usize / (2 * h as usize);
         let start = 4 * sy * src.width() as usize;
         let src = &src.as_raw()[start..];
-        for (&sx, dst) in columns.iter().zip(row.chunks_exact_mut(4)) {
+        for (&sx, dst) in columns.iter().zip(row.as_chunks_mut::<4>().0) {
             dst.copy_from_slice(&src[sx * 4..sx * 4 + 4]);
             if bgra {
                 dst.swap(0, 2);

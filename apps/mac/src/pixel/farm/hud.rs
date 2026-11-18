@@ -22,7 +22,6 @@ pub enum Panel {
     Log,
     Warehouse,
     Shop,
-    Chat,
 }
 
 impl Panel {
@@ -38,7 +37,6 @@ impl Panel {
                 Self::Log => "web.farm.native.log",
                 Self::Warehouse => "web.farm.native.warehouse",
                 Self::Shop => "web.farm.native.shop",
-                Self::Chat => "web.farm.native.chat",
             },
             &[],
         )
@@ -227,15 +225,8 @@ fn rows(f: &FarmScene, panel: Panel) -> Vec<Row> {
                 )
             })
             .collect(),
-        Panel::Chat | Panel::Log => {
-            let mut channels: Vec<_> = f
-                .frame
-                .state
-                .chat
-                .channels
-                .iter()
-                .filter(|c| c.archived.is_none() && (panel == Panel::Log || c.parent.is_none()))
-                .collect();
+        Panel::Log => {
+            let mut channels: Vec<_> = f.frame.state.chat.channels.iter().filter(|c| c.archived.is_none()).collect();
             channels.sort_by_key(|c| std::cmp::Reverse(c.last.as_ref().map(|m| m.at).unwrap_or(c.at)));
             channels
                 .into_iter()

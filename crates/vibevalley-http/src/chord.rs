@@ -28,13 +28,18 @@ pub(super) async fn upgrade(State(server): State<Shared>, headers: HeaderMap, ws
     let origin = format!("http://{}", headers["host"].to_str().expect("validated host"));
     ws.max_frame_size(MAX_MESSAGE_BYTES)
         .max_message_size(MAX_MESSAGE_BYTES)
-        .on_upgrade(move |socket| serve_socket(socket, space, origin))
+        .on_upgrade(move |socket| serve_socket(socket, server, space, origin))
         .into_response()
 }
 
-fn endpoint(space: Document, origin: String) -> Endpoint {
+fn endpoint(server: Shared, space: Document, origin: String) -> Endpoint {
     let endpoint = Endpoint::default();
     endpoint.publish("space", space.clone());
+    endpoint.handle("approval.resolve", {
+        let server = server.clone();
+        move |_, input| governance(server.clone(), input, |s, v| s.resolve_approval(v))
+    });
+    endpoint.handle("budget.raise", move |_, input| governance(server.clone(), input, |s, v| s.raise_budget(v)));
     let snapshot = space.clone();
     endpoint.handle("space.snapshot", move |_, _| {
         let (rev, view, _) = snapshot.state();
@@ -71,20 +76,33 @@ fn endpoint(space: Document, origin: String) -> Endpoint {
     endpoint
 }
 
-async fn serve_socket(socket: WebSocket, space: Document, origin: String) {
+async fn governance(
+    server: Shared,
+    input: Value,
+    call: fn(&dyn vibevalley_server_api::Server, Value) -> vibevalley_protocol::Envelope,
+) -> Result<Value, RpcError> {
+    let reply = tokio::task::spawn_blocking(move || call(server.as_ref(), input))
+        .await
+        .map_err(|err| RpcError::new("internal", err.to_string()))?;
+    match reply.error() {
+        Some(error) => Err(RpcError::new(error.biz_code.code().to_string(), error.message)),
+        None => Ok(reply.data.unwrap_or(Value::Null)),
+    }
+}
+
+async fn serve_socket(socket: WebSocket, server: Shared, space: Document, origin: String) {
     let (wire, bridge) = Transport::pipe(8);
     let (mut sink, mut stream) = socket.split();
     let io = async {
         let read = async {
             while let Some(Ok(message)) = stream.next().await {
-                match message {
+                let bytes = match message {
+                    Message::Text(_) | Message::Binary(_) => message.into_data(),
                     Message::Close(_) => break,
-                    Message::Text(_) | Message::Binary(_) => {
-                        if bridge.send(message.into_data().to_vec()).await.is_err() {
-                            break;
-                        }
-                    }
-                    _ => {}
+                    _ => continue,
+                };
+                if bridge.send(bytes.to_vec()).await.is_err() {
+                    break;
                 }
             }
         };
@@ -106,7 +124,7 @@ async fn serve_socket(socket: WebSocket, space: Document, origin: String) {
                 Err(RpcError::new("unauthorized", "expected user device"))
             }
         }));
-        let endpoint = endpoint(space, origin);
+        let endpoint = endpoint(server, space, origin);
         if let Ok(Ok(link)) = tokio::time::timeout(Duration::from_secs(15), endpoint.connect(wire, options)).await {
             link.closed().await;
         }

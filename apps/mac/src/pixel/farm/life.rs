@@ -43,6 +43,13 @@ enum Picture {
 const HEART: &[&str] = &[".#.#.", "#####", ".###.", "..#.."];
 const ZED: &[&str] = &["####", "..#.", ".#..", "####"];
 const STAR: &[&str] = &[".#.", "###", ".#."];
+struct DotMotion {
+    velocity: Box2,
+    fall: f32,
+    life: (f32, f32),
+    size: f32,
+}
+
 struct Bit {
     at: Point,
     velocity: Point,
@@ -224,7 +231,8 @@ impl Life {
         *next = t + interval * self.random.range(0.7, 1.3);
         true
     }
-    fn dot_burst(&mut self, layer: Layer, at: Point, count: usize, colors: &[u32], velocity: Box2, fall: f32, life: (f32, f32), size: f32) {
+    fn dot_burst(&mut self, layer: Layer, at: Point, count: usize, colors: &[u32], motion: DotMotion) {
+        let DotMotion { velocity, fall, life, size } = motion;
         for i in 0..count {
             let mut b = Bit::new(layer, Picture::Dot(colors[i % colors.len()], size), at, self.random.range(life.0, life.1));
             b.velocity = self.random.point(velocity);
@@ -246,7 +254,18 @@ impl Life {
         ));
         let sound = match ground {
             Ground::Pond => {
-                self.dot_burst(Layer::World, at, 8, &[0xcfeff2], region(-25., -55., 25., -25.), 170., (0.4, 0.6), 1.);
+                self.dot_burst(
+                    Layer::World,
+                    at,
+                    8,
+                    &[0xcfeff2],
+                    DotMotion {
+                        velocity: region(-25., -55., 25., -25.),
+                        fall: 170.,
+                        life: (0.4, 0.6),
+                        size: 1.,
+                    },
+                );
                 for (end, life) in [(7., 0.9), (4., 0.6)] {
                     self.bits.push(Bit::new(
                         Layer::World,
@@ -267,12 +286,25 @@ impl Life {
                     at,
                     7,
                     &[0x9dbb4e, 0x7d9a3a, 0xc8d36a],
-                    region(-22., -42., 22., -16.),
-                    110.,
-                    (0.5, 0.75),
-                    1.,
+                    DotMotion {
+                        velocity: region(-22., -42., 22., -16.),
+                        fall: 110.,
+                        life: (0.5, 0.75),
+                        size: 1.,
+                    },
                 );
-                self.dot_burst(Layer::World, at, 2, &[0x8aa43a, 0xc9a23a], region(-6., -10., 6., -4.), 14., (1.2, 1.8), 2.);
+                self.dot_burst(
+                    Layer::World,
+                    at,
+                    2,
+                    &[0x8aa43a, 0xc9a23a],
+                    DotMotion {
+                        velocity: region(-6., -10., 6., -4.),
+                        fall: 14.,
+                        life: (1.2, 1.8),
+                        size: 2.,
+                    },
+                );
                 "rustle"
             }
             Ground::Soil => {
@@ -281,15 +313,28 @@ impl Life {
                     at,
                     10,
                     &[0xf6e3bd, 0xe9cfa0, 0xfff2d6],
-                    region(-28., -24., 28., -6.),
-                    40.,
-                    (0.35, 0.6),
-                    1.,
+                    DotMotion {
+                        velocity: region(-28., -24., 28., -6.),
+                        fall: 40.,
+                        life: (0.35, 0.6),
+                        size: 1.,
+                    },
                 );
                 "thud"
             }
             Ground::Stone => {
-                self.dot_burst(Layer::Glow, at, 4, &[0xfff6d8], region(-20., -28., 20., -8.), 60., (0.3, 0.3), 1.);
+                self.dot_burst(
+                    Layer::Glow,
+                    at,
+                    4,
+                    &[0xfff6d8],
+                    DotMotion {
+                        velocity: region(-20., -28., 20., -8.),
+                        fall: 60.,
+                        life: (0.3, 0.3),
+                        size: 1.,
+                    },
+                );
                 "tap"
             }
         };
@@ -312,21 +357,56 @@ impl Life {
                         p,
                         1,
                         &[if i % 3 == 0 { 0xc8e6f7 } else { 0x6fb3e0 }],
-                        region(0., 10., 0., 30.),
-                        160.,
-                        (0.35, 0.6),
-                        1.,
+                        DotMotion {
+                            velocity: region(0., 10., 0., 30.),
+                            fall: 160.,
+                            life: (0.35, 0.6),
+                            size: 1.,
+                        },
                     );
                 }
             }
-            FarmTool::Bug => self.dot_burst(Layer::World, at, 12, &[0xf4f1e6], region(-24., -26., 24., -6.), 0., (0.5, 0.9), 2.),
-            FarmTool::Shovel => self.dot_burst(Layer::World, at, 12, &[0x5d4429, 0x8a6a45], region(-30., -50., 30., -20.), 140., (0.4, 0.7), 2.),
+            FarmTool::Bug => self.dot_burst(
+                Layer::World,
+                at,
+                12,
+                &[0xf4f1e6],
+                DotMotion {
+                    velocity: region(-24., -26., 24., -6.),
+                    fall: 0.,
+                    life: (0.5, 0.9),
+                    size: 2.,
+                },
+            ),
+            FarmTool::Shovel => self.dot_burst(
+                Layer::World,
+                at,
+                12,
+                &[0x5d4429, 0x8a6a45],
+                DotMotion {
+                    velocity: region(-30., -50., 30., -20.),
+                    fall: 140.,
+                    life: (0.4, 0.7),
+                    size: 2.,
+                },
+            ),
             FarmTool::Harvest => {
                 let mut b = Bit::new(Layer::World, Picture::Sprite("icon-harvest"), at, 1.1);
                 b.velocity.y = -38.;
                 b.fall = 30.;
                 self.bits.push(b);
-                self.dot_burst(Layer::World, at, 10, &[0xf2c14e], region(-30., -60., 30., -30.), 150., (0.5, 0.8), 1.);
+                self.dot_burst(
+                    Layer::World,
+                    at,
+                    10,
+                    &[0xf2c14e],
+                    DotMotion {
+                        velocity: region(-30., -60., 30., -30.),
+                        fall: 150.,
+                        life: (0.5, 0.8),
+                        size: 1.,
+                    },
+                );
             }
             _ => {}
         }
@@ -440,10 +520,12 @@ impl Life {
                 at,
                 4,
                 &[0xffd27a, 0xffb347, 0xfff1c2],
-                region(-32., -48., 32., -20.),
-                130.,
-                (0.3, 0.6),
-                1.,
+                DotMotion {
+                    velocity: region(-32., -48., 32., -20.),
+                    fall: 130.,
+                    life: (0.3, 0.6),
+                    size: 1.,
+                },
             );
             self.flash = 0.16;
         }

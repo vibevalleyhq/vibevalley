@@ -157,7 +157,7 @@ impl Lighting {
                 let vignette = 1. - g.vignette * smooth(0.3, 0.75, (vx * vx + vy * vy).sqrt());
                 for sy in 0..density {
                     let start = ((y * density + sy) * w * density + x * density) * 4;
-                    for p in color.as_mut()[start..start + density * 4].chunks_exact_mut(4) {
+                    for p in color.as_mut()[start..start + density * 4].as_chunks_mut::<4>().0 {
                         let rgb: [f32; 3] = std::array::from_fn(|c| p[c] as f32 * illumination[c] + [0.9, 0.92, 0.94][c] * haze * g.exposure);
                         let l = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114;
                         let dark = 1. - smooth(0., 0.6, l);

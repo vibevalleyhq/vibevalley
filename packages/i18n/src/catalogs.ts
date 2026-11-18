@@ -2194,7 +2194,6 @@ export const catalogs = {
         log: "农场日志",
         warehouse: "仓库里的工单",
         shop: "小摊",
-        chat: "田头",
         workbench: "工作台",
         map: "群岛",
         tree: "记忆树",
@@ -5934,7 +5933,6 @@ export const catalogs = {
         log: "Farm log",
         warehouse: "Stored issues",
         shop: "Shop",
-        chat: "Chat",
         workbench: "Workbench",
         map: "Islands",
         tree: "Memory tree",
@@ -9581,7 +9579,6 @@ export interface Messages {
   "web.farm.menu.skills": undefined;
   "web.farm.native.accepted": undefined;
   "web.farm.native.achievements": undefined;
-  "web.farm.native.chat": undefined;
   "web.farm.native.close": undefined;
   "web.farm.native.coins": { readonly coins: string | number };
   "web.farm.native.dawn": undefined;

@@ -25,7 +25,7 @@ const fn frame(sprite: &'static str) -> Look {
     Look { sprite, lift: 0., grow: 0. }
 }
 fn wagon(time: f32) -> Look {
-    frame(if (time / 0.12) as u32 % 2 == 0 { "dog-wag-1" } else { "dog-wag-2" })
+    frame(if ((time / 0.12) as u32).is_multiple_of(2) { "dog-wag-1" } else { "dog-wag-2" })
 }
 fn scratching(time: f32) -> Look {
     Look {

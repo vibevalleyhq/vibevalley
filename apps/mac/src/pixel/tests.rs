@@ -181,11 +181,11 @@ fn regression_farm_controls_stay_in_the_pane_and_modal_blocks_the_ground() {
             assert!(b.x >= 0.0 && b.y >= 0.0 && b.x + b.w <= size.0 && b.y + b.h <= size.1);
             assert!(hit(&scene, b.x + b.w / 2.0, b.y + b.h / 2.0).is_some());
         }
-        scene.panel = Some(Panel::Chat);
+        scene.panel = Some(Panel::Log);
         assert_eq!(hit(&scene, 0.0, 0.0), Some(Action::Block));
         let list = scene.draw(2.0);
         assert!(list.hud_view);
-        save(&format!("farm-chat-{}", size.0 as u32), &draw::raster_view(&list, Some(&atlas), size));
+        save(&format!("farm-log-{}", size.0 as u32), &draw::raster_view(&list, Some(&atlas), size));
         scene.panel = None;
         scene.phone.open = true;
         assert_eq!(hit(&scene, layout.phone.x + 40.0, layout.phone.y + 40.0), Some(Action::Block));
@@ -273,7 +273,7 @@ fn farm_fixture_supplies_typed_chat_and_profiles() {
     let (world, atlas) = load_village().unwrap();
     let mut scene = FarmScene::new(world, atlas);
     scene.frame = frame;
-    scene.panel = Some(farm::hud::Panel::Chat);
+    scene.panel = Some(farm::hud::Panel::Log);
     let p = farm::hud::Layout::new(&scene).panel;
     assert_eq!(
         farm::hud::hit(&scene, p.x + 20.0, p.y + 50.0),

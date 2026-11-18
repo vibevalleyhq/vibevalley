@@ -140,7 +140,20 @@ jobs:
           key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
       - run: git config --global user.name ci && git config --global user.email ci@example.com
-      - run: vp run nsh:install
+      - name: Restore nsh CLI
+        id: nsh
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/bin/nsh
+          key: nsh-cli-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json', 'rust-toolchain.toml') }}
+      - if: steps.nsh.outputs.cache-hit != 'true'
+        run: vp run nsh:install
+      - name: Cache nsh CLI
+        if: steps.nsh.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/bin/nsh
+          key: ${{ steps.nsh.outputs.cache-primary-key }}
       - run: vp run protocol:check
       - run: vp run rust:check
       - run: vp test run scripts/release/verify-server.test.ts
