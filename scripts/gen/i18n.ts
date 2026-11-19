@@ -34,6 +34,9 @@ const namespaces = (locale: Locale) =>
         .toSorted()
     : [];
 
+/** Rust-only namespaces (`server.*`, `cli`, `desktop`) stay in `crates/vibevalley-i18n`; TS bundles only UI catalogs. */
+const isUiNamespace = (ns: string) => ns === "shared" || ns.startsWith("web.");
+
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
 const readCatalog = (locale: Locale, ns: string): Nested => JSON.parse(readFileSync(join(localesDir, locale, ns + ".json"), "utf8")) as Nested;
 
@@ -43,23 +46,23 @@ function flatten(prefix: string, v: string | Nested, out: Map<string, string>) {
   return out;
 }
 
-function messages(locale: Locale): Map<string, string> {
+function messages(locale: Locale, filter: (ns: string) => boolean = () => true): Map<string, string> {
   const out = new Map<string, string>();
-  for (const ns of namespaces(locale)) flatten(ns, readCatalog(locale, ns), out);
+  for (const ns of namespaces(locale).filter(filter)) flatten(ns, readCatalog(locale, ns), out);
   return out;
 }
 
 const quote = (s: string) => JSON.stringify(s);
 
 function generated(): string {
-  const zh = messages("zh");
-  const all = locales.map(messages);
+  const zh = messages("zh", isUiNamespace);
+  const all = locales.map((l) => messages(l, isUiNamespace));
   // The catalogs are written in as data, not imported as JSON: every bundler and Node read a .ts the same way.
   const lines = ["// Written by `vpx scripts/gen/i18n.ts gen` from crates/vibevalley-i18n/locales: do not edit.", ""];
   lines.push("/** Each language's catalogs by namespace. */", "export const catalogs = {");
   for (const locale of locales) {
     lines.push(`  ${locale}: {`);
-    for (const ns of namespaces(locale)) lines.push(`    ${quote(ns)}: ${JSON.stringify(readCatalog(locale, ns))},`);
+    for (const ns of namespaces(locale).filter(isUiNamespace)) lines.push(`    ${quote(ns)}: ${JSON.stringify(readCatalog(locale, ns))},`);
     lines.push("  },");
   }
   lines.push("};", "", "/** Every key, and the params its zh message names (undefined: none). */", "export interface Messages {");

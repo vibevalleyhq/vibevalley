@@ -4,7 +4,7 @@
 import "../polyfill";
 import { expect, test } from "nsh/test";
 
-import { createFrame, framed, withPolicy } from "../web/features/artifact/frame";
+import { createFrame, withPolicy, withShellQuery } from "../web/features/artifact/frame";
 
 test("the policy goes in after <head>, else after the doctype, else first", () => {
   expect(withPolicy("<html><head><title>x</title></head></html>")).toMatch(/^<html><head><meta http-equiv="Content-Security-Policy"/u);
@@ -13,10 +13,11 @@ test("the policy goes in after <head>, else after the doctype, else first", () =
 });
 
 test("the shell's runtime reads the asked slide and stillness in place of location.search", () => {
-  const page = framed({ page: "<section>a</section><section>b</section>", display: "slides", theme: "dark", at: 1, still: true });
-  expect(page).toContain(`new URLSearchParams("at=1&still=1")`);
-  expect(page).toContain("vv-slides");
-  const plain = framed({ page: "<p>x</p>", display: "page", theme: "light" });
+  const sample = `<!doctype html><html><head></head><body><section>a</section><script>const asked = new URLSearchParams(location.search);</script></body></html>`;
+  const slide = withShellQuery(sample, { at: 1, still: true });
+  expect(slide).toContain(`<head><meta http-equiv="Content-Security-Policy"`);
+  expect(slide).toContain(`new URLSearchParams("at=1&still=1")`);
+  const plain = withShellQuery(sample);
   expect(plain).toContain(`new URLSearchParams("")`);
 });
 

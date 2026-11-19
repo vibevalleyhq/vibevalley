@@ -557,6 +557,7 @@ pub struct ArtifactHtmlEdit {
     #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
     pub id: ArtifactId,
     pub version: i64,
+    pub path: Option<String>,
     pub anchor: HtmlAnchor,
     pub text: String,
 }

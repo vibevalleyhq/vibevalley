@@ -2,7 +2,7 @@ import { computed, effect, Scroll, signal, Text, untracked, View, WebView, type 
 import { z } from "zod";
 
 import { type ShellTheme, themeVariables, typeVariables } from "@vibevalley/artifact/shell";
-import { sanitizeWhiteboardSvg, storeMessageOf } from "@vibevalley/artifact/viewers";
+import { storeMessageOf } from "@vibevalley/artifact/viewers";
 import { t } from "@vibevalley/i18n";
 
 import { shownTheme } from "../../state/prefs";
@@ -178,7 +178,7 @@ function buildWhiteboardSvg(elements: readonly WbElement[]): string {
     } else if (el.type === "text") {
       layers.push(`<text x="${x + 4}" y="${y + 22}" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#1c1917">${text}</text>`);
     } else if (el.type === "svg" && el.svg) {
-      layers.push(`<g transform="translate(${x},${y})">${sanitizeWhiteboardSvg(el.svg)}</g>`);
+      layers.push(`<g transform="translate(${x},${y})">${el.svg}</g>`);
     } else {
       const colors = fillColorsForSvg(el.fill, el.shape);
       const rx = el.shape === "pill" || el.shape === "ellipse" ? Math.round(h / 2) : 8;
@@ -613,7 +613,7 @@ export function WhiteboardView(props: StoreViewerProps) {
     const th = shownTheme();
     const wireElements = elements().map((el) => ({
       ...el,
-      ...(el.type === "svg" && el.svg ? { sanitizedSvg: sanitizeWhiteboardSvg(el.svg) } : {}),
+      ...(el.type === "svg" && el.svg ? { sanitizedSvg: el.svg } : {}),
     }));
     const payload = {
       elements: wireElements,

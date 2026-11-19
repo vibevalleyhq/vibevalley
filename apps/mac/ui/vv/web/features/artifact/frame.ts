@@ -9,8 +9,7 @@
 // which the runtime takes since its source is `parent`.
 import { signal, type Accessor, type WebViewRef } from "nsh";
 
-import { type ShellTheme, withShell } from "@vibevalley/artifact/shell";
-import type { ArtifactDisplay, HtmlAnchor, HtmlShellCommand, HtmlShellMessage } from "@vibevalley/protocol";
+import type { HtmlAnchor, HtmlShellCommand, HtmlShellMessage } from "@vibevalley/protocol";
 
 import { selectionOf, shellMessageOf } from "./shell";
 
@@ -70,19 +69,13 @@ export function withPolicy(page: string): string {
   return policy + page;
 }
 
-/** The page a web view shows: the version as made, with its policy and the shell's theme, styles and runtime. `at` and
- * `still` are the runtime's query string in VibeValley (shellPath): here they are set before it reads them. */
-export function framed(shown: {
-  readonly page: string;
-  readonly display: ArtifactDisplay;
-  readonly theme: ShellTheme;
-  readonly at?: number;
-  readonly still?: boolean;
-}): string {
+/** Prepares a Rust shell-wrapped page for an nsh WebView: injects the CSP meta policy and substitutes `location.search`
+ * with the requested slide/still query parameters (a WebView loaded from `html` has no URL query string). */
+export function withShellQuery(html: string, opts?: { readonly at?: number; readonly still?: boolean }): string {
   const asked = new URLSearchParams();
-  if (shown.at !== undefined) asked.set("at", String(shown.at));
-  if (shown.still === true) asked.set("still", "1");
-  const whole = withShell({ page: withPolicy(shown.page), display: shown.display, theme: shown.theme });
+  if (opts?.at !== undefined) asked.set("at", String(opts.at));
+  if (opts?.still === true) asked.set("still", "1");
+  const whole = withPolicy(html);
   // The runtime reads `location.search`, which a page given as html does not have: it reads the asked one instead. The
   // runtime is last in the page, so the last such read is its.
   const read = "new URLSearchParams(location.search)";

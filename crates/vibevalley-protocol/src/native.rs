@@ -51,6 +51,24 @@ pub const NATIVE_ENDPOINTS: &[Endpoint] = &[
         input: Some("ArtifactViewInput"),
         result: Some("ArtifactPage"),
     },
+    Endpoint {
+        op: "artifact.entry.writeProps",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactEntryWritePropsInput"),
+        result: Some("ArtifactEntryBatchResult"),
+    },
+    Endpoint {
+        op: "artifact.tokens.inspect",
+        module: "artifact",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactTokensInspectInput"),
+        result: Some("InspectedTokensSpec"),
+    },
 ];
 
 /// The attachment's id (the sha256 of its bytes).
@@ -114,6 +132,85 @@ pub struct ArtifactPage {
     pub headers: std::collections::BTreeMap<String, String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum DesignPropValue {
+    Bool(bool),
+    Number(f64),
+    String(String),
+}
+
+/// Updates declared `data-props` default values inside a `.dc.html` store entry.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactEntryWritePropsInput {
+    pub id: String,
+    pub path: String,
+    pub values: std::collections::BTreeMap<String, DesignPropValue>,
+}
+
+/// Parses a design-system `tokens.json` string into swatches, typography, spacing, contrast ratios, and compiled CSS.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactTokensInspectInput {
+    pub raw: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectedColorSwatch {
+    pub id: String,
+    pub group: String,
+    pub light: String,
+    pub dark: String,
+    pub note: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contrast_light: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contrast_dark: Option<f64>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectedTypeFamily {
+    pub id: String,
+    pub value: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectedTokenValue {
+    pub id: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectedTypeStyle {
+    pub id: String,
+    pub family: String,
+    pub size: String,
+    pub weight: String,
+    pub line_height: String,
+    pub letter_spacing: String,
+    pub sample: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectedTokensSpec {
+    pub themes: Vec<String>,
+    pub default_theme: String,
+    pub colors: Vec<InspectedColorSwatch>,
+    pub families: Vec<InspectedTypeFamily>,
+    pub scale: Vec<InspectedTokenValue>,
+    pub styles: Vec<InspectedTypeStyle>,
+    pub space: Vec<InspectedTokenValue>,
+    pub radius: Vec<InspectedTokenValue>,
+    pub css: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MediaInputFileInput {
@@ -166,5 +263,21 @@ pub mod native_ops {
         const NAME: &'static str = "artifact.view";
         type Input = ArtifactViewInput;
         type Result = super::ArtifactPage;
+    }
+
+    /// Rewrites `data-props` defaults in a `.dc.html` store entry and commits the update.
+    pub struct ArtifactEntryWriteProps;
+    impl Op for ArtifactEntryWriteProps {
+        const NAME: &'static str = "artifact.entry.writeProps";
+        type Input = ArtifactEntryWritePropsInput;
+        type Result = crate::ArtifactEntryBatchResult;
+    }
+
+    /// Parses design-system tokens, computes WCAG contrast against surface colors, and compiles CSS.
+    pub struct ArtifactTokensInspect;
+    impl Op for ArtifactTokensInspect {
+        const NAME: &'static str = "artifact.tokens.inspect";
+        type Input = ArtifactTokensInspectInput;
+        type Result = InspectedTokensSpec;
     }
 }
