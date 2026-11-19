@@ -1,35 +1,7 @@
-// Local structural types aligned with PR #257 protocol shapes (tighten to @vibevalley/protocol imports after w1/proto-cli-v2 merges).
-export const ArtifactTypeValues = ["docs", "slides", "dashboard", "motion", "whiteboard", "design", "design-system"] as const;
-export type ArtifactType = (typeof ArtifactTypeValues)[number];
+import { type ArtifactEntry, type ArtifactEntryKind, type ArtifactEntryWriteInput, type ArtifactType, ArtifactTypeValues } from "@vibevalley/protocol";
 
-export const ArtifactEntryKindValues = ["json", "html", "text", "asset"] as const;
-export type ArtifactEntryKind = (typeof ArtifactEntryKindValues)[number];
-
-export const ArtifactEntryOpValues = ["set", "patch", "delete", "copy"] as const;
-export type ArtifactEntryOp = (typeof ArtifactEntryOpValues)[number];
-
-export interface ArtifactEntry {
-  readonly artifactId: string;
-  readonly path: string;
-  readonly kind: ArtifactEntryKind;
-  readonly mime: string;
-  readonly size: number;
-  readonly rev: number;
-  readonly updatedBy: string;
-  readonly updated: number;
-  readonly value?: string | undefined;
-  readonly attachmentId?: string | undefined;
-}
-
-export interface ArtifactEntryWriteInput {
-  readonly op: ArtifactEntryOp;
-  readonly path: string;
-  readonly kind?: ArtifactEntryKind | undefined;
-  readonly value?: string | undefined;
-  readonly from?: string | undefined;
-  readonly mime?: string | undefined;
-  readonly ifRev?: number | undefined;
-}
+export { ArtifactTypeValues };
+export type { ArtifactEntry, ArtifactEntryKind, ArtifactEntryWriteInput, ArtifactType };
 
 export const entryMaxBytes = 2 * 1024 * 1024;
 export const entryMaxCount = 500;

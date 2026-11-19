@@ -4,141 +4,14 @@
 
 use std::collections::BTreeSet;
 
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
+pub use vibevalley_protocol::{ArtifactEntry, ArtifactEntryKind, ArtifactEntryOp, ArtifactEntryWriteInput, ArtifactType};
 
 pub const ENTRY_MAX_BYTES: usize = 2 * 1024 * 1024;
 pub const ENTRY_MAX_COUNT: usize = 500;
 pub const INLINE_EVENT_MAX_BYTES: usize = 256 * 1024;
 
 const ENTRY_PATH_MAX: usize = 240;
-
-// Local wire-aligned types mirroring PR #257 protocol shapes (tighten to
-// vibevalley_protocol imports after w1/proto-cli-v2 merges).
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum ArtifactType {
-    #[serde(rename = "docs")]
-    Docs,
-    #[serde(rename = "slides")]
-    Slides,
-    #[serde(rename = "dashboard")]
-    Dashboard,
-    #[serde(rename = "motion")]
-    Motion,
-    #[serde(rename = "whiteboard")]
-    Whiteboard,
-    #[serde(rename = "design")]
-    Design,
-    #[serde(rename = "design-system")]
-    DesignSystem,
-}
-
-impl ArtifactType {
-    pub const ALL: [ArtifactType; 7] = [
-        ArtifactType::Docs,
-        ArtifactType::Slides,
-        ArtifactType::Dashboard,
-        ArtifactType::Motion,
-        ArtifactType::Whiteboard,
-        ArtifactType::Design,
-        ArtifactType::DesignSystem,
-    ];
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            ArtifactType::Docs => "docs",
-            ArtifactType::Slides => "slides",
-            ArtifactType::Dashboard => "dashboard",
-            ArtifactType::Motion => "motion",
-            ArtifactType::Whiteboard => "whiteboard",
-            ArtifactType::Design => "design",
-            ArtifactType::DesignSystem => "design-system",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "docs" => Some(ArtifactType::Docs),
-            "slides" => Some(ArtifactType::Slides),
-            "dashboard" => Some(ArtifactType::Dashboard),
-            "motion" => Some(ArtifactType::Motion),
-            "whiteboard" => Some(ArtifactType::Whiteboard),
-            "design" => Some(ArtifactType::Design),
-            "design-system" => Some(ArtifactType::DesignSystem),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum ArtifactEntryKind {
-    #[serde(rename = "json")]
-    Json,
-    #[serde(rename = "html")]
-    Html,
-    #[serde(rename = "text")]
-    Text,
-    #[serde(rename = "asset")]
-    Asset,
-}
-
-impl ArtifactEntryKind {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            ArtifactEntryKind::Json => "json",
-            ArtifactEntryKind::Html => "html",
-            ArtifactEntryKind::Text => "text",
-            ArtifactEntryKind::Asset => "asset",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum ArtifactEntryOp {
-    #[serde(rename = "set")]
-    Set,
-    #[serde(rename = "patch")]
-    Patch,
-    #[serde(rename = "delete")]
-    Delete,
-    #[serde(rename = "copy")]
-    Copy,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArtifactEntry {
-    pub artifact_id: String,
-    pub path: String,
-    pub kind: ArtifactEntryKind,
-    pub mime: String,
-    pub size: usize,
-    pub rev: i64,
-    pub updated_by: String,
-    pub updated: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub attachment_id: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArtifactEntryWriteInput {
-    pub op: ArtifactEntryOp,
-    pub path: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kind: Option<ArtifactEntryKind>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub from: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub mime: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub if_rev: Option<i64>,
-}
 
 fn has_control_char(s: &str) -> bool {
     s.chars().any(|c| {

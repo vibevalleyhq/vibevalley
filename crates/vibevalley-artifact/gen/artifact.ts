@@ -13,6 +13,7 @@ import * as Tokens from "@vibevalley/artifact/tokens";
 import * as Viewers from "@vibevalley/artifact/viewers";
 import { setLocale } from "@vibevalley/i18n";
 import { keyBetween } from "@vibevalley/protocol/rules";
+import { artifactId } from "@vibevalley/protocol/schema";
 import { sample } from "./sample.ts";
 
 const out = process.argv[2]!;
@@ -369,7 +370,7 @@ write("suffix", {
 
 // ---- structured store ----
 const sampleEntries: Store.ArtifactEntry[] = Starters.starterEntriesForType("slides", "Demo").map((w, i) => ({
-  artifactId: "00000000-0000-4000-a000-000000000099",
+  artifactId: artifactId("00000000-0000-4000-a000-000000000099"),
   path: w.path,
   kind: w.kind ?? Store.inferEntryKind(w.path),
   mime: Store.inferEntryMime(w.path, w.kind ?? Store.inferEntryKind(w.path)),
@@ -443,7 +444,7 @@ write(
 // ---- viewers ----
 const materialize = (type: Store.ArtifactType): Store.ArtifactEntry[] =>
   Starters.starterEntriesForType(type, "Demo").map((w, i) => ({
-    artifactId: "00000000-0000-4000-a000-000000000099",
+    artifactId: artifactId("00000000-0000-4000-a000-000000000099"),
     path: w.path,
     kind: w.kind ?? Store.inferEntryKind(w.path),
     mime: Store.inferEntryMime(w.path, w.kind ?? Store.inferEntryKind(w.path)),

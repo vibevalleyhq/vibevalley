@@ -1,13 +1,12 @@
 import { type DefaultTreeAdapterTypes as P, parseFragment, serialize } from "parse5";
 import { z } from "zod";
 
+import { artifactViewPath } from "@vibevalley/protocol";
+
 import { htmlCheck, htmlProblem, htmlSources } from "./html.ts";
 import { motionRecorderHelper, selectionScript, type ShellTheme, themeVariables, typeVariables } from "./shell.ts";
 import type { ArtifactEntry, ArtifactType } from "./store.ts";
 import { compileTokensCss } from "./tokens.ts";
-
-// Mirrors @vibevalley/protocol artifactViewPath (tighten to protocol import after w1/proto-cli-v2 merges).
-const artifactViewPath = (id: string) => `/api/v1/artifact/${id}/view`;
 
 export function storeViewHeaders(origin?: string, print = false, sandboxTokens = ""): Record<string, string> {
   const attach = origin ? ` ${origin}/api/v1/attachment/` : "";

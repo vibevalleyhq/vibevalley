@@ -43,10 +43,10 @@ pub fn artifact_problem(title: Option<&str>, kind: Option<&str>, size: Option<us
         }
     }
     if let Some(kind) = kind
-        && kind != "html"
-        && kind != "markdown"
+        && !ArtifactKind::ALL.iter().any(|k| k.as_str() == kind)
     {
-        return t("server.artifact.badKind", &[("kind", kind.into()), ("kinds", "html, markdown".into())]);
+        let kinds = ArtifactKind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>().join(", ");
+        return t("server.artifact.badKind", &[("kind", kind.into()), ("kinds", kinds.into())]);
     }
     match size {
         None => String::new(),
