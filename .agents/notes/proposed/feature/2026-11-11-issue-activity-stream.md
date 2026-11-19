@@ -9,7 +9,7 @@ Status: proposed
 | 块 | 取数 | 内容 |
 |---|---|---|
 | 讨论与交付记录（`IssueThread`） | 工单串的频道消息，`useFollowed`，往上翻页 | 用户的话、帮工的汇报、系统消息 |
-| 怎么走到这一步（`Story`） | `issue.timeline.get`，服务端 `milestonesOf`（`apps/server/src/modules/issue/brief.ts`）由 runs 折出 | 开单、开工、交回、提问、打回、验收、关单 |
+| 怎么走到这一步（`Story`） | `issue.timeline.get`，核心规则 `milestones_of`（`crates/vibevalley-core/src/brief.rs`）由 runs 折出 | 开单、开工、交回、提问、打回、验收、关单 |
 | 帮工的每一步（`WorkLog`） | `session.event.list`，只取当前帮工，展开才读 | 想、说、用工具、出错 |
 | 每一轮（`Runs`） | `issue.run.list` | 每轮的起止、结果、摘要 |
 
@@ -36,7 +36,7 @@ Status: proposed
 ## 共享约定
 
 - 事件行的图标走 `ui/icons.ts` 的名字，一种 `MilestoneKind` 一个，写成 `Record<MilestoneKind, IconName>`，加新种类时编不过。
-- 页面的 `data-testid`：活动 `issue-activity`，消息行沿用 `issue-message`，事件行沿用 `milestone`（`data-kind`、新加 `data-run`）。现有页面测试按这些找元素，改名就要一起改。
+- 页面的 `testID`：活动 `issue-activity`，消息行沿用 `issue-message`，事件行沿用 `milestone`。现有页面测试按这些找元素，改名就要一起改。
 
 ## Alternatives considered
 
@@ -52,14 +52,13 @@ Status: proposed
 
 - 一张走过「开工 → 提问 → 回答 → 交回 → 打回 → 交回 → 验收 → 关单」的工单，详情页只有一条活动：每件事出现一次，从上到下按时间，回答和打回意见是消息行，其余是事件行。
 - 事件行展开能看到那一轮的步骤，含之前帮工的轮次；不展开时不读 `session.event.list`。
-- 服务端测试：`milestonesOf` 不出 `told`、摘要在 `said` 不在 `text`、带 `run`、旧的在前（`apps/server/src/modules/issue` 的规则测试）。命令行的 `issue timeline` 仍打出每轮的摘要（`apps/cli` 的 golden 测试）。
-- 页面：合并两列的纯函数在 `features/issue/*.ts` 用 vitest 测（同一毫秒、只读到一部分消息时的截断）；`issue-page.spec.ts` 的真实一轮断言活动里的事件和消息都在、展开一轮能看到步骤。
-- 截图验收（vv-acceptance 的页面分册）：1440 和 390 宽各一张。
+- 服务端测试：`milestones_of` 不出 `told`、摘要在 `said` 不在 `text`、带 `run`、旧的在前（`crates/vibevalley-core/src/brief.rs` 与 `crates/vibevalley-server/tests/issue_edits.rs`）。命令行的 `issue timeline` 仍打出每轮的摘要（`crates/vibevalley-cli/tests/cli.rs`）。
+- 页面：合并两列的纯函数在 `apps/mac/ui/vv/web/features/issue/` 补单测（同一毫秒、只读到一部分消息时的截断）；`apps/mac/ui/vv/app/issues.test.tsx` 断言活动里的事件和消息都在、展开一轮能看到步骤。
+- 截图验收（vv-acceptance 的应用分册）：浅色与深色各一张。
 - `docs/subsystems/issue.md` 写下活动由什么组成、去重归服务端。
 
 ## Risks
 
 - **消息分页和事件的对齐**：只读了最近一页消息时，较早的事件要不要画？上面选了「只画比最早一条已读消息新的事件」，翻页后补出来；如果某张工单消息很少、事件很多，这个规则可能显得事件晚到。做时看真数据再定。
-- **农场的工单视图**（`farm/issue/IssueView.tsx`）自己画里程碑和每一轮。这次只改工作台；`milestonesOf` 的变化（不出 `told`、摘要挪进 `said`）农场也会看到，它的里程碑行要改成读 `said`，否则交回那行就没了摘要。
-- **`issue.timeline.get` 的形状变了**：加 `run`、`said`，去掉 `told`，`text` 不再带摘要。读它的有页面、农场和命令行的 `issue timeline`；照「内部不留兼容」直接改，三处一起改，跑命令行的 golden 测试。
-- **页面测试**：`issue-page.spec.ts` 现在断言有 `told` 里程碑，要改成断言那句话是一条消息。
+- **`issue.timeline.get` 的形状变了**：加 `run`、`said`，去掉 `told`，`text` 不再带摘要。读它的有页面、助手工具（`modules/tool/issue.rs`）和命令行的 `issue timeline`；照「内部不留兼容」直接改，各处一起改，跑 `rust:check`、`protocol:check` 与 `mac:check`。
+- **已有测试**：`crates/vibevalley-server/tests/issue_edits.rs` 目前断言存在 `MilestoneKind::Told` 且倒序，需同步改为正序并断言无 `Told`。
