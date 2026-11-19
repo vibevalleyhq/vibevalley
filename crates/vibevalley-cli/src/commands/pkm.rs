@@ -179,7 +179,7 @@ pub fn run(ctx: &Ctx, m: &ArgMatches) -> Done {
             if ctx.dry_run {
                 return Err(no_dry_run("pkm journal show"));
             }
-            let day = get(m, "day").unwrap_or_else(|| jiff::Zoned::now().strftime("%Y-%m-%d").to_string());
+            let day = get(m, "day").unwrap_or_else(|| jiff::ZonedDateTime::now().strftime("%Y-%m-%d").to_string());
             let page = ctx.ask::<ops::PkmJournalOpen>(&PkmJournalRequest { day })?;
             ctx.show(&page, outline);
             Ok(())

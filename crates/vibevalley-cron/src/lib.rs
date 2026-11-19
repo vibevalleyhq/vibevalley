@@ -130,7 +130,7 @@ fn offset_at(at: i64, zone: &Zone) -> i64 {
 /// A wall time as UTC milliseconds (`Date.UTC`).
 fn utc_ms(year: i16, month: i8, day: i8, hour: i8, minute: i8) -> i64 {
     Date::new(year, month, day)
-        .and_then(|d| d.at(hour, minute, 0, 0).to_zoned(TimeZone::UTC))
+        .and_then(|d| d.at(hour, minute, 0, 0).to_zoned_datetime(TimeZone::UTC))
         .map(|z| z.timestamp().as_millisecond())
         .unwrap_or(i64::MIN)
 }
@@ -138,7 +138,7 @@ fn utc_ms(year: i16, month: i8, day: i8, hour: i8, minute: i8) -> i64 {
 /// The wall clock at an instant, as UTC fields.
 fn wall_of(at: i64, zone: &Zone) -> jiff::civil::DateTime {
     let ts = Timestamp::from_millisecond(at + offset_at(at, zone)).unwrap_or(Timestamp::UNIX_EPOCH);
-    ts.to_zoned(TimeZone::UTC).datetime()
+    ts.to_zoned_datetime(TimeZone::UTC).datetime()
 }
 
 /// The instant a wall time names: in a fold the earlier; in a gap as if the

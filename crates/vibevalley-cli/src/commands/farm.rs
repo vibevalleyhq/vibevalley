@@ -612,11 +612,11 @@ fn parse_at(raw: &str) -> Result<i64, Failure> {
     if let Ok(ts) = raw.parse::<jiff::Timestamp>() {
         return Ok(ts.as_millisecond());
     }
-    if let Ok(zoned) = raw.parse::<jiff::Zoned>() {
+    if let Ok(zoned) = raw.parse::<jiff::ZonedDateTime>() {
         return Ok(zoned.timestamp().as_millisecond());
     }
     if let Ok(dt) = raw.parse::<jiff::civil::DateTime>()
-        && let Ok(zoned) = dt.to_zoned(jiff::tz::TimeZone::system())
+        && let Ok(zoned) = dt.to_zoned_datetime(jiff::tz::TimeZone::system())
     {
         return Ok(zoned.timestamp().as_millisecond());
     }

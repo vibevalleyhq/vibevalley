@@ -703,7 +703,7 @@ impl Orchestrator {
         let news = if heard.is_empty() { String::new() } else { words::news(&heard.join("\n")) };
         let at = jiff::Timestamp::from_millisecond(now())
             .unwrap_or_default()
-            .to_zoned(jiff::tz::TimeZone::system());
+            .to_zoned_datetime(jiff::tz::TimeZone::system());
         let time = at.strftime("%Y/%-m/%-d %H:%M").to_string();
         let asked: Vec<String> = batch.iter().map(|i| format!("{}{}", i.source.head(), i.line)).collect();
         [words::now_line(&time), shown, news, asked.join("\n\n")]

@@ -182,7 +182,7 @@ fn seconds_of(text: &str) -> i64 {
 
 fn local_day(ms: i64) -> String {
     jiff::Timestamp::from_millisecond(ms)
-        .map(|ts| ts.to_zoned(jiff::tz::TimeZone::system()).strftime("%Y-%m-%d").to_string())
+        .map(|ts| ts.to_zoned_datetime(jiff::tz::TimeZone::system()).strftime("%Y-%m-%d").to_string())
         .unwrap_or_default()
 }
 

@@ -1840,6 +1840,7 @@ export const catalogs = {
       },
       updateReady: "{next} 已下好，去「关于」重启",
       intent: { timedOut: "等了太久没回音，可以重试", offline: "没连上农场，这一下没发出去" },
+      pickTooLarge: "{name} 没加上：超过 512 MiB 了",
     },
     "web.catalog": {
       ground: { check: "格子", grass: "草地", night: "夜里" },
@@ -5674,6 +5675,7 @@ export const catalogs = {
       },
       updateReady: "{next} is ready: restart from About",
       intent: { timedOut: "No answer in time; try again", offline: "Not connected to the farm, so this was not sent" },
+      pickTooLarge: "{name} was not added: it is over 512 MiB",
     },
     "web.catalog": {
       ground: { check: "Checks", grass: "Grass", night: "Night" },
@@ -9337,6 +9339,7 @@ export interface Messages {
   "web.base.money.underCent": undefined;
   "web.base.off": undefined;
   "web.base.orchestrator": undefined;
+  "web.base.pickTooLarge": { readonly name: string | number };
   "web.base.place.agents.hint": undefined;
   "web.base.place.agents.label": undefined;
   "web.base.place.catalog.hint": undefined;

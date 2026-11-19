@@ -229,7 +229,7 @@ mod graph_golden {
 fn journal_titles() {
     let at = jiff::civil::date(2026, 11, 3)
         .at(10, 0, 0, 0)
-        .to_zoned(jiff::tz::TimeZone::system())
+        .to_zoned_datetime(jiff::tz::TimeZone::system())
         .unwrap()
         .timestamp()
         .as_millisecond();

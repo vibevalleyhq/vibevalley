@@ -28,6 +28,7 @@ import { AttachmentTile } from "../../../ui/domain/AttachmentTile";
 import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Icon } from "../../../ui/Icon";
 import type { IconName } from "../../../ui/icons";
+import { readFiles } from "../../../ui/picked";
 import { Bubble } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { mix } from "../../../ui/tone";
@@ -125,7 +126,7 @@ export function Composer(props: {
     },
   });
   // The system's open panel (VibeValley's hidden file input); the picked files come with their bytes.
-  const pick = async () => attach((await Picker.pickFiles({ multiple: true })).map((p) => p.file));
+  const pick = async () => attach(readFiles(await Picker.pickFiles({ multiple: true })));
   const attach = (files: readonly File[]) => {
     const id = props.channel?.id;
     if (id && files.length > 0) void attachFiles(id, files, uploadFailed);

@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 use gpui_kit::{
     App, Bounds, Element, ElementId, Entity, FocusHandle, Font, FontFallbacks, FontStyle, FontWeight, GlobalElementId, Hsla, InputHandler, InspectorElementId,
-    IntoElement, LayoutId, Pixels, Point, ShapedLine, SharedString, StrikethroughStyle, Style, TextAlign, TextRun, UTF16Selection, UnderlineStyle, Window,
-    fill, font, outline, point, px, relative, size,
+    LayoutId, Pixels, Point, ShapedLine, SharedString, StrikethroughStyle, Style, TextAlign, TextRun, UTF16Selection, UnderlineStyle, Window, fill, font,
+    outline, point, px, relative, size,
 };
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
@@ -290,13 +290,6 @@ pub struct Prepaint {
     colors: Palette,
     font_size: Pixels,
     blink_on: bool,
-}
-
-impl IntoElement for TerminalElement {
-    type Element = Self;
-    fn into_element(self) -> Self {
-        self
-    }
 }
 
 impl Element for TerminalElement {

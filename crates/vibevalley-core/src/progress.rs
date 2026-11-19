@@ -141,7 +141,7 @@ fn tallied(p: &mut Progress, entry: &LedgerEntry) {
 fn local_parts(at: i64) -> (i64, i64) {
     jiff::Timestamp::from_millisecond(at)
         .map(|ts| {
-            let z = ts.to_zoned(jiff::tz::TimeZone::system());
+            let z = ts.to_zoned_datetime(jiff::tz::TimeZone::system());
             (z.hour() as i64, z.weekday().to_sunday_zero_offset() as i64)
         })
         .unwrap_or((12, 1))

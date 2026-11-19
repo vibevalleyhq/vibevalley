@@ -233,5 +233,6 @@
   "intent": {
     "timedOut": "等了太久没回音，可以重试",
     "offline": "没连上农场，这一下没发出去"
-  }
+  },
+  "pickTooLarge": "{name} 没加上：超过 512 MiB 了"
 }

@@ -5,9 +5,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-base64 = "0.22.1"
+base64 = "0.23.1"
 sqlx = { version = "0.9.1", default-features = false, features = ["sqlite", "derive"] }
-pollster = "0.4.0"
+pollster = "1.0.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 thiserror = "2.0.21"

@@ -208,6 +208,9 @@ impl HostedView {
     /// `view` selects the surface in `ui/App.tsx`; `params` reach it as
     /// `host.params`.
     pub fn new(view: &str, params: Map<String, Value>, dark: bool, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        // nsh serves only nsh/base's core part unless the host names more; the views import Command, Menu, Select…
+        static UI_SETS: std::sync::Once = std::sync::Once::new();
+        UI_SETS.call_once(|| nsh_platform_gpui::set_ui_sets(vec![nsh_base::registry()]));
         let (tx, rx) = flume::unbounded::<Value>();
         let (err_tx, err_rx) = flume::unbounded::<String>();
         let options = AppOptions {

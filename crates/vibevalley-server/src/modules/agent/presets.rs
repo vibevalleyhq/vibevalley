@@ -67,8 +67,8 @@ pub fn support_of(runtime: &str) -> RuntimeSupport {
 
 fn when_text(at: i64) -> String {
     let local = jiff::Timestamp::from_millisecond(at)
-        .map(|ts| ts.to_zoned(jiff::tz::TimeZone::system()))
-        .unwrap_or_else(|_| jiff::Zoned::now());
+        .map(|ts| ts.to_zoned_datetime(jiff::tz::TimeZone::system()))
+        .unwrap_or_else(|_| jiff::ZonedDateTime::now());
     t(
         "server.runtime.date",
         &[

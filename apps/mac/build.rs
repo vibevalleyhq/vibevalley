@@ -1,6 +1,6 @@
 //! Bundles the hosted views (`ui/`) with the `nsh` CLI into `$OUT_DIR/ui`,
 //! which the binary embeds. The CLI is found through `NSH_BIN`, the repo's
-//! `.tools/bin/nsh` (`cargo install nsh-cli --root .tools`), or `PATH`.
+//! `.tools/bin/nsh` (`vp run nsh:install`), or `PATH`.
 //! Without it the build still succeeds, with a bundle that reports the
 //! missing UI at run time.
 

@@ -24,6 +24,7 @@ import { Select, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Empty, Quiet } from "../../ui/layout";
 import { Lightbox, type Picture } from "../../ui/Lightbox";
+import { readFiles } from "../../ui/picked";
 import { Segmented } from "../../ui/Segmented";
 import { toast } from "../../ui/toasts";
 import { AudioPanel } from "./AudioPanel";
@@ -153,14 +154,8 @@ export function LibraryPage() {
         );
 
   const pickFiles = async () => {
-    const chosenFiles = await Picker.pickFiles({ multiple: true });
-    await uploadEntries(
-      chosenFiles.map((p) => ({
-        name: p.file.name,
-        type: p.file.type,
-        data: attachmentData(p.file),
-      })),
-    );
+    const chosenFiles = readFiles(await Picker.pickFiles({ multiple: true }));
+    await uploadEntries(chosenFiles.map((file) => ({ name: file.name, type: file.type, data: attachmentData(file) })));
   };
 
   const dropUris = async (uris: readonly string[]) => {

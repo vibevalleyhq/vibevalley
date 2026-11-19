@@ -149,5 +149,8 @@ fn parse_time(s: &str) -> Option<i64> {
         return Some(t.as_millisecond());
     }
     let local = text.parse::<jiff::civil::DateTime>().ok()?;
-    local.to_zoned(jiff::tz::TimeZone::system()).ok().map(|z| z.timestamp().as_millisecond())
+    local
+        .to_zoned_datetime(jiff::tz::TimeZone::system())
+        .ok()
+        .map(|z| z.timestamp().as_millisecond())
 }

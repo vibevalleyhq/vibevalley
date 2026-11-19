@@ -209,7 +209,7 @@ pub fn flat_blocks(nodes: &[Node]) -> Vec<Block> {
 pub fn day_of(at: i64) -> String {
     let zone = jiff::tz::TimeZone::system();
     match jiff::Timestamp::from_millisecond(at) {
-        Ok(t) => t.to_zoned(zone).strftime("%Y-%m-%d").to_string(),
+        Ok(t) => t.to_zoned_datetime(zone).strftime("%Y-%m-%d").to_string(),
         Err(_) => String::new(),
     }
 }

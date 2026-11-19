@@ -152,7 +152,7 @@ static SPACES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").expect("spa
 fn midnight(day: &str) -> Option<i64> {
     let m = DAY.captures(day)?;
     let date = jiff::civil::Date::new(m[1].parse().ok()?, m[2].parse().ok()?, m[3].parse().ok()?).ok()?;
-    Some(date.to_zoned(jiff::tz::TimeZone::system()).ok()?.timestamp().as_millisecond())
+    Some(date.to_zoned_datetime(jiff::tz::TimeZone::system()).ok()?.timestamp().as_millisecond())
 }
 
 /// `parseSearch`: a search's filters read out of its words; a filter that
