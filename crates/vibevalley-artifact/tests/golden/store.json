@@ -1,0 +1,165 @@
+{
+ "paths": [
+  {
+   "path": "",
+   "problem": "empty path"
+  },
+  {
+   "path": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "problem": "exceeds 240 characters"
+  },
+  {
+   "path": "bad\u0001char",
+   "problem": "contains control characters"
+  },
+  {
+   "path": "a\\b",
+   "problem": "use forward slashes (/)"
+  },
+  {
+   "path": "/leading",
+   "problem": "must be relative without leading or trailing /"
+  },
+  {
+   "path": "trailing/",
+   "problem": "must be relative without leading or trailing /"
+  },
+  {
+   "path": "a//b",
+   "problem": "contains empty path segment (//)"
+  },
+  {
+   "path": "a/./b",
+   "problem": "dot path segments are not allowed"
+  },
+  {
+   "path": "project/../secret",
+   "problem": "dot path segments are not allowed"
+  },
+  {
+   "path": "project/slides/s01.html",
+   "problem": null
+  }
+ ],
+ "kinds": [
+  {
+   "path": "project/deck.json",
+   "kind": "json",
+   "mime": "application/json"
+  },
+  {
+   "path": "assets/logo.png",
+   "kind": "asset",
+   "mime": "image/png"
+  },
+  {
+   "path": "datasets/metrics",
+   "kind": "json",
+   "mime": "application/json"
+  },
+  {
+   "path": "elements/node-1",
+   "kind": "json",
+   "mime": "application/json"
+  },
+  {
+   "path": "board/meta",
+   "kind": "json",
+   "mime": "application/json"
+  },
+  {
+   "path": "dash/params",
+   "kind": "json",
+   "mime": "application/json"
+  },
+  {
+   "path": "film/meta",
+   "kind": "json",
+   "mime": "application/json"
+  },
+  {
+   "path": "film/script",
+   "kind": "text",
+   "mime": "text/javascript"
+  },
+  {
+   "path": "project/deck.css",
+   "kind": "text",
+   "mime": "text/css"
+  },
+  {
+   "path": "project/slides/s01.html",
+   "kind": "text",
+   "mime": "text/html"
+  }
+ ],
+ "patches": [
+  {
+   "current": "{\"x\":10,\"y\":20,\"label\":\"Box\",\"meta\":{\"color\":\"leaf\",\"locked\":true}}",
+   "patch": "{\"x\":42,\"label\":null,\"meta\":{\"locked\":false}}",
+   "result": {
+    "ok": true,
+    "value": "{\"x\":42,\"y\":20,\"meta\":{\"color\":\"leaf\",\"locked\":false}}"
+   }
+  },
+  {
+   "patch": "{\"a\":1,\"b\":[1,2]}",
+   "result": {
+    "ok": true,
+    "value": "{\"a\":1,\"b\":[1,2]}"
+   }
+  }
+ ],
+ "summary": {
+  "title": "Demo",
+  "artifactType": "slides",
+  "seq": 4,
+  "entries": [
+   {
+    "artifactId": "00000000-0000-4000-a000-000000000099",
+    "path": "project/deck.json",
+    "kind": "json",
+    "mime": "application/json",
+    "size": 241,
+    "rev": 1,
+    "updatedBy": "user",
+    "updated": 1000,
+    "value": "{\"title\":\"Demo\",\"aspectRatio\":\"16:9\",\"slides\":[{\"id\":\"s01-cover\",\"file\":\"s01-cover.html\",\"title\":\"Cover\",\"notes\":\"Welcome and agenda.\"},{\"id\":\"s02-points\",\"file\":\"s02-points.html\",\"title\":\"Key Points\",\"notes\":\"Walk through each fragment.\"}]}"
+   },
+   {
+    "artifactId": "00000000-0000-4000-a000-000000000099",
+    "path": "project/deck.css",
+    "kind": "text",
+    "mime": "text/css",
+    "size": 315,
+    "rev": 2,
+    "updatedBy": "user",
+    "updated": 1000,
+    "value": ".eyebrow{font-size:22px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-accent,var(--vv-accent));font-weight:600}\n.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:24px}\n.kpi-card{padding:36px;border-radius:16px;background:var(--vv-side);border:1px solid var(--vv-line)}"
+   },
+   {
+    "artifactId": "00000000-0000-4000-a000-000000000099",
+    "path": "project/slides/s01-cover.html",
+    "kind": "text",
+    "mime": "text/html",
+    "size": 148,
+    "rev": 3,
+    "updatedBy": "user",
+    "updated": 1000,
+    "value": "<div class=\"slide\"><span class=\"eyebrow\">Presentation</span><h1>Demo</h1><p style=\"color:var(--vv-muted)\">Structured multi-file slide deck</p></div>"
+   },
+   {
+    "artifactId": "00000000-0000-4000-a000-000000000099",
+    "path": "project/slides/s02-points.html",
+    "kind": "text",
+    "mime": "text/html",
+    "size": 407,
+    "rev": 4,
+    "updatedBy": "user",
+    "updated": 1000,
+    "value": "<div class=\"slide\"><h2>Key Highlights</h2><div class=\"kpi-row\"><div class=\"kpi-card fragment\"><h3>01 · Clarity</h3><p>One core takeaway per slide.</p></div><div class=\"kpi-card fragment\"><h3>02 · Modularity</h3><p>Edit individual slides without rewriting the deck.</p></div><div class=\"kpi-card fragment\"><h3>03 · Ready to Present</h3><p>Presenter notes, step fragments, and PDF print.</p></div></div></div>"
+   }
+  ],
+  "out": "# Demo\n\ntype: slides · seq: 4 · entries: 4\n\n## Entries\n\n- `project/deck.json` (json, rev 1, 241 B)\n- `project/deck.css` (text, rev 2, 315 B)\n- `project/slides/s01-cover.html` (text, rev 3, 148 B)\n- `project/slides/s02-points.html` (text, rev 4, 407 B)\n## project/deck.json\n\n```json\n{\"title\":\"Demo\",\"aspectRatio\":\"16:9\",\"slides\":[{\"id\":\"s01-cover\",\"file\":\"s01-cover.html\",\"title\":\"Cover\",\"notes\":\"Welcome and agenda.\"},{\"id\":\"s02-points\",\"file\":\"s02-points.html\",\"title\":\"Key Points\",\"notes\":\"Walk through each fragment.\"}]}\n```"
+ }
+}

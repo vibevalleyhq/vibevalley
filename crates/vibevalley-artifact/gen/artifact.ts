@@ -7,6 +7,10 @@ import { join } from "node:path";
 import * as A from "@vibevalley/artifact";
 import * as H from "@vibevalley/artifact/html";
 import * as Sh from "@vibevalley/artifact/shell";
+import * as Starters from "@vibevalley/artifact/starters";
+import * as Store from "@vibevalley/artifact/store";
+import * as Tokens from "@vibevalley/artifact/tokens";
+import * as Viewers from "@vibevalley/artifact/viewers";
 import { setLocale } from "@vibevalley/i18n";
 import { keyBetween } from "@vibevalley/protocol/rules";
 import { sample } from "./sample.ts";
@@ -18,9 +22,22 @@ const golden = join(out, "tests/golden");
 mkdirSync(golden, { recursive: true });
 const write = (name: string, v: unknown) => writeFileSync(join(golden, `${name}.json`), JSON.stringify(v, null, 1) + "\n");
 
-// ---- the shell: the words after the page, per display and theme ----
+// ---- the shell: the words after the page, per display and theme, plus shared inline helpers ----
 const shell: Record<string, string> = {};
-for (const display of ["page", "slides", "motion"]) for (const theme of ["light", "dark"]) shell[`${display}|${theme}`] = Sh.withShell({ page: "", display, theme });
+const marker = "<!--VV_SHELL_MARKER-->";
+for (const display of ["page", "slides", "motion"] as const) {
+  for (const theme of ["light", "dark"] as const) {
+    const full = Sh.withShell({ page: marker, display, theme });
+    const idx = full.indexOf(marker);
+    shell[`${display}|${theme}`] = full.slice(idx + marker.length);
+    if (display === "motion" && theme === "light") shell.motion_preload = full.slice(0, idx);
+  }
+}
+shell.theme_light = Sh.themeVariables.light;
+shell.theme_dark = Sh.themeVariables.dark;
+shell.type_variables = Sh.typeVariables;
+shell.selection_script = Sh.selectionScript;
+shell.motion_recorder_helper = Sh.motionRecorderHelper;
 writeFileSync(join(out, "assets/shell.json"), JSON.stringify(shell, null, 1) + "\n");
 
 // ---- Markdown in, blocks, Markdown out ----
@@ -319,4 +336,148 @@ write("problem", [
   { title: "ok", kind: "markdown", size: 6 * 1024 * 1024 },
   { title: "ok", kind: "markdown", size: 6 },
 ].map((a) => ({ ...a, problem: H.artifactProblem(a) })));
+
+// ---- compound filename suffixes ----
+write("suffix", {
+  suffixes: [
+    { body: "blocks" as const },
+    { body: "store" as const, artifactType: "docs" as const },
+    { body: "store" as const, artifactType: "slides" as const },
+    { body: "store" as const, artifactType: "dashboard" as const },
+    { body: "store" as const, artifactType: "motion" as const },
+    { body: "store" as const, artifactType: "whiteboard" as const },
+    { body: "store" as const, artifactType: "design" as const },
+    { body: "store" as const, artifactType: "design-system" as const },
+    { body: "html" as const, display: "page" as const },
+    { body: "html" as const, display: "slides" as const },
+    { body: "html" as const, display: "motion" as const },
+  ].map((input) => ({ ...input, suffix: H.artifactSuffixOf(input) })),
+  names: [
+    { name: "q3-deck.slide.html" },
+    { name: "poster.visual.html" },
+    { name: "kpi.dashboard.html" },
+    { name: "intro.motion.html" },
+    { name: "pipeline.whiteboard" },
+    { name: "brand.tokens.json" },
+    { name: "notes.doc.md" },
+    { name: "plain.html", content: "<script>vv.timeline(5, () => {})</script>" },
+    { name: "deck.html", content: "<section><h1>One</h1></section><section><h2>Two</h2></section>" },
+    { name: "untitled", content: "<!doctype html><p>hi</p>" },
+    { name: "readme" },
+  ].map((c) => ({ ...c, inferred: H.inferArtifactFromName(c.name, c.content) })),
+});
+
+// ---- structured store ----
+const sampleEntries: Store.ArtifactEntry[] = Starters.starterEntriesForType("slides", "Demo").map((w, i) => ({
+  artifactId: "00000000-0000-4000-a000-000000000099",
+  path: w.path,
+  kind: w.kind ?? Store.inferEntryKind(w.path),
+  mime: Store.inferEntryMime(w.path, w.kind ?? Store.inferEntryKind(w.path)),
+  size: (w.value ?? "").length,
+  rev: i + 1,
+  updatedBy: "user",
+  updated: 1000,
+  ...(w.value !== undefined ? { value: w.value } : {}),
+}));
+write("store", {
+  paths: [
+    "",
+    "a".repeat(241),
+    "bad\x01char",
+    "a\\b",
+    "/leading",
+    "trailing/",
+    "a//b",
+    "a/./b",
+    "project/../secret",
+    "project/slides/s01.html",
+  ].map((path) => ({ path, problem: Store.entryPathProblem(path) ?? null })),
+  kinds: [
+    "project/deck.json",
+    "assets/logo.png",
+    "datasets/metrics",
+    "elements/node-1",
+    "board/meta",
+    "dash/params",
+    "film/meta",
+    "film/script",
+    "project/deck.css",
+    "project/slides/s01.html",
+  ].map((path) => {
+    const kind = Store.inferEntryKind(path);
+    return { path, kind, mime: Store.inferEntryMime(path, kind) };
+  }),
+  patches: [
+    {
+      current: JSON.stringify({ x: 10, y: 20, label: "Box", meta: { color: "leaf", locked: true } }),
+      patch: JSON.stringify({ x: 42, label: null, meta: { locked: false } }),
+    },
+    { current: undefined, patch: JSON.stringify({ a: 1, b: [1, 2] }) },
+  ].map((c) => ({ ...c, result: Store.applyJsonMergePatch(c.current, c.patch) })),
+  summary: {
+    title: "Demo",
+    artifactType: "slides",
+    seq: 4,
+    entries: sampleEntries,
+    out: Store.formatStoreSummary({ title: "Demo", artifactType: "slides", seq: 4 }, sampleEntries),
+  },
+});
+
+// ---- design-system tokens ----
+const starterTokensJson = Starters.starterEntriesForType("design-system", "Brand").find((e) => e.path === "project/tokens.json")?.value ?? "{}";
+write("tokens", {
+  specs: [starterTokensJson, "{bad json"].map((raw) => ({ raw, parsed: Tokens.parseTokensSpec(raw) })),
+  contrasts: [
+    ["#1c1917", "#fcfcfb"],
+    ["#fff", "#000"],
+    ["not-hex", "#000"],
+  ].map(([fg, bg]) => ({ fg, bg, ratio: Tokens.contrastRatio(fg!, bg!) ?? null })),
+});
+
+// ---- starters ----
+write(
+  "starters",
+  Store.ArtifactTypeValues.map((type) => ({ type, title: "Demo", entries: Starters.starterEntriesForType(type, "Demo") })),
+);
+
+// ---- viewers ----
+const materialize = (type: Store.ArtifactType): Store.ArtifactEntry[] =>
+  Starters.starterEntriesForType(type, "Demo").map((w, i) => ({
+    artifactId: "00000000-0000-4000-a000-000000000099",
+    path: w.path,
+    kind: w.kind ?? Store.inferEntryKind(w.path),
+    mime: Store.inferEntryMime(w.path, w.kind ?? Store.inferEntryKind(w.path)),
+    size: (w.value ?? "").length,
+    rev: i + 1,
+    updatedBy: "user",
+    updated: 1000,
+    ...(w.value !== undefined ? { value: w.value } : {}),
+  }));
+const sandboxTokens = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
+write("viewers", {
+  headers: [
+    { origin: "http://127.0.0.1:8787", print: false, out: Viewers.storeViewHeaders("http://127.0.0.1:8787", false, sandboxTokens) },
+    { origin: undefined, print: true, out: Viewers.storeViewHeaders(undefined, true, sandboxTokens) },
+  ],
+  htmlProblems: [
+    `<img src="assets/logo.png"><img src="/api/v1/attachment/a1">`,
+    `<img src="https://evil.example/pixel.png">`,
+  ].map((source) => ({ source, problem: Viewers.storeHtmlProblem(source) })),
+  urls: [
+    { id: "a1", query: { theme: "dark" as const, seq: 3, path: "project/desktop.dc.html", print: true }, out: Viewers.storeViewUrl("a1", { theme: "dark", seq: 3, path: "project/desktop.dc.html", print: true }) },
+    { id: "a2", query: {}, out: Viewers.storeViewUrl("a2", {}) },
+  ],
+  dcProps: {
+    source: `<x-dc data-props='[{"name":"density","type":"select","options":["comfortable","compact"],"value":"comfortable"}]'><div>Body</div></x-dc>`,
+    values: { density: "compact" },
+    out: Viewers.writePropsIntoDcHtml(
+      `<x-dc data-props='[{"name":"density","type":"select","options":["comfortable","compact"],"value":"comfortable"}]'><div>Body</div></x-dc>`,
+      { density: "compact" },
+    ),
+  },
+  renders: (["slides", "dashboard", "motion", "design", "design-system"] as const).map((type) => {
+    const entries = materialize(type);
+    return { type, entries, theme: "light", html: Viewers.renderStoreArtifactHtml(type, entries, { theme: "light" }) };
+  }),
+});
 console.log("artifact goldens written");
