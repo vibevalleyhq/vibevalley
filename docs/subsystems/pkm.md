@@ -50,7 +50,7 @@
 ## 怎么走
 
 1. **闪念捕获（`pkm.capture`）**：未指定页面时追加到今日日记 `journals/YYYY_MM_DD.md` 并标 `LATER #inbox`；指定页面时追加到该页末尾。
-2. **全文检索（`pkm.search`）**：加载或写回时用 `gse` 分词写进 `pkm_term` 表的 `terms` 列，表在 `server.db`（SQLite），匹配和打分在 Rust 里做（前缀匹配，照 TS 版 `ts_rank` 的算法）；按分数、整句命中与 PARA 层级权重排序（`crates/vibevalley-server/src/modules/pkm/db.rs`）。
+2. **全文检索（`pkm.search`）**：加载或写回时用 `gse` 分词并按块去重合并后，以 `ON CONFLICT(page, block) DO UPDATE` 写进 `pkm_term` 表（`primary key (page, block)`，位于 `server.db`），匹配和打分在 Rust 里做（前缀匹配，照 TS 版 `ts_rank` 的算法）；按分数、整句命中与 PARA 层级权重排序（`crates/vibevalley-server/src/modules/pkm/db.rs`）。
 3. **改名与合并（`pkm.page.rename`）**：目标页不存在时重命名并记 `alias::`；目标页已存在时合并块并删除旧文件，同时更新全库 `[[旧名]]`。
 
 ## 和谁打交道

@@ -41,7 +41,8 @@
 | Artifact | `Artifacts`（`artifact/mod.rs`） | `server.db` 的 `artifact*` 表 | — |
 | 笔记 | `Pkm`（`pkm/mod.rs`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_change` 表 | — |
 | 记性 | `Memories`（`memory.rs`，规则在 `crates/vibevalley-memory`） | `memory` 表 | — |
-| 定时任务 | `Crons`（`cron.rs`，什么时候跑在 `crates/vibevalley-cron`） | `crons.json` | — |
+| 定时任务 | `Crons`（`cron/mod.rs`，什么时候跑在 `crates/vibevalley-cron`） | `server.db` 的 `cron` 表 | — |
+| PR 与分支发布 | `Pulls`（`pull/mod.rs`、`publish.rs`、`store.rs`、`poll.rs`、`snapshot.rs`） | `server.db` 的 `pull`、`pull_event` 表 | — |
 
 ## oar 那一层
 

@@ -6,9 +6,9 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 
 ```
 crates/vibevalley-server/  服务端（二进制 vibevalley-server）：src/modules 按单数概念分深模块（agent、artifact、attachment、channel、cron、game、issue、
-                           ledger、library、media、memory、mcp、orchestrator、pkm、provider、publish、repo、session、setting、tool、watch、workplace；
+                           ledger、library、media、memory、mcp、orchestrator、pkm、provider、pull、repo、session、setting、tool、watch、workplace；
                            工单板拆成 issue（状态与交付）、session（帮工和每一轮）、workplace（worktree 与合并），都只经 ledger 写），lib.rs 组装 Hub，
-                           start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、助手和帮工的提示
+                           start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、Artifact 类型指南（artifact/types/）、助手和帮工的提示
 crates/vibevalley-http/    HTTP 门（/api/v1、SSE、/mcp）：照契约的接口表把请求交给服务端
 crates/vibevalley-server-api/  服务端对桥和 HTTP 门的接口（Server trait）
 crates/vibevalley-bridge/  页面和进程内服务端之间的桥（Hub），和顶替服务端的样例（fake）

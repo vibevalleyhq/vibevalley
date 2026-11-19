@@ -1,23 +1,22 @@
 # 仓库
 
-仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。服务端的 `modules/repo.rs` 管仓库新建与克隆、统计与 `gh` 检测，`modules/publish.rs` 发布已有分支；工单 worktree、冲突预检、`.vibevalley/check` 与合并在 `modules/workplace`（`Workplace`）里，工单板只告诉它工单号、仓库和帮工的 worktree，git 操作都经 `vibevalley-git` 调系统的 `git`。
+仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。服务端的 `modules/repo.rs` 管仓库新建与克隆、统计与 `gh` 检测；工单 worktree、冲突预检、`.vibevalley/check` 与合并在 `modules/workplace`（`Workplace`）里，工单板只告诉它工单号、仓库和帮工的 worktree，git 操作都经 `vibevalley-git` 调系统的 `git`。已有分支推送、PR/MR 发布与轮询由独立的 `modules/pull` 承担（[PR 与分支发布](docs/subsystems/pull.md)）。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
 | 空间（`repos/`、`worktrees/` 与全局 `AGENTS.md`）、仓库新建与 GitHub 克隆 | 工作目录根路径配置（`work_root`，[设置和配置](docs/subsystems/setting.md#模型和不变量)） |
-| 工单 worktree 与分支 `vibevalley/issue-<号>` 的创建、复用、重置与清理 | 何时派活、何时合并、合并和跟 PR 的编排（[工单](docs/subsystems/issue.md#完成和交付)） |
+| 工单 worktree 与分支 `vibevalley/issue-<号>` 的创建、复用、重置与清理 | 何时派活、何时合并与交付编排（[工单](docs/subsystems/issue.md#完成和交付)） |
 | 分支改动读取（`Changes`）、冲突预检（`git merge-tree`）、运行 `.vibevalley/check`、子工单的检查（`verifyCheckout`） | 会话生命周期与并发槽位准入控制（[帮工](docs/subsystems/session.md)） |
-| 本地合并、无检出合入父分支（`merge_into`）、推送已有分支并开 PR/MR | 经验值、等级与成就计算（[游戏](docs/subsystems/game.md#模型和不变量)） |
-| `gh` 状态检测缓存、语言统计（`tokei`）、年度提交日历与作者 commit 计数 | 仓库页与群岛地图的界面渲染（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)） |
+| 本地合并、无检出合入父分支（`merge_into`） | 分支推送、PR/MR 发布、状态与 CI/评审轮询（[PR 与分支发布](docs/subsystems/pull.md)） |
+| `gh` 状态检测缓存、语言统计（`tokei`）、年度提交日历与作者 commit 计数 | 经验值、等级与成就计算（[游戏](docs/subsystems/game.md#模型和不变量)）；仓库页与群岛地图渲染（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
 | `crates/vibevalley-server/src/modules/repo.rs` | `repo.*`、`github.*`：`<工作目录>/repos` 下按名字新建或克隆、活跃度与语言（`tokei`）、`gh` 能不能开 PR |
-| `crates/vibevalley-server/src/modules/publish.rs` | `repo.pr.submit`：推送已有分支并开 GitHub PR 或 GitLab.com MR |
 | `crates/vibevalley-git/src/repo.rs` | git 封装：状态、diff、分支、worktree、冲突预检（`merge_check`）、无检出合入（`merge_into`：`merge-tree` + `commit-tree` + `update-ref`） |
 | `crates/vibevalley-server/src/modules/workplace/mod.rs`、`crates/vibevalley-server/src/modules/workplace/git.rs`、`crates/vibevalley-server/src/modules/workplace/check.rs` | `Workplace`：确保仓库在（`ensure_repo`）、工单的 worktree 与分支（`worktree`、`base`）、改动（`changes`）、交付（`land`）、子工单合进父分支（`join`）、帮工走时收拾 worktree 和分支（`release`）、跑 `.vibevalley/check`；不读工单板的状态 |
 
@@ -33,7 +32,7 @@
 - **冲突预检与合入父分支均不污染工作区**：
   - 冲突检测用 `git merge-tree --write-tree`；子工单合入父分支（`merge_into`）用 `merge-tree` + `commit-tree` + 带旧值校验的 `update-ref`。
 - **工单剩余改动进入候选提交**。本地交付前，服务把工单 worktree 的剩余改动提交到工单分支。目标检出的本地修改保留。
-- **PR 能力只读检测缓存**：开机与调 `github.refresh` 时检测 `gh` 登录及各仓库 `origin` 写权限并缓存。工单走 PR 交付、PR 快照与 CI 日志：Rust 版还没有。
+- **PR 能力只读检测缓存**：开机与调 `github.refresh` 时检测 `gh` 登录及各仓库 `origin` 写权限并缓存。分支推送、PR 轮询与快照见 [PR 与分支发布](docs/subsystems/pull.md)。
 
 ## 怎么走
 
@@ -50,21 +49,12 @@
 
 工单改动接口返回审查基线提交和工单文件树。文件补丁来自这两个固定的 Git 对象。工单未提交的文件也包含在补丁中。传入上次显示的文件树时，接口在 `sinceReview` 返回变化的补丁。已经通过的审查会保留文件树引用，清理工单 worktree 后仍可核对。
 
-**发布已有分支（`repo.pr.submit`）**
-
-本机用户显式给出检出根目录、分支、完整 SHA、base、标题和正文。检出可在空间外，不注册仓库。接口的 `can` 只有 `user`，HTTP 拒绝 Bearer 身份；远程设备、助手和帮工工具不暴露此操作。本机回环监听仍是用户的信任边界。
-
-发布按仓库共用 Git 目录串行，拒绝脏目录、detached HEAD、分支或 SHA 不符、默认/base 分支、多远端、多个 URL、读写仓库不一致及 URL 重写配置。GitHub.com 用 gh，GitLab.com 用 glab；工具缺失、未登录、返回无法解码均拒绝。未知主机与自建 GitLab 不支持。
-
-正式发布取得目标分支，预检冲突，执行检出的 `.vibevalley/check`，再核对工作树、HEAD、远端配置和 base SHA。检查的 PATH 优先使用目标检出的 `node_modules/.bin`，移除宿主带入的其他检出工具路径。推送使用明确 URL 和 `<SHA>:refs/heads/<branch>`，不强推，不自动提交或切分支。平台查询开放 PR/MR 后复用或创建；只有得到校验过的链接才返回发布成功。
-
-`dryRun` 只读取检出与平台信息，不 fetch、不运行检查、不推送或创建请求。回执的 `check` 区分 `preview`、`passed`、`not-run`；没有脚本不算检查通过。推送后平台失败明确说明 SHA 已推送但链接未确认；重试查询已有请求。失败、取消和成功均保留用户的原检出。网络中断或取消时，远端可能已接收操作，应查询后重试。
-
-工单走 PR 交付还没接到这条流程上。
+**发布已有分支（`repo.pr.submit`）**：已独立到 `modules/pull`，规则与流程见 [PR 与分支发布](docs/subsystems/pull.md)。
 
 ## 和谁打交道
 
 - **工单板与帮工（`modules/issue`、`modules/session`）**：经 `Workplace` 开、复用、清工单的 worktree，读改动，预检冲突，跑检查，合并或合入父分支。
+- **PR 与分支发布（`modules/pull`）**：读取空间内仓库列表与 `gh` 远端解析约定。
 - **游戏（`game`）**：读仓库的 commit 计数。
 
 ## 为什么这样
@@ -76,12 +66,10 @@
 
 ## 还没做的
 
-- 工单走 PR 交付、跟 CI 与评审：Rust 版还没有。
 - 同一工单 worktree 内多帮工接力：[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
 
 ## 怎么验证
 
 - `crates/vibevalley-git/src/tests.rs`：git 封装、冲突预检与无检出合入。
 - `crates/vibevalley-server/tests/issue_board.rs`：合并、冲突、检查失败退回、留分支。
-- `crates/vibevalley-server/tests/publish.rs`：发布已有分支的预览、推送、拒绝与只许用户发布。
 - `apps/mac/src/pixel/tests.rs` 的 `map_draws_an_island_per_repo`：群岛地图一个仓库一座岛。
