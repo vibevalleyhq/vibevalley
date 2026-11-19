@@ -1,0 +1,15 @@
+[package]
+name = "vibevalley-canvas"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pure-Rust JSON Canvas 1.0 codec, validator, infinite-canvas engine, and resvg-safe SVG renderer"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+
+[dev-dependencies]
+resvg = { version = "0.46.0", default-features = false, features = ["text"] }
+roxmltree = "0.21.2"
