@@ -11,10 +11,10 @@ use vibevalley_pele::preprocess::{cleanup_comments, encode_entities, preprocess}
 use vibevalley_pele::util::url::{internal_link, link_url, sanitize_url};
 use vibevalley_pele::util::yaml::{YamlValue, parse_yaml};
 use vibevalley_pele::{
-    ErrorCode, METRICS_MEASURER, ParseOptions, RenderOptions, TextMeasurer, TextStyle, ThemeMode, detect_type, parse, render, render_model, supports,
+    ErrorCode, METRICS_MEASURER, ParseOptions, Registry, RenderOptions, TextMeasurer, TextStyle, ThemeMode, detect_type, parse, render, render_model, supports,
 };
 
-use support::{Lcg, assert_inert, css_options, inert_problem, resolved_options};
+use support::{Lcg, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, inert_problem, resolved_options};
 
 // Mermaid's original encodeEntities used as reference oracle on short lines.
 // JS regex `.` excludes both `\n` and `\r`, matching Rust `[^\r\n]`.
@@ -575,4 +575,108 @@ fn mermaid_type_detection_and_error_metadata() {
     // Default ThemeMode is Resolved (resvg-safe).
     assert!(matches!(RenderOptions::default().theme_mode, ThemeMode::Resolved(_)));
     let _ = DiagramConfig::default();
+}
+
+#[test]
+fn all_33_diagram_types_are_registered_and_render_safely() {
+    const ALL_TYPES: [DiagramType; 33] = [
+        DiagramType::Flowchart,
+        DiagramType::Sequence,
+        DiagramType::Class,
+        DiagramType::State,
+        DiagramType::Er,
+        DiagramType::Pie,
+        DiagramType::Gantt,
+        DiagramType::GitGraph,
+        DiagramType::Mindmap,
+        DiagramType::Timeline,
+        DiagramType::Journey,
+        DiagramType::XyChart,
+        DiagramType::QuadrantChart,
+        DiagramType::Requirement,
+        DiagramType::C4,
+        DiagramType::Sankey,
+        DiagramType::Block,
+        DiagramType::Packet,
+        DiagramType::Kanban,
+        DiagramType::Architecture,
+        DiagramType::Radar,
+        DiagramType::Treemap,
+        DiagramType::Info,
+        DiagramType::Agentflow,
+        DiagramType::Usecase,
+        DiagramType::Railroad,
+        DiagramType::TreeView,
+        DiagramType::Venn,
+        DiagramType::Cynefin,
+        DiagramType::Wardley,
+        DiagramType::Swimlane,
+        DiagramType::Ishikawa,
+        DiagramType::EventModeling,
+    ];
+
+    let sample_for = |dt: DiagramType| -> &'static str {
+        match dt {
+            DiagramType::Flowchart => "flowchart LR\n  A --> B",
+            DiagramType::Sequence => "sequenceDiagram\n  A->>B: hi",
+            DiagramType::Class => "classDiagram\n  class A {\n    +id int\n  }",
+            DiagramType::State => "stateDiagram-v2\n  [*] --> Active",
+            DiagramType::Er => "erDiagram\n  USER ||--o{ ORDER : places",
+            DiagramType::Pie => "pie\n  \"A\" : 1\n  \"B\" : 2",
+            DiagramType::Gantt => "gantt\n  dateFormat YYYY-MM-DD\n  section S\n    Task :a1, 2024-01-01, 3d",
+            DiagramType::GitGraph => "gitGraph\n  commit\n  branch dev\n  commit",
+            DiagramType::Mindmap => "mindmap\n  root((Plan))\n    Build",
+            DiagramType::Timeline => "timeline\n  2024 : Launch",
+            DiagramType::Journey => "journey\n  section Day\n    Code: 5: Me",
+            DiagramType::XyChart => "xychart-beta\n  x-axis [a, b]\n  y-axis 0 --> 10\n  bar [3, 7]",
+            DiagramType::QuadrantChart => "quadrantChart\n  x-axis Low --> High\n  y-axis Low --> High\n  Item: [0.5, 0.5]",
+            DiagramType::Requirement => "requirementDiagram\n  requirement r1 {\n    id: 1\n    text: Must work\n    risk: low\n    verifymethod: test\n  }",
+            DiagramType::C4 => "C4Context\n  Person(u, \"User\")\n  System(s, \"App\")\n  Rel(u, s, \"Uses\")",
+            DiagramType::Sankey => "sankey-beta\nA,B,10",
+            DiagramType::Block => "block-beta\n  a[\"A\"] b[\"B\"]\n  a --> b",
+            DiagramType::Packet => "packet-beta\n  0-7: \"Header\"\n  8-15: \"Body\"",
+            DiagramType::Kanban => "kanban\n  todo[Todo]\n    t1[Ship]",
+            DiagramType::Architecture => "architecture-beta\n  service api(server)[API]\n  service db(database)[DB]\n  api:R -- L:db",
+            DiagramType::Radar => "radar-beta\n  axis a, b, c\n  curve x{1, 2, 3}",
+            DiagramType::Treemap => "treemap-beta\n\"Root\"\n  \"A\": 10\n  \"B\": 20",
+            DiagramType::Info => "info",
+            DiagramType::Agentflow => "agentflow-beta TB\n  A[Agent] --> B[Tool]",
+            DiagramType::Usecase => "usecase-beta\n  actor User\n  Login(\"Login\")\n  User --> Login",
+            DiagramType::Railroad => "railroad-abnf-beta\nrule = \"test\" ;",
+            DiagramType::TreeView => "treeView-beta\n  \"src\"\n    \"lib.rs\"",
+            DiagramType::Venn => "venn-beta\n  set A\n  set B\n  union A,B",
+            DiagramType::Cynefin => "cynefin-beta\n  clear\n    \"Best practice\"",
+            DiagramType::Wardley => "wardley-beta\n  component App [0.7, 0.5]",
+            DiagramType::Swimlane => "swimlane-beta LR\n  subgraph Lane\n    A --> B\n  end",
+            DiagramType::Ishikawa => "ishikawa-beta\n    Effect\n        Cause\n            Detail",
+            DiagramType::EventModeling => "eventmodeling\n    tf 01 ui UI\n    tf 02 cmd RunAction\n    tf 03 evt ActionExecuted",
+        }
+    };
+
+    let registry = Registry::default();
+    assert_eq!(ALL_TYPES.len(), 33);
+    for dt in ALL_TYPES {
+        assert!(
+            registry.registered(dt),
+            "DiagramType::{dt:?} ({}) is not registered in Registry::default()",
+            dt.as_str()
+        );
+        let src = sample_for(dt);
+        assert!(supports(src), "supports() returned false for {dt:?}");
+        assert_eq!(detect_type(src), Some(dt), "detect_type mismatch for {dt:?}");
+
+        let css = render(src, &css_options()).unwrap_or_else(|e| panic!("{dt:?} css render failed: {e}"));
+        assert_eq!(css.diagram_type, dt);
+        assert_inert(&css.svg, dt.as_str());
+
+        let light = render(src, &resolved_options()).unwrap_or_else(|e| panic!("{dt:?} light render failed: {e}"));
+        assert_eq!(light.diagram_type, dt);
+        assert_inert_resolved(&light.svg, dt.as_str());
+        assert_resvg_parses(&light.svg, dt.as_str());
+
+        let dark = render(src, &dark_options()).unwrap_or_else(|e| panic!("{dt:?} dark render failed: {e}"));
+        assert_eq!(dark.diagram_type, dt);
+        assert_inert_resolved(&dark.svg, dt.as_str());
+        assert_resvg_parses(&dark.svg, dt.as_str());
+    }
 }

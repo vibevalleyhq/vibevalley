@@ -113,7 +113,49 @@ fn frame_kind(t: LineType) -> Option<&'static str> {
         LineType::CriticalStart => Some("critical"),
         LineType::BreakStart => Some("break"),
         LineType::RectStart => Some("rect"),
-        _ => None,
+        LineType::Solid
+        | LineType::Dotted
+        | LineType::Note
+        | LineType::SolidCross
+        | LineType::DottedCross
+        | LineType::SolidOpen
+        | LineType::DottedOpen
+        | LineType::LoopEnd
+        | LineType::AltElse
+        | LineType::AltEnd
+        | LineType::OptEnd
+        | LineType::ActiveStart
+        | LineType::ActiveEnd
+        | LineType::ParAnd
+        | LineType::ParEnd
+        | LineType::RectEnd
+        | LineType::SolidPoint
+        | LineType::DottedPoint
+        | LineType::Autonumber
+        | LineType::CriticalOption
+        | LineType::CriticalEnd
+        | LineType::BreakEnd
+        | LineType::BidirectionalSolid
+        | LineType::BidirectionalDotted
+        | LineType::SolidTop
+        | LineType::SolidBottom
+        | LineType::StickTop
+        | LineType::StickBottom
+        | LineType::SolidArrowTopReverse
+        | LineType::SolidArrowBottomReverse
+        | LineType::StickArrowTopReverse
+        | LineType::StickArrowBottomReverse
+        | LineType::SolidTopDotted
+        | LineType::SolidBottomDotted
+        | LineType::StickTopDotted
+        | LineType::StickBottomDotted
+        | LineType::SolidArrowTopReverseDotted
+        | LineType::SolidArrowBottomReverseDotted
+        | LineType::StickArrowTopReverseDotted
+        | LineType::StickArrowBottomReverseDotted
+        | LineType::CentralConnection
+        | LineType::CentralConnectionReverse
+        | LineType::CentralConnectionDual => None,
     }
 }
 

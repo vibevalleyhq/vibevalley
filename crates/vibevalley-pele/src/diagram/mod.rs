@@ -1,7 +1,37 @@
+pub mod agentflow;
+pub mod architecture;
+pub mod block;
+pub mod c4;
+pub mod class;
 pub mod common;
+pub mod cynefin;
+pub mod er;
+pub mod eventmodeling;
 pub mod flowchart;
+pub mod gantt;
+pub mod git;
+pub mod info;
+pub mod ishikawa;
+pub mod journey;
+pub mod kanban;
+pub mod mindmap;
+pub mod packet;
 pub mod pie;
+pub mod quadrant;
+pub mod radar;
+pub mod railroad;
+pub mod requirement;
+pub mod sankey;
 pub mod sequence;
+pub mod state;
+pub mod swimlane;
+pub mod timeline;
+pub mod treemap;
+pub mod treeview;
+pub mod usecase;
+pub mod venn;
+pub mod wardley;
+pub mod xychart;
 
 use std::collections::HashMap;
 
@@ -44,6 +74,36 @@ pub enum ParsedModel {
     Flowchart(flowchart::FlowDb),
     Sequence(sequence::SeqDb),
     Pie(pie::PieModel),
+    Class(class::ClassDb),
+    State(state::StateDb),
+    Er(er::ErDb),
+    Requirement(requirement::RequirementDb),
+    Usecase(usecase::UsecaseModel),
+    Architecture(architecture::ArchitectureDb),
+    Swimlane(flowchart::FlowDb),
+    Agentflow(Box<agentflow::AgentflowDb>),
+    Block(block::BlockDb),
+    Gantt(gantt::GanttDb),
+    C4(c4::C4Db),
+    GitGraph(git::GitModel),
+    EventModeling(eventmodeling::EventModelingModel),
+    Timeline(timeline::TimelineModel),
+    Journey(journey::JourneyModel),
+    XyChart(xychart::XyChartModel),
+    QuadrantChart(quadrant::QuadrantModel),
+    Radar(radar::RadarModel),
+    Sankey(sankey::SankeyModel),
+    Venn(venn::VennModel),
+    Wardley(wardley::WardleyModel),
+    Railroad(railroad::RailroadModel),
+    TreeView(treeview::TreeViewModel),
+    Treemap(treemap::TreemapModel),
+    Cynefin(cynefin::CynefinModel),
+    Ishikawa(ishikawa::IshikawaModel),
+    Kanban(kanban::KanbanModel),
+    Mindmap(mindmap::MindmapModel),
+    Packet(packet::PacketModel),
+    Info(info::InfoModel),
 }
 
 impl ParsedModel {
@@ -52,14 +112,74 @@ impl ParsedModel {
             Self::Flowchart(_) => DiagramType::Flowchart,
             Self::Sequence(_) => DiagramType::Sequence,
             Self::Pie(_) => DiagramType::Pie,
+            Self::Class(_) => DiagramType::Class,
+            Self::State(_) => DiagramType::State,
+            Self::Er(_) => DiagramType::Er,
+            Self::Requirement(_) => DiagramType::Requirement,
+            Self::Usecase(_) => DiagramType::Usecase,
+            Self::Architecture(_) => DiagramType::Architecture,
+            Self::Swimlane(_) => DiagramType::Swimlane,
+            Self::Agentflow(_) => DiagramType::Agentflow,
+            Self::Block(_) => DiagramType::Block,
+            Self::Gantt(_) => DiagramType::Gantt,
+            Self::C4(_) => DiagramType::C4,
+            Self::GitGraph(_) => DiagramType::GitGraph,
+            Self::EventModeling(_) => DiagramType::EventModeling,
+            Self::Timeline(_) => DiagramType::Timeline,
+            Self::Journey(_) => DiagramType::Journey,
+            Self::XyChart(_) => DiagramType::XyChart,
+            Self::QuadrantChart(_) => DiagramType::QuadrantChart,
+            Self::Radar(_) => DiagramType::Radar,
+            Self::Sankey(_) => DiagramType::Sankey,
+            Self::Venn(_) => DiagramType::Venn,
+            Self::Wardley(_) => DiagramType::Wardley,
+            Self::Railroad(_) => DiagramType::Railroad,
+            Self::TreeView(_) => DiagramType::TreeView,
+            Self::Treemap(_) => DiagramType::Treemap,
+            Self::Cynefin(_) => DiagramType::Cynefin,
+            Self::Ishikawa(_) => DiagramType::Ishikawa,
+            Self::Kanban(_) => DiagramType::Kanban,
+            Self::Mindmap(_) => DiagramType::Mindmap,
+            Self::Packet(_) => DiagramType::Packet,
+            Self::Info(_) => DiagramType::Info,
         }
     }
 
-    pub fn render(&self, ctx: &RenderContext<'_>) -> Rendered {
+    pub fn render(&self, ctx: &RenderContext<'_>) -> Result<Rendered, PeleError> {
         match self {
-            Self::Flowchart(db) => flowchart::render_flowchart(db, ctx, None),
-            Self::Sequence(db) => sequence::render_sequence(db, ctx),
-            Self::Pie(model) => pie::render::render_pie(model, ctx),
+            Self::Flowchart(db) => Ok(flowchart::render_flowchart(db, ctx, None)),
+            Self::Sequence(db) => Ok(sequence::render_sequence(db, ctx)),
+            Self::Pie(model) => Ok(pie::render::render_pie(model, ctx)),
+            Self::Class(db) => Ok(class::render_class(db, ctx)),
+            Self::State(db) => Ok(state::render_state(db, ctx)),
+            Self::Er(db) => Ok(er::render_er(db, ctx)),
+            Self::Requirement(db) => Ok(requirement::render_requirement(db, ctx)),
+            Self::Usecase(model) => Ok(usecase::render_usecase(model, ctx)),
+            Self::Architecture(db) => Ok(architecture::render_architecture(db, ctx)),
+            Self::Swimlane(db) => Ok(swimlane::render_swimlane(db, ctx)),
+            Self::Agentflow(db) => Ok(agentflow::render_agentflow(db, ctx)),
+            Self::Block(db) => Ok(block::render_block(db, ctx)),
+            Self::Gantt(db) => gantt::render::try_render_gantt(db, ctx),
+            Self::C4(db) => c4::render::try_render_c4(db, ctx),
+            Self::GitGraph(model) => Ok(git::render::render_git(model, ctx)),
+            Self::EventModeling(model) => Ok(eventmodeling::render::render_event_model(model, ctx)),
+            Self::Timeline(model) => Ok(timeline::render::render_timeline(model, ctx)),
+            Self::Journey(model) => Ok(journey::render::render_journey(model, ctx)),
+            Self::XyChart(model) => xychart::render::render_xychart(model, ctx),
+            Self::QuadrantChart(model) => Ok(quadrant::render::render_quadrant(model, ctx)),
+            Self::Radar(model) => Ok(radar::render::render_radar(model, ctx)),
+            Self::Sankey(model) => sankey::render::render_sankey(model, ctx),
+            Self::Venn(model) => Ok(venn::render::render_venn(model, ctx)),
+            Self::Wardley(model) => Ok(wardley::render::render_wardley(model, ctx)),
+            Self::Railroad(model) => Ok(railroad::render::render_railroad(model, ctx)),
+            Self::TreeView(model) => Ok(treeview::render::render_tree_view(model, ctx)),
+            Self::Treemap(model) => Ok(treemap::render::render_treemap(model, ctx)),
+            Self::Cynefin(model) => Ok(cynefin::render::render_cynefin(model, ctx)),
+            Self::Ishikawa(model) => Ok(ishikawa::render::render_ishikawa(model, ctx)),
+            Self::Kanban(model) => Ok(kanban::render::render_kanban(model, ctx)),
+            Self::Mindmap(model) => Ok(mindmap::render::render_mindmap(model, ctx)),
+            Self::Packet(model) => Ok(packet::render::render_packet(model, ctx)),
+            Self::Info(model) => Ok(info::render::render_info(model, ctx)),
         }
     }
 }
@@ -113,6 +233,36 @@ impl Registry {
         reg.register(Box::new(flowchart::FlowchartDiagram));
         reg.register(Box::new(sequence::SequenceDiagram));
         reg.register(Box::new(pie::PieDiagram));
+        reg.register(Box::new(class::ClassDiagram));
+        reg.register(Box::new(state::StateDiagram));
+        reg.register(Box::new(er::ErDiagram));
+        reg.register(Box::new(requirement::RequirementDiagram));
+        reg.register(Box::new(usecase::UsecaseDiagram));
+        reg.register(Box::new(architecture::ArchitectureDiagram));
+        reg.register(Box::new(swimlane::SwimlaneDiagram));
+        reg.register(Box::new(agentflow::AgentflowDiagram));
+        reg.register(Box::new(block::BlockDiagram));
+        reg.register(Box::new(gantt::GanttDiagram));
+        reg.register(Box::new(c4::C4Diagram));
+        reg.register(Box::new(git::GitGraphDiagram));
+        reg.register(Box::new(eventmodeling::EventModelingDiagram));
+        reg.register(Box::new(timeline::TimelineDiagram));
+        reg.register(Box::new(journey::JourneyDiagram));
+        reg.register(Box::new(xychart::XyChartDiagram));
+        reg.register(Box::new(quadrant::QuadrantDiagram));
+        reg.register(Box::new(radar::RadarDiagram));
+        reg.register(Box::new(sankey::SankeyDiagram));
+        reg.register(Box::new(venn::VennDiagram));
+        reg.register(Box::new(wardley::WardleyDiagram));
+        reg.register(Box::new(railroad::RailroadDiagram));
+        reg.register(Box::new(treeview::TreeViewDiagram));
+        reg.register(Box::new(treemap::TreemapDiagram));
+        reg.register(Box::new(cynefin::CynefinDiagram));
+        reg.register(Box::new(ishikawa::IshikawaDiagram));
+        reg.register(Box::new(kanban::KanbanDiagram));
+        reg.register(Box::new(mindmap::MindmapDiagram));
+        reg.register(Box::new(packet::PacketDiagram));
+        reg.register(Box::new(info::InfoDiagram));
         reg
     }
 
@@ -203,17 +353,18 @@ impl Registry {
             icons: icons_ref,
             math: math_ref,
         };
-        let mut rendered = parsed.model.render(&ctx);
+        let found = Detected {
+            diagram_type: parsed.diagram_type,
+            mermaid_type: parsed.mermaid_type,
+        };
+        let mut rendered = parsed.model.render(&ctx).map_err(|e| tag_error(e, found))?;
         let output_limit = options.output_limit.unwrap_or(DEFAULT_OUTPUT_LIMIT);
         if rendered.svg.len() > output_limit {
             return Err(PeleError::new(
                 format!("Diagram output is longer than the limit of {output_limit} characters."),
                 ErrorCode::Limit,
             )
-            .with_detected(Detected {
-                diagram_type: parsed.diagram_type,
-                mermaid_type: parsed.mermaid_type,
-            }));
+            .with_detected(found));
         }
         for link in &mut rendered.links {
             link.id = decode_entities(&link.id);
