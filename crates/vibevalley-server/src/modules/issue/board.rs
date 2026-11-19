@@ -672,6 +672,50 @@ impl Board {
         })
     }
 
+    /// Registers the owner-backed `Issue.cron` lookup (from `modules::cron`).
+    pub fn use_cron_of_issue(&self, lookup: crate::modules::ledger::CronOfIssue) {
+        self.0.ledger.use_cron_of_issue(lookup);
+    }
+
+    /// Registers the owner-backed `Issue.pull_request` lookup (from `modules::pull`).
+    pub fn use_pull_of_issue(&self, lookup: crate::modules::ledger::PullOfIssue) {
+        self.0.ledger.use_pull_of_issue(lookup);
+    }
+
+    /// Refreshes owner-backed `cron` and `pull_request` projections on `id`.
+    pub fn refresh_issue(&self, id: &str) {
+        self.0.ledger.refresh_issue(id);
+    }
+
+    /// Settles `reference` after its tracked pull request transitions to `merged` or `closed`.
+    pub fn settle_pull(&self, reference: &str, state: vibevalley_protocol::PullRequestState) -> Result<Option<Issue>> {
+        let _work = lock(&self.0.work);
+        let Some(issue) = self.issue(reference) else {
+            return Ok(None);
+        };
+        self.0.ledger.refresh_issue(&issue.id);
+        let Some(updated) = self.issue(&issue.id) else {
+            return Ok(None);
+        };
+        if state == vibevalley_protocol::PullRequestState::Open || !vibevalley_core::pr::finishes_with_pull_request(&updated) {
+            return Ok(Some(updated));
+        }
+        if let Some(s) = self.on_board(&updated) {
+            self.0.sessions.dismiss(&s.id, Leave::KeepBranch)?;
+        } else if let Some(main) = self.0.workplaces.main_repo(updated.repo.as_deref())? {
+            self.0.workplaces.clear_checkout(&main, updated.number)?;
+        }
+        let change = match state {
+            vibevalley_protocol::PullRequestState::Merged => IssueChange::Delivered(vibevalley_protocol::Landing::PullRequest, None),
+            vibevalley_protocol::PullRequestState::Closed => IssueChange::Canceled(vibevalley_protocol::IssueCanceled::Dismissed),
+            vibevalley_protocol::PullRequestState::Open => unreachable!(),
+        };
+        let done = self.change(&updated.id, change)?;
+        let _ = self.take_words(&updated.id);
+        self.refresh_queue_locked();
+        Ok(Some(done))
+    }
+
     // ----- delivering -----
 
     /// Records a pull (or merge) request opened or updated for `reference`.

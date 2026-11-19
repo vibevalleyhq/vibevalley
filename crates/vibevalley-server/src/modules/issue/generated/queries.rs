@@ -11,7 +11,6 @@ pub struct ListIssuesRow {
     pub r#rank: Option<i64>,
     pub r#deliver: String,
     pub r#parent: Option<String>,
-    pub r#cron: Option<String>,
     pub r#created_at: i64,
     pub r#queued_at: Option<i64>,
     pub r#closed_at: Option<i64>,
@@ -21,7 +20,6 @@ pub struct ListIssuesRow {
     pub r#mandate: String,
     pub r#constraints: Option<String>,
     pub r#conflict: Option<String>,
-    pub r#pull_request: Option<String>,
     pub r#last_run: Option<String>,
     pub r#answer: Option<String>,
     pub r#blocked_by: String,
@@ -36,7 +34,7 @@ pub struct ListIssuesRow {
 pub async fn r#list_issues<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
 ) -> Result<Vec<ListIssuesRow>, sqlx::Error> {
-    sqlx::query_as::<_, ListIssuesRow>(r#"SELECT i.id, i.number, i.title, i.description, i.repo, i.priority, i.rank, i.deliver, i.parent, i.cron, i.created_at, i.queued_at, i.closed_at, i.reviewed_at, i.canceled, i.delivered, i.mandate, i.constraints, i."conflict", i.pull_request, i.last_run, i.answer, i.blocked_by, i.criteria, i.checks, i.findings, i.questions, i.assignments, e.evidence FROM issue AS i LEFT JOIN issue_delivery_evidence AS e ON e.issue_id = i.id ORDER BY i.number"#)
+    sqlx::query_as::<_, ListIssuesRow>(r#"SELECT i.id, i.number, i.title, i.description, i.repo, i.priority, i.rank, i.deliver, i.parent, i.created_at, i.queued_at, i.closed_at, i.reviewed_at, i.canceled, i.delivered, i.mandate, i.constraints, i."conflict", i.last_run, i.answer, i.blocked_by, i.criteria, i.checks, i.findings, i.questions, i.assignments, e.evidence FROM issue AS i LEFT JOIN issue_delivery_evidence AS e ON e.issue_id = i.id ORDER BY i.number"#)
         .fetch_all(db).await
 }
 
@@ -50,7 +48,6 @@ pub struct PutIssueParams {
     pub r#rank: Option<i64>,
     pub r#deliver: String,
     pub r#parent: Option<String>,
-    pub r#cron: Option<String>,
     pub r#created_at: i64,
     pub r#queued_at: Option<i64>,
     pub r#closed_at: Option<i64>,
@@ -60,7 +57,6 @@ pub struct PutIssueParams {
     pub r#mandate: String,
     pub r#constraints: Option<String>,
     pub r#conflict: Option<String>,
-    pub r#pull_request: Option<String>,
     pub r#last_run: Option<String>,
     pub r#answer: Option<String>,
     pub r#blocked_by: String,
@@ -75,8 +71,34 @@ pub async fn r#put_issue<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: PutIssueParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT OR REPLACE INTO issue (id, number, title, description, repo, priority, rank, deliver, parent, cron, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, pull_request, last_run, answer, blocked_by, criteria, checks, findings, questions, assignments)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)"#)
+    sqlx::query(r#"INSERT INTO issue (id, number, title, description, repo, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, blocked_by, criteria, checks, findings, questions, assignments)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)
+ON CONFLICT(id) DO UPDATE SET
+  number = excluded.number,
+  title = excluded.title,
+  description = excluded.description,
+  repo = excluded.repo,
+  priority = excluded.priority,
+  rank = excluded.rank,
+  deliver = excluded.deliver,
+  parent = excluded.parent,
+  created_at = excluded.created_at,
+  queued_at = excluded.queued_at,
+  closed_at = excluded.closed_at,
+  reviewed_at = excluded.reviewed_at,
+  canceled = excluded.canceled,
+  delivered = excluded.delivered,
+  mandate = excluded.mandate,
+  constraints = excluded.constraints,
+  conflict = excluded.conflict,
+  last_run = excluded.last_run,
+  answer = excluded.answer,
+  blocked_by = excluded.blocked_by,
+  criteria = excluded.criteria,
+  checks = excluded.checks,
+  findings = excluded.findings,
+  questions = excluded.questions,
+  assignments = excluded.assignments"#)
         .bind(params.r#id)
         .bind(params.r#number)
         .bind(params.r#title)
@@ -86,7 +108,6 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?
         .bind(params.r#rank)
         .bind(params.r#deliver)
         .bind(params.r#parent)
-        .bind(params.r#cron)
         .bind(params.r#created_at)
         .bind(params.r#queued_at)
         .bind(params.r#closed_at)
@@ -96,7 +117,6 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?
         .bind(params.r#mandate)
         .bind(params.r#constraints)
         .bind(params.r#conflict)
-        .bind(params.r#pull_request)
         .bind(params.r#last_run)
         .bind(params.r#answer)
         .bind(params.r#blocked_by)
@@ -117,8 +137,9 @@ pub async fn r#put_issue_evidence<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: PutIssueEvidenceParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT OR REPLACE INTO issue_delivery_evidence (issue_id, evidence)
-VALUES (?1, ?2)"#)
+    sqlx::query(r#"INSERT INTO issue_delivery_evidence (issue_id, evidence)
+VALUES (?1, ?2)
+ON CONFLICT(issue_id) DO UPDATE SET evidence = excluded.evidence"#)
         .bind(params.r#issue_id)
         .bind(params.r#evidence)
         .execute(db).await.map(|_| ())

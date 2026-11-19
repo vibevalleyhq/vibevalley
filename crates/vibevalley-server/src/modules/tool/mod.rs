@@ -22,7 +22,7 @@ use crate::modules::channel::Chat;
 use crate::modules::cron::Crons;
 use crate::modules::issue::Board;
 use crate::modules::orchestrator::words;
-use crate::modules::publish::Publisher;
+use crate::modules::pull::Pulls;
 use crate::modules::repo::Repos;
 
 /// A tool as the model sees it.
@@ -66,7 +66,7 @@ pub struct Farm {
     pub chat: Arc<Chat>,
     pub agents: Arc<Agents>,
     pub repos: Arc<Repos>,
-    pub publisher: Arc<Publisher>,
+    pub pulls: Arc<Pulls>,
     pub crons: Arc<Crons>,
     pub memories: Arc<crate::modules::memory::Memories>,
     pub media: Arc<crate::modules::media::jobs::Jobs>,

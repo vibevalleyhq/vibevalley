@@ -42,7 +42,9 @@ pub struct ServerConfig {
     /// (`None` follows `probe_runtimes`).
     pub probe_github: Option<bool>,
     /// Optional hosted-branch publisher override (offline tests).
-    pub publisher: Option<Arc<modules::publish::Publisher>>,
+    pub publisher: Option<Arc<modules::pull::Publisher>>,
+    /// Poll open PRs every N seconds (`None` disables the background poller).
+    pub poll_pulls: Option<u64>,
     /// Runs due crons every 20 s (`tickCrons`).
     pub tick_crons: bool,
     /// Reads link previews for chat messages off the web.
@@ -101,6 +103,7 @@ impl ServerConfig {
             probe_runtimes: true,
             probe_github: None,
             publisher: None,
+            poll_pulls: None,
             tick_crons: true,
             link_previews: true,
             git_emails: vec![],
@@ -137,6 +140,7 @@ impl ServerConfig {
             starters: csv("VIBEVALLEY_AGENT_STARTERS"),
             git_emails: csv("VIBEVALLEY_GIT_EMAILS"),
             pkm_root: env_str("VIBEVALLEY_PKM_ROOT").map(PathBuf::from),
+            poll_pulls: Some(env_str("VIBEVALLEY_GITHUB_PR_POLL_SECONDS").and_then(|s| s.parse::<u64>().ok()).unwrap_or(180)),
             ..Self::under(home)
         };
         config.voice_line.url = env_str("VIBEVALLEY_VOICE_LINE_URL").unwrap_or_default();
@@ -156,6 +160,7 @@ pub struct Started {
     pub board: Board,
     pub registry: Arc<Registry>,
     pub repos: Arc<modules::repo::Repos>,
+    pub pulls: Arc<modules::pull::Pulls>,
     pub crons: Arc<modules::cron::Crons>,
     pub game: Arc<modules::game::Game>,
     pub attachments: Arc<modules::attachment::Attachments>,
@@ -195,6 +200,7 @@ impl Started {
     /// for reads; it serves nothing that needs the board afterwards.
     pub fn close(&self) {
         self.connectors.close();
+        self.pulls.close();
         self.crons.close();
         self.voice.close();
         self.watch.close();
@@ -308,7 +314,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         repos.probe_in_background();
     }
     game.count_commits(repos.clone(), config.git_emails.clone());
-    let publisher = config.publisher.clone().unwrap_or_else(|| Arc::new(modules::publish::Publisher::default()));
+    let publisher = config.publisher.clone().unwrap_or_else(|| Arc::new(modules::pull::Publisher::default()));
     let memories = modules::memory::Memories::open(&config.home, agents.clone()).map_err(|e| failed("the memory")(&e.message))?;
     modules::memory::install(&hub, memories.clone());
     agents.attach_memories(&memories);
@@ -329,11 +335,13 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         },
     )
     .map_err(|e| failed("the board")(&e))?;
-    modules::publish::install_with_board(&hub, publisher.clone(), Some(board.clone()));
+    let pulls = modules::pull::Pulls::open(&config.home, publisher, Some(repos.clone()), Some(board.clone()), None, None)
+        .map_err(|e| failed("the pulls")(&e.message))?;
+    modules::pull::install(&hub, pulls.clone(), config.poll_pulls);
     modules::issue::install_on(&hub, board.clone(), Some(agents.clone()));
     modules::session::install(&hub, board.clone(), trajectories.clone());
     modules::repo::install_templates(&hub, repos.clone(), board.clone(), agents.clone());
-    let crons = modules::cron::Crons::open(&config.home, &hub, board.clone(), agents.clone());
+    let crons = modules::cron::Crons::open(&config.home, &hub, board.clone(), agents.clone()).map_err(|e| failed("the crons")(&e.message))?;
     modules::cron::install(&hub, crons.clone(), config.tick_crons);
     let attachments = modules::attachment::Attachments::open(&config.home).map_err(|e| failed("the attachments")(&e))?;
     modules::attachment::install(&hub, attachments.clone());
@@ -378,13 +386,13 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     if config.watch_pkm {
         pkm.watch();
     }
-    let resources = modules::mcp::Resources::new(board.clone(), chat.clone(), trajectories.clone());
+    let resources = modules::mcp::Resources::with_pulls(board.clone(), chat.clone(), trajectories.clone(), pulls.clone());
     let farm = Arc::new(modules::tool::Farm {
         board: board.clone(),
         chat: chat.clone(),
         agents: agents.clone(),
         repos: repos.clone(),
-        publisher,
+        pulls: pulls.clone(),
         crons: crons.clone(),
         memories: memories.clone(),
         media: media.clone(),
@@ -441,6 +449,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         board,
         registry,
         repos,
+        pulls,
         crons,
         game,
         attachments,

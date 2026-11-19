@@ -50,7 +50,8 @@ DELETE FROM pkm_term WHERE page=?1;
 DELETE FROM pkm_term;
 
 -- name: AddTerm :exec
-INSERT INTO pkm_term(block,page,terms) VALUES (?1,?2,?3);
+INSERT INTO pkm_term(block,page,terms) VALUES (?1,?2,?3)
+ON CONFLICT(page, block) DO UPDATE SET terms = excluded.terms;
 
 -- name: AllTerms :many
 SELECT block,terms FROM pkm_term;

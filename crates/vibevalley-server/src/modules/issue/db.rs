@@ -14,7 +14,6 @@ fn read(r: queries::ListIssuesRow) -> sqlx::Result<Issue> {
     issue.description = r.description;
     issue.repo = r.repo;
     issue.parent = r.parent;
-    issue.cron = r.cron;
     issue.rank = r.rank;
     issue.queued_at = r.queued_at;
     issue.closed_at = r.closed_at;
@@ -32,7 +31,6 @@ fn read(r: queries::ListIssuesRow) -> sqlx::Result<Issue> {
     issue.assignments = read_json(r.assignments)?;
     issue.constraints = r.constraints.map(read_json).transpose()?;
     issue.conflict = r.conflict.map(read_json).transpose()?;
-    issue.pull_request = r.pull_request.map(read_json).transpose()?;
     issue.last_run = r.last_run.map(read_json).transpose()?;
     issue.answer = r.answer.map(read_json).transpose()?;
     issue.delivery_evidence = r.evidence.map(read_json).transpose()?;
@@ -50,7 +48,6 @@ pub fn put(db: &Sqlite<'_>, t: &Issue) -> sqlx::Result<()> {
         description: t.description.clone(),
         repo: t.repo.clone(),
         parent: t.parent.clone(),
-        cron: t.cron.clone(),
         number: t.number,
         rank: t.rank,
         created_at: t.created_at,
@@ -70,7 +67,6 @@ pub fn put(db: &Sqlite<'_>, t: &Issue) -> sqlx::Result<()> {
         assignments: json(&t.assignments)?,
         constraints: t.constraints.as_ref().map(json).transpose()?,
         conflict: t.conflict.as_ref().map(json).transpose()?,
-        pull_request: t.pull_request.as_ref().map(json).transpose()?,
         last_run: t.last_run.as_ref().map(json).transpose()?,
         answer: t.answer.as_ref().map(json).transpose()?,
     };

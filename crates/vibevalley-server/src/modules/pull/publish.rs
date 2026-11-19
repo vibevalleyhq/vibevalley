@@ -90,7 +90,7 @@ fn git(cwd: &Path, args: &[&str]) -> Result<String, String> {
 }
 
 /// `runGitHub` / `runGitLab`: the tool on PATH, 15 s at most.
-fn host_command(tool: &'static str) -> HostRun {
+pub(crate) fn host_command(tool: &'static str) -> HostRun {
     Arc::new(move |args: &[String]| {
         let mut c = Command::new(tool);
         c.args(args);
@@ -99,7 +99,7 @@ fn host_command(tool: &'static str) -> HostRun {
         } else {
             c.env("GH_PROMPT_DISABLED", "1");
         }
-        match crate::modules::publish::output_within(c, Duration::from_secs(15)) {
+        match output_within(c, Duration::from_secs(15)) {
             Ok(Some((code, out))) => Answer {
                 ok: code == 0,
                 out,
@@ -220,6 +220,23 @@ impl Hosting<'_> {
             return Err(platform_failed("receipt"));
         }
         Ok((number, url.to_string()))
+    }
+
+    /// Reads a hosted pull/merge request's remote state (`open`, `merged`, `closed`).
+    pub(crate) fn state(&self, number: i64) -> Result<PullRequestState, ApiError> {
+        let out = if self.github() {
+            self.request(&["pr", "view", &number.to_string(), "--repo", &self.repo.name, "--json", "state"])?
+        } else {
+            self.request(&["api", &format!("{}/merge_requests/{number}", self.project())])?
+        };
+        let v: Value = serde_json::from_str(&out).map_err(|_| platform_failed("pull state decode"))?;
+        let raw = v["state"].as_str().ok_or_else(|| platform_failed("pull state decode"))?;
+        match raw.to_ascii_lowercase().as_str() {
+            "open" | "opened" => Ok(PullRequestState::Open),
+            "merged" => Ok(PullRequestState::Merged),
+            "closed" => Ok(PullRequestState::Closed),
+            _ => Err(platform_failed("pull state decode")),
+        }
     }
 
     fn inspect(&self) -> Result<String, ApiError> {
@@ -563,6 +580,11 @@ impl Publisher {
         result.state = Some(BranchPublicationState::Open);
         Ok(result)
     }
+}
+
+/// Queries the hosted platform (`gh`/`glab`) for a pull/merge request's current state.
+pub fn remote_pull_state(repo: &HostedRepo, number: i64, run: &HostRun) -> Result<PullRequestState, ApiError> {
+    Hosting { repo, run }.state(number)
 }
 
 /// Extracts the protocol `PullRequest` when a branch publication pushed and

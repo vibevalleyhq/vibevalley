@@ -87,15 +87,34 @@ fn crons_are_kept_refused_and_run_when_due() {
     // Run once: the next tick makes nothing new.
     started.crons.tick();
     assert_eq!(started.board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 1);
+    assert!(!dir.path().join("crons.json").exists(), "crons must live in server.db, not crons.json");
+
+    // Updating the issue preserves cron.issue_id (PutIssue ON CONFLICT DO UPDATE, not INSERT OR REPLACE).
+    started
+        .board
+        .edit(
+            &made.id,
+            &vibevalley_protocol::IssueUpdate {
+                title: Some("say hi updated".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(started.crons.issue_of(once["id"].as_str().unwrap()).as_deref(), Some(made.id.as_str()));
 
     call("cron.delete", json!({ "id": id })).data.unwrap_or_default();
     started.board.close();
     drop(started);
 
-    // Kept through a restart.
+    // Kept through a restart, including Issue.cron projected from cron.issue_id.
     let again = server(dir.path());
     let crons = again.hub.read(|s| s.crons.clone());
     assert_eq!(crons.len(), 1);
     assert_eq!(crons[0].name, "say hi");
+    let reloaded = again.board.issue(&made.id).unwrap();
+    assert_eq!(reloaded.cron.as_deref(), once["id"].as_str());
+    // Deleting the cron clears Issue.cron on the linked issue.
+    again.crons.remove(once["id"].as_str().unwrap()).unwrap();
+    assert_eq!(again.board.issue(&made.id).unwrap().cron, None);
     again.board.close();
 }

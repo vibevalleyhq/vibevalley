@@ -22,7 +22,7 @@ pub mod memory;
 pub mod orchestrator;
 pub mod pkm;
 pub mod provider;
-pub mod publish;
+pub mod pull;
 pub mod repo;
 pub mod session;
 pub mod setting;
