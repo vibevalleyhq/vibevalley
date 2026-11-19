@@ -1,7 +1,13 @@
+pub mod c4;
 pub mod common;
+pub mod eventmodeling;
 pub mod flowchart;
+pub mod gantt;
+pub mod git;
+pub mod journey;
 pub mod pie;
 pub mod sequence;
+pub mod timeline;
 
 use std::collections::HashMap;
 
@@ -44,6 +50,12 @@ pub enum ParsedModel {
     Flowchart(flowchart::FlowDb),
     Sequence(sequence::SeqDb),
     Pie(pie::PieModel),
+    Gantt(gantt::GanttDb),
+    C4(c4::C4Db),
+    GitGraph(git::GitModel),
+    EventModeling(eventmodeling::EventModelingModel),
+    Timeline(timeline::TimelineModel),
+    Journey(journey::JourneyModel),
 }
 
 impl ParsedModel {
@@ -52,6 +64,12 @@ impl ParsedModel {
             Self::Flowchart(_) => DiagramType::Flowchart,
             Self::Sequence(_) => DiagramType::Sequence,
             Self::Pie(_) => DiagramType::Pie,
+            Self::Gantt(_) => DiagramType::Gantt,
+            Self::C4(_) => DiagramType::C4,
+            Self::GitGraph(_) => DiagramType::GitGraph,
+            Self::EventModeling(_) => DiagramType::EventModeling,
+            Self::Timeline(_) => DiagramType::Timeline,
+            Self::Journey(_) => DiagramType::Journey,
         }
     }
 
@@ -60,6 +78,12 @@ impl ParsedModel {
             Self::Flowchart(db) => flowchart::render_flowchart(db, ctx, None),
             Self::Sequence(db) => sequence::render_sequence(db, ctx),
             Self::Pie(model) => pie::render::render_pie(model, ctx),
+            Self::Gantt(db) => gantt::render::render_gantt(db, ctx),
+            Self::C4(db) => c4::render::render_c4(db, ctx),
+            Self::GitGraph(model) => git::render::render_git(model, ctx),
+            Self::EventModeling(model) => eventmodeling::render::render_event_model(model, ctx),
+            Self::Timeline(model) => timeline::render::render_timeline(model, ctx),
+            Self::Journey(model) => journey::render::render_journey(model, ctx),
         }
     }
 }
@@ -113,6 +137,12 @@ impl Registry {
         reg.register(Box::new(flowchart::FlowchartDiagram));
         reg.register(Box::new(sequence::SequenceDiagram));
         reg.register(Box::new(pie::PieDiagram));
+        reg.register(Box::new(gantt::GanttDiagram));
+        reg.register(Box::new(c4::C4Diagram));
+        reg.register(Box::new(git::GitGraphDiagram));
+        reg.register(Box::new(eventmodeling::EventModelingDiagram));
+        reg.register(Box::new(timeline::TimelineDiagram));
+        reg.register(Box::new(journey::JourneyDiagram));
         reg
     }
 
@@ -203,7 +233,17 @@ impl Registry {
             icons: icons_ref,
             math: math_ref,
         };
-        let mut rendered = parsed.model.render(&ctx);
+        let detected = Detected {
+            diagram_type: parsed.diagram_type,
+            mermaid_type: parsed.mermaid_type,
+        };
+        let mut rendered = if let ParsedModel::C4(db) = &parsed.model {
+            c4::render::try_render_c4(db, &ctx).map_err(|e| tag_error(e, detected))?
+        } else if let ParsedModel::Gantt(db) = &parsed.model {
+            gantt::render::try_render_gantt(db, &ctx).map_err(|e| tag_error(e, detected))?
+        } else {
+            parsed.model.render(&ctx)
+        };
         let output_limit = options.output_limit.unwrap_or(DEFAULT_OUTPUT_LIMIT);
         if rendered.svg.len() > output_limit {
             return Err(PeleError::new(
