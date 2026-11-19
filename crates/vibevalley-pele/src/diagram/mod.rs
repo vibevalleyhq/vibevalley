@@ -1,15 +1,21 @@
 pub mod agentflow;
 pub mod architecture;
 pub mod block;
+pub mod c4;
 pub mod class;
 pub mod common;
 pub mod er;
+pub mod eventmodeling;
 pub mod flowchart;
+pub mod gantt;
+pub mod git;
+pub mod journey;
 pub mod pie;
 pub mod requirement;
 pub mod sequence;
 pub mod state;
 pub mod swimlane;
+pub mod timeline;
 pub mod usecase;
 
 use std::collections::HashMap;
@@ -62,6 +68,12 @@ pub enum ParsedModel {
     Swimlane(flowchart::FlowDb),
     Agentflow(agentflow::AgentflowDb),
     Block(block::BlockDb),
+    Gantt(gantt::GanttDb),
+    C4(c4::C4Db),
+    GitGraph(git::GitModel),
+    EventModeling(eventmodeling::EventModelingModel),
+    Timeline(timeline::TimelineModel),
+    Journey(journey::JourneyModel),
 }
 
 impl ParsedModel {
@@ -79,23 +91,35 @@ impl ParsedModel {
             Self::Swimlane(_) => DiagramType::Swimlane,
             Self::Agentflow(_) => DiagramType::Agentflow,
             Self::Block(_) => DiagramType::Block,
+            Self::Gantt(_) => DiagramType::Gantt,
+            Self::C4(_) => DiagramType::C4,
+            Self::GitGraph(_) => DiagramType::GitGraph,
+            Self::EventModeling(_) => DiagramType::EventModeling,
+            Self::Timeline(_) => DiagramType::Timeline,
+            Self::Journey(_) => DiagramType::Journey,
         }
     }
 
-    pub fn render(&self, ctx: &RenderContext<'_>) -> Rendered {
+    pub fn render(&self, ctx: &RenderContext<'_>) -> Result<Rendered, PeleError> {
         match self {
-            Self::Flowchart(db) => flowchart::render_flowchart(db, ctx, None),
-            Self::Sequence(db) => sequence::render_sequence(db, ctx),
-            Self::Pie(model) => pie::render::render_pie(model, ctx),
-            Self::Class(db) => class::render_class(db, ctx),
-            Self::State(db) => state::render_state(db, ctx),
-            Self::Er(db) => er::render_er(db, ctx),
-            Self::Requirement(db) => requirement::render_requirement(db, ctx),
-            Self::Usecase(model) => usecase::render_usecase(model, ctx),
-            Self::Architecture(db) => architecture::render_architecture(db, ctx),
-            Self::Swimlane(db) => swimlane::render_swimlane(db, ctx),
-            Self::Agentflow(db) => agentflow::render_agentflow(db, ctx),
-            Self::Block(db) => block::render_block(db, ctx),
+            Self::Flowchart(db) => Ok(flowchart::render_flowchart(db, ctx, None)),
+            Self::Sequence(db) => Ok(sequence::render_sequence(db, ctx)),
+            Self::Pie(model) => Ok(pie::render::render_pie(model, ctx)),
+            Self::Class(db) => Ok(class::render_class(db, ctx)),
+            Self::State(db) => Ok(state::render_state(db, ctx)),
+            Self::Er(db) => Ok(er::render_er(db, ctx)),
+            Self::Requirement(db) => Ok(requirement::render_requirement(db, ctx)),
+            Self::Usecase(model) => Ok(usecase::render_usecase(model, ctx)),
+            Self::Architecture(db) => Ok(architecture::render_architecture(db, ctx)),
+            Self::Swimlane(db) => Ok(swimlane::render_swimlane(db, ctx)),
+            Self::Agentflow(db) => Ok(agentflow::render_agentflow(db, ctx)),
+            Self::Block(db) => Ok(block::render_block(db, ctx)),
+            Self::Gantt(db) => gantt::render::try_render_gantt(db, ctx),
+            Self::C4(db) => c4::render::try_render_c4(db, ctx),
+            Self::GitGraph(model) => Ok(git::render::render_git(model, ctx)),
+            Self::EventModeling(model) => Ok(eventmodeling::render::render_event_model(model, ctx)),
+            Self::Timeline(model) => Ok(timeline::render::render_timeline(model, ctx)),
+            Self::Journey(model) => Ok(journey::render::render_journey(model, ctx)),
         }
     }
 }
@@ -158,6 +182,12 @@ impl Registry {
         reg.register(Box::new(swimlane::SwimlaneDiagram));
         reg.register(Box::new(agentflow::AgentflowDiagram));
         reg.register(Box::new(block::BlockDiagram));
+        reg.register(Box::new(gantt::GanttDiagram));
+        reg.register(Box::new(c4::C4Diagram));
+        reg.register(Box::new(git::GitGraphDiagram));
+        reg.register(Box::new(eventmodeling::EventModelingDiagram));
+        reg.register(Box::new(timeline::TimelineDiagram));
+        reg.register(Box::new(journey::JourneyDiagram));
         reg
     }
 
@@ -248,17 +278,18 @@ impl Registry {
             icons: icons_ref,
             math: math_ref,
         };
-        let mut rendered = parsed.model.render(&ctx);
+        let found = Detected {
+            diagram_type: parsed.diagram_type,
+            mermaid_type: parsed.mermaid_type,
+        };
+        let mut rendered = parsed.model.render(&ctx).map_err(|e| tag_error(e, found))?;
         let output_limit = options.output_limit.unwrap_or(DEFAULT_OUTPUT_LIMIT);
         if rendered.svg.len() > output_limit {
             return Err(PeleError::new(
                 format!("Diagram output is longer than the limit of {output_limit} characters."),
                 ErrorCode::Limit,
             )
-            .with_detected(Detected {
-                diagram_type: parsed.diagram_type,
-                mermaid_type: parsed.mermaid_type,
-            }));
+            .with_detected(found));
         }
         for link in &mut rendered.links {
             link.id = decode_entities(&link.id);
