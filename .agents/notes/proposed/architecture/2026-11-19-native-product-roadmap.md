@@ -34,7 +34,7 @@ Status: proposed
 
 ### 二、开发者拿到仓库，怎样得到同一个程序
 
-根目录用 Vite+ 组合检查任务。CI 在 Linux 上检查脚本、TypeScript 和官网，在 macOS 上检查 Rust 和原生页面。维护者应沿用本地和 CI 共用的命令。[任务定义](vite.config.ts) · [脚本入口](package.json) · [CI 工作流](.github/workflows/ci.yml)
+根目录用 Vite+ 组合检查任务。CI 在 Linux 上检查脚本、TypeScript 和官网。Rust 和原生页面由合并前本机的 `vp run release:verify` 检查。维护者应沿用本地和 CI 共用的命令。[任务定义](vite.config.ts) · [脚本入口](package.json) · [CI 工作流](.github/workflows/ci.yml)
 
 | 入口 | 维护者的工作 | 验收证据 |
 | --- | --- | --- |

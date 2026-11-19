@@ -51,7 +51,7 @@ description: 给 VibeValley 开、改、合 PR：默认把同一批工作的改�
    gh pr create --base main --head <分支> --title "<标题>" --body-file <正文文件>
    ```
 
-3. 等 CI：`gh pr checks <号> --watch`。红了就看日志修，推上去再等；不要为了过而跳检查。
+3. 等 CI：`gh pr checks <号> --watch`。红了就看日志修，推上去再等；不要为了过而跳检查。CI 只在 Linux 上查，不编 Rust、不查原生页面：动了 `crates/`、`apps/mac/`、`Cargo.*`、`packages/protocol` 或 SQL，合之前在 PR 的最新提交上跑 `vp run release:verify`，把通过的结果写进 `## Checks`。
 4. 只改了标题或正文（`gh pr edit`），CI 不会重跑。合之前在本机再查一遍 PR 上现在的样子：
 
    ```bash

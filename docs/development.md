@@ -49,7 +49,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 
 测试不连接真实模型：服务端的测试在 `crates/vibevalley-server/tests`，助手用替身模型，帮工用 oar 的 scripted 农机（`crates/vibevalley-server/src/testing.rs`）。页面的测试用 `nsh/test` 写在 `apps/mac/ui`，喂样例的 `Transport`；像素场景的测试在 `apps/mac/src/pixel/tests.rs`。
 
-CI 在 Linux 上运行 `sql:check`、脚本与软件包测试。macOS 的 `rust` 任务运行 `protocol:check`、`rust:check`、`mac:check`，并在真实 CLI 和服务端验证交付，在 Mach-O 文件上验证架构与最低系统版本。[CI 工作流](.github/workflows/ci.yml)
+CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`sql:check`、`docs:verify`、脚本与软件包测试、`deadcode` 和官网构建。Rust 工作区和原生页面不在 CI 上查（macOS 机器一次要 16 到 44 分钟）：合并前在本机跑 `vp run release:verify`，它包含 `rust:check`、`protocol:check`、`sql:check` 和 `mac:check`。[CI 工作流](.github/workflows/ci.yml)
 
 ## 分支、提交和 PR
 

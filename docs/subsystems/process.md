@@ -61,7 +61,7 @@
 ## 和谁打交道
 
 - **根目录 `AGENTS.md` 与 `docs/`**：由 `docs:verify` 校验链接、路径、用语表和生成文档同步。
-- **CI 与 Git Hooks**：提交前跑 `vp check --fix --deny-warnings`；CI 的 `check` job 跑 `vp check`、`docs:verify`、`scripts:test`、`deadcode` 和 `scripts/release/regression.ts`，macOS 上的 `rust` job 跑 `protocol:check`、`rust:check` 和 `mac:check`。
+- **CI 与 Git Hooks**：提交前跑 `vp check --fix --deny-warnings`；CI 的 `check` job 跑 `vp check`、`docs:verify`、`scripts:test`、`deadcode` 和 `scripts/release/regression.ts`；Rust 工作区和原生页面由合并前本机的 `vp run release:verify` 检查，CI 不再起 macOS 机器。
 - **验收 Skill**：`.agents/skills/vv-acceptance/` 提供隔离服务端沙箱（`scripts/release/verify-server.ts`）与实机验证分册。
 
 ## 为什么这样
