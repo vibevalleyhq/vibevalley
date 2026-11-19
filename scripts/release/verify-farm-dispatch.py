@@ -16,10 +16,32 @@ UTTERANCE = "create a field issue"
 TITLE = "Native assistant from field"
 CHANNEL_TEXT = "Native CLI receipt"
 TOOL_CALL = "offline-field-create"
+WINDOW = (1280, 820)
+# The farm-chat-input rectangle in window points with the handset open at this viewport.
+CHAT_INPUT = (125, 599, 732, 651)
 
 
 def save(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
+
+
+def manager_area(assets):
+    level = json.loads((assets / "village.ldtk").read_text())["levels"][0]
+    areas = [entity for layer in level["layerInstances"] for entity in layer["entityInstances"]
+             if entity["__identifier"] in ("Prop", "Area") and
+             any(f["__identifier"] == "spot" and f["__value"] == "manager" for f in entity["fieldInstances"])]
+    if len(areas) != 1:
+        raise ValueError(f"Expected one manager in {assets}/village.ldtk, found {len(areas)}")
+    area = areas[0]
+    x, y = area["px"]
+    w, h = area["width"], area["height"]
+    ax, ay = area["__pivot"]
+    return (x - ax * w, y - ay * h, x + (1 - ax) * w, y + (1 - ay) * h)
+
+
+def midpoint(bounds):
+    x0, y0, x1, y1 = bounds
+    return (x0 + x1) / 2, (y0 + y1) / 2
 
 
 class LocalModel(ThreadingHTTPServer):
@@ -61,7 +83,7 @@ class ModelRequest(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def verify(app, cli, root):
+def verify(app, cli, assets, root):
     home, work, user = (root / name for name in ("home", "work", "user"))
     for path in (home, work, user):
         path.mkdir()
@@ -79,10 +101,13 @@ def verify(app, cli, root):
         "VIBEVALLEY_PATROL_HEARTBEAT_MINUTES": "0", "VIBEVALLEY_DEBUG_DUMP": str(root / "dump.json"),
         "VIBEVALLEY_DEBUG_SCRIPT": str(root / "steps.jsonl"),
     }
-    steps = ['hosted:vv {"route":"/farm"}', "wait:700", "mouse:click,106,442", "wait:700", "draw",
-             "mouse:click,359,459", "wait:700", f"shot:{root}/chat.png", "draw", "wait:700",
-             "mouse:click,270,620", f"type:{UTTERANCE}", f"shot:{root}/typed.png", "mouse:click,200,669",
-             "wait:500", f"shot:{root}/sent.png"]
+    area = manager_area(assets)
+    mx, my = midpoint(area)
+    ix, iy = midpoint(CHAT_INPUT)
+    steps = [f"resize:{WINDOW[0]},{WINDOW[1]}", 'hosted:vv {"route":"/farm"}', "draw", "draw",
+             f"pixel_tap:{mx:g},{my:g}", "draw", "draw", f"shot:{root}/chat.png",
+             f"mouse:click,{ix:g},{iy:g}", f"type:{UTTERANCE}", f"shot:{root}/typed.png",
+             "key:enter", f"shot:{root}/sent.png"]
     (root / "steps.jsonl").write_text("".join(json.dumps({"shell": s}) + "\n" for s in steps))
     policy = '(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))'
     with (root / "app.log").open("w") as log:
@@ -105,6 +130,19 @@ def verify(app, cli, root):
             return receipt if receipt["pid"] == proc.pid else None
         except (OSError, ValueError):
             return None
+
+    def field_open():
+        try:
+            state = json.loads((root / "dump.json").read_text())
+        except (OSError, ValueError):
+            return None
+        farm = state.get("pixel") or {}
+        if farm.get("kind") != "farm" or not farm.get("taps"):
+            return None
+        expected = 'Spot { id: "manager", opens: "chat" }'
+        assert farm["taps"][0] == expected, ("first farm action", farm["taps"])
+        return {"viewport": WINDOW, "managerArea": area, "managerTap": [mx, my], "firstAction": expected,
+                "farmViewport": farm["placed"], "inputBounds": CHAT_INPUT, "inputTap": [ix, iy], "submit": "enter"}
 
     def api(op, args):
         req = urllib.request.Request(address + "/api/v1/" + op.replace(".", "/"), data=json.dumps(args).encode(), headers={"Content-Type": "application/json"})
@@ -133,11 +171,16 @@ def verify(app, cli, root):
         doctor = command("doctor")
         assert all(item["ok"] for item in doctor)
         save(root / "doctor.json", doctor)
+        interaction = until("farm manager opened the field chat", field_open)
+        save(root / "interaction.json", interaction)
+        def submitted():
+            hits = api("channel.message.search", {"text": UTTERANCE})
+            return next((h["message"] for h in hits if h["message"]["text"] == UTTERANCE), None)
+        user_message = until("field textarea submitted the message", submitted)
+        assert user_message["sendKey"]
+        until("local model received the field message", lambda: any(e["heard"] for e in model.events))
         dispatched = until("issue dispatched by the field chat", lambda: next((i for i in api("issue.list", {}) if i["title"] == TITLE), None))
         field_run = completed(dispatched["id"])
-        hits = api("channel.message.search", {"text": UTTERANCE})
-        user_message = next(h["message"] for h in hits if h["message"]["text"] == UTTERANCE)
-        assert user_message["sendKey"]
         until("orchestrator received issue_create result", lambda: any(TOOL_CALL in e["toolResultIds"] for e in model.events))
         save(root / "field.json", {"message": user_message, "issue": dispatched, "runs": field_run})
 
@@ -159,7 +202,8 @@ def verify(app, cli, root):
         save(root / "result.json", {
             "ok": True, "appSHA256": hashlib.sha256(app.read_bytes()).hexdigest(), "cliSHA256": hashlib.sha256(cli.read_bytes()).hexdigest(),
             "modelEndpoint": f"http://127.0.0.1:{model.server_port}", "fieldMessage": user_message["id"], "dispatchIssue": dispatched["id"],
-            "workerRun": field_run[0]["id"], "doctor": "passed", "cliMessage": cli_msg["id"], "cron": timer["id"], "scheduledIssue": scheduled["id"],
+            "firstFarmAction": interaction["firstAction"], "workerRun": field_run[0]["id"], "doctor": "passed", "cliMessage": cli_msg["id"],
+            "cron": timer["id"], "scheduledIssue": scheduled["id"], "scheduledRun": scheduled_run[0]["id"],
         })
     finally:
         if proc.poll() is None:
@@ -180,8 +224,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     app_path = args.app.resolve(strict=True)
     binary = app_path / "Contents/MacOS/vibevalley-mac" if app_path.is_dir() else app_path
+    assets = app_path / "Contents/Resources/assets" if app_path.is_dir() else Path(__file__).resolve().parents[2] / "assets"
     cli_path = args.cli.resolve(strict=True) if args.cli else binary.parent / "vibevalley"
     evidence = Path(tempfile.mkdtemp(prefix="vv-native-dispatch-")).resolve()
     print(evidence, flush=True)
-    verify(binary, cli_path, evidence)
+    verify(binary, cli_path, assets, evidence)
     print("Passed native farm chat, scheduled dispatch and CLI diagnostics")
