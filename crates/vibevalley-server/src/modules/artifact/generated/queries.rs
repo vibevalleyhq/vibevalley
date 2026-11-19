@@ -9,8 +9,11 @@ pub struct ArtifactRow {
     pub r#id: String,
     pub r#title: String,
     pub r#body: String,
+    pub r#artifact_type: Option<String>,
+    pub r#is_default: i64,
     pub r#display: Option<String>,
     pub r#channel_id: Option<String>,
+    pub r#message_id: Option<String>,
     pub r#issue: Option<String>,
     pub r#by_id: String,
     pub r#by_name: String,
@@ -26,11 +29,54 @@ pub async fn r#artifact<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ArtifactParams,
 ) -> Result<ArtifactRow, sqlx::Error> {
-    sqlx::query_as::<_, ArtifactRow>(r#"select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+    sqlx::query_as::<_, ArtifactRow>(r#"select a.id, a.title, a.body, a.artifact_type, a.is_default, a.display, a.channel_id, a.message_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
   a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
   from artifact a left join channel_message m on m.id = a.message_id where a.id = ?1"#)
         .bind(params.r#id)
         .fetch_one(db).await
+}
+
+pub type DefaultDesignSystemArtifactRow = ArtifactRow;
+
+pub async fn r#default_design_system_artifact<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+) -> Result<DefaultDesignSystemArtifactRow, sqlx::Error> {
+    sqlx::query_as::<_, DefaultDesignSystemArtifactRow>(r#"select a.id, a.title, a.body, a.artifact_type, a.is_default, a.display, a.channel_id, a.message_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+  a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
+  from artifact a left join channel_message m on m.id = a.message_id
+  where a.artifact_type = 'design-system' and a.is_default = 1
+  limit 1"#)
+        .fetch_one(db).await
+}
+
+pub struct ClearDefaultDesignSystemParams {
+    pub r#updated_at: i64,
+}
+
+pub async fn r#clear_default_design_system<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: ClearDefaultDesignSystemParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"update artifact set is_default = 0, updated_at = ?1 where is_default = 1"#)
+        .bind(params.r#updated_at)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct SetArtifactDefaultParams {
+    pub r#id: String,
+    pub r#is_default: i64,
+    pub r#updated_at: i64,
+}
+
+pub async fn r#set_artifact_default<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: SetArtifactDefaultParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"update artifact set is_default = ?2, updated_at = ?3 where id = ?1"#)
+        .bind(params.r#id)
+        .bind(params.r#is_default)
+        .bind(params.r#updated_at)
+        .execute(db).await.map(|_| ())
 }
 
 pub struct ArtifactsInChannelParams {
@@ -43,7 +89,7 @@ pub async fn r#artifacts_in_channel<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ArtifactsInChannelParams,
 ) -> Result<Vec<ArtifactsInChannelRow>, sqlx::Error> {
-    sqlx::query_as::<_, ArtifactsInChannelRow>(r#"select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+    sqlx::query_as::<_, ArtifactsInChannelRow>(r#"select a.id, a.title, a.body, a.artifact_type, a.is_default, a.display, a.channel_id, a.message_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
   a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
   from artifact a left join channel_message m on m.id = a.message_id where a.channel_id = ?1 order by a.updated_at desc, a.id"#)
         .bind(params.r#channel_id)
@@ -60,7 +106,7 @@ pub async fn r#artifacts_for_issue<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ArtifactsForIssueParams,
 ) -> Result<Vec<ArtifactsForIssueRow>, sqlx::Error> {
-    sqlx::query_as::<_, ArtifactsForIssueRow>(r#"select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+    sqlx::query_as::<_, ArtifactsForIssueRow>(r#"select a.id, a.title, a.body, a.artifact_type, a.is_default, a.display, a.channel_id, a.message_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
   a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
   from artifact a left join channel_message m on m.id = a.message_id where a.issue = ?1 order by a.updated_at desc, a.id"#)
         .bind(params.r#issue)
@@ -77,7 +123,7 @@ pub async fn r#artifacts<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ArtifactsParams,
 ) -> Result<Vec<ArtifactsRow>, sqlx::Error> {
-    sqlx::query_as::<_, ArtifactsRow>(r#"select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+    sqlx::query_as::<_, ArtifactsRow>(r#"select a.id, a.title, a.body, a.artifact_type, a.is_default, a.display, a.channel_id, a.message_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
   a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
   from artifact a left join channel_message m on m.id = a.message_id order by a.updated_at desc, a.id limit ?1"#)
         .bind(params.r#limit)
@@ -88,6 +134,8 @@ pub struct AddArtifactParams {
     pub r#id: String,
     pub r#title: String,
     pub r#body: String,
+    pub r#artifact_type: Option<String>,
+    pub r#is_default: i64,
     pub r#display: Option<String>,
     pub r#channel_id: Option<String>,
     pub r#issue: Option<String>,
@@ -101,11 +149,13 @@ pub async fn r#add_artifact<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: AddArtifactParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"insert into artifact (id, title, body, display, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)
-  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10, ?10)"#)
+    sqlx::query(r#"insert into artifact (id, title, body, artifact_type, is_default, display, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0, ?12, ?12)"#)
         .bind(params.r#id)
         .bind(params.r#title)
         .bind(params.r#body)
+        .bind(params.r#artifact_type)
+        .bind(params.r#is_default)
         .bind(params.r#display)
         .bind(params.r#channel_id)
         .bind(params.r#issue)
@@ -611,5 +661,208 @@ pub async fn r#resolve_suggestion<'e>(
         .bind(params.r#status)
         .bind(params.r#resolved_at)
         .bind(params.r#resolved_by)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct ArtifactEntriesParams {
+    pub r#artifact_id: String,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct ArtifactEntriesRow {
+    pub r#artifact_id: String,
+    pub r#path: String,
+    pub r#kind: String,
+    pub r#mime: String,
+    pub r#value: Option<String>,
+    pub r#attachment_id: Option<String>,
+    pub r#size: i64,
+    pub r#rev: i64,
+    pub r#updated_by: String,
+    pub r#updated_at: i64,
+}
+
+pub async fn r#artifact_entries<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: ArtifactEntriesParams,
+) -> Result<Vec<ArtifactEntriesRow>, sqlx::Error> {
+    sqlx::query_as::<_, ArtifactEntriesRow>(r#"select artifact_id, path, kind, mime, value, attachment_id, size, rev, updated_by, updated_at
+  from artifact_entry where artifact_id = ?1 order by path"#)
+        .bind(params.r#artifact_id)
+        .fetch_all(db).await
+}
+
+pub struct ArtifactEntriesByPrefixParams {
+    pub r#artifact_id: String,
+    pub r#path: String,
+}
+
+pub type ArtifactEntriesByPrefixRow = ArtifactEntriesRow;
+
+pub async fn r#artifact_entries_by_prefix<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: ArtifactEntriesByPrefixParams,
+) -> Result<Vec<ArtifactEntriesByPrefixRow>, sqlx::Error> {
+    sqlx::query_as::<_, ArtifactEntriesByPrefixRow>(r#"select artifact_id, path, kind, mime, value, attachment_id, size, rev, updated_by, updated_at
+  from artifact_entry where artifact_id = ?1 and path like ?2 order by path"#)
+        .bind(params.r#artifact_id)
+        .bind(params.r#path)
+        .fetch_all(db).await
+}
+
+pub struct ArtifactEntryParams {
+    pub r#artifact_id: String,
+    pub r#path: String,
+}
+
+pub type ArtifactEntryRow = ArtifactEntriesRow;
+
+pub async fn r#artifact_entry<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: ArtifactEntryParams,
+) -> Result<ArtifactEntryRow, sqlx::Error> {
+    sqlx::query_as::<_, ArtifactEntryRow>(r#"select artifact_id, path, kind, mime, value, attachment_id, size, rev, updated_by, updated_at
+  from artifact_entry where artifact_id = ?1 and path = ?2"#)
+        .bind(params.r#artifact_id)
+        .bind(params.r#path)
+        .fetch_one(db).await
+}
+
+pub struct ArtifactEntryCountParams {
+    pub r#artifact_id: String,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct ArtifactEntryCountRow {
+    pub r#n: i64,
+}
+
+pub async fn r#artifact_entry_count<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: ArtifactEntryCountParams,
+) -> Result<ArtifactEntryCountRow, sqlx::Error> {
+    sqlx::query_as::<_, ArtifactEntryCountRow>(r#"select count(*) as n from artifact_entry where artifact_id = ?1"#)
+        .bind(params.r#artifact_id)
+        .fetch_one(db).await
+}
+
+pub struct UpsertArtifactEntryParams {
+    pub r#artifact_id: String,
+    pub r#path: String,
+    pub r#kind: String,
+    pub r#mime: String,
+    pub r#value: Option<String>,
+    pub r#attachment_id: Option<String>,
+    pub r#size: i64,
+    pub r#rev: i64,
+    pub r#updated_by: String,
+    pub r#updated_at: i64,
+}
+
+pub async fn r#upsert_artifact_entry<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: UpsertArtifactEntryParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"insert into artifact_entry (artifact_id, path, kind, mime, value, attachment_id, size, rev, updated_by, updated_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+  on conflict (artifact_id, path) do update set
+    kind = excluded.kind,
+    mime = excluded.mime,
+    value = excluded.value,
+    attachment_id = excluded.attachment_id,
+    size = excluded.size,
+    rev = excluded.rev,
+    updated_by = excluded.updated_by,
+    updated_at = excluded.updated_at"#)
+        .bind(params.r#artifact_id)
+        .bind(params.r#path)
+        .bind(params.r#kind)
+        .bind(params.r#mime)
+        .bind(params.r#value)
+        .bind(params.r#attachment_id)
+        .bind(params.r#size)
+        .bind(params.r#rev)
+        .bind(params.r#updated_by)
+        .bind(params.r#updated_at)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct DeleteArtifactEntryParams {
+    pub r#artifact_id: String,
+    pub r#path: String,
+}
+
+pub async fn r#delete_artifact_entry<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: DeleteArtifactEntryParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"delete from artifact_entry where artifact_id = ?1 and path = ?2"#)
+        .bind(params.r#artifact_id)
+        .bind(params.r#path)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct AddArtifactEntryChangeParams {
+    pub r#artifact_id: String,
+    pub r#seq: i64,
+    pub r#actor: String,
+    pub r#paths: String,
+    pub r#deleted: String,
+    pub r#created_at: i64,
+}
+
+pub async fn r#add_artifact_entry_change<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: AddArtifactEntryChangeParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"insert into artifact_entry_change (artifact_id, seq, actor, paths, deleted, created_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6)"#)
+        .bind(params.r#artifact_id)
+        .bind(params.r#seq)
+        .bind(params.r#actor)
+        .bind(params.r#paths)
+        .bind(params.r#deleted)
+        .bind(params.r#created_at)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct ArtifactEntryChangesAfterParams {
+    pub r#artifact_id: String,
+    pub r#seq: i64,
+    pub r#limit: i64,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct ArtifactEntryChangesAfterRow {
+    pub r#artifact_id: String,
+    pub r#seq: i64,
+    pub r#actor: String,
+    pub r#paths: String,
+    pub r#deleted: String,
+    pub r#created_at: i64,
+}
+
+pub async fn r#artifact_entry_changes_after<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: ArtifactEntryChangesAfterParams,
+) -> Result<Vec<ArtifactEntryChangesAfterRow>, sqlx::Error> {
+    sqlx::query_as::<_, ArtifactEntryChangesAfterRow>(r#"select artifact_id, seq, actor, paths, deleted, created_at
+  from artifact_entry_change where artifact_id = ?1 and seq > ?2 order by seq limit ?3"#)
+        .bind(params.r#artifact_id)
+        .bind(params.r#seq)
+        .bind(params.r#limit)
+        .fetch_all(db).await
+}
+
+pub struct PruneArtifactEntryChangesParams {
+    pub r#created_at: i64,
+}
+
+pub async fn r#prune_artifact_entry_changes<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: PruneArtifactEntryChangesParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"delete from artifact_entry_change where created_at < ?1"#)
+        .bind(params.r#created_at)
         .execute(db).await.map(|_| ())
 }

@@ -856,7 +856,7 @@ fn rand_unit() -> f64 {
     (uuid::Uuid::new_v4().as_u128() % 1_000_000) as f64 / 1_000_000.0
 }
 
-fn relay<T, E: serde::Serialize>(rx: &flume::Receiver<T>, sink: &Sink, keep: impl Fn(T) -> Option<E>) {
+pub(super) fn relay<T, E: serde::Serialize>(rx: &flume::Receiver<T>, sink: &Sink, keep: impl Fn(T) -> Option<E>) {
     loop {
         if sink.stopped() {
             return;

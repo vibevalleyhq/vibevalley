@@ -1,29 +1,35 @@
 //! Artifacts (VibeValley `modules/artifact/artifact.ts`): an html page kept
-//! version by version (each version's bytes an attachment), or a page of
-//! blocks written together (`blocks.rs`). Made with content, it is
-//! announced in a channel with its card; the `artifact.*` endpoints, the
-//! `artifact.follow` and `artifact.suggestion.follow` subscriptions, the
-//! quotes of blocks a chat message carries, and VibeValley's `artifact.page`
-//! (what `GET /api/v1/artifact/:id/:version` serves).
+//! version by version (each version's bytes an attachment), a page of blocks
+//! written together (`blocks.rs`), or a structured entry store (`entries.rs`)
+//! with progressive-disclosure type guides (`types.rs`). Made with content or
+//! entries, it is announced in a channel with its card; the `artifact.*`
+//! endpoints, the `artifact.follow`, `artifact.entry.follow`, and
+//! `artifact.suggestion.follow` subscriptions, the quotes of blocks a chat
+//! message carries, and VibeValley's `artifact.page` / `artifact.view`.
 
 mod blocks;
 mod db;
+mod entries;
+mod types;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 use sqlx::{Connection, SqliteConnection};
-use vibevalley_artifact::{artifact_headers, artifact_problem, html_check, html_edit, html_problem, shell_theme_of, with_shell};
+use vibevalley_artifact::{artifact_headers, artifact_problem, html_check, html_edit, html_problem, infer_artifact_from_name, shell_theme_of, with_shell};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Artifact as Wire, ArtifactBody, ArtifactCard, ArtifactContent, ArtifactDisplay, ArtifactHtmlEdit, ArtifactListRequest, ArtifactMarkdown,
-    ArtifactPage, ArtifactPageInput, ArtifactRequest, ArtifactSaid, ArtifactUpdateRequest, ArtifactVersion, ArtifactVersionRequest, BizCode, BlockAck,
-    BlockCreate, BlockDelete, BlockRef, BlockSnapshot, BlockUpdate, Preview, QuotedBlock, USER_ID, native_ops, ops, subscriptions,
+    ApiError, Artifact as Wire, ArtifactBody, ArtifactCard, ArtifactContent, ArtifactDisplay, ArtifactEntryBatchRequest, ArtifactHtmlEdit, ArtifactKind,
+    ArtifactListRequest, ArtifactMarkdown, ArtifactPage, ArtifactPageInput, ArtifactRequest, ArtifactSaid, ArtifactType, ArtifactUpdateRequest,
+    ArtifactVersion, ArtifactVersionRequest, BizCode, BlockAck, BlockCreate, BlockDelete, BlockRef, BlockSnapshot, BlockUpdate, Preview, QuotedBlock, USER_ID,
+    native_ops, ops, subscriptions,
 };
 
 pub use blocks::spans_of;
 use db::ArtifactRow;
+use entries::EntryChange;
 
 use crate::base::{LookIn, missing, open_sqlx_db};
 use crate::modules::agent::Agents;
@@ -94,9 +100,12 @@ pub struct Artifacts {
     rows: Mutex<()>,
     /// One batch of block ops at a time.
     batches: Mutex<()>,
+    /// Per-artifact write lock for structured entry store batches.
+    entry_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     files: Arc<Attachments>,
     chat: Arc<Chat>,
     changes: Mutex<Vec<flume::Sender<Change>>>,
+    entry_changes: Mutex<Vec<flume::Sender<EntryChange>>>,
     suggestion_changes: Mutex<Vec<flume::Sender<SuggestionsNow>>>,
     demo_on: AtomicBool,
     closed: AtomicBool,
@@ -117,9 +126,11 @@ impl Artifacts {
             db: Mutex::new(conn),
             rows: Mutex::default(),
             batches: Mutex::default(),
+            entry_locks: Mutex::default(),
             files,
             chat,
             changes: Mutex::default(),
+            entry_changes: Mutex::default(),
             suggestion_changes: Mutex::default(),
             demo_on: AtomicBool::new(false),
             closed: AtomicBool::new(false),
@@ -162,10 +173,17 @@ impl Artifacts {
     fn assemble(&self, db: &mut SqliteConnection, row: ArtifactRow) -> Result<Wire, ApiError> {
         let versions = if row.body == "html" { db::versions(db, &row.id).map_err(q)? } else { vec![] };
         let channel = row.channel_id.clone().unwrap_or_default();
+        let body = match row.body.as_str() {
+            "html" => ArtifactBody::Html,
+            "store" => ArtifactBody::Store,
+            _ => ArtifactBody::Blocks,
+        };
         Ok(Wire {
             id: row.id,
             title: row.title,
-            body: if row.body == "html" { ArtifactBody::Html } else { ArtifactBody::Blocks },
+            body,
+            artifact_type: row.artifact_type.as_deref().and_then(artifact_type_of),
+            is_default: row.is_default != 0,
             display: row.display.as_deref().and_then(display_of),
             channel: row.channel_id,
             said: match (row.said_channel, row.said_number) {
@@ -210,9 +228,10 @@ impl Artifacts {
             (None, None) => db::artifacts(&mut db, LISTED_MAX),
         }
         .map_err(q)?;
-        // Both given: the issue's, in that channel.
+        // Both given: the issue's, in that channel; filtered by artifact_type when set.
         rows.into_iter()
             .filter(|r| channel.is_none_or(|c| r.channel_id.as_deref() == Some(c)))
+            .filter(|r| req.artifact_type.is_none_or(|ty| r.artifact_type.as_deref() == Some(ty.as_str())))
             .map(|r| self.assemble(&mut db, r))
             .collect()
     }
@@ -249,7 +268,8 @@ impl Artifacts {
             })
     }
 
-    /// An html one's version as made; a blocks one's Markdown now, its version its seq.
+    /// An html one's version as made; a blocks one's Markdown now; a store one's
+    /// manifest summary, its version its seq.
     pub fn content(&self, id: &str, version: Option<i64>) -> Result<(ArtifactContent, ArtifactBody), ApiError> {
         let row = self.found(&mut self.db(), id)?;
         if row.body == "blocks" {
@@ -259,6 +279,16 @@ impl Artifacts {
                     content: self.markdown(id)?,
                 },
                 ArtifactBody::Blocks,
+            ));
+        }
+        if row.body == "store" {
+            let summary = self.store_summary(&row)?;
+            return Ok((
+                ArtifactContent {
+                    version: row.seq,
+                    content: summary,
+                },
+                ArtifactBody::Store,
             ));
         }
         let (row, v) = self.version_of(&mut self.db(), id, version)?;
@@ -281,64 +311,106 @@ impl Artifacts {
         Ok(self.files.keep(bytes, &format!("{title}.html"), "text/html")?.id)
     }
 
-    fn words(base: String, note: Option<&str>) -> String {
+    pub(super) fn words(base: String, note: Option<&str>) -> String {
         match note {
             Some(note) => t("server.artifact.withNote", &[("said", base.into()), ("note", note.into())]),
             None => base,
         }
     }
 
-    /// Without content, an empty blocks one, not announced. With content, a
-    /// hand-in: html kept whole, Markdown read into blocks, announced with
-    /// its card.
+    /// Without content, an empty blocks or store one. With content or entries, a
+    /// hand-in: html kept whole, Markdown read into blocks, or store entries
+    /// committed, announced when appropriate.
     pub fn create(&self, maker: &Maker, req: &ArtifactRequest) -> Result<Wire, ApiError> {
         let _rows = lock(&self.rows);
         let trimmed = req.title.trim();
-        let title = if trimmed.is_empty() {
+        let inferred = (req.kind.is_none() && req.artifact_type.is_none() && !trimmed.is_empty())
+            .then(|| infer_artifact_from_name(trimmed, req.content.as_deref()))
+            .filter(|inf| inf.title != trimmed || inf.display.is_some() || inf.artifact_type.is_some());
+
+        let effective_title = if let Some(inf) = &inferred {
+            inf.title.clone()
+        } else if trimmed.is_empty() {
             t("server.artifact.untitled", &[])
         } else {
             trimmed.to_string()
         };
+
+        let inferred_type = inferred
+            .as_ref()
+            .filter(|_| req.content.is_none() || inferred.as_ref().is_some_and(|i| i.kind == ArtifactKind::Markdown))
+            .and_then(|i| i.artifact_type);
+        let artifact_type = req.artifact_type.or(inferred_type);
+
+        if req.is_default == Some(true) && artifact_type != Some(ArtifactType::DesignSystem) {
+            return Err(refused(t("server.artifact.defaultDesignSystemOnly", &[])));
+        }
+
+        let wants_store = artifact_type.is_some_and(|ty| ty != ArtifactType::Docs)
+            || req.kind == Some(ArtifactKind::Store)
+            || (req.entries.is_some() && req.content.is_none() && req.kind != Some(ArtifactKind::Html) && req.kind != Some(ArtifactKind::Markdown));
+
+        if wants_store {
+            let store_type = artifact_type.filter(|&ty| ty != ArtifactType::Docs);
+            return self.create_store(maker, req, &effective_title, store_type);
+        }
+
+        let docs_type = (artifact_type == Some(ArtifactType::Docs)).then_some(ArtifactType::Docs);
         let Some(content) = &req.content else {
-            let problem = artifact_problem(Some(&title), None, None);
+            let problem = artifact_problem(Some(&effective_title), None, None);
             if !problem.is_empty() {
                 return Err(refused(problem));
             }
-            return self.start(maker, &title);
+            if req.display.is_some() {
+                return Err(refused(t("server.artifact.displayHtmlOnly", &[])));
+            }
+            let channel = match req.channel.as_deref() {
+                Some(c) => Some(self.chat.place_of(&maker.from, c)?),
+                None => None,
+            };
+            return self.start_blocks(maker, &effective_title, docs_type, channel, req.issue.clone());
         };
-        let kind = req.kind.as_str();
+
+        let kind = req.kind.or_else(|| inferred.as_ref().map(|i| i.kind)).unwrap_or(ArtifactKind::Markdown);
         let bytes = content.as_bytes();
-        let mut problem = artifact_problem(Some(&req.title), Some(kind), Some(bytes.len()));
-        if problem.is_empty() && kind == "html" {
+        let title_for_check = if inferred.is_some() { effective_title.as_str() } else { req.title.as_str() };
+        let mut problem = artifact_problem(Some(title_for_check), Some(kind.as_str()), Some(bytes.len()));
+        if problem.is_empty() && kind == ArtifactKind::Html {
             problem = html_problem(&html_check(content));
         }
         if !problem.is_empty() {
             return Err(refused(problem));
         }
-        let html = kind == "html";
+        let html = kind == ArtifactKind::Html;
         if !html && req.display.is_some() {
             return Err(refused(t("server.artifact.displayHtmlOnly", &[])));
         }
-        let display = html.then(|| req.display.unwrap_or(ArtifactDisplay::Page));
+        let display = html.then(|| {
+            req.display
+                .or_else(|| inferred.as_ref().and_then(|i| i.display))
+                .unwrap_or(ArtifactDisplay::Page)
+        });
+        let final_type = if html { None } else { docs_type };
         let channel = self.chat.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?;
-        let file = if html { self.keep(bytes, &title)? } else { String::new() };
+        let file = if html { self.keep(bytes, &effective_title)? } else { String::new() };
         let id = new_id();
         let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
         let version = if html { 1 } else { 0 };
         let card = ArtifactCard {
             id: id.clone(),
-            title: title.clone(),
+            title: effective_title.clone(),
             body: if html { ArtifactBody::Html } else { ArtifactBody::Blocks },
             version,
             note: note.unwrap_or("").into(),
             display,
+            artifact_type: final_type,
         };
         let mut initial = None;
         self.chat.post_with(
             Posting {
                 from: maker.from.clone(),
                 channel,
-                text: Self::words(t("server.artifact.made", &[("title", title.as_str().into())]), note),
+                text: Self::words(t("server.artifact.made", &[("title", effective_title.as_str().into())]), note),
                 made: Some(Made::Card(card)),
                 run: maker.run.clone(),
                 ..Posting::default()
@@ -349,8 +421,10 @@ impl Artifacts {
                     db,
                     db::NewArtifact {
                         id: id.clone(),
-                        title: title.clone(),
+                        title: effective_title.clone(),
                         body: if html { "html" } else { "blocks" }.into(),
+                        artifact_type: final_type.map(|ty| ty.as_str().into()),
+                        is_default: 0,
                         display: display.map(|d| d.as_str().into()),
                         channel_id: Some(said.channel.clone()),
                         issue: req.issue.clone(),
@@ -389,8 +463,113 @@ impl Artifacts {
         self.get_now(&id)
     }
 
+    fn create_store(&self, maker: &Maker, req: &ArtifactRequest, title: &str, artifact_type: Option<ArtifactType>) -> Result<Wire, ApiError> {
+        let title_for_check = if req.title.trim().is_empty() { title } else { req.title.as_str() };
+        let problem = artifact_problem(Some(title_for_check), None, None);
+        if !problem.is_empty() {
+            return Err(refused(problem));
+        }
+        if req.display.is_some() {
+            return Err(refused(t("server.artifact.displayHtmlOnly", &[])));
+        }
+        let is_default = req.is_default == Some(true);
+        if is_default && artifact_type != Some(ArtifactType::DesignSystem) {
+            return Err(refused(t("server.artifact.defaultDesignSystemOnly", &[])));
+        }
+
+        let has_entries = req.entries.as_ref().is_some_and(|e| !e.is_empty());
+        let should_announce = req.announce.unwrap_or_else(|| (maker.by != USER_ID && has_entries) || req.channel.is_some());
+        let resolved_channel = if should_announce || req.channel.is_some() || maker.by != USER_ID {
+            Some(self.chat.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?)
+        } else {
+            None
+        };
+
+        let id = new_id();
+        let at = now();
+        let initial_name = if maker.by == USER_ID {
+            t("server.channel.name.user", &[])
+        } else {
+            maker.by.clone()
+        };
+
+        {
+            let mut db = self.db();
+            let mut tx = pollster::block_on(db.begin()).map_err(q)?;
+            if is_default {
+                db::clear_default_design_system(&mut tx, at).map_err(q)?;
+            }
+            db::add_artifact(
+                &mut tx,
+                db::NewArtifact {
+                    id: id.clone(),
+                    title: title.into(),
+                    body: "store".into(),
+                    artifact_type: artifact_type.map(|ty| ty.as_str().into()),
+                    is_default: i64::from(is_default),
+                    display: None,
+                    channel_id: resolved_channel.clone(),
+                    issue: req.issue.clone(),
+                    by_id: maker.by.clone(),
+                    by_name: initial_name,
+                    version: 0,
+                    created_at: at,
+                },
+            )
+            .map_err(q)?;
+            pollster::block_on(tx.commit()).map_err(q)?;
+        }
+
+        let mut seq = 0;
+        if let Some(entries) = &req.entries
+            && !entries.is_empty()
+        {
+            let seeded = self.batch_entries(
+                maker,
+                &ArtifactEntryBatchRequest {
+                    id: id.clone(),
+                    writes: entries.clone(),
+                    note: None,
+                    announce: Some(false),
+                },
+            )?;
+            seq = seeded.seq;
+        }
+
+        if should_announce && let Some(channel) = resolved_channel {
+            let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
+            let card = ArtifactCard {
+                id: id.clone(),
+                title: title.into(),
+                body: ArtifactBody::Store,
+                version: seq,
+                note: note.unwrap_or("").into(),
+                display: None,
+                artifact_type,
+            };
+            let (said, _) = self.chat.post(Posting {
+                from: maker.from.clone(),
+                channel,
+                text: Self::words(t("server.artifact.made", &[("title", title.into())]), note),
+                made: Some(Made::Card(card)),
+                run: maker.run.clone(),
+                ..Posting::default()
+            })?;
+            db::artifact_said(&mut self.db(), &id, &said.id).map_err(q)?;
+        }
+
+        self.get_now(&id)
+    }
+
     /// An empty blocks one the user starts on the page.
-    fn start(&self, maker: &Maker, title: &str) -> Result<Wire, ApiError> {
+    fn start_blocks(
+        &self,
+        maker: &Maker,
+        title: &str,
+        artifact_type: Option<ArtifactType>,
+        channel: Option<String>,
+        issue: Option<String>,
+    ) -> Result<Wire, ApiError> {
         let id = new_id();
         let name = if maker.by == USER_ID {
             t("server.channel.name.user", &[])
@@ -404,11 +583,13 @@ impl Artifacts {
                 id: id.clone(),
                 title: title.into(),
                 body: "blocks".into(),
+                artifact_type: artifact_type.map(|ty| ty.as_str().into()),
+                is_default: 0,
                 display: None,
-                channel_id: None,
-                issue: None,
+                channel_id: channel,
+                issue,
                 by_id: maker.by.clone(),
-                by_name: name.clone(),
+                by_name: name,
                 version: 0,
                 created_at: now(),
             },
@@ -418,7 +599,7 @@ impl Artifacts {
         self.assemble(&mut db, row)
     }
 
-    /// An html one's next version; a blocks one is refused.
+    /// An html one's next version; a blocks or store one is refused.
     pub fn version(&self, maker: &Maker, req: &ArtifactVersionRequest) -> Result<Wire, ApiError> {
         let _rows = lock(&self.rows);
         self.version_locked(maker, req)
@@ -447,6 +628,7 @@ impl Artifacts {
             version: next,
             note: note.unwrap_or("").into(),
             display: row.display.as_deref().and_then(display_of),
+            artifact_type: None,
         };
         self.chat.post_with(
             Posting {
@@ -515,7 +697,7 @@ impl Artifacts {
         )
     }
 
-    /// Its title, or how an html one is shown.
+    /// Its title, how an html one is shown, or whether a design-system is the farm's default.
     pub fn update(&self, req: &ArtifactUpdateRequest) -> Result<Wire, ApiError> {
         let _rows = lock(&self.rows);
         let mut db = self.db();
@@ -529,6 +711,9 @@ impl Artifacts {
         if req.display.is_some() && row.body != "html" {
             return Err(refused(t("server.artifact.displayHtmlOnly", &[])));
         }
+        if req.is_default == Some(true) && row.artifact_type.as_deref() != Some(ArtifactType::DesignSystem.as_str()) {
+            return Err(refused(t("server.artifact.defaultDesignSystemOnly", &[])));
+        }
         let at = now();
         let mut tx = pollster::block_on(db.begin()).map_err(q)?;
         if let Some(title) = &req.title {
@@ -536,6 +721,12 @@ impl Artifacts {
         }
         if let Some(display) = req.display {
             db::artifact_shown(&mut tx, &req.id, display.as_str(), at).map_err(q)?;
+        }
+        if let Some(is_default) = req.is_default {
+            if is_default {
+                db::clear_default_design_system(&mut tx, at).map_err(q)?;
+            }
+            db::set_artifact_default(&mut tx, &req.id, is_default, at).map_err(q)?;
         }
         pollster::block_on(tx.commit()).map_err(q)?;
         let row = self.found(&mut db, &req.id)?;
@@ -549,6 +740,12 @@ impl Artifacts {
                 "server.artifact.preview.remove",
                 &[("title", row.title.as_str().into()), ("n", row.version.into())],
             )
+        } else if row.body == "store" {
+            let n = self.entry_count(id)?;
+            t(
+                "server.artifact.preview.removeEntries",
+                &[("title", row.title.as_str().into()), ("n", n.into())],
+            )
         } else {
             let n = self.live_blocks(id)?.len();
             t("server.artifact.preview.removeBlocks", &[("title", row.title.as_str().into()), ("n", n.into())])
@@ -560,7 +757,7 @@ impl Artifacts {
         Ok(Preview { does })
     }
 
-    /// It and its versions or blocks go; the versions' attachments stay.
+    /// It and its versions, blocks, or entries go; the versions' attachments stay.
     pub fn remove(&self, id: &str) -> Result<(), ApiError> {
         let _rows = lock(&self.rows);
         let mut db = self.db();
@@ -632,6 +829,10 @@ fn display_of(s: &str) -> Option<ArtifactDisplay> {
     ArtifactDisplay::ALL.into_iter().find(|d| d.as_str() == s)
 }
 
+pub(super) fn artifact_type_of(s: &str) -> Option<ArtifactType> {
+    ArtifactType::ALL.into_iter().find(|ty| ty.as_str() == s)
+}
+
 fn prune_daily(me: Weak<Artifacts>, stop_rx: flume::Receiver<()>) -> Option<std::thread::JoinHandle<()>> {
     std::thread::Builder::new()
         .name("vibevalley-artifact-prune".into())
@@ -684,6 +885,7 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board:
             a.list(&ArtifactListRequest {
                 channel: r.channel.filter(|c| !c.is_empty()),
                 issue,
+                artifact_type: r.artifact_type,
             })
         }
     });
@@ -725,6 +927,26 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board:
     hub.on::<ops::ArtifactPreviewDelete>({
         let a = a.clone();
         move |_, r| a.preview_remove(&r.id)
+    });
+    hub.on::<ops::ArtifactTypeList>({
+        let a = a.clone();
+        move |_, _| a.list_types()
+    });
+    hub.on::<ops::ArtifactTypeRead>({
+        let a = a.clone();
+        move |_, r| a.read_type(&r)
+    });
+    hub.on::<ops::ArtifactEntryList>({
+        let a = a.clone();
+        move |_, r| a.list_entries(&r)
+    });
+    hub.on::<ops::ArtifactEntryGet>({
+        let a = a.clone();
+        move |_, r| a.get_entry(&r)
+    });
+    hub.on::<ops::ArtifactEntryBatch>({
+        let a = a.clone();
+        move |_, r| a.batch_entries(&Maker::user(), &r)
     });
     hub.on::<ops::ArtifactBlockList>({
         let a = a.clone();
@@ -810,9 +1032,17 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board:
         let a = a.clone();
         move |_, r| a.page(&r)
     });
+    hub.on::<native_ops::ArtifactView>({
+        let a = a.clone();
+        move |_, r| a.view(&r)
+    });
     hub.on_subscription::<subscriptions::ArtifactFollow>({
         let a = a.clone();
         move |_, p, sink| a.follow(&p.id, p.after, sink)
+    });
+    hub.on_subscription::<subscriptions::ArtifactEntryFollow>({
+        let a = a.clone();
+        move |_, p, sink| a.follow_entries(&p.id, p.after, sink)
     });
     hub.on_subscription::<subscriptions::ArtifactSuggestionFollow>(move |_, p, sink| a.follow_suggestions(&p.id, sink));
 }

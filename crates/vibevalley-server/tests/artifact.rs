@@ -117,6 +117,10 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
 
     // Markdown is read into blocks, as its maker; it takes no version.
     std::thread::sleep(Duration::from_millis(3));
+    let linked_issue = ok(call("issue.create", json!({ "title": "关联工单" })))["issue"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let notes = started
         .artifacts
         .create(
@@ -125,7 +129,7 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
                 by: "lab".into(),
                 run: None,
             },
-            &serde_json::from_value(json!({ "title": "调研", "kind": "markdown", "content": "# 结论\n\n用**抽屉**。", "note": "初稿", "issue": "issue-1" }))
+            &serde_json::from_value(json!({ "title": "调研", "kind": "markdown", "content": "# 结论\n\n用**抽屉**。", "note": "初稿", "issue": linked_issue }))
                 .unwrap(),
         )
         .unwrap();
@@ -157,7 +161,7 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
             .map(|a| a["id"].as_str().unwrap().to_string())
             .collect::<Vec<_>>()
     };
-    assert_eq!(ids(json!({ "issue": "issue-1" })), vec![notes.id.clone()]);
+    assert_eq!(ids(json!({ "issue": linked_issue })), vec![notes.id.clone()]);
     assert_eq!(ids(json!({ "channel": general })), vec![notes.id.clone(), id.clone()]);
     assert_eq!(ids(json!({})).len(), 2);
 
@@ -713,4 +717,327 @@ fn regression_a_failed_artifact_version_never_publishes_its_channel_card() {
     assert!(events.try_recv().is_ok());
     assert!(events.try_recv().is_err());
     server.close();
+}
+
+#[test]
+fn structured_artifact_types_guides_and_starters() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    // Lists all 7 artifact types and serves bilingual progressive-disclosure guides.
+    let listed = ok(call("artifact.type.list", json!({})));
+    let types: Vec<&str> = listed.as_array().unwrap().iter().map(|t| t["type"].as_str().unwrap()).collect();
+    assert_eq!(types, vec!["docs", "slides", "dashboard", "motion", "whiteboard", "design", "design-system"]);
+    let slides_info = listed.as_array().unwrap().iter().find(|t| t["type"] == "slides").unwrap();
+    assert_eq!(slides_info["references"], json!(["craft", "format", "layout"]));
+
+    for ty in &types {
+        let guide = ok(call("artifact.type.read", json!({ "type": ty })));
+        assert_eq!(guide["type"], *ty);
+        assert!(guide["content"].as_str().unwrap().len() > 80);
+        assert!(guide["reference"].is_null());
+    }
+    let craft = ok(call("artifact.type.read", json!({ "type": "slides", "reference": "craft" })));
+    assert_eq!(craft["reference"], "craft");
+    assert!(craft["content"].as_str().unwrap().contains("tabular-nums"));
+
+    vibevalley_i18n::set_locale("en");
+    let wb_en = ok(call("artifact.type.read", json!({ "type": "whiteboard" })));
+    assert!(wb_en["content"].as_str().unwrap().contains("elements/"));
+    vibevalley_i18n::set_locale("zh");
+
+    assert_eq!(
+        code(call("artifact.type.read", json!({ "type": "slides", "reference": "nonexistent" }))),
+        BizCode::ArtifactRefused.code()
+    );
+
+    // Creates all 7 types with starters, filters by artifactType, and summarizes store entries.
+    let docs = ok(call(
+        "artifact.create",
+        json!({ "title": "架构纪要", "artifactType": "docs", "content": "# 目标\n\n保持清晰。" }),
+    ));
+    assert_eq!((docs["body"].as_str(), docs["artifactType"].as_str()), (Some("blocks"), Some("docs")));
+
+    for ty in [
+        vibevalley_protocol::ArtifactType::Slides,
+        vibevalley_protocol::ArtifactType::Dashboard,
+        vibevalley_protocol::ArtifactType::Motion,
+        vibevalley_protocol::ArtifactType::Whiteboard,
+        vibevalley_protocol::ArtifactType::Design,
+        vibevalley_protocol::ArtifactType::DesignSystem,
+    ] {
+        let title = format!("样例-{}", ty.as_str());
+        let starters = vibevalley_artifact::starter_entries_for_type(ty, &title);
+        let made = ok(call(
+            "artifact.create",
+            json!({ "title": title, "artifactType": ty.as_str(), "entries": starters }),
+        ));
+        assert_eq!(
+            (made["body"].as_str(), made["artifactType"].as_str(), made["seq"].as_i64()),
+            (Some("store"), Some(ty.as_str()), Some(1))
+        );
+        let summary = ok(call("artifact.content.get", json!({ "id": made["id"] })));
+        assert_eq!(summary["version"], 1);
+        assert!(summary["content"].as_str().unwrap().contains(&format!("type: {}", ty.as_str())));
+    }
+
+    let dashboards = ok(call("artifact.list", json!({ "artifactType": "dashboard" })));
+    assert_eq!(dashboards.as_array().unwrap().len(), 1);
+    assert_eq!(dashboards[0]["artifactType"], "dashboard");
+
+    // Compound filename suffix inference on HTML hand-in.
+    let inferred = ok(call("artifact.create", json!({ "title": "Q3.slides.html", "content": page("Q3") })));
+    assert_eq!(
+        (inferred["title"].as_str(), inferred["body"].as_str(), inferred["display"].as_str()),
+        (Some("Q3"), Some("html"), Some("slides"))
+    );
+    started.close();
+}
+
+#[test]
+fn store_entry_batch_ops_optimistic_concurrency_and_sanitization() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let png = started.attachments.keep(&[0x89, 0x50, 0x4e, 0x47], "logo.png", "image/png").unwrap();
+    let board = ok(call(
+        "artifact.create",
+        json!({
+            "title": "系统拓扑",
+            "artifactType": "whiteboard",
+            "entries": [
+                { "op": "set", "path": "board/meta", "kind": "json", "value": serde_json::to_string(&json!({ "title": "系统拓扑" })).unwrap() },
+                { "op": "set", "path": "elements/api", "kind": "json", "value": serde_json::to_string(&json!({ "id": "api", "type": "shape", "x": 100, "label": "Gateway" })).unwrap() }
+            ]
+        }),
+    ));
+    let id = board["id"].as_str().unwrap().to_string();
+    assert_eq!(board["seq"], 1);
+
+    // Atomic patch (RFC 7396), copy, asset link, and SVG sanitization.
+    let batch2 = ok(call(
+        "artifact.entry.batch",
+        json!({
+            "id": id,
+            "writes": [
+                { "op": "patch", "path": "elements/api", "ifRev": 1, "value": serde_json::to_string(&json!({ "x": 240, "label": null, "note": "Moved" })).unwrap() },
+                { "op": "copy", "from": "elements/api", "path": "elements/api-copy" },
+                { "op": "set", "path": "assets/logo.png", "kind": "asset", "value": png.id },
+                {
+                    "op": "set",
+                    "path": "elements/diagram",
+                    "kind": "json",
+                    "value": serde_json::to_string(&json!({
+                        "id": "diagram",
+                        "type": "svg",
+                        "svg": "<svg viewBox=\"0 0 100 100\" onload=\"evil()\"><script>alert(1)</script><rect width=\"80\" height=\"40\"/></svg>"
+                    })).unwrap()
+                }
+            ]
+        }),
+    ));
+    assert_eq!((batch2["applied"].as_bool(), batch2["seq"].as_i64()), (Some(true), Some(2)));
+
+    let api_entry = ok(call("artifact.entry.get", json!({ "id": id, "path": "elements/api" })));
+    assert_eq!(api_entry["rev"], 2);
+    let api_val: Value = serde_json::from_str(api_entry["value"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        (api_val["x"].as_i64(), api_val["note"].as_str(), api_val.get("label")),
+        (Some(240), Some("Moved"), None)
+    );
+
+    let copied = ok(call("artifact.entry.get", json!({ "id": id, "path": "elements/api-copy" })));
+    assert_eq!(copied["rev"], 1);
+    let asset = ok(call("artifact.entry.get", json!({ "id": id, "path": "assets/logo.png" })));
+    assert_eq!((asset["kind"].as_str(), asset["attachmentId"].as_str()), (Some("asset"), Some(png.id.as_str())));
+
+    let diagram = ok(call("artifact.entry.get", json!({ "id": id, "path": "elements/diagram" })));
+    let diagram_val: Value = serde_json::from_str(diagram["value"].as_str().unwrap()).unwrap();
+    let svg = diagram_val["svg"].as_str().unwrap();
+    assert!(!svg.contains("<script"));
+    assert!(!svg.contains("onload"));
+    assert!(svg.contains("<rect"));
+
+    // Optimistic concurrency conflict leaves store unchanged and returns current entry.
+    let conflict = ok(call(
+        "artifact.entry.batch",
+        json!({
+            "id": id,
+            "writes": [
+                { "op": "patch", "path": "elements/api", "ifRev": 1, "value": "{\"x\":999}" },
+                { "op": "delete", "path": "elements/api-copy" }
+            ]
+        }),
+    ));
+    assert_eq!((conflict["applied"].as_bool(), conflict["seq"].as_i64()), (Some(false), Some(2)));
+    assert_eq!(conflict["conflicts"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        (
+            conflict["conflicts"][0]["path"].as_str(),
+            conflict["conflicts"][0]["expectedRev"].as_i64(),
+            conflict["conflicts"][0]["actualRev"].as_i64(),
+            conflict["conflicts"][0]["current"]["rev"].as_i64(),
+        ),
+        (Some("elements/api"), Some(1), Some(2), Some(2))
+    );
+    // Delete was not applied due to atomic conflict rollback.
+    assert_eq!(ok(call("artifact.entry.get", json!({ "id": id, "path": "elements/api-copy" })))["rev"], 1);
+
+    // Delete works when preconditions pass.
+    let deleted = ok(call(
+        "artifact.entry.batch",
+        json!({ "id": id, "writes": [{ "op": "delete", "path": "elements/api-copy", "ifRev": 1 }] }),
+    ));
+    assert_eq!((deleted["applied"].as_bool(), deleted["seq"].as_i64()), (Some(true), Some(3)));
+    assert_eq!(
+        code(call("artifact.entry.get", json!({ "id": id, "path": "elements/api-copy" }))),
+        BizCode::ArtifactNotFound.code()
+    );
+    started.close();
+}
+
+#[test]
+fn store_view_csp_headers_default_design_system_tokens_and_http_route() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    // Create standing default design-system artifact.
+    let ds_tokens = json!({
+        "name": "Brand DS",
+        "colors": { "brand-primary": { "light": "#123456", "dark": "#654321" } }
+    });
+    let ds = ok(call(
+        "artifact.create",
+        json!({
+            "title": "品牌设计系统",
+            "artifactType": "design-system",
+            "isDefault": true,
+            "entries": [
+                { "op": "set", "path": "project/tokens.json", "kind": "json", "value": serde_json::to_string(&ds_tokens).unwrap() }
+            ]
+        }),
+    ));
+    assert_eq!(ds["isDefault"], true);
+
+    // Only design-system can be default.
+    let slides = ok(call(
+        "artifact.create",
+        json!({
+            "title": "演示文稿",
+            "artifactType": "slides",
+            "entries": vibevalley_artifact::starter_entries_for_type(vibevalley_protocol::ArtifactType::Slides, "演示文稿")
+        }),
+    ));
+    let slides_id = slides["id"].as_str().unwrap().to_string();
+    assert_eq!(
+        code(call("artifact.update", json!({ "id": slides_id, "isDefault": true }))),
+        BizCode::ArtifactRefused.code()
+    );
+
+    // Type registry reports the default design-system id & title.
+    let guide = ok(call("artifact.type.read", json!({ "type": "slides" })));
+    assert_eq!(guide["defaultArtifactId"], ds["id"]);
+    assert_eq!(guide["defaultArtifactTitle"], "品牌设计系统");
+
+    // In-process native `artifact.view` injects standing design-system tokens + CSP headers.
+    let view = ok(call(
+        "artifact.view",
+        json!({ "id": slides_id, "theme": "dark", "origin": "http://127.0.0.1:8787" }),
+    ));
+    let html = view["content"].as_str().unwrap();
+    assert!(html.contains("#123456") || html.contains("#654321"));
+    let csp = view["headers"]["content-security-policy"].as_str().unwrap();
+    assert!(csp.starts_with("sandbox "));
+    assert!(csp.contains("http://127.0.0.1:8787/api/v1/attachment/"));
+
+    // HTTP route `GET /api/v1/artifact/:id/view` serves the rendered HTML with CSP headers.
+    let http = vibevalley_http::serve(hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let res = ureq::get(&format!("{}/api/v1/artifact/{slides_id}/view?theme=light", http.url()))
+        .call()
+        .unwrap();
+    assert_eq!(res.status(), 200);
+    let http_csp = res.headers().get("content-security-policy").unwrap().to_str().unwrap().to_string();
+    assert!(http_csp.starts_with("sandbox "));
+    assert!(http_csp.contains(&format!("{}/api/v1/attachment/", http.url())));
+    let body = res.into_body().read_to_string().unwrap();
+    assert!(body.contains("#123456"));
+    drop(http);
+    started.close();
+}
+
+#[test]
+fn store_entry_follow_replays_and_streams_live_updates() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let made = ok(call(
+        "artifact.create",
+        json!({
+            "title": "实时看板",
+            "artifactType": "dashboard",
+            "entries": [{ "op": "set", "path": "dash/params", "kind": "json", "value": "{\"region\":\"east\"}" }]
+        }),
+    ));
+    let id = made["id"].as_str().unwrap().to_string();
+
+    let (sub_id, rx) = hub.subscribe("artifact.entry.follow", json!({ "id": id, "after": 0 })).unwrap();
+    let replayed = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    assert_eq!((replayed["_tag"].as_str(), replayed["seq"].as_i64()), (Some("Entries"), Some(1)));
+    assert_eq!(replayed["entries"][0]["path"], "dash/params");
+
+    ok(call(
+        "artifact.entry.batch",
+        json!({
+            "id": id,
+            "writes": [{ "op": "patch", "path": "dash/params", "value": "{\"region\":\"west\"}" }]
+        }),
+    ));
+    let live = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    assert_eq!((live["_tag"].as_str(), live["seq"].as_i64()), (Some("Entries"), Some(2)));
+    assert!(live["entries"][0]["value"].as_str().unwrap().contains("west"));
+
+    hub.unsubscribe(sub_id);
+    started.close();
+}
+
+#[test]
+fn artifact_issue_fk_sets_null_on_issue_delete() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let issue_id = ok(call("issue.create", json!({ "title": "临时工单" })))["issue"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let made = ok(call(
+        "artifact.create",
+        json!({
+            "title": "工单产物",
+            "artifactType": "whiteboard",
+            "issue": issue_id
+        }),
+    ));
+    let artifact_id = made["id"].as_str().unwrap().to_string();
+    assert_eq!(made["issue"], issue_id);
+
+    ok(call("issue.delete", json!({ "id": issue_id })));
+    let after = ok(call("artifact.get", json!({ "id": artifact_id })));
+    assert_eq!(after["id"], artifact_id);
+    assert!(after.get("issue").is_none());
+    started.close();
 }

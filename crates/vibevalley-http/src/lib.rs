@@ -14,6 +14,8 @@
 //!   empty 404 when it is refused, as VibeValley answers;
 //! - `GET /api/v1/attachment/<id>`: the stored file, by VibeValley's
 //!   `attachment.file` op;
+//! - `GET /api/v1/artifact/<id>/view?theme=…&path=…&elementId=…&print=1`: a
+//!   store artifact's rendered viewer with CSP headers (`artifact.view`);
 //! - `GET /api/v1/artifact/<id>/<version>?shell=1&theme=…&print=1`: an
 //!   HTML artifact's page with the server's headers (`artifact.page`);
 //! - only the machine's own pages: a loopback `Host`, and an `Origin` (when
@@ -110,6 +112,7 @@ pub fn router(server: Shared) -> Router {
         .route("/api/v1/subscribe/{name}", get(subscribe).post(command))
         .route("/api/v1/issue/watch/{id}", get(issue_watch).post(command))
         .route("/api/v1/attachment/{id}", get(attachment).post(command))
+        .route("/api/v1/artifact/{id}/view", get(artifact_view).post(command))
         .route("/api/v1/artifact/{id}/{version}", get(artifact_page).post(command))
         .route("/api/v1/media/input/{id}/content", get(media::content).put(media::upload).post(command))
         .route("/api/v1/media/speech/{id}/stream", get(media::speech).post(command))
@@ -286,6 +289,62 @@ fn artifact_id() -> &'static Regex {
 fn artifact_version() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"^[1-9]\d*$").expect("regex"))
+}
+
+/// VibeValley's `artifact/:id/view`: what a structured store artifact's `<iframe src>` loads.
+async fn artifact_view(
+    State(server): State<Shared>,
+    Path(id): Path<String>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Response {
+    if !from_the_farm(&headers) {
+        return refuse(BizCode::Forbidden, "forbidden");
+    }
+    if !artifact_id().is_match(&id) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let mut payload = serde_json::json!({ "id": id });
+    if let Some(theme) = query.get("theme") {
+        payload["theme"] = theme.clone().into();
+    }
+    if let Some(path) = query.get("path") {
+        payload["path"] = path.clone().into();
+    }
+    if let Some(element_id) = query.get("elementId") {
+        payload["elementId"] = element_id.clone().into();
+    }
+    if query.get("print").map(String::as_str) == Some("1") {
+        payload["print"] = true.into();
+    }
+    if let Some(host) = headers.get("host").and_then(|v| v.to_str().ok())
+        && !host.is_empty()
+    {
+        payload["origin"] = format!("http://{host}").into();
+    }
+    let envelope = match tokio::task::spawn_blocking(move || server.call("artifact.view", payload)).await {
+        Ok(envelope) => envelope,
+        Err(e) => return refuse(BizCode::InternalError, e.to_string()),
+    };
+    if envelope.biz_code == BizCode::ArtifactNotFound.code() || envelope.biz_code == BizCode::ArtifactRefused.code() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    if envelope.biz_code != 0 {
+        return reply(envelope);
+    }
+    let data = envelope.data.unwrap_or_default();
+    let mut response = data["content"].as_str().unwrap_or_default().to_string().into_response();
+    if let Some(map) = data["headers"].as_object() {
+        for (name, value) in map {
+            if let (Ok(name), Some(Ok(value))) = (
+                axum::http::HeaderName::try_from(name.as_str()),
+                value.as_str().map(axum::http::HeaderValue::try_from),
+            ) {
+                response.headers_mut().insert(name, value);
+            }
+        }
+    }
+    response
 }
 
 /// VibeValley's `artifactContent`: what an `<iframe src>` loads.

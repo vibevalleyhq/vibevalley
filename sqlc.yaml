@@ -71,6 +71,7 @@ sql:
         options: { share_table_rows: true }
   - engine: sqlite
     schema:
+      - crates/vibevalley-server/src/modules/issue/sql/schema.sql
       - crates/vibevalley-server/src/modules/channel/sql/schema.sql
       - crates/vibevalley-server/src/modules/artifact/sql/schema.sql
     queries: crates/vibevalley-server/src/modules/artifact/sql/queries.sql
