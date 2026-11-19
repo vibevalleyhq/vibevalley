@@ -13,3 +13,25 @@ export const OrchestratorEval = z.object({
   id: z.string(),
   file: z.string(),
 }) satisfies Codec<T.OrchestratorEval>;
+
+export const OrchestratorApprovalListInput = z.object({
+  conversationId: z.exactOptional(z.string()),
+}) satisfies Codec<T.OrchestratorApprovalListInput>;
+
+export const OrchestratorApproval = z.object({
+  conversationId: z.string(),
+  taskId: z.string(),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  argumentsJson: z.string(),
+  reason: z.string(),
+  requestedAtMs: z.int(),
+}) satisfies Codec<T.OrchestratorApproval>;
+
+export const OrchestratorApprovalResolveInput = z.object({
+  conversationId: z.string(),
+  taskId: z.string(),
+  toolCallId: z.string(),
+  approved: z.boolean(),
+  reason: z.exactOptional(z.string()),
+}) satisfies Codec<T.OrchestratorApprovalResolveInput>;

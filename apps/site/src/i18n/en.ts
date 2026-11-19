@@ -6,7 +6,7 @@ export const en: Copy = {
   other: { label: "中文", href: "/", name: "中文" },
   title: "VibeValley · 码农场物语",
   description:
-    "Direct a team of coding agents with one line: the assistant splits it into tickets for the real pi, Claude Code and Codex on your machine, and nothing merges into main until you have looked. Linear for agents, drawn as a pixel farm. Runs on your own machine. Open source.",
+    "Assign tickets to Claude Code, Codex and other coding agents on your Mac. Follow their progress on a pixel farm, review changes in the native workbench and merge into main.",
   nav: { how: "How it plays", features: "What it does", screens: "The farm", start: "Get started", github: "GitHub" },
   hero: {
     name: "VibeValley",
@@ -20,7 +20,7 @@ export const en: Copy = {
       evening: ["At dusk, reports", "come in by rows;"],
       night: ["you sleep, and still", "the garden grows."],
     },
-    primary: "See it on GitHub",
+    primary: "View the Mac source",
     secondary: "How it plays",
     hours: "Time of day",
     hour: { morning: "Dawn", day: "Day", evening: "Dusk", night: "Night" },
@@ -28,7 +28,7 @@ export const en: Copy = {
   },
   parade: {
     title: "The helpers are off to work",
-    text: "Seven little animals in four outfits. Every helper is a real coding agent on your machine: pi, Claude Code, Codex, or the one VibeValley brings along.",
+    text: "Seven little animals in four outfits. Every helper is a real coding agent on your machine: Claude Code, Codex, OpenCode, or the one VibeValley brings along.",
   },
   harvest: {
     title: ["Wake to a harvest,", "ripe and bright."],
@@ -45,7 +45,7 @@ export const en: Copy = {
   },
   how: {
     title: "How a job grows",
-    git: { branch: "vibevalley/w3-mgr2k", worktree: "its own worktree", commits: "commits", tests: "tests", merged: "into main" },
+    git: { branch: "vibevalley/issue-3", worktree: "its own worktree", commits: "commits", tests: "tests", merged: "into main" },
     steps: [
       {
         icon: "act-speaking_text",
@@ -72,7 +72,7 @@ export const en: Copy = {
   features: {
     title: "What it does",
     tally: {
-      machines: "machines: VibeValley's own, pi, Claude Code, Codex",
+      views: "views: the workbench and the pixel farm",
       looks: "helpers: 7 animals × 4 outfits",
       plots: "plots at work at once, 3 per project by default",
       achievements: "achievements",
@@ -97,8 +97,8 @@ export const en: Copy = {
       },
       {
         icon: "icon-log",
-        title: "A restart loses nothing",
-        text: "The assistant and VibeValley\u2019s own machine run on pi-durable: every turn and every tool call is written to disk before it shows. If the server stops mid-answer, the assistant finishes the answer after the restart; if the process crashes mid-turn, the helper carries on from where it was, and the turn counts once.",
+        title: "Pick up where you left off",
+        text: "Tickets keep a record of each work round. Reopen the workbench to read the last report, answer an outstanding question or inspect changes in the working directory.",
       },
       {
         icon: "icon-tasks",
@@ -107,8 +107,8 @@ export const en: Copy = {
       },
       {
         icon: "icon-pigeon",
-        title: "Work from anywhere",
-        text: "Voice, WeChat, Feishu and QQ, and only your own account gets in. A phone or another computer comes in through the yard gate: once you approve it on this machine, or sign in with the password you set.",
+        title: "Assign work in chat",
+        text: "Give the assistant a ticket in farm chat and answer helpers in the ticket thread. Connect WeChat, Feishu or QQ to message the assistant from that chat service.",
       },
       {
         icon: "icon-clock",
@@ -128,18 +128,17 @@ export const en: Copy = {
     own: "VibeValley's own",
   },
   devices: {
-    title: "Your farm on every screen",
-    text: "The interface is one Solid page: the Mac app, a browser and the phone shell open the same one. The farm runs on your Mac: hand out work in the farm chat, follow the tickets, read the helpers\u2019 reports. Away from home, connect the farm chat to WeChat, Feishu or QQ.",
-    platforms: ["macOS", "iPhone", "Android"],
-    note: "Build the phone shell (iPhone, Android) yourself; it pairs by QR code and opens the same page. The yard gate is closed by default and lets in only devices you approved on this machine or that signed in with your password or a confirmation code; open it only on a network you trust.",
-    shots: { mac: "The farm on a Mac", chat: "The farm chat on a phone", tickets: "The tickets on a phone" },
+    title: "Tend your farm on a Mac",
+    text: "Each plot belongs to a ticket. Open a plot to read the helper's report, then switch to the workbench to review the files it changed.",
+    note: "The workbench includes a terminal. Open the ticket's working directory to inspect the Git diff or run project checks in the same window.",
+    shot: "The pixel farm and workbench navigation in the native Mac app",
   },
   screens: {
     title: "The farm",
     items: [
-      { image: "farm", caption: "The farm: the plots, the assistant, and the farm chat at the bottom right" },
-      { image: "title", caption: "The title screen: day and night follow your clock" },
-      { image: "chat", caption: "The chat page: channels, helpers, and a job\u2019s thread open on the right" },
+      { image: "native-farm", caption: "The farm on Mac: plots, helpers and the toolbar" },
+      { image: "native-workbench", caption: "The workbench: tickets waiting, in progress, in review and done" },
+      { image: "native-chat", caption: "Channels and farm chat in the Mac workbench" },
     ],
     open: "Open it large",
     close: "Close",
@@ -153,14 +152,14 @@ export const en: Copy = {
     title: "Get started",
     needs: "You need",
     list: [
-      "macOS on Apple silicon",
-      "At least one coding agent installed and signed in: pi, Claude Code or Codex",
-      "A DeepSeek API key, for the assistant",
-      "To build it: Vite+ (vp), which installs Node 24 from .node-version and brings pnpm",
+      "An Apple silicon Mac running macOS 14 or later",
+      "To build: Xcode with Swift 6, Rust, Zig and Vite+ (vp)",
+      "To use helpers: install and sign in to a coding agent such as Claude Code or Codex",
+      "To use the built-in assistant: a DeepSeek API key",
     ],
-    build: "Build the macOS app",
-    more: "More in the README and docs/ in the repository.",
-    readme: "Read the README",
+    build: "Build the Mac app from source",
+    more: "The app, DMG, update ZIP and release.json are written to apps/mac/dist.",
+    readme: "Read the native README",
     copy: "Copy",
     copied: "Copied",
   },

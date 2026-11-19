@@ -10,6 +10,8 @@ export interface OrchestratorHandlers {
   readonly "orchestrator.stop": (a: { readonly agent?: string }) => Promise<void>;
   /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
   readonly "orchestrator.eval.create": (a: T.OrchestratorEvalRequest) => Promise<T.OrchestratorEval>;
+  readonly "orchestrator.approval.list": (a: T.OrchestratorApprovalListInput) => Promise<T.OrchestratorApproval[]>;
+  readonly "orchestrator.approval.resolve": (a: T.OrchestratorApprovalResolveInput) => Promise<void>;
 }
 
 export const orchestratorEndpoints: readonly Endpoint[] = [
@@ -33,5 +35,19 @@ export const orchestratorEndpoints: readonly Endpoint[] = [
     input: S.OrchestratorEvalRequest,
     result: S.OrchestratorEval,
     can: ["user", "remote"],
+  },
+  {
+    op: "orchestrator.approval.list",
+    about: ["conversationId"],
+    input: S.OrchestratorApprovalListInput,
+    result: z.array(S.OrchestratorApproval),
+    can: ["user"],
+  },
+  {
+    op: "orchestrator.approval.resolve",
+    about: ["conversationId", "taskId", "toolCallId"],
+    input: S.OrchestratorApprovalResolveInput,
+    result: undefined,
+    can: ["user"],
   },
 ];

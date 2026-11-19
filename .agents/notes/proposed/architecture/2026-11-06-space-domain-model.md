@@ -11,7 +11,7 @@ Status: proposed
 ## Proposal
 
 1. **按 `Space` 隔离空间状态**：
-   - 本地单机默认模式下，空间业务数据随 `<space>` 隔离（仅 API 密钥 `settings.json`、全局档案模板与农机探测留在宿主 `$VIBEVALLEY_HOME`）；在[多机共享服务端](.agents/notes/proposed/architecture/2026-11-10-server-and-machines.md)的 Postgres 模式下，明确以独立库/schema 或空间标识隔离，保证切换 `Space` 时看板、频道、仓库与笔记一致切换。
+   - 本地单机默认模式下，空间业务数据随 `<space>` 隔离（仅 API 密钥 `settings.json`、全局档案模板与农机探测留在宿主 `$VIBEVALLEY_HOME`），保证切换 `Space` 时看板、频道、仓库与笔记一致切换。
 2. **支持 `<owner>/<repo>` 两级仓库寻址**：
    - 扩展 `packages/protocol/src/repo/schema.ts` 与 `apps/server/src/modules/repo/repo.ts` 的仓库名校验，兼容本地单层 `<repo>` 与 GitHub 两级 `<owner>/<repo>`（禁止 `..` 与符号链接越界）。
    - 克隆 `https://github.com/<owner>/<repo>` 时支持落盘至 `<space>/repos/<owner>/<repo>`，工单 worktree 对应 `<space>/worktrees/<owner>/<repo>.<工单号>`。

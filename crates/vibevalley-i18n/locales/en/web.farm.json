@@ -1,0 +1,185 @@
+{
+  "panel": {
+    "shop": "Shop",
+    "warehouse": "Warehouse",
+    "graphs": "Tasks and achievements",
+    "log": "Farm log",
+    "orchestrator": "Assistant and pets",
+    "harvest": "Harvest {name}'s plot",
+    "sow": "Sow · plot {plot}",
+    "water": "Water {name}",
+    "menu": "Menu",
+    "shopClosed": "The shop is being done up and opens in the next version. You have {coins} coins: save them for now."
+  },
+  "menu": {
+    "agents": "Helper roster",
+    "runtimes": "Machines",
+    "skills": "Skill book",
+    "issues": "Tickets",
+    "catalog": "Catalog",
+    "chat": "Farm chat (channels)",
+    "connectors": "Connectors",
+    "repos": "Repos"
+  },
+  "tool": {
+    "hand": {
+      "hint": "Click a plot for its details, an empty one to sow"
+    },
+    "water": {
+      "hint": "Pass a helper a word; one at work hears it on the way"
+    },
+    "bug": {
+      "hint": "The job failed (bugs in the plot): have it go on fixing"
+    },
+    "weed": {
+      "hint": "Review notes that did not pass grow as weeds: pulled when the helper fixes them and the next review passes"
+    },
+    "harvest": {
+      "hint": "A ripe plot: bring in the result and let the helper go"
+    },
+    "shovel": {
+      "hint": "Stops one at work; lets one not at work go"
+    }
+  },
+  "native": {
+    "islandWorking": "{repo} · {count}/{limit} working",
+    "islandQueued": " · {count} queued",
+    "islandGone": "{repo} · repository unavailable",
+    "ledger": "Ledger & clock",
+    "achievements": "Achievements",
+    "log": "Farm log",
+    "warehouse": "Stored issues",
+    "shop": "Shop",
+    "workbench": "Workbench",
+    "map": "Islands",
+    "tree": "Memory tree",
+    "phone": "Pixel phone",
+    "noMessages": "No messages yet",
+    "empty": "No records yet",
+    "progress": "Lv.{level} · XP {xp}/{need}",
+    "coins": "Coins {coins}",
+    "workers": "Helpers here: {count}",
+    "dawn": "Dawn",
+    "noon": "Noon",
+    "dusk": "Dusk",
+    "night": "Night",
+    "previous": "Previous",
+    "next": "Next · {page}/{pages}",
+    "score": "Score {score}",
+    "restart": "Click or Space to restart",
+    "steer": "Arrow keys / WASD",
+    "pending": "Sending…",
+    "accepted": "Accepted",
+    "close": "Close",
+    "loading": "Loading…",
+    "treeCounts": "Leaves {leaves} · Fruits {fruits} · Seeds {seeds}",
+    "treeGrowth": "{rounds} rounds · {growth}% grown",
+    "leaf": "Memory",
+    "fruit": "Principle",
+    "seed": "Habit"
+  },
+  "chat": {
+    "channels": "Channels",
+    "enlarge": "Enlarge the chat window",
+    "fold": "Fold the chat",
+    "greeting": "This is the farm chat, where you, the assistant and the helpers talk. Tell me something to do, such as \"have the tester run the tests\".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.",
+    "send": "Send"
+  },
+  "friends": {
+    "helpers": "Helpers"
+  },
+  "hud": {
+    "toLevel": "{xp}/{need} commits",
+    "toLevelNext": "{xp}/{need} commits · Lv.{next} clears a plot",
+    "tree": "Memory tree",
+    "workbench": "Workbench"
+  },
+  "overlay": {
+    "clearAt": "Lv.{level} clears it",
+    "idle": "What shall we plant today?",
+    "click": "Click: {text}",
+    "unclaimed": "Uncleared plot",
+    "flowerbed": "Flowerbed",
+    "bare": "Plot {plot} · empty"
+  },
+  "quota": {
+    "left": "Allowance left",
+    "quota": "Allowance"
+  },
+  "sign": {
+    "noRepo": "No repo",
+    "repo": "Repo"
+  },
+  "sow": {
+    "homeless": "This farm belongs to no repo",
+    "toMap": "To plant, enter a repo's farm first: go back to the map and pick an island.",
+    "noRepos": "No repos in the workbench yet: make one on the Repos page first.",
+    "makeRepo": "Make a repo",
+    "plantIn": "Planting in {repo}",
+    "retry": "Fetch the seed bags again",
+    "recent": "Recent",
+    "kinds": "Common jobs",
+    "own": "Write your own",
+    "jobHint": "What to do, and what counts as done",
+    "who": "Who plants it",
+    "orchestratorPicks": "Assistant picks",
+    "how": "Start: the assistant hands this to a helper, who starts in {repo} at once. Draft: a helper reads the code and writes it up as a ticket for you to look over before starting.",
+    "draft": "Draft",
+    "start": "Start"
+  },
+  "water": {
+    "drops": {
+      "0": "Keep the change small",
+      "1": "Leave the tests alone for now",
+      "2": "Tell me when done",
+      "3": "Add a test while at it"
+    },
+    "working": "It is working: it hears this before its next step.",
+    "idle": "It is not working: this has it work another round.",
+    "thread": "This is kept in its ticket thread, with its replies.",
+    "hint": "A word to pass on…",
+    "water": "Water",
+    "moved": "The ticket's status changed: go back to the plot and see what it asks of you."
+  },
+  "harvest": {
+    "repo": "Repo {repo}",
+    "counts": "{commits} commits · {files} files",
+    "letGo": "Let it go",
+    "take": "Harvest, merge into {base}",
+    "resolve": "Have it resolve the conflict"
+  },
+  "plotOf": "{name}'s plot",
+  "aim": {
+    "flowerbed": "A cleared flowerbed",
+    "clearAt": "Lv.{level} clears this plot",
+    "unread": "This plot's ticket has not been read yet",
+    "look": "Look at this plot",
+    "sow": "Sow",
+    "water": "Water {name} (pass a word)",
+    "nothingYet": "Nothing planted yet: sow with the hand first",
+    "bug": "Spray: have it go on fixing",
+    "noBugs": "No bugs in this plot",
+    "weeds": "Weeds are pulled once the helper fixes them and the review passes",
+    "noWeeds": "No weeds",
+    "harvestRipe": "Harvest, let the helper go",
+    "harvestLook": "Harvest: see what it changed",
+    "nothingToHarvest": "Nothing to harvest on an empty plot",
+    "shovelStop": "Shovel: stop it",
+    "shovelDismiss": "Shovel: let it go",
+    "noShovel": "Nothing to shovel on an empty plot",
+    "unavailable": "This ticket is {state}: open the plot to see"
+  },
+  "crop": {
+    "empty": "empty",
+    "seeded": "just sown",
+    "sprout": "sprouting",
+    "leafy": "leafy",
+    "flowering": "flowering",
+    "wheat": "ripe",
+    "withered": "withered",
+    "weeds": "weedy",
+    "dry": "dry",
+    "harvested": "harvested",
+    "locked": "uncleared"
+  }
+}

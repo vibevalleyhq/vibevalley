@@ -1,43 +1,68 @@
 export type { Wire } from "./codec";
 export {
+  Actor,
+  ActorKind,
   Applied,
-  ArtifactId,
   artifactId,
+  ArtifactId,
   blockId,
   issueId,
+  IssueId,
   jsonString,
   Locale,
-  MessageId,
   messageId,
+  MessageId,
+  Outcome,
   Preview,
+  Secret,
   sessionId,
+  SessionId,
+  Spent,
+  suggestionId,
   SuggestionId,
   Validation,
 } from "./common/schema";
-export { Health, LiveEvent, ServerEvent, StateFrame } from "./core/schema";
-export { Agent, AgentTemplate, AgentValidateRequest, AgentValidation, Skill } from "./agent/schema";
-export { ModelEntry, RuntimeInfo, RuntimeSettings } from "./runtime/schema";
+export { Fact, Health, LiveEvent, ServerEvent, StateFrame } from "./core/schema";
+export { Agent, AgentTemplate, AgentValidateRequest, AgentValidation, Build, Head, Outfit, PersonaMode, Skill, Species } from "./agent/schema";
+export { ModelEntry, RuntimeInfo, RuntimePreset, RuntimeSettings, RuntimeSupport } from "./runtime/schema";
 export { Memory, MemoryList, MemoryRequest, MemorySearch, RecallPreview } from "./memory/schema";
-export { BranchPublication, Changes, GitHubStatus, NewRepo, RepoActivity, RepoLanguages, RepoSummary, RepoTemplates, SubmitBranch } from "./repo/schema";
-export { Run, Session, SessionEvent } from "./session/schema";
+export {
+  BranchPublication,
+  Changes,
+  Conflict,
+  GitHubStatus,
+  NewRepo,
+  RepoActivity,
+  RepoLanguages,
+  RepoSummary,
+  RepoTemplates,
+  SubmitBranch,
+} from "./repo/schema";
+export { IssueAnswer, LastRun, Phase, Run, RunTrigger, Session, SessionEvent } from "./session/schema";
 export {
   Channel,
   ChannelEvent,
   ChannelRequest,
+  ChannelType,
   ChannelUnread,
   ChannelUpdate,
   ChatMessage,
   ChatReadRequest,
+  Embed,
   MessageEdit,
   MessageHit,
+  MessageKind,
   MessageSearch,
+  Notify,
   NotifyRequest,
   OnSet,
   ReactionSet,
   SayRequest,
+  SubjectKind,
 } from "./channel/schema";
 export {
   Artifact,
+  ArtifactCard,
   ArtifactContent,
   ArtifactEvent,
   ArtifactHtmlEdit,
@@ -48,6 +73,7 @@ export {
   ArtifactUpdateRequest,
   ArtifactVersionRequest,
   BlockAck,
+  BlockAttrs,
   BlockCreate,
   BlockDelete,
   BlockOpResult,
@@ -55,9 +81,12 @@ export {
   BlockSubmit,
   BlockUpdate,
   HtmlShellMessage,
+  QuotedBlock,
   Suggestion,
+  SuggestionChange,
   SuggestionCreate,
   SuggestionEvent,
+  TextSpan,
 } from "./artifact/schema";
 export {
   PkmCaptureRequest,
@@ -91,44 +120,45 @@ export {
 export {
   AppliedIssue,
   CommentRequest,
+  CriterionCheck,
+  Finding,
   Issue,
+  IssueConstraints,
   IssueFilter,
   IssueHistory,
   IssueRefineRequest,
+  IssueReport,
+  IssueReportMemory,
   IssueRequest,
   IssueReviewRequest,
   IssueSplitRequest,
+  IssueStageKind,
   IssueStatus,
   IssueStatusRequest,
   IssueTimeline,
   IssueUpdate,
+  IssueWatch,
+  PullRequest,
+  Question,
 } from "./issue/schema";
-export { Cron, CronRequest, CronUpdate } from "./cron/schema";
-export { OrchestratorEval, OrchestratorEvalRequest } from "./orchestrator/schema";
-export { Achievement, ChooseTitleRequest } from "./game/schema";
-export { AnswerPairingRequest, LanPaired, LanPairRequest, LanStatus, SetOpenRequest } from "./lan/schema";
+export { Cron, CronRequest, CronUpdate, CronWhen, CronWhenWeekly } from "./cron/schema";
 export {
-  ApprovalAnswerRequest,
-  ApprovalCollected,
-  ApprovalCollectRequest,
-  ApprovalCreated,
-  ApprovalCreateRequest,
-  Approvals,
-  UserDevices,
-  UserLogin,
-  UserLoginRequest,
-  UserPasswordRequest,
-  UserStatus,
-  UserUpdateRequest,
-} from "./user/schema";
+  OrchestratorApproval,
+  OrchestratorApprovalListInput,
+  OrchestratorApprovalResolveInput,
+  OrchestratorEval,
+  OrchestratorEvalRequest,
+} from "./orchestrator/schema";
+export { Achievement, AchievementCategory, ChooseTitleRequest, LedgerEntry } from "./game/schema";
 export { Attachment, AttachmentUpload } from "./attachment/schema";
 export { ConnectorLogin, ConnectorsChannelRequest, ConnectorStatus, VerifyRequest } from "./connector/schema";
-export { AgoraGrant, Dictated, DictateRequest, VoiceCall, VoiceCallStart, VoiceGrantRenew, VoiceHeard, VoiceSaid } from "./voice/schema";
-export { SettingsStatus, SettingsUpdate } from "./setting/schema";
+export { AgoraGrant, Dictated, DictateRequest, SettingsUpdateVoice, VoiceCall, VoiceCallStart, VoiceGrantRenew, VoiceHeard, VoiceSaid } from "./voice/schema";
+export { MemorySourceKind, SettingsStatus, SettingsUpdate } from "./setting/schema";
 export { ProviderModelListing, ProviderModelRequest, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceRequest } from "./provider/schema";
 export {
   MediaImageJob,
   MediaImageRequest,
+  MediaImageUsage,
   MediaInput,
   MediaInputRequest,
   MediaJob,
@@ -139,8 +169,15 @@ export {
   MediaUnderstandingAuthorizationRequest,
   MediaUnderstandingJob,
   MediaUnderstandingRequest,
+  MediaUnderstandingResult,
+  MediaAudioMetadata,
+  MediaAudioUsage,
+  MediaInputReference,
+  MediaSource,
   LibraryAddRequest,
   LibraryItem,
   LibraryItems,
   LibraryListRequest,
+  LibraryOrigin,
 } from "./media/schema";
+export { MediaAudioRequest, MediaAudioResult, MediaSpeakersRequest, MediaVoiceDesignRequest } from "./media/audio-schema";

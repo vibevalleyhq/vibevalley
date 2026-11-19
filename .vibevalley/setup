@@ -1,5 +1,6 @@
 #!/bin/sh
-# A new worktree has no node_modules or package declarations: vp install runs prepare (packages:build) too.
+# A new worktree has no node_modules or package declarations: install both, so the helper's first check runs.
 set -eu
 cd "$(git rev-parse --show-toplevel)"
 vp install --frozen-lockfile
+vp run packages:build

@@ -1,11 +1,96 @@
 version: "2"
+plugins:
+  - name: sqlx
+    process:
+      cmd: ./scripts/gen/sqlc-rust/generate.ts
+      format: json
+    env: [PATH]
 sql:
-  - engine: "sqlite"
-    queries: "pkg/db/queries"
-    schema: "pkg/db/migrations"
-    gen:
-      go:
-        package: "generated"
-        out: "pkg/db/generated"
-        emit_empty_slices: true
-        emit_prepared_queries: true
+  - engine: sqlite
+    schema: crates/vibevalley-store/sql/migrations
+    queries: crates/vibevalley-store/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-store/src/generated
+  - engine: sqlite
+    schema: crates/vibevalley-server/src/modules/attachment/sql/schema.sql
+    queries: crates/vibevalley-server/src/modules/attachment/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/attachment/generated
+  - engine: sqlite
+    schema: crates/vibevalley-durable/src/schema.sql
+    queries: crates/vibevalley-durable/sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-durable/src/generated
+        options: { share_table_rows: true }
+  - engine: sqlite
+    schema: crates/vibevalley-server/src/modules/issue/sql/schema.sql
+    queries: crates/vibevalley-server/src/modules/issue/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/issue/generated
+        options: { share_table_rows: true }
+  - engine: sqlite
+    schema:
+      - crates/vibevalley-server/src/modules/session/sql/schema.sql
+      - crates/vibevalley-durable/src/schema.sql
+    queries: crates/vibevalley-server/src/modules/session/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/session/generated
+        options: { share_table_rows: true }
+  - engine: sqlite
+    schema: crates/vibevalley-server/src/modules/memory/sql/schema.sql
+    queries: crates/vibevalley-server/src/modules/memory/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/memory/generated
+  - engine: sqlite
+    schema:
+      - crates/vibevalley-server/src/modules/library/sql/schema.sql
+      - crates/vibevalley-server/src/modules/attachment/sql/schema.sql
+    queries: crates/vibevalley-server/src/modules/library/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/library/generated
+        options: { share_table_rows: true }
+  - engine: sqlite
+    schema: crates/vibevalley-server/src/modules/connector/sql/schema.sql
+    queries: crates/vibevalley-server/src/modules/connector/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/connector/generated
+  - engine: sqlite
+    schema: crates/vibevalley-server/src/modules/pkm/sql/schema.sql
+    queries: crates/vibevalley-server/src/modules/pkm/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/pkm/generated
+        options: { share_table_rows: true }
+  - engine: sqlite
+    schema:
+      - crates/vibevalley-server/src/modules/channel/sql/schema.sql
+      - crates/vibevalley-server/src/modules/artifact/sql/schema.sql
+    queries: crates/vibevalley-server/src/modules/artifact/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/artifact/generated
+        options: { share_table_rows: true }
+  - engine: sqlite
+    schema:
+      - crates/vibevalley-server/src/modules/media/sql/inputs.sql
+      - crates/vibevalley-server/src/modules/media/sql/jobs.sql
+    queries: crates/vibevalley-server/src/modules/media/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/media/generated
+        options: { share_table_rows: true }
+  - engine: sqlite
+    schema: crates/vibevalley-server/src/modules/channel/sql/schema.sql
+    queries: crates/vibevalley-server/src/modules/channel/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/channel/generated
+        options: { share_table_rows: true }

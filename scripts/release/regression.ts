@@ -9,7 +9,7 @@ export const prefix = "regression: ";
 /** The body's section that names each regression test the pull request changed, and why. */
 export const section = "## Regression";
 
-const testFile = /\.(test|spec)\.tsx?$/u;
+const testFile = /\.(test|spec)\.tsx?$|\.rs$/u;
 const runners = new Set(["it", "test"]);
 
 type Node = { readonly type?: unknown; readonly start?: number; readonly end?: number; readonly [key: string]: unknown };
@@ -30,8 +30,58 @@ function nameOf(arg: Node): string | undefined {
   return undefined;
 }
 
+/** Balanced `{ ... }` slice starting at `openBrace`, skipping Rust comments and string literals. */
+function rustBlockEnd(text: string, openBrace: number): number {
+  let depth = 0;
+  let i = openBrace;
+  while (i < text.length) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (ch === "/" && next === "/") {
+      const nl = text.indexOf("\n", i + 2);
+      i = nl < 0 ? text.length : nl + 1;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      const close = text.indexOf("*/", i + 2);
+      i = close < 0 ? text.length : close + 2;
+      continue;
+    }
+    if (ch === '"') {
+      i++;
+      while (i < text.length && text[i] !== '"') {
+        if (text[i] === "\\") i++;
+        i++;
+      }
+      i++;
+      continue;
+    }
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+    i++;
+  }
+  return text.length;
+}
+
+function rustRegressionTestsIn(text: string): Map<string, string> {
+  const found = new Map<string, string>();
+  const re = /#\[(?:\w+::)*test(?:\([^\]]*\))?\]\s*(?:#\[[^\]]*\]\s*)*(?:async\s+)?fn\s+(regression_\w+)\s*\([^)]*\)(?:\s*->\s*[^{]+)?\s*\{/gu;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    const name = match[1]!;
+    const openBrace = match.index + match[0].length - 1;
+    const end = rustBlockEnd(text, openBrace);
+    found.set(name, text.slice(match.index, end));
+  }
+  return found;
+}
+
 /** Each regression test in a file: its name, and its whole call's text (the runner, its options and its body). */
 export function regressionTestsIn(path: string, text: string): Map<string, string> {
+  if (path.endsWith(".rs")) return rustRegressionTestsIn(text);
   const found = new Map<string, string>();
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) return value.forEach(visit);

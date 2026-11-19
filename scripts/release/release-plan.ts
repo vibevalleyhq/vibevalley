@@ -1,3 +1,5 @@
+import { newer } from "./releases.ts";
+
 export type Stage = "alpha" | "beta" | "final";
 
 interface Version {
@@ -8,22 +10,6 @@ interface Version {
 }
 
 const tagPattern = /^v(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)\.(\d+))?$/u;
-const releasePattern = /^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)\.(\d+))?$/u;
-
-function rankOf(v: string): number[] | undefined {
-  const m = releasePattern.exec(v);
-  if (!m) return undefined;
-  const stage = m[4] === "alpha" ? 0 : m[4] === "beta" ? 1 : 2;
-  return [Number(m[1]), Number(m[2]), Number(m[3]), stage, Number(m[5] ?? 0)];
-}
-
-function newer(a: string, b: string): boolean {
-  const x = rankOf(a);
-  const y = rankOf(b);
-  if (!x || !y) return false;
-  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return (x[i] ?? 0) > (y[i] ?? 0);
-  return false;
-}
 
 function versionOf(tag: string): Version | undefined {
   const m = tagPattern.exec(tag);

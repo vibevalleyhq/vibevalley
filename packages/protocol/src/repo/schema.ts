@@ -149,7 +149,10 @@ const ChangedFile = z.object({
   removed: z.number(),
   patch: z.exactOptional(z.string()),
 }) satisfies Codec<T.ChangedFile>;
+export const ReviewRevision = z.object({ baseCommit: z.string(), tree: z.string() }) satisfies Codec<T.ReviewRevision>;
 export const Changes = z.object({
+  revision: z.exactOptional(ReviewRevision),
+  sinceReview: z.exactOptional(z.array(ChangedFile)),
   repo: z.string(),
   base: z.string(),
   branch: z.exactOptional(z.string()),

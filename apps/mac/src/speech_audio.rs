@@ -1,0 +1,300 @@
+use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
+
+use base64::Engine as _;
+use serde::Serialize;
+use vibevalley_protocol::MediaSpeechEvent;
+use vibevalley_server_api::media::{SharedSpeechStreams, SpeechClaim};
+
+#[derive(Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct State {
+    phase: Phase,
+    problem: Option<String>,
+}
+#[derive(Clone, Copy, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum Phase {
+    #[default]
+    Idle,
+    Playing,
+    Draining,
+    Stopping,
+}
+#[derive(Default)]
+struct Playback {
+    state: State,
+    stop: Option<flume::Sender<()>>,
+    owner: String,
+}
+fn playback() -> &'static Mutex<Playback> {
+    static PLAYBACK: OnceLock<Mutex<Playback>> = OnceLock::new();
+    PLAYBACK.get_or_init(Default::default)
+}
+pub fn state(owner: &str) -> State {
+    let current = playback().lock().unwrap_or_else(|e| e.into_inner());
+    if current.owner == owner { current.state.clone() } else { State::default() }
+}
+
+struct Claim(SpeechClaim);
+impl Drop for Claim {
+    fn drop(&mut self) {
+        let gone = std::mem::replace(&mut self.0.gone, Box::new(|| {}));
+        gone();
+    }
+}
+
+pub fn start(streams: SharedSpeechStreams, id: &str) -> Result<State, String> {
+    let mut current = playback().lock().unwrap_or_else(|e| e.into_inner());
+    if current.state.phase != Phase::Idle {
+        if current.owner == id {
+            return Ok(current.state.clone());
+        }
+        return Err("speech playback is already active".into());
+    }
+    let claim = Claim(streams.claim(id).map_err(|e| e.message)?);
+    let (stop, stopped) = flume::bounded(1);
+    current.stop = Some(stop);
+    current.owner = id.to_string();
+    current.state = State {
+        phase: Phase::Playing,
+        problem: None,
+    };
+    std::thread::Builder::new()
+        .name("speech-audio".into())
+        .spawn(move || {
+            let result = crate::audio::reserve_for_call().and_then(|lease| {
+                let _lease = lease;
+                play(claim, stopped, &mut Native, || {
+                    playback().lock().unwrap_or_else(|e| e.into_inner()).state.phase = Phase::Draining;
+                })
+            });
+            let mut current = playback().lock().unwrap_or_else(|e| e.into_inner());
+            current.stop = None;
+            current.state = State {
+                phase: Phase::Idle,
+                problem: result.err(),
+            };
+        })
+        .map_err(|e| {
+            current.stop = None;
+            current.state.phase = Phase::Idle;
+            e.to_string()
+        })?;
+    Ok(current.state.clone())
+}
+
+pub fn stop(owner: Option<&str>) -> State {
+    let mut playback = playback().lock().unwrap_or_else(|e| e.into_inner());
+    if owner.is_some_and(|id| id != playback.owner) {
+        return State::default();
+    }
+    if playback.stop.take().is_some() {
+        playback.state.phase = Phase::Stopping;
+    }
+    playback.state.clone()
+}
+
+trait Output {
+    fn format(&mut self, rate: u32, channels: u32) -> Result<(), String>;
+    fn queued_seconds(&self) -> Result<f64, String>;
+    fn append(&mut self, bytes: &[u8]) -> Result<(), String>;
+}
+struct Native;
+impl Output for Native {
+    fn format(&mut self, rate: u32, channels: u32) -> Result<(), String> {
+        crate::audio::start_pcm(crate::audio::PcmFormat { sample_rate: rate, channels })
+    }
+    fn queued_seconds(&self) -> Result<f64, String> {
+        let seconds = crate::audio::state().queued_seconds;
+        if seconds < 0.0 {
+            Err("the audio output device stopped".into())
+        } else {
+            Ok(seconds)
+        }
+    }
+    fn append(&mut self, bytes: &[u8]) -> Result<(), String> {
+        crate::audio::append_bytes(bytes)
+    }
+}
+
+fn stopped(stop: &flume::Receiver<()>) -> bool {
+    stop.is_disconnected() || stop.try_recv().is_ok()
+}
+fn wait_capacity(stop: &flume::Receiver<()>, output: &impl Output, seconds: f64) -> Result<bool, String> {
+    while output.queued_seconds()? + seconds > 5.0 {
+        if !matches!(stop.recv_timeout(Duration::from_millis(20)), Err(flume::RecvTimeoutError::Timeout)) {
+            return Ok(false);
+        }
+    }
+    Ok(!stopped(stop))
+}
+fn play(claim: Claim, stop: flume::Receiver<()>, output: &mut impl Output, draining: impl Fn()) -> Result<(), String> {
+    let mut format = None;
+    let mut sequence = 0;
+    loop {
+        if stopped(&stop) {
+            return Ok(());
+        }
+        let event = flume::Selector::new().recv(&stop, |_| None).recv(&claim.0.events, Result::ok).wait();
+        let Some(event) = event else {
+            return if stopped(&stop) {
+                Ok(())
+            } else {
+                Err("speech stream ended without completion".into())
+            };
+        };
+        match serde_json::from_value::<MediaSpeechEvent>(event).map_err(|e| e.to_string())? {
+            MediaSpeechEvent::Format {
+                sample_rate,
+                channels,
+                bit_depth,
+            } => {
+                if format.is_some() || bit_depth != 16 {
+                    return Err("invalid speech PCM format".into());
+                }
+                let rate = u32::try_from(sample_rate).map_err(|e| e.to_string())?;
+                let channels = u32::try_from(channels).map_err(|e| e.to_string())?;
+                crate::audio::PcmFormat { sample_rate: rate, channels }.validate()?;
+                output.format(rate, channels)?;
+                format = Some((rate, channels));
+            }
+            MediaSpeechEvent::Audio { sequence: next, audio } => {
+                let (rate, channels) = format.ok_or("speech audio arrived before its format")?;
+                if next != sequence || audio.len() > 2 << 20 {
+                    return Err("invalid or out-of-order speech audio".into());
+                }
+                sequence += 1;
+                let bytes = base64::engine::general_purpose::STANDARD.decode(audio).map_err(|e| e.to_string())?;
+                let block = channels as usize * 2;
+                if bytes.is_empty() || bytes.len() % block != 0 {
+                    return Err("speech chunk contains an incomplete sample frame".into());
+                }
+                // A provider chunk may exceed the playback window; feed it in 100 ms pieces.
+                let size = (rate as usize / 10) * block;
+                for piece in bytes.chunks(size) {
+                    let seconds = piece.len() as f64 / (f64::from(rate) * block as f64);
+                    if !wait_capacity(&stop, output, seconds)? {
+                        return Ok(());
+                    }
+                    output.append(piece)?;
+                }
+            }
+            MediaSpeechEvent::Done {} => {
+                if format.is_none() {
+                    return Err("speech completed without a format".into());
+                }
+                draining();
+                while output.queued_seconds()? > 0.0 {
+                    if !matches!(stop.recv_timeout(Duration::from_millis(20)), Err(flume::RecvTimeoutError::Timeout)) {
+                        return Ok(());
+                    }
+                }
+                return Ok(());
+            }
+            MediaSpeechEvent::Failed {} => return Err("speech generation failed".into()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    };
+    struct OutputProbe {
+        queued: std::cell::Cell<f64>,
+        bytes: usize,
+        drain: Arc<AtomicBool>,
+        full: Option<flume::Sender<()>>,
+    }
+    impl Output for OutputProbe {
+        fn format(&mut self, _: u32, _: u32) -> Result<(), String> {
+            Ok(())
+        }
+        fn queued_seconds(&self) -> Result<f64, String> {
+            let queued = self.queued.get();
+            if queued >= 4.99
+                && let Some(full) = &self.full
+            {
+                let _ = full.try_send(());
+            }
+            if self.drain.load(Ordering::SeqCst) || (self.full.is_none() && queued >= 4.99) {
+                self.queued.set((queued - 1.0).max(0.0));
+            }
+            Ok(queued)
+        }
+        fn append(&mut self, bytes: &[u8]) -> Result<(), String> {
+            assert!(self.queued.get() + bytes.len() as f64 / 16000.0 <= 5.000001);
+            self.queued.set(self.queued.get() + bytes.len() as f64 / 16000.0);
+            self.bytes += bytes.len();
+            Ok(())
+        }
+    }
+    fn claim() -> (Claim, flume::Sender<serde_json::Value>, Arc<AtomicBool>) {
+        let (send, events) = flume::unbounded();
+        let gone = Arc::new(AtomicBool::new(false));
+        let receipt = gone.clone();
+        (
+            Claim(SpeechClaim {
+                events,
+                gone: Box::new(move || {
+                    receipt.store(true, Ordering::SeqCst);
+                }),
+            }),
+            send,
+            gone,
+        )
+    }
+    #[test]
+    fn regression_a_ten_second_burst_waits_for_playback_capacity_then_drains() {
+        let (claim, send, gone) = claim();
+        let (_stop, stopped) = flume::bounded(1);
+        send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).unwrap();
+        send.send(json!({"type":"audio","sequence":0,"audio":base64::engine::general_purpose::STANDARD.encode(vec![0;160000])}))
+            .unwrap();
+        send.send(json!({"type":"done"})).unwrap();
+        let mut output = OutputProbe {
+            queued: 0.0.into(),
+            bytes: 0,
+            drain: Arc::new(AtomicBool::new(false)),
+            full: None,
+        };
+        let drain = output.drain.clone();
+        let drained = AtomicUsize::new(0);
+        play(claim, stopped, &mut output, || {
+            drain.store(true, Ordering::SeqCst);
+            drained.fetch_add(1, Ordering::SeqCst);
+        })
+        .unwrap();
+        assert_eq!(output.bytes, 160000);
+        assert_eq!(output.queued.get(), 0.0);
+        assert_eq!(drained.load(Ordering::SeqCst), 1);
+        assert!(gone.load(Ordering::SeqCst));
+    }
+    #[test]
+    fn regression_stop_interrupts_a_full_playback_window_and_releases_the_claim() {
+        let (claim, send, gone) = claim();
+        let (stop, stopped) = flume::bounded(1);
+        send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).unwrap();
+        send.send(json!({"type":"audio","sequence":0,"audio":"AAAAAA=="})).unwrap();
+        let (full, reached) = flume::bounded(1);
+        let worker = std::thread::spawn(move || {
+            let mut output = OutputProbe {
+                queued: 5.0.into(),
+                bytes: 0,
+                drain: Arc::new(AtomicBool::new(false)),
+                full: Some(full),
+            };
+            play(claim, stopped, &mut output, || {}).unwrap();
+            output.bytes
+        });
+        reached.recv_timeout(Duration::from_secs(5)).unwrap();
+        drop(stop);
+        assert_eq!(worker.join().unwrap(), 0);
+        assert!(gone.load(Ordering::SeqCst));
+    }
+}

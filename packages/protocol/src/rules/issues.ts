@@ -1,19 +1,13 @@
 import { t } from "@vibevalley/i18n";
 
-import { issueId } from "../common/schema";
-import type { Assignment, Issue, IssueId, SessionId, SessionScope } from "../shapes";
+import type { Assignment, Issue, SessionId } from "../shapes";
 
 const titleMax = 40;
-
-/** The issue a session is working on or drafting, if any. */
-export const issueScopeOf = (h: { readonly scope?: SessionScope }): IssueId | undefined =>
-  h.scope?.kind === "issue" || h.scope?.kind === "draft" ? issueId(h.scope.id) : undefined;
 
 /** The responsibility in force now. */
 const assignmentOf = (issue: Pick<Issue, "assignments">): Assignment | undefined =>
   issue.assignments.findLast((assignment) => assignment.endedAt === undefined);
 
-/** The agent currently responsible for the issue, if any. */
 export const assignedAgentOf = (issue: Pick<Issue, "assignments">): string | undefined => assignmentOf(issue)?.agent;
 
 /** Every execution, in assignment and start order. */
@@ -23,7 +17,6 @@ export const executionsOf = (issue: Pick<Issue, "assignments">): Assignment["exe
 export const sessionIdsOf = (issue: Pick<Issue, "assignments">): SessionId[] =>
   executionsOf(issue).flatMap((execution) => (execution.kind === "worker" ? [execution.session] : []));
 
-/** The latest helper context that executed the issue, if any. */
 export const latestSessionIdOf = (issue: Pick<Issue, "assignments">): SessionId | undefined => sessionIdsOf(issue).at(-1);
 
 /** One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits. failing those, cut. */

@@ -5,15 +5,22 @@ cd "$(git rev-parse --show-toplevel)"
 main=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || printf '%s\n' main)
 main=${main#origin/}
 base=$(git merge-base "$main" HEAD)
-changed=$(git diff --name-only --no-renames "$base")
-server=false
-web=false
+changed=$(git diff --name-only --no-renames "$base" && git ls-files --others --exclude-standard)
+rust=false
+packages=false
+mac=false
+protocol=false
+sql=false
 while IFS= read -r path; do
+    case "$path" in crates/*|apps/mac/*|Cargo.*) rust=true ;; esac
+    case "$path" in packages/*) packages=true ;; esac
+    case "$path" in apps/mac/ui/*|packages/*) mac=true ;; esac
     case "$path" in
-        packages/base-ui/*|packages/engine/*|packages/stories/*|packages/health/*|packages/tsrs/*) ;;
-        cmd/*|internal/*|pkg/*|go.mod|go.sum|sqlc.yaml|arch_test.go|packages/*) server=true ;;
+        crates/vibevalley-protocol/*|crates/vibevalley-artifact/*|crates/vibevalley-pkm/*|packages/protocol/*|packages/artifact/*|packages/pkm/*|scripts/gen/goldens.sh) protocol=true ;;
     esac
-    case "$path" in apps/web/*|apps/mobile/*|packages/*) web=true ;; esac
+    case "$path" in
+        sqlc.yaml|crates/*.sql|crates/*/generated/queries.rs|scripts/gen/sqlc-rust/*|scripts/release/verify-native-schema.py) sql=true ;;
+    esac
 done <<PATHS
 $changed
 PATHS
@@ -25,16 +32,23 @@ for key in $(env | cut -d= -f1); do
     esac
 done
 
-# Narrowest checks first; vp install's prepare hook runs packages:build.
+# The same checks AGENTS.md asks for, narrowest first: a fresh worktree may not have installed yet.
 vp install --frozen-lockfile
 vp check --deny-warnings
-if "$server"; then
-    vp run server:check
+if "$protocol"; then
+    vp run protocol:check
 fi
-if "$web"; then
-    vp run web:check
+if "$sql"; then
+    vp run sql:check
 fi
+if "$rust"; then
+    vp run rust:check
+fi
+if "$packages"; then
+    vp run packages:check
+fi
+if "$mac"; then
+    vp run mac:check
+fi
+# Docs, the notes' catalog and our primitives drift with any change, not only a docs one.
 vp run docs:verify
-vp run practice:check
-vp run health:verify
-vp run deadcode

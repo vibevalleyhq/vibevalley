@@ -1,0 +1,11 @@
+{
+  "source": {
+    "local": "Local",
+    "nowledge": "Nowledge Mem",
+    "everos": "EverOS"
+  },
+  "empty": "There is nothing to remember",
+  "dbFailed": "Not remembered: the database could not be written",
+  "noMemory": "{agent}'s memory has no {id}",
+  "forget": "Forget from {agent}'s memory: \"{text}\""
+}

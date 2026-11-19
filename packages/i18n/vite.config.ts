@@ -1,9 +1,8 @@
 import { defineConfig } from "vite-plus";
 
-import pkg from "./package.json" with { type: "json" };
-
 export default defineConfig({
   test: { include: ["test/**/*.test.ts"] },
-  pack: { entry: Object.values(pkg.exports).map((e) => e.default), fixedExtension: false, dts: { sourcemap: true, emitDtsOnly: true } },
+  // The types other packages check against (package.json's exports.
+  pack: { entry: ["src/index.ts", "src/format.ts"], outDir: "dist", clean: true, fixedExtension: false, dts: { sourcemap: true, emitDtsOnly: true } },
   run: { tasks: { build: { command: "vp pack", cache: { input: [{ auto: true }, "!dist/**"] } }, test: "vp test run" } },
 });

@@ -1,0 +1,11 @@
+{
+  "source": {
+    "local": "本地",
+    "nowledge": "Nowledge Mem",
+    "everos": "EverOS"
+  },
+  "empty": "要记的话是空的",
+  "dbFailed": "没记下来：数据库写不进去",
+  "noMemory": "{agent} 的记性里没有 {id}",
+  "forget": "从 {agent} 的记性里忘掉：「{text}」"
+}

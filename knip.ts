@@ -1,10 +1,10 @@
 /**
  * What is dead: files nothing reaches, exports nothing imports, dependencies nothing uses (`vp run deadcode`, through
  * scripts/audit/deadcode.ts, which says what to do about each). A file is alive when an entry reaches it. knip finds most
- * entries itself (package.json's scripts, index.html, the Vite, Vitest, Playwright and Expo configs); the ones listed
- * below are run some other way: scripts by vpx and the stories' page. A package's
- * exports are entries too, and includeEntryExports reports the ones no other workspace imports: the packages are ours,
- * nobody outside uses them. An app's entries keep theirs: a config's default export is read by its tool.
+ * entries itself (package.json's scripts, the Vite, Vitest and Playwright configs); the ones listed below are run some
+ * other way: scripts by vpx, the site's documents by its prerender. A package's exports are entries too, and
+ * includeEntryExports reports the ones no other workspace imports: the packages are ours, nobody outside uses them. An
+ * app's entries keep theirs: a config's default export is read by its tool.
  */
 
 import type { KnipConfig } from "knip";
@@ -15,28 +15,28 @@ const config: KnipConfig = {
   ignoreExportsUsedInFile: { interface: true, type: true },
   workspaces: {
     ".": {
-      entry: ["scripts/*/*.ts"],
-      project: ["scripts/**/*.ts"],
-    },
-    "apps/web": {
-      entry: ["index.html", "stories.html", "src/stories.tsx", "vite.stories.config.ts", "test/**/*.ts"],
-      project: ["src/**/*.{ts,tsx}", "test/**/*.ts"],
-      // Imported by src/style.css (@import "tailwindcss/…"), which knip does not read.
-      ignoreDependencies: ["tailwindcss"],
+      // sqlc launches its plugin from YAML. The Rust golden generators run through the root goldens script.
+      entry: [
+        "scripts/*/*.ts",
+        "scripts/gen/sqlc-rust/generate.ts",
+        "crates/vibevalley-artifact/gen/artifact.ts",
+        "crates/vibevalley-pkm/golden/{gen,graph}.ts",
+      ],
+      project: ["scripts/**/*.ts", "crates/**/*.ts"],
     },
     "apps/site": {
-      entry: ["src/{App,Document}.tsx", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
+      // scripts/images.ts reads the scene exports through Vite's ssrLoadModule.
+      entry: ["src/{App,Document}.tsx", "src/base/scene.ts", "scripts/*.ts", "test/**/*.ts", "test/prerender/fixture/{App,Document}.tsx"],
       project: ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "test/**/*.{ts,tsx}"],
       // Imported by src/ui/global.css (@import "tailwindcss"), which knip does not read.
       ignoreDependencies: ["tailwindcss"],
     },
-    "apps/mobile": {
-      entry: ["scripts/*.ts"],
-      project: ["*.{ts,tsx}", "src/**/*.{ts,tsx}", "scripts/**/*.ts"],
-      // knip's Expo plugin infers these from app.json (expo-system-ui for userInterfaceStyle, expo-updates unless updates
-      // are turned off), not from an import. Adding them changes the phone's native build, so it is the phone's own
-      // change, checked on a simulator (apps/mobile/README.md).
-      ignoreDependencies: ["expo-system-ui", "expo-updates"],
+    "apps/mac/ui": {
+      // nsh loads App.tsx, and its tests open the app and story entry points by filename.
+      entry: ["App.tsx", "**/*.{test,story,stories}.{ts,tsx}", "**/main.tsx", "**/story.tsx"],
+      project: ["**/*.{ts,tsx}", "!.nsh/**", "!build/**"],
+      // nsh provides these modules inside its runtime, without npm packages.
+      ignoreDependencies: ["nsh", "nsh/*"],
     },
     "packages/*": {
       project: ["src/**/*.{ts,tsx}"],
@@ -46,15 +46,14 @@ const config: KnipConfig = {
       // Run by path from its shell scripts (bin/tsgolint, tsdk/tsgo), which knip does not read.
       ignoreDependencies: ["tsrs"],
     },
-    "packages/base-ui": {
-      project: ["src/**/*.{ts,tsx}"],
-      includeEntryExports: true,
-      // vite-plus/test/browser-playwright, the browser mode's provider in vite.config.ts, needs it beside it.
-      ignoreDependencies: ["@vitest/browser-playwright"],
-    },
   },
-  // Programs on the machine, not packages: the voice line's tunnel and the Go toolchain.
-  ignoreBinaries: ["cloudflared", "go", "sqlc"],
+  // Programs on the machine, not packages: Xcode's swift and Rust's cargo.
+  ignoreBinaries: ["swift", "cargo"],
+  // Rust owns the complete wire contract; unused TS projections are not dead Rust API types.
+  // Handwritten re-exports and schemas remain checked.
+  ignoreIssues: { "packages/protocol/src/**/*.gen.ts": ["exports", "types"] },
+  // Swift, with its own tools.
+  ignoreWorkspaces: ["apps/island"],
 };
 
 export default config;

@@ -1,0 +1,51 @@
+{
+  "looks": {
+    "farmer": {
+      "name": "Young farmer",
+      "blurb": "Straw hat and overalls, always smiling."
+    },
+    "foreman": {
+      "name": "Foreman",
+      "blurb": "Hard hat and safety vest, walkie-talkie always on, there at a call."
+    },
+    "auntie": {
+      "name": "Farm auntie",
+      "blurb": "Headscarf and apron, every plot's work in her notebook."
+    },
+    "grandpa": {
+      "name": "Old hand",
+      "blurb": "White beard, a lifetime of farming, never in a hurry."
+    },
+    "gardener": {
+      "name": "Gardener",
+      "blurb": "A flower in a wide straw hat, shears in the apron pocket."
+    },
+    "robot": {
+      "name": "Robot butler",
+      "blurb": "A round farm robot whose face screen smiles."
+    }
+  },
+  "orchestrator": {
+    "tab": {
+      "memory": "Memory",
+      "trajectory": "Trajectory",
+      "voice": "Voice"
+    },
+    "all": "← All profiles",
+    "title": "Assistant",
+    "intro": "The assistant is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
+    "look": "It looks like {name}.",
+    "profile": "Edit its profile",
+    "tabs": "The assistant's",
+    "heard": "Heard",
+    "quiet": "The assistant has not spoken yet.",
+    "trajectory": "Each of the assistant's rounds",
+    "about": "What it heard, every tool it called (click a row for the arguments and the result), what it said. Newest at the bottom; the last 1000 steps are kept. When a round went wrong, click \"This round went wrong\" on what it heard, write what it should have done, and it is kept as an eval."
+  },
+  "approval": {
+    "title": "Tool calls awaiting approval",
+    "allow": "Allow this call",
+    "deny": "Deny this call",
+    "unavailable": "Could not load pending tool calls: {why}"
+  }
+}

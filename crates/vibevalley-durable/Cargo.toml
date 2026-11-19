@@ -1,0 +1,18 @@
+[package]
+name = "vibevalley-durable"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+base64 = "0.23.1"
+sqlx = { version = "0.9.1", default-features = false, features = ["sqlite", "derive"] }
+pollster = "1.0.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+uuid = { version = "1.29.2", features = ["v7"] }
+flume = "0.12.0"
+
+[dev-dependencies]
+tempfile = "3.27.0"

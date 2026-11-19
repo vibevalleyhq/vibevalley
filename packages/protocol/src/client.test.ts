@@ -13,6 +13,15 @@ const failure = async (status: number, text: string) => {
 };
 
 describe("the API client envelope and error boundary", () => {
+  it("regression: the approval list preserves the JSON argument text returned by the server", async () => {
+    const argumentsJson = '{ "title": "Review", "priority": 1.0, "labels": ["ui"] }';
+    const approval = { conversationId: "c1", taskId: "t1", toolCallId: "call1", toolName: "issue_create", reason: "requires review", requestedAtMs: 10 };
+    const list = (args: unknown) =>
+      client(200, JSON.stringify({ bizCode: 0, message: "ok", data: [{ ...approval, argumentsJson: args }] })).orchestrator.approval.list({});
+    expect(await list(argumentsJson)).toEqual([{ ...approval, argumentsJson }]);
+    await expect(list({ title: "Review" })).rejects.toThrow(/argumentsJson/u);
+  });
+
   it("regression: per-request cancellation reaches the transport without canceling another request", async () => {
     const signals: (AbortSignal | undefined)[] = [];
     const api = new VibeValleyApi("http://farm", (_url, init) => {
@@ -86,5 +95,27 @@ describe("the API client envelope and error boundary", () => {
     await expect(client(200, "not json").server.health.get()).rejects.toThrow(SyntaxError);
     await expect(client(200, `{"ok":true,"version":"test"}`).server.health.get()).rejects.toThrow(/not in its shape/u);
     await expect(client(200, `{"bizCode":0,"message":"ok","data":{"ok":"yes"}}`).server.health.get()).rejects.toThrow(/not in its shape/u);
+  });
+
+  it("calls direct envelope transports via VibeValleyApi.over without HTTP serialization", async () => {
+    const calls: [string, unknown][] = [];
+    const api = VibeValleyApi.over((op, input) => {
+      calls.push([op, input]);
+      if (op === "server.health.get") {
+        return Promise.resolve({ bizCode: 0, message: "ok", data: { ok: true, version: "native" } });
+      }
+      return Promise.resolve({ bizCode: BizCode.IssueNotFound, message: "missing" });
+    });
+    expect(await api.server.health.get()).toEqual({ ok: true, version: "native" });
+    await expect(api.orchestrator.open()).rejects.toMatchObject({
+      status: 404,
+      bizCode: BizCode.IssueNotFound,
+      tag: "Missing",
+      reason: "missing",
+    });
+    expect(calls).toEqual([
+      ["server.health.get", undefined],
+      ["orchestrator.open", undefined],
+    ]);
   });
 });

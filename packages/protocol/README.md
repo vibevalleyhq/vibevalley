@@ -1,38 +1,28 @@
 # @vibevalley/protocol
 
-The contracts: between the Go server (`cmd/vibe-server`) and the page (the shapes on the wire, their Schemas, the endpoints, the subscriptions,
-and the few pure rules both sides run), and between the page and the program around it (the host). A rule only the server runs belongs to its Go package under `internal/domain/`, and so do the core
-state's fold and the frame (`internal/domain/gateway`). No files, no network.
+The contracts between the server and the views (the shapes on the wire, their Schemas, the endpoints, the subscriptions,
+and the few pure rules both sides run), and between the page and the program around it (the host). The shapes and the
+endpoint table are Rust's: `crates/vibevalley-protocol/src/contract/` is the source, and `src/<concept>/shapes.gen.ts`
+and `src/endpoints.gen.ts` are written from it (`vp run protocol:ts`; `cargo test` fails when they are stale). The zod
+Schemas, `api.ts`, the rules and the client are hand-written here for the native app's views (`apps/mac/ui`). No files, no network.
 
 | Entry | What |
 |---|---|
-| `@vibevalley/protocol` | `src/<concept>/shapes.ts`, a folder per concept named as the server's module, gathered by `src/shapes.ts` (the types, and the constants both sides share), `src/stream.ts` (reading a stream), `src/client.ts` (`VibeValleyApi`, written by `vp run api:client` from the endpoint table) |
+| `@vibevalley/protocol` | `src/<concept>/shapes.ts`, a folder per concept named as the Rust contract's module: its `shapes.gen.ts` and the constants and paths kept here, gathered by `src/shapes.ts`, and `src/client.ts` (`VibeValleyApi`, written by `vp run api:client` from the endpoint table) |
 | `@vibevalley/protocol/schema` | a Schema for every shape, in `src/<concept>/schema.ts` beside it, each typed `Codec<T.X>` (`z.ZodType<T.X, Wire<T.X>>` in `src/codec.ts`, the wire side without the ids' brands): it fails to compile when the two differ |
-| `@vibevalley/protocol/api` | `endpoints` (method, path, parameters, request and answer Schemas, who may call) and `Handlers`, put together from each concept's `src/<concept>/api.ts`; `BizCode`, `bizCodeMeta`, `ApiError`, `ApiErrorEnvelope`, `ApiVoidEnvelope`, `apiSuccessEnvelope`, `Endpoint` and `input` from `src/endpoint.ts` |
+| `@vibevalley/protocol/api` | `endpoints` (method, path, parameters, request and answer Schemas, who may call) and `Handlers`, put together from each concept's `src/<concept>/api.ts` (`api.test.ts` holds it to the served table, `endpoints.gen.ts`); `BizCode`, `bizCodeMeta`, `ApiError`, `ApiErrorEnvelope`, `ApiVoidEnvelope`, `apiSuccessEnvelope`, `Endpoint` and `input` from `src/endpoint.ts` |
 | `@vibevalley/protocol/rpc` | `subscriptions` and `Subscriptions`: what a page follows a channel, the farm's reports and an artifact by, each over SSE at `subscriptionPath` (`GET /api/v1/subscribe/<name>?payload=…`, `subscriptionUrl`) |
-| `@vibevalley/protocol/host` | `Host`: what the page may ask of the desktop's shell or the phone's (below); `desktopBridge` and `mobileBridge`, the contracts each host's calls go over (`@vibevalley/bridge`), and `mobileHost`, the page's end of the phone's |
+| `@vibevalley/protocol/host` | `Host`: what the page may ask of the native macOS shell around it (below), with the Schemas of what crosses (`UpdateState`, `CommandLineState`, `ThemeChoice`) |
 | `@vibevalley/protocol/rules` | pure rules both the server and the page run: phase and action words (`phase.ts`), issue titles and stage helpers (`issues.ts`, `stage.ts`), channel lookup (`channel.ts`), block order keys (`order.ts`), sandbox attributes (`display.ts`), repo name validation (`repo.ts`), inbox news (`inbox.ts`), a session's farm (`play.ts`), and small helpers (`same.ts`, `plain.ts`, `omit.ts`, `oneOf.ts`, `cut.ts`) |
 
 
 ## The host
 
-Every host gives the whole `Host`; a capability it lacks is null, and the page draws by that, never by asking which host
-it is in. The page finds its host in `apps/web/src/infra/host.ts` (`currentHost()`: the desktop preload's, the phone's built
-over the bridge, `browserHost` otherwise).
-
-| Member | Desktop (`cmd/vibe-desktop`) | Phone (`apps/mobile`) | Browser |
-|---|---|---|---|
-| `notify(notice)` | a system notification | a local notification | null |
-| `tray(summary)` | the menu bar's title and lines | null | null |
-| `voiceShortcut` | ⌥⇧Space from anywhere | null | null |
-| `rtc(grant, events)` | null (the page's Agora Web SDK) | Agora's native SDK, going on with the screen locked | null |
-| `locale(locale)` | the tray's menu and the island follow the page's language | null (the shell speaks the phone's) | null |
-
-What a host carries to another program goes by a contract here over `@vibevalley/bridge`: the desktop's preload to
-Electron's main by `desktopBridge`, the phone's page to its shell by `mobileBridge`, the call's events coming back as
-pushes with their line. Each `RtcLine` keeps its own line across the bridge: its controls and events cannot act on a
-later call, including a join that finishes after the page cancelled it.
+A capability a host lacks is absent, and the page draws by that, never by asking which host it is in. The page finds its
+host in `apps/mac/ui/vv/web/infra/host.ts` (`currentHost()`): inside the native app each member is a `host.<name>` call
+over the bridge, answered by the shell (`apps/mac/src/shell.rs`, `host_call`; `host.info` lists what it answers);
+headless tests and stories get a host with a name and nothing else ([the client](docs/subsystems/app.md#宿主)).
 
 ```bash
-vp run test     # vitest: the rules and the phone's bridge (types: vp check at the root)
+vp run test     # vitest: the rules, the Schemas and the endpoint table against the generated ones (types: vp check at the root)
 ```

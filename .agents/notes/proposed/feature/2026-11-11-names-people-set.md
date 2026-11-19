@@ -15,7 +15,7 @@ Status: proposed
 
 - `User` 往上给一个名字的流（`names`，改名时发），`Channel` 订阅它，更新用户参与者的名字；历史消息照旧按参与者显示，所以改名后旧消息也显示新名字。没设名字时照旧用词典里的默认叫法。
 - 助手的系统提示写上「用户叫 X」（`orchestrator/prompts.ts`），帮工的提示里提到用户的地方也用这个名字；没设名字就不写。
-- 页面上用户自己的头像写名字的第一个字（`apps/web/src/ui/domain/Face.tsx` 的 `UserFace`）。
+- 页面上用户自己的头像写名字的第一个字（`apps/mac/ui/vv/web/ui/domain/Face.tsx` 的 `UserFace`）。
 
 **帮工能改名。**
 
@@ -32,7 +32,7 @@ Status: proposed
 
 - 在设置里改名字：频道里用户发过的、新发的消息都显示新名字；助手下一轮的提示里有这个名字（测试读提示）；没设名字时照旧。
 - 改一个帮工的名字：频道、帮工列表、轨迹页都显示新名字；同档案的别的帮工不变；重启后还在。
-- 测试：`user.test.ts`（名字的流）、`channel.test.ts`（参与者跟着改）、`session.test.ts`（`session.update` 只改一个）、页面的 Playwright 走一遍改名。
+- 测试：`user.test.ts`（名字的流）、`channel.test.ts`（参与者跟着改）、`session.test.ts`（`session.update` 只改一个）、页面测试走一遍改名。
 - 文档：`user.md`、`session.md`、`channel.md`。
 
 ## Risks

@@ -1,0 +1,497 @@
+{
+ "AgentProblemLevel": [
+  "error",
+  "warn"
+ ],
+ "AgentProblem": [
+  {
+   "field": "s36",
+   "level": "error",
+   "text": "s37"
+  },
+  {
+   "field": "s38",
+   "level": "error",
+   "text": "s39"
+  }
+ ],
+ "PersonaMode": [
+  "append",
+  "replace",
+  "prompt"
+ ],
+ "MCPServer": [
+  {
+   "type": "stdio",
+   "name": "s40",
+   "command": "s41",
+   "args": [
+    "s42"
+   ],
+   "env": {
+    "k43": "s44"
+   }
+  },
+  {
+   "type": "stdio",
+   "name": "s45",
+   "command": "s46",
+   "args": [
+    "s47"
+   ],
+   "env": {
+    "k48": "s49"
+   }
+  },
+  {
+   "type": "http",
+   "name": "s50",
+   "url": "s51",
+   "headers": {
+    "k52": "s53"
+   }
+  },
+  {
+   "type": "http",
+   "name": "s54",
+   "url": "s55",
+   "headers": {
+    "k56": "s57"
+   }
+  }
+ ],
+ "Species": [
+  "bear",
+  "rabbit",
+  "fox",
+  "cat",
+  "owl",
+  "hedgehog",
+  "raccoon"
+ ],
+ "Outfit": [
+  "farmer",
+  "gardener",
+  "rain",
+  "winter"
+ ],
+ "Build": [
+  "biped",
+  "treads",
+  "wheel",
+  "hopper",
+  "hover"
+ ],
+ "Head": [
+  "rounded",
+  "terminal",
+  "dome",
+  "orb",
+  "saucer"
+ ],
+ "Look": [
+  {
+   "species": "bear",
+   "outfit": "farmer",
+   "orchestrator": "farmer",
+   "build": "biped",
+   "head": "rounded",
+   "body": "s58",
+   "trim": "s59",
+   "hat": "s60",
+   "eye": "s61"
+  },
+  {
+   "species": null,
+   "outfit": null,
+   "orchestrator": null,
+   "build": "biped",
+   "head": "rounded",
+   "body": "s62",
+   "trim": "s63",
+   "hat": "s64",
+   "eye": "s65"
+  }
+ ],
+ "OrchestratorLook": [
+  "farmer",
+  "foreman",
+  "auntie",
+  "grandpa",
+  "gardener",
+  "robot"
+ ],
+ "AgentFrom": [
+  {
+   "template": "s66",
+   "version": 67
+  },
+  {
+   "template": "s68",
+   "version": 69
+  }
+ ],
+ "Agent": [
+  {
+   "id": "s70",
+   "name": "s71",
+   "role": "orchestrator",
+   "duty": "s72",
+   "enabled": false,
+   "runtime": "s74",
+   "model": "s75",
+   "effort": "s76",
+   "persona": "s77",
+   "personaMode": "append",
+   "skills": [
+    "s78"
+   ],
+   "mcpServers": [
+    {
+     "type": "stdio",
+     "name": "s79",
+     "command": "s80",
+     "args": [
+      "s81"
+     ],
+     "env": {
+      "k82": "s83"
+     }
+    }
+   ],
+   "disallowedTools": [
+    "s84"
+   ],
+   "env": {
+    "k85": "s86"
+   },
+   "workdir": "s87",
+   "worktree": true,
+   "tags": [
+    "s89"
+   ],
+   "look": {
+    "species": "bear",
+    "outfit": "farmer",
+    "orchestrator": "farmer",
+    "build": "biped",
+    "head": "rounded",
+    "body": "s90",
+    "trim": "s91",
+    "hat": "s92",
+    "eye": "s93"
+   },
+   "from": {
+    "template": "s94",
+    "version": 95
+   }
+  },
+  {
+   "id": "s96",
+   "name": "s97",
+   "role": "orchestrator",
+   "duty": "s98",
+   "enabled": false,
+   "runtime": "s100",
+   "model": "s101",
+   "effort": "s102",
+   "persona": "s103",
+   "personaMode": "append",
+   "skills": [
+    "s104"
+   ],
+   "mcpServers": [
+    {
+     "type": "stdio",
+     "name": "s105",
+     "command": "s106",
+     "args": [
+      "s107"
+     ],
+     "env": {
+      "k108": "s109"
+     }
+    }
+   ],
+   "disallowedTools": [
+    "s110"
+   ],
+   "env": {
+    "k111": "s112"
+   },
+   "workdir": "s113",
+   "worktree": true,
+   "tags": [
+    "s115"
+   ],
+   "look": {
+    "species": null,
+    "outfit": null,
+    "orchestrator": null,
+    "build": "biped",
+    "head": "rounded",
+    "body": "s116",
+    "trim": "s117",
+    "hat": "s118",
+    "eye": "s119"
+   }
+  }
+ ],
+ "AgentTemplate": [
+  {
+   "id": "s120",
+   "version": 121,
+   "role": "orchestrator",
+   "name": "s122",
+   "duty": "s123",
+   "tags": [
+    "s124"
+   ],
+   "runtime": "s125",
+   "model": "s126",
+   "effort": "s127",
+   "personaMode": "append",
+   "worktree": true,
+   "look": {
+    "species": "bear",
+    "outfit": "farmer",
+    "orchestrator": "farmer",
+    "build": "biped",
+    "head": "rounded",
+    "body": "s129",
+    "trim": "s130",
+    "hat": "s131",
+    "eye": "s132"
+   },
+   "persona": "s133",
+   "source": "builtIn",
+   "skills": [
+    "s134"
+   ],
+   "installed": [
+    "s135"
+   ]
+  },
+  {
+   "id": "s136",
+   "version": 137,
+   "role": "orchestrator",
+   "name": "s138",
+   "duty": "s139",
+   "tags": [
+    "s140"
+   ],
+   "runtime": "s141",
+   "model": "s142",
+   "effort": "s143",
+   "personaMode": "append",
+   "worktree": true,
+   "look": {
+    "species": null,
+    "outfit": null,
+    "orchestrator": null,
+    "build": "biped",
+    "head": "rounded",
+    "body": "s145",
+    "trim": "s146",
+    "hat": "s147",
+    "eye": "s148"
+   },
+   "persona": "s149",
+   "source": "builtIn",
+   "skills": [
+    "s150"
+   ],
+   "installed": [
+    "s151"
+   ]
+  }
+ ],
+ "AgentTemplateSource": [
+  "builtIn",
+  "added"
+ ],
+ "AgentValidateRequest": [
+  {
+   "agents": [
+    {
+     "id": "s152",
+     "name": "s153",
+     "role": "orchestrator",
+     "duty": "s154",
+     "enabled": false,
+     "runtime": "s156",
+     "model": "s157",
+     "effort": "s158",
+     "persona": "s159",
+     "personaMode": "append",
+     "skills": [
+      "s160"
+     ],
+     "mcpServers": [
+      {
+       "type": "stdio",
+       "name": "s161",
+       "command": "s162",
+       "args": [],
+       "env": {}
+      }
+     ],
+     "disallowedTools": [
+      "s163"
+     ],
+     "env": {
+      "k164": "s165"
+     },
+     "workdir": "s166",
+     "worktree": false,
+     "tags": [
+      "s168"
+     ],
+     "look": {
+      "species": "bear",
+      "outfit": "farmer",
+      "orchestrator": "farmer",
+      "build": "biped",
+      "head": "rounded",
+      "body": "s169",
+      "trim": "s170",
+      "hat": "s171",
+      "eye": "s172"
+     },
+     "from": {
+      "template": "s173",
+      "version": 174
+     }
+    }
+   ]
+  },
+  {
+   "agents": [
+    {
+     "id": "s175",
+     "name": "s176",
+     "role": "orchestrator",
+     "duty": "s177",
+     "enabled": true,
+     "runtime": "s179",
+     "model": "s180",
+     "effort": "s181",
+     "persona": "s182",
+     "personaMode": "append",
+     "skills": [
+      "s183"
+     ],
+     "mcpServers": [
+      {
+       "type": "stdio",
+       "name": "s184",
+       "command": "s185",
+       "args": [],
+       "env": {}
+      }
+     ],
+     "disallowedTools": [
+      "s186"
+     ],
+     "env": {
+      "k187": "s188"
+     },
+     "workdir": "s189",
+     "worktree": true,
+     "tags": [
+      "s191"
+     ],
+     "look": {
+      "species": null,
+      "outfit": null,
+      "orchestrator": null,
+      "build": "biped",
+      "head": "rounded",
+      "body": "s192",
+      "trim": "s193",
+      "hat": "s194",
+      "eye": "s195"
+     }
+    }
+   ]
+  }
+ ],
+ "AgentValidation": [
+  {
+   "id": "s196",
+   "problems": [
+    {
+     "field": "s197",
+     "level": "error",
+     "text": "s198"
+    }
+   ]
+  },
+  {
+   "id": "s199",
+   "problems": [
+    {
+     "field": "s200",
+     "level": "error",
+     "text": "s201"
+    }
+   ]
+  }
+ ],
+ "Skill": [
+  {
+   "id": "s202",
+   "name": "s203",
+   "description": "s204",
+   "body": "s205",
+   "builtIn": true
+  },
+  {
+   "id": "s207",
+   "name": "s208",
+   "description": "s209",
+   "body": "s210"
+  }
+ ],
+ "AgentDeleteInput": [
+  {
+   "id": "s6920"
+  },
+  {
+   "id": "s6921"
+  }
+ ],
+ "AgentTemplateInstallInput": [
+  {
+   "id": "s6922"
+  },
+  {
+   "id": "s6923"
+  }
+ ],
+ "AgentTemplateUpdateInput": [
+  {
+   "agent": "s6924"
+  },
+  {
+   "agent": "s6925"
+  }
+ ],
+ "AgentTemplateAddInput": [
+  {
+   "path": "s6926"
+  },
+  {
+   "path": "s6927"
+  }
+ ],
+ "SkillDeleteInput": [
+  {
+   "id": "s6928"
+  },
+  {
+   "id": "s6929"
+  }
+ ]
+}

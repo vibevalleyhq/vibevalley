@@ -11,7 +11,7 @@ import { prepareImages } from "./images";
 await prepareImages();
 
 const site = resolve(import.meta.dirname, "..");
-const pub = resolve(site, "../web/public");
+const pub = resolve(site, "../../assets");
 const out = resolve(site, "public/gen");
 mkdirSync(out, { recursive: true });
 

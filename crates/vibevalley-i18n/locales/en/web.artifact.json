@@ -1,0 +1,143 @@
+{
+  "place": {
+    "label": "Artifacts",
+    "hint": "What you, the helpers and the assistant leave to be read: pages written together and web pages handed in"
+  },
+  "card": {
+    "version": "Version {version}",
+    "open": "Open \"{title}\""
+  },
+  "page": {
+    "by": "Made by {name}",
+    "updated": "Updated {when}",
+    "versions": "Versions",
+    "delete": "Delete",
+    "deleteAsk": "Delete “{title}”? Its cards stay in the conversation.",
+    "deleted": "Deleted \"{title}\"",
+    "gone": "This artifact was deleted, or there is no such artifact.",
+    "frame": "\"{title}\" version {version}",
+    "list": "All artifacts",
+    "new": "New",
+    "none": "No artifacts yet: give one a title to start it, or have a helper hand one in.",
+    "all": "All artifacts",
+    "forIssue": "For #{number}",
+    "untitled": "Untitled",
+    "find": "Find by title",
+    "nothingFound": "No title matches",
+    "title": "Title",
+    "more": "More",
+    "group": {
+      "delivered": "Handed in by helpers",
+      "mine": "Written by you"
+    },
+    "rail": "Beside this artifact",
+    "railShow": "Show the side panel",
+    "railHide": "Hide the side panel"
+  },
+  "talk": {
+    "atMessage": "In the conversation",
+    "reply": "Reply",
+    "replyHint": "For the helper who made it: what to change",
+    "send": "Reply",
+    "sent": "Replied",
+    "replyVersion": "Reply to this version",
+    "sentVersion": "Replied to version {version}",
+    "none": "Not said in any conversation yet: you wrote this one and have not handed it to anyone."
+  },
+  "issue": {
+    "title": "Artifacts"
+  },
+  "blocks": {
+    "memoryItem": "Memory",
+    "saving": "Saving…",
+    "saved": "All saved",
+    "blocks": "{n, plural, one {# block} other {# blocks}}",
+    "helpersWriting": "helpers writing",
+    "demo": "Demo: several helpers writing at once",
+    "append": "Write a paragraph at the end",
+    "user": "You",
+    "done": "Done",
+    "notDone": "Not done",
+    "writing": "{who} is writing",
+    "wrote": "{who} wrote it",
+    "issue": "Ticket {id}",
+    "unknown": "This block is a \"{type}\", which this version cannot draw yet: it can be read, not changed",
+    "block": "Block {id}",
+    "heading": "Heading",
+    "notSaved": "Not saved: {why}",
+    "changed": "Someone else just changed this block",
+    "conflict": "{why}: what you wrote was not saved and stays in the revision",
+    "image": "Image: {alt} {src}",
+    "start": "Start writing here…"
+  },
+  "canvas": {
+    "label": "Open artifact",
+    "close": "Close",
+    "openPage": "Open its page",
+    "quote": "Speak about it"
+  },
+  "suggestions": {
+    "title": "Suggestions ({n})",
+    "by": "From {name}",
+    "rev": "on rev {rev}",
+    "stale": "The block changed since; this suggestion is stale",
+    "accept": "Accept",
+    "reject": "Dismiss",
+    "delete": "Delete this block",
+    "type": "Change to {type}",
+    "types": {
+      "paragraph": "paragraph",
+      "heading": "heading",
+      "bulleted": "bulleted list",
+      "numbered": "numbered list",
+      "todo": "todo",
+      "quote": "quote",
+      "code": "code",
+      "divider": "divider",
+      "image": "image",
+      "issueRef": "issue reference",
+      "memoryItem": "memory"
+    },
+    "attrLevel": "level",
+    "attrChecked": "checked",
+    "attrLanguage": "language",
+    "attrs": "Change attrs: {attrs}"
+  },
+  "body": {
+    "blocks": "Written together",
+    "html": "Web page",
+    "slides": "Slides",
+    "motion": "Motion"
+  },
+  "edit": {
+    "title": "Change words",
+    "hint": "Select words in the page to change them on the right",
+    "older": "This is an older version: go to the latest to change words",
+    "to": "Change to",
+    "save": "Save as a new version",
+    "saved": "Saved as version {version}"
+  },
+  "slides": {
+    "previous": "Previous slide",
+    "next": "Next slide",
+    "at": "{at} / {pages}",
+    "present": "Present full screen",
+    "presenter": "Presenter view",
+    "thumbnails": "Slides",
+    "slide": "Slide {at} {title}"
+  },
+  "presenter": {
+    "missing": "No deck named: open the presenter view from an artifact's controls.",
+    "current": "This slide",
+    "next": "Next slide",
+    "end": "This is the last slide",
+    "notes": "Notes",
+    "noNotes": "No notes on this slide",
+    "clock": "Time so far",
+    "restart": "Restart timer",
+    "aside": "Next slide and notes",
+    "waiting": "Waiting for the slide deck",
+    "empty": "This deck has no slides",
+    "loadFailure": "Could not load the slide deck: {reason}"
+  }
+}

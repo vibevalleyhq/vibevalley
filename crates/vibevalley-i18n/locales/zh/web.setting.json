@@ -1,0 +1,182 @@
+{
+  "language": {
+    "title": "语言",
+    "line": "界面上的字、助手和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
+    "zh": "中文",
+    "en": "English",
+    "label": "界面语言"
+  },
+  "keys": {
+    "deepseekHint": "sk-…（不改就空着）",
+    "saved": "存好了，马上就用上。"
+  },
+  "source": {
+    "off": "没接",
+    "on": "接上了",
+    "closed": "关着",
+    "configure": "配置 {label}",
+    "enabled": "启用",
+    "enable": "启用 {label}",
+    "noKey": "本机的不用 key",
+    "address": "{label} 的地址",
+    "key": "{label} 的 key",
+    "keyHint": "key（不用或不改就空着）",
+    "user": "{label} 的 user_id",
+    "userHint": "你在 EverOS 里的 user_id（空着用默认的那个）",
+    "read": "读",
+    "readHint": "开工想起、帮工翻记性时也问它",
+    "write": "写",
+    "writeHint": "记下的也送一份过去",
+    "everything": "读全部",
+    "everythingHint": "不只读 VibeValley 替帮工记的，你在里面的记忆每个帮工都读得到"
+  },
+  "github": {
+    "noGh": "没装 gh",
+    "note": "能提 PR 的仓库在「仓库」里看；完成时提 PR 要在配置里打开（github.pr_repos）。",
+    "recheck": "重新检测",
+    "cli": "gh 命令行",
+    "cliHint": "合并时开 PR、读仓库用它",
+    "login": "登录",
+    "loginHint": "gh auth login 登录的账号",
+    "notLoggedIn": "没登录"
+  },
+  "nav": {
+    "label": "设置的分区",
+    "search": "搜索设置…",
+    "general": "通用",
+    "appearance": "外观",
+    "about": "关于",
+    "memory": "记性",
+    "skills": "技能",
+    "call": "通话线路",
+    "dictation": "听写",
+    "chat": "聊天软件",
+    "width": "导航的宽窄（拖动，双击回默认）",
+    "accounts": "账号与钥匙"
+  },
+  "groups": {
+    "options": "选项",
+    "helpers": "帮工",
+    "voice": "语音",
+    "connect": "连接"
+  },
+  "words": {
+    "general": "语言 language 启动 打开 工作台 农场",
+    "appearance": "主题 深色 浅色 暗色 dark light 界面大小 缩放 字号",
+    "about": "版本 家目录 设置文件 version",
+    "memory": "Nowledge EverOS 记性 记忆",
+    "skills": "技能 skill",
+    "call": "声网 Agora 电话 识别 合成 谁接电话 区域",
+    "moss": "MOSS 试音 key 实时",
+    "dictation": "听写 转写 语音输入",
+    "github": "gh PR 登录",
+    "chat": "微信 飞书 QQ 连接器 配对",
+    "accounts": "钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型"
+  },
+  "scope": {
+    "farm": "对整个 VibeValley",
+    "device": "只对这台设备"
+  },
+  "general": {
+    "languageHint": "界面、助手和帮工说的话都用它",
+    "start": "启动时打开",
+    "startHint": "打开应用、或者打开首页时先进哪里",
+    "starts": {
+      "workbench": "工作台",
+      "farm": "农场"
+    }
+  },
+  "appearance": {
+    "intro": "只改工作台；农场、记忆树是画出来的，有自己的颜色和昼夜。",
+    "theme": "主题",
+    "themeHint": "跟随系统时随电脑的浅色和深色变",
+    "themes": {
+      "light": "浅色",
+      "dark": "深色",
+      "system": "跟随系统"
+    },
+    "scale": "界面大小",
+    "scaleHint": "缩放整个工作台；农场按整数倍放大，不跟着变"
+  },
+  "models": {
+    "deepseekHint": "助手和 VibeValley 自己的帮工用它"
+  },
+  "memory": {
+    "intro": "帮工还能去外面的记性里查、往里记。"
+  },
+  "about": {
+    "version": "版本",
+    "versionHint": "这台电脑上的服务端",
+    "files": "文件",
+    "home": "家目录",
+    "homeHint": "VibeValley 的一切都在这里",
+    "settings": "设置文件",
+    "settingsHint": "钥匙和这几页的设置",
+    "repos": "仓库目录",
+    "reposHint": "这个空间的仓库，每个文件夹都是一个 git 仓库",
+    "worktrees": "工作树目录",
+    "worktreesHint": "帮工干活时每张工单自己的检出",
+    "pkm": "笔记库",
+    "pkmHint": "这个空间的 PARA 目录和日记",
+    "copy": "复制路径",
+    "copied": "路径复制好了",
+    "reveal": "在访达里显示",
+    "update": "更新",
+    "updateHint": "桌面版从 GitHub 上的发布自己更新",
+    "upToDate": "已是最新",
+    "checking": "正在查有没有新版本…",
+    "downloading": "正在下载 {next}（{percent}%）",
+    "ready": "{next} 已下好，退出时装上",
+    "readyNewFarm": "{next} 已下好：它会从新的数据开始，旧的留在一边",
+    "manual": {
+      "diskImage": "{next} 要手动装：应用还在安装盘里运行，先拖进「应用程序」",
+      "translocated": "{next} 要手动装：macOS 把应用挪到了临时的地方运行，先拖进「应用程序」再打开",
+      "readOnly": "{next} 要手动装：应用所在的文件夹不能写",
+      "noBuild": "{next} 没有这台 Mac 的版本"
+    },
+    "failed": "没查成：{why}",
+    "check": "检查更新",
+    "restart": "重启更新",
+    "restartQuestion": "重启到新版本？",
+    "workingQuestion": "{n} 个帮工在干活，重启会打断它们。现在重启？",
+    "newFarmQuestion": "新版本从新的数据开始，旧的留在家目录里。现在重启？",
+    "download": "去下载",
+    "cli": "命令行",
+    "cliHint": "装上以后，在终端里用 {command} 读写这个农场，本机的 agent 也能用",
+    "cliReady": "在终端里用 {command}；本机的 agent 也能用它读写这个农场",
+    "cliNotOnPath": "已经装到 {link}，但 ~/.local/bin 不在 PATH 里：在 ~/.zshrc 里加一行 export PATH=\"$HOME/.local/bin:$PATH\"",
+    "cliTaken": "{link} 已经有别的文件，没有换掉：先挪开它再装",
+    "cliInstall": "安装",
+    "cliRemove": "移除"
+  },
+  "missing": {
+    "deepseekKey": "还没填 DeepSeek 的钥匙",
+    "mossAccount": "还没有 MOSS 账号",
+    "mossKey": "MOSS 账号还没填钥匙",
+    "mossOff": "用到的 MOSS 账号停用了",
+    "binding": "还没选用哪个账号和模型",
+    "agora": "还缺声网的凭据",
+    "dictationUrl": "还没填听写的地址"
+  },
+  "feature": {
+    "orchestrator": "助手",
+    "image": "生图",
+    "understanding": "媒体理解",
+    "speech": "单人语音",
+    "speakers": "多人语音",
+    "voiceDesign": "音色设计",
+    "transcription": "音频转写",
+    "dictation": "听写",
+    "live": "MOSS Live",
+    "vision": "实时视觉",
+    "call": "通话"
+  },
+  "readiness": {
+    "ready": "{feature}：可以用了",
+    "lacks": "{feature}：{why}",
+    "fix": "去设置"
+  },
+  "accounts": {
+    "intro": "所有供应商的账号和钥匙都在这里；每个账号能用哪些模型也在这里看。每个功能用哪个账号，在「用途」里选。"
+  }
+}

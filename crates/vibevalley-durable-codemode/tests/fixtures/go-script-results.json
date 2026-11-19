@@ -1,0 +1,101 @@
+[
+  {
+    "error": "",
+    "reason": "completed",
+    "result": {
+      "value": 3,
+      "executedSteps": 1,
+      "replayedCalls": 0,
+      "replayedSleeps": 0,
+      "virtualNowMs": 1750000000000
+    },
+    "script": "1+2"
+  },
+  {
+    "error": "",
+    "reason": "completed",
+    "result": {
+      "value": {
+        "r": 0.7415648787718233,
+        "t": "2025-06-15T15:06:40.000Z"
+      },
+      "executedSteps": 2,
+      "replayedCalls": 0,
+      "replayedSleeps": 0,
+      "virtualNowMs": 1750000000000
+    },
+    "script": "return {r:rand(),t:new Date().toISOString()}"
+  },
+  {
+    "error": "",
+    "reason": "completed",
+    "result": {
+      "value": 3,
+      "executedSteps": 6,
+      "replayedCalls": 1,
+      "replayedSleeps": 1,
+      "virtualNowMs": 1750000000000
+    },
+    "script": "const {nums}=call(\"echo\",{nums:[1,2]});sleep(0);return nums.reduce((sum,n)=>sum+n,0)"
+  },
+  {
+    "error": "",
+    "reason": "completed",
+    "result": {
+      "value": 3,
+      "executedSteps": 7,
+      "replayedCalls": 0,
+      "replayedSleeps": 0,
+      "virtualNowMs": 1750000000000
+    },
+    "script": "let x=0;for(let i=0;i<3;i++)x+=i\nreturn x"
+  },
+  {
+    "error": "",
+    "reason": "completed",
+    "result": {
+      "value": 11,
+      "executedSteps": 4,
+      "replayedCalls": 0,
+      "replayedSleeps": 0,
+      "virtualNowMs": 1750000000000
+    },
+    "script": "class A {get number() {return 11;}}; return new A().number"
+  },
+  {
+    "error": "",
+    "reason": "completed",
+    "result": {
+      "value": "ab",
+      "executedSteps": 6,
+      "replayedCalls": 0,
+      "replayedSleeps": 0,
+      "virtualNowMs": 1750000000000
+    },
+    "script": "let out=\"\";for(const a of [\"a\",\"b\"]){out+=a;}return out;"
+  },
+  {
+    "error": "",
+    "reason": "completed",
+    "result": {
+      "value": 3,
+      "executedSteps": 6,
+      "replayedCalls": 0,
+      "replayedSleeps": 0,
+      "virtualNowMs": 1750000000000
+    },
+    "script": "let i=0;while(i++<2); return i"
+  },
+  {
+    "error": "",
+    "reason": "completed",
+    "result": {
+      "value": 4,
+      "executedSteps": 4,
+      "replayedCalls": 0,
+      "replayedSleeps": 0,
+      "virtualNowMs": 1750000000000
+    },
+    "script": "return eval(\"let x=1;x+3\")"
+  }
+]

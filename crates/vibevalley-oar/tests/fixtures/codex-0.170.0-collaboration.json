@@ -1,0 +1,40 @@
+{
+  "capture": {
+    "cli": "codex-cli 0.170.0",
+    "features": {
+      "multi_agent_v2": true
+    },
+    "transport": "stdio",
+    "origin": "Isolated macOS app-server with scripted Responses on loopback, with credentials omitted and external connections denied.",
+    "reread": "Fresh app-server process with networking denied; thread/resume excluded turns before thread/read of known child ids.",
+    "redaction": "Preserves notification order and selected fields, substitutes thread/turn ids, omits disk paths, timestamps and token counts.",
+    "reproducer": "capture_codex_collaboration.py"
+  },
+  "notifications": [
+    {"method":"turn/started","params":{"threadId":"root-thread","turn":{"id":"root-turn","status":"inProgress","error":null}}},
+    {"method":"item/started","params":{"threadId":"root-thread","turnId":"root-turn","item":{"type":"subAgentActivity","kind":"started","id":"spawn_agent0","agentThreadId":"audit-thread","agentPath":"/root/audit"}}},
+    {"method":"item/completed","params":{"threadId":"root-thread","turnId":"root-turn","item":{"type":"subAgentActivity","kind":"started","id":"spawn_agent0","agentThreadId":"audit-thread","agentPath":"/root/audit"}}},
+    {"method":"turn/started","params":{"threadId":"audit-thread","turn":{"id":"audit-turn","status":"inProgress","error":null}}},
+    {"method":"item/started","params":{"threadId":"root-thread","turnId":"root-turn","item":{"type":"subAgentActivity","kind":"started","id":"spawn_agent1","agentThreadId":"verify-thread","agentPath":"/root/verify"}}},
+    {"method":"item/completed","params":{"threadId":"root-thread","turnId":"root-turn","item":{"type":"subAgentActivity","kind":"started","id":"spawn_agent1","agentThreadId":"verify-thread","agentPath":"/root/verify"}}},
+    {"method":"turn/started","params":{"threadId":"verify-thread","turn":{"id":"verify-turn","status":"inProgress","error":null}}},
+    {"method":"item/started","params":{"threadId":"audit-thread","turnId":"audit-turn","item":{"type":"agentMessage","id":"message_r_267123374779125","text":""}}},
+    {"method":"item/agentMessage/delta","params":{"threadId":"audit-thread","turnId":"audit-turn","delta":"Done.","itemId":"message_r_267123374779125"}},
+    {"method":"item/completed","params":{"threadId":"audit-thread","turnId":"audit-turn","item":{"type":"agentMessage","id":"message_r_267123374779125","text":"Done."}}},
+    {"method":"item/started","params":{"threadId":"root-thread","turnId":"root-turn","item":{"type":"collabAgentToolCall","id":"wait_agent0","tool":"wait","status":"inProgress","senderThreadId":"root-thread","receiverThreadIds":[],"prompt":null,"agentsStates":{}}}},
+    {"method":"error","params":{"threadId":"verify-thread","turnId":"verify-turn","error":{"message":"Fixture failure","codexErrorInfo":"other","additionalDetails":null,"misalignment":null},"willRetry":false}},
+    {"method":"item/started","params":{"threadId":"root-thread","turnId":"root-turn","item":{"type":"subAgentActivity","kind":"completed","id":"subagent-completed-audit-turn","agentThreadId":"audit-thread","agentPath":"/root/audit"}}},
+    {"method":"turn/completed","params":{"threadId":"audit-thread","turn":{"id":"audit-turn","status":"completed","error":null}}},
+    {"method":"turn/completed","params":{"threadId":"verify-thread","turn":{"id":"verify-turn","status":"failed","error":{"message":"Fixture failure","codexErrorInfo":"other","additionalDetails":null,"misalignment":null}}}},
+    {"method":"item/completed","params":{"threadId":"root-thread","turnId":"root-turn","item":{"type":"subAgentActivity","kind":"completed","id":"subagent-completed-audit-turn","agentThreadId":"audit-thread","agentPath":"/root/audit"}}},
+    {"method":"item/completed","params":{"threadId":"root-thread","turnId":"root-turn","item":{"type":"collabAgentToolCall","id":"wait_agent0","tool":"wait","status":"completed","senderThreadId":"root-thread","receiverThreadIds":[],"prompt":null,"agentsStates":{}}}},
+    {"method":"item/started","params":{"threadId":"root-thread","turnId":"root-turn","item":{"type":"agentMessage","id":"message_r_267123397331791","text":""}}},
+    {"method":"item/agentMessage/delta","params":{"threadId":"root-thread","turnId":"root-turn","delta":"Done.","itemId":"message_r_267123397331791"}},
+    {"method":"item/completed","params":{"threadId":"root-thread","turnId":"root-turn","item":{"type":"agentMessage","id":"message_r_267123397331791","text":"Done."}}},
+    {"method":"turn/completed","params":{"threadId":"root-thread","turn":{"id":"root-turn","status":"completed","error":null}}}
+  ],
+  "reads": [
+    {"thread":{"id":"audit-thread","parentThreadId":"root-thread","preview":"","source":{"subAgent":{"thread_spawn":{"parent_thread_id":"root-thread","depth":1,"agent_path":"/root/audit","agent_nickname":"Descartes","agent_role":null}}},"turns":[{"id":"audit-turn","status":"completed","error":null,"items":[{"type":"agentMessage","text":"Done."}]}]}},
+    {"thread":{"id":"verify-thread","parentThreadId":"root-thread","preview":"","source":{"subAgent":{"thread_spawn":{"parent_thread_id":"root-thread","depth":1,"agent_path":"/root/verify","agent_nickname":"Boyle","agent_role":null}}},"turns":[{"id":"verify-turn","status":"failed","error":{"message":"Fixture failure","codexErrorInfo":"other","additionalDetails":null,"misalignment":null},"items":[]}]}}
+  ]
+}

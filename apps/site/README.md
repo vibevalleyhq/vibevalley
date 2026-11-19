@@ -23,7 +23,7 @@ vp run site:deploy                                    # 构建，再发到 Cloud
 
 ## 素材
 
-不另存原图：场景素材来自 `apps/web/public/`，截图来自 `docs/images/`，摆放的数据在 `src/base/scene.ts`。
+不另存原图：场景素材来自 `assets/`，截图来自 `docs/images/`，摆放的数据在 `src/base/scene.ts`。
 
 - `scripts/images.ts` 读取 `scene.ts` 的 `SHOWN` 和时辰清单，用 Sharp 生成 WebP 与多尺寸截图；缺图、尺寸或清单就失败。
 - 转换后的图写到 `public/gen/images/`，路径和尺寸由同一步写入 `src/base/images.generated.json`；不要手改生成清单。
@@ -43,7 +43,7 @@ vp run site:deploy                                    # 构建，再发到 Cloud
 
 `test:production` 只访问正式构建的静态文件，覆盖三条路由的无脚本 HTML、初始 CSS、元信息、字体、接管前后的节点身份、截图对话框的焦点与退出、复制、时辰切换、离屏暂停、缩放后的滚动叙事和语言导航。普通动画桌面和减少动画手机各跑一遍，报告在 `.test/production/results.json`。
 
-`test:prerender` 构建独立回归页，验证接管前的输入值、屏幕内外的 DOM、条件子树、监听清理与跨文档导航，报告在 `.test/prerender/results.json`。`site:check` 检查预渲染的错误、重定向和不完整响应不会写出部分 HTML。
+`test:prerender` 构建独立回归页，验证接管前的输入值、屏幕内外的 DOM、条件子树、监听清理与跨文档导航，报告在 `.test/prerender/results.json`。`test` 检查预渲染的错误、重定向和不完整响应不会写出部分 HTML。
 
 ## 文字
 

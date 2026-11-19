@@ -1,69 +1,70 @@
 # VibeValley 自己的 agent
 
-助手、`vibevalley` 农机的帮工以及终端对话，均运行在平台原生的持久对话与调度引擎（`internal/durable`）之上：以 SQLite 与 `sqlc` 持久化每一轮对话、工具权限评估、预算与压缩；外部编码农机通过 `pkg/oar` 协议驱动，内部助手与托管帮工工具则由 `internal/domain/stack` 提供。
+助手和 `vibevalley` 农机的帮工跑在同一个自研的 agent 上：`crates/vibevalley-agent`。它替代了 TS 版从 pi-ai（DeepSeek 接入）和 pi-durable（循环、先落盘再显示、断点续跑、压缩）拿的东西，只接 DeepSeek（OpenAI 兼容的 chat completions），不做多厂商路由（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)「砍掉的」）。终端里也能经 `vibevalley chat` 直接和本机农机或助手对话。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 持久生成循环、会话队列调度、Token 预算、上下文压缩、权限门禁与代码执行沙箱（`internal/durable/`） | 模型名称选择与 Provider 密钥界面配置（[档案和农机](docs/subsystems/agent.md)、[设置和配置](docs/subsystems/setting.md)） |
-| 持久化后端（`internal/durable/store/`）：内存替身与 SQLite 事务存储 | 频道触发规则与派活队列（[助手](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
-| LLM SSE 流式路由与协议适配（`internal/provider/`）：Anthropic 与 OpenAI SSE 解析及路由 | 跨档案数据库记忆的存储与召回（[记性](docs/subsystems/memory.md)） |
-| 平台业务工具注册、提示拼接与助手调度（`internal/domain/stack/`） | 外部编码农机安装探测与 MCP 外壳细节（[档案和农机](docs/subsystems/agent.md)） |
+| 一个对话：模型客户端、工具、先落盘的转写（JSONL）、续跑、压缩 | 模型名称的选择和 DeepSeek 钥匙的存放（[档案和农机](docs/subsystems/agent.md)、[设置和配置](docs/subsystems/setting.md)） |
+| 工具的形状（`Tool`：JSON Schema 加执行，会改东西的不重放）、编码工具 | 农场的业务工具（`crates/vibevalley-server/src/modules/tool/`）、跨档案的数据库记忆（[记性](docs/subsystems/memory.md)） |
+| 技能按需加载、`MemoryPort`、MCP 客户端、自己的任务图、帮手（`spawn_agent`） | 输入什么时候送、一轮怎样记进会话（[助手](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `internal/durable/driver.go`、`generation.go`、`scheduler.go` | 持久驱动器、多轮流式生成、工具并行与并发调度 |
-| `internal/durable/budget.go`、`compaction.go`、`permission.go`、`grader.go`、`codemode.go` | 成本与 Token 预算、上下文压缩、工具权限门禁（`PermissionEvaluator` / `Park`）、评分器与 JS 代码执行器 |
-| `internal/durable/store/` | `store.go`、`sqlite.go`、`memory.go`、`tx.go`、`clock.go`（表与查询在 `pkg/db/migrations/0001_durable.up.sql`、`pkg/db/queries/durable.sql`） |
-| `internal/provider/` | `router.go`、`anthropic_sse.go`、`openai_sse.go`、`types.go` |
-| `internal/domain/stack/` | `orchestrator.go`、`tools.go`、`prompts.go`、`llm_adapter.go`、`dispatch.go`、`stack.go` |
-| `cmd/vibe/chat.go` | 终端 `vibe chat` 交互入口 |
+| `crates/vibevalley-agent/src/conversation.rs` | `Brain`（模型、系统提示、工具、压缩门槛）与 `Conversation`：`send`、`resume`（接着跑没跑完的一轮）、`compact`、`abort_handle`；转写的每一条 `Entry` 先追加进 JSONL 再显示 |
+| `crates/vibevalley-agent/src/model.rs` | 消息与 `ModelClient`；`OpenAiClient::deepseek` 读 DeepSeek 的流，含 `reasoning_content` 与 `reasoning_effort` |
+| `crates/vibevalley-agent/src/tool.rs` | `Tool`、`ToolOutput`；`coding_tools`：`read`、`write`、`edit`、`bash`（工作目录是帮工的） |
+| `crates/vibevalley-agent/src/kit.rs` | 技能（`default_skill_dirs`、`scan_skills`、`LoadSkill`）、记性（`MemoryPort`、`FileMemory`、`Remember`、`RewriteMemory`）、任务图（`todo_tools`）、帮手（`SpawnAgent`） |
+| `crates/vibevalley-agent/src/mcp.rs`、`mcp/client.rs` | 档案挂的 MCP 客户端。官方 Rust SDK 管标准输入输出和流式 HTTP，应用保留工具名、只读提示和结果文字。 |
+| `crates/vibevalley-agent/src/price.rs` | DeepSeek 的价目表，花费按它算 |
+| `crates/vibevalley-oar/src/vibevalley.rs` | `vibevalley` 农机：照 oar 的 `Runtime` 契约，一个会话一个对话（`<会话>.jsonl`），按会话 ID 找回 |
+| `crates/vibevalley-server/src/modules/orchestrator/mod.rs` | 助手：每个助手档案一个对话（`<home>/agent/<id>/conversation.jsonl`），带农场的工具 |
+| `crates/vibevalley-cli/src/commands/chat.rs` | `vibevalley chat`：在终端直接驱动本机农机（含 `vibevalley`），或加 `--orchestrator` 在 `#general` 和助手对话 |
+
+内置农机与助手均使用档案的 MCP 配置。一个连接上的工具共用会话和后台运行时。连接和请求限时 120 秒。用户叫停调用时，客户端取消在途请求。其他工具仍可使用该连接。最后一个工具和连接持有者释放后，SDK 关闭标准输入并回收子进程。[客户端](crates/vibevalley-agent/src/mcp/client.rs)
+
+助手按档案复用连接。同一轮生成和工具调用共用工具列表。档案变更后，下一次读取工具时使用新配置。`disallowedTools` 中的 MCP 工具不进入模型的工具列表，其他 MCP 工具仍由执行层判定权限。[档案连接](crates/vibevalley-server/src/modules/orchestrator/mcp.rs)
 
 ## 模型和不变量
 
-### 持久存储与显式阶段状态机（`internal/durable`）
+- **只接 DeepSeek**：模型是 `deepseek-flash`、`deepseek-v4-pro`；钥匙每次请求现取（设置里的优先）。帮工的 effort 原样发成 `reasoning_effort`，没有 effort 不开思考；回带工具调用的回答时带回 `reasoning_content`。
+- **先落盘再显示**：输入、每次回答、每个工具开跑（`ToolStarted`）和结果都先追加进转写。进程在一轮中间停掉，重开时 `resume` 接着跑完：只读的工具重跑，会改东西的工具不重放，模型读到它被打断。
+- **压缩**：一次请求的提示到 12 万 token（`compact_at`）先压缩：让模型写一段摘要，之前的条目在读回时由 `Compacted` 的摘要代替，这一轮的输入保留。
+- **两种宿主**：
 
-- **六张正交表与单一写者组提交（`internal/durable/store`）**：存储兼容内存后端与零 CGO `modernc.org/sqlite`（WAL + `synchronous=NORMAL`），收敛为 `durable_conversation`、`durable_entry`（只追加不可变账本，压缩和重置推进 `head_seq`）、`durable_document`（按 `(scope_kind, scope_id, doc_kind)` 存 `pi.agent`、`pi.live`、`pi.inbox`、`pi.usage`、`pi.governance`）、`durable_submission`（`UNIQUE(conversation_id, request_id)` 保障跨重启幂等）、`durable_task` 与 `durable_signal` 六张表。写路径经单一写协程执行批量组提交（上限 `64` 项），事务落盘后才更新内存文档与通知 `SubscribeDocuments` 观察者；仅 `pi.live` 流式输出允许 `deferred` 合批（`100 ms` 推内存视图、`1,000 ms` 合并落盘）。
-- **零空转阶段迁移与熔断**：休眠（`TransSleep`）与子任务汇合（`TransWaitTasks`，支持 `allSettled`、`failFast`、`any`）均落盘释放 Goroutine；早到信号在 `durable_signal` 持久缓存并单次消费。重启后未推进检查点的非模型任务递增 `restart_count`，达到 `restartLimit`（默认 `5` 次）即熔断并自底向上级联中止子任务。
-- **缓存亲和与四级压缩（`compaction.go`）**：透传固定 `provider_affinity`，工具或提示变化仅在尾部追加 `pi.system` 增量条目以保住前缀缓存，内置四级上下文压缩。
-- **`CodeMode` 确定性 JS 重放（`codemode.go`）**：内嵌纯 Go [`dop251/goja`](https://github.com/dop251/goja) 引擎并限制默认步数（`10,000`）、变量数（`256`）、内存（`16 MiB`）、输出（`1 MiB`）与 `5 s` 看门狗超时，锁定虚拟时钟与种子；脚本工具调用映射为带 `dedup_key` 的持久化子任务 `pi.codemode.tool`，崩溃重启可零耗时快进跳过已完成步骤。
+| 能力项 | 助手 | 帮工（`vibevalley` 农机） | 帮手（`spawn_agent`） |
+|---|---|---|---|
+| 农场业务工具 | `modules/tool` 给助手的那组 | 经 `/mcp` 挂的帮工工具 | 无 |
+| 编码工具 | 无 | `read`、`write`、`edit`、`bash` | 同帮工 |
+| 技能 | `<home>/agent/<id>/skills`（开机时放进内置的） | `~/.agents/skills`、`~/.claude/skills`、`<工作目录>/.agents/skills` | 无 |
+| 任务图 | 无 | 有 | 有 |
+| `spawn_agent` | 无 | 有 | 无（不嵌套） |
 
-### 模型路由与三大治理闭环
+- **技能按需加载**：提示里只列名字和 160 字以内的简介，`load_skill` 时才读正文。
+- **自己的任务**：`todo_add|update|list` 维护一张 DAG，加的时候全加或全不加。
 
-- **SSE 模型路由（`internal/provider/`）**：`Router` 封装 Anthropic 与 OpenAI（兼容 OpenAI / DeepSeek / 自定义端点）SSE 客户端，按显式供应商或模型前缀路由，密钥仅在请求边界注入。
-- **会话花费硬熔断（`budget.go`）**：`BudgetGate` 核算会话及派生子任务在 `pi.usage` 的累计花费；在发起新模型请求前检查 `maxCostMicros`，跨线后发出 `budget_reached` 告警并将任务转入 `sleeping`（保留工作目录租约），用户调高额度后投递 `budget.updated` 信号恢复执行。
-- **三态工具权限风控（`permission.go`）**：内置工具默认 `always_allow`，外部 MCP 工具默认 `always_ask`，支持按单工具覆写。`always_ask` 通过 `Park` 挂起并推送审批卡片至收件箱与灵动岛，由 `permission.decision` 信号唤醒；`auto` 模式经 `ExtractTrustedUserIntent` 严格只提取 `pi.user` 意图与工具参数（剔除 `pi.tool_result`、网页与 MCP 返回内容以阻断间接提示词注入），交 `RiskClassifier` 判定：`safe` 放行、`high_risk` 硬拒且禁止客户端绕过、`indeterminate` 降级为 `ask`。
-- **独立上下文验收裁判（`grader.go`）**：当会话配置验收标准 `RubricSpec` 时，`OutcomeGrader` 在 `pi.generation` 的 `onYield` 拦截点创建无任何写工具的只读独立裁判会话（仅传入任务描述、`RubricMarkdown` 与交付产物，隔离主会话推理路径），最多评估 `maxIterations`（默认 `3` 轮），返回 `needs_revision` 时将未达标项注入主会话返工。
+## 内置帮工怎样核对验收条件
 
-### 提示、恢复与去重
+内置帮工完成带验收条件的工单轮次时，服务端读取本轮交付物。服务端核对厂商会话、业务轮次和工单的归属。评审输入由工单标题、描述、验收条件、帮工汇报、该工单的 Git 改动和 Artifact 组成。交付证据最多 16,000 个字符，超出时附截断标记。独立评审会话只收到评审指令和这份输入，工具列表为空。[输入边界](crates/vibevalley-server/src/modules/orchestrator/execution.rs) · [评审阶段](crates/vibevalley-agent/src/generation/grading.rs)
 
-- 提示词分节组织于 `internal/domain/stack/prompts.go`，动态变化的环境现状随每轮输入注入，保持稳定的前置缓存前缀。
-- 每一轮输入、模型回答、工具调用与权限判决先行写入 SQLite（`pkg/db/migrations/0001_durable.up.sql`），服务重启或从异常停机恢复后按状态对账继续或结算，不重复计数与重放有副作用的操作。
+评审未通过时，缺项回到同一工作轮次。默认最多评审三次。通过后，工单沿用帮工的结构化汇报或最终答复。仍有缺项时，轮次记为失败，摘要包含评审原因。帮工明确提问或报告阻塞时，工单先等用户回答。普通对话、起草轮次和没有验收条件的工单沿用原有结算流程。人工审查和 Git 合并仍由工单板负责。[服务端回归](crates/vibevalley-server/tests/orchestrator/grading.rs)
 
-## 怎么走
-
-1. `internal/domain/stack` 将频道或用户提交写入持久对话并触发生成。
-2. `internal/durable/generation.go` 读取上下文与工具清单、请求模型流（`internal/provider`），对每次工具调用先经 `permission.go` 鉴权、再路由给 `internal/domain/stack/tools.go` 执行并落库。
-3. 回合事件向网关实时流广播，助手或托管帮工回复经频道写回对应话题串或私聊。
-
-## 和谁打交道
-
-- **工作台与 CLI**：工作台界面与终端 `cmd/vibe/chat.go` 对接同一个服务端对话与事件流模型。
-- **网关（`internal/domain/gateway`）**：处理错轮录入（`/api/v1/orchestrator/eval/create`）与模型连接事件推送。
+评审调用也受该会话的预算约束。服务端先保存当次证据，额度用完时暂停模型请求。上调额度后，帮工沿用原证据继续评审。在评审回复已落盘的轮次中，恢复时复用该次判定。[预算与恢复回归](crates/vibevalley-agent/src/generation/tests.rs)
 
 ## 为什么这样
 
-- **持久引擎与平台网关统一用纯 Go 实现**：消除 Node/TypeScript 运行时进程边界，以单库 SQLite 事务加内存替身覆盖会话恢复、权限阻塞与预算控制，支持桌面端零外部依赖单二进制分发。
-- **权限门禁内建进每轮生成循环**：确保审批与预算拦截在任何工具执行之前生效，而不是散落在各个工具实现中。
+- **自己写循环，不追 pi-durable**：要的只是先落盘、续跑、不重放会改东西的工具和压缩，几百行 Rust 就够；省掉 Node 运行时和上游版本的锁定。
+- **只接 DeepSeek**：农场默认的模型就是它；多厂商路由、价目表的完整语义没人用，砍掉。
 
 ## 还没做的
 
-- 按档案 `toolsets` 分配工具、统一技能发现并让助手也能加载技能：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
+- 按档案 `toolsets` 分配工具、助手也能加载技能：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 
 ## 怎么验证
 
-- `env -u GOROOT CGO_ENABLED=0 go test -count=1 -race ./internal/durable/... ./internal/provider/... ./internal/domain/stack/...`：持久生成、预算、压缩、权限停靠、SQLite 存储与 SSE 解析测试。
-- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./cmd/vibe/...`：终端聊天与命令行交互测试。
+- `crates/vibevalley-agent/src/tests.rs`：工具调用的一轮、转写经重开喂给下一轮、没跑完的一轮续跑且不重跑会改东西的工具、中断、压缩、DeepSeek 流的读法与请求体、价目、编码工具、技能、记性、任务图、帮手不被重放两次。
+- `crates/vibevalley-agent/tests/mcp.rs`：MCP 客户端。
+- `crates/vibevalley-server/tests/orchestrator.rs`：助手在测试农场上照脚本回答。

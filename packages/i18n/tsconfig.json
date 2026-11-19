@@ -1,5 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "lib": ["ES2024", "DOM", "DOM.Iterable"], "types": ["node"] },
-  "include": ["src", "test", "vite.config.ts"]
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "outDir": "dist"
+  },
+  "include": ["src", "test"]
 }

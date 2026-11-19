@@ -1,0 +1,707 @@
+[
+ {
+  "type": "sessionChanged",
+  "at": 1794500000000,
+  "session": {
+   "id": "w1",
+   "role": "worker",
+   "name": "Helper w1",
+   "agent": "lab",
+   "runtime": "claude",
+   "brief": "work on i1",
+   "repo": "demo",
+   "branch": "vibevalley/issue-1",
+   "worktree": "/tmp/worktrees/demo.1",
+   "hiredAt": 1794500000000,
+   "runs": 0,
+   "issue": "i1",
+   "refining": false,
+   "phase": {
+    "_tag": "working",
+    "since": 1794500000000,
+    "doing": {
+     "action": "run_command",
+     "label": "vp test"
+    }
+   }
+  }
+ },
+ {
+  "type": "sessionChanged",
+  "at": 1794500000000,
+  "session": {
+   "id": "w2",
+   "role": "worker",
+   "name": "Helper w2",
+   "agent": "lab",
+   "runtime": "claude",
+   "brief": "work on i2",
+   "repo": "demo",
+   "branch": "vibevalley/issue-2",
+   "worktree": "/tmp/worktrees/demo.2",
+   "hiredAt": 1794500000000,
+   "runs": 0,
+   "issue": "i2",
+   "refining": false,
+   "phase": {
+    "_tag": "resting"
+   }
+  }
+ },
+ {
+  "type": "sessionChanged",
+  "at": 1794500000000,
+  "session": {
+   "id": "w3",
+   "role": "worker",
+   "name": "Helper w3",
+   "agent": "lab",
+   "runtime": "claude",
+   "brief": "work on i3",
+   "repo": "demo",
+   "branch": "vibevalley/issue-3",
+   "worktree": "/tmp/worktrees/demo.3",
+   "hiredAt": 1794500000000,
+   "runs": 0,
+   "issue": "i3",
+   "refining": false,
+   "phase": {
+    "_tag": "resting"
+   }
+  }
+ },
+ {
+  "type": "sessionChanged",
+  "at": 1794500000000,
+  "session": {
+   "id": "w4",
+   "role": "worker",
+   "name": "Helper w4",
+   "agent": "lab",
+   "runtime": "claude",
+   "brief": "work on i4",
+   "repo": "demo",
+   "branch": "vibevalley/issue-4",
+   "worktree": "/tmp/worktrees/demo.4",
+   "hiredAt": 1794500000000,
+   "runs": 0,
+   "issue": "i4",
+   "refining": false,
+   "phase": {
+    "_tag": "resting"
+   }
+  }
+ },
+ {
+  "type": "sessionChanged",
+  "at": 1794500000000,
+  "session": {
+   "id": "w5",
+   "role": "worker",
+   "name": "Helper w5",
+   "agent": "lab",
+   "runtime": "claude",
+   "brief": "work on i5",
+   "repo": "demo",
+   "branch": "vibevalley/issue-5",
+   "worktree": "/tmp/worktrees/demo.5",
+   "hiredAt": 1794500000000,
+   "runs": 0,
+   "issue": "i5",
+   "refining": false,
+   "phase": {
+    "_tag": "working",
+    "since": 1794500000000,
+    "quietSince": 1794500300000,
+    "retry": {
+     "attempt": 1,
+     "of": 3
+    },
+    "doing": {
+     "action": "run_command",
+     "label": "vp test"
+    }
+   }
+  }
+ },
+ {
+  "type": "sessionChanged",
+  "at": 1794500000000,
+  "session": {
+   "id": "w6",
+   "role": "worker",
+   "name": "Helper w6",
+   "agent": "lab",
+   "runtime": "claude",
+   "brief": "work on i6",
+   "repo": "demo",
+   "branch": "vibevalley/issue-6",
+   "worktree": "/tmp/worktrees/demo.6",
+   "hiredAt": 1794500000000,
+   "runs": 0,
+   "issue": "i6",
+   "refining": false,
+   "phase": {
+    "_tag": "resting"
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "id": "i1",
+   "number": 1,
+   "title": "Issue 1",
+   "description": "Fix the login",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "assignments": [
+    {
+     "id": "a1",
+     "issue": "i1",
+     "agent": "lab",
+     "assignedAt": 1794499940000,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "w1",
+       "startedAt": 1794500000000
+      }
+     ]
+    }
+   ],
+   "priority": "high",
+   "createdAt": 1794497780000,
+   "blockedBy": [],
+   "status": "todo",
+   "moves": [],
+   "deliver": "change",
+   "findings": [],
+   "questions": [],
+   "criteria": [
+    "logs in"
+   ],
+   "checks": [],
+   "stage": {
+    "state": "queued",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "id": "i2",
+   "number": 2,
+   "title": "Issue 2",
+   "description": "",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "assignments": [
+    {
+     "id": "a2",
+     "issue": "i2",
+     "agent": "lab",
+     "assignedAt": 1794499880000,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "w2",
+       "startedAt": 1794500000000
+      }
+     ]
+    }
+   ],
+   "priority": "medium",
+   "createdAt": 1794495560000,
+   "blockedBy": [],
+   "status": "todo",
+   "moves": [],
+   "deliver": "change",
+   "findings": [],
+   "questions": [
+    {
+     "question": "Which port?",
+     "options": [
+      "8080",
+      "9090"
+     ]
+    }
+   ],
+   "criteria": [],
+   "checks": [],
+   "stage": {
+    "state": "queued",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "id": "i3",
+   "number": 3,
+   "title": "Issue 3",
+   "description": "",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "conflict": {
+    "base": "main",
+    "files": [
+     "a.ts"
+    ]
+   },
+   "assignments": [
+    {
+     "id": "a3",
+     "issue": "i3",
+     "agent": "lab",
+     "assignedAt": 1794499820000,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "w3",
+       "startedAt": 1794500000000
+      }
+     ]
+    }
+   ],
+   "priority": "high",
+   "createdAt": 1794493340000,
+   "blockedBy": [],
+   "status": "todo",
+   "moves": [],
+   "deliver": "change",
+   "findings": [],
+   "questions": [],
+   "criteria": [],
+   "checks": [],
+   "stage": {
+    "state": "queued",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "id": "i4",
+   "number": 4,
+   "title": "Issue 4",
+   "description": "",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "assignments": [
+    {
+     "id": "a4",
+     "issue": "i4",
+     "agent": "lab",
+     "assignedAt": 1794499760000,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "w4",
+       "startedAt": 1794500000000
+      }
+     ]
+    }
+   ],
+   "priority": "medium",
+   "createdAt": 1794491120000,
+   "blockedBy": [],
+   "status": "todo",
+   "moves": [],
+   "deliver": "answer",
+   "findings": [],
+   "questions": [],
+   "criteria": [],
+   "checks": [],
+   "stage": {
+    "state": "queued",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "id": "i5",
+   "number": 5,
+   "title": "Issue 5",
+   "description": "",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "repo": "demo",
+   "assignments": [
+    {
+     "id": "a5",
+     "issue": "i5",
+     "agent": "lab",
+     "assignedAt": 1794499700000,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "w5",
+       "startedAt": 1794500000000
+      }
+     ]
+    }
+   ],
+   "priority": "high",
+   "createdAt": 1794488900000,
+   "blockedBy": [],
+   "status": "todo",
+   "moves": [],
+   "deliver": "change",
+   "findings": [],
+   "questions": [],
+   "criteria": [],
+   "checks": [],
+   "stage": {
+    "state": "queued",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "constraints": {
+    "check": "sh check.sh",
+    "scope": [
+     "check.sh"
+    ],
+    "acceptance": true,
+    "frozen": []
+   },
+   "id": "i6",
+   "number": 6,
+   "title": "Issue 6",
+   "description": "",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "assignments": [
+    {
+     "id": "a6",
+     "issue": "i6",
+     "agent": "lab",
+     "assignedAt": 1794499640000,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "w6",
+       "startedAt": 1794500000000
+      }
+     ]
+    }
+   ],
+   "priority": "medium",
+   "createdAt": 1794486680000,
+   "blockedBy": [],
+   "status": "todo",
+   "moves": [],
+   "deliver": "change",
+   "findings": [],
+   "questions": [],
+   "criteria": [],
+   "checks": [],
+   "stage": {
+    "state": "queued",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "id": "i7",
+   "number": 7,
+   "title": "Issue 7",
+   "description": "",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "assignments": [
+    {
+     "id": "a7",
+     "issue": "i7",
+     "agent": "lab",
+     "assignedAt": 1794499580000,
+     "executions": []
+    }
+   ],
+   "priority": "high",
+   "rank": 1024,
+   "createdAt": 1794484460000,
+   "blockedBy": [],
+   "status": "backlog",
+   "moves": [],
+   "deliver": "change",
+   "findings": [],
+   "questions": [],
+   "criteria": [],
+   "checks": [],
+   "stage": {
+    "state": "draft",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "id": "i8",
+   "number": 8,
+   "title": "Issue 8",
+   "description": "",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "assignments": [
+    {
+     "id": "a8",
+     "issue": "i8",
+     "agent": "lab",
+     "assignedAt": 1794499520000,
+     "executions": []
+    }
+   ],
+   "priority": "medium",
+   "createdAt": 1794482240000,
+   "queuedAt": 1794500000000,
+   "blockedBy": [],
+   "status": "todo",
+   "moves": [],
+   "deliver": "change",
+   "findings": [],
+   "questions": [],
+   "criteria": [],
+   "checks": [],
+   "stage": {
+    "state": "queued",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "id": "i9",
+   "number": 9,
+   "title": "Issue 9",
+   "description": "",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "assignments": [
+    {
+     "id": "a9",
+     "issue": "i9",
+     "agent": "lab",
+     "assignedAt": 1794499460000,
+     "executions": []
+    }
+   ],
+   "priority": "high",
+   "createdAt": 1794480020000,
+   "closedAt": 1794500000000,
+   "delivered": "merged",
+   "blockedBy": [],
+   "status": "done",
+   "moves": [],
+   "deliver": "change",
+   "findings": [],
+   "questions": [],
+   "criteria": [],
+   "checks": [],
+   "stage": {
+    "state": "done",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "id": "i10",
+   "number": 10,
+   "title": "Issue 10",
+   "description": "",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "assignments": [
+    {
+     "id": "a10",
+     "issue": "i10",
+     "agent": "lab",
+     "assignedAt": 1794499400000,
+     "executions": []
+    }
+   ],
+   "priority": "medium",
+   "createdAt": 1794477800000,
+   "closedAt": 1794500000000,
+   "canceled": "dismissed",
+   "blockedBy": [],
+   "status": "canceled",
+   "moves": [],
+   "deliver": "change",
+   "findings": [],
+   "questions": [],
+   "criteria": [],
+   "checks": [],
+   "stage": {
+    "state": "canceled",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "issueChanged",
+  "at": 1794500000000,
+  "issue": {
+   "id": "i11",
+   "number": 11,
+   "title": "Issue 11",
+   "description": "",
+   "mandate": {
+    "strength": "explicit",
+    "maxBotReviewRounds": 3,
+    "autoSubmitPr": false
+   },
+   "assignments": [
+    {
+     "id": "a11",
+     "issue": "i11",
+     "agent": "lab",
+     "assignedAt": 1794499340000,
+     "executions": []
+    }
+   ],
+   "priority": "high",
+   "createdAt": 1794475580000,
+   "blockedBy": [],
+   "status": "todo",
+   "moves": [],
+   "deliver": "change",
+   "findings": [],
+   "questions": [],
+   "criteria": [],
+   "checks": [],
+   "lastRun": {
+    "startedAt": 1794500000000,
+    "endedAt": 1794500060000,
+    "outcome": "completed"
+   },
+   "stage": {
+    "state": "queued",
+    "acts": []
+   }
+  }
+ },
+ {
+  "type": "sessionReported",
+  "at": 1794500120000,
+  "id": "w2",
+  "outcome": "completed",
+  "summary": "Asked about the port",
+  "runs": 1,
+  "questions": [
+   {
+    "question": "Which port?",
+    "options": [
+     "8080",
+     "9090"
+    ]
+   }
+  ],
+  "checks": []
+ },
+ {
+  "type": "sessionReported",
+  "at": 1794500180000,
+  "id": "w3",
+  "outcome": "completed",
+  "summary": "Done; conflicts",
+  "runs": 1,
+  "questions": [],
+  "checks": []
+ },
+ {
+  "type": "sessionReported",
+  "at": 1794500240000,
+  "id": "w4",
+  "outcome": "completed",
+  "summary": "Found it",
+  "runs": 2,
+  "spent": {
+   "tokens": 1200,
+   "cny": 0.37
+  },
+  "questions": [],
+  "checks": [
+   {
+    "criterion": 0,
+    "result": "met",
+    "proof": "ran it"
+   }
+  ],
+  "answer": {
+   "conclusion": "It is 42.",
+   "evidence": [
+    "a.ts:1"
+   ],
+   "unsure": [],
+   "next": [
+    "ship"
+   ]
+  }
+ },
+ {
+  "type": "sessionReported",
+  "at": 1794500300000,
+  "id": "w6",
+  "outcome": "failed",
+  "summary": "Build broke",
+  "runs": 1,
+  "questions": [],
+  "checks": []
+ }
+]

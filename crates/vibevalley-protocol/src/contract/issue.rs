@@ -1,0 +1,1287 @@
+#![allow(clippy::large_enum_variant, clippy::enum_variant_names)]
+
+#[allow(unused_imports)]
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
+#[cfg(feature = "ts-gen")]
+use ts_rs::TS;
+
+#[allow(unused_imports)]
+use super::*;
+#[allow(unused_imports)]
+use crate::wire::*;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum Landing {
+    #[serde(rename = "merged")]
+    Merged,
+    #[serde(rename = "merged_into_parent")]
+    MergedIntoParent,
+    #[serde(rename = "pull_request")]
+    PullRequest,
+    #[serde(rename = "submitted")]
+    Submitted,
+    #[serde(rename = "kept")]
+    Kept,
+    #[serde(rename = "none")]
+    None,
+}
+
+impl Landing {
+    pub const ALL: [Landing; 6] = [
+        Landing::Merged,
+        Landing::MergedIntoParent,
+        Landing::PullRequest,
+        Landing::Submitted,
+        Landing::Kept,
+        Landing::None,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Landing::Merged => "merged",
+            Landing::MergedIntoParent => "merged_into_parent",
+            Landing::PullRequest => "pull_request",
+            Landing::Submitted => "submitted",
+            Landing::Kept => "kept",
+            Landing::None => "none",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum IssueCanceled {
+    #[serde(rename = "dismissed")]
+    Dismissed,
+    #[serde(rename = "lost")]
+    Lost,
+}
+
+impl IssueCanceled {
+    pub const ALL: [IssueCanceled; 2] = [IssueCanceled::Dismissed, IssueCanceled::Lost];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IssueCanceled::Dismissed => "dismissed",
+            IssueCanceled::Lost => "lost",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum Priority {
+    #[serde(rename = "urgent")]
+    Urgent,
+    #[serde(rename = "high")]
+    High,
+    #[serde(rename = "medium")]
+    Medium,
+    #[serde(rename = "low")]
+    Low,
+}
+
+impl Priority {
+    pub const ALL: [Priority; 4] = [Priority::Urgent, Priority::High, Priority::Medium, Priority::Low];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Priority::Urgent => "urgent",
+            Priority::High => "high",
+            Priority::Medium => "medium",
+            Priority::Low => "low",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum IssueStatus {
+    #[serde(rename = "backlog")]
+    Backlog,
+    #[serde(rename = "todo")]
+    Todo,
+    #[serde(rename = "in_progress")]
+    InProgress,
+    #[serde(rename = "in_review")]
+    InReview,
+    #[serde(rename = "done")]
+    Done,
+    #[serde(rename = "canceled")]
+    Canceled,
+}
+
+impl IssueStatus {
+    pub const ALL: [IssueStatus; 6] = [
+        IssueStatus::Backlog,
+        IssueStatus::Todo,
+        IssueStatus::InProgress,
+        IssueStatus::InReview,
+        IssueStatus::Done,
+        IssueStatus::Canceled,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IssueStatus::Backlog => "backlog",
+            IssueStatus::Todo => "todo",
+            IssueStatus::InProgress => "in_progress",
+            IssueStatus::InReview => "in_review",
+            IssueStatus::Done => "done",
+            IssueStatus::Canceled => "canceled",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum PullRequestState {
+    #[serde(rename = "open")]
+    Open,
+    #[serde(rename = "merged")]
+    Merged,
+    #[serde(rename = "closed")]
+    Closed,
+}
+
+impl PullRequestState {
+    pub const ALL: [PullRequestState; 3] = [PullRequestState::Open, PullRequestState::Merged, PullRequestState::Closed];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PullRequestState::Open => "open",
+            PullRequestState::Merged => "merged",
+            PullRequestState::Closed => "closed",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequest {
+    pub url: String,
+    pub number: i64,
+    pub state: PullRequestState,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct Finding {
+    pub id: String,
+    pub text: String,
+    pub at: i64,
+    pub resolved: bool,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueRefining {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+    pub session: SessionId,
+    pub name: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct Question {
+    pub question: String,
+    pub options: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum CheckResult {
+    #[serde(rename = "met")]
+    Met,
+    #[serde(rename = "unmet")]
+    Unmet,
+    #[serde(rename = "unsure")]
+    Unsure,
+}
+
+impl CheckResult {
+    pub const ALL: [CheckResult; 3] = [CheckResult::Met, CheckResult::Unmet, CheckResult::Unsure];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CheckResult::Met => "met",
+            CheckResult::Unmet => "unmet",
+            CheckResult::Unsure => "unsure",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct CriterionCheck {
+    /// 0-based index into `Issue.criteria`.
+    pub criterion: i64,
+    pub result: CheckResult,
+    pub proof: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum IssueStageKind {
+    #[serde(rename = "draft")]
+    Draft,
+    #[serde(rename = "queued")]
+    Queued,
+    #[serde(rename = "working")]
+    Working,
+    #[serde(rename = "asking")]
+    Asking,
+    #[serde(rename = "reviewing")]
+    Reviewing,
+    #[serde(rename = "stuck")]
+    Stuck,
+    #[serde(rename = "done")]
+    Done,
+    #[serde(rename = "canceled")]
+    Canceled,
+}
+
+impl IssueStageKind {
+    pub const ALL: [IssueStageKind; 8] = [
+        IssueStageKind::Draft,
+        IssueStageKind::Queued,
+        IssueStageKind::Working,
+        IssueStageKind::Asking,
+        IssueStageKind::Reviewing,
+        IssueStageKind::Stuck,
+        IssueStageKind::Done,
+        IssueStageKind::Canceled,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IssueStageKind::Draft => "draft",
+            IssueStageKind::Queued => "queued",
+            IssueStageKind::Working => "working",
+            IssueStageKind::Asking => "asking",
+            IssueStageKind::Reviewing => "reviewing",
+            IssueStageKind::Stuck => "stuck",
+            IssueStageKind::Done => "done",
+            IssueStageKind::Canceled => "canceled",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum StuckReason {
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "conflict")]
+    Conflict,
+    #[serde(rename = "interrupted")]
+    Interrupted,
+    #[serde(rename = "quiet")]
+    Quiet,
+}
+
+impl StuckReason {
+    pub const ALL: [StuckReason; 4] = [StuckReason::Failed, StuckReason::Conflict, StuckReason::Interrupted, StuckReason::Quiet];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            StuckReason::Failed => "failed",
+            StuckReason::Conflict => "conflict",
+            StuckReason::Interrupted => "interrupted",
+            StuckReason::Quiet => "quiet",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum IssueAct {
+    #[serde(rename = "start")]
+    Start,
+    #[serde(rename = "answer")]
+    Answer,
+    #[serde(rename = "reject")]
+    Reject,
+    #[serde(rename = "complete")]
+    Complete,
+    #[serde(rename = "acknowledge")]
+    Acknowledge,
+    #[serde(rename = "resolve")]
+    Resolve,
+    #[serde(rename = "resume")]
+    Resume,
+    #[serde(rename = "cure")]
+    Cure,
+    #[serde(rename = "tell")]
+    Tell,
+    #[serde(rename = "stop")]
+    Stop,
+    #[serde(rename = "close")]
+    Close,
+    #[serde(rename = "reopen")]
+    Reopen,
+}
+
+impl IssueAct {
+    pub const ALL: [IssueAct; 12] = [
+        IssueAct::Start,
+        IssueAct::Answer,
+        IssueAct::Reject,
+        IssueAct::Complete,
+        IssueAct::Acknowledge,
+        IssueAct::Resolve,
+        IssueAct::Resume,
+        IssueAct::Cure,
+        IssueAct::Tell,
+        IssueAct::Stop,
+        IssueAct::Close,
+        IssueAct::Reopen,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IssueAct::Start => "start",
+            IssueAct::Answer => "answer",
+            IssueAct::Reject => "reject",
+            IssueAct::Complete => "complete",
+            IssueAct::Acknowledge => "acknowledge",
+            IssueAct::Resolve => "resolve",
+            IssueAct::Resume => "resume",
+            IssueAct::Cure => "cure",
+            IssueAct::Tell => "tell",
+            IssueAct::Stop => "stop",
+            IssueAct::Close => "close",
+            IssueAct::Reopen => "reopen",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum ActWords {
+    #[serde(rename = "none")]
+    None,
+    #[serde(rename = "optional")]
+    Optional,
+    #[serde(rename = "required")]
+    Required,
+}
+
+impl ActWords {
+    pub const ALL: [ActWords; 3] = [ActWords::None, ActWords::Optional, ActWords::Required];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ActWords::None => "none",
+            ActWords::Optional => "optional",
+            ActWords::Required => "required",
+        }
+    }
+}
+
+/// `move` dispatches `issue.status.update`, `say` dispatches `issue.comment.create`, `stop` dispatches `session.stop`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "does")]
+pub enum IssueAction {
+    #[serde(rename = "move", rename_all = "camelCase")]
+    Move { act: IssueAct, status: IssueStatus, words: ActWords },
+    #[serde(rename = "say", rename_all = "camelCase")]
+    Say { act: IssueAct },
+    #[serde(rename = "stop", rename_all = "camelCase")]
+    Stop { act: IssueAct },
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueStage {
+    pub state: IssueStageKind,
+    pub since: Option<i64>,
+    pub stuck: Option<StuckReason>,
+    /// Primary action highlighted for the user, if any.
+    pub lead: Option<IssueAct>,
+    pub acts: Vec<IssueAction>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum MilestoneKind {
+    #[serde(rename = "opened")]
+    Opened,
+    #[serde(rename = "refined")]
+    Refined,
+    #[serde(rename = "started")]
+    Started,
+    #[serde(rename = "reported")]
+    Reported,
+    #[serde(rename = "asked")]
+    Asked,
+    #[serde(rename = "told")]
+    Told,
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "stopped")]
+    Stopped,
+    #[serde(rename = "rejected")]
+    Rejected,
+    #[serde(rename = "accepted")]
+    Accepted,
+    #[serde(rename = "closed")]
+    Closed,
+}
+
+impl MilestoneKind {
+    pub const ALL: [MilestoneKind; 11] = [
+        MilestoneKind::Opened,
+        MilestoneKind::Refined,
+        MilestoneKind::Started,
+        MilestoneKind::Reported,
+        MilestoneKind::Asked,
+        MilestoneKind::Told,
+        MilestoneKind::Failed,
+        MilestoneKind::Stopped,
+        MilestoneKind::Rejected,
+        MilestoneKind::Accepted,
+        MilestoneKind::Closed,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MilestoneKind::Opened => "opened",
+            MilestoneKind::Refined => "refined",
+            MilestoneKind::Started => "started",
+            MilestoneKind::Reported => "reported",
+            MilestoneKind::Asked => "asked",
+            MilestoneKind::Told => "told",
+            MilestoneKind::Failed => "failed",
+            MilestoneKind::Stopped => "stopped",
+            MilestoneKind::Rejected => "rejected",
+            MilestoneKind::Accepted => "accepted",
+            MilestoneKind::Closed => "closed",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct Milestone {
+    pub at: i64,
+    pub kind: MilestoneKind,
+    /// Session name; absent for user or system milestones.
+    pub who: Option<String>,
+    pub text: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueTimeline {
+    pub milestones: Vec<Milestone>,
+    pub spent: Option<Spent>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum Deliverable {
+    #[serde(rename = "change")]
+    Change,
+    #[serde(rename = "branch")]
+    Branch,
+    #[serde(rename = "answer")]
+    Answer,
+    #[serde(rename = "pull_request")]
+    PullRequest,
+}
+
+impl Deliverable {
+    pub const ALL: [Deliverable; 4] = [Deliverable::Change, Deliverable::Branch, Deliverable::Answer, Deliverable::PullRequest];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Deliverable::Change => "change",
+            Deliverable::Branch => "branch",
+            Deliverable::Answer => "answer",
+            Deliverable::PullRequest => "pull_request",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "kind")]
+pub enum Execution {
+    #[serde(rename = "worker", rename_all = "camelCase")]
+    Worker {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+        session: SessionId,
+        started_at: i64,
+    },
+    #[serde(rename = "orchestrator", rename_all = "camelCase")]
+    Orchestrator { session: String, started_at: i64 },
+}
+
+/// Retained across execution contexts and ended only by reassignment or unassignment.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct Assignment {
+    pub id: String,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub issue: IssueId,
+    pub agent: String,
+    pub assigned_at: i64,
+    pub ended_at: Option<i64>,
+    pub executions: Vec<Execution>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum MandateStrength {
+    #[serde(rename = "explicit")]
+    Explicit,
+    #[serde(rename = "inferred")]
+    Inferred,
+}
+
+impl MandateStrength {
+    pub const ALL: [MandateStrength; 2] = [MandateStrength::Explicit, MandateStrength::Inferred];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MandateStrength::Explicit => "explicit",
+            MandateStrength::Inferred => "inferred",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueMandate {
+    pub origin_trigger_id: Option<String>,
+    pub strength: MandateStrength,
+    pub max_bot_review_rounds: i64,
+    pub auto_submit_pr: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum IssueReportMemoryScope {
+    #[serde(rename = "repo")]
+    Repo,
+    #[serde(rename = "all")]
+    All,
+}
+
+impl IssueReportMemoryScope {
+    pub const ALL: [IssueReportMemoryScope; 2] = [IssueReportMemoryScope::Repo, IssueReportMemoryScope::All];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IssueReportMemoryScope::Repo => "repo",
+            IssueReportMemoryScope::All => "all",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueReportMemory {
+    pub text: String,
+    pub scope: IssueReportMemoryScope,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueReport {
+    pub summary: String,
+    pub questions: Vec<Question>,
+    pub checks: Vec<CriterionCheck>,
+    pub remember: Vec<IssueReportMemory>,
+    pub pr_submit: bool,
+    pub answer: Option<IssueAnswer>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueConstraints {
+    pub check: Option<String>,
+    pub scope: Vec<String>,
+    pub acceptance: bool,
+    pub frozen: Vec<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueLastRun {
+    pub started_at: i64,
+    pub ended_at: Option<i64>,
+    pub outcome: Option<Outcome>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct CodeReview {
+    pub at: i64,
+    pub revision: ReviewRevision,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectCheckStatus {
+    Passed,
+    Failed,
+    NotConfigured,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectCheckReceipt {
+    pub target_branch: String,
+    pub target_commit: String,
+    pub source_tree: String,
+    pub candidate_commit: String,
+    pub candidate_tree: String,
+    pub status: ProjectCheckStatus,
+    pub command: Option<String>,
+    pub output: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DeliveryEvidence {
+    pub reviews: Vec<CodeReview>,
+    pub check: Option<ProjectCheckReceipt>,
+    pub merged_commit: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct Issue {
+    pub constraints: Option<IssueConstraints>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub id: IssueId,
+    pub number: i64,
+    pub title: String,
+    pub description: String,
+    pub mandate: IssueMandate,
+    pub conflict: Option<Conflict>,
+    pub repo: Option<String>,
+    pub assignments: Vec<Assignment>,
+    pub priority: Priority,
+    pub rank: Option<i64>,
+    pub created_at: i64,
+    pub queued_at: Option<i64>,
+    pub closed_at: Option<i64>,
+    pub delivered: Option<Landing>,
+    pub canceled: Option<IssueCanceled>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
+    pub parent: Option<IssueId>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Vec<crate::typescript::IssueId>"))]
+    pub blocked_by: Vec<IssueId>,
+    pub cron: Option<String>,
+    pub status: IssueStatus,
+    pub moves: Vec<IssueStatus>,
+    pub pull_request: Option<PullRequest>,
+    pub deliver: Deliverable,
+    pub reviewed_at: Option<i64>,
+    pub delivery_evidence: Option<DeliveryEvidence>,
+    pub findings: Vec<Finding>,
+    pub questions: Vec<Question>,
+    pub criteria: Vec<String>,
+    pub checks: Vec<CriterionCheck>,
+    pub refining: Option<IssueRefining>,
+    /// Tracks runs executed without a worker session (e.g. in-process orchestrator); active while `endedAt` is absent.
+    pub last_run: Option<IssueLastRun>,
+    pub answer: Option<IssueAnswer>,
+    pub stage: IssueStage,
+}
+
+/// Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct AppliedIssue {
+    pub constraints: Option<IssueConstraints>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub id: IssueId,
+    pub number: i64,
+    pub title: String,
+    pub description: String,
+    pub mandate: IssueMandate,
+    pub conflict: Option<Conflict>,
+    pub repo: Option<String>,
+    pub assignments: Vec<Assignment>,
+    pub priority: Priority,
+    pub rank: Option<i64>,
+    pub created_at: i64,
+    pub queued_at: Option<i64>,
+    pub closed_at: Option<i64>,
+    pub delivered: Option<Landing>,
+    pub canceled: Option<IssueCanceled>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
+    pub parent: Option<IssueId>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Vec<crate::typescript::IssueId>"))]
+    pub blocked_by: Vec<IssueId>,
+    pub cron: Option<String>,
+    pub status: IssueStatus,
+    pub moves: Vec<IssueStatus>,
+    pub pull_request: Option<PullRequest>,
+    pub deliver: Deliverable,
+    pub reviewed_at: Option<i64>,
+    pub delivery_evidence: Option<DeliveryEvidence>,
+    pub findings: Vec<Finding>,
+    pub questions: Vec<Question>,
+    pub criteria: Vec<String>,
+    pub checks: Vec<CriterionCheck>,
+    pub refining: Option<IssueRefining>,
+    pub last_run: Option<IssueLastRun>,
+    pub answer: Option<IssueAnswer>,
+    pub stage: IssueStage,
+    pub seq: i64,
+}
+
+impl AppliedIssue {
+    pub fn from_issue(issue: Issue, seq: i64) -> Self {
+        Self {
+            constraints: issue.constraints,
+            id: issue.id,
+            number: issue.number,
+            title: issue.title,
+            description: issue.description,
+            mandate: issue.mandate,
+            conflict: issue.conflict,
+            repo: issue.repo,
+            assignments: issue.assignments,
+            priority: issue.priority,
+            rank: issue.rank,
+            created_at: issue.created_at,
+            queued_at: issue.queued_at,
+            closed_at: issue.closed_at,
+            delivered: issue.delivered,
+            canceled: issue.canceled,
+            parent: issue.parent,
+            blocked_by: issue.blocked_by,
+            cron: issue.cron,
+            status: issue.status,
+            moves: issue.moves,
+            pull_request: issue.pull_request,
+            deliver: issue.deliver,
+            reviewed_at: issue.reviewed_at,
+            delivery_evidence: issue.delivery_evidence,
+            findings: issue.findings,
+            questions: issue.questions,
+            criteria: issue.criteria,
+            checks: issue.checks,
+            refining: issue.refining,
+            last_run: issue.last_run,
+            answer: issue.answer,
+            stage: issue.stage,
+            seq,
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueUpdate {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub repo: Option<String>,
+    pub agent: Option<String>,
+    pub priority: Option<Priority>,
+    pub criteria: Option<Vec<String>>,
+    pub deliver: Option<Deliverable>,
+    /// Board placement before this issue id; "" places it last. Valid only before dispatch.
+    pub before: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueHistory {
+    pub issue: Issue,
+    pub sessions: Vec<Session>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Vec<crate::typescript::SessionId>"))]
+    pub missing_sessions: Vec<SessionId>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueRefineRequest {
+    pub text: Option<String>,
+    /// Unsaved field edits applied atomically before refining starts.
+    pub edit: Option<IssueUpdate>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueRequest {
+    pub constraints: Option<IssueConstraints>,
+    pub title: String,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
+    pub parent: Option<IssueId>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<crate::typescript::IssueId>>"))]
+    pub blocked_by: Option<Vec<IssueId>>,
+    pub description: Option<String>,
+    pub repo: Option<String>,
+    pub agent: Option<String>,
+    pub priority: Option<Priority>,
+    pub deliver: Option<Deliverable>,
+    pub auto_submit_pr: Option<bool>,
+    pub criteria: Option<Vec<String>>,
+    /// Idempotency key deduplicating retries after a lost response.
+    pub request_key: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct CommentRequest {
+    pub text: String,
+    pub send_key: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueReviewRequest {
+    pub revision: Option<ReviewRevision>,
+    pub pass: bool,
+    pub findings: Option<Vec<String>>,
+    pub text: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueFilter {
+    /// Includes closed issues when set to `done` or `canceled`.
+    pub status: Option<IssueStatus>,
+    pub text: Option<String>,
+    pub repo: Option<String>,
+    pub limit: Option<i64>,
+    pub closed: Option<bool>,
+    /// Filters to issues waiting on the user, ordered longest-waiting first.
+    pub wants_user: Option<bool>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueChildDraft {
+    pub id: String,
+    pub title: Option<String>,
+    pub brief: String,
+    pub needs: Option<Vec<String>>,
+    /// Profile id or name; "" lets the server assign one.
+    pub agent: Option<String>,
+    pub check: Option<String>,
+    pub scope: Option<Vec<String>>,
+    pub acceptance: Option<bool>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueSplitRequest {
+    pub title: Option<String>,
+    pub tasks: Vec<IssueChildDraft>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueStatusRequest {
+    pub revision: Option<ReviewRevision>,
+    pub status: IssueStatus,
+    /// Follow-up instructions or review findings when moving back to `todo`.
+    pub text: Option<String>,
+    pub agent: Option<String>,
+    /// Unsaved field edits applied atomically before the status transition.
+    pub edit: Option<IssueUpdate>,
+    /// Idempotency key deduplicating retries after a lost response.
+    pub request_key: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct FactSessionReported {
+    pub at: i64,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+    pub id: SessionId,
+    pub run: Option<String>,
+    pub outcome: Outcome,
+    /// Set when a turn rests waiting on external feedback without handing off to the user.
+    pub phase: Option<PhaseRestingOnly>,
+    pub summary: String,
+    pub runs: i64,
+    pub spent: Option<Spent>,
+    pub questions: Vec<Question>,
+    pub checks: Vec<CriterionCheck>,
+    pub answer: Option<IssueAnswer>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct FactIssueChanged {
+    pub at: i64,
+    pub issue: Issue,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct FactIssueRemoved {
+    pub at: i64,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub id: IssueId,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "kind")]
+pub enum IssueWatch {
+    #[serde(rename = "history", rename_all = "camelCase")]
+    History {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+        session: SessionId,
+        events: Vec<SessionEvent>,
+    },
+    #[serde(rename = "state", rename_all = "camelCase")]
+    State {
+        issue: Issue,
+        sessions: Vec<Session>,
+        #[cfg_attr(feature = "ts-gen", ts(as = "Vec<crate::typescript::SessionId>"))]
+        session_ids: Vec<SessionId>,
+        settled: bool,
+        omitted_sessions: i64,
+    },
+    #[serde(rename = "event", rename_all = "camelCase")]
+    Event {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+        session: SessionId,
+        event: SessionEvent,
+    },
+    #[serde(rename = "gap", rename_all = "camelCase")]
+    Gap {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+        session: SessionId,
+        before: Option<i64>,
+    },
+    #[serde(rename = "missing", rename_all = "camelCase")]
+    Missing {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+        issue: IssueId,
+    },
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueConversationGetInput {
+    pub id: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueCommentCreateInput {
+    pub id: String,
+    pub text: String,
+    pub send_key: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueDiffGetInput {
+    pub id: String,
+    pub since_tree: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueReviewInput {
+    pub revision: Option<ReviewRevision>,
+    pub id: String,
+    pub pass: bool,
+    pub findings: Option<Vec<String>>,
+    pub text: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueSplitInput {
+    pub id: String,
+    pub title: Option<String>,
+    pub tasks: Vec<IssueChildDraft>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueGetInput {
+    pub id: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueRunListInput {
+    pub id: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueTimelineGetInput {
+    pub id: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueUpdateInput {
+    pub id: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub repo: Option<String>,
+    pub agent: Option<String>,
+    pub priority: Option<Priority>,
+    pub criteria: Option<Vec<String>>,
+    pub deliver: Option<Deliverable>,
+    pub before: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueDeleteInput {
+    pub id: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueStatusUpdateInput {
+    pub revision: Option<ReviewRevision>,
+    pub id: String,
+    pub status: IssueStatus,
+    pub text: Option<String>,
+    pub agent: Option<String>,
+    pub edit: Option<IssueUpdate>,
+    pub request_key: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueRefineInput {
+    pub id: String,
+    pub text: Option<String>,
+    pub edit: Option<IssueUpdate>,
+}
+
+#[cfg(feature = "ts-gen")]
+crate::typescript::module! {
+    "issue";
+    types: [Landing,
+    IssueCanceled,
+    Priority,
+    IssueStatus,
+    PullRequestState,
+    PullRequest,
+    Finding,
+    IssueRefining,
+    Question,
+    CheckResult,
+    CriterionCheck,
+    IssueStageKind,
+    StuckReason,
+    IssueAct,
+    ActWords,
+    IssueAction,
+    IssueStage,
+    MilestoneKind,
+    Milestone,
+    IssueTimeline,
+    Deliverable,
+    Execution,
+    Assignment,
+    MandateStrength,
+    CodeReview,
+    ProjectCheckStatus,
+    ProjectCheckReceipt,
+    DeliveryEvidence,
+    IssueMandate,
+    IssueReportMemoryScope,
+    IssueReportMemory,
+    IssueReport,
+    IssueConstraints,
+    IssueLastRun,
+    Issue,
+    AppliedIssue,
+    IssueUpdate,
+    IssueHistory,
+    IssueRefineRequest,
+    IssueRequest,
+    CommentRequest,
+    IssueReviewRequest,
+    IssueFilter,
+    IssueChildDraft,
+    IssueSplitRequest,
+    IssueStatusRequest,
+    FactSessionReported,
+    FactIssueChanged,
+    FactIssueRemoved,
+    IssueWatch,
+    IssueConversationGetInput,
+    IssueCommentCreateInput,
+    IssueDiffGetInput,
+    IssueReviewInput,
+    IssueSplitInput,
+    IssueGetInput,
+    IssueRunListInput,
+    IssueTimelineGetInput,
+    IssueUpdateInput,
+    IssueDeleteInput,
+    IssueStatusUpdateInput,
+    IssueRefineInput];
+    aliases: [];
+}

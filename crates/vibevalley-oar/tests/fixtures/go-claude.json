@@ -1,0 +1,231 @@
+{
+  "compact": [
+    {
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "status": "compacting",
+      "subtype": "status",
+      "type": "system"
+    },
+    {
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "subtype": "compact_boundary",
+      "type": "system"
+    },
+    {
+      "is_error": false,
+      "modelUsage": {
+        "sonnet": {
+          "cacheReadTokens": 290,
+          "cacheWriteTokens": 105,
+          "inputTokens": 650,
+          "outputTokens": 155,
+          "reasoningTokens": 75
+        }
+      },
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "subtype": "success",
+      "type": "result",
+      "usage": null
+    }
+  ],
+  "get_usage": [
+    {
+      "response": {
+        "request_id": "REQUEST",
+        "response": {
+          "model_usage": {
+            "sonnet": {
+              "cacheReadTokens": 200,
+              "cacheWriteTokens": 80,
+              "inputTokens": 500,
+              "outputTokens": 100,
+              "reasoningTokens": 40
+            }
+          }
+        },
+        "subtype": "success"
+      },
+      "type": "control_response"
+    }
+  ],
+  "initialize": [
+    {
+      "model": "claude-sonnet-4-5",
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "subtype": "init",
+      "type": "system"
+    },
+    {
+      "response": {
+        "request_id": "REQUEST",
+        "subtype": "success"
+      },
+      "type": "control_response"
+    }
+  ],
+  "interrupt": [
+    {
+      "response": {
+        "request_id": "REQUEST",
+        "subtype": "success"
+      },
+      "type": "control_response"
+    },
+    {
+      "is_error": false,
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "subtype": "aborted",
+      "type": "result"
+    }
+  ],
+  "stop_task": [
+    {
+      "response": {
+        "request_id": "REQUEST",
+        "subtype": "success"
+      },
+      "type": "control_response"
+    },
+    {
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "status": "killed",
+      "subtype": "task_notification",
+      "summary": "stopped by host",
+      "task_id": "task-child",
+      "type": "system"
+    }
+  ],
+  "user": [
+    {
+      "event": {
+        "message": {
+          "id": "msg-1"
+        },
+        "type": "message_start"
+      },
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "type": "stream_event"
+    },
+    {
+      "event": {
+        "delta": {
+          "text": "Hello ",
+          "type": "text_delta"
+        },
+        "index": 0,
+        "type": "content_block_delta"
+      },
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "type": "stream_event"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "Hello world",
+            "type": "text"
+          }
+        ],
+        "id": "msg-1",
+        "model": "claude-sonnet-4-5",
+        "usage": {
+          "input_tokens": 100,
+          "output_tokens": 20
+        }
+      },
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "type": "assistant"
+    },
+    {
+      "description": "inspect files",
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "subtype": "task_started",
+      "task_id": "task-sub-1",
+      "task_type": "local_agent",
+      "type": "system"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "id": "toolu_sub1",
+            "input": {
+              "prompt": "scan"
+            },
+            "name": "Task",
+            "type": "tool_use"
+          }
+        ],
+        "id": "msg-parent-tool"
+      },
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "type": "assistant"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "subagent reading",
+            "type": "text"
+          },
+          {
+            "id": "toolu_nested2",
+            "input": {
+              "path": "a.go"
+            },
+            "name": "Read",
+            "type": "tool_use"
+          }
+        ],
+        "id": "msg-sub-1"
+      },
+      "parent_tool_use_id": "toolu_sub1",
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "type": "assistant"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "deep leaf",
+            "type": "text"
+          }
+        ],
+        "id": "msg-sub-2"
+      },
+      "parent_tool_use_id": "toolu_nested2",
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "type": "assistant"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "content": "scan ok",
+            "is_error": false,
+            "tool_use_id": "toolu_sub1",
+            "type": "tool_result"
+          }
+        ]
+      },
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "type": "user"
+    },
+    {
+      "is_error": false,
+      "modelUsage": {
+        "sonnet": {
+          "cacheReadTokens": 290,
+          "cacheWriteTokens": 105,
+          "inputTokens": 650,
+          "outputTokens": 155,
+          "reasoningTokens": 75
+        }
+      },
+      "result": "done: hello",
+      "session_id": "092b52de-330b-4d1d-abde-1dee9e56a8df",
+      "subtype": "success",
+      "type": "result"
+    }
+  ]
+}

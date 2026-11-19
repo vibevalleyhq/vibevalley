@@ -1,0 +1,106 @@
+-- name: Artifact :one
+select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+  a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
+  from artifact a left join channel_message m on m.id = a.message_id where a.id = ?1;
+
+-- name: ArtifactsInChannel :many
+select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+  a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
+  from artifact a left join channel_message m on m.id = a.message_id where a.channel_id = ?1 order by a.updated_at desc, a.id;
+
+-- name: ArtifactsForIssue :many
+select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+  a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
+  from artifact a left join channel_message m on m.id = a.message_id where a.issue = ?1 order by a.updated_at desc, a.id;
+
+-- name: Artifacts :many
+select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+  a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
+  from artifact a left join channel_message m on m.id = a.message_id order by a.updated_at desc, a.id limit ?1;
+
+-- name: AddArtifact :exec
+insert into artifact (id, title, body, display, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10, ?10);
+
+-- name: ArtifactSaid :exec
+update artifact set message_id = ?2 where id = ?1;
+
+-- name: ArtifactVersioned :exec
+update artifact set version = ?2, updated_at = ?3 where id = ?1;
+
+-- name: ArtifactAccepted :exec
+update artifact set seq = ?2, updated_at = ?3 where id = ?1;
+
+-- name: ArtifactRenamed :exec
+update artifact set title = ?2, updated_at = ?3 where id = ?1;
+
+-- name: ArtifactShown :exec
+update artifact set display = ?2, updated_at = ?3 where id = ?1 and body = 'html';
+
+-- name: DeleteArtifact :exec
+delete from artifact where id = ?1;
+
+-- name: AddVersion :exec
+insert into artifact_version (artifact_id, version, attachment_id, size, note, by_id, by_name, created_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);
+
+-- name: VersionAnnounced :exec
+update artifact_version set message_id = ?3 where artifact_id = ?1 and version = ?2;
+
+-- name: Versions :many
+select v.version, v.attachment_id, v.size, v.note, v.by_id, v.by_name, v.created_at, m.channel_id as message_channel, m.number as message_number
+  from artifact_version v left join channel_message m on m.id = v.message_id where v.artifact_id = ?1 order by v.version;
+
+-- name: Version :one
+select v.version, v.attachment_id, v.size, v.note, v.by_id, v.by_name, v.created_at, m.channel_id as message_channel, m.number as message_number
+  from artifact_version v left join channel_message m on m.id = v.message_id where v.artifact_id = ?1 and v.version = ?2;
+
+-- name: Blocks :many
+select id, artifact_id, parent_id, order_key, type, attrs, spans, rev, deleted, updated_by, updated_at
+  from artifact_block where artifact_id = ?1 order by order_key, id;
+
+-- name: BlockOwner :one
+select artifact_id from artifact_block where id = ?1;
+
+-- name: PutBlock :exec
+insert into artifact_block (id, artifact_id, parent_id, order_key, type, attrs, spans, rev, deleted, updated_by, updated_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+  on conflict (id) do update set parent_id = excluded.parent_id, order_key = excluded.order_key, type = excluded.type,
+  attrs = excluded.attrs, spans = excluded.spans, rev = excluded.rev, deleted = excluded.deleted,
+  updated_by = excluded.updated_by, updated_at = excluded.updated_at;
+
+-- name: AddRevision :exec
+insert into artifact_block_revision (id, block_id, rev, spans, actor, kind, created_at) values (?1, ?2, ?3, ?4, ?5, ?6, ?7);
+
+-- name: Revision :one
+select spans from artifact_block_revision where block_id = ?1 and rev = ?2 and kind = 'normal'
+  order by created_at desc limit 1;
+
+-- name: PruneChanges :exec
+delete from artifact_change where created_at < ?1;
+
+-- name: PruneRevisions :exec
+delete from artifact_block_revision where created_at < ?1;
+
+-- name: ChangeByBatch :one
+select artifact_id, seq, batch_id, block_ids, results from artifact_change where batch_id = ?1;
+
+-- name: AddChange :exec
+insert into artifact_change (artifact_id, seq, batch_id, actor, block_ids, results, created_at) values (?1, ?2, ?3, ?4, ?5, ?6, ?7);
+
+-- name: ChangesAfter :many
+select artifact_id, seq, batch_id, block_ids, results from artifact_change
+  where artifact_id = ?1 and seq > ?2 order by seq limit ?3;
+
+-- name: AddSuggestion :exec
+insert into artifact_suggestion (id, artifact_id, block_id, author, at_rev, change, status, created_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6, 'open', ?7);
+
+-- name: Suggestion :one
+select id, artifact_id, block_id, author, at_rev, change, status, created_at, resolved_at, resolved_by from artifact_suggestion where id = ?1;
+
+-- name: Suggestions :many
+select id, artifact_id, block_id, author, at_rev, change, status, created_at, resolved_at, resolved_by from artifact_suggestion where artifact_id = ?1 order by created_at, id limit ?2;
+
+-- name: ResolveSuggestion :exec
+update artifact_suggestion set status = ?2, resolved_at = ?3, resolved_by = ?4 where id = ?1 and status = 'open';

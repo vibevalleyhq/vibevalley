@@ -8,15 +8,15 @@
 
 - **先定业务语义，再分模块**：谁拥有状态、谁能改；一次操作在什么时刻算成功；重复、并发、取消、外部失败和重启各留下什么；容量满了拒绝、排队还是降级。这些写在拥有该行为的子系统里（例：[帮工的契约](docs/subsystems/session.md)），不由测试替身决定。业务政策不清楚时先作决定，不用增大超时或放松断言代替。
 - **返回值说清阶段**：异步方法返回时是已接收、已持久化还是已执行，写进它的名字、返回类型或注释；跨模块一致性由事务或恢复流程保证，不靠两个模块碰巧按同一顺序更新。
-- **外部输入在拥有它的边界取得**：时间、随机数、环境、外部响应由拥有该依赖的模块取得；纯规则收值（纯日期比较收 `now`），执行流程用可替换的外部能力（`deps.clock`）。只有跨真实依赖边界时才建端口，不给每个函数配一个 Clock、每个对象配一个接口。
+- **外部输入在拥有它的边界取得**：时间、随机数、环境、外部响应由拥有该依赖的模块取得；纯规则收值（纯日期比较收 `now`，如 [vibevalley-cron](crates/vibevalley-cron/src/lib.rs) 的 `due_crons(all, now)`），执行流程在边界取时间。只有跨真实依赖边界时才建端口（trait），不给每个函数配一个时钟、每个结构配一个 trait。
 
 ### 静态化、类型化与可分析化
 
 当代码主要由 agent 编写与演进时，口头约定与长文档最先失效。设计模块与接口时，应把不变量依次推进三道防线：
 
-- **类型化（让非法状态不可表达）**：用 Zod Schema、品牌主键（`T.Branded<K>`）、进门就解过的受约束值、判别联合（`kind`、`type`）和返回联合的预期结果（合进去或冲突）把业务前提与输出承诺写进签名。不在模块间传递未区分的裸 `string` 主键，不用多个松散布尔拼状态，也不在成功返回值里夹带 `{ ok: boolean }`。
-- **静态化（让拓扑与归属在构建期确定）**：Go 域间依赖方向（根目录 `arch_test.go`）、模块装配次序（`internal/domain/stack/stack.go`）与清晰依赖构造应保持静态结构。不应在运行期拼装循环依赖、把整个系统隐式交给全局单例。
-- **可分析化（让架构边界可由语法树、编译期校验与契约表对账）**：架构约束应写成单遍即可判定的命题——Go 跨层依赖进 `arch_test.go`，Go 与协议一致性进 `internal/domain/gateway/contract_parity_test.go` 与 `vpx scripts/gen/go-contract.ts --check`，SQL 迁移与绑定进 `vpx scripts/gen/go-sqlc.ts --check`，根协议导出面收进 [protocol-surface.ratchet.json](scripts/audit/protocol-surface.ratchet.json)，枚举与边界检查进 [schema-audit.ts](scripts/audit/schema-audit.ts)，全仓语法与生命周期误用进 [practice-audit.ts](scripts/audit/practice-audit.ts)。
+- **类型化（让非法状态不可表达）**：用结构体、enum（带数据的变体）、newtype（`Secret`）和返回 `Result` 的预期结果（合进去或冲突）把业务前提与输出承诺写进签名。门内不传 `serde_json::Value`，不按字符串分支，不用多个松散布尔拼状态，也不在成功返回值里夹带 `ok: bool`。
+- **静态化（让拓扑与归属在构建期确定）**：服务端的模块是 [modules/mod.rs](crates/vibevalley-server/src/modules/mod.rs) 里的 `pub mod`，每个模块对外一个窄的结构体（`Agents`、`Chat`、`Crons`…），在 [start.rs](crates/vibevalley-server/src/start.rs) 照次序建好并把端点注册到 `Hub`（`Hub::on::<O: Op>` 由契约的 `ops` 定入参和结果的类型）。不在运行期拼装依赖，不把整个服务端交给一个模块。
+- **可分析化（让架构边界可由编译器与检查对账）**：能交给类型和 clippy 的交给它们（`vp run rust:check` 带 `-D warnings`）；TS 一侧的约束写成 [lint](scripts/audit/oxlint-plugin.ts) 规则，无需启动运行时或通读上下文即可定位违规。
 
 ### 可控制、可观察、可关闭共同决定可测试性
 
@@ -63,7 +63,7 @@
 
 三者不必拆成三个服务。只有职责可独立命名且能降低耦合时才提取，保留在原业务模块内；不新建一个收集所有规则的技术层。
 
-以定时任务为例，`internal/domain/issue/cron.go` 划分日期决定与持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
+以定时任务为例，[到期计算](crates/vibevalley-cron/src/lib.rs)与[服务执行](crates/vibevalley-server/src/modules/cron.rs)分别承担日期决定和持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
 
 提取纯决定时，应保留「读取、判断、提交」的并发边界。把判断挪到锁外可能引入过期快照；函数变纯不代表整个流程变正确。
 
@@ -71,29 +71,29 @@
 
 让不变量住进类型，在系统入口一次性完成解析（Parse, don't validate），不在业务内部散落防御性判断或裸字符串约定：
 
-- **进门一次解析**：前端与公共包经 Zod（`z.object`、`.check`、`.transform`、`jsonString`）窄化为带约束的领域值；Go 端在网关解码、配置加载（`internal/config/config.go`）与工具入参（`internal/domain/stack/tools.go`）入口完成校验，格式错误当场失败。门内 TS 造品牌主键用协议的铸造函数（`issueId(s)`），不写 `as` 断言；含密钥的值在协议中有 `Secret`（`toJSON` 抛错、打印成 `[secret]`），在 Go 端由 `internal/vault/secret.go`（`Secret`）护持（[schema-audit.ts](scripts/audit/schema-audit.ts) 检查）。
-- **共用契约 Fail-Fast**：前端通过 `packages/protocol` 解码服务端响应与流（SSE 流经 [stream.ts](packages/protocol/src/stream.ts) 解码，HTTP 客户端 [client.ts](packages/protocol/src/client.ts) 按 `Endpoint.result` 与 `ApiError` 信封解码）。`packages/protocol` 通过 `satisfies Codec<T.X>`（[codec.ts](packages/protocol/src/codec.ts)）锁死形状与解码器；Go 与 TS 的一致性由 `internal/domain/gateway/contract_parity_test.go` 与 `vpx scripts/gen/go-contract.ts --check` 对账。
-- **未解析引用与品牌主键分离**：TS 侧持久实体主键使用品牌标称类型（如 `IssueId`、`SessionId`、`ArtifactId`、`BlockId`、`SuggestionId`、`MessageId`），不应跨概念混传同为 `string` 的 ID。
-- **存储迁移与 SQLc 绑定**：库表结构在 `pkg/db/migrations/` 按模块顺序维护，查询在 `pkg/db/queries/`，经 `vpx scripts/gen/go-sqlc.ts` 生成 `pkg/db/generated/`（`package generated`）强类型 Go 绑定，不手写 SQL 拼接或忽略扫描错误。
+- **进门一次解析**：HTTP、命令行、工具参数、配置、落盘 JSON 与厂商响应在边界经 serde 一步解成结构体和 enum：端点的入参是契约的类型（`Hub::on::<O>`，[lib.rs](crates/vibevalley-server/src/lib.rs)）；模型给的工具参数经 [tool/mod.rs](crates/vibevalley-server/src/modules/tool/mod.rs) 的 `args` 宽松解析一次（数字字符串、`null` 当缺省写在这一处）再成参数结构体；`settings.json` 在 [setting.rs](crates/vibevalley-server/src/modules/setting.rs) 一次读成 `Stored`。格式错误当场失败，不兜底成默认值。
+- **密钥是 `Secret`**：钥匙和 token 包进 `Secret`（[setting.rs](crates/vibevalley-server/src/modules/setting.rs)），`Debug` 只出提示，取原文要显式 `expose()`。
+- **契约一份**：线上的形状以 Rust 的 [contract](crates/vibevalley-protocol/src/contract/mod.rs) 类型为源，TS 类型由它生成；页面收到的帧、事件和接口结果按同一份手写的 Schema 解码（`packages/protocol` 的 `schema.ts`，测试对着生成的类型查）。闭合词集是 enum，不重复内联字面量。
+- **未解析引用与主键分离**：用户、命令行或模型传入的名称、编号与地址（如 `#41`、频道名、`vv://`）按引用建模，在所属模块的入口一次解析成 id；模块内部与存储层只传已解析的 id。
+- **存储区分「缺省」与「损坏」**：可空列读成 `Option`，非空的损坏立即报错，不静默吞成缺省；只有外部不可信的载荷才容错。
 
 ### 显式状态
 
-一件事沿一条线走（等着、就绪、关了），就用一个联合或枚举状态表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`），存在一个 `let`、信号或结构体里。例子：[意图](apps/web/src/state/intent.ts)的 `IntentAt`、`internal/domain/voice` 的通话状态与 `internal/domain/memory` 的记忆版本生命周期。
+一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/mac/ui/vv/web/state/intent.ts)的 `IntentAt`、[媒体任务](crates/vibevalley-server/src/modules/media/jobs.rs)的 `Held`、[谁听见](crates/vibevalley-server/src/modules/watch/hearers.rs)的 `HeldBy`。Rust 里就是带数据的 enum，`match` 穷尽。
 
-- **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/web/src/infra/form/form.ts)）；MOSS 回答的音频发完、回答结束和被切断（[MOSS](packages/ai/src/realtime/moss.ts)）。硬并只会得到它们的乘积。
-- **永远同值的删掉副本。** 读源头：通话的「在结束」就是它 `life` 的 abort。
-- **共享对象靠同一性比较时，留着对象、换它的状态。** 通话和实时线路共用一个 `MossLine`，判断靠 `activeMoss === target`，所以只换它的 `phase`。
+- **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/mac/ui/vv/web/infra/form/form.ts)）。硬并只会得到它们的乘积。
+- **永远同值的删掉副本。** 读源头，不另存一份跟着改。
 - **会被别处读原因的，先记原因再中断。** 记性源退役时同步记下原因和一个完成信号，再起一个任务去停：被中断的操作无论何时醒来都读得到原因。
-- **闭包里改的状态放进有类型的属性。** TypeScript 按初值收窄闭包外对 `let` 的读，看不到闭包里的赋值；放进标好类型的对象属性或有名字的类型（[闪播](apps/web/src/features/media/flash-stream.ts)）。
-- **页面的帧不拆。** 帧是 Solid 的 store，按 id 逐个 reconcile（[帧](apps/web/src/infra/frame.ts)）；为了联合改成按状态整个替换，会让每次换态重建整份画面。
+- **闭包里改的状态放进有类型的属性。** TypeScript 按初值收窄闭包外对 `let` 的读，看不到闭包里的赋值；放进标好类型的对象属性或有名字的类型。
+- **页面的帧不拆。** 页面拿到的是最新的整帧（[帧](apps/mac/ui/vv/web/infra/frame.ts)），按 id 的列表用 `Each` 保住行；不为了联合把帧改成按状态分开的几份。
 
-`practice:check` 的 `loose-flags` 拦一个函数里三个以上的 `let` 布尔：多半是一条没写出来的线；真是几个独立的维度，就照上面分开放、各自起名。不用 XState 等外部状态机运行时：TypeScript 判别联合配合服务端的字段（读改写之间夹着 `await` 时包进同一把 `Semaphore`）、客户端 `state/` 的 store 与组件内 `createSignal` 加 `variant()`，零额外依赖即可获得编译期穷尽检查。
+一个函数里三个以上的 `let` 布尔多半是一条没写出来的线；真是几个独立的维度，就照上面分开放、各自起名。不用外部状态机运行时：服务端是 Rust enum 加 `match`（读改写在同一把锁里），页面是 TypeScript 判别联合、`state/` 的原子与组件内的信号加 `variant()`，都有编译期穷尽检查。
 
 ### 错误与回滚契约
 
-- **三层错误各走其道**：外部 I/O 失败在调用处包成模块自己的 `Error` 子类并保留 `cause`；业务拒绝抛协议 `ApiError`（可恢复时附带 `next: Next[]` 或 `settings: VoiceFix`）；内部数据自相矛盾抛 `Inconsistent`（缺陷），绝不伪装成普通拒绝。
-- **内部失败抛出来，资源移交走 `AsyncDisposableStack`**：服务内部方法遇到调用方要分辨的拒绝或故障时抛它的 `Error` 子类（如 `HireRefused`），调用方 `instanceof` 接；不把 `{ refused?: string }` 塞进成功返回值，也不用 `let refusal = ""` 旁路记下再查。多步获取且跨调用存活的资源先建 `AsyncDisposableStack`，逐项 `use` / `defer` 挂入；失败或中断时 `disposeAsync()` 逆序回滚，提交后用 `move()` 把整个栈移交给在场对象。
-- **线上只暴露闭合 `ApiError`，客户端无损转 `UiFault`**：内部细粒度的错误类在服务端边界按 `instanceof` 处理或转为 `ApiError`，不泄漏到 HTTP 契约；客户端 `faultOf`（[apps/web/src/infra/api.ts](apps/web/src/infra/api.ts)）将全部 `ApiError`（含 `502`/`503`）归类为明确的业务拒绝并保留 `next`、`settings` 与 `retryable`。
+- **三层错误各走其道**：外部 I/O 失败在调用处包成模块自己的错误类型并保留原因；业务拒绝返回契约的 `ApiError`（带 `BizCode`，可恢复时附带 `next`，见 [base.rs](crates/vibevalley-server/src/base.rs) 的 `missing`、`refused`）；内部数据自相矛盾是缺陷，不伪装成普通拒绝。
+- **内部失败是 `Result`，资源靠 `Drop`**：调用方要分辨的拒绝或故障是 `Result` 的错误 enum，不把 `refused: Option<String>` 塞进成功返回值。多步获取的资源用守卫对象（`Drop`）成对释放，失败时逆序回滚。
+- **线上只暴露闭合 `ApiError`，客户端无损转 `UiFault`**：内部细粒度的错误在服务端边界转为 `ApiError`，不泄漏到 HTTP 契约；客户端 `faultOf`（[apps/mac/ui/vv/web/infra/api.ts](apps/mac/ui/vv/web/infra/api.ts)）将全部 `ApiError`（含 `502`/`503`）归类为明确的业务拒绝并保留 `next`、`settings` 与 `retryable`。
 
 ### 从测试困难诊断设计，避免先补工具
 
@@ -104,7 +104,7 @@
 | 返回后仍需 sleep 或固定次数 yield | 完成语义、订阅就绪是否明确 | 等待已定义的结果或阶段 |
 | 需要修改全局时间、环境 | 外部依赖是否隐藏 | 在装配或适配器边界接入 |
 | 注入失败需要改私有字段 | 故障是否有实际外部边界 | 在该边界控制结果，不改内部状态 |
-| 关闭后仍有回调 | 谁拥有任务与订阅 | 成对取得释放（`await using`、`AsyncDisposableStack`） |
+| 关闭后仍有回调 | 谁拥有任务与订阅 | 成对取得释放（Rust 的 `Drop`，页面的 `await using`） |
 | 重构内部实现就坏很多测试 | 断言是否绑定私有步骤 | 对公开行为和必要的交互契约断言 |
 
 不应增加 `isTesting`、跳过校验开关、测试专用业务分支或任意暴露的内部状态。替身可以控制外部端口，但不应复制被测模块的完整业务算法。
@@ -118,7 +118,7 @@
 | 真实进程保护、测试防挂死 | 独立的真实截止时间，不依赖被冻结的业务时钟 |
 | 知道后台工作已完成 | 方法返回、状态、事件或阶段确认，不靠时间流逝猜测 |
 
-同一业务时间线的读取、等待和测试输入应一致。外部事件自带的发生时间与本机接收时间可以不同，但应明确字段语义；浏览器和服务端也不是一个可以一起拨动的时钟。
+同一业务时间线的读取、等待和测试输入应一致。外部事件自带的发生时间与本机接收时间可以不同，但应明确字段语义；页面和服务端也不是一个可以一起拨动的时钟。
 
 Clock 的读取不应推进时间；同刻事件的顺序应由业务已有的序号或排序契约表达。测试时间推进与真实 I/O 完成是两件事，虚拟时钟不能使外部进程立即结束。
 
@@ -153,15 +153,11 @@ Clock 的读取不应推进时间；同刻事件的顺序应由业务已有的�
 
 | 要表达或验证的边界 | 已有工具 | 使用限制 |
 |---|---|---|
-| 形状、品牌与进门解码 | TypeScript 联合、Zod（`branded`、`jsonString`、`satisfies Codec<T.X>`）、`Error` 子类、[schema-audit.ts](scripts/audit/schema-audit.ts) | 类型不能独自表达事务、完成与取消语义；页面主包不直接打包全量接口 Schema |
-| 依赖与组合 | 工厂函数与依赖注入；Go 栈装配 `internal/domain/stack/stack.go` | 在装配前替换依赖；不另建一套测试业务装配 |
-| 业务时间 | TS `Clock`（`@vibevalley/async`、`deps.clock`）、`vi.useFakeTimers()`；Go 注入时钟 | 固定起点先于会捕获时间的构建；不负责外部 I/O 完成 |
-| 任务与资源 | `AbortSignal`、`await using`、`AsyncDisposableStack`、`TaskGroup`；Go `context.Context` | 关闭语义由业务定义，工具只实现归属与释放 |
-| 交错控制 | `Promise.withResolvers()`、[until.ts](packages/testkit/src/until.ts) | 挡住明确的一步；不靠缩短业务超时制造竞争 |
-| 状态与事件观察 | `Subscription`、`AsyncIterable`、Go 状态订阅 | 确认订阅和匹配目标；不假设全系统能被 drain |
-| 真实边界等待 | [waitFor 与 until](packages/testkit/src/until.ts) | 有界等待和防挂死，不替代业务完成契约 |
-| 外部 agent 与模型 | Go `pkg/oar/replaytest`、`internal/domain/gateway/issue_helpers.go` 脚本帮工 | 控制端口协议，不复制业务；意外调用应失败 |
-| 浏览器时间与交互 | Playwright Clock、组件与页面测试 | 浏览器时间独立于服务端；截图不证明动态行为 |
-| 边界防退化 | [lint](scripts/audit/oxlint-plugin.ts)、[全仓实践审计](scripts/audit/practice-audit.ts)、[协议导出面](scripts/audit/protocol-surface.ts)棘轮、Go `arch_test.go` 与 health 棘轮 | 检查守住已确定的边界，不用行数或覆盖率指标代替设计判断 |
+| 形状与进门解码 | Rust 结构体与 enum、serde、`Secret`；页面的 TypeScript 联合与 Zod（`satisfies Codec<T.X>`） | 类型不能独自表达事务、完成与取消语义 |
+| 依赖与组合 | [start.rs](crates/vibevalley-server/src/start.rs) 照次序建模块；集成测试起真的服务端（[tests/](crates/vibevalley-server/tests/issue.rs)） | 在服务建好前替换依赖；不另建一套测试业务装配 |
+| 外部 agent 与模型 | oar 的 scripted 运行时（[scripted.rs](crates/vibevalley-oar/src/scripted.rs)）、测试用替身 agent `pi`（[testing.rs](crates/vibevalley-server/src/testing.rs)） | 控制端口协议，不复制业务；意外调用应失败 |
+| 任务与资源（页面） | `AbortSignal`、作用域的 `cleanup` | 关闭语义由业务定义，工具只实现归属与释放；有界等待不替代完成契约 |
+| 页面的时间与交互 | `nsh/test` 的页面测试、应用的调试脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） | 页面的时间独立于服务端；截图不证明动态行为 |
+| 边界防退化 | `rust:check`（clippy `-D warnings`）、[lint](scripts/audit/oxlint-plugin.ts)、`mac:check` | 检查守住已确定的边界，不用行数或覆盖率指标代替设计判断 |
 
 工具使用中的失败也可能是架构反馈：大量依赖替换可能来自过宽依赖，持续增加 gate 可能来自过度耦合的流程，越来越复杂的观察器可能来自缺失的结果契约。应先回到边界审查，不继续堆工具。

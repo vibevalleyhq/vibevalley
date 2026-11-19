@@ -16,25 +16,29 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 
 | 位置 | 职责 |
 |---|---|
-| [`packages/artifact/`](packages/artifact/README.md) | 独立 Artifact 纯领域包（`@vibevalley/artifact`）：块状态机 `Page` 与码点切分（`ops.ts`）、Markdown 互转（`markdown.ts`）、HTML 前缀与划词改字（`html.ts`）、外壳运行时与主题（`shell.ts`）、前端块跨度计算与协同编辑器状态机（`blocks.ts`、`editor.ts`） |
-| `internal/domain/artifact/` | Artifact 服务（`service.go`）、块状态与顺序键（`page.go`、`order.go`）、`gotextdiff` 差异与 CAS 存储（`cas.go`）、原生 `esbuild` 编译校验（`compiler.go`）、独立隔离预览（`preview.go`）与交付物索引（`deliverables.go`） |
-| `internal/domain/gateway/artifact_shell.go`、`handlers_collab.go` | HTTP 与订阅流接口挂接、`GET /api/v1/artifact/<id>/<version>` 响应头与外壳脚本注入 |
+| [`packages/artifact/`](packages/artifact/README.md) | 独立 Artifact 纯领域包（`@vibevalley/artifact`）：块状态机 `Page` 与码点切分（`ops.ts`）、Markdown 互转（`markdown.ts`）、HTML CSP 响应头与 `parse5` 白名单检查及划词改字（`html.ts`）、前端块跨度计算与协同编辑器状态机（`blocks.ts`、`editor.ts`） |
+| `crates/vibevalley-server/src/modules/artifact/mod.rs`、`blocks.rs`、`db.rs` | `Artifacts`：增删改查、块与建议的持久化（`server.db`）、HTML 每一稿存成附件（[附件](docs/subsystems/attachment.md)）、频道卡片、`artifact.follow` 订阅 |
+| `crates/vibevalley-artifact/src/` | 服务端跑的那份引擎：块操作 `Page`（`ops.rs`）、Markdown 互转（`markdown.rs`）、HTML 检查与划词改字（`html.rs`）、外壳（`shell.rs`）；和 `packages/artifact` 用同一份 golden 测例 |
 | `packages/protocol/src/rules/order.ts`、`display.ts` | 前后端共用的分数顺序键 `keyBetween` 与沙箱常量 `htmlSandbox` |
-| `apps/web/src/features/artifact/` | `ArtifactsPage.tsx`、`ArtifactCanvas.tsx`、`BlocksView.tsx` 及消费 `@vibevalley/artifact` 的薄层适配 |
+| 表 `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion` | Artifact、HTML 版本、块、块修订、操作批次与改写建议表 |
+| `apps/mac/ui/vv/web/features/artifact/` | `ArtifactsPage.tsx`、`ArtifactCanvas.tsx`、`BlocksView.tsx` 及消费 `@vibevalley/artifact` 的薄层适配 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*` 及 `GET /api/v1/artifact/<id>/<version>`）。
+
+Artifact 使用 SQLx 访问 SQLite。sqlc 从 Artifact 与频道的正式表结构生成命名查询。频道消息不存在时，左连接返回空引用。版本的文件内容由附件库保管。[查询](crates/vibevalley-server/src/modules/artifact/sql/queries.sql)
+
+频道中的 Artifact 卡片、版本号和消息引用由 `Chat::post_with` 在同一连接上提交。版本写入失败时，频道回滚消息和事件，恢复内存镜像。订阅者只收到已提交的卡片。
 
 ## 模型和不变量
 
 ### 网页 Artifact（`html`）
 
 - **每一稿是一个附件，版本不可变**：单版上限 5MB，字节经 `Attachment.keep` 存一次，`artifact_version.attachment_id` 指向它；提交新版追加 `artifact_version` 记录，不覆盖旧版；删掉 Artifact 不删附件。
-- **双层沙箱与独立源预览监听（`preview.go`）**：`GET /api/v1/artifact/<id>/<version>` 响应头携带严格 CSP（`sandbox` 不含 `allow-same-origin`，`connect-src 'none'`），前端 `iframe` 同步设 `sandbox={htmlSandbox}`；`vibe-server` 另起独立预览 HTTP 监听（`preview_addr`，默认 `127.0.0.1:0`），由 `PreviewHandler` 服务 `/preview/sha256/<sha>` 与 `/preview/artifact/<id>/<version>`，施加 `StrictPreviewCSP`（`?print=1` 为 `StrictPrintPreviewCSP`）、拒绝带 `Authorization` 请求与同源主机混访，防止预览脚本读取主工作台凭据。
-- **内嵌 `esbuild` 进程内编译与 `gotextdiff` 差异（`compiler.go`、`cas.go`）**：`CompileBundle` 直接调用 Go 版 [`github.com/evanw/esbuild/pkg/api`](https://pkg.go.dev/github.com/evanw/esbuild/pkg/api) 与内存虚拟文件系统编译多文件 TSX/JSX/TS/JS/CSS 产物，编译错误返回精确文件路径与行列号 `*CompileError` 反馈给 `durable` 循环当场自愈；修订按 SHA-256 去重存 CAS，行级补丁使用 `hexops/gotextdiff` 计算。
-- **提交前静态白名单检查（`@vibevalley/artifact/html`）**：仅放行 `cdn.jsdelivr.net`、`cdnjs.cloudflare.com`、`fonts.googleapis.com`、`fonts.gstatic.com`，且媒体必须内联為 `data:` 或 `blob:`；含表外外链、表单提交或嵌套页面的直接拒绝并报错行号。
+- **双层沙箱隔离**：`GET /api/v1/artifact/<id>/<version>` 响应头携带严格 CSP（`sandbox` 不含 `allow-same-origin`，`connect-src 'none'`），前端 `iframe` 同步设 `sandbox={htmlSandbox}`。
+- **提交前静态白名单检查（`check.ts`）**：仅放行 `cdn.jsdelivr.net`、`cdnjs.cloudflare.com`、`fonts.googleapis.com`、`fonts.gstatic.com`，且媒体必须内联為 `data:` 或 `blob:`；含表外外链、表单提交或嵌套页面的直接拒绝并报错行号。
 - **怎么看（`display`）**：网页 Artifact 带 `display`：`page`（整页，没有约定）、`slides`、`motion`，建的时候定（不填是 `page`），`artifact.update` 能改，一稿不变只换看法；一起写的没有这一项。
 - **外壳和消息约定（`@vibevalley/artifact/shell`）**：工作台看一稿时请求 `?shell=1&display=…&theme=…`，服务端在页面后面接上主题变量（`--vv-page`、`--vv-ink`…，和 `style.css` 的取值一致）、划词脚本和 `vv` 运行时；样式用 `:where()`，页面自己写的总是赢。运行时只对父窗口说话、只听父窗口：页面报 `ready`（种类、页数和每页的标题、备注，或时长）和 `at`（第几页、第几秒），外壳发 `goto`、`seek`、`play`、`pause`。两头都按 `HtmlShellMessage`、`HtmlShellCommand` 的 Schema 认，不认的丢掉；页面的话只改外壳显示的东西，不能让工作台做框外的事。显示和主题写在地址里，因为一稿的响应永久缓存。
-- **幻灯片（`display: "slides"`）**：一页一个顶层 `<section>`，备注写在 `<aside class="notes">`，版式 class 有 `title`、`two-col`、`image`、`quote`。运行时按 1280×720 排一页、缩放到框里，`?at=` 打开在某一页，`?still=1` 是缩略图（不收键盘和点击），自己处理 ←/→、空格、Home/End 和点击翻页，报每页的标题和备注。外壳（`SlidesControls`）给上一页、下一页、缩略图条、全屏放映、演讲者视图（`/present`，当前页、下一页、备注、计时）和存成 PDF；工作台的标签页和演讲者视图经 `BroadcastChannel` 互相跟着翻。存成 PDF 是新开一个 `?print=1` 的页面：只有它的 CSP 多一个 `allow-modals`，好让页面自己调打印，打印时每页一张纸。写法给模型的在工具描述（`display`）和内置的 `slides` 技能（`internal/domain/gateway/seed_catalog.go`）。
+- **幻灯片（`display: "slides"`）**：一页一个顶层 `<section>`，备注写在 `<aside class="notes">`，版式 class 有 `title`、`two-col`、`image`、`quote`。运行时按 1280×720 排一页、缩放到框里，`?at=` 打开在某一页，`?still=1` 是缩略图（不收键盘和点击），自己处理 ←/→、空格、Home/End 和点击翻页，报每页的标题和备注。外壳（`SlidesControls`）给上一页、下一页、缩略图条、全屏放映、演讲者视图（`/present`，当前页、下一页、备注、计时）和存成 PDF；工作台的标签页和演讲者视图经 `BroadcastChannel` 互相跟着翻。存成 PDF 是新开一个 `?print=1` 的页面：只有它的 CSP 多一个 `allow-modals`，好让页面自己调打印，打印时每页一张纸。写法给模型的在工具描述（`display`）和助手的 `slides` skill（`crates/vibevalley-server/assets/orchestrator/skills/slides/SKILL.md`，带模板）。
 - **划词源码替换（`artifact.html.edit`）**：预览挂载 `?shell=1` 外壳，划词生成选中文本及前后各 32 字的 `HtmlAnchor`；服务端在最新版源码中唯一匹配并替换该处转义字节存为新版，跨标签或有歧义则拒绝。
 
 ### 协作块文档（`blocks`）
@@ -50,7 +54,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 **创建与交付 Artifact**
 
 1. 帮工或助手调用 `artifact_create`（传入 `html` 或 `markdown` 正文，或工作目录内相对路径 `file`）。
-2. 服务端校验内容（`html` 过 `htmlCheck`，`markdown` 转为初始 `BlockInput[]`），在对应工单串或频道发出带 `ArtifactCard` 的消息并落库。
+2. 服务端校验内容（`html` 过 `check.ts`，`markdown` 转为初始 `BlockInput[]`），在对应工单串或频道发出带 `ArtifactCard` 的消息并落库。
 3. 用户在 `/artifacts` 点「新建」直接创建空的 `blocks` Artifact，不发频道消息。
 
 **块协同编辑与带话**
@@ -62,7 +66,6 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 
 - **频道（`channel`）**：调用 `channel.post({ _tag: "Announce" })` 发 Artifact 卡片；在消息中记录被引用的块快照。
 - **工具（`tool`、`mcp`）**：向助手和帮工暴露 `artifact_*` 工具，自动绑定会话工单与档案身份。
-- **「连接到本机」（`lan`）**：放行配对设备访问 `GET /api/v1/artifact/<id>/<version>`。
 
 ## 为什么这样
 
@@ -80,6 +83,9 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 
 ## 怎么验证
 
-- `env -u GOROOT CGO_ENABLED=0 go test -count=1 ./internal/domain/artifact/... ./internal/domain/gateway/...`：CAS 存储、HTML 编译校验、顺序键、Markdown 往返、`batchId` 幂等、`baseRev` 冲突、`Suggestion` 与 `?shell=1` 外壳注入测试。
-- `apps/web/test/artifact.spec.ts`、`artifact-blocks.spec.ts`：浏览器沙箱隔离、划词改字、块编辑与建议接受端到端测试。
-- `packages/artifact/src/artifact.test.ts`：外壳消息只认约定里的形状、主题变量和运行时接在页面后面；`apps/web/test/slides.spec.ts`：幻灯片按控件、缩略图和键盘翻页，演讲者视图互相跟着翻、显示备注，打印时一页一张。
+- `crates/vibevalley-artifact/tests/golden.rs`：块操作、Markdown 往返、HTML 检查与划词改字对着 `packages/artifact` 写出的 golden（`vp run protocol:check` 重写并比对）。
+- `crates/vibevalley-server/tests/artifact.rs`：HTML 与 Markdown 交稿的版本和拒绝、划词改字与删除、块一起写（`batchId` 幂等、`baseRev` 冲突、建议）、消息引用块。
+- `apps/mac/ui/vv/app/artifacts.test.tsx`：Artifact 页在样例数据上的页面测试（`nsh/test`）。
+- `packages/artifact/src/artifact.test.ts`：外壳消息只认约定里的形状、主题变量和运行时接在页面后面。
+
+演讲者视图在 HTML 发回页数后显示页码、下一页与备注。尚未收到回执时，页面显示「等待演示页就绪」。载入错误显示具体原因。[原生页面验收](.agents/skills/vv-acceptance/references/app.md#演示页的就绪回执)

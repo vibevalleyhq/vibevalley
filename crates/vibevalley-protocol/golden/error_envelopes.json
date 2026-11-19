@@ -1,0 +1,30 @@
+[
+ {
+  "bizCode": 300001,
+  "message": "没有这张工单"
+ },
+ {
+  "bizCode": 700001,
+  "message": "语音未配置",
+  "error": {
+   "settings": "models"
+  }
+ },
+ {
+  "bizCode": 300002,
+  "message": "no",
+  "error": {
+   "next": [
+    {
+     "say": "start it",
+     "run": [
+      "vibevalley issue start 1"
+     ]
+    },
+    {
+     "say": "wait"
+    }
+   ]
+  }
+ }
+]

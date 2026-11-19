@@ -1,0 +1,21 @@
+{
+  "id": "lab",
+  "version": 1,
+  "role": "worker",
+  "name": "Pi 实验员",
+  "duty": "写原型、试新做法",
+  "tags": ["原型", "试试", "实验", "脚本"],
+  "runtime": "pi",
+  "effort": "medium",
+  "worktree": true,
+  "look": {
+    "eye": "#ff9de2",
+    "build": "hopper",
+    "head": "dome",
+    "body": "#f4e6d4",
+    "trim": "#b0503f",
+    "hat": "#d9534f",
+    "species": "hedgehog",
+    "outfit": "rain"
+  }
+}

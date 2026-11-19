@@ -1,0 +1,20 @@
+{
+  "badge": {
+    "ripe": "Ripe",
+    "bugs": "Bugs",
+    "retrying": "Retrying",
+    "rest": "Resting",
+    "weeding": "Weeding {n}"
+  },
+  "tier": {
+    "silver": "Silver {title}",
+    "gold": "Gold {title}"
+  },
+  "reached": {
+    "starter": "Starter task done",
+    "secret": "Found a secret",
+    "gold": "Up to gold",
+    "silver": "Up to silver",
+    "unlocked": "Achievement unlocked"
+  }
+}

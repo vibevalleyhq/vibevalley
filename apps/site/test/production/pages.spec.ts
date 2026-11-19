@@ -96,6 +96,29 @@ for (const path of ["/", "/en/", "/404.html"]) {
   });
 }
 
+for (const path of ["/", "/en/"]) {
+  test(`regression: the Mac source instructions and device preview agree at ${path}`, async ({ page, website }, info) => {
+    await page.goto(website + path);
+    const start = page.locator("#start");
+    await expect(start.locator("pre")).toContainText("vp run nsh:install");
+    await expect(start.locator("pre")).toContainText("open apps/mac/dist/VibeValley.app");
+    await expect(start.locator("pre")).toContainText("--branch refactor/native-macos-cutover");
+    await expect(start.locator("a")).toHaveAttribute("href", "https://github.com/vibevalleyhq/vibevalley/tree/refactor/native-macos-cutover#readme");
+    const device = page.locator("#devices img");
+    await expect(device).toHaveCount(1);
+    await expect(device).toHaveAttribute("src", /native-farm-.*\.webp$/u);
+    await expect(device).toHaveAttribute("alt", /Mac/u);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await device.scrollIntoViewIfNeeded();
+    await device.evaluate((image: HTMLImageElement) => image.decode());
+    await page.locator("#devices").screenshot({ path: info.outputPath("native-device.png"), animations: "disabled" });
+    await start.locator("pre").scrollIntoViewIfNeeded();
+    const commandBlock = start.locator("pre");
+    expect(await commandBlock.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await commandBlock.screenshot({ path: info.outputPath("native-install.png"), animations: "disabled" });
+  });
+}
+
 test("regression: production hydration preserves top and offscreen DOM", async ({ page, website }) => {
   let release!: () => void;
   const ready = new Promise<void>((done) => {

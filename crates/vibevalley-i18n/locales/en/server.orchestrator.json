@@ -1,0 +1,5 @@
+{
+  "noKey": "I don't have a DeepSeek key yet, so I can't think. Put a DeepSeek API Key in Settings (also at the bottom of the workbench's left bar), then tell me again.",
+  "cannotStart": "I can't start on my side: {why}",
+  "onlyDeepseek": "The assistant runs only on DeepSeek models: set the assistant profile's model to deepseek/<model> or just the model's name; {configured} cannot be used"
+}

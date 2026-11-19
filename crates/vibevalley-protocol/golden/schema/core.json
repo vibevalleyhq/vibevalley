@@ -1,0 +1,4540 @@
+{
+ "SpaceState": [
+  {
+   "call": "idle",
+   "callReason": "s4864",
+   "media": [
+    {
+     "kind": "image",
+     "id": "s4865",
+     "prompt": "s4866",
+     "model": "s4867",
+     "connection": "s4868",
+     "revision": 4869,
+     "source": {
+      "kind": "user"
+     },
+     "usage": {
+      "images": 1,
+      "width": 1540,
+      "height": 1541
+     },
+     "phase": "queued",
+     "phaseText": "s4872",
+     "problem": "s4873",
+     "attachment": {
+      "id": "s4874",
+      "name": "s4875",
+      "type": "s4876",
+      "size": 4877
+     },
+     "canCancel": true,
+     "canRetryDownload": false,
+     "createdAt": 4880,
+     "updatedAt": 4881
+    }
+   ],
+   "chat": {
+    "channels": [
+     {
+      "id": "s4882",
+      "type": "channel",
+      "default": false,
+      "peer": "s4884",
+      "orchestrator": "s4885",
+      "members": [
+       "s4886"
+      ],
+      "parent": "s4887",
+      "category": "s4888",
+      "position": 4889,
+      "archived": 4890,
+      "notify": "all",
+      "root": "s4891",
+      "rootNumber": 4892,
+      "name": "s4893",
+      "description": "s4894",
+      "repo": "s4895",
+      "subjectKind": "issue",
+      "subjectId": "s4896",
+      "lastNumber": 4897,
+      "replies": 4898,
+      "read": 4899,
+      "unread": 4900,
+      "title": "s4901",
+      "last": {
+       "from": "s4902",
+       "name": "s4903",
+       "text": "s4904",
+       "at": 4905
+      },
+      "at": 4906
+     }
+    ],
+    "userMentions": [
+     {
+      "message": {
+       "id": "s4907",
+       "number": 4908,
+       "channel": "s4909",
+       "from": "s4910",
+       "actor": {
+        "kind": "user",
+        "id": "s4911"
+       },
+       "name": "s4912",
+       "kind": "chat",
+       "text": "s4913",
+       "mentions": [],
+       "outcome": "completed",
+       "spoken": true,
+       "at": 4915,
+       "revision": 4916,
+       "reactions": [],
+       "attachments": [],
+       "embeds": []
+      },
+      "channel": "s4917",
+      "address": "s4918"
+     }
+    ]
+   },
+   "commits": {
+    "total": 4919,
+    "repos": [
+     {
+      "path": "s4920",
+      "commits": 4921
+     }
+    ]
+   },
+   "progress": {
+    "coins": 4922,
+    "streak": 4923,
+    "bestStreak": 4924,
+    "counts": {
+     "k4925": 4926
+    },
+    "unlocked": [
+     {
+      "id": "s4927",
+      "tier": 4928,
+      "at": 4929
+     }
+    ],
+    "title": {
+     "id": "s4930",
+     "tier": 4931
+    },
+    "agents": {
+     "k4932": {
+      "hired": 4933,
+      "harvested": 4934,
+      "failed": 4935
+     }
+    },
+    "multiplier": 4936
+   },
+   "issues": [
+    {
+     "constraints": {
+      "check": "s4937",
+      "scope": [
+       "s4938"
+      ],
+      "acceptance": false,
+      "frozen": [
+       "s4940"
+      ]
+     },
+     "id": "s4941",
+     "number": 4942,
+     "title": "s4943",
+     "description": "s4944",
+     "mandate": {
+      "originTriggerId": "s4945",
+      "strength": "explicit",
+      "maxBotReviewRounds": 4946,
+      "autoSubmitPr": false
+     },
+     "conflict": {
+      "base": "s4948",
+      "files": [
+       "s4949"
+      ]
+     },
+     "repo": "s4950",
+     "assignments": [
+      {
+       "id": "s4951",
+       "issue": "s4952",
+       "agent": "s4953",
+       "assignedAt": 4954,
+       "executions": []
+      }
+     ],
+     "priority": "urgent",
+     "rank": 4955,
+     "createdAt": 4956,
+     "queuedAt": 4957,
+     "closedAt": 4958,
+     "delivered": "merged",
+     "canceled": "dismissed",
+     "parent": "s4959",
+     "blockedBy": [
+      "s4960"
+     ],
+     "cron": "s4961",
+     "status": "backlog",
+     "moves": [
+      "backlog"
+     ],
+     "pullRequest": {
+      "url": "s4962",
+      "number": 4963,
+      "state": "open"
+     },
+     "deliver": "change",
+     "reviewedAt": 4964,
+     "findings": [
+      {
+       "id": "s4965",
+       "text": "s4966",
+       "at": 4967,
+       "resolved": true
+      }
+     ],
+     "questions": [
+      {
+       "question": "s4969",
+       "options": []
+      }
+     ],
+     "criteria": [
+      "s4970"
+     ],
+     "checks": [
+      {
+       "criterion": 4971,
+       "result": "met",
+       "proof": "s4972"
+      }
+     ],
+     "refining": {
+      "session": "s4973",
+      "name": "s4974"
+     },
+     "lastRun": {
+      "startedAt": 4975,
+      "endedAt": 4976,
+      "outcome": "completed"
+     },
+     "answer": {
+      "conclusion": "s4977",
+      "evidence": [
+       "s4978"
+      ],
+      "unsure": [
+       "s4979"
+      ],
+      "next": [
+       "s4980"
+      ]
+     },
+     "stage": {
+      "state": "draft",
+      "since": 4981,
+      "stuck": "failed",
+      "lead": "start",
+      "acts": [
+       {
+        "act": "start",
+        "does": "move",
+        "status": "backlog",
+        "words": "none"
+       }
+      ]
+     }
+    }
+   ],
+   "connectors": [
+    {
+     "id": "weixin",
+     "state": "off",
+     "qr": "s4982",
+     "pairCode": "s4983",
+     "channel": "s4984",
+     "user": "s4985",
+     "since": 4986,
+     "lastInbound": 4987,
+     "pausedUntil": 4988,
+     "pending": 4989,
+     "error": "s4990"
+    }
+   ],
+   "machines": [
+    {
+     "id": "s4991",
+     "name": "s4992",
+     "here": false,
+     "online": true,
+     "joinedAt": 4995
+    }
+   ],
+   "sessions": [
+    {
+     "id": "s4996",
+     "role": "orchestrator",
+     "name": "s4997",
+     "agent": "s4998",
+     "runtime": "s4999",
+     "brief": "s5000",
+     "repo": "s5001",
+     "branch": "s5002",
+     "worktree": "s5003",
+     "hiredAt": 5004,
+     "runs": 5005,
+     "lastRun": {
+      "outcome": "completed",
+      "summary": "s5006",
+      "at": 5007,
+      "spent": {
+       "tokens": 5008
+      },
+      "answer": {
+       "conclusion": "s5009",
+       "evidence": [],
+       "unsure": [],
+       "next": []
+      }
+     },
+     "spent": {
+      "tokens": 5010,
+      "cny": 5011
+     },
+     "channel": "s5012",
+     "issue": "s5013",
+     "refining": true,
+     "toolConnections": [
+      {
+       "server": "s5015",
+       "status": "unknown"
+      }
+     ],
+     "machine": "s5016",
+     "phase": {
+      "_tag": "working",
+      "since": 5017,
+      "quietSince": 5018,
+      "retry": {
+       "attempt": 5019
+      },
+      "doing": {
+       "action": "run_command",
+       "label": "s5020"
+      }
+     }
+    }
+   ],
+   "crons": [
+    {
+     "id": "s5021",
+     "name": "s5022",
+     "text": "s5023",
+     "channel": "s5024",
+     "agent": "s5025",
+     "repo": "s5026",
+     "when": {
+      "kind": "once",
+      "at": 5027
+     },
+     "tz": "s5028",
+     "enabled": false,
+     "created": 5030,
+     "lastRun": 5031,
+     "by": "user",
+     "pending": true
+    }
+   ],
+   "plays": {
+    "k5033": {
+     "station": 5034,
+     "toolsThisRun": 5035,
+     "counts": {
+      "k5036": 5037
+     },
+     "files": [
+      "s5038"
+     ],
+     "commands": [
+      "s5039"
+     ],
+     "runStartedAt": 5040,
+     "history": [
+      {
+       "at": 5041,
+       "action": "run_command",
+       "label": "s5042"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "call": "idle",
+   "callReason": "s5043",
+   "issues": [
+    {
+     "id": "s5044",
+     "number": 5045,
+     "title": "s5046",
+     "description": "s5047",
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 5048,
+      "autoSubmitPr": false
+     },
+     "assignments": [
+      {
+       "id": "s5050",
+       "issue": "s5051",
+       "agent": "s5052",
+       "assignedAt": 5053,
+       "executions": []
+      }
+     ],
+     "priority": "urgent",
+     "createdAt": 5054,
+     "blockedBy": [
+      "s5055"
+     ],
+     "status": "backlog",
+     "moves": [
+      "backlog"
+     ],
+     "deliver": "change",
+     "findings": [
+      {
+       "id": "s5056",
+       "text": "s5057",
+       "at": 5058,
+       "resolved": false
+      }
+     ],
+     "questions": [
+      {
+       "question": "s5060",
+       "options": []
+      }
+     ],
+     "criteria": [
+      "s5061"
+     ],
+     "checks": [
+      {
+       "criterion": 5062,
+       "result": "met",
+       "proof": "s5063"
+      }
+     ],
+     "stage": {
+      "state": "draft",
+      "acts": [
+       {
+        "act": "start",
+        "does": "move",
+        "status": "backlog",
+        "words": "none"
+       }
+      ]
+     }
+    }
+   ],
+   "connectors": [
+    {
+     "id": "weixin",
+     "state": "off",
+     "qr": "s5064",
+     "pairCode": "s5065",
+     "pending": 5066,
+     "error": "s5067"
+    }
+   ],
+   "machines": [
+    {
+     "id": "s5068",
+     "name": "s5069",
+     "here": true,
+     "online": false,
+     "joinedAt": 5072
+    }
+   ],
+   "sessions": [
+    {
+     "id": "s5073",
+     "role": "orchestrator",
+     "name": "s5074",
+     "agent": "s5075",
+     "runtime": "s5076",
+     "brief": "s5077",
+     "hiredAt": 5078,
+     "runs": 5079,
+     "refining": true,
+     "phase": {
+      "_tag": "working",
+      "since": 5081,
+      "doing": {
+       "action": "run_command",
+       "label": "s5082"
+      }
+     }
+    }
+   ],
+   "crons": [
+    {
+     "id": "s5083",
+     "name": "s5084",
+     "text": "s5085",
+     "channel": "s5086",
+     "when": {
+      "kind": "once",
+      "at": 5087
+     },
+     "tz": "s5088",
+     "enabled": false,
+     "created": 5090,
+     "by": "user",
+     "pending": false
+    }
+   ]
+  }
+ ],
+ "SpaceView": [
+  {
+   "call": "idle",
+   "callReason": "s5092",
+   "media": [
+    {
+     "kind": "image",
+     "id": "s5093",
+     "prompt": "s5094",
+     "model": "s5095",
+     "connection": "s5096",
+     "revision": 5097,
+     "source": {
+      "kind": "user"
+     },
+     "usage": {
+      "images": 1,
+      "width": 1768,
+      "height": 1769
+     },
+     "phase": "queued",
+     "phaseText": "s5100",
+     "problem": "s5101",
+     "attachment": {
+      "id": "s5102",
+      "name": "s5103",
+      "type": "s5104",
+      "size": 5105
+     },
+     "canCancel": true,
+     "canRetryDownload": false,
+     "createdAt": 5108,
+     "updatedAt": 5109
+    }
+   ],
+   "chat": {
+    "channels": [
+     {
+      "id": "s5110",
+      "type": "channel",
+      "default": false,
+      "peer": "s5112",
+      "orchestrator": "s5113",
+      "members": [
+       "s5114"
+      ],
+      "parent": "s5115",
+      "category": "s5116",
+      "position": 5117,
+      "archived": 5118,
+      "notify": "all",
+      "root": "s5119",
+      "rootNumber": 5120,
+      "name": "s5121",
+      "description": "s5122",
+      "repo": "s5123",
+      "subjectKind": "issue",
+      "subjectId": "s5124",
+      "lastNumber": 5125,
+      "replies": 5126,
+      "read": 5127,
+      "unread": 5128,
+      "title": "s5129",
+      "last": {
+       "from": "s5130",
+       "name": "s5131",
+       "text": "s5132",
+       "at": 5133
+      },
+      "at": 5134
+     }
+    ],
+    "userMentions": [
+     {
+      "message": {
+       "id": "s5135",
+       "number": 5136,
+       "channel": "s5137",
+       "from": "s5138",
+       "actor": {
+        "kind": "user",
+        "id": "s5139"
+       },
+       "name": "s5140",
+       "kind": "chat",
+       "text": "s5141",
+       "mentions": [],
+       "outcome": "completed",
+       "spoken": true,
+       "at": 5143,
+       "revision": 5144,
+       "reactions": [],
+       "attachments": [],
+       "embeds": []
+      },
+      "channel": "s5145",
+      "address": "s5146"
+     }
+    ]
+   },
+   "commits": {
+    "total": 5147,
+    "repos": [
+     {
+      "path": "s5148",
+      "commits": 5149
+     }
+    ]
+   },
+   "progress": {
+    "coins": 5150,
+    "streak": 5151,
+    "bestStreak": 5152,
+    "counts": {
+     "k5153": 5154
+    },
+    "unlocked": [
+     {
+      "id": "s5155",
+      "tier": 5156,
+      "at": 5157
+     }
+    ],
+    "title": {
+     "id": "s5158",
+     "tier": 5159
+    },
+    "agents": {
+     "k5160": {
+      "hired": 5161,
+      "harvested": 5162,
+      "failed": 5163
+     }
+    },
+    "multiplier": 5164
+   },
+   "issues": [
+    {
+     "constraints": {
+      "check": "s5165",
+      "scope": [
+       "s5166"
+      ],
+      "acceptance": false,
+      "frozen": [
+       "s5168"
+      ]
+     },
+     "id": "s5169",
+     "number": 5170,
+     "title": "s5171",
+     "description": "s5172",
+     "mandate": {
+      "originTriggerId": "s5173",
+      "strength": "explicit",
+      "maxBotReviewRounds": 5174,
+      "autoSubmitPr": false
+     },
+     "conflict": {
+      "base": "s5176",
+      "files": [
+       "s5177"
+      ]
+     },
+     "repo": "s5178",
+     "assignments": [
+      {
+       "id": "s5179",
+       "issue": "s5180",
+       "agent": "s5181",
+       "assignedAt": 5182,
+       "executions": []
+      }
+     ],
+     "priority": "urgent",
+     "rank": 5183,
+     "createdAt": 5184,
+     "queuedAt": 5185,
+     "closedAt": 5186,
+     "delivered": "merged",
+     "canceled": "dismissed",
+     "parent": "s5187",
+     "blockedBy": [
+      "s5188"
+     ],
+     "cron": "s5189",
+     "status": "backlog",
+     "moves": [
+      "backlog"
+     ],
+     "pullRequest": {
+      "url": "s5190",
+      "number": 5191,
+      "state": "open"
+     },
+     "deliver": "change",
+     "reviewedAt": 5192,
+     "findings": [
+      {
+       "id": "s5193",
+       "text": "s5194",
+       "at": 5195,
+       "resolved": true
+      }
+     ],
+     "questions": [
+      {
+       "question": "s5197",
+       "options": []
+      }
+     ],
+     "criteria": [
+      "s5198"
+     ],
+     "checks": [
+      {
+       "criterion": 5199,
+       "result": "met",
+       "proof": "s5200"
+      }
+     ],
+     "refining": {
+      "session": "s5201",
+      "name": "s5202"
+     },
+     "lastRun": {
+      "startedAt": 5203,
+      "endedAt": 5204,
+      "outcome": "completed"
+     },
+     "answer": {
+      "conclusion": "s5205",
+      "evidence": [
+       "s5206"
+      ],
+      "unsure": [
+       "s5207"
+      ],
+      "next": [
+       "s5208"
+      ]
+     },
+     "stage": {
+      "state": "draft",
+      "since": 5209,
+      "stuck": "failed",
+      "lead": "start",
+      "acts": [
+       {
+        "act": "start",
+        "does": "move",
+        "status": "backlog",
+        "words": "none"
+       }
+      ]
+     }
+    }
+   ],
+   "connectors": [
+    {
+     "id": "weixin",
+     "state": "off",
+     "qr": "s5210",
+     "pairCode": "s5211",
+     "channel": "s5212",
+     "user": "s5213",
+     "since": 5214,
+     "lastInbound": 5215,
+     "pausedUntil": 5216,
+     "pending": 5217,
+     "error": "s5218"
+    }
+   ],
+   "machines": [
+    {
+     "id": "s5219",
+     "name": "s5220",
+     "here": false,
+     "online": true,
+     "joinedAt": 5223
+    }
+   ],
+   "sessions": [
+    {
+     "id": "s5224",
+     "role": "orchestrator",
+     "name": "s5225",
+     "agent": "s5226",
+     "runtime": "s5227",
+     "brief": "s5228",
+     "repo": "s5229",
+     "branch": "s5230",
+     "worktree": "s5231",
+     "hiredAt": 5232,
+     "runs": 5233,
+     "lastRun": {
+      "outcome": "completed",
+      "summary": "s5234",
+      "at": 5235,
+      "spent": {
+       "tokens": 5236
+      },
+      "answer": {
+       "conclusion": "s5237",
+       "evidence": [],
+       "unsure": [],
+       "next": []
+      }
+     },
+     "spent": {
+      "tokens": 5238,
+      "cny": 5239
+     },
+     "channel": "s5240",
+     "issue": "s5241",
+     "refining": true,
+     "toolConnections": [
+      {
+       "server": "s5243",
+       "status": "unknown"
+      }
+     ],
+     "machine": "s5244",
+     "phase": {
+      "_tag": "working",
+      "since": 5245,
+      "quietSince": 5246,
+      "retry": {
+       "attempt": 5247
+      },
+      "doing": {
+       "action": "run_command",
+       "label": "s5248",
+       "actionText": "s5249"
+      }
+     },
+     "phaseText": "s5250"
+    }
+   ],
+   "crons": [
+    {
+     "id": "s5251",
+     "name": "s5252",
+     "text": "s5253",
+     "channel": "s5254",
+     "agent": "s5255",
+     "repo": "s5256",
+     "when": {
+      "kind": "once",
+      "at": 5257
+     },
+     "tz": "s5258",
+     "enabled": false,
+     "created": 5260,
+     "lastRun": 5261,
+     "by": "user",
+     "pending": true,
+     "whenText": "s5263",
+     "nextText": "s5264"
+    }
+   ]
+  },
+  {
+   "call": "idle",
+   "callReason": "s5265",
+   "issues": [
+    {
+     "id": "s5266",
+     "number": 5267,
+     "title": "s5268",
+     "description": "s5269",
+     "mandate": {
+      "strength": "explicit",
+      "maxBotReviewRounds": 5270,
+      "autoSubmitPr": false
+     },
+     "assignments": [
+      {
+       "id": "s5272",
+       "issue": "s5273",
+       "agent": "s5274",
+       "assignedAt": 5275,
+       "executions": []
+      }
+     ],
+     "priority": "urgent",
+     "createdAt": 5276,
+     "blockedBy": [
+      "s5277"
+     ],
+     "status": "backlog",
+     "moves": [
+      "backlog"
+     ],
+     "deliver": "change",
+     "findings": [
+      {
+       "id": "s5278",
+       "text": "s5279",
+       "at": 5280,
+       "resolved": false
+      }
+     ],
+     "questions": [
+      {
+       "question": "s5282",
+       "options": []
+      }
+     ],
+     "criteria": [
+      "s5283"
+     ],
+     "checks": [
+      {
+       "criterion": 5284,
+       "result": "met",
+       "proof": "s5285"
+      }
+     ],
+     "stage": {
+      "state": "draft",
+      "acts": [
+       {
+        "act": "start",
+        "does": "move",
+        "status": "backlog",
+        "words": "none"
+       }
+      ]
+     }
+    }
+   ],
+   "connectors": [
+    {
+     "id": "weixin",
+     "state": "off",
+     "qr": "s5286",
+     "pairCode": "s5287",
+     "pending": 5288,
+     "error": "s5289"
+    }
+   ],
+   "machines": [
+    {
+     "id": "s5290",
+     "name": "s5291",
+     "here": true,
+     "online": false,
+     "joinedAt": 5294
+    }
+   ],
+   "sessions": [
+    {
+     "id": "s5295",
+     "role": "orchestrator",
+     "name": "s5296",
+     "agent": "s5297",
+     "runtime": "s5298",
+     "brief": "s5299",
+     "hiredAt": 5300,
+     "runs": 5301,
+     "refining": true,
+     "phase": {
+      "_tag": "working",
+      "since": 5303,
+      "doing": {
+       "action": "run_command",
+       "label": "s5304",
+       "actionText": "s5305"
+      }
+     },
+     "phaseText": "s5306"
+    }
+   ],
+   "crons": [
+    {
+     "id": "s5307",
+     "name": "s5308",
+     "text": "s5309",
+     "channel": "s5310",
+     "when": {
+      "kind": "once",
+      "at": 5311
+     },
+     "tz": "s5312",
+     "enabled": false,
+     "created": 5314,
+     "by": "user",
+     "pending": false,
+     "whenText": "s5316",
+     "nextText": "s5317"
+    }
+   ]
+  }
+ ],
+ "NoticeLevel": [
+  "info",
+  "warn",
+  "error"
+ ],
+ "StateFrame": [
+  {
+   "seq": 5318,
+   "state": {
+    "call": "idle",
+    "callReason": "s5319",
+    "media": [
+     {
+      "kind": "image",
+      "id": "s5320",
+      "prompt": "s5321",
+      "model": "s5322",
+      "connection": "s5323",
+      "revision": 5324,
+      "source": {
+       "kind": "user"
+      },
+      "usage": {
+       "images": 1,
+       "width": 1995,
+       "height": 1996
+      },
+      "phase": "queued",
+      "phaseText": "s5327",
+      "problem": "s5328",
+      "attachment": {
+       "id": "s5329",
+       "name": "s5330",
+       "type": "s5331",
+       "size": 5332
+      },
+      "canCancel": false,
+      "canRetryDownload": true,
+      "createdAt": 5335,
+      "updatedAt": 5336
+     }
+    ],
+    "chat": {
+     "channels": [
+      {
+       "id": "s5337",
+       "type": "channel",
+       "default": true,
+       "category": "s5339",
+       "notify": "all",
+       "description": "s5340",
+       "subjectKind": "issue",
+       "replies": 5341,
+       "title": "s5342",
+       "at": 5343
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "s5344",
+        "number": 5345,
+        "channel": "s5346",
+        "from": "s5347",
+        "actor": {
+         "kind": "user",
+         "id": "s5348"
+        },
+        "name": "s5349",
+        "kind": "chat",
+        "text": "s5350",
+        "mentions": [],
+        "outcome": "completed",
+        "spoken": false,
+        "at": 5352,
+        "revision": 5353,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "s5354",
+       "address": "s5355"
+      }
+     ]
+    },
+    "commits": {
+     "total": 5356,
+     "repos": [
+      {
+       "path": "s5357",
+       "commits": 5358
+      }
+     ]
+    },
+    "progress": {
+     "coins": 5359,
+     "streak": 5360,
+     "bestStreak": 5361,
+     "counts": {
+      "k5362": 5363
+     },
+     "unlocked": [
+      {
+       "id": "s5364",
+       "tier": 5365,
+       "at": 5366
+      }
+     ],
+     "title": {
+      "id": "s5367",
+      "tier": 5368
+     },
+     "agents": {
+      "k5369": {
+       "hired": 5370,
+       "harvested": 5371,
+       "failed": 5372
+      }
+     },
+     "multiplier": 5373
+    },
+    "issues": [
+     {
+      "constraints": {
+       "scope": [],
+       "acceptance": true,
+       "frozen": []
+      },
+      "id": "s5375",
+      "number": 5376,
+      "title": "s5377",
+      "description": "s5378",
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 5379,
+       "autoSubmitPr": true
+      },
+      "conflict": {
+       "base": "s5381",
+       "files": []
+      },
+      "repo": "s5382",
+      "assignments": [
+       {
+        "id": "s5383",
+        "issue": "s5384",
+        "agent": "s5385",
+        "assignedAt": 5386,
+        "executions": []
+       }
+      ],
+      "priority": "urgent",
+      "rank": 5387,
+      "createdAt": 5388,
+      "queuedAt": 5389,
+      "closedAt": 5390,
+      "delivered": "merged",
+      "canceled": "dismissed",
+      "parent": "s5391",
+      "blockedBy": [
+       "s5392"
+      ],
+      "cron": "s5393",
+      "status": "backlog",
+      "moves": [
+       "backlog"
+      ],
+      "pullRequest": {
+       "url": "s5394",
+       "number": 5395,
+       "state": "open"
+      },
+      "deliver": "change",
+      "reviewedAt": 5396,
+      "findings": [
+       {
+        "id": "s5397",
+        "text": "s5398",
+        "at": 5399,
+        "resolved": true
+       }
+      ],
+      "questions": [
+       {
+        "question": "s5401",
+        "options": []
+       }
+      ],
+      "criteria": [
+       "s5402"
+      ],
+      "checks": [
+       {
+        "criterion": 5403,
+        "result": "met",
+        "proof": "s5404"
+       }
+      ],
+      "refining": {
+       "session": "s5405",
+       "name": "s5406"
+      },
+      "lastRun": {
+       "startedAt": 5407
+      },
+      "answer": {
+       "conclusion": "s5408",
+       "evidence": [],
+       "unsure": [],
+       "next": []
+      },
+      "stage": {
+       "state": "draft",
+       "acts": []
+      }
+     }
+    ],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "off",
+      "qr": "s5409",
+      "pairCode": "s5410",
+      "channel": "s5411",
+      "user": "s5412",
+      "since": 5413,
+      "lastInbound": 5414,
+      "pausedUntil": 5415,
+      "pending": 5416,
+      "error": "s5417"
+     }
+    ],
+    "machines": [
+     {
+      "id": "s5418",
+      "name": "s5419",
+      "here": true,
+      "online": false,
+      "joinedAt": 5422
+     }
+    ],
+    "sessions": [
+     {
+      "id": "s5423",
+      "role": "orchestrator",
+      "name": "s5424",
+      "agent": "s5425",
+      "runtime": "s5426",
+      "brief": "s5427",
+      "repo": "s5428",
+      "branch": "s5429",
+      "worktree": "s5430",
+      "hiredAt": 5431,
+      "runs": 5432,
+      "lastRun": {
+       "outcome": "completed",
+       "summary": "s5433",
+       "at": 5434
+      },
+      "spent": {
+       "tokens": 5435
+      },
+      "channel": "s5436",
+      "issue": "s5437",
+      "refining": true,
+      "toolConnections": [
+       {
+        "server": "s5439",
+        "status": "unknown"
+       }
+      ],
+      "machine": "s5440",
+      "phase": {
+       "_tag": "working",
+       "since": 5441,
+       "doing": {
+        "action": "run_command",
+        "label": "s5442",
+        "actionText": "s5443"
+       }
+      },
+      "phaseText": "s5444"
+     }
+    ],
+    "crons": [
+     {
+      "id": "s5445",
+      "name": "s5446",
+      "text": "s5447",
+      "channel": "s5448",
+      "agent": "s5449",
+      "repo": "s5450",
+      "when": {
+       "kind": "once",
+       "at": 5451
+      },
+      "tz": "s5452",
+      "enabled": false,
+      "created": 5454,
+      "lastRun": 5455,
+      "by": "user",
+      "pending": true,
+      "whenText": "s5457",
+      "nextText": "s5458"
+     }
+    ]
+   },
+   "inbox": [
+    {
+     "id": "s5459",
+     "kind": "review",
+     "from": {
+      "kind": "session",
+      "id": "s5460",
+      "name": "s5461",
+      "agent": "s5462"
+     },
+     "who": "s5463",
+     "text": "s5464",
+     "at": 5465,
+     "target": {
+      "kind": "session",
+      "id": "s5466"
+     },
+     "words": {
+      "label": "s5467",
+      "title": "s5468",
+      "body": "s5469",
+      "tray": "s5470"
+     }
+    }
+   ],
+   "view": {
+    "level": {
+     "level": 5471,
+     "xp": 5472,
+     "need": 5473
+    },
+    "plots": {
+     "k5474": {
+      "crop": "empty",
+      "badge": {
+       "text": "s5475",
+       "tone": "ripe"
+      }
+     }
+    },
+    "plays": {
+     "k5476": {
+      "station": 5477,
+      "toolsThisRun": 5478,
+      "counts": {
+       "k5479": 5480
+      },
+      "files": [
+       "s5481"
+      ],
+      "commands": [
+       "s5482"
+      ],
+      "runStartedAt": 5483,
+      "history": [
+       {
+        "at": 5484,
+        "action": "run_command",
+        "label": "s5485",
+        "actionText": "s5486"
+       }
+      ]
+     }
+    },
+    "achievements": [
+     {
+      "id": "s5487",
+      "tier": 5488,
+      "count": 5489,
+      "next": 5490
+     }
+    ]
+   },
+   "effects": [
+    {
+     "kind": "reward",
+     "sessionId": "s5491",
+     "coins": 5492,
+     "streak": 5493
+    }
+   ]
+  },
+  {
+   "seq": 5494,
+   "state": {
+    "call": "idle",
+    "callReason": "s5495",
+    "issues": [
+     {
+      "id": "s5496",
+      "number": 5497,
+      "title": "s5498",
+      "description": "s5499",
+      "mandate": {
+       "strength": "explicit",
+       "maxBotReviewRounds": 5500,
+       "autoSubmitPr": false
+      },
+      "assignments": [
+       {
+        "id": "s5502",
+        "issue": "s5503",
+        "agent": "s5504",
+        "assignedAt": 5505,
+        "executions": []
+       }
+      ],
+      "priority": "urgent",
+      "createdAt": 5506,
+      "blockedBy": [
+       "s5507"
+      ],
+      "status": "backlog",
+      "moves": [
+       "backlog"
+      ],
+      "deliver": "change",
+      "findings": [
+       {
+        "id": "s5508",
+        "text": "s5509",
+        "at": 5510,
+        "resolved": false
+       }
+      ],
+      "questions": [
+       {
+        "question": "s5512",
+        "options": []
+       }
+      ],
+      "criteria": [
+       "s5513"
+      ],
+      "checks": [
+       {
+        "criterion": 5514,
+        "result": "met",
+        "proof": "s5515"
+       }
+      ],
+      "stage": {
+       "state": "draft",
+       "acts": []
+      }
+     }
+    ],
+    "connectors": [
+     {
+      "id": "weixin",
+      "state": "off",
+      "qr": "s5516",
+      "pairCode": "s5517",
+      "pending": 5518,
+      "error": "s5519"
+     }
+    ],
+    "machines": [
+     {
+      "id": "s5520",
+      "name": "s5521",
+      "here": true,
+      "online": false,
+      "joinedAt": 5524
+     }
+    ],
+    "sessions": [
+     {
+      "id": "s5525",
+      "role": "orchestrator",
+      "name": "s5526",
+      "agent": "s5527",
+      "runtime": "s5528",
+      "brief": "s5529",
+      "hiredAt": 5530,
+      "runs": 5531,
+      "refining": true,
+      "phase": {
+       "_tag": "working",
+       "since": 5533,
+       "doing": {
+        "action": "run_command",
+        "label": "s5534",
+        "actionText": "s5535"
+       }
+      },
+      "phaseText": "s5536"
+     }
+    ],
+    "crons": [
+     {
+      "id": "s5537",
+      "name": "s5538",
+      "text": "s5539",
+      "channel": "s5540",
+      "when": {
+       "kind": "once",
+       "at": 5541
+      },
+      "tz": "s5542",
+      "enabled": false,
+      "created": 5544,
+      "by": "user",
+      "pending": false,
+      "whenText": "s5546",
+      "nextText": "s5547"
+     }
+    ]
+   },
+   "inbox": [
+    {
+     "id": "s5548",
+     "kind": "review",
+     "from": {
+      "kind": "session",
+      "id": "s5549",
+      "name": "s5550",
+      "agent": "s5551"
+     },
+     "who": "s5552",
+     "text": "s5553",
+     "at": 5554,
+     "target": {
+      "kind": "session",
+      "id": "s5555"
+     },
+     "words": {
+      "label": "s5556",
+      "title": "s5557",
+      "body": "s5558",
+      "tray": "s5559"
+     }
+    }
+   ],
+   "view": {
+    "level": {
+     "level": 5560,
+     "xp": 5561,
+     "need": 5562
+    },
+    "plots": {
+     "k5563": {
+      "crop": "empty"
+     }
+    },
+    "plays": {
+     "k5564": {
+      "station": 5565,
+      "toolsThisRun": 5566,
+      "counts": {
+       "k5567": 5568
+      },
+      "files": [
+       "s5569"
+      ],
+      "commands": [
+       "s5570"
+      ],
+      "history": [
+       {
+        "at": 5571,
+        "action": "run_command",
+        "label": "s5572",
+        "actionText": "s5573"
+       }
+      ]
+     }
+    },
+    "achievements": [
+     {
+      "id": "s5574",
+      "tier": 5575,
+      "count": 5576
+     }
+    ]
+   },
+   "effects": [
+    {
+     "kind": "reward",
+     "coins": 5577,
+     "streak": 5578
+    }
+   ]
+  }
+ ],
+ "Health": [
+  {
+   "ok": false,
+   "version": "s5580"
+  },
+  {
+   "ok": false,
+   "version": "s5582"
+  }
+ ],
+ "Fact": [
+  {
+   "type": "callChanged",
+   "at": 5583,
+   "state": "idle",
+   "reason": "s5584"
+  },
+  {
+   "type": "callChanged",
+   "at": 5585,
+   "state": "idle",
+   "reason": "s5586"
+  },
+  {
+   "type": "sessionToolChanged",
+   "at": 5587,
+   "id": "s5588",
+   "connection": {
+    "server": "s5589",
+    "status": "starting",
+    "reason": "s5590"
+   }
+  },
+  {
+   "type": "sessionToolChanged",
+   "at": 5591,
+   "id": "s5592",
+   "connection": {
+    "server": "s5593",
+    "status": "starting"
+   }
+  },
+  {
+   "type": "sessionToolsReset",
+   "at": 5594,
+   "id": "s5595"
+  },
+  {
+   "type": "sessionToolsReset",
+   "at": 5596,
+   "id": "s5597"
+  },
+  {
+   "type": "sessionPhaseChanged",
+   "at": 5598,
+   "id": "s5599",
+   "phase": {
+    "_tag": "resting"
+   },
+   "channel": "s5600",
+   "spent": {
+    "tokens": 5601,
+    "cny": 5602
+   },
+   "brief": "s5603"
+  },
+  {
+   "type": "sessionPhaseChanged",
+   "at": 5604,
+   "id": "s5605",
+   "phase": {
+    "_tag": "resting"
+   }
+  },
+  {
+   "type": "messageChanged",
+   "at": 5606,
+   "message": {
+    "id": "s5607",
+    "number": 5608,
+    "channel": "s5609",
+    "from": "s5610",
+    "actor": {
+     "kind": "agent",
+     "id": "s5611",
+     "role": "orchestrator",
+     "name": "s5612",
+     "forUser": false
+    },
+    "name": "s5614",
+    "agent": "s5615",
+    "kind": "chat",
+    "text": "s5616",
+    "mentions": [
+     "s5617"
+    ],
+    "session": "s5618",
+    "run": "s5619",
+    "outcome": "failed",
+    "spent": {
+     "tokens": 5620,
+     "cny": 5621
+    },
+    "spoken": true,
+    "sendKey": "s5623",
+    "at": 5624,
+    "revision": 5625,
+    "replyTo": 5626,
+    "edited": 5627,
+    "deleted": 5628,
+    "pinned": 5629,
+    "reactions": [
+     {
+      "emoji": "s5630",
+      "by": [
+       "s5631"
+      ]
+     }
+    ],
+    "attachments": [
+     {
+      "id": "s5632",
+      "name": "s5633",
+      "type": "s5634",
+      "size": 5635
+     }
+    ],
+    "embeds": [
+     {
+      "url": "s5636",
+      "title": "s5637",
+      "description": "s5638",
+      "site": "s5639",
+      "image": "s5640"
+     }
+    ],
+    "artifact": {
+     "id": "s5641",
+     "title": "s5642",
+     "body": "blocks",
+     "version": 5643,
+     "note": "s5644",
+     "display": "slides"
+    },
+    "blocks": [
+     {
+      "artifactId": "s5645",
+      "blockId": "s5646",
+      "rev": 5647,
+      "title": "s5648",
+      "type": "s5649",
+      "text": "s5650",
+      "nowRev": 5651,
+      "deleted": true
+     }
+    ]
+   },
+   "thread": "s5653",
+   "answers": "s5654"
+  },
+  {
+   "type": "messageChanged",
+   "at": 5655,
+   "message": {
+    "id": "s5656",
+    "number": 5657,
+    "channel": "s5658",
+    "from": "s5659",
+    "actor": {
+     "kind": "agent",
+     "id": "s5660",
+     "role": "orchestrator"
+    },
+    "name": "s5661",
+    "kind": "chat",
+    "text": "s5662",
+    "mentions": [
+     "s5663"
+    ],
+    "outcome": null,
+    "spoken": true,
+    "at": 5665,
+    "revision": 5666,
+    "reactions": [
+     {
+      "emoji": "s5667",
+      "by": [
+       "s5668"
+      ]
+     }
+    ],
+    "attachments": [
+     {
+      "id": "s5669",
+      "name": "s5670",
+      "type": "s5671",
+      "size": 5672
+     }
+    ],
+    "embeds": [
+     {
+      "url": "s5673",
+      "title": "s5674",
+      "description": "s5675",
+      "site": "s5676",
+      "image": "s5677"
+     }
+    ]
+   }
+  },
+  {
+   "type": "channelChanged",
+   "at": 5678,
+   "channel": {
+    "id": "s5679",
+    "type": "thread",
+    "default": true,
+    "peer": "s5681",
+    "orchestrator": "s5682",
+    "members": [
+     "s5683"
+    ],
+    "parent": "s5684",
+    "category": "s5685",
+    "position": 5686,
+    "archived": 5687,
+    "notify": "none",
+    "root": "s5688",
+    "rootNumber": 5689,
+    "name": "s5690",
+    "description": "s5691",
+    "repo": "s5692",
+    "subjectKind": "talk",
+    "subjectId": "s5693",
+    "lastNumber": 5694,
+    "replies": 5695,
+    "read": 5696,
+    "unread": 5697,
+    "title": "s5698",
+    "last": {
+     "from": "s5699",
+     "name": "s5700",
+     "text": "s5701",
+     "at": 5702
+    },
+    "at": 5703
+   }
+  },
+  {
+   "type": "channelChanged",
+   "at": 5704,
+   "channel": {
+    "id": "s5705",
+    "type": "thread",
+    "default": true,
+    "category": "s5707",
+    "notify": "none",
+    "description": "s5708",
+    "subjectKind": null,
+    "replies": 5709,
+    "title": "s5710",
+    "at": 5711
+   }
+  },
+  {
+   "type": "userMentionsChanged",
+   "at": 5712,
+   "mentions": [
+    {
+     "message": {
+      "id": "s5713",
+      "number": 5714,
+      "channel": "s5715",
+      "from": "s5716",
+      "actor": {
+       "kind": "user",
+       "id": "s5717"
+      },
+      "name": "s5718",
+      "agent": "s5719",
+      "kind": "report",
+      "text": "s5720",
+      "mentions": [
+       "s5721"
+      ],
+      "session": "s5722",
+      "run": "s5723",
+      "outcome": "completed",
+      "spent": {
+       "tokens": 5724
+      },
+      "spoken": false,
+      "sendKey": "s5726",
+      "at": 5727,
+      "revision": 5728,
+      "replyTo": 5729,
+      "edited": 5730,
+      "deleted": 5731,
+      "pinned": 5732,
+      "reactions": [
+       {
+        "emoji": "s5733",
+        "by": []
+       }
+      ],
+      "attachments": [
+       {
+        "id": "s5734",
+        "name": "s5735",
+        "type": "s5736",
+        "size": 5737
+       }
+      ],
+      "embeds": [
+       {
+        "url": "s5738",
+        "title": "s5739",
+        "description": "s5740",
+        "site": "s5741",
+        "image": "s5742"
+       }
+      ],
+      "artifact": {
+       "id": "s5743",
+       "title": "s5744",
+       "body": "blocks",
+       "version": 5745,
+       "note": "s5746"
+      },
+      "blocks": [
+       {
+        "artifactId": "s5747",
+        "blockId": "s5748",
+        "rev": 5749,
+        "title": "s5750"
+       }
+      ]
+     },
+     "channel": "s5751",
+     "address": "s5752"
+    }
+   ]
+  },
+  {
+   "type": "userMentionsChanged",
+   "at": 5753,
+   "mentions": [
+    {
+     "message": {
+      "id": "s5754",
+      "number": 5755,
+      "channel": "s5756",
+      "from": "s5757",
+      "actor": {
+       "kind": "user",
+       "id": "s5758"
+      },
+      "name": "s5759",
+      "kind": "report",
+      "text": "s5760",
+      "mentions": [
+       "s5761"
+      ],
+      "outcome": null,
+      "spoken": true,
+      "at": 5763,
+      "revision": 5764,
+      "reactions": [
+       {
+        "emoji": "s5765",
+        "by": []
+       }
+      ],
+      "attachments": [
+       {
+        "id": "s5766",
+        "name": "s5767",
+        "type": "s5768",
+        "size": 5769
+       }
+      ],
+      "embeds": [
+       {
+        "url": "s5770",
+        "title": "s5771",
+        "description": "s5772",
+        "site": "s5773",
+        "image": "s5774"
+       }
+      ]
+     },
+     "channel": "s5775",
+     "address": "s5776"
+    }
+   ]
+  },
+  {
+   "type": "sessionChanged",
+   "at": 5777,
+   "session": {
+    "id": "s5778",
+    "role": "worker",
+    "name": "s5779",
+    "agent": "s5780",
+    "runtime": "s5781",
+    "brief": "s5782",
+    "repo": "s5783",
+    "branch": "s5784",
+    "worktree": "s5785",
+    "hiredAt": 5786,
+    "runs": 5787,
+    "lastRun": {
+     "outcome": "failed",
+     "summary": "s5788",
+     "at": 5789,
+     "spent": {
+      "tokens": 5790,
+      "cny": 5791
+     },
+     "answer": {
+      "conclusion": "s5792",
+      "evidence": [
+       "s5793"
+      ],
+      "unsure": [
+       "s5794"
+      ],
+      "next": [
+       "s5795"
+      ]
+     }
+    },
+    "spent": {
+     "tokens": 5796,
+     "cny": 5797
+    },
+    "channel": "s5798",
+    "issue": "s5799",
+    "refining": true,
+    "toolConnections": [
+     {
+      "server": "s5801",
+      "status": "ready",
+      "reason": "s5802"
+     }
+    ],
+    "machine": "s5803",
+    "phase": {
+     "_tag": "failed"
+    }
+   }
+  },
+  {
+   "type": "sessionChanged",
+   "at": 5804,
+   "session": {
+    "id": "s5805",
+    "role": "worker",
+    "name": "s5806",
+    "agent": "s5807",
+    "runtime": "s5808",
+    "brief": "s5809",
+    "hiredAt": 5810,
+    "runs": 5811,
+    "refining": true,
+    "phase": {
+     "_tag": "failed"
+    }
+   }
+  },
+  {
+   "type": "sessionReported",
+   "at": 5813,
+   "id": "s5814",
+   "run": "s5815",
+   "outcome": "interrupted",
+   "phase": {
+    "_tag": "resting"
+   },
+   "summary": "s5816",
+   "runs": 5817,
+   "spent": {
+    "tokens": 5818,
+    "cny": 5819
+   },
+   "questions": [
+    {
+     "question": "s5820",
+     "options": [
+      "s5821"
+     ]
+    }
+   ],
+   "checks": [
+    {
+     "criterion": 5822,
+     "result": "unsure",
+     "proof": "s5823"
+    }
+   ],
+   "answer": {
+    "conclusion": "s5824",
+    "evidence": [
+     "s5825"
+    ],
+    "unsure": [
+     "s5826"
+    ],
+    "next": [
+     "s5827"
+    ]
+   }
+  },
+  {
+   "type": "sessionReported",
+   "at": 5828,
+   "id": "s5829",
+   "outcome": "interrupted",
+   "summary": "s5830",
+   "runs": 5831,
+   "questions": [
+    {
+     "question": "s5832",
+     "options": [
+      "s5833"
+     ]
+    }
+   ],
+   "checks": [
+    {
+     "criterion": 5834,
+     "result": "unsure",
+     "proof": "s5835"
+    }
+   ]
+  },
+  {
+   "type": "sessionLeft",
+   "at": 5836,
+   "id": "s5837",
+   "closed": "completed",
+   "merged": 5838
+  },
+  {
+   "type": "sessionLeft",
+   "at": 5839,
+   "id": "s5840"
+  },
+  {
+   "type": "progressChanged",
+   "at": 5841,
+   "progress": {
+    "coins": 5842,
+    "streak": 5843,
+    "bestStreak": 5844,
+    "counts": {
+     "k5845": 5846
+    },
+    "unlocked": [
+     {
+      "id": "s5847",
+      "tier": 5848,
+      "at": 5849
+     }
+    ],
+    "title": {
+     "id": "s5850",
+     "tier": 5851
+    },
+    "agents": {
+     "k5852": {
+      "hired": 5853,
+      "harvested": 5854,
+      "failed": 5855
+     }
+    },
+    "multiplier": 5856
+   },
+   "news": {
+    "coins": 5857,
+    "session": "s5858",
+    "unlocked": [
+     {
+      "id": "s5859",
+      "tier": 5860,
+      "at": 5861
+     }
+    ]
+   },
+   "commits": {
+    "total": 5862,
+    "repos": [
+     {
+      "path": "s5863",
+      "commits": 5864
+     }
+    ]
+   },
+   "station": {
+    "id": "s5865",
+    "station": 5866
+   }
+  },
+  {
+   "type": "progressChanged",
+   "at": 5867
+  },
+  {
+   "type": "issueChanged",
+   "at": 5868,
+   "issue": {
+    "constraints": {
+     "check": "s5869",
+     "scope": [
+      "s5870"
+     ],
+     "acceptance": false,
+     "frozen": [
+      "s5872"
+     ]
+    },
+    "id": "s5873",
+    "number": 5874,
+    "title": "s5875",
+    "description": "s5876",
+    "mandate": {
+     "originTriggerId": "s5877",
+     "strength": "inferred",
+     "maxBotReviewRounds": 5878,
+     "autoSubmitPr": false
+    },
+    "conflict": {
+     "base": "s5880",
+     "files": [
+      "s5881"
+     ]
+    },
+    "repo": "s5882",
+    "assignments": [
+     {
+      "id": "s5883",
+      "issue": "s5884",
+      "agent": "s5885",
+      "assignedAt": 5886,
+      "endedAt": 5887,
+      "executions": [
+       {
+        "kind": "orchestrator",
+        "session": "s5888",
+        "startedAt": 5889
+       }
+      ]
+     }
+    ],
+    "priority": "low",
+    "rank": 5890,
+    "createdAt": 5891,
+    "queuedAt": 5892,
+    "closedAt": 5893,
+    "delivered": "none",
+    "canceled": "lost",
+    "parent": "s5894",
+    "blockedBy": [
+     "s5895"
+    ],
+    "cron": "s5896",
+    "status": "canceled",
+    "moves": [
+     "canceled"
+    ],
+    "pullRequest": {
+     "url": "s5897",
+     "number": 5898,
+     "state": "closed"
+    },
+    "deliver": "pull_request",
+    "reviewedAt": 5899,
+    "findings": [
+     {
+      "id": "s5900",
+      "text": "s5901",
+      "at": 5902,
+      "resolved": false
+     }
+    ],
+    "questions": [
+     {
+      "question": "s5904",
+      "options": [
+       "s5905"
+      ]
+     }
+    ],
+    "criteria": [
+     "s5906"
+    ],
+    "checks": [
+     {
+      "criterion": 5907,
+      "result": "unsure",
+      "proof": "s5908"
+     }
+    ],
+    "refining": {
+     "session": "s5909",
+     "name": "s5910"
+    },
+    "lastRun": {
+     "startedAt": 5911,
+     "endedAt": 5912,
+     "outcome": "interrupted"
+    },
+    "answer": {
+     "conclusion": "s5913",
+     "evidence": [
+      "s5914"
+     ],
+     "unsure": [
+      "s5915"
+     ],
+     "next": [
+      "s5916"
+     ]
+    },
+    "stage": {
+     "state": "asking",
+     "since": 5917,
+     "stuck": "quiet",
+     "lead": "reopen",
+     "acts": [
+      {
+       "act": "reopen",
+       "does": "stop"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "type": "issueChanged",
+   "at": 5918,
+   "issue": {
+    "id": "s5919",
+    "number": 5920,
+    "title": "s5921",
+    "description": "s5922",
+    "mandate": {
+     "strength": "inferred",
+     "maxBotReviewRounds": 5923,
+     "autoSubmitPr": true
+    },
+    "assignments": [
+     {
+      "id": "s5925",
+      "issue": "s5926",
+      "agent": "s5927",
+      "assignedAt": 5928,
+      "executions": [
+       {
+        "kind": "orchestrator",
+        "session": "s5929",
+        "startedAt": 5930
+       }
+      ]
+     }
+    ],
+    "priority": "low",
+    "createdAt": 5931,
+    "blockedBy": [
+     "s5932"
+    ],
+    "status": "canceled",
+    "moves": [
+     "canceled"
+    ],
+    "deliver": "pull_request",
+    "findings": [
+     {
+      "id": "s5933",
+      "text": "s5934",
+      "at": 5935,
+      "resolved": true
+     }
+    ],
+    "questions": [
+     {
+      "question": "s5937",
+      "options": [
+       "s5938"
+      ]
+     }
+    ],
+    "criteria": [
+     "s5939"
+    ],
+    "checks": [
+     {
+      "criterion": 5940,
+      "result": "unsure",
+      "proof": "s5941"
+     }
+    ],
+    "stage": {
+     "state": "asking",
+     "acts": [
+      {
+       "act": "reopen",
+       "does": "stop"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "type": "issueRemoved",
+   "at": 5942,
+   "id": "s5943"
+  },
+  {
+   "type": "issueRemoved",
+   "at": 5944,
+   "id": "s5945"
+  },
+  {
+   "type": "channelRemoved",
+   "at": 5946,
+   "id": "s5947"
+  },
+  {
+   "type": "channelRemoved",
+   "at": 5948,
+   "id": "s5949"
+  },
+  {
+   "type": "cronChanged",
+   "at": 5950,
+   "cron": {
+    "id": "s5951",
+    "name": "s5952",
+    "text": "s5953",
+    "channel": "s5954",
+    "agent": "s5955",
+    "repo": "s5956",
+    "when": {
+     "kind": "cron",
+     "expr": "s5957"
+    },
+    "tz": "s5958",
+    "enabled": false,
+    "created": 5960,
+    "lastRun": 5961,
+    "by": "system",
+    "pending": true
+   }
+  },
+  {
+   "type": "cronChanged",
+   "at": 5963,
+   "cron": {
+    "id": "s5964",
+    "name": "s5965",
+    "text": "s5966",
+    "channel": "s5967",
+    "when": {
+     "kind": "cron",
+     "expr": "s5968"
+    },
+    "tz": "s5969",
+    "enabled": true,
+    "created": 5971,
+    "by": "system",
+    "pending": true
+   }
+  },
+  {
+   "type": "cronRemoved",
+   "at": 5973,
+   "id": "s5974"
+  },
+  {
+   "type": "cronRemoved",
+   "at": 5975,
+   "id": "s5976"
+  },
+  {
+   "type": "connectorChanged",
+   "at": 5977,
+   "status": {
+    "id": "feishu",
+    "state": "scanned",
+    "qr": "s5978",
+    "pairCode": "s5979",
+    "channel": "s5980",
+    "user": "s5981",
+    "since": 5982,
+    "lastInbound": 5983,
+    "pausedUntil": 5984,
+    "pending": 5985,
+    "error": "s5986"
+   }
+  },
+  {
+   "type": "connectorChanged",
+   "at": 5987,
+   "status": {
+    "id": "feishu",
+    "state": "scanned",
+    "qr": "s5988",
+    "pairCode": "s5989",
+    "pending": 5990,
+    "error": "s5991"
+   }
+  },
+  {
+   "type": "machineChanged",
+   "at": 5992,
+   "machine": {
+    "id": "s5993",
+    "name": "s5994",
+    "here": false,
+    "online": true,
+    "joinedAt": 5997
+   }
+  },
+  {
+   "type": "machineChanged",
+   "at": 5998,
+   "machine": {
+    "id": "s5999",
+    "name": "s6000",
+    "here": false,
+    "online": true,
+    "joinedAt": 6003
+   }
+  },
+  {
+   "type": "mediaChanged",
+   "at": 6004,
+   "jobs": [
+    {
+     "kind": "speech",
+     "id": "s6005",
+     "prompt": "s6006",
+     "model": "s6007",
+     "connection": "s6008",
+     "revision": 6009,
+     "source": {
+      "kind": "user"
+     },
+     "voice": "s6010",
+     "format": "wav",
+     "contentType": "s6011",
+     "metadata": {
+      "source": "file",
+      "sampleRate": 6013,
+      "duration": 6014,
+      "channels": 6015,
+      "bitDepth": 6016
+     },
+     "usage": {
+      "inputCharacters": 6016,
+      "promptTokens": 6017,
+      "completionTokens": 6018,
+      "totalTokens": 6019,
+      "inputAudioSeconds": 6020
+     },
+     "canResume": false,
+     "canRelease": true,
+     "phase": "downloading",
+     "phaseText": "s6023",
+     "problem": "s6024",
+     "attachment": {
+      "id": "s6025",
+      "name": "s6026",
+      "type": "s6027",
+      "size": 6028
+     },
+     "resultInput": {
+      "id": "s6029",
+      "kind": "image",
+      "name": "s6030",
+      "mime": "s6031",
+      "size": 6032,
+      "hash": "0000000000000000000000000000000000000000000000000000000000001791"
+     },
+     "canCancel": true,
+     "canRetryDownload": false,
+     "createdAt": 6036,
+     "updatedAt": 6037
+    }
+   ]
+  },
+  {
+   "type": "mediaChanged",
+   "at": 6038,
+   "jobs": [
+    {
+     "kind": "speech",
+     "id": "s6039",
+     "prompt": "s6040",
+     "model": "s6041",
+     "connection": "s6042",
+     "revision": 6043,
+     "source": {
+      "kind": "user"
+     },
+     "voice": "s6044",
+     "format": "wav",
+     "canRelease": false,
+     "phase": "downloading",
+     "phaseText": "s6046",
+     "problem": "s6047",
+     "resultInput": null,
+     "canCancel": true,
+     "canRetryDownload": false,
+     "createdAt": 6050,
+     "updatedAt": 6051
+    }
+   ]
+  }
+ ],
+ "LiveEvent": [
+  {
+   "type": "event",
+   "at": 6052,
+   "id": "s6053",
+   "activity": {
+    "seq": 6054,
+    "revision": 6055,
+    "time": 6056,
+    "type": "run/start",
+    "run": "s6057",
+    "call": 6058,
+    "under": 6059,
+    "text": "s6060",
+    "action": "run_command",
+    "actionText": "s6061",
+    "tool": "s6062",
+    "input": "s6063",
+    "output": "s6064",
+    "ok": false,
+    "tokens": {
+     "input": 6066,
+     "cacheRead": 6067,
+     "output": 6068
+    },
+    "connection": {
+     "server": "s6069",
+     "status": "unknown",
+     "reason": "s6070"
+    }
+   }
+  },
+  {
+   "type": "event",
+   "at": 6071,
+   "id": "s6072",
+   "activity": {
+    "seq": 6073,
+    "revision": 6074,
+    "time": 6075,
+    "type": "run/start",
+    "text": "s6076"
+   }
+  },
+  {
+   "type": "notice",
+   "at": 6077,
+   "level": "warn",
+   "text": "s6078"
+  },
+  {
+   "type": "notice",
+   "at": 6079,
+   "level": "warn",
+   "text": "s6080"
+  },
+  {
+   "type": "runtime",
+   "at": 6081,
+   "info": {
+    "id": "s6082",
+    "preset": {
+     "id": "s6083",
+     "label": "s6084",
+     "blurb": "s6085",
+     "look": {
+      "species": "fox",
+      "outfit": "rain",
+      "orchestrator": "auntie",
+      "build": "wheel",
+      "head": "dome",
+      "body": "s6086",
+      "trim": "s6087",
+      "hat": "s6088",
+      "eye": "s6089"
+     }
+    },
+    "support": {
+     "steer": true,
+     "refused": {
+      "k6091": "s6092"
+     },
+     "capabilities": [
+      "checkUpdate"
+     ],
+     "inProcess": false
+    },
+    "installation": {
+     "status": "checking"
+    },
+    "models": [
+     {
+      "id": "s6094",
+      "name": "s6095",
+      "effortLevels": [
+       "s6096"
+      ],
+      "isDefault": false
+     }
+    ],
+    "usage": {
+     "status": "login_required"
+    },
+    "skills": [
+     {
+      "name": "s6098",
+      "description": "s6099",
+      "source": "s6100",
+      "enabled": false
+     }
+    ],
+    "mcpServers": [
+     {
+      "name": "s6102",
+      "description": "s6103",
+      "source": "s6104",
+      "enabled": false
+     }
+    ],
+    "tools": [
+     {
+      "name": "s6106",
+      "description": "s6107",
+      "source": "s6108",
+      "enabled": false
+     }
+    ],
+    "settings": {
+     "enabled": true,
+     "binPath": "s6111",
+     "defaultModel": "s6112",
+     "defaultEffort": "s6113",
+     "env": {
+      "k6114": "s6115"
+     },
+     "dailyBudget": 6116,
+     "maxWorking": 6117
+    },
+    "spentToday": 6118,
+    "quota": {
+     "left": 6119,
+     "text": "s6120"
+    },
+    "stop": "s6121",
+    "checkedAt": 6122
+   }
+  },
+  {
+   "type": "runtime",
+   "at": 6123,
+   "info": {
+    "id": "s6124",
+    "preset": {
+     "id": "s6125",
+     "label": "s6126",
+     "blurb": "s6127",
+     "look": {
+      "species": null,
+      "outfit": null,
+      "orchestrator": null,
+      "build": "wheel",
+      "head": "dome",
+      "body": "s6128",
+      "trim": "s6129",
+      "hat": "s6130",
+      "eye": "s6131"
+     }
+    },
+    "support": {
+     "steer": true,
+     "refused": {
+      "k6133": "s6134"
+     },
+     "capabilities": [
+      "checkUpdate"
+     ],
+     "inProcess": false
+    },
+    "installation": {
+     "status": "checking"
+    },
+    "models": null,
+    "usage": null,
+    "skills": null,
+    "mcpServers": null,
+    "tools": null,
+    "settings": {
+     "enabled": true,
+     "binPath": "s6137",
+     "defaultModel": "s6138",
+     "defaultEffort": "s6139",
+     "env": {
+      "k6140": "s6141"
+     }
+    },
+    "stop": "s6142",
+    "checkedAt": 6143
+   }
+  }
+ ],
+ "ServerEvent": [
+  {
+   "type": "callChanged",
+   "at": 6144,
+   "state": "idle",
+   "reason": "s6145"
+  },
+  {
+   "type": "callChanged",
+   "at": 6146,
+   "state": "idle",
+   "reason": "s6147"
+  },
+  {
+   "type": "sessionToolChanged",
+   "at": 6148,
+   "id": "s6149",
+   "connection": {
+    "server": "s6150",
+    "status": "starting",
+    "reason": "s6151"
+   }
+  },
+  {
+   "type": "sessionToolChanged",
+   "at": 6152,
+   "id": "s6153",
+   "connection": {
+    "server": "s6154",
+    "status": "starting"
+   }
+  },
+  {
+   "type": "sessionToolsReset",
+   "at": 6155,
+   "id": "s6156"
+  },
+  {
+   "type": "sessionToolsReset",
+   "at": 6157,
+   "id": "s6158"
+  },
+  {
+   "type": "sessionPhaseChanged",
+   "at": 6159,
+   "id": "s6160",
+   "phase": {
+    "_tag": "resting"
+   },
+   "channel": "s6161",
+   "spent": {
+    "tokens": 6162,
+    "cny": 6163
+   },
+   "brief": "s6164"
+  },
+  {
+   "type": "sessionPhaseChanged",
+   "at": 6165,
+   "id": "s6166",
+   "phase": {
+    "_tag": "resting"
+   }
+  },
+  {
+   "type": "messageChanged",
+   "at": 6167,
+   "message": {
+    "id": "s6168",
+    "number": 6169,
+    "channel": "s6170",
+    "from": "s6171",
+    "actor": {
+     "kind": "agent",
+     "id": "s6172",
+     "role": "orchestrator",
+     "name": "s6173",
+     "forUser": true
+    },
+    "name": "s6175",
+    "agent": "s6176",
+    "kind": "chat",
+    "text": "s6177",
+    "mentions": [
+     "s6178"
+    ],
+    "session": "s6179",
+    "run": "s6180",
+    "outcome": "failed",
+    "spent": {
+     "tokens": 6181,
+     "cny": 6182
+    },
+    "spoken": false,
+    "sendKey": "s6184",
+    "at": 6185,
+    "revision": 6186,
+    "replyTo": 6187,
+    "edited": 6188,
+    "deleted": 6189,
+    "pinned": 6190,
+    "reactions": [
+     {
+      "emoji": "s6191",
+      "by": [
+       "s6192"
+      ]
+     }
+    ],
+    "attachments": [
+     {
+      "id": "s6193",
+      "name": "s6194",
+      "type": "s6195",
+      "size": 6196
+     }
+    ],
+    "embeds": [
+     {
+      "url": "s6197",
+      "title": "s6198",
+      "description": "s6199",
+      "site": "s6200",
+      "image": "s6201"
+     }
+    ],
+    "artifact": {
+     "id": "s6202",
+     "title": "s6203",
+     "body": "blocks",
+     "version": 6204,
+     "note": "s6205",
+     "display": "slides"
+    },
+    "blocks": [
+     {
+      "artifactId": "s6206",
+      "blockId": "s6207",
+      "rev": 6208,
+      "title": "s6209",
+      "type": "s6210",
+      "text": "s6211",
+      "nowRev": 6212,
+      "deleted": false
+     }
+    ]
+   },
+   "thread": "s6214",
+   "answers": "s6215"
+  },
+  {
+   "type": "messageChanged",
+   "at": 6216,
+   "message": {
+    "id": "s6217",
+    "number": 6218,
+    "channel": "s6219",
+    "from": "s6220",
+    "actor": {
+     "kind": "agent",
+     "id": "s6221",
+     "role": "orchestrator"
+    },
+    "name": "s6222",
+    "kind": "chat",
+    "text": "s6223",
+    "mentions": [
+     "s6224"
+    ],
+    "outcome": null,
+    "spoken": false,
+    "at": 6226,
+    "revision": 6227,
+    "reactions": [
+     {
+      "emoji": "s6228",
+      "by": [
+       "s6229"
+      ]
+     }
+    ],
+    "attachments": [
+     {
+      "id": "s6230",
+      "name": "s6231",
+      "type": "s6232",
+      "size": 6233
+     }
+    ],
+    "embeds": [
+     {
+      "url": "s6234",
+      "title": "s6235",
+      "description": "s6236",
+      "site": "s6237",
+      "image": "s6238"
+     }
+    ]
+   }
+  },
+  {
+   "type": "channelChanged",
+   "at": 6239,
+   "channel": {
+    "id": "s6240",
+    "type": "thread",
+    "default": false,
+    "peer": "s6242",
+    "orchestrator": "s6243",
+    "members": [
+     "s6244"
+    ],
+    "parent": "s6245",
+    "category": "s6246",
+    "position": 6247,
+    "archived": 6248,
+    "notify": "none",
+    "root": "s6249",
+    "rootNumber": 6250,
+    "name": "s6251",
+    "description": "s6252",
+    "repo": "s6253",
+    "subjectKind": "talk",
+    "subjectId": "s6254",
+    "lastNumber": 6255,
+    "replies": 6256,
+    "read": 6257,
+    "unread": 6258,
+    "title": "s6259",
+    "last": {
+     "from": "s6260",
+     "name": "s6261",
+     "text": "s6262",
+     "at": 6263
+    },
+    "at": 6264
+   }
+  },
+  {
+   "type": "channelChanged",
+   "at": 6265,
+   "channel": {
+    "id": "s6266",
+    "type": "thread",
+    "default": false,
+    "category": "s6268",
+    "notify": "none",
+    "description": "s6269",
+    "subjectKind": null,
+    "replies": 6270,
+    "title": "s6271",
+    "at": 6272
+   }
+  },
+  {
+   "type": "userMentionsChanged",
+   "at": 6273,
+   "mentions": [
+    {
+     "message": {
+      "id": "s6274",
+      "number": 6275,
+      "channel": "s6276",
+      "from": "s6277",
+      "actor": {
+       "kind": "user",
+       "id": "s6278"
+      },
+      "name": "s6279",
+      "agent": "s6280",
+      "kind": "report",
+      "text": "s6281",
+      "mentions": [
+       "s6282"
+      ],
+      "session": "s6283",
+      "run": "s6284",
+      "outcome": "completed",
+      "spent": {
+       "tokens": 6285
+      },
+      "spoken": true,
+      "sendKey": "s6287",
+      "at": 6288,
+      "revision": 6289,
+      "replyTo": 6290,
+      "edited": 6291,
+      "deleted": 6292,
+      "pinned": 6293,
+      "reactions": [
+       {
+        "emoji": "s6294",
+        "by": []
+       }
+      ],
+      "attachments": [
+       {
+        "id": "s6295",
+        "name": "s6296",
+        "type": "s6297",
+        "size": 6298
+       }
+      ],
+      "embeds": [
+       {
+        "url": "s6299",
+        "title": "s6300",
+        "description": "s6301",
+        "site": "s6302",
+        "image": "s6303"
+       }
+      ],
+      "artifact": {
+       "id": "s6304",
+       "title": "s6305",
+       "body": "blocks",
+       "version": 6306,
+       "note": "s6307"
+      },
+      "blocks": [
+       {
+        "artifactId": "s6308",
+        "blockId": "s6309",
+        "rev": 6310,
+        "title": "s6311"
+       }
+      ]
+     },
+     "channel": "s6312",
+     "address": "s6313"
+    }
+   ]
+  },
+  {
+   "type": "userMentionsChanged",
+   "at": 6314,
+   "mentions": [
+    {
+     "message": {
+      "id": "s6315",
+      "number": 6316,
+      "channel": "s6317",
+      "from": "s6318",
+      "actor": {
+       "kind": "user",
+       "id": "s6319"
+      },
+      "name": "s6320",
+      "kind": "report",
+      "text": "s6321",
+      "mentions": [
+       "s6322"
+      ],
+      "outcome": null,
+      "spoken": false,
+      "at": 6324,
+      "revision": 6325,
+      "reactions": [
+       {
+        "emoji": "s6326",
+        "by": []
+       }
+      ],
+      "attachments": [
+       {
+        "id": "s6327",
+        "name": "s6328",
+        "type": "s6329",
+        "size": 6330
+       }
+      ],
+      "embeds": [
+       {
+        "url": "s6331",
+        "title": "s6332",
+        "description": "s6333",
+        "site": "s6334",
+        "image": "s6335"
+       }
+      ]
+     },
+     "channel": "s6336",
+     "address": "s6337"
+    }
+   ]
+  },
+  {
+   "type": "sessionChanged",
+   "at": 6338,
+   "session": {
+    "id": "s6339",
+    "role": "worker",
+    "name": "s6340",
+    "agent": "s6341",
+    "runtime": "s6342",
+    "brief": "s6343",
+    "repo": "s6344",
+    "branch": "s6345",
+    "worktree": "s6346",
+    "hiredAt": 6347,
+    "runs": 6348,
+    "lastRun": {
+     "outcome": "failed",
+     "summary": "s6349",
+     "at": 6350,
+     "spent": {
+      "tokens": 6351,
+      "cny": 6352
+     },
+     "answer": {
+      "conclusion": "s6353",
+      "evidence": [
+       "s6354"
+      ],
+      "unsure": [
+       "s6355"
+      ],
+      "next": [
+       "s6356"
+      ]
+     }
+    },
+    "spent": {
+     "tokens": 6357,
+     "cny": 6358
+    },
+    "channel": "s6359",
+    "issue": "s6360",
+    "refining": false,
+    "toolConnections": [
+     {
+      "server": "s6362",
+      "status": "ready",
+      "reason": "s6363"
+     }
+    ],
+    "machine": "s6364",
+    "phase": {
+     "_tag": "failed"
+    }
+   }
+  },
+  {
+   "type": "sessionChanged",
+   "at": 6365,
+   "session": {
+    "id": "s6366",
+    "role": "worker",
+    "name": "s6367",
+    "agent": "s6368",
+    "runtime": "s6369",
+    "brief": "s6370",
+    "hiredAt": 6371,
+    "runs": 6372,
+    "refining": false,
+    "phase": {
+     "_tag": "failed"
+    }
+   }
+  },
+  {
+   "type": "sessionReported",
+   "at": 6374,
+   "id": "s6375",
+   "run": "s6376",
+   "outcome": "interrupted",
+   "phase": {
+    "_tag": "resting"
+   },
+   "summary": "s6377",
+   "runs": 6378,
+   "spent": {
+    "tokens": 6379,
+    "cny": 6380
+   },
+   "questions": [
+    {
+     "question": "s6381",
+     "options": [
+      "s6382"
+     ]
+    }
+   ],
+   "checks": [
+    {
+     "criterion": 6383,
+     "result": "unsure",
+     "proof": "s6384"
+    }
+   ],
+   "answer": {
+    "conclusion": "s6385",
+    "evidence": [
+     "s6386"
+    ],
+    "unsure": [
+     "s6387"
+    ],
+    "next": [
+     "s6388"
+    ]
+   }
+  },
+  {
+   "type": "sessionReported",
+   "at": 6389,
+   "id": "s6390",
+   "outcome": "interrupted",
+   "summary": "s6391",
+   "runs": 6392,
+   "questions": [
+    {
+     "question": "s6393",
+     "options": [
+      "s6394"
+     ]
+    }
+   ],
+   "checks": [
+    {
+     "criterion": 6395,
+     "result": "unsure",
+     "proof": "s6396"
+    }
+   ]
+  },
+  {
+   "type": "sessionLeft",
+   "at": 6397,
+   "id": "s6398",
+   "closed": "completed",
+   "merged": 6399
+  },
+  {
+   "type": "sessionLeft",
+   "at": 6400,
+   "id": "s6401"
+  },
+  {
+   "type": "progressChanged",
+   "at": 6402,
+   "progress": {
+    "coins": 6403,
+    "streak": 6404,
+    "bestStreak": 6405,
+    "counts": {
+     "k6406": 6407
+    },
+    "unlocked": [
+     {
+      "id": "s6408",
+      "tier": 6409,
+      "at": 6410
+     }
+    ],
+    "title": {
+     "id": "s6411",
+     "tier": 6412
+    },
+    "agents": {
+     "k6413": {
+      "hired": 6414,
+      "harvested": 6415,
+      "failed": 6416
+     }
+    },
+    "multiplier": 6417
+   },
+   "news": {
+    "coins": 6418,
+    "session": "s6419",
+    "unlocked": [
+     {
+      "id": "s6420",
+      "tier": 6421,
+      "at": 6422
+     }
+    ]
+   },
+   "commits": {
+    "total": 6423,
+    "repos": [
+     {
+      "path": "s6424",
+      "commits": 6425
+     }
+    ]
+   },
+   "station": {
+    "id": "s6426",
+    "station": 6427
+   }
+  },
+  {
+   "type": "progressChanged",
+   "at": 6428
+  },
+  {
+   "type": "issueChanged",
+   "at": 6429,
+   "issue": {
+    "constraints": {
+     "check": "s6430",
+     "scope": [
+      "s6431"
+     ],
+     "acceptance": true,
+     "frozen": [
+      "s6433"
+     ]
+    },
+    "id": "s6434",
+    "number": 6435,
+    "title": "s6436",
+    "description": "s6437",
+    "mandate": {
+     "originTriggerId": "s6438",
+     "strength": "inferred",
+     "maxBotReviewRounds": 6439,
+     "autoSubmitPr": true
+    },
+    "conflict": {
+     "base": "s6441",
+     "files": [
+      "s6442"
+     ]
+    },
+    "repo": "s6443",
+    "assignments": [
+     {
+      "id": "s6444",
+      "issue": "s6445",
+      "agent": "s6446",
+      "assignedAt": 6447,
+      "endedAt": 6448,
+      "executions": [
+       {
+        "kind": "orchestrator",
+        "session": "s6449",
+        "startedAt": 6450
+       }
+      ]
+     }
+    ],
+    "priority": "low",
+    "rank": 6451,
+    "createdAt": 6452,
+    "queuedAt": 6453,
+    "closedAt": 6454,
+    "delivered": "none",
+    "canceled": "lost",
+    "parent": "s6455",
+    "blockedBy": [
+     "s6456"
+    ],
+    "cron": "s6457",
+    "status": "canceled",
+    "moves": [
+     "canceled"
+    ],
+    "pullRequest": {
+     "url": "s6458",
+     "number": 6459,
+     "state": "closed"
+    },
+    "deliver": "pull_request",
+    "reviewedAt": 6460,
+    "findings": [
+     {
+      "id": "s6461",
+      "text": "s6462",
+      "at": 6463,
+      "resolved": true
+     }
+    ],
+    "questions": [
+     {
+      "question": "s6465",
+      "options": [
+       "s6466"
+      ]
+     }
+    ],
+    "criteria": [
+     "s6467"
+    ],
+    "checks": [
+     {
+      "criterion": 6468,
+      "result": "unsure",
+      "proof": "s6469"
+     }
+    ],
+    "refining": {
+     "session": "s6470",
+     "name": "s6471"
+    },
+    "lastRun": {
+     "startedAt": 6472,
+     "endedAt": 6473,
+     "outcome": "interrupted"
+    },
+    "answer": {
+     "conclusion": "s6474",
+     "evidence": [
+      "s6475"
+     ],
+     "unsure": [
+      "s6476"
+     ],
+     "next": [
+      "s6477"
+     ]
+    },
+    "stage": {
+     "state": "asking",
+     "since": 6478,
+     "stuck": "quiet",
+     "lead": "reopen",
+     "acts": [
+      {
+       "act": "reopen",
+       "does": "stop"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "type": "issueChanged",
+   "at": 6479,
+   "issue": {
+    "id": "s6480",
+    "number": 6481,
+    "title": "s6482",
+    "description": "s6483",
+    "mandate": {
+     "strength": "inferred",
+     "maxBotReviewRounds": 6484,
+     "autoSubmitPr": false
+    },
+    "assignments": [
+     {
+      "id": "s6486",
+      "issue": "s6487",
+      "agent": "s6488",
+      "assignedAt": 6489,
+      "executions": [
+       {
+        "kind": "orchestrator",
+        "session": "s6490",
+        "startedAt": 6491
+       }
+      ]
+     }
+    ],
+    "priority": "low",
+    "createdAt": 6492,
+    "blockedBy": [
+     "s6493"
+    ],
+    "status": "canceled",
+    "moves": [
+     "canceled"
+    ],
+    "deliver": "pull_request",
+    "findings": [
+     {
+      "id": "s6494",
+      "text": "s6495",
+      "at": 6496,
+      "resolved": false
+     }
+    ],
+    "questions": [
+     {
+      "question": "s6498",
+      "options": [
+       "s6499"
+      ]
+     }
+    ],
+    "criteria": [
+     "s6500"
+    ],
+    "checks": [
+     {
+      "criterion": 6501,
+      "result": "unsure",
+      "proof": "s6502"
+     }
+    ],
+    "stage": {
+     "state": "asking",
+     "acts": [
+      {
+       "act": "reopen",
+       "does": "stop"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "type": "issueRemoved",
+   "at": 6503,
+   "id": "s6504"
+  },
+  {
+   "type": "issueRemoved",
+   "at": 6505,
+   "id": "s6506"
+  },
+  {
+   "type": "channelRemoved",
+   "at": 6507,
+   "id": "s6508"
+  },
+  {
+   "type": "channelRemoved",
+   "at": 6509,
+   "id": "s6510"
+  },
+  {
+   "type": "cronChanged",
+   "at": 6511,
+   "cron": {
+    "id": "s6512",
+    "name": "s6513",
+    "text": "s6514",
+    "channel": "s6515",
+    "agent": "s6516",
+    "repo": "s6517",
+    "when": {
+     "kind": "cron",
+     "expr": "s6518"
+    },
+    "tz": "s6519",
+    "enabled": true,
+    "created": 6521,
+    "lastRun": 6522,
+    "by": "system",
+    "pending": false
+   }
+  },
+  {
+   "type": "cronChanged",
+   "at": 6524,
+   "cron": {
+    "id": "s6525",
+    "name": "s6526",
+    "text": "s6527",
+    "channel": "s6528",
+    "when": {
+     "kind": "cron",
+     "expr": "s6529"
+    },
+    "tz": "s6530",
+    "enabled": false,
+    "created": 6532,
+    "by": "system",
+    "pending": false
+   }
+  },
+  {
+   "type": "cronRemoved",
+   "at": 6534,
+   "id": "s6535"
+  },
+  {
+   "type": "cronRemoved",
+   "at": 6536,
+   "id": "s6537"
+  },
+  {
+   "type": "connectorChanged",
+   "at": 6538,
+   "status": {
+    "id": "feishu",
+    "state": "scanned",
+    "qr": "s6539",
+    "pairCode": "s6540",
+    "channel": "s6541",
+    "user": "s6542",
+    "since": 6543,
+    "lastInbound": 6544,
+    "pausedUntil": 6545,
+    "pending": 6546,
+    "error": "s6547"
+   }
+  },
+  {
+   "type": "connectorChanged",
+   "at": 6548,
+   "status": {
+    "id": "feishu",
+    "state": "scanned",
+    "qr": "s6549",
+    "pairCode": "s6550",
+    "pending": 6551,
+    "error": "s6552"
+   }
+  },
+  {
+   "type": "machineChanged",
+   "at": 6553,
+   "machine": {
+    "id": "s6554",
+    "name": "s6555",
+    "here": true,
+    "online": false,
+    "joinedAt": 6558
+   }
+  },
+  {
+   "type": "machineChanged",
+   "at": 6559,
+   "machine": {
+    "id": "s6560",
+    "name": "s6561",
+    "here": true,
+    "online": false,
+    "joinedAt": 6564
+   }
+  },
+  {
+   "type": "mediaChanged",
+   "at": 6565,
+   "jobs": [
+    {
+     "kind": "speech",
+     "id": "s6566",
+     "prompt": "s6567",
+     "model": "s6568",
+     "connection": "s6569",
+     "revision": 6570,
+     "source": {
+      "kind": "user"
+     },
+     "voice": "s6571",
+     "format": "wav",
+     "contentType": "s6572",
+     "metadata": {
+      "source": "file",
+      "sampleRate": 6574,
+      "duration": 6575,
+      "channels": 6576,
+      "bitDepth": 6577
+     },
+     "usage": {
+      "inputCharacters": 6577,
+      "promptTokens": 6578,
+      "completionTokens": 6579,
+      "totalTokens": 6580,
+      "inputAudioSeconds": 6581
+     },
+     "canResume": true,
+     "canRelease": false,
+     "phase": "downloading",
+     "phaseText": "s6584",
+     "problem": "s6585",
+     "attachment": {
+      "id": "s6586",
+      "name": "s6587",
+      "type": "s6588",
+      "size": 6589
+     },
+     "resultInput": {
+      "id": "s6590",
+      "kind": "image",
+      "name": "s6591",
+      "mime": "s6592",
+      "size": 6593,
+      "hash": "00000000000000000000000000000000000000000000000000000000000019c2"
+     },
+     "canCancel": false,
+     "canRetryDownload": true,
+     "createdAt": 6597,
+     "updatedAt": 6598
+    }
+   ]
+  },
+  {
+   "type": "mediaChanged",
+   "at": 6599,
+   "jobs": [
+    {
+     "kind": "speech",
+     "id": "s6600",
+     "prompt": "s6601",
+     "model": "s6602",
+     "connection": "s6603",
+     "revision": 6604,
+     "source": {
+      "kind": "user"
+     },
+     "voice": "s6605",
+     "format": "wav",
+     "canRelease": true,
+     "phase": "downloading",
+     "phaseText": "s6607",
+     "problem": "s6608",
+     "resultInput": null,
+     "canCancel": false,
+     "canRetryDownload": true,
+     "createdAt": 6611,
+     "updatedAt": 6612
+    }
+   ]
+  },
+  {
+   "type": "snapshot",
+   "at": 6613,
+   "state": {
+    "call": "error",
+    "callReason": "s6614",
+    "media": [
+     {
+      "id": "s6615",
+      "prompt": "s6616",
+      "model": "s6617",
+      "connection": "s6618",
+      "revision": 6619,
+      "source": {
+       "kind": "orchestrator",
+       "agent": "s6620",
+       "channel": "s6621"
+      },
+      "phase": "ready",
+      "phaseText": "s6622",
+      "problem": "s6623",
+      "format": "mp3",
+      "contentType": "s6624",
+      "metadata": {
+       "source": "provider"
+      },
+      "usage": {},
+      "input": {
+       "id": "s6625",
+       "kind": "video",
+       "name": "s6626",
+       "mime": "s6627",
+       "size": 6628,
+       "hash": "00000000000000000000000000000000000000000000000000000000000019e5"
+      },
+      "resultInput": {
+       "id": "s6630",
+       "kind": "video",
+       "name": "s6631",
+       "mime": "s6632",
+       "size": 6633,
+       "hash": "00000000000000000000000000000000000000000000000000000000000019ea"
+      },
+      "attachment": {
+       "id": "s6635",
+       "name": "s6636",
+       "type": "s6637",
+       "size": 6638
+      },
+      "previewInput": "s6639",
+      "result": {
+       "kind": "transcription",
+       "text": "s6640",
+       "segments": []
+      },
+      "canCancel": false,
+      "canRetryDownload": true,
+      "canResume": false,
+      "canCleanup": true,
+      "canRelease": false,
+      "createdAt": 6646,
+      "updatedAt": 6647,
+      "kind": "transcription",
+      "request": {
+       "id": "s6648",
+       "connection": "s6649",
+       "revision": 6650,
+       "input": "s6651",
+       "allowUpload": true
+      }
+     }
+    ],
+    "chat": {
+     "channels": [
+      {
+       "id": "s6652",
+       "type": "direct",
+       "default": false,
+       "category": "s6654",
+       "notify": "mentions",
+       "description": "s6655",
+       "subjectKind": "talk",
+       "replies": 6656,
+       "title": "s6657",
+       "at": 6658
+      }
+     ],
+     "userMentions": [
+      {
+       "message": {
+        "id": "s6659",
+        "number": 6660,
+        "channel": "s6661",
+        "from": "s6662",
+        "actor": {
+         "kind": "agent",
+         "id": "s6663",
+         "role": "worker"
+        },
+        "name": "s6664",
+        "kind": "notice",
+        "text": "s6665",
+        "mentions": [],
+        "outcome": "failed",
+        "spoken": true,
+        "at": 6667,
+        "revision": 6668,
+        "reactions": [],
+        "attachments": [],
+        "embeds": []
+       },
+       "channel": "s6669",
+       "address": "s6670"
+      }
+     ]
+    },
+    "commits": {
+     "total": 6671,
+     "repos": [
+      {
+       "path": "s6672",
+       "commits": 6673
+      }
+     ]
+    },
+    "progress": {
+     "coins": 6674,
+     "streak": 6675,
+     "bestStreak": 6676,
+     "counts": {
+      "k6677": 6678
+     },
+     "unlocked": [
+      {
+       "id": "s6679",
+       "tier": 6680,
+       "at": 6681
+      }
+     ],
+     "title": {
+      "id": "s6682",
+      "tier": 6683
+     },
+     "agents": {
+      "k6684": {
+       "hired": 6685,
+       "harvested": 6686,
+       "failed": 6687
+      }
+     },
+     "multiplier": 6688
+    },
+    "issues": [
+     {
+      "constraints": {
+       "scope": [],
+       "acceptance": false,
+       "frozen": []
+      },
+      "id": "s6690",
+      "number": 6691,
+      "title": "s6692",
+      "description": "s6693",
+      "mandate": {
+       "strength": "inferred",
+       "maxBotReviewRounds": 6694,
+       "autoSubmitPr": false
+      },
+      "conflict": {
+       "base": "s6696",
+       "files": []
+      },
+      "repo": "s6697",
+      "assignments": [
+       {
+        "id": "s6698",
+        "issue": "s6699",
+        "agent": "s6700",
+        "assignedAt": 6701,
+        "executions": []
+       }
+      ],
+      "priority": "low",
+      "rank": 6702,
+      "createdAt": 6703,
+      "queuedAt": 6704,
+      "closedAt": 6705,
+      "delivered": "merged_into_parent",
+      "canceled": "lost",
+      "parent": "s6706",
+      "blockedBy": [
+       "s6707"
+      ],
+      "cron": "s6708",
+      "status": "todo",
+      "moves": [
+       "todo"
+      ],
+      "pullRequest": {
+       "url": "s6709",
+       "number": 6710,
+       "state": "merged"
+      },
+      "deliver": "pull_request",
+      "reviewedAt": 6711,
+      "findings": [
+       {
+        "id": "s6712",
+        "text": "s6713",
+        "at": 6714,
+        "resolved": false
+       }
+      ],
+      "questions": [
+       {
+        "question": "s6716",
+        "options": []
+       }
+      ],
+      "criteria": [
+       "s6717"
+      ],
+      "checks": [
+       {
+        "criterion": 6718,
+        "result": "unmet",
+        "proof": "s6719"
+       }
+      ],
+      "refining": {
+       "session": "s6720",
+       "name": "s6721"
+      },
+      "lastRun": {
+       "startedAt": 6722
+      },
+      "answer": {
+       "conclusion": "s6723",
+       "evidence": [],
+       "unsure": [],
+       "next": []
+      },
+      "stage": {
+       "state": "asking",
+       "acts": []
+      }
+     }
+    ],
+    "connectors": [
+     {
+      "id": "feishu",
+      "state": "connected",
+      "qr": "s6724",
+      "pairCode": "s6725",
+      "channel": "s6726",
+      "user": "s6727",
+      "since": 6728,
+      "lastInbound": 6729,
+      "pausedUntil": 6730,
+      "pending": 6731,
+      "error": "s6732"
+     }
+    ],
+    "machines": [
+     {
+      "id": "s6733",
+      "name": "s6734",
+      "here": false,
+      "online": true,
+      "joinedAt": 6737
+     }
+    ],
+    "sessions": [
+     {
+      "id": "s6738",
+      "role": "worker",
+      "name": "s6739",
+      "agent": "s6740",
+      "runtime": "s6741",
+      "brief": "s6742",
+      "repo": "s6743",
+      "branch": "s6744",
+      "worktree": "s6745",
+      "hiredAt": 6746,
+      "runs": 6747,
+      "lastRun": {
+       "outcome": "failed",
+       "summary": "s6748",
+       "at": 6749
+      },
+      "spent": {
+       "tokens": 6750
+      },
+      "channel": "s6751",
+      "issue": "s6752",
+      "refining": false,
+      "toolConnections": [
+       {
+        "server": "s6754",
+        "status": "cancelled"
+       }
+      ],
+      "machine": "s6755",
+      "phase": {
+       "_tag": "closed",
+       "at": 6756,
+       "closed": "lost"
+      }
+     }
+    ],
+    "crons": [
+     {
+      "id": "s6757",
+      "name": "s6758",
+      "text": "s6759",
+      "channel": "s6760",
+      "agent": "s6761",
+      "repo": "s6762",
+      "when": {
+       "kind": "cron",
+       "expr": "s6763"
+      },
+      "tz": "s6764",
+      "enabled": false,
+      "created": 6766,
+      "lastRun": 6767,
+      "by": "agent",
+      "pending": true
+     }
+    ],
+    "plays": {
+     "k6769": {
+      "station": 6770,
+      "toolsThisRun": 6771,
+      "counts": {
+       "k6772": 6773
+      },
+      "files": [
+       "s6774"
+      ],
+      "commands": [
+       "s6775"
+      ],
+      "runStartedAt": 6776,
+      "history": [
+       {
+        "at": 6777,
+        "action": "thinking",
+        "label": "s6778"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "type": "snapshot",
+   "at": 6779,
+   "state": {
+    "call": "error",
+    "callReason": "s6780",
+    "issues": [
+     {
+      "id": "s6781",
+      "number": 6782,
+      "title": "s6783",
+      "description": "s6784",
+      "mandate": {
+       "strength": "inferred",
+       "maxBotReviewRounds": 6785,
+       "autoSubmitPr": true
+      },
+      "assignments": [
+       {
+        "id": "s6787",
+        "issue": "s6788",
+        "agent": "s6789",
+        "assignedAt": 6790,
+        "executions": []
+       }
+      ],
+      "priority": "low",
+      "createdAt": 6791,
+      "blockedBy": [
+       "s6792"
+      ],
+      "status": "todo",
+      "moves": [
+       "todo"
+      ],
+      "deliver": "pull_request",
+      "findings": [
+       {
+        "id": "s6793",
+        "text": "s6794",
+        "at": 6795,
+        "resolved": true
+       }
+      ],
+      "questions": [
+       {
+        "question": "s6797",
+        "options": []
+       }
+      ],
+      "criteria": [
+       "s6798"
+      ],
+      "checks": [
+       {
+        "criterion": 6799,
+        "result": "unmet",
+        "proof": "s6800"
+       }
+      ],
+      "stage": {
+       "state": "asking",
+       "acts": []
+      }
+     }
+    ],
+    "connectors": [
+     {
+      "id": "feishu",
+      "state": "connected",
+      "qr": "s6801",
+      "pairCode": "s6802",
+      "pending": 6803,
+      "error": "s6804"
+     }
+    ],
+    "machines": [
+     {
+      "id": "s6805",
+      "name": "s6806",
+      "here": false,
+      "online": true,
+      "joinedAt": 6809
+     }
+    ],
+    "sessions": [
+     {
+      "id": "s6810",
+      "role": "worker",
+      "name": "s6811",
+      "agent": "s6812",
+      "runtime": "s6813",
+      "brief": "s6814",
+      "hiredAt": 6815,
+      "runs": 6816,
+      "refining": false,
+      "phase": {
+       "_tag": "closed",
+       "at": 6818,
+       "closed": "lost"
+      }
+     }
+    ],
+    "crons": [
+     {
+      "id": "s6819",
+      "name": "s6820",
+      "text": "s6821",
+      "channel": "s6822",
+      "when": {
+       "kind": "cron",
+       "expr": "s6823"
+      },
+      "tz": "s6824",
+      "enabled": false,
+      "created": 6826,
+      "by": "agent",
+      "pending": false
+     }
+    ]
+   }
+  },
+  {
+   "type": "event",
+   "at": 6828,
+   "id": "s6829",
+   "activity": {
+    "seq": 6830,
+    "revision": 6831,
+    "time": 6832,
+    "type": "run/error",
+    "run": "s6833",
+    "call": 6834,
+    "under": 6835,
+    "text": "s6836",
+    "action": "web",
+    "actionText": "s6837",
+    "tool": "s6838",
+    "input": "s6839",
+    "output": "s6840",
+    "ok": false,
+    "tokens": {
+     "input": 6842,
+     "cacheRead": 6843,
+     "output": 6844
+    },
+    "connection": {
+     "server": "s6845",
+     "status": "unknown",
+     "reason": "s6846"
+    }
+   }
+  },
+  {
+   "type": "event",
+   "at": 6847,
+   "id": "s6848",
+   "activity": {
+    "seq": 6849,
+    "revision": 6850,
+    "time": 6851,
+    "type": "run/error",
+    "text": "s6852"
+   }
+  },
+  {
+   "type": "notice",
+   "at": 6853,
+   "level": "info",
+   "text": "s6854"
+  },
+  {
+   "type": "notice",
+   "at": 6855,
+   "level": "info",
+   "text": "s6856"
+  },
+  {
+   "type": "runtime",
+   "at": 6857,
+   "info": {
+    "id": "s6858",
+    "preset": {
+     "id": "s6859",
+     "label": "s6860",
+     "blurb": "s6861",
+     "look": {
+      "species": "rabbit",
+      "outfit": "rain",
+      "orchestrator": "gardener",
+      "build": "wheel",
+      "head": "dome",
+      "body": "s6862",
+      "trim": "s6863",
+      "hat": "s6864",
+      "eye": "s6865"
+     }
+    },
+    "support": {
+     "steer": true,
+     "refused": {
+      "k6867": "s6868"
+     },
+     "capabilities": [
+      "accountUsage"
+     ],
+     "inProcess": false
+    },
+    "installation": {
+     "status": "checking"
+    },
+    "models": [
+     {
+      "id": "s6870",
+      "name": "s6871",
+      "effortLevels": [
+       "s6872"
+      ],
+      "isDefault": false
+     }
+    ],
+    "usage": {
+     "status": "login_required"
+    },
+    "skills": [
+     {
+      "name": "s6874",
+      "description": "s6875",
+      "source": "s6876",
+      "enabled": false
+     }
+    ],
+    "mcpServers": [
+     {
+      "name": "s6878",
+      "description": "s6879",
+      "source": "s6880",
+      "enabled": false
+     }
+    ],
+    "tools": [
+     {
+      "name": "s6882",
+      "description": "s6883",
+      "source": "s6884",
+      "enabled": false
+     }
+    ],
+    "settings": {
+     "enabled": true,
+     "binPath": "s6887",
+     "defaultModel": "s6888",
+     "defaultEffort": "s6889",
+     "env": {
+      "k6890": "s6891"
+     },
+     "dailyBudget": 6892,
+     "maxWorking": 6893
+    },
+    "spentToday": 6894,
+    "quota": {
+     "left": 6895,
+     "text": "s6896"
+    },
+    "stop": "s6897",
+    "checkedAt": 6898
+   }
+  },
+  {
+   "type": "runtime",
+   "at": 6899,
+   "info": {
+    "id": "s6900",
+    "preset": {
+     "id": "s6901",
+     "label": "s6902",
+     "blurb": "s6903",
+     "look": {
+      "species": null,
+      "outfit": null,
+      "orchestrator": null,
+      "build": "wheel",
+      "head": "dome",
+      "body": "s6904",
+      "trim": "s6905",
+      "hat": "s6906",
+      "eye": "s6907"
+     }
+    },
+    "support": {
+     "steer": true,
+     "refused": {
+      "k6909": "s6910"
+     },
+     "capabilities": [
+      "accountUsage"
+     ],
+     "inProcess": false
+    },
+    "installation": {
+     "status": "checking"
+    },
+    "models": null,
+    "usage": null,
+    "skills": null,
+    "mcpServers": null,
+    "tools": null,
+    "settings": {
+     "enabled": true,
+     "binPath": "s6913",
+     "defaultModel": "s6914",
+     "defaultEffort": "s6915",
+     "env": {
+      "k6916": "s6917"
+     }
+    },
+    "stop": "s6918",
+    "checkedAt": 6919
+   }
+  }
+ ],
+ "ChannelFollowPayload": [
+  {
+   "id": "s7185",
+   "after": 7186
+  },
+  {
+   "id": "s7187",
+   "after": 7188
+  }
+ ],
+ "ChannelReportsPayload": [
+  {
+   "after": "s7189"
+  },
+  {}
+ ],
+ "ArtifactFollowPayload": [
+  {
+   "id": "s7190",
+   "after": 7191
+  },
+  {
+   "id": "s7192",
+   "after": 7193
+  }
+ ],
+ "ArtifactSuggestionFollowPayload": [
+  {
+   "id": "s7194"
+  },
+  {
+   "id": "s7195"
+  }
+ ]
+}

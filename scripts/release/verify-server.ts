@@ -1,9 +1,11 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { inspect } from "node:util";
+
+import { z } from "zod";
 
 import { pathOf } from "@vibevalley/protocol";
 
@@ -13,28 +15,15 @@ export interface VerificationResult {
   address: string;
 }
 
+/** Every built-in template but the default orchestrator's (crates/vibevalley-server/assets/agent/templates/index.json). */
 const errorCode = (error: unknown): unknown => (typeof error === "object" && error !== null && "code" in error ? error.code : undefined);
 
-function goBuildEnv(): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && key !== "GOROOT") env[key] = value;
-  }
-  env.CGO_ENABLED = "0";
-  return env;
-}
-
-function buildGoBinary(root: string, pkg: string, outPath: string): void {
-  const res = spawnSync("go", ["build", "-o", outPath, pkg], {
-    cwd: root,
-    env: goBuildEnv(),
-    encoding: "utf8",
-  });
-  if (res.error) throw res.error;
-  if (res.status !== 0) {
-    throw new Error(`go build ${pkg} failed (${res.status}): ${res.stderr || res.stdout}`);
-  }
-}
+const starters = () =>
+  z
+    .array(z.string())
+    .parse(JSON.parse(readFileSync(join(import.meta.dirname, "../..", "crates", "vibevalley-server", "assets", "agent", "templates", "index.json"), "utf8")))
+    .filter((id) => id !== "orchestrator")
+    .join(",");
 
 function isolatedEnvironment(home: string, work: string): Record<string, string> {
   const env: Record<string, string> = {};
@@ -42,10 +31,7 @@ function isolatedEnvironment(home: string, work: string): Record<string, string>
   for (const [key, value] of Object.entries(process.env)) {
     if (
       value !== undefined &&
-      key !== "GOROOT" &&
       (!key.startsWith("VIBEVALLEY_") || screenOptions.has(key)) &&
-      !key.startsWith("VIBE_") &&
-      !key.startsWith("MYGO_") &&
       !["DEEPSEEK_API_KEY", "AGORA_APP_ID", "AGORA_APP_CERTIFICATE"].includes(key)
     )
       env[key] = value;
@@ -54,10 +40,14 @@ function isolatedEnvironment(home: string, work: string): Record<string, string>
     ...env,
     VIBEVALLEY_HOME: home,
     VIBEVALLEY_WORK_ROOT: work,
+    VIBEVALLEY_PORT: "0",
+    VIBEVALLEY_VOICE_LINE_PORT: "0",
+    VIBEVALLEY_PATROL_HEARTBEAT_MINUTES: "0",
+    VIBEVALLEY_AGENT_STARTERS: starters(),
   };
 }
 
-// The child publishes this @vibevalley/home ServerReady receipt after binding its own port.
+// The child publishes this protocol.ServerReady receipt after binding its own port.
 export function readyAddress(line: string, pid: number): string | undefined {
   try {
     const ready = JSON.parse(line);
@@ -84,30 +74,36 @@ export async function runVerification(command: string[] = [], options: Verificat
   const work = join(evidence, "work");
   const binaries = join(evidence, "bin");
   for (const path of [home, work, binaries]) mkdirSync(path);
-  const env: Record<string, string> = {
-    ...isolatedEnvironment(home, work),
-    ...(options.scriptedHelper === true
-      ? {
-          VIBEVALLEY_TEST_RUNTIMES: "1",
-          VIBEVALLEY_AGENT_STARTERS: "backend,tester,frontend,docs,scout,night,claude,codex,lab,slides,collector,pages,reviewer",
-        }
-      : {}),
-  };
-  const serverBin = join(binaries, "vibe-server");
-  const cli = join(binaries, "vibe");
-  buildGoBinary(root, "./cmd/vibe-server", serverBin);
-  buildGoBinary(root, "./cmd/vibe", cli);
+  const env: Record<string, string> = { ...isolatedEnvironment(home, work), ...(options.scriptedHelper === true ? { VIBEVALLEY_TEST_RUNTIMES: "1" } : {}) };
+  // The Rust workspace's binaries (cargo build -p vibevalley-server -p vibevalley-cli); VIBEVALLEY_SERVER_BIN names another server.
+  const built = join(process.env.CARGO_TARGET_DIR ?? join(root, "target"), "debug");
+  const serverBin = process.env.VIBEVALLEY_SERVER_BIN ?? join(built, "vibevalley-server");
+  const cliBin = join(built, "vibevalley");
+  if (process.env.VIBEVALLEY_SERVER_BIN === undefined && (!existsSync(serverBin) || !existsSync(cliBin))) {
+    const build = spawnSync("cargo", ["build", "-q", "-p", "vibevalley-server", "-p", "vibevalley-cli"], { cwd: root, stdio: "inherit" });
+    if (build.status !== 0) throw new Error(`cargo build failed (${String(build.status ?? build.error)})`);
+  }
+  const cli = join(binaries, "vv");
+  writeFileSync(cli, `#!/bin/sh\nexec ${JSON.stringify(cliBin)} "$@"\n`, { mode: 0o755 });
   const log = join(evidence, "server.stdout.log");
   /** A child in a process group of its own; exited settles with its exit code. */
   interface Child {
-    pid: number;
+    pid: number | undefined;
     exited: Promise<number>;
     exitCode: () => number | null;
     process: ChildProcess;
   }
   const own = (p: ChildProcess): Child => {
-    const exited = new Promise<number>((done) => p.once("exit", (status, sig) => done(status ?? (sig ? 128 : 1))));
-    return { pid: p.pid!, exited, exitCode: () => p.exitCode, process: p };
+    let failed = false;
+    const exited = new Promise<number>((done) => {
+      p.once("exit", (status, sig) => done(status ?? (sig ? 128 : 1)));
+      p.once("error", (error) => {
+        failed = true;
+        writeFileSync(join(evidence, "spawn-error.log"), String(error));
+        done(1);
+      });
+    });
+    return { pid: p.pid, exited, exitCode: () => (failed ? 1 : p.exitCode), process: p };
   };
   const owned = new Set<Child>();
   let serverOutputDone: Promise<void> | undefined;
@@ -116,6 +112,7 @@ export async function runVerification(command: string[] = [], options: Verificat
   let address = "";
   let code = 1;
   const signal = (child: Child, signal: "SIGTERM" | "SIGKILL") => {
+    if (child.pid === undefined) return true;
     try {
       process.kill(-child.pid, signal);
       return true;
@@ -126,6 +123,7 @@ export async function runVerification(command: string[] = [], options: Verificat
     }
   };
   const alive = (child: Child) => {
+    if (child.pid === undefined) return false;
     try {
       process.kill(-child.pid, 0);
       return true;
@@ -160,22 +158,10 @@ export async function runVerification(command: string[] = [], options: Verificat
   };
   try {
     if (interrupted) throw new Error("verification interrupted before startup");
-    const web = join(root, "apps", "web", "dist");
+    // The receipt's pid is the server's own.
     const serverErr = openSync(join(evidence, "server.stderr.log"), "w");
-    const serverArgs = [
-      "--addr",
-      "127.0.0.1:0",
-      "--preview-addr",
-      "127.0.0.1:0",
-      "--db",
-      join(home, "vibevalley.db"),
-      "--work-root",
-      work,
-      "--ready-json",
-      ...(existsSync(join(web, "index.html")) ? ["--web", web] : []),
-    ];
-    const spawned = spawn(serverBin, serverArgs, {
-      cwd: root,
+    const spawned = spawn(serverBin, ["--ready-json"], {
+      cwd: evidence,
       env,
       detached: true,
       stdio: ["ignore", "pipe", serverErr],
@@ -195,7 +181,7 @@ export async function runVerification(command: string[] = [], options: Verificat
           while ((end = pending.indexOf("\n")) >= 0) {
             const line = pending.slice(0, end);
             pending = pending.slice(end + 1);
-            const announced = readyAddress(line, running.pid);
+            const announced = readyAddress(line, running.pid ?? -1);
             if (!address && announced) {
               address = announced;
               writeFileSync(join(evidence, "ready.json"), line + "\n");

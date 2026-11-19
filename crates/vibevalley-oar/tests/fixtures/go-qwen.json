@@ -1,0 +1,96 @@
+{
+  "compact": [
+    {
+      "session_id": "vendor-42",
+      "subtype": "compact_boundary",
+      "type": "system"
+    },
+    {
+      "session_id": "vendor-42",
+      "subtype": "success",
+      "type": "result",
+      "usage": {
+        "input_tokens": 30,
+        "output_tokens": 12
+      }
+    }
+  ],
+  "get_usage": [
+    {
+      "response": {
+        "request_id": "REQUEST",
+        "subtype": "success"
+      },
+      "type": "control_response"
+    }
+  ],
+  "initialize": [
+    {
+      "response": {
+        "request_id": "REQUEST",
+        "subtype": "success"
+      },
+      "type": "control_response"
+    },
+    {
+      "session_id": "vendor-42",
+      "subtype": "init",
+      "type": "system"
+    }
+  ],
+  "interrupt": [
+    {
+      "response": {
+        "request_id": "REQUEST",
+        "subtype": "success"
+      },
+      "type": "control_response"
+    },
+    {
+      "session_id": "vendor-42",
+      "subtype": "aborted",
+      "type": "result"
+    }
+  ],
+  "stop_task": [
+    {
+      "response": {
+        "request_id": "REQUEST",
+        "subtype": "success"
+      },
+      "type": "control_response"
+    },
+    {
+      "session_id": "vendor-42",
+      "status": "killed",
+      "subtype": "task_notification",
+      "task_id": "task-child",
+      "type": "system"
+    }
+  ],
+  "user": [
+    {
+      "message": {
+        "content": [
+          {
+            "text": "sdk reply: hello",
+            "type": "text"
+          }
+        ],
+        "id": "sdk-msg-1"
+      },
+      "session_id": "vendor-42",
+      "type": "assistant"
+    },
+    {
+      "is_error": false,
+      "session_id": "vendor-42",
+      "subtype": "success",
+      "type": "result",
+      "usage": {
+        "input_tokens": 30,
+        "output_tokens": 12
+      }
+    }
+  ]
+}

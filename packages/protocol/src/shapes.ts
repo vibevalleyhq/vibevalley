@@ -22,18 +22,7 @@ export {
   userId,
   type Validation,
 } from "./common/shapes";
-export {
-  eventsPath,
-  type Health,
-  type LiveEvent,
-  livePath,
-  pathOf,
-  type ServerEvent,
-  type SpaceState,
-  type SpaceView,
-  type StateFrame,
-  statePath,
-} from "./core/shapes";
+export { type Health, type LiveEvent, pathOf, type SpaceState, type SpaceView, type StateFrame } from "./core/shapes";
 export {
   type Agent,
   type AgentProblem,
@@ -46,7 +35,6 @@ export {
   type Look,
   type MCPServer,
   type OrchestratorLook,
-  OrchestratorLookValues,
   type Outfit,
   OutfitValues,
   type PersonaMode,
@@ -55,8 +43,6 @@ export {
   SpeciesValues,
 } from "./agent/shapes";
 export {
-  type AccountUsage,
-  type Installation,
   type InventoryEntry,
   quotaLow,
   type RuntimeCapability,
@@ -88,17 +74,15 @@ export type {
 } from "./repo/shapes";
 export {
   type DoingView,
-  type EventTokens,
+  type IssueAnswer,
   type Phase,
   type PhaseView,
   type Run,
   type RunTrigger,
   type Session,
   type SessionAction,
-  SessionActionValues,
   type SessionEvent,
   type SessionEventType,
-  type SessionScope,
   type SessionView,
   type ToolAction,
 } from "./session/shapes";
@@ -127,6 +111,7 @@ export {
   type ArtifactCard,
   type ArtifactContent,
   type ArtifactDisplay,
+  ArtifactKindValues,
   type ArtifactEvent,
   type ArtifactHtmlEdit,
   type ArtifactListRequest,
@@ -157,7 +142,6 @@ export {
   BlockTypeValues,
   type BlockUpdate,
   type HtmlAnchor,
-  type HtmlShellCommand,
   type HtmlShellMessage,
   type SpanMarks,
   type Suggestion,
@@ -214,7 +198,6 @@ export {
   type Issue,
   type IssueAct,
   type IssueAction,
-  type IssueAnswer,
   type IssueFilter,
   type IssueHistory,
   type IssueRefineRequest,
@@ -233,42 +216,17 @@ export {
   PriorityValues,
   type Question,
 } from "./issue/shapes";
-export type { Cron, CronRequest, CronUpdate, CronView } from "./cron/shapes";
-export type { InboxItem, InboxKind } from "./inbox/shapes";
-export type { OrchestratorEval, OrchestratorEvalRequest } from "./orchestrator/shapes";
+export { type Cron, type CronRequest, type CronUpdate, type CronView } from "./cron/shapes";
+export type { InboxItem } from "./inbox/shapes";
 export type {
-  Achievement,
-  AchievementCategory,
-  AchievementStanding,
-  AgentTally,
-  BadgeTone,
-  ChooseTitleRequest,
-  Crop,
-  FarmView,
-  GameEffect,
-  GameEffectAchievement,
-  GameEffectReward,
-  PlotView,
-  Progress,
-  SessionPlayView,
-} from "./game/shapes";
-export type { AnswerPairingRequest, LanPaired, LanPairing, LanPairRequest, LanStatus, SetOpenRequest } from "./lan/shapes";
-export {
-  type Approval,
-  type ApprovalAnswerRequest,
-  type ApprovalCollected,
-  type ApprovalCollectRequest,
-  type ApprovalCreated,
-  type ApprovalCreateRequest,
-  deviceKeyCookie,
-  type UserDevice,
-  type UserLogin,
-  type UserLoginRequest,
-  type UserPasswordRequest,
-  type UserStatus,
-  type UserUpdateRequest,
-} from "./user/shapes";
-export { type Attachment, attachmentPath, type AttachmentUpload } from "./attachment/shapes";
+  OrchestratorApproval,
+  OrchestratorApprovalListInput,
+  OrchestratorApprovalResolveInput,
+  OrchestratorEval,
+  OrchestratorEvalRequest,
+} from "./orchestrator/shapes";
+export type { Achievement, AgentTally, ChooseTitleRequest, Crop } from "./game/shapes";
+export { type Attachment, type AttachmentUpload } from "./attachment/shapes";
 export {
   type ConnectorID,
   ConnectorIDValues,
@@ -288,8 +246,6 @@ export {
   type Language,
   LanguageValues,
   ModelValues,
-  mossLinePath,
-  visionLinePath,
   type VoiceAnswer,
   VoiceAnswerAgoraModelValues,
   type VoiceASR,
@@ -337,14 +293,12 @@ export {
   type MediaImageJob,
   type MediaImageRequest,
   type MediaInput,
-  mediaInputContentPath,
   type MediaInputRequest,
   type MediaJob,
   type MediaJobRequest,
-  type MediaSpeechEvent,
+  type MediaSource,
   type MediaSpeechJob,
   type MediaSpeechRequest,
-  mediaSpeechStreamPath,
   type MediaUnderstandingAuthorizationRequest,
   type MediaUnderstandingJob,
   type MediaUnderstandingRequest,
@@ -365,4 +319,4 @@ export {
   type MediaSpeakersRequest,
   type MediaTranscriptionRequest,
   type MediaVoiceDesignRequest,
-} from "./media/audio-shapes";
+} from "./media/shapes";

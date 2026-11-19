@@ -22,7 +22,7 @@ Host（~/.vibevalley：密钥、农机、全局模板）
 
 一个 Space 有若干个 **Repo**、若干个 **Issue** 和一份 **Pkm**。Repo 是仓库本身；Issue 归 Space，用 `repo` 指向它要改的仓库，也可以不指（只调研、只写笔记）；指了仓库且档案开了 worktree 时，才为它切出 **Worktree**。Agent、Session、Run 是在这个 Space 里干活的执行和协同实体。
 
-现在工单、频道这些状态还在 Host 的库里（`$VIBEVALLEY_HOME/db`），所以切换 Space 目前只切 `repos/`、`worktrees/` 和 `pkm/`，看板还没跟着切；让整个 Space 自包含是 [Space 领域模型](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md) 还没做完的一步。
+现在工单、频道这些状态还在 Host 的库里（`$VIBEVALLEY_HOME/server.db`），所以切换 Space 目前只切 `repos/`、`worktrees/` 和 `pkm/`，看板还没跟着切；让整个 Space 自包含是 [Space 领域模型](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md) 还没做完的一步。
 
 ## 一件活怎么走
 

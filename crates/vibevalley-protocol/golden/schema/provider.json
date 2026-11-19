@@ -1,0 +1,347 @@
+{
+ "ProviderModel": [
+  {
+   "id": "s4490",
+   "owner": "s4491"
+  },
+  {
+   "id": "s4492",
+   "owner": "s4493"
+  }
+ ],
+ "ProviderConnection": [
+  {
+   "id": "s4494",
+   "name": "s4495",
+   "adapter": "moss",
+   "enabled": true,
+   "key": {
+    "source": "settings",
+    "hint": "s4497"
+   }
+  },
+  {
+   "id": "s4498",
+   "name": "s4499",
+   "adapter": "moss",
+   "enabled": true,
+   "key": {
+    "source": null
+   }
+  }
+ ],
+ "ProviderConnectionAdapter": [
+  "moss"
+ ],
+ "ProviderBinding": [
+  {
+   "connection": "s4501",
+   "model": "s4502"
+  },
+  {
+   "connection": "s4503",
+   "model": "s4504"
+  }
+ ],
+ "ProviderStatus": [
+  {
+   "revision": 4505,
+   "connections": [
+    {
+     "id": "s4506",
+     "name": "s4507",
+     "adapter": "moss",
+     "enabled": true,
+     "key": {
+      "source": "settings",
+      "hint": "s4509"
+     }
+    }
+   ],
+   "dictation": {
+    "connection": "s4510",
+    "model": "s4511"
+   },
+   "image": {
+    "connection": "s4512",
+    "model": "s4513"
+   },
+   "live": {
+    "connection": "s4514",
+    "model": "s4515"
+   },
+   "liveModels": [
+    "s4516"
+   ],
+   "speakers": {
+    "connection": "s4517",
+    "model": "s4518"
+   },
+   "speakersModels": [
+    "s4519"
+   ],
+   "voiceDesign": {
+    "connection": "s4520",
+    "model": "s4521"
+   },
+   "voiceDesignModels": [
+    "s4522"
+   ],
+   "transcription": {
+    "connection": "s4523",
+    "model": "s4524"
+   },
+   "transcriptionModels": [
+    "s4525"
+   ],
+   "vision": {
+    "connection": "s4526",
+    "model": "s4527"
+   },
+   "visionModels": [
+    "s4528"
+   ],
+   "dictationModels": [
+    "s4529"
+   ],
+   "imageModels": [
+    "s4530"
+   ],
+   "understanding": {
+    "connection": "s4531",
+    "model": "s4532"
+   },
+   "understandingModels": [
+    "s4533"
+   ],
+   "speech": {
+    "connection": "s4534",
+    "model": "s4535"
+   },
+   "speechModels": [
+    "s4536"
+   ]
+  },
+  {
+   "revision": 4537,
+   "connections": [
+    {
+     "id": "s4538",
+     "name": "s4539",
+     "adapter": "moss",
+     "enabled": true,
+     "key": {
+      "source": null
+     }
+    }
+   ],
+   "dictation": null,
+   "image": null,
+   "live": null,
+   "liveModels": [
+    "s4541"
+   ],
+   "speakers": null,
+   "speakersModels": [
+    "s4542"
+   ],
+   "voiceDesign": null,
+   "voiceDesignModels": [
+    "s4543"
+   ],
+   "transcription": null,
+   "transcriptionModels": [
+    "s4544"
+   ],
+   "vision": null,
+   "visionModels": [
+    "s4545"
+   ],
+   "dictationModels": [
+    "s4546"
+   ],
+   "imageModels": [
+    "s4547"
+   ],
+   "understanding": null,
+   "understandingModels": [
+    "s4548"
+   ],
+   "speech": null,
+   "speechModels": [
+    "s4549"
+   ]
+  }
+ ],
+ "ProviderConnectionUpdate": [
+  {
+   "id": "s4550",
+   "name": "s4551",
+   "adapter": "moss",
+   "enabled": true,
+   "key": "s4553"
+  },
+  {
+   "id": "s4554",
+   "name": "s4555",
+   "adapter": "moss",
+   "enabled": true
+  }
+ ],
+ "ProviderUpdate": [
+  {
+   "speech": {
+    "connection": "s4557",
+    "model": "s4558"
+   },
+   "revision": 4559,
+   "connections": [
+    {
+     "id": "s4560",
+     "name": "s4561",
+     "adapter": "moss",
+     "enabled": true,
+     "key": "s4563"
+    }
+   ],
+   "understanding": {
+    "connection": "s4564",
+    "model": "s4565"
+   },
+   "dictation": {
+    "connection": "s4566",
+    "model": "s4567"
+   },
+   "image": {
+    "connection": "s4568",
+    "model": "s4569"
+   },
+   "live": {
+    "connection": "s4570",
+    "model": "s4571"
+   },
+   "speakers": {
+    "connection": "s4572",
+    "model": "s4573"
+   },
+   "voiceDesign": {
+    "connection": "s4574",
+    "model": "s4575"
+   },
+   "transcription": {
+    "connection": "s4576",
+    "model": "s4577"
+   },
+   "vision": {
+    "connection": "s4578",
+    "model": "s4579"
+   }
+  },
+  {
+   "speech": null,
+   "revision": 4580,
+   "connections": [
+    {
+     "id": "s4581",
+     "name": "s4582",
+     "adapter": "moss",
+     "enabled": false
+    }
+   ],
+   "understanding": null,
+   "dictation": null,
+   "image": null,
+   "live": null,
+   "speakers": null,
+   "voiceDesign": null,
+   "transcription": null,
+   "vision": null
+  }
+ ],
+ "ProviderModelRequest": [
+  {
+   "connection": "s4584",
+   "revision": 4585
+  },
+  {
+   "connection": "s4586",
+   "revision": 4587
+  }
+ ],
+ "ProviderVoiceRequest": [
+  {
+   "connection": "s4588",
+   "revision": 4589,
+   "limit": 91,
+   "offset": 4591,
+   "after": "s4592",
+   "status": "s4593"
+  },
+  {
+   "connection": "s4594",
+   "revision": 4595
+  }
+ ],
+ "ProviderVoiceListing": [
+  {
+   "connection": "s4596",
+   "revision": 4597,
+   "voices": [
+    {
+     "id": "s4598",
+     "name": "s4599",
+     "createdAtSeconds": 4600
+    }
+   ],
+   "hasMore": false,
+   "nextCursor": "s4602"
+  },
+  {
+   "connection": "s4603",
+   "revision": 4604,
+   "voices": [
+    {
+     "id": "s4605",
+     "name": "s4606",
+     "createdAtSeconds": 4607
+    }
+   ],
+   "hasMore": true,
+   "nextCursor": null
+  }
+ ],
+ "ProviderVoiceListingVoices": [
+  {
+   "id": "s4609",
+   "name": "s4610",
+   "createdAtSeconds": 4611
+  },
+  {
+   "id": "s4612",
+   "name": "s4613",
+   "createdAtSeconds": 4614
+  }
+ ],
+ "ProviderModelListing": [
+  {
+   "connection": "s4615",
+   "revision": 4616,
+   "models": [
+    {
+     "id": "s4617",
+     "owner": "s4618"
+    }
+   ]
+  },
+  {
+   "connection": "s4619",
+   "revision": 4620,
+   "models": [
+    {
+     "id": "s4621",
+     "owner": "s4622"
+    }
+   ]
+  }
+ ]
+}

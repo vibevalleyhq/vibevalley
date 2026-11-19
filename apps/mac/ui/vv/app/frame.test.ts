@@ -1,0 +1,33 @@
+// An html artifact's web view page (features/artifact/frame.ts): the policy
+// where the page's head starts, the shell's runtime reading the asked slide,
+// and what the page says taken only when it is the protocol's.
+import "../polyfill";
+import { expect, test } from "nsh/test";
+
+import { createFrame, framed, withPolicy } from "../web/features/artifact/frame";
+
+test("the policy goes in after <head>, else after the doctype, else first", () => {
+  expect(withPolicy("<html><head><title>x</title></head></html>")).toMatch(/^<html><head><meta http-equiv="Content-Security-Policy"/u);
+  expect(withPolicy("<!doctype html><p>x</p>")).toMatch(/^<!doctype html><meta http-equiv/u);
+  expect(withPolicy("<p>x</p>")).toMatch(/^<meta http-equiv/u);
+});
+
+test("the shell's runtime reads the asked slide and stillness in place of location.search", () => {
+  const page = framed({ page: "<section>a</section><section>b</section>", display: "slides", theme: "dark", at: 1, still: true });
+  expect(page).toContain(`new URLSearchParams("at=1&still=1")`);
+  expect(page).toContain("vv-slides");
+  const plain = framed({ page: "<p>x</p>", display: "page", theme: "light" });
+  expect(plain).toContain(`new URLSearchParams("")`);
+});
+
+test("ready, at and a selection are taken; anything else a page posts is not", () => {
+  const frame = createFrame();
+  frame.heard(JSON.stringify({ vibevalley: "ready", display: "slides", pages: 3, titles: ["a", "b", "c"], notes: ["", "n", ""] }));
+  frame.heard(JSON.stringify({ vibevalley: "at", page: 2 }));
+  frame.heard(JSON.stringify({ vibevalley: "selection", anchor: { kind: "text", exact: "两条测试", prefix: "", suffix: "" } }));
+  frame.heard("not json");
+  frame.heard(JSON.stringify({ vibevalley: "ready", display: "nonsense" }));
+  expect(frame.shown().ready?.pages).toBe(3);
+  expect(frame.shown().at?.page).toBe(2);
+  expect(frame.picked()?.exact).toBe("两条测试");
+});

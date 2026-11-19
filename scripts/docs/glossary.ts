@@ -170,8 +170,8 @@ export function missingNames(glossary: Glossary, hasName: (identifier: string) =
   return problems;
 }
 
-/** Where the code names live: the shapes, the Go backend/desktop/CLI and SQL migrations, and the page. */
-const codeDirs = ["packages/protocol/src", "apps/web/src", "internal", "pkg", "cmd"];
+/** Where the code names live: the shapes, the Rust crates and native app, and the page. */
+const codeDirs = ["packages/protocol/src", "crates", "apps/mac/src", "apps/mac/ui", "apps/web/src"];
 
 if (import.meta.main) {
   const root = resolve(import.meta.dirname, "../..");
@@ -180,7 +180,7 @@ if (import.meta.main) {
     .split("\n")
     .filter((f) => f !== "" && existsSync(resolve(root, f)));
   const names = new Set<string>();
-  for (const file of tracked.filter((f) => codeDirs.some((d) => f.startsWith(d + "/")) && /\.(ts|tsx|sql|go)$/u.test(f)))
+  for (const file of tracked.filter((f) => codeDirs.some((d) => f.startsWith(d + "/")) && /\.(ts|tsx|sql|rs)$/u.test(f)))
     for (const m of readFileSync(resolve(root, file), "utf8").matchAll(/[A-Za-z_][A-Za-z0-9_]*/gu)) names.add(m[0]);
   const fileNames = new Set(tracked.map((f) => basename(f)));
   const problems = missingNames(

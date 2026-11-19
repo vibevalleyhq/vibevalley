@@ -27,8 +27,8 @@ function shapeOf(members: readonly TypeNode[], parent?: string, omit?: readonly 
   const nested = new Map<string, Shape>();
   for (const m of members) {
     const key = m.type === "TSPropertySignature" ? (m.key as TypeNode) : undefined;
-    if (key?.type !== "Identifier") continue;
-    const name = key.name as string;
+    const name = key?.type === "Identifier" ? (key.name as string) : key?.type === "Literal" ? (key.value as string) : undefined;
+    if (name === undefined) continue;
     keys.push(name);
     const literal = (m.typeAnnotation as TypeNode | null)?.typeAnnotation as TypeNode | undefined;
     if (literal?.type === "TSTypeLiteral") nested.set(name, shapeOf(literal.members as TypeNode[]));
@@ -36,11 +36,16 @@ function shapeOf(members: readonly TypeNode[], parent?: string, omit?: readonly 
   return { keys, nested, ...(parent ? { parent } : {}), ...(omit ? { omit } : {}) };
 }
 
-/** Each exported interface, read from the syntax tree: its own keys, its nested object types, the interface it extends. */
+/** Each exported interface or object type, read from the syntax tree: its own keys, its nested object types, the interface it extends. */
 function interfaces(path: string, source: string): Map<string, Shape> {
   const out = new Map<string, Shape>();
   for (const statement of (programOf(path, source).body as TypeNode[] | undefined) ?? []) {
     const d = statement.type === "ExportNamedDeclaration" ? (statement.declaration as TypeNode | null) : undefined;
+    const literal = d?.type === "TSTypeAliasDeclaration" ? (d.typeAnnotation as TypeNode) : undefined;
+    if (literal?.type === "TSTypeLiteral") {
+      out.set((d!.id as TypeNode).name as string, shapeOf(literal.members as TypeNode[]));
+      continue;
+    }
     if (d?.type !== "TSInterfaceDeclaration") continue;
     const heritage = (d.extends as TypeNode[] | undefined)?.[0];
     let parent = (heritage?.expression as TypeNode | undefined)?.name as string | undefined;
@@ -74,10 +79,12 @@ function differences(at: string, want: readonly string[], nested: Map<string, Sh
 }
 
 test("every struct Schema has the keys of its shape, nested object types too", () => {
-  // Each concept's shapes, read as one: an interface may extend one in another concept.
+  // Each concept's shapes (the ones written from the Rust contract and the few kept here), read as one: an interface may
+  // extend one in another concept.
   const files = readdirSync(new URL("./", import.meta.url), { withFileTypes: true })
-    .filter((d) => d.isDirectory() && existsSync(new URL(`./${d.name}/shapes.ts`, import.meta.url)))
-    .map((d) => new URL(`./${d.name}/shapes.ts`, import.meta.url));
+    .filter((d) => d.isDirectory())
+    .flatMap((d) => [`./${d.name}/shapes.gen.ts`, `./${d.name}/shapes.ts`].map((f) => new URL(f, import.meta.url)))
+    .filter((f) => existsSync(f));
   const shapes = new Map(files.flatMap((f) => [...interfaces(f.pathname, readFileSync(f, "utf8"))]));
   const keysOf = (name: string): string[] => {
     const s = shapes.get(name)!;

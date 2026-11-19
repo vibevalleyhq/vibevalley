@@ -1,0 +1,117 @@
+[
+ {
+  "id": "w5:quiet:1794500300000",
+  "kind": "quiet",
+  "from": {
+   "kind": "session",
+   "id": "w5",
+   "name": "Helper w5",
+   "agent": "lab"
+  },
+  "who": "Helper w5",
+  "text": "work on i5",
+  "at": 1794500300000,
+  "target": {
+   "kind": "session",
+   "id": "w5"
+  },
+  "words": {
+   "label": "好久没动静",
+   "title": "Helper w5 好一阵没动静了",
+   "body": "可能在跑很久的命令，也可能卡住了：看看它的轨迹。",
+   "tray": "Helper w5 好一阵没动静"
+  }
+ },
+ {
+  "id": "w6:fix:1",
+  "kind": "fix",
+  "from": {
+   "kind": "session",
+   "id": "w6",
+   "name": "Helper w6",
+   "agent": "lab"
+  },
+  "who": "Helper w6",
+  "text": "Build broke",
+  "at": 1794500300000,
+  "target": {
+   "kind": "session",
+   "id": "w6"
+  },
+  "words": {
+   "label": "活没做成",
+   "title": "Helper w6 没做成",
+   "body": "Build broke",
+   "tray": "Helper w6 没做成"
+  }
+ },
+ {
+  "id": "w4:review:2",
+  "kind": "review",
+  "from": {
+   "kind": "session",
+   "id": "w4",
+   "name": "Helper w4",
+   "agent": "lab"
+  },
+  "who": "Helper w4",
+  "text": "Found it",
+  "at": 1794500240000,
+  "target": {
+   "kind": "session",
+   "id": "w4"
+  },
+  "words": {
+   "label": "等你看",
+   "title": "Helper w4 做完了",
+   "body": "Found it",
+   "tray": "Helper w4 做完了，等你看"
+  }
+ },
+ {
+  "id": "w3:conflict:1",
+  "kind": "conflict",
+  "from": {
+   "kind": "session",
+   "id": "w3",
+   "name": "Helper w3",
+   "agent": "lab"
+  },
+  "who": "Helper w3",
+  "text": "1 个文件和主分支冲突",
+  "at": 1794500180000,
+  "target": {
+   "kind": "session",
+   "id": "w3"
+  },
+  "words": {
+   "label": "合不进去",
+   "title": "Helper w3 的活合进主分支会冲突",
+   "body": "1 个文件和主分支冲突",
+   "tray": "Helper w3 的活会冲突"
+  }
+ },
+ {
+  "id": "w2:ask:1",
+  "kind": "ask",
+  "from": {
+   "kind": "session",
+   "id": "w2",
+   "name": "Helper w2",
+   "agent": "lab"
+  },
+  "who": "Helper w2",
+  "text": "Which port?",
+  "at": 1794500120000,
+  "target": {
+   "kind": "session",
+   "id": "w2"
+  },
+  "words": {
+   "label": "有问题问你",
+   "title": "Helper w2 有问题问你",
+   "body": "Which port?",
+   "tray": ""
+  }
+ }
+]

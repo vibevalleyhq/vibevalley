@@ -1,0 +1,68 @@
+{
+  "producer": "refactor/native-vibevalley@275732ef1, modules/connector/store.rs, offline Store API",
+  "tables": {
+    "connector_account": [
+      {
+        "connector": "qq",
+        "secrets": "{\"appId\":\"offline-id\",\"secret\":\"offline-only\"}",
+        "user_id": "test-user",
+        "pair_code": null,
+        "cursor": "old-cursor",
+        "reply_context": null,
+        "last_inbound": null,
+        "paused_until": 4102444800000,
+        "connected_at": 5,
+        "channel_id": null
+      }
+    ],
+    "connector_inbound": [
+      {
+        "seq": 1,
+        "connector": "qq",
+        "ext_id": "old-in",
+        "from_id": "test-user",
+        "body": "",
+        "reply": "test-reply",
+        "quoted": "",
+        "message_id": "farm-old",
+        "created_at": 6,
+        "delivered": 1
+      }
+    ],
+    "connector_outbox": [
+      {
+        "seq": 1,
+        "connector": "feishu",
+        "message_id": "legacy-sent",
+        "body": "delivered part",
+        "state": "sent",
+        "ext_id": "ext-sent",
+        "error": null,
+        "created_at": 2,
+        "sent_at": 3
+      },
+      {
+        "seq": 2,
+        "connector": "feishu",
+        "message_id": "legacy-old",
+        "body": "obsolete part",
+        "state": "dropped",
+        "ext_id": null,
+        "error": "account retired",
+        "created_at": 4,
+        "sent_at": null
+      },
+      {
+        "seq": 3,
+        "connector": "qq",
+        "message_id": "paused-message",
+        "body": "waiting part",
+        "state": "pending",
+        "ext_id": null,
+        "error": null,
+        "created_at": 7,
+        "sent_at": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,238 @@
+{
+  "route": {
+    "missing": "这个页面不存在",
+    "invalid": "这个地址无效",
+    "home": "返回应用"
+  },
+  "place": {
+    "chat": {
+      "label": "聊天",
+      "hint": "频道和串"
+    },
+    "issues": {
+      "label": "工单",
+      "hint": "每张工单从写下到关上"
+    },
+    "agents": {
+      "label": "档案",
+      "hint": "档案：助手和帮工"
+    },
+    "runtimes": {
+      "label": "农机",
+      "hint": "机器上的编码 agent"
+    },
+    "repos": {
+      "label": "仓库",
+      "hint": "每个仓库一座岛"
+    },
+    "catalog": {
+      "label": "图鉴",
+      "hint": "素材：农场用的每张图、每个指针、每个声音，和工作台的界面零件"
+    },
+    "settings": {
+      "label": "设置",
+      "hint": "通用、外观、模型、记性、技能、语音、连接"
+    }
+  },
+  "link": {
+    "connecting": "连接中",
+    "open": "已连上",
+    "lost": "断了，重连中"
+  },
+  "rail": "工作台",
+  "farm": "回农场",
+  "farmShort": "农场",
+  "update": "更新",
+  "working": "开工中 · {n} 个在干活",
+  "off": "没开工",
+  "chips": {
+    "drop": "去掉 {v}",
+    "valueOf": "{k} 的值",
+    "removeKey": "删除 {k}",
+    "remove": "删除",
+    "name": "变量名",
+    "value": "变量的值",
+    "valueHint": "值",
+    "add": "添加"
+  },
+  "toasts": "提示",
+  "runtime": "运行工具：{name}",
+  "user": "你",
+  "orchestrator": "助手",
+  "unreachable": "暂时连不上服务端，请等它恢复后重试。",
+  "query": {
+    "invalidResponse": "返回的数据格式不符，已有的有效结果已保留。"
+  },
+  "table": {
+    "columns": "显示的列",
+    "stale": "新页还在读取，当前显示的是上一次的结果，暂时不能操作这些行。",
+    "selectPage": "选择本页",
+    "selectRow": "选择行 {id}",
+    "empty": "暂无数据",
+    "previous": "上一页",
+    "next": "下一页",
+    "page": "第 {n} 页"
+  },
+  "form": {
+    "invalid": "请检查这一项。",
+    "validationUnavailable": "暂时无法校验，输入已保留。",
+    "deliveryUnknown": "请求可能已送达，但还没收到确认。输入已保留，请先查看保存结果再决定是否重试。",
+    "asking": "在问服务端……",
+    "unreachable": "问不到服务端：{why}",
+    "none": "还没有",
+    "unset": "还没设",
+    "removeOnSave": "保存后移除",
+    "removeKey": "移除 {label}",
+    "keepKey": "不移除 {label}",
+    "undo": "撤销",
+    "storedIn": "存在 {file}",
+    "keepEmpty": "不改就空着",
+    "save": "保存",
+    "reset": "恢复默认",
+    "never": "算了",
+    "remove": "删除",
+    "from": {
+      "settings": "存在设置里",
+      "config": "来自配置（vibevalley.yaml 或环境变量）"
+    },
+    "inUse": "在用 {hint}（{from}）",
+    "fromOnly": "在用（{from}）",
+    "example": "比如：{value}"
+  },
+  "time": {
+    "justNow": "刚刚",
+    "secondsAgo": "{s} 秒前",
+    "minutesAgo": "{m} 分钟前",
+    "hoursAgo": "{h} 小时前",
+    "daysAgo": "{d} 天前",
+    "monthsAgo": "{m} 个月前",
+    "yearsAgo": "{y} 年前",
+    "seconds": "{s} 秒",
+    "minutes": "{m} 分 {s} 秒",
+    "hours": "{h} 小时 {m} 分",
+    "round": {
+      "underMinute": "不到 1 分钟",
+      "minutes": "{m} 分钟",
+      "hours": "{h} 小时",
+      "days": "{d} 天"
+    },
+    "tenths": "{s} 秒",
+    "today": "今天",
+    "yesterday": "昨天",
+    "clock": "{am, select, true {上午{hh}:{mm}} other {下午{hh}:{mm}}}",
+    "weekdays": {
+      "0": "日",
+      "1": "一",
+      "2": "二",
+      "3": "三",
+      "4": "四",
+      "5": "五",
+      "6": "六"
+    },
+    "monthDay": "{month}月{day}日",
+    "month": "{month}月",
+    "date": "{y} 年 {m} 月 {d} 日",
+    "day": "{m} 月 {d} 日 星期{weekday}"
+  },
+  "money": {
+    "underCent": "不到 ¥0.01",
+    "about": "约 {yuan}",
+    "spent": "花了 {yuan}"
+  },
+  "cast": {
+    "species": {
+      "bear": "熊",
+      "rabbit": "兔子",
+      "fox": "小狐狸",
+      "cat": "猫",
+      "owl": "猫头鹰",
+      "hedgehog": "刺猬",
+      "raccoon": "浣熊"
+    },
+    "outfit": {
+      "farmer": "农夫",
+      "gardener": "园丁",
+      "rain": "雨衣",
+      "winter": "冬装"
+    },
+    "pose": {
+      "idle": "待命",
+      "walk": "走过来",
+      "think": "琢磨",
+      "work": "干活",
+      "cheer": "做完",
+      "worry": "长虫了"
+    }
+  },
+  "reading": "在读……",
+  "write": "记下",
+  "secret": {
+    "hide": "藏起来",
+    "peek": "看一眼"
+  },
+  "big": "{n} 万",
+  "file": {
+    "pdf": "PDF · 在新标签页里看",
+    "remove": "去掉 {name}"
+  },
+  "lightbox": {
+    "label": "看图",
+    "prev": "上一张",
+    "next": "下一张",
+    "original": "打开原图",
+    "close": "关上"
+  },
+  "shortcuts": {
+    "title": "快捷键",
+    "place": {
+      "everywhere": "到处",
+      "composer": "输入框",
+      "lists": "菜单和名单",
+      "issues": "工单",
+      "pictures": "看图",
+      "library": "素材库",
+      "farm": "农场",
+      "desktop": "桌面版（系统全局）"
+    },
+    "say": {
+      "switcher": "跳到频道、串、私聊",
+      "sheet": "打开这张表",
+      "close": "关掉对话框、菜单、浮层",
+      "send": "发出去",
+      "newline": "换行",
+      "mention": "叫人",
+      "editLast": "改自己上一条（输入框空着时）",
+      "dropReply": "不回复那一条了",
+      "move": "上下挑",
+      "pick": "选中",
+      "flip": "上一张、下一张",
+      "tool": "拿起第几样农具",
+      "names": "按住写出院子里每样东西的名字",
+      "farmMenu": "放下农具，或打开菜单",
+      "debug": "调试台",
+      "voice": "跟助手说话（在设置里能换）",
+      "command": "命令：记工单、让助手记住、叫停、私聊",
+      "newIssue": "新工单",
+      "libraryMove": "在素材之间挪",
+      "libraryLook": "全屏看选中的图",
+      "libraryRemove": "从库里拿掉选中的"
+    }
+  },
+  "rich": {
+    "copy": "复制",
+    "copied": "复制了",
+    "more": "展开",
+    "less": "收起",
+    "lines": "{n} 行",
+    "diagram": "图",
+    "diagramFailed": "这张图画不出来：{why}",
+    "longMore": "展开全文",
+    "longLess": "收起"
+  },
+  "updateReady": "{next} 已下好，去「关于」重启",
+  "intent": {
+    "timedOut": "等了太久没回音，可以重试",
+    "offline": "没连上农场，这一下没发出去"
+  },
+  "pickTooLarge": "{name} 没加上：超过 512 MiB 了"
+}
