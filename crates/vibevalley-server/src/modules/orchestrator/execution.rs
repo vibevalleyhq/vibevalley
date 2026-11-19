@@ -61,6 +61,7 @@ impl Environment for Bound {
             .list(&vibevalley_protocol::ArtifactListRequest {
                 channel: None,
                 issue: Some(issue.id.clone()),
+                artifact_type: None,
             })
             .map_err(|e| Error::Invalid(e.message))?;
         let deliverables = json!({"report":report, "changes":changes, "artifacts":artifacts}).to_string();

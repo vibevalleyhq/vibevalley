@@ -579,6 +579,19 @@
   "parameters": {
    "additionalProperties": true,
    "properties": {
+    "artifactType": {
+     "description": "只列某一种结构化 ArtifactType；不填列全部",
+     "enum": [
+      "docs",
+      "slides",
+      "dashboard",
+      "motion",
+      "whiteboard",
+      "design",
+      "design-system"
+     ],
+     "type": "string"
+    },
     "channel": {
      "description": "在哪说：#<频道>，或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方",
      "type": "string"
@@ -630,37 +643,112 @@
  {
   "op": "artifact.create",
   "name": "artifact_create",
-  "description": "写一份 Artifact：要交给用户看、代码改动说不清的一整页，比如两种设计让用户挑、调研报告、对比表、带图的说明。先把它写成你工作目录里的一个文件，再用 file 交上来（或者直接给 content）。它挂在你的工单上，你会在工单串里说一句带卡片的话，用户在工作台里点开看、回复卡片评论，评论会叫醒你。",
+  "description": "写一份 Artifact：要交给用户看、代码改动说不清的一整页，比如两种设计让用户挑、调研报告、对比表、带图的说明；也支持结构化多条目作品（传 artifactType 与 entries，动笔前先调 artifact_type_read 读规范）。单文件 html 可先写成工作目录里的文件再用 file 交上来（支持 *.slide.html / *.motion.html 等复合后缀自动识别 display）。它挂在你的工单上，你会在工单串里说一句带卡片的话，用户在工作台里点开看、回复卡片评论，评论会叫醒你。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
+    "announce": {
+     "description": "提交后是否在频道里发一张更新卡片通知用户",
+     "type": "boolean"
+    },
+    "artifactType": {
+     "description": "结构化 Artifact 类型：docs（协作块文档）、slides（多文件演示稿）、dashboard（数据集+溯源看板）、motion（时间轴动态图形短片）、whiteboard（无限画布白板）、design（多画板 .dc.html 设计稿）、design-system（常驻设计令牌体系）。动笔前先调 artifact_type_read 读规范",
+     "enum": [
+      "docs",
+      "slides",
+      "dashboard",
+      "motion",
+      "whiteboard",
+      "design",
+      "design-system"
+     ],
+     "type": "string"
+    },
     "content": {
      "description": "这一稿的全文；和 file 二选一",
      "type": "string"
     },
-    "note": {
-     "description": "这一稿改了什么，一句话；第一稿可以写这是什么",
-     "type": "string"
-    },
-    "file": {
-     "description": "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
-     "type": "string"
-    },
-    "kind": {
-     "description": "html 是一整页，一稿一稿换（页面在沙箱里显示：连不了网、调不了农场的接口、不能提交表单、不能再嵌一个页面；样式和脚本写在这一个文件里，库只能从 cdn.jsdelivr.net、cdnjs.cloudflare.com 加载，字体和它的样式还能从 fonts.googleapis.com、fonts.gstatic.com 加载；图片、音视频内联成 data:；一稿最多 5 MB。交上来先查，从别处加载的会被退回，说哪一行、怎么改）；markdown 读成一块一块的，用户和你都能接着改（artifact_block_create、artifact_block_update）",
-     "enum": [
-      "html",
-      "markdown"
-     ],
-     "type": "string"
-    },
     "display": {
-     "description": "网页（html）怎么看，不填是 page：page 是一整页照原样；slides 是幻灯片：每页一个顶层 <section>，版式 class 有 title、two-col、image、quote，备注写在 <aside class=\"notes\">，工作台负责排成 16:9、翻页、放映和存成 PDF，别给 section 写 position、transform、width、height、display；颜色和字体用 --vv-ink、--vv-accent、--vv-font-sans 这类变量。一起写的（markdown）不填",
+     "description": "网页（html）怎么看，支持按复合后缀（*.slide.html / *.motion.html）自动识别，不填是 page：page 是一整页照原样；slides 是幻灯片：每页一个顶层 <section>，版式 class 有 title、two-col、image、quote，备注写在 <aside class=\"notes\">，工作台负责排成 16:9、翻页、放映和存成 PDF，别给 section 写 position、transform、width、height、display；motion 是时间轴动画页（调 vv.timeline）；颜色和字体用 --vv-ink、--vv-accent、--vv-font-sans 这类变量。一起写的（markdown）或结构化 store 不填",
      "enum": [
       "page",
       "slides",
       "motion"
      ],
+     "type": "string"
+    },
+    "entries": {
+     "description": "一组原子写入操作：全部通过乐观锁校验才一起提交，任一冲突则整批不落库并返回冲突详情",
+     "items": {
+      "additionalProperties": true,
+      "properties": {
+       "from": {
+        "description": "op 为 copy 时的源条目路径",
+        "type": "string"
+       },
+       "ifRev": {
+        "description": "乐观并发锁：0 要求该路径尚不存在；>0 要求当前版本号等于 ifRev",
+        "type": "integer"
+       },
+       "kind": {
+        "description": "条目种类：text、json、asset（value 填附件 id）；不填按路径自动推断",
+        "enum": [
+         "text",
+         "json",
+         "asset"
+        ],
+        "type": "string"
+       },
+       "mime": {
+        "description": "可选 MIME 类型；不填按路径后缀推断",
+        "type": "string"
+       },
+       "op": {
+        "description": "操作：set（整条写入/覆盖）、patch（RFC 7396 JSON 合并修改，null 删除键）、delete（删除条目）、copy（从 from 复制）",
+        "enum": [
+         "set",
+         "patch",
+         "delete",
+         "copy"
+        ],
+        "type": "string"
+       },
+       "path": {
+        "description": "相对条目路径，比如 project/deck.json、files/index.html、elements/node-1（不以 / 开头）",
+        "type": "string"
+       },
+       "value": {
+        "description": "set/patch 时的内容字符串（asset 填附件 id）",
+        "type": "string"
+       }
+      },
+      "required": [
+       "op",
+       "path"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "file": {
+     "description": "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
+     "type": "string"
+    },
+    "isDefault": {
+     "description": "仅用于 design-system：设为全农场常驻默认令牌，视觉类 Artifact 会自动注入它的 CSS 变量",
+     "type": "boolean"
+    },
+    "kind": {
+     "description": "html 是一整页，一稿一稿换（页面在沙箱里显示：连不了网、调不了农场的接口、不能提交表单、不能再嵌一个页面；样式和脚本写在这一个文件里，库只能从 cdn.jsdelivr.net、cdnjs.cloudflare.com 加载，字体和它的样式还能从 fonts.googleapis.com、fonts.gstatic.com 加载；图片、音视频内联成 data:；一稿最多 5 MB。交上来先查，从别处加载的会被退回，说哪一行、怎么改）；markdown 读成一块一块的，用户和你都能接着改（artifact_block_create、artifact_block_update）；store 是结构化多条目作品（配合 artifactType 使用）",
+     "enum": [
+      "html",
+      "markdown",
+      "store"
+     ],
+     "type": "string"
+    },
+    "note": {
+     "description": "这一稿改了什么，一句话；第一稿可以写这是什么",
      "type": "string"
     },
     "title": {
@@ -669,8 +757,7 @@
     }
    },
    "required": [
-    "title",
-    "kind"
+    "title"
    ],
    "type": "object"
   }
@@ -701,6 +788,176 @@
    },
    "required": [
     "id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.type.list",
+  "name": "artifact_type_list",
+  "description": "列出工作台支持的 7 种结构化 ArtifactType（docs、slides、dashboard、motion、whiteboard、design、design-system）、各自简介、可用参考分册以及当前默认的 Design System。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {},
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.type.read",
+  "name": "artifact_type_read",
+  "description": "按需读取某一种结构化 ArtifactType 的创作规范（SKILL）或指定参考分册（reference），并告知农场当前默认的 Design System。做结构化作品前先调它。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "reference": {
+     "description": "可选的参考分册名（从 artifact_type_read 或 artifact_type_list 返回的 references 里挑）；不填读该类型的主 SKILL",
+     "type": "string"
+    },
+    "type": {
+     "description": "要读规范的类型：docs、slides、dashboard、motion、whiteboard、design、design-system",
+     "enum": [
+      "docs",
+      "slides",
+      "dashboard",
+      "motion",
+      "whiteboard",
+      "design",
+      "design-system"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "type"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.entry.list",
+  "name": "artifact_entry_list",
+  "description": "列出一个结构化 store Artifact 里的条目清单（路径、类型、rev 版本号、字节数；includeValues 为 true 时附带内容）。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "type": "string"
+    },
+    "includeValues": {
+     "description": "是否顺带返回每个条目的文本内容；默认 false 只列路径、类型、版本号和大小",
+     "type": "boolean"
+    },
+    "prefix": {
+     "description": "只列这个路径前缀下的条目（比如 project/slides/ 或 elements/）；不填列全部",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.entry.get",
+  "name": "artifact_entry_get",
+  "description": "读取一个结构化 store Artifact 里某一条目的当前内容、类型与 rev 版本号。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "type": "string"
+    },
+    "path": {
+     "description": "相对条目路径，比如 project/deck.json、files/index.html、elements/node-1（不以 / 开头）",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "path"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "artifact.entry.batch",
+  "name": "artifact_entry_batch",
+  "description": "对一个结构化 store Artifact 原子提交一批条目修改（set/patch/delete/copy，支持 ifRev 乐观锁与 announce 发卡片）。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "announce": {
+     "description": "提交后是否在频道里发一张更新卡片通知用户",
+     "type": "boolean"
+    },
+    "id": {
+     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "type": "string"
+    },
+    "note": {
+     "description": "这一稿改了什么，一句话；第一稿可以写这是什么",
+     "type": "string"
+    },
+    "writes": {
+     "description": "一组原子写入操作：全部通过乐观锁校验才一起提交，任一冲突则整批不落库并返回冲突详情",
+     "items": {
+      "additionalProperties": true,
+      "properties": {
+       "from": {
+        "description": "op 为 copy 时的源条目路径",
+        "type": "string"
+       },
+       "ifRev": {
+        "description": "乐观并发锁：0 要求该路径尚不存在；>0 要求当前版本号等于 ifRev",
+        "type": "integer"
+       },
+       "kind": {
+        "description": "条目种类：text、json、asset（value 填附件 id）；不填按路径自动推断",
+        "enum": [
+         "text",
+         "json",
+         "asset"
+        ],
+        "type": "string"
+       },
+       "mime": {
+        "description": "可选 MIME 类型；不填按路径后缀推断",
+        "type": "string"
+       },
+       "op": {
+        "description": "操作：set（整条写入/覆盖）、patch（RFC 7396 JSON 合并修改，null 删除键）、delete（删除条目）、copy（从 from 复制）",
+        "enum": [
+         "set",
+         "patch",
+         "delete",
+         "copy"
+        ],
+        "type": "string"
+       },
+       "path": {
+        "description": "相对条目路径，比如 project/deck.json、files/index.html、elements/node-1（不以 / 开头）",
+        "type": "string"
+       },
+       "value": {
+        "description": "set/patch 时的内容字符串（asset 填附件 id）",
+        "type": "string"
+       }
+      },
+      "required": [
+       "op",
+       "path"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "id",
+    "writes"
    ],
    "type": "object"
   }

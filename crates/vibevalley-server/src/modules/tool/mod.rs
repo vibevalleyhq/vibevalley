@@ -245,6 +245,11 @@ fn handler(op: &str) -> Option<Run> {
         "artifact.block.create" => typed!(notes::block_create),
         "artifact.block.update" => typed!(notes::block_update),
         "artifact.block.delete" => typed!(notes::block_delete),
+        "artifact.type.list" => typed!(notes::artifact_type_list),
+        "artifact.type.read" => typed!(notes::artifact_type_read),
+        "artifact.entry.list" => typed!(notes::artifact_entry_list),
+        "artifact.entry.get" => typed!(notes::artifact_entry_get),
+        "artifact.entry.batch" => typed!(notes::artifact_entry_batch),
         _ => return None,
     })
 }
@@ -288,7 +293,7 @@ impl Tool {
     /// Reads only: safe to run again if the process died while it ran.
     pub fn replay_safe(&self) -> bool {
         let op = self.words.op.as_str();
-        op.ends_with(".list") || op.ends_with(".get") || op == "memory.search" || op == "pkm.search" || op == "resource.read"
+        op.ends_with(".list") || op.ends_with(".get") || op.ends_with(".read") || op == "memory.search" || op == "pkm.search"
     }
 }
 
@@ -347,6 +352,22 @@ mod tests {
     #[test]
     fn every_listed_tool_runs() {
         assert!(unrun().is_empty(), "{:?}", unrun());
+    }
+
+    #[test]
+    fn artifact_store_tools_are_listed_with_expected_replay_safety() {
+        for tools in [orchestrator(), helper()] {
+            for (op, expected_safe) in [
+                ("artifact.type.list", true),
+                ("artifact.type.read", true),
+                ("artifact.entry.list", true),
+                ("artifact.entry.get", true),
+                ("artifact.entry.batch", false),
+            ] {
+                let t = tools.iter().find(|t| t.words.op == op).unwrap_or_else(|| panic!("missing {op}"));
+                assert_eq!(t.replay_safe(), expected_safe, "replay_safe mismatch for {op}");
+            }
+        }
     }
 
     #[test]
