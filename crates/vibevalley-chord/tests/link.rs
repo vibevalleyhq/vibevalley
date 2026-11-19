@@ -1,16 +1,6 @@
 use serde_json::json;
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-    time::Duration,
-};
-use tokio::{
-    net::TcpListener,
-    sync::{Notify, mpsc},
-    time,
-};
+use std::{sync::Arc, time::Duration};
+use tokio::{net::TcpListener, sync::Notify, time};
 use vibevalley_chord::{
     delta::{Op, Snapshot},
     link::{Client, Endpoint, Error, Options, Principal, RpcError, Transport},
@@ -20,6 +10,11 @@ use vibevalley_chord::{
 
 fn options(id: &str) -> Options {
     Options::new(Principal::user_device(id))
+}
+
+async fn accept_socket(listener: &TcpListener) -> Transport {
+    let (stream, _) = listener.accept().await.unwrap();
+    ws::accept(stream).await.unwrap()
 }
 
 #[tokio::test]
@@ -35,39 +30,41 @@ async fn mutual_auth_and_rejection() {
 }
 
 #[tokio::test]
-async fn rpc_watch_chunking_and_cancel_over_pipe() {
+async fn rpc_watch_chunking_and_cancel_over_websocket() {
     let server = Endpoint::default();
     let client = Endpoint::default();
     server.handle("echo", |p, v| async move { Ok(json!([p.id, v])) });
     client.handle("callback", |p, _| async move { Ok(json!(p.id)) });
-    let notify = Arc::new(Notify::new());
-    let dropped = Arc::new(AtomicUsize::new(0));
-    struct Mark(Arc<AtomicUsize>);
-    impl Drop for Mark {
+    let entered = Arc::new(Notify::new());
+    let cancelled = Arc::new(Notify::new());
+    struct OnCancel(Arc<Notify>);
+    impl Drop for OnCancel {
         fn drop(&mut self) {
-            self.0.fetch_add(1, Ordering::SeqCst);
+            self.0.notify_one();
         }
     }
     server.handle("wait", {
-        let notify = notify.clone();
-        let dropped = dropped.clone();
+        let entered = entered.clone();
+        let cancelled = cancelled.clone();
         move |_, _| {
-            let notify = notify.clone();
-            let mark = Mark(dropped.clone());
+            let entered = entered.clone();
+            let on_cancel = OnCancel(cancelled.clone());
             async move {
-                notify.notify_one();
-                let result = std::future::pending().await;
-                drop(mark);
-                result
+                let _guard = on_cancel;
+                entered.notify_one();
+                std::future::pending().await
             }
         }
     });
     let doc = Document::new(Snapshot::new(json!({"text":""})));
     server.publish("space", doc.clone());
-    let (a, b) = Transport::pipe(2);
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}", listener.local_addr().unwrap());
+    let (server_socket, dialled) = tokio::join!(accept_socket(&listener), ws::dial(url));
+    let (client_socket, _) = dialled.unwrap();
     let mut small = options("client");
     small.max_frame_bytes = 768;
-    let (l, r) = tokio::join!(server.connect(a, options("server")), client.connect(b, small));
+    let (l, r) = tokio::join!(server.connect(server_socket, options("server")), client.connect(client_socket, small));
     let (l, r) = (l.unwrap(), r.unwrap());
     let payload = json!("abc".repeat(100_000));
     let (big, small) = tokio::join!(r.call("echo", payload.clone(), None), l.call("callback", json!(null), None));
@@ -83,61 +80,50 @@ async fn rpc_watch_chunking_and_cancel_over_pipe() {
         let r = r.clone();
         async move { r.call("wait", json!(null), None).await }
     });
-    notify.notified().await;
+    time::timeout(Duration::from_secs(2), entered.notified()).await.unwrap();
     waiter.abort();
-    let _ = waiter.await;
-    time::timeout(Duration::from_secs(2), async {
-        while dropped.load(Ordering::SeqCst) == 0 {
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .unwrap();
+    assert!(waiter.await.unwrap_err().is_cancelled());
+    time::timeout(Duration::from_secs(2), cancelled.notified()).await.unwrap();
     assert!(matches!(
         r.call("wait", json!(null), Some(Duration::from_millis(25))).await,
         Err(Error::Deadline) | Err(Error::Rpc(_))
     ));
     l.close();
-    assert_eq!(r.closed().await, Error::Closed);
-    assert!(watch.recv().await.is_err());
+    assert_eq!(l.closed().await, Error::Closed);
+    assert_eq!(watch.recv().await.unwrap_err(), r.closed().await);
 }
 
 #[tokio::test]
 async fn reconnect_resumes_live_watch_over_websocket() {
     let server = Endpoint::default();
-    let doc = Document::new(Snapshot::new(json!({"count":1})));
+    let doc = Document::with_limits(Snapshot::new(json!({"count":1})), 1, 8);
     server.publish("space", doc.clone());
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("ws://{}", listener.local_addr().unwrap());
-    let (accepted, mut links) = mpsc::channel(2);
-    let host = tokio::spawn(async move {
-        while let Ok((stream, _)) = listener.accept().await {
-            let pipe = ws::accept(stream).await.unwrap();
-            let l = server.connect(pipe, options("server")).await.unwrap();
-            if accepted.send(l).await.is_err() {
-                break;
-            }
-        }
-    });
-    let client = Client::connect(Endpoint::default(), options("client"), move || {
+    let accept_link = || async { server.connect(accept_socket(&listener).await, options("server")).await.unwrap() };
+    let connect = Client::connect(Endpoint::default(), options("client"), move || {
         let url = url.clone();
         async move { ws::dial(url).await.map(|(tr, _)| tr) }
-    })
-    .await
-    .unwrap();
-    let first = links.recv().await.unwrap();
+    });
+    let (mut link, client) = tokio::join!(accept_link(), connect);
+    let client = client.unwrap();
     let mut sub = client.watch("space");
     assert_eq!(sub.recv().await.unwrap().rev, 1);
-    first.close();
-    first.closed().await;
-    doc.mutate(|draft| draft.apply(Op::Replace(vec!["count".into()], json!(2)))).unwrap();
-    let next = time::timeout(Duration::from_secs(5), sub.recv()).await.unwrap().unwrap();
-    assert_eq!(json!(next.snapshot), json!({"count":2}));
-    assert_eq!(json!(next.ops), json!([["r", ["count"], 2]]));
-    let second = links.recv().await.unwrap();
+    for (missed, expected_ops) in [(2..=2, json!([["r", ["count"], 2]])), (3..=4, json!([["r", {"count":4}]]))] {
+        link.close();
+        link.closed().await;
+        let latest = *missed.end();
+        for count in missed {
+            doc.mutate(|draft| draft.apply(Op::Replace(vec!["count".into()], json!(count)))).unwrap();
+        }
+        link = time::timeout(Duration::from_secs(5), accept_link()).await.unwrap();
+        let next = time::timeout(Duration::from_secs(5), sub.recv()).await.unwrap().unwrap();
+        assert_eq!(next.rev, latest);
+        assert_eq!(json!(next.snapshot), json!({"count":latest}));
+        assert_eq!(json!(next.ops), expected_ops);
+    }
     client.close().await;
-    assert_eq!(second.closed().await, Error::Closed);
-    host.abort();
+    assert_eq!(link.closed().await, Error::Closed);
 }
 
 #[tokio::test]

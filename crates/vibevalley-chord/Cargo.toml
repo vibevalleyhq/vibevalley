@@ -15,6 +15,3 @@ futures-util = "0.3.34"
 tokio = { version = "1.54.1", features = ["net", "macros", "rt-multi-thread", "sync", "time"] }
 tokio-util = { version = "0.7.20", features = ["rt"] }
 tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
-
-[dev-dependencies]
-tempfile = "3.27.0"

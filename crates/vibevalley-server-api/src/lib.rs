@@ -48,9 +48,6 @@ pub trait Server: Send + Sync {
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
     fn subscribe(&self, name: &str, payload: serde_json::Value) -> Result<(u64, flume::Receiver<serde_json::Value>), Envelope>;
     fn unsubscribe(&self, id: u64);
-    fn channel_messages_after(&self, _channel: &str, _after: i64, _limit: i64) -> Result<Vec<vibevalley_protocol::ChatMessage>, ApiError> {
-        Err(ApiError::new(BizCode::ServiceUnavailable, "channel history unavailable"))
-    }
     fn resolve_approval(&self, _input: serde_json::Value) -> Envelope {
         refusal(BizCode::Refused, "durable approvals unavailable")
     }

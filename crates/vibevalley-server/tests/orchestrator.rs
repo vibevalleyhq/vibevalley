@@ -488,33 +488,100 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
 }
 
 #[test]
-#[ignore = "run the Chord interop verify.sh --app with the reference Go client"]
-fn go_client_approves_native_tool_through_chord_and_the_issue_survives_restart() {
+fn rust_chord_client_approves_a_tool_and_observes_the_durable_issue() {
+    use vibevalley_chord::{
+        link::{Endpoint, Error, Options, Principal},
+        ws,
+    };
+    use vibevalley_protocol::Issue;
     use vibevalley_server_api::Server;
-    let binary = std::env::var_os("VIBEVALLEY_GO_CHORD_PEER").expect("pinned Go client");
+
     let home = tempfile::tempdir().unwrap();
     let (model, cfg) = approval_fixture(home.path());
     let started = vibevalley_server::start(cfg.clone()).unwrap();
     let http = vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let channel = ask_to_create_issue(&started);
-    assert!(
-        std::process::Command::new(binary)
-            .arg("approval")
-            .env("VIBEVALLEY_SERVER", http.url())
-            .status()
-            .unwrap()
-            .success()
-    );
+    let url = http.url().replace("http://", "ws://") + "/chord/ws";
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    runtime.block_on(async {
+        let flow = async {
+            let (socket, _) = ws::dial(&url).await.unwrap();
+            assert!(
+                Endpoint::default()
+                    .connect(socket, Options::new(Principal::new("machine", "foreign")))
+                    .await
+                    .is_err()
+            );
+            let (socket, _) = ws::dial(&url).await.unwrap();
+            let link = Endpoint::default()
+                .connect(socket, Options::new(Principal::user_device("native-test")))
+                .await
+                .unwrap();
+            assert!(matches!(
+                link.call("issue.list", json!(null), None).await,
+                Err(Error::Rpc(ref error)) if error.code == "not_found"
+            ));
+            let mut watch = link.watch("space", 0, None).unwrap();
+            let (observed_revision, approval) = loop {
+                let event = watch.recv().await.unwrap();
+                if let Some(card) = json!(event.snapshot)["approvals"].as_array().and_then(|cards| cards.first()) {
+                    break (event.rev, card.clone());
+                }
+            };
+            assert_eq!(approval["toolName"], "issue_create");
+            let reply = link
+                .call(
+                    "approval.resolve",
+                    json!({"conversationId": approval["sessionId"], "taskId": approval["taskId"],
+                           "toolCallId": "approval-1", "approved": true}),
+                    None,
+                )
+                .await
+                .unwrap();
+            assert_eq!(reply["ok"], true);
+            loop {
+                let event = watch.recv().await.unwrap();
+                if json!(event.snapshot)["approvals"] == json!([]) {
+                    assert!(event.rev > observed_revision);
+                    break;
+                }
+            }
+            let raised = link
+                .call(
+                    "budget.raise",
+                    json!({"conversationId": approval["sessionId"], "taskId": approval["taskId"], "newMaxCostMicros": 10_000}),
+                    None,
+                )
+                .await
+                .unwrap();
+            assert_eq!(raised["maxCostMicros"], 10_000);
+            link.close();
+        };
+        tokio::time::timeout(Duration::from_secs(10), flow)
+            .await
+            .expect("native Chord exchange timed out")
+    });
     until("assistant's approved round settled", || {
         let messages = started.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
         messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())
     });
+    let issues = || -> Vec<Issue> {
+        let mut reply = ureq::post(format!("{}/api/v1/issue/list", http.url())).send_json(json!({})).unwrap();
+        let result: vibevalley_protocol::Envelope = reply.body_mut().read_json().unwrap();
+        assert_eq!(result.biz_code, 0);
+        serde_json::from_value(result.data.unwrap()).unwrap()
+    };
+    let issue_id = issues().into_iter().find(|i| i.title == "Approved work").unwrap().id;
     drop(http);
     started.close();
     let reopened = vibevalley_server::start(cfg).unwrap();
     let view = json!(reopened.hub.space_document().unwrap().state().1);
     assert_eq!(view["approvals"], json!([]));
-    assert_eq!(view["issues"].as_array().unwrap().iter().filter(|i| i["title"] == "Approved work").count(), 1);
+    let result = reopened.hub.call_as(Caller::User, "issue.list", json!({}));
+    assert_eq!(result.biz_code, 0);
+    let issues: Vec<Issue> = serde_json::from_value(result.data.unwrap()).unwrap();
+    let recovered: Vec<_> = issues.into_iter().filter(|i| i.title == "Approved work").map(|i| i.id).collect();
+    assert_eq!(recovered, [issue_id]);
     assert_eq!(model.seen.lock().unwrap().len(), 2);
     reopened.close();
 }

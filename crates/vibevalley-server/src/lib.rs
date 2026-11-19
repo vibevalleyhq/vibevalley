@@ -96,7 +96,6 @@ pub struct Hub {
     space: chord_space::Space,
     workbench: workbench_frames::WorkbenchFrames,
     execution: std::sync::OnceLock<std::sync::Weak<modules::orchestrator::Orchestrator>>,
-    chat: std::sync::OnceLock<std::sync::Weak<modules::channel::Chat>>,
     handlers: RwLock<HashMap<&'static str, Handler>>,
     openers: RwLock<HashMap<&'static str, Opener>>,
     watchers: RwLock<Vec<Watcher>>,
@@ -135,13 +134,12 @@ impl Hub {
         let (kicks, kicked) = flume::unbounded();
         let core = Core::new(state);
         let first = core.frame(vec![]);
-        let space = chord_space::Space::new(&first);
+        let space = chord_space::Space::new();
         let hub = Arc::new(Hub {
             core: Mutex::new(core),
             space,
             workbench: workbench_frames::WorkbenchFrames::new(first),
             execution: std::sync::OnceLock::new(),
-            chat: std::sync::OnceLock::new(),
             handlers: RwLock::default(),
             openers: RwLock::default(),
             watchers: RwLock::default(),
@@ -198,7 +196,6 @@ impl Hub {
             let changes = core.apply(facts);
             if !changes.transitions.is_empty() {
                 let frame = core.frame(vec![]);
-                self.space.update(&frame, &changes.transitions);
                 self.workbench.replace(frame);
             }
             changes
@@ -427,14 +424,6 @@ impl modules::ledger::Facts for std::sync::Weak<Hub> {
 }
 
 impl Server for Hub {
-    fn channel_messages_after(&self, channel: &str, after: i64, limit: i64) -> Result<Vec<vibevalley_protocol::ChatMessage>, ApiError> {
-        self.chat
-            .get()
-            .and_then(std::sync::Weak::upgrade)
-            .ok_or_else(|| ApiError::new(BizCode::ServiceUnavailable, "channel history unavailable"))?
-            .messages_after(channel, after, limit)
-    }
-
     fn resolve_approval(&self, input: Value) -> Envelope {
         self.execution.get().and_then(std::sync::Weak::upgrade).map_or_else(
             || vibevalley_server_api::refusal(BizCode::Refused, "durable execution unavailable"),

@@ -2210,15 +2210,6 @@ impl Chat {
         Ok(rows)
     }
 
-    pub(crate) fn messages_after(&self, channel: &str, after: i64, limit: i64) -> Result<Vec<ChatMessage>, ApiError> {
-        let inner = self.locked();
-        if inner.model.channel(channel).is_none() {
-            return Err(no_channel(channel));
-        }
-        let rows = db::messages_after(&inner.db, channel, after, if limit > 0 { limit } else { -1 }).q()?;
-        Ok(rows.iter().map(to_message).collect())
-    }
-
     pub fn rows_after(&self, channel: &str, after: i64) -> Result<Vec<MsgRow>, ApiError> {
         db::messages_after(&self.locked().db, channel, after, 1000).q()
     }
@@ -2755,7 +2746,6 @@ pub fn direct(chat: &Chat, agents: &Agents, reference: &str) -> Result<String, A
 /// `channel.*`, `channel.follow`, `channel.reports`; the orchestrators
 /// seated now and whenever a profile is kept.
 pub fn install(hub: &Hub, chat: Arc<Chat>, agents: Arc<Agents>, game: Option<Arc<crate::modules::game::Game>>) {
-    let _ = hub.chat.set(Arc::downgrade(&chat));
     for agent in agents.profiles.orchestrators() {
         if let Err(e) = seat_orchestrator(&chat, &agents, &agent) {
             eprintln!("vibevalley-server: chat: seating {}: {}", agent.id, e.message);

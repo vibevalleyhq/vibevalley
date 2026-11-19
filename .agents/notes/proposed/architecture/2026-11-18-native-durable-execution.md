@@ -4,17 +4,17 @@ Status: proposed
 
 ## Problem
 
-计划以原生 macOS 工作台 `refactor/native-vibevalley@275732ef1` 为开发基线，以 `perf/platform-simplification@a2c1851ab` 的 Go 实现为行为参照。前者已有 GPUI 工作区、独立 PTY、文件与 Git 面板、工单和原生农场。后者最先值得带过来的能力是：用户回应一次，服务重启或重投后仍能查到同一次执行及其结果。两条分支的契约、宿主和存储结构已分化，应按用户可观察的行为逐项验证。[原生总体计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)
+计划以原生 macOS 工作台 `refactor/native-vibevalley@275732ef1` 为开发基线，以 `perf/platform-simplification@a2c1851ab` 为持久执行、oar 和农场的行为参照。前者已有 GPUI 工作区、独立 PTY、文件与 Git 面板、工单和原生农场。后者最先值得带过来的能力是：用户回应一次，服务重启或重投后仍能查到同一次执行及其结果。两条分支的契约、宿主和存储结构已分化，应按用户可观察的行为逐项验证。[原生总体计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)
 
 ## Proposal
 
 ### 交付范围
 
-四项均以 Go/Web 的 `a2c1851ab` 为核对版本。优先级只决定实施顺序。视觉基准是该提交实际运行的完整 Web 农场，包括世界画布与叠在上面的界面。
+Chord 按原生服务的订阅与执行治理需求验收。持久执行、oar 和农场沿用 `a2c1851ab` 的行为样本。农场视觉基准包括该提交实际运行的 Web 世界画布及叠加界面。
 
 | 交付项 | 基线与验收范围 |
 | --- | --- |
-| Chord | `pkg/chord/{delta,watch,link,ws}` 的严格 JSON、不可变快照、增量合并、历史与慢订阅者、退休与重建、身份握手、双向 RPC、取消、心跳、分块、重连和 WebSocket。以 Go 与 Rust 双向收发、断线续订和生产消费状态为证。 |
+| Chord | 用 Rust 客户端和服务验证执行治理文档的订阅、断线续订、审批与预算。[链路与服务验收](crates/vibevalley-chord/README.md) |
 | durable | `internal/durable` 及其 store 的事务、提交去重、阶段迁移、信号、睡眠、子任务、取消、恢复、断路、模型生成、工具权限、预算、压缩、代码执行和结果评估。沿真实助手与帮工入口核对故障前后同一轮的结果。涉及 pi agent 的对话或工具语义时，核对所参考版本及对应测试。 |
 | oar | `pkg/oar` 的注册表、各驱动、会话控制、模型与用量、子 agent 路径、事件记录和离线回放。逐驱动核对注册、能力声明、启动、运行、插话、取消、恢复和清理，补齐生产选用入口。 |
 | 完整农场 | 逐一核对 `apps/web/src/farm`：仓库群岛与院子、日夜与帮工、工具栏、悬停与命中、播种、工单与收获、仓库与成就、手机来电、聊天、小游戏、快捷键与窄窗。固定状态、时刻、窗口与 DPR，在真实的 Web 和 GPUI 窗口截图，对照图像和交互回执。 |
@@ -39,27 +39,11 @@ Status: proposed
 | 1．执行请求去重与结算 | Rust 的频道表对发送者和 `send_key` 有唯一索引；工单轮次另行写入。Go 的 `internal/durable/store/store_test.go` 覆盖同一对话与请求 ID 跨重启返回同一提交，以及提交结算与通知同事务写入。 | 先从工单串追问这一条真实入口查重投。让原消息、执行请求和业务轮次可以对账；重启后重复提交返回原结果，结算与待投递通知一起持久化。复用现有消息 ID、轮次和账本，按实测缺口补字段或事务。 |
 | 2．等待、唤醒与中断 | Go 的 `Scheduler` 可缓存早到信号，等待时释放执行名额，重启扫描未结束任务；还有重启次数上限及先子后父的取消。Rust 已能恢复未完的内置对话，对已启动且不宜重放的工具返回中断结果。[内置对话](crates/vibevalley-agent/src/conversation.rs) | 把一个真实等待点接上，优先选等用户回答。分别检验先回答后进入等待、等待中重启、重复回答。已有业务轮次结算后才开后续轮次。仅在实际使用子任务的路径验证级联取消。 |
 | 3．oar 驱动回放 | Rust 已有协议解析、脚本农机、厂商样本及离线测试。Go 的 `pkg/oar/replaytest` 用模拟 CLI 经驱动入口回放，`pkg/oar/registry.go` 可核对各驱动支持范围。[Rust 驱动样本](crates/vibevalley-oar/tests/fixtures) | 先在两端对照 Claude 与 Codex 的启动、工具调用、提问、中断、恢复及异常退出。核对同一调用的起止、事件顺序和轮末结果；再按实际需要补农机。服务端再用脚本农机验证从事件到工单和农场的映射。 |
-| 4．执行治理 | Go 的 `internal/durable/governance_test.go` 另测预算暂停与上调续跑、上下文压缩和工具策略。Rust 已有额度探测、日预算与对话压缩，粒度和触发时机需逐项比较。 | 首条执行链稳定后按 Go 测例逐项实现和验收；远程机器、手机宿主和三维渲染有各自的产品范围与验收方式。 |
+| 4．执行治理 | Go 的 `internal/durable/governance_test.go` 另测预算暂停与上调续跑、上下文压缩和工具策略。Rust 已有额度探测、日预算与对话压缩，粒度和触发时机需逐项比较。 | 用原生助手与帮工核对从发现待审批、批准或拒绝，到恢复任务的完整过程。预算暂停后，调高额度应能唤醒同一任务。 |
 
-### Chord 的业务方法
+### 客户端怎样访问服务
 
-Go 提交 `a2c1851ab` 的 `internal/domain/stack/link_server.go` 注册 16 个方法。原生版已注册 `health.ping`、`space.snapshot`、`issue.list`、`approval.resolve`、`budget.raise`。下表列出其余 11 个方法。原生版现已接入其中的频道读取。[原生注册表](crates/vibevalley-http/src/chord.rs)
-
-| Go 方法 | 请求与返回 | 原生入口或缺口 |
-| --- | --- | --- |
-| `channel.events` | 频道 ID、起始序号、条数 → `ChannelEventView[]` | 已接入。按频道消息号升序读取正文和帮工报告。旧客户端可按序号续读。编辑、删除和表情沿用[原生频道语义](docs/subsystems/channel.md#chord-读取频道)。 |
-| `channel.post` | `AppendRequest` → 社交事件与观察层派单结果 | `Chat::say` 与 `Chat::post` 可写消息。Go 还接收提问、表情和角色，并返回本次观察层唤醒的记录。 |
-| `issue.create` | 工单、是否派单 → 工单，派单时附回执 | 工单板支持建单和派活。需核对调用方指定的工单 ID、Go 的工单状态以及派单回执。 |
-| `issue.queue` | 工单 ID → 工单与派单回执 | `issue.status.update` 可派活。Go 回执含提交 ID、对话 ID、会话 ID 和去重结果。 |
-| `pkm.search` | 文本、向量、范围和排序参数 → 页面命中列表 | `pkm.search` 的原生接口按块返回结果。Go 按页返回全文与向量的名次、摘要和反链数。 |
-| `pkm.backlinks` | 目标页或路径 → 反链列表 | 原生页面返回分组的反链块。Go 需要每处引用在源文件的行号及起止字节。 |
-| `memory.dream.run` | 范围 ID、会话摘要 → 待审提案 | 原生记忆库记录笔记和每轮结果。缺带基础版本与候选版本的归并提案。 |
-| `memory.dream.approve` | 提案 ID → 已采纳提案 | 缺采纳提案并原子切换记忆版本的领域入口。 |
-| `memory.dream.rollback` | 提案 ID → 已撤回提案 | 缺按版本撤回提案和恢复记忆内容的领域入口。 |
-| `artifact.publish` | 交付物信息、网页源码包或 HTML → 交付物、版本、卡片与去重结果 | 原生 Artifact 可保存和发布 HTML 版本。Go 还编译源码包并返回编译耗时。 |
-| `vault.token.issue` | 主体、会话、权限、主机、密钥范围、有效期 → 限权令牌 | 原生 MCP 会话令牌用于调用帮工工具。Go 出站令牌需约束可访问的主机和可取用的密钥。 |
-
-频道回归通过真实 WebSocket 检查跨频道隔离、缺失频道、非法游标、删除正文和报告的会话号。Go 客户端从 Rust 命令行写入的两条消息逐页读取，末页返回空数组。[频道回归](crates/vibevalley-server/tests/channel.rs) · [Go 客户端验收](crates/vibevalley-chord/tests/interop/product.go)
+CLI 通过 HTTP `/api/v1` 查询和修改业务数据。工作台经进程内桥订阅核心帧和频道消息，从核心帧读取工单与频道未读数。Chord 客户端从 `space` 订阅持久执行通知和审批卡，可调用 `approval.resolve` 审批工具或调用 `budget.raise` 提高预算。[Chord 契约与 Cargo 验收](crates/vibevalley-chord/README.md)
 
 ### 外部驱动验收覆盖
 

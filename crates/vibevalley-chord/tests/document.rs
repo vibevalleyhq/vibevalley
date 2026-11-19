@@ -15,10 +15,9 @@ struct Case {
 }
 
 #[test]
-fn go_delta_wire_results_and_hashes() {
-    let cases: Vec<Value> = serde_json::from_str(include_str!("fixtures/go-delta.json")).unwrap();
-    for raw in cases {
-        let case: Case = serde_json::from_value(raw).unwrap();
+fn delta_wire_results_and_hashes() {
+    let cases: Vec<Case> = serde_json::from_str(include_str!("fixtures/delta.json")).unwrap();
+    for case in cases {
         let original = Snapshot::new(case.input.clone());
         let applied = original.apply(&case.operations);
         assert_eq!(json!(original), case.input);

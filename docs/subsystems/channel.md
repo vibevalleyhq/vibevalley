@@ -4,11 +4,11 @@
 
 连接器按平台和外部消息标识登记入站消息。一批消息与读取游标在同一个 SQLite 事务中保存。换绑账号时，连接器同时清除旧入站记录并退役旧待发消息。重启后只读取 `pending` 状态的出站分片，按序号投递。平台已接收但本地尚未记录回执的分片仍可能重发。[连接器查询](crates/vibevalley-server/src/modules/connector/sql/queries.sql)
 
-## Chord 读取频道
+## 读取频道消息
 
-本机工作台经 `/chord/ws` 调 `channel.events`。请求的 `channelId` 是频道 ID。`afterSeq` 默认为 0，结果按频道内的消息号升序排列，从大于该序号的第一条开始。`limit` 为正数时限制条数，否则返回余下的消息。读完返回空数组。此方法保留参与者的已读位置。
+原生工作台经进程内桥调用 `channel.message.list` 读取最新一页。向前翻页时，`before` 取当前最早的消息号。工作台从已读到的最大修订号订阅 `channel.follow`，按消息号合并新增和修改，保留修订号较大的版本。读取分页和申报已读位置是两次调用。[工作台消息列表](apps/mac/ui/vv/web/features/channel/model/follow.ts) · [频道契约](packages/protocol/src/channel/api.ts)
 
-每行含 `channelId`、`seq`、`kind`、`authorId`、`text` 和 `createdAtMs`。有业务会话的消息另含 `sessionId`。帮工报告使用 `report`，聊天、派活和通知使用 `message`。编辑后读取最新正文，删除后原号的正文为空。表情更新同一条消息，不占新号。要接收已读过的消息上的修改，可订阅 `channel.follow`。
+命令行通过 HTTP `/api/v1` 访问同一频道服务。执行 `vibevalley channel message list general --limit 10` 可读取田头最近十条消息。
 
 ## 管什么，不管什么
 
