@@ -1,10 +1,14 @@
+pub mod architecture;
 pub mod class;
 pub mod common;
 pub mod er;
 pub mod flowchart;
 pub mod pie;
+pub mod requirement;
 pub mod sequence;
 pub mod state;
+pub mod swimlane;
+pub mod usecase;
 
 use std::collections::HashMap;
 
@@ -50,6 +54,10 @@ pub enum ParsedModel {
     Class(class::ClassDb),
     State(state::StateDb),
     Er(er::ErDb),
+    Requirement(requirement::RequirementDb),
+    Usecase(usecase::UsecaseModel),
+    Architecture(architecture::ArchitectureDb),
+    Swimlane(flowchart::FlowDb),
 }
 
 impl ParsedModel {
@@ -61,6 +69,10 @@ impl ParsedModel {
             Self::Class(_) => DiagramType::Class,
             Self::State(_) => DiagramType::State,
             Self::Er(_) => DiagramType::Er,
+            Self::Requirement(_) => DiagramType::Requirement,
+            Self::Usecase(_) => DiagramType::Usecase,
+            Self::Architecture(_) => DiagramType::Architecture,
+            Self::Swimlane(_) => DiagramType::Swimlane,
         }
     }
 
@@ -72,6 +84,10 @@ impl ParsedModel {
             Self::Class(db) => class::render_class(db, ctx),
             Self::State(db) => state::render_state(db, ctx),
             Self::Er(db) => er::render_er(db, ctx),
+            Self::Requirement(db) => requirement::render_requirement(db, ctx),
+            Self::Usecase(model) => usecase::render_usecase(model, ctx),
+            Self::Architecture(db) => architecture::render_architecture(db, ctx),
+            Self::Swimlane(db) => swimlane::render_swimlane(db, ctx),
         }
     }
 }
@@ -128,6 +144,10 @@ impl Registry {
         reg.register(Box::new(class::ClassDiagram));
         reg.register(Box::new(state::StateDiagram));
         reg.register(Box::new(er::ErDiagram));
+        reg.register(Box::new(requirement::RequirementDiagram));
+        reg.register(Box::new(usecase::UsecaseDiagram));
+        reg.register(Box::new(architecture::ArchitectureDiagram));
+        reg.register(Box::new(swimlane::SwimlaneDiagram));
         reg
     }
 
