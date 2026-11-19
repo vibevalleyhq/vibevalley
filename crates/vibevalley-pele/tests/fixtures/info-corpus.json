@@ -1,0 +1,21 @@
+[
+  "info",
+  "should handle an info definition",
+  "should handle an info definition with showInfo",
+  "info showInfo",
+  "should throw because of unsupported info grammar",
+  "info unsupported",
+  "\n    info",
+  "info\n    ",
+  "\n    info\n    ",
+  "should handle empty info",
+  "info showInfo\n    ",
+  "\n    info showInfo",
+  "info\n    showInfo",
+  "info\n    showInfo\n    ",
+  "\n    info\n    showInfo\n    ",
+  "\n    info\n    showInfo",
+  "\n    info showInfo\n    ",
+  "info\n",
+  "info showInfo\n"
+]

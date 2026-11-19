@@ -4,21 +4,30 @@ pub mod block;
 pub mod c4;
 pub mod class;
 pub mod common;
+pub mod cynefin;
 pub mod er;
 pub mod eventmodeling;
 pub mod flowchart;
 pub mod gantt;
 pub mod git;
+pub mod info;
+pub mod ishikawa;
 pub mod journey;
+pub mod kanban;
+pub mod mindmap;
+pub mod packet;
 pub mod pie;
 pub mod quadrant;
 pub mod radar;
+pub mod railroad;
 pub mod requirement;
 pub mod sankey;
 pub mod sequence;
 pub mod state;
 pub mod swimlane;
 pub mod timeline;
+pub mod treemap;
+pub mod treeview;
 pub mod usecase;
 pub mod venn;
 pub mod wardley;
@@ -86,6 +95,15 @@ pub enum ParsedModel {
     Sankey(sankey::SankeyModel),
     Venn(venn::VennModel),
     Wardley(wardley::WardleyModel),
+    Railroad(railroad::RailroadModel),
+    TreeView(treeview::TreeViewModel),
+    Treemap(treemap::TreemapModel),
+    Cynefin(cynefin::CynefinModel),
+    Ishikawa(ishikawa::IshikawaModel),
+    Kanban(kanban::KanbanModel),
+    Mindmap(mindmap::MindmapModel),
+    Packet(packet::PacketModel),
+    Info(info::InfoModel),
 }
 
 impl ParsedModel {
@@ -115,6 +133,15 @@ impl ParsedModel {
             Self::Sankey(_) => DiagramType::Sankey,
             Self::Venn(_) => DiagramType::Venn,
             Self::Wardley(_) => DiagramType::Wardley,
+            Self::Railroad(_) => DiagramType::Railroad,
+            Self::TreeView(_) => DiagramType::TreeView,
+            Self::Treemap(_) => DiagramType::Treemap,
+            Self::Cynefin(_) => DiagramType::Cynefin,
+            Self::Ishikawa(_) => DiagramType::Ishikawa,
+            Self::Kanban(_) => DiagramType::Kanban,
+            Self::Mindmap(_) => DiagramType::Mindmap,
+            Self::Packet(_) => DiagramType::Packet,
+            Self::Info(_) => DiagramType::Info,
         }
     }
 
@@ -144,6 +171,15 @@ impl ParsedModel {
             Self::Sankey(model) => sankey::render::render_sankey(model, ctx),
             Self::Venn(model) => Ok(venn::render::render_venn(model, ctx)),
             Self::Wardley(model) => Ok(wardley::render::render_wardley(model, ctx)),
+            Self::Railroad(model) => Ok(railroad::render::render_railroad(model, ctx)),
+            Self::TreeView(model) => Ok(treeview::render::render_tree_view(model, ctx)),
+            Self::Treemap(model) => Ok(treemap::render::render_treemap(model, ctx)),
+            Self::Cynefin(model) => Ok(cynefin::render::render_cynefin(model, ctx)),
+            Self::Ishikawa(model) => Ok(ishikawa::render::render_ishikawa(model, ctx)),
+            Self::Kanban(model) => Ok(kanban::render::render_kanban(model, ctx)),
+            Self::Mindmap(model) => Ok(mindmap::render::render_mindmap(model, ctx)),
+            Self::Packet(model) => Ok(packet::render::render_packet(model, ctx)),
+            Self::Info(model) => Ok(info::render::render_info(model, ctx)),
         }
     }
 }
@@ -218,6 +254,15 @@ impl Registry {
         reg.register(Box::new(sankey::SankeyDiagram));
         reg.register(Box::new(venn::VennDiagram));
         reg.register(Box::new(wardley::WardleyDiagram));
+        reg.register(Box::new(railroad::RailroadDiagram));
+        reg.register(Box::new(treeview::TreeViewDiagram));
+        reg.register(Box::new(treemap::TreemapDiagram));
+        reg.register(Box::new(cynefin::CynefinDiagram));
+        reg.register(Box::new(ishikawa::IshikawaDiagram));
+        reg.register(Box::new(kanban::KanbanDiagram));
+        reg.register(Box::new(mindmap::MindmapDiagram));
+        reg.register(Box::new(packet::PacketDiagram));
+        reg.register(Box::new(info::InfoDiagram));
         reg
     }
 
