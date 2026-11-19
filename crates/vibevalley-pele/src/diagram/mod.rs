@@ -1,3 +1,5 @@
+pub mod agentflow;
+pub mod block;
 pub mod common;
 pub mod flowchart;
 pub mod pie;
@@ -44,6 +46,8 @@ pub enum ParsedModel {
     Flowchart(flowchart::FlowDb),
     Sequence(sequence::SeqDb),
     Pie(pie::PieModel),
+    Agentflow(Box<agentflow::AgentflowDb>),
+    Block(block::BlockDb),
 }
 
 impl ParsedModel {
@@ -52,6 +56,8 @@ impl ParsedModel {
             Self::Flowchart(_) => DiagramType::Flowchart,
             Self::Sequence(_) => DiagramType::Sequence,
             Self::Pie(_) => DiagramType::Pie,
+            Self::Agentflow(_) => DiagramType::Agentflow,
+            Self::Block(_) => DiagramType::Block,
         }
     }
 
@@ -60,6 +66,8 @@ impl ParsedModel {
             Self::Flowchart(db) => flowchart::render_flowchart(db, ctx, None),
             Self::Sequence(db) => sequence::render_sequence(db, ctx),
             Self::Pie(model) => pie::render::render_pie(model, ctx),
+            Self::Agentflow(db) => agentflow::render_agentflow(db, ctx),
+            Self::Block(db) => block::render_block(db, ctx),
         }
     }
 }
@@ -113,6 +121,8 @@ impl Registry {
         reg.register(Box::new(flowchart::FlowchartDiagram));
         reg.register(Box::new(sequence::SequenceDiagram));
         reg.register(Box::new(pie::PieDiagram));
+        reg.register(Box::new(agentflow::AgentflowDiagram));
+        reg.register(Box::new(block::BlockDiagram));
         reg
     }
 
