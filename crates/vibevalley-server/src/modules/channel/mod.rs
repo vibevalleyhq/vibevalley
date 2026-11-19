@@ -24,10 +24,10 @@ use serde_json::Value;
 use sqlx::SqliteConnection;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    Actor, AgentRole, ApiError, ArtifactCard, Attachment, BizCode, CallState, Channel, ChannelEvent, ChannelLast, ChannelType, ChannelUnread, ChannelUpdate,
-    ChatMessage, DEFAULT_ORCHESTRATOR, EVERYONE, Embed, Fact, FactCallChanged, FactChannelChanged, FactChannelRemoved, FactMessageChanged,
-    FactUserMentionsChanged, MessageHit, MessageKind, NoticeLevel, Notify, Outcome, Preview, QuotedBlock, Reaction, Spent, SubjectKind, USER_ID, UserMention,
-    ops, subscriptions,
+    Actor, AgentRole, ApiError, ArtifactCard, ArtifactViewContext, Attachment, BizCode, CallState, Channel, ChannelEvent, ChannelLast, ChannelType,
+    ChannelUnread, ChannelUpdate, ChatMessage, DEFAULT_ORCHESTRATOR, EVERYONE, Embed, Fact, FactCallChanged, FactChannelChanged, FactChannelRemoved,
+    FactMessageChanged, FactUserMentionsChanged, MessageHit, MessageKind, NoticeLevel, Notify, Outcome, Preview, QuotedBlock, Reaction, Spent, SubjectKind,
+    USER_ID, UserMention, ops, subscriptions,
 };
 
 use self::db::{ChannelRow, EventRow, MsgRow, ParticipantRow};
@@ -130,6 +130,7 @@ pub struct Meta {
     pub embeds: Option<Vec<Embed>>,
     pub artifact: Option<ArtifactCard>,
     pub blocks: Option<Vec<QuotedBlock>>,
+    pub view_context: Option<ArtifactViewContext>,
     pub picked: Option<Picked>,
     pub ingress_source: Option<String>,
     pub ingress_recipient: Option<String>,
@@ -264,6 +265,7 @@ pub fn to_message(row: &MsgRow) -> ChatMessage {
         embeds: meta.embeds.unwrap_or_default(),
         artifact: meta.artifact.filter(|_| !gone),
         blocks: meta.blocks.filter(|b| !b.is_empty() && !gone),
+        view_context: meta.view_context.filter(|_| !gone),
     }
 }
 
@@ -307,6 +309,8 @@ pub struct AddressedMessage {
     pub artifact: Option<ArtifactRef>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blocks: Option<Vec<QuotedBlock>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub view_context: Option<ArtifactViewContext>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub picked: Option<Picked>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -390,6 +394,7 @@ pub struct Saying {
     pub attachments: Vec<String>,
     pub picked: Option<Picked>,
     pub blocks: Vec<QuotedBlock>,
+    pub view_context: Option<ArtifactViewContext>,
     /// Delivers only to this orchestrator.
     pub to: Option<String>,
 }
@@ -882,6 +887,7 @@ impl Inner {
                 version: a.version,
             }),
             blocks: meta.blocks.filter(|b| !b.is_empty() && !gone),
+            view_context: meta.view_context.filter(|_| !gone),
             picked: meta.picked,
             response_port: meta.response_port.filter(|s| !s.is_empty()),
             voice_mode: meta.voice_mode.filter(|s| !s.is_empty()),
@@ -1466,6 +1472,7 @@ impl Chat {
                 attachments: (!files.is_empty()).then_some(files),
                 picked: (picked.agent.is_some() || picked.repo.is_some()).then_some(picked),
                 blocks: (!s.blocks.is_empty()).then(|| s.blocks.clone()),
+                view_context: s.view_context.clone(),
                 ingress_source: s.source.clone(),
                 spoken: voice.then_some(true),
                 response_port: s.response_port.clone(),
@@ -2780,6 +2787,7 @@ pub fn install(hub: &Hub, chat: Arc<Chat>, agents: Arc<Agents>, game: Option<Arc
                 attachments: body.attachments.unwrap_or_default(),
                 to: body.to,
                 blocks,
+                view_context: body.view_context,
                 ..Saying::default()
             })
             .map(|_| ())

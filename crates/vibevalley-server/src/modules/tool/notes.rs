@@ -6,8 +6,9 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use vibevalley_protocol::{
-    ArtifactListRequest, ArtifactRequest, ArtifactVersionRequest, BlockCreate, BlockDelete, BlockUpdate, LibraryAddRequest, LibraryListRequest,
-    MediaImageRequest, MediaSource, MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, PkmProposalRequest, PkmSearchRequest, Session,
+    ArtifactEntryBatchRequest, ArtifactEntryGetRequest, ArtifactEntryListRequest, ArtifactKind, ArtifactListRequest, ArtifactRequest, ArtifactType,
+    ArtifactTypeReadRequest, ArtifactVersionRequest, BlockCreate, BlockDelete, BlockUpdate, LibraryAddRequest, LibraryListRequest, MediaImageRequest,
+    MediaSource, MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, PkmProposalRequest, PkmSearchRequest, Session,
 };
 
 use super::{Farm, Who, given};
@@ -160,9 +161,11 @@ pub fn library_add(f: &Farm, who: &Who, req: LibraryAddRequest) -> Result<String
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ArtifactListArgs {
     channel: Option<String>,
     issue: Option<String>,
+    artifact_type: Option<ArtifactType>,
 }
 
 pub fn artifact_list(f: &Farm, who: &Who, a: ArtifactListArgs) -> Result<String, String> {
@@ -174,7 +177,15 @@ pub fn artifact_list(f: &Farm, who: &Who, a: ArtifactListArgs) -> Result<String,
     if let (Who::Helper(me), None) = (who, &channel) {
         issue = me.issue.clone();
     }
-    text(&f.artifacts.list(&ArtifactListRequest { channel, issue }).map_err(|e| e.message)?)
+    text(
+        &f.artifacts
+            .list(&ArtifactListRequest {
+                channel,
+                issue,
+                artifact_type: a.artifact_type,
+            })
+            .map_err(|e| e.message)?,
+    )
 }
 
 pub fn artifact_get(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
@@ -215,7 +226,30 @@ pub struct ArtifactCreateArgs {
     file: Option<String>,
 }
 
+fn is_store_create(req: &ArtifactRequest, file: Option<&str>) -> bool {
+    req.artifact_type.is_some_and(|t| t != ArtifactType::Docs)
+        || req.kind == Some(ArtifactKind::Store)
+        || (req.entries.is_some() && req.content.is_none() && file.is_none())
+}
+
+fn prepare_artifact_create(req: &mut ArtifactRequest, file: Option<&str>) {
+    if is_store_create(req, file) || (req.artifact_type == Some(ArtifactType::Docs) && req.content.is_none() && file.is_none()) {
+        return;
+    }
+    if req.kind.is_none() && req.content.is_some() {
+        req.kind = Some(ArtifactKind::Markdown);
+    }
+    if req.kind == Some(ArtifactKind::Html) && req.display.is_none() {
+        let name = file.unwrap_or(req.title.as_str());
+        req.display = vibevalley_artifact::infer_artifact_from_name(name, req.content.as_deref()).display;
+    }
+}
+
 pub fn artifact_create(f: &Farm, who: &Who, mut a: ArtifactCreateArgs) -> Result<String, String> {
+    let file = given(&a.file).map(str::to_string);
+    if a.req.content.is_some() && file.is_some() {
+        return Err("content 和 file 只能填一个".into());
+    }
     match who {
         Who::Orchestrator(here) => {
             if given(&a.req.channel).is_none() && !here.channel.is_empty() {
@@ -235,6 +269,7 @@ pub fn artifact_create(f: &Farm, who: &Who, mut a: ArtifactCreateArgs) -> Result
             }
         }
     }
+    prepare_artifact_create(&mut a.req, file.as_deref());
     text(&f.artifacts.create(&maker_of(who), &a.req).map_err(|e| e.message)?)
 }
 
@@ -302,6 +337,29 @@ pub fn block_delete(f: &Farm, who: &Who, a: BlockDeleteArgs) -> Result<String, S
     text(&f.artifacts.delete_block(&a.id, actor, &a.body).map_err(|e| e.message)?)
 }
 
+pub fn artifact_type_list(f: &Farm, _: &Who, _: EmptyArgs) -> Result<String, String> {
+    text(&f.artifacts.list_types().map_err(|e| e.message)?)
+}
+
+pub fn artifact_type_read(f: &Farm, _: &Who, req: ArtifactTypeReadRequest) -> Result<String, String> {
+    text(&f.artifacts.read_type(&req).map_err(|e| e.message)?)
+}
+
+pub fn artifact_entry_list(f: &Farm, _: &Who, mut req: ArtifactEntryListRequest) -> Result<String, String> {
+    req.id = req.id.trim().to_string();
+    text(&f.artifacts.list_entries(&req).map_err(|e| e.message)?)
+}
+
+pub fn artifact_entry_get(f: &Farm, _: &Who, mut req: ArtifactEntryGetRequest) -> Result<String, String> {
+    req.id = req.id.trim().to_string();
+    text(&f.artifacts.get_entry(&req).map_err(|e| e.message)?)
+}
+
+pub fn artifact_entry_batch(f: &Farm, who: &Who, mut req: ArtifactEntryBatchRequest) -> Result<String, String> {
+    req.id = req.id.trim().to_string();
+    text(&f.artifacts.batch_entries(&maker_of(who), &req).map_err(|e| e.message)?)
+}
+
 /// `file`: a file in the helper's own folder becomes the content.
 fn read_helper_file(me: &Session, file: &Option<String>) -> Result<Option<String>, String> {
     let Some(file) = given(file) else {
@@ -325,11 +383,58 @@ fn inside(dir: &Path, name: &str) -> Result<PathBuf, String> {
 
 #[cfg(test)]
 mod tests {
+    use vibevalley_protocol::{ArtifactDisplay, ArtifactEntryOp, ArtifactEntryWriteInput, ArtifactKind, ArtifactRequest, ArtifactType};
+
+    fn empty_req(title: &str) -> ArtifactRequest {
+        ArtifactRequest {
+            title: title.into(),
+            kind: None,
+            artifact_type: None,
+            display: None,
+            content: None,
+            entries: None,
+            is_default: None,
+            announce: None,
+            note: None,
+            channel: None,
+            issue: None,
+        }
+    }
+
     #[test]
     fn a_file_outside_the_folder_is_refused() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("a.md"), "x").unwrap();
         assert!(super::inside(dir.path(), "a.md").is_ok());
         assert!(super::inside(dir.path(), "../a.md").is_err());
+    }
+
+    #[test]
+    fn prepare_artifact_create_preserves_store_and_infers_html_display() {
+        let mut store = empty_req("Q3 Deck");
+        store.artifact_type = Some(ArtifactType::Slides);
+        store.entries = Some(vec![ArtifactEntryWriteInput {
+            op: ArtifactEntryOp::Set,
+            path: "project/deck.json".into(),
+            kind: None,
+            value: Some("{}".into()),
+            from: None,
+            mime: None,
+            if_rev: None,
+        }]);
+        super::prepare_artifact_create(&mut store, None);
+        assert_eq!(store.kind, None);
+        assert_eq!(store.display, None);
+
+        let mut md = empty_req("Notes");
+        md.content = Some("# Hello".into());
+        super::prepare_artifact_create(&mut md, None);
+        assert_eq!(md.kind, Some(ArtifactKind::Markdown));
+
+        let mut slides_html = empty_req("Deck");
+        slides_html.kind = Some(ArtifactKind::Html);
+        slides_html.content = Some("<html><body></body></html>".into());
+        super::prepare_artifact_create(&mut slides_html, Some("pitch.slide.html"));
+        assert_eq!(slides_html.display, Some(ArtifactDisplay::Slides));
     }
 }
