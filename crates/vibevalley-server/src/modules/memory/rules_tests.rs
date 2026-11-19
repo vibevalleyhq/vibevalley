@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use serde_json::Value;
 
-use crate::*;
+use super::*;
 
 fn golden() -> Value {
-    serde_json::from_str(include_str!("../golden/golden.json")).unwrap()
+    serde_json::from_str(include_str!("golden/golden.json")).unwrap()
 }
 
 fn strings(v: &Value) -> Vec<String> {

@@ -58,7 +58,7 @@ fn go_parse_float(text: &str) -> Option<f64> {
 fn dict() -> &'static Dictionary {
     static DICT: OnceLock<Dictionary> = OnceLock::new();
     DICT.get_or_init(|| {
-        let text = gunzip(include_bytes!("../data/zh_s.txt.gz"));
+        let text = gunzip(include_bytes!("data/zh_s.txt.gz"));
         let mut freq = HashMap::new();
         let mut total = 0.0;
         for line in text.split('\n') {
@@ -160,7 +160,7 @@ const MIN_FLOAT: f64 = -3.14e100;
 fn emit() -> &'static HashMap<State, HashMap<String, f64>> {
     static EMIT: OnceLock<HashMap<State, HashMap<String, f64>>> = OnceLock::new();
     EMIT.get_or_init(|| {
-        let text = gunzip(include_bytes!("../data/hmm_emit.json.gz"));
+        let text = gunzip(include_bytes!("data/hmm_emit.json.gz"));
         let raw: HashMap<String, HashMap<String, f64>> = serde_json::from_str(&text).expect("bundled HMM table");
         raw.into_iter()
             .filter_map(|(k, v)| {

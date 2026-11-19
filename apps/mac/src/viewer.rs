@@ -48,7 +48,7 @@ pub struct FileViewer {
 /// Splits `text` into lines with their highlight spans (blocking; run off
 /// the UI thread).
 pub fn prepare(text: &str, language: Option<&Language>) -> Vec<Line> {
-    let spans = language.map(|l| vibevalley_files::highlight(text, l)).unwrap_or_default();
+    let spans = language.map(|l| vibevalley_highlight::highlight(text, l)).unwrap_or_default();
     let mut spans = spans.into_iter();
     text.lines()
         .map(|line| Line {

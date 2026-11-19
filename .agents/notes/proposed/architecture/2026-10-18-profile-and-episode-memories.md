@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-`memory` 表（[记性](docs/subsystems/memory.md)，`0001_schema.up.sql`（TS 服务端，已删；Rust 的表在 [memory.rs](crates/vibevalley-server/src/modules/memory.rs)，还没有这几列））已经有 `scope`（`user` / `agent`）、`title`、`importance`（0–3）和 `replaced_by` 列，召回的查询（`memory.sql`）也只读 `replaced_by is null` 的行。还缺三样：
+`memory` 表（[记性](docs/subsystems/memory.md)，`0001_schema.up.sql`（TS 服务端，已删；Rust 的表在 [memory.rs](crates/vibevalley-server/src/modules/memory/mod.rs)，还没有这几列））已经有 `scope`（`user` / `agent`）、`title`、`importance`（0–3）和 `replaced_by` 列，召回的查询（`memory.sql`）也只读 `replaced_by is null` 的行。还缺三样：
 
 | 缺项 | 现状 | 问题 |
 |---|---|---|

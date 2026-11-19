@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use vibevalley_store::{Project, ProjectId, SavedTerminal};
+use crate::store::{Project, ProjectId, SavedTerminal};
 
 use crate::layout::{Layout, PaneKind};
 use crate::persist::Persistence;
@@ -66,19 +66,19 @@ pub struct LoadedProject {
 }
 
 /// Blocking. Registers `path` (or finds it) and reads its saved state.
-pub fn load_project(store: &dyn Persistence, path: &Path) -> vibevalley_store::Result<LoadedProject> {
+pub fn load_project(store: &dyn Persistence, path: &Path) -> crate::store::Result<LoadedProject> {
     let info = store.add_project(path)?;
     load_existing(store, info)
 }
 
 /// Blocking. Reads every stored project, in rail order.
-pub fn load_all(store: &dyn Persistence) -> vibevalley_store::Result<Vec<LoadedProject>> {
+pub fn load_all(store: &dyn Persistence) -> crate::store::Result<Vec<LoadedProject>> {
     let mut projects = store.projects()?;
     projects.sort_by_key(|p| p.position);
     projects.into_iter().map(|info| load_existing(store, info)).collect()
 }
 
-fn load_existing(store: &dyn Persistence, info: Project) -> vibevalley_store::Result<LoadedProject> {
+fn load_existing(store: &dyn Persistence, info: Project) -> crate::store::Result<LoadedProject> {
     let layout = store.layout(info.id)?;
     let terminals = store.terminals(info.id)?;
     Ok(LoadedProject { info, layout, terminals })
@@ -232,7 +232,7 @@ pub struct SaveJob<T> {
 
 impl<T: TerminalHandle> SaveJob<T> {
     /// Blocking: asks each session for its scrollback, then writes.
-    pub fn run(self, store: &dyn Persistence) -> vibevalley_store::Result<()> {
+    pub fn run(self, store: &dyn Persistence) -> crate::store::Result<()> {
         let mut saved = self.dormant;
         for (id, title, initial_cwd, handle) in self.live {
             saved.push(SavedTerminal {

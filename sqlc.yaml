@@ -7,11 +7,11 @@ plugins:
     env: [PATH]
 sql:
   - engine: sqlite
-    schema: crates/vibevalley-store/sql/migrations
-    queries: crates/vibevalley-store/sql/queries.sql
+    schema: crates/vibevalley-workspace/sql/migrations
+    queries: crates/vibevalley-workspace/sql/queries.sql
     codegen:
       - plugin: sqlx
-        out: crates/vibevalley-store/src/generated
+        out: crates/vibevalley-workspace/src/store/generated
   - engine: sqlite
     schema: crates/vibevalley-server/src/modules/attachment/sql/schema.sql
     queries: crates/vibevalley-server/src/modules/attachment/sql/queries.sql

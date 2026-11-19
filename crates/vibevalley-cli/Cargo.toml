@@ -10,8 +10,8 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.6.7", features = ["string"] }
-jiff = "1.0.1"
-serde = { version = "1.0.229", features = ["derive"] }
+jiff = { workspace = true }
+serde = { workspace = true }
 serde_json = "1.0.154"
 ureq = { version = "3.5.2", features = ["json"] }
 vibevalley-core = { path = "../vibevalley-core" }

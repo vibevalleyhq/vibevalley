@@ -59,7 +59,7 @@ fn tier_name(t: Tier) -> String {
 }
 
 fn tokenize(text: &str) -> Vec<String> {
-    vibevalley_memory::terms_list(text)
+    crate::modules::memory::terms_list(text)
 }
 
 fn query_words(text: &str) -> Vec<String> {

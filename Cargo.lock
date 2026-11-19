@@ -11288,8 +11288,12 @@ checksum = "8f72a05e828585856dacd553fba484c242c46e391fb0e58917c942ee9202915c"
 dependencies = [
  "futures-util",
  "log",
+ "rustls",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls",
  "tungstenite 0.29.0",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -11785,6 +11789,8 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.9.5",
+ "rustls",
+ "rustls-pki-types",
  "sha1 0.10.7",
  "thiserror 2.0.21",
 ]
@@ -12297,6 +12303,22 @@ dependencies = [
  "serde",
  "tempfile",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "vibevalley-git"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "similar 3.2.1",
+ "tempfile",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "vibevalley-highlight"
+version = "0.1.0"
+dependencies = [
  "tree-sitter",
  "tree-sitter-bash",
  "tree-sitter-c",
@@ -12315,16 +12337,7 @@ dependencies = [
  "tree-sitter-typescript",
  "tree-sitter-yaml",
  "tree-sitter-zig",
-]
-
-[[package]]
-name = "vibevalley-git"
-version = "0.1.0"
-dependencies = [
- "serde",
- "similar 3.2.1",
- "tempfile",
- "thiserror 2.0.21",
+ "vibevalley-files",
 ]
 
 [[package]]
@@ -12386,31 +12399,21 @@ dependencies = [
  "smallvec",
  "tempfile",
  "tokio",
- "tokio-tungstenite 0.30.0",
+ "tokio-tungstenite 0.29.0",
  "unicode-segmentation",
  "unicode-width",
  "vibevalley-bridge",
  "vibevalley-files",
  "vibevalley-git",
+ "vibevalley-highlight",
  "vibevalley-http",
  "vibevalley-i18n",
  "vibevalley-pixel",
  "vibevalley-protocol",
  "vibevalley-server",
  "vibevalley-server-api",
- "vibevalley-store",
  "vibevalley-terminal",
  "vibevalley-workspace",
-]
-
-[[package]]
-name = "vibevalley-memory"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "regex",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -12486,7 +12489,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
- "tokio-tungstenite 0.30.0",
+ "tokio-tungstenite 0.29.0",
  "ureq",
  "url",
  "uuid",
@@ -12502,7 +12505,6 @@ dependencies = [
  "vibevalley-home",
  "vibevalley-http",
  "vibevalley-i18n",
- "vibevalley-memory",
  "vibevalley-oar",
  "vibevalley-pkm",
  "vibevalley-protocol",
@@ -12517,18 +12519,6 @@ dependencies = [
  "serde_json",
  "vibevalley-chord",
  "vibevalley-protocol",
-]
-
-[[package]]
-name = "vibevalley-store"
-version = "0.1.0"
-dependencies = [
- "pollster 1.0.3",
- "serde",
- "serde_json",
- "sqlx",
- "tempfile",
- "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -12548,10 +12538,13 @@ dependencies = [
 name = "vibevalley-workspace"
 version = "0.1.0"
 dependencies = [
+ "pollster 1.0.3",
  "serde",
  "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.21",
  "vibevalley-git",
- "vibevalley-store",
  "vibevalley-terminal",
 ]
 

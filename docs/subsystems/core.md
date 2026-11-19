@@ -83,7 +83,7 @@ SSE 以外的路由：
 
 **服务端启动**
 
-1. `start`（`crates/vibevalley-server/src/start.rs`）从空状态起 `Hub`，按序打开设置、游戏、档案和农机、`state.db`（`vibevalley-store`）、仓库、记性、轨迹、工单板、定时任务、附件、频道、素材库、媒体、Artifact、笔记、助手、观察层；各自从库读回并施加初始事实。
+1. `start`（`crates/vibevalley-server/src/start.rs`）从空状态起 `Hub`，按序打开设置、游戏、档案和农机、`state.db`（`vibevalley-workspace::store`）、仓库、记性、轨迹、工单板、定时任务、附件、频道、素材库、媒体、Artifact、笔记、助手、观察层；各自从库读回并施加初始事实。
 2. 工单板接回停机时在场的会话；观察层按游标读完漏读的频道事件。
 3. `main.rs` 绑定端口（`VIBEVALLEY_PORT=0` 时取任意端口），写出 `server.json`，`--ready-json` 打印 `{"url","pid"}`。
 

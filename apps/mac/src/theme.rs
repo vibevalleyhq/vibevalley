@@ -293,7 +293,7 @@ impl Ui {
         self.settings.mono_font.clone().into()
     }
 
-    /// Applies new settings everywhere, including the component library.
+    /// Applies new settings everywhere.
     pub fn apply(settings: Settings, cx: &mut App) {
         let appearance_override = match settings.theme {
             ThemeChoice::Dark => Some(gpui_kit::WindowAppearance::Dark),
@@ -308,13 +308,7 @@ impl Ui {
         let epoch = cx.try_global::<Ui>().map_or(0, |ui| ui.epoch + 1);
         let mut ui = Ui::new(settings, system_dark);
         ui.epoch = epoch;
-        let mode = if ui.colors.dark {
-            gpui_kit::component::ThemeMode::Dark
-        } else {
-            gpui_kit::component::ThemeMode::Light
-        };
         cx.set_global(ui);
-        gpui_kit::component::Theme::change(mode, None, cx);
         cx.refresh_windows();
     }
 }

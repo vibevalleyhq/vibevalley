@@ -13,7 +13,6 @@ use std::sync::{Arc, Mutex};
 
 use sqlx::{Connection, SqliteConnection};
 use vibevalley_i18n::t;
-use vibevalley_memory as m;
 use vibevalley_protocol::{
     ActorKind, ApiError, BizCode, Fact, Memory, MemoryFound, MemoryKind, MemoryList, MemoryScope, MemorySearch, MemorySourceInfo, Outcome, Preview,
     RecallPreview, ops,
@@ -23,8 +22,15 @@ use crate::base::{RequestKeys, open_sqlx_db};
 use crate::modules::agent::Agents;
 use crate::{Hub, lock, now};
 
+mod gse;
+#[allow(dead_code)]
+mod rules;
+
+use rules as m;
+pub(crate) use rules::terms_list;
+
 #[rustfmt::skip]
-#[path = "memory/generated/queries.rs"]
+#[path = "generated/queries.rs"]
 mod queries;
 
 /// Fading marks the ones that would go if this many more were kept.
@@ -101,7 +107,7 @@ impl Memories {
     pub fn open(home: &Path, agents: Arc<Agents>) -> Result<Arc<Memories>, ApiError> {
         let db = pollster::block_on(async {
             let mut conn = open_sqlx_db(home).await?;
-            sqlx::raw_sql(include_str!("memory/sql/schema.sql")).execute(&mut conn).await?;
+            sqlx::raw_sql(include_str!("sql/schema.sql")).execute(&mut conn).await?;
             let version = i64::from(m::TERMS_VERSION);
             let stale = queries::list_stale_terms(&mut conn, queries::ListStaleTermsParams { terms_of: version }).await?;
             if !stale.is_empty() {

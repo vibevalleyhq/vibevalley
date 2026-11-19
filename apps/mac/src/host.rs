@@ -16,7 +16,7 @@ impl Storage {
     }
 
     fn from_override(path: Option<PathBuf>) -> Self {
-        let database = path.unwrap_or_else(vibevalley_store::Store::default_path);
+        let database = path.unwrap_or_else(vibevalley_workspace::Store::default_path);
         let views = if database.file_name() == Some(std::ffi::OsStr::new("state.db")) {
             database.with_file_name("nsh")
         } else {

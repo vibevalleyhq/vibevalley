@@ -25,16 +25,15 @@ vibevalley-cron = { version = "0.1.0", path = "../vibevalley-cron" }
 vibevalley-core = { version = "0.1.0", path = "../vibevalley-core" }
 vibevalley-git = { version = "0.1.0", path = "../vibevalley-git" }
 vibevalley-i18n = { version = "0.1.0", path = "../vibevalley-i18n" }
-vibevalley-memory = { version = "0.1.0", path = "../vibevalley-memory" }
 vibevalley-protocol = { version = "0.1.0", path = "../vibevalley-protocol" }
 vibevalley-server-api = { version = "0.1.0", path = "../vibevalley-server-api" }
 flume = "0.12.0"
 include_dir = "0.7.4"
-jiff = "1.0.1"
+jiff = { workspace = true }
 regex = "1.13.1"
 sqlx = { version = "0.9.1", default-features = false, features = ["sqlite", "derive"] }
 pollster = "1.0.3"
-serde = { version = "1.0.229", features = ["derive"] }
+serde = { workspace = true }
 serde_json = "1.0.154"
 vibevalley-home = { path = "../vibevalley-home" }
 serde_path_to_error = "0.1.20"
@@ -42,7 +41,7 @@ thiserror = "2.0.21"
 sha2 = "0.11.1"
 ureq = { version = "3.5.2", features = ["json"] }
 url = "2.5.8"
-uuid = { version = "1.29.2", features = ["v4", "v7"] }
+uuid = { workspace = true }
 vibevalley-pkm = { version = "0.1.0", path = "../vibevalley-pkm" }
 vibevalley-files = { version = "0.1.0", path = "../vibevalley-files" }
 symphonia = { version = "0.6.1", default-features = false, features = ["wav", "mp3", "isomp4", "flac", "ogg", "mkv"] }
@@ -51,9 +50,9 @@ crc32fast = "1.5.5"
 
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "json"] }
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
-tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
-futures-util = { version = "0.3.34", default-features = false, features = ["sink"] }
-tokio = { version = "1.54.1", features = ["rt", "time", "net", "sync", "macros", "signal"] }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+tokio = { workspace = true }
 vibevalley-http = { version = "0.1.0", path = "../vibevalley-http" }
 
 [dev-dependencies]

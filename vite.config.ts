@@ -56,15 +56,11 @@ export default defineConfig({
           "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build && ../../../.tools/bin/nsh test vv/app/issues.test.tsx",
         cache: false,
       },
-      "release:verify": [
-        "vp run rust:check",
-        "vp run protocol:check",
-        "vp run sql:check",
-        "vp run packages:check",
-        "vp run scripts:test",
-        "vp run mac:check",
-        "vp run docs:verify",
-      ],
+      "release:verify": {
+        command: "true",
+        dependsOn: ["rust:check", "protocol:check", "sql:check", "packages:check", "scripts:test", "mac:check", "docs:verify"],
+        cache: false,
+      },
     },
   },
   // scripts/'s own tests; each package has its vite.config.ts with its own.

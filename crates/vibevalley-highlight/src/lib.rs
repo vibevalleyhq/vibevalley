@@ -2,7 +2,7 @@ use std::sync::OnceLock;
 
 use tree_sitter_highlight::{HighlightConfiguration, HighlightEvent, Highlighter};
 
-use crate::{HighlightKind, HighlightSpan, SUPPORTED};
+use vibevalley_files::{HighlightKind, HighlightSpan, Language, SUPPORTED};
 
 /// Reached only through injection (the inline half of the markdown grammar).
 const MARKDOWN_INLINE: &str = "markdown_inline";
@@ -289,9 +289,12 @@ impl<'a> Lines<'a> {
     }
 }
 
-pub(crate) fn highlight(text: &str, language: &str) -> Vec<Vec<HighlightSpan>> {
+/// Highlight spans for each line of `text` (one inner `Vec` per line, spans
+/// sorted and non-overlapping). Unknown languages yield empty lines. Lines
+/// are those of `str::lines`, so spans never cover a line terminator.
+pub fn highlight(text: &str, language: &Language) -> Vec<Vec<HighlightSpan>> {
     let mut lines = Lines::new(text);
-    let Some(config) = config(language) else { return lines.spans };
+    let Some(config) = config(&language.0) else { return lines.spans };
 
     let mut highlighter = Highlighter::new();
     // A closure, not the fn item: passing the fn directly pins the callback's
@@ -342,7 +345,6 @@ mod tests {
     use std::time::Instant;
 
     use super::*;
-    use crate::Language;
 
     fn run(text: &str, language: &str) -> Vec<Vec<HighlightSpan>> {
         let spans = crate::highlight(text, &Language(language.to_string()));

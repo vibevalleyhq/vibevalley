@@ -66,7 +66,7 @@ CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`sql:check`、`doc
 
 - **形状**：改 `crates/vibevalley-protocol/src/contract/<概念>.rs`，运行 `vp run protocol:ts` 重写 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`；页面要解码它的，同改手写的 `schema.ts` 和 `api.ts`（各自的测试对着生成物查）；改接口后再运行 `vp run api:client` 和 `vp run capabilities`。
 - **规则**：服务端的规则是 `crates/vibevalley-core` 或所属模块里的纯函数，页面的在所属包里，在旁边的测试里用手写的例子写出改了的行为。
-- **表和查询。** 服务端模块共用 `server.db`，表名沿用「模块_概念」。宿主 `state.db` 的迁移按版本存放。改表或命名查询后，在根目录用 sqlc 1.31.1 执行 `sqlc generate`。CI 用 `sqlc diff` 对账，并用 `python3 scripts/release/verify-native-schema.py --queries-only` 在 SQLite 内存库预编译每条查询。修改生成器后运行 `scripts/gen/sqlc-rust/verify.sh`，检查重复生成、空值读写、事务回滚，以及错误参数类型和未知列能否被拒绝。[模块配置](sqlc.yaml) · [宿主迁移](crates/vibevalley-store/sql/migrations)
+- **表和查询。** 服务端模块共用 `server.db`，表名沿用「模块_概念」。宿主 `state.db` 的迁移按版本存放。改表或命名查询后，在根目录用 sqlc 1.31.1 执行 `sqlc generate`。CI 用 `sqlc diff` 对账，并用 `python3 scripts/release/verify-native-schema.py --queries-only` 在 SQLite 内存库预编译每条查询。修改生成器后运行 `scripts/gen/sqlc-rust/verify.sh`，检查重复生成、空值读写、事务回滚，以及错误参数类型和未知列能否被拒绝。[模块配置](sqlc.yaml) · [宿主迁移](crates/vibevalley-workspace/sql/migrations)
 - **旧名字**：`vp run names:verify` 检查代码与词典中的废弃命名；重命名后将旧名登记到 `scripts/docs/stale-names.ts`。
 
 ## 只用命令行派一个活

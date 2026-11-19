@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-serde = { version = "1.0.229", features = ["derive"] }
+serde = { workspace = true }
 similar = "3.2.1"
 thiserror = "2.0.21"
 

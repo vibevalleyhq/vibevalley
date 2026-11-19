@@ -1,7 +1,7 @@
-use crate::{Result, StoreError};
+use super::{Result, StoreError};
 use sqlx::{Connection, SqliteConnection};
 
-pub(crate) const MIGRATIONS: &[&str] = &[include_str!("../sql/migrations/0001_workspace.sql")];
+pub(crate) const MIGRATIONS: &[&str] = &[include_str!("../../sql/migrations/0001_workspace.sql")];
 
 pub(crate) async fn migrate(conn: &mut SqliteConnection) -> Result<()> {
     let mut tx = conn.begin_with("BEGIN IMMEDIATE").await?;

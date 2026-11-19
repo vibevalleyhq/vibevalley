@@ -6,7 +6,7 @@ license.workspace = true
 
 [dependencies]
 vibevalley-i18n = { version = "0.1.0", path = "../vibevalley-i18n" }
-jiff = { version = "1.0.1", features = ["tz-system"] }
+jiff = { workspace = true }
 regex = "1.13.1"
-serde = { version = "1.0.229", features = ["derive"] }
+serde = { workspace = true }
 serde_json = "1.0.154"

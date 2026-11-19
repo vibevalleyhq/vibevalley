@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-pub mod gse;
+use super::gse;
 
 pub use gse::{cut_all, cut_search, go_lower};
 
@@ -73,7 +73,7 @@ pub struct Memory {
 
 fn stopwords() -> &'static HashSet<String> {
     static STOP: OnceLock<HashSet<String>> = OnceLock::new();
-    STOP.get_or_init(|| serde_json::from_str(include_str!("../data/stopwords.json")).expect("bundled stopwords"))
+    STOP.get_or_init(|| serde_json::from_str(include_str!("data/stopwords.json")).expect("bundled stopwords"))
 }
 
 fn has_han(s: &str) -> bool {
@@ -366,6 +366,7 @@ pub fn redact(text: &str) -> String {
 }
 
 #[cfg(test)]
+#[path = "rules_tests.rs"]
 mod tests;
 
 // ---- several sources ---------------------------------------------------------

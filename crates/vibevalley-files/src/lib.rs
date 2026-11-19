@@ -9,8 +9,6 @@ use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 mod fuzzy;
-#[cfg(feature = "highlight")]
-mod highlight;
 mod load;
 mod search;
 mod walk;
@@ -200,7 +198,7 @@ impl Language {
     }
 }
 
-pub(crate) const SUPPORTED: &[&str] = &[
+pub const SUPPORTED: &[&str] = &[
     "rust",
     "typescript",
     "tsx",
@@ -245,12 +243,4 @@ pub struct HighlightSpan {
     /// Byte range within its line.
     pub range: Range<usize>,
     pub kind: HighlightKind,
-}
-
-/// Highlight spans for each line of `text` (one inner `Vec` per line, spans
-/// sorted and non-overlapping). Unknown languages yield empty lines. Lines
-/// are those of `str::lines`, so spans never cover a line terminator.
-#[cfg(feature = "highlight")]
-pub fn highlight(text: &str, language: &Language) -> Vec<Vec<HighlightSpan>> {
-    highlight::highlight(text, &language.0)
 }

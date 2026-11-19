@@ -16,9 +16,9 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/memory.rs` | `Memories`：`memory` 表（`server.db`）的读写、`memory.*` 端点、工单一轮结束时记下的经历 |
-| `crates/vibevalley-memory/src/lib.rs` | 纯函数：切词、召回评分（`pick`）、去重、淘汰、搜索、出站前脱敏 |
-| `crates/vibevalley-memory/src/gse.rs` | 简体中文分词（照 gse 的词典与 HMM） |
+| `crates/vibevalley-server/src/modules/memory/mod.rs` | `Memories`：`memory` 表（`server.db`）的读写、`memory.*` 端点、工单一轮结束时记下的经历 |
+| `crates/vibevalley-server/src/modules/memory/rules.rs` | 纯函数：切词、召回评分（`pick`）、去重、淘汰、搜索、出站前脱敏 |
+| `crates/vibevalley-server/src/modules/memory/gse.rs` | 简体中文分词（照 gse 的词典与 HMM） |
 | `crates/vibevalley-server/src/modules/tool/memory.rs` | 帮工档案的记性工具 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`memory.*`）。
@@ -61,5 +61,5 @@
 
 ## 怎么验证
 
-- `crates/vibevalley-memory/src/tests.rs`：切词（对 gse 的 golden）、召回、去重、淘汰与脱敏。
+- `crates/vibevalley-server/src/modules/memory/rules_tests.rs`：切词（对 gse 的 golden）、召回、去重、淘汰与脱敏。
 - `crates/vibevalley-server/tests/memory.rs`：记下、搜索、召回与忘掉经端点走一遍。

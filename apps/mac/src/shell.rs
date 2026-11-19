@@ -17,9 +17,9 @@ use gpui_kit::{
 use serde_json::{Map, Value, json};
 use vibevalley_files::{FileIndex, FsChange, SearchOptions, Watcher};
 use vibevalley_git::{Branch, Commit, Repo, Status, Worktree};
-use vibevalley_store::{ProjectId, Store};
 use vibevalley_terminal::TermSession;
 use vibevalley_workspace::{Axis, PaneKind, TabId, Workspace, load_all, load_project};
+use vibevalley_workspace::{ProjectId, Store};
 
 use crate::diff::DiffView;
 use crate::hosted::frames::{self, PaletteMode, RailProject, TreeState};
@@ -605,7 +605,7 @@ impl Shell {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| path.to_string_lossy().into_owned());
         vibevalley_workspace::LoadedProject {
-            info: vibevalley_store::Project {
+            info: vibevalley_workspace::Project {
                 id: next_id,
                 path: path.to_owned(),
                 name,

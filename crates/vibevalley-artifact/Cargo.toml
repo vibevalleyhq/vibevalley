@@ -12,6 +12,6 @@ vibevalley-protocol = { version = "0.1.0", path = "../vibevalley-protocol" }
 htmlize = { version = "1.1.0", features = ["unescape"] }
 lol_html = "3.0.3"
 regex = "1.13.1"
-serde = { version = "1.0.229", features = ["derive"] }
+serde = { workspace = true }
 serde_json = "1.0.154"
 url = "2.5.8"

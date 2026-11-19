@@ -11,11 +11,11 @@ vibevalley-bridge = { version = "0.1.0", path = "../vibevalley-bridge" }
 vibevalley-protocol = { version = "0.1.0", path = "../vibevalley-protocol" }
 vibevalley-server-api = { version = "0.1.0", path = "../vibevalley-server-api" }
 flume = "0.12.0"
-futures-util = "0.3.34"
+futures-util = { workspace = true }
 regex = "1.13.1"
-serde = "1.0.229"
+serde = { workspace = true }
 serde_json = "1.0.154"
-tokio = { version = "1.54.1", features = ["rt-multi-thread", "net", "time", "macros", "sync", "fs"] }
+tokio = { workspace = true }
 tokio-stream = "0.1.19"
 
 [dev-dependencies]
