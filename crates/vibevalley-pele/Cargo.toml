@@ -1,0 +1,16 @@
+[package]
+name = "vibevalley-pele"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pure-Rust Mermaid diagram parser, layered graph layout engine, and resvg-safe SVG renderer"
+
+[dependencies]
+indexmap = "2.14.2"
+serde = { workspace = true }
+serde_json = "1.0.154"
+
+[dev-dependencies]
+regex = "1.13.1"
+roxmltree = "0.21.2"
+usvg = { version = "0.46.0", default-features = false }
