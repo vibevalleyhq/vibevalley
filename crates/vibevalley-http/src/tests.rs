@@ -247,3 +247,33 @@ fn events_aliases_live_sse_stream() {
     let event = first_event(&format!("{}/api/v1/events", listener.url()));
     assert_eq!(event["text"], "ready");
 }
+
+#[test]
+fn loopback_and_artifact_route_validators_match_exact_ascii_rules() {
+    for good in ["127.0.0.1", "127.0.0.1:8787", "localhost", "localhost:3000", "[::1]", "[::1]:8787"] {
+        assert!(is_loopback(good), "{good}");
+    }
+    for bad in [
+        "",
+        "127.0.0.1:",
+        "127.0.0.1:abc",
+        "127.0.0.1.evil.com",
+        "localhost.evil",
+        "[::1]:",
+        "0.0.0.0:8787",
+    ] {
+        assert!(!is_loopback(bad), "{bad}");
+    }
+
+    assert!(is_artifact_id("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3f"));
+    assert!(!is_artifact_id("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3"));
+    assert!(!is_artifact_id("0196F8E2-7c0a-7f10-8b2d-9e5a4c1d2e3f"));
+    assert!(!is_artifact_id("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3g"));
+
+    for good in ["1", "2", "10", "987654321"] {
+        assert!(is_artifact_version(good), "{good}");
+    }
+    for bad in ["", "0", "01", "-1", "1a", "+1"] {
+        assert!(!is_artifact_version(bad), "{bad}");
+    }
+}

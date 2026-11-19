@@ -86,7 +86,7 @@ fn updates_keep_the_key_and_follow_revisions() {
         work_root: home.path().into(),
         ..Default::default()
     });
-    let p = Provider::new(setting.clone(), std::sync::Arc::new(vibevalley_server::modules::media::vendor::Ureq));
+    let p = Provider::new(setting.clone(), std::sync::Arc::new(vibevalley_server::modules::media::vendor::Http));
     let first = p
         .update(&update(|u| u["speech"] = json!({ "connection": "moss", "model": "moss-tts-1.5-flash" })))
         .unwrap();

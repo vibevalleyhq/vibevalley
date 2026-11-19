@@ -405,29 +405,39 @@ fn cron_at_agent_default_pkm_dry_run_and_doctor_setting_chat_work() {
 
     // local chat via scripted runtime and VibeValleyRuntime key check from <home>/settings.json
     let no_key_home = tempfile::tempdir().unwrap();
-    let refused_chat = cli(no_key_home.path(), &["chat", "hello"], &[]);
-    assert_eq!((refused_chat.code, refused_chat.tag()), (3, "Refused"));
-    assert!(
-        refused_chat.failure.as_ref().unwrap()["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("no DeepSeek API key")
-    );
-    std::fs::write(no_key_home.path().join("settings.json"), r#"{"deepseekApiKey":"sk-valid12345"}"#).unwrap();
-    let missing_session = cli(no_key_home.path(), &["chat", "hello", "--resume", "vv-missing"], &[]);
-    assert_eq!((missing_session.code, missing_session.tag()), (3, "Refused"));
-    assert!(
-        missing_session.failure.as_ref().unwrap()["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("session_not_found")
-    );
+    #[cfg(feature = "local-chat")]
+    {
+        let refused_chat = cli(no_key_home.path(), &["chat", "hello"], &[]);
+        assert_eq!((refused_chat.code, refused_chat.tag()), (3, "Refused"));
+        assert!(
+            refused_chat.failure.as_ref().unwrap()["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("no DeepSeek API key")
+        );
+        std::fs::write(no_key_home.path().join("settings.json"), r#"{"deepseekApiKey":"sk-valid12345"}"#).unwrap();
+        let missing_session = cli(no_key_home.path(), &["chat", "hello", "--resume", "vv-missing"], &[]);
+        assert_eq!((missing_session.code, missing_session.tag()), (3, "Refused"));
+        assert!(
+            missing_session.failure.as_ref().unwrap()["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("session_not_found")
+        );
 
-    let scripted_text = cli(no_key_home.path(), &["chat", "hello", "--runtime", "scripted"], &[]);
-    assert_eq!(scripted_text.code, 0, "{:?}", scripted_text.failure);
-    assert!(!scripted_text.out.is_empty());
-    let scripted_json: Value =
-        serde_json::from_str(&cli(no_key_home.path(), &["chat", "hello", "--runtime", "scripted", "--format", "json"], &[]).out).unwrap();
-    assert_eq!(scripted_json["runtime"], "scripted");
-    assert_eq!(scripted_json["reason"], "Completed");
+        let scripted_text = cli(no_key_home.path(), &["chat", "hello", "--runtime", "scripted"], &[]);
+        assert_eq!(scripted_text.code, 0, "{:?}", scripted_text.failure);
+        assert!(!scripted_text.out.is_empty());
+        let scripted_json: Value =
+            serde_json::from_str(&cli(no_key_home.path(), &["chat", "hello", "--runtime", "scripted", "--format", "json"], &[]).out).unwrap();
+        assert_eq!(scripted_json["runtime"], "scripted");
+        assert_eq!(scripted_json["reason"], "Completed");
+    }
+    #[cfg(not(feature = "local-chat"))]
+    {
+        let local_disabled = cli(no_key_home.path(), &["chat", "hello"], &[]);
+        assert_eq!((local_disabled.code, local_disabled.tag()), (3, "Unsupported"));
+        let msg = local_disabled.failure.as_ref().unwrap()["error"]["message"].as_str().unwrap();
+        assert!(msg.contains("local-chat") && msg.contains("--orchestrator"), "{msg}");
+    }
 }

@@ -1,15 +1,16 @@
 [package]
 name = "vibevalley-terminal"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
-flume = "0.12.0"
+flume = { workspace = true }
 libc = "0.2.191"
-libghostty-vt = { git = "https://github.com/uzaaft/libghostty-rs", rev = "cd4d497e8c698b27054a677ce19d1bd1a1a4d8bf", version = "0.2.1" }
+libghostty-vt = { git = "https://github.com/uzaaft/libghostty-rs", rev = "cd4d497e8c698b27054a677ce19d1bd1a1a4d8bf", version = "0.2.1", default-features = false }
 portable-pty = "0.9.0"
 serde = { workspace = true }
-thiserror = "2.0.21"
+thiserror = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.27.0"
+tempfile = { workspace = true }

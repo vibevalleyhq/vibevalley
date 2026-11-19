@@ -3,7 +3,8 @@
 //! `reasoning_content` (must be sent back on assistant messages that carry
 //! tool calls) and `reasoning_effort`.
 
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -156,12 +157,60 @@ pub trait ModelClient: Send + Sync {
     fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> Result<Completion>;
 }
 
+fn http_runtime() -> Result<&'static tokio::runtime::Runtime> {
+    static RT: OnceLock<std::result::Result<tokio::runtime::Runtime, String>> = OnceLock::new();
+    RT.get_or_init(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .thread_name("vibevalley-model")
+            .enable_all()
+            .build()
+            .map_err(|e| e.to_string())
+    })
+    .as_ref()
+    .map_err(|e| BrainError::Network(e.clone()))
+}
+
+struct ChannelReader {
+    rx: flume::Receiver<std::io::Result<Vec<u8>>>,
+    buf: Vec<u8>,
+    pos: usize,
+}
+
+impl ChannelReader {
+    fn new(rx: flume::Receiver<std::io::Result<Vec<u8>>>) -> Self {
+        Self { rx, buf: Vec::new(), pos: 0 }
+    }
+}
+
+impl Read for ChannelReader {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        while self.pos >= self.buf.len() {
+            match self.rx.recv() {
+                Ok(Ok(chunk)) => {
+                    if chunk.is_empty() {
+                        continue;
+                    }
+                    self.buf = chunk;
+                    self.pos = 0;
+                }
+                Ok(Err(e)) => return Err(e),
+                Err(_) => return Ok(0),
+            }
+        }
+        let n = (self.buf.len() - self.pos).min(out.len());
+        out[..n].copy_from_slice(&self.buf[self.pos..self.pos + n]);
+        self.pos += n;
+        Ok(n)
+    }
+}
+
 /// DeepSeek (or any OpenAI-compatible endpoint). The key is read on every
 /// request, so a key set in the settings takes effect without a restart.
 pub struct OpenAiClient {
     pub base_url: String,
     pub key: Box<dyn Fn() -> Option<String> + Send + Sync>,
-    agent: ureq::Agent,
+    client: reqwest::Client,
 }
 
 impl OpenAiClient {
@@ -170,15 +219,15 @@ impl OpenAiClient {
     }
 
     pub fn new(base_url: impl Into<String>, key: impl Fn() -> Option<String> + Send + Sync + 'static) -> OpenAiClient {
-        let agent: ureq::Agent = ureq::Agent::config_builder()
-            .timeout_global(Some(Duration::from_secs(600)))
-            .http_status_as_error(false)
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(600))
             .build()
-            .into();
+            .expect("openai http client");
         OpenAiClient {
             base_url: base_url.into().trim_end_matches('/').to_string(),
             key: Box::new(key),
-            agent,
+            client,
         }
     }
 }
@@ -293,33 +342,134 @@ pub(crate) fn fold_stream(reader: impl BufRead, on: &mut dyn FnMut(Delta)) -> Re
     Ok(Completion { message, finish, usage })
 }
 
+enum StreamStart {
+    Error { status: u16, text: String },
+    Body(flume::Receiver<std::io::Result<Vec<u8>>>),
+}
+
 impl ModelClient for OpenAiClient {
     fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
         let key = (self.key)().filter(|k| !k.trim().is_empty()).ok_or(BrainError::NoKey)?;
-        let response = self
-            .agent
-            .post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {key}"))
-            .header("Accept", "text/event-stream")
-            .send_json(request_body(request))
-            .map_err(|e| BrainError::Network(e.to_string()))?;
-        let status = response.status().as_u16();
-        let mut body = response.into_body();
-        if status >= 400 {
-            let text = body.read_to_string().unwrap_or_default();
-            let message = serde_json::from_str::<Value>(&text)
-                .ok()
-                .and_then(|v| v.pointer("/error/message").and_then(Value::as_str).map(str::to_string))
-                .unwrap_or_else(|| text.clone());
-            if matches!(status, 400 | 413 | 422)
-                && (message.to_lowercase().contains("context length")
-                    || message.to_lowercase().contains("context window")
-                    || text.contains("context_length_exceeded"))
-            {
-                return Err(BrainError::ContextOverflow(message));
+        let url = format!("{}/chat/completions", self.base_url);
+        let payload = request_body(request);
+        let client = self.client.clone();
+        let (head_tx, head_rx) = flume::bounded::<Result<StreamStart>>(1);
+        http_runtime()?.spawn(async move {
+            let response = client
+                .post(url)
+                .bearer_auth(key)
+                .header("Accept", "text/event-stream")
+                .json(&payload)
+                .send()
+                .await;
+            let mut response = match response {
+                Ok(r) => r,
+                Err(e) => {
+                    let _ = head_tx.send(Err(BrainError::Network(e.to_string())));
+                    return;
+                }
+            };
+            let status = response.status().as_u16();
+            if status >= 400 {
+                let text = response.text().await.unwrap_or_default();
+                let _ = head_tx.send(Ok(StreamStart::Error { status, text }));
+                return;
             }
-            return Err(BrainError::Model(format!("HTTP {status}: {message}")));
+            let (body_tx, body_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(16);
+            if head_tx.send(Ok(StreamStart::Body(body_rx))).is_err() {
+                return;
+            }
+            loop {
+                match response.chunk().await {
+                    Ok(Some(bytes)) => {
+                        if body_tx.send_async(Ok(bytes.to_vec())).await.is_err() {
+                            break;
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        let _ = body_tx.send_async(Err(std::io::Error::other(e.to_string()))).await;
+                        break;
+                    }
+                }
+            }
+        });
+        match head_rx.recv().map_err(|_| BrainError::Network("http task stopped".into()))?? {
+            StreamStart::Error { status, text } => {
+                let message = serde_json::from_str::<Value>(&text)
+                    .ok()
+                    .and_then(|v| v.pointer("/error/message").and_then(Value::as_str).map(str::to_string))
+                    .unwrap_or_else(|| text.clone());
+                if matches!(status, 400 | 413 | 422)
+                    && (message.to_lowercase().contains("context length")
+                        || message.to_lowercase().contains("context window")
+                        || text.contains("context_length_exceeded"))
+                {
+                    return Err(BrainError::ContextOverflow(message));
+                }
+                Err(BrainError::Model(format!("HTTP {status}: {message}")))
+            }
+            StreamStart::Body(body_rx) => fold_stream(BufReader::new(ChannelReader::new(body_rx)), on),
         }
-        fold_stream(BufReader::new(body.into_reader()), on)
+    }
+}
+
+#[cfg(test)]
+mod http_tests {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    use super::*;
+
+    fn serve_once(response: &'static str) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buf = [0u8; 4096];
+            let _ = stream.read(&mut buf);
+            let _ = stream.write_all(response.as_bytes());
+        });
+        format!("http://{addr}")
+    }
+
+    fn sample_request() -> ChatRequest {
+        ChatRequest {
+            model: "deepseek-chat".into(),
+            messages: vec![Message::user("hi")],
+            tools: vec![],
+            effort: None,
+        }
+    }
+
+    #[test]
+    fn openai_client_streams_sse_and_maps_http_errors() {
+        let sse = concat!(
+            "HTTP/1.1 200 OK\r\n",
+            "Content-Type: text/event-stream\r\n",
+            "Connection: close\r\n\r\n",
+            "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"think\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"hello \"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"world\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2}}\n\n",
+            "data: [DONE]\n\n",
+        );
+        let client = OpenAiClient::new(serve_once(sse), || Some("sk-test".into()));
+        let mut deltas = Vec::new();
+        let done = client.complete(&sample_request(), &mut |d| deltas.push(d)).unwrap();
+        assert_eq!(done.message.content.as_deref(), Some("hello world"));
+        assert_eq!(done.message.reasoning.as_deref(), Some("think"));
+        assert_eq!(done.finish, FinishReason::Stop);
+        assert_eq!(done.usage.input, 3);
+        assert_eq!(deltas.len(), 3);
+
+        let overflow = concat!(
+            "HTTP/1.1 400 Bad Request\r\n",
+            "Content-Type: application/json\r\n",
+            "Connection: close\r\n\r\n",
+            "{\"error\":{\"message\":\"maximum context length exceeded\"}}",
+        );
+        let client = OpenAiClient::new(serve_once(overflow), || Some("sk-test".into()));
+        let err = client.complete(&sample_request(), &mut |_| {}).unwrap_err();
+        assert!(matches!(err, BrainError::ContextOverflow(_)), "{err:?}");
     }
 }

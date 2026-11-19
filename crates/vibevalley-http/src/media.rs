@@ -61,7 +61,7 @@ pub(super) async fn upload(State(server): State<Shared>, Path(id): Path<String>,
     {
         return refuse(BizCode::PayloadTooLarge, "the body exceeds 512000000 bytes");
     }
-    if !super::artifact_id().is_match(&id) {
+    if !super::is_artifact_id(&id) {
         return refuse(BizCode::MediaNotFound, "media input not found");
     }
     let Some(inputs) = server.media_inputs() else {
@@ -131,7 +131,7 @@ pub(super) async fn content(State(server): State<Shared>, Path(id): Path<String>
     if !from_the_farm(&headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
-    if !super::artifact_id().is_match(&id) {
+    if !super::is_artifact_id(&id) {
         return StatusCode::NOT_FOUND.into_response();
     }
     let Some(inputs) = server.media_inputs() else {

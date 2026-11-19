@@ -6,7 +6,6 @@
 //! What the farm hears is recorded on a thread of its own: a hub watcher
 //! may run while the chat holds its write transaction.
 
-use std::io::Read;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -324,39 +323,46 @@ fn download(address: &str) -> Result<(Vec<u8>, String, String), ApiError> {
             &[("url", address.into()), ("why", "Public IPv4 resolution required".into())],
         )));
     }
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(DOWNLOAD))
-        .max_redirects(0)
-        .http_status_as_error(false)
-        .build()
-        .into();
-    let mut response = agent.get(address).call().map_err(|e| match e {
-        ureq::Error::Timeout(_) => refused(t("server.library.slow", &[])),
-        e => refused(t("server.library.notFetched", &[("url", "".into()), ("why", e.to_string().into())])),
+    let client = crate::public_http::no_redirect_client()
+        .map_err(|e| refused(t("server.library.notFetched", &[("url", "".into()), ("why", e.into())])))?
+        .clone();
+    let target = address.to_string();
+    let (bytes, kind) = crate::public_http::run_http(async move {
+        let mut response = client.get(&target).timeout(DOWNLOAD).send().await.map_err(|e| {
+            if e.is_timeout() {
+                refused(t("server.library.slow", &[]))
+            } else {
+                refused(t("server.library.notFetched", &[("url", "".into()), ("why", e.to_string().into())]))
+            }
+        })?;
+        let status = response.status().as_u16();
+        if status != 200 {
+            return Err(refused(t(
+                "server.library.notFetched",
+                &[("url", target.into()), ("why", status.to_string().into())],
+            )));
+        }
+        let kind = response
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.split(';').next().unwrap_or("").trim().to_string())
+            .unwrap_or_default();
+        let mut bytes = vec![];
+        while let Some(chunk) = response.chunk().await.map_err(|e| {
+            if e.is_timeout() {
+                refused(t("server.library.slow", &[]))
+            } else {
+                refused(t("server.library.notFetched", &[("url", "".into()), ("why", e.to_string().into())]))
+            }
+        })? {
+            if bytes.len() + chunk.len() > ATTACHMENT_MAX {
+                return Err(too_big());
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        Ok((bytes, kind))
     })?;
-    let status = response.status().as_u16();
-    if status != 200 {
-        return Err(refused(t(
-            "server.library.notFetched",
-            &[("url", address.into()), ("why", status.to_string().into())],
-        )));
-    }
-    let kind = response
-        .headers()
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v.split(';').next().unwrap_or("").trim().to_string())
-        .unwrap_or_default();
-    let mut bytes = vec![];
-    response
-        .body_mut()
-        .as_reader()
-        .take(ATTACHMENT_MAX as u64 + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|e| refused(t("server.library.notFetched", &[("url", "".into()), ("why", e.to_string().into())])))?;
-    if bytes.len() > ATTACHMENT_MAX {
-        return Err(too_big());
-    }
     let segment = url.path().rsplit('/').next().unwrap_or("");
     let named = percent_decoded(segment).unwrap_or_else(|| segment.to_string());
     Ok((bytes, if named.is_empty() { host } else { named }, kind))
