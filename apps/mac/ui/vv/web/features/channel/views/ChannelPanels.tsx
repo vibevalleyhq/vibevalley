@@ -3,18 +3,18 @@
 // page puts them in nsh/base Popovers, which place and close them) rather
 // than boxes placed under their buttons; a thread's rename and archive show
 // on the row under the pointer, as group-hover does there.
-import { keymap, Scroll, signal, Text, untracked, View } from "nsh";
+import { computed, keymap, Scroll, signal, Text, untracked, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, userId } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
-import { useNow } from "../../../base/dom";
+import { Keyed, useNow } from "../../../base/dom";
 import { useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { orchestratorMood, useCore } from "../../../infra/frame";
-import { useRouter } from "../../../infra/router";
+import { Link as A, useRouter } from "../../../infra/router";
 import { useLatest } from "../../../state/atom";
 import { useIntents } from "../../../state/intent";
 import { createAct } from "../../../ui/act";
@@ -25,7 +25,7 @@ import { Icon } from "../../../ui/Icon";
 import { Bubble } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "../model/marks";
-import { chatPath, messagePath, threadOwnerOf, threadsIn, threadTitle, workbenchClock } from "../model/places";
+import { channelLabel, chatPath, issueThreadOf, messagePath, threadOwnerOf, threadsIn, threadTitle, topsOf, workbenchClock } from "../model/places";
 import { BarButton, orchestratorMoodLabels } from "./ChannelSidebar";
 import { Composer, FileDrop } from "./Composer";
 import { notifyOptions } from "./Dialogs";
@@ -205,6 +205,52 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
         <Composer channel={props.thread} placeholder={session() ? t("web.channel.sayInThread", { name: session()?.name ?? "" }) : t("web.channel.reply")} />
       </FileDrop>
     </View>
+  );
+}
+
+/** Embedded live channel pane used beside an artifact canvas so the user can discuss it in place. */
+export function ChannelSidePane(props: { channel?: string | undefined; issue?: string | undefined; point?: number | undefined }) {
+  const chat = useMarkedChat();
+  const shown = computed(() => {
+    const c = chat();
+    if (!c) return undefined;
+    if (props.channel) {
+      const found = channelOf(c, props.channel);
+      if (found) return found;
+    }
+    if (props.issue) {
+      const thread = issueThreadOf(c, props.issue);
+      if (thread) return thread;
+    }
+    return defaultOf(c) ?? topsOf(c)[0];
+  });
+  const href = () => {
+    const c = shown();
+    if (!c) return "/chat";
+    return props.point !== undefined ? messagePath(c, props.point) : chatPath(c);
+  };
+  return (
+    <If when={shown()}>
+      {(c) => (
+        <Keyed key={c().id}>
+          {() => (
+            <View testID="artifact-chat-pane" class="min-h-0 min-w-0 flex-1">
+              <View class="shrink-0 flex-row items-center justify-between gap-2 border-b border-line px-3 py-2">
+                <A href={href()} testID="artifact-message" class="min-w-0 flex-1 flex-row items-center gap-1.5">
+                  <Icon name="chat" size={14} tone="muted" />
+                  <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{channelLabel(c())}</Text>
+                  <Icon name="open" size={12} tone="muted" />
+                </A>
+              </View>
+              <FileDrop channel={c()}>
+                <MessageList channel={c()} point={props.point} emptyText={t("web.channel.empty", { label: channelLabel(c()) })} />
+                <Composer channel={c()} replyTo={props.point} placeholder={t("web.channel.sendTo", { label: channelLabel(c()) })} />
+              </FileDrop>
+            </View>
+          )}
+        </Keyed>
+      )}
+    </If>
   );
 }
 

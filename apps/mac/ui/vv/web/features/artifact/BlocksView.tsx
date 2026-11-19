@@ -15,6 +15,7 @@ import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, type ArtifactId, userId, type Suggestion, type TextSpan } from "@vibevalley/protocol";
+import { blockId as brandBlockId } from "@vibevalley/protocol/schema";
 
 import { hostApi } from "../../../../bridge";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "../../../solid";
@@ -30,6 +31,7 @@ import { Icon } from "../../ui/Icon";
 import { tone } from "../../ui/tone";
 import { knownTypes, plainOf } from "./blocks";
 import { BlockEditor, type EditBlock } from "./editor";
+import { useReportViewContext } from "./store";
 
 /** The user's lines on the attribution bar. */
 const userColor = () => tone("cream-300");
@@ -111,6 +113,19 @@ export function BlocksView(props: {
   });
   // The editor changes its blocks in place and bumps its version; each version is drawn as fresh rows, matched by id.
   const version = createExternal(editor.subscribe, () => editor.version);
+  useReportViewContext(
+    () => props.id,
+    () => {
+      version();
+      const focused = editor.focusId;
+      return {
+        artifactType: "docs",
+        title: editor.artifact?.title ?? "",
+        ...(editor.artifact?.seq !== undefined ? { seq: editor.artifact.seq } : {}),
+        ...(focused ? { selectedBlockIds: [brandBlockId(focused)] } : {}),
+      };
+    },
+  );
   const all = useAgents();
   const agents = createMemo(() => new Map(ready(all, []).map((a) => [a.id, a])));
   const rows = createMemo((): Row[] => {

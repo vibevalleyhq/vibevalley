@@ -1,11 +1,14 @@
-// Ported from VibeValley apps/web/src/features/media/LibraryPage.tsx: the
-// media library (/library) with origin & kind rail filters, search, sort,
-// tile size presets, Picker upload & FileDrop, Lightbox, Inspector, and
-// generation dialogs.
+// Ported from VibeValley apps/web/src/features/media/LibraryPage.tsx: unified
+// workspace library (/library) for media + deliverables, with origin/kind/artifact
+// rail filters, cross-filtered counts, search, sort, tile size presets, Picker
+// upload & FileDrop (auto-creating artifacts for compound suffixes), Lightbox,
+// Inspector (with host.saveFile), "New deliverable" type menu, and generation dialogs.
 import { effect, keymap, Picker, Scroll, signal, Text, View, windowSize } from "nsh";
 
+import { inferArtifactFromName } from "@vibevalley/artifact/html";
 import { t } from "@vibevalley/i18n";
-import { type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob } from "@vibevalley/protocol";
+import { type Artifact, type ArtifactType, type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob } from "@vibevalley/protocol";
+import { artifactId } from "@vibevalley/protocol/schema";
 
 import { hostApi } from "../../../../bridge";
 import { createMemo } from "../../../solid";
@@ -14,8 +17,8 @@ import { api } from "../../infra/api";
 import { attachmentData } from "../../infra/attachment";
 import { fileUrl, useAttachmentFile } from "../../infra/attachmentFile";
 import { useCore } from "../../infra/frame";
-import { ready, useAgents, useQuery } from "../../infra/query";
-import { useSearchParams } from "../../infra/router";
+import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
+import { useRouter, useSearchParams } from "../../infra/router";
 import { prefsNow, setLibraryTile } from "../../state/prefs";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
@@ -24,18 +27,35 @@ import { Select, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Empty, Quiet } from "../../ui/layout";
 import { Lightbox, type Picture } from "../../ui/Lightbox";
+import { type MoreItem, MoreMenu } from "../../ui/MoreMenu";
 import { readFiles } from "../../ui/picked";
 import { Segmented } from "../../ui/Segmented";
 import { toast } from "../../ui/toasts";
+import { artifactTypeIcon, createTypedArtifact, useArtifacts } from "../artifact";
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
 import { Inspector } from "./Inspector";
-import { between, countsOf, justify, type KindFilter, kindOf, making, type Names, neighbor, shown, understoodText, type Where } from "./items";
+import {
+  artifactCountsOf,
+  type ArtifactKindFilter,
+  between,
+  countsOf,
+  justify,
+  type KindFilter,
+  kindOf,
+  making,
+  type Names,
+  neighbor,
+  shown,
+  shownArtifacts,
+  understoodText,
+  type Where,
+} from "./items";
 import { libraryQuery } from "./listing";
 import { publicationKey } from "./publication";
 import { Rail } from "./Rail";
 import { SpeechPanel } from "./SpeechPanel";
-import { knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles } from "./Tiles";
+import { ArtifactTiles, knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles } from "./Tiles";
 import { UnderstandingPanel } from "./UnderstandingPanel";
 
 type Make = "image" | "speech" | "audio";
@@ -43,17 +63,32 @@ const makes: readonly Make[] = ["image", "speech", "audio"];
 const tileMin = 96;
 const tileMax = 280;
 
+const deliverableNameRe =
+  /\.(?:(?:slide|slides|visual|canvas|design|dashboard|motion|page)\.html|html|htm|whiteboard(?:\.json|\.html)?|(?:design-system|tokens)\.json|doc\.md|md|markdown)$/iu;
+
+function base64ToUtf8(b64: string): string {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
 export function LibraryPage() {
   const core = useCore();
   const agents = useAgents();
+  const router = useRouter();
+  const queries = useQueryClient();
   const [search, setSearch] = useSearchParams();
   const text = signal("");
   const typed = createSettled(text, 250);
   const sort = signal<LibrarySort>("recent");
   const items = useQuery(() => libraryQuery({ text: typed().trim(), sort: sort() }), { interval: () => 10_000, keepPrevious: true });
+  const artifactsQuery = useArtifacts(() => ({}));
   const where = signal<Where>({ by: "all" });
   const kind = signal<KindFilter>("all");
+  const artifactKind = signal<ArtifactKindFilter | undefined>(undefined);
   const picked = signal<readonly string[]>([]);
+  const pickedArtifact = signal<string | undefined>(undefined);
   const anchor = signal<string | undefined>(undefined);
   const asking = signal(false);
   const looking = signal<number | undefined>(undefined);
@@ -63,16 +98,42 @@ export function LibraryPage() {
 
   const tile = () => Math.min(tileMax, Math.max(tileMin, prefsNow().libraryTile));
   const all = (): readonly LibraryItem[] => ready(items, undefined) ?? [];
+  const allArtifacts = (): readonly Artifact[] => ready(artifactsQuery, undefined) ?? [];
   const jobs = (): readonly MediaJob[] => core()?.media ?? [];
   const working = () => making(jobs());
-  const list = createMemo(() => shown({ items: all(), where: where(), kind: kind() }));
+  const list = createMemo(() => (artifactKind() !== undefined ? [] : shown({ items: all(), where: where(), kind: kind() })));
+  const visibleArtifacts = createMemo(() =>
+    artifactKind() === undefined && kind() !== "all"
+      ? []
+      : shownArtifacts(allArtifacts(), { where: where(), artifactKind: artifactKind(), search: typed().trim(), sort: sort() }),
+  );
   const ids = createMemo(() => list().map((item) => item.attachment.id));
-  const counts = createMemo(() => countsOf({ items: all(), where: where(), kind: kind() }));
+  const counts = createMemo(() =>
+    countsOf({
+      items: all(),
+      artifacts: allArtifacts(),
+      where: where(),
+      kind: kind(),
+      artifactKind: artifactKind(),
+      search: typed().trim(),
+    }),
+  );
+  const artifactCounts = createMemo(() => artifactCountsOf(allArtifacts(), { where: where(), search: typed().trim() }));
+
+  const chosen = createMemo(() => {
+    const on = picked();
+    return all().filter((item) => on.includes(item.attachment.id));
+  });
+  const chosenArtifact = createMemo(() => {
+    const id = pickedArtifact();
+    return id !== undefined ? allArtifacts().find((a) => a.id === id) : undefined;
+  });
+  const inspectorOpen = () => chosen().length > 0 || chosenArtifact() !== undefined;
 
   const inner = () => {
     const w = windowSize().width;
-    const railW = w < 640 ? 56 : 76 + 208;
-    const inspW = picked().length > 0 && w >= 640 ? 304 : 0;
+    const railW = w < 640 ? 56 : 76 + 224;
+    const inspW = inspectorOpen() && w >= 640 ? 304 : 0;
     return Math.max(220, w - railW - inspW - 32);
   };
 
@@ -86,10 +147,6 @@ export function LibraryPage() {
     });
   });
 
-  const chosen = createMemo(() => {
-    const on = picked();
-    return all().filter((item) => on.includes(item.attachment.id));
-  });
   const active = () => anchor() ?? picked().at(-1);
 
   const names: Names = {
@@ -117,6 +174,14 @@ export function LibraryPage() {
     }
   });
 
+  effect(() => {
+    const id = pickedArtifact();
+    if (id !== undefined && !visibleArtifacts().some((a) => a.id === id)) {
+      pickedArtifact.set(undefined);
+      asking.set(false);
+    }
+  });
+
   const make = (): Make | undefined => {
     const m = search().get("make");
     return makes.find((x) => x === m);
@@ -127,31 +192,70 @@ export function LibraryPage() {
     return all().find((item) => item.attachment.id === id)?.attachment ?? { id, name: id, type: "", size: 0 };
   };
 
+  const createNewArtifact = (choice: ArtifactType | "html") =>
+    act.run(async () => {
+      const made = await createTypedArtifact(choice, t("web.artifact.page.untitled"));
+      await queries.invalidate({ prefix: ["artifacts"] });
+      router.navigate(`/artifacts/${encodeURIComponent(made.id)}`);
+    });
+
+  const newArtifactItems = (): MoreItem[] => [
+    { key: "docs", label: t("web.artifact.types.docs"), icon: artifactTypeIcon.docs, onSelect: () => void createNewArtifact("docs") },
+    { key: "slides", label: t("web.artifact.types.slides"), icon: artifactTypeIcon.slides, onSelect: () => void createNewArtifact("slides") },
+    { key: "dashboard", label: t("web.artifact.types.dashboard"), icon: artifactTypeIcon.dashboard, onSelect: () => void createNewArtifact("dashboard") },
+    { key: "motion", label: t("web.artifact.types.motion"), icon: artifactTypeIcon.motion, onSelect: () => void createNewArtifact("motion") },
+    { key: "whiteboard", label: t("web.artifact.types.whiteboard"), icon: artifactTypeIcon.whiteboard, onSelect: () => void createNewArtifact("whiteboard") },
+    { key: "design", label: t("web.artifact.types.design"), icon: artifactTypeIcon.design, onSelect: () => void createNewArtifact("design") },
+    {
+      key: "design-system",
+      label: t("web.artifact.types.designSystem"),
+      icon: artifactTypeIcon["design-system"],
+      onSelect: () => void createNewArtifact("design-system"),
+    },
+    { key: "html", label: t("web.artifact.types.html"), icon: "web", onSelect: () => void createNewArtifact("html") },
+  ];
+
   const uploadEntries = (entries: readonly { name: string; type: string; data: Promise<string> }[]) =>
     entries.length === 0
       ? Promise.resolve()
-      : act.run(() =>
-          Promise.all(
-            entries.map((entry) =>
-              entry.data
-                .then((data) =>
-                  api.attachment.create({
-                    name: entry.name === "" ? "file" : entry.name,
-                    type: entry.type === "" ? "application/octet-stream" : entry.type,
-                    data,
-                  }),
-                )
-                .then((kept) => api.library.item.add({ attachment: kept.id })),
-            ),
-          ).then((added) => {
-            void items.refetch();
-            const last = added.at(-1);
-            if (last !== undefined) {
-              picked.set([last.attachment.id]);
-              anchor.set(last.attachment.id);
+      : act.run(async () => {
+          let lastMedia: LibraryItem | undefined;
+          let lastArtifact: Artifact | undefined;
+          for (const entry of entries) {
+            const data = await entry.data;
+            const filename = entry.name.trim() || "file";
+            if (deliverableNameRe.test(filename)) {
+              const content = base64ToUtf8(data);
+              const inferred = inferArtifactFromName(filename, content);
+              lastArtifact = await api.artifact.create({
+                title: inferred.title,
+                kind: inferred.kind,
+                ...(inferred.display !== undefined ? { display: inferred.display } : {}),
+                ...(inferred.artifactType !== undefined ? { artifactType: inferred.artifactType } : {}),
+                content,
+              });
+            } else {
+              const kept = await api.attachment.create({
+                name: filename,
+                type: entry.type === "" ? "application/octet-stream" : entry.type,
+                data,
+              });
+              lastMedia = await api.library.item.add({ attachment: kept.id });
             }
-          }),
-        );
+          }
+          if (lastArtifact !== undefined) {
+            await queries.invalidate({ prefix: ["artifacts"] });
+            picked.set([]);
+            anchor.set(undefined);
+            pickedArtifact.set(lastArtifact.id);
+          }
+          if (lastMedia !== undefined) {
+            void items.refetch();
+            pickedArtifact.set(undefined);
+            picked.set([lastMedia.attachment.id]);
+            anchor.set(lastMedia.attachment.id);
+          }
+        });
 
   const pickFiles = async () => {
     const chosenFiles = readFiles(await Picker.pickFiles({ multiple: true }));
@@ -166,6 +270,7 @@ export function LibraryPage() {
 
   const pick = (id: string, how: { readonly add: boolean; readonly range: boolean }) => {
     asking.set(false);
+    pickedArtifact.set(undefined);
     const from = anchor();
     if (how.range && from !== undefined) picked.set(between({ ids: ids(), from, to: id }));
     else if (how.add) {
@@ -177,6 +282,15 @@ export function LibraryPage() {
       anchor.set(id);
     }
   };
+
+  const pickArtifact = (id: string) => {
+    asking.set(false);
+    picked.set([]);
+    anchor.set(undefined);
+    pickedArtifact.set(id);
+  };
+
+  const openArtifact = (id: string) => router.navigate(`/artifacts/${encodeURIComponent(id)}`);
 
   const imageItems = createMemo(() => list().filter((item) => kindOf(item.attachment.type) === "image"));
   const look = (id: string | undefined) => {
@@ -207,6 +321,17 @@ export function LibraryPage() {
     );
   };
 
+  const removeArtifact = (id: string) => {
+    const target = allArtifacts().find((a) => a.id === id);
+    return act.run(async () => {
+      await api.artifact.delete({ id: artifactId(id) });
+      asking.set(false);
+      pickedArtifact.set(undefined);
+      if (target) toast(t("web.artifact.page.deleted", { title: target.title }));
+      await queries.invalidate({ prefix: ["artifacts"] });
+    });
+  };
+
   const stepKey = (way: "left" | "right" | "up" | "down") => {
     const at = active();
     const index = at === undefined ? -1 : ids().indexOf(at);
@@ -226,14 +351,15 @@ export function LibraryPage() {
         if (at !== undefined) look(at);
       },
       backspace: () => {
-        if (picked().length > 0) asking.set(true);
+        if (inspectorOpen()) asking.set(true);
       },
       delete: () => {
-        if (picked().length > 0) asking.set(true);
+        if (inspectorOpen()) asking.set(true);
       },
       escape: () => {
-        if (picked().length > 0) {
+        if (inspectorOpen()) {
           picked.set([]);
+          pickedArtifact.set(undefined);
           anchor.set(undefined);
           asking.set(false);
         }
@@ -242,7 +368,8 @@ export function LibraryPage() {
     { when: "notEditing", passThrough: true },
   );
 
-  const empty = () => all().length === 0 && working().length === 0 && typed().trim() === "";
+  const empty = () => all().length === 0 && allArtifacts().length === 0 && working().length === 0 && typed().trim() === "";
+  const nothingShown = () => list().length === 0 && visibleArtifacts().length === 0;
 
   return (
     <View
@@ -260,12 +387,19 @@ export function LibraryPage() {
         names={names}
         where={where()}
         kind={kind()}
+        artifactKind={artifactKind()}
+        artifactCounts={artifactCounts()}
         onWhere={(w) => {
           where.set(w);
           asking.set(false);
         }}
         onKind={(k) => {
+          artifactKind.set(undefined);
           kind.set(k);
+          asking.set(false);
+        }}
+        onArtifactKind={(ak) => {
+          artifactKind.set(ak);
           asking.set(false);
         }}
       />
@@ -312,13 +446,19 @@ export function LibraryPage() {
           <Button testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
             {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
           </Button>
+          <View class="flex-row items-center gap-1">
+            <Button testID="library-new-artifact" icon="add" disabled={act.busy()} onPress={() => void createNewArtifact("docs")}>
+              {t("web.library.newArtifact")}
+            </Button>
+            <MoreMenu icon="choose" label={t("web.artifact.types.pick")} testid="new-artifact-type" items={newArtifactItems()} />
+          </View>
           <Button testID="library-make" tone="primary" icon="generate" onPress={() => setSearch({ make: "image" })}>
             {t("web.library.make")}
           </Button>
         </View>
 
         <View class="min-h-0 min-w-0 flex-1 flex-row">
-          <Scroll testID="library-grid" class="min-h-0 flex-1" contentClass="gap-3 p-4">
+          <Scroll testID="library-grid" class="min-h-0 flex-1" contentClass="gap-4 p-4">
             <If
               when={!empty()}
               else={
@@ -331,6 +471,9 @@ export function LibraryPage() {
                       <View class="flex-row justify-center gap-2">
                         <Button icon="upload" onPress={() => void pickFiles()}>
                           {t("web.library.upload")}
+                        </Button>
+                        <Button icon="add" onPress={() => void createNewArtifact("docs")}>
+                          {t("web.library.newArtifact")}
                         </Button>
                         <Button icon="generate" onPress={() => setSearch({ make: "image" })}>
                           {t("web.library.make")}
@@ -346,31 +489,52 @@ export function LibraryPage() {
               <If when={working().length > 0}>
                 <MakingTiles jobs={working()} width={inner()} height={tile()} label={(job) => t(`web.library.job.${job.kind}`)} />
               </If>
-              <If when={list().length > 0} else={<Quiet>{t("web.library.nothingShown")}</Quiet>}>
-                <Tiles
-                  items={list()}
-                  rows={rows()}
-                  picked={picked()}
-                  active={active()}
-                  seen={(id) => seen().get(id)}
-                  onSeen={(id, s) => {
-                    const was = seen();
-                    const had = was.get(id);
-                    if (had !== undefined && knows({ had, learnt: s })) return;
-                    const next = new Map(was);
-                    next.set(id, { ...had, ...s });
-                    seen.set(next);
-                  }}
-                  onPick={(id, how) => pick(id, how)}
-                  onLook={(id) => look(id)}
-                />
+              <If when={!nothingShown()} else={<Quiet>{t("web.library.nothingShown")}</Quiet>}>
+                <If when={visibleArtifacts().length > 0}>
+                  <View class="gap-2">
+                    <If when={list().length > 0}>
+                      <Text class="text-xs font-medium text-faint">{t("web.library.rail.artifacts")}</Text>
+                    </If>
+                    <ArtifactTiles
+                      artifacts={visibleArtifacts()}
+                      selectedId={pickedArtifact()}
+                      onSelect={(id) => pickArtifact(id)}
+                      onOpen={(id) => openArtifact(id)}
+                    />
+                  </View>
+                </If>
+                <If when={list().length > 0}>
+                  <View class="gap-2">
+                    <If when={visibleArtifacts().length > 0}>
+                      <Text class="text-xs font-medium text-faint">{t("web.library.rail.kind")}</Text>
+                    </If>
+                    <Tiles
+                      items={list()}
+                      rows={rows()}
+                      picked={picked()}
+                      active={active()}
+                      seen={(id) => seen().get(id)}
+                      onSeen={(id, s) => {
+                        const was = seen();
+                        const had = was.get(id);
+                        if (had !== undefined && knows({ had, learnt: s })) return;
+                        const next = new Map(was);
+                        next.set(id, { ...had, ...s });
+                        seen.set(next);
+                      }}
+                      onPick={(id, how) => pick(id, how)}
+                      onLook={(id) => look(id)}
+                    />
+                  </View>
+                </If>
               </If>
             </If>
           </Scroll>
 
-          <If when={chosen().length > 0}>
+          <If when={inspectorOpen()}>
             <Inspector
               items={chosen()}
+              artifact={chosenArtifact()}
               seen={chosen().length === 1 ? seen().get(chosen()[0]?.attachment.id ?? "") : undefined}
               understood={chosen().length === 1 ? understoodText(chosen()[0]?.attachment.id ?? "")(jobs()) : undefined}
               names={names}
@@ -385,9 +549,12 @@ export function LibraryPage() {
                 keep: () => asking.set(false),
                 clear: () => {
                   picked.set([]);
+                  pickedArtifact.set(undefined);
                   anchor.set(undefined);
                   asking.set(false);
                 },
+                openArtifact,
+                removeArtifact: (id) => void removeArtifact(id),
               }}
             />
           </If>

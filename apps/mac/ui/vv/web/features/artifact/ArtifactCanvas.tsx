@@ -10,9 +10,10 @@ import { ready } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
-import { bodyIcon, kindLabel, useArtifact } from "./ArtifactCard";
+import { artifactIcon, kindLabel, useArtifact } from "./ArtifactCard";
 import { BlocksView, type QuoteTarget } from "./BlocksView";
 import { HtmlFrame } from "./HtmlFrame";
+import { StoreArtifactView } from "./StoreArtifactView";
 
 export function ArtifactCanvas(props: { id: string; version?: number | undefined; onClose?: () => void; onQuote?: (block: QuoteTarget) => void }) {
   const artifact = useArtifact(() => props.id);
@@ -29,12 +30,16 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
           {(a) => (
             <>
               <View class="size-8 shrink-0 items-center justify-center rounded-md bg-hover">
-                <Icon name={bodyIcon[a().body]} size={16} tone="muted" />
+                <Icon name={artifactIcon(a())} size={16} tone="muted" />
               </View>
               <View class="min-w-0 flex-1">
                 <Text class="truncate text-sm font-semibold text-ink">{a().title}</Text>
                 <Text class="truncate text-xs text-muted">
-                  {`${kindLabel(a())}${a().body === "html" ? ` · ${t("web.artifact.card.version", { version: props.version ?? a().version })}` : ""}`}
+                  {[
+                    kindLabel(a()),
+                    ...(a().isDefault ? [t("web.artifact.types.defaultBadge")] : []),
+                    ...(a().body === "html" ? [t("web.artifact.card.version", { version: props.version ?? a().version })] : []),
+                  ].join(" · ")}
                 </Text>
               </View>
             </>
@@ -54,9 +59,18 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
       </If>
       <If when={shown()}>
         {(a) => (
-          <If
-            when={a().body === "blocks"}
-            else={
+          <>
+            <If when={a().body === "blocks"}>
+              <View class="min-h-0 flex-1 p-3">
+                <BlocksView id={a().id} {...(props.onQuote ? { onQuote: props.onQuote } : {})} />
+              </View>
+            </If>
+            <If when={a().body === "store"}>
+              <View class="min-h-0 flex-1 p-2">
+                <StoreArtifactView artifact={a()} />
+              </View>
+            </If>
+            <If when={a().body === "html"}>
               <HtmlFrame
                 artifact={a()}
                 version={props.version ?? a().version}
@@ -64,12 +78,8 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
                 testId="artifact-canvas-frame"
                 frameClass="min-h-0 w-full flex-1 bg-page"
               />
-            }
-          >
-            <View class="min-h-0 flex-1 p-3">
-              <BlocksView id={a().id} {...(props.onQuote ? { onQuote: props.onQuote } : {})} />
-            </View>
-          </If>
+            </If>
+          </>
         )}
       </If>
       <If when={artifact.status() === "success" && artifact.data() === undefined}>
