@@ -6,7 +6,7 @@ use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use gpui_kit::{
+use gpui::{
     AppContext as _, Context, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, InteractiveElement as _, IntoElement, ObjectFit,
     ParentElement as _, Render, ScrollStrategy, StatefulInteractiveElement as _, Styled as _, StyledImage as _, StyledText, UniformListScrollHandle, Window,
     div, img, px, uniform_list,
@@ -153,12 +153,12 @@ impl FileViewer {
 impl EventEmitter<ViewerEvent> for FileViewer {}
 
 impl Focusable for FileViewer {
-    fn focus_handle(&self, _: &gpui_kit::App) -> FocusHandle {
+    fn focus_handle(&self, _: &gpui::App) -> FocusHandle {
         self.focus.clone()
     }
 }
 
-fn button(id: &'static str, label: &'static str, colors: &crate::theme::Palette) -> gpui_kit::Stateful<gpui_kit::Div> {
+fn button(id: &'static str, label: &'static str, colors: &crate::theme::Palette) -> gpui::Stateful<gpui::Div> {
     div()
         .id(id)
         .h(px(22.0))

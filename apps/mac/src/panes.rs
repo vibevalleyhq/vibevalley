@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use gpui_kit::{
+use gpui::{
     AnyElement, App, Bounds, Context, Entity, FocusHandle, Focusable, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels, Point,
     StatefulInteractiveElement as _, Styled as _, Window, canvas, div, px, relative,
 };
@@ -150,7 +150,7 @@ trait FlexDir {
     fn when_horizontal(self, horizontal: bool) -> Self;
 }
 
-impl FlexDir for gpui_kit::Div {
+impl FlexDir for gpui::Div {
     fn when_horizontal(self, horizontal: bool) -> Self {
         if horizontal { self.flex_row() } else { self.flex_col() }
     }
@@ -380,11 +380,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 .justify_center()
                 .rounded(px(5.0))
                 .text_size(px(13.0))
-                .bg(if inspector_open {
-                    colors.elevated
-                } else {
-                    gpui_kit::hsla(0.0, 0.0, 0.0, 0.0)
-                })
+                .bg(if inspector_open { colors.elevated } else { gpui::hsla(0.0, 0.0, 0.0, 0.0) })
                 .text_color(if inspector_open { colors.text } else { colors.muted })
                 .hover(|s| s.bg(colors.hover))
                 .child("◨")
@@ -429,11 +425,11 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
 }
 
 trait TabLook {
-    fn when_active(self, active: bool, bg: gpui_kit::Hsla, text: gpui_kit::Hsla, muted: gpui_kit::Hsla) -> Self;
+    fn when_active(self, active: bool, bg: gpui::Hsla, text: gpui::Hsla, muted: gpui::Hsla) -> Self;
 }
 
-impl TabLook for gpui_kit::Stateful<gpui_kit::Div> {
-    fn when_active(self, active: bool, bg: gpui_kit::Hsla, text: gpui_kit::Hsla, muted: gpui_kit::Hsla) -> Self {
+impl TabLook for gpui::Stateful<gpui::Div> {
+    fn when_active(self, active: bool, bg: gpui::Hsla, text: gpui::Hsla, muted: gpui::Hsla) -> Self {
         if active { self.bg(bg).text_color(text) } else { self.text_color(muted) }
     }
 }

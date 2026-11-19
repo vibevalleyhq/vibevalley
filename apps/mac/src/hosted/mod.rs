@@ -6,7 +6,7 @@ pub mod frames;
 
 use std::collections::HashMap;
 
-use gpui_kit::{
+use gpui::{
     App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _,
     Window, div,
 };
@@ -21,10 +21,10 @@ mod late;
 /// subscriptions), shared app-wide.
 pub struct BridgeHub(pub vibevalley_bridge::Hub);
 
-impl gpui_kit::Global for BridgeHub {}
+impl gpui::Global for BridgeHub {}
 
 pub struct ServerStartup(pub tokio::sync::watch::Receiver<Option<Result<(), String>>>);
-impl gpui_kit::Global for ServerStartup {}
+impl gpui::Global for ServerStartup {}
 
 impl BridgeHub {
     /// The real server under VibeValley's own data folder, started off the UI
@@ -233,6 +233,7 @@ impl HostedView {
             let mut params = params;
             params.insert("view".into(), json!(name));
             params.entry("locale").or_insert_with(|| json!(vibevalley_i18n::locale()));
+            params.entry("randomSeed").or_insert_with(|| json!(crate::host::random_seed_hex()));
             let pixel_dir = crate::pixel::assets_dir().join("pixel");
             let has_pixel_dir = pixel_dir.join("sprites.json").is_file();
             if has_pixel_dir {
@@ -242,20 +243,30 @@ impl HostedView {
             let bridge = hub.map(|hub| std::sync::Arc::new(hub.attach(std::sync::Arc::new(ChannelOutlet(host.clone())))));
             client = bridge.clone();
             let reply_host = host.clone();
-            // Runs on the engine thread. Server traffic goes straight to the
-            // bridge; everything else is handed to the GPUI thread.
+            // Runs on the engine thread. Server traffic and stateless host ops
+            // answer directly here; everything else is handed to the GPUI thread.
             host.handle("action", move |call| {
                 let v = call.data();
-                if v["type"].as_str() == Some("call") && v["op"].as_str() == Some("host.pixelDir") {
-                    if let Some(id) = v["id"].as_str() {
-                        let env = if has_pixel_dir {
-                            vibevalley_bridge::Envelope::ok(json!({ "path": pixel_dir }))
-                        } else {
-                            vibevalley_bridge::refusal(vibevalley_bridge::BizCode::NotFound, "the pixel art is not installed")
-                        };
-                        let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));
+                if v["type"].as_str() == Some("call")
+                    && let Some(op) = v["op"].as_str()
+                {
+                    if op == "host.pixelDir" {
+                        if let Some(id) = v["id"].as_str() {
+                            let env = if has_pixel_dir {
+                                vibevalley_bridge::Envelope::ok(json!({ "path": pixel_dir }))
+                            } else {
+                                vibevalley_bridge::refusal(vibevalley_bridge::BizCode::NotFound, "the pixel art is not installed")
+                            };
+                            let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));
+                        }
+                        return;
                     }
-                    return;
+                    if let Some(env) = crate::host::handle_stateless_op(op, &v["payload"]) {
+                        if let Some(id) = v["id"].as_str() {
+                            let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));
+                        }
+                        return;
+                    }
                 }
                 if let Some(bridge) = &bridge
                     && route_to_bridge(bridge, v)
@@ -415,7 +426,7 @@ impl Render for HostedView {
             return view;
         }
         // nsh keymaps deliver presses; the runner also needs to know when a held duck key is released.
-        view.capture_key_up(cx.listener(|this, event: &gpui_kit::KeyUpEvent, _, cx| {
+        view.capture_key_up(cx.listener(|this, event: &gpui::KeyUpEvent, _, cx| {
             let key = event.keystroke.key.as_ref();
             if matches!(key, "down" | "x") {
                 let _ = this.app.read(cx).host().send("farm-key-up", json!(key));

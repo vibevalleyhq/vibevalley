@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use gpui_kit::App;
+use gpui::App;
 use objc2::{AnyThread, DefinedClass as _, MainThreadOnly, rc::Retained, runtime::AnyObject, sel};
 use objc2_app_kit::{NSImage, NSMenu, NSMenuItem, NSStatusBar, NSStatusItem};
 use objc2_foundation::{MainThreadMarker, NSObject, NSSize, NSString};
