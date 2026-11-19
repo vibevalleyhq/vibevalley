@@ -1,4 +1,6 @@
+pub mod agentflow;
 pub mod architecture;
+pub mod block;
 pub mod class;
 pub mod common;
 pub mod er;
@@ -58,6 +60,8 @@ pub enum ParsedModel {
     Usecase(usecase::UsecaseModel),
     Architecture(architecture::ArchitectureDb),
     Swimlane(flowchart::FlowDb),
+    Agentflow(agentflow::AgentflowDb),
+    Block(block::BlockDb),
 }
 
 impl ParsedModel {
@@ -73,6 +77,8 @@ impl ParsedModel {
             Self::Usecase(_) => DiagramType::Usecase,
             Self::Architecture(_) => DiagramType::Architecture,
             Self::Swimlane(_) => DiagramType::Swimlane,
+            Self::Agentflow(_) => DiagramType::Agentflow,
+            Self::Block(_) => DiagramType::Block,
         }
     }
 
@@ -88,6 +94,8 @@ impl ParsedModel {
             Self::Usecase(model) => usecase::render_usecase(model, ctx),
             Self::Architecture(db) => architecture::render_architecture(db, ctx),
             Self::Swimlane(db) => swimlane::render_swimlane(db, ctx),
+            Self::Agentflow(db) => agentflow::render_agentflow(db, ctx),
+            Self::Block(db) => block::render_block(db, ctx),
         }
     }
 }
@@ -148,6 +156,8 @@ impl Registry {
         reg.register(Box::new(usecase::UsecaseDiagram));
         reg.register(Box::new(architecture::ArchitectureDiagram));
         reg.register(Box::new(swimlane::SwimlaneDiagram));
+        reg.register(Box::new(agentflow::AgentflowDiagram));
+        reg.register(Box::new(block::BlockDiagram));
         reg
     }
 
