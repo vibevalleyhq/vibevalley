@@ -1,6 +1,5 @@
 import { t } from "@vibevalley/i18n";
 import type { StateFrame } from "@vibevalley/protocol";
-import { same } from "@vibevalley/protocol/rules";
 
 import { type Accessor } from "../../solid";
 import { faultOf, newSendKey, type UiFault } from "../infra/api";
@@ -84,13 +83,6 @@ export interface Intents<I, R> {
   readonly drop: (key: string) => Intent<I, R> | undefined;
   readonly get: (key: string) => Intent<I, R> | undefined;
   readonly all: () => readonly Intent<I, R>[];
-}
-
-/** An intent made by a button rather than typed (a suggestion, the repo map's sow, an artifact's reply). */
-export function sendOnce<I, R>(intents: Intents<I, R>, input: I): Promise<Intent<I, R> | undefined> {
-  const kept = intents.all().find((i) => same(i.input, input));
-  if (!kept) return intents.send(input).done;
-  return kept.phase === "failed" ? intents.retry(kept.key) : Promise.resolve(kept);
 }
 
 /** A setting the user changes again before the first change showed (a reaction off and on, a level picked twice). */

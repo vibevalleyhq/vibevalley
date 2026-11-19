@@ -81,15 +81,15 @@ const wbShim = String.raw`(() => {
   });
 })();`;
 
-const escapeXml = (s: string) =>
-  s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+const escapeXml = (s: string) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 
 function labelOf(el: WbElement): string {
   return el.label ?? el.text ?? el.title ?? "";
 }
 
 function makeId(prefix: string): string {
-  const rand = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID().slice(0, 6) : Math.random().toString(36).slice(2, 8);
+  const rand =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID().slice(0, 6) : Math.random().toString(36).slice(2, 8);
   return `${prefix}-${rand}`;
 }
 
@@ -176,9 +176,7 @@ function buildWhiteboardSvg(elements: readonly WbElement[]): string {
           `<text x="${x + 12}" y="${y + 22}" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#5e5852">${text}</text></g>`,
       );
     } else if (el.type === "text") {
-      layers.push(
-        `<text x="${x + 4}" y="${y + 22}" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#1c1917">${text}</text>`,
-      );
+      layers.push(`<text x="${x + 4}" y="${y + 22}" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#1c1917">${text}</text>`);
     } else if (el.type === "svg" && el.svg) {
       layers.push(`<g transform="translate(${x},${y})">${sanitizeWhiteboardSvg(el.svg)}</g>`);
     } else {
@@ -720,9 +718,7 @@ export function WhiteboardView(props: StoreViewerProps) {
         selectedIds.set(msg.ids);
         break;
       case "wb-move":
-        void act.run(() =>
-          client.batch([{ op: "patch", path: `elements/${msg.id}`, value: JSON.stringify({ x: msg.x, y: msg.y }) }]),
-        );
+        void act.run(() => client.batch([{ op: "patch", path: `elements/${msg.id}`, value: JSON.stringify({ x: msg.x, y: msg.y }) }]));
         break;
       case "wb-create":
         createAt(msg.x, msg.y, msg.kind);
@@ -974,13 +970,7 @@ export function WhiteboardView(props: StoreViewerProps) {
 
                     <View class="gap-1">
                       <Text class="text-xs font-medium text-muted">Entry JSON</Text>
-                      <TextArea
-                        rows={8}
-                        testID="wb-inspector-json"
-                        value={jsonDraft()}
-                        onInput={(v) => jsonDraft.set(v)}
-                        class="font-mono text-xs"
-                      />
+                      <TextArea rows={8} testID="wb-inspector-json" value={jsonDraft()} onInput={(v) => jsonDraft.set(v)} class="font-mono text-xs" />
                       <View class="flex-row justify-end">
                         <Button tone="primary" testID="wb-inspector-save-json" disabled={act.busy()} onPress={saveInspectorJson}>
                           Save JSON

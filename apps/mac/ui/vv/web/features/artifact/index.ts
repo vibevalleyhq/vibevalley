@@ -1,8 +1,7 @@
-export { ArtifactCard, artifactIcon, artifactSuffix, artifactTypeIcon, artifactTypeLabel, kindLabel, useArtifacts } from "./ArtifactCard";
+export { ArtifactCard, artifactIcon, artifactSuffix, artifactTypeIcon, kindLabel, useArtifacts } from "./ArtifactCard";
 export { ArtifactCanvas } from "./ArtifactCanvas";
 export type { QuoteTarget } from "./BlocksView";
 export { ArtifactsPage } from "./ArtifactsPage";
 export { IssueArtifacts } from "./IssueArtifacts";
 export { PresenterPage } from "./PresenterPage";
-export type { StoreViewerProps } from "./StoreArtifactView";
-export { activeArtifactViewContext, createTypedArtifact } from "./store";
+export { createTypedArtifact } from "./store";

@@ -86,7 +86,7 @@ const artifactMatchesSearch = (a: Artifact, search: string): boolean => {
 };
 
 /** Maps PR #255's library deliverable facets onto PR #257's ArtifactType and legacy ArtifactDisplay. */
-export const artifactMatchesKind = (
+const artifactMatchesKind = (
   a: { readonly body: ArtifactBody; readonly display?: ArtifactDisplay | undefined; readonly artifactType?: ArtifactType | undefined },
   kind: ArtifactKindFilter,
 ): boolean => {

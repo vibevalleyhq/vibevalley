@@ -90,16 +90,7 @@ export function MotionControls(props: Controls) {
         />
         <IconButton icon="previous" label={t("web.artifact.motion.prevFrame")} testid="motion-prev-frame" onClick={() => stepFrame(-1)} />
         <IconButton icon="next" label={t("web.artifact.motion.nextFrame")} testid="motion-next-frame" onClick={() => stepFrame(1)} />
-        <Slider
-          min={0}
-          max={duration()}
-          step={0.01}
-          value={time()}
-          onChange={seek}
-          label={timeLabel()}
-          testid="motion-scrub"
-          class="min-w-28 flex-1"
-        />
+        <Slider min={0} max={duration()} step={0.01} value={time()} onChange={seek} label={timeLabel()} testid="motion-scrub" class="min-w-28 flex-1" />
         <Text testID="motion-time" class="text-xs text-muted tabular-nums">
           {`${timeLabel()} · ${fps()} fps`}
         </Text>

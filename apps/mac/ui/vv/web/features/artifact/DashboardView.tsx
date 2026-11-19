@@ -195,15 +195,9 @@ export function DashboardView(props: StoreViewerProps) {
         />
 
         <If when={drawerOpen()}>
-          <View
-            testID="dashboard-sources"
-            class="max-h-96 shrink-0 border-t border-line bg-side lg:max-h-none lg:w-96 lg:border-t-0 lg:border-l"
-          >
+          <View testID="dashboard-sources" class="max-h-96 shrink-0 border-t border-line bg-side lg:max-h-none lg:w-96 lg:border-t-0 lg:border-l">
             <Scroll contentClass="gap-3 p-3">
-              <If
-                when={datasetNames().length > 0}
-                else={<Text class="text-xs text-muted">{t("web.artifact.dashboard.noDatasets")}</Text>}
-              >
+              <If when={datasetNames().length > 0} else={<Text class="text-xs text-muted">{t("web.artifact.dashboard.noDatasets")}</Text>}>
                 <View class="flex-row flex-wrap items-center gap-1">
                   <Each of={datasetNames()}>
                     {(ds) => {
@@ -249,12 +243,7 @@ export function DashboardView(props: StoreViewerProps) {
                       <If when={editDraft()}>
                         {(draft) => (
                           <View class="gap-2 rounded-md border border-line bg-page p-2">
-                            <TextArea
-                              rows={7}
-                              value={draft()}
-                              onInput={(val) => setDrawer({ tag: "editJson", draft: val })}
-                              class="font-mono text-xs"
-                            />
+                            <TextArea rows={7} value={draft()} onInput={(val) => setDrawer({ tag: "editJson", draft: val })} class="font-mono text-xs" />
                             <View class="flex-row justify-end gap-1.5">
                               <Button onPress={() => setDrawer({ tag: "browse" })}>{t("web.base.form.never")}</Button>
                               <Button tone="primary" testID="dashboard-save-json" disabled={act.busy()} onPress={saveDatasetJson}>

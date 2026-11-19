@@ -330,7 +330,7 @@ export function starterEntriesForType(type: ArtifactType, title: string): Artifa
               { id: "ink", group: "text", value: { light: "#1c1917", dark: "#ecebe8" }, note: "Primary body text" },
               { id: "muted", group: "text", value: { light: "#5e5852", dark: "#a9a49e" }, note: "Secondary supporting copy" },
               { id: "accent", group: "brand", value: { light: "#4d7a2a", dark: "#7fae4f" }, note: "Primary brand action" },
-              { id: "warning", group: "status", value: { light: "#b9770e", dark: "#e5a93c" }, note: "Attention state" },
+              { id: "warning", group: "status", value: { light: "#b9770e", dark: "#e5a93c" }, note: "Warning status" },
             ],
             type: {
               families: [

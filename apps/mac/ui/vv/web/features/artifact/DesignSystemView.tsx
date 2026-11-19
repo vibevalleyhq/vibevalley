@@ -228,10 +228,7 @@ export function DesignSystemView(props: StoreViewerProps) {
                     </If>
                     <If when={ratio()}>
                       {(r) => (
-                        <View
-                          testID="ds-contrast-badge"
-                          class={`self-start rounded-full px-2 py-0.5 ${r() >= 4.5 ? "bg-ok-soft" : "bg-bad-soft"}`}
-                        >
+                        <View testID="ds-contrast-badge" class={`self-start rounded-full px-2 py-0.5 ${r() >= 4.5 ? "bg-ok-soft" : "bg-bad-soft"}`}>
                           <Text class={`text-2xs font-medium ${r() >= 4.5 ? "text-ok-ink" : "text-berry"}`}>
                             {r() >= 4.5
                               ? t("web.artifact.designSystem.contrastPass", { ratio: r() })
@@ -271,10 +268,7 @@ export function DesignSystemView(props: StoreViewerProps) {
                     <Each of={parsedTokens().radius}>
                       {(rad) => (
                         <View class="flex-row items-center gap-2.5 rounded-md border border-line bg-side px-3 py-2">
-                          <View
-                            class="size-7 border border-accent bg-page"
-                            style={{ borderRadius: parsePx(rad().value, 6, 0, 24) }}
-                          />
+                          <View class="size-7 border border-accent bg-page" style={{ borderRadius: parsePx(rad().value, 6, 0, 24) }} />
                           <View class="gap-0.5">
                             <Text class="font-mono text-xs font-semibold text-ink">{`--radius-${rad().id}`}</Text>
                             <Text class="font-mono text-2xs text-muted">{rad().value}</Text>
@@ -356,9 +350,7 @@ export function DesignSystemView(props: StoreViewerProps) {
                     onPress={() => selectedComponent.set(comp().id)}
                     class={`rounded-md px-2.5 py-1.5 ${selected() ? "bg-selected" : "hover:bg-hover"}`}
                   >
-                    <Text class={`truncate text-xs font-medium ${selected() ? "text-ink" : "text-muted"}`}>
-                      {comp().title ?? comp().id}
-                    </Text>
+                    <Text class={`truncate text-xs font-medium ${selected() ? "text-ink" : "text-muted"}`}>{comp().title ?? comp().id}</Text>
                   </View>
                 );
               }}
@@ -383,12 +375,7 @@ export function DesignSystemView(props: StoreViewerProps) {
 
       <If when={tab() === "tokensJson"}>
         <View testID="ds-tokens-editor" class="min-h-0 flex-1 gap-2 p-4">
-          <TextArea
-            rows={16}
-            value={draftValue()}
-            onInput={(val) => tokensDraft.set(val)}
-            class="min-h-0 flex-1 font-mono text-xs"
-          />
+          <TextArea rows={16} value={draftValue()} onInput={(val) => tokensDraft.set(val)} class="min-h-0 flex-1 font-mono text-xs" />
           <View class="flex-row items-center justify-between gap-2">
             <Text class={`text-xs ${draftValid() ? "text-muted" : "text-berry"}`}>
               {draftValid() ? `${compileTokensCss(draftValue()).length} B compiled CSS` : "Invalid JSON"}

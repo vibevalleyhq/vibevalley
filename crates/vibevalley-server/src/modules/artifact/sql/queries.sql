@@ -154,7 +154,7 @@ insert into artifact_entry_change (artifact_id, seq, actor, paths, deleted, crea
   values (?1, ?2, ?3, ?4, ?5, ?6);
 
 -- name: ArtifactEntryChangesAfter :many
-select artifact_id, seq, actor, paths, deleted, created_at
+select seq, paths, deleted
   from artifact_entry_change where artifact_id = ?1 and seq > ?2 order by seq limit ?3;
 
 -- name: PruneArtifactEntryChanges :exec

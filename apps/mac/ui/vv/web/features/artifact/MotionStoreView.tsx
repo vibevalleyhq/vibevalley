@@ -33,16 +33,7 @@ export function MotionStoreView(props: StoreViewerProps) {
         onFrame={(f) => setFrame(f)}
         onPresent={props.onPresent}
       />
-      <If when={frame()}>
-        {(f) => (
-          <MotionControls
-            artifact={props.artifact}
-            version={seq()}
-            frame={f()}
-            onPresent={(on) => props.onPresent?.(on)}
-          />
-        )}
-      </If>
+      <If when={frame()}>{(f) => <MotionControls artifact={props.artifact} version={seq()} frame={f()} onPresent={(on) => props.onPresent?.(on)} />}</If>
     </View>
   );
 }

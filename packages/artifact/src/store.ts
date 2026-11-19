@@ -3,10 +3,6 @@ import { type ArtifactEntry, type ArtifactEntryKind, type ArtifactEntryWriteInpu
 export { ArtifactTypeValues };
 export type { ArtifactEntry, ArtifactEntryKind, ArtifactEntryWriteInput, ArtifactType };
 
-export const entryMaxBytes = 2 * 1024 * 1024;
-export const entryMaxCount = 500;
-export const inlineEventMaxBytes = 256 * 1024;
-
 const entryPathMax = 240;
 const hasControlChar = (s: string) => {
   for (let i = 0; i < s.length; i += 1) {
@@ -106,15 +102,6 @@ function jsonMergePatch(target: unknown, patch: unknown): unknown {
 }
 
 export type JsonTextResult = { readonly ok: true; readonly value: string } | { readonly ok: false; readonly why: string };
-
-export function canonicalJson(raw: string): JsonTextResult {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return { ok: true, value: JSON.stringify(parsed) };
-  } catch (e) {
-    return { ok: false, why: e instanceof Error ? e.message : String(e) };
-  }
-}
 
 export function applyJsonMergePatch(currentRaw: string | undefined, patchRaw: string): JsonTextResult {
   let target: unknown = {};

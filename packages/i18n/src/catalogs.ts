@@ -707,7 +707,6 @@ export const catalogs = {
       },
       notStore: "「{title}」不是结构化存储的 Artifact：不能读写条目",
       defaultDesignSystemOnly: "只有设计体系（design-system）类型的 Artifact 能设为农场默认",
-      badType: "不认识 {type} 这种 Artifact 类型，只认 {types}",
       noReference: "{type} 没有叫 {reference} 的参考分册；可选：{available}",
       entry: {
         missing: "「{title}」里没有路径 {path}",
@@ -1517,12 +1516,10 @@ export const catalogs = {
       noEffortModel: "{model}没有推理强度可选。",
     },
     "web.artifact": {
-      place: { label: "Artifact", hint: "你和帮工、助手留下要看的东西：一起写的 Artifact、交上来的网页，都在这里" },
       card: { version: "第 {version} 稿", open: "打开「{title}」" },
       page: {
         by: "{name} 做的",
         updated: "{when}更新",
-        versions: "每一稿",
         delete: "删掉",
         deleteAsk: "删掉「{title}」？对话里的卡片还在。",
         deleted: "删掉了「{title}」",
@@ -1545,16 +1542,6 @@ export const catalogs = {
         listShow: "展开列表",
         listHide: "收起列表",
         backToLibrary: "返回素材库",
-      },
-      talk: {
-        atMessage: "在对话里",
-        reply: "回复",
-        replyHint: "写给做它的帮工：哪里要改",
-        send: "回复",
-        sent: "回复了",
-        replyVersion: "回复这一稿",
-        sentVersion: "回复了第 {version} 稿",
-        none: "还没在对话里说过：自己写的这篇，还没交给谁看。",
       },
       issue: { title: "Artifact" },
       blocks: {
@@ -1666,7 +1653,6 @@ export const catalogs = {
         zoomOut: "缩小",
         fitView: "适应画布",
         elements: "{n} 个元素",
-        agentWorking: "帮工正在绘制：{label}",
         doubleClickEdit: "双击编辑文字",
         empty: "空白白板：用上方工具放图形和连线，或在对话里让助手/帮工一起画",
       },
@@ -2871,7 +2857,6 @@ export const catalogs = {
         page: "网页与文档",
       },
       newArtifact: "新建作品",
-      blocksLabel: "协作文档",
       search: "搜索名字",
       sortLabel: "排序",
       sort: { recent: "最近", name: "名字", size: "大小" },
@@ -4607,7 +4592,6 @@ export const catalogs = {
       },
       notStore: "“{title}” is not a structured store artifact and has no entries",
       defaultDesignSystemOnly: "Only a design-system artifact can be set as the farm's standing default",
-      badType: "Unknown artifact type {type}; expected one of {types}",
       noReference: "{type} has no reference chapter named {reference}; available: {available}",
       entry: {
         missing: "“{title}” has no entry at {path}",
@@ -5495,12 +5479,10 @@ export const catalogs = {
       noEffortModel: "{model} has no effort levels.",
     },
     "web.artifact": {
-      place: { label: "Artifacts", hint: "What you, the helpers and the assistant leave to be read: pages written together and web pages handed in" },
       card: { version: "Version {version}", open: 'Open "{title}"' },
       page: {
         by: "Made by {name}",
         updated: "Updated {when}",
-        versions: "Versions",
         delete: "Delete",
         deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
         deleted: 'Deleted "{title}"',
@@ -5523,16 +5505,6 @@ export const catalogs = {
         listShow: "Show list",
         listHide: "Hide list",
         backToLibrary: "Back to library",
-      },
-      talk: {
-        atMessage: "In the conversation",
-        reply: "Reply",
-        replyHint: "For the helper who made it: what to change",
-        send: "Reply",
-        sent: "Replied",
-        replyVersion: "Reply to this version",
-        sentVersion: "Replied to version {version}",
-        none: "Not said in any conversation yet: you wrote this one and have not handed it to anyone.",
       },
       issue: { title: "Artifacts" },
       blocks: {
@@ -5644,7 +5616,6 @@ export const catalogs = {
         zoomOut: "Zoom out",
         fitView: "Fit view",
         elements: "{n} elements",
-        agentWorking: "Helper drawing: {label}",
         doubleClickEdit: "Double-click to edit text",
         empty: "Empty whiteboard: place shapes and arrows from the toolbar, or draw together in chat",
       },
@@ -6927,7 +6898,6 @@ export const catalogs = {
         page: "Pages & docs",
       },
       newArtifact: "New deliverable",
-      blocksLabel: "Shared doc",
       search: "Search names",
       sortLabel: "Sort",
       sort: { recent: "Recent", name: "Name", size: "Size" },
@@ -8493,7 +8463,6 @@ export interface Messages {
   "server.artifact.attrNotForType": { readonly attr: string | number; readonly type: string | number };
   "server.artifact.badBlockType": { readonly types: string | number };
   "server.artifact.badKind": { readonly kind: string | number; readonly kinds: string | number };
-  "server.artifact.badType": { readonly type: string | number; readonly types: string | number };
   "server.artifact.check.base": { readonly line: string | number };
   "server.artifact.check.font": { readonly hosts: string | number; readonly line: string | number; readonly url: string | number };
   "server.artifact.check.form": { readonly line: string | number; readonly url: string | number };
@@ -9522,9 +9491,6 @@ export interface Messages {
   "web.artifact.page.title": undefined;
   "web.artifact.page.untitled": undefined;
   "web.artifact.page.updated": { readonly when: string | number };
-  "web.artifact.page.versions": undefined;
-  "web.artifact.place.hint": undefined;
-  "web.artifact.place.label": undefined;
   "web.artifact.presenter.aside": undefined;
   "web.artifact.presenter.clock": undefined;
   "web.artifact.presenter.current": undefined;
@@ -9579,14 +9545,6 @@ export interface Messages {
   "web.artifact.suggestions.types.paragraph": undefined;
   "web.artifact.suggestions.types.quote": undefined;
   "web.artifact.suggestions.types.todo": undefined;
-  "web.artifact.talk.atMessage": undefined;
-  "web.artifact.talk.none": undefined;
-  "web.artifact.talk.reply": undefined;
-  "web.artifact.talk.replyHint": undefined;
-  "web.artifact.talk.replyVersion": undefined;
-  "web.artifact.talk.send": undefined;
-  "web.artifact.talk.sent": undefined;
-  "web.artifact.talk.sentVersion": { readonly version: string | number };
   "web.artifact.types.dashboard": undefined;
   "web.artifact.types.defaultBadge": undefined;
   "web.artifact.types.design": undefined;
@@ -9600,7 +9558,6 @@ export interface Messages {
   "web.artifact.types.slides": undefined;
   "web.artifact.types.unsetDefault": undefined;
   "web.artifact.types.whiteboard": undefined;
-  "web.artifact.whiteboard.agentWorking": { readonly label: string | number };
   "web.artifact.whiteboard.arrow": undefined;
   "web.artifact.whiteboard.container": undefined;
   "web.artifact.whiteboard.deleteSelected": undefined;
@@ -10801,7 +10758,6 @@ export interface Messages {
   "web.library.artifactKind.page": undefined;
   "web.library.artifactKind.slides": undefined;
   "web.library.artifactKind.whiteboard": undefined;
-  "web.library.blocksLabel": undefined;
   "web.library.download": undefined;
   "web.library.drop": undefined;
   "web.library.empty": undefined;

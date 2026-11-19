@@ -50,7 +50,7 @@ const displayLabel: Record<ArtifactDisplay, string> = {
   motion: t("web.artifact.body.motion"),
 };
 
-export const artifactTypeLabel: Record<ArtifactType, string> = {
+const artifactTypeLabel: Record<ArtifactType, string> = {
   docs: t("web.artifact.types.docs"),
   slides: t("web.artifact.types.slides"),
   dashboard: t("web.artifact.types.dashboard"),
@@ -92,7 +92,7 @@ export const kindLabel = (a: {
   return displayLabel[a.display ?? "page"];
 };
 
-export const bodyIcon: Record<ArtifactBody, IconName> = { blocks: "artifacts", html: "web", store: "catalog" };
+const bodyIcon: Record<ArtifactBody, IconName> = { blocks: "artifacts", html: "web", store: "catalog" };
 
 export const artifactIcon = (a: { readonly body: ArtifactBody; readonly artifactType?: ArtifactType | undefined }): IconName =>
   a.artifactType ? artifactTypeIcon[a.artifactType] : bodyIcon[a.body];

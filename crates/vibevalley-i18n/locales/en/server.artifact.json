@@ -109,7 +109,6 @@
   },
   "notStore": "“{title}” is not a structured store artifact and has no entries",
   "defaultDesignSystemOnly": "Only a design-system artifact can be set as the farm's standing default",
-  "badType": "Unknown artifact type {type}; expected one of {types}",
   "noReference": "{type} has no reference chapter named {reference}; available: {available}",
   "entry": {
     "missing": "“{title}” has no entry at {path}",

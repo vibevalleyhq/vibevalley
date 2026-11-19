@@ -117,10 +117,7 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
 
     // Markdown is read into blocks, as its maker; it takes no version.
     std::thread::sleep(Duration::from_millis(3));
-    let linked_issue = ok(call("issue.create", json!({ "title": "关联工单" })))["issue"]["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let linked_issue = ok(call("issue.create", json!({ "title": "关联工单" })))["id"].as_str().unwrap().to_string();
     let notes = started
         .artifacts
         .create(
@@ -912,8 +909,11 @@ fn store_view_csp_headers_default_design_system_tokens_and_http_route() {
 
     // Create standing default design-system artifact.
     let ds_tokens = json!({
-        "name": "Brand DS",
-        "colors": { "brand-primary": { "light": "#123456", "dark": "#654321" } }
+        "themes": ["light", "dark"],
+        "defaultTheme": "light",
+        "color": [
+            { "id": "brand-primary", "group": "brand", "value": { "light": "#123456", "dark": "#654321" } }
+        ]
     });
     let ds = ok(call(
         "artifact.create",
@@ -1020,10 +1020,7 @@ fn artifact_issue_fk_sets_null_on_issue_delete() {
     let hub = started.hub.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
-    let issue_id = ok(call("issue.create", json!({ "title": "临时工单" })))["issue"]["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let issue_id = ok(call("issue.create", json!({ "title": "临时工单" })))["id"].as_str().unwrap().to_string();
     let made = ok(call(
         "artifact.create",
         json!({

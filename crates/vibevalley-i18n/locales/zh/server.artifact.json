@@ -109,7 +109,6 @@
   },
   "notStore": "「{title}」不是结构化存储的 Artifact：不能读写条目",
   "defaultDesignSystemOnly": "只有设计体系（design-system）类型的 Artifact 能设为农场默认",
-  "badType": "不认识 {type} 这种 Artifact 类型，只认 {types}",
   "noReference": "{type} 没有叫 {reference} 的参考分册；可选：{available}",
   "entry": {
     "missing": "「{title}」里没有路径 {path}",

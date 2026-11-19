@@ -834,19 +834,16 @@ pub struct ArtifactEntryChangesAfterParams {
 
 #[derive(sqlx::FromRow)]
 pub struct ArtifactEntryChangesAfterRow {
-    pub r#artifact_id: String,
     pub r#seq: i64,
-    pub r#actor: String,
     pub r#paths: String,
     pub r#deleted: String,
-    pub r#created_at: i64,
 }
 
 pub async fn r#artifact_entry_changes_after<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ArtifactEntryChangesAfterParams,
 ) -> Result<Vec<ArtifactEntryChangesAfterRow>, sqlx::Error> {
-    sqlx::query_as::<_, ArtifactEntryChangesAfterRow>(r#"select artifact_id, seq, actor, paths, deleted, created_at
+    sqlx::query_as::<_, ArtifactEntryChangesAfterRow>(r#"select seq, paths, deleted
   from artifact_entry_change where artifact_id = ?1 and seq > ?2 order by seq limit ?3"#)
         .bind(params.r#artifact_id)
         .bind(params.r#seq)

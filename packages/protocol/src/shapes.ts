@@ -111,7 +111,6 @@ export {
   type ArtifactCard,
   type ArtifactContent,
   type ArtifactDisplay,
-  ArtifactDisplayValues,
   type ArtifactEntry,
   type ArtifactEntryBatchRequest,
   type ArtifactEntryBatchResult,

@@ -196,9 +196,7 @@ export function SlidesStoreView(props: StoreViewerProps) {
     });
   };
 
-  const thumbView = useStoreViewHtml(() =>
-    pages() > 1 ? { id: props.artifact.id, theme: shownTheme(), seq: seq() } : undefined,
-  );
+  const thumbView = useStoreViewHtml(() => (pages() > 1 ? { id: props.artifact.id, theme: shownTheme(), seq: seq() } : undefined));
   const slideNumbers = (): readonly number[] => Array.from({ length: pages() }, (_, i) => i);
   const slideTitle = (i: number) => shown()?.ready?.titles?.[i] ?? slideList()[i]?.title ?? "";
 
@@ -259,7 +257,13 @@ export function SlidesStoreView(props: StoreViewerProps) {
           <Button icon="add" testID="slides-add" disabled={act.busy()} onPress={addSlide}>
             {t("web.artifact.slidesStore.addSlide")}
           </Button>
-          <IconButton icon="notes" label={t("web.artifact.presenter.notes")} testid="slides-notes-toggle" pressed={showNotes()} onClick={() => setShowNotes((v) => !v)} />
+          <IconButton
+            icon="notes"
+            label={t("web.artifact.presenter.notes")}
+            testid="slides-notes-toggle"
+            pressed={showNotes()}
+            onClick={() => setShowNotes((v) => !v)}
+          />
           <IconButton icon="edit" label={t("web.artifact.slidesStore.editSlide")} testid="slides-edit-html" pressed={editingHtml()} onClick={toggleEditHtml} />
           <IconButton icon="present" label={t("web.artifact.slides.present")} testid="slides-present" onClick={() => props.onPresent?.(true)} />
           <IconButton
@@ -273,9 +277,7 @@ export function SlidesStoreView(props: StoreViewerProps) {
         <If when={showNotes()}>
           <View testID="slides-notes-panel" class="gap-1 rounded-md border border-line bg-side px-3 py-2">
             <Text class="text-xs font-medium text-muted">{t("web.artifact.presenter.notes")}</Text>
-            <Text class={`text-xs ${currentNotes() ? "text-ink" : "text-faint"}`}>
-              {currentNotes() || t("web.artifact.presenter.noNotes")}
-            </Text>
+            <Text class={`text-xs ${currentNotes() ? "text-ink" : "text-faint"}`}>{currentNotes() || t("web.artifact.presenter.noNotes")}</Text>
           </View>
         </If>
 

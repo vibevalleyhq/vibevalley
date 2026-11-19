@@ -266,16 +266,10 @@ export function DesignCanvasView(props: StoreViewerProps) {
             onPresent={props.onPresent}
           />
 
-          <View
-            testID="design-props-panel"
-            class="max-h-80 shrink-0 border-t border-line bg-page lg:max-h-none lg:w-72 lg:border-t-0 lg:border-l"
-          >
+          <View testID="design-props-panel" class="max-h-80 shrink-0 border-t border-line bg-page lg:max-h-none lg:w-72 lg:border-t-0 lg:border-l">
             <Scroll contentClass="gap-3 p-3">
               <Text class="text-xs font-semibold text-muted">{t("web.artifact.design.props")}</Text>
-              <If
-                when={propDefs().length > 0}
-                else={<Text class="text-xs text-faint">{t("web.artifact.design.noProps")}</Text>}
-              >
+              <If when={propDefs().length > 0} else={<Text class="text-xs text-faint">{t("web.artifact.design.noProps")}</Text>}>
                 <View class="gap-2.5">
                   <Each of={propDefs()}>
                     {(def) => {
@@ -314,12 +308,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
                             </View>
                           </If>
                           <If when={def().type === "text" || def().type === "color"}>
-                            <TextInput
-                              value={String(current())}
-                              onInput={(val) => updateProp(def().name, val)}
-                              accessibilityLabel={label()}
-                              class="text-xs"
-                            />
+                            <TextInput value={String(current())} onInput={(val) => updateProp(def().name, val)} accessibilityLabel={label()} class="text-xs" />
                           </If>
                         </View>
                       );

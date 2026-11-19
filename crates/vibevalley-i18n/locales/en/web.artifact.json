@@ -1,8 +1,4 @@
 {
-  "place": {
-    "label": "Artifacts",
-    "hint": "What you, the helpers and the assistant leave to be read: pages written together and web pages handed in"
-  },
   "card": {
     "version": "Version {version}",
     "open": "Open \"{title}\""
@@ -10,7 +6,6 @@
   "page": {
     "by": "Made by {name}",
     "updated": "Updated {when}",
-    "versions": "Versions",
     "delete": "Delete",
     "deleteAsk": "Delete “{title}”? Its cards stay in the conversation.",
     "deleted": "Deleted \"{title}\"",
@@ -36,16 +31,6 @@
     "listShow": "Show list",
     "listHide": "Hide list",
     "backToLibrary": "Back to library"
-  },
-  "talk": {
-    "atMessage": "In the conversation",
-    "reply": "Reply",
-    "replyHint": "For the helper who made it: what to change",
-    "send": "Reply",
-    "sent": "Replied",
-    "replyVersion": "Reply to this version",
-    "sentVersion": "Replied to version {version}",
-    "none": "Not said in any conversation yet: you wrote this one and have not handed it to anyone."
   },
   "issue": {
     "title": "Artifacts"
@@ -170,7 +155,6 @@
     "zoomOut": "Zoom out",
     "fitView": "Fit view",
     "elements": "{n} elements",
-    "agentWorking": "Helper drawing: {label}",
     "doubleClickEdit": "Double-click to edit text",
     "empty": "Empty whiteboard: place shapes and arrows from the toolbar, or draw together in chat"
   },

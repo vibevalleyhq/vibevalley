@@ -122,7 +122,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         .iter()
         .map(|t| t["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names.len(), 24, "{names:?}");
+    assert_eq!(names.len(), 29, "{names:?}");
     assert!(names.contains(&"issue_report"));
 
     let stranger = rpc(&door, "not-a-token", 3, "tools/call", json!({ "name": "session_list", "arguments": {} }));

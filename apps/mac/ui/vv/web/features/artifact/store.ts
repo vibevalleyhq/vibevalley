@@ -172,8 +172,6 @@ export function useStoreEntries(id: () => ArtifactId): {
   return { client, snapshot };
 }
 
-export const useArtifactEntries = useStoreEntries;
-
 export function useStoreViewHtml(
   params: () =>
     | {

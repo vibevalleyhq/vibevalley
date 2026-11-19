@@ -457,8 +457,6 @@ export const shellPath = (
 ) =>
   `${artifactPath(id, version)}?shell=1&display=${display}&theme=${theme}${more.at === undefined ? "" : `&at=${more.at}`}${more.still === true ? "&still=1" : ""}${more.print === true ? "&print=1" : ""}`;
 
-export const shellThemeOf = (asked: string | null): ShellTheme => (asked === "dark" ? "dark" : "light");
-
 export const shellMessageOf = (data: unknown): HtmlShellMessage | undefined => {
   const got = S.HtmlShellMessage.safeParse(data);
   return got.success ? got.data : undefined;

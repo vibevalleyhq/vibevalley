@@ -1,8 +1,4 @@
 {
-  "place": {
-    "label": "Artifact",
-    "hint": "你和帮工、助手留下要看的东西：一起写的 Artifact、交上来的网页，都在这里"
-  },
   "card": {
     "version": "第 {version} 稿",
     "open": "打开「{title}」"
@@ -10,7 +6,6 @@
   "page": {
     "by": "{name} 做的",
     "updated": "{when}更新",
-    "versions": "每一稿",
     "delete": "删掉",
     "deleteAsk": "删掉「{title}」？对话里的卡片还在。",
     "deleted": "删掉了「{title}」",
@@ -36,16 +31,6 @@
     "listShow": "展开列表",
     "listHide": "收起列表",
     "backToLibrary": "返回素材库"
-  },
-  "talk": {
-    "atMessage": "在对话里",
-    "reply": "回复",
-    "replyHint": "写给做它的帮工：哪里要改",
-    "send": "回复",
-    "sent": "回复了",
-    "replyVersion": "回复这一稿",
-    "sentVersion": "回复了第 {version} 稿",
-    "none": "还没在对话里说过：自己写的这篇，还没交给谁看。"
   },
   "issue": {
     "title": "Artifact"
@@ -170,7 +155,6 @@
     "zoomOut": "缩小",
     "fitView": "适应画布",
     "elements": "{n} 个元素",
-    "agentWorking": "帮工正在绘制：{label}",
     "doubleClickEdit": "双击编辑文字",
     "empty": "空白白板：用上方工具放图形和连线，或在对话里让助手/帮工一起画"
   },
