@@ -43,7 +43,7 @@ debug = false
 opt-level = 0
 debug = false
 
-[profile.dev.package.gpui-kit]
+[profile.dev.package.gpui-fast]
 opt-level = 2
 
 [profile.dev.package.image]

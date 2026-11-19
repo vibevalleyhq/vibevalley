@@ -5,7 +5,7 @@ const keyDigits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 // Long keys come from inserting at one place again and again; past this a key is refused (rebalancing is not done yet).
 const maxKeyLen = 256;
 
-export const validKey = (k: string) => k !== "" && k.length <= maxKeyLen && !k.endsWith("0") && [...k].every((c) => keyDigits.includes(c));
+const validKey = (k: string) => k !== "" && k.length <= maxKeyLen && !k.endsWith("0") && [...k].every((c) => keyDigits.includes(c));
 
 class KeyError extends Error {}
 
