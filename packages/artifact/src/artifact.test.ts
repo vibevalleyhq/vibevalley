@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { keyBetween } from "@vibevalley/protocol/rules";
 import { artifactId, blockId } from "@vibevalley/protocol/schema";
 
+import { artifactSuffixOf, inferArtifactFromName, inferDisplayFromContent } from "./html.ts";
 import {
   blocksOfMarkdown,
   codePointOffset,
@@ -103,5 +104,34 @@ describe("@vibevalley/artifact domain engine", () => {
       /^<p>hi<\/p>\n<style>:root\{[^}]*--vv-page:#151413[^]*\(\{ display: "page" \}\)/u,
     );
     expect(shellPath("a", 3, "slides", "dark")).toBe("/api/v1/artifact/a/3?shell=1&display=slides&theme=dark");
+  });
+
+  it("infers compound artifact extensions and formats canonical suffixes", () => {
+    expect(inferArtifactFromName("q3-deck.slide.html")).toEqual({ title: "q3-deck", kind: "html", display: "slides", artifactType: "slides" });
+    expect(inferArtifactFromName("poster.visual.html")).toEqual({ title: "poster", kind: "html", display: "page", artifactType: "design" });
+    expect(inferArtifactFromName("kpi.dashboard.html")).toEqual({ title: "kpi", kind: "html", display: "page", artifactType: "dashboard" });
+    expect(inferArtifactFromName("intro.motion.html")).toEqual({ title: "intro", kind: "html", display: "motion", artifactType: "motion" });
+    expect(inferArtifactFromName("pipeline.whiteboard")).toEqual({ title: "pipeline", kind: "html", display: "page", artifactType: "whiteboard" });
+    expect(inferArtifactFromName("brand.tokens.json")).toEqual({ title: "brand", kind: "html", display: "page", artifactType: "design-system" });
+    expect(inferArtifactFromName("notes.doc.md")).toEqual({ title: "notes", kind: "markdown", artifactType: "docs" });
+    expect(inferArtifactFromName("plain.html", "<script>vv.timeline(5, () => {})</script>")).toEqual({
+      title: "plain",
+      kind: "html",
+      display: "motion",
+    });
+    expect(inferDisplayFromContent("<section><h1>One</h1></section><section><h2>Two</h2></section>")).toBe("slides");
+    expect(inferDisplayFromContent("<p>Just a page</p>")).toBeUndefined();
+
+    expect(artifactSuffixOf({ body: "blocks" })).toBe(".doc.md");
+    expect(artifactSuffixOf({ body: "store", artifactType: "docs" })).toBe(".doc.md");
+    expect(artifactSuffixOf({ body: "store", artifactType: "slides" })).toBe(".slide.html");
+    expect(artifactSuffixOf({ body: "store", artifactType: "dashboard" })).toBe(".dashboard.html");
+    expect(artifactSuffixOf({ body: "store", artifactType: "motion" })).toBe(".motion.html");
+    expect(artifactSuffixOf({ body: "store", artifactType: "whiteboard" })).toBe(".whiteboard");
+    expect(artifactSuffixOf({ body: "store", artifactType: "design" })).toBe(".visual.html");
+    expect(artifactSuffixOf({ body: "store", artifactType: "design-system" })).toBe(".design-system.json");
+    expect(artifactSuffixOf({ body: "html", display: "page" })).toBe(".html");
+    expect(artifactSuffixOf({ body: "html", display: "slides" })).toBe(".slide.html");
+    expect(artifactSuffixOf({ body: "html", display: "motion" })).toBe(".motion.html");
   });
 });

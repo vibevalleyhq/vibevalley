@@ -1,0 +1,156 @@
+{
+ "suffixes": [
+  {
+   "body": "blocks",
+   "suffix": ".doc.md"
+  },
+  {
+   "body": "store",
+   "artifactType": "docs",
+   "suffix": ".doc.md"
+  },
+  {
+   "body": "store",
+   "artifactType": "slides",
+   "suffix": ".slide.html"
+  },
+  {
+   "body": "store",
+   "artifactType": "dashboard",
+   "suffix": ".dashboard.html"
+  },
+  {
+   "body": "store",
+   "artifactType": "motion",
+   "suffix": ".motion.html"
+  },
+  {
+   "body": "store",
+   "artifactType": "whiteboard",
+   "suffix": ".whiteboard"
+  },
+  {
+   "body": "store",
+   "artifactType": "design",
+   "suffix": ".visual.html"
+  },
+  {
+   "body": "store",
+   "artifactType": "design-system",
+   "suffix": ".design-system.json"
+  },
+  {
+   "body": "html",
+   "display": "page",
+   "suffix": ".html"
+  },
+  {
+   "body": "html",
+   "display": "slides",
+   "suffix": ".slide.html"
+  },
+  {
+   "body": "html",
+   "display": "motion",
+   "suffix": ".motion.html"
+  }
+ ],
+ "names": [
+  {
+   "name": "q3-deck.slide.html",
+   "inferred": {
+    "title": "q3-deck",
+    "kind": "html",
+    "display": "slides",
+    "artifactType": "slides"
+   }
+  },
+  {
+   "name": "poster.visual.html",
+   "inferred": {
+    "title": "poster",
+    "kind": "html",
+    "display": "page",
+    "artifactType": "design"
+   }
+  },
+  {
+   "name": "kpi.dashboard.html",
+   "inferred": {
+    "title": "kpi",
+    "kind": "html",
+    "display": "page",
+    "artifactType": "dashboard"
+   }
+  },
+  {
+   "name": "intro.motion.html",
+   "inferred": {
+    "title": "intro",
+    "kind": "html",
+    "display": "motion",
+    "artifactType": "motion"
+   }
+  },
+  {
+   "name": "pipeline.whiteboard",
+   "inferred": {
+    "title": "pipeline",
+    "kind": "html",
+    "display": "page",
+    "artifactType": "whiteboard"
+   }
+  },
+  {
+   "name": "brand.tokens.json",
+   "inferred": {
+    "title": "brand",
+    "kind": "html",
+    "display": "page",
+    "artifactType": "design-system"
+   }
+  },
+  {
+   "name": "notes.doc.md",
+   "inferred": {
+    "title": "notes",
+    "kind": "markdown",
+    "artifactType": "docs"
+   }
+  },
+  {
+   "name": "plain.html",
+   "content": "<script>vv.timeline(5, () => {})</script>",
+   "inferred": {
+    "title": "plain",
+    "kind": "html",
+    "display": "motion"
+   }
+  },
+  {
+   "name": "deck.html",
+   "content": "<section><h1>One</h1></section><section><h2>Two</h2></section>",
+   "inferred": {
+    "title": "deck",
+    "kind": "html",
+    "display": "slides"
+   }
+  },
+  {
+   "name": "untitled",
+   "content": "<!doctype html><p>hi</p>",
+   "inferred": {
+    "title": "untitled",
+    "kind": "html",
+    "display": "page"
+   }
+  },
+  {
+   "name": "readme",
+   "inferred": {
+    "title": "readme",
+    "kind": "markdown"
+   }
+  }
+ ]
+}

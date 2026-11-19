@@ -14,10 +14,12 @@ use std::sync::LazyLock;
 use lol_html::html_content::TextType;
 use lol_html::{RewriteStrSettings, doc_text, element, rewrite_str};
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use vibevalley_i18n::{list, t};
+use vibevalley_protocol::{ArtifactDisplay, ArtifactKind};
 
 use crate::spans::{js_space, js_trim};
+use crate::store::ArtifactType;
 
 /// The largest artifact body, bytes.
 pub const ARTIFACT_MAX: usize = 5 * 1024 * 1024;
@@ -56,11 +58,23 @@ pub fn artifact_problem(title: Option<&str>, kind: Option<&str>, size: Option<us
 
 const LIBRARIES: [&str; 2] = ["https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"];
 
+pub(crate) fn script_sources() -> Vec<&'static str> {
+    LIBRARIES.to_vec()
+}
+
+pub(crate) fn style_sources() -> Vec<&'static str> {
+    [&LIBRARIES[..], &["https://fonts.googleapis.com"]].concat()
+}
+
+pub(crate) fn font_sources() -> Vec<&'static str> {
+    [&LIBRARIES[..], &["https://fonts.gstatic.com"]].concat()
+}
+
 fn sources(need: Need) -> Vec<&'static str> {
     match need {
-        Need::Script => LIBRARIES.to_vec(),
-        Need::Style => [&LIBRARIES[..], &["https://fonts.googleapis.com"]].concat(),
-        Need::Font => [&LIBRARIES[..], &["https://fonts.gstatic.com"]].concat(),
+        Need::Script => script_sources(),
+        Need::Style => style_sources(),
+        Need::Font => font_sources(),
         Need::Inline => vec![],
         Need::Link => {
             let mut all: Vec<&str> = vec![];
@@ -725,4 +739,164 @@ pub fn html_problem(check: &HtmlCheck) -> String {
         String::new()
     };
     format!("{}{shown}{more}", t("server.artifact.check.refused", &[("n", check.refused.len().into())]))
+}
+
+pub fn artifact_suffix_of(body: &str, artifact_type: Option<ArtifactType>, display: Option<ArtifactDisplay>) -> &'static str {
+    if let Some(at) = artifact_type {
+        return match at {
+            ArtifactType::Docs => ".doc.md",
+            ArtifactType::Slides => ".slide.html",
+            ArtifactType::Dashboard => ".dashboard.html",
+            ArtifactType::Motion => ".motion.html",
+            ArtifactType::Whiteboard => ".whiteboard",
+            ArtifactType::Design => ".visual.html",
+            ArtifactType::DesignSystem => ".design-system.json",
+        };
+    }
+    if body == "blocks" {
+        return ".doc.md";
+    }
+    match display.unwrap_or(ArtifactDisplay::Page) {
+        ArtifactDisplay::Slides => ".slide.html",
+        ArtifactDisplay::Motion => ".motion.html",
+        ArtifactDisplay::Page => ".html",
+    }
+}
+
+static RE_TIMELINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bvv\.timeline\s*\(").expect("regex"));
+static RE_SECTION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)<section\b[^>]*>").expect("regex"));
+static RE_SLIDE_CLASS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"(?i)\bclass=["'][^"']*\bslide\b"#).expect("regex"));
+static RE_HTML_HEAD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^\s*(?:<!doctype\s+html|<html\b|<section\b)").expect("regex"));
+
+pub fn infer_display_from_content(content: Option<&str>) -> Option<ArtifactDisplay> {
+    let content = content?;
+    if content.trim().is_empty() {
+        return None;
+    }
+    if RE_TIMELINE.is_match(content) {
+        return Some(ArtifactDisplay::Motion);
+    }
+    let section_count = RE_SECTION.find_iter(content).take(2).count();
+    if section_count >= 2 || (section_count >= 1 && RE_SLIDE_CLASS.is_match(content)) {
+        return Some(ArtifactDisplay::Slides);
+    }
+    None
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InferredArtifactName {
+    pub title: String,
+    pub kind: ArtifactKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display: Option<ArtifactDisplay>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub artifact_type: Option<ArtifactType>,
+}
+
+static RE_NAME_SLIDES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.(?:slide|slides)\.html$").expect("regex"));
+static RE_NAME_DESIGN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.(?:visual|canvas|design)\.html$").expect("regex"));
+static RE_NAME_DASHBOARD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.dashboard\.html$").expect("regex"));
+static RE_NAME_MOTION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.motion\.html$").expect("regex"));
+static RE_NAME_WHITEBOARD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.whiteboard(?:\.json|\.html)?$").expect("regex"));
+static RE_NAME_DS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.(?:design-system|tokens)\.json$").expect("regex"));
+static RE_NAME_HTML: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.(?:page\.html|html|htm)$").expect("regex"));
+static RE_NAME_MD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.(?:doc\.md|md|markdown)$").expect("regex"));
+
+pub fn infer_artifact_from_name(name: &str, content: Option<&str>) -> InferredArtifactName {
+    let trimmed = name.trim();
+    let title_of = |caps: &regex::Captures<'_>| {
+        let base = caps.get(1).map_or("", |m| m.as_str()).trim();
+        if base.is_empty() { trimmed.to_string() } else { base.to_string() }
+    };
+
+    if let Some(c) = RE_NAME_SLIDES.captures(trimmed) {
+        return InferredArtifactName {
+            title: title_of(&c),
+            kind: ArtifactKind::Html,
+            display: Some(ArtifactDisplay::Slides),
+            artifact_type: Some(ArtifactType::Slides),
+        };
+    }
+    if let Some(c) = RE_NAME_DESIGN.captures(trimmed) {
+        return InferredArtifactName {
+            title: title_of(&c),
+            kind: ArtifactKind::Html,
+            display: Some(ArtifactDisplay::Page),
+            artifact_type: Some(ArtifactType::Design),
+        };
+    }
+    if let Some(c) = RE_NAME_DASHBOARD.captures(trimmed) {
+        return InferredArtifactName {
+            title: title_of(&c),
+            kind: ArtifactKind::Html,
+            display: Some(ArtifactDisplay::Page),
+            artifact_type: Some(ArtifactType::Dashboard),
+        };
+    }
+    if let Some(c) = RE_NAME_MOTION.captures(trimmed) {
+        return InferredArtifactName {
+            title: title_of(&c),
+            kind: ArtifactKind::Html,
+            display: Some(ArtifactDisplay::Motion),
+            artifact_type: Some(ArtifactType::Motion),
+        };
+    }
+    if let Some(c) = RE_NAME_WHITEBOARD.captures(trimmed) {
+        return InferredArtifactName {
+            title: title_of(&c),
+            kind: ArtifactKind::Html,
+            display: Some(ArtifactDisplay::Page),
+            artifact_type: Some(ArtifactType::Whiteboard),
+        };
+    }
+    if let Some(c) = RE_NAME_DS.captures(trimmed) {
+        return InferredArtifactName {
+            title: title_of(&c),
+            kind: ArtifactKind::Html,
+            display: Some(ArtifactDisplay::Page),
+            artifact_type: Some(ArtifactType::DesignSystem),
+        };
+    }
+    if let Some(c) = RE_NAME_HTML.captures(trimmed) {
+        let display = infer_display_from_content(content).unwrap_or(ArtifactDisplay::Page);
+        return InferredArtifactName {
+            title: title_of(&c),
+            kind: ArtifactKind::Html,
+            display: Some(display),
+            artifact_type: None,
+        };
+    }
+    if let Some(c) = RE_NAME_MD.captures(trimmed) {
+        return InferredArtifactName {
+            title: title_of(&c),
+            kind: ArtifactKind::Markdown,
+            display: None,
+            artifact_type: Some(ArtifactType::Docs),
+        };
+    }
+    if let Some(display) = infer_display_from_content(content) {
+        return InferredArtifactName {
+            title: trimmed.to_string(),
+            kind: ArtifactKind::Html,
+            display: Some(display),
+            artifact_type: None,
+        };
+    }
+    if let Some(text) = content
+        && RE_HTML_HEAD.is_match(text)
+    {
+        return InferredArtifactName {
+            title: trimmed.to_string(),
+            kind: ArtifactKind::Html,
+            display: Some(ArtifactDisplay::Page),
+            artifact_type: None,
+        };
+    }
+    InferredArtifactName {
+        title: trimmed.to_string(),
+        kind: ArtifactKind::Markdown,
+        display: None,
+        artifact_type: None,
+    }
 }
