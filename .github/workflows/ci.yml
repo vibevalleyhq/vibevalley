@@ -132,45 +132,21 @@ jobs:
       - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
       # rustup reads rust-toolchain.toml; libghostty-vt builds with Zig.
-      - run: rustup show active-toolchain && brew install zig
-      - name: Restore cargo cache
-        id: cargo-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-          restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
+      - run: rustup show active-toolchain
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with: { version: 0.17.1 }
+      # The dependencies' build output, without the workspace's own crates or incremental state, so the entry stays well
+      # under the repository's cache limit (a whole target/ was evicted before the next run could read it). Only main
+      # saves; pull requests read main's entry instead of each storing their own.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with: { save-if: "${{ github.ref == 'refs/heads/main' }}" }
       - run: git config --global user.name ci && git config --global user.email ci@example.com
-      - name: Restore nsh CLI
-        id: nsh
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .tools/bin/nsh
-          key: nsh-cli-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json', 'rust-toolchain.toml') }}
-      - if: steps.nsh.outputs.cache-hit != 'true'
-        run: vp run nsh:install
-      - name: Cache nsh CLI
-        if: steps.nsh.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .tools/bin/nsh
-          key: ${{ steps.nsh.outputs.cache-primary-key }}
+      # The published CLI, checked against its sha256; apps/mac/build.rs bundles the views with it.
+      - run: vp run nsh:install
       - run: vp run protocol:check
       - run: vp run rust:check
       - run: vp test run scripts/release/verify-server.test.ts scripts/release/package-platform.test.ts
       - run: vp run mac:check
-      - name: Save cargo cache
-        if: success()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
   site:
     name: site
