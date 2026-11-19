@@ -1,0 +1,404 @@
+import { computed, Scroll, signal, Text, View, WebView } from "nsh";
+import { z } from "zod";
+
+import { compileTokensCss, contrastRatio, parseTokensSpec } from "@vibevalley/artifact/tokens";
+import { t } from "@vibevalley/i18n";
+
+import { api } from "../../infra/api";
+import { useQueryClient } from "../../infra/query";
+import { shownTheme } from "../../state/prefs";
+import { createAct } from "../../ui/act";
+import { Button } from "../../ui/Button";
+import { TextArea } from "../../ui/Field";
+import { Icon } from "../../ui/Icon";
+import { Markdown } from "../../ui/Markdown";
+import { Tabs } from "../../ui/Tabs";
+import { toast } from "../../ui/toasts";
+import { useReportViewContext, useStoreEntries, useStoreViewHtml } from "./store";
+import type { StoreViewerProps } from "./StoreArtifactView";
+
+type DsTab = "overview" | "colors" | "typography" | "components" | "tokensJson";
+
+const DsManifestSchema = z.object({
+  name: z.exactOptional(z.string()),
+  version: z.exactOptional(z.string()),
+  components: z.exactOptional(
+    z.array(
+      z.object({
+        id: z.string(),
+        title: z.exactOptional(z.string()),
+        preview: z.string(),
+      }),
+    ),
+  ),
+});
+
+function parsePx(raw: string, fallback: number, min = 2, max = 96): number {
+  const m = /^(\d+(?:\.\d+)?)\s*(px|rem)?$/iu.exec(raw.trim());
+  if (!m) return fallback;
+  const num = Number(m[1]);
+  if (!Number.isFinite(num)) return fallback;
+  const px = m[2]?.toLowerCase() === "rem" ? num * 16 : num;
+  return Math.max(min, Math.min(max, Math.round(px)));
+}
+
+function isJsonValid(raw: string): boolean {
+  try {
+    JSON.parse(raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function DesignSystemView(props: StoreViewerProps) {
+  const { client, snapshot } = useStoreEntries(() => props.artifact.id);
+  const queries = useQueryClient();
+  const act = createAct();
+
+  const tab = signal<DsTab>("overview");
+  const previewTheme = signal<"light" | "dark">(shownTheme());
+  const selectedComponent = signal<string | undefined>(undefined);
+  const tokensDraft = signal<string | undefined>(undefined);
+
+  const seq = () => (snapshot().seq > 0 ? snapshot().seq : props.artifact.seq);
+  const tokensRaw = () => snapshot().entries.get("project/tokens.json")?.value ?? "{}";
+  const parsedTokens = computed(() => parseTokensSpec(tokensRaw()));
+  const compiledCss = computed(() => compileTokensCss(tokensRaw()));
+  const readmeText = () => snapshot().entries.get("project/README.md")?.value ?? `# ${props.artifact.title}`;
+
+  const components = computed(() => {
+    const raw = snapshot().entries.get("project/design-system.json")?.value;
+    if (raw) {
+      try {
+        const parsed = DsManifestSchema.safeParse(JSON.parse(raw));
+        if (parsed.success && parsed.data.components && parsed.data.components.length > 0) {
+          return parsed.data.components;
+        }
+      } catch (e) {
+        if (!(e instanceof SyntaxError)) throw e;
+      }
+    }
+    return [...snapshot().entries.keys()]
+      .filter((p) => p.startsWith("project/components/") && p.endsWith(".html"))
+      .toSorted()
+      .map((p) => {
+        const seg = p.slice("project/components/".length).split("/")[0] ?? p;
+        return { id: seg, title: seg, preview: p };
+      });
+  });
+
+  const activeComponent = () => {
+    const id = selectedComponent();
+    const all = components();
+    return (id ? all.find((c) => c.id === id) : undefined) ?? all[0];
+  };
+
+  const componentView = useStoreViewHtml(() => {
+    if (tab() !== "components") return undefined;
+    const comp = activeComponent();
+    if (!comp) return undefined;
+    return {
+      id: props.artifact.id,
+      theme: previewTheme(),
+      seq: seq(),
+      path: comp.preview,
+    };
+  });
+
+  useReportViewContext(
+    () => props.artifact.id,
+    () => ({
+      artifactType: "design-system",
+      title: props.artifact.title,
+      seq: seq(),
+      activeTab: tab(),
+    }),
+  );
+
+  const surfaceLight = () => parsedTokens().colors.find((c) => c.id === "surface" || c.id === "page")?.light;
+  const surfaceDark = () => parsedTokens().colors.find((c) => c.id === "surface" || c.id === "page")?.dark;
+
+  const toggleDefault = () => {
+    const next = !props.artifact.isDefault;
+    const id = props.artifact.id;
+    void act.run(async () => {
+      await api.artifact.update({ id, isDefault: next });
+      await queries.invalidate({ prefix: ["artifacts"] });
+    });
+  };
+
+  const saveTokens = () => {
+    const val = tokensDraft() ?? tokensRaw();
+    void act.run(async () => {
+      await client.batch([{ op: "set", path: "project/tokens.json", kind: "json", value: val }]);
+      tokensDraft.set(undefined);
+      toast(t("web.artifact.designSystem.savedTokens"));
+    });
+  };
+
+  const tabItems = [
+    { value: "overview" as const, label: t("web.artifact.designSystem.overview") },
+    { value: "colors" as const, label: t("web.artifact.designSystem.colors") },
+    { value: "typography" as const, label: t("web.artifact.designSystem.typography") },
+    { value: "components" as const, label: t("web.artifact.designSystem.components") },
+    { value: "tokensJson" as const, label: t("web.artifact.designSystem.tokensJson") },
+  ];
+
+  const draftValue = () => tokensDraft() ?? tokensRaw();
+  const draftValid = () => isJsonValid(draftValue());
+
+  return (
+    <View testID="design-system-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-page">
+      <View class="shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-side px-3 py-2">
+        <Tabs label={props.artifact.title} value={tab()} onChange={(v) => tab.set(v)} items={tabItems} />
+        <View class="ml-auto flex-row flex-wrap items-center gap-1.5">
+          <If when={props.artifact.isDefault === true}>
+            <View testID="ds-default-badge" class="flex-row items-center gap-1 rounded-full bg-ok-soft px-2.5 py-0.5">
+              <Icon name="check" size={12} tone="leaf" />
+              <Text class="text-xs font-medium text-ok-ink">{t("web.artifact.types.defaultBadge")}</Text>
+            </View>
+          </If>
+          <Button icon="appearance" testID="ds-toggle-default" disabled={act.busy()} onPress={toggleDefault}>
+            {props.artifact.isDefault === true ? t("web.artifact.types.unsetDefault") : t("web.artifact.types.setDefault")}
+          </Button>
+          <Button
+            icon={previewTheme() === "light" ? "themeLight" : "themeDark"}
+            testID="ds-toggle-theme"
+            onPress={() => previewTheme.set(previewTheme() === "light" ? "dark" : "light")}
+          >
+            {previewTheme() === "light" ? t("web.artifact.designSystem.themeLight") : t("web.artifact.designSystem.themeDark")}
+          </Button>
+        </View>
+      </View>
+
+      <If when={tab() === "overview"}>
+        <Scroll class="min-h-0 flex-1" contentClass="p-4 gap-4">
+          <View class="w-full max-w-3xl self-center gap-4">
+            <View class="flex-row flex-wrap gap-2">
+              <View class="rounded-md border border-line bg-side px-3 py-1.5">
+                <Text class="font-mono text-xs text-muted">{`${parsedTokens().colors.length} colors`}</Text>
+              </View>
+              <View class="rounded-md border border-line bg-side px-3 py-1.5">
+                <Text class="font-mono text-xs text-muted">{`${parsedTokens().styles.length} type styles`}</Text>
+              </View>
+              <View class="rounded-md border border-line bg-side px-3 py-1.5">
+                <Text class="font-mono text-xs text-muted">{`${parsedTokens().space.length} spacing · ${parsedTokens().radius.length} radius`}</Text>
+              </View>
+              <View class="rounded-md border border-line bg-side px-3 py-1.5">
+                <Text class="font-mono text-xs text-muted">{`${compiledCss().length} B CSS`}</Text>
+              </View>
+            </View>
+            <Markdown text={readmeText()} />
+          </View>
+        </Scroll>
+      </If>
+
+      <If when={tab() === "colors"}>
+        <Scroll class="min-h-0 flex-1" contentClass="p-4 gap-5">
+          <View testID="ds-colors-grid" class="flex-row flex-wrap gap-3">
+            <Each of={parsedTokens().colors}>
+              {(item) => {
+                const c = () => item();
+                const chosenBg = () => (previewTheme() === "dark" ? surfaceDark() : surfaceLight());
+                const chosenHex = () => (previewTheme() === "dark" ? c().dark : c().light);
+                const ratio = () => {
+                  const bg = chosenBg();
+                  if (!bg || c().id === "surface" || c().id === "page") return undefined;
+                  return contrastRatio(chosenHex(), bg);
+                };
+                return (
+                  <View testID="ds-color-swatch" class="w-60 shrink-0 gap-2 rounded-lg border border-line bg-side p-3">
+                    <View class="flex-row gap-2">
+                      <View class="h-14 flex-1 rounded-md border border-line" style={{ backgroundColor: c().light }} />
+                      <View class="h-14 flex-1 rounded-md border border-line" style={{ backgroundColor: c().dark }} />
+                    </View>
+                    <View class="flex-row items-center justify-between gap-2">
+                      <Text class="truncate font-mono text-xs font-semibold text-ink">{`--color-${c().id}`}</Text>
+                      <View class="rounded-sm bg-hover px-1.5 py-0.5">
+                        <Text class="text-2xs text-muted">{c().group}</Text>
+                      </View>
+                    </View>
+                    <View class="flex-row items-center justify-between gap-2">
+                      <Text class="font-mono text-2xs text-muted">{`L: ${c().light}`}</Text>
+                      <Text class="font-mono text-2xs text-muted">{`D: ${c().dark}`}</Text>
+                    </View>
+                    <If when={c().note !== ""}>
+                      <Text class="text-xs text-muted">{c().note}</Text>
+                    </If>
+                    <If when={ratio()}>
+                      {(r) => (
+                        <View
+                          testID="ds-contrast-badge"
+                          class={`self-start rounded-full px-2 py-0.5 ${r() >= 4.5 ? "bg-ok-soft" : "bg-bad-soft"}`}
+                        >
+                          <Text class={`text-2xs font-medium ${r() >= 4.5 ? "text-ok-ink" : "text-berry"}`}>
+                            {r() >= 4.5
+                              ? t("web.artifact.designSystem.contrastPass", { ratio: r() })
+                              : t("web.artifact.designSystem.contrastLow", { ratio: r() })}
+                          </Text>
+                        </View>
+                      )}
+                    </If>
+                  </View>
+                );
+              }}
+            </Each>
+          </View>
+
+          <If when={parsedTokens().space.length > 0 || parsedTokens().radius.length > 0}>
+            <View testID="ds-spacing-radius" class="gap-3">
+              <If when={parsedTokens().space.length > 0}>
+                <View class="gap-2">
+                  <Text class="text-xs font-semibold text-muted">Spacing</Text>
+                  <View class="flex-row flex-wrap gap-2">
+                    <Each of={parsedTokens().space}>
+                      {(sp) => (
+                        <View class="flex-row items-center gap-2.5 rounded-md border border-line bg-side px-3 py-2">
+                          <Text class="font-mono text-xs font-semibold text-ink">{`--space-${sp().id}`}</Text>
+                          <View class="h-3 rounded-xs bg-accent" style={{ width: parsePx(sp().value, 16, 4, 120) }} />
+                          <Text class="font-mono text-2xs text-muted">{sp().value}</Text>
+                        </View>
+                      )}
+                    </Each>
+                  </View>
+                </View>
+              </If>
+              <If when={parsedTokens().radius.length > 0}>
+                <View class="gap-2">
+                  <Text class="text-xs font-semibold text-muted">Radius</Text>
+                  <View class="flex-row flex-wrap gap-2">
+                    <Each of={parsedTokens().radius}>
+                      {(rad) => (
+                        <View class="flex-row items-center gap-2.5 rounded-md border border-line bg-side px-3 py-2">
+                          <View
+                            class="size-7 border border-accent bg-page"
+                            style={{ borderRadius: parsePx(rad().value, 6, 0, 24) }}
+                          />
+                          <View class="gap-0.5">
+                            <Text class="font-mono text-xs font-semibold text-ink">{`--radius-${rad().id}`}</Text>
+                            <Text class="font-mono text-2xs text-muted">{rad().value}</Text>
+                          </View>
+                        </View>
+                      )}
+                    </Each>
+                  </View>
+                </View>
+              </If>
+            </View>
+          </If>
+        </Scroll>
+      </If>
+
+      <If when={tab() === "typography"}>
+        <Scroll class="min-h-0 flex-1" contentClass="p-4 gap-4">
+          <View testID="ds-typography" class="gap-4">
+            <View class="flex-row flex-wrap gap-3">
+              <Each of={parsedTokens().families}>
+                {(f) => (
+                  <View class="min-w-64 flex-1 gap-1 rounded-lg border border-line bg-side p-3">
+                    <Text class="font-mono text-xs font-semibold text-muted">{`--font-${f().id}`}</Text>
+                    <Text class="text-sm text-ink">{f().value}</Text>
+                    <If when={f().note !== ""}>
+                      <Text class="text-xs text-faint">{f().note}</Text>
+                    </If>
+                  </View>
+                )}
+              </Each>
+            </View>
+
+            <If when={parsedTokens().scale.length > 0}>
+              <View class="flex-row flex-wrap gap-2">
+                <Each of={parsedTokens().scale}>
+                  {(sc) => (
+                    <View class="flex-row items-center gap-2 rounded-md border border-line bg-side px-2.5 py-1.5">
+                      <Text class="font-mono text-xs font-semibold text-ink">{`--text-${sc().id}`}</Text>
+                      <Text class="font-mono text-2xs text-muted">{sc().value}</Text>
+                    </View>
+                  )}
+                </Each>
+              </View>
+            </If>
+
+            <View class="gap-3">
+              <Each of={parsedTokens().styles}>
+                {(st) => {
+                  const pxSize = () => parsePx(st().size, 14, 11, 48);
+                  return (
+                    <View class="gap-1.5 rounded-lg border border-line bg-side p-3">
+                      <View class="flex-row items-center justify-between gap-2">
+                        <Text class="font-mono text-xs text-muted">{`.type-${st().id}`}</Text>
+                        <Text class="font-mono text-xs text-muted">{`${st().size} · ${st().weight} · lh ${st().lineHeight}`}</Text>
+                      </View>
+                      <Text class="truncate text-ink" style={{ fontSize: pxSize() }}>
+                        {st().sample}
+                      </Text>
+                    </View>
+                  );
+                }}
+              </Each>
+            </View>
+          </View>
+        </Scroll>
+      </If>
+
+      <If when={tab() === "components"}>
+        <View testID="ds-components" class="min-h-0 flex-1 flex-row gap-3 p-4">
+          <Scroll class="w-48 shrink-0" contentClass="gap-1">
+            <Each of={components()}>
+              {(comp) => {
+                const selected = () => comp().id === activeComponent()?.id;
+                return (
+                  <View
+                    role="button"
+                    testID="ds-component-item"
+                    accessibilityState={{ selected: selected() }}
+                    onPress={() => selectedComponent.set(comp().id)}
+                    class={`rounded-md px-2.5 py-1.5 ${selected() ? "bg-selected" : "hover:bg-hover"}`}
+                  >
+                    <Text class={`truncate text-xs font-medium ${selected() ? "text-ink" : "text-muted"}`}>
+                      {comp().title ?? comp().id}
+                    </Text>
+                  </View>
+                );
+              }}
+            </Each>
+          </Scroll>
+          <View class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-page">
+            <If when={componentView.html()}>
+              {(html) => (
+                <WebView
+                  testID="ds-component-frame"
+                  accessibilityLabel={activeComponent()?.title ?? activeComponent()?.id ?? props.artifact.title}
+                  html={html()}
+                  incognito
+                  class="min-h-0 min-w-0 flex-1"
+                  style={props.covered === true ? { opacity: 0 } : undefined}
+                />
+              )}
+            </If>
+          </View>
+        </View>
+      </If>
+
+      <If when={tab() === "tokensJson"}>
+        <View testID="ds-tokens-editor" class="min-h-0 flex-1 gap-2 p-4">
+          <TextArea
+            rows={16}
+            value={draftValue()}
+            onInput={(val) => tokensDraft.set(val)}
+            class="min-h-0 flex-1 font-mono text-xs"
+          />
+          <View class="flex-row items-center justify-between gap-2">
+            <Text class={`text-xs ${draftValid() ? "text-muted" : "text-berry"}`}>
+              {draftValid() ? `${compileTokensCss(draftValue()).length} B compiled CSS` : "Invalid JSON"}
+            </Text>
+            <Button tone="primary" testID="ds-save-tokens" disabled={act.busy() || !draftValid()} onPress={saveTokens}>
+              {t("web.artifact.designSystem.saveTokens")}
+            </Button>
+          </View>
+        </View>
+      </If>
+    </View>
+  );
+}
