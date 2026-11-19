@@ -11,9 +11,8 @@
 //!   (`vibevalley-onig`) highlighters into `nsh_base::editor` (`<Editor>` and `<DiffView>`),
 //!   working with `nsh-base/highlight` (`syntect`/`two-face`/`onig_sys`) disabled.
 //! - Native `#[component]`s: [`VvMarkdown`], [`VvCodeBlock`], [`VvDiagram`], [`VvCanvas`],
-//!   [`VvChart`], and [`VvGenUi`].
-//! - Pluggable [`ChartRenderer`] and [`GenUiRenderer`] traits so `vibevalley-chart` and
-//!   `vibevalley-genui` snap straight in without changing callers.
+//!   [`VvChart`] (backed by `vibevalley-chart`), and [`VvGenUi`] (backed by `vibevalley-genui`).
+//! - Optional [`ChartRenderer`] and [`GenUiRenderer`] override traits for custom host or test hooks.
 
 pub mod cache;
 pub mod canvas;
@@ -33,7 +32,7 @@ pub use cache::CacheStats;
 pub use canvas::{
     CanvasRenderError, RenderedCanvas, VvCanvas, VvCanvasElement, VvCanvasProps, canvas_cache_stats, clear_canvas_cache, render_canvas, vv_canvas,
 };
-pub use chart::{VvChart, VvChartElement, VvChartProps, vv_chart};
+pub use chart::{VvChart, VvChartElement, VvChartProps, chart_cache_stats, clear_chart_cache, render_chart, vv_chart};
 pub use code_block::{
     ASYNC_HIGHLIGHT_BYTE_THRESHOLD, ASYNC_HIGHLIGHT_LINE_THRESHOLD, CODE_LINE_HEIGHT, DEFAULT_FOLD_LINES, VvCodeBlock, VvCodeBlockElement, VvCodeBlockEvent,
     VvCodeBlockProps, VvCodeCopyEvent, count_code_lines, should_offload_highlight, vv_code_block,
@@ -60,8 +59,8 @@ pub use markdown::{
     parse_wikilink_target, vv_markdown, vv_markdown_extensions, vv_markdown_options,
 };
 pub use theme::{
-    AdaptiveUi, CODE_FONT_MONO, DIAGRAM_FONT_SANS, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, UiPalette, vv_canvas_palette, vv_pele_palette, vv_shiki_dark_theme,
-    vv_shiki_light_theme,
+    AdaptiveUi, CODE_FONT_MONO, DIAGRAM_FONT_SANS, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, UiPalette, vv_canvas_palette, vv_chart_palette, vv_pele_palette,
+    vv_shiki_dark_theme, vv_shiki_light_theme,
 };
 
 /// JS module specifier passed to `nativeModule("vibevalley/rich")` and `Registry::ui_set`.

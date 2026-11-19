@@ -5,11 +5,13 @@
 //! - `vibevalley-shiki` warm light/dark TextMate themes
 //! - `vibevalley-pele` resolved SVG palettes (no CSS `var()` so `resvg` renders accurately)
 //! - `vibevalley-canvas` warm light/dark JSON Canvas palettes
+//! - `vibevalley-chart` resolved SVG chart palettes
 
 use std::collections::BTreeMap;
 
 use nsh_core::prelude::{AdaptiveColor, Hsla, rgb, rgba};
 use vibevalley_canvas::{PresetSwatch as CanvasPresetSwatch, Rgba8 as CanvasRgba8, ThemePalette as CanvasThemePalette};
+use vibevalley_chart::ThemePalette as ChartThemePalette;
 use vibevalley_pele::ThemePalette as PeleThemePalette;
 use vibevalley_shiki::{RawTheme, RawThemeSetting, RawTokenSettings, ScopePatternList, ThemeType};
 
@@ -109,18 +111,23 @@ impl AdaptiveUi {
         AdaptiveColor { light, dark }
     }
 
+    pub const PAGE: AdaptiveColor = Self::pair(UiPalette::LIGHT.page, UiPalette::DARK.page);
     pub const INK: AdaptiveColor = Self::pair(UiPalette::LIGHT.ink, UiPalette::DARK.ink);
     pub const MUTED: AdaptiveColor = Self::pair(UiPalette::LIGHT.muted, UiPalette::DARK.muted);
     pub const FAINT: AdaptiveColor = Self::pair(UiPalette::LIGHT.faint, UiPalette::DARK.faint);
     pub const LINE: AdaptiveColor = Self::pair(UiPalette::LIGHT.line, UiPalette::DARK.line);
     pub const HOVER: AdaptiveColor = Self::pair(UiPalette::LIGHT.hover, UiPalette::DARK.hover);
+    pub const SELECTED: AdaptiveColor = Self::pair(UiPalette::LIGHT.selected, UiPalette::DARK.selected);
     pub const SIDE: AdaptiveColor = Self::pair(UiPalette::LIGHT.side, UiPalette::DARK.side);
     pub const ACCENT: AdaptiveColor = Self::pair(UiPalette::LIGHT.accent, UiPalette::DARK.accent);
+    pub const LEAF: AdaptiveColor = Self::pair(UiPalette::LIGHT.leaf, UiPalette::DARK.leaf);
     pub const WATER: AdaptiveColor = Self::pair(UiPalette::LIGHT.water, UiPalette::DARK.water);
     pub const WHEAT: AdaptiveColor = Self::pair(UiPalette::LIGHT.wheat, UiPalette::DARK.wheat);
     pub const BERRY: AdaptiveColor = Self::pair(UiPalette::LIGHT.berry, UiPalette::DARK.berry);
     pub const OK_SOFT: AdaptiveColor = Self::pair(UiPalette::LIGHT.ok_soft, UiPalette::DARK.ok_soft);
     pub const OK_INK: AdaptiveColor = Self::pair(UiPalette::LIGHT.ok_ink, UiPalette::DARK.ok_ink);
+    pub const BAD_SOFT: AdaptiveColor = Self::pair(UiPalette::LIGHT.bad_soft, UiPalette::DARK.bad_soft);
+    pub const WARN_INK: AdaptiveColor = Self::pair(UiPalette::LIGHT.warn_ink, UiPalette::DARK.warn_ink);
     pub const CODE_SURFACE: AdaptiveColor = Self::pair(UiPalette::LIGHT.code_surface, UiPalette::DARK.code_surface);
     pub const INLINE_CODE_BG: AdaptiveColor = Self::pair(UiPalette::LIGHT.inline_code_bg, UiPalette::DARK.inline_code_bg);
 }
@@ -179,6 +186,16 @@ pub fn vv_pele_palette(dark: bool) -> PeleThemePalette {
             bold_weight: "600".to_owned(),
         }
     }
+}
+
+/// Builds a resolved `vibevalley_chart::ThemePalette` matching `apps/mac/ui/vv/theme.json`.
+///
+/// Uses concrete hex colors (zero CSS `var()`) and VibeValley's macOS UI font stack so
+/// `resvg` renders chart axes, legends, and labels accurately.
+pub fn vv_chart_palette(dark: bool) -> ChartThemePalette {
+    let mut palette = if dark { ChartThemePalette::dark() } else { ChartThemePalette::light() };
+    palette.font_family = DIAGRAM_FONT_SANS.to_owned();
+    palette
 }
 
 /// Builds a warm VibeValley `vibevalley_canvas::ThemePalette` for JSON Canvas SVG rendering.

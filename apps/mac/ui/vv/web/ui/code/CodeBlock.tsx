@@ -1,31 +1,62 @@
-// Ported from VibeValley apps/web/src/ui/richText.ts's codeBlock: a fenced
-// block with its language (or its line count), a copy button, folded past
-// sixteen lines. Its colours come from nsh's Editor (read-only, its own
-// highlighting) rather than Shiki in a web worker.
-import { Clipboard, signal, Text, View } from "nsh";
-import { Editor } from "nsh/base";
+// Fenced code block backed by native Rust `vibevalley/rich` (`VvCodeBlock` via
+// vibevalley-shiki + vibevalley-onig), with a lightweight `<Text>` fallback for
+// stock `nsh test` (zero `<Editor readOnly>`).
+import { Clipboard, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../Icon";
+import { richNative, type VvCodeCopyEvent } from "../rich/native";
 import { mix } from "../tone";
 
-const foldLines = 16;
-const lineHeight = 18;
+const defaultFoldLines = 16;
 
-export function CodeBlock(props: { code: string; language?: string | undefined }) {
+export interface CodeBlockProps {
+  code: string;
+  language?: string | undefined;
+  foldLines?: number;
+  selectable?: boolean;
+  wrap?: boolean;
+  onCopy?: (event: VvCodeCopyEvent) => void;
+  class?: string | undefined;
+}
+
+export function CodeBlock(props: CodeBlockProps) {
+  const native = richNative();
+  if (native) {
+    const VvCodeBlock = native.VvCodeBlock;
+    return (
+      <VvCodeBlock
+        code={props.code}
+        language={props.language ?? null}
+        foldLines={props.foldLines}
+        selectable={props.selectable}
+        wrap={props.wrap}
+        onCopy={props.onCopy}
+        class={props.class}
+      />
+    );
+  }
+  return <CodeBlockFallback {...props} />;
+}
+
+function CodeBlockFallback(props: CodeBlockProps) {
+  const foldAt = () => props.foldLines ?? defaultFoldLines;
   const lines = () => props.code.split("\n").length;
   const folded = signal(true);
   const copied = signal(false);
-  const long = () => lines() > foldLines;
+  const long = () => foldAt() > 0 && lines() > foldAt();
   const copy = () => {
-    void Clipboard.writeText(props.code).then(() => {
+    const code = props.code;
+    const language = props.language ?? null;
+    void Clipboard.writeText(code).then(() => {
       copied.set(true);
+      props.onCopy?.({ code, language });
       setTimeout(() => copied.set(false), 1500);
     });
   };
   return (
-    <View testID="code-block" class="my-2 rounded-md" style={{ backgroundColor: mix("ink", 0.06) }}>
+    <View testID="code-block" class={`my-2 rounded-md ${props.class ?? ""}`} style={{ backgroundColor: mix("ink", 0.06) }}>
       <View class="flex-row items-center gap-2 pt-1 pr-1 pl-3">
         <Text class="flex-1 font-mono text-2xs text-muted">{props.language || t("web.base.rich.lines", { n: lines() })}</Text>
         <View
@@ -38,21 +69,10 @@ export function CodeBlock(props: { code: string; language?: string | undefined }
           <Icon name={copied() ? "check" : "copy"} size={14} tone="muted" />
         </View>
       </View>
-      <View class="overflow-hidden px-3 pb-3" style={long() && folded() ? { maxHeight: 288 } : undefined}>
-        <Editor
-          value={props.code}
-          language={props.language || undefined}
-          readOnly
-          lineNumbers={false}
-          folding={false}
-          activeLine={false}
-          indentGuides={false}
-          scrollBeyondLastLine={false}
-          fontSize={12}
-          lineHeight={lineHeight}
-          minRows={1}
-          class="bg-transparent"
-        />
+      <View class="overflow-hidden px-3 pb-3" style={long() && folded() ? { maxHeight: foldAt() * 18 } : undefined}>
+        <Scroll horizontal={props.wrap !== true}>
+          <Text class="font-mono text-xs text-ink">{props.code}</Text>
+        </Scroll>
       </View>
       <If when={long()}>
         <View class="flex-row px-2 pb-1">

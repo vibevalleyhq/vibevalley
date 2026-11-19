@@ -19,6 +19,10 @@ thread_local! {
     static RECORDED_ACTIONS: RefCell<Vec<VvGenUiActionEvent>> = const { RefCell::new(Vec::new()) };
 }
 
+const VALID_BAR_CHART: &str = r#"{"type":"bar","title":"Sales","categories":["Q1","Q2","Q3"],"series":[{"name":"Rev","data":[12,18,25]}]}"#;
+const SIMPLE_GENUI_JSONL: &str = r#"{"op":"set_node","root":true,"node":{"id":"root","kind":"text","value":"Default Native GenUI"}}
+{"op":"done"}"#;
+
 struct MockChartRenderer;
 
 impl ChartRenderer for MockChartRenderer {
@@ -29,7 +33,7 @@ impl ChartRenderer for MockChartRenderer {
         let bg = if dark { "#151413" } else { "#fcfcfb" };
         let fg = if dark { "#ecebe8" } else { "#1c1917" };
         let svg = format!(
-            r#"<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180"><rect width="320" height="180" fill="{bg}"/><text x="16" y="40" fill="{fg}">Chart</text></svg>"#
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180"><rect width="320" height="180" fill="{bg}"/><text x="16" y="40" fill="{fg}">Override Chart</text></svg>"#
         );
         Ok(RenderedSvg::new(svg, 320.0, 180.0).with_label("Mock Chart"))
     }
@@ -70,27 +74,32 @@ fn ChartTestRoot(props: ChartTestRootProps) -> impl IntoElement {
 }
 
 #[test]
-fn vv_chart_renders_placeholder_without_hook_and_image_with_hook() {
+fn vv_chart_defaults_to_builtin_and_honors_context_override() {
     let _guard = HOOK_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     clear_chart_renderer();
-    // Without a ChartRenderer installed: clean placeholder + readable JSON code block.
-    let placeholder = TestHarness::mount(Root::new::<ChartTestRoot>(|| ChartTestRootProps {
-        install_renderer: false,
-        spec: r#"{"type":"bar","data":[1,2,3]}"#.to_owned(),
-    }));
-    assert!(placeholder.find_test_id("chart-placeholder").is_some());
-    assert!(placeholder.find_test_id("code-block").is_some());
 
-    // With a ChartRenderer installed via context: mounts ViewKind::Image (never element::svg Canvas).
+    // Without an override installed: renders natively via vibevalley-chart.
+    let builtin = TestHarness::mount(Root::new::<ChartTestRoot>(|| ChartTestRootProps {
+        install_renderer: false,
+        spec: VALID_BAR_CHART.to_owned(),
+    }));
+    assert!(!builtin.has_view_kind(ViewKind::Canvas));
+    assert!(builtin.has_view_kind(ViewKind::Image));
+    let builtin_id = builtin.find_test_id("chart-image").expect("builtin chart image mounted");
+    let builtin_svg = assert_inline_svg_image(builtin.images.get(&builtin_id).expect("builtin chart src"));
+    assert!(builtin_svg.contains("Sales"));
+
+    // With a ChartRenderer installed via context: override takes precedence.
     let mut rendered = TestHarness::mount(Root::new::<ChartTestRoot>(|| ChartTestRootProps {
         install_renderer: true,
-        spec: r#"{"type":"bar","data":[1,2,3]}"#.to_owned(),
+        spec: VALID_BAR_CHART.to_owned(),
     }));
     assert!(!rendered.has_view_kind(ViewKind::Canvas));
     assert!(rendered.has_view_kind(ViewKind::Image));
     let img_id = rendered.find_test_id("chart-image").expect("chart image mounted");
     let light_src = rendered.images.get(&img_id).expect("chart src").clone();
     let light_svg = assert_inline_svg_image(&light_src);
+    assert!(light_svg.contains("Override Chart"));
     assert!(light_svg.contains("#fcfcfb"));
 
     rendered.set_dark(true);
@@ -141,18 +150,21 @@ fn GenUiTestRoot(props: GenUiTestRootProps) -> impl IntoElement {
 }
 
 #[test]
-fn vv_genui_renders_placeholder_custom_surface_error_and_forwards_actions_through_markdown() {
+fn vv_genui_defaults_to_builtin_honors_override_and_forwards_actions_through_markdown() {
     let _guard = HOOK_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     clear_genui_renderer();
     RECORDED_ACTIONS.with(|a| a.borrow_mut().clear());
-    let placeholder = TestHarness::mount(Root::new::<GenUiTestRoot>(|| GenUiTestRootProps {
+
+    // Without an override installed: renders natively via vibevalley-genui.
+    let builtin = TestHarness::mount(Root::new::<GenUiTestRoot>(|| GenUiTestRootProps {
         install_renderer: false,
         inside_markdown: false,
-        spec: r#"{"widget":"poll"}"#.to_owned(),
+        spec: SIMPLE_GENUI_JSONL.to_owned(),
     }));
-    assert!(placeholder.find_test_id("genui-placeholder").is_some());
+    assert!(builtin.find_test_id("genui-surface").is_some());
+    assert!(builtin.contains_text("Default Native GenUI"));
 
-    // Mounted directly with GenUiRenderer: reacts to dark() and dispatches typed Action event.
+    // Mounted directly with GenUiRenderer override: reacts to dark() and dispatches typed Action event.
     let mut direct = TestHarness::mount(Root::new::<GenUiTestRoot>(|| GenUiTestRootProps {
         install_renderer: true,
         inside_markdown: false,
@@ -200,10 +212,11 @@ fn global_chart_and_genui_renderer_registration_works_without_context_override()
 
     let chart = TestHarness::mount(Root::new::<ChartTestRoot>(|| ChartTestRootProps {
         install_renderer: false,
-        spec: r#"{"type":"line","data":[1,4,2]}"#.to_owned(),
+        spec: VALID_BAR_CHART.to_owned(),
     }));
     let img_id = chart.find_test_id("chart-image").expect("global chart renderer active");
-    assert_inline_svg_image(chart.images.get(&img_id).expect("global chart svg"));
+    let svg = assert_inline_svg_image(chart.images.get(&img_id).expect("global chart svg"));
+    assert!(svg.contains("Override Chart"));
 
     let genui = TestHarness::mount(Root::new::<GenUiTestRoot>(|| GenUiTestRootProps {
         install_renderer: false,

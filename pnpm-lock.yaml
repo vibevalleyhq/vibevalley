@@ -191,9 +191,6 @@ catalogs:
     opentype.js:
       specifier: ^2.0.0
       version: 2.0.0
-    pele:
-      specifier: ^1.13.0
-      version: 1.13.0
     pinyin-pro:
       specifier: 3.29.5
       version: 3.29.5
@@ -290,9 +287,6 @@ importers:
       '@vibevalley/protocol':
         specifier: workspace:*
         version: link:../../../packages/protocol
-      pele:
-        specifier: 'catalog:'
-        version: 1.13.0
       pinyin-pro:
         specifier: 'catalog:'
         version: 3.29.5
@@ -2544,10 +2538,6 @@ packages:
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
-  pele@1.13.0:
-    resolution: {integrity: sha512-Ie8UKY9x00MsuR3jO6AzUwzK2Z6MIV3Tf4EDdITiuk8Uaz8K7g0R082WqsqNaSU8DdgkrRvZThzhit83mi/uiw==}
-    engines: {node: '>=20'}
-
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -4543,8 +4533,6 @@ snapshots:
     optional: true
 
   pathe@2.0.3: {}
-
-  pele@1.13.0: {}
 
   picocolors@1.1.1: {}
 

@@ -25,6 +25,22 @@ fn registry_exports_all_components_and_documents_every_export() {
         "every exported component/prop/event must be documented, missing: {undocumented:?}"
     );
 
+    let dts = nsh_core::element::declarations(&set, &[]);
+    for expected in [
+        "export declare const VvMarkdown:",
+        "export declare const VvCodeBlock:",
+        "export declare const VvDiagram:",
+        "export declare const VvCanvas:",
+        "export declare const VvChart:",
+        "export declare const VvGenUi:",
+        "onIssuePress?: (event: VvIssuePressEvent) => void;",
+        "onWikilinkPress?: (event: VvWikilinkPressEvent) => void;",
+        "onBlockRefPress?: (event: VvBlockRefPressEvent) => void;",
+        "onGenUiAction?: (event: VvGenUiActionEvent) => void;",
+    ] {
+        assert!(dts.contains(expected), "generated declarations missing `{expected}`");
+    }
+
     // Merging alongside `nsh_base::registry()` must never panic on name collisions.
     let merged = Registry::merged(&[nsh_base::registry(), set]);
     assert!(merged.specs().len() > 6);

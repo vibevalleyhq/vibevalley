@@ -389,7 +389,7 @@ fn with_optional_prefix(prefix: &str, token: Text) -> AnyElement {
     }
 }
 
-fn render_custom_node(node: &CustomNode, refs: &[BlockRefPayload], cx: Scope<VvMarkdownEvent>) -> AnyElement {
+fn render_custom_node(node: &CustomNode, refs: &[BlockRefPayload], streaming: bool, cx: Scope<VvMarkdownEvent>) -> AnyElement {
     let Some(kind) = CustomNodeKind::parse(&node.name) else {
         return text(node.text.clone()).into_element();
     };
@@ -559,6 +559,7 @@ fn render_custom_node(node: &CustomNode, refs: &[BlockRefPayload], cx: Scope<VvM
         CustomNodeKind::Chart => vv_chart().spec(node.text.clone()).into_element(),
         CustomNodeKind::GenUi => vv_gen_ui()
             .spec(node.text.clone())
+            .streaming(streaming)
             .on_action(move |ev: &VvGenUiActionEvent| {
                 cx.emit(VvMarkdownEvent::GenUiAction(ev.clone()));
             })
@@ -571,7 +572,7 @@ fn render_custom_node(node: &CustomNode, refs: &[BlockRefPayload], cx: Scope<VvM
 /// Supports GitHub Flavored Markdown, `ratex` math, GitHub alerts, incremental streaming,
 /// `#12` issue references, `@mentions`, PKM syntax (`![[embed]]`, `[[wikilink]]`, `((block-ref))`,
 /// `==remark==^[note]`, `#tag`), pure-Rust Shiki code blocks, Mermaid diagrams, JSON Canvas,
-/// and pluggable Chart / GenUI blocks with zero JS string-splicing.
+/// native SVG Charts, and reactive GenUI surfaces with zero JS string-splicing.
 #[component]
 pub fn VvMarkdown(props: VvMarkdownProps, cx: Scope<VvMarkdownEvent>) -> impl IntoElement {
     provide_context(vv_text_view_parts(props.size));
@@ -579,6 +580,7 @@ pub fn VvMarkdown(props: VvMarkdownProps, cx: Scope<VvMarkdownEvent>) -> impl In
     let options = computed(move || vv_markdown_options(props.streaming.get()));
     let extensions = computed(move || vv_markdown_extensions(props.mentions.get(), props.pkm.get()));
     let refs_prop = props.refs;
+    let streaming_prop = props.streaming;
     let selectable_prop = props.selectable;
 
     text_view()
@@ -591,7 +593,7 @@ pub fn VvMarkdown(props: VvMarkdownProps, cx: Scope<VvMarkdownEvent>) -> impl In
         .styles(props.styles)
         .render_custom(move |node: &CustomNode| {
             let refs = refs_prop.get();
-            render_custom_node(node, &refs, cx)
+            render_custom_node(node, &refs, streaming_prop.get(), cx)
         })
         .render_code_block(move |block: &CodeBlock| {
             vv_code_block()
