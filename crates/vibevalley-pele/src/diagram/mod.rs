@@ -81,7 +81,7 @@ pub enum ParsedModel {
     Usecase(usecase::UsecaseModel),
     Architecture(architecture::ArchitectureDb),
     Swimlane(flowchart::FlowDb),
-    Agentflow(agentflow::AgentflowDb),
+    Agentflow(Box<agentflow::AgentflowDb>),
     Block(block::BlockDb),
     Gantt(gantt::GanttDb),
     C4(c4::C4Db),
