@@ -215,6 +215,11 @@ Artifact：一起写的，和交上来的网页
 | `artifact.suggestion.accept` | 接受一条改写建议 | `/api/v1/artifact/suggestion/accept` | ✓ | ✓ |   |   |
 | `artifact.suggestion.reject` | 拒绝一条改写建议 | `/api/v1/artifact/suggestion/reject` | ✓ | ✓ |   |   |
 | `artifact.markdown.get` | 把一起写的 Artifact 读成 Markdown | `/api/v1/artifact/markdown/get` | ✓ | ✓ |   |   |
+| `artifact.type.list` | cli.op.artifact.type.list | `/api/v1/artifact/type/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.type.read` | cli.op.artifact.type.read | `/api/v1/artifact/type/read` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.entry.list` | cli.op.artifact.entry.list | `/api/v1/artifact/entry/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.entry.get` | cli.op.artifact.entry.get | `/api/v1/artifact/entry/get` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.entry.batch` | cli.op.artifact.entry.batch | `/api/v1/artifact/entry/batch` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.demo` | 开演示：几个帮工一起写一篇 Artifact，不花模型的钱 | `/api/v1/artifact/demo` | ✓ |   |   |   |
 
 ## game

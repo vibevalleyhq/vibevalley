@@ -11,6 +11,8 @@ export const subscriptions = {
   "channel.reports": { payload: z.object({ after: z.exactOptional(z.string()) }), event: S.ChannelEvent },
   /** A blocks artifact's changes after this seq, then each batch from now on. */
   "artifact.follow": { payload: z.object({ id: z.string(), after: z.number() }), event: S.ArtifactEvent },
+  /** A store artifact's entry changes after this seq, then each batch from now on. */
+  "artifact.entry.follow": { payload: z.object({ id: z.string(), after: z.number() }), event: S.ArtifactEntryEvent },
   /** An artifact's suggestions as they now are, then the whole list after each change. */
   "artifact.suggestion.follow": { payload: z.object({ id: z.string() }), event: S.SuggestionEvent },
 } as const;
