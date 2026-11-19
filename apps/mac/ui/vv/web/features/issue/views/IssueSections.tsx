@@ -6,6 +6,7 @@ import { t } from "@vibevalley/i18n";
 import type { Issue, IssueAction, IssueAnswer, Milestone, Question as QuestionItem, SessionEvent } from "@vibevalley/protocol";
 import { plainText } from "@vibevalley/protocol/rules";
 
+import { useNow } from "../../../base/dom";
 import { tookText, wallClockText } from "../../../base/format";
 import { ready } from "../../../infra/query";
 import { useIntents } from "../../../state/intent";
@@ -15,6 +16,7 @@ import { Checkbox } from "../../../ui/Checkbox";
 import { Icon } from "../../../ui/Icon";
 import type { IconName } from "../../../ui/icons";
 import { mix } from "../../../ui/tone";
+import { SubagentProgress } from "../../session/SubagentProgress";
 import { perform } from "../model/acts";
 import { useIssueRuns } from "../model/history";
 import { issueTag, runText, tagOpen, tagText } from "../model/issue";
@@ -123,19 +125,34 @@ export function Story(props: { milestones: Milestone[] }) {
   );
 }
 
-/** The runs of an issue, read again whenever `version` changes. */
-export function Runs(props: { issue: string; version: string }) {
+export function ReconcileWorktree(props: { onChanges?: (() => void) | undefined }) {
+  return (
+    <View testID="run-reconcile" class="my-1.5 flex-row flex-wrap items-center gap-2">
+      <Icon name="warn" size={14} tone="berry" />
+      <Text class="text-sm text-ink">{t("web.issue.run.reconcile")}</Text>
+      <If when={props.onChanges}>
+        {(show) => (
+          <Button testID="run-review-changes" onPress={() => show()()}>
+            {t("web.issue.run.currentChanges")}
+          </Button>
+        )}
+      </If>
+    </View>
+  );
+}
+
+export function Runs(props: { issue: string; version: string; onChanges?: (() => void) | undefined }) {
   const query = useIssueRuns(
     () => props.issue,
     () => props.version,
   );
   const runs = () => ready(query, []);
-  const now = () => Date.now();
+  const now = useNow();
   return (
     <If when={runs().length > 0} else={<Text class="text-xs text-faint">{t("web.issue.detail.noRuns")}</Text>}>
       <View>
         <Text class="mb-2 text-xs text-muted">{t("web.issue.detail.runCount", { n: runs().length })}</Text>
-        <Each of={[...runs()].toReversed()}>
+        <Each of={runs().toReversed()} key={(run) => run.id}>
           {(r) => (
             <View class="flex-row gap-3 pb-2">
               <Text class="w-20 shrink-0 text-sm text-muted">{wallClockText(r().startedAt)}</Text>
@@ -146,6 +163,10 @@ export function Runs(props: { issue: string; version: string }) {
                     {r().summary}
                   </Text>
                 </If>
+                <If when={r().needsReconciliation}>
+                  <ReconcileWorktree onChanges={props.onChanges} />
+                </If>
+                <If when={r().subagents}>{(progress) => <SubagentProgress session={r().session} progress={progress()} now={now()} />}</If>
               </View>
             </View>
           )}

@@ -2,6 +2,8 @@
 
 `vibevalley.dev` 是 `apps/site/` 中的双语静态网站：`/` 中文、`/en/` 英文、`/404.html` 未找到页面。Vite 与 Solid 2 在构建时生成 HTML，每个文档只接管一次，Cloudflare 只发布静态文件。
 
+首页提供已公开的 `refactor/native-macos-cutover` 分支及构建命令。读者执行命令时，Git 取该分支当时的提交。应用路径和输出目录来自[打包脚本](scripts/release/package.ts)。设备区和截图区使用原生窗口的农场、工单看板和聊天画面。中英文页面共用[源码地址和命令](apps/site/src/base/links.ts)。
+
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |

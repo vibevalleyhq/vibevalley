@@ -45,6 +45,7 @@ const InstallationChecking = z.object({
 const InstallationUnsupported = z.object({
   status: z.literal("unsupported"),
   reason: z.string(),
+  signInCommand: z.exactOptional(z.string()),
 }) satisfies Codec<T.InstallationUnsupported>;
 
 const Installation = z.discriminatedUnion("status", [

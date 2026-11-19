@@ -112,6 +112,12 @@ fn fold(state: &mut SpaceState, f: &Fact) -> (bool, bool) {
             all.push(f.connection.clone());
             h.tool_connections = Some(all);
         })),
+        Fact::SessionSubagentsChanged(f) => {
+            if session_of(state, &f.id).is_none_or(|s| s.subagents == f.subagents) {
+                return (false, false);
+            }
+            changed_only(with_session(state, &f.id, |s| s.subagents.clone_from(&f.subagents)))
+        }
         Fact::SessionPhaseChanged(f) => {
             let Some(session) = session_of(state, &f.id) else { return (false, false) };
             if session.phase == f.phase
@@ -203,6 +209,7 @@ fn fold(state: &mut SpaceState, f: &Fact) -> (bool, bool) {
                     ended(f.outcome)
                 };
                 x.last_run = Some(LastRun {
+                    needs_reconciliation: false,
                     outcome: f.outcome,
                     summary: f.summary.clone(),
                     at: f.at,
@@ -336,6 +343,7 @@ pub fn session_view(h: &Session, conflict: Option<&Conflict>) -> SessionView {
         channel: h.channel.clone(),
         issue: h.issue.clone(),
         refining: h.refining,
+        subagents: h.subagents.clone(),
         tool_connections: h.tool_connections.clone(),
         machine: h.machine.clone(),
         phase_text: phase_words(h, conflict),

@@ -133,7 +133,7 @@ type Drag = ReturnType<typeof createDrag>;
 
 /** Four lanes to drag between; narrower than 700, one lane at a time behind tabs. */
 export function IssueBoard(props: BoardProps) {
-  const lane = signal<Lane>("todo");
+  const lane = signal<Lane>(props.cards.find((card) => card.id === props.selected)?.lane ?? "todo");
   const narrow = () => windowSize().width < 700;
   const drag = createDrag(() => props);
   return (
@@ -143,6 +143,7 @@ export function IssueBoard(props: BoardProps) {
           <Each of={lanes}>
             {(l) => (
               <View
+                testID={`board-lane-tab-${l()}`}
                 onPress={() => lane.set(l())}
                 role="tab"
                 accessibilityState={{ selected: lane() === l() }}
@@ -313,6 +314,13 @@ function CardView(props: {
       </If>
       <View
         {...pan.panHandlers}
+        ref={(el) => {
+          if (props.selected)
+            requestAnimationFrame(() => {
+              el.reveal({ vertical: "nearest" });
+              el.focus();
+            });
+        }}
         onPress={() => props.onOpen(props.card.id)}
         role="button"
         testID="issue-card"
@@ -334,6 +342,13 @@ function CardView(props: {
         <Text class="mt-0.5 text-sm font-medium text-ink" style={{ numberOfLines: 2 }}>
           {look().title}
         </Text>
+        <If when={look().wait}>
+          {(wait) => (
+            <Text class="mt-1 text-xs text-water" style={{ numberOfLines: 2 }}>
+              {wait()}
+            </Text>
+          )}
+        </If>
         {/* Only what differs from the lane's default: its own status, a high priority, who works it, how far, its flags. */}
         <If when={marks()}>
           <View testID="card-marks" class="mt-2 flex-row flex-wrap items-center gap-1.5">

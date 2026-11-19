@@ -736,3 +736,23 @@ fn alternate_scroll_is_reported_on_the_alternate_screen_only() {
     h.session.kill();
     h.wait_exit();
 }
+
+#[test]
+fn regression_local_cwd_tracks_cd_after_an_old_osc_directory() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    let nested = root.join("nested");
+    std::fs::create_dir(&nested).unwrap();
+    let mut opts = options("/bin/sh", &[], size(80, 10));
+    opts.cwd = root.clone();
+    let h = spawn(opts);
+    h.session.send_text(&format!(
+        "printf '\\033]7;file://localhost{}\\007'; cd nested; printf '\\033]0;cwd-observed\\007'\n",
+        root.display()
+    ));
+    h.wait_event("shell changed directory", |event| {
+        matches!(event,TermEvent::TitleChanged(ref title) if title=="cwd-observed").then_some(())
+    });
+    assert_eq!(h.session.cwd(), Some(root));
+    assert_eq!(h.session.local_cwd(), Some(nested));
+}

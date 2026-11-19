@@ -1,0 +1,142 @@
+{
+  "compact": [],
+  "get_usage": [],
+  "initialize": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {
+        "agentCapabilities": {
+          "loadSession": true,
+          "sessionCapabilities": {
+            "close": {},
+            "resume": {}
+          }
+        },
+        "protocolVersion": 1
+      }
+    }
+  ],
+  "initialized": [],
+  "interrupt": [],
+  "session/cancel": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {
+        "stopReason": "cancelled"
+      }
+    }
+  ],
+  "session/close": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {}
+    }
+  ],
+  "session/new": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {
+        "configOptions": [
+          {
+            "category": "model",
+            "id": "model"
+          },
+          {
+            "category": "thought_level",
+            "id": "reasoning_effort"
+          }
+        ],
+        "sessionId": "vendor-root"
+      }
+    }
+  ],
+  "session/prompt": [
+    {
+      "jsonrpc": "2.0",
+      "method": "session/update",
+      "params": {
+        "sessionId": "vendor-root",
+        "update": {
+          "content": {
+            "text": "acp hello",
+            "type": "text"
+          },
+          "sessionUpdate": "agent_message_chunk"
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "session/update",
+      "params": {
+        "_meta": {
+          "opencode/child-session": {
+            "parentSessionId": "vendor-root",
+            "sessionId": "vendor-child"
+          }
+        },
+        "sessionId": "vendor-root",
+        "update": {
+          "content": {
+            "text": "child chunk",
+            "type": "text"
+          },
+          "sessionUpdate": "agent_message_chunk"
+        }
+      }
+    },
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {
+        "stopReason": "end_turn",
+        "usage": {
+          "cacheReadTokens": 290,
+          "cacheWriteTokens": 105,
+          "inputTokens": 650,
+          "outputTokens": 155,
+          "reasoningTokens": 75
+        }
+      }
+    }
+  ],
+  "session/resume": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {
+        "configOptions": [
+          {
+            "category": "model",
+            "id": "model"
+          },
+          {
+            "category": "thought_level",
+            "id": "reasoning_effort"
+          }
+        ],
+        "sessionId": "vendor-root"
+      }
+    }
+  ],
+  "session/set_config_option": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {}
+    }
+  ],
+  "session/steer": [],
+  "stop_task": [],
+  "thread/compact/start": [],
+  "thread/resume": [],
+  "thread/start": [],
+  "turn/interrupt": [],
+  "turn/start": [],
+  "turn/steer": [],
+  "user": []
+}

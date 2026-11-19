@@ -336,11 +336,23 @@ pub struct ChangedFile {
 }
 
 #[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewRevision {
+    pub base_commit: String,
+    pub tree: String,
+}
+
+#[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct Changes {
+    pub revision: Option<ReviewRevision>,
+    pub since_review: Option<Vec<ChangedFile>>,
     pub repo: String,
     pub base: String,
     pub branch: Option<String>,
@@ -405,6 +417,7 @@ crate::typescript::module! {
     Repo,
     Conflict,
     ChangedFile,
+    ReviewRevision,
     Changes,
     RepoLanguageListInput,
     RepoTemplateListInput,

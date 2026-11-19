@@ -9,7 +9,7 @@ import { Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { OrchestratorEval, SessionEvent } from "@vibevalley/protocol";
+import type { OrchestratorEval, Session, SessionEvent } from "@vibevalley/protocol";
 import { omitUndefined, oneLine } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -17,6 +17,7 @@ import { createMemo } from "../../../solid";
 import { Keyed, useNow } from "../../base/dom";
 import { ago } from "../../base/format";
 import { api, reasonOf } from "../../infra/api";
+import { useCore } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useQuery } from "../../infra/query";
 import { createAct } from "../../ui/act";
 import { TextInput } from "../../ui/Field";
@@ -42,6 +43,7 @@ import {
   type TrajectorySummary,
   waterfallOf,
 } from "./runs";
+import { SubagentProgress } from "./SubagentProgress";
 
 /** Saves the model turn its user/message `step` began as a case of the orchestrator's evals; `want` is what it should have done. */
 type MarkWrong = (step: number, want: string) => Promise<OrchestratorEval>;
@@ -93,7 +95,15 @@ function summaryText(s: TrajectorySummary) {
 }
 
 /** A session's (or the orchestrator's) trajectory, read and then followed live. */
-export function TrajectoryLog(props: { id: string; asked?: string; empty?: string; onMarkWrong?: MarkWrong; title?: string; about?: string }) {
+export function TrajectoryLog(props: {
+  id: string;
+  asked?: string;
+  empty?: string;
+  onMarkWrong?: MarkWrong;
+  title?: string;
+  about?: string;
+  subagents?: Session["subagents"];
+}) {
   const steps = createSessionEvents(
     () => props.id,
     () => true,
@@ -106,17 +116,20 @@ export function TrajectoryLog(props: { id: string; asked?: string; empty?: strin
       </View>
     ) : undefined;
   return (
-    <If
-      when={steps().length > 0}
-      else={
-        <View class="gap-2">
-          {head()}
-          <Quiet>{props.empty ?? t("web.session.trajectory.quiet")}</Quiet>
-        </View>
-      }
-    >
-      <Trajectory steps={steps()} now={now()} asked={props.asked} onMarkWrong={props.onMarkWrong} head={head()} />
-    </If>
+    <View class="min-h-0 flex-1">
+      <If when={props.subagents}>{(progress) => <SubagentProgress session={props.id} progress={progress()} now={now()} />}</If>
+      <If
+        when={steps().length > 0}
+        else={
+          <View class="gap-2">
+            {head()}
+            <Quiet>{props.empty ?? t("web.session.trajectory.quiet")}</Quiet>
+          </View>
+        }
+      >
+        <Trajectory steps={steps()} now={now()} asked={props.asked} onMarkWrong={props.onMarkWrong} head={head()} />
+      </If>
+    </View>
   );
 }
 
@@ -516,6 +529,7 @@ const sessionsQuery = defineQuery({
   ...retryRead,
 });
 export function TrajectoryList(props: { agent: string }) {
+  const core = useCore();
   const heads = useQuery(() => sessionsQuery(props.agent));
   const picked = signal<string>();
   const now = useNow();
@@ -580,7 +594,14 @@ export function TrajectoryList(props: { agent: string }) {
               <If when={open()} else={<Quiet>{t("web.session.trajectory.pick")}</Quiet>}>
                 {(o) => (
                   <Keyed key={o().id}>
-                    {() => <TrajectoryLog id={o().id} title={o().brief ? `${o().name} · ${oneLine(o().brief).trim()}` : o().name} about={o().brief} />}
+                    {() => (
+                      <TrajectoryLog
+                        id={o().id}
+                        subagents={(core()?.sessions.find((session) => session.id === o().id) ?? o()).subagents}
+                        title={o().brief ? `${o().name} · ${oneLine(o().brief).trim()}` : o().name}
+                        about={o().brief}
+                      />
+                    )}
                   </Keyed>
                 )}
               </If>

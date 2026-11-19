@@ -1,7 +1,7 @@
 # 帮工
 
 帮工是「一个档案（`Agent`）干一件活」：会话（`Session`）和它的每一轮（`Run`）、工作目录、农机的执行和轨迹。Rust 版里这些在服务端的 `modules/session`：`Sessions` 雇帮工、跑每一轮、私聊、带话和叫停，另有 `session.*` 端点、轨迹和工单观察流；它由工单板（`modules/issue` 的 `Board`）叫来，一轮的汇报经 `Ledger` 写回工单，起草的一轮和每轮之后的排队交回工单板（`Rounds`）。
-- 处理工单时画成地里的小动物，处理私聊时关联频道；外部农机经 `vibevalley-oar` 驱动（Claude Code、Codex、ACP 与测试用的 scripted），VibeValley 自己的 agent 是 oar 里的 `vibevalley` 农机。
+- 处理工单时画成地里的小动物，处理私聊时关联频道；外部农机经 `vibevalley-oar` 驱动（Claude Code、Codex、OpenCode、Grok、Kimi、CodeBuddy、Qwen Code、Qoder 等），VibeValley 自己的 agent 是 oar 里的 `vibevalley` 农机。
 - 一次触发到一次汇报是一轮 `Run`；一个 `Session` 可跨越多次 `Run` 与重启。
 
 ## 管什么，不管什么
@@ -12,6 +12,29 @@
 | 每一轮：触发来源、结局、汇报（`issue_report`）、问题；静默检测 | 工单状态机、验收、合并、拆单（[工单](docs/subsystems/issue.md)） |
 | 并发上限（全农场、每个仓库）、排队 | 农机安装探测、档案校验（[档案和农机](docs/subsystems/agent.md)） |
 | 轨迹（`SessionEvent`）的记录、推送与读回；`/mcp` 帮工门的令牌 | 记忆的存储与检索（[记性](docs/subsystems/memory.md)）；助手的编排（[助手](docs/subsystems/orchestrator.md)） |
+
+## 一次农机执行怎样复核
+
+| 运行时 | 进程协议 | 恢复时怎样算用量 |
+| --- | --- | --- |
+| Claude Code | 双向 stream-json，工具调用 ID 串起子 agent 路径。MCP 配置放在权限为 `0600` 的临时文件里。 | 开轮前通过 `get_usage` 读取基线，对照模型累计量计算本次增量。读不到基线则记录未知原因。 |
+| Codex | app-server 的 `thread/start`、`turn/start`、`turn/steer` 和 `thread/compact/start`；通知标出线程、工具和轮次。 | 从恢复响应或开轮前的 token 通知取基线；子线程用量独立归属。 |
+| OpenCode、Grok、Kimi、CodeBuddy | ACP 协商会话、模型、推理强度和工具。OpenCode、Grok 支持中途插话；Kimi 和 CodeBuddy 的工作规则随首条输入发送。 | 新会话累计已报告用量；恢复会话缺少可查的历史基线，标记未知。 |
+| Qwen Code、Qoder | SDK stream-json。Qwen 首个输入帧是 `initialize`，Qoder 的提示和 MCP 配置经私有文件传入。厂商 ID 到达后写回业务会话，供下一轮续接。 | 平面用量按轮累加；Qoder 缺少用量字段时保留未知。 |
+
+工单只按根轮已报告的输入与输出 token 之和结算。轮次、最后一次汇报和工单时间线共用该结果。输入或输出缺失时省略 `spent`。子线程单独归属，USD 成本留在驱动记录。累计数缺少上一轮边界时，服务等到下一对完整读数再算增量。[用量归约](crates/vibevalley-oar/src/accounting.rs) · [工单结算](crates/vibevalley-server/src/modules/session/sessions.rs)
+
+每个 `oar-voyage/3` JSONL 文件先写头，再写带序号、厂商会话 ID、轮次跨度和子 agent 路径的记录。原生进程帧、控制回执和生命周期标记分开存放。消费者可从已有序号订阅后续记录；同一路径重开时续写文件序号。[运行时接口](crates/vibevalley-oar/src/lib.rs) · [记录格式](crates/vibevalley-oar/src/voyage.rs)
+
+`cargo test -p vibevalley-oar` 使用真实子进程离线回放三类协议。样本中的响应和有序事件由 Go 基线 `a2c1851ab` 的 `pkg/oar/replaytest` 与实际驱动生成。验收逐条核对八种农机的帧类型、子 agent 路径和事件内容，另测恢复缺少用量基线、压缩期间排队、撤回、子会话限额和记录读回。[跨实现对照](crates/vibevalley-oar/tests/go_drivers.rs) · [生命周期](crates/vibevalley-oar/tests/lifecycle.rs)
+
+## Codex 子线程的进度
+
+服务端按业务轮次和厂商线程保存摘要。`session.get` 和核心帧返回当前摘要，`issue.run.list` 返回各轮的摘要。工作日志保留最近 240 步。用户重开工单后仍可查看已移出日志的子任务。[服务端归约](crates/vibevalley-server/src/modules/session/subagents.rs) · [重启回归](crates/vibevalley-server/tests/session/subagent_progress.rs)
+
+创建者取自派出事件或线程元数据。等待记录以等待者和调用标识区分。Codex 等待协作邮箱时可以省略目标。此时工作台显示「等待协作消息」。厂商只提供路径时，工作台显示路径。计划步骤和终态取自厂商事件。[真实 CLI 通知样本](crates/vibevalley-oar/tests/fixtures/codex-0.170.0-collaboration.json)
+
+服务意外退出后，摘要保留最后观测时间和服务发现连接中断的时间。续接同一厂商根线程后，服务按子线程标识和原轮次标识补读。未匹配的子轮继续显示原记录。补读的终态不会补出缺失的中间活动。
 
 ## 在哪
 
@@ -49,7 +72,8 @@
 
 - **用 oar 驱动农机，不自己写各家协议的循环**：Claude Code、Codex、ACP 各有各的协议，oar 收成一个会话接口（事件、插话、关闭）。
 - **不做命令级权限确认，靠工作目录与回环监听划边界**：逐条批准会让帮工停在命令上等人，与无人值守冲突。
-- **外部农机重启后停在 `resting` 不自动重跑**：避免重跑外部 shell 命令导致重复副作用。
+- **外部执行中断**。服务重启时，未结算的外部帮工轮次记为 `interrupted`。账本在同一笔事务中写入轮次的工作目录核对标记和会话的 `lastRun.needsReconciliation`。总览读取会话摘要。历史记录从 `issue.run.list` 读取该轮的 `needsReconciliation`。用户可核对工作目录和 Git 提交。重送同一条回复沿用原轮次。用户主动叫停的轮次保留普通中断状态。
+- **工单串汇报**。服务在同一笔事务中结算输入、保存轮次和登记待发汇报。启动时观察层补投待发汇报。工单串按帮工标识和轮次标识去重。
 
 ## 还没做的
 

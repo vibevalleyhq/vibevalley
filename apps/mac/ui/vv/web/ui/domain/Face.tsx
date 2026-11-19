@@ -5,7 +5,7 @@
 // the profile's name in a circle, tinted by its look's hat colour (a
 // helper) or on the orchestrators' sky blue. Not ported: the muted face's
 // grayscale (nsh has no filters); it is only faded.
-import { Image, Text, View } from "nsh";
+import { Image, pixelRatio, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type Look } from "@vibevalley/protocol";
@@ -111,8 +111,14 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
     const look = props.look ?? orchestratorLookOf(ready(agents, []), props.agent);
     const name = `manager-${look}-face` in all ? `manager-${look}-face` : "manager-face";
     const sp = all[name];
+    if (!sp) return undefined;
+    const dpr = pixelRatio();
+    if (sp.railSize === size() && (dpr === 1 || dpr === 2)) {
+      const src = url(`rail/${name}-${dpr}x`);
+      return src ? { src, left: 0, top: 0, width: size(), height: size() } : undefined;
+    }
     const src = url(name);
-    if (!sp || !src) return undefined;
+    if (!src) return undefined;
     const k = size() / (sp.w * 0.86);
     return { src, left: (size() - sp.w * k) / 2, top: size() * 0.04, width: sp.w * k, height: sp.h * k };
   };

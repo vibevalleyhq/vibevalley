@@ -11,7 +11,7 @@ export interface IssueHandlers {
   readonly "issue.conversation.get": (a: { readonly id: string }) => Promise<string | null>;
   /** To the issue's newest session, as the user: a comment is on the issue, not on one step. A closed issue is refused: reopen it. */
   readonly "issue.comment.create": (a: { readonly id: string } & T.CommentRequest) => Promise<T.Applied>;
-  readonly "issue.diff.get": (a: { readonly id: string }) => Promise<T.Changes>;
+  readonly "issue.diff.get": (a: { readonly id: string; readonly sinceTree?: string }) => Promise<T.Changes>;
   /** One joined read of issues and their real sessions, including explicit missing records. */
   readonly "issue.history.list": () => Promise<T.IssueHistory[]>;
   /** The open issues by default, the newest first; the filter narrows them. */
@@ -49,7 +49,7 @@ export const issueEndpoints: readonly Endpoint[] = [
   {
     op: "issue.diff.get",
     about: ["id"],
-    input: input({ id: z.string() }),
+    input: input({ id: z.string(), sinceTree: z.exactOptional(z.string()) }),
     result: S.Changes,
     can: ["user", "remote", "orchestrator"],
   },

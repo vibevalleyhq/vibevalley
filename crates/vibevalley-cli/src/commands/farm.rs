@@ -417,6 +417,7 @@ fn runtime_line(r: &RuntimeInfo) -> String {
     use vibevalley_protocol::Installation;
     let state = match &r.installation {
         Installation::Available(a) => format!("{} {}", a.version.clone().unwrap_or_default(), a.command).trim().to_string(),
+        Installation::Unsupported(failure) if failure.sign_in_command.is_some() => "login_required".into(),
         Installation::NotFound(_) => "not_found".into(),
         Installation::Checking(_) => "checking".into(),
         Installation::Unsupported(_) => "unsupported".into(),

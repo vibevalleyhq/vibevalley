@@ -59,7 +59,11 @@ fn rename_relocate_touch() {
 
     assert!(matches!(s.relocate_project(a.id, &b.path), Err(StoreError::Db(_))));
 
-    s.conn.lock().unwrap().execute("UPDATE projects SET last_opened_ms = 1", []).unwrap();
+    s.run(async |conn| {
+        sqlx::query("UPDATE projects SET last_opened_ms = 1").execute(conn).await?;
+        Ok(())
+    })
+    .unwrap();
     s.touch_project(a.id).unwrap();
     assert!(s.project(a.id).unwrap().last_opened_ms > 1);
     assert_eq!(s.project(b.id).unwrap().last_opened_ms, 1);
@@ -153,12 +157,13 @@ fn removing_a_project_removes_everything_it_owns() {
     assert_eq!(s.projects().unwrap(), vec![keep.clone()]);
     assert_eq!(s.layout(p.id).unwrap(), None);
     assert!(s.terminals(p.id).unwrap().is_empty());
-    let conn = s.conn.lock().unwrap();
-    for table in ["layouts", "terminals"] {
-        let n: i64 = conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0)).unwrap();
-        assert_eq!(n, 1, "{table}");
-    }
-    drop(conn);
+    s.run(async |conn| {
+        for sql in ["SELECT COUNT(*) FROM layouts", "SELECT COUNT(*) FROM terminals"] {
+            assert_eq!(sqlx::query_scalar::<_, i64>(sql).fetch_one(&mut *conn).await?, 1);
+        }
+        Ok(())
+    })
+    .unwrap();
     assert_eq!(s.layout(keep.id).unwrap(), Some(json!({"id": keep.id})));
 
     // Ids are never reused, so stale references cannot alias a new project.
@@ -213,19 +218,27 @@ fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
         s.set_layout(p.id, &layout).unwrap();
         s.set_terminals(p.id, &[terminal("t1", p.id), terminal("t2", p.id)]).unwrap();
         s.set_setting("k", &json!([true, null])).unwrap();
-        let mode: String = s.conn.lock().unwrap().query_row("PRAGMA journal_mode", [], |r| r.get(0)).unwrap();
+        let mode: String = s
+            .run(async |conn| Ok(sqlx::query_scalar("PRAGMA journal_mode").fetch_one(conn).await?))
+            .unwrap();
         assert_eq!(mode, "wal");
         (p, layout)
     };
 
     for _ in 0..2 {
         let s = Store::open(&path).unwrap();
-        let conn = s.conn.lock().unwrap();
-        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
-        assert_eq!(version, Store::schema_version());
-        let fk: i64 = conn.query_row("PRAGMA foreign_keys", [], |r| r.get(0)).unwrap();
-        assert_eq!(fk, 1);
-        drop(conn);
+        s.run(async |conn| {
+            for (sql, expected) in [
+                ("PRAGMA user_version", Store::schema_version()),
+                ("PRAGMA foreign_keys", 1),
+                ("PRAGMA busy_timeout", 5000),
+                ("PRAGMA synchronous", 1),
+            ] {
+                assert_eq!(sqlx::query_scalar::<_, i64>(sql).fetch_one(&mut *conn).await?, expected, "{sql}");
+            }
+            Ok(())
+        })
+        .unwrap();
         assert_eq!(s.projects().unwrap(), vec![project.clone()]);
         assert_eq!(s.layout(project.id).unwrap(), Some(layout.clone()));
         assert_eq!(s.terminals(project.id).unwrap(), vec![terminal("t1", project.id), terminal("t2", project.id)]);
@@ -237,9 +250,27 @@ fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
 fn refuses_a_database_from_a_newer_build() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("state.db");
-    drop(Store::open(&path).unwrap());
-    let conn = Connection::open(&path).unwrap();
-    conn.pragma_update(None, "user_version", Store::schema_version() + 1).unwrap();
-    drop(conn);
+    let store = Store::open(&path).unwrap();
+    store
+        .run(async |conn| {
+            sqlx::query("PRAGMA user_version = 2147483647").execute(conn).await?;
+            Ok(())
+        })
+        .unwrap();
+    drop(store);
     assert!(matches!(Store::open(&path), Err(StoreError::Db(_))));
+}
+
+#[test]
+fn regression_failed_terminal_batch_preserves_previous_set_after_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("state.db");
+    let s = Store::open(&path).unwrap();
+    let id = s.add_project(Path::new("/project")).unwrap().id;
+    let original = terminal("saved", id);
+    s.set_terminals(id, std::slice::from_ref(&original)).unwrap();
+    let duplicate = terminal("duplicate", id);
+    assert!(matches!(s.set_terminals(id, &[duplicate.clone(), duplicate]), Err(StoreError::Db(_))));
+    drop(s);
+    assert_eq!(Store::open(&path).unwrap().terminals(id).unwrap(), vec![original]);
 }

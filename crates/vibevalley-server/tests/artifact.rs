@@ -656,3 +656,61 @@ fn the_demo_writes_three_sections_and_a_message_quotes_blocks() {
         ])
     );
 }
+
+#[test]
+fn regression_a_failed_artifact_version_never_publishes_its_channel_card() {
+    use sqlx::{Connection, SqliteConnection, sqlite::SqliteConnectOptions};
+    let dir = tempfile::tempdir().unwrap();
+    let server = start(dir.path());
+    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+    let channel = server.chat.default_channel();
+    let created = ok(call("artifact.create", json!({"title":"Proposal","kind":"html","content":page("v1")})));
+    let before = ok(call("channel.message.list", json!({"id":channel})));
+    let first_card = last_message(&call, &channel);
+    let events = server.chat.committed();
+    let opts = SqliteConnectOptions::new().filename(dir.path().join("server.db"));
+    let mut inspect = pollster::block_on(SqliteConnection::connect_with(&opts)).unwrap();
+    pollster::block_on(
+        sqlx::raw_sql(
+            "CREATE TRIGGER reject_version BEFORE INSERT ON artifact_version WHEN NEW.version = 2 BEGIN SELECT raise(ABORT, 'blocked version'); END;",
+        )
+        .execute(&mut inspect),
+    )
+    .unwrap();
+
+    let version = || call("artifact.version.create", json!({"id":created["id"],"content":page("v2")}));
+    let failed = version();
+    assert_ne!(failed.biz_code, 0);
+    assert!(failed.message.contains("blocked version"), "{}", failed.message);
+    assert_eq!(ok(call("artifact.get", json!({"id":created["id"]})))["version"], 1);
+    assert_eq!(ok(call("channel.message.list", json!({"id":channel}))), before);
+    assert!(events.try_recv().is_err());
+
+    pollster::block_on(sqlx::raw_sql("DROP TRIGGER reject_version").execute(&mut inspect)).unwrap();
+    pollster::block_on(
+        sqlx::raw_sql(
+            "CREATE TABLE proof_parent (id integer primary key);
+         CREATE TABLE proof_child (parent integer references proof_parent(id) deferrable initially deferred);
+         CREATE TRIGGER reject_commit AFTER INSERT ON artifact_version WHEN NEW.version = 2 BEGIN INSERT INTO proof_child VALUES (1); END;",
+        )
+        .execute(&mut inspect),
+    )
+    .unwrap();
+    let failed = version();
+    assert_ne!(failed.biz_code, 0);
+    assert!(failed.message.contains("FOREIGN KEY"), "{}", failed.message);
+    assert_eq!(ok(call("artifact.get", json!({"id":created["id"]})))["version"], 1);
+    assert_eq!(ok(call("channel.message.list", json!({"id":channel}))), before);
+    assert!(events.try_recv().is_err());
+    pollster::block_on(sqlx::raw_sql("DROP TRIGGER reject_commit").execute(&mut inspect)).unwrap();
+    let published = ok(version());
+    let card = last_message(&call, &channel);
+    assert_eq!(published["version"], 2);
+    assert_eq!(card["number"].as_i64(), first_card["number"].as_i64().map(|n| n + 1));
+    assert_eq!(card["artifact"]["version"], 2);
+    let second = published["versions"].as_array().unwrap().iter().find(|v| v["version"] == 2).unwrap();
+    assert_eq!(second["number"], card["number"]);
+    assert!(events.try_recv().is_ok());
+    assert!(events.try_recv().is_err());
+    server.close();
+}

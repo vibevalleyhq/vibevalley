@@ -777,10 +777,13 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     pending(1, "the handoff waiting outside");
     call(&s, "channel.markRead", json!({ "id": general, "number": said.number }));
     pending(0, "the seen handoff withdrawn");
-    let db = rusqlite::Connection::open(dir.path().join("server.db")).unwrap();
-    let state: String = db
-        .query_row("select state from connector_outbox where message_id = ?1", [&said.id], |r| r.get(0))
-        .unwrap();
+    let mut db = crate::support::inspect_db(&dir.path().join("server.db"));
+    let state: String = pollster::block_on(
+        sqlx::query_scalar("select state from connector_outbox where message_id = ?1")
+            .bind(&said.id)
+            .fetch_one(&mut db),
+    )
+    .unwrap();
     assert_eq!(state, "dropped");
     assert_eq!(world.by("weixin").len(), 1);
 
@@ -835,9 +838,8 @@ fn weixin_goes_on_after_a_restart_and_rests_when_its_login_is_stale() {
         s.close();
     }
     // Saved secrets that are not this app's keys are said, not guessed at.
-    let db = rusqlite::Connection::open(dir.path().join("server.db")).unwrap();
-    db.execute("update connector_account set secrets = '{\"token\":42}' where connector = 'weixin'", [])
-        .unwrap();
+    let mut db = crate::support::inspect_db(&dir.path().join("server.db"));
+    crate::support::execute_sql(&mut db, "update connector_account set secrets = '{\"token\":42}' where connector = 'weixin'");
     drop(db);
     let s = start(dir.path(), &world);
     assert!(status(&s, "weixin")["error"].as_str().unwrap().contains("存着的登录信息读不出来"));

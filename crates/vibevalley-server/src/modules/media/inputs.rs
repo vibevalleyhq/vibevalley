@@ -1,9 +1,10 @@
 //! Input reservations, uploads and job pins (`media/inputs.ts`). The mutex
 //! protects admission and pins, never a streaming read or attachment write.
-use super::validate;
-use crate::{Hub, base::open_db, modules::attachment::Attachments, now};
-use rusqlite::{Connection, OptionalExtension, params};
+use super::{q, validate};
+use crate::{Hub, base::open_sqlx_db, modules::attachment::Attachments, now};
+use pollster::block_on;
 use sha2::{Digest, Sha256};
+use sqlx::{Connection, SqliteConnection};
 use std::{
     collections::HashSet,
     io::{Read, Write},
@@ -16,17 +17,6 @@ use vibevalley_protocol::{ApiError, AttachmentFile, BizCode, MediaInput, MediaIn
 
 const LIFETIME: i64 = 86_400_000;
 const QUOTA: i64 = 2 * 1024 * 1024 * 1024;
-const SCHEMA: &str = "
-create table if not exists media_input (
- id text primary key, metadata text not null, size integer not null,
- phase text not null, hash text, created_at integer not null, expires_at integer not null
-);
-create table if not exists media_input_pin (
- input_id text not null references media_input(id) on delete cascade,
- holder text not null, primary key(input_id, holder)
-);";
-const SELECT: &str = "select id, metadata, phase, hash, created_at, expires_at,
- exists(select 1 from media_input_pin where input_id=media_input.id) from media_input";
 pub(super) fn refused(key: &str) -> ApiError {
     ApiError::new(BizCode::MediaRefused, t(&format!("server.media.{key}"), &[]))
 }
@@ -34,7 +24,7 @@ fn storage(_: impl std::fmt::Display) -> ApiError {
     refused("inputStorage")
 }
 struct Inner {
-    db: Connection,
+    db: SqliteConnection,
     uploading: HashSet<String>,
 }
 pub struct Inputs {
@@ -43,49 +33,58 @@ pub struct Inputs {
     staging: PathBuf,
     stop: Mutex<Option<flume::Sender<()>>>,
 }
-fn row(r: &rusqlite::Row<'_>) -> rusqlite::Result<MediaInput> {
-    let metadata: String = r.get(1)?;
-    let m: MediaInputRequest =
-        serde_json::from_str(&metadata).map_err(|e| rusqlite::Error::FromSqlConversionFailure(1, rusqlite::types::Type::Text, Box::new(e)))?;
-    let phase: String = r.get(2)?;
+fn input(row: q::GetInputRow, can_delete: bool) -> Result<MediaInput, ApiError> {
+    let m: MediaInputRequest = serde_json::from_str(&row.metadata).map_err(storage)?;
     let phase = MediaInputPhase::ALL
         .into_iter()
-        .find(|p| p.as_str() == phase)
-        .ok_or(rusqlite::Error::InvalidQuery)?;
+        .find(|p| p.as_str() == row.phase)
+        .ok_or_else(|| refused("inputStorage"))?;
     Ok(MediaInput {
-        id: r.get(0)?,
+        id: row.id,
         kind: m.kind,
         name: m.name,
         mime: m.mime,
         size: m.size,
         phase,
-        hash: r.get(3)?,
-        created_at: r.get(4)?,
-        expires_at: r.get(5)?,
-        can_delete: !r.get::<_, bool>(6)?,
+        hash: row.hash,
+        created_at: row.created_at,
+        expires_at: row.expires_at,
+        can_delete,
     })
 }
-fn find(inner: &Inner, id: &str) -> Result<Option<MediaInput>, ApiError> {
-    let mut got = inner.db.query_row(&format!("{SELECT} where id=?1"), [id], row).optional().map_err(storage)?;
-    if let Some(r) = &mut got {
+async fn find_db(db: &mut SqliteConnection, id: &str) -> Result<Option<MediaInput>, ApiError> {
+    let row = match q::get_input(&mut *db, q::GetInputParams { id: id.into() }).await {
+        Ok(row) => row,
+        Err(sqlx::Error::RowNotFound) => return Ok(None),
+        Err(e) => return Err(storage(e)),
+    };
+    let free = q::get_pin(db, q::GetPinParams { input_id: id.into() }).await.map_err(storage)?.pinned == 0;
+    input(row, free).map(Some)
+}
+fn find(inner: &mut Inner, id: &str) -> Result<Option<MediaInput>, ApiError> {
+    let mut record = block_on(find_db(&mut inner.db, id))?;
+    if let Some(r) = &mut record {
         r.can_delete &= !inner.uploading.contains(id);
     }
-    Ok(got)
+    Ok(record)
 }
-fn found(inner: &Inner, id: &str) -> Result<MediaInput, ApiError> {
+fn found(inner: &mut Inner, id: &str) -> Result<MediaInput, ApiError> {
     find(inner, id)?.ok_or_else(|| refused("inputMissing"))
 }
-fn phase(inner: &Inner, id: &str, p: &str) -> Result<(), ApiError> {
-    inner
-        .db
-        .execute("update media_input set phase=?2 where id=?1", params![id, p])
-        .map_err(storage)?;
-    Ok(())
+fn phase(inner: &mut Inner, id: &str, p: &str) -> Result<(), ApiError> {
+    block_on(q::set_input_phase(
+        &mut inner.db,
+        q::SetInputPhaseParams {
+            id: id.into(),
+            phase: p.into(),
+        },
+    ))
+    .map_err(storage)
 }
 impl Inputs {
     pub fn open(home: &Path, files: Arc<Attachments>) -> Result<Arc<Self>, ApiError> {
-        let db = open_db(home).map_err(storage)?;
-        db.execute_batch(SCHEMA).map_err(storage)?;
+        let mut db = block_on(open_sqlx_db(home)).map_err(storage)?;
+        block_on(sqlx::raw_sql(include_str!("sql/inputs.sql")).execute(&mut db)).map_err(storage)?;
         let inputs = Arc::new(Self {
             inner: Mutex::new(Inner { db, uploading: HashSet::new() }),
             files,
@@ -118,63 +117,71 @@ impl Inputs {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
     }
     pub fn get(&self, id: &str) -> Result<MediaInput, ApiError> {
-        found(&self.inner(), id)
+        found(&mut self.inner(), id)
     }
     pub fn list(&self) -> Result<Vec<MediaInput>, ApiError> {
-        let inner = self.inner();
-        let mut q = inner.db.prepare(&format!("{SELECT} order by created_at desc,id")).map_err(storage)?;
-        q.query_map([], row)
-            .map_err(storage)?
-            .map(|r| {
-                r.map(|mut r| {
-                    r.can_delete &= !inner.uploading.contains(&r.id);
-                    r
-                })
-                .map_err(storage)
+        let mut inner = self.inner();
+        let (rows, pins) = block_on(async {
+            let mut tx = inner.db.begin().await?;
+            let rows = q::list_inputs(&mut *tx).await?;
+            let pins = q::pinned_inputs(&mut *tx).await?;
+            tx.commit().await?;
+            Ok::<_, sqlx::Error>((rows, pins))
+        })
+        .map_err(storage)?;
+        let pinned: HashSet<_> = pins.into_iter().map(|r| r.input_id).collect();
+        rows.into_iter()
+            .map(|row| {
+                let free = !pinned.contains(&row.id) && !inner.uploading.contains(&row.id);
+                input(row, free)
             })
             .collect()
     }
     pub fn create(&self, r: &MediaInputRequest) -> Result<MediaInput, ApiError> {
         validate::declared(r)?;
         self.sweep()?;
-        let inner = self.inner();
-        let (bytes, count): (i64, i64) = inner
-            .db
-            .query_row("select coalesce(sum(size),0),count(*) from media_input", [], |r| Ok((r.get(0)?, r.get(1)?)))
-            .map_err(storage)?;
-        if count >= 256 || bytes + r.size > QUOTA {
-            return Err(refused("inputQuota"));
-        }
         let id = uuid::Uuid::now_v7().to_string();
         let time = now();
-        inner
-            .db
-            .execute(
-                "insert into media_input (id,metadata,size,phase,created_at,expires_at) values (?1,?2,?3,'reserved',?4,?5)",
-                params![id, serde_json::to_string(r).map_err(storage)?, r.size, time, time + LIFETIME],
-            )
+        self.transaction(|db| {
+            let quota = block_on(q::input_quota(&mut *db)).map_err(storage)?;
+            if quota.entries >= 256 || quota.bytes + r.size > QUOTA {
+                return Err(refused("inputQuota"));
+            }
+            block_on(q::reserve_input(
+                &mut *db,
+                q::ReserveInputParams {
+                    id: id.clone(),
+                    metadata: serde_json::to_string(r).map_err(storage)?,
+                    size: r.size,
+                    created_at: time,
+                    expires_at: time + LIFETIME,
+                },
+            ))
             .map_err(storage)?;
-        found(&inner, &id)
+            block_on(find_db(db, &id))?.ok_or_else(|| refused("inputMissing"))
+        })
     }
-    fn remove(&self, inner: &Inner, r: &MediaInput) -> Result<(), ApiError> {
+    fn remove(&self, inner: &mut Inner, r: &MediaInput) -> Result<(), ApiError> {
         if !r.can_delete {
             return Err(refused("inputBusy"));
         }
-        phase(inner, &r.id, "deleting")?;
+        if block_on(q::mark_input_deleting(&mut inner.db, q::MarkInputDeletingParams { id: r.id.clone() })).map_err(storage)? == 0 {
+            return Err(refused("inputBusy"));
+        }
         remove_dir(&self.staging.join(&r.id))?;
-        inner.db.execute("delete from media_input where id=?1", [&r.id]).map_err(storage)?;
+        block_on(q::forget_input(&mut inner.db, q::ForgetInputParams { id: r.id.clone() })).map_err(storage)?;
         Ok(())
     }
     pub fn delete(&self, id: &str) -> Result<(), ApiError> {
-        let inner = self.inner();
-        if let Some(r) = find(&inner, id)? {
-            self.remove(&inner, &r)?;
+        let mut inner = self.inner();
+        if let Some(r) = find(&mut inner, id)? {
+            self.remove(&mut inner, &r)?;
         }
         Ok(())
     }
     pub fn preview_delete(&self, id: &str) -> Result<Preview, ApiError> {
-        let inner = self.inner();
-        let Some(r) = find(&inner, id)? else {
+        let mut inner = self.inner();
+        let Some(r) = find(&mut inner, id)? else {
             return Ok(Preview { does: vec![] });
         };
         if !r.can_delete {
@@ -185,12 +192,13 @@ impl Inputs {
         })
     }
     pub fn sweep(&self) -> Result<(), ApiError> {
-        let inner = self.inner();
-        let ids:Vec<String>=inner.db.prepare("select id from media_input where (expires_at<=?1 or phase='deleting') and not exists(select 1 from media_input_pin where input_id=media_input.id)").map_err(storage)?.query_map([now()],|r|r.get(0)).map_err(storage)?.collect::<Result<_,_>>().map_err(storage)?;
-        for id in ids {
-            let r = found(&inner, &id)?;
+        let mut inner = self.inner();
+        let ids = block_on(q::expired_inputs(&mut inner.db, q::ExpiredInputsParams { expires_at: now() })).map_err(storage)?;
+        for row in ids {
+            let id = row.id;
+            let r = found(&mut inner, &id)?;
             if r.can_delete
-                && let Err(error) = self.remove(&inner, &r)
+                && let Err(error) = self.remove(&mut inner, &r)
             {
                 eprintln!("media input cleanup pending for {id}: {}", error.message);
             }
@@ -198,23 +206,13 @@ impl Inputs {
         Ok(())
     }
     fn restore(&self) -> Result<(), ApiError> {
-        let inner = self.inner();
+        let mut inner = self.inner();
         remove_dir(&self.staging)?;
-        inner
-            .db
-            .execute("update media_input set phase='failed' where phase='uploading'", [])
-            .map_err(storage)?;
-        let rows: Vec<MediaInput> = inner
-            .db
-            .prepare(SELECT)
-            .map_err(storage)?
-            .query_map([], row)
-            .map_err(storage)?
-            .collect::<Result<_, _>>()
-            .map_err(storage)?;
-        for r in rows {
+        block_on(q::interrupt_uploads(&mut inner.db)).map_err(storage)?;
+        for row in block_on(q::list_inputs(&mut inner.db)).map_err(storage)? {
+            let r = input(row, false)?;
             if r.phase == MediaInputPhase::Ready && !r.hash.as_ref().is_some_and(|h| self.files.path_of(h).is_file()) {
-                phase(&inner, &r.id, "failed")?;
+                phase(&mut inner, &r.id, "failed")?;
             }
         }
         Ok(())
@@ -224,7 +222,7 @@ impl Inputs {
     pub fn upload(&self, id: &str, source: impl Read) -> Result<MediaInput, ApiError> {
         let r = {
             let mut inner = self.inner();
-            let r = found(&inner, id)?;
+            let r = found(&mut inner, id)?;
             if r.phase == MediaInputPhase::Ready {
                 return Ok(r);
             }
@@ -232,7 +230,7 @@ impl Inputs {
                 return Err(refused("inputBusy"));
             }
             remove_dir(&self.staging.join(id))?;
-            phase(&inner, id, "uploading")?;
+            phase(&mut inner, id, "uploading")?;
             inner.uploading.insert(id.to_owned());
             r
         };
@@ -242,13 +240,13 @@ impl Inputs {
         let mut inner = self.inner();
         inner.uploading.remove(id);
         if result.is_err() {
-            phase(&inner, id, "failed")?;
+            phase(&mut inner, id, "failed")?;
         }
         result?;
         if let Err(error) = cleanup {
             eprintln!("media staging cleanup: {}", error.message);
         }
-        found(&inner, id)
+        found(&mut inner, id)
     }
     fn upload_inner(&self, r: &MediaInput, mut source: impl Read) -> Result<(), ApiError> {
         let directory = self.staging.join(&r.id);
@@ -305,21 +303,25 @@ impl Inputs {
             return Err(refused("inputChanged"));
         }
         {
-            let inner = self.inner();
-            inner
-                .db
-                .execute("update media_input set hash=?2 where id=?1", params![r.id, hash])
-                .map_err(storage)?;
+            let mut inner = self.inner();
+            block_on(q::save_input_hash(
+                &mut inner.db,
+                q::SaveInputHashParams {
+                    id: r.id.clone(),
+                    hash: Some(hash.clone()),
+                },
+            ))
+            .map_err(storage)?;
         }
         self.files.keep_staged(&path, &hash, r.size, &r.name, &r.mime)?;
-        let inner = self.inner();
-        inner
-            .db
-            .execute(
-                "update media_input set phase='ready',expires_at=?2 where id=?1",
-                params![r.id, now() + LIFETIME],
-            )
-            .map_err(storage)?;
+        block_on(q::input_ready(
+            &mut self.inner().db,
+            q::InputReadyParams {
+                id: r.id.clone(),
+                expires_at: now() + LIFETIME,
+            },
+        ))
+        .map_err(storage)?;
         Ok(())
     }
     pub fn adopt(&self, id: &str) -> Result<MediaInput, ApiError> {
@@ -381,35 +383,41 @@ impl Inputs {
             name: r.name,
         })
     }
-    /// Pins and the job admission commit together, on this database connection.
-    /// The callback must not call Inputs or open another write transaction.
-    pub fn pin<T>(&self, ids: &[String], holder: &str, admit: impl FnOnce(&Connection) -> Result<T, ApiError>) -> Result<T, ApiError> {
+    fn transaction<T>(&self, write: impl FnOnce(&mut SqliteConnection) -> Result<T, ApiError>) -> Result<T, ApiError> {
+        let mut inner = self.inner();
+        let mut tx = block_on(inner.db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
+        let value = write(&mut tx)?;
+        block_on(tx.commit()).map_err(storage)?;
+        Ok(value)
+    }
+
+    pub(super) fn pin_in(&self, db: &mut SqliteConnection, ids: &[String], holder: &str) -> Result<(), ApiError> {
         if ids.is_empty() || ids.len() > 5 {
             return Err(refused("inputInvalid"));
         }
-        let mut inner = self.inner();
         for id in ids {
-            let r = found(&inner, id)?;
+            let r = block_on(find_db(&mut *db, id))?.ok_or_else(|| refused("inputMissing"))?;
             if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= now()) || !r.hash.as_ref().is_some_and(|h| self.files.path_of(h).is_file())
             {
                 return Err(refused("inputMissing"));
             }
+            block_on(q::pin_input(
+                &mut *db,
+                q::PinInputParams {
+                    input_id: id.clone(),
+                    holder: holder.into(),
+                },
+            ))
+            .map_err(storage)?;
         }
-        let tx = inner.db.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(storage)?;
-        for id in ids {
-            tx.execute("insert or ignore into media_input_pin(input_id,holder) values (?1,?2)", params![id, holder])
-                .map_err(storage)?;
-        }
-        let result = admit(&tx)?;
-        tx.commit().map_err(storage)?;
-        Ok(result)
+        Ok(())
+    }
+
+    pub fn pin(&self, ids: &[String], holder: &str) -> Result<(), ApiError> {
+        self.transaction(|db| self.pin_in(db, ids, holder))
     }
     pub fn release(&self, holder: &str) -> Result<(), ApiError> {
-        self.inner()
-            .db
-            .execute("delete from media_input_pin where holder=?1", [holder])
-            .map_err(storage)?;
-        Ok(())
+        block_on(q::release_pins(&mut self.inner().db, q::ReleasePinsParams { holder: holder.into() })).map_err(storage)
     }
 }
 fn remove_dir(path: &Path) -> Result<(), ApiError> {

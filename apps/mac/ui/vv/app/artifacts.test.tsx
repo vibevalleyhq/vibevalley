@@ -97,6 +97,9 @@ test("the speaker's view: the deck, the clock, a way back; without a deck it say
   expect(app.count("id:presenter")).toBe(1);
   expect(app.count("id:presenter-current")).toBe(1);
   expect(app.count("id:presenter-clock")).toBe(1);
+  expect(app.count("id:presenter-status")).toBe(1);
+  expect(app.count("id:presenter-at")).toBe(0);
+  expect(app.texts()).not.toContain("这是最后一页");
   const none = await start("/present");
   expect(none.app.count("id:presenter")).toBe(0);
 });

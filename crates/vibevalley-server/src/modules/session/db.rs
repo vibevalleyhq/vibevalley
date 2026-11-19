@@ -1,180 +1,196 @@
 use super::sessions::Extra;
-use crate::modules::column::{Reading, json, json_or_none, word, word_or_none};
-use rusqlite::{Connection, OptionalExtension, params};
+use crate::modules::column::{json, optional, read_json, read_word, word};
 use std::collections::HashMap;
-use vibevalley_protocol::{Run, Session};
+use vibevalley_durable::Sqlite;
+use vibevalley_protocol::{Run, Session, SessionSubagents};
 
-pub const SCHEMA: &str = "
-create table if not exists session (
-  id text primary key,
-  role text not null,
-  name text not null,
-  agent text not null,
-  runtime text not null,
-  brief text not null,
-  repo text,
-  branch text,
-  worktree text,
-  hired_at integer not null,
-  runs integer not null,
-  last_run text,
-  spent text,
-  channel text,
-  issue text,
-  refining integer not null,
-  tool_connections text,
-  machine text,
-  phase text not null,
-  departed integer not null default 0
-);
-create index if not exists session_issue on session (issue);
-create table if not exists session_extra (
-  session text primary key, agent_session text, base text, run text
-);
-create table if not exists session_run (
-  id text primary key, session text not null, issue text,
-  triggered_by text not null, heard text not null, started_at integer not null,
-  ended_at integer, outcome text, summary text not null, spent text
-);
-create index if not exists session_run_issue on session_run (issue, started_at);
-create table if not exists session_counter (
-  name text primary key, last_number integer not null
-);
-";
+#[rustfmt::skip]
+#[path = "generated/queries.rs"]
+mod queries;
 
-const COLUMNS: &str = "id, role, name, agent, runtime, brief, repo, branch, worktree, hired_at, runs, last_run, spent, channel, issue, refining, tool_connections, machine, phase";
-fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Session> {
-    let mut r = Reading::of(row);
+pub const SCHEMA: &str = include_str!("sql/schema.sql");
+
+pub fn put_subagents(db: &Sqlite<'_>, summary: &SessionSubagents) -> sqlx::Result<()> {
+    let params = queries::PutSubagentsParams {
+        run: summary.run.clone(),
+        summary: json(summary)?,
+    };
+    db.query(async |c| queries::put_subagents(c, params).await)
+}
+
+fn read(r: queries::ListSessionsRow) -> sqlx::Result<Session> {
     Ok(Session {
-        id: r.get()?,
-        role: r.word()?,
-        name: r.get()?,
-        agent: r.get()?,
-        runtime: r.get()?,
-        brief: r.get()?,
-        repo: r.get()?,
-        branch: r.get()?,
-        worktree: r.get()?,
-        hired_at: r.get()?,
-        runs: r.get()?,
-        last_run: r.json_or_none()?,
-        spent: r.json_or_none()?,
-        channel: r.get()?,
-        issue: r.get()?,
-        refining: r.get()?,
-        tool_connections: r.json_or_none()?,
-        machine: r.get()?,
-        phase: r.json()?,
+        id: r.id,
+        name: r.name,
+        agent: r.agent,
+        runtime: r.runtime,
+        brief: r.brief,
+        repo: r.repo,
+        branch: r.branch,
+        worktree: r.worktree,
+        channel: r.channel,
+        issue: r.issue,
+        machine: r.machine,
+        hired_at: r.hired_at,
+        runs: r.runs,
+        role: read_word(r.role)?,
+        phase: read_json(r.phase)?,
+        last_run: r.last_run.map(read_json).transpose()?,
+        spent: r.spent.map(read_json).transpose()?,
+        tool_connections: r.tool_connections.map(read_json).transpose()?,
+        refining: r.refining != 0,
+        subagents: r.subagents.map(read_json).transpose()?,
     })
 }
 
-pub fn all(db: &Connection) -> rusqlite::Result<Vec<Session>> {
-    let mut q = db.prepare_cached(&format!("select {COLUMNS} from session where departed = 0 order by hired_at, id"))?;
-    q.query_map([], read)?.collect()
+pub fn all(db: &Sqlite<'_>) -> sqlx::Result<Vec<Session>> {
+    db.query(async |c| queries::list_sessions(c).await)?.into_iter().map(read).collect()
 }
 
-pub fn past(db: &Connection, id: &str) -> rusqlite::Result<Option<Session>> {
-    db.query_row(&format!("select {COLUMNS} from session where id = ?1 and departed = 1"), [id], read)
-        .optional()
+pub fn past(db: &Sqlite<'_>, id: &str) -> sqlx::Result<Option<Session>> {
+    optional(db.query(async |c| queries::get_past_session(c, queries::GetPastSessionParams { id: id.into() }).await))?
+        .map(read)
+        .transpose()
 }
 
-pub fn put(db: &Connection, s: &Session, departed: bool) -> rusqlite::Result<()> {
-    db.execute(&format!("insert or replace into session ({COLUMNS}, departed) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)"), params![
-        s.id,
-        word(&s.role)?,
-        s.name,
-        s.agent,
-        s.runtime,
-        s.brief,
-        s.repo,
-        s.branch,
-        s.worktree,
-        s.hired_at,
-        s.runs,
-        json_or_none(&s.last_run)?,
-        json_or_none(&s.spent)?,
-        s.channel,
-        s.issue,
-        s.refining,
-        json_or_none(&s.tool_connections)?,
-        s.machine,
-        json(&s.phase)?,
-        departed,
-    ])?;
-    Ok(())
+pub fn put(db: &Sqlite<'_>, s: &Session, departed: bool) -> sqlx::Result<()> {
+    let params = queries::PutSessionParams {
+        id: s.id.clone(),
+        name: s.name.clone(),
+        agent: s.agent.clone(),
+        runtime: s.runtime.clone(),
+        brief: s.brief.clone(),
+        repo: s.repo.clone(),
+        branch: s.branch.clone(),
+        worktree: s.worktree.clone(),
+        channel: s.channel.clone(),
+        issue: s.issue.clone(),
+        machine: s.machine.clone(),
+        hired_at: s.hired_at,
+        runs: s.runs,
+        role: word(&s.role)?,
+        phase: json(&s.phase)?,
+        last_run: s.last_run.as_ref().map(json).transpose()?,
+        spent: s.spent.as_ref().map(json).transpose()?,
+        tool_connections: s.tool_connections.as_ref().map(json).transpose()?,
+        refining: i64::from(s.refining),
+        departed: i64::from(departed),
+    };
+    db.query(async |c| queries::put_session(c, params).await)
 }
 
-pub fn extras(db: &Connection) -> rusqlite::Result<HashMap<String, Extra>> {
-    let mut q = db.prepare_cached("select session, agent_session, base, run from session_extra")?;
-    q.query_map([], |r| {
-        Ok((
-            r.get(0)?,
-            Extra {
-                agent_session: r.get(1)?,
-                base: r.get(2)?,
-                run: r.get(3)?,
+pub fn extras(db: &Sqlite<'_>) -> sqlx::Result<HashMap<String, Extra>> {
+    let rows = db.query(async |c| queries::list_session_extras(c).await)?;
+    Ok(rows
+        .into_iter()
+        .map(|r| {
+            (
+                r.session,
+                Extra {
+                    agent_session: r.agent_session,
+                    base: r.base,
+                    run: r.run,
+                },
+            )
+        })
+        .collect())
+}
+
+pub fn put_extra(db: &Sqlite<'_>, session: &str, e: &Extra) -> sqlx::Result<()> {
+    let params = queries::PutSessionExtraParams {
+        session: session.into(),
+        agent_session: e.agent_session.clone(),
+        base: e.base.clone(),
+        run: e.run.clone(),
+    };
+    db.query(async |c| queries::put_session_extra(c, params).await)
+}
+
+pub fn remove_extra(db: &Sqlite<'_>, session: &str) -> sqlx::Result<()> {
+    db.query(async |c| queries::delete_session_extra(c, queries::DeleteSessionExtraParams { session: session.into() }).await)
+}
+
+pub fn clear_run(db: &Sqlite<'_>, session: &str, run: &str) -> sqlx::Result<()> {
+    db.query(async |c| {
+        queries::clear_session_run(
+            c,
+            queries::ClearSessionRunParams {
+                session: session.into(),
+                run: Some(run.into()),
             },
-        ))
-    })?
-    .collect()
-}
-
-pub fn put_extra(db: &Connection, session: &str, extra: &Extra) -> rusqlite::Result<()> {
-    db.execute(
-        "insert or replace into session_extra (session, agent_session, base, run) values (?1, ?2, ?3, ?4)",
-        params![session, extra.agent_session, extra.base, extra.run],
-    )?;
-    Ok(())
-}
-
-pub fn remove_extra(db: &Connection, session: &str) -> rusqlite::Result<()> {
-    db.execute("delete from session_extra where session = ?1", [session])?;
-    Ok(())
-}
-
-fn read_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Run> {
-    let mut r = Reading::of(row);
-    Ok(Run {
-        id: r.get()?,
-        session: r.get()?,
-        issue: r.get()?,
-        triggered_by: r.json()?,
-        heard: r.json()?,
-        started_at: r.get()?,
-        ended_at: r.get()?,
-        outcome: r.word_or_none()?,
-        summary: r.get()?,
-        spent: r.json_or_none()?,
+        )
+        .await
     })
 }
 
-pub fn run(db: &Connection, id: &str) -> rusqlite::Result<Option<Run>> {
-    db.query_row(
-        "select id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from session_run where id = ?1",
-        [id],
-        read_run,
-    )
-    .optional()
+pub fn active_run(db: &Sqlite<'_>, session: &str, run: &str, root: &str) -> sqlx::Result<bool> {
+    let params = queries::FindActiveRunParams {
+        session: session.into(),
+        run: Some(run.into()),
+        agent_session: Some(root.into()),
+    };
+    db.query(async |c| queries::find_active_run(c, params).await).map(|row| row.active > 0)
 }
 
-pub fn runs(db: &Connection, issue: &str) -> rusqlite::Result<Vec<Run>> {
-    let mut q = db.prepare_cached("select id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent from session_run where issue = ?1 order by started_at, cast(substr(id, 2) as integer)")?;
-    q.query_map([issue], read_run)?.collect()
+fn read_run(r: queries::GetRunRow) -> sqlx::Result<Run> {
+    Ok(Run {
+        id: r.id,
+        session: r.session,
+        issue: r.issue,
+        summary: r.summary,
+        started_at: r.started_at,
+        ended_at: r.ended_at,
+        triggered_by: read_json(r.triggered_by)?,
+        heard: read_json(r.heard)?,
+        outcome: r.outcome.map(read_word).transpose()?,
+        spent: r.spent.map(read_json).transpose()?,
+        subagents: r.subagents.map(read_json).transpose()?,
+        needs_reconciliation: r.reconciliation.is_some(),
+    })
 }
 
-pub fn put_run(db: &Connection, r: &Run) -> rusqlite::Result<()> {
-    db.execute("insert or replace into session_run (id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)", params![r.id, r.session, r.issue, json(&r.triggered_by)?, json(&r.heard)?, r.started_at, r.ended_at, word_or_none(&r.outcome)?, r.summary, json_or_none(&r.spent)?])?;
-    Ok(())
+pub fn run(db: &Sqlite<'_>, id: &str) -> sqlx::Result<Option<Run>> {
+    optional(db.query(async |c| queries::get_run(c, queries::GetRunParams { id: id.into() }).await))?
+        .map(read_run)
+        .transpose()
 }
 
-pub fn next(db: &Connection, name: &str, at_least: i64) -> rusqlite::Result<i64> {
-    let last: Option<i64> = db
-        .query_row("select last_number from session_counter where name = ?1", [name], |r| r.get(0))
-        .optional()?;
-    let next = last.unwrap_or(0).max(at_least) + 1;
-    db.execute(
-        "insert or replace into session_counter (name, last_number) values (?1, ?2)",
-        params![name, next],
-    )?;
-    Ok(next)
+pub fn runs(db: &Sqlite<'_>, issue: &str) -> sqlx::Result<Vec<Run>> {
+    db.query(async |c| queries::list_runs(c, queries::ListRunsParams { issue: Some(issue.into()) }).await)?
+        .into_iter()
+        .map(read_run)
+        .collect()
+}
+
+pub fn put_run(db: &Sqlite<'_>, r: &Run) -> sqlx::Result<()> {
+    let params = queries::PutRunParams {
+        id: r.id.clone(),
+        session: r.session.clone(),
+        issue: r.issue.clone(),
+        summary: r.summary.clone(),
+        started_at: r.started_at,
+        ended_at: r.ended_at,
+        triggered_by: json(&r.triggered_by)?,
+        heard: json(&r.heard)?,
+        outcome: r.outcome.as_ref().map(word).transpose()?,
+        spent: r.spent.as_ref().map(json).transpose()?,
+    };
+    db.query(async |c| queries::put_run(c, params).await)
+}
+
+pub fn next(db: &Sqlite<'_>, name: &str, at_least: i64) -> sqlx::Result<i64> {
+    db.query(async |c| {
+        let last =
+            optional(queries::read_session_counter(&mut *c, queries::ReadSessionCounterParams { name: name.into() }).await)?.map_or(0, |r| r.last_number);
+        let next = last.max(at_least) + 1;
+        queries::write_session_counter(
+            c,
+            queries::WriteSessionCounterParams {
+                name: name.into(),
+                last_number: next,
+            },
+        )
+        .await?;
+        Ok(next)
+    })
 }

@@ -93,7 +93,7 @@ export type MediaCleanup = (typeof MediaCleanupValues)[number];
 
 export type MediaUnderstandingJob = { kind: MediaUnderstandingJobKind, id: string, prompt: string, inputs: Array<MediaInputReference>, model: string, connection: string, revision: number, source: MediaSource, authorization: MediaUnderstandingAuthorization | null, phase: MediaUnderstandingPhase, phaseText: string, problem: string, result: MediaUnderstandingResult | null, cleanup: MediaCleanup, cleanupText: string, canCancel: boolean, canCleanup: boolean, canRetryDownload: false, createdAt: number, updatedAt: number, };
 
-export type MediaSpeechEvent = { "type": "format", sampleRate: number, channels: number, 
+export type MediaSpeechEvent = { "type": "format", sampleRate: number, channels: number,
 /**
  * Always 16.
  */

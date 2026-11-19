@@ -135,6 +135,9 @@
     "noNotes": "No notes on this slide",
     "clock": "Time so far",
     "restart": "Restart timer",
-    "aside": "Next slide and notes"
+    "aside": "Next slide and notes",
+    "waiting": "Waiting for the slide deck",
+    "empty": "This deck has no slides",
+    "loadFailure": "Could not load the slide deck: {reason}"
   }
 }

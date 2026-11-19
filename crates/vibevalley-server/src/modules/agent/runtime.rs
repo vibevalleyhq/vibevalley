@@ -285,14 +285,20 @@ impl Fleet {
             } else {
                 t("server.runtime.oarUnknown", &[])
             };
-            info.installation = Installation::Unsupported(InstallationUnsupported { reason });
+            info.installation = Installation::Unsupported(InstallationUnsupported { reason, sign_in_command: None });
             return info;
         };
         let probed = runtime.clone();
-        let installation = within(PROBE_TIMEOUT, move || probed.installation()).unwrap_or(vibevalley_oar::Installation::NotInstalled);
+        let installation = within(PROBE_TIMEOUT, move || probed.installation()).unwrap_or_else(|| vibevalley_oar::Installation::Unusable {
+            reason: t("server.runtime.probeTimeout", &[]),
+        });
         info.installation = match installation {
+            vibevalley_oar::Installation::LoginRequired { path } => Installation::Unsupported(InstallationUnsupported {
+                reason: t("server.runtime.signInRequired", &[("runtime", info.preset.label.clone().into())]),
+                sign_in_command: Some(path.to_string_lossy().into_owned()),
+            }),
             vibevalley_oar::Installation::NotInstalled => Installation::NotFound(InstallationNotFound {}),
-            vibevalley_oar::Installation::Unusable { reason } => Installation::Unsupported(InstallationUnsupported { reason }),
+            vibevalley_oar::Installation::Unusable { reason } => Installation::Unsupported(InstallationUnsupported { reason, sign_in_command: None }),
             vibevalley_oar::Installation::Available { version, path } => {
                 if info.support.in_process || path.as_os_str() == "(built in)" {
                     Installation::Available(InstallationAvailable {

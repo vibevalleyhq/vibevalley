@@ -27,5 +27,13 @@
     "window": "Window",
     "close": "Close Window",
     "closeTab": "Close Tab"
+  },
+  "terminal": {
+    "noProject": "Open a project to start a terminal.",
+    "missingFolder": "This working directory no longer exists. The terminal could not open here.",
+    "dismiss": "OK"
+  },
+  "files": {
+    "missingInWorktree": "This file is unavailable in the issue worktree: {path}"
   }
 }

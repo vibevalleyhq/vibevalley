@@ -15,9 +15,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, Weak};
 use std::time::Duration;
 
-use rusqlite::{Connection, OptionalExtension, params};
+use pollster::block_on;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sqlx::{Connection, SqliteConnection};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Attachment, BizCode, Caller, Fact, JsNumber, MediaAudioFormat, MediaAudioMetadata, MediaAudioMetadataSource, MediaAudioResult, MediaCleanup,
@@ -26,13 +27,13 @@ use vibevalley_protocol::{
     MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Preview, ops,
 };
 
-use super::Stop;
 use super::image_provider::{Failure, ImageBackend, Prepared, Work};
 use super::remote::{RemoteFile, RemoteState};
 use super::understanding::Authorization;
 use super::vendor::{self, Account, Fetch, Moss, Outcome, Request, Task, TaskKind};
+use super::{Stop, q};
 use crate::Hub;
-use crate::base::open_db;
+use crate::base::open_sqlx_db;
 use crate::modules::attachment::{ATTACHMENT_MAX, Attachments};
 use crate::modules::channel::{Chat, Made, Posting};
 use crate::modules::media::inputs::Inputs;
@@ -49,7 +50,6 @@ const STREAM_MAX: usize = 128 * 1024 * 1024 - 44;
 const POLL: Duration = Duration::from_secs(3);
 const POLLS: usize = 600;
 const DOWNLOAD_TIME: Duration = Duration::from_secs(300);
-const ACTIVE: &str = "('queued','generating','downloading','authorized','uploading')";
 
 pub(super) fn refused(key: &str) -> ApiError {
     ApiError::new(BizCode::MediaRefused, t(&format!("server.media.{key}"), &[]))
@@ -497,7 +497,7 @@ pub struct Parts {
 }
 
 pub struct Jobs {
-    db: Mutex<Connection>,
+    db: Mutex<SqliteConnection>,
     held: Mutex<HashMap<String, Held>>,
     runs: Mutex<HashMap<String, Running>>,
     /// One schedule at a time, so a waiting job starts once.
@@ -521,12 +521,8 @@ pub struct Jobs {
 
 impl Jobs {
     pub fn open(p: Parts) -> Result<Arc<Jobs>, ApiError> {
-        let db = open_db(&p.home).map_err(storage)?;
-        db.execute_batch(
-            "create table if not exists media_job(id text primary key,kind text not null,phase text not null,data text not null,created_at integer not null,updated_at integer not null);
-             create index if not exists media_job_recent on media_job(created_at desc,id);",
-        )
-        .map_err(storage)?;
+        let mut db = block_on(open_sqlx_db(&p.home)).map_err(storage)?;
+        block_on(sqlx::raw_sql(include_str!("sql/jobs.sql")).execute(&mut db)).map_err(storage)?;
         let jobs = Arc::new(Jobs {
             db: Mutex::new(db),
             held: Mutex::default(),
@@ -574,7 +570,7 @@ impl Jobs {
         Ok(())
     }
 
-    fn db(&self) -> MutexGuard<'_, Connection> {
+    fn db(&self) -> MutexGuard<'_, SqliteConnection> {
         self.db.lock().unwrap_or_else(|e| e.into_inner())
     }
 
@@ -582,44 +578,51 @@ impl Jobs {
         self.runs.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    fn read(db: &Connection, id: &str) -> Result<Option<Record>, ApiError> {
-        let data: Option<String> = db
-            .query_row("select data from media_job where id=?1", [id], |r| r.get(0))
-            .optional()
-            .map_err(storage)?;
-        Ok(data.and_then(|s| serde_json::from_str(&s).ok()))
+    fn read(db: &mut SqliteConnection, id: &str) -> Result<Option<Record>, ApiError> {
+        match block_on(q::get_job(db, q::GetJobParams { id: id.into() })) {
+            Ok(row) => serde_json::from_str(&row.data).map(Some).map_err(storage),
+            Err(sqlx::Error::RowNotFound) => Ok(None),
+            Err(error) => Err(storage(error)),
+        }
     }
 
     pub(super) fn found(&self, id: &str) -> Result<Record, ApiError> {
-        Self::read(&self.db(), id)?.ok_or_else(|| refused("missing"))
+        Self::read(&mut self.db(), id)?.ok_or_else(|| refused("missing"))
     }
 
-    pub(super) fn rows(&self, sql: &str) -> Result<Vec<Record>, ApiError> {
-        let db = self.db();
-        let mut q = db.prepare(sql).map_err(storage)?;
-        let rows: Vec<String> = q.query_map([], |r| r.get::<_, String>(0)).map_err(storage)?.filter_map(Result::ok).collect();
-        Ok(rows.into_iter().filter_map(|d| serde_json::from_str(&d).ok()).collect())
+    pub(super) fn rows(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<Vec<q::GetJobRow>>) -> Result<Vec<Record>, ApiError> {
+        block_on(query(&mut self.db()))
+            .map_err(storage)?
+            .into_iter()
+            .map(|row| serde_json::from_str(&row.data).map_err(storage))
+            .collect()
     }
 
     fn recent(&self) -> Result<Vec<Record>, ApiError> {
-        self.rows("select data from media_job order by created_at desc,id limit 100")
+        self.rows(async |db| q::recent_jobs(db).await)
     }
 
-    fn save(db: &Connection, r: &mut Record) -> Result<(), ApiError> {
+    fn save(db: &mut SqliteConnection, r: &mut Record) -> Result<(), ApiError> {
         r.updated_at = now();
-        db.execute(
-            "insert into media_job(id,kind,phase,data,created_at,updated_at) values (?1,?2,?3,?4,?5,?6)
-             on conflict(id) do update set phase=excluded.phase,data=excluded.data,updated_at=excluded.updated_at",
-            params![
-                r.id(),
-                r.ask.kind(),
-                r.phase.as_str(),
-                serde_json::to_string(r).map_err(storage)?,
-                r.created_at,
-                r.updated_at
-            ],
-        )
-        .map_err(storage)?;
+        block_on(q::save_job(
+            db,
+            q::SaveJobParams {
+                id: r.id().into(),
+                kind: r.ask.kind().into(),
+                phase: r.phase.as_str().into(),
+                data: serde_json::to_string(r).map_err(storage)?,
+                created_at: r.created_at,
+                updated_at: r.updated_at,
+            },
+        ))
+        .map_err(storage)
+    }
+
+    fn require_capacity(db: &mut SqliteConnection) -> Result<(), ApiError> {
+        let count = block_on(q::active_count(db)).map_err(storage)?.total;
+        if count >= ADMITTED {
+            return Err(refused("busy"));
+        }
         Ok(())
     }
 
@@ -642,13 +645,19 @@ impl Jobs {
             return Ok(false);
         }
         {
-            let db = self.db();
-            let Some(mut r) = Self::read(&db, id)? else { return Ok(false) };
+            let mut db = self.db();
+            let mut tx = block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
+            let Some(mut r) = Self::read(&mut tx, id)? else { return Ok(false) };
             if !before.contains(&r.phase) {
                 return Ok(false);
             }
+            let was_active = active(r.phase);
             patch(&mut r);
-            Self::save(&db, &mut r)?;
+            if !was_active && active(r.phase) {
+                Self::require_capacity(&mut tx)?;
+            }
+            Self::save(&mut tx, &mut r)?;
+            block_on(tx.commit()).map_err(storage)?;
         }
         self.publish();
         Ok(true)
@@ -668,7 +677,7 @@ impl Jobs {
 
     /// The job already under this ask's id, refused when it was asked otherwise.
     pub(super) fn known(&self, ask: &Ask, alike: impl FnOnce(&Record) -> bool) -> Result<Option<Record>, ApiError> {
-        match Self::read(&self.db(), ask.id())? {
+        match Self::read(&mut self.db(), ask.id())? {
             Some(old) if old.ask != *ask || !alike(&old) => Err(refused("reusedId")),
             old => Ok(old),
         }
@@ -678,23 +687,27 @@ impl Jobs {
     pub(super) fn admit(&self, mut r: Record, held: Option<Held>) -> Result<Record, ApiError> {
         self.open_for_work()?;
         {
-            let db = self.db();
-            if let Some(old) = Self::read(&db, r.id())? {
-                if old.ask != r.ask || old.source != r.source {
+            // Another worker may scan queued jobs as soon as the transaction commits.
+            let _schedule = self.scheduling.lock().unwrap_or_else(|e| e.into_inner());
+            let mut db = self.db();
+            let mut tx = block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
+            if let Some(old) = Self::read(&mut tx, r.id())? {
+                if old.ask != r.ask || old.source != r.source || old.authorization.as_ref().map(|a| &a.channel) != r.authorization.as_ref().map(|a| &a.channel)
+                {
                     return Err(refused("reusedId"));
                 }
                 return Ok(old);
             }
-            let busy: i64 = db
-                .query_row(&format!("select count(*) from media_job where phase in {ACTIVE}"), [], |x| x.get(0))
-                .map_err(storage)?;
-            if busy >= ADMITTED {
-                return Err(refused("busy"));
+            Self::require_capacity(&mut tx)?;
+            let ids: Vec<_> = r.input.iter().chain(&r.inputs).map(|input| input.id.clone()).collect();
+            if !ids.is_empty() {
+                self.inputs.pin_in(&mut tx, &ids, r.id())?;
             }
-            Self::save(&db, &mut r)?;
-        }
-        if let Some(held) = held {
-            self.hold(r.id(), held);
+            Self::save(&mut tx, &mut r)?;
+            block_on(tx.commit()).map_err(storage)?;
+            if let Some(held) = held {
+                self.hold(r.id(), held);
+            }
         }
         self.publish();
         self.schedule();
@@ -715,7 +728,7 @@ impl Jobs {
         }
         self.open_for_work()?;
         let ask = Ask::Image(request);
-        if let Some(old) = Self::read(&self.db(), ask.id())? {
+        if let Some(old) = Self::read(&mut self.db(), ask.id())? {
             if old.ask != ask || old.source != source {
                 return Err(refused("reusedId"));
             }
@@ -776,7 +789,7 @@ impl Jobs {
             return Err(refused("speechInvalid"));
         }
         let ask = Ask::Speech(request.clone());
-        if let Some(old) = Self::read(&self.db(), &request.id)? {
+        if let Some(old) = Self::read(&mut self.db(), &request.id)? {
             if old.ask != ask || old.source != source {
                 return Err(refused("reusedId"));
             }
@@ -812,7 +825,7 @@ impl Jobs {
         }
         let Some(me) = self.me.get().and_then(Weak::upgrade) else { return };
         let _one = self.scheduling.lock().unwrap_or_else(|e| e.into_inner());
-        let waiting = match self.rows("select data from media_job where phase in ('queued','generating','downloading') order by created_at,id") {
+        let waiting = match self.rows(async |db| q::waiting_jobs(db).await) {
             Ok(w) => w,
             Err(e) => return eprintln!("media: {}", e.message),
         };
@@ -1141,7 +1154,7 @@ impl Jobs {
             return None;
         }
         let input = self.inputs.adopt(&attachment.id).ok()?;
-        self.inputs.pin(std::slice::from_ref(&input.id), r.id(), |_| Ok(())).ok()?;
+        self.inputs.pin(std::slice::from_ref(&input.id), r.id()).ok()?;
         Some(input.id)
     }
 
@@ -1161,7 +1174,7 @@ impl Jobs {
             })
             .map_err(|e| e.message)?;
         let input = self.inputs.upload(&input.id, std::io::Cursor::new(bytes)).map_err(|e| e.message)?;
-        self.inputs.pin(std::slice::from_ref(&input.id), id, |_| Ok(())).map_err(|e| e.message)?;
+        self.inputs.pin(std::slice::from_ref(&input.id), id).map_err(|e| e.message)?;
         Ok((
             None,
             Some(MediaInputReference {
@@ -1368,7 +1381,7 @@ impl Jobs {
     /// Jobs a restart left: a known vendor task is asked again (never a stream), a download fetched again, the rest
     /// given up. What never started lets go of its inputs; an upload cut short may or may not be at the vendor.
     fn pick_up(&self) -> Result<(), ApiError> {
-        for r in self.rows(&format!("select data from media_job where phase in {ACTIVE}"))? {
+        for r in self.rows(async |db| q::active_jobs(db).await)? {
             let id = r.id();
             self.note(id, |r| {
                 for file in r.remote.iter_mut().filter(|f| f.state == RemoteState::Uploading) {
@@ -1441,13 +1454,6 @@ impl Jobs {
         }
         if !r.can_retry_download() {
             return Err(refused("noDownload"));
-        }
-        let busy: i64 = self
-            .db()
-            .query_row(&format!("select count(*) from media_job where phase in {ACTIVE}"), [], |x| x.get(0))
-            .map_err(storage)?;
-        if busy >= ADMITTED {
-            return Err(refused("busy"));
         }
         self.change(id, &[r.phase], |r| {
             r.phase = Phase::Downloading;

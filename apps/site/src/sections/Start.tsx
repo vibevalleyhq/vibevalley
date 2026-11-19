@@ -56,7 +56,7 @@ export default function Start(props: Props) {
                 done={props.copy.start.copied}
               />
             </div>
-            <pre class="mt-3.5 overflow-x-auto border-2 border-bark-900 bg-bark-900 px-5 py-4.5 font-mono text-sm leading-[1.8] text-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-bark-600)]">
+            <pre class="mt-3.5 whitespace-pre-wrap wrap-anywhere border-2 border-bark-900 bg-bark-900 px-5 py-4.5 font-mono text-sm leading-[1.8] text-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-bark-600)]">
               {props.commands.map((c) => (
                 <span class="block">
                   <span class="text-wheat select-none">$ </span>

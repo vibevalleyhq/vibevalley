@@ -1,0 +1,378 @@
+{
+  "seq": 17,
+  "state": {
+    "call": "idle",
+    "callReason": "",
+    "chat": {
+      "channels": [
+        {
+          "id": "general",
+          "type": "channel",
+          "default": true,
+          "orchestrator": "orchestrator",
+          "members": ["orchestrator"],
+          "category": "",
+          "notify": "all",
+          "name": "general",
+          "description": "",
+          "subjectKind": null,
+          "lastNumber": 2,
+          "replies": 2,
+          "unread": 2,
+          "title": "general",
+          "last": {
+            "from": "orchestrator",
+            "name": "管家",
+            "text": "先问清楚再提交",
+            "at": 1795032463963
+          },
+          "at": 1795032463963
+        },
+        {
+          "id": "dm:orchestrator",
+          "type": "direct",
+          "default": false,
+          "peer": "orchestrator",
+          "orchestrator": "orchestrator",
+          "category": "",
+          "notify": "all",
+          "name": "orchestrator",
+          "description": "",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "orchestrator",
+          "at": 1795032420481
+        }
+      ],
+      "userMentions": []
+    },
+    "commits": {
+      "total": 0,
+      "repos": []
+    },
+    "progress": {
+      "coins": 0,
+      "streak": 0,
+      "bestStreak": 0,
+      "counts": {
+        "merged": 0
+      },
+      "unlocked": [],
+      "agents": {}
+    },
+    "issues": [
+      {
+        "id": "issue-774a37beeddcc8c2567acb35",
+        "number": 2,
+        "title": "先问清楚再提交",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 0,
+          "autoSubmitPr": false
+        },
+        "repo": "parity",
+        "assignments": [
+          {
+            "id": "assign-issue-774a37beeddcc8c2567acb35",
+            "issue": "issue-774a37beeddcc8c2567acb35",
+            "agent": "agent-5367d7cfc3e4eb8d1b242551",
+            "assignedAt": 1795032463915,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "sess-9c5ce54d372025d0ecac7065",
+                "startedAt": 1795032463915
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795032463913,
+        "queuedAt": 1795032463914,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [
+          {
+            "question": "用 8787 还是 8797？",
+            "options": []
+          }
+        ],
+        "criteria": [],
+        "checks": [],
+        "lastRun": {
+          "startedAt": 1795032463964,
+          "endedAt": 1795032464028,
+          "outcome": "completed"
+        },
+        "stage": {
+          "state": "asking",
+          "since": 1795032464028,
+          "lead": "answer",
+          "acts": [
+            {
+              "act": "answer",
+              "does": "say"
+            },
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "issue-b029002a2d36c21b7edf16b4",
+        "number": 1,
+        "title": "提交打卡页",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 0,
+          "autoSubmitPr": false
+        },
+        "repo": "parity",
+        "assignments": [
+          {
+            "id": "assign-issue-b029002a2d36c21b7edf16b4",
+            "issue": "issue-b029002a2d36c21b7edf16b4",
+            "agent": "agent-842c2d39b35d2250516b3d7e",
+            "assignedAt": 1795032463712,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "sess-f657b9e2d173e028d62f915d",
+                "startedAt": 1795032463712
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795032463710,
+        "queuedAt": 1795032463711,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "lastRun": {
+          "startedAt": 1795032463754,
+          "endedAt": 1795032463823,
+          "outcome": "completed"
+        },
+        "stage": {
+          "state": "reviewing",
+          "since": 1795032463823,
+          "lead": "complete",
+          "acts": [
+            {
+              "act": "complete",
+              "does": "move",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "act": "reject",
+              "does": "move",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "act": "tell",
+              "does": "say"
+            },
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      }
+    ],
+    "connectors": [
+      {
+        "id": "weixin",
+        "state": "off",
+        "qr": "",
+        "pairCode": "",
+        "pending": 0,
+        "error": ""
+      },
+      {
+        "id": "feishu",
+        "state": "off",
+        "qr": "",
+        "pairCode": "",
+        "pending": 0,
+        "error": ""
+      },
+      {
+        "id": "qq",
+        "state": "off",
+        "qr": "",
+        "pairCode": "",
+        "pending": 0,
+        "error": ""
+      }
+    ],
+    "machines": [
+      {
+        "id": "here",
+        "name": "local",
+        "here": true,
+        "online": true,
+        "joinedAt": 1795032494380
+      }
+    ],
+    "sessions": [
+      {
+        "id": "sess-f657b9e2d173e028d62f915d",
+        "role": "worker",
+        "name": "fox",
+        "agent": "agent-842c2d39b35d2250516b3d7e",
+        "runtime": "pi",
+        "brief": "提交打卡页",
+        "repo": "parity",
+        "branch": "vibevalley/issue-issue-b029002a2d36c21b7edf16b4",
+        "worktree": "/fixture/work/worktrees/parity.issue-b029002a2d36c21b7edf16b4",
+        "hiredAt": 1795032463712,
+        "runs": 1,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "done",
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "做完了：提交打卡页｜人设：无",
+          "at": 1795032463823
+        },
+        "channel": "conv-issue-issue-b029002a2d36c21b7edf16b4",
+        "scope": {
+          "kind": "issue",
+          "id": "issue-b029002a2d36c21b7edf16b4"
+        }
+      },
+      {
+        "id": "sess-9c5ce54d372025d0ecac7065",
+        "role": "worker",
+        "name": "owl",
+        "agent": "agent-5367d7cfc3e4eb8d1b242551",
+        "runtime": "pi",
+        "brief": "先问清楚再提交",
+        "repo": "parity",
+        "branch": "vibevalley/issue-issue-774a37beeddcc8c2567acb35",
+        "worktree": "/fixture/work/worktrees/parity.issue-774a37beeddcc8c2567acb35",
+        "hiredAt": 1795032463915,
+        "runs": 1,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "done",
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "做完了：先问清楚再提交｜人设：无\n\n要问用户：用 8787 还是 8797？",
+          "at": 1795032464028
+        },
+        "channel": "conv-issue-issue-774a37beeddcc8c2567acb35",
+        "scope": {
+          "kind": "issue",
+          "id": "issue-774a37beeddcc8c2567acb35"
+        }
+      }
+    ],
+    "crons": []
+  },
+  "inbox": [
+    {
+      "id": "sess-9c5ce54d372025d0ecac7065:ask:1",
+      "kind": "ask",
+      "from": {
+        "kind": "session",
+        "id": "sess-9c5ce54d372025d0ecac7065",
+        "name": "owl",
+        "agent": "agent-5367d7cfc3e4eb8d1b242551"
+      },
+      "who": "owl",
+      "text": "用 8787 还是 8797？",
+      "at": 1795032464028,
+      "target": {
+        "kind": "session",
+        "id": "sess-9c5ce54d372025d0ecac7065"
+      },
+      "words": {
+        "label": "Ask",
+        "title": "owl asked",
+        "body": "用 8787 还是 8797？",
+        "tray": ""
+      }
+    },
+    {
+      "id": "sess-f657b9e2d173e028d62f915d:review:1",
+      "kind": "review",
+      "from": {
+        "kind": "session",
+        "id": "sess-f657b9e2d173e028d62f915d",
+        "name": "fox",
+        "agent": "agent-842c2d39b35d2250516b3d7e"
+      },
+      "who": "fox",
+      "text": "做完了：提交打卡页｜人设：无",
+      "at": 1795032463823,
+      "target": {
+        "kind": "session",
+        "id": "sess-f657b9e2d173e028d62f915d"
+      },
+      "words": {
+        "label": "Review",
+        "title": "fox waiting review",
+        "body": "做完了：提交打卡页｜人设：无",
+        "tray": "fox: review"
+      }
+    }
+  ],
+  "view": {
+    "level": {
+      "level": 1,
+      "xp": 0,
+      "need": 10
+    },
+    "plots": {
+      "issue-774a37beeddcc8c2567acb35": {
+        "crop": "wheat"
+      },
+      "issue-b029002a2d36c21b7edf16b4": {
+        "crop": "wheat"
+      }
+    },
+    "plays": {
+      "sess-9c5ce54d372025d0ecac7065": {
+        "station": 1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "sess-f657b9e2d173e028d62f915d": {
+        "station": 0,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      }
+    },
+    "achievements": []
+  },
+  "effects": []
+}

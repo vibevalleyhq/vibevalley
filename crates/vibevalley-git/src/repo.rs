@@ -109,7 +109,7 @@ impl Repo {
         &self.root
     }
 
-    fn git(&self, subcommand: &str) -> Cmd<'_> {
+    pub(crate) fn git(&self, subcommand: &str) -> Cmd<'_> {
         Cmd::new(&self.root, subcommand)
     }
 
@@ -128,7 +128,7 @@ impl Repo {
         self.rev_parse("HEAD^{commit}")
     }
 
-    fn require_commit(&self, command: &str, rev: &str) -> Result<String> {
+    pub(crate) fn require_commit(&self, command: &str, rev: &str) -> Result<String> {
         check_rev(command, rev)?;
         self.rev_parse(&format!("{rev}^{{commit}}"))?.ok_or_else(|| GitError::Command {
             command: command.to_string(),
@@ -647,7 +647,7 @@ impl Repo {
         Ok(tip)
     }
 
-    fn trial_merge(&self, ours: &str, theirs: &str) -> Result<MergeCheck> {
+    pub(crate) fn trial_merge(&self, ours: &str, theirs: &str) -> Result<MergeCheck> {
         let ancestor = self.git("merge-base").args(["--is-ancestor", theirs, ours]).read().output()?;
         match ancestor.code {
             0 => return Ok(MergeCheck::UpToDate),
@@ -701,14 +701,49 @@ impl Repo {
         self.head()?.ok_or_else(|| GitError::Parse("no HEAD after merge".into()))
     }
 
+    pub fn worktree_tree(&self) -> Result<String> {
+        let temp = self.temp_index()?;
+        self.git("add").arg("--all").env("GIT_INDEX_FILE", &temp.path).run()?;
+        Ok(self.git("write-tree").env("GIT_INDEX_FILE", &temp.path).run()?.text())
+    }
+
+    pub fn tree_id(&self, rev: &str) -> Result<String> {
+        check_rev("rev-parse", rev)?;
+        self.rev_parse(&format!("{rev}^{{tree}}"))?
+            .ok_or_else(|| GitError::Parse(format!("no tree for {rev}")))
+    }
+
+    pub fn contains_commit(&self, branch: &str, commit: &str) -> Result<bool> {
+        check_rev("merge-base", branch)?;
+        check_rev("merge-base", commit)?;
+        if self.rev_parse(&format!("{commit}^{{commit}}"))?.is_none() || self.rev_parse(&format!("{branch}^{{commit}}"))?.is_none() {
+            return Ok(false);
+        }
+        let out = self.git("merge-base").args(["--is-ancestor", commit, branch]).read().output()?;
+        match out.code {
+            0 => Ok(true),
+            1 => Ok(false),
+            _ => Err(failure("merge-base", &out)),
+        }
+    }
+
+    pub fn retain_review(&self, base: &str, tree: &str) -> Result<()> {
+        let base = self.require_commit("review", base)?;
+        let tree = self.tree_id(tree)?;
+        self.git("update-ref")
+            .arg("--stdin")
+            .stdin(format!(
+                "update refs/vibevalley/reviews/bases/{base} {base}\nupdate refs/vibevalley/reviews/trees/{tree} {tree}\n"
+            ))
+            .run()?;
+        Ok(())
+    }
+
     /// Records the full working-tree state (tracked + untracked) as a commit
     /// under `refs/vibevalley/snapshots/` without touching HEAD, the index or the
     /// working tree. Returns the snapshot commit id.
     pub fn snapshot(&self, label: &str) -> Result<String> {
-        let temp = self.temp_index()?;
-        self.git("add").arg("--all").env("GIT_INDEX_FILE", &temp.path).run()?;
-        let tree = self.git("write-tree").env("GIT_INDEX_FILE", &temp.path).run()?.text();
-        drop(temp);
+        let tree = self.worktree_tree()?;
 
         let subject: String = label.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
         let mut cmd = self.git("commit-tree").arg("--no-gpg-sign").arg(&tree);

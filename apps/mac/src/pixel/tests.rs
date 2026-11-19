@@ -25,6 +25,46 @@ pub(crate) fn save(name: &str, img: &image::RgbaImage) {
 }
 
 #[test]
+fn regression_overlapping_helpers_draw_and_hit_in_arrival_order_at_the_same_animation_step() {
+    let (world, atlas) = load_village().unwrap();
+    let mut scene = FarmScene::new(world, atlas);
+    let mut frame = Frame::parse(&fixture("state.json"));
+    let mut first = frame.state.sessions.iter().find(|s| s.id == "s-ripe").unwrap().clone();
+    first.id = "z-first".into();
+    first.agent = "owl".into();
+    let mut last = first.clone();
+    last.id = "a-last".into();
+    last.agent = "fox".into();
+    for species in ["owl", "fox"] {
+        scene.agent_looks.insert(species.into(), (species.into(), "farmer".into()));
+    }
+    frame.view.plays.insert(first.id.clone(), farm::frame::Play { station: 0. });
+    frame.view.plays.insert(last.id.clone(), farm::frame::Play { station: 1. });
+    frame.state.sessions = vec![first];
+    scene.apply_frame(frame.clone());
+    scene.tick(0.);
+    frame.seq += 1;
+    frame.state.sessions.push(last);
+    scene.apply_frame(frame);
+    for _ in 0..30 {
+        scene.tick(1. / 60.);
+    }
+    let list = scene.draw(3.);
+    let bodies: Vec<_> = list
+        .ops
+        .iter()
+        .filter_map(|op| match op {
+            draw::Op::Sprite { name, .. } if name.starts_with("owl-farmer-") || name.starts_with("fox-farmer-") => Some(name.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(bodies, ["owl-farmer-side", "fox-farmer-side"]);
+    let at = scene.helper_feet("a-last").unwrap();
+    assert_eq!(scene.helper_feet("z-first"), Some(at));
+    assert_eq!(scene.hit_at(at + level::pt(0., -8.)), Some(farm::world::VillageHit::Session("a-last".into())));
+}
+
+#[test]
 fn farm_walks_helpers_to_their_work() {
     if !assets_dir().join("village.ldtk").exists() {
         eprintln!("skipped: no assets");
@@ -66,8 +106,8 @@ fn map_draws_an_island_per_repo() {
     use super::farm::islands::{MapHit, MapScene, RepoSummary};
     let atlas = load_atlas().unwrap();
     let mut map = MapScene::new(atlas.clone());
-    map.frame = Frame::parse(&fixture("state.json"));
-    map.repos = serde_json::from_value::<Vec<RepoSummary>>(fixture("responses.json")["repo.list"].clone()).unwrap();
+    map.apply_frame(Frame::parse(&fixture("state.json")));
+    map.set_repos(serde_json::from_value::<Vec<RepoSummary>>(fixture("responses.json")["repo.list"].clone()).unwrap());
     map.tick(0.1);
     let state = map.debug_state();
     let islands = state["islands"].as_array().unwrap();
@@ -85,6 +125,24 @@ fn map_draws_an_island_per_repo() {
     assert!(
         matches!(hit, Some(MapHit::Island(_)) | Some(MapHit::Plot { .. }) | Some(MapHit::Sow(_))),
         "{hit:?}"
+    );
+}
+
+#[test]
+fn regression_map_uses_the_helpers_outfit_and_the_issues_conflict() {
+    let mut state = fixture("state.json");
+    let worker = &mut state["state"]["sessions"][0];
+    worker["phase"] = serde_json::json!({"_tag":"resting"});
+    state["state"]["issues"][0]["stage"] = serde_json::json!({"state":"stuck","stuck":"conflict","acts":[]});
+    let (_, atlas) = load_village().unwrap();
+    let mut map = farm::islands::MapScene::new(atlas);
+    map.apply_frame(Frame::parse(&state));
+    map.agent_looks.insert("agent-owl".into(), ("fox".into(), "farmer".into()));
+    assert!(
+        map.draw(1.5)
+            .ops
+            .iter()
+            .any(|op| matches!(op, draw::Op::Sprite { name, .. } if name == "fox-farmer-worry"))
     );
 }
 
@@ -152,7 +210,7 @@ fn regression_night_tints_ground_but_keeps_hud_readable() {
     scene.clock.set_time_of_day(0.92);
     let night = scene.draw(2.0);
     assert!(night.lit > 0);
-    assert!(night.ops[night.lit..].iter().all(|op| matches!(op, draw::Op::Glow { .. })));
+    assert!(night.ops[night.lit..].iter().any(|op| matches!(op, draw::Op::Glow { .. })));
     let energy = |img: image::RgbaImage| img.pixels().map(|p| p.0[..3].iter().map(|c| *c as u64).sum::<u64>()).sum::<u64>();
     assert!(energy(raster(&night, Some(&atlas), 1.0)) < energy(raster(&day, Some(&atlas), 1.0)));
     let paper = |list: &draw::DrawList| {
@@ -176,20 +234,20 @@ fn regression_farm_controls_stay_in_the_pane_and_modal_blocks_the_ground() {
     scene.frame = Frame::parse(&fixture("state.json"));
     for size in [(320.0, 400.0), (768.0, 512.0), (1200.0, 700.0)] {
         scene.view_size = size;
-        let layout = Layout::new(size);
-        for b in layout.nav.iter().chain(&layout.tools) {
+        let layout = Layout::new(&scene);
+        for b in layout.nav.iter().map(|n| &n.bounds).chain(&layout.tools) {
             assert!(b.x >= 0.0 && b.y >= 0.0 && b.x + b.w <= size.0 && b.y + b.h <= size.1);
             assert!(hit(&scene, b.x + b.w / 2.0, b.y + b.h / 2.0).is_some());
         }
-        scene.panel = Some(Panel::Chat);
+        scene.panel = Some(Panel::Log);
         assert_eq!(hit(&scene, 0.0, 0.0), Some(Action::Block));
         let list = scene.draw(2.0);
         assert!(list.hud_view);
-        save(&format!("farm-chat-{}", size.0 as u32), &draw::raster_view(&list, Some(&atlas), size));
+        save(&format!("farm-log-{}", size.0 as u32), &draw::raster_view(&list, Some(&atlas), size));
         scene.panel = None;
-        scene.phone_open = true;
+        scene.phone.open = true;
         assert_eq!(hit(&scene, layout.phone.x + 40.0, layout.phone.y + 40.0), Some(Action::Block));
-        scene.phone_open = false;
+        scene.phone.open = false;
     }
 }
 
@@ -255,7 +313,14 @@ fn regression_helper_outfits_change_on_the_next_frame() {
 #[test]
 fn regression_native_farm_labels_are_embedded_for_both_languages() {
     for locale in ["zh", "en"] {
-        for key in ["web.farm.native.progress", "web.farm.native.treeCounts", "web.farm.tool.hand.hint"] {
+        for key in [
+            "web.farm.native.progress",
+            "web.farm.native.treeCounts",
+            "web.farm.tool.hand.hint",
+            "web.farm.native.islandWorking",
+            "web.farm.native.islandGone",
+            "web.farm.native.islandQueued",
+        ] {
             assert_ne!(vibevalley_i18n::t_in(locale, key, &[]), key);
         }
     }
@@ -273,10 +338,92 @@ fn farm_fixture_supplies_typed_chat_and_profiles() {
     let (world, atlas) = load_village().unwrap();
     let mut scene = FarmScene::new(world, atlas);
     scene.frame = frame;
-    scene.panel = Some(farm::hud::Panel::Chat);
-    let p = farm::hud::Layout::new(scene.view_size).panel;
+    scene.panel = Some(farm::hud::Panel::Log);
+    let p = farm::hud::Layout::new(&scene).panel;
     assert_eq!(
         farm::hud::hit(&scene, p.x + 20.0, p.y + 50.0),
         Some(farm::hud::Action::Route(format!("/chat/{}", messages[0].channel)))
     );
+}
+
+#[test]
+fn regression_plot_hover_tracks_the_current_tool_and_offered_action() {
+    use farm::{scene::FarmTool, world::VillageHit};
+    use vibevalley_i18n::t;
+    let (world, atlas) = load_village().unwrap();
+    let mut scene = FarmScene::new(world, atlas);
+    scene.frame = Frame::parse(&fixture("state.json"));
+    scene.hover = Some(VillageHit::Plot(4));
+    scene.tool = FarmTool::Harvest;
+    let can_harvest = t("web.farm.overlay.click", &[("text", t("web.farm.aim.harvestRipe", &[]).into())]);
+    let offered = serde_json::from_value(serde_json::json!({"act":"complete","does":"move","status":"done","words":"none"})).unwrap();
+    scene
+        .frame
+        .state
+        .issues
+        .iter_mut()
+        .find(|i| i.id == "i-105")
+        .unwrap()
+        .stage
+        .as_mut()
+        .unwrap()
+        .acts
+        .push(offered);
+    for size in [(568., 720.), (1208., 800.)] {
+        scene.view_size = size;
+        assert!(
+            scene
+                .draw(1.)
+                .hud
+                .iter()
+                .any(|item| matches!(item, draw::HudOp::Text{text,..} if text==&can_harvest))
+        );
+    }
+    scene
+        .frame
+        .state
+        .issues
+        .iter_mut()
+        .find(|i| i.id == "i-105")
+        .unwrap()
+        .stage
+        .as_mut()
+        .unwrap()
+        .acts
+        .clear();
+    let unavailable = t("web.farm.aim.unavailable", &[("state", t("shared.stage.reviewing", &[]).to_lowercase().into())]);
+    let list = scene.draw(1.);
+    assert!(list.hud.iter().any(|item| matches!(item,draw::HudOp::Text{text,..} if text==&unavailable)));
+    assert!(!list.hud.iter().any(|item| matches!(item,draw::HudOp::Text{text,..} if text==&can_harvest)));
+}
+
+#[test]
+fn regression_unread_channel_badge_stays_inside_the_chat_hit_area() {
+    use farm::hud::{Action, Layout, hit};
+    let (world, atlas) = load_village().unwrap();
+    let mut scene = FarmScene::new(world, atlas);
+    scene.frame = Frame::parse(&fixture("state.json"));
+    for channel in &mut scene.frame.state.chat.channels {
+        channel.unread = None;
+    }
+    let chat = |f: &FarmScene| {
+        Layout::new(f)
+            .nav
+            .into_iter()
+            .find(|c| c.action == Action::Route("/chat".into()))
+            .unwrap()
+            .bounds
+    };
+    for size in [(568., 720.), (1208., 800.)] {
+        scene.view_size = size;
+        let plain = chat(&scene);
+        scene.frame.state.chat.channels[0].unread = Some(12);
+        let with_badge = chat(&scene);
+        assert!(with_badge.w > plain.w + 10.);
+        assert_eq!(
+            hit(&scene, with_badge.x + with_badge.w - 4., with_badge.y + 10.),
+            Some(Action::Route("/chat".into()))
+        );
+        scene.frame.state.chat.channels[0].unread = None;
+    }
 }

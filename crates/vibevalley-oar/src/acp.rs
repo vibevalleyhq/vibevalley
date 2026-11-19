@@ -21,9 +21,7 @@
 //!   request with its allow option, `AcceptEdits` those of kind `edit`,
 //!   `delete` and `move`.
 //!
-//! Not available over ACP: `steer` (refused; use `queue`), a denial's
-//! message, token usage, and the agent's own login flow (an agent that
-//! answers "auth required" fails the open with `NotAvailable`).
+//! An agent that answers "auth required" fails the open with `NotAvailable`.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -33,16 +31,15 @@ use std::time::Duration;
 
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::schema::{
-    CancelNotification, Implementation, InitializeRequest, LoadSessionRequest, NewSessionRequest, PromptRequest, RequestPermissionOutcome,
-    RequestPermissionRequest, RequestPermissionResponse, ResumeSessionRequest, SelectedPermissionOutcome, SetSessionConfigOptionRequest, SetSessionModeRequest,
-    SystemPrompt,
+    CancelNotification, Implementation, InitializeRequest, LoadSessionRequest, NewSessionRequest, RequestPermissionOutcome, RequestPermissionRequest,
+    RequestPermissionResponse, ResumeSessionRequest, SelectedPermissionOutcome, SetSessionConfigOptionRequest, SetSessionModeRequest, SystemPrompt,
 };
 use agent_client_protocol::v1::{ConnectionTo, Responder};
 use agent_client_protocol::{Agent, Client, Lines, UntypedMessage};
 use base64::Engine;
 use serde_json::{Value, json};
 
-use crate::core::{CoreSession, Driver, SessionCore, absolute, check_cwd, file_as_text, lock, rejected, rejection};
+use crate::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, lock, rejected, rejection};
 use crate::process::{LineChild, Spawn, find_binary, run_capture};
 use crate::record::{self, Recorder};
 use crate::{
@@ -133,11 +130,14 @@ fn split_command_line(line: &str) -> Result<Vec<String>> {
     Ok(words)
 }
 
-/// The ACP agents VibeValley knows how to start: Gemini CLI and OpenCode.
+/// The built-in ACP launch profiles.
 pub fn builtin_agents() -> Vec<AcpAgentSpec> {
     vec![
         AcpAgentSpec::new("acp:gemini", "Gemini CLI (ACP)", "gemini", ["--acp"]),
-        AcpAgentSpec::new("acp:opencode", "OpenCode (ACP)", "opencode", ["acp"]),
+        AcpAgentSpec::new("grok", "Grok CLI", "grok", ["agent", "stdio"]),
+        AcpAgentSpec::new("kimi", "Kimi CLI", "kimi", ["acp"]),
+        AcpAgentSpec::new("codebuddy", "CodeBuddy CLI", "codebuddy", ["--acp"]),
+        AcpAgentSpec::new("opencode", "OpenCode (ACP)", "opencode", ["acp"]),
     ]
 }
 
@@ -440,6 +440,7 @@ struct PendingPermission {
 }
 
 enum Command {
+    Steer(Vec<Value>),
     Prompt(Vec<Value>),
     Cancel,
     Shutdown,
@@ -468,26 +469,55 @@ struct Shared {
     abort_killed: AtomicBool,
     turns_finished: AtomicU64,
     image_input: AtomicBool,
+    children: Mutex<HashMap<String, Vec<String>>>,
+    updates: Mutex<std::collections::VecDeque<String>>,
     commands: flume::Sender<Command>,
     cwd: PathBuf,
 }
 
 impl Shared {
     fn agent_path(&self, params: &Value) -> Vec<String> {
-        match (str_of(params, "sessionId"), self.acp_session.get()) {
-            // opencode reports child sessions on the parent's connection.
-            (Some(session), Some(own)) if session != own => vec![session.to_string()],
-            _ => Vec::new(),
+        let root = self.acp_session.get().map(String::as_str).unwrap_or_default();
+        let meta = params
+            .pointer("/_meta/opencode~1child-session")
+            .or_else(|| params.pointer("/update/_meta/opencode~1child-session"));
+        let mut id = str_of(params, "sessionId").unwrap_or(root);
+        let mut paths = lock(&self.children);
+        if let Some(meta) = meta
+            && let Some(child) = meta
+                .as_str()
+                .or_else(|| ["childSessionId", "sessionId", "id"].into_iter().find_map(|k| str_of(meta, k)))
+            && child != root
+        {
+            let parent = str_of(meta, "parentSessionId").or_else(|| str_of(meta, "parentId")).unwrap_or(id);
+            let mut parent_path = paths
+                .get(parent)
+                .cloned()
+                .unwrap_or_else(|| if parent == root { vec![] } else { vec![parent.to_owned()] });
+            parent_path.push(child.to_string());
+            if !paths.contains_key(child) {
+                if let Some(core) = self.core.get() {
+                    core.child_session(parent, child, &parent_path);
+                }
+                paths.insert(child.to_owned(), parent_path);
+            }
+            id = child;
         }
+        paths.get(id).cloned().unwrap_or_else(|| if id != root { vec![id.into()] } else { vec![] })
     }
 
     fn on_update(&self, params: &Value) {
+        let line = lock(&self.updates)
+            .pop_front()
+            .unwrap_or_else(|| json!({"jsonrpc":"2.0","method":"session/update","params":params}).to_string());
         if self.replaying.load(Ordering::SeqCst) {
             return;
         }
         let Some(core) = self.core.get() else { return };
         let Some(update) = params.get("update") else { return };
         let path = self.agent_path(params);
+        let frame_type = format!("session/update/{}", str_of(update, "sessionUpdate").unwrap_or_default());
+        let _frame = core.record_raw(&frame_type, path.clone(), &line, params);
         let events = lock(&self.projector).update(update);
         for kind in events {
             core.emit(path.clone(), kind);
@@ -609,12 +639,6 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
     let session_capability = |key: &str| capabilities.pointer(&format!("/sessionCapabilities/{key}")).is_some_and(|v| !v.is_null());
     let image_input = capabilities.pointer("/promptCapabilities/image").and_then(Value::as_bool) == Some(true);
 
-    if opts.effort.is_some() {
-        return Err(unsupported("effort", format!("{name} takes no reasoning effort over ACP")));
-    }
-    if !opts.disallowed_tools.is_empty() {
-        return Err(unsupported("disallowed_tools", format!("{name} cannot forbid single tools over ACP")));
-    }
     // A replacing prompt overrides the agent's own, with the appended part after it.
     let (mode, text) = match (&opts.system_prompt, &opts.append_system_prompt) {
         (None, None) => ("append", None),
@@ -624,6 +648,7 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
     };
     let system_prompt = match text {
         None => None,
+        Some(_) if matches!(name.as_str(), "grok" | "acp:opencode" | "opencode") && !session_capability("systemPrompt") => None,
         Some(_) if !session_capability("systemPrompt") => {
             let option = if opts.system_prompt.is_some() {
                 "system_prompt"
@@ -675,9 +700,21 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
         }
     };
 
+    let mut meta = serde_json::Map::new();
+    if system_prompt.is_none() {
+        if let Some(text) = &opts.system_prompt {
+            meta.insert("systemPrompt".into(), json!(text));
+        }
+        if let Some(text) = &opts.append_system_prompt {
+            meta.insert("appendSystemPrompt".into(), json!(text));
+        }
+    }
     let (session_id, session) = match &opts.resume {
         None => {
             let mut request = NewSessionRequest::new(&opts.cwd).mcp_servers(mcp_servers.clone());
+            if !meta.is_empty() {
+                request.meta = Some(meta.clone());
+            }
             if let Some(prompt) = system_prompt {
                 request = request.system_prompt(prompt);
             }
@@ -686,14 +723,20 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
         }
         Some(id) if session_capability("resume") => {
             let mut request = ResumeSessionRequest::new(id.clone(), &opts.cwd).mcp_servers(mcp_servers.clone());
+            if !meta.is_empty() {
+                request.meta = Some(meta.clone());
+            }
             if let Some(prompt) = system_prompt {
                 request = request.system_prompt(prompt);
             }
             let reply = cx.send_request(request).block_task().await.map_err(|e| open_error("session/resume", e))?;
             (id.clone(), serde_json::to_value(&reply).unwrap_or(Value::Null))
         }
-        Some(id) if capabilities.get("loadSession").and_then(Value::as_bool) == Some(true) => {
+        Some(id) if capabilities.get("loadSession").and_then(Value::as_bool) == Some(true) || session_capability("load") => {
             let mut request = LoadSessionRequest::new(id.clone(), &opts.cwd).mcp_servers(mcp_servers.clone());
+            if !meta.is_empty() {
+                request.meta = Some(meta.clone());
+            }
             if let Some(prompt) = system_prompt {
                 request = request.system_prompt(prompt);
             }
@@ -709,7 +752,7 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
     let mut model = current_model(&session);
     if let Some(wanted) = &opts.model {
         let listed = models_of(&session);
-        if !listed.iter().any(|m| &m.id == wanted) {
+        if !listed.is_empty() && !listed.iter().any(|m| &m.id == wanted) {
             let reason = if listed.is_empty() {
                 format!("{name} offers no model selection over ACP")
             } else {
@@ -730,6 +773,16 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
         };
         outcome.map_err(|e| unsupported("model", acp_error("the agent refused the model", &e)))?;
         model = Some(wanted.clone());
+    }
+
+    if let Some(effort) = &opts.effort {
+        let id = config_option(&session, "thought_level")
+            .and_then(|o| str_of(o, "id"))
+            .unwrap_or("reasoning_effort");
+        cx.send_request(SetSessionConfigOptionRequest::new(session_id.clone(), id.to_string(), effort.as_str()))
+            .block_task()
+            .await
+            .map_err(|e| unsupported("effort", acp_error("the agent refused the reasoning effort", &e)))?;
     }
 
     let modes: Vec<String> = session
@@ -814,13 +867,17 @@ async fn serve(
     while let Ok(command) = commands.recv_async().await {
         match command {
             Command::Prompt(blocks) => {
-                let request: PromptRequest = typed(json!({ "sessionId": session_id, "prompt": blocks }))?;
+                let request = UntypedMessage::new("session/prompt", json!({ "sessionId": session_id, "prompt": blocks }))?;
                 let shared = shared.clone();
                 // Ordered: the answer is handled after every update that preceded it.
                 cx.send_request(request).on_receiving_result(move |result| async move {
                     match result {
                         Ok(reply) => {
-                            let (reason, error) = stop_reason(&serde_json::to_value(&reply).unwrap_or(Value::Null));
+                            let _frame = shared
+                                .core
+                                .get()
+                                .map(|core| core.record_raw("session/prompt_result", vec![], &reply.to_string(), &reply));
+                            let (reason, error) = stop_reason(&reply);
                             shared.turn_finished(reason, error);
                         }
                         Err(error) => {
@@ -835,6 +892,9 @@ async fn serve(
                     }
                     Ok(())
                 })?;
+            }
+            Command::Steer(blocks) => {
+                cx.send_notification(UntypedMessage::new("session/steer", json!({"sessionId":session_id, "prompt":blocks}))?)?;
             }
             Command::Cancel => {
                 shared.cancel_pending();
@@ -900,6 +960,7 @@ fn connection_thread(
         child.kill();
     }
     if let Some(core) = shared.core.get() {
+        core.observe_exit(shared.child.get().and_then(|c| c.status()));
         if shared.abort_killed.load(Ordering::SeqCst) && core.turn_active() {
             core.emit_root(EventKind::TurnFinished {
                 reason: StopReason::Aborted,
@@ -972,8 +1033,8 @@ impl Driver for AcpDriver {
         self.send(Command::Prompt(self.blocks(&content)?))
     }
 
-    fn steer(&self, _content: Vec<ContentBlock>) -> Result<()> {
-        Err(unsupported("steer", "ACP has no way to add input to a running turn"))
+    fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
+        self.send(Command::Steer(self.blocks(&content)?))
     }
 
     fn abort(&self) -> Result<()> {
@@ -1021,6 +1082,9 @@ impl Driver for AcpDriver {
         let _ = self.shared.commands.send(Command::Shutdown);
         if let Some(child) = self.shared.child.get() {
             child.kill();
+            if let Some(core) = self.shared.core.get() {
+                core.observe_exit(child.status());
+            }
         }
     }
 }
@@ -1043,12 +1107,8 @@ impl AcpRuntime {
         &self.spec
     }
 
-    fn binary(&self) -> Result<PathBuf> {
-        find_binary(&self.spec.command).ok_or_else(|| AgentError::NotAvailable(format!("`{}` was not found on PATH", self.spec.command)))
-    }
-
     fn connect(&self, opts: &SessionOptions) -> Result<Connected> {
-        let binary = self.binary()?;
+        let binary = opts.binary(&self.spec.command)?;
         let (commands_tx, commands_rx) = flume::unbounded();
         let shared = Arc::new(Shared {
             runtime_id: self.spec.id.clone(),
@@ -1064,13 +1124,21 @@ impl AcpRuntime {
             abort_killed: AtomicBool::new(false),
             turns_finished: AtomicU64::new(0),
             image_input: AtomicBool::new(false),
+            children: Default::default(),
+            updates: Default::default(),
             commands: commands_tx,
             cwd: opts.cwd.clone(),
         });
         let (incoming_tx, incoming_rx) = futures::channel::mpsc::unbounded::<std::io::Result<String>>();
         let on_line = {
             let incoming = incoming_tx.clone();
+            let shared = shared.clone();
             move |line: &str| {
+                if let Ok(v) = serde_json::from_str::<Value>(line)
+                    && v["method"] == "session/update"
+                {
+                    lock(&shared.updates).push_back(line.to_string());
+                }
                 let _ = incoming.unbounded_send(Ok(line.to_string()));
             }
         };
@@ -1083,6 +1151,7 @@ impl AcpRuntime {
                 args: self.spec.args.clone(),
                 cwd: &opts.cwd,
                 env: &opts.env,
+                options: Some(opts),
                 env_remove: &[],
             },
             on_line,
@@ -1102,7 +1171,7 @@ impl AcpRuntime {
             child.kill();
             return Err(AgentError::Io(format!("cannot start the ACP thread: {error}")));
         }
-        match ready_rx.recv_timeout(OPEN_TIMEOUT) {
+        match ready_rx.recv_timeout(opts.request_timeout.unwrap_or(OPEN_TIMEOUT)) {
             Ok(Ok(opened)) => Ok(Connected { shared, opened }),
             Ok(Err(error)) => {
                 child.kill();
@@ -1131,12 +1200,12 @@ impl Runtime for AcpRuntime {
     fn capabilities(&self) -> Capabilities {
         Capabilities {
             resume: true,
-            steer: false,
+            steer: matches!(self.id(), "grok" | "acp:opencode" | "opencode"),
             queue: true,
             permission_requests: true,
             model_selection: true,
             subagents: false,
-            usage: false,
+            usage: true,
         }
     }
 
@@ -1164,12 +1233,15 @@ impl Runtime for AcpRuntime {
         Ok(models_of(&connected.opened.session))
     }
 
-    fn open(&self, opts: SessionOptions) -> Result<Arc<dyn Session>> {
-        check_cwd(&opts.cwd)?;
+    fn open(&self, mut opts: SessionOptions) -> Result<Arc<dyn Session>> {
+        opts.prepare(self.id())?;
         let file = record::open_file(opts.record_to.as_deref())?;
         let Connected { shared, opened } = self.connect(&opts)?;
         let recorder = Recorder::start(file, &self.spec.id, &opened.session_id, &opts.cwd, opened.model.as_deref());
         let core = SessionCore::new(&self.spec.id, &opened.session_id, recorder);
+        if opts.resume.is_some() {
+            core.resume_meter(&Value::Null, "acp_resume_baseline_unknown");
+        }
         core.emit_root(EventKind::SessionStarted {
             session_id: opened.session_id.clone(),
             model: opened.model.clone(),

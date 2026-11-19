@@ -1,114 +1,25 @@
-//! The chat's tables and queries (VibeValley `db/migrations` and
-//! `db/queries/channel*.sql`), on SQLite: times are integer milliseconds,
-//! `greatest` is `max`, a JSON field is read with `json_extract`.
+use std::cell::RefCell;
 
-use rusqlite::{Connection, OptionalExtension, Row, params};
+use pollster::block_on;
+use sqlx::SqliteConnection;
 
-pub type Sql<T> = rusqlite::Result<T>;
+use super::queries;
 
-pub const SCHEMA: &str = "
-create table if not exists channel_participant (
-  id text primary key,
-  kind text not null check (kind in ('user', 'agent', 'system')),
-  name text not null,
-  agent_id text,
-  home_id text,
-  joined_at integer not null,
-  left_at integer,
-  check (kind = 'agent' or agent_id is null)
-);
-create table if not exists channel (
-  id text primary key,
-  type text not null check (type in ('channel', 'direct', 'thread')),
-  is_default integer not null default 0,
-  root_id text unique,
-  root_number integer,
-  subject_kind text check (subject_kind in ('issue', 'talk')),
-  subject_id text,
-  last_number integer,
-  reply_count integer not null default 0,
-  created_at integer not null,
-  name text,
-  description text,
-  repo text,
-  parent_id text references channel (id),
-  peer_id text unique references channel_participant (id),
-  revision integer not null default 0,
-  category text,
-  position integer,
-  archived_at integer,
-  notify text not null default 'all' check (notify in ('all', 'mentions', 'none'))
-);
-create table if not exists channel_message (
-  id text primary key,
-  channel_id text not null references channel (id),
-  number integer not null,
-  sender_id text not null references channel_participant (id),
-  kind text not null check (kind in ('chat', 'dispatch', 'report', 'notice')),
-  body text not null,
-  meta text,
-  send_key text,
-  created_at integer not null,
-  revision integer not null,
-  reply_number integer,
-  edited_at integer,
-  deleted_at integer,
-  pinned_at integer,
-  reactions text,
-  unique (channel_id, number),
-  unique (channel_id, revision)
-);
-create table if not exists channel_mention (
-  message_id text not null references channel_message (id) on delete cascade,
-  target_id text not null,
-  resolved text not null check (resolved in ('delivered', 'absent', 'unknown')),
-  primary key (message_id, target_id)
-);
-create table if not exists channel_member (
-  channel_id text not null references channel (id),
-  participant_id text not null references channel_participant (id),
-  reason text not null check (reason in ('user', 'replied', 'mentioned', 'manual')),
-  from_number integer not null,
-  left_at integer,
-  primary key (channel_id, participant_id)
-);
-create table if not exists channel_read_cursor (
-  participant_id text not null references channel_participant (id),
-  channel_id text not null references channel (id),
-  read_number integer not null,
-  updated_at integer not null,
-  primary key (participant_id, channel_id)
-);
-create table if not exists channel_seen (
-  participant_id text not null references channel_participant (id),
-  message_id text not null references channel_message (id) on delete cascade,
-  seen_at integer not null,
-  primary key (participant_id, message_id)
-);
-create table if not exists channel_event (
-  seq integer primary key autoincrement,
-  kind text not null check (kind in ('posted', 'removed')),
-  channel_id text not null,
-  message_id text not null,
-  at integer not null
-);
-create table if not exists watch_cursor (
-  name text primary key,
-  seq integer not null
-);
-create unique index if not exists channel_by_name on channel (name) where name is not null and type <> 'thread';
-create index if not exists channel_by_subject on channel (subject_kind, subject_id);
-create unique index if not exists channel_one_default on channel (is_default) where is_default;
-create index if not exists channel_by_parent on channel (parent_id) where parent_id is not null;
-create index if not exists channel_mention_by_target on channel_mention (target_id, message_id);
-create index if not exists channel_message_by_channel on channel_message (channel_id, number);
-create index if not exists channel_message_by_sender on channel_message (sender_id, id);
-create unique index if not exists channel_message_send_key on channel_message (sender_id, send_key) where send_key is not null;
-create index if not exists channel_event_by_message on channel_event (message_id);
-create index if not exists channel_member_by_participant on channel_member (participant_id);
-create index if not exists channel_read_cursor_by_channel on channel_read_cursor (channel_id);
-create index if not exists channel_seen_by_message on channel_seen (message_id);
-";
+pub type Sql<T> = sqlx::Result<T>;
+// Inner serializes access; a read borrows mutably only while the SQLx worker executes its statement.
+pub type Connection = RefCell<SqliteConnection>;
+pub const SCHEMA: &str = include_str!("sql/schema.sql");
+
+pub(super) fn control(db: &Connection, statement: &'static str) -> Sql<()> {
+    block_on(sqlx::raw_sql(statement).execute(&mut *db.borrow_mut())).map(|_| ())
+}
+
+fn optional<T>(result: Sql<T>) -> Sql<Option<T>> {
+    match result {
+        Err(sqlx::Error::RowNotFound) => Ok(None),
+        other => other.map(Some),
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChannelRow {
@@ -135,7 +46,6 @@ pub struct ChannelRow {
 }
 
 impl ChannelRow {
-    /// `emptyChannelRow`.
     pub fn empty(id: &str, kind: &str, created_at: i64) -> ChannelRow {
         ChannelRow {
             id: id.into(),
@@ -160,33 +70,6 @@ impl ChannelRow {
             notify: "all".into(),
         }
     }
-}
-
-const CHANNEL_COLS: &str = "id, type, is_default, root_id, root_number, subject_kind, subject_id, last_number, reply_count, created_at, name, description, repo, parent_id, peer_id, revision, category, position, archived_at, notify";
-
-fn channel_row(r: &Row) -> Sql<ChannelRow> {
-    Ok(ChannelRow {
-        id: r.get(0)?,
-        r#type: r.get(1)?,
-        is_default: r.get(2)?,
-        root_id: r.get(3)?,
-        root_number: r.get(4)?,
-        subject_kind: r.get(5)?,
-        subject_id: r.get(6)?,
-        last_number: r.get(7)?,
-        reply_count: r.get(8)?,
-        created_at: r.get(9)?,
-        name: r.get(10)?,
-        description: r.get(11)?,
-        repo: r.get(12)?,
-        parent_id: r.get(13)?,
-        peer_id: r.get(14)?,
-        revision: r.get(15)?,
-        category: r.get(16)?,
-        position: r.get(17)?,
-        archived_at: r.get(18)?,
-        notify: r.get(19)?,
-    })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -222,7 +105,6 @@ pub struct MsgRow {
     pub sender_agent: Option<String>,
 }
 
-/// A message with where it was said (`UserMentions`, `SearchMessages`).
 #[derive(Debug, Clone)]
 pub struct PlacedRow {
     pub row: MsgRow,
@@ -232,89 +114,204 @@ pub struct PlacedRow {
     pub channel_name: String,
 }
 
-const MSG: &str = "select m.id, m.channel_id, m.number, m.sender_id, m.kind, m.body, m.meta, m.send_key, m.created_at, m.revision, m.reply_number, m.edited_at, m.deleted_at, m.pinned_at, m.reactions, p.name, p.kind, p.agent_id";
-const MSG_FROM: &str = "from channel_message m join channel_participant p on p.id = m.sender_id";
-
-fn msg_row(r: &Row) -> Sql<MsgRow> {
-    Ok(MsgRow {
-        id: r.get(0)?,
-        channel_id: r.get(1)?,
-        number: r.get(2)?,
-        sender_id: r.get(3)?,
-        kind: r.get(4)?,
-        body: r.get(5)?,
-        meta: r.get(6)?,
-        send_key: r.get(7)?,
-        created_at: r.get(8)?,
-        revision: r.get(9)?,
-        reply_number: r.get(10)?,
-        edited_at: r.get(11)?,
-        deleted_at: r.get(12)?,
-        pinned_at: r.get(13)?,
-        reactions: r.get(14)?,
-        sender_name: r.get(15)?,
-        sender_kind: r.get(16)?,
-        sender_agent: r.get(17)?,
-    })
+pub struct UnreadRow {
+    pub r#type: String,
+    pub root_number: Option<i64>,
+    pub channel_name: String,
+    pub unread: i64,
+    pub mentions_you: bool,
+    pub latest_sender_name: Option<String>,
 }
 
-fn placed_row(r: &Row) -> Sql<PlacedRow> {
-    Ok(PlacedRow {
-        row: msg_row(r)?,
-        channel_type: r.get(18)?,
-        root_number: r.get(19)?,
-        top_id: r.get(20)?,
-        channel_name: r.get(21)?,
-    })
+#[derive(Debug, Clone, PartialEq)]
+pub struct EventRow {
+    pub seq: i64,
+    pub kind: String,
+    pub channel_id: String,
+    pub message_id: String,
+    pub at: i64,
 }
 
-fn msgs(db: &Connection, tail: &str, p: impl rusqlite::Params) -> Sql<Vec<MsgRow>> {
-    let mut st = db.prepare_cached(&format!("{MSG} {MSG_FROM} {tail}"))?;
-    st.query_map(p, msg_row)?.collect()
+pub struct SearchParams<'a> {
+    pub text: &'a str,
+    pub channel: &'a str,
+    pub sender: &'a str,
+    pub has_file: bool,
+    pub has_image: bool,
+    pub has_link: bool,
+    pub after: i64,
+    pub before: i64,
+    pub n: i64,
 }
 
-fn msg(db: &Connection, tail: &str, p: impl rusqlite::Params) -> Sql<Option<MsgRow>> {
-    db.query_row(&format!("{MSG} {MSG_FROM} {tail}"), p, msg_row).optional()
+impl From<queries::AllChannelsRow> for ChannelRow {
+    fn from(r: queries::AllChannelsRow) -> Self {
+        Self {
+            id: r.id,
+            r#type: r.r#type,
+            is_default: r.is_default != 0,
+            root_id: r.root_id,
+            root_number: r.root_number,
+            subject_kind: r.subject_kind,
+            subject_id: r.subject_id,
+            last_number: r.last_number,
+            reply_count: r.reply_count,
+            created_at: r.created_at,
+            name: r.name,
+            description: r.description,
+            repo: r.repo,
+            parent_id: r.parent_id,
+            peer_id: r.peer_id,
+            revision: r.revision,
+            category: r.category,
+            position: r.position,
+            archived_at: r.archived_at,
+            notify: r.notify,
+        }
+    }
 }
 
-// ----- channel.sql -----
+impl From<queries::MessageByIdRow> for MsgRow {
+    fn from(r: queries::MessageByIdRow) -> Self {
+        Self {
+            id: r.id,
+            channel_id: r.channel_id,
+            number: r.number,
+            sender_id: r.sender_id,
+            kind: r.kind,
+            body: r.body,
+            meta: r.meta,
+            send_key: r.send_key,
+            created_at: r.created_at,
+            revision: r.revision,
+            reply_number: r.reply_number,
+            edited_at: r.edited_at,
+            deleted_at: r.deleted_at,
+            pinned_at: r.pinned_at,
+            reactions: r.reactions,
+            sender_name: r.sender_name,
+            sender_kind: r.sender_kind,
+            sender_agent: r.sender_agent,
+        }
+    }
+}
+
+impl From<queries::EventsAfterRow> for EventRow {
+    fn from(r: queries::EventsAfterRow) -> Self {
+        Self {
+            seq: r.seq,
+            kind: r.kind,
+            channel_id: r.channel_id,
+            message_id: r.message_id,
+            at: r.at,
+        }
+    }
+}
+
+impl From<queries::UnreadOfRow> for UnreadRow {
+    fn from(r: queries::UnreadOfRow) -> Self {
+        Self {
+            r#type: r.r#type,
+            root_number: r.root_number,
+            channel_name: r.channel_name,
+            unread: r.unread,
+            mentions_you: r.mentions_you != 0,
+            latest_sender_name: r.latest_sender_name,
+        }
+    }
+}
+
+impl From<queries::ParticipantsRow> for ParticipantRow {
+    fn from(r: queries::ParticipantsRow) -> Self {
+        Self {
+            id: r.id,
+            kind: r.kind,
+            name: r.name,
+            agent_id: r.agent_id,
+            home_id: r.home_id,
+            joined_at: r.joined_at,
+            left_at: r.left_at,
+        }
+    }
+}
+
+impl From<queries::UserMentionsRow> for PlacedRow {
+    fn from(r: queries::UserMentionsRow) -> Self {
+        Self {
+            row: MsgRow {
+                id: r.id,
+                channel_id: r.channel_id,
+                number: r.number,
+                sender_id: r.sender_id,
+                kind: r.kind,
+                body: r.body,
+                meta: r.meta,
+                send_key: r.send_key,
+                created_at: r.created_at,
+                revision: r.revision,
+                reply_number: r.reply_number,
+                edited_at: r.edited_at,
+                deleted_at: r.deleted_at,
+                pinned_at: r.pinned_at,
+                reactions: r.reactions,
+                sender_name: r.sender_name,
+                sender_kind: r.sender_kind,
+                sender_agent: r.sender_agent,
+            },
+            channel_type: r.channel_type,
+            root_number: r.root_number,
+            top_id: r.top_id,
+            channel_name: r.channel_name,
+        }
+    }
+}
 
 pub fn default_id(db: &Connection) -> Sql<Option<String>> {
-    db.query_row("select id from channel where is_default", [], |r| r.get(0)).optional()
+    optional(block_on(queries::default_id(&mut *db.borrow_mut()))).map(|row| row.map(|r| r.id))
 }
 
 pub fn create_channel(db: &Connection, id: &str, is_default: bool, name: &str, description: Option<&str>, repo: Option<&str>, at: i64) -> Sql<()> {
-    db.execute(
-        "insert into channel (id, type, is_default, name, description, repo, created_at) values (?1, 'channel', ?2, ?3, ?4, ?5, ?6)",
-        params![id, is_default, name, description, repo, at],
-    )?;
-    Ok(())
+    block_on(queries::create_channel(
+        &mut *db.borrow_mut(),
+        queries::CreateChannelParams {
+            id: id.to_owned(),
+            is_default: i64::from(is_default),
+            name: Some(name.to_owned()),
+            description: description.map(str::to_owned),
+            repo: repo.map(str::to_owned),
+            created_at: at,
+        },
+    ))
 }
 
 pub fn create_direct(db: &Connection, id: &str, peer: &str, at: i64) -> Sql<()> {
-    db.execute(
-        "insert into channel (id, type, peer_id, created_at) values (?1, 'direct', ?2, ?3) on conflict (peer_id) do nothing",
-        params![id, peer, at],
-    )?;
-    Ok(())
+    block_on(queries::create_direct(
+        &mut *db.borrow_mut(),
+        queries::CreateDirectParams {
+            id: id.to_owned(),
+            peer_id: Some(peer.to_owned()),
+            created_at: at,
+        },
+    ))
 }
 
 pub fn clear_default(db: &Connection) -> Sql<()> {
-    db.execute("update channel set is_default = 0 where is_default", [])?;
-    Ok(())
+    block_on(queries::clear_default(&mut *db.borrow_mut()))
 }
 
 pub fn make_default(db: &Connection, id: &str) -> Sql<()> {
-    db.execute("update channel set is_default = 1 where id = ?1 and type = 'channel'", [id])?;
-    Ok(())
+    block_on(queries::make_default(&mut *db.borrow_mut(), queries::MakeDefaultParams { id: id.to_owned() }))
 }
 
 pub fn update_channel(db: &Connection, id: &str, description: Option<&str>, repo: Option<&str>) -> Sql<()> {
-    db.execute(
-        "update channel set description = ?1, repo = ?2 where id = ?3 and type = 'channel'",
-        params![description, repo, id],
-    )?;
-    Ok(())
+    block_on(queries::update_channel(
+        &mut *db.borrow_mut(),
+        queries::UpdateChannelParams {
+            description: description.map(str::to_owned),
+            repo: repo.map(str::to_owned),
+            id: id.to_owned(),
+        },
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -328,308 +325,286 @@ pub fn create_thread(
     parent_id: &str,
     at: i64,
 ) -> Sql<()> {
-    db.execute(
-        "insert into channel (id, type, root_id, root_number, subject_kind, subject_id, parent_id, created_at) values (?1, 'thread', ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![id, root_id, root_number, subject_kind, subject_id, parent_id, at],
-    )?;
-    Ok(())
+    block_on(queries::create_thread(
+        &mut *db.borrow_mut(),
+        queries::CreateThreadParams {
+            id: id.to_owned(),
+            root_id: Some(root_id.to_owned()),
+            root_number: Some(root_number),
+            subject_kind: Some(subject_kind.to_owned()),
+            subject_id: subject_id.map(str::to_owned),
+            parent_id: Some(parent_id.to_owned()),
+            created_at: at,
+        },
+    ))
 }
 
 pub fn all_channels(db: &Connection) -> Sql<Vec<ChannelRow>> {
-    let mut st = db.prepare(&format!("select {CHANNEL_COLS} from channel order by id"))?;
-    st.query_map([], channel_row)?.collect()
+    block_on(queries::all_channels(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn recent_channels(db: &Connection, n: i64) -> Sql<Vec<ChannelRow>> {
-    let mut st = db.prepare(&format!(
-        "select {CHANNEL_COLS} from channel order by coalesce(last_number, 0) desc, id desc limit ?1"
-    ))?;
-    st.query_map([n], channel_row)?.collect()
+    block_on(queries::recent_channels(&mut *db.borrow_mut(), queries::RecentChannelsParams { limit: n })).map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn touch_channel(db: &Connection, id: &str, number: i64) -> Sql<()> {
-    db.execute(
-        "update channel set last_number = max(coalesce(last_number, 0), ?1),
-           reply_count = reply_count + case when type = 'thread' then 1 else 0 end where id = ?2",
-        params![number, id],
-    )?;
-    Ok(())
+    block_on(queries::touch_channel(
+        &mut *db.borrow_mut(),
+        queries::TouchChannelParams {
+            last_number: number,
+            id: id.to_owned(),
+        },
+    ))
 }
 
-pub struct UnreadRow {
-    pub r#type: String,
-    pub root_number: Option<i64>,
-    pub channel_name: String,
-    pub unread: i64,
-    pub mentions_you: bool,
-    pub latest_sender_name: Option<String>,
-}
-
-/// `UnreadOf`: a participant's unread, the channel it is in and the
-/// threads it follows, newest first, at most 20.
 pub fn unread_of(db: &Connection, participant: &str, channel: &str) -> Sql<Vec<UnreadRow>> {
-    let mut st = db.prepare_cached(
-        "with unread as (
-           select c.id, c.type, c.root_number, coalesce(ch.name, c.name, '') as channel_name,
-                  count(m.id) as unread,
-                  max(exists (select 1 from channel_mention x where x.message_id = m.id and x.target_id = ?1)) as mentions_you,
-                  coalesce(max(m.number), 0) as latest
-           from channel c
-           left join channel ch on ch.id = c.parent_id
-           join channel_message m on m.channel_id = c.id
-           left join channel_read_cursor rc on rc.participant_id = ?1 and rc.channel_id = c.id
-           left join channel_member f on f.channel_id = c.id and f.participant_id = ?1 and f.left_at is null
-           where m.sender_id <> ?1 and m.kind <> 'notice'
-             and (c.id = ?2 or f.participant_id is not null)
-             and m.number > max(coalesce(rc.read_number, 0), coalesce(f.from_number, 0))
-             and not exists (select 1 from channel_seen s where s.participant_id = ?1 and s.message_id = m.id)
-           group by c.id, ch.name
-         )
-         select u.type, u.root_number, u.channel_name, u.unread, u.mentions_you,
-                (select p.name from channel_message lm join channel_participant p on p.id = lm.sender_id
-                 where lm.channel_id = u.id and lm.number = u.latest)
-         from unread u order by u.latest desc limit 20",
-    )?;
-    st.query_map(params![participant, channel], |r| {
-        Ok(UnreadRow {
-            r#type: r.get(0)?,
-            root_number: r.get(1)?,
-            channel_name: r.get(2)?,
-            unread: r.get(3)?,
-            mentions_you: r.get(4)?,
-            latest_sender_name: r.get(5)?,
-        })
-    })?
-    .collect()
+    block_on(queries::unread_of(
+        &mut *db.borrow_mut(),
+        queries::UnreadOfParams {
+            target_id: participant.to_owned(),
+            id: channel.to_owned(),
+        },
+    ))
+    .map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn bump_revision(db: &Connection, id: &str) -> Sql<i64> {
-    db.query_row("update channel set revision = revision + 1 where id = ?1 returning revision", [id], |r| {
-        r.get(0)
-    })
+    block_on(queries::bump_revision(&mut *db.borrow_mut(), queries::BumpRevisionParams { id: id.to_owned() })).map(|r| r.revision)
 }
 
 pub fn rename_channel(db: &Connection, id: &str, name: Option<&str>) -> Sql<()> {
-    db.execute("update channel set name = ?1 where id = ?2 and type <> 'direct'", params![name, id])?;
-    Ok(())
+    block_on(queries::rename_channel(
+        &mut *db.borrow_mut(),
+        queries::RenameChannelParams {
+            name: name.map(str::to_owned),
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn set_category(db: &Connection, id: &str, category: Option<&str>) -> Sql<()> {
-    db.execute("update channel set category = ?1 where id = ?2 and type = 'channel'", params![category, id])?;
-    Ok(())
+    block_on(queries::set_category(
+        &mut *db.borrow_mut(),
+        queries::SetCategoryParams {
+            category: category.map(str::to_owned),
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn place_channel(db: &Connection, id: &str, position: i64) -> Sql<()> {
-    db.execute("update channel set position = ?1 where id = ?2", params![position, id])?;
-    Ok(())
+    block_on(queries::place_channel(
+        &mut *db.borrow_mut(),
+        queries::PlaceChannelParams {
+            position: Some(position),
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn set_archived(db: &Connection, id: &str, at: Option<i64>) -> Sql<()> {
-    db.execute("update channel set archived_at = ?1 where id = ?2 and not is_default", params![at, id])?;
-    Ok(())
+    block_on(queries::set_archived(
+        &mut *db.borrow_mut(),
+        queries::SetArchivedParams {
+            archived_at: at,
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn set_notify(db: &Connection, id: &str, notify: &str) -> Sql<()> {
-    db.execute("update channel set notify = ?1 where id = ?2", params![notify, id])?;
-    Ok(())
+    block_on(queries::set_notify(
+        &mut *db.borrow_mut(),
+        queries::SetNotifyParams {
+            notify: notify.to_owned(),
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn topic_threads_in(db: &Connection, id: &str) -> Sql<i64> {
-    db.query_row(
-        "select count(*) from channel t where t.parent_id = ?1 and t.subject_kind = 'issue'",
-        [id],
-        |r| r.get(0),
-    )
+    block_on(queries::topic_threads_in(
+        &mut *db.borrow_mut(),
+        queries::TopicThreadsInParams {
+            parent_id: Some(id.to_owned()),
+        },
+    ))
+    .map(|r| r.total)
 }
-
-/// A channel deleted with its threads, what was said in them, their
-/// members and read cursors (`deleteChannel` in store.ts, in its order).
-pub fn delete_channel(db: &Connection, id: &str) -> Sql<()> {
-    let threads = "select t.id from channel t where t.parent_id = ?1";
-    db.execute(&format!("delete from channel_message where channel_id in ({threads})"), [id])?;
-    db.execute(&format!("delete from channel_member where channel_id = ?1 or channel_id in ({threads})"), [id])?;
-    db.execute(
-        &format!("delete from channel_read_cursor where channel_id = ?1 or channel_id in ({threads})"),
-        [id],
-    )?;
-    db.execute("delete from channel where parent_id = ?1", [id])?;
-    db.execute("delete from channel_message where channel_id = ?1", [id])?;
-    db.execute("delete from channel where id = ?1 and not is_default", [id])?;
-    Ok(())
-}
-
-// ----- channel_participant.sql -----
 
 pub fn upsert_participant(db: &Connection, p: &ParticipantRow) -> Sql<()> {
-    db.execute(
-        "insert into channel_participant (id, kind, name, agent_id, home_id, joined_at) values (?1, ?2, ?3, ?4, ?5, ?6)
-         on conflict (id) do update set name = excluded.name, agent_id = excluded.agent_id,
-           home_id = coalesce(excluded.home_id, channel_participant.home_id), left_at = null",
-        params![p.id, p.kind, p.name, p.agent_id, p.home_id, p.joined_at],
-    )?;
-    Ok(())
+    block_on(queries::upsert_participant(
+        &mut *db.borrow_mut(),
+        queries::UpsertParticipantParams {
+            id: p.id.clone(),
+            kind: p.kind.clone(),
+            name: p.name.clone(),
+            agent_id: p.agent_id.clone(),
+            home_id: p.home_id.clone(),
+            joined_at: p.joined_at,
+        },
+    ))
 }
 
 pub fn add_participant(db: &Connection, id: &str, kind: &str, name: &str, at: i64) -> Sql<()> {
-    db.execute(
-        "insert into channel_participant (id, kind, name, joined_at) values (?1, ?2, ?3, ?4) on conflict (id) do nothing",
-        params![id, kind, name, at],
-    )?;
-    Ok(())
+    block_on(queries::add_participant(
+        &mut *db.borrow_mut(),
+        queries::AddParticipantParams {
+            id: id.to_owned(),
+            kind: kind.to_owned(),
+            name: name.to_owned(),
+            joined_at: at,
+        },
+    ))
 }
 
 pub fn participant_left(db: &Connection, id: &str, at: i64) -> Sql<()> {
-    db.execute("update channel_participant set left_at = ?1 where id = ?2 and left_at is null", params![at, id])?;
-    Ok(())
+    block_on(queries::participant_left(
+        &mut *db.borrow_mut(),
+        queries::ParticipantLeftParams {
+            left_at: Some(at),
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn participants(db: &Connection) -> Sql<Vec<ParticipantRow>> {
-    let mut st = db.prepare("select id, kind, name, agent_id, home_id, joined_at, left_at from channel_participant order by joined_at, rowid")?;
-    st.query_map([], |r| {
-        Ok(ParticipantRow {
-            id: r.get(0)?,
-            kind: r.get(1)?,
-            name: r.get(2)?,
-            agent_id: r.get(3)?,
-            home_id: r.get(4)?,
-            joined_at: r.get(5)?,
-            left_at: r.get(6)?,
-        })
-    })?
-    .collect()
+    block_on(queries::participants(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
-// ----- channel_member.sql -----
-
 pub fn add_member(db: &Connection, channel: &str, participant: &str, reason: &str, from: i64) -> Sql<()> {
-    db.execute(
-        "insert into channel_member (channel_id, participant_id, reason, from_number) values (?1, ?2, ?3, ?4)
-         on conflict (channel_id, participant_id) do update set left_at = null",
-        params![channel, participant, reason, from],
-    )?;
-    Ok(())
+    block_on(queries::add_member(
+        &mut *db.borrow_mut(),
+        queries::AddMemberParams {
+            channel_id: channel.to_owned(),
+            participant_id: participant.to_owned(),
+            reason: reason.to_owned(),
+            from_number: from,
+        },
+    ))
 }
 
 pub fn remove_member(db: &Connection, channel: &str, participant: &str, at: i64) -> Sql<()> {
-    db.execute(
-        "update channel_member set left_at = ?1 where channel_id = ?2 and participant_id = ?3 and left_at is null",
-        params![at, channel, participant],
-    )?;
-    Ok(())
+    block_on(queries::remove_member(
+        &mut *db.borrow_mut(),
+        queries::RemoveMemberParams {
+            left_at: Some(at),
+            channel_id: channel.to_owned(),
+            participant_id: participant.to_owned(),
+        },
+    ))
 }
 
 pub fn all_members(db: &Connection) -> Sql<Vec<(String, String)>> {
-    let mut st = db.prepare("select channel_id, participant_id from channel_member where left_at is null")?;
-    st.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect()
+    block_on(queries::all_members(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(|r| (r.channel_id, r.participant_id)).collect())
 }
 
 pub fn remove_from_all(db: &Connection, participant: &str, at: i64) -> Sql<()> {
-    db.execute(
-        "update channel_member set left_at = ?1 where participant_id = ?2 and left_at is null",
-        params![at, participant],
-    )?;
-    Ok(())
+    block_on(queries::remove_from_all(
+        &mut *db.borrow_mut(),
+        queries::RemoveFromAllParams {
+            left_at: Some(at),
+            participant_id: participant.to_owned(),
+        },
+    ))
 }
 
-// ----- channel_mention.sql, channel_seen.sql -----
-
 pub fn insert_mention(db: &Connection, message: &str, target: &str, resolved: &str) -> Sql<()> {
-    db.execute(
-        "insert into channel_mention (message_id, target_id, resolved) values (?1, ?2, ?3) on conflict do nothing",
-        params![message, target, resolved],
-    )?;
-    Ok(())
+    block_on(queries::insert_mention(
+        &mut *db.borrow_mut(),
+        queries::InsertMentionParams {
+            message_id: message.to_owned(),
+            target_id: target.to_owned(),
+            resolved: resolved.to_owned(),
+        },
+    ))
 }
 
 pub fn mark_seen(db: &Connection, participant: &str, message: &str, at: i64) -> Sql<()> {
-    db.execute(
-        "insert into channel_seen (participant_id, message_id, seen_at)
-         select p.id, m.id, ?3 from channel_message m, channel_participant p where m.id = ?2 and p.id = ?1
-         on conflict do nothing",
-        params![participant, message, at],
-    )?;
-    Ok(())
+    block_on(queries::mark_seen(
+        &mut *db.borrow_mut(),
+        queries::MarkSeenParams {
+            seen_at: at,
+            message_id: message.to_owned(),
+            participant_id: participant.to_owned(),
+        },
+    ))
 }
 
-// ----- channel_read_cursor.sql -----
-
 pub fn set_read_cursor(db: &Connection, participant: &str, channel: &str, upto: i64, at: i64) -> Sql<()> {
-    db.execute(
-        "insert into channel_read_cursor (participant_id, channel_id, read_number, updated_at) values (?1, ?2, ?3, ?4)
-         on conflict (participant_id, channel_id) do update set
-           read_number = max(channel_read_cursor.read_number, excluded.read_number), updated_at = excluded.updated_at",
-        params![participant, channel, upto, at],
-    )?;
-    Ok(())
+    block_on(queries::set_read_cursor(
+        &mut *db.borrow_mut(),
+        queries::SetReadCursorParams {
+            participant_id: participant.to_owned(),
+            channel_id: channel.to_owned(),
+            read_number: upto,
+            updated_at: at,
+        },
+    ))
 }
 
 pub fn read_cursor(db: &Connection, participant: &str, channel: &str) -> Sql<Option<i64>> {
-    db.query_row(
-        "select read_number from channel_read_cursor where participant_id = ?1 and channel_id = ?2",
-        params![participant, channel],
-        |r| r.get(0),
-    )
-    .optional()
+    optional(block_on(queries::read_cursor(
+        &mut *db.borrow_mut(),
+        queries::ReadCursorParams {
+            participant_id: participant.to_owned(),
+            channel_id: channel.to_owned(),
+        },
+    )))
+    .map(|row| row.map(|r| r.read_number))
 }
 
 pub fn read_cursors_of(db: &Connection, participant: &str) -> Sql<Vec<(String, i64)>> {
-    let mut st = db.prepare("select channel_id, read_number from channel_read_cursor where participant_id = ?1")?;
-    st.query_map([participant], |r| Ok((r.get(0)?, r.get(1)?)))?.collect()
+    block_on(queries::read_cursors_of(
+        &mut *db.borrow_mut(),
+        queries::ReadCursorsOfParams {
+            participant_id: participant.to_owned(),
+        },
+    ))
+    .map(|rows| rows.into_iter().map(|r| (r.channel_id, r.read_number)).collect())
 }
 
 pub fn mark_unread(db: &Connection, channel: &str, upto: i64, at: i64) -> Sql<()> {
-    db.execute(
-        "insert into channel_read_cursor (participant_id, channel_id, read_number, updated_at) values ('user', ?1, ?2, ?3)
-         on conflict (participant_id, channel_id) do update set read_number = excluded.read_number, updated_at = excluded.updated_at",
-        params![channel, upto, at],
-    )?;
-    Ok(())
-}
-
-// ----- channel_event.sql -----
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct EventRow {
-    pub seq: i64,
-    pub kind: String,
-    pub channel_id: String,
-    pub message_id: String,
-    pub at: i64,
+    block_on(queries::mark_unread(
+        &mut *db.borrow_mut(),
+        queries::MarkUnreadParams {
+            channel_id: channel.to_owned(),
+            read_number: upto,
+            updated_at: at,
+        },
+    ))
 }
 
 pub fn insert_event(db: &Connection, kind: &str, channel: &str, message: &str, at: i64) -> Sql<i64> {
-    db.query_row(
-        "insert into channel_event (kind, channel_id, message_id, at) values (?1, ?2, ?3, ?4) returning seq",
-        params![kind, channel, message, at],
-        |r| r.get(0),
-    )
-}
-
-fn event_row(r: &Row) -> Sql<EventRow> {
-    Ok(EventRow {
-        seq: r.get(0)?,
-        kind: r.get(1)?,
-        channel_id: r.get(2)?,
-        message_id: r.get(3)?,
-        at: r.get(4)?,
-    })
+    block_on(queries::insert_event(
+        &mut *db.borrow_mut(),
+        queries::InsertEventParams {
+            kind: kind.to_owned(),
+            channel_id: channel.to_owned(),
+            message_id: message.to_owned(),
+            at,
+        },
+    ))
+    .map(|r| r.seq)
 }
 
 pub fn events_after(db: &Connection, after: i64, n: i64) -> Sql<Vec<EventRow>> {
-    let mut st = db.prepare_cached("select seq, kind, channel_id, message_id, at from channel_event where seq > ?1 order by seq limit ?2")?;
-    st.query_map(params![after, n], event_row)?.collect()
+    block_on(queries::events_after(
+        &mut *db.borrow_mut(),
+        queries::EventsAfterParams { seq: after, limit: n },
+    ))
+    .map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn event_of(db: &Connection, message: &str) -> Sql<Option<EventRow>> {
-    db.query_row(
-        "select seq, kind, channel_id, message_id, at from channel_event where message_id = ?1 and kind = 'posted'",
-        [message],
-        event_row,
-    )
-    .optional()
+    optional(block_on(queries::event_of(
+        &mut *db.borrow_mut(),
+        queries::EventOfParams {
+            message_id: message.to_owned(),
+        },
+    )))
+    .map(|row| row.map(Into::into))
 }
-
-// ----- channel_message.sql -----
 
 #[allow(clippy::too_many_arguments)]
 pub fn insert_message(
@@ -645,267 +620,330 @@ pub fn insert_message(
     revision: i64,
     reply_number: Option<i64>,
 ) -> Sql<i64> {
-    db.query_row(
-        "insert into channel_message (id, channel_id, number, sender_id, kind, body, meta, send_key, created_at, revision, reply_number)
-         values (?1, ?2, (select coalesce(max(number), 0) + 1 from channel_message where channel_id = ?2), ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
-         returning number",
-        params![id, channel, sender, kind, body, meta, send_key, at, revision, reply_number],
-        |r| r.get(0),
-    )
+    block_on(queries::insert_message(
+        &mut *db.borrow_mut(),
+        queries::InsertMessageParams {
+            id: id.to_owned(),
+            channel_id: channel.to_owned(),
+            sender_id: sender.to_owned(),
+            kind: kind.to_owned(),
+            body: body.to_owned(),
+            meta: meta.map(str::to_owned),
+            send_key: send_key.map(str::to_owned),
+            created_at: at,
+            revision,
+            reply_number,
+        },
+    ))
+    .map(|r| r.number)
 }
 
 pub fn update_message_meta(db: &Connection, id: &str, meta: Option<&str>) -> Sql<()> {
-    db.execute("update channel_message set meta = ?1 where id = ?2", params![meta, id])?;
-    Ok(())
+    block_on(queries::update_message_meta(
+        &mut *db.borrow_mut(),
+        queries::UpdateMessageMetaParams {
+            meta: meta.map(str::to_owned),
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn message_by_id(db: &Connection, id: &str) -> Sql<Option<MsgRow>> {
-    msg(db, "where m.id = ?1", [id])
+    optional(block_on(queries::message_by_id(
+        &mut *db.borrow_mut(),
+        queries::MessageByIdParams { id: id.to_owned() },
+    )))
+    .map(|row| row.map(Into::into))
 }
 
 pub fn message_by_send_key(db: &Connection, sender: &str, key: &str) -> Sql<Option<MsgRow>> {
-    msg(db, "where m.sender_id = ?1 and m.send_key = ?2", params![sender, key])
+    optional(block_on(queries::message_by_send_key(
+        &mut *db.borrow_mut(),
+        queries::MessageBySendKeyParams {
+            sender_id: sender.to_owned(),
+            send_key: Some(key.to_owned()),
+        },
+    )))
+    .map(|row| row.map(Into::into))
 }
 
 pub fn message_by_number(db: &Connection, channel: &str, number: i64) -> Sql<Option<MsgRow>> {
-    msg(db, "where m.channel_id = ?1 and m.number = ?2", params![channel, number])
+    optional(block_on(queries::message_by_number(
+        &mut *db.borrow_mut(),
+        queries::MessageByNumberParams {
+            channel_id: channel.to_owned(),
+            number,
+        },
+    )))
+    .map(|row| row.map(Into::into))
 }
 
-const PLACED: &str = ", c.type, c.root_number, coalesce(c.parent_id, c.id), coalesce(ch.name, c.name, '')";
-
-/// `UserMentions`: the user's mentions not read or answered yet.
 pub fn user_mentions(db: &Connection) -> Sql<Vec<PlacedRow>> {
-    let mut st = db.prepare_cached(&format!(
-        "{MSG}{PLACED}
-         from channel_mention n
-         join channel_message m on m.id = n.message_id
-         join channel_participant p on p.id = m.sender_id
-         join channel c on c.id = m.channel_id
-         left join channel ch on ch.id = c.parent_id
-         left join channel_read_cursor r on r.participant_id = 'user' and r.channel_id = c.id
-         where n.target_id = 'user' and m.sender_id <> 'user'
-           and m.number > coalesce(r.read_number, 0)
-           and not exists (select 1 from channel_message reply where reply.channel_id = c.id and reply.sender_id = 'user' and reply.number > m.number)
-         order by m.id"
-    ))?;
-    st.query_map([], placed_row)?.collect()
+    block_on(queries::user_mentions(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
-/// Newest first.
 pub fn messages_before(db: &Connection, channel: &str, number: i64, n: i64) -> Sql<Vec<MsgRow>> {
-    msgs(
-        db,
-        "where m.channel_id = ?1 and m.number < ?2 order by m.number desc limit ?3",
-        params![channel, number, n],
-    )
+    block_on(queries::messages_before(
+        &mut *db.borrow_mut(),
+        queries::MessagesBeforeParams {
+            channel_id: channel.to_owned(),
+            number,
+            limit: n,
+        },
+    ))
+    .map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn messages_after(db: &Connection, channel: &str, number: i64, n: i64) -> Sql<Vec<MsgRow>> {
-    msgs(
-        db,
-        "where m.channel_id = ?1 and m.number > ?2 order by m.number limit ?3",
-        params![channel, number, n],
-    )
+    block_on(queries::messages_after(
+        &mut *db.borrow_mut(),
+        queries::MessagesAfterParams {
+            channel_id: channel.to_owned(),
+            number,
+            limit: n,
+        },
+    ))
+    .map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn recent_reports(db: &Connection, n: i64) -> Sql<Vec<MsgRow>> {
-    msgs(db, "where m.kind = 'report' order by m.id desc limit ?1", [n])
+    block_on(queries::recent_reports(&mut *db.borrow_mut(), queries::RecentReportsParams { limit: n })).map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn reports_after(db: &Connection, after: &str, n: i64) -> Sql<Vec<MsgRow>> {
-    msgs(db, "where m.kind = 'report' and m.id > ?1 order by m.id limit ?2", params![after, n])
+    block_on(queries::reports_after(
+        &mut *db.borrow_mut(),
+        queries::ReportsAfterParams {
+            id: after.to_owned(),
+            limit: n,
+        },
+    ))
+    .map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn recent_duplicate(db: &Connection, sender: &str, channel: &str, body: &str, since: i64) -> Sql<Option<String>> {
-    db.query_row(
-        "select id from channel_message where sender_id = ?1 and channel_id = ?2 and body = ?3 and created_at > ?4 order by id desc limit 1",
-        params![sender, channel, body, since],
-        |r| r.get(0),
-    )
-    .optional()
+    optional(block_on(queries::recent_duplicate(
+        &mut *db.borrow_mut(),
+        queries::RecentDuplicateParams {
+            sender_id: sender.to_owned(),
+            channel_id: channel.to_owned(),
+            body: body.to_owned(),
+            created_at: since,
+        },
+    )))
+    .map(|row| row.map(|r| r.id))
 }
 
 pub fn dispatches_in(db: &Connection, channel: &str) -> Sql<i64> {
-    db.query_row(
-        "select count(*) from channel_message where channel_id = ?1 and kind = 'dispatch'",
-        [channel],
-        |r| r.get(0),
-    )
+    block_on(queries::dispatches_in(
+        &mut *db.borrow_mut(),
+        queries::DispatchesInParams {
+            channel_id: channel.to_owned(),
+        },
+    ))
+    .map(|r| r.total)
 }
 
 pub fn user_unread(db: &Connection, channel: &str, read: i64) -> Sql<i64> {
-    db.query_row(
-        "select count(*) from channel_message where channel_id = ?1 and number > ?2 and sender_id <> 'user' and kind <> 'notice' and deleted_at is null",
-        params![channel, read],
-        |r| r.get(0),
-    )
+    block_on(queries::user_unread(
+        &mut *db.borrow_mut(),
+        queries::UserUnreadParams {
+            channel_id: channel.to_owned(),
+            number: read,
+        },
+    ))
+    .map(|r| r.total)
 }
 
 pub fn latest_number(db: &Connection, channel: &str) -> Sql<i64> {
-    db.query_row("select coalesce(max(number), 0) from channel_message where channel_id = ?1", [channel], |r| {
-        r.get(0)
-    })
+    block_on(queries::latest_number(
+        &mut *db.borrow_mut(),
+        queries::LatestNumberParams {
+            channel_id: channel.to_owned(),
+        },
+    ))
+    .map(|r| r.number)
 }
 
-/// `CallersOf`: who @-ed the speaker here since it last spoke, before a
-/// message, newest first.
 pub fn callers_of(db: &Connection, speaker: &str, channel: &str, before: &str, n: i64) -> Sql<Vec<String>> {
-    let mut st = db.prepare_cached(
-        "select m.sender_id from channel_message m
-         join channel_mention n on n.message_id = m.id and n.target_id = ?1
-         where m.channel_id = ?2 and m.sender_id <> ?1 and m.id < ?3
-           and m.id > coalesce((select max(s.id) from channel_message s where s.channel_id = ?2 and s.sender_id = ?1 and s.id < ?3), '')
-         order by m.id desc limit ?4",
-    )?;
-    st.query_map(params![speaker, channel, before, n], |r| r.get(0))?.collect()
+    block_on(queries::callers_of(
+        &mut *db.borrow_mut(),
+        queries::CallersOfParams {
+            target_id: speaker.to_owned(),
+            channel_id: channel.to_owned(),
+            id: before.to_owned(),
+            limit: n,
+        },
+    ))
+    .map(|rows| rows.into_iter().map(|r| r.sender_id).collect())
 }
 
 pub fn unseen_in(db: &Connection, channel: &str, participant: &str) -> Sql<Vec<String>> {
-    let mut st = db.prepare_cached(
-        "select m.id from channel_message m
-         where m.channel_id = ?1 and m.sender_id <> ?2
-           and m.number > coalesce((select read_number from channel_read_cursor where participant_id = ?2 and channel_id = ?1), 0)
-           and not exists (select 1 from channel_seen s where s.participant_id = ?2 and s.message_id = m.id)
-         order by m.number",
-    )?;
-    st.query_map(params![channel, participant], |r| r.get(0))?.collect()
+    block_on(queries::unseen_in(
+        &mut *db.borrow_mut(),
+        queries::UnseenInParams {
+            channel_id: channel.to_owned(),
+            sender_id: participant.to_owned(),
+        },
+    ))
+    .map(|rows| rows.into_iter().map(|r| r.id).collect())
 }
 
 pub fn notice_since_user(db: &Connection, channel: &str, code: &str) -> Sql<i64> {
-    db.query_row(
-        "select count(*) from channel_message m
-         where m.channel_id = ?1 and m.sender_id = 'system' and json_extract(m.meta, '$.code') = ?2
-           and m.id > coalesce((select max(u.id) from channel_message u where u.channel_id = ?1 and u.sender_id = 'user'), '')",
-        params![channel, code],
-        |r| r.get(0),
-    )
+    block_on(queries::notice_since_user(
+        &mut *db.borrow_mut(),
+        queries::NoticeSinceUserParams {
+            channel_id: channel.to_owned(),
+            meta: Some(code.to_owned()),
+        },
+    ))
+    .map(|r| r.total)
 }
 
 pub fn messages_changed_after(db: &Connection, channel: &str, revision: i64, n: i64) -> Sql<Vec<MsgRow>> {
-    msgs(
-        db,
-        "where m.channel_id = ?1 and m.revision > ?2 order by m.revision limit ?3",
-        params![channel, revision, n],
-    )
+    block_on(queries::messages_changed_after(
+        &mut *db.borrow_mut(),
+        queries::MessagesChangedAfterParams {
+            channel_id: channel.to_owned(),
+            revision,
+            limit: n,
+        },
+    ))
+    .map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn edit_message(db: &Connection, id: &str, body: &str, at: i64, revision: i64) -> Sql<()> {
-    db.execute(
-        "update channel_message set body = ?1, edited_at = ?2, revision = ?3 where id = ?4",
-        params![body, at, revision, id],
-    )?;
-    Ok(())
+    block_on(queries::edit_message(
+        &mut *db.borrow_mut(),
+        queries::EditMessageParams {
+            body: body.to_owned(),
+            edited_at: Some(at),
+            revision,
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn delete_message(db: &Connection, id: &str, at: i64, revision: i64) -> Sql<()> {
-    db.execute(
-        "update channel_message set body = '', meta = null, reactions = null, deleted_at = ?1, revision = ?2 where id = ?3",
-        params![at, revision, id],
-    )?;
-    Ok(())
+    block_on(queries::delete_message(
+        &mut *db.borrow_mut(),
+        queries::DeleteMessageParams {
+            deleted_at: Some(at),
+            revision,
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn set_reactions(db: &Connection, id: &str, reactions: Option<&str>, revision: i64) -> Sql<()> {
-    db.execute(
-        "update channel_message set reactions = ?1, revision = ?2 where id = ?3",
-        params![reactions, revision, id],
-    )?;
-    Ok(())
+    block_on(queries::set_reactions(
+        &mut *db.borrow_mut(),
+        queries::SetReactionsParams {
+            reactions: reactions.map(str::to_owned),
+            revision,
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn set_pinned(db: &Connection, id: &str, at: Option<i64>, revision: i64) -> Sql<()> {
-    db.execute(
-        "update channel_message set pinned_at = ?1, revision = ?2 where id = ?3",
-        params![at, revision, id],
-    )?;
-    Ok(())
+    block_on(queries::set_pinned(
+        &mut *db.borrow_mut(),
+        queries::SetPinnedParams {
+            pinned_at: at,
+            revision,
+            id: id.to_owned(),
+        },
+    ))
 }
 
-/// `SetEmbeds`, also how a message's meta changes as a change.
 pub fn set_meta(db: &Connection, id: &str, meta: Option<&str>, revision: i64) -> Sql<()> {
-    db.execute("update channel_message set meta = ?1, revision = ?2 where id = ?3", params![meta, revision, id])?;
-    Ok(())
+    block_on(queries::set_meta(
+        &mut *db.borrow_mut(),
+        queries::SetMetaParams {
+            meta: meta.map(str::to_owned),
+            revision,
+            id: id.to_owned(),
+        },
+    ))
 }
 
 pub fn pinned_in(db: &Connection, channel: &str) -> Sql<Vec<MsgRow>> {
-    msgs(db, "where m.channel_id = ?1 and m.pinned_at is not null order by m.pinned_at desc", [channel])
+    block_on(queries::pinned_in(
+        &mut *db.borrow_mut(),
+        queries::PinnedInParams {
+            channel_id: channel.to_owned(),
+        },
+    ))
+    .map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
-pub struct SearchParams<'a> {
-    pub text: &'a str,
-    pub channel: &'a str,
-    pub sender: &'a str,
-    pub has_file: bool,
-    pub has_image: bool,
-    pub has_link: bool,
-    pub after: i64,
-    pub before: i64,
-    pub n: i64,
-}
-
-/// `SearchMessages`: newest first.
 pub fn search_messages(db: &Connection, q: &SearchParams) -> Sql<Vec<PlacedRow>> {
-    let mut st = db.prepare_cached(&format!(
-        "{MSG}{PLACED}
-         from channel_message m
-         join channel_participant p on p.id = m.sender_id
-         join channel c on c.id = m.channel_id
-         left join channel ch on ch.id = c.parent_id
-         where m.deleted_at is null and m.kind <> 'notice'
-           and (?1 = '' or instr(lower(m.body), lower(?1)) > 0)
-           and (?2 = '' or c.id = ?2 or c.parent_id = ?2)
-           and (?3 = '' or m.sender_id = ?3 or lower(p.name) = lower(?3))
-           and (not ?4 or instr(coalesce(m.meta, ''), '\"attachments\"') > 0)
-           and (not ?5 or instr(coalesce(m.meta, ''), '\"type\":\"image/') > 0)
-           and (not ?6 or instr(m.body, 'http://') > 0 or instr(m.body, 'https://') > 0)
-           and m.created_at >= ?7 and m.created_at < ?8
-         order by m.id desc limit ?9"
-    ))?;
-    st.query_map(
-        params![q.text, q.channel, q.sender, q.has_file, q.has_image, q.has_link, q.after, q.before, q.n],
-        placed_row,
-    )?
-    .collect()
+    block_on(queries::search_messages(
+        &mut *db.borrow_mut(),
+        queries::SearchMessagesParams {
+            needle: q.text.to_owned(),
+            place: q.channel.to_owned(),
+            sender: q.sender.to_owned(),
+            file_only: i64::from(q.has_file),
+            image_only: i64::from(q.has_image),
+            link_only: i64::from(q.has_link),
+            since: q.after,
+            until_time: q.before,
+            page_size: q.n,
+        },
+    ))
+    .map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
-/// `NotificationReceipt`: when the user read it, and whether a later
-/// message there took its place.
 pub fn notification_receipt(db: &Connection, id: &str) -> Sql<Option<(Option<i64>, bool)>> {
-    db.query_row(
-        "select r.updated_at,
-           exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.number > m.number
-             and n.deleted_at is null and (n.sender_id = 'user' or (m.kind = 'report' and n.kind = 'report' and n.sender_id = m.sender_id)))
-         from channel_message m
-         left join channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'user' and r.read_number >= m.number
-         where m.id = ?1",
-        [id],
-        |r| Ok((r.get(0)?, r.get(1)?)),
-    )
-    .optional()
+    optional(block_on(queries::notification_receipt(
+        &mut *db.borrow_mut(),
+        queries::NotificationReceiptParams { id: id.to_owned() },
+    )))
+    .map(|row| row.map(|r| (r.updated_at, r.superseded != 0)))
 }
 
-/// `UserReadReports`: each speaker's latest report the user has read.
 pub fn user_read_reports(db: &Connection) -> Sql<Vec<(String, i64, i64)>> {
-    let mut st = db.prepare_cached(
-        "select m.sender_id, m.created_at, r.updated_at from channel_message m
-         join channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id = 'user' and r.read_number >= m.number
-         where m.kind = 'report' and m.deleted_at is null
-           and not exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.sender_id = m.sender_id and n.kind = 'report' and n.number > m.number)",
-    )?;
-    st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect()
+    block_on(queries::user_read_reports(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(|r| (r.sender_id, r.created_at, r.updated_at)).collect())
 }
 
-/// `watch_cursor.sql`: how far a reader of the events has handled them.
 pub fn cursor_of(db: &Connection, name: &str) -> Sql<i64> {
-    db.query_row("select seq from watch_cursor where name = ?1", params![name], |r| r.get(0))
-        .optional()
-        .map(|s| s.unwrap_or(0))
+    optional(block_on(queries::cursor_of(
+        &mut *db.borrow_mut(),
+        queries::CursorOfParams { name: name.to_owned() },
+    )))
+    .map(|row| row.map_or(0, |r| r.seq))
 }
 
 pub fn move_cursor(db: &Connection, name: &str, seq: i64) -> Sql<()> {
-    db.execute(
-        "insert into watch_cursor (name, seq) values (?1, ?2) on conflict (name) do update set seq = max(seq, excluded.seq)",
-        params![name, seq],
-    )
-    .map(|_| ())
+    block_on(queries::move_cursor(
+        &mut *db.borrow_mut(),
+        queries::MoveCursorParams { name: name.to_owned(), seq },
+    ))
+}
+
+pub fn delete_channel(db: &Connection, id: &str) -> Sql<()> {
+    let mut db = db.borrow_mut();
+    block_on(async {
+        queries::remove_thread_messages(
+            &mut *db,
+            queries::RemoveThreadMessagesParams {
+                parent_id: Some(id.to_owned()),
+            },
+        )
+        .await?;
+        queries::remove_channel_members(&mut *db, queries::RemoveChannelMembersParams { channel_id: id.to_owned() }).await?;
+        queries::remove_channel_cursors(&mut *db, queries::RemoveChannelCursorsParams { channel_id: id.to_owned() }).await?;
+        queries::remove_threads(
+            &mut *db,
+            queries::RemoveThreadsParams {
+                parent_id: Some(id.to_owned()),
+            },
+        )
+        .await?;
+        queries::remove_messages(&mut *db, queries::RemoveMessagesParams { channel_id: id.to_owned() }).await?;
+        queries::remove_channel(&mut *db, queries::RemoveChannelParams { id: id.to_owned() }).await?;
+        Ok(())
+    })
 }

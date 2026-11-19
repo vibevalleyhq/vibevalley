@@ -33,11 +33,21 @@ impl ToolOutput {
 
 pub trait Tool: Send + Sync {
     fn spec(&self) -> ToolSpec;
+    fn is_mcp(&self) -> bool {
+        false
+    }
     /// Safe to run again if the process died while it ran (reads only).
     fn replay_safe(&self) -> bool {
         false
     }
     fn execute(&self, args: &Value) -> ToolOutput;
+    fn execute_cancellable(&self, args: &Value, cancelled: &flume::Receiver<()>) -> ToolOutput {
+        if cancelled.is_disconnected() {
+            ToolOutput::error("aborted by the user")
+        } else {
+            self.execute(args)
+        }
+    }
 }
 
 /// Where coding tools work and what their shell sees.

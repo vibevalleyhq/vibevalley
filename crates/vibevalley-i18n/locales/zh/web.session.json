@@ -95,5 +95,34 @@
     "hired": "{ago}接活",
     "hiredAndLeft": "{hired}接活 · {left}走的",
     "pick": "选一个帮工，看它的轨迹。"
+  },
+  "subagents": {
+    "heading": "子任务",
+    "root": "主线程",
+    "wait": "{who}在等「{targets}」",
+    "observed": "{ago}确认 · {status}",
+    "creator": "派出者：{who}",
+    "openLog": "查看「{task}」的工作日志",
+    "noLog": "近期工作日志中暂无这条线程的步骤。",
+    "status": {
+      "pendingInit": "等待启动",
+      "running": "执行中",
+      "interrupted": "已中断",
+      "completed": "已完成",
+      "errored": "失败",
+      "shutdown": "已关闭",
+      "notFound": "找不到线程",
+      "unknown": "状态未知"
+    },
+    "steps": {
+      "title": "最近报告的步骤",
+      "pending": "未开始",
+      "inProgress": "进行中",
+      "completed": "已完成"
+    },
+    "disconnected": "{ago}检测到进度连接中断。以下为最后确认的状态。",
+    "lastWait": "中断前，{who}在等「{targets}」",
+    "mailbox": "{who}在等协作消息",
+    "lastMailbox": "中断前，{who}在等协作消息"
   }
 }

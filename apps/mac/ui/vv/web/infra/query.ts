@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { VibeValleyApiError } from "@vibevalley/protocol";
+import { type ProviderVoiceRequest, VibeValleyApiError } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { CursorManifest, SpriteManifest } from "../base/manifests";
@@ -57,6 +57,12 @@ const reposQuery = defineQuery({
   fetch: (_: void, context) => api.repo.list(context),
   ...retryRead,
 });
+export const providerVoicesQuery = defineQuery({
+  schema: S.ProviderVoiceListing,
+  key: (input: ProviderVoiceRequest) => ["provider-voices", input.connection, input.revision, input.after ?? null],
+  fetch: (input, context) => api.provider.voice.list(input, context),
+});
+
 export const providerQuery = defineQuery({
   schema: S.ProviderStatus,
   key: () => ["providers"],

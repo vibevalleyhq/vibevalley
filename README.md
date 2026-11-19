@@ -64,7 +64,7 @@ flowchart LR
 ### 从源码跑
 
 ```bash
-git clone https://github.com/vibevalleyhq/vibevalley.git && cd vibevalley
+git clone --single-branch --branch refactor/native-macos-cutover https://github.com/vibevalleyhq/vibevalley.git && cd vibevalley
 vp install
 vp run nsh:install                  # 打页面的包要用的 nsh 命令行
 vp run mac:check                    # 打出页面的包

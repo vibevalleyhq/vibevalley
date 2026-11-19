@@ -8,12 +8,16 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use base64::Engine;
-use rusqlite::{Connection, OptionalExtension, params};
 use sha2::{Digest, Sha256};
+use sqlx::SqliteConnection;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentUpload, BizCode, native_ops, ops};
 
-use crate::base::{internal, open_db};
+#[rustfmt::skip]
+#[path = "attachment/generated/queries.rs"]
+mod queries;
+
+use crate::base::{internal, open_sqlx_db};
 use crate::{Hub, now};
 
 /// `attachmentMax`: 25 MB.
@@ -21,7 +25,7 @@ pub const ATTACHMENT_MAX: usize = 25 * 1024 * 1024;
 
 pub struct Attachments {
     root: PathBuf,
-    db: Mutex<Connection>,
+    db: Mutex<SqliteConnection>,
 }
 
 fn refused(text: String) -> ApiError {
@@ -34,13 +38,12 @@ fn no_attachment(id: &str) -> ApiError {
 }
 
 impl Attachments {
-    pub fn open(home: &Path) -> rusqlite::Result<Arc<Attachments>> {
-        let conn = open_db(home)?;
-        conn.execute_batch(
-            "create table if not exists attachment (
-               id text primary key, name text not null, type text not null, size integer not null, created_at integer not null
-             );",
-        )?;
+    pub fn open(home: &Path) -> sqlx::Result<Arc<Attachments>> {
+        let conn = pollster::block_on(async {
+            let mut conn = open_sqlx_db(home).await?;
+            sqlx::raw_sql(include_str!("attachment/sql/schema.sql")).execute(&mut conn).await?;
+            Ok::<_, sqlx::Error>(conn)
+        })?;
         Ok(Arc::new(Attachments {
             root: home.join("attachments"),
             db: Mutex::new(conn),
@@ -52,7 +55,7 @@ impl Attachments {
         self.root.join(id)
     }
 
-    fn db(&self) -> std::sync::MutexGuard<'_, Connection> {
+    fn db(&self) -> std::sync::MutexGuard<'_, SqliteConnection> {
         crate::lock(&self.db)
     }
 
@@ -113,11 +116,16 @@ impl Attachments {
         } else {
             given_type.trim()
         };
-        let db = self.db();
-        db.execute(
-            "insert into attachment (id, name, type, size, created_at) values (?1, ?2, ?3, ?4, ?5) on conflict (id) do nothing",
-            params![id, name, kind, size, now()],
-        )
+        pollster::block_on(queries::keep_attachment(
+            &mut *self.db(),
+            queries::KeepAttachmentParams {
+                id: id.into(),
+                name: name.into(),
+                r#type: kind.into(),
+                size,
+                created_at: now(),
+            },
+        ))
         .map_err(internal)?;
         Ok(Attachment {
             id: id.into(),
@@ -128,17 +136,16 @@ impl Attachments {
     }
 
     fn by_id(&self, id: &str) -> Result<Option<Attachment>, ApiError> {
-        self.db()
-            .query_row("select id, name, type, size from attachment where id = ?1", [id], |r| {
-                Ok(Attachment {
-                    id: r.get(0)?,
-                    name: r.get(1)?,
-                    r#type: r.get(2)?,
-                    size: r.get(3)?,
-                })
-            })
-            .optional()
-            .map_err(internal)
+        match pollster::block_on(queries::get_attachment(&mut *self.db(), queries::GetAttachmentParams { id: id.into() })) {
+            Ok(row) => Ok(Some(Attachment {
+                id: row.id,
+                name: row.name,
+                r#type: row.r#type,
+                size: row.size,
+            })),
+            Err(sqlx::Error::RowNotFound) => Ok(None),
+            Err(error) => Err(internal(error)),
+        }
     }
 
     /// `of`: the attachments with these ids, each once; one not kept is

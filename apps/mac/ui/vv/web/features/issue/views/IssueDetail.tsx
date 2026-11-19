@@ -2,7 +2,7 @@
 // the same blocks, acts and side. The steps' <details> is a Fold; the
 // title is renamed in an Input (Return or leaving keeps it, Escape lets it
 // go). VibeValley's addition: the worktree opens a terminal there.
-import { Clipboard, keymap, signal, Text, View } from "nsh";
+import { Clipboard, keymap, signal, Text, View, type ViewRef } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
 import { DeliverableValues, type Issue, type IssueAct, PriorityValues, type Session, type SessionView } from "@vibevalley/protocol";
@@ -26,15 +26,17 @@ import { Dot } from "../../../ui/Tag";
 import { toast } from "../../../ui/toasts";
 import { IssueArtifacts } from "../../artifact";
 import { createSessionEvents } from "../../session/events";
+import { SubagentProgress } from "../../session/SubagentProgress";
 import { createIssueActs } from "../model/acts";
 import { changesLine } from "../model/changes";
 import { useIssueChanges, useIssues, useIssueTimeline } from "../model/history";
+import { needsWorktreeCheck } from "../model/issue";
 import { issueMove, movedIssue } from "../model/moves";
 import { issueState, noStepsText, stageTone } from "../model/overview";
 import { issueSet, labeledIssue, sendLabel } from "../model/write";
 import { ActLines } from "./ActLines";
-import { ChangesBody, ChangesHead } from "./CloseDialog";
-import { AnswerView, Criteria, OrchestratorIssueDetail, Question, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
+import { ChangesBody, ChangesHead, ConflictFiles } from "./CloseDialog";
+import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
 import { IssueThread } from "./IssueThread";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 
@@ -75,6 +77,13 @@ export function IssueDetail(props: {
     () => s().showsChanges,
   );
   const changes = () => ready(changesQuery, undefined);
+  const filesOpen = signal(false);
+  let changesSection: ViewRef | undefined;
+  const reviewChanges = () => {
+    filesOpen.set(true);
+    requestAnimationFrame(() => changesSection?.reveal({ vertical: "nearest" }));
+  };
+  const changesAction = () => (live().deliver !== "answer" && s().showsChanges ? reviewChanges : undefined);
   const timelineQuery = useIssueTimeline(
     () => props.issue,
     () => head().runs,
@@ -145,14 +154,43 @@ export function IssueDetail(props: {
           ? t("web.issue.reopen.title")
           : t("web.issue.detail.tell", { who: head().name });
 
+  const failedCheck = () => {
+    const check = live().deliveryEvidence?.check;
+    return check?.status === "failed" ? check : undefined;
+  };
   const main = (
     <>
+      <If when={failedCheck()}>
+        {(check) => (
+          <Note tone="berry">
+            <Fold
+              testID="failed-project-check"
+              defaultOpen
+              label={t("web.issue.changes.projectCheck")}
+              summary={`${t("web.issue.changes.check.failed")} · ${check().candidateCommit.slice(0, 12)}`}
+            >
+              <If when={check().command}>{(command) => <Text class="font-mono text-xs text-ink">{command()}</Text>}</If>
+              <If when={check().output}>
+                {(output) => (
+                  <Text testID="failed-check-output" class="mt-1 font-mono text-xs text-ink">
+                    {output()}
+                  </Text>
+                )}
+              </If>
+            </Fold>
+          </Note>
+        )}
+      </If>
       <If when={s().description}>
         <View testID="issue-requirement">
           <SheetLabel>{t("web.issue.detail.full")}</SheetLabel>
           <Markdown size="sm" text={s().description} />
         </View>
       </If>
+      <If when={s().open && needsWorktreeCheck(head())}>
+        <ReconcileWorktree onChanges={changesAction()} />
+      </If>
+      <If when={head().subagents}>{(progress) => <SubagentProgress session={head().id} progress={progress()} now={now()} />}</If>
       <ActLines issue={props.issue.id} words={acts.words()} onSayAgain={acts.sayAgain} onTakeBack={acts.takeBack} />
       <If when={s().ask}>
         {(ask) => (
@@ -160,12 +198,19 @@ export function IssueDetail(props: {
             <SheetLabel>{t("web.issue.detail.yours")}</SheetLabel>
             <Note tone={ask().tone}>
               <Text class="text-sm font-semibold text-ink">{ask().head}</Text>
-              <If when={ask().line}>
-                {(line) => (
-                  <Text class="mt-1 text-sm text-ink" style={{ numberOfLines: 4 }}>
-                    {plainText(line())}
-                  </Text>
-                )}
+              <If
+                when={live().conflict}
+                else={
+                  <If when={ask().line}>
+                    {(line) => (
+                      <Text class="mt-1 text-sm text-ink" style={{ numberOfLines: 4 }}>
+                        {plainText(line())}
+                      </Text>
+                    )}
+                  </If>
+                }
+              >
+                {(conflict) => <ConflictFiles files={conflict().files} worktree={head().worktree} />}
               </If>
               <If when={s().stage.state === "asking"}>
                 <Each of={props.issue.questions}>
@@ -246,7 +291,13 @@ export function IssueDetail(props: {
         </If>
       </View>
 
-      <View accessibilityLabel={t("web.issue.detail.made")} testID="issue-made">
+      <View
+        accessibilityLabel={t("web.issue.detail.made")}
+        testID="issue-made"
+        ref={(node) => {
+          changesSection = node;
+        }}
+      >
         <SheetLabel>{t("web.issue.detail.made")}</SheetLabel>
         <If
           when={live().deliver === "answer"}
@@ -276,7 +327,13 @@ export function IssueDetail(props: {
                     <If when={c().conflicts.length > 0}>
                       <Text class="text-sm text-berry">{t("web.issue.detail.conflict", { base: c().base, files: list(c().conflicts) })}</Text>
                     </If>
-                    <Fold testID="changed-files" label={t("web.issue.detail.changedFiles")} summary={t("web.issue.detail.fileCount", { n: c().files.length })}>
+                    <Fold
+                      testID="changed-files"
+                      open={filesOpen()}
+                      onToggle={filesOpen.set}
+                      label={t("web.issue.detail.changedFiles")}
+                      summary={t("web.issue.detail.fileCount", { n: c().files.length })}
+                    >
                       <ChangesHead changes={c()} />
                       <ChangesBody changes={c()} />
                     </Fold>
@@ -321,8 +378,12 @@ export function IssueDetail(props: {
               {(st) => <WorkLog steps={st()} />}
             </If>
           </Fold>
-          <Fold label={t("web.issue.detail.runs")} summary={s().historyLine}>
-            <Runs issue={props.issue.id} version={`${props.issue.stage.state}:${props.session?.runs}:${props.session?.phase._tag}`} />
+          <Fold label={t("web.issue.detail.runs")} summary={s().historyLine} testID="issue-runs-fold">
+            <Runs
+              issue={props.issue.id}
+              version={`${props.issue.stage.state}:${props.session?.runs}:${props.session?.phase._tag}`}
+              onChanges={changesAction()}
+            />
           </Fold>
         </View>
       </View>
@@ -399,6 +460,30 @@ export function IssueDetail(props: {
       <Property label={t("web.issue.detail.started")}>{wallClockText((props.sessions[0] ?? head()).hiredAt)}</Property>
       <If when={s().ask && s().stage.since}>
         {(at) => <Property label={t("web.issue.detail.waiting")}>{t("web.issue.detail.since", { clock: wallClockText(at()) })}</Property>}
+      </If>
+      <If when={live().deliveryEvidence?.reviews.at(-1)}>
+        {(review) => (
+          <Property
+            label={t("web.issue.changes.reviewVersion")}
+          >{`${review().revision.baseCommit.slice(0, 8)} → ${review().revision.tree.slice(0, 12)}`}</Property>
+        )}
+      </If>
+      <If when={!failedCheck() ? live().deliveryEvidence?.check : undefined}>
+        {(check) => (
+          <Property label={t("web.issue.changes.projectCheck")}>
+            {`${t(`web.issue.changes.check.${check().status}`)} · ${check().candidateCommit.slice(0, 12)}`}
+          </Property>
+        )}
+      </If>
+      <If when={!failedCheck() ? live().deliveryEvidence?.check?.output : undefined}>
+        {(output) => (
+          <Fold label={t("web.issue.changes.checkOutput")}>
+            <Text class="font-mono text-xs text-ink">{output()}</Text>
+          </Fold>
+        )}
+      </If>
+      <If when={live().deliveryEvidence?.mergedCommit}>
+        {(commit) => <Property label={t("web.issue.changes.mergedCommit")}>{commit().slice(0, 12)}</Property>}
       </If>
       <If when={props.issue.reviewedAt}>
         {(at) => (

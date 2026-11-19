@@ -42,7 +42,7 @@
 
 | 路径 | 编码 Schema | 初始消息 | 后续推送 | 消费者 |
 |---|---|---|---|---|
-| `GET /api/v1/state` | `StateFrame` | 首帧 `StateFrame` | 200ms 窗口合并后的 `StateFrame` | 页面、`issue show --watch` |
+| `GET /api/v1/state` | `StateFrame` | 首帧 `StateFrame` | 每 200 毫秒合并一次，保留窗口内的有序特效 | HTTP 客户端 |
 | `GET /api/v1/live`（别名 `/api/v1/events`） | `LiveEvent` | 无 | `SessionEvent`、`Notice`、`Runtime` | 页面 |
 | `GET /api/v1/issue/watch/:id` | `IssueWatch` | 工单状态与保留的轨迹 | 状态、轨迹和缺口（[观察执行](docs/subsystems/issue.md#观察执行)） | `issue watch` |
 | `GET /api/v1/subscribe/<名字>?payload=<JSON>` | 各订阅的 `event`（`packages/protocol/src/rpc.ts` 定义） | 补齐 `after` 之后的变化 | 之后的每次变化 | 页面：`channel.follow`、`channel.reports`、`artifact.follow`、`artifact.suggestion.follow` |
@@ -78,7 +78,8 @@ SSE 以外的路由：
 1. 拥有者模块提交数据库事务或文件后，调用 `Hub::apply(facts)`。
 2. `Core` 运行 `reduce`；若状态未变则直接结束。
 3. 原子替换可见状态、递增 `seq`，按序把 `Transition` 交给订阅它的模块（`Watcher`）。
-4. `/state` 连接在 200ms 窗口后由 `frame_of` 生成 `StateFrame` 推给客户端。
+4. 服务端复用 Chord 投影所读的状态快照。HTTP 和像素场景在 200 毫秒窗口结束时接收当前状态和窗口内的有序特效。
+5. 原生工作台订阅最新状态。空闲后的首次变化立即唤醒窗口。连续变化在同一帧线程合并。工作台快照的 `effects` 为空。每个窗口有一个容量为 1 的唤醒通道。窗口确认已应用当前帧后，才接收下一份快照。
 
 **服务端启动**
 

@@ -34,6 +34,21 @@ impl Execution {
     }
 }
 
+impl From<ToolAction> for SessionAction {
+    fn from(action: ToolAction) -> Self {
+        match action {
+            ToolAction::RunCommand => Self::RunCommand,
+            ToolAction::ReadFile => Self::ReadFile,
+            ToolAction::EditFile => Self::EditFile,
+            ToolAction::Search => Self::Search,
+            ToolAction::Web => Self::Web,
+            ToolAction::Mcp => Self::Mcp,
+            ToolAction::Wait => Self::Wait,
+            ToolAction::Other => Self::Other,
+        }
+    }
+}
+
 impl IssueStatus {
     pub fn is_closed(self) -> bool {
         matches!(self, IssueStatus::Done | IssueStatus::Canceled)
@@ -151,6 +166,7 @@ impl Issue {
             pull_request: None,
             deliver: Deliverable::Change,
             reviewed_at: None,
+            delivery_evidence: None,
             findings: vec![],
             questions: vec![],
             criteria: vec![],
@@ -184,6 +200,7 @@ impl Session {
             channel: None,
             issue: None,
             refining: false,
+            subagents: None,
             tool_connections: None,
             machine: None,
         }
@@ -252,6 +269,7 @@ impl Fact {
             Fact::CallChanged(f) => f.at,
             Fact::SessionToolChanged(f) => f.at,
             Fact::SessionToolsReset(f) => f.at,
+            Fact::SessionSubagentsChanged(f) => f.at,
             Fact::SessionPhaseChanged(f) => f.at,
             Fact::MessageChanged(f) => f.at,
             Fact::ChannelChanged(f) => f.at,

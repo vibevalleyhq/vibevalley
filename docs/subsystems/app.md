@@ -42,7 +42,21 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 - **服务端在应用的进程里**：`BridgeHub::install` 在后台线程调 `vibevalley_server::start`，家目录是 `$VIBEVALLEY_HOME`（默认 `~/.vibevalley`），工作目录是 `$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`；起来之前的调用由 `LateServer` 接住。开场等待服务端、HTTP 地址公告和项目加载都成功；失败停在失败画面。
 - **同一个服务端另开一道本机的 HTTP 门**：`vibevalley_http::serve` 绑 `127.0.0.1` 的空闲端口，地址写进家目录的 `server.json`；命令行据此找到它，帮工的 `/mcp` 也在这道门上。
 - **一个服务端只有一个用户**：门只听 `127.0.0.1`，本机来的请求就是用户，没有登录、设备和配对。
-- **外壳自己的数据另存一个库**：项目、布局、外壳的设置在 `~/Library/Application Support/VibeValley/state.db`（`VIBEVALLEY_STORE` 改位置），和服务端的家目录分开。
+- **外壳自己的数据另存一个库**：项目、布局、外壳的设置在 `~/Library/Application Support/VibeValley/state.db`。`VIBEVALLEY_STORE` 指定宿主库文件。宿主库名为 `state.db` 时，nsh 页面在同目录的 `nsh/` 读写。其他库名各用同目录的 `<库名>.nsh/`。服务端使用自己的家目录。 已有项目可直接激活。用户按目录打开新项目或关联终端时，宿主在后台读取项目。终端桥在标签创建或复用后返回其标识。
+
+### 工单里的子任务
+
+工单详情和档案的会话轨迹读取服务端的子任务摘要。每行显示任务、最近确认的状态、活动和时间。看板和工单列表也显示等待对象。等待对象与任务创建者分别显示。Codex 等待协作消息时，面板显示等待消息。若任务描述缺失，面板显示厂商提供的名称或线程标识。展开一行可看该线程报告的计划，以及该轮该线程的近期工作日志。日志只保留最近 240 步。较早的步骤移出后，页面仍保留服务端给出的任务摘要。进度连接中断时，面板显示中断时间与最后确认的状态。打开工单的轮次记录可查看以前各轮的子任务。[子任务面板](apps/mac/ui/vv/web/features/session/SubagentProgress.tsx)
+
+工单的最近轮次带有工作目录核对标记时，看板、列表与详情从会话摘要显示核对提示。新轮执行期间，页面收起上一轮的提示。轮次记录保留历史提示。查看改动会打开该工单当前的 Git 差异。[工单详情](apps/mac/ui/vv/web/features/issue/views/IssueDetail.tsx)
+
+从看板或列表打开工单后，按 Escape 可回到原卡片。窄窗还会恢复原卡片所在的列。
+
+### 从工单进入终端
+
+右击仓库岛在仓库目录打开终端；右击有帮工的地块和从工单详情进入，都使用会话的 worktree，并以工单号标识标签。再次打开同一命名入口时，若 shell 仍在该目录或子目录，工作区会聚焦原进程。明确带启动命令的入口每次开一个新标签。已经移除的目录在当前窗口显示路径和原因，用户可关闭提示，当前终端不会收到这条启动命令。
+
+在终端中新建标签、向右或向下分屏时，宿主从 PTY 前台进程取得当前本地目录，必要时采用 shell 上报的目录。PTY 启动期间收到的键盘输入、输入法提交和粘贴按原顺序交给新 shell。切换项目保留运行中的进程；重启应用恢复原标签、目录和历史输出，启动新 shell。命名入口的工单号和目标路径存进布局，在子目录退出也能从同一张田找回原标签。[原生终端](apps/mac/src/terminal/mod.rs) · [PTY 会话](crates/vibevalley-terminal/src/lib.rs)
 
 ### 桥
 
@@ -51,7 +65,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | 页面（`apps/mac/ui/bridge.ts`） | 动作 | 回来的事件 |
 |---|---|---|
 | `call(op, payload)` | `call` | `reply:<id>`，契约的信封 `{ bizCode, message, data?, error? }` |
-| `frame("state")` | `watch` | `frame:state`，每帧一个 `StateFrame` |
+| `frame("state")` | `watch` | `frame:state`，工作台的最新状态。页面用 `applied` 确认修订号。慢窗口可跳过中间修订。 |
 | `frame("live")`、`onLive(fn)` | `watch` | `frame:live`，每个事件一个 `LiveEvent` |
 | `subscribe(name, payload, on, ended)` | `subscribe`、`unsubscribe` | `sub:<id>`，每个事件一次，结束一次 |
 | `hostApi.<名字>` | `call`，`op` 是 `host.<名字>` | 外壳的 `Shell::host_call` 答 |

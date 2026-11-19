@@ -170,6 +170,13 @@ function Row(props: {
     <View
       role="button"
       testID="issue-card"
+      ref={(el) => {
+        if (props.selected)
+          requestAnimationFrame(() => {
+            el.reveal({ vertical: "nearest" });
+            el.focus();
+          });
+      }}
       accessibilityLabel={look().title}
       accessibilityState={{ selected: props.selected }}
       tooltip={look().detail ? <Text>{look().detail}</Text> : undefined}
@@ -189,7 +196,10 @@ function Row(props: {
           <StatusMark status={look().status} tone={look().statusTone} size={13} />
         </If>
       </View>
-      <Text class="min-w-0 flex-1 truncate text-sm text-ink">{look().title}</Text>
+      <View class="min-w-0 flex-1">
+        <Text class="truncate text-sm text-ink">{look().title}</Text>
+        <If when={look().wait}>{(wait) => <Text class="truncate text-xs text-water">{wait()}</Text>}</If>
+      </View>
       <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
       <Each of={props.wide ? look().flags : look().flags.slice(0, 1)}>{(f) => <FlagChip text={f().text} tone={f().tone} />}</Each>
       <If when={props.showRepo && props.wide}>

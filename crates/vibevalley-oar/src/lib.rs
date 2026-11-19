@@ -14,14 +14,20 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+mod accounting;
 pub mod acp;
+pub use accounting::TokenTotals;
 mod claude;
 mod codex;
 mod core;
+mod frames;
 mod process;
 pub mod record;
 pub mod scripted;
+mod sdk;
+pub mod subagent;
 pub mod vibevalley;
+pub mod voyage;
 
 pub use crate::core::{StatusFold, derive_status, rejection};
 pub use crate::record::{RecordHeader, read_record_with_header};
@@ -59,15 +65,10 @@ pub type Result<T> = std::result::Result<T, AgentError>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Installation {
-    Available {
-        version: Option<String>,
-        path: PathBuf,
-    },
+    Available { version: Option<String>, path: PathBuf },
     NotInstalled,
-    /// Installed but unusable (not logged in, too old, ...).
-    Unusable {
-        reason: String,
-    },
+    LoginRequired { path: PathBuf },
+    Unusable { reason: String },
 }
 
 /// What a runtime can do. Options outside these are refused at open time.
@@ -131,6 +132,17 @@ pub enum PermissionMode {
 
 #[derive(Debug, Clone, Default)]
 pub struct SessionOptions {
+    pub baseline_timeout: Option<std::time::Duration>,
+    pub request_timeout: Option<std::time::Duration>,
+    pub bin_path: Option<PathBuf>,
+    pub base_env: Option<Vec<(String, String)>>,
+    pub unset_env: Vec<String>,
+    pub name: Option<String>,
+    pub service_tier: Option<String>,
+    pub additional_directories: Vec<PathBuf>,
+    pub output_schema: Option<serde_json::Value>,
+    pub launch_args: Vec<String>,
+    pub allowed_tools: Vec<String>,
     pub cwd: PathBuf,
     pub model: Option<String>,
     /// Resume an earlier session by its id (works across processes).
@@ -149,6 +161,116 @@ pub struct SessionOptions {
     /// Replaces the runtime's own system prompt (VibeValley's persona mode
     /// `replace`); `append_system_prompt` still goes after it.
     pub system_prompt: Option<String>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RefusableOption {
+    SystemPrompt,
+    AppendSystemPrompt,
+    Effort,
+    DisallowedTools,
+    AllowedTools,
+    Name,
+    ServiceTier,
+    AdditionalDirectories,
+    OutputSchema,
+    LaunchArgs,
+}
+
+impl RefusableOption {
+    fn name(self) -> &'static str {
+        use RefusableOption::*;
+        match self {
+            SystemPrompt => "system_prompt",
+            AppendSystemPrompt => "append_system_prompt",
+            Effort => "effort",
+            DisallowedTools => "disallowed_tools",
+            AllowedTools => "allowed_tools",
+            Name => "name",
+            ServiceTier => "service_tier",
+            AdditionalDirectories => "additional_directories",
+            OutputSchema => "output_schema",
+            LaunchArgs => "launch_args",
+        }
+    }
+    fn supplied(self, o: &SessionOptions) -> bool {
+        use RefusableOption::*;
+        match self {
+            SystemPrompt => o.system_prompt.as_ref().is_some_and(|s| !s.is_empty()),
+            AppendSystemPrompt => o.append_system_prompt.as_ref().is_some_and(|s| !s.is_empty()),
+            Effort => o.effort.as_ref().is_some_and(|s| !s.is_empty()),
+            DisallowedTools => !o.disallowed_tools.is_empty(),
+            AllowedTools => !o.allowed_tools.is_empty(),
+            Name => o.name.as_ref().is_some_and(|s| !s.is_empty()),
+            ServiceTier => o.service_tier.as_ref().is_some_and(|s| !s.is_empty()),
+            AdditionalDirectories => !o.additional_directories.is_empty(),
+            OutputSchema => o.output_schema.is_some(),
+            LaunchArgs => !o.launch_args.is_empty(),
+        }
+    }
+}
+fn refused_options(runtime: &str) -> &'static [RefusableOption] {
+    use RefusableOption::*;
+    match runtime {
+        "claude" => &[Name, ServiceTier, LaunchArgs],
+        "codex" => &[AllowedTools, AdditionalDirectories, Name, ServiceTier, LaunchArgs],
+        "qwen" => &[Effort, Name, ServiceTier, OutputSchema, LaunchArgs],
+        "qoder" => &[Effort, Name, ServiceTier, AdditionalDirectories, OutputSchema, LaunchArgs],
+        "kimi" | "codebuddy" => &[
+            SystemPrompt,
+            AppendSystemPrompt,
+            DisallowedTools,
+            AllowedTools,
+            AdditionalDirectories,
+            OutputSchema,
+            Name,
+            ServiceTier,
+            LaunchArgs,
+        ],
+        "grok" | "opencode" => &[
+            DisallowedTools,
+            AllowedTools,
+            AdditionalDirectories,
+            OutputSchema,
+            Name,
+            ServiceTier,
+            LaunchArgs,
+        ],
+        id if id.starts_with("acp:") => &[
+            DisallowedTools,
+            AllowedTools,
+            AdditionalDirectories,
+            OutputSchema,
+            Name,
+            ServiceTier,
+            LaunchArgs,
+        ],
+        _ => &[],
+    }
+}
+
+impl SessionOptions {
+    fn binary(&self, name: &str) -> Result<PathBuf> {
+        self.bin_path.clone().map_or_else(|| process::require_binary(name), Ok)
+    }
+    fn prepare(&mut self, runtime: &str) -> Result<()> {
+        self.validate_for(runtime)?;
+        if self.cwd.as_os_str().is_empty() {
+            self.cwd = std::env::current_dir().map_err(|e| AgentError::Io(e.to_string()))?;
+        }
+        core::check_cwd(&self.cwd)
+    }
+    pub fn validate_for(&self, runtime: &str) -> Result<()> {
+        if let Some(option) = refused_options(runtime).iter().find(|o| o.supplied(self)) {
+            let name = option.name();
+            return Err(AgentError::Unsupported {
+                option: name.into(),
+                reason: format!("{runtime} does not support {name}"),
+            });
+        }
+        Ok(())
+    }
 }
 
 /// One usage bucket of an account (oar's `AccountUsageWindow`).
@@ -281,6 +403,75 @@ pub enum PermissionDecision {
     Deny { message: Option<String> },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SubagentStatus {
+    PendingInit,
+    Running,
+    Interrupted,
+    Completed,
+    Errored,
+    Shutdown,
+    NotFound,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SubagentPlanStatus {
+    Pending,
+    InProgress,
+    Completed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubagentPlanStep {
+    pub step: String,
+    pub status: SubagentPlanStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubagentSnapshot {
+    pub parent_thread_id: Option<String>,
+    pub agent_name: Option<String>,
+    pub status: Option<SubagentStatus>,
+    pub message: Option<String>,
+}
+
+impl SubagentSnapshot {
+    fn unsupported() -> AgentError {
+        AgentError::Unsupported {
+            option: "read_subagent".into(),
+            reason: "runtime cannot read a saved child thread".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolAction {
+    RunCommand,
+    ReadFile,
+    EditFile,
+    Search,
+    Web,
+    Mcp,
+    Wait,
+    Other,
+}
+
+pub fn tool_action(name: &str, input: &serde_json::Value) -> ToolAction {
+    match name {
+        "Bash" | "BashOutput" | "shell" | "exec_command" | "local_shell" | "commandExecution" => ToolAction::RunCommand,
+        "Read" | "NotebookRead" | "read_file" => ToolAction::ReadFile,
+        "Edit" | "Write" | "MultiEdit" | "NotebookEdit" | "apply_patch" | "fileChange" => ToolAction::EditFile,
+        "Grep" | "Glob" | "LS" | "search" => ToolAction::Search,
+        "WebFetch" | "WebSearch" | "web_search" | "webSearch" => ToolAction::Web,
+        "collabAgentToolCall" if input["tool"] == "wait" => ToolAction::Wait,
+        "mcpToolCall" => ToolAction::Mcp,
+        n if n.starts_with("mcp__") || n.starts_with("mcp:") => ToolAction::Mcp,
+        _ => ToolAction::Other,
+    }
+}
+
 /// One fact. `seq` is strictly increasing within a session. `agent_path` is
 /// empty for the root agent and names the chain of subagents otherwise.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -317,6 +508,34 @@ pub enum EventKind {
         id: String,
         ok: bool,
         output: String,
+    },
+    SubagentSpawned {
+        parent_thread_id: String,
+        thread_id: String,
+        task: Option<String>,
+        agent_name: Option<String>,
+    },
+    SubagentWait {
+        thread_id: String,
+        call_id: String,
+        targets: Vec<String>,
+        waiting: bool,
+    },
+    SubagentMessage {
+        thread_id: String,
+        turn_id: String,
+        text: String,
+    },
+    SubagentPlanUpdated {
+        thread_id: String,
+        turn_id: String,
+        steps: Vec<SubagentPlanStep>,
+    },
+    SubagentStatusChanged {
+        thread_id: String,
+        turn_id: Option<String>,
+        status: SubagentStatus,
+        message: Option<String>,
     },
     FileChanged {
         path: PathBuf,
@@ -358,9 +577,71 @@ pub enum SessionStatus {
     Failed,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlAction {
+    Prompt,
+    Steer,
+    Queue,
+    Withdraw,
+    Abort,
+    Compact,
+    StopTask,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlStatus {
+    Accepted,
+    Rejected,
+    Unsupported,
+    NotRunning,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlOutcome {
+    pub action: ControlAction,
+    pub status: ControlStatus,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub code: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub span_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub input_id: String,
+}
 /// One conversation with a runtime.
 pub trait Session: Send + Sync {
     fn id(&self) -> String;
+    fn control(&self, action: ControlAction, arg: &str, input_id: &str, span_id: &str) -> Result<ControlOutcome>;
+    fn usage(&self) -> Option<TokenTotals> {
+        self.records()
+            .iter()
+            .rev()
+            .filter(|r| r.agent_path.is_empty())
+            .flat_map(|r| r.events.iter().rev())
+            .find(|e| e["kind"] == "usage")
+            .and_then(|e| serde_json::from_value(e["usage"]["tokens"].clone()).ok())
+    }
+    fn records(&self) -> Vec<voyage::Record>;
+    fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<voyage::Record>;
+    fn wait(&self) -> Result<()> {
+        let events = self.events();
+        for e in events {
+            if matches!(e.kind, EventKind::SessionEnded) {
+                break;
+            }
+        }
+        Ok(())
+    }
+    fn resume_id(&self) -> Option<String> {
+        Some(self.id())
+    }
+    /// Resolves the outcome of the specified child turn. Without its turn id,
+    /// only thread identity is recoverable.
+    fn read_subagent(&self, _thread_id: &str, _turn_id: Option<&str>) -> Result<SubagentSnapshot> {
+        Err(SubagentSnapshot::unsupported())
+    }
     fn runtime_id(&self) -> &str;
     fn status(&self) -> SessionStatus;
     /// A new receiver that yields every event from now on. May be called
@@ -389,6 +670,9 @@ pub trait Runtime: Send + Sync {
     fn id(&self) -> &str;
     fn display_name(&self) -> &str;
     fn capabilities(&self) -> Capabilities;
+    fn refused_options(&self) -> &'static [RefusableOption] {
+        refused_options(self.id())
+    }
     /// Blocking: probes the local machine.
     fn installation(&self) -> Installation;
     /// Blocking.
@@ -414,7 +698,11 @@ impl Registry {
     }
 
     pub fn register(&mut self, runtime: Arc<dyn Runtime>) {
-        self.runtimes.push(runtime);
+        if let Some(slot) = self.runtimes.iter_mut().find(|r| r.id() == runtime.id()) {
+            *slot = runtime;
+        } else {
+            self.runtimes.push(runtime);
+        }
     }
 
     pub fn list(&self) -> &[Arc<dyn Runtime>] {
@@ -422,7 +710,15 @@ impl Registry {
     }
 
     pub fn get(&self, id: &str) -> Option<Arc<dyn Runtime>> {
-        self.runtimes.iter().find(|r| r.id() == id).cloned()
+        self.runtimes
+            .iter()
+            .find(|r| r.id() == id)
+            .or_else(|| {
+                self.runtimes
+                    .iter()
+                    .find(|r| r.id().strip_prefix("acp:") == Some(id) || id.strip_prefix("acp:") == Some(r.id()))
+            })
+            .cloned()
     }
 
     pub fn require(&self, id: &str) -> Result<Arc<dyn Runtime>> {
@@ -445,6 +741,8 @@ pub fn default_runtimes() -> Registry {
     for spec in acp::builtin_agents() {
         registry.register(Arc::new(acp::AcpRuntime::new(spec)));
     }
+    registry.register(Arc::new(sdk::SdkRuntime::Qwen));
+    registry.register(Arc::new(sdk::SdkRuntime::Qoder));
     registry.register(Arc::new(vibevalley::VibeValleyRuntime::from_env()));
     registry.register(Arc::new(scripted::ScriptedRuntime::demo()));
     registry

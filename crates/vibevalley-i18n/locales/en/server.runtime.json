@@ -29,5 +29,8 @@
   "cannotDrive": "oar cannot drive {runtime}",
   "cannotSend": "{name} cannot be sent: {why}",
   "defaultModel": "{runtime} has no model {model}; {name} uses the default for now",
-  "effort": "{model} has no {effort} effort; it has: {levels}"
+  "effort": "{model} has no {effort} effort; it has: {levels}",
+  "probeTimeout": "The runtime check timed out. Check again.",
+  "stillChecking": "The runtime check is still in progress",
+  "signInRequired": "Sign in to {runtime} in a local terminal, then check again."
 }

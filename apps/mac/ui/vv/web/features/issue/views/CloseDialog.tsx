@@ -9,6 +9,7 @@ import { DiffView } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
 
+import { hostApi } from "../../../../../bridge";
 import { ago } from "../../../base/format";
 import { reasonOf } from "../../../infra/api";
 import { useCore } from "../../../infra/frame";
@@ -21,11 +22,11 @@ import { TextArea } from "../../../ui/Field";
 import { mix } from "../../../ui/tone";
 import { actionOf, perform } from "../model/acts";
 import { type Lane } from "../model/cards";
-import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "../model/changes";
+import { approveShownChanges, changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "../model/changes";
 import { useIssueChanges } from "../model/history";
 import { issueTitle } from "../model/issue";
 import { issueMove, sendMove } from "../model/moves";
-import { Note } from "./Sheet";
+import { Note, SheetLabel } from "./Sheet";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session?: Session | undefined; review?: boolean; lane?: Lane | undefined; onClose: () => void }) {
@@ -41,7 +42,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
   const who = () => props.session?.name ?? props.issue.title;
   return (
     <Dialog open onClose={props.onClose} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={reviewing()} testid="close-issue">
-      <If when={!reviewing()} else={<ChangesReview issue={props.issue.id} lane={props.lane} onDone={props.onClose} />}>
+      <If when={!reviewing()} else={<ChangesReview issue={props.issue.id} worktree={props.session?.worktree} lane={props.lane} onDone={props.onClose} />}>
         <View>
           <Text class="text-base text-ink">
             {working()
@@ -77,13 +78,13 @@ function createPresses(lane: () => Lane | undefined) {
   const act = createAct();
   return {
     /** False when the issue does not offer it or the press did not go through. */
-    press: async (issue: Issue | undefined, pressed: IssueAct) => {
+    press: async (issue: Issue | undefined, pressed: IssueAct, revision?: Changes["revision"]) => {
       const a = issue && actionOf(issue, pressed);
       if (!issue || !a) return false;
       if (a.does === "move") {
         // The lane it was dropped on is where closing puts it; a resolve sends it back to work instead.
         const to = pressed === "resolve" ? undefined : lane();
-        void sendMove(moves, { id: issue.id, status: a.status, ...(to ? { lane: to } : {}) });
+        void sendMove(moves, { id: issue.id, status: a.status, ...(revision ? { revision } : {}), ...(to ? { lane: to } : {}) });
         return true;
       }
       return (await act.run(async () => (await perform(issue, a), true))) === true;
@@ -92,14 +93,30 @@ function createPresses(lane: () => Lane | undefined) {
 }
 
 /** What the branch brings before it is merged. */
-function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: () => void }) {
-  const changes = useIssueChanges(() => props.issue);
+function ChangesReview(props: { issue: string; worktree?: string | undefined; lane?: Lane | undefined; onDone: () => void }) {
+  const sinceTree = signal<string | undefined>(undefined);
+  const changes = useIssueChanges(
+    () => props.issue,
+    () => true,
+    sinceTree,
+  );
   const core = useCore();
   const live = () => core()?.issues.find((i) => i.id === props.issue);
   const acts = () => (live()?.stage.acts ?? []).map((a) => a.act);
   const presses = createPresses(() => props.lane);
-  const take = async () => {
-    if (await presses.press(live(), "complete")) props.onDone();
+  const reviewError = signal("");
+  const review = createAct((message) => reviewError.set(message));
+  const take = async (shown: Changes) => {
+    const issue = live();
+    if (!issue || review.busy()) return;
+    reviewError.set("");
+    const approved = await review.run(() => approveShownChanges(issue, shown));
+    if (!approved) {
+      if (shown.revision && sinceTree() !== shown.revision.tree) sinceTree.set(shown.revision.tree);
+      else await changes.refetch();
+      return;
+    }
+    if (await presses.press(issue, "complete", approved.revision)) props.onDone();
   };
   const resolve = async () => {
     if (await presses.press(live(), "resolve")) props.onDone();
@@ -126,6 +143,13 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
           {(c) => (
             <View testID="changes-review" class="gap-3">
               <ChangesHead changes={c()} />
+              <If when={reviewError()}>
+                {(message) => (
+                  <Note tone="wheat">
+                    <Text class="text-sm text-ink">{message()}</Text>
+                  </Note>
+                )}
+              </If>
               <If
                 when={c().conflicts.length > 0}
                 else={
@@ -138,15 +162,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
               >
                 <Note tone="berry">
                   <Text class="text-sm font-semibold text-berry">{t("web.issue.changes.conflict", { base: c().base })}</Text>
-                  <View class="mt-1.5 flex-row flex-wrap gap-1">
-                    <Each of={c().conflicts}>
-                      {(f) => (
-                        <View class="rounded-sm bg-page px-1.5">
-                          <Text class="font-mono text-xs text-berry">{f()}</Text>
-                        </View>
-                      )}
-                    </Each>
-                  </View>
+                  <ConflictFiles files={c().conflicts} worktree={props.worktree} />
                   <Text class="mt-1.5 text-xs text-muted">{t("web.issue.changes.resolveHow", { base: c().base })}</Text>
                 </Note>
               </If>
@@ -169,7 +185,7 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
               </If>
               <View class="flex-row flex-wrap gap-2">
                 <If when={acts().includes("complete")}>
-                  <Button tone="primary" testID="act-complete" onPress={() => void take()}>
+                  <Button tone="primary" testID="review-complete" disabled={review.busy()} onPress={() => void take(c())}>
                     {t("shared.act.complete")}
                   </Button>
                 </If>
@@ -183,12 +199,45 @@ function ChangesReview(props: { issue: string; lane?: Lane | undefined; onDone: 
               <If when={!acts().includes("complete") && !acts().includes("resolve")}>
                 <Text class="text-xs text-muted">{t("web.issue.changes.moved")}</Text>
               </If>
-              <ChangesBody changes={c()} />
+              <If when={c().sinceReview} else={<ChangesBody changes={c()} />}>
+                {(files) => (
+                  <View testID="changes-since-review">
+                    <SheetLabel>{t("web.issue.changes.sinceReview")}</SheetLabel>
+                    <ChangesBody changes={{ ...c(), commits: [], files: files() }} />
+                  </View>
+                )}
+              </If>
             </View>
           )}
         </If>
       </If>
     </If>
+  );
+}
+
+export function ConflictFiles(props: { files: string[]; worktree?: string | undefined }) {
+  const error = signal("");
+  const open = async (worktree: string, path: string) => {
+    const reply = await hostApi.openWorktreeFile(worktree, path);
+    error.set(reply.bizCode === 0 ? "" : reply.message);
+  };
+  return (
+    <View class="mt-1.5 gap-1">
+      <View class="flex-row flex-wrap gap-1">
+        <Each of={props.files}>
+          {(path) => (
+            <If when={props.worktree} else={<Text class="font-mono text-xs text-berry">{path()}</Text>}>
+              {(worktree) => (
+                <Button testID="conflict-file" onPress={() => void open(worktree(), path())}>
+                  {path()}
+                </Button>
+              )}
+            </If>
+          )}
+        </Each>
+      </View>
+      <If when={error()}>{(reason) => <Text class="text-xs text-berry">{reason()}</Text>}</If>
+    </View>
   );
 }
 

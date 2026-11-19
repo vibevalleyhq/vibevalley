@@ -185,6 +185,9 @@
     }
   ],
   "runtimeSupport": {
+    "qwen": {"steer": false, "refused": {"effort": "这个农机不能指定推理强度"}, "capabilities": [], "inProcess": false},
+    "qoder": {"steer": false, "refused": {"effort": "这个农机不能指定推理强度"}, "capabilities": [], "inProcess": false},
+    "codebuddy": {"steer": false, "refused": {"systemPrompt": "CodeBuddy ACP 不接受会话提示或单个工具清单", "appendSystemPrompt": "CodeBuddy ACP 不接受会话提示或单个工具清单", "disallowedTools": "CodeBuddy ACP 不接受会话提示或单个工具清单"}, "capabilities": ["listModels"], "inProcess": false},
     "claude": {
       "steer": true,
       "refused": {},
@@ -267,5 +270,5 @@
       "inProcess": false
     }
   },
-  "runtimeIds": ["claude", "codex", "opencode", "vibevalley", "pi", "cursor", "grok", "kimi", "antigravity", "dsh"]
+  "runtimeIds": ["claude", "codex", "opencode", "qwen", "qoder", "codebuddy", "vibevalley", "pi", "cursor", "grok", "kimi", "antigravity", "dsh"]
 }

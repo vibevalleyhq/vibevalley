@@ -103,3 +103,12 @@ test("? opens the shortcut sheet: every place with its keys", async () => {
   expect(app.count("id:shortcut-place")).toBe(8);
   expect(app.texts()).toContain("⌘");
 });
+
+test("regression: the repositories map button enters the native islands route", async () => {
+  const { app, fake } = await start({ route: "/repos" });
+  await app.press("id:open-repo-map");
+  await fake.pump(app);
+  await app.waitUntil(() => app.count("id:repo-map") === 1);
+  expect(fake.acts).toContainEqual({ type: "openRepoMap" });
+  expect(fake.acts.some((action) => action.type === "openFarm")).toBe(false);
+});

@@ -235,3 +235,6 @@ fn a_sent_issue_is_logged_listed_and_watched() {
     assert_eq!(missing.err().unwrap().biz_code, vibevalley_protocol::BizCode::IssueNotFound.code());
     started.board.close();
 }
+
+#[path = "session/subagent_progress.rs"]
+mod subagent_progress;

@@ -45,17 +45,17 @@ export type Badge = { text: string, tone: BadgeTone, };
 
 export type PlotView = { crop: Crop, badge?: Badge, };
 
-export type FarmView = { level: FarmLevel, 
+export type FarmView = { level: FarmLevel,
 /**
  * Each issue's plot, by the issue's id (`plotKeyOf`): a reopened issue's new session draws on the same one.
  */
-plots: { [key in string]: PlotView }, 
+plots: { [key in string]: PlotView },
 /**
  * Each session's station and step history, by the session's id; the farm reads only this.
  */
 plays: { [key in string]: SessionPlayView }, achievements: Array<AchievementStanding>, };
 
-export type GameEffectReward = { "kind": "reward", 
+export type GameEffectReward = { "kind": "reward",
 /**
  * The session whose work paid; none for a reward of the farm as a whole.
  */

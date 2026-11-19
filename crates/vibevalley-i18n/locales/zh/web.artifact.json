@@ -135,6 +135,9 @@
     "noNotes": "这一页没有备注",
     "clock": "讲了多久",
     "restart": "重新计时",
-    "aside": "下一页和备注"
+    "aside": "下一页和备注",
+    "waiting": "等待演示页就绪",
+    "empty": "没有可演示的页",
+    "loadFailure": "演示页未能载入：{reason}"
   }
 }

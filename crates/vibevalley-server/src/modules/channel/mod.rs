@@ -10,14 +10,18 @@
 //! and the write returns once [`Chat::await_reader`]'s readers handled it.
 
 pub mod db;
+#[rustfmt::skip]
+#[path = "generated/queries.rs"]
+mod queries;
 pub mod model;
 pub mod words;
 
 use std::sync::{Arc, Mutex, MutexGuard, RwLock, Weak};
 
-use rusqlite::Connection;
+use self::db::Connection;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sqlx::SqliteConnection;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
     Actor, AgentRole, ApiError, ArtifactCard, Attachment, BizCode, CallState, Channel, ChannelEvent, ChannelLast, ChannelType, ChannelUnread, ChannelUpdate,
@@ -29,7 +33,7 @@ use vibevalley_protocol::{
 use self::db::{ChannelRow, EventRow, MsgRow, ParticipantRow};
 use self::model::ChatModel;
 use self::words::{ChatTarget, Has, Nameable};
-use crate::base::{LookIn, RequestKeys, internal, missing, open_db, refused as refuse};
+use crate::base::{LookIn, RequestKeys, internal, missing, open_sqlx_db, refused as refuse};
 use crate::modules::agent::Agents;
 use crate::modules::attachment::Attachments;
 use crate::{Hub, Sink, lock, now};
@@ -63,7 +67,7 @@ trait Q<T> {
     fn q(self) -> Result<T, ApiError>;
 }
 
-impl<T> Q<T> for rusqlite::Result<T> {
+impl<T> Q<T> for sqlx::Result<T> {
     fn q(self) -> Result<T, ApiError> {
         self.map_err(internal)
     }
@@ -537,12 +541,15 @@ struct Written {
     event: Option<EventRow>,
 }
 
+type BeforePost<'a> = Box<dyn FnOnce(&mut SqliteConnection, &ChatMessage) -> Result<(), ApiError> + 'a>;
+
 type Reader = Arc<dyn Fn(i64) -> Result<(), ApiError> + Send + Sync>;
 type Guard = Arc<dyn Fn(&str) -> Vec<String> + Send + Sync>;
 
 /// The tables and the places in memory, under one lock (`locked`).
 pub struct Inner {
     db: Connection,
+    transaction_depth: usize,
     model: ChatModel,
 }
 
@@ -551,25 +558,37 @@ pub struct Inner {
 /// write to the same file, and a read that later wants to write would be
 /// refused (`SQLITE_BUSY`) rather than wait.
 fn tx<T>(inner: &mut Inner, work: impl FnOnce(&mut Inner) -> Result<T, ApiError>) -> Result<T, ApiError> {
-    let outermost = inner.db.is_autocommit();
-    let (begin, done, undo) = if outermost {
+    struct Savepoint<'a> {
+        inner: &'a mut Inner,
+        previous: Option<ChatModel>,
+        undo: &'static str,
+    }
+    impl Drop for Savepoint<'_> {
+        fn drop(&mut self) {
+            self.inner.transaction_depth -= 1;
+            if let Some(previous) = self.previous.take() {
+                let _ = db::control(&self.inner.db, self.undo);
+                self.inner.model = previous;
+            }
+        }
+    }
+    let (begin, commit, undo) = if inner.transaction_depth == 0 {
         ("begin immediate", "commit", "rollback")
     } else {
         ("savepoint chat", "release chat", "rollback to chat; release chat")
     };
-    inner.db.execute_batch(begin).q()?;
-    let kept = inner.model.clone();
-    match work(inner) {
-        Ok(v) => {
-            inner.db.execute_batch(done).q()?;
-            Ok(v)
-        }
-        Err(e) => {
-            let _ = inner.db.execute_batch(undo);
-            inner.model = kept;
-            Err(e)
-        }
-    }
+    let previous = inner.model.clone();
+    db::control(&inner.db, begin).q()?;
+    inner.transaction_depth += 1;
+    let mut guard = Savepoint {
+        inner,
+        previous: Some(previous),
+        undo,
+    };
+    let value = work(guard.inner)?;
+    db::control(&guard.inner.db, commit).q()?;
+    guard.previous = None;
+    Ok(value)
 }
 
 impl Inner {
@@ -1077,8 +1096,8 @@ impl Chat {
     /// places loaded, and the newest channels and the user's mentions put
     /// in the state.
     pub fn open(home: &std::path::Path, hub: &Arc<Hub>, files: Arc<Attachments>, embeds: bool) -> Result<Arc<Chat>, ApiError> {
-        let conn = open_db(home).q()?;
-        conn.execute_batch(db::SCHEMA).q()?;
+        let conn = Connection::new(pollster::block_on(open_sqlx_db(home)).q()?);
+        db::control(&conn, db::SCHEMA).q()?;
         let at = now();
         for (id, kind, name) in [
             (USER_ID, "user", t("server.channel.name.user", &[])),
@@ -1114,7 +1133,11 @@ impl Chat {
         let chat = Arc::new_cyclic(|me| Chat {
             hub: Arc::downgrade(hub),
             files,
-            inner: Mutex::new(Inner { db: conn, model }),
+            inner: Mutex::new(Inner {
+                db: conn,
+                transaction_depth: 0,
+                model,
+            }),
             me: me.clone(),
             said: Mutex::default(),
             told: Mutex::default(),
@@ -1210,7 +1233,7 @@ impl Chat {
 
     /// One message changed with its channel's next revision; then whoever
     /// follows its channel is told it as it now is.
-    fn change(&self, inner: &mut Inner, row: &MsgRow, work: impl FnOnce(&Connection, i64, i64) -> rusqlite::Result<()>) -> Result<ChatMessage, ApiError> {
+    fn change(&self, inner: &mut Inner, row: &MsgRow, work: impl FnOnce(&Connection, i64, i64) -> sqlx::Result<()>) -> Result<ChatMessage, ApiError> {
         let at = now();
         tx(inner, |me| {
             let revision = db::bump_revision(&me.db, &row.channel_id).q()?;
@@ -1226,6 +1249,10 @@ impl Chat {
     /// `write`, under the lock: the message, its event, who it names and
     /// follows, the state told; the readers are told after the lock.
     fn write(&self, inner: &mut Inner, w: Write) -> Result<Written, ApiError> {
+        self.write_with(inner, w, None)
+    }
+
+    fn write_with(&self, inner: &mut Inner, w: Write, persist: Option<BeforePost<'_>>) -> Result<Written, ApiError> {
         let written = tx(inner, |me| {
             if let Some(key) = w.send_key.as_deref().filter(|k| !k.is_empty())
                 && let Some(seen) = db::message_by_send_key(&me.db, &w.from, key).q()?
@@ -1296,6 +1323,9 @@ impl Chat {
                 Some(subject) => me.thread_for(&id, number, &w.channel, subject)?,
                 None => String::new(),
             };
+            if let Some(persist) = persist {
+                persist(&mut me.db.borrow_mut(), &to_message(&row))?;
+            }
             let event = EventRow {
                 seq,
                 kind: "posted".into(),
@@ -1547,6 +1577,19 @@ impl Chat {
     /// `post`: words written as `from` into a place; the speaker has read
     /// the place up to them.
     pub fn post(&self, p: Posting) -> Result<(ChatMessage, bool), ApiError> {
+        self.post_storing(p, None)
+    }
+
+    /// A new card and its owner row share this connection until commit. A repeated send key skips the callback.
+    pub(crate) fn post_with(
+        &self,
+        p: Posting,
+        persist: impl FnOnce(&mut SqliteConnection, &ChatMessage) -> Result<(), ApiError>,
+    ) -> Result<(ChatMessage, bool), ApiError> {
+        self.post_storing(p, Some(Box::new(persist)))
+    }
+
+    fn post_storing(&self, p: Posting, persist: Option<BeforePost<'_>>) -> Result<(ChatMessage, bool), ApiError> {
         let written = {
             let mut inner = self.locked();
             if p.send_key.encode_utf16().count() > SEND_KEY_MAX {
@@ -1577,7 +1620,7 @@ impl Chat {
                 Some(Made::Attachments(ids)) => meta.attachments = Some(self.files.of(ids)?),
                 None => {}
             }
-            self.write(
+            self.write_with(
                 &mut inner,
                 Write {
                     meta: Some(meta),
@@ -1585,6 +1628,7 @@ impl Chat {
                     read_by: Some(p.from.clone()),
                     ..Write::new(&place, &p.from, MessageKind::Chat, p.text.trim())
                 },
+                persist,
             )?
         };
         self.handled(written.event.as_ref())?;
@@ -1613,6 +1657,10 @@ impl Chat {
     /// `note`: a dispatch or report; `topic` opens the place's thread about
     /// it under the note.
     pub fn note(&self, n: Note) -> Result<String, ApiError> {
+        self.note_once(n, None)
+    }
+
+    pub(crate) fn note_once(&self, n: Note, key: Option<String>) -> Result<String, ApiError> {
         let written = {
             let mut inner = self.locked();
             if let Some(seat) = &n.seat {
@@ -1622,6 +1670,7 @@ impl Chat {
                 &mut inner,
                 Write {
                     meta: Some(n.meta),
+                    send_key: key,
                     thread: n.topic,
                     member: n.member,
                     ..Write::new(&n.channel, &n.from, n.kind, &n.text)
@@ -2161,6 +2210,15 @@ impl Chat {
         Ok(rows)
     }
 
+    pub(crate) fn messages_after(&self, channel: &str, after: i64, limit: i64) -> Result<Vec<ChatMessage>, ApiError> {
+        let inner = self.locked();
+        if inner.model.channel(channel).is_none() {
+            return Err(no_channel(channel));
+        }
+        let rows = db::messages_after(&inner.db, channel, after, if limit > 0 { limit } else { -1 }).q()?;
+        Ok(rows.iter().map(to_message).collect())
+    }
+
     pub fn rows_after(&self, channel: &str, after: i64) -> Result<Vec<MsgRow>, ApiError> {
         db::messages_after(&self.locked().db, channel, after, 1000).q()
     }
@@ -2697,6 +2755,7 @@ pub fn direct(chat: &Chat, agents: &Agents, reference: &str) -> Result<String, A
 /// `channel.*`, `channel.follow`, `channel.reports`; the orchestrators
 /// seated now and whenever a profile is kept.
 pub fn install(hub: &Hub, chat: Arc<Chat>, agents: Arc<Agents>, game: Option<Arc<crate::modules::game::Game>>) {
+    let _ = hub.chat.set(Arc::downgrade(&chat));
     for agent in agents.profiles.orchestrators() {
         if let Err(e) = seat_orchestrator(&chat, &agents, &agent) {
             eprintln!("vibevalley-server: chat: seating {}: {}", agent.id, e.message);

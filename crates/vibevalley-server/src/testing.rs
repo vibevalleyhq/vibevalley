@@ -2,6 +2,7 @@
 //! `helper`): runtime `pi`, whose every turn does what the words of its brief
 //! say. Served only when `VIBEVALLEY_TEST_RUNTIMES=1`; never asks a model.
 
+use std::num::NonZeroU16;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
@@ -9,6 +10,21 @@ use std::sync::Arc;
 use serde_json::json;
 use vibevalley_oar::scripted::{Script, ScriptedRuntime, Step, TurnAsk};
 use vibevalley_oar::{EventKind, Runtime};
+
+pub(crate) fn configure(config: &mut crate::ServerConfig, model_port: Option<&str>) {
+    let mut registry = vibevalley_oar::Registry::new();
+    registry.register(helper());
+    config.registry = Some(Arc::new(registry));
+    config.probe_runtimes = false;
+    config.link_previews = false;
+    config.offline_media = true;
+    if let Some(value) = model_port {
+        let port: NonZeroU16 = value.parse().expect("VIBEVALLEY_TEST_MODEL_PORT must be a port from 1 to 65535");
+        config.model_client = Some(Arc::new(vibevalley_agent::OpenAiClient::new(format!("http://127.0.0.1:{port}"), || {
+            Some("local-fixture".into())
+        })));
+    }
+}
 
 /// `briefBreak`: a persona before the brief is set apart by it.
 const BRIEF_BREAK: &str = "\n\n---\n\n";
@@ -191,7 +207,7 @@ fn turn(ask: &TurnAsk) -> Result<Vec<Step>, String> {
             notes += &format!("\n\n{}", lines.join("\n"));
         }
     }
-    let persona = if persona.is_empty() { "无".to_string() } else { persona };
+    let persona = if persona.is_empty() { "无" } else { "已配置" };
     say(&mut steps, format!("做完了：{input}｜人设：{persona}{notes}"));
     Ok(steps)
 }
@@ -223,6 +239,15 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    #[test]
+    fn regression_scripted_report_keeps_private_instructions_out_of_the_issue() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut request = ask("提交打卡页", dir.path());
+        request.append_system_prompt = Some("private instructions that belong only to the helper".into());
+        let summary = said(&turn(&request).unwrap());
+        assert_eq!(summary, "做完了：提交打卡页｜人设：已配置");
     }
 
     #[test]

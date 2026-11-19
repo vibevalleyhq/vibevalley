@@ -310,7 +310,14 @@ impl ModelClient for OpenAiClient {
             let message = serde_json::from_str::<Value>(&text)
                 .ok()
                 .and_then(|v| v.pointer("/error/message").and_then(Value::as_str).map(str::to_string))
-                .unwrap_or(text);
+                .unwrap_or_else(|| text.clone());
+            if matches!(status, 400 | 413 | 422)
+                && (message.to_lowercase().contains("context length")
+                    || message.to_lowercase().contains("context window")
+                    || text.contains("context_length_exceeded"))
+            {
+                return Err(BrainError::ContextOverflow(message));
+            }
             return Err(BrainError::Model(format!("HTTP {status}: {message}")));
         }
         fold_stream(BufReader::new(body.into_reader()), on)

@@ -97,6 +97,18 @@ impl Rounds for Heard {
     }
 }
 
+fn pending_delivery(issue: &Issue) -> Option<&vibevalley_protocol::ProjectCheckReceipt> {
+    if issue.status.is_closed() || issue.deliver != Deliverable::Change {
+        return None;
+    }
+    issue
+        .delivery_evidence
+        .as_ref()?
+        .check
+        .as_ref()
+        .filter(|r| r.status != vibevalley_protocol::ProjectCheckStatus::Failed && r.target_commit != r.candidate_commit)
+}
+
 impl Board {
     /// The board as stored, without taking it: for reading while another
     /// process holds it. Working sessions show as they were last stored.
@@ -149,7 +161,7 @@ impl Board {
         let (ledger, opened) = Ledger::open(path, facts)?;
         let ledger = Arc::new(ledger);
         let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
-        let sessions = Sessions::new(ledger.clone(), drivers.clone(), workplaces.clone(), config.clone())?;
+        let sessions = Sessions::new(ledger.durable.clone(), ledger.clone(), drivers.clone(), workplaces.clone(), config.clone())?;
         let board = Board(Arc::new(Inner {
             ledger,
             sessions,
@@ -161,13 +173,16 @@ impl Board {
         }));
         observe(&board.0.sessions);
         board.0.sessions.on_rounds(Box::new(Heard(Arc::downgrade(&board.0))));
-        board.0.sessions.interrupted(&opened.interrupted)?;
+        board.0.sessions.recover_on_connect(opened.recoverable);
+        board.0.sessions.record_interrupted(opened.interrupted);
         {
             let _work = lock(&board.0.work);
+            board.recover_published_deliveries()?;
             for id in opened.lost {
                 if let Ok(issue) = board.stored(&id)
                     && !issue.status.is_closed()
                     && issue.latest_session_id().is_some()
+                    && pending_delivery(&issue).is_none()
                 {
                     board.close_issue(&issue, IssueCanceled::Lost)?;
                 }
@@ -328,11 +343,25 @@ impl Board {
         self.stored(&id)
     }
 
+    pub(super) fn verify_approval(issue: &Issue, to: IssueStatus, seen: Option<&vibevalley_protocol::ReviewRevision>) -> Result<()> {
+        if let Some(seen) = seen
+            && (to != IssueStatus::Done || issue.delivery_evidence.as_ref().and_then(|e| e.reviews.last()).map(|r| &r.revision) != Some(seen))
+        {
+            return Err(BoardError::Other(vibevalley_i18n::t("server.issue.reviewChanged", &[])));
+        }
+        Ok(())
+    }
+
     /// The user moves an issue on the board. `words` carry what to do this
     /// time for a round or a reopen.
     pub fn move_to(&self, reference: &str, to: IssueStatus, words: Option<&str>) -> Result<Move> {
+        self.move_reviewed(reference, to, words, None)
+    }
+
+    pub fn move_reviewed(&self, reference: &str, to: IssueStatus, words: Option<&str>, seen: Option<&vibevalley_protocol::ReviewRevision>) -> Result<Move> {
         let _work = lock(&self.0.work);
         let issue = self.stored(reference)?;
+        Self::verify_approval(&issue, to, seen)?;
         let mv = status_move(&issue, to).map_err(BoardError::Refused)?;
         let words = words.map(str::trim).filter(|w| !w.is_empty()).map(String::from);
         match mv {
@@ -414,6 +443,51 @@ impl Board {
         }
     }
 
+    pub fn tell_message(&self, reference: &str, words: &str, key: &str) -> Result<()> {
+        if key.trim().is_empty() || words.trim().is_empty() {
+            return Err(BoardError::WordsRequired);
+        }
+        let _work = lock(&self.0.work);
+        let issue = self.stored(reference)?;
+        let sessions = &self.0.sessions;
+        let sub = sessions.submit_words(&issue.id, key, words)?;
+        match sub.status {
+            vibevalley_durable::SubmissionStatus::Done | vibevalley_durable::SubmissionStatus::Placed => return Ok(()),
+            vibevalley_durable::SubmissionStatus::Unanswered => return Err(BoardError::Other(sub.result.to_string())),
+            vibevalley_durable::SubmissionStatus::Queued => (),
+        }
+        if issue.status.is_closed() {
+            let e = BoardError::Refused(if issue.was_sent() { Refusal::Reopen } else { Refusal::Revive });
+            sessions.settle_words(&sub.id, false, &serde_json::json!({"error":e.to_string()}))?;
+            return Err(e);
+        }
+        if let Some(session) = self.on_board(&issue)
+            && session.phase.is_working()
+            && sessions.is_live(&session.id)
+            && sessions.bind_to_active_run(&session.id, &sub)?
+        {
+            let result = sessions
+                .steer(&session, words)
+                .unwrap_or_else(|| Err(BoardError::Other("the active run ended during handoff".into())));
+            if let Err(e) = &result {
+                sessions.settle_words(&sub.id, false, &serde_json::json!({"error":e.to_string()}))?;
+            }
+            return result;
+        }
+        if matches!(issue.status, IssueStatus::Backlog | IssueStatus::Todo) {
+            return Ok(());
+        }
+        self.dispatch_replies(&issue)
+    }
+
+    fn dispatch_replies(&self, issue: &Issue) -> Result<()> {
+        if self.room_for_round(issue).is_err() {
+            return Ok(());
+        }
+        self.change(&issue.id, IssueChange::Answered)?;
+        self.send(&issue.id, None, RunTriggerKind::Comment).map(|_| ())
+    }
+
     /// Stops the running turn of the issue's session (its drafter's while
     /// it is drafted).
     pub fn stop(&self, reference: &str) -> Result<()> {
@@ -429,6 +503,7 @@ impl Board {
         let _work = lock(&self.0.work);
         self.join_children()?;
         self.refresh_queue_locked();
+        self.retry_replies();
         Ok(())
     }
 
@@ -457,6 +532,25 @@ impl Board {
             eprintln!("vibevalley: child issues could not be merged: {e}");
         }
         self.refresh_queue_locked();
+        self.retry_replies();
+    }
+
+    fn retry_replies(&self) {
+        for issue in self
+            .state()
+            .issues
+            .iter()
+            .filter(|i| matches!(i.status, IssueStatus::InReview | IssueStatus::InProgress))
+        {
+            if self.on_board(issue).is_some_and(|s| s.phase.is_working()) {
+                continue;
+            }
+            if self.0.sessions.queued_words(&issue.id).is_ok_and(|q| !q.is_empty())
+                && let Err(e) = self.dispatch_replies(issue)
+            {
+                eprintln!("vibevalley: queued replies for {}: {e}", issue.id);
+            }
+        }
     }
 
     // ----- sending -----
@@ -506,6 +600,18 @@ impl Board {
             return Ok(Sent::Queued { blocked_by: blocked });
         }
         let kept = self.take_words(id)?;
+        let original = words.clone();
+        let deliveries = self.0.sessions.queued_words(id)?;
+        let words = words
+            .into_iter()
+            .chain(deliveries.iter().filter_map(|s| s.payload["text"].as_str().map(str::to_owned)))
+            .collect::<Vec<_>>();
+        let words = (!words.is_empty()).then(|| words.join("\n\n"));
+        let retry_words = match (&kept, original) {
+            (Some(k), Some(o)) => Some(format!("{k}\n\n{o}")),
+            (Some(k), None) => Some(k.clone()),
+            (None, o) => o,
+        };
         let words = match (kept, words) {
             (Some(a), Some(b)) => Some(format!("{a}\n\n{b}")),
             (a, b) => a.or(b),
@@ -530,7 +636,7 @@ impl Board {
             Ok(session) => Ok(Sent::Working { session }),
             Err(e) => {
                 // Not sent: it leaves the queue, the words stay for the next try.
-                if let Some(w) = &words {
+                if let Some(w) = &retry_words {
                     let _ = self.keep_words(id, w);
                 }
                 let _ = self.change(id, IssueChange::Unqueued);
@@ -582,7 +688,7 @@ impl Board {
             } else if let Some(main) = self.0.workplaces.main_repo(updated.repo.as_deref())? {
                 self.0.workplaces.clear_checkout(&main, updated.number)?;
             }
-            let done = self.change(&updated.id, IssueChange::Delivered(vibevalley_protocol::Landing::PullRequest))?;
+            let done = self.change(&updated.id, IssueChange::Delivered(vibevalley_protocol::Landing::PullRequest, None))?;
             let _ = self.take_words(&updated.id);
             self.refresh_queue_locked();
             return Ok(done);
@@ -631,11 +737,30 @@ impl Board {
 
     /// The issue's work as it stands.
     pub fn changes(&self, reference: &str) -> Result<Changes> {
+        self.changes_since(reference, None)
+    }
+
+    pub fn changes_since(&self, reference: &str, since_tree: Option<&str>) -> Result<Changes> {
         let issue = self.stored(reference)?;
         let wp = &self.0.workplaces;
         let main = wp
             .main_repo(issue.repo.as_deref())?
             .ok_or_else(|| BoardError::Other("the issue has no repository".into()))?;
+        if issue.status.is_closed()
+            && let Some(evidence) = &issue.delivery_evidence
+            && let Some(receipt) = &evidence.check
+            && evidence.merged_commit.as_deref() == Some(receipt.candidate_commit.as_str())
+        {
+            let revision = evidence
+                .reviews
+                .last()
+                .map(|r| r.revision.clone())
+                .unwrap_or_else(|| vibevalley_protocol::ReviewRevision {
+                    base_commit: receipt.target_commit.clone(),
+                    tree: receipt.candidate_tree.clone(),
+                });
+            return Workplace::published_changes(&main, issue.number, revision, receipt, since_tree);
+        }
         let base = self.session_base(&issue, &main)?;
         let worktree = self.on_board(&issue).and_then(|s| s.worktree);
         let at = OnDisk {
@@ -643,7 +768,19 @@ impl Board {
             title: &issue.title,
             worktree: worktree.as_deref(),
         };
-        wp.changes(&main, &at, base, issue.parent.is_some())
+        wp.changes(
+            &main,
+            &at,
+            base,
+            issue.parent.is_some(),
+            since_tree.or_else(|| {
+                issue
+                    .delivery_evidence
+                    .as_ref()
+                    .and_then(|e| e.reviews.last())
+                    .map(|r| r.revision.tree.as_str())
+            }),
+        )
     }
 
     /// The branch the issue's work forked from: its session's, else its
@@ -656,6 +793,54 @@ impl Board {
                 self.0.workplaces.base(main, parent)
             }
         }
+    }
+
+    fn recover_published_deliveries(&self) -> Result<()> {
+        let issues = self.read(|state| {
+            state
+                .issues
+                .iter()
+                .filter_map(|i| pending_delivery(i).map(|r| (i.clone(), r.clone())))
+                .collect::<Vec<_>>()
+        });
+        for (issue, receipt) in issues {
+            match self.recover_delivery(&issue, &receipt) {
+                Err(BoardError::Git(_) | BoardError::NotARepo(_) | BoardError::Other(_)) => self.hold_delivery(&issue.id, &receipt.candidate_commit)?,
+                result => result?,
+            }
+        }
+        Ok(())
+    }
+
+    fn hold_delivery(&self, issue: &str, commit: &str) -> Result<()> {
+        let why = vibevalley_i18n::t("server.issue.verifyDelivery", &[("commit", commit.into())]);
+        self.change(issue, IssueChange::Stuck { why, conflict: None }).map(|_| ())
+    }
+
+    fn recover_delivery(&self, issue: &Issue, last: &vibevalley_protocol::ProjectCheckReceipt) -> Result<()> {
+        let Some(repo) = issue.repo.as_deref() else { return Ok(()) };
+        let Some(main) = self.0.workplaces.existing(repo)? else {
+            return self.hold_delivery(&issue.id, &last.candidate_commit);
+        };
+        let session = self.on_board(issue);
+        let worktree = session.as_ref().and_then(|s| s.worktree.as_deref());
+        let tree = self
+            .0
+            .workplaces
+            .checkout(&main, issue.number, worktree, false)?
+            .as_ref()
+            .map(vibevalley_git::Repo::worktree_tree)
+            .transpose()?;
+        if self
+            .0
+            .workplaces
+            .was_published(&main, &crate::modules::workplace::issue_branch(issue.number), tree.as_deref(), last)?
+        {
+            self.finish_delivery(issue, Some(&main), vibevalley_protocol::Landing::Merged, Some(last.candidate_commit.clone()))?;
+        } else if tree.is_none() {
+            self.hold_delivery(&issue.id, &last.candidate_commit)?;
+        }
+        Ok(())
     }
 
     /// Accepted: deliver as the issue says.
@@ -671,6 +856,7 @@ impl Board {
                 .pull_request
                 .as_ref()
                 .is_some_and(|pr| pr.state == vibevalley_protocol::PullRequestState::Merged);
+        let mut merged = None;
         let landing = match &main {
             _ if issue.deliver == Deliverable::Answer => vibevalley_protocol::Landing::None,
             _ if issue.deliver == Deliverable::PullRequest => vibevalley_protocol::Landing::Submitted,
@@ -684,7 +870,22 @@ impl Board {
                     title: &issue.title,
                     worktree: worktree.as_deref(),
                 };
-                match wp.land(main, &at, issue.deliver, || self.session_base(issue, main), has_children)? {
+                let delivery = crate::modules::workplace::Delivery {
+                    work: at,
+                    kind: issue.deliver,
+                    has_children,
+                    evidence: issue.delivery_evidence.as_ref(),
+                };
+                match wp.land(
+                    main,
+                    delivery,
+                    || self.session_base(issue, main),
+                    |receipt| self.change(&issue.id, IssueChange::ProjectChecked(receipt)).map(|_| ()),
+                )? {
+                    Landed::Merged(commit) => {
+                        merged = Some(commit);
+                        vibevalley_protocol::Landing::Merged
+                    }
                     Landed::Landed(landing) => landing,
                     Landed::Conflict(conflict) => {
                         let (base, files) = (conflict.base.clone(), conflict.files.clone());
@@ -703,20 +904,26 @@ impl Board {
                 }
             }
         };
-        if let Some(s) = &session {
+        self.finish_delivery(issue, main.as_ref(), landing, merged)
+    }
+
+    fn finish_delivery(&self, issue: &Issue, main: Option<&vibevalley_git::Repo>, landing: vibevalley_protocol::Landing, merged: Option<String>) -> Result<()> {
+        if let Some(s) = self.on_board(issue) {
             let leave = if matches!(issue.deliver, Deliverable::Branch | Deliverable::PullRequest)
-                || pr_merged
+                || landing == vibevalley_protocol::Landing::PullRequest
                 || vibevalley_core::pr::goes_by_pull_request(issue, false)
             {
                 Leave::KeepBranch
+            } else if issue.deliver == Deliverable::Change {
+                Leave::Integrated
             } else {
                 Leave::Discard
             };
             self.0.sessions.dismiss(&s.id, leave)?;
-        } else if let Some(main) = &main {
-            wp.clear_checkout(main, issue.number)?;
+        } else if let Some(main) = main {
+            self.0.workplaces.clear_checkout(main, issue.number)?;
         }
-        self.change(&issue.id, IssueChange::Delivered(landing))?;
+        self.change(&issue.id, IssueChange::Delivered(landing, merged))?;
         let _ = self.take_words(&issue.id);
         self.refresh_queue_locked();
         Ok(())

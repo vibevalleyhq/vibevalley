@@ -12,7 +12,9 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use vibevalley_oar::{ContentBlock, EventKind, McpServer, PermissionDecision, PermissionMode, SessionOptions, StopReason};
-use vibevalley_protocol::{Deliverable, Doing, Fact, Issue, IssueAnswer, Millis, Outcome, Phase, PhaseWorking, Question, RunTrigger, Session, SessionAction};
+use vibevalley_protocol::{
+    Deliverable, Doing, Fact, Issue, IssueAnswer, Millis, Outcome, Phase, PhaseWorking, Question, RunTrigger, Session, SessionAction, Spent,
+};
 
 use super::drivers::{Drive, Drivers, HelperPlace, Persona};
 use super::report::{Report, ReportQuestion, ReportStatus};
@@ -49,6 +51,7 @@ struct Door {
 /// A drafting round that ended: what the drafter said, for the issue
 /// module to read the draft from.
 pub struct DraftEnd {
+    pub spent: Option<Spent>,
     pub session: Session,
     pub issue: Issue,
     pub reason: StopReason,
@@ -80,19 +83,6 @@ pub struct Hire<'a> {
     pub trigger: RunTrigger,
 }
 
-/// `SessionAction` of a tool by its name (Claude Code's and Codex's).
-fn action_of_tool(name: &str) -> SessionAction {
-    match name {
-        "Bash" | "shell" | "exec_command" | "local_shell" => SessionAction::RunCommand,
-        "Read" | "NotebookRead" | "read_file" => SessionAction::ReadFile,
-        "Edit" | "Write" | "MultiEdit" | "NotebookEdit" | "apply_patch" => SessionAction::EditFile,
-        "Grep" | "Glob" | "LS" | "search" => SessionAction::Search,
-        "WebFetch" | "WebSearch" | "web_search" => SessionAction::Web,
-        n if n.starts_with("mcp__") => SessionAction::Mcp,
-        _ => SessionAction::Other,
-    }
-}
-
 pub(super) fn text(s: &str) -> Vec<ContentBlock> {
     vec![ContentBlock::Text(s.to_string())]
 }
@@ -102,23 +92,32 @@ pub struct Sessions(pub(super) Arc<Inner>);
 
 pub(super) struct Inner {
     pub ledger: Arc<Ledger>,
+    pub durable: vibevalley_durable::Store,
     pub drivers: Arc<dyn Drivers>,
     pub workplaces: Arc<Workplace>,
     pub config: Arc<BoardConfig>,
     live: Mutex<HashMap<String, Live>>,
     generation: AtomicU64,
-    extras: Mutex<HashMap<String, Extra>>,
+    pub(super) extras: Mutex<HashMap<String, Extra>>,
     door: Mutex<Door>,
     rounds: OnceLock<Box<dyn Rounds>>,
+    pub(super) recovering: Mutex<Vec<String>>,
     pub(super) listeners: Mutex<Vec<super::news::Listener>>,
     /// Held while a direct talk finds or hires its session.
     pub talking: Mutex<()>,
 }
 
 impl Sessions {
-    pub fn new(ledger: Arc<Ledger>, drivers: Arc<dyn Drivers>, workplaces: Arc<Workplace>, config: Arc<BoardConfig>) -> Result<Sessions> {
+    pub fn new(
+        durable: vibevalley_durable::Store,
+        ledger: Arc<Ledger>,
+        drivers: Arc<dyn Drivers>,
+        workplaces: Arc<Workplace>,
+        config: Arc<BoardConfig>,
+    ) -> Result<Sessions> {
         let extras = ledger.database(super::db::extras)?;
         Ok(Sessions(Arc::new(Inner {
+            durable,
             ledger,
             drivers,
             workplaces,
@@ -129,6 +128,7 @@ impl Sessions {
             door: Mutex::new(Door::default()),
             rounds: OnceLock::new(),
             listeners: Mutex::new(Vec::new()),
+            recovering: Default::default(),
             talking: Mutex::new(()),
         })))
     }
@@ -186,6 +186,13 @@ impl Sessions {
     /// started before it is known gets no door.
     pub fn set_mcp_url(&self, url: String) {
         lock(&self.0.door).url = Some(url);
+        let ids = std::mem::take(&mut *lock(&self.0.recovering));
+        for id in ids {
+            if let Err(e) = self.restore_generation(&id) {
+                eprintln!("vibevalley: restoring {id}: {e}");
+                lock(&self.0.recovering).push(id);
+            }
+        }
     }
 
     /// The helper a bearer token names.
@@ -232,13 +239,16 @@ impl Sessions {
         self.extra(session).base
     }
 
-    /// Sessions the last process left working: their open runs end as
-    /// interrupted.
-    pub fn interrupted(&self, ids: &[String]) -> Result<()> {
-        for id in ids {
-            self.end_run(id, Outcome::Interrupted, "Interrupted: VibeValley was closed while it worked", None)?;
+    pub(crate) fn record_interrupted(&self, runs: Vec<(String, String)>) {
+        for (session, run) in runs {
+            self.record(
+                &session,
+                Step::RunEnded {
+                    run,
+                    outcome: Outcome::Interrupted,
+                },
+            );
         }
-        Ok(())
     }
 
     /// A new session on an issue, its agent opened and its first prompt sent.
@@ -262,6 +272,65 @@ impl Sessions {
     /// first prompt. `resume` reopens the runtime's own session.
     fn start(&self, drive: Drive, mut session: Session, issue: &Issue, prompt: String, resume: bool, trigger: RunTrigger) -> Result<String> {
         let _ = std::fs::remove_file(self.report_path(&session.id));
+        let (agent, prompt) = self.open_for(drive, &session, issue, prompt, resume)?;
+        session.phase = Phase::working(now(), SessionAction::Thinking, "");
+        let started = IssueChange::Started {
+            session: session.id.clone(),
+            worker: !session.refining,
+        };
+        self.go_live(agent.clone(), session.clone(), Some((issue.id.as_str(), started)))?;
+        let run = self.begin_run(&session.id, &issue.id, trigger)?;
+        let prompt = self.with_recall(&session, prompt);
+        self.record(&session.id, Step::Asked { text: prompt.clone() });
+        if let Err(e) = Self::prompt_run(&*agent, &run, &prompt) {
+            let _ = self.dismiss(&session.id, Leave::Keep);
+            return Err(e.into());
+        }
+        Ok(session.id)
+    }
+
+    fn prompt_run(agent: &dyn vibevalley_oar::Session, run: &str, prompt: &str) -> vibevalley_oar::Result<()> {
+        if agent.runtime_id() != vibevalley_oar::vibevalley::ID {
+            return agent.prompt(text(prompt));
+        }
+        let key = format!("work:{run}");
+        let outcome = agent.control(vibevalley_oar::ControlAction::Prompt, prompt, &key, &key)?;
+        if outcome.status != vibevalley_oar::ControlStatus::Accepted {
+            return Err(vibevalley_oar::AgentError::Rejected(format!("{}: {}", outcome.code, outcome.reason)));
+        }
+        Ok(())
+    }
+    pub(crate) fn recover_on_connect(&self, ids: Vec<String>) {
+        lock(&self.0.recovering).extend(ids);
+    }
+
+    fn restore_generation(&self, id: &str) -> Result<()> {
+        let session = self.session(id).ok_or_else(|| BoardError::Other(format!("missing session {id}")))?;
+        let issue = session
+            .issue
+            .as_ref()
+            .and_then(|i| self.0.ledger.issue(i))
+            .ok_or_else(|| BoardError::Other(format!("missing issue for {id}")))?;
+        let extra = self.extra(id);
+        let run = extra.run.ok_or_else(|| BoardError::Other(format!("missing open run for {id}")))?;
+        let vendor = extra.agent_session.ok_or_else(|| BoardError::Other(format!("missing driver id for {id}")))?;
+        let conv = vibevalley_agent::generation::workers::worker_conversation(&vendor);
+        let sub = self
+            .0
+            .durable
+            .read(|tx| tx.submission_by_request(&conv, &format!("work:{run}")))?
+            .ok_or_else(|| BoardError::Other(format!("missing generation for {run}")))?;
+        let task = self.0.durable.read(|tx| tx.task(&format!("gen-{}", sub.id)))?;
+        let drive = self.0.drivers.drive(Some(&session.agent), &issue)?;
+        let (agent, _) = self.open_for(drive, &session, &issue, String::new(), true)?;
+        self.go_live(agent.clone(), session, None)?;
+        if task.status == vibevalley_durable::TaskStatus::Terminal {
+            Self::prompt_run(&*agent, &run, sub.payload["text"].as_str().unwrap_or_default())?;
+        }
+        Ok(())
+    }
+
+    fn open_for(&self, drive: Drive, session: &Session, issue: &Issue, prompt: String, resume: bool) -> Result<(Arc<dyn vibevalley_oar::Session>, String)> {
         let cwd = PathBuf::from(session.worktree.clone().unwrap_or_default());
         let instructions = if session.refining {
             "You are drafting an issue for VibeValley's board. Do not change or commit files.".to_string()
@@ -288,12 +357,13 @@ impl Sessions {
         let mut mcp_servers: Vec<McpServer> = self.door_for(&session.id).into_iter().collect();
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
         #[allow(clippy::needless_update, reason = "fields vibevalley-oar adds later")]
+        let (append_system_prompt, prompt) = drive.work_instructions(instructions, prompt);
         let opts = SessionOptions {
             cwd,
             model: drive.model.clone(),
             resume: if resume { self.extra(&session.id).agent_session } else { None },
             permission_mode: self.0.config.permission,
-            append_system_prompt: Some(instructions),
+            append_system_prompt,
             env: drive.env.clone(),
             record_to: Some(self.record_path(&session.id)),
             effort: drive.effort.clone(),
@@ -302,37 +372,50 @@ impl Sessions {
             system_prompt,
             ..Default::default()
         };
-        let agent = drive.runtime.open(opts)?;
-        session.phase = Phase::working(now(), SessionAction::Thinking, "");
-        let started = IssueChange::Started {
-            session: session.id.clone(),
-            worker: !session.refining,
-        };
-        self.go_live(agent.clone(), session.clone(), Some((issue.id.as_str(), started)))?;
-        self.begin_run(&session.id, &issue.id, trigger)?;
-        let prompt = self.with_recall(&session, prompt);
-        self.record(&session.id, Step::Asked { text: prompt.clone() });
-        if let Err(e) = agent.prompt(text(&prompt)) {
-            let _ = self.dismiss(&session.id, Leave::Keep);
-            return Err(e.into());
-        }
-        Ok(session.id)
+        Ok((drive.runtime.open(opts)?, prompt))
     }
 
     /// `session` on the board, driven by `agent` from now on: its events
     /// pumped into facts. The issue it works changes in the same commit.
     pub(super) fn go_live(&self, agent: Arc<dyn vibevalley_oar::Session>, session: Session, issue: Option<(&str, IssueChange)>) -> Result<()> {
-        self.set_extra(&session.id, |e| e.agent_session = Some(agent.id()))?;
-        let events = agent.events();
+        let events = agent.events_with_history();
+        self.set_extra(&session.id, |e| e.agent_session = agent.resume_id())?;
         let generation = self.0.generation.fetch_add(1, Ordering::SeqCst) + 1;
-        lock(&self.0.live).insert(session.id.clone(), Live { agent, generation });
+        lock(&self.0.live).insert(
+            session.id.clone(),
+            Live {
+                agent: agent.clone(),
+                generation,
+            },
+        );
         let id = session.id.clone();
+        let previous = session
+            .subagents
+            .as_ref()
+            .filter(|s| s.disconnected_at.is_some() && s.root_thread_id == agent.id())
+            .cloned();
         let changed = Fact::session_changed(now(), session);
         match issue.filter(|(i, _)| self.0.ledger.issue(i).is_some()) {
             Some((issue, change)) => {
                 self.0.ledger.change_with(issue, change, |fact| vec![changed, fact])?;
             }
             None => self.0.ledger.apply(vec![changed])?,
+        }
+        if let Some(before) = previous {
+            let me = self.clone();
+            let session_id = id.clone();
+            if let Err(err) = std::thread::Builder::new().name(format!("vibevalley-read-children-{id}")).spawn(move || {
+                let mut after = before.clone();
+                let changed = super::subagents::read_back(&mut after, |thread, turn| agent.read_subagent(thread, turn), now);
+                if changed
+                    && me.current(&session_id, generation)
+                    && let Err(err) = me.0.ledger.reconcile_subagents(&session_id, &before, after)
+                {
+                    eprintln!("could not reconcile subagents for {session_id}: {err}");
+                }
+            }) {
+                eprintln!("could not start subagent history lookup for {id}: {err}");
+            }
         }
         let me = self.clone();
         std::thread::Builder::new()
@@ -363,10 +446,10 @@ impl Sessions {
                 // start: the room is counted by it.
                 let phase = Phase::working(now(), SessionAction::Thinking, "");
                 self.0.ledger.apply(vec![self.phase_changed(session.id.clone(), phase)])?;
-                self.begin_run(&session.id, &issue.id, trigger)?;
+                let run = self.begin_run(&session.id, &issue.id, trigger)?;
                 let words = self.with_recall(session, words);
                 self.record(&session.id, Step::Asked { text: words.clone() });
-                agent.prompt(text(&words))?;
+                Self::prompt_run(&*agent, &run, &words)?;
                 self.0.ledger.change(&issue.id, IssueChange::Unqueued)?;
                 Ok(session.id.clone())
             }
@@ -446,8 +529,10 @@ impl Sessions {
     /// Turns the agent's events into facts until the session ends or leaves.
     fn pump(&self, session_id: &str, generation: u64, events: flume::Receiver<vibevalley_oar::Event>) {
         let quiet_after = self.0.config.quiet_after;
+        let mut observed_run = None;
         let mut said = String::new();
         let mut asked: Vec<Question> = Vec::new();
+        let mut failure = None;
         let mut last_event = Instant::now();
         let tick = quiet_after.min(Duration::from_secs(5)).max(Duration::from_millis(20));
         loop {
@@ -469,23 +554,39 @@ impl Sessions {
             }
             last_event = Instant::now();
             self.set_quiet(session_id, None);
-            self.record(session_id, Step::Agent(event.clone()));
             let root = event.agent_path.is_empty();
+            if root && matches!(event.kind, EventKind::TurnStarted { .. }) {
+                observed_run = self.extra(session_id).run;
+            }
+            if let Some(run) = observed_run.as_deref()
+                && super::subagents::relevant(&event)
+                && let Err(error) = self.observe_subagents(session_id, generation, run, &event)
+            {
+                eprintln!("could not record subagent progress for {session_id}: {error}");
+            }
+            self.record(session_id, Step::Agent(event.clone()));
             match event.kind {
+                EventKind::SessionStarted { session_id: vendor, .. } if root => {
+                    let _ = self.set_extra(session_id, |e| e.agent_session = Some(vendor));
+                }
                 EventKind::TurnStarted { .. } if root => {
                     said.clear();
                     asked.clear();
+                    failure = None;
                     let phase = Phase::working(now(), SessionAction::Thinking, "");
                     let _ = self.0.ledger.apply(vec![self.phase_changed(session_id, phase)]);
                 }
                 EventKind::TextDelta { text } if root => said.push_str(&text),
-                EventKind::ToolCallStarted { name, .. } if root => self.set_doing(
-                    session_id,
-                    Doing {
-                        action: action_of_tool(&name),
-                        label: name,
-                    },
-                ),
+                EventKind::ToolCallStarted { name, input, .. } if root => {
+                    let action = super::journal::tool_action(&name, &input);
+                    let detail = super::journal::tool_detail(&input, "");
+                    let label = if detail.is_empty() && action == vibevalley_protocol::ToolAction::Other {
+                        name
+                    } else {
+                        detail.chars().take(512).collect()
+                    };
+                    self.set_doing(session_id, Doing { action: action.into(), label });
+                }
                 EventKind::Question { text } if root => {
                     asked.push(Question {
                         question: text,
@@ -498,8 +599,10 @@ impl Sessions {
                         let _ = agent.respond_permission(&request_id, PermissionDecision::AllowOnce);
                     }
                 }
-                EventKind::TurnFinished { reason, .. } if root => {
-                    self.finish(session_id, reason, &said, &asked);
+                EventKind::Error { message } if root => failure = Some(message),
+                EventKind::TurnFinished { reason, usage } if root => {
+                    observed_run = None;
+                    self.finish(session_id, reason, reported_spent(&usage), &said, &asked, failure.as_deref());
                     if let Some(rounds) = self.0.rounds.get() {
                         rounds.after();
                     }
@@ -512,6 +615,16 @@ impl Sessions {
         if live.get(session_id).is_some_and(|l| l.generation == generation) {
             live.remove(session_id);
         }
+    }
+
+    fn observe_subagents(&self, session_id: &str, generation: u64, run: &str, event: &vibevalley_oar::Event) -> Result<()> {
+        if !self.current(session_id, generation) {
+            return Ok(());
+        }
+        let Some(root) = self.extra(session_id).agent_session else { return Ok(()) };
+        self.0
+            .ledger
+            .update_subagents(session_id, run, &root, |session| super::subagents::observe(session, run, &root, event))
     }
 
     /// A phase change keeps the session where it talks: the fact carries
@@ -544,12 +657,48 @@ impl Sessions {
         let _ = self.0.ledger.apply(vec![self.phase_changed(session_id, phase)]);
     }
 
+    pub(crate) fn review_work(&self, vendor: &str, run_id: &str, candidate: &str) -> Result<Option<(Issue, Report)>> {
+        let Some(run) = self.0.ledger.database(|db| super::db::run(db, run_id))? else {
+            return Ok(None);
+        };
+        let Some(session) = self.session(&run.session) else { return Ok(None) };
+        let extra = self.extra(&run.session);
+        if session.refining
+            || run.outcome.is_some()
+            || session.runtime != vibevalley_oar::vibevalley::ID
+            || extra.run.as_deref() != Some(run_id)
+            || extra.agent_session.as_deref() != Some(vendor)
+        {
+            return Ok(None);
+        }
+        let Some(issue) = run.issue.as_deref().and_then(|id| self.0.ledger.issue(id)) else {
+            return Ok(None);
+        };
+        if issue.criteria.iter().all(|line| line.trim().is_empty()) {
+            return Ok(None);
+        }
+        let report = Report::read(&self.report_path(&run.session));
+        let round = read_round(&issue, StopReason::Completed, report.as_ref(), candidate, &[]);
+        if round.outcome != Outcome::Completed || !round.questions.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some((
+            issue,
+            Report {
+                summary: round.summary,
+                checks: round.checks,
+                answer: round.answer,
+                ..Report::default()
+            },
+        )))
+    }
+
     /// A round's end: a talk's answer, a draft for the issue module, or a
     /// work round's report onto its issue.
-    fn finish(&self, session_id: &str, reason: StopReason, said: &str, asked: &[Question]) {
+    fn finish(&self, session_id: &str, reason: StopReason, spent: Option<Spent>, said: &str, asked: &[Question], failure: Option<&str>) {
         let Some(session) = self.session(session_id) else { return };
         if session.issue.is_none() && session.channel.is_some() {
-            self.finish_talk(&session, reason, said);
+            self.finish_talk(&session, reason, said, spent);
             return;
         }
         let Some(issue) = session.issue.as_deref().and_then(|i| self.0.ledger.issue(i)) else {
@@ -558,6 +707,7 @@ impl Sessions {
         if session.refining {
             if let Some(rounds) = self.0.rounds.get() {
                 rounds.drafted(DraftEnd {
+                    spent,
                     session,
                     issue,
                     reason,
@@ -567,18 +717,32 @@ impl Sessions {
             }
             return;
         }
+        let extra = self.extra(session_id);
+        let output = match self.graded_output(&session, &extra) {
+            Ok(output) => output,
+            Err(e) => {
+                eprintln!("vibevalley: reading the outcome for {session_id}: {e}");
+                return;
+            }
+        };
         let report = Report::read(&self.report_path(session_id));
-        let round = read_round(&issue, reason, report.as_ref(), said, asked);
-        let _ = self.end_run(session_id, round.outcome, &round.summary, None);
+        let failed = matches!(reason, StopReason::Error | StopReason::MaxTurns);
+        let mut round = read_round(&issue, reason, report.as_ref(), output.as_deref().unwrap_or(said), asked);
+        if failed && let Some(error) = failure {
+            round.summary = vibevalley_core::text::clip(error, 400);
+        }
+        let run_id = extra.run;
+        let summary = round.summary.clone();
+        let outcome = round.outcome;
         let reported = Fact::SessionReported(vibevalley_protocol::FactSessionReported {
             at: now(),
             id: session_id.into(),
-            run: None,
+            run: run_id.clone(),
             outcome: round.outcome,
             phase: None,
             summary: round.summary,
             runs: session.runs + 1,
-            spent: None,
+            spent: spent.clone(),
             questions: vec![],
             checks: round.checks.clone(),
             answer: round.answer.clone(),
@@ -588,7 +752,36 @@ impl Sessions {
             checks: round.checks,
             answer: round.answer,
         };
-        let _ = self.0.ledger.change_with(&issue.id, change, |fact| vec![fact, reported]);
+        if let Err(error) = self.0.ledger.change_commit(
+            &issue.id,
+            change,
+            |fact| vec![fact, reported],
+            |tx| {
+                if let Some(id) = run_id.as_deref()
+                    && let Some(mut r) = super::db::run(tx.connection(), id)?
+                {
+                    r.ended_at = Some(now());
+                    r.outcome = Some(outcome);
+                    r.summary = summary;
+                    r.spent = spent;
+                    super::db::put_run(tx.connection(), &r)?;
+                    super::delivery::settle_run(tx, &r)?;
+                    super::db::clear_run(tx.connection(), session_id, id)?;
+                }
+                Ok(())
+            },
+        ) {
+            eprintln!("vibevalley: settling {session_id}: {error}");
+            return;
+        }
+        if let Some(id) = run_id {
+            if let Some(extra) = lock(&self.0.extras).get_mut(session_id)
+                && extra.run.as_ref() == Some(&id)
+            {
+                extra.run = None;
+            }
+            self.record(session_id, Step::RunEnded { run: id, outcome });
+        }
         if let Some(r) = report.as_ref().filter(|r| !r.remember.is_empty()) {
             self.announce(super::News::Remember {
                 agent: session.agent.clone(),
@@ -598,6 +791,14 @@ impl Sessions {
             });
         }
     }
+}
+
+fn reported_spent(usage: &vibevalley_oar::Usage) -> Option<Spent> {
+    let tokens = usage.input_tokens?.checked_add(usage.output_tokens?)?;
+    Some(Spent {
+        tokens: i64::try_from(tokens).ok()?,
+        cny: None,
+    })
 }
 
 /// What a work round handed back, from its report or else from what the

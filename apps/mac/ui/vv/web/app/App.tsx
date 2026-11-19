@@ -101,6 +101,11 @@ function Tree() {
   );
 }
 
+function RepoMap() {
+  effect(() => act({ type: "openRepoMap" }));
+  return <View testID="repo-map" class="flex-1" />;
+}
+
 function MissingPage(props: { invalid?: boolean }) {
   return (
     <View testID="route-missing" class="flex-1 items-center justify-center gap-4 bg-page p-6">
@@ -126,6 +131,7 @@ const routes: readonly RouteDefinition[] = [
     ),
     children: [
       { path: "/tree", meta: { skin: "farm" }, component: Tree },
+      { path: "/map", meta: { place: "repos" }, component: RepoMap },
       { path: "/farm", meta: { skin: "farm" }, component: FarmHome },
       { path: "/farm/", meta: { skin: "farm" }, component: () => <Farm repo="" /> },
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
@@ -151,8 +157,8 @@ export function App(props: { history?: RouterHistory }) {
       <Follow />
       <View class="flex-1 bg-page">
         <Routes routes={routes} fallback={() => <MissingPage />} invalid={() => <MissingPage invalid />} />
+        <ToastHost />
       </View>
-      <ToastHost />
     </Root>
   );
 }

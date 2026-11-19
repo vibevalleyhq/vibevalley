@@ -7,7 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::Ordering;
 
-use rusqlite::Connection;
+use sqlx::SqliteConnection;
 use vibevalley_artifact::{Page, blocks_of_markdown, inline_spans, markdown_of, ordered, unmarked};
 use vibevalley_core::rules::key_between;
 use vibevalley_i18n::{list, t};
@@ -166,7 +166,7 @@ fn base_of(op: &BlockOp) -> Option<(&str, i64)> {
 
 impl Artifacts {
     /// `foundBlocks`: the artifact, refused when it is not written in blocks.
-    pub(super) fn found_blocks(&self, db: &Connection, id: &str) -> Result<ArtifactRow, ApiError> {
+    pub(super) fn found_blocks(&self, db: &mut SqliteConnection, id: &str) -> Result<ArtifactRow, ApiError> {
         let row = self.found(db, id)?;
         if row.body != "blocks" {
             return Err(refused(t("server.artifact.notBlocks", &[("title", row.title.as_str().into())])));
@@ -175,14 +175,14 @@ impl Artifacts {
     }
 
     fn blocks_of(&self, id: &str) -> Result<Vec<Block>, ApiError> {
-        db::blocks(&self.db(), id).map_err(q)
+        db::blocks(&mut self.db(), id).map_err(q)
     }
 
     /// The live blocks in order.
     pub fn live_blocks(&self, id: &str) -> Result<Vec<Block>, ApiError> {
-        let db = self.db();
-        self.found_blocks(&db, id)?;
-        Ok(ordered(&db::blocks(&db, id).map_err(q)?))
+        let mut db = self.db();
+        self.found_blocks(&mut db, id)?;
+        Ok(ordered(&db::blocks(&mut db, id).map_err(q)?))
     }
 
     pub fn markdown(&self, id: &str) -> Result<String, ApiError> {
@@ -213,80 +213,95 @@ impl Artifacts {
         if batch_id.trim().is_empty() {
             return Err(refused(t("server.artifact.noBatch", &[])));
         }
-        let ack = {
+        let (ack, fresh) = {
             let mut conn = self.db();
-            let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(q)?;
-            let row = self.found_blocks(&tx, id)?;
-            let all = db::blocks(&tx, id).map_err(q)?;
-            if let Some(seen) = db::change_by_batch(&tx, batch_id).map_err(q)? {
-                return self.again(&all, id, seen);
+            use sqlx::Connection;
+            let mut tx = pollster::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+            let result = self.apply_batch(&mut tx, id, actor, batch_id, &ops)?;
+            pollster::block_on(tx.commit()).map_err(q)?;
+            result
+        };
+        if fresh {
+            self.publish_change(id, &ack);
+        }
+        Ok(ack)
+    }
+
+    fn apply_batch(&self, db: &mut SqliteConnection, id: &str, actor: &str, batch_id: &str, ops: &[BlockOp]) -> Result<(BlockAck, bool), ApiError> {
+        let row = self.found_blocks(db, id)?;
+        let all = db::blocks(db, id).map_err(q)?;
+        if let Some(seen) = db::change_by_batch(db, batch_id).map_err(q)? {
+            return Ok((self.again(&all, id, seen)?, false));
+        }
+        let at = now();
+        let mut p = Page::new(id, actor, at, &all);
+        // Page.apply runs without the database: the base texts and the
+        // ids other artifacts hold are read first.
+        let mut revisions: HashMap<(String, i64), Vec<TextSpan>> = HashMap::new();
+        for op in ops {
+            let Some((block, base)) = base_of(op) else { continue };
+            let Some(b) = p.find(block) else { continue };
+            if base > b.rev || revisions.contains_key(&(b.id.clone(), base)) {
+                continue;
             }
-            let at = now();
-            let mut p = Page::new(id, actor, at, &all);
-            // Page.apply runs without the database: the base texts and the
-            // ids other artifacts hold are read first.
-            let mut revisions: HashMap<(String, i64), Vec<TextSpan>> = HashMap::new();
-            for op in &ops {
-                let Some((block, base)) = base_of(op) else { continue };
-                let Some(b) = p.find(block) else { continue };
-                if base > b.rev || revisions.contains_key(&(b.id.clone(), base)) {
-                    continue;
-                }
-                if base == b.rev {
-                    revisions.insert((b.id.clone(), base), b.text.clone());
-                    continue;
-                }
-                if let Some(spans) = db::revision(&tx, &b.id, base).map_err(q)? {
-                    revisions.insert((b.id.clone(), base), spans);
-                }
+            if base == b.rev {
+                revisions.insert((b.id.clone(), base), b.text.clone());
+                continue;
             }
-            let mut taken = HashSet::new();
-            for op in &ops {
-                if let Some(fresh) = fresh_id(op)
-                    && db::block_owner(&tx, fresh).map_err(q)?.is_some()
-                {
-                    taken.insert(fresh.to_string());
-                }
+            if let Some(spans) = db::revision(db, &b.id, base).map_err(q)? {
+                revisions.insert((b.id.clone(), base), spans);
             }
-            p.base = Box::new(move |block, rev| revisions.get(&(block.to_string(), rev)).cloned());
-            p.taken = Box::new(move |block| taken.contains(block));
-            let results: Vec<BlockOpResult> = ops.iter().map(|op| p.apply(op)).collect();
-            let changed = p.changed_blocks();
-            for b in &changed {
-                db::put_block(&tx, id, b).map_err(q)?;
+        }
+        let mut taken = HashSet::new();
+        for op in ops {
+            if let Some(fresh) = fresh_id(op)
+                && db::block_owner(db, fresh).map_err(q)?.is_some()
+            {
+                taken.insert(fresh.to_string());
             }
-            for r in &p.revisions {
-                db::add_revision(&tx, &r.block, r.rev, &r.spans, actor, r.kind.as_str(), at).map_err(q)?;
-            }
-            let seq = row.seq + 1;
-            db::add_change(
-                &tx,
-                &db::NewChange {
-                    artifact_id: id,
-                    seq,
-                    batch_id,
-                    actor,
-                    block_ids: &p.changed,
-                    results: &results,
-                    created_at: at,
-                },
-            )
-            .map_err(q)?;
-            db::artifact_accepted(&tx, id, seq, at).map_err(q)?;
-            tx.commit().map_err(q)?;
+        }
+        p.base = Box::new(move |block, rev| revisions.get(&(block.to_string(), rev)).cloned());
+        p.taken = Box::new(move |block| taken.contains(block));
+        let results: Vec<BlockOpResult> = ops.iter().map(|op| p.apply(op)).collect();
+        let changed = p.changed_blocks();
+        for b in &changed {
+            db::put_block(db, id, b).map_err(q)?;
+        }
+        for r in &p.revisions {
+            db::add_revision(db, &r.block, r.rev, &r.spans, actor, r.kind.as_str(), at).map_err(q)?;
+        }
+        let seq = row.seq + 1;
+        db::add_change(
+            db,
+            &db::NewChange {
+                artifact_id: id,
+                seq,
+                batch_id,
+                actor,
+                block_ids: &p.changed,
+                results: &results,
+                created_at: at,
+            },
+        )
+        .map_err(q)?;
+        db::artifact_accepted(db, id, seq, at).map_err(q)?;
+        Ok((
             BlockAck {
                 batch_id: batch_id.into(),
                 seq,
                 results,
                 blocks: changed,
-            }
-        };
+            },
+            true,
+        ))
+    }
+
+    pub(super) fn publish_change(&self, id: &str, ack: &BlockAck) {
         let change = Change {
             artifact: id.into(),
             ack: ack.clone(),
         };
         lock(&self.changes).retain(|tx| tx.send(change.clone()).is_ok());
-        Ok(ack)
     }
 
     fn one(ack: BlockAck, block: &str) -> (Option<Block>, Option<BlockOpResult>) {
@@ -311,7 +326,7 @@ impl Artifacts {
     }
 
     pub fn insert_block(&self, artifact: &str, actor: &str, req: &BlockCreate) -> Result<BlockOpResult, ApiError> {
-        self.found_blocks(&self.db(), artifact)?;
+        self.found_blocks(&mut self.db(), artifact)?;
         let name = req.r#type.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or("paragraph");
         let kind = append_type(name).ok_or_else(bad_block_type)?;
         if let Some(problem) = attr_problem(kind, &req.into()) {
@@ -471,13 +486,13 @@ impl Artifacts {
     /// when too far behind.
     pub fn follow(&self, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
         let (rx, missed, current) = {
-            let db = self.db();
-            self.found_blocks(&db, id)?;
+            let mut db = self.db();
+            self.found_blocks(&mut db, id)?;
             // Subscribed before the catch-up is read; live ones are told by seq.
             let (tx, rx) = flume::unbounded();
             lock(&self.changes).push(tx);
-            let missed = db::changes_after(&db, id, after, CATCH_UP_MAX as i64 + 1).map_err(q)?;
-            (rx, missed, db::blocks(&db, id).map_err(q)?)
+            let missed = db::changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).map_err(q)?;
+            (rx, missed, db::blocks(&mut db, id).map_err(q)?)
         };
         let id = id.to_string();
         std::thread::Builder::new()
@@ -508,9 +523,9 @@ impl Artifacts {
     // ----- suggestions -----
 
     pub fn suggestions(&self, id: &str) -> Result<Vec<Suggestion>, ApiError> {
-        let db = self.db();
-        self.found_blocks(&db, id)?;
-        db::suggestions(&db, id, SUGGESTIONS_LISTED).map_err(q)
+        let mut db = self.db();
+        self.found_blocks(&mut db, id)?;
+        db::suggestions(&mut db, id, SUGGESTIONS_LISTED).map_err(q)
     }
 
     fn publish_suggestions(&self, id: &str) -> Result<(), ApiError> {
@@ -521,9 +536,9 @@ impl Artifacts {
 
     pub fn suggest(&self, artifact: &str, actor: &str, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
         let made = {
-            let db = self.db();
-            self.found_blocks(&db, artifact)?;
-            let block = db::blocks(&db, artifact).map_err(q)?.into_iter().find(|b| b.id == req.block);
+            let mut db = self.db();
+            self.found_blocks(&mut db, artifact)?;
+            let block = db::blocks(&mut db, artifact).map_err(q)?.into_iter().find(|b| b.id == req.block);
             let Some(block) = block.filter(|b| b.deleted != Some(true)) else {
                 return Err(refused(t("server.artifact.suggestion.noBlock", &[("id", req.block.as_str().into())])));
             };
@@ -549,8 +564,8 @@ impl Artifacts {
                 resolved_at: None,
                 resolved_by: None,
             };
-            db::add_suggestion(&db, &open).map_err(q)?;
-            db::suggestion(&db, &id)
+            db::add_suggestion(&mut db, &open).map_err(q)?;
+            db::suggestion(&mut db, &id)
                 .map_err(q)?
                 .ok_or_else(|| refused(t("server.artifact.suggestion.missing", &[("id", id.as_str().into())])))?
         };
@@ -559,7 +574,7 @@ impl Artifacts {
     }
 
     fn open_suggestion(&self, artifact: &str, suggestion: &str) -> Result<Suggestion, ApiError> {
-        db::suggestion(&self.db(), suggestion)
+        db::suggestion(&mut self.db(), suggestion)
             .map_err(q)?
             .filter(|s| s.artifact_id == artifact)
             .ok_or_else(|| refused(t("server.artifact.suggestion.missing", &[("id", suggestion.into())])))
@@ -567,9 +582,9 @@ impl Artifacts {
 
     fn resolve(&self, artifact: &str, row: &Suggestion, status: SuggestionStatus, actor: &str) -> Result<Suggestion, ApiError> {
         let updated = {
-            let db = self.db();
-            db::resolve_suggestion(&db, &row.id, status.as_str(), now(), actor).map_err(q)?;
-            db::suggestion(&db, &row.id).map_err(q)?
+            let mut db = self.db();
+            db::resolve_suggestion(&mut db, &row.id, status.as_str(), now(), actor).map_err(q)?;
+            db::suggestion(&mut db, &row.id).map_err(q)?
         };
         self.publish_suggestions(artifact)?;
         Ok(updated.unwrap_or_else(|| row.clone()))
@@ -660,7 +675,7 @@ impl Artifacts {
     }
 
     /// `fill`: Markdown read into blocks, as one batch.
-    pub(super) fn fill(&self, id: &str, markdown: &str, actor: &str) -> Result<(), ApiError> {
+    pub(super) fn fill(&self, db: &mut SqliteConnection, id: &str, markdown: &str, actor: &str) -> Result<Option<BlockAck>, ApiError> {
         let mut parents: Vec<String> = vec![];
         let mut last: HashMap<String, String> = HashMap::new();
         let mut ops = vec![];
@@ -683,10 +698,11 @@ impl Artifacts {
                 },
             }));
         }
-        if !ops.is_empty() {
-            self.submit(id, actor, &new_id(), ops)?;
+        if ops.is_empty() {
+            return Ok(None);
         }
-        Ok(())
+        let (ack, _) = self.apply_batch(db, id, actor, &new_id(), &ops)?;
+        Ok(Some(ack))
     }
 
     // ----- the demo -----
@@ -799,7 +815,7 @@ impl Artifacts {
     /// `demo`: up to three helpers write their own sections at once; returns
     /// at once.
     pub fn demo(self: &std::sync::Arc<Self>, id: &str, helpers: &[Agent]) -> Result<(), ApiError> {
-        self.found_blocks(&self.db(), id)?;
+        self.found_blocks(&mut self.db(), id)?;
         let writers: Vec<(String, usize)> = helpers
             .iter()
             .filter(|a| a.enabled)

@@ -58,6 +58,26 @@ pub enum TerminalEvent {
     Exited,
 }
 
+enum Input {
+    Key(vibevalley_terminal::KeyInput),
+    Text(String),
+    Paste(String),
+}
+
+impl Input {
+    fn deliver(self, session: &TermSession) {
+        session.scroll_to_bottom();
+        match self {
+            Input::Key(key) => {
+                session.selection_clear();
+                session.send_key(key);
+            }
+            Input::Text(text) => session.send_text(&text),
+            Input::Paste(text) => session.paste(&text),
+        }
+    }
+}
+
 enum State {
     /// Waiting for the first layout, which decides the grid size.
     Unsized,
@@ -68,6 +88,7 @@ enum State {
 
 pub struct TerminalView {
     state: State,
+    pending_input: Vec<Input>,
     spec: SpawnSpec,
     focus: FocusHandle,
     pub(crate) marked: Option<String>,
@@ -142,6 +163,7 @@ impl TerminalView {
         let initial_title = spec.title.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(str::to_string);
         TerminalView {
             state: State::Unsized,
+            pending_input: Vec::new(),
             spec,
             focus: cx.focus_handle(),
             marked: None,
@@ -170,8 +192,12 @@ impl TerminalView {
         self.session().map(|s| s.snapshot())
     }
 
+    pub fn link_title(&self) -> Option<&str> {
+        self.spec.title.as_deref().filter(|title| !title.trim().is_empty())
+    }
+
     pub fn title(&self) -> Option<&str> {
-        self.title.as_deref()
+        self.link_title().or(self.title.as_deref())
     }
 
     /// Detects whether an agent (`codex`, `claude`, `opencode`, ...) or command
@@ -247,20 +273,39 @@ impl TerminalView {
         None
     }
 
+    pub fn directory(&self) -> PathBuf {
+        self.session()
+            .and_then(|session| session.local_cwd().or_else(|| session.cwd()))
+            .filter(|p| p.is_dir())
+            .unwrap_or_else(|| self.spec.cwd.clone())
+    }
+
+    pub fn can_reopen_in(&self, target: &std::path::Path) -> bool {
+        !self.exited
+            && !matches!(self.state, State::Failed(_))
+            && self.session().is_none_or(TermSession::is_alive)
+            && self.directory().canonicalize().is_ok_and(|cwd| cwd.starts_with(target))
+    }
+
     pub fn has_exited(&self) -> bool {
         self.exited
     }
 
-    /// Types text as if pasted (used to run `$EDITOR file`).
-    pub fn send_line(&self, line: &str) {
-        if let Some(session) = self.session() {
-            session.send_text(line);
-            session.send_key(vibevalley_terminal::KeyInput {
-                key: vibevalley_terminal::Key::Enter,
-                mods: Mods::default(),
-                text: None,
-            });
+    fn input(&mut self, input: Input) {
+        match &self.state {
+            State::Running(session) if !self.exited => input.deliver(session),
+            State::Unsized | State::Spawning => self.pending_input.push(input),
+            _ => {}
         }
+    }
+
+    pub fn send_line(&mut self, line: &str) {
+        self.input(Input::Text(line.to_owned()));
+        self.input(Input::Key(vibevalley_terminal::KeyInput {
+            key: vibevalley_terminal::Key::Enter,
+            mods: Mods::default(),
+            text: None,
+        }));
     }
 
     /// Called at prepaint with the grid the element measured. Starts the
@@ -311,12 +356,16 @@ impl TerminalView {
                         {
                             session.resize(g.size);
                         }
+                        for input in view.pending_input.drain(..) {
+                            input.deliver(&session);
+                        }
                         view.state = State::Running(session);
                         cx.emit(TerminalEvent::Spawned);
                         cx.notify();
                         true
                     }
                     Err(e) => {
+                        view.pending_input.clear();
                         view.state = State::Failed(e.to_string());
                         cx.emit(TerminalEvent::SpawnFailed(e.to_string()));
                         cx.notify();
@@ -393,11 +442,8 @@ impl TerminalView {
 
     pub(crate) fn commit_text(&mut self, text: &str, cx: &mut Context<Self>) {
         self.marked = None;
-        if let Some(session) = self.session()
-            && !text.is_empty()
-        {
-            session.scroll_to_bottom();
-            session.send_text(text);
+        if !text.is_empty() {
+            self.input(Input::Text(text.to_owned()));
         }
         self.wake_cursor(cx);
     }
@@ -412,12 +458,9 @@ impl TerminalView {
         if self.marked.is_some() {
             return;
         }
-        let Some(session) = self.session() else { return };
         let option_as_meta = Ui::get(cx).settings.option_as_meta;
         if let Some(input) = keys::map_keystroke(&event.keystroke, option_as_meta) {
-            session.selection_clear();
-            session.scroll_to_bottom();
-            session.send_key(input);
+            self.input(Input::Key(input));
             cx.stop_propagation();
             self.wake_cursor(cx);
         }
@@ -436,11 +479,8 @@ impl TerminalView {
     }
 
     fn paste(&mut self, _: &Paste, _: &mut Window, cx: &mut Context<Self>) {
-        if let Some(session) = self.session()
-            && let Some(text) = cx.read_from_clipboard().and_then(|item| item.text())
-        {
-            session.scroll_to_bottom();
-            session.paste(&text);
+        if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
+            self.input(Input::Paste(text));
         }
     }
 

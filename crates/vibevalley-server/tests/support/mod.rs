@@ -17,6 +17,16 @@ use vibevalley_protocol::{Issue, IssueStageKind as StageKind};
 use vibevalley_server::modules::issue::Board;
 use vibevalley_server::modules::ledger::BoardConfig;
 
+/// Opens a separate connection for assertions or SQLite failure injection.
+pub fn inspect_db(path: &Path) -> sqlx::SqliteConnection {
+    use sqlx::ConnectOptions;
+    pollster::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(path).connect()).unwrap()
+}
+
+pub fn execute_sql(connection: &mut sqlx::SqliteConnection, sql: &'static str) {
+    pollster::block_on(sqlx::raw_sql(sql).execute(connection)).unwrap();
+}
+
 /// What a hook sees of a turn.
 #[derive(Debug, Clone)]
 pub struct Turn {
@@ -146,6 +156,21 @@ fn prompt_text(content: &[ContentBlock]) -> String {
 }
 
 impl Session for HookSession {
+    fn records(&self) -> Vec<vibevalley_oar::voyage::Record> {
+        self.inner.records()
+    }
+    fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<vibevalley_oar::voyage::Record> {
+        self.inner.subscribe_records(after)
+    }
+    fn control(
+        &self,
+        action: vibevalley_oar::ControlAction,
+        arg: &str,
+        input_id: &str,
+        span_id: &str,
+    ) -> vibevalley_oar::Result<vibevalley_oar::ControlOutcome> {
+        self.inner.control(action, arg, input_id, span_id)
+    }
     fn id(&self) -> String {
         self.inner.id()
     }

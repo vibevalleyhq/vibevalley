@@ -1,14 +1,14 @@
 // Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
 
-export type GitHubStatus = { installed: boolean, 
+export type GitHubStatus = { installed: boolean,
 /**
  * gh's version, when it says one.
  */
-version?: string, loggedIn: boolean, 
+version?: string, loggedIn: boolean,
 /**
  * The logged-in account, when logged in.
  */
-account?: string, 
+account?: string,
 /**
  * Why it is not usable, when it is not.
  */
@@ -66,7 +66,9 @@ export type Conflict = { base: string, files: Array<string>, };
 
 export type ChangedFile = { path: string, status: string, added: number, removed: number, patch?: string, };
 
-export type Changes = { repo: string, base: string, branch?: string, commits: Array<Commit>, files: Array<ChangedFile>, uncommitted: Array<UncommittedItem>, conflicts: Array<string>, behind: number, };
+export type ReviewRevision = { baseCommit: string, tree: string, };
+
+export type Changes = { revision?: ReviewRevision, sinceReview?: Array<ChangedFile>, repo: string, base: string, branch?: string, commits: Array<Commit>, files: Array<ChangedFile>, uncommitted: Array<UncommittedItem>, conflicts: Array<string>, behind: number, };
 
 export type RepoLanguageListInput = { id: string, };
 

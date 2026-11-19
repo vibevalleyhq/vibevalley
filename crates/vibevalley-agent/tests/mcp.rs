@@ -53,11 +53,14 @@ fn an_http_server_s_tools_are_offered_and_called() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let handle = std::thread::spawn(move || {
-        for _ in 0..4 {
+        loop {
             let Ok((mut stream, _)) = listener.accept() else { break };
             let mut reader = BufReader::new(stream.try_clone().unwrap());
             let mut content_len = 0usize;
             let mut auth_ok = false;
+            let mut session = None;
+            let mut first = String::new();
+            reader.read_line(&mut first).unwrap();
             loop {
                 let mut line = String::new();
                 reader.read_line(&mut line).unwrap();
@@ -70,13 +73,26 @@ fn an_http_server_s_tools_are_offered_and_called() {
                         content_len = v.trim().parse().unwrap_or(0);
                     } else if k.eq_ignore_ascii_case("authorization") && v.trim() == "Bearer secret-key" {
                         auth_ok = true;
+                    } else if k.eq_ignore_ascii_case("mcp-session-id") {
+                        session = Some(v.trim().to_owned());
                     }
                 }
             }
             assert!(auth_ok, "expected Authorization header");
+            if first.starts_with("GET ") {
+                assert_eq!(session.as_deref(), Some("s1"));
+                stream
+                    .write_all(b"HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                    .unwrap();
+                continue;
+            }
+            assert!(first.starts_with("POST "), "{first}");
             let mut body = vec![0u8; content_len];
             reader.read_exact(&mut body).unwrap();
             let msg: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            if msg["method"] != "initialize" {
+                assert_eq!(session.as_deref(), Some("s1"), "{msg}");
+            }
             let id = msg.get("id").cloned();
             let resp = match msg["method"].as_str().unwrap_or_default() {
                 "initialize" => json!({"jsonrpc": "2.0", "id": id, "result": {
@@ -102,7 +118,7 @@ fn an_http_server_s_tools_are_offered_and_called() {
                         sse
                     );
                     stream.write_all(reply.as_bytes()).unwrap();
-                    continue;
+                    break;
                 }
                 _ => json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": "no"}}),
             };
@@ -130,4 +146,45 @@ fn an_http_server_s_tools_are_offered_and_called() {
     let out = tools[0].execute(&json!({}));
     assert_eq!((out.is_error, out.text.as_str()), (false, "pong"));
     handle.join().unwrap();
+}
+
+#[test]
+fn regression_cancelling_an_mcp_call_preserves_its_peer_and_dropping_the_last_tool_stops_the_child() {
+    use std::io::{BufRead, BufReader};
+    use std::net::TcpListener;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/cancellable_mcp.py");
+    let cfg = serde_json::from_value(json!({"mcpServers": {"slow": {
+        "command": "python3", "args": ["-I", fixture], "env": {"MCP_TEST_PORT": listener.local_addr().unwrap().port().to_string()}
+    }}}))
+    .unwrap();
+    let hub = McpHub::connect(&cfg);
+    assert!(hub.failures.is_empty(), "{:?}", hub.failures);
+    let tool = hub.tools().pop().unwrap();
+    let (events, _) = listener.accept().unwrap();
+    events.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+    let mut lines = BufReader::new(events).lines();
+    let pid = lines.next().unwrap().unwrap();
+    let (cancel, cancelled) = flume::bounded(0);
+    std::thread::scope(|scope| {
+        let running = scope.spawn(|| tool.execute_cancellable(&json!({}), &cancelled));
+        let sent = lines.next().unwrap().unwrap();
+        let id = sent.strip_prefix("begin:").unwrap();
+        drop(cancel);
+        assert_eq!(lines.next().unwrap().unwrap(), format!("cancel:{id}"));
+        let result = running.join().unwrap();
+        assert!(result.is_error && result.text.contains("aborted"), "{result:?}");
+    });
+    drop(hub);
+    assert_eq!(tool.execute(&json!({"ping":true})).text, "pong");
+    drop(tool);
+    assert!(lines.next().is_none(), "MCP process still owns its socket");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Command::new("kill").args(["-0", &pid]).stderr(Stdio::null()).status().unwrap().success() {
+        assert!(Instant::now() < deadline, "MCP child {pid} was not reaped");
+        std::thread::yield_now();
+    }
 }

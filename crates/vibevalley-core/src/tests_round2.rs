@@ -300,6 +300,7 @@ fn asking(at: Millis) -> SpaceState {
     h.issue = Some("t1".into());
     h.phase = Phase::resting();
     h.last_run = Some(LastRun {
+        needs_reconciliation: false,
         outcome: Outcome::Completed,
         summary: "asked".into(),
         at,

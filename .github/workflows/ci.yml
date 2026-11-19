@@ -2,6 +2,7 @@
 name: ci
 
 on:
+  workflow_call:
   pull_request:
   push:
     branches: [main]
@@ -35,14 +36,14 @@ jobs:
       - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with: { node-version-file: .node-version, cache: true, cache-toolchain: true }
       # Vite Task's results from earlier runs (after install, which may touch node_modules): a task whose inputs did not
-      # change replays. The key has this job (and shard) so jobs do not take each other's; each run saves a new entry.
+      # change replays. Each job restores its own cache and each run saves a new entry.
       - name: Restore Vite Task cache
         id: vite-task-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vite/task-cache
-          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ matrix.shard }}-
+          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-
       - name: pull request title
         if: github.event_name == 'pull_request'
         # Squash merging makes the title the commit's subject. Passed through the environment, never into the shell.
@@ -72,6 +73,9 @@ jobs:
         run: vpx scripts/release/regression.ts --base HEAD^1 --branch "$BRANCH" --body "$BODY"
       # A warning fails too: none are let in to pile up.
       - run: vp check --deny-warnings
+      - uses: sqlc-dev/setup-sqlc@c0209b9199cd1cce6a14fc27cabcec491b651761 # v4.0.0
+        with: { sqlc-version: "1.31.1" }
+      - run: vp run sql:check
       - run: vp run docs:verify
       - run: vp test run --exclude scripts/release/verify-server.test.ts
       - run: vp run deadcode
@@ -140,10 +144,23 @@ jobs:
           key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
       - run: git config --global user.name ci && git config --global user.email ci@example.com
-      - run: vp run nsh:install
+      - name: Restore nsh CLI
+        id: nsh
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/bin/nsh
+          key: nsh-cli-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package.json', 'rust-toolchain.toml') }}
+      - if: steps.nsh.outputs.cache-hit != 'true'
+        run: vp run nsh:install
+      - name: Cache nsh CLI
+        if: steps.nsh.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/bin/nsh
+          key: ${{ steps.nsh.outputs.cache-primary-key }}
       - run: vp run protocol:check
       - run: vp run rust:check
-      - run: vp test run scripts/release/verify-server.test.ts
+      - run: vp test run scripts/release/verify-server.test.ts scripts/release/package-platform.test.ts
       - run: vp run mac:check
       - name: Save cargo cache
         if: success()

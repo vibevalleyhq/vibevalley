@@ -13,7 +13,7 @@ export type ProviderBinding = { connection: string, model: string, };
 
 export type ProviderStatus = { revision: number, connections: Array<ProviderConnection>, dictation: ProviderBinding | null, image: ProviderBinding | null, live: ProviderBinding | null, liveModels: Array<string>, speakers: ProviderBinding | null, speakersModels: Array<string>, voiceDesign: ProviderBinding | null, voiceDesignModels: Array<string>, transcription: ProviderBinding | null, transcriptionModels: Array<string>, vision: ProviderBinding | null, visionModels: Array<string>, dictationModels: Array<string>, imageModels: Array<string>, understanding: ProviderBinding | null, understandingModels: Array<string>, speech: ProviderBinding | null, speechModels: Array<string>, };
 
-export type ProviderConnectionUpdate = { id: string, name: string, adapter: ProviderConnectionAdapter, enabled: boolean, 
+export type ProviderConnectionUpdate = { id: string, name: string, adapter: ProviderConnectionAdapter, enabled: boolean,
 /**
  * Omitted keeps the credential; null clears it; a nonempty string replaces it.
  */

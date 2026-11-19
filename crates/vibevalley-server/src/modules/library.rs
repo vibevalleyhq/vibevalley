@@ -9,17 +9,21 @@
 use std::io::Read;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use rusqlite::{Connection, OptionalExtension, Row, params};
+use sqlx::Connection;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     Actor, ApiError, Attachment, BizCode, Fact, JobKind, LibraryAddRequest, LibraryItem, LibraryListRequest, LibraryOrigin, LibraryOriginFetchedFrom,
     MediaAudioJob, MediaJob, MediaPhase, MessageKind, Preview, ops,
 };
 
-use crate::base::{LookIn, missing, open_db};
+#[rustfmt::skip]
+#[path = "library/generated/queries.rs"]
+mod q;
+
+use crate::base::{LookIn, ModuleDb, missing};
 use crate::modules::attachment::{ATTACHMENT_MAX, Attachments};
 use crate::public_http::{public_https, public_v4};
 use crate::{Hub, lock, now};
@@ -27,23 +31,11 @@ use crate::{Hub, lock, now};
 const LIST_MAX: i64 = 500;
 const DOWNLOAD: Duration = Duration::from_secs(60);
 
-const SCHEMA: &str = "
-create table if not exists media_library_item (
-  attachment_id text primary key,
-  kind          text not null check (kind in ('generated', 'uploaded', 'fetched')),
-  origin        text not null,
-  added_at      integer not null,
-  last_at       integer not null
-);
-create table if not exists media_library_job (job_id text primary key);
-create index if not exists media_library_item_recent on media_library_item (last_at desc, attachment_id);
-";
-
 fn refused(text: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::LibraryRefused, text.into())
 }
 
-fn db_failed(e: rusqlite::Error) -> ApiError {
+fn db_failed(e: sqlx::Error) -> ApiError {
     ApiError::new(BizCode::InternalError, format!("library: {e}"))
 }
 
@@ -113,26 +105,22 @@ fn origin_kind(o: &LibraryOrigin) -> &'static str {
     }
 }
 
-const ITEM: &str = "select i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size
-     from media_library_item i join attachment a on a.id = i.attachment_id";
-
-fn item_of(r: &Row) -> rusqlite::Result<LibraryItem> {
-    let origin: String = r.get(1)?;
-    Ok(LibraryItem {
+fn item_of(row: q::GetItemRow) -> LibraryItem {
+    LibraryItem {
         attachment: Attachment {
-            id: r.get(0)?,
-            name: r.get(4)?,
-            r#type: r.get(5)?,
-            size: r.get(6)?,
+            id: row.attachment_id,
+            name: row.name,
+            r#type: row.r#type,
+            size: row.size,
         },
-        origin: serde_json::from_str(&origin).unwrap_or(LibraryOrigin::Uploaded { channel: None, message: None }),
-        added_at: r.get(2)?,
-        last_at: r.get(3)?,
-    })
+        origin: serde_json::from_str(&row.origin).unwrap_or(LibraryOrigin::Uploaded { channel: None, message: None }),
+        added_at: row.added_at,
+        last_at: row.last_at,
+    }
 }
 
 pub struct Library {
-    db: Mutex<Connection>,
+    db: ModuleDb,
     files: Arc<Attachments>,
     stop: Mutex<Option<flume::Sender<()>>>,
     thread: Mutex<Option<std::thread::JoinHandle<()>>>,
@@ -140,10 +128,8 @@ pub struct Library {
 
 impl Library {
     pub fn open(home: &Path, files: Arc<Attachments>) -> Result<Arc<Library>, ApiError> {
-        let conn = open_db(home).map_err(db_failed)?;
-        conn.execute_batch(SCHEMA).map_err(db_failed)?;
         Ok(Arc::new(Library {
-            db: Mutex::new(conn),
+            db: ModuleDb::open(home, include_str!("library/sql/schema.sql")).map_err(db_failed)?,
             files,
             stop: Mutex::new(None),
             thread: Mutex::new(None),
@@ -159,28 +145,30 @@ impl Library {
         }
     }
 
-    fn db(&self) -> MutexGuard<'_, Connection> {
-        self.db.lock().unwrap_or_else(|e| e.into_inner())
-    }
-
     fn found(&self, id: &str) -> Result<LibraryItem, ApiError> {
-        self.db()
-            .query_row(&format!("{ITEM} where i.attachment_id = ?1"), [id], item_of)
-            .optional()
-            .map_err(db_failed)?
-            .ok_or_else(|| missing(t("server.library.noItem", &[("id", id.into())]), LookIn::Library))
+        match self.db.run(async |db| q::get_item(db, q::GetItemParams { attachment_id: id.into() }).await) {
+            Ok(row) => Ok(item_of(row)),
+            Err(sqlx::Error::RowNotFound) => Err(missing(t("server.library.noItem", &[("id", id.into())]), LookIn::Library)),
+            Err(error) => Err(db_failed(error)),
+        }
     }
 
     /// A later arrival only moves `last_at`.
     fn keep(&self, id: &str, origin: &LibraryOrigin, at: i64) -> Result<(), ApiError> {
-        self.db()
-            .execute(
-                "insert into media_library_item (attachment_id, kind, origin, added_at, last_at) values (?1, ?2, ?3, ?4, ?4)
-                 on conflict (attachment_id) do update set last_at = max(media_library_item.last_at, excluded.last_at)",
-                params![id, origin_kind(origin), serde_json::to_string(origin).expect("JSON"), at],
-            )
-            .map_err(db_failed)?;
-        Ok(())
+        self.db
+            .run(async |db| {
+                q::keep_item(
+                    db,
+                    q::KeepItemParams {
+                        attachment_id: id.into(),
+                        kind: origin_kind(origin).into(),
+                        origin: serde_json::to_string(origin).expect("JSON"),
+                        added_at: at,
+                    },
+                )
+                .await
+            })
+            .map_err(db_failed)
     }
 
     /// What a ready media job made, once per job.
@@ -190,25 +178,27 @@ impl Library {
                 continue;
             };
             let origin = LibraryOrigin::Generated { job: id.into(), job_kind };
-            let mut db = self.db();
-            let seen: bool = db
-                .query_row("select exists(select 1 from media_library_job where job_id=?1)", [id], |r| r.get(0))
+            self.db
+                .run(async |db| {
+                    if q::job_count(&mut *db, q::JobCountParams { job_id: id.into() }).await?.count > 0 {
+                        return Ok(());
+                    }
+                    let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
+                    if q::mark_job(&mut *tx, q::MarkJobParams { job_id: id.into() }).await? != 0 {
+                        q::keep_generated(
+                            &mut *tx,
+                            q::KeepGeneratedParams {
+                                attachment_id: attachment.into(),
+                                kind: origin_kind(&origin).into(),
+                                origin: serde_json::to_string(&origin).expect("JSON"),
+                                added_at: updated_at,
+                            },
+                        )
+                        .await?;
+                    }
+                    tx.commit().await
+                })
                 .map_err(db_failed)?;
-            if seen {
-                continue;
-            }
-            let tx = db.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(db_failed)?;
-            let inserted = tx
-                .execute("insert or ignore into media_library_job(job_id) values (?1)", [id])
-                .map_err(db_failed)?;
-            if inserted != 0 {
-                tx.execute(
-                    "insert into media_library_item (attachment_id,kind,origin,added_at,last_at) values (?1,?2,?3,?4,?4) on conflict(attachment_id) do nothing",
-                    params![attachment, origin_kind(&origin), serde_json::to_string(&origin).expect("JSON"), updated_at],
-                )
-                .map_err(db_failed)?;
-            }
-            tx.commit().map_err(db_failed)?;
         }
         Ok(())
     }
@@ -232,24 +222,23 @@ impl Library {
         let top = req.r#type.map(|t| t.as_str()).unwrap_or("");
         let text = req.text.as_deref().unwrap_or("").trim().to_lowercase();
         let sort = req.sort.map(|s| s.as_str()).unwrap_or("recent");
-        let db = self.db();
-        let mut stmt = db
-            .prepare(&format!(
-                "{ITEM}
-                 where (?1 = '' or i.kind = ?1)
-                   and (?2 = ''
-                     or (?2 = 'other' and substr(a.type, 1, instr(a.type || '/', '/') - 1) not in ('image', 'audio', 'video'))
-                     or substr(a.type, 1, instr(a.type || '/', '/') - 1) = ?2)
-                   and (?3 = '' or instr(lower(a.name), ?3) > 0)
-                 order by
-                   case when ?4 = 'name' then lower(a.name) end,
-                   case when ?4 = 'size' then a.size end desc,
-                   i.last_at desc, i.attachment_id
-                 limit ?5"
-            ))
+        let rows = self
+            .db
+            .run(async |db| {
+                q::list_items(
+                    db,
+                    q::ListItemsParams {
+                        kind: kind.into(),
+                        media_type: top.into(),
+                        search: text,
+                        sort: sort.into(),
+                        item_limit: LIST_MAX,
+                    },
+                )
+                .await
+            })
             .map_err(db_failed)?;
-        let rows = stmt.query_map(params![kind, top, text, sort, LIST_MAX], item_of).map_err(db_failed)?;
-        rows.collect::<Result<_, _>>().map_err(db_failed)
+        Ok(rows.into_iter().map(item_of).collect())
     }
 
     pub fn add(&self, req: &LibraryAddRequest, by: &AddedBy) -> Result<LibraryItem, ApiError> {
@@ -303,10 +292,9 @@ impl Library {
 
     pub fn remove(&self, id: &str) -> Result<(), ApiError> {
         self.found(id)?;
-        self.db()
-            .execute("delete from media_library_item where attachment_id = ?1", [id])
-            .map_err(db_failed)?;
-        Ok(())
+        self.db
+            .run(async |db| q::remove_item(db, q::RemoveItemParams { attachment_id: id.into() }).await)
+            .map_err(db_failed)
     }
 
     pub fn preview_remove(&self, id: &str) -> Result<Preview, ApiError> {
@@ -495,5 +483,44 @@ pub fn install(hub: &Hub, library: Arc<Library>) {
         }
     }) {
         *lock(&library.thread) = Some(handle);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn regression_failed_generated_item_is_retryable_after_reopen() {
+        let home = tempfile::tempdir().unwrap();
+        let files = Attachments::open(home.path()).unwrap();
+        let attachment = files.keep(b"image", "image.png", "image/png").unwrap();
+        let job: MediaJob = serde_json::from_value(serde_json::json!({
+            "kind":"image","id":"job","prompt":"p","model":"m","connection":"c","revision":1,
+            "source":{"kind":"user"},"phase":"ready","phaseText":"","problem":"","canCancel":false,
+            "canRetryDownload":false,"createdAt":1,"updatedAt":2,"attachment":attachment
+        }))
+        .unwrap();
+        let library = Library::open(home.path(), files.clone()).unwrap();
+        let admin = |sql: &'static str| {
+            pollster::block_on(async {
+                let mut conn = crate::base::open_sqlx_db(home.path()).await?;
+                sqlx::raw_sql(sql).execute(&mut conn).await
+            })
+            .unwrap()
+        };
+        admin("CREATE TRIGGER refuse_media_item BEFORE INSERT ON media_library_item BEGIN SELECT RAISE(ABORT, 'item failed'); END;");
+        assert!(library.record_made(std::slice::from_ref(&job)).is_err());
+        drop(library);
+        let library = Library::open(home.path(), files.clone()).unwrap();
+        admin("DROP TRIGGER refuse_media_item;");
+        library.record_made(std::slice::from_ref(&job)).unwrap();
+        let stored = library.found(&attachment.id).unwrap();
+        assert_eq!(stored.attachment, attachment);
+        assert!(matches!(stored.origin,LibraryOrigin::Generated{ref job,..} if job=="job"));
+        library.remove(&attachment.id).unwrap();
+        library.record_made(&[job]).unwrap();
+        assert_eq!(library.found(&attachment.id).unwrap_err().biz_code, BizCode::LibraryNotFound);
+        assert_eq!(std::fs::read(files.file(&attachment.id).unwrap().path).unwrap(), b"image");
     }
 }

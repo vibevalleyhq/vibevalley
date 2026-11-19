@@ -188,6 +188,8 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
               const active = () => props.draft.runtime === info().id;
               const status = () => {
                 const inst = info().installation;
+                if (inst.status === "unsupported" && inst.signInCommand) return t("web.runtime.quota.signedOut");
+                if (inst.status === "unsupported") return inst.reason || t("web.runtime.unsupported");
                 return inst.status === "available"
                   ? info().settings.enabled
                     ? (inst.version ?? t("web.agent.available"))

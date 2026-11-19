@@ -88,6 +88,16 @@
     "cancel": "Cancel the ticket"
   },
   "changes": {
+    "checkOutput": "Check output",
+    "reviewVersion": "Review base and tree",
+    "sinceReview": "Changes since last review",
+    "projectCheck": "Project check",
+    "check": {
+      "passed": "Passed",
+      "failed": "Failed",
+      "not_configured": "No check configured"
+    },
+    "mergedCommit": "Merged commit",
     "reading": "Looking at what it changed…",
     "unreadable": "The changes cannot be read: ",
     "none": "This one has no changes. Completing just lets it go.",
@@ -285,7 +295,9 @@
   },
   "run": {
     "working": "working",
-    "heard": "{n, plural, one {heard # word on the way} other {heard # words on the way}}"
+    "heard": "{n, plural, one {heard # word on the way} other {heard # words on the way}}",
+    "reconcile": "Verify the working directory",
+    "currentChanges": "View current issue changes"
   },
   "card": {
     "orchestrator": "Assistant",
@@ -351,7 +363,8 @@
     "whoRuntime": "{name} ({runtime})",
     "changes": "{branch} → {base} · {commits} commits · +{added} -{removed}",
     "changesUncommitted": "{branch} → {base} · {commits} commits · +{added} -{removed} · {uncommitted} uncommitted",
-    "justNow": "just now"
+    "justNow": "just now",
+    "reviewAfterFailedCheck": "Review the fix, then complete the issue to rerun the check"
   },
   "new": {
     "title": "New issue",
@@ -359,7 +372,8 @@
     "words": "What to do",
     "placeholder": "What needs doing? A sentence is enough; it is drafted from your words",
     "keys": "⌘ Enter to save",
-    "keep": "Save"
+    "keep": "Save",
+    "editsKept": "The previous version was submitted. Your edits are still in the draft."
   },
   "conversation": {
     "title": "Discussion and delivery",

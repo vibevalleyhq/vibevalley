@@ -3972,7 +3972,8 @@
   "ay": 59,
   "h": 60,
   "sheet": "design/pixel/raw/look-auntie.png",
-  "w": 55
+  "w": 55,
+  "railSize": 38
  },
  "manager-auntie-listen": {
   "ax": 16,
@@ -3993,7 +3994,8 @@
   "ay": 62,
   "h": 63,
   "sheet": "design/pixel/raw/look-farmer.png",
-  "w": 58
+  "w": 58,
+  "railSize": 38
  },
  "manager-foreman": {
   "ax": 18,
@@ -4007,7 +4009,8 @@
   "ay": 63,
   "h": 64,
   "sheet": "design/pixel/raw/look-foreman.png",
-  "w": 60
+  "w": 60,
+  "railSize": 38
  },
  "manager-foreman-listen": {
   "ax": 20,
@@ -4035,7 +4038,8 @@
   "ay": 59,
   "h": 60,
   "sheet": "design/pixel/raw/look-gardener.png",
-  "w": 54
+  "w": 54,
+  "railSize": 38
  },
  "manager-gardener-listen": {
   "ax": 15,
@@ -4063,7 +4067,8 @@
   "ay": 64,
   "h": 65,
   "sheet": "design/pixel/raw/look-grandpa.png",
-  "w": 61
+  "w": 61,
+  "railSize": 38
  },
  "manager-grandpa-listen": {
   "ax": 17,
@@ -4098,7 +4103,8 @@
   "ay": 67,
   "h": 68,
   "sheet": "design/pixel/raw/look-robot.png",
-  "w": 57
+  "w": 57,
+  "railSize": 38
  },
  "manager-robot-listen": {
   "ax": 21,

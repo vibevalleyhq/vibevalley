@@ -311,8 +311,12 @@ impl Walker {
 }
 
 /// Which frame of a looping animation shows at `t` seconds.
-pub fn frame_at(t: f32, frames: usize, fps: f32) -> usize {
-    if frames == 0 { 0 } else { ((t * fps).floor().max(0.0) as usize) % frames }
+pub fn frame_at(t: impl Into<f64>, frames: usize, fps: f32) -> usize {
+    if frames == 0 {
+        0
+    } else {
+        ((t.into() * f64::from(fps)).floor().max(0.0) as usize) % frames
+    }
 }
 
 #[cfg(test)]

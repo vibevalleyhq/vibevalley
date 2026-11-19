@@ -134,7 +134,7 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
       <Each of={shown()} key={(s) => s.seq}>
         {(s) => (
           <View class={s().under !== undefined ? "ml-5 border-l-2 pl-2.5" : ""} style={s().under !== undefined ? { borderColor: mix("leaf", 0.5) } : undefined}>
-            <Step step={s()} now={props.now} />
+            <WorkLogStep step={s()} now={props.now} />
           </View>
         )}
       </Each>
@@ -219,7 +219,7 @@ function Line(props: { mark: IconName; step: SessionEvent; now: number; tint: st
   );
 }
 
-function Step(props: { step: SessionEvent; now: number }) {
+export function WorkLogStep(props: { step: SessionEvent; now: number }) {
   const sub = () => props.step.under !== undefined;
   const type = () => props.step.type;
   // Not rows: a run's bounds (each step carries its run), a result is shown in its call (shownEvents).

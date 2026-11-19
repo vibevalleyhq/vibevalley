@@ -1,12 +1,11 @@
 import { cleanup, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { MediaAudioFormatValues, type MediaAudioFormat, type MediaSpeechJob, type MediaSpeechRequest, type ProviderVoiceRequest } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
+import { MediaAudioFormatValues, type MediaAudioFormat, type MediaSpeechJob, type MediaSpeechRequest } from "@vibevalley/protocol";
 
 import { api, reasonOf } from "../../infra/api";
 import { useCore } from "../../infra/frame";
-import { defineQuery, providerQuery, ready, useQuery } from "../../infra/query";
+import { providerQuery, providerVoicesQuery, ready, useQuery } from "../../infra/query";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
@@ -16,12 +15,6 @@ import { AudioMetadataLine, AudioUsageLine, JobActions, Refusal, ResultAudio, So
 import { publicationKey } from "./publication";
 import { ReleaseAssets } from "./ReleaseAssets";
 import { playSpeech } from "./stream";
-
-const voicesQuery = defineQuery({
-  schema: S.ProviderVoiceListing,
-  key: (input: ProviderVoiceRequest) => ["provider-voices", input.connection, input.revision, input.after ?? null],
-  fetch: (input, context) => api.provider.voice.list(input, context),
-});
 
 export function SpeechPanel() {
   const core = useCore();
@@ -34,7 +27,7 @@ export function SpeechPanel() {
   const voices = useQuery(
     () => {
       const after = page()?.scope === scope() ? page()?.after : undefined;
-      return voicesQuery({
+      return providerVoicesQuery({
         connection: status()?.speech?.connection ?? "",
         revision: status()?.revision ?? 0,
         limit: 20,

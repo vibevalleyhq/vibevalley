@@ -97,7 +97,7 @@ pub fn diff(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    Ok(match crate::modules::issue::changes_of(&f.board, &item) {
+    Ok(match crate::modules::issue::changes_of(&f.board, &item, None) {
         Ok(changes) => words::changes_text(&changes),
         Err(why) => format!("看不了改动：{}", why.message),
     })
@@ -130,6 +130,7 @@ pub fn review(f: &Farm, _: &Who, a: ReviewArgs) -> Result<String, String> {
         OneOrMany::Many(many) => many,
     });
     let input = IssueReviewInput {
+        revision: None,
         id: item.id,
         pass: a.pass,
         findings,
@@ -271,6 +272,7 @@ pub fn status(f: &Farm, who: &Who, a: StatusArgs) -> Result<String, String> {
     };
     let to = words::status_named(&a.status).ok_or_else(|| format!("Expected one of: {}", words::STATUS_WORDS))?;
     let mut req = vibevalley_protocol::IssueStatusUpdateInput {
+        revision: None,
         id: item.id.clone(),
         status: to,
         text: given(&a.text).map(String::from),
@@ -389,6 +391,7 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
         &f.board,
         Some(&f.agents),
         &vibevalley_protocol::IssueStatusUpdateInput {
+            revision: None,
             id: item.id.clone(),
             status: IssueStatus::Todo,
             text: None,

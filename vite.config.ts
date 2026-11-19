@@ -47,14 +47,24 @@ export default defineConfig({
       // their TS engines (vp run goldens).
       "rust:check": { command: "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace", cache: false },
       "protocol:check": {
-        command:
-          "cargo test -p vibevalley-protocol --features ts-gen --test typescript && vp run goldens && git diff --exit-code -- crates/vibevalley-artifact/assets/shell.json crates/vibevalley-artifact/tests/golden 'crates/vibevalley-pkm/golden/*.json'",
+        command: "cargo test -p vibevalley-protocol --features ts-gen --test typescript && vp run goldens --check",
         cache: false,
       },
-      // The native views: nsh's own type check, then a bundle.
-      "mac:check": { command: "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build", cache: false },
-      // What a beta and a release must pass before scripts/release/release.ts tags them (alphas are tagged on CI being green).
-      "release:verify": ["vp run rust:check", "vp run protocol:check", "vp run packages:check", "vp run mac:check", "vp run docs:verify"],
+      "sql:check": { command: "sqlc diff && python3 scripts/release/verify-native-schema.py --queries-only", cache: false },
+      "mac:check": {
+        command:
+          "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build && ../../../.tools/bin/nsh test vv/app/issues.test.tsx",
+        cache: false,
+      },
+      "release:verify": [
+        "vp run rust:check",
+        "vp run protocol:check",
+        "vp run sql:check",
+        "vp run packages:check",
+        "vp run scripts:test",
+        "vp run mac:check",
+        "vp run docs:verify",
+      ],
     },
   },
   // scripts/'s own tests; each package has its vite.config.ts with its own.

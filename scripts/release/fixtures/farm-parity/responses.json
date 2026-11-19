@@ -1,0 +1,761 @@
+{
+  "repo.list": [
+    {
+      "name": "parity",
+      "path": "/fixture/work/repos/parity",
+      "git": true,
+      "last": 1795032463707,
+      "maxSessions": 4,
+      "pullRequest": {
+        "available": false,
+        "reason": "no remote URL configured"
+      }
+    }
+  ],
+  "agent.list": [
+    {
+      "id": "orchestrator",
+      "name": "管家",
+      "role": "orchestrator",
+      "duty": "替用户派活、转告结果",
+      "enabled": true,
+      "runtime": "vibevalley",
+      "model": "",
+      "effort": "",
+      "persona": "",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": false,
+      "tags": [],
+      "look": {
+        "species": "owl",
+        "outfit": "farmer",
+        "orchestrator": "farmer",
+        "build": "hopper",
+        "head": "orb",
+        "body": "#fbe7c6",
+        "trim": "#4f9a5a",
+        "hat": "#f2b53a",
+        "eye": "#a6f4ff"
+      },
+      "from": {
+        "template": "orchestrator",
+        "version": 1
+      }
+    },
+    {
+      "id": "agent-5367d7cfc3e4eb8d1b242551",
+      "name": "owl",
+      "role": "worker",
+      "duty": "",
+      "enabled": true,
+      "runtime": "pi",
+      "model": "",
+      "effort": "",
+      "persona": "",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": true,
+      "tags": [],
+      "look": {
+        "species": "owl",
+        "outfit": "farmer",
+        "orchestrator": null,
+        "build": "biped",
+        "head": "rounded",
+        "body": "",
+        "trim": "",
+        "hat": "",
+        "eye": ""
+      }
+    },
+    {
+      "id": "agent-842c2d39b35d2250516b3d7e",
+      "name": "fox",
+      "role": "worker",
+      "duty": "",
+      "enabled": true,
+      "runtime": "pi",
+      "model": "",
+      "effort": "",
+      "persona": "",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": true,
+      "tags": [],
+      "look": {
+        "species": "fox",
+        "outfit": "farmer",
+        "orchestrator": null,
+        "build": "biped",
+        "head": "rounded",
+        "body": "",
+        "trim": "",
+        "hat": "",
+        "eye": ""
+      }
+    },
+    {
+      "id": "docs",
+      "name": "文档员 Kimi",
+      "role": "worker",
+      "duty": "通读文档、写 README、整理说明",
+      "enabled": true,
+      "runtime": "pi",
+      "model": "",
+      "effort": "",
+      "persona": "你负责文档：读懂再写，写清楚怎么用、为什么这样设计。",
+      "personaMode": "append",
+      "skills": [],
+      "mcpServers": [],
+      "disallowedTools": [],
+      "env": {},
+      "workdir": "",
+      "worktree": true,
+      "tags": ["文档", "readme", "通读", "说明", "docs"],
+      "look": {
+        "species": "cat",
+        "outfit": "winter",
+        "orchestrator": null,
+        "build": "hopper",
+        "head": "dome",
+        "body": "#f4e6d4",
+        "trim": "#b0503f",
+        "hat": "#9580e6",
+        "eye": "#ffd25e"
+      },
+      "from": {
+        "template": "docs",
+        "version": 1
+      }
+    }
+  ],
+  "channel.message.list": [
+    {
+      "id": "general:1",
+      "number": 1,
+      "channel": "general",
+      "from": "orchestrator",
+      "actor": {
+        "kind": "agent",
+        "id": "orchestrator",
+        "role": "orchestrator",
+        "name": "管家"
+      },
+      "name": "管家",
+      "agent": "orchestrator",
+      "kind": "dispatch",
+      "text": "提交打卡页",
+      "mentions": [],
+      "session": "sess-f657b9e2d173e028d62f915d",
+      "outcome": null,
+      "spoken": false,
+      "at": 1795032463752,
+      "revision": 1,
+      "reactions": [],
+      "attachments": [],
+      "embeds": []
+    },
+    {
+      "id": "general:2",
+      "number": 2,
+      "channel": "general",
+      "from": "orchestrator",
+      "actor": {
+        "kind": "agent",
+        "id": "orchestrator",
+        "role": "orchestrator",
+        "name": "管家"
+      },
+      "name": "管家",
+      "agent": "orchestrator",
+      "kind": "dispatch",
+      "text": "先问清楚再提交",
+      "mentions": [],
+      "session": "sess-9c5ce54d372025d0ecac7065",
+      "outcome": null,
+      "spoken": false,
+      "at": 1795032463963,
+      "revision": 2,
+      "reactions": [],
+      "attachments": [],
+      "embeds": []
+    }
+  ],
+  "game.achievement.list": [
+    {
+      "category": "harvest",
+      "detail": "Complete your first issue on the farm.",
+      "id": "first-harvest",
+      "tiers": [
+        {
+          "coins": 30,
+          "need": 1,
+          "reached": "Harvested your first crop",
+          "title": "Sprout Keeper"
+        }
+      ],
+      "title": "First Harvest",
+      "wearable": true
+    }
+  ],
+  "runtime.list": [
+    {
+      "id": "claude",
+      "preset": {
+        "id": "claude",
+        "label": "Claude Code",
+        "blurb": "Anthropic CLI coding agent.",
+        "look": {
+          "species": null,
+          "outfit": null,
+          "orchestrator": null,
+          "build": "biped",
+          "head": "rounded",
+          "body": "#f3e9da",
+          "trim": "#d9774f",
+          "hat": "#e8804f",
+          "eye": "#a6f4ff"
+        }
+      },
+      "support": {
+        "steer": true,
+        "refused": {},
+        "capabilities": ["listModels", "accountUsage", "skills", "mcpServers", "tools"],
+        "inProcess": false
+      },
+      "installation": {
+        "status": "not_found"
+      },
+      "models": null,
+      "usage": null,
+      "skills": null,
+      "mcpServers": null,
+      "tools": null,
+      "settings": {
+        "enabled": true,
+        "binPath": "",
+        "defaultModel": "",
+        "defaultEffort": "",
+        "env": {}
+      },
+      "stop": "",
+      "checkedAt": 1795032420477
+    },
+    {
+      "id": "codex",
+      "preset": {
+        "id": "codex",
+        "label": "Codex",
+        "blurb": "OpenAI coding agent via app-server.",
+        "look": {
+          "species": null,
+          "outfit": null,
+          "orchestrator": null,
+          "build": "treads",
+          "head": "terminal",
+          "body": "#3d434a",
+          "trim": "#d8dadc",
+          "hat": "#f4f3ee",
+          "eye": "#a6f4ff"
+        }
+      },
+      "support": {
+        "steer": true,
+        "refused": {},
+        "capabilities": ["listModels", "accountUsage", "skills", "mcpServers", "tools"],
+        "inProcess": false
+      },
+      "installation": {
+        "status": "not_found"
+      },
+      "models": null,
+      "usage": null,
+      "skills": null,
+      "mcpServers": null,
+      "tools": null,
+      "settings": {
+        "enabled": true,
+        "binPath": "",
+        "defaultModel": "",
+        "defaultEffort": "",
+        "env": {}
+      },
+      "stop": "",
+      "checkedAt": 1795032420477
+    },
+    {
+      "id": "opencode",
+      "preset": {
+        "id": "opencode",
+        "label": "opencode",
+        "blurb": "Open-source terminal coding agent over ACP.",
+        "look": {
+          "species": null,
+          "outfit": null,
+          "orchestrator": null,
+          "build": "biped",
+          "head": "terminal",
+          "body": "#e9e6de",
+          "trim": "#24282d",
+          "hat": "#2f3438",
+          "eye": "#a6f4ff"
+        }
+      },
+      "support": {
+        "steer": true,
+        "refused": {
+          "disallowedTools": "opencode ACP has no session disallowedTools"
+        },
+        "capabilities": ["listModels"],
+        "inProcess": false
+      },
+      "installation": {
+        "status": "not_found"
+      },
+      "models": null,
+      "usage": null,
+      "skills": null,
+      "mcpServers": null,
+      "tools": null,
+      "settings": {
+        "enabled": true,
+        "binPath": "",
+        "defaultModel": "",
+        "defaultEffort": "",
+        "env": {}
+      },
+      "stop": "",
+      "checkedAt": 1795032420477
+    },
+    {
+      "id": "vibevalley",
+      "preset": {
+        "id": "vibevalley",
+        "label": "vibevalley",
+        "blurb": "VibeValley hosted agent running in-process.",
+        "look": {
+          "species": null,
+          "outfit": null,
+          "orchestrator": null,
+          "build": "hopper",
+          "head": "orb",
+          "body": "#fbe7c6",
+          "trim": "#4f9a5a",
+          "hat": "#f2b53a",
+          "eye": "#a6f4ff"
+        }
+      },
+      "support": {
+        "steer": true,
+        "refused": {},
+        "capabilities": ["listModels"],
+        "inProcess": true
+      },
+      "installation": {
+        "command": "vibevalley",
+        "status": "available",
+        "version": null,
+        "via": "bundled"
+      },
+      "models": null,
+      "usage": null,
+      "skills": null,
+      "mcpServers": null,
+      "tools": null,
+      "settings": {
+        "enabled": true,
+        "binPath": "",
+        "defaultModel": "",
+        "defaultEffort": "",
+        "env": {}
+      },
+      "stop": "",
+      "checkedAt": 1795032420477
+    },
+    {
+      "id": "pi",
+      "preset": {
+        "id": "pi",
+        "label": "Pi",
+        "blurb": "In-process coding agent SDK.",
+        "look": {
+          "species": null,
+          "outfit": null,
+          "orchestrator": null,
+          "build": "hopper",
+          "head": "dome",
+          "body": "#f4e6d4",
+          "trim": "#b0503f",
+          "hat": "#d9534f",
+          "eye": "#a6f4ff"
+        }
+      },
+      "support": {
+        "steer": true,
+        "refused": {},
+        "capabilities": ["listModels", "skills", "tools"],
+        "inProcess": true
+      },
+      "installation": {
+        "command": "pi",
+        "status": "available",
+        "version": null,
+        "via": "bundled"
+      },
+      "models": null,
+      "usage": null,
+      "skills": null,
+      "mcpServers": null,
+      "tools": null,
+      "settings": {
+        "enabled": true,
+        "binPath": "",
+        "defaultModel": "",
+        "defaultEffort": "",
+        "env": {}
+      },
+      "stop": "",
+      "checkedAt": 1795032420477
+    },
+    {
+      "id": "cursor",
+      "preset": {
+        "id": "cursor",
+        "label": "Cursor",
+        "blurb": "Cursor local agent SDK.",
+        "look": {
+          "species": null,
+          "outfit": null,
+          "orchestrator": null,
+          "build": "wheel",
+          "head": "saucer",
+          "body": "#dfe4ea",
+          "trim": "#5b6470",
+          "hat": "#a9b4c2",
+          "eye": "#a6f4ff"
+        }
+      },
+      "support": {
+        "steer": true,
+        "refused": {
+          "appendSystemPrompt": "unsupported",
+          "env": "unsupported",
+          "mcpServers": "unsupported",
+          "systemPrompt": "unsupported"
+        },
+        "capabilities": ["listModels"],
+        "inProcess": true
+      },
+      "installation": {
+        "status": "not_found"
+      },
+      "models": null,
+      "usage": null,
+      "skills": null,
+      "mcpServers": null,
+      "tools": null,
+      "settings": {
+        "enabled": true,
+        "binPath": "",
+        "defaultModel": "",
+        "defaultEffort": "",
+        "env": {}
+      },
+      "stop": "",
+      "checkedAt": 1795032420477
+    },
+    {
+      "id": "grok",
+      "preset": {
+        "id": "grok",
+        "label": "Grok",
+        "blurb": "xAI grok CLI over ACP.",
+        "look": {
+          "species": null,
+          "outfit": null,
+          "orchestrator": null,
+          "build": "wheel",
+          "head": "dome",
+          "body": "#b9c4d1",
+          "trim": "#3a404a",
+          "hat": "#4f86d9",
+          "eye": "#a6f4ff"
+        }
+      },
+      "support": {
+        "steer": true,
+        "refused": {
+          "disallowedTools": "unsupported"
+        },
+        "capabilities": ["listModels", "accountUsage", "skills", "mcpServers"],
+        "inProcess": false
+      },
+      "installation": {
+        "status": "not_found"
+      },
+      "models": null,
+      "usage": null,
+      "skills": null,
+      "mcpServers": null,
+      "tools": null,
+      "settings": {
+        "enabled": true,
+        "binPath": "",
+        "defaultModel": "",
+        "defaultEffort": "",
+        "env": {}
+      },
+      "stop": "",
+      "checkedAt": 1795032420477
+    },
+    {
+      "id": "kimi",
+      "preset": {
+        "id": "kimi",
+        "label": "Kimi",
+        "blurb": "Moonshot kimi CLI over ACP.",
+        "look": {
+          "species": null,
+          "outfit": null,
+          "orchestrator": null,
+          "build": "hopper",
+          "head": "orb",
+          "body": "#e7e6fb",
+          "trim": "#6c70d8",
+          "hat": "#9580e6",
+          "eye": "#a6f4ff"
+        }
+      },
+      "support": {
+        "steer": false,
+        "refused": {
+          "appendSystemPrompt": "unsupported",
+          "disallowedTools": "unsupported",
+          "systemPrompt": "unsupported"
+        },
+        "capabilities": ["listModels", "accountUsage"],
+        "inProcess": false
+      },
+      "installation": {
+        "status": "not_found"
+      },
+      "models": null,
+      "usage": null,
+      "skills": null,
+      "mcpServers": null,
+      "tools": null,
+      "settings": {
+        "enabled": true,
+        "binPath": "",
+        "defaultModel": "",
+        "defaultEffort": "",
+        "env": {}
+      },
+      "stop": "",
+      "checkedAt": 1795032420477
+    },
+    {
+      "id": "antigravity",
+      "preset": {
+        "id": "antigravity",
+        "label": "Antigravity",
+        "blurb": "Google Antigravity agent over ACP.",
+        "look": {
+          "species": null,
+          "outfit": null,
+          "orchestrator": null,
+          "build": "hover",
+          "head": "saucer",
+          "body": "#d3efe8",
+          "trim": "#2f9d8f",
+          "hat": "#45bf8c",
+          "eye": "#a6f4ff"
+        }
+      },
+      "support": {
+        "steer": true,
+        "refused": {
+          "disallowedTools": "unsupported",
+          "mcpServerCredentials": "plaintext credential storage rejected",
+          "systemPrompt": "unsupported"
+        },
+        "capabilities": ["listModels"],
+        "inProcess": false
+      },
+      "installation": {
+        "status": "not_found"
+      },
+      "models": null,
+      "usage": null,
+      "skills": null,
+      "mcpServers": null,
+      "tools": null,
+      "settings": {
+        "enabled": true,
+        "binPath": "",
+        "defaultModel": "",
+        "defaultEffort": "",
+        "env": {}
+      },
+      "stop": "",
+      "checkedAt": 1795032420477
+    },
+    {
+      "id": "dsh",
+      "preset": {
+        "id": "dsh",
+        "label": "DeepSeek Harness",
+        "blurb": "DeepSeek harness over ACP.",
+        "look": {
+          "species": null,
+          "outfit": null,
+          "orchestrator": null,
+          "build": "treads",
+          "head": "orb",
+          "body": "#dce6fb",
+          "trim": "#3b5bdb",
+          "hat": "#4d6bfe",
+          "eye": "#a6f4ff"
+        }
+      },
+      "support": {
+        "steer": false,
+        "refused": {
+          "appendSystemPrompt": "unsupported",
+          "disallowedTools": "unsupported",
+          "systemPrompt": "unsupported"
+        },
+        "capabilities": ["listModels"],
+        "inProcess": false
+      },
+      "installation": {
+        "status": "not_found"
+      },
+      "models": null,
+      "usage": null,
+      "skills": null,
+      "mcpServers": null,
+      "tools": null,
+      "settings": {
+        "enabled": true,
+        "binPath": "",
+        "defaultModel": "",
+        "defaultEffort": "",
+        "env": {}
+      },
+      "stop": "",
+      "checkedAt": 1795032420477
+    }
+  ],
+  "channel.list": [
+    {
+      "id": "general",
+      "type": "channel",
+      "default": true,
+      "orchestrator": "orchestrator",
+      "members": ["orchestrator"],
+      "category": "",
+      "notify": "all",
+      "name": "general",
+      "description": "",
+      "subjectKind": null,
+      "lastNumber": 2,
+      "replies": 2,
+      "unread": 2,
+      "title": "general",
+      "last": {
+        "from": "orchestrator",
+        "name": "管家",
+        "text": "先问清楚再提交",
+        "at": 1795032463963
+      },
+      "at": 1795032463963
+    },
+    {
+      "id": "dm:orchestrator",
+      "type": "direct",
+      "default": false,
+      "peer": "orchestrator",
+      "orchestrator": "orchestrator",
+      "category": "",
+      "notify": "all",
+      "name": "orchestrator",
+      "description": "",
+      "subjectKind": null,
+      "replies": 0,
+      "title": "orchestrator",
+      "at": 1795032420481
+    }
+  ],
+  "session.list": [
+    {
+      "id": "sess-9c5ce54d372025d0ecac7065",
+      "role": "worker",
+      "name": "owl",
+      "agent": "agent-5367d7cfc3e4eb8d1b242551",
+      "runtime": "pi",
+      "brief": "先问清楚再提交",
+      "repo": "parity",
+      "branch": "vibevalley/issue-issue-774a37beeddcc8c2567acb35",
+      "worktree": "/fixture/work/worktrees/parity.issue-774a37beeddcc8c2567acb35",
+      "hiredAt": 1795032463915,
+      "runs": 1,
+      "phase": {
+        "_tag": "done"
+      },
+      "lastRun": {
+        "outcome": "completed",
+        "summary": "做完了：先问清楚再提交｜人设：无\n\n要问用户：用 8787 还是 8797？",
+        "at": 1795032464028
+      },
+      "channel": "conv-issue-issue-774a37beeddcc8c2567acb35",
+      "scope": {
+        "kind": "issue",
+        "id": "issue-774a37beeddcc8c2567acb35"
+      }
+    },
+    {
+      "id": "sess-f657b9e2d173e028d62f915d",
+      "role": "worker",
+      "name": "fox",
+      "agent": "agent-842c2d39b35d2250516b3d7e",
+      "runtime": "pi",
+      "brief": "提交打卡页",
+      "repo": "parity",
+      "branch": "vibevalley/issue-issue-b029002a2d36c21b7edf16b4",
+      "worktree": "/fixture/work/worktrees/parity.issue-b029002a2d36c21b7edf16b4",
+      "hiredAt": 1795032463712,
+      "runs": 1,
+      "phase": {
+        "_tag": "done"
+      },
+      "lastRun": {
+        "outcome": "completed",
+        "summary": "做完了：提交打卡页｜人设：无",
+        "at": 1795032463823
+      },
+      "channel": "conv-issue-issue-b029002a2d36c21b7edf16b4",
+      "scope": {
+        "kind": "issue",
+        "id": "issue-b029002a2d36c21b7edf16b4"
+      }
+    }
+  ],
+  "server.health.get": {
+    "ok": true,
+    "version": "0.1.0-dev"
+  }
+}

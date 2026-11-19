@@ -1,6 +1,7 @@
 //! The map of islands, one per repo: VibeValley's `farm/map/islands.ts`
 //! (rules) and `RepoMap.tsx` (the picture, here painted).
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde::Deserialize;
@@ -12,7 +13,7 @@ use super::frame::{Frame, Issue, PlotView, Session};
 use super::scene::cast_prefix;
 
 /// How many helpers may work on the whole farm at once (`maxRunning`).
-pub const MAX_RUNNING: i64 = 6;
+const MAX_RUNNING: i64 = vibevalley_protocol::MAX_RUNNING as i64;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -25,7 +26,11 @@ pub struct RepoSummary {
 
 #[derive(Debug, Clone)]
 pub enum Spot {
-    Taken { session: Box<Session>, plot: PlotView },
+    Taken {
+        session: Box<Session>,
+        plot: PlotView,
+        pose: &'static str,
+    },
     Open,
     Shut,
 }
@@ -72,6 +77,13 @@ pub fn islands_of(repos: &[RepoSummary], frame: &Frame) -> Vec<Island> {
                 .iter()
                 .map(|s| Spot::Taken {
                     session: Box::new((*s).clone()),
+                    pose: map_pose(
+                        s,
+                        frame.state.issues.iter().any(|i| {
+                            Some(&i.id) == s.issue.as_ref()
+                                && i.stage.as_ref().and_then(|stage| stage.stuck) == Some(vibevalley_protocol::StuckReason::Conflict)
+                        }),
+                    ),
                     plot: frame.plot_of(s).cloned().unwrap_or(PlotView {
                         crop: super::frame::Crop::Seeded,
                         badge: None,
@@ -170,9 +182,10 @@ pub fn island_look(repo: &str) -> &'static str {
 }
 
 /// A helper on the map: the pose's sprite suffix.
-pub fn map_pose(s: &Session) -> &'static str {
+fn map_pose(s: &Session, conflict: bool) -> &'static str {
     match s.phase.tag.as_str() {
         "failed" => "worry",
+        "done" | "resting" if conflict => "worry",
         "working" => match s.doing() {
             Some("thinking") | Some("speaking_text") => "side",
             _ => "work",
@@ -189,14 +202,33 @@ const GAP: f32 = 24.0;
 pub enum MapHit {
     Island(String),
     Sow(String),
-    Plot { repo: String, session: String, issue: Option<String> },
+    Plot {
+        agent: String,
+        worktree: Option<String>,
+        issue: Option<String>,
+    },
+}
+
+impl MapHit {
+    pub fn route(&self) -> String {
+        use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
+        const COMPONENT: &percent_encoding::AsciiSet = &NON_ALPHANUMERIC.remove(b'-').remove(b'_').remove(b'.').remove(b'~');
+        match self {
+            Self::Island(repo) => format!("/farm/{}", utf8_percent_encode(repo, COMPONENT)),
+            Self::Sow(repo) => format!("/issues/new?repo={}", utf8_percent_encode(repo, COMPONENT)),
+            Self::Plot { issue: Some(id), .. } => format!("/issues/{}", utf8_percent_encode(id, COMPONENT)),
+            Self::Plot { agent, .. } => format!("/agents/{}", utf8_percent_encode(agent, COMPONENT)),
+        }
+    }
 }
 
 pub struct MapScene {
     pub atlas: Arc<Atlas>,
-    pub frame: Frame,
-    pub repos: Vec<RepoSummary>,
+    frame: Frame,
+    repos: Option<Vec<RepoSummary>>,
     pub islands: Vec<Island>,
+    pub agent_looks: HashMap<String, (String, String)>,
+    pub load_error: Option<String>,
     hits: Vec<(Box2, MapHit)>,
     pub hover: Option<MapHit>,
     t: f32,
@@ -207,8 +239,10 @@ impl MapScene {
         MapScene {
             atlas,
             frame: Frame::default(),
-            repos: Vec::new(),
+            repos: None,
             islands: Vec::new(),
+            agent_looks: HashMap::new(),
+            load_error: None,
             hits: Vec::new(),
             hover: None,
             t: 0.0,
@@ -217,7 +251,20 @@ impl MapScene {
 
     pub fn tick(&mut self, dt: f32) {
         self.t += dt.min(0.1);
-        self.islands = islands_of(&self.repos, &self.frame);
+    }
+
+    pub fn apply_frame(&mut self, frame: Frame) {
+        self.frame = frame;
+        self.islands = islands_of(self.repos.as_deref().unwrap_or_default(), &self.frame);
+    }
+
+    pub fn set_repos(&mut self, repos: Vec<RepoSummary>) {
+        self.repos = Some(repos);
+        self.islands = islands_of(self.repos.as_deref().unwrap_or_default(), &self.frame);
+    }
+
+    pub fn repo_path(&self, repo: &str) -> Option<&str> {
+        self.repos.as_ref()?.iter().find(|r| r.name == repo).map(|r| r.path.as_str())
     }
 
     fn cell(&self) -> (f32, f32) {
@@ -262,6 +309,11 @@ impl MapScene {
             y += 32.0;
         }
         self.hits.clear();
+        if let Some(error) = &self.load_error {
+            list.hud_art.push((width / 2., 3., error.clone()));
+        } else if self.repos.is_some() && self.islands.is_empty() {
+            list.hud_art.push((width / 2., height / 2., vibevalley_i18n::t("web.farm.sow.noRepos", &[])));
+        }
         for (i, island) in self.islands.iter().enumerate() {
             let (col, row) = (i % cols, i / cols);
             let name = atlas.first(&[island_look(&island.repo), "island-meadow"]);
@@ -299,10 +351,11 @@ impl MapScene {
             };
             for (spot, foot) in island.spots.iter().zip(plots_in(yard, island.spots.len())) {
                 match spot {
-                    Spot::Taken { session, plot } => {
+                    Spot::Taken { session, plot, pose } => {
                         list.sprite(&atlas, &format!("plot-{}", plot.crop.name()), foot.x, foot.y, false, 1.0);
-                        let look = cast_prefix(None, &session.agent, &atlas);
-                        let pose = format!("{look}-{}", map_pose(session));
+                        let configured = self.agent_looks.get(&session.agent).map(|(sp, outfit)| (sp.as_str(), outfit.as_str()));
+                        let look = cast_prefix(configured, &session.agent, &atlas);
+                        let pose = format!("{look}-{pose}");
                         let pose = if atlas.has(&pose) { pose } else { format!("{look}-down") };
                         list.sprite(&atlas, &pose, foot.x, foot.y - 10.0, false, 1.0);
                         self.hits.push((
@@ -313,8 +366,8 @@ impl MapScene {
                                 y1: foot.y,
                             },
                             MapHit::Plot {
-                                repo: island.repo.clone(),
-                                session: session.id.clone(),
+                                agent: session.agent.clone(),
+                                worktree: session.worktree.clone(),
                                 issue: session.issue.clone(),
                             },
                         ));
@@ -339,21 +392,24 @@ impl MapScene {
             for (k, _) in island.queued.iter().take(3).enumerate() {
                 list.sprite(&atlas, "map-sack", gate.x + 20.0 + k as f32 * 12.0, gate.y + 8.0, false, 1.0);
             }
-            let tally = if island.summary.is_some() {
-                format!(
-                    "{} · {}/{} 在干活{}",
-                    island.repo,
-                    island.working,
-                    island.max_sessions,
-                    if island.queued.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" · 排队 {}", island.queued.len())
-                    }
+            let mut tally = if island.summary.is_some() {
+                vibevalley_i18n::t(
+                    "web.farm.native.islandWorking",
+                    &[
+                        ("repo", island.repo.as_str().into()),
+                        ("count", island.working.into()),
+                        ("limit", island.max_sessions.into()),
+                    ],
                 )
             } else {
-                format!("{} · 不在仓库列表里", island.repo)
+                vibevalley_i18n::t("web.farm.native.islandGone", &[("repo", island.repo.as_str().into())])
             };
+            if !island.queued.is_empty() {
+                tally.push_str(&vibevalley_i18n::t(
+                    "web.farm.native.islandQueued",
+                    &[("count", (island.queued.len() as i64).into())],
+                ));
+            }
             list.hud_art.push((left + info.w / 2.0, top + info.h + 6.0, tally));
         }
         let cloud = atlas.get("map-cloud");
@@ -388,7 +444,7 @@ impl MapScene {
 
     pub fn debug_state(&self) -> serde_json::Value {
         serde_json::json!({
-            "repos": self.repos.len(),
+            "repos": self.repos.as_ref().map_or(0, Vec::len),
             "islands": self.islands.iter().map(|i| serde_json::json!({
                 "repo": i.repo, "look": island_look(&i.repo), "working": i.working, "max": i.max_sessions,
                 "spots": i.spots.iter().map(|s| match s { Spot::Taken { session, .. } => session.id.clone(), Spot::Open => "open".into(), Spot::Shut => "shut".into() }).collect::<Vec<_>>(),
@@ -405,7 +461,7 @@ pub fn label_ops(list: &DrawList, scale: f32) -> Vec<HudOp> {
     list.hud_art
         .iter()
         .map(|(x, y, text)| {
-            let w = text.chars().map(|c| if c.is_ascii() { 7.0 } else { 12.0 }).sum::<f32>();
+            let w = super::super::font::width(text, 12.0);
             HudOp::Text {
                 x: x * scale - w / 2.0,
                 y: y * scale,
@@ -434,6 +490,19 @@ mod tests {
         assert_eq!(p[0].y, p[1].y);
         assert_eq!(p[2].y, p[0].y + ROW_PITCH);
         assert!(plots_in(yard, 0).is_empty());
+    }
+
+    #[test]
+    fn regression_map_targets_resolve_to_workbench_routes() {
+        assert_eq!(MapHit::Island("tools.v2".into()).route(), "/farm/tools.v2");
+        assert_eq!(MapHit::Sow("A&B".into()).route(), "/issues/new?repo=A%26B");
+        let plot = |issue| MapHit::Plot {
+            agent: "docs/1".into(),
+            worktree: None,
+            issue,
+        };
+        assert_eq!(plot(Some("i17".into())).route(), "/issues/i17");
+        assert_eq!(plot(None).route(), "/agents/docs%2F1");
     }
 
     #[test]

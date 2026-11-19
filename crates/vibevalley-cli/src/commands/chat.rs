@@ -87,6 +87,7 @@ fn run_local(ctx: &Ctx, m: &ArgMatches, initial: String) -> Done {
     let runtime = registry.require(&runtime_id).map_err(map_oar_error)?;
     match runtime.installation() {
         Installation::Available { .. } => {}
+        Installation::LoginRequired { .. } => return Err(map_oar_error(AgentError::NotAvailable(format!("{runtime_id} requires a local sign-in")))),
         Installation::NotInstalled => return Err(map_oar_error(AgentError::NotAvailable(runtime_id))),
         Installation::Unusable { reason } => return Err(map_oar_error(AgentError::NotAvailable(reason))),
     }
@@ -177,6 +178,11 @@ fn local_turn(ctx: &Ctx, session: &Arc<dyn OarSession>, events: &mut dyn Iterato
             | EventKind::ToolCallFinished { .. }
             | EventKind::FileChanged { .. }
             | EventKind::PermissionResolved { .. }
+            | EventKind::SubagentSpawned { .. }
+            | EventKind::SubagentMessage { .. }
+            | EventKind::SubagentPlanUpdated { .. }
+            | EventKind::SubagentWait { .. }
+            | EventKind::SubagentStatusChanged { .. }
             | EventKind::Question { .. } => {}
         }
     }

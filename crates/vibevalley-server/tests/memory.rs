@@ -97,3 +97,36 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
     assert_eq!(gone.biz_code, BizCode::MemoryNotFound.code());
     started.board.close();
 }
+
+#[test]
+fn regression_replacing_an_agents_notes_rolls_back_the_entire_set() {
+    use vibevalley_server::modules::memory::{By, Note};
+    let home = tempfile::tempdir().unwrap();
+    let server = vibevalley_server::start(vibevalley_server::ServerConfig {
+        probe_runtimes: false,
+        tick_crons: false,
+        watch_pkm: false,
+        link_previews: false,
+        ..vibevalley_server::ServerConfig::under(home.path())
+    })
+    .unwrap();
+    let notes = &server.memories;
+    for (text, by) in [("Keep my preference", By::User), ("Previous note", By::Orchestrator)] {
+        notes
+            .write(&Note {
+                agent: "helper".into(),
+                text: text.into(),
+                repo: String::new(),
+                by,
+            })
+            .unwrap();
+    }
+    let before = notes.list("helper").unwrap();
+    let bad = notes.rewrite("helper", &["Partial note".into(), "  ".into()], By::Orchestrator).unwrap_err();
+    assert_eq!(bad.biz_code, BizCode::MemoryRefused);
+    assert_eq!(notes.list("helper").unwrap(), before);
+    notes.rewrite("helper", &["Replacement".into()], By::Orchestrator).unwrap();
+    let after: Vec<_> = notes.list("helper").unwrap().into_iter().map(|note| note.text).collect();
+    assert_eq!(after, ["Replacement", "Keep my preference"]);
+    server.close();
+}

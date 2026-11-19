@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
-import { Conflict } from "../repo/schema";
+import { Conflict, ReviewRevision } from "../repo/schema";
 import { IssueAnswer, PhaseResting, Session, SessionEvent } from "../session/schema";
 import * as T from "./shapes";
 import { IssueReportMemoryScopeValues } from "./shapes";
@@ -149,6 +149,24 @@ const issueFields = {
   pullRequest: z.exactOptional(PullRequest),
   deliver: Deliverable,
   reviewedAt: z.exactOptional(z.number()),
+  deliveryEvidence: z.exactOptional(
+    z.object({
+      reviews: z.array(z.object({ at: z.number(), revision: ReviewRevision })),
+      check: z.exactOptional(
+        z.object({
+          targetBranch: z.string(),
+          targetCommit: z.string(),
+          sourceTree: z.string(),
+          candidateCommit: z.string(),
+          candidateTree: z.string(),
+          status: z.enum(T.ProjectCheckStatusValues),
+          command: z.exactOptional(z.string()),
+          output: z.exactOptional(z.string()),
+        }),
+      ),
+      mergedCommit: z.exactOptional(z.string()),
+    }),
+  ),
   findings: z.array(Finding),
   questions: z.array(Question),
   criteria: z.array(z.string()),
@@ -212,6 +230,7 @@ export const CommentRequest = z.object({
 }) satisfies Codec<T.CommentRequest>;
 
 export const IssueReviewRequest = z.object({
+  revision: z.exactOptional(ReviewRevision),
   pass: z.boolean(),
   findings: z.exactOptional(z.array(z.string())),
   text: z.exactOptional(z.string()),
@@ -243,6 +262,7 @@ export const IssueSplitRequest = z.object({
 }) satisfies Codec<T.IssueSplitRequest>;
 
 export const IssueStatusRequest = z.object({
+  revision: z.exactOptional(ReviewRevision),
   status: IssueStatus,
   text: z.exactOptional(z.string()),
   agent: z.exactOptional(z.string()),

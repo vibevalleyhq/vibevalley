@@ -1,0 +1,388 @@
+{
+  "claude": [
+    {
+      "event": {
+        "kind": "model",
+        "model": "claude-sonnet-4-5"
+      },
+      "path": [],
+      "type": "system/init"
+    },
+    {
+      "event": {
+        "kind": "turn_started",
+        "input": "hello",
+        "requestId": "input1"
+      },
+      "path": [],
+      "type": "user_prompt"
+    },
+    {
+      "event": {
+        "kind": "text_delta",
+        "text": "Hello "
+      },
+      "path": [],
+      "type": "stream_event"
+    },
+    {
+      "event": {
+        "kind": "model",
+        "model": "claude-sonnet-4-5"
+      },
+      "path": [],
+      "type": "assistant"
+    },
+    {
+      "event": {
+        "kind": "task_started",
+        "taskId": "task-sub-1",
+        "taskKind": "agent",
+        "label": "inspect files"
+      },
+      "path": [],
+      "type": "system/task_started"
+    },
+    {
+      "event": {
+        "kind": "tool_call_started",
+        "input": "{\"prompt\":\"scan\"}",
+        "callId": "toolu_sub1",
+        "tool": "Task"
+      },
+      "path": [],
+      "type": "assistant"
+    },
+    {
+      "event": {
+        "kind": "text_delta",
+        "text": "subagent reading"
+      },
+      "path": [
+        "toolu_sub1"
+      ],
+      "type": "assistant"
+    },
+    {
+      "event": {
+        "kind": "tool_call_started",
+        "input": "{\"path\":\"a.go\"}",
+        "callId": "toolu_nested2",
+        "tool": "Read"
+      },
+      "path": [
+        "toolu_sub1"
+      ],
+      "type": "assistant"
+    },
+    {
+      "event": {
+        "kind": "text_delta",
+        "text": "deep leaf"
+      },
+      "path": [
+        "toolu_sub1",
+        "toolu_nested2"
+      ],
+      "type": "assistant"
+    },
+    {
+      "event": {
+        "kind": "tool_call_ended",
+        "callId": "toolu_sub1",
+        "result": "ok",
+        "content": [
+          {
+            "type": "text",
+            "text": "scan ok"
+          }
+        ]
+      },
+      "path": [],
+      "type": "user"
+    },
+    {
+      "event": {
+        "kind": "turn_ended",
+        "outcome": {
+          "kind": "completed"
+        }
+      },
+      "path": [],
+      "type": "result/success"
+    },
+    {
+      "event": {
+        "kind": "usage",
+        "usage": {
+          "tokens": {
+            "inputTokens": 150,
+            "outputTokens": 55,
+            "cacheReadTokens": 90,
+            "cacheWriteTokens": 25,
+            "reasoningTokens": 35
+          }
+        }
+      },
+      "path": [],
+      "type": "result/success"
+    }
+  ],
+  "codex": [
+    {
+      "event": {
+        "kind": "turn_started",
+        "input": "hello",
+        "requestId": "input1"
+      },
+      "path": [],
+      "type": "turn/start"
+    },
+    {
+      "event": {
+        "kind": "reasoning",
+        "text": "analyzing repo",
+        "reasoningKind": "text"
+      },
+      "path": [],
+      "type": "item/reasoning/summaryTextDelta"
+    },
+    {
+      "event": {
+        "kind": "tool_call_started",
+        "input": "{\"command\":\"go test ./...\"}",
+        "callId": "cmd-1",
+        "tool": "bash"
+      },
+      "path": [],
+      "type": "item/started"
+    },
+    {
+      "event": {
+        "kind": "tool_call_ended",
+        "callId": "cmd-1",
+        "result": "ok",
+        "exitCode": 0,
+        "content": [
+          {
+            "type": "text",
+            "text": "ok"
+          }
+        ]
+      },
+      "path": [],
+      "type": "item/completed"
+    },
+    {
+      "event": {
+        "kind": "child_session",
+        "childSessionId": "vendor-child",
+        "parentSessionId": "vendor-root"
+      },
+      "path": [
+        "vendor-child"
+      ],
+      "type": "child_thread_associated"
+    },
+    {
+      "event": {
+        "kind": "text_delta",
+        "text": "child output"
+      },
+      "path": [
+        "vendor-child"
+      ],
+      "type": "item/agentMessage/delta"
+    },
+    {
+      "event": {
+        "kind": "text_delta",
+        "text": "codex: hello"
+      },
+      "path": [],
+      "type": "item/agentMessage/delta"
+    },
+    {
+      "event": {
+        "kind": "usage",
+        "usage": {
+          "tokens": {
+            "inputTokens": 150,
+            "outputTokens": 55,
+            "cacheReadTokens": 90,
+            "cacheWriteTokens": 25,
+            "reasoningTokens": 35
+          },
+          "context": {
+            "tokens": 650,
+            "contextWindow": 200000,
+            "percent": 0.325
+          }
+        }
+      },
+      "path": [],
+      "type": "thread/tokenUsage/updated"
+    },
+    {
+      "event": {
+        "kind": "turn_ended",
+        "outcome": {
+          "kind": "completed"
+        }
+      },
+      "path": [],
+      "type": "turn/completed"
+    }
+  ],
+  "opencode": [
+    {
+      "event": {
+        "kind": "turn_started",
+        "input": "hello",
+        "requestId": "input1"
+      },
+      "path": [],
+      "type": "session/prompt"
+    },
+    {
+      "event": {
+        "kind": "text_delta",
+        "text": "acp hello"
+      },
+      "path": [],
+      "type": "session/update/agent_message_chunk"
+    },
+    {
+      "event": {
+        "kind": "child_session",
+        "childSessionId": "vendor-child",
+        "parentSessionId": "vendor-root"
+      },
+      "path": [
+        "vendor-child"
+      ],
+      "type": "child_session_associated"
+    },
+    {
+      "event": {
+        "kind": "text_delta",
+        "text": "child chunk"
+      },
+      "path": [
+        "vendor-child"
+      ],
+      "type": "session/update/agent_message_chunk"
+    },
+    {
+      "event": {
+        "kind": "turn_ended",
+        "outcome": {
+          "kind": "completed"
+        }
+      },
+      "path": [],
+      "type": "session/prompt_result"
+    },
+    {
+      "event": {
+        "kind": "usage",
+        "usage": {
+          "tokens": {
+            "inputTokens": 650,
+            "outputTokens": 155,
+            "cacheReadTokens": 290,
+            "cacheWriteTokens": 105,
+            "reasoningTokens": 75
+          }
+        }
+      },
+      "path": [],
+      "type": "session/prompt_result"
+    }
+  ],
+  "qoder": [
+    {
+      "event": {
+        "kind": "turn_started",
+        "input": "hello",
+        "requestId": "input1"
+      },
+      "path": [],
+      "type": "user_prompt"
+    },
+    {
+      "event": {
+        "kind": "text_delta",
+        "text": "sdk reply: hello"
+      },
+      "path": [],
+      "type": "assistant"
+    },
+    {
+      "event": {
+        "kind": "turn_ended",
+        "outcome": {
+          "kind": "completed"
+        }
+      },
+      "path": [],
+      "type": "result/success"
+    },
+    {
+      "event": {
+        "kind": "usage",
+        "usage": {
+          "tokens": null,
+          "unknownReason": "usage_not_reported"
+        }
+      },
+      "path": [],
+      "type": "result/success"
+    }
+  ],
+  "qwen": [
+    {
+      "event": {
+        "kind": "turn_started",
+        "input": "hello",
+        "requestId": "input1"
+      },
+      "path": [],
+      "type": "user_prompt"
+    },
+    {
+      "event": {
+        "kind": "text_delta",
+        "text": "sdk reply: hello"
+      },
+      "path": [],
+      "type": "assistant"
+    },
+    {
+      "event": {
+        "kind": "turn_ended",
+        "outcome": {
+          "kind": "completed"
+        }
+      },
+      "path": [],
+      "type": "result/success"
+    },
+    {
+      "event": {
+        "kind": "usage",
+        "usage": {
+          "tokens": {
+            "inputTokens": 30,
+            "outputTokens": 12,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "reasoningTokens": 0
+          }
+        }
+      },
+      "path": [],
+      "type": "result/success"
+    }
+  ]
+}

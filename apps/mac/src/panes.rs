@@ -156,10 +156,11 @@ impl FlexDir for gpui_kit::Div {
     }
 }
 
-/// What a terminal is called in the sidebar: what runs in it, else a title
-/// the program set, else the shell and its folder. A shell's default title
-/// (`user@host:path`) says nothing and is not used.
+/// Named work links keep their label while programs change the terminal title.
 pub fn terminal_name(t: &crate::terminal::TerminalView) -> String {
+    if let Some(title) = t.link_title() {
+        return title.to_owned();
+    }
     if let Some((_, label)) = t.running_status() {
         return label;
     }
@@ -208,7 +209,8 @@ fn shell_name() -> String {
 
 pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
     match &tab.kind {
-        PaneKind::Terminal { terminal_id } => shell
+        PaneKind::Terminal { link: Some(link), .. } => link.title.clone(),
+        PaneKind::Terminal { terminal_id, .. } => shell
             .terminals
             .get(terminal_id)
             .map(|t| terminal_name(t.view.read(cx)))
@@ -287,7 +289,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         let tab_id = tab.id;
         let title = names.get(&tab.id).cloned().unwrap_or_else(|| tab_title(shell, tab, cx));
         let attention = match &tab.kind {
-            PaneKind::Terminal { terminal_id } => shell.ws.active().and_then(|p| p.terminal(terminal_id)).is_some_and(|t| t.attention),
+            PaneKind::Terminal { terminal_id, .. } => shell.ws.active().and_then(|p| p.terminal(terminal_id)).is_some_and(|t| t.attention),
             _ => false,
         };
         tabs_row = tabs_row.child(
@@ -391,7 +393,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
     }
     let content: AnyElement = match g.active_tab() {
         Some(Tab {
-            kind: PaneKind::Terminal { terminal_id },
+            kind: PaneKind::Terminal { terminal_id, .. },
             ..
         }) => match shell.terminals.get(terminal_id) {
             Some(t) => t.view.clone().into_any_element(),

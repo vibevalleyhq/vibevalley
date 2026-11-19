@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde_json::{Value, json};
@@ -53,6 +54,7 @@ impl Hub {
             hub: self.clone(),
             outlet,
             inner: Arc::new(Mutex::new(Inner::default())),
+            revisions: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -63,8 +65,14 @@ struct Pump {
     server_sub: Option<u64>,
 }
 
+struct WorkbenchReceipt {
+    pending: AtomicU64,
+    received: flume::Sender<()>,
+}
+
 #[derive(Default)]
 struct Inner {
+    workbench: Option<Arc<WorkbenchReceipt>>,
     watches: HashMap<String, Pump>,
     subs: HashMap<String, Pump>,
 }
@@ -74,16 +82,11 @@ pub struct Client {
     hub: Hub,
     outlet: Arc<dyn Outlet>,
     inner: Arc<Mutex<Inner>>,
+    revisions: Arc<AtomicU64>,
 }
 
-/// Forwards `rx` until it disconnects or `stop` fires. `each` gets every
-/// item; with `latest`, items already queued are skipped for the newest.
-fn pump<T: Send + 'static>(
-    rx: flume::Receiver<T>,
-    latest: bool,
-    mut each: impl FnMut(T) + Send + 'static,
-    ended: impl FnOnce(bool) + Send + 'static,
-) -> flume::Sender<()> {
+/// Forwards every event until the subscriber stops or the source closes.
+fn pump<T: Send + 'static>(rx: flume::Receiver<T>, mut each: impl FnMut(T) + Send + 'static, ended: impl FnOnce(bool) + Send + 'static) -> flume::Sender<()> {
     let (stop_tx, stop_rx) = flume::bounded::<()>(1);
     std::thread::spawn(move || {
         enum Step<T> {
@@ -96,16 +99,11 @@ fn pump<T: Send + 'static>(
                 .recv(&rx, |r| r.map_or(Step::Ended, Step::Item))
                 .recv(&stop_rx, |_| Step::Stopped)
                 .wait();
-            let mut item = match step {
+            let item = match step {
                 Step::Item(item) => item,
                 Step::Ended => break false,
                 Step::Stopped => break true,
             };
-            if latest {
-                while let Ok(newer) = rx.try_recv() {
-                    item = newer;
-                }
-            }
             each(item);
         };
         ended(stopped);
@@ -117,24 +115,38 @@ impl Client {
     /// Starts `frame:<topic>` events for `"state"` or `"live"`. A topic
     /// watched twice keeps one stream.
     pub fn watch(&self, topic: &str) -> Result<(), String> {
-        if self.inner.lock().unwrap().watches.contains_key(topic) {
+        let mut inner = self.inner.lock().unwrap();
+        if inner.watches.contains_key(topic) {
             return Ok(());
         }
         let outlet = self.outlet.clone();
         let mut rev = 0u64;
         let stop = match topic {
-            "state" => pump(
-                self.hub.server.state(),
-                true,
-                move |frame| {
-                    rev += 1;
-                    outlet.send("frame:state", json!({ "rev": rev, "data": frame }));
-                },
-                |_| {},
-            ),
+            "state" => {
+                let (stop, stopped) = flume::bounded(0);
+                let (received, ack) = flume::bounded(1);
+                let receipt = Arc::new(WorkbenchReceipt {
+                    pending: AtomicU64::new(0),
+                    received,
+                });
+                inner.workbench = Some(receipt.clone());
+                let revisions = self.revisions.clone();
+                let server = self.hub.server.clone();
+                std::thread::spawn(move || {
+                    server.watch_workbench(&stopped, &mut |frame| {
+                        if stopped.is_disconnected() {
+                            return;
+                        }
+                        let rev = revisions.fetch_add(1, Ordering::Relaxed) + 1;
+                        receipt.pending.store(rev, Ordering::Release);
+                        outlet.send("frame:state", json!({"rev": rev, "data": frame}));
+                        flume::Selector::new().recv(&stopped, |_| ()).recv(&ack, |_| ()).wait();
+                    });
+                });
+                stop
+            }
             "live" => pump(
                 self.hub.server.live(),
-                false,
                 move |event| {
                     rev += 1;
                     let data = serde_json::to_value(event).unwrap_or(Value::Null);
@@ -144,7 +156,7 @@ impl Client {
             ),
             other => return Err(format!("no topic {other}")),
         };
-        self.inner.lock().unwrap().watches.insert(
+        inner.watches.insert(
             topic.to_string(),
             Pump {
                 stop: Some(stop),
@@ -154,9 +166,22 @@ impl Client {
         Ok(())
     }
 
+    pub fn applied_workbench(&self, rev: u64) {
+        let inner = self.inner.lock().unwrap();
+        if rev != 0
+            && let Some(receipt) = &inner.workbench
+            && receipt.pending.compare_exchange(rev, 0, Ordering::AcqRel, Ordering::Acquire).is_ok()
+        {
+            let _ = receipt.received.try_send(());
+        }
+    }
+
     pub fn unwatch(&self, topic: &str) {
-        let pump = self.inner.lock().unwrap().watches.remove(topic);
-        drop(pump);
+        let mut inner = self.inner.lock().unwrap();
+        inner.watches.remove(topic);
+        if topic == "state" {
+            inner.workbench = None;
+        }
     }
 
     /// Runs a call for this view: the envelope comes back as `reply:<id>`.
@@ -187,7 +212,6 @@ impl Client {
                 let key = id.to_string();
                 let stop = pump(
                     rx,
-                    false,
                     move |event| outlet.send(&each_name, json!({ "event": event })),
                     move |_| {
                         // Only a subscription still registered ended on the
@@ -299,6 +323,7 @@ mod tests {
         client.watch("state").unwrap();
         client.watch("state").unwrap();
         wait_for("first frame", || rec.named("frame:state").len() == 1);
+        client.applied_workbench(1);
         fake.set_state(json!({ "issues": 1 }));
         wait_for("second frame", || rec.named("frame:state").len() >= 2);
         let frames = rec.named("frame:state");

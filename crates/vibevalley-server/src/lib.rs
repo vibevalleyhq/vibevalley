@@ -25,6 +25,8 @@ use vibevalley_protocol::{
 pub use vibevalley_server_api::{Server, refusal};
 
 pub mod base;
+mod chord_space;
+mod workbench_frames;
 pub use vibevalley_home as home;
 pub mod modules;
 pub mod offline;
@@ -91,6 +93,10 @@ struct Streams {
 /// (`Arc<Hub>`).
 pub struct Hub {
     core: Mutex<Core>,
+    space: chord_space::Space,
+    workbench: workbench_frames::WorkbenchFrames,
+    execution: std::sync::OnceLock<std::sync::Weak<modules::orchestrator::Orchestrator>>,
+    chat: std::sync::OnceLock<std::sync::Weak<modules::channel::Chat>>,
     handlers: RwLock<HashMap<&'static str, Handler>>,
     openers: RwLock<HashMap<&'static str, Opener>>,
     watchers: RwLock<Vec<Watcher>>,
@@ -127,8 +133,15 @@ impl Hub {
     /// thread ends when the last `Arc<Hub>` is dropped.
     pub fn new(state: SpaceState) -> Arc<Hub> {
         let (kicks, kicked) = flume::unbounded();
+        let core = Core::new(state);
+        let first = core.frame(vec![]);
+        let space = chord_space::Space::new(&first);
         let hub = Arc::new(Hub {
-            core: Mutex::new(Core::new(state)),
+            core: Mutex::new(core),
+            space,
+            workbench: workbench_frames::WorkbenchFrames::new(first),
+            execution: std::sync::OnceLock::new(),
+            chat: std::sync::OnceLock::new(),
             handlers: RwLock::default(),
             openers: RwLock::default(),
             watchers: RwLock::default(),
@@ -164,6 +177,13 @@ impl Hub {
         lock(&self.core).seq()
     }
 
+    fn refresh_frame_words(&self) {
+        if self.workbench.snapshot().locale != vibevalley_i18n::locale() {
+            let core = lock(&self.core);
+            self.workbench.replace(core.frame(vec![]));
+        }
+    }
+
     /// The frame now, with no effects.
     pub fn frame(&self) -> StateFrame {
         lock(&self.core).frame(vec![])
@@ -173,7 +193,16 @@ impl Hub {
     /// transition, the frame thread the effects. Owners store first, then
     /// apply.
     pub fn apply(&self, facts: Vec<Fact>) -> Applied {
-        let applied = lock(&self.core).apply(facts);
+        let applied = {
+            let mut core = lock(&self.core);
+            let changes = core.apply(facts);
+            if !changes.transitions.is_empty() {
+                let frame = core.frame(vec![]);
+                self.space.update(&frame, &changes.transitions);
+                self.workbench.replace(frame);
+            }
+            changes
+        };
         if applied.transitions.is_empty() {
             return applied;
         }
@@ -326,16 +355,35 @@ pub fn decode<T: serde::de::DeserializeOwned>(payload: Value) -> Result<T, ApiEr
 /// `STATE_EVERY_MS` is one frame, with all their effects.
 fn frames(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Vec<GameEffect>>) {
     while let Ok(mut effects) = kicked.recv() {
-        std::thread::sleep(Duration::from_millis(STATE_EVERY_MS));
+        let deadline = std::time::Instant::now() + Duration::from_millis(STATE_EVERY_MS);
+        let Some(leading) = hub.upgrade() else { return };
+        leading.refresh_frame_words();
+        leading.workbench.publish(true);
+        drop(leading);
+        std::thread::sleep(deadline.saturating_duration_since(std::time::Instant::now()));
         effects.extend(kicked.drain().flatten());
         let Some(hub) = hub.upgrade() else { return };
-        let frame = Arc::new(lock(&hub.core).frame(effects));
+        hub.refresh_frame_words();
+        hub.workbench.publish(false);
+        let snapshot = hub.workbench.snapshot();
         let mut streams = lock(&hub.streams);
-        streams.frames.retain(|tx| tx.send(frame.clone()).is_ok());
-        if !streams.states.is_empty()
-            && let Ok(value) = serde_json::to_value(&*frame)
-        {
-            streams.states.retain(|tx| tx.send(value.clone()).is_ok());
+        if !streams.frames.is_empty() {
+            let frame = if effects.is_empty() {
+                snapshot.frame.clone()
+            } else {
+                Arc::new(StateFrame {
+                    effects: effects.clone(),
+                    ..snapshot.frame.as_ref().clone()
+                })
+            };
+            streams.frames.retain(|tx| tx.send(frame.clone()).is_ok());
+        }
+        if !streams.states.is_empty() {
+            let mut frame = snapshot.wire().clone();
+            if !effects.is_empty() {
+                frame["effects"] = serde_json::to_value(effects).expect("game effects serialize");
+            }
+            streams.states.retain(|tx| tx.send(frame.clone()).is_ok());
         }
     }
 }
@@ -379,6 +427,30 @@ impl modules::ledger::Facts for std::sync::Weak<Hub> {
 }
 
 impl Server for Hub {
+    fn channel_messages_after(&self, channel: &str, after: i64, limit: i64) -> Result<Vec<vibevalley_protocol::ChatMessage>, ApiError> {
+        self.chat
+            .get()
+            .and_then(std::sync::Weak::upgrade)
+            .ok_or_else(|| ApiError::new(BizCode::ServiceUnavailable, "channel history unavailable"))?
+            .messages_after(channel, after, limit)
+    }
+
+    fn resolve_approval(&self, input: Value) -> Envelope {
+        self.execution.get().and_then(std::sync::Weak::upgrade).map_or_else(
+            || vibevalley_server_api::refusal(BizCode::Refused, "durable execution unavailable"),
+            |o| o.execution.resolve_approval(input),
+        )
+    }
+    fn raise_budget(&self, input: Value) -> Envelope {
+        self.execution.get().and_then(std::sync::Weak::upgrade).map_or_else(
+            || vibevalley_server_api::refusal(BizCode::Refused, "durable execution unavailable"),
+            |o| o.execution.raise_budget(input),
+        )
+    }
+    fn space_document(&self) -> Option<vibevalley_server_api::Document> {
+        Some(self.space.document())
+    }
+
     fn speech_streams(&self) -> Option<vibevalley_server_api::media::SharedSpeechStreams> {
         self.speech.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
@@ -393,13 +465,17 @@ impl Server for Hub {
     }
 
     fn state(&self) -> flume::Receiver<Value> {
+        self.refresh_frame_words();
         let (tx, rx) = flume::unbounded();
         let mut streams = lock(&self.streams);
-        if let Ok(v) = serde_json::to_value(self.frame()) {
-            let _ = tx.send(v);
-        }
+        let _ = tx.send(self.workbench.snapshot().wire().clone());
         streams.states.push(tx);
         rx
+    }
+
+    fn watch_workbench(&self, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(&Value)) {
+        self.refresh_frame_words();
+        self.workbench.watch(stop, receive);
     }
 
     fn live(&self) -> flume::Receiver<LiveEvent> {

@@ -12,6 +12,8 @@
 | 农机注册表、后台探测、模型与能力缓存、派活前配置解析（`Agent.resolve`） | 档案记忆的存储与召回（[记性](docs/subsystems/memory.md)） |
 | 档案可派性预检（`agentProblems`：农机缺失、选项不兼容、额度/预算耗尽） | 像素角色贴图渲染（[农场的皮](docs/subsystems/farm.md)） |
 | 每日花费 | 对话怎么拼提示、怎么压缩（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
+农机详情区分缺少可执行文件、首次需要登录和账户用量报告登录失效。找不到文件时可填写命令路径。登录入口打开本机终端，用户自行登录后可重新检测。探测出错时展示失败原因。[农机详情](apps/mac/ui/vv/web/features/runtime/RuntimesPage.tsx)
+
 
 ## 在哪
 

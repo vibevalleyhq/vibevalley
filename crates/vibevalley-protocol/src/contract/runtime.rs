@@ -146,6 +146,7 @@ pub struct InstallationChecking {}
 #[serde(rename_all = "camelCase")]
 pub struct InstallationUnsupported {
     pub reason: String,
+    pub sign_in_command: Option<String>,
 }
 
 /// Told apart by `status`.

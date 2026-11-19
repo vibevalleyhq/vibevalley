@@ -4,21 +4,17 @@
 //! 120 s for connecting and for each call, a server that cannot be reached
 //! reported (not fatal), results flattened to text.
 
-use std::collections::{BTreeMap, HashMap};
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+mod client;
+
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use serde::Deserialize;
-use serde_json::{Map, Value, json};
+use serde_json::Value;
 
+use self::client::Client;
 use crate::model::ToolSpec;
 use crate::tool::{Tool, ToolOutput};
-
-const CALL_TIMEOUT: Duration = Duration::from_secs(120);
-const PROTOCOL_VERSION: &str = "2025-06-18";
 
 /// `mcp.json` as VibeValley and Claude Code write it.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -84,338 +80,67 @@ pub fn content_text(content: &[Value]) -> String {
 
 /// Connected servers. Dropping it and its tools closes them.
 pub struct McpHub {
-    servers: Vec<(String, Arc<Client>)>,
-    /// Servers that could not be reached, with why.
+    tools: Vec<McpTool>,
+    /// Servers that could not offer their tools, with why.
     pub failures: Vec<(String, String)>,
 }
 
 impl McpHub {
-    /// Connects every server of `config`, each within 120 s, in parallel.
+    /// Each configured server connects and enumerates independently.
     pub fn connect(config: &McpConfig) -> McpHub {
-        let results: Vec<(String, Result<Client, String>)> = std::thread::scope(|scope| {
+        std::thread::scope(|scope| {
             let handles: Vec<_> = config
                 .servers
                 .iter()
                 .map(|(name, cfg)| {
-                    let name = name.clone();
-                    scope.spawn(move || (name, Client::connect(cfg)))
+                    (
+                        name,
+                        scope.spawn(move || {
+                            let client = Arc::new(Client::connect(cfg)?);
+                            let mut tools = Vec::new();
+                            for tool in client.tools()? {
+                                let remote = tool.name.into_owned();
+                                if remote.is_empty() {
+                                    continue;
+                                }
+                                let description = tool.description.as_deref().unwrap_or_default();
+                                tools.push(McpTool {
+                                    spec: ToolSpec {
+                                        name: tool_name(name, &remote),
+                                        description: format!("（{name}）{description}"),
+                                        parameters: Value::Object((*tool.input_schema).clone()),
+                                    },
+                                    server: name.clone(),
+                                    remote,
+                                    read_only: tool.annotations.and_then(|a| a.read_only_hint).unwrap_or(false),
+                                    client: client.clone(),
+                                });
+                            }
+                            Ok::<_, String>(tools)
+                        }),
+                    )
                 })
                 .collect();
-            handles.into_iter().filter_map(|h| h.join().ok()).collect()
-        });
-        let mut servers = Vec::new();
-        let mut failures = Vec::new();
-        for (name, result) in results {
-            match result {
-                Ok(client) => servers.push((name, Arc::new(client))),
-                Err(why) => failures.push((name.clone(), format!("连不上 MCP 服务 {name}：{why}"))),
-            }
-        }
-        McpHub { servers, failures }
-    }
-
-    /// Every tool of every connected server.
-    pub fn tools(&self) -> Vec<Box<dyn Tool>> {
-        let mut out: Vec<Box<dyn Tool>> = Vec::new();
-        for (server, client) in &self.servers {
-            let Ok(tools) = client.list_all_tools() else { continue };
-            for value in tools {
-                let remote = value["name"].as_str().unwrap_or_default().to_string();
-                if remote.is_empty() {
-                    continue;
-                }
-                let description = value["description"].as_str().unwrap_or_default();
-                out.push(Box::new(McpTool {
-                    spec: ToolSpec {
-                        name: tool_name(server, &remote),
-                        description: format!("（{server}）{description}"),
-                        parameters: value.get("inputSchema").cloned().unwrap_or_else(|| json!({"type": "object"})),
-                    },
-                    server: server.clone(),
-                    remote,
-                    read_only: value.pointer("/annotations/readOnlyHint").and_then(Value::as_bool).unwrap_or(false),
-                    client: client.clone(),
-                }));
-            }
-        }
-        out
-    }
-}
-
-enum Transport {
-    Stdio(StdioTransport),
-    Http(HttpTransport),
-}
-
-struct Client {
-    next_id: AtomicU64,
-    transport: Transport,
-}
-
-impl Client {
-    fn connect(cfg: &McpServerConfig) -> Result<Client, String> {
-        let transport = match cfg {
-            McpServerConfig::Stdio { command, args, env, cwd } => Transport::Stdio(StdioTransport::spawn(command, args, env, cwd.as_deref())?),
-            McpServerConfig::Http { url, headers } => Transport::Http(HttpTransport::new(url, headers)),
-        };
-        let client = Client {
-            next_id: AtomicU64::new(1),
-            transport,
-        };
-        client.request(
-            "initialize",
-            json!({
-                "protocolVersion": PROTOCOL_VERSION,
-                "capabilities": {},
-                "clientInfo": { "name": "vibevalley", "version": env!("CARGO_PKG_VERSION") },
-            }),
-        )?;
-        client.notify("notifications/initialized", json!({}));
-        Ok(client)
-    }
-
-    fn request(&self, method: &str, params: Value) -> Result<Value, String> {
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        let req = json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "method": method,
-            "params": params,
-        });
-        let msg = match &self.transport {
-            Transport::Stdio(stdio) => stdio.request(id, &req)?,
-            Transport::Http(http) => http.request(id, &req)?,
-        };
-        if let Some(err) = msg.get("error") {
-            let reason = err.get("message").and_then(Value::as_str).cloned_or_json(err);
-            return Err(reason);
-        }
-        Ok(msg.get("result").cloned().unwrap_or(Value::Null))
-    }
-
-    fn notify(&self, method: &str, params: Value) {
-        let note = json!({
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params,
-        });
-        match &self.transport {
-            Transport::Stdio(stdio) => stdio.notify(&note),
-            Transport::Http(http) => http.notify(&note),
-        }
-    }
-
-    fn list_all_tools(&self) -> Result<Vec<Value>, String> {
-        let mut out = Vec::new();
-        let mut cursor: Option<String> = None;
-        for _ in 0..64 {
-            let params = match &cursor {
-                Some(c) => json!({ "cursor": c }),
-                None => json!({}),
+            let mut hub = McpHub {
+                tools: vec![],
+                failures: vec![],
             };
-            let result = self.request("tools/list", params)?;
-            if let Some(items) = result.get("tools").and_then(Value::as_array) {
-                out.extend(items.iter().cloned());
-            }
-            match result.get("nextCursor").and_then(Value::as_str).filter(|s| !s.is_empty()) {
-                Some(next) => cursor = Some(next.to_string()),
-                None => break,
-            }
-        }
-        Ok(out)
-    }
-}
-
-trait ErrorText {
-    fn cloned_or_json(self, fallback: &Value) -> String;
-}
-
-impl ErrorText for Option<&str> {
-    fn cloned_or_json(self, fallback: &Value) -> String {
-        self.map(str::to_owned).unwrap_or_else(|| fallback.to_string())
-    }
-}
-
-struct StdioTransport {
-    stdin: Mutex<ChildStdin>,
-    pending: Arc<Mutex<HashMap<u64, flume::Sender<Value>>>>,
-    child: Mutex<Child>,
-}
-
-impl StdioTransport {
-    fn spawn(command: &str, args: &[String], env: &BTreeMap<String, String>, cwd: Option<&str>) -> Result<Self, String> {
-        let mut cmd = Command::new(command);
-        cmd.args(args).envs(env).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
-        if let Some(dir) = cwd {
-            cmd.current_dir(dir);
-        }
-        let mut child = cmd.spawn().map_err(|e| e.to_string())?;
-        let stdin = child.stdin.take().ok_or_else(|| "missing child stdin".to_string())?;
-        let stdout = child.stdout.take().ok_or_else(|| "missing child stdout".to_string())?;
-        let pending: Arc<Mutex<HashMap<u64, flume::Sender<Value>>>> = Arc::new(Mutex::new(HashMap::new()));
-        let waiters = pending.clone();
-        std::thread::Builder::new()
-            .name("vibevalley-mcp-stdio".into())
-            .spawn(move || {
-                let reader = BufReader::new(stdout);
-                for line in reader.lines() {
-                    let Ok(line) = line else { break };
-                    let trimmed = line.trim();
-                    if trimmed.is_empty() {
-                        continue;
-                    }
-                    let Ok(msg) = serde_json::from_str::<Value>(trimmed) else { continue };
-                    let Some(id) = msg.get("id").and_then(Value::as_u64) else { continue };
-                    let tx = waiters.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
-                    if let Some(tx) = tx {
-                        let _ = tx.send(msg);
-                    }
+            for (name, handle) in handles {
+                match handle.join().unwrap_or_else(|_| Err("MCP connector thread stopped unexpectedly".into())) {
+                    Ok(tools) => hub.tools.extend(tools),
+                    Err(why) => hub.failures.push((name.clone(), format!("连不上 MCP 服务 {name}：{why}"))),
                 }
-                // Drop remaining senders so in-flight callers wake immediately on EOF.
-                waiters.lock().unwrap_or_else(|e| e.into_inner()).clear();
-            })
-            .map_err(|e| e.to_string())?;
-        Ok(StdioTransport {
-            stdin: Mutex::new(stdin),
-            pending,
-            child: Mutex::new(child),
+            }
+            hub
         })
     }
 
-    fn write_line(&self, msg: &Value) -> Result<(), String> {
-        let mut line = serde_json::to_vec(msg).map_err(|e| e.to_string())?;
-        line.push(b'\n');
-        let mut stdin = self.stdin.lock().unwrap_or_else(|e| e.into_inner());
-        stdin.write_all(&line).and_then(|()| stdin.flush()).map_err(|e| e.to_string())
-    }
-
-    fn request(&self, id: u64, req: &Value) -> Result<Value, String> {
-        let (tx, rx) = flume::bounded(1);
-        self.pending.lock().unwrap_or_else(|e| e.into_inner()).insert(id, tx);
-        if let Err(e) = self.write_line(req) {
-            self.pending.lock().unwrap_or_else(|p| p.into_inner()).remove(&id);
-            return Err(e);
-        }
-        match rx.recv_timeout(CALL_TIMEOUT) {
-            Ok(msg) => Ok(msg),
-            Err(flume::RecvTimeoutError::Timeout) => {
-                self.pending.lock().unwrap_or_else(|p| p.into_inner()).remove(&id);
-                Err("timed out".into())
-            }
-            Err(flume::RecvTimeoutError::Disconnected) => Err("connection closed".into()),
-        }
-    }
-
-    fn notify(&self, note: &Value) {
-        let _ = self.write_line(note);
+    pub fn tools(&self) -> Vec<Box<dyn Tool>> {
+        self.tools.iter().cloned().map(|tool| Box::new(tool) as Box<dyn Tool>).collect()
     }
 }
 
-impl Drop for StdioTransport {
-    fn drop(&mut self) {
-        let mut child = self.child.lock().unwrap_or_else(|e| e.into_inner());
-        let _ = child.kill();
-        let _ = child.wait();
-    }
-}
-
-struct HttpTransport {
-    url: String,
-    headers: BTreeMap<String, String>,
-    session_id: Mutex<Option<String>>,
-    agent: ureq::Agent,
-}
-
-impl HttpTransport {
-    fn new(url: &str, headers: &BTreeMap<String, String>) -> Self {
-        let agent: ureq::Agent = ureq::Agent::config_builder()
-            .timeout_global(Some(CALL_TIMEOUT))
-            .http_status_as_error(false)
-            .build()
-            .into();
-        HttpTransport {
-            url: url.to_owned(),
-            headers: headers.clone(),
-            session_id: Mutex::new(None),
-            agent,
-        }
-    }
-
-    fn send(&self, body: &Value) -> Result<(u16, String, BufReader<impl std::io::Read>), String> {
-        let mut req = self
-            .agent
-            .post(&self.url)
-            .header("content-type", "application/json")
-            .header("accept", "application/json, text/event-stream");
-        for (k, v) in &self.headers {
-            req = req.header(k, v);
-        }
-        if let Some(sid) = self.session_id.lock().unwrap_or_else(|e| e.into_inner()).as_deref() {
-            req = req.header("mcp-session-id", sid);
-        }
-        let payload = serde_json::to_vec(body).map_err(|e| e.to_string())?;
-        let response = req.send(&payload[..]).map_err(|e| match e {
-            ureq::Error::Timeout(_) => "timed out".to_string(),
-            other => other.to_string(),
-        })?;
-        if let Some(sid) = response.headers().get("mcp-session-id").and_then(|v| v.to_str().ok()) {
-            *self.session_id.lock().unwrap_or_else(|e| e.into_inner()) = Some(sid.to_owned());
-        }
-        let status = response.status().as_u16();
-        let content_type = response
-            .headers()
-            .get("content-type")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or_default()
-            .to_ascii_lowercase();
-        let reader = BufReader::new(response.into_body().into_reader());
-        Ok((status, content_type, reader))
-    }
-
-    fn request(&self, id: u64, req: &Value) -> Result<Value, String> {
-        let (status, content_type, mut reader) = self.send(req)?;
-        if !(200..300).contains(&status) {
-            let mut text = String::new();
-            let _ = std::io::Read::read_to_string(&mut reader, &mut text);
-            return Err(format!("HTTP {status}: {}", text.trim()));
-        }
-        if content_type.contains("text/event-stream") {
-            let mut data_lines = Vec::new();
-            let mut line = String::new();
-            loop {
-                line.clear();
-                let n = reader.read_line(&mut line).map_err(|e| e.to_string())?;
-                let trimmed = line.trim_end_matches(['\r', '\n']);
-                if n == 0 || trimmed.is_empty() {
-                    if !data_lines.is_empty() {
-                        let joined = data_lines.join("\n");
-                        data_lines.clear();
-                        if let Ok(msg) = serde_json::from_str::<Value>(&joined)
-                            && msg.get("id").and_then(Value::as_u64) == Some(id)
-                        {
-                            return Ok(msg);
-                        }
-                    }
-                    if n == 0 {
-                        break;
-                    }
-                    continue;
-                }
-                if let Some(rest) = trimmed.strip_prefix("data:") {
-                    data_lines.push(rest.trim_start().to_owned());
-                }
-            }
-            Err("stream ended without response".into())
-        } else {
-            serde_json::from_reader(reader).map_err(|e| e.to_string())
-        }
-    }
-
-    fn notify(&self, note: &Value) {
-        let _ = self.send(note);
-    }
-}
-
+#[derive(Clone)]
 struct McpTool {
     spec: ToolSpec,
     server: String,
@@ -425,6 +150,10 @@ struct McpTool {
 }
 
 impl Tool for McpTool {
+    fn is_mcp(&self) -> bool {
+        true
+    }
+
     fn spec(&self) -> ToolSpec {
         self.spec.clone()
     }
@@ -434,19 +163,33 @@ impl Tool for McpTool {
     }
 
     fn execute(&self, args: &Value) -> ToolOutput {
-        let arguments = match args {
-            Value::Object(map) => Value::Object(map.clone()),
-            _ => Value::Object(Map::new()),
-        };
-        match self.client.request("tools/call", json!({ "name": self.remote, "arguments": arguments })) {
+        self.call(args, None)
+    }
+
+    fn execute_cancellable(&self, args: &Value, cancelled: &flume::Receiver<()>) -> ToolOutput {
+        self.call(args, Some(cancelled))
+    }
+}
+
+impl McpTool {
+    fn call(&self, args: &Value, cancelled: Option<&flume::Receiver<()>>) -> ToolOutput {
+        let arguments = args.as_object().cloned().unwrap_or_default();
+        match self.client.call(self.remote.clone(), arguments, cancelled) {
             Err(e) => ToolOutput::error(format!("{} 的 {} 出错：{e}", self.server, self.remote)),
-            Ok(value) => {
-                let blocks = value["content"].as_array().cloned().unwrap_or_default();
-                let mut text = content_text(&blocks);
+            Ok(result) => {
+                let content: Vec<_> = match result.content.iter().map(serde_json::to_value).collect::<Result<_, _>>() {
+                    Ok(blocks) => blocks,
+                    Err(e) => return ToolOutput::error(e.to_string()),
+                };
+                let mut text = content_text(&content);
                 if text.is_empty() {
-                    text = value.get("structuredContent").map(Value::to_string).unwrap_or_else(|| "（没有内容）".into());
+                    text = result
+                        .structured_content
+                        .as_ref()
+                        .map(Value::to_string)
+                        .unwrap_or_else(|| "（没有内容）".into());
                 }
-                if value["isError"].as_bool().unwrap_or(false) {
+                if result.is_error == Some(true) {
                     ToolOutput::error(text)
                 } else {
                     ToolOutput::ok(text)

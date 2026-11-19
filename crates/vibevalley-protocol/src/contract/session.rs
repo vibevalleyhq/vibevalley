@@ -233,6 +233,9 @@ pub struct IssueAnswer {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct LastRun {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<bool>", optional))]
+    pub needs_reconciliation: bool,
     pub outcome: Outcome,
     pub summary: String,
     pub at: i64,
@@ -288,6 +291,77 @@ pub struct ToolConnection {
     pub reason: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum SubagentStatus {
+    PendingInit,
+    Running,
+    Interrupted,
+    Completed,
+    Errored,
+    Shutdown,
+    NotFound,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum SubagentStepStatus {
+    Pending,
+    InProgress,
+    Completed,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub struct SubagentStep {
+    pub step: String,
+    pub status: SubagentStepStatus,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SubagentThread {
+    pub thread_id: String,
+    pub agent_name: Option<String>,
+    pub parent_thread_id: Option<String>,
+    pub turn_id: Option<String>,
+    pub steps: Option<Vec<SubagentStep>>,
+    pub task: Option<String>,
+    pub status: Option<SubagentStatus>,
+    pub last_activity: Option<String>,
+    pub last_action: Option<ToolAction>,
+    pub updated_at: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SubagentWait {
+    pub thread_id: String,
+    pub call_id: String,
+    pub targets: Vec<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSubagents {
+    pub run: String,
+    pub root_thread_id: String,
+    pub disconnected_at: Option<i64>,
+    pub threads: Vec<SubagentThread>,
+    pub waits: Vec<SubagentWait>,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -312,6 +386,7 @@ pub struct Session {
     #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
     pub issue: Option<IssueId>,
     pub refining: bool,
+    pub subagents: Option<SessionSubagents>,
     pub tool_connections: Option<Vec<ToolConnection>>,
     /// The machine it works on; none for an agent hosted in the server's process.
     pub machine: Option<String>,
@@ -343,6 +418,7 @@ pub struct SessionView {
     #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
     pub issue: Option<IssueId>,
     pub refining: bool,
+    pub subagents: Option<SessionSubagents>,
     pub tool_connections: Option<Vec<ToolConnection>>,
     pub machine: Option<String>,
     pub phase: PhaseView,
@@ -482,6 +558,7 @@ pub struct SessionEvent {
     pub run: Option<String>,
     pub call: Option<i64>,
     pub under: Option<i64>,
+    pub thread_id: Option<String>,
     pub text: String,
     pub action: Option<ToolAction>,
     pub action_text: Option<String>,
@@ -549,11 +626,16 @@ pub struct RunTrigger {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct Run {
+    /// The external worker disconnected before acknowledging its changes.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<bool>", optional))]
+    pub needs_reconciliation: bool,
     pub id: String,
     #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
     pub session: SessionId,
     #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
     pub issue: Option<IssueId>,
+    pub subagents: Option<SessionSubagents>,
     pub triggered_by: RunTrigger,
     pub heard: Vec<String>,
     pub started_at: i64,
@@ -576,6 +658,18 @@ pub struct FactSessionPhaseChanged {
     pub channel: Option<String>,
     pub spent: Option<Spent>,
     pub brief: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct FactSessionSubagentsChanged {
+    pub at: i64,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+    pub id: SessionId,
+    pub subagents: Option<SessionSubagents>,
 }
 
 #[skip_serializing_none]
@@ -715,6 +809,13 @@ crate::typescript::module! {
     LastRun,
     ToolConnectionStatus,
     ToolConnection,
+    SubagentStatus,
+    SubagentStepStatus,
+    SubagentStep,
+    SubagentThread,
+    SubagentWait,
+    SessionSubagents,
+    FactSessionSubagentsChanged,
     Session,
     SessionView,
     SessionEventType,

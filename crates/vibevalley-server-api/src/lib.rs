@@ -4,6 +4,8 @@
 
 pub use vibevalley_protocol::{ApiError, BizCode, Envelope, LiveEvent};
 
+pub use vibevalley_chord::watch::Document;
+
 pub mod media;
 
 /// The helpers' MCP door (`POST /mcp`): one JSON-RPC message from a helper
@@ -23,6 +25,22 @@ pub trait Server: Send + Sync {
     /// receiver that gets every frame from then on, starting with the
     /// current one.
     fn state(&self) -> flume::Receiver<serde_json::Value>;
+    /// Latest workbench state only. Slow views may skip revisions. Farm animation consumers use `state` for ordered effects.
+    /// Blocks on the caller's worker until `stop` disconnects.
+    fn watch_workbench(&self, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(&serde_json::Value)) {
+        let states = self.state();
+        while !stop.is_disconnected() {
+            let next = flume::Selector::new().recv(stop, |_| None).recv(&states, |r| r.ok()).wait();
+            let Some(mut frame) = next else { break };
+            for recent in states.drain() {
+                frame = recent;
+            }
+            if let Some(effects) = frame.get_mut("effects") {
+                *effects = serde_json::Value::Array(vec![]);
+            }
+            receive(&frame);
+        }
+    }
     /// `LiveEvent`s from now on; a new receiver per call.
     fn live(&self) -> flume::Receiver<LiveEvent>;
     /// One of `rpc.ts`'s subscriptions. `Err` is a refusal before the first
@@ -30,6 +48,19 @@ pub trait Server: Send + Sync {
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
     fn subscribe(&self, name: &str, payload: serde_json::Value) -> Result<(u64, flume::Receiver<serde_json::Value>), Envelope>;
     fn unsubscribe(&self, id: u64);
+    fn channel_messages_after(&self, _channel: &str, _after: i64, _limit: i64) -> Result<Vec<vibevalley_protocol::ChatMessage>, ApiError> {
+        Err(ApiError::new(BizCode::ServiceUnavailable, "channel history unavailable"))
+    }
+    fn resolve_approval(&self, _input: serde_json::Value) -> Envelope {
+        refusal(BizCode::Refused, "durable approvals unavailable")
+    }
+    fn raise_budget(&self, _input: serde_json::Value) -> Envelope {
+        refusal(BizCode::Refused, "durable budgets unavailable")
+    }
+    fn space_document(&self) -> Option<Document> {
+        None
+    }
+
     /// Optional local binary media transport.
     fn media_inputs(&self) -> Option<media::SharedMediaInputs> {
         None

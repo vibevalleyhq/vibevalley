@@ -204,3 +204,319 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
     });
     started.board.close();
 }
+
+fn approval_fixture(home: &std::path::Path) -> (Arc<Scripted>, vibevalley_server::ServerConfig) {
+    use vibevalley_agent::generation::governance::Policy;
+    let model = Arc::new(Scripted {
+        answers: Mutex::new([call("approval-1", "issue_create", json!({"title":"Approved work"})), say("done")].into()),
+        seen: Default::default(),
+    });
+    let mut cfg = vibevalley_server::ServerConfig {
+        model_client: Some(model.clone()),
+        probe_runtimes: false,
+        tick_crons: false,
+        link_previews: false,
+        ..vibevalley_server::ServerConfig::under(home)
+    };
+    cfg.tool_permissions.overrides.insert("issue_create".into(), Policy::AlwaysAsk);
+    (model, cfg)
+}
+
+fn ask_to_create_issue(started: &vibevalley_server::Started) -> String {
+    let channel = started.chat.default_channel();
+    let sent = started.hub.call_as(
+        Caller::User,
+        "channel.message.send",
+        json!({"id":channel,"text":"create a task","sendKey":"stable-input"}),
+    );
+    assert_eq!(sent.biz_code, 0);
+    channel
+}
+
+#[test]
+fn durable_permission_is_projected_and_one_competing_decision_wins() {
+    use vibevalley_server_api::Server;
+    let home = tempfile::tempdir().unwrap();
+    let (model, cfg) = approval_fixture(home.path());
+    let started = vibevalley_server::start(cfg.clone()).unwrap();
+    let channel = ask_to_create_issue(&started);
+    let space = started.hub.space_document().unwrap();
+    let card = until("pending approval", || {
+        let (rev, snap, _) = space.state();
+        assert_eq!(snap.get(&["rev".into()]).unwrap().as_i64(), Some(rev));
+        let view = serde_json::json!(snap);
+        let approval = view["approvals"].as_array()?.first()?;
+        let item = view["inbox"].as_array()?.iter().find(|a| a["kind"] == "approval")?;
+        assert_eq!(item["sessionId"], approval["sessionId"]);
+        Some(approval.clone())
+    });
+    assert_eq!(card["toolName"], "issue_create");
+    let task = card["taskId"].as_str().unwrap();
+    started.close();
+    let reopened = vibevalley_server::start(cfg).unwrap();
+    let space = reopened.hub.space_document().unwrap();
+    assert_eq!(serde_json::json!(space.state().1)["approvals"][0]["taskId"], task);
+    assert_ne!(
+        reopened
+            .hub
+            .resolve_approval(json!({"conversationId":"wrong","taskId":task,"approved":true}))
+            .biz_code,
+        0
+    );
+    let approved = json!({"taskId":task,"toolCallId":"approval-1","approved":true});
+    let answers = std::thread::scope(|s| {
+        let a = s.spawn(|| reopened.hub.resolve_approval(approved.clone()));
+        let b = s.spawn(|| reopened.hub.resolve_approval(approved.clone()));
+        (a.join().unwrap(), b.join().unwrap())
+    });
+    assert_eq!((answers.0.biz_code, answers.1.biz_code), (0, 0));
+    assert_ne!(
+        reopened
+            .hub
+            .resolve_approval(json!({"taskId":task,"toolCallId":"approval-1","approved":false}))
+            .biz_code,
+        0
+    );
+    until("assistant reported after recovery", || {
+        let messages = reopened.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
+        messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())
+    });
+    let list = reopened.hub.call_as(Caller::User, "issue.list", json!({})).data.unwrap();
+    assert_eq!(list.as_array().unwrap().iter().filter(|i| i["title"] == "Approved work").count(), 1);
+    assert_eq!(serde_json::json!(space.state().1)["approvals"], json!([]));
+    assert_eq!(model.seen.lock().unwrap().len(), 2);
+    let raised = reopened.hub.raise_budget(json!({"taskId":task,"newMaxCostMicros":10_000}));
+    assert_eq!(raised.biz_code, 0);
+    assert_eq!(raised.data.unwrap()["maxCostMicros"], 10_000);
+    reopened.close();
+}
+
+#[test]
+fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use vibevalley_protocol::IssueStageKind;
+    const CHILD: &str = "VV_TEST_CRASHED_BUILTIN_HOME";
+    struct CrashModel {
+        crash: bool,
+        calls: AtomicUsize,
+    }
+    impl ModelClient for CrashModel {
+        fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> vibevalley_agent::Result<Completion> {
+            let n = self.calls.fetch_add(1, Ordering::AcqRel);
+            if self.crash && n == 0 {
+                return Ok(call("append-once", "bash", json!({"command":"printf x >> durable-count.txt"})));
+            }
+            assert!(
+                request
+                    .messages
+                    .iter()
+                    .any(|m| m.role == Role::Tool && m.tool_call_id.as_deref() == Some("append-once")),
+                "expected committed tool result"
+            );
+            if self.crash {
+                std::process::exit(87);
+            }
+            let text = "recovered same worker";
+            on(Delta::Text(text.into()));
+            Ok(say(text))
+        }
+    }
+    fn launch(path: &std::path::Path, model: Arc<CrashModel>) -> (vibevalley_server::Started, vibevalley_http::Listener) {
+        let server = vibevalley_server::start(vibevalley_server::ServerConfig {
+            model_client: Some(model),
+            probe_runtimes: false,
+            tick_crons: false,
+            link_previews: false,
+            orchestrator_listens: false,
+            ..vibevalley_server::ServerConfig::under(path)
+        })
+        .unwrap();
+        let listen = vibevalley_http::serve(server.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+        server.board.sessions().set_mcp_url(format!("{}/mcp", listen.url()));
+        (server, listen)
+    }
+    if let Some(home) = std::env::var_os(CHILD) {
+        let (start, _listen) = launch(
+            std::path::Path::new(&home),
+            Arc::new(CrashModel {
+                crash: true,
+                calls: AtomicUsize::new(0),
+            }),
+        );
+        let call = |op: &str, p: Value| {
+            let e = start.hub.call_as(Caller::User, op, p);
+            assert_eq!(e.biz_code, 0, "{e:?}");
+            e.data.unwrap_or(Value::Null)
+        };
+        call("repo.create", json!({"name":"demo"}));
+        let mut helper = start.agents.profiles.install_template("reviewer").unwrap();
+        helper.runtime = "vibevalley".into();
+        helper.model = "deepseek-flash".into();
+        helper.name = "Durable worker".into();
+        start.agents.profiles.save(helper).unwrap();
+        let issue = call("issue.create", json!({"title":"Record one line","repo":"demo","agent":"Durable worker"}));
+        call("issue.status.update", json!({"id":issue["id"],"status":"todo"}));
+        until("process exit", || None::<()>);
+        unreachable!();
+    }
+    let home = tempfile::tempdir().unwrap();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "orchestrator::crash_restores_the_builtin_worker_in_the_same_issue_run",
+            "--nocapture",
+        ])
+        .env(CHILD, home.path())
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(87),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let model = Arc::new(CrashModel {
+        crash: false,
+        calls: AtomicUsize::new(0),
+    });
+    let (start, _listen) = launch(home.path(), model.clone());
+    let issue = until("worker recovered", || {
+        start.board.issue("1").filter(|i| i.stage.state == IssueStageKind::Reviewing)
+    });
+    let session = start.board.session(issue.latest_session_id().unwrap()).unwrap();
+    assert_eq!(
+        std::fs::read(std::path::Path::new(session.worktree.as_deref().unwrap()).join("durable-count.txt")).unwrap(),
+        b"x"
+    );
+    let runs = start.board.runs(&issue.id).unwrap();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].summary, "recovered same worker");
+    assert_eq!(session.runs, 1);
+    assert_eq!(model.calls.load(Ordering::Acquire), 1);
+    start.close();
+}
+
+#[test]
+fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases() {
+    use vibevalley_agent::generation::governance::{Permissions, Policy};
+    use vibevalley_protocol::{MCPServer, MCPServerStdio};
+
+    let dir = tempfile::tempdir().unwrap();
+    let starts = dir.path().join("starts");
+    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../vibevalley-agent/tests/fixtures/echo_mcp.py");
+    let model = Arc::new(Scripted {
+        answers: Mutex::new(VecDeque::from([
+            call("external", "probe__echo", json!({"text":"server roundtrip"})),
+            say("external done"),
+        ])),
+        seen: Default::default(),
+    });
+    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+        registry: Some(Arc::new(vibevalley_oar::Registry::new())),
+        probe_runtimes: false,
+        link_previews: false,
+        watch_pkm: false,
+        tick_crons: false,
+        tool_permissions: Permissions {
+            overrides: [("probe__echo".into(), Policy::AlwaysAllow)].into(),
+            ..Default::default()
+        },
+        model_client: Some(model.clone()),
+        ..vibevalley_server::ServerConfig::under(dir.path())
+    })
+    .unwrap();
+    let mut profile = started.agents.profiles.agent("orchestrator").unwrap();
+    profile.mcp_servers.push(MCPServer::Stdio(MCPServerStdio {
+        name: "probe".into(),
+        command: "python3".into(),
+        args: vec![
+            "-I".into(),
+            "-c".into(),
+            "import sys,runpy; open(sys.argv[1],'a').write('start\\n'); runpy.run_path(sys.argv[2])".into(),
+            starts.to_string_lossy().into_owned(),
+            script.to_string_lossy().into_owned(),
+        ],
+        env: Default::default(),
+    }));
+    profile.disallowed_tools.push("probe__fail".into());
+    started.agents.profiles.save(profile.clone()).unwrap();
+    let send = |key: &str| {
+        let res = started.hub.call_as(
+            Caller::User,
+            "channel.message.send",
+            json!({"id":started.chat.default_channel(),"text":key,"sendKey":key}),
+        );
+        assert_eq!(res.biz_code, 0, "{res:?}");
+    };
+    send("call the profile tool");
+    until("MCP result reached the orchestrator model", || {
+        model
+            .seen
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|r| {
+                r.messages
+                    .iter()
+                    .any(|m| m.tool_call_id.as_deref() == Some("external") && m.content.as_deref() == Some("echo: server roundtrip"))
+            })
+            .then_some(())
+    });
+    {
+        let requests = model.seen.lock().unwrap();
+        assert!(
+            requests
+                .iter()
+                .all(|r| r.tools.iter().any(|t| t.name == "probe__echo") && r.tools.iter().all(|t| t.name != "probe__fail"))
+        );
+    }
+    assert_eq!(std::fs::read_to_string(starts).unwrap(), "start\n");
+    profile.mcp_servers.clear();
+    started.agents.profiles.save(profile).unwrap();
+    send("after removing the server");
+    until("the removed profile tool disappears", || {
+        model
+            .seen
+            .lock()
+            .unwrap()
+            .last()
+            .is_some_and(|r| r.tools.iter().all(|t| !t.name.starts_with("probe__")))
+            .then_some(())
+    });
+    started.close();
+}
+
+#[test]
+#[ignore = "run the Chord interop verify.sh --app with the reference Go client"]
+fn go_client_approves_native_tool_through_chord_and_the_issue_survives_restart() {
+    use vibevalley_server_api::Server;
+    let binary = std::env::var_os("VIBEVALLEY_GO_CHORD_PEER").expect("pinned Go client");
+    let home = tempfile::tempdir().unwrap();
+    let (model, cfg) = approval_fixture(home.path());
+    let started = vibevalley_server::start(cfg.clone()).unwrap();
+    let http = vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let channel = ask_to_create_issue(&started);
+    assert!(
+        std::process::Command::new(binary)
+            .arg("approval")
+            .env("VIBEVALLEY_SERVER", http.url())
+            .status()
+            .unwrap()
+            .success()
+    );
+    until("assistant's approved round settled", || {
+        let messages = started.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
+        messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())
+    });
+    drop(http);
+    started.close();
+    let reopened = vibevalley_server::start(cfg).unwrap();
+    let view = json!(reopened.hub.space_document().unwrap().state().1);
+    assert_eq!(view["approvals"], json!([]));
+    assert_eq!(view["issues"].as_array().unwrap().iter().filter(|i| i["title"] == "Approved work").count(), 1);
+    assert_eq!(model.seen.lock().unwrap().len(), 2);
+    reopened.close();
+}
+
+mod grading;

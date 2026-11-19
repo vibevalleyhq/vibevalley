@@ -1,176 +1,125 @@
 //! Derived status and stage are rebuilt from issues and sessions, never persisted.
-
-use rusqlite::{Connection, OptionalExtension, params};
+use crate::modules::column::{json, optional, read_json, read_word, word};
+use vibevalley_durable::Sqlite;
 use vibevalley_protocol::{Issue, Millis};
 
-use crate::modules::column::{Reading, json, json_or_none, word, word_or_none};
+#[rustfmt::skip]
+#[path = "generated/queries.rs"]
+mod queries;
 
-pub const SCHEMA: &str = "
-create table if not exists issue (
-  id           text primary key,
-  number       integer not null unique,
-  title        text not null,
-  description  text not null,
-  repo         text,
-  priority     text not null,
-  rank         integer,
-  deliver      text not null,
-  parent       text,
-  cron         text,
-  created_at   integer not null,
-  queued_at    integer,
-  closed_at    integer,
-  reviewed_at  integer,
-  canceled     text,
-  delivered    text,
-  mandate      text not null,
-  constraints  text,
-  conflict     text,
-  pull_request text,
-  last_run     text,
-  answer       text,
-  blocked_by   text not null,
-  criteria     text not null,
-  checks       text not null,
-  findings     text not null,
-  questions    text not null,
-  assignments  text not null
-);
-create index if not exists issue_parent on issue (parent);
-create table if not exists issue_word (
-  seq        integer primary key autoincrement,
-  issue      text not null,
-  text       text not null,
-  created_at integer not null
-);
-create index if not exists issue_word_waiting on issue_word (issue, seq);
-create table if not exists issue_counter (
-  id          integer primary key check (id = 1),
-  last_number integer not null
-);
-";
+pub const SCHEMA: &str = include_str!("sql/schema.sql");
 
-const COLUMNS: &str = "id, number, title, description, repo, priority, rank, deliver, parent, cron, created_at, queued_at, closed_at, \
-     reviewed_at, canceled, delivered, mandate, constraints, conflict, pull_request, last_run, answer, blocked_by, criteria, checks, \
-     findings, questions, assignments";
-
-fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Issue> {
-    let mut r = Reading::of(row);
-    let id: String = r.get()?;
-    let number: i64 = r.get()?;
-    let title: String = r.get()?;
-    let description: String = r.get()?;
-    let repo: Option<String> = r.get()?;
-    let priority = r.word()?;
-    let rank: Option<i64> = r.get()?;
-    let deliver = r.word()?;
-    let parent: Option<String> = r.get()?;
-    let cron: Option<String> = r.get()?;
-    let created_at: Millis = r.get()?;
-    let mut issue = Issue::new(id, number, title, created_at);
-    issue.description = description;
-    issue.repo = repo;
-    issue.priority = priority;
-    issue.rank = rank;
-    issue.deliver = deliver;
-    issue.parent = parent;
-    issue.cron = cron;
-    issue.queued_at = r.get()?;
-    issue.closed_at = r.get()?;
-    issue.reviewed_at = r.get()?;
-    issue.canceled = r.word_or_none()?;
-    issue.delivered = r.word_or_none()?;
-    issue.mandate = r.json()?;
-    issue.constraints = r.json_or_none()?;
-    issue.conflict = r.json_or_none()?;
-    issue.pull_request = r.json_or_none()?;
-    issue.last_run = r.json_or_none()?;
-    issue.answer = r.json_or_none()?;
-    issue.blocked_by = r.json()?;
-    issue.criteria = r.json()?;
-    issue.checks = r.json()?;
-    issue.findings = r.json()?;
-    issue.questions = r.json()?;
-    issue.assignments = r.json()?;
+fn read(r: queries::ListIssuesRow) -> sqlx::Result<Issue> {
+    let mut issue = Issue::new(r.id, r.number, r.title, r.created_at);
+    issue.description = r.description;
+    issue.repo = r.repo;
+    issue.parent = r.parent;
+    issue.cron = r.cron;
+    issue.rank = r.rank;
+    issue.queued_at = r.queued_at;
+    issue.closed_at = r.closed_at;
+    issue.reviewed_at = r.reviewed_at;
+    issue.priority = read_word(r.priority)?;
+    issue.deliver = read_word(r.deliver)?;
+    issue.canceled = r.canceled.map(read_word).transpose()?;
+    issue.delivered = r.delivered.map(read_word).transpose()?;
+    issue.mandate = read_json(r.mandate)?;
+    issue.blocked_by = read_json(r.blocked_by)?;
+    issue.criteria = read_json(r.criteria)?;
+    issue.checks = read_json(r.checks)?;
+    issue.findings = read_json(r.findings)?;
+    issue.questions = read_json(r.questions)?;
+    issue.assignments = read_json(r.assignments)?;
+    issue.constraints = r.constraints.map(read_json).transpose()?;
+    issue.conflict = r.conflict.map(read_json).transpose()?;
+    issue.pull_request = r.pull_request.map(read_json).transpose()?;
+    issue.last_run = r.last_run.map(read_json).transpose()?;
+    issue.answer = r.answer.map(read_json).transpose()?;
+    issue.delivery_evidence = r.evidence.map(read_json).transpose()?;
     Ok(issue)
 }
 
-pub fn all(db: &Connection) -> rusqlite::Result<Vec<Issue>> {
-    let mut q = db.prepare_cached(&format!("select {COLUMNS} from issue order by number"))?;
-    let rows = q.query_map([], read)?;
-    rows.collect()
+pub fn all(db: &Sqlite<'_>) -> sqlx::Result<Vec<Issue>> {
+    db.query(async |c| queries::list_issues(c).await)?.into_iter().map(read).collect()
 }
 
-pub fn put(db: &Connection, t: &Issue) -> rusqlite::Result<()> {
-    db.prepare_cached(&format!(
-        "insert or replace into issue ({COLUMNS}) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, \
-         ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)"
-    ))?
-    .execute(params![
-        t.id,
-        t.number,
-        t.title,
-        t.description,
-        t.repo,
-        word(&t.priority)?,
-        t.rank,
-        word(&t.deliver)?,
-        t.parent,
-        t.cron,
-        t.created_at,
-        t.queued_at,
-        t.closed_at,
-        t.reviewed_at,
-        word_or_none(&t.canceled)?,
-        word_or_none(&t.delivered)?,
-        json(&t.mandate)?,
-        json_or_none(&t.constraints)?,
-        json_or_none(&t.conflict)?,
-        json_or_none(&t.pull_request)?,
-        json_or_none(&t.last_run)?,
-        json_or_none(&t.answer)?,
-        json(&t.blocked_by)?,
-        json(&t.criteria)?,
-        json(&t.checks)?,
-        json(&t.findings)?,
-        json(&t.questions)?,
-        json(&t.assignments)?,
-    ])?;
-    Ok(())
-}
-
-pub fn remove(db: &Connection, id: &str) -> rusqlite::Result<()> {
-    db.execute("delete from issue_word where issue = ?1", [id])?;
-    db.execute("delete from issue where id = ?1", [id])?;
-    Ok(())
-}
-
-pub fn next_number(db: &Connection, at_least: i64) -> rusqlite::Result<i64> {
-    let last: Option<i64> = db
-        .query_row("select last_number from issue_counter where id = 1", [], |r| r.get(0))
-        .optional()?;
-    let next = last.unwrap_or(0).max(at_least) + 1;
-    db.execute(
-        "insert into issue_counter (id, last_number) values (1, ?1) on conflict (id) do update set last_number = excluded.last_number",
-        [next],
-    )?;
-    Ok(next)
-}
-
-pub fn keep_words(db: &Connection, issue: &str, words: &str, at: Millis) -> rusqlite::Result<()> {
-    db.execute(
-        "insert into issue_word (issue, text, created_at) values (?1, ?2, ?3)",
-        params![issue, words, at],
-    )?;
-    Ok(())
-}
-
-pub fn take_words(db: &Connection, issue: &str) -> rusqlite::Result<Vec<String>> {
-    let kept = {
-        let mut q = db.prepare_cached("select text from issue_word where issue = ?1 order by seq")?;
-        let rows = q.query_map([issue], |r| r.get::<_, String>(0))?;
-        rows.collect::<rusqlite::Result<Vec<String>>>()?
+pub fn put(db: &Sqlite<'_>, t: &Issue) -> sqlx::Result<()> {
+    let params = queries::PutIssueParams {
+        id: t.id.clone(),
+        title: t.title.clone(),
+        description: t.description.clone(),
+        repo: t.repo.clone(),
+        parent: t.parent.clone(),
+        cron: t.cron.clone(),
+        number: t.number,
+        rank: t.rank,
+        created_at: t.created_at,
+        queued_at: t.queued_at,
+        closed_at: t.closed_at,
+        reviewed_at: t.reviewed_at,
+        priority: word(&t.priority)?,
+        deliver: word(&t.deliver)?,
+        canceled: t.canceled.as_ref().map(word).transpose()?,
+        delivered: t.delivered.as_ref().map(word).transpose()?,
+        mandate: json(&t.mandate)?,
+        blocked_by: json(&t.blocked_by)?,
+        criteria: json(&t.criteria)?,
+        checks: json(&t.checks)?,
+        findings: json(&t.findings)?,
+        questions: json(&t.questions)?,
+        assignments: json(&t.assignments)?,
+        constraints: t.constraints.as_ref().map(json).transpose()?,
+        conflict: t.conflict.as_ref().map(json).transpose()?,
+        pull_request: t.pull_request.as_ref().map(json).transpose()?,
+        last_run: t.last_run.as_ref().map(json).transpose()?,
+        answer: t.answer.as_ref().map(json).transpose()?,
     };
-    db.execute("delete from issue_word where issue = ?1", [issue])?;
-    Ok(kept)
+    db.query(async |c| queries::put_issue(c, params).await)?;
+    if let Some(evidence) = &t.delivery_evidence {
+        let params = queries::PutIssueEvidenceParams {
+            issue_id: t.id.clone(),
+            evidence: json(evidence)?,
+        };
+        db.query(async |c| queries::put_issue_evidence(c, params).await)?;
+    }
+    Ok(())
+}
+
+pub fn remove(db: &Sqlite<'_>, id: &str) -> sqlx::Result<()> {
+    db.query(async |c| {
+        queries::delete_issue_evidence(&mut *c, queries::DeleteIssueEvidenceParams { issue_id: id.into() }).await?;
+        queries::delete_issue_words(&mut *c, queries::DeleteIssueWordsParams { issue: id.into() }).await?;
+        queries::delete_issue(c, queries::DeleteIssueParams { id: id.into() }).await
+    })
+}
+
+pub fn next_number(db: &Sqlite<'_>, at_least: i64) -> sqlx::Result<i64> {
+    db.query(async |c| {
+        let prev = optional(queries::read_issue_number(&mut *c).await)?.map_or(0, |r| r.last_number);
+        let next = prev.max(at_least) + 1;
+        queries::write_issue_number(c, queries::WriteIssueNumberParams { last_number: next }).await?;
+        Ok(next)
+    })
+}
+
+pub fn keep_words(db: &Sqlite<'_>, issue: &str, words: &str, at: Millis) -> sqlx::Result<()> {
+    db.query(async |c| {
+        queries::keep_issue_words(
+            c,
+            queries::KeepIssueWordsParams {
+                issue: issue.into(),
+                text: words.into(),
+                created_at: at,
+            },
+        )
+        .await
+    })
+}
+
+pub fn take_words(db: &Sqlite<'_>, issue: &str) -> sqlx::Result<Vec<String>> {
+    db.query(async |c| {
+        let kept = queries::list_issue_words(&mut *c, queries::ListIssueWordsParams { issue: issue.into() }).await?;
+        queries::delete_issue_words(c, queries::DeleteIssueWordsParams { issue: issue.into() }).await?;
+        Ok(kept.into_iter().map(|r| r.text).collect())
+    })
 }

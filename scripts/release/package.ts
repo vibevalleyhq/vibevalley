@@ -1,8 +1,10 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { parseArgs } from "node:util";
+
+import { minimumMacOS, packageArchitecture, requireDeveloperId, verifyMacExecutable } from "./package-platform.ts";
 
 const root = resolve(import.meta.dirname, "../..");
 const { values } = parseArgs({
@@ -28,6 +30,8 @@ try {
 }
 const version = values.version ?? (tag.replace(/^v/u, "") || "0.0.0");
 if (!/^\d+\.\d+\.\d+(?:-(?:alpha|beta)\.\d+)?$/u.test(version)) throw new Error(`Invalid package version: ${version}`);
+const versionTag = `v${version}`;
+const tagged = git("tag", "--points-at", "HEAD", "--list", versionTag) === versionTag;
 const profile = values.profile;
 if (profile !== "release" && profile !== "debug") throw new Error("--profile must be release or debug");
 const identity = values.sign ?? process.env.VIBEVALLEY_SIGN_IDENTITY ?? "-";
@@ -48,6 +52,7 @@ if (!values["skip-build"]) {
   );
   run("swift", ["build", "-c", "release", "--package-path", "apps/island"]);
 }
+const arch = packageArchitecture(process.arch);
 for (const file of [
   join(target, "vibevalley-mac"),
   join(target, "vibevalley"),
@@ -55,6 +60,9 @@ for (const file of [
   join(root, "apps/island/.build/release/VibeValleyIsland"),
 ]) {
   if (!existsSync(file)) throw new Error(`Missing package input: ${file}. Build it before --skip-build`);
+}
+for (const binary of [join(target, "vibevalley-mac"), join(target, "vibevalley"), join(root, "apps/island/.build/release/VibeValleyIsland")]) {
+  verifyMacExecutable(binary, arch);
 }
 mkdirSync(out, { recursive: true });
 rmSync(app, { recursive: true, force: true });
@@ -86,14 +94,18 @@ writeFileSync(
 <key>VibeValleyVersion</key><string>${version}</string>
 <key>CFBundleShortVersionString</key><string>${version.split("-")[0]}</string>
 <key>CFBundleVersion</key><string>${version.split("-")[0]}</string>
-<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSMinimumSystemVersion</key><string>${minimumMacOS}</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSMicrophoneUsageDescription</key><string>VibeValley uses the microphone for voice conversations and dictation.</string>
 </dict></plist>\n`,
 );
 sign(app, true);
 run("codesign", ["--verify", "--deep", "--strict", app]);
-const arch = process.arch === "arm64" ? "arm64" : "x64";
+if (identity !== "-") {
+  const result = spawnSync("codesign", ["-dvvv", app], { encoding: "utf8" });
+  if (result.status !== 0) throw new Error(`Cannot inspect signed bundle: ${result.stderr}`);
+  requireDeveloperId(result.stderr);
+}
 const name = `VibeValley-${version}-${arch}`;
 const zip = join(out, `${name}.zip`);
 const makeZip = () => {
@@ -133,7 +145,7 @@ writeFileSync(
     {
       version,
       notes,
-      page: `https://github.com/vibevalleyhq/vibevalley/releases/tag/v${version}`,
+      page: tagged ? `https://github.com/vibevalleyhq/vibevalley/releases/tag/${versionTag}` : "",
       builds: [{ arch, file: `${name}.zip`, size: statSync(zip).size, sha512: createHash("sha512").update(readFileSync(zip)).digest("hex") }],
     },
     null,

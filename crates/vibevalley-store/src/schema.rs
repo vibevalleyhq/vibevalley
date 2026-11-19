@@ -1,49 +1,20 @@
-use rusqlite::Connection;
-
 use crate::{Result, StoreError};
+use sqlx::{Connection, SqliteConnection};
 
-/// One entry per schema version; `user_version` counts how many have run.
-/// Append only: never edit an entry that has shipped.
-pub(crate) const MIGRATIONS: &[&str] = &["
-    CREATE TABLE projects (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        path TEXT NOT NULL UNIQUE,
-        name TEXT NOT NULL,
-        position INTEGER NOT NULL,
-        last_opened_ms INTEGER NOT NULL
-    );
-    CREATE TABLE layouts (
-        project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
-        json TEXT NOT NULL
-    );
-    CREATE TABLE terminals (
-        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        id TEXT NOT NULL,
-        ord INTEGER NOT NULL,
-        cwd TEXT NOT NULL,
-        title TEXT,
-        scrollback TEXT NOT NULL,
-        PRIMARY KEY (project_id, id)
-    );
-    CREATE TABLE settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-    );
-"];
+pub(crate) const MIGRATIONS: &[&str] = &[include_str!("../sql/migrations/0001_workspace.sql")];
 
-pub(crate) fn migrate(conn: &mut Connection) -> Result<()> {
-    let current: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+pub(crate) async fn migrate(conn: &mut SqliteConnection) -> Result<()> {
+    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await?;
+    let current: i64 = sqlx::query_scalar("PRAGMA user_version").fetch_one(&mut *tx).await?;
     let target = MIGRATIONS.len() as i64;
-    if current > target {
+    if !(0..=target).contains(&current) {
         return Err(StoreError::Db(format!(
-            "database schema version {current} is newer than this build supports ({target})"
+            "unsupported database schema version {current}, this build supports 0 through {target}"
         )));
     }
-    for (index, sql) in MIGRATIONS.iter().enumerate().skip(current as usize) {
-        let tx = conn.transaction()?;
-        tx.execute_batch(sql)?;
-        tx.pragma_update(None, "user_version", index as i64 + 1)?;
-        tx.commit()?;
+    for &sql in &MIGRATIONS[current as usize..] {
+        sqlx::raw_sql(sql).execute(&mut *tx).await?;
     }
+    tx.commit().await?;
     Ok(())
 }

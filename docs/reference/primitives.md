@@ -122,6 +122,7 @@
 | `refetchOnRelink` | `query.ts` |  |
 | `cursorsQuery` | `query.ts` |  |
 | `agentsQuery` | `query.ts` |  |
+| `providerVoicesQuery` | `query.ts` |  |
 | `providerQuery` | `query.ts` |  |
 | `settingsQuery` | `query.ts` |  |
 | `runtimesQuery` | `query.ts` |  |

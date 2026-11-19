@@ -9,6 +9,7 @@ export const SpriteManifest = z.record(
     ay: z.number(),
     hx: z.exactOptional(z.number()),
     hy: z.exactOptional(z.number()),
+    railSize: z.exactOptional(z.number()),
     yard: z.exactOptional(z.array(z.number())),
     sheet: z.exactOptional(z.string()),
   }),

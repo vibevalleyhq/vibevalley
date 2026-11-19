@@ -9,6 +9,7 @@ pub mod catalog;
 pub mod draw;
 pub mod element;
 pub mod farm;
+mod font;
 pub mod level;
 pub mod nav;
 pub mod opening;

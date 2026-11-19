@@ -5,7 +5,7 @@
 use vibevalley_core::brief::{failed_text, issue_words};
 use vibevalley_git::Repo;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{Assignment, Fact, Finding, Issue, IssueStatus, IssueUpdate};
+use vibevalley_protocol::{Assignment, Deliverable, Fact, Finding, Issue, IssueStatus, IssueUpdate, ReviewRevision};
 
 use super::board::Board;
 use crate::modules::ledger::{BoardError, IssueChange, Result, lock, now};
@@ -149,13 +149,25 @@ impl Board {
     /// The verdict on what was handed back: a pass marks it reviewed (the
     /// user completes it by moving it to done); a fail records the findings
     /// and sends them to the session for another round.
-    pub fn review(&self, reference: &str, pass: bool, findings: &[String], text: &str) -> Result<Issue> {
+    pub fn review(&self, reference: &str, pass: bool, findings: &[String], text: &str, seen: Option<&ReviewRevision>) -> Result<Issue> {
+        let _work = pass.then(|| lock(&self.0.work));
         let issue = self.stored(reference)?;
         if issue.status != IssueStatus::InReview {
             return Err(refused("server.issue.nothingToAccept", &[]));
         }
         if pass {
-            return self.change(&issue.id, IssueChange::Reviewed);
+            let revision = if issue.deliver == Deliverable::Change && issue.repo.is_some() && issue.parent.is_none() {
+                let c = self.changes(&issue.id)?;
+                if seen.is_some_and(|seen| seen != &c.revision) {
+                    return Err(refused("server.issue.reviewChanged", &[]));
+                }
+                let repo = Repo::discover(&c.worktree)?.ok_or_else(|| BoardError::NotARepo(c.worktree.clone()))?;
+                repo.retain_review(&c.revision.base_commit, &c.revision.tree)?;
+                Some(c.revision)
+            } else {
+                None
+            };
+            return self.change(&issue.id, IssueChange::Reviewed(revision));
         }
         let fresh = vibevalley_core::refine::kept(findings);
         let text = text.trim();

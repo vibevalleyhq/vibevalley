@@ -137,6 +137,7 @@ export function Select<V extends string>(props: {
       class={props.class}
       trigger={
         <View
+          testID={props.testid ? `${props.testid}-trigger` : undefined}
           class={[
             "min-w-0 flex-row items-center gap-1.5 rounded-md border",
             props.size === "control" ? "h-7 px-2" : "h-8 px-2.5",

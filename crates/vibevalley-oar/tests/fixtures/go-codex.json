@@ -1,0 +1,268 @@
+{
+  "compact": [],
+  "get_usage": [],
+  "initialize": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {
+        "serverInfo": {
+          "name": "codex-fake",
+          "version": "1.0"
+        }
+      }
+    }
+  ],
+  "initialized": [],
+  "interrupt": [],
+  "session/cancel": [],
+  "session/close": [],
+  "session/new": [],
+  "session/prompt": [],
+  "session/resume": [],
+  "session/set_config_option": [],
+  "session/steer": [],
+  "stop_task": [],
+  "thread/compact/start": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {}
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "item/started",
+      "params": {
+        "item": {
+          "id": "cmp-1",
+          "type": "contextCompaction"
+        },
+        "threadId": "vendor-root",
+        "turnId": "compact-turn-1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "id": "cmp-1",
+          "type": "contextCompaction"
+        },
+        "threadId": "vendor-root",
+        "turnId": "compact-turn-1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "turn/completed",
+      "params": {
+        "threadId": "vendor-root",
+        "turn": {
+          "id": "compact-turn-1",
+          "status": "completed"
+        }
+      }
+    }
+  ],
+  "thread/resume": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {
+        "thread": {
+          "id": "vendor-root"
+        },
+        "tokenUsage": {
+          "total": {
+            "cacheReadTokens": 200,
+            "cacheWriteTokens": 80,
+            "inputTokens": 500,
+            "outputTokens": 100,
+            "reasoningTokens": 40
+          }
+        }
+      }
+    }
+  ],
+  "thread/start": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {
+        "thread": {
+          "id": "vendor-root"
+        }
+      }
+    }
+  ],
+  "turn/interrupt": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {}
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "turn/completed",
+      "params": {
+        "threadId": "vendor-root",
+        "turn": {
+          "id": "",
+          "status": "interrupted"
+        }
+      }
+    }
+  ],
+  "turn/start": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {
+        "turn": {
+          "id": "codex-turn-1"
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "turn/started",
+      "params": {
+        "threadId": "vendor-root",
+        "turn": {
+          "id": "codex-turn-1"
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "mcpServer/startupStatus/updated",
+      "params": {
+        "name": "vibevalley",
+        "status": "ready",
+        "threadId": "vendor-root"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "item/reasoning/summaryTextDelta",
+      "params": {
+        "delta": "analyzing repo",
+        "threadId": "vendor-root",
+        "turnId": "codex-turn-1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "item/started",
+      "params": {
+        "item": {
+          "command": "go test ./...",
+          "id": "cmd-1",
+          "type": "commandExecution"
+        },
+        "threadId": "vendor-root",
+        "turnId": "codex-turn-1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "aggregatedOutput": "ok",
+          "exitCode": 0,
+          "id": "cmd-1",
+          "status": "completed",
+          "type": "commandExecution"
+        },
+        "threadId": "vendor-root",
+        "turnId": "codex-turn-1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "item/started",
+      "params": {
+        "item": {
+          "id": "child-msg-1",
+          "type": "agentMessage"
+        },
+        "subAgentActivity": {
+          "agentThreadId": "vendor-child"
+        },
+        "threadId": "vendor-root",
+        "turnId": "codex-turn-1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "item/agentMessage/delta",
+      "params": {
+        "delta": "child output",
+        "threadId": "vendor-child",
+        "turnId": "child-turn-1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "item/agentMessage/delta",
+      "params": {
+        "delta": "codex: hello",
+        "threadId": "vendor-root",
+        "turnId": "codex-turn-1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "vendor-root",
+        "tokenUsage": {
+          "last": {
+            "cachedInputTokens": 100,
+            "inputTokens": 500,
+            "outputTokens": 50
+          },
+          "modelContextWindow": 200000,
+          "total": {
+            "cacheReadTokens": 290,
+            "cacheWriteTokens": 105,
+            "inputTokens": 650,
+            "outputTokens": 155,
+            "reasoningTokens": 75
+          }
+        },
+        "turnId": "codex-turn-1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "turn/completed",
+      "params": {
+        "threadId": "vendor-root",
+        "turn": {
+          "id": "codex-turn-1",
+          "status": "completed"
+        }
+      }
+    }
+  ],
+  "turn/steer": [
+    {
+      "id": 9412,
+      "jsonrpc": "2.0",
+      "result": {}
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "item/agentMessage/delta",
+      "params": {
+        "delta": "steered",
+        "threadId": "vendor-root",
+        "turnId": "vendor-root"
+      }
+    }
+  ],
+  "user": []
+}

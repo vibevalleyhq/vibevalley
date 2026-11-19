@@ -72,11 +72,12 @@ impl Sessions {
         };
         let mut mcp_servers: Vec<_> = self.door_for(&session.id).into_iter().collect();
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
+        let (append_system_prompt, prompt) = drive.work_instructions(rules, prompt);
         let opts = SessionOptions {
             cwd,
             model: drive.model.clone(),
             permission_mode: self.0.config.permission,
-            append_system_prompt: Some(rules),
+            append_system_prompt,
             env: drive.env.clone(),
             record_to: Some(self.record_path(&session.id)),
             effort: drive.effort.clone(),
@@ -95,7 +96,7 @@ impl Sessions {
     }
 
     /// A talking round's end: what it said, whole, as its report.
-    pub(super) fn finish_talk(&self, session: &Session, reason: StopReason, said: &str) {
+    pub(super) fn finish_talk(&self, session: &Session, reason: StopReason, said: &str, spent: Option<vibevalley_protocol::Spent>) {
         let outcome = match reason {
             StopReason::Aborted => Outcome::Interrupted,
             StopReason::Error | StopReason::MaxTurns => Outcome::Failed,
@@ -118,7 +119,7 @@ impl Sessions {
             phase: None,
             summary,
             runs,
-            spent: None,
+            spent,
             questions: vec![],
             checks: vec![],
             answer: None,

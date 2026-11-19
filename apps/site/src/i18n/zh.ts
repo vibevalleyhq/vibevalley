@@ -3,8 +3,7 @@ export const zh = {
   home: "/",
   other: { label: "EN", href: "/en/", name: "English" },
   title: "码农场物语 · VibeValley",
-  description:
-    "一句话指挥一队编码 agent：助手拆成工单、派给你电脑上真的 pi、Claude Code、Codex，你看过改动才合进主分支。AI 版的 Linear，画成一座像素农场。跑在你自己的电脑上，开源。",
+  description: "在 Mac 上把工单交给 Claude Code、Codex 等编码 agent。到像素农场看进度，在原生工作台查看改动、运行检查、合进主分支。",
   nav: { how: "怎么玩", features: "能做什么", screens: "看看农场", start: "开始种地", github: "GitHub" },
   hero: {
     name: "码农场物语",
@@ -18,7 +17,7 @@ export const zh = {
       evening: ["傍晚田头坐，", "汇报一排排。"],
       night: ["夜里你睡下，", "它们接着栽。"],
     },
-    primary: "在 GitHub 上看",
+    primary: "查看 Mac 版源码",
     secondary: "怎么玩",
     hours: "换个时辰",
     hour: { morning: "清晨", day: "白天", evening: "傍晚", night: "夜里" },
@@ -26,7 +25,7 @@ export const zh = {
   },
   parade: {
     title: "帮工上工了",
-    text: "七种小动物，四套衣服。每个帮工都是你电脑上真实的编码 agent：pi、Claude Code、Codex，或 VibeValley 自带的那一台。",
+    text: "七种小动物，四套衣服。每个帮工都是你电脑上真实的编码 agent：Claude Code、Codex、OpenCode，或 VibeValley 自带的那一台。",
   },
   harvest: {
     title: ["一觉醒过来，", "满园都是菜。"],
@@ -36,8 +35,7 @@ export const zh = {
   },
   how: {
     title: "一件活是怎么种出来的",
-    // The job's branch as the story goes (a helper's branch is vibevalley/<helper>-<time>).
-    git: { branch: "vibevalley/w3-mgr2k", worktree: "自己的 worktree", commits: "个提交", tests: "测试", merged: "收进 main" },
+    git: { branch: "vibevalley/issue-3", worktree: "自己的 worktree", commits: "个提交", tests: "测试", merged: "收进 main" },
     steps: [
       { icon: "act-speaking_text", title: "说一句", text: "对助手说：「在 clock-in 里加一个查询打卡记录的接口，写测试。」打字也行，按住说话也行。" },
       { icon: "icon-seeds", title: "派活", text: "助手把这句话拆成工单，按档案挑一个帮工，在项目里给它开独立的分支和 worktree，像在空地上播下种子。" },
@@ -53,11 +51,11 @@ export const zh = {
     title: "能做什么",
     // The farm's numbers (src/base/facts.ts), what each counts.
     tally: {
-      machines: "台农机：自带的、pi、Claude Code、Codex",
+      views: "种视图：工作台和像素农场",
       looks: "种帮工：7 种小动物 × 4 套衣服",
       plots: "块地一起开工，每个仓库默认 3 块",
       achievements: "个成就",
-      games: "个手机小游戏",
+      games: "个农场掌机小游戏",
       connectors: "个聊天软件能派活：微信、飞书、QQ",
     },
     items: [
@@ -78,8 +76,8 @@ export const zh = {
       },
       {
         icon: "icon-log",
-        title: "停了也不丢活",
-        text: "助手和自带的农机跑在 pi-durable 上：每一轮、每个工具调用先落盘再显示。助手答到一半服务端停了，重启后接着答完；进程崩在半路时，帮工也从断点接着做，这一轮只记一次。",
+        title: "重开后接着看",
+        text: "工单保留帮工的每轮记录。重新打开工作台，可以看上次汇报、还有哪条问题等你回答，也可以打开工作目录核对改动。",
       },
       {
         icon: "icon-tasks",
@@ -88,8 +86,8 @@ export const zh = {
       },
       {
         icon: "icon-pigeon",
-        title: "在哪都能派活",
-        text: "语音、微信、飞书、QQ，只认你自己的账号。手机或另一台电脑经「连接到本机」连进来：你在本机点过头，或凭你设的密码登录。",
+        title: "在聊天里派活",
+        text: "在田头给助手分派工单，在工单串里回答帮工。配置微信、飞书或 QQ 连接后，也可以从对应聊天会话给助手发消息。",
       },
       {
         icon: "icon-clock",
@@ -109,18 +107,17 @@ export const zh = {
     own: "VibeValley 自带",
   },
   devices: {
-    title: "在哪都能看农场",
-    text: "界面是一份 Solid 页面，Mac 应用、浏览器和手机壳打开的是同一份。农场跑在你的 Mac 上；在田头派活、看工单、收帮工的汇报。不在家时，把田头接到微信、飞书或 QQ。",
-    platforms: ["macOS", "iPhone", "安卓"],
-    note: "手机壳（iPhone、安卓）要自己构建，扫码配对后打开同一份页面。「连接到本机」默认关着，只放你在本机点过头的设备，和凭密码或确认码登录的设备；只在信得过的网络里打开。",
-    shots: { mac: "Mac 上的农场", chat: "手机上的田头", tickets: "手机上的工单" },
+    title: "在 Mac 上照看农场",
+    text: "每块地对应一张工单。点进地块看帮工的汇报，切到工作台审查改了哪些文件。",
+    note: "工作台内置终端。打开工单的工作目录，就能在同一个窗口查看 Git 改动或运行项目检查。",
+    shot: "Mac 原生应用里的像素农场与工作台导航",
   },
   screens: {
     title: "看看农场",
     items: [
-      { image: "farm", caption: "农场：田地、助手和右下角的田头" },
-      { image: "title", caption: "首页：昼夜跟着你的时间走" },
-      { image: "chat", caption: "聊天页：频道、帮工和右边打开的工单串" },
+      { image: "native-farm", caption: "Mac 上的农场：田地、帮工与工具栏" },
+      { image: "native-workbench", caption: "工单看板：待办、开工中、等着看和已完成" },
+      { image: "native-chat", caption: "Mac 工作台里的频道和田头消息" },
     ],
     open: "点开看大图",
     close: "关上",
@@ -134,14 +131,14 @@ export const zh = {
     title: "开始种地",
     needs: "需要",
     list: [
-      "macOS（Apple 芯片）",
-      "至少一个装好并登录的编码 agent：pi、Claude Code 或 Codex",
-      "一把 DeepSeek 的 API 钥匙，助手要用",
-      "构建要 Vite+（vp）：它照 .node-version 装 Node 24，带着 pnpm",
+      "Apple 芯片 Mac，macOS 14 或更新版本",
+      "构建工具：Xcode（含 Swift 6）、Rust、Zig 和 Vite+（vp）",
+      "使用帮工：在 Mac 上安装并登录 Claude Code、Codex 等编码 agent",
+      "使用内置助手：配置 DeepSeek API 密钥",
     ],
-    build: "打一个 macOS 应用",
-    more: "更多见仓库里的 README 和 docs/。",
-    readme: "读 README",
+    build: "从源码构建 Mac 版",
+    more: "应用、DMG、更新用的 ZIP 和 release.json 都写入 apps/mac/dist。",
+    readme: "阅读原生版 README",
     copy: "复制",
     copied: "复制好了",
   },

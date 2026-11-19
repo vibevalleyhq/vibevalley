@@ -180,18 +180,8 @@ impl Jobs {
             account.model.clone(),
             account.fingerprint.clone(),
         );
-        if let Some(input) = &input {
-            self.inputs.pin(std::slice::from_ref(&input.id), r.id(), |_| Ok(()))?;
-        }
         r.input = input;
-        let id = r.id().to_string();
-        match self.admit(r, Some(Held::Account(account))) {
-            Ok(r) => shown(&r),
-            Err(e) => {
-                let _ = self.inputs.release(&id);
-                Err(e)
-            }
-        }
+        shown(&self.admit(r, Some(Held::Account(account)))?)
     }
 
     /// The user's audio input, ready to be read.

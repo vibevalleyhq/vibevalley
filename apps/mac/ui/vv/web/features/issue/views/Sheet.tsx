@@ -60,15 +60,18 @@ export function Fold(props: {
   label: string;
   summary?: string | undefined;
   open?: boolean;
+  defaultOpen?: boolean;
   leading?: JSX.Element;
   testID?: string;
   onToggle?: (open: boolean) => void;
   children: JSX.Element;
 }) {
-  const open = signal(props.open ?? false);
+  const localOpen = signal(props.defaultOpen ?? false);
+  const open = () => props.open ?? localOpen();
   const toggle = () => {
-    open.set(!open());
-    props.onToggle?.(open());
+    const next = !open();
+    if (props.open === undefined) localOpen.set(next);
+    props.onToggle?.(next);
   };
   return (
     <View class="border-b border-line">

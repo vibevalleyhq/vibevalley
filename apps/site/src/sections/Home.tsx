@@ -1,7 +1,7 @@
 import { RUNTIMES, WALKERS, pixelArt, storyArt } from "../base/assets";
 import { FACTS } from "../base/facts";
 import { backgrounds, screenshotOf, titleArt } from "../base/images";
-import { COMMANDS, GITHUB } from "../base/links";
+import { COMMANDS, NATIVE_SOURCE } from "../base/links";
 import { FRONT } from "../base/scene";
 /** @jsxImportSource @solidjs/web */
 import type { Copy } from "../i18n/zh";
@@ -24,7 +24,7 @@ export default function Home(props: { copy: Copy }) {
     <>
       <Bar
         copy={{ home: props.copy.home, title: props.copy.title, nav: props.copy.nav, other: props.copy.other, name: props.copy.hero.name }}
-        github={GITHUB}
+        github={NATIVE_SOURCE}
       />
       <main>
         <Hero
@@ -38,7 +38,7 @@ export default function Home(props: { copy: Copy }) {
             bushLeft: pixelArt("fg-bush-left"),
             bushRight: pixelArt("fg-bush-right"),
           }}
-          github={GITHUB}
+          github={NATIVE_SOURCE}
         />
         <Parade
           copy={props.copy.parade}
@@ -72,7 +72,7 @@ export default function Home(props: { copy: Copy }) {
             { name: props.copy.runtimes.own, logo: pixelArt("app-sprout") },
           ]}
         />
-        <Devices copy={props.copy.devices} mac={screenshotOf("farm")} phones={[screenshotOf("phone-chat"), screenshotOf("phone-issues")]} />
+        <Devices copy={props.copy.devices} mac={screenshotOf("native-farm")} />
         <Screens
           copy={props.copy.screens}
           shots={props.copy.screens.items.map((shot) => ({ ...screenshotOf(shot.image), caption: shot.caption }))}
@@ -81,7 +81,7 @@ export default function Home(props: { copy: Copy }) {
         <Start
           copy={{ start: props.copy.start, safety: props.copy.safety }}
           commands={COMMANDS}
-          readme={`${GITHUB}#readme`}
+          readme={`${NATIVE_SOURCE}#readme`}
           icons={{ warn: pixelArt("mark-warn"), check: pixelArt("mark-check"), copy: pixelArt("button-copy") }}
         />
       </main>

@@ -118,5 +118,8 @@
     "signedOut": "没登录"
   },
   "spentToday": "今天帮工花了约 {spent}，没设每日预算。",
-  "spentTodayBudget": "今天帮工花了约 {spent}，每日预算 {budget}。"
+  "spentTodayBudget": "今天帮工花了约 {spent}，每日预算 {budget}。",
+  "missingCommand": "请在本机安装 {runtime}，再点「重新检测」。如果已经安装，可填写可执行文件的完整路径。",
+  "enterPath": "填写命令路径",
+  "signInTerminal": "打开终端登录"
 }

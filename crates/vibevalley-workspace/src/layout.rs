@@ -35,10 +35,18 @@ impl DiffSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TerminalLink {
+    pub directory: PathBuf,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PaneKind {
     Terminal {
         terminal_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        link: Option<TerminalLink>,
     },
     File {
         path: PathBuf,
@@ -206,6 +214,11 @@ impl Layout {
         self.tabs().find(|t| t.id == tab)
     }
 
+    pub fn tab_mut(&mut self, tab: TabId) -> Option<&mut Tab> {
+        let (group, index) = self.locate(tab)?;
+        self.group_mut(group)?.tabs.get_mut(index)
+    }
+
     pub fn find(&self, kind: &PaneKind) -> Option<TabId> {
         self.tabs().find(|t| &t.kind == kind).map(|t| t.id)
     }
@@ -213,7 +226,7 @@ impl Layout {
     pub fn terminal_ids(&self) -> Vec<String> {
         self.tabs()
             .filter_map(|t| match &t.kind {
-                PaneKind::Terminal { terminal_id } => Some(terminal_id.clone()),
+                PaneKind::Terminal { terminal_id, .. } => Some(terminal_id.clone()),
                 _ => None,
             })
             .collect()
@@ -486,8 +499,37 @@ fn collapse(node: &mut Node) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn regression_named_terminal_origin_survives_layout_save_and_restore() {
+        let mut layout = Layout::default();
+        let tab = layout.add_tab(None, term("worker"));
+        let target = TerminalLink {
+            directory: "/work/issue-23".into(),
+            title: "#23".into(),
+        };
+        let Some(Tab {
+            kind: PaneKind::Terminal { link, .. },
+            ..
+        }) = layout.tab_mut(tab)
+        else {
+            unreachable!()
+        };
+        *link = Some(target.clone());
+        let restored = Layout::from_json(&layout.to_json()).unwrap();
+        assert_eq!(
+            restored.tab(tab).unwrap().kind,
+            PaneKind::Terminal {
+                terminal_id: "worker".into(),
+                link: Some(target)
+            }
+        );
+    }
+
     fn term(id: &str) -> PaneKind {
-        PaneKind::Terminal { terminal_id: id.into() }
+        PaneKind::Terminal {
+            terminal_id: id.into(),
+            link: None,
+        }
     }
 
     fn file(p: &str) -> PaneKind {

@@ -66,10 +66,14 @@ fn is_git_state(relative: &Path) -> bool {
 
 pub(crate) fn is_git_state_path(path: &Path) -> bool {
     let parts: Vec<Component<'_>> = path.components().collect();
-    parts
-        .iter()
-        .rposition(|c| c.as_os_str() == ".git")
-        .is_some_and(|at| is_git_state(&parts[at + 1..].iter().collect::<PathBuf>()))
+    let Some(at) = parts.iter().rposition(|c| c.as_os_str() == ".git") else {
+        return false;
+    };
+    let relative = match &parts[at + 1..] {
+        [Component::Normal(dir), Component::Normal(_), state @ ..] if *dir == "worktrees" => state,
+        inside => inside,
+    };
+    is_git_state(&relative.iter().collect::<PathBuf>())
 }
 
 /// For a linked worktree `.git` is a file pointing at the real git dir.
@@ -200,8 +204,8 @@ impl Pending {
         self.order.is_empty() && !self.rescan
     }
 
-    /// What is on disk now decides the kind: the event stream coalesces and
-    /// reorders too freely to trust its own flags.
+    /// A missing path is removed. For a path that survives, creation and
+    /// rename flags are hints: FSEvents can retain them across later writes.
     fn into_batch(mut self, filter: &Filter) -> Vec<FsChange> {
         let mut batch = Vec::with_capacity(self.order.len() + 1);
         if self.rescan {
@@ -341,13 +345,16 @@ mod tests {
 
         /// Waits until `relative` has been reported (with `kind`, if given).
         fn wait_for(&self, relative: &str, kind: Option<FsChangeKind>) {
+            self.wait_for_kind(relative, |got| kind.is_none_or(|want| got == want));
+        }
+
+        fn wait_for_kind(&self, relative: &str, accept: impl Fn(FsChangeKind) -> bool) {
             let deadline = Instant::now() + Duration::from_secs(10);
             loop {
-                let got = self.kind_of(relative);
-                if got.is_some() && (kind.is_none() || got == kind) {
+                if self.kind_of(relative).is_some_and(&accept) {
                     return;
                 }
-                assert!(Instant::now() < deadline, "no {kind:?} for {relative}; got {:#?}", self.changes());
+                assert!(Instant::now() < deadline, "no matching change for {relative}; got {:#?}", self.changes());
                 std::thread::sleep(Duration::from_millis(20));
             }
         }
@@ -388,21 +395,92 @@ mod tests {
 
     #[test]
     fn batches_a_burst_of_changes() {
-        let w = Watched::new(|_| {});
-        for n in 0..300 {
-            fs::write(w.root.join(format!("burst-{n}.txt")), "x").unwrap();
-        }
-        w.wait_for("burst-299.txt", None);
-        w.settle();
+        use std::collections::BTreeSet;
 
-        let batches = w.log.lock().unwrap().clone();
-        let total: usize = batches.iter().map(Vec::len).sum();
-        assert_eq!(total, 300, "each path is reported once");
-        assert!(batches.len() <= 20, "300 changes arrived in {} batches", batches.len());
-        let mut names: Vec<_> = batches.iter().flatten().map(|c| c.path.clone()).collect();
-        names.sort();
-        names.dedup();
-        assert_eq!(names.len(), 300);
+        let root = tempfile::tempdir().unwrap();
+        let (tx, rx) = mpsc::channel();
+        let _watcher = Watcher::new(root.path(), move |batch| {
+            let _ = tx.send(batch);
+        })
+        .unwrap();
+        let mut expected = BTreeSet::new();
+        for n in 0..300 {
+            let path = root.path().join(format!("burst-{n}.txt"));
+            fs::write(&path, "x").unwrap();
+            expected.insert(path);
+        }
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut seen = BTreeSet::new();
+        let mut batch_count = 0;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            let wait = if seen == expected { remaining.min(MAX_DELAY * 2) } else { remaining };
+            let batch = match rx.recv_timeout(wait) {
+                Ok(batch) => batch,
+                Err(RecvTimeoutError::Timeout) => break,
+                Err(RecvTimeoutError::Disconnected) => panic!("watcher closed"),
+            };
+            batch_count += 1;
+            assert!(batch_count <= 20, "300 changes arrived in {batch_count} batches");
+            let paths: BTreeSet<_> = batch.iter().map(|change| &change.path).collect();
+            assert_eq!(paths.len(), batch.len(), "duplicate path in batch {batch_count}: {batch:?}");
+            seen.extend(paths.into_iter().cloned());
+        }
+        assert!(
+            seen == expected,
+            "missing: {:?}, unexpected: {:?}",
+            expected.difference(&seen).collect::<Vec<_>>(),
+            seen.difference(&expected).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn regression_repeated_events_coalesce_within_a_batch() {
+        let root = tempfile::tempdir().unwrap();
+        let canonical = root.path().canonicalize().unwrap();
+        let path = canonical.join("changes.txt");
+        fs::write(&path, "new").unwrap();
+        let mut filter = Filter::new(canonical, root.path().to_owned());
+        let mut pending = Pending::default();
+        for kind in [EventKind::Create(notify::event::CreateKind::File), EventKind::Modify(ModifyKind::Any)] {
+            pending.absorb(notify::Event::new(kind).add_path(path.clone()), &mut filter);
+        }
+        assert_eq!(
+            pending.into_batch(&filter),
+            [FsChange {
+                path: root.path().join("changes.txt"),
+                kind: FsChangeKind::Created,
+            }]
+        );
+    }
+
+    #[test]
+    fn regression_delivers_a_later_write_to_the_same_path() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("changes.txt");
+        let watched = path.clone();
+        let (tx, rx) = mpsc::channel();
+        let _watcher = Watcher::new(root.path(), move |batch| {
+            if batch.iter().any(|change| change.path == watched) {
+                let _ = tx.send(fs::read(&watched));
+            }
+        })
+        .unwrap();
+
+        for contents in [b"first".as_slice(), b"second".as_slice()] {
+            fs::write(&path, contents).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                let observed = rx
+                    .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+                    .expect("write notification")
+                    .unwrap();
+                if observed == contents {
+                    break;
+                }
+            }
+        }
     }
 
     #[test]
@@ -438,10 +516,17 @@ mod tests {
         fs::write(w.root.join("kept.txt"), "x").unwrap();
 
         w.wait_for(".git/index", None);
-        w.wait_for(".git/HEAD", Some(FsChangeKind::Modified));
+        let present = |kind| matches!(kind, FsChangeKind::Created | FsChangeKind::Modified);
+        w.wait_for_kind(".git/HEAD", present);
         w.wait_for(".git/refs/heads/other", Some(FsChangeKind::Created));
         w.wait_for("targets/list.txt", None);
         w.wait_for("kept.txt", None);
+
+        fs::remove_file(w.root.join(".git/HEAD")).unwrap();
+        w.wait_for(".git/HEAD", Some(FsChangeKind::Removed));
+        fs::write(w.root.join(".git/HEAD.lock"), "ref: refs/heads/main\n").unwrap();
+        fs::rename(w.root.join(".git/HEAD.lock"), w.root.join(".git/HEAD")).unwrap();
+        w.wait_for_kind(".git/HEAD", present);
         w.settle();
 
         let mut reported: Vec<String> = w
@@ -473,10 +558,19 @@ mod tests {
         let base = tmp.path().canonicalize().unwrap();
         let git_dir = base.join("main/.git/worktrees/task");
         let root = base.join("task");
+        let main = base.join("main");
         fs::create_dir_all(&git_dir).unwrap();
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join(".git"), format!("gitdir: {}\n", git_dir.display())).unwrap();
         std::thread::sleep(Duration::from_millis(300));
+
+        let index = git_dir.join("index");
+        let mut main_filter = Filter::new(main.clone(), main);
+        assert!(main_filter.accept(&index).is_none(), "the linked index belongs to the linked watcher");
+        assert!(Watcher::is_git_state_path(&index));
+        assert!(Watcher::is_git_state_path(&git_dir.join("HEAD")));
+        assert!(!Watcher::is_git_state_path(&git_dir.join("index.lock")));
+        assert!(!Watcher::is_git_state_path(&git_dir.join("ORIG_HEAD")));
 
         let log: Log = Arc::default();
         let sink = log.clone();

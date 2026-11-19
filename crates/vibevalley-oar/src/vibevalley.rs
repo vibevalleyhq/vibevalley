@@ -6,8 +6,13 @@
 //! prompts.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
+use vibevalley_agent::generation::{
+    Generation,
+    workers::{SharedExecution, WorkersOnly, worker_conversation},
+};
+#[path = "vibevalley_execution.rs"]
+mod execution;
 
 use serde_json::Value;
 use vibevalley_agent::price::{charge_usd, deepseek_price};
@@ -31,9 +36,11 @@ pub type KeySource = Arc<dyn Fn() -> Option<String> + Send + Sync>;
 
 pub struct VibeValleyRuntime {
     key: KeySource,
-    /// Where conversations are kept, one JSONL file per session.
+    /// Directory of standalone worker data.
     dir: PathBuf,
     client: Option<Arc<dyn ModelClient>>,
+    execution: Arc<OnceLock<SharedExecution>>,
+    init: Mutex<()>,
 }
 
 impl VibeValleyRuntime {
@@ -53,7 +60,35 @@ impl VibeValleyRuntime {
     }
 
     pub fn new(key: KeySource, dir: PathBuf) -> VibeValleyRuntime {
-        VibeValleyRuntime { key, dir, client: None }
+        VibeValleyRuntime {
+            key,
+            dir,
+            client: None,
+            execution: Default::default(),
+            init: Default::default(),
+        }
+    }
+
+    pub fn with_execution(mut self, execution: Arc<OnceLock<SharedExecution>>) -> Self {
+        self.execution = execution;
+        self
+    }
+
+    fn execution(&self) -> Result<SharedExecution> {
+        if let Some(shared) = self.execution.get() {
+            return Ok(shared.clone());
+        }
+        let _init = self.init.lock().unwrap();
+        if let Some(shared) = self.execution.get() {
+            return Ok(shared.clone());
+        }
+        std::fs::create_dir_all(&self.dir).map_err(|e| AgentError::Io(e.to_string()))?;
+        let store = vibevalley_durable::Store::open(&self.dir.join("execution.db")).map_err(|e| AgentError::Io(e.to_string()))?;
+        let scheduler = vibevalley_durable::Scheduler::new(store.clone(), 32);
+        let generation = Generation::new(store, Arc::new(WorkersOnly));
+        generation.register(&scheduler);
+        scheduler.recover().map_err(|e| AgentError::Io(e.to_string()))?;
+        Ok(self.execution.get_or_init(|| SharedExecution { generation, scheduler }).clone())
     }
 
     /// Talks to `client` instead of DeepSeek (tests).
@@ -119,10 +154,18 @@ impl Runtime for VibeValleyRuntime {
                 reason: format!("{ID} has no model `{model}`"),
             });
         }
-        if let Some(resume) = &opts.resume
-            && !self.dir.join(format!("{resume}.jsonl")).is_file()
-        {
-            return Err(AgentError::Rejected(format!("session_not_found: {resume}")));
+        let shared = self.execution()?;
+        if let Some(id) = &opts.resume {
+            if !id.starts_with("vv-") || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+                return Err(AgentError::Rejected(format!("session_not_found: {id}")));
+            }
+            match shared.generation.store.read(|tx| tx.conversation(&worker_conversation(id))) {
+                Err(vibevalley_durable::Error::Missing(_)) if !self.dir.join(format!("{id}.jsonl")).is_file() => {
+                    return Err(AgentError::Rejected(format!("session_not_found: {id}")));
+                }
+                Err(vibevalley_durable::Error::Missing(_)) | Ok(_) => (),
+                Err(e) => return Err(AgentError::Io(e.to_string())),
+            }
         }
         let session_id = opts.resume.clone().unwrap_or_else(|| format!("vv-{}", uuid::Uuid::new_v4()));
         let mut system = opts.system_prompt.clone().unwrap_or_else(|| SYSTEM.to_string());
@@ -179,14 +222,17 @@ impl Runtime for VibeValleyRuntime {
             brain.tools.extend(vibevalley_agent::mcp::McpHub::connect(&config).tools());
         }
         brain.tools.retain(|t| !opts.disallowed_tools.iter().any(|name| *name == t.spec().name));
-        let conversation = Conversation::open(self.dir.join(format!("{session_id}.jsonl")), brain).map_err(|e| AgentError::Io(e.to_string()))?;
         let file = record::open_file(opts.record_to.as_deref())?;
         let recorder = Recorder::start(file, ID, &session_id, &opts.cwd, Some(&model));
         let core = SessionCore::new(ID, &session_id, recorder);
         core.emit_root(EventKind::SessionStarted {
-            session_id,
+            session_id: session_id.clone(),
             model: Some(model.clone()),
         });
+        if !self.dir.join(format!("{session_id}.jsonl")).exists() {
+            return execution::WorkerDriver::open(shared, &session_id, brain, core, opts.cwd, self.capabilities());
+        }
+        let conversation = Conversation::open(self.dir.join(format!("{session_id}.jsonl")), brain).map_err(|e| AgentError::Io(e.to_string()))?;
         let abort = conversation.abort_handle();
         let unfinished = conversation.unfinished_turn();
         let driver = BrainDriver {
@@ -208,7 +254,7 @@ impl Runtime for VibeValleyRuntime {
 struct BrainDriver {
     core: Arc<SessionCore>,
     conversation: Arc<Mutex<Conversation>>,
-    abort: Arc<AtomicBool>,
+    abort: Arc<vibevalley_agent::TurnAbort>,
     model: String,
     cwd: PathBuf,
 }
@@ -287,7 +333,6 @@ impl BrainDriver {
 
 impl Driver for BrainDriver {
     fn start_turn(&self, content: Vec<ContentBlock>) -> Result<()> {
-        self.abort.store(false, Ordering::SeqCst);
         self.spawn(Some(render_text(&content)));
         Ok(())
     }
@@ -300,7 +345,7 @@ impl Driver for BrainDriver {
     }
 
     fn abort(&self) -> Result<()> {
-        self.abort.store(true, Ordering::SeqCst);
+        self.abort.abort();
         Ok(())
     }
 
@@ -309,6 +354,6 @@ impl Driver for BrainDriver {
     }
 
     fn dispose(&self) {
-        self.abort.store(true, Ordering::SeqCst);
+        self.abort.abort();
     }
 }

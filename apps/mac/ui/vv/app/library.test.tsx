@@ -18,6 +18,18 @@ async function start(route: string, extra: Record<string, unknown> = {}, frame =
 
 const payloadOf = (fake: { calls: { op: string; payload: unknown }[] }, op: string) => fake.calls.find((c) => c.op === op)?.payload as Record<string, unknown>;
 
+test("regression: speech and audio share the provider voice listing across tab changes", async () => {
+  const { app, fake } = await start("/library?make=speech");
+  expect(app.count("id:speech-panel")).toBe(1);
+  await app.press("id:library-make-form-audio");
+  await fake.pump(app);
+  expect(app.count("id:audio-panel")).toBe(1);
+  await app.press("id:library-make-form-speech");
+  await fake.pump(app);
+  expect(app.count("id:speech-panel")).toBe(1);
+  expect(fake.calls.map((c) => c.op)).toContain("provider.voice.list");
+});
+
 test("the library: every kept file as a tile, the job still generating, one file's inspector", async () => {
   const { app, fake } = await start("/library");
   expect(app.count("id:library-page")).toBe(1);

@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 use std::{io::Cursor, path::Path, sync::Arc};
-use vibevalley_protocol::{ApiError, BizCode, Caller, MediaInputPhase, MediaInputRequest};
+use vibevalley_protocol::{BizCode, Caller, MediaInputPhase, MediaInputRequest};
 use vibevalley_server::{
     Hub,
     modules::{
@@ -8,6 +8,11 @@ use vibevalley_server::{
         media::inputs::{self, Inputs},
     },
 };
+fn database(root: &Path) -> sqlx::SqliteConnection {
+    use sqlx::ConnectOptions;
+    pollster::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(root.join("server.db")).connect()).unwrap()
+}
+
 fn setup() -> (tempfile::TempDir, Arc<Inputs>, Arc<Attachments>, Arc<Hub>) {
     let dir = tempfile::tempdir().unwrap();
     let files = Attachments::open(dir.path()).unwrap();
@@ -80,14 +85,14 @@ fn pins_admission_rollback_expiry_and_restart() {
     let (dir, inputs, files, _) = setup();
     let r = inputs.create(&request()).unwrap();
     inputs.upload(&r.id, Cursor::new(png())).unwrap();
-    let bad: Result<(), _> = inputs.pin(std::slice::from_ref(&r.id), "job", |_| Err(ApiError::new(BizCode::MediaRefused, "reject")));
+    let bad = inputs.pin(&[r.id.clone(), "missing".into()], "job");
     assert!(bad.is_err());
     assert!(inputs.get(&r.id).unwrap().can_delete);
-    inputs.pin(&[r.id.clone(), r.id.clone()], "job", |_| Ok(())).unwrap();
+    inputs.pin(&[r.id.clone(), r.id.clone()], "job").unwrap();
     assert!(!inputs.get(&r.id).unwrap().can_delete);
     assert!(inputs.delete(&r.id).is_err());
-    let db = rusqlite::Connection::open(dir.path().join("server.db")).unwrap();
-    db.execute("update media_input set expires_at=0", []).unwrap();
+    let mut db = database(dir.path());
+    pollster::block_on(sqlx::query("update media_input set expires_at=0").execute(&mut db)).unwrap();
     inputs.sweep().unwrap();
     assert!(inputs.content(&r.id).is_ok());
     let restored = Inputs::open(dir.path(), files.clone()).unwrap();
@@ -97,7 +102,12 @@ fn pins_admission_rollback_expiry_and_restart() {
     restored.sweep().unwrap();
     assert!(restored.list().unwrap().is_empty());
     let interrupted = restored.create(&request()).unwrap();
-    db.execute("update media_input set phase='uploading' where id=?1", [&interrupted.id]).unwrap();
+    pollster::block_on(
+        sqlx::query("update media_input set phase='uploading' where id=?1")
+            .bind(&interrupted.id)
+            .execute(&mut db),
+    )
+    .unwrap();
     let reopened = Inputs::open(dir.path(), files).unwrap();
     assert_eq!(reopened.get(&interrupted.id).unwrap().phase, MediaInputPhase::Failed);
 }
@@ -112,8 +122,8 @@ fn quota_and_corrupted_content() {
         inputs.create(&r).unwrap();
     }
     assert!(inputs.create(&r).is_err());
-    let db = rusqlite::Connection::open(dir.path().join("server.db")).unwrap();
-    db.execute("update media_input set expires_at=0", []).unwrap();
+    let mut db = database(dir.path());
+    pollster::block_on(sqlx::query("update media_input set expires_at=0").execute(&mut db)).unwrap();
     inputs.sweep().unwrap();
     let input = inputs.create(&request()).unwrap();
     let ready = inputs.upload(&input.id, Cursor::new(png())).unwrap();
@@ -162,7 +172,7 @@ fn active_upload_cannot_be_deleted_or_pinned() {
     rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
     assert!(!inputs.get(&r.id).unwrap().can_delete);
     assert!(inputs.delete(&r.id).is_err());
-    assert!(inputs.pin(&[r.id], "job", |_| Ok(())).is_err());
+    assert!(inputs.pin(&[r.id], "job").is_err());
     go.send(()).unwrap();
     assert!(task.join().unwrap().is_ok());
 }
@@ -246,14 +256,16 @@ fn real_http_upload_preview_ranges_and_origin_checks() {
 fn failed_promotion_keeps_hash_and_refuses_changed_retry() {
     let (dir, inputs, _, _) = setup();
     let r = inputs.create(&request()).unwrap();
-    let db = rusqlite::Connection::open(dir.path().join("server.db")).unwrap();
-    db.execute_batch("create trigger fail_attachment before insert on attachment begin select raise(abort, 'disk failure'); end;")
-        .unwrap();
+    let mut db = database(dir.path());
+    pollster::block_on(
+        sqlx::raw_sql("create trigger fail_attachment before insert on attachment begin select raise(abort, 'disk failure'); end;").execute(&mut db),
+    )
+    .unwrap();
     assert!(inputs.upload(&r.id, Cursor::new(png())).is_err());
     let failed = inputs.get(&r.id).unwrap();
     assert_eq!(failed.phase, MediaInputPhase::Failed);
     assert!(failed.hash.is_some());
-    db.execute_batch("drop trigger fail_attachment").unwrap();
+    pollster::block_on(sqlx::query("drop trigger fail_attachment").execute(&mut db)).unwrap();
     let mut changed = png();
     changed[23] = 1;
     assert!(inputs.upload(&r.id, Cursor::new(changed)).is_err());

@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use rusqlite::{Connection, params};
+use sqlx::{Connection, SqliteConnection};
 use vibevalley_i18n::t;
 use vibevalley_memory as m;
 use vibevalley_protocol::{
@@ -19,15 +19,19 @@ use vibevalley_protocol::{
     RecallPreview, ops,
 };
 
-use crate::base::{RequestKeys, open_db};
+use crate::base::{RequestKeys, open_sqlx_db};
 use crate::modules::agent::Agents;
 use crate::{Hub, lock, now};
+
+#[rustfmt::skip]
+#[path = "memory/generated/queries.rs"]
+mod queries;
 
 /// Fading marks the ones that would go if this many more were kept.
 const FADING_SOON: usize = 10;
 pub const LOCAL: &str = "local";
 
-fn db_failed(e: rusqlite::Error) -> ApiError {
+fn db_failed(e: sqlx::Error) -> ApiError {
     ApiError::new(BizCode::MemoryRefused, format!("{}: {e}", t("server.memory.dbFailed", &[])))
 }
 
@@ -65,7 +69,7 @@ pub struct FinishedRun {
 }
 
 pub struct Memories {
-    db: Mutex<Connection>,
+    db: Mutex<SqliteConnection>,
     agents: Arc<Agents>,
 }
 
@@ -95,49 +99,30 @@ fn to_wire(x: m::Memory) -> Memory {
 
 impl Memories {
     pub fn open(home: &Path, agents: Arc<Agents>) -> Result<Arc<Memories>, ApiError> {
-        let db = open_db(home).map_err(db_failed)?;
-        db.execute_batch(
-            "create table if not exists memory (
-                id text primary key,
-                agent text not null,
-                kind text not null,
-                body text not null,
-                terms text not null default '',
-                terms_of integer not null default 0,
-                repo text,
-                session text,
-                author text not null,
-                created_at integer not null,
-                updated_at integer not null,
-                recalled integer not null default 0,
-                recalled_at integer
-            );
-            create index if not exists memory_agent on memory (agent, created_at);
-            create unique index if not exists memory_issue_session on memory (agent, session) where kind = 'issue';",
-        )
+        let db = pollster::block_on(async {
+            let mut conn = open_sqlx_db(home).await?;
+            sqlx::raw_sql(include_str!("memory/sql/schema.sql")).execute(&mut conn).await?;
+            let version = i64::from(m::TERMS_VERSION);
+            let stale = queries::list_stale_terms(&mut conn, queries::ListStaleTermsParams { terms_of: version }).await?;
+            if !stale.is_empty() {
+                let mut tx = conn.begin().await?;
+                for entry in stale {
+                    queries::set_terms(
+                        &mut *tx,
+                        queries::SetTermsParams {
+                            id: entry.id,
+                            terms: m::terms_text(&entry.body),
+                            terms_of: version,
+                        },
+                    )
+                    .await?;
+                }
+                tx.commit().await?;
+            }
+            Ok::<_, sqlx::Error>(conn)
+        })
         .map_err(db_failed)?;
-        let me = Arc::new(Memories { db: Mutex::new(db), agents });
-        me.recut_terms();
-        Ok(me)
-    }
-
-    /// What an older cut left is cut again.
-    fn recut_terms(&self) {
-        let db = lock(&self.db);
-        let Ok(mut stmt) = db.prepare("select id, body from memory where terms_of < ?1") else {
-            return;
-        };
-        let rows: Vec<(String, String)> = stmt
-            .query_map([m::TERMS_VERSION], |r| Ok((r.get(0)?, r.get(1)?)))
-            .map(|rows| rows.flatten().collect())
-            .unwrap_or_default();
-        drop(stmt);
-        for (id, body) in rows {
-            let _ = db.execute(
-                "update memory set terms = ?1, terms_of = ?2 where id = ?3",
-                params![m::terms_text(&body), m::TERMS_VERSION, id],
-            );
-        }
+        Ok(Arc::new(Memories { db: Mutex::new(db), agents }))
     }
 
     pub fn observe_sessions(self: &Arc<Self>, sessions: &crate::modules::session::Sessions) {
@@ -170,38 +155,32 @@ impl Memories {
 
     /// An agent's own memories, newest first.
     pub fn list(&self, agent: &str) -> Result<Vec<m::Memory>, ApiError> {
-        let db = lock(&self.db);
-        let mut stmt = db
-            .prepare(
-                "select id, kind, body, repo, session, author, created_at, recalled, recalled_at
-                 from memory where agent = ?1 order by created_at desc, id desc",
-            )
-            .map_err(db_failed)?;
-        let rows = stmt
-            .query_map([agent], |r| {
-                let kind: String = r.get(1)?;
-                let author: String = r.get(5)?;
-                Ok(m::Memory {
-                    id: r.get(0)?,
-                    agent: agent.to_string(),
-                    kind: if kind == "issue" { m::MemoryKind::Issue } else { m::MemoryKind::Note },
-                    text: r.get(2)?,
-                    author: match author.as_str() {
-                        "user" => m::ActorKind::User,
-                        "agent" => m::ActorKind::Agent,
-                        _ => m::ActorKind::System,
-                    },
-                    repo: r.get(3)?,
-                    session: r.get(4)?,
-                    at: r.get(6)?,
-                    recalled: r.get(7)?,
-                    recalled_at: r.get(8)?,
-                    fading: false,
-                    source: None,
-                })
+        pollster::block_on(Self::read_for(&mut lock(&self.db), agent)).map_err(db_failed)
+    }
+
+    async fn read_for(db: &mut SqliteConnection, agent: &str) -> sqlx::Result<Vec<m::Memory>> {
+        let rows = queries::list_memories(db, queries::ListMemoriesParams { agent: agent.into() }).await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| m::Memory {
+                id: row.id,
+                agent: agent.into(),
+                kind: if row.kind == "issue" { m::MemoryKind::Issue } else { m::MemoryKind::Note },
+                text: row.body,
+                author: match row.author.as_str() {
+                    "user" => m::ActorKind::User,
+                    "agent" => m::ActorKind::Agent,
+                    _ => m::ActorKind::System,
+                },
+                repo: row.repo,
+                session: row.session,
+                at: row.created_at,
+                recalled: row.recalled,
+                recalled_at: row.recalled_at,
+                fading: false,
+                source: None,
             })
-            .map_err(db_failed)?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(db_failed)
+            .collect())
     }
 
     /// The memories with the ones that would go next marked fading.
@@ -233,6 +212,10 @@ impl Memories {
     }
 
     pub fn write(&self, n: &Note) -> Result<Memory, ApiError> {
+        pollster::block_on(Self::insert_note(&mut lock(&self.db), n))
+    }
+
+    async fn insert_note(db: &mut SqliteConnection, n: &Note) -> Result<Memory, ApiError> {
         let body = m::clip(&n.text, m::NOTE_MAX_CHARS);
         if body.is_empty() {
             return Err(refused(t("server.memory.empty", &[])));
@@ -245,13 +228,22 @@ impl Memories {
         };
         let at = now();
         let id = uuid::Uuid::now_v7().to_string();
-        lock(&self.db)
-            .execute(
-                "insert into memory (id, agent, kind, body, terms, terms_of, repo, session, author, created_at, updated_at)
-                 values (?1, ?2, 'note', ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
-                params![id, n.agent, body, m::terms_text(&body), m::TERMS_VERSION, repo, session, author, at],
-            )
-            .map_err(db_failed)?;
+        queries::write_note(
+            db,
+            queries::WriteNoteParams {
+                id: id.clone(),
+                agent: n.agent.clone(),
+                terms: m::terms_text(&body),
+                body: body.clone(),
+                terms_of: i64::from(m::TERMS_VERSION),
+                repo: repo.clone(),
+                session: session.clone(),
+                author: author.into(),
+                created_at: at,
+            },
+        )
+        .await
+        .map_err(db_failed)?;
         Ok(to_wire(m::Memory {
             id,
             agent: n.agent.clone(),
@@ -270,18 +262,27 @@ impl Memories {
 
     /// `rewrite`: the agent's own notes replaced; the user's stay.
     pub fn rewrite(&self, agent: &str, texts: &[String], by: By) -> Result<usize, ApiError> {
-        lock(&self.db)
-            .execute("delete from memory where agent = ?1 and kind = 'note' and author <> 'user'", [agent])
-            .map_err(db_failed)?;
-        for text in texts {
-            self.write(&Note {
-                agent: agent.into(),
-                text: text.clone(),
-                repo: String::new(),
-                by: by.clone(),
-            })?;
-        }
-        Ok(texts.len())
+        let mut db = lock(&self.db);
+        pollster::block_on(async {
+            let mut tx = db.begin().await.map_err(db_failed)?;
+            queries::clear_agent_notes(&mut *tx, queries::ClearAgentNotesParams { agent: agent.into() })
+                .await
+                .map_err(db_failed)?;
+            for text in texts {
+                Self::insert_note(
+                    &mut tx,
+                    &Note {
+                        agent: agent.into(),
+                        text: text.clone(),
+                        repo: String::new(),
+                        by: by.clone(),
+                    },
+                )
+                .await?;
+            }
+            tx.commit().await.map_err(db_failed)?;
+            Ok(texts.len())
+        })
     }
 
     fn forgettable(&self, agent: &str, id: &str) -> Result<m::Memory, ApiError> {
@@ -299,9 +300,14 @@ impl Memories {
 
     pub fn forget(&self, agent: &str, id: &str) -> Result<(), ApiError> {
         self.forgettable(agent, id)?;
-        lock(&self.db)
-            .execute("delete from memory where agent = ?1 and id = ?2", [agent, id])
-            .map_err(db_failed)?;
+        pollster::block_on(queries::forget(
+            &mut *lock(&self.db),
+            queries::ForgetParams {
+                agent: agent.into(),
+                id: id.into(),
+            },
+        ))
+        .map_err(db_failed)?;
         Ok(())
     }
 
@@ -330,9 +336,15 @@ impl Memories {
         let picked = m::pick(&all, &cue);
         if !peek {
             let at = now();
-            let db = lock(&self.db);
+            let mut db = lock(&self.db);
             for x in &picked {
-                let _ = db.execute("update memory set recalled = recalled + 1, recalled_at = ?1 where id = ?2", params![at, x.id]);
+                let _ = pollster::block_on(queries::count_recall(
+                    &mut *db,
+                    queries::CountRecallParams {
+                        recalled_at: Some(at),
+                        id: x.id.clone(),
+                    },
+                ));
             }
         }
         picked.iter().map(|x| (x.id.clone(), m::line_of(x, repo))).collect()
@@ -352,31 +364,34 @@ impl Memories {
         if run.outcome == Outcome::Interrupted {
             return;
         }
-        if run.issue.is_some() {
-            let text = m::issue_memory_text(&run.brief, &run.summary, run.outcome == Outcome::Failed);
-            let at = now();
-            let _ = lock(&self.db).execute(
-                "insert into memory (id, agent, kind, body, terms, terms_of, repo, session, author, created_at, updated_at)
-                 values (?1, ?2, 'issue', ?3, ?4, ?5, ?6, ?7, 'system', ?8, ?8)
-                 on conflict (agent, session) where kind = 'issue'
-                 do update set body = excluded.body, terms = excluded.terms, terms_of = excluded.terms_of,
-                    repo = excluded.repo, created_at = excluded.created_at, updated_at = excluded.updated_at",
-                params![
-                    uuid::Uuid::now_v7().to_string(),
-                    run.agent,
-                    text,
-                    m::terms_text(&text),
-                    m::TERMS_VERSION,
-                    run.repo,
-                    run.session,
-                    at
-                ],
-            );
-        }
-        let all = self.list(&run.agent).unwrap_or_default();
-        let db = lock(&self.db);
-        for id in m::next_forgotten(&all, 0) {
-            let _ = db.execute("delete from memory where agent = ?1 and id = ?2", [&run.agent, &id]);
+        let mut db = lock(&self.db);
+        let saved = pollster::block_on(async {
+            let mut tx = db.begin().await?;
+            if run.issue.is_some() {
+                let text = m::issue_memory_text(&run.brief, &run.summary, run.outcome == Outcome::Failed);
+                queries::keep_issue(
+                    &mut *tx,
+                    queries::KeepIssueParams {
+                        id: uuid::Uuid::now_v7().to_string(),
+                        agent: run.agent.clone(),
+                        terms: m::terms_text(&text),
+                        body: text,
+                        terms_of: i64::from(m::TERMS_VERSION),
+                        repo: Some(run.repo.clone()),
+                        session: Some(run.session.clone()),
+                        created_at: now(),
+                    },
+                )
+                .await?;
+            }
+            let all = Self::read_for(&mut tx, &run.agent).await?;
+            for id in m::next_forgotten(&all, 0) {
+                queries::forget(&mut *tx, queries::ForgetParams { agent: run.agent.clone(), id }).await?;
+            }
+            tx.commit().await
+        });
+        if let Err(error) = saved {
+            eprintln!("could not keep the completed run for {}: {error}", run.session);
         }
     }
 

@@ -67,7 +67,7 @@ export function UpdateRow(props: { state: Accessor<UpdateState | undefined>; las
               />
             )}
           </If>
-          <If when={variant(s(), "_tag", "manual")}>{(m) => <OutLink href={m().page} label={t("web.setting.about.download")} />}</If>
+          <If when={variant(s(), "_tag", "manual")?.page}>{(page) => <OutLink href={page()} label={t("web.setting.about.download")} />}</If>
         </SettingRow>
       )}
     </If>

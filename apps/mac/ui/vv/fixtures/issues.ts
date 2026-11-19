@@ -5,7 +5,7 @@
 // `withIssues` adds the issue pages' own cases (VibeValley's issue page
 // stories: one working, one to review, one asking, a family) to a fixture,
 // for the issue tests and pictures; the workbench keeps its seven cards.
-import type { Issue, IssueHistory, Milestone, Run, SessionView, StateFrame } from "@vibevalley/protocol";
+import type { Issue, IssueHistory, Milestone, Run, SessionEvent, SessionView, StateFrame } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { acts, min, now, sampleChanges, sampleIssue, sampleSession, type SampleIssue, working } from "../web/features/issue/model/issue.samples";
@@ -25,6 +25,12 @@ const runs: Run[] = [
   {
     id: "run-1",
     session: "w4" as Run["session"],
+    subagents: {
+      run: "run-1",
+      rootThreadId: "main",
+      waits: [],
+      threads: [{ threadId: "old-review", parentThreadId: "main", task: "复查登录提示", status: "completed", updatedAt: now - 20 * min }],
+    },
     triggeredBy: { kind: "issue" },
     heard: [],
     startedAt: now - 20 * min,
@@ -63,7 +69,32 @@ const base = (number: number, title: string, more: SampleIssue) =>
 const lastRun = (outcome: "completed" | "failed" | "interrupted", summary: string) => ({ outcome, summary, at: now - 6 * min });
 
 const at = { repo: "vibevalley", branch: "issue-31-login", worktree: "/Users/me/vibevalley/.worktrees/issue-31-login" };
-const workingSession = sampleSession("w5", "laozhou", working(now - 4 * min), { name: "老周", ...at, branch: "issue-32-settings" });
+const workingSession = sampleSession("w5", "laozhou", working(now - 4 * min), {
+  name: "老周",
+  ...at,
+  branch: "issue-32-settings",
+  runtime: "codex",
+  subagents: {
+    run: "run-2",
+    rootThreadId: "main",
+    waits: [{ threadId: "main", callId: "wait-1", targets: ["test-settings"] }],
+    threads: [
+      {
+        threadId: "test-settings",
+        parentThreadId: "main",
+        task: "测试设置分组",
+        status: "running",
+        lastActivity: "运行设置页测试",
+        steps: [
+          { step: "运行设置页键盘用例", status: "inProgress" },
+          { step: "复核测试输出", status: "pending" },
+        ],
+        updatedAt: now - 2 * min,
+      },
+      { threadId: "review-groups", parentThreadId: "main", task: "核对分组名称", status: "completed", updatedAt: now - 3 * min },
+    ],
+  },
+});
 const reviewSession = sampleSession(
   "w4",
   "laozhou",
@@ -137,6 +168,16 @@ export function withIssues(fixture: { state: StateFrame; responses: Record<strin
     responses: {
       ...fixture.responses,
       ...responses,
+      "session.event.list": ({ id }: { id: string }) =>
+        id === "w5"
+          ? ([
+              ...finishedRun,
+              ...liveRun,
+              { seq: 310, revision: 0, run: "run-2", time: now - 2 * min, threadId: "test-settings", type: "assistant/message", text: "设置项分组用例通过" },
+              { seq: 311, revision: 0, run: "run-2", time: now - 3 * min, threadId: "review-groups", type: "assistant/message", text: "四组名称核对完毕" },
+              { seq: 312, revision: 0, run: "run-1", time: now - 12 * min, threadId: "test-settings", type: "assistant/message", text: "旧轮用例通过" },
+            ] satisfies SessionEvent[])
+          : [...finishedRun, ...liveRun],
       "issue.history.list": history(allIssues, allSessions),
     },
   };

@@ -279,7 +279,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
                 ? t("web.issue.todo.noCriteria")
                 : t("web.issue.todo.criteriaSummary", { n: criteria().length, first: criteria()[0] ?? "" })
             }
-            open={criteria().length === 0}
+            defaultOpen={criteria().length === 0}
           >
             <TextArea
               rows={3}

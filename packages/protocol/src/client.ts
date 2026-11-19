@@ -364,7 +364,7 @@ export class VibeValleyApi {
         this.call<T.Applied>("issue.comment.create", "/api/v1/issue/comment/create", a, options),
     },
     diff: {
-      get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Changes> =>
+      get: (a: { id: string; sinceTree?: string }, options?: { signal?: AbortSignal }): Promise<T.Changes> =>
         this.call<T.Changes>("issue.diff.get", "/api/v1/issue/diff/get", a, options),
     },
     history: {

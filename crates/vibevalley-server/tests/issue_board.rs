@@ -197,6 +197,10 @@ fn an_interrupted_round_resumes_or_completes() {
     w.board.stop("1").unwrap();
     let stuck = wait_stage(&w.board, "1", StageKind::Stuck);
     assert_eq!(stuck.stage.stuck, Some(StuckReason::Interrupted));
+    assert!(!w.board.runs(&stuck.id).unwrap().last().unwrap().needs_reconciliation);
+    let session = w.board.session(stuck.latest_session_id().unwrap()).unwrap();
+    assert!(!session.last_run.unwrap().needs_reconciliation);
+
     assert!(stuck.moves.contains(&IssueStatus::Done), "what is there can be completed");
     assert_eq!(w.board.frame().inbox[0].kind, vibevalley_protocol::InboxKind::Interrupted);
     assert_eq!(w.board.move_to("1", IssueStatus::Todo, None).unwrap(), Move::Round);
@@ -447,6 +451,144 @@ fn a_failing_check_sends_the_work_back_with_the_output_tail() {
     assert_eq!(w.board.session(back.latest_session_id().unwrap()).unwrap().runs, 2);
     w.board.move_to("1", IssueStatus::Done, None).unwrap();
     assert!(exists_on(&main, "main", "ok.txt"));
+}
+
+#[test]
+fn regression_review_keeps_the_seen_tree_and_records_the_delivered_commit() {
+    let rt = HookRuntime::new("t", quick(), |turn| {
+        turn.write("first.txt", "review me");
+        turn.done("ready");
+    });
+    let w = world(vec![rt], |_| {});
+    let main = repo(w.dir.path(), "app");
+    w.board.create(new("Review the content", Some(&main))).unwrap();
+    w.board.move_to("1", IssueStatus::Todo, None).unwrap();
+    wait_stage(&w.board, "1", StageKind::Reviewing);
+    let first = w.board.changes("1").unwrap();
+    assert_eq!(first.files.len(), 1, "the displayed patch includes uncommitted files");
+    assert_eq!(first.uncommitted[0].new_path.as_deref(), Some(Path::new("first.txt")));
+    w.board.review("1", true, &[], "", Some(&first.revision)).unwrap();
+    std::fs::write(first.worktree.join("second.txt"), "new edit").unwrap();
+    assert!(w.board.review("1", true, &[], "", Some(&first.revision)).is_err());
+    assert!(w.board.move_to("1", IssueStatus::Done, None).is_err());
+    assert!(!main.join("first.txt").exists());
+    let next = w.board.changes("1").unwrap();
+    let added = next.since_review.unwrap();
+    assert_eq!(added.len(), 1);
+    assert_eq!(added[0].new_path.as_deref(), Some(Path::new("second.txt")));
+    w.board.review("1", true, &[], "", Some(&next.revision)).unwrap();
+    assert!(
+        w.board.move_reviewed("1", IssueStatus::Done, None, Some(&first.revision)).is_err(),
+        "a stale completion cannot adopt another reviewer's pass"
+    );
+    std::fs::write(main.join("unrelated"), "another issue").unwrap();
+    git(&main, &["add", "unrelated"]);
+    git(&main, &["commit", "-qm", "advance the target"]);
+    let target = git(&main, &["rev-parse", "HEAD"]);
+    w.board.move_to("1", IssueStatus::Done, None).unwrap();
+
+    w.board.close();
+    let board = Board::open(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
+    let archived = board.changes_since("1", Some(&first.revision.tree)).unwrap();
+    assert_eq!(archived.revision, next.revision);
+    assert_eq!(archived.files.len(), 2);
+    assert_eq!(archived.since_review.unwrap().len(), 1);
+    let delivery = board.issue("1").unwrap().delivery_evidence.unwrap();
+    assert_eq!(
+        delivery.reviews.iter().map(|r| &r.revision).collect::<Vec<_>>(),
+        [&first.revision, &next.revision]
+    );
+    let check = delivery.check.unwrap();
+    assert_eq!(check.target_commit, target);
+    assert_eq!(check.source_tree, next.revision.tree);
+    assert_eq!(check.candidate_tree, git(&main, &["rev-parse", "HEAD^{tree}"]));
+    assert_eq!(check.status, vibevalley_protocol::ProjectCheckStatus::NotConfigured);
+    assert_eq!(check.command, None);
+    assert_eq!(delivery.merged_commit.as_deref(), Some(check.candidate_commit.as_str()));
+    assert_eq!(check.candidate_commit, git(&main, &["rev-parse", "HEAD"]));
+}
+
+#[test]
+fn regression_reopen_recognizes_an_already_published_candidate_without_running_git_again() {
+    let rt = HookRuntime::new("t", quick(), |turn| {
+        turn.commit("work", "reviewed");
+        turn.done("ready");
+    });
+    let w = world(vec![rt], |_| {});
+    let main = repo(w.dir.path(), "app");
+    w.board.create(new("Recover delivery", Some(&main))).unwrap();
+    w.board.move_to("1", IssueStatus::Todo, None).unwrap();
+    wait_stage(&w.board, "1", StageKind::Reviewing);
+    let mut db = inspect_db(&w.store);
+    execute_sql(
+        &mut db,
+        "create trigger stop_delivery before insert on issue when new.delivered = 'merged' begin select raise(fail, 'stop after Git accepted the commit'); end;",
+    );
+    let err = w.board.move_to("1", IssueStatus::Done, None).unwrap_err();
+    assert!(err.to_string().contains("stop after Git"), "{err}");
+    let head = git(&main, &["rev-parse", "HEAD"]);
+    assert_eq!(git(&main, &["show", "HEAD:work"]), "reviewed");
+    assert!(!branch_exists(&main, "vibevalley/issue-1"));
+    w.board.close();
+    execute_sql(&mut db, "drop trigger stop_delivery");
+    let board = Board::open(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
+    let restored = board.issue("1").unwrap();
+    assert_eq!(restored.status, IssueStatus::Done);
+    assert_eq!(restored.delivery_evidence.unwrap().merged_commit.as_deref(), Some(head.as_str()));
+    assert_eq!(git(&main, &["rev-parse", "HEAD"]), head);
+}
+
+#[test]
+fn regression_project_check_runs_on_the_combined_tree_before_delivery() {
+    let rt = HookRuntime::new("t", quick(), |turn| {
+        turn.commit("jobs", if turn.index == 0 { "2" } else { "1" });
+        turn.done("updated jobs");
+    });
+    let w = world(vec![rt], |_| {});
+    let main = repo(w.dir.path(), "app");
+    std::fs::create_dir(main.join(".vibevalley")).unwrap();
+    std::fs::write(
+        main.join(".vibevalley/check"),
+        r#"test "$(cat jobs)" -le "$(cat limit)" || { echo "too many jobs"; exit 1; }"#,
+    )
+    .unwrap();
+    std::fs::write(main.join("jobs"), "1").unwrap();
+    std::fs::write(main.join("limit"), "2").unwrap();
+    git(&main, &["add", "."]);
+    git(&main, &["commit", "-qm", "initial capacity"]);
+    w.board.create(new("Increase jobs", Some(&main))).unwrap();
+    w.board.move_to("1", IssueStatus::Todo, None).unwrap();
+    let reviewing = wait_stage(&w.board, "1", StageKind::Reviewing);
+    let session = w.board.session(reviewing.latest_session_id().unwrap()).unwrap();
+    let worktree = Path::new(session.worktree.as_ref().unwrap());
+    std::fs::write(main.join("limit"), "1").unwrap();
+    git(&main, &["commit", "-qam", "decrease capacity"]);
+    let target = git(&main, &["rev-parse", "HEAD"]);
+    for dir in [&*main, worktree] {
+        assert!(
+            std::process::Command::new("sh")
+                .arg(".vibevalley/check")
+                .current_dir(dir)
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+
+    let result = w.board.move_to("1", IssueStatus::Done, None);
+    assert!(
+        matches!(result, Err(BoardError::NotDelivered(Undelivered::CheckFailed { ref output, .. })) if output == "too many jobs"),
+        "{result:?}"
+    );
+    let failed = w.board.issue("1").unwrap().delivery_evidence.unwrap().check.unwrap();
+    assert_eq!(failed.status, vibevalley_protocol::ProjectCheckStatus::Failed);
+    assert_eq!(failed.output.as_deref(), Some("too many jobs"));
+    assert_eq!(git(&main, &["rev-parse", "HEAD"]), target);
+    assert_eq!(std::fs::read_to_string(main.join("jobs")).unwrap(), "1");
+    wait_stage(&w.board, "1", StageKind::Reviewing);
+    w.board.move_to("1", IssueStatus::Done, None).unwrap();
+    assert_eq!(w.board.issue("1").unwrap().delivered, Some(Landing::Merged));
+    assert_eq!(std::fs::read_to_string(main.join("limit")).unwrap(), "1");
 }
 
 #[test]

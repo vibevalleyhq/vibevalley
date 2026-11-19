@@ -16,7 +16,7 @@
 | 位置 | 职责 |
 |---|---|
 | [`packages/pkm/`](packages/pkm/README.md) | 独立 PKM 与双链大纲纯领域包（`@vibevalley/pkm`）：Logseq 式 Markdown 解析与打印（`markdown.ts`）、PARA 目录映射（`para.ts`）、双链反链与块引用图谱（`graph.ts`）、前端大纲视图与行内切片（`view.ts`）、键盘编辑与补全状态机（`editing.ts`）、多块框选与拖拽（`selection.ts`）、日历日期（`days.ts`）与乐观写入队列（`writer.ts`） |
-| `crates/vibevalley-server/src/modules/pkm/mod.rs`、`db.rs` | `Pkm`：文件读写、单写锁、文件监听（外部编辑器改了就重扫）、批注、全文索引与撤销记录（`server.db`） |
+| [笔记服务](crates/vibevalley-server/src/modules/pkm/mod.rs)、[数据库查询](crates/vibevalley-server/src/modules/pkm/sql/queries.sql) | 笔记服务读写并监听 Markdown 文件。sqlc 为批注、全文索引和撤销记录生成 SQLx 查询。 |
 | `crates/vibevalley-pkm/src/` | 服务端跑的那份大纲引擎：解析与打印、PARA、双链图谱（`graph.rs`）；和 `packages/pkm` 对着 `crates/vibevalley-pkm/golden` 的测例 |
 | `crates/vibevalley-cli/src/commands/pkm.rs` | `vibevalley pkm ...` |
 | `packages/protocol/src/pkm/`、`packages/pkm/src/outline.ts` | 笔记契约与前后端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |
@@ -36,6 +36,7 @@
   - 仅当块已有 `id::`、被 `((id))` 引用或挂有批注时，才在文件中写出 `id::` 属性。
   - 外部编辑器修改文件触发重读时，未写 `id::` 的块按同层级、同状态与同文本续接原内存 ID（`carryIds`）。
 - **单锁串行读写与文件级撤销**：
+  - 写回先替换 Markdown 文件。数据库在一笔事务中替换该页的全文索引。若索引写入失败，旧索引仍可读取；下次启动按磁盘正文重建。
   - 所有笔记读写经过同一把信号量锁，采用临时文件原子替换。
   - 每次修改在 `pkm_change` 记录修改前后的全文（保留最近 200 条），`pkm.undo` 每次恢复最新一条变更。
 - **Agent 只提改写建议，且强制保留链接**：

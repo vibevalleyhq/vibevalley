@@ -30,7 +30,7 @@ export type InboxTarget = InboxTargetSession | InboxTargetIssue | InboxTargetCha
  */
 export type InboxWords = { label: string, title: string, body: string, tray: string, };
 
-export type InboxItem = { id: string, kind: InboxKind, from: InboxFrom, 
+export type InboxItem = { id: string, kind: InboxKind, from: InboxFrom,
 /**
  * Who it is from, as the routes say it: the helper's name, or the orchestrator.
  */

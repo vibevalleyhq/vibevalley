@@ -145,7 +145,14 @@ pub(crate) fn run_capture_streams(binary: &Path, args: &[&str], timeout: Duratio
 /// (exit status, stdout + stderr) that says yes.
 pub(crate) struct LoginCheck {
     pub args: &'static [&'static str],
-    pub logged_in: fn(bool, &str) -> bool,
+    pub status: fn(bool, &str) -> LoginStatus,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LoginStatus {
+    SignedIn,
+    SignedOut,
+    Unknown,
 }
 
 pub(crate) fn probe_installation_with(name: &str, login: Option<&LoginCheck>) -> Installation {
@@ -159,13 +166,15 @@ pub(crate) fn probe_installation_with(name: &str, login: Option<&LoginCheck>) ->
     };
     let version = output.lines().map(str::trim).find(|l| !l.is_empty()).map(str::to_string);
     if let Some(check) = login {
-        // A check that cannot run says nothing either way.
-        if let Some((ok, text)) = run_capture_streams(&path, check.args, Duration::from_secs(15), true)
-            && !(check.logged_in)(ok, &text)
-        {
-            return Installation::Unusable {
-                reason: format!("not logged in: run `{name} {}` to see why", check.args.join(" ")),
-            };
+        let status = run_capture_streams(&path, check.args, Duration::from_secs(15), true).map_or(LoginStatus::Unknown, |(ok, text)| (check.status)(ok, &text));
+        match status {
+            LoginStatus::SignedIn => {}
+            LoginStatus::SignedOut => return Installation::LoginRequired { path },
+            LoginStatus::Unknown => {
+                return Installation::Unusable {
+                    reason: format!("could not determine login status: run `{name} {}` to inspect the result", check.args.join(" ")),
+                };
+            }
         }
     }
     Installation::Available { version, path }
@@ -207,6 +216,7 @@ pub(crate) struct Spawn<'a> {
     pub args: Vec<String>,
     pub cwd: &'a Path,
     pub env: &'a [(String, String)],
+    pub options: Option<&'a crate::SessionOptions>,
     pub env_remove: &'a [&'a str],
 }
 
@@ -237,6 +247,14 @@ impl LineChild {
             .stderr(Stdio::piped())
             // Its own group, so stopping it reaches the tools it started.
             .process_group(0);
+        if let Some(opts) = spec.options {
+            if let Some(base) = &opts.base_env {
+                command.env_clear().envs(base.iter().map(|(k, v)| (k, v)));
+            }
+            for name in &opts.unset_env {
+                command.env_remove(name);
+            }
+        }
         for name in spec.env_remove {
             command.env_remove(name);
         }
@@ -344,37 +362,42 @@ impl LineChild {
         tail.iter().cloned().collect::<Vec<_>>().join("\n")
     }
 
-    /// Closes stdin, asks the whole process group to stop, and makes sure
-    /// the root is gone shortly after. Returns at once.
+    /// The group may outlive its leader while a tool still has our pipes open.
+    pub(crate) fn status(&self) -> Option<(i32, String)> {
+        use std::os::unix::process::ExitStatusExt;
+        let status = self.child.lock().unwrap_or_else(|p| p.into_inner()).try_wait().ok()??;
+        let signal = status.signal().unwrap_or(0);
+        let reason = match signal {
+            0 => String::new(),
+            2 => "interrupt".into(),
+            9 => "killed".into(),
+            15 => "terminated".into(),
+            n => nix::sys::signal::Signal::try_from(n).map_or_else(|_| format!("signal {n}"), |s| s.as_str().to_string()),
+        };
+        Some((status.code().unwrap_or(128 + signal), reason))
+    }
+
     pub(crate) fn kill(self: &Arc<Self>) {
+        use nix::sys::signal::{Signal, killpg};
+        use nix::unistd::Pid;
         if self.killed.swap(true, Ordering::SeqCst) {
             return;
         }
+        let group = Pid::from_raw(self.pid as i32);
+        let _ = killpg(group, Signal::SIGTERM);
         self.stdin.lock().unwrap_or_else(|p| p.into_inner()).take();
-        let group = format!("-{}", self.pid);
-        let signal = |name: &str| {
-            let _ = Command::new("/bin/kill")
-                .args([name, "--", &group])
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-        };
-        signal("-TERM");
-        let this = self.clone();
-        std::thread::spawn(move || {
-            let deadline = Instant::now() + Duration::from_secs(3);
-            while Instant::now() < deadline {
-                if matches!(this.child.lock().unwrap_or_else(|p| p.into_inner()).try_wait(), Ok(Some(_))) {
-                    return;
-                }
-                std::thread::sleep(Duration::from_millis(50));
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let _ = self.child.lock().unwrap_or_else(|p| p.into_inner()).try_wait();
+            if killpg(group, None) == Err(nix::errno::Errno::ESRCH) {
+                return;
             }
-            let _ = Command::new("/bin/kill")
-                .args(["-KILL", "--", &format!("-{}", this.pid)])
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-            let _ = this.child.lock().unwrap_or_else(|p| p.into_inner()).kill();
-        });
+            if Instant::now() >= deadline {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let _ = killpg(group, Signal::SIGKILL);
+        let _ = self.child.lock().unwrap_or_else(|p| p.into_inner()).wait();
     }
 }

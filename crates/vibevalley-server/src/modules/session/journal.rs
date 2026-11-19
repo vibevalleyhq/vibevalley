@@ -46,6 +46,7 @@ fn blank(kind: SessionEventType, text: String) -> SessionEvent {
         run: None,
         call: None,
         under: None,
+        thread_id: None,
         text,
         action: None,
         action_text: None,
@@ -174,6 +175,7 @@ impl Journal {
         step.revision = 0;
         step.time = now();
         step.under = self.parent_of(from);
+        step.thread_id = from.last().cloned();
         step.run = self.run.clone();
         step
     }
@@ -306,7 +308,7 @@ impl Journal {
 
 /// What a tool call is shown as: the command, file, pattern or address it
 /// names, near the session's folder; else the tool's name.
-fn tool_detail(input: &serde_json::Value, cwd: &str) -> String {
+pub(super) fn tool_detail(input: &serde_json::Value, cwd: &str) -> String {
     let pick = ["command", "cmd", "file_path", "path", "notebook_path", "pattern", "url", "query"];
     let found = pick.iter().find_map(|k| match &input[*k] {
         serde_json::Value::String(s) if !s.is_empty() => Some(s.clone()),
@@ -322,15 +324,17 @@ fn tool_detail(input: &serde_json::Value, cwd: &str) -> String {
     detail.replace(&prefix, "")
 }
 
-fn tool_action(name: &str) -> ToolAction {
-    match name {
-        "Bash" | "shell" | "exec_command" | "local_shell" | "BashOutput" => ToolAction::RunCommand,
-        "Read" | "NotebookRead" | "read_file" => ToolAction::ReadFile,
-        "Edit" | "Write" | "MultiEdit" | "NotebookEdit" | "apply_patch" => ToolAction::EditFile,
-        "Grep" | "Glob" | "LS" | "search" => ToolAction::Search,
-        "WebFetch" | "WebSearch" | "web_search" => ToolAction::Web,
-        n if n.starts_with("mcp__") => ToolAction::Mcp,
-        _ => ToolAction::Other,
+pub(super) fn tool_action(name: &str, input: &serde_json::Value) -> ToolAction {
+    use vibevalley_oar::ToolAction as Oar;
+    match vibevalley_oar::tool_action(name, input) {
+        Oar::RunCommand => ToolAction::RunCommand,
+        Oar::ReadFile => ToolAction::ReadFile,
+        Oar::EditFile => ToolAction::EditFile,
+        Oar::Search => ToolAction::Search,
+        Oar::Web => ToolAction::Web,
+        Oar::Mcp => ToolAction::Mcp,
+        Oar::Wait => ToolAction::Wait,
+        Oar::Other => ToolAction::Other,
     }
 }
 
@@ -516,12 +520,13 @@ impl Trajectories {
                     K::ToolCallStarted { id: call, name, input } => {
                         let detail = tool_detail(&input, cwd);
                         let text = if detail.is_empty() { name.clone() } else { detail };
+                        let action = tool_action(&name, &input);
                         let input = match &input {
                             serde_json::Value::Null => None,
                             serde_json::Value::String(s) => Some(s.clone()),
                             v => Some(v.to_string()),
                         };
-                        j.tool_started(&call, text, tool_action(&name), &name, input, from);
+                        j.tool_started(&call, text, action, &name, input, from);
                     }
                     K::ToolCallFinished { id: call, ok, output } => j.tool_ended(&call, &output, ok, from),
                     K::Question { text } => j.said(&text, from),

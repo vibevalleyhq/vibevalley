@@ -124,3 +124,80 @@ fn subscriptions_send_until_stopped_and_refuse_before_the_first_event() {
     while rx.recv_deadline(deadline).is_ok() {}
     assert!(rx.is_disconnected());
 }
+
+#[test]
+fn regression_slow_workbench_skips_revisions_and_the_farm_and_http_receive_the_ordered_effects() {
+    use std::io::{BufRead, BufReader};
+    use std::sync::Arc;
+    use vibevalley_bridge::Outlet;
+    use vibevalley_protocol::{CommitCount, FactProgressChanged};
+
+    struct Window(flume::Sender<Value>);
+    impl Outlet for Window {
+        fn send(&self, name: &str, frame: Value) {
+            assert_eq!(name, "frame:state");
+            let _ = self.0.send(frame);
+        }
+    }
+
+    let hub = hub();
+    let listener = vibevalley_http::serve(hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let mut wire = BufReader::new(ureq::get(format!("{}/api/v1/state", listener.url())).call().unwrap().into_body().into_reader());
+    let mut public_frame = || loop {
+        let mut line = String::new();
+        assert_ne!(wire.read_line(&mut line).unwrap(), 0);
+        if let Some(data) = line.strip_prefix("data:") {
+            break serde_json::from_str::<Value>(data.trim()).unwrap();
+        }
+    };
+    let farm = hub.state();
+    assert_eq!(public_frame(), farm.recv().unwrap());
+    let bridge = vibevalley_bridge::Hub::new(hub.clone(), 1);
+    let window = || {
+        let (tx, rx) = flume::unbounded();
+        let client = bridge.attach(Arc::new(Window(tx)));
+        client.watch("state").unwrap();
+        (client, move || rx.recv_timeout(Duration::from_secs(2)).unwrap())
+    };
+    let (fast, next_fast) = window();
+    let (slow, next_slow) = window();
+    let first_fast = next_fast();
+    let first_slow = next_slow();
+    fast.applied_workbench(first_fast["rev"].as_u64().unwrap());
+    let apply = |n| {
+        hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
+            at: n + 1,
+            commits: Some(CommitCount { total: n, repos: vec![] }),
+            ..Default::default()
+        })])
+    };
+    let begin = Instant::now();
+    let mut effects = apply(20).effects;
+    let leading = next_fast();
+    assert_eq!(leading["data"]["seq"], hub.seq());
+    assert!(farm.try_recv().is_err());
+    fast.applied_workbench(leading["rev"].as_u64().unwrap());
+    effects.extend(apply(55).effects);
+    effects.extend(apply(110).effects);
+    let final_fast = next_fast();
+    let final_farm = farm.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert!(begin.elapsed() >= Duration::from_millis(vibevalley_protocol::STATE_EVERY_MS));
+    assert!(!effects.is_empty());
+    assert_eq!(final_farm["effects"], serde_json::to_value(effects).unwrap());
+    assert_eq!(public_frame(), final_farm);
+    assert_eq!(final_fast["data"]["state"], final_farm["state"]);
+    assert_eq!(final_fast["data"]["effects"], json!([]));
+    slow.applied_workbench(first_slow["rev"].as_u64().unwrap());
+    let final_slow = next_slow();
+    assert_eq!(final_slow["data"]["seq"], final_fast["data"]["seq"]);
+    assert_eq!(final_slow["rev"], 2, "only initial and newest snapshots reach the slow window");
+    slow.unwatch("state");
+    slow.watch("state").unwrap();
+    let reopened = next_slow();
+    assert!(reopened["rev"].as_u64() > final_slow["rev"].as_u64());
+    slow.applied_workbench(final_slow["rev"].as_u64().unwrap());
+    drop(slow);
+    fast.applied_workbench(final_fast["rev"].as_u64().unwrap());
+    apply(125);
+    assert_eq!(next_fast()["data"]["seq"], hub.seq());
+}

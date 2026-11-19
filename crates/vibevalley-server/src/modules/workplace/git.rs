@@ -42,6 +42,10 @@ pub fn add_worktree_on(main: &Repo, dir: &Path, branch: &str) -> Result<Repo> {
     Repo::discover(dir)?.ok_or_else(|| BoardError::NotARepo(dir.to_path_buf()))
 }
 
+pub fn commit_id(root: &Path, rev: &str) -> Result<String> {
+    text(root, &["rev-parse", "--verify", "--end-of-options", &format!("{rev}^{{commit}}")])
+}
+
 pub fn merge_base(root: &Path, a: &str, b: &str) -> Result<String> {
     text(root, &["merge-base", a, b])
 }

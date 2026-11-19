@@ -1,7 +1,7 @@
 // Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes.gen";
-import type { Conflict } from "../repo/shapes.gen";
+import type { Conflict, ReviewRevision } from "../repo/shapes.gen";
 import type { IssueAnswer, PhaseRestingOnly, Session, SessionEvent } from "../session/shapes.gen";
 
 export const LandingValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
@@ -30,7 +30,7 @@ export type Question = { question: string, options: Array<string>, };
 export const CheckResultValues = ["met", "unmet", "unsure"] as const;
 export type CheckResult = (typeof CheckResultValues)[number];
 
-export type CriterionCheck = { 
+export type CriterionCheck = {
 /**
  * 0-based index into `Issue.criteria`.
  */
@@ -53,7 +53,7 @@ export type ActWords = (typeof ActWordsValues)[number];
  */
 export type IssueAction = { "does": "move", act: IssueAct, status: IssueStatus, words: ActWords, } | { "does": "say", act: IssueAct, } | { "does": "stop", act: IssueAct, };
 
-export type IssueStage = { state: IssueStageKind, since?: number, stuck?: StuckReason, 
+export type IssueStage = { state: IssueStageKind, since?: number, stuck?: StuckReason,
 /**
  * Primary action highlighted for the user, if any.
  */
@@ -62,7 +62,7 @@ lead?: IssueAct, acts: Array<IssueAction>, };
 export const MilestoneKindValues = ["opened", "refined", "started", "reported", "asked", "told", "failed", "stopped", "rejected", "accepted", "closed"] as const;
 export type MilestoneKind = (typeof MilestoneKindValues)[number];
 
-export type Milestone = { at: number, kind: MilestoneKind, 
+export type Milestone = { at: number, kind: MilestoneKind,
 /**
  * Session name; absent for user or system milestones.
  */
@@ -83,6 +83,15 @@ export type Assignment = { id: string, issue: IssueId, agent: string, assignedAt
 export const MandateStrengthValues = ["explicit", "inferred"] as const;
 export type MandateStrength = (typeof MandateStrengthValues)[number];
 
+export type CodeReview = { at: number, revision: ReviewRevision, };
+
+export const ProjectCheckStatusValues = ["passed", "failed", "not_configured"] as const;
+export type ProjectCheckStatus = (typeof ProjectCheckStatusValues)[number];
+
+export type ProjectCheckReceipt = { targetBranch: string, targetCommit: string, sourceTree: string, candidateCommit: string, candidateTree: string, status: ProjectCheckStatus, command?: string, output?: string, };
+
+export type DeliveryEvidence = { reviews: Array<CodeReview>, check?: ProjectCheckReceipt, mergedCommit?: string, };
+
 export type IssueMandate = { originTriggerId?: string, strength: MandateStrength, maxBotReviewRounds: number, autoSubmitPr: boolean, };
 
 export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
@@ -96,7 +105,7 @@ export type IssueConstraints = { check?: string, scope: Array<string>, acceptanc
 
 export type IssueLastRun = { startedAt: number, endedAt?: number, outcome?: Outcome, };
 
-export type Issue = { constraints?: IssueConstraints, id: IssueId, number: number, title: string, description: string, mandate: IssueMandate, conflict?: Conflict, repo?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, 
+export type Issue = { constraints?: IssueConstraints, id: IssueId, number: number, title: string, description: string, mandate: IssueMandate, conflict?: Conflict, repo?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining,
 /**
  * Tracks runs executed without a worker session (e.g. in-process orchestrator); active while `endedAt` is absent.
  */
@@ -105,9 +114,9 @@ lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, };
 /**
  * Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
  */
-export type AppliedIssue = { constraints?: IssueConstraints, id: IssueId, number: number, title: string, description: string, mandate: IssueMandate, conflict?: Conflict, repo?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, seq: number, };
+export type AppliedIssue = { constraints?: IssueConstraints, id: IssueId, number: number, title: string, description: string, mandate: IssueMandate, conflict?: Conflict, repo?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, seq: number, };
 
-export type IssueUpdate = { title?: string, description?: string, repo?: string, agent?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable, 
+export type IssueUpdate = { title?: string, description?: string, repo?: string, agent?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable,
 /**
  * Board placement before this issue id; "" places it last. Valid only before dispatch.
  */
@@ -115,13 +124,13 @@ before?: string, };
 
 export type IssueHistory = { issue: Issue, sessions: Array<Session>, missingSessions: Array<SessionId>, };
 
-export type IssueRefineRequest = { text?: string, 
+export type IssueRefineRequest = { text?: string,
 /**
  * Unsaved field edits applied atomically before refining starts.
  */
 edit?: IssueUpdate, };
 
-export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>, 
+export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>,
 /**
  * Idempotency key deduplicating retries after a lost response.
  */
@@ -129,19 +138,19 @@ requestKey?: string, };
 
 export type CommentRequest = { text: string, sendKey?: string, };
 
-export type IssueReviewRequest = { pass: boolean, findings?: Array<string>, text?: string, };
+export type IssueReviewRequest = { revision?: ReviewRevision, pass: boolean, findings?: Array<string>, text?: string, };
 
-export type IssueFilter = { 
+export type IssueFilter = {
 /**
  * Includes closed issues when set to `done` or `canceled`.
  */
-status?: IssueStatus, text?: string, repo?: string, limit?: number, closed?: boolean, 
+status?: IssueStatus, text?: string, repo?: string, limit?: number, closed?: boolean,
 /**
  * Filters to issues waiting on the user, ordered longest-waiting first.
  */
 wantsUser?: boolean, };
 
-export type IssueChildDraft = { id: string, title?: string, brief: string, needs?: Array<string>, 
+export type IssueChildDraft = { id: string, title?: string, brief: string, needs?: Array<string>,
 /**
  * Profile id or name; "" lets the server assign one.
  */
@@ -149,21 +158,21 @@ agent?: string, check?: string, scope?: Array<string>, acceptance?: boolean, };
 
 export type IssueSplitRequest = { title?: string, tasks: Array<IssueChildDraft>, };
 
-export type IssueStatusRequest = { status: IssueStatus, 
+export type IssueStatusRequest = { revision?: ReviewRevision, status: IssueStatus,
 /**
  * Follow-up instructions or review findings when moving back to `todo`.
  */
-text?: string, agent?: string, 
+text?: string, agent?: string,
 /**
  * Unsaved field edits applied atomically before the status transition.
  */
-edit?: IssueUpdate, 
+edit?: IssueUpdate,
 /**
  * Idempotency key deduplicating retries after a lost response.
  */
 requestKey?: string, };
 
-export type FactSessionReported = { "type": "sessionReported", at: number, id: SessionId, run?: string, outcome: Outcome, 
+export type FactSessionReported = { "type": "sessionReported", at: number, id: SessionId, run?: string, outcome: Outcome,
 /**
  * Set when a turn rests waiting on external feedback without handing off to the user.
  */
@@ -179,9 +188,9 @@ export type IssueConversationGetInput = { id: string, };
 
 export type IssueCommentCreateInput = { id: string, text: string, sendKey?: string, };
 
-export type IssueDiffGetInput = { id: string, };
+export type IssueDiffGetInput = { id: string, sinceTree?: string, };
 
-export type IssueReviewInput = { id: string, pass: boolean, findings?: Array<string>, text?: string, };
+export type IssueReviewInput = { revision?: ReviewRevision, id: string, pass: boolean, findings?: Array<string>, text?: string, };
 
 export type IssueSplitInput = { id: string, title?: string, tasks: Array<IssueChildDraft>, };
 
@@ -195,6 +204,6 @@ export type IssueUpdateInput = { id: string, title?: string, description?: strin
 
 export type IssueDeleteInput = { id: string, };
 
-export type IssueStatusUpdateInput = { id: string, status: IssueStatus, text?: string, agent?: string, edit?: IssueUpdate, requestKey?: string, };
+export type IssueStatusUpdateInput = { revision?: ReviewRevision, id: string, status: IssueStatus, text?: string, agent?: string, edit?: IssueUpdate, requestKey?: string, };
 
 export type IssueRefineInput = { id: string, text?: string, edit?: IssueUpdate, };

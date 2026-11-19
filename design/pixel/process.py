@@ -26,11 +26,12 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
+from rail_faces import RAIL_SIZE, save_rail_faces
 from straighten import dirt_of, straighten_field, straighten_plots
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "raw"
-OUT = HERE.parent.parent / "apps" / "web" / "public" / "pixel"
+OUT = HERE.parent.parent / "assets" / "pixel"
 # The pixel density: how many of a picture's pixels make one of the village's art pixels. The game's pictures are
 # drawn twice as dense (gen.sh hd-<name>, from raw/hd-<name>.png); by default the density is the one the game's
 # pictures already have (its map's width against the village's 384), so a sheet is never cut to another. A trial
@@ -413,8 +414,12 @@ def cut(name: str, sheet: Sheet, manifest: dict) -> None:
             ay = ground_row(small[..., 3], i in sheet.tools)
             ax = feet_middle(small[..., 3], ay) if sheet.feet_middle else small.shape[1] // 2
         h, w = small.shape[:2]
-        Image.fromarray(small, "RGBA").save(OUT / f"{sprite}.png")
+        image = Image.fromarray(small, "RGBA")
+        image.save(OUT / f"{sprite}.png")
         entry = {"w": w, "h": h, "ax": ax, "ay": ay, "sheet": sheet_path(name)}
+        if name.startswith("look-") and sprite.endswith("-face"):
+            save_rail_faces(image, OUT / "rail", sprite)
+            entry["railSize"] = RAIL_SIZE
         if sheet.head:
             # The head is the top of a chibi body: about the upper 45%.
             entry |= {"hx": w / 2, "hy": round(h * 0.3, 1)}

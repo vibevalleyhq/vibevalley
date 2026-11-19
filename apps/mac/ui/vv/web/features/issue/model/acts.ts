@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import { type Issue, type IssueAct, type IssueAction, type IssueStatus } from "@vibevalley/protocol";
+import { type Changes, type Issue, type IssueAct, type IssueAction, type IssueStatus } from "@vibevalley/protocol";
 import { latestSessionIdOf, omitUndefined } from "@vibevalley/protocol/rules";
 
 import { createSignal } from "../../../../solid";
@@ -12,10 +12,10 @@ import { issueSay, pendingWords } from "./write";
 // The user's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx) and the farm's (farm/issue/IssueView.tsx).
 
 /** An action sent once, without an overlay (the farm's bed tools, which play their effect after it). */
-export function perform(issue: Issue, a: IssueAction, words = "", sendKey = ""): Promise<unknown> {
+export function perform(issue: Issue, a: IssueAction, words = "", sendKey = "", revision?: Changes["revision"]): Promise<unknown> {
   switch (a.does) {
     case "move":
-      return api.issue.status.update({ id: issue.id, status: a.status, ...(words ? { text: words } : {}) });
+      return api.issue.status.update({ id: issue.id, status: a.status, ...(words ? { text: words } : {}), ...(revision ? { revision } : {}) });
     case "say":
       return api.issue.comment.create({ id: issue.id, text: words, ...(sendKey ? { sendKey } : {}) });
     case "stop": {

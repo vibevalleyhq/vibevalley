@@ -384,10 +384,12 @@ impl TermSession {
     /// The directory the shell reported (OSC 7), else the working directory
     /// of the PTY's foreground process.
     pub fn cwd(&self) -> Option<PathBuf> {
+        self.inner.shared.cwd.lock().unwrap().clone().or_else(|| self.local_cwd())
+    }
+
+    /// Where a new local shell can start, even if the running program never sends OSC 7.
+    pub fn local_cwd(&self) -> Option<PathBuf> {
         let shared = &self.inner.shared;
-        if let Some(cwd) = shared.cwd.lock().unwrap().clone() {
-            return Some(cwd);
-        }
         let foreground = shared.master_fd.lock().unwrap().as_ref().and_then(|fd| pty::foreground_pgid(fd.as_raw_fd()));
         foreground
             .and_then(pty::process_cwd)

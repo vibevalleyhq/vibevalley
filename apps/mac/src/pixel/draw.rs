@@ -60,6 +60,14 @@ pub enum Op {
 /// Over the picture, in view pixels from the picture's view box's top left.
 #[derive(Clone)]
 pub enum HudOp {
+    Bitmap {
+        key: String,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        render: Arc<dyn Fn(u32, u32) -> RgbaImage + Send + Sync>,
+    },
     Text {
         x: f32,
         y: f32,
@@ -98,6 +106,12 @@ pub enum HudOp {
     Clip(Option<[f32; 4]>),
 }
 
+#[derive(Clone)]
+pub struct FarmLight {
+    pub lighting: vibevalley_pixel::Lighting,
+    pub foreground: std::ops::Range<usize>,
+}
+
 #[derive(Clone, Default)]
 pub struct DrawList {
     /// Art pixels of the picture (the framing fits this).
@@ -118,6 +132,7 @@ pub struct DrawList {
     pub hud_view: bool,
     /// The sky's light: the first `lit` ops are multiplied by it, the rest
     /// (what shines by itself) are drawn as painted. `None` is full light.
+    pub farm_light: Option<FarmLight>,
     pub light: Option<[f32; 3]>,
     pub lit: usize,
 }
@@ -135,6 +150,7 @@ impl DrawList {
             hud_center: false,
             hud_images: Vec::new(),
             hud_view: false,
+            farm_light: None,
             light: None,
             lit: 0,
         }
@@ -191,23 +207,13 @@ impl DrawList {
 /// Nearest-neighbour resample of `src` to `w`×`h`, mirrored when `flip`,
 /// alpha times `alpha`. Straight RGBA in, straight RGBA out.
 pub fn resample(src: &RgbaImage, w: u32, h: u32, flip: bool, alpha: f32) -> RgbaImage {
-    let (sw, sh) = src.dimensions();
-    let mut out = RgbaImage::new(w.max(1), h.max(1));
-    if sw == 0 || sh == 0 {
-        return out;
+    let mut out = vibevalley_pixel::nearest(src, w.max(1), h.max(1), false);
+    if flip {
+        image::imageops::flip_horizontal_in_place(&mut out);
     }
-    for y in 0..out.height() {
-        let sy = ((y as u64 * sh as u64) / h.max(1) as u64).min(sh as u64 - 1) as u32;
-        for x in 0..out.width() {
-            let mut sx = ((x as u64 * sw as u64) / w.max(1) as u64).min(sw as u64 - 1) as u32;
-            if flip {
-                sx = sw - 1 - sx;
-            }
-            let mut p = *src.get_pixel(sx, sy);
-            if alpha < 1.0 {
-                p.0[3] = (p.0[3] as f32 * alpha).round() as u8;
-            }
-            out.put_pixel(x, y, p);
+    if alpha < 1.0 {
+        for pixel in out.pixels_mut() {
+            pixel.0[3] = (pixel.0[3] as f32 * alpha).round() as u8;
         }
     }
     out
@@ -270,10 +276,71 @@ fn blit(target: &mut RgbaImage, img: &RgbaImage, x: i64, y: i64) {
     }
 }
 
+pub fn farm_picture(list: &DrawList, atlas: &Atlas, light: &FarmLight) -> RgbaImage {
+    use vibevalley_pixel::{Brush, Surface};
+    let mut surface = Surface::new(list.width as u32, list.height as u32, atlas.density as u32, to_rgba(list.background));
+    let paint = |surface: &mut Surface, op: &Op, lit: bool, tint: [f32; 3]| match op {
+        Op::Sprite { name, x, y, flip, alpha } => {
+            if let (Some(info), Some(image)) = (atlas.get(name), atlas.image(name)) {
+                let normal = lit.then(|| atlas.normals(name, &image));
+                surface.paint(
+                    &image,
+                    normal.as_deref(),
+                    Brush {
+                        flip: *flip,
+                        alpha: *alpha,
+                        tint,
+                        ..Brush::at(*x, *y, info.w, info.h)
+                    },
+                );
+            }
+        }
+        Op::Image { key, image, x, y, w, h, alpha } => {
+            let normal = (lit && atlas.has(key)).then(|| atlas.normals(key, image));
+            surface.paint(
+                image,
+                normal.as_deref(),
+                Brush {
+                    alpha: *alpha,
+                    tint,
+                    ..Brush::at(*x, *y, *w, *h)
+                },
+            );
+        }
+        Op::Rect { x, y, w, h, color } => surface.paint(&RgbaImage::from_pixel(1, 1, to_rgba(*color)), None, Brush::at(*x, *y, *w, *h)),
+        Op::Glow { x, y, r, color } => {
+            let size = (r * 2.).round().max(1.) as u32;
+            surface.paint(
+                &glow_image(size, *color),
+                None,
+                Brush {
+                    additive: true,
+                    ..Brush::at(x - r, y - r, r * 2., r * 2.)
+                },
+            );
+        }
+    };
+    for op in &list.ops[..light.foreground.start] {
+        paint(&mut surface, op, true, [1.; 3]);
+    }
+    surface.shade(&light.lighting);
+    for op in &list.ops[light.foreground.end..] {
+        paint(&mut surface, op, false, [1.; 3]);
+    }
+    let tint = list.light.unwrap_or([1.; 3]).map(|c| (c * 0.82 * 255.).round().clamp(0., 255.) / 255.);
+    for op in &list.ops[light.foreground.clone()] {
+        paint(&mut surface, op, false, tint);
+    }
+    surface.finish()
+}
+
 /// The list's art layer at `k` pixels per art pixel, on the CPU (no HUD
 /// text; HUD boxes are drawn). For checking scenes without a screen.
 pub fn raster(list: &DrawList, atlas: Option<&Atlas>, k: f32) -> RgbaImage {
     let (w, h) = ((list.width * k).round() as u32, (list.height * k).round() as u32);
+    if let (Some(light), Some(atlas)) = (&list.farm_light, atlas) {
+        return vibevalley_pixel::nearest(&farm_picture(list, atlas, light), w, h, false);
+    }
     let mut target = RgbaImage::from_pixel(w.max(1), h.max(1), to_rgba([list.background[0], list.background[1], list.background[2], 1.0]));
     let px = |v: f32| (v * k).round() as i64;
     if let Some(l) = list.light {
@@ -358,8 +425,11 @@ pub fn raster_view(list: &DrawList, atlas: Option<&Atlas>, view: (f32, f32)) -> 
                 }
                 put(&mut target, &img, *x, *y, clip);
             }
+            HudOp::Bitmap { render, x, y, w, h, .. } => {
+                put(&mut target, &render(w.round() as u32, h.round() as u32), *x, *y, clip);
+            }
             HudOp::Image { image, x, y, w, h, .. } => {
-                let img = resample(image, w.round() as u32, h.round() as u32, false, 1.0);
+                let img = vibevalley_pixel::css_pixelated(image, w.round() as u32, h.round() as u32);
                 put(&mut target, &img, *x, *y, clip);
             }
             HudOp::Clip(c) => clip = *c,
@@ -372,6 +442,16 @@ pub fn raster_view(list: &DrawList, atlas: Option<&Atlas>, view: (f32, f32)) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn regression_scaled_sprites_sample_the_destination_pixel_centres() {
+        let src = RgbaImage::from_fn(4, 4, |x, y| Rgba([x as u8, y as u8, 0, 255]));
+        let small = resample(&src, 2, 2, false, 1.0);
+        assert_eq!(small.get_pixel(0, 0).0, [1, 1, 0, 255]);
+        assert_eq!(small.get_pixel(1, 1).0, [3, 3, 0, 255]);
+        let flipped = resample(&src, 2, 2, true, 0.5);
+        assert_eq!(flipped.get_pixel(0, 1).0, [3, 3, 0, 128]);
+    }
 
     #[test]
     fn resample_is_nearest_and_flips() {

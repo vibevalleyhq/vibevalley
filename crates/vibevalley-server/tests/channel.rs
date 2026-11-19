@@ -28,6 +28,75 @@ fn ok(e: Envelope) -> Value {
 }
 
 #[test]
+fn regression_chord_channel_events_resume_in_the_requested_channel() {
+    use vibevalley_chord::{
+        link::{Endpoint, Error, Options, Principal},
+        ws,
+    };
+
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let call = |op, payload| ok(started.hub.call_as(Caller::User, op, payload));
+    let channel = call("channel.create", json!({"name":"history"}));
+    let other = call("channel.create", json!({"name":"other"}));
+    for (id, text) in [(&channel, "first"), (&other, "private to other"), (&channel, "second"), (&channel, "third")] {
+        call("channel.message.send", json!({"id":id,"text":text}));
+    }
+    let history = call("channel.message.list", json!({"id":channel}));
+    call("channel.message.delete", json!({"id":history[1]["id"]}));
+    started
+        .chat
+        .note(vibevalley_server::modules::channel::Note {
+            channel: channel.as_str().unwrap().into(),
+            kind: vibevalley_protocol::MessageKind::Report,
+            text: "worker finished".into(),
+            from: "orchestrator".into(),
+            meta: vibevalley_server::modules::channel::Meta {
+                session: Some("worker-session".into()),
+                ..Default::default()
+            },
+            topic: None,
+            member: None,
+            seat: None,
+        })
+        .unwrap();
+
+    let http = vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    runtime.block_on(async {
+        let url = http.url().replace("http://", "ws://") + "/chord/ws";
+        let (transport, _) = ws::dial(url).await.unwrap();
+        let link = Endpoint::default()
+            .connect(transport, Options::new(Principal::user_device("channel-test")))
+            .await
+            .unwrap();
+        let read = |params| link.call("channel.events", params, Some(Duration::from_secs(5)));
+        let first = read(json!({"channelId":channel,"limit":1})).await.unwrap();
+        assert_eq!(
+            first,
+            json!([{
+                "channelId":channel, "seq":1, "kind":"message", "authorId":"user", "text":"first", "createdAtMs":history[0]["at"]
+            }])
+        );
+        let rest = read(json!({"channelId":channel,"afterSeq":first[0]["seq"]})).await.unwrap();
+        assert_eq!(rest.as_array().unwrap().len(), 3);
+        assert_eq!((&rest[0]["seq"], &rest[0]["text"]), (&json!(2), &json!("")));
+        assert_eq!((&rest[1]["seq"], &rest[1]["text"]), (&json!(3), &json!("third")));
+        assert_eq!(
+            (&rest[2]["kind"], &rest[2]["sessionId"], &rest[2]["text"]),
+            (&json!("report"), &json!("worker-session"), &json!("worker finished"))
+        );
+        assert!(rest.as_array().unwrap().iter().all(|item| item["channelId"] == channel));
+        assert_eq!(read(json!({"channelId":channel,"afterSeq":rest[2]["seq"]})).await.unwrap(), json!([]));
+        assert!(matches!(read(json!({"channelId":"missing"})).await, Err(Error::Rpc(ref e)) if e.code == BizCode::ChannelNotFound.code().to_string()));
+        assert!(matches!(read(json!({"channelId":channel,"afterSeq":"3"})).await, Err(Error::Rpc(ref e)) if e.code == "invalid_params"));
+        link.close();
+    });
+    drop(http);
+    started.close();
+}
+
+#[test]
 fn the_chat_through_its_endpoints() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
@@ -217,4 +286,61 @@ fn the_chat_through_its_endpoints() {
     assert_eq!(chat.history(&dev, None, None).unwrap().len(), 1);
     assert!(hub2.read(|s| s.chat.clone()).unwrap().channels.iter().any(|c| c.id == dev));
     assert_eq!(chat.events(0, 1000).unwrap().iter().filter(|e| e.kind == "removed").count(), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
+    use std::os::unix::process::ExitStatusExt;
+    use std::process::Command;
+    const CHANNEL_CRASH_HOME: &str = "VV_TEST_CHANNEL_CRASH_HOME";
+    let name = "channel::regression_send_key_thread_pages_and_observer_cursor_survive_sigkill";
+    if let Some(home) = std::env::var_os(CHANNEL_CRASH_HOME) {
+        let server = start(std::path::Path::new(&home));
+        let call = |op, params| ok(server.hub.call_as(Caller::User, op, params));
+        let channel = server.chat.default_channel();
+        for text in ["one", "two", "three"] {
+            call("channel.message.send", json!({"id":channel,"text":text,"sendKey":text}));
+        }
+        let root = server.chat.history(&channel, None, None).unwrap()[0].id.clone();
+        let thread = call("channel.thread.create", json!({"id":root}));
+        call("channel.message.send", json!({"id":thread,"text":"first reply","sendKey":"thread-first"}));
+        let checkpoint = server.chat.events(0, 100).unwrap().last().unwrap().seq;
+        server.chat.move_cursor("crash-test", checkpoint).unwrap();
+        server.chat.await_reader(|_| {
+            Command::new("kill").args(["-KILL", &std::process::id().to_string()]).status().unwrap();
+            unreachable!("SIGKILL at the committed message, before reader acknowledgement");
+        });
+        call("channel.message.send", json!({"id":thread,"text":"second reply","sendKey":"thread-second"}));
+        panic!("message returned without entering the reader");
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let result = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", name])
+        .env(CHANNEL_CRASH_HOME, dir.path())
+        .status()
+        .unwrap();
+    assert_eq!(result.signal(), Some(9));
+    let server = start(dir.path());
+    let call = |op, params| ok(server.hub.call_as(Caller::User, op, params));
+    let channel = server.chat.default_channel();
+    let last_two = server.chat.history(&channel, None, Some(2)).unwrap();
+    assert_eq!(last_two.iter().map(|m| m.number).collect::<Vec<_>>(), [2, 3]);
+    let first = server.chat.history(&channel, Some(2), Some(2)).unwrap();
+    assert_eq!(first.len(), 1);
+    let thread = call("channel.thread.create", json!({"id":first[0].id})).as_str().unwrap().to_owned();
+    let replies = server.chat.history(&thread, None, Some(2)).unwrap();
+    assert_eq!(replies.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(), ["first reply", "second reply"]);
+    let cursor = server.chat.cursor_of("crash-test").unwrap();
+    let unseen = server.chat.events(cursor, 10).unwrap();
+    assert_eq!(unseen.len(), 1);
+    assert_eq!(unseen[0].message_id, replies[1].id);
+    call("channel.message.send", json!({"id":thread,"text":"second reply","sendKey":"thread-second"}));
+    assert_eq!(server.chat.events(cursor, 10).unwrap(), unseen);
+    assert_eq!(server.chat.history(&thread, None, Some(5)).unwrap().len(), 2);
+    server.chat.move_cursor("crash-test", unseen[0].seq).unwrap();
+    server.chat.move_cursor("crash-test", cursor).unwrap();
+    assert!(server.chat.events(server.chat.cursor_of("crash-test").unwrap(), 10).unwrap().is_empty());
+    server.close();
 }

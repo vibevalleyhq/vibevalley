@@ -3,7 +3,7 @@
 // inventories. The account's energy bottle is a pixel sprite (ui/pixel);
 // without the art it is a bottle-shaped meter filled to what is left, in
 // the cells' colours.
-import { signal, Text, View, type JSX } from "nsh";
+import { signal, Text, View, type JSX, type InputRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -19,6 +19,7 @@ import {
 import { same } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
+import { hostApi } from "../../../../bridge";
 import { createEffect, untrack } from "../../../solid";
 import { variant } from "../../base/dom";
 import { momentText, yuan } from "../../base/format";
@@ -86,17 +87,30 @@ function Bottle(props: { quota: Quota; size: number }) {
   );
 }
 
-export function Usage(props: { info: RuntimeInfo }) {
+export function Usage(props: { info: RuntimeInfo; terminalDirectory?: string | undefined }) {
   const quota = () => quotaOf(props.info);
   return (
     <If
-      when={props.info.usage}
+      when={
+        props.info.installation.status === "unsupported" && props.info.installation.signInCommand ? ({ status: "login_required" } as const) : props.info.usage
+      }
       else={<Quiet>{props.info.support.capabilities.includes("accountUsage") ? t("web.runtime.afterInstall") : t("web.runtime.noUsage")}</Quiet>}
     >
       {(usage) => (
         <If
           when={usage().status !== "login_required"}
-          else={<Text class="text-xs text-warn-ink">{t("web.runtime.signedOut", { runtime: props.info.preset.label })}</Text>}
+          else={
+            <View class="items-start gap-2">
+              <Text class="text-sm text-warn-ink">{t("web.runtime.signedOut", { runtime: props.info.preset.label })}</Text>
+              <If when={props.terminalDirectory}>
+                {(cwd) => (
+                  <Button testID="runtime-sign-in-terminal" onPress={() => void hostApi.openTerminal({ cwd: cwd(), title: props.info.preset.label })}>
+                    {t("web.runtime.signInTerminal")}
+                  </Button>
+                )}
+              </If>
+            </View>
+          }
         >
           <If
             when={variant(usage(), "status", "unavailable")}
@@ -240,7 +254,7 @@ function Field(props: { label: string; hint?: string | undefined; children: JSX.
   );
 }
 
-export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) => void }) {
+export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeInfo) => void; pathRef: (node: InputRef) => void }) {
   const draft = signal<RuntimeSettings>(untrack(() => props.info.settings));
   // The settings as the server has them now replace the draft; a refetch with the same settings leaves it.
   let saved = untrack(() => props.info.settings);
@@ -296,6 +310,8 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
         <Field label={t("web.runtime.binPath")} hint={t("web.runtime.binPathHint", { id: props.info.id.toUpperCase() })}>
           <TextInput
             accessibilityLabel={t("web.runtime.binPath")}
+            ref={props.pathRef}
+            testID="runtime-bin-path"
             class="font-mono"
             placeholder={t("web.runtime.auto")}
             value={draft().binPath}

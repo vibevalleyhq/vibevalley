@@ -1,9 +1,39 @@
 //! Native halves of VibeValley's host capabilities (packages/protocol/src/host.ts).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde_json::Value;
+
+pub struct Storage {
+    pub database: PathBuf,
+    pub views: PathBuf,
+}
+
+impl Storage {
+    pub fn configured() -> Self {
+        Self::from_override(std::env::var_os("VIBEVALLEY_STORE").map(PathBuf::from))
+    }
+
+    fn from_override(path: Option<PathBuf>) -> Self {
+        let database = path.unwrap_or_else(vibevalley_store::Store::default_path);
+        let views = if database.file_name() == Some(std::ffi::OsStr::new("state.db")) {
+            database.with_file_name("nsh")
+        } else {
+            database.with_added_extension("nsh")
+        };
+        Self { database, views }
+    }
+}
+
+pub fn worktree_file(worktree: &Path, relative: &Path) -> Option<(PathBuf, PathBuf)> {
+    if !worktree.is_absolute() || relative.as_os_str().is_empty() || !relative.components().all(|part| matches!(part, std::path::Component::Normal(_))) {
+        return None;
+    }
+    let root = worktree.canonicalize().ok()?;
+    let path = root.join(relative).canonicalize().ok()?;
+    (path.starts_with(&root) && path.is_file()).then_some((root, path))
+}
 
 /// AppleScript string literal for `text`.
 fn applescript_string(text: &str) -> String {
@@ -180,6 +210,41 @@ pub fn set_app_icon() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn regression_conflict_files_open_only_inside_the_issue_worktree() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("issue");
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(root.join("file.ts"), "branch").unwrap();
+        std::fs::write(dir.path().join("file.ts"), "main").unwrap();
+        assert_eq!(
+            worktree_file(&root, Path::new("file.ts")).unwrap().1,
+            root.join("file.ts").canonicalize().unwrap()
+        );
+        assert!(worktree_file(&root, Path::new("../file.ts")).is_none());
+        assert!(worktree_file(&root, &dir.path().join("file.ts")).is_none());
+        assert!(worktree_file(&root, Path::new("deleted.ts")).is_none());
+        std::os::unix::fs::symlink(dir.path().join("file.ts"), root.join("link")).unwrap();
+        assert!(worktree_file(&root, Path::new("link")).is_none());
+    }
+
+    #[test]
+    fn regression_hosted_views_use_the_same_directory_as_the_host_store() {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("host.db");
+        let paths = Storage::from_override(Some(state.clone()));
+        assert_eq!(paths.database, state);
+        assert_eq!(paths.views, root.path().join("host.db.nsh"));
+        let sibling = Storage::from_override(Some(root.path().join("other.db")));
+        assert_eq!(sibling.views, root.path().join("other.db.nsh"));
+        let isolated = Storage::from_override(Some(root.path().join("state.db")));
+        assert_eq!(isolated.views, root.path().join("nsh"));
+
+        let installed = Storage::from_override(None);
+        assert!(installed.database.ends_with("Library/Application Support/VibeValley/state.db"));
+        assert!(installed.views.ends_with("Library/Application Support/VibeValley/nsh"));
+    }
 
     #[test]
     fn applescript_strings_are_escaped() {

@@ -4,24 +4,42 @@
 use std::path::Path;
 use std::time::Duration;
 
-use rusqlite::Connection;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, Next};
 
-/// Opens a SQLite database with the server's busy timeout, WAL journal,
-/// `NORMAL` sync and foreign keys.
-pub fn open_db_at(path: &Path) -> rusqlite::Result<Connection> {
-    let conn = Connection::open(path)?;
-    conn.busy_timeout(Duration::from_secs(5))?;
-    conn.pragma_update(None, "journal_mode", "WAL")?;
-    conn.pragma_update(None, "synchronous", "NORMAL")?;
-    conn.pragma_update(None, "foreign_keys", "ON")?;
-    Ok(conn)
+pub(crate) async fn open_sqlx_db(home: &Path) -> sqlx::Result<sqlx::SqliteConnection> {
+    open_sqlx_db_at(&home.join("server.db")).await
 }
 
-/// Opens `<home>/server.db`, shared by the server's SQLite-backed modules.
-pub fn open_db(home: &Path) -> rusqlite::Result<Connection> {
-    open_db_at(&home.join("server.db"))
+pub(crate) async fn open_sqlx_db_at(path: &Path) -> sqlx::Result<sqlx::SqliteConnection> {
+    use sqlx::ConnectOptions;
+    use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
+    SqliteConnectOptions::new()
+        .filename(path)
+        .create_if_missing(true)
+        .busy_timeout(Duration::from_secs(5))
+        .journal_mode(SqliteJournalMode::Wal)
+        .synchronous(SqliteSynchronous::Normal)
+        .foreign_keys(true)
+        .connect()
+        .await
+}
+
+pub(crate) struct ModuleDb(std::sync::Mutex<sqlx::SqliteConnection>);
+
+impl ModuleDb {
+    pub(crate) fn open(home: &Path, schema: &'static str) -> sqlx::Result<Self> {
+        pollster::block_on(async {
+            let mut connection = open_sqlx_db(home).await?;
+            sqlx::raw_sql(schema).execute(&mut connection).await?;
+            Ok(Self(std::sync::Mutex::new(connection)))
+        })
+    }
+
+    pub(crate) fn run<T>(&self, query: impl AsyncFnOnce(&mut sqlx::SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
+        let mut connection = crate::lock(&self.0);
+        pollster::block_on(query(&mut connection))
+    }
 }
 
 /// `lookIn`: a hint listing the ones there are, and the code a miss gets.

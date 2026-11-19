@@ -1084,3 +1084,118 @@ fn init_clone_log_all_and_raw_commands() {
     let empty = crate::init(&dir.path().join("empty"), None).unwrap();
     assert!(empty.log_all(0, 10).unwrap().is_empty());
 }
+
+#[test]
+fn regression_verified_merge_rechecks_a_new_target_and_publishes_the_exact_commit() {
+    let f = Fixture::new();
+    f.git(&["switch", "-qc", "issue"]);
+    f.write("jobs", "2");
+    f.git(&["add", "jobs"]);
+    f.git(&["commit", "-qm", "increase jobs"]);
+    f.git(&["switch", "-q", "main"]);
+    let hook = f.root().join(".git/hooks/post-receive");
+    fs::write(&hook, "#!/bin/sh\ntouch deploy-fired\n").unwrap();
+    fs::set_permissions(&hook, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let mut checked = Vec::new();
+    let result = f
+        .repo
+        .merge_verified(
+            "main",
+            "issue",
+            "deliver",
+            |work| {
+                checked.push(git_in(work, &["rev-parse", "HEAD"]).trim().to_owned());
+                if checked.len() == 1 {
+                    f.write("capacity", "3");
+                    f.git(&["add", "capacity"]);
+                    f.git(&["commit", "-qm", "set capacity"]);
+                } else {
+                    assert_eq!(fs::read_to_string(work.join("capacity")).unwrap(), "3");
+                }
+                fs::write(work.join("scratch"), "check output").unwrap();
+                Ok(true)
+            },
+            |_, _| Ok::<_, GitError>(()),
+        )
+        .unwrap();
+    let head = f.repo.head().unwrap().unwrap();
+    assert_eq!(checked.len(), 2);
+    assert_eq!(checked[1], head);
+    assert_eq!(result, VerifiedMerge::Merged(head));
+    assert_eq!(f.read("jobs"), "2");
+    assert_eq!(f.read("capacity"), "3");
+    assert!(!f.exists("scratch"));
+    assert!(!f.root().join(".git/deploy-fired").exists());
+    assert!(!f.exists("deploy-fired"));
+    assert_eq!(f.repo.worktrees().unwrap().len(), 1);
+}
+
+#[test]
+fn regression_verified_merge_leaves_user_edits_intact() {
+    let f = Fixture::new();
+    let base = f.repo.head().unwrap();
+    f.git(&["switch", "-qc", "issue"]);
+    f.write("a.txt", "agent");
+    f.git(&["commit", "-qam", "agent"]);
+    f.git(&["switch", "-q", "main"]);
+    f.write("a.txt", "user edit");
+    assert!(
+        f.repo
+            .merge_verified("main", "issue", "deliver", |_| Ok(true), |_, _| Ok::<_, GitError>(()))
+            .is_err()
+    );
+    assert_eq!(f.repo.head().unwrap(), base);
+    assert_eq!(f.read("a.txt"), "user edit");
+    assert_eq!(f.repo.worktrees().unwrap().len(), 1);
+}
+
+#[test]
+fn regression_verified_merge_preserves_an_ignored_file_that_would_be_overwritten() {
+    let f = Fixture::new();
+    f.write(".gitignore", "settings.local\n");
+    f.git(&["add", ".gitignore"]);
+    f.git(&["commit", "-qm", "ignore local settings"]);
+    let base = f.repo.head().unwrap();
+    f.git(&["switch", "-qc", "issue"]);
+    f.write("settings.local", "from the issue");
+    f.git(&["add", "-f", "settings.local"]);
+    f.git(&["commit", "-qm", "track settings"]);
+    f.git(&["switch", "-q", "main"]);
+    f.write("settings.local", "user settings");
+    let err = f
+        .repo
+        .merge_verified("main", "issue", "deliver", |_| Ok(true), |_, _| Ok::<_, GitError>(()))
+        .unwrap_err();
+    assert!(err.to_string().contains("settings.local"), "{err}");
+    assert_eq!(f.repo.head().unwrap(), base);
+    assert_eq!(f.read("settings.local"), "user settings");
+}
+
+#[test]
+fn regression_a_project_check_that_rewrites_a_tracked_file_cannot_publish() {
+    let f = Fixture::new();
+    let base = f.repo.head().unwrap();
+    f.git(&["switch", "-qc", "issue"]);
+    f.write("work", "original");
+    f.git(&["add", "work"]);
+    f.git(&["commit", "-qm", "work"]);
+    f.git(&["switch", "-q", "main"]);
+    let result = f
+        .repo
+        .merge_verified(
+            "main",
+            "issue",
+            "deliver",
+            |dir| {
+                fs::write(dir.join("work"), "auto-fixed").unwrap();
+                Ok(true)
+            },
+            |_, receipt| {
+                assert!(receipt.is_err());
+                Ok::<_, GitError>(())
+            },
+        )
+        .unwrap();
+    assert!(matches!(result, VerifiedMerge::CheckFailed(_)));
+    assert_eq!(f.repo.head().unwrap(), base);
+}

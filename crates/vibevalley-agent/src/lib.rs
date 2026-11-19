@@ -4,13 +4,14 @@
 //! compaction) for the assistant and for the built-in `vibevalley` runtime.
 
 pub mod conversation;
+pub mod generation;
 pub mod kit;
 pub mod mcp;
 pub mod model;
 pub mod price;
 pub mod tool;
 
-pub use conversation::{Brain, BrainEvent, Conversation, Entry, TurnOutcome, read_entries};
+pub use conversation::{Brain, BrainEvent, Conversation, Entry, TurnAbort, TurnOutcome, read_entries};
 pub use model::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, OpenAiClient, Role, ToolCall, ToolSpec, Usage};
 pub use tool::{Tool, ToolOutput, Workspace, coding_tools};
 
@@ -18,6 +19,8 @@ pub use tool::{Tool, ToolOutput, Workspace, coding_tools};
 pub enum BrainError {
     #[error("no API key is set for the model")]
     NoKey,
+    #[error("model context window overflow: {0}")]
+    ContextOverflow(String),
     #[error("network: {0}")]
     Network(String),
     #[error("model: {0}")]

@@ -37,6 +37,7 @@ pub struct Atlas {
     sprites: HashMap<String, SpriteInfo>,
     yards: HashMap<String, super::level::Box2>,
     pub density: f32,
+    normals: Mutex<HashMap<String, Arc<RgbaImage>>>,
     images: Mutex<HashMap<String, Option<Arc<RgbaImage>>>>,
 }
 
@@ -87,6 +88,7 @@ impl Atlas {
             sprites,
             yards,
             density,
+            normals: Mutex::new(HashMap::new()),
             images: Mutex::new(HashMap::new()),
         })
     }
@@ -127,6 +129,23 @@ impl Atlas {
             .map(Arc::new);
         self.images.lock().ok()?.insert(name.to_string(), decoded.clone());
         decoded
+    }
+
+    pub fn normals(&self, name: &str, img: &RgbaImage) -> Arc<RgbaImage> {
+        let mut cache = self.normals.lock().expect("sprite normals");
+        cache
+            .entry(name.to_owned())
+            .or_insert_with(|| {
+                let shape = if name == "map" {
+                    vibevalley_pixel::Normals::Ground
+                } else if name.starts_with("plot-") {
+                    vibevalley_pixel::Normals::Plot
+                } else {
+                    vibevalley_pixel::Normals::Sprite
+                };
+                Arc::new(vibevalley_pixel::normals(img, shape))
+            })
+            .clone()
     }
 
     /// The top left of `name` stood with its feet on (`x`, `y`), art pixels;

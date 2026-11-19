@@ -20,7 +20,7 @@ export type InstallationNotFound = { "status": "not_found", };
 
 export type InstallationChecking = { "status": "checking", };
 
-export type InstallationUnsupported = { "status": "unsupported", reason: string, };
+export type InstallationUnsupported = { "status": "unsupported", reason: string, signInCommand?: string, };
 
 /**
  * Told apart by `status`.

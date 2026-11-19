@@ -2,13 +2,14 @@
 // ui/App.tsx): the ported apps/web App on the bridge to the Rust server.
 // Params: `route` (where it opens, default "/"), `locale` ("zh" default, "en").
 import "./polyfill";
-import { cleanup, effect, host, windowSize } from "nsh";
+import { cleanup, host } from "nsh";
 
 import { setLocale } from "@vibevalley/i18n";
 
 import { App } from "./web/app/App";
 import { useBridge } from "./web/infra/bridged";
 import { appHistory } from "./web/infra/router";
+import { SOUNDS, playSound, type SoundName } from "./web/ui/pixel/sound";
 
 export function VibeValley() {
   setLocale(host.params.locale === "en" ? "en" : "zh");
@@ -19,10 +20,14 @@ export function VibeValley() {
   cleanup(host.on("route", (to) => typeof to === "string" && appHistory.navigate(to)));
   cleanup(host.on("locale", (loc) => (loc === "en" || loc === "zh") && setLocale(loc)));
   if (host.params.globalShell === true) {
+    cleanup(
+      host.on("farm-sound", (name) => {
+        if (typeof name === "string" && Object.hasOwn(SOUNDS, name)) playSound(name as SoundName);
+      }),
+    );
     const changed = () => host.post("action", { type: "global_route", path: appHistory.read().pathname });
     cleanup(appHistory.subscribe(changed));
     changed();
-    effect(() => host.post("action", { type: "global_rail", rail_width: windowSize().width < 640 ? 68 : 76 }));
   }
   return <App />;
 }

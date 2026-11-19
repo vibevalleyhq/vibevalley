@@ -10,6 +10,7 @@ import { cleanup, keymap, Scroll, signal, Text, View, WebView } from "nsh";
 import { t } from "@vibevalley/i18n";
 
 import { useNow } from "../../base/dom";
+import { reasonOf } from "../../infra/api";
 import { useRouter } from "../../infra/router";
 import { shownTheme } from "../../state/prefs";
 import { Button } from "../../ui/Button";
@@ -42,6 +43,13 @@ function Presenter(props: { id: string; version: number }) {
   const content = useArtifactContent(() => ({ id: props.id, version: props.version }));
   const frame = createFrame();
   const pages = () => frame.shown().ready?.pages ?? 0;
+  const statusText = () => {
+    const state = frame.state();
+    const error = content.error();
+    if (error) return t("web.artifact.presenter.loadFailure", { reason: reasonOf(error) });
+    if (typeof state === "object") return t("web.artifact.presenter.loadFailure", { reason: state.error });
+    return frame.shown().ready ? t("web.artifact.presenter.empty") : t("web.artifact.presenter.waiting");
+  };
   const at = () => frame.shown().at?.page ?? 0;
   const goto = (page: number) => frame.send({ vibevalley: "goto", page });
   const now = useNow(1000);
@@ -83,9 +91,16 @@ function Presenter(props: { id: string; version: number }) {
             onClick={() => router.navigate(artifactHref(props.id, props.version))}
           />
           <IconButton icon="previous" label={t("web.artifact.slides.previous")} testid="presenter-previous" disabled={at() === 0} onClick={() => step(-1)} />
-          <Text testID="presenter-at" class="text-sm text-muted tabular-nums">
-            {t("web.artifact.slides.at", { at: at() + 1, pages: pages() })}
-          </Text>
+          <If
+            when={pages() > 0}
+            else={
+              <Text testID="presenter-status" class="text-sm text-muted">
+                {statusText()}
+              </Text>
+            }
+          >
+            <Text testID="presenter-at" class="text-sm text-ink">{`${at() + 1} / ${pages()}`}</Text>
+          </If>
           <IconButton icon="next" label={t("web.artifact.slides.next")} testid="presenter-next" disabled={at() >= pages() - 1} onClick={() => step(1)} />
           <View class="flex-1" />
           <Text testID="presenter-clock" accessibilityLabel={t("web.artifact.presenter.clock")} class="text-xl font-semibold text-ink tabular-nums">
@@ -100,7 +115,9 @@ function Presenter(props: { id: string; version: number }) {
           when={pages() > 0 && at() < pages() - 1}
           else={
             <View class="aspect-video w-full items-center justify-center rounded-md border border-dashed border-line">
-              <Text class="text-faint">{t("web.artifact.presenter.end")}</Text>
+              <If when={pages() > 0}>
+                <Text class="text-faint">{t("web.artifact.presenter.end")}</Text>
+              </If>
             </View>
           }
         >
@@ -111,7 +128,7 @@ function Presenter(props: { id: string; version: number }) {
         <Text class="text-xs text-faint">{t("web.artifact.presenter.notes")}</Text>
         <Scroll class="min-h-0 flex-1">
           <Text testID="presenter-notes" class="text-lg text-ink" style={{ lineHeight: 28.8 }}>
-            {notes() || t("web.artifact.presenter.noNotes")}
+            {pages() > 0 ? notes() || t("web.artifact.presenter.noNotes") : ""}
           </Text>
         </Scroll>
         <Text class="text-xs text-faint">{title()}</Text>

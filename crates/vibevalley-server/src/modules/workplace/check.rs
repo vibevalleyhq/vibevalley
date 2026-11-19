@@ -7,14 +7,12 @@ use std::process::Command;
 
 const TAIL_LINES: usize = 40;
 
-/// The project's check script: `.vibevalley/check`, else `.vibevalley/check`.
-pub fn project_check(root: &Path) -> Option<std::path::PathBuf> {
-    [".vibevalley/check", ".vibevalley/check"].iter().map(|p| root.join(p)).find(|p| p.is_file())
-}
-
 /// Runs the project's check script when there is one.
-pub fn run_project_check(root: &Path) -> Result<(), String> {
-    let Some(script) = project_check(root) else { return Ok(()) };
+pub fn run_project_check(root: &Path) -> Result<bool, String> {
+    let script = root.join(".vibevalley/check");
+    if !script.is_file() {
+        return Ok(false);
+    }
     let mut cmd = if is_executable(&script) {
         Command::new(&script)
     } else {
@@ -22,7 +20,7 @@ pub fn run_project_check(root: &Path) -> Result<(), String> {
         sh.arg(&script);
         sh
     };
-    run(cmd.current_dir(root), &script.to_string_lossy())
+    run(cmd.current_dir(root), &script.to_string_lossy()).map(|()| true)
 }
 
 /// Runs a shell command in `root`.

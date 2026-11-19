@@ -1,0 +1,227 @@
+[
+  {
+    "hash": "b240b13d407c688575b9f8e554909c60374a10d6bf61741625d7a8627bfe0820",
+    "input": {
+      "text": "田",
+      "list": [
+        1,
+        2
+      ],
+      "stale": true
+    },
+    "operations": [
+      [
+        "a",
+        [
+          "text"
+        ],
+        "间"
+      ],
+      [
+        "s",
+        [
+          "list"
+        ],
+        1,
+        9,
+        8,
+        7
+      ],
+      [
+        "d",
+        [
+          "stale"
+        ]
+      ],
+      [
+        "r",
+        [
+          "n"
+        ],
+        3
+      ]
+    ],
+    "result": {
+      "list": [
+        1,
+        8,
+        7
+      ],
+      "n": 3,
+      "text": "田间"
+    }
+  },
+  {
+    "hash": "93161b12565ec07379a7b7026a9da0da24880460b4149907c32f5c4b3aec8812",
+    "input": {
+      "old": "yes"
+    },
+    "operations": [
+      [
+        "r",
+        [
+          null,
+          true,
+          {
+            "x": false
+          }
+        ]
+      ],
+      [
+        "r",
+        [
+          "2",
+          "x"
+        ],
+        1.25
+      ]
+    ],
+    "result": [
+      null,
+      true,
+      {
+        "x": 1.25
+      }
+    ]
+  },
+  {
+    "hash": "d4444b39836979d2e85416cd4de975b16ad66156d41d48f25d2e1ff02be7baf8",
+    "input": {
+      "list": [
+        0
+      ],
+      "n": 1.0,
+      "min": -9223372036854775808,
+      "z": -0.0
+    },
+    "operations": [
+      [
+        "d",
+        [
+          "missing"
+        ]
+      ],
+      [
+        "s",
+        [
+          "list"
+        ],
+        1,
+        0,
+        "end"
+      ]
+    ],
+    "result": {
+      "list": [
+        0,
+        "end"
+      ],
+      "min": -9223372036854775808,
+      "n": 1,
+      "z": -0
+    }
+  },
+  {
+    "hash": "6fba92e3d8803807a73392b3cf8332bd23ad739d94d12a8a90ec99910bc4bbd5",
+    "input": "plain",
+    "operations": [
+      [
+        "a",
+        [],
+        " text"
+      ]
+    ],
+    "result": "plain text"
+  },
+  {
+    "input": {
+      "text": "start"
+    },
+    "operations": [
+      [
+        "a",
+        [
+          "text"
+        ],
+        "!"
+      ],
+      [
+        "d",
+        [
+          "text",
+          "bad"
+        ]
+      ]
+    ]
+  },
+  {
+    "input": [
+      1,
+      2
+    ],
+    "operations": [
+      [
+        "r",
+        [
+          "01"
+        ],
+        5
+      ]
+    ]
+  },
+  {
+    "input": [
+      1,
+      2
+    ],
+    "operations": [
+      [
+        "d",
+        [
+          "1"
+        ]
+      ]
+    ]
+  },
+  {
+    "input": {
+      "x": []
+    },
+    "operations": [
+      [
+        "s",
+        [
+          "x"
+        ],
+        1,
+        0
+      ]
+    ]
+  },
+  {
+    "input": null,
+    "operations": [
+      [
+        "r",
+        [
+          "missing"
+        ],
+        true
+      ]
+    ]
+  },
+  {
+    "hash": "8ce86a6ae65d3692e7305e2c58ac62eebd97d3d943e093f577da25c36988246b",
+    "input": [
+      1
+    ],
+    "operations": [
+      [
+        "r",
+        [],
+        null
+      ]
+    ],
+    "result": null
+  }
+]

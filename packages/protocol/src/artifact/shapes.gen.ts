@@ -8,11 +8,11 @@ export type ArtifactBody = (typeof ArtifactBodyValues)[number];
 export const ArtifactDisplayValues = ["page", "slides", "motion"] as const;
 export type ArtifactDisplay = (typeof ArtifactDisplayValues)[number];
 
-export type ArtifactCard = { id: ArtifactId, title: string, body: ArtifactBody, 
+export type ArtifactCard = { id: ArtifactId, title: string, body: ArtifactBody,
 /**
  * Announced version for html; 0 for blocks.
  */
-version: number, note: string, 
+version: number, note: string,
 /**
  * Omit defaults to "page" for cards created before display modes existed.
  */
@@ -29,19 +29,19 @@ export type ArtifactVersion = { version: number, size: number, note: string, by:
 
 export type ArtifactSaid = { channel: string, number: number, };
 
-export type Artifact = { id: ArtifactId, title: string, body: ArtifactBody, 
+export type Artifact = { id: ArtifactId, title: string, body: ArtifactBody,
 /**
  * html only; absent on blocks.
  */
-display?: ArtifactDisplay, channel?: string, said?: ArtifactSaid, issue?: IssueId, by: string, byName: string, 
+display?: ArtifactDisplay, channel?: string, said?: ArtifactSaid, issue?: IssueId, by: string, byName: string,
 /**
  * Latest version for html; 0 for blocks.
  */
-version: number, 
+version: number,
 /**
  * Committed batch count for blocks; 0 for html.
  */
-seq: number, 
+seq: number,
 /**
  * Oldest first for html; empty on blocks.
  */
@@ -50,7 +50,7 @@ versions: Array<ArtifactVersion>, at: number, updated: number, };
 /**
  * Omit content to create an unannounced empty blocks artifact.
  */
-export type ArtifactRequest = { title: string, kind: ArtifactKind, 
+export type ArtifactRequest = { title: string, kind: ArtifactKind,
 /**
  * html only; defaults to "page".
  */
@@ -120,15 +120,15 @@ export type BlockSubmit = { batchId: string, lastSeq: number, ops: Array<BlockOp
 export const BlockOpStatusValues = ["applied", "merged", "conflict", "noop", "rejected"] as const;
 export type BlockOpStatus = (typeof BlockOpStatusValues)[number];
 
-export type BlockCreate = { type?: string, 
+export type BlockCreate = { type?: string,
 /**
  * 1 to 3; defaults to 2.
  */
-level?: number, checked?: boolean, language?: string, text: string, 
+level?: number, checked?: boolean, language?: string, text: string,
 /**
  * "" inserts first; omit appends at the end.
  */
-afterBlock?: BlockId, 
+afterBlock?: BlockId,
 /**
  * Omit inserts at the top level.
  */
@@ -137,7 +137,7 @@ parentId?: BlockId, };
 /**
  * Conflicts when text is changed against a stale baseRev.
  */
-export type BlockUpdate = { block: BlockId, baseRev: number, 
+export type BlockUpdate = { block: BlockId, baseRev: number,
 /**
  * Full replacement text, not a delta.
  */
@@ -145,7 +145,7 @@ text?: string, type?: string, level?: number, checked?: boolean, language?: stri
 
 export type BlockDelete = { block: BlockId, };
 
-export type BlockOpResult = { status: BlockOpStatus, blockId: BlockId, rev?: number, text?: Array<TextSpan>, yours?: Array<TextSpan>, reason?: string, 
+export type BlockOpResult = { status: BlockOpStatus, blockId: BlockId, rev?: number, text?: Array<TextSpan>, yours?: Array<TextSpan>, reason?: string,
 /**
  * Populated when an agent edit to a user-authored block was diverted into a suggestion.
  */

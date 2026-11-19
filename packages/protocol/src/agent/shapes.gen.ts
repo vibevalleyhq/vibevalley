@@ -34,11 +34,11 @@ export type Head = (typeof HeadValues)[number];
 export const OrchestratorLookValues = ["farmer", "foreman", "auntie", "grandpa", "gardener", "robot"] as const;
 export type OrchestratorLook = (typeof OrchestratorLookValues)[number];
 
-export type Look = { 
+export type Look = {
 /**
  * null until the server fills it from the id.
  */
-species: Species | null, outfit: Outfit | null, 
+species: Species | null, outfit: Outfit | null,
 /**
  * An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A helper has null.
  */
@@ -49,11 +49,11 @@ orchestrator: OrchestratorLook | null, build: Build, head: Head, body: string, t
  */
 export type AgentFrom = { template: string, version: number, };
 
-export type Agent = { id: string, name: string, role: AgentRole, 
+export type Agent = { id: string, name: string, role: AgentRole,
 /**
  * What it does, in a sentence (duty): orchestrators read it to pick who takes a job.
  */
-duty: string, enabled: boolean, runtime: string, model: string, effort: string, persona: string, personaMode: PersonaMode, skills: Array<string>, mcpServers: Array<MCPServer>, disallowedTools: Array<string>, env: { [key in string]: string }, workdir: string, worktree: boolean, tags: Array<string>, look: Look, 
+duty: string, enabled: boolean, runtime: string, model: string, effort: string, persona: string, personaMode: PersonaMode, skills: Array<string>, mcpServers: Array<MCPServer>, disallowedTools: Array<string>, env: { [key in string]: string }, workdir: string, worktree: boolean, tags: Array<string>, look: Look,
 /**
  * The template it was installed from, at that template's version; none for one made by hand.
  */
@@ -65,19 +65,19 @@ export type AgentTemplateSource = (typeof AgentTemplateSourceValues)[number];
 /**
  * A recipe for a profile (agent.json and persona.md in a folder), in the farm's language: installing it makes a profile.
  */
-export type AgentTemplate = { id: string, 
+export type AgentTemplate = { id: string,
 /**
  * Raised when the template changes: a profile installed at a lower one has an update.
  */
-version: number, role: AgentRole, name: string, duty: string, tags: Array<string>, 
+version: number, role: AgentRole, name: string, duty: string, tags: Array<string>,
 /**
  * The runtime it is written for.
  */
-runtime: string, model: string, effort: string, personaMode: PersonaMode, worktree: boolean, look: Look, persona: string, source: AgentTemplateSource, 
+runtime: string, model: string, effort: string, personaMode: PersonaMode, worktree: boolean, look: Look, persona: string, source: AgentTemplateSource,
 /**
  * The built-in skills a profile installed from it has ticked, by id.
  */
-skills: Array<string>, 
+skills: Array<string>,
 /**
  * The profiles installed from it, by id.
  */
@@ -87,7 +87,7 @@ export type AgentValidateRequest = { agents: Array<Agent>, };
 
 export type AgentValidation = { id: string, problems: Array<AgentProblem>, };
 
-export type Skill = { id: string, name: string, description: string, body: string, 
+export type Skill = { id: string, name: string, description: string, body: string,
 /**
  * Shipped with VibeValley (apps/server/src/agent/skills): read-only, changed only by updating VibeValley.
  */

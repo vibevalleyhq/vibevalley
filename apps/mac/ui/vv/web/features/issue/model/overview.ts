@@ -53,6 +53,9 @@ function userQuestion(stage: IssueStage, issue: Issue, head: Session): UserQuest
     case "asking":
       return { head: t("web.issue.issue.asking", { who, n: issue.questions.length }), line: t("web.issue.issue.askingLine"), tone: "wheat" };
     case "reviewing":
+      if (issue.deliveryEvidence?.check?.status === "failed") {
+        return { head: t("web.issue.issue.reviewAfterFailedCheck"), ...(said ? { line: said } : {}), tone: "wheat" };
+      }
       return issue.reviewedAt !== undefined
         ? { head: t("web.issue.issue.reviewed"), ...(said ? { line: said } : {}), tone: "leaf" }
         : { head: t("web.issue.issue.handedBack", { who }), ...(said ? { line: said } : {}), tone: "wheat" };
@@ -178,7 +181,7 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
       ].join(" · ");
     },
     /** What it made, while there is a worktree to read it from. */
-    showsChanges: session !== undefined && stage.state !== "done" && stage.state !== "canceled",
+    showsChanges: issue.deliveryEvidence?.mergedCommit !== undefined || (session !== undefined && stage.state !== "done" && stage.state !== "canceled"),
   };
 }
 

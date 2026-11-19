@@ -100,7 +100,7 @@ fn worker(outcome: Outcome) -> Session {
     s.brief = "Task".into();
     s.runs = 1;
     s.phase = Phase::Done;
-    s.last_run = Some(LastRun { outcome, summary: "Result".into(), at: 1, answer: None });
+    s.last_run = Some(LastRun { needs_reconciliation: false, outcome, summary: "Result".into(), at: 1, answer: None });
     s
 }
 
@@ -128,7 +128,7 @@ fn questions_and_failed_runs_stay_in_progress_with_recovery_actions() {
         assert_eq!(issues[0].stage.lead, Some(lead), "{outcome:?}");
 
         let mut delivered = worker(outcome);
-        delivered.last_run = Some(LastRun { outcome: Outcome::Completed, summary: "Delivered".into(), at: 2, answer: None });
+        delivered.last_run = Some(LastRun { needs_reconciliation: false, outcome: Outcome::Completed, summary: "Delivered".into(), at: 2, answer: None });
         let mut issues = vec![seed()];
         with_issue_statuses(&mut issues, std::slice::from_ref(&delivered));
         assert_eq!(issues[0].status, InReview);

@@ -15,8 +15,13 @@ const config: KnipConfig = {
   ignoreExportsUsedInFile: { interface: true, type: true },
   workspaces: {
     ".": {
-      // The Rust golden generators run through the root goldens script.
-      entry: ["scripts/*/*.ts", "crates/vibevalley-artifact/gen/artifact.ts", "crates/vibevalley-pkm/golden/{gen,graph}.ts"],
+      // sqlc launches its plugin from YAML. The Rust golden generators run through the root goldens script.
+      entry: [
+        "scripts/*/*.ts",
+        "scripts/gen/sqlc-rust/generate.ts",
+        "crates/vibevalley-artifact/gen/artifact.ts",
+        "crates/vibevalley-pkm/golden/{gen,graph}.ts",
+      ],
       project: ["scripts/**/*.ts", "crates/**/*.ts"],
     },
     "apps/site": {

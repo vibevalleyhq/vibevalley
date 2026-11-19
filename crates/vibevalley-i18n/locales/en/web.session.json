@@ -95,5 +95,34 @@
     "hired": "took the ticket {ago}",
     "hiredAndLeft": "took the ticket {hired} · left {left}",
     "pick": "Pick a helper to see its trajectory."
+  },
+  "subagents": {
+    "heading": "Subtasks",
+    "root": "Main thread",
+    "wait": "{who} is waiting for {targets}",
+    "observed": "Last observed {ago} · {status}",
+    "creator": "Started by {who}",
+    "openLog": "Show the work log for {task}",
+    "noLog": "No steps for this thread in the recent work log.",
+    "status": {
+      "pendingInit": "Starting",
+      "running": "Running",
+      "interrupted": "Interrupted",
+      "completed": "Completed",
+      "errored": "Failed",
+      "shutdown": "Closed",
+      "notFound": "Thread not found",
+      "unknown": "Unknown"
+    },
+    "steps": {
+      "title": "Reported steps",
+      "pending": "Pending",
+      "inProgress": "In progress",
+      "completed": "Done"
+    },
+    "disconnected": "Connection loss detected {ago}. Showing the last confirmed states.",
+    "lastWait": "At disconnect, {who} was waiting for {targets}",
+    "mailbox": "{who} is waiting for a collaboration message",
+    "lastMailbox": "At disconnect, {who} was waiting for a collaboration message"
   }
 }

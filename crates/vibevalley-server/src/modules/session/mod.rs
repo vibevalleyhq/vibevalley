@@ -15,6 +15,8 @@ use crate::modules::issue::Board;
 use crate::{Hub, Server, Sink};
 
 pub(crate) mod db;
+mod delivery;
+pub(crate) use delivery::interrupt_on_reopen;
 mod drivers;
 mod news;
 pub use news::News;
@@ -22,6 +24,7 @@ pub mod journal;
 mod report;
 mod runs;
 mod sessions;
+mod subagents;
 mod talk;
 
 pub use drivers::{Drive, Drivers, HelperPlace, Persona, RuntimeDrivers};

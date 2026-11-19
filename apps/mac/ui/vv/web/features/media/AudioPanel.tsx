@@ -13,15 +13,13 @@ import {
   type MediaVoiceDesignRequest,
   type Preview,
   type ProviderStatus,
-  type ProviderVoiceRequest,
 } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 
 import { useTimeout } from "../../base/timer";
 import { api, reasonOf } from "../../infra/api";
 import { type LocalFile, pickFile, playInput, uploadAudio } from "../../infra/attachmentFile";
 import { useCore } from "../../infra/frame";
-import { defineQuery, providerQuery, ready, useQuery } from "../../infra/query";
+import { providerQuery, providerVoicesQuery, ready, useQuery } from "../../infra/query";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { Checkbox } from "../../ui/Checkbox";
@@ -33,12 +31,6 @@ import { TextLink } from "../../ui/TextLink";
 import { audioTimestamp, dialogueComplete, supportsStreamingTranscription, transcriptContent } from "./audio";
 import { AudioMetadataLine, AudioUsageLine, JobActions, Refusal, ResultAudio, SourceLine } from "./JobFacts";
 import { ReleaseAssets } from "./ReleaseAssets";
-
-const voicesQuery = defineQuery({
-  schema: S.ProviderVoiceListing,
-  key: (input: ProviderVoiceRequest) => ["provider-voices", input.connection, input.revision, input.after ?? null],
-  fetch: (input, context) => api.provider.voice.list(input, context),
-});
 
 type AudioMode = "speakers" | "voiceDesign" | "clone" | "transcription";
 const modes: AudioMode[] = ["speakers", "voiceDesign", "clone", "transcription"];
@@ -129,7 +121,7 @@ function VoicePicker(props: { connection: string; revision: number; value: strin
   const voices = useQuery(
     () => {
       const after = page()?.scope === scope() ? page()?.after : undefined;
-      return voicesQuery({ connection: props.connection, revision: props.revision, limit: 20, ...(after ? { after } : {}) });
+      return providerVoicesQuery({ connection: props.connection, revision: props.revision, limit: 20, ...(after ? { after } : {}) });
     },
     { enabled: () => Boolean(props.connection) },
   );

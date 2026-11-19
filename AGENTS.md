@@ -49,9 +49,11 @@ cargo run -p vibevalley-server                                  # 只跑服务�
 cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、channel、repo、agent、session、runtime、memory、cron、artifact、pkm、setting、chat、doctor
 vp run rust:check                                               # 改完 crates/ 或 apps/mac/src：cargo fmt、clippy（-D warnings）、cargo test
 vp run protocol:ts                                              # 改了 crates/vibevalley-protocol/src/contract：重写 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
+sqlc generate                                                   # 改完 SQLite 表结构或命名查询：重写各模块的 generated/queries.rs
+vp run sql:check                                                # 用 sqlc 1.31.1 对账 Rust 绑定；用 Python 3 的 SQLite 按参数个数预编译每条查询
 vp run goldens                                                  # 改了 packages/pkm、packages/artifact 的规则：重写两个 crate 的 golden
 vp run protocol:check                                           # 生成的 TS 契约和两份 golden 是不是最新，和提交的不同就失败
-vp run mac:check                                                # 改完 apps/mac/ui：nsh 的类型检查和打包
+vp run mac:check                                                # 改完 apps/mac/ui：nsh 类型检查、打包和工单按钮行为测试
 vp check                                                        # 改完 apps/mac/ui 以外的 TS：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和类型；--fix 改格式
 vp run packages:check                                           # 改完 packages/：打出声明、vp check、各包的测试
 vp run scripts:test                                             # 改完 scripts/：它自己的测试
@@ -63,7 +65,8 @@ vp run capabilities                                             # 改了 <概念
 vp run api:client                                               # 改了 <概念>/api.ts 的接口：重写 packages/protocol/src/client.ts
 vp run deadcode                                                 # knip 查 TS 里没人用的文件、导出和依赖
 vpx scripts/audit/comment-review.ts                             # 提 PR 前：模型审这个分支新加的注释（vv-comments）
-vp run release alpha|beta|final                                 # 发版：算版本、跑 release:verify，问过才打 tag 推送（docs/development.md）
+vp run release:verify                                           # 在 Mac 上检查 Rust、契约、SQL、软件包、脚本、原生页面和文档
+vp run release alpha|beta|final                                 # beta/final 先跑 release:verify；确认后推 tag，每个标签通过 CI 才打包
 ```
 
 Rust 照 `rust-toolchain.toml`，Node 24（`.node-version`），Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务）。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `crates/` 要重新构建、重启它。
@@ -90,7 +93,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **深模块**：每个模块对外一个窄接口；不靠一个带 `kind` 的入口复用多种操作（[模块设计](docs/style/module-design.md)）。
 - **封闭的联合穷尽处理**：Rust 的 `match` 不写吞掉新成员的 `_`；TS 按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员（`switch-exhaustiveness-check` 查）。
 - **契约改在 Rust**：形状和接口表改 `crates/vibevalley-protocol/src/contract`，TS 的类型由它生成；页面要用的同改手写的 `schema.ts` 与 `api.ts`，它们的测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
-- **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、artifact 与 pkm 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。
+- **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、artifact 与 pkm 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。SQLite 查询绑定由 sqlc 生成，输入和输出见[配置](sqlc.yaml)。
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层、旧数据兜底或迁移脚本；对外 HTTP `v1` 是唯一例外（[接口版本](docs/subsystems/core.md)）。
 - **页面不折事实**：页面只读推来的 `StateFrame` 并写画面摆法，请求只经 `Transport`；缺数据就补进契约与 `reduce` 或调接口问服务端（[客户端](docs/subsystems/app.md)）。
 - **处理函数要薄**：HTTP 门、桥和页面组件只做转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。

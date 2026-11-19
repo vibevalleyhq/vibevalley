@@ -118,5 +118,8 @@
     "signedOut": "Not signed in"
   },
   "spentToday": "Helpers spent about {spent} today, with no daily budget.",
-  "spentTodayBudget": "Helpers spent about {spent} today, against a daily budget of {budget}."
+  "spentTodayBudget": "Helpers spent about {spent} today, against a daily budget of {budget}.",
+  "missingCommand": "Install {runtime} on this computer, then check again. If it is installed, enter the full path to its executable.",
+  "enterPath": "Enter command path",
+  "signInTerminal": "Open a terminal to sign in"
 }

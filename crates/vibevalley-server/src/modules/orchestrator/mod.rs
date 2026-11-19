@@ -10,7 +10,10 @@
 //! turn (VibeValley steers the user's words into the turn under way; the
 //! brain has no steering).
 
+mod execution;
+mod mcp;
 pub mod words;
+pub use execution::Execution;
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
@@ -39,7 +42,7 @@ const QUOTA_LOW: f64 = 15.0;
 const SKILLS: include_dir::Dir = include_dir::include_dir!("$CARGO_MANIFEST_DIR/assets/orchestrator/skills");
 
 /// One input to an orchestrator (`Handed`).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Input {
     /// The orchestrator it is for; none is the place's.
     pub agent: Option<String>,
@@ -96,10 +99,10 @@ struct Waiting {
 
 struct Instance {
     id: String,
-    queue: Mutex<VecDeque<Input>>,
+    queue: Mutex<VecDeque<()>>,
     more: Condvar,
     route: Arc<Mutex<Route>>,
-    abort: Mutex<Option<Arc<AtomicBool>>>,
+    abort: Mutex<Option<Arc<vibevalley_agent::TurnAbort>>>,
     /// The situation it was last shown whole; "" shows it whole again.
     shown: Mutex<String>,
     /// What it last said it cannot start for, per place.
@@ -115,6 +118,8 @@ pub struct Orchestrator {
     key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
     client: Option<Arc<dyn ModelClient>>,
     instances: Mutex<HashMap<String, Arc<Instance>>>,
+    pub execution: Execution,
+    mcp: mcp::ProfileServers,
     /// The live answers not yet taken by a turn.
     ports: Mutex<HashMap<String, flume::Sender<String>>>,
     closed: AtomicBool,
@@ -161,6 +166,7 @@ fn message_of_turn(entry: &Entry) -> Option<Option<Message>> {
 
 /// What the orchestrator is made with.
 pub struct Parts {
+    pub permissions: vibevalley_agent::generation::governance::Permissions,
     pub hub: Weak<Hub>,
     pub farm: Arc<Farm>,
     pub home: PathBuf,
@@ -172,8 +178,10 @@ pub struct Parts {
 }
 
 impl Orchestrator {
-    pub fn open(p: Parts) -> Arc<Orchestrator> {
-        let o = Arc::new(Orchestrator {
+    pub fn open(p: Parts) -> vibevalley_durable::Result<Arc<Orchestrator>> {
+        let store = p.farm.board.sessions().durable_store().clone();
+        let o = Arc::new_cyclic(|weak| Orchestrator {
+            execution: Execution::new(store, weak.clone(), p.permissions),
             hub: p.hub,
             farm: p.farm,
             home: p.home,
@@ -182,6 +190,7 @@ impl Orchestrator {
             client: p.client,
             instances: Default::default(),
             ports: Default::default(),
+            mcp: Default::default(),
             closed: AtomicBool::new(false),
         });
         for a in o.farm.agents.profiles.orchestrators() {
@@ -192,17 +201,19 @@ impl Orchestrator {
             if let Some(o) = weak.upgrade()
                 && a.role == AgentRole::Orchestrator
             {
+                o.mcp.forget(&a.id);
                 o.keep_on_duty(a);
             }
             Ok(())
         }));
         // A turn the last process left unfinished is finished now.
+        o.execution.scheduler.recover()?;
         for a in o.farm.agents.profiles.orchestrators() {
-            if Self::conversation_file(&o.home, &a.id).is_file() {
+            if o.execution.has_inputs(&a.id)? || Self::conversation_file(&o.home, &a.id).is_file() {
                 o.instance(&a.id);
             }
         }
-        o
+        Ok(o)
     }
 
     fn hub(&self) -> Option<Arc<Hub>> {
@@ -251,6 +262,7 @@ impl Orchestrator {
                 channel: None,
                 issue: None,
                 refining: false,
+                subagents: None,
                 tool_connections: None,
                 machine: None,
                 phase: Phase::Resting(PhaseResting {}),
@@ -301,7 +313,15 @@ impl Orchestrator {
         }
         let id = self.target(input.agent.as_deref());
         let me = self.instance(&id);
-        lock(&me.queue).push_back(input);
+        let mut queue = lock(&me.queue);
+        if let Err(error) = self.execution.enqueue(&id, &input) {
+            if let Some(hub) = self.hub() {
+                hub.notice(NoticeLevel::Error, error.to_string());
+            }
+            return false;
+        }
+        queue.push_back(());
+        drop(queue);
         me.more.notify_all();
         true
     }
@@ -361,16 +381,19 @@ impl Orchestrator {
         let id = self.target(agent);
         let Some(me) = lock(&self.instances).get(&id).cloned() else { return };
         lock(&me.queue).clear();
+        let _ = self.execution.stop(&id);
         if let Some(a) = lock(&me.abort).as_ref() {
-            a.store(true, Ordering::SeqCst);
+            a.abort();
         }
     }
 
     pub fn close(&self) {
-        self.closed.store(true, Ordering::Relaxed);
+        self.closed.store(true, Ordering::Release);
+        self.execution.close();
+        self.mcp.close();
         for me in lock(&self.instances).values() {
             if let Some(a) = lock(&me.abort).as_ref() {
-                a.store(true, Ordering::SeqCst);
+                a.abort();
             }
             me.more.notify_all();
         }
@@ -422,7 +445,14 @@ impl Orchestrator {
 
     /// Everything it can call: the farm's tools for where it is, its skills and its memory.
     fn tools(&self, me: &Instance, skills_dir: PathBuf, memory: Arc<dyn kit::MemoryPort>) -> Vec<Box<dyn Tool>> {
-        let mut tools = held(&self.farm, &me.route);
+        self.tools_for(&me.id, &me.route, skills_dir, memory)
+    }
+
+    fn tools_for(&self, id: &str, route: &Arc<Mutex<Route>>, skills_dir: PathBuf, memory: Arc<dyn kit::MemoryPort>) -> Vec<Box<dyn Tool>> {
+        let mut tools = held(&self.farm, route);
+        if let Some(profile) = self.farm.agents.profiles.agent(id) {
+            tools.extend(self.mcp.tools(&profile));
+        }
         let dirs = vec![skills_dir];
         tools.push(Box::new(kit::LoadSkill {
             skills: Box::new(move || kit::scan_skills(&dirs)),
@@ -459,7 +489,8 @@ impl Orchestrator {
             .iter()
             .filter(|e| e.seq < on && e.r#type == SessionEventType::UserMessage && e.text == asked.text)
             .count();
-        let entries = vibevalley_agent::read_entries(&Self::conversation_file(&self.home, &id)).map_err(|e| refused(BizCode::Refused, e.to_string()))?;
+        let mut entries = vibevalley_agent::read_entries(&Self::conversation_file(&self.home, &id)).map_err(|e| refused(BizCode::Refused, e.to_string()))?;
+        entries.extend(self.execution.entries(&id).map_err(|e| refused(BizCode::Refused, e.to_string()))?);
         let turns = entries
             .iter()
             .enumerate()
@@ -506,16 +537,20 @@ impl Orchestrator {
 
     /// The conversation, opened as its turn starts (its prompt as it is now).
     fn conversation(&self, me: &Instance, model: &str) -> Result<Conversation, String> {
-        let home = self.home.join("agent").join(&me.id);
+        Conversation::open(Self::conversation_file(&self.home, &me.id), self.brain_at(&me.id, &me.route, model)).map_err(|e| e.to_string())
+    }
+
+    fn brain_at(&self, id: &str, route: &Arc<Mutex<Route>>, model: &str) -> Brain {
+        let home = self.home.join("agent").join(id);
         let skills_dir = home.join("skills");
         if !skills_dir.is_dir() {
             let _ = std::fs::create_dir_all(&skills_dir);
             let _ = SKILLS.extract(&skills_dir);
         }
-        let memory = self.farm.memories.port(&me.id, crate::modules::memory::By::Orchestrator);
-        let mut brain = Brain::new(self.client(), model, self.system_prompt(&me.id, &home, memory.as_ref()));
-        brain.tools = self.tools(me, skills_dir, memory);
-        Conversation::open(Self::conversation_file(&self.home, &me.id), brain).map_err(|e| e.to_string())
+        let memory = self.farm.memories.port(id, crate::modules::memory::By::Orchestrator);
+        let mut brain = Brain::new(self.client(), model, self.system_prompt(id, &home, memory.as_ref()));
+        brain.tools = self.tools_for(id, route, skills_dir, memory);
+        brain
     }
 
     fn work(o: Weak<Orchestrator>, me: Arc<Instance>) {
@@ -524,26 +559,48 @@ impl Orchestrator {
             o.resume(&me);
         }
         loop {
-            let batch: Vec<Input> = {
+            {
                 let mut q = lock(&me.queue);
                 loop {
                     let Some(o) = o.upgrade() else { return };
                     if o.closed.load(Ordering::Relaxed) {
                         return;
                     }
+                    let saved = o.execution.has_inputs(&me.id).unwrap_or(false);
                     drop(o);
                     if !q.is_empty() {
-                        break q.drain(..).collect();
+                        q.clear();
+                        break;
+                    }
+                    // Includes inputs durably accepted before the previous process stopped.
+                    if saved {
+                        break;
                     }
                     q = me.more.wait_timeout(q, std::time::Duration::from_secs(1)).unwrap_or_else(|e| e.into_inner()).0;
                 }
             };
             let Some(o) = o.upgrade() else { return };
-            o.turn(&me, batch);
+            {
+                let batch = match o.execution.batch(&me.id) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        if let Some(hub) = o.hub() {
+                            hub.notice(NoticeLevel::Error, e.to_string());
+                        }
+                        return;
+                    }
+                };
+                if !batch.is_empty() {
+                    o.turn(&me, batch);
+                }
+            }
         }
     }
 
     fn resume(&self, me: &Instance) {
+        if !Self::conversation_file(&self.home, &me.id).is_file() {
+            return;
+        }
         let Ok(model) = self.model_of(&me.id) else { return };
         if (self.key)().is_none() && self.client.is_none() {
             return;
@@ -656,7 +713,8 @@ impl Orchestrator {
             .join("\n\n")
     }
 
-    fn turn(&self, me: &Instance, batch: Vec<Input>) {
+    fn turn(&self, me: &Instance, pending: Vec<(String, Input)>) {
+        let (requests, batch): (Vec<_>, Vec<_>) = pending.into_iter().unzip();
         let Some(last) = batch.last().cloned() else { return };
         let route = Route {
             agent: me.id.clone(),
@@ -676,6 +734,7 @@ impl Orchestrator {
         };
         *lock(&me.route) = route.clone();
         let cannot = |why: String| {
+            let _ = self.execution.finish_inputs(&requests, false, &serde_json::json!({"error":why}));
             // The round is still in its log, failed: what it was told can be read and judged there.
             let run = Run::new(self, me, &route);
             run.asked(&self.input_of(me, &batch));
@@ -705,17 +764,21 @@ impl Orchestrator {
             Ok(m) => m,
             Err(why) => return cannot(t("server.orchestrator.cannotStart", &[("why", why.into())])),
         };
-        let mut conv = match self.conversation(me, &model) {
-            Ok(c) => c,
-            Err(why) => return cannot(t("server.orchestrator.cannotStart", &[("why", why.into())])),
-        };
         lock(&me.cannot).clear();
-        *lock(&me.abort) = Some(conv.abort_handle());
         let text = self.input_of(me, &batch);
-        let mut run = Run::new(self, me, &route);
+        let mut run = Run::start(self, me, &route, format!("run-{}", requests[0]));
         run.ports = ports;
         run.asked(&text);
-        let outcome = conv.send(&text, &mut |e| run.on(e));
+        let input = execution::TurnInput {
+            requests: &requests,
+            batch: &batch,
+            text: &text,
+            model: &model,
+        };
+        let outcome = self.execution.run(&mut run, input);
+        if self.closed.load(Ordering::Acquire) {
+            return;
+        }
         run.finish(outcome);
         for id in batch.iter().flat_map(|i| &i.messages) {
             let _ = self.farm.chat.mark_seen(&me.id, id);
@@ -731,13 +794,20 @@ struct Run<'a> {
     run: String,
     said: String,
     calls: u64,
+    durable: bool,
     /// The live answers this turn's words also go to, read out as they are.
     ports: Vec<flume::Sender<String>>,
 }
 
 impl<'a> Run<'a> {
     fn new(o: &'a Orchestrator, me: &'a Instance, route: &'a Route) -> Run<'a> {
-        let run = format!("run-{}", uuid::Uuid::now_v7());
+        Self::start(o, me, route, format!("run-{}", uuid::Uuid::now_v7()))
+    }
+    fn start(o: &'a Orchestrator, me: &'a Instance, route: &'a Route, run: String) -> Self {
+        let started = o
+            .trajectories
+            .events(&me.id, Some(&run))
+            .is_some_and(|steps| steps.iter().any(|step| step.r#type == SessionEventType::RunStart));
         let r = Run {
             o,
             me,
@@ -745,9 +815,12 @@ impl<'a> Run<'a> {
             run,
             said: String::new(),
             calls: 0,
+            durable: false,
             ports: vec![],
         };
-        r.step(Step::RunStarted { run: r.run.clone() });
+        if !started {
+            r.step(Step::RunStarted { run: r.run.clone() });
+        }
         r.phase(Some(SessionAction::Thinking));
         r
     }
@@ -766,7 +839,14 @@ impl<'a> Run<'a> {
     }
 
     fn asked(&self, text: &str) {
-        self.step(Step::Asked { text: text.into() });
+        if self
+            .o
+            .trajectories
+            .events(&self.me.id, Some(&self.run))
+            .is_none_or(|events| !events.iter().any(|e| e.r#type == SessionEventType::UserMessage))
+        {
+            self.step(Step::Asked { text: text.into() });
+        }
     }
 
     fn phase(&self, doing: Option<SessionAction>) {
@@ -805,6 +885,9 @@ impl<'a> Run<'a> {
         }
         for port in &self.ports {
             let _ = port.send(text.clone());
+        }
+        if self.durable {
+            return;
         }
         if let Err(e) = self.o.farm.chat.post(Posting {
             from: self.me.id.clone(),

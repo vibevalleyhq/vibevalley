@@ -62,7 +62,7 @@ function topic(name: string): Signal<FrameEnvelope<unknown> | null> {
   host.on(`frame:${name}`, (payload) => {
     const env = payload as unknown as FrameEnvelope<unknown>;
     store.set(env);
-    // Rust's debug dump records what each view applied; the live stream is too chatty for that.
+    // A state receipt releases the next workbench snapshot. Other non-live receipts feed the debug dump.
     if (name !== "live") host.post("action", { type: "applied", topic: name, rev: env.rev });
   });
   if (serverTopics.has(name) && host.available()) host.post("action", { type: "watch", topic: name });
@@ -141,6 +141,7 @@ export const hostApi = {
   openUrl: (url: string) => call<void>("host.openUrl", { url }),
   /** Opens an existing absolute path in the system's default app. */
   openFile: (path: string) => call<void>("host.openFile", { path }),
+  openWorktreeFile: (worktree: string, path: string) => call<void>("host.openFile", { worktree, path }),
   /** VibeValley's built pixel art: the folder with sprites.json and its PNGs. */
   pixelDir: () => call<{ path: string }>("host.pixelDir", {}),
   /** Plays a local sound file (nsh's AudioPlayer is silent in the app); stops the last one. */

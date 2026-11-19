@@ -510,3 +510,45 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     assert_eq!(wait(&s, "voice", "ready")["source"]["agent"], "orchestrator");
     s.close();
 }
+
+#[test]
+fn regression_job_admission_rolls_back_input_pins_without_a_second_write() {
+    use sqlx::ConnectOptions;
+    let dir = tempfile::tempdir().unwrap();
+    let network = Network::new();
+    let s = start(dir.path(), &network);
+    let revision = bind(&s, "test-understanding");
+    let image = picture(&s);
+    let mut approved = understanding("atomic", revision, &image, "Describe");
+    approved["channel"] = json!(s.chat.default_channel());
+    let mut db = pollster::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(dir.path().join("server.db")).connect()).unwrap();
+    pollster::block_on(
+        sqlx::raw_sql(
+            "CREATE TRIGGER reject_job BEFORE INSERT ON media_job BEGIN SELECT RAISE(ABORT,'job store failed'); END;
+         CREATE TRIGGER reject_unpin BEFORE DELETE ON media_input_pin BEGIN SELECT RAISE(ABORT,'storage unavailable'); END;",
+        )
+        .execute(&mut db),
+    )
+    .unwrap();
+    refused(&s, "media.understanding.authorize", approved.clone());
+    assert!(deletable(&s, &image));
+    refused(&s, "media.job.get", json!({"id":"atomic"}));
+    pollster::block_on(sqlx::raw_sql("DROP TRIGGER reject_job; DROP TRIGGER reject_unpin;").execute(&mut db)).unwrap();
+
+    std::thread::scope(|scope| {
+        let duplicate = scope.spawn(|| ok(&s, "media.understanding.authorize", approved.clone()));
+        assert_eq!(ok(&s, "media.understanding.authorize", approved.clone())["phase"], "authorized");
+        assert_eq!(duplicate.join().unwrap()["phase"], "authorized");
+    });
+    assert!(!deletable(&s, &image));
+    let different = picture(&s);
+    let mut conflicting = approved;
+    conflicting["inputs"] = json!([different]);
+    refused(&s, "media.understanding.authorize", conflicting);
+    assert!(!deletable(&s, &image));
+    assert!(deletable(&s, &different));
+    assert_eq!(network.count("POST /files"), 0);
+    ok(&s, "media.job.cancel", json!({"id":"atomic"}));
+    assert!(deletable(&s, &image));
+    s.close();
+}

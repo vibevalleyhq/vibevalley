@@ -85,7 +85,13 @@ fn config(home: &Path, model: Arc<Model>) -> ServerConfig {
         }})).map_err(|e| e.to_string())?;
         let reply: Value = response.body_mut().read_json().map_err(|e| e.to_string())?;
         if reply.get("error").is_some() || !reply["result"].is_object() || reply["result"]["isError"] == true { return Err(reply.to_string()); }
-        Ok(vec![Step::text(format!("committed {file}"))])
+        Ok(vec![
+            Step::text(format!("committed {file}")),
+            Step::Emit(vibevalley_oar::EventKind::TurnFinished {
+                reason: vibevalley_oar::StopReason::Completed,
+                usage: vibevalley_oar::Usage { input_tokens: Some(30), output_tokens: Some(12), cost_usd: Some(0.001) },
+            }),
+        ])
     })))));
     ServerConfig {
         registry: Some(Arc::new(registry)),
@@ -151,6 +157,12 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let runs = call(&url, "issue.run.list", json!({ "id": id }));
     assert_eq!(runs.as_array().unwrap().len(), 2, "{runs}");
     assert!(runs.to_string().contains("committed round-2.txt"), "{runs}");
+    assert_eq!(runs[0]["spent"], json!({"tokens":42}));
+    assert_eq!(runs[1]["spent"], json!({"tokens":42}));
+    let timeline = call(&url, "issue.timeline.get", json!({"id":id}));
+    assert_eq!(timeline["spent"], json!({"tokens":84}));
+    let last = call(&url, "session.get", json!({"id":session}));
+    assert_eq!(last["lastRun"]["spent"], json!({"tokens":42}));
     let events = call(&url, "session.event.list", json!({ "id": session }));
     assert!(events.to_string().contains("Add the second file"), "{events}");
     let changes = call(&url, "issue.diff.get", json!({ "id": id }));
@@ -163,11 +175,31 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let draft = call(&url, "issue.create", json!({ "title": "Draft permissions", "repo": "demo", "agent": "Worker" }));
     let denied = server.hub.call_as(Caller::Session, "issue.refine", json!({ "id": draft["id"] }));
     assert_eq!(denied.biz_code, BizCode::Forbidden.code());
+    call(
+        &url,
+        "issue.comment.create",
+        json!({"id":draft["id"], "text":"For the implementer", "sendKey":"queued-before-draft"}),
+    );
     let allowed = server.hub.call_as(Caller::Orchestrator, "issue.refine", json!({ "id": draft["id"] }));
     assert_eq!(allowed.biz_code, 0, "{allowed:?}");
     until(&server, "assistant draft finished", || {
         server.board.issue(draft["id"].as_str().unwrap()).filter(|i| i.refining.is_none())
     });
+
+    let draft_id = draft["id"].as_str().unwrap();
+    let run = server.board.runs(draft_id).unwrap().pop().unwrap();
+    assert!(run.heard.is_empty());
+    let queued = server
+        .board
+        .sessions()
+        .durable_store()
+        .read(|tx| {
+            assert!(tx.document("run", &run.id, "issue.report")?.is_none());
+            tx.submissions(&format!("issue:{draft_id}"))
+        })
+        .unwrap();
+    assert_eq!(queued.len(), 1);
+    assert_eq!(queued[0].status, vibevalley_durable::SubmissionStatus::Queued);
 
     model.0.lock().unwrap().extend([
         answer(Some(ToolCall {
@@ -236,3 +268,5 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     assert_eq!(reopened.board.issue(&scheduled.id).unwrap().stage.state, IssueStageKind::Reviewing);
     reopened.close();
 }
+
+mod recovery;

@@ -10,7 +10,7 @@ export type MemorySourceKind = (typeof MemorySourceKindValues)[number];
 
 export type MemorySource = { kind: MemorySourceKind, url: string, enabled: boolean, read: boolean, write: boolean, everything: boolean, user?: string, key: KeyStatus, };
 
-export type SpacePaths = { repos: string, 
+export type SpacePaths = { repos: string,
 /**
  * Named `<repo>.<issue number>`.
  */
@@ -24,7 +24,7 @@ export type Readiness = { ready: true, } | { ready: false, missing: Missing, };
 export const FeatureValues = ["orchestrator", "image", "understanding", "speech", "speakers", "voiceDesign", "transcription", "dictation", "live", "vision", "call"] as const;
 export type Feature = (typeof FeatureValues)[number];
 
-export type SettingsStatus = { file: string, home: string, paths: SpacePaths, version: string, locale: Locale, deepseekApiKey: KeyStatus, agoraAppId: AgoraAppID, agoraAppCertificate: KeyStatus, voice: VoiceSettings, voiceDefaults: VoiceSettings, asrKey: KeyStatus, llmKey: KeyStatus, ttsKey: KeyStatus, dictation: Dictation, dictationKey: KeyStatus, 
+export type SettingsStatus = { file: string, home: string, paths: SpacePaths, version: string, locale: Locale, deepseekApiKey: KeyStatus, agoraAppId: AgoraAppID, agoraAppCertificate: KeyStatus, voice: VoiceSettings, voiceDefaults: VoiceSettings, asrKey: KeyStatus, llmKey: KeyStatus, ttsKey: KeyStatus, dictation: Dictation, dictationKey: KeyStatus,
 /**
  * Local configuration check only; does not probe remote endpoints.
  */

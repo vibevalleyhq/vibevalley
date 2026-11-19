@@ -24,7 +24,7 @@ const APPROVAL: i64 = 15 * 60_000;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Authorization {
-    channel: String,
+    pub(super) channel: String,
     expires_at: i64,
 }
 
@@ -130,7 +130,6 @@ impl Jobs {
             });
         }
         Moss::prepare_understanding(&account.model, &request.prompt, &media(&inputs, |i| i.id.clone()), request.max_output_tokens).map_err(|_| invalid())?;
-        let ids = request.inputs.clone();
         let mut r = Record::new(
             ask,
             MediaSource::User {},
@@ -153,15 +152,7 @@ impl Jobs {
             }
             None => Some(Held::Account(account)),
         };
-        let id = r.id().to_string();
-        self.inputs.pin(&ids, &id, |_| Ok(()))?;
-        match self.admit(r, held) {
-            Ok(r) => shown(&r),
-            Err(e) => {
-                let _ = self.inputs.release(&id);
-                Err(e)
-            }
-        }
+        shown(&self.admit(r, held)?)
     }
 
     /// `media.understanding.start`: an orchestrator, with the user's word in this batch, starts what the user approved
@@ -327,7 +318,7 @@ impl Jobs {
 
     /// Approvals that ran out before an orchestrator used them end here, and let go of their inputs.
     pub(super) fn expire_approvals(&self) {
-        let waiting = match self.rows("select data from media_job where phase='authorized'") {
+        let waiting = match self.rows(async |db| super::q::authorized_jobs(db).await) {
             Ok(w) => w,
             Err(e) => return eprintln!("media: {}", e.message),
         };

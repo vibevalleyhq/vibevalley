@@ -18,11 +18,15 @@
 | `crates/vibevalley-agent/src/model.rs` | 消息与 `ModelClient`；`OpenAiClient::deepseek` 读 DeepSeek 的流，含 `reasoning_content` 与 `reasoning_effort` |
 | `crates/vibevalley-agent/src/tool.rs` | `Tool`、`ToolOutput`；`coding_tools`：`read`、`write`、`edit`、`bash`（工作目录是帮工的） |
 | `crates/vibevalley-agent/src/kit.rs` | 技能（`default_skill_dirs`、`scan_skills`、`LoadSkill`）、记性（`MemoryPort`、`FileMemory`、`Remember`、`RewriteMemory`）、任务图（`todo_tools`）、帮手（`SpawnAgent`） |
-| `crates/vibevalley-agent/src/mcp.rs` | 档案挂的 MCP 服务（stdio、streamable HTTP，`rmcp`），工具以 `server__tool` 给模型 |
+| `crates/vibevalley-agent/src/mcp.rs`、`mcp/client.rs` | 档案挂的 MCP 客户端。官方 Rust SDK 管标准输入输出和流式 HTTP，应用保留工具名、只读提示和结果文字。 |
 | `crates/vibevalley-agent/src/price.rs` | DeepSeek 的价目表，花费按它算 |
 | `crates/vibevalley-oar/src/vibevalley.rs` | `vibevalley` 农机：照 oar 的 `Runtime` 契约，一个会话一个对话（`<会话>.jsonl`），按会话 ID 找回 |
 | `crates/vibevalley-server/src/modules/orchestrator/mod.rs` | 助手：每个助手档案一个对话（`<home>/agent/<id>/conversation.jsonl`），带农场的工具 |
 | `crates/vibevalley-cli/src/commands/chat.rs` | `vibevalley chat`：在终端直接驱动本机农机（含 `vibevalley`），或加 `--orchestrator` 在 `#general` 和助手对话 |
+
+内置农机与助手均使用档案的 MCP 配置。一个连接上的工具共用会话和后台运行时。连接和请求限时 120 秒。用户叫停调用时，客户端取消在途请求。其他工具仍可使用该连接。最后一个工具和连接持有者释放后，SDK 关闭标准输入并回收子进程。[客户端](crates/vibevalley-agent/src/mcp/client.rs)
+
+助手按档案复用连接。同一轮生成和工具调用共用工具列表。档案变更后，下一次读取工具时使用新配置。`disallowedTools` 中的 MCP 工具不进入模型的工具列表，其他 MCP 工具仍由执行层判定权限。[档案连接](crates/vibevalley-server/src/modules/orchestrator/mcp.rs)
 
 ## 模型和不变量
 
@@ -41,6 +45,14 @@
 
 - **技能按需加载**：提示里只列名字和 160 字以内的简介，`load_skill` 时才读正文。
 - **自己的任务**：`todo_add|update|list` 维护一张 DAG，加的时候全加或全不加。
+
+## 内置帮工怎样核对验收条件
+
+内置帮工完成带验收条件的工单轮次时，服务端读取本轮交付物。服务端核对厂商会话、业务轮次和工单的归属。评审输入由工单标题、描述、验收条件、帮工汇报、该工单的 Git 改动和 Artifact 组成。交付证据最多 16,000 个字符，超出时附截断标记。独立评审会话只收到评审指令和这份输入，工具列表为空。[输入边界](crates/vibevalley-server/src/modules/orchestrator/execution.rs) · [评审阶段](crates/vibevalley-agent/src/generation/grading.rs)
+
+评审未通过时，缺项回到同一工作轮次。默认最多评审三次。通过后，工单沿用帮工的结构化汇报或最终答复。仍有缺项时，轮次记为失败，摘要包含评审原因。帮工明确提问或报告阻塞时，工单先等用户回答。普通对话、起草轮次和没有验收条件的工单沿用原有结算流程。人工审查和 Git 合并仍由工单板负责。[服务端回归](crates/vibevalley-server/tests/orchestrator/grading.rs)
+
+评审调用也受该会话的预算约束。服务端先保存当次证据，额度用完时暂停模型请求。上调额度后，帮工沿用原证据继续评审。在评审回复已落盘的轮次中，恢复时复用该次判定。[预算与恢复回归](crates/vibevalley-agent/src/generation/tests.rs)
 
 ## 为什么这样
 

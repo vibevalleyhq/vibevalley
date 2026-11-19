@@ -681,6 +681,52 @@ pub struct IssueLastRun {
 }
 
 #[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct CodeReview {
+    pub at: i64,
+    pub revision: ReviewRevision,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectCheckStatus {
+    Passed,
+    Failed,
+    NotConfigured,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectCheckReceipt {
+    pub target_branch: String,
+    pub target_commit: String,
+    pub source_tree: String,
+    pub candidate_commit: String,
+    pub candidate_tree: String,
+    pub status: ProjectCheckStatus,
+    pub command: Option<String>,
+    pub output: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DeliveryEvidence {
+    pub reviews: Vec<CodeReview>,
+    pub check: Option<ProjectCheckReceipt>,
+    pub merged_commit: Option<String>,
+}
+
+#[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
@@ -713,6 +759,7 @@ pub struct Issue {
     pub pull_request: Option<PullRequest>,
     pub deliver: Deliverable,
     pub reviewed_at: Option<i64>,
+    pub delivery_evidence: Option<DeliveryEvidence>,
     pub findings: Vec<Finding>,
     pub questions: Vec<Question>,
     pub criteria: Vec<String>,
@@ -758,6 +805,7 @@ pub struct AppliedIssue {
     pub pull_request: Option<PullRequest>,
     pub deliver: Deliverable,
     pub reviewed_at: Option<i64>,
+    pub delivery_evidence: Option<DeliveryEvidence>,
     pub findings: Vec<Finding>,
     pub questions: Vec<Question>,
     pub criteria: Vec<String>,
@@ -796,6 +844,7 @@ impl AppliedIssue {
             pull_request: issue.pull_request,
             deliver: issue.deliver,
             reviewed_at: issue.reviewed_at,
+            delivery_evidence: issue.delivery_evidence,
             findings: issue.findings,
             questions: issue.questions,
             criteria: issue.criteria,
@@ -888,6 +937,7 @@ pub struct CommentRequest {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct IssueReviewRequest {
+    pub revision: Option<ReviewRevision>,
     pub pass: bool,
     pub findings: Option<Vec<String>>,
     pub text: Option<String>,
@@ -942,6 +992,7 @@ pub struct IssueSplitRequest {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct IssueStatusRequest {
+    pub revision: Option<ReviewRevision>,
     pub status: IssueStatus,
     /// Follow-up instructions or review findings when moving back to `todo`.
     pub text: Option<String>,
@@ -1061,6 +1112,7 @@ pub struct IssueCommentCreateInput {
 #[serde(rename_all = "camelCase")]
 pub struct IssueDiffGetInput {
     pub id: String,
+    pub since_tree: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -1069,6 +1121,7 @@ pub struct IssueDiffGetInput {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct IssueReviewInput {
+    pub revision: Option<ReviewRevision>,
     pub id: String,
     pub pass: bool,
     pub findings: Option<Vec<String>>,
@@ -1145,6 +1198,7 @@ pub struct IssueDeleteInput {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct IssueStatusUpdateInput {
+    pub revision: Option<ReviewRevision>,
     pub id: String,
     pub status: IssueStatus,
     pub text: Option<String>,
@@ -1191,6 +1245,10 @@ crate::typescript::module! {
     Execution,
     Assignment,
     MandateStrength,
+    CodeReview,
+    ProjectCheckStatus,
+    ProjectCheckReceipt,
+    DeliveryEvidence,
     IssueMandate,
     IssueReportMemoryScope,
     IssueReportMemory,

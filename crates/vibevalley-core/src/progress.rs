@@ -406,6 +406,7 @@ pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<
         | Fact::UserMentionsChanged(_)
         | Fact::SessionPhaseChanged(_)
         | Fact::SessionToolChanged(_)
+        | Fact::SessionSubagentsChanged(_)
         | Fact::SessionToolsReset(_)
         | Fact::IssueRemoved(_)
         | Fact::CronChanged(_)

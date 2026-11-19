@@ -12,7 +12,13 @@ fn main() {
             let path = file.path();
             let stem = path.file_stem().unwrap().to_string_lossy();
             if path.extension().is_some_and(|e| e == "json")
-                && (stem == "shared" || stem == "cli" || stem == "server" || stem.starts_with("server.") || stem == "web.farm")
+                && (stem == "shared"
+                    || stem == "desktop"
+                    || stem == "cli"
+                    || stem == "server"
+                    || stem.starts_with("server.")
+                    || stem == "web.farm"
+                    || stem.starts_with("web.farm."))
             {
                 println!("cargo:rerun-if-changed={}", path.display());
                 entries.push((

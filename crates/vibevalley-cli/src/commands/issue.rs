@@ -56,6 +56,7 @@ fn applied(a: &vibevalley_protocol::AppliedIssue) -> Issue {
         pull_request: a.pull_request.clone(),
         deliver: a.deliver,
         reviewed_at: a.reviewed_at,
+        delivery_evidence: a.delivery_evidence.clone(),
         findings: a.findings.clone(),
         questions: a.questions.clone(),
         criteria: a.criteria.clone(),
@@ -250,8 +251,11 @@ pub fn command() -> Command {
                 flag("fail", "cli.flag.fail"),
                 many("finding", "cli.flag.finding"),
                 text("comment", "cli.flag.reviewComment"),
+                text("base-commit", "cli.flag.reviewBase").requires("tree").requires("pass"),
+                text("tree", "cli.flag.reviewTree").requires("base-commit").requires("pass"),
             ]),
-            cmd("diff", "cli.command.issue.diff", &[("vibevalley issue diff 12", "cli.example.issueDiff.about")]).arg(issue_arg()),
+            cmd("diff", "cli.command.issue.diff", &[("vibevalley issue diff 12", "cli.example.issueDiff.about")])
+                .args([issue_arg(), text("since-tree", "cli.flag.reviewTree")]),
             cmd(
                 "timeline",
                 "cli.command.issue.timeline",
@@ -347,6 +351,7 @@ pub fn run(ctx: &Ctx, m: &ArgMatches) -> Done {
         }
         "status" => {
             let request = IssueStatusUpdateInput {
+                revision: None,
                 id: id(),
                 status: status_of(&arg(m, "status")).unwrap_or(IssueStatus::Backlog),
                 text: get(m, "comment"),
@@ -372,7 +377,11 @@ pub fn run(ctx: &Ctx, m: &ArgMatches) -> Done {
             if pass == fail {
                 return Err(Failure::usage("InvalidValue", t("cli.issue.passOrFail", &[])));
             }
+            let revision = get(m, "base-commit")
+                .zip(get(m, "tree"))
+                .map(|(base_commit, tree)| vibevalley_protocol::ReviewRevision { base_commit, tree });
             let request = IssueReviewInput {
+                revision,
                 id: id(),
                 pass,
                 findings: Some(all(m, "finding")).filter(|f| !f.is_empty()),
@@ -381,7 +390,10 @@ pub fn run(ctx: &Ctx, m: &ArgMatches) -> Done {
             ctx.change::<ops::IssueReview>("issue review", None, &request, issue_line)
         }
         "diff" => {
-            let c = ctx.ask::<ops::IssueDiffGet>(&IssueDiffGetInput { id: id() })?;
+            let c = ctx.ask::<ops::IssueDiffGet>(&IssueDiffGetInput {
+                id: id(),
+                since_tree: get(m, "since-tree"),
+            })?;
             ctx.show(&c, changes_text);
             Ok(())
         }

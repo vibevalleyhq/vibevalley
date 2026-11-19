@@ -13,6 +13,8 @@ mod diff;
 mod repo;
 pub use repo::{RawOutput, clone, init};
 mod status;
+mod verified_merge;
+pub use verified_merge::{MergeRevision, VerifiedMerge};
 #[cfg(test)]
 mod tests;
 

@@ -5,12 +5,10 @@
 //! session, write before display, resume the unfinished turn, tools that
 //! change things are not replayed, compaction when the prompt grows.
 
-use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 
@@ -98,12 +96,48 @@ impl Brain {
     }
 }
 
+pub struct TurnAbort {
+    state: Mutex<TurnSignal>,
+}
+
+struct TurnSignal {
+    sender: Option<flume::Sender<()>>,
+    receiver: flume::Receiver<()>,
+}
+
+impl TurnSignal {
+    fn open() -> Self {
+        let (sender, receiver) = flume::bounded(0);
+        Self {
+            sender: Some(sender),
+            receiver,
+        }
+    }
+}
+
+impl TurnAbort {
+    pub fn abort(&self) {
+        self.state.lock().unwrap_or_else(|e| e.into_inner()).sender.take();
+    }
+
+    fn reset(&self) {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if state.sender.is_none() {
+            *state = TurnSignal::open();
+        }
+    }
+
+    fn signal(&self) -> flume::Receiver<()> {
+        self.state.lock().unwrap_or_else(|e| e.into_inner()).receiver.clone()
+    }
+}
+
 pub struct Conversation {
     brain: Brain,
     path: PathBuf,
     file: File,
     entries: Vec<Entry>,
-    abort: Arc<AtomicBool>,
+    abort: Arc<TurnAbort>,
 }
 
 const COMPACT_PROMPT: &str = "Summarize the conversation so far for yourself, so that you can continue the work \
@@ -117,14 +151,22 @@ impl Conversation {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(io)?;
         }
-        let entries = read_entries(&path)?;
-        let file = OpenOptions::new().create(true).append(true).open(&path).map_err(io)?;
+        let mut file = OpenOptions::new().create(true).read(true).append(true).open(&path).map_err(io)?;
+        let (entries, committed, newline) = read_transcript(&file)?;
+        if committed != file.metadata().map_err(io)?.len() {
+            file.set_len(committed).map_err(io)?;
+            file.sync_data().map_err(io)?;
+        } else if !newline {
+            file.write_all(b"\n").map_err(io)?;
+        }
         Ok(Conversation {
             brain,
             path,
             file,
             entries,
-            abort: Arc::new(AtomicBool::new(false)),
+            abort: Arc::new(TurnAbort {
+                state: Mutex::new(TurnSignal::open()),
+            }),
         })
     }
 
@@ -136,8 +178,8 @@ impl Conversation {
         &self.entries
     }
 
-    /// Set it to stop the running turn after the current step.
-    pub fn abort_handle(&self) -> Arc<AtomicBool> {
+    /// Stops a running turn and wakes tools waiting on its cancellation signal.
+    pub fn abort_handle(&self) -> Arc<TurnAbort> {
         self.abort.clone()
     }
 
@@ -188,7 +230,7 @@ impl Conversation {
         if self.unfinished_turn().is_some() {
             return Err(BrainError::Busy);
         }
-        self.abort.store(false, Ordering::SeqCst);
+        self.abort.reset();
         self.append(Entry::TurnStarted { input: input.to_string() })?;
         on(BrainEvent::TurnStarted {
             input: input.to_string(),
@@ -201,11 +243,26 @@ impl Conversation {
     /// is none.
     pub fn resume(&mut self, on: &mut dyn FnMut(BrainEvent)) -> Option<Result<TurnOutcome>> {
         let input = self.unfinished_turn()?;
-        self.abort.store(false, Ordering::SeqCst);
+        self.abort.reset();
         on(BrainEvent::TurnStarted { input, resumed: true });
         // Tool calls cut off mid-run: read-only ones run again; the others
         // tell the model they were interrupted, so it checks before retrying.
-        let results = self.pending_tool_calls();
+        let start = self.entries.iter().rposition(|e| matches!(e, Entry::TurnStarted { .. }))?;
+        let turn = &self.entries[start..];
+        if let Some(Entry::Message { message, .. }) = turn.last()
+            && message.role == Role::Assistant
+            && message.tool_calls.is_empty()
+        {
+            let mut usage = Usage::default();
+            for entry in turn {
+                if let Entry::Message { usage: Some(billed), .. } = entry {
+                    usage.add(*billed);
+                }
+            }
+            let text = message.content.clone().unwrap_or_default();
+            return Some(self.finish(TurnOutcome::Completed, usage, text, on));
+        }
+        let results = self.pending_tool_calls(start);
         for (call, started) in results {
             let rerun = self.brain.tool(&call.name).map(|tool| tool.replay_safe() || !started);
             let output = match rerun {
@@ -214,39 +271,36 @@ impl Conversation {
                         return Some(Err(e));
                     }
                     match self.brain.tool(&call.name) {
-                        Some(tool) => run_tool(tool, &call),
+                        Some(tool) => run_tool(tool, &call, &self.abort),
                         None => ToolOutput::error(format!("unknown tool `{}`", call.name)),
                     }
                 }
                 Some(false) => ToolOutput::error("interrupted: the process stopped while this ran. Check what it did before running it again."),
                 None => ToolOutput::error(format!("unknown tool `{}`", call.name)),
             };
-            on(BrainEvent::ToolFinished {
-                id: call.id.clone(),
-                output: output.clone(),
-            });
             if let Err(e) = self.append(Entry::Message {
                 message: Message::tool(&call.id, output_text(&output)),
                 usage: None,
             }) {
                 return Some(Err(e));
             }
+            on(BrainEvent::ToolFinished { id: call.id, output });
         }
         Some(self.run(on))
     }
 
     /// Calls of the last assistant message with no result yet, and whether
     /// each had started.
-    fn pending_tool_calls(&self) -> Vec<(ToolCall, bool)> {
-        let Some(at) = self
-            .entries
+    fn pending_tool_calls(&self, start: usize) -> Vec<(ToolCall, bool)> {
+        let turn = &self.entries[start..];
+        let Some(at) = turn
             .iter()
             .rposition(|e| matches!(e, Entry::Message { message, .. } if message.role == Role::Assistant))
         else {
             return vec![];
         };
-        let Entry::Message { message, .. } = &self.entries[at] else { return vec![] };
-        let after = &self.entries[at + 1..];
+        let Entry::Message { message, .. } = &turn[at] else { return vec![] };
+        let after = &turn[at + 1..];
         let answered: Vec<&str> = after
             .iter()
             .filter_map(|e| match e {
@@ -273,8 +327,19 @@ impl Conversation {
         let mut usage = Usage::default();
         let mut text = String::new();
         let mut last_prompt = 0u64;
-        for _ in 0..self.brain.max_steps {
-            if self.abort.load(Ordering::SeqCst) {
+        let mut steps = 0;
+        for entry in self.entries.iter().rev().take_while(|e| !matches!(e, Entry::TurnStarted { .. })) {
+            if let Entry::Message { message, usage: Some(billed) } = entry {
+                if steps == 0 {
+                    last_prompt = billed.input;
+                    text = message.content.clone().unwrap_or_default();
+                }
+                steps += 1;
+                usage.add(*billed);
+            }
+        }
+        for _ in steps..self.brain.max_steps {
+            if self.abort.signal().is_disconnected() {
                 return self.finish(TurnOutcome::Aborted, usage, text, on);
             }
             if last_prompt >= self.brain.compact_at {
@@ -310,43 +375,26 @@ impl Conversation {
                 return self.finish(TurnOutcome::Completed, usage, text, on);
             }
             // Calls run one after another, in the order the model gave.
-            let mut results = HashMap::new();
             for call in &calls {
-                if self.abort.load(Ordering::SeqCst) {
-                    results.insert(call.id.clone(), ToolOutput::error("aborted by the user"));
-                    continue;
-                }
-                on(BrainEvent::ToolStarted {
-                    id: call.id.clone(),
-                    name: call.name.clone(),
-                    arguments: call.arguments.clone(),
-                });
-                self.append(Entry::ToolStarted { id: call.id.clone() })?;
-                let output = match self.brain.tool(&call.name) {
-                    Some(tool) => run_tool(tool, call),
-                    None => ToolOutput::error(format!("unknown tool `{}`", call.name)),
+                let output = if self.abort.signal().is_disconnected() {
+                    ToolOutput::error("aborted by the user")
+                } else {
+                    self.append(Entry::ToolStarted { id: call.id.clone() })?;
+                    on(BrainEvent::ToolStarted {
+                        id: call.id.clone(),
+                        name: call.name.clone(),
+                        arguments: call.arguments.clone(),
+                    });
+                    match self.brain.tool(&call.name) {
+                        Some(tool) => run_tool(tool, call, &self.abort),
+                        None => ToolOutput::error(format!("unknown tool `{}`", call.name)),
+                    }
                 };
-                on(BrainEvent::ToolFinished {
-                    id: call.id.clone(),
-                    output: output.clone(),
-                });
                 self.append(Entry::Message {
                     message: Message::tool(&call.id, output_text(&output)),
                     usage: None,
                 })?;
-                results.insert(call.id.clone(), output);
-            }
-            // Calls skipped by an abort still need a result, or the next
-            // request is malformed.
-            for call in &calls {
-                if let Some(output) = results.get(&call.id)
-                    && output.text == "aborted by the user"
-                {
-                    self.append(Entry::Message {
-                        message: Message::tool(&call.id, &output.text),
-                        usage: None,
-                    })?;
-                }
+                on(BrainEvent::ToolFinished { id: call.id.clone(), output });
             }
         }
         self.finish(TurnOutcome::TooLong, usage, text, on)
@@ -386,14 +434,14 @@ impl Conversation {
     }
 }
 
-fn run_tool(tool: &dyn Tool, call: &ToolCall) -> ToolOutput {
+fn run_tool(tool: &dyn Tool, call: &ToolCall, abort: &TurnAbort) -> ToolOutput {
     let args = if call.arguments.trim().is_empty() {
         Ok(serde_json::Value::Object(Default::default()))
     } else {
         serde_json::from_str(&call.arguments)
     };
     match args {
-        Ok(args) => tool.execute(&args),
+        Ok(args) => tool.execute_cancellable(&args, &abort.signal()),
         Err(e) => ToolOutput::error(format!("arguments are not valid JSON: {e}")),
     }
 }
@@ -408,21 +456,38 @@ fn output_text(output: &ToolOutput) -> String {
 
 /// The transcript stored at `path`, oldest first; empty when there is none.
 pub fn read_entries(path: &Path) -> Result<Vec<Entry>> {
-    let Ok(file) = File::open(path) else { return Ok(Vec::new()) };
-    let mut out = Vec::new();
-    for line in BufReader::new(file).lines() {
-        let line = line.map_err(io)?;
-        if line.trim().is_empty() {
-            continue;
-        }
-        // A line half-written by a crash is the only one that can be bad,
-        // and it is the last; stop there.
-        match serde_json::from_str(&line) {
-            Ok(entry) => out.push(entry),
-            Err(_) => break,
-        }
+    match File::open(path) {
+        Ok(file) => read_transcript(&file).map(|(entries, _, _)| entries),
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(Vec::new()),
+        Err(e) => Err(io(e)),
     }
-    Ok(out)
+}
+
+// A terminated, invalid record is corruption. Only an unterminated tail can
+// be discarded before appending again.
+fn read_transcript(file: &File) -> Result<(Vec<Entry>, u64, bool)> {
+    let mut reader = BufReader::new(file);
+    let mut entries = Vec::new();
+    let mut bytes = Vec::new();
+    let mut committed = 0;
+    let mut newline = true;
+    loop {
+        bytes.clear();
+        let len = reader.read_until(b'\n', &mut bytes).map_err(io)?;
+        if len == 0 {
+            break;
+        }
+        newline = bytes.ends_with(b"\n");
+        if !bytes.iter().all(u8::is_ascii_whitespace) {
+            match serde_json::from_slice(&bytes) {
+                Ok(entry) => entries.push(entry),
+                Err(_) if !newline => break,
+                Err(e) => return Err(BrainError::Store(format!("transcript at byte {committed}: {e}"))),
+            }
+        }
+        committed += len as u64;
+    }
+    Ok((entries, committed, newline))
 }
 
 fn io(e: std::io::Error) -> BrainError {

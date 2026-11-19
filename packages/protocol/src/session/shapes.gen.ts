@@ -39,7 +39,7 @@ export type PhaseView = PhaseWorkingView | PhaseDone | PhaseFailed | PhaseRestin
  */
 export type IssueAnswer = { conclusion: string, evidence: Array<string>, unsure: Array<string>, next: Array<string>, };
 
-export type LastRun = { outcome: Outcome, summary: string, at: number, spent?: Spent, 
+export type LastRun = { needsReconciliation?: boolean, outcome: Outcome, summary: string, at: number, spent?: Spent,
 /**
  * The conclusion it handed back in the block an answer issue asks for, when one could be read.
  */
@@ -50,7 +50,23 @@ export type ToolConnectionStatus = (typeof ToolConnectionStatusValues)[number];
 
 export type ToolConnection = { server: string, status: ToolConnectionStatus, reason?: string, };
 
-export type Session = { id: SessionId, role: AgentRole, name: string, agent: string, runtime: string, brief: string, repo?: string, branch?: string, worktree?: string, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, channel?: string, issue?: IssueId, refining: boolean, toolConnections?: Array<ToolConnection>, 
+export const SubagentStatusValues = ["pendingInit", "running", "interrupted", "completed", "errored", "shutdown", "notFound"] as const;
+export type SubagentStatus = (typeof SubagentStatusValues)[number];
+
+export const SubagentStepStatusValues = ["pending", "inProgress", "completed"] as const;
+export type SubagentStepStatus = (typeof SubagentStepStatusValues)[number];
+
+export type SubagentStep = { step: string, status: SubagentStepStatus, };
+
+export type SubagentThread = { threadId: string, agentName?: string, parentThreadId?: string, turnId?: string, steps?: Array<SubagentStep>, task?: string, status?: SubagentStatus, lastActivity?: string, lastAction?: ToolAction, updatedAt: number, };
+
+export type SubagentWait = { threadId: string, callId: string, targets: Array<string>, };
+
+export type SessionSubagents = { run: string, rootThreadId: string, disconnectedAt?: number, threads: Array<SubagentThread>, waits: Array<SubagentWait>, };
+
+export type FactSessionSubagentsChanged = { "type": "sessionSubagentsChanged", at: number, id: SessionId, subagents?: SessionSubagents, };
+
+export type Session = { id: SessionId, role: AgentRole, name: string, agent: string, runtime: string, brief: string, repo?: string, branch?: string, worktree?: string, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, channel?: string, issue?: IssueId, refining: boolean, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>,
 /**
  * The machine it works on; none for an agent hosted in the server's process.
  */
@@ -59,7 +75,7 @@ machine?: string, phase: Phase, };
 /**
  * reduce never sees these: the words are the frame's (projection/frame.ts).
  */
-export type SessionView = { id: SessionId, role: AgentRole, name: string, agent: string, runtime: string, brief: string, repo?: string, branch?: string, worktree?: string, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, channel?: string, issue?: IssueId, refining: boolean, toolConnections?: Array<ToolConnection>, machine?: string, phase: PhaseView, phaseText: string, };
+export type SessionView = { id: SessionId, role: AgentRole, name: string, agent: string, runtime: string, brief: string, repo?: string, branch?: string, worktree?: string, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, channel?: string, issue?: IssueId, refining: boolean, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>, machine?: string, phase: PhaseView, phaseText: string, };
 
 export const SessionEventTypeValues = ["run/start", "user/message", "memory/recalled", "assistant/thinking", "assistant/message", "tool/call", "tool/result", "llm/retry", "llm/usage", "run/error", "run/end"] as const;
 export type SessionEventType = (typeof SessionEventTypeValues)[number];
@@ -69,22 +85,26 @@ export type ToolAction = (typeof ToolActionValues)[number];
 
 export type EventTokens = { input: number, cacheRead: number, output: number, };
 
-export type SessionEvent = { seq: number, 
+export type SessionEvent = { seq: number,
 /**
  * Increases when this step's streaming text or input changes; independent of transport delivery order.
  */
-revision: number, time: number, type: SessionEventType, run?: string, call?: number, under?: number, text: string, action?: ToolAction, actionText?: string, tool?: string, input?: string, output?: string, ok?: boolean, tokens?: EventTokens, connection?: ToolConnection, };
+revision: number, time: number, type: SessionEventType, run?: string, call?: number, under?: number, threadId?: string, text: string, action?: ToolAction, actionText?: string, tool?: string, input?: string, output?: string, ok?: boolean, tokens?: EventTokens, connection?: ToolConnection, };
 
 export const RunTriggerKindValues = ["issue", "comment", "cron", "refine", "runtime"] as const;
 export type RunTriggerKind = (typeof RunTriggerKindValues)[number];
 
-export type RunTrigger = { kind: RunTriggerKind, message?: string, 
+export type RunTrigger = { kind: RunTriggerKind, message?: string,
 /**
  * Where the input was said and its reply belongs.
  */
 channel?: string, cron?: string, missed?: boolean, };
 
-export type Run = { id: string, session: SessionId, issue?: IssueId, triggeredBy: RunTrigger, heard: Array<string>, startedAt: number, endedAt?: number, outcome?: Outcome, summary: string, spent?: Spent, };
+export type Run = {
+/**
+ * The external worker disconnected before acknowledging its changes.
+ */
+needsReconciliation?: boolean, id: string, session: SessionId, issue?: IssueId, subagents?: SessionSubagents, triggeredBy: RunTrigger, heard: Array<string>, startedAt: number, endedAt?: number, outcome?: Outcome, summary: string, spent?: Spent, };
 
 export type FactSessionPhaseChanged = { "type": "sessionPhaseChanged", at: number, id: SessionId, phase: Phase, channel?: string, spent?: Spent, brief?: string, };
 
@@ -99,11 +119,11 @@ export type FactSessionToolsReset = { "type": "sessionToolsReset", at: number, i
 /**
  * A computer the farm's helpers work on. Today the one this server runs on; others join from the command line.
  */
-export type Machine = { id: string, name: string, 
+export type Machine = { id: string, name: string,
 /**
  * The server's own machine: its helpers run in the server's process.
  */
-here: boolean, 
+here: boolean,
 /**
  * Reachable now: the server can hire helpers on it.
  */

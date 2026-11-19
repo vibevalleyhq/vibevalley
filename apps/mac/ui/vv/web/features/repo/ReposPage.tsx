@@ -1,19 +1,9 @@
-// Ported from VibeValley apps/web/src/features/repo/ReposPage.tsx: the
-// repos as the page's side list, one repo's overview, languages, commit
-// calendar and hands beside it, and the new repo dialog. Not ported: the
-// skin (`skin={repoMap}` in VibeValley's App.tsx), the farm's map of every
-// repo and the map's head over one repo; the farm is the GPUI app's
-// (docs/vibevalley-port.md § Architecture 5), so with no repo open the
-// page offers the farm instead. A repo's picture is the map's crop for how
-// recently it was worked (a tile in that shade without the art). VibeValley adds: a terminal at the
-// repo's folder.
 import { Clipboard, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { act as shellAct } from "../../../../bridge";
 import { createMemo, untrack } from "../../../solid";
 import { Keyed, useNow } from "../../base/dom";
 import { api } from "../../infra/api";
@@ -140,7 +130,7 @@ export function ReposPage(props: { rest: string }) {
       </Scroll>
       <Scroll class="min-h-120 min-w-0 flex-1 md:min-h-0" contentClass="p-3">
         {/* Keyed by the name, a plain value: the panel's queries ask about this one repo for its life. */}
-        <If when={selected()?.name} else={<FarmInstead />}>
+        <If when={selected()?.name} else={<RepoMapLink />}>
           {(name) => <Keyed key={name()}>{() => <RepoPanel name={untrack(name)} repos={sorted} now={now()} />}</Keyed>}
         </If>
       </Scroll>
@@ -156,15 +146,15 @@ export function ReposPage(props: { rest: string }) {
   );
 }
 
-/** The farm's map of every repo is the app's own pixel view, not a page. */
-function FarmInstead() {
+function RepoMapLink() {
+  const router = useRouter();
   return (
     <Empty
       icon="farm"
       testid="repos-map"
       action={
-        <Button icon="farm" onPress={() => shellAct({ type: "openFarm", repo: "" })}>
-          {t("web.base.farm")}
+        <Button icon="farm" testID="open-repo-map" onPress={() => router.navigate("/map")}>
+          {t("web.farm.native.map")}
         </Button>
       }
     >

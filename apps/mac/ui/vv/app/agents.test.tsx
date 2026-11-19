@@ -4,6 +4,8 @@
 import "../polyfill";
 import { expect, open, test } from "nsh/test";
 
+import * as S from "@vibevalley/protocol/schema";
+
 import { responses, state } from "../fixtures/workbench";
 import { fakeHost } from "./fakeHost";
 
@@ -16,6 +18,41 @@ async function start(route: string, options: { width?: number } = {}) {
 }
 
 const ops = (fake: { calls: { op: string }[] }) => fake.calls.map((c) => c.op);
+
+test("regression: a missing runtime leads to its executable path", async () => {
+  const { app, fake } = await start("/runtimes/opencode", { width: 560 });
+  expect(app.count("id:runtime-locate-command")).toBe(1);
+  await app.press("id:runtime-locate-command");
+  await app.keyboard.press("x");
+  expect(app.value("id:runtime-bin-path")).toBe("x");
+  expect(ops(fake)).not.toContain("runtime.setting.update");
+});
+
+for (const initial of [true, false]) {
+  test(
+    initial ? "regression: an installed runtime awaiting first sign-in opens its terminal" : "regression: an expired account opens its terminal",
+    async () => {
+      const catalog = S.RuntimeInfo.array().parse(responses["runtime.list"]);
+      const signedOut = catalog.map((info) => {
+        if (info.id !== "codex") return info;
+        return initial
+          ? { ...info, installation: { status: "unsupported" as const, reason: "Sign in", signInCommand: "/opt/homebrew/bin/codex" }, usage: null }
+          : { ...info, usage: { status: "login_required" as const } };
+      });
+      const fake = fakeHost(
+        { state, responses: { ...responses, "runtime.list": signedOut, "host.openTerminal": { terminalId: "local" } } },
+        { route: "/runtimes/codex" },
+      );
+      const app = await open("./main.tsx", { width: 560, height: 760, colorScheme: "light", platform: "macos", host: fake.options });
+      await fake.pump(app);
+      expect(app.count("id:runtime-locate-command")).toBe(0);
+      expect(app.count("id:runtime-sign-in-terminal")).toBe(1);
+      await app.press("id:runtime-sign-in-terminal");
+      await fake.pump(app);
+      expect(fake.calls.find((call) => call.op === "host.openTerminal")?.payload).toEqual({ cwd: "/opt/homebrew/bin", title: "Codex" });
+    },
+  );
+}
 
 test("the agents page: orchestrators and helpers as cards", async () => {
   const { app, fake } = await start("/agents");

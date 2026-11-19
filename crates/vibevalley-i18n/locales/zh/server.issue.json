@@ -17,6 +17,8 @@
   "roundNeedsWords": "再干一轮要说一句：这一轮要它做什么",
   "closed": "这张工单关上了",
   "cannotDelete": "工单 #{n} 还不能删：{why}",
+  "verifyDelivery": "请核对目标分支是否已合入候选提交 {commit}。",
+  "reviewChanged": "工单有新的改动。请查看最新改动，再确认这次审查。",
   "nothingToAccept": "还没交回来，没有东西可验收",
   "failNeedsFindings": "没过验收要说哪里不行：至少写一条意见",
   "does": {

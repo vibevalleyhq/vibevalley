@@ -25,6 +25,10 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*` 及 `GET /api/v1/artifact/<id>/<version>`）。
 
+Artifact 使用 SQLx 访问 SQLite。sqlc 从 Artifact 与频道的正式表结构生成命名查询。频道消息不存在时，左连接返回空引用。版本的文件内容由附件库保管。[查询](crates/vibevalley-server/src/modules/artifact/sql/queries.sql)
+
+频道中的 Artifact 卡片、版本号和消息引用由 `Chat::post_with` 在同一连接上提交。版本写入失败时，频道回滚消息和事件，恢复内存镜像。订阅者只收到已提交的卡片。
+
 ## 模型和不变量
 
 ### 网页 Artifact（`html`）
@@ -83,3 +87,5 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档产�
 - `crates/vibevalley-server/tests/artifact.rs`：HTML 与 Markdown 交稿的版本和拒绝、划词改字与删除、块一起写（`batchId` 幂等、`baseRev` 冲突、建议）、消息引用块。
 - `apps/mac/ui/vv/app/artifacts.test.tsx`：Artifact 页在样例数据上的页面测试（`nsh/test`）。
 - `packages/artifact/src/artifact.test.ts`：外壳消息只认约定里的形状、主题变量和运行时接在页面后面。
+
+演讲者视图在 HTML 发回页数后显示页码、下一页与备注。尚未收到回执时，页面显示「等待演示页就绪」。载入错误显示具体原因。[原生页面验收](.agents/skills/vv-acceptance/references/app.md#演示页的就绪回执)

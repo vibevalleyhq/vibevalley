@@ -3,7 +3,7 @@
 // The machines' pixel sprites are the GPUI app's art (ui/pixel/RuntimeIcon);
 // the portrait's radial glow is a flat tint of the hat colour. VibeValley
 // adds: a terminal at the runtime's command's folder.
-import { Text, View } from "nsh";
+import { Text, View, type InputRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Agent, RuntimeInfo } from "@vibevalley/protocol";
@@ -31,7 +31,7 @@ const statusOf = (r: RuntimeInfo) => {
       return r.settings.enabled ? (i.version ?? t("web.runtime.available")) : t("web.runtime.disabled");
     // The reason, not just unsupported: for vibevalley it is a missing DeepSeek key, which is the user's to fix.
     case "unsupported":
-      return i.reason || t("web.runtime.unsupported");
+      return i.signInCommand ? t("web.runtime.quota.signedOut") : i.reason || t("web.runtime.unsupported");
     case "not_found":
       return t("web.runtime.notFound");
     case "checking":
@@ -109,6 +109,12 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
   const client = useQueryClient();
   const refreshing = createAct();
   const inst = () => props.info.installation;
+  let pathInput: InputRef | undefined;
+  const terminalDirectory = () => {
+    const i = inst();
+    if (i.status === "available") return folderOf(i.command);
+    return i.status === "unsupported" && i.signInCommand ? folderOf(i.signInCommand) : undefined;
+  };
   const keep = (got: RuntimeInfo) => client.setData(runtimesQuery(), (all) => (all ? { value: all.value.map((r) => (r.id === got.id ? got : r)) } : undefined));
   const refresh = () => {
     const id = props.info.id;
@@ -145,14 +151,31 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
             </If>
             <If when={variant(inst(), "status", "unsupported")}>
               {(i) => (
-                <View class="rounded-sm bg-bad-soft px-1.5">
-                  <Text class="text-xs text-berry">{t("web.runtime.unsupportedWhy", { why: i().reason })}</Text>
-                </View>
+                <If
+                  when={i().signInCommand}
+                  else={
+                    <View class="rounded-sm bg-bad-soft px-1.5">
+                      <Text class="text-xs text-berry">{t("web.runtime.unsupportedWhy", { why: i().reason })}</Text>
+                    </View>
+                  }
+                >
+                  {(command) => <Text class="font-mono text-xs text-muted">{command()}</Text>}
+                </If>
               )}
             </If>
             <If when={inst().status === "not_found"}>
-              <View class="rounded-sm bg-bad-soft px-1.5">
+              <View class="gap-1.5">
                 <Text class="text-xs text-berry">{t("web.runtime.notHere")}</Text>
+                <Text class="text-sm text-muted">{t("web.runtime.missingCommand", { runtime: props.info.preset.label })}</Text>
+                <Button
+                  testID="runtime-locate-command"
+                  onPress={() => {
+                    pathInput?.reveal({ vertical: "nearest" });
+                    pathInput?.focus();
+                  }}
+                >
+                  {t("web.runtime.enterPath")}
+                </Button>
               </View>
             </If>
             <Text class="text-xs text-muted">
@@ -166,11 +189,17 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       </View>
       <View class="grid gap-3 md:grid-cols-2">
         <Card title={t("web.runtime.account")}>
-          <Usage info={props.info} />
+          <Usage info={props.info} terminalDirectory={terminalDirectory()} />
         </Card>
         <SupportCard info={props.info} />
       </View>
-      <SettingsCard info={props.info} onSaved={keep} />
+      <SettingsCard
+        info={props.info}
+        onSaved={keep}
+        pathRef={(node) => {
+          pathInput = node;
+        }}
+      />
       <ModelsCard info={props.info} />
       <View class="grid gap-3 md:grid-cols-3">
         <InventoryCard title={t("web.runtime.skills")} entries={props.info.skills} />

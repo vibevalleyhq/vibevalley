@@ -15,6 +15,8 @@ name = "publish"
 path = "tests/publish.rs"
 
 [dependencies]
+vibevalley-durable = { version = "0.1.0", path = "../vibevalley-durable" }
+vibevalley-chord = { version = "0.1.0", path = "../vibevalley-chord" }
 base64 = "0.23.1"
 vibevalley-oar = { version = "0.1.0", path = "../vibevalley-oar" }
 vibevalley-artifact = { version = "0.1.0", path = "../vibevalley-artifact" }
@@ -30,7 +32,8 @@ flume = "0.12.0"
 include_dir = "0.7.4"
 jiff = "0.2.43"
 regex = "1.13.1"
-rusqlite = { version = "0.42", features = ["bundled"] }
+sqlx = { version = "0.9.1", default-features = false, features = ["sqlite", "derive"] }
+pollster = "0.4.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 vibevalley-home = { path = "../vibevalley-home" }
@@ -54,4 +57,5 @@ tokio = { version = "1.54.1", features = ["rt", "time", "net", "sync", "macros",
 vibevalley-http = { version = "0.1.0", path = "../vibevalley-http" }
 
 [dev-dependencies]
+vibevalley-bridge = { version = "0.1.0", path = "../vibevalley-bridge" }
 tempfile = "3.27.0"

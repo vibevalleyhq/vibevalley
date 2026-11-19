@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures_util::FutureExt as _;
 use gpui_kit::{
     AppContext as _, Context, Entity, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyBinding, MouseButton, MouseMoveEvent,
     ParentElement as _, PathPromptOptions, Pixels, Render, Styled as _, Subscription, Window, div, px,
@@ -224,6 +225,7 @@ pub struct PixelSlot {
 
 pub struct Shell {
     pub store: Option<Arc<Store>>,
+    project_open: Option<gpui_kit::Task<()>>,
     pub ws: Workspace<TermSession>,
     pub loaded: bool,
     server_ready: bool,
@@ -236,6 +238,7 @@ pub struct Shell {
     /// not the project was opened (its full view is built on first open).
     pub git_summaries: HashMap<ProjectId, GitSummary>,
     pub terminals: HashMap<String, TerminalSlot>,
+    pub(crate) terminal_notice: Option<String>,
     pub panes: HashMap<(ProjectId, TabId), PaneSlot>,
     pub sidebar: Entity<HostedView>,
     pub inspector: Entity<HostedView>,
@@ -340,6 +343,7 @@ impl Shell {
         let already_settled = startup_rx.as_ref().and_then(|rx| rx.borrow().clone());
         let mut shell = Shell {
             store: None,
+            project_open: None,
             ws: Workspace::new(),
             loaded: false,
             server_ready: matches!(already_settled, Some(Ok(()))),
@@ -352,6 +356,7 @@ impl Shell {
             },
             projects: HashMap::new(),
             git_summaries: HashMap::new(),
+            terminal_notice: None,
             terminals: HashMap::new(),
             panes: HashMap::new(),
             sidebar,
@@ -476,7 +481,7 @@ impl Shell {
     fn load(&mut self, cx: &mut Context<Self>) {
         let cwd = std::env::current_dir().ok();
         let work_root = crate::serving::work_root();
-        let path = std::env::var_os("VIBEVALLEY_STORE").map(PathBuf::from).unwrap_or_else(Store::default_path);
+        let path = crate::host::Storage::configured().database;
         Self::bg(
             cx,
             move || -> Result<_, String> {
@@ -582,9 +587,8 @@ impl Shell {
     // ---- projects -------------------------------------------------------
 
     pub fn activate_index(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(id) = self.ws.activate_index(index) {
-            self.show_workspace(cx);
-            self.after_activate(id, window, cx);
+        if let Some(project) = self.ws.projects().get(index) {
+            self.activate_path(project.root().to_owned(), window, cx, |_, _, _| {});
         }
     }
 
@@ -594,43 +598,89 @@ impl Shell {
         }
     }
 
-    pub fn ensure_project_at(&mut self, path: &Path, cx: &mut Context<Self>) -> Option<ProjectId> {
-        let cleaned: PathBuf = path.components().collect();
-        let path = if cleaned.as_os_str().is_empty() { path.to_path_buf() } else { cleaned };
-        if let Some(p) = self.ws.projects().iter().find(|p| p.root() == path) {
-            return Some(p.id());
+    fn transient_project(&self, path: &Path) -> vibevalley_workspace::LoadedProject {
+        let next_id = self.ws.projects().iter().map(|p| p.id()).min().unwrap_or(0).min(0) - 1;
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string_lossy().into_owned());
+        vibevalley_workspace::LoadedProject {
+            info: vibevalley_store::Project {
+                id: next_id,
+                path: path.to_owned(),
+                name,
+                position: self.ws.projects().len() as i64,
+                last_opened_ms: 0,
+            },
+            layout: None,
+            terminals: Vec::new(),
         }
-        if !path.is_dir() {
-            return None;
-        }
-        let loaded = self.store.as_ref().and_then(|s| load_project(&**s, &path).ok()).unwrap_or_else(|| {
-            let next_id = self.ws.projects().iter().map(|p| p.id()).min().unwrap_or(0).min(0) - 1;
-            let name = path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_else(|| path.to_string_lossy().into_owned());
-            vibevalley_workspace::LoadedProject {
-                info: vibevalley_store::Project {
-                    id: next_id,
-                    path: path.clone(),
-                    name,
-                    position: self.ws.projects().len() as i64,
-                    last_opened_ms: 0,
-                },
-                layout: None,
-                terminals: Vec::new(),
-            }
-        });
-        let id = self.ws.open(loaded);
-        self.ensure_project_view(id, cx);
-        Some(id)
     }
 
-    pub fn activate_path(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
-        self.show_workspace(cx);
-        if let Some(id) = self.ensure_project_at(&path, cx) {
-            self.activate_project(id, window, cx);
+    fn with_project_at(
+        &mut self,
+        path: PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        then: impl FnOnce(&mut Self, Result<ProjectId, String>, &mut Window, &mut Context<Self>) + 'static,
+    ) {
+        let running = self
+            .project_open
+            .take()
+            .and_then(|mut task| (&mut task).now_or_never().is_none().then_some(task));
+        let existing = self.ws.projects().iter().find(|p| p.root() == path).map(|p| p.id());
+        if running.is_none()
+            && let Some(id) = existing
+        {
+            return then(self, Ok(id), window, cx);
         }
+        let store = self.store.clone();
+        let window = window.window_handle();
+        self.project_open = Some(cx.spawn(async move |this, cx| {
+            // Preserve the user's order when a second path arrives during the first database load.
+            if let Some(earlier) = running {
+                earlier.await;
+            }
+            let loaded = cx
+                .background_spawn(async move {
+                    if !path.is_dir() {
+                        return Err(format!("{}: {}", vibevalley_i18n::t("desktop.terminal.missingFolder", &[]), path.display()));
+                    }
+                    let loaded = store.and_then(|db| load_project(&*db, &path).map_err(|e| eprintln!("open project: {e}")).ok());
+                    Ok((path, loaded))
+                })
+                .await;
+            let _ = cx.update_window(window, |_, window, cx| {
+                let _ = this.update(cx, |shell, cx| {
+                    let id = loaded.map(|(path, loaded)| {
+                        if let Some(project) = shell.ws.projects().iter().find(|p| p.root() == path) {
+                            return project.id();
+                        }
+                        let id = shell.ws.open(loaded.unwrap_or_else(|| shell.transient_project(&path)));
+                        shell.ensure_project_view(id, cx);
+                        id
+                    });
+                    then(shell, id, window, cx);
+                });
+            });
+        }));
+    }
+
+    fn activate_path(
+        &mut self,
+        path: PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        then: impl FnOnce(&mut Self, &mut Window, &mut Context<Self>) + 'static,
+    ) {
+        self.with_project_at(path, window, cx, move |s, result, window, cx| match result {
+            Ok(id) => {
+                s.show_workspace(cx);
+                s.activate_project(id, window, cx);
+                then(s, window, cx);
+            }
+            Err(error) => eprintln!("open project: {error}"),
+        });
     }
 
     fn after_activate(&mut self, id: ProjectId, window: &mut Window, cx: &mut Context<Self>) {
@@ -958,7 +1008,7 @@ impl Shell {
                     .map(|t| {
                         let title = names.get(&t.id).cloned().unwrap_or_else(|| crate::panes::tab_title(self, t, cx));
                         let (kind, running, running_agent, running_label, attention) = match &t.kind {
-                            PaneKind::Terminal { terminal_id } => {
+                            PaneKind::Terminal { terminal_id, .. } => {
                                 let status = self.terminals.get(terminal_id).and_then(|v| v.view.read(cx).running_status());
                                 let att = p.terminal(terminal_id).is_some_and(|e| e.attention);
                                 (
@@ -1027,38 +1077,46 @@ impl Shell {
             Action::GlobalRoute { path } => {
                 self.native_workspace = path == "/workspace";
                 if self.native_workspace {
-                    self.ensure_default_workspace_project(cx);
+                    self.with_workspace_project(window, cx, |_, _, _, _| {});
                 }
-                if !path.starts_with("/farm") && path != "/tree" {
+                if !path.starts_with("/farm") && path != "/tree" && path != "/map" {
                     self.native_pixel = None;
                 }
                 cx.notify();
             }
-            Action::Applied { .. } | Action::Ready => {}
+            Action::Applied { .. }
+            | Action::Ready
+            | Action::DismissFarmForm
+            | Action::FarmHandset { .. }
+            | Action::FarmCall { .. }
+            | Action::SilenceFarmPhone => {}
             Action::Probe { results } => {
                 eprintln!("bridge probe: {results}");
                 self.probe = Some(results);
             }
             Action::Call { op, .. } => eprintln!("host call {op} reached the shell without a reply handle"),
             Action::OpenTerminal { cwd, title, command } => {
-                self.open_terminal_at(cwd, title, command, window, cx);
+                self.open_terminal_at(cwd, title, command, window, cx, |_| {});
             }
-            Action::ActivateProject { id } => self.activate_project(id, window, cx),
-            Action::ActivatePath { path } => self.activate_path(path, window, cx),
-            Action::ActivateTab { path, tab_id } => {
-                self.activate_path(path, window, cx);
-                if let Some(p) = self.ws.active_mut() {
+            Action::ActivateProject { id } => {
+                if let Some(project) = self.ws.project(id) {
+                    self.with_project_at(project.root().to_owned(), window, cx, |s, result, window, cx| {
+                        if let Ok(id) = result {
+                            s.activate_project(id, window, cx);
+                        }
+                    });
+                }
+            }
+            Action::ActivatePath { path } => self.activate_path(path, window, cx, |_, _, _| {}),
+            Action::ActivateTab { path, tab_id } => self.activate_path(path, window, cx, move |s, window, cx| {
+                if let Some(p) = s.ws.active_mut() {
                     p.layout.activate(tab_id);
                 }
-                self.layout_changed(window, cx);
-            }
-            Action::CloseTabAt { path, tab_id } => {
-                self.activate_path(path, window, cx);
-                self.close_tab(tab_id, window, cx);
-            }
+                s.layout_changed(window, cx);
+            }),
+            Action::CloseTabAt { path, tab_id } => self.activate_path(path, window, cx, move |s, window, cx| s.close_tab(tab_id, window, cx)),
             Action::NewTerminalAt { path } => {
-                self.activate_path(path, window, cx);
-                self.new_terminal(None, window, cx);
+                self.open_terminal_at(path, None, None, window, cx, |_| {});
             }
             Action::AddProject => self.add_project(window, cx),
             Action::CloseProject { id } => self.close_project(id, cx),
@@ -1087,6 +1145,7 @@ impl Shell {
                 let props = if repo.is_empty() { json!({}) } else { json!({ "repo": repo }) };
                 self.show_pixel("farm", props, window, cx)
             }
+            Action::OpenRepoMap => self.show_pixel("map", json!({}), window, cx),
             Action::OpenTree => self.show_pixel("tree", json!({}), window, cx),
             Action::RevealInTerminal { path } => {
                 let dir = if path.is_dir() {
@@ -1094,7 +1153,7 @@ impl Shell {
                 } else {
                     path.parent().map(Path::to_path_buf).unwrap_or(path)
                 };
-                self.new_terminal(Some(SpawnSpec::shell(dir)), window, cx);
+                self.open_terminal_at(dir, None, None, window, cx, |_| {});
             }
             Action::OpenDiff { path, staged } => {
                 let spec = if staged {
@@ -1142,63 +1201,136 @@ impl Shell {
     }
 
     /// A terminal tab at `cwd`, optionally running `command` first.
-    pub fn open_terminal_at(
+    fn open_terminal_at(
         &mut self,
         cwd: PathBuf,
         title: Option<String>,
         command: Option<String>,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> Option<String> {
-        self.show_workspace(cx);
-        let cwd = if cwd.is_dir() {
-            let cleaned: PathBuf = cwd.components().collect();
-            let norm = if cleaned.as_os_str().is_empty() { cwd } else { cleaned };
-            let target = self
-                .ws
-                .projects()
-                .iter()
-                .find(|p| p.root() == norm)
-                .map(|p| p.id())
-                .or_else(|| Repo::discover(&norm).ok().flatten().and_then(|repo| self.ensure_project_at(repo.root(), cx)))
-                .or_else(|| self.ws.active().is_none().then(|| self.ensure_project_at(&norm, cx)).flatten());
-            if let Some(id) = target {
-                self.ws.activate(id);
-                self.ensure_project_view(id, cx);
-            }
-            norm
-        } else {
-            self.ws.active().map(|p| p.root().to_path_buf())?
+        done: impl FnOnce(Result<String, String>) + 'static,
+    ) {
+        if cwd.as_os_str().is_empty() {
+            self.show_workspace(cx);
+            return self.with_workspace_project(window, cx, move |s, id, w, cx| {
+                let result = id.and_then(|id| {
+                    let cwd = s.ws.project(id).expect("loaded project").root().to_owned();
+                    s.terminal_in_active_project(cwd, title, command, w, cx)
+                });
+                done(result);
+            });
+        }
+        let Some(directory) = cwd.canonicalize().ok().filter(|p| p.is_dir()) else {
+            let reason = format!("{} {}", vibevalley_i18n::t("desktop.terminal.missingFolder", &[]), cwd.display());
+            self.terminal_notice = Some(reason.clone());
+            cx.notify();
+            return done(Err(reason));
         };
+        let repo = Repo::discover(&directory).ok().flatten();
+        let root = repo.as_ref().map(|r| r.root()).unwrap_or(&directory);
+        let target = self
+            .ws
+            .projects()
+            .iter()
+            .filter_map(|p| {
+                let path = p.root().canonicalize().ok()?;
+                (path == root || (repo.is_none() && directory.starts_with(&path))).then(|| (path.components().count(), p.root().to_owned()))
+            })
+            .max_by_key(|(depth, _)| *depth)
+            .map(|(_, path)| path)
+            .unwrap_or_else(|| root.to_owned());
+        self.with_project_at(target, window, cx, move |s, id, window, cx| {
+            let result = id.and_then(|id| {
+                s.ws.activate(id);
+                s.show_workspace(cx);
+                s.terminal_in_active_project(directory, title, command, window, cx)
+            });
+            if let Err(reason) = &result {
+                s.terminal_notice = Some(reason.clone());
+                cx.notify();
+            }
+            done(result);
+        });
+    }
+
+    fn terminal_in_active_project(
+        &mut self,
+        cwd: PathBuf,
+        title: Option<String>,
+        command: Option<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<String, String> {
+        let no_project = || vibevalley_i18n::t("desktop.terminal.noProject", &[]);
+        self.terminal_notice = None;
         let mut spec = SpawnSpec::shell(cwd);
-        spec.title = title.filter(|t| !t.trim().is_empty());
+        spec.title = title.map(|t| t.trim().to_owned()).filter(|t| !t.is_empty());
         if let Some(command) = command.filter(|c| !c.trim().is_empty()) {
             let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
             spec.program = Some(shell.clone());
-            spec.args = vec!["-lc".into(), format!("{command}; exec {shell} -l")];
+            spec.args = vec!["-lc".into(), format!("{command}\nexec \"$0\" -l"), shell];
         }
-        let has_command = spec.program.is_some();
-        let has_title = spec.title.is_some();
-        let project = self.ws.active_mut()?;
-        let unspawned = (!has_command && !has_title && spec.cwd == project.root())
-            .then(|| {
-                project.layout.tabs().find_map(|t| match &t.kind {
-                    PaneKind::Terminal { terminal_id } if !self.terminals.contains_key(terminal_id) => Some(terminal_id.clone()),
-                    _ => None,
-                })
-            })
-            .flatten();
-        let id = unspawned.unwrap_or_else(|| project.new_terminal_tab().0);
+        let link = spec
+            .title
+            .as_ref()
+            .filter(|_| spec.program.is_none())
+            .map(|title| vibevalley_workspace::TerminalLink {
+                directory: spec.cwd.clone(),
+                title: title.clone(),
+            });
+        let project = self.ws.active_mut().ok_or_else(no_project)?;
+        if let Some(target) = &link {
+            let existing = project.layout.tabs().find_map(|tab| {
+                let PaneKind::Terminal {
+                    terminal_id,
+                    link: Some(origin),
+                } = &tab.kind
+                else {
+                    return None;
+                };
+                if origin != target {
+                    return None;
+                }
+                let in_directory = match self.terminals.get(terminal_id) {
+                    Some(slot) => slot.view.read(cx).can_reopen_in(&target.directory),
+                    None => project
+                        .saved_terminal(terminal_id)
+                        .is_some_and(|s| s.cwd.canonicalize().is_ok_and(|p| p.starts_with(&target.directory))),
+                };
+                in_directory.then(|| (tab.id, terminal_id.clone()))
+            });
+            if let Some((tab, id)) = existing {
+                project.layout.activate(tab);
+                self.layout_changed(window, cx);
+                return Ok(id);
+            }
+        }
+        let unused = project.layout.active_tab().and_then(|tab| {
+            let PaneKind::Terminal { terminal_id, link: None } = &tab.kind else {
+                return None;
+            };
+            (project.saved_terminal(terminal_id).is_none() && !self.terminals.contains_key(terminal_id)).then(|| (terminal_id.clone(), tab.id))
+        });
+        let (id, tab) = unused.unwrap_or_else(|| project.new_terminal_tab());
+        if let Some(vibevalley_workspace::Tab {
+            kind: PaneKind::Terminal { link: origin, .. },
+            ..
+        }) = project.layout.tab_mut(tab)
+        {
+            *origin = link;
+        }
         let slot = self.make_terminal(&id, spec, cx);
         self.terminals.insert(id.clone(), slot);
         self.layout_changed(window, cx);
-        Some(id)
+        Ok(id)
     }
 
     /// A pixel scene's ask: a VibeValley page (the hosted `vv` view, given
     /// the route) or a terminal.
     pub fn on_pixel_event(&mut self, event: crate::pixel::view::PixelEvent, window: &mut Window, cx: &mut Context<Self>) {
         match event {
+            crate::pixel::view::PixelEvent::Sound(name) => self.workbench.read(cx).play_farm_sound(name, cx),
+            crate::pixel::view::PixelEvent::HostCall { op, payload, reply } => self.host_call(&op, payload, reply, window, cx),
             crate::pixel::view::PixelEvent::Route(route) => self.open_pane(
                 PaneKind::Hosted {
                     module: "vv".into(),
@@ -1209,7 +1341,7 @@ impl Shell {
             ),
             crate::pixel::view::PixelEvent::Pixel { scene, props } => self.open_pane(PaneKind::Pixel { scene, props }, window, cx),
             crate::pixel::view::PixelEvent::Terminal { cwd, title } => {
-                self.open_terminal_at(PathBuf::from(cwd), Some(title), None, window, cx);
+                self.open_terminal_at(PathBuf::from(cwd), Some(title), None, window, cx, |_| {});
             }
         }
     }
@@ -1387,10 +1519,13 @@ impl Shell {
                 let cwd = PathBuf::from(text("cwd"));
                 let title = payload["title"].as_str().map(str::to_string);
                 let command = payload["command"].as_str().map(str::to_string);
-                match self.open_terminal_at(cwd, title, command, window, cx) {
-                    Some(id) => Envelope::ok(json!({ "terminalId": id })),
-                    None => refusal(BizCode::Refused, "no project is open to hold the terminal"),
-                }
+                self.open_terminal_at(cwd, title, command, window, cx, move |result| {
+                    reply.send(match result {
+                        Ok(id) => Envelope::ok(json!({ "terminalId": id })),
+                        Err(reason) => refusal(BizCode::Refused, reason),
+                    })
+                });
+                return;
             }
             "host.openUrl" => {
                 let url = text("url");
@@ -1400,6 +1535,26 @@ impl Shell {
                 } else {
                     refusal(BizCode::InvalidInput, "only http(s) and mailto URLs open")
                 }
+            }
+            "host.openFile" if payload.get("worktree").is_some() => {
+                let relative = text("path");
+                let Some((root, file)) = crate::host::worktree_file(std::path::Path::new(&text("worktree")), std::path::Path::new(&relative)) else {
+                    return reply.send(refusal(
+                        BizCode::Refused,
+                        vibevalley_i18n::t("desktop.files.missingInWorktree", &[("path", relative.into())]),
+                    ));
+                };
+                self.with_project_at(root, window, cx, move |s, id, window, cx| {
+                    reply.send(match id {
+                        Ok(id) => {
+                            s.activate_project(id, window, cx);
+                            s.open_file(file, None, window, cx);
+                            Envelope::void()
+                        }
+                        Err(why) => refusal(BizCode::Refused, why),
+                    });
+                });
+                return;
             }
             // Opens a file in the system's default app (a PDF, a picture).
             "host.openFile" => match payload["path"].as_str() {
@@ -1725,6 +1880,7 @@ impl Shell {
             "palette.search" => self.open_palette(PaletteMode::Search, window, cx),
             "panel.files" | "panel.git" => {
                 self.show_workspace(cx);
+                self.with_workspace_project(window, cx, |_, _, _, _| {});
                 self.panel = if id == "panel.git" { Panel::Git } else { Panel::Files };
                 self.inspector_open = true;
                 self.push_sidebar(cx);
@@ -1750,7 +1906,6 @@ impl Shell {
     fn show_workspace(&mut self, cx: &mut Context<Self>) {
         self.native_workspace = true;
         self.native_pixel = None;
-        self.ensure_default_workspace_project(cx);
         self.workbench.update(cx, |v, cx| v.navigate("/workspace", cx));
         cx.notify();
     }
@@ -1785,36 +1940,60 @@ impl Shell {
             return;
         }
         self.show_workspace(cx);
-        let Some(project) = self.ws.active_mut() else { return };
-        project.layout.open(kind);
-        self.layout_changed(window, cx);
+        self.with_workspace_project(window, cx, move |s, id, w, cx| {
+            if let Ok(id) = id
+                && let Some(project) = s.ws.project_mut(id)
+            {
+                project.layout.open(kind);
+                s.layout_changed(w, cx);
+            }
+        });
     }
 
     pub fn open_file(&mut self, path: PathBuf, line: Option<u32>, window: &mut Window, cx: &mut Context<Self>) {
         self.show_workspace(cx);
-        let Some(project) = self.ws.active_mut() else { return };
-        let tab = project.layout.open(PaneKind::File { path: path.clone() });
-        let pid = project.id();
-        if let Some(pv) = self.projects.get_mut(&pid) {
-            pv.tree.selected = Some(path);
+        self.with_workspace_project(window, cx, move |s, id, window, cx| {
+            let Ok(pid) = id else { return };
+            let Some(project) = s.ws.project_mut(pid) else { return };
+            let tab = project.layout.open(PaneKind::File { path: path.clone() });
+            if let Some(pv) = s.projects.get_mut(&pid) {
+                pv.tree.selected = Some(path);
+            }
+            s.ensure_panes(window, cx);
+            if let (Some(line), Some(PaneEntity::File(v))) = (line, s.panes.get(&(pid, tab)).map(|s| &s.entity)) {
+                v.update(cx, |v, cx| v.scroll_to_line(line, cx));
+            }
+            s.push_sidebar(cx);
+            s.layout_changed(window, cx);
+        });
+    }
+
+    fn next_terminal_directory(&self, cx: &gpui_kit::App) -> Option<PathBuf> {
+        let project = self.ws.active()?;
+        if let Some(PaneKind::Terminal { terminal_id, .. }) = project.layout.active_tab().map(|t| &t.kind)
+            && let Some(slot) = self.terminals.get(terminal_id)
+        {
+            let cwd = slot.view.read(cx).directory();
+            if cwd.is_dir() {
+                return Some(cwd);
+            }
         }
-        self.ensure_panes(window, cx);
-        if let (Some(line), Some(PaneEntity::File(v))) = (line, self.panes.get(&(pid, tab)).map(|s| &s.entity)) {
-            v.update(cx, |v, cx| v.scroll_to_line(line, cx));
-        }
-        self.push_sidebar(cx);
-        self.layout_changed(window, cx);
+        Some(project.root().to_path_buf())
     }
 
     pub fn new_terminal(&mut self, spec: Option<SpawnSpec>, window: &mut Window, cx: &mut Context<Self>) {
         self.show_workspace(cx);
-        let Some(project) = self.ws.active_mut() else { return };
-        let (id, _) = project.new_terminal_tab();
-        if let Some(spec) = spec {
-            let slot = self.make_terminal(&id, spec, cx);
-            self.terminals.insert(id, slot);
-        }
-        self.layout_changed(window, cx);
+        self.with_workspace_project(window, cx, move |s, id, window, cx| {
+            let Some(spec) = spec.or_else(|| s.next_terminal_directory(cx).map(SpawnSpec::shell)) else {
+                return;
+            };
+            let Ok(id) = id else { return };
+            let Some(project) = s.ws.project_mut(id) else { return };
+            let (id, _) = project.new_terminal_tab();
+            let slot = s.make_terminal(&id, spec, cx);
+            s.terminals.insert(id, slot);
+            s.layout_changed(window, cx);
+        });
     }
 
     /// `$EDITOR file` in a new terminal tab (the viewer's "Open in editor").
@@ -1834,10 +2013,25 @@ impl Shell {
     }
 
     fn split(&mut self, axis: Axis, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(project) = self.ws.active_mut() else { return };
-        let group = project.layout.focused;
+        let Some(cwd) = self.next_terminal_directory(cx) else { return };
         let id = vibevalley_workspace::util::new_id();
-        project.layout.split(group, axis, PaneKind::Terminal { terminal_id: id });
+        let Some(project) = self.ws.active_mut() else { return };
+        if project
+            .layout
+            .split(
+                project.layout.focused,
+                axis,
+                PaneKind::Terminal {
+                    terminal_id: id.clone(),
+                    link: None,
+                },
+            )
+            .is_none()
+        {
+            return;
+        }
+        let slot = self.make_terminal(&id, SpawnSpec::shell(cwd), cx);
+        self.terminals.insert(id, slot);
         self.layout_changed(window, cx);
     }
 
@@ -1850,7 +2044,7 @@ impl Shell {
     pub fn close_tab(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(project) = self.ws.active_mut() else { return };
         let pid = project.id();
-        if let Some(PaneKind::Terminal { terminal_id }) = project.close_tab(tab) {
+        if let Some(PaneKind::Terminal { terminal_id, .. }) = project.close_tab(tab) {
             self.terminals.remove(&terminal_id);
         }
         self.panes.remove(&(pid, tab));
@@ -1874,7 +2068,7 @@ impl Shell {
         let Some(project) = self.ws.active() else { return };
         let Some(tab) = project.layout.active_tab() else { return };
         let handle = match &tab.kind {
-            PaneKind::Terminal { terminal_id } => self.terminals.get(terminal_id).map(|t| t.view.read(cx).focus_handle(cx)),
+            PaneKind::Terminal { terminal_id, .. } => self.terminals.get(terminal_id).map(|t| t.view.read(cx).focus_handle(cx)),
             _ => self.panes.get(&(project.id(), tab.id)).map(|p| p.entity.focus_handle(cx)),
         };
         window.focus(&handle.unwrap_or_else(|| self.focus.clone()), cx);
@@ -1894,7 +2088,7 @@ impl Shell {
         let root = project.root().to_path_buf();
         for (tab, kind) in visible {
             match kind {
-                PaneKind::Terminal { terminal_id } => {
+                PaneKind::Terminal { terminal_id, .. } => {
                     if self.terminals.contains_key(&terminal_id) {
                         continue;
                     }
@@ -2189,23 +2383,31 @@ impl Shell {
         }
     }
 
-    fn ensure_default_workspace_project(&mut self, cx: &mut Context<Self>) {
-        if !self.loaded || !self.ws.projects().is_empty() {
-            return;
+    fn with_workspace_project(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        then: impl FnOnce(&mut Self, Result<ProjectId, String>, &mut Window, &mut Context<Self>) + 'static,
+    ) {
+        if let Some(id) = self.ws.active_id() {
+            return then(self, Ok(id), window, cx);
         }
-        let work_root = crate::serving::work_root();
-        let candidate = first_workspace_repo(&work_root).or_else(|| {
-            let _ = std::fs::create_dir_all(&work_root);
-            work_root.is_dir().then_some(work_root)
+        if !self.loaded {
+            return then(self, Err(vibevalley_i18n::t("desktop.terminal.noProject", &[])), window, cx);
+        }
+        let root = crate::serving::work_root();
+        let dir = first_workspace_repo(&root).or_else(|| std::fs::create_dir_all(&root).ok().map(|()| root));
+        let Some(dir) = dir else {
+            return then(self, Err(vibevalley_i18n::t("desktop.terminal.noProject", &[])), window, cx);
+        };
+        self.with_project_at(dir, window, cx, move |s, id, w, cx| {
+            if let Ok(id) = id {
+                s.ws.activate(id);
+                s.refresh_summaries(cx);
+                s.push_sidebar(cx);
+            }
+            then(s, id, w, cx);
         });
-        if let Some(dir) = candidate
-            && let Some(id) = self.ensure_project_at(&dir, cx)
-        {
-            self.ws.activate(id);
-            self.ensure_project_view(id, cx);
-            self.refresh_summaries(cx);
-            self.push_sidebar(cx);
-        }
     }
 
     /// Tells every open terminal and hosted view about the new theme.
@@ -2455,6 +2657,40 @@ impl Render for Shell {
                     .child(slot.view.clone())
             }))
             .children(palette)
+            .children(self.terminal_notice.as_ref().map(|message| {
+                div()
+                    .id("terminal-folder-notice")
+                    .absolute()
+                    .left(px(20.))
+                    .right(px(20.))
+                    .bottom(px(16.))
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .px(px(14.))
+                    .py(px(10.))
+                    .rounded(px(8.))
+                    .bg(colors.elevated)
+                    .border_1()
+                    .border_color(colors.danger)
+                    .child(div().flex_1().min_w_0().text_sm().child(message.clone()))
+                    .child(
+                        div()
+                            .id("terminal-notice-dismiss")
+                            .cursor_pointer()
+                            .text_sm()
+                            .text_color(colors.accent)
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|s, _, _, cx| {
+                                    s.terminal_notice = None;
+                                    cx.stop_propagation();
+                                    cx.notify();
+                                }),
+                            )
+                            .child(vibevalley_i18n::t("desktop.terminal.dismiss", &[])),
+                    )
+            }))
             .children(launch)
     }
 }

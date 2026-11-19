@@ -36,35 +36,23 @@
     "night": "/gen/images/title-night-206a36c7cba9.webp"
   },
   "shots": {
-    "farm": {
-      "src": "/gen/images/farm-2f6f2cd44cf6.webp",
+    "native-farm": {
+      "src": "/gen/images/native-farm-c2256d395306.webp",
       "width": 1440,
-      "height": 900,
-      "srcset": "/gen/images/farm-92c875794ff7.webp 480w, /gen/images/farm-85c995dd42e6.webp 720w, /gen/images/farm-22b4a99698f1.webp 1080w, /gen/images/farm-2f6f2cd44cf6.webp 1440w"
+      "height": 880,
+      "srcset": "/gen/images/native-farm-e48bce5a67cc.webp 480w, /gen/images/native-farm-0d4226ac8aa7.webp 720w, /gen/images/native-farm-376b0189d6f2.webp 1080w, /gen/images/native-farm-c2256d395306.webp 1440w"
     },
-    "title": {
-      "src": "/gen/images/title-9006c9a2f9c3.webp",
+    "native-workbench": {
+      "src": "/gen/images/native-workbench-2b269ce3bd63.webp",
       "width": 1440,
-      "height": 900,
-      "srcset": "/gen/images/title-c5ed7713975b.webp 480w, /gen/images/title-2a2dc497e142.webp 720w, /gen/images/title-69082006444d.webp 1080w, /gen/images/title-9006c9a2f9c3.webp 1440w"
+      "height": 880,
+      "srcset": "/gen/images/native-workbench-bb8f93ac3e33.webp 480w, /gen/images/native-workbench-b5de3ea9e40c.webp 720w, /gen/images/native-workbench-0800d0bdd12c.webp 1080w, /gen/images/native-workbench-2b269ce3bd63.webp 1440w"
     },
-    "chat": {
-      "src": "/gen/images/chat-95fefa1dcb38.webp",
+    "native-chat": {
+      "src": "/gen/images/native-chat-fa1b89bfaf6a.webp",
       "width": 1440,
-      "height": 900,
-      "srcset": "/gen/images/chat-c854b15bc048.webp 480w, /gen/images/chat-4dc6f0f59fdc.webp 720w, /gen/images/chat-a2fa3f15e9fa.webp 1080w, /gen/images/chat-95fefa1dcb38.webp 1440w"
-    },
-    "phone-chat": {
-      "src": "/gen/images/phone-chat-b4411e87d1ba.webp",
-      "width": 390,
-      "height": 844,
-      "srcset": "/gen/images/phone-chat-b4411e87d1ba.webp 390w"
-    },
-    "phone-issues": {
-      "src": "/gen/images/phone-issues-6285a7d27fe4.webp",
-      "width": 390,
-      "height": 844,
-      "srcset": "/gen/images/phone-issues-6285a7d27fe4.webp 390w"
+      "height": 880,
+      "srcset": "/gen/images/native-chat-f5b33d6ea6c6.webp 480w, /gen/images/native-chat-1d978a6a8eb1.webp 720w, /gen/images/native-chat-6a502d947e90.webp 1080w, /gen/images/native-chat-fa1b89bfaf6a.webp 1440w"
     }
   }
 }

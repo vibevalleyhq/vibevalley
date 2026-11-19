@@ -32,7 +32,7 @@ import { useIssueHistory, useNameOf } from "../model/history";
 import { issueIs } from "../model/issue";
 import { issueMove, movedCards, sendMove } from "../model/moves";
 import { issueSearch } from "../model/navigation";
-import { createWriteKey, writeIssue } from "../model/write";
+import { writeIssue } from "../model/write";
 import { IssueBoard } from "./Board";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { DisplayMenu } from "./DisplayMenu";
@@ -72,7 +72,22 @@ export function IssuesPage(props: { rest: string }) {
     const search = new URLSearchParams(Object.entries({ repo: repo(), agent: agent() }).filter(([, v]) => v !== "")).toString();
     return search ? `?${search}` : "";
   };
-  const open = (to: string | undefined) => router.navigate((to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`) + kept());
+  const fromScene = () => {
+    if (!router.location().pathname.startsWith("/issues/")) return;
+    const path = router.history.previous()?.pathname;
+    if (path === "/map") return t("web.farm.native.map");
+    if (path === "/farm" || path?.startsWith("/farm/")) return t("web.base.farm");
+  };
+  const returnTo = signal<string>();
+  const open = (to: string | undefined) => {
+    if (!to && fromScene()) {
+      router.history.back();
+      return;
+    }
+    if (to && !id()) returnTo.set(to);
+    if (!to && !returnTo()) returnTo.set(card()?.id ?? id());
+    router.navigate((to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`) + kept());
+  };
   const notice = dispatchedNotice(open);
 
   const orchestrators = useOrchestrators();
@@ -108,9 +123,12 @@ export function IssuesPage(props: { rest: string }) {
     else if (move === "reopen" && (c.kind === "issue" || c.kind === "family")) reopening.set({ issue: c.issue, lane: to });
   };
 
-  const newAt = signal<NewIssueAt | undefined>(
-    props.rest === "new" ? { ...(repo() ? { repo: repo() } : {}), ...(agent() ? { agent: agent() } : {}) } : undefined,
-  );
+  const newAt = signal<NewIssueAt>();
+  const draftAt = () => (props.rest === "new" ? { ...(repo() ? { repo: repo() } : {}), ...(agent() ? { agent: agent() } : {}) } : newAt());
+  const closeDraft = () => {
+    newAt.set(undefined);
+    if (props.rest === "new") open(undefined);
+  };
   const startNew = (where: NewIssueAt) => {
     const f = filter();
     const repo = where.repo || f.repo;
@@ -118,7 +136,7 @@ export function IssuesPage(props: { rest: string }) {
     newAt.set({ ...(repo ? { repo } : {}), ...(agent ? { agent } : {}) });
   };
   const addInList: ListAdd = (where) => startNew(where);
-  const dialogUp = () => newAt() !== undefined || closing() !== undefined || reopening() !== undefined;
+  const dialogUp = () => draftAt() !== undefined || closing() !== undefined || reopening() !== undefined;
   // C, unless a field has focus, a dialog is up or an issue is open.
   keymap.bind(
     "c",
@@ -128,13 +146,12 @@ export function IssuesPage(props: { rest: string }) {
     },
     { when: "notEditing" },
   );
-  const writeKey = createWriteKey();
-  const keepNew = async (words: string, where: NewIssueAt) => {
-    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", writeKey.for(words)));
-    if (!made) return;
-    writeKey.used();
+  const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
+    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey));
+    if (!made) return false;
     rememberPick(where.agent ?? "", where.repo ?? "");
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
+    return true;
   };
   const retry = async (c: BoardCard) => {
     if (c.move?.state !== "failed") return;
@@ -162,7 +179,7 @@ export function IssuesPage(props: { rest: string }) {
                 <IssueList
                   cards={shown()}
                   loading={history.loading()}
-                  selected={card()?.id ?? id()}
+                  selected={returnTo()}
                   older={older()}
                   grouping={look().grouping}
                   ordering={look().ordering}
@@ -175,7 +192,7 @@ export function IssuesPage(props: { rest: string }) {
               <IssueBoard
                 cards={shown()}
                 loading={history.loading()}
-                selected={card()?.id ?? id()}
+                selected={returnTo()}
                 older={older()}
                 ordering={look().ordering}
                 onOlder={() => older.set(!older())}
@@ -193,7 +210,7 @@ export function IssuesPage(props: { rest: string }) {
         {/* Keyed by the id, a plain value; the detail keeps the card it last found (see Detail). */}
         <Each of={id() === undefined ? [] : [id() as string]}>
           {(at) => (
-            <IssueView onBack={() => open(undefined)} blocked={dialogUp}>
+            <IssueView onBack={() => open(undefined)} backLabel={fromScene() ?? t("web.issue.page.backToBoard")} blocked={dialogUp}>
               <Detail
                 id={at()}
                 cards={all}
@@ -205,7 +222,7 @@ export function IssuesPage(props: { rest: string }) {
           )}
         </Each>
       </If>
-      <If when={newAt()}>{(at) => <NewIssue at={at()} onKeep={(words, where) => void keepNew(words, where)} onClose={() => newAt.set(undefined)} />}</If>
+      <If when={draftAt()}>{(at) => <NewIssue at={at()} onKeep={keepNew} onClose={closeDraft} />}</If>
       <If when={closing()}>
         {(c) => <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} lane={c().lane} onClose={() => closing.set(undefined)} />}
       </If>
@@ -294,7 +311,7 @@ function Detail(props: {
 }
 
 /** An issue's own page, at its URL: Issues or Escape goes back to the board as it was left. */
-function IssueView(props: { onBack: () => void; blocked: () => boolean; children: JSX.Element }) {
+function IssueView(props: { onBack: () => void; backLabel: string; blocked: () => boolean; children: JSX.Element }) {
   // A dialog over the issue, or a field being written in, has Escape first.
   keymap.bind("escape", () => !props.blocked() && props.onBack(), { when: "notEditing" });
   return (
@@ -307,7 +324,7 @@ function IssueView(props: { onBack: () => void; blocked: () => boolean; children
           class="mb-3 flex-row items-center gap-1 self-start rounded-md px-1.5 py-0.5 hover:bg-hover"
         >
           <Icon name="back" size={14} tone="muted" />
-          <Text class="text-sm text-muted">{t("web.issue.page.backToBoard")}</Text>
+          <Text class="text-sm text-muted">{props.backLabel}</Text>
         </View>
         {props.children}
       </View>

@@ -337,13 +337,13 @@ fn resolve_agent(profiles: Option<&Agents>, agent: &str) -> String {
     }
 }
 
-pub(crate) fn changes_of(board: &Board, item: &Issue) -> Result<Changes, ApiError> {
+pub(crate) fn changes_of(board: &Board, item: &Issue, since_tree: Option<&str>) -> Result<Changes, ApiError> {
     // A parent is worked through its children: their merges are its changes.
     let has_children = board.read(|s| s.issues.iter().any(|i| i.parent.as_deref() == Some(item.id.as_str())));
     if item.repo.is_none() || !(item.was_sent() || has_children) {
         return Err(refused("server.issue.notStarted", &[]));
     }
-    let c = board.changes(&item.id).map_err(|e| api(board, e))?;
+    let c = board.changes_since(&item.id, since_tree).map_err(|e| api(board, e))?;
     let letter = |d: &vibevalley_git::FileDiff| -> String {
         use vibevalley_git::Change::*;
         match d.change {
@@ -364,6 +364,13 @@ pub(crate) fn changes_of(board: &Board, item: &Issue) -> Result<Changes, ApiErro
             .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_default()
     };
+    let changed_file = |d: &vibevalley_git::FileDiff| ChangedFile {
+        path: path(d),
+        status: letter(d),
+        added: if d.binary { -1 } else { d.added.into() },
+        removed: if d.binary { -1 } else { d.removed.into() },
+        patch: (!d.binary).then(|| patch_of(d, &path(d))),
+    };
     Ok(Changes {
         repo: item.repo.clone().unwrap_or_default(),
         base: c.base.clone(),
@@ -377,17 +384,9 @@ pub(crate) fn changes_of(board: &Board, item: &Issue) -> Result<Changes, ApiErro
                 at: x.time * 1000,
             })
             .collect(),
-        files: c
-            .files
-            .iter()
-            .map(|d| ChangedFile {
-                path: path(d),
-                status: letter(d),
-                added: if d.binary { -1 } else { d.added.into() },
-                removed: if d.binary { -1 } else { d.removed.into() },
-                patch: (!d.binary).then(|| patch_of(d, &path(d))),
-            })
-            .collect(),
+        revision: Some(c.revision.clone()),
+        since_review: c.since_review.as_deref().map(|files| files.iter().map(&changed_file).collect()),
+        files: c.files.iter().map(&changed_file).collect(),
         uncommitted: c
             .uncommitted
             .iter()
@@ -427,7 +426,13 @@ pub(crate) fn review(board: &Board, input: IssueReviewInput) -> Result<Issue, Ap
         return Err(refused("server.issue.nothingToAccept", &[]).with_next(next_steps(&item)));
     }
     board
-        .review(&item.id, input.pass, &input.findings.unwrap_or_default(), input.text.as_deref().unwrap_or(""))
+        .review(
+            &item.id,
+            input.pass,
+            &input.findings.unwrap_or_default(),
+            input.text.as_deref().unwrap_or(""),
+            input.revision.as_ref(),
+        )
         .map_err(|e| api(board, e))
 }
 
@@ -543,6 +548,7 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
     let names = names.clone();
     hub.on::<ops::IssueStatusPreviewUpdate>(move |_, input| {
         let mut item = get(&b, &input.id)?;
+        Board::verify_approval(&item, input.status, input.revision.as_ref()).map_err(|e| api(&b, e))?;
         if let Some(edit) = &input.edit {
             if edit_rewords(edit) && item.was_sent() {
                 return Err(refused("server.issue.started", &[]));
@@ -607,7 +613,7 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
     let b = board.clone();
     hub.on::<ops::IssueDiffGet>(move |_, input| {
         let item = get(&b, &input.id)?;
-        changes_of(&b, &item)
+        changes_of(&b, &item, input.since_tree.as_deref())
     });
     let b = board.clone();
     hub.on::<ops::IssueHistoryList>(move |_, ()| {
@@ -641,7 +647,7 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
 pub fn install_reviewed(hub: &Hub, board: Board, game: Arc<crate::modules::game::Game>) {
     hub.on::<ops::IssueDiffGet>(move |ctx, input| {
         let item = get(&board, &input.id)?;
-        let changes = changes_of(&board, &item)?;
+        let changes = changes_of(&board, &item, input.since_tree.as_deref())?;
         if ctx.caller == vibevalley_protocol::Caller::User
             && let Some(session) = item.latest_session_id()
             && board.read(|s| s.sessions.iter().any(|h| &h.id == session))
@@ -745,6 +751,7 @@ pub(crate) fn update(board: &Board, profiles: Option<&Agents>, input: vibevalley
 
 pub(crate) fn status(board: &Board, profiles: Option<&Agents>, input: &vibevalley_protocol::IssueStatusUpdateInput) -> Result<Issue, ApiError> {
     let mut item = get(board, &input.id)?;
+    Board::verify_approval(&item, input.status, input.revision.as_ref()).map_err(|e| api(board, e))?;
     if let Some(mut edit) = input.edit.clone() {
         edit.agent = edit.agent.map(|a| resolve_agent(profiles, &a));
         item = board.edit(&item.id, &edit).map_err(|e| api(board, e))?;
@@ -785,9 +792,13 @@ pub(crate) fn status(board: &Board, profiles: Option<&Agents>, input: &vibevalle
     let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
     let words = (!settled.said.is_empty()).then_some(settled.said.as_str());
     if settled.mv == Move::Round && words.is_some() && item.stage.state == IssueStageKind::Reviewing {
-        board.review(&item.id, false, &findings_of(&settled.said), "").map_err(|e| api(board, e))?;
+        board
+            .review(&item.id, false, &findings_of(&settled.said), "", None)
+            .map_err(|e| api(board, e))?;
     } else {
-        board.move_to(&item.id, input.status, words).map_err(|e| api(board, e))?;
+        board
+            .move_reviewed(&item.id, input.status, words, input.revision.as_ref())
+            .map_err(|e| api(board, e))?;
     }
     get(board, &item.id)
 }

@@ -216,6 +216,7 @@ impl Watch {
                 .spawn(move || {
                     if let Some(w) = w.upgrade() {
                         w.open_threads();
+                        w.replay_reports();
                     } else {
                         return;
                     }
@@ -526,6 +527,7 @@ impl Watch {
                 issue,
                 &text,
                 on.as_deref(),
+                &c.row.id,
                 std::iter::once(c.row.id.clone()).chain(earlier.into_iter().map(|w| w.message)),
             );
         }
@@ -553,7 +555,7 @@ impl Watch {
             });
             let lines: Vec<String> = waiting.iter().map(|w| w.line.clone()).collect();
             let issue = h.issue.clone().unwrap_or_default();
-            self.tell(&issue, &wake_input(&lines), Some(&h.id), waiting.into_iter().map(|w| w.message));
+            self.tell(&issue, &wake_input(&lines), Some(&h.id), &c.row.id, waiting.into_iter().map(|w| w.message));
         }
     }
 
@@ -616,8 +618,8 @@ impl Watch {
     }
 
     /// Words to an issue; each message handed is seen and 👀'd by the session.
-    fn tell(&self, issue: &str, text: &str, session: Option<&str>, messages: impl Iterator<Item = String>) {
-        match self.board.tell(issue, text) {
+    fn tell(&self, issue: &str, text: &str, session: Option<&str>, request: &str, messages: impl Iterator<Item = String>) {
+        match self.board.tell_message(issue, text, request) {
             Ok(()) => {
                 let Some(session) = session else { return };
                 for m in messages {
@@ -829,6 +831,56 @@ impl Watch {
         }
     }
 
+    fn replay_reports(&self) {
+        let store = self.board.sessions().durable_store();
+        let docs = match store.read(|r| r.documents_by_kind("run", "issue.report")) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("vibevalley: report outbox: {e}");
+                return;
+            }
+        };
+        for d in docs {
+            let p = &d.state;
+            let Some(issue) = p["issueId"].as_str() else { continue };
+            let Some(session) = p["sessionId"].as_str() else { continue };
+            let Some(thread) = self.chat.issue_thread_id(issue) else { continue };
+            let Ok(outcome) = serde_json::from_value::<Outcome>(p["outcome"].clone()) else {
+                continue;
+            };
+            let note = Note {
+                channel: thread,
+                from: session.into(),
+                kind: MessageKind::Report,
+                text: head(p["summary"].as_str().unwrap_or(""), REPORT_MAX),
+                meta: Meta {
+                    outcome: Some(outcome),
+                    run: Some(d.scope_id.clone()),
+                    spent: serde_json::from_value(p["spent"].clone()).ok().flatten(),
+                    ..Meta::default()
+                },
+                topic: None,
+                member: None,
+                seat: None,
+            };
+            if let Err(e) = self.deliver_report(note, Some(&d.scope_id)) {
+                warn("replay report", &e);
+            }
+        }
+    }
+
+    fn deliver_report(&self, note: Note, run: Option<&str>) -> Result<(), ApiError> {
+        self.chat.note_once(note, run.map(|id| format!("report:{id}")))?;
+        if let Some(id) = run {
+            self.board
+                .sessions()
+                .durable_store()
+                .write(|tx| tx.delete_document("run", id, "issue.report"))
+                .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?;
+        }
+        Ok(())
+    }
+
     fn post_report(&self, h: &Session, f: &FactSessionReported) -> Result<(), ApiError> {
         if h.refining {
             // The draft, or why there is none, in the issue's thread (the session itself is let go already).
@@ -853,16 +905,19 @@ impl Watch {
             run: f.run.clone(),
             ..Meta::default()
         };
-        self.chat.note(Note {
-            channel: thread,
-            from: h.id.clone(),
-            kind: MessageKind::Report,
-            text: head(&f.summary, REPORT_MAX),
-            meta,
-            topic: None,
-            member: None,
-            seat: None,
-        })?;
+        self.deliver_report(
+            Note {
+                channel: thread,
+                from: h.id.clone(),
+                kind: MessageKind::Report,
+                text: head(&f.summary, REPORT_MAX),
+                meta,
+                topic: None,
+                member: None,
+                seat: None,
+            },
+            f.run.as_deref(),
+        )?;
         Ok(())
     }
 }

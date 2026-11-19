@@ -19,8 +19,8 @@ const historyQuery = defineQuery({
 });
 const changesQuery = defineQuery({
   schema: S.Changes,
-  key: (id: string) => ["issues", "changes", id],
-  fetch: (id, context) => api.issue.diff.get({ id }, context),
+  key: (input: { id: string; sinceTree?: string }) => ["issues", "changes", input.id, input.sinceTree ?? ""],
+  fetch: (input, context) => api.issue.diff.get(input, context),
   ...retryRead,
 });
 const timelineQuery = defineQuery({
@@ -69,7 +69,14 @@ export function useIssueHistory(older: () => boolean) {
 // An issue's reads, keyed under "issues".
 
 /** What completing the issue would merge; read only while it is shown. */
-export const useIssueChanges = (id: () => string, shown: () => boolean = () => true) => useQuery(() => changesQuery(id()), { enabled: shown });
+export const useIssueChanges = (id: () => string, shown: () => boolean = () => true, sinceTree?: () => string | undefined) =>
+  useQuery(
+    () => {
+      const since = sinceTree?.();
+      return changesQuery(since ? { id: id(), sinceTree: since } : { id: id() });
+    },
+    { enabled: shown },
+  );
 
 /** The issue's timeline, read again as it moves on: where it stands, its helper's rounds, the findings it was sent back with. */
 export const useIssueTimeline = (issue: () => Issue, rounds: () => number) =>

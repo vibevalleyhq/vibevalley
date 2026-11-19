@@ -91,13 +91,13 @@ export type Dictated = { text: string, };
 
 export type VoiceSaid = { agentId: string, text: string, };
 
-export type VoiceHeard = { agentId: string, text: string, 
+export type VoiceHeard = { agentId: string, text: string,
 /**
  * The profile the user picked; absent for none.
  */
 agent?: string, sendKey?: string, };
 
-export type VoiceCallStart = { channel: string, uid: string, 
+export type VoiceCallStart = { channel: string, uid: string,
 /**
  * The call answers a ring: what rang, which the orchestrator says first instead of the greeting.
  */

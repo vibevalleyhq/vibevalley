@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
-use rusqlite::Connection;
+use sqlx::{Connection, SqliteConnection};
 use vibevalley_artifact::{artifact_headers, artifact_problem, html_check, html_edit, html_problem, shell_theme_of, with_shell};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
@@ -25,7 +25,7 @@ use vibevalley_protocol::{
 pub use blocks::spans_of;
 use db::ArtifactRow;
 
-use crate::base::{LookIn, missing, open_db};
+use crate::base::{LookIn, missing, open_sqlx_db};
 use crate::modules::agent::Agents;
 use crate::modules::attachment::Attachments;
 use crate::modules::channel::{Chat, Made, Posting};
@@ -38,7 +38,7 @@ fn refused(text: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::ArtifactRefused, text.into())
 }
 
-fn q(e: rusqlite::Error) -> ApiError {
+fn q(e: sqlx::Error) -> ApiError {
     crate::base::internal(e)
 }
 
@@ -88,7 +88,7 @@ struct Change {
 type SuggestionsNow = (String, Vec<vibevalley_protocol::Suggestion>);
 
 pub struct Artifacts {
-    db: Mutex<Connection>,
+    db: Mutex<SqliteConnection>,
     /// One change of an artifact's row at a time: a version's number is the
     /// latest's plus one.
     rows: Mutex<()>,
@@ -110,8 +110,8 @@ impl Artifacts {
     /// The tables in `<home>/server.db`, and the daily prune of old batches
     /// and texts. Open it after the chat: its messages are joined.
     pub fn open(home: &std::path::Path, files: Arc<Attachments>, chat: Arc<Chat>) -> Result<Arc<Artifacts>, ApiError> {
-        let conn = open_db(home).map_err(q)?;
-        conn.execute_batch(db::SCHEMA).map_err(q)?;
+        let mut conn = pollster::block_on(open_sqlx_db(home)).map_err(q)?;
+        pollster::block_on(sqlx::raw_sql(db::SCHEMA).execute(&mut conn)).map_err(q)?;
         let (stop_tx, stop_rx) = flume::bounded::<()>(0);
         let me = Arc::new(Artifacts {
             db: Mutex::new(conn),
@@ -149,17 +149,17 @@ impl Artifacts {
         }
     }
 
-    fn db(&self) -> MutexGuard<'_, Connection> {
+    fn db(&self) -> MutexGuard<'_, SqliteConnection> {
         lock(&self.db)
     }
 
-    fn found(&self, db: &Connection, id: &str) -> Result<ArtifactRow, ApiError> {
+    fn found(&self, db: &mut SqliteConnection, id: &str) -> Result<ArtifactRow, ApiError> {
         db::artifact(db, id)
             .map_err(q)?
             .ok_or_else(|| missing(t("server.artifact.missing", &[("id", id.into())]), LookIn::Artifact))
     }
 
-    fn assemble(&self, db: &Connection, row: ArtifactRow) -> Result<Wire, ApiError> {
+    fn assemble(&self, db: &mut SqliteConnection, row: ArtifactRow) -> Result<Wire, ApiError> {
         let versions = if row.body == "html" { db::versions(db, &row.id).map_err(q)? } else { vec![] };
         let channel = row.channel_id.clone().unwrap_or_default();
         Ok(Wire {
@@ -196,24 +196,24 @@ impl Artifacts {
     }
 
     fn get_now(&self, id: &str) -> Result<Wire, ApiError> {
-        let db = self.db();
-        let row = self.found(&db, id)?;
-        self.assemble(&db, row)
+        let mut db = self.db();
+        let row = self.found(&mut db, id)?;
+        self.assemble(&mut db, row)
     }
 
     pub fn list(&self, req: &ArtifactListRequest) -> Result<Vec<Wire>, ApiError> {
-        let db = self.db();
+        let mut db = self.db();
         let channel = req.channel.as_deref().filter(|c| !c.is_empty());
         let rows = match (req.issue.as_deref().filter(|i| !i.is_empty()), channel) {
-            (Some(issue), _) => db::artifacts_for_issue(&db, issue),
-            (None, Some(channel)) => db::artifacts_in_channel(&db, channel),
-            (None, None) => db::artifacts(&db, LISTED_MAX),
+            (Some(issue), _) => db::artifacts_for_issue(&mut db, issue),
+            (None, Some(channel)) => db::artifacts_in_channel(&mut db, channel),
+            (None, None) => db::artifacts(&mut db, LISTED_MAX),
         }
         .map_err(q)?;
         // Both given: the issue's, in that channel.
         rows.into_iter()
             .filter(|r| channel.is_none_or(|c| r.channel_id.as_deref() == Some(c)))
-            .map(|r| self.assemble(&db, r))
+            .map(|r| self.assemble(&mut db, r))
             .collect()
     }
 
@@ -221,7 +221,7 @@ impl Artifacts {
         self.get_now(id)
     }
 
-    fn version_of(&self, db: &Connection, id: &str, version: Option<i64>) -> Result<(ArtifactRow, db::VersionRow), ApiError> {
+    fn version_of(&self, db: &mut SqliteConnection, id: &str, version: Option<i64>) -> Result<(ArtifactRow, db::VersionRow), ApiError> {
         let row = self.found(db, id)?;
         let n = version.unwrap_or(row.version);
         let Some(v) = db::version(db, id, n).map_err(q)? else {
@@ -251,7 +251,7 @@ impl Artifacts {
 
     /// An html one's version as made; a blocks one's Markdown now, its version its seq.
     pub fn content(&self, id: &str, version: Option<i64>) -> Result<(ArtifactContent, ArtifactBody), ApiError> {
-        let row = self.found(&self.db(), id)?;
+        let row = self.found(&mut self.db(), id)?;
         if row.body == "blocks" {
             return Ok((
                 ArtifactContent {
@@ -261,19 +261,19 @@ impl Artifacts {
                 ArtifactBody::Blocks,
             ));
         }
-        let (row, v) = self.version_of(&self.db(), id, version)?;
+        let (row, v) = self.version_of(&mut self.db(), id, version)?;
         let content = self.page_of(&row, &v)?;
         Ok((ArtifactContent { version: v.version, content }, ArtifactBody::Html))
     }
 
     /// An html version's file on disk; none when there is none.
     pub fn file(&self, id: &str, version: i64) -> Option<PathBuf> {
-        let db = self.db();
-        let row = db::artifact(&db, id).ok()??;
+        let mut db = self.db();
+        let row = db::artifact(&mut db, id).ok()??;
         if row.body != "html" {
             return None;
         }
-        db::version(&db, id, version).ok()?.map(|v| self.files.path_of(&v.attachment_id))
+        db::version(&mut db, id, version).ok()?.map(|v| self.files.path_of(&v.attachment_id))
     }
 
     /// `keep`: a version's bytes as an attachment.
@@ -333,55 +333,58 @@ impl Artifacts {
             note: note.unwrap_or("").into(),
             display,
         };
-        // Said first: the name it goes by is the one the channel knows its maker by.
-        let (said, _) = self.chat.post(Posting {
-            from: maker.from.clone(),
-            channel,
-            text: Self::words(t("server.artifact.made", &[("title", title.as_str().into())]), note),
-            made: Some(Made::Card(card)),
-            run: maker.run.clone(),
-            ..Posting::default()
-        })?;
-        let at = now();
-        {
-            let db = self.db();
-            db::add_artifact(
-                &db,
-                &db::NewArtifact {
-                    id: &id,
-                    title: &title,
-                    body: if html { "html" } else { "blocks" },
-                    display: display.map(ArtifactDisplay::as_str),
-                    channel_id: Some(&said.channel),
-                    issue: req.issue.as_deref(),
-                    by_id: &maker.by,
-                    by_name: &said.name,
-                    version,
-                    created_at: at,
-                },
-            )
-            .map_err(q)?;
-            db::artifact_said(&db, &id, &said.id).map_err(q)?;
-            if html {
-                db::add_version(
-                    &db,
-                    &db::NewVersion {
-                        artifact_id: &id,
-                        version: 1,
-                        attachment_id: &file,
-                        size: bytes.len() as i64,
-                        note,
-                        by_id: &maker.by,
-                        by_name: &said.name,
+        let mut initial = None;
+        self.chat.post_with(
+            Posting {
+                from: maker.from.clone(),
+                channel,
+                text: Self::words(t("server.artifact.made", &[("title", title.as_str().into())]), note),
+                made: Some(Made::Card(card)),
+                run: maker.run.clone(),
+                ..Posting::default()
+            },
+            |db, said| {
+                let at = now();
+                db::add_artifact(
+                    db,
+                    db::NewArtifact {
+                        id: id.clone(),
+                        title: title.clone(),
+                        body: if html { "html" } else { "blocks" }.into(),
+                        display: display.map(|d| d.as_str().into()),
+                        channel_id: Some(said.channel.clone()),
+                        issue: req.issue.clone(),
+                        by_id: maker.by.clone(),
+                        by_name: said.name.clone(),
+                        version,
                         created_at: at,
                     },
                 )
                 .map_err(q)?;
-                db::version_announced(&db, &id, 1, &said.id).map_err(q)?;
-            }
-        }
-        if !html {
-            self.fill(&id, content, &maker.by)?;
+                db::artifact_said(db, &id, &said.id).map_err(q)?;
+                if html {
+                    db::add_version(
+                        db,
+                        db::NewVersion {
+                            artifact_id: id.clone(),
+                            version: 1,
+                            attachment_id: file.clone(),
+                            size: bytes.len() as i64,
+                            note: note.map(str::to_owned),
+                            by_id: maker.by.clone(),
+                            by_name: said.name.clone(),
+                            created_at: at,
+                        },
+                    )
+                    .map_err(q)?;
+                    db::version_announced(db, &id, 1, &said.id).map_err(q)?;
+                }
+                initial = if html { None } else { self.fill(db, &id, content, &maker.by)? };
+                Ok(())
+            },
+        )?;
+        if let Some(ack) = initial {
+            self.publish_change(&id, &ack);
         }
         self.get_now(&id)
     }
@@ -394,25 +397,25 @@ impl Artifacts {
         } else {
             maker.by.clone()
         };
-        let db = self.db();
+        let mut db = self.db();
         db::add_artifact(
-            &db,
-            &db::NewArtifact {
-                id: &id,
-                title,
-                body: "blocks",
+            &mut db,
+            db::NewArtifact {
+                id: id.clone(),
+                title: title.into(),
+                body: "blocks".into(),
                 display: None,
                 channel_id: None,
                 issue: None,
-                by_id: &maker.by,
-                by_name: &name,
+                by_id: maker.by.clone(),
+                by_name: name.clone(),
                 version: 0,
                 created_at: now(),
             },
         )
         .map_err(q)?;
-        let row = self.found(&db, &id)?;
-        self.assemble(&db, row)
+        let row = self.found(&mut db, &id)?;
+        self.assemble(&mut db, row)
     }
 
     /// An html one's next version; a blocks one is refused.
@@ -422,7 +425,7 @@ impl Artifacts {
     }
 
     fn version_locked(&self, maker: &Maker, req: &ArtifactVersionRequest) -> Result<Wire, ApiError> {
-        let row = self.found(&self.db(), &req.id)?;
+        let row = self.found(&mut self.db(), &req.id)?;
         if row.body != "html" {
             return Err(refused(t("server.artifact.notHtml", &[("title", row.title.as_str().into())])));
         }
@@ -445,45 +448,47 @@ impl Artifacts {
             note: note.unwrap_or("").into(),
             display: row.display.as_deref().and_then(display_of),
         };
-        // Announced where the first one was: its comments stay in one place.
-        let (said, _) = self.chat.post(Posting {
-            from: maker.from.clone(),
-            channel: row.channel_id.clone().unwrap_or_default(),
-            text: Self::words(
-                t("server.artifact.versioned", &[("title", row.title.as_str().into()), ("version", next.into())]),
-                note,
-            ),
-            made: Some(Made::Card(card)),
-            run: maker.run.clone(),
-            ..Posting::default()
-        })?;
-        let at = now();
-        let db = self.db();
-        db::add_version(
-            &db,
-            &db::NewVersion {
-                artifact_id: &row.id,
-                version: next,
-                attachment_id: &file,
-                size: bytes.len() as i64,
-                note,
-                by_id: &maker.by,
-                by_name: &said.name,
-                created_at: at,
+        self.chat.post_with(
+            Posting {
+                from: maker.from.clone(),
+                channel: row.channel_id.clone().unwrap_or_default(),
+                text: Self::words(
+                    t("server.artifact.versioned", &[("title", row.title.as_str().into()), ("version", next.into())]),
+                    note,
+                ),
+                made: Some(Made::Card(card)),
+                run: maker.run.clone(),
+                ..Posting::default()
             },
-        )
-        .map_err(q)?;
-        db::version_announced(&db, &row.id, next, &said.id).map_err(q)?;
-        db::artifact_versioned(&db, &row.id, next, at).map_err(q)?;
-        let row = self.found(&db, &row.id)?;
-        self.assemble(&db, row)
+            |db, said| {
+                let at = now();
+                db::add_version(
+                    db,
+                    db::NewVersion {
+                        artifact_id: row.id.clone(),
+                        version: next,
+                        attachment_id: file.clone(),
+                        size: bytes.len() as i64,
+                        note: note.map(str::to_owned),
+                        by_id: maker.by.clone(),
+                        by_name: said.name.clone(),
+                        created_at: at,
+                    },
+                )
+                .map_err(q)?;
+                db::version_announced(db, &row.id, next, &said.id).map_err(q)?;
+                db::artifact_versioned(db, &row.id, next, at).map_err(q)?;
+                Ok(())
+            },
+        )?;
+        self.get_now(&row.id)
     }
 
     /// The user's words in place of some in the latest version, kept as
     /// the next version.
     pub fn html_edit(&self, maker: &Maker, req: &ArtifactHtmlEdit) -> Result<Wire, ApiError> {
         let _rows = lock(&self.rows);
-        let (row, v) = self.version_of(&self.db(), &req.id, Some(req.version))?;
+        let (row, v) = self.version_of(&mut self.db(), &req.id, Some(req.version))?;
         if row.body != "html" {
             return Err(refused(t("server.artifact.notHtml", &[("title", row.title.as_str().into())])));
         }
@@ -513,8 +518,8 @@ impl Artifacts {
     /// Its title, or how an html one is shown.
     pub fn update(&self, req: &ArtifactUpdateRequest) -> Result<Wire, ApiError> {
         let _rows = lock(&self.rows);
-        let db = self.db();
-        let row = self.found(&db, &req.id)?;
+        let mut db = self.db();
+        let row = self.found(&mut db, &req.id)?;
         if let Some(title) = &req.title {
             let problem = artifact_problem(Some(title), None, None);
             if !problem.is_empty() {
@@ -525,18 +530,20 @@ impl Artifacts {
             return Err(refused(t("server.artifact.displayHtmlOnly", &[])));
         }
         let at = now();
+        let mut tx = pollster::block_on(db.begin()).map_err(q)?;
         if let Some(title) = &req.title {
-            db::artifact_renamed(&db, &req.id, title.trim(), at).map_err(q)?;
+            db::artifact_renamed(&mut tx, &req.id, title.trim(), at).map_err(q)?;
         }
         if let Some(display) = req.display {
-            db::artifact_shown(&db, &req.id, display.as_str(), at).map_err(q)?;
+            db::artifact_shown(&mut tx, &req.id, display.as_str(), at).map_err(q)?;
         }
-        let row = self.found(&db, &req.id)?;
-        self.assemble(&db, row)
+        pollster::block_on(tx.commit()).map_err(q)?;
+        let row = self.found(&mut db, &req.id)?;
+        self.assemble(&mut db, row)
     }
 
     pub fn preview_remove(&self, id: &str) -> Result<Preview, ApiError> {
-        let row = self.found(&self.db(), id)?;
+        let row = self.found(&mut self.db(), id)?;
         let what = if row.body == "html" {
             t(
                 "server.artifact.preview.remove",
@@ -556,9 +563,9 @@ impl Artifacts {
     /// It and its versions or blocks go; the versions' attachments stay.
     pub fn remove(&self, id: &str) -> Result<(), ApiError> {
         let _rows = lock(&self.rows);
-        let db = self.db();
-        self.found(&db, id)?;
-        db::delete_artifact(&db, id).map_err(q)
+        let mut db = self.db();
+        self.found(&mut db, id)?;
+        db::delete_artifact(&mut db, id).map_err(q)
     }
 
     pub fn snapshot(&self, id: &str) -> Result<BlockSnapshot, ApiError> {
@@ -637,7 +644,7 @@ fn prune_daily(me: Weak<Artifacts>, stop_rx: flume::Receiver<()>) -> Option<std:
                         return;
                     }
                     let before = now() - blocks::KEPT_DAYS * blocks::DAY_MS;
-                    if let Err(e) = db::prune(&a.db(), before) {
+                    if let Err(e) = db::prune(&mut a.db(), before) {
                         eprintln!("vibevalley-server: artifact.prune failed: {e}");
                     }
                 }

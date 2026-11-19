@@ -1,4 +1,4 @@
-import type { AppliedIssue, Issue, IssueStatus, IssueUpdate } from "@vibevalley/protocol";
+import type { AppliedIssue, Changes, Issue, IssueStatus, IssueUpdate } from "@vibevalley/protocol";
 import { omitUndefined, same } from "@vibevalley/protocol/rules";
 
 import { api } from "../../../infra/api";
@@ -7,6 +7,7 @@ import type { BoardCard, Lane } from "./cards";
 
 export interface IssueMove {
   readonly id: string;
+  readonly revision?: NonNullable<Changes["revision"]>;
   readonly status: IssueStatus;
   /** What the user said with it: the findings of reject, what a reopen asks for. */
   readonly text?: string;
@@ -17,7 +18,7 @@ export interface IssueMove {
 }
 
 export const issueMove = defineIntent<IssueMove, AppliedIssue>({
-  send: (m, key) => api.issue.status.update(omitUndefined({ id: m.id, status: m.status, text: m.text, edit: m.edit, requestKey: key })),
+  send: (m, key) => api.issue.status.update(omitUndefined({ id: m.id, status: m.status, text: m.text, edit: m.edit, revision: m.revision, requestKey: key })),
   confirmed: bySeq,
   whileLost: "queue",
   timeoutMs: 20_000,

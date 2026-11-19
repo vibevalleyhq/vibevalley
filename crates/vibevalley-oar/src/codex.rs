@@ -24,13 +24,15 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 
-use crate::core::{CoreSession, Driver, SessionCore, absolute, check_cwd, file_as_text, lock, rejected, rejection};
-use crate::process::{LineChild, LoginCheck, Spawn, probe_installation_with, require_binary};
+use crate::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, lock, rejected, rejection};
+use crate::process::{LineChild, LoginCheck, LoginStatus, Spawn, probe_installation_with, require_binary};
 use crate::record::{self, Recorder};
 use crate::{
     AccountUsage, AgentError, Capabilities, ContentBlock, EventKind, FileChangeKind, Installation, McpServer, ModelInfo, PermissionDecision, PermissionMode,
     Result, Runtime, Session, SessionOptions, StopReason, Usage, UsageWindow,
 };
+
+mod subagents;
 
 const ID: &str = "codex";
 const RPC_TIMEOUT: Duration = Duration::from_secs(60);
@@ -51,11 +53,17 @@ fn str_of<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
 /// `codex login status` exits non-zero and says "Not logged in" otherwise.
 const LOGIN: LoginCheck = LoginCheck {
     args: &["login", "status"],
-    logged_in: codex_logged_in,
+    status: codex_login_status,
 };
 
-pub(crate) fn codex_logged_in(ok: bool, text: &str) -> bool {
-    ok && !text.to_ascii_lowercase().contains("not logged in")
+pub(crate) fn codex_login_status(ok: bool, text: &str) -> LoginStatus {
+    if text.lines().any(|line| line.trim().eq_ignore_ascii_case("not logged in")) {
+        LoginStatus::SignedOut
+    } else if ok {
+        LoginStatus::SignedIn
+    } else {
+        LoginStatus::Unknown
+    }
 }
 
 pub(crate) fn policy(mode: PermissionMode) -> (&'static str, &'static str) {
@@ -90,6 +98,10 @@ pub(crate) fn open_request(opts: &SessionOptions) -> (&'static str, Value) {
     if let Some(effort) = &opts.effort {
         config.insert("model_reasoning_effort".into(), json!(effort));
     }
+    if !opts.disallowed_tools.is_empty() {
+        config.insert("disallowed_tools".into(), json!(opts.disallowed_tools));
+    }
+    let mut servers = serde_json::Map::new();
     for server in &opts.mcp_servers {
         let entry = match server {
             McpServer::Stdio { command, args, env, cwd, .. } => {
@@ -103,7 +115,10 @@ pub(crate) fn open_request(opts: &SessionOptions) -> (&'static str, Value) {
                 json!({ "url": url, "http_headers": headers.iter().cloned().collect::<std::collections::BTreeMap<_, _>>() })
             }
         };
-        config.insert(format!("mcp_servers.{}", server.name()), entry);
+        servers.insert(server.name().into(), entry);
+    }
+    if !servers.is_empty() {
+        config.insert("mcp_servers".into(), Value::Object(servers));
     }
     if !config.is_empty() {
         fields.insert("config".into(), Value::Object(config));
@@ -233,6 +248,7 @@ pub(crate) enum ServerRequest {
         summary: String,
     },
     Question {
+        agent_path: Vec<String>,
         text: String,
     },
     /// Not a decision we can make (auth refresh, client-side tools, ...).
@@ -242,8 +258,11 @@ pub(crate) enum ServerRequest {
 /// app-server notifications → events, as a pure fold (tests feed it fixtures).
 pub(crate) struct Projector {
     root_thread: String,
-    streamed_items: HashSet<String>,
-    items: HashMap<String, Value>,
+    subagents: subagents::Subagents,
+    recorded_children: HashSet<String>,
+    streamed_items: HashSet<(String, String)>,
+    completed_items: HashSet<(String, String)>,
+    items: HashMap<(String, String), Value>,
     total: Option<(u64, u64)>,
     turn_baseline: Option<(u64, u64)>,
     error_in_turn: bool,
@@ -254,7 +273,10 @@ impl Projector {
     pub(crate) fn new(root_thread: &str) -> Self {
         Self {
             root_thread: root_thread.to_string(),
+            subagents: subagents::Subagents::default(),
+            recorded_children: HashSet::new(),
             streamed_items: HashSet::new(),
+            completed_items: HashSet::new(),
             items: HashMap::new(),
             total: None,
             turn_baseline: None,
@@ -263,34 +285,52 @@ impl Projector {
         }
     }
 
-    fn path(&self, params: &Value) -> Vec<String> {
-        match str_of(params, "threadId") {
-            Some(thread) if thread != self.root_thread => vec![thread.to_string()],
-            _ => Vec::new(),
-        }
+    fn thread<'a>(&'a self, params: &'a Value) -> &'a str {
+        params
+            .pointer("/subAgentActivity/agentThreadId")
+            .and_then(Value::as_str)
+            .or_else(|| str_of(params, "threadId"))
+            .or_else(|| params.pointer("/thread/id").and_then(Value::as_str))
+            .unwrap_or(&self.root_thread)
     }
 
+    fn path(&self, params: &Value) -> Vec<String> {
+        self.subagents.path(&self.root_thread, self.thread(params))
+    }
+
+    #[cfg(test)]
     pub(crate) fn notification(&mut self, method: &str, params: &Value) -> Vec<(Vec<String>, EventKind)> {
+        self.project(method, params).unwrap_or_default()
+    }
+
+    fn project(&mut self, method: &str, params: &Value) -> Option<Vec<(Vec<String>, EventKind)>> {
+        let thread = self.thread(params).to_owned();
+        let mut out = self.subagents.observe(&self.root_thread, &thread, method, params)?;
         let path = self.path(params);
         let root = path.is_empty();
-        let mut out = Vec::new();
+        if method == "turn/started" {
+            self.items.retain(|(source, _), _| source != &thread);
+            self.streamed_items.retain(|(source, _)| source != &thread);
+            self.completed_items.retain(|(source, _)| source != &thread);
+        }
+        let key = |id: &str| (thread.clone(), id.to_owned());
         let delta = || str_of(params, "delta").filter(|d| !d.is_empty()).map(str::to_string);
         match method {
             "item/agentMessage/delta" => {
                 if let Some(text) = delta() {
-                    self.streamed_items.insert(str_of(params, "itemId").unwrap_or_default().to_string());
+                    self.streamed_items.insert(key(str_of(params, "itemId").unwrap_or_default()));
                     out.push((path, EventKind::TextDelta { text }));
                 }
             }
             "item/reasoning/summaryTextDelta" | "item/reasoning/textDelta" => {
                 if let Some(text) = delta() {
-                    self.streamed_items.insert(str_of(params, "itemId").unwrap_or_default().to_string());
+                    self.streamed_items.insert(key(str_of(params, "itemId").unwrap_or_default()));
                     out.push((path, EventKind::ThinkingDelta { text }));
                 }
             }
             "item/reasoning/summaryPartAdded" => {
                 let id = str_of(params, "itemId").unwrap_or_default();
-                if self.streamed_items.contains(id) {
+                if self.streamed_items.contains(&key(id)) {
                     out.push((path, EventKind::ThinkingDelta { text: "\n\n".into() }));
                 }
             }
@@ -299,7 +339,11 @@ impl Projector {
                 let kind = str_of(item, "type").unwrap_or_default();
                 if TOOL_ITEMS.contains(&kind) {
                     let id = str_of(item, "id").unwrap_or_default().to_string();
-                    self.items.insert(id.clone(), item.clone());
+                    let key = key(&id);
+                    if self.items.contains_key(&key) || self.completed_items.contains(&key) {
+                        return Some(out);
+                    }
+                    self.items.insert(key, item.clone());
                     out.push((
                         path,
                         EventKind::ToolCallStarted {
@@ -313,14 +357,28 @@ impl Projector {
             "item/completed" => {
                 let item = params.get("item").unwrap_or(&Value::Null);
                 let id = str_of(item, "id").unwrap_or_default().to_string();
+                if !self.completed_items.insert(key(&id)) {
+                    return Some(out);
+                }
                 match str_of(item, "type").unwrap_or_default() {
-                    // Whole text only when nothing streamed for the item.
-                    "agentMessage" if !self.streamed_items.contains(&id) => {
+                    "agentMessage" => {
                         if let Some(text) = str_of(item, "text").filter(|t| !t.is_empty()) {
-                            out.push((path, EventKind::TextDelta { text: text.to_string() }));
+                            if !self.streamed_items.contains(&key(&id)) {
+                                out.push((path.clone(), EventKind::TextDelta { text: text.into() }));
+                            }
+                            if !root && let Some(turn) = str_of(params, "turnId") {
+                                out.push((
+                                    path,
+                                    EventKind::SubagentMessage {
+                                        thread_id: thread,
+                                        turn_id: turn.into(),
+                                        text: text.into(),
+                                    },
+                                ));
+                            }
                         }
                     }
-                    "reasoning" if !self.streamed_items.contains(&id) => {
+                    "reasoning" if !self.streamed_items.contains(&key(&id)) => {
                         let parts = |key: &str| -> Vec<String> {
                             item.get(key)
                                 .and_then(Value::as_array)
@@ -338,7 +396,7 @@ impl Projector {
                         }
                     }
                     kind if TOOL_ITEMS.contains(&kind) => {
-                        if self.items.remove(&id).is_none() {
+                        if self.items.remove(&key(&id)).is_none() {
                             // Completed without a start (a resumed or replayed item): open it first.
                             out.push((
                                 path.clone(),
@@ -386,9 +444,13 @@ impl Projector {
                     message.push_str(details);
                 }
                 if params.get("willRetry").and_then(Value::as_bool) == Some(true) {
-                    self.last_error = Some(message);
+                    if root {
+                        self.last_error = Some(message);
+                    }
                 } else {
-                    self.error_in_turn = true;
+                    if root {
+                        self.error_in_turn = true;
+                    }
                     out.push((path, EventKind::Error { message }));
                 }
             }
@@ -404,23 +466,20 @@ impl Projector {
                         .pointer("/error/message")
                         .and_then(Value::as_str)
                         .map(str::to_string)
-                        .or_else(|| self.last_error.clone())
+                        .or_else(|| root.then(|| self.last_error.clone()).flatten())
                         .unwrap_or_else(|| format!("codex turn {}", str_of(turn, "status").unwrap_or("failed")));
                     out.push((path.clone(), EventKind::Error { message }));
                 }
-                let usage = match (root, self.total, self.turn_baseline.take()) {
-                    (true, Some((input, output)), Some((base_input, base_output))) => Usage {
-                        input_tokens: Some(input.saturating_sub(base_input)),
-                        output_tokens: Some(output.saturating_sub(base_output)),
-                        cost_usd: None,
-                    },
-                    _ => Usage::default(),
-                };
+                let mut usage = Usage::default();
+                if root && let (Some((input, output)), Some((base_input, base_output))) = (self.total, self.turn_baseline.take()) {
+                    usage.input_tokens = Some(input.saturating_sub(base_input));
+                    usage.output_tokens = Some(output.saturating_sub(base_output));
+                }
                 out.push((path, EventKind::TurnFinished { reason, usage }));
             }
             _ => {}
         }
-        out
+        Some(out)
     }
 
     pub(crate) fn server_request(&self, method: &str, params: &Value) -> ServerRequest {
@@ -452,7 +511,7 @@ impl Projector {
             }
             "item/fileChange/requestApproval" | "applyPatchApproval" => {
                 let changes = str_of(params, "itemId")
-                    .and_then(|id| self.items.get(id))
+                    .and_then(|id| self.items.get(&(self.thread(params).to_owned(), id.to_owned())))
                     .and_then(|item| item.get("changes").cloned())
                     .or_else(|| params.get("fileChanges").cloned())
                     .unwrap_or(Value::Null);
@@ -488,7 +547,7 @@ impl Projector {
             "item/tool/requestUserInput" => {
                 let questions = params.get("questions").and_then(Value::as_array).cloned().unwrap_or_default();
                 let text = questions.iter().filter_map(|q| str_of(q, "question")).collect::<Vec<_>>().join("\n");
-                ServerRequest::Question { text }
+                ServerRequest::Question { agent_path, text }
             }
             _ => ServerRequest::Unsupported,
         }
@@ -526,10 +585,11 @@ struct Shared {
     child: OnceLock<Arc<LineChild>>,
     next_id: AtomicU64,
     calls: Mutex<HashMap<u64, RpcCallback>>,
+    timeout: Duration,
     /// Set once the thread exists; lines before that are only RPC replies.
     session: OnceLock<SessionState>,
     /// Notifications that arrived before `session` was set, in wire order.
-    early: Mutex<Vec<(String, Value)>>,
+    early: Mutex<Vec<(String, Value, String)>>,
     exit: Mutex<Option<String>>,
 }
 
@@ -543,6 +603,8 @@ struct SessionState {
     turns_finished: AtomicU64,
     approvals: Mutex<HashMap<String, PendingApproval>>,
     cwd: PathBuf,
+    output_schema: Option<Value>,
+    effort: Option<String>,
 }
 
 impl Shared {
@@ -565,7 +627,7 @@ impl Shared {
     fn call(&self, method: &str, params: Value) -> Result<Value> {
         let (tx, rx) = flume::bounded(1);
         self.call_async(method, params, Box::new(move |result| drop(tx.send(result))))?;
-        match rx.recv_timeout(RPC_TIMEOUT) {
+        match rx.recv_timeout(self.timeout) {
             Ok(Ok(value)) => Ok(value),
             Ok(Err(message)) => Err(AgentError::Protocol(format!("codex {method}: {message}"))),
             Err(_) => Err(AgentError::Protocol(format!("codex did not answer {method} in time"))),
@@ -613,20 +675,48 @@ impl Shared {
                     match self.session.get() {
                         Some(session) => session,
                         None => {
-                            early.push((method.to_string(), params));
+                            early.push((method.to_string(), params, line.to_string()));
                             return;
                         }
                     }
                 };
-                self.on_notification(session, method, &params);
+                self.on_notification(session, method, &params, line);
             }
             (None, None) => {}
         }
     }
 
-    fn on_notification(&self, session: &SessionState, method: &str, params: &Value) {
-        let events = lock(&session.projector).notification(method, params);
-        let root = str_of(params, "threadId").is_none_or(|thread| thread == session.thread_id);
+    fn on_notification(&self, session: &SessionState, method: &str, params: &Value, line: &str) {
+        let (projected, path) = {
+            let mut projector = lock(&session.projector);
+            let projected = projector.project(method, params);
+            let path = projector.path(params);
+            if let Some(events) = &projected {
+                for (child_path, event) in events {
+                    if let EventKind::SubagentSpawned {
+                        parent_thread_id, thread_id, ..
+                    } = event
+                        && projector.recorded_children.insert(thread_id.clone())
+                    {
+                        session.core.child_session(parent_thread_id, thread_id, child_path);
+                    }
+                }
+                // Older record streams can relay a child's activity without a spawn.
+                // Keep their voyage marker separate from confirmed creation facts.
+                if let Some(child) = params.pointer("/subAgentActivity/agentThreadId").and_then(Value::as_str)
+                    && let Some(parent) = str_of(params, "threadId")
+                    && child != parent
+                    && !path.is_empty()
+                    && projector.recorded_children.insert(child.into())
+                {
+                    session.core.child_session(parent, child, &path);
+                }
+            }
+            (projected, path)
+        };
+        let root = path.is_empty();
+        let _frame = session.core.record_raw(method, path, line, params);
+        let Some(events) = projected else { return };
         if root && method == "turn/started" {
             let turn_id = params.pointer("/turn/id").and_then(Value::as_str).map(str::to_string);
             *lock(&session.turn_id) = turn_id.clone();
@@ -697,8 +787,8 @@ impl Shared {
                     },
                 );
             }
-            ServerRequest::Question { text } => {
-                session.core.emit_root(EventKind::Question { text });
+            ServerRequest::Question { agent_path, text } => {
+                session.core.emit(agent_path, EventKind::Question { text });
                 // Answered empty: the contract answers a question with the next prompt.
                 self.reply(id, Ok(json!({ "answers": {} })));
             }
@@ -707,6 +797,9 @@ impl Shared {
     }
 
     fn on_exit(&self, code: Option<i32>, stderr: String) {
+        if let Some(session) = self.session.get() {
+            session.core.observe_exit(self.child.get().and_then(|c| c.status()));
+        }
         let mut message = match code {
             Some(code) => format!("codex app-server exited with status {code}"),
             None => "codex app-server exited".to_string(),
@@ -766,6 +859,13 @@ impl CodexDriver {
 }
 
 impl Driver for CodexDriver {
+    fn read_subagent(&self, thread_id: &str, turn_id: Option<&str>) -> Result<crate::SubagentSnapshot> {
+        let reply = self
+            .shared
+            .call("thread/read", json!({"threadId":thread_id,"includeTurns":turn_id.is_some()}))?;
+        subagents::read_snapshot(&reply, thread_id, turn_id)
+    }
+
     fn check_content(&self, content: &[ContentBlock]) -> Result<()> {
         user_input(&self.session().cwd, content).map(|_| ())
     }
@@ -774,9 +874,16 @@ impl Driver for CodexDriver {
         let session = self.session();
         let input = user_input(&session.cwd, &content)?;
         let shared = self.shared.clone();
+        let mut params = json!({ "threadId": session.thread_id, "input": input });
+        if let Some(effort) = &session.effort {
+            params["effort"] = json!(effort);
+        }
+        if let Some(schema) = &session.output_schema {
+            params["outputSchema"] = schema.clone();
+        }
         self.shared.call_async(
             "turn/start",
-            json!({ "threadId": session.thread_id, "input": input }),
+            params,
             Box::new(move |result| {
                 let Some(session) = shared.session.get() else { return };
                 match result {
@@ -855,18 +962,25 @@ impl Driver for CodexDriver {
         Ok(())
     }
 
+    fn compact(&self) -> Result<()> {
+        self.shared
+            .call("thread/compact/start", json!({"threadId":self.session().thread_id}))
+            .map(|_| ())
+    }
     fn dispose(&self) {
         if let Some(child) = self.shared.child.get() {
             child.kill();
+            self.session().core.observe_exit(child.status());
         }
     }
 }
 
-fn connect(binary: &Path, cwd: &Path, env: &[(String, String)]) -> Result<Arc<Shared>> {
+fn connect(binary: &Path, cwd: &Path, opts: Option<&SessionOptions>) -> Result<Arc<Shared>> {
     let shared = Arc::new(Shared {
         child: OnceLock::new(),
         next_id: AtomicU64::new(1),
         calls: Mutex::new(HashMap::new()),
+        timeout: opts.and_then(|o| o.request_timeout).unwrap_or(RPC_TIMEOUT),
         session: OnceLock::new(),
         early: Mutex::new(Vec::new()),
         exit: Mutex::new(None),
@@ -885,7 +999,8 @@ fn connect(binary: &Path, cwd: &Path, env: &[(String, String)]) -> Result<Arc<Sh
             binary,
             args: vec!["app-server".into(), "--listen".into(), "stdio://".into()],
             cwd,
-            env,
+            env: opts.map_or(&[], |o| o.env.as_slice()),
+            options: opts,
             env_remove: &[],
         },
         on_line,
@@ -935,7 +1050,7 @@ impl Runtime for CodexRuntime {
 
     fn account_usage(&self) -> Result<AccountUsage> {
         let binary = require_binary(ID)?;
-        let shared = connect(&binary, &std::env::temp_dir(), &[])?;
+        let shared = connect(&binary, &std::env::temp_dir(), None)?;
         // Account first: an API-key login has no subscription windows, and
         // the rate-limit read would wrongly say to log in again.
         let account = shared.call("account/read", json!({})).ok();
@@ -961,7 +1076,7 @@ impl Runtime for CodexRuntime {
 
     fn list_models(&self) -> Result<Vec<ModelInfo>> {
         let binary = require_binary(ID)?;
-        let shared = connect(&binary, &std::env::temp_dir(), &[])?;
+        let shared = connect(&binary, &std::env::temp_dir(), None)?;
         let mut models = Vec::new();
         let mut cursor = Value::Null;
         let result = loop {
@@ -1002,17 +1117,11 @@ impl Runtime for CodexRuntime {
     /// Every `SessionOptions` field has a codex seam (see the module docs for
     /// `permission_mode`). A model codex does not end up running, or a
     /// `resume` id it does not know, fails the open before a session exists.
-    fn open(&self, opts: SessionOptions) -> Result<Arc<dyn Session>> {
-        check_cwd(&opts.cwd)?;
-        if !opts.disallowed_tools.is_empty() {
-            return Err(AgentError::Unsupported {
-                option: "disallowed_tools".into(),
-                reason: "codex has no setting that forbids single tools".into(),
-            });
-        }
-        let binary = require_binary(ID)?;
+    fn open(&self, mut opts: SessionOptions) -> Result<Arc<dyn Session>> {
+        opts.prepare(ID)?;
+        let binary = opts.binary(ID)?;
         let file = record::open_file(opts.record_to.as_deref())?;
-        let shared = connect(&binary, &opts.cwd, &opts.env)?;
+        let shared = connect(&binary, &opts.cwd, Some(&opts))?;
         let kill = |error: AgentError| {
             if let Some(child) = shared.child.get() {
                 child.kill();
@@ -1040,6 +1149,9 @@ impl Runtime for CodexRuntime {
         }
         let recorder = Recorder::start(file, ID, &thread_id, &opts.cwd, model.as_deref());
         let core = SessionCore::new(ID, &thread_id, recorder);
+        if opts.resume.is_some() {
+            core.resume_meter(&reply, "missing_codex_resume_baseline");
+        }
         core.emit_root(EventKind::SessionStarted {
             session_id: thread_id.clone(),
             model,
@@ -1054,11 +1166,13 @@ impl Runtime for CodexRuntime {
             turns_finished: AtomicU64::new(0),
             approvals: Mutex::new(HashMap::new()),
             cwd: opts.cwd.clone(),
+            output_schema: opts.output_schema.clone(),
+            effort: opts.effort.clone(),
         });
         if let Some(session) = shared.session.get() {
-            let held: Vec<(String, Value)> = std::mem::take(&mut *lock(&shared.early));
-            for (method, params) in held {
-                shared.on_notification(session, &method, &params);
+            let held: Vec<(String, Value, String)> = std::mem::take(&mut *lock(&shared.early));
+            for (method, params, line) in held {
+                shared.on_notification(session, &method, &params, &line);
             }
             let exited = lock(&shared.exit).clone();
             if let Some(message) = exited {

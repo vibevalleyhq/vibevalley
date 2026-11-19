@@ -9,21 +9,21 @@ export type PkmMarker = (typeof PkmMarkerValues)[number];
 export const PkmPriorityValues = ["A", "B", "C"] as const;
 export type PkmPriority = (typeof PkmPriorityValues)[number];
 
-export type PkmBlock = { id: string, parent?: string, depth: number, marker?: PkmMarker, priority?: PkmPriority, 
+export type PkmBlock = { id: string, parent?: string, depth: number, marker?: PkmMarker, priority?: PkmPriority,
 /**
  * Excludes marker and priority; continuation lines follow `\n`.
  */
-body: string, 
+body: string,
 /**
  * Excludes `id::`.
  */
 props: { [key in string]: string }, path: string, };
 
-export type PkmPageSummary = { slug: string, title: string, tier: PkmTier, 
+export type PkmPageSummary = { slug: string, title: string, tier: PkmTier,
 /**
  * Relative to vault root.
  */
-file: string, tldr: string, updated: number, open: number, 
+file: string, tldr: string, updated: number, open: number,
 /**
  * `YYYY-MM-DD` for journal pages; absent otherwise.
  */
@@ -33,7 +33,7 @@ export type PkmVault = { root: string, pages: Array<PkmPageSummary>, };
 
 export type PkmPage = { slug: string, title: string, tier: PkmTier, file: string, props: { [key in string]: string }, tldr: string, blocks: Array<PkmBlock>, updated: number, };
 
-export type PkmTransclusion = { block: string, found: boolean, 
+export type PkmTransclusion = { block: string, found: boolean,
 /**
  * True when the target block points back to its embedding ancestor chain.
  */
@@ -69,7 +69,7 @@ export type PkmBlockOp = { "op": "append", id?: string, body: string, marker?: P
 
 export type PkmMutation = { page: string, ops: Array<PkmBlockOp>, };
 
-export type PkmSearchRequest = { text?: string, tier?: PkmTier, marker?: PkmMarker, linkedTo?: string, 
+export type PkmSearchRequest = { text?: string, tier?: PkmTier, marker?: PkmMarker, linkedTo?: string,
 /**
  * Defaults to 10.
  */
@@ -77,7 +77,7 @@ limit?: number, };
 
 export type PkmSearchHit = { block: string, page: string, pageTitle: string, tier: PkmTier, marker?: PkmMarker, path: string, body: string, plain: string, score: number, children: Array<PkmBlock>, };
 
-export type PkmCaptureRequest = { text: string, 
+export type PkmCaptureRequest = { text: string,
 /**
  * Appends to the named page, or to today's journal as `LATER #inbox` when omitted.
  */
@@ -90,7 +90,7 @@ export type PkmSource = { page: string, title: string, markdown: string, updated
  */
 export type PkmSourceUpdate = { page: string, markdown: string, updated: number, };
 
-export type PkmJournalRequest = { 
+export type PkmJournalRequest = {
 /**
  * `YYYY-MM-DD`.
  */

@@ -208,9 +208,15 @@ fn shape_files() -> Vec<(String, String)> {
                 out.push_str(BRANDED);
                 out.push_str("\n\n");
             }
-            let decls: Vec<&str> = m.decls.iter().map(|d| d.text.as_str()).collect();
-            out.push_str(&decls.join("\n\n"));
-            out.push('\n');
+            for (i, decl) in m.decls.iter().enumerate() {
+                if i > 0 {
+                    out.push('\n');
+                }
+                for line in decl.text.lines() {
+                    out.push_str(line.trim_end());
+                    out.push('\n');
+                }
+            }
             (format!("packages/protocol/src/{}/shapes.gen.ts", m.name), out)
         })
         .collect()

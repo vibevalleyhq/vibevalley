@@ -12,11 +12,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::base::open_db_at;
+use crate::base::open_sqlx_db_at;
 use crate::modules::{issue::db as issue_db, session::db as session_db};
-use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
+use sqlx::SqliteConnection;
 use vibevalley_core::{Applied, Core, Refusal};
+use vibevalley_durable::Sqlite;
 use vibevalley_oar::PermissionMode;
 use vibevalley_protocol::{
     Assignment, Conflict, CriterionCheck, Execution, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome, Phase, PullRequest,
@@ -25,6 +26,8 @@ use vibevalley_protocol::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum BoardError {
+    #[error("durable: {0}")]
+    Durable(#[from] vibevalley_durable::Error),
     #[error("no issue {0}")]
     NoIssue(String),
     #[error("move refused: {0:?}")]
@@ -44,7 +47,7 @@ pub enum BoardError {
     #[error("git: {0}")]
     Git(#[from] vibevalley_git::GitError),
     #[error("store: {0}")]
-    Store(#[from] rusqlite::Error),
+    Store(#[from] sqlx::Error),
     #[error("{0}")]
     Other(String),
     /// A refusal already worded for the endpoint (from a `Drivers`).
@@ -193,21 +196,29 @@ pub enum IssueChange {
     /// The user's words answer its questions and take back a reviewer's pass.
     Answered,
     /// Accepted and delivered.
-    Delivered(Landing),
+    Delivered(Landing, Option<String>),
     /// Closed without delivering.
     Canceled(IssueCanceled),
     /// Merging it into `base` would conflict.
     Conflicted(Conflict),
     /// A child that could not merge into its parent: why, and the conflict
     /// when that was it.
-    Stuck { why: String, conflict: Option<Conflict> },
+    Stuck {
+        why: String,
+        conflict: Option<Conflict>,
+    },
     /// A child merged into its parent's branch; an acceptance child's files
     /// are frozen from now on.
-    MergedIntoParent { frozen: Option<Vec<String>> },
+    MergedIntoParent {
+        frozen: Option<Vec<String>>,
+    },
     /// The reviewer passed it; every finding is resolved.
-    Reviewed,
+    Reviewed(Option<vibevalley_protocol::ReviewRevision>),
+    ProjectChecked(vibevalley_protocol::ProjectCheckReceipt),
     /// The reviewer failed it with these findings (all of them, old and new).
-    Failed { findings: Vec<Finding> },
+    Failed {
+        findings: Vec<Finding>,
+    },
     /// A drafting session wrote it up.
     Drafted {
         title: String,
@@ -228,7 +239,10 @@ pub enum IssueChange {
     PullRequest(PullRequest),
     /// A session started working it: it leaves the queue, and a new worker
     /// is its current assignment's newest execution.
-    Started { session: String, worker: bool },
+    Started {
+        session: String,
+        worker: bool,
+    },
 }
 
 impl IssueChange {
@@ -256,7 +270,10 @@ impl IssueChange {
                 t.reviewed_at = None;
                 t.queued_at = Some(at);
             }
-            IssueChange::Delivered(landing) => {
+            IssueChange::Delivered(landing, commit) => {
+                if let Some(id) = commit {
+                    t.delivery_evidence.get_or_insert_with(Default::default).merged_commit = Some(id);
+                }
                 t.delivered = Some(landing);
                 t.closed_at = Some(at);
                 t.conflict = None;
@@ -287,7 +304,16 @@ impl IssueChange {
                 t.conflict = None;
                 t.questions.clear();
             }
-            IssueChange::Reviewed => {
+            IssueChange::ProjectChecked(receipt) => {
+                t.delivery_evidence.get_or_insert_with(Default::default).check = Some(receipt);
+            }
+            IssueChange::Reviewed(revision) => {
+                if let Some(revision) = revision {
+                    let evidence = t.delivery_evidence.get_or_insert_with(Default::default);
+                    if evidence.reviews.last().is_none_or(|r| r.revision != revision) {
+                        evidence.reviews.push(vibevalley_protocol::CodeReview { at, revision });
+                    }
+                }
                 t.reviewed_at = Some(at);
                 for f in &mut t.findings {
                     f.resolved = true;
@@ -348,8 +374,9 @@ impl IssueChange {
 /// What opening found that the board must still settle.
 #[derive(Default)]
 pub struct Opened {
-    /// Sessions that were working when the last process ended.
-    pub interrupted: Vec<String>,
+    /// Sessions and their interrupted runs for the work log.
+    pub interrupted: Vec<(String, String)>,
+    pub recoverable: Vec<String>,
     /// Issues whose session's worktree is gone.
     pub lost: Vec<String>,
     /// Drafting sessions cut short.
@@ -357,7 +384,8 @@ pub struct Opened {
 }
 
 pub struct Ledger {
-    db: Mutex<Connection>,
+    pub(crate) durable: vibevalley_durable::Store,
+    db: Mutex<SqliteConnection>,
     facts: Arc<dyn Facts>,
     /// Held across every apply and every read-modify-apply of an issue.
     write: Mutex<()>,
@@ -365,14 +393,16 @@ pub struct Ledger {
     subscribers: Mutex<Vec<(flume::Sender<Frame>, flume::Receiver<Frame>)>>,
 }
 
-fn database(path: &Path) -> Result<Connection> {
-    let db = open_db_at(path)?;
-    db.execute_batch(issue_db::SCHEMA)?;
-    db.execute_batch(session_db::SCHEMA)?;
-    Ok(db)
+fn database(path: &Path) -> Result<SqliteConnection> {
+    Ok(pollster::block_on(async {
+        let mut db = open_sqlx_db_at(path).await?;
+        sqlx::raw_sql(issue_db::SCHEMA).execute(&mut db).await?;
+        sqlx::raw_sql(session_db::SCHEMA).execute(&mut db).await?;
+        Ok::<_, sqlx::Error>(db)
+    })?)
 }
 
-fn load(db: &Connection) -> Result<(Vec<Session>, Vec<Issue>)> {
+fn load(db: &Sqlite<'_>) -> Result<(Vec<Session>, Vec<Issue>)> {
     Ok((session_db::all(db)?, issue_db::all(db)?))
 }
 
@@ -387,7 +417,7 @@ impl Ledger {
     /// The board as stored, without taking it: for reading while another
     /// process holds it.
     pub fn snapshot(path: &Path) -> Result<Frame> {
-        let (sessions, issues) = load(&database(path)?)?;
+        let (sessions, issues) = load(&Sqlite::new(&mut database(path)?))?;
         let facts = LocalFacts::default();
         facts.apply(loaded(sessions, issues));
         Ok(facts.frame())
@@ -397,37 +427,69 @@ impl Ledger {
     /// it rests now, its run counted. A session whose worktree is gone is
     /// dropped and its issue listed as lost.
     pub fn open(path: &Path, facts: Arc<dyn Facts>) -> Result<(Ledger, Opened)> {
-        let db = database(path)?;
+        let mut conn = database(path)?;
+        let db = Sqlite::new(&mut conn);
+        let durable = vibevalley_durable::Store::open(path)?;
+        let extras = session_db::extras(&db)?;
         let (stored, issues) = load(&db)?;
         let mut sessions = Vec::new();
         let mut opened = Opened::default();
         for mut session in stored {
-            if session.worktree.as_deref().is_some_and(|w| !Path::new(w).exists()) {
-                session_db::put(&db, &session, true)?;
-                opened.lost.extend(session.issue.clone());
-                continue;
-            }
-            if session.refining {
+            let lost = session.worktree.as_deref().is_some_and(|w| !Path::new(w).exists());
+            if !lost && session.refining {
                 opened.drafts.push(session.id.clone());
             }
-            if session.phase.is_working() {
-                opened.interrupted.push(session.id.clone());
+            if session.phase.is_working()
+                && !lost
+                && !session.refining
+                && session.runtime == vibevalley_oar::vibevalley::ID
+                && let Some(extra) = extras.get(&session.id)
+                && let (Some(run), Some(vendor)) = (extra.run.as_deref(), extra.agent_session.as_deref())
+                && durable
+                    .read(|tx| tx.submission_by_request(&vibevalley_agent::generation::workers::worker_conversation(vendor), &format!("work:{run}")))?
+                    .is_some()
+            {
+                opened.recoverable.push(session.id.clone());
+            } else if session.phase.is_working() {
+                let at = now();
+                let summary = "Interrupted: VibeValley was closed while it worked";
+                if let Some(children) = &mut session.subagents {
+                    children.disconnected_at.get_or_insert(at);
+                }
                 session.phase = Phase::resting();
                 session.runs += 1;
-                session.last_run = Some(LastRun {
-                    outcome: Outcome::Interrupted,
-                    summary: "Interrupted: VibeValley was closed while it worked".into(),
-                    at: now(),
-                    spent: None,
-                    answer: None,
-                });
-                session_db::put(&db, &session, false)?;
+                let run = durable.write(|tx| {
+                    let recovery = crate::modules::session::interrupt_on_reopen(tx, &session, extras.get(&session.id), at, summary)?;
+                    session.last_run = Some(LastRun {
+                        needs_reconciliation: recovery.as_ref().is_some_and(|(_, needed)| *needed),
+                        outcome: Outcome::Interrupted,
+                        summary: summary.into(),
+                        at,
+                        spent: None,
+                        answer: None,
+                    });
+                    if let Some(children) = &session.subagents {
+                        session_db::put_subagents(tx.connection(), children)?;
+                    }
+                    session_db::put(tx.connection(), &session, lost)?;
+                    Ok(recovery.map(|(id, _)| id))
+                })?;
+                if let Some(run) = run {
+                    opened.interrupted.push((session.id.clone(), run));
+                }
+            } else if lost {
+                session_db::put(&db, &session, true)?;
             }
-            sessions.push(session);
+            if lost {
+                opened.lost.extend(session.issue);
+            } else {
+                sessions.push(session);
+            }
         }
         facts.apply(loaded(sessions, issues));
         let ledger = Ledger {
-            db: Mutex::new(db),
+            durable,
+            db: Mutex::new(conn),
             facts,
             write: Mutex::new(()),
             subscribers: Mutex::new(Vec::new()),
@@ -435,8 +497,8 @@ impl Ledger {
         Ok((ledger, opened))
     }
 
-    pub(crate) fn database<R>(&self, query: impl FnOnce(&Connection) -> rusqlite::Result<R>) -> Result<R> {
-        Ok(query(&lock(&self.db))?)
+    pub(crate) fn database<R>(&self, query: impl FnOnce(&Sqlite<'_>) -> sqlx::Result<R>) -> Result<R> {
+        Ok(query(&Sqlite::new(&mut lock(&self.db)))?)
     }
 
     pub fn frame(&self) -> Frame {
@@ -485,7 +547,7 @@ impl Ledger {
     /// Stores `facts`, folds them in as one commit and tells the subscribers.
     pub fn apply(&self, facts: Vec<Fact>) -> Result<()> {
         let _write = lock(&self.write);
-        self.apply_locked(facts)
+        self.apply_locked(facts, |_| Ok(()))
     }
 
     /// `change` made to issue `id`; the issue as it is after.
@@ -496,33 +558,48 @@ impl Ledger {
     /// `change` made to issue `id`, committed as the facts `batch` makes
     /// around the issue's own.
     pub fn change_with(&self, id: &str, change: IssueChange, batch: impl FnOnce(Fact) -> Vec<Fact>) -> Result<Issue> {
+        self.change_commit(id, change, batch, |_| Ok(()))
+    }
+
+    pub(crate) fn change_commit(
+        &self,
+        id: &str,
+        change: IssueChange,
+        batch: impl FnOnce(Fact) -> Vec<Fact>,
+        also: impl FnOnce(&mut vibevalley_durable::Tx<'_>) -> vibevalley_durable::Result<()>,
+    ) -> Result<Issue> {
         let id = {
             let _write = lock(&self.write);
             let mut issue = self.issue(id).ok_or_else(|| BoardError::NoIssue(id.into()))?;
             let at = now();
             change.fold(&mut issue, at);
             let id = issue.id.clone();
-            self.apply_locked(batch(Fact::issue_changed(at, issue)))?;
+            self.apply_locked(batch(Fact::issue_changed(at, issue)), also)?;
             id
         };
         self.issue(&id).ok_or(BoardError::NoIssue(id))
     }
 
-    fn apply_locked(&self, facts: Vec<Fact>) -> Result<()> {
+    fn apply_locked(&self, facts: Vec<Fact>, also: impl FnOnce(&mut vibevalley_durable::Tx<'_>) -> vibevalley_durable::Result<()>) -> Result<()> {
         let mut prospective = self.state();
-        {
-            let mut db = lock(&self.db);
-            let tx = db.transaction()?;
+        self.durable.write(|write| {
+            also(write)?;
+            let tx = write.connection();
             for fact in &facts {
                 match fact {
-                    Fact::IssueChanged(vibevalley_protocol::FactIssueChanged { issue, .. }) => issue_db::put(&tx, issue)?,
-                    Fact::IssueRemoved(vibevalley_protocol::FactIssueRemoved { id, .. }) => issue_db::remove(&tx, id)?,
+                    Fact::IssueChanged(vibevalley_protocol::FactIssueChanged { issue, .. }) => issue_db::put(tx, issue)?,
+                    Fact::IssueRemoved(vibevalley_protocol::FactIssueRemoved { id, .. }) => issue_db::remove(tx, id)?,
+                    Fact::SessionSubagentsChanged(f) => {
+                        if let Some(summary) = &f.subagents {
+                            session_db::put_subagents(tx, summary)?;
+                        }
+                    }
                     Fact::SessionLeft(vibevalley_protocol::FactSessionLeft { id, closed, at, .. }) => {
                         if let Some(mut past) = prospective.sessions.iter().find(|s| &s.id == id).cloned() {
                             if let Some(closed) = closed {
                                 past.phase = Phase::Closed(vibevalley_protocol::PhaseClosed { at: *at, closed: *closed });
                             }
-                            session_db::put(&tx, &past, true)?;
+                            session_db::put(tx, &past, true)?;
                         }
                     }
                     _ => {}
@@ -537,11 +614,16 @@ impl Ledger {
                 if let Some(id) = id
                     && let Some(session) = prospective.sessions.iter().find(|s| &s.id == id)
                 {
-                    session_db::put(&tx, session, false)?;
+                    session_db::put(tx, session, false)?;
                 }
             }
-            tx.commit()?;
-        }
+            Ok(())
+        })?;
+        self.publish(facts);
+        Ok(())
+    }
+
+    fn publish(&self, facts: Vec<Fact>) {
         let applied = self.facts.apply(facts);
         let mut subscribers = lock(&self.subscribers);
         if !applied.transitions.is_empty() && !subscribers.is_empty() {
@@ -551,7 +633,55 @@ impl Ledger {
                 !matches!(tx.try_send(frame.clone()), Err(flume::TrySendError::Disconnected(_)))
             });
         }
+    }
+
+    pub(crate) fn update_subagents(
+        &self,
+        session_id: &str,
+        run: &str,
+        root: &str,
+        observe: impl FnOnce(&Session) -> Option<vibevalley_protocol::FactSessionSubagentsChanged>,
+    ) -> Result<()> {
+        let _write = lock(&self.write);
+        let Some(fact) = self.session(session_id).as_ref().and_then(observe) else {
+            return Ok(());
+        };
+        let current = self.durable.write(|tx| {
+            let db = tx.connection();
+            let active = session_db::active_run(db, session_id, run, root)?;
+            if active && let Some(summary) = &fact.subagents {
+                session_db::put_subagents(db, summary)?;
+            }
+            Ok(active)
+        })?;
+        if current {
+            self.publish(vec![Fact::SessionSubagentsChanged(fact)]);
+        }
         Ok(())
+    }
+
+    pub(crate) fn reconcile_subagents(
+        &self,
+        session: &str,
+        before: &vibevalley_protocol::SessionSubagents,
+        after: vibevalley_protocol::SessionSubagents,
+    ) -> Result<()> {
+        let _write = lock(&self.write);
+        let stored = self.database(|db| session_db::run(db, &before.run))?;
+        if !stored.is_some_and(|r| r.session == session && r.subagents.as_ref() == Some(before)) {
+            return Ok(());
+        }
+        if self.session(session).is_some_and(|s| s.subagents.as_ref() == Some(before)) {
+            let fact = vibevalley_protocol::FactSessionSubagentsChanged {
+                at: now(),
+                id: session.into(),
+                subagents: Some(after),
+            };
+            self.apply_locked(vec![Fact::SessionSubagentsChanged(fact)], |_| Ok(()))
+        } else {
+            self.durable.write(|tx| Ok(session_db::put_subagents(tx.connection(), &after)?))?;
+            Ok(())
+        }
     }
 
     /// The next number of `counter`, above `at_least`.

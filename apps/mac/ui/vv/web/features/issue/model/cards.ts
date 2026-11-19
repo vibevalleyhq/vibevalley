@@ -4,7 +4,8 @@ import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle,
 
 import { ago, tookText } from "../../../base/format";
 import { matches } from "../../../base/search";
-import { endedAt, assignedOnDuty, issueSession, issueTag, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
+import { describeSubagents } from "../../session/subagents";
+import { endedAt, assignedOnDuty, issueSession, issueTag, needsWorktreeCheck, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
 
@@ -155,6 +156,7 @@ interface CardLook {
   priority?: Priority;
   flags: { text: string; tone: Tone }[];
   detail: string;
+  wait?: string;
   progress?: { done: number; total: number };
 }
 
@@ -209,6 +211,9 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
             : t(`shared.stage.${st.state}`),
           tone: stageTone[st.state],
         });
+      if (tagOpen(tag) && needsWorktreeCheck(now0)) {
+        flags.unshift({ text: t("web.issue.run.reconcile"), tone: "wheat" });
+      }
       if (issue.canceled === "lost") flags.push({ text: t("web.issue.card.lost"), tone: "berry" });
       if (issue.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       lines.push(head.name);
@@ -228,11 +233,18 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       );
       const said = now0.lastRun?.summary;
       if (tag === "waiting" && said) lines.push(said);
+      const wait = session?.subagents?.waits.length
+        ? describeSubagents(session.subagents)
+            .waits.map((entry) => entry.text)
+            .join(" · ")
+        : undefined;
+      if (wait) lines.push(wait);
       if (!tagOpen(tag)) lines.push(`${tagText(issue)} · ${ago(issue.closedAt ?? endedAt(head) ?? head.hiredAt, now)}`);
       return omitUndefined({
         number: numberOf(issue),
         title: shortTitle(issueTitle(issue, issues)),
         status: issue.status,
+        wait,
         statusTone: issue.canceled === "lost" ? ("berry" as const) : undefined,
         priority: issue.priority,
         flags,

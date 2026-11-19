@@ -53,13 +53,25 @@
 - **边界解码一次，门内全是类型**：HTTP 的入参经 `decode`（`crates/vibevalley-server/src/lib.rs`，serde）按端点的类型解成结构体，解不开当场拒绝；文件、厂商响应、模型给的工具参数各在进门处解成结构体和 enum。门内不传 `serde_json::Value`，不按字符串分支。
 - **钥匙是 `Secret`**：`settings.json` 里的钥匙读成 `Secret`（`crates/vibevalley-server/src/modules/setting.rs`），打印只出提示。
 - **拒绝带 `BizCode`**：对调用方的拒绝是 `ApiError`（带 `bizCode` 与 `next`），网关写成全信封；模块内部可分辨的失败是 `thiserror` 的 enum；预期的结果（合进去或冲突）返回 enum，不当错误。
-- **普通线程，不进异步运行时**：模块的方法都是阻塞的，后台的活是 `std::thread` 加 `flume` 通道；只有 HTTP（axum）在 tokio 上，经 `vibevalley-server-api` 的 `Server` trait 调进来。
+- **同步领域接口，异步适配器**。领域模块保留同步接口。HTTP 由 axum 和 Tokio 驱动，MCP 客户端共享专用运行时。SQLx 的 SQLite 工作线程执行查询。宿主把可能等待写锁的工作放在后台线程。
 
 ### 契约、规则和数据库
 
 - **契约以 Rust 为源，生成 TS**：`crates/vibevalley-protocol/src/contract/` 的类型是数据源，`vp run protocol:ts` 写出 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`，`cargo test` 里的 `tests/typescript.rs` 查最新；页面在边界解码用的 Zod Schema 与 `api.ts` 手写，由 `schema.test.ts`、`api.test.ts` 对着生成物查。词典在 `crates/vibevalley-i18n/locales/`，`vp run i18n:gen` 写出 TS 目录。
 - **生成文件不手改**：`packages/protocol` 的 `*.gen.ts`、`packages/protocol/src/client.ts`、`packages/i18n/src/catalogs.ts`、[capabilities.md](docs/reference/capabilities.md) 由脚本生成并有检查。
-- **服务端共用一个 SQLite 库**：工单、会话、每轮、频道、记性、笔记、Artifact、媒体等各模块的表在 `server.db`，每个模块在自己的 `db.rs` 或模块文件里 `create table if not exists`。时间存整数毫秒。`vibevalley-store` 只供原生外壳保存项目、终端与布局。
+- **SQLite 按连接范围分工。** 宿主 `state.db` 保存项目、布局、终端和设置。服务端业务模块共用 `server.db`。各模块用同一份 SQL 定义运行时表结构和查询生成时的输入。[sqlc 配置](sqlc.yaml)
+- **sqlc 检查 SQL，SQLx 执行查询。** sqlc 通过标准输入把命名查询的 JSON 发给本仓库的进程插件。插件按参数编号绑定值，并用 sqlc 标注的列名、类型和可空性生成 Rust 行类型。SQLite 的 `INTEGER`、`TEXT`、`REAL`、`BLOB` 分别映射为 `i64`、`String`、`f64`、`Vec<u8>`。可空列使用 `Option<T>`。不支持的类型或命令使生成失败。[生成器](scripts/gen/sqlc-rust/generate.ts) · [官方插件协议](https://docs.sqlc.dev/en/latest/guides/plugins.html)
+- **调用方持有事务。** 生成函数接受 SQLx 连接池或调用方的连接。`:one` 查不到记录时返回 `RowNotFound`，`:many` 返回列表，`:exec` 成功时返回 `()`，`:execrows` 返回受影响行数。领域模块决定何时提交，并将数据库行转换为业务类型。[宿主调用点](crates/vibevalley-store/src/lib.rs) · [事务回归](scripts/gen/sqlc-rust/smoke.rs)
+- **工单结算与持久执行共用写连接**：账本把工单事实、轮次和待投递结果写入调用方的 SQLx 事务。一次业务写入占用一个保存点。外层批次提交成功后，服务才发布订阅通知。保存点回滚只撤销这一次写入。磁盘库用独立的只读连接查询已提交快照。[事务](crates/vibevalley-durable/src/store.rs) · [工单账本](crates/vibevalley-server/src/modules/ledger.rs)
+
+**提交耗时。** 在同一台 Apple Silicon Mac 上，release 构建用临时 WAL 库测量文档写入。每个并发线程写自己的文档 60 次，等待每次提交回执。两种驱动交错运行 11 轮。表中为各轮总延迟 p95 的中位数，单位为微秒。这个负载只覆盖持久写入。执行 `cargo run --release -p vibevalley-durable --example commit_latency` 可分别看到进入回调、执行回调和等待回执的耗时。[基准程序](crates/vibevalley-durable/examples/commit_latency.rs)
+
+| 并发写者 | 原 rusqlite 批提交 | SQLx 批提交 |
+| --- | --- | --- |
+| 1 | 42 | 90 |
+| 3 | 276 | 509 |
+| 6 | 754 | 1027 |
+
 - **内部不留兼容**：改表直接改建表语句，不写迁移。
 
 ### 测试金字塔
@@ -86,7 +98,7 @@
 
 ## 怎么走
 
-**新增或修改表**：改模块里的建表语句和查询，跑 `cargo test -p vibevalley-server`。
+**新增或修改表。** 改模块的建表语句和命名查询，按开发指南重新生成绑定，再运行所属 crate 的测试。[开发指南](docs/development.md)
 
 **新增或修改接口**
 

@@ -86,13 +86,13 @@ fn a_sent_issue_keeps_what_was_asked_and_its_runs_make_the_timeline() {
     assert_eq!(renamed.title, "Make f now");
 
     // Failing needs words; failing with findings sends another round.
-    assert!(w.board.review(&issue.id, false, &[], "").is_err());
-    w.board.review(&issue.id, false, &["it is wrong".into()], "").unwrap();
+    assert!(w.board.review(&issue.id, false, &[], "", None).is_err());
+    w.board.review(&issue.id, false, &["it is wrong".into()], "", None).unwrap();
     let back = wait_issue(&w.board, &issue.id, "second round handed back", |i| {
         i.stage.state == StageKind::Reviewing && i.findings.len() == 1
     });
     assert!(!back.findings[0].resolved);
-    let passed = w.board.review(&issue.id, true, &[], "").unwrap();
+    let passed = w.board.review(&issue.id, true, &[], "", None).unwrap();
     assert!(passed.reviewed_at.is_some() && passed.findings[0].resolved);
 
     let runs = w.board.runs(&issue.id).unwrap();

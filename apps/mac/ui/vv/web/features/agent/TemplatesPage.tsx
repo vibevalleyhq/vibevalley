@@ -86,6 +86,21 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
   const orchestrator = () => template().role === "orchestrator";
   // An orchestrator runs in the server itself; a helper's runtime may be missing from this machine.
   const here = () => orchestrator() || props.runtime?.installation.status === "available";
+  const runtimeNote = () => {
+    const runtime = runtimeName(props.runtimes, template().runtime);
+    if (orchestrator()) return t("web.agent.templates.onServer");
+    const install = props.runtime?.installation;
+    switch (install?.status) {
+      case "available":
+        return t("web.agent.templates.runsOn", { runtime });
+      case "checking":
+        return t("web.runtime.checking");
+      case "unsupported":
+        return install.signInCommand ? t("web.runtime.signedOut", { runtime }) : t("web.runtime.unsupportedWhy", { why: install.reason });
+      default:
+        return t("web.agent.templates.notHere", { runtime });
+    }
+  };
   const install = () => {
     const id = template().id;
     return act.run(async () => {
@@ -127,13 +142,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
               {t("web.agent.templates.skills", { skills: list(skills().map((s) => s.name)) })}
             </Text>
           </If>
-          <Text class={`text-xs ${here() ? "text-muted" : "text-warn-ink"}`}>
-            {orchestrator()
-              ? t("web.agent.templates.onServer")
-              : here()
-                ? t("web.agent.templates.runsOn", { runtime: runtimeName(props.runtimes, template().runtime) })
-                : t("web.agent.templates.notHere", { runtime: runtimeName(props.runtimes, template().runtime) })}
-          </Text>
+          <Text class={`text-xs ${here() ? "text-muted" : "text-warn-ink"}`}>{runtimeNote()}</Text>
         </View>
       </View>
       <If when={open()}>

@@ -419,14 +419,19 @@ fn acp_updates_project_text_tools_and_file_changes() {
 
 #[test]
 fn login_status_is_read_from_each_cli() {
-    use crate::claude::claude_logged_in;
-    use crate::codex::codex_logged_in;
-    assert!(claude_logged_in(true, r#"{"loggedIn": true, "authMethod": "claude.ai"}"#));
-    assert!(!claude_logged_in(true, r#"{"loggedIn": false}"#));
-    assert!(!claude_logged_in(false, "error: something"));
-    assert!(codex_logged_in(true, "Logged in using ChatGPT\n"));
-    assert!(!codex_logged_in(false, "Not logged in\n"));
-    assert!(!codex_logged_in(true, "Not logged in\n"));
+    use crate::{claude::claude_login_status, codex::codex_login_status, process::LoginStatus};
+    assert_eq!(
+        claude_login_status(true, r#"{"loggedIn": true, "authMethod": "claude.ai"}"#),
+        LoginStatus::SignedIn
+    );
+    assert_eq!(claude_login_status(true, r#"{"loggedIn": false}"#), LoginStatus::SignedOut);
+    assert_eq!(claude_login_status(false, "error: something"), LoginStatus::Unknown);
+    assert_eq!(codex_login_status(true, "Logged in using ChatGPT\n"), LoginStatus::SignedIn);
+    assert_eq!(codex_login_status(false, "Not logged in\n"), LoginStatus::SignedOut);
+    assert_eq!(codex_login_status(true, "Not logged in\n"), LoginStatus::SignedOut);
+    assert_eq!(codex_login_status(false, "connection reset"), LoginStatus::Unknown);
+    assert_eq!(claude_login_status(false, r#"{"loggedIn":false}"#), LoginStatus::SignedOut);
+    assert_eq!(claude_login_status(false, "connection reset"), LoginStatus::Unknown);
 }
 
 #[test]
@@ -638,21 +643,25 @@ fn session_options_reach_claude_and_codex() {
         ],
         ..opts()
     };
-    let args = crate::claude::launch_args("s1", &opts);
+    let launch = crate::claude::claude_launch("s1", &opts).unwrap();
+    let args = &launch.args;
     let after = |flag: &str| args.iter().position(|a| a == flag).map(|i| args[i + 1].clone());
     assert_eq!(after("--effort").as_deref(), Some("high"));
     assert_eq!(after("--system-prompt").as_deref(), Some("own"));
-    let config: Value = serde_json::from_str(&after("--mcp-config").unwrap()).unwrap();
+    let config: Value = serde_json::from_slice(&std::fs::read(after("--mcp-config").unwrap()).unwrap()).unwrap();
     assert_eq!(config["mcpServers"]["fs"]["command"], "mcp-fs");
     assert_eq!(config["mcpServers"]["web"]["type"], "http");
     assert_eq!(config["mcpServers"]["web"]["headers"]["Authorization"], "Bearer t");
-    assert_eq!(&args[args.len() - 2..], ["Bash", "Write"]);
+    assert_eq!(after("--disallowed-tools").as_deref(), Some("Bash"));
+    assert!(args.contains(&"Write".into()));
+    assert!(!args.iter().any(|a| a.contains("Bearer t")));
 
     let (_, params) = crate::codex::open_request(&opts);
     assert_eq!(params["baseInstructions"], "own");
     assert_eq!(params["config"]["model_reasoning_effort"], "high");
-    assert_eq!(params["config"]["mcp_servers.fs"]["args"][0], "/tmp");
-    assert_eq!(params["config"]["mcp_servers.web"]["http_headers"]["Authorization"], "Bearer t");
+    assert_eq!(params["config"]["disallowed_tools"], serde_json::json!(["Bash", "Write"]));
+    assert_eq!(params["config"]["mcp_servers"]["fs"]["args"][0], "/tmp");
+    assert_eq!(params["config"]["mcp_servers"]["web"]["http_headers"]["Authorization"], "Bearer t");
 }
 
 #[test]
@@ -716,4 +725,66 @@ fn account_usage_as_oar_projects_it() {
         .unwrap(),
         serde_json::json!({ "kind": "reauth_required", "reason": "not_authenticated" })
     );
+}
+
+#[test]
+fn regression_only_root_usage_reported_in_this_turn_is_charged() {
+    use serde_json::json;
+    let core = crate::core::SessionCore::new("qwen", "meter", None);
+    let rx = core.subscribe(false);
+    let turn = |root: Option<Value>, child: Option<Value>| {
+        core.begin_turn("run").unwrap();
+        for (path, payload) in [(vec![], root), (vec!["child".into()], child)] {
+            if let Some(payload) = payload {
+                let msg = json!({"type":"result","usage":payload});
+                drop(core.record_raw("result", path, &msg.to_string(), &msg));
+            }
+        }
+        core.emit_root(EventKind::TurnFinished {
+            reason: StopReason::Completed,
+            usage: Usage::default(),
+        });
+        loop {
+            if let EventKind::TurnFinished { usage, .. } = rx.recv_timeout(Duration::from_secs(2)).unwrap().kind {
+                break (usage.input_tokens, usage.output_tokens);
+            }
+        }
+    };
+    assert_eq!(
+        turn(
+            Some(json!({"input_tokens":30,"output_tokens":12})),
+            Some(json!({"input_tokens":999,"output_tokens":88}))
+        ),
+        (Some(30), Some(12))
+    );
+    assert_eq!(turn(None, None), (None, None));
+    assert_eq!(turn(Some(json!({"input_tokens":35})), None), (None, None));
+    assert_eq!(turn(Some(json!({"input_tokens":2,"output_tokens":0})), None), (Some(2), Some(0)));
+    assert_eq!(turn(None, Some(json!({"input_tokens":100,"output_tokens":50}))), (None, None));
+}
+
+#[test]
+fn regression_cumulative_usage_requires_a_known_preceding_turn_boundary() {
+    let core = crate::core::SessionCore::new("claude", "cumulative", None);
+    let events = core.subscribe(false);
+    let turn = |totals: Option<(u64, u64)>| {
+        core.begin_turn("work").unwrap();
+        if let Some((input, output)) = totals {
+            let frame = serde_json::json!({"type":"result","modelUsage":{"model":{"inputTokens":input,"outputTokens":output}}});
+            drop(core.record_raw("result", vec![], &frame.to_string(), &frame));
+        }
+        core.emit_root(EventKind::TurnFinished {
+            reason: StopReason::Completed,
+            usage: Usage::default(),
+        });
+        loop {
+            if let EventKind::TurnFinished { usage, .. } = events.recv_timeout(Duration::from_secs(2)).unwrap().kind {
+                break (usage.input_tokens, usage.output_tokens);
+            }
+        }
+    };
+    assert_eq!(turn(Some((8, 2))), (Some(8), Some(2)));
+    assert_eq!(turn(None), (None, None));
+    assert_eq!(turn(Some((21, 6))), (None, None));
+    assert_eq!(turn(Some((24, 7))), (Some(3), Some(1)));
 }

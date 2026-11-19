@@ -39,6 +39,8 @@
   - 每次召回最多 8 条、总长不超过 1600 字（其中 `issue` 类最多 3 条）。
 - **出站强制脱敏**：离开本机的文本先经 `vibevalley-memory` 的脱敏抹掉密钥。
 
+整理档案笔记时，服务在一笔 SQLx 事务中替换 agent 写下的笔记。用户写下的笔记保留。若任一条新笔记未能写入，整组笔记恢复原值。[命名查询](crates/vibevalley-server/src/modules/memory/sql/queries.sql) · [回滚回归](crates/vibevalley-server/tests/memory.rs)
+
 ## 怎么走
 
 1. **新回合召回**：开会话（`crates/vibevalley-server/src/modules/agent/drive.rs`）时传入任务文本，召回的拼入 `【你记得的】`。

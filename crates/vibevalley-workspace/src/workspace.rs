@@ -27,7 +27,7 @@ pub trait TerminalHandle: Clone + Send + 'static {
 
 impl TerminalHandle for vibevalley_terminal::TermSession {
     fn cwd(&self) -> Option<PathBuf> {
-        vibevalley_terminal::TermSession::cwd(self)
+        self.local_cwd().or_else(|| vibevalley_terminal::TermSession::cwd(self))
     }
     fn scrollback_text(&self, max_lines: usize) -> String {
         vibevalley_terminal::TermSession::scrollback_text(self, max_lines)
@@ -101,7 +101,13 @@ impl<T: TerminalHandle> OpenProject<T> {
         let referenced = layout.terminal_ids();
         restorable.retain(|id, _| referenced.contains(id));
         if layout.tabs().next().is_none() {
-            layout.add_tab(None, PaneKind::Terminal { terminal_id: new_id() });
+            layout.add_tab(
+                None,
+                PaneKind::Terminal {
+                    terminal_id: new_id(),
+                    link: None,
+                },
+            );
         }
         OpenProject {
             info: loaded.info,
@@ -122,7 +128,13 @@ impl<T: TerminalHandle> OpenProject<T> {
     /// Adds a terminal tab; the session itself is attached once spawned.
     pub fn new_terminal_tab(&mut self) -> (String, crate::layout::TabId) {
         let id = new_id();
-        let tab = self.layout.add_tab(None, PaneKind::Terminal { terminal_id: id.clone() });
+        let tab = self.layout.add_tab(
+            None,
+            PaneKind::Terminal {
+                terminal_id: id.clone(),
+                link: None,
+            },
+        );
         (id, tab)
     }
 
@@ -136,6 +148,10 @@ impl<T: TerminalHandle> OpenProject<T> {
 
     pub fn terminals(&self) -> impl Iterator<Item = &TerminalEntry<T>> {
         self.terminals.values()
+    }
+
+    pub fn saved_terminal(&self, id: &str) -> Option<&SavedTerminal> {
+        self.restorable.get(id)
     }
 
     /// Saved state for a terminal that has not been respawned yet. Taking it
@@ -170,7 +186,7 @@ impl<T: TerminalHandle> OpenProject<T> {
     /// Closes a tab and releases whatever session it owned.
     pub fn close_tab(&mut self, tab: crate::layout::TabId) -> Option<PaneKind> {
         let kind = self.layout.close_tab(tab)?;
-        if let PaneKind::Terminal { terminal_id } = &kind {
+        if let PaneKind::Terminal { terminal_id, .. } = &kind {
             self.drop_terminal(terminal_id);
         }
         Some(kind)

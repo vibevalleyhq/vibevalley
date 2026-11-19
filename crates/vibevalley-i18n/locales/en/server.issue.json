@@ -17,6 +17,8 @@
   "roundNeedsWords": "Another round needs a few words: what it should do this round",
   "closed": "This ticket is closed",
   "cannotDelete": "Ticket #{n} cannot be deleted yet: {why}",
+  "verifyDelivery": "Verify whether the target branch contains candidate commit {commit}.",
+  "reviewChanged": "The changes have moved. Review the latest diff before accepting this delivery.",
   "nothingToAccept": "Nothing has been handed back yet, so there is nothing to accept",
   "failNeedsFindings": "Failing the acceptance needs what is wrong: write at least one point",
   "does": {

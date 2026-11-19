@@ -54,7 +54,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
                 .map(|t| {
                     let mut v = json!({ "id": t.id, "kind": serde_json::to_value(&t.kind).unwrap_or(Value::Null), "title": tab_title(shell, t, cx) });
                     match &t.kind {
-                        PaneKind::Terminal { terminal_id } => {
+                        PaneKind::Terminal { terminal_id, .. } => {
                             if let Some(slot) = shell.terminals.get(terminal_id) {
                                 let view = slot.view.read(cx);
                                 v["spawned"] = json!(view.session().is_some());
@@ -110,6 +110,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
             "open": p.open, "mode": p.mode.name(), "query": p.query, "view": p.view.read(cx).debug_state(),
         })),
         "live_terminal_views": shell.terminals.len(),
+        "terminal_notice": shell.terminal_notice,
         "bridge_probe": shell.probe,
         "tray": shell.tray,
         "pane_entities": shell.panes.len(),
@@ -199,13 +200,21 @@ pub fn start(shell: Entity<Shell>, window: WindowHandle<gpui_kit::base::Root>, c
 /// dispatch and paint paths as real events, so they work without a visible
 /// screen. Returns false for shell commands.
 fn run_window(cmd: &str, window: &mut Window, cx: &mut App) -> bool {
-    use gpui_kit::{Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput, point, px};
+    use gpui_kit::{KeyUpEvent, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput, point, px};
+    let press = |key: Keystroke, window: &mut Window, cx: &mut App| {
+        window.draw(cx).clear(cx);
+        let handled = window.dispatch_keystroke(key.clone(), cx);
+        window.dispatch_event(PlatformInput::KeyUp(KeyUpEvent { keystroke: key }), cx);
+        handled
+    };
     let (name, arg) = cmd.split_once(':').unwrap_or((cmd, ""));
     match name {
         // `draw`: lays out and paints a frame now (the platform does not ask for frames while locked).
         "draw" => window.draw(cx).clear(cx),
         // `shot:<file.png>`: the window's frame rendered by Metal into a texture.
         "shot" => {
+            #[cfg(feature = "shot")]
+            window.simulate_next_frame(cx);
             window.draw(cx).clear(cx);
             shot(window, arg);
         }
@@ -215,8 +224,7 @@ fn run_window(cmd: &str, window: &mut Window, cx: &mut App) -> bool {
                 // `parse` wants a static str; scripts are short.
                 match gpui_kit::Keystroke::parse(text.to_string().leak()) {
                     Ok(k) => {
-                        window.draw(cx).clear(cx);
-                        let handled = window.dispatch_keystroke(k, cx);
+                        let handled = press(k, window, cx);
                         eprintln!("debug script: key {text} handled={handled}");
                     }
                     Err(_) => eprintln!("debug script: key {text}: not a keystroke"),
@@ -227,13 +235,13 @@ fn run_window(cmd: &str, window: &mut Window, cx: &mut App) -> bool {
         "type" => {
             for ch in arg.chars() {
                 let key = ch.to_string();
-                window.draw(cx).clear(cx);
-                window.dispatch_keystroke(
-                    gpui_kit::Keystroke {
+                press(
+                    Keystroke {
                         modifiers: Modifiers::default(),
                         key: key.clone(),
                         key_char: Some(key),
                     },
+                    window,
                     cx,
                 );
             }
@@ -379,11 +387,11 @@ fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui_kit::Context
         "save" => s.save_now(cx),
         "send" => {
             let Some(project) = s.ws.active() else { return };
-            let Some(PaneKind::Terminal { terminal_id }) = project.layout.active_tab().map(|t| t.kind.clone()) else {
+            let Some(PaneKind::Terminal { terminal_id, .. }) = project.layout.active_tab().map(|t| t.kind.clone()) else {
                 return;
             };
             if let Some(t) = s.terminals.get(&terminal_id) {
-                t.view.read(cx).send_line(arg);
+                t.view.update(cx, |v, _| v.send_line(arg));
             }
         }
         // `hosted:<module>[ <props JSON>]`
@@ -411,7 +419,10 @@ fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui_kit::Context
         "pixel_clock" => {
             let parts: Vec<&str> = arg.split(',').collect();
             if let Some(view) = active_pixel(s, cx) {
-                view.update(cx, |v, _| v.set_clock(parts[0].parse().ok(), parts.get(1).and_then(|p| p.parse().ok())));
+                view.update(cx, |v, cx| {
+                    v.set_clock(parts[0].parse().ok(), parts.get(1).and_then(|p| p.parse().ok()));
+                    cx.notify();
+                });
             }
         }
         // `close_kind:pixel` / `close_kind:hosted` / `close_kind:terminal`: closes every such tab of the active project

@@ -117,6 +117,8 @@ pub enum Fact {
     SessionToolChanged(FactSessionToolChanged),
     #[serde(rename = "sessionToolsReset")]
     SessionToolsReset(FactSessionToolsReset),
+    #[serde(rename = "sessionSubagentsChanged")]
+    SessionSubagentsChanged(FactSessionSubagentsChanged),
     #[serde(rename = "sessionPhaseChanged")]
     SessionPhaseChanged(FactSessionPhaseChanged),
     #[serde(rename = "messageChanged")]
@@ -222,6 +224,8 @@ pub enum ServerEvent {
     SessionToolChanged(FactSessionToolChanged),
     #[serde(rename = "sessionToolsReset")]
     SessionToolsReset(FactSessionToolsReset),
+    #[serde(rename = "sessionSubagentsChanged")]
+    SessionSubagentsChanged(FactSessionSubagentsChanged),
     #[serde(rename = "sessionPhaseChanged")]
     SessionPhaseChanged(FactSessionPhaseChanged),
     #[serde(rename = "messageChanged")]

@@ -11,6 +11,7 @@ export interface Navigation {
 
 export interface RouterHistory {
   readonly read: () => Location;
+  readonly previous: () => Location | undefined;
   readonly navigate: (to: string, options?: Navigation) => void;
   readonly back: () => void;
   readonly forward: () => void;
@@ -62,6 +63,10 @@ export function memoryHistory(initial = "/"): RouterHistory {
   };
   return {
     read: () => locationOf(current),
+    previous: () => {
+      const entry = entries[index - 1];
+      return entry === undefined ? undefined : locationOf(entry);
+    },
     navigate: (to, options) => {
       const next = internalUrl(to, current.href);
       if (!next) throw new Error(`Navigation must stay within the application: ${to}`);

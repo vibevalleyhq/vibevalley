@@ -9,7 +9,7 @@ use std::sync::OnceLock;
 use serde::Deserialize;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    AccountUsage, Agent, AgentProblem, AgentProblemLevel, PersonaMode, RuntimeInfo, RuntimePreset, RuntimeQuota, RuntimeSettings, RuntimeSupport,
+    AccountUsage, Agent, AgentProblem, AgentProblemLevel, Installation, PersonaMode, RuntimeInfo, RuntimePreset, RuntimeQuota, RuntimeSettings, RuntimeSupport,
 };
 
 #[derive(Deserialize)]
@@ -319,9 +319,13 @@ pub fn agent_problems(agent: &Agent, runtime: Option<&RuntimeInfo>) -> Vec<Agent
     let mut add = |text: String| problems.push(problem("runtime", AgentProblemLevel::Error, text));
     match runtime {
         None => add(t("server.runtime.unknownRuntime", &[("runtime", agent.runtime.clone().into())])),
-        Some(r) if !matches!(r.installation, vibevalley_protocol::Installation::Available(_)) => add(t("server.runtime.notInstalled", &[])),
-        Some(r) if !r.settings.enabled => add(t("server.runtime.disabled", &[])),
-        _ => {}
+        Some(r) => match &r.installation {
+            Installation::Available(_) if !r.settings.enabled => add(t("server.runtime.disabled", &[])),
+            Installation::Available(_) => {}
+            Installation::Checking(_) => add(t("server.runtime.stillChecking", &[])),
+            Installation::NotFound(_) => add(t("server.runtime.notInstalled", &[])),
+            Installation::Unsupported(why) => add(why.reason.clone()),
+        },
     }
     let broke = money_stop(runtime);
     if !broke.is_empty() {

@@ -75,6 +75,7 @@ impl Board {
     /// thread is told as the drafter's report, and the drafter goes home.
     pub(super) fn finish_draft(&self, end: DraftEnd) {
         let DraftEnd {
+            spent,
             session,
             issue,
             reason,
@@ -98,7 +99,7 @@ impl Board {
             ),
         };
         let sessions = &self.0.sessions;
-        let _ = sessions.end_run(&session.id, outcome, &said_back, None);
+        let _ = sessions.end_run(&session.id, outcome, &said_back, spent.clone());
         // What the issue's thread is told (`handedBack`).
         let name = |key: &str, extra: (&str, String)| vibevalley_i18n::t(key, &[("name", session.name.clone().into()), (extra.0, extra.1.into())]);
         let told = match read {
@@ -138,7 +139,7 @@ impl Board {
             phase: None,
             summary: told,
             runs: session.runs + 1,
-            spent: None,
+            spent,
             questions: vec![],
             checks: vec![],
             answer: None,

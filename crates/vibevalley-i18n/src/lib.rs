@@ -350,6 +350,12 @@ mod tests {
     }
 
     #[test]
+    fn regression_desktop_terminal_errors_are_embedded_in_both_languages() {
+        assert!(t_in("zh", "desktop.terminal.missingFolder", &[]).contains("工作目录"));
+        assert!(t_in("en", "desktop.terminal.missingFolder", &[]).contains("working directory"));
+    }
+
+    #[test]
     fn plural_select_and_exact_cases() {
         let text = "{n, plural, =0 {none} one {# item} other {# items}} {who, select, me {by me} other {by {who}}}";
         assert_eq!(format(text, &[("n", 0i64.into()), ("who", "me".into())]), "none by me");

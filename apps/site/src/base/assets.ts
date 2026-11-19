@@ -38,7 +38,7 @@ export const WALKERS = ["bear-farmer", "rabbit-gardener", "fox-rain", "cat-winte
 }));
 
 export const RUNTIMES = [
-  { name: "pi", logo: "logo-pi" },
+  { name: "OpenCode", logo: "logo-opencode" },
   { name: "Claude Code", logo: "logo-claude" },
   { name: "Codex", logo: "logo-codex" },
 ] as const;

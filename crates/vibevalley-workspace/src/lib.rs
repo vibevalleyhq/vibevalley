@@ -14,6 +14,6 @@ pub mod workspace;
 #[cfg(test)]
 mod testing;
 
-pub use layout::{Axis, DiffSpec, Group, GroupId, Layout, Node, PaneKind, Split, SplitId, Tab, TabId};
+pub use layout::{Axis, DiffSpec, Group, GroupId, Layout, Node, PaneKind, Split, SplitId, Tab, TabId, TerminalLink};
 pub use persist::Persistence;
 pub use workspace::{LoadedProject, OpenProject, RestoreCommand, SaveJob, TerminalEntry, TerminalHandle, Workspace, load_all, load_project, restore_command};

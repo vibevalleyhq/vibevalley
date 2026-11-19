@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+percent-encoding = "2.3.2"
+vibevalley-pixel = { version = "0.1.0", path = "../../crates/vibevalley-pixel" }
 vibevalley-server-api = { version = "0.1.0", path = "../../crates/vibevalley-server-api" }
 base64 = "0.23.1"
 vibevalley-i18n = { version = "0.1.0", path = "../../crates/vibevalley-i18n" }
@@ -19,6 +21,7 @@ vibevalley-workspace = { version = "0.1.0", path = "../../crates/vibevalley-work
 flume = "0.12.0"
 gpui-kit = { version = "0.9.1", features = ["gpui-fast"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+indexmap = "2.14.2"
 nsh-engine = { version = "0.5.0", default-features = false }
 nsh-platform-gpui = "0.5.0"
 objc2 = "0.6.5"
@@ -29,6 +32,7 @@ serde_json = "1.0.154"
 sha2 = "0.11.1"
 smallvec = "1.16.5"
 unicode-segmentation = "1.13.3"
+rustybuzz = "0.20.1"
 unicode-width = "0.2.3"
 
 tokio = { version = "1.54.1", features = ["rt", "time", "net", "sync", "macros"] }

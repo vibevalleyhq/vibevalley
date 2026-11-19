@@ -88,6 +88,16 @@
     "cancel": "取消工单"
   },
   "changes": {
+    "checkOutput": "检查输出",
+    "reviewVersion": "审查版本",
+    "sinceReview": "自上次审查后的改动",
+    "projectCheck": "项目检查",
+    "check": {
+      "passed": "通过",
+      "failed": "失败",
+      "not_configured": "未配置检查"
+    },
+    "mergedCommit": "合入提交",
     "reading": "正在看它改了什么…",
     "unreadable": "看不了改动：",
     "none": "这一单没有改动。完成就是请它收工。",
@@ -285,7 +295,9 @@
   },
   "run": {
     "working": "正在干",
-    "heard": "中途听到 {n} 句"
+    "heard": "中途听到 {n} 句",
+    "reconcile": "需要核对工作目录",
+    "currentChanges": "查看工单当前改动"
   },
   "card": {
     "orchestrator": "助手",
@@ -351,7 +363,8 @@
     "whoRuntime": "{name}（{runtime}）",
     "changes": "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
     "changesUncommitted": "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
-    "justNow": "刚刚"
+    "justNow": "刚刚",
+    "reviewAfterFailedCheck": "核对修复后，再次完成工单以重跑检查"
   },
   "new": {
     "title": "新工单",
@@ -359,7 +372,8 @@
     "words": "要做什么",
     "placeholder": "要做什么？一句话就行，帮工会照它起草",
     "keys": "⌘ 回车记下",
-    "keep": "记下"
+    "keep": "记下",
+    "editsKept": "刚才的内容已提交，修改后的草稿已保留。"
   },
   "conversation": {
     "title": "讨论与交付记录",

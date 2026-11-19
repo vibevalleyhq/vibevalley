@@ -15,9 +15,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use regex::Regex;
-use rusqlite::Connection;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use sqlx::SqliteConnection;
 use vibevalley_i18n::{list, t};
 use vibevalley_pkm::{self as p, Node, Page, Tier};
 use vibevalley_protocol::{
@@ -36,7 +36,7 @@ fn refused(text: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::PkmRefused, text.into())
 }
 
-fn db_failed(e: rusqlite::Error) -> ApiError {
+fn db_failed(e: sqlx::Error) -> ApiError {
     ApiError::new(BizCode::InternalError, format!("pkm: {e}"))
 }
 
@@ -178,7 +178,7 @@ const TIERS: [Tier; 6] = [Tier::Inbox, Tier::Project, Tier::Area, Tier::Resource
 
 struct Inner {
     root: PathBuf,
-    db: Connection,
+    db: SqliteConnection,
     /// VibeValley's map in its order (slug-keyed, insertion order).
     pages: Vec<Page>,
     loaded: bool,
@@ -195,13 +195,13 @@ impl Inner {
 
     /// The remarks the user wrote in a page's file, kept so their status
     /// outlives a reading.
-    fn keep_remarks(&self, page: &Page) -> Result<(), ApiError> {
+    fn keep_remarks(&mut self, page: &Page) -> Result<(), ApiError> {
         let at = now();
         for node in p::walk(&page.blocks) {
             for (i, span) in p::spans_of(&node.body).into_iter().enumerate() {
                 db::keep_remark(
-                    &self.db,
-                    &db::Remark {
+                    &mut self.db,
+                    db::Remark {
                         id: format!("span:{}:{}", node.id, i + 1),
                         page: page.slug.clone(),
                         block: node.id.clone(),
@@ -215,8 +215,8 @@ impl Inner {
             }
             if let Some(comment) = node.props.get("comment").filter(|c| !c.is_empty()) {
                 db::keep_remark(
-                    &self.db,
-                    &db::Remark {
+                    &mut self.db,
+                    db::Remark {
                         id: format!("prop:{}", node.id),
                         page: page.slug.clone(),
                         block: node.id.clone(),
@@ -232,26 +232,26 @@ impl Inner {
         Ok(())
     }
 
-    fn remarked(&self) -> Result<HashSet<String>, ApiError> {
-        Ok(db::remarked_blocks(&self.db).map_err(db_failed)?.into_iter().collect())
+    fn remarked(&mut self) -> Result<HashSet<String>, ApiError> {
+        Ok(db::remarked_blocks(&mut self.db).map_err(db_failed)?.into_iter().collect())
     }
 
     /// A page's blocks in the full-text index, as they read now.
-    fn indexed(&self, page: &Page) -> Result<(), ApiError> {
+    fn indexed(&mut self, page: &Page) -> Result<(), ApiError> {
         let rows: Vec<(String, String)> = p::flat_blocks(&page.blocks)
             .into_iter()
             .map(|b| (b.id, tokenize(&format!("{}\n{}\n{}", page.title, b.path, b.body)).join(" ")))
             .collect();
-        db::set_page_terms(&self.db, &page.slug, &rows).map_err(db_failed)
+        db::set_page_terms(&mut self.db, &page.slug, &rows).map_err(db_failed)
     }
 
-    fn unindexed(&self, slug: &str) -> Result<(), ApiError> {
-        db::clear_page_terms(&self.db, slug).map_err(db_failed)
+    fn unindexed(&mut self, slug: &str) -> Result<(), ApiError> {
+        db::clear_page_terms(&mut self.db, slug).map_err(db_failed)
     }
 
     /// A file read as the page it is now; `was`: the page as held, whose ids
     /// carry over to the blocks that did not change.
-    fn read_page(&self, file: &str, mtime: i64, was: Option<&Page>) -> Result<Page, ApiError> {
+    fn read_page(&mut self, file: &str, mtime: i64, was: Option<&Page>) -> Result<Page, ApiError> {
         let text = std::fs::read_to_string(self.abs(file)).map_err(|e| refused(e.to_string()))?;
         let read = p::parse(&text, file, mtime);
         if let Some(was) = was
@@ -336,7 +336,7 @@ impl Inner {
         if self.loaded {
             return Ok(());
         }
-        db::clear_all_terms(&self.db).map_err(db_failed)?;
+        db::clear_all_terms(&mut self.db).map_err(db_failed)?;
         self.rescan().map(|_| ())
     }
 
@@ -397,19 +397,19 @@ impl Inner {
         // Writing a block's id is not a change to undo.
         if what != "pin" {
             db::add_change(
-                &self.db,
-                &db::NewChange {
+                &mut self.db,
+                db::NewChange {
                     at: now(),
-                    what,
-                    page: &written.slug,
-                    before_file: before.as_ref().map(|_| from.as_str()),
-                    after_file: &written.file,
-                    before_text: before.as_deref(),
-                    after_text: &text,
+                    what: what.to_owned(),
+                    page: written.slug.clone(),
+                    before_file: before.as_ref().map(|_| from.clone()),
+                    after_file: written.file.clone(),
+                    before_text: before,
+                    after_text: text,
                 },
             )
             .map_err(db_failed)?;
-            db::trim_changes(&self.db, CHANGE_KEEP).map_err(db_failed)?;
+            db::trim_changes(&mut self.db, CHANGE_KEEP).map_err(db_failed)?;
         }
         self.keep_remarks(&written)?;
         let stale: Vec<String> = self
@@ -438,9 +438,9 @@ impl Inner {
         Ok(written)
     }
 
-    fn view_of(&self, page: &Page) -> Result<PkmPageView, ApiError> {
+    fn view_of(&mut self, page: &Page) -> Result<PkmPageView, ApiError> {
         let ids: HashSet<&str> = p::walk(&page.blocks).into_iter().map(|n| n.id.as_str()).collect();
-        let rows = db::open_comments(&self.db, Some(&page.slug)).map_err(db_failed)?;
+        let rows = db::open_comments(&mut self.db, Some(&page.slug)).map_err(db_failed)?;
         let linking = p::backlinks(&self.pages, &page.slug);
         let shown: Vec<(String, String)> = [&linking.projects, &linking.journals, &linking.areas, &linking.archives]
             .into_iter()
@@ -532,8 +532,8 @@ impl Pkm {
     /// The vault at `root` (VibeValley `pkmDir`), its tables in
     /// `<home>/server.db`.
     pub fn open(home: &Path, root: &Path) -> Result<Arc<Pkm>, ApiError> {
-        let conn = crate::base::open_db(home).map_err(db_failed)?;
-        conn.execute_batch(db::SCHEMA).map_err(db_failed)?;
+        let mut conn = pollster::block_on(crate::base::open_sqlx_db(home)).map_err(db_failed)?;
+        pollster::block_on(sqlx::raw_sql(db::SCHEMA).execute(&mut conn)).map_err(db_failed)?;
         Ok(Arc::new(Pkm {
             root: root.to_path_buf(),
             inner: Mutex::new(Inner {
@@ -631,7 +631,7 @@ impl Pkm {
         if text.is_empty() {
             return Ok(wire(search(&g.pages, &req_p, None)));
         }
-        let ranked = db::match_terms(&g.db, &query_words(text)).map_err(db_failed)?;
+        let ranked = db::match_terms(&mut g.db, &query_words(text)).map_err(db_failed)?;
         Ok(wire(search(&g.pages, &req_p, Some(&ranked))))
     }
 
@@ -746,10 +746,10 @@ impl Pkm {
     pub fn comments(&self, page: Option<&str>) -> Result<Vec<PkmComment>, ApiError> {
         let mut g = self.lock();
         match page.filter(|p| !p.is_empty()) {
-            None => db::open_comments(&g.db, None).map_err(db_failed),
+            None => db::open_comments(&mut g.db, None).map_err(db_failed),
             Some(name) => {
                 let page = g.fresh(name)?;
-                db::open_comments(&g.db, Some(&page.slug)).map_err(db_failed)
+                db::open_comments(&mut g.db, Some(&page.slug)).map_err(db_failed)
             }
         }
     }
@@ -767,8 +767,8 @@ impl Pkm {
         let kept = p::keep_links(&node.body, &req.suggested);
         let rationale = req.rationale.clone().unwrap_or_else(|| t("server.pkm.kept", &[]));
         let answering = match req.comment.as_deref() {
-            Some(id) => db::comment(&g.db, id),
-            None => db::newest_on(&g.db, &req.block),
+            Some(id) => db::comment(&mut g.db, id),
+            None => db::newest_on(&mut g.db, &req.block),
         }
         .map_err(db_failed)?;
         if let Some(id) = &req.comment
@@ -782,21 +782,21 @@ impl Pkm {
             .map(|a| a.id.clone());
         let id = match answers {
             Some(id) => {
-                db::suggest(&g.db, &id, &kept.text, &rationale).map_err(db_failed)?;
+                db::suggest(&mut g.db, &id, &kept.text, &rationale).map_err(db_failed)?;
                 id
             }
             None => {
                 let id = new_id();
                 db::add_suggestion(
-                    &g.db,
-                    &db::Suggestion {
-                        id: &id,
-                        page: &page.slug,
-                        block: &req.block,
-                        author: by,
-                        body: &rationale,
-                        suggested: &kept.text,
-                        rationale: &rationale,
+                    &mut g.db,
+                    db::Suggestion {
+                        id: id.clone(),
+                        page: page.slug.clone(),
+                        block: req.block.clone(),
+                        author: by.into(),
+                        body: rationale.clone(),
+                        suggested: Some(kept.text.clone()),
+                        rationale: Some(rationale.clone()),
                         created_at: now(),
                     },
                 )
@@ -809,7 +809,7 @@ impl Pkm {
         if !node.explicit {
             g.write(page, "pin", None)?;
         }
-        let comment = db::comment(&g.db, &id)
+        let comment = db::comment(&mut g.db, &id)
             .map_err(db_failed)?
             .ok_or_else(|| ApiError::new(BizCode::InternalError, "a suggestion just written must read back"))?;
         Ok(PkmProposal {
@@ -822,7 +822,7 @@ impl Pkm {
     pub fn resolve(&self, req: &PkmResolveRequest) -> Result<PkmPage, ApiError> {
         let mut g = self.lock();
         let no_comment = || missing(t("server.pkm.noComment", &[("id", req.id.clone().into())]), LookIn::Pkm);
-        let row = db::comment(&g.db, &req.id).map_err(db_failed)?.ok_or_else(no_comment)?;
+        let row = db::comment(&mut g.db, &req.id).map_err(db_failed)?.ok_or_else(no_comment)?;
         g.ready()?;
         let slug = p::block_of(&g.pages, &row.block)
             .map(|at| at.page.slug.clone())
@@ -830,7 +830,7 @@ impl Pkm {
         let page = g.fresh(&slug)?;
         let when = now();
         if !req.accept {
-            db::resolve(&g.db, &row.id, "rejected", when).map_err(db_failed)?;
+            db::resolve(&mut g.db, &row.id, "rejected", when).map_err(db_failed)?;
             return Ok(wire(p::wire_of(&page)));
         }
         let Some(node) = p::find(&page.blocks, &row.block) else {
@@ -841,7 +841,7 @@ impl Pkm {
         let body = p::without_spans(row.suggested.as_deref().unwrap_or(&node.body));
         let blocks = replaced(&page.blocks, &row.block, &body, &props);
         let written = g.write(Page { blocks, ..page }, "resolve", None)?;
-        db::resolve_on(&g.db, &row.block, when).map_err(db_failed)?;
+        db::resolve_on(&mut g.db, &row.block, when).map_err(db_failed)?;
         Ok(wire(p::wire_of(&written)))
     }
 
@@ -1023,7 +1023,7 @@ impl Pkm {
                     "rename",
                     Some(&from_file),
                 )?;
-                db::move_page(&g.db, &was, &p::slug_of(to)).map_err(db_failed)?;
+                db::move_page(&mut g.db, &was, &p::slug_of(to)).map_err(db_failed)?;
             }
             (old, Some(target)) => {
                 let into = g.fresh(&target)?;
@@ -1042,7 +1042,7 @@ impl Pkm {
                     g.remove_file(&m.file, "after its page was merged");
                     g.pages.retain(|p| p.slug != m.slug);
                     g.unindexed(&m.slug)?;
-                    db::move_page(&g.db, &m.slug, &into_slug).map_err(db_failed)?;
+                    db::move_page(&mut g.db, &m.slug, &into_slug).map_err(db_failed)?;
                 }
             }
         }
@@ -1062,7 +1062,7 @@ impl Pkm {
 
     pub fn undo(&self) -> Result<PkmUndo, ApiError> {
         let mut g = self.lock();
-        let Some(last) = db::last_change(&g.db).map_err(db_failed)? else {
+        let Some(last) = db::last_change(&mut g.db).map_err(db_failed)? else {
             return Ok(PkmUndo {
                 undone: false,
                 page: None,
@@ -1077,7 +1077,7 @@ impl Pkm {
             let wrote = at.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|_| std::fs::write(&at, text));
             wrote.map_err(|e| refused(e.to_string()))?;
         }
-        db::drop_change(&g.db, last.seq).map_err(db_failed)?;
+        db::drop_change(&mut g.db, last.seq).map_err(db_failed)?;
         g.pages
             .retain(|p| p.file != last.after_file && last.before_file.as_deref() != Some(p.file.as_str()));
         g.unindexed(&last.page)?;

@@ -88,7 +88,7 @@ impl StatusFold {
                 self.pending_permissions.clear();
                 self.failed = *reason == StopReason::Error;
             }
-            EventKind::Error { .. } if !self.turn_active => self.failed = true,
+            EventKind::Error { .. } if root && !self.turn_active => self.failed = true,
             EventKind::SessionEnded => self.ended = true,
             _ => {}
         }
@@ -144,34 +144,80 @@ struct CoreState {
     history: std::collections::VecDeque<Event>,
     fold: StatusFold,
     recorder: Option<Recorder>,
+    records: Vec<crate::voyage::Record>,
+    frames: std::collections::HashMap<std::thread::ThreadId, crate::voyage::Record>,
+    record_subscribers: Vec<flume::Sender<crate::voyage::Record>>,
     ended: bool,
     disposed: bool,
-    queue: VecDeque<Vec<ContentBlock>>,
+    queue: VecDeque<QueuedInput>,
+    meter: crate::accounting::Meter,
+    extras: crate::frames::Frames,
+    last_error: Option<String>,
+    process_exit: Option<(i32, String)>,
+    exit_error: Option<String>,
+    previous_turn: Option<crate::TokenTotals>,
+    root_usage_seen: bool,
+    child_meters: std::collections::HashMap<Vec<String>, crate::accounting::Meter>,
+    compacting: bool,
+    manual_compaction: bool,
+    input_id: String,
+    span_id: String,
+}
+
+struct QueuedInput {
+    content: Vec<ContentBlock>,
+    id: String,
+    span: String,
 }
 
 type TurnHook = Arc<dyn Fn() + Send + Sync>;
 
 pub(crate) struct SessionCore {
     runtime_id: String,
-    session_id: String,
+    session_id: Mutex<String>,
     state: Mutex<CoreState>,
     after_turn: Mutex<Option<TurnHook>>,
+}
+
+pub(crate) struct FrameGuard<'a> {
+    core: &'a SessionCore,
+    producer: std::thread::ThreadId,
+}
+impl Drop for FrameGuard<'_> {
+    fn drop(&mut self) {
+        self.core.flush_frame(&mut self.core.lock(), self.producer);
+    }
 }
 
 impl SessionCore {
     pub(crate) fn new(runtime_id: &str, session_id: &str, recorder: Option<Recorder>) -> Arc<Self> {
         Arc::new(Self {
             runtime_id: runtime_id.to_string(),
-            session_id: session_id.to_string(),
+            session_id: Mutex::new(session_id.to_string()),
             state: Mutex::new(CoreState {
                 next_seq: 0,
                 subscribers: Vec::new(),
                 history: std::collections::VecDeque::new(),
                 fold: StatusFold::new(),
                 recorder,
+                records: vec![],
+                frames: Default::default(),
+                record_subscribers: vec![],
                 ended: false,
                 disposed: false,
                 queue: VecDeque::new(),
+                meter: Default::default(),
+                extras: Default::default(),
+                last_error: None,
+                process_exit: None,
+                exit_error: None,
+                previous_turn: Some(Default::default()),
+                root_usage_seen: false,
+                child_meters: Default::default(),
+                compacting: false,
+                manual_compaction: false,
+                input_id: String::new(),
+                span_id: String::new(),
             }),
             after_turn: Mutex::new(None),
         })
@@ -181,16 +227,64 @@ impl SessionCore {
         self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    pub(crate) fn session_id(&self) -> &str {
-        &self.session_id
+    pub(crate) fn session_id(&self) -> String {
+        lock(&self.session_id).clone()
+    }
+
+    pub(crate) fn identify(&self, id: &str) -> bool {
+        let mut known = lock(&self.session_id);
+        if known.as_str() == id {
+            return false;
+        }
+        *known = id.to_owned();
+        true
     }
 
     pub(crate) fn runtime_id(&self) -> &str {
         &self.runtime_id
     }
 
-    fn emit_locked(&self, state: &mut CoreState, agent_path: Vec<String>, kind: EventKind) {
+    fn external(&self) -> bool {
+        matches!(
+            self.runtime_id(),
+            "claude" | "codex" | "qwen" | "qoder" | "kimi" | "grok" | "opencode" | "codebuddy"
+        ) || self.runtime_id().starts_with("acp:")
+    }
+
+    fn emit_locked(&self, state: &mut CoreState, agent_path: Vec<String>, mut kind: EventKind) {
         if state.ended {
+            return;
+        }
+        if agent_path.is_empty() && self.external() {
+            match &mut kind {
+                EventKind::TurnStarted { .. } => {
+                    state.root_usage_seen = false;
+                    state.meter.turn_local = None;
+                }
+                EventKind::TurnFinished { usage, .. } => {
+                    let total = state.root_usage_seen.then_some(state.meter.totals).flatten();
+                    let delta = total.and_then(|total| {
+                        state.meter.turn_local.or_else(|| {
+                            let base = state.previous_turn?;
+                            if base == crate::TokenTotals::default() {
+                                return Some(total);
+                            }
+                            (total.input_tokens >= base.input_tokens && total.output_tokens >= base.output_tokens).then(|| total.subtract(base))
+                        })
+                    });
+                    *usage = delta.map(crate::TokenTotals::native).unwrap_or_default();
+                    state.previous_turn = total;
+                }
+                _ => {}
+            }
+        }
+        if state.manual_compaction && agent_path.is_empty() && matches!(kind, EventKind::TurnFinished { .. }) {
+            if state.compacting {
+                self.compact_event(state, false, "completed");
+            }
+            state.compacting = false;
+            state.manual_compaction = false;
+            state.span_id.clear();
             return;
         }
         let event = Event {
@@ -201,18 +295,72 @@ impl SessionCore {
         };
         state.next_seq += 1;
         state.fold.apply(&event);
-        if let Some(recorder) = state.recorder.as_mut()
-            && recorder.write(&event).is_err()
+        if event.agent_path.is_empty() && matches!(event.kind, EventKind::TurnStarted { .. }) && state.span_id.is_empty() {
+            state.span_id = format!("turn-{}", event.seq);
+        }
+        let mut envelope = crate::voyage::Record::event(self.session_id(), &event);
+        if event.agent_path.is_empty() {
+            if let EventKind::Error { message } = &event.kind {
+                state.last_error = Some(message.clone());
+            }
+            if matches!(event.kind, EventKind::TurnStarted { .. }) {
+                envelope.frame_type = match self.runtime_id() {
+                    "claude" | "qwen" | "qoder" => "user_prompt",
+                    "codex" => "turn/start",
+                    _ => "session/prompt",
+                }
+                .into();
+                if !state.input_id.is_empty() {
+                    envelope.events[0]["requestId"] = serde_json::json!(state.input_id);
+                }
+                state.last_error = None;
+            }
+            if matches!(event.kind, EventKind::TurnFinished { reason: StopReason::Error, .. })
+                && let Some(end) = envelope.events.iter_mut().find(|v| v["kind"] == "turn_ended")
+            {
+                let reason = state.last_error.as_deref().unwrap_or("runtime failed");
+                end["outcome"]["reason"] = serde_json::json!(reason);
+                end["outcome"]["failure"] = serde_json::json!(crate::frames::failure(reason));
+            }
+        }
+        if matches!(event.kind, EventKind::SessionEnded)
+            && let Some((code, signal)) = &state.process_exit
         {
-            // A full disk must not take the session down with it.
-            state.recorder = None;
+            envelope.frame_type = "exited".into();
+            envelope.marker = Some(serde_json::json!({"name":"exited"}));
+            envelope.events = vec![serde_json::json!({"kind":"exited","code":code})];
+            if !signal.is_empty() {
+                envelope.events[0]["signal"] = serde_json::json!(signal);
+            }
+        }
+        if self.external() {
+            envelope.events.retain(|e| e["kind"] != "usage");
+        }
+        let producer = std::thread::current().id();
+        if let Some(frame) = state.frames.get_mut(&producer)
+            && frame.agent_path == event.agent_path
+        {
+            frame.events.append(&mut envelope.events);
+            frame.native_events.append(&mut envelope.native_events);
+            if matches!(event.kind, EventKind::TurnFinished { .. } | EventKind::SessionEnded) {
+                self.flush_frame(state, producer);
+            }
+        } else {
+            // A single notification can update the caller and several child paths.
+            // Flush earlier native events before writing an event on another path.
+            if state.frames.get(&producer).is_some_and(|frame| !frame.native_events.is_empty()) {
+                self.flush_frame(state, producer);
+            }
+            self.record_locked(state, envelope);
+        }
+        if event.agent_path.is_empty() && matches!(event.kind, EventKind::TurnFinished { .. }) {
+            state.span_id.clear();
         }
         state.subscribers.retain(|subscriber| subscriber.send(event.clone()).is_ok());
         if matches!(event.kind, EventKind::SessionEnded) {
             state.ended = true;
-            if let Some(mut recorder) = state.recorder.take() {
-                recorder.end("session_ended");
-            }
+            state.recorder.take();
+            state.record_subscribers.clear();
             // Receivers then see the channel close after the last event.
             state.subscribers.clear();
         }
@@ -220,6 +368,123 @@ impl SessionCore {
             state.history.pop_front();
         }
         state.history.push_back(event);
+    }
+
+    fn record_locked(&self, state: &mut CoreState, mut record: crate::voyage::Record) {
+        record.seq = state.records.len() as u64;
+        if record.span_id.is_empty() {
+            record.span_id = state.span_id.clone();
+        }
+        if let Some(recorder) = state.recorder.as_mut()
+            && recorder.write(&record).is_err()
+        {
+            state.recorder = None;
+        }
+        state.record_subscribers.retain(|s| s.send(record.clone()).is_ok());
+        state.records.push(record);
+    }
+
+    pub(crate) fn resume_meter(&self, base: &serde_json::Value, reason: &'static str) {
+        let mut s = self.lock();
+        s.meter.resume(reason);
+        s.meter.baseline(base);
+    }
+
+    fn compact_event(&self, state: &mut CoreState, start: bool, why: &str) {
+        let mut rec = crate::voyage::Record::new(crate::voyage::Kind::Frame, self.session_id(), now_ms());
+        let e = if start {
+            serde_json::json!({"kind":"compaction_started","trigger":why})
+        } else {
+            serde_json::json!({"kind":"compaction_ended","compactionOutcome":why})
+        };
+        rec.frame_type = e["kind"].as_str().unwrap_or_default().into();
+        rec.events.push(e);
+        self.record_locked(state, rec);
+    }
+    pub(crate) fn span_id(&self) -> String {
+        self.lock().span_id.clone()
+    }
+    pub(crate) fn child_session(&self, parent: &str, child: &str, path: &[String]) {
+        let mut rec = crate::voyage::Record::new(crate::voyage::Kind::Marker, self.session_id(), now_ms());
+        rec.frame_type = if self.runtime_id() == "codex" {
+            "child_thread_associated"
+        } else {
+            "child_session_associated"
+        }
+        .into();
+        rec.agent_path = path.to_vec();
+        rec.events
+            .push(serde_json::json!({"kind":"child_session","parentSessionId":parent,"childSessionId":child}));
+        self.record_locked(&mut self.lock(), rec);
+    }
+    fn flush_frame(&self, state: &mut CoreState, producer: std::thread::ThreadId) {
+        if let Some(mut rec) = state.frames.remove(&producer) {
+            rec.events.sort_by_key(|e| e["kind"] == "usage");
+            if self.runtime_id() == "codex"
+                && matches!(rec.frame_type.as_str(), "item/started" | "item/completed")
+                && let Ok(raw) = serde_json::from_slice::<serde_json::Value>(&rec.raw)
+            {
+                let item = &raw["params"]["item"];
+                for e in &mut rec.events {
+                    if e["kind"] == "tool_call_started" && item["type"] == "commandExecution" {
+                        e["tool"] = serde_json::json!("bash");
+                    }
+                    if e["kind"] == "tool_call_ended"
+                        && let Some(code) = item["exitCode"].as_i64()
+                    {
+                        e["exitCode"] = serde_json::json!(code);
+                    }
+                }
+            }
+            self.record_locked(state, rec);
+        }
+    }
+    #[must_use]
+    pub(crate) fn record_raw(&self, kind: &str, path: Vec<String>, line: &str, frame: &serde_json::Value) -> FrameGuard<'_> {
+        let producer = std::thread::current().id();
+        let guard = FrameGuard { core: self, producer };
+        let mut state = self.lock();
+        if state.ended {
+            return guard;
+        }
+        let mut record = crate::voyage::Record::new(crate::voyage::Kind::Frame, self.session_id(), now_ms());
+        let compact_item = matches!(
+            frame.pointer("/item/type").and_then(serde_json::Value::as_str),
+            Some("contextCompaction" | "compaction")
+        );
+        if (kind == "system/status" && frame["status"] == "compacting" || kind == "item/started" && compact_item) && !state.compacting {
+            state.compacting = true;
+            self.compact_event(&mut state, true, "auto");
+        }
+        if kind == "system/compact_boundary" || kind == "item/completed" && compact_item {
+            self.compact_event(&mut state, false, "completed");
+            state.compacting = false;
+        }
+        let meter = if path.is_empty() {
+            &mut state.meter
+        } else {
+            state.child_meters.entry(path.clone()).or_default()
+        };
+        let telemetry = match self.runtime_id() {
+            "claude" | "qwen" | "qoder" => meter.stream(self.runtime_id(), frame),
+            "codex" => meter.codex(kind, frame, path.is_empty()),
+            _ if kind == "session/prompt_result" => meter.acp(&serde_json::json!({"sessionUpdate":"usage_update","usage":frame["usage"]})),
+            _ => meter.acp(&frame["update"]),
+        };
+        if let Some(ev) = telemetry {
+            if path.is_empty() {
+                state.root_usage_seen = true;
+            }
+            record.events.push(ev);
+        }
+        record.events.extend(state.extras.extras(kind, &path, frame));
+        record.agent_path = path;
+        record.raw = line.as_bytes().to_vec();
+        record.frame_type = kind.to_string();
+        record.span_id = state.span_id.clone();
+        self.flush_frame(&mut state, producer);
+        state.frames.insert(producer, record);
+        guard
     }
 
     pub(crate) fn emit(&self, agent_path: Vec<String>, kind: EventKind) {
@@ -275,56 +540,83 @@ impl SessionCore {
 
     /// Atomically: refuse when unreachable or busy, else record the turn's start.
     pub(crate) fn begin_turn(&self, prompt: &str) -> Result<()> {
+        self.begin_span(prompt, "", "")
+    }
+    fn begin_span(&self, prompt: &str, input_id: &str, span: &str) -> Result<()> {
         let mut state = self.lock();
         if let Some(error) = Self::unreachable(&state) {
             return Err(error);
         }
+        if state.compacting {
+            return Err(rejected("compacting", "compaction is running"));
+        }
         if state.fold.turn_active() {
             return Err(rejected(rejection::BUSY, "a turn is running; use steer or queue"));
         }
+        state.span_id = span.into();
+        state.input_id = input_id.into();
         self.emit_locked(&mut state, Vec::new(), EventKind::TurnStarted { prompt: prompt.to_string() });
         Ok(())
     }
 
     /// Starts the turn when idle (`Ok(true)`), else holds the input (`Ok(false)`).
-    fn begin_turn_or_queue(&self, content: &[ContentBlock]) -> Result<bool> {
+    fn begin_turn_or_queue(&self, content: &[ContentBlock], id: &str, span: &str) -> Result<bool> {
         let mut state = self.lock();
         if let Some(error) = Self::unreachable(&state) {
             return Err(error);
         }
-        if state.fold.turn_active() || !state.queue.is_empty() {
-            state.queue.push_back(content.to_vec());
+        if state.compacting && self.runtime_id() == "codex" {
+            return Err(rejected("compacting", "manual compaction is running"));
+        }
+        if state.compacting || state.fold.turn_active() || !state.queue.is_empty() {
+            state.queue.push_back(QueuedInput {
+                content: content.to_vec(),
+                id: id.into(),
+                span: span.into(),
+            });
             return Ok(false);
         }
+        state.span_id = span.into();
+        state.input_id = id.into();
         self.emit_locked(&mut state, Vec::new(), EventKind::TurnStarted { prompt: render_text(content) });
         Ok(true)
     }
 
     fn next_queued(&self) -> Option<Vec<ContentBlock>> {
         let mut state = self.lock();
-        if state.ended || state.fold.turn_active() {
+        if state.ended || state.compacting || state.fold.turn_active() {
             return None;
         }
-        let next = state.queue.pop_front()?;
+        let input = state.queue.pop_front()?;
+        state.span_id = input.span;
+        state.input_id = input.id;
+        let next = input.content;
         self.emit_locked(&mut state, Vec::new(), EventKind::TurnStarted { prompt: render_text(&next) });
         Some(next)
     }
 
     /// Ends the stream: an optional error, the open turn's end, `SessionEnded`.
     /// Idempotent; whoever notices the end first (dispose or process exit) wins.
+    pub(crate) fn observe_exit(&self, status: Option<(i32, String)>) {
+        if let Some(status) = status {
+            self.lock().process_exit = Some(status);
+        }
+    }
     pub(crate) fn finish(&self, error: Option<String>) {
         let mut state = self.lock();
         if state.ended {
             return;
         }
         let disposed = state.disposed;
-        if let Some(message) = error
+        let clean = state.process_exit.as_ref().is_some_and(|(code, _)| *code == 0);
+        if let Some(message) = error.filter(|_| !clean)
             && !disposed
         {
+            state.exit_error = Some(message.clone());
             self.emit_locked(&mut state, Vec::new(), EventKind::Error { message });
         }
         if state.fold.turn_active() {
-            let reason = if disposed { StopReason::Aborted } else { StopReason::Error };
+            let reason = if disposed || clean { StopReason::Aborted } else { StopReason::Error };
             self.emit_locked(
                 &mut state,
                 Vec::new(),
@@ -345,6 +637,9 @@ impl SessionCore {
 
 /// What an adapter supplies; `CoreSession` wraps it with the shared rules.
 pub(crate) trait Driver: Send + Sync + 'static {
+    fn read_subagent(&self, _thread_id: &str, _turn_id: Option<&str>) -> Result<crate::SubagentSnapshot> {
+        Err(crate::SubagentSnapshot::unsupported())
+    }
     /// Refuses content the runtime cannot take, before the turn is recorded.
     fn check_content(&self, _content: &[ContentBlock]) -> Result<()> {
         Ok(())
@@ -352,6 +647,18 @@ pub(crate) trait Driver: Send + Sync + 'static {
     fn start_turn(&self, content: Vec<ContentBlock>) -> Result<()>;
     fn steer(&self, content: Vec<ContentBlock>) -> Result<()>;
     fn abort(&self) -> Result<()>;
+    fn compact(&self) -> Result<()> {
+        Err(AgentError::Unsupported {
+            option: "compact".into(),
+            reason: "runtime has no manual compaction".into(),
+        })
+    }
+    fn stop_task(&self, _id: &str) -> Result<()> {
+        Err(AgentError::Unsupported {
+            option: "stop_task".into(),
+            reason: "runtime cannot stop individual tasks".into(),
+        })
+    }
     fn respond_permission(&self, request_id: &str, decision: &PermissionDecision) -> Result<()>;
     fn dispose(&self);
 }
@@ -405,34 +712,131 @@ impl<D: Driver> CoreSession<D> {
     }
 }
 
-impl<D: Driver> Session for CoreSession<D> {
-    fn id(&self) -> String {
-        self.core.session_id().to_string()
+impl<D: Driver> CoreSession<D> {
+    fn legacy_control(&self, action: crate::ControlAction, content: Vec<ContentBlock>) -> Result<()> {
+        let (_, error) = self.dispatch(action, content, "", "", "")?;
+        match error {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
+    }
+    fn dispatch(
+        &self,
+        action: crate::ControlAction,
+        content: Vec<ContentBlock>,
+        arg: &str,
+        input_id: &str,
+        span_id: &str,
+    ) -> Result<(crate::ControlOutcome, Option<AgentError>)> {
+        use crate::{ControlAction as A, ControlStatus as S};
+        let result = match action {
+            A::Prompt => self
+                .check(&content)
+                .and_then(|_| self.core.begin_span(&render_text(&content), input_id, span_id))
+                .and_then(|_| self.run_turn(content)),
+            A::Steer => self.steer_input(content),
+            A::Queue if self.capabilities.queue => self
+                .check(&content)
+                .and_then(|_| self.core.begin_turn_or_queue(&content, input_id, span_id))
+                .and_then(|start| if start { self.run_turn(content) } else { Ok(()) }),
+            A::Queue => Err(AgentError::Unsupported {
+                option: "queue".into(),
+                reason: "runtime does not hold input".into(),
+            }),
+            A::Abort => self.abort_input(),
+            A::Withdraw => {
+                let mut state = self.core.lock();
+                if let Some(e) = SessionCore::unreachable(&state) {
+                    Err(e)
+                } else if let Some(index) = state.queue.iter().position(|q| !arg.is_empty() && q.id == arg) {
+                    state.queue.remove(index);
+                    Ok(())
+                } else {
+                    Err(rejected("not_found", "input is not queued"))
+                }
+            }
+            A::Compact if !matches!(self.runtime_id(), "claude" | "codex" | "qoder") => Err(AgentError::Unsupported {
+                option: "compact".into(),
+                reason: "no manual compaction".into(),
+            }),
+            A::Compact | A::StopTask => {
+                let mut state = self.core.lock();
+                if let Some(e) = SessionCore::unreachable(&state) {
+                    Err(e)
+                } else if action == A::Compact && (state.fold.turn_active() || state.compacting) {
+                    Err(rejected("busy", "cannot compact during a turn"))
+                } else if action == A::StopTask && arg.trim().is_empty() {
+                    Err(rejected("invalid_task_id", "task identifier is empty"))
+                } else {
+                    if action == A::Compact {
+                        state.compacting = true;
+                        state.manual_compaction = true;
+                        state.span_id = format!("compact-{}", state.records.len());
+                        self.core.compact_event(&mut state, true, "manual");
+                        drop(state);
+                        let result = self.driver.compact();
+                        if result.is_err() {
+                            let mut state = self.core.lock();
+                            state.compacting = false;
+                            state.manual_compaction = false;
+                            self.core.compact_event(&mut state, false, "failed");
+                            state.span_id.clear();
+                        }
+                        result
+                    } else {
+                        drop(state);
+                        self.driver.stop_task(arg)
+                    }
+                }
+            }
+        };
+        let (status, code, reason) = match &result {
+            Ok(()) => (S::Accepted, "".into(), String::new()),
+            Err(AgentError::Unsupported { reason, .. }) => (S::Unsupported, "unsupported".into(), reason.clone()),
+            Err(e @ AgentError::Rejected(_)) => {
+                let code = e.rejection_code().unwrap_or("rejected");
+                (
+                    if matches!(code, rejection::DISPOSED | rejection::RUNTIME_EXITED) {
+                        S::NotRunning
+                    } else {
+                        S::Rejected
+                    },
+                    if matches!(code, rejection::DISPOSED | rejection::RUNTIME_EXITED) {
+                        "not_running".into()
+                    } else {
+                        code.to_owned()
+                    },
+                    e.to_string(),
+                )
+            }
+            Err(_) => return result.map(|_| unreachable!()),
+        };
+        let mut state = self.core.lock();
+        let span = if !span_id.is_empty() { span_id.to_owned() } else { state.span_id.clone() };
+        let outcome = crate::ControlOutcome {
+            action,
+            status,
+            code,
+            reason,
+            span_id: span.clone(),
+            input_id: if action == A::Withdraw { arg.into() } else { input_id.into() },
+        };
+        let mut rec = crate::voyage::Record::new(crate::voyage::Kind::Control, self.id(), now_ms());
+        rec.span_id = span;
+        let mut control = serde_json::json!({"action":action,"outcome":outcome});
+        if !outcome.input_id.is_empty() {
+            control["inputId"] = serde_json::json!(outcome.input_id);
+        }
+        if action == A::StopTask {
+            control["taskId"] = serde_json::json!(arg);
+        }
+        rec.frame_type = control["action"].as_str().unwrap_or_default().into();
+        rec.control = Some(control);
+        self.core.record_locked(&mut state, rec);
+        Ok((outcome, result.err()))
     }
 
-    fn runtime_id(&self) -> &str {
-        self.core.runtime_id()
-    }
-
-    fn status(&self) -> SessionStatus {
-        self.core.status()
-    }
-
-    fn events(&self) -> flume::Receiver<Event> {
-        self.core.subscribe(false)
-    }
-
-    fn events_with_history(&self) -> flume::Receiver<Event> {
-        self.core.subscribe(true)
-    }
-
-    fn prompt(&self, content: Vec<ContentBlock>) -> Result<()> {
-        self.check(&content)?;
-        self.core.begin_turn(&render_text(&content))?;
-        self.run_turn(content)
-    }
-
-    fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
+    fn steer_input(&self, content: Vec<ContentBlock>) -> Result<()> {
         if !self.capabilities.steer {
             return Err(AgentError::Unsupported {
                 option: "steer".into(),
@@ -452,23 +856,7 @@ impl<D: Driver> Session for CoreSession<D> {
         self.driver.steer(content)
     }
 
-    fn queue(&self, content: Vec<ContentBlock>) -> Result<()> {
-        if !self.capabilities.queue {
-            return Err(AgentError::Unsupported {
-                option: "queue".into(),
-                reason: format!("{} does not hold input", self.core.runtime_id()),
-            });
-        }
-        self.check(&content)?;
-        if self.core.begin_turn_or_queue(&content)? {
-            return self.run_turn(content);
-        }
-        Ok(())
-    }
-
-    /// Also withdraws input still held by `queue`: a stopped session must
-    /// not start the next turn by itself.
-    fn abort(&self) -> Result<()> {
+    fn abort_input(&self) -> Result<()> {
         {
             let mut state = self.core.lock();
             if let Some(error) = SessionCore::unreachable(&state) {
@@ -481,7 +869,83 @@ impl<D: Driver> Session for CoreSession<D> {
         }
         self.driver.abort()
     }
+}
 
+impl<D: Driver> Session for CoreSession<D> {
+    fn id(&self) -> String {
+        self.core.session_id()
+    }
+
+    fn control(&self, action: crate::ControlAction, arg: &str, input_id: &str, span_id: &str) -> Result<crate::ControlOutcome> {
+        self.dispatch(action, vec![ContentBlock::Text(arg.into())], arg, input_id, span_id)
+            .map(|(outcome, _)| outcome)
+    }
+    fn wait(&self) -> Result<()> {
+        let rx = self.events();
+        while let Ok(e) = rx.recv() {
+            if matches!(e.kind, EventKind::SessionEnded) {
+                break;
+            }
+        }
+        match self.core.lock().exit_error.clone() {
+            Some(e) => Err(AgentError::Io(e)),
+            None => Ok(()),
+        }
+    }
+    fn records(&self) -> Vec<crate::voyage::Record> {
+        self.core.lock().records.clone()
+    }
+
+    fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<crate::voyage::Record> {
+        let (tx, rx) = flume::unbounded();
+        let mut state = self.core.lock();
+        for rec in state.records.iter().filter(|r| after.is_none_or(|seq| r.seq > seq)) {
+            let _ = tx.send(rec.clone());
+        }
+        if !state.ended {
+            state.record_subscribers.push(tx);
+        }
+        rx
+    }
+    fn resume_id(&self) -> Option<String> {
+        let id = self.id();
+        if (self.runtime_id() == "qwen" && id == "qwen-pending") || (self.runtime_id() == "qoder" && id == "qoder-pending") {
+            return None;
+        }
+        Some(id)
+    }
+
+    fn read_subagent(&self, thread_id: &str, turn_id: Option<&str>) -> Result<crate::SubagentSnapshot> {
+        self.driver.read_subagent(thread_id, turn_id)
+    }
+    fn runtime_id(&self) -> &str {
+        self.core.runtime_id()
+    }
+
+    fn status(&self) -> SessionStatus {
+        self.core.status()
+    }
+
+    fn events(&self) -> flume::Receiver<Event> {
+        self.core.subscribe(false)
+    }
+
+    fn events_with_history(&self) -> flume::Receiver<Event> {
+        self.core.subscribe(true)
+    }
+
+    fn prompt(&self, content: Vec<ContentBlock>) -> Result<()> {
+        self.legacy_control(crate::ControlAction::Prompt, content)
+    }
+    fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
+        self.legacy_control(crate::ControlAction::Steer, content)
+    }
+    fn queue(&self, content: Vec<ContentBlock>) -> Result<()> {
+        self.legacy_control(crate::ControlAction::Queue, content)
+    }
+    fn abort(&self) -> Result<()> {
+        self.legacy_control(crate::ControlAction::Abort, vec![])
+    }
     fn respond_permission(&self, request_id: &str, decision: PermissionDecision) -> Result<()> {
         let path = {
             let state = self.core.lock();

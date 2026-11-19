@@ -2,6 +2,14 @@
 
 频道（`Channel`）是用户、助手和帮工说话的地方，含公共频道 `channel`（默认 `general` 叫「田头」）、私聊 `direct` 和工单串 `thread` 三类通道。外部聊天软件（微信、飞书、QQ）经连接器（`modules/connector`）各接到一个频道上：用户在那边对机器人说的话记成他在这个频道里说的，农场里该用户听的话（助手的话、汇报、派活、`@` 他的）在他还没在农场里读到时发到那边。
 
+连接器按平台和外部消息标识登记入站消息。一批消息与读取游标在同一个 SQLite 事务中保存。换绑账号时，连接器同时清除旧入站记录并退役旧待发消息。重启后只读取 `pending` 状态的出站分片，按序号投递。平台已接收但本地尚未记录回执的分片仍可能重发。[连接器查询](crates/vibevalley-server/src/modules/connector/sql/queries.sql)
+
+## Chord 读取频道
+
+本机工作台经 `/chord/ws` 调 `channel.events`。请求的 `channelId` 是频道 ID。`afterSeq` 默认为 0，结果按频道内的消息号升序排列，从大于该序号的第一条开始。`limit` 为正数时限制条数，否则返回余下的消息。读完返回空数组。此方法保留参与者的已读位置。
+
+每行含 `channelId`、`seq`、`kind`、`authorId`、`text` 和 `createdAtMs`。有业务会话的消息另含 `sessionId`。帮工报告使用 `report`，聊天、派活和通知使用 `message`。编辑后读取最新正文，删除后原号的正文为空。表情更新同一条消息，不占新号。要接收已读过的消息上的修改，可订阅 `channel.follow`。
+
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
@@ -17,8 +25,8 @@
 | 位置 | 职责 |
 |---|---|
 | `crates/vibevalley-server/src/modules/channel/mod.rs` | `Chat`：频道、私聊、串的增删改查，写话（`say`、`speak`、`post`、`notice`），每条消息连同带序号的事件（`channel_event`）在一个事务里落库；提交后发给读者（`Chat::committed`），写话等读者处理完（`Chat::await_reader`）；端点也在这里注册 |
-| `crates/vibevalley-server/src/modules/channel/db.rs` | 表和查询（SQLite，在 `server.db`） |
-| `crates/vibevalley-server/src/modules/channel/model.rs` | 内存镜像：提交以后才改 |
+| [频道表结构](crates/vibevalley-server/src/modules/channel/sql/schema.sql)、[命名查询](crates/vibevalley-server/src/modules/channel/sql/queries.sql)、`db.rs` | sqlc 生成 SQLx 查询。频道连接在 `server.db` 上读写消息、串和观察游标。 |
+| `crates/vibevalley-server/src/modules/channel/model.rs` | 写事务在频道锁内更新镜像。回滚恢复原镜像，提交后才向订阅者发布。 |
 | `crates/vibevalley-server/src/modules/channel/words.rs` | `@` 识别、地址解析、搜索过滤与公网链接预览 |
 | `crates/vibevalley-server/src/modules/watch/` | 读者：[观察层](docs/subsystems/watch.md)按自己的游标读事件、排席位、路由、开串、回执 |
 | `crates/vibevalley-http/src/lib.rs` | 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)） |

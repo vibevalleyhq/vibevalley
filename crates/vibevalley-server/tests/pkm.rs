@@ -439,3 +439,51 @@ fn the_endpoints_are_served_and_the_watcher_follows_an_outside_editor() {
         std::thread::sleep(Duration::from_millis(100));
     }
 }
+
+#[test]
+fn regression_failed_index_refresh_keeps_old_terms_and_recovers_the_written_file_and_undo() {
+    use sqlx::{ConnectOptions, sqlite::SqliteConnectOptions};
+
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("pkm");
+    let pkm = Pkm::open(dir.path(), &root).unwrap();
+    let page = pkm.save(&req("Notes", Some(PkmTier::Project), "- alder\n")).unwrap();
+    let mut db = pollster::block_on(SqliteConnectOptions::new().filename(dir.path().join("server.db")).connect()).unwrap();
+    let before: Vec<String> = pollster::block_on(
+        sqlx::query_scalar("SELECT terms FROM pkm_term WHERE page=? ORDER BY block")
+            .bind(page.slug.clone())
+            .fetch_all(&mut db),
+    )
+    .unwrap();
+    assert!(!before.is_empty());
+    pollster::block_on(
+        sqlx::raw_sql(
+            "CREATE TRIGGER refuse_new_term BEFORE INSERT ON pkm_term WHEN instr(NEW.terms, 'juniper') > 0 BEGIN SELECT RAISE(ABORT,'index failure'); END;",
+        )
+        .execute(&mut db),
+    )
+    .unwrap();
+    let ops: Vec<PkmBlockOp> = serde_json::from_value(json!([{"op":"update","block":page.blocks[0].id,"body":"juniper"}])).unwrap();
+    let error = pkm.apply("notes", &ops).unwrap_err();
+    assert_eq!(error.biz_code, BizCode::InternalError);
+    assert_eq!(on_disk(&root, &page.file), "- juniper\n");
+    let kept: Vec<String> = pollster::block_on(
+        sqlx::query_scalar("SELECT terms FROM pkm_term WHERE page=? ORDER BY block")
+            .bind(page.slug)
+            .fetch_all(&mut db),
+    )
+    .unwrap();
+    assert_eq!(kept, before);
+    pollster::block_on(sqlx::raw_sql("DROP TRIGGER refuse_new_term").execute(&mut db)).unwrap();
+    drop(pkm);
+    let reopened = Pkm::open(dir.path(), &root).unwrap();
+    let query = |text: &str| PkmSearchRequest {
+        text: Some(text.into()),
+        ..Default::default()
+    };
+    assert_eq!(reopened.search(&query("juniper")).unwrap()[0].body, "juniper");
+    assert!(reopened.search(&query("alder")).unwrap().is_empty());
+    assert!(reopened.undo().unwrap().undone);
+    assert!(on_disk(&root, &page.file).contains("- alder"));
+    assert_eq!(reopened.search(&query("alder")).unwrap()[0].body, "alder");
+}

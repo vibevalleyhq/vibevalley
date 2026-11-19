@@ -1,0 +1,34 @@
+{
+  "initialize": [
+    {"id":9412,"jsonrpc":"2.0","result":{"serverInfo":{"name":"codex-fake","version":"1.0"}}}
+  ],
+  "initialized": [
+
+  ],
+  "thread/start": [
+    {"id":9412,"jsonrpc":"2.0","result":{"thread":{"id":"vendor-root"}}}
+  ],
+  "thread/resume": [
+    {"id":9412,"jsonrpc":"2.0","result":{"thread":{"id":"vendor-root"},"tokenUsage":{"total":{"cacheReadTokens":200,"cacheWriteTokens":80,"inputTokens":500,"outputTokens":100,"reasoningTokens":40}}}}
+  ],
+  "turn/start": [
+    {"id":9412,"jsonrpc":"2.0","result":{"turn":{"id":"codex-turn-1"}}},
+    {"jsonrpc":"2.0","method":"turn/started","params":{"threadId":"vendor-root","turn":{"id":"codex-turn-1"}}},
+    {"jsonrpc":"2.0","method":"item/started","params":{"threadId":"vendor-root","turnId":"codex-turn-1","item":{"type":"collabAgentToolCall","id":"spawn-review","tool":"spawnAgent","senderThreadId":"vendor-root","receiverThreadIds":[],"agentsStates":{},"prompt":"Review the change","status":"inProgress"}}},
+    {"jsonrpc":"2.0","method":"item/completed","params":{"threadId":"vendor-root","turnId":"codex-turn-1","item":{"type":"collabAgentToolCall","id":"spawn-review","tool":"spawnAgent","senderThreadId":"vendor-root","receiverThreadIds":["review"],"agentsStates":{"review":{"status":"running","message":null}},"prompt":null,"status":"completed"}}},
+    {"jsonrpc":"2.0","method":"turn/started","params":{"threadId":"review","turn":{"id":"review-turn","status":"inProgress"}}},
+    {"jsonrpc":"2.0","method":"item/started","params":{"threadId":"review","turnId":"review-turn","item":{"type":"collabAgentToolCall","id":"wait-tests","tool":"wait","senderThreadId":"review","receiverThreadIds":["tests"],"agentsStates":{},"prompt":null,"status":"inProgress"}}},
+    {"jsonrpc":"2.0","method":"item/completed","params":{"threadId":"vendor-root","turnId":"codex-turn-1","item":{"type":"collabAgentToolCall","id":"spawn-tests","tool":"spawnAgent","senderThreadId":"vendor-root","receiverThreadIds":["tests"],"agentsStates":{"tests":{"status":"pendingInit","message":null}},"prompt":"Run the tests","status":"completed"}}},
+    {"jsonrpc":"2.0","method":"turn/started","params":{"threadId":"tests","turn":{"id":"attempt-1","status":"inProgress"}}},
+    {"jsonrpc":"2.0","method":"item/started","params":{"threadId":"tests","turnId":"attempt-1","item":{"type":"commandExecution","id":"tests-cmd","command":"cargo test","status":"inProgress"}}},
+    {"jsonrpc":"2.0","method":"item/completed","params":{"threadId":"tests","turnId":"attempt-1","item":{"type":"commandExecution","id":"tests-cmd","command":"cargo test","status":"failed","exitCode":1,"aggregatedOutput":"fixture failed"}}},
+    {"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"tests","turn":{"id":"attempt-1","status":"failed"}}},
+    {"jsonrpc":"2.0","method":"turn/started","params":{"threadId":"tests","turn":{"id":"attempt-2","status":"inProgress"}}},
+    {"jsonrpc":"2.0","method":"item/completed","params":{"threadId":"review","turnId":"review-turn","item":{"type":"collabAgentToolCall","id":"wait-tests","tool":"wait","senderThreadId":"review","receiverThreadIds":["tests"],"agentsStates":{"tests":{"status":"errored","message":"obsolete first attempt"}},"prompt":null,"status":"completed"}}},
+    {"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"tests","turn":{"id":"attempt-1","status":"failed"}}},
+    {"jsonrpc":"2.0","method":"turn/plan/updated","params":{"threadId":"tests","turnId":"attempt-2","plan":[{"step":"Retry the check","status":"inProgress"}]}},
+    {"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"review","turn":{"id":"review-turn","status":"completed"}}},
+    {"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"tests","turn":{"id":"attempt-2","status":"completed"}}},
+    {"jsonrpc":"2.0","method":"turn/completed","params":{"threadId":"vendor-root","turn":{"id":"codex-turn-1","status":"completed"}}}
+  ]
+}

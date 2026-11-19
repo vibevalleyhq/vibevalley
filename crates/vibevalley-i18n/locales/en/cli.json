@@ -32,6 +32,8 @@
     "fail": "Fail it",
     "finding": "What is wrong, one a flag, may be given more than once",
     "pass": "Pass it",
+    "reviewBase": "Git base commit shown in the review",
+    "reviewTree": "Git tree shown in the review",
     "reviewComment": "Words with the review",
     "statusComment": "Words with the move: what to change, when it goes for another round",
     "title": "The new title",

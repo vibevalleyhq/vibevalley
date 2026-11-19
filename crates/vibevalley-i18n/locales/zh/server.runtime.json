@@ -29,5 +29,8 @@
   "cannotDrive": "oar 驱动不了 {runtime}",
   "cannotSend": "{name} 派不出去：{why}",
   "defaultModel": "{runtime} 没有 {model} 这个模型，{name} 先用默认模型",
-  "effort": "{model} 没有 {effort} 这一档，可选：{levels}"
+  "effort": "{model} 没有 {effort} 这一档，可选：{levels}",
+  "probeTimeout": "检测农机超时。可重新检测。",
+  "stillChecking": "农机检测尚未结束",
+  "signInRequired": "请在本机终端登录 {runtime}，再重新检测。"
 }

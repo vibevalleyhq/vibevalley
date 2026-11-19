@@ -194,3 +194,53 @@ fn refuses_what_does_not_name_one_public_source_or_is_not_the_callers_to_give() 
     let e = library.add(&req(json!({ "path": "../../etc/hosts" })), &inside).expect_err("outside");
     assert_eq!(e.biz_code, BizCode::LibraryRefused);
 }
+
+#[test]
+fn regression_library_sort_filter_and_attachment_identity_survive_reopen() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = start(dir.path());
+    let mut ids = Vec::new();
+    for (name, data, kind) in [
+        ("zeta.png", "aaa", "image/png"),
+        ("Alpha.txt", "a", "text/plain"),
+        ("aUDIO.mp3", "aabbb", "audio/mpeg"),
+        ("beta.md", "bbb", "text/markdown"),
+    ] {
+        let file = ok(s.hub.call_as(Caller::User, "attachment.create", file(name, data, kind)));
+        let id = file["id"].as_str().unwrap().to_string();
+        let added = ok(s.hub.call_as(Caller::User, "library.item.add", json!({"attachment": id})));
+        assert_eq!(added["attachment"], file);
+        ids.push(id);
+    }
+    s.close();
+    let mut db = crate::support::inspect_db(&dir.path().join("server.db"));
+    crate::support::execute_sql(&mut db, "update media_library_item set last_at = 10");
+    drop(db);
+    let s = start(dir.path());
+    let list = |args: Value| {
+        let items = ok(s.hub.call_as(Caller::User, "library.item.list", args));
+        items
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["attachment"]["id"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let mut by_id = ids.clone();
+    by_id.sort();
+    assert_eq!(list(json!({})), by_id);
+    assert_eq!(list(json!({"sort":"name"})), [&ids[1], &ids[2], &ids[3], &ids[0]].map(Clone::clone));
+    let mut tied = [ids[0].clone(), ids[3].clone()];
+    tied.sort();
+    assert_eq!(list(json!({"sort":"size"})), [ids[2].clone(), tied[0].clone(), tied[1].clone(), ids[1].clone()]);
+    assert_eq!(
+        list(json!({"origin":"uploaded","type":"other","sort":"name"})),
+        [ids[1].clone(), ids[3].clone()]
+    );
+    assert_eq!(list(json!({"text":"  ALP  "})), [ids[1].clone()]);
+    assert!(list(json!({"origin":"generated"})).is_empty());
+    ok(s.hub.call_as(Caller::User, "library.item.delete", json!({"id":ids[1]})));
+    assert!(list(json!({"text":"Alpha"})).is_empty());
+    assert_eq!(std::fs::read(s.attachments.file(&ids[1]).unwrap().path).unwrap(), b"a");
+    s.close();
+}

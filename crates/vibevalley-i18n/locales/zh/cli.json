@@ -32,6 +32,8 @@
     "fail": "不通过",
     "finding": "哪里不对，一条一处，可以给多次",
     "pass": "通过",
+    "reviewBase": "审查时显示的 Git 基线提交",
+    "reviewTree": "审查时显示的 Git 文件树",
     "reviewComment": "验收的话",
     "statusComment": "一起说的话：再来一轮时说要改什么",
     "title": "新的标题",
