@@ -238,9 +238,23 @@ impl Inner {
 
     /// A page's blocks in the full-text index, as they read now.
     fn indexed(&mut self, page: &Page) -> Result<(), ApiError> {
-        let rows: Vec<(String, String)> = p::flat_blocks(&page.blocks)
+        let mut order: Vec<String> = Vec::new();
+        let mut by_block: HashMap<String, Vec<String>> = HashMap::new();
+        for b in p::flat_blocks(&page.blocks) {
+            let next = tokenize(&format!("{}\n{}\n{}", page.title, b.path, b.body));
+            let entry = by_block.entry(b.id.clone()).or_insert_with(|| {
+                order.push(b.id.clone());
+                Vec::new()
+            });
+            for term in next {
+                if !entry.contains(&term) {
+                    entry.push(term);
+                }
+            }
+        }
+        let rows: Vec<(String, String)> = order
             .into_iter()
-            .map(|b| (b.id, tokenize(&format!("{}\n{}\n{}", page.title, b.path, b.body)).join(" ")))
+            .filter_map(|id| by_block.remove(&id).map(|terms| (id, terms.join(" "))))
             .collect();
         db::set_page_terms(&mut self.db, &page.slug, &rows).map_err(db_failed)
     }

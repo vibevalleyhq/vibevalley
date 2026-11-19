@@ -287,7 +287,8 @@ pub async fn r#add_term<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: AddTermParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT INTO pkm_term(block,page,terms) VALUES (?1,?2,?3)"#)
+    sqlx::query(r#"INSERT INTO pkm_term(block,page,terms) VALUES (?1,?2,?3)
+ON CONFLICT(page, block) DO UPDATE SET terms = excluded.terms"#)
         .bind(params.r#block)
         .bind(params.r#page)
         .bind(params.r#terms)

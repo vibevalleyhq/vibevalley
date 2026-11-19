@@ -16,9 +16,9 @@ create index if not exists pkm_comment_by_page on pkm_comment (page, created_at)
 create table if not exists pkm_term (
   block  text not null,
   page   text not null,
-  terms  text not null
+  terms  text not null,
+  primary key (page, block)
 );
-create index if not exists pkm_term_by_page on pkm_term (page);
 create table if not exists pkm_change (
   seq          integer primary key autoincrement,
   at           integer not null,
