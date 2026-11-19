@@ -1,13 +1,12 @@
 // Ported from VibeValley apps/web/src/features/artifact/PresenterPage.tsx:
-// the speaker's view of a deck: this slide, the next, its notes and the
-// time. VibeValley opens it as a popup window that follows the workbench's
-// tab over a BroadcastChannel; here it is a page of the same view (with a
-// way back to the deck), so there is nothing to follow. The arrow keys,
-// PageUp/PageDown and Space step (keymap bindings while no field is being
-// written in).
+// the speaker's view of a deck (both html and store-backed slides): this slide,
+// the next, its notes and the time. VibeValley opens it as a popup window that
+// follows the workbench's tab over a BroadcastChannel; here it is a page of the
+// same view (with a way back to the deck), so no BroadcastChannel is needed.
 import { cleanup, keymap, Scroll, signal, Text, View, WebView } from "nsh";
 
 import { t } from "@vibevalley/i18n";
+import { artifactId } from "@vibevalley/protocol/schema";
 
 import { useNow } from "../../base/dom";
 import { reasonOf } from "../../infra/api";
@@ -19,6 +18,16 @@ import { artifactHref, useArtifact, useArtifactContent } from "./ArtifactCard";
 import { createFrame, framed, shim } from "./frame";
 import { elapsedText, presenterOf, stepped } from "./slides";
 import { Slide } from "./SlidesControls";
+import { useStoreViewHtml } from "./store";
+
+function withSlideQuery(html: string, at: number, still: boolean): string {
+  const asked = new URLSearchParams();
+  asked.set("at", String(at));
+  if (still) asked.set("still", "1");
+  const read = "new URLSearchParams(location.search)";
+  const idx = html.lastIndexOf(read);
+  return idx < 0 ? html : `${html.slice(0, idx)}new URLSearchParams(${JSON.stringify(asked.toString())})${html.slice(idx + read.length)}`;
+}
 
 export function PresenterPage() {
   const router = useRouter();
@@ -40,13 +49,20 @@ export function PresenterPage() {
 function Presenter(props: { id: string; version: number }) {
   const router = useRouter();
   const artifact = useArtifact(() => props.id);
+  const isStore = () => artifact.data()?.body === "store";
   const content = useArtifactContent(() => ({ id: props.id, version: props.version }));
+  const storeView = useStoreViewHtml(() => (isStore() ? { id: artifactId(props.id), theme: shownTheme(), seq: props.version } : undefined));
+  const currentHtml = () => {
+    if (isStore()) return storeView.html();
+    const c = content.data();
+    return c ? framed({ page: c.content, display: "slides", theme: shownTheme() }) : undefined;
+  };
   const frame = createFrame();
   const pages = () => frame.shown().ready?.pages ?? 0;
   const statusText = () => {
     const state = frame.state();
-    const error = content.error();
-    if (error) return t("web.artifact.presenter.loadFailure", { reason: reasonOf(error) });
+    const error = isStore() ? storeView.error() : content.error();
+    if (error) return t("web.artifact.presenter.loadFailure", { reason: typeof error === "string" ? error : reasonOf(error) });
     if (typeof state === "object") return t("web.artifact.presenter.loadFailure", { reason: state.error });
     return frame.shown().ready ? t("web.artifact.presenter.empty") : t("web.artifact.presenter.waiting");
   };
@@ -66,13 +82,13 @@ function Presenter(props: { id: string; version: number }) {
     <View testID="presenter" accessibilityValue={{ now: at(), max: pages() }} class="h-full flex-1 gap-4 bg-side p-4 md:flex-row">
       <View accessibilityLabel={t("web.artifact.presenter.current")} class="min-h-0 gap-3 md:flex-2">
         <View class="aspect-video w-full overflow-hidden rounded-lg border border-line bg-page">
-          <If when={content.data()}>
-            {(c) => (
+          <If when={currentHtml()}>
+            {(html) => (
               <WebView
                 ref={(r) => frame.setRef(r)}
                 testID="presenter-current"
                 accessibilityLabel={t("web.artifact.presenter.current")}
-                html={framed({ page: c().content, display: "slides", theme: shownTheme() })}
+                html={html()}
                 incognito
                 injectedJavaScriptBeforeContentLoaded={shim}
                 onLoad={() => frame.setState("loaded")}
@@ -88,7 +104,7 @@ function Presenter(props: { id: string; version: number }) {
             icon="back"
             label={t("web.artifact.page.all")}
             testid="presenter-back"
-            onClick={() => router.navigate(artifactHref(props.id, props.version))}
+            onClick={() => router.navigate(artifactHref(props.id, isStore() ? undefined : props.version))}
           />
           <IconButton icon="previous" label={t("web.artifact.slides.previous")} testid="presenter-previous" disabled={at() === 0} onClick={() => step(-1)} />
           <If
@@ -122,7 +138,13 @@ function Presenter(props: { id: string; version: number }) {
           }
         >
           <View testID="presenter-next-slide" class="aspect-video w-full overflow-hidden rounded-md border border-line bg-page">
-            <Slide id={props.id} version={props.version} at={at() + 1} />
+            <If when={isStore()} else={<Slide id={props.id} version={props.version} at={at() + 1} />}>
+              <If when={storeView.html()}>
+                {(html) => (
+                  <WebView html={withSlideQuery(html(), at() + 1, true)} incognito scrollable={false} accessibilityElementsHidden class="h-full w-full" />
+                )}
+              </If>
+            </If>
           </View>
         </If>
         <Text class="text-xs text-faint">{t("web.artifact.presenter.notes")}</Text>

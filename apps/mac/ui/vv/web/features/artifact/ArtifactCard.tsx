@@ -1,11 +1,12 @@
 // Ported from VibeValley apps/web/src/features/artifact/ArtifactCard.tsx:
-// the artifact queries, the labels and icons a kind is shown with, and the
+// the artifact queries, the labels and icons a kind/type is shown with, and the
 // card a message announces one with.
 import { Text, View } from "nsh";
 import { z } from "zod";
 
+import { artifactSuffixOf } from "@vibevalley/artifact/html";
 import { t } from "@vibevalley/i18n";
-import type { ArtifactBody, ArtifactCard as Card, ArtifactDisplay, ArtifactListRequest } from "@vibevalley/protocol";
+import type { ArtifactBody, ArtifactCard as Card, ArtifactDisplay, ArtifactListRequest, ArtifactType } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -25,7 +26,7 @@ const artifactQuery = defineQuery({
 });
 const artifactsQuery = defineQuery({
   schema: z.array(S.Artifact),
-  key: (q: ArtifactListRequest) => ["artifacts", "list", q.channel ?? null, q.issue ?? null],
+  key: (q: ArtifactListRequest) => ["artifacts", "list", q.channel ?? null, q.issue ?? null, q.artifactType ?? null],
   fetch: (q, context) => api.artifact.list(q, context),
   ...retryRead,
 });
@@ -48,10 +49,59 @@ const displayLabel: Record<ArtifactDisplay, string> = {
   slides: t("web.artifact.body.slides"),
   motion: t("web.artifact.body.motion"),
 };
-/** What it is, as a card or a header says it: an html one by how it is shown. */
-export const kindLabel = (a: { readonly body: ArtifactBody; readonly display?: ArtifactDisplay | undefined }) =>
-  a.body === "blocks" ? t("web.artifact.body.blocks") : displayLabel[a.display ?? "page"];
-export const bodyIcon: Record<ArtifactBody, IconName> = { blocks: "artifacts", html: "web" };
+
+export const artifactTypeLabel: Record<ArtifactType, string> = {
+  docs: t("web.artifact.types.docs"),
+  slides: t("web.artifact.types.slides"),
+  dashboard: t("web.artifact.types.dashboard"),
+  motion: t("web.artifact.types.motion"),
+  whiteboard: t("web.artifact.types.whiteboard"),
+  design: t("web.artifact.types.design"),
+  "design-system": t("web.artifact.types.designSystem"),
+};
+
+export const artifactTypeIcon: Record<ArtifactType, IconName> = {
+  docs: "artifacts",
+  slides: "present",
+  dashboard: "catalog",
+  motion: "video",
+  whiteboard: "idea",
+  design: "devices",
+  "design-system": "appearance",
+};
+
+const artifactTypeSuffix: Record<ArtifactType, string> = {
+  docs: ".doc.md",
+  slides: ".slide.html",
+  dashboard: ".dashboard.html",
+  motion: ".motion.html",
+  whiteboard: ".whiteboard",
+  design: ".design.html",
+  "design-system": ".tokens.json",
+};
+
+/** What it is, as a card or a header says it: a structured type by its domain, or an html one by how it is shown. */
+export const kindLabel = (a: {
+  readonly body: ArtifactBody;
+  readonly display?: ArtifactDisplay | undefined;
+  readonly artifactType?: ArtifactType | undefined;
+}) => {
+  if (a.artifactType) return artifactTypeLabel[a.artifactType];
+  if (a.body === "blocks") return t("web.artifact.body.blocks");
+  if (a.body === "store") return t("web.artifact.body.store");
+  return displayLabel[a.display ?? "page"];
+};
+
+export const bodyIcon: Record<ArtifactBody, IconName> = { blocks: "artifacts", html: "web", store: "catalog" };
+
+export const artifactIcon = (a: { readonly body: ArtifactBody; readonly artifactType?: ArtifactType | undefined }): IconName =>
+  a.artifactType ? artifactTypeIcon[a.artifactType] : bodyIcon[a.body];
+
+export const artifactSuffix = (a: {
+  readonly body: ArtifactBody;
+  readonly display?: ArtifactDisplay | undefined;
+  readonly artifactType?: ArtifactType | undefined;
+}): string => (a.artifactType ? artifactTypeSuffix[a.artifactType] : artifactSuffixOf(a));
 
 /** The card's second line: what it is, its version (html), its note. */
 const cardLine = (card: Card) =>
@@ -78,7 +128,7 @@ export function ArtifactCard(props: { card: Card }) {
       class="mt-1 w-full max-w-md flex-row items-center gap-3 rounded-lg border border-line bg-page px-3 py-2 transition duration-120 ease-out hover:bg-hover"
     >
       <View class="size-9 shrink-0 items-center justify-center rounded-md bg-hover">
-        <Icon name={bodyIcon[props.card.body]} size={20} tone="muted" />
+        <Icon name={artifactIcon(props.card)} size={20} tone="muted" />
       </View>
       <View class="min-w-0 flex-1">
         <Text class="truncate text-sm font-semibold text-ink">{props.card.title}</Text>

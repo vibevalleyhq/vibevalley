@@ -1,5 +1,5 @@
-// Ported from VibeValley apps/web/src/features/media/Rail.tsx: origin and
-// file-kind facet filters with cross-filtered counts.
+// Ported from VibeValley apps/web/src/features/media/Rail.tsx: origin,
+// file-kind, and deliverable facet filters with cross-filtered counts.
 import { Scroll, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -7,7 +7,7 @@ import { t } from "@vibevalley/i18n";
 import { Select } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
-import { type Counts, type KindFilter, type Names, type Where, whereKey } from "./items";
+import { type ArtifactCounts, artifactFilterKinds, type ArtifactKindFilter, type Counts, type KindFilter, type Names, type Where, whereKey } from "./items";
 
 const originIcons: Record<"generated" | "uploaded" | "fetched", IconName> = {
   generated: "generate",
@@ -22,6 +22,15 @@ const kindIcons: Record<KindFilter, IconName> = {
   other: "file",
 };
 const kinds: readonly KindFilter[] = ["all", "image", "audio", "video", "other"];
+const artifactKindIcons: Record<ArtifactKindFilter, IconName> = {
+  all: "artifacts",
+  canvas: "appearance",
+  slides: "present",
+  dashboard: "catalog",
+  whiteboard: "idea",
+  page: "web",
+};
+const artifactKinds: readonly ArtifactKindFilter[] = ["all", ...artifactFilterKinds];
 
 function Row(props: { testid: string; icon: IconName; label: string; count: number; here: boolean; onPick: () => void }) {
   return (
@@ -29,6 +38,7 @@ function Row(props: { testid: string; icon: IconName; label: string; count: numb
       role="button"
       testID={props.testid}
       accessibilityLabel={`${props.label} ${props.count}`}
+      accessibilityState={{ selected: props.here }}
       onPress={() => props.onPick()}
       class={`h-7 shrink-0 flex-row items-center gap-2 rounded-md px-2 ${props.here ? "bg-selected" : "hover:bg-hover"}`}
     >
@@ -44,10 +54,14 @@ export function Rail(props: {
   names: Names;
   where: Where;
   kind: KindFilter;
+  artifactKind?: ArtifactKindFilter | undefined;
+  artifactCounts?: ArtifactCounts | undefined;
   onWhere: (where: Where) => void;
   onKind: (kind: KindFilter) => void;
+  onArtifactKind?: ((kind: ArtifactKindFilter | undefined) => void) | undefined;
 }) {
   const narrow = () => windowSize().width < 640;
+  const inArtifacts = () => props.artifactKind !== undefined;
   const here = (where: Where) => whereKey(where) === whereKey(props.where);
   const wheres = (): readonly { readonly where: Where; readonly label: string }[] => {
     const names = props.names;
@@ -62,6 +76,7 @@ export function Rail(props: {
     ];
   };
   const n = (key: string) => props.counts.where.get(key) ?? 0;
+  const artifactCount = (k: ArtifactKindFilter) => (k === "all" ? (props.artifactCounts?.all ?? 0) : (props.artifactCounts?.byKind[k] ?? 0));
   const whereRow = (where: Where, icon: IconName, label: string) => (
     <Row testid="library-where" icon={icon} label={label} count={n(whereKey(where))} here={here(where)} onPick={() => props.onWhere(where)} />
   );
@@ -90,18 +105,33 @@ export function Rail(props: {
             label={t("web.library.rail.kind")}
             testid="library-kind-select"
             size="control"
-            value={props.kind}
-            onChange={props.onKind}
-            options={kinds.map((kind) => ({
-              value: kind,
-              label: `${kind === "all" ? t("web.library.rail.anyKind") : t(`web.library.kind.${kind}`)} · ${props.counts.kind.get(kind) ?? 0}`,
-            }))}
+            value={inArtifacts() ? `artifact:${props.artifactKind}` : props.kind}
+            onChange={(v) => {
+              if (v.startsWith("artifact:")) {
+                props.onArtifactKind?.(v.slice("artifact:".length) as ArtifactKindFilter);
+              } else {
+                props.onArtifactKind?.(undefined);
+                props.onKind(v as KindFilter);
+              }
+            }}
+            options={[
+              ...kinds.map((kind) => ({
+                value: kind,
+                label: `${kind === "all" ? t("web.library.rail.anyKind") : t(`web.library.kind.${kind}`)} · ${props.counts.kind.get(kind) ?? 0}`,
+              })),
+              ...(props.onArtifactKind !== undefined
+                ? artifactKinds.map((ak) => ({
+                    value: `artifact:${ak}`,
+                    label: `${t(`web.library.artifactKind.${ak}`)} · ${artifactCount(ak)}`,
+                  }))
+                : []),
+            ]}
             class="min-w-0 flex-1"
           />
         </View>
       }
     >
-      <Scroll testID="library-rail" class="w-52 shrink-0 border-r border-line bg-side" contentClass="gap-5 p-3">
+      <Scroll testID="library-rail" class="w-56 shrink-0 border-r border-line bg-side" contentClass="gap-5 p-3">
         <View class="gap-0.5">
           <Text class="px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.where")}</Text>
           {whereRow({ by: "all" }, "media", t("web.library.origin.all"))}
@@ -118,12 +148,32 @@ export function Rail(props: {
                 icon={kindIcons[k()]}
                 label={t(`web.library.kind.${k()}`)}
                 count={props.counts.kind.get(k()) ?? 0}
-                here={props.kind === k()}
-                onPick={() => props.onKind(k())}
+                here={!inArtifacts() && props.kind === k()}
+                onPick={() => {
+                  props.onArtifactKind?.(undefined);
+                  props.onKind(k());
+                }}
               />
             )}
           </Each>
         </View>
+        <If when={props.onArtifactKind !== undefined}>
+          <View class="gap-0.5">
+            <Text class="px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.artifacts")}</Text>
+            <Each of={artifactKinds}>
+              {(ak) => (
+                <Row
+                  testid={`library-artifact-kind-${ak()}`}
+                  icon={artifactKindIcons[ak()]}
+                  label={t(`web.library.artifactKind.${ak()}`)}
+                  count={artifactCount(ak())}
+                  here={props.artifactKind === ak()}
+                  onPick={() => props.onArtifactKind?.(ak())}
+                />
+              )}
+            </Each>
+          </View>
+        </If>
         <If when={props.counts.channels.length > 0}>
           <View class="gap-0.5">
             <Text class="px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.channels")}</Text>

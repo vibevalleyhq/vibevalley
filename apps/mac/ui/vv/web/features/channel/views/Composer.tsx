@@ -32,6 +32,7 @@ import { readFiles } from "../../../ui/picked";
 import { Bubble } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { mix } from "../../../ui/tone";
+import { activeArtifactViewContext } from "../../artifact/store";
 import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying, type ComposerKey } from "../model/composing";
 import { followed } from "../model/follow";
 import { EmojiPopover } from "./EmojiPicker";
@@ -75,6 +76,7 @@ function BoxButton(props: { icon: IconName; label: string; testid: string; onPre
 export function Composer(props: {
   channel: Channel | undefined;
   placeholder: string;
+  replyTo?: number | undefined;
   quoted?: readonly QuotedBlockDraft[] | undefined;
   onClearQuote?: (() => void) | undefined;
   onRemoveQuote?: ((blockId: string) => void) | undefined;
@@ -101,12 +103,14 @@ export function Composer(props: {
     says: useIntents(chatSay),
     target: () => {
       const d = draft();
-      const reply = replying();
+      const replyNumber = replying()?.number ?? props.replyTo;
+      const viewContext = untracked(activeArtifactViewContext);
       return {
         id: props.channel?.id ?? "",
-        ...(reply ? { replyTo: reply.number } : {}),
+        ...(replyNumber !== undefined ? { replyTo: replyNumber } : {}),
         ...(d.files.length > 0 ? { attachments: d.files.map((f) => f.id) } : {}),
         ...((props.quoted?.length ?? 0) > 0 ? { blocks: (props.quoted ?? []).map((q) => q.ref) } : {}),
+        ...(viewContext ? { viewContext } : {}),
       };
     },
     failed: (reason) => {
@@ -410,7 +414,7 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
   const over = signal(false);
   return (
     <View
-      class="min-w-0 flex-1"
+      class="min-h-0 min-w-0 flex-1"
       onFileDragEnter={() => props.channel && over.set(true)}
       onFileDragLeave={() => over.set(false)}
       onFileDrop={(e) => {
