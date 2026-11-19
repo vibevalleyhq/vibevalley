@@ -11,12 +11,18 @@ pub mod gantt;
 pub mod git;
 pub mod journey;
 pub mod pie;
+pub mod quadrant;
+pub mod radar;
 pub mod requirement;
+pub mod sankey;
 pub mod sequence;
 pub mod state;
 pub mod swimlane;
 pub mod timeline;
 pub mod usecase;
+pub mod venn;
+pub mod wardley;
+pub mod xychart;
 
 use std::collections::HashMap;
 
@@ -74,6 +80,12 @@ pub enum ParsedModel {
     EventModeling(eventmodeling::EventModelingModel),
     Timeline(timeline::TimelineModel),
     Journey(journey::JourneyModel),
+    XyChart(xychart::XyChartModel),
+    QuadrantChart(quadrant::QuadrantModel),
+    Radar(radar::RadarModel),
+    Sankey(sankey::SankeyModel),
+    Venn(venn::VennModel),
+    Wardley(wardley::WardleyModel),
 }
 
 impl ParsedModel {
@@ -97,6 +109,12 @@ impl ParsedModel {
             Self::EventModeling(_) => DiagramType::EventModeling,
             Self::Timeline(_) => DiagramType::Timeline,
             Self::Journey(_) => DiagramType::Journey,
+            Self::XyChart(_) => DiagramType::XyChart,
+            Self::QuadrantChart(_) => DiagramType::QuadrantChart,
+            Self::Radar(_) => DiagramType::Radar,
+            Self::Sankey(_) => DiagramType::Sankey,
+            Self::Venn(_) => DiagramType::Venn,
+            Self::Wardley(_) => DiagramType::Wardley,
         }
     }
 
@@ -120,6 +138,12 @@ impl ParsedModel {
             Self::EventModeling(model) => Ok(eventmodeling::render::render_event_model(model, ctx)),
             Self::Timeline(model) => Ok(timeline::render::render_timeline(model, ctx)),
             Self::Journey(model) => Ok(journey::render::render_journey(model, ctx)),
+            Self::XyChart(model) => xychart::render::render_xychart(model, ctx),
+            Self::QuadrantChart(model) => Ok(quadrant::render::render_quadrant(model, ctx)),
+            Self::Radar(model) => Ok(radar::render::render_radar(model, ctx)),
+            Self::Sankey(model) => sankey::render::render_sankey(model, ctx),
+            Self::Venn(model) => Ok(venn::render::render_venn(model, ctx)),
+            Self::Wardley(model) => Ok(wardley::render::render_wardley(model, ctx)),
         }
     }
 }
@@ -188,6 +212,12 @@ impl Registry {
         reg.register(Box::new(eventmodeling::EventModelingDiagram));
         reg.register(Box::new(timeline::TimelineDiagram));
         reg.register(Box::new(journey::JourneyDiagram));
+        reg.register(Box::new(xychart::XyChartDiagram));
+        reg.register(Box::new(quadrant::QuadrantDiagram));
+        reg.register(Box::new(radar::RadarDiagram));
+        reg.register(Box::new(sankey::SankeyDiagram));
+        reg.register(Box::new(venn::VennDiagram));
+        reg.register(Box::new(wardley::WardleyDiagram));
         reg
     }
 
