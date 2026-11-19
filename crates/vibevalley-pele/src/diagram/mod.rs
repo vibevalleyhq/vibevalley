@@ -1,7 +1,10 @@
+pub mod class;
 pub mod common;
+pub mod er;
 pub mod flowchart;
 pub mod pie;
 pub mod sequence;
+pub mod state;
 
 use std::collections::HashMap;
 
@@ -44,6 +47,9 @@ pub enum ParsedModel {
     Flowchart(flowchart::FlowDb),
     Sequence(sequence::SeqDb),
     Pie(pie::PieModel),
+    Class(class::ClassDb),
+    State(state::StateDb),
+    Er(er::ErDb),
 }
 
 impl ParsedModel {
@@ -52,6 +58,9 @@ impl ParsedModel {
             Self::Flowchart(_) => DiagramType::Flowchart,
             Self::Sequence(_) => DiagramType::Sequence,
             Self::Pie(_) => DiagramType::Pie,
+            Self::Class(_) => DiagramType::Class,
+            Self::State(_) => DiagramType::State,
+            Self::Er(_) => DiagramType::Er,
         }
     }
 
@@ -60,6 +69,9 @@ impl ParsedModel {
             Self::Flowchart(db) => flowchart::render_flowchart(db, ctx, None),
             Self::Sequence(db) => sequence::render_sequence(db, ctx),
             Self::Pie(model) => pie::render::render_pie(model, ctx),
+            Self::Class(db) => class::render_class(db, ctx),
+            Self::State(db) => state::render_state(db, ctx),
+            Self::Er(db) => er::render_er(db, ctx),
         }
     }
 }
@@ -113,6 +125,9 @@ impl Registry {
         reg.register(Box::new(flowchart::FlowchartDiagram));
         reg.register(Box::new(sequence::SequenceDiagram));
         reg.register(Box::new(pie::PieDiagram));
+        reg.register(Box::new(class::ClassDiagram));
+        reg.register(Box::new(state::StateDiagram));
+        reg.register(Box::new(er::ErDiagram));
         reg
     }
 
