@@ -966,7 +966,6 @@ impl<'a> Run<'a> {
     }
 }
 
-/// `orchestrator.open`, `orchestrator.stop`.
 pub fn install(hub: &Hub, o: Arc<Orchestrator>) {
     let opened = o.clone();
     hub.on::<ops::OrchestratorOpen>(move |_, ()| {
@@ -978,5 +977,9 @@ pub fn install(hub: &Hub, o: Arc<Orchestrator>) {
         stopped.stop(input.agent.as_deref());
         Ok(())
     });
+    let approvals = o.clone();
+    hub.on::<ops::OrchestratorApprovalList>(move |_, input| approvals.execution.approvals(input.conversation_id.as_deref()));
+    let decisions = o.clone();
+    hub.on::<ops::OrchestratorApprovalResolve>(move |_, input| decisions.execution.resolve_approval(input));
     hub.on::<ops::OrchestratorEvalCreate>(move |_, input| o.mark_wrong(input.agent.as_deref(), input.on.0 as i64, &input.want));
 }

@@ -41,5 +41,11 @@
     "quiet": "The assistant has not spoken yet.",
     "trajectory": "Each of the assistant's rounds",
     "about": "What it heard, every tool it called (click a row for the arguments and the result), what it said. Newest at the bottom; the last 1000 steps are kept. When a round went wrong, click \"This round went wrong\" on what it heard, write what it should have done, and it is kept as an eval."
+  },
+  "approval": {
+    "title": "Tool calls awaiting approval",
+    "allow": "Allow this call",
+    "deny": "Deny this call",
+    "unavailable": "Could not load pending tool calls: {why}"
   }
 }

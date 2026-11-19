@@ -52,9 +52,6 @@ impl LateServer {
 }
 
 impl Server for LateServer {
-    fn resolve_approval(&self, input: Value) -> Envelope {
-        self.server().resolve_approval(input)
-    }
     fn raise_budget(&self, input: Value) -> Envelope {
         self.server().raise_budget(input)
     }

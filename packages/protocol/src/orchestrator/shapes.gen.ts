@@ -9,3 +9,9 @@ agent?: string, on: number, want: string, };
 export type OrchestratorEval = { id: string, file: string, };
 
 export type OrchestratorStopInput = { agent?: string, };
+
+export type OrchestratorApprovalListInput = { conversationId?: string, };
+
+export type OrchestratorApproval = { conversationId: string, taskId: string, toolCallId: string, toolName: string, argumentsJson: string, reason: string, requestedAtMs: number, };
+
+export type OrchestratorApprovalResolveInput = { conversationId: string, taskId: string, toolCallId: string, approved: boolean, reason?: string, };

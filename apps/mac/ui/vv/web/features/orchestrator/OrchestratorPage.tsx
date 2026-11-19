@@ -16,6 +16,7 @@ import { OrchestratorMemoryPanel } from "../memory";
 import { TrajectoryLog } from "../session/Trajectory";
 import { VoiceForm } from "../voice";
 import { markWrongOf, orchestratorLooks } from "./looks";
+import { PendingApprovals } from "./PendingApprovals";
 
 const tabs = [
   { id: "memory", label: t("web.orchestrator.orchestrator.tab.memory") },
@@ -100,6 +101,7 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
       <View testID="orchestrator-page" class="h-full min-h-0 flex-1 gap-4 px-4 pb-4">
         {head()}
         {bar()}
+        <PendingApprovals conversationId={props.agent} />
         <View class="min-h-0 flex-1">
           <TrajectoryLog
             id={props.agent}

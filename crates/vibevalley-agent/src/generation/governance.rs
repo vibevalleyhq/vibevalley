@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use vibevalley_durable::{Entry, Error, Read, Result, Scheduler, Store, Tx};
+use vibevalley_durable::{Entry, Error, Read, Result, Scheduler, Store, TaskStatus, Tx};
 
 pub const SCOPE: &str = "conversation";
 pub const GOVERNANCE: &str = "pi.governance";
@@ -201,11 +201,9 @@ pub struct Decision {
 pub fn resolve(store: &Store, _scheduler: &Scheduler, conv: &str, task: &str, decision: Decision) -> Result<()> {
     store.write(|tx| {
         let mut gov = document(tx, conv, GOVERNANCE)?;
-        if tx.task(task)?.conversation_id != conv {
+        let owner = tx.task(task)?;
+        if owner.conversation_id != conv {
             return Err(Error::Invalid("task belongs to another conversation".into()));
-        }
-        if gov["hardDeniedCalls"][&decision.tool_call_id] == true {
-            return Err(Error::Invalid("permission is not overridable".into()));
         }
         let key = &decision.tool_call_id;
         let signal = json!(decision);
@@ -219,6 +217,12 @@ pub fn resolve(store: &Store, _scheduler: &Scheduler, conv: &str, task: &str, de
             } else {
                 Err(Error::Invalid("a different decision was already recorded".into()))
             };
+        }
+        if gov["hardDeniedCalls"][&decision.tool_call_id] == true {
+            return Err(Error::Invalid("permission is not overridable".into()));
+        }
+        if owner.status == TaskStatus::Terminal {
+            return Err(Error::Invalid("task has already ended".into()));
         }
         if gov["pendingPermissions"][task]["toolCallId"].as_str() != Some(key) {
             return Err(Error::Invalid("permission decision belongs to another call".into()));

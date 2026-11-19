@@ -1,5 +1,16 @@
 {
   "about": "VibeValley's command line: one command is one operation of the server's, <resource> [<sub-resource>] <verb>",
+  "approval": {
+    "about": "Review the assistant’s pending tool calls",
+    "list": "List pending tool approvals",
+    "resolve": "Approve or reject a specific tool call",
+    "conversation": "The conversation ID shown in the approval list",
+    "task": "The task ID shown in the approval list",
+    "toolCall": "The tool call ID shown in the approval list",
+    "decision": "Approve or deny the tool call",
+    "reason": "The reason for the decision",
+    "saved": "Decision recorded"
+  },
   "flag": {
     "model": "The model",
     "effort": "How hard to think",
@@ -345,6 +356,10 @@
       "search": "Search memories by words, every profile's if none is named"
     },
     "orchestrator": {
+      "approval": {
+        "list": "List assistant tool calls awaiting approval",
+        "resolve": "Approve or deny an assistant tool call"
+      },
       "eval": {
         "create": "Save an assistant turn that went wrong as an eval case, with what it should have done"
       },

@@ -218,7 +218,13 @@ export {
 } from "./issue/shapes";
 export { type Cron, type CronRequest, type CronUpdate, type CronView } from "./cron/shapes";
 export type { InboxItem } from "./inbox/shapes";
-export type { OrchestratorEval, OrchestratorEvalRequest } from "./orchestrator/shapes";
+export type {
+  OrchestratorApproval,
+  OrchestratorApprovalListInput,
+  OrchestratorApprovalResolveInput,
+  OrchestratorEval,
+  OrchestratorEvalRequest,
+} from "./orchestrator/shapes";
 export type { Achievement, AgentTally, ChooseTitleRequest, Crop } from "./game/shapes";
 export { type Attachment, type AttachmentUpload } from "./attachment/shapes";
 export {

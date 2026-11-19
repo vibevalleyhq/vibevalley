@@ -233,61 +233,53 @@ fn ask_to_create_issue(started: &vibevalley_server::Started) -> String {
     channel
 }
 
+fn pending_approvals(hub: &vibevalley_server::Hub) -> Value {
+    let reply = hub.call_as(Caller::User, "orchestrator.approval.list", json!({}));
+    assert_eq!(reply.biz_code, 0);
+    reply.data.unwrap()
+}
+
 #[test]
-fn durable_permission_is_projected_and_one_competing_decision_wins() {
-    use vibevalley_server_api::Server;
+fn durable_approval_survives_restart_and_one_competing_decision_wins() {
     let home = tempfile::tempdir().unwrap();
     let (model, cfg) = approval_fixture(home.path());
     let started = vibevalley_server::start(cfg.clone()).unwrap();
     let channel = ask_to_create_issue(&started);
-    let space = started.hub.space_document().unwrap();
-    let card = until("pending approval", || {
-        let (rev, snap, _) = space.state();
-        assert_eq!(snap.get(&["rev".into()]).unwrap().as_i64(), Some(rev));
-        let view = serde_json::json!(snap);
-        let approval = view["approvals"].as_array()?.first()?;
-        let item = view["inbox"].as_array()?.iter().find(|a| a["kind"] == "approval")?;
-        assert_eq!(item["sessionId"], approval["sessionId"]);
-        Some(approval.clone())
-    });
+    let card = until("pending approval", || pending_approvals(&started.hub).as_array()?.first().cloned());
     assert_eq!(card["toolName"], "issue_create");
-    let task = card["taskId"].as_str().unwrap();
+    assert_eq!(card["toolCallId"], "approval-1");
     started.close();
+
     let reopened = vibevalley_server::start(cfg).unwrap();
-    let space = reopened.hub.space_document().unwrap();
-    assert_eq!(serde_json::json!(space.state().1)["approvals"][0]["taskId"], task);
-    assert_ne!(
-        reopened
-            .hub
-            .resolve_approval(json!({"conversationId":"wrong","taskId":task,"approved":true}))
-            .biz_code,
-        0
-    );
-    let approved = json!({"taskId":task,"toolCallId":"approval-1","approved":true});
+    assert_eq!(pending_approvals(&reopened.hub), json!([card]));
+    let resolve = |p| reopened.hub.call_as(Caller::User, "orchestrator.approval.resolve", p);
+    let approved = json!({
+        "conversationId":card["conversationId"],"taskId":card["taskId"],"toolCallId":card["toolCallId"],"approved":true
+    });
+    let mut foreign = approved.clone();
+    foreign["conversationId"] = json!("wrong");
+    assert_ne!(resolve(foreign).biz_code, 0);
+    let denied_as_helper = reopened.hub.call_as(Caller::Session, "orchestrator.approval.resolve", approved.clone());
+    assert_ne!(denied_as_helper.biz_code, 0);
+    assert_eq!(pending_approvals(&reopened.hub), json!([card]));
+
     let answers = std::thread::scope(|s| {
-        let a = s.spawn(|| reopened.hub.resolve_approval(approved.clone()));
-        let b = s.spawn(|| reopened.hub.resolve_approval(approved.clone()));
+        let a = s.spawn(|| resolve(approved.clone()));
+        let b = s.spawn(|| resolve(approved.clone()));
         (a.join().unwrap(), b.join().unwrap())
     });
     assert_eq!((answers.0.biz_code, answers.1.biz_code), (0, 0));
-    assert_ne!(
-        reopened
-            .hub
-            .resolve_approval(json!({"taskId":task,"toolCallId":"approval-1","approved":false}))
-            .biz_code,
-        0
-    );
+    let mut opposite = approved.clone();
+    opposite["approved"] = json!(false);
+    assert_ne!(resolve(opposite).biz_code, 0);
     until("assistant reported after recovery", || {
         let messages = reopened.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
         messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())
     });
     let list = reopened.hub.call_as(Caller::User, "issue.list", json!({})).data.unwrap();
     assert_eq!(list.as_array().unwrap().iter().filter(|i| i["title"] == "Approved work").count(), 1);
-    assert_eq!(serde_json::json!(space.state().1)["approvals"], json!([]));
+    assert_eq!(pending_approvals(&reopened.hub), json!([]));
     assert_eq!(model.seen.lock().unwrap().len(), 2);
-    let raised = reopened.hub.raise_budget(json!({"taskId":task,"newMaxCostMicros":10_000}));
-    assert_eq!(raised.biz_code, 0);
-    assert_eq!(raised.data.unwrap()["maxCostMicros"], 10_000);
     reopened.close();
 }
 
@@ -488,19 +480,52 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
 }
 
 #[test]
-fn rust_chord_client_approves_a_tool_and_observes_the_durable_issue() {
+fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     use vibevalley_chord::{
         link::{Endpoint, Error, Options, Principal},
         ws,
     };
-    use vibevalley_protocol::Issue;
-    use vibevalley_server_api::Server;
+    use vibevalley_protocol::{Envelope, Issue, OrchestratorApproval};
 
     let home = tempfile::tempdir().unwrap();
     let (model, cfg) = approval_fixture(home.path());
+    model
+        .answers
+        .lock()
+        .unwrap()
+        .insert(1, call("approval-2", "issue_create", json!({"title":"Denied work"})));
     let started = vibevalley_server::start(cfg.clone()).unwrap();
     let http = vibevalley_http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let channel = ask_to_create_issue(&started);
+    let request = |path: &str, input: Value| -> Envelope {
+        let url = format!("{}/api/v1/{path}", http.url());
+        let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();
+        agent.post(url).send_json(input).unwrap().body_mut().read_json().unwrap()
+    };
+    let list = |filter| -> Vec<OrchestratorApproval> {
+        let reply = request("orchestrator/approval/list", filter);
+        assert_eq!(reply.biz_code, 0);
+        serde_json::from_value(reply.data.unwrap()).unwrap()
+    };
+    let first = until("first approval", || list(json!({})).into_iter().next());
+    assert_eq!(first.tool_call_id, "approval-1");
+    assert_eq!(serde_json::from_str::<Value>(&first.arguments_json).unwrap(), json!({"title":"Approved work"}));
+    assert!(list(json!({"conversationId":"another-assistant"})).is_empty());
+    let decision = |approval: &OrchestratorApproval, approved: bool| json!({"conversationId":approval.conversation_id,"taskId":approval.task_id,"toolCallId":approval.tool_call_id,"approved":approved});
+    let mut ambiguous = decision(&first, true);
+    ambiguous.as_object_mut().unwrap().remove("toolCallId");
+    assert_ne!(request("orchestrator/approval/resolve", ambiguous).biz_code, 0);
+    assert_eq!(request("orchestrator/approval/resolve", decision(&first, true)).biz_code, 0);
+
+    let filter = json!({"conversationId":first.conversation_id});
+    let second = until("second approval", || {
+        list(filter.clone()).into_iter().find(|item| item.tool_call_id == "approval-2")
+    });
+    assert_eq!(second.task_id, first.task_id);
+    assert_eq!(request("orchestrator/approval/resolve", decision(&first, true)).biz_code, 0);
+    assert_eq!(list(filter).into_iter().next().unwrap().tool_call_id, second.tool_call_id);
+    assert_eq!(request("orchestrator/approval/resolve", decision(&second, false)).biz_code, 0);
+
     let url = http.url().replace("http://", "ws://") + "/chord/ws";
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
     runtime.block_on(async {
@@ -518,38 +543,13 @@ fn rust_chord_client_approves_a_tool_and_observes_the_durable_issue() {
                 .await
                 .unwrap();
             assert!(matches!(
-                link.call("issue.list", json!(null), None).await,
+                link.call("approval.resolve", decision(&first, true), None).await,
                 Err(Error::Rpc(ref error)) if error.code == "not_found"
             ));
-            let mut watch = link.watch("space", 0, None).unwrap();
-            let (observed_revision, approval) = loop {
-                let event = watch.recv().await.unwrap();
-                if let Some(card) = json!(event.snapshot)["approvals"].as_array().and_then(|cards| cards.first()) {
-                    break (event.rev, card.clone());
-                }
-            };
-            assert_eq!(approval["toolName"], "issue_create");
-            let reply = link
-                .call(
-                    "approval.resolve",
-                    json!({"conversationId": approval["sessionId"], "taskId": approval["taskId"],
-                           "toolCallId": "approval-1", "approved": true}),
-                    None,
-                )
-                .await
-                .unwrap();
-            assert_eq!(reply["ok"], true);
-            loop {
-                let event = watch.recv().await.unwrap();
-                if json!(event.snapshot)["approvals"] == json!([]) {
-                    assert!(event.rev > observed_revision);
-                    break;
-                }
-            }
             let raised = link
                 .call(
                     "budget.raise",
-                    json!({"conversationId": approval["sessionId"], "taskId": approval["taskId"], "newMaxCostMicros": 10_000}),
+                    json!({"conversationId":first.conversation_id,"taskId":first.task_id,"newMaxCostMicros":10_000}),
                     None,
                 )
                 .await
@@ -565,24 +565,20 @@ fn rust_chord_client_approves_a_tool_and_observes_the_durable_issue() {
         let messages = started.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
         messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())
     });
-    let issues = || -> Vec<Issue> {
-        let mut reply = ureq::post(format!("{}/api/v1/issue/list", http.url())).send_json(json!({})).unwrap();
-        let result: vibevalley_protocol::Envelope = reply.body_mut().read_json().unwrap();
-        assert_eq!(result.biz_code, 0);
-        serde_json::from_value(result.data.unwrap()).unwrap()
-    };
-    let issue_id = issues().into_iter().find(|i| i.title == "Approved work").unwrap().id;
+    assert!(list(json!({})).is_empty());
+    let issues: Vec<Issue> = serde_json::from_value(request("issue/list", json!({})).data.unwrap()).unwrap();
+    assert!(!issues.iter().any(|i| i.title == "Denied work"));
+    let issue_id = issues.into_iter().find(|i| i.title == "Approved work").unwrap().id;
+
     drop(http);
     started.close();
     let reopened = vibevalley_server::start(cfg).unwrap();
-    let view = json!(reopened.hub.space_document().unwrap().state().1);
-    assert_eq!(view["approvals"], json!([]));
+    assert_eq!(pending_approvals(&reopened.hub), json!([]));
     let result = reopened.hub.call_as(Caller::User, "issue.list", json!({}));
-    assert_eq!(result.biz_code, 0);
     let issues: Vec<Issue> = serde_json::from_value(result.data.unwrap()).unwrap();
     let recovered: Vec<_> = issues.into_iter().filter(|i| i.title == "Approved work").map(|i| i.id).collect();
     assert_eq!(recovered, [issue_id]);
-    assert_eq!(model.seen.lock().unwrap().len(), 2);
+    assert_eq!(model.seen.lock().unwrap().len(), 3);
     reopened.close();
 }
 

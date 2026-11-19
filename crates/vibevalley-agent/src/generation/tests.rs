@@ -188,6 +188,7 @@ fn approval_survives_restart_hard_denials_cannot_be_overridden() {
     assert!(governance::resolve(&g.store, &s, "one", &t.id, decision("another")).is_err());
     governance::resolve(&g.store, &s, "one", &t.id, decision("one")).unwrap();
     assert_eq!(s.wait(&t.id, Duration::from_secs(5)).unwrap().result["output"], "done");
+    governance::resolve(&g.store, &s, "one", &t.id, decision("one")).unwrap();
     assert_eq!(*env.runs.lock().unwrap(), 1);
     let env = Fixture::new(vec![call(json!({"query":"drop table"})), reply("blocked", vec![])]);
     let (mut g, s) = setup(Store::memory().unwrap(), env.clone());
@@ -202,6 +203,26 @@ fn approval_survives_restart_hard_denials_cannot_be_overridden() {
     assert_eq!(*env.runs.lock().unwrap(), 0);
     assert!(governance::resolve(&g.store, &s, "one", &t.id, decision("one")).is_err());
 }
+#[test]
+fn regression_aborted_task_cannot_consume_an_outstanding_approval() {
+    let fixture = Fixture::new(vec![call(json!({}))]);
+    let (mut engine, scheduler) = setup(Store::memory().unwrap(), fixture.clone());
+    engine.permissions.builtin_default = governance::Policy::AlwaysAsk;
+    engine.register(&scheduler);
+    scheduler.recover().unwrap();
+    let (_, task, _) = engine.submit(req()).unwrap();
+    wait_until(&engine.store, &task.id, |t| t.status == TaskStatus::Sleeping);
+    scheduler.abort(&task.id).unwrap();
+    let decision = Decision {
+        tool_call_id: "one".into(),
+        approved: true,
+        reason: String::new(),
+    };
+    assert!(governance::resolve(&engine.store, &scheduler, "one", &task.id, decision).is_err());
+    assert!(engine.store.read(|tx| tx.signals(&task.id, true)).unwrap().is_empty());
+    assert_eq!(*fixture.runs.lock().unwrap(), 0);
+}
+
 #[test]
 fn rubric_only_sees_deliverables_and_revises() {
     let env = Fixture::new(vec![

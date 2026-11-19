@@ -290,6 +290,7 @@ const validations: AgentValidation[] = [
 
 export const responses: Record<string, unknown> = {
   "agent.list": agents,
+  "orchestrator.approval.list": [],
   "agent.template.list": templates,
   "agent.validate": validations,
   "runtime.list": runtimes,

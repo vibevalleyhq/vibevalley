@@ -182,6 +182,8 @@ export const servedEndpoints = [
   { op: "orchestrator.open", can: ["user", "remote"], about: [] },
   { op: "orchestrator.stop", can: ["user", "remote"], about: [] },
   { op: "orchestrator.eval.create", can: ["user", "remote"], about: [] },
+  { op: "orchestrator.approval.list", can: ["user"], about: ["conversationId"] },
+  { op: "orchestrator.approval.resolve", can: ["user"], about: ["conversationId", "taskId", "toolCallId"] },
   { op: "attachment.create", can: ["user", "remote"], about: [] },
   { op: "server.health.get", can: ["user", "remote"], about: [] },
 ] as const;

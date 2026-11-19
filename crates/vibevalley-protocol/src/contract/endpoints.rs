@@ -1638,6 +1638,24 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("OrchestratorEval"),
     },
     Endpoint {
+        op: "orchestrator.approval.list",
+        module: "orchestrator",
+        about: &["conversationId"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("OrchestratorApprovalListInput"),
+        result: Some("Vec<OrchestratorApproval>"),
+    },
+    Endpoint {
+        op: "orchestrator.approval.resolve",
+        module: "orchestrator",
+        about: &["conversationId", "taskId", "toolCallId"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("OrchestratorApprovalResolveInput"),
+        result: None,
+    },
+    Endpoint {
         op: "attachment.create",
         module: "attachment",
         about: &[],
@@ -2841,6 +2859,18 @@ pub mod ops {
         const NAME: &'static str = "orchestrator.eval.create";
         type Input = t::OrchestratorEvalRequest;
         type Result = t::OrchestratorEval;
+    }
+    pub struct OrchestratorApprovalList;
+    impl Op for OrchestratorApprovalList {
+        const NAME: &'static str = "orchestrator.approval.list";
+        type Input = t::OrchestratorApprovalListInput;
+        type Result = Vec<t::OrchestratorApproval>;
+    }
+    pub struct OrchestratorApprovalResolve;
+    impl Op for OrchestratorApprovalResolve {
+        const NAME: &'static str = "orchestrator.approval.resolve";
+        type Input = t::OrchestratorApprovalResolveInput;
+        type Result = ();
     }
     /// Kept once by its bytes: the same file again is the same attachment.
     pub struct AttachmentCreate;

@@ -28,6 +28,8 @@
 | `orchestrator.open` | 让助手上线，可以说话了 | `/api/v1/orchestrator/open` | ✓ | ✓ |   |   |
 | `orchestrator.stop` | 停下助手这一轮，派出去的帮工接着干 | `/api/v1/orchestrator/stop` | ✓ | ✓ |   |   |
 | `orchestrator.eval.create` | 把助手做错的一轮存成评测样例，写上该怎么做 | `/api/v1/orchestrator/eval/create` | ✓ | ✓ |   |   |
+| `orchestrator.approval.list` | 列出助手等待审批的工具调用 | `/api/v1/orchestrator/approval/list` | ✓ |   |   |   |
+| `orchestrator.approval.resolve` | 批准或拒绝助手的工具调用 | `/api/v1/orchestrator/approval/resolve` | ✓ |   |   |   |
 
 ## setting
 

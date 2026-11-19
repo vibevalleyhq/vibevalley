@@ -13,6 +13,15 @@ const failure = async (status: number, text: string) => {
 };
 
 describe("the API client envelope and error boundary", () => {
+  it("regression: the approval list preserves the JSON argument text returned by the server", async () => {
+    const argumentsJson = '{ "title": "Review", "priority": 1.0, "labels": ["ui"] }';
+    const approval = { conversationId: "c1", taskId: "t1", toolCallId: "call1", toolName: "issue_create", reason: "requires review", requestedAtMs: 10 };
+    const list = (args: unknown) =>
+      client(200, JSON.stringify({ bizCode: 0, message: "ok", data: [{ ...approval, argumentsJson: args }] })).orchestrator.approval.list({});
+    expect(await list(argumentsJson)).toEqual([{ ...approval, argumentsJson }]);
+    await expect(list({ title: "Review" })).rejects.toThrow(/argumentsJson/u);
+  });
+
   it("regression: per-request cancellation reaches the transport without canceling another request", async () => {
     const signals: (AbortSignal | undefined)[] = [];
     const api = new VibeValleyApi("http://farm", (_url, init) => {

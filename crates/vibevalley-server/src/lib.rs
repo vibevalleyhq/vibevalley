@@ -424,12 +424,6 @@ impl modules::ledger::Facts for std::sync::Weak<Hub> {
 }
 
 impl Server for Hub {
-    fn resolve_approval(&self, input: Value) -> Envelope {
-        self.execution.get().and_then(std::sync::Weak::upgrade).map_or_else(
-            || vibevalley_server_api::refusal(BizCode::Refused, "durable execution unavailable"),
-            |o| o.execution.resolve_approval(input),
-        )
-    }
     fn raise_budget(&self, input: Value) -> Envelope {
         self.execution.get().and_then(std::sync::Weak::upgrade).map_or_else(
             || vibevalley_server_api::refusal(BizCode::Refused, "durable execution unavailable"),

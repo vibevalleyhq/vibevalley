@@ -15,14 +15,13 @@ pub(crate) struct Space {
 #[derive(Default)]
 struct Projection {
     alerts: BTreeMap<(String, String), Vec<Value>>,
-    approvals: BTreeMap<String, Vec<Value>>,
     revisions: BTreeMap<(String, String, String), i64>,
 }
 
 impl Space {
     pub fn new() -> Self {
         Self {
-            document: Document::new(Snapshot::new(json!({"rev":1,"inbox":[],"approvals":[]}))),
+            document: Document::new(Snapshot::new(json!({"rev":1,"inbox":[]}))),
             observer: Default::default(),
         }
     }
@@ -32,8 +31,7 @@ impl Space {
     pub fn attach(&self, store: &vibevalley_durable::Store) -> vibevalley_durable::Result<()> {
         let events = store.subscribe_documents()?;
         let initial = store.read(|tx| {
-            let mut docs = tx.documents_by_kind("conversation", "pi.governance")?;
-            docs.extend(tx.documents_by_kind("conversation", "pi.inbox")?);
+            let mut docs = tx.documents_by_kind("conversation", "pi.inbox")?;
             docs.extend(tx.documents_by_kind("global", "pi.inbox")?);
             Ok(docs)
         })?;
@@ -42,18 +40,18 @@ impl Space {
         for doc in initial {
             projection.apply_doc(&doc, false);
         }
-        publish(&document, projection.governance(), false);
+        publish(&document, Some(projection.inbox()));
         let (stop, shutdown) = flume::bounded(0);
         let handle = std::thread::Builder::new()
             .name("chord-governance".into())
             .spawn(move || {
                 while let Some(event) = flume::Selector::new().recv(&shutdown, |_| None).recv(&events, Result::ok).wait() {
-                    if !matches!(event.document.doc_kind.as_str(), "pi.governance" | "pi.inbox" | "pi.live") {
+                    if !matches!(event.document.doc_kind.as_str(), "pi.inbox" | "pi.live") {
                         continue;
                     }
                     let live = event.document.doc_kind == "pi.live";
                     if projection.apply_doc(&event.document, event.retired) {
-                        publish(&document, if live { BTreeMap::new() } else { projection.governance() }, live);
+                        publish(&document, (!live).then(|| projection.inbox()));
                     }
                 }
             })
@@ -76,12 +74,10 @@ impl Drop for Space {
 }
 
 impl Projection {
-    fn governance(&self) -> BTreeMap<&'static str, Value> {
-        BTreeMap::from([
-            ("inbox", Value::Array(self.alerts.values().flatten().cloned().collect())),
-            ("approvals", Value::Array(self.approvals.values().flatten().cloned().collect())),
-        ])
+    fn inbox(&self) -> Value {
+        Value::Array(self.alerts.values().flatten().cloned().collect())
     }
+
     fn apply_doc(&mut self, d: &vibevalley_durable::Document, retired: bool) -> bool {
         let key = (d.scope_kind.clone(), d.scope_id.clone(), d.doc_kind.clone());
         if retired {
@@ -104,33 +100,18 @@ impl Projection {
                     for (n, alert) in d.state["items"].as_array().into_iter().flatten().enumerate() {
                         let text = |k: &str| alert[k].as_str().unwrap_or_default();
                         let kind = text("kind");
+                        if kind == "permission_park" {
+                            continue;
+                        }
                         let task = text("taskId");
                         let at = alert["createdAtMs"].as_i64().unwrap_or_default();
-                        let mut v = json!({"id":format!("durable:{kind}:{task}:{at}:{n}"),"kind":match kind{"permission_park"=>"approval","budget_reached"=>"budget_reached",_=>"mention"},"createdAtMs":at,"resolved":false,"title":text("title"),"summary":text("message")});
+                        let mut v = json!({"id":format!("durable:{kind}:{task}:{at}:{n}"),"kind":match kind{"budget_reached"=>"budget_reached",_=>"mention"},"createdAtMs":at,"resolved":false,"title":text("title"),"summary":text("message")});
                         if !text("conversationId").is_empty() {
                             v["sessionId"] = json!(text("conversationId"))
                         }
                         items.push(v);
                     }
                     self.alerts.insert(key, items);
-                }
-            }
-            "pi.governance" => {
-                if retired {
-                    self.approvals.remove(&d.scope_id);
-                } else {
-                    let approvals = d.state["pendingPermissions"]
-                        .as_object()
-                        .into_iter()
-                        .flat_map(|m| m.values())
-                        .map(|p| {
-                            json!({
-                                "taskId":p["taskId"],"sessionId":d.scope_id,"toolName":p["toolName"],"policy":p["evaluation"]["policy"],
-                                "summary":p["evaluation"]["reason"],"requestedAtMs":p["requestedAtMs"]
-                            })
-                        })
-                        .collect();
-                    self.approvals.insert(d.scope_id.clone(), approvals);
                 }
             }
             "pi.live" => {}
@@ -140,39 +121,29 @@ impl Projection {
     }
 }
 
-fn publish(document: &Document, fields: BTreeMap<&'static str, Value>, force: bool) {
+fn publish(document: &Document, inbox: Option<Value>) {
     let (rev, snapshot, _) = document.state();
-    let mut ops = vec![];
-    for (field, next) in fields {
-        let path = vec![field.to_owned()];
-        let prev = snapshot.get(&path).expect("published space field");
+    let path = vec!["inbox".into()];
+    let mut ops = vec![Op::Replace(vec!["rev".into()], json!(rev + 1))];
+    if let Some(next) = inbox {
+        let prev = snapshot.get(&path).expect("inbox field");
         if prev == next {
-            continue;
+            return;
         }
-        let a = prev.as_array().expect("space collection");
-        let b = next.as_array().expect("space collection");
-        if b.len() > a.len() && b.starts_with(a) {
-            ops.push(Op::Splice(path, a.len(), 0, b[a.len()..].to_vec()));
-        } else if a.len() == b.len() {
-            for (i, (was, item)) in a.iter().zip(b).enumerate() {
-                if was != item {
-                    ops.push(Op::Replace(vec![field.into(), i.to_string()], item.clone()))
-                }
-            }
+        let previous = prev.as_array().expect("inbox array");
+        let entries = next.as_array().expect("inbox array");
+        if entries.len() > previous.len() && entries.starts_with(previous) {
+            ops.push(Op::Splice(path, previous.len(), 0, entries[previous.len()..].to_vec()));
         } else {
             ops.push(Op::Replace(path, next));
         }
     }
-    if !force && ops.is_empty() {
-        return;
-    }
     document
         .mutate(|d| {
-            d.apply(Op::Replace(vec!["rev".into()], json!(rev + 1)))?;
             for op in ops {
-                d.apply(op)?
+                d.apply(op)?;
             }
             Ok(())
         })
-        .expect("valid projection fields");
+        .expect("valid inbox update");
 }

@@ -39,6 +39,12 @@
 - **整条消息落库**：完整回复生成后一次性写入频道。
 - **忙时来的输入排着，下一轮一起进**：Rust 版的自研 agent 不支持插话（TS 版把用户的话插进正在跑的一轮）。
 
+## 工具审批
+
+工具策略要求确认时，执行器保存待批调用并暂停该任务。用户在助手的「执行轨迹」里核对工具名、参数与审批原因，也可以用 `vibevalley approval list --format json` 找到调用。CLI 的 `approval resolve` 接收对话 ID、任务 ID、工具调用 ID 和 `approve` 或 `deny`。工作台和 CLI 使用同一条 Rust 审批契约。
+
+执行器在同一个 SQLite 事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/vibevalley-server/src/modules/orchestrator/execution.rs) · [决策事务](crates/vibevalley-agent/src/generation/governance.rs)
+
 ## 怎么走
 
 **处理一条输入**

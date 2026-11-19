@@ -1,12 +1,14 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, Weak, atomic::Ordering};
 
 use serde_json::{Value, json};
 use vibevalley_agent::{
     Brain, BrainError, BrainEvent, Entry, Message, TurnOutcome,
-    generation::{Environment, Generation, OutcomeReview, Request, ReviewRequest, Rubric, transcript::Transcript},
+    generation::{Environment, Generation, OutcomeReview, Request, ReviewRequest, Rubric, governance, transcript::Transcript},
 };
 use vibevalley_durable::{Error, Result, Scheduler, Store, SubmissionStatus, Task, TaskStatus};
+
+use vibevalley_protocol::{ApiError, BizCode, OrchestratorApproval, OrchestratorApprovalResolveInput};
 
 use super::{Input, Orchestrator, Run};
 use crate::lock;
@@ -125,63 +127,77 @@ impl Execution {
         &self.generation.store
     }
 
-    pub(crate) fn resolve_approval(&self, input: Value) -> vibevalley_protocol::Envelope {
+    pub(super) fn approvals(&self, conversation: Option<&str>) -> std::result::Result<Vec<OrchestratorApproval>, ApiError> {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
-        struct Resolve {
-            #[serde(default)]
-            conversation_id: String,
-            task_id: String,
-            #[serde(default)]
+        struct PendingApproval {
             tool_call_id: String,
-            approved: bool,
             #[serde(default)]
-            reason: String,
+            args_json: Value,
+            evaluation: governance::Evaluation,
+            requested_at_ms: i64,
         }
-        let result = (|| -> Result<_> {
-            let p: Resolve = serde_json::from_value(input)?;
-            let (conv, call) = self.store().read(|tx| {
-                let task = tx.task(&p.task_id)?;
-                let conv = if p.conversation_id.is_empty() {
-                    task.conversation_id
-                } else {
-                    p.conversation_id
+
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Governance {
+            #[serde(default)]
+            pending_permissions: BTreeMap<String, PendingApproval>,
+        }
+
+        if conversation.is_some_and(|id| id.trim().is_empty()) {
+            return Err(ApiError::new(BizCode::InvalidInput, "conversationId must be nonempty"));
+        }
+        self.store()
+            .read(|tx| {
+                let documents = match conversation {
+                    Some(id) => tx.document(governance::SCOPE, id, governance::GOVERNANCE)?.into_iter().collect(),
+                    None => tx.documents_by_kind(governance::SCOPE, governance::GOVERNANCE)?,
                 };
-                let call = if p.tool_call_id.is_empty() {
-                    let d = tx.document("conversation", &conv, "pi.governance")?;
-                    let current = d
-                        .as_ref()
-                        .and_then(|d| d.state["pendingPermissions"][&p.task_id]["toolCallId"].as_str())
-                        .map(str::to_owned);
-                    current
-                        .or_else(|| {
-                            tx.signals(&p.task_id, true)
-                                .ok()?
-                                .into_iter()
-                                .rev()
-                                .find(|s| s.signal_name == "permission.decision")
-                                .map(|s| s.signal_key)
-                        })
-                        .ok_or_else(|| Error::Invalid("missing tool call".into()))?
-                } else {
-                    p.tool_call_id
-                };
-                Ok((conv, call))
-            })?;
-            vibevalley_agent::generation::governance::resolve(
-                self.store(),
-                &self.scheduler,
-                &conv,
-                &p.task_id,
-                vibevalley_agent::generation::governance::Decision {
-                    tool_call_id: call,
-                    approved: p.approved,
-                    reason: p.reason,
-                },
-            )?;
-            Ok(json!({"ok":true}))
-        })();
-        envelope(result)
+                let mut approvals = vec![];
+                for document in documents {
+                    let pending: Governance = serde_json::from_value(document.state)?;
+                    for (task_id, approval) in pending.pending_permissions {
+                        let task = tx.task(&task_id)?;
+                        if task.status == TaskStatus::Terminal || task.conversation_id != document.scope_id {
+                            continue;
+                        }
+                        approvals.push(OrchestratorApproval {
+                            conversation_id: task.conversation_id,
+                            task_id,
+                            tool_call_id: approval.tool_call_id,
+                            tool_name: approval.evaluation.tool_name,
+                            arguments_json: approval.args_json.to_string(),
+                            reason: approval.evaluation.reason,
+                            requested_at_ms: approval.requested_at_ms,
+                        });
+                    }
+                }
+                approvals.sort_by_key(|approval| approval.requested_at_ms);
+                Ok(approvals)
+            })
+            .map_err(approval_error)
+    }
+
+    pub(super) fn resolve_approval(&self, input: OrchestratorApprovalResolveInput) -> std::result::Result<(), ApiError> {
+        if [&input.conversation_id, &input.task_id, &input.tool_call_id]
+            .iter()
+            .any(|id| id.trim().is_empty())
+        {
+            return Err(ApiError::new(BizCode::InvalidInput, "conversationId, taskId and toolCallId must be nonempty"));
+        }
+        governance::resolve(
+            self.store(),
+            &self.scheduler,
+            &input.conversation_id,
+            &input.task_id,
+            governance::Decision {
+                tool_call_id: input.tool_call_id,
+                approved: input.approved,
+                reason: input.reason.unwrap_or_default(),
+            },
+        )
+        .map_err(approval_error)
     }
 
     pub(crate) fn raise_budget(&self, input: Value) -> vibevalley_protocol::Envelope {
@@ -429,6 +445,16 @@ impl Execution {
             Ok(out)
         })
     }
+}
+
+fn approval_error(error: Error) -> ApiError {
+    let code = match error {
+        Error::Missing(_) => BizCode::OrchestratorNotFound,
+        Error::Invalid(_) => BizCode::OrchestratorRefused,
+        Error::Closed | Error::Timeout => BizCode::ServiceUnavailable,
+        Error::Commit(_) | Error::Sql(_) | Error::Json(_) => BizCode::InternalError,
+    };
+    ApiError::new(code, error.to_string())
 }
 
 fn envelope(result: Result<Value>) -> vibevalley_protocol::Envelope {

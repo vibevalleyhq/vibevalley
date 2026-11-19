@@ -1,5 +1,6 @@
 //! The command tree and where each command runs.
 
+mod approval;
 mod chat;
 mod doctor;
 mod farm;
@@ -40,6 +41,7 @@ pub fn tree() -> Command {
             pkm::command(),
             setting::command(),
             chat::command(),
+            approval::command(),
             doctor::command(),
         ])
 }
@@ -59,6 +61,7 @@ pub fn run(ctx: &Ctx, m: &ArgMatches) -> Done {
         "pkm" => pkm::run(ctx, sub),
         "setting" => setting::run(ctx, sub),
         "chat" => chat::run(ctx, sub),
+        "approval" => approval::run(ctx, sub),
         "doctor" => doctor::run(ctx),
         _ => Ok(()),
     }

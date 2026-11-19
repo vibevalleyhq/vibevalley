@@ -5,6 +5,17 @@ export const catalogs = {
   zh: {
     cli: {
       about: "VibeValley 的命令行：一条命令是服务端的一个操作，<资源> [<子资源>] <动作>",
+      approval: {
+        about: "处理助手待审批的工具调用",
+        list: "列出待审批的工具调用",
+        resolve: "批准或拒绝指定工具调用",
+        conversation: "待审批列表中的对话 ID",
+        task: "待审批列表中的任务 ID",
+        toolCall: "待审批列表中的工具调用 ID",
+        decision: "批准或拒绝工具调用",
+        reason: "作出决定的理由",
+        saved: "已记录决定",
+      },
       flag: {
         model: "模型",
         effort: "思考的力度",
@@ -244,6 +255,7 @@ export const catalogs = {
           search: "按字搜记性，不指定档案就搜全部",
         },
         orchestrator: {
+          approval: { list: "列出助手等待审批的工具调用", resolve: "批准或拒绝助手的工具调用" },
           eval: { create: "把助手做错的一轮存成评测样例，写上该怎么做" },
           open: "让助手上线，可以说话了",
           stop: "停下助手这一轮，派出去的帮工接着干",
@@ -2940,6 +2952,7 @@ export const catalogs = {
         about:
           "它收到的话、调的每个工具（点一行看参数和结果）、它说的话。新的在下面，一直留着最近的 1000 步。哪一轮做错了，在它收到的话上点「这一轮做错了」，写一句应该怎样，存成一条评测。",
       },
+      approval: { title: "待审批的工具调用", allow: "允许这次调用", deny: "拒绝这次调用", unavailable: "读不到待审批的工具调用：{why}" },
     },
     "web.pkm": {
       place: { label: "笔记", hint: "你自己的笔记：每天的日记、PARA 分好的大纲页、反链和润色建议" },
@@ -3659,6 +3672,17 @@ export const catalogs = {
   en: {
     cli: {
       about: "VibeValley's command line: one command is one operation of the server's, <resource> [<sub-resource>] <verb>",
+      approval: {
+        about: "Review the assistant’s pending tool calls",
+        list: "List pending tool approvals",
+        resolve: "Approve or reject a specific tool call",
+        conversation: "The conversation ID shown in the approval list",
+        task: "The task ID shown in the approval list",
+        toolCall: "The tool call ID shown in the approval list",
+        decision: "Approve or deny the tool call",
+        reason: "The reason for the decision",
+        saved: "Decision recorded",
+      },
       flag: {
         model: "The model",
         effort: "How hard to think",
@@ -3941,6 +3965,7 @@ export const catalogs = {
           search: "Search memories by words, every profile's if none is named",
         },
         orchestrator: {
+          approval: { list: "List assistant tool calls awaiting approval", resolve: "Approve or deny an assistant tool call" },
           eval: { create: "Save an assistant turn that went wrong as an eval case, with what it should have done" },
           open: "Bring the assistant online",
           stop: "Stop the assistant's current round; the helpers it sent keep working",
@@ -6823,6 +6848,12 @@ export const catalogs = {
         about:
           'What it heard, every tool it called (click a row for the arguments and the result), what it said. Newest at the bottom; the last 1000 steps are kept. When a round went wrong, click "This round went wrong" on what it heard, write what it should have done, and it is kept as an eval.',
       },
+      approval: {
+        title: "Tool calls awaiting approval",
+        allow: "Allow this call",
+        deny: "Deny this call",
+        unavailable: "Could not load pending tool calls: {why}",
+      },
     },
     "web.pkm": {
       place: { label: "Notes", hint: "Your own notes: daily journals, outline pages sorted by PARA, backlinks and suggested rewrites" },
@@ -7601,6 +7632,15 @@ export const catalogs = {
 export interface Messages {
   "cli.about": undefined;
   "cli.agent.deleted": { readonly agent: string | number };
+  "cli.approval.about": undefined;
+  "cli.approval.conversation": undefined;
+  "cli.approval.decision": undefined;
+  "cli.approval.list": undefined;
+  "cli.approval.reason": undefined;
+  "cli.approval.resolve": undefined;
+  "cli.approval.saved": undefined;
+  "cli.approval.task": undefined;
+  "cli.approval.toolCall": undefined;
   "cli.arg.agent": undefined;
   "cli.arg.agentName": undefined;
   "cli.arg.artifact": undefined;
@@ -7990,6 +8030,8 @@ export interface Messages {
   "cli.op.memory.previewDelete": undefined;
   "cli.op.memory.recall": undefined;
   "cli.op.memory.search": undefined;
+  "cli.op.orchestrator.approval.list": undefined;
+  "cli.op.orchestrator.approval.resolve": undefined;
   "cli.op.orchestrator.eval.create": undefined;
   "cli.op.orchestrator.open": undefined;
   "cli.op.orchestrator.stop": undefined;
@@ -10529,6 +10571,10 @@ export interface Messages {
   "web.memory.memory.words": undefined;
   "web.memory.memory.wordsHint": undefined;
   "web.memory.memory.yours": undefined;
+  "web.orchestrator.approval.allow": undefined;
+  "web.orchestrator.approval.deny": undefined;
+  "web.orchestrator.approval.title": undefined;
+  "web.orchestrator.approval.unavailable": { readonly why: string | number };
   "web.orchestrator.looks.auntie.blurb": undefined;
   "web.orchestrator.looks.auntie.name": undefined;
   "web.orchestrator.looks.farmer.blurb": undefined;

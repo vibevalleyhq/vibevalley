@@ -44,11 +44,49 @@ pub struct OrchestratorStopInput {
     pub agent: Option<String>,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct OrchestratorApprovalListInput {
+    pub conversation_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct OrchestratorApproval {
+    pub conversation_id: String,
+    pub task_id: String,
+    pub tool_call_id: String,
+    pub tool_name: String,
+    pub arguments_json: String,
+    pub reason: String,
+    pub requested_at_ms: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct OrchestratorApprovalResolveInput {
+    pub conversation_id: String,
+    pub task_id: String,
+    pub tool_call_id: String,
+    pub approved: bool,
+    pub reason: Option<String>,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "orchestrator";
     types: [OrchestratorEvalRequest,
     OrchestratorEval,
-    OrchestratorStopInput];
+    OrchestratorStopInput,
+    OrchestratorApprovalListInput,
+    OrchestratorApproval,
+    OrchestratorApprovalResolveInput];
     aliases: [];
 }

@@ -97,6 +97,12 @@ export class VibeValleyApi {
       create: (a: T.OrchestratorEvalRequest, options?: { signal?: AbortSignal }): Promise<T.OrchestratorEval> =>
         this.call<T.OrchestratorEval>("orchestrator.eval.create", "/api/v1/orchestrator/eval/create", a, options),
     },
+    approval: {
+      list: (a: T.OrchestratorApprovalListInput, options?: { signal?: AbortSignal }): Promise<T.OrchestratorApproval[]> =>
+        this.call<T.OrchestratorApproval[]>("orchestrator.approval.list", "/api/v1/orchestrator/approval/list", a, options),
+      resolve: (a: T.OrchestratorApprovalResolveInput, options?: { signal?: AbortSignal }): Promise<void> =>
+        this.call<void>("orchestrator.approval.resolve", "/api/v1/orchestrator/approval/resolve", a, options),
+    },
   };
 
   readonly setting = {

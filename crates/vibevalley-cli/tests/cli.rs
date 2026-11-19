@@ -112,6 +112,8 @@ impl Farm {
 }
 
 const COMMANDS: &[&str] = &[
+    "approval list",
+    "approval resolve",
     "agent create",
     "agent delete",
     "agent list",
@@ -175,6 +177,19 @@ fn every_command_has_a_description_and_an_example() {
         let help = cli(home.path(), &args, &[]);
         assert_eq!((command, help.code, help.out.contains("EXAMPLES")), (command, 0, true), "{}", help.out);
     }
+}
+
+#[test]
+fn approval_commands_use_the_native_http_service() {
+    let farm = farm();
+    let listed = farm.run(&["approval", "list", "--conversation", "orchestrator", "--format", "json"]);
+    assert_eq!((listed.code, listed.out.as_str()), (0, "[]"), "{:?}", listed.failure);
+
+    let missing = farm.run(&["approval", "resolve", "orchestrator", "missing", "call-1", "approve", "--format", "json"]);
+    assert_eq!((missing.code, missing.tag()), (4, "Missing"), "{:?}", missing.failure);
+
+    let ambiguous = farm.run(&["approval", "resolve", "orchestrator", "missing", "approve"]);
+    assert_eq!((ambiguous.code, ambiguous.tag()), (2, "MissingArgument"));
 }
 
 #[test]

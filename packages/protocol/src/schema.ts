@@ -142,7 +142,13 @@ export {
   Question,
 } from "./issue/schema";
 export { Cron, CronRequest, CronUpdate, CronWhen, CronWhenWeekly } from "./cron/schema";
-export { OrchestratorEval, OrchestratorEvalRequest } from "./orchestrator/schema";
+export {
+  OrchestratorApproval,
+  OrchestratorApprovalListInput,
+  OrchestratorApprovalResolveInput,
+  OrchestratorEval,
+  OrchestratorEvalRequest,
+} from "./orchestrator/schema";
 export { Achievement, AchievementCategory, ChooseTitleRequest, LedgerEntry } from "./game/schema";
 export { Attachment, AttachmentUpload } from "./attachment/schema";
 export { ConnectorLogin, ConnectorsChannelRequest, ConnectorStatus, VerifyRequest } from "./connector/schema";

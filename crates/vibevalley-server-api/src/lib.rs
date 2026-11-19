@@ -48,9 +48,6 @@ pub trait Server: Send + Sync {
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
     fn subscribe(&self, name: &str, payload: serde_json::Value) -> Result<(u64, flume::Receiver<serde_json::Value>), Envelope>;
     fn unsubscribe(&self, id: u64);
-    fn resolve_approval(&self, _input: serde_json::Value) -> Envelope {
-        refusal(BizCode::Refused, "durable approvals unavailable")
-    }
     fn raise_budget(&self, _input: serde_json::Value) -> Envelope {
         refusal(BizCode::Refused, "durable budgets unavailable")
     }

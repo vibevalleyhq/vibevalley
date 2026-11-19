@@ -34,20 +34,12 @@ pub(super) async fn upgrade(State(server): State<Shared>, headers: HeaderMap, ws
 fn endpoint(server: Shared, space: Document) -> Endpoint {
     let endpoint = Endpoint::default();
     endpoint.publish("space", space);
-    endpoint.handle("approval.resolve", {
-        let server = server.clone();
-        move |_, input| governance(server.clone(), input, |s, v| s.resolve_approval(v))
-    });
-    endpoint.handle("budget.raise", move |_, input| governance(server.clone(), input, |s, v| s.raise_budget(v)));
+    endpoint.handle("budget.raise", move |_, input| raise_budget(server.clone(), input));
     endpoint
 }
 
-async fn governance(
-    server: Shared,
-    input: Value,
-    call: fn(&dyn vibevalley_server_api::Server, Value) -> vibevalley_protocol::Envelope,
-) -> Result<Value, RpcError> {
-    let reply = tokio::task::spawn_blocking(move || call(server.as_ref(), input))
+async fn raise_budget(server: Shared, input: Value) -> Result<Value, RpcError> {
+    let reply = tokio::task::spawn_blocking(move || server.raise_budget(input))
         .await
         .map_err(|err| RpcError::new("internal", err.to_string()))?;
     match reply.error() {
