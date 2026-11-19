@@ -1,6 +1,6 @@
 // Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
 
-import type { ArtifactCard, BlockRef, QuotedBlock } from "../artifact/shapes.gen";
+import type { ArtifactCard, ArtifactViewContext, BlockRef, QuotedBlock } from "../artifact/shapes.gen";
 import type { Attachment } from "../attachment/shapes.gen";
 import type { Actor, MessageId, Outcome, SessionId, Spent } from "../common/shapes.gen";
 
@@ -26,7 +26,7 @@ revision: number, replyTo?: number, edited?: number,
 /**
  * Timestamp of deletion; text and attachments are cleared while `number` is preserved.
  */
-deleted?: number, pinned?: number, reactions: Array<Reaction>, attachments: Array<Attachment>, embeds: Array<Embed>, artifact?: ArtifactCard, blocks?: readonly QuotedBlock[], };
+deleted?: number, pinned?: number, reactions: Array<Reaction>, attachments: Array<Attachment>, embeds: Array<Embed>, artifact?: ArtifactCard, blocks?: readonly QuotedBlock[], viewContext?: ArtifactViewContext, };
 
 export const ChannelTypeValues = ["channel", "direct", "thread"] as const;
 export type ChannelType = (typeof ChannelTypeValues)[number];
@@ -63,7 +63,7 @@ export type Chat = { channels: Array<Channel>, userMentions: Array<UserMention>,
  */
 export type ChannelEvent = { "_tag": "Message", message: ChatMessage, } | { "_tag": "Reset", };
 
-export type SayRequest = { id: string, text: string, blocks?: Array<BlockRef>, replyTo?: number, attachments?: Array<string>, station?: number, agent?: string, repo?: string, sendKey?: string,
+export type SayRequest = { id: string, text: string, blocks?: Array<BlockRef>, viewContext?: ArtifactViewContext, replyTo?: number, attachments?: Array<string>, station?: number, agent?: string, repo?: string, sendKey?: string,
 /**
  * Orchestrator profile id that alone receives this message (e.g. `/imagegen`).
  */

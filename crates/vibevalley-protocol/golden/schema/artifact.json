@@ -85,6 +85,7 @@
    "id": "s3499",
    "title": "s3500",
    "body": "blocks",
+   "isDefault": false,
    "display": "page",
    "channel": "s3501",
    "said": {
@@ -115,6 +116,7 @@
    "id": "s3519",
    "title": "s3520",
    "body": "blocks",
+   "isDefault": false,
    "by": "s3521",
    "byName": "s3522",
    "version": 3523,
@@ -461,6 +463,7 @@
     "id": "s3669",
     "title": "s3670",
     "body": "blocks",
+    "isDefault": false,
     "display": "page",
     "channel": "s3671",
     "said": {
@@ -523,6 +526,7 @@
     "id": "s3707",
     "title": "s3708",
     "body": "blocks",
+    "isDefault": false,
     "by": "s3709",
     "byName": "s3710",
     "version": 3711,

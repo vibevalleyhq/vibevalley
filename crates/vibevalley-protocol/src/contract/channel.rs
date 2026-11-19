@@ -128,6 +128,7 @@ pub struct ChatMessage {
     pub artifact: Option<ArtifactCard>,
     #[cfg_attr(feature = "ts-gen", ts(optional, type = "readonly QuotedBlock[]"))]
     pub blocks: Option<Vec<QuotedBlock>>,
+    pub view_context: Option<ArtifactViewContext>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -270,6 +271,7 @@ pub struct SayRequest {
     pub id: String,
     pub text: String,
     pub blocks: Option<Vec<BlockRef>>,
+    pub view_context: Option<ArtifactViewContext>,
     pub reply_to: Option<i64>,
     pub attachments: Option<Vec<String>>,
     pub station: Option<i64>,

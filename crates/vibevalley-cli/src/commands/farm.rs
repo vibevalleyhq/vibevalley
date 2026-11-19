@@ -692,8 +692,12 @@ pub fn run_cron(ctx: &Ctx, m: &ArgMatches) -> Done {
 // artifact
 
 fn artifact_line(a: &Artifact) -> String {
+    let body = match a.artifact_type {
+        Some(kind) => format!("{}:{}", a.body.as_str(), kind.as_str()),
+        None => a.body.as_str().to_owned(),
+    };
     let issue = a.issue.as_ref().map(|i| format!("issue {i}")).unwrap_or_default();
-    line(&[&a.id, &a.title, a.body.as_str(), &format!("@{}", a.by_name), &issue])
+    line(&[&a.id, &a.title, &body, &format!("@{}", a.by_name), &issue])
 }
 
 pub fn artifact() -> Command {
@@ -729,6 +733,7 @@ pub fn run_artifact(ctx: &Ctx, m: &ArgMatches) -> Done {
             let all = ctx.ask::<ops::ArtifactList>(&ArtifactListRequest {
                 issue: get(m, "issue").map(|i| issue_ref(&i)),
                 channel: None,
+                artifact_type: None,
             })?;
             ctx.show(&all, |a| a.iter().map(artifact_line).collect::<Vec<_>>().join("\n"));
             Ok(())

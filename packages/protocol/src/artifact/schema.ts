@@ -8,7 +8,13 @@ const ArtifactBody = z.enum(T.ArtifactBodyValues) satisfies Codec<T.ArtifactBody
 
 const ArtifactKind = z.enum(T.ArtifactKindValues) satisfies Codec<T.ArtifactKind>;
 
+const ArtifactType = z.enum(T.ArtifactTypeValues) satisfies Codec<T.ArtifactType>;
+
 const ArtifactDisplay = z.enum(T.ArtifactDisplayValues) satisfies Codec<T.ArtifactDisplay>;
+
+export const ArtifactEntryKind = z.enum(T.ArtifactEntryKindValues) satisfies Codec<T.ArtifactEntryKind>;
+
+export const ArtifactEntryOp = z.enum(T.ArtifactEntryOpValues) satisfies Codec<T.ArtifactEntryOp>;
 
 export const ArtifactCard = z.object({
   id: ArtifactId,
@@ -17,6 +23,7 @@ export const ArtifactCard = z.object({
   version: z.number(),
   note: z.string(),
   display: z.exactOptional(ArtifactDisplay),
+  artifactType: z.exactOptional(ArtifactType),
 }) satisfies Codec<T.ArtifactCard>;
 
 const ArtifactVersion = z.object({
@@ -34,6 +41,8 @@ export const Artifact = z.object({
   id: ArtifactId,
   title: z.string(),
   body: ArtifactBody,
+  artifactType: z.exactOptional(ArtifactType),
+  isDefault: z.boolean(),
   display: z.exactOptional(ArtifactDisplay),
   channel: z.exactOptional(z.string()),
   said: z.exactOptional(z.object({ channel: z.string(), number: z.number() })),
@@ -47,11 +56,122 @@ export const Artifact = z.object({
   updated: z.number(),
 }) satisfies Codec<T.Artifact>;
 
+const ArtifactEntryWriteInput = z.object({
+  op: ArtifactEntryOp,
+  path: z.string(),
+  kind: z.exactOptional(ArtifactEntryKind),
+  value: z.exactOptional(z.string()),
+  from: z.exactOptional(z.string()),
+  mime: z.exactOptional(z.string()),
+  ifRev: z.exactOptional(z.number().int().min(0)),
+}) satisfies Codec<T.ArtifactEntryWriteInput>;
+
+export const ArtifactEntry = z.object({
+  artifactId: ArtifactId,
+  path: z.string(),
+  kind: ArtifactEntryKind,
+  mime: z.string(),
+  size: z.number(),
+  rev: z.number(),
+  updatedBy: z.string(),
+  updated: z.number(),
+  value: z.exactOptional(z.string()),
+  attachmentId: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactEntry>;
+
+export const ArtifactEntrySnapshot = z.object({
+  artifact: Artifact,
+  seq: z.number(),
+  entries: z.array(ArtifactEntry),
+}) satisfies Codec<T.ArtifactEntrySnapshot>;
+
+const ArtifactEntryConflict = z.object({
+  path: z.string(),
+  expectedRev: z.number(),
+  actualRev: z.number(),
+  current: ArtifactEntry.nullable(),
+}) satisfies Codec<T.ArtifactEntryConflict>;
+
+export const ArtifactEntryBatchResult = z.object({
+  applied: z.boolean(),
+  seq: z.number(),
+  entries: z.array(ArtifactEntry),
+  conflicts: z.array(ArtifactEntryConflict),
+}) satisfies Codec<T.ArtifactEntryBatchResult>;
+
+export const ArtifactEntryListRequest = z.object({
+  id: ArtifactId,
+  prefix: z.exactOptional(z.string()),
+  includeValues: z.exactOptional(z.boolean()),
+}) satisfies Codec<T.ArtifactEntryListRequest>;
+
+export const ArtifactEntryGetRequest = z.object({
+  id: ArtifactId,
+  path: z.string(),
+}) satisfies Codec<T.ArtifactEntryGetRequest>;
+
+export const ArtifactEntryBatchRequest = z.object({
+  id: ArtifactId,
+  writes: z.array(ArtifactEntryWriteInput),
+  note: z.exactOptional(z.string()),
+  announce: z.exactOptional(z.boolean()),
+}) satisfies Codec<T.ArtifactEntryBatchRequest>;
+
+export const ArtifactEntryEvent = z.discriminatedUnion("_tag", [
+  z.object({ _tag: z.literal("Entries"), seq: z.number(), entries: z.array(ArtifactEntry), deleted: z.array(z.string()) }),
+  z.object({ _tag: z.literal("Reset") }),
+]) satisfies Codec<T.ArtifactEntryEvent>;
+
+export const ArtifactTypeInfo = z.object({
+  type: ArtifactType,
+  body: ArtifactBody,
+  title: z.string(),
+  summary: z.string(),
+  references: z.array(z.string()),
+  defaultArtifactId: ArtifactId.nullable(),
+}) satisfies Codec<T.ArtifactTypeInfo>;
+
+export const ArtifactTypeReadRequest = z.object({
+  type: ArtifactType,
+  reference: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactTypeReadRequest>;
+
+export const ArtifactTypeGuide = z.object({
+  type: ArtifactType,
+  title: z.string(),
+  reference: z.string().nullable(),
+  content: z.string(),
+  references: z.array(z.string()),
+  defaultArtifactId: ArtifactId.nullable(),
+  defaultArtifactTitle: z.string().nullable(),
+}) satisfies Codec<T.ArtifactTypeGuide>;
+
+export const ArtifactViewContext = z.object({
+  artifactId: ArtifactId,
+  artifactType: z.exactOptional(ArtifactType),
+  title: z.string().max(500),
+  seq: z.exactOptional(z.number().int().min(0)),
+  version: z.exactOptional(z.number().int().min(0)),
+  slideId: z.exactOptional(z.string().max(200)),
+  slideIndex: z.exactOptional(z.number().int().min(0)),
+  time: z.exactOptional(z.number().min(0)),
+  activeArtboard: z.exactOptional(z.string().max(200)),
+  activeDataset: z.exactOptional(z.string().max(200)),
+  activeTab: z.exactOptional(z.string().max(100)),
+  selectedIds: z.exactOptional(z.array(z.string().max(200)).max(100)),
+  selectedBlockIds: z.exactOptional(z.array(BlockId).max(100)),
+  summary: z.exactOptional(z.string().max(2000)),
+}) satisfies Codec<T.ArtifactViewContext>;
+
 export const ArtifactRequest = z.object({
   title: z.string(),
-  kind: ArtifactKind,
+  kind: z.exactOptional(ArtifactKind),
+  artifactType: z.exactOptional(ArtifactType),
   display: z.exactOptional(ArtifactDisplay),
   content: z.exactOptional(z.string()),
+  entries: z.exactOptional(z.array(ArtifactEntryWriteInput)),
+  isDefault: z.exactOptional(z.boolean()),
+  announce: z.exactOptional(z.boolean()),
   note: z.exactOptional(z.string()),
   channel: z.exactOptional(z.string()),
   issue: z.exactOptional(z.string()),
@@ -81,28 +201,48 @@ export const ArtifactUpdateRequest = z.object({
   id: ArtifactId,
   title: z.exactOptional(z.string()),
   display: z.exactOptional(ArtifactDisplay),
+  isDefault: z.exactOptional(z.boolean()),
 }) satisfies Codec<T.ArtifactUpdateRequest>;
 
 const shellCount = z.number().int().min(0).max(10_000);
 const shellTime = z.number().min(0).max(86_400);
 const shellWords = z.array(z.string().max(10_000)).max(10_000);
+const shellCounts = z.array(shellCount).max(10_000);
+const shellChapters = z.array(z.object({ at: shellTime, label: z.string().max(200) })).max(500);
 
 export const HtmlShellMessage = z.discriminatedUnion("vibevalley", [
-  z.object({ vibevalley: z.literal("selection"), anchor: HtmlAnchor }),
+  z.object({ vibevalley: z.literal("selection"), anchor: HtmlAnchor, path: z.exactOptional(z.string().max(500)) }),
   z.object({
     vibevalley: z.literal("ready"),
     display: ArtifactDisplay,
     pages: z.exactOptional(shellCount),
     titles: z.exactOptional(shellWords),
     notes: z.exactOptional(shellWords),
+    fragments: z.exactOptional(shellCounts),
     duration: z.exactOptional(shellTime),
+    fps: z.exactOptional(z.number().int().min(1).max(120)),
+    chapters: z.exactOptional(shellChapters),
   }),
-  z.object({ vibevalley: z.literal("at"), page: z.exactOptional(shellCount), time: z.exactOptional(shellTime) }),
+  z.object({
+    vibevalley: z.literal("at"),
+    page: z.exactOptional(shellCount),
+    fragment: z.exactOptional(shellCount),
+    time: z.exactOptional(shellTime),
+    playing: z.exactOptional(z.boolean()),
+  }),
+  z.object({
+    vibevalley: z.literal("recorded"),
+    ok: z.boolean(),
+    mimeType: z.exactOptional(z.string().max(100)),
+    base64: z.exactOptional(z.string().max(80_000_000)),
+    reason: z.exactOptional(z.string().max(500)),
+  }),
 ]) satisfies Codec<T.HtmlShellMessage>;
 
 export const ArtifactListRequest = z.object({
   channel: z.exactOptional(z.string()),
   issue: z.exactOptional(z.string()),
+  artifactType: z.exactOptional(ArtifactType),
 }) satisfies Codec<T.ArtifactListRequest>;
 
 export const ArtifactReadRequest = z.object({

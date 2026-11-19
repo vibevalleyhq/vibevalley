@@ -166,6 +166,11 @@ export const catalogs = {
           create: "新建 Artifact：空的一篇来一起写，或交上来一稿",
           delete: "删掉一篇 Artifact",
           demo: "开演示：几个帮工一起写一篇 Artifact，不花模型的钱",
+          entry: {
+            batch: "原子批量增改、合并或删除结构化 Artifact 的条目（带版本号校验）",
+            get: "读取结构化 Artifact 的一个条目与当前版本号",
+            list: "列出结构化 Artifact 的条目（可按路径前缀筛）",
+          },
           get: "看一篇 Artifact",
           html: { edit: "在网页 Artifact 里换掉一段字，成为新的一版" },
           list: "列出某个频道或工单的 Artifact，不指定就是全部",
@@ -178,7 +183,8 @@ export const catalogs = {
             list: "列出 Artifact 上的改写建议，没答的和答过的",
             reject: "拒绝一条改写建议",
           },
-          update: "给 Artifact 改标题",
+          type: { list: "列出全部结构化 Artifact 类型与当前默认设计体系", read: "读取一种 Artifact 类型的规范或参考分册" },
+          update: "给 Artifact 改标题或默认设置",
           version: { create: "给网页 Artifact 交新的一版，旧的留着" },
         },
         channel: {
@@ -609,6 +615,7 @@ export const catalogs = {
         removeBlock: "删掉块 {id}",
         removeChildren: "连同 {n} 个子块",
         removeBlocks: "删掉「{title}」和它的 {n} 块",
+        removeEntries: "删掉「{title}」和它的 {n} 个条目",
       },
       untitled: "没起名的 Artifact",
       noBatch: "这批改动没有 batchId",
@@ -697,6 +704,31 @@ export const catalogs = {
         crosses: "「{words}」跨了带格式的几段，这里只改一段里的字：少选几个字，或者交给帮工改",
         stale: "你看的是第 {version} 稿，最新的是第 {latest} 稿：在最新的一稿上改",
         note: "用户在页面上改了：「{old}」→「{new}」",
+      },
+      notStore: "「{title}」不是结构化存储的 Artifact：不能读写条目",
+      defaultDesignSystemOnly: "只有设计体系（design-system）类型的 Artifact 能设为农场默认",
+      badType: "不认识 {type} 这种 Artifact 类型，只认 {types}",
+      noReference: "{type} 没有叫 {reference} 的参考分册；可选：{available}",
+      entry: {
+        missing: "「{title}」里没有路径 {path}",
+        badPath: "不合法的条目路径「{path}」：{why}",
+        badJson: "条目 {path} 不是合法的 JSON：{why}",
+        notJson: "条目 {path} 是 {kind}，不能做 JSON 合并修改",
+        noValue: "写条目 {path} 时必须给 value",
+        noFrom: "复制条目 {path} 时必须给源路径 from",
+        noAttachment: "附件 {id} 不存在，不能挂到条目 {path}",
+        tooBig: "条目 {path} 太大了：单条最多 {kb} KB",
+        tooMany: "一份结构化 Artifact 最多放 {max} 个条目",
+        updated: "更新了「{title}」（第 {seq} 批）",
+      },
+      types: {
+        docs: { title: "协作文档", summary: "多帮工与用户按块共同编辑、带建议流与 Markdown 互转的长文档" },
+        slides: { title: "幻灯片", summary: "16:9 或 4:3 分页讲稿（deck.json + deck.css + 每页 HTML），支持渐进揭示、演讲者视图与矢量 PDF" },
+        dashboard: { title: "数据看板", summary: "结构化数据集与沙箱图表页分离的看板，支持字段级数据溯源核对、筛选持久化与 CSV 导出" },
+        motion: { title: "动态短片", summary: "纯时间函数驱动的分镜短片与图形动画，支持逐帧定位、章节跳转与导出视频进素材库" },
+        whiteboard: { title: "无限白板", summary: "无限平移缩放画布，支持流程图、架构框图、正交折线箭头、表格、手绘插图与内嵌小挂件" },
+        design: { title: "界面画板", summary: "多画板 UI/视觉设计（canvas.json + .dc.html），支持状态逻辑与右侧属性面板实时调参" },
+        "design-system": { title: "设计体系", summary: "编译为明暗双主题 CSS 令牌的色彩、字阶、组件预览与品牌规范，可设为农场默认" },
       },
     },
     "server.attachment": { noAttachment: "没有 {id} 这个附件：先上传，再带着它说话", emptyFile: "这个文件是空的", fileTooBig: "文件太大了：至多 {mb} MB" },
@@ -1510,6 +1542,9 @@ export const catalogs = {
         rail: "这篇的旁注",
         railShow: "打开旁注",
         railHide: "收起旁注",
+        listShow: "展开列表",
+        listHide: "收起列表",
+        backToLibrary: "返回素材库",
       },
       talk: {
         atMessage: "在对话里",
@@ -1573,7 +1608,100 @@ export const catalogs = {
         attrLanguage: "语言",
         attrs: "改属性：{attrs}",
       },
-      body: { blocks: "一起写的", html: "网页", slides: "幻灯片", motion: "动画" },
+      body: { blocks: "一起写的", html: "网页", store: "结构化作品", slides: "幻灯片", motion: "动画" },
+      types: {
+        pick: "选一种要新建的 Artifact",
+        defaultBadge: "默认体系",
+        setDefault: "设为默认设计体系",
+        unsetDefault: "取消默认",
+        docs: "协作文档",
+        slides: "幻灯片",
+        dashboard: "数据看板",
+        motion: "动态短片",
+        whiteboard: "无限白板",
+        design: "界面画板",
+        designSystem: "设计体系",
+        html: "单页网页",
+        exportMarkdown: "导出 Markdown",
+      },
+      motion: {
+        play: "播放",
+        pause: "暂停",
+        prevFrame: "上一帧",
+        nextFrame: "下一帧",
+        loop: "循环播放",
+        exportVideo: "导出视频",
+        exporting: "正在导出…",
+        exported: "视频已存进素材库",
+        exportFailed: "导出失败：{why}",
+        tooLong: "超过 60 秒的动画暂不在浏览器内录屏导出",
+        chapters: "章节",
+        time: "{at}s / {duration}s",
+      },
+      dashboard: {
+        sources: "数据源",
+        hideSources: "收起数据源",
+        verified: "{ok}/{total} 处数字已核对源表",
+        mismatches: "{n} 处数字与源表不一致",
+        noDatasets: "还没有结构化数据集",
+        rows: "{n} 行",
+        exportCsv: "导出 CSV",
+        highlightMarks: "在看板中高亮引用",
+        resetParams: "重置筛选",
+        editJson: "编辑数据 JSON",
+        saveDataset: "保存数据集",
+        savedDataset: "数据集已保存",
+      },
+      whiteboard: {
+        pan: "平移",
+        select: "选择",
+        rect: "矩形",
+        sticky: "便签",
+        diamond: "菱形",
+        text: "文字",
+        container: "分区容器",
+        arrow: "连线箭头",
+        deleteSelected: "删除选中",
+        zoomIn: "放大",
+        zoomOut: "缩小",
+        fitView: "适应画布",
+        elements: "{n} 个元素",
+        agentWorking: "帮工正在绘制：{label}",
+        doubleClickEdit: "双击编辑文字",
+        empty: "空白白板：用上方工具放图形和连线，或在对话里让助手/帮工一起画",
+      },
+      design: {
+        canvas: "全部画板",
+        focus: "聚焦画板",
+        props: "交互属性调节",
+        noProps: "当前画板未声明可调属性（data-props）",
+        saveProps: "保存属性默认值",
+        savedProps: "属性已写回画板",
+        artboards: "{n} 个画板",
+        addArtboard: "新增画板",
+      },
+      designSystem: {
+        overview: "总览",
+        colors: "色彩与对比度",
+        typography: "字体与字阶",
+        components: "组件预览",
+        tokensJson: "令牌源码",
+        themeLight: "浅色预览",
+        themeDark: "深色预览",
+        saveTokens: "保存令牌",
+        savedTokens: "设计令牌已更新",
+        contrastPass: "AA 通过（{ratio}:1）",
+        contrastLow: "对比度偏低（{ratio}:1）",
+      },
+      slidesStore: {
+        addSlide: "加一页",
+        aspect16x9: "16:9 宽屏",
+        aspect4x3: "4:3 标准",
+        stepAt: "第 {at}/{pages} 页 · 片段 {frag}/{frags}",
+        editSlide: "编辑本页 HTML",
+        saveSlide: "保存本页",
+        savedSlide: "本页已保存",
+      },
       edit: {
         title: "改字",
         hint: "选中页面里的字，就能在右边直接改掉它",
@@ -2731,9 +2859,19 @@ export const catalogs = {
       emptyHow: "生成一张图或一段语音、上传或拖进来一个文件，或者在聊天里让帮工把找到的东西放进来。",
       nothingShown: "没有符合筛选的素材。",
       drop: "松开，放进素材库",
-      rail: { where: "来路", kind: "种类", channels: "来自频道", agents: "来自帮工", anyWhere: "全部来路", anyKind: "全部种类" },
+      rail: { where: "来路", kind: "种类", artifacts: "作品交付", channels: "来自频道", agents: "来自帮工", anyWhere: "全部来路", anyKind: "全部种类" },
       origin: { all: "全部", generated: "生成的", uploaded: "你上传的", fetched: "帮工拿回来的" },
       kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
+      artifactKind: {
+        all: "全部作品",
+        canvas: "视觉画板 (.visual.html)",
+        slides: "幻灯片 (.slide.html)",
+        dashboard: "仪表盘 (.dashboard.html)",
+        whiteboard: "白板 (.whiteboard)",
+        page: "网页与文档",
+      },
+      newArtifact: "新建作品",
+      blocksLabel: "协作文档",
       search: "搜索名字",
       sortLabel: "排序",
       sort: { recent: "最近", name: "名字", size: "大小" },
@@ -2762,6 +2900,9 @@ export const catalogs = {
         from: "来路",
         added: "加入",
         openChannel: "去 {channel} 看",
+        openWorkbench: "打开工作台",
+        versionBadge: "第 {version} 稿",
+        byMaker: "作者：{name}",
         selected: "已选 {n} 个",
         clear: "不选了",
         more: "更多",
@@ -3869,6 +4010,11 @@ export const catalogs = {
           create: "Create an artifact: an empty one to write in, or a hand-in",
           delete: "Delete an artifact",
           demo: "Start the demo: several helpers write one artifact at once, no model spending",
+          entry: {
+            batch: "Atomically set, merge, copy or delete entries in a store artifact with revision checks",
+            get: "Read one entry and its revision from a store artifact",
+            list: "List entries in a store artifact, optionally filtered by path prefix",
+          },
           get: "Get an artifact",
           html: { edit: "Replace some words in an HTML artifact, as its next version" },
           list: "List the artifacts of a channel or ticket, or every one",
@@ -3881,7 +4027,11 @@ export const catalogs = {
             list: "List an artifact's suggestions, open and resolved",
             reject: "Reject a suggested change",
           },
-          update: "Rename an artifact",
+          type: {
+            list: "List all structured artifact types and the standing default design system",
+            read: "Read an artifact type's guide or one of its reference chapters",
+          },
+          update: "Rename an artifact or update its default status",
           version: { create: "Hand in a new version of an HTML artifact; the old ones stay" },
         },
         channel: {
@@ -4365,6 +4515,7 @@ export const catalogs = {
         removeBlock: "Delete block {id}",
         removeChildren: "and its {n} child blocks",
         removeBlocks: "Delete “{title}” and its {n} blocks",
+        removeEntries: "Delete “{title}” and its {n} entries",
       },
       untitled: "Untitled",
       noBatch: "This batch of changes has no batchId",
@@ -4453,6 +4604,46 @@ export const catalogs = {
         crosses: '"{words}" crosses differently formatted parts; only words within one can be changed here: select fewer, or hand it to a helper',
         stale: "You are looking at version {version}; the latest is {latest}: change the latest",
         note: 'The user changed on the page: "{old}" → "{new}"',
+      },
+      notStore: "“{title}” is not a structured store artifact and has no entries",
+      defaultDesignSystemOnly: "Only a design-system artifact can be set as the farm's standing default",
+      badType: "Unknown artifact type {type}; expected one of {types}",
+      noReference: "{type} has no reference chapter named {reference}; available: {available}",
+      entry: {
+        missing: "“{title}” has no entry at {path}",
+        badPath: "Invalid entry path “{path}”: {why}",
+        badJson: "Entry {path} is not valid JSON: {why}",
+        notJson: "Entry {path} is {kind} and cannot take a JSON merge",
+        noValue: "Writing entry {path} requires a value",
+        noFrom: "Copying to {path} requires a source path (from)",
+        noAttachment: "Attachment {id} does not exist for entry {path}",
+        tooBig: "Entry {path} is too large: at most {kb} KB per entry",
+        tooMany: "A store artifact holds at most {max} entries",
+        updated: "Updated “{title}” (batch {seq})",
+      },
+      types: {
+        docs: { title: "Document", summary: "Collaborative block document with tracked suggestions and Markdown export" },
+        slides: {
+          title: "Slide Deck",
+          summary: "16:9 or 4:3 multi-file deck (deck.json + deck.css + slide HTML) with fragments, presenter view, and PDF print",
+        },
+        dashboard: {
+          title: "Dashboard",
+          summary: "Structured datasets paired with sandboxed charts, field-level provenance inspection, persistent filters, and CSV export",
+        },
+        motion: {
+          title: "Motion Film",
+          summary: "Deterministic pure-time motion graphics with frame-accurate scrubbing, chapters, and WebM export to the library",
+        },
+        whiteboard: {
+          title: "Whiteboard",
+          summary: "Infinite pan-and-zoom canvas with shapes, containers, orthogonal arrows, tables, SVG sketches, and sealed embeds",
+        },
+        design: { title: "Design Canvas", summary: "Multi-artboard UI & graphic canvas (.dc.html) with interactive state logic and live property levers" },
+        "design-system": {
+          title: "Design System",
+          summary: "Standing light/dark design tokens, typography specimens, and live component previews reusable across visual artifacts",
+        },
       },
     },
     "server.attachment": {
@@ -5329,6 +5520,9 @@ export const catalogs = {
         rail: "Beside this artifact",
         railShow: "Show the side panel",
         railHide: "Hide the side panel",
+        listShow: "Show list",
+        listHide: "Hide list",
+        backToLibrary: "Back to library",
       },
       talk: {
         atMessage: "In the conversation",
@@ -5392,7 +5586,100 @@ export const catalogs = {
         attrLanguage: "language",
         attrs: "Change attrs: {attrs}",
       },
-      body: { blocks: "Written together", html: "Web page", slides: "Slides", motion: "Motion" },
+      body: { blocks: "Written together", html: "Web page", store: "Structured", slides: "Slides", motion: "Motion" },
+      types: {
+        pick: "Choose an artifact type to create",
+        defaultBadge: "Default DS",
+        setDefault: "Set as default design system",
+        unsetDefault: "Unset default",
+        docs: "Document",
+        slides: "Slide Deck",
+        dashboard: "Dashboard",
+        motion: "Motion Film",
+        whiteboard: "Whiteboard",
+        design: "Design Canvas",
+        designSystem: "Design System",
+        html: "Web Page",
+        exportMarkdown: "Export Markdown",
+      },
+      motion: {
+        play: "Play",
+        pause: "Pause",
+        prevFrame: "Previous frame",
+        nextFrame: "Next frame",
+        loop: "Loop",
+        exportVideo: "Export video",
+        exporting: "Exporting…",
+        exported: "Saved video to the media library",
+        exportFailed: "Export failed: {why}",
+        tooLong: "Clips over 60 seconds cannot be recorded in the browser",
+        chapters: "Chapters",
+        time: "{at}s / {duration}s",
+      },
+      dashboard: {
+        sources: "Sources",
+        hideSources: "Hide sources",
+        verified: "{ok}/{total} figures verified against datasets",
+        mismatches: "{n} figures differ from source datasets",
+        noDatasets: "No structured datasets yet",
+        rows: "{n} rows",
+        exportCsv: "Export CSV",
+        highlightMarks: "Highlight references",
+        resetParams: "Reset filters",
+        editJson: "Edit JSON",
+        saveDataset: "Save dataset",
+        savedDataset: "Dataset saved",
+      },
+      whiteboard: {
+        pan: "Pan",
+        select: "Select",
+        rect: "Rectangle",
+        sticky: "Sticky note",
+        diamond: "Diamond",
+        text: "Text",
+        container: "Container",
+        arrow: "Arrow",
+        deleteSelected: "Delete selected",
+        zoomIn: "Zoom in",
+        zoomOut: "Zoom out",
+        fitView: "Fit view",
+        elements: "{n} elements",
+        agentWorking: "Helper drawing: {label}",
+        doubleClickEdit: "Double-click to edit text",
+        empty: "Empty whiteboard: place shapes and arrows from the toolbar, or draw together in chat",
+      },
+      design: {
+        canvas: "All artboards",
+        focus: "Focus artboard",
+        props: "Property levers",
+        noProps: "This artboard declares no adjustable props (data-props)",
+        saveProps: "Save defaults",
+        savedProps: "Props written back to artboard",
+        artboards: "{n} artboards",
+        addArtboard: "New artboard",
+      },
+      designSystem: {
+        overview: "Overview",
+        colors: "Colors & Contrast",
+        typography: "Typography",
+        components: "Components",
+        tokensJson: "Tokens JSON",
+        themeLight: "Light theme",
+        themeDark: "Dark theme",
+        saveTokens: "Save tokens",
+        savedTokens: "Design tokens updated",
+        contrastPass: "AA pass ({ratio}:1)",
+        contrastLow: "Low contrast ({ratio}:1)",
+      },
+      slidesStore: {
+        addSlide: "Add slide",
+        aspect16x9: "16:9 Widescreen",
+        aspect4x3: "4:3 Classic",
+        stepAt: "Slide {at}/{pages} · Step {frag}/{frags}",
+        editSlide: "Edit slide HTML",
+        saveSlide: "Save slide",
+        savedSlide: "Slide saved",
+      },
       edit: {
         title: "Change words",
         hint: "Select words in the page to change them on the right",
@@ -6620,9 +6907,27 @@ export const catalogs = {
       emptyHow: "Generate an image or speech, upload or drop in a file, or ask a helper in the chat to put what it found here.",
       nothingShown: "Nothing matches these filters.",
       drop: "Let go to put it in the library",
-      rail: { where: "From", kind: "Kind", channels: "From channels", agents: "From helpers", anyWhere: "Any origin", anyKind: "Any kind" },
+      rail: {
+        where: "From",
+        kind: "Kind",
+        artifacts: "Deliverables",
+        channels: "From channels",
+        agents: "From helpers",
+        anyWhere: "Any origin",
+        anyKind: "Any kind",
+      },
       origin: { all: "All", generated: "Generated", uploaded: "Uploaded", fetched: "Brought back" },
       kind: { all: "All", image: "Images", audio: "Audio", video: "Video", other: "Other" },
+      artifactKind: {
+        all: "All deliverables",
+        canvas: "Visual (.visual.html)",
+        slides: "Slides (.slide.html)",
+        dashboard: "Dashboard (.dashboard.html)",
+        whiteboard: "Whiteboard (.whiteboard)",
+        page: "Pages & docs",
+      },
+      newArtifact: "New deliverable",
+      blocksLabel: "Shared doc",
       search: "Search names",
       sortLabel: "Sort",
       sort: { recent: "Recent", name: "Name", size: "Size" },
@@ -6651,6 +6956,9 @@ export const catalogs = {
         from: "From",
         added: "Added",
         openChannel: "See it in {channel}",
+        openWorkbench: "Open in workbench",
+        versionBadge: "v{version}",
+        byMaker: "By {name}",
         selected: "{n} selected",
         clear: "Clear selection",
         more: "More",
@@ -7922,6 +8230,9 @@ export interface Messages {
   "cli.op.artifact.create": undefined;
   "cli.op.artifact.delete": undefined;
   "cli.op.artifact.demo": undefined;
+  "cli.op.artifact.entry.batch": undefined;
+  "cli.op.artifact.entry.get": undefined;
+  "cli.op.artifact.entry.list": undefined;
   "cli.op.artifact.get": undefined;
   "cli.op.artifact.html.edit": undefined;
   "cli.op.artifact.list": undefined;
@@ -7932,6 +8243,8 @@ export interface Messages {
   "cli.op.artifact.suggestion.create": undefined;
   "cli.op.artifact.suggestion.list": undefined;
   "cli.op.artifact.suggestion.reject": undefined;
+  "cli.op.artifact.type.list": undefined;
+  "cli.op.artifact.type.read": undefined;
   "cli.op.artifact.update": undefined;
   "cli.op.artifact.version.create": undefined;
   "cli.op.attachment.create": undefined;
@@ -8180,6 +8493,7 @@ export interface Messages {
   "server.artifact.attrNotForType": { readonly attr: string | number; readonly type: string | number };
   "server.artifact.badBlockType": { readonly types: string | number };
   "server.artifact.badKind": { readonly kind: string | number; readonly kinds: string | number };
+  "server.artifact.badType": { readonly type: string | number; readonly types: string | number };
   "server.artifact.check.base": { readonly line: string | number };
   "server.artifact.check.font": { readonly hosts: string | number; readonly line: string | number; readonly url: string | number };
   "server.artifact.check.form": { readonly line: string | number; readonly url: string | number };
@@ -8191,6 +8505,7 @@ export interface Messages {
   "server.artifact.check.refused": { readonly n: string | number };
   "server.artifact.check.script": { readonly hosts: string | number; readonly line: string | number; readonly url: string | number };
   "server.artifact.check.style": { readonly hosts: string | number; readonly line: string | number; readonly url: string | number };
+  "server.artifact.defaultDesignSystemOnly": undefined;
   "server.artifact.demo.0.heading": undefined;
   "server.artifact.demo.0.paragraphs.0": undefined;
   "server.artifact.demo.0.paragraphs.1": undefined;
@@ -8214,17 +8529,29 @@ export interface Messages {
   "server.artifact.edit.same": undefined;
   "server.artifact.edit.stale": { readonly latest: string | number; readonly version: string | number };
   "server.artifact.empty": undefined;
+  "server.artifact.entry.badJson": { readonly path: string | number; readonly why: string | number };
+  "server.artifact.entry.badPath": { readonly path: string | number; readonly why: string | number };
+  "server.artifact.entry.missing": { readonly path: string | number; readonly title: string | number };
+  "server.artifact.entry.noAttachment": { readonly id: string | number; readonly path: string | number };
+  "server.artifact.entry.noFrom": { readonly path: string | number };
+  "server.artifact.entry.noValue": { readonly path: string | number };
+  "server.artifact.entry.notJson": { readonly kind: string | number; readonly path: string | number };
+  "server.artifact.entry.tooBig": { readonly kb: string | number; readonly path: string | number };
+  "server.artifact.entry.tooMany": { readonly max: string | number };
+  "server.artifact.entry.updated": { readonly seq: string | number; readonly title: string | number };
   "server.artifact.longTitle": { readonly max: string | number };
   "server.artifact.made": { readonly title: string | number };
   "server.artifact.missing": { readonly id: string | number };
   "server.artifact.noBatch": undefined;
   "server.artifact.noFile": { readonly title: string | number; readonly version: string | number };
+  "server.artifact.noReference": { readonly available: string | number; readonly reference: string | number; readonly type: string | number };
   "server.artifact.noTitle": undefined;
   "server.artifact.noVersion": { readonly latest: string | number; readonly title: string | number; readonly version: string | number };
   "server.artifact.noWriter": undefined;
   "server.artifact.notApplied": undefined;
   "server.artifact.notBlocks": { readonly title: string | number };
   "server.artifact.notHtml": { readonly title: string | number };
+  "server.artifact.notStore": { readonly title: string | number };
   "server.artifact.nothingToChange": undefined;
   "server.artifact.op.badKey": { readonly key: string | number };
   "server.artifact.op.changed": undefined;
@@ -8248,6 +8575,7 @@ export interface Messages {
   "server.artifact.preview.removeBlock": { readonly id: string | number };
   "server.artifact.preview.removeBlocks": { readonly n: string | number; readonly title: string | number };
   "server.artifact.preview.removeChildren": { readonly n: string | number };
+  "server.artifact.preview.removeEntries": { readonly n: string | number; readonly title: string | number };
   "server.artifact.suggestion.beyond": { readonly now: string | number; readonly rev: string | number };
   "server.artifact.suggestion.deleteAlone": undefined;
   "server.artifact.suggestion.empty": undefined;
@@ -8256,6 +8584,20 @@ export interface Messages {
   "server.artifact.suggestion.stale": { readonly now: string | number; readonly rev: string | number };
   "server.artifact.suggestion.suggested": { readonly id: string | number };
   "server.artifact.tooBig": { readonly mb: string | number };
+  "server.artifact.types.dashboard.summary": undefined;
+  "server.artifact.types.dashboard.title": undefined;
+  "server.artifact.types.design-system.summary": undefined;
+  "server.artifact.types.design-system.title": undefined;
+  "server.artifact.types.design.summary": undefined;
+  "server.artifact.types.design.title": undefined;
+  "server.artifact.types.docs.summary": undefined;
+  "server.artifact.types.docs.title": undefined;
+  "server.artifact.types.motion.summary": undefined;
+  "server.artifact.types.motion.title": undefined;
+  "server.artifact.types.slides.summary": undefined;
+  "server.artifact.types.slides.title": undefined;
+  "server.artifact.types.whiteboard.summary": undefined;
+  "server.artifact.types.whiteboard.title": undefined;
   "server.artifact.untitled": undefined;
   "server.artifact.versioned": { readonly title: string | number; readonly version: string | number };
   "server.artifact.withNote": { readonly note: string | number; readonly said: string | number };
@@ -9098,12 +9440,44 @@ export interface Messages {
   "web.artifact.body.html": undefined;
   "web.artifact.body.motion": undefined;
   "web.artifact.body.slides": undefined;
+  "web.artifact.body.store": undefined;
   "web.artifact.canvas.close": undefined;
   "web.artifact.canvas.label": undefined;
   "web.artifact.canvas.openPage": undefined;
   "web.artifact.canvas.quote": undefined;
   "web.artifact.card.open": { readonly title: string | number };
   "web.artifact.card.version": { readonly version: string | number };
+  "web.artifact.dashboard.editJson": undefined;
+  "web.artifact.dashboard.exportCsv": undefined;
+  "web.artifact.dashboard.hideSources": undefined;
+  "web.artifact.dashboard.highlightMarks": undefined;
+  "web.artifact.dashboard.mismatches": { readonly n: string | number };
+  "web.artifact.dashboard.noDatasets": undefined;
+  "web.artifact.dashboard.resetParams": undefined;
+  "web.artifact.dashboard.rows": { readonly n: string | number };
+  "web.artifact.dashboard.saveDataset": undefined;
+  "web.artifact.dashboard.savedDataset": undefined;
+  "web.artifact.dashboard.sources": undefined;
+  "web.artifact.dashboard.verified": { readonly ok: string | number; readonly total: string | number };
+  "web.artifact.design.addArtboard": undefined;
+  "web.artifact.design.artboards": { readonly n: string | number };
+  "web.artifact.design.canvas": undefined;
+  "web.artifact.design.focus": undefined;
+  "web.artifact.design.noProps": undefined;
+  "web.artifact.design.props": undefined;
+  "web.artifact.design.saveProps": undefined;
+  "web.artifact.design.savedProps": undefined;
+  "web.artifact.designSystem.colors": undefined;
+  "web.artifact.designSystem.components": undefined;
+  "web.artifact.designSystem.contrastLow": { readonly ratio: string | number };
+  "web.artifact.designSystem.contrastPass": { readonly ratio: string | number };
+  "web.artifact.designSystem.overview": undefined;
+  "web.artifact.designSystem.saveTokens": undefined;
+  "web.artifact.designSystem.savedTokens": undefined;
+  "web.artifact.designSystem.themeDark": undefined;
+  "web.artifact.designSystem.themeLight": undefined;
+  "web.artifact.designSystem.tokensJson": undefined;
+  "web.artifact.designSystem.typography": undefined;
   "web.artifact.edit.hint": undefined;
   "web.artifact.edit.older": undefined;
   "web.artifact.edit.save": undefined;
@@ -9111,7 +9485,20 @@ export interface Messages {
   "web.artifact.edit.title": undefined;
   "web.artifact.edit.to": undefined;
   "web.artifact.issue.title": undefined;
+  "web.artifact.motion.chapters": undefined;
+  "web.artifact.motion.exportFailed": { readonly why: string | number };
+  "web.artifact.motion.exportVideo": undefined;
+  "web.artifact.motion.exported": undefined;
+  "web.artifact.motion.exporting": undefined;
+  "web.artifact.motion.loop": undefined;
+  "web.artifact.motion.nextFrame": undefined;
+  "web.artifact.motion.pause": undefined;
+  "web.artifact.motion.play": undefined;
+  "web.artifact.motion.prevFrame": undefined;
+  "web.artifact.motion.time": { readonly at: string | number; readonly duration: string | number };
+  "web.artifact.motion.tooLong": undefined;
   "web.artifact.page.all": undefined;
+  "web.artifact.page.backToLibrary": undefined;
   "web.artifact.page.by": { readonly name: string | number };
   "web.artifact.page.delete": undefined;
   "web.artifact.page.deleteAsk": { readonly title: string | number };
@@ -9123,6 +9510,8 @@ export interface Messages {
   "web.artifact.page.group.delivered": undefined;
   "web.artifact.page.group.mine": undefined;
   "web.artifact.page.list": undefined;
+  "web.artifact.page.listHide": undefined;
+  "web.artifact.page.listShow": undefined;
   "web.artifact.page.more": undefined;
   "web.artifact.page.new": undefined;
   "web.artifact.page.none": undefined;
@@ -9155,6 +9544,18 @@ export interface Messages {
   "web.artifact.slides.previous": undefined;
   "web.artifact.slides.slide": { readonly at: string | number; readonly title: string | number };
   "web.artifact.slides.thumbnails": undefined;
+  "web.artifact.slidesStore.addSlide": undefined;
+  "web.artifact.slidesStore.aspect16x9": undefined;
+  "web.artifact.slidesStore.aspect4x3": undefined;
+  "web.artifact.slidesStore.editSlide": undefined;
+  "web.artifact.slidesStore.saveSlide": undefined;
+  "web.artifact.slidesStore.savedSlide": undefined;
+  "web.artifact.slidesStore.stepAt": {
+    readonly at: string | number;
+    readonly frag: string | number;
+    readonly frags: string | number;
+    readonly pages: string | number;
+  };
   "web.artifact.suggestions.accept": undefined;
   "web.artifact.suggestions.attrChecked": undefined;
   "web.artifact.suggestions.attrLanguage": undefined;
@@ -9186,6 +9587,35 @@ export interface Messages {
   "web.artifact.talk.send": undefined;
   "web.artifact.talk.sent": undefined;
   "web.artifact.talk.sentVersion": { readonly version: string | number };
+  "web.artifact.types.dashboard": undefined;
+  "web.artifact.types.defaultBadge": undefined;
+  "web.artifact.types.design": undefined;
+  "web.artifact.types.designSystem": undefined;
+  "web.artifact.types.docs": undefined;
+  "web.artifact.types.exportMarkdown": undefined;
+  "web.artifact.types.html": undefined;
+  "web.artifact.types.motion": undefined;
+  "web.artifact.types.pick": undefined;
+  "web.artifact.types.setDefault": undefined;
+  "web.artifact.types.slides": undefined;
+  "web.artifact.types.unsetDefault": undefined;
+  "web.artifact.types.whiteboard": undefined;
+  "web.artifact.whiteboard.agentWorking": { readonly label: string | number };
+  "web.artifact.whiteboard.arrow": undefined;
+  "web.artifact.whiteboard.container": undefined;
+  "web.artifact.whiteboard.deleteSelected": undefined;
+  "web.artifact.whiteboard.diamond": undefined;
+  "web.artifact.whiteboard.doubleClickEdit": undefined;
+  "web.artifact.whiteboard.elements": { readonly n: string | number };
+  "web.artifact.whiteboard.empty": undefined;
+  "web.artifact.whiteboard.fitView": undefined;
+  "web.artifact.whiteboard.pan": undefined;
+  "web.artifact.whiteboard.rect": undefined;
+  "web.artifact.whiteboard.select": undefined;
+  "web.artifact.whiteboard.sticky": undefined;
+  "web.artifact.whiteboard.text": undefined;
+  "web.artifact.whiteboard.zoomIn": undefined;
+  "web.artifact.whiteboard.zoomOut": undefined;
   "web.audio.account": undefined;
   "web.audio.addSpeaker": undefined;
   "web.audio.addTurn": undefined;
@@ -10365,6 +10795,13 @@ export interface Messages {
   "web.issue.trigger.missed": undefined;
   "web.issue.trigger.refine": undefined;
   "web.issue.trigger.runtime": undefined;
+  "web.library.artifactKind.all": undefined;
+  "web.library.artifactKind.canvas": undefined;
+  "web.library.artifactKind.dashboard": undefined;
+  "web.library.artifactKind.page": undefined;
+  "web.library.artifactKind.slides": undefined;
+  "web.library.artifactKind.whiteboard": undefined;
+  "web.library.blocksLabel": undefined;
   "web.library.download": undefined;
   "web.library.drop": undefined;
   "web.library.empty": undefined;
@@ -10376,6 +10813,7 @@ export interface Messages {
   "web.library.from.uploadedIn": { readonly channel: string | number };
   "web.library.hint": undefined;
   "web.library.inspector.added": undefined;
+  "web.library.inspector.byMaker": { readonly name: string | number };
   "web.library.inspector.bytes": undefined;
   "web.library.inspector.clear": undefined;
   "web.library.inspector.from": undefined;
@@ -10383,8 +10821,10 @@ export interface Messages {
   "web.library.inspector.length": undefined;
   "web.library.inspector.more": undefined;
   "web.library.inspector.openChannel": { readonly channel: string | number };
+  "web.library.inspector.openWorkbench": undefined;
   "web.library.inspector.pixels": undefined;
   "web.library.inspector.selected": { readonly n: string | number };
+  "web.library.inspector.versionBadge": { readonly version: string | number };
   "web.library.job.clone": undefined;
   "web.library.job.image": undefined;
   "web.library.job.speakers": undefined;
@@ -10403,6 +10843,7 @@ export interface Messages {
   "web.library.makeTabs.image": undefined;
   "web.library.makeTabs.speech": undefined;
   "web.library.makeTitle": undefined;
+  "web.library.newArtifact": undefined;
   "web.library.nothingShown": undefined;
   "web.library.origin.all": undefined;
   "web.library.origin.fetched": undefined;
@@ -10411,6 +10852,7 @@ export interface Messages {
   "web.library.rail.agents": undefined;
   "web.library.rail.anyKind": undefined;
   "web.library.rail.anyWhere": undefined;
+  "web.library.rail.artifacts": undefined;
   "web.library.rail.channels": undefined;
   "web.library.rail.kind": undefined;
   "web.library.rail.where": undefined;

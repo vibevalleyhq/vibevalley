@@ -482,6 +482,25 @@ export class VibeValleyApi {
       get: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.ArtifactMarkdown> =>
         this.call<T.ArtifactMarkdown>("artifact.markdown.get", "/api/v1/artifact/markdown/get", a, options),
     },
+    type: {
+      /** All structured artifact types and the farm's standing default design-system if any. */
+      list: (options?: { signal?: AbortSignal }): Promise<T.ArtifactTypeInfo[]> =>
+        this.call<T.ArtifactTypeInfo[]>("artifact.type.list", "/api/v1/artifact/type/list", undefined, options),
+      /** A structured artifact type's SKILL.md guide or one of its named reference chapters. */
+      read: (a: T.ArtifactTypeReadRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactTypeGuide> =>
+        this.call<T.ArtifactTypeGuide>("artifact.type.read", "/api/v1/artifact/type/read", a, options),
+    },
+    entry: {
+      /** A store artifact's entries (filtered by path prefix when given), with values when requested. */
+      list: (a: T.ArtifactEntryListRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactEntrySnapshot> =>
+        this.call<T.ArtifactEntrySnapshot>("artifact.entry.list", "/api/v1/artifact/entry/list", a, options),
+      /** One store entry with its value and revision. */
+      get: (a: T.ArtifactEntryGetRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactEntry> =>
+        this.call<T.ArtifactEntry>("artifact.entry.get", "/api/v1/artifact/entry/get", a, options),
+      /** An atomic batch of set, patch, delete or copy writes on a store artifact with per-entry optimistic concurrency. */
+      batch: (a: T.ArtifactEntryBatchRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactEntryBatchResult> =>
+        this.call<T.ArtifactEntryBatchResult>("artifact.entry.batch", "/api/v1/artifact/entry/batch", a, options),
+    },
   };
 
   readonly game = {

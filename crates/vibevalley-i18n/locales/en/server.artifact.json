@@ -16,7 +16,8 @@
     "cards": "Its cards stay in the conversation and say it was deleted when opened",
     "removeBlock": "Delete block {id}",
     "removeChildren": "and its {n} child blocks",
-    "removeBlocks": "Delete “{title}” and its {n} blocks"
+    "removeBlocks": "Delete “{title}” and its {n} blocks",
+    "removeEntries": "Delete “{title}” and its {n} entries"
   },
   "untitled": "Untitled",
   "noBatch": "This batch of changes has no batchId",
@@ -105,5 +106,51 @@
     "crosses": "\"{words}\" crosses differently formatted parts; only words within one can be changed here: select fewer, or hand it to a helper",
     "stale": "You are looking at version {version}; the latest is {latest}: change the latest",
     "note": "The user changed on the page: \"{old}\" → \"{new}\""
+  },
+  "notStore": "“{title}” is not a structured store artifact and has no entries",
+  "defaultDesignSystemOnly": "Only a design-system artifact can be set as the farm's standing default",
+  "badType": "Unknown artifact type {type}; expected one of {types}",
+  "noReference": "{type} has no reference chapter named {reference}; available: {available}",
+  "entry": {
+    "missing": "“{title}” has no entry at {path}",
+    "badPath": "Invalid entry path “{path}”: {why}",
+    "badJson": "Entry {path} is not valid JSON: {why}",
+    "notJson": "Entry {path} is {kind} and cannot take a JSON merge",
+    "noValue": "Writing entry {path} requires a value",
+    "noFrom": "Copying to {path} requires a source path (from)",
+    "noAttachment": "Attachment {id} does not exist for entry {path}",
+    "tooBig": "Entry {path} is too large: at most {kb} KB per entry",
+    "tooMany": "A store artifact holds at most {max} entries",
+    "updated": "Updated “{title}” (batch {seq})"
+  },
+  "types": {
+    "docs": {
+      "title": "Document",
+      "summary": "Collaborative block document with tracked suggestions and Markdown export"
+    },
+    "slides": {
+      "title": "Slide Deck",
+      "summary": "16:9 or 4:3 multi-file deck (deck.json + deck.css + slide HTML) with fragments, presenter view, and PDF print"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "summary": "Structured datasets paired with sandboxed charts, field-level provenance inspection, persistent filters, and CSV export"
+    },
+    "motion": {
+      "title": "Motion Film",
+      "summary": "Deterministic pure-time motion graphics with frame-accurate scrubbing, chapters, and WebM export to the library"
+    },
+    "whiteboard": {
+      "title": "Whiteboard",
+      "summary": "Infinite pan-and-zoom canvas with shapes, containers, orthogonal arrows, tables, SVG sketches, and sealed embeds"
+    },
+    "design": {
+      "title": "Design Canvas",
+      "summary": "Multi-artboard UI & graphic canvas (.dc.html) with interactive state logic and live property levers"
+    },
+    "design-system": {
+      "title": "Design System",
+      "summary": "Standing light/dark design tokens, typography specimens, and live component previews reusable across visual artifacts"
+    }
   }
 }
