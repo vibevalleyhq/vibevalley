@@ -1,4 +1,4 @@
-use gpui_kit::*;
+use gpui::*;
 
 struct Hello;
 
@@ -9,8 +9,8 @@ impl Render for Hello {
 }
 
 fn main() {
-    gpui_kit::application().run(|cx| {
-        gpui_kit::init(cx);
-        gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| cx.new(|_| Hello)).expect("failed to open window");
+    gpui_platform::application().run(|cx| {
+        cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| Hello))
+            .expect("failed to open window");
     });
 }

@@ -1,4 +1,4 @@
-import { colorScheme } from "nsh";
+import { colorScheme, host } from "nsh";
 
 // What nsh's JS engine (still in 0.6.0) lacks and the reused VibeValley code calls.
 // Import it first in every entry that loads VibeValley modules.
@@ -98,5 +98,99 @@ if (!g2.window) {
   };
 }
 if (!g2.document) g2.document = { documentElement: { dataset: {}, style: { setProperty: () => {} } } };
+
+// Synchronous `crypto.getRandomValues` and `crypto.randomUUID` when `nsh-platform-gpui`
+// is built without its heavy `"crypto"` feature. Seeded with 256-bit OS entropy injected
+// by Rust via `host.params.randomSeed` and expanded with RFC 8439 ChaCha20.
+function installCryptoPolyfill() {
+  const existing = g2.crypto as { getRandomValues?: unknown; randomUUID?: unknown } | undefined;
+  if (typeof existing?.getRandomValues === "function" && typeof existing.randomUUID === "function") return;
+
+  const key = new Uint32Array(8);
+  const seedHex = typeof host.params.randomSeed === "string" ? host.params.randomSeed : "";
+  if (/^[0-9a-f]{64}$/iu.test(seedHex)) {
+    for (let i = 0; i < 8; i++) key[i] = parseInt(seedHex.slice(i * 8, i * 8 + 8), 16) >>> 0;
+  } else {
+    const now = Date.now();
+    for (let i = 0; i < 8; i++) key[i] = ((Math.random() * 0x1_0000_0000) ^ (now + i * 0x9e37_79b9)) >>> 0;
+  }
+
+  let counter = 1;
+  const nonce = new Uint32Array([0x243f_6a88, 0x85a3_08d3, (Date.now() & 0xffff_ffff) >>> 0]);
+  const state = new Uint32Array(16);
+  const work = new Uint32Array(16);
+  const block = new Uint8Array(64);
+  let pos = 64;
+
+  const rotl = (v: number, n: number) => ((v << n) | (v >>> (32 - n))) >>> 0;
+  const qr = (w: Uint32Array, a: number, b: number, c: number, d: number) => {
+    w[a] = (w[a]! + w[b]!) >>> 0;
+    w[d] = rotl(w[d]! ^ w[a]!, 16);
+    w[c] = (w[c]! + w[d]!) >>> 0;
+    w[b] = rotl(w[b]! ^ w[c]!, 12);
+    w[a] = (w[a]! + w[b]!) >>> 0;
+    w[d] = rotl(w[d]! ^ w[a]!, 8);
+    w[c] = (w[c]! + w[d]!) >>> 0;
+    w[b] = rotl(w[b]! ^ w[c]!, 7);
+  };
+
+  const refill = () => {
+    state[0] = 0x6170_7865;
+    state[1] = 0x3320_646e;
+    state[2] = 0x7962_2d32;
+    state[3] = 0x6b20_6574;
+    for (let i = 0; i < 8; i++) state[4 + i] = key[i]!;
+    state[12] = counter >>> 0;
+    counter = (counter + 1) >>> 0;
+    if (counter === 0) nonce[0] = (nonce[0]! + 1) >>> 0;
+    state[13] = nonce[0]!;
+    state[14] = nonce[1]!;
+    state[15] = nonce[2]!;
+    work.set(state);
+    for (let r = 0; r < 10; r++) {
+      qr(work, 0, 4, 8, 12);
+      qr(work, 1, 5, 9, 13);
+      qr(work, 2, 6, 10, 14);
+      qr(work, 3, 7, 11, 15);
+      qr(work, 0, 5, 10, 15);
+      qr(work, 1, 6, 11, 12);
+      qr(work, 2, 7, 8, 13);
+      qr(work, 3, 4, 9, 14);
+    }
+    for (let i = 0; i < 16; i++) {
+      const v = (work[i]! + state[i]!) >>> 0;
+      block[i * 4] = v & 0xff;
+      block[i * 4 + 1] = (v >>> 8) & 0xff;
+      block[i * 4 + 2] = (v >>> 16) & 0xff;
+      block[i * 4 + 3] = (v >>> 24) & 0xff;
+    }
+    pos = 0;
+  };
+
+  const getRandomValues = <T extends ArrayBufferView>(array: T): T => {
+    const out = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+    for (let i = 0; i < out.length; i++) {
+      if (pos >= 64) refill();
+      out[i] = block[pos++]!;
+    }
+    return array;
+  };
+
+  const randomUUID = (): string => {
+    const bytes = getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+    bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+    let hex = "";
+    for (let i = 0; i < 16; i++) hex += bytes[i]!.toString(16).padStart(2, "0");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  };
+
+  const target = (existing ?? {}) as Record<string, unknown>;
+  if (typeof target.getRandomValues !== "function") target.getRandomValues = getRandomValues;
+  if (typeof target.randomUUID !== "function") target.randomUUID = randomUUID;
+  g2.crypto = target;
+}
+
+installCryptoPolyfill();
 
 export {};

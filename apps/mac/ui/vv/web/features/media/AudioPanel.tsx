@@ -16,7 +16,7 @@ import {
 } from "@vibevalley/protocol";
 
 import { useTimeout } from "../../base/timer";
-import { api, reasonOf } from "../../infra/api";
+import { api, reasonOf, sha256Hex } from "../../infra/api";
 import { type LocalFile, pickFile, playInput, uploadAudio } from "../../infra/attachmentFile";
 import { useCore } from "../../infra/frame";
 import { providerQuery, providerVoicesQuery, ready, useQuery } from "../../infra/query";
@@ -711,8 +711,7 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
     const voiceName = name().trim();
     return act.run(async () => {
       if (previous) return api.media.clone.create(previous);
-      const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(["audio-voice", job.id])));
-      const id = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      const id = await sha256Hex(JSON.stringify(["audio-voice", job.id]));
       const request: MediaCloneRequest = {
         id,
         connection: job.connection,

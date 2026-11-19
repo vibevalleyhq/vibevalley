@@ -144,14 +144,22 @@ export const hostApi = {
   openWorktreeFile: (worktree: string, path: string) => call<void>("host.openFile", { worktree, path }),
   /** VibeValley's built pixel art: the folder with sprites.json and its PNGs. */
   pixelDir: () => call<{ path: string }>("host.pixelDir", {}),
+  /** VibeValley's sprite manifest read from disk by Rust (`assets/pixel/sprites.json`). */
+  pixelManifest: () => call<Record<string, unknown>>("host.pixelManifest", {}),
+  /** SHA-256 hex digest of UTF-8 text computed in Rust. */
+  sha256: (text: string) => call<{ hex: string }>("host.sha256", { text }),
+  /** Cryptographic random bytes (hex-encoded) generated in Rust. */
+  randomBytes: (length: number) => call<{ hex: string }>("host.randomBytes", { length }),
+  /** Encodes UTF-8 text into a QR module grid (`'1'` dark / `'0'` light) in Rust. */
+  qr: (text: string, border = 2) => call<{ size: number; rows: string[] }>("host.qr", { text, border }),
   /** Plays a local sound file (nsh's AudioPlayer is silent in the app); stops the last one. */
   playAudio: (path: string, position = 0) => call<void>("host.playAudio", { path, position }),
   seekAudio: (position: number) => call<void>("host.seekAudio", { position }),
   audioState: () => call<{ position: number; duration: number; playing: boolean }>("host.audioState"),
   pcmStart: (sampleRate: number, channels = 1) => call<void>("host.pcmStart", { sampleRate, channels }),
   pcmAppend: (data: string) => call<void>("host.pcmAppend", { data }),
-  /** Plays a sound made in the view (base64, e.g. a synthesised WAV of at most 2 MB). */
-  playAudioData: (data: string, type = "audio/wav") => call<void>("host.playAudio", { data, type }),
+  /** Plays a named UI sound synthesized and cached in Rust. */
+  playSound: (name: string) => call<void>("host.playSound", { name }),
   /** A dropped file's bytes (an absolute path or a file: URL; at most 50 MB). */
   readFile: (path: string) => call<{ data: string; type: string; name: string }>("host.readFile", { path }),
   cliState: () => call<import("@vibevalley/protocol/host").CommandLineState>("host.cliState"),

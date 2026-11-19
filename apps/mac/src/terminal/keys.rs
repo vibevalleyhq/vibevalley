@@ -4,7 +4,7 @@
 //! mapped: they are left to the platform text system so an input method can
 //! compose them, and arrive as committed text instead.
 
-use gpui_kit::Keystroke;
+use gpui::Keystroke;
 use vibevalley_terminal::{Key, KeyInput, Mods};
 
 fn named(key: &str) -> Option<Key> {
