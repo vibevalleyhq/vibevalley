@@ -1,7 +1,13 @@
 pub mod common;
 pub mod flowchart;
 pub mod pie;
+pub mod quadrant;
+pub mod radar;
+pub mod sankey;
 pub mod sequence;
+pub mod venn;
+pub mod wardley;
+pub mod xychart;
 
 use std::collections::HashMap;
 
@@ -44,6 +50,12 @@ pub enum ParsedModel {
     Flowchart(flowchart::FlowDb),
     Sequence(sequence::SeqDb),
     Pie(pie::PieModel),
+    XyChart(xychart::XyChartModel),
+    QuadrantChart(quadrant::QuadrantModel),
+    Radar(radar::RadarModel),
+    Sankey(sankey::SankeyModel),
+    Venn(venn::VennModel),
+    Wardley(wardley::WardleyModel),
 }
 
 impl ParsedModel {
@@ -52,14 +64,26 @@ impl ParsedModel {
             Self::Flowchart(_) => DiagramType::Flowchart,
             Self::Sequence(_) => DiagramType::Sequence,
             Self::Pie(_) => DiagramType::Pie,
+            Self::XyChart(_) => DiagramType::XyChart,
+            Self::QuadrantChart(_) => DiagramType::QuadrantChart,
+            Self::Radar(_) => DiagramType::Radar,
+            Self::Sankey(_) => DiagramType::Sankey,
+            Self::Venn(_) => DiagramType::Venn,
+            Self::Wardley(_) => DiagramType::Wardley,
         }
     }
 
-    pub fn render(&self, ctx: &RenderContext<'_>) -> Rendered {
+    pub fn render(&self, ctx: &RenderContext<'_>) -> Result<Rendered, PeleError> {
         match self {
-            Self::Flowchart(db) => flowchart::render_flowchart(db, ctx, None),
-            Self::Sequence(db) => sequence::render_sequence(db, ctx),
-            Self::Pie(model) => pie::render::render_pie(model, ctx),
+            Self::Flowchart(db) => Ok(flowchart::render_flowchart(db, ctx, None)),
+            Self::Sequence(db) => Ok(sequence::render_sequence(db, ctx)),
+            Self::Pie(model) => Ok(pie::render::render_pie(model, ctx)),
+            Self::XyChart(model) => xychart::render::render_xychart(model, ctx),
+            Self::QuadrantChart(model) => Ok(quadrant::render::render_quadrant(model, ctx)),
+            Self::Radar(model) => Ok(radar::render::render_radar(model, ctx)),
+            Self::Sankey(model) => sankey::render::render_sankey(model, ctx),
+            Self::Venn(model) => Ok(venn::render::render_venn(model, ctx)),
+            Self::Wardley(model) => Ok(wardley::render::render_wardley(model, ctx)),
         }
     }
 }
@@ -113,6 +137,12 @@ impl Registry {
         reg.register(Box::new(flowchart::FlowchartDiagram));
         reg.register(Box::new(sequence::SequenceDiagram));
         reg.register(Box::new(pie::PieDiagram));
+        reg.register(Box::new(xychart::XyChartDiagram));
+        reg.register(Box::new(quadrant::QuadrantDiagram));
+        reg.register(Box::new(radar::RadarDiagram));
+        reg.register(Box::new(sankey::SankeyDiagram));
+        reg.register(Box::new(venn::VennDiagram));
+        reg.register(Box::new(wardley::WardleyDiagram));
         reg
     }
 
@@ -203,17 +233,18 @@ impl Registry {
             icons: icons_ref,
             math: math_ref,
         };
-        let mut rendered = parsed.model.render(&ctx);
+        let found = Detected {
+            diagram_type: parsed.diagram_type,
+            mermaid_type: parsed.mermaid_type,
+        };
+        let mut rendered = parsed.model.render(&ctx).map_err(|e| tag_error(e, found))?;
         let output_limit = options.output_limit.unwrap_or(DEFAULT_OUTPUT_LIMIT);
         if rendered.svg.len() > output_limit {
             return Err(PeleError::new(
                 format!("Diagram output is longer than the limit of {output_limit} characters."),
                 ErrorCode::Limit,
             )
-            .with_detected(Detected {
-                diagram_type: parsed.diagram_type,
-                mermaid_type: parsed.mermaid_type,
-            }));
+            .with_detected(found));
         }
         for link in &mut rendered.links {
             link.id = decode_entities(&link.id);
