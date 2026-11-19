@@ -153,3 +153,83 @@ impl Expr {
         }
     }
 }
+
+pub fn collect_group_bodies<'a>(expr: &'a Expr, out: &mut [Option<&'a Expr>]) {
+    match expr {
+        Expr::Capture { index, expr } => {
+            out[*index] = Some(expr);
+            collect_group_bodies(expr, out);
+        }
+        Expr::Seq(items) | Expr::Alt(items) => {
+            for item in items {
+                collect_group_bodies(item, out);
+            }
+        }
+        Expr::Repeat { expr, .. } | Expr::Atomic(expr) | Expr::Lookaround { expr, .. } | Expr::AbsentRepeater(expr) | Expr::AbsentStopper(expr) => {
+            collect_group_bodies(expr, out)
+        }
+        Expr::AbsentExpression { absent, expr } => {
+            collect_group_bodies(absent, out);
+            collect_group_bodies(expr, out);
+        }
+        Expr::Condition {
+            cond,
+            then_branch,
+            else_branch,
+        } => {
+            match cond {
+                ConditionKind::Expr(e) => collect_group_bodies(e, out),
+                ConditionKind::BackrefValid { .. } => {}
+            }
+            collect_group_bodies(then_branch, out);
+            if let Some(e) = else_branch {
+                collect_group_bodies(e, out);
+            }
+        }
+        Expr::Empty
+        | Expr::Fail
+        | Expr::Literal { .. }
+        | Expr::AnyChar { .. }
+        | Expr::GeneralNewline
+        | Expr::TextSegment(_)
+        | Expr::CharClass(_)
+        | Expr::Anchor(_)
+        | Expr::Keep
+        | Expr::Backref { .. }
+        | Expr::Call { .. }
+        | Expr::RangeClear => {}
+    }
+}
+
+pub fn expr_can_match_empty(expr: &Expr, group_bodies: &[Option<&Expr>]) -> bool {
+    let mut visited = vec![false; group_bodies.len()];
+    expr_can_match_empty_rec(expr, group_bodies, &mut visited)
+}
+
+fn expr_can_match_empty_rec(expr: &Expr, group_bodies: &[Option<&Expr>], visited: &mut [bool]) -> bool {
+    match expr {
+        Expr::Empty | Expr::Anchor(_) | Expr::Keep | Expr::Lookaround { .. } | Expr::RangeClear => true,
+        Expr::Fail | Expr::AnyChar { .. } | Expr::GeneralNewline | Expr::TextSegment(_) | Expr::CharClass(_) => false,
+        Expr::Literal { text, .. } => text.is_empty(),
+        Expr::Backref { .. } => true,
+        Expr::Seq(items) => items.iter().all(|i| expr_can_match_empty_rec(i, group_bodies, visited)),
+        Expr::Alt(branches) => branches.iter().any(|b| expr_can_match_empty_rec(b, group_bodies, visited)),
+        Expr::Repeat { expr, min, .. } => *min == 0 || expr_can_match_empty_rec(expr, group_bodies, visited),
+        Expr::Capture { expr, .. } | Expr::Atomic(expr) => expr_can_match_empty_rec(expr, group_bodies, visited),
+        Expr::Call { target_group } => {
+            if visited[*target_group] {
+                return true;
+            }
+            visited[*target_group] = true;
+            let res = group_bodies[*target_group].is_some_and(|b| expr_can_match_empty_rec(b, group_bodies, visited));
+            visited[*target_group] = false;
+            res
+        }
+        Expr::Condition { then_branch, else_branch, .. } => {
+            expr_can_match_empty_rec(then_branch, group_bodies, visited)
+                || else_branch.as_deref().is_none_or(|e| expr_can_match_empty_rec(e, group_bodies, visited))
+        }
+        Expr::AbsentRepeater(_) | Expr::AbsentStopper(_) => true,
+        Expr::AbsentExpression { expr, .. } => expr_can_match_empty_rec(expr, group_bodies, visited),
+    }
+}

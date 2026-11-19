@@ -1,4 +1,4 @@
-use crate::ast::{Anchor, BackrefTarget, ConditionKind, Expr, LookaroundKind, ParsedPattern, QuantifierMode};
+use crate::ast::{Anchor, BackrefTarget, ConditionKind, Expr, LookaroundKind, ParsedPattern, QuantifierMode, collect_group_bodies, expr_can_match_empty};
 use crate::options::FindOption;
 use crate::unicode::segment::SegmentMode;
 use crate::unicode::{CharSet, fold_multi_expansion, fold1_equivalents, set_byte};
@@ -187,9 +187,10 @@ pub fn compile(parsed: &ParsedPattern) -> Program {
         let absent_pc = comp.ops.len() as u32;
         comp.emit_expr(&absent_expr);
         comp.ops.push(Op::Match);
-        match &mut comp.ops[patch_idx] {
-            Op::AbsentRepeater { absent_pc: dst } | Op::AbsentSetLimit { absent_pc: dst, .. } => *dst = absent_pc,
-            _ => unreachable!(),
+        if let Op::AbsentRepeater { absent_pc: dst } | Op::AbsentSetLimit { absent_pc: dst, .. } = &mut comp.ops[patch_idx] {
+            *dst = absent_pc;
+        } else {
+            unreachable!("absent_queue only records AbsentRepeater or AbsentSetLimit ops");
         }
     }
 
@@ -729,41 +730,6 @@ impl<'a> Compiler<'a> {
     }
 }
 
-fn collect_group_bodies<'a>(expr: &'a Expr, out: &mut [Option<&'a Expr>]) {
-    match expr {
-        Expr::Capture { index, expr, .. } => {
-            out[*index] = Some(expr);
-            collect_group_bodies(expr, out);
-        }
-        Expr::Seq(items) | Expr::Alt(items) => {
-            for item in items {
-                collect_group_bodies(item, out);
-            }
-        }
-        Expr::Repeat { expr, .. } | Expr::Atomic(expr) | Expr::Lookaround { expr, .. } | Expr::AbsentRepeater(expr) | Expr::AbsentStopper(expr) => {
-            collect_group_bodies(expr, out)
-        }
-        Expr::AbsentExpression { absent, expr } => {
-            collect_group_bodies(absent, out);
-            collect_group_bodies(expr, out);
-        }
-        Expr::Condition {
-            cond,
-            then_branch,
-            else_branch,
-        } => {
-            if let ConditionKind::Expr(e) = cond {
-                collect_group_bodies(e, out);
-            }
-            collect_group_bodies(then_branch, out);
-            if let Some(e) = else_branch {
-                collect_group_bodies(e, out);
-            }
-        }
-        _ => {}
-    }
-}
-
 fn collect_called_groups(expr: &Expr, out: &mut [bool]) {
     match expr {
         Expr::Call { target_group } => out[*target_group] = true,
@@ -787,15 +753,26 @@ fn collect_called_groups(expr: &Expr, out: &mut [bool]) {
             then_branch,
             else_branch,
         } => {
-            if let ConditionKind::Expr(e) = cond {
-                collect_called_groups(e, out);
+            match cond {
+                ConditionKind::Expr(e) => collect_called_groups(e, out),
+                ConditionKind::BackrefValid { .. } => {}
             }
             collect_called_groups(then_branch, out);
             if let Some(e) = else_branch {
                 collect_called_groups(e, out);
             }
         }
-        _ => {}
+        Expr::Empty
+        | Expr::Fail
+        | Expr::Literal { .. }
+        | Expr::AnyChar { .. }
+        | Expr::GeneralNewline
+        | Expr::TextSegment(_)
+        | Expr::CharClass(_)
+        | Expr::Anchor(_)
+        | Expr::Keep
+        | Expr::Backref { .. }
+        | Expr::RangeClear => {}
     }
 }
 
@@ -812,6 +789,10 @@ fn detect_level_backref(expr: &Expr, out: &mut bool) {
             cond: ConditionKind::BackrefValid { level: Some(_), .. },
             ..
         } => *out = true,
+        Expr::Backref {
+            target: BackrefTarget::Groups(_),
+            ..
+        } => {}
         Expr::Seq(items) | Expr::Alt(items) => {
             for item in items {
                 detect_level_backref(item, out);
@@ -832,48 +813,26 @@ fn detect_level_backref(expr: &Expr, out: &mut bool) {
             then_branch,
             else_branch,
         } => {
-            if let ConditionKind::Expr(e) = cond {
-                detect_level_backref(e, out);
+            match cond {
+                ConditionKind::Expr(e) => detect_level_backref(e, out),
+                ConditionKind::BackrefValid { .. } => {}
             }
             detect_level_backref(then_branch, out);
             if let Some(e) = else_branch {
                 detect_level_backref(e, out);
             }
         }
-        _ => {}
-    }
-}
-
-fn expr_can_match_empty(expr: &Expr, group_bodies: &[Option<&Expr>]) -> bool {
-    let mut visited = vec![false; group_bodies.len()];
-    expr_can_match_empty_rec(expr, group_bodies, &mut visited)
-}
-
-fn expr_can_match_empty_rec(expr: &Expr, group_bodies: &[Option<&Expr>], visited: &mut [bool]) -> bool {
-    match expr {
-        Expr::Empty | Expr::Anchor(_) | Expr::Keep | Expr::Lookaround { .. } | Expr::RangeClear => true,
-        Expr::Fail | Expr::AnyChar { .. } | Expr::GeneralNewline | Expr::TextSegment(_) | Expr::CharClass(_) => false,
-        Expr::Literal { text, .. } => text.is_empty(),
-        Expr::Backref { .. } => true,
-        Expr::Seq(items) => items.iter().all(|i| expr_can_match_empty_rec(i, group_bodies, visited)),
-        Expr::Alt(branches) => branches.iter().any(|b| expr_can_match_empty_rec(b, group_bodies, visited)),
-        Expr::Repeat { expr, min, .. } => *min == 0 || expr_can_match_empty_rec(expr, group_bodies, visited),
-        Expr::Capture { expr, .. } | Expr::Atomic(expr) => expr_can_match_empty_rec(expr, group_bodies, visited),
-        Expr::Call { target_group } => {
-            if visited[*target_group] {
-                return true;
-            }
-            visited[*target_group] = true;
-            let res = group_bodies[*target_group].is_some_and(|b| expr_can_match_empty_rec(b, group_bodies, visited));
-            visited[*target_group] = false;
-            res
-        }
-        Expr::Condition { then_branch, else_branch, .. } => {
-            expr_can_match_empty_rec(then_branch, group_bodies, visited)
-                || else_branch.as_deref().is_none_or(|e| expr_can_match_empty_rec(e, group_bodies, visited))
-        }
-        Expr::AbsentRepeater(_) | Expr::AbsentStopper(_) => true,
-        Expr::AbsentExpression { expr, .. } => expr_can_match_empty_rec(expr, group_bodies, visited),
+        Expr::Empty
+        | Expr::Fail
+        | Expr::Literal { .. }
+        | Expr::AnyChar { .. }
+        | Expr::GeneralNewline
+        | Expr::TextSegment(_)
+        | Expr::CharClass(_)
+        | Expr::Anchor(_)
+        | Expr::Keep
+        | Expr::Call { .. }
+        | Expr::RangeClear => {}
     }
 }
 
@@ -911,7 +870,17 @@ fn expr_has_captures_rec(expr: &Expr, group_bodies: &[Option<&Expr>], visited: &
             c || expr_has_captures_rec(then_branch, group_bodies, visited)
                 || else_branch.as_deref().is_some_and(|e| expr_has_captures_rec(e, group_bodies, visited))
         }
-        _ => false,
+        Expr::Empty
+        | Expr::Fail
+        | Expr::Literal { .. }
+        | Expr::AnyChar { .. }
+        | Expr::GeneralNewline
+        | Expr::TextSegment(_)
+        | Expr::CharClass(_)
+        | Expr::Anchor(_)
+        | Expr::Keep
+        | Expr::Backref { .. }
+        | Expr::RangeClear => false,
     }
 }
 
@@ -1067,7 +1036,22 @@ fn must_start_with_anchor(expr: &Expr, target: Anchor) -> bool {
         Expr::Alt(branches) => !branches.is_empty() && branches.iter().all(|b| must_start_with_anchor(b, target)),
         Expr::Capture { expr, .. } | Expr::Atomic(expr) => must_start_with_anchor(expr, target),
         Expr::Repeat { expr, min, .. } => *min > 0 && must_start_with_anchor(expr, target),
-        _ => false,
+        Expr::Empty
+        | Expr::Fail
+        | Expr::Literal { .. }
+        | Expr::AnyChar { .. }
+        | Expr::GeneralNewline
+        | Expr::TextSegment(_)
+        | Expr::CharClass(_)
+        | Expr::Keep
+        | Expr::Lookaround { .. }
+        | Expr::Backref { .. }
+        | Expr::Call { .. }
+        | Expr::Condition { .. }
+        | Expr::AbsentRepeater(_)
+        | Expr::AbsentExpression { .. }
+        | Expr::AbsentStopper(_)
+        | Expr::RangeClear => false,
     }
 }
 
@@ -1086,7 +1070,24 @@ fn extract_exact_prefix(expr: &Expr) -> Option<Vec<u8>> {
                     Expr::Literal { text, ignore_case: false, .. } => {
                         out.extend_from_slice(text.as_bytes());
                     }
-                    _ => {
+                    Expr::Literal { ignore_case: true, .. }
+                    | Expr::Fail
+                    | Expr::AnyChar { .. }
+                    | Expr::GeneralNewline
+                    | Expr::TextSegment(_)
+                    | Expr::CharClass(_)
+                    | Expr::Seq(_)
+                    | Expr::Alt(_)
+                    | Expr::Repeat { .. }
+                    | Expr::Capture { .. }
+                    | Expr::Atomic(_)
+                    | Expr::Backref { .. }
+                    | Expr::Call { .. }
+                    | Expr::Condition { .. }
+                    | Expr::AbsentRepeater(_)
+                    | Expr::AbsentExpression { .. }
+                    | Expr::AbsentStopper(_)
+                    | Expr::RangeClear => {
                         if out.is_empty()
                             && let Some(sub) = extract_exact_prefix(item)
                         {
@@ -1100,7 +1101,25 @@ fn extract_exact_prefix(expr: &Expr) -> Option<Vec<u8>> {
         }
         Expr::Capture { expr, .. } | Expr::Atomic(expr) => extract_exact_prefix(expr),
         Expr::Repeat { expr, min, .. } if *min > 0 => extract_exact_prefix(expr),
-        _ => None,
+        Expr::Empty
+        | Expr::Fail
+        | Expr::Literal { .. }
+        | Expr::AnyChar { .. }
+        | Expr::GeneralNewline
+        | Expr::TextSegment(_)
+        | Expr::CharClass(_)
+        | Expr::Anchor(_)
+        | Expr::Keep
+        | Expr::Alt(_)
+        | Expr::Repeat { .. }
+        | Expr::Lookaround { .. }
+        | Expr::Backref { .. }
+        | Expr::Call { .. }
+        | Expr::Condition { .. }
+        | Expr::AbsentRepeater(_)
+        | Expr::AbsentExpression { .. }
+        | Expr::AbsentStopper(_)
+        | Expr::RangeClear => None,
     }
 }
 
@@ -1193,6 +1212,19 @@ fn collect_first_bytes(expr: &Expr, group_bodies: &[Option<&Expr>], mask: &mut [
         }
         Expr::Capture { expr, .. } | Expr::Atomic(expr) => collect_first_bytes(expr, group_bodies, mask),
         Expr::Repeat { expr, min, .. } => *min > 0 && collect_first_bytes(expr, group_bodies, mask),
-        _ => false,
+        Expr::Empty
+        | Expr::Fail
+        | Expr::AnyChar { .. }
+        | Expr::TextSegment(_)
+        | Expr::Anchor(_)
+        | Expr::Keep
+        | Expr::Lookaround { .. }
+        | Expr::Backref { .. }
+        | Expr::Call { .. }
+        | Expr::Condition { .. }
+        | Expr::AbsentRepeater(_)
+        | Expr::AbsentExpression { .. }
+        | Expr::AbsentStopper(_)
+        | Expr::RangeClear => false,
     }
 }

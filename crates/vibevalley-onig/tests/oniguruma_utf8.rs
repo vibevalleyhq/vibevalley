@@ -1,6 +1,6 @@
-// Ported verbatim from kkos/oniguruma/test/test_utf8.c (1,547 UTF-8 test cases;
-// 6 raw invalid-UTF-8 byte-sequence tests are excluded because Rust &str is valid UTF-8,
-// and 2 cases are explicitly tracked as skipped below).
+// Ported verbatim from kkos/oniguruma/test/test_utf8.c (1,554 total upstream cases:
+// 1,548 valid UTF-8 cases — 1,545 passing, 3 explicitly tracked as skipped below —
+// plus 6 raw invalid-UTF-8 byte-sequence tests at L1759 and L1761-L1765 excluded because Rust &str is valid UTF-8).
 use vibevalley_onig::{ExecLimits, OnigRegExp};
 
 #[derive(Clone, Copy)]
@@ -11453,10 +11453,11 @@ static CASES: &[Case] = &[
     },
 ];
 
-/// Explicitly skipped upstream UTF-8 cases (2 of 1547):
+/// Explicitly skipped upstream UTF-8 cases (3 of 1548):
 /// - L850 `a(?~(?~)).`: nested absent function (?~(?~)): undefined behavior per Oniguruma doc/RE
-/// - L1378 `(?:[ab]|(*MAX{2}).)*`: stateful named callout (*MAX{n}): Phase 2 feature
-const SKIPPED_COUNT: usize = 2;
+/// - L1378 `(?:[ab]|(*MAX{2}).)*`: stateful named callout (*MAX{2}): Phase 2 feature
+/// - L1379 `(?:(*COUNT[AB]{X})[ab]|(*COUNT[CD]{X})[cd])*(*CMP{AB,<,CD})`: stateful named callouts (*COUNT) / (*CMP) (L1379-L1380): Phase 2 feature
+const SKIPPED_COUNT: usize = 3;
 
 #[test]
 fn oniguruma_test_utf8_suite() {
@@ -11505,7 +11506,7 @@ fn oniguruma_test_utf8_suite() {
         }
     }
 
-    assert_eq!(SKIPPED_COUNT, 2);
+    assert_eq!(SKIPPED_COUNT, 3);
     assert!(
         failed.is_empty(),
         "{}/{} passed ({SKIPPED_COUNT} skipped), {} failed:

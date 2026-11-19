@@ -920,7 +920,13 @@ impl<'a> Vm<'a> {
             StackFrame::UndoScopedRangePop(val) => {
                 self.scoped_ranges.push(val);
             }
-            _ => {}
+            StackFrame::Choice { .. }
+            | StackFrame::StepBack { .. }
+            | StackFrame::AbsentStep { .. }
+            | StackFrame::AtomicMark
+            | StackFrame::PosLookaroundMark { .. }
+            | StackFrame::NegLookaroundMark
+            | StackFrame::CondMark => {}
         }
     }
 

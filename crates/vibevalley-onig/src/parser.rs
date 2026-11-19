@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Anchor, BackrefTarget, ConditionKind, Expr, LookaroundKind, ParsedPattern, QuantifierMode};
+use crate::ast::{Anchor, BackrefTarget, ConditionKind, Expr, LookaroundKind, ParsedPattern, QuantifierMode, collect_group_bodies, expr_can_match_empty};
 use crate::options::{CompileError, CompileErrorKind, FindOption, Syntax};
 use crate::unicode::segment::SegmentMode;
 use crate::unicode::{
@@ -1438,10 +1438,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses one or more `\xHH` / `\nnn` raw byte escapes and decodes UTF-8 multi-byte sequences.
-    fn parse_raw_byte_sequence_from(&mut self, esc_pos: usize, in_class: bool) -> Result<RawExpr, CompileError> {
+    fn parse_raw_byte_char(&mut self, esc_pos: usize) -> Result<char, CompileError> {
         let first = self.parse_single_raw_byte(esc_pos)?;
         if first < 0x80 {
-            return Ok(self.literal_char(first as char));
+            return Ok(first as char);
         }
 
         let expected_len = utf8_leading_len(first)
@@ -1467,8 +1467,11 @@ impl<'a> Parser<'a> {
 
         let s = std::str::from_utf8(&buf[..expected_len])
             .map_err(|_| CompileError::new(CompileErrorKind::InvalidEscape, esc_pos, "invalid UTF-8 code point in raw byte escape"))?;
-        let ch = s.chars().next().unwrap();
-        let _ = in_class;
+        Ok(s.chars().next().unwrap())
+    }
+
+    fn parse_raw_byte_sequence_from(&mut self, esc_pos: usize, _in_class: bool) -> Result<RawExpr, CompileError> {
+        let ch = self.parse_raw_byte_char(esc_pos)?;
         Ok(self.literal_char(ch))
     }
 
@@ -2198,7 +2201,17 @@ impl<'a> Parser<'a> {
             PosixClass::Word => self.flags.word_ascii || self.flags.posix_ascii,
             PosixClass::Digit => self.flags.digit_ascii || self.flags.posix_ascii,
             PosixClass::Space => self.flags.space_ascii || self.flags.posix_ascii,
-            _ => self.flags.posix_ascii,
+            PosixClass::Alnum
+            | PosixClass::Alpha
+            | PosixClass::Ascii
+            | PosixClass::Blank
+            | PosixClass::Cntrl
+            | PosixClass::Graph
+            | PosixClass::Lower
+            | PosixClass::Print
+            | PosixClass::Punct
+            | PosixClass::Upper
+            | PosixClass::XDigit => self.flags.posix_ascii,
         };
 
         let mut set = posix.charset(ascii_only);
@@ -2261,20 +2274,14 @@ impl<'a> Parser<'a> {
                     self.pos += 2;
                     self.parse_braced_class_spec(16, 8, esc_pos)
                 } else {
-                    match self.parse_raw_byte_sequence_from(esc_pos, true)? {
-                        RawExpr::Literal { text, .. } => Ok(ClassAtom::Single(text.chars().next().unwrap())),
-                        _ => unreachable!(),
-                    }
+                    Ok(ClassAtom::Single(self.parse_raw_byte_char(esc_pos)?))
                 }
             }
             'o' if self.bytes.get(self.pos + 1) == Some(&b'{') => {
                 self.pos += 2;
                 self.parse_braced_class_spec(8, 11, esc_pos)
             }
-            '0'..='7' => match self.parse_raw_byte_sequence_from(esc_pos, true)? {
-                RawExpr::Literal { text, .. } => Ok(ClassAtom::Single(text.chars().next().unwrap())),
-                _ => unreachable!(),
-            },
+            '0'..='7' => Ok(ClassAtom::Single(self.parse_raw_byte_char(esc_pos)?)),
             _ => {
                 let c = self.parse_char_escape_after_backslash(esc_pos, true)?;
                 Ok(ClassAtom::Single(c))
@@ -2739,41 +2746,6 @@ fn push_coalesced(out: &mut Vec<Expr>, item: Expr) {
     }
 }
 
-fn collect_group_bodies<'a>(expr: &'a Expr, out: &mut [Option<&'a Expr>]) {
-    match expr {
-        Expr::Capture { index, expr, .. } => {
-            out[*index] = Some(expr);
-            collect_group_bodies(expr, out);
-        }
-        Expr::Seq(items) | Expr::Alt(items) => {
-            for item in items {
-                collect_group_bodies(item, out);
-            }
-        }
-        Expr::Repeat { expr, .. } | Expr::Atomic(expr) | Expr::Lookaround { expr, .. } | Expr::AbsentRepeater(expr) | Expr::AbsentStopper(expr) => {
-            collect_group_bodies(expr, out)
-        }
-        Expr::AbsentExpression { absent, expr } => {
-            collect_group_bodies(absent, out);
-            collect_group_bodies(expr, out);
-        }
-        Expr::Condition {
-            cond,
-            then_branch,
-            else_branch,
-        } => {
-            if let ConditionKind::Expr(e) = cond {
-                collect_group_bodies(e, out);
-            }
-            collect_group_bodies(then_branch, out);
-            if let Some(e) = else_branch {
-                collect_group_bodies(e, out);
-            }
-        }
-        _ => {}
-    }
-}
-
 fn validate_expr(expr: &Expr, group_bodies: &[Option<&Expr>]) -> Result<(), CompileError> {
     match expr {
         Expr::Lookaround {
@@ -2798,7 +2770,10 @@ fn validate_expr(expr: &Expr, group_bodies: &[Option<&Expr>]) -> Result<(), Comp
         Expr::Repeat { expr, .. }
         | Expr::Capture { expr, .. }
         | Expr::Atomic(expr)
-        | Expr::Lookaround { expr, .. }
+        | Expr::Lookaround {
+            kind: LookaroundKind::PosLookahead | LookaroundKind::NegLookahead,
+            expr,
+        }
         | Expr::AbsentRepeater(expr)
         | Expr::AbsentStopper(expr) => validate_expr(expr, group_bodies)?,
         Expr::AbsentExpression { absent, expr } => {
@@ -2810,15 +2785,27 @@ fn validate_expr(expr: &Expr, group_bodies: &[Option<&Expr>]) -> Result<(), Comp
             then_branch,
             else_branch,
         } => {
-            if let ConditionKind::Expr(e) = cond {
-                validate_expr(e, group_bodies)?;
+            match cond {
+                ConditionKind::Expr(e) => validate_expr(e, group_bodies)?,
+                ConditionKind::BackrefValid { .. } => {}
             }
             validate_expr(then_branch, group_bodies)?;
             if let Some(e) = else_branch {
                 validate_expr(e, group_bodies)?;
             }
         }
-        _ => {}
+        Expr::Empty
+        | Expr::Fail
+        | Expr::Literal { .. }
+        | Expr::AnyChar { .. }
+        | Expr::GeneralNewline
+        | Expr::TextSegment(_)
+        | Expr::CharClass(_)
+        | Expr::Anchor(_)
+        | Expr::Keep
+        | Expr::Backref { .. }
+        | Expr::Call { .. }
+        | Expr::RangeClear => {}
     }
     Ok(())
 }
@@ -2881,7 +2868,12 @@ fn validate_lookbehind_inner(expr: &Expr, is_negative: bool, group_bodies: &[Opt
             }
             validate_lookbehind_inner(expr, is_negative, group_bodies, visited)?;
         }
-        Expr::Atomic(expr) | Expr::Lookaround { expr, .. } | Expr::AbsentRepeater(expr) => {
+        Expr::Atomic(expr)
+        | Expr::Lookaround {
+            kind: LookaroundKind::PosLookbehind | LookaroundKind::NegLookbehind,
+            expr,
+        }
+        | Expr::AbsentRepeater(expr) => {
             validate_lookbehind_inner(expr, is_negative, group_bodies, visited)?;
         }
         Expr::AbsentExpression { absent, expr } => {
@@ -2893,15 +2885,25 @@ fn validate_lookbehind_inner(expr: &Expr, is_negative: bool, group_bodies: &[Opt
             then_branch,
             else_branch,
         } => {
-            if let ConditionKind::Expr(e) = cond {
-                validate_lookbehind_inner(e, is_negative, group_bodies, visited)?;
+            match cond {
+                ConditionKind::Expr(e) => validate_lookbehind_inner(e, is_negative, group_bodies, visited)?,
+                ConditionKind::BackrefValid { .. } => {}
             }
             validate_lookbehind_inner(then_branch, is_negative, group_bodies, visited)?;
             if let Some(e) = else_branch {
                 validate_lookbehind_inner(e, is_negative, group_bodies, visited)?;
             }
         }
-        _ => {}
+        Expr::Empty
+        | Expr::Fail
+        | Expr::Literal { .. }
+        | Expr::AnyChar { .. }
+        | Expr::GeneralNewline
+        | Expr::TextSegment(_)
+        | Expr::CharClass(_)
+        | Expr::Anchor(_)
+        | Expr::Keep
+        | Expr::Backref { .. } => {}
     }
     Ok(())
 }
@@ -2944,7 +2946,7 @@ fn has_left_call_to(expr: &Expr, target: usize, group_bodies: &[Option<&Expr>], 
                 if has_left_call_to(item, target, group_bodies, visiting) {
                     return true;
                 }
-                if !can_match_empty(item, group_bodies, &mut vec![false; group_bodies.len()]) {
+                if !expr_can_match_empty(item, group_bodies) {
                     break;
                 }
             }
@@ -2967,17 +2969,24 @@ fn has_left_call_to(expr: &Expr, target: usize, group_bodies: &[Option<&Expr>], 
             else_branch,
         } => {
             let (cond_calls, cond_nullable) = match cond {
-                ConditionKind::Expr(e) => (
-                    has_left_call_to(e, target, group_bodies, visiting),
-                    can_match_empty(e, group_bodies, &mut vec![false; group_bodies.len()]),
-                ),
+                ConditionKind::Expr(e) => (has_left_call_to(e, target, group_bodies, visiting), expr_can_match_empty(e, group_bodies)),
                 ConditionKind::BackrefValid { .. } => (false, true),
             };
             cond_calls
                 || (cond_nullable && has_left_call_to(then_branch, target, group_bodies, visiting))
                 || else_branch.as_deref().is_some_and(|e| has_left_call_to(e, target, group_bodies, visiting))
         }
-        _ => false,
+        Expr::Empty
+        | Expr::Fail
+        | Expr::Literal { .. }
+        | Expr::AnyChar { .. }
+        | Expr::GeneralNewline
+        | Expr::TextSegment(_)
+        | Expr::CharClass(_)
+        | Expr::Anchor(_)
+        | Expr::Keep
+        | Expr::Backref { .. }
+        | Expr::RangeClear => false,
     }
 }
 
@@ -3009,38 +3018,22 @@ fn check_repeat_len_overflow(expr: &Expr, outer_min: u64) -> bool {
                 if prod > LIMIT { None } else { Some(prod) }
             }
             Expr::Capture { expr, .. } | Expr::Atomic(expr) => min_bytes(expr),
-            _ => Some(0),
+            Expr::Empty
+            | Expr::Fail
+            | Expr::Anchor(_)
+            | Expr::Keep
+            | Expr::Lookaround { .. }
+            | Expr::Backref { .. }
+            | Expr::Call { .. }
+            | Expr::Condition { .. }
+            | Expr::AbsentRepeater(_)
+            | Expr::AbsentExpression { .. }
+            | Expr::AbsentStopper(_)
+            | Expr::RangeClear => Some(0),
         }
     }
     match min_bytes(expr) {
         None => true,
         Some(inner) => inner.checked_mul(outer_min).is_none_or(|p| p > LIMIT),
-    }
-}
-
-fn can_match_empty(expr: &Expr, group_bodies: &[Option<&Expr>], visited: &mut [bool]) -> bool {
-    match expr {
-        Expr::Empty | Expr::Anchor(_) | Expr::Keep | Expr::Lookaround { .. } | Expr::RangeClear => true,
-        Expr::Fail | Expr::AnyChar { .. } | Expr::GeneralNewline | Expr::TextSegment(_) | Expr::CharClass(_) => false,
-        Expr::Literal { text, .. } => text.is_empty(),
-        Expr::Backref { .. } => true,
-        Expr::Seq(items) => items.iter().all(|i| can_match_empty(i, group_bodies, visited)),
-        Expr::Alt(branches) => branches.iter().any(|b| can_match_empty(b, group_bodies, visited)),
-        Expr::Repeat { expr, min, .. } => *min == 0 || can_match_empty(expr, group_bodies, visited),
-        Expr::Capture { expr, .. } | Expr::Atomic(expr) => can_match_empty(expr, group_bodies, visited),
-        Expr::Call { target_group } => {
-            if visited[*target_group] {
-                return true;
-            }
-            visited[*target_group] = true;
-            let res = group_bodies[*target_group].is_some_and(|b| can_match_empty(b, group_bodies, visited));
-            visited[*target_group] = false;
-            res
-        }
-        Expr::Condition { then_branch, else_branch, .. } => {
-            can_match_empty(then_branch, group_bodies, visited) || else_branch.as_deref().is_none_or(|e| can_match_empty(e, group_bodies, visited))
-        }
-        Expr::AbsentRepeater(_) | Expr::AbsentStopper(_) => true,
-        Expr::AbsentExpression { expr, .. } => can_match_empty(expr, group_bodies, visited),
     }
 }
