@@ -1,0 +1,20 @@
+[package]
+name = "vibevalley-rich-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Native Rust rich UI set for VibeValley on nsh 0.6.0 (Markdown, Shiki highlighting, Mermaid diagrams, JSON Canvas, extensible Chart and GenUI hooks)"
+
+[dependencies]
+nsh-base = { version = "0.6.0", default-features = false, features = ["editor"] }
+nsh-core = { version = "0.6.0", default-features = false }
+tokio = { workspace = true }
+vibevalley-canvas = { path = "../vibevalley-canvas" }
+vibevalley-i18n = { path = "../vibevalley-i18n" }
+vibevalley-pele = { path = "../vibevalley-pele" }
+vibevalley-pkm = { path = "../vibevalley-pkm" }
+vibevalley-shiki = { path = "../vibevalley-shiki" }
+
+[dev-dependencies]
+nsh-core = { version = "0.6.0", features = ["declarations"] }
+roxmltree = "0.21.2"
