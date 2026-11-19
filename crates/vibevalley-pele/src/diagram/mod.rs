@@ -1,7 +1,16 @@
 pub mod common;
+pub mod cynefin;
 pub mod flowchart;
+pub mod info;
+pub mod ishikawa;
+pub mod kanban;
+pub mod mindmap;
+pub mod packet;
 pub mod pie;
+pub mod railroad;
 pub mod sequence;
+pub mod treemap;
+pub mod treeview;
 
 use std::collections::HashMap;
 
@@ -44,6 +53,15 @@ pub enum ParsedModel {
     Flowchart(flowchart::FlowDb),
     Sequence(sequence::SeqDb),
     Pie(pie::PieModel),
+    Railroad(railroad::RailroadModel),
+    TreeView(treeview::TreeViewModel),
+    Treemap(treemap::TreemapModel),
+    Cynefin(cynefin::CynefinModel),
+    Ishikawa(ishikawa::IshikawaModel),
+    Kanban(kanban::KanbanModel),
+    Mindmap(mindmap::MindmapModel),
+    Packet(packet::PacketModel),
+    Info(info::InfoModel),
 }
 
 impl ParsedModel {
@@ -52,6 +70,15 @@ impl ParsedModel {
             Self::Flowchart(_) => DiagramType::Flowchart,
             Self::Sequence(_) => DiagramType::Sequence,
             Self::Pie(_) => DiagramType::Pie,
+            Self::Railroad(_) => DiagramType::Railroad,
+            Self::TreeView(_) => DiagramType::TreeView,
+            Self::Treemap(_) => DiagramType::Treemap,
+            Self::Cynefin(_) => DiagramType::Cynefin,
+            Self::Ishikawa(_) => DiagramType::Ishikawa,
+            Self::Kanban(_) => DiagramType::Kanban,
+            Self::Mindmap(_) => DiagramType::Mindmap,
+            Self::Packet(_) => DiagramType::Packet,
+            Self::Info(_) => DiagramType::Info,
         }
     }
 
@@ -60,6 +87,15 @@ impl ParsedModel {
             Self::Flowchart(db) => flowchart::render_flowchart(db, ctx, None),
             Self::Sequence(db) => sequence::render_sequence(db, ctx),
             Self::Pie(model) => pie::render::render_pie(model, ctx),
+            Self::Railroad(model) => railroad::render::render_railroad(model, ctx),
+            Self::TreeView(model) => treeview::render::render_tree_view(model, ctx),
+            Self::Treemap(model) => treemap::render::render_treemap(model, ctx),
+            Self::Cynefin(model) => cynefin::render::render_cynefin(model, ctx),
+            Self::Ishikawa(model) => ishikawa::render::render_ishikawa(model, ctx),
+            Self::Kanban(model) => kanban::render::render_kanban(model, ctx),
+            Self::Mindmap(model) => mindmap::render::render_mindmap(model, ctx),
+            Self::Packet(model) => packet::render::render_packet(model, ctx),
+            Self::Info(model) => info::render::render_info(model, ctx),
         }
     }
 }
@@ -113,6 +149,15 @@ impl Registry {
         reg.register(Box::new(flowchart::FlowchartDiagram));
         reg.register(Box::new(sequence::SequenceDiagram));
         reg.register(Box::new(pie::PieDiagram));
+        reg.register(Box::new(railroad::RailroadDiagram));
+        reg.register(Box::new(treeview::TreeViewDiagram));
+        reg.register(Box::new(treemap::TreemapDiagram));
+        reg.register(Box::new(cynefin::CynefinDiagram));
+        reg.register(Box::new(ishikawa::IshikawaDiagram));
+        reg.register(Box::new(kanban::KanbanDiagram));
+        reg.register(Box::new(mindmap::MindmapDiagram));
+        reg.register(Box::new(packet::PacketDiagram));
+        reg.register(Box::new(info::InfoDiagram));
         reg
     }
 
