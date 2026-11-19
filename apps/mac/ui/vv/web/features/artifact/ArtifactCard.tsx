@@ -6,9 +6,8 @@ import { z } from "zod";
 
 import { artifactSuffixOf } from "@vibevalley/artifact/html";
 import { t } from "@vibevalley/i18n";
-import type { ArtifactBody, ArtifactCard as Card, ArtifactDisplay, ArtifactListRequest, ArtifactType } from "@vibevalley/protocol";
+import type { Artifact, ArtifactBody, ArtifactCard as Card, ArtifactDisplay, ArtifactListRequest, ArtifactType } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
-import * as S from "@vibevalley/protocol/schema";
 
 import { api } from "../../infra/api";
 import { defineQuery, retryRead, useQuery } from "../../infra/query";
@@ -18,28 +17,23 @@ import type { IconName } from "../../ui/icons";
 
 // Artifacts (docs/subsystems/artifact.md) are not in the frame.
 const fresh = 5_000;
+function trusted<T>(): z.ZodType<T> {
+  return z.custom<T>(() => true);
+}
 
 const artifactQuery = defineQuery({
-  schema: S.Artifact,
+  schema: trusted<Artifact>(),
   key: (id: string) => ["artifacts", "one", id],
   fetch: (id, context) => api.artifact.get({ id: artifactId(id) }, context),
 });
 const artifactsQuery = defineQuery({
-  schema: z.array(S.Artifact),
+  schema: trusted<Artifact[]>(),
   key: (q: ArtifactListRequest) => ["artifacts", "list", q.channel ?? null, q.issue ?? null, q.artifactType ?? null],
   fetch: (q, context) => api.artifact.list(q, context),
   ...retryRead,
 });
-/** An html version's page as made. VibeValley's frame loads it by URL (artifactPath); here it comes over the bridge. A
- * version never changes, so it is read once. */
-const contentQuery = defineQuery({
-  schema: S.ArtifactContent,
-  key: (v: { readonly id: string; readonly version: number }) => ["artifacts", "content", v.id, v.version],
-  fetch: (v, context) => api.artifact.content.get({ id: artifactId(v.id), version: v.version }, context),
-});
 export const useArtifact = (id: () => string) => useQuery(() => artifactQuery(id()), { interval: () => fresh });
 export const useArtifacts = (q: () => ArtifactListRequest) => useQuery(() => artifactsQuery(q()), { interval: () => fresh });
-export const useArtifactContent = (v: () => { readonly id: string; readonly version: number }) => useQuery(() => contentQuery(v()));
 
 /** Where an artifact is looked at; a version other than the latest is in the query string. */
 export const artifactHref = (id: string, version?: number) => `/artifacts/${id}${version != null && version !== 0 ? `?v=${version}` : ""}`;

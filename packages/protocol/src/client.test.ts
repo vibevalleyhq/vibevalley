@@ -118,4 +118,17 @@ describe("the API client envelope and error boundary", () => {
       ["orchestrator.open", undefined],
     ]);
   });
+
+  it("trusts in-process bridge bizCode 0 envelopes without re-running Zod payload validation", async () => {
+    const payload = { ok: true, version: "native" };
+    const api = VibeValleyApi.over((op) => {
+      if (op === "server.health.get") return Promise.resolve({ bizCode: 0, message: "ok", data: payload });
+      if (op === "orchestrator.open") return Promise.resolve({ bizCode: 0, message: "ok" });
+      return Promise.resolve({ bizCode: 999999, message: "unexpected" });
+    });
+    // Preserves exact object identity without cloning via Zod safeParse.
+    expect(await api.server.health.get()).toBe(payload);
+    expect(await api.orchestrator.open()).toBeUndefined();
+    await expect(api.repo.list()).rejects.toMatchObject({ status: 500, reason: "unexpected" });
+  });
 });

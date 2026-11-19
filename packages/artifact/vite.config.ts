@@ -4,19 +4,7 @@ import { configDefaults } from "vite-plus/test/config";
 export default defineConfig({
   test: { include: ["src/**/*.test.ts"], reporters: [...configDefaults.reporters, "@vibevalley/testkit/budgets"] },
   pack: {
-    entry: [
-      "src/index.ts",
-      "src/blocks.ts",
-      "src/editor.ts",
-      "src/html.ts",
-      "src/markdown.ts",
-      "src/ops.ts",
-      "src/shell.ts",
-      "src/starters.ts",
-      "src/store.ts",
-      "src/tokens.ts",
-      "src/viewers.ts",
-    ],
+    entry: ["src/index.ts", "src/blocks.ts", "src/editor.ts", "src/html.ts", "src/shell.ts", "src/viewers.ts"],
     outDir: "dist",
     clean: true,
     fixedExtension: false,

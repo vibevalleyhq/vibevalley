@@ -12,7 +12,7 @@ function marksOf(m: SpanMarks | undefined): SpanMarks {
 }
 
 /** Equal for marks that read the same: a mark not set and a mark set false give the same key. */
-export const marksKey = (m: SpanMarks) =>
+const marksKey = (m: SpanMarks) =>
   `${Number(m.bold === true)}${Number(m.italic === true)}${Number(m.code === true)}${Number(m.strike === true)}${m.link === undefined ? "" : `|${m.link}`}`;
 
 /** Drops empty spans and joins neighbours with the same marks, so one text has one way to be written. */

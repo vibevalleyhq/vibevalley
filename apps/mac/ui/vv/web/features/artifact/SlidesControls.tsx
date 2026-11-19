@@ -12,10 +12,10 @@ import { t } from "@vibevalley/i18n";
 import { useRouter } from "../../infra/router";
 import { shownTheme } from "../../state/prefs";
 import { IconButton } from "../../ui/IconButton";
-import { useArtifactContent } from "./ArtifactCard";
-import { framed } from "./frame";
+import { withShellQuery } from "./frame";
 import type { Controls } from "./HtmlFrame";
 import { presenterHref, stepped } from "./slides";
+import { useArtifactPage } from "./store";
 
 export function SlidesControls(props: Controls) {
   const router = useRouter();
@@ -88,13 +88,13 @@ export function SlidesControls(props: Controls) {
 const picked = String.raw`addEventListener("click", (e) => { e.preventDefault(); try { window.nsh.postMessage("pick"); } catch {} }, true);`;
 
 export function Slide(props: { id: string; version: number; at: number; class?: string; onPress?: () => void }) {
-  const content = useArtifactContent(() => ({ id: props.id, version: props.version }));
+  const page = useArtifactPage(() => ({ id: props.id, version: props.version, theme: shownTheme() }));
   return (
     <View class={`h-full w-full ${props.class ?? ""}`}>
-      <If when={content.data()}>
-        {(c) => (
+      <If when={page.html()}>
+        {(html) => (
           <WebView
-            html={framed({ page: c().content, display: "slides", theme: shownTheme(), at: props.at, still: true })}
+            html={withShellQuery(html(), { at: props.at, still: true })}
             incognito
             scrollable={false}
             injectedJavaScriptBeforeContentLoaded={picked}

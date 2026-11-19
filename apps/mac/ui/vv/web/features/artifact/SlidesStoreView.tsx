@@ -1,11 +1,11 @@
 import { Scroll, Text, View, WebView } from "nsh";
 import { z } from "zod";
 
-import { htmlEdit } from "@vibevalley/artifact/html";
 import { t } from "@vibevalley/i18n";
 import type { HtmlAnchor } from "@vibevalley/protocol";
 
 import { createEffect, createMemo, createSignal } from "../../../solid";
+import { api } from "../../infra/api";
 import { useRouter } from "../../infra/router";
 import { shownTheme } from "../../state/prefs";
 import { createAct } from "../../ui/act";
@@ -131,15 +131,14 @@ export function SlidesStoreView(props: StoreViewerProps) {
   const savePickedWords = () => {
     const sel = picked();
     if (!sel || act.busy()) return;
-    const entry = snapshot().entries.get(sel.path);
-    if (!entry?.value) return;
-    const edited = htmlEdit(entry.value, sel.anchor, pickedText());
-    if (!edited.ok) {
-      toast(edited.why, "bad");
-      return;
-    }
     void act.run(async () => {
-      await client.batch([{ op: "set", path: sel.path, kind: "text", value: edited.source }]);
+      await api.artifact.html.edit({
+        id: props.artifact.id,
+        version: seq(),
+        path: sel.path,
+        anchor: sel.anchor,
+        text: pickedText(),
+      });
       setPicked(undefined);
       toast(t("web.artifact.slidesStore.savedSlide"));
     });
