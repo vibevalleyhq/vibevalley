@@ -1,26 +1,39 @@
 -- name: Artifact :one
-select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+select a.id, a.title, a.body, a.artifact_type, a.is_default, a.display, a.channel_id, a.message_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
   a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
   from artifact a left join channel_message m on m.id = a.message_id where a.id = ?1;
 
+-- name: DefaultDesignSystemArtifact :one
+select a.id, a.title, a.body, a.artifact_type, a.is_default, a.display, a.channel_id, a.message_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+  a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
+  from artifact a left join channel_message m on m.id = a.message_id
+  where a.artifact_type = 'design-system' and a.is_default = 1
+  limit 1;
+
+-- name: ClearDefaultDesignSystem :exec
+update artifact set is_default = 0, updated_at = ?1 where is_default = 1;
+
+-- name: SetArtifactDefault :exec
+update artifact set is_default = ?2, updated_at = ?3 where id = ?1;
+
 -- name: ArtifactsInChannel :many
-select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+select a.id, a.title, a.body, a.artifact_type, a.is_default, a.display, a.channel_id, a.message_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
   a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
   from artifact a left join channel_message m on m.id = a.message_id where a.channel_id = ?1 order by a.updated_at desc, a.id;
 
 -- name: ArtifactsForIssue :many
-select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+select a.id, a.title, a.body, a.artifact_type, a.is_default, a.display, a.channel_id, a.message_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
   a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
   from artifact a left join channel_message m on m.id = a.message_id where a.issue = ?1 order by a.updated_at desc, a.id;
 
 -- name: Artifacts :many
-select a.id, a.title, a.body, a.display, a.channel_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
+select a.id, a.title, a.body, a.artifact_type, a.is_default, a.display, a.channel_id, a.message_id, a.issue, a.by_id, a.by_name, a.version, a.seq,
   a.created_at, a.updated_at, m.channel_id as said_channel, m.number as said_number
   from artifact a left join channel_message m on m.id = a.message_id order by a.updated_at desc, a.id limit ?1;
 
 -- name: AddArtifact :exec
-insert into artifact (id, title, body, display, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)
-  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10, ?10);
+insert into artifact (id, title, body, artifact_type, is_default, display, channel_id, issue, by_id, by_name, version, seq, created_at, updated_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0, ?12, ?12);
 
 -- name: ArtifactSaid :exec
 update artifact set message_id = ?2 where id = ?1;
@@ -104,3 +117,45 @@ select id, artifact_id, block_id, author, at_rev, change, status, created_at, re
 
 -- name: ResolveSuggestion :exec
 update artifact_suggestion set status = ?2, resolved_at = ?3, resolved_by = ?4 where id = ?1 and status = 'open';
+
+-- name: ArtifactEntries :many
+select artifact_id, path, kind, mime, value, attachment_id, size, rev, updated_by, updated_at
+  from artifact_entry where artifact_id = ?1 order by path;
+
+-- name: ArtifactEntriesByPrefix :many
+select artifact_id, path, kind, mime, value, attachment_id, size, rev, updated_by, updated_at
+  from artifact_entry where artifact_id = ?1 and path like ?2 order by path;
+
+-- name: ArtifactEntry :one
+select artifact_id, path, kind, mime, value, attachment_id, size, rev, updated_by, updated_at
+  from artifact_entry where artifact_id = ?1 and path = ?2;
+
+-- name: ArtifactEntryCount :one
+select count(*) as n from artifact_entry where artifact_id = ?1;
+
+-- name: UpsertArtifactEntry :exec
+insert into artifact_entry (artifact_id, path, kind, mime, value, attachment_id, size, rev, updated_by, updated_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+  on conflict (artifact_id, path) do update set
+    kind = excluded.kind,
+    mime = excluded.mime,
+    value = excluded.value,
+    attachment_id = excluded.attachment_id,
+    size = excluded.size,
+    rev = excluded.rev,
+    updated_by = excluded.updated_by,
+    updated_at = excluded.updated_at;
+
+-- name: DeleteArtifactEntry :exec
+delete from artifact_entry where artifact_id = ?1 and path = ?2;
+
+-- name: AddArtifactEntryChange :exec
+insert into artifact_entry_change (artifact_id, seq, actor, paths, deleted, created_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6);
+
+-- name: ArtifactEntryChangesAfter :many
+select seq, paths, deleted
+  from artifact_entry_change where artifact_id = ?1 and seq > ?2 order by seq limit ?3;
+
+-- name: PruneArtifactEntryChanges :exec
+delete from artifact_entry_change where created_at < ?1;

@@ -11,7 +11,7 @@ import { Keyed } from "../base/dom";
 import { AgentsRoute } from "../features/agent";
 import { ArtifactsPage, PresenterPage } from "../features/artifact";
 import { CatalogPage } from "../features/catalog";
-import { ChatPage, chatSay } from "../features/channel";
+import { ChannelSidePane, ChatPage } from "../features/channel";
 import { Follow } from "../features/inbox";
 import { issueSearch } from "../features/issue/model/navigation";
 import { IssuesPage } from "../features/issue/views/IssuesPage";
@@ -145,7 +145,7 @@ const routes: readonly RouteDefinition[] = [
       page("/repos", "repos", (rest) => <ReposPage rest={rest()} />),
       page("/catalog", "catalog", (rest) => <CatalogPage rest={rest()} />),
       page("/library", "library", () => <LibraryPage />),
-      page("/artifacts", "artifacts", (rest) => <ArtifactsPage rest={rest()} say={chatSay} />),
+      page("/artifacts", "library", (rest) => <ArtifactsPage rest={rest()} chat={(p) => <ChannelSidePane {...p} />} />),
       page("/pkm", "pkm", (rest) => <PkmPage rest={rest()} />),
     ],
   },

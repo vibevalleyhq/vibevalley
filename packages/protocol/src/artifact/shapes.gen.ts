@@ -2,59 +2,106 @@
 
 import type { ArtifactId, BlockId, IssueId, SuggestionId } from "../common/shapes.gen";
 
-export const ArtifactBodyValues = ["blocks", "html"] as const;
+export const ArtifactBodyValues = ["blocks", "html", "store"] as const;
 export type ArtifactBody = (typeof ArtifactBodyValues)[number];
+
+export const ArtifactTypeValues = ["docs", "slides", "dashboard", "motion", "whiteboard", "design", "design-system"] as const;
+export type ArtifactType = (typeof ArtifactTypeValues)[number];
+
+export const ArtifactEntryKindValues = ["text", "json", "asset"] as const;
+export type ArtifactEntryKind = (typeof ArtifactEntryKindValues)[number];
+
+export const ArtifactEntryOpValues = ["set", "patch", "delete", "copy"] as const;
+export type ArtifactEntryOp = (typeof ArtifactEntryOpValues)[number];
 
 export const ArtifactDisplayValues = ["page", "slides", "motion"] as const;
 export type ArtifactDisplay = (typeof ArtifactDisplayValues)[number];
 
 export type ArtifactCard = { id: ArtifactId, title: string, body: ArtifactBody,
 /**
- * Announced version for html; 0 for blocks.
+ * Announced version for html; seq for store; 0 for blocks.
  */
 version: number, note: string,
 /**
  * Omit defaults to "page" for cards created before display modes existed.
  */
-display?: ArtifactDisplay, };
+display?: ArtifactDisplay, artifactType?: ArtifactType, };
 
 export type QuotedBlock = { artifactId: ArtifactId, blockId: BlockId, rev: number, title: string, type?: string, text?: string, nowRev?: number, deleted?: boolean, };
 
 export type BlockRef = { artifactId: ArtifactId, blockId: BlockId, rev: number, };
 
-export const ArtifactKindValues = ["html", "markdown"] as const;
+export const ArtifactKindValues = ["html", "markdown", "store"] as const;
 export type ArtifactKind = (typeof ArtifactKindValues)[number];
 
 export type ArtifactVersion = { version: number, size: number, note: string, by: string, byName: string, at: number, channel: string, number?: number, };
 
 export type ArtifactSaid = { channel: string, number: number, };
 
-export type Artifact = { id: ArtifactId, title: string, body: ArtifactBody,
+export type Artifact = { id: ArtifactId, title: string, body: ArtifactBody, artifactType?: ArtifactType,
 /**
- * html only; absent on blocks.
+ * True on the standing default design-system artifact consumed when creating visual artifacts.
+ */
+isDefault: boolean,
+/**
+ * html only; absent on blocks and store.
  */
 display?: ArtifactDisplay, channel?: string, said?: ArtifactSaid, issue?: IssueId, by: string, byName: string,
 /**
- * Latest version for html; 0 for blocks.
+ * Latest version for html; 0 for blocks and store.
  */
 version: number,
 /**
- * Committed batch count for blocks; 0 for html.
+ * Committed batch count for blocks and store; 0 for html.
  */
 seq: number,
 /**
- * Oldest first for html; empty on blocks.
+ * Oldest first for html; empty on blocks and store.
  */
 versions: Array<ArtifactVersion>, at: number, updated: number, };
 
+export type ArtifactEntryWriteInput = { op: ArtifactEntryOp, path: string, kind?: ArtifactEntryKind,
 /**
- * Omit content to create an unannounced empty blocks artifact.
+ * UTF-8 text for text, JSON text for json/patch, or attachment id for asset.
  */
-export type ArtifactRequest = { title: string, kind: ArtifactKind,
+value?: string, from?: string, mime?: string,
+/**
+ * Optimistic concurrency guard: 0 requires the path not to exist; >0 must match current rev.
+ */
+ifRev?: number, };
+
+export type ArtifactEntry = { artifactId: ArtifactId, path: string, kind: ArtifactEntryKind, mime: string, size: number, rev: number, updatedBy: string, updated: number, value?: string, attachmentId?: string, };
+
+export type ArtifactEntrySnapshot = { artifact: Artifact, seq: number, entries: Array<ArtifactEntry>, };
+
+export type ArtifactEntryConflict = { path: string, expectedRev: number, actualRev: number, current: ArtifactEntry | null, };
+
+export type ArtifactEntryBatchResult = { applied: boolean, seq: number, entries: Array<ArtifactEntry>, conflicts: Array<ArtifactEntryConflict>, };
+
+export type ArtifactEntryListRequest = { id: ArtifactId, prefix?: string, includeValues?: boolean, };
+
+export type ArtifactEntryGetRequest = { id: ArtifactId, path: string, };
+
+export type ArtifactEntryBatchRequest = { id: ArtifactId, writes: Array<ArtifactEntryWriteInput>, note?: string, announce?: boolean, };
+
+export type ArtifactEntryEvent = { "_tag": "Entries", seq: number, entries: Array<ArtifactEntry>, deleted: Array<string>, } | { "_tag": "Reset", };
+
+export type ArtifactTypeInfo = { type: ArtifactType, body: ArtifactBody, title: string, summary: string, references: Array<string>, defaultArtifactId: ArtifactId | null, };
+
+export type ArtifactTypeReadRequest = { type: ArtifactType, reference?: string, };
+
+export type ArtifactTypeGuide = { type: ArtifactType, title: string, reference: string | null, content: string, references: Array<string>, defaultArtifactId: ArtifactId | null, defaultArtifactTitle: string | null, };
+
+export type ArtifactViewContext = { artifactId: ArtifactId, artifactType?: ArtifactType, title: string, seq?: number, version?: number, slideId?: string, slideIndex?: number, time?: number, activeArtboard?: string, activeDataset?: string, activeTab?: string, selectedIds?: Array<string>, selectedBlockIds?: Array<BlockId>, summary?: string, };
+
+/**
+ * Omit content to create an unannounced empty blocks or store artifact.
+ */
+export type ArtifactRequest = { title: string, kind?: ArtifactKind, artifactType?: ArtifactType,
 /**
  * html only; defaults to "page".
  */
-display?: ArtifactDisplay, content?: string, note?: string, channel?: string, issue?: string, };
+display?: ArtifactDisplay, content?: string, entries?: Array<ArtifactEntryWriteInput>, isDefault?: boolean, announce?: boolean, note?: string, channel?: string, issue?: string, };
 
 export type ArtifactVersionRequest = { id: ArtifactId, content: string, note?: string, };
 
@@ -68,11 +115,15 @@ export type HtmlAnchor = { kind: HtmlAnchorKind, exact: string, prefix: string, 
 
 export type ArtifactHtmlEdit = { id: ArtifactId, version: number, anchor: HtmlAnchor, text: string, };
 
-export type ArtifactUpdateRequest = { id: ArtifactId, title?: string, display?: ArtifactDisplay, };
+export type ArtifactUpdateRequest = { id: ArtifactId, title?: string, display?: ArtifactDisplay, isDefault?: boolean, };
 
-export type HtmlShellMessage = { "vibevalley": "selection", anchor: HtmlAnchor, } | { "vibevalley": "ready", display: ArtifactDisplay, pages?: number, titles?: Array<string>, notes?: Array<string>, duration?: number, } | { "vibevalley": "at", page?: number, time?: number, };
+export type ShellChapter = { at: number, label: string, };
 
-export type ArtifactListRequest = { channel?: string, issue?: string, };
+export type HtmlShellMessage = { "vibevalley": "selection", anchor: HtmlAnchor, path?: string, } | { "vibevalley": "ready", display: ArtifactDisplay, pages?: number, titles?: Array<string>, notes?: Array<string>, fragments?: Array<number>, duration?: number, fps?: number, chapters?: Array<ShellChapter>, } | { "vibevalley": "at", page?: number, fragment?: number, time?: number, playing?: boolean, } | { "vibevalley": "recorded", ok: boolean, mimeType?: string, base64?: string, reason?: string, };
+
+export type HtmlShellCommand = { "vibevalley": "goto", page: number, fragment?: number, } | { "vibevalley": "step", delta: number, } | { "vibevalley": "seek", time: number, } | { "vibevalley": "play", } | { "vibevalley": "pause", } | { "vibevalley": "record", fps?: number, };
+
+export type ArtifactListRequest = { channel?: string, issue?: string, artifactType?: ArtifactType, };
 
 export type ArtifactReadRequest = { id: ArtifactId, version?: number, };
 

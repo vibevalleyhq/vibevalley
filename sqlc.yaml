@@ -71,6 +71,7 @@ sql:
         options: { share_table_rows: true }
   - engine: sqlite
     schema:
+      - crates/vibevalley-server/src/modules/issue/sql/schema.sql
       - crates/vibevalley-server/src/modules/channel/sql/schema.sql
       - crates/vibevalley-server/src/modules/artifact/sql/schema.sql
     queries: crates/vibevalley-server/src/modules/artifact/sql/queries.sql
@@ -93,4 +94,22 @@ sql:
     codegen:
       - plugin: sqlx
         out: crates/vibevalley-server/src/modules/channel/generated
+        options: { share_table_rows: true }
+  - engine: sqlite
+    schema:
+      - crates/vibevalley-server/src/modules/issue/sql/schema.sql
+      - crates/vibevalley-server/src/modules/cron/sql/schema.sql
+    queries: crates/vibevalley-server/src/modules/cron/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/cron/generated
+        options: { share_table_rows: true }
+  - engine: sqlite
+    schema:
+      - crates/vibevalley-server/src/modules/issue/sql/schema.sql
+      - crates/vibevalley-server/src/modules/pull/sql/schema.sql
+    queries: crates/vibevalley-server/src/modules/pull/sql/queries.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/vibevalley-server/src/modules/pull/generated
         options: { share_table_rows: true }

@@ -532,6 +532,12 @@ pub fn no_profile_named(key: &str) -> String {
     format!("没有叫 {key} 的帮工档案")
 }
 
+/// Formats untrusted client view state inside a fenced XML block so titles or summaries cannot break out.
+pub fn format_artifact_view_context(vc: &vibevalley_protocol::ArtifactViewContext) -> String {
+    let safe_json = serde_json::to_string(vc).unwrap_or_default().replace("</", "<\\/");
+    format!("<artifact-view-context>\n{safe_json}\n</artifact-view-context>")
+}
+
 /// `messageLine` (session/prompts.ts): line breaks are marked, so no
 /// message can pass for a header.
 pub fn message_line(m: &crate::modules::channel::AddressedMessage) -> String {
@@ -560,8 +566,13 @@ pub fn message_line(m: &crate::modules::channel::AddressedMessage) -> String {
             )
         })
         .unwrap_or_default();
+    let view = m
+        .view_context
+        .as_ref()
+        .map(|vc| format!("\n  │ {}", format_artifact_view_context(vc).replace('\n', "\n  │ ")))
+        .unwrap_or_default();
     let edited = if m.edited == Some(true) { "（改过）" } else { "" };
-    format!("{head}{edited} {}{files}{made}", m.text.trim().replace('\n', "\n  │ "))
+    format!("{head}{edited} {}{files}{made}{view}", m.text.trim().replace('\n', "\n  │ "))
 }
 
 /// `orchestratorEnvelopeLines`: what others said past `LINE_MAX` is cut.
@@ -586,4 +597,74 @@ pub fn orchestrator_lines(messages: &[crate::modules::channel::AddressedMessage]
 /// `s.slice(n)` in UTF-16 units.
 pub fn slice_from(s: &str, n: usize) -> String {
     slice(s, n, None)
+}
+
+#[cfg(test)]
+mod tests {
+    use vibevalley_protocol::{Actor, ArtifactType, ArtifactViewContext};
+
+    use super::*;
+
+    fn sample_view_context(title: &str) -> ArtifactViewContext {
+        ArtifactViewContext {
+            artifact_id: "art-1".into(),
+            artifact_type: Some(ArtifactType::Slides),
+            title: title.into(),
+            seq: Some(3),
+            version: None,
+            slide_id: Some("02".into()),
+            slide_index: Some(1),
+            time: None,
+            active_artboard: None,
+            active_dataset: None,
+            active_tab: None,
+            selected_ids: None,
+            selected_block_ids: None,
+            summary: Some("Slide 2".into()),
+        }
+    }
+
+    #[test]
+    fn format_artifact_view_context_escapes_closing_tags() {
+        let formatted = format_artifact_view_context(&sample_view_context("Title </artifact-view-context> break"));
+        assert!(formatted.starts_with("<artifact-view-context>\n"));
+        assert!(formatted.ends_with("\n</artifact-view-context>"));
+        let inner = formatted
+            .strip_prefix("<artifact-view-context>\n")
+            .unwrap()
+            .strip_suffix("\n</artifact-view-context>")
+            .unwrap();
+        assert!(!inner.contains("</"));
+        assert!(inner.contains("<\\/artifact-view-context>"));
+    }
+
+    #[test]
+    fn message_line_includes_fenced_view_context() {
+        let m = crate::modules::channel::AddressedMessage {
+            id: "m1".into(),
+            number: 4,
+            target: "#general".into(),
+            from: "user".into(),
+            actor: Actor::User {
+                id: "user".into(),
+                name: Some("You".into()),
+            },
+            name: "You".into(),
+            text: "Make slide 2 brighter".into(),
+            reply_to: None,
+            edited: None,
+            deleted: None,
+            attachments: None,
+            artifact: None,
+            blocks: None,
+            view_context: Some(sample_view_context("Q3 Pitch")),
+            picked: None,
+            response_port: None,
+            voice_mode: None,
+        };
+        let line = message_line(&m);
+        assert!(line.contains("Make slide 2 brighter"));
+        assert!(line.contains("\n  │ <artifact-view-context>\n  │ "));
+        assert!(line.contains("\n  │ </artifact-view-context>"));
+    }
 }

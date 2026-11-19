@@ -383,6 +383,9 @@ pub struct Opened {
     pub drafts: Vec<String>,
 }
 
+pub type CronOfIssue = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
+pub type PullOfIssue = Arc<dyn Fn(&str) -> Option<PullRequest> + Send + Sync>;
+
 pub struct Ledger {
     pub(crate) durable: vibevalley_durable::Store,
     db: Mutex<SqliteConnection>,
@@ -391,6 +394,8 @@ pub struct Ledger {
     write: Mutex<()>,
     /// Each subscriber's sender and a receiver to drop a stale frame with.
     subscribers: Mutex<Vec<(flume::Sender<Frame>, flume::Receiver<Frame>)>>,
+    cron_of_issue: Mutex<Option<CronOfIssue>>,
+    pull_of_issue: Mutex<Option<PullOfIssue>>,
 }
 
 fn database(path: &Path) -> Result<SqliteConnection> {
@@ -493,8 +498,70 @@ impl Ledger {
             facts,
             write: Mutex::new(()),
             subscribers: Mutex::new(Vec::new()),
+            cron_of_issue: Mutex::new(None),
+            pull_of_issue: Mutex::new(None),
         };
         Ok((ledger, opened))
+    }
+
+    /// Registers the owner-backed `Issue.cron` projection and syncs current issues.
+    pub fn use_cron_of_issue(&self, lookup: CronOfIssue) {
+        let _write = lock(&self.write);
+        *lock(&self.cron_of_issue) = Some(lookup.clone());
+        let at = now();
+        let mut facts = Vec::new();
+        for mut issue in self.state().issues {
+            let next = lookup(&issue.id);
+            if issue.cron != next {
+                issue.cron = next;
+                facts.push(Fact::issue_changed(at, issue));
+            }
+        }
+        if !facts.is_empty() {
+            self.publish(facts);
+        }
+    }
+
+    /// Registers the owner-backed `Issue.pull_request` projection and syncs current issues.
+    pub fn use_pull_of_issue(&self, lookup: PullOfIssue) {
+        let _write = lock(&self.write);
+        *lock(&self.pull_of_issue) = Some(lookup.clone());
+        let at = now();
+        let mut facts = Vec::new();
+        for mut issue in self.state().issues {
+            let next = lookup(&issue.id);
+            if issue.pull_request != next {
+                issue.pull_request = next;
+                facts.push(Fact::issue_changed(at, issue));
+            }
+        }
+        if !facts.is_empty() {
+            self.publish(facts);
+        }
+    }
+
+    /// Re-projects `cron` and `pull_request` onto `id` from their owners without touching SQLite.
+    pub fn refresh_issue(&self, id: &str) {
+        let _write = lock(&self.write);
+        let Some(mut issue) = self.issue(id) else { return };
+        let mut changed = false;
+        if let Some(lookup) = lock(&self.cron_of_issue).clone() {
+            let next = lookup(&issue.id);
+            if issue.cron != next {
+                issue.cron = next;
+                changed = true;
+            }
+        }
+        if let Some(lookup) = lock(&self.pull_of_issue).clone() {
+            let next = lookup(&issue.id);
+            if issue.pull_request != next {
+                issue.pull_request = next;
+                changed = true;
+            }
+        }
+        if changed {
+            self.publish(vec![Fact::issue_changed(now(), issue)]);
+        }
     }
 
     pub(crate) fn database<R>(&self, query: impl FnOnce(&Sqlite<'_>) -> sqlx::Result<R>) -> Result<R> {

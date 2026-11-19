@@ -171,3 +171,27 @@ pub fn match_terms(db: &mut SqliteConnection, words: &[String]) -> sqlx::Result<
     scored.truncate(500);
     Ok(scored.into_iter().collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::base::open_sqlx_db;
+
+    #[test]
+    fn pkm_term_enforces_pk_and_upserts_duplicate_blocks() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut db = block_on(async {
+            let mut c = open_sqlx_db(dir.path()).await?;
+            sqlx::raw_sql(SCHEMA).execute(&mut c).await?;
+            Ok::<_, sqlx::Error>(c)
+        })
+        .unwrap();
+        let rows = vec![("b1".into(), "alpha beta".into()), ("b1".into(), "alpha beta gamma".into())];
+        set_page_terms(&mut db, "notes", &rows).unwrap();
+        let hits = match_terms(&mut db, &["gamma".into()]).unwrap();
+        assert!(hits.contains_key("b1"));
+        let all = block_on(queries::all_terms(&mut db)).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].terms, "alpha beta gamma");
+    }
+}

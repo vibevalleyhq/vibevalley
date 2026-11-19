@@ -8,12 +8,37 @@ use vibevalley_protocol::{Block, BlockOpResult, Suggestion, TextSpan};
 #[rustfmt::skip]
 #[path = "generated/queries.rs"]
 mod queries;
-pub use queries::{AddArtifactParams as NewArtifact, AddVersionParams as NewVersion, ArtifactRow, VersionRow};
+pub use queries::{
+    AddArtifactParams as NewArtifact, AddVersionParams as NewVersion, ArtifactEntriesRow as EntryRow, ArtifactRow, UpsertArtifactEntryParams as UpsertEntry,
+    VersionRow,
+};
 
 pub const SCHEMA: &str = include_str!("sql/schema.sql");
 
 pub fn artifact(db: &mut SqliteConnection, id: &str) -> Q<Option<ArtifactRow>> {
     optional(block_on(queries::artifact(db, queries::ArtifactParams { id: id.into() })))
+}
+
+pub fn default_design_system_artifact(db: &mut SqliteConnection) -> Q<Option<ArtifactRow>> {
+    optional(block_on(queries::default_design_system_artifact(db)))
+}
+
+pub fn clear_default_design_system(db: &mut SqliteConnection, at: i64) -> Q<()> {
+    block_on(queries::clear_default_design_system(
+        db,
+        queries::ClearDefaultDesignSystemParams { updated_at: at },
+    ))
+}
+
+pub fn set_artifact_default(db: &mut SqliteConnection, id: &str, is_default: bool, at: i64) -> Q<()> {
+    block_on(queries::set_artifact_default(
+        db,
+        queries::SetArtifactDefaultParams {
+            id: id.into(),
+            is_default: i64::from(is_default),
+            updated_at: at,
+        },
+    ))
 }
 
 pub fn artifacts_in_channel(db: &mut SqliteConnection, channel: &str) -> Q<Vec<ArtifactRow>> {
@@ -205,6 +230,7 @@ pub fn prune(db: &mut SqliteConnection, before: i64) -> Q<()> {
         let mut tx = db.begin().await?;
         queries::prune_changes(&mut *tx, queries::PruneChangesParams { created_at: before }).await?;
         queries::prune_revisions(&mut *tx, queries::PruneRevisionsParams { created_at: before }).await?;
+        queries::prune_artifact_entry_changes(&mut *tx, queries::PruneArtifactEntryChangesParams { created_at: before }).await?;
         tx.commit().await
     })
 }
@@ -311,5 +337,94 @@ pub fn suggestions(db: &mut SqliteConnection, artifact: &str, limit: i64) -> Q<V
     ))?
     .into_iter()
     .map(decode_suggestion)
+    .collect()
+}
+
+// ----- store entries -----
+
+pub fn entries(db: &mut SqliteConnection, artifact: &str) -> Q<Vec<EntryRow>> {
+    block_on(queries::artifact_entries(db, queries::ArtifactEntriesParams { artifact_id: artifact.into() }))
+}
+
+pub fn entries_by_prefix(db: &mut SqliteConnection, artifact: &str, prefix: &str) -> Q<Vec<EntryRow>> {
+    let rows = block_on(queries::artifact_entries_by_prefix(
+        db,
+        queries::ArtifactEntriesByPrefixParams {
+            artifact_id: artifact.into(),
+            path: format!("{prefix}%"),
+        },
+    ))?;
+    Ok(rows.into_iter().filter(|r| r.path.starts_with(prefix)).collect())
+}
+
+pub fn entry(db: &mut SqliteConnection, artifact: &str, path: &str) -> Q<Option<EntryRow>> {
+    optional(block_on(queries::artifact_entry(
+        db,
+        queries::ArtifactEntryParams {
+            artifact_id: artifact.into(),
+            path: path.into(),
+        },
+    )))
+}
+
+pub fn entry_count(db: &mut SqliteConnection, artifact: &str) -> Q<i64> {
+    Ok(block_on(queries::artifact_entry_count(
+        db,
+        queries::ArtifactEntryCountParams { artifact_id: artifact.into() },
+    ))?
+    .n)
+}
+
+pub fn upsert_entry(db: &mut SqliteConnection, params: UpsertEntry) -> Q<()> {
+    block_on(queries::upsert_artifact_entry(db, params))
+}
+
+pub fn delete_entry(db: &mut SqliteConnection, artifact: &str, path: &str) -> Q<()> {
+    block_on(queries::delete_artifact_entry(
+        db,
+        queries::DeleteArtifactEntryParams {
+            artifact_id: artifact.into(),
+            path: path.into(),
+        },
+    ))
+}
+
+pub struct EntryChangeRow {
+    pub seq: i64,
+    pub paths: Vec<String>,
+    pub deleted: Vec<String>,
+}
+
+pub fn add_entry_change(db: &mut SqliteConnection, artifact: &str, seq: i64, actor: &str, paths: &[String], deleted: &[String], created_at: i64) -> Q<()> {
+    block_on(queries::add_artifact_entry_change(
+        db,
+        queries::AddArtifactEntryChangeParams {
+            artifact_id: artifact.into(),
+            seq,
+            actor: actor.into(),
+            paths: json(&paths)?,
+            deleted: json(&deleted)?,
+            created_at,
+        },
+    ))
+}
+
+pub fn entry_changes_after(db: &mut SqliteConnection, artifact: &str, seq: i64, limit: i64) -> Q<Vec<EntryChangeRow>> {
+    block_on(queries::artifact_entry_changes_after(
+        db,
+        queries::ArtifactEntryChangesAfterParams {
+            artifact_id: artifact.into(),
+            seq,
+            limit,
+        },
+    ))?
+    .into_iter()
+    .map(|r| {
+        Ok(EntryChangeRow {
+            seq: r.seq,
+            paths: read_json(r.paths)?,
+            deleted: read_json(r.deleted)?,
+        })
+    })
     .collect()
 }

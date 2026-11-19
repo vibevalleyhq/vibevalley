@@ -13,6 +13,7 @@ use vibevalley_protocol::{AgentRole, Issue, Session};
 use crate::lock;
 use crate::modules::channel::Chat;
 use crate::modules::issue::Board;
+use crate::modules::pull::Pulls;
 use crate::modules::session::Trajectories;
 
 #[derive(Deserialize)]
@@ -43,6 +44,11 @@ enum Ref {
     Issue(String),
     Channel(String),
     Session(String),
+    GithubPull {
+        repo: String,
+        number: i64,
+        section: Option<String>,
+    },
     /// Kinds the TypeScript server kept that this one does not.
     Absent,
 }
@@ -60,7 +66,38 @@ fn parse(uri: &str) -> Option<Ref> {
         ("channel", [id, m]) if m == "messages" => Some(Ref::Channel(id.clone())),
         ("session", [id, t]) if t == "trajectory" => Some(Ref::Session(id.clone())),
         ("trigger" | "envelope", [_]) => Some(Ref::Absent),
-        ("github", [_, pulls, n, ..]) if pulls == "pulls" && n.parse::<u64>().is_ok_and(|n| n > 0) => Some(Ref::Absent),
+        ("github", [repo, pulls, n]) if pulls == "pulls" => {
+            let number = n.parse::<i64>().ok().filter(|&v| v > 0)?;
+            Some(Ref::GithubPull {
+                repo: repo.clone(),
+                number,
+                section: None,
+            })
+        }
+        ("github", [repo, pulls, n, section]) if pulls == "pulls" => {
+            let number = n.parse::<i64>().ok().filter(|&v| v > 0)?;
+            Some(Ref::GithubPull {
+                repo: repo.clone(),
+                number,
+                section: Some(section.clone()),
+            })
+        }
+        ("github", [owner, repo, pulls, n]) if pulls == "pulls" => {
+            let number = n.parse::<i64>().ok().filter(|&v| v > 0)?;
+            Some(Ref::GithubPull {
+                repo: format!("{owner}/{repo}"),
+                number,
+                section: None,
+            })
+        }
+        ("github", [owner, repo, pulls, n, section]) if pulls == "pulls" => {
+            let number = n.parse::<i64>().ok().filter(|&v| v > 0)?;
+            Some(Ref::GithubPull {
+                repo: format!("{owner}/{repo}"),
+                number,
+                section: Some(section.clone()),
+            })
+        }
         _ => None,
     }
 }
@@ -116,6 +153,7 @@ pub struct Resources {
     board: Board,
     chat: Arc<Chat>,
     trajectories: Arc<Trajectories>,
+    pulls: Option<Arc<Pulls>>,
     cache: Mutex<Cache>,
 }
 
@@ -125,6 +163,17 @@ impl Resources {
             board,
             chat,
             trajectories,
+            pulls: None,
+            cache: Mutex::new(Cache::default()),
+        })
+    }
+
+    pub fn with_pulls(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>, pulls: Arc<Pulls>) -> Arc<Resources> {
+        Arc::new(Resources {
+            board,
+            chat,
+            trajectories,
+            pulls: Some(pulls),
             cache: Mutex::new(Cache::default()),
         })
     }
@@ -195,6 +244,19 @@ impl Resources {
                 let events = self.trajectories.events(&id, None).ok_or_else(|| missing(uri))?;
                 pretty(json!({ "events": events }))
             }
+            Ref::GithubPull { repo, number, section } => {
+                let Some(pulls) = &self.pulls else {
+                    return Err(missing(uri));
+                };
+                let snap = pulls.snapshot(&repo, number).map_err(|e| e.message)?;
+                match section.as_deref() {
+                    None => pretty(serde_json::to_value(&snap).map_err(|e| e.to_string())?),
+                    Some("checks") => pretty(json!({ "repo": snap.repo, "number": snap.number, "head": snap.head, "checks": snap.checks })),
+                    Some("reviews") => pretty(json!({ "repo": snap.repo, "number": snap.number, "reviews": snap.reviews })),
+                    Some("comments") => pretty(json!({ "repo": snap.repo, "number": snap.number, "comments": snap.comments })),
+                    Some(_) => Err(missing(uri)),
+                }
+            }
         }
     }
 
@@ -244,7 +306,14 @@ mod tests {
         assert!(matches!(parse("vv://channel/c%201/messages"), Some(Ref::Channel(id)) if id == "c 1"));
         assert!(matches!(parse("vv://session/w3/trajectory"), Some(Ref::Session(id)) if id == "w3"));
         assert!(matches!(parse("vv://trigger/t1"), Some(Ref::Absent)));
-        assert!(matches!(parse("vv://github/demo/pulls/3/checks"), Some(Ref::Absent)));
+        assert!(matches!(
+            parse("vv://github/demo/pulls/3/checks"),
+            Some(Ref::GithubPull { repo, number: 3, section }) if repo == "demo" && section.as_deref() == Some("checks")
+        ));
+        assert!(matches!(
+            parse("vv://github/acme/demo/pulls/7"),
+            Some(Ref::GithubPull { repo, number: 7, section: None }) if repo == "acme/demo"
+        ));
         assert!(parse("vv://issue/a/b").is_none());
         assert!(parse("vv://issue/a?x=1").is_none());
         assert!(parse("https://issue/a").is_none());

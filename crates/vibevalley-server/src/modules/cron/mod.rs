@@ -1,21 +1,21 @@
-//! `cron.*` and the ticker (VibeValley `modules/issue/cron.ts`,
-//! `dispatch.ts` `scheduled`): each cron, when due, keeps one issue going.
-//! The rules (when it is due, what is wrong with a request) are
-//! `vibevalley-cron`'s; crons are kept in `<home>/crons.json`.
-//!
-//! A cron's channel is a channel's id, resolved as the user names it once
-//! the chat is attached ([`Crons::attach_chat`]); before that it is the
-//! name given (`general` when none). A cron for the orchestrator (no
-//! profile) is said in its channel and handed to the orchestrator.
+//! `cron.*` and the ticker: each cron, when due, keeps one issue going or
+//! nudges the channel's orchestrator. The rules (when it is due, what is wrong
+//! with a request) are `vibevalley-cron`'s; crons live in `server.db`'s `cron`
+//! table and own the `issue_id` link (`references issue(id) on delete set null`).
 
+mod db;
+
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
+use pollster::block_on;
+use sqlx::SqliteConnection;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, Fact, FactCronChanged, FactCronRemoved, IssueStatus, NoticeLevel, Preview, ops};
 
-use crate::base::{LookIn, missing};
+use crate::base::{LookIn, internal, missing, open_sqlx_db};
 use crate::modules::agent::Agents;
 use crate::modules::issue::{Board, NewIssue};
 use crate::{Hub, lock, now};
@@ -36,8 +36,31 @@ fn local_zone() -> String {
         .unwrap_or_else(|| "UTC".into())
 }
 
+#[derive(Default)]
+struct CronLinks {
+    issue_of_cron: HashMap<String, String>,
+    cron_of_issue: HashMap<String, String>,
+}
+
+impl CronLinks {
+    fn link(&mut self, cron_id: &str, issue_id: Option<&str>) -> Option<String> {
+        let prev_issue = self.issue_of_cron.remove(cron_id);
+        if let Some(prev) = &prev_issue {
+            self.cron_of_issue.remove(prev);
+        }
+        if let Some(issue_id) = issue_id {
+            if let Some(prev_cron) = self.cron_of_issue.insert(issue_id.into(), cron_id.into()) {
+                self.issue_of_cron.remove(&prev_cron);
+            }
+            self.issue_of_cron.insert(cron_id.into(), issue_id.into());
+        }
+        prev_issue
+    }
+}
+
 pub struct Crons {
-    file: PathBuf,
+    db: Mutex<SqliteConnection>,
+    links: Arc<Mutex<CronLinks>>,
     hub: Weak<Hub>,
     board: Board,
     agents: Arc<Agents>,
@@ -51,23 +74,36 @@ pub struct Crons {
 }
 
 impl Crons {
-    /// The crons kept under `home`, put into the hub's state.
-    pub fn open(home: &Path, hub: &Arc<Hub>, board: Board, agents: Arc<Agents>) -> Arc<Crons> {
-        let file = home.join("crons.json");
-        // A cron this code cannot read any more is left out.
-        let kept: Vec<serde_json::Value> = std::fs::read_to_string(&file)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
+    /// Opens `cron` in `<home>/server.db`, puts stored crons into the hub's
+    /// state, and registers `Issue.cron` projection on `board`.
+    pub fn open(home: &Path, hub: &Arc<Hub>, board: Board, agents: Arc<Agents>) -> Result<Arc<Crons>, ApiError> {
+        let mut conn = block_on(async {
+            let mut db = open_sqlx_db(home).await?;
+            sqlx::raw_sql(db::SCHEMA).execute(&mut db).await?;
+            Ok::<_, sqlx::Error>(db)
+        })
+        .map_err(internal)?;
+        let stored = db::list(&mut conn).map_err(internal)?;
+        let links = Arc::new(Mutex::new(CronLinks::default()));
         let at = now();
-        let facts: Vec<Fact> = kept
-            .into_iter()
-            .filter_map(|v| serde_json::from_value::<Cron>(v).ok())
-            .map(|cron| Fact::CronChanged(FactCronChanged { at, cron }))
-            .collect();
-        hub.apply(facts);
-        Arc::new(Crons {
-            file,
+        let mut facts = Vec::with_capacity(stored.len());
+        {
+            let mut map = lock(&links);
+            for item in stored {
+                if let Some(issue_id) = item.issue_id.as_deref() {
+                    map.link(&item.cron.id, Some(issue_id));
+                }
+                facts.push(Fact::CronChanged(FactCronChanged { at, cron: item.cron }));
+            }
+        }
+        if !facts.is_empty() {
+            hub.apply(facts);
+        }
+        let lookup_links = links.clone();
+        board.use_cron_of_issue(Arc::new(move |issue_id| lock(&lookup_links).cron_of_issue.get(issue_id).cloned()));
+        Ok(Arc::new(Crons {
+            db: Mutex::new(conn),
+            links,
             hub: Arc::downgrade(hub),
             board,
             agents,
@@ -77,7 +113,7 @@ impl Crons {
             closed: Default::default(),
             stop: Mutex::new(None),
             thread: Mutex::new(None),
-        })
+        }))
     }
 
     /// Stops the ticker.
@@ -109,22 +145,34 @@ impl Crons {
         self.hub().map(|h| h.read(|s| s.crons.clone())).unwrap_or_default()
     }
 
-    fn save(&self, all: &[Cron]) -> Result<(), ApiError> {
-        let body = serde_json::to_string_pretty(all).map_err(crate::base::internal)?;
-        let tmp = self.file.with_extension("json.tmp");
-        std::fs::write(&tmp, body)
-            .and_then(|_| std::fs::rename(&tmp, &self.file))
-            .map_err(crate::base::internal)
+    pub fn issue_of(&self, cron_id: &str) -> Option<String> {
+        lock(&self.links).issue_of_cron.get(cron_id).cloned()
     }
 
-    /// Keeps `cron` (replacing one with its id) and tells the state.
+    pub fn cron_of(&self, issue_id: &str) -> Option<String> {
+        lock(&self.links).cron_of_issue.get(issue_id).cloned()
+    }
+
+    /// Persists `cron` (keeping its linked issue, if any) and tells the state.
     fn put(&self, cron: Cron) -> Result<(), ApiError> {
-        let mut all = self.list();
-        all.retain(|c| c.id != cron.id);
-        all.push(cron.clone());
-        self.save(&all)?;
+        let issue_id = self.issue_of(&cron.id);
+        db::upsert(&mut lock(&self.db), &cron, issue_id.as_deref()).map_err(internal)?;
         if let Some(hub) = self.hub() {
             hub.apply(vec![Fact::CronChanged(FactCronChanged { at: now(), cron })]);
+        }
+        Ok(())
+    }
+
+    fn link_issue(&self, cron_id: &str, issue_id: Option<&str>) -> Result<(), ApiError> {
+        db::set_issue(&mut lock(&self.db), cron_id, issue_id).map_err(internal)?;
+        let prev = lock(&self.links).link(cron_id, issue_id);
+        if let Some(prev_id) = prev
+            && prev_id.as_str() != issue_id.unwrap_or("")
+        {
+            self.board.refresh_issue(&prev_id);
+        }
+        if let Some(next_id) = issue_id {
+            self.board.refresh_issue(next_id);
         }
         Ok(())
     }
@@ -220,11 +268,13 @@ impl Crons {
     pub fn remove(&self, id: &str) -> Result<Cron, ApiError> {
         let _l = lock(&self.lock);
         let was = self.find(id)?;
-        let mut all = self.list();
-        all.retain(|c| c.id != id);
-        self.save(&all)?;
+        db::remove(&mut lock(&self.db), id).map_err(internal)?;
+        let prev_issue = lock(&self.links).link(id, None);
         if let Some(hub) = self.hub() {
             hub.apply(vec![Fact::CronRemoved(FactCronRemoved { at: now(), id: id.into() })]);
+        }
+        if let Some(issue_id) = prev_issue {
+            self.board.refresh_issue(&issue_id);
         }
         Ok(was)
     }
@@ -299,21 +349,15 @@ impl Crons {
         if o.hear(input) { Ok(()) } else { Err(unserved()) }
     }
 
-    /// `scheduled`: the issue the cron made last, started, reopened or told;
-    /// else a new one.
+    /// `scheduled`: the issue the cron owns, started, reopened or told;
+    /// else a new one linked back to `cron.issue_id`.
     fn scheduled(&self, cron: &Cron, words: &str) -> Result<(), ApiError> {
         let fail = |e: crate::modules::ledger::BoardError| match e {
             crate::modules::ledger::BoardError::Api(e) => e,
             e => ApiError::new(BizCode::IssueRefused, e.to_string()),
         };
         let Some(agent) = &cron.agent else { return self.to_orchestrator(cron, words) };
-        let found = self.board.read(|s| {
-            s.issues
-                .iter()
-                .filter(|i| i.cron.as_deref() == Some(cron.id.as_str()))
-                .max_by_key(|i| i.number)
-                .cloned()
-        });
+        let found = self.issue_of(&cron.id).and_then(|id| self.board.issue(&id));
         let Some(issue) = found else {
             let made = self
                 .board
@@ -326,6 +370,7 @@ impl Crons {
                     ..Default::default()
                 })
                 .map_err(fail)?;
+            self.link_issue(&cron.id, Some(&made.id))?;
             self.board.move_to(&made.id, IssueStatus::Todo, None).map_err(fail)?;
             return Ok(());
         };

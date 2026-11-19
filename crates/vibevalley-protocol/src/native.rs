@@ -42,6 +42,15 @@ pub const NATIVE_ENDPOINTS: &[Endpoint] = &[
         input: Some("ArtifactPageInput"),
         result: Some("ArtifactPage"),
     },
+    Endpoint {
+        op: "artifact.view",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactViewInput"),
+        result: Some("ArtifactPage"),
+    },
 ];
 
 /// The attachment's id (the sha256 of its bytes).
@@ -76,6 +85,24 @@ pub struct ArtifactPageInput {
     pub theme: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub print: Option<bool>,
+}
+
+/// A store artifact's rendered view as `GET /api/v1/artifact/<id>/view`
+/// serves it: query `theme`, `path`, `elementId`, `print`, and `origin`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactViewInput {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub element_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub print: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
 }
 
 /// The page and the headers to serve it with (its sandbox policy, cached
@@ -130,6 +157,14 @@ pub mod native_ops {
     impl Op for ArtifactPage {
         const NAME: &'static str = "artifact.page";
         type Input = ArtifactPageInput;
+        type Result = super::ArtifactPage;
+    }
+
+    /// A store artifact's rendered HTML viewer document and headers.
+    pub struct ArtifactView;
+    impl Op for ArtifactView {
+        const NAME: &'static str = "artifact.view";
+        type Input = ArtifactViewInput;
         type Result = super::ArtifactPage;
     }
 }

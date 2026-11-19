@@ -428,8 +428,18 @@ impl Watch {
         let target = self.chat.target_of(&c.row.channel_id).unwrap_or_else(|| format!("#{}", c.channel_name));
         let reply = c.row.reply_number.map(|n| format!(" reply={n}")).unwrap_or_default();
         let edited = if c.row.edited_at.is_some() { "（改过）" } else { "" };
+        let view = meta_of(c.row.meta.as_deref())
+            .view_context
+            .filter(|_| c.row.deleted_at.is_none())
+            .map(|vc| {
+                format!(
+                    "\n  │ {}",
+                    crate::modules::orchestrator::words::format_artifact_view_context(&vc).replace('\n', "\n  │ ")
+                )
+            })
+            .unwrap_or_default();
         format!(
-            "[target={target} msg={}{reply} from={from}]{edited} {}",
+            "[target={target} msg={}{reply} from={from}]{edited} {}{view}",
             c.row.number,
             c.row.body.trim().replace('\n', "\n  │ ")
         )
@@ -518,6 +528,9 @@ impl Watch {
         if let Some(issue) = &pooled {
             let on = self.on_issue(hired, issue).map(|h| h.id.clone());
             let mut text = c.row.body.trim().to_string();
+            if let Some(vc) = meta_of(c.row.meta.as_deref()).view_context.filter(|_| c.row.deleted_at.is_none()) {
+                text = format!("{}\n{text}", crate::modules::orchestrator::words::format_artifact_view_context(&vc));
+            }
             let earlier = on.as_deref().map(|s| self.take_waiting(s)).unwrap_or_default();
             if !earlier.is_empty() {
                 let lines: Vec<String> = earlier.iter().map(|w| w.line.clone()).collect();
@@ -584,12 +597,18 @@ impl Watch {
                 picked_note += &w::picked_repo(r);
             }
         }
+        let view_note = meta
+            .view_context
+            .as_ref()
+            .filter(|_| c.row.deleted_at.is_none())
+            .map(|vc| format!("{}\n", w::format_artifact_view_context(vc)))
+            .unwrap_or_default();
         let text = c.row.body.trim();
         let said = match meta.voice_mode.as_deref() {
-            Some("dictated") => format!("{picked_note}{}{}", w::DICTATED, w::user_line(text)),
+            Some("dictated") => format!("{picked_note}{view_note}{}{}", w::DICTATED, w::user_line(text)),
             Some("conversation") => format!("{}\n{}", w::PROMPTS.voice, w::user_line(text)),
             _ if from_user && (c.channel_type == ChannelType::Direct || c.row.channel_id == self.chat.default_channel()) => {
-                format!("{picked_note}{}", w::user_line(text))
+                format!("{picked_note}{view_note}{}", w::user_line(text))
             }
             _ => format!("{picked_note}{}", w::chat_line(&m.target, &line)),
         };
@@ -654,9 +673,13 @@ impl Watch {
         if p.id != profile_id(agent) {
             return;
         }
+        let words = match meta_of(c.row.meta.as_deref()).view_context.filter(|_| c.row.deleted_at.is_none()) {
+            Some(vc) => format!("{}\n{}", crate::modules::orchestrator::words::format_artifact_view_context(&vc), c.row.body),
+            None => c.row.body.clone(),
+        };
         let why = match self.agents.profiles.agent(agent) {
             Some(a) if !a.enabled => t("server.channel.profileDisabled", &[("name", a.name.into())]),
-            _ => match self.board.sessions().talk(agent, &c.row.channel_id, &c.row.body) {
+            _ => match self.board.sessions().talk(agent, &c.row.channel_id, &words) {
                 Ok(_) => return,
                 Err(e) => e.to_string(),
             },

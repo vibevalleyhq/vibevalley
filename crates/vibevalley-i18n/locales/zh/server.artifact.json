@@ -16,7 +16,8 @@
     "cards": "对话里的卡片还在，点开说已经删掉了",
     "removeBlock": "删掉块 {id}",
     "removeChildren": "连同 {n} 个子块",
-    "removeBlocks": "删掉「{title}」和它的 {n} 块"
+    "removeBlocks": "删掉「{title}」和它的 {n} 块",
+    "removeEntries": "删掉「{title}」和它的 {n} 个条目"
   },
   "untitled": "没起名的 Artifact",
   "noBatch": "这批改动没有 batchId",
@@ -105,5 +106,50 @@
     "crosses": "「{words}」跨了带格式的几段，这里只改一段里的字：少选几个字，或者交给帮工改",
     "stale": "你看的是第 {version} 稿，最新的是第 {latest} 稿：在最新的一稿上改",
     "note": "用户在页面上改了：「{old}」→「{new}」"
+  },
+  "notStore": "「{title}」不是结构化存储的 Artifact：不能读写条目",
+  "defaultDesignSystemOnly": "只有设计体系（design-system）类型的 Artifact 能设为农场默认",
+  "noReference": "{type} 没有叫 {reference} 的参考分册；可选：{available}",
+  "entry": {
+    "missing": "「{title}」里没有路径 {path}",
+    "badPath": "不合法的条目路径「{path}」：{why}",
+    "badJson": "条目 {path} 不是合法的 JSON：{why}",
+    "notJson": "条目 {path} 是 {kind}，不能做 JSON 合并修改",
+    "noValue": "写条目 {path} 时必须给 value",
+    "noFrom": "复制条目 {path} 时必须给源路径 from",
+    "noAttachment": "附件 {id} 不存在，不能挂到条目 {path}",
+    "tooBig": "条目 {path} 太大了：单条最多 {kb} KB",
+    "tooMany": "一份结构化 Artifact 最多放 {max} 个条目",
+    "updated": "更新了「{title}」（第 {seq} 批）"
+  },
+  "types": {
+    "docs": {
+      "title": "协作文档",
+      "summary": "多帮工与用户按块共同编辑、带建议流与 Markdown 互转的长文档"
+    },
+    "slides": {
+      "title": "幻灯片",
+      "summary": "16:9 或 4:3 分页讲稿（deck.json + deck.css + 每页 HTML），支持渐进揭示、演讲者视图与矢量 PDF"
+    },
+    "dashboard": {
+      "title": "数据看板",
+      "summary": "结构化数据集与沙箱图表页分离的看板，支持字段级数据溯源核对、筛选持久化与 CSV 导出"
+    },
+    "motion": {
+      "title": "动态短片",
+      "summary": "纯时间函数驱动的分镜短片与图形动画，支持逐帧定位、章节跳转与导出视频进素材库"
+    },
+    "whiteboard": {
+      "title": "无限白板",
+      "summary": "无限平移缩放画布，支持流程图、架构框图、正交折线箭头、表格、手绘插图与内嵌小挂件"
+    },
+    "design": {
+      "title": "界面画板",
+      "summary": "多画板 UI/视觉设计（canvas.json + .dc.html），支持状态逻辑与右侧属性面板实时调参"
+    },
+    "design-system": {
+      "title": "设计体系",
+      "summary": "编译为明暗双主题 CSS 令牌的色彩、字阶、组件预览与品牌规范，可设为农场默认"
+    }
   }
 }

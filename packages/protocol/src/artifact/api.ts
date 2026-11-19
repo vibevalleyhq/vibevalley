@@ -45,6 +45,16 @@ export interface ArtifactHandlers {
   readonly "artifact.suggestion.reject": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Promise<T.Suggestion>;
   /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
   readonly "artifact.markdown.get": (a: { readonly id: T.ArtifactId }) => Promise<T.ArtifactMarkdown>;
+  /** All structured artifact types and the farm's standing default design-system if any. */
+  readonly "artifact.type.list": () => Promise<T.ArtifactTypeInfo[]>;
+  /** A structured artifact type's SKILL.md guide or one of its named reference chapters. */
+  readonly "artifact.type.read": (a: T.ArtifactTypeReadRequest) => Promise<T.ArtifactTypeGuide>;
+  /** A store artifact's entries (filtered by path prefix when given), with values when requested. */
+  readonly "artifact.entry.list": (a: T.ArtifactEntryListRequest) => Promise<T.ArtifactEntrySnapshot>;
+  /** One store entry with its value and revision. */
+  readonly "artifact.entry.get": (a: T.ArtifactEntryGetRequest) => Promise<T.ArtifactEntry>;
+  /** An atomic batch of set, patch, delete or copy writes on a store artifact with per-entry optimistic concurrency. */
+  readonly "artifact.entry.batch": (a: T.ArtifactEntryBatchRequest) => Promise<T.ArtifactEntryBatchResult>;
   /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
    * one already running is refused. */
   readonly "artifact.demo": (a: { readonly id: T.ArtifactId }) => Promise<void>;
@@ -192,6 +202,41 @@ export const artifactEndpoints: readonly Endpoint[] = [
     input: input({ id: S.ArtifactId }),
     result: S.ArtifactMarkdown,
     can: ["user", "remote"],
+  },
+  {
+    op: "artifact.type.list",
+    about: [],
+    input: undefined,
+    result: z.array(S.ArtifactTypeInfo),
+    can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.type.read",
+    about: [],
+    input: S.ArtifactTypeReadRequest,
+    result: S.ArtifactTypeGuide,
+    can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.entry.list",
+    about: ["id"],
+    input: S.ArtifactEntryListRequest,
+    result: S.ArtifactEntrySnapshot,
+    can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.entry.get",
+    about: ["id"],
+    input: S.ArtifactEntryGetRequest,
+    result: S.ArtifactEntry,
+    can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.entry.batch",
+    about: ["id"],
+    input: S.ArtifactEntryBatchRequest,
+    result: S.ArtifactEntryBatchResult,
+    can: ["user", "remote", "orchestrator", "session"],
   },
   {
     op: "artifact.demo",

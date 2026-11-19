@@ -3,27 +3,39 @@
 // its parent. Here it is an nsh WebView (a WKWebView in the GPUI host)
 // given the whole page as `html`: at the top of a web view `parent` is the
 // page's own window, so the shell's `parent.postMessage` lands on itself,
-// and `shim` (run before the page's scripts) hands those messages out
-// through `window.nsh.postMessage` (the WebView's onMessage). Commands go in
-// as a message the page posts to itself (`injectJavaScript`), which the
-// runtime takes since its source is `parent`.
+// and `shim` (run before the page's scripts) hands whitelisted outgoing
+// messages out through `window.nsh.postMessage` (the WebView's onMessage).
+// Commands go in as a message the page posts to itself (`injectJavaScript`),
+// which the runtime takes since its source is `parent`.
 import { signal, type Accessor, type WebViewRef } from "nsh";
 
 import { type ShellTheme, withShell } from "@vibevalley/artifact/shell";
-import type { ArtifactDisplay, HtmlAnchor, HtmlShellMessage } from "@vibevalley/protocol";
+import type { ArtifactDisplay, HtmlAnchor, HtmlShellCommand, HtmlShellMessage } from "@vibevalley/protocol";
 
 import { selectionOf, shellMessageOf } from "./shell";
 
-/** What the page's runtime last said: what it is (ready) and where it is (at). */
+export type { HtmlShellCommand };
+
+/** What the page's runtime last said: what it is (ready), where it is (at), and any recording result. */
 export interface Shown {
   readonly ready?: Extract<HtmlShellMessage, { vibevalley: "ready" }>;
   readonly at?: Extract<HtmlShellMessage, { vibevalley: "at" }>;
+  readonly recorded?: Extract<HtmlShellMessage, { vibevalley: "recorded" }>;
 }
 
-/** What goes into the page: the protocol's one command. */
-export type HtmlShellCommand = { readonly vibevalley: "goto"; readonly page: number };
-
+/** Whitelist outgoing HtmlShellMessage and StoreBridgeMessage tags so incoming commands are never echoed back out. */
 export const shim = String.raw`(() => {
+  const OUT = new Set([
+    "selection",
+    "ready",
+    "at",
+    "recorded",
+    "store-provenance",
+    "store-mark-click",
+    "store-params",
+    "store-props",
+    "store-embed-save",
+  ]);
   const out = (d) => {
     try {
       window.nsh.postMessage(JSON.stringify(d));
@@ -31,13 +43,10 @@ export const shim = String.raw`(() => {
   };
   addEventListener("message", (e) => {
     const d = e.data;
-    if (e.source === window && d && typeof d === "object" && typeof d.vibevalley === "string" && d.vibevalley !== "goto") out(d);
+    if (e.source === window && d && typeof d === "object" && typeof d.vibevalley === "string" && OUT.has(d.vibevalley)) out(d);
   });
 })();`;
 
-// What VibeValley's server sends as the page's Content-Security-Policy (packages/artifact/src/html.ts htmlLimits, which
-// is not vendored: it parses with parse5); `sandbox` cannot be said in a meta, the web view's own store (incognito)
-// keeps the page from the app's.
 const limits = [
   "default-src 'none'",
   "script-src 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
@@ -84,20 +93,22 @@ export function framed(shown: {
 /** One web view's talk: what its runtime said, the words last picked in it, and the way to send it a command. */
 export interface Frame {
   readonly shown: Accessor<Shown>;
-  readonly picked: Accessor<HtmlAnchor | undefined>;
+  readonly picked: Accessor<(HtmlAnchor & { readonly path?: string }) | undefined>;
   /** The page loaded (onLoad), or why it did not (onError). */
   readonly state: Accessor<"loading" | "loaded" | { readonly error: string }>;
-  readonly send: (command: HtmlShellCommand) => void;
+  readonly send: (command: HtmlShellCommand | Record<string, unknown>) => void;
   readonly heard: (data: string) => void;
+  readonly onMessage: (listener: (raw: unknown) => void) => () => void;
   readonly setRef: (ref: WebViewRef | undefined) => void;
   readonly setState: (state: "loading" | "loaded" | { readonly error: string }) => void;
 }
 
-/** What a frame's runtime says, followed: only the protocol's messages (a page can post anything; they are hints). */
+/** What a frame's runtime says, followed: only whitelisted protocol messages (a page can post anything; they are hints). */
 export function createFrame(): Frame {
   const shown = signal<Shown>({});
-  const picked = signal<HtmlAnchor | undefined>(undefined);
+  const picked = signal<(HtmlAnchor & { readonly path?: string }) | undefined>(undefined);
   const state = signal<"loading" | "loaded" | { readonly error: string }>("loading");
+  const listeners = new Set<(raw: unknown) => void>();
   let ref: WebViewRef | undefined;
   return {
     shown,
@@ -111,11 +122,32 @@ export function createFrame(): Frame {
       } catch {
         return;
       }
-      const anchor = selectionOf(parsed);
-      if (anchor) return picked.set(anchor);
+      for (const fn of listeners) fn(parsed);
       const message = shellMessageOf(parsed);
-      if (message?.vibevalley === "ready") shown.set({ ...shown(), ready: message });
-      if (message?.vibevalley === "at") shown.set({ ...shown(), at: message });
+      if (message) {
+        switch (message.vibevalley) {
+          case "selection":
+            picked.set(message.path !== undefined ? { ...message.anchor, path: message.path } : message.anchor);
+            return;
+          case "ready":
+            shown.set({ ...shown(), ready: message });
+            return;
+          case "at":
+            shown.set({ ...shown(), at: message });
+            return;
+          case "recorded":
+            shown.set({ ...shown(), recorded: message });
+            return;
+        }
+      }
+      const anchor = selectionOf(parsed);
+      if (anchor) picked.set(anchor);
+    },
+    onMessage: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
     setRef: (r) => {
       ref = r;

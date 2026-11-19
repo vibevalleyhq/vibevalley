@@ -201,7 +201,7 @@ Artifact：一起写的，和交上来的网页
 | `artifact.create` | 新建 Artifact：空的一篇来一起写，或交上来一稿 | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.version.create` | 给网页 Artifact 交新的一版，旧的留着 | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.html.edit` | 在网页 Artifact 里换掉一段字，成为新的一版 | `/api/v1/artifact/html/edit` | ✓ | ✓ |   |   |
-| `artifact.update` | 给 Artifact 改标题 | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
+| `artifact.update` | 给 Artifact 改标题或默认设置 | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
 | `artifact.delete` | 删掉一篇 Artifact | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
 | `artifact.previewDelete` | 试删一篇 Artifact：说会删掉什么，不真删 | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
 | `artifact.block.list` | 按顺序列出 Artifact 现有的每一块 | `/api/v1/artifact/block/list` | ✓ | ✓ |   |   |
@@ -215,6 +215,11 @@ Artifact：一起写的，和交上来的网页
 | `artifact.suggestion.accept` | 接受一条改写建议 | `/api/v1/artifact/suggestion/accept` | ✓ | ✓ |   |   |
 | `artifact.suggestion.reject` | 拒绝一条改写建议 | `/api/v1/artifact/suggestion/reject` | ✓ | ✓ |   |   |
 | `artifact.markdown.get` | 把一起写的 Artifact 读成 Markdown | `/api/v1/artifact/markdown/get` | ✓ | ✓ |   |   |
+| `artifact.type.list` | 列出全部结构化 Artifact 类型与当前默认设计体系 | `/api/v1/artifact/type/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.type.read` | 读取一种 Artifact 类型的规范或参考分册 | `/api/v1/artifact/type/read` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.entry.list` | 列出结构化 Artifact 的条目（可按路径前缀筛） | `/api/v1/artifact/entry/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.entry.get` | 读取结构化 Artifact 的一个条目与当前版本号 | `/api/v1/artifact/entry/get` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.entry.batch` | 原子批量增改、合并或删除结构化 Artifact 的条目（带版本号校验） | `/api/v1/artifact/entry/batch` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.demo` | 开演示：几个帮工一起写一篇 Artifact，不花模型的钱 | `/api/v1/artifact/demo` | ✓ |   |   |   |
 
 ## game

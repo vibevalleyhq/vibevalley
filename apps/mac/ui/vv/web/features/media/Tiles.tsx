@@ -1,12 +1,17 @@
 // Ported from VibeValley apps/web/src/features/media/Tiles.tsx: justified
-// rows of media tiles and in-progress generation jobs.
+// rows of media tiles, lightweight native deliverable cards, and in-progress
+// generation jobs.
 import { effect, Image, Text, View } from "nsh";
 
-import type { LibraryItem, MediaJob } from "@vibevalley/protocol";
+import { t } from "@vibevalley/i18n";
+import type { Artifact, LibraryItem, MediaJob } from "@vibevalley/protocol";
 
+import { useNow } from "../../base/dom";
+import { ago } from "../../base/format";
 import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
+import { artifactIcon, artifactSuffix, kindLabel } from "../artifact";
 import { durationText, extOf, justify, kindOf, type Placed } from "./items";
 
 export interface Seen {
@@ -183,6 +188,80 @@ function Tile(props: {
         </If>
       </View>
       <Text class={`pt-1.5 truncate text-xs ${props.picked ? "text-ink font-medium" : "text-muted"}`}>{file().name}</Text>
+    </View>
+  );
+}
+
+/** Lightweight native deliverable cards (no WebView grid): icon, type badge, compound suffix, title, and updated time. */
+export function ArtifactTiles(props: {
+  artifacts: readonly Artifact[];
+  selectedId: string | undefined;
+  onSelect: (id: string) => void;
+  onOpen: (id: string) => void;
+}) {
+  const now = useNow();
+  return (
+    <View testID="library-artifacts" class="flex-row flex-wrap gap-3">
+      <Each of={props.artifacts} key={(a) => a.id}>
+        {(a) => {
+          const picked = () => props.selectedId === a().id;
+          let lastPress = 0;
+          return (
+            <View
+              role="button"
+              testID={`library-artifact-${a().id}`}
+              accessibilityLabel={a().title}
+              accessibilityState={{ selected: picked() }}
+              onPress={() => {
+                const ts = Date.now();
+                if (ts - lastPress < 350 && picked()) {
+                  props.onOpen(a().id);
+                } else {
+                  props.onSelect(a().id);
+                }
+                lastPress = ts;
+              }}
+              class={`w-56 shrink-0 gap-2 rounded-lg border-2 bg-side p-3 transition duration-120 ease-out hover:bg-hover ${
+                picked() ? "border-accent bg-selected" : "border-line"
+              }`}
+            >
+              <View class="flex-row items-center gap-2">
+                <View class="size-9 shrink-0 items-center justify-center rounded-md bg-page border border-line">
+                  <Icon name={artifactIcon(a())} size={20} tone="muted" />
+                </View>
+                <View class="min-w-0 flex-1 gap-0.5">
+                  <View class="flex-row flex-wrap items-center gap-1">
+                    <View class="rounded-sm bg-page px-1.5 py-0.5 border border-line">
+                      <Text class="text-2xs font-medium text-ink">{kindLabel(a())}</Text>
+                    </View>
+                    <If when={a().isDefault}>
+                      <View class="rounded-sm bg-accent px-1.5 py-0.5">
+                        <Text class="text-2xs font-medium text-page">{t("web.artifact.types.defaultBadge")}</Text>
+                      </View>
+                    </If>
+                  </View>
+                  <Text class="truncate font-mono text-2xs text-faint">{artifactSuffix(a())}</Text>
+                </View>
+              </View>
+              <Text class="truncate text-sm font-semibold text-ink">{a().title}</Text>
+              <View class="flex-row items-center justify-between gap-2">
+                <Text class="min-w-0 flex-1 truncate text-xs text-muted">
+                  {[...(a().body === "html" ? [t("web.library.inspector.versionBadge", { version: a().version })] : []), ago(a().updated, now())].join(" · ")}
+                </Text>
+                <View
+                  role="button"
+                  testID={`library-artifact-open-${a().id}`}
+                  accessibilityLabel={t("web.library.inspector.openWorkbench")}
+                  onPress={() => props.onOpen(a().id)}
+                  class="size-6 items-center justify-center rounded-sm hover:bg-page"
+                >
+                  <Icon name="open" size={12} tone="muted" />
+                </View>
+              </View>
+            </View>
+          );
+        }}
+      </Each>
     </View>
   );
 }

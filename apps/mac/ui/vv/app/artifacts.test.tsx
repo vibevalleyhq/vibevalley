@@ -32,10 +32,10 @@ test("the list: delivered, then the user's own; the first one opens; the search 
   expect(app.count("id:artifact-row-art-plan")).toBe(0);
 });
 
-test("a blocks one: by whom, its issue, the rail with nowhere to reply; the rail shuts", async () => {
+test("a blocks one: by whom, its issue, the embedded channel rail; the rail shuts", async () => {
   const { app } = await start("/artifacts/art-mine");
   await app.waitUntil(() => app.count("id:artifact-block") === 3);
-  expect(app.count("id:artifact-unsaid")).toBe(1);
+  expect(app.count("id:artifact-chat-pane")).toBe(1);
   await app.press("id:artifact-rail-toggle");
   expect(app.count("id:artifact-rail")).toBe(0);
   const plan = await start("/artifacts/art-plan");
@@ -50,11 +50,11 @@ test("an html one: its frame, its versions, an older one picked, a reply under i
   expect(app.count("id:artifact-version-2")).toBe(1);
   await app.press("id:artifact-version-1");
   await fake.pump(app);
-  expect(app.texts().join(" ")).toContain("第一版");
+  expect(app.texts().join(" ")).toContain("第 1 稿");
   const asked = fake.calls.filter((c) => c.op === "artifact.content.get").map((c) => (c.payload as { version: number }).version);
   expect(asked).toContain(1);
-  await app.type("id:artifact-reply", "第二步再细一点");
-  await app.press("id:artifact-send");
+  await app.type("id:composer-input", "第二步再细一点");
+  await app.press("id:send");
   await fake.pump(app);
   const sent = fake.calls.find((c) => c.op === "channel.message.send")?.payload as { id: string; text: string; replyTo?: number };
   expect(sent.id).toBe("general");

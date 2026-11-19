@@ -16,7 +16,7 @@ export const IssueStatus = z.enum(T.IssueStatusValues) satisfies Codec<T.IssueSt
 
 const PullRequestState = z.enum(T.PullRequestStateValues) satisfies Codec<T.PullRequestState>;
 
-export const PullRequest = z.object({
+const PullRequest = z.object({
   url: z.string(),
   number: z.number(),
   state: PullRequestState,

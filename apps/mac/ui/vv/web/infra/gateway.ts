@@ -4,9 +4,9 @@
 // each event still decoded with rpc.ts's Schema. A refusal or a broken
 // stream ends it; one the transport could not open at all is asked for again
 // after reconnectDelayMs, as there. The fetcher parameter is gone (no HTTP).
-import type { z } from "zod";
+import { z } from "zod";
 
-import type { ArtifactEvent, ChannelEvent, SuggestionEvent } from "@vibevalley/protocol";
+import type { ArtifactEntryEvent, ArtifactEvent, ChannelEvent, SuggestionEvent } from "@vibevalley/protocol";
 import { type SubscriptionName, subscriptions } from "@vibevalley/protocol/rpc";
 
 import { transport } from "./transport";
@@ -69,6 +69,31 @@ export const followChannel = (id: string, after: number, on: (e: ChannelEvent) =
 export const followArtifact = (id: string, after: number, on: (e: ArtifactEvent) => void, ended: () => void) =>
   subscribe("artifact.follow", { id, after }, subscriptions["artifact.follow"].event, on, ended);
 
+/** A store artifact's entry changes after this seq, then each batch from now on. */
+export const followArtifactEntries = (id: string, after: number, on: (e: ArtifactEntryEvent) => void, ended?: () => void) =>
+  subscribe("artifact.entry.follow", { id, after }, subscriptions["artifact.entry.follow"].event, on, ended);
+
 /** An artifact's suggestions as they now are, then the whole list after each change. */
 export const followSuggestions = (id: string, on: (e: SuggestionEvent) => void, ended?: () => void) =>
   subscribe("artifact.suggestion.follow", { id }, subscriptions["artifact.suggestion.follow"].event, on, ended);
+
+const ArtifactPageSchema = z.object({
+  content: z.string(),
+  headers: z.record(z.string(), z.string()),
+});
+
+export interface ArtifactViewRequest {
+  readonly id: string;
+  readonly theme?: string;
+  readonly path?: string;
+  readonly elementId?: string;
+  readonly print?: boolean;
+  readonly origin?: string;
+}
+
+/** Fetches a store artifact's rendered HTML viewer document through the native `artifact.view` op. */
+export async function fetchArtifactView(input: ArtifactViewRequest): Promise<{ readonly content: string; readonly headers: Record<string, string> }> {
+  const envelope = await transport().call("artifact.view", input);
+  if (envelope.bizCode !== 0) throw new Error(envelope.message);
+  return ArtifactPageSchema.parse(envelope.data);
+}

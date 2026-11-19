@@ -29,7 +29,7 @@
 | 验收、打回意见、问题清理与验收标准自评（`checks`） | 信箱投递、三道刹车与唤醒调度（[帮工的信箱](docs/subsystems/session.md)） |
 | 一件活的路由（[蓄水池和路由](#蓄水池和路由)）：对工单说的话交给它的帮工（`Board::tell`）、派活的队列、每张工单的各轮 | 谁听见频道里的一句话、刹车（[观察层](docs/subsystems/watch.md)） |
 | 完成与交付：何时完成、按 `deliver` 走哪条路、子工单要过哪些检查；合并、子工单合入父分支，以及工单上记下的冲突与结局 | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
-| 定时任务（[定时任务](#定时任务)）：规格、到期、补跑与用户点头，每个定时任务固定一张工单 | 帮工的工作目录在谁手里、交接时怎么歇下和放走（[帮工](docs/subsystems/session.md)）；git 与 GitHub 的实现（[仓库](docs/subsystems/repo.md)） |
+| 定时任务（[定时任务](#定时任务)）：规格、到期、补跑与用户点头，每个定时任务固定一张工单 | 帮工的工作目录在谁手里、交接时怎么歇下和放走（[帮工](docs/subsystems/session.md)）；git 实现（[仓库](docs/subsystems/repo.md)）；分支发布与 PR 轮询（[PR 与分支发布](docs/subsystems/pull.md)） |
 
 ## 在哪
 
@@ -43,14 +43,14 @@
 | `crates/vibevalley-core/src/status.rs`、`moves.rs` | 状态派生、展示阶段与可执行动作；合法挪动（`status_move`） |
 | `crates/vibevalley-core/src/deps.rs`、`refine.rs`、`brief.rs`、`pr.rs` | 父子依赖与 DAG、子工单要过的检查；起草的提示与读回；对帮工说的话；PR 的纯规则 |
 | `crates/vibevalley-server/src/modules/issue/mod.rs` | `issue.*` 端点：解码入参、调 `Board`、带 `requestKey` 的幂等与拒绝的话 |
-| `crates/vibevalley-server/src/modules/cron.rs`、`crates/vibevalley-cron/src/lib.rs` | 定时任务：增删改与到期（存 `<家目录>/crons.json`）；时间规格与 `next_run` |
+| `crates/vibevalley-server/src/modules/cron/`、`crates/vibevalley-cron/src/lib.rs` | 定时任务：增删改与到期（`server.db` 的 `cron` 表，`issue_id references issue(id) on delete set null`，经 `Board::use_cron_of_issue` 投影）；时间规格与 `next_run` |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`issue.*`），CLI 命令为 `vibevalley issue ...`。
 
 ## 模型和不变量
 
 - **生命周期统一走 `setStatus` 状态机**：用户只能将工单移至 `backlog`、`todo`、`done`、`canceled`；`in_progress` 与 `in_review` 从在场会话实时派生。
-- **核心状态保留活跃与近期工单**：全量工单存 `issue` 表；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
+- **核心状态保留活跃与近期工单**：全量工单存 `issue` 表（`PutIssue` 使用 `ON CONFLICT(id) DO UPDATE` 避免清空 `cron`、`pull`、`artifact` 的 `ON DELETE SET NULL` 外键；`Issue.cron` 与 `Issue.pull_request` 由各自模块经 `Board::use_cron_of_issue`、`Board::use_pull_of_issue` 同步投影，不在 `issue` 表存冗余列）；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
 - **写操作收敛为「挪状态」与「说话」，建单与留言规则内聚在 `Issue`**：流转调 `issue.status.update`，评论调 `issue.comment.create`。`Board::create` 收拢仓库推导、父单继承与派发；端点和工具只做解码与格式化。
 - **看板挪一张工单只写一行**：`edit`（`issue/edits.rs`）在相邻两张未派发工单的 `rank` 之间取中值（排在两端时加减 1024），一次 `UPDATE`、一次发布；间距用完或超出 ±2,000,000,000 时才在一个事务里按 1024 的步长重排全部未派发工单。
 - **引用解析统一在服务内完成**：接口支持传入 `#41`、`41`、工单 UUID 或曾执行该工单的 `Session` ID。
@@ -58,7 +58,7 @@
 - **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，助手建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。
 - **单轮结局只认结构化 `issue_report`**：帮工通过 `issue_report` 提交状态、问题、`checks`、`answer`、记性与 `prSubmit`，不解析自由正文。
 - **执行情况与生命周期分开**：提问、失败、中断及未明确交回的休息会话保持 `in_progress`，`stage` 提供回答、重试、继续动作；有效交回且没有待答问题才进入 `in_review`。看板、详情与 CLI 都读取同一投影；CLI 的 `issue show --watch` 在提问或受阻阶段也返回，stderr 同时给出生命周期和阶段。
-- **PR 在途自动跟进与同轮评审归并（Rust 版还没有：PR 交付未做）**：当 PR 在途且无待答问题时，回合结束后会话进 `resting` 并释放槽位，工单保持 `in_progress` 等待 CI/评审；按 CI 指纹比对，收下过的评审和评论记在 `issue_github_event`，同一次 Review 及其附带的多条行内评论共享同一个 `botRoundKey`（只消耗一次 `maxBotReviewRounds` 额度）；仅 `prSubmit=false` 显式交接才进 `in_review`。
+- **PR 状态轮询与同轮评审归并**：由独立模块 `modules/pull` 承担（[PR 与分支发布](docs/subsystems/pull.md)），`pull` / `pull_event` 表记录开放 PR、CI 指纹与同轮机器人评审去重（`bot_round_key`）；状态变为 `merged` 或 `closed` 时通知 `Board::settle_pull` 结清工单。
 - **交付物类型 `deliver` 事先声明**：分 `change`（要求合入）、`pull_request`（提交 PR/MR 即交付）、`branch`（留分支）与只读调研 `answer`；`answer` 单将结论写入 `Issue.answer`，完成后重置 worktree 并记 `delivered: none`。
 - **原生父子工单与 DAG 依赖**：通过 `parent` 与 `blockedBy` 表达归属与前置依赖。子工单从父分支 `vibevalley/issue-<父编号>` 切出 worktree，完成后合入父分支。
 - **验收子工单先判红并冻结文件**：标记 `constraints.acceptance` 的子工单应先证明检查失败，合入父分支时将其改动文件记为 `frozen`；后继子工单不得修改冻结文件，且末端须通过全部祖先验收命令。
@@ -89,7 +89,7 @@
 4. **要求合入（`change`）**：
    - 普通工单提交剩余改动，按[本地合并](docs/subsystems/repo.md)交付。预检冲突时保存 `Issue.conflict` 并留在 `in_review`。候选检查失败时保留工单，按会话余量交回帮工修复。工单详情展开最近一次失败检查的命令、受检提交和输出。发生冲突时，用户可从详情或审查对话框打开该工单工作目录中的冲突文件。成功合入记 `merged`。
    - 子工单使用父分支和自身的验收命令，合入父分支记 `merged_into_parent`。
-5. **要求合入的 PR 轮询结清（Rust 版还没有）**：每 `github.pr_poll_seconds` 秒轮询开放 PR；合并后记 `delivered: pull_request` 并清理 worktree，关闭未合则记 `canceled: dismissed`。
+5. **要求合入的 PR 轮询结清**：`modules/pull` 每 `github.pr_poll_seconds` 秒轮询 `pull` 表中的开放 PR；合并或关闭时调用 `Board::settle_pull` 结清关联工单（[PR 与分支发布](docs/subsystems/pull.md)）。
 
 交付由 `Board` 在工单的锁里做：帮工在场时等它歇下，跑检查与合并，冲突和子工单冻结的文件直接写在工单上；失败时帮工留着，工单记下冲突、把要改的话带给帮工。子工单的检查由 `workplace/check.rs` 跑：验收子工单的检查要先失败、它改的文件冻结；其余的检查要过、冻结的文件不许动；然后合进父工单的分支。
 
@@ -97,11 +97,11 @@
 
 本地交付把检查回执先写入 SQLite，再推进 Git 引用。回执记录目标分支和提交、工单文件树、候选提交和文件树，以及检查是否配置、是否通过和失败输出。工单完成时保存最终提交。若 Git 已接受候选而进程在结算前中断，服务重开时核对目标分支是否包含候选提交，再确认源目录没有新增改动。两项吻合时，服务认领原提交并完成结算。
 
-**跟 PR**：Rust 版还没做（不轮询 PR、CI 与评审）。
+**跟 PR**：由独立模块 `modules/pull` 承担（`refresh`、`poll`、`snapshot`，见[PR 与分支发布](docs/subsystems/pull.md)）。
 
 ### 蓄水池和路由
 
-Rust 版没有 TS 版的蓄水池（`issue_input`）、订阅与触发表：观察层算好听众后经 `Board::tell` 把话直接交给工单的帮工，帮工在干活就插进这一轮，歇着就开下一轮；工单在排队时话随它一起交出。定时任务到期时由 `cron.rs` 准备它固定的那张工单并 `tell`。
+Rust 版没有 TS 版的蓄水池（`issue_input`）、订阅与触发表：观察层算好听众后经 `Board::tell` 把话直接交给工单的帮工，帮工在干活就插进这一轮，歇着就开下一轮；工单在排队时话随它一起交出。定时任务到期时由 `modules/cron` 准备它固定的那张工单并 `tell`。
 
 ### 详情与讨论
 
@@ -140,7 +140,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 定时任务
 
-定时任务（`Cron`，存在 `<家目录>/crons.json`）是工单的时间触发器：每次到期，更新运行时间，随后准备它固定的那张工单（最近建的那张，或重开，或新建），交给帮工，或在它的频道交给助手。接口见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放），服务端在 `crates/vibevalley-server/src/modules/cron.rs`，时间规则在 `vibevalley-cron`。
+定时任务（`Cron`，存在 `server.db` 的 `cron` 表，`issue_id references issue(id) on delete set null` 并建 `cron_by_issue` 索引，经 `Board::use_cron_of_issue` 投影到 `Issue.cron`）是工单的时间触发器：每次到期，更新运行时间，随后准备它固定的那张工单（最近建的那张，或重开，或新建），交给帮工，或在它的频道交给助手。接口见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放），服务端在 `crates/vibevalley-server/src/modules/cron/`（`mod.rs`、`db.rs`、`sql/schema.sql`），时间规则在 `vibevalley-cron`。
 
 - **五种时间规格（`CronWhen`）**：`once`、`every`、`daily`、`weekly` 与五段式 `cron`（`once` 跑完自动关闭）；每项携带 IANA 时区或偏移量，缺省取本机时区；8 年内无合法触发时刻的表达式（如 2 月 30 日）直接拒绝。
 - **下次运行时间不落库，实时从 `last_run` 推导**：`nextRun` 计算严格晚于 `last_run`（未运行过则取创建时间）的下一个匹配分钟；夏令时跳过的时刻顺延，重复的时刻取第一次；重新开启已关闭的周期任务时将 `last_run` 设为当前时间，不补跑关闭期间的时刻。

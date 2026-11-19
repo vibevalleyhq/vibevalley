@@ -12,6 +12,7 @@
   "rail": {
     "where": "来路",
     "kind": "种类",
+    "artifacts": "作品交付",
     "channels": "来自频道",
     "agents": "来自帮工",
     "anyWhere": "全部来路",
@@ -30,6 +31,15 @@
     "video": "视频",
     "other": "其它"
   },
+  "artifactKind": {
+    "all": "全部作品",
+    "canvas": "视觉画板 (.visual.html)",
+    "slides": "幻灯片 (.slide.html)",
+    "dashboard": "仪表盘 (.dashboard.html)",
+    "whiteboard": "白板 (.whiteboard)",
+    "page": "网页与文档"
+  },
+  "newArtifact": "新建作品",
   "search": "搜索名字",
   "sortLabel": "排序",
   "sort": {
@@ -62,6 +72,9 @@
     "from": "来路",
     "added": "加入",
     "openChannel": "去 {channel} 看",
+    "openWorkbench": "打开工作台",
+    "versionBadge": "第 {version} 稿",
+    "byMaker": "作者：{name}",
     "selected": "已选 {n} 个",
     "clear": "不选了",
     "more": "更多"

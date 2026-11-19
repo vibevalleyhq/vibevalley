@@ -570,10 +570,7 @@ fn submit(f: &Farm, who: &Who, summary: Option<&str>) -> Result<String, String> 
         body,
         dry_run: None,
     };
-    let data = f.publisher.submit(&req).map_err(|e| e.message)?;
-    if let Some(pr) = crate::modules::publish::pull_request_of(&data) {
-        f.board.record_pull_request(&issue.id, pr).map_err(|e| e.to_string())?;
-    }
+    let data = f.pulls.publish(&req, Some(&issue.id)).map_err(|e| e.message)?;
     Ok(data.url.unwrap_or(data.branch))
 }
 

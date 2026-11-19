@@ -1359,6 +1359,51 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("ArtifactMarkdown"),
     },
     Endpoint {
+        op: "artifact.type.list",
+        module: "artifact",
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: None,
+        result: Some("Vec<ArtifactTypeInfo>"),
+    },
+    Endpoint {
+        op: "artifact.type.read",
+        module: "artifact",
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("ArtifactTypeReadRequest"),
+        result: Some("ArtifactTypeGuide"),
+    },
+    Endpoint {
+        op: "artifact.entry.list",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("ArtifactEntryListRequest"),
+        result: Some("ArtifactEntrySnapshot"),
+    },
+    Endpoint {
+        op: "artifact.entry.get",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("ArtifactEntryGetRequest"),
+        result: Some("ArtifactEntry"),
+    },
+    Endpoint {
+        op: "artifact.entry.batch",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("ArtifactEntryBatchRequest"),
+        result: Some("ArtifactEntryBatchResult"),
+    },
+    Endpoint {
         op: "artifact.demo",
         module: "artifact",
         about: &["id"],
@@ -2649,6 +2694,41 @@ pub mod ops {
         type Input = t::ArtifactMarkdownGetInput;
         type Result = t::ArtifactMarkdown;
     }
+    /// All structured artifact types and the farm's standing default design-system if any.
+    pub struct ArtifactTypeList;
+    impl Op for ArtifactTypeList {
+        const NAME: &'static str = "artifact.type.list";
+        type Input = ();
+        type Result = Vec<t::ArtifactTypeInfo>;
+    }
+    /// A structured artifact type's SKILL.md guide or one of its named reference chapters.
+    pub struct ArtifactTypeRead;
+    impl Op for ArtifactTypeRead {
+        const NAME: &'static str = "artifact.type.read";
+        type Input = t::ArtifactTypeReadRequest;
+        type Result = t::ArtifactTypeGuide;
+    }
+    /// A store artifact's entries (filtered by path prefix when given), with values when requested.
+    pub struct ArtifactEntryList;
+    impl Op for ArtifactEntryList {
+        const NAME: &'static str = "artifact.entry.list";
+        type Input = t::ArtifactEntryListRequest;
+        type Result = t::ArtifactEntrySnapshot;
+    }
+    /// One store entry with its value and revision.
+    pub struct ArtifactEntryGet;
+    impl Op for ArtifactEntryGet {
+        const NAME: &'static str = "artifact.entry.get";
+        type Input = t::ArtifactEntryGetRequest;
+        type Result = t::ArtifactEntry;
+    }
+    /// An atomic batch of set, patch, delete or copy writes on a store artifact with per-entry optimistic concurrency.
+    pub struct ArtifactEntryBatch;
+    impl Op for ArtifactEntryBatch {
+        const NAME: &'static str = "artifact.entry.batch";
+        type Input = t::ArtifactEntryBatchRequest;
+        type Result = t::ArtifactEntryBatchResult;
+    }
     /// Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
     /// one already running is refused.
     pub struct ArtifactDemo;
@@ -2908,6 +2988,12 @@ pub mod subscriptions {
         const NAME: &'static str = "artifact.follow";
         type Payload = t::ArtifactFollowPayload;
         type Event = t::ArtifactEvent;
+    }
+    pub struct ArtifactEntryFollow;
+    impl Subscription for ArtifactEntryFollow {
+        const NAME: &'static str = "artifact.entry.follow";
+        type Payload = t::ArtifactFollowPayload;
+        type Event = t::ArtifactEntryEvent;
     }
     pub struct ArtifactSuggestionFollow;
     impl Subscription for ArtifactSuggestionFollow {
