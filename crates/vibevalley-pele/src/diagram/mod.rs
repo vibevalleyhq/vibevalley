@@ -1,7 +1,11 @@
+pub mod architecture;
 pub mod common;
 pub mod flowchart;
 pub mod pie;
+pub mod requirement;
 pub mod sequence;
+pub mod swimlane;
+pub mod usecase;
 
 use std::collections::HashMap;
 
@@ -44,6 +48,10 @@ pub enum ParsedModel {
     Flowchart(flowchart::FlowDb),
     Sequence(sequence::SeqDb),
     Pie(pie::PieModel),
+    Requirement(requirement::RequirementDb),
+    Usecase(usecase::UsecaseModel),
+    Architecture(architecture::ArchitectureDb),
+    Swimlane(flowchart::FlowDb),
 }
 
 impl ParsedModel {
@@ -52,6 +60,10 @@ impl ParsedModel {
             Self::Flowchart(_) => DiagramType::Flowchart,
             Self::Sequence(_) => DiagramType::Sequence,
             Self::Pie(_) => DiagramType::Pie,
+            Self::Requirement(_) => DiagramType::Requirement,
+            Self::Usecase(_) => DiagramType::Usecase,
+            Self::Architecture(_) => DiagramType::Architecture,
+            Self::Swimlane(_) => DiagramType::Swimlane,
         }
     }
 
@@ -60,6 +72,10 @@ impl ParsedModel {
             Self::Flowchart(db) => flowchart::render_flowchart(db, ctx, None),
             Self::Sequence(db) => sequence::render_sequence(db, ctx),
             Self::Pie(model) => pie::render::render_pie(model, ctx),
+            Self::Requirement(db) => requirement::render_requirement(db, ctx),
+            Self::Usecase(model) => usecase::render_usecase(model, ctx),
+            Self::Architecture(db) => architecture::render_architecture(db, ctx),
+            Self::Swimlane(db) => swimlane::render_swimlane(db, ctx),
         }
     }
 }
@@ -113,6 +129,10 @@ impl Registry {
         reg.register(Box::new(flowchart::FlowchartDiagram));
         reg.register(Box::new(sequence::SequenceDiagram));
         reg.register(Box::new(pie::PieDiagram));
+        reg.register(Box::new(requirement::RequirementDiagram));
+        reg.register(Box::new(usecase::UsecaseDiagram));
+        reg.register(Box::new(architecture::ArchitectureDiagram));
+        reg.register(Box::new(swimlane::SwimlaneDiagram));
         reg
     }
 
