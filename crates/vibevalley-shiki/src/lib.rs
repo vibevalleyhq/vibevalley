@@ -1,8 +1,8 @@
 //! Pure-Rust TextMate grammar (`vscode-textmate`) and Shiki syntax highlighting engine.
 //!
 //! Built completely in pure Rust with no JavaScript/WASM runtime and no C FFI.
-//! Pluggable over any [`RegexEngine`] implementation (aligned 1:1 with `vibevalley-onig`,
-//! with a built-in pure-Rust [`FancyRegexEngine`] fallback).
+//! Powered by [`OnigEngine`] (`vibevalley-onig`) by default and pluggable over any
+//! [`RegexEngine`] implementation.
 
 pub mod encoded_attrs;
 pub mod error;
@@ -31,7 +31,10 @@ pub use highlighter::{
 };
 pub use matcher::{InjectionPriority, MatcherWithPriority, SelectorExpr, create_matchers, name_matcher};
 pub use raw_grammar::{RawGrammar, RawRule, parse_grammar_json, parse_grammar_plist, parse_raw_grammar};
-pub use regex_engine::{CaptureIndex, FancyRegexEngine, FancyRegexScanner, FindOption, RegexEngine, RegexScanner, RegexString, ScannerMatch};
+pub use regex_engine::{
+    CaptureIndex, FindOption, OnigEngine, OnigScanner, OnigScannerAdapter, OnigString, RegexEngine, RegexScanner, RegexString, ScannerCache, ScannerConfig,
+    ScannerMatch,
+};
 pub use registry::{FnGrammarLoader, GrammarLoader, Registry};
 pub use rule::{MatchTarget, RuleId};
 pub use theme::{

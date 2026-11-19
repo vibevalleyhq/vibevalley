@@ -5,7 +5,7 @@ use crate::error::ShikiError;
 use crate::grammar::dependencies::ScopeDependencyProcessor;
 use crate::grammar::{EmbeddedLanguagesMap, Grammar, GrammarConfiguration};
 use crate::raw_grammar::RawGrammar;
-use crate::regex_engine::{FancyRegexEngine, RegexEngine};
+use crate::regex_engine::{OnigEngine, RegexEngine};
 use crate::theme::{RawTheme, Theme};
 
 /// Optional loader callback used by [`Registry`] to fetch external grammars on demand.
@@ -41,7 +41,7 @@ where
 }
 
 /// TextMate grammar registry managing raw grammars, external includes, injections, and active theme.
-pub struct Registry<E: RegexEngine = FancyRegexEngine> {
+pub struct Registry<E: RegexEngine = OnigEngine> {
     engine: Arc<E>,
     theme: Arc<RwLock<Arc<Theme>>>,
     raw_grammars: BTreeMap<String, RawGrammar>,
@@ -50,10 +50,10 @@ pub struct Registry<E: RegexEngine = FancyRegexEngine> {
     loader: Option<Box<dyn GrammarLoader>>,
 }
 
-impl Registry<FancyRegexEngine> {
-    /// Creates a registry backed by the built-in pure-Rust `FancyRegexEngine`.
+impl Registry<OnigEngine> {
+    /// Creates a registry backed by the built-in pure-Rust `vibevalley-onig` engine.
     pub fn with_default_engine() -> Self {
-        Self::new(FancyRegexEngine)
+        Self::new(OnigEngine::default())
     }
 }
 

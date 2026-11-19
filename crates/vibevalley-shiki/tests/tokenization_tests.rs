@@ -133,47 +133,23 @@ fn run_suite_test(base_dir: &Path, case: &RawSuiteTest) -> Result<(), String> {
     Ok(())
 }
 
-/// Runs 63 of the 64 upstream `microsoft/vscode-textmate/test-cases/first-mate/tests.json`
-/// suites with the built-in `FancyRegexEngine` fallback.
-///
-/// The single remaining case (`TEST #73`, Thrift) is tracked explicitly in
-/// `upstream_first_mate_test_73_thrift_pending_vibevalley_onig` below.
+/// Runs all 64 upstream `microsoft/vscode-textmate/test-cases/first-mate/tests.json`
+/// suites (including `TEST #73` Thrift recursive `\g<ft>` subroutines) on `vibevalley-onig`.
 #[test]
-fn upstream_first_mate_suite_63_of_64() {
+fn upstream_first_mate_all_64_tests() {
     let (base_dir, cases) = load_suite("first-mate/tests.json");
     assert_eq!(cases.len(), 64, "upstream first-mate suite has 64 cases");
 
     let mut passed = 0usize;
     let mut failures = Vec::new();
     for case in &cases {
-        if case.desc == "TEST #73" {
-            continue;
-        }
         match run_suite_test(&base_dir, case) {
             Ok(()) => passed += 1,
             Err(err) => failures.push((case.desc.clone(), err)),
         }
     }
-    assert!(failures.is_empty(), "first-mate had {} unexpected failures: {failures:#?}", failures.len());
-    assert_eq!(passed, 63);
-}
-
-/// Verifies that Thrift's 4-way recursive `\g<ft>` subroutine fails fast with a clean
-/// `RegexError::Compile` under `FancyRegexEngine` rather than hanging.
-#[test]
-fn upstream_first_mate_test_73_fails_fast_under_fancy_regex() {
-    let (base_dir, cases) = load_suite("first-mate/tests.json");
-    let test_73 = cases.iter().find(|c| c.desc == "TEST #73").expect("TEST #73 exists");
-    let err = run_suite_test(&base_dir, test_73).expect_err("fancy-regex exceeds max_prog_size on Thrift");
-    assert!(err.contains("max_prog_size"), "expected bounded compile error, got: {err}");
-}
-
-#[test]
-#[ignore = "pending vibevalley-onig integration: Thrift uses 4-way recursive \\g<ft> subroutine exceeding fancy-regex compile-time inlining"]
-fn upstream_first_mate_test_73_thrift_pending_vibevalley_onig() {
-    let (base_dir, cases) = load_suite("first-mate/tests.json");
-    let test_73 = cases.iter().find(|c| c.desc == "TEST #73").expect("TEST #73 exists");
-    run_suite_test(&base_dir, test_73).expect("TEST #73 should pass with vibevalley-onig");
+    assert!(failures.is_empty(), "first-mate had {} failures out of 64: {failures:#?}", failures.len());
+    assert_eq!(passed, 64);
 }
 
 /// All 22 upstream `microsoft/vscode-textmate/test-cases/suite1/tests.json` suites.

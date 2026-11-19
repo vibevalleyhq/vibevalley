@@ -10,7 +10,7 @@ use crate::encoded_attrs::{EncodedTokenAttributes, FontStyle, OptionalStandardTo
 use crate::error::ShikiError;
 use crate::grammar::{Grammar, StateStack};
 use crate::raw_grammar::{RawGrammar, parse_grammar_json, parse_grammar_plist};
-use crate::regex_engine::{FancyRegexEngine, RegexEngine};
+use crate::regex_engine::{OnigEngine, RegexEngine};
 use crate::registry::Registry;
 use crate::theme::{
     RawTheme, RawThemeSetting, ResolvedTheme, Rgba, ScopePatternList, ScopeStack, Theme, load_theme_from_file, normalize_theme, parse_theme_json,
@@ -432,7 +432,7 @@ struct LoadedLanguage<E: RegexEngine> {
 
 /// High-level Shiki highlighting engine supporting multiple grammars, themes, aliases,
 /// injections, dual/multi-theme CSS variables, GPUI spans, HTML, and SVG output.
-pub struct Highlighter<E: RegexEngine = FancyRegexEngine> {
+pub struct Highlighter<E: RegexEngine = OnigEngine> {
     registry: Registry<E>,
     languages: BTreeMap<String, LoadedLanguage<E>>,
     lang_aliases: BTreeMap<String, String>,
@@ -441,10 +441,10 @@ pub struct Highlighter<E: RegexEngine = FancyRegexEngine> {
     theme_order: Vec<String>,
 }
 
-impl Highlighter<FancyRegexEngine> {
-    /// Creates a highlighter backed by the built-in pure-Rust `FancyRegexEngine`.
+impl Highlighter<OnigEngine> {
+    /// Creates a highlighter backed by the built-in pure-Rust `vibevalley-onig` engine.
     pub fn with_default_engine() -> Self {
-        Self::new(FancyRegexEngine)
+        Self::new(OnigEngine::default())
     }
 }
 
