@@ -15,10 +15,11 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 | 文档 | 内容 |
 |---|---|
-| [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、完成与 PR 跟进、定时任务 |
+| [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、完成与交付、定时任务 |
+| [pull.md](docs/subsystems/pull.md) | PR 与分支发布：分支预检与推送、GitHub PR / GitLab.com MR、状态轮询、CI/评审去重与 `vv://github/...` 快照 |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、工作目录、经 oar 开会话、`/mcp`、规矩和汇报、轨迹、额度和上限 |
-| [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、GitHub 检测与 PR 快照、地契 |
-| [artifact.md](docs/subsystems/artifact.md) | Artifact：用户和帮工一起写的块、交上来的网页；按块存按 op 改，网页按版本存、隔离着看，带卡片说出来 |
+| [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、本地合并、GitHub 检测、提交统计 |
+| [artifact.md](docs/subsystems/artifact.md) | Artifact：结构化多条目作品（`store`，七种 `ArtifactType`）、协作块文档（`blocks`）与单页网页（`html`）；乐观并发、双语指南、沙箱预览与 `/library` 统一交付物 |
 | [pkm.md](docs/subsystems/pkm.md) | 笔记：用户的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、消息和事件、工单串 |
 | [watch.md](docs/subsystems/watch.md) | 观察层：按游标读频道的事件、谁听见、刹车、帮工的串和回执；收件箱：要你处理的事、刚来的、巡查 |
@@ -71,7 +72,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 档案 | profile | agent（`Agent`） | 帮工档案、角色（指档案时） |
 | 农机 | machine | runtime（`RuntimeInfo`） | harness、引擎、runtime（中文界面） |
 | 工单 | ticket | issue（`Issue`） | job、ticket |
-| Artifact | artifact | artifact（`Artifact`，正文 `blocks` 或 `html`） | 稿子、草稿（指 Artifact 时）、产出、文档（指 Artifact 时）、doc（指 Artifact 时） |
+| Artifact | artifact | artifact（`Artifact`，正文 `blocks`、`store` 或 `html`） | 稿子、草稿（指 Artifact 时）、产出、文档（指 Artifact 时）、doc（指 Artifact 时） |
 | 笔记 | notes | pkm（`Pkm`，一页 `PkmPage`，一块 `PkmBlock`） |  |
 | 仓库 | repo | repo（`RepoSummary`） | 一块地 |
 | 空间 | space | `SpaceState`；目录是 `work_root`（`VIBEVALLEY_WORK_ROOT`） | 世界、全图 |
