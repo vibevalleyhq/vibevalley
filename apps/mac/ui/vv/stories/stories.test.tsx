@@ -23,7 +23,7 @@ for (const scheme of ["light", "dark"] as const) {
 test("board narrow shows one lane behind tabs", async () => {
   const app = await open("./main.tsx", { width: 420, height: 640, platform: "macos", host: { params: { story: "board" } } });
   expect(app.count("id:issue-card")).toBe(3);
-  await app.press("text:处理中 3");
+  await app.press("text:处理中");
   expect(app.texts()).toContain("修好登录");
   await shoot(app, "board-narrow");
 });

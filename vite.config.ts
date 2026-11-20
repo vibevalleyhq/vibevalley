@@ -53,7 +53,7 @@ export default defineConfig({
       "sql:check": { command: "sqlc diff && python3 scripts/release/verify-native-schema.py --queries-only", cache: false },
       "mac:check": {
         command:
-          "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build && ../../../.tools/bin/nsh test vv/app/issues.test.tsx",
+          "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build && cd ../../.. && vpx scripts/audit/mac-tests.ts",
         cache: false,
       },
       "release:verify": {

@@ -1,0 +1,172 @@
+{
+  "seq": 1,
+  "state": {
+    "call": "idle",
+    "callReason": "",
+    "media": [],
+    "chat": {
+      "channels": [
+        {
+          "id": "general",
+          "type": "channel",
+          "default": true,
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "general",
+          "description": "",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "general",
+          "at": 1795194443624
+        }
+      ],
+      "userMentions": []
+    },
+    "issues": [],
+    "connectors": [],
+    "machines": [],
+    "sessions": [],
+    "crons": []
+  },
+  "inbox": [],
+  "view": {
+    "level": {
+      "level": 1,
+      "xp": 0,
+      "need": 10
+    },
+    "plots": {},
+    "plays": {},
+    "achievements": [
+      {
+        "id": "s_open",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_hire",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_tell",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_review",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_voice",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_split",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_call",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "harvests",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "first_try",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "big_graph",
+        "tier": 0,
+        "count": 0,
+        "next": 3
+      },
+      {
+        "id": "farm_level",
+        "tier": 0,
+        "count": 0,
+        "next": 5
+      },
+      {
+        "id": "steady",
+        "tier": 0,
+        "count": 0,
+        "next": 5
+      },
+      {
+        "id": "untangle",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "comeback",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "thrifty",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "every_machine",
+        "tier": 0,
+        "count": 0,
+        "next": 2
+      },
+      {
+        "id": "handoff",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "parallel_graph",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "night_owl",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "weekend",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "full_house",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      }
+    ]
+  },
+  "effects": []
+}

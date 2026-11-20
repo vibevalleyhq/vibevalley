@@ -63,7 +63,7 @@ test("an html one: its frame, its versions, an older one picked, a reply under i
 });
 
 test("new makes an untitled blocks one; delete asks first", async () => {
-  const { app, fake } = await start("/artifacts/art-mine");
+  const { app, fake } = await start("/artifacts");
   await app.press("id:new-artifact");
   await fake.pump(app);
   expect(ops(fake)).toContain("artifact.create");

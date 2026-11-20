@@ -105,7 +105,7 @@ test("a suggested rewrite accepted", async () => {
 
 test("the quick switcher finds a note by its title and offers to search the notes", async () => {
   const { app, fake } = await start("/pkm");
-  await app.keyboard.press("mod+k");
+  await app.keyboard.press("mod+j");
   await fake.pump(app);
   await app.type("id:switcher-input", "健康");
   await app.waitUntil(() => app.texts().some((s) => s.includes("健康")));

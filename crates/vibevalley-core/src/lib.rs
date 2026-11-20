@@ -21,6 +21,7 @@ pub mod progress;
 pub mod prompts;
 pub mod refine;
 pub mod rules;
+pub mod scenario;
 pub mod status;
 pub mod text;
 
