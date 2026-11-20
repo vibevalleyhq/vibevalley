@@ -3,7 +3,7 @@
 // rail filters, cross-filtered counts, search, sort, tile size presets, Picker
 // upload & FileDrop (auto-creating artifacts for compound suffixes), Lightbox,
 // Inspector (with host.saveFile), "New deliverable" type menu, and generation dialogs.
-import { effect, keymap, Picker, Scroll, signal, Text, View, windowSize } from "nsh";
+import { effect, keymap, Picker, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
 import { Input } from "nsh/base";
 
 import { inferArtifactFromName } from "@vibevalley/artifact/html";
@@ -37,22 +37,33 @@ import { artifactTypeIcon, createTypedArtifact, useArtifacts } from "../artifact
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
 import { Inspector } from "./Inspector";
+import { artifactCountsOf, countsOf, justify, kindOf, making, type Names, neighbor, shown, shownArtifacts, understoodText, type Where } from "./items";
 import {
-  artifactCountsOf,
-  type ArtifactKindFilter,
-  between,
-  countsOf,
-  justify,
-  type KindFilter,
-  kindOf,
-  making,
-  type Names,
-  neighbor,
-  shown,
-  shownArtifacts,
-  understoodText,
-  type Where,
-} from "./items";
+  activeFileId,
+  askRemove,
+  cancelRemove,
+  clearSelection,
+  closeLightbox,
+  initialLibraryScope,
+  initialLibrarySelection,
+  isAskingRemove,
+  type LibraryScope,
+  type LibrarySelection,
+  lightboxIndex,
+  openLightbox,
+  pickArtifact as selectArtifact,
+  pickFile,
+  reconcileSelection,
+  scopeArtifactKind,
+  scopeForArtifactKind,
+  scopeForKind,
+  scopeKindFilter,
+  selectedArtifactId,
+  selectedFileIds,
+  selectScope,
+  showsArtifactsInScope,
+  showsMediaInScope,
+} from "./libraryView";
 import { libraryQuery } from "./listing";
 import { publicationKey } from "./publication";
 import { Rail } from "./Rail";
@@ -87,44 +98,56 @@ export function LibraryPage() {
   const items = useQuery(() => libraryQuery({ text: typed().trim(), sort: sort() }), { interval: () => 10_000, keepPrevious: true });
   const artifactsQuery = useArtifacts(() => ({}));
   const where = signal<Where>({ by: "all" });
-  const kind = signal<KindFilter>("all");
-  const artifactKind = signal<ArtifactKindFilter | undefined>(undefined);
-  const picked = signal<readonly string[]>([]);
-  const pickedArtifact = signal<string | undefined>(undefined);
-  const anchor = signal<string | undefined>(undefined);
-  const asking = signal(false);
-  const looking = signal<number | undefined>(undefined);
+  const scope = signal<LibraryScope>(initialLibraryScope);
+  const selection = signal<LibrarySelection>(initialLibrarySelection);
   const dragging = signal(false);
   const seen = signal<ReadonlyMap<string, Seen>>(new Map());
   const act = createAct();
+
+  const applyScope = (nextScope: LibraryScope) => {
+    const next = selectScope({ scope: untracked(scope), selection: untracked(selection) }, nextScope);
+    scope.set(next.scope);
+    selection.set(next.selection);
+  };
 
   const tile = () => Math.min(tileMax, Math.max(tileMin, prefsNow().libraryTile));
   const all = (): readonly LibraryItem[] => ready(items, undefined) ?? [];
   const allArtifacts = (): readonly Artifact[] => ready(artifactsQuery, undefined) ?? [];
   const jobs = (): readonly MediaJob[] => core()?.media ?? [];
   const working = () => making(jobs());
-  const list = createMemo(() => (artifactKind() !== undefined ? [] : shown({ items: all(), where: where(), kind: kind() })));
-  const visibleArtifacts = createMemo(() =>
-    artifactKind() === undefined && kind() !== "all"
-      ? []
-      : shownArtifacts(allArtifacts(), { where: where(), artifactKind: artifactKind(), search: typed().trim(), sort: sort() }),
-  );
+  const list = createMemo(() => {
+    const current = scope();
+    return showsMediaInScope(current) ? shown({ items: all(), where: where(), kind: scopeKindFilter(current) }) : [];
+  });
+  const visibleArtifacts = createMemo(() => {
+    const current = scope();
+    return showsArtifactsInScope(current)
+      ? shownArtifacts(allArtifacts(), { where: where(), artifactKind: scopeArtifactKind(current), search: typed().trim(), sort: sort() })
+      : [];
+  });
   const ids = createMemo(() => list().map((item) => item.attachment.id));
+  const imageItems = createMemo(() => list().filter((item) => kindOf(item.attachment.type) === "image"));
   const counts = createMemo(() =>
     countsOf({
       items: all(),
       artifacts: allArtifacts(),
       where: where(),
-      kind: kind(),
-      artifactKind: artifactKind(),
+      kind: scopeKindFilter(scope()),
+      artifactKind: scopeArtifactKind(scope()),
       search: typed().trim(),
     }),
   );
   const artifactCounts = createMemo(() => artifactCountsOf(allArtifacts(), { where: where(), search: typed().trim() }));
 
+  const picked = () => selectedFileIds(selection());
+  const pickedArtifact = () => selectedArtifactId(selection());
+  const active = () => activeFileId(selection());
+  const looking = () => lightboxIndex(selection());
+  const asking = () => isAskingRemove(selection());
+
   const chosen = createMemo(() => {
-    const on = picked();
-    return all().filter((item) => on.includes(item.attachment.id));
+    const on = new Set(picked());
+    return all().filter((item) => on.has(item.attachment.id));
   });
   const chosenArtifact = createMemo(() => {
     const id = pickedArtifact();
@@ -149,8 +172,6 @@ export function LibraryPage() {
     });
   });
 
-  const active = () => anchor() ?? picked().at(-1);
-
   const names: Names = {
     agent: (id) => (ready(agents, undefined) ?? []).find((a) => a.id === id)?.name ?? id,
     channel: (id) => {
@@ -167,21 +188,12 @@ export function LibraryPage() {
   });
 
   effect(() => {
-    const now = ids();
-    const cur = picked();
-    const kept = cur.filter((id) => now.includes(id));
-    if (kept.length !== cur.length) {
-      picked.set(kept);
-      asking.set(false);
-    }
-  });
-
-  effect(() => {
-    const id = pickedArtifact();
-    if (id !== undefined && !visibleArtifacts().some((a) => a.id === id)) {
-      pickedArtifact.set(undefined);
-      asking.set(false);
-    }
+    const next = reconcileSelection(untracked(selection), {
+      fileIds: ids(),
+      artifactIds: visibleArtifacts().map((a) => a.id),
+      imageCount: imageItems().length,
+    });
+    selection.set(next);
   });
 
   const make = (): Make | undefined => {
@@ -247,15 +259,11 @@ export function LibraryPage() {
           }
           if (lastArtifact !== undefined) {
             await queries.invalidate({ prefix: ["artifacts"] });
-            picked.set([]);
-            anchor.set(undefined);
-            pickedArtifact.set(lastArtifact.id);
+            selection.set(selectArtifact(lastArtifact.id));
           }
           if (lastMedia !== undefined) {
             void items.refetch();
-            pickedArtifact.set(undefined);
-            picked.set([lastMedia.attachment.id]);
-            anchor.set(lastMedia.attachment.id);
+            selection.set(pickFile(untracked(selection), lastMedia.attachment.id, { add: false, range: false }, ids()));
           }
         });
 
@@ -271,33 +279,19 @@ export function LibraryPage() {
   };
 
   const pick = (id: string, how: { readonly add: boolean; readonly range: boolean }) => {
-    asking.set(false);
-    pickedArtifact.set(undefined);
-    const from = anchor();
-    if (how.range && from !== undefined) picked.set(between({ ids: ids(), from, to: id }));
-    else if (how.add) {
-      const was = picked();
-      picked.set(was.includes(id) ? was.filter((x) => x !== id) : [...was, id]);
-      anchor.set(id);
-    } else {
-      picked.set([id]);
-      anchor.set(id);
-    }
+    selection.set(pickFile(untracked(selection), id, how, ids()));
   };
 
   const pickArtifact = (id: string) => {
-    asking.set(false);
-    picked.set([]);
-    anchor.set(undefined);
-    pickedArtifact.set(id);
+    selection.set(selectArtifact(id));
   };
 
   const openArtifact = (id: string) => router.navigate(`/artifacts/${encodeURIComponent(id)}`);
 
-  const imageItems = createMemo(() => list().filter((item) => kindOf(item.attachment.type) === "image"));
   const look = (id: string | undefined) => {
-    const at = imageItems().findIndex((p) => p.attachment.id === id);
-    if (at >= 0) looking.set(at);
+    const images = imageItems();
+    const at = images.findIndex((p) => p.attachment.id === id);
+    if (at >= 0) selection.set(openLightbox(untracked(selection), at, images.length));
   };
 
   const send = (channel: string) => {
@@ -315,9 +309,7 @@ export function LibraryPage() {
     const gone = picked();
     return act.run(() =>
       Promise.all(gone.map((id) => api.library.item.delete({ id }))).then(() => {
-        asking.set(false);
-        picked.set([]);
-        anchor.set(undefined);
+        selection.set(clearSelection());
         void items.refetch();
       }),
     );
@@ -327,8 +319,7 @@ export function LibraryPage() {
     const target = allArtifacts().find((a) => a.id === id);
     return act.run(async () => {
       await api.artifact.delete({ id: artifactId(id) });
-      asking.set(false);
-      pickedArtifact.set(undefined);
+      selection.set(clearSelection());
       if (target) toast(t("web.artifact.page.deleted", { title: target.title }));
       await queries.invalidate({ prefix: ["artifacts"] });
     });
@@ -353,18 +344,13 @@ export function LibraryPage() {
         if (at !== undefined) look(at);
       },
       backspace: () => {
-        if (inspectorOpen()) asking.set(true);
+        if (inspectorOpen()) selection.set(askRemove(untracked(selection)));
       },
       delete: () => {
-        if (inspectorOpen()) asking.set(true);
+        if (inspectorOpen()) selection.set(askRemove(untracked(selection)));
       },
       escape: () => {
-        if (inspectorOpen()) {
-          picked.set([]);
-          pickedArtifact.set(undefined);
-          anchor.set(undefined);
-          asking.set(false);
-        }
+        if (inspectorOpen()) selection.set(clearSelection());
       },
     },
     { when: "notEditing", passThrough: true },
@@ -388,21 +374,16 @@ export function LibraryPage() {
         counts={counts()}
         names={names}
         where={where()}
-        kind={kind()}
-        artifactKind={artifactKind()}
+        kind={scopeKindFilter(scope())}
+        artifactKind={scopeArtifactKind(scope())}
         artifactCounts={artifactCounts()}
         onWhere={(w) => {
           where.set(w);
-          asking.set(false);
+          selection.set(cancelRemove(untracked(selection)));
         }}
-        onKind={(k) => {
-          artifactKind.set(undefined);
-          kind.set(k);
-          asking.set(false);
-        }}
+        onKind={(k) => applyScope(scopeForKind(k))}
         onArtifactKind={(ak) => {
-          artifactKind.set(ak);
-          asking.set(false);
+          if (ak !== undefined) applyScope(scopeForArtifactKind(ak));
         }}
       />
       <View class="min-h-0 min-w-0 flex-1">
@@ -566,15 +547,10 @@ export function LibraryPage() {
                 send: (channel) => void send(channel),
                 understand: () => setSearch({ understand: chosen()[0]?.attachment.id }),
                 look: () => look(chosen()[0]?.attachment.id),
-                ask: () => asking.set(true),
+                ask: () => selection.set(askRemove(untracked(selection))),
                 remove: () => void remove(),
-                keep: () => asking.set(false),
-                clear: () => {
-                  picked.set([]);
-                  pickedArtifact.set(undefined);
-                  anchor.set(undefined);
-                  asking.set(false);
-                },
+                keep: () => selection.set(cancelRemove(untracked(selection))),
+                clear: () => selection.set(clearSelection()),
                 openArtifact,
                 removeArtifact: (id) => void removeArtifact(id),
               }}
@@ -593,7 +569,11 @@ export function LibraryPage() {
         </View>
       </If>
 
-      <LibraryLightbox items={imageItems()} at={looking()} onAt={(at) => looking.set(at)} />
+      <LibraryLightbox
+        items={imageItems()}
+        at={looking()}
+        onAt={(at) => selection.set(at === undefined ? closeLightbox(untracked(selection)) : openLightbox(untracked(selection), at, imageItems().length))}
+      />
 
       <Dialog open={make() !== undefined} onClose={() => setSearch({ make: undefined })} title={t("web.library.makeTitle")} wide testid="library-make-dialog">
         <Segmented

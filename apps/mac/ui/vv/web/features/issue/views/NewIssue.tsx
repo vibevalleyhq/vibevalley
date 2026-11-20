@@ -1,18 +1,19 @@
 // Ported from VibeValley apps/web/src/features/issue/views/NewIssue.tsx:
 // the sheet that writes a new issue from a few words. Command+Return keeps
 // it (a key binding while the sheet is up), as the form's submit did.
-import { cleanup, effect, keymap, signal, Text, View } from "nsh";
+import { cleanup, effect, keymap, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
 import { useWorkAgents } from "../../../infra/agents";
+import { newSendKey } from "../../../infra/api";
 import { ready, useRepos } from "../../../infra/query";
 import { prefsNow } from "../../../state/prefs";
 import { Button } from "../../../ui/Button";
 import { Dialog } from "../../../ui/Dialog";
 import { Select, TextArea } from "../../../ui/Field";
 import { toast } from "../../../ui/toasts";
-import { createWriteKey } from "../model/write";
+import { canSubmitDraft, type DraftSubmitEvent, type DraftSubmitState, draftSubmitTransition, initialDraftSubmit } from "../model/draftSubmit";
 
 /** The repo and helper the board is filtered to, or the list group it was opened in. */
 export interface NewIssueAt {
@@ -21,40 +22,62 @@ export interface NewIssueAt {
 }
 
 export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where: NewIssueAt, requestKey: string) => Promise<boolean>; onClose: () => void }) {
-  const text = signal("");
   const last = prefsNow();
-  const repo = signal(props.at.repo ?? last.repo);
-  const agent = signal(props.at.agent ?? (last.pick === "auto" ? "" : last.pick));
+  const flow = signal<DraftSubmitState>(
+    initialDraftSubmit({
+      text: "",
+      repo: props.at.repo ?? last.repo,
+      agent: props.at.agent ?? (last.pick === "auto" ? "" : last.pick),
+    }),
+  );
+  const dispatch = (event: DraftSubmitEvent): DraftSubmitState => {
+    const next = draftSubmitTransition(untracked(flow), event, newSendKey);
+    flow.set(next);
+    return next;
+  };
+  const draft = () => flow().draft;
   const agents = useWorkAgents(true);
   const repoList = useRepos();
   const repos = () => ready(repoList, []).map((p) => p.name);
-  const saving = signal(false);
-  const editing = signal(true);
-  const request = createWriteKey();
+  const textFocused = signal(true);
   let mounted = true;
   cleanup(() => {
     mounted = false;
   });
   const keep = async () => {
-    const words = text().trim();
-    if (!words || saving()) return;
-    const targetRepo = repo();
-    const targetAgent = agent();
-    saving.set(true);
+    if (!canSubmitDraft(untracked(flow))) return;
+    const started = dispatch({ kind: "submit" });
+    if (started.kind !== "submitting") return;
+    const { submitted, requestKey } = started;
+    let kept = false;
     try {
-      const key = request.for(words, targetAgent, targetRepo);
-      const kept = await props.onKeep(words, { ...(targetRepo ? { repo: targetRepo } : {}), ...(targetAgent ? { agent: targetAgent } : {}) }, key);
-      if (!kept || !mounted) return;
-      request.used();
-      if (text().trim() === words && repo() === targetRepo && agent() === targetAgent) props.onClose();
-      else toast(t("web.issue.new.editsKept"));
-    } finally {
-      if (mounted) saving.set(false);
+      kept = await props.onKeep(
+        submitted.words,
+        { ...(submitted.repo ? { repo: submitted.repo } : {}), ...(submitted.agent ? { agent: submitted.agent } : {}) },
+        requestKey,
+      );
+    } catch (error) {
+      if (mounted) dispatch({ kind: "rejected" });
+      throw error;
+    }
+    if (!mounted) return;
+    const settled = dispatch({ kind: kept ? "accepted" : "rejected" });
+    switch (settled.kind) {
+      case "committed":
+        props.onClose();
+        break;
+      case "retainedDirty":
+        toast(t("web.issue.new.editsKept"));
+        break;
+      case "editing":
+      case "submitting":
+      case "rejected":
+        break;
     }
   };
   keymap.bind("mod+enter", () => void keep(), { when: "always" });
   effect(() => {
-    if (editing()) return keymap.bind("escape", props.onClose, { when: "always" });
+    if (textFocused()) return keymap.bind("escape", props.onClose, { when: "always" });
   });
   return (
     <Dialog open onClose={props.onClose} title={t("web.issue.new.title")} testid="issue-new-dialog">
@@ -64,11 +87,11 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           accessibilityLabel={t("web.issue.new.words")}
           placeholder={t("web.issue.new.placeholder")}
           rows={4}
-          value={text()}
+          value={draft().text}
           autoFocus
-          onInput={text.set}
-          onFocus={() => editing.set(true)}
-          onBlur={() => editing.set(false)}
+          onInput={(text) => dispatch({ kind: "setText", text })}
+          onFocus={() => textFocused.set(true)}
+          onBlur={() => textFocused.set(false)}
         />
         <View class="flex-row flex-wrap items-center gap-2">
           <Select
@@ -76,19 +99,19 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
             size="control"
             label={t("web.issue.task.repo")}
             testid="issue-new-repo"
-            value={repo()}
+            value={draft().repo}
             placeholder={t("web.issue.todo.whichRepo")}
-            onChange={repo.set}
-            options={[...new Set([...repos(), ...(repo() ? [repo()] : [])])].map((p) => ({ value: p, label: p }))}
+            onChange={(repo) => dispatch({ kind: "setRepo", repo })}
+            options={[...new Set([...repos(), ...(draft().repo ? [draft().repo] : [])])].map((p) => ({ value: p, label: p }))}
           />
           <Select
             quiet
             size="control"
             label={t("web.issue.detail.helper")}
             testid="issue-new-helper"
-            value={agent()}
+            value={draft().agent}
             placeholder={t("web.issue.todo.pickForMe")}
-            onChange={agent.set}
+            onChange={(agent) => dispatch({ kind: "setAgent", agent })}
             options={agents().map((a) => ({ value: a.id, label: a.name }))}
           />
         </View>
@@ -97,7 +120,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           <Button tone="quiet" testID="issue-new-dialog-never" onPress={() => props.onClose()}>
             {t("web.base.form.never")}
           </Button>
-          <Button tone="primary" testID="issue-new-keep" disabled={!text().trim() || saving()} onPress={() => void keep()}>
+          <Button tone="primary" testID="issue-new-keep" disabled={!canSubmitDraft(flow())} onPress={() => void keep()}>
             {t("web.issue.new.keep")}
           </Button>
         </View>

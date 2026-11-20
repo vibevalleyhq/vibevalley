@@ -3,17 +3,19 @@
 // patch is nsh's DiffView (one column, + and - beside the lines, the code
 // coloured by the file's language) in place of Shiki in a web worker; a
 // patch DiffView cannot read (cut short) shows its lines tinted, uncoloured.
-import { Scroll, signal, Text, View } from "nsh";
+import { cleanup, effect, Scroll, signal, Text, untracked, View } from "nsh";
 import { DiffView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { ChangedFile, Changes, Issue, IssueAct, Session } from "@vibevalley/protocol";
+import { type ChangedFile, type Changes, type Issue, type IssueAct, type Session, VibeValleyApiError } from "@vibevalley/protocol";
 
 import { hostApi } from "../../../../../bridge";
+import { variant } from "../../../base/dom";
 import { ago } from "../../../base/format";
 import { reasonOf } from "../../../infra/api";
 import { useCore } from "../../../infra/frame";
 import { ready } from "../../../infra/query";
+import { linkIn, useRegistry } from "../../../state/atom";
 import { useIntents } from "../../../state/intent";
 import { createAct } from "../../../ui/act";
 import { Button } from "../../../ui/Button";
@@ -24,6 +26,17 @@ import { mix } from "../../../ui/tone";
 import { actionOf, perform } from "../model/acts";
 import { type Lane } from "../model/cards";
 import { approveShownChanges, changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "../model/changes";
+import {
+  closeDialogSurface,
+  type CloseFlowEvent,
+  type CloseFlowState,
+  closeFlowTransition,
+  initialCloseFlow,
+  isCloseDialogWide,
+  isCloseDiffEnabled,
+  shouldSyncCloseDiff,
+  sinceTreeOf,
+} from "../model/closeFlow";
 import { useIssueChanges } from "../model/history";
 import { issueTitle } from "../model/issue";
 import { issueMove, sendMove } from "../model/moves";
@@ -31,112 +44,160 @@ import { Note, SheetLabel } from "./Sheet";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session?: Session | undefined; review?: boolean; lane?: Lane | undefined; onClose: () => void }) {
-  const reviewing = signal(props.review ?? false);
+  const flow = signal<CloseFlowState>(initialCloseFlow(props.review ?? false));
+  const dispatch = (event: CloseFlowEvent): CloseFlowState => {
+    const next = closeFlowTransition(untracked(flow), event);
+    flow.set(next);
+    return next;
+  };
+  let mounted = true;
+  cleanup(() => {
+    mounted = false;
+  });
+  const registry = useRegistry();
   const core = useCore();
   const live = () => core()?.issues.find((i) => i.id === props.issue.id);
   const acts = () => (live()?.stage.acts ?? []).map((a) => a.act);
   const working = () => acts().includes("stop");
   const presses = createPresses(() => props.lane);
-  const cancel = async () => {
-    if (await presses.press(live(), "close")) props.onClose();
+  const changes = useIssueChanges(
+    () => props.issue.id,
+    () => isCloseDiffEnabled(flow()),
+    () => sinceTreeOf(flow()),
+  );
+
+  effect(() => {
+    const current = flow();
+    if (!shouldSyncCloseDiff(current)) return;
+    const status = changes.status();
+    const error = changes.error();
+    const data = ready(changes, undefined);
+    if (status === "pending") return;
+    if (error !== undefined && error !== null) {
+      dispatch({ kind: "diffFailed", message: reasonOf(error) });
+      return;
+    }
+    if (data !== undefined) {
+      dispatch({ kind: "diffLoaded", changes: data });
+    }
+  });
+
+  const close = () => {
+    dispatch({ kind: "dismiss" });
+    props.onClose();
   };
+  const cancel = async () => {
+    if (untracked(flow).kind !== "confirming") return;
+    dispatch({ kind: "submitCancel" });
+    const ok = await presses.press(live(), "close");
+    if (!mounted) return;
+    if (ok) {
+      dispatch({ kind: "completed" });
+      props.onClose();
+    } else {
+      dispatch({ kind: "submitFailed" });
+    }
+  };
+  const take = async () => {
+    const current = untracked(flow);
+    if (current.kind !== "reviewing") return;
+    const issue = live();
+    if (!issue) return;
+    const shown = current.changes;
+    dispatch({ kind: "submitComplete" });
+    if (linkIn(registry) === "lost") {
+      dispatch({ kind: "submitFailed", message: t("web.base.intent.offline") });
+      return;
+    }
+    let approved: Awaited<ReturnType<typeof approveShownChanges>>;
+    try {
+      approved = await approveShownChanges(issue, shown);
+    } catch (error) {
+      if (!mounted) return;
+      const message = reasonOf(error);
+      if (error instanceof VibeValleyApiError) {
+        const next = dispatch({
+          kind: "reviewRejected",
+          message,
+          ...(error.bizCode !== undefined ? { bizCode: error.bizCode } : {}),
+        });
+        if (next.kind === "treeChanged" && next.refetch) {
+          const snap = await changes.refetch();
+          if (!mounted) return;
+          if (snap.error !== undefined && snap.error !== null) dispatch({ kind: "diffFailed", message: reasonOf(snap.error) });
+          else if (snap.record !== undefined) dispatch({ kind: "diffLoaded", changes: snap.record.value });
+        }
+      } else {
+        dispatch({ kind: "submitFailed", message });
+      }
+      return;
+    }
+    if (!mounted) return;
+    const ok = await presses.press(issue, "complete", approved.revision);
+    if (!mounted) return;
+    if (ok) {
+      dispatch({ kind: "completed" });
+      props.onClose();
+    } else {
+      dispatch({ kind: "submitFailed" });
+    }
+  };
+  const resolve = async () => {
+    if (untracked(flow).kind !== "reviewing") return;
+    dispatch({ kind: "submitResolve" });
+    const ok = await presses.press(live(), "resolve");
+    if (!mounted) return;
+    if (ok) {
+      dispatch({ kind: "completed" });
+      props.onClose();
+    } else {
+      dispatch({ kind: "submitFailed" });
+    }
+  };
+
   const who = () => props.session?.name ?? props.issue.title;
   const canComplete = () => acts().includes("complete");
   const canClose = () => acts().includes("close");
+  const surface = () => closeDialogSurface(flow());
+
   return (
-    <Dialog open onClose={props.onClose} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={reviewing()} testid="close-issue">
-      <If when={!reviewing()} else={<ChangesReview issue={props.issue.id} worktree={props.session?.worktree} lane={props.lane} onDone={props.onClose} />}>
-        <View class="gap-5">
-          <Text class="text-sm leading-relaxed text-ink">
-            {working()
-              ? t("web.issue.close.working", { who: who() })
-              : canComplete()
-                ? t("web.issue.close.completable", { who: who() })
-                : t("web.issue.close.notCompletable", { who: who() })}
-          </Text>
-          <View class="flex-row flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
-            <Button tone="quiet" class={canComplete() && canClose() ? "mr-auto" : undefined} testID="close-never" onPress={() => props.onClose()}>
-              {t("web.issue.never")}
-            </Button>
-            <If when={canClose()}>
-              <Button tone="danger" testID="act-close" onPress={() => void cancel()}>
-                {working() ? t("web.issue.close.stopAndCancel") : t("web.issue.close.cancel")}
+    <Dialog open onClose={close} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={isCloseDialogWide(flow())} testid="close-issue">
+      <If when={variant(surface(), "kind", "confirm")}>
+        {(confirm) => (
+          <View class="gap-5">
+            <Text class="text-sm leading-relaxed text-ink">
+              {working()
+                ? t("web.issue.close.working", { who: who() })
+                : canComplete()
+                  ? t("web.issue.close.completable", { who: who() })
+                  : t("web.issue.close.notCompletable", { who: who() })}
+            </Text>
+            <View class="flex-row flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
+              <Button tone="quiet" class={canComplete() && canClose() ? "mr-auto" : undefined} testID="close-never" onPress={close}>
+                {t("web.issue.never")}
               </Button>
-            </If>
-            <If when={canComplete()}>
-              <Button tone="primary" testID="review-changes" onPress={() => reviewing.set(true)}>
-                {t("web.issue.close.review")}
-              </Button>
-            </If>
+              <If when={canClose()}>
+                <Button tone="danger" testID="act-close" disabled={confirm().busy} onPress={() => void cancel()}>
+                  {working() ? t("web.issue.close.stopAndCancel") : t("web.issue.close.cancel")}
+                </Button>
+              </If>
+              <If when={canComplete()}>
+                <Button tone="primary" testID="review-changes" disabled={confirm().busy} onPress={() => dispatch({ kind: "openReview" })}>
+                  {t("web.issue.close.review")}
+                </Button>
+              </If>
+            </View>
           </View>
-        </View>
+        )}
       </If>
-    </Dialog>
-  );
-}
-
-/** The dialog's buttons. A move is an intent: the dialog closes once it is sent, and the board and the issue's page show it moving, or refused with a retry. */
-function createPresses(lane: () => Lane | undefined) {
-  const moves = useIntents(issueMove);
-  const act = createAct();
-  return {
-    /** False when the issue does not offer it or the press did not go through. */
-    press: async (issue: Issue | undefined, pressed: IssueAct, revision?: Changes["revision"]) => {
-      const a = issue && actionOf(issue, pressed);
-      if (!issue || !a) return false;
-      if (a.does === "move") {
-        // The lane it was dropped on is where closing puts it; a resolve sends it back to work instead.
-        const to = pressed === "resolve" ? undefined : lane();
-        void sendMove(moves, { id: issue.id, status: a.status, ...(revision ? { revision } : {}), ...(to ? { lane: to } : {}) });
-        return true;
-      }
-      return (await act.run(async () => (await perform(issue, a), true))) === true;
-    },
-  };
-}
-
-/** What the branch brings before it is merged. */
-function ChangesReview(props: { issue: string; worktree?: string | undefined; lane?: Lane | undefined; onDone: () => void }) {
-  const sinceTree = signal<string | undefined>(undefined);
-  const changes = useIssueChanges(
-    () => props.issue,
-    () => true,
-    sinceTree,
-  );
-  const core = useCore();
-  const live = () => core()?.issues.find((i) => i.id === props.issue);
-  const acts = () => (live()?.stage.acts ?? []).map((a) => a.act);
-  const presses = createPresses(() => props.lane);
-  const reviewError = signal("");
-  const review = createAct((message) => reviewError.set(message));
-  const take = async (shown: Changes) => {
-    const issue = live();
-    if (!issue || review.busy()) return;
-    reviewError.set("");
-    const approved = await review.run(() => approveShownChanges(issue, shown));
-    if (!approved) {
-      if (shown.revision && sinceTree() !== shown.revision.tree) sinceTree.set(shown.revision.tree);
-      else await changes.refetch();
-      return;
-    }
-    if (await presses.press(issue, "complete", approved.revision)) props.onDone();
-  };
-  const resolve = async () => {
-    if (await presses.press(live(), "resolve")) props.onDone();
-  };
-  return (
-    <If
-      when={changes.status() !== "pending"}
-      else={
+      <If when={variant(surface(), "kind", "loading")}>
         <View class="flex-row items-center justify-center gap-2 py-10">
           <Icon name="wait" size={14} tone="muted" />
           <Text class="text-sm text-muted">{t("web.issue.changes.reading")}</Text>
         </View>
-      }
-    >
-      <If
-        when={changes.error() === undefined || changes.error() === null}
-        else={
+      </If>
+      <If when={variant(surface(), "kind", "error")}>
+        {(err) => (
           <View class="gap-4">
             <Note tone="berry">
               <View class="flex-row items-start gap-2">
@@ -145,23 +206,25 @@ function ChangesReview(props: { issue: string; worktree?: string | undefined; la
                 </View>
                 <Text class="min-w-0 flex-1 text-sm text-berry">
                   {t("web.issue.changes.unreadable")}
-                  {reasonOf(changes.error())}
+                  {err().message}
                 </Text>
               </View>
             </Note>
             <View class="flex-row justify-end border-t border-line pt-3">
-              <Button tone="quiet" onPress={() => props.onDone()}>
+              <Button tone="quiet" onPress={close}>
                 {t("web.issue.later")}
               </Button>
             </View>
           </View>
-        }
-      >
-        <If when={ready(changes, undefined)}>
-          {(c) => (
+        )}
+      </If>
+      <If when={variant(surface(), "kind", "review")}>
+        {(rev) => {
+          const c = () => rev().changes;
+          return (
             <View testID="changes-review" class="gap-3">
               <ChangesHead changes={c()} />
-              <If when={reviewError()}>
+              <If when={rev().notice}>
                 {(message) => (
                   <Note tone="wheat">
                     <View class="flex-row items-start gap-2">
@@ -193,7 +256,7 @@ function ChangesReview(props: { issue: string; worktree?: string | undefined; la
                     </View>
                     <View class="min-w-0 flex-1">
                       <Text class="text-sm font-semibold text-berry">{t("web.issue.changes.conflict", { base: c().base })}</Text>
-                      <ConflictFiles files={c().conflicts} worktree={props.worktree} />
+                      <ConflictFiles files={c().conflicts} worktree={props.session?.worktree} />
                       <Text class="mt-2 text-xs leading-relaxed text-muted">{t("web.issue.changes.resolveHow", { base: c().base })}</Text>
                     </View>
                   </View>
@@ -240,16 +303,16 @@ function ChangesReview(props: { issue: string; worktree?: string | undefined; la
               </If>
               <View class="flex-row flex-wrap items-center gap-2 border-b border-line pb-3">
                 <If when={acts().includes("complete")}>
-                  <Button tone="primary" testID="review-complete" disabled={review.busy()} onPress={() => void take(c())}>
+                  <Button tone="primary" testID="review-complete" disabled={rev().busy} onPress={() => void take()}>
                     {t("shared.act.complete")}
                   </Button>
                 </If>
                 <If when={acts().includes("resolve")}>
-                  <Button tone="danger" testID="act-resolve" onPress={() => void resolve()}>
+                  <Button tone="danger" testID="act-resolve" disabled={rev().busy} onPress={() => void resolve()}>
                     {t("web.issue.changes.resolve")}
                   </Button>
                 </If>
-                <Button tone="quiet" onPress={() => props.onDone()}>
+                <Button tone="quiet" onPress={close}>
                   {t("web.issue.later")}
                 </Button>
               </View>
@@ -265,11 +328,31 @@ function ChangesReview(props: { issue: string; worktree?: string | undefined; la
                 )}
               </If>
             </View>
-          )}
-        </If>
+          );
+        }}
       </If>
-    </If>
+    </Dialog>
   );
+}
+
+/** The dialog's buttons. A move is an intent: the dialog closes once it is sent, and the board and the issue's page show it moving, or refused with a retry. */
+function createPresses(lane: () => Lane | undefined) {
+  const moves = useIntents(issueMove);
+  const act = createAct();
+  return {
+    /** False when the issue does not offer it or the press did not go through. */
+    press: async (issue: Issue | undefined, pressed: IssueAct, revision?: Changes["revision"]) => {
+      const a = issue && actionOf(issue, pressed);
+      if (!issue || !a) return false;
+      if (a.does === "move") {
+        // The lane it was dropped on is where closing puts it; a resolve sends it back to work instead.
+        const to = pressed === "resolve" ? undefined : lane();
+        void sendMove(moves, { id: issue.id, status: a.status, ...(revision ? { revision } : {}), ...(to ? { lane: to } : {}) });
+        return true;
+      }
+      return (await act.run(async () => (await perform(issue, a), true))) === true;
+    },
+  };
 }
 
 export function ConflictFiles(props: { files: string[]; worktree?: string | undefined }) {
