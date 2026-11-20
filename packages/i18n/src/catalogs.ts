@@ -1839,6 +1839,7 @@ export const catalogs = {
     "web.base": {
       route: { missing: "这个页面不存在", invalid: "这个地址无效", home: "返回应用" },
       place: {
+        workspace: { label: "工作目录", hint: "工作目录与终端" },
         chat: { label: "聊天", hint: "频道和串" },
         issues: { label: "工单", hint: "每张工单从写下到关上" },
         agents: { label: "档案", hint: "档案：助手和帮工" },
@@ -5838,6 +5839,7 @@ export const catalogs = {
     "web.base": {
       route: { missing: "This page does not exist", invalid: "This address is invalid", home: "Back to the app" },
       place: {
+        workspace: { label: "Workspace", hint: "Workspaces and terminals" },
         chat: { label: "Chat", hint: "Channels and threads" },
         issues: { label: "Tickets", hint: "Every ticket from written to closed" },
         agents: { label: "Profiles", hint: "Profiles: assistants and helpers" },
@@ -9827,6 +9829,8 @@ export interface Messages {
   "web.base.place.runtimes.label": undefined;
   "web.base.place.settings.hint": undefined;
   "web.base.place.settings.label": undefined;
+  "web.base.place.workspace.hint": undefined;
+  "web.base.place.workspace.label": undefined;
   "web.base.query.invalidResponse": undefined;
   "web.base.rail": undefined;
   "web.base.reading": undefined;

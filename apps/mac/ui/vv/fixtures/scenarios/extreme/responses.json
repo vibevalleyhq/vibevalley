@@ -4156,6 +4156,7 @@
       "id": "art-plan",
       "title": "看板拖拽的方案",
       "body": "blocks",
+      "isDefault": false,
       "channel": "general",
       "said": {
         "channel": "general",
@@ -4174,6 +4175,7 @@
       "id": "art-login",
       "title": "登录流程",
       "body": "html",
+      "isDefault": false,
       "display": "page",
       "channel": "general",
       "said": {
@@ -4214,6 +4216,7 @@
       "id": "art-deck",
       "title": "本周进展",
       "body": "html",
+      "isDefault": false,
       "display": "slides",
       "channel": "general",
       "by": "orchestrator",
@@ -4238,6 +4241,7 @@
       "id": "art-mine",
       "title": "发版前要查的",
       "body": "blocks",
+      "isDefault": false,
       "by": "user",
       "byName": "用户",
       "version": 0,
@@ -4251,6 +4255,7 @@
     "id": "art-plan",
     "title": "看板拖拽的方案",
     "body": "blocks",
+    "isDefault": false,
     "channel": "general",
     "said": {
       "channel": "general",
@@ -4274,6 +4279,7 @@
       "id": "art-plan",
       "title": "看板拖拽的方案",
       "body": "blocks",
+      "isDefault": false,
       "channel": "general",
       "said": {
         "channel": "general",
@@ -4478,6 +4484,7 @@
     "id": "art-new",
     "title": "未命名",
     "body": "blocks",
+    "isDefault": false,
     "by": "user",
     "byName": "用户",
     "version": 0,
@@ -4490,6 +4497,7 @@
     "id": "art-plan",
     "title": "看板拖拽的方案",
     "body": "blocks",
+    "isDefault": false,
     "channel": "general",
     "said": {
       "channel": "general",
@@ -4509,6 +4517,7 @@
     "id": "art-login",
     "title": "登录流程",
     "body": "html",
+    "isDefault": false,
     "display": "page",
     "channel": "general",
     "said": {

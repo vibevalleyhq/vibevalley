@@ -5,6 +5,10 @@
     "home": "Back to the app"
   },
   "place": {
+    "workspace": {
+      "label": "Workspace",
+      "hint": "Workspaces and terminals"
+    },
     "chat": {
       "label": "Chat",
       "hint": "Channels and threads"

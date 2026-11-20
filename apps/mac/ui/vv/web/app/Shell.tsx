@@ -46,8 +46,8 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       accessibilityLabel={props.label}
       tooltip={<Bubble text={props.label} placement="right" />}
       class={[
-        "relative items-center justify-center gap-0.5 rounded-lg px-1 transition duration-120 ease-out",
-        hero() ? (small() ? "h-12 w-12" : compactTall() ? "h-15.5 w-14" : "h-16 w-14") : small() ? "h-11 w-11" : compactTall() ? "h-11.5 w-14" : "h-12.5 w-14",
+        "relative items-center justify-center gap-0.5 rounded-lg px-0.5 transition duration-120 ease-out",
+        hero() ? (small() ? "h-12 w-12" : compactTall() ? "h-15.5 w-16" : "h-16 w-16") : small() ? "h-11 w-11" : compactTall() ? "h-11.5 w-16" : "h-12.5 w-16",
         current() ? "" : "hover:bg-hover",
       ].join(" ")}
       style={current() ? { backgroundColor: mix("on-rail", colorScheme() === "dark" ? 0.12 : 0.09) } : undefined}
@@ -61,7 +61,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       <If when={!small() && props.name}>
         {(name) => (
           <Text
-            class={`w-full truncate text-center font-sans text-xs leading-tight ${current() ? "font-medium" : ""}`}
+            class={`w-full truncate text-center font-sans text-2xs leading-tight ${current() ? "font-medium" : ""}`}
             style={{ color: current() ? mix("on-rail", 1) : mix("on-rail", 0.65) }}
           >
             {name()}
@@ -153,8 +153,8 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
             <Slot
               to="/workspace"
               place="workspace"
-              label="工作区与终端"
-              name="工作区"
+              label={t("web.base.place.workspace.hint")}
+              name={t("web.base.place.workspace.label")}
               current={location().pathname === "/workspace"}
               icon={railIcon("terminal", () => location().pathname === "/workspace")}
             />

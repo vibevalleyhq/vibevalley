@@ -5,6 +5,10 @@
     "home": "返回应用"
   },
   "place": {
+    "workspace": {
+      "label": "工作目录",
+      "hint": "工作目录与终端"
+    },
     "chat": {
       "label": "聊天",
       "hint": "频道和串"
