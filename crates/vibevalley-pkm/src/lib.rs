@@ -77,8 +77,6 @@ pub struct Span {
     pub remark: String,
 }
 
-// ---- PARA --------------------------------------------------------------------
-
 pub fn tier_folder(tier: Tier) -> &'static str {
     match tier {
         Tier::Inbox => "00_Inbox",
@@ -144,8 +142,6 @@ pub fn journal_day(file: &str) -> Option<String> {
     Some(format!("{}-{}-{}", &c[1], &c[2], &c[3]))
 }
 
-// ---- slugs and tags ------------------------------------------------------------
-
 /// A page's name from its title: trimmed, lower case, spaces as dashes, `/`
 /// (or `\`) as `__`.
 pub fn slug_of(title: &str) -> String {
@@ -179,8 +175,6 @@ pub fn tags_in(text: &str) -> Vec<String> {
     }
     out
 }
-
-// ---- parse and print ---------------------------------------------------------------
 
 const PAGE_ORDER: [&str; 14] = [
     "title",
@@ -678,8 +672,6 @@ pub fn outline_of(text: &str, new_id: &mut dyn FnMut() -> String) -> Vec<Node> {
     }
     fresh(parse(&(markdown.join("\n") + "\n"), "captured.md", 0).blocks, new_id)
 }
-
-// ---- block operations ---------------------------------------------------------------
 
 /// VibeValley's `PkmBlockOp`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

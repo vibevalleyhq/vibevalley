@@ -1,6 +1,5 @@
 //! `agent.*`, `skill.*` and `runtime.*`: the profiles, their skills and
-//! templates, and the runtimes they run on. Ported from VibeValley
-//! `modules/agent` and `gateway/http/handlers/{agent,runtime}.ts`.
+//! templates, and the runtimes they run on.
 
 use std::path::Path;
 use std::sync::Arc;

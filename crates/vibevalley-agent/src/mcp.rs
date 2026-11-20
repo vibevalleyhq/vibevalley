@@ -1,8 +1,7 @@
 //! MCP servers an agent profile attaches, their tools offered to the model
-//! as `server__tool`. Ported from VibeValley
-//! `packages/agent/src/infra/mcp.ts`: stdio and streamable HTTP servers,
-//! 120 s for connecting and for each call, a server that cannot be reached
-//! reported (not fatal), results flattened to text.
+//! as `server__tool`: stdio and streamable HTTP servers, 120 s for connecting
+//! and for each call, an unreachable server reported (not fatal), results
+//! flattened to text.
 
 mod client;
 

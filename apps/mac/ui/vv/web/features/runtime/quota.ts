@@ -34,7 +34,7 @@ export function quotaOf(info: RuntimeInfo | undefined): Quota {
   // Not logged in: nothing to work with, which is an empty bottle, not an unknown one.
   if (usage?.status === "login_required") return { level: "empty", fill: 0, short: t("web.runtime.quota.signedOut"), text };
   if (usage?.status === "balance") {
-    const first = usage.balances[0];
+    const first = usage.balances.at(0);
     return { level: usage.available ? "gold" : "empty", fill: usage.available ? 1 : 0.06, short: first ? money(first.currency, first.amount) : "", text };
   }
   const left = info?.quota?.left;

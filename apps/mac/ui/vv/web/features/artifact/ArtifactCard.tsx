@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/ArtifactCard.tsx:
-// the artifact queries, the labels and icons a kind/type is shown with, and the
-// card a message announces one with.
 import { Text, View } from "nsh";
 import { z } from "zod";
 
@@ -112,7 +109,7 @@ export function ArtifactCard(props: { card: Card }) {
     if (!path.startsWith("/chat")) return artifactHref(props.card.id, props.card.body === "html" ? props.card.version : undefined);
     const params = new URLSearchParams(router.path().split("?")[1] ?? "");
     params.set("artifact", props.card.id);
-    return `${path}?${params}`;
+    return `${path}?${params.toString()}`;
   };
   return (
     <A

@@ -1,8 +1,5 @@
 //! Parent and child issues: the dependency graph, when a blocked issue may
 //! go, and what a child must pass before it merges into its parent.
-//! Ported from VibeValley `packages/agent/src/base/dag.ts` (`dagProblems`,
-//! `dagLayers`, `dagIDValid`), `apps/server/src/modules/issue/dependencies.ts`
-//! and `childChecks` in `apps/server/src/modules/issue/merge.ts`.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 

@@ -13,7 +13,7 @@ import {
 } from "@vibevalley/protocol";
 
 import { CursorManifest, SpriteManifest } from "../base/manifests";
-import { cursorManifest, spriteManifest } from "../ui/pixel/manifests";
+import { cursorManifest, loadSpriteManifest } from "../ui/pixel/manifests";
 import { api, ApiConnectionError } from "./api";
 import type { FramesSource } from "./frame";
 import { defineQuery, type QueryClient } from "./query/cache";
@@ -40,7 +40,7 @@ export function refetchOnRelink(source: FramesSource, client: QueryClient) {
 const spritesQuery = defineQuery({
   schema: SpriteManifest,
   key: () => ["sprites"],
-  fetch: (): Promise<unknown> => Promise.resolve(spriteManifest),
+  fetch: (): Promise<unknown> => loadSpriteManifest(),
   staleTime: Infinity,
   ...retryRead,
 });

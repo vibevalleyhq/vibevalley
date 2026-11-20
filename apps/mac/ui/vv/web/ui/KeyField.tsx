@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/KeyField.tsx: the key's mark, a
-// key field with its remove toggle, and the save bar.
 import { Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Icon.tsx. reicon draws SVG; nsh has
-// none, so the same path data (vv/icons.py → icons.ts) is drawn on Canvas.
-// A canvas cannot inherit the text color (CSS currentColor): callers pass
-// `color` (a color) or `tone` (a theme token), else it is `ink`.
 import { Canvas, Path2D } from "nsh";
 
 import { type IconName, type IconShape, icons } from "./icons";
@@ -20,7 +16,7 @@ const pathOf = (d: string): Path2D => {
   return p;
 };
 
-export function Icon(props: { name: IconName; size?: IconSize | number; label?: string; color?: string; tone?: string; testID?: string }) {
+export function Icon(props: { name: IconName; size?: number; label?: string; color?: string; tone?: string; testID?: string }) {
   const size = () => props.size ?? 16;
   const color = () => {
     const fixed = iconTone[props.name];
@@ -41,11 +37,11 @@ export function Icon(props: { name: IconName; size?: IconSize | number; label?: 
         for (const s of shapes) {
           const p = pathOf(s.d);
           cx.globalAlpha = s.opacity ?? 1;
-          if (s.fill) {
+          if (s.fill === 1) {
             cx.fillStyle = c;
-            cx.fill(p, s.evenodd ? "evenodd" : "nonzero");
+            cx.fill(p, s.evenodd === 1 ? "evenodd" : "nonzero");
           }
-          if (s.stroke) {
+          if (s.stroke !== undefined && s.stroke > 0) {
             cx.strokeStyle = c;
             cx.lineWidth = s.stroke;
             cx.lineCap = s.cap ?? "butt";

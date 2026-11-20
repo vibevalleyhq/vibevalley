@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/FamilyDetail.tsx.
 import { Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

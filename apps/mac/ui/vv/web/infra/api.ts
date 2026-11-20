@@ -67,13 +67,14 @@ export const newSendKey = () => Array.from(crypto.getRandomValues(new Uint8Array
 export async function sha256Hex(text: string): Promise<string> {
   try {
     const envelope = await transport().call("host.sha256", { text });
-    const hex = envelope.bizCode === 0 ? (envelope.data as { hex?: unknown } | undefined)?.hex : undefined;
+    const data = envelope.bizCode === 0 && typeof envelope.data === "object" && envelope.data !== null ? envelope.data : undefined;
+    const hex = data && "hex" in data ? data.hex : undefined;
     if (typeof hex === "string" && hex.length === 64) return hex;
   } catch {
     // Offline/fixture transport without host.sha256 falls through to WebCrypto below.
   }
-  const subtle = (globalThis as { crypto?: { subtle?: { digest(algorithm: string, data: Uint8Array): Promise<ArrayBuffer> } } }).crypto?.subtle;
-  if (subtle) {
+  const subtle = typeof crypto === "object" && "subtle" in crypto ? crypto.subtle : undefined;
+  if (subtle !== undefined && typeof subtle.digest === "function") {
     const hash = await subtle.digest("SHA-256", new TextEncoder().encode(text));
     return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
   }

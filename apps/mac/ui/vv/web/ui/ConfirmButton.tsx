@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/ConfirmButton.tsx.
 import { signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

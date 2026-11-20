@@ -139,8 +139,6 @@ pub fn artifact_headers(print: bool) -> BTreeMap<String, String> {
     .collect()
 }
 
-// ----- the page as elements and text nodes -----
-
 struct El {
     tag: String,
     line: usize,
@@ -283,8 +281,6 @@ fn scan(source: &str) -> Scan {
     Rc::try_unwrap(state).map(RefCell::into_inner).unwrap_or_default()
 }
 
-// ----- words edited in place -----
-
 #[derive(Clone, Copy)]
 struct At {
     node: i64,
@@ -418,8 +414,6 @@ pub fn html_edit(source: &str, anchor: &vibevalley_protocol::HtmlAnchor, text: &
     }
     Ok(format!("{}{}{}", &source[..first.from], escaped(text), &source[last.to..]))
 }
-
-// ----- what a page may load -----
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]

@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/domain/settings.tsx: a section's
-// page, a group of rows in one card, a row, a key row; what Settings'
-// search finds is tinted.
 import { Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -77,7 +74,7 @@ export function SettingRow(props: {
       class={`gap-x-6 gap-y-2 px-4 py-3 ${props.last === true ? "" : "border-b border-line"} ${props.wide === true ? "" : "flex-row flex-wrap items-center"}`}
       style={found() ? { backgroundColor: mix("wheat", 0.15) } : undefined}
     >
-      <View class="min-w-0 flex-1 gap-0.5" style={{ minWidth: 200 }}>
+      <View class="min-w-50 flex-1 gap-0.5">
         <View class="flex-row items-center gap-1.5">
           <Text class="text-sm font-medium text-ink">{props.label}</Text>
           <If when={props.tip}>{(tip) => <Hint text={tip()} />}</If>

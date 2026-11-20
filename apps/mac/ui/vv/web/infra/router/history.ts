@@ -55,9 +55,10 @@ export function memoryHistory(initial = "/"): RouterHistory {
     for (const listener of listeners) listener();
   };
   const move = (offset: number) => {
-    const next = entries[index + offset];
-    if (!next) return;
-    index += offset;
+    const target = index + offset;
+    if (target < 0 || target >= entries.length) return;
+    const next = entries[target];
+    index = target;
     current = next;
     changed();
   };

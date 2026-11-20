@@ -1,12 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/frame.ts. There an
-// html version is an <iframe> whose shell runtime talks by postMessage to
-// its parent. Here it is an nsh WebView (a WKWebView in the GPUI host)
-// given the whole page as `html`: at the top of a web view `parent` is the
-// page's own window, so the shell's `parent.postMessage` lands on itself,
-// and `shim` (run before the page's scripts) hands whitelisted outgoing
-// messages out through `window.nsh.postMessage` (the WebView's onMessage).
-// Commands go in as a message the page posts to itself (`injectJavaScript`),
-// which the runtime takes since its source is `parent`.
 import { signal, type Accessor, type WebViewRef } from "nsh";
 
 import type { HtmlAnchor, HtmlShellCommand, HtmlShellMessage } from "@vibevalley/protocol";
@@ -36,15 +27,16 @@ export const shim = String.raw`(() => {
     "store-embed-save",
   ]);
   const out = (d) => {
-    try {
-      window.nsh.postMessage(JSON.stringify(d));
-    } catch {}
+    window.nsh?.postMessage(JSON.stringify(d));
   };
   addEventListener("message", (e) => {
     const d = e.data;
     if (e.source === window && d && typeof d === "object" && typeof d.vibevalley === "string" && OUT.has(d.vibevalley)) out(d);
   });
 })();`;
+
+/** One slide thumbnail, still: a WebView consumes pointer hits over its box, so any click posts `"pick"` back to the host. */
+export const pickShim = String.raw`addEventListener("click", (e) => { e.preventDefault(); window.nsh?.postMessage("pick"); }, true);`;
 
 const limits = [
   "default-src 'none'",

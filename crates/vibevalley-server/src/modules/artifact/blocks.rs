@@ -520,8 +520,6 @@ impl Artifacts {
         Ok(())
     }
 
-    // ----- suggestions -----
-
     pub fn suggestions(&self, id: &str) -> Result<Vec<Suggestion>, ApiError> {
         let mut db = self.db();
         self.found_blocks(&mut db, id)?;
@@ -704,8 +702,6 @@ impl Artifacts {
         let (ack, _) = self.apply_batch(db, id, actor, &new_id(), &ops)?;
         Ok(Some(ack))
     }
-
-    // ----- the demo -----
 
     fn wait(&self, ticks: f64) -> Result<(), ApiError> {
         let jitter = 1.0 + vibevalley_artifact::html::DEMO_JITTER * (2.0 * rand_unit() - 1.0);

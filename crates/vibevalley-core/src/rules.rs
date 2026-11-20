@@ -7,8 +7,6 @@ use std::cmp::Ordering;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::*;
 
-// ----- strings, in UTF-16 units -----
-
 /// The length JavaScript gives `s.length`.
 pub fn js_len(s: &str) -> usize {
     s.encode_utf16().count()
@@ -109,8 +107,6 @@ fn strip_emphasis(s: &str) -> String {
     out
 }
 
-// ----- issues (rules/issues.ts) -----
-
 /// `assignmentOf`: the responsibility in force now.
 pub fn assignment_of(issue: &Issue) -> Option<&Assignment> {
     issue.assignments.iter().rev().find(|a| a.ended_at.is_none())
@@ -174,8 +170,6 @@ pub fn closed_text(issue: &Issue) -> String {
 pub fn stage_wants_user(s: IssueStageKind) -> bool {
     s.wants_user()
 }
-
-// ----- phase (rules/phase.ts) -----
 
 /// `spanText`: seconds under a minute (at least one), else minutes.
 pub fn span_text(ms: i64) -> String {
@@ -298,8 +292,6 @@ pub fn phase_words(h: &Session, conflict: Option<&Conflict>) -> String {
     }
 }
 
-// ----- play (rules/play.ts) -----
-
 /// `farmOf`: each repo has its own farm; sessions without one share one.
 pub fn farm_of(h: &Session) -> &str {
     h.repo.as_deref().unwrap_or("")
@@ -309,8 +301,6 @@ pub fn farm_of(h: &Session) -> &str {
 pub fn plot_key_of(h: &Session) -> &str {
     h.issue.as_deref().unwrap_or(&h.id)
 }
-
-// ----- channel (rules/channel.ts) -----
 
 /// `defaultOf`: the channel words go to when none is named.
 pub fn default_of(chat: Option<&Chat>) -> Option<&Channel> {
@@ -329,8 +319,6 @@ pub fn actor_role_of(actor: &Actor) -> Option<AgentRole> {
         _ => None,
     }
 }
-
-// ----- order keys (rules/order.ts) -----
 
 const KEY_DIGITS: &str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const MAX_KEY_LEN: usize = 256;
@@ -409,8 +397,6 @@ fn midpoint(a: &str, b: &str) -> String {
     }
     format!("{}{}", digit_at(lo), midpoint(if a.len() > 1 { &a[1..] } else { "" }, ""))
 }
-
-// ----- repo (rules/repo.ts) -----
 
 /// `githubRepository`: only repository home URLs.
 pub fn github_repository(input: &str) -> Option<(String, String)> {

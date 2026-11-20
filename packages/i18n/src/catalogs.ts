@@ -538,6 +538,7 @@ export const catalogs = {
         repos: { label: "仓库", hint: "每个仓库一座岛" },
         catalog: { label: "图鉴", hint: "素材：农场用的每张图、每个指针、每个声音，和工作台的界面零件" },
         settings: { label: "设置", hint: "通用、外观、模型、记性、技能、语音、连接" },
+        workspace: { label: "工作目录与终端", name: "终端" },
       },
       link: { connecting: "连接中", open: "已连上", lost: "断了，重连中" },
       rail: "工作台",
@@ -670,6 +671,7 @@ export const catalogs = {
       updateReady: "{next} 已下好，去「关于」重启",
       intent: { timedOut: "等了太久没回音，可以重试", offline: "没连上农场，这一下没发出去" },
       pickTooLarge: "{name} 没加上：超过 512 MiB 了",
+      openTerminal: "在这里打开终端",
     },
     "web.catalog": {
       ground: { check: "格子", grass: "草地", night: "夜里" },
@@ -2280,6 +2282,11 @@ export const catalogs = {
         themes: { light: "浅色", dark: "深色", system: "跟随系统" },
         scale: "界面大小",
         scaleHint: "缩放整个工作台；农场按整数倍放大，不跟着变",
+        monoFont: "终端与代码字体",
+        monoFontRow: "终端与代码字体（支持 Nerd Font）",
+        monoFontHint: "用于终端、Diff 与文件预览的等宽字体，内置 Nerd Font 图标回退链",
+        terminalFontSize: "终端字号",
+        terminalFontSizeHint: "也可在工作目录随时按 ⌘+ / ⌘- / ⌘0 调整",
       },
       models: { deepseekHint: "助手和 VibeValley 自己的帮工用它" },
       memory: { intro: "帮工还能去外面的记性里查、往里记。" },
@@ -2352,6 +2359,45 @@ export const catalogs = {
       },
       readiness: { ready: "{feature}：可以用了", lacks: "{feature}：{why}", fix: "去设置" },
       accounts: { intro: "所有供应商的账号和钥匙都在这里；每个账号能用哪些模型也在这里看。每个功能用哪个账号，在「用途」里选。" },
+    },
+    "web.shell": {
+      sidebar: {
+        title: "仓库与终端",
+        addRepo: "添加仓库",
+        addRepoButton: "+ 仓库",
+        otherFolders: "其他文件夹",
+        running: "正在运行",
+        runningAgent: "{agent} 正在运行",
+        closeTab: "关闭 {title}",
+        newTerminal: "新终端：{name}",
+        closeFolder: "关闭文件夹：{name}",
+        mainWorktree: "{label} · 主目录",
+        files: "文件",
+      },
+      git: {
+        loading: "正在读取 Git 状态…",
+        notRepo: "当前目录不是 Git 仓库。",
+        refresh: "刷新 Git",
+        tab: { changes: "变更", changesCount: "变更 ({count})", branches: "分支 ({count})", commits: "历史" },
+        commitPlaceholder: "输入提交信息…",
+        commitStaged: "提交暂存变更 ({count})",
+        noStaged: "暂无暂存文件",
+        conflicts: "冲突",
+        staged: "已暂存",
+        unstageAll: "全部取消暂存",
+        stagedEmpty: "暂无已暂存的文件。",
+        changes: "未暂存变更",
+        stageAll: "全部暂存",
+        clean: "工作目录干净，没有未提交改动。",
+        branches: "本地分支",
+        currentBranch: "{name}，当前分支",
+        switchBranch: "切换到 {name}",
+        noBranches: "未找到本地分支。",
+        worktrees: "工作树",
+        mainWorktree: "主工作树",
+        commits: "提交记录",
+        noCommits: "暂无提交记录。",
+      },
     },
     "web.tree": { sky: "农场的记忆星空" },
     "web.ui.pixel": {
@@ -3067,6 +3113,7 @@ export const catalogs = {
         repos: { label: "Repos", hint: "An island for each repo" },
         catalog: { label: "Catalog", hint: "Assets: every picture, cursor and sound the farm uses, and the workbench's kit" },
         settings: { label: "Settings", hint: "General, appearance, models, memory, skills, voice, connections" },
+        workspace: { label: "Working folder & terminals", name: "Terminals" },
       },
       link: { connecting: "Connecting", open: "Connected", lost: "Lost, reconnecting" },
       rail: "Workbench",
@@ -3214,6 +3261,7 @@ export const catalogs = {
       updateReady: "{next} is ready: restart from About",
       intent: { timedOut: "No answer in time; try again", offline: "Not connected to the farm, so this was not sent" },
       pickTooLarge: "{name} was not added: it is over 512 MiB",
+      openTerminal: "Open a terminal here",
     },
     "web.catalog": {
       ground: { check: "Checks", grass: "Grass", night: "Night" },
@@ -4944,6 +4992,11 @@ export const catalogs = {
         themes: { light: "Light", dark: "Dark", system: "System" },
         scale: "Interface size",
         scaleHint: "Scales the whole workbench; the farm keeps its whole-number scaling",
+        monoFont: "Terminal & code font",
+        monoFontRow: "Terminal & code font (Nerd Font)",
+        monoFontHint: "Monospace font for terminals, diffs, and file previews, with built-in Nerd Font icon fallback",
+        terminalFontSize: "Terminal font size",
+        terminalFontSizeHint: "Also adjustable anytime in the terminal view with ⌘+ / ⌘- / ⌘0",
       },
       models: { deepseekHint: "The assistant and VibeValley's own helpers use it" },
       memory: { intro: "Helpers can also look things up in, and write to, memory outside VibeValley." },
@@ -5017,6 +5070,45 @@ export const catalogs = {
       readiness: { ready: "{feature}: ready", lacks: "{feature}: {why}", fix: "Set it up" },
       accounts: {
         intro: "Every vendor's accounts and keys are here, with the models each account can use. Which account each feature uses is chosen under Uses.",
+      },
+    },
+    "web.shell": {
+      sidebar: {
+        title: "Repos & terminals",
+        addRepo: "Add repository",
+        addRepoButton: "+ Repo",
+        otherFolders: "Other folders",
+        running: "Running",
+        runningAgent: "{agent} running",
+        closeTab: "Close {title}",
+        newTerminal: "New terminal: {name}",
+        closeFolder: "Close folder: {name}",
+        mainWorktree: "{label} · main",
+        files: "Files",
+      },
+      git: {
+        loading: "Loading Git status…",
+        notRepo: "This folder is not a Git repository.",
+        refresh: "Refresh Git",
+        tab: { changes: "Changes", changesCount: "Changes ({count})", branches: "Branches ({count})", commits: "Commits" },
+        commitPlaceholder: "Commit message…",
+        commitStaged: "Commit staged ({count})",
+        noStaged: "No staged files",
+        conflicts: "Conflicts",
+        staged: "Staged",
+        unstageAll: "Unstage all",
+        stagedEmpty: "No staged files.",
+        changes: "Changes",
+        stageAll: "Stage all",
+        clean: "Working tree clean, no uncommitted changes.",
+        branches: "Branches",
+        currentBranch: "{name}, current branch",
+        switchBranch: "Switch to {name}",
+        noBranches: "No local branches found.",
+        worktrees: "Worktrees",
+        mainWorktree: "Main worktree",
+        commits: "Commit history",
+        noCommits: "No commits yet.",
       },
     },
     "web.tree": { sky: "The farm's sky of memories" },
@@ -5773,6 +5865,7 @@ export interface Messages {
   "web.base.money.spent": { readonly yuan: string | number };
   "web.base.money.underCent": undefined;
   "web.base.off": undefined;
+  "web.base.openTerminal": undefined;
   "web.base.orchestrator": undefined;
   "web.base.pickTooLarge": { readonly name: string | number };
   "web.base.place.agents.hint": undefined;
@@ -5789,6 +5882,8 @@ export interface Messages {
   "web.base.place.runtimes.label": undefined;
   "web.base.place.settings.hint": undefined;
   "web.base.place.settings.label": undefined;
+  "web.base.place.workspace.label": undefined;
+  "web.base.place.workspace.name": undefined;
   "web.base.query.invalidResponse": undefined;
   "web.base.rail": undefined;
   "web.base.reading": undefined;
@@ -7533,8 +7628,13 @@ export interface Messages {
   "web.setting.about.worktreesHint": undefined;
   "web.setting.accounts.intro": undefined;
   "web.setting.appearance.intro": undefined;
+  "web.setting.appearance.monoFont": undefined;
+  "web.setting.appearance.monoFontHint": undefined;
+  "web.setting.appearance.monoFontRow": undefined;
   "web.setting.appearance.scale": undefined;
   "web.setting.appearance.scaleHint": undefined;
+  "web.setting.appearance.terminalFontSize": undefined;
+  "web.setting.appearance.terminalFontSizeHint": undefined;
   "web.setting.appearance.theme": undefined;
   "web.setting.appearance.themeHint": undefined;
   "web.setting.appearance.themes.dark": undefined;
@@ -7630,6 +7730,42 @@ export interface Messages {
   "web.setting.words.memory": undefined;
   "web.setting.words.moss": undefined;
   "web.setting.words.skills": undefined;
+  "web.shell.git.branches": undefined;
+  "web.shell.git.changes": undefined;
+  "web.shell.git.clean": undefined;
+  "web.shell.git.commitPlaceholder": undefined;
+  "web.shell.git.commitStaged": { readonly count: string | number };
+  "web.shell.git.commits": undefined;
+  "web.shell.git.conflicts": undefined;
+  "web.shell.git.currentBranch": { readonly name: string | number };
+  "web.shell.git.loading": undefined;
+  "web.shell.git.mainWorktree": undefined;
+  "web.shell.git.noBranches": undefined;
+  "web.shell.git.noCommits": undefined;
+  "web.shell.git.noStaged": undefined;
+  "web.shell.git.notRepo": undefined;
+  "web.shell.git.refresh": undefined;
+  "web.shell.git.stageAll": undefined;
+  "web.shell.git.staged": undefined;
+  "web.shell.git.stagedEmpty": undefined;
+  "web.shell.git.switchBranch": { readonly name: string | number };
+  "web.shell.git.tab.branches": { readonly count: string | number };
+  "web.shell.git.tab.changes": undefined;
+  "web.shell.git.tab.changesCount": { readonly count: string | number };
+  "web.shell.git.tab.commits": undefined;
+  "web.shell.git.unstageAll": undefined;
+  "web.shell.git.worktrees": undefined;
+  "web.shell.sidebar.addRepo": undefined;
+  "web.shell.sidebar.addRepoButton": undefined;
+  "web.shell.sidebar.closeFolder": { readonly name: string | number };
+  "web.shell.sidebar.closeTab": { readonly title: string | number };
+  "web.shell.sidebar.files": undefined;
+  "web.shell.sidebar.mainWorktree": { readonly label: string | number };
+  "web.shell.sidebar.newTerminal": { readonly name: string | number };
+  "web.shell.sidebar.otherFolders": undefined;
+  "web.shell.sidebar.running": undefined;
+  "web.shell.sidebar.runningAgent": { readonly agent: string | number };
+  "web.shell.sidebar.title": undefined;
   "web.tree.sky": undefined;
   "web.ui.pixel.sound.group.field": undefined;
   "web.ui.pixel.sound.group.reward": undefined;

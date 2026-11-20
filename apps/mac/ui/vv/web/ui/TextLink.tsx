@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/layout.tsx's TextLink (layout.tsx
-// here leaves it out). There a link opens in the browser; here a workbench
-// path ("/settings/accounts") goes through the router and any other address
-// to the host's browser (hostApi.openUrl).
 import { Text, View, type JSX } from "nsh";
 
 import { hostApi } from "../../../bridge";

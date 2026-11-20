@@ -340,8 +340,6 @@ pub fn suggestions(db: &mut SqliteConnection, artifact: &str, limit: i64) -> Q<V
     .collect()
 }
 
-// ----- store entries -----
-
 pub fn entries(db: &mut SqliteConnection, artifact: &str) -> Q<Vec<EntryRow>> {
     block_on(queries::artifact_entries(db, queries::ArtifactEntriesParams { artifact_id: artifact.into() }))
 }

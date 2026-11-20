@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/orchestrator/OrchestratorPage.tsx:
-// an orchestrator's head and tabs. The trajectory tab is features/session's
-// TrajectoryLog with the "marked wrong" cases; memory and the voice agent's
-// settings as there.
 import { Scroll, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

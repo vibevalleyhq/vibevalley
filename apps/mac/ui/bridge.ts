@@ -12,6 +12,8 @@
 // act({ type, ... }) for intent back.
 import { host, signal, type Signal } from "nsh";
 
+import type { CommandLineState } from "@vibevalley/protocol/host";
+
 export type Next = { say: string; run?: readonly string[] };
 export type ErrorDetail = { next?: readonly Next[]; settings?: string };
 /** VibeValley's response envelope. `bizCode` 0 is success. */
@@ -22,6 +24,25 @@ const BridgeCode = { Ok: 0, ServiceUnavailable: 100009 } as const;
 
 let counter = 0;
 const nextId = () => `${Date.now().toString(36)}.${(++counter).toString(36)}`;
+
+function isEnvelope(value: unknown): value is Envelope {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "bizCode" in value &&
+    typeof value.bizCode === "number" &&
+    "message" in value &&
+    typeof value.message === "string"
+  );
+}
+
+function isFrameEnvelope(value: unknown): value is FrameEnvelope<unknown> {
+  return typeof value === "object" && value !== null && "rev" in value && typeof value.rev === "number" && "data" in value;
+}
+
+function isSubMessage(value: unknown): value is { event?: unknown; end?: Envelope | null } {
+  return typeof value === "object" && value !== null;
+}
 
 /** One endpoint by name. Never rejects: failures are envelopes with a non-zero bizCode. */
 export function call<T = unknown>(op: string, payload: unknown = null, options?: { timeoutMs?: number }): Promise<Envelope<T>> {
@@ -35,7 +56,12 @@ export function call<T = unknown>(op: string, payload: unknown = null, options?:
     const stop = host.on(`reply:${id}`, (envelope) => {
       stop();
       if (timer !== undefined) clearTimeout(timer);
-      resolve(envelope as unknown as Envelope<T>);
+      if (isEnvelope(envelope)) {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- bridge RPC callers decode `data` per op schema
+        resolve(envelope as Envelope<T>);
+      } else {
+        resolve({ bizCode: BridgeCode.ServiceUnavailable, message: `${op}: invalid bridge envelope` });
+      }
     });
     if (options?.timeoutMs !== undefined && Number.isFinite(options.timeoutMs)) {
       timer = setTimeout(() => {
@@ -60,18 +86,20 @@ function topic(name: string): Signal<FrameEnvelope<unknown> | null> {
   topics.set(name, store);
   s = store;
   host.on(`frame:${name}`, (payload) => {
-    const env = payload as unknown as FrameEnvelope<unknown>;
-    store.set(env);
+    if (!isFrameEnvelope(payload)) return;
+    store.set(payload);
     // A state receipt releases the next workbench snapshot. Other non-live receipts feed the debug dump.
-    if (name !== "live") host.post("action", { type: "applied", topic: name, rev: env.rev });
+    if (name !== "live") host.post("action", { type: "applied", topic: name, rev: payload.rev });
   });
   if (serverTopics.has(name) && host.available()) host.post("action", { type: "watch", topic: name });
   return s;
 }
 
 /** The latest frame of `name` (reactive), `null` until the first one. `frame("state")` is the StateFrame. */
-export function frame<T>(name: string): () => T | null {
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- each topic pushes its own contract shape from Rust
+export function frame<T = unknown>(name: string): () => T | null {
   const s = topic(name);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Rust pushes each topic in its own contract shape
   return () => (s()?.data as T | undefined) ?? null;
 }
 
@@ -81,25 +109,32 @@ export function frameRev(name: string): () => number {
   return () => s()?.rev ?? 0;
 }
 
+/** Subscribes to each incoming frame payload on `name` (validating the FrameEnvelope wrapper). */
+export function onFrame(name: string, listener: (data: unknown) => void): () => void {
+  topic(name);
+  return host.on(`frame:${name}`, (payload) => {
+    if (isFrameEnvelope(payload)) listener(payload.data);
+  });
+}
+
 /** Every LiveEvent from now on. Returns how to stop listening. */
 export function onLive(listener: (event: unknown) => void): () => void {
-  topic("live");
-  return host.on("frame:live", (payload) => listener((payload as unknown as FrameEnvelope<unknown>).data));
+  return onFrame("live", listener);
 }
 
 /** One of rpc.ts's subscriptions (`channel.follow`, ...). `ended` gets `null` when the server ended it,
  * or the refusal's envelope. Returns how to stop it. */
-export function subscribe<E = unknown>(name: string, payload: unknown, on: (event: E) => void, ended?: (why: Envelope | null) => void): () => void {
+export function subscribe(name: string, payload: unknown, on: (event: unknown) => void, ended?: (why: Envelope | null) => void): () => void {
   const id = nextId();
   let open = true;
   const off = host.on(`sub:${id}`, (message) => {
-    const m = message as unknown as { event?: E; end?: Envelope | null };
-    if ("end" in m) {
+    if (!isSubMessage(message)) return;
+    if ("end" in message) {
       open = false;
       off();
-      ended?.(m.end ?? null);
+      ended?.(message.end ?? null);
     } else {
-      on(m.event as E);
+      on(message.event);
     }
   });
   host.post("action", { type: "subscribe", id, name, payload });
@@ -125,7 +160,7 @@ export const hostApi = {
       uiFontSize?: number;
       capabilities: string[];
     }>("host.info"),
-  updateState: () => call<unknown>("host.updateState", null, { timeoutMs: 5_000 }),
+  updateState: () => call("host.updateState", null, { timeoutMs: 5_000 }),
   updateCheck: () => call<void>("host.updateCheck"),
   updateInstall: () => call<void>("host.updateInstall"),
   font: (font: { monoFont?: string; terminalFontSize?: number; uiFontSize?: number }) =>
@@ -162,9 +197,9 @@ export const hostApi = {
   playSound: (name: string) => call<void>("host.playSound", { name }),
   /** A dropped file's bytes (an absolute path or a file: URL; at most 50 MB). */
   readFile: (path: string) => call<{ data: string; type: string; name: string }>("host.readFile", { path }),
-  cliState: () => call<import("@vibevalley/protocol/host").CommandLineState>("host.cliState"),
-  cliInstall: () => call<import("@vibevalley/protocol/host").CommandLineState>("host.cliInstall"),
-  cliRemove: () => call<import("@vibevalley/protocol/host").CommandLineState>("host.cliRemove"),
+  cliState: () => call<CommandLineState>("host.cliState"),
+  cliInstall: () => call<CommandLineState>("host.cliInstall"),
+  cliRemove: () => call<CommandLineState>("host.cliRemove"),
   stopAudio: () => call<void>("host.stopAudio", {}),
 };
 
@@ -178,5 +213,5 @@ export function act(action: Action): void {
 
 /** Which surface this view shows (set by Rust before the bundle loads). */
 export function viewName(): string {
-  return String(host.params.view ?? "stories");
+  return typeof host.params.view === "string" ? host.params.view : "stories";
 }

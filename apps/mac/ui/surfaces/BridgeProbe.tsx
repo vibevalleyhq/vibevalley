@@ -2,7 +2,7 @@
 // contract once and reports the results to the shell (debug dump "probe").
 import { Text, View } from "nsh";
 
-import { act, call, frame, frameRev, hostApi, onLive, subscribe } from "../bridge";
+import { act, call, frame, frameRev, hostApi, onLive, subscribe, type Envelope } from "../bridge";
 import { tok } from "../tokens";
 
 type StateFrame = { seq: number; state: { issues: unknown[] } };
@@ -25,8 +25,8 @@ export function BridgeProbe() {
       (e) => events.push(e),
       (why) => (results.ended = why),
     );
-    const refused = await new Promise((resolve) => subscribe("fake.refuse", {}, () => {}, resolve));
-    results.refused = (refused as { bizCode?: number } | null)?.bizCode ?? null;
+    const refused = await new Promise<Envelope | null>((resolve) => subscribe("fake.refuse", {}, () => {}, resolve));
+    results.refused = refused?.bizCode ?? null;
     await call("fake.emit", { name: "channel.follow", event: { n: 1 } });
     await call("fake.live", { event: { type: "notice", at: 1, level: "info", text: "probe" } });
     await call("fake.setState", { state: { state: { issues: [{ id: "i1" }] } } });

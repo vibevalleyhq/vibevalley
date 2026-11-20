@@ -1,7 +1,5 @@
 //! `provider.*`: the MOSS accounts (connections), which one each use is
-//! bound to, and the account's models and voices. Ported from VibeValley
-//! `platform/provider/connections.ts`, `provider.ts` (`status`, `update`,
-//! `models`, `voices`) and `packages/provider/src/moss/{models,voices}.ts`.
+//! bound to, and the account's models and voices.
 //! The providers live in `settings.json` (`Setting::update_providers`).
 
 use std::sync::Arc;

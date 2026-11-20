@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/MessageList.tsx.
-// The reversed overflow log becomes nsh's List laid out from the bottom,
-// which stays at the newest while the user is there and keeps its place as
-// older pages load above. Not here: a new row does not rise in (no
-// starting: classes on recycled rows).
 import { computed, List, signal, Text, untracked, View, type JSX, type ListRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -621,7 +616,7 @@ function ThreadPreview(props: { thread: Channel }) {
             </>
           )}
         </If>
-        <View style={{ opacity: 0.6 }}>
+        <View class="opacity-60">
           <Icon name="expand" size={12} />
         </View>
       </View>

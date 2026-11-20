@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/features/setting/AppearancePage.tsx.
-// Theme and interface scale sync with both nsh and the GPUI host (`hostApi.font`, `Host.theme`).
 import { host, setColorScheme, signal } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -47,9 +45,9 @@ export function AppearancePage() {
       if (env.bizCode === 0 && env.data) {
         if (env.data.monoFont) monoFont.set(env.data.monoFont);
         if (Array.isArray(env.data.monoFonts) && env.data.monoFonts.length > 0) {
-          const merged = [...defaultMonoFonts];
+          const merged: string[] = [...defaultMonoFonts];
           for (const f of env.data.monoFonts) {
-            if (!merged.includes(f as (typeof defaultMonoFonts)[number])) merged.push(f as (typeof defaultMonoFonts)[number]);
+            if (!merged.includes(f)) merged.push(f);
           }
           availableFonts.set(merged);
         }
@@ -92,9 +90,9 @@ export function AppearancePage() {
             }}
           />
         </SettingRow>
-        <SettingRow label="终端与代码字体 (支持 Nerd Font)" hint="用于终端、Diff 与文件预览的等宽字体，内置 Nerd Font 图标回退链">
+        <SettingRow label={t("web.setting.appearance.monoFontRow")} hint={t("web.setting.appearance.monoFontHint")}>
           <Select
-            label="终端与代码字体"
+            label={t("web.setting.appearance.monoFont")}
             testid="mono-font"
             value={monoFont()}
             options={availableFonts().map((f) => ({ value: f, label: f }))}
@@ -104,9 +102,9 @@ export function AppearancePage() {
             }}
           />
         </SettingRow>
-        <SettingRow label="终端字号" hint="也可在工作区随时按 ⌘+ / ⌘- / ⌘0 调整" last>
+        <SettingRow label={t("web.setting.appearance.terminalFontSize")} hint={t("web.setting.appearance.terminalFontSizeHint")} last>
           <Segmented
-            label="终端字号"
+            label={t("web.setting.appearance.terminalFontSize")}
             testid="terminal-font-size"
             value={String(termSize())}
             options={fontSizes.map((s) => ({ value: String(s), label: `${s}pt` }))}

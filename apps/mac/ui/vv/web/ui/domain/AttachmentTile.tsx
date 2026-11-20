@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/domain/AttachmentTile.tsx. A
-// picture's thumbnail is its file where the server keeps it
-// (infra/attachmentFile: attachment.file), its kind's icon until then.
 import { Image, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -29,7 +26,7 @@ export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void
     <View testID={props.testid} class="max-w-64 flex-row items-center gap-2 rounded-md border border-line bg-page p-1">
       <View class="h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-hover">
         <If when={kind() === "image" ? url() : undefined} else={<Icon name={kindIcon[kind()]} size={16} tone="muted" />}>
-          {(src) => <Image testID="attachment-thumb" src={src()} style={{ width: 32, height: 32, objectFit: "cover" }} />}
+          {(src) => <Image testID="attachment-thumb" src={src()} class="h-8 w-8 object-cover" />}
         </If>
       </View>
       <View class="min-w-0 shrink">

@@ -88,7 +88,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
   const activeArtboard = () => {
     const id = selectedId();
     const all = artboards();
-    return (id ? all.find((a) => a.id === id) : undefined) ?? all[0];
+    return (id ? all.find((a) => a.id === id) : undefined) ?? all.at(0);
   };
   const activePath = () => {
     const ab = activeArtboard();

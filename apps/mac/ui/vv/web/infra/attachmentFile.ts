@@ -11,18 +11,19 @@ import { defineQuery, ready, useQuery } from "./query";
 import { transport } from "./transport";
 
 /** A call through the transport (the bridge in the app, a fixture in stories), its data or a throw. */
-async function data<T>(op: string, payload: unknown): Promise<T> {
+async function callData(op: string, payload: unknown): Promise<unknown> {
   const envelope = await transport().call(op, payload);
   if (envelope.bizCode !== 0) throw new Error(envelope.message);
-  return envelope.data as T;
+  return envelope.data;
 }
 
 const AttachmentFile = z.object({ path: z.string(), type: z.string(), name: z.exactOptional(z.string()) });
+const SavedResult = z.object({ saved: z.boolean() });
 
 const attachmentFileQuery = defineQuery({
   schema: AttachmentFile,
   key: (id: string) => ["attachment", "file", id],
-  fetch: (id: string) => data<unknown>("attachment.file", { id }),
+  fetch: (id: string) => callData("attachment.file", { id }),
   staleTime: Infinity,
   // A refusal is a file gone: asked once, not retried.
   retry: 0,
@@ -47,22 +48,24 @@ export function useAttachmentUrl(id: () => string) {
 
 /** Opens the attachment in the system's app for its kind (VibeValley opens it in a browser tab). */
 export async function openAttachment(id: string) {
-  const file = await data<{ path: string; type: string }>("attachment.file", { id });
-  await data("host.openFile", { path: file.path });
+  const file = AttachmentFile.parse(await callData("attachment.file", { id }));
+  await callData("host.openFile", { path: file.path });
 }
 
 /** Plays a sound file through the host (nsh has no audio on GPUI); one at a time, host.stopAudio stops it. */
-export const playAudio = (path: string, position = 0) => data<void>("host.playAudio", { path, position });
-export const saveFile = (path: string, name?: string) => data<{ saved: boolean }>("host.saveFile", { path, name });
+export const playAudio = async (path: string, position = 0): Promise<void> => {
+  await callData("host.playAudio", { path, position });
+};
+export const saveFile = async (path: string, name?: string) => SavedResult.parse(await callData("host.saveFile", { path, name }));
 
 const LocalFile = z.object({ path: z.string(), name: z.string(), type: z.string(), size: z.number().int().nonnegative() });
 export type LocalFile = z.infer<typeof LocalFile>;
-export const pickFile = async () => LocalFile.nullable().parse(await data<unknown>("host.pickFile", {}));
+export const pickFile = async () => LocalFile.nullable().parse(await callData("host.pickFile", {}));
 
 export async function uploadAudio(file: LocalFile) {
   const reserved = await api.media.input.create({ kind: "audio", name: file.name, mime: file.type, size: file.size });
   try {
-    return S.MediaInput.parse(await data<unknown>("media.input.uploadFile", { id: reserved.id, path: file.path }));
+    return S.MediaInput.parse(await callData("media.input.uploadFile", { id: reserved.id, path: file.path }));
   } catch (error) {
     await api.media.input.delete({ id: reserved.id });
     throw error;
@@ -70,14 +73,14 @@ export async function uploadAudio(file: LocalFile) {
 }
 
 export async function playInput(id: string, position = 0) {
-  const file = AttachmentFile.parse(await data<unknown>("media.input.file", { id }));
+  const file = AttachmentFile.parse(await callData("media.input.file", { id }));
   await playAudio(file.path, position);
 }
 
 const inputFileQuery = defineQuery({
   schema: AttachmentFile,
   key: (id: string) => ["media", "input", "file", id],
-  fetch: (id: string) => data<unknown>("media.input.file", { id }),
+  fetch: (id: string) => callData("media.input.file", { id }),
   staleTime: Infinity,
   retry: 0,
 });

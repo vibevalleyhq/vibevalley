@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Field.tsx: inputs are nsh/base's
-// native Input, the select is nsh/base's Select (headless, as base-ui's)
-// with VibeValley's trigger, popup and rows.
 import { Text, View, type InputRef, type JSX } from "nsh";
 import { Input, Select as Base } from "nsh/base";
 

@@ -147,9 +147,9 @@ export function DinoGame(props: { big?: boolean }) {
     return now ? dinoScore(now) : 0;
   };
   return (
-    <View testID="dino" style={{ flex: 1, alignItems: "center", paddingHorizontal: 4, paddingTop: 12 }}>
+    <View testID="dino" class="flex-1 items-center px-1 pt-3">
       <Stats label={t("web.farm.phone.game.dino")} value={t("web.farm.phone.blocks.best") + " " + five(Math.max(score(), top()))} />
-      <View style={{ alignSelf: "flex-end", marginTop: 4, marginBottom: 8 }}>
+      <View class="mt-1 mb-2 self-end">
         <Words>{five(score())}</Words>
       </View>
       <Board label={t("web.farm.phone.dino.road")} width={dinoWidth} height={dinoHeight} zoom={zoom()} draw={draw}>
@@ -157,9 +157,9 @@ export function DinoGame(props: { big?: boolean }) {
           <Cover
             solid
             lines={[
-              (d()?.over ? t("web.farm.phone.dino.crashed") : t("web.farm.phone.game.dino")) +
+              (d()?.over === true ? t("web.farm.phone.dino.crashed") : t("web.farm.phone.game.dino")) +
                 " · " +
-                t("web.farm.phone.pressA", { what: t(d()?.over ? "web.farm.phone.again" : "web.farm.phone.start") }),
+                t("web.farm.phone.pressA", { what: t(d()?.over === true ? "web.farm.phone.again" : "web.farm.phone.start") }),
             ]}
           />
         </If>

@@ -272,12 +272,12 @@ test("regression: a changed review keeps the dialog open and reads the new patch
   await fake.pump(app);
   expect(fake.calls.find((call) => call.op === "issue.review")?.payload).toEqual({ id: "i31", pass: true, revision });
   expect(ops(fake)).not.toContain("issue.status.update");
-  expect(fake.calls.filter((call) => call.op === "issue.diff.get").at(-1)?.payload).toEqual({ id: "i31", sinceTree: "seen" });
+  expect(fake.calls.findLast((call) => call.op === "issue.diff.get")?.payload).toEqual({ id: "i31", sinceTree: "seen" });
   expect(app.count("id:changes-since-review")).toBe(1);
   expect(app.texts()).toContain("updated.txt");
   await app.press("id:review-complete");
   await fake.pump(app);
-  expect(fake.calls.filter((call) => call.op === "issue.review").at(-1)?.payload).toEqual({
+  expect(fake.calls.findLast((call) => call.op === "issue.review")?.payload).toEqual({
     id: "i31",
     pass: true,
     revision: { baseCommit: "base", tree: "new" },

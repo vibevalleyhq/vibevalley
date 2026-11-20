@@ -80,8 +80,6 @@ struct TypeStyleInput {
 struct SimpleTokenInput {
     id: String,
     value: ThemedString,
-    #[allow(dead_code)]
-    note: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

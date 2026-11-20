@@ -124,7 +124,7 @@ export function DesignSystemView(props: StoreViewerProps) {
   const activeComponent = () => {
     const id = selectedComponent();
     const all = components();
-    return (id ? all.find((c) => c.id === id) : undefined) ?? all[0];
+    return (id ? all.find((c) => c.id === id) : undefined) ?? all.at(0);
   };
 
   const componentView = useStoreViewHtml(() => {

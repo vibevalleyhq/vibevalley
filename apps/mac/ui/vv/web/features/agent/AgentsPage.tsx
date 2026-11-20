@@ -1,9 +1,3 @@
-// Ported from VibeValley apps/web/src/features/agent/AgentsPage.tsx: the
-// orchestrators and the helpers as cards, each to its profile. The faces
-// are letters until the farm's pixel art is drawn here (ui/domain/Face);
-// the portrait's radial glow is a flat tint of the hat colour. The enable
-// toggle shows on hover as there; nsh has no group hover, so it shows
-// while the card is hovered by a signal.
 import { Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -149,9 +143,7 @@ function OrchestratorCard(props: { agent: Agent }) {
         </View>
         <View class="min-w-0 flex-1 gap-0.5">
           <Text class="text-base font-semibold text-ink">{props.agent.name}</Text>
-          <Text class="text-sm text-muted" style={{ numberOfLines: 2 }}>
-            {props.agent.duty || t("web.agent.list.orchestratorLine")}
-          </Text>
+          <Text class="line-clamp-2 text-sm text-muted">{props.agent.duty || t("web.agent.list.orchestratorLine")}</Text>
         </View>
       </View>
       <View class="mt-auto flex-row items-center gap-3 border-t border-line pt-3">
@@ -232,9 +224,7 @@ function AgentCard(props: {
               </View>
             </If>
           </View>
-          <Text class="text-sm text-muted" style={{ numberOfLines: 2 }}>
-            {props.agent.duty}
-          </Text>
+          <Text class="line-clamp-2 text-sm text-muted">{props.agent.duty}</Text>
           <View class="min-w-0 flex-row items-center gap-1.5 pt-1">
             <View class={`h-1.75 w-1.75 shrink-0 rounded-full ${available() ? "bg-leaf" : "bg-berry"}`} />
             <Text class="truncate text-xs text-muted">

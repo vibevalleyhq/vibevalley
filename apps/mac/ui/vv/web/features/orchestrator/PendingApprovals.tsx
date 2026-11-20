@@ -55,9 +55,7 @@ export function PendingApprovals(props: { conversationId: string }) {
                     </View>
                     <Text class="text-sm text-ink">{item().reason}</Text>
                     <Text class="text-xs text-muted">{t("web.session.trajectory.input")}</Text>
-                    <Text class="font-mono text-xs text-ink" style={{ userSelect: "text" }}>
-                      {item().argumentsJson}
-                    </Text>
+                    <Text class="select-text font-mono text-xs text-ink">{item().argumentsJson}</Text>
                     <View class="flex-row items-center gap-2">
                       <Button testID={`approval-allow-${item().toolCallId}`} disabled={act.busy()} onPress={() => void decide(item(), true)}>
                         {t("web.orchestrator.approval.allow")}

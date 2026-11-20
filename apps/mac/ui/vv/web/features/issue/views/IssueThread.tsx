@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/IssueThread.tsx:
-// the issue's conversation, read through the chat's own model
-// (features/channel, vendored by the chat port).
 import { Text, View } from "nsh";
 import { z } from "zod";
 

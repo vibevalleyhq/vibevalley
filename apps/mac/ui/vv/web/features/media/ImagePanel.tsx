@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/features/media/ImagePanel.tsx: image
-// generation form and recent image jobs.
 import { Image, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -81,14 +79,25 @@ export function ImagePanel() {
           </Field>
           <View class="grid grid-cols-2 gap-3">
             <Field label={t("web.media.width")}>
-              <TextInput testID="media-width" accessibilityLabel={t("web.media.width")} value={String(width())} onInput={(v) => width.set(Number(v) || 1024)} />
+              <TextInput
+                testID="media-width"
+                accessibilityLabel={t("web.media.width")}
+                value={String(width())}
+                onInput={(v) => {
+                  const n = Number(v);
+                  width.set(Number.isFinite(n) && n !== 0 ? n : 1024);
+                }}
+              />
             </Field>
             <Field label={t("web.media.height")}>
               <TextInput
                 testID="media-height"
                 accessibilityLabel={t("web.media.height")}
                 value={String(height())}
-                onInput={(v) => height.set(Number(v) || 1024)}
+                onInput={(v) => {
+                  const n = Number(v);
+                  height.set(Number.isFinite(n) && n !== 0 ? n : 1024);
+                }}
               />
             </Field>
           </View>
@@ -192,7 +201,7 @@ function JobCard(props: { job: MediaImageJob }) {
         <If when={props.job.attachment}>
           {(file) => (
             <>
-              <If when={url()}>{(src) => <Image testID="media-image" src={src()} style={{ width: 280, height: 220, objectFit: "contain" }} />}</If>
+              <If when={url()}>{(src) => <Image testID="media-image" src={src()} class="h-55 w-70 object-contain" />}</If>
               <Button testID="media-save" onPress={() => void openAttachment(file().id)}>
                 {t("web.media.save")}
               </Button>

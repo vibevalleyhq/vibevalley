@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/PresenterPage.tsx:
-// the speaker's view of a deck (both html and store-backed slides): this slide,
-// the next, its notes and the time. VibeValley opens it as a popup window that
-// follows the workbench's tab over a BroadcastChannel; here it is a page of the
-// same view (with a way back to the deck), so no BroadcastChannel is needed.
 import { cleanup, keymap, Scroll, signal, Text, View, WebView } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -149,7 +144,7 @@ function Presenter(props: { id: string; version: number }) {
         </If>
         <Text class="text-xs text-faint">{t("web.artifact.presenter.notes")}</Text>
         <Scroll class="min-h-0 flex-1">
-          <Text testID="presenter-notes" class="text-lg text-ink" style={{ lineHeight: 28.8 }}>
+          <Text testID="presenter-notes" class="text-lg leading-[28.8px] text-ink">
             {pages() > 0 ? notes() || t("web.artifact.presenter.noNotes") : ""}
           </Text>
         </Scroll>

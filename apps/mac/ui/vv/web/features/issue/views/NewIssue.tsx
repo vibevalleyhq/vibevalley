@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/NewIssue.tsx:
-// the sheet that writes a new issue from a few words. Command+Return keeps
-// it (a key binding while the sheet is up), as the form's submit did.
 import { cleanup, effect, keymap, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -66,7 +63,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           rows={4}
           value={text()}
           autoFocus
-          onInput={text.set}
+          onInput={(v) => text.set(v)}
           onFocus={() => editing.set(true)}
           onBlur={() => editing.set(false)}
         />
@@ -78,7 +75,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
             testid="issue-new-repo"
             value={repo()}
             placeholder={t("web.issue.todo.whichRepo")}
-            onChange={repo.set}
+            onChange={(v) => repo.set(v)}
             options={[...new Set([...repos(), ...(repo() ? [repo()] : [])])].map((p) => ({ value: p, label: p }))}
           />
           <Select
@@ -88,7 +85,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
             testid="issue-new-helper"
             value={agent()}
             placeholder={t("web.issue.todo.pickForMe")}
-            onChange={agent.set}
+            onChange={(v) => agent.set(v)}
             options={agents().map((a) => ({ value: a.id, label: a.name }))}
           />
         </View>

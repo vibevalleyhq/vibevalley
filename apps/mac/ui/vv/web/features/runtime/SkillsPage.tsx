@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/runtime/SkillsPage.tsx: the
-// skills book (installed by runtime, built in, the farm's own) and the
-// skill editor on the same form model (infra/form, vendored). Its route,
-// /settings/skills, is the settings page's.
 import { Scroll, signal, Text, View } from "nsh";
 import { z } from "zod";
 

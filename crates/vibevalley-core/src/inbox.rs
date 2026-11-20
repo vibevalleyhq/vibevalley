@@ -1,6 +1,4 @@
-//! What waits on the user, gathered from the state. Ported from VibeValley
-//! `apps/server/src/modules/watch/items.ts` and `watch/prompts.ts`
-//! (`patrolBrief`, `patrolWho`), and `packages/protocol/src/rules/inbox.ts`.
+//! What waits on the user, gathered from the state.
 
 use std::collections::{HashMap, HashSet};
 

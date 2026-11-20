@@ -1,6 +1,5 @@
 //! The runtimes the profiles run on: what is installed, its models, and
-//! what stops it taking work. Ported from VibeValley
-//! `modules/agent/runtime.ts` on `vibevalley-oar`' `Registry`.
+//! what stops it taking work.
 //!
 //! VibeValley's runtime ids are kept on the wire; one that `vibevalley-oar`
 //! registers as `acp:<id>` (opencode) is found under it. Runtimes the

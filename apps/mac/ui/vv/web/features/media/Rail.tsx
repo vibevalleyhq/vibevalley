@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/features/media/Rail.tsx: origin,
-// file-kind, and deliverable facet filters with cross-filtered counts.
 import { Scroll, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -108,10 +106,12 @@ export function Rail(props: {
             value={inArtifacts() ? `artifact:${props.artifactKind}` : props.kind}
             onChange={(v) => {
               if (v.startsWith("artifact:")) {
-                props.onArtifactKind?.(v.slice("artifact:".length) as ArtifactKindFilter);
+                const next = artifactKinds.find((k) => k === v.slice("artifact:".length));
+                if (next !== undefined) props.onArtifactKind?.(next);
               } else {
                 props.onArtifactKind?.(undefined);
-                props.onKind(v as KindFilter);
+                const next = kinds.find((k) => k === v);
+                if (next !== undefined) props.onKind(next);
               }
             }}
             options={[

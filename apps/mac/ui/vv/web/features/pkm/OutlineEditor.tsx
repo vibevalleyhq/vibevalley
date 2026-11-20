@@ -1,20 +1,4 @@
-// Ported from VibeValley apps/web/src/features/pkm/OutlineEditor.tsx: a
-// block's row (indent guides, bullet that folds, marker box, words or the
-// box, remark count) and the box a block is written in, with VibeValley's
-// own key rules (editing.ts editAction, pasteAction, completions).
-//
-// The box is nsh/base's multiline Input. Its keys: Return is the input's
-// submit (Shift+Return breaks the line); Tab, Shift+Tab, Alt+↑↓, ⌘Return
-// and Escape are keymap bindings held while it has the focus; ↑ ↓, Shift+↑
-// ↓ and ⌘Z are bound only while the caret is where they act (first or last
-// line, the box's ends, nothing typed), so elsewhere the input moves the
-// caret itself; Backspace at the start is read from onKeyPress (the input
-// deletes nothing there). Pastes are reported, a multi-line one becomes
-// blocks. A row is dragged by its bullet as a pan gesture (nsh has no HTML
-// drag and drop): OutlineView measures the rows and says where it would
-// land. Not ported: the phone toolbar (Toolbar).
-import { effect, keymap, PanResponder, signal, Text, untracked, View, type JSX } from "nsh";
-import type { InputRef, ViewRef } from "nsh";
+import { effect, keymap, PanResponder, signal, Text, untracked, View, type JSX, type InputRef, type ViewRef } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";

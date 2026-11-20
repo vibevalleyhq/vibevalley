@@ -48,7 +48,7 @@ test("regression: harvest keeps a changed plot open until the new tree is review
   await app.press("id:harvest-take");
   await fake.pump(app);
   expect(fake.calls.some((c) => c.op === "issue.status.update")).toBe(false);
-  expect(fake.calls.filter((c) => c.op === "issue.diff.get").at(-1)?.payload).toEqual({ id: "i31", sinceTree: original.tree });
+  expect(fake.calls.findLast((c) => c.op === "issue.diff.get")?.payload).toEqual({ id: "i31", sinceTree: original.tree });
   expect(app.texts()).toContain("A new.txt");
   await app.press("id:harvest-take");
   await fake.pump(app);

@@ -1,6 +1,6 @@
 // Motion table (docs/design/components.md section 3). Every duration goes
 // through `ms`, which is 0 under reduced motion so end states still apply.
-import { reduceMotion } from "nsh";
+import { LayoutAnimation, reduceMotion } from "nsh";
 
 export const ease = "cubic-bezier(0.22, 1, 0.36, 1)";
 
@@ -39,8 +39,6 @@ export function formatElapsed(msElapsed: number): string {
   if (m < 60) return `${m}m ${String(s % 60).padStart(2, "0")}s`;
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
 }
-
-import { LayoutAnimation } from "nsh";
 
 /** Animates the size changes of the next commit (expand, collapse, fold). */
 export function animateLayout(duration: number = durations.expandHeight): void {

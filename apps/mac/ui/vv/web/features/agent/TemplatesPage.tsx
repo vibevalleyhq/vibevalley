@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/features/agent/TemplatesPage.tsx.
-// The folder to add from is typed, as there; Return in it adds.
 import { Scroll, signal, Text, View } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
@@ -134,11 +132,9 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
               <Text class="text-xs text-muted">{t(`web.agent.role.${template().role}`)}</Text>
             </View>
           </View>
-          <Text class="text-sm text-muted" style={{ numberOfLines: 2 }}>
-            {template().duty}
-          </Text>
+          <Text class="line-clamp-2 text-sm text-muted">{template().duty}</Text>
           <If when={skills().length > 0}>
-            <Text testID="template-skills" class="text-sm text-muted" style={{ numberOfLines: 2 }}>
+            <Text testID="template-skills" class="line-clamp-2 text-sm text-muted">
               {t("web.agent.templates.skills", { skills: list(skills().map((s) => s.name)) })}
             </Text>
           </If>

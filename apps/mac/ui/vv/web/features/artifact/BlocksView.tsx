@@ -1,15 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/BlocksView.tsx: a
-// blocks artifact written together: each block's author bar and face, the
-// marks drawn until a block is pressed, then a box of its own; open
-// suggestions to take or turn down; VibeValley's BlockEditor (vendored,
-// packages/artifact/src/editor.ts) does the rest.
-//
-// The box is nsh/base's multiline Input. Return types a line break, which
-// the editor turns into a new block (code keeps it); Backspace at the start
-// is read from onKeyPress; ↑ at the start and ↓ at the end are keymap
-// bindings held only while the caret is there. Not here: the suggestions
-// put into the page's side panel with a Portal; `onRail` hands the page the
-// list to draw there instead.
 import { effect, keymap, signal, Scroll, Text, untracked, View, type InputRef, type JSX } from "nsh";
 import { Input } from "nsh/base";
 

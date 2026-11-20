@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/layout.tsx: Split, ListCard,
-// ListRow, Card, Quiet, Empty, Toggle (nsh/base's Switch, as base-ui's)
-// and SecretInput. Not here: TextLink, titleBar and WindowStrip (the
-// desktop window's own strip is the GPUI app's).
 import { signal, Scroll, Text, View, type JSX } from "nsh";
 import { Switch } from "nsh/base";
 
@@ -78,7 +74,7 @@ export function Card(props: { title?: JSX.Element; action?: JSX.Element; childre
           <View class="min-w-0 flex-1">
             <If when={typeof props.title === "string"} else={props.title}>
               <Text role="header" class="truncate text-base font-semibold text-ink">
-                {props.title as string}
+                {props.title}
               </Text>
             </If>
           </View>

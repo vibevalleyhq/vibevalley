@@ -19,14 +19,14 @@ function blocksOf(slug: string, rows: readonly Row[]): PkmBlock[] {
   const stack: PkmBlock[] = [];
   return rows.map(([depth, body, extra]) => {
     stack.length = depth;
-    const parent = stack[depth - 1];
+    const parent = stack.at(depth - 1);
     const block: PkmBlock = {
       id: extra?.id ?? `${slug}-${++ids}`,
       depth,
       body,
       props: {},
       path: stack.map((b) => b.body.split("\n")[0] ?? "").join(" › "),
-      ...(parent ? { parent: parent.id } : {}),
+      ...(depth > 0 && parent ? { parent: parent.id } : {}),
       ...extra,
     };
     stack[depth] = block;
