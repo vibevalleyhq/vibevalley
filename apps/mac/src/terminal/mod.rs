@@ -12,11 +12,12 @@ use std::time::{Duration, Instant};
 
 use gpui_kit::{
     App, AppContext as _, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent, Modifiers,
-    MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point, Render, ScrollEvent, Styled as _, Window, div, point, px,
+    ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point, Render, ScrollEvent,
+    StatefulInteractiveElement as _, Styled as _, Window, div, point, px,
 };
-use unicode_segmentation::UnicodeSegmentation;
 use vibevalley_terminal::{
-    Mods, MouseButton as TermButton, MouseInput, MouseKind, Row, SelectionMode, Snapshot, SpawnOptions, TermEvent, TermSession, TermSize,
+    LinkMatch, LinkResolveContext, LinkSpan, LinkTarget, Mods, MouseButton as TermButton, MouseInput, MouseKind, Row, SelectionMode, Snapshot, SpawnOptions,
+    TermEvent, TermSession, TermSize, link_at_with,
 };
 
 pub use element::Geometry;
@@ -29,6 +30,8 @@ gpui_kit::actions!(terminal, [Copy, Paste, Clear, ScrollPageUp, ScrollPageDown, 
 #[derive(Debug, Clone)]
 pub struct SpawnSpec {
     pub cwd: PathBuf,
+    /// Owning workspace project root, used as fallback when resolving relative links.
+    pub project_root: Option<PathBuf>,
     pub title: Option<String>,
     pub program: Option<String>,
     pub args: Vec<String>,
@@ -41,6 +44,7 @@ impl SpawnSpec {
     pub fn shell(cwd: PathBuf) -> Self {
         SpawnSpec {
             cwd,
+            project_root: None,
             title: None,
             program: None,
             args: Vec::new(),
@@ -59,7 +63,7 @@ pub enum TerminalEvent {
     Bell,
     CommandFinished,
     Exited,
-    OpenLink(String),
+    OpenLink(LinkTarget),
 }
 
 enum Input {
@@ -129,6 +133,14 @@ impl TerminalStatus {
 /// working rather than sitting idle at its input prompt.
 const ACTIVE_OUTPUT_WINDOW: Duration = Duration::from_secs(3);
 
+struct HoveredLink {
+    link: LinkMatch,
+    snapshot_seq: u64,
+    /// Rows that produced `link`, checked via `Arc::ptr_eq` on `Dirty` to drop
+    /// stale underlines without running link resolution during output bursts.
+    row_refs: Vec<(u16, Arc<Row>)>,
+}
+
 pub struct TerminalView {
     state: State,
     pending_input: Vec<Input>,
@@ -150,6 +162,13 @@ pub struct TerminalView {
     dragging: bool,
     /// Cell where a click started, and whether its selection is still unstarted.
     drag_anchor: Option<(vibevalley_terminal::Point, bool)>,
+    /// Cell where a plain (non-Cmd, non-Shift) single click started when no
+    /// selection was active; cleared as soon as the pointer drags to another cell.
+    plain_click_cell: Option<vibevalley_terminal::Point>,
+    hovered_cell: Option<vibevalley_terminal::Point>,
+    hover_eval_key: Option<(u64, vibevalley_terminal::Point, bool)>,
+    hovered_link: Option<HoveredLink>,
+    cmd_held: bool,
     context_menu: Option<Point<Pixels>>,
 }
 
@@ -226,6 +245,11 @@ impl TerminalView {
             scroll_remainder: px(0.0),
             dragging: false,
             drag_anchor: None,
+            plain_click_cell: None,
+            hovered_cell: None,
+            hover_eval_key: None,
+            hovered_link: None,
+            cmd_held: false,
             context_menu: None,
         }
     }
@@ -458,6 +482,7 @@ impl TerminalView {
     fn on_term_event(&mut self, event: TermEvent, cx: &mut Context<Self>) {
         match event {
             TermEvent::Dirty => {
+                self.invalidate_stale_hover();
                 self.last_output_at = Some(Instant::now());
                 let now_status = self.terminal_status();
                 if now_status.state == RunningState::Working {
@@ -608,18 +633,146 @@ impl TerminalView {
         !modifiers.shift && self.snapshot().is_some_and(|s| s.mouse_reporting)
     }
 
+    pub(crate) fn hovered_link_spans(&self) -> Vec<LinkSpan> {
+        self.hovered_link.as_ref().map(|h| h.link.spans.clone()).unwrap_or_default()
+    }
+
+    fn link_resolve_context(&self) -> LinkResolveContext {
+        LinkResolveContext::new(Some(self.directory()), self.spec.project_root.clone())
+    }
+
+    fn match_link_in(&self, snapshot: &Snapshot, at: vibevalley_terminal::Point) -> Option<LinkMatch> {
+        link_at_with(snapshot, at, || self.link_resolve_context())
+    }
+
+    fn resolve_link_at(&self, at: vibevalley_terminal::Point) -> Option<LinkMatch> {
+        let snapshot = self.snapshot()?;
+        if let Some(hovered) = &self.hovered_link
+            && hovered.snapshot_seq == snapshot.seq
+            && hovered.link.contains(at)
+        {
+            return Some(hovered.link.clone());
+        }
+        self.match_link_in(&snapshot, at)
+    }
+
+    fn clear_hover(&mut self, cx: &mut Context<Self>) {
+        self.hovered_cell = None;
+        self.hover_eval_key = None;
+        if self.hovered_link.take().is_some() {
+            cx.notify();
+        }
+    }
+
+    fn invalidate_stale_hover(&mut self) {
+        let Some(snapshot) = self.snapshot() else {
+            self.hovered_link = None;
+            self.hover_eval_key = None;
+            return;
+        };
+        if let Some(hovered) = &self.hovered_link {
+            let allow_hover = !snapshot.mouse_reporting || self.cmd_held;
+            let rows_unchanged = hovered
+                .row_refs
+                .iter()
+                .all(|(row_idx, old_row)| snapshot.rows.get(usize::from(*row_idx)).is_some_and(|cur| Arc::ptr_eq(cur, old_row)));
+            if !allow_hover || !rows_unchanged {
+                self.hovered_link = None;
+                self.hover_eval_key = None;
+            }
+        } else {
+            self.hover_eval_key = None;
+        }
+    }
+
+    fn update_hover(&mut self, cell: Option<vibevalley_terminal::Point>, cmd_held: bool, cx: &mut Context<Self>) {
+        self.hovered_cell = cell;
+        self.cmd_held = cmd_held;
+        if self.context_menu.is_some() || self.dragging {
+            self.hover_eval_key = None;
+            if self.hovered_link.take().is_some() {
+                cx.notify();
+            }
+            return;
+        }
+        let (Some(cell), Some(snapshot)) = (cell, self.snapshot()) else {
+            self.hover_eval_key = None;
+            if self.hovered_link.take().is_some() {
+                cx.notify();
+            }
+            return;
+        };
+        let allow_hover = !snapshot.mouse_reporting || cmd_held;
+        let eval_key = (snapshot.seq, cell, cmd_held);
+        if !allow_hover {
+            self.hover_eval_key = Some(eval_key);
+            if self.hovered_link.take().is_some() {
+                cx.notify();
+            }
+            return;
+        }
+        if self.hover_eval_key == Some(eval_key) {
+            return;
+        }
+        if let Some(existing) = &self.hovered_link
+            && existing.snapshot_seq == snapshot.seq
+            && existing.link.contains(cell)
+        {
+            self.hover_eval_key = Some(eval_key);
+            return;
+        }
+
+        let next = self.match_link_in(&snapshot, cell);
+        self.hover_eval_key = Some(eval_key);
+        let unchanged = self.hovered_link.as_ref().map(|h| &h.link) == next.as_ref();
+        self.hovered_link = next.map(|link| {
+            let row_refs = link
+                .spans
+                .iter()
+                .filter_map(|span| snapshot.rows.get(usize::from(span.row)).map(|row| (span.row, row.clone())))
+                .collect();
+            HoveredLink {
+                link,
+                snapshot_seq: snapshot.seq,
+                row_refs,
+            }
+        });
+        if !unchanged {
+            cx.notify();
+        }
+    }
+
+    fn on_modifiers_changed(&mut self, event: &ModifiersChangedEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if event.modifiers.platform != self.cmd_held {
+            self.update_hover(self.hovered_cell, event.modifiers.platform, cx);
+        }
+    }
+
     fn on_mouse_down(&mut self, event: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         window.focus(&self.focus, cx);
+        self.cmd_held = event.modifiers.platform;
+        self.plain_click_cell = None;
         let (Some(session), Some(g)) = (self.session().cloned(), self.geometry) else {
             return;
         };
         let at = g.cell_at(event.position);
+        let exact = g.cell_at_exact(event.position);
         let button = match event.button {
             MouseButton::Left => TermButton::Left,
             MouseButton::Middle => TermButton::Middle,
             MouseButton::Right => TermButton::Right,
             _ => return,
         };
+        // Cmd+Click overrides embedded TUI mouse reporting when over a matched link.
+        if button == TermButton::Left
+            && event.modifiers.platform
+            && self.context_menu.is_none()
+            && let Some(cell) = exact
+            && let Some(hit) = self.resolve_link_at(cell)
+        {
+            cx.emit(TerminalEvent::OpenLink(hit.target));
+            return;
+        }
         if self.reports_mouse(event.modifiers) {
             if self.context_menu.take().is_some() {
                 cx.notify();
@@ -630,9 +783,11 @@ impl TerminalView {
                 mods: mods(event.modifiers),
             });
             self.dragging = button == TermButton::Left;
+            self.drag_anchor = None;
             return;
         }
         if button == TermButton::Right {
+            self.clear_hover(cx);
             let local_x = (event.position.x - g.origin.x + px(element::PADDING)).max(px(4.0));
             let local_y = (event.position.y - g.origin.y + px(element::PADDING)).max(px(4.0));
             let max_x = (g.cell_width * g.size.cols as f32 + px(element::PADDING * 2.0) - px(164.0)).max(px(4.0));
@@ -648,16 +803,7 @@ impl TerminalView {
             cx.notify();
             return;
         }
-        if event.modifiers.platform {
-            if let Some(url) = self.hyperlink_at(at) {
-                cx.open_url(&url);
-                return;
-            }
-            if let Some(token) = self.link_token_at(at) {
-                cx.emit(TerminalEvent::OpenLink(token));
-                return;
-            }
-        }
+        let had_selection = self.snapshot().is_some_and(|s| s.selection.is_some());
         if event.modifiers.shift {
             session.selection_extend(at);
         } else {
@@ -669,23 +815,27 @@ impl TerminalView {
             session.selection_clear();
             if event.click_count > 1 {
                 session.selection_start(at, mode);
+            } else if !had_selection && !event.modifiers.platform {
+                self.plain_click_cell = exact;
             }
         }
         self.dragging = true;
         self.drag_anchor = Some((at, event.click_count <= 1));
     }
 
-    fn on_mouse_move(&mut self, event: &MouseMoveEvent, _: &mut Window, _: &mut Context<Self>) {
+    fn on_mouse_move(&mut self, event: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
         let (Some(session), Some(g)) = (self.session().cloned(), self.geometry) else {
             return;
         };
         let at = g.cell_at(event.position);
+        let exact = g.cell_at_exact(event.position);
         if self.reports_mouse(event.modifiers) {
             session.send_mouse(MouseInput {
                 kind: MouseKind::Move,
                 at,
                 mods: mods(event.modifiers),
             });
+            self.update_hover(exact, event.modifiers.platform, cx);
             return;
         }
         if self.dragging && event.pressed_button == Some(MouseButton::Left) {
@@ -695,16 +845,22 @@ impl TerminalView {
                 if anchor == at {
                     return;
                 }
+                self.plain_click_cell = None;
+                self.clear_hover(cx);
                 session.selection_start(anchor, SelectionMode::Cell);
                 self.drag_anchor = Some((anchor, false));
             }
             session.selection_extend(at);
+            return;
         }
+        self.update_hover(exact, event.modifiers.platform, cx);
     }
 
-    fn on_mouse_up(&mut self, event: &MouseUpEvent, _: &mut Window, _: &mut Context<Self>) {
+    fn on_mouse_up(&mut self, event: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {
+        self.cmd_held = event.modifiers.platform;
         let was_dragging = std::mem::take(&mut self.dragging);
         self.drag_anchor = None;
+        let plain_click = self.plain_click_cell.take();
         let (Some(session), Some(g)) = (self.session(), self.geometry) else { return };
         let button = match event.button {
             MouseButton::Left => TermButton::Left,
@@ -718,7 +874,24 @@ impl TerminalView {
                 at: g.cell_at(event.position),
                 mods: mods(event.modifiers),
             });
+            return;
         }
+        if button == TermButton::Left
+            && !self.reports_mouse(event.modifiers)
+            && !event.modifiers.shift
+            && !event.modifiers.platform
+            && let Some(down_cell) = plain_click
+            && g.cell_at_exact(event.position) == Some(down_cell)
+            && let Some(hit) = self.resolve_link_at(down_cell)
+        {
+            cx.emit(TerminalEvent::OpenLink(hit.target));
+        }
+    }
+
+    fn on_mouse_up_out(&mut self, event: &MouseUpEvent, window: &mut Window, cx: &mut Context<Self>) {
+        self.plain_click_cell = None;
+        self.clear_hover(cx);
+        self.on_mouse_up(event, window, cx);
     }
 
     fn on_scroll(&mut self, event: &ScrollEvent, _: &mut Window, _: &mut Context<Self>) {
@@ -757,97 +930,6 @@ impl TerminalView {
             session.scroll_lines(lines);
         }
     }
-
-    fn hyperlink_at(&self, at: vibevalley_terminal::Point) -> Option<String> {
-        let snapshot = self.snapshot()?;
-        let row = snapshot.rows.get(at.row as usize)?;
-        row.runs
-            .iter()
-            .find(|run| at.col >= run.start_col && at.col < run.start_col + run.cols)
-            .and_then(|run| run.hyperlink.as_ref())
-            .map(|url| url.to_string())
-    }
-
-    fn link_token_at(&self, at: vibevalley_terminal::Point) -> Option<String> {
-        let snapshot = self.snapshot()?;
-        let row = snapshot.rows.get(at.row as usize)?;
-        extract_link_token(row, at.col)
-    }
-}
-
-fn extract_link_token(row: &Row, col: u16) -> Option<String> {
-    let mut line = String::new();
-    let mut cur_col = 0u16;
-    let mut target_byte = None;
-    for run in &row.runs {
-        if run.start_col > cur_col {
-            for _ in 0..(run.start_col - cur_col) {
-                line.push(' ');
-            }
-            cur_col = run.start_col;
-        }
-        for g in run.text.graphemes(true) {
-            let w = element::grapheme_cols(g);
-            if col >= cur_col && col < cur_col + w {
-                target_byte = Some(line.len());
-            }
-            line.push_str(g);
-            cur_col += w;
-        }
-    }
-    let byte_idx = target_byte?;
-    if line[byte_idx..].chars().next()?.is_whitespace() {
-        return None;
-    }
-    let start = line[..byte_idx]
-        .rfind(char::is_whitespace)
-        .map_or(0, |i| i + line[i..].chars().next().map_or(1, char::len_utf8));
-    let end = line[byte_idx..].find(char::is_whitespace).map_or(line.len(), |i| byte_idx + i);
-    let trimmed = line[start..end]
-        .trim_matches(|c: char| matches!(c, '(' | ')' | '[' | ']' | '<' | '>' | '\'' | '"' | ',' | ';'))
-        .trim_end_matches(':');
-    looks_like_link_or_path(trimmed).then(|| trimmed.to_string())
-}
-
-fn strip_line_col(s: &str) -> &str {
-    let mut base = s;
-    for _ in 0..2 {
-        if let Some((head, tail)) = base.rsplit_once(':')
-            && !head.is_empty()
-            && !tail.is_empty()
-            && tail.bytes().all(|b| b.is_ascii_digit())
-        {
-            base = head;
-        } else {
-            break;
-        }
-    }
-    base
-}
-
-fn looks_like_link_or_path(token: &str) -> bool {
-    if token.is_empty() {
-        return false;
-    }
-    if token.starts_with("http://") {
-        return token.len() > "http://".len();
-    }
-    if token.starts_with("https://") {
-        return token.len() > "https://".len();
-    }
-    let base = strip_line_col(token);
-    if base.is_empty() {
-        return false;
-    }
-    if base.contains('/') {
-        return base.chars().any(char::is_alphanumeric);
-    }
-    const CODE_EXTS: &[&str] = &[
-        "rs", "ts", "tsx", "js", "jsx", "mjs", "cjs", "json", "toml", "yaml", "yml", "md", "markdown", "py", "go", "swift", "c", "h", "cpp", "hpp", "sh",
-        "zsh", "css", "html", "sql", "txt", "lock",
-    ];
-    base.rsplit_once('.')
-        .is_some_and(|(stem, ext)| !stem.is_empty() && CODE_EXTS.iter().any(|e| ext.eq_ignore_ascii_case(e)))
 }
 
 impl EventEmitter<TerminalEvent> for TerminalView {}
@@ -1035,7 +1117,7 @@ impl Render for TerminalView {
             _ if self.exited => Some("[process exited]".to_string()),
             _ => None,
         };
-        div()
+        let mut root = div()
             .id("terminal")
             .size_full()
             .relative()
@@ -1044,6 +1126,12 @@ impl Render for TerminalView {
             .key_context("Terminal")
             .capture_key_down(cx.listener(Self::on_capture_key_down))
             .on_key_down(cx.listener(Self::on_key_down))
+            .on_modifiers_changed(cx.listener(Self::on_modifiers_changed))
+            .on_hover(cx.listener(|this, hovered: &bool, _, cx| {
+                if !*hovered {
+                    this.clear_hover(cx);
+                }
+            }))
             .on_action(cx.listener(Self::copy))
             .on_action(cx.listener(Self::paste))
             .on_action(cx.listener(Self::clear))
@@ -1059,11 +1147,14 @@ impl Render for TerminalView {
             .on_mouse_down(MouseButton::Right, cx.listener(Self::on_mouse_down))
             .on_mouse_move(cx.listener(Self::on_mouse_move))
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
-            .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
+            .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up_out))
             .on_mouse_up(MouseButton::Middle, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Right, cx.listener(Self::on_mouse_up))
-            .on_scroll(cx.listener(Self::on_scroll))
-            .child(TerminalElement::new(cx.entity(), self.focus.clone()))
+            .on_scroll(cx.listener(Self::on_scroll));
+        if self.hovered_link.is_some() {
+            root = root.cursor_pointer();
+        }
+        root.child(TerminalElement::new(cx.entity(), self.focus.clone()))
             .children(message.map(|text| {
                 div()
                     .absolute()
@@ -1151,47 +1242,26 @@ impl Render for TerminalView {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vibevalley_terminal::{CellStyle, Rgb, Run};
-
-    fn make_row(text: &str) -> Row {
-        Row {
-            runs: vec![Run {
-                start_col: 0,
-                cols: text.len() as u16,
-                text: text.to_string(),
-                style: CellStyle {
-                    fg: Rgb(255, 255, 255),
-                    bg: None,
-                    bold: false,
-                    italic: false,
-                    dim: false,
-                    underline: false,
-                    strikethrough: false,
-                },
-                hyperlink: None,
-            }],
-            wrapped: false,
-        }
-    }
 
     #[test]
-    fn extracts_urls_and_file_paths() {
-        let row = make_row("see (https://example.com/a/b), apps/mac/src/shell.rs:42:5; Cargo.toml hello");
-        assert_eq!(extract_link_token(&row, 10).as_deref(), Some("https://example.com/a/b"));
-        assert_eq!(extract_link_token(&row, 35).as_deref(), Some("apps/mac/src/shell.rs:42:5"));
-        assert_eq!(extract_link_token(&row, 62).as_deref(), Some("Cargo.toml"));
-        assert_eq!(extract_link_token(&row, 70), None);
-    }
-
-    #[test]
-    fn rejects_plain_words_and_bare_slashes() {
-        assert!(!looks_like_link_or_path(""));
-        assert!(!looks_like_link_or_path("hello"));
-        assert!(!looks_like_link_or_path("/"));
-        assert!(!looks_like_link_or_path("http://"));
-        assert!(!looks_like_link_or_path(".rs"));
-        assert!(looks_like_link_or_path("lib.rs:10"));
-        assert!(looks_like_link_or_path("./README.md"));
+    fn geometry_cell_at_exact_rejects_padding_and_out_of_bounds() {
+        let g = Geometry {
+            origin: point(px(6.0), px(6.0)),
+            cell_width: px(8.0),
+            line_height: px(16.0),
+            size: TermSize {
+                cols: 10,
+                rows: 4,
+                cell_width_px: 8,
+                cell_height_px: 16,
+            },
+        };
+        assert_eq!(g.cell_at_exact(point(px(2.0), px(10.0))), None);
+        assert_eq!(g.cell_at_exact(point(px(10.0), px(2.0))), None);
+        assert_eq!(g.cell_at_exact(point(px(6.0), px(6.0))), Some(vibevalley_terminal::Point { row: 0, col: 0 }));
+        assert_eq!(g.cell_at_exact(point(px(85.0), px(69.0))), Some(vibevalley_terminal::Point { row: 3, col: 9 }));
+        assert_eq!(g.cell_at_exact(point(px(86.0), px(69.0))), None);
+        assert_eq!(g.cell_at_exact(point(px(85.0), px(70.0))), None);
     }
 
     #[test]

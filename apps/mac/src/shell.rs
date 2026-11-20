@@ -2228,6 +2228,7 @@ impl Shell {
         let cwd = path.parent().map(Path::to_path_buf).unwrap_or_default();
         let spec = SpawnSpec {
             cwd,
+            project_root: self.ws.active().map(|p| p.root().to_path_buf()),
             program: Some(shell.clone()),
             args: vec!["-lc".into(), format!("${{EDITOR:-vi}} {quoted}; exec {shell} -l")],
             env: Vec::new(),
@@ -2321,13 +2322,17 @@ impl Shell {
                     let spec = match saved {
                         Some(saved) => SpawnSpec {
                             cwd: if saved.cwd.is_dir() { saved.cwd.clone() } else { root.clone() },
+                            project_root: Some(root.clone()),
                             program: None,
                             args: Vec::new(),
                             env: Vec::new(),
                             history: Some(saved.scrollback).filter(|s| !s.trim().is_empty()),
                             title: saved.title.clone(),
                         },
-                        None => SpawnSpec::shell(root.clone()),
+                        None => SpawnSpec {
+                            project_root: Some(root.clone()),
+                            ..SpawnSpec::shell(root.clone())
+                        },
                     };
                     let slot = self.make_terminal(&terminal_id, spec, window, cx);
                     self.terminals.insert(terminal_id, slot);
@@ -2343,7 +2348,10 @@ impl Shell {
         }
     }
 
-    fn make_terminal(&mut self, id: &str, spec: SpawnSpec, window: &mut Window, cx: &mut Context<Self>) -> TerminalSlot {
+    fn make_terminal(&mut self, id: &str, mut spec: SpawnSpec, window: &mut Window, cx: &mut Context<Self>) -> TerminalSlot {
+        if spec.project_root.is_none() {
+            spec.project_root = self.ws.active().map(|p| p.root().to_path_buf());
+        }
         let cwd = spec.cwd.clone();
         let initial_title = spec.title.clone();
         let view = cx.new(|cx| TerminalView::new(spec, cx));
@@ -2354,8 +2362,7 @@ impl Shell {
             let on_screen = this.ws.active_id() == Some(owner);
             match event {
                 TerminalEvent::OpenLink(target) => {
-                    let term_cwd = view.read(cx).directory();
-                    this.open_terminal_link(target, &term_cwd, window, cx);
+                    this.open_terminal_link(target.clone(), owner, window, cx);
                     return;
                 }
                 TerminalEvent::Spawned => {
@@ -2396,28 +2403,36 @@ impl Shell {
         TerminalSlot { view, _sub: sub }
     }
 
-    fn open_terminal_link(&mut self, target: &str, terminal_cwd: &Path, window: &mut Window, cx: &mut Context<Self>) {
-        if target.starts_with("http://") || target.starts_with("https://") {
-            cx.open_url(target);
-            return;
-        }
-        let (raw_path, line) = parse_file_target(target);
-        let decoded = if let Some(rest) = raw_path.strip_prefix("file://") {
-            percent_decode(rest)
-        } else {
-            raw_path.to_string()
-        };
-        let path = Path::new(&decoded);
-        let resolved = if path.is_absolute() {
-            path.is_file().then(|| path.to_path_buf())
-        } else {
-            self.ws.active().map(|p| p.root().join(path)).filter(|p| p.is_file()).or_else(|| {
-                let from_cwd = terminal_cwd.join(path);
-                from_cwd.is_file().then_some(from_cwd)
-            })
-        };
-        if let Some(file) = resolved {
-            self.open_file(file, line, window, cx);
+    fn open_terminal_link(&mut self, target: vibevalley_terminal::LinkTarget, owner: ProjectId, window: &mut Window, cx: &mut Context<Self>) {
+        match target {
+            vibevalley_terminal::LinkTarget::Url(url) => cx.open_url(&url),
+            vibevalley_terminal::LinkTarget::File { path, line, col: _ } => {
+                let project_root = self.ws.project(owner).or_else(|| self.ws.active()).map(|p| p.root().to_path_buf());
+                let window = window.window_handle();
+                cx.spawn(async move |this, cx| {
+                    let viewer_target = cx
+                        .background_spawn(async move {
+                            match classify_terminal_file_action(path, line, project_root.as_deref()) {
+                                TerminalFileAction::Viewer { path, line } => Some((path, line)),
+                                TerminalFileAction::SystemOpen(path) => {
+                                    if let Err(e) = crate::host::open(&path) {
+                                        eprintln!("open {}: {e}", path.display());
+                                    }
+                                    None
+                                }
+                            }
+                        })
+                        .await;
+                    if let Some((path, line)) = viewer_target {
+                        let _ = cx.update_window(window, |_, window, cx| {
+                            let _ = this.update(cx, |shell, cx| {
+                                shell.open_file(path, line, window, cx);
+                            });
+                        });
+                    }
+                })
+                .detach();
+            }
         }
     }
 
@@ -3003,21 +3018,95 @@ fn shell_palette_commands() -> Vec<Value> {
     items
 }
 
-/// Splits an optional `:line` or `:line:col` suffix from a terminal link target.
-fn parse_file_target(target: &str) -> (&str, Option<u32>) {
-    let trimmed = target.strip_suffix(':').unwrap_or(target);
-    let Some((left, last)) = trimmed.rsplit_once(':') else {
-        return (trimmed, None);
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TerminalFileAction {
+    Viewer { path: PathBuf, line: Option<u32> },
+    SystemOpen(PathBuf),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FilePreviewKind {
+    Text,
+    Image,
+    SystemOnly,
+}
+
+fn sniff_file_preview_kind(path: &Path) -> FilePreviewKind {
+    use std::io::Read as _;
+
+    const MAX_VIEWER_BYTES: u64 = 8 * 1024 * 1024;
+    const SNIFF_BYTES: usize = 8192;
+    const IMAGE_EXTS: &[&str] = &[
+        "png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "icns", "tif", "tiff", "heic", "heif", "avif", "svg",
+    ];
+
+    let Ok(meta) = std::fs::metadata(path) else {
+        return FilePreviewKind::SystemOnly;
     };
-    let Ok(n1) = last.parse::<u32>() else {
-        return (trimmed, None);
-    };
-    if let Some((path, line_str)) = left.rsplit_once(':')
-        && let Ok(line) = line_str.parse::<u32>()
-    {
-        return (path, Some(line));
+    if !meta.is_file() {
+        return FilePreviewKind::SystemOnly;
     }
-    (left, Some(n1))
+    if path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| IMAGE_EXTS.contains(&e.to_ascii_lowercase().as_str()))
+    {
+        return FilePreviewKind::Image;
+    }
+    if meta.len() > MAX_VIEWER_BYTES {
+        return FilePreviewKind::SystemOnly;
+    }
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return FilePreviewKind::SystemOnly;
+    };
+    let mut head = [0u8; SNIFF_BYTES];
+    let n = file.read(&mut head).unwrap_or(0);
+    let head = &head[..n];
+    let utf16_bom = matches!(head, [0xFF, 0xFE, ..] | [0xFE, 0xFF, ..]);
+    if !utf16_bom && head.contains(&0) {
+        return FilePreviewKind::SystemOnly;
+    }
+    FilePreviewKind::Text
+}
+
+fn is_plain_text_name(path: &Path) -> bool {
+    const TEXT_EXTS: &[&str] = &[
+        "txt", "log", "env", "ini", "cfg", "conf", "csv", "tsv", "xml", "sql", "graphql", "gql", "proto", "diff", "patch", "lock", "nix", "rb", "java", "kt",
+        "scala", "php", "lua", "vim", "fish", "tf", "hcl",
+    ];
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|ext| TEXT_EXTS.iter().any(|t| ext.eq_ignore_ascii_case(t)))
+}
+
+fn path_is_inside(path: &Path, root: &Path) -> bool {
+    let canon_path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let canon_root = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+    canon_path.starts_with(canon_root)
+}
+
+fn classify_terminal_file_action(path: PathBuf, line: Option<u32>, project_root: Option<&Path>) -> TerminalFileAction {
+    let Some(root) = project_root else {
+        return TerminalFileAction::SystemOpen(path);
+    };
+    let in_project = path_is_inside(&path, root);
+    match sniff_file_preview_kind(&path) {
+        FilePreviewKind::SystemOnly => TerminalFileAction::SystemOpen(path),
+        FilePreviewKind::Image => {
+            if in_project {
+                TerminalFileAction::Viewer { path, line: None }
+            } else {
+                TerminalFileAction::SystemOpen(path)
+            }
+        }
+        FilePreviewKind::Text => {
+            if in_project || line.is_some() || vibevalley_files::Language::from_path(&path).is_some() || is_plain_text_name(&path) {
+                TerminalFileAction::Viewer { path, line }
+            } else {
+                TerminalFileAction::SystemOpen(path)
+            }
+        }
+    }
 }
 
 fn first_workspace_repo(work_root: &Path) -> Option<PathBuf> {
@@ -3059,12 +3148,74 @@ mod url_tests {
     }
 
     #[test]
-    fn terminal_file_targets_parse_line_and_column() {
-        assert_eq!(super::parse_file_target("src/main.rs"), ("src/main.rs", None));
-        assert_eq!(super::parse_file_target("src/main.rs:42"), ("src/main.rs", Some(42)));
-        assert_eq!(super::parse_file_target("src/main.rs:42:10"), ("src/main.rs", Some(42)));
-        assert_eq!(super::parse_file_target("src/main.rs:42:10:"), ("src/main.rs", Some(42)));
-        assert_eq!(super::parse_file_target("/abs/path/file.ts:12"), ("/abs/path/file.ts", Some(12)));
-        assert_eq!(super::parse_file_target("dir/file:name.rs"), ("dir/file:name.rs", None));
+    fn terminal_file_action_routes_project_text_to_viewer_and_binaries_or_external_media_to_system() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("proj");
+        let outside = dir.path().join("outside");
+        std::fs::create_dir_all(&project).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+
+        let proj_rs = project.join("main.rs");
+        let proj_png = project.join("icon.png");
+        let proj_bin = project.join("app.bin");
+        let ext_rs = outside.join("lib.rs");
+        let ext_unknown_text = outside.join("scratch");
+        let ext_png = outside.join("photo.png");
+        let ext_pdf = outside.join("doc.pdf");
+
+        std::fs::write(&proj_rs, "fn main() {}\n").unwrap();
+        std::fs::write(&proj_png, b"\x89PNG\r\n\x1a\n").unwrap();
+        std::fs::write(&proj_bin, b"\x7fELF\0\x01\x02").unwrap();
+        std::fs::write(&ext_rs, "pub fn x() {}\n").unwrap();
+        std::fs::write(&ext_unknown_text, "plain text\n").unwrap();
+        std::fs::write(&ext_png, b"\x89PNG\r\n\x1a\n").unwrap();
+        std::fs::write(&ext_pdf, b"%PDF-1.7\0binary").unwrap();
+
+        assert_eq!(
+            super::classify_terminal_file_action(proj_rs.clone(), Some(12), Some(&project)),
+            super::TerminalFileAction::Viewer {
+                path: proj_rs.clone(),
+                line: Some(12),
+            }
+        );
+        assert_eq!(
+            super::classify_terminal_file_action(proj_png.clone(), None, Some(&project)),
+            super::TerminalFileAction::Viewer { path: proj_png, line: None }
+        );
+        assert_eq!(
+            super::classify_terminal_file_action(proj_bin.clone(), None, Some(&project)),
+            super::TerminalFileAction::SystemOpen(proj_bin)
+        );
+        assert_eq!(
+            super::classify_terminal_file_action(ext_rs.clone(), Some(5), Some(&project)),
+            super::TerminalFileAction::Viewer { path: ext_rs, line: Some(5) }
+        );
+        assert_eq!(
+            super::classify_terminal_file_action(ext_unknown_text.clone(), None, Some(&project)),
+            super::TerminalFileAction::SystemOpen(ext_unknown_text.clone())
+        );
+        assert_eq!(
+            super::classify_terminal_file_action(ext_unknown_text.clone(), Some(3), Some(&project)),
+            super::TerminalFileAction::Viewer {
+                path: ext_unknown_text,
+                line: Some(3),
+            }
+        );
+        assert_eq!(
+            super::classify_terminal_file_action(ext_png.clone(), None, Some(&project)),
+            super::TerminalFileAction::SystemOpen(ext_png)
+        );
+        assert_eq!(
+            super::classify_terminal_file_action(ext_pdf.clone(), None, Some(&project)),
+            super::TerminalFileAction::SystemOpen(ext_pdf)
+        );
+        assert_eq!(
+            super::classify_terminal_file_action(project.clone(), None, Some(&project)),
+            super::TerminalFileAction::SystemOpen(project)
+        );
+        assert_eq!(
+            super::classify_terminal_file_action(proj_rs.clone(), Some(1), None),
+            super::TerminalFileAction::SystemOpen(proj_rs)
+        );
     }
 }

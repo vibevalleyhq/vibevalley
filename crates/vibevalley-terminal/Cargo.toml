@@ -10,6 +10,8 @@ libghostty-vt = { git = "https://github.com/uzaaft/libghostty-rs", rev = "cd4d49
 portable-pty = "0.9.0"
 serde = { workspace = true }
 thiserror = "2.0.21"
+unicode-segmentation = "1.13.3"
+unicode-width = "0.2.3"
 
 [dev-dependencies]
 tempfile = "3.27.0"

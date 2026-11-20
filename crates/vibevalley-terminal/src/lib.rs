@@ -11,9 +11,12 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 mod input;
+mod links;
 mod pty;
 mod screen;
 mod session;
+
+pub use links::{LinkMatch, LinkResolveContext, LinkSpan, LinkTarget, link_at, link_at_rows, link_at_rows_with, link_at_with};
 
 use session::{Msg, Shared};
 

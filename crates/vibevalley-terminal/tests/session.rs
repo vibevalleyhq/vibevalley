@@ -756,3 +756,51 @@ fn regression_local_cwd_tracks_cd_after_an_old_osc_directory() {
     assert_eq!(h.session.cwd(), Some(root));
     assert_eq!(h.session.local_cwd(), Some(nested));
 }
+
+#[test]
+fn link_hit_testing_works_on_live_pty_snapshots() {
+    use vibevalley_terminal::{LinkResolveContext, LinkTarget, link_at};
+
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    let src = root.join("src");
+    std::fs::create_dir(&src).unwrap();
+    let file = src.join("demo.rs");
+    std::fs::write(&file, "fn main() {}\n").unwrap();
+
+    let mut opts = options(
+        "/bin/sh",
+        &[
+            "-c",
+            "printf '\\033]8;;https://example.com/osc\\033\\\\docs\\033]8;;\\033\\\\ src/demo.rs:9:2\\nsrc/missing.rs\\nhttps://vibevalley.dev/very/long/wrapped/path'",
+        ],
+        size(30, 6),
+    );
+    opts.cwd = root.clone();
+    let h = spawn(opts);
+    assert_eq!(h.wait_exit(), Some(0));
+    let snap = h.session.snapshot();
+    let ctx = LinkResolveContext::new(Some(root), None);
+
+    let osc = link_at(&snap, Point { row: 0, col: 1 }, &ctx).expect("osc8 link");
+    assert_eq!(osc.target, LinkTarget::Url("https://example.com/osc".into()));
+
+    let local = link_at(&snap, Point { row: 0, col: 8 }, &ctx).expect("existing relative file");
+    assert_eq!(
+        local.target,
+        LinkTarget::File {
+            path: file,
+            line: Some(9),
+            col: Some(2),
+        }
+    );
+
+    // Non-existent relative file on row 1 is rejected.
+    assert_eq!(row_text(&snap, 1), "src/missing.rs");
+    assert_eq!(link_at(&snap, Point { row: 1, col: 4 }, &ctx), None);
+
+    // Wrapped URL spans row 2 and row 3 in the 30-column viewport.
+    let wrapped = link_at(&snap, Point { row: 3, col: 2 }, &ctx).expect("wrapped url hit");
+    assert_eq!(wrapped.target, LinkTarget::Url("https://vibevalley.dev/very/long/wrapped/path".into()));
+    assert_eq!(wrapped.spans.len(), 2);
+}
