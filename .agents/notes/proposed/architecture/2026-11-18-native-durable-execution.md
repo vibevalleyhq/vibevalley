@@ -37,7 +37,7 @@ Chord 按原生服务的订阅与执行治理需求验收。持久执行、oar �
 | 优先级 | 两端已有的证据 | 原生版交付条件 |
 | --- | --- | --- |
 | 1．执行请求去重与结算 | Rust 的频道表对发送者和 `send_key` 有唯一索引；工单轮次另行写入。Go 的 `internal/durable/store/store_test.go` 覆盖同一对话与请求 ID 跨重启返回同一提交，以及提交结算与通知同事务写入。 | 先从工单串追问这一条真实入口查重投。让原消息、执行请求和业务轮次可以对账；重启后重复提交返回原结果，结算与待投递通知一起持久化。复用现有消息 ID、轮次和账本，按实测缺口补字段或事务。 |
-| 2．等待、唤醒与中断 | Go 的 `Scheduler` 可缓存早到信号，等待时释放执行名额，重启扫描未结束任务；还有重启次数上限及先子后父的取消。Rust 已能恢复未完的内置对话，对已启动且不宜重放的工具返回中断结果。[内置对话](crates/vibevalley-agent/src/conversation.rs) | 把一个真实等待点接上，优先选等用户回答。分别检验先回答后进入等待、等待中重启、重复回答。已有业务轮次结算后才开后续轮次。仅在实际使用子任务的路径验证级联取消。 |
+| 2．等待、唤醒与中断 | Go 的 `Scheduler` 可缓存早到信号，等待时释放执行名额，重启扫描未结束任务；还有重启次数上限及先子后父的取消。Rust 已能恢复未完的内置对话，对已启动且不宜重放的工具返回中断结果。[持久引擎](crates/vibevalley-agent/src/core/engine.rs) | 把一个真实等待点接上，优先选等用户回答。分别检验先回答后进入等待、等待中重启、重复回答。已有业务轮次结算后才开后续轮次。仅在实际使用子任务的路径验证级联取消。 |
 | 3．oar 驱动回放 | Rust 已有协议解析、脚本农机、厂商样本及离线测试。Go 的 `pkg/oar/replaytest` 用模拟 CLI 经驱动入口回放，`pkg/oar/registry.go` 可核对各驱动支持范围。[Rust 驱动样本](crates/vibevalley-oar/tests/fixtures) | 先在两端对照 Claude 与 Codex 的启动、工具调用、提问、中断、恢复及异常退出。核对同一调用的起止、事件顺序和轮末结果；再按实际需要补农机。服务端再用脚本农机验证从事件到工单和农场的映射。 |
 | 4．执行治理 | Go 的 `internal/durable/governance_test.go` 另测预算暂停与上调续跑、上下文压缩和工具策略。Rust 已有额度探测、日预算与对话压缩，粒度和触发时机需逐项比较。 | 用原生助手与帮工核对从发现待审批、批准或拒绝，到恢复任务的完整过程。预算暂停后，调高额度应能唤醒同一会话的所有等待任务。验收覆盖额度检查已记录、任务尚未写入休眠状态的时点。 |
 
@@ -72,13 +72,13 @@ Go 基线为 `a2c1851ab`。在该提交运行 `CGO_ENABLED=0 go test -count=1 ./
 
 | 范围 | Go 对照与 Rust 底层 | Rust 产品入口与证据边界 |
 | --- | --- | --- |
-| 任务树、睡眠、早到信号 | Go `scheduler_test.go` 对照 Rust 三种子任务等待方式。Rust 回放覆盖先到的唤醒、定时醒来、休眠让出执行名额。[调度器测试](crates/vibevalley-durable/tests/parity.rs) | 助手和内置帮工用同一个生成调度器。助手审批等待可实际唤醒。厂商自建的子线程有自己的生命周期，不能用这组测试证明 Codex 子线程已经终止。 |
-| 级联取消、崩溃断路 | Go 与 Rust 均测试先取消子任务再取消父任务。Rust 检验重启上限、单条告警、取消后迟到的完成事件。[调度器](crates/vibevalley-durable/src/scheduler.rs) | 停止助手和中断内置帮工会调用调度器。内置帮工经过进程退出后能恢复同一工单轮次。实际厂商请求何时停止计费仍需厂商侧证据。[内置帮工恢复](crates/vibevalley-server/tests/orchestrator.rs) |
-| 模型生成、工具治理 | Go `governance_test.go` 与 Rust 均覆盖拒绝、停等确认和恢复。Rust 还验证已启动的副作用工具在恢复时保留中断结果。[生成阶段](crates/vibevalley-agent/src/generation/mod.rs) | 真实服务上的助手调用工具建单。经原生 HTTP 审批后，重开仍只看到一张工单。相同任务的下一张审批卡保留完整工具调用 ID。内置帮工在工作目录执行命令后发生进程退出，恢复后的文件只含一次写入。[助手与帮工入口测试](crates/vibevalley-server/tests/orchestrator.rs) |
-| 预算 | Go 与 Rust 均在新模型调用前检查上限。Rust 回放覆盖完成在途工具、暂停、上调后唤醒及评审前暂停。[治理](crates/vibevalley-agent/src/generation/governance.rs) | Chord 暴露 `budget.raise`。服务测试覆盖额度更新回执。暂停评审、重启再上调的证据来自生成引擎，厂商账单另行核对。 |
-| 压缩 | Go 有手工、软阈值、硬阈值和溢出四级。Rust 生成阶段调用阈值检查。测试覆盖过期软压缩结果和一次溢出重试。[转写与压缩](crates/vibevalley-agent/src/generation/transcript.rs) | 助手和内置帮工共用生成路径。手工级别存在于压缩器。原生界面触发手工压缩以及真实模型触达各阈值仍待验。 |
-| CodeMode | Go 使用 Goja。Rust 使用 QuickJS。回放核对随机数、时钟、工具异常、执行限额及重启跳过已完成的调用。[代码回放](crates/vibevalley-durable-codemode/tests/parity.rs) | 生成引擎注册 CodeMode 和工具阶段。现有证据来自调度器创建脚本任务，普通助手或帮工对话创建这类任务的入口仍待验。 |
-| 结果评估 | Go 可按验收标准单独评审并要求修正。`stack.go` 默认装配直接通过的 grader，模型评审需要相应装配。Rust 单独保存只读评审会话及判定。[评审](crates/vibevalley-agent/src/generation/grading.rs) | HTTP 派给内置帮工的带条件工单已验证拒绝后修正、次数耗尽和提问停等。评审只读当前工单证据。外部农机和通用助手对话沿用各自结算入口。[工单回归](crates/vibevalley-server/tests/orchestrator/grading.rs) |
+| 任务树、睡眠、早到信号 | Go `scheduler_test.go` 对照 Rust 三种子任务等待方式。Rust 回放覆盖先到的唤醒、定时醒来、休眠让出执行名额。[调度器测试](crates/vibevalley-agent/tests/durable_parity.rs) | 助手和内置帮工用同一个生成调度器。助手审批等待可实际唤醒。厂商自建的子线程有自己的生命周期，不能用这组测试证明 Codex 子线程已经终止。 |
+| 级联取消、崩溃断路 | Go 与 Rust 均测试先取消子任务再取消父任务。Rust 检验重启上限、单条告警、取消后迟到的完成事件。[调度器](crates/vibevalley-agent/src/durable/scheduler.rs) | 停止助手和中断内置帮工会调用调度器。内置帮工经过进程退出后能恢复同一工单轮次。实际厂商请求何时停止计费仍需厂商侧证据。[内置帮工恢复](crates/vibevalley-server/tests/orchestrator.rs) |
+| 模型生成、工具治理 | Go `governance_test.go` 与 Rust 均覆盖拒绝、停等确认和恢复。Rust 还验证已启动的副作用工具在恢复时保留中断结果。[生成阶段](crates/vibevalley-agent/src/core/engine.rs) | 真实服务上的助手调用工具建单。经原生 HTTP 审批后，重开仍只看到一张工单。相同任务的下一张审批卡保留完整工具调用 ID。内置帮工在工作目录执行命令后发生进程退出，恢复后的文件只含一次写入。[助手与帮工入口测试](crates/vibevalley-server/tests/orchestrator.rs) |
+| 预算 | Go 与 Rust 均在新模型调用前检查上限。Rust 回放覆盖完成在途工具、暂停、上调后唤醒及评审前暂停。[治理](crates/vibevalley-agent/src/extensions/governance.rs) | Chord 暴露 `budget.raise`。服务测试覆盖额度更新回执。暂停评审、重启再上调的证据来自生成引擎，厂商账单另行核对。 |
+| 压缩 | Go 有手工、软阈值、硬阈值和溢出四级。Rust 生成阶段调用阈值检查。测试覆盖过期软压缩结果和一次溢出重试。[转写与压缩](crates/vibevalley-agent/src/core/pipeline.rs) | 助手和内置帮工共用生成路径。手工级别存在于压缩器。原生界面触发手工压缩以及真实模型触达各阈值仍待验。 |
+| CodeMode | Go 使用 Goja。Rust 使用 QuickJS。回放核对随机数、时钟、工具异常、执行限额及重启跳过已完成的调用。[代码回放](crates/vibevalley-agent/tests/codemode_parity.rs) | 生成引擎注册 CodeMode 和工具阶段。现有证据来自调度器创建脚本任务，普通助手或帮工对话创建这类任务的入口仍待验。 |
+| 结果评估 | Go 可按验收标准单独评审并要求修正。`stack.go` 默认装配直接通过的 grader，模型评审需要相应装配。Rust 单独保存只读评审会话及判定。[评审](crates/vibevalley-agent/src/extensions/grader.rs) | HTTP 派给内置帮工的带条件工单已验证拒绝后修正、次数耗尽和提问停等。评审只读当前工单证据。外部农机和通用助手对话沿用各自结算入口。[工单回归](crates/vibevalley-server/tests/orchestrator/grading.rs) |
 
 ## Alternatives considered
 

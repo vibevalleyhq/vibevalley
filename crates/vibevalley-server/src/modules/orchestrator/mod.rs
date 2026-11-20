@@ -1,14 +1,13 @@
 //! The orchestrator (VibeValley `modules/orchestrator/orchestrator.ts`): one
 //! assistant per orchestrator profile, each a durable conversation on
-//! `vibevalley-agent` (`<home>/agent/<id>/conversation.jsonl`) holding the farm's
+//! `vibevalley-agent` (`Harness` / SQLite `execution.db`) holding the farm's
 //! tools. The watch hands it what the chat says to it; crons for no profile
 //! come to it too. Before each input it is shown the time and the farm
 //! (`situation`), or what changed since; its words are said in the place it
 //! answers.
 //!
 //! Inputs that come while it works wait and go in together as the next
-//! turn (VibeValley steers the user's words into the turn under way; the
-//! brain has no steering).
+//! turn.
 
 mod execution;
 mod mcp;
@@ -20,7 +19,10 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, Weak};
 
-use vibevalley_agent::{Brain, BrainEvent, Conversation, Entry, Message, ModelClient, OpenAiClient, Tool, TurnOutcome, kit};
+use vibevalley_agent::extensions::governance::Permissions;
+use vibevalley_agent::extensions::memory::{MemoryPort, Remember, RewriteMemory};
+use vibevalley_agent::resources::skills::{LoadSkill, scan_skills, skill_index};
+use vibevalley_agent::{AgentEvent, Brain, Message, ModelClient, OpenAiClient, Tool, TurnOutcome, TypedToolAdapter};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     AgentRole, ApiError, BizCode, Doing, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel, ORCHESTRATOR_RUNTIME, OrchestratorEval, Outcome,
@@ -102,7 +104,6 @@ struct Instance {
     queue: Mutex<VecDeque<()>>,
     more: Condvar,
     route: Arc<Mutex<Route>>,
-    abort: Mutex<Option<Arc<vibevalley_agent::TurnAbort>>>,
     /// The situation it was last shown whole; "" shows it whole again.
     shown: Mutex<String>,
     /// What it last said it cannot start for, per place.
@@ -142,31 +143,30 @@ struct EvalCase {
 }
 
 /// What the model had in front of it before a turn: the last summary, then every message since.
-fn told_before(entries: &[Entry]) -> Vec<Message> {
-    let from = entries.iter().rposition(|e| matches!(e, Entry::Compacted { .. })).unwrap_or(0);
+fn told_before(entries: &[execution::EvalEntry]) -> Vec<Message> {
+    let from = entries.iter().rposition(|e| matches!(e, execution::EvalEntry::Compacted { .. })).unwrap_or(0);
     entries[from..]
         .iter()
-        .filter_map(|e| match e {
-            Entry::Compacted { summary } => Some(Message::system(summary.clone())),
-            Entry::Message { message, .. } => Some(message.clone()),
-            Entry::TurnStarted { input } => Some(Message::user(input.clone())),
-            Entry::ToolStarted { .. } | Entry::TurnFinished { .. } => None,
+        .map(|e| match e {
+            execution::EvalEntry::Compacted { summary } => Message::system(summary.clone()),
+            execution::EvalEntry::Message(message) => message.clone(),
+            execution::EvalEntry::TurnStarted { input } => Message::user(input.clone()),
         })
         .collect()
 }
 
 /// A turn's own messages, up to where the next turn starts.
-fn message_of_turn(entry: &Entry) -> Option<Option<Message>> {
+fn message_of_turn(entry: &execution::EvalEntry) -> Option<Option<Message>> {
     match entry {
-        Entry::TurnStarted { .. } => None,
-        Entry::Message { message, .. } => Some(Some(message.clone())),
-        Entry::ToolStarted { .. } | Entry::Compacted { .. } | Entry::TurnFinished { .. } => Some(None),
+        execution::EvalEntry::TurnStarted { .. } => None,
+        execution::EvalEntry::Message(message) => Some(Some(message.clone())),
+        execution::EvalEntry::Compacted { .. } => Some(None),
     }
 }
 
 /// What the orchestrator is made with.
 pub struct Parts {
-    pub permissions: vibevalley_agent::generation::governance::Permissions,
+    pub permissions: Permissions,
     pub hub: Weak<Hub>,
     pub farm: Arc<Farm>,
     pub home: PathBuf,
@@ -178,7 +178,7 @@ pub struct Parts {
 }
 
 impl Orchestrator {
-    pub fn open(p: Parts) -> vibevalley_durable::Result<Arc<Orchestrator>> {
+    pub fn open(p: Parts) -> vibevalley_agent::durable::Result<Arc<Orchestrator>> {
         let store = p.farm.board.sessions().durable_store().clone();
         let o = Arc::new_cyclic(|weak| Orchestrator {
             execution: Execution::new(store, weak.clone(), p.permissions),
@@ -209,7 +209,7 @@ impl Orchestrator {
         // A turn the last process left unfinished is finished now.
         o.execution.scheduler.recover()?;
         for a in o.farm.agents.profiles.orchestrators() {
-            if o.execution.has_inputs(&a.id)? || Self::conversation_file(&o.home, &a.id).is_file() {
+            if o.execution.has_inputs(&a.id)? {
                 o.instance(&a.id);
             }
         }
@@ -218,10 +218,6 @@ impl Orchestrator {
 
     fn hub(&self) -> Option<Arc<Hub>> {
         self.hub.upgrade()
-    }
-
-    fn conversation_file(home: &std::path::Path, id: &str) -> PathBuf {
-        home.join("agent").join(id).join("conversation.jsonl")
     }
 
     pub fn ensure_open(&self) {
@@ -292,7 +288,6 @@ impl Orchestrator {
                 channel: self.farm.chat.default_channel(),
                 ..Route::default()
             })),
-            abort: Mutex::new(None),
             shown: Default::default(),
             cannot: Default::default(),
             news: Default::default(),
@@ -382,9 +377,6 @@ impl Orchestrator {
         let Some(me) = lock(&self.instances).get(&id).cloned() else { return };
         lock(&me.queue).clear();
         let _ = self.execution.stop(&id);
-        if let Some(a) = lock(&me.abort).as_ref() {
-            a.abort();
-        }
     }
 
     pub fn close(&self) {
@@ -392,9 +384,6 @@ impl Orchestrator {
         self.execution.close();
         self.mcp.close();
         for me in lock(&self.instances).values() {
-            if let Some(a) = lock(&me.abort).as_ref() {
-                a.abort();
-            }
             me.more.notify_all();
         }
     }
@@ -418,7 +407,7 @@ impl Orchestrator {
         })
     }
 
-    fn system_prompt(&self, id: &str, home: &std::path::Path, memory: &dyn kit::MemoryPort) -> String {
+    fn system_prompt(&self, id: &str, home: &std::path::Path, memory: &dyn MemoryPort) -> String {
         let p = &*words::PROMPTS;
         let profile = self.farm.agents.profiles.agent(id);
         let mut s = p.system.clone() + &p.agent;
@@ -430,10 +419,10 @@ impl Orchestrator {
         s = s.trim().to_string();
         s += "\n\n";
         s += &p.env.replace("{cwd}", &self.farm.repos.root().display().to_string());
-        let skills = kit::scan_skills(&[home.join("skills")]);
+        let skills = scan_skills(&[home.join("skills")]);
         if !skills.is_empty() {
             s += "\n\n";
-            s += &p.skills.replace("{skills}", &kit::skill_index(&skills, 160));
+            s += &p.skills.replace("{skills}", &skill_index(&skills, 160));
         }
         let mem = memory.prompt();
         if !mem.is_empty() {
@@ -444,21 +433,21 @@ impl Orchestrator {
     }
 
     /// Everything it can call: the farm's tools for where it is, its skills and its memory.
-    fn tools(&self, me: &Instance, skills_dir: PathBuf, memory: Arc<dyn kit::MemoryPort>) -> Vec<Box<dyn Tool>> {
+    fn tools(&self, me: &Instance, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
         self.tools_for(&me.id, &me.route, skills_dir, memory)
     }
 
-    fn tools_for(&self, id: &str, route: &Arc<Mutex<Route>>, skills_dir: PathBuf, memory: Arc<dyn kit::MemoryPort>) -> Vec<Box<dyn Tool>> {
+    fn tools_for(&self, id: &str, route: &Arc<Mutex<Route>>, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
         let mut tools = held(&self.farm, route);
         if let Some(profile) = self.farm.agents.profiles.agent(id) {
             tools.extend(self.mcp.tools(&profile));
         }
         let dirs = vec![skills_dir];
-        tools.push(Box::new(kit::LoadSkill {
-            skills: Box::new(move || kit::scan_skills(&dirs)),
+        tools.push(Box::new(LoadSkill {
+            skills: Box::new(move || scan_skills(&dirs)),
         }));
-        tools.push(Box::new(kit::Remember(memory.clone())));
-        tools.push(Box::new(kit::RewriteMemory(memory)));
+        tools.push(Box::new(TypedToolAdapter(Remember(memory.clone()))));
+        tools.push(Box::new(TypedToolAdapter(RewriteMemory(memory))));
         tools
     }
 
@@ -489,13 +478,12 @@ impl Orchestrator {
             .iter()
             .filter(|e| e.seq < on && e.r#type == SessionEventType::UserMessage && e.text == asked.text)
             .count();
-        let mut entries = vibevalley_agent::read_entries(&Self::conversation_file(&self.home, &id)).map_err(|e| refused(BizCode::Refused, e.to_string()))?;
-        entries.extend(self.execution.entries(&id).map_err(|e| refused(BizCode::Refused, e.to_string()))?);
+        let entries = self.execution.entries(&id).map_err(|e| refused(BizCode::Refused, e.to_string()))?;
         let turns = entries
             .iter()
             .enumerate()
-            .filter(|(_, e)| matches!(e, Entry::TurnStarted { input } if input.contains(&asked.text)));
-        let Some((at, Entry::TurnStarted { input })) = turns.clone().nth(nth).or_else(|| turns.clone().next_back()) else {
+            .filter(|(_, e)| matches!(e, execution::EvalEntry::TurnStarted { input } if input.contains(&asked.text)));
+        let Some((at, execution::EvalEntry::TurnStarted { input })) = turns.clone().nth(nth).or_else(|| turns.clone().next_back()) else {
             return Err(refused(
                 BizCode::Refused,
                 t("server.session.host.notInConversation", &[("on", on.into()), ("label", label.into())]),
@@ -535,11 +523,6 @@ impl Orchestrator {
         })
     }
 
-    /// The conversation, opened as its turn starts (its prompt as it is now).
-    fn conversation(&self, me: &Instance, model: &str) -> Result<Conversation, String> {
-        Conversation::open(Self::conversation_file(&self.home, &me.id), self.brain_at(&me.id, &me.route, model)).map_err(|e| e.to_string())
-    }
-
     fn brain_at(&self, id: &str, route: &Arc<Mutex<Route>>, model: &str) -> Brain {
         let home = self.home.join("agent").join(id);
         let skills_dir = home.join("skills");
@@ -554,10 +537,6 @@ impl Orchestrator {
     }
 
     fn work(o: Weak<Orchestrator>, me: Arc<Instance>) {
-        // A turn cut short by the last process goes on first.
-        if let Some(o) = o.upgrade() {
-            o.resume(&me);
-        }
         loop {
             {
                 let mut q = lock(&me.queue);
@@ -595,25 +574,6 @@ impl Orchestrator {
                 }
             }
         }
-    }
-
-    fn resume(&self, me: &Instance) {
-        if !Self::conversation_file(&self.home, &me.id).is_file() {
-            return;
-        }
-        let Ok(model) = self.model_of(&me.id) else { return };
-        if (self.key)().is_none() && self.client.is_none() {
-            return;
-        }
-        let Ok(mut conv) = self.conversation(me, &model) else { return };
-        if conv.unfinished_turn().is_none() {
-            return;
-        }
-        *lock(&me.abort) = Some(conv.abort_handle());
-        let route = lock(&me.route).clone();
-        let mut run = Run::new(self, me, &route);
-        let outcome = conv.resume(&mut |e| run.on(e)).unwrap_or(Ok(TurnOutcome::Completed));
-        run.finish(outcome);
     }
 
     /// The farm as it is shown before an input (`situation`).
@@ -903,25 +863,25 @@ impl<'a> Run<'a> {
         }
     }
 
-    fn on(&mut self, e: BrainEvent) {
+    fn on(&mut self, e: AgentEvent) {
         use vibevalley_oar::EventKind as K;
         match e {
-            BrainEvent::Text(text) => {
+            AgentEvent::TextDelta { delta } => {
                 if self.said.is_empty() {
                     self.phase(Some(SessionAction::SpeakingText));
                 }
-                self.said.push_str(&text);
-                self.agent(K::TextDelta { text });
+                self.said.push_str(&delta);
+                self.agent(K::TextDelta { text: delta });
             }
-            BrainEvent::Reasoning(text) => self.agent(K::ThinkingDelta { text }),
-            BrainEvent::ToolStarted { id, name, arguments } => {
+            AgentEvent::ReasoningDelta { delta } => self.agent(K::ThinkingDelta { text: delta }),
+            AgentEvent::ToolStart { id, name, arguments } => {
                 self.say();
                 self.calls += 1;
                 self.phase(Some(SessionAction::Other));
                 let input = serde_json::from_str(&arguments).unwrap_or(serde_json::Value::String(arguments));
                 self.agent(K::ToolCallStarted { id, name, input });
             }
-            BrainEvent::ToolFinished { id, output } => {
+            AgentEvent::ToolEnd { id, name: _, output } => {
                 self.agent(K::ToolCallFinished {
                     id,
                     ok: !output.is_error,
@@ -929,8 +889,16 @@ impl<'a> Run<'a> {
                 });
                 self.phase(Some(SessionAction::Thinking));
             }
-            BrainEvent::Error(message) => self.agent(K::Error { message }),
-            BrainEvent::TurnStarted { .. } | BrainEvent::Compacted | BrainEvent::TurnFinished { .. } => {}
+            AgentEvent::Error { message } => self.agent(K::Error { message }),
+            AgentEvent::AgentStart
+            | AgentEvent::TurnStart { .. }
+            | AgentEvent::ToolUpdate { .. }
+            | AgentEvent::PermissionRequested { .. }
+            | AgentEvent::SubagentSpawned { .. }
+            | AgentEvent::SubagentStatusChanged { .. }
+            | AgentEvent::Compacted { .. }
+            | AgentEvent::TurnEnd { .. }
+            | AgentEvent::AgentEnd { .. } => {}
         }
     }
 

@@ -1,19 +1,28 @@
-//! VibeValley's own agent: a model client, tools, and a durable conversation
-//! loop. It replaces what VibeValley takes from pi-ai (the DeepSeek
-//! provider) and pi-durable (the loop, write-before-display, resume,
-//! compaction) for the assistant and for the built-in `vibevalley` runtime.
+//! VibeValley's own agent: layered model client, durable execution core,
+//! typed tools, resources, extensions, harness, and built-in `vibevalley` runtime.
 
-pub mod conversation;
-pub mod generation;
-pub mod kit;
-pub mod mcp;
-pub mod model;
-pub mod price;
-pub mod tool;
+pub mod ai;
+pub mod codemode;
+pub mod compaction;
+pub mod core;
+pub mod durable;
+pub mod eval;
+pub mod experiments;
+pub mod extensions;
+pub mod harness;
+pub mod resources;
+pub mod runtime;
+pub mod tools;
 
-pub use conversation::{Brain, BrainEvent, Conversation, Entry, TurnAbort, TurnOutcome, read_entries};
-pub use model::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, OpenAiClient, Role, ToolCall, ToolSpec, Usage};
-pub use tool::{Tool, ToolOutput, Workspace, coding_tools};
+pub use ai::OpenAiClient;
+pub use ai::types::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, ToolCall, ToolSpec, Usage};
+pub use core::doc::DocSpec;
+pub use core::events::{AgentEvent, Brain, TurnOutcome};
+pub use core::extension::Extension;
+pub use harness::Harness;
+pub use tools::{
+    ReplayPolicy, Tool, ToolContext, ToolOutput, ToolUpdate, TypedTool, TypedToolAdapter, TypedToolOutput, Workspace, coding_tools, read_only_tools,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum BrainError {
@@ -29,6 +38,8 @@ pub enum BrainError {
     Store(String),
     #[error("a turn is already unfinished; resume it first")]
     Busy,
+    #[error("cancelled")]
+    Cancelled,
 }
 
 pub type Result<T> = std::result::Result<T, BrainError>;

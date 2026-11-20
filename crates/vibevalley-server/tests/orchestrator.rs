@@ -206,7 +206,7 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
 }
 
 fn approval_fixture(home: &std::path::Path) -> (Arc<Scripted>, vibevalley_server::ServerConfig) {
-    use vibevalley_agent::generation::governance::Policy;
+    use vibevalley_agent::extensions::governance::Policy;
     let model = Arc::new(Scripted {
         answers: Mutex::new([call("approval-1", "issue_create", json!({"title":"Approved work"})), say("done")].into()),
         seen: Default::default(),
@@ -391,7 +391,7 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
 
 #[test]
 fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases() {
-    use vibevalley_agent::generation::governance::{Permissions, Policy};
+    use vibevalley_agent::extensions::governance::{Permissions, Policy};
     use vibevalley_protocol::{MCPServer, MCPServerStdio};
 
     let dir = tempfile::tempdir().unwrap();

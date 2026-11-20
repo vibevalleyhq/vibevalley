@@ -1,7 +1,7 @@
 use super::sessions::Extra;
 use crate::modules::column::{json, optional, read_json, read_word, word};
 use std::collections::HashMap;
-use vibevalley_durable::Sqlite;
+use vibevalley_agent::durable::Sqlite;
 use vibevalley_protocol::{Run, Session, SessionSubagents};
 
 #[rustfmt::skip]

@@ -887,5 +887,30 @@
   },
   "chat": {
     "session": "会话 {session}（输入 /exit 或按 Ctrl-D 退出）"
+  },
+  "eval": {
+    "about": "导出持久 JSONL 轨迹、检查运行指标、重放切片与运行对比评测集",
+    "export": "将对话及其任务图导出为自包含的 JSONL 目录",
+    "inspect": "分析 JSONL 目录或 SQLite 持久库，输出时间线或离线 HTML 报告",
+    "replay": "从 JSONL 前缀切片分支重放到隔离目录并执行验收器",
+    "run": "在隔离工作目录与均衡顺序下运行评测集并统计对比结果",
+    "missingKey": "未配置 DeepSeek API 密钥；请设置 DEEPSEEK_API_KEY 或通过 vibevalley setting update 保存",
+    "arg": {
+      "conversation": "要导出的对话 ID",
+      "path": "JSONL 轨迹目录或 SQLite 数据库路径",
+      "spec": "ReplaySpec JSON 文件路径",
+      "suite": "EvalSuite JSON 文件路径"
+    },
+    "flag": {
+      "out": "导出的存储目录或评测输出目录",
+      "source": "源 SQLite 数据库或 JSONL 目录（默认家目录下的 server.db）",
+      "atSeq": "截断到第 N 条条目序号，生成可供重放的前缀切片",
+      "noChildren": "导出时不追踪子帮手会话",
+      "conversation": "目标对话 ID（默认选根对话）",
+      "timeline": "输出紧凑的逐条时间线与任务状态",
+      "html": "把离线单文件 HTML 报告写到该路径",
+      "trials": "覆盖每道题的重复测试次数",
+      "profile": "只跑指定名字的配置档案（可传多次）"
+    }
   }
 }

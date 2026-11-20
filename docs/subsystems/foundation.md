@@ -62,9 +62,9 @@
 - **SQLite 按连接范围分工。** 宿主 `state.db` 保存项目、布局、终端和设置。服务端业务模块共用 `server.db`。各模块用同一份 SQL 定义运行时表结构和查询生成时的输入。[sqlc 配置](sqlc.yaml)
 - **sqlc 检查 SQL，SQLx 执行查询。** sqlc 通过标准输入把命名查询的 JSON 发给本仓库的进程插件。插件按参数编号绑定值，并用 sqlc 标注的列名、类型和可空性生成 Rust 行类型。SQLite 的 `INTEGER`、`TEXT`、`REAL`、`BLOB` 分别映射为 `i64`、`String`、`f64`、`Vec<u8>`。可空列使用 `Option<T>`。不支持的类型或命令使生成失败。[生成器](scripts/gen/sqlc-rust/generate.ts) · [官方插件协议](https://docs.sqlc.dev/en/latest/guides/plugins.html)
 - **调用方持有事务。** 生成函数接受 SQLx 连接池或调用方的连接。`:one` 查不到记录时返回 `RowNotFound`，`:many` 返回列表，`:exec` 成功时返回 `()`，`:execrows` 返回受影响行数。领域模块决定何时提交，并将数据库行转换为业务类型。[宿主调用点](crates/vibevalley-workspace/src/store/mod.rs) · [事务回归](scripts/gen/sqlc-rust/smoke.rs)
-- **工单结算与持久执行共用写连接**：账本把工单事实、轮次和待投递结果写入调用方的 SQLx 事务。一次业务写入占用一个保存点。外层批次提交成功后，服务才发布订阅通知。保存点回滚只撤销这一次写入。磁盘库用独立的只读连接查询已提交快照。[事务](crates/vibevalley-durable/src/store.rs) · [工单账本](crates/vibevalley-server/src/modules/ledger.rs)
+- **工单结算与持久执行共用写连接**：账本把工单事实、轮次和待投递结果写入调用方的 SQLx 事务。一次业务写入占用一个保存点。外层批次提交成功后，服务才发布订阅通知。保存点回滚只撤销这一次写入。磁盘库用独立的只读连接查询已提交快照。[事务](crates/vibevalley-agent/src/durable/store.rs) · [工单账本](crates/vibevalley-server/src/modules/ledger.rs)
 
-**提交耗时。** 在同一台 Apple Silicon Mac 上，release 构建用临时 WAL 库测量文档写入。每个并发线程写自己的文档 60 次，等待每次提交回执。两种驱动交错运行 11 轮。表中为各轮总延迟 p95 的中位数，单位为微秒。这个负载只覆盖持久写入。执行 `cargo run --release -p vibevalley-durable --example commit_latency` 可分别看到进入回调、执行回调和等待回执的耗时。[基准程序](crates/vibevalley-durable/examples/commit_latency.rs)
+**提交耗时。** 在同一台 Apple Silicon Mac 上，release 构建用临时 WAL 库测量文档写入。每个并发线程写自己的文档 60 次，等待每次提交回执。两种驱动交错运行 11 轮。表中为各轮总延迟 p95 的中位数，单位为微秒。这个负载只覆盖持久写入。执行 `cargo run --release -p vibevalley-agent --example commit_latency` 可分别看到进入回调、执行回调和等待回执的耗时。[基准程序](crates/vibevalley-agent/examples/commit_latency.rs)
 
 | 并发写者 | 原 rusqlite 批提交 | SQLx 批提交 |
 | --- | --- | --- |

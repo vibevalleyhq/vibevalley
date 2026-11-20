@@ -513,6 +513,31 @@ export const catalogs = {
       "repo.preview": "预览：将 {branch} 的 {sha} 发布到 {base}；尚未运行检查",
       setting: { nothingGiven: "至少给一个要改的设置项", valid: "设置校验通过" },
       chat: { session: "会话 {session}（输入 /exit 或按 Ctrl-D 退出）" },
+      eval: {
+        about: "导出持久 JSONL 轨迹、检查运行指标、重放切片与运行对比评测集",
+        export: "将对话及其任务图导出为自包含的 JSONL 目录",
+        inspect: "分析 JSONL 目录或 SQLite 持久库，输出时间线或离线 HTML 报告",
+        replay: "从 JSONL 前缀切片分支重放到隔离目录并执行验收器",
+        run: "在隔离工作目录与均衡顺序下运行评测集并统计对比结果",
+        missingKey: "未配置 DeepSeek API 密钥；请设置 DEEPSEEK_API_KEY 或通过 vibevalley setting update 保存",
+        arg: {
+          conversation: "要导出的对话 ID",
+          path: "JSONL 轨迹目录或 SQLite 数据库路径",
+          spec: "ReplaySpec JSON 文件路径",
+          suite: "EvalSuite JSON 文件路径",
+        },
+        flag: {
+          out: "导出的存储目录或评测输出目录",
+          source: "源 SQLite 数据库或 JSONL 目录（默认家目录下的 server.db）",
+          atSeq: "截断到第 N 条条目序号，生成可供重放的前缀切片",
+          noChildren: "导出时不追踪子帮手会话",
+          conversation: "目标对话 ID（默认选根对话）",
+          timeline: "输出紧凑的逐条时间线与任务状态",
+          html: "把离线单文件 HTML 报告写到该路径",
+          trials: "覆盖每道题的重复测试次数",
+          profile: "只跑指定名字的配置档案（可传多次）",
+        },
+      },
     },
     desktop: {
       open: "打开 VibeValley",
@@ -4403,6 +4428,31 @@ export const catalogs = {
       "repo.preview": "Preview: publish {branch} at {sha} into {base}; checks have not run",
       setting: { nothingGiven: "Give at least one setting flag to update", valid: "Settings are valid" },
       chat: { session: "Session {session} (/exit or Ctrl-D to leave)" },
+      eval: {
+        about: "Export durable JSONL trajectories, inspect runs, replay slices, and run agent evaluation suites",
+        export: "Export a conversation and its task graph to a self-contained JSONL directory",
+        inspect: "Analyze a JSONL directory or SQLite durable store, render timeline, or write HTML",
+        replay: "Replay a sliced JSONL prefix into an isolated output directory and run graders",
+        run: "Run an evaluation suite with isolated workspaces and balanced profile ordering",
+        missingKey: "No DeepSeek API key is configured; set DEEPSEEK_API_KEY or save it via vibevalley setting update",
+        arg: {
+          conversation: "Conversation ID to export",
+          path: "Path to a JSONL trajectory directory or SQLite database",
+          spec: "Path to a ReplaySpec JSON file",
+          suite: "Path to an EvalSuite JSON file",
+        },
+        flag: {
+          out: "Destination directory for exported store or trial outputs",
+          source: "Source SQLite database or JSONL directory (defaults to home server.db)",
+          atSeq: "Truncate root conversation at entry sequence N for prefix slice replay",
+          noChildren: "Do not follow child subagent conversations when exporting",
+          conversation: "Target conversation ID (defaults to root conversation)",
+          timeline: "Include compact entry-by-entry timeline and task statuses",
+          html: "Write a self-contained offline HTML report to this path",
+          trials: "Override number of trials per task",
+          profile: "Filter to named profile(s); may be passed multiple times",
+        },
+      },
     },
     desktop: {
       open: "Open VibeValley",
@@ -8021,6 +8071,25 @@ export interface Messages {
   "cli.doctor.setModelKey": undefined;
   "cli.doctor.unreachable": { readonly base: string | number };
   "cli.doctor.wrong": { readonly checks: string | number };
+  "cli.eval.about": undefined;
+  "cli.eval.arg.conversation": undefined;
+  "cli.eval.arg.path": undefined;
+  "cli.eval.arg.spec": undefined;
+  "cli.eval.arg.suite": undefined;
+  "cli.eval.export": undefined;
+  "cli.eval.flag.atSeq": undefined;
+  "cli.eval.flag.conversation": undefined;
+  "cli.eval.flag.html": undefined;
+  "cli.eval.flag.noChildren": undefined;
+  "cli.eval.flag.out": undefined;
+  "cli.eval.flag.profile": undefined;
+  "cli.eval.flag.source": undefined;
+  "cli.eval.flag.timeline": undefined;
+  "cli.eval.flag.trials": undefined;
+  "cli.eval.inspect": undefined;
+  "cli.eval.missingKey": undefined;
+  "cli.eval.replay": undefined;
+  "cli.eval.run": undefined;
   "cli.example.agentCreate.about": undefined;
   "cli.example.agentDelete.about": undefined;
   "cli.example.agentList.about": undefined;

@@ -1,12 +1,26 @@
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use serde_json::{Value, json};
 
-use crate::model::{fold_stream, request_body};
-use crate::price::{charge_usd, deepseek_price};
-use crate::tool::{Bash, EditFile};
+use crate::ai::models::{charge_usd, deepseek_price};
+use crate::ai::providers::deepseek::request_body;
+use crate::ai::stream::{CancelToken, fold_stream};
+use crate::ai::types::ResponseFormat;
+use crate::core::doc::{CONVERSATION_SCOPE, GovernanceDoc, OarSessionDoc, OarSessionState, TodoDoc, read_doc, write_doc};
+use crate::core::engine::{KIND as GENERATION_KIND, Request, TOOL_RUN};
+use crate::core::inbox::WhenBusy;
+use crate::core::pipeline::PromptSection;
+use crate::durable::{Store, SubmissionStatus, Task, TaskStatus};
+use crate::extensions::governance::{self, Decision, GovernanceExtension, Permissions};
+use crate::extensions::grader::{ExplicitReviewProvider, GraderExtension, Rubric};
+use crate::extensions::memory::MemoryExtension;
+use crate::extensions::subagent::SubagentExtension;
+use crate::extensions::todo::{TodoExtension, todo_tools};
+use crate::harness::{Harness, StandIn, worker_conversation};
+use crate::tools::{Bash, EditFile, TypedToolAdapter};
 use crate::*;
 
 /// Answers with the completions it was given, in order, and records the
@@ -99,19 +113,42 @@ impl Tool for Counter {
     }
 }
 
-fn brain(client: Arc<Scripted>, tools: Vec<Box<dyn Tool>>) -> Brain {
+fn brain(client: Arc<Scripted>, tools: Vec<Box<dyn Tool>>) -> Arc<Brain> {
     let mut b = Brain::new(client, "deepseek-flash", "You are a test.");
     b.tools = tools;
-    b
+    Arc::new(b)
+}
+
+fn worker_harness(store: Store) -> Harness {
+    let harness = Harness::workers_only(store);
+    harness.register_extension(Arc::new(GovernanceExtension::default()));
+    harness.register_extension(Arc::new(TodoExtension::default().without_global_tools()));
+    harness.register_extension(Arc::new(SubagentExtension::new("VibeValley").without_global_tools()));
+    harness.recover().unwrap();
+    harness
+}
+
+fn run_worker_turn(harness: &Harness, conv: &str, b: Arc<Brain>, prompt: &str) -> (Vec<AgentEvent>, Task) {
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let ev_sink = events.clone();
+    harness.attach_worker(conv, b, Arc::new(move |e| ev_sink.lock().unwrap().push(e))).unwrap();
+    let (_, task, _) = harness.conversation(conv).prompt("deepseek-flash", "req-1", prompt, "You are a test.").unwrap();
+    let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).unwrap();
+    let captured = events.lock().unwrap().clone();
+    harness.workers().detach(conv);
+    (captured, done)
 }
 
 #[test]
 fn a_turn_with_a_tool_call_runs_the_tool_and_answers() {
-    let dir = tempfile::tempdir().unwrap();
+    let store = Store::memory().unwrap();
+    let harness = worker_harness(store);
     let runs = Arc::new(Mutex::new(0));
     let client = Scripted::new(vec![call("c1", "count", json!({})), say("done")]);
-    let mut conv = Conversation::open(
-        dir.path().join("c.jsonl"),
+    let conv = worker_conversation("t1");
+    let (events, task) = run_worker_turn(
+        &harness,
+        &conv,
         brain(
             client.clone(),
             vec![Box::new(Counter {
@@ -119,13 +156,10 @@ fn a_turn_with_a_tool_call_runs_the_tool_and_answers() {
                 safe: false,
             })],
         ),
-    )
-    .unwrap();
-    let mut events = vec![];
-    let outcome = conv.send("please count", &mut |e| events.push(e)).unwrap();
-    assert_eq!(outcome, TurnOutcome::Completed);
+        "please count",
+    );
+    assert_eq!(task.terminal_reason, "completed");
     assert_eq!(*runs.lock().unwrap(), 1);
-    // The second request carried the tool call (with its reasoning) and the result.
     let seen = client.seen.lock().unwrap();
     let second: Vec<Value> = seen[1].messages.iter().map(Message::to_wire).collect();
     assert_eq!(second[0]["role"], "system");
@@ -136,27 +170,38 @@ fn a_turn_with_a_tool_call_runs_the_tool_and_answers() {
     assert_eq!(second[3]["role"], "tool");
     assert_eq!(second[3]["tool_call_id"], "c1");
     match events.last().unwrap() {
-        BrainEvent::TurnFinished { usage, text, .. } => {
+        AgentEvent::AgentEnd { outcome, usage, text } => {
+            assert_eq!(*outcome, TurnOutcome::Completed);
             assert_eq!(text, "done");
             assert_eq!(usage.input, 200);
             assert_eq!(usage.cache_read, 50);
         }
         e => panic!("{e:?}"),
     }
-    assert!(events.iter().any(|e| matches!(e, BrainEvent::ToolStarted { name, .. } if name == "count")));
+    assert!(events.iter().any(|e| matches!(e, AgentEvent::ToolStart { name, .. } if name == "count")));
+    harness.close();
 }
 
 #[test]
 fn the_transcript_survives_a_reopen_and_feeds_the_next_turn() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("c.jsonl");
+    let db = dir.path().join("execution.db");
+    let conv = worker_conversation("reopen");
     let client = Scripted::new(vec![say("first answer"), say("second answer")]);
-    Conversation::open(&path, brain(client.clone(), vec![]))
-        .unwrap()
-        .send("one", &mut |_| {})
-        .unwrap();
-    let mut again = Conversation::open(&path, brain(client.clone(), vec![])).unwrap();
-    again.send("two", &mut |_| {}).unwrap();
+    {
+        let h1 = worker_harness(Store::open(&db).unwrap());
+        h1.attach_worker(&conv, brain(client.clone(), vec![]), Arc::new(|_| {})).unwrap();
+        let (_, t1, _) = h1.conversation(&conv).prompt("deepseek-flash", "r1", "one", "You are a test.").unwrap();
+        h1.scheduler().wait(&t1.id, Duration::from_secs(10)).unwrap();
+        h1.close();
+    }
+    {
+        let h2 = worker_harness(Store::open(&db).unwrap());
+        h2.attach_worker(&conv, brain(client.clone(), vec![]), Arc::new(|_| {})).unwrap();
+        let (_, t2, _) = h2.conversation(&conv).prompt("deepseek-flash", "r2", "two", "You are a test.").unwrap();
+        h2.scheduler().wait(&t2.id, Duration::from_secs(10)).unwrap();
+        h2.close();
+    }
     let seen = client.seen.lock().unwrap();
     let texts: Vec<Option<String>> = seen[1].messages.iter().map(|m| m.content.clone()).collect();
     assert_eq!(
@@ -170,127 +215,436 @@ fn the_transcript_survives_a_reopen_and_feeds_the_next_turn() {
     );
 }
 
-/// Writes the transcript a crash would leave: the turn started, the model
-/// asked for a tool, the tool started, nothing more.
-fn crashed_mid_tool(path: &std::path::Path) {
-    let entries = [
-        Entry::TurnStarted { input: "count it".into() },
-        Entry::Message {
-            message: call("c1", "count", json!({})).message,
-            usage: None,
-        },
-        Entry::ToolStarted { id: "c1".into() },
-    ];
-    let text: String = entries.iter().map(|e| serde_json::to_string(e).unwrap() + "\n").collect();
-    std::fs::write(path, text + "{\"entry\":\"message\",\"mess").unwrap();
+fn seed_crashed_mid_tool(db: &std::path::Path, conv: &str) -> String {
+    let store = Store::open(db).unwrap();
+    let gen_id = store
+        .write(|tx| {
+            tx.create_conversation(conv, "deepseek-flash")?;
+            tx.append_entry(conv, "pi.system", &json!({ "text": "You are a test.", "delta": false }))?;
+            tx.append_entry(conv, "pi.user", &json!({ "text": "count it", "source": "user" }))?;
+            let call_msg = call("c1", "count", json!({})).message;
+            let (sub, _) = tx.submit(conv, "r1", "prompt", &json!({ "text": "count it" }), None)?;
+            let sub = tx.set_submission_status(&sub.id, SubmissionStatus::Placed)?;
+
+            let mut gen_task = Task::new(GENERATION_KIND, crate::core::engine::PHASE_TOOL_JOIN);
+            gen_task.id = format!("gen-{}", sub.id);
+            gen_task.conversation_id = conv.into();
+
+            let mut child = Task::new(crate::core::engine::TOOL_KIND, TOOL_RUN);
+            child.owner_task_id = gen_task.id.clone();
+            child.conversation_id = conv.into();
+            child.dedup_key = format!("{}:s1:cc1", gen_task.id);
+            child.memo = json!({ "started": true });
+            child.checkpoint = json!({
+                "parentTaskId": gen_task.id,
+                "step": 1,
+                "call": { "id": "c1", "name": "count", "arguments": "{}" },
+                "args": {},
+                "prompt": "count it",
+                "submissionId": sub.id,
+                "requestId": "r1",
+                "iteration": 0,
+            });
+            let (child, _) = tx.create_task(child)?;
+
+            gen_task.status = TaskStatus::Waiting;
+            gen_task.wait_mode = Some(crate::durable::WaitMode::AllSettled);
+            gen_task.wait_task_ids = vec![child.id.clone()];
+            gen_task.checkpoint = json!({
+                "prompt": "count it",
+                "submission": sub.id,
+                "requestId": "r1",
+                "step": 1,
+                "calls": [{ "id": "c1", "name": "count", "arguments": "{}" }],
+                "index": 0,
+                "batchCalls": [child.id],
+            });
+            tx.create_task(gen_task.clone())?;
+            tx.append_entry(
+                conv,
+                "pi.assistant",
+                &json!({
+                    "text": call_msg.content,
+                    "reasoning": call_msg.reasoning,
+                    "toolCalls": [{ "id": "c1", "toolName": "count", "argsJson": {}, "rawArguments": "{}" }],
+                    "generationTask": gen_task.id,
+                }),
+            )?;
+            Ok(gen_task.id)
+        })
+        .unwrap();
+    store.close().unwrap();
+    gen_id
 }
 
 #[test]
 fn an_unfinished_turn_resumes_and_does_not_rerun_a_tool_that_changes_things() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("c.jsonl");
-    crashed_mid_tool(&path);
+    let db = dir.path().join("execution.db");
+    let conv = worker_conversation("crash-unsafe");
+    let gen_id = seed_crashed_mid_tool(&db, &conv);
+
     let runs = Arc::new(Mutex::new(0));
     let client = Scripted::new(vec![say("I checked; carrying on")]);
-    let mut conv = Conversation::open(
-        &path,
-        brain(
-            client.clone(),
-            vec![Box::new(Counter {
-                runs: runs.clone(),
-                safe: false,
-            })],
-        ),
-    )
-    .unwrap();
-    assert_eq!(conv.unfinished_turn().as_deref(), Some("count it"));
-    assert!(matches!(conv.send("new input", &mut |_| {}), Err(BrainError::Busy)));
-    let outcome = conv.resume(&mut |_| {}).unwrap().unwrap();
-    assert_eq!(outcome, TurnOutcome::Completed);
-    assert_eq!(*runs.lock().unwrap(), 0, "a tool that changes things is not replayed");
+    let harness = worker_harness(Store::open(&db).unwrap());
+    harness
+        .attach_worker(
+            &conv,
+            brain(
+                client.clone(),
+                vec![Box::new(Counter {
+                    runs: runs.clone(),
+                    safe: false,
+                })],
+            ),
+            Arc::new(|_| {}),
+        )
+        .unwrap();
+    let done = harness.scheduler().wait(&gen_id, Duration::from_secs(10)).unwrap();
+    assert_eq!(done.terminal_reason, "completed");
+    assert_eq!(*runs.lock().unwrap(), 0, "unsafe tool must not be replayed");
     let seen = client.seen.lock().unwrap();
     let last = seen[0].messages.last().unwrap();
     assert_eq!(last.role, Role::Tool);
     assert!(last.content.as_ref().unwrap().contains("interrupted"));
-    assert!(conv.unfinished_turn().is_none());
-    assert!(conv.resume(&mut |_| {}).is_none());
+    harness.close();
 }
 
 #[test]
 fn a_read_only_tool_cut_off_mid_run_is_run_again() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("c.jsonl");
-    crashed_mid_tool(&path);
+    let db = dir.path().join("execution.db");
+    let conv = worker_conversation("crash-safe");
+    let gen_id = seed_crashed_mid_tool(&db, &conv);
+
     let runs = Arc::new(Mutex::new(0));
     let client = Scripted::new(vec![say("ok")]);
-    let mut conv = Conversation::open(
-        &path,
-        brain(
-            client,
-            vec![Box::new(Counter {
-                runs: runs.clone(),
-                safe: true,
-            })],
-        ),
-    )
-    .unwrap();
-    conv.resume(&mut |_| {}).unwrap().unwrap();
+    let harness = worker_harness(Store::open(&db).unwrap());
+    harness
+        .attach_worker(
+            &conv,
+            brain(
+                client,
+                vec![Box::new(Counter {
+                    runs: runs.clone(),
+                    safe: true,
+                })],
+            ),
+            Arc::new(|_| {}),
+        )
+        .unwrap();
+    let done = harness.scheduler().wait(&gen_id, Duration::from_secs(10)).unwrap();
+    assert_eq!(done.terminal_reason, "completed");
     assert_eq!(*runs.lock().unwrap(), 1);
+    harness.close();
 }
 
 #[test]
 fn abort_stops_before_the_next_step() {
-    let dir = tempfile::tempdir().unwrap();
+    let store = Store::memory().unwrap();
+    let harness = worker_harness(store);
     let runs = Arc::new(Mutex::new(0));
     let client = Scripted::new(vec![call("c1", "count", json!({})), say("never")]);
-    let mut conv = Conversation::open(
-        dir.path().join("c.jsonl"),
-        brain(
-            client.clone(),
-            vec![Box::new(Counter {
-                runs: runs.clone(),
-                safe: false,
-            })],
-        ),
-    )
-    .unwrap();
-    let abort = conv.abort_handle();
-    let outcome = conv
-        .send("go", &mut |e| {
-            if matches!(e, BrainEvent::ToolFinished { .. }) {
-                abort.abort();
-            }
-        })
+    let conv = worker_conversation("abort");
+    let handle = harness.conversation(&conv);
+    let handle_abort = handle.clone();
+    harness
+        .attach_worker(
+            &conv,
+            brain(
+                client.clone(),
+                vec![Box::new(Counter {
+                    runs: runs.clone(),
+                    safe: false,
+                })],
+            ),
+            Arc::new(move |e| {
+                if matches!(e, AgentEvent::ToolEnd { .. }) {
+                    let _ = handle_abort.abort();
+                }
+            }),
+        )
         .unwrap();
-    assert_eq!(outcome, TurnOutcome::Aborted);
+    let (_, task, _) = handle.prompt("deepseek-flash", "r1", "go", "You are a test.").unwrap();
+    let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).unwrap();
+    assert_eq!(done.terminal_reason, "aborted");
     assert_eq!(client.seen.lock().unwrap().len(), 1);
-    assert!(conv.unfinished_turn().is_none());
+    harness.close();
 }
 
 #[test]
-fn a_big_prompt_is_compacted_and_the_current_turn_kept() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("c.jsonl");
-    let mut big = call("c1", "count", json!({}));
-    big.usage.input = 150_000;
-    let client = Scripted::new(vec![say("old answer"), big, say("SUMMARY TEXT"), say("finished")]);
+fn governance_extension_allows_readonly_tools_and_parks_on_unsafe_tool() {
+    let store = Store::memory().unwrap();
+    let conv = worker_conversation("gov");
+    store
+        .write(|tx| {
+            tx.create_conversation(&conv, "deepseek-flash")?;
+            write_doc::<OarSessionDoc>(
+                tx,
+                CONVERSATION_SCOPE,
+                &conv,
+                &OarSessionState {
+                    runtime_id: "vibevalley".into(),
+                    vendor_session_id: "gov".into(),
+                    cwd: ".".into(),
+                    permission_mode: "ask".into(),
+                    status: "open".into(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+    struct ReadMock;
+    impl Tool for ReadMock {
+        fn spec(&self) -> ToolSpec {
+            ToolSpec {
+                name: "read".into(),
+                description: "mock read".into(),
+                parameters: json!({"type": "object"}),
+            }
+        }
+        fn replay_safe(&self) -> bool {
+            true
+        }
+        fn execute(&self, _: &Value) -> ToolOutput {
+            ToolOutput::ok("contents")
+        }
+    }
+
+    let (perm_tx, perm_rx) = flume::unbounded();
+    let harness = Harness::workers_only(store.clone());
+    harness.register_extension(Arc::new(GovernanceExtension::new(Permissions::default())));
+    harness.recover().unwrap();
+
     let runs = Arc::new(Mutex::new(0));
-    let mut conv = Conversation::open(&path, brain(client.clone(), vec![Box::new(Counter { runs, safe: true })])).unwrap();
-    conv.send("old question", &mut |_| {}).unwrap();
-    let mut compacted = false;
-    conv.send("new question", &mut |e| compacted |= e == BrainEvent::Compacted).unwrap();
-    assert!(compacted);
+    let client = Scripted::new(vec![call("r1", "read", json!({"path": "a.txt"})), call("c1", "count", json!({})), say("done")]);
+    harness
+        .attach_worker(
+            &conv,
+            brain(
+                client,
+                vec![
+                    Box::new(ReadMock),
+                    Box::new(Counter {
+                        runs: runs.clone(),
+                        safe: false,
+                    }),
+                ],
+            ),
+            Arc::new(move |e| {
+                if let AgentEvent::PermissionRequested {
+                    task_id,
+                    tool_call_id,
+                    tool_name,
+                    ..
+                } = e
+                {
+                    let _ = perm_tx.send((task_id, tool_call_id, tool_name));
+                }
+            }),
+        )
+        .unwrap();
+
+    let (_, task, _) = harness.conversation(&conv).prompt("deepseek-flash", "req", "read then count", "sys").unwrap();
+
+    // `read` is allowlisted in DefaultClassifier so it runs without parking; `count` parks.
+    let (parked_task, call_id, tool_name) = perm_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(call_id, "c1");
+    assert_eq!(tool_name, "count");
+    assert_eq!(*runs.lock().unwrap(), 0);
+
+    let gov = store.read(|tx| read_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, &conv)).unwrap();
+    assert!(gov.pending_permissions.contains_key(&parked_task));
+
+    governance::resolve(
+        &store,
+        harness.scheduler(),
+        &conv,
+        &parked_task,
+        Decision {
+            tool_call_id: "c1".into(),
+            approved: true,
+            reason: String::new(),
+        },
+    )
+    .unwrap();
+
+    let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).unwrap();
+    assert_eq!(done.terminal_reason, "completed");
+    assert_eq!(*runs.lock().unwrap(), 1);
+    harness.close();
+}
+
+#[test]
+fn grader_extension_uses_json_object_and_strips_fenced_verdict() {
+    struct FixedBrain(Arc<Brain>);
+    impl crate::core::engine::BrainProvider for FixedBrain {
+        fn resolve_brain(&self, _: &str, _: &str) -> crate::durable::Result<Option<Arc<Brain>>> {
+            Ok(Some(self.0.clone()))
+        }
+    }
+
+    let store = Store::memory().unwrap();
+    let client = Scripted::new(vec![
+        say("draft 1"),
+        say("```json\n{\"satisfied\":false,\"summary\":\"missing tests\",\"unmetItems\":[\"add test\"]}\n```"),
+        say("draft 2"),
+        say("{\"satisfied\":true,\"summary\":\"all good\",\"unmetItems\":[]}"),
+    ]);
+    let conv = "assistant-graded";
+    let b = brain(client.clone(), vec![]);
+    let harness = Harness::from_store(store.clone(), Arc::new(FixedBrain(b)));
+    harness.register_extension(Arc::new(GraderExtension::new(Arc::new(ExplicitReviewProvider))));
+    harness.recover().unwrap();
+
+    let (_, task, _) = harness
+        .submit(Request {
+            conversation: conv,
+            provider: "deepseek-flash",
+            request_id: "req-grade",
+            prompt: "ship feature",
+            source: "user",
+            system: "sys",
+            rubric: Some(Rubric {
+                markdown: "- must pass tests".into(),
+                max_iterations: 3,
+            }),
+            ..Default::default()
+        })
+        .unwrap();
+
+    let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).unwrap();
+    assert_eq!(done.terminal_reason, "completed");
+    assert_eq!(done.result["rubricVerdict"]["satisfied"], true);
+    assert_eq!(done.result["rubricVerdict"]["iteration"], 2);
+
     let seen = client.seen.lock().unwrap();
-    // Request 3 was the summary request; request 4 continues from the summary.
-    assert!(seen[2].messages.last().unwrap().content.as_ref().unwrap().starts_with("Summarize"));
-    let after: Vec<String> = seen[3].messages.iter().filter_map(|m| m.content.clone()).collect();
-    assert!(after[1].contains("SUMMARY TEXT"), "{after:?}");
-    assert!(after.iter().any(|t| t == "new question"));
-    assert!(!after.iter().any(|t| t == "old question"));
-    // Reopened, the transcript reads the same way.
+    // Request 1 and Request 3 are grader calls.
+    assert_eq!(seen[1].response_format, Some(ResponseFormat::JsonObject));
+    assert_eq!(seen[3].response_format, Some(ResponseFormat::JsonObject));
+
+    let gov = store.read(|tx| read_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, conv)).unwrap();
+    assert_eq!(gov.rubric_history.len(), 2);
+    assert!(gov.last_rubric_verdict.unwrap().satisfied);
+    harness.close();
+}
+
+#[test]
+fn subagent_extension_spawns_once_and_does_not_duplicate_on_replay() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("execution.db");
+    let store = Store::open(&db).unwrap();
+    let harness = Harness::workers_only(store.clone());
+    harness.register_extension(Arc::new(SubagentExtension::new("阿狐").without_global_tools()));
+    harness.recover().unwrap();
+
+    let client = Scripted::new(vec![
+        call("s1", "spawn_agent", json!({"brief": "find the clock code", "label": "scout"})),
+        say("Found it in main.rs:12."),
+        say("Parent done."),
+    ]);
+    let conv = worker_conversation("parent");
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let ev_sink = events.clone();
+    harness
+        .attach_worker(&conv, brain(client.clone(), vec![]), Arc::new(move |e| ev_sink.lock().unwrap().push(e)))
+        .unwrap();
+    let (_, task, _) = harness
+        .conversation(&conv)
+        .prompt("deepseek-flash", "r1", "find clock", "You are parent.")
+        .unwrap();
+    let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).unwrap();
+    assert_eq!(done.terminal_reason, "completed");
+
+    let captured = events.lock().unwrap().clone();
+    assert!(
+        captured
+            .iter()
+            .any(|e| matches!(e, AgentEvent::SubagentSpawned { label, brief, .. } if label == "scout" && brief == "find the clock code"))
+    );
+    assert!(
+        captured
+            .iter()
+            .any(|e| matches!(e, AgentEvent::SubagentStatusChanged { status, .. } if status == "running"))
+    );
+    assert!(
+        captured
+            .iter()
+            .any(|e| matches!(e, AgentEvent::SubagentStatusChanged { status, .. } if status == "completed"))
+    );
+
+    let seen = client.seen.lock().unwrap();
+    assert_eq!(seen.len(), 3);
+    // Child helper received the helper system prompt with "阿狐".
+    assert!(seen[1].messages[0].content.as_ref().unwrap().contains("「阿狐」派出去的帮手"));
     drop(seen);
-    let reopened = Conversation::open(&path, brain(Scripted::new(vec![]), vec![])).unwrap();
-    assert!(reopened.entries().iter().any(|e| matches!(e, Entry::Compacted { .. })));
+    harness.close();
+}
+
+#[test]
+fn todo_extension_persists_graph_to_todo_doc_across_reopen() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("execution.db");
+    let conv = worker_conversation("todo-persist");
+    let client = Scripted::new(vec![
+        call("t1", "todo_add", json!({"tasks": [{"id": "step1", "brief": "read code"}]})),
+        say("added"),
+        call("t2", "todo_list", json!({})),
+        say("listed"),
+    ]);
+    {
+        let h1 = worker_harness(Store::open(&db).unwrap());
+        h1.attach_worker(&conv, brain(client.clone(), todo_tools(Default::default())), Arc::new(|_| {}))
+            .unwrap();
+        let (_, t1, _) = h1.conversation(&conv).prompt("deepseek-flash", "r1", "add step", "sys").unwrap();
+        h1.scheduler().wait(&t1.id, Duration::from_secs(10)).unwrap();
+        let doc = h1.store().read(|tx| read_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, &conv)).unwrap();
+        assert_eq!(doc.items.len(), 1);
+        assert_eq!(doc.items[0].id, "step1");
+        h1.close();
+    }
+    {
+        let h2 = worker_harness(Store::open(&db).unwrap());
+        h2.attach_worker(&conv, brain(client.clone(), todo_tools(Default::default())), Arc::new(|_| {}))
+            .unwrap();
+        let (_, t2, _) = h2.conversation(&conv).prompt("deepseek-flash", "r2", "list", "sys").unwrap();
+        h2.scheduler().wait(&t2.id, Duration::from_secs(10)).unwrap();
+        h2.close();
+    }
+    let seen = client.seen.lock().unwrap();
+    let listed_msg = seen[3].messages.last().unwrap().content.as_ref().unwrap();
+    assert!(listed_msg.contains("step1"), "{listed_msg}");
+}
+
+#[test]
+fn standin_and_durable_follow_up_work_through_harness() {
+    let store = Store::memory().unwrap();
+    let harness = worker_harness(store.clone());
+    let conv = worker_conversation("standin-fu");
+    let client = Scripted::new(vec![say("first"), say("followed up")]);
+    harness.attach_worker(&conv, brain(client.clone(), vec![]), Arc::new(|_| {})).unwrap();
+    let handle = harness.conversation(&conv);
+    let (_, task, _) = handle
+        .prompt_with(Request {
+            conversation: &conv,
+            provider: "deepseek-flash",
+            request_id: "r1",
+            prompt: "start",
+            source: "user",
+            system: "sys",
+            when_busy: WhenBusy::Queue,
+            ..Default::default()
+        })
+        .unwrap();
+    handle.follow_up("fu-1", "next thing").unwrap();
+    let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).unwrap();
+    assert_eq!(done.terminal_reason, "completed");
+
+    let sections = vec![PromptSection::new("extra", "remember this")];
+    store.write(|tx| StandIn::save(tx, &conv, &sections, &[])).unwrap();
+    assert_eq!(harness.reconcile_sections(&conv).unwrap(), sections);
+    harness.close();
 }
 
 #[test]
@@ -306,7 +660,7 @@ fn a_deepseek_stream_folds_into_text_reasoning_tool_calls_and_usage() {
     ]
     .join("\n\n");
     let mut deltas = vec![];
-    let c = fold_stream(Cursor::new(stream), &mut |d| deltas.push(d)).unwrap();
+    let c = fold_stream(Cursor::new(stream), &CancelToken::never(), &mut |d| deltas.push(d)).unwrap();
     assert_eq!(c.finish, FinishReason::ToolCalls);
     assert_eq!(c.message.reasoning.as_deref(), Some("Let me look."));
     assert_eq!(c.message.content.as_deref(), Some("Checking "));
@@ -327,7 +681,11 @@ fn a_deepseek_stream_folds_into_text_reasoning_tool_calls_and_usage() {
         }
     );
     assert_eq!(deltas.len(), 3);
-    let err = fold_stream(Cursor::new(r#"data: {"error":{"message":"Insufficient Balance"}}"#), &mut |_| {});
+    let err = fold_stream(
+        Cursor::new(r#"data: {"error":{"message":"Insufficient Balance"}}"#),
+        &CancelToken::never(),
+        &mut |_| {},
+    );
     assert!(matches!(err, Err(BrainError::Model(m)) if m == "Insufficient Balance"));
 }
 
@@ -369,15 +727,15 @@ fn prices_follow_vibevalleys_table() {
 fn edit_needs_exactly_one_match_and_bash_times_out() {
     let dir = tempfile::tempdir().unwrap();
     let ws = Workspace {
-        bash_timeout: std::time::Duration::from_millis(300),
+        bash_timeout: Duration::from_millis(300),
         ..Workspace::new(dir.path())
     };
     std::fs::write(dir.path().join("f.txt"), "a b a").unwrap();
-    let edit = EditFile(ws.clone());
+    let edit = TypedToolAdapter(EditFile(ws.clone()));
     assert!(edit.execute(&json!({"path": "f.txt", "old_text": "a", "new_text": "x"})).is_error);
     assert!(!edit.execute(&json!({"path": "f.txt", "old_text": "b", "new_text": "y"})).is_error);
     assert_eq!(std::fs::read_to_string(dir.path().join("f.txt")).unwrap(), "a y a");
-    let bash = Bash(ws);
+    let bash = TypedToolAdapter(Bash(ws));
     let ok = bash.execute(&json!({"command": "echo hi; echo err >&2"}));
     assert_eq!((ok.is_error, ok.text.as_str()), (false, "hi\nerr\n"));
     let slow = bash.execute(&json!({"command": "sleep 5"}));
@@ -394,16 +752,16 @@ fn deepseek_live_tool_turn() {
     let client = Arc::new(OpenAiClient::deepseek(move || Some(key.clone())));
     let mut b = Brain::new(client, "deepseek-flash", "You are a careful assistant. Use tools to look at files.");
     b.tools = coding_tools(&Workspace::new(dir.path()));
-    let mut conv = Conversation::open(dir.path().join("c.jsonl"), b).unwrap();
-    let mut text = String::new();
-    conv.send("What number is in secret.txt? Reply with the number only.", &mut |e| {
-        if let BrainEvent::TurnFinished { text: t, usage, .. } = e {
-            println!("usage {usage:?}");
-            text = t;
-        }
-    })
-    .unwrap();
+    let store = Store::memory().unwrap();
+    let harness = worker_harness(store);
+    let conv = worker_conversation("live");
+    let (events, _) = run_worker_turn(&harness, &conv, Arc::new(b), "What number is in secret.txt? Reply with the number only.");
+    let Some(AgentEvent::AgentEnd { text, usage, .. }) = events.last() else {
+        panic!("missing AgentEnd: {events:?}");
+    };
+    println!("usage {usage:?}");
     assert!(text.contains("42"), "{text}");
+    harness.close();
 }
 
 mod kit_tests {
@@ -411,8 +769,9 @@ mod kit_tests {
 
     use serde_json::json;
 
-    use crate::Tool;
-    use crate::kit::*;
+    use super::*;
+    use crate::extensions::memory::{FileMemory, MemoryPort, Remember, RewriteMemory};
+    use crate::resources::skills::{front_matter, read_skill, scan_skills, skill_body, skill_index};
 
     #[test]
     fn front_matter_and_skills_scan_first_name_wins() {
@@ -442,17 +801,21 @@ mod kit_tests {
     }
 
     #[test]
-    fn memory_remembers_dated_lines_and_rewrites() {
+    fn memory_remembers_dated_lines_and_rewrites_and_builds_extension_section() {
         let home = tempfile::tempdir().unwrap();
         let mem: Arc<dyn MemoryPort> = Arc::new(FileMemory { home: home.path().into() });
         assert_eq!(mem.prompt(), "");
-        let remember = Remember(mem.clone());
+        let remember = TypedToolAdapter(Remember(mem.clone()));
         assert!(remember.execute(&json!({"note": "  "})).is_error);
         assert_eq!(remember.execute(&json!({"note": "用户喜欢\n简短回答"})).text, "记下了。");
         let prompt = mem.prompt();
         assert!(prompt.starts_with("- 20") && prompt.ends_with("用户喜欢 简短回答"), "{prompt}");
+        let ext = MemoryExtension::new(mem.clone());
+        let sections = ext.sections();
+        assert_eq!(sections.len(), 1);
+        assert!(sections[0].content.starts_with("## 记性\n"));
         assert_eq!(
-            RewriteMemory(mem.clone()).execute(&json!({"content": "- a\n- b"})).text,
+            TypedToolAdapter(RewriteMemory(mem.clone())).execute(&json!({"content": "- a\n- b"})).text,
             "重写好了，现在 2 行。"
         );
         assert_eq!(mem.prompt(), "- a\n- b");
@@ -483,64 +846,4 @@ mod kit_tests {
         assert_eq!(tools[2].execute(&json!({})).text, "现在没有任务。");
         assert!(add.execute(&json!({"tasks": [{"id": "坏", "brief": "x"}]})).text.contains("不能当 id"));
     }
-}
-
-#[test]
-fn spawn_agent_runs_a_helper_and_a_replay_does_not_run_it_twice() {
-    use crate::kit::SpawnAgent;
-    let dir = tempfile::tempdir().unwrap();
-    let client = Scripted::new(vec![say("Found it in main.rs:12.")]);
-    let tool = SpawnAgent {
-        parent: "阿狐".into(),
-        client: client.clone(),
-        model: "deepseek-flash".into(),
-        tools: Arc::new(Vec::new),
-        dir: dir.path().into(),
-    };
-    let out = tool.execute(&json!({"brief": "find the clock code"}));
-    assert_eq!((out.is_error, out.text.as_str()), (false, "Found it in main.rs:12."));
-    let seen = client.seen.lock().unwrap();
-    assert!(seen[0].messages[0].content.as_ref().unwrap().contains("「阿狐」派出去的帮手"));
-    drop(seen);
-    // The same call again (a replay after a crash) reads the finished helper.
-    let again = tool.execute(&json!({"brief": "find the clock code"}));
-    assert_eq!(again.text, "Found it in main.rs:12.");
-    assert_eq!(client.seen.lock().unwrap().len(), 1);
-    assert!(tool.execute(&json!({"brief": " "})).is_error);
-}
-
-#[test]
-fn reopening_after_a_torn_write_keeps_new_entries_readable() {
-    use std::io::Write;
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("assistant.jsonl");
-    let client = Scripted::new(vec![say("first"), say("second")]);
-    Conversation::open(&path, brain(client.clone(), vec![]))
-        .unwrap()
-        .send("one", &mut |_| {})
-        .unwrap();
-    std::fs::OpenOptions::new().append(true).open(&path).unwrap().write_all(b"{\"entry\":").unwrap();
-    Conversation::open(&path, brain(client, vec![])).unwrap().send("two", &mut |_| {}).unwrap();
-    let entries = read_entries(&path).unwrap();
-    assert_eq!(entries.iter().filter(|e| matches!(e, Entry::TurnFinished { .. })).count(), 2);
-}
-
-#[test]
-fn recovery_settles_a_committed_answer_without_a_second_generation() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("assistant.jsonl");
-    let answer = say("done");
-    let entries = [
-        Entry::TurnStarted { input: "finish".into() },
-        Entry::Message {
-            message: answer.message,
-            usage: Some(answer.usage),
-        },
-    ];
-    std::fs::write(&path, entries.iter().map(|e| serde_json::to_string(e).unwrap()).collect::<Vec<_>>().join("\n")).unwrap();
-    let mut conv = Conversation::open(&path, brain(Scripted::new(vec![]), vec![])).unwrap();
-    let mut events = vec![];
-    assert_eq!(conv.resume(&mut |e| events.push(e)).unwrap().unwrap(), TurnOutcome::Completed);
-    assert!(matches!(events.last(),Some(BrainEvent::TurnFinished { text,usage,.. }) if text=="done" && *usage==answer.usage));
-    assert_eq!(read_entries(&path).unwrap().len(), 3);
 }

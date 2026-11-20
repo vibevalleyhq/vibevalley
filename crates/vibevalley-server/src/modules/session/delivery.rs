@@ -1,7 +1,7 @@
 use super::{Sessions, db};
 use crate::modules::ledger::Result;
 use serde_json::{Value, json};
-use vibevalley_durable::{Error, Result as DurableResult, Store, Submission, SubmissionStatus, Tx};
+use vibevalley_agent::durable::{Error, Result as DurableResult, Store, Submission, SubmissionStatus, Tx};
 use vibevalley_protocol::{Millis, Outcome, Run, RunTriggerKind, Session};
 
 use super::sessions::Extra;
@@ -12,14 +12,14 @@ pub(crate) fn delivery_conversation(issue: &str) -> String {
 
 impl Sessions {
     pub(super) fn graded_output(&self, session: &Session, extra: &Extra) -> Result<Option<String>> {
-        if session.runtime != vibevalley_oar::vibevalley::ID {
+        if session.runtime != vibevalley_agent::runtime::ID {
             return Ok(None);
         }
         let (Some(run), Some(vendor)) = (&extra.run, &extra.agent_session) else {
             return Ok(None);
         };
         Ok(self.0.durable.read(|tx| {
-            let sub = tx.submission_by_request(&vibevalley_agent::generation::workers::worker_conversation(vendor), &format!("work:{run}"))?;
+            let sub = tx.submission_by_request(&vibevalley_agent::harness::worker_conversation(vendor), &format!("work:{run}"))?;
             Ok(sub
                 .filter(|s| s.status == SubmissionStatus::Done && s.result["rubricVerdict"]["satisfied"] == true)
                 .and_then(|s| s.result["output"].as_str().map(str::to_owned)))
@@ -123,7 +123,7 @@ pub(crate) fn interrupt_on_reopen(
             run.ended_at = Some(at);
             run.outcome = Some(Outcome::Interrupted);
             run.summary = summary.into();
-            if !session.refining && session.runtime != vibevalley_oar::vibevalley::ID && run.issue.is_some() {
+            if !session.refining && session.runtime != vibevalley_agent::runtime::ID && run.issue.is_some() {
                 tx.put_document(
                     "run",
                     &id,

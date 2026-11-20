@@ -2,11 +2,16 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, Weak, atomic::Ordering};
 
 use serde_json::{Value, json};
-use vibevalley_agent::{
-    Brain, BrainError, BrainEvent, Entry, Message, TurnOutcome,
-    generation::{Environment, Generation, OutcomeReview, Request, ReviewRequest, Rubric, governance, transcript::Transcript},
-};
-use vibevalley_durable::{Error, Result, Scheduler, Store, SubmissionStatus, Task, TaskStatus};
+use vibevalley_agent::core::engine::{BrainProvider, Request};
+use vibevalley_agent::core::pipeline::Transcript;
+use vibevalley_agent::durable::{Error, Result, Scheduler, Store, SubmissionStatus, Task, TaskStatus};
+use vibevalley_agent::extensions::budget::{BUDGET_SIGNAL, BudgetExtension, set_budget};
+use vibevalley_agent::extensions::governance::{self, GovernanceExtension, Permissions};
+use vibevalley_agent::extensions::grader::{GraderExtension, OutcomeReview, ReviewProvider, ReviewRequest, Rubric};
+use vibevalley_agent::extensions::subagent::SubagentExtension;
+use vibevalley_agent::extensions::todo::TodoExtension;
+use vibevalley_agent::harness::{Harness, generation_kind};
+use vibevalley_agent::{AgentEvent, Brain, BrainError, Message, TurnOutcome};
 
 use vibevalley_protocol::{ApiError, BizCode, OrchestratorApproval, OrchestratorApprovalResolveInput};
 
@@ -14,13 +19,20 @@ use super::{Input, Orchestrator, Run};
 use crate::lock;
 use crate::modules::{channel::Posting, tool::Route};
 
+pub(super) enum EvalEntry {
+    TurnStarted { input: String },
+    Message(Message),
+    Compacted { summary: String },
+}
+
 struct Bound {
     orchestrator: Weak<Orchestrator>,
     store: Store,
-    listeners: Mutex<HashMap<String, flume::Sender<BrainEvent>>>,
+    listeners: Mutex<HashMap<String, flume::Sender<AgentEvent>>>,
 }
-impl Environment for Bound {
-    fn brain(&self, conv: &str, provider: &str) -> Result<Arc<Brain>> {
+
+impl BrainProvider for Bound {
+    fn resolve_brain(&self, conv: &str, provider: &str) -> Result<Option<Arc<Brain>>> {
         let o = self.orchestrator.upgrade().ok_or(Error::Closed)?;
         let route = self.store.read(|tx| Ok(tx.document("conversation", conv, "pi.route")?.map(|d| d.state)))?;
         let route: Route = route.map(serde_json::from_value).transpose()?.unwrap_or_else(|| Route {
@@ -28,13 +40,17 @@ impl Environment for Bound {
             channel: o.farm.chat.default_channel(),
             ..Default::default()
         });
-        Ok(Arc::new(o.brain_at(conv, &Arc::new(Mutex::new(route)), provider)))
+        Ok(Some(Arc::new(o.brain_at(conv, &Arc::new(Mutex::new(route)), provider))))
     }
-    fn observe(&self, conv: &str, _task: &str, event: BrainEvent) {
+
+    fn observe(&self, conv: &str, _task: &str, event: AgentEvent) {
         if let Some(s) = lock(&self.listeners).get(conv) {
             let _ = s.send(event);
         }
     }
+}
+
+impl ReviewProvider for Bound {
     fn review(&self, request: ReviewRequest<'_>) -> Result<Option<OutcomeReview>> {
         let (Some(vendor), Some(run)) = (request.conversation.strip_prefix("worker:"), request.request_id.strip_prefix("work:")) else {
             return Ok(request.explicit());
@@ -86,7 +102,7 @@ impl Environment for Bound {
 
 pub struct Execution {
     pub scheduler: Scheduler,
-    pub generation: Generation,
+    pub harness: Harness,
     bound: Arc<Bound>,
     shutdown: Mutex<Option<flume::Sender<()>>>,
     stopped: flume::Receiver<()>,
@@ -100,32 +116,36 @@ pub(super) struct TurnInput<'a> {
 }
 
 impl Execution {
-    pub(super) fn new(store: Store, o: Weak<Orchestrator>, permissions: vibevalley_agent::generation::governance::Permissions) -> Self {
-        let scheduler = Scheduler::new(store.clone(), 32);
+    pub(super) fn new(store: Store, o: Weak<Orchestrator>, permissions: Permissions) -> Self {
         let bound = Arc::new(Bound {
             orchestrator: o,
             store: store.clone(),
             listeners: Default::default(),
         });
-        let mut generation = Generation::new(store, bound.clone());
-        generation.permissions = permissions;
-        generation.register(&scheduler);
+        let harness = Harness::from_store(store, bound.clone());
+        let scheduler = harness.scheduler().clone();
+        harness.register_extension(Arc::new(GovernanceExtension::new(permissions)));
+        harness.register_extension(Arc::new(BudgetExtension));
+        harness.register_extension(Arc::new(GraderExtension::new(bound.clone())));
+        harness.register_extension(Arc::new(TodoExtension::default().without_global_tools()));
+        harness.register_extension(Arc::new(SubagentExtension::new("VibeValley").without_global_tools()));
         let (shutdown, stopped) = flume::bounded(0);
         Self {
             scheduler,
-            generation,
+            harness,
             bound,
             shutdown: Mutex::new(Some(shutdown)),
             stopped,
         }
     }
+
     pub(super) fn close(&self) {
         lock(&self.shutdown).take();
-        self.scheduler.close();
-        self.generation.compactor.wait();
+        self.harness.close();
     }
+
     pub fn store(&self) -> &Store {
-        &self.generation.store
+        self.harness.store()
     }
 
     pub(super) fn approvals(&self, conversation: Option<&str>) -> std::result::Result<Vec<OrchestratorApproval>, ApiError> {
@@ -224,18 +244,12 @@ impl Execution {
                 } else {
                     tx.tasks_by_conversation(&conv)?
                         .into_iter()
-                        .find(|t| t.status == TaskStatus::Sleeping && t.wait_signal_name == "budget.updated")
+                        .find(|t| t.status == TaskStatus::Sleeping && t.wait_signal_name == BUDGET_SIGNAL)
                         .map(|t| t.id)
                 };
                 Ok((conv, task))
             })?;
-            Ok(json!(vibevalley_agent::generation::governance::set_budget(
-                self.store(),
-                &self.scheduler,
-                &conv,
-                task.as_deref(),
-                p.new_max_cost_micros
-            )?))
+            Ok(json!(set_budget(self.store(), &self.scheduler, &conv, task.as_deref(), p.new_max_cost_micros)?))
         })();
         envelope(result)
     }
@@ -259,6 +273,7 @@ impl Execution {
             Ok(())
         })
     }
+
     pub(super) fn has_inputs(&self, id: &str) -> Result<bool> {
         self.store().read(|tx| {
             Ok(tx
@@ -283,12 +298,10 @@ impl Execution {
                 .collect()
         })
     }
+
     pub(super) fn stop(&self, profile: &str) -> Result<()> {
         let tasks = self.store().read(|tx| tx.tasks_by_conversation(profile))?;
-        for t in tasks
-            .into_iter()
-            .filter(|t| t.kind == vibevalley_agent::generation::KIND && t.status != TaskStatus::Terminal)
-        {
+        for t in tasks.into_iter().filter(|t| t.kind == generation_kind() && t.status != TaskStatus::Terminal) {
             self.scheduler.abort(&t.id)?;
         }
         let ids = self.store().read(|tx| {
@@ -320,13 +333,16 @@ impl Execution {
         result.map_err(|e| BrainError::Store(e.to_string()))
     }
 
-    fn dispatch(&self, run: &mut Run<'_>, input: &TurnInput<'_>, events: &flume::Receiver<BrainEvent>) -> Result<TurnOutcome> {
+    fn dispatch(&self, run: &mut Run<'_>, input: &TurnInput<'_>, events: &flume::Receiver<AgentEvent>) -> Result<TurnOutcome> {
         let conv = &run.me.id;
         let turn = format!("turn:{}", input.requests[0]);
-        let brain = self.bound.brain(conv, input.model)?;
+        let brain = self
+            .bound
+            .resolve_brain(conv, input.model)?
+            .ok_or_else(|| Error::Invalid("orchestrator brain unavailable".into()))?;
         let trusted = input.batch.iter().filter(|i| i.user).map(|i| i.line.as_str()).collect::<Vec<_>>().join("\n");
         let changes = self.store().subscribe_tasks()?;
-        let (sub, task, _) = self.generation.submit_with(
+        let (sub, task, _) = self.harness.submit_with(
             Request {
                 conversation: conv,
                 provider: input.model,
@@ -420,12 +436,12 @@ impl Execution {
         Ok(())
     }
 
-    pub(super) fn entries(&self, profile: &str) -> Result<Vec<Entry>> {
+    pub(super) fn entries(&self, profile: &str) -> Result<Vec<EvalEntry>> {
         self.store().read(|tx| {
             let mut out = vec![];
             for e in tx.entries(profile, 1)? {
                 match e.kind.as_str() {
-                    "pi.user" => out.push(Entry::TurnStarted {
+                    "pi.user" => out.push(EvalEntry::TurnStarted {
                         input: e.payload["text"].as_str().unwrap_or_default().into(),
                     }),
                     "pi.assistant" | "pi.tool_result" => {
@@ -435,9 +451,9 @@ impl Execution {
                             entries: vec![e],
                             prefix_hash: String::new(),
                         };
-                        out.extend(tr.messages().into_iter().map(|message: Message| Entry::Message { message, usage: None }));
+                        out.extend(tr.messages().into_iter().map(EvalEntry::Message));
                     }
-                    "pi.compaction" => out.push(Entry::Compacted {
+                    "pi.compaction" => out.push(EvalEntry::Compacted {
                         summary: e.payload["summary"].as_str().unwrap_or_default().into(),
                     }),
                     _ => (),

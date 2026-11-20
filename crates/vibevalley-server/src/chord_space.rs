@@ -28,7 +28,7 @@ impl Space {
     pub fn document(&self) -> Document {
         self.document.clone()
     }
-    pub fn attach(&self, store: &vibevalley_durable::Store) -> vibevalley_durable::Result<()> {
+    pub fn attach(&self, store: &vibevalley_agent::durable::Store) -> vibevalley_agent::durable::Result<()> {
         let events = store.subscribe_documents()?;
         let initial = store.read(|tx| {
             let mut docs = tx.documents_by_kind("conversation", "pi.inbox")?;
@@ -55,7 +55,7 @@ impl Space {
                     }
                 }
             })
-            .map_err(|e| vibevalley_durable::Error::Invalid(e.to_string()))?;
+            .map_err(|e| vibevalley_agent::durable::Error::Invalid(e.to_string()))?;
         *super::lock(&self.observer) = Some((stop, handle));
         Ok(())
     }
@@ -78,7 +78,7 @@ impl Projection {
         Value::Array(self.alerts.values().flatten().cloned().collect())
     }
 
-    fn apply_doc(&mut self, d: &vibevalley_durable::Document, retired: bool) -> bool {
+    fn apply_doc(&mut self, d: &vibevalley_agent::durable::Document, retired: bool) -> bool {
         let key = (d.scope_kind.clone(), d.scope_id.clone(), d.doc_kind.clone());
         if retired {
             if self.revisions.remove(&key).is_none() {

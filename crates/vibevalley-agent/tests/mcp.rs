@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use serde_json::json;
-use vibevalley_agent::mcp::{McpConfig, McpHub, content_text, tool_name};
+use vibevalley_agent::resources::mcp::{McpConfig, McpHub, content_text, tool_name};
 
 fn config() -> McpConfig {
     let script = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/echo_mcp.py");

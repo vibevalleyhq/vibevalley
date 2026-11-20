@@ -172,7 +172,7 @@ struct QueuedInput {
 
 type TurnHook = Arc<dyn Fn() + Send + Sync>;
 
-pub(crate) struct SessionCore {
+pub struct SessionCore {
     runtime_id: String,
     session_id: Mutex<String>,
     state: Mutex<CoreState>,
@@ -190,7 +190,7 @@ impl Drop for FrameGuard<'_> {
 }
 
 impl SessionCore {
-    pub(crate) fn new(runtime_id: &str, session_id: &str, recorder: Option<Recorder>) -> Arc<Self> {
+    pub fn new(runtime_id: &str, session_id: &str, recorder: Option<Recorder>) -> Arc<Self> {
         Arc::new(Self {
             runtime_id: runtime_id.to_string(),
             session_id: Mutex::new(session_id.to_string()),
@@ -401,7 +401,7 @@ impl SessionCore {
         rec.events.push(e);
         self.record_locked(state, rec);
     }
-    pub(crate) fn span_id(&self) -> String {
+    pub fn span_id(&self) -> String {
         self.lock().span_id.clone()
     }
     pub(crate) fn child_session(&self, parent: &str, child: &str, path: &[String]) {
@@ -502,7 +502,7 @@ impl SessionCore {
         }
     }
 
-    pub(crate) fn emit_root(&self, kind: EventKind) {
+    pub fn emit_root(&self, kind: EventKind) {
         self.emit(Vec::new(), kind);
     }
 
@@ -539,7 +539,7 @@ impl SessionCore {
     }
 
     /// Atomically: refuse when unreachable or busy, else record the turn's start.
-    pub(crate) fn begin_turn(&self, prompt: &str) -> Result<()> {
+    pub fn begin_turn(&self, prompt: &str) -> Result<()> {
         self.begin_span(prompt, "", "")
     }
     fn begin_span(&self, prompt: &str, input_id: &str, span: &str) -> Result<()> {
@@ -636,7 +636,7 @@ impl SessionCore {
 }
 
 /// What an adapter supplies; `CoreSession` wraps it with the shared rules.
-pub(crate) trait Driver: Send + Sync + 'static {
+pub trait Driver: Send + Sync + 'static {
     fn read_subagent(&self, _thread_id: &str, _turn_id: Option<&str>) -> Result<crate::SubagentSnapshot> {
         Err(crate::SubagentSnapshot::unsupported())
     }
@@ -663,14 +663,14 @@ pub(crate) trait Driver: Send + Sync + 'static {
     fn dispose(&self);
 }
 
-pub(crate) struct CoreSession<D: Driver> {
+pub struct CoreSession<D: Driver> {
     core: Arc<SessionCore>,
     driver: D,
     capabilities: Capabilities,
 }
 
 impl<D: Driver> CoreSession<D> {
-    pub(crate) fn new(core: Arc<SessionCore>, driver: D, capabilities: Capabilities) -> Arc<Self> {
+    pub fn new(core: Arc<SessionCore>, driver: D, capabilities: Capabilities) -> Arc<Self> {
         let session = Arc::new(Self {
             core: core.clone(),
             driver,
@@ -991,7 +991,7 @@ impl<D: Driver> Drop for CoreSession<D> {
 }
 
 /// The prompt as one string, for `TurnStarted` and for text-only runtimes.
-pub(crate) fn render_text(content: &[ContentBlock]) -> String {
+pub fn render_text(content: &[ContentBlock]) -> String {
     let mut out = String::new();
     for block in content {
         if !out.is_empty() {
@@ -1030,7 +1030,7 @@ pub(crate) fn file_as_text(cwd: &std::path::Path, path: &std::path::Path, lines:
 }
 
 /// Options every process adapter checks the same way, before anything starts.
-pub(crate) fn check_cwd(cwd: &std::path::Path) -> Result<()> {
+pub fn check_cwd(cwd: &std::path::Path) -> Result<()> {
     if cwd.as_os_str().is_empty() {
         return Err(AgentError::Unsupported {
             option: "cwd".into(),

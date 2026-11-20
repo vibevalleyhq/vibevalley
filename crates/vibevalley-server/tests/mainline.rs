@@ -199,7 +199,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
         })
         .unwrap();
     assert_eq!(queued.len(), 1);
-    assert_eq!(queued[0].status, vibevalley_durable::SubmissionStatus::Queued);
+    assert_eq!(queued[0].status, vibevalley_agent::durable::SubmissionStatus::Queued);
 
     model.0.lock().unwrap().extend([
         answer(Some(ToolCall {

@@ -265,11 +265,11 @@ pub fn built_in_skills() -> Vec<Skill> {
         .filter_map(|id| {
             let read = |f: &str| BUILT_IN.get_file(format!("skills/{id}/{f}")).and_then(|f| f.contents_utf8());
             let text = (if en { read("SKILL.en.md") } else { None }).or_else(|| read("SKILL.md"))?;
-            let head = vibevalley_agent::kit::front_matter(text);
+            let head = vibevalley_agent::resources::skills::front_matter(text);
             Some(Skill {
                 name: head.get("name").cloned().unwrap_or_else(|| id.clone()),
                 description: head.get("description").cloned().unwrap_or_default(),
-                body: vibevalley_agent::kit::skill_body(text),
+                body: vibevalley_agent::resources::skills::skill_body(text),
                 built_in: Some(true),
                 id,
             })

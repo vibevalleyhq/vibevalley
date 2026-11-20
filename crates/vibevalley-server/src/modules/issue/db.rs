@@ -1,6 +1,6 @@
 //! Derived status and stage are rebuilt from issues and sessions, never persisted.
 use crate::modules::column::{json, optional, read_json, read_word, word};
-use vibevalley_durable::Sqlite;
+use vibevalley_agent::durable::Sqlite;
 use vibevalley_protocol::{Issue, Millis};
 
 #[rustfmt::skip]

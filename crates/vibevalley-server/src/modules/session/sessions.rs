@@ -92,7 +92,7 @@ pub struct Sessions(pub(super) Arc<Inner>);
 
 pub(super) struct Inner {
     pub ledger: Arc<Ledger>,
-    pub durable: vibevalley_durable::Store,
+    pub durable: vibevalley_agent::durable::Store,
     pub drivers: Arc<dyn Drivers>,
     pub workplaces: Arc<Workplace>,
     pub config: Arc<BoardConfig>,
@@ -109,7 +109,7 @@ pub(super) struct Inner {
 
 impl Sessions {
     pub fn new(
-        durable: vibevalley_durable::Store,
+        durable: vibevalley_agent::durable::Store,
         ledger: Arc<Ledger>,
         drivers: Arc<dyn Drivers>,
         workplaces: Arc<Workplace>,
@@ -290,7 +290,7 @@ impl Sessions {
     }
 
     fn prompt_run(agent: &dyn vibevalley_oar::Session, run: &str, prompt: &str) -> vibevalley_oar::Result<()> {
-        if agent.runtime_id() != vibevalley_oar::vibevalley::ID {
+        if agent.runtime_id() != vibevalley_agent::runtime::ID {
             return agent.prompt(text(prompt));
         }
         let key = format!("work:{run}");
@@ -314,7 +314,7 @@ impl Sessions {
         let extra = self.extra(id);
         let run = extra.run.ok_or_else(|| BoardError::Other(format!("missing open run for {id}")))?;
         let vendor = extra.agent_session.ok_or_else(|| BoardError::Other(format!("missing driver id for {id}")))?;
-        let conv = vibevalley_agent::generation::workers::worker_conversation(&vendor);
+        let conv = vibevalley_agent::harness::worker_conversation(&vendor);
         let sub = self
             .0
             .durable
@@ -324,7 +324,7 @@ impl Sessions {
         let drive = self.0.drivers.drive(Some(&session.agent), &issue)?;
         let (agent, _) = self.open_for(drive, &session, &issue, String::new(), true)?;
         self.go_live(agent.clone(), session, None)?;
-        if task.status == vibevalley_durable::TaskStatus::Terminal {
+        if task.status == vibevalley_agent::durable::TaskStatus::Terminal {
             Self::prompt_run(&*agent, &run, sub.payload["text"].as_str().unwrap_or_default())?;
         }
         Ok(())
@@ -665,7 +665,7 @@ impl Sessions {
         let extra = self.extra(&run.session);
         if session.refining
             || run.outcome.is_some()
-            || session.runtime != vibevalley_oar::vibevalley::ID
+            || session.runtime != vibevalley_agent::runtime::ID
             || extra.run.as_deref() != Some(run_id)
             || extra.agent_session.as_deref() != Some(vendor)
         {

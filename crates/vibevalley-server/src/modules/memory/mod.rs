@@ -455,7 +455,7 @@ impl Memories {
     }
 
     /// An agent's notes as its prompt carries them (`forAgent`'s port).
-    pub fn port(self: &Arc<Self>, agent: &str, by: By) -> Arc<dyn vibevalley_agent::kit::MemoryPort> {
+    pub fn port(self: &Arc<Self>, agent: &str, by: By) -> Arc<dyn vibevalley_agent::extensions::memory::MemoryPort> {
         Arc::new(AgentMemory {
             store: self.clone(),
             agent: agent.into(),
@@ -470,7 +470,7 @@ struct AgentMemory {
     by: By,
 }
 
-impl vibevalley_agent::kit::MemoryPort for AgentMemory {
+impl vibevalley_agent::extensions::memory::MemoryPort for AgentMemory {
     fn prompt(&self) -> String {
         let notes = self.store.list(&self.agent).unwrap_or_default();
         let lines: Vec<String> = notes

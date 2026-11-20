@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use vibevalley_agent::Tool;
-use vibevalley_agent::mcp::{McpConfig, McpHub, McpServerConfig};
+use vibevalley_agent::resources::mcp::{McpConfig, McpHub, McpServerConfig};
 use vibevalley_protocol::{Agent, MCPServer};
 
 use crate::lock;

@@ -452,9 +452,9 @@ impl Board {
         let sessions = &self.0.sessions;
         let sub = sessions.submit_words(&issue.id, key, words)?;
         match sub.status {
-            vibevalley_durable::SubmissionStatus::Done | vibevalley_durable::SubmissionStatus::Placed => return Ok(()),
-            vibevalley_durable::SubmissionStatus::Unanswered => return Err(BoardError::Other(sub.result.to_string())),
-            vibevalley_durable::SubmissionStatus::Queued => (),
+            vibevalley_agent::durable::SubmissionStatus::Done | vibevalley_agent::durable::SubmissionStatus::Placed => return Ok(()),
+            vibevalley_agent::durable::SubmissionStatus::Unanswered => return Err(BoardError::Other(sub.result.to_string())),
+            vibevalley_agent::durable::SubmissionStatus::Queued => (),
         }
         if issue.status.is_closed() {
             let e = BoardError::Refused(if issue.was_sent() { Refusal::Reopen } else { Refusal::Revive });

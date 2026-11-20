@@ -83,7 +83,7 @@ fn map_oar_error(e: AgentError) -> Failure {
 
 fn run_local(ctx: &Ctx, m: &ArgMatches, initial: String) -> Done {
     let runtime_id = arg(m, "runtime");
-    let registry = vibevalley_oar::default_runtimes();
+    let registry = vibevalley_agent::runtime::default_registry();
     let runtime = registry.require(&runtime_id).map_err(map_oar_error)?;
     match runtime.installation() {
         Installation::Available { .. } => {}
