@@ -1,16 +1,13 @@
-let spell: ((text: string, query: string) => boolean) | undefined;
-
-void import("pinyin-pro").then(({ match }) => {
-  spell = (text, query) => match(text, query, { continuous: true }) !== null;
-});
+import { richNative } from "../ui/rich/native";
 
 const han = /\p{Script=Han}/u;
-const letters = /^[a-z]+$/u;
 
 /** The text holds the query, ignoring case, or spells it in pinyin; query is lower case. */
 export function spelled(text: string, query: string): boolean {
-  if (text.toLowerCase().includes(query)) return true;
-  return spell !== undefined && letters.test(query) && han.test(text) && spell(text, query);
+  const q = query.toLowerCase();
+  if (text.toLowerCase().includes(q)) return true;
+  if (q === "" || !han.test(text)) return false;
+  return richNative()?.matchPinyin(text, q) ?? false;
 }
 
 /** Every word of the query is somewhere in the texts (spelled), ignoring case; an empty query matches everything. */

@@ -15,9 +15,11 @@ vibevalley-chart = { path = "../vibevalley-chart" }
 vibevalley-genui = { path = "../vibevalley-genui" }
 vibevalley-i18n = { path = "../vibevalley-i18n" }
 vibevalley-pele = { path = "../vibevalley-pele" }
+vibevalley-pinyin = { path = "../vibevalley-pinyin" }
 vibevalley-pkm = { path = "../vibevalley-pkm" }
 vibevalley-shiki = { path = "../vibevalley-shiki" }
 
 [dev-dependencies]
 nsh-core = { version = "0.6.0", features = ["declarations"] }
+nsh-js = { version = "0.6.0", default-features = false }
 roxmltree = "0.21.2"
