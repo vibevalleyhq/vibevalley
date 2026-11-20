@@ -320,3 +320,97 @@ fn vv_markdown_mounts_in_core_and_emits_typed_events_without_canvas_svg_view_kin
     });
     assert_eq!(harness.clipboard_writes, vec!["let v = 7;"]);
 }
+
+#[component]
+fn MathAndGenUiRoot() -> impl IntoElement {
+    let md = concat!(
+        "Inline formula $E = mc^2$ in prose.\n\n",
+        "$$\n\\sum_{i=1}^n i = \\frac{n(n+1)}{2}\n$$\n\n",
+        "```genui\n",
+        "{\"op\":\"state_init\",\"state\":{\"active\":false}}\n",
+        "{\"op\":\"set_node\",\"root\":true,\"node\":{\"id\":\"root\",\"kind\":\"stack\",\"direction\":\"vertical\",\"gap\":8,\"children\":[\"sw\",\"label\"]}}\n",
+        "{\"op\":\"set_node\",\"node\":{\"id\":\"sw\",\"kind\":\"switch\",\"bind\":\"active\",\"label\":\"Toggle\"}}\n",
+        "{\"op\":\"set_node\",\"node\":{\"id\":\"label\",\"kind\":\"text\",\"value\":\"State: ${active}\"}}\n",
+        "{\"op\":\"done\"}\n",
+        "```\n",
+    );
+    vv_markdown().text(md)
+}
+
+#[test]
+fn regression_ratex_math_updates_canvas_color_on_theme_toggle_without_resetting_genui() {
+    use nsh_core::canvas::{CanvasOp, Paint};
+
+    let mut harness = TestHarness::mount(Root::of::<MathAndGenUiRoot>());
+    let inline_id = harness.find_test_id("math-inline").expect("inline math wrapper mounted");
+    let block_id = harness.find_test_id("math-block").expect("block math wrapper mounted");
+    assert!(harness.contains_text("State: false"));
+
+    // Verify inline and block math formulas lay out with realistic non-zero dimensions
+    // (inline must shrink-wrap to formula width rather than collapsing or stretching full-width).
+    let inline_frame = harness.frames.get(&inline_id).copied().expect("inline math frame");
+    assert!(
+        inline_frame.size.width.0 > 20.0 && inline_frame.size.width.0 < 160.0,
+        "inline math width should match formula size, got {:?}",
+        inline_frame.size
+    );
+    assert!(
+        inline_frame.size.height.0 > 10.0 && inline_frame.size.height.0 < 36.0,
+        "inline math height should match line box, got {:?}",
+        inline_frame.size
+    );
+    let block_frame = harness.frames.get(&block_id).copied().expect("block math frame");
+    assert!(block_frame.size.height.0 > 20.0, "block math must have non-zero height: {:?}", block_frame.size);
+
+    let canvas_fill_colors = |h: &TestHarness| -> Vec<u32> {
+        h.canvases
+            .values()
+            .flat_map(|drawing| {
+                drawing.ops.iter().filter_map(|op| match op {
+                    CanvasOp::FillStyle(Paint::Color(c)) => Some(c.0),
+                    _ => None,
+                })
+            })
+            .collect()
+    };
+
+    // Light ink (#1c1917 -> 0x1c1917ff) vs Dark ink (#ecebe8 -> 0xecebe8ff).
+    let light_ink_rgba: u32 = 0x1c19_17ff;
+    let dark_ink_rgba: u32 = 0xeceb_e8ff;
+
+    // 1. Light mode: both inline and block ratex canvases paint with light ink.
+    assert_eq!(harness.canvases.len(), 2, "expected inline + block ratex math canvases");
+    let light_fills = canvas_fill_colors(&harness);
+    assert!(!light_fills.is_empty(), "ratex math canvases must emit fill colors");
+    assert!(
+        light_fills.iter().all(|&c| c == light_ink_rgba),
+        "expected all math fills to match light ink 0x{light_ink_rgba:08x}, got {light_fills:08x?}"
+    );
+
+    // Mutate interactive GenUI switch state before toggling theme.
+    let switch_id = harness.find_test_id("genui-switch-sw").expect("genui switch mounted");
+    assert!(harness.press(switch_id));
+    assert!(harness.contains_text("State: true"));
+
+    // 2. Toggle Light -> Dark: both math canvases must repaint in dark ink, while GenUI keeps State: true.
+    harness.set_dark(true);
+    assert_eq!(harness.canvases.len(), 2, "expected 2 live math canvases after toggling to dark");
+    let dark_fills = canvas_fill_colors(&harness);
+    assert!(!dark_fills.is_empty());
+    assert!(
+        dark_fills.iter().all(|&c| c == dark_ink_rgba),
+        "expected all math fills to switch to dark ink 0x{dark_ink_rgba:08x}, got {dark_fills:08x?}"
+    );
+    assert!(harness.contains_text("State: true"), "GenUI state must survive Light->Dark toggle");
+
+    // 3. Toggle Dark -> Light: both math canvases must return to light ink, and GenUI still keeps State: true.
+    harness.set_dark(false);
+    assert_eq!(harness.canvases.len(), 2, "expected 2 live math canvases after toggling back to light");
+    let restored_fills = canvas_fill_colors(&harness);
+    assert!(!restored_fills.is_empty());
+    assert!(
+        restored_fills.iter().all(|&c| c == light_ink_rgba),
+        "expected all math fills to return to light ink 0x{light_ink_rgba:08x}, got {restored_fills:08x?}"
+    );
+    assert!(harness.contains_text("State: true"), "GenUI state must survive Dark->Light toggle");
+}

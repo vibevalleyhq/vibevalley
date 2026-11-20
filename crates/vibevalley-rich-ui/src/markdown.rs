@@ -7,8 +7,8 @@
 //! fenced `mermaid`, `canvas`, `chart`, and `genui` blocks via `MarkdownExtension::language`.
 
 use nsh_base::text_view::{
-    CodeBlock, CustomNode, Document, MarkdownExtension, MarkdownOptions, Parser, TextViewClasses, TextViewLinkPressEvent, TextViewLinks, TextViewPart,
-    TextViewParts, TextViewStyles, TextViewTaskPressEvent, text_view,
+    CodeBlock, CustomNode, Document, MarkdownExtension, MarkdownOptions, Parser, TextViewClasses, TextViewLinkPressEvent, TextViewLinks, TextViewMath,
+    TextViewPart, TextViewParts, TextViewStyles, TextViewTaskPressEvent, text_view,
 };
 use nsh_core::keymap::Modifiers;
 use nsh_core::prelude::*;
@@ -20,6 +20,7 @@ use crate::chart::vv_chart;
 use crate::code_block::{VvCodeCopyEvent, vv_code_block};
 use crate::diagram::vv_diagram;
 use crate::genui::{VvGenUiActionEvent, vv_gen_ui};
+use crate::math::render_math_element;
 use crate::theme::{AdaptiveUi, CODE_FONT_MONO, UiPalette};
 
 /// Pattern for `#12` issue references outside code and links.
@@ -582,6 +583,7 @@ pub fn VvMarkdown(props: VvMarkdownProps, cx: Scope<VvMarkdownEvent>) -> impl In
     let refs_prop = props.refs;
     let streaming_prop = props.streaming;
     let selectable_prop = props.selectable;
+    let size_prop = props.size;
 
     text_view()
         .markdown(move || Some(props.text.get()))
@@ -591,6 +593,7 @@ pub fn VvMarkdown(props: VvMarkdownProps, cx: Scope<VvMarkdownEvent>) -> impl In
         .links(props.links)
         .classes(props.classes)
         .styles(props.styles)
+        .render_math(move |math: &TextViewMath| render_math_element(&math.tex, math.display, size_prop.get().body_pt(), selectable_prop.get()))
         .render_custom(move |node: &CustomNode| {
             let refs = refs_prop.get();
             render_custom_node(node, &refs, streaming_prop.get(), cx)

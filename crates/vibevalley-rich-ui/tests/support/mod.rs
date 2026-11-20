@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
+use nsh_core::canvas::Drawing;
 use nsh_core::element::{Registry, Root};
 use nsh_core::platform::Appearance;
 use nsh_core::prelude::*;
@@ -20,6 +21,8 @@ pub struct TestHarness {
     pub labels: HashMap<NodeId, String>,
     pub texts: HashMap<NodeId, Arc<AttributedText>>,
     pub images: HashMap<NodeId, ImageSource>,
+    pub canvases: HashMap<NodeId, Arc<Drawing>>,
+    pub frames: HashMap<NodeId, Bounds<Points>>,
     pub clipboard_writes: Vec<String>,
 }
 
@@ -57,6 +60,8 @@ impl TestHarness {
             labels: HashMap::new(),
             texts: HashMap::new(),
             images: HashMap::new(),
+            canvases: HashMap::new(),
+            frames: HashMap::new(),
             clipboard_writes: Vec::new(),
         };
         harness.commit();
@@ -178,6 +183,11 @@ impl TestHarness {
                     self.labels.remove(id);
                     self.texts.remove(id);
                     self.images.remove(id);
+                    self.canvases.remove(id);
+                    self.frames.remove(id);
+                }
+                MountItem::Frame { id, frame } => {
+                    self.frames.insert(*id, *frame);
                 }
                 MountItem::ViewProps { id, props } => {
                     if let Some(tid) = &props.test_id {
@@ -205,6 +215,9 @@ impl TestHarness {
                     } else {
                         self.images.remove(id);
                     }
+                }
+                MountItem::Canvas { id, drawing } => {
+                    self.canvases.insert(*id, Arc::clone(drawing));
                 }
                 MountItem::Command {
                     command: Command::SetClipboard(s),

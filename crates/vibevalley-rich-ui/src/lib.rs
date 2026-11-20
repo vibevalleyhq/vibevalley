@@ -24,6 +24,7 @@ pub mod grammars;
 pub mod highlight;
 pub mod hooks;
 pub mod markdown;
+mod math;
 pub mod theme;
 
 use nsh_core::element::Registry;

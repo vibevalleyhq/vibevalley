@@ -11691,9 +11691,14 @@ version = "0.1.0"
 dependencies = [
  "nsh-base",
  "nsh-core",
+ "ratex-font",
+ "ratex-layout",
+ "ratex-parser",
+ "ratex-types",
  "roxmltree 0.21.2",
  "serde_json",
  "tokio",
+ "ttf-parser",
  "vibevalley-canvas",
  "vibevalley-chart",
  "vibevalley-genui",
@@ -11701,6 +11706,7 @@ dependencies = [
  "vibevalley-pele",
  "vibevalley-pkm",
  "vibevalley-shiki",
+ "zstd",
 ]
 
 [[package]]

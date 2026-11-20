@@ -106,9 +106,19 @@ fn vv_code_block_renders_themed_spans_reacts_to_dark_and_handles_copy_and_fold()
     assert!(colors_dark.len() >= 2);
     assert_ne!(colors_light, colors_dark, "switching light->dark must update code colors");
 
-    // Copy action writes clipboard and emits typed VvCodeCopyEvent.
+    // Copy action writes clipboard and emits typed VvCodeCopyEvent, showing localized copy text (never raw i18n keys).
+    assert!(
+        !harness.contains_text("web.base.rich."),
+        "code block must render localized labels, got {:?}",
+        harness.all_text_strings()
+    );
     let copy_id = harness.find_test_id("code-copy").expect("copy button");
     assert!(harness.press(copy_id));
+    assert!(
+        !harness.contains_text("web.base.rich."),
+        "copied label must be localized, got {:?}",
+        harness.all_text_strings()
+    );
     assert_eq!(harness.clipboard_writes, vec![short_code]);
     RECORDED_COPIES.with(|c| {
         let recorded = c.borrow();
@@ -116,6 +126,29 @@ fn vv_code_block_renders_themed_spans_reacts_to_dark_and_handles_copy_and_fold()
         assert_eq!(recorded[0].code.as_str(), short_code);
         assert_eq!(recorded[0].language.as_deref(), Some("rust"));
     });
+}
+
+#[test]
+fn regression_all_rich_ui_i18n_keys_resolve_in_zh_and_en() {
+    for lang in ["zh", "en"] {
+        for key in [
+            "web.base.rich.copy",
+            "web.base.rich.copied",
+            "web.base.rich.more",
+            "web.base.rich.less",
+            "web.base.rich.diagram",
+            "web.pkm.page.missingRef",
+        ] {
+            let value = vibevalley_i18n::t_in(lang, key, &[]);
+            assert!(!value.starts_with("web."), "{lang} key {key} resolved to raw key {value:?}");
+        }
+        let lines = vibevalley_i18n::t_in(lang, "web.base.rich.lines", &[("n", 24i64.into())]);
+        assert!(!lines.starts_with("web."), "{lang} lines resolved to {lines:?}");
+        let failed = vibevalley_i18n::t_in(lang, "web.base.rich.diagramFailed", &[("why", "syntax".into())]);
+        assert!(!failed.starts_with("web."), "{lang} diagramFailed resolved to {failed:?}");
+        let ref_from = vibevalley_i18n::t_in(lang, "web.pkm.page.refFrom", &[("page", "Notes".into())]);
+        assert!(!ref_from.starts_with("web."), "{lang} refFrom resolved to {ref_from:?}");
+    }
 }
 
 #[test]
