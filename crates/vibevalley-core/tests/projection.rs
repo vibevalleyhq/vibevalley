@@ -59,7 +59,14 @@ fn scenario(name: &str) {
         }
     }
     let frame = frame_of(&state, all_effects, seq);
-    diff("frame", &golden["frame"], &serde_json::to_value(&frame).unwrap(), &mut problems);
+    let mut got_frame = serde_json::to_value(&frame).unwrap();
+    // Native Rust projections added after the historical pre-Rust TypeScript goldens were captured.
+    if let Some(state_obj) = got_frame.get_mut("state").and_then(Value::as_object_mut) {
+        for key in ["boardSummary", "mediaSummary", "channelSummary"] {
+            assert!(state_obj.remove(key).is_some(), "{name}: missing native projection {key}");
+        }
+    }
+    diff("frame", &golden["frame"], &got_frame, &mut problems);
     assert!(problems.is_empty(), "{name}: {} differences\n{}", problems.len(), problems.join("\n"));
 }
 

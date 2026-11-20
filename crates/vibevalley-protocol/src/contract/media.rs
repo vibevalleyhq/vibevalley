@@ -1285,10 +1285,21 @@ pub struct LibraryItemDeleteInput {
     pub id: String,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct MediaSummary {
+    pub active_count: i64,
+    pub active_ids: Vec<String>,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "media";
     types: [MediaAudioFormat,
+    MediaSummary,
     MediaAudioAccountRequest,
     MediaSpeakersRequestSpeakers,
     MediaSpeakersRequestSegments,

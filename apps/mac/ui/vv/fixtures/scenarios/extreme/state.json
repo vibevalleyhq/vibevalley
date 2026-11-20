@@ -1136,7 +1136,128 @@
         "whenText": "每周五 17:00",
         "nextText": "11/20 17:00"
       }
-    ]
+    ],
+    "boardSummary": {
+      "laneCounts": {
+        "todo": 4,
+        "working": 4,
+        "waiting": 2,
+        "closed": 3
+      },
+      "runningSlots": 2,
+      "maxRunning": 6,
+      "byIssue": {
+        "i-ext-conflict": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "stuck_conflict"
+        },
+        "i-ext-en": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i10": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "canceled_reopenable"
+        },
+        "i12": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i18": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i21": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i22": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i31": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i33": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "asking"
+        },
+        "i34": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "stuck_failed"
+        },
+        "i40": {
+          "lane": "working",
+          "cardKind": "family",
+          "familyDone": 1,
+          "familyTotal": 2,
+          "needsWorktreeCheck": false
+        },
+        "i41": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i42": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        }
+      }
+    },
+    "mediaSummary": {
+      "activeCount": 0,
+      "activeIds": []
+    },
+    "channelSummary": {
+      "unreadTotal": 1,
+      "unreadUnder": {
+        "design": 0,
+        "dm-laozhou": 0,
+        "general": 1,
+        "t-login": 0
+      }
+    }
   },
   "inbox": [
     {

@@ -1,13 +1,13 @@
 // Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
 
-import type { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/shapes.gen";
+import type { ChannelSummary, Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/shapes.gen";
 import type { SessionId } from "../common/shapes.gen";
 import type { ConnectorStatus, FactConnectorChanged } from "../connector/shapes.gen";
 import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/shapes.gen";
 import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/shapes.gen";
 import type { InboxItem } from "../inbox/shapes.gen";
-import type { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes.gen";
-import type { FactMediaChanged, MediaJob } from "../media/shapes.gen";
+import type { BoardSummary, FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes.gen";
+import type { FactMediaChanged, MediaJob, MediaSummary } from "../media/shapes.gen";
 import type { RuntimeInfo } from "../runtime/shapes.gen";
 import type { FactMachineChanged, FactSessionChanged, FactSessionLeft, FactSessionPhaseChanged, FactSessionSubagentsChanged, FactSessionToolChanged, FactSessionToolsReset, Machine, Session, SessionEvent, SessionView } from "../session/shapes.gen";
 import type { CallState, FactCallChanged } from "../voice/shapes.gen";
@@ -30,7 +30,7 @@ sessions: Array<Session>, crons: Array<Cron>,
  */
 plays?: { [key in string]: SessionPlay }, };
 
-export type SpaceView = { call: CallState, callReason: string, media?: Array<MediaJob>, chat?: Chat, commits?: CommitCount, progress?: Progress, issues: Array<Issue>, connectors: Array<ConnectorStatus>, machines: Array<Machine>, sessions: Array<SessionView>, crons: Array<CronView>, };
+export type SpaceView = { call: CallState, callReason: string, media?: Array<MediaJob>, chat?: Chat, commits?: CommitCount, progress?: Progress, issues: Array<Issue>, connectors: Array<ConnectorStatus>, machines: Array<Machine>, sessions: Array<SessionView>, crons: Array<CronView>, boardSummary?: BoardSummary, mediaSummary?: MediaSummary, channelSummary?: ChannelSummary, };
 
 export const NoticeLevelValues = ["info", "warn", "error"] as const;
 export type NoticeLevel = (typeof NoticeLevelValues)[number];

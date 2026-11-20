@@ -1,8 +1,8 @@
 {
   "seq": 2,
   "state": {
-    "call": "live",
-    "callReason": "",
+    "call": "connecting",
+    "callReason": "正在建立实时语音连接",
     "media": [
       {
         "kind": "image",
@@ -3391,12 +3391,11 @@
       },
       {
         "id": "qq",
-        "state": "paused",
+        "state": "off",
         "qr": "",
         "pairCode": "",
-        "since": 1795193243624,
-        "lastInbound": 1795193303624,
-        "pausedUntil": 1795196843624,
+        "since": 1795192943624,
+        "lastInbound": 1795193003624,
         "pending": 0,
         "error": ""
       }
@@ -3964,7 +3963,504 @@
         "whenText": "每 150 分钟",
         "nextText": "11/20 18:37"
       }
-    ]
+    ],
+    "boardSummary": {
+      "laneCounts": {
+        "todo": 17,
+        "working": 17,
+        "waiting": 14,
+        "closed": 17
+      },
+      "runningSlots": 6,
+      "maxRunning": 6,
+      "byIssue": {
+        "i-d100": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d101": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d102": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d103": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d104": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d105": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d106": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d107": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d108": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d109": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d110": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d111": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d112": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d113": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d114": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d115": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d116": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d117": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d118": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d119": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d120": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d121": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d122": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d123": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d124": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d125": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d126": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d127": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d128": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d129": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d130": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d131": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d132": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d133": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d134": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d135": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d136": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d137": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d138": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d139": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d140": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d141": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d142": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d143": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d144": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d145": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d146": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d147": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d148": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d149": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d150": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d151": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d152": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d153": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i10": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "canceled_reopenable"
+        },
+        "i12": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i18": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i21": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i22": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i31": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i33": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "asking"
+        },
+        "i34": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "stuck_failed"
+        },
+        "i40": {
+          "lane": "working",
+          "cardKind": "family",
+          "familyDone": 1,
+          "familyTotal": 2,
+          "needsWorktreeCheck": false
+        },
+        "i41": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i42": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        }
+      }
+    },
+    "mediaSummary": {
+      "activeCount": 0,
+      "activeIds": []
+    },
+    "channelSummary": {
+      "unreadTotal": 1,
+      "unreadUnder": {
+        "design": 0,
+        "dm-laozhou": 0,
+        "general": 1,
+        "t-login": 0
+      }
+    }
   },
   "inbox": [
     {

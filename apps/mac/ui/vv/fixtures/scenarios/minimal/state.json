@@ -137,7 +137,36 @@
         "whenText": "每天 09:30",
         "nextText": "11/21 09:30"
       }
-    ]
+    ],
+    "boardSummary": {
+      "laneCounts": {
+        "todo": 0,
+        "working": 1,
+        "waiting": 0,
+        "closed": 0
+      },
+      "runningSlots": 1,
+      "maxRunning": 6,
+      "byIssue": {
+        "i1": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        }
+      }
+    },
+    "mediaSummary": {
+      "activeCount": 0,
+      "activeIds": []
+    },
+    "channelSummary": {
+      "unreadTotal": 0,
+      "unreadUnder": {
+        "general": 0
+      }
+    }
   },
   "inbox": [],
   "view": {

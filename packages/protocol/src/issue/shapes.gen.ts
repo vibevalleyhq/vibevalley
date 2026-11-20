@@ -16,6 +16,21 @@ export type Priority = (typeof PriorityValues)[number];
 export const IssueStatusValues = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
 export type IssueStatus = (typeof IssueStatusValues)[number];
 
+export const IssueLaneValues = ["todo", "working", "waiting", "closed"] as const;
+export type IssueLane = (typeof IssueLaneValues)[number];
+
+export const IssueCardKindValues = ["todo", "issue", "family", "orchestrator"] as const;
+export type IssueCardKind = (typeof IssueCardKindValues)[number];
+
+export const IssuePromptKindValues = ["asking", "review_after_failed_check", "reviewed", "handed_back", "stuck_conflict", "stuck_failed", "stuck_interrupted", "stuck_quiet", "stuck_unknown", "canceled_reopenable"] as const;
+export type IssuePromptKind = (typeof IssuePromptKindValues)[number];
+
+export type BoardLaneCounts = { todo: number, working: number, waiting: number, closed: number, };
+
+export type BoardIssueSummary = { lane: IssueLane, cardKind: IssueCardKind, familyDone: number, familyTotal: number, needsWorktreeCheck: boolean, prompt?: IssuePromptKind, };
+
+export type BoardSummary = { laneCounts: BoardLaneCounts, runningSlots: number, maxRunning: number, byIssue: { [key in string]: BoardIssueSummary }, };
+
 export const PullRequestStateValues = ["open", "merged", "closed"] as const;
 export type PullRequestState = (typeof PullRequestStateValues)[number];
 

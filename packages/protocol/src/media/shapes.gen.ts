@@ -6,6 +6,8 @@ import type { MessageId, SessionId } from "../common/shapes.gen";
 export const MediaAudioFormatValues = ["wav", "mp3", "flac", "aac", "opus", "pcm"] as const;
 export type MediaAudioFormat = (typeof MediaAudioFormatValues)[number];
 
+export type MediaSummary = { activeCount: number, activeIds: Array<string>, };
+
 export type MediaAudioAccountRequest = { id: string, connection: string, revision: number, };
 
 export type MediaSpeakersRequestSpeakers = { id: string, voice: string, };

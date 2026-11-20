@@ -3,6 +3,7 @@ import type { ChatMessage, IssueHistory, SessionEvent, StateFrame } from "@vibev
 
 import workbenchResponsesJson from "../workbench/responses.json";
 import denseRaw from "./dense/state.json";
+import edgeRaw from "./edge/state.json";
 import emptyRaw from "./empty/state.json";
 import extremeRaw from "./extreme/state.json";
 import minimalRaw from "./minimal/state.json";
@@ -10,7 +11,7 @@ import typicalRaw from "./typical/state.json";
 
 export const SCENARIO_NOW = 1_795_194_443_624;
 
-export type ScenarioDensity = "empty" | "minimal" | "typical" | "dense" | "extreme";
+export type ScenarioDensity = "empty" | "minimal" | "typical" | "dense" | "extreme" | "edge";
 
 const MIN_MS = 60_000;
 const baseResponses = workbenchResponsesJson as Record<string, unknown>;
@@ -92,7 +93,7 @@ function buildMessages(density: ScenarioDensity, now: number): ChatMessage[] {
     ...(m.deleted !== undefined ? { deleted: now - 30_000 } : {}),
   }));
   if (density === "minimal") return anchored.slice(0, 2);
-  if (density === "typical" || density === "extreme") return anchored;
+  if (density === "typical" || density === "extreme" || density === "edge") return anchored;
 
   // Dense: expand deterministically to 80 messages in #general with Markdown & code snippets.
   const extra = Array.from({ length: 80 - anchored.length }, (_, i) => {
@@ -206,6 +207,7 @@ const rawFrames: Record<ScenarioDensity, StateFrame> = {
   typical: asFrame(typicalRaw),
   dense: asFrame(denseRaw),
   extreme: asFrame(extremeRaw),
+  edge: asFrame(edgeRaw),
 };
 
 export const scenarios: Record<ScenarioDensity, { state: StateFrame; responses: Record<string, unknown> }> = {
@@ -214,4 +216,5 @@ export const scenarios: Record<ScenarioDensity, { state: StateFrame; responses: 
   typical: { state: rawFrames.typical, responses: responsesFor("typical", rawFrames.typical) },
   dense: { state: rawFrames.dense, responses: responsesFor("dense", rawFrames.dense) },
   extreme: { state: rawFrames.extreme, responses: responsesFor("extreme", rawFrames.extreme) },
+  edge: { state: rawFrames.edge, responses: responsesFor("edge", rawFrames.edge) },
 };

@@ -547,10 +547,21 @@ pub struct ChannelMarkUnreadInput {
     pub number: i64,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelSummary {
+    pub unread_total: i64,
+    pub unread_under: BTreeMap<String, i64>,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "channel";
     types: [MessageKind,
+    ChannelSummary,
     Notify,
     Embed,
     Reaction,

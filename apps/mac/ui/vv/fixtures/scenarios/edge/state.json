@@ -1,0 +1,2613 @@
+{
+  "seq": 1,
+  "state": {
+    "call": "ending",
+    "callReason": "正在结束语音会话",
+    "media": [
+      {
+        "kind": "image",
+        "id": "job-edge-queued",
+        "prompt": "边角媒体任务 (queued)",
+        "model": "moss-image-1",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "user"
+        },
+        "phase": "queued",
+        "phaseText": "queued",
+        "problem": "",
+        "canCancel": true,
+        "canRetryDownload": false,
+        "createdAt": 1795193843624,
+        "updatedAt": 1795194383624
+      },
+      {
+        "kind": "image",
+        "id": "job-edge-generating",
+        "prompt": "边角媒体任务 (generating)",
+        "model": "moss-image-1",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "user"
+        },
+        "phase": "generating",
+        "phaseText": "generating",
+        "problem": "",
+        "canCancel": true,
+        "canRetryDownload": false,
+        "createdAt": 1795193843624,
+        "updatedAt": 1795194383624
+      },
+      {
+        "kind": "speech",
+        "id": "job-edge-downloading",
+        "prompt": "边角语音任务 (downloading)",
+        "model": "moss-tts-1.5-flash",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "orchestrator",
+          "agent": "orchestrator",
+          "channel": "general"
+        },
+        "voice": "voice-warm",
+        "format": "wav",
+        "contentType": "audio/wav",
+        "canResume": false,
+        "canRelease": false,
+        "phase": "downloading",
+        "phaseText": "downloading",
+        "problem": "",
+        "resultInput": null,
+        "canCancel": true,
+        "canRetryDownload": false,
+        "createdAt": 1795193963624,
+        "updatedAt": 1795194383624
+      },
+      {
+        "kind": "image",
+        "id": "job-edge-ready",
+        "prompt": "边角媒体任务 (ready)",
+        "model": "moss-image-1",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "user"
+        },
+        "usage": {
+          "images": 1,
+          "width": 1024,
+          "height": 1024
+        },
+        "phase": "ready",
+        "phaseText": "ready",
+        "problem": "",
+        "attachment": {
+          "id": "lib-edge-img",
+          "name": "edge-poster.png",
+          "type": "image/png",
+          "size": 256000
+        },
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1795193843624,
+        "updatedAt": 1795194383624
+      },
+      {
+        "kind": "image",
+        "id": "job-edge-failed",
+        "prompt": "边角媒体任务 (failed)",
+        "model": "moss-image-1",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "user"
+        },
+        "phase": "failed",
+        "phaseText": "failed",
+        "problem": "provider quota exceeded",
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1795193843624,
+        "updatedAt": 1795194383624
+      },
+      {
+        "kind": "speech",
+        "id": "job-edge-unknown",
+        "prompt": "边角语音任务 (unknown)",
+        "model": "moss-tts-1.5-flash",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "orchestrator",
+          "agent": "orchestrator",
+          "channel": "general"
+        },
+        "voice": "voice-warm",
+        "format": "wav",
+        "contentType": "audio/wav",
+        "canResume": false,
+        "canRelease": false,
+        "phase": "unknown",
+        "phaseText": "unknown",
+        "problem": "remote poll timed out",
+        "resultInput": null,
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1795193963624,
+        "updatedAt": 1795194383624
+      },
+      {
+        "kind": "image",
+        "id": "job-edge-canceled",
+        "prompt": "边角媒体任务 (canceled)",
+        "model": "moss-image-1",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "user"
+        },
+        "phase": "canceled",
+        "phaseText": "canceled",
+        "problem": "",
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1795193843624,
+        "updatedAt": 1795194383624
+      },
+      {
+        "kind": "speech",
+        "id": "job-edge-dl-failed",
+        "prompt": "边角语音任务 (download_failed)",
+        "model": "moss-tts-1.5-flash",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "orchestrator",
+          "agent": "orchestrator",
+          "channel": "general"
+        },
+        "voice": "voice-warm",
+        "format": "wav",
+        "contentType": "audio/wav",
+        "canResume": false,
+        "canRelease": false,
+        "phase": "download_failed",
+        "phaseText": "download_failed",
+        "problem": "connection reset while saving audio",
+        "resultInput": null,
+        "canCancel": false,
+        "canRetryDownload": true,
+        "createdAt": 1795193963624,
+        "updatedAt": 1795194383624
+      },
+      {
+        "kind": "understanding",
+        "id": "job-edge-understanding",
+        "prompt": "分析这段录屏中的状态帧异常",
+        "inputs": [
+          {
+            "id": "in-edge-1",
+            "kind": "image",
+            "name": "edge-trace.png",
+            "mime": "image/png",
+            "size": 120000,
+            "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          }
+        ],
+        "model": "moss-vision-1",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "user"
+        },
+        "authorization": null,
+        "phase": "generating",
+        "phaseText": "generating",
+        "problem": "",
+        "result": null,
+        "cleanup": "pending",
+        "cleanupText": "",
+        "canCancel": true,
+        "canCleanup": false,
+        "canRetryDownload": false,
+        "createdAt": 1795194323624,
+        "updatedAt": 1795194383624
+      }
+    ],
+    "chat": {
+      "channels": [
+        {
+          "id": "dm-orch",
+          "type": "direct",
+          "default": false,
+          "peer": "profile:orchestrator",
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "助手",
+          "description": "",
+          "subjectKind": null,
+          "replies": 0,
+          "unread": 2,
+          "title": "助手",
+          "at": 1795194263624
+        },
+        {
+          "id": "general",
+          "type": "channel",
+          "default": true,
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "general",
+          "description": "边角压测频道",
+          "subjectKind": null,
+          "lastNumber": 1500,
+          "replies": 0,
+          "unread": 1248,
+          "title": "general",
+          "last": {
+            "from": "w-edge-pr",
+            "name": "老周",
+            "text": "检查失败 SHA=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "at": 1795194383624
+          },
+          "at": 1795194383624
+        },
+        {
+          "id": "t-edge-burst",
+          "type": "thread",
+          "default": false,
+          "orchestrator": "orchestrator",
+          "parent": "general",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "rootNumber": 1400,
+          "description": "",
+          "subjectKind": "issue",
+          "subjectId": "i-edge-pr-open",
+          "replies": 37,
+          "unread": 37,
+          "title": "PR 校验失败排查",
+          "at": 1795194323624
+        }
+      ],
+      "userMentions": [
+        {
+          "message": {
+            "id": "m-edge-mention",
+            "number": 1500,
+            "channel": "general",
+            "from": "w-edge-ask",
+            "actor": {
+              "kind": "agent",
+              "id": "xiaolin",
+              "role": "worker",
+              "name": "小林"
+            },
+            "name": "小林",
+            "kind": "chat",
+            "text": "@user 请查看 PR #4242 失败日志 https://github.com/vibevalley/vibevalley/pull/4242/commits/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "mentions": [],
+            "outcome": null,
+            "spoken": false,
+            "at": 1795194383624,
+            "revision": 1,
+            "reactions": [],
+            "attachments": [],
+            "embeds": []
+          },
+          "channel": "general",
+          "address": "#general"
+        }
+      ]
+    },
+    "issues": [
+      {
+        "id": "i-edge-canceled",
+        "number": 825,
+        "title": "已关闭 PR 且可重开工单",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "low",
+        "createdAt": 1795140443624,
+        "closedAt": 1795180043624,
+        "canceled": "lost",
+        "blockedBy": [],
+        "status": "canceled",
+        "moves": ["backlog"],
+        "pullRequest": {
+          "url": "https://github.com/vibevalley/vibevalley/pull/4199",
+          "number": 4199,
+          "state": "closed"
+        },
+        "deliver": "pull_request",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "canceled",
+          "since": 1795180043624,
+          "lead": "reopen",
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-land-none",
+        "number": 824,
+        "title": "纯问答结论已确认",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "assignments": [],
+        "priority": "low",
+        "createdAt": 1795144043624,
+        "closedAt": 1795176443624,
+        "delivered": "none",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "answer",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795176443624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-land-kept",
+        "number": 823,
+        "title": "保留本地分支交付",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "low",
+        "createdAt": 1795147643624,
+        "closedAt": 1795172843624,
+        "delivered": "kept",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795172843624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-land-submitted",
+        "number": 822,
+        "title": "分支已提交交付",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "low",
+        "createdAt": 1795151243624,
+        "closedAt": 1795169243624,
+        "delivered": "submitted",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "branch",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795169243624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-land-pr",
+        "number": 821,
+        "title": "PR 已合并交付",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "medium",
+        "createdAt": 1795154843624,
+        "closedAt": 1795165643624,
+        "delivered": "pull_request",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "pullRequest": {
+          "url": "https://github.com/vibevalley/vibevalley/pull/4201",
+          "number": 4201,
+          "state": "merged"
+        },
+        "deliver": "pull_request",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795165643624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-land-merged",
+        "number": 820,
+        "title": "合并交付完成",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "medium",
+        "createdAt": 1795158443624,
+        "closedAt": 1795162043624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795162043624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-family",
+        "number": 800,
+        "title": "深层拆单家族：状态机投影与端到端收口",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795172843624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795172843624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-fam-1",
+        "number": 801,
+        "title": "子工单 1：协议枚举定义",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795176443624,
+        "closedAt": 1795180043624,
+        "delivered": "merged_into_parent",
+        "parent": "i-edge-family",
+        "blockedBy": [],
+        "status": "done",
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795180043624,
+          "acts": []
+        }
+      },
+      {
+        "id": "i-edge-fam-2",
+        "number": 802,
+        "title": "子工单 2：核心折叠汇总",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795176503624,
+        "closedAt": 1795183643624,
+        "delivered": "merged_into_parent",
+        "parent": "i-edge-family",
+        "blockedBy": ["i-edge-fam-1"],
+        "status": "done",
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795183643624,
+          "acts": []
+        }
+      },
+      {
+        "id": "i-edge-fam-3",
+        "number": 803,
+        "title": "子工单 3：淘汰冗余分支",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "low",
+        "createdAt": 1795176563624,
+        "closedAt": 1795187243624,
+        "canceled": "dismissed",
+        "parent": "i-edge-family",
+        "blockedBy": ["i-edge-fam-2"],
+        "status": "canceled",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "canceled",
+          "since": 1795187243624,
+          "lead": "reopen",
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-fam-5",
+        "number": 805,
+        "title": "子工单 5：导出边角夹具",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "medium",
+        "createdAt": 1795176683624,
+        "queuedAt": 1795193363624,
+        "parent": "i-edge-family",
+        "blockedBy": ["i-edge-fam-4"],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795193363624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-fam-6",
+        "number": 806,
+        "title": "子工单 6：端到端验收回归",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "medium",
+        "createdAt": 1795176743624,
+        "parent": "i-edge-family",
+        "blockedBy": ["i-edge-fam-4", "i-edge-fam-5"],
+        "status": "backlog",
+        "moves": ["todo", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "draft",
+          "since": 1795176743624,
+          "lead": "start",
+          "acts": [
+            {
+              "does": "move",
+              "act": "start",
+              "status": "todo",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-draft",
+        "number": 826,
+        "title": "待排期草稿工单",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "assignments": [],
+        "priority": "low",
+        "createdAt": 1795194263624,
+        "blockedBy": [],
+        "status": "backlog",
+        "moves": ["todo", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "draft",
+          "since": 1795194263624,
+          "lead": "start",
+          "acts": [
+            {
+              "does": "move",
+              "act": "start",
+              "status": "todo",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-orch",
+        "number": 810,
+        "title": "助手汇总本周期发布风险清单",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "assignments": [
+          {
+            "id": "as-i-edge-orch",
+            "issue": "i-edge-orch",
+            "agent": "orchestrator",
+            "assignedAt": 1795193243624,
+            "executions": [
+              {
+                "kind": "orchestrator",
+                "session": "orch-1",
+                "startedAt": 1795193243624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795192643624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "answer",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "lastRun": {
+          "startedAt": 1795193243624
+        },
+        "stage": {
+          "state": "working",
+          "since": 1795193243624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-stuck-unknown",
+        "number": 819,
+        "title": "未知阻塞原因兼容展示",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-edge-stuck-unknown",
+            "issue": "i-edge-stuck-unknown",
+            "agent": "ajie",
+            "assignedAt": 1795192163624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w-edge-unk",
+                "startedAt": 1795192163624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795191923624,
+        "queuedAt": 1795192163624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["todo", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "stuck",
+          "since": 1795193543624,
+          "lead": "cure",
+          "acts": [
+            {
+              "does": "move",
+              "act": "cure",
+              "status": "todo",
+              "words": "none"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-quiet",
+        "number": 818,
+        "title": "静默超时阻塞中的长命令",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-edge-quiet",
+            "issue": "i-edge-quiet",
+            "agent": "xiaolin",
+            "assignedAt": 1795192043624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w-edge-quiet",
+                "startedAt": 1795192043624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795191743624,
+        "queuedAt": 1795192043624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "stuck",
+          "since": 1795192943624,
+          "stuck": "quiet",
+          "lead": "stop",
+          "acts": [
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-ask",
+        "number": 811,
+        "title": "确认生产数据库回滚窗口",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-edge-ask",
+            "issue": "i-edge-ask",
+            "agent": "xiaolin",
+            "assignedAt": 1795191743624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w-edge-ask",
+                "startedAt": 1795191743624
+              }
+            ]
+          }
+        ],
+        "priority": "high",
+        "createdAt": 1795191443624,
+        "queuedAt": 1795191743624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["todo", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [
+          {
+            "question": "是否在凌晨 02:00 窗口执行迁移回滚？",
+            "options": ["是，按窗口执行", "否，立即热修"]
+          }
+        ],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "asking",
+          "since": 1795193843624,
+          "lead": "answer",
+          "acts": [
+            {
+              "does": "say",
+              "act": "answer"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-interrupted",
+        "number": 817,
+        "title": "中断后需核对工作区改动",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-edge-interrupted",
+            "issue": "i-edge-interrupted",
+            "agent": "laozhou",
+            "assignedAt": 1795191443624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w-edge-int",
+                "startedAt": 1795191443624
+              }
+            ]
+          }
+        ],
+        "priority": "high",
+        "createdAt": 1795191143624,
+        "queuedAt": 1795191443624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "stuck",
+          "since": 1795193603624,
+          "stuck": "interrupted",
+          "lead": "resume",
+          "acts": [
+            {
+              "does": "move",
+              "act": "resume",
+              "status": "todo",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-failed",
+        "number": 816,
+        "title": "失败重跑恢复链路",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-edge-failed",
+            "issue": "i-edge-failed",
+            "agent": "ajie",
+            "assignedAt": 1795191143624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w-edge-fail",
+                "startedAt": 1795191143624
+              }
+            ]
+          }
+        ],
+        "priority": "high",
+        "createdAt": 1795190843624,
+        "queuedAt": 1795191143624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["todo", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "stuck",
+          "since": 1795193663624,
+          "stuck": "failed",
+          "lead": "cure",
+          "acts": [
+            {
+              "does": "move",
+              "act": "cure",
+              "status": "todo",
+              "words": "none"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-conflict",
+        "number": 815,
+        "title": "合并冲突阻塞交付",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "conflict": {
+          "base": "main",
+          "files": ["crates/vibevalley-core/src/core.rs", "packages/protocol/src/core/schema.ts"]
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-edge-conflict",
+            "issue": "i-edge-conflict",
+            "agent": "ajie",
+            "assignedAt": 1795190843624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w-edge-conf",
+                "startedAt": 1795190843624
+              }
+            ]
+          }
+        ],
+        "priority": "urgent",
+        "createdAt": 1795190543624,
+        "queuedAt": 1795190843624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "stuck",
+          "since": 1795193723624,
+          "stuck": "conflict",
+          "lead": "resolve",
+          "acts": [
+            {
+              "does": "move",
+              "act": "resolve",
+              "status": "todo",
+              "words": "none"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-handed",
+        "number": 814,
+        "title": "核查宽窄屏看板计数偏差原因",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-edge-handed",
+            "issue": "i-edge-handed",
+            "agent": "xiaolin",
+            "assignedAt": 1795190243624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w-edge-hand",
+                "startedAt": 1795190243624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795189643624,
+        "queuedAt": 1795190243624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "answer",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "answer": {
+          "conclusion": "状态帧投影下沉 Rust 后宽窄屏计数完全一致。",
+          "evidence": ["crates/vibevalley-core/src/status.rs"],
+          "unsure": [],
+          "next": []
+        },
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193783624,
+          "lead": "acknowledge",
+          "acts": [
+            {
+              "does": "move",
+              "act": "acknowledge",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-reviewed",
+        "number": 813,
+        "title": "已复审的分支交付工单",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-edge-reviewed",
+            "issue": "i-edge-reviewed",
+            "agent": "laozhou",
+            "assignedAt": 1795189043624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w-edge-rev",
+                "startedAt": 1795189043624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795187243624,
+        "queuedAt": 1795189043624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "branch",
+        "reviewedAt": 1795193963624,
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193903624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-pr-open",
+        "number": 812,
+        "title": "PR 校验失败与超长链接截断验证 https://github.com/vibevalley/vibevalley/pull/4242/commits/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "description": "Commit SHA: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nURL: https://github.com/vibevalley/vibevalley/pull/4242/commits/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nKeep scrollback anchored during rapid window resize while streaming multi-kilobyte tool output and Shiki code blocks at 120fps without main-thread stalls",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-edge-pr-open",
+            "issue": "i-edge-pr-open",
+            "agent": "laozhou",
+            "assignedAt": 1795183643624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w-edge-pr",
+                "startedAt": 1795183643624
+              }
+            ]
+          }
+        ],
+        "priority": "urgent",
+        "createdAt": 1795180043624,
+        "queuedAt": 1795183643624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "pullRequest": {
+          "url": "https://github.com/vibevalley/vibevalley/pull/4242/commits/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "number": 4242,
+          "state": "open"
+        },
+        "deliver": "pull_request",
+        "deliveryEvidence": {
+          "reviews": [],
+          "check": {
+            "targetBranch": "main",
+            "targetCommit": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "sourceTree": "abcdef0123456789abcdef0123456789abcdef01",
+            "candidateCommit": "fedcba9876543210fedcba9876543210fedcba98",
+            "candidateTree": "9876543210fedcba9876543210fedcba98765432",
+            "status": "failed",
+            "command": "vp run release:verify",
+            "output": "FAIL pr-check: clippy warning in crates/vibevalley-core/src/scenario.rs"
+          }
+        },
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795194083624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-edge-fam-4",
+        "number": 804,
+        "title": "子工单 4：面板计数统一",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-edge-fam-4",
+            "issue": "i-edge-fam-4",
+            "agent": "laozhou",
+            "assignedAt": 1795193243624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w-edge-fam4",
+                "startedAt": 1795193243624
+              }
+            ]
+          }
+        ],
+        "priority": "high",
+        "createdAt": 1795176623624,
+        "queuedAt": 1795193243624,
+        "parent": "i-edge-family",
+        "blockedBy": ["i-edge-fam-2", "i-edge-fam-3"],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193843624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      }
+    ],
+    "connectors": [
+      {
+        "id": "weixin",
+        "state": "scanned",
+        "qr": "",
+        "pairCode": "",
+        "channel": "general",
+        "since": 1795194143624,
+        "lastInbound": 1795194203624,
+        "pending": 0,
+        "error": ""
+      },
+      {
+        "id": "feishu",
+        "state": "verify",
+        "qr": "",
+        "pairCode": "",
+        "channel": "general",
+        "since": 1795194203624,
+        "lastInbound": 1795194263624,
+        "pending": 1,
+        "error": ""
+      },
+      {
+        "id": "qq",
+        "state": "pairing",
+        "qr": "",
+        "pairCode": "",
+        "since": 1795194263624,
+        "lastInbound": 1795194323624,
+        "pending": 0,
+        "error": ""
+      }
+    ],
+    "machines": [
+      {
+        "id": "local",
+        "name": "Mac Studio",
+        "here": true,
+        "online": true,
+        "joinedAt": 1794935243624
+      }
+    ],
+    "sessions": [
+      {
+        "id": "orch-1",
+        "role": "orchestrator",
+        "name": "助手",
+        "agent": "orchestrator",
+        "runtime": "vibevalley",
+        "brief": "",
+        "hiredAt": 1795187243624,
+        "runs": 0,
+        "channel": "general",
+        "refining": false,
+        "phase": {
+          "_tag": "working",
+          "since": 1795194383624,
+          "doing": {
+            "action": "search",
+            "label": "issue_list",
+            "actionText": "搜索"
+          }
+        },
+        "phaseText": "在搜索：issue_list"
+      },
+      {
+        "id": "w-edge-ask",
+        "role": "worker",
+        "name": "小林",
+        "agent": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795191743624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "需要确认回滚策略。",
+          "at": 1795193843624,
+          "spent": {
+            "tokens": 50000,
+            "cny": 0.12
+          }
+        },
+        "issue": "i-edge-ask",
+        "refining": false,
+        "phase": {
+          "_tag": "resting"
+        },
+        "phaseText": "歇着（上一轮做完了）"
+      },
+      {
+        "id": "w-edge-pr",
+        "role": "worker",
+        "name": "老周",
+        "agent": "laozhou",
+        "runtime": "codex",
+        "brief": "",
+        "repo": "vibevalley",
+        "branch": "issue-812-pr-check",
+        "worktree": "/tmp/vibevalley/.worktrees/i-edge-pr-open",
+        "hiredAt": 1795183643624,
+        "runs": 7,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "PR #4242 远端检查未通过，提交 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "at": 1795194083624,
+          "spent": {
+            "tokens": 48500000,
+            "cny": 1234.56
+          }
+        },
+        "spent": {
+          "tokens": 48500000,
+          "cny": 1234.56
+        },
+        "issue": "i-edge-pr-open",
+        "refining": false,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      },
+      {
+        "id": "w-edge-rev",
+        "role": "worker",
+        "name": "老周",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795189043624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "分支代码已复审通过，待交付。",
+          "at": 1795193903624,
+          "spent": {
+            "tokens": 91000,
+            "cny": 0.21
+          }
+        },
+        "issue": "i-edge-reviewed",
+        "refining": false,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      },
+      {
+        "id": "w-edge-hand",
+        "role": "worker",
+        "name": "小林",
+        "agent": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795190243624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "已给出结论与证据，请验收。",
+          "at": 1795193783624,
+          "spent": {
+            "tokens": 60000,
+            "cny": 0.15
+          },
+          "answer": {
+            "conclusion": "状态帧投影下沉 Rust 后宽窄屏计数完全一致。",
+            "evidence": ["crates/vibevalley-core/src/status.rs"],
+            "unsure": [],
+            "next": []
+          }
+        },
+        "issue": "i-edge-handed",
+        "refining": false,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      },
+      {
+        "id": "w-edge-conf",
+        "role": "worker",
+        "name": "阿杰",
+        "agent": "ajie",
+        "runtime": "codex",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795190843624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "与主干分支发生三方合并冲突。",
+          "at": 1795193723624,
+          "spent": {
+            "tokens": 72000,
+            "cny": 0.18
+          }
+        },
+        "issue": "i-edge-conflict",
+        "refining": false,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看，合进 main 会冲突（crates/vibevalley-core/src/core.rs、packages/protocol/src/core/schema.ts）"
+      },
+      {
+        "id": "w-edge-fail",
+        "role": "worker",
+        "name": "阿杰",
+        "agent": "ajie",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795191143624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "failed",
+          "summary": "构建命令返回非零退出码。",
+          "at": 1795193663624,
+          "spent": {
+            "tokens": 40000,
+            "cny": 0.09
+          }
+        },
+        "issue": "i-edge-failed",
+        "refining": false,
+        "phase": {
+          "_tag": "failed"
+        },
+        "phaseText": "这一轮没做成"
+      },
+      {
+        "id": "w-edge-int",
+        "role": "worker",
+        "name": "老周",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "worktree": "/tmp/vibevalley/.worktrees/i-edge-interrupted",
+        "hiredAt": 1795191443624,
+        "runs": 1,
+        "lastRun": {
+          "needsReconciliation": true,
+          "outcome": "interrupted",
+          "summary": "进程意外中断，worktree 存在未提交改动需核对。",
+          "at": 1795193603624,
+          "spent": {
+            "tokens": 88000,
+            "cny": 0.19
+          }
+        },
+        "issue": "i-edge-interrupted",
+        "refining": false,
+        "phase": {
+          "_tag": "resting"
+        },
+        "phaseText": "歇着（上一轮停在半路）"
+      },
+      {
+        "id": "w-edge-quiet",
+        "role": "worker",
+        "name": "小林",
+        "agent": "xiaolin",
+        "runtime": "codex",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795192043624,
+        "runs": 1,
+        "issue": "i-edge-quiet",
+        "refining": false,
+        "phase": {
+          "_tag": "working",
+          "since": 1795192343624,
+          "quietSince": 1795192943624,
+          "doing": {
+            "action": "run_command",
+            "label": "cargo test --workspace",
+            "actionText": "跑命令"
+          }
+        },
+        "phaseText": "在跑命令：cargo test --workspace（已经 {span}没动静了）"
+      },
+      {
+        "id": "w-edge-unk",
+        "role": "worker",
+        "name": "阿杰",
+        "agent": "ajie",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795192163624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "failed",
+          "summary": "未知卡住原因兜底测试。",
+          "at": 1795193543624
+        },
+        "issue": "i-edge-stuck-unknown",
+        "refining": false,
+        "phase": {
+          "_tag": "failed"
+        },
+        "phaseText": "这一轮没做成"
+      },
+      {
+        "id": "w-edge-fam4",
+        "role": "worker",
+        "name": "老周",
+        "agent": "laozhou",
+        "runtime": "codex",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795193243624,
+        "runs": 1,
+        "issue": "i-edge-fam-4",
+        "refining": false,
+        "phase": {
+          "_tag": "working",
+          "since": 1795193843624,
+          "doing": {
+            "action": "edit_file",
+            "label": "status.rs",
+            "actionText": "改文件"
+          }
+        },
+        "phaseText": "在改文件：status.rs"
+      }
+    ],
+    "crons": [
+      {
+        "id": "c-edge-ask",
+        "name": "等待确认的发布巡检",
+        "text": "巡检：等待确认的发布巡检",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "cron",
+          "expr": "0 9 * * 1-5"
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795193543624,
+        "lastRun": 1795197143624,
+        "by": "user",
+        "pending": true,
+        "whenText": "工作日 09:00",
+        "nextText": "11/23 09:00"
+      }
+    ],
+    "boardSummary": {
+      "laneCounts": {
+        "todo": 3,
+        "working": 8,
+        "waiting": 4,
+        "closed": 9
+      },
+      "runningSlots": 2,
+      "maxRunning": 6,
+      "byIssue": {
+        "i-edge-ask": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "asking"
+        },
+        "i-edge-canceled": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "canceled_reopenable"
+        },
+        "i-edge-conflict": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "stuck_conflict"
+        },
+        "i-edge-draft": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-failed": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "stuck_failed"
+        },
+        "i-edge-fam-1": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-fam-2": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-fam-3": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "canceled_reopenable"
+        },
+        "i-edge-fam-4": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-fam-5": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-fam-6": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-family": {
+          "lane": "working",
+          "cardKind": "family",
+          "familyDone": 3,
+          "familyTotal": 6,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-handed": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-edge-interrupted": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": true,
+          "prompt": "stuck_interrupted"
+        },
+        "i-edge-land-kept": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-land-merged": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-land-none": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-land-pr": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-land-submitted": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-orch": {
+          "lane": "working",
+          "cardKind": "orchestrator",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-edge-pr-open": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "review_after_failed_check"
+        },
+        "i-edge-quiet": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "stuck_quiet"
+        },
+        "i-edge-reviewed": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "reviewed"
+        },
+        "i-edge-stuck-unknown": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "stuck_unknown"
+        }
+      }
+    },
+    "mediaSummary": {
+      "activeCount": 3,
+      "activeIds": ["job-edge-queued", "job-edge-generating", "job-edge-downloading"]
+    },
+    "channelSummary": {
+      "unreadTotal": 1287,
+      "unreadUnder": {
+        "dm-orch": 2,
+        "general": 1285,
+        "t-edge-burst": 37
+      }
+    }
+  },
+  "inbox": [
+    {
+      "id": "m-edge-mention",
+      "kind": "mention",
+      "from": {
+        "kind": "session",
+        "id": "w-edge-ask",
+        "name": "小林",
+        "agent": ""
+      },
+      "who": "小林",
+      "text": "@user 请查看 PR #4242 失败日志 https://github.c…",
+      "at": 1795194383624,
+      "target": {
+        "kind": "chat",
+        "channel": "general"
+      },
+      "words": {
+        "label": "找你",
+        "title": "小林 叫你",
+        "body": "@user 请查看 PR #4242 失败日志 https://github.c…",
+        "tray": ""
+      }
+    },
+    {
+      "id": "w-edge-pr:review:7",
+      "kind": "review",
+      "from": {
+        "kind": "session",
+        "id": "w-edge-pr",
+        "name": "老周",
+        "agent": "laozhou"
+      },
+      "who": "老周",
+      "text": "PR #4242 远端检查未通过，提交 0123456789abcdef0123…",
+      "at": 1795194083624,
+      "target": {
+        "kind": "session",
+        "id": "w-edge-pr"
+      },
+      "words": {
+        "label": "等你看",
+        "title": "老周 做完了",
+        "body": "PR #4242 远端检查未通过，提交 0123456789abcdef0123…",
+        "tray": "老周 做完了，等你看"
+      }
+    },
+    {
+      "id": "w-edge-rev:review:1",
+      "kind": "review",
+      "from": {
+        "kind": "session",
+        "id": "w-edge-rev",
+        "name": "老周",
+        "agent": "laozhou"
+      },
+      "who": "老周",
+      "text": "分支代码已复审通过，待交付。",
+      "at": 1795193903624,
+      "target": {
+        "kind": "session",
+        "id": "w-edge-rev"
+      },
+      "words": {
+        "label": "等你看",
+        "title": "老周 做完了",
+        "body": "分支代码已复审通过，待交付。",
+        "tray": "老周 做完了，等你看"
+      }
+    },
+    {
+      "id": "w-edge-ask:ask:1",
+      "kind": "ask",
+      "from": {
+        "kind": "session",
+        "id": "w-edge-ask",
+        "name": "小林",
+        "agent": "xiaolin"
+      },
+      "who": "小林",
+      "text": "是否在凌晨 02:00 窗口执行迁移回滚？",
+      "at": 1795193843624,
+      "target": {
+        "kind": "session",
+        "id": "w-edge-ask"
+      },
+      "words": {
+        "label": "有问题问你",
+        "title": "小林 有问题问你",
+        "body": "是否在凌晨 02:00 窗口执行迁移回滚？",
+        "tray": ""
+      }
+    },
+    {
+      "id": "w-edge-hand:review:1",
+      "kind": "review",
+      "from": {
+        "kind": "session",
+        "id": "w-edge-hand",
+        "name": "小林",
+        "agent": "xiaolin"
+      },
+      "who": "小林",
+      "text": "已给出结论与证据，请验收。",
+      "at": 1795193783624,
+      "target": {
+        "kind": "session",
+        "id": "w-edge-hand"
+      },
+      "words": {
+        "label": "等你看",
+        "title": "小林 做完了",
+        "body": "已给出结论与证据，请验收。",
+        "tray": "小林 做完了，等你看"
+      }
+    },
+    {
+      "id": "w-edge-conf:conflict:1",
+      "kind": "conflict",
+      "from": {
+        "kind": "session",
+        "id": "w-edge-conf",
+        "name": "阿杰",
+        "agent": "ajie"
+      },
+      "who": "阿杰",
+      "text": "2 个文件和主分支冲突",
+      "at": 1795193723624,
+      "target": {
+        "kind": "session",
+        "id": "w-edge-conf"
+      },
+      "words": {
+        "label": "合不进去",
+        "title": "阿杰 的活合进主分支会冲突",
+        "body": "2 个文件和主分支冲突",
+        "tray": "阿杰 的活会冲突"
+      }
+    },
+    {
+      "id": "w-edge-fail:fix:1",
+      "kind": "fix",
+      "from": {
+        "kind": "session",
+        "id": "w-edge-fail",
+        "name": "阿杰",
+        "agent": "ajie"
+      },
+      "who": "阿杰",
+      "text": "构建命令返回非零退出码。",
+      "at": 1795193663624,
+      "target": {
+        "kind": "session",
+        "id": "w-edge-fail"
+      },
+      "words": {
+        "label": "活没做成",
+        "title": "阿杰 没做成",
+        "body": "构建命令返回非零退出码。",
+        "tray": "阿杰 没做成"
+      }
+    },
+    {
+      "id": "w-edge-int:interrupted:1",
+      "kind": "interrupted",
+      "from": {
+        "kind": "session",
+        "id": "w-edge-int",
+        "name": "老周",
+        "agent": "laozhou"
+      },
+      "who": "老周",
+      "text": "进程意外中断，worktree 存在未提交改动需核对。",
+      "at": 1795193603624,
+      "target": {
+        "kind": "session",
+        "id": "w-edge-int"
+      },
+      "words": {
+        "label": "停在半路",
+        "title": "老周 停在了半路",
+        "body": "进程意外中断，worktree 存在未提交改动需核对。",
+        "tray": ""
+      }
+    },
+    {
+      "id": "w-edge-unk:fix:1",
+      "kind": "fix",
+      "from": {
+        "kind": "session",
+        "id": "w-edge-unk",
+        "name": "阿杰",
+        "agent": "ajie"
+      },
+      "who": "阿杰",
+      "text": "未知卡住原因兜底测试。",
+      "at": 1795193543624,
+      "target": {
+        "kind": "session",
+        "id": "w-edge-unk"
+      },
+      "words": {
+        "label": "活没做成",
+        "title": "阿杰 没做成",
+        "body": "未知卡住原因兜底测试。",
+        "tray": "阿杰 没做成"
+      }
+    },
+    {
+      "id": "c-edge-ask:ask",
+      "kind": "cron-ask",
+      "from": {
+        "kind": "orchestrator"
+      },
+      "who": "助手",
+      "text": "等待确认的发布巡检",
+      "at": 1795193543624,
+      "target": {
+        "kind": "chat",
+        "channel": "general"
+      },
+      "words": {
+        "label": "定时任务等你同意",
+        "title": "助手想定一个定时任务",
+        "body": "「等待确认的发布巡检」：同意了才开始",
+        "tray": "定时任务「等待确认的发布巡检」等你同意"
+      }
+    },
+    {
+      "id": "w-edge-quiet:quiet:1795192943624",
+      "kind": "quiet",
+      "from": {
+        "kind": "session",
+        "id": "w-edge-quiet",
+        "name": "小林",
+        "agent": "xiaolin"
+      },
+      "who": "小林",
+      "text": "",
+      "at": 1795192943624,
+      "target": {
+        "kind": "session",
+        "id": "w-edge-quiet"
+      },
+      "words": {
+        "label": "好久没动静",
+        "title": "小林 好一阵没动静了",
+        "body": "可能在跑很久的命令，也可能卡住了：看看它的轨迹。",
+        "tray": "小林 好一阵没动静"
+      }
+    }
+  ],
+  "view": {
+    "level": {
+      "level": 1,
+      "xp": 0,
+      "need": 10
+    },
+    "plots": {
+      "i-edge-ask": {
+        "crop": "dry",
+        "badge": {
+          "text": "等你回答",
+          "tone": "wait"
+        }
+      },
+      "i-edge-conflict": {
+        "crop": "withered",
+        "badge": {
+          "text": "有冲突",
+          "tone": "bug"
+        }
+      },
+      "i-edge-failed": {
+        "crop": "withered",
+        "badge": {
+          "text": "有虫",
+          "tone": "bug"
+        }
+      },
+      "i-edge-fam-4": {
+        "crop": "sprout"
+      },
+      "i-edge-handed": {
+        "crop": "flowering",
+        "badge": {
+          "text": "等你验收",
+          "tone": "wait"
+        }
+      },
+      "i-edge-interrupted": {
+        "crop": "sprout",
+        "badge": {
+          "text": "停在半路",
+          "tone": "stuck"
+        }
+      },
+      "i-edge-pr-open": {
+        "crop": "flowering",
+        "badge": {
+          "text": "等你验收",
+          "tone": "wait"
+        }
+      },
+      "i-edge-quiet": {
+        "crop": "dry",
+        "badge": {
+          "text": "没动静",
+          "tone": "stuck"
+        }
+      },
+      "i-edge-reviewed": {
+        "crop": "wheat",
+        "badge": {
+          "text": "可收获",
+          "tone": "ripe"
+        }
+      },
+      "i-edge-stuck-unknown": {
+        "crop": "withered",
+        "badge": {
+          "text": "有虫",
+          "tone": "bug"
+        }
+      }
+    },
+    "plays": {
+      "orch-1": {
+        "station": -1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w-edge-ask": {
+        "station": 0,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w-edge-conf": {
+        "station": 4,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w-edge-fail": {
+        "station": 5,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w-edge-fam4": {
+        "station": -1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w-edge-hand": {
+        "station": 3,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w-edge-int": {
+        "station": -1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w-edge-pr": {
+        "station": 1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w-edge-quiet": {
+        "station": -1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w-edge-rev": {
+        "station": 2,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w-edge-unk": {
+        "station": -1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      }
+    },
+    "achievements": [
+      {
+        "id": "s_open",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_hire",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_tell",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_review",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_voice",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_split",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_call",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "harvests",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "first_try",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "big_graph",
+        "tier": 0,
+        "count": 0,
+        "next": 3
+      },
+      {
+        "id": "farm_level",
+        "tier": 0,
+        "count": 0,
+        "next": 5
+      },
+      {
+        "id": "steady",
+        "tier": 0,
+        "count": 0,
+        "next": 5
+      },
+      {
+        "id": "untangle",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "comeback",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "thrifty",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "every_machine",
+        "tier": 0,
+        "count": 0,
+        "next": 2
+      },
+      {
+        "id": "handoff",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "parallel_graph",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "night_owl",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "weekend",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "full_house",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      }
+    ]
+  },
+  "effects": []
+}

@@ -4,7 +4,7 @@
 //! done, canceled); in_progress and in_review are worked out here.
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use vibevalley_protocol::*;
 
@@ -413,4 +413,118 @@ pub fn open_findings(t: &Issue) -> usize {
 /// `assignedOnDuty`.
 pub fn assigned_on_duty(t: &Issue, on_duty: impl Fn(&str) -> bool) -> bool {
     on_duty(t.assigned_agent().unwrap_or(""))
+}
+
+/// Maps an issue's board status onto one of the four UI lanes.
+pub fn issue_lane_of(status: IssueStatus) -> IssueLane {
+    match status {
+        IssueStatus::Backlog | IssueStatus::Todo => IssueLane::Todo,
+        IssueStatus::InProgress => IssueLane::Working,
+        IssueStatus::InReview => IssueLane::Waiting,
+        IssueStatus::Done | IssueStatus::Canceled => IssueLane::Closed,
+    }
+}
+
+/// Structured, locale-free user prompt kind for an issue's current stage.
+pub fn issue_prompt_of(issue: &Issue) -> Option<IssuePromptKind> {
+    match issue.stage.state {
+        IssueStageKind::Asking => Some(IssuePromptKind::Asking),
+        IssueStageKind::Reviewing => {
+            if issue
+                .delivery_evidence
+                .as_ref()
+                .and_then(|e| e.check.as_ref())
+                .is_some_and(|c| c.status == ProjectCheckStatus::Failed)
+            {
+                Some(IssuePromptKind::ReviewAfterFailedCheck)
+            } else if issue.reviewed_at.is_some() {
+                Some(IssuePromptKind::Reviewed)
+            } else {
+                Some(IssuePromptKind::HandedBack)
+            }
+        }
+        IssueStageKind::Stuck => Some(match issue.stage.stuck {
+            Some(StuckReason::Conflict) => IssuePromptKind::StuckConflict,
+            Some(StuckReason::Failed) => IssuePromptKind::StuckFailed,
+            Some(StuckReason::Interrupted) => IssuePromptKind::StuckInterrupted,
+            Some(StuckReason::Quiet) => IssuePromptKind::StuckQuiet,
+            None => IssuePromptKind::StuckUnknown,
+        }),
+        IssueStageKind::Canceled => (issue.stage.lead == Some(IssueAct::Reopen)).then_some(IssuePromptKind::CanceledReopenable),
+        IssueStageKind::Draft | IssueStageKind::Queued | IssueStageKind::Working | IssueStageKind::Done => None,
+    }
+}
+
+/// Deterministic board summary folded into `SpaceView`: identical lane counts
+/// for wide and narrow views, active worker slot usage, and per-issue metadata.
+pub fn board_summary(state: &SpaceState) -> BoardSummary {
+    let lookup = lookup_of(state);
+    let mut on_duty_agents: HashSet<&str> = HashSet::from([DEFAULT_ORCHESTRATOR]);
+    for s in &state.sessions {
+        if is_on_duty(s.role) && !s.agent.is_empty() {
+            on_duty_agents.insert(s.agent.as_str());
+        }
+    }
+    if let Some(chat) = &state.chat {
+        for c in &chat.channels {
+            if let Some(orch) = c.orchestrator.as_deref()
+                && !orch.is_empty()
+            {
+                on_duty_agents.insert(orch);
+            }
+        }
+    }
+
+    let mut lane_counts = BoardLaneCounts::default();
+    let mut by_issue = BTreeMap::new();
+    for issue in &state.issues {
+        let lane = issue_lane_of(issue.status);
+        match lane {
+            IssueLane::Todo => lane_counts.todo += 1,
+            IssueLane::Working => lane_counts.working += 1,
+            IssueLane::Waiting => lane_counts.waiting += 1,
+            IssueLane::Closed => lane_counts.closed += 1,
+        }
+
+        let kids = lookup.children.get(issue.id.as_str()).map_or(&[][..], Vec::as_slice);
+        let family_total = kids.len() as i64;
+        let family_done = kids.iter().filter(|c| c.status.is_closed()).count() as i64;
+
+        let is_orch = assigned_on_duty(issue, |a| on_duty_agents.contains(a))
+            || (issue.latest_session_id().is_none() && issue.executions().any(|e| matches!(e, Execution::Orchestrator { .. })));
+        let card_kind = if family_total > 0 {
+            IssueCardKind::Family
+        } else if is_orch {
+            IssueCardKind::Orchestrator
+        } else if issue.executions().next().is_none() {
+            IssueCardKind::Todo
+        } else {
+            IssueCardKind::Issue
+        };
+
+        let session = issue.latest_session_id().and_then(|id| lookup.sessions.get(id.as_str()).copied());
+        let needs_worktree_check =
+            !issue.status.is_closed() && session.is_some_and(|s| !s.phase.is_working() && s.last_run.as_ref().is_some_and(|r| r.needs_reconciliation));
+
+        by_issue.insert(
+            issue.id.clone(),
+            BoardIssueSummary {
+                lane,
+                card_kind,
+                family_done,
+                family_total,
+                needs_worktree_check,
+                prompt: issue_prompt_of(issue),
+            },
+        );
+    }
+
+    let running_slots = state.sessions.iter().filter(|s| is_hired(s.role) && is_busy(s)).count() as i64;
+
+    BoardSummary {
+        lane_counts,
+        running_slots,
+        max_running: MAX_RUNNING as i64,
+        by_issue,
+    }
 }

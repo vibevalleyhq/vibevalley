@@ -1,14 +1,14 @@
 import { z } from "zod";
 
-import { Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/schema";
+import { ChannelSummary, Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/schema";
 import type { Codec } from "../codec";
 import { SessionId } from "../common/schema";
 import { ConnectorStatus, FactConnectorChanged } from "../connector/schema";
 import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema";
 import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/schema";
 import { InboxItem } from "../inbox/schema";
-import { FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/schema";
-import { MediaJob, FactMediaChanged } from "../media/schema";
+import { BoardSummary, FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/schema";
+import { MediaJob, MediaSummary, FactMediaChanged } from "../media/schema";
 import { RuntimeInfo } from "../runtime/schema";
 import {
   FactMachineChanged,
@@ -49,6 +49,9 @@ const SpaceView = z.object({
   ...spaceFields,
   sessions: z.array(SessionView),
   crons: z.array(CronView),
+  boardSummary: z.exactOptional(BoardSummary),
+  mediaSummary: z.exactOptional(MediaSummary),
+  channelSummary: z.exactOptional(ChannelSummary),
 }) satisfies Codec<T.SpaceView>;
 
 const NoticeLevel = z.enum(T.NoticeLevelValues) satisfies Codec<T.NoticeLevel>;
