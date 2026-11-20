@@ -1,11 +1,11 @@
 // The file tree: nsh's Tree over the frame Rust keeps (directories load as
 // they expand), with git status colors.
-import { Text, View } from "nsh";
-import { Tree, type TreeItem } from "nsh/base";
+import { Clipboard, Text, View } from "nsh";
+import { ContextMenu, MenuItem, MenuSeparator, Tree, type TreeItem } from "nsh/base";
 
-import { act } from "../bridge";
-import { tok, type as ty } from "../tokens";
-import { Empty, SectionHead, toneColor } from "./shared";
+import { act, hostApi } from "../bridge";
+import { radius, tok } from "../tokens";
+import { Empty, IconButton, SectionHead, SurfaceIcon, toneColor } from "./shared";
 
 export type FileItem = TreeItem & { tone?: string; hidden?: boolean; children?: FileItem[] };
 export type FilesFrame = { root?: string; name?: string; items: FileItem[]; expanded?: string[]; selected?: string | null; loading?: boolean };
@@ -21,11 +21,37 @@ function index(items: FileItem[], into: Map<string, FileItem>) {
 export function FileTree(props: { frame: FilesFrame | null }) {
   const p = () => tok();
   const byId = () => index(props.frame?.items ?? [], new Map());
+  const relPath = (abs: string) => {
+    const root = props.frame?.root?.replace(/\/+$/, "");
+    return root && abs.startsWith(`${root}/`) ? abs.slice(root.length + 1) : abs;
+  };
+  const dirOf = (abs: string, folder: boolean) => {
+    if (folder) return abs;
+    const i = abs.lastIndexOf("/");
+    return i > 0 ? abs.slice(0, i) : (props.frame?.root ?? abs);
+  };
+  const itemStyle = { height: 26, paddingHorizontal: 10, borderRadius: 5, justifyContent: "center" as const };
   return (
     <View style={{ flex: 1 }}>
-      <SectionHead title={props.frame?.name ?? "Files"} />
+      <SectionHead
+        title={props.frame?.name ?? "文件"}
+        borderBottom
+        right={
+          (props.frame?.expanded?.length ?? 0) > 0 ? (
+            <IconButton
+              label="折叠全部目录"
+              icon="collapse-all"
+              onPress={() => {
+                for (const dir of [...(props.frame?.expanded ?? [])].reverse()) {
+                  act({ type: "collapse_dir", path: dir });
+                }
+              }}
+            />
+          ) : undefined
+        }
+      />
       {!props.frame || props.frame.items.length === 0 ? (
-        <Empty text={props.frame?.loading || !props.frame ? "Reading the project…" : "This folder is empty."} />
+        <Empty text={props.frame?.loading || !props.frame ? "正在读取目录…" : "此目录为空。"} />
       ) : (
         <Tree
           items={props.frame.items}
@@ -33,8 +59,9 @@ export function FileTree(props: { frame: FilesFrame | null }) {
           selected={props.frame.selected ?? null}
           accessibilityLabel="Files"
           class="flex-1"
-          listClass="px-1 pb-2"
-          itemClass="group h-6 rounded-md hover:bg-[#f0f0f0] dark:hover:bg-[#232326] selected:bg-[#e8eefb] dark:selected:bg-[#1e2a44] focus-visible:outline-2 focus-visible:outline-[#4d8dff]"
+          listClass="px-1.5 py-1.5"
+          itemClass="group rounded-md hover:bg-hover selected:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
+          itemStyle={{ height: 26 }}
           onExpand={({ id }) => act({ type: "expand_dir", path: id })}
           onCollapse={({ id }) => act({ type: "collapse_dir", path: id })}
           onSelectedChange={({ selected }) => {
@@ -46,26 +73,100 @@ export function FileTree(props: { frame: FilesFrame | null }) {
             if (item && !item.children) act({ type: "open_file", path: id });
           }}
           renderItem={(entry) => {
-            const item = byId().get(entry.id);
-            const color = toneColor(p(), item?.tone);
-            return (
-              <View style={{ height: 24, flexDirection: "row", alignItems: "center", gap: 4, paddingLeft: 6 + entry.depth * 14 }}>
-                <Text class="transition-transform group-aria-expanded:rotate-90" style={{ width: 12, fontSize: 10, color: p().muted }}>
-                  {entry.folder ? "›" : ""}
-                </Text>
+            const item = () => byId().get(entry.id);
+            const isPlaceholder = () => item()?.tone === "placeholder";
+            const labelColor = () => {
+              const cur = item();
+              if (cur?.tone === "placeholder") return p().faint;
+              if (cur?.hidden && cur.tone === "clean") return p().text;
+              return toneColor(p(), cur?.tone);
+            };
+            const iconColor = () => {
+              const tone = item()?.tone;
+              if (entry.folder) {
+                if (tone === "dirty") return p().alert;
+                if (tone === "ignored") return p().faint;
+                return p().text;
+              }
+              if (tone && tone !== "clean") return toneColor(p(), tone);
+              return p().muted;
+            };
+            const row = (
+              <View
+                style={{
+                  height: 26,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  paddingLeft: 6 + entry.depth * 14,
+                  paddingRight: 8,
+                }}
+              >
+                <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {entry.folder ? (
+                    <View
+                      class="transition-transform duration-120 ease-out group-aria-expanded:rotate-90"
+                      style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center" }}
+                    >
+                      <SurfaceIcon name="chevron-right" size={10} color={p().muted} />
+                    </View>
+                  ) : null}
+                </View>
+                {!isPlaceholder() ? (
+                  <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <SurfaceIcon name={entry.folder ? "folder" : "file"} size={13} color={iconColor()} />
+                  </View>
+                ) : null}
                 <Text
                   style={{
-                    ...ty.body,
-                    fontSize: 13,
-                    color: item?.hidden && item.tone === "clean" ? p().text : color,
+                    fontSize: isPlaceholder() ? 12 : 13,
+                    lineHeight: 18,
+                    fontWeight: entry.folder ? "500" : "400",
+                    color: labelColor(),
                     numberOfLines: 1,
                     flex: 1,
-                    fontStyle: item?.tone === "placeholder" ? "italic" : "normal",
+                    minWidth: 0,
+                    fontStyle: isPlaceholder() ? "italic" : "normal",
                   }}
                 >
                   {entry.label}
                 </Text>
+                {entry.folder && item()?.tone === "dirty" ? (
+                  <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: p().alert, flexShrink: 0 }} />
+                ) : null}
               </View>
+            );
+            if (isPlaceholder()) return row;
+            return (
+              <ContextMenu
+                trigger={row}
+                popupStyle={{
+                  minWidth: 168,
+                  padding: 4,
+                  borderRadius: radius.sm,
+                  backgroundColor: p().surface,
+                  borderWidth: 1,
+                  borderColor: p().border,
+                }}
+              >
+                <MenuItem onSelect={() => void Clipboard.writeText(relPath(entry.id))} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
+                  <Text style={{ fontSize: 12, color: p().ink }}>复制相对路径</Text>
+                </MenuItem>
+                <MenuItem onSelect={() => void Clipboard.writeText(entry.id)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
+                  <Text style={{ fontSize: 12, color: p().ink }}>复制绝对路径</Text>
+                </MenuItem>
+                <MenuSeparator style={{ height: 1, marginVertical: 4, backgroundColor: p().border }} />
+                <MenuItem onSelect={() => void hostApi.reveal(entry.id)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
+                  <Text style={{ fontSize: 12, color: p().ink }}>在 Finder 中显示</Text>
+                </MenuItem>
+                <MenuItem
+                  onSelect={() => act({ type: "new_terminal_at", path: dirOf(entry.id, entry.folder) })}
+                  style={itemStyle}
+                  hoverStyle={{ backgroundColor: p().subtle }}
+                >
+                  <Text style={{ fontSize: 12, color: p().ink }}>在此目录新建终端</Text>
+                </MenuItem>
+              </ContextMenu>
             );
           }}
         />

@@ -1,5 +1,5 @@
 use crate::Lighting;
-use image::{Rgba, RgbaImage};
+use image::{GrayImage, Rgba, RgbaImage};
 
 pub type Tint = [f32; 3];
 #[derive(Clone, Copy)]
@@ -39,7 +39,11 @@ impl Surface {
         }
     }
     pub fn paint(&mut self, image: &RgbaImage, normal: Option<&RgbaImage>, brush: Brush) {
-        blit(&mut self.color, self.density, image, brush, false);
+        self.paint_with_depth(image, normal, brush, None);
+    }
+    /// The baked depth is measured at ground level in logical pixels, just like the sprite's feet.
+    pub fn paint_with_depth(&mut self, image: &RgbaImage, normal: Option<&RgbaImage>, brush: Brush, occlusion: Option<(&GrayImage, f32)>) {
+        blit(&mut self.color, self.density, image, brush, false, occlusion);
         if let Some(normal) = normal {
             blit(
                 &mut self.normal,
@@ -51,6 +55,7 @@ impl Surface {
                     ..brush
                 },
                 true,
+                occlusion,
             );
         }
     }
@@ -66,7 +71,7 @@ fn byte(v: f32) -> u8 {
     v.round().clamp(0., 255.) as u8
 }
 
-fn blit(out: &mut RgbaImage, scale: u32, src: &RgbaImage, b: Brush, normal: bool) {
+fn blit(out: &mut RgbaImage, scale: u32, src: &RgbaImage, b: Brush, normal: bool, occlusion: Option<(&GrayImage, f32)>) {
     if src.width() == 0 || src.height() == 0 || b.alpha <= 0. {
         return;
     }
@@ -87,6 +92,13 @@ fn blit(out: &mut RgbaImage, scale: u32, src: &RgbaImage, b: Brush, normal: bool
             let sx = if b.flip { src.width() - 1 - sx } else { sx };
             let p = src.get_pixel(sx, sy);
             if p[3] == 0 {
+                continue;
+            }
+            if let Some((mask, feet)) = occlusion
+                && mask
+                    .get_pixel_checked(ox / scale, oy / scale)
+                    .is_some_and(|d| d[0] > 0 && f32::from(d[0]) > feet)
+            {
                 continue;
             }
             let d = out.get_pixel_mut(ox, oy);
@@ -138,6 +150,21 @@ fn sample_centres(src: &RgbaImage, w: u32, h: u32, bgra: bool, preceding_on_edge
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn regression_baked_wall_hides_only_pixels_behind_it_at_both_densities() {
+        let mask = GrayImage::from_raw(2, 1, vec![7, 0]).unwrap();
+        let red = RgbaImage::from_pixel(1, 1, Rgba([255, 0, 0, 255]));
+        for density in [1, 2] {
+            let mut surface = Surface::new(2, 1, density, Rgba([0, 0, 0, 255]));
+            let brush = Brush::at(0., 0., 2., 1.);
+            surface.paint_with_depth(&red, None, brush, Some((&mask, 6.)));
+            assert_eq!(surface.color.get_pixel(0, 0)[0], 0);
+            assert_eq!(surface.color.get_pixel(density, 0)[0], 255);
+            surface.paint_with_depth(&red, None, brush, Some((&mask, 8.)));
+            assert_eq!(surface.finish().get_pixel(0, 0)[0], 255);
+        }
+    }
 
     #[test]
     fn regression_css_and_world_images_resolve_exact_pixel_edges_separately() {

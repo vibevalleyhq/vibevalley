@@ -122,8 +122,8 @@ export function ThinkingDots() {
 
 export function Count(props: { n: number }) {
   return (
-    <View class="shrink-0 rounded-full bg-accent px-1.5">
-      <Text class="text-xs font-semibold text-page">{String(props.n)}</Text>
+    <View class="h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-accent px-1.5">
+      <Text class="font-mono text-2xs font-semibold text-page">{String(props.n)}</Text>
     </View>
   );
 }

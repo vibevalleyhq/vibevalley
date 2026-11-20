@@ -1,15 +1,18 @@
-import { Scroll, Text, View } from "nsh";
+import { Scroll, signal, Text, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorApproval } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { wallClockText } from "../../base/format";
+import { momentText, wallClockText } from "../../base/format";
 import { api, reasonOf } from "../../infra/api";
 import { defineQuery, retryRead, useQuery, useQueryClient } from "../../infra/query";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
+import { Icon } from "../../ui/Icon";
+import { Bubble } from "../../ui/Tip";
+import { mix } from "../../ui/tone";
 
 const approvalsQuery = defineQuery({
   schema: z.array(S.OrchestratorApproval),
@@ -41,42 +44,84 @@ export function PendingApprovals(props: { conversationId: string }) {
       when={query.error()}
       else={
         <If when={pending().length > 0}>
-          <View testID="orchestrator-approvals" class="gap-1">
-            <Text role="header" class="text-sm font-semibold text-ink">
-              {t("web.orchestrator.approval.title")}
-            </Text>
-            <Scroll class="max-h-48 shrink" contentClass="gap-2">
-              <Each of={pending()}>
-                {(item) => (
-                  <View class="gap-1 rounded-md border border-line bg-page p-2">
-                    <View class="flex-row flex-wrap items-center gap-2">
-                      <Text class="text-sm font-semibold text-ink">{item().toolName}</Text>
-                      <Text class="text-xs text-muted">{wallClockText(item().requestedAtMs)}</Text>
-                    </View>
-                    <Text class="text-sm text-ink">{item().reason}</Text>
-                    <Text class="text-xs text-muted">{t("web.session.trajectory.input")}</Text>
-                    <Text class="font-mono text-xs text-ink" style={{ userSelect: "text" }}>
-                      {item().argumentsJson}
-                    </Text>
-                    <View class="flex-row items-center gap-2">
-                      <Button testID={`approval-allow-${item().toolCallId}`} disabled={act.busy()} onPress={() => void decide(item(), true)}>
-                        {t("web.orchestrator.approval.allow")}
-                      </Button>
-                      <Button testID={`approval-deny-${item().toolCallId}`} disabled={act.busy()} onPress={() => void decide(item(), false)}>
-                        {t("web.orchestrator.approval.deny")}
-                      </Button>
-                    </View>
-                  </View>
-                )}
+          <View testID="orchestrator-approvals" class="shrink-0 overflow-hidden rounded-lg border bg-page" style={{ borderColor: mix("wheat", 0.5) }}>
+            <View class="flex-row items-center justify-between gap-2 border-b border-line px-3.5 py-2" style={{ backgroundColor: mix("wheat", 0.12) }}>
+              <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                <Icon name="warn" size={14} />
+                <Text role="header" class="truncate text-sm font-semibold text-ink">
+                  {t("web.orchestrator.approval.title")}
+                </Text>
+              </View>
+              <View class="h-5 flex-row items-center rounded-full px-2" style={{ backgroundColor: mix("wheat", 0.22) }}>
+                <Text class="font-mono text-2xs font-medium text-warn-ink tabular-nums">{String(pending().length)}</Text>
+              </View>
+            </View>
+            <Scroll class="max-h-72 shrink">
+              <Each of={pending()} key={(item) => item.toolCallId}>
+                {(item, index) => <ApprovalRow item={item()} first={index() === 0} busy={act.busy()} onDecide={(ok) => void decide(item(), ok)} />}
               </Each>
             </Scroll>
           </View>
         </If>
       }
     >
-      <Text testID="orchestrator-approvals-error" class="text-sm text-berry">
-        {t("web.orchestrator.approval.unavailable", { why: reasonOf(query.error()) })}
-      </Text>
+      <View class="flex-row items-center gap-2 rounded-lg border border-berry bg-bad-soft px-3.5 py-2">
+        <Icon name="cross" size={14} />
+        <Text testID="orchestrator-approvals-error" class="min-w-0 flex-1 text-sm font-medium text-berry">
+          {t("web.orchestrator.approval.unavailable", { why: reasonOf(query.error()) })}
+        </Text>
+      </View>
     </If>
+  );
+}
+
+function ApprovalRow(props: { item: OrchestratorApproval; first: boolean; busy: boolean; onDecide: (approved: boolean) => void }) {
+  const expanded = signal(true);
+  return (
+    <View class={`gap-2 px-3.5 py-3 ${props.first ? "" : "border-t border-line"}`}>
+      <View class="flex-row items-center justify-between gap-2">
+        <View class="min-w-0 flex-1 flex-row items-center gap-2">
+          <View class="size-2 shrink-0 rounded-full bg-wheat" />
+          <View class="rounded-sm bg-side px-2 py-0.5">
+            <Text class="truncate font-mono text-xs font-semibold text-ink">{props.item.toolName}</Text>
+          </View>
+        </View>
+        <View tooltip={<Bubble text={momentText(props.item.requestedAtMs)} />} class="shrink-0">
+          <Text class="font-mono text-xs text-muted tabular-nums">{wallClockText(props.item.requestedAtMs)}</Text>
+        </View>
+      </View>
+      <Text class="text-sm leading-relaxed text-ink">{props.item.reason}</Text>
+      <View class="gap-1">
+        <View
+          role="button"
+          accessibilityState={{ expanded: expanded() }}
+          onPress={() => expanded.set(!expanded())}
+          class="group -ml-1 h-6 flex-row items-center gap-1 self-start rounded-sm px-1 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          <View
+            class="size-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+            style={{ transform: [{ rotate: expanded() ? "90deg" : "0deg" }] }}
+          >
+            <Icon name="expand" size={10} tone="faint" />
+          </View>
+          <Text class="text-xs font-medium text-muted group-hover:text-ink">{t("web.session.trajectory.input")}</Text>
+        </View>
+        <If when={expanded()}>
+          <View class="rounded-md bg-side px-2.5 py-2">
+            <Text class="font-mono text-xs leading-relaxed text-ink" style={{ userSelect: "text" }}>
+              {props.item.argumentsJson}
+            </Text>
+          </View>
+        </If>
+      </View>
+      <View class="flex-row items-center gap-2 pt-0.5">
+        <Button tone="primary" icon="ticked" testID={`approval-allow-${props.item.toolCallId}`} disabled={props.busy} onPress={() => props.onDecide(true)}>
+          {t("web.orchestrator.approval.allow")}
+        </Button>
+        <Button tone="danger" icon="close" testID={`approval-deny-${props.item.toolCallId}`} disabled={props.busy} onPress={() => props.onDecide(false)}>
+          {t("web.orchestrator.approval.deny")}
+        </Button>
+      </View>
+    </View>
   );
 }

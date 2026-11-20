@@ -4,7 +4,7 @@
 // shortcut sheet.
 // The orchestrator's pixel face at the rail's top is the farm's icon while
 // the art is not installed.
-import { effect, host, keymap, Scroll, Text, View, windowSize, type JSX } from "nsh";
+import { colorScheme, effect, host, keymap, Scroll, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -20,7 +20,7 @@ import { Icon } from "../ui/Icon";
 import type { IconName } from "../ui/icons";
 import { usePixelDir } from "../ui/pixel/atlas";
 import { ShortcutSheet } from "../ui/ShortcutSheet";
-import { Hint } from "../ui/Tip";
+import { Bubble, Hint } from "../ui/Tip";
 import { mix } from "../ui/tone";
 import { type Place, places, settingsPlace } from "./places";
 
@@ -28,28 +28,41 @@ const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base
 
 /** Tailwind's `sm` (40rem): narrower, the rail is slimmer and its names go. */
 const small = () => windowSize().width < 640;
+/** Short windows (<760px tall): tighten rail vertical rhythm so all 9 nav items fit without clipping. */
+const compactTall = () => windowSize().height < 760;
 
-/** name: none for the farm's face at the top; a place's name sits under its icon so the rail reads without hovering. */
-function Slot(props: { to: string; place: string; label: string; name?: string; current?: boolean; badge?: number; icon: () => JSX.Element }) {
+/** A place on the rail: 24px icon (or the 38px farm anchor) with its short name underneath so it reads without hovering. */
+function Slot(props: { to: string; place: string; label: string; name?: string; current?: boolean; badge?: number; hero?: boolean; icon: () => JSX.Element }) {
   const current = () => props.current === true;
+  const hero = () => props.hero === true;
+  const badgeText = () => {
+    const n = props.badge ?? 0;
+    return n > 99 ? "99+" : String(n);
+  };
   return (
     <NavLink
       href={props.to}
       testID={`place-${props.place}`}
       accessibilityLabel={props.label}
+      tooltip={<Bubble text={props.label} placement="right" />}
       class={[
-        "items-center justify-center gap-0.5 rounded-lg",
-        props.name === undefined ? (small() ? "h-11 w-11" : "h-12 w-12") : small() ? "h-12 w-12" : "h-12 w-14",
+        "relative items-center justify-center gap-0.5 rounded-lg px-1 transition duration-120 ease-out",
+        hero() ? (small() ? "h-12 w-12" : compactTall() ? "h-15.5 w-14" : "h-16 w-14") : small() ? "h-11 w-11" : compactTall() ? "h-11.5 w-14" : "h-12.5 w-14",
         current() ? "" : "hover:bg-hover",
       ].join(" ")}
-      style={current() ? { backgroundColor: mix("on-rail", 0.09) } : undefined}
+      style={current() ? { backgroundColor: mix("on-rail", colorScheme() === "dark" ? 0.12 : 0.09) } : undefined}
     >
+      <If when={current()}>
+        <View class="absolute top-0 bottom-0 left-0 justify-center">
+          <View class="h-4 w-0.5 rounded-full bg-accent" />
+        </View>
+      </If>
       {props.icon()}
       <If when={!small() && props.name}>
         {(name) => (
           <Text
-            class="w-full truncate text-center font-sans text-xs"
-            style={{ left: -0.5, top: -0.5, color: current() ? mix("on-rail", 1) : mix("on-rail", 0.65) }}
+            class={`w-full truncate text-center font-sans text-xs leading-tight ${current() ? "font-medium" : ""}`}
+            style={{ color: current() ? mix("on-rail", 1) : mix("on-rail", 0.65) }}
           >
             {name()}
           </Text>
@@ -57,8 +70,12 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       </If>
       {/* How many wait on the user there: the place to go next, seen from anywhere. */}
       <If when={props.badge !== undefined && props.badge > 0}>
-        <View testID="rail-badge" class="absolute top-0.5 right-1 h-4 min-w-4 items-center justify-center rounded-full bg-wheat px-1">
-          <Text class="font-sans text-2xs font-semibold text-ink">{String(props.badge)}</Text>
+        <View
+          testID="rail-badge"
+          class={`absolute ${small() ? "top-0.5 right-0.5" : "top-0.5 right-1"} h-4 min-w-4 items-center justify-center rounded-full border border-rail bg-wheat px-1`}
+        >
+          {/* Dark bark ink on wheat keeps >7:1 contrast in both light and dark themes (docs/style/design.md). */}
+          <Text class="font-sans text-2xs leading-none font-semibold text-bark-900 tabular-nums">{badgeText()}</Text>
         </View>
       </If>
     </NavLink>
@@ -82,8 +99,9 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
   const settings = settingsPlace;
   const atSettings = () => props.here === settings;
   const location = useLocation();
-  const width = () => (props.farm ? (small() ? 56 : 72) : small() ? 68 : 76);
-  if (host.params.globalShell === true) {
+  const globalShell = host.params.globalShell === true;
+  const width = () => (globalShell ? (small() ? 68 : 76) : props.farm ? (small() ? 56 : 72) : small() ? 68 : 76);
+  if (globalShell) {
     effect(() => host.post("action", { type: "global_rail", rail_width: width() }));
   }
   return (
@@ -91,44 +109,47 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
       accessibilityLabel={t("web.base.rail")}
       testID="rail"
       class={`${small() ? "w-14" : "w-18"} shrink-0 border-r border-line bg-rail pl-px`}
-      style={host.params.globalShell === true ? { width: width() } : undefined}
+      style={globalShell ? { width: width() } : undefined}
     >
-      <If when={host.params.globalShell === true && !props.farm}>
+      <If when={globalShell}>
         <View class="h-7 shrink-0" />
       </If>
-      <Scroll class="flex-1" contentClass="items-center pb-3">
-        <View class="h-16.5 shrink-0 items-center justify-center">
-          <Slot
-            to="/farm"
-            place="farm-face"
-            label={t("web.base.farm")}
-            current={props.farm}
-            icon={() => (
-              <View class="relative">
+      <View class={`shrink-0 items-center ${globalShell ? "pt-1 pb-2" : compactTall() ? "pt-1.5 pb-2" : "pt-2 pb-2"}`}>
+        <Slot
+          to="/farm"
+          place="farm"
+          label={`${t("web.base.farm")} · ${linkWords[frames.link]}`}
+          name={t("web.base.farmShort")}
+          current={props.farm}
+          hero
+          icon={() => (
+            <View class="relative">
+              <View class="overflow-hidden rounded-md border border-line">
                 <If
                   when={pixelDir()}
                   else={
-                    <View class="h-9.5 w-9.5 items-center justify-center rounded-full bg-page">
+                    <View class="h-9.5 w-9.5 items-center justify-center bg-page">
                       <Icon name="farm" size={20} tone="leaf" />
                     </View>
                   }
                 >
                   <OrchestratorFace size={38} />
                 </If>
-                <If when={!props.farm}>
-                  <View
-                    testID="link"
-                    accessibilityLabel={linkWords[frames.link]}
-                    accessible
-                    class={`absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-rail ${frames.link === "open" ? "bg-leaf" : frames.link === "lost" ? "bg-berry" : "bg-faint"}`}
-                  />
-                </If>
               </View>
-            )}
-          />
-        </View>
+              <View
+                testID="link"
+                accessibilityLabel={linkWords[frames.link]}
+                accessible
+                class={`absolute -right-1 -bottom-1 h-3 w-3 rounded-full border-2 border-rail ${frames.link === "open" ? "bg-leaf" : frames.link === "lost" ? "bg-berry" : "bg-faint"}`}
+              />
+            </View>
+          )}
+        />
+      </View>
+      <View class="self-center h-px w-8 shrink-0" style={{ backgroundColor: mix("on-rail", 0.1) }} />
+      <Scroll class="flex-1" contentClass="items-center py-2">
         <View class="items-center gap-1">
-          <If when={host.params.globalShell === true && !props.farm}>
+          <If when={globalShell}>
             <Slot
               to="/workspace"
               place="workspace"
@@ -162,7 +183,8 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
           </Each>
         </View>
       </Scroll>
-      <View class="items-center gap-1 pt-2 pb-3">
+      <View class="shrink-0 items-center gap-1 pt-2 pb-3">
+        <View class="mb-1 h-px w-8" style={{ backgroundColor: mix("on-rail", 0.1) }} />
         <If when={ready()}>
           {(r) => (
             <Slot
@@ -182,19 +204,6 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
           current={atSettings()}
           icon={railIcon(settings.icon, atSettings)}
         />
-        <Slot
-          to="/farm"
-          place="farm"
-          label={t("web.base.farm")}
-          name={t("web.base.farmShort")}
-          current={props.farm}
-          icon={railIcon("farm", () => props.farm)}
-        />
-        <If when={props.farm}>
-          <View testID="link" accessibilityLabel={linkWords[frames.link]} accessible class="h-4 items-center justify-center">
-            <View class={`h-2 w-2 rounded-full ${frames.link === "open" ? "bg-leaf" : frames.link === "lost" ? "bg-berry" : "bg-faint"}`} />
-          </View>
-        </If>
       </View>
     </View>
   );
@@ -207,10 +216,10 @@ function Desk(props: { place?: Place | undefined }) {
   const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
   const status = () => (live() ? t("web.base.working", { n: working() }) : t("web.base.off"));
   return (
-    <View testID="desk" class="h-16.5 shrink-0 flex-row items-center gap-3 border-b border-line px-5">
+    <View testID="desk" class="h-16.5 shrink-0 flex-row items-center justify-between gap-4 border-b border-line px-5">
       <If when={props.place} else={<View class="flex-1" />}>
         {(place) => (
-          <>
+          <View class="min-w-0 flex-1 flex-row items-center gap-2.5">
             <Icon name={place().icon} size={20} />
             {/* What the place is goes beside its name, on hover: a sentence under every head was read once and then only took room. */}
             <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
@@ -219,17 +228,20 @@ function Desk(props: { place?: Place | undefined }) {
               </Text>
               <Hint text={place().hint} />
             </View>
-          </>
+          </View>
         )}
       </If>
       <A
         href="/farm"
         accessibilityLabel={status()}
         testID="desk-status"
-        class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 hover:bg-hover"
+        tooltip={<Bubble text={t("web.base.farm")} placement="bottom" />}
+        class="h-7 shrink-0 flex-row items-center gap-2 rounded-full border border-line bg-side px-3 transition duration-120 ease-out hover:bg-selected active:translate-y-px"
       >
-        <View class={`h-2 w-2 rounded-full ${live() ? "bg-leaf" : "bg-faint"}`} />
-        <Text class="text-xs text-ink">{status()}</Text>
+        <View class="size-3.5 shrink-0 items-center justify-center rounded-full" style={live() ? { backgroundColor: mix("leaf", 0.2) } : undefined}>
+          <View class={`size-2 rounded-full ${live() ? "bg-leaf" : "bg-idle"}`} />
+        </View>
+        <Text class={`text-xs font-medium ${live() ? "text-ink" : "text-muted"}`}>{status()}</Text>
       </A>
     </View>
   );
@@ -240,8 +252,8 @@ export function Shell(props: { children: JSX.Element }) {
   const meta = () => matches().at(-1)?.meta;
   const here = () => places.find((place) => place.id === meta()?.place);
   const inFarm = () => meta()?.skin === "farm";
-  // Ctrl+K (⌘K on a Mac) anywhere in the workbench, in a text field too.
-  keymap.bind("mod+k", () => switcher.toggle(), { when: "always" });
+  // Ctrl+J (⌘J on a Mac) opens the channel quick switcher without colliding with global ⌘K command palette.
+  keymap.bind("mod+j", () => switcher.toggle(), { when: "always" });
   return (
     <View class="flex-1 flex-row bg-page">
       <QuickSwitcher />

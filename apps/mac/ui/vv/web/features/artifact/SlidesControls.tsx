@@ -26,8 +26,8 @@ export function SlidesControls(props: Controls) {
   const title = (i: number) => props.frame.shown().ready?.titles?.[i] ?? "";
   return (
     <If when={pages() > 0}>
-      <View testID="slides-controls" accessibilityValue={{ now: at(), max: pages() }} class="shrink-0 gap-2 border-t border-line px-3 py-2">
-        <View class="flex-row items-center gap-1">
+      <View testID="slides-controls" accessibilityValue={{ now: at(), max: pages() }} class="shrink-0 gap-2 border-t border-line bg-page px-3 py-2">
+        <View class="h-7 flex-row items-center gap-1.5">
           <IconButton
             icon="previous"
             label={t("web.artifact.slides.previous")}
@@ -36,7 +36,7 @@ export function SlidesControls(props: Controls) {
             onClick={() => goto(stepped({ at: at(), step: -1, pages: pages() }))}
           />
           <View class="min-w-14 items-center">
-            <Text testID="slides-at" class="text-xs text-muted tabular-nums">
+            <Text testID="slides-at" class="text-xs font-medium text-muted tabular-nums">
               {t("web.artifact.slides.at", { at: at() + 1, pages: pages() })}
             </Text>
           </View>
@@ -47,7 +47,8 @@ export function SlidesControls(props: Controls) {
             disabled={at() >= pages() - 1}
             onClick={() => goto(stepped({ at: at(), step: 1, pages: pages() }))}
           />
-          <Text class="min-w-0 flex-1 truncate text-xs text-faint">{title(at())}</Text>
+          <Text class="min-w-0 flex-1 truncate px-1 text-xs text-muted">{title(at())}</Text>
+          <View class="mx-0.5 h-4 w-px bg-line" />
           <IconButton icon="present" label={t("web.artifact.slides.present")} testid="slides-present" onClick={() => props.onPresent(true)} />
           <IconButton
             icon="presenter"
@@ -59,22 +60,27 @@ export function SlidesControls(props: Controls) {
         <If when={pages() > 1}>
           <Scroll horizontal accessibilityLabel={t("web.artifact.slides.thumbnails")} testID="slides-strip" contentClass="flex-row gap-2 pb-1">
             <Each of={slideNumbers()}>
-              {(i) => (
-                <View
-                  role="button"
-                  testID="slides-thumb"
-                  accessibilityLabel={t("web.artifact.slides.slide", { at: i() + 1, title: title(i()) })}
-                  accessibilityState={{ selected: i() === at() }}
-                  onPress={() => goto(i())}
-                  class={`h-18 w-32 shrink-0 overflow-hidden rounded-md border bg-side ${i() === at() ? "border-accent" : "border-line hover:border-faint"}`}
-                  style={i() === at() ? { borderWidth: 2 } : undefined}
-                >
-                  <Slide id={props.artifact.id} version={props.version} at={i()} onPress={() => goto(i())} />
-                  <View class="absolute top-1 right-1 rounded-sm bg-page px-1">
-                    <Text class="text-xs text-muted">{String(i() + 1)}</Text>
+              {(i) => {
+                const selected = () => i() === at();
+                return (
+                  <View
+                    role="button"
+                    testID="slides-thumb"
+                    accessibilityLabel={t("web.artifact.slides.slide", { at: i() + 1, title: title(i()) })}
+                    accessibilityState={{ selected: selected() }}
+                    onPress={() => goto(i())}
+                    class={`h-18 w-32 shrink-0 overflow-hidden rounded-md border bg-side transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                      selected() ? "border-accent shadow-raise" : "border-line hover:border-faint"
+                    }`}
+                    style={selected() ? { borderWidth: 2 } : undefined}
+                  >
+                    <Slide id={props.artifact.id} version={props.version} at={i()} onPress={() => goto(i())} />
+                    <View class={`absolute top-1 right-1 rounded-xs px-1.5 py-px ${selected() ? "bg-accent" : "border border-line bg-page"}`}>
+                      <Text class={`font-mono text-2xs font-medium tabular-nums ${selected() ? "text-page" : "text-muted"}`}>{String(i() + 1)}</Text>
+                    </View>
                   </View>
-                </View>
-              )}
+                );
+              }}
             </Each>
           </Scroll>
         </If>

@@ -2,7 +2,7 @@
 // SVG marks are drawn on nsh Canvas (no SVG in nsh) with the same
 // geometry; colors are the theme tokens the CSS variables named. Faces are
 // ui/domain/Face's (an initial until the pixel sprites are drawn here).
-import { Canvas, Path2D, Text, View } from "nsh";
+import { Canvas, colorScheme, Path2D, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { IssueStatus, Priority } from "@vibevalley/protocol";
@@ -28,23 +28,26 @@ export function StatusMark(props: { status: IssueStatus; size?: number; tone?: T
       accessibilityLabel={props.label ?? t(`shared.status.${props.status}`)}
       style={{ width: size(), height: size(), flexShrink: 0 }}
       draw={(cx) => {
+        void colorScheme();
         const s = size();
+        const status = props.status;
+        const col = color();
+        const pg = page();
         const c = s / 2;
         const r = s / 2 - 1;
         const u = r / 2.2;
-        const col = color();
         cx.lineWidth = 1.5;
         cx.lineCap = "round";
         cx.lineJoin = "round";
-        if (props.status === "backlog" || props.status === "todo" || props.status === "in_progress" || props.status === "in_review") {
+        if (status === "backlog" || status === "todo" || status === "in_progress" || status === "in_review") {
           cx.strokeStyle = col;
-          if (props.status === "backlog") cx.setLineDash([(Math.PI * r) / 4, (Math.PI * r) / 4]);
+          if (status === "backlog") cx.setLineDash([(Math.PI * r) / 4, (Math.PI * r) / 4]);
           cx.beginPath();
           cx.arc(c, c, r, 0, Math.PI * 2);
           cx.stroke();
           cx.setLineDash([]);
-          if (props.status === "in_progress" || props.status === "in_review") {
-            const part = props.status === "in_progress" ? 0.5 : 0.75;
+          if (status === "in_progress" || status === "in_review") {
+            const part = status === "in_progress" ? 0.5 : 0.75;
             const pr = r - 2.5;
             const a = -Math.PI / 2 + 2 * Math.PI * part;
             cx.fillStyle = col;
@@ -56,10 +59,10 @@ export function StatusMark(props: { status: IssueStatus; size?: number; tone?: T
         cx.beginPath();
         cx.arc(c, c, r + 0.75, 0, Math.PI * 2);
         cx.fill();
-        cx.strokeStyle = page();
+        cx.strokeStyle = pg;
         cx.stroke(
           new Path2D(
-            props.status === "done"
+            status === "done"
               ? `M${c - u},${c} L${c - u * 0.25},${c + u * 0.75} L${c + u},${c - u * 0.6}`
               : `M${c - u * 0.7},${c - u * 0.7} L${c + u * 0.7},${c + u * 0.7} M${c + u * 0.7},${c - u * 0.7} L${c - u * 0.7},${c + u * 0.7}`,
           ),
@@ -79,13 +82,19 @@ export function PriorityMark(props: { priority: Priority; size?: number }) {
       accessible
       role="image"
       accessibilityLabel={label()}
-      tooltip={<Text>{label()}</Text>}
+      tooltip={<Bubble text={label()} />}
       style={{ width: s(), height: s(), flexShrink: 0 }}
       draw={(cx) => {
+        void colorScheme();
         const size = s();
+        const priority = props.priority;
+        const bars = lit();
         const page = tone("page");
-        if (props.priority === "urgent") {
-          cx.fillStyle = tone("berry");
+        const berry = tone("berry");
+        const muted = tone("muted");
+        const line = tone("line");
+        if (priority === "urgent") {
+          cx.fillStyle = berry;
           cx.beginPath();
           cx.roundRect(1, 1, size - 2, size - 2, 3);
           cx.fill();
@@ -101,7 +110,7 @@ export function PriorityMark(props: { priority: Priority; size?: number }) {
         const w = size / 5;
         for (const i of [0, 1, 2]) {
           const h = size * (0.35 + 0.25 * i);
-          cx.fillStyle = i < lit() ? tone("muted") : tone("line");
+          cx.fillStyle = i < bars ? muted : line;
           cx.beginPath();
           cx.roundRect(1 + i * (w + w / 2), size - 1.5 - h, w, h, 1);
           cx.fill();
@@ -117,21 +126,25 @@ export function ProgressMark(props: { done: number; total: number }) {
   return (
     <View class="flex-row items-center gap-1">
       <Canvas
-        style={{ width: 13, height: 13 }}
+        style={{ width: 13, height: 13, flexShrink: 0 }}
         draw={(cx) => {
+          void colorScheme();
+          const frac = part();
+          const line = tone("line");
+          const leaf = tone("leaf");
           cx.lineWidth = 2;
-          cx.strokeStyle = tone("line");
+          cx.strokeStyle = line;
           cx.beginPath();
           cx.arc(6.5, 6.5, 5.5, 0, Math.PI * 2);
           cx.stroke();
-          if (part() <= 0) return;
-          cx.strokeStyle = tone("leaf");
+          if (frac <= 0) return;
+          cx.strokeStyle = leaf;
           cx.beginPath();
-          cx.arc(6.5, 6.5, 5.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * part());
+          cx.arc(6.5, 6.5, 5.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
           cx.stroke();
         }}
       />
-      <Text class="text-2xs text-muted">{`${props.done}/${props.total}`}</Text>
+      <Text class="text-2xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>{`${props.done}/${props.total}`}</Text>
     </View>
   );
 }
@@ -146,10 +159,11 @@ export function NoFaceMark(props: { size?: number }) {
       accessibilityLabel={t("web.issue.noHelper")}
       style={{ width: s(), height: s(), flexShrink: 0 }}
       draw={(cx) => {
+        void colorScheme();
         const size = s();
+        const faint = tone("faint");
         const c = size / 2;
         const r = size / 2 - 1;
-        const faint = tone("faint");
         cx.strokeStyle = faint;
         cx.lineWidth = 1.2;
         cx.setLineDash([(Math.PI * r) / 4, (Math.PI * r) / 4]);
@@ -167,11 +181,21 @@ export function NoFaceMark(props: { size?: number }) {
   );
 }
 
+const flagStyles: Record<Tone, { bg: () => string; text: string }> = {
+  leaf: { bg: () => tone("ok-soft"), text: "text-ok-ink" },
+  berry: { bg: () => tone("bad-soft"), text: "text-berry" },
+  wheat: { bg: () => mix("wheat", 0.22), text: "text-warn-ink" },
+  water: { bg: () => mix("water", 0.16), text: "text-water" },
+  muted: { bg: () => mix("muted", 0.14), text: "text-muted" },
+  faint: { bg: () => mix("faint", 0.14), text: "text-muted" },
+};
+
 /** A small flag on a card or row: only the things the user should notice. */
 export function FlagChip(props: { text: string; tone: Tone }) {
+  const look = () => flagStyles[props.tone];
   return (
-    <View class="rounded-sm px-1.5" style={{ backgroundColor: mix(props.tone, 0.18) }}>
-      <Text class="text-2xs font-medium text-ink" style={{ lineHeight: 16, numberOfLines: 1 }}>
+    <View class="rounded-sm px-1.5" style={{ backgroundColor: look().bg() }}>
+      <Text class={`text-2xs font-medium ${look().text}`} style={{ lineHeight: 16, numberOfLines: 1 }}>
         {props.text}
       </Text>
     </View>

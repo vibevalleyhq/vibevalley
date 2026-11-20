@@ -17,7 +17,7 @@ export function Readiness(props: { features: readonly Feature[] }) {
   return (
     <If when={readiness()}>
       {(all) => (
-        <View class="gap-1" testID="readiness">
+        <View class="gap-1.5 rounded-lg bg-side px-3.5 py-2.5" testID="readiness">
           <Each of={props.features}>
             {(feature) => {
               const state = () => all()[feature()];
@@ -39,7 +39,7 @@ export function Readiness(props: { features: readonly Feature[] }) {
                   >
                     {(missing) => (
                       <>
-                        <Icon name="warn" size={14} tone="berry" />
+                        <Icon name="warn" size={14} />
                         <Text class="text-sm text-ink">{t("web.setting.readiness.lacks", { feature: name(), why: fixOf(missing()).words })}</Text>
                         <TextLink href={fixOf(missing()).href}>{t("web.setting.readiness.fix")}</TextLink>
                       </>

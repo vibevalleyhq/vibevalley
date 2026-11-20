@@ -312,7 +312,7 @@
         "number": 104,
         "title": "Issue 104",
         "repo": "vibevalley",
-        "status": "in_progress",
+        "status": "in_review",
         "priority": "medium",
         "description": "",
         "mandate": {
@@ -343,13 +343,33 @@
         ],
         "deliver": "change",
         "findings": [],
-        "questions": [],
+        "questions": [
+          {
+            "question": "Which branch should receive the change?",
+            "options": [
+              "main",
+              "release"
+            ]
+          }
+        ],
         "criteria": [],
         "checks": [],
         "stage": {
-          "state": "working",
+          "state": "asking",
           "since": 1794499760000,
-          "acts": []
+          "lead": "answer",
+          "acts": [
+            {
+              "does": "say",
+              "act": "answer"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
         }
       },
       {

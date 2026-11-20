@@ -7,11 +7,12 @@
 // affectUI is MIT licensed: Copyright (c) affectUI contributors. Permission
 // is hereby granted, free of charge, to any person obtaining a copy of this
 // software, to deal in it without restriction, provided this notice is kept.
-import { announce, cleanup, Clipboard, createMotion, effect, reduceMotion, Scroll, signal, Text, untracked, View } from "nsh";
-import type { JSX } from "nsh";
+import { announce, Canvas, cleanup, Clipboard, colorScheme, createMotion, effect, reduceMotion, Scroll, signal, Text, untracked, View } from "nsh";
+import type { CanvasRenderingContext2D, JSX } from "nsh";
 import { Button } from "nsh/base";
 
 import { animateLayout, durations, ease, ms } from "../motion";
+import { SurfaceIcon, TipBubble } from "../surfaces/shared";
 import { cardShadow, dangerTint, radius, tok, type as ty, type Palette } from "../tokens";
 import type { AgentEvent } from "./shapes";
 
@@ -150,9 +151,111 @@ export function useSwapIn(key: () => unknown) {
   return m;
 }
 
+function drawToolIcon(cx: CanvasRenderingContext2D, glyph: string, size: number, color: string) {
+  cx.scale(size / 16, size / 16);
+  cx.strokeStyle = color;
+  cx.fillStyle = color;
+  cx.lineCap = "round";
+  cx.lineJoin = "round";
+  cx.lineWidth = 1.45 * (16 / size);
+
+  switch (glyph) {
+    case "$":
+      // Terminal prompt >_
+      cx.beginPath();
+      cx.moveTo(3.25, 4.75);
+      cx.lineTo(6.75, 8);
+      cx.lineTo(3.25, 11.25);
+      cx.moveTo(8.5, 11.25);
+      cx.lineTo(12.75, 11.25);
+      cx.stroke();
+      break;
+    case "◱":
+      // Document / read
+      cx.beginPath();
+      cx.moveTo(4.5, 2.5);
+      cx.lineTo(9.25, 2.5);
+      cx.lineTo(12.25, 5.5);
+      cx.lineTo(12.25, 12.5);
+      cx.quadraticCurveTo(12.25, 13.5, 11.25, 13.5);
+      cx.lineTo(4.5, 13.5);
+      cx.quadraticCurveTo(3.5, 13.5, 3.5, 12.5);
+      cx.lineTo(3.5, 3.5);
+      cx.quadraticCurveTo(3.5, 2.5, 4.5, 2.5);
+      cx.closePath();
+      cx.moveTo(9.25, 2.5);
+      cx.lineTo(9.25, 5.5);
+      cx.lineTo(12.25, 5.5);
+      cx.stroke();
+      break;
+    case "✎":
+      // Pencil / edit
+      cx.beginPath();
+      cx.moveTo(10.75, 2.75);
+      cx.lineTo(13.25, 5.25);
+      cx.lineTo(6, 12.5);
+      cx.lineTo(2.75, 13.25);
+      cx.lineTo(3.5, 10);
+      cx.closePath();
+      cx.stroke();
+      break;
+    case "⌕":
+      // Magnifier / search
+      cx.beginPath();
+      cx.arc(7, 7, 3.75, 0, Math.PI * 2);
+      cx.moveTo(9.8, 9.8);
+      cx.lineTo(13, 13);
+      cx.stroke();
+      break;
+    case "◎":
+      // Globe / web fetch
+      cx.beginPath();
+      cx.arc(8, 8, 5, 0, Math.PI * 2);
+      cx.moveTo(3, 8);
+      cx.lineTo(13, 8);
+      cx.moveTo(8, 3);
+      cx.quadraticCurveTo(10.6, 8, 8, 13);
+      cx.moveTo(8, 3);
+      cx.quadraticCurveTo(5.4, 8, 8, 13);
+      cx.stroke();
+      break;
+    case "⧉":
+      // Linked squares / MCP
+      cx.beginPath();
+      cx.moveTo(3, 5);
+      cx.lineTo(9, 5);
+      cx.lineTo(9, 11);
+      cx.lineTo(3, 11);
+      cx.closePath();
+      cx.moveTo(7, 5);
+      cx.lineTo(7, 3);
+      cx.lineTo(13, 3);
+      cx.lineTo(13, 9);
+      cx.lineTo(9, 9);
+      cx.stroke();
+      break;
+    default:
+      // Sliders / generic tool
+      cx.beginPath();
+      cx.moveTo(3, 5);
+      cx.lineTo(13, 5);
+      cx.moveTo(3, 11);
+      cx.lineTo(13, 11);
+      cx.stroke();
+      cx.beginPath();
+      cx.arc(6, 5, 1.5, 0, Math.PI * 2);
+      cx.fill();
+      cx.beginPath();
+      cx.arc(10.5, 11, 1.5, 0, Math.PI * 2);
+      cx.fill();
+      break;
+  }
+}
+
 export function IconTile(props: { glyph: string; size?: number }) {
   const p = () => tok();
-  const size = () => props.size ?? 26;
+  const size = () => props.size ?? 22;
+  const iconSize = () => Math.max(11, Math.round(size() * 0.56));
   return (
     <View
       accessibilityElementsHidden
@@ -160,7 +263,7 @@ export function IconTile(props: { glyph: string; size?: number }) {
         width: size(),
         height: size(),
         flexShrink: 0,
-        borderRadius: radius.sm,
+        borderRadius: 6,
         backgroundColor: p().tile,
         borderWidth: 1,
         borderColor: p().border,
@@ -168,49 +271,103 @@ export function IconTile(props: { glyph: string; size?: number }) {
         justifyContent: "center",
       }}
     >
-      <Text style={{ fontSize: 12, lineHeight: 14, color: p().text, fontFamily: ty.mono.fontFamily }}>{props.glyph}</Text>
+      <Canvas
+        style={{ width: iconSize(), height: iconSize(), flexShrink: 0 }}
+        draw={(cx) => {
+          void colorScheme();
+          drawToolIcon(cx, props.glyph, iconSize(), tok().text);
+        }}
+      />
     </View>
   );
 }
 
-function Spinner(props: { color?: string }) {
+export function Spinner(props: { color?: string; size?: number }) {
   const p = () => tok();
+  const size = () => props.size ?? 12;
   return (
     <View
       accessibilityElementsHidden
       style={{
-        width: 12,
-        height: 12,
-        borderRadius: 6,
+        width: size(),
+        height: size(),
+        borderRadius: size() / 2,
         borderWidth: 1.5,
-        borderColor: p().border,
-        borderTopColor: props.color ?? p().muted,
+        borderColor: p().subtle,
+        borderTopColor: props.color ?? p().ink,
         animationName: reduceMotion() ? "none" : "spin",
         animationDuration: durations.spinner,
         animationTimingFunction: "linear",
+        flexShrink: 0,
       }}
     />
   );
 }
 
-function ErrorMark() {
-  const p = () => tok();
+export function ErrorMark(props: { size?: number }) {
+  const size = () => props.size ?? 13;
   return (
-    <View
+    <Canvas
       accessibilityElementsHidden
-      style={{
-        width: 13,
-        height: 13,
-        borderRadius: 7,
-        borderWidth: 1.4,
-        borderColor: p().danger,
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
+      style={{ width: size(), height: size(), flexShrink: 0 }}
+      draw={(cx) => {
+        void colorScheme();
+        const color = tok().danger;
+        const s = size();
+        cx.scale(s / 16, s / 16);
+        cx.strokeStyle = color;
+        cx.fillStyle = color;
+        cx.lineCap = "round";
+        cx.lineJoin = "round";
+        cx.lineWidth = 1.5 * (16 / s);
+        cx.beginPath();
+        cx.arc(8, 8, 5.75, 0, Math.PI * 2);
+        cx.moveTo(8, 4.75);
+        cx.lineTo(8, 8.75);
+        cx.stroke();
+        cx.beginPath();
+        cx.arc(8, 11.4, 0.9, 0, Math.PI * 2);
+        cx.fill();
       }}
-    >
-      <Text style={{ fontSize: 9, lineHeight: 10, fontWeight: "700", color: p().danger }}>!</Text>
-    </View>
+    />
+  );
+}
+
+function CopyIcon(props: { size?: number; color?: string }) {
+  const size = () => props.size ?? 12;
+  return (
+    <Canvas
+      accessibilityElementsHidden
+      style={{ width: size(), height: size(), flexShrink: 0 }}
+      draw={(cx) => {
+        void colorScheme();
+        const color = props.color ?? tok().muted;
+        const s = size();
+        cx.scale(s / 16, s / 16);
+        cx.strokeStyle = color;
+        cx.lineCap = "round";
+        cx.lineJoin = "round";
+        cx.lineWidth = 1.45 * (16 / s);
+        cx.beginPath();
+        cx.moveTo(6.25, 5.25);
+        cx.lineTo(12.25, 5.25);
+        cx.quadraticCurveTo(13.25, 5.25, 13.25, 6.25);
+        cx.lineTo(13.25, 12.25);
+        cx.quadraticCurveTo(13.25, 13.25, 12.25, 13.25);
+        cx.lineTo(6.25, 13.25);
+        cx.quadraticCurveTo(5.25, 13.25, 5.25, 12.25);
+        cx.lineTo(5.25, 6.25);
+        cx.quadraticCurveTo(5.25, 5.25, 6.25, 5.25);
+        cx.closePath();
+        cx.moveTo(3.75, 10.25);
+        cx.quadraticCurveTo(2.75, 10.25, 2.75, 9.25);
+        cx.lineTo(2.75, 3.75);
+        cx.quadraticCurveTo(2.75, 2.75, 3.75, 2.75);
+        cx.lineTo(9.25, 2.75);
+        cx.quadraticCurveTo(10.25, 2.75, 10.25, 3.75);
+        cx.stroke();
+      }}
+    />
   );
 }
 
@@ -225,13 +382,17 @@ function CallStatus(props: { status: ToolCallStatus; startedMs: number; endedMs:
   const swap = useSwapIn(() => props.status);
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0, ...swap.style }}>
-      {props.status === "running" ? <Spinner /> : null}
-      {props.status === "done" ? <Text style={{ fontSize: 12, lineHeight: 14, color: p().ok }}>✓</Text> : null}
-      {props.status === "failed" ? <ErrorMark /> : null}
+      <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {props.status === "running" ? <Spinner /> : null}
+        {props.status === "done" ? <SurfaceIcon name="check" size={12} color={p().ok} strokeWidth={1.7} /> : null}
+        {props.status === "failed" ? <ErrorMark /> : null}
+      </View>
       <Text
         style={{
-          ...ty.mono,
-          fontSize: 12,
+          fontFamily: ty.mono.fontFamily,
+          fontSize: 11.5,
+          lineHeight: 16,
+          fontWeight: props.status === "failed" ? "500" : "400",
           color: props.status === "failed" ? p().danger : p().muted,
           fontVariant: ["tabular-nums"],
         }}
@@ -242,25 +403,24 @@ function CallStatus(props: { status: ToolCallStatus; startedMs: number; endedMs:
   );
 }
 
-export function Chevron(props: { open: boolean }) {
+export function Chevron(props: { open: boolean; size?: number; color?: string }) {
   return (
-    <Text
+    <View
       accessibilityElementsHidden
       style={{
-        width: 16,
-        textAlign: "center",
-        fontSize: 12,
-        lineHeight: 16,
-        color: tok().muted,
+        width: 14,
+        height: 14,
+        alignItems: "center",
+        justifyContent: "center",
         flexShrink: 0,
-        transform: [{ rotate: props.open ? "180deg" : "0deg" }],
+        transform: [{ rotate: props.open ? "90deg" : "0deg" }],
         transitionProperty: "transform",
         transitionDuration: ms(durations.chevron),
         transitionTimingFunction: ease,
       }}
     >
-      ⌄
-    </Text>
+      <SurfaceIcon name="chevron-right" size={props.size ?? 11} color={props.color ?? tok().muted} />
+    </View>
   );
 }
 
@@ -309,6 +469,7 @@ function highlight(text: string, p: Palette): JSX.Element[] {
 function CopyButton(props: { text: string; label: string }) {
   const p = () => tok();
   const copied = signal(false);
+  const hovered = signal(false);
   let timer: number | undefined;
   cleanup(() => clearTimeout(timer));
   const copy = () => {
@@ -321,23 +482,24 @@ function CopyButton(props: { text: string; label: string }) {
   return (
     <Button
       onPress={copy}
+      onMouseEnter={() => hovered.set(true)}
+      onMouseLeave={() => hovered.set(false)}
       accessibilityLabel={copied() ? "Copied" : `Copy ${props.label}`}
-      tooltip={<Text>{copied() ? "Copied" : `Copy ${props.label}`}</Text>}
-      style={{ width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center" }}
+      tooltip={<TipBubble text={copied() ? "Copied" : `Copy ${props.label}`} />}
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: 5,
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        transitionProperty: "colors",
+        transitionDuration: ms(durations.press),
+      }}
       hoverStyle={{ backgroundColor: p().subtle }}
       focusVisibleStyle={{ outlineWidth: 2, outlineColor: p().focus, outlineOffset: 2, outlineStyle: "solid" }}
     >
-      <Text
-        style={{
-          fontSize: 12,
-          lineHeight: 14,
-          color: copied() ? p().ok : p().muted,
-          transitionProperty: "colors",
-          transitionDuration: ms(durations.press),
-        }}
-      >
-        {copied() ? "✓" : "⧉"}
-      </Text>
+      {copied() ? <SurfaceIcon name="check" size={12} color={p().ok} strokeWidth={1.7} /> : <CopyIcon size={12} color={hovered() ? p().ink : p().muted} />}
     </Button>
   );
 }
@@ -350,22 +512,50 @@ function CodeSection(props: { label: string; value: unknown; tone?: "danger"; te
   const height = signal(0);
   const capped = () => height() > CAP + 24;
   const maxHeight = () => (capped() ? (full() ? Math.min(height(), OPEN_MAX) : CAP) : undefined);
+  const danger = () => props.tone === "danger";
+  const ring = () => (danger() ? dangerTint(p()).ring : p().border);
+  const headBg = () => (danger() ? dangerTint(p()).fill : p().tile);
   return (
-    <View style={{ gap: 6 }} testID={props.testID}>
-      <View style={{ flexDirection: "row", alignItems: "center", height: 24 }}>
-        <Text style={{ ...ty.label, color: p().muted, flex: 1 }}>{props.label}</Text>
+    <View
+      testID={props.testID}
+      style={{
+        borderRadius: radius.sm,
+        backgroundColor: p().canvas,
+        borderWidth: 1,
+        borderColor: ring(),
+        overflow: "hidden",
+      }}
+    >
+      <View
+        style={{
+          height: 28,
+          paddingLeft: 10,
+          paddingRight: 5,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          backgroundColor: headBg(),
+          borderBottomWidth: 1,
+          borderBottomColor: ring(),
+        }}
+      >
+        <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "600", letterSpacing: 0.25, color: danger() ? p().danger : p().muted }}>{props.label}</Text>
+        {shown().json ? <Text style={{ fontFamily: ty.mono.fontFamily, fontSize: 10, lineHeight: 14, color: p().faint }}>JSON</Text> : null}
+        <View style={{ flex: 1 }} />
         <CopyButton text={shown().text} label={props.label.toLowerCase()} />
       </View>
-      <View style={{ backgroundColor: p().tile, borderRadius: radius.sm, overflow: "hidden" }}>
+      <View style={{ position: "relative", overflow: "hidden" }}>
         <Scroll style={{ maxHeight: maxHeight() }} scrollable={capped() && full() && height() > OPEN_MAX}>
           <Text
             onLayout={(e) => height.set(e.bounds.size.height)}
             style={{
               ...ty.code,
+              fontSize: 11.5,
+              lineHeight: 18,
               userSelect: "text",
-              color: props.tone === "danger" ? p().danger : p().ink,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
+              color: danger() ? p().danger : p().ink,
+              paddingHorizontal: 10,
+              paddingVertical: 8,
               writingDirection: "auto",
             }}
           >
@@ -381,8 +571,8 @@ function CodeSection(props: { label: string; value: unknown; tone?: "danger"; te
               left: 0,
               right: 0,
               bottom: 0,
-              height: 48,
-              backgroundImage: `linear-gradient(to bottom, ${alpha(p().tile, 0)}, ${p().tile})`,
+              height: 44,
+              backgroundImage: `linear-gradient(to bottom, ${alpha(p().canvas, 0)}, ${p().canvas})`,
             }}
           />
         ) : null}
@@ -395,11 +585,23 @@ function CodeSection(props: { label: string; value: unknown; tone?: "danger"; te
           }}
           role="button"
           accessibilityState={{ expanded: full() }}
-          style={{ alignSelf: "flex-start", height: 24, paddingHorizontal: 8, marginLeft: -8, borderRadius: 6, justifyContent: "center" }}
+          style={{
+            height: 28,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 5,
+            borderTopWidth: 1,
+            borderTopColor: ring(),
+            backgroundColor: p().tile,
+            transitionProperty: "colors",
+            transitionDuration: ms(durations.press),
+          }}
           hoverStyle={{ backgroundColor: p().subtle }}
-          focusVisibleStyle={{ outlineWidth: 2, outlineColor: p().focus, outlineOffset: 2, outlineStyle: "solid" }}
+          focusVisibleStyle={{ outlineWidth: 2, outlineColor: p().focus, outlineOffset: -2, outlineStyle: "solid" }}
         >
-          <Text style={{ ...ty.label, fontWeight: "500", color: p().ink }}>{full() ? "Show less" : "Show all"}</Text>
+          <Chevron open={full()} size={10} color={p().muted} />
+          <Text style={{ fontSize: 11.5, lineHeight: 14, fontWeight: "500", color: p().ink }}>{full() ? "Show less" : "Show all"}</Text>
         </View>
       ) : null}
     </View>
@@ -418,6 +620,7 @@ function alpha(color: string, a: number): string {
 export function ToolCallCard(props: ToolCallCardProps) {
   const p = () => tok();
   const open = signal(props.defaultOpen ?? props.call.status === "failed");
+  const hovered = signal(false);
   let autoOpened = open() && props.call.status === "failed";
   // Opens on failure, closes on the next run, unless someone toggled it.
   let prev = props.call.status;
@@ -450,6 +653,7 @@ export function ToolCallCard(props: ToolCallCardProps) {
   effect(() => {
     if (open()) void body.play({ duration: ms(durations.expandOpacity), keyframes: { opacity: [0, 1] } });
   });
+  const showSummary = () => props.call.summary.trim() !== "" && props.call.summary !== props.call.name;
   return (
     <View
       testID={`tool-call-${props.call.id}`}
@@ -462,32 +666,53 @@ export function ToolCallCard(props: ToolCallCardProps) {
     >
       <View
         onPress={toggle}
+        onMouseEnter={() => hovered.set(true)}
+        onMouseLeave={() => hovered.set(false)}
         role="button"
         accessibilityLabel={`${props.call.name}: ${props.call.summary}`}
         accessibilityState={{ expanded: open() }}
         style={{
-          minHeight: 44,
+          minHeight: props.nested ? 36 : 42,
           flexDirection: "row",
           alignItems: "center",
-          gap: 10,
-          paddingLeft: 10,
+          gap: 8,
+          paddingLeft: props.nested ? 28 : 10,
           paddingRight: 12,
-          transitionProperty: "colors,transform",
+          transitionProperty: "colors",
           transitionDuration: ms(durations.press),
           transitionTimingFunction: "ease",
         }}
         hoverStyle={{ backgroundColor: p().subtle }}
-        activeStyle={{ transform: [{ scale: 0.98 }] }}
+        activeStyle={{ opacity: 0.9 }}
         focusVisibleStyle={{ outlineWidth: 2, outlineColor: p().focus, outlineOffset: -2, outlineStyle: "solid" }}
       >
-        <IconTile glyph={toolGlyph(props.call.name)} />
-        <Text style={{ ...ty.mono, color: p().ink, numberOfLines: 1, flexShrink: 0, maxWidth: 180 }}>{props.call.name}</Text>
-        <Text style={{ ...ty.body, color: p().text, flex: 1, minWidth: 0, numberOfLines: 1, writingDirection: "auto" }}>{props.call.summary}</Text>
+        <Chevron open={open()} color={hovered() ? p().ink : p().muted} />
+        <IconTile glyph={toolGlyph(props.call.name)} size={22} />
+        <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text
+            style={{
+              fontFamily: ty.mono.fontFamily,
+              fontSize: 12,
+              lineHeight: 16,
+              fontWeight: "600",
+              color: p().ink,
+              numberOfLines: 1,
+              flexShrink: 0,
+              maxWidth: 160,
+            }}
+          >
+            {props.call.name}
+          </Text>
+          {showSummary() ? (
+            <Text style={{ fontSize: 12.5, lineHeight: 16, color: p().muted, flex: 1, minWidth: 0, numberOfLines: 1, writingDirection: "auto" }}>
+              {props.call.summary}
+            </Text>
+          ) : null}
+        </View>
         <CallStatus status={props.call.status} startedMs={props.call.startedMs} endedMs={props.call.endedMs} />
-        <Chevron open={open()} />
       </View>
       {open() ? (
-        <View style={{ paddingHorizontal: 12, paddingBottom: 12, paddingTop: 2, gap: 12, ...body.style }}>
+        <View style={{ paddingLeft: props.nested ? 50 : 32, paddingRight: 12, paddingBottom: 12, paddingTop: 4, gap: 10, ...body.style }}>
           {props.call.status === "failed" ? (
             <View
               role="alert"
@@ -502,32 +727,35 @@ export function ToolCallCard(props: ToolCallCardProps) {
                 padding: 10,
               }}
             >
-              <View style={{ paddingTop: 3 }}>
+              <View style={{ paddingTop: 2 }}>
                 <ErrorMark />
               </View>
-              <Text style={{ ...ty.body, fontSize: 13, color: p().danger, flex: 1, numberOfLines: 4, writingDirection: "auto" }}>
+              <Text style={{ fontSize: 12.5, lineHeight: 18, color: p().danger, flex: 1, numberOfLines: 4, writingDirection: "auto" }}>
                 {props.call.error ?? "The tool call failed."}
               </Text>
               {props.onRetry ? (
                 <Button
                   onPress={() => props.onRetry?.()}
+                  accessibilityLabel="Retry tool call"
+                  tooltip={<TipBubble text="Retry tool call" />}
                   style={{
-                    height: 30,
-                    paddingHorizontal: 12,
-                    borderRadius: radius.button,
+                    height: 28,
+                    paddingHorizontal: 10,
+                    borderRadius: radius.sm,
                     backgroundColor: p().surface,
-                    boxShadow: [{ x: 0, y: 0, blur: 0, spread: 1, color: p().border, inset: false }],
+                    borderWidth: 1,
+                    borderColor: p().border,
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 6,
+                    gap: 5,
                     flexShrink: 0,
                   }}
                   hoverStyle={{ backgroundColor: p().subtle }}
-                  activeStyle={{ transform: [{ scale: 0.98 }] }}
+                  activeStyle={{ opacity: 0.88 }}
                   focusVisibleStyle={{ outlineWidth: 2, outlineColor: p().focus, outlineOffset: 2, outlineStyle: "solid" }}
                 >
-                  <Text style={{ fontSize: 12, color: p().ink }}>↻</Text>
-                  <Text style={{ ...ty.label, fontWeight: "500", color: p().ink }}>Retry</Text>
+                  <SurfaceIcon name="refresh" size={12} color={p().ink} />
+                  <Text style={{ fontSize: 11.5, lineHeight: 14, fontWeight: "500", color: p().ink }}>Retry</Text>
                 </Button>
               ) : null}
             </View>
@@ -536,13 +764,25 @@ export function ToolCallCard(props: ToolCallCardProps) {
           {props.call.output != null && props.call.output !== "" ? (
             <CodeSection label="Result" value={props.call.output} tone={props.call.status === "failed" ? "danger" : undefined} testID="result" />
           ) : props.call.status === "running" ? (
-            <View style={{ gap: 6 }}>
-              <Text style={{ ...ty.label, color: p().muted }}>Result</Text>
-              <Text style={{ ...ty.body, fontSize: 13, color: p().muted }}>Waiting for result…</Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+                borderRadius: radius.sm,
+                backgroundColor: p().canvas,
+                borderWidth: 1,
+                borderColor: p().border,
+              }}
+            >
+              <Spinner size={11} color={p().muted} />
+              <Text style={{ fontSize: 12, lineHeight: 16, color: p().muted }}>Waiting for result…</Text>
             </View>
           ) : null}
           {props.call.input == null && !props.call.output && props.call.status === "done" ? (
-            <Text style={{ ...ty.body, fontSize: 13, color: p().muted }}>No arguments or result.</Text>
+            <Text style={{ fontSize: 12, lineHeight: 16, color: p().muted }}>No arguments or result.</Text>
           ) : null}
         </View>
       ) : null}

@@ -23,6 +23,7 @@ import { Icon } from "../../../ui/Icon";
 import type { IconName } from "../../../ui/icons";
 import { Markdown } from "../../../ui/Markdown";
 import { Tag, type TagTone } from "../../../ui/Tag";
+import { Bubble } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { mix } from "../../../ui/tone";
 import { ArtifactCard } from "../../artifact";
@@ -243,12 +244,14 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
             role="button"
             testID="to-latest"
             onPress={toLatest}
-            class="flex-row items-center gap-1.5 rounded-full border border-line bg-page px-3 py-1 shadow-float hover:bg-hover"
+            class="h-7 flex-row items-center gap-1.5 rounded-full border border-line bg-page px-3 shadow-float transition duration-120 ease-out hover:bg-hover active:translate-y-px"
           >
             <View style={{ transform: [{ rotate: "90deg" }] }}>
-              <Icon name="expand" size={12} />
+              <Icon name="expand" size={12} tone="muted" />
             </View>
-            <Text class="text-xs text-ink">{unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}</Text>
+            <Text class="text-xs font-medium text-ink">
+              {unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}
+            </Text>
           </View>
         </View>
       </If>
@@ -383,10 +386,12 @@ function Frame(props: {
       <View class="flex-row gap-3">
         <View class="w-10 shrink-0">
           <If when={props.continues !== true}>
-            {props.face}
-            <If when={props.dot}>
-              <View class="absolute top-6.5 left-6.5">{props.dot}</View>
-            </If>
+            <View class="relative h-9 w-9">
+              {props.face}
+              <If when={props.dot}>
+                <View class="absolute -right-0.5 -bottom-0.5">{props.dot}</View>
+              </If>
+            </View>
           </If>
         </View>
         <View class="min-w-0 flex-1 pb-0.5">
@@ -447,9 +452,10 @@ function Dispatch(props: { m: ChatMessage }) {
         onPress={() => open.set(!open())}
         accessibilityLabel={open() ? t("web.channel.messages.foldDispatch") : t("web.channel.messages.unfoldDispatch")}
         accessibilityState={{ expanded: open() }}
-        class="mt-1.25 opacity-50 hover:opacity-100"
+        tooltip={<Bubble text={open() ? t("web.channel.messages.foldDispatch") : t("web.channel.messages.unfoldDispatch")} />}
+        class="h-6 w-6 shrink-0 items-center justify-center rounded-md opacity-70 transition duration-120 ease-out hover:bg-hover hover:opacity-100"
       >
-        <Icon name={open() ? "collapse" : "enlarge"} size={12} />
+        <Icon name={open() ? "collapse" : "enlarge"} size={12} tone="muted" />
       </View>
     </View>
   );
@@ -490,7 +496,7 @@ function MessageRow(props: {
   return (
     <Frame
       face={<SenderFace m={props.m} />}
-      dot={<If when={session()}>{(s) => <Dot tone={phaseDot(s().phase)} size={11} />}</If>}
+      dot={<If when={session()}>{(s) => <Dot tone={phaseDot(s().phase)} size={8} />}</If>}
       name={props.m.actor.kind === "user" ? t("web.channel.messages.user") : props.m.name}
       meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}${meta() ? `  ${meta()}` : ""}`}
       continues={props.continues}
@@ -599,10 +605,10 @@ function ThreadPreview(props: { thread: Channel }) {
       role="button"
       testID={`thread-preview-${props.thread.id}`}
       onPress={() => router.navigate(chatPath(props.thread))}
-      class="mt-2 w-full max-w-xl gap-1 rounded-lg border border-line px-3 py-2 hover:bg-hover"
+      class="mt-2 w-full max-w-xl gap-1.5 rounded-lg border border-line bg-page px-3 py-2 transition duration-120 ease-out hover:bg-hover"
     >
       <View class="w-full flex-row items-center gap-1.5">
-        <Icon name="thread" size={16} />
+        <Icon name="thread" size={14} tone="accent" />
         <Text class="text-sm font-semibold text-accent">
           {props.thread.replies > 0
             ? t("web.channel.replies", { n: props.thread.replies })
@@ -616,13 +622,13 @@ function ThreadPreview(props: { thread: Channel }) {
         <If when={session()} else={<View class="flex-1" />}>
           {(s) => (
             <>
-              <PhaseGlyph phase={s().phase} />
+              <PhaseGlyph phase={s().phase} size={12} />
               <Text class="min-w-0 flex-1 truncate text-xs text-muted">{phaseText(s(), now())}</Text>
             </>
           )}
         </If>
         <View style={{ opacity: 0.6 }}>
-          <Icon name="expand" size={12} />
+          <Icon name="expand" size={12} tone="muted" />
         </View>
       </View>
       <If when={last()}>

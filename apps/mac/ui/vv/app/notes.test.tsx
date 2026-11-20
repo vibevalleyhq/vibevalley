@@ -128,3 +128,41 @@ test("a block dragged by its bullet onto the row above goes before it; the radar
   await app.press("id:pkm-radar-inbox");
   expect(app.count("id:pkm-tier-inbox")).toBe(1);
 });
+
+test("an uncreated [[page]] opens fresh with inbound links and creates on write; sidebar + creates and title renames; block converts to issue", async () => {
+  // 1. Uncreated page shows FreshPage with inbound links (`#vibevalley` / `[[vibevalley]]` in fixtures).
+  const { app, fake } = await start("/pkm/vibevalley");
+  expect(app.count("id:pkm-fresh")).toBe(1);
+  await app.waitUntil(() => app.count("id:pkm-backlink") > 0);
+  await app.type("id:pkm-fresh-input", "第一条记录");
+  await app.submit("id:pkm-fresh-input");
+  await fake.pump(app);
+  await app.waitUntil(() => app.count("id:pkm-page") === 1);
+  expect(fake.calls.some((c) => c.op === "pkm.page.save")).toBe(true);
+
+  // 2. Sidebar + creates a new page and navigates to it.
+  await app.press("id:pkm-new-page");
+  expect(app.count("id:pkm-new-page-input")).toBe(1);
+  await app.type("id:pkm-new-page-input", "架构草案");
+  await app.submit("id:pkm-new-page-input");
+  await fake.pump(app);
+  await app.waitUntil(() => app.texts().includes("架构草案"));
+
+  // 3. Clicking the title renames the page via pkm.page.rename.
+  await app.press("id:pkm-title");
+  expect(app.count("id:pkm-title-input")).toBe(1);
+  await app.clear("id:pkm-title-input");
+  await app.type("id:pkm-title-input", "架构终稿");
+  await app.submit("id:pkm-title-input");
+  await fake.pump(app);
+  await app.waitUntil(() => fake.calls.some((c) => c.op === "pkm.page.rename"));
+  expect(fake.calls.find((c) => c.op === "pkm.page.rename")?.payload).toEqual({ from: "架构草案", to: "架构终稿" });
+
+  // 4. Turning a block into an issue calls issue.create.
+  await app.press("text:健康");
+  await fake.pump(app);
+  await app.waitUntil(() => app.count("id:pkm-to-issue") > 0);
+  await app.press("id:pkm-to-issue >> nth=0");
+  await fake.pump(app);
+  expect(fake.calls.some((c) => c.op === "issue.create")).toBe(true);
+});

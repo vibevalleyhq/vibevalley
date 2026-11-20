@@ -165,7 +165,7 @@ pub struct Rect {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Framing {
-    /// View pixels per art pixel, whole.
+    /// View pixels per art pixel.
     pub scale: f32,
     /// The whole picture in view pixels; may stick out past the view.
     pub bx: Rect,
@@ -180,17 +180,32 @@ fn round_away(v: f32) -> f32 {
     v.signum() * v.abs().round()
 }
 
-pub fn frame_whole(view: (f32, f32), picture: (f32, f32), cut: (f32, f32)) -> Framing {
-    let mut s = 1.0;
-    let cover = (view.0 / picture.0).max(view.1 / picture.1).ceil().max(1.0) as i32;
-    for k in (1..=cover).rev() {
-        let (w, h) = (picture.0 * k as f32, picture.1 * k as f32);
-        if (w - view.0) / 2.0 <= w * cut.0 && (h - view.1) / 2.0 <= h * cut.1 {
-            s = k as f32;
-            break;
-        }
-    }
-    let (w, h) = (picture.0 * s, picture.1 * s);
+pub fn fit_framing(view: (f32, f32), picture: (f32, f32)) -> Framing {
+    let fits = (view.0 / picture.0).min(view.1 / picture.1);
+    let scale = if fits >= 1.0 { (fits * 2.0).floor() / 2.0 } else { fits.max(0.1) };
+    let (w, h) = (picture.0 * scale, picture.1 * scale);
+    let bx = Rect {
+        x: ((view.0 - w) / 2.0).round(),
+        y: ((view.1 - h) / 2.0).round(),
+        w,
+        h,
+    };
+    Framing { scale, bx, shown: bx }
+}
+
+/// Fills `view` edge-to-edge while keeping crop within `cut` (fraction off each side);
+/// beyond that aspect ratio, clamps the scale so landmarks stay visible.
+pub fn frame_cover(view: (f32, f32), picture: (f32, f32), cut: (f32, f32)) -> Framing {
+    let pw = picture.0.max(1.0);
+    let ph = picture.1.max(1.0);
+    let cover = (view.0 / pw).max(view.1 / ph);
+    let max_x = view.0 / (pw * (1.0 - 2.0 * cut.0).max(0.1));
+    let max_y = view.1 / (ph * (1.0 - 2.0 * cut.1).max(0.1));
+    let scale = cover.min(max_x).min(max_y).max(0.1);
+    let raw_w = pw * scale;
+    let raw_h = ph * scale;
+    let w = if raw_w >= view.0 - 0.5 { raw_w.ceil().max(view.0) } else { raw_w.round() };
+    let h = if raw_h >= view.1 - 0.5 { raw_h.ceil().max(view.1) } else { raw_h.round() };
     let bx = Rect {
         x: round_away((view.0 - w) / 2.0),
         y: round_away((view.1 - h) / 2.0),
@@ -200,7 +215,7 @@ pub fn frame_whole(view: (f32, f32), picture: (f32, f32), cut: (f32, f32)) -> Fr
     let (x0, y0) = (bx.x.max(0.0), bx.y.max(0.0));
     let (x1, y1) = (view.0.min(bx.x + w), view.1.min(bx.y + h));
     Framing {
-        scale: s,
+        scale,
         bx,
         shown: Rect {
             x: x0,
@@ -216,24 +231,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn framing_is_whole_and_cuts_little() {
-        let f = frame_whole((1280.0, 820.0), (384.0, 256.0), FARM_CUT);
-        assert_eq!(f.scale, 3.0);
-        assert_eq!(
-            f.bx,
-            Rect {
-                x: 64.0,
-                y: 26.0,
-                w: 1152.0,
-                h: 768.0
-            }
-        );
-        let f = frame_whole((400.0, 260.0), (384.0, 256.0), FARM_CUT);
-        assert_eq!(f.scale, 1.0);
-        // 2x would cut (768-400)/2 = 184 px per side: far more than 5%.
-        let f = frame_whole((740.0, 500.0), (384.0, 256.0), FARM_CUT);
-        assert_eq!(f.scale, 2.0);
-        assert_eq!(f.bx.x, -14.0);
+    fn framing_covers_standard_panes_and_clamps_extreme_cuts() {
+        // 16:10 and 16:9 panes stay within FARM_CUT and fill edge-to-edge with no margins.
+        for view in [(1280.0, 820.0), (1278.0, 848.0), (1440.0, 900.0), (1600.0, 900.0)] {
+            let f = frame_cover(view, (384.0, 256.0), FARM_CUT);
+            assert_eq!(
+                f.shown,
+                Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    w: view.0,
+                    h: view.1
+                },
+                "{view:?}: {f:?}"
+            );
+            assert!((f.bx.w - view.0) / 2.0 <= f.bx.w * FARM_CUT.0 + 1.0);
+            assert!((f.bx.h - view.1) / 2.0 <= f.bx.h * FARM_CUT.1 + 1.0);
+        }
+        // Narrow portrait pane clamps horizontal crop to 5% per side instead of chopping buildings.
+        let narrow = frame_cover((568.0, 720.0), (384.0, 256.0), FARM_CUT);
+        assert!((narrow.bx.w - 568.0) / 2.0 <= narrow.bx.w * FARM_CUT.0 + 1.0);
+        assert!(narrow.bx.y > 0.0);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 // Ported from VibeValley apps/web/src/features/media/Rail.tsx: origin,
 // file-kind, and deliverable facet filters with cross-filtered counts.
-import { Scroll, Text, View, windowSize } from "nsh";
+import { Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -32,6 +32,40 @@ const artifactKindIcons: Record<ArtifactKindFilter, IconName> = {
 };
 const artifactKinds: readonly ArtifactKindFilter[] = ["all", ...artifactFilterKinds];
 
+function FacetSection(props: { id: string; title: string; count: number; hasActive?: boolean; children: JSX.Element }) {
+  const open = signal(true);
+  return (
+    <View testID={`library-section-${props.id}`} class="gap-0.5">
+      <View
+        role="button"
+        testID={`library-section-toggle-${props.id}`}
+        accessibilityState={{ expanded: open() }}
+        onPress={() => open.set(!open())}
+        class="group h-7 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out hover:bg-hover"
+      >
+        <View
+          class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+          style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
+        >
+          <Icon name="expand" size={10} tone="faint" />
+        </View>
+        <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-muted group-hover:text-ink">{props.title}</Text>
+        <If when={!open() && props.hasActive === true}>
+          <View class="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+        </If>
+        <If when={!open()}>
+          <View class="shrink-0 rounded-full bg-hover px-1.5 py-px">
+            <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{String(props.count)}</Text>
+          </View>
+        </If>
+      </View>
+      <If when={open()}>
+        <View class="gap-0.5">{props.children}</View>
+      </If>
+    </View>
+  );
+}
+
 function Row(props: { testid: string; icon: IconName; label: string; count: number; here: boolean; onPick: () => void }) {
   return (
     <View
@@ -40,11 +74,15 @@ function Row(props: { testid: string; icon: IconName; label: string; count: numb
       accessibilityLabel={`${props.label} ${props.count}`}
       accessibilityState={{ selected: props.here }}
       onPress={() => props.onPick()}
-      class={`h-7 shrink-0 flex-row items-center gap-2 rounded-md px-2 ${props.here ? "bg-selected" : "hover:bg-hover"}`}
+      class={`h-7 shrink-0 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out ${props.here ? "bg-selected" : "hover:bg-hover"}`}
     >
-      <Icon name={props.icon} size={14} tone="muted" />
+      <View class="w-3.5 shrink-0 items-center justify-center">
+        <Icon name={props.icon} size={14} tone={props.here ? "ink" : "muted"} />
+      </View>
       <Text class={`min-w-0 flex-1 truncate text-sm text-ink ${props.here ? "font-medium" : ""}`}>{props.label}</Text>
-      <Text class="shrink-0 text-xs text-faint">{String(props.count)}</Text>
+      <View class={`shrink-0 rounded-full px-1.5 py-px ${props.here ? "bg-page" : ""}`}>
+        <Text class={`font-mono text-2xs tabular-nums ${props.here ? "font-medium text-ink" : "text-faint"}`}>{String(props.count)}</Text>
+      </View>
     </View>
   );
 }
@@ -85,7 +123,7 @@ export function Rail(props: {
     <If
       when={!narrow()}
       else={
-        <View testID="library-rail" class="shrink-0 flex-row gap-2 border-b border-line bg-side p-2">
+        <View testID="library-rail" class="shrink-0 flex-row items-center gap-2 border-b border-line bg-side px-3 py-2">
           <Select
             label={t("web.library.rail.where")}
             testid="library-where-select"
@@ -131,16 +169,14 @@ export function Rail(props: {
         </View>
       }
     >
-      <Scroll testID="library-rail" class="w-56 shrink-0 border-r border-line bg-side" contentClass="gap-5 p-3">
-        <View class="gap-0.5">
-          <Text class="px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.where")}</Text>
+      <Scroll testID="library-rail" class="w-56 shrink-0 border-r border-line bg-side" contentClass="gap-3 px-3 pt-3 pb-3">
+        <FacetSection id="where" title={t("web.library.rail.where")} count={n("all")} hasActive={props.where.by === "origin"}>
           {whereRow({ by: "all" }, "media", t("web.library.origin.all"))}
           <Each of={["generated", "uploaded", "fetched"] as const}>
             {(origin) => whereRow({ by: "origin", origin: origin() }, originIcons[origin()], t(`web.library.origin.${origin()}`))}
           </Each>
-        </View>
-        <View class="gap-0.5">
-          <Text class="px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.kind")}</Text>
+        </FacetSection>
+        <FacetSection id="kind" title={t("web.library.rail.kind")} count={props.counts.kind.get("all") ?? 0} hasActive={!inArtifacts() && props.kind !== "all"}>
           <Each of={kinds}>
             {(k) => (
               <Row
@@ -156,10 +192,9 @@ export function Rail(props: {
               />
             )}
           </Each>
-        </View>
+        </FacetSection>
         <If when={props.onArtifactKind !== undefined}>
-          <View class="gap-0.5">
-            <Text class="px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.artifacts")}</Text>
+          <FacetSection id="artifacts" title={t("web.library.rail.artifacts")} count={artifactCount("all")} hasActive={inArtifacts()}>
             <Each of={artifactKinds}>
               {(ak) => (
                 <Row
@@ -172,19 +207,17 @@ export function Rail(props: {
                 />
               )}
             </Each>
-          </View>
+          </FacetSection>
         </If>
         <If when={props.counts.channels.length > 0}>
-          <View class="gap-0.5">
-            <Text class="px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.channels")}</Text>
+          <FacetSection id="channels" title={t("web.library.rail.channels")} count={props.counts.channels.length} hasActive={props.where.by === "channel"}>
             <Each of={props.counts.channels}>{(channel) => whereRow({ by: "channel", channel: channel() }, "chat", props.names.channel(channel()))}</Each>
-          </View>
+          </FacetSection>
         </If>
         <If when={props.counts.agents.length > 0}>
-          <View class="gap-0.5">
-            <Text class="px-2 pb-1 text-xs font-medium text-faint">{t("web.library.rail.agents")}</Text>
+          <FacetSection id="agents" title={t("web.library.rail.agents")} count={props.counts.agents.length} hasActive={props.where.by === "agent"}>
             <Each of={props.counts.agents}>{(agent) => whereRow({ by: "agent", agent: agent() }, "agents", props.names.agent(agent()))}</Each>
-          </View>
+          </FacetSection>
         </If>
       </Scroll>
     </If>

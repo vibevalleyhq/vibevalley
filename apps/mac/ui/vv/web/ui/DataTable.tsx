@@ -41,7 +41,7 @@ export function DataTable<T, K extends string>(props: {
         <View role="group" accessibilityLabel={t("web.base.table.columns")} class="flex-row flex-wrap items-center gap-3">
           <Each of={table().allColumns.filter((c) => c.hideable)} key={(column) => column.id}>
             {(column) => (
-              <View class="flex-row items-center gap-1.5">
+              <View class="h-6 flex-row items-center gap-1.5">
                 <Checkbox
                   testid={`table-column-${column().id}`}
                   label={header(column().id)}
@@ -59,10 +59,10 @@ export function DataTable<T, K extends string>(props: {
           {t("web.base.table.stale")}
         </Text>
       </If>
-      <View role="table" class="min-w-0 overflow-hidden rounded-lg border border-line">
-        <View role="row" class="flex-row bg-hover">
+      <View role="table" class="min-w-0 overflow-hidden rounded-lg border border-line bg-page">
+        <View role="row" class="min-h-9 flex-row items-center bg-side">
           <If when={props.selection}>
-            <View class="px-3 py-2">
+            <View class="w-10 shrink-0 items-center justify-center py-2">
               <Checkbox
                 testid="table-select-page"
                 label={t("web.base.table.selectPage")}
@@ -74,54 +74,63 @@ export function DataTable<T, K extends string>(props: {
             </View>
           </If>
           <Each of={table().columns()} key={(column) => column.id}>
-            {(column) => (
-              <View role="columnheader" class="min-w-0 flex-1 justify-center px-3 py-2">
-                <If when={column().compareRows} else={<Text class="text-xs font-medium text-muted">{header(column().id)}</Text>}>
-                  <View
-                    role="button"
-                    testID={`table-sort-${column().id}`}
-                    onPress={() => sort(column().id)}
-                    class="h-6 flex-row items-center gap-1 self-start rounded-md px-1.5 hover:bg-selected"
-                  >
-                    <Text class="text-xs font-medium text-muted">{header(column().id)}</Text>
-                    <Icon name="choose" size={12} tone="muted" />
-                  </View>
-                </If>
-              </View>
-            )}
+            {(column) => {
+              const sorted = () => {
+                const s = table().sorting();
+                return s?.column === column().id ? s.direction : undefined;
+              };
+              return (
+                <View role="columnheader" class="min-w-0 flex-1 justify-center px-3 py-1.5">
+                  <If when={column().compareRows} else={<Text class="truncate text-xs font-medium text-muted">{header(column().id)}</Text>}>
+                    <View
+                      role="button"
+                      testID={`table-sort-${column().id}`}
+                      onPress={() => sort(column().id)}
+                      class="-ml-1.5 h-6 flex-row items-center gap-1 self-start rounded-md px-1.5 transition duration-120 ease-out hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
+                    >
+                      <Text class={`truncate text-xs ${sorted() ? "font-semibold text-ink" : "font-medium text-muted"}`}>{header(column().id)}</Text>
+                      <Icon name={sorted() === "asc" ? "moveUp" : sorted() === "desc" ? "moveDown" : "choose"} size={12} tone={sorted() ? "ink" : "faint"} />
+                    </View>
+                  </If>
+                </View>
+              );
+            }}
           </Each>
         </View>
         <View class={table().stale() ? "opacity-60" : ""}>
           <Each of={table().rows()} key={(row) => row.id}>
-            {(row) => (
-              <View
-                role="row"
-                testID="table-row"
-                accessibilityState={{ selected: table().selection().has(row().id) }}
-                class="flex-row items-center border-t border-line"
-              >
-                <If when={props.selection}>
-                  <View class="px-3 py-2">
-                    <Checkbox
-                      testid="table-select-row"
-                      label={t("web.base.table.selectRow", { id: row().id })}
-                      checked={table().selection().has(row().id)}
-                      onChange={() => table().toggleRow(row().id)}
-                    />
-                  </View>
-                </If>
-                <Each of={table().columns()} key={(column) => column.id}>
-                  {(column) => (
-                    <View role="cell" class="min-w-0 flex-1 flex-row flex-wrap items-center px-3 py-2">
-                      {props.cells[column().id].render(() => row().original)}
+            {(row) => {
+              const selected = () => table().selection().has(row().id);
+              return (
+                <View
+                  role="row"
+                  testID="table-row"
+                  accessibilityState={{ selected: selected() }}
+                  class={`min-h-10 flex-row items-center border-t border-line transition duration-120 ease-out ${selected() ? "bg-selected" : "bg-page hover:bg-hover"}`}
+                >
+                  <If when={props.selection}>
+                    <View class="w-10 shrink-0 items-center justify-center py-2">
+                      <Checkbox
+                        testid="table-select-row"
+                        label={t("web.base.table.selectRow", { id: row().id })}
+                        checked={selected()}
+                        onChange={() => table().toggleRow(row().id)}
+                      />
                     </View>
-                  )}
-                </Each>
-              </View>
-            )}
+                  </If>
+                  <Each of={table().columns()} key={(column) => column.id}>
+                    {(column) => (
+                      <View role="cell" class="min-w-0 flex-1 flex-row flex-wrap items-center px-3 py-2">
+                        {props.cells[column().id].render(() => row().original)}
+                      </View>
+                    )}
+                  </Each>
+                </View>
+              );
+            }}
           </Each>
           <If when={table().rows().length === 0 && !table().stale()}>
-            <View class="border-t border-line p-3">
+            <View class="border-t border-line bg-page px-3 py-4">
               <Text class="text-sm text-muted">{t("web.base.table.empty")}</Text>
             </View>
           </If>
@@ -136,7 +145,7 @@ export function DataTable<T, K extends string>(props: {
             disabled={table().page().index === 0}
             onClick={() => table().setPage({ ...table().page(), index: table().page().index - 1 })}
           />
-          <Text testID="table-page" class="text-xs text-muted">
+          <Text testID="table-page" class="text-xs text-muted tabular-nums">
             {t("web.base.table.page", { n: table().page().index + 1 })}
           </Text>
           <IconButton

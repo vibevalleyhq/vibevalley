@@ -168,9 +168,11 @@ function HeadPopover(props: {
           accessibilityState={{ expanded: props.open }}
           tooltip={<Bubble text={props.label} />}
           disabled={props.disabled}
-          class={`h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-hover ${props.open ? "bg-selected" : ""} ${props.disabled === true ? "opacity-50" : ""}`}
+          class={`h-7 w-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover ${
+            props.open ? "bg-selected" : ""
+          } ${props.disabled === true ? "opacity-50" : "active:translate-y-px"}`}
         >
-          <Icon name={props.icon} size={20} />
+          <Icon name={props.icon} size={16} tone={props.open ? "ink" : "muted"} />
         </View>
       }
     >
@@ -203,14 +205,14 @@ function ChannelMain(props: {
     <View accessibilityLabel={channelLabel(props.channel)} testID="channel-main" class="min-w-0 flex-1">
       <View testID="channel-head" class="h-16.5 shrink-0 flex-row items-center gap-3 border-b border-line px-4">
         <If when={!md()}>
-          <BarButton icon="chat" label={t("web.channel.channels")} testid="channels-drawer" onPress={() => props.onDrawer()} />
+          <BarButton icon="chat" size={16} label={t("web.channel.channels")} testid="channels-drawer" onPress={() => props.onDrawer()} />
         </If>
-        <View class="h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-selected">
-          <Text class="text-lg font-semibold text-muted">{markOf(props.channel)}</Text>
+        <View class="h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line bg-side">
+          <Text class="font-mono text-base font-semibold text-muted">{markOf(props.channel)}</Text>
         </View>
-        <View class="min-w-0 flex-1">
+        <View class="min-w-0 flex-1 gap-0.5">
           <View tooltip={props.channel?.default === true ? <Bubble text={t("web.channel.defaultHint")} /> : undefined}>
-            <Text role="header" class="truncate text-lg font-semibold text-ink">
+            <Text role="header" class="truncate text-base font-semibold text-ink">
               {name()}
             </Text>
           </View>
@@ -218,77 +220,86 @@ function ChannelMain(props: {
             <Text class="truncate text-xs text-muted">{about()}</Text>
           </If>
         </View>
-        <If when={search() !== undefined}>
-          <View class="w-48">
-            <TextInput
-              testID="message-search"
-              autoFocus
-              value={search() ?? ""}
-              onInput={search.set}
-              placeholder={t("web.channel.findHint")}
-              accessibilityLabel={t("web.channel.find")}
-            />
-          </View>
-        </If>
-        <BarButton
-          icon="search"
-          testid="message-search-toggle"
-          label={t("web.channel.findMessages")}
-          pressed={search() !== undefined}
-          onPress={() => {
-            search.set(search() === undefined ? "" : undefined);
-            tab.set("chat");
-          }}
-        />
-        <If when={props.channel?.type === "channel" ? props.channel : undefined}>
-          {(c) => (
-            <HeadPopover
-              icon="thread"
-              testid="threads-toggle"
-              label={t("web.channel.threadList.title")}
-              open={threadsOpen()}
-              onOpen={(o) => overlay.set(o ? "threads" : "none")}
-              width={384}
-            >
-              {() => <ThreadList channel={c()} onPick={() => overlay.set("none")} />}
-            </HeadPopover>
-          )}
-        </If>
-        <HeadPopover
-          icon="pin"
-          testid="pins-toggle"
-          label={t("web.channel.pins.open")}
-          open={pinsOpen()}
-          onOpen={(o) => overlay.set(o ? "pins" : "none")}
-          disabled={!props.channel}
-          width={320}
-        >
-          {() => <If when={props.channel}>{(c) => <Pins channel={c()} onPick={() => overlay.set("none")} />}</If>}
-        </HeadPopover>
-        {/* The members panel is beside the list, which a phone has no room for. */}
-        <If when={md()}>
-          <View
-            role="button"
-            testID="members-toggle"
-            accessibilityState={{ selected: membersOpen() }}
-            disabled={!props.channel}
+        <View class="shrink-0 flex-row items-center gap-1">
+          <If when={search() !== undefined}>
+            <View class="mr-1 w-44">
+              <TextInput
+                testID="message-search"
+                autoFocus
+                value={search() ?? ""}
+                onInput={search.set}
+                placeholder={t("web.channel.findHint")}
+                accessibilityLabel={t("web.channel.find")}
+              />
+            </View>
+          </If>
+          <BarButton
+            icon="search"
+            size={16}
+            testid="message-search-toggle"
+            label={t("web.channel.findMessages")}
+            pressed={search() !== undefined}
             onPress={() => {
-              const next = !membersOpen();
-              membersOpen.set(next);
-              if (next) tab.set("chat");
+              search.set(search() === undefined ? "" : undefined);
+              tab.set("chat");
             }}
-            class={`h-8 shrink-0 items-center justify-center rounded-md px-2 hover:bg-hover ${membersOpen() ? "bg-selected" : ""}`}
+          />
+          <If when={props.channel?.type === "channel" ? props.channel : undefined}>
+            {(c) => (
+              <HeadPopover
+                icon="thread"
+                testid="threads-toggle"
+                label={t("web.channel.threadList.title")}
+                open={threadsOpen()}
+                onOpen={(o) => overlay.set(o ? "threads" : "none")}
+                width={384}
+              >
+                {() => <ThreadList channel={c()} onPick={() => overlay.set("none")} />}
+              </HeadPopover>
+            )}
+          </If>
+          <HeadPopover
+            icon="pin"
+            testid="pins-toggle"
+            label={t("web.channel.pins.open")}
+            open={pinsOpen()}
+            onOpen={(o) => overlay.set(o ? "pins" : "none")}
+            disabled={!props.channel}
+            width={320}
           >
-            <Text class="text-sm text-ink">{t("web.channel.members.open")}</Text>
-          </View>
-        </If>
-        <BarButton
-          icon="settings"
-          testid="channel-settings-open"
-          label={t("web.channel.settings")}
-          disabled={!props.channel}
-          onPress={() => settings.set(true)}
-        />
+            {() => <If when={props.channel}>{(c) => <Pins channel={c()} onPick={() => overlay.set("none")} />}</If>}
+          </HeadPopover>
+          {/* The members panel is beside the list, which a phone has no room for. */}
+          <If when={md()}>
+            <View
+              role="button"
+              testID="members-toggle"
+              accessibilityLabel={t("web.channel.members.open")}
+              accessibilityState={{ selected: membersOpen() }}
+              tooltip={<Bubble text={t("web.channel.members.open")} />}
+              disabled={!props.channel}
+              onPress={() => {
+                const next = !membersOpen();
+                membersOpen.set(next);
+                if (next) tab.set("chat");
+              }}
+              class={`h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border px-2 transition duration-120 ease-out ${
+                membersOpen() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
+              } ${!props.channel ? "opacity-50" : "active:translate-y-px"}`}
+            >
+              <Icon name="agents" size={14} tone={membersOpen() ? "ink" : "muted"} />
+              <Text class={`text-xs font-medium ${membersOpen() ? "text-ink" : "text-muted"}`}>{t("web.channel.members.open")}</Text>
+            </View>
+          </If>
+          <BarButton
+            icon="settings"
+            size={16}
+            testid="channel-settings-open"
+            label={t("web.channel.settings")}
+            disabled={!props.channel}
+            onPress={() => settings.set(true)}
+          />
+        </View>
       </View>
       <Tabs
         look="line"
@@ -300,7 +311,7 @@ function ChannelMain(props: {
           label: e.label,
           icon: e.icon,
         }))}
-        class="shrink-0 border-b border-line px-3"
+        class="shrink-0 border-b border-line px-4"
       />
       <If when={tab() === "chat"}>
         <View class="min-h-0 flex-1 flex-row">

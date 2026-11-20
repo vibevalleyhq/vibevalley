@@ -204,8 +204,8 @@ export function SlidesStoreView(props: StoreViewerProps) {
     <View testID="slides-store-view" class="min-h-0 min-w-0 flex-1">
       <If when={snapshot().error}>
         {(err) => (
-          <View class="px-3 py-2">
-            <Text class="text-xs text-berry">{err()}</Text>
+          <View class="border-b border-line bg-bad-soft px-3 py-2">
+            <Text class="text-xs font-medium text-berry">{err()}</Text>
           </View>
         )}
       </If>
@@ -228,7 +228,7 @@ export function SlidesStoreView(props: StoreViewerProps) {
         accessibilityValue={{ now: at(), max: Math.max(1, pages()) }}
         class="shrink-0 gap-2 border-t border-line bg-page px-3 py-2"
       >
-        <View class="flex-row flex-wrap items-center gap-1.5">
+        <View class="min-h-7 flex-row flex-wrap items-center gap-1.5">
           <IconButton
             icon="previous"
             label={t("web.artifact.slides.previous")}
@@ -237,7 +237,7 @@ export function SlidesStoreView(props: StoreViewerProps) {
             onClick={() => step(-1)}
           />
           <View class="min-w-16 items-center">
-            <Text testID="slides-at" class="text-xs text-muted tabular-nums">
+            <Text testID="slides-at" class="text-xs font-medium text-muted tabular-nums">
               {maxFrag() > 0
                 ? t("web.artifact.slidesStore.stepAt", { at: at() + 1, pages: Math.max(1, pages()), frag: frag(), frags: maxFrag() })
                 : t("web.artifact.slides.at", { at: at() + 1, pages: Math.max(1, pages()) })}
@@ -250,13 +250,14 @@ export function SlidesStoreView(props: StoreViewerProps) {
             disabled={at() >= pages() - 1 && frag() >= maxFrag()}
             onClick={() => step(1)}
           />
-          <Text class="min-w-0 flex-1 truncate text-xs text-faint">{slideTitle(at())}</Text>
+          <Text class="min-w-0 flex-1 truncate px-1 text-xs text-muted">{slideTitle(at())}</Text>
           <Button testID="slides-aspect" disabled={act.busy()} onPress={toggleAspect}>
             {aspect() === "4:3" ? t("web.artifact.slidesStore.aspect4x3") : t("web.artifact.slidesStore.aspect16x9")}
           </Button>
           <Button icon="add" testID="slides-add" disabled={act.busy()} onPress={addSlide}>
             {t("web.artifact.slidesStore.addSlide")}
           </Button>
+          <View class="mx-0.5 h-4 w-px bg-line" />
           <IconButton
             icon="notes"
             label={t("web.artifact.presenter.notes")}
@@ -265,6 +266,7 @@ export function SlidesStoreView(props: StoreViewerProps) {
             onClick={() => setShowNotes((v) => !v)}
           />
           <IconButton icon="edit" label={t("web.artifact.slidesStore.editSlide")} testid="slides-edit-html" pressed={editingHtml()} onClick={toggleEditHtml} />
+          <View class="mx-0.5 h-4 w-px bg-line" />
           <IconButton icon="present" label={t("web.artifact.slides.present")} testid="slides-present" onClick={() => props.onPresent?.(true)} />
           <IconButton
             icon="presenter"
@@ -275,23 +277,25 @@ export function SlidesStoreView(props: StoreViewerProps) {
         </View>
 
         <If when={showNotes()}>
-          <View testID="slides-notes-panel" class="gap-1 rounded-md border border-line bg-side px-3 py-2">
-            <Text class="text-xs font-medium text-muted">{t("web.artifact.presenter.notes")}</Text>
-            <Text class={`text-xs ${currentNotes() ? "text-ink" : "text-faint"}`}>{currentNotes() || t("web.artifact.presenter.noNotes")}</Text>
+          <View testID="slides-notes-panel" class="gap-1 rounded-md border border-line bg-side px-3 py-2.5">
+            <Text class="text-xs font-semibold text-muted">{t("web.artifact.presenter.notes")}</Text>
+            <Text class={`text-sm leading-relaxed ${currentNotes() ? "text-ink" : "text-faint"}`}>{currentNotes() || t("web.artifact.presenter.noNotes")}</Text>
           </View>
         </If>
 
         <If when={picked()}>
           {(sel) => (
-            <View testID="slides-inline-edit" class="gap-1.5 rounded-md border border-line bg-side p-2.5">
-              <View class="border-l-2 border-wheat pl-2">
-                <Text class="text-xs text-muted" style={{ numberOfLines: 2 }}>
+            <View testID="slides-inline-edit" class="gap-2 rounded-md border border-line bg-side p-2.5">
+              <View class="rounded-r-xs border-l-2 border-wheat bg-page py-1 pr-2 pl-2">
+                <Text class="text-xs leading-relaxed text-muted" style={{ numberOfLines: 2 }}>
                   {sel().anchor.exact.trim()}
                 </Text>
               </View>
               <TextArea rows={2} value={pickedText()} onInput={(val) => setPickedText(val)} />
-              <View class="flex-row justify-end gap-1.5">
-                <Button onPress={() => setPicked(undefined)}>{t("web.base.form.never")}</Button>
+              <View class="flex-row items-center justify-end gap-1.5">
+                <Button tone="quiet" onPress={() => setPicked(undefined)}>
+                  {t("web.base.form.never")}
+                </Button>
                 <Button tone="primary" disabled={act.busy()} onPress={savePickedWords}>
                   {t("web.artifact.slidesStore.saveSlide")}
                 </Button>
@@ -302,10 +306,12 @@ export function SlidesStoreView(props: StoreViewerProps) {
 
         <If when={editingHtml()}>
           <View testID="slides-html-drawer" class="gap-2 rounded-md border border-line bg-side p-2.5">
-            <Text class="font-mono text-xs text-muted">{currentSlidePath()}</Text>
+            <Text class="truncate font-mono text-xs text-muted">{currentSlidePath()}</Text>
             <TextArea rows={6} value={htmlDraft()} onInput={(val) => setHtmlDraft(val)} class="font-mono text-xs" />
-            <View class="flex-row justify-end gap-1.5">
-              <Button onPress={() => setEditingHtml(false)}>{t("web.base.form.never")}</Button>
+            <View class="flex-row items-center justify-end gap-1.5">
+              <Button tone="quiet" onPress={() => setEditingHtml(false)}>
+                {t("web.base.form.never")}
+              </Button>
               <Button tone="primary" testID="slides-save-html" disabled={act.busy()} onPress={saveSlideHtml}>
                 {t("web.artifact.slidesStore.saveSlide")}
               </Button>
@@ -316,35 +322,40 @@ export function SlidesStoreView(props: StoreViewerProps) {
         <If when={pages() > 1}>
           <Scroll horizontal accessibilityLabel={t("web.artifact.slides.thumbnails")} testID="slides-strip" contentClass="flex-row gap-2 pb-1">
             <Each of={slideNumbers()}>
-              {(i) => (
-                <View
-                  role="button"
-                  testID="slides-thumb"
-                  accessibilityLabel={t("web.artifact.slides.slide", { at: i() + 1, title: slideTitle(i()) })}
-                  accessibilityState={{ selected: i() === at() }}
-                  onPress={() => goto(i())}
-                  class={`h-18 w-32 shrink-0 overflow-hidden rounded-md border bg-side ${i() === at() ? "border-accent" : "border-line hover:border-faint"}`}
-                  style={i() === at() ? { borderWidth: 2 } : undefined}
-                >
-                  <If when={thumbView.html()}>
-                    {(html) => (
-                      <WebView
-                        html={withStillAt(html(), i())}
-                        incognito
-                        scrollable={false}
-                        injectedJavaScriptBeforeContentLoaded={pickedThumb}
-                        onMessage={(e) => e.data === "pick" && goto(i())}
-                        accessibilityElementsHidden
-                        class="h-full w-full"
-                        style={props.covered === true ? { opacity: 0 } : undefined}
-                      />
-                    )}
-                  </If>
-                  <View class="absolute top-1 right-1 rounded-sm bg-page px-1">
-                    <Text class="text-xs text-muted tabular-nums">{String(i() + 1)}</Text>
+              {(i) => {
+                const selected = () => i() === at();
+                return (
+                  <View
+                    role="button"
+                    testID="slides-thumb"
+                    accessibilityLabel={t("web.artifact.slides.slide", { at: i() + 1, title: slideTitle(i()) })}
+                    accessibilityState={{ selected: selected() }}
+                    onPress={() => goto(i())}
+                    class={`h-18 w-32 shrink-0 overflow-hidden rounded-md border bg-side transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                      selected() ? "border-accent shadow-raise" : "border-line hover:border-faint"
+                    }`}
+                    style={selected() ? { borderWidth: 2 } : undefined}
+                  >
+                    <If when={thumbView.html()}>
+                      {(html) => (
+                        <WebView
+                          html={withStillAt(html(), i())}
+                          incognito
+                          scrollable={false}
+                          injectedJavaScriptBeforeContentLoaded={pickedThumb}
+                          onMessage={(e) => e.data === "pick" && goto(i())}
+                          accessibilityElementsHidden
+                          class="h-full w-full"
+                          style={props.covered === true ? { opacity: 0 } : undefined}
+                        />
+                      )}
+                    </If>
+                    <View class={`absolute top-1 right-1 rounded-xs px-1.5 py-px ${selected() ? "bg-accent" : "border border-line bg-page"}`}>
+                      <Text class={`font-mono text-2xs font-medium tabular-nums ${selected() ? "text-page" : "text-muted"}`}>{String(i() + 1)}</Text>
+                    </View>
                   </View>
-                </View>
-              )}
+                );
+              }}
             </Each>
           </Scroll>
         </If>

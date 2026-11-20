@@ -1,14 +1,11 @@
 use super::*;
+use crate::pixel::level::pt;
+use crate::pixel::projection::ground;
 use crate::pixel::sky::Framing;
-use unicode_width::UnicodeWidthStr;
 use vibevalley_protocol::{Agent, AgentRole};
 
 const PAPER: Color = rgba(0xf3e2b8, 1.0);
 const MUTED: Color = rgba(0x776046, 1.0);
-
-fn word_width(s: &str, size: f32) -> f32 {
-    s.width() as f32 * size * 0.5
-}
 
 fn translate(key: &str) -> String {
     t(key, &[])
@@ -121,6 +118,8 @@ fn friend_activity(f: &FarmScene) -> (usize, Option<Color>) {
         let crops = mine.clone().filter_map(|s| f.frame.plot_of(s)).map(|p| p.crop);
         if crops.clone().any(|crop| crop == Crop::Withered) {
             stage = Some(rgba(0xc84a3a, 1.));
+        } else if crops.clone().any(|crop| crop == Crop::Dry) {
+            stage.get_or_insert(rgba(0xd97426, 1.));
         } else if crops.clone().any(super::super::world::is_ripe) {
             stage.get_or_insert(rgba(0xe5a93c, 1.));
         } else if mine.into_iter().any(|s| s.phase.tag == "working") {
@@ -569,12 +568,23 @@ fn draw_plot_hover(f: &FarmScene, list: &mut DrawList, fr: Framing) {
         rows.push((repo, MUTED));
     }
     rows.push((&action, if ok { rgba(0x3f6b2a, 1.) } else { MUTED }));
-    let p = f.world.plot_at(i);
+    let foot = f.world.plot_at(i);
+    let p = ground(pt(foot.x, foot.y - PLOT_H * 0.5));
     let center = fr.bx.x + p.x * fr.scale;
-    let bottom = fr.bx.y + (p.y - PLOT_H - 3.) * fr.scale - 2.;
+    let bottom = fr.bx.y + (p.y - PLOT_H * 0.5 - 3.) * fr.scale - 2.;
     let width = rows.iter().map(|(s, _)| crate::pixel::font::width(s, 12.)).fold(0.0f32, f32::max) + 16.;
     let height = rows.len() as f32 * 14. + 10.;
-    let b = rect(center - (width + 2.) / 2., bottom - height - 2., width, height);
+    let raw_x = center - (width + 2.) / 2.;
+    let raw_y = bottom - height - 2.;
+    let (bx, by) = if f.view_size.0 > 0.0 && f.view_size.1 > 0.0 {
+        (
+            raw_x.clamp(4.0, (f.view_size.0 - width - 6.0).max(4.0)),
+            raw_y.clamp(4.0, (f.view_size.1 - height - 6.0).max(4.0)),
+        )
+    } else {
+        (raw_x, raw_y)
+    };
+    let b = rect(bx, by, width, height);
     card(list, b, PAPER);
     for (index, (words, ink)) in rows.into_iter().enumerate() {
         let x = b.x + (b.w - crate::pixel::font::width(words, 12.)) / 2.;
@@ -583,7 +593,8 @@ fn draw_plot_hover(f: &FarmScene, list: &mut DrawList, fr: Framing) {
 }
 
 pub(super) fn repo_sign(f: &FarmScene, fr: Framing) -> Rect {
-    let foot = (fr.bx.x + 44.0 * fr.scale, fr.bx.y + 104.0 * fr.scale);
+    let sign = ground(pt(44., 104.));
+    let foot = (fr.bx.x + sign.x * fr.scale, fr.bx.y + sign.y * fr.scale);
     let name = f.repo.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| translate("web.farm.sign.noRepo"));
     let title = translate("web.farm.sign.repo");
     let w = (crate::pixel::font::width(&name, 13.0).max(crate::pixel::font::width(&title, 10.0)) + 24.0).min(160.0);
@@ -594,6 +605,79 @@ pub(super) fn repo_sign(f: &FarmScene, fr: Framing) -> Rect {
 // GPUI paints these glyphs in a 1.25-em line. Centre that line in the pin's text row.
 fn line_top(top: f32, font_size: f32, row_height: f32) -> f32 {
     top + (row_height - font_size * 1.25) / 2.0
+}
+
+#[derive(Clone, Copy)]
+struct AttentionStyle {
+    paper: Color,
+    ink: Color,
+    accent: u32,
+    icon: &'static str,
+}
+
+fn attention_style(tone: Option<&str>, crop: Option<super::super::frame::Crop>) -> Option<AttentionStyle> {
+    use super::super::frame::Crop;
+    match tone {
+        Some("wait") => Some(AttentionStyle {
+            paper: rgba(0xd97426, 1.0),
+            ink: rgba(0xfff3dc, 1.0),
+            accent: 0xffc078,
+            icon: "icon-bell",
+        }),
+        Some("ripe") => Some(AttentionStyle {
+            paper: rgba(0xf0b93c, 1.0),
+            ink: INK,
+            accent: 0xfff1a8,
+            icon: "icon-harvest",
+        }),
+        Some("bug") => Some(AttentionStyle {
+            paper: rgba(0xb44b36, 1.0),
+            ink: rgba(0xfff3dc, 1.0),
+            accent: 0xff9b85,
+            icon: "icon-bug",
+        }),
+        Some("stuck") => Some(AttentionStyle {
+            paper: rgba(0x4a728c, 1.0),
+            ink: rgba(0xfff3dc, 1.0),
+            accent: 0x9cd1f0,
+            icon: "mark-warn",
+        }),
+        _ => match crop {
+            Some(Crop::Dry) => attention_style(Some("wait"), None),
+            Some(c) if super::super::world::is_ripe(c) => attention_style(Some("ripe"), None),
+            Some(Crop::Withered) => attention_style(Some("bug"), None),
+            _ => None,
+        },
+    }
+}
+
+fn attention_pin(list: &mut DrawList, point: (f32, f32), rows: &[&str], style: AttentionStyle, t: f64) {
+    let pulse = (0.5 + 0.5 * (t * 3.5).sin()) as f32;
+    let bob = ((t * 3.2).sin().max(0.0) * 2.5).round() as f32;
+    let dot_space = 10.0;
+    let (px, py) = (6.0, 3.0);
+    let first_w = rows.first().map(|s| crate::pixel::font::width(s, 12.0) + dot_space).unwrap_or(0.0);
+    let rest_w = rows.iter().skip(1).map(|s| crate::pixel::font::width(s, 12.0)).fold(0.0f32, f32::max);
+    let w = first_w.max(rest_w) + 4.0 + 2.0 * px;
+    let h = rows.len() as f32 * 14.0 + 4.0 + 2.0 * py;
+    let b = rect(point.0 - (w + 2.0) / 2.0, point.1 - (h + 2.0) - bob, w, h);
+    paint(list, rect(b.x - 2.0, b.y - 2.0, b.w + 4.0, b.h + 4.0), rgba(style.accent, 0.30 + 0.50 * pulse));
+    card(list, b, style.paper);
+    let dot_x = b.x + 2.0 + px;
+    let dot_y = b.y + 2.0 + py + 4.0;
+    paint(list, rect(dot_x, dot_y, 6.0, 6.0), rgba(style.accent, 0.65 + 0.35 * pulse));
+    paint(list, rect(dot_x + 2.0, dot_y + 2.0, 2.0, 2.0), rgba(0xfffdf2, 0.8 + 0.2 * pulse));
+    for (row, text) in rows.iter().enumerate() {
+        let indent = if row == 0 { dot_space } else { 0.0 };
+        label(
+            list,
+            b.x + 2.0 + px + indent,
+            line_top(b.y + 2.0 + py + row as f32 * 14.0, 12.0, 14.0),
+            *text,
+            12.0,
+            style.ink,
+        );
+    }
 }
 
 fn text_pin(list: &mut DrawList, point: (f32, f32), ay: f32, rows: &[&str], pad: (f32, f32), paper: Color, ink: Color) {
@@ -645,8 +729,10 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
         if hovered == Some(bed.index) {
             continue;
         }
-        let p = f.world.plot_at(bed.index);
-        let (x, y) = at(p.x, p.y - PLOT_H / 2.0);
+        let foot = f.world.plot_at(bed.index);
+        let p = ground(pt(foot.x, foot.y - PLOT_H / 2.0));
+        let (x, y) = at(p.x, p.y);
+        let badge_y = at(p.x, p.y - PLOT_H * 0.5 + 5.).1 - 2.;
         let session = f
             .frame
             .state
@@ -656,24 +742,19 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
         if let Some(s) = session {
             let badge = f.frame.plot_of(s).and_then(|p| p.badge.as_ref());
             if let Some(b) = badge {
-                let paper = match b.tone.as_str() {
-                    "ripe" => 0xe8b84a,
-                    "bug" => 0xb44b36,
-                    "stuck" => 0x4a728c,
-                    "rest" => 0xcdbb92,
-                    "wait" => 0xb4cb7c,
-                    _ => 0xf3e2b8,
-                };
                 let mut rows = vec![b.text.as_str()];
                 rows.extend(s.repo.as_deref());
-                let ink = if matches!(b.tone.as_str(), "bug" | "stuck") {
-                    rgba(0xfff3dc, 1.0)
+                if let Some(style) = attention_style(Some(b.tone.as_str()), None) {
+                    attention_pin(list, (x, badge_y), &rows, style, f.t);
                 } else {
-                    INK
-                };
-                text_pin(list, (x, at(p.x, p.y - PLOT_H + 5.0).1 - 2.0), 1.0, &rows, (6.0, 3.0), rgba(paper, 1.0), ink);
+                    let paper = match b.tone.as_str() {
+                        "rest" => 0xcdbb92,
+                        _ => 0xf3e2b8,
+                    };
+                    text_pin(list, (x, badge_y), 1.0, &rows, (6.0, 3.0), rgba(paper, 1.0), INK);
+                }
             } else if let Some(repo) = &s.repo {
-                text_pin(list, (x, at(p.x, p.y - PLOT_H + 5.0).1 - 2.0), 1.0, &[repo], (3.0, 0.0), PAPER, MUTED);
+                text_pin(list, (x, badge_y), 1.0, &[repo], (3.0, 0.0), PAPER, MUTED);
             }
         } else if let Some(level) = bed.unlock_level
             && f.frame.view.level.level < level as f64
@@ -691,7 +772,20 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
     }
     for (i, (id, bx)) in f.world.spot_boxes.iter().enumerate() {
         let top = if bx.y0 < 20.0 { bx.y0 + 30.0 } else { bx.y0 };
-        let (x, y) = at((bx.x0 + bx.x1) / 2.0, top);
+        let prop_top = || {
+            let prop = f.world.props.iter().find(|prop| prop.spot == *id)?;
+            let feet = ground(prop.at);
+            let ink = f.atlas.visible_box(&prop.sprite, feet.x, feet.y, false)?;
+            Some(pt((ink.x0 + ink.x1) * 0.5, ink.y0))
+        };
+        let p = f
+            .atlas
+            .landmarks
+            .as_ref()
+            .and_then(|mask| mask.pin(id))
+            .or_else(prop_top)
+            .unwrap_or_else(|| ground(pt((bx.x0 + bx.x1) / 2., top)));
+        let (x, y) = at(p.x, p.y);
         let tip = YARD_PLACES
             .iter()
             .find(|p| p.id == *id && (f.reveal_names || matches!(&f.hover, Some(VillageHit::Spot(s)) if s == id)));
@@ -711,7 +805,7 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
         if count > 0 {
             text_pin(
                 list,
-                at(bx.x1, bx.y0),
+                (x + 6. * fr.scale, y),
                 0.5,
                 &[&count.to_string()],
                 (3.0, 0.0),
@@ -723,13 +817,28 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
             pin(list, x, y - 4.0, &translate(place.label), PAPER);
         }
     }
-    let m = f.world.orchestrator;
+    let m = ground(f.world.orchestrator);
     if f.frame.state.sessions.is_empty() && !f.reveal_names {
         let (x, y) = at(m.x, m.y - 34.0);
         pin(list, x, y - 4.0, &translate("web.farm.overlay.idle"), PAPER);
     }
     for s in &f.frame.state.sessions {
         if let Some(p) = f.helper_feet(&s.id) {
+            let plot = f.frame.plot_of(s);
+            let attention = attention_style(plot.and_then(|pl| pl.badge.as_ref()).map(|b| b.tone.as_str()), plot.map(|pl| pl.crop));
+            if let Some(style) = attention
+                && f.atlas.has(style.icon)
+            {
+                let pulse = (0.5 + 0.5 * (f.t * 3.5).sin()) as f32;
+                let bob = ((f.t * 3.2).sin().max(0.0) * 2.5).round() as f32;
+                let w = 26.0;
+                let (x, y) = at(p.x, p.y - 31.0);
+                let b = rect((x - w / 2.0).round(), y - 28.0 - bob, w, 26.0);
+                paint(list, rect(b.x - 2.0, b.y - 2.0, b.w + 4.0, b.h + 4.0), rgba(style.accent, 0.35 + 0.50 * pulse));
+                card(list, b, style.paper);
+                sprite(f, list, style.icon, b.x + 4.0, b.y + 4.0, 18.0);
+                continue;
+            }
             let doing = s.doing().unwrap_or("none");
             let named = s.phase.tag == "working" && s.runs == 0;
             if doing == "none" && !named {
@@ -737,13 +846,17 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
             }
             let image = format!("act-{doing}");
             let iw = if f.atlas.has(&image) { 18.0 } else { 0.0 };
-            let w = 8.0 + iw + if named { word_width(&s.name, 12.0) + 3.0 } else { 0.0 };
+            let gap = if iw > 0.0 && named { 3.0 } else { 0.0 };
+            let text_w = if named { crate::pixel::font::width(&s.name, 12.0) } else { 0.0 };
+            let w = 8.0 + iw + gap + text_w;
             let (x, y) = at(p.x, p.y - 31.0);
             let b = rect((x - w / 2.0).round(), y - 28.0, w, 26.0);
             card(list, b, PAPER);
-            sprite(f, list, &image, b.x + 4.0, b.y + 4.0, iw);
+            if iw > 0.0 {
+                sprite(f, list, &image, b.x + 4.0, b.y + 4.0, iw);
+            }
             if named {
-                label(list, b.x + 4.0 + iw + 3.0, b.y + 5.0, &s.name, 12.0, INK);
+                label(list, b.x + 4.0 + iw + gap, line_top(b.y + 2.0, 12.0, 22.0), &s.name, 12.0, INK);
             }
         }
     }
@@ -789,7 +902,7 @@ mod tests {
         let (world, atlas) = crate::pixel::load_village().unwrap();
         let mut farm = FarmScene::new(world, atlas);
         farm.view_size = (1208.0, 800.0);
-        let fr = frame_whole(farm.view_size, (farm.world.level.width, farm.world.level.height), FARM_CUT);
+        let fr = frame_cover(farm.view_size, (farm.world.level.width, farm.world.level.height), FARM_CUT);
         let mut draw = DrawList::default();
         draw_overlay(&farm, &mut draw, fr);
         let image = draw
@@ -800,8 +913,14 @@ mod tests {
                 _ => None,
             })
             .unwrap();
-        assert_eq!((image.0, image.2), (798., 30.));
-        assert_eq!((image.1, image.3), (201.0, 22.0));
+        let crates = farm.world.props.iter().find(|prop| prop.spot == "warehouse").unwrap();
+        let foot = ground(crates.at);
+        let ink = farm.atlas.visible_box(&crates.sprite, foot.x, foot.y, false).unwrap();
+        let center = fr.bx.x + fr.scale * (ink.x0 + ink.x1) * 0.5;
+        let top = fr.bx.y + fr.scale * ink.y0;
+        assert_eq!((image.2, image.3), (30., 22.));
+        assert!((image.0 + image.2 / 2. - center).abs() <= 2.);
+        assert!((image.1 + image.3 - (top - 3. * fr.scale - 6.)).abs() < 0.1);
     }
     #[test]
     fn regression_world_badges_count_non_chat_inbox_items_and_harvested_issues() {
@@ -831,7 +950,7 @@ mod tests {
                 ..Default::default()
             });
         }
-        let fr = frame_whole(farm.view_size, (farm.world.level.width, farm.world.level.height), FARM_CUT);
+        let fr = frame_cover(farm.view_size, (farm.world.level.width, farm.world.level.height), FARM_CUT);
         let mut draw = DrawList::default();
         draw_overlay(&farm, &mut draw, fr);
         let counts: Vec<_> = draw
@@ -850,10 +969,82 @@ mod tests {
         let mut farm = FarmScene::new(world, atlas);
         farm.repo = Some("parity".into());
         farm.view_size = (1208.0, 800.0);
-        let framing = frame_whole(farm.view_size, (farm.world.level.width, farm.world.level.height), FARM_CUT);
+        let framing = frame_cover(farm.view_size, (farm.world.level.width, farm.world.level.height), FARM_CUT);
         let sign = repo_sign(&farm, framing);
-        assert_eq!(sign.h, 55.0);
+        assert!((sign.h - (40.0 + 5.0 * framing.scale)).abs() < 0.01);
         assert!((sign.w - 58.6667).abs() < 0.01);
         assert_eq!(hit(&farm, sign.x + sign.w / 2.0, sign.y + sign.h - 1.0), Some(Action::Route("/repos".into())));
+    }
+    #[test]
+    fn attention_plots_and_helpers_render_pulsing_indicators() {
+        use crate::pixel::farm::frame::{Badge, Crop, Frame, Play, PlotView, Session};
+        let (world, atlas) = crate::pixel::load_village().unwrap();
+        let mut farm = FarmScene::new(world, atlas);
+        farm.view_size = (1208.0, 800.0);
+        let mut frame = Frame::default();
+        frame.state.sessions.push(Session {
+            id: "s-wait".into(),
+            role: "worker".into(),
+            name: "cat".into(),
+            agent: "agent-cat".into(),
+            issue: Some("i-wait".into()),
+            ..Default::default()
+        });
+        frame.state.sessions.push(Session {
+            id: "s-ripe".into(),
+            role: "worker".into(),
+            name: "rabbit".into(),
+            agent: "agent-rabbit".into(),
+            issue: Some("i-ripe".into()),
+            ..Default::default()
+        });
+        frame.view.plays.insert("s-wait".into(), Play { station: 0.0 });
+        frame.view.plays.insert("s-ripe".into(), Play { station: 1.0 });
+        frame.view.plots.insert(
+            "i-wait".into(),
+            PlotView {
+                crop: Crop::Dry,
+                badge: Some(Badge {
+                    text: "等你回答".into(),
+                    tone: "wait".into(),
+                }),
+            },
+        );
+        frame.view.plots.insert(
+            "i-ripe".into(),
+            PlotView {
+                crop: Crop::Wheat,
+                badge: Some(Badge {
+                    text: "可收获".into(),
+                    tone: "ripe".into(),
+                }),
+            },
+        );
+        farm.apply_frame(frame);
+        farm.tick(0.1);
+        let list = farm.draw(2.0);
+        assert!(list.hud.iter().any(|op| matches!(op, HudOp::Image { key, .. } if key == "hud:icon-bell")));
+        assert!(list.hud.iter().any(|op| matches!(op, HudOp::Image { key, .. } if key == "hud:icon-harvest")));
+        assert!(list.hud.iter().any(|op| matches!(op, HudOp::Text { text, .. } if text == "等你回答")));
+        assert!(list.hud.iter().any(|op| matches!(op, HudOp::Text { text, .. } if text == "可收获")));
+    }
+    #[test]
+    fn regression_plot_hover_clamps_inside_viewport() {
+        let (world, atlas) = crate::pixel::load_village().unwrap();
+        let mut farm = FarmScene::new(world, atlas);
+        farm.view_size = (320.0, 400.0);
+        farm.hover = Some(VillageHit::Plot(0));
+        let fr = frame_cover(farm.view_size, (farm.world.level.width, farm.world.level.height), FARM_CUT);
+        let mut draw = DrawList::default();
+        draw_plot_hover(&farm, &mut draw, fr);
+        assert!(!draw.hud.is_empty());
+        for op in &draw.hud {
+            if let HudOp::Rect { x, y, w, h, .. } = op {
+                assert!(
+                    *x >= 4.0 && *y >= 4.0 && x + w <= farm.view_size.0 && y + h <= farm.view_size.1,
+                    "hover rect out of bounds: ({x}, {y}, {w}, {h})"
+                );
+            }
+        }
     }
 }

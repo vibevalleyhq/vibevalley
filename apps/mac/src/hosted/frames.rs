@@ -181,10 +181,21 @@ pub fn file_tree(state: &TreeState, tones: &HashMap<PathBuf, &'static str>) -> V
     })
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct WorktreeActivity {
+    pub changed: usize,
+    pub conflicts: usize,
+    pub ahead: u32,
+    pub behind: u32,
+    pub summary: Option<String>,
+}
+
 pub struct GitView<'a> {
     pub status: Option<&'a Status>,
     pub branches: &'a [Branch],
     pub worktrees: &'a [Worktree],
+    pub worktree_activity: &'a HashMap<PathBuf, WorktreeActivity>,
+    pub current_root: Option<&'a Path>,
     pub log: &'a [Commit],
     pub error: Option<&'a str>,
     pub busy: bool,
@@ -231,9 +242,22 @@ pub fn git_panel(v: &GitView<'_>) -> Value {
         "branches": v.branches.iter().filter(|b| !b.is_remote).map(|b| json!({
             "name": b.name, "head": b.is_head, "upstream": b.upstream,
         })).collect::<Vec<_>>(),
-        "worktrees": v.worktrees.iter().map(|w| json!({
-            "path": w.path.to_string_lossy(), "branch": w.branch, "main": w.is_main, "locked": w.locked,
-        })).collect::<Vec<_>>(),
+        "worktrees": v.worktrees.iter().map(|w| {
+            let act = v.worktree_activity.get(&w.path);
+            let current = v.current_root.is_some_and(|cur| cur == w.path);
+            json!({
+                "path": w.path.to_string_lossy(),
+                "branch": w.branch,
+                "main": w.is_main,
+                "locked": w.locked,
+                "current": current,
+                "changed": act.map_or(0, |a| a.changed),
+                "conflicts": act.map_or(0, |a| a.conflicts),
+                "ahead": act.map_or(0, |a| a.ahead),
+                "behind": act.map_or(0, |a| a.behind),
+                "summary": act.and_then(|a| a.summary.as_deref()),
+            })
+        }).collect::<Vec<_>>(),
         "log": v.log.iter().map(|c| json!({
             "id": c.id, "short": c.short_id, "summary": c.summary, "author": c.author_name, "time": c.time,
         })).collect::<Vec<_>>(),
@@ -261,23 +285,23 @@ impl PaletteMode {
 
 /// Commands the palette offers: (id, label, group, shortcut as `keymap` writes it).
 pub const COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
-    ("terminal.new", "New Terminal", "Terminal", Some("mod+t")),
-    ("pane.split_right", "Split Right", "Layout", Some("mod+d")),
-    ("pane.split_down", "Split Down", "Layout", Some("mod+shift+d")),
-    ("pane.close", "Close Tab", "Layout", Some("mod+w")),
-    ("palette.files", "Go to File…", "Navigate", Some("mod+p")),
-    ("palette.search", "Search in Project…", "Navigate", Some("mod+shift+f")),
-    ("panel.files", "Show Files", "View", None),
-    ("panel.git", "Show Source Control", "View", None),
-    ("git.diff", "Open Changes", "Source Control", None),
-    ("git.diff_staged", "Open Staged Changes", "Source Control", None),
-    ("project.add", "Add Project…", "Projects", None),
-    ("project.close", "Close Project", "Projects", None),
-    ("sidebar.toggle", "Toggle Sidebar", "View", Some("mod+b")),
-    ("font.increase", "Increase Font Size", "View", Some("mod+=")),
-    ("font.decrease", "Decrease Font Size", "View", Some("mod+-")),
-    ("font.reset", "Reset Font Size", "View", Some("mod+0")),
-    ("theme.toggle", "Toggle Light/Dark Theme", "View", None),
+    ("terminal.new", "新建终端", "终端", Some("mod+t")),
+    ("pane.split_right", "向右分栏", "布局", Some("mod+d")),
+    ("pane.split_down", "向下分栏", "布局", Some("mod+shift+d")),
+    ("pane.close", "关闭标签页", "布局", Some("mod+w")),
+    ("palette.files", "跳转到文件…", "导航", Some("mod+p")),
+    ("palette.search", "在项目中搜索…", "导航", Some("mod+shift+f")),
+    ("panel.files", "显示文件树", "视图", None),
+    ("panel.git", "显示变更与分支", "视图", None),
+    ("git.diff", "查看未暂存变更", "版本控制", None),
+    ("git.diff_staged", "查看已暂存变更", "版本控制", None),
+    ("project.add", "添加项目…", "项目", None),
+    ("project.close", "关闭项目", "项目", None),
+    ("sidebar.toggle", "切换左侧栏", "视图", Some("mod+b")),
+    ("font.increase", "增大字号", "视图", Some("mod+=")),
+    ("font.decrease", "减小字号", "视图", Some("mod+-")),
+    ("font.reset", "重置字号", "视图", Some("mod+0")),
+    ("theme.toggle", "切换深浅色主题", "外观", None),
 ];
 
 pub fn palette_commands() -> Vec<Value> {
@@ -448,10 +472,13 @@ mod tests {
             ],
             ..Default::default()
         };
+        let empty_activity = HashMap::new();
         let v = git_panel(&GitView {
             status: Some(&status),
             branches: &[],
             worktrees: &[],
+            worktree_activity: &empty_activity,
+            current_root: None,
             log: &[],
             error: None,
             busy: false,
@@ -465,6 +492,8 @@ mod tests {
             status: None,
             branches: &[],
             worktrees: &[],
+            worktree_activity: &empty_activity,
+            current_root: None,
             log: &[],
             error: Some("not a repo"),
             busy: false,

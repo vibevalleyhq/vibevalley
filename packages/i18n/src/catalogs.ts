@@ -1539,8 +1539,6 @@ export const catalogs = {
         rail: "这篇的旁注",
         railShow: "打开旁注",
         railHide: "收起旁注",
-        listShow: "展开列表",
-        listHide: "收起列表",
         backToLibrary: "返回素材库",
       },
       issue: { title: "Artifact" },
@@ -2461,6 +2459,7 @@ export const catalogs = {
       app: { missed: "未接", channels: "频道", games: "游戏" },
       game: { blocks: "方块", sokoban: "推箱子", dino: "小恐龙", bugs: "贪吃虫", merge: "种田 2048" },
       phone: "手机",
+      new: "新",
       brand: "农场通",
       openChat: "展开田头",
       key: { up: "上", left: "左", right: "右", down: "下" },
@@ -2848,14 +2847,7 @@ export const catalogs = {
       rail: { where: "来路", kind: "种类", artifacts: "作品交付", channels: "来自频道", agents: "来自帮工", anyWhere: "全部来路", anyKind: "全部种类" },
       origin: { all: "全部", generated: "生成的", uploaded: "你上传的", fetched: "帮工拿回来的" },
       kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
-      artifactKind: {
-        all: "全部作品",
-        canvas: "视觉画板 (.visual.html)",
-        slides: "幻灯片 (.slide.html)",
-        dashboard: "仪表盘 (.dashboard.html)",
-        whiteboard: "白板 (.whiteboard)",
-        page: "网页与文档",
-      },
+      artifactKind: { all: "全部作品", canvas: "视觉画板", slides: "幻灯片", dashboard: "仪表盘", whiteboard: "白板", page: "网页与文档" },
       newArtifact: "新建作品",
       search: "搜索名字",
       sortLabel: "排序",
@@ -3084,7 +3076,7 @@ export const catalogs = {
     "web.pkm": {
       place: { label: "笔记", hint: "你自己的笔记：每天的日记、PARA 分好的大纲页、反链和润色建议" },
       tier: { project: "项目", area: "领域", resource: "资源", inbox: "收件箱", journal: "日记", archive: "归档" },
-      list: { label: "页面和日历", find: "搜笔记", open: "{n} 项没做完", today: "今天" },
+      list: { label: "页面和日历", find: "搜笔记", newPage: "新建页面", newPagePlaceholder: "输入标题，回车建页", open: "{n} 项没做完", today: "今天" },
       calendar: { label: "日历", previous: "上个月", next: "下个月" },
       radar: { inbox: "收件箱", stale: "搁着", overdue: "过期", days: "{n} 天没动" },
       gone: "没有这一页，或者它的文件已经删掉了。",
@@ -3107,6 +3099,15 @@ export const catalogs = {
         refFrom: "引自「{page}」",
         notSaved: "没存上：{why}",
         outline: "大纲",
+        rename: "重命名页面",
+        renamed: "改名成了「{title}」",
+        create: "创建这一页",
+        freshHint: "这一页还没有建，写第一条就会自动保存。",
+        freshPlaceholder: "写下第一条，回车创建…",
+        copyRef: "复制块引用",
+        copiedRef: "块引用复制好了",
+        toIssue: "转成工单",
+        issueMade: "建好工单了",
       },
       props: {
         deadline: "截止 {day}",
@@ -3118,7 +3119,16 @@ export const catalogs = {
         fewer: "收起属性",
       },
       marker: { TODO: "待办", DOING: "在做", DONE: "做完了", NOW: "现在做", LATER: "以后做", WAITING: "在等", CANCELED: "不做了" },
-      command: { todo: "标成待办", doing: "标成在做", done: "标成做完了", clear: "去掉标记", h1: "大标题", h2: "小标题", today: "链到今天的日记" },
+      command: {
+        todo: "标成待办",
+        doing: "标成在做",
+        done: "标成做完了",
+        clear: "去掉标记",
+        h1: "大标题",
+        h2: "小标题",
+        code: "代码块",
+        today: "链到今天的日记",
+      },
       complete: { newPage: "新页面" },
       rail: { label: "这一页的旁注", show: "打开旁注", hide: "收起旁注", contents: "这页的大纲" },
       search: {
@@ -5502,8 +5512,6 @@ export const catalogs = {
         rail: "Beside this artifact",
         railShow: "Show the side panel",
         railHide: "Hide the side panel",
-        listShow: "Show list",
-        listHide: "Hide list",
         backToLibrary: "Back to library",
       },
       issue: { title: "Artifacts" },
@@ -6463,6 +6471,7 @@ export const catalogs = {
       app: { missed: "Missed", channels: "Chat", games: "Games" },
       game: { blocks: "Blocks", sokoban: "Sokoban", dino: "Dino", bugs: "Bug snake", merge: "Farm 2048" },
       phone: "Phone",
+      new: "NEW",
       brand: "FarmTel",
       openChat: "Open the farm chat",
       key: { up: "Up", left: "Left", right: "Right", down: "Down" },
@@ -6889,14 +6898,7 @@ export const catalogs = {
       },
       origin: { all: "All", generated: "Generated", uploaded: "Uploaded", fetched: "Brought back" },
       kind: { all: "All", image: "Images", audio: "Audio", video: "Video", other: "Other" },
-      artifactKind: {
-        all: "All deliverables",
-        canvas: "Visual (.visual.html)",
-        slides: "Slides (.slide.html)",
-        dashboard: "Dashboard (.dashboard.html)",
-        whiteboard: "Whiteboard (.whiteboard)",
-        page: "Pages & docs",
-      },
+      artifactKind: { all: "All deliverables", canvas: "Visual", slides: "Slides", dashboard: "Dashboard", whiteboard: "Whiteboard", page: "Pages & docs" },
       newArtifact: "New deliverable",
       search: "Search names",
       sortLabel: "Sort",
@@ -7138,7 +7140,14 @@ export const catalogs = {
     "web.pkm": {
       place: { label: "Notes", hint: "Your own notes: daily journals, outline pages sorted by PARA, backlinks and suggested rewrites" },
       tier: { project: "Projects", area: "Areas", resource: "Resources", inbox: "Inbox", journal: "Journals", archive: "Archive" },
-      list: { label: "Pages and calendar", find: "Search notes", open: "{n} open", today: "Today" },
+      list: {
+        label: "Pages and calendar",
+        find: "Search notes",
+        newPage: "New page",
+        newPagePlaceholder: "Page title, Enter to create",
+        open: "{n} open",
+        today: "Today",
+      },
       calendar: { label: "Calendar", previous: "Previous month", next: "Next month" },
       radar: { inbox: "Inbox", stale: "Stale", overdue: "Overdue", days: "{n} days untouched" },
       gone: "There is no such page, or its file was deleted.",
@@ -7161,6 +7170,15 @@ export const catalogs = {
         refFrom: "From “{page}”",
         notSaved: "Not saved: {why}",
         outline: "Outline",
+        rename: "Rename page",
+        renamed: "Renamed to “{title}”",
+        create: "Create this page",
+        freshHint: "This page does not exist yet. Write the first block to create it.",
+        freshPlaceholder: "Write the first block, Enter to create…",
+        copyRef: "Copy block ref",
+        copiedRef: "Block ref copied",
+        toIssue: "Turn into issue",
+        issueMade: "Issue created",
       },
       props: {
         deadline: "Due {day}",
@@ -7179,6 +7197,7 @@ export const catalogs = {
         clear: "Clear the mark",
         h1: "Heading",
         h2: "Subheading",
+        code: "Code block",
         today: "Link today's journal",
       },
       complete: { newPage: "New page" },
@@ -9479,8 +9498,6 @@ export interface Messages {
   "web.artifact.page.group.delivered": undefined;
   "web.artifact.page.group.mine": undefined;
   "web.artifact.page.list": undefined;
-  "web.artifact.page.listHide": undefined;
-  "web.artifact.page.listShow": undefined;
   "web.artifact.page.more": undefined;
   "web.artifact.page.new": undefined;
   "web.artifact.page.none": undefined;
@@ -10359,6 +10376,7 @@ export interface Messages {
   "web.farm.phone.merge.stages": undefined;
   "web.farm.phone.merge.start": undefined;
   "web.farm.phone.missed": { readonly n: string | number };
+  "web.farm.phone.new": undefined;
   "web.farm.phone.noCalls": undefined;
   "web.farm.phone.noMissed": undefined;
   "web.farm.phone.openChat": undefined;
@@ -11011,6 +11029,7 @@ export interface Messages {
   "web.pkm.calendar.next": undefined;
   "web.pkm.calendar.previous": undefined;
   "web.pkm.command.clear": undefined;
+  "web.pkm.command.code": undefined;
   "web.pkm.command.doing": undefined;
   "web.pkm.command.done": undefined;
   "web.pkm.command.h1": undefined;
@@ -11028,6 +11047,8 @@ export interface Messages {
   "web.pkm.gone": undefined;
   "web.pkm.list.find": undefined;
   "web.pkm.list.label": undefined;
+  "web.pkm.list.newPage": undefined;
+  "web.pkm.list.newPagePlaceholder": undefined;
   "web.pkm.list.open": { readonly n: string | number };
   "web.pkm.list.today": undefined;
   "web.pkm.marker.CANCELED": undefined;
@@ -11040,11 +11061,17 @@ export interface Messages {
   "web.pkm.page.append": undefined;
   "web.pkm.page.collapse": undefined;
   "web.pkm.page.copiedFile": undefined;
+  "web.pkm.page.copiedRef": undefined;
   "web.pkm.page.copyFile": { readonly file: string | number };
+  "web.pkm.page.copyRef": undefined;
+  "web.pkm.page.create": undefined;
   "web.pkm.page.edit": undefined;
   "web.pkm.page.expand": undefined;
   "web.pkm.page.export": undefined;
   "web.pkm.page.exported": undefined;
+  "web.pkm.page.freshHint": undefined;
+  "web.pkm.page.freshPlaceholder": undefined;
+  "web.pkm.page.issueMade": undefined;
   "web.pkm.page.missingRef": undefined;
   "web.pkm.page.more": undefined;
   "web.pkm.page.moved": { readonly tier: string | number };
@@ -11052,7 +11079,10 @@ export interface Messages {
   "web.pkm.page.nothingToUndo": undefined;
   "web.pkm.page.outline": undefined;
   "web.pkm.page.refFrom": { readonly page: string | number };
+  "web.pkm.page.rename": undefined;
+  "web.pkm.page.renamed": { readonly title: string | number };
   "web.pkm.page.tier": undefined;
+  "web.pkm.page.toIssue": undefined;
   "web.pkm.page.undo": undefined;
   "web.pkm.page.undone": { readonly what: string | number };
   "web.pkm.place.hint": undefined;

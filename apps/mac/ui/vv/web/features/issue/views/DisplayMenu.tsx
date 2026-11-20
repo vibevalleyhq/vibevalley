@@ -8,6 +8,7 @@ import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../../../ui/Icon";
 import { Segmented } from "../../../ui/Segmented";
+import { Bubble } from "../../../ui/Tip";
 import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "../model/display";
 
 /** Display: a small panel under its button with how the list groups and how both views order. */
@@ -30,17 +31,21 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
           testID="display"
           role="button"
           accessibilityLabel={t("web.issue.display.show")}
-          class="h-7 flex-row items-center gap-1.5 rounded-md border border-transparent px-2.5 hover:bg-hover"
+          tooltip={<Bubble text={t("web.issue.display.show")} />}
+          class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
         >
-          <Icon name="settings" size={14} tone="ink" />
+          <Icon name="settings" size={14} tone="muted" />
           <Text class="text-sm text-ink">{t("web.issue.display.show")}</Text>
+          <If when={changed()}>
+            <View class="h-1.5 w-1.5 rounded-full bg-leaf" />
+          </If>
         </View>
       }
     >
       <View testID="display-menu" accessibilityLabel={t("web.issue.display.show")}>
-        <View class="flex-row items-center gap-2">
-          <Text class="w-10 shrink-0 text-sm text-muted">{t("web.issue.display.group")}</Text>
-          <View class="flex-1">
+        <View class="flex-row items-center gap-2.5">
+          <Text class="w-12 shrink-0 text-xs font-medium text-muted">{t("web.issue.display.group")}</Text>
+          <View class="min-w-0 flex-1">
             <Segmented
               label={t("web.issue.display.group")}
               testid="grouping"
@@ -51,9 +56,9 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
             />
           </View>
         </View>
-        <View class="mt-2.5 flex-row items-center gap-2">
-          <Text class="w-10 shrink-0 text-sm text-muted">{t("web.issue.display.order")}</Text>
-          <View class="flex-1">
+        <View class="mt-2.5 flex-row items-center gap-2.5">
+          <Text class="w-12 shrink-0 text-xs font-medium text-muted">{t("web.issue.display.order")}</Text>
+          <View class="min-w-0 flex-1">
             <Segmented
               label={t("web.issue.display.order")}
               testid="ordering"
@@ -65,16 +70,18 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
           </View>
         </View>
         <If when={notes().length > 0}>
-          <Text class="mt-2.5 text-xs leading-relaxed text-muted">{notes().join("\n")}</Text>
+          <View class="mt-3 border-t border-line pt-2.5">
+            <Text class="text-xs leading-relaxed text-muted">{notes().join("\n")}</Text>
+          </View>
         </If>
         <If when={changed()}>
           <View
             role="button"
             testID="display-reset"
-            class="mt-2 self-start"
+            class="mt-2 self-start rounded-md px-2 py-1 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
             onPress={() => props.onChange({ ...props.look, grouping: defaultLook.grouping, ordering: defaultLook.ordering })}
           >
-            <Text class="text-sm text-water">{t("web.issue.display.reset")}</Text>
+            <Text class="text-xs font-medium text-water">{t("web.issue.display.reset")}</Text>
           </View>
         </If>
       </View>

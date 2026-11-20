@@ -2,8 +2,9 @@ use super::super::{
     atlas::Atlas,
     draw::{DrawList, Op, glow_image, rgba},
     level::{Box2, Point, pt},
+    projection::{ground, raised},
 };
-use super::world::VillageWorld;
+use super::world::{VillageWorld, projected_box};
 use image::RgbaImage;
 use std::{collections::HashMap, sync::Arc};
 use vibevalley_pixel::PointLight;
@@ -139,6 +140,7 @@ pub struct Activity<'a> {
     pub walkers: &'a [Point],
     pub library: bool,
     pub workshop: bool,
+    pub hammer_strike: bool,
     pub mast: bool,
     pub bench: bool,
     pub ripe: &'a [Box2],
@@ -151,7 +153,7 @@ pub struct Life {
     butterflies: Vec<Butterfly>,
     flies: [Firefly; 12],
     birds: Vec<Bird>,
-    chimney: Vec<Box2>,
+    chimney: Vec<(Point, bool)>,
     pond: Vec<Box2>,
     mast: Option<Point>,
     anvil: Option<Point>,
@@ -191,7 +193,7 @@ impl Life {
         let meadows = [region(12., 110., 90., 215.), region(300., 140., 380., 200.), region(90., 92., 300., 110.)];
         let butterflies = (0..5)
             .map(|i| {
-                let home = rng.point(meadows[i % 3]);
+                let home = ground(rng.point(meadows[i % 3]));
                 Butterfly {
                     home,
                     at: home,
@@ -202,8 +204,15 @@ impl Life {
             })
             .collect();
         let flies = Firefly::yard(|| rng.unit());
-        let zones = |k: &str| w.level.things_of("Fx").iter().filter(|e| e.text("kind") == k).map(|e| e.bx).collect::<Vec<_>>();
-        let top = |k: &str| zones(k).first().map(|b| pt((b.x0 + b.x1) / 2., b.y0));
+        let fx = w.level.things_of("Fx");
+        let chimney = fx
+            .iter()
+            .filter(|e| e.text("kind") == "chimney")
+            .map(|e| {
+                let workshop = w.spot_boxes.iter().any(|(id, b)| *id == "runtimes" && b.contains(e.at));
+                (raised(e.at, e.num("height") as f32), workshop)
+            })
+            .collect();
         let wings =
             [0xf6f1e4, 0xf5d76e, 0xf2a6b8].map(|color| (tint(atlas.image("critter-butterfly-1"), color), tint(atlas.image("critter-butterfly-2"), color)));
         Self {
@@ -213,10 +222,10 @@ impl Life {
             birds: Vec::new(),
             butterflies,
             flies,
-            chimney: zones("chimney"),
-            pond: zones("pond"),
-            mast: top("mast"),
-            anvil: top("anvil"),
+            chimney,
+            pond: fx.iter().filter(|e| e.text("kind") == "pond").map(|e| projected_box(e.bx)).collect(),
+            mast: w.emitter("mast"),
+            anvil: w.emitter("anvil"),
             map: atlas.image("map"),
             density: atlas.density,
             flash: 0.,
@@ -462,9 +471,8 @@ impl Life {
         let day = (1. - night * 1.6).max(0.);
         let wind = 0.55 + 0.45 * (t * 0.21).sin() * (t * 0.067 + 1.).sin();
         for i in 0..self.chimney.len() {
-            let b = self.chimney[i];
-            let at = pt((b.x0 + b.x1) / 2., b.y0);
-            let busy = f.workshop && w.spot_boxes.iter().any(|(k, b)| *k == "runtimes" && b.contains(at));
+            let (at, is_workshop) = self.chimney[i];
+            let busy = f.workshop && is_workshop;
             if self.due("smoke", i, t, if busy { 0.22 } else { 0.45 }) {
                 let mut p = Bit::new(
                     Layer::World,
@@ -534,26 +542,25 @@ impl Life {
             }
         }
         if f.sleeping && self.due("dog", 0, t, 1.8) {
-            self.zzz(w.dog + pt(5., -13.));
+            self.zzz(ground(w.dog) + pt(5., -13.));
         }
         if f.bench
             && self.due("bench", 0, t, 1.6)
             && let Some((bench, _)) = w.places.get("bench")
         {
-            self.zzz(*bench + pt(2., -26.));
+            self.zzz(ground(*bench) + pt(2., -26.));
         }
         if f.library
             && self.due("pages", 0, t, 0.45)
             && let Some((p, _)) = w.places.get("library")
         {
-            let mut b = Bit::new(Layer::World, Picture::Dot(0xf3efe3, 2.), *p + pt(self.random.range(-8., 8.), -18.), 1.6);
+            let mut b = Bit::new(Layer::World, Picture::Dot(0xf3efe3, 2.), ground(*p) + pt(self.random.range(-8., 8.), -18.), 1.6);
             b.velocity.y = self.random.range(-8., -4.);
             b.sway = 4.;
             b.drift = 0.4;
             self.bits.push(b);
         }
-        if f.workshop
-            && self.due("anvil", 0, t, 0.3)
+        if f.hammer_strike
             && let Some(at) = self.anvil
         {
             self.dot_burst(
@@ -727,6 +734,7 @@ impl Life {
         if night > 0.4 {
             for f in &self.flies {
                 let (at, k) = f.sample(t);
+                let at = ground(at);
                 let a = k * ((night - 0.4) / 0.6);
                 if a > 0. {
                     list.ops.push(Op::Glow {
@@ -743,7 +751,7 @@ impl Life {
         if self.flash > 0.
             && let Some(at) = self.anvil
         {
-            lamps.push(light(at, 8., 28., 0xffb347, 1.1));
+            lamps.push(light(at, 4., 12., 0xffb347, 0.65 * (self.flash / 0.16)));
         }
         if night > 0.3
             && t % 1.6 < 0.9

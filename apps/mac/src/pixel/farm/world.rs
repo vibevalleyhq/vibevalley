@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use super::super::level::{Box2, Level, Point, pt};
 use super::super::nav::{Facing, NavMap};
+use super::super::projection::{ground, raised, unproject};
 use super::frame::{Crop, Session};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +70,28 @@ pub fn bed_of_station(station: i32) -> Option<Bed> {
     } else {
         BEDS.iter().copied().find(|b| b.station == station)
     }
+}
+
+pub(super) fn box_corners(b: Box2) -> [Point; 4] {
+    [pt(b.x0, b.y0), pt(b.x1, b.y0), pt(b.x1, b.y1), pt(b.x0, b.y1)]
+}
+
+pub(super) fn projected_box(b: Box2) -> Box2 {
+    let [p, rest @ ..] = box_corners(b).map(ground);
+    rest.into_iter().fold(
+        Box2 {
+            x0: p.x,
+            y0: p.y,
+            x1: p.x,
+            y1: p.y,
+        },
+        |b, p| Box2 {
+            x0: b.x0.min(p.x),
+            y0: b.y0.min(p.y),
+            x1: b.x1.max(p.x),
+            y1: b.y1.max(p.y),
+        },
+    )
 }
 
 pub fn is_ripe(crop: Crop) -> bool {
@@ -156,14 +179,6 @@ fn around(s: PlotSpot) -> Point {
         PlotSpot::Back => pt(6.0, -29.0),
     }
 }
-fn in_bed(s: PlotSpot) -> Point {
-    match s {
-        PlotSpot::Front => pt(0.0, -9.0),
-        PlotSpot::Left => pt(-7.0, -11.0),
-        PlotSpot::Right => pt(7.0, -11.0),
-        PlotSpot::Back => pt(0.0, -13.0),
-    }
-}
 fn facing_at(s: PlotSpot) -> Facing {
     match s {
         PlotSpot::Front => Facing::Up,
@@ -199,8 +214,10 @@ pub struct Goal {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Pose {
     Cheer,
+    Ask,
     Worry,
     Idle,
+    Hoe,
     Work,
     Think,
 }
@@ -219,6 +236,18 @@ pub struct GoalInput<'a> {
 
 const REACH: f32 = 15.0;
 
+pub enum LightSource {
+    Window,
+    Lamp,
+    Forge,
+}
+
+pub struct YardLight {
+    pub at: Point,
+    pub radius: f32,
+    pub source: LightSource,
+}
+
 pub struct VillageWorld {
     pub level: Level,
     pub plots: HashMap<usize, Point>,
@@ -227,7 +256,7 @@ pub struct VillageWorld {
     pub orchestrator: Point,
     pub dog: Point,
     pub lawn: Vec<Point>,
-    pub lights: Vec<(Point, f32)>,
+    pub lights: Vec<YardLight>,
     pub props: Vec<Prop>,
     pub spot_boxes: Vec<(&'static str, Box2)>,
     pub places: HashMap<String, (Point, Facing)>,
@@ -264,6 +293,20 @@ impl VillageWorld {
             .iter()
             .map(|t| (t.text("place"), (t.at, facing_of(&t.text("facing")))))
             .collect();
+        let mut lights = Vec::new();
+        for light in level.things_of("Light") {
+            let source = match light.text("kind").as_str() {
+                "" | "window" => LightSource::Window,
+                "lamp" => LightSource::Lamp,
+                "forge" => LightSource::Forge,
+                kind => return Err(format!("village.ldtk: unknown Light source {kind}")),
+            };
+            lights.push(YardLight {
+                at: raised(light.at, light.num("height") as f32),
+                radius: light.num("r") as f32,
+                source,
+            });
+        }
         let mut world = VillageWorld {
             plots,
             gate: level.the_thing("Gate")?.at,
@@ -271,7 +314,7 @@ impl VillageWorld {
             orchestrator: level.the_thing("Manager")?.at,
             dog: level.the_thing("Dog")?.at,
             lawn: rest.into_iter().map(|r| r.1).collect(),
-            lights: level.things_of("Light").iter().map(|t| (t.at, t.num("r") as f32)).collect(),
+            lights,
             props,
             spot_boxes,
             places,
@@ -281,6 +324,11 @@ impl VillageWorld {
         let nav = NavMap::new(world.level.width + 16.0, world.level.height, 2.0, 2.0, |p| world.walkable(p));
         world.nav = nav;
         Ok(world)
+    }
+
+    pub fn emitter(&self, name: &str) -> Option<Point> {
+        let e = self.level.things_of("Fx").iter().find(|e| e.text("kind") == name)?;
+        Some(raised(e.at, e.num("height") as f32))
     }
 
     pub fn plot_at(&self, index: usize) -> Point {
@@ -361,11 +409,14 @@ impl VillageWorld {
                 at: self.lawn.get(rest % self.lawn.len().max(1)).copied().unwrap_or(self.gate),
                 facing: None,
             },
-            StrollSpot::Plot(s) if a.pose == Pose::Work => Goal {
-                key: format!("bed:{s:?}"),
-                at: plot + in_bed(s),
-                facing: Some(Facing::Down),
-            },
+            StrollSpot::Plot(s) if a.pose == Pose::Hoe => {
+                let left = matches!(s, PlotSpot::Front | PlotSpot::Left);
+                Goal {
+                    key: format!("bed:{s:?}"),
+                    at: plot + pt(if left { -17. } else { 17. }, if s == PlotSpot::Front { -3. } else { -12. }),
+                    facing: Some(if left { Facing::Right } else { Facing::Left }),
+                }
+            }
             StrollSpot::Plot(s) => Goal {
                 key: format!("plot:{s:?}"),
                 at: plot + around(s),
@@ -385,9 +436,17 @@ impl VillageWorld {
         }
         if n == 1 {
             let back = if facing == Facing::Right { Facing::Left } else { Facing::Right };
+            let opposite = if key == "workshop"
+                && let Some(face) = self.emitter("anvil")
+            {
+                let foot = ground(at);
+                unproject(pt(2. * face.x - foot.x, foot.y))
+            } else {
+                pt(at.x + dir * REACH * 2., at.y)
+            };
             return Goal {
                 key: key.into(),
-                at: pt(at.x + dir * REACH * 2.0, at.y),
+                at: opposite,
                 facing: Some(back),
             };
         }
@@ -421,9 +480,10 @@ impl PoseHold {
     }
 }
 
-const HANDS_ON: [&str; 4] = ["edit_file", "run_command", "mcp", "other"];
-
-pub fn pose_of(s: &Session, crop: Crop) -> Pose {
+pub fn pose_of(s: &Session, crop: Crop, stage: Option<&vibevalley_protocol::IssueStage>) -> Pose {
+    if stage.is_some_and(|stage| stage.state == vibevalley_protocol::IssueStageKind::Asking) {
+        return Pose::Ask;
+    }
     if is_ripe(crop) {
         return Pose::Cheer;
     }
@@ -432,7 +492,8 @@ pub fn pose_of(s: &Session, crop: Crop) -> Pose {
     }
     match s.doing() {
         None | Some("none") => Pose::Idle,
-        Some(a) if HANDS_ON.contains(&a) => Pose::Work,
+        Some("edit_file") => Pose::Hoe,
+        Some("run_command" | "mcp" | "other") => Pose::Work,
         Some(_) => Pose::Think,
     }
 }
@@ -461,7 +522,7 @@ pub fn spots_for(s: &Session, crop: Crop, pose: Pose) -> Vec<StrollSpot> {
         return vec![Plot(Front), Plot(Left), Plot(Right)];
     }
     match s.phase.tag.as_str() {
-        "working" if pose == Pose::Work => vec![Plot(Front), Plot(Right), Plot(Left)],
+        "working" if pose == Pose::Hoe => vec![Plot(Front), Plot(Right), Plot(Left)],
         "working" => vec![Plot(Left), Plot(Back), Plot(Right)],
         "resting" => vec![Rest, Rest, Plot(Front), Plot(Back)],
         _ => vec![Plot(Front)],
@@ -521,32 +582,6 @@ pub enum VillageHit {
     Plot(usize),
 }
 
-/// What a tap lands on, in order: helpers (last drawn on top), the dog, the
-/// yard's places, the plots (a little taller than their box).
-pub fn village_hit_at(sessions: &[(String, Box2)], dog: Option<Box2>, spots: &[(&'static str, Box2)], plots: &[(usize, Box2)], p: Point) -> Option<VillageHit> {
-    if let Some((id, _)) = sessions.iter().rev().find(|(_, b)| b.contains(p)) {
-        return Some(VillageHit::Session(id.clone()));
-    }
-    if dog.is_some_and(|d| d.contains(p)) {
-        return Some(VillageHit::Dog);
-    }
-    if let Some((spot, _)) = spots.iter().rev().find(|(_, b)| b.contains(p)) {
-        return Some(VillageHit::Spot(spot));
-    }
-    plots
-        .iter()
-        .rev()
-        .find(|(_, b)| {
-            Box2 {
-                y0: b.y0 - 4.0,
-                y1: b.y1 + 2.0,
-                ..*b
-            }
-            .contains(p)
-        })
-        .map(|(i, _)| VillageHit::Plot(*i))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -567,21 +602,5 @@ mod tests {
         let mut h = PoseHold::new(Pose::Idle, 0.0);
         assert_eq!(h.next(Pose::Work, 0.5), Pose::Idle);
         assert_eq!(h.next(Pose::Work, 0.9), Pose::Work);
-    }
-
-    #[test]
-    fn hits_in_order() {
-        let b = Box2 {
-            x0: 0.0,
-            y0: 0.0,
-            x1: 10.0,
-            y1: 10.0,
-        };
-        assert_eq!(
-            village_hit_at(&[("s".into(), b)], Some(b), &[], &[(0, b)], pt(5.0, 5.0)),
-            Some(VillageHit::Session("s".into()))
-        );
-        assert_eq!(village_hit_at(&[], None, &[], &[(3, b)], pt(5.0, -3.0)), Some(VillageHit::Plot(3)));
-        assert_eq!(village_hit_at(&[], None, &[], &[], pt(5.0, 5.0)), None);
     }
 }

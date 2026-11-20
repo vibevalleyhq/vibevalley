@@ -178,6 +178,14 @@ pub enum Action {
     Checkout {
         branch: String,
     },
+    AddWorktree {
+        branch: String,
+    },
+    RemoveWorktree {
+        path: PathBuf,
+        #[serde(default)]
+        force: bool,
+    },
     OpenCommit {
         id: String,
     },

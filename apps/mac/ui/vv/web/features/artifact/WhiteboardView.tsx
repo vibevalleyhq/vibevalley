@@ -544,6 +544,14 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--vv-si
 }
 
 const FILL_OPTIONS = ["default", "leaf", "water", "wheat", "berry", "side"] as const;
+const fillDotClass: Record<(typeof FILL_OPTIONS)[number], string> = {
+  default: "border border-line bg-page",
+  leaf: "bg-leaf",
+  water: "bg-water",
+  wheat: "bg-wheat",
+  berry: "bg-berry",
+  side: "bg-idle",
+};
 
 export function WhiteboardView(props: StoreViewerProps) {
   const { client, snapshot } = useStoreEntries(() => props.artifact.id);
@@ -792,16 +800,18 @@ export function WhiteboardView(props: StoreViewerProps) {
         testID={`wb-tool-${id}`}
         accessibilityState={{ selected: active() }}
         onPress={() => tool.set(id)}
-        class={`rounded-md px-2 py-1 ${active() ? "bg-selected" : "hover:bg-hover"}`}
+        class={`h-7 justify-center rounded-md px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+          active() ? "bg-selected" : "hover:bg-hover"
+        }`}
       >
-        <Text class={`text-xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{label}</Text>
+        <Text class={`text-xs ${active() ? "font-semibold text-ink" : "font-medium text-muted"}`}>{label}</Text>
       </View>
     );
   };
 
   return (
     <View testID="whiteboard-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side">
-      <View class="shrink-0 flex-row flex-wrap items-center gap-1 border-b border-line bg-page px-2.5 py-1.5">
+      <View class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-1 border-b border-line bg-page px-2.5 py-1.5">
         {toolButton("select", t("web.artifact.whiteboard.select"))}
         {toolButton("pan", t("web.artifact.whiteboard.pan"))}
         <View class="mx-1 h-4 w-px bg-line" />
@@ -825,14 +835,14 @@ export function WhiteboardView(props: StoreViewerProps) {
         </If>
 
         <View class="ml-auto flex-row items-center gap-1">
-          <Text class="text-xs text-muted tabular-nums">{t("web.artifact.whiteboard.elements", { n: elements().length })}</Text>
+          <Text class="pr-1 font-mono text-xs text-muted tabular-nums">{t("web.artifact.whiteboard.elements", { n: elements().length })}</Text>
           <IconButton
             icon="partly"
             label={t("web.artifact.whiteboard.zoomOut")}
             testid="wb-zoom-out"
             onClick={() => webRef?.injectJavaScript("window.__wb && window.__wb.zoomBy(-0.15);")}
           />
-          <Text class="min-w-10 text-center text-xs text-muted tabular-nums">{`${Math.round(zoom() * 100)}%`}</Text>
+          <Text class="min-w-11 text-center font-mono text-xs text-muted tabular-nums">{`${Math.round(zoom() * 100)}%`}</Text>
           <IconButton
             icon="add"
             label={t("web.artifact.whiteboard.zoomIn")}
@@ -881,21 +891,26 @@ export function WhiteboardView(props: StoreViewerProps) {
 
         <If when={inspectorOpen()}>
           <View testID="wb-inspector" class="w-72 shrink-0 border-l border-line bg-page">
+            <View class="shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-side px-3 py-2">
+              <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-muted">
+                {selectedElement()?.id ?? t("web.artifact.whiteboard.elements", { n: elements().length })}
+              </Text>
+              <IconButton icon="close" size={14} label={t("web.artifact.canvas.close")} onClick={() => inspectorOpen.set(false)} />
+            </View>
             <Scroll class="min-h-0 flex-1" contentClass="p-3 gap-3">
               <If
                 when={selectedElement()}
                 else={
-                  <View class="gap-2">
-                    <Text class="text-xs font-semibold text-muted">{t("web.artifact.whiteboard.elements", { n: elements().length })}</Text>
+                  <View class="gap-1.5">
                     <Each of={elements()}>
                       {(el) => (
                         <View
                           role="button"
                           onPress={() => selectedIds.set([el().id])}
-                          class="flex-row items-center justify-between gap-2 rounded-md border border-line bg-side px-2.5 py-1.5 hover:bg-hover"
+                          class="h-8 flex-row items-center justify-between gap-2 rounded-md border border-line bg-side px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
                         >
-                          <Text class="truncate text-xs font-medium text-ink">{labelOf(el()) || el().id}</Text>
-                          <Text class="font-mono text-2xs text-faint">{el().type}</Text>
+                          <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{labelOf(el()) || el().id}</Text>
+                          <Text class="shrink-0 font-mono text-2xs text-faint">{el().type}</Text>
                         </View>
                       )}
                     </Each>
@@ -905,17 +920,17 @@ export function WhiteboardView(props: StoreViewerProps) {
                 {(el) => (
                   <View class="gap-3">
                     <View class="flex-row items-center justify-between gap-2">
-                      <View class="flex-row items-center gap-1.5">
+                      <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
                         <Icon name="bolt" size={12} tone="muted" />
-                        <Text class="font-mono text-xs font-semibold text-ink">{el().id}</Text>
+                        <Text class="truncate font-mono text-xs font-semibold text-ink">{el().id}</Text>
                       </View>
-                      <Text class="font-mono text-2xs text-faint">{`${el().type} · rev ${el().rev}`}</Text>
+                      <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{`${el().type} · rev ${el().rev}`}</Text>
                     </View>
 
                     <If when={el().type !== "arrow"}>
                       <View class="gap-1">
                         <Text class="text-xs font-medium text-muted">Label</Text>
-                        <View class="flex-row gap-1.5">
+                        <View class="flex-row items-center gap-1.5">
                           <TextInput
                             testID="wb-inspector-label"
                             value={labelDraft()}
@@ -940,9 +955,13 @@ export function WhiteboardView(props: StoreViewerProps) {
                               return (
                                 <View
                                   role="button"
+                                  accessibilityState={{ selected: current() }}
                                   onPress={() => patchFill(el().id, f())}
-                                  class={`rounded-md border px-2 py-0.5 ${current() ? "border-accent bg-selected" : "border-line bg-side hover:bg-hover"}`}
+                                  class={`h-6 flex-row items-center gap-1.5 rounded-md border px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                                    current() ? "border-accent bg-selected" : "border-line bg-side hover:border-faint hover:bg-hover"
+                                  }`}
                                 >
+                                  <View class={`size-2 shrink-0 rounded-full ${fillDotClass[f()]}`} />
                                   <Text class={`text-2xs font-medium ${current() ? "text-ink" : "text-muted"}`}>{f()}</Text>
                                 </View>
                               );
@@ -968,7 +987,7 @@ export function WhiteboardView(props: StoreViewerProps) {
                       </View>
                     </If>
 
-                    <View class="gap-1">
+                    <View class="gap-1.5">
                       <Text class="text-xs font-medium text-muted">Entry JSON</Text>
                       <TextArea rows={8} testID="wb-inspector-json" value={jsonDraft()} onInput={(v) => jsonDraft.set(v)} class="font-mono text-xs" />
                       <View class="flex-row justify-end">

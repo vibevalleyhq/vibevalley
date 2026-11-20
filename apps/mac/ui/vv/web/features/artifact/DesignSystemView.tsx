@@ -150,11 +150,11 @@ export function DesignSystemView(props: StoreViewerProps) {
 
   return (
     <View testID="design-system-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-page">
-      <View class="shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-side px-3 py-2">
+      <View class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-side px-3 py-2">
         <Tabs label={props.artifact.title} value={tab()} onChange={(v) => tab.set(v)} items={tabItems} />
         <View class="ml-auto flex-row flex-wrap items-center gap-1.5">
           <If when={props.artifact.isDefault === true}>
-            <View testID="ds-default-badge" class="flex-row items-center gap-1 rounded-full bg-ok-soft px-2.5 py-0.5">
+            <View testID="ds-default-badge" class="h-6 flex-row items-center gap-1 rounded-full bg-ok-soft px-2.5">
               <Icon name="check" size={12} tone="leaf" />
               <Text class="text-xs font-medium text-ok-ink">{t("web.artifact.types.defaultBadge")}</Text>
             </View>
@@ -177,16 +177,16 @@ export function DesignSystemView(props: StoreViewerProps) {
           <View class="w-full max-w-3xl self-center gap-4">
             <View class="flex-row flex-wrap gap-2">
               <View class="rounded-md border border-line bg-side px-3 py-1.5">
-                <Text class="font-mono text-xs text-muted">{`${parsedTokens().colors.length} colors`}</Text>
+                <Text class="font-mono text-xs text-muted tabular-nums">{`${parsedTokens().colors.length} colors`}</Text>
               </View>
               <View class="rounded-md border border-line bg-side px-3 py-1.5">
-                <Text class="font-mono text-xs text-muted">{`${parsedTokens().styles.length} type styles`}</Text>
+                <Text class="font-mono text-xs text-muted tabular-nums">{`${parsedTokens().styles.length} type styles`}</Text>
               </View>
               <View class="rounded-md border border-line bg-side px-3 py-1.5">
-                <Text class="font-mono text-xs text-muted">{`${parsedTokens().space.length} spacing · ${parsedTokens().radius.length} radius`}</Text>
+                <Text class="font-mono text-xs text-muted tabular-nums">{`${parsedTokens().space.length} spacing · ${parsedTokens().radius.length} radius`}</Text>
               </View>
               <View class="rounded-md border border-line bg-side px-3 py-1.5">
-                <Text class="font-mono text-xs text-muted">{`${compiledCss().length} B CSS`}</Text>
+                <Text class="font-mono text-xs text-muted tabular-nums">{`${compiledCss().length} B CSS`}</Text>
               </View>
             </View>
             <Markdown text={readmeText()} />
@@ -209,27 +209,31 @@ export function DesignSystemView(props: StoreViewerProps) {
                 };
                 return (
                   <View testID="ds-color-swatch" class="w-60 shrink-0 gap-2 rounded-lg border border-line bg-side p-3">
-                    <View class="flex-row gap-2">
-                      <View class="h-14 flex-1 rounded-md border border-line" style={{ backgroundColor: c().light }} />
-                      <View class="h-14 flex-1 rounded-md border border-line" style={{ backgroundColor: c().dark }} />
+                    <View class="h-14 flex-row overflow-hidden rounded-md border border-line">
+                      <View class="flex-1" style={{ backgroundColor: c().light }} />
+                      <View class="w-px bg-line" />
+                      <View class="flex-1" style={{ backgroundColor: c().dark }} />
                     </View>
                     <View class="flex-row items-center justify-between gap-2">
-                      <Text class="truncate font-mono text-xs font-semibold text-ink">{`--color-${c().id}`}</Text>
-                      <View class="rounded-sm bg-hover px-1.5 py-0.5">
+                      <Text class="min-w-0 flex-1 truncate font-mono text-xs font-semibold text-ink">{`--color-${c().id}`}</Text>
+                      <View class="shrink-0 rounded-sm bg-hover px-1.5 py-0.5">
                         <Text class="text-2xs text-muted">{c().group}</Text>
                       </View>
                     </View>
                     <View class="flex-row items-center justify-between gap-2">
-                      <Text class="font-mono text-2xs text-muted">{`L: ${c().light}`}</Text>
-                      <Text class="font-mono text-2xs text-muted">{`D: ${c().dark}`}</Text>
+                      <Text class="font-mono text-2xs text-muted tabular-nums">{`L: ${c().light}`}</Text>
+                      <Text class="font-mono text-2xs text-muted tabular-nums">{`D: ${c().dark}`}</Text>
                     </View>
                     <If when={c().note !== ""}>
-                      <Text class="text-xs text-muted">{c().note}</Text>
+                      <Text class="text-xs leading-relaxed text-muted">{c().note}</Text>
                     </If>
                     <If when={ratio()}>
                       {(r) => (
-                        <View testID="ds-contrast-badge" class={`self-start rounded-full px-2 py-0.5 ${r() >= 4.5 ? "bg-ok-soft" : "bg-bad-soft"}`}>
-                          <Text class={`text-2xs font-medium ${r() >= 4.5 ? "text-ok-ink" : "text-berry"}`}>
+                        <View
+                          testID="ds-contrast-badge"
+                          class={`h-5 flex-row items-center self-start rounded-full px-2 ${r() >= 4.5 ? "bg-ok-soft" : "bg-bad-soft"}`}
+                        >
+                          <Text class={`text-2xs font-medium tabular-nums ${r() >= 4.5 ? "text-ok-ink" : "text-berry"}`}>
                             {r() >= 4.5
                               ? t("web.artifact.designSystem.contrastPass", { ratio: r() })
                               : t("web.artifact.designSystem.contrastLow", { ratio: r() })}
@@ -244,7 +248,7 @@ export function DesignSystemView(props: StoreViewerProps) {
           </View>
 
           <If when={parsedTokens().space.length > 0 || parsedTokens().radius.length > 0}>
-            <View testID="ds-spacing-radius" class="gap-3">
+            <View testID="ds-spacing-radius" class="gap-4 border-t border-line pt-4">
               <If when={parsedTokens().space.length > 0}>
                 <View class="gap-2">
                   <Text class="text-xs font-semibold text-muted">Spacing</Text>
@@ -254,7 +258,7 @@ export function DesignSystemView(props: StoreViewerProps) {
                         <View class="flex-row items-center gap-2.5 rounded-md border border-line bg-side px-3 py-2">
                           <Text class="font-mono text-xs font-semibold text-ink">{`--space-${sp().id}`}</Text>
                           <View class="h-3 rounded-xs bg-accent" style={{ width: parsePx(sp().value, 16, 4, 120) }} />
-                          <Text class="font-mono text-2xs text-muted">{sp().value}</Text>
+                          <Text class="font-mono text-2xs text-muted tabular-nums">{sp().value}</Text>
                         </View>
                       )}
                     </Each>
@@ -271,7 +275,7 @@ export function DesignSystemView(props: StoreViewerProps) {
                           <View class="size-7 border border-accent bg-page" style={{ borderRadius: parsePx(rad().value, 6, 0, 24) }} />
                           <View class="gap-0.5">
                             <Text class="font-mono text-xs font-semibold text-ink">{`--radius-${rad().id}`}</Text>
-                            <Text class="font-mono text-2xs text-muted">{rad().value}</Text>
+                            <Text class="font-mono text-2xs text-muted tabular-nums">{rad().value}</Text>
                           </View>
                         </View>
                       )}
@@ -307,7 +311,7 @@ export function DesignSystemView(props: StoreViewerProps) {
                   {(sc) => (
                     <View class="flex-row items-center gap-2 rounded-md border border-line bg-side px-2.5 py-1.5">
                       <Text class="font-mono text-xs font-semibold text-ink">{`--text-${sc().id}`}</Text>
-                      <Text class="font-mono text-2xs text-muted">{sc().value}</Text>
+                      <Text class="font-mono text-2xs text-muted tabular-nums">{sc().value}</Text>
                     </View>
                   )}
                 </Each>
@@ -321,8 +325,8 @@ export function DesignSystemView(props: StoreViewerProps) {
                   return (
                     <View class="gap-1.5 rounded-lg border border-line bg-side p-3">
                       <View class="flex-row items-center justify-between gap-2">
-                        <Text class="font-mono text-xs text-muted">{`.type-${st().id}`}</Text>
-                        <Text class="font-mono text-xs text-muted">{`${st().size} · ${st().weight} · lh ${st().lineHeight}`}</Text>
+                        <Text class="font-mono text-xs font-medium text-muted">{`.type-${st().id}`}</Text>
+                        <Text class="font-mono text-xs text-muted tabular-nums">{`${st().size} · ${st().weight} · lh ${st().lineHeight}`}</Text>
                       </View>
                       <Text class="truncate text-ink" style={{ fontSize: pxSize() }}>
                         {st().sample}
@@ -348,9 +352,11 @@ export function DesignSystemView(props: StoreViewerProps) {
                     testID="ds-component-item"
                     accessibilityState={{ selected: selected() }}
                     onPress={() => selectedComponent.set(comp().id)}
-                    class={`rounded-md px-2.5 py-1.5 ${selected() ? "bg-selected" : "hover:bg-hover"}`}
+                    class={`h-7 justify-center rounded-md px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                      selected() ? "bg-selected" : "hover:bg-hover"
+                    }`}
                   >
-                    <Text class={`truncate text-xs font-medium ${selected() ? "text-ink" : "text-muted"}`}>{comp().title ?? comp().id}</Text>
+                    <Text class={`truncate text-xs ${selected() ? "font-semibold text-ink" : "font-medium text-muted"}`}>{comp().title ?? comp().id}</Text>
                   </View>
                 );
               }}
@@ -374,12 +380,14 @@ export function DesignSystemView(props: StoreViewerProps) {
       </If>
 
       <If when={tab() === "tokensJson"}>
-        <View testID="ds-tokens-editor" class="min-h-0 flex-1 gap-2 p-4">
+        <View testID="ds-tokens-editor" class="min-h-0 flex-1 gap-2.5 p-4">
           <TextArea rows={16} value={draftValue()} onInput={(val) => tokensDraft.set(val)} class="min-h-0 flex-1 font-mono text-xs" />
           <View class="flex-row items-center justify-between gap-2">
-            <Text class={`text-xs ${draftValid() ? "text-muted" : "text-berry"}`}>
-              {draftValid() ? `${compileTokensCss(draftValue()).length} B compiled CSS` : "Invalid JSON"}
-            </Text>
+            <View class={`h-6 flex-row items-center rounded-full px-2.5 ${draftValid() ? "bg-side" : "bg-bad-soft"}`}>
+              <Text class={`font-mono text-xs tabular-nums ${draftValid() ? "text-muted" : "font-medium text-berry"}`}>
+                {draftValid() ? `${compileTokensCss(draftValue()).length} B compiled CSS` : "Invalid JSON"}
+              </Text>
+            </View>
             <Button tone="primary" testID="ds-save-tokens" disabled={act.busy() || !draftValid()} onPress={saveTokens}>
               {t("web.artifact.designSystem.saveTokens")}
             </Button>

@@ -2,16 +2,17 @@
 // same sections, groups, search and resizable list, every section's forms.
 // Not here: MOSS Live's playground (microphone and camera, features/voice).
 import { Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
+import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
 import { matches } from "../../base/search";
 import { Link as A, Navigate } from "../../infra/router";
 import { SettingsPage as Page, SettingsSearch } from "../../ui/domain/settings";
-import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
 import { Splitter, usePaneWidth } from "../../ui/Splitter";
+import { Bubble } from "../../ui/Tip";
 import { ConnectorsPage } from "../connector";
 import { MossAccounts, ProviderPage } from "../provider";
 import { SkillsPage } from "../runtime";
@@ -128,7 +129,7 @@ export function SettingsPage(props: { rest: string }) {
       {(current) => (
         <SettingsSearch.Provider value={q}>
           <View class={`h-full min-h-0 flex-1 ${md() ? "flex-row" : ""}`}>
-            <View class={`shrink-0 border-line ${md() ? "border-r" : "max-h-56"}`} style={md() ? { width: navWidth() } : undefined}>
+            <View class={`shrink-0 border-line bg-side ${md() ? "border-r" : "max-h-56 border-b"}`} style={md() ? { width: navWidth() } : undefined}>
               <If when={md()}>
                 <Splitter pane="settingsNav" side="right" width={navWidth()} min={176} max={360} label={t("web.setting.nav.width")} />
               </If>
@@ -138,18 +139,33 @@ export function SettingsPage(props: { rest: string }) {
                 class={md() ? "flex-1" : "shrink"}
                 contentClass={`gap-4 p-3 ${md() ? "min-h-full" : ""}`}
               >
-                <TextInput
-                  testID="settings-search"
-                  accessibilityLabel={t("web.setting.nav.search")}
-                  placeholder={t("web.setting.nav.search")}
-                  value={query()}
-                  onInput={query.set}
-                />
+                <View class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:border-faint focus-within:border-focus">
+                  <Icon name="search" size={14} tone="faint" />
+                  <Input
+                    testID="settings-search"
+                    accessibilityLabel={t("web.setting.nav.search")}
+                    placeholder={t("web.setting.nav.search")}
+                    value={query()}
+                    onChange={(e) => query.set(e.value)}
+                    class="min-w-0 flex-1 text-sm text-ink placeholder:text-faint"
+                  />
+                  <If when={query().length > 0}>
+                    <View
+                      role="button"
+                      accessibilityLabel={t("web.issue.page.clear")}
+                      tooltip={<Bubble text={t("web.issue.page.clear")} />}
+                      onPress={() => query.set("")}
+                      class="size-4 shrink-0 items-center justify-center rounded-xs hover:bg-hover"
+                    >
+                      <Icon name="close" size={10} tone="muted" />
+                    </View>
+                  </If>
+                </View>
                 <Each of={groups}>
                   {(g) => (
                     <If when={shown(g()).length > 0}>
                       <View class="gap-0.5">
-                        <Text class="px-2 pb-1 text-xs font-medium text-faint">{t(`web.setting.groups.${g()}`)}</Text>
+                        <Text class="px-2 pb-1 text-2xs font-semibold text-faint">{t(`web.setting.groups.${g()}`)}</Text>
                         <Each of={shown(g())}>{(s) => <SectionLink section={s()} current={s() === current()} />}</Each>
                       </View>
                     </If>
@@ -165,7 +181,7 @@ export function SettingsPage(props: { rest: string }) {
                 </Each>
               </Scroll>
             </View>
-            <Scroll testID={`settings-${current().id}`} class="min-h-0 min-w-0 flex-1" contentClass="p-5">
+            <Scroll testID={`settings-${current().id}`} class="min-h-0 min-w-0 flex-1 bg-page" contentClass="px-6 py-5">
               <Each of={[current()]}>{(s) => body(s())}</Each>
             </Scroll>
           </View>
@@ -182,10 +198,12 @@ function SectionLink(props: { section: Section; current: boolean }) {
       testID={`settings-section-${props.section.id}`}
       accessibilityLabel={props.section.label}
       accessibilityState={{ selected: props.current }}
-      class={`flex-row items-center gap-2.5 rounded-md px-2 py-1.5 ${props.current ? "bg-selected" : "hover:bg-hover"}`}
+      class={`group h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out ${props.current ? "bg-selected" : "hover:bg-hover"}`}
     >
-      <Icon name={props.section.icon} size={16} tone={props.current ? "ink" : "muted"} />
-      <Text class={`text-sm ${props.current ? "font-medium text-ink" : "text-muted hover:text-ink"}`}>{props.section.label}</Text>
+      <View class="w-4 shrink-0 items-center justify-center">
+        <Icon name={props.section.icon} size={14} tone={props.current ? "ink" : "muted"} />
+      </View>
+      <Text class={`min-w-0 flex-1 truncate text-sm ${props.current ? "font-medium text-ink" : "text-muted group-hover:text-ink"}`}>{props.section.label}</Text>
     </A>
   );
 }

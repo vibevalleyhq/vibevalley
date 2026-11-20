@@ -159,25 +159,45 @@ fn dev_ui_build_dir() -> Option<std::path::PathBuf> {
 
 /// The bundle every hosted view runs: `VIBEVALLEY_UI_BUNDLE` (or `ui/build` in
 /// debug builds) when present on disk, else the one embedded at build time.
+/// Cached process-wide so multiple hosted views share one disk read, and prefers
+/// the precompiled `bundle.nshc` bytecode when present to skip parsing 4+ MB JS.
 fn bundle() -> Bundle {
-    if let Some(dir) = dev_ui_build_dir() {
-        match std::fs::read_to_string(dir.join("bundle.js")) {
-            Ok(js) => {
+    static CACHED: std::sync::OnceLock<Bundle> = std::sync::OnceLock::new();
+    CACHED
+        .get_or_init(|| {
+            if let Some(dir) = dev_ui_build_dir() {
                 let raw_caps = std::fs::read_to_string(dir.join("capabilities.json")).unwrap_or_else(|_| CAPABILITIES.to_string());
-                if let Ok(b) = Bundle::source(js)
-                    .with_app_id(Some("dev.vibevalley.ui"))
-                    .with_capabilities_json(Some(&capabilities_from(&raw_caps)))
+                let nshc = dir.join("bundle.nshc");
+                if nshc.is_file()
+                    && let Ok(bytes) = std::fs::read(&nshc)
                 {
-                    return b;
+                    // SAFETY: local `nsh build` output under the workspace's own `ui/build/`.
+                    let b = unsafe { Bundle::bytecode(bytes) };
+                    if let Ok(b) = b
+                        .with_app_id(Some("dev.vibevalley.ui"))
+                        .with_capabilities_json(Some(&capabilities_from(&raw_caps)))
+                    {
+                        return b;
+                    }
+                }
+                match std::fs::read_to_string(dir.join("bundle.js")) {
+                    Ok(js) => {
+                        if let Ok(b) = Bundle::source(js)
+                            .with_app_id(Some("dev.vibevalley.ui"))
+                            .with_capabilities_json(Some(&capabilities_from(&raw_caps)))
+                        {
+                            return b;
+                        }
+                    }
+                    Err(e) => eprintln!("ui bundle at {}: {e}; using the embedded bundle", dir.display()),
                 }
             }
-            Err(e) => eprintln!("ui bundle at {}: {e}; using the embedded bundle", dir.display()),
-        }
-    }
-    Bundle::source(BUNDLE_JS.to_string())
-        .with_app_id(Some("dev.vibevalley.ui"))
-        .with_capabilities_json(Some(&capabilities_from(CAPABILITIES)))
-        .expect("capabilities.json written by nsh build")
+            Bundle::source(BUNDLE_JS.to_string())
+                .with_app_id(Some("dev.vibevalley.ui"))
+                .with_capabilities_json(Some(&capabilities_from(CAPABILITIES)))
+                .expect("capabilities.json written by nsh build")
+        })
+        .clone()
 }
 
 #[derive(Debug, Clone)]

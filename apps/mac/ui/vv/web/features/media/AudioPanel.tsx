@@ -26,10 +26,14 @@ import { Checkbox } from "../../ui/Checkbox";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { sizeText } from "../../ui/domain/AttachmentTile";
 import { Field, Select, TextArea, TextInput } from "../../ui/Field";
+import { Icon } from "../../ui/Icon";
 import { Card, Quiet } from "../../ui/layout";
+import { Segmented } from "../../ui/Segmented";
+import { Dot } from "../../ui/Tag";
 import { TextLink } from "../../ui/TextLink";
+import { Bubble } from "../../ui/Tip";
 import { audioTimestamp, dialogueComplete, supportsStreamingTranscription, transcriptContent } from "./audio";
-import { AudioMetadataLine, AudioUsageLine, JobActions, Refusal, ResultAudio, SourceLine } from "./JobFacts";
+import { AudioMetadataLine, AudioUsageLine, FactGrid, JobActions, NoticeBanner, PhasePill, Refusal, ResultAudio, SectionHeading, SourceLine } from "./JobFacts";
 import { ReleaseAssets } from "./ReleaseAssets";
 
 type AudioMode = "speakers" | "voiceDesign" | "clone" | "transcription";
@@ -63,23 +67,29 @@ export function AudioPanel() {
     ) ?? [];
 
   return (
-    <View testID="audio-panel" accessibilityLabel={t("web.audio.title")} class="min-w-0 gap-4">
-      <Text class="text-sm text-muted">{t("web.audio.notice")}</Text>
-      <View class="flex-row">
-        <Button testID="audio-refresh" disabled={act.busy() || query.fetching()} onPress={() => void act.run(() => query.refetch())}>
-          {t("web.audio.refresh")}
-        </Button>
+    <View testID="audio-panel" accessibilityLabel={t("web.audio.title")} class="max-w-3xl min-w-0 gap-4">
+      <NoticeBanner tone="info">{t("web.audio.notice")}</NoticeBanner>
+      <View class="flex-row flex-wrap items-center justify-between gap-2">
+        <Segmented
+          testid="audio-mode"
+          label={t("web.audio.title")}
+          value={mode()}
+          onChange={(kind) => mode.set(kind)}
+          options={modes.map((kind) => ({ value: kind, label: titleOf(kind) }))}
+        />
+        <View tooltip={<Bubble text={t("web.audio.refresh")} />}>
+          <Button
+            testID="audio-refresh"
+            tone="quiet"
+            icon="refresh"
+            disabled={act.busy() || query.fetching()}
+            onPress={() => void act.run(() => query.refetch())}
+          >
+            {t("web.audio.refresh")}
+          </Button>
+        </View>
       </View>
       <Refusal error={error() ?? (query.error() ? reasonOf(query.error()) : undefined)} testid="audio-error" />
-      <View class="flex-row flex-wrap gap-2">
-        <Each of={modes}>
-          {(kind) => (
-            <Button testID={`audio-mode-${kind()}`} tone={mode() === kind() ? "primary" : "plain"} onPress={() => mode.set(kind())}>
-              {titleOf(kind())}
-            </Button>
-          )}
-        </Each>
-      </View>
       <If when={mode() === "speakers"}>
         <SpeakersForm status={status()} />
       </If>
@@ -92,7 +102,7 @@ export function AudioPanel() {
       <If when={mode() === "transcription"}>
         <UploadForm kind="transcription" status={status()} />
       </If>
-      <Text class="text-base font-semibold text-ink">{t("web.audio.history")}</Text>
+      <SectionHeading title={t("web.audio.history")} count={jobs().length} />
       <If when={jobs().length > 0} else={<Quiet>{t("web.audio.empty")}</Quiet>}>
         <Each of={jobs()} key={(job) => job.id}>
           {(job) => <AudioJobCard job={job()} />}
@@ -104,10 +114,13 @@ export function AudioPanel() {
 
 function Binding(props: { connection: string | undefined; revision: number | undefined; model: string | undefined }) {
   return (
-    <If when={props.connection} else={<Quiet>{t("web.audio.configure")}</Quiet>}>
-      <Text testID="audio-binding" class="text-xs text-muted">
-        {`${props.connection} · ${props.model} · ${props.revision}`}
-      </Text>
+    <If when={props.connection} else={<NoticeBanner tone="warn">{t("web.audio.configure")}</NoticeBanner>}>
+      <View class="flex-row items-center gap-2 rounded-md bg-side px-3 py-2">
+        <Dot tone="leaf" size={6} ring={false} />
+        <Text testID="audio-binding" class="min-w-0 flex-1 truncate font-mono text-xs text-muted tabular-nums">
+          {`${props.connection} · ${props.model} · ${props.revision}`}
+        </Text>
+      </View>
     </If>
   );
 }
@@ -134,29 +147,36 @@ function VoicePicker(props: { connection: string; revision: number; value: strin
   };
   return (
     <View class="min-w-0 gap-2">
-      <Field label={t("web.audio.queryVoice")} hint={t("web.audio.queryHint")}>
-        <TextInput
-          testID={`${props.testid}-search`}
-          accessibilityLabel={t("web.audio.queryVoice")}
-          disabled={props.disabled}
-          value={search()}
-          onInput={(v) => search.set(v)}
-        />
-      </Field>
-      <Field label={t("web.audio.voice")}>
-        <Select
-          testid={props.testid}
-          label={t("web.audio.voice")}
-          placeholder={t("web.audio.chooseVoice")}
-          disabled={props.disabled || voices.fetching() || !props.connection}
-          value={props.value}
-          options={options()}
-          onChange={(voice) => props.onChange(voice)}
-        />
-      </Field>
-      <View class="flex-row flex-wrap gap-2">
+      <View class="flex-row gap-2.5">
+        <View class="min-w-0 flex-1">
+          <Field label={t("web.audio.queryVoice")} hint={t("web.audio.queryHint")}>
+            <TextInput
+              testID={`${props.testid}-search`}
+              accessibilityLabel={t("web.audio.queryVoice")}
+              disabled={props.disabled}
+              value={search()}
+              onInput={(v) => search.set(v)}
+            />
+          </Field>
+        </View>
+        <View class="min-w-0 flex-1">
+          <Field label={t("web.audio.voice")}>
+            <Select
+              testid={props.testid}
+              label={t("web.audio.voice")}
+              placeholder={t("web.audio.chooseVoice")}
+              disabled={props.disabled || voices.fetching() || !props.connection}
+              value={props.value}
+              options={options()}
+              onChange={(voice) => props.onChange(voice)}
+            />
+          </Field>
+        </View>
+      </View>
+      <View class="flex-row flex-wrap items-center gap-2">
         <Button
           testID={`${props.testid}-first`}
+          icon="refresh"
           disabled={props.disabled || voices.fetching() || !props.connection}
           onPress={() => {
             const first = page()?.scope !== scope() || !page()?.after;
@@ -168,6 +188,7 @@ function VoicePicker(props: { connection: string; revision: number; value: strin
         </Button>
         <Button
           testID={`${props.testid}-next`}
+          icon="next"
           disabled={props.disabled || voices.fetching() || ready(voices, undefined)?.hasMore !== true}
           onPress={() => {
             const after = ready(voices, undefined)?.nextCursor;
@@ -176,10 +197,10 @@ function VoicePicker(props: { connection: string; revision: number; value: strin
         >
           {t("web.audio.next")}
         </Button>
+        <If when={voices.fetching()}>
+          <Text class="text-xs text-muted">{t("web.base.form.asking")}</Text>
+        </If>
       </View>
-      <If when={voices.fetching()}>
-        <Quiet>{t("web.base.form.asking")}</Quiet>
-      </If>
       <If when={voices.status() === "success" && ready(voices, undefined)?.voices.length === 0}>
         <Quiet>{t("web.audio.emptyVoices")}</Quiet>
       </If>
@@ -197,24 +218,24 @@ function RequestActions(props: {
   reset: () => void;
 }) {
   return (
-    <>
+    <View class="min-w-0 gap-3">
       <If when={props.request}>
         {(request) => (
-          <View testID="audio-request" class="min-w-0 gap-1">
+          <View testID="audio-request" class="min-w-0 gap-1 rounded-md bg-side px-3 py-2">
             <Text class="text-xs text-muted">{t("web.audio.pending")}</Text>
-            <Text class="text-xs text-muted">{`${request().id} · ${request().connection} · ${request().revision}`}</Text>
+            <Text class="truncate font-mono text-2xs text-faint tabular-nums">{`${request().id} · ${request().connection} · ${request().revision}`}</Text>
           </View>
         )}
       </If>
-      <View class="flex-row flex-wrap gap-2">
-        <Button testID="audio-submit" tone="primary" disabled={props.busy || (!props.request && !props.valid)} onPress={() => props.submit()}>
+      <View class="flex-row flex-wrap items-center gap-2 border-t border-line pt-3">
+        <Button testID="audio-submit" tone="primary" icon="generate" disabled={props.busy || (!props.request && !props.valid)} onPress={() => props.submit()}>
           {props.request ? t("web.audio.check") : props.label}
         </Button>
         <If when={props.request}>
           <ConfirmButton testid="audio-new" label={t("web.audio.new")} question={t("web.audio.newAsk")} disabled={props.busy} onConfirm={() => props.reset()} />
         </If>
       </View>
-    </>
+    </View>
   );
 }
 
@@ -278,12 +299,27 @@ function SpeakersForm(props: { status: ProviderStatus | undefined }) {
 
   return (
     <Card title={t("web.audio.speakerTitle")}>
-      <Text class="text-sm text-muted">{t("web.audio.speakerHint")}</Text>
+      <Text class="text-xs leading-relaxed text-muted">{t("web.audio.speakerHint")}</Text>
       <Binding connection={binding()?.connection} model={binding()?.model} revision={props.status?.revision} />
-      <View class="min-w-0 gap-4">
+      <View class="min-w-0 gap-3">
         <Each of={speakers()} key={(speaker) => speaker.key}>
-          {(speaker) => (
-            <View testID="audio-speaker" class="min-w-0 gap-2">
+          {(speaker, idx) => (
+            <View testID="audio-speaker" class="min-w-0 gap-2.5 rounded-md bg-side p-3">
+              <View class="flex-row items-center justify-between gap-2">
+                <Text class="font-mono text-2xs font-semibold text-muted tabular-nums">{`${t("web.audio.speaker")} #${idx() + 1}`}</Text>
+                <Button
+                  testID="audio-remove-speaker"
+                  tone="quiet"
+                  icon="delete"
+                  disabled={disabled() || speakers().length <= 1}
+                  onPress={() => {
+                    const key = speaker().key;
+                    speakers.set(speakers().filter((item) => item.key !== key));
+                  }}
+                >
+                  {t("web.audio.remove")}
+                </Button>
+              </View>
               <Field label={t("web.audio.speaker")}>
                 <TextInput
                   testID="audio-speaker-name"
@@ -309,45 +345,57 @@ function SpeakersForm(props: { status: ProviderStatus | undefined }) {
                   speakers.set(speakers().map((item) => (item.key === key ? { ...item, voice, scope: current } : item)));
                 }}
               />
-              <View class="flex-row">
-                <Button
-                  testID="audio-remove-speaker"
-                  disabled={disabled() || speakers().length <= 1}
-                  onPress={() => {
-                    const key = speaker().key;
-                    speakers.set(speakers().filter((item) => item.key !== key));
-                  }}
-                >
-                  {t("web.audio.remove")}
-                </Button>
-              </View>
             </View>
           )}
         </Each>
         <View class="flex-row">
           <Button
             testID="audio-add-speaker"
+            icon="add"
             disabled={disabled() || speakers().length >= 5}
             onPress={() => speakers.set([...speakers(), { key: crypto.randomUUID(), id: "", voice: "", scope: "" }])}
           >
             {t("web.audio.addSpeaker")}
           </Button>
         </View>
-        <Text class="text-sm font-semibold text-ink">{t("web.audio.dialogue")}</Text>
+        <View class="flex-row items-center gap-2 border-t border-line pt-3">
+          <Text class="text-sm font-semibold text-ink">{t("web.audio.dialogue")}</Text>
+          <View class="rounded-full bg-hover px-1.5 py-px">
+            <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{String(segments().length)}</Text>
+          </View>
+        </View>
         <Each of={segments()} key={(segment) => segment.key}>
-          {(segment) => (
-            <View testID="audio-turn" class="min-w-0 gap-2">
-              <Select
-                testid="audio-turn-speaker"
-                label={t("web.audio.speaker")}
-                disabled={disabled()}
-                value={segment().speaker}
-                options={speakers().map((speaker) => ({ value: speaker.key, label: speaker.id || t("web.audio.speaker") }))}
-                onChange={(speaker) => {
-                  const key = segment().key;
-                  segments.set(segments().map((item) => (item.key === key ? { ...item, speaker } : item)));
-                }}
-              />
+          {(segment, idx) => (
+            <View testID="audio-turn" class="min-w-0 gap-2.5 rounded-md bg-side p-3">
+              <View class="flex-row items-center gap-2">
+                <Text class="w-6 shrink-0 font-mono text-2xs font-semibold text-faint tabular-nums">{`#${idx() + 1}`}</Text>
+                <View class="min-w-0 flex-1">
+                  <Select
+                    testid="audio-turn-speaker"
+                    label={t("web.audio.speaker")}
+                    size="control"
+                    disabled={disabled()}
+                    value={segment().speaker}
+                    options={speakers().map((speaker) => ({ value: speaker.key, label: speaker.id || t("web.audio.speaker") }))}
+                    onChange={(speaker) => {
+                      const key = segment().key;
+                      segments.set(segments().map((item) => (item.key === key ? { ...item, speaker } : item)));
+                    }}
+                  />
+                </View>
+                <Button
+                  testID="audio-remove-turn"
+                  tone="quiet"
+                  icon="delete"
+                  disabled={disabled() || segments().length <= 1}
+                  onPress={() => {
+                    const key = segment().key;
+                    segments.set(segments().filter((item) => item.key !== key));
+                  }}
+                >
+                  {t("web.audio.remove")}
+                </Button>
+              </View>
               <Field label={t("web.audio.text")}>
                 <TextArea
                   testID="audio-turn-text"
@@ -362,24 +410,13 @@ function SpeakersForm(props: { status: ProviderStatus | undefined }) {
                   }}
                 />
               </Field>
-              <View class="flex-row">
-                <Button
-                  testID="audio-remove-turn"
-                  disabled={disabled() || segments().length <= 1}
-                  onPress={() => {
-                    const key = segment().key;
-                    segments.set(segments().filter((item) => item.key !== key));
-                  }}
-                >
-                  {t("web.audio.remove")}
-                </Button>
-              </View>
             </View>
           )}
         </Each>
         <View class="flex-row">
           <Button
             testID="audio-add-turn"
+            icon="add"
             disabled={disabled()}
             onPress={() => {
               const speaker = speakers()[0]?.key ?? "";
@@ -436,9 +473,9 @@ function DesignForm(props: { status: ProviderStatus | undefined }) {
 
   return (
     <Card title={t("web.audio.designTitle")}>
-      <Text class="text-sm text-muted">{t("web.audio.designHint")}</Text>
+      <Text class="text-xs leading-relaxed text-muted">{t("web.audio.designHint")}</Text>
       <Binding connection={props.status?.voiceDesign?.connection} model={props.status?.voiceDesign?.model} revision={props.status?.revision} />
-      <View class="min-w-0 gap-3">
+      <View class="min-w-0 gap-3.5">
         <Field label={t("web.audio.instructions")}>
           <TextArea
             testID="audio-instructions"
@@ -552,35 +589,41 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
 
   return (
     <Card title={titleOf(props.kind)}>
-      <Text class="text-sm text-muted">{props.kind === "clone" ? t("web.audio.cloneHint") : t("web.audio.transcriptionHint")}</Text>
+      <Text class="text-xs leading-relaxed text-muted">{props.kind === "clone" ? t("web.audio.cloneHint") : t("web.audio.transcriptionHint")}</Text>
       <If when={props.kind === "transcription"}>
         <Binding connection={connection()} model={props.status?.transcription?.model} revision={props.status?.revision} />
       </If>
-      <View class="min-w-0 gap-3">
+      <View class="min-w-0 gap-3.5">
         <If when={props.kind === "clone"}>
-          <Field label={t("web.audio.account")}>
-            <Select
-              testid="audio-account"
-              label={t("web.audio.account")}
-              placeholder={t("web.audio.chooseAccount")}
-              value={account()}
-              disabled={disabled()}
-              options={(props.status?.connections ?? []).filter((item) => item.enabled).map((item) => ({ value: item.id, label: item.name }))}
-              onChange={(value) => {
-                account.set(value);
-                consent.set(undefined);
-              }}
-            />
-          </Field>
-          <Field label={t("web.audio.voiceName")}>
-            <TextInput
-              testID="audio-voice-name"
-              accessibilityLabel={t("web.audio.voiceName")}
-              disabled={disabled()}
-              value={name()}
-              onInput={(v) => name.set(v.slice(0, 1000))}
-            />
-          </Field>
+          <View class="flex-row gap-3">
+            <View class="min-w-0 flex-1">
+              <Field label={t("web.audio.account")}>
+                <Select
+                  testid="audio-account"
+                  label={t("web.audio.account")}
+                  placeholder={t("web.audio.chooseAccount")}
+                  value={account()}
+                  disabled={disabled()}
+                  options={(props.status?.connections ?? []).filter((item) => item.enabled).map((item) => ({ value: item.id, label: item.name }))}
+                  onChange={(value) => {
+                    account.set(value);
+                    consent.set(undefined);
+                  }}
+                />
+              </Field>
+            </View>
+            <View class="min-w-0 flex-1">
+              <Field label={t("web.audio.voiceName")}>
+                <TextInput
+                  testID="audio-voice-name"
+                  accessibilityLabel={t("web.audio.voiceName")}
+                  disabled={disabled()}
+                  value={name()}
+                  onInput={(v) => name.set(v.slice(0, 1000))}
+                />
+              </Field>
+            </View>
+          </View>
         </If>
         <Field label={t("web.audio.input")}>
           <View class="flex-row flex-wrap items-center gap-2">
@@ -589,9 +632,12 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
             </Button>
             <If when={selected()}>
               {(file) => (
-                <Text testID="audio-file-name" class="min-w-0 flex-1 text-xs text-muted">
-                  {`${file().file.name} · ${sizeText(file().file.size)}`}
-                </Text>
+                <View class="min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md bg-side px-2.5 py-1.5">
+                  <Icon name="audio" size={14} tone="muted" />
+                  <Text testID="audio-file-name" class="min-w-0 flex-1 truncate text-xs text-ink tabular-nums">
+                    {`${file().file.name} · ${sizeText(file().file.size)}`}
+                  </Text>
+                </View>
               )}
             </If>
           </View>
@@ -621,7 +667,7 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
             />
           </Field>
         </If>
-        <View class="flex-row items-start gap-2">
+        <View class="flex-row items-start gap-2 rounded-md bg-side px-3 py-2.5">
           <Checkbox
             testid="audio-consent"
             label={t("web.audio.consent")}
@@ -633,15 +679,18 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
               consent.set(checked && file && current && connection() ? { file, connection: connection(), revision: current.revision } : undefined);
             }}
           />
-          <Text class="min-w-0 flex-1 text-sm text-ink">{t("web.audio.consent")}</Text>
+          <Text class="min-w-0 flex-1 text-xs leading-relaxed text-ink">{t("web.audio.consent")}</Text>
         </View>
       </View>
       <If when={act.busy() && !submitted()}>
-        <View class="flex-row flex-wrap items-center gap-2">
-          <Text testID="audio-uploading" class="text-sm text-muted">
-            {t("web.audio.uploading")}
-          </Text>
-          <Button testID="audio-stop-upload" onPress={() => transfer?.abort()}>
+        <View class="flex-row flex-wrap items-center justify-between gap-2 rounded-md bg-side px-3 py-2">
+          <View class="flex-row items-center gap-2">
+            <Dot tone="water" size={6} ring={false} />
+            <Text testID="audio-uploading" class="text-xs text-water">
+              {t("web.audio.uploading")}
+            </Text>
+          </View>
+          <Button testID="audio-stop-upload" tone="danger" icon="stop" onPress={() => transfer?.abort()}>
             {t("web.audio.stopUpload")}
           </Button>
         </View>
@@ -660,15 +709,17 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
       />
       <Refusal error={error()} testid="audio-form-error" />
       <If when={props.kind === "clone" && connection()}>
-        <Text class="text-sm font-semibold text-ink">{t("web.audio.voices")}</Text>
-        <VoicePicker
-          connection={connection()}
-          revision={props.status?.revision ?? 0}
-          value={selectedVoice()?.connection === connection() && selectedVoice()?.revision === props.status?.revision ? (selectedVoice()?.id ?? "") : ""}
-          disabled={act.busy()}
-          testid="audio-account-voice"
-          onChange={(id) => selectedVoice.set({ connection: connection(), revision: props.status?.revision ?? 0, id })}
-        />
+        <View class="min-w-0 gap-2 border-t border-line pt-3">
+          <Text class="text-sm font-semibold text-ink">{t("web.audio.voices")}</Text>
+          <VoicePicker
+            connection={connection()}
+            revision={props.status?.revision ?? 0}
+            value={selectedVoice()?.connection === connection() && selectedVoice()?.revision === props.status?.revision ? (selectedVoice()?.id ?? "") : ""}
+            disabled={act.busy()}
+            testid="audio-account-voice"
+            onChange={(id) => selectedVoice.set({ connection: connection(), revision: props.status?.revision ?? 0, id })}
+          />
+        </View>
       </If>
     </Card>
   );
@@ -696,6 +747,7 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
   const act = createAct((e) => error.set(e));
   const transcription = () => (props.job.result?.kind === "transcription" ? props.job.result : undefined);
   const partial = () => props.job.phase !== "ready";
+  const failed = () => props.job.phase === "failed" || props.job.phase === "download_failed";
   const voice = () => (props.job.result?.kind === "clone" ? props.job.result.voice : undefined);
   const content = () => {
     const result = transcription();
@@ -727,25 +779,29 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
   };
 
   return (
-    <Card title={props.job.phaseText}>
+    <Card title={titleOf(props.job.kind)} action={<PhasePill phase={props.job.phase} text={props.job.phaseText} />}>
       <View testID="audio-job" class="min-w-0 gap-3">
-        <Text class="text-xs font-medium text-ink">{titleOf(props.job.kind)}</Text>
-        <Text class="text-xs text-muted">{[props.job.model, props.job.connection, props.job.revision, props.job.id].join(" · ")}</Text>
-        <If when={props.job.format}>
-          {(format) => (
-            <Text testID="audio-format-result" class="text-xs text-muted">
-              {`${t("web.audio.format")}: ${format().toUpperCase()}`}
-            </Text>
-          )}
-        </If>
-        <AudioMetadataLine metadata={props.job.metadata} testid="audio-metadata" />
-        <SourceLine source={props.job.source} testid="audio-source" />
-        <Text class="text-sm text-ink">{props.job.prompt}</Text>
+        <FactGrid>
+          <Text class="font-mono text-2xs text-muted tabular-nums">
+            {[props.job.model, props.job.connection, props.job.revision, props.job.id].join(" · ")}
+          </Text>
+          <If when={props.job.format}>
+            {(format) => (
+              <Text testID="audio-format-result" class="font-mono text-2xs text-muted">
+                {`${t("web.audio.format")}: ${format().toUpperCase()}`}
+              </Text>
+            )}
+          </If>
+          <AudioMetadataLine metadata={props.job.metadata} testid="audio-metadata" />
+          <SourceLine source={props.job.source} testid="audio-source" />
+          <AudioUsageLine usage={props.job.usage} testid="audio-usage" />
+        </FactGrid>
+        <Text class="text-sm leading-relaxed text-ink">{props.job.prompt}</Text>
         <If when={props.job.problem}>
           {(problem) => (
-            <Text testID="audio-problem" class="text-sm text-muted">
+            <NoticeBanner tone={failed() ? "error" : "warn"} testid="audio-problem">
               {problem()}
-            </Text>
+            </NoticeBanner>
           )}
         </If>
         <ResultAudio
@@ -754,147 +810,204 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
           pcm={props.job.format === "pcm"}
           prefix="audio-result"
           save={t("web.audio.downloadAudio")}
+          duration={props.job.metadata?.duration}
+          format={props.job.format}
         />
         <If when={props.job.kind === "voiceDesign" && props.job.previewInput !== null}>
-          <Text class="text-sm text-muted">{t("web.audio.designHint")}</Text>
-          <Field label={t("web.audio.voiceName")}>
-            <TextInput
-              testID="audio-save-name"
-              accessibilityLabel={t("web.audio.voiceName")}
-              disabled={act.busy() || Boolean(originalSave())}
-              value={originalSave()?.name ?? name()}
-              onInput={(v) => name.set(v.slice(0, 1000))}
-            />
-          </Field>
-          <View class="flex-row">
-            <Button testID="audio-save-voice" disabled={act.busy()} onPress={() => void saveVoice()}>
-              {originalSave() ? t("web.audio.check") : t("web.audio.saveVoice")}
-            </Button>
+          <View class="min-w-0 gap-2.5 rounded-md bg-side p-3">
+            <Text class="text-xs leading-relaxed text-muted">{t("web.audio.designHint")}</Text>
+            <View class="flex-row flex-wrap items-end gap-2">
+              <View class="min-w-0 flex-1">
+                <Field label={t("web.audio.voiceName")}>
+                  <TextInput
+                    testID="audio-save-name"
+                    accessibilityLabel={t("web.audio.voiceName")}
+                    disabled={act.busy() || Boolean(originalSave())}
+                    value={originalSave()?.name ?? name()}
+                    onInput={(v) => name.set(v.slice(0, 1000))}
+                  />
+                </Field>
+              </View>
+              <Button testID="audio-save-voice" disabled={act.busy()} onPress={() => void saveVoice()}>
+                {originalSave() ? t("web.audio.check") : t("web.audio.saveVoice")}
+              </Button>
+            </View>
           </View>
         </If>
         <If when={voice()}>
           {(result) => (
-            <Text testID="audio-saved-voice" class="text-sm text-ink">
-              {t("web.audio.savedVoice", { voice: result().name ? `${result().name} · ${result().id}` : result().id })}
-            </Text>
+            <View class="flex-row items-center gap-2 rounded-md bg-ok-soft px-3 py-2">
+              <Icon name="check" size={12} />
+              <Text testID="audio-saved-voice" class="min-w-0 flex-1 text-xs font-medium text-ok-ink">
+                {t("web.audio.savedVoice", { voice: result().name ? `${result().name} · ${result().id}` : result().id })}
+              </Text>
+            </View>
           )}
         </If>
         <If when={transcription()}>
           {(result) => (
-            <>
-              <Text class="text-sm font-semibold text-ink">{t("web.audio.transcript")}</Text>
-              <If when={partial()}>
-                <Text testID="audio-partial" class="text-sm text-muted">
-                  {t("web.audio.partialTranscript")}
-                </Text>
-              </If>
-              <Text testID="audio-transcript" class="text-sm text-ink">
-                {result().text}
-              </Text>
-              <Text class="text-sm font-semibold text-ink">{t("web.audio.timeline")}</Text>
-              <If when={result().segments.length > 0} else={<Quiet>{t("web.audio.noTimestamps")}</Quiet>}>
-                <View testID="audio-timeline" class="min-w-0 gap-3">
-                  <Each of={result().segments}>
-                    {(segment) => (
-                      <View class="min-w-0 gap-1">
-                        <Button
-                          testID={`audio-seek-${segment().start}`}
-                          disabled={!props.job.input}
-                          onPress={() => {
-                            const input = props.job.input;
-                            if (input) void act.run(() => playInput(input.id, segment().start));
-                          }}
-                        >
-                          {`${audioTimestamp(segment().start)} – ${audioTimestamp(segment().end)}`}
-                        </Button>
-                        <Text class="text-xs font-medium text-ink">{segment().speaker || t("web.audio.unknownSpeaker")}</Text>
-                        <Text class="text-sm text-ink">{segment().text}</Text>
-                      </View>
-                    )}
-                  </Each>
+            <View class="min-w-0 gap-3">
+              <View class="min-w-0 gap-2 rounded-md bg-side p-3">
+                <View class="flex-row flex-wrap items-center justify-between gap-2">
+                  <Text class="text-xs font-semibold text-ink">{t("web.audio.transcript")}</Text>
+                  <View class="flex-row flex-wrap items-center gap-1.5">
+                    <View tooltip={<Bubble text={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}>
+                      <Button
+                        testID="audio-copy-transcript"
+                        icon={copied() ? "check" : "copy"}
+                        disabled={!content()}
+                        onPress={() =>
+                          void Clipboard.writeText(content()).then(() => {
+                            copied.set(true);
+                            later(() => copied.set(false), 1500);
+                          })
+                        }
+                      >
+                        {copied() ? t("web.base.rich.copied") : partial() ? t("web.audio.copyPartialTranscript") : t("web.audio.copyTranscript")}
+                      </Button>
+                    </View>
+                    <Button
+                      testID="audio-save-transcript"
+                      icon="artifacts"
+                      disabled={act.busy() || Boolean(saved()) || !content()}
+                      onPress={() => {
+                        const text = content();
+                        const input = props.job.input?.name ?? props.job.id;
+                        const title = partial() ? `${input} — ${t("web.audio.partialTitle")}` : input;
+                        void act.run(async () => saved.set((await api.artifact.create({ title, kind: "markdown", content: text })).id));
+                      }}
+                    >
+                      {partial() ? t("web.audio.savePartialTranscript") : t("web.audio.saveTranscript")}
+                    </Button>
+                  </View>
                 </View>
-              </If>
-              <View class="flex-row flex-wrap items-center gap-2">
-                <Button
-                  testID="audio-copy-transcript"
-                  icon="copy"
-                  disabled={!content()}
-                  onPress={() =>
-                    void Clipboard.writeText(content()).then(() => {
-                      copied.set(true);
-                      later(() => copied.set(false), 1500);
-                    })
-                  }
-                >
-                  {copied() ? t("web.base.rich.copied") : partial() ? t("web.audio.copyPartialTranscript") : t("web.audio.copyTranscript")}
-                </Button>
-                <Button
-                  testID="audio-save-transcript"
-                  disabled={act.busy() || Boolean(saved()) || !content()}
-                  onPress={() => {
-                    const text = content();
-                    const input = props.job.input?.name ?? props.job.id;
-                    const title = partial() ? `${input} — ${t("web.audio.partialTitle")}` : input;
-                    void act.run(async () => saved.set((await api.artifact.create({ title, kind: "markdown", content: text })).id));
-                  }}
-                >
-                  {partial() ? t("web.audio.savePartialTranscript") : t("web.audio.saveTranscript")}
-                </Button>
+                <If when={partial()}>
+                  <NoticeBanner tone="warn" testid="audio-partial">
+                    {t("web.audio.partialTranscript")}
+                  </NoticeBanner>
+                </If>
+                <Text testID="audio-transcript" class="text-sm leading-relaxed text-ink" style={{ userSelect: "text" }}>
+                  {result().text}
+                </Text>
+                <If when={saved()}>
+                  {(id) => (
+                    <TextLink href={`/artifacts/${id()}`} testid="audio-artifact">
+                      {t("web.audio.openTranscript")}
+                    </TextLink>
+                  )}
+                </If>
               </View>
-              <If when={saved()}>
-                {(id) => (
-                  <TextLink href={`/artifacts/${id()}`} testid="audio-artifact">
-                    {t("web.audio.openTranscript")}
-                  </TextLink>
-                )}
-              </If>
-            </>
+              <View class="min-w-0 gap-2">
+                <View class="flex-row items-center gap-2">
+                  <Text class="text-xs font-semibold text-muted">{t("web.audio.timeline")}</Text>
+                  <If when={result().segments.length > 0}>
+                    <View class="rounded-full bg-hover px-1.5 py-px">
+                      <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{String(result().segments.length)}</Text>
+                    </View>
+                  </If>
+                </View>
+                <If when={result().segments.length > 0} else={<Quiet>{t("web.audio.noTimestamps")}</Quiet>}>
+                  <View testID="audio-timeline" class="min-w-0 gap-1">
+                    <Each of={result().segments}>
+                      {(segment) => (
+                        <View class="flex-row items-start gap-2.5 rounded-md px-2 py-1.5 transition duration-120 ease-out hover:bg-hover">
+                          <View
+                            role="button"
+                            testID={`audio-seek-${segment().start}`}
+                            accessibilityLabel={`${audioTimestamp(segment().start)} – ${audioTimestamp(segment().end)}`}
+                            tooltip={<Bubble text={t("web.catalog.play")} />}
+                            disabled={!props.job.input}
+                            onPress={() => {
+                              const input = props.job.input;
+                              if (input) void act.run(() => playInput(input.id, segment().start));
+                            }}
+                            class={`mt-0.5 h-6 shrink-0 flex-row items-center gap-1 rounded-sm border border-line bg-page px-1.5 transition duration-120 ease-out ${
+                              !props.job.input ? "opacity-50" : "hover:bg-selected active:translate-y-px"
+                            }`}
+                          >
+                            <Icon name="play" size={10} tone="muted" />
+                            <Text class="font-mono text-2xs text-ink tabular-nums">
+                              {`${audioTimestamp(segment().start)} – ${audioTimestamp(segment().end)}`}
+                            </Text>
+                          </View>
+                          <View class="min-w-0 flex-1 gap-0.5">
+                            <Text class={`text-xs font-medium ${segment().speaker ? "text-water" : "text-faint"}`}>
+                              {segment().speaker || t("web.audio.unknownSpeaker")}
+                            </Text>
+                            <Text class="text-sm text-ink">{segment().text}</Text>
+                          </View>
+                        </View>
+                      )}
+                    </Each>
+                  </View>
+                </If>
+              </View>
+            </View>
           )}
         </If>
-        <AudioUsageLine usage={props.job.usage} testid="audio-usage" />
         <If when={props.job.canRelease}>
           <ReleaseAssets id={props.job.id} />
         </If>
         <If when={props.job.canCleanup}>
-          <View class="flex-row">
-            <Button
-              testID="audio-preview-cleanup"
-              disabled={act.busy()}
-              onPress={() => {
-                const id = props.job.id;
-                void act.run(async () => cleanupPreview.set(await api.media.audio.previewCleanup({ id })));
-              }}
-            >
-              {t("web.audio.cleanupPreview")}
-            </Button>
-          </View>
-          <If when={cleanupPreview()}>
-            {(preview) => (
-              <View class="min-w-0 gap-2">
-                <View class="gap-1">
-                  <Each of={preview().does}>{(step) => <Text class="text-sm text-muted">{`• ${step()}`}</Text>}</Each>
+          <View class="min-w-0 gap-2">
+            <View class="flex-row">
+              <Button
+                testID="audio-preview-cleanup"
+                icon="show"
+                disabled={act.busy()}
+                onPress={() => {
+                  const id = props.job.id;
+                  void act.run(async () => cleanupPreview.set(await api.media.audio.previewCleanup({ id })));
+                }}
+              >
+                {t("web.audio.cleanupPreview")}
+              </Button>
+            </View>
+            <If when={cleanupPreview()}>
+              {(preview) => (
+                <View class="min-w-0 gap-2 rounded-md bg-side p-3">
+                  <View class="gap-1">
+                    <Each of={preview().does}>
+                      {(step) => (
+                        <View class="flex-row items-start gap-2 rounded-sm bg-page px-2.5 py-1.5">
+                          <View class="mt-1.5 shrink-0">
+                            <Dot tone="muted" size={5} ring={false} />
+                          </View>
+                          <Text class="min-w-0 flex-1 text-xs text-ink">{step()}</Text>
+                        </View>
+                      )}
+                    </Each>
+                  </View>
+                  <View class="flex-row flex-wrap items-center gap-2">
+                    <ConfirmButton
+                      testid="audio-cleanup"
+                      tone="danger"
+                      icon="delete"
+                      label={t("web.audio.cleanup")}
+                      question={t("web.audio.cleanupAsk")}
+                      disabled={act.busy()}
+                      onConfirm={() => {
+                        const id = props.job.id;
+                        void act.run(async () => {
+                          await api.media.audio.cleanup({ id });
+                          cleanupPreview.set(undefined);
+                        });
+                      }}
+                    />
+                    <Button tone="quiet" disabled={act.busy()} onPress={() => cleanupPreview.set(undefined)}>
+                      {t("web.base.form.never")}
+                    </Button>
+                  </View>
                 </View>
-                <ConfirmButton
-                  testid="audio-cleanup"
-                  label={t("web.audio.cleanup")}
-                  question={t("web.audio.cleanupAsk")}
-                  disabled={act.busy()}
-                  onConfirm={() => {
-                    const id = props.job.id;
-                    void act.run(async () => {
-                      await api.media.audio.cleanup({ id });
-                      cleanupPreview.set(undefined);
-                    });
-                  }}
-                />
-              </View>
-            )}
-          </If>
+              )}
+            </If>
+          </View>
         </If>
         <JobActions job={props.job} act={act} prefix="audio">
           <If when={props.job.canResume}>
             <Button
               testID="audio-resume"
+              icon="retry"
               disabled={act.busy()}
               onPress={() => {
                 const id = props.job.id;

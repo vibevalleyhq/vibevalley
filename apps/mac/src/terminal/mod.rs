@@ -8,13 +8,16 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gpui_kit::{
     App, AppContext as _, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent, Modifiers,
-    MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Render, ScrollEvent, Styled as _, Window, div, px,
+    MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point, Render, ScrollEvent, Styled as _, Window, div, point, px,
 };
-use vibevalley_terminal::{Mods, MouseButton as TermButton, MouseInput, MouseKind, SelectionMode, Snapshot, SpawnOptions, TermEvent, TermSession, TermSize};
+use unicode_segmentation::UnicodeSegmentation;
+use vibevalley_terminal::{
+    Mods, MouseButton as TermButton, MouseInput, MouseKind, Row, SelectionMode, Snapshot, SpawnOptions, TermEvent, TermSession, TermSize,
+};
 
 pub use element::Geometry;
 use element::{RowCache, TerminalElement};
@@ -56,6 +59,7 @@ pub enum TerminalEvent {
     Bell,
     CommandFinished,
     Exited,
+    OpenLink(String),
 }
 
 enum Input {
@@ -86,6 +90,45 @@ enum State {
     Failed(String),
 }
 
+/// How actively a terminal is running work.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RunningState {
+    /// Actively producing output or executing a foreground command.
+    Working,
+    /// An interactive agent CLI or full-screen TUI is open and waiting at its prompt.
+    Ready,
+    /// Plain idle shell with no active command or agent.
+    #[default]
+    Idle,
+}
+
+impl RunningState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Working => "working",
+            Self::Ready => "ready",
+            Self::Idle => "idle",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TerminalStatus {
+    pub state: RunningState,
+    pub agent: Option<String>,
+    pub label: Option<String>,
+}
+
+impl TerminalStatus {
+    pub fn idle() -> Self {
+        Self::default()
+    }
+}
+
+/// PTY output within this window treats an interactive agent/TUI as actively
+/// working rather than sitting idle at its input prompt.
+const ACTIVE_OUTPUT_WINDOW: Duration = Duration::from_secs(3);
+
 pub struct TerminalView {
     state: State,
     pending_input: Vec<Input>,
@@ -98,13 +141,16 @@ pub struct TerminalView {
     focused: bool,
     title: Option<String>,
     running_command: Option<String>,
-    last_running: Option<(String, String)>,
+    last_output_at: Option<Instant>,
+    settle_pending: bool,
+    last_status: TerminalStatus,
     exited: bool,
     scroll_remainder: Pixels,
     /// Left button went down inside the grid (selection or reported drag).
     dragging: bool,
     /// Cell where a click started, and whether its selection is still unstarted.
     drag_anchor: Option<(vibevalley_terminal::Point, bool)>,
+    context_menu: Option<Point<Pixels>>,
 }
 
 fn mods(m: Modifiers) -> Mods {
@@ -173,11 +219,14 @@ impl TerminalView {
             focused: false,
             title: initial_title,
             running_command: None,
-            last_running: None,
+            last_output_at: None,
+            settle_pending: false,
+            last_status: TerminalStatus::idle(),
             exited: false,
             scroll_remainder: px(0.0),
             dragging: false,
             drag_anchor: None,
+            context_menu: None,
         }
     }
 
@@ -200,77 +249,96 @@ impl TerminalView {
         self.link_title().or(self.title.as_deref())
     }
 
-    /// Detects whether an agent (`codex`, `claude`, `opencode`, ...) or command
-    /// is actively running in this terminal: returns `(agent_id, display_label)`.
+    /// Structured status distinguishing actively running commands/output (`Working`)
+    /// from an interactive agent CLI sitting open at its prompt (`Ready`) and a plain
+    /// idle shell (`Idle`).
+    pub fn terminal_status(&self) -> TerminalStatus {
+        self.terminal_status_at(Instant::now())
+    }
+
+    fn terminal_status_at(&self, now: Instant) -> TerminalStatus {
+        let recent_output = self.last_output_at.is_some_and(|t| now.saturating_duration_since(t) < ACTIVE_OUTPUT_WINDOW);
+        let snap = self.snapshot();
+        let mut alt_lines = Vec::new();
+        let mut inline_lines = Vec::new();
+        let mut is_idle_prompt = false;
+        let alt_screen = snap.as_ref().is_some_and(|s| s.alt_screen);
+
+        if let Some(snap) = snap.as_ref() {
+            if snap.alt_screen {
+                alt_lines = snap.rows.iter().map(|row| row.runs.iter().map(|r| r.text.as_str()).collect()).collect();
+            } else {
+                let cursor_row = snap.cursor.row as usize;
+                let max_row = cursor_row.min(snap.rows.len().saturating_sub(1));
+                for row in snap.rows.iter().take(max_row + 1).rev().take(12) {
+                    let line: String = row.runs.iter().map(|r| r.text.as_str()).collect();
+                    let trimmed = line.trim();
+                    if !trimmed.is_empty() {
+                        inline_lines.push(trimmed.to_lowercase());
+                    }
+                }
+                let last_non_empty = inline_lines.first().map(String::as_str).unwrap_or("");
+                is_idle_prompt = looks_like_shell_prompt(last_non_empty);
+            }
+        }
+
+        classify_terminal_status(
+            self.exited,
+            self.running_command.as_deref(),
+            self.spec.program.as_deref(),
+            self.title.as_deref(),
+            alt_screen,
+            &alt_lines,
+            &inline_lines,
+            is_idle_prompt,
+            recent_output,
+        )
+    }
+
+    /// Detects whether an agent (`antigravity`, `codex`, `claude`, `opencode`, ...) or
+    /// command is present in this terminal: returns `(agent_id, display_label)`.
     pub fn running_status(&self) -> Option<(String, String)> {
-        if self.exited {
-            return None;
+        let status = self.terminal_status();
+        match status.state {
+            RunningState::Idle => None,
+            RunningState::Working | RunningState::Ready => Some((status.agent?, status.label?)),
         }
-        if let Some(cmd) = self.running_command.as_deref() {
-            if let Some(agent) = detect_agent_token(cmd) {
-                return Some((agent.to_string(), agent.to_string()));
+    }
+
+    fn ensure_settle_timer(&mut self, cx: &mut Context<Self>) {
+        if self.settle_pending {
+            return;
+        }
+        self.settle_pending = true;
+        cx.spawn(async move |this, cx| {
+            loop {
+                let wait = this
+                    .update(cx, |view, cx| {
+                        let Some(last_at) = view.last_output_at else {
+                            view.settle_pending = false;
+                            return None;
+                        };
+                        let elapsed = Instant::now().saturating_duration_since(last_at);
+                        if elapsed < ACTIVE_OUTPUT_WINDOW {
+                            return Some((ACTIVE_OUTPUT_WINDOW - elapsed) + Duration::from_millis(80));
+                        }
+                        view.settle_pending = false;
+                        let now = view.terminal_status();
+                        if now != view.last_status {
+                            view.last_status = now;
+                            cx.emit(TerminalEvent::TitleChanged);
+                        }
+                        None
+                    })
+                    .ok()
+                    .flatten();
+                let Some(delay) = wait else {
+                    break;
+                };
+                cx.background_executor().timer(delay).await;
             }
-            let head = first_command_token(cmd).unwrap_or(cmd);
-            return Some(("cmd".into(), head.to_string()));
-        }
-        if let Some(title) = self.title.as_deref()
-            && let Some(agent) = detect_agent_token(title)
-        {
-            return Some((agent.to_string(), agent.to_string()));
-        }
-        let snap = self.snapshot()?;
-        if snap.alt_screen {
-            for row in &snap.rows {
-                let line: String = row.runs.iter().map(|r| r.text.as_str()).collect();
-                if let Some(agent) = detect_agent_token(&line) {
-                    return Some((agent.to_string(), agent.to_string()));
-                }
-            }
-            let label = self.title.clone().unwrap_or_else(|| "运行中".into());
-            return Some(("cmd".into(), label));
-        }
-        // Inline agent TUIs (like Codex or Claude Code) that do not use alt_screen:
-        // check the non-empty lines near the cursor if the cursor row is not an idle shell prompt.
-        let cursor_row = snap.cursor.row as usize;
-        let max_row = cursor_row.min(snap.rows.len().saturating_sub(1));
-        let mut window_lines = Vec::new();
-        for row in snap.rows.iter().take(max_row + 1).rev().take(12) {
-            let line: String = row.runs.iter().map(|r| r.text.as_str()).collect();
-            let trimmed = line.trim();
-            if !trimmed.is_empty() {
-                window_lines.push(trimmed.to_lowercase());
-            }
-        }
-        let last_non_empty = window_lines.first().map(String::as_str).unwrap_or("");
-        let is_idle_prompt = last_non_empty.ends_with('%')
-            || last_non_empty.ends_with('$')
-            || last_non_empty.ends_with('#')
-            || last_non_empty.ends_with('❯')
-            || last_non_empty.ends_with('➜');
-        if !is_idle_prompt {
-            for line in &window_lines {
-                if line.contains("openai codex")
-                    || line.starts_with("codex")
-                    || line.contains("% codex")
-                    || line.contains("$ codex")
-                    || line.contains("❯ codex")
-                {
-                    return Some(("codex".into(), "codex".into()));
-                }
-                if line.contains("claude code")
-                    || line.starts_with("claude")
-                    || line.contains("% claude")
-                    || line.contains("$ claude")
-                    || line.contains("❯ claude")
-                {
-                    return Some(("claude".into(), "claude".into()));
-                }
-                if line.contains("opencode") {
-                    return Some(("opencode".into(), "opencode".into()));
-                }
-            }
-        }
-        None
+        })
+        .detach();
     }
 
     pub fn directory(&self) -> PathBuf {
@@ -390,9 +458,13 @@ impl TerminalView {
     fn on_term_event(&mut self, event: TermEvent, cx: &mut Context<Self>) {
         match event {
             TermEvent::Dirty => {
-                let now_running = self.running_status();
-                if now_running != self.last_running {
-                    self.last_running = now_running;
+                self.last_output_at = Some(Instant::now());
+                let now_status = self.terminal_status();
+                if now_status.state == RunningState::Working {
+                    self.ensure_settle_timer(cx);
+                }
+                if now_status != self.last_status {
+                    self.last_status = now_status;
                     cx.emit(TerminalEvent::TitleChanged);
                 }
                 cx.notify();
@@ -403,24 +475,35 @@ impl TerminalView {
                     return;
                 }
                 self.title = next.or_else(|| self.spec.title.clone().filter(|t| !t.trim().is_empty()));
-                self.last_running = self.running_status();
+                let now_status = self.terminal_status();
+                if now_status.state == RunningState::Working {
+                    self.ensure_settle_timer(cx);
+                }
+                self.last_status = now_status;
                 cx.emit(TerminalEvent::TitleChanged);
             }
             TermEvent::CwdChanged(_) => cx.emit(TerminalEvent::TitleChanged),
             TermEvent::Bell => cx.emit(TerminalEvent::Bell),
             TermEvent::CommandStarted(block) => {
                 self.running_command = Some(block.command).filter(|c| !c.trim().is_empty());
-                self.last_running = self.running_status();
+                self.last_output_at = Some(Instant::now());
+                let now_status = self.terminal_status();
+                if now_status.state == RunningState::Working {
+                    self.ensure_settle_timer(cx);
+                }
+                self.last_status = now_status;
                 cx.emit(TerminalEvent::TitleChanged);
             }
             TermEvent::CommandFinished(_) => {
                 self.running_command = None;
-                self.last_running = self.running_status();
+                self.last_output_at = None;
+                self.last_status = self.terminal_status();
                 cx.emit(TerminalEvent::CommandFinished);
             }
             TermEvent::Exited { .. } => {
                 self.running_command = None;
-                self.last_running = None;
+                self.last_output_at = None;
+                self.last_status = TerminalStatus::idle();
                 self.exited = true;
                 cx.emit(TerminalEvent::Exited);
                 cx.notify();
@@ -453,7 +536,27 @@ impl TerminalView {
         cx.notify();
     }
 
+    fn on_capture_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
+        // Intercept Tab / Shift-Tab before gpui-base::Root's focus-cycling keybindings swallow them.
+        if self.marked.is_some() || event.keystroke.key != "tab" || event.keystroke.modifiers.platform {
+            return;
+        }
+        let option_as_meta = Ui::get(cx).settings.option_as_meta;
+        if let Some(input) = keys::map_keystroke(&event.keystroke, option_as_meta) {
+            self.input(Input::Key(input));
+            cx.stop_propagation();
+            self.wake_cursor(cx);
+        }
+    }
+
     fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if self.context_menu.take().is_some() {
+            cx.notify();
+            if event.keystroke.key == "escape" {
+                cx.stop_propagation();
+                return;
+            }
+        }
         // While composing, every key belongs to the input method.
         if self.marked.is_some() {
             return;
@@ -507,7 +610,9 @@ impl TerminalView {
 
     fn on_mouse_down(&mut self, event: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         window.focus(&self.focus, cx);
-        let (Some(session), Some(g)) = (self.session(), self.geometry) else { return };
+        let (Some(session), Some(g)) = (self.session().cloned(), self.geometry) else {
+            return;
+        };
         let at = g.cell_at(event.position);
         let button = match event.button {
             MouseButton::Left => TermButton::Left,
@@ -516,6 +621,9 @@ impl TerminalView {
             _ => return,
         };
         if self.reports_mouse(event.modifiers) {
+            if self.context_menu.take().is_some() {
+                cx.notify();
+            }
             session.send_mouse(MouseInput {
                 kind: MouseKind::Press(button),
                 at,
@@ -524,14 +632,31 @@ impl TerminalView {
             self.dragging = button == TermButton::Left;
             return;
         }
+        if button == TermButton::Right {
+            let local_x = (event.position.x - g.origin.x + px(element::PADDING)).max(px(4.0));
+            let local_y = (event.position.y - g.origin.y + px(element::PADDING)).max(px(4.0));
+            let max_x = (g.cell_width * g.size.cols as f32 + px(element::PADDING * 2.0) - px(164.0)).max(px(4.0));
+            let max_y = (g.line_height * g.size.rows as f32 + px(element::PADDING * 2.0) - px(124.0)).max(px(4.0));
+            self.context_menu = Some(point(local_x.min(max_x), local_y.min(max_y)));
+            cx.notify();
+            return;
+        }
         if button != TermButton::Left {
             return;
         }
-        if event.modifiers.platform
-            && let Some(url) = self.hyperlink_at(at)
-        {
-            cx.open_url(&url);
+        if self.context_menu.take().is_some() {
+            cx.notify();
             return;
+        }
+        if event.modifiers.platform {
+            if let Some(url) = self.hyperlink_at(at) {
+                cx.open_url(&url);
+                return;
+            }
+            if let Some(token) = self.link_token_at(at) {
+                cx.emit(TerminalEvent::OpenLink(token));
+                return;
+            }
         }
         if event.modifiers.shift {
             session.selection_extend(at);
@@ -642,6 +767,87 @@ impl TerminalView {
             .and_then(|run| run.hyperlink.as_ref())
             .map(|url| url.to_string())
     }
+
+    fn link_token_at(&self, at: vibevalley_terminal::Point) -> Option<String> {
+        let snapshot = self.snapshot()?;
+        let row = snapshot.rows.get(at.row as usize)?;
+        extract_link_token(row, at.col)
+    }
+}
+
+fn extract_link_token(row: &Row, col: u16) -> Option<String> {
+    let mut line = String::new();
+    let mut cur_col = 0u16;
+    let mut target_byte = None;
+    for run in &row.runs {
+        if run.start_col > cur_col {
+            for _ in 0..(run.start_col - cur_col) {
+                line.push(' ');
+            }
+            cur_col = run.start_col;
+        }
+        for g in run.text.graphemes(true) {
+            let w = element::grapheme_cols(g);
+            if col >= cur_col && col < cur_col + w {
+                target_byte = Some(line.len());
+            }
+            line.push_str(g);
+            cur_col += w;
+        }
+    }
+    let byte_idx = target_byte?;
+    if line[byte_idx..].chars().next()?.is_whitespace() {
+        return None;
+    }
+    let start = line[..byte_idx]
+        .rfind(char::is_whitespace)
+        .map_or(0, |i| i + line[i..].chars().next().map_or(1, char::len_utf8));
+    let end = line[byte_idx..].find(char::is_whitespace).map_or(line.len(), |i| byte_idx + i);
+    let trimmed = line[start..end]
+        .trim_matches(|c: char| matches!(c, '(' | ')' | '[' | ']' | '<' | '>' | '\'' | '"' | ',' | ';'))
+        .trim_end_matches(':');
+    looks_like_link_or_path(trimmed).then(|| trimmed.to_string())
+}
+
+fn strip_line_col(s: &str) -> &str {
+    let mut base = s;
+    for _ in 0..2 {
+        if let Some((head, tail)) = base.rsplit_once(':')
+            && !head.is_empty()
+            && !tail.is_empty()
+            && tail.bytes().all(|b| b.is_ascii_digit())
+        {
+            base = head;
+        } else {
+            break;
+        }
+    }
+    base
+}
+
+fn looks_like_link_or_path(token: &str) -> bool {
+    if token.is_empty() {
+        return false;
+    }
+    if token.starts_with("http://") {
+        return token.len() > "http://".len();
+    }
+    if token.starts_with("https://") {
+        return token.len() > "https://".len();
+    }
+    let base = strip_line_col(token);
+    if base.is_empty() {
+        return false;
+    }
+    if base.contains('/') {
+        return base.chars().any(char::is_alphanumeric);
+    }
+    const CODE_EXTS: &[&str] = &[
+        "rs", "ts", "tsx", "js", "jsx", "mjs", "cjs", "json", "toml", "yaml", "yml", "md", "markdown", "py", "go", "swift", "c", "h", "cpp", "hpp", "sh",
+        "zsh", "css", "html", "sql", "txt", "lock",
+    ];
+    base.rsplit_once('.')
+        .is_some_and(|(stem, ext)| !stem.is_empty() && CODE_EXTS.iter().any(|e| ext.eq_ignore_ascii_case(e)))
 }
 
 impl EventEmitter<TerminalEvent> for TerminalView {}
@@ -658,20 +864,166 @@ fn first_command_token(cmd: &str) -> Option<&str> {
         .map(|tok| tok.rsplit('/').next().unwrap_or(tok))
 }
 
+fn looks_like_shell_prompt(line: &str) -> bool {
+    line.ends_with('%') || line.ends_with('$') || line.ends_with('#') || line.ends_with('❯') || line.ends_with('➜')
+}
+
 fn detect_agent_token(text: &str) -> Option<&'static str> {
     let lower = text.to_lowercase();
     for word in lower.split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_') {
         match word {
+            "antigravity" | "antigravity-cli" | "agy" => return Some("antigravity"),
             "codex" | "codex-cli" => return Some("codex"),
             "claude" | "claude-code" => return Some("claude"),
             "opencode" => return Some("opencode"),
             "gemini" | "gemini-cli" => return Some("gemini"),
             "cursor" | "cursor-agent" => return Some("cursor"),
-            "kimi" => return Some("kimi"),
+            "kimi" | "kimi-cli" => return Some("kimi"),
+            "pi" | "pi-cli" => return Some("pi"),
+            "dsh" => return Some("dsh"),
+            "grok" | "grok-cli" => return Some("grok"),
             _ => {}
         }
     }
     None
+}
+
+fn matches_inline_cli(line: &str, cli: &str) -> bool {
+    if line == cli {
+        return true;
+    }
+    if line.starts_with(cli) && line.as_bytes().get(cli.len()).is_some_and(|b| b.is_ascii_whitespace()) {
+        return true;
+    }
+    for prefix in ["% ", "$ ", "❯ ", "➜ "] {
+        if let Some(pos) = line.find(prefix) {
+            let rest = &line[pos + prefix.len()..];
+            if rest == cli || (rest.starts_with(cli) && rest.as_bytes().get(cli.len()).is_some_and(|b| b.is_ascii_whitespace())) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn detect_inline_agent(lines: &[String]) -> Option<&'static str> {
+    for line in lines {
+        if line.contains("antigravity") || matches_inline_cli(line, "agy") {
+            return Some("antigravity");
+        }
+        if line.contains("openai codex") || matches_inline_cli(line, "codex") {
+            return Some("codex");
+        }
+        if line.contains("claude code") || matches_inline_cli(line, "claude") {
+            return Some("claude");
+        }
+        if line.contains("opencode") {
+            return Some("opencode");
+        }
+        if line.contains("cursor-agent") || matches_inline_cli(line, "cursor") {
+            return Some("cursor");
+        }
+        if line.contains("kimi-cli") || matches_inline_cli(line, "kimi") {
+            return Some("kimi");
+        }
+        if matches_inline_cli(line, "pi") {
+            return Some("pi");
+        }
+        if matches_inline_cli(line, "dsh") {
+            return Some("dsh");
+        }
+        if matches_inline_cli(line, "grok") {
+            return Some("grok");
+        }
+    }
+    None
+}
+
+#[allow(clippy::too_many_arguments)]
+fn classify_terminal_status(
+    exited: bool,
+    running_command: Option<&str>,
+    program: Option<&str>,
+    title: Option<&str>,
+    alt_screen: bool,
+    alt_lines: &[String],
+    inline_lines: &[String],
+    is_idle_prompt: bool,
+    recent_output: bool,
+) -> TerminalStatus {
+    if exited {
+        return TerminalStatus::idle();
+    }
+    let interactive_state = if recent_output { RunningState::Working } else { RunningState::Ready };
+
+    if let Some(cmd) = running_command {
+        if let Some(agent) = detect_agent_token(cmd) {
+            return TerminalStatus {
+                state: interactive_state,
+                agent: Some(agent.to_string()),
+                label: Some(agent.to_string()),
+            };
+        }
+        let head = first_command_token(cmd).unwrap_or(cmd);
+        let state = if alt_screen { interactive_state } else { RunningState::Working };
+        return TerminalStatus {
+            state,
+            agent: Some("cmd".into()),
+            label: Some(head.to_string()),
+        };
+    }
+
+    if let Some(prog) = program
+        && let Some(agent) = detect_agent_token(prog)
+    {
+        return TerminalStatus {
+            state: interactive_state,
+            agent: Some(agent.to_string()),
+            label: Some(agent.to_string()),
+        };
+    }
+
+    if let Some(t) = title
+        && let Some(agent) = detect_agent_token(t)
+    {
+        return TerminalStatus {
+            state: interactive_state,
+            agent: Some(agent.to_string()),
+            label: Some(agent.to_string()),
+        };
+    }
+
+    if alt_screen {
+        for line in alt_lines {
+            if let Some(agent) = detect_agent_token(line) {
+                return TerminalStatus {
+                    state: interactive_state,
+                    agent: Some(agent.to_string()),
+                    label: Some(agent.to_string()),
+                };
+            }
+        }
+        let label = title
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && !crate::panes::is_default_title(s))
+            .map(String::from)
+            .unwrap_or_else(|| "运行中".into());
+        return TerminalStatus {
+            state: interactive_state,
+            agent: Some("cmd".into()),
+            label: Some(label),
+        };
+    }
+
+    if !is_idle_prompt && let Some(agent) = detect_inline_agent(inline_lines) {
+        return TerminalStatus {
+            state: interactive_state,
+            agent: Some(agent.to_string()),
+            label: Some(agent.to_string()),
+        };
+    }
+
+    TerminalStatus::idle()
 }
 
 impl Render for TerminalView {
@@ -690,6 +1042,7 @@ impl Render for TerminalView {
             .bg(colors.bg)
             .track_focus(&self.focus)
             .key_context("Terminal")
+            .capture_key_down(cx.listener(Self::on_capture_key_down))
             .on_key_down(cx.listener(Self::on_key_down))
             .on_action(cx.listener(Self::copy))
             .on_action(cx.listener(Self::paste))
@@ -723,5 +1076,177 @@ impl Render for TerminalView {
                     .text_size(px(12.0))
                     .child(text)
             }))
+            .children(self.context_menu.map(|pos| {
+                let colors = colors.clone();
+                let item = |id: &'static str, label: &'static str| {
+                    div()
+                        .id(id)
+                        .h(px(26.0))
+                        .px(px(10.0))
+                        .flex()
+                        .items_center()
+                        .text_size(px(12.0))
+                        .text_color(colors.text)
+                        .hover(move |s| s.bg(colors.hover))
+                        .child(label)
+                };
+                div()
+                    .id("terminal-context-menu")
+                    .absolute()
+                    .left(pos.x)
+                    .top(pos.y)
+                    .w(px(160.0))
+                    .py(px(4.0))
+                    .rounded(px(6.0))
+                    .border_1()
+                    .border_color(colors.border)
+                    .bg(colors.elevated)
+                    .shadow_md()
+                    .flex()
+                    .flex_col()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
+                    .child(item("ctx-copy", "Copy").on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, window, cx| {
+                            this.context_menu = None;
+                            this.copy(&Copy, window, cx);
+                            cx.notify();
+                            cx.stop_propagation();
+                        }),
+                    ))
+                    .child(item("ctx-paste", "Paste").on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, window, cx| {
+                            this.context_menu = None;
+                            this.paste(&Paste, window, cx);
+                            cx.notify();
+                            cx.stop_propagation();
+                        }),
+                    ))
+                    .child(item("ctx-clear", "Clear").on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, window, cx| {
+                            this.context_menu = None;
+                            this.clear(&Clear, window, cx);
+                            cx.notify();
+                            cx.stop_propagation();
+                        }),
+                    ))
+                    .child(item("ctx-scroll-bottom", "Scroll to bottom").on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.context_menu = None;
+                            if let Some(session) = this.session() {
+                                session.scroll_to_bottom();
+                            }
+                            cx.notify();
+                            cx.stop_propagation();
+                        }),
+                    ))
+            }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vibevalley_terminal::{CellStyle, Rgb, Run};
+
+    fn make_row(text: &str) -> Row {
+        Row {
+            runs: vec![Run {
+                start_col: 0,
+                cols: text.len() as u16,
+                text: text.to_string(),
+                style: CellStyle {
+                    fg: Rgb(255, 255, 255),
+                    bg: None,
+                    bold: false,
+                    italic: false,
+                    dim: false,
+                    underline: false,
+                    strikethrough: false,
+                },
+                hyperlink: None,
+            }],
+            wrapped: false,
+        }
+    }
+
+    #[test]
+    fn extracts_urls_and_file_paths() {
+        let row = make_row("see (https://example.com/a/b), apps/mac/src/shell.rs:42:5; Cargo.toml hello");
+        assert_eq!(extract_link_token(&row, 10).as_deref(), Some("https://example.com/a/b"));
+        assert_eq!(extract_link_token(&row, 35).as_deref(), Some("apps/mac/src/shell.rs:42:5"));
+        assert_eq!(extract_link_token(&row, 62).as_deref(), Some("Cargo.toml"));
+        assert_eq!(extract_link_token(&row, 70), None);
+    }
+
+    #[test]
+    fn rejects_plain_words_and_bare_slashes() {
+        assert!(!looks_like_link_or_path(""));
+        assert!(!looks_like_link_or_path("hello"));
+        assert!(!looks_like_link_or_path("/"));
+        assert!(!looks_like_link_or_path("http://"));
+        assert!(!looks_like_link_or_path(".rs"));
+        assert!(looks_like_link_or_path("lib.rs:10"));
+        assert!(looks_like_link_or_path("./README.md"));
+    }
+
+    #[test]
+    fn detects_known_agent_tokens() {
+        assert_eq!(detect_agent_token("antigravity"), Some("antigravity"));
+        assert_eq!(detect_agent_token("agy --resume"), Some("antigravity"));
+        assert_eq!(detect_agent_token("/usr/local/bin/agy"), Some("antigravity"));
+        assert_eq!(detect_agent_token("Antigravity CLI"), Some("antigravity"));
+        assert_eq!(detect_agent_token("claude --dangerously-skip-permissions"), Some("claude"));
+        assert_eq!(detect_agent_token("codex"), Some("codex"));
+        assert_eq!(detect_agent_token("opencode"), Some("opencode"));
+        assert_eq!(detect_agent_token("cursor-agent"), Some("cursor"));
+        assert_eq!(detect_agent_token("kimi"), Some("kimi"));
+        assert_eq!(detect_agent_token("pi"), Some("pi"));
+        assert_eq!(detect_agent_token("dsh"), Some("dsh"));
+        assert_eq!(detect_agent_token("grok"), Some("grok"));
+        assert_eq!(detect_agent_token("zsh"), None);
+        assert_eq!(detect_agent_token("cargo test -p vibevalley-mac"), None);
+    }
+
+    #[test]
+    fn detects_inline_agents_from_screen_lines() {
+        assert_eq!(detect_inline_agent(&["welcome to antigravity".into()]), Some("antigravity"));
+        assert_eq!(detect_inline_agent(&["~/repo % agy".into()]), Some("antigravity"));
+        assert_eq!(detect_inline_agent(&["❯ pi --model fast".into()]), Some("pi"));
+        assert_eq!(detect_inline_agent(&["$ dsh".into()]), Some("dsh"));
+        assert_eq!(detect_inline_agent(&["➜ grok".into()]), Some("grok"));
+        assert_eq!(detect_inline_agent(&["openai codex v0.1".into()]), Some("codex"));
+        assert_eq!(detect_inline_agent(&["claude code".into()]), Some("claude"));
+        assert_eq!(detect_inline_agent(&["pip install foo".into()]), None);
+    }
+
+    #[test]
+    fn classifies_working_ready_and_idle_states() {
+        let working_agy = classify_terminal_status(false, Some("agy"), None, None, false, &[], &[], false, true);
+        assert_eq!(working_agy.state, RunningState::Working);
+        assert_eq!(working_agy.agent.as_deref(), Some("antigravity"));
+
+        let ready_agy = classify_terminal_status(false, Some("agy"), None, None, false, &[], &[], false, false);
+        assert_eq!(ready_agy.state, RunningState::Ready);
+        assert_eq!(ready_agy.agent.as_deref(), Some("antigravity"));
+
+        let compiling = classify_terminal_status(false, Some("cargo test"), None, None, false, &[], &[], false, false);
+        assert_eq!(compiling.state, RunningState::Working);
+        assert_eq!(compiling.agent.as_deref(), Some("cmd"));
+        assert_eq!(compiling.label.as_deref(), Some("cargo"));
+
+        let idle_alt_agy = classify_terminal_status(false, None, None, None, true, &["Antigravity".into()], &[], false, false);
+        assert_eq!(idle_alt_agy.state, RunningState::Ready);
+        assert_eq!(idle_alt_agy.agent.as_deref(), Some("antigravity"));
+
+        let idle_shell = classify_terminal_status(false, None, None, Some("zsh"), false, &[], &["~/repo %".into()], true, false);
+        assert_eq!(idle_shell, TerminalStatus::idle());
+
+        let exited_agy = classify_terminal_status(true, Some("agy"), None, None, false, &[], &[], false, true);
+        assert_eq!(exited_agy, TerminalStatus::idle());
     }
 }

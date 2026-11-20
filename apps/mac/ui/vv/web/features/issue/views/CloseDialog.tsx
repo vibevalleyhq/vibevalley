@@ -19,6 +19,7 @@ import { createAct } from "../../../ui/act";
 import { Button } from "../../../ui/Button";
 import { Dialog } from "../../../ui/Dialog";
 import { TextArea } from "../../../ui/Field";
+import { Icon } from "../../../ui/Icon";
 import { mix } from "../../../ui/tone";
 import { actionOf, perform } from "../model/acts";
 import { type Lane } from "../model/cards";
@@ -40,31 +41,33 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
     if (await presses.press(live(), "close")) props.onClose();
   };
   const who = () => props.session?.name ?? props.issue.title;
+  const canComplete = () => acts().includes("complete");
+  const canClose = () => acts().includes("close");
   return (
     <Dialog open onClose={props.onClose} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={reviewing()} testid="close-issue">
       <If when={!reviewing()} else={<ChangesReview issue={props.issue.id} worktree={props.session?.worktree} lane={props.lane} onDone={props.onClose} />}>
-        <View>
-          <Text class="text-base text-ink">
+        <View class="gap-5">
+          <Text class="text-sm leading-relaxed text-ink">
             {working()
               ? t("web.issue.close.working", { who: who() })
-              : acts().includes("complete")
+              : canComplete()
                 ? t("web.issue.close.completable", { who: who() })
                 : t("web.issue.close.notCompletable", { who: who() })}
           </Text>
-          <View class="mt-5 flex-row flex-wrap gap-2">
-            <If when={acts().includes("complete")}>
-              <Button tone="primary" testID="review-changes" onPress={() => reviewing.set(true)}>
-                {t("web.issue.close.review")}
-              </Button>
-            </If>
-            <If when={acts().includes("close")}>
+          <View class="flex-row flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
+            <Button tone="quiet" class={canComplete() && canClose() ? "mr-auto" : undefined} testID="close-never" onPress={() => props.onClose()}>
+              {t("web.issue.never")}
+            </Button>
+            <If when={canClose()}>
               <Button tone="danger" testID="act-close" onPress={() => void cancel()}>
                 {working() ? t("web.issue.close.stopAndCancel") : t("web.issue.close.cancel")}
               </Button>
             </If>
-            <Button testID="close-never" onPress={() => props.onClose()}>
-              {t("web.issue.never")}
-            </Button>
+            <If when={canComplete()}>
+              <Button tone="primary" testID="review-changes" onPress={() => reviewing.set(true)}>
+                {t("web.issue.close.review")}
+              </Button>
+            </If>
           </View>
         </View>
       </If>
@@ -122,20 +125,35 @@ function ChangesReview(props: { issue: string; worktree?: string | undefined; la
     if (await presses.press(live(), "resolve")) props.onDone();
   };
   return (
-    <If when={changes.status() !== "pending"} else={<Text class="py-10 text-center text-sm text-muted">{t("web.issue.changes.reading")}</Text>}>
+    <If
+      when={changes.status() !== "pending"}
+      else={
+        <View class="flex-row items-center justify-center gap-2 py-10">
+          <Icon name="wait" size={14} tone="muted" />
+          <Text class="text-sm text-muted">{t("web.issue.changes.reading")}</Text>
+        </View>
+      }
+    >
       <If
         when={changes.error() === undefined || changes.error() === null}
         else={
-          <View>
+          <View class="gap-4">
             <Note tone="berry">
-              <Text class="text-sm text-berry">
-                {t("web.issue.changes.unreadable")}
-                {reasonOf(changes.error())}
-              </Text>
+              <View class="flex-row items-start gap-2">
+                <View class="mt-0.5 shrink-0">
+                  <Icon name="cross" size={14} />
+                </View>
+                <Text class="min-w-0 flex-1 text-sm text-berry">
+                  {t("web.issue.changes.unreadable")}
+                  {reasonOf(changes.error())}
+                </Text>
+              </View>
             </Note>
-            <Button class="mt-4 self-start" onPress={() => props.onDone()}>
-              {t("web.issue.later")}
-            </Button>
+            <View class="flex-row justify-end border-t border-line pt-3">
+              <Button tone="quiet" onPress={() => props.onDone()}>
+                {t("web.issue.later")}
+              </Button>
+            </View>
           </View>
         }
       >
@@ -146,7 +164,12 @@ function ChangesReview(props: { issue: string; worktree?: string | undefined; la
               <If when={reviewError()}>
                 {(message) => (
                   <Note tone="wheat">
-                    <Text class="text-sm text-ink">{message()}</Text>
+                    <View class="flex-row items-start gap-2">
+                      <View class="mt-0.5 shrink-0">
+                        <Icon name="warn" size={14} />
+                      </View>
+                      <Text class="min-w-0 flex-1 text-sm text-ink">{message()}</Text>
+                    </View>
                   </Note>
                 )}
               </If>
@@ -155,35 +178,67 @@ function ChangesReview(props: { issue: string; worktree?: string | undefined; la
                 else={
                   <If when={nothingChanged(c())}>
                     <Note>
-                      <Text class="text-sm text-muted">{t("web.issue.changes.none")}</Text>
+                      <View class="flex-row items-center gap-2">
+                        <Icon name="info" size={14} tone="muted" />
+                        <Text class="min-w-0 flex-1 text-sm text-muted">{t("web.issue.changes.none")}</Text>
+                      </View>
                     </Note>
                   </If>
                 }
               >
                 <Note tone="berry">
-                  <Text class="text-sm font-semibold text-berry">{t("web.issue.changes.conflict", { base: c().base })}</Text>
-                  <ConflictFiles files={c().conflicts} worktree={props.worktree} />
-                  <Text class="mt-1.5 text-xs text-muted">{t("web.issue.changes.resolveHow", { base: c().base })}</Text>
-                </Note>
-              </If>
-              <If when={c().behind > 0 && c().conflicts.length === 0}>
-                <Text class="text-xs text-muted">{t("web.issue.changes.behind", { base: c().base, n: c().behind })}</Text>
-              </If>
-              <If when={c().uncommitted.length > 0}>
-                <Note tone="wheat">
-                  <Text class="text-sm text-ink">{t("web.issue.changes.uncommitted", { n: c().uncommitted.length })}</Text>
-                  <View class="mt-1.5 flex-row flex-wrap gap-1">
-                    <Each of={c().uncommitted}>
-                      {(f) => (
-                        <View class="rounded-sm bg-page px-1.5 py-0.5">
-                          <Text class="font-mono text-xs text-ink">{`${changeKind(f().status).mark} ${f().path}`}</Text>
-                        </View>
-                      )}
-                    </Each>
+                  <View class="flex-row items-start gap-2">
+                    <View class="mt-0.5 shrink-0">
+                      <Icon name="cross" size={14} />
+                    </View>
+                    <View class="min-w-0 flex-1">
+                      <Text class="text-sm font-semibold text-berry">{t("web.issue.changes.conflict", { base: c().base })}</Text>
+                      <ConflictFiles files={c().conflicts} worktree={props.worktree} />
+                      <Text class="mt-2 text-xs leading-relaxed text-muted">{t("web.issue.changes.resolveHow", { base: c().base })}</Text>
+                    </View>
                   </View>
                 </Note>
               </If>
-              <View class="flex-row flex-wrap gap-2">
+              <If when={c().behind > 0 && c().conflicts.length === 0}>
+                <View class="flex-row items-start gap-1.5 px-1">
+                  <View class="mt-0.5 shrink-0">
+                    <Icon name="info" size={12} tone="muted" />
+                  </View>
+                  <Text class="min-w-0 flex-1 text-xs text-muted tabular-nums">{t("web.issue.changes.behind", { base: c().base, n: c().behind })}</Text>
+                </View>
+              </If>
+              <If when={c().uncommitted.length > 0}>
+                <Note tone="wheat">
+                  <View class="flex-row items-start gap-2">
+                    <View class="mt-0.5 shrink-0">
+                      <Icon name="warn" size={14} />
+                    </View>
+                    <View class="min-w-0 flex-1">
+                      <Text class="text-sm font-medium text-ink tabular-nums">{t("web.issue.changes.uncommitted", { n: c().uncommitted.length })}</Text>
+                      <View class="mt-2 flex-row flex-wrap gap-1.5">
+                        <Each of={c().uncommitted}>
+                          {(f) => {
+                            const kind = () => changeKind(f().status);
+                            const look = () => kindLook[f().status];
+                            return (
+                              <View class="flex-row items-center gap-1.5 rounded-sm border border-line bg-page px-1.5 py-0.5">
+                                <View
+                                  class={`h-4 min-w-4 items-center justify-center rounded-xs px-0.5 ${look() ? "" : "bg-selected"}`}
+                                  style={look() ? { backgroundColor: look()?.bg() } : undefined}
+                                >
+                                  <Text class={`text-2xs font-semibold ${look()?.ink ?? "text-ink"}`}>{kind().mark}</Text>
+                                </View>
+                                <Text class="font-mono text-xs text-ink">{f().path}</Text>
+                              </View>
+                            );
+                          }}
+                        </Each>
+                      </View>
+                    </View>
+                  </View>
+                </Note>
+              </If>
+              <View class="flex-row flex-wrap items-center gap-2 border-b border-line pb-3">
                 <If when={acts().includes("complete")}>
                   <Button tone="primary" testID="review-complete" disabled={review.busy()} onPress={() => void take(c())}>
                     {t("shared.act.complete")}
@@ -194,7 +249,9 @@ function ChangesReview(props: { issue: string; worktree?: string | undefined; la
                     {t("web.issue.changes.resolve")}
                   </Button>
                 </If>
-                <Button onPress={() => props.onDone()}>{t("web.issue.later")}</Button>
+                <Button tone="quiet" onPress={() => props.onDone()}>
+                  {t("web.issue.later")}
+                </Button>
               </View>
               <If when={!acts().includes("complete") && !acts().includes("resolve")}>
                 <Text class="text-xs text-muted">{t("web.issue.changes.moved")}</Text>
@@ -202,7 +259,7 @@ function ChangesReview(props: { issue: string; worktree?: string | undefined; la
               <If when={c().sinceReview} else={<ChangesBody changes={c()} />}>
                 {(files) => (
                   <View testID="changes-since-review">
-                    <SheetLabel>{t("web.issue.changes.sinceReview")}</SheetLabel>
+                    <SheetLabel first>{t("web.issue.changes.sinceReview")}</SheetLabel>
                     <ChangesBody changes={{ ...c(), commits: [], files: files() }} />
                   </View>
                 )}
@@ -222,14 +279,21 @@ export function ConflictFiles(props: { files: string[]; worktree?: string | unde
     error.set(reply.bizCode === 0 ? "" : reply.message);
   };
   return (
-    <View class="mt-1.5 gap-1">
-      <View class="flex-row flex-wrap gap-1">
+    <View class="mt-2 gap-1.5">
+      <View class="flex-row flex-wrap gap-1.5">
         <Each of={props.files}>
           {(path) => (
-            <If when={props.worktree} else={<Text class="font-mono text-xs text-berry">{path()}</Text>}>
+            <If
+              when={props.worktree}
+              else={
+                <View class="rounded-sm bg-bad-soft px-1.5 py-0.5">
+                  <Text class="font-mono text-xs text-berry">{path()}</Text>
+                </View>
+              }
+            >
               {(worktree) => (
-                <Button testID="conflict-file" onPress={() => void open(worktree(), path())}>
-                  {path()}
+                <Button icon="file" testID="conflict-file" onPress={() => void open(worktree(), path())}>
+                  <Text class="truncate font-mono text-xs text-ink">{path()}</Text>
                 </Button>
               )}
             </If>
@@ -244,17 +308,26 @@ export function ConflictFiles(props: { files: string[]; worktree?: string | unde
 export function ChangesHead(props: { changes: Changes }) {
   const counts = () => lineCounts(props.changes);
   return (
-    <View class="flex-row flex-wrap items-center gap-2">
-      <View class="rounded-sm bg-selected px-1.5">
-        <Text class="text-xs text-ink">{`${t("web.issue.task.repo")} ${props.changes.repo}`}</Text>
+    <View class="flex-row flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-md bg-side px-3 py-2">
+      <View class="flex-row items-center gap-1 rounded-sm bg-selected px-1.5 py-0.5">
+        <Icon name="folder" size={12} tone="muted" />
+        <Text class="text-xs font-medium text-ink">{props.changes.repo}</Text>
       </View>
       <If when={props.changes.branch}>
-        <Text class="font-mono text-xs text-ink">{`${props.changes.branch} → ${props.changes.base}`}</Text>
+        <View class="min-w-0 flex-row items-center gap-1">
+          <Text class="truncate font-mono text-xs font-medium text-ink">{props.changes.branch}</Text>
+          <Text class="shrink-0 text-xs text-faint">→</Text>
+          <Text class="shrink-0 font-mono text-xs text-muted">{props.changes.base}</Text>
+        </View>
       </If>
-      <Text class="text-xs text-muted">{t("web.issue.changes.counts", { commits: props.changes.commits.length, files: props.changes.files.length })}</Text>
-      <If when={props.changes.files.length > 0}>
-        <PlusMinus added={counts()[0]} removed={counts()[1]} />
-      </If>
+      <View class="ml-auto flex-row items-center gap-2.5">
+        <Text class="text-xs text-muted tabular-nums">
+          {t("web.issue.changes.counts", { commits: props.changes.commits.length, files: props.changes.files.length })}
+        </Text>
+        <If when={props.changes.files.length > 0}>
+          <PlusMinus added={counts()[0]} removed={counts()[1]} />
+        </If>
+      </View>
     </View>
   );
 }
@@ -262,32 +335,42 @@ export function ChangesHead(props: { changes: Changes }) {
 /** The commits and the files, each file opening to its patch. */
 export function ChangesBody(props: { changes: Changes }) {
   const now = Date.now();
+  const anyPatch = () => props.changes.files.some((f) => !!f.patch);
   return (
     <>
       <If when={props.changes.commits.length > 0}>
         <View>
-          <Text role="header" class="mt-2 mb-1 text-xs font-semibold text-muted">
+          <Text role="header" class="mt-2 mb-1.5 text-xs font-semibold text-muted tabular-nums">
             {t("web.issue.changes.commits", { n: props.changes.commits.length })}
           </Text>
-          <Each of={props.changes.commits}>
-            {(m) => (
-              <View class="flex-row items-center gap-2.5 py-0.5">
-                <Text class="font-mono text-xs text-muted">{m().hash}</Text>
-                <Text class="min-w-0 flex-1 truncate text-sm text-ink">{m().subject}</Text>
-                <Text class="text-xs text-faint">{ago(m().at, now)}</Text>
-              </View>
-            )}
-          </Each>
+          <View class="overflow-hidden rounded-md border border-line">
+            <Each of={props.changes.commits}>
+              {(m, i) => (
+                <View class={`flex-row items-center gap-2.5 px-2.5 py-1.5 ${i() === props.changes.commits.length - 1 ? "" : "border-b border-line"}`}>
+                  <Text class="w-16 shrink-0 font-mono text-xs text-muted tabular-nums">{m().hash}</Text>
+                  <Text class="min-w-0 flex-1 truncate text-sm text-ink">{m().subject}</Text>
+                  <Text class="shrink-0 text-right text-xs text-faint tabular-nums">{ago(m().at, now)}</Text>
+                </View>
+              )}
+            </Each>
+          </View>
         </View>
       </If>
       <If when={props.changes.files.length > 0}>
         <View>
-          <Text role="header" class="mt-2 mb-1 text-xs font-semibold text-muted">
+          <Text role="header" class="mt-2.5 mb-1.5 text-xs font-semibold text-muted tabular-nums">
             {t("web.issue.changes.files", { n: props.changes.files.length })}
           </Text>
           <View class="overflow-hidden rounded-md border border-line">
             <Each of={props.changes.files}>
-              {(f, i) => <FileRow file={f()} last={i() === props.changes.files.length - 1} conflict={props.changes.conflicts.includes(f().path)} />}
+              {(f, i) => (
+                <FileRow
+                  file={f()}
+                  last={i() === props.changes.files.length - 1}
+                  conflict={props.changes.conflicts.includes(f().path)}
+                  reserveChevron={anyPatch()}
+                />
+              )}
             </Each>
           </View>
         </View>
@@ -296,21 +379,24 @@ export function ChangesBody(props: { changes: Changes }) {
   );
 }
 
-function PlusMinus(props: { added: number; removed: number }) {
+function PlusMinus(props: { added: number; removed: number; aligned?: boolean }) {
+  const numClass = () =>
+    props.aligned === true ? "min-w-8 text-right font-mono text-xs font-medium tabular-nums" : "font-mono text-xs font-medium tabular-nums";
   return (
-    <Text class="font-mono text-xs">
-      <Text class="text-accent">{`+${props.added}`}</Text> <Text class="text-berry">{`−${props.removed}`}</Text>
-    </Text>
+    <View class="shrink-0 flex-row items-center gap-1.5">
+      <Text class={`${numClass()} ${props.added > 0 ? "text-accent" : "text-faint"}`}>{`+${props.added}`}</Text>
+      <Text class={`${numClass()} ${props.removed > 0 ? "text-berry" : "text-faint"}`}>{`−${props.removed}`}</Text>
+    </View>
   );
 }
 
 const kindLook: Record<string, { bg: () => string; ink: string }> = {
-  A: { bg: () => mix("leaf", 0.2), ink: "text-accent" },
-  M: { bg: () => mix("wheat", 0.2), ink: "text-bark" },
-  D: { bg: () => mix("berry", 0.15), ink: "text-berry" },
+  A: { bg: () => mix("ok-soft", 1), ink: "text-ok-ink" },
+  M: { bg: () => mix("wheat", 0.22), ink: "text-warn-ink" },
+  D: { bg: () => mix("bad-soft", 1), ink: "text-berry" },
 };
 
-function FileRow(props: { file: ChangedFile; conflict: boolean; last: boolean }) {
+function FileRow(props: { file: ChangedFile; conflict: boolean; last: boolean; reserveChevron: boolean }) {
   const open = signal(false);
   const kind = () => changeKind(props.file.status);
   const hasPatch = () => !!props.file.patch;
@@ -324,23 +410,33 @@ function FileRow(props: { file: ChangedFile; conflict: boolean; last: boolean })
         accessibilityState={hasPatch() ? { expanded: open() } : undefined}
         disabled={!hasPatch()}
         onPress={() => open.set(!open())}
-        class={`w-full flex-row items-center gap-2.5 px-2.5 py-1.5 ${open() ? "bg-hover" : hasPatch() ? "hover:bg-hover" : ""}`}
+        class={`min-h-8 w-full flex-row items-center gap-2 px-2.5 py-1.5 transition duration-120 ease-out ${open() ? "bg-side hover:bg-hover" : hasPatch() ? "hover:bg-hover" : ""}`}
       >
+        <If when={props.reserveChevron}>
+          <View
+            class="size-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+            style={hasPatch() ? { transform: [{ rotate: open() ? "90deg" : "0deg" }] } : undefined}
+          >
+            <If when={hasPatch()}>
+              <Icon name="expand" size={10} tone={open() ? "ink" : "muted"} />
+            </If>
+          </View>
+        </If>
         <View
           accessibilityLabel={kind().label}
           class={`h-5 w-5 shrink-0 items-center justify-center rounded-sm ${look() ? "" : "bg-selected"}`}
           style={look() ? { backgroundColor: look()?.bg() } : undefined}
         >
-          <Text class={`text-xs font-semibold ${look()?.ink ?? "text-ink"}`}>{kind().mark}</Text>
+          <Text class={`text-2xs font-semibold ${look()?.ink ?? "text-ink"}`}>{kind().mark}</Text>
         </View>
         <Text class={`min-w-0 flex-1 truncate font-mono text-xs ${props.conflict ? "text-berry" : "text-ink"}`}>{props.file.path}</Text>
         <If when={props.conflict}>
-          <View class="rounded-sm px-1.5" style={{ backgroundColor: mix("berry", 0.15) }}>
-            <Text class="text-xs text-berry">{t("web.issue.changes.conflictMark")}</Text>
+          <View class="shrink-0 rounded-sm bg-bad-soft px-1.5 py-px">
+            <Text class="text-2xs font-medium text-berry">{t("web.issue.changes.conflictMark")}</Text>
           </View>
         </If>
-        <If when={props.file.added >= 0} else={<Text class="font-mono text-xs text-muted">{t("web.issue.changes.binary")}</Text>}>
-          <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} />
+        <If when={props.file.added >= 0} else={<Text class="shrink-0 font-mono text-xs text-muted">{t("web.issue.changes.binary")}</Text>}>
+          <PlusMinus added={Math.round(props.file.added)} removed={Math.round(props.file.removed)} aligned />
         </If>
       </View>
       <If when={open() ? props.file.patch : undefined}>{(patch) => <Patch text={patch()} path={props.file.path} />}</If>
@@ -393,12 +489,12 @@ function Patch(props: { text: string; path: string }) {
     <If
       when={wellFormed(props.text)}
       else={
-        <Scroll testID="patch" class="mx-2 mb-2 rounded-md bg-page py-1" style={{ maxHeight: 320 }}>
+        <Scroll testID="patch" class="border-t border-line bg-page py-1" style={{ maxHeight: 320 }}>
           <TintedLines text={props.text} />
         </Scroll>
       }
     >
-      <View testID="patch" class="mx-2 mb-2 overflow-hidden rounded-md bg-page py-1">
+      <View testID="patch" class="overflow-hidden border-t border-line bg-page py-1">
         <DiffView
           patch={props.text}
           language={props.path}
@@ -424,7 +520,7 @@ function TintedLines(props: { text: string }) {
       {(line) => {
         const look = patchTone[patchMarkOf(line())];
         return (
-          <View class="px-2" style={look.bg ? { backgroundColor: look.bg() } : undefined}>
+          <View class="px-2.5" style={look.bg ? { backgroundColor: look.bg() } : undefined}>
             <Text class={`font-mono text-xs ${look.ink}`} style={{ lineHeight: 17 }}>
               {line() || " "}
             </Text>
@@ -449,21 +545,24 @@ export function ReopenDialog(props: { issue: Issue; lane?: Lane | undefined; onC
   };
   return (
     <Dialog open onClose={props.onClose} title={t("web.issue.reopen.title")} testid="reopen-issue">
-      <Text class="text-base text-ink">{t("web.issue.reopen.line", { issue: issueTitle(props.issue) })}</Text>
-      <TextArea
-        autoFocus
-        class="mt-4"
-        rows={3}
-        value={text()}
-        onInput={(v) => text.set(v)}
-        placeholder={t("web.issue.reopen.what")}
-        accessibilityLabel={t("web.issue.reopen.whatLabel")}
-      />
-      <View class="mt-5 flex-row justify-end gap-2">
-        <Button onPress={() => props.onClose()}>{t("web.issue.never")}</Button>
-        <Button tone="primary" testID="reopen" onPress={() => reopen()}>
-          {t("web.issue.reopen.reopen")}
-        </Button>
+      <View class="gap-3.5">
+        <Text class="text-sm leading-relaxed text-ink">{t("web.issue.reopen.line", { issue: issueTitle(props.issue) })}</Text>
+        <TextArea
+          autoFocus
+          rows={3}
+          value={text()}
+          onInput={(v) => text.set(v)}
+          placeholder={t("web.issue.reopen.what")}
+          accessibilityLabel={t("web.issue.reopen.whatLabel")}
+        />
+        <View class="flex-row items-center justify-end gap-2 border-t border-line pt-3">
+          <Button tone="quiet" onPress={() => props.onClose()}>
+            {t("web.issue.never")}
+          </Button>
+          <Button tone="primary" testID="reopen" onPress={() => reopen()}>
+            {t("web.issue.reopen.reopen")}
+          </Button>
+        </View>
       </View>
     </Dialog>
   );

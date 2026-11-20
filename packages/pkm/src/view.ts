@@ -22,17 +22,98 @@ export function visibleBlocks(blocks: readonly PkmBlock[], collapsed: ReadonlySe
   return out;
 }
 
+export interface Heading {
+  readonly level: 1 | 2 | 3;
+  /** Length of the leading `# ` / `## ` / `### ` prefix. */
+  readonly prefix: number;
+}
+
+/** Leading `# `, `## `, or `### ` heading level and prefix length, if any. */
+export function headingOf(body: string): Heading | undefined {
+  const m = /^(#{1,3})\s/u.exec(body);
+  if (!m?.[1]) return undefined;
+  const level = m[1].length;
+  if (level !== 1 && level !== 2 && level !== 3) return undefined;
+  return { level, prefix: m[0].length };
+}
+
+export type BodySegment = { readonly kind: "text"; readonly text: string } | { readonly kind: "code"; readonly lang: string; readonly code: string };
+
+const fenceOpen = /^(`{3,}|~{3,})([^\n]*)$/u;
+
+/** Splits a block containing at least one closed fenced code block into ordered text and code segments; undefined when none. */
+export function fencedCode(body: string): readonly BodySegment[] | undefined {
+  if (!body.includes("```") && !body.includes("~~~")) return undefined;
+  const lines = body.split("\n");
+  const out: BodySegment[] = [];
+  let textLines: string[] = [];
+  let hasCode = false;
+  const flushText = () => {
+    if (textLines.length > 0) {
+      out.push({ kind: "text", text: textLines.join("\n") });
+      textLines = [];
+    }
+  };
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] ?? "";
+    const open = fenceOpen.exec(line.trimStart());
+    if (open?.[1]) {
+      const fence = open[1];
+      let close = -1;
+      for (let j = i + 1; j < lines.length; j += 1) {
+        if ((lines[j] ?? "").trim() === fence) {
+          close = j;
+          break;
+        }
+      }
+      if (close !== -1) {
+        flushText();
+        hasCode = true;
+        out.push({ kind: "code", lang: (open[2] ?? "").trim(), code: lines.slice(i + 1, close).join("\n") });
+        i = close;
+        continue;
+      }
+    }
+    textLines.push(line);
+  }
+  if (!hasCode) return undefined;
+  flushText();
+  return out;
+}
+
 export type Piece =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "link"; readonly page: string; readonly text: string }
   | { readonly kind: "tag"; readonly page: string; readonly text: string }
   | { readonly kind: "ref"; readonly id: string }
-  | { readonly kind: "remark"; readonly text: string; readonly remark: string };
+  | { readonly kind: "remark"; readonly text: string; readonly remark: string }
+  | { readonly kind: "code"; readonly text: string }
+  | { readonly kind: "bold"; readonly text: string }
+  | { readonly kind: "italic"; readonly text: string }
+  | { readonly kind: "strike"; readonly text: string }
+  | { readonly kind: "url"; readonly text: string; readonly url: string };
 
-const inline = new RegExp(String.raw`==([^=]+)==\^\[([^\]]+)\]|\[\[([^[\]]+?)\]\]|\(\(([0-9a-fA-F-]{8,36})\)\)|` + pkmTag.source, "gu");
+// CJK sentence punctuation excluded from bare URLs (，。；：！？）》】」』).
+const cjkStop = String.raw`\uFF0C\u3002\uFF1B\uFF1A\uFF01\uFF1F\uFF09\u300B\u3011\u300D\u300F`;
 
-/** A block's text as pieces: ==words==^[remark] inline remarks, [[page]] or [[page|words]] links, #tags, ((block)) refs
- * and the text between. */
+// Order matters: inline `code` must win before wikilinks, tags, URLs and emphasis; [label](url) before bare URLs; **bold** before *italic*.
+const inline = new RegExp(
+  [
+    "`([^`\\n]+)`", // 1: code
+    String.raw`==([^=]+)==\^\[([^\]]+)\]`, // 2, 3: remark
+    String.raw`\[\[([^[\]]+?)\]\]`, // 4: wikilink
+    String.raw`\(\(([0-9a-fA-F-]{8,36})\)\)`, // 5: block ref
+    String.raw`\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)`, // 6, 7: markdown url
+    String.raw`(https?:\/\/[^\s<>)[\]${cjkStop}]+[^\s<>)[\].,;:!?${cjkStop}])`, // 8: bare url
+    String.raw`\*\*([^*\n]+?)\*\*`, // 9: bold
+    String.raw`~~([^~\n]+?)~~`, // 10: strike
+    String.raw`(?<!\*)\*([^\s*\n](?:[^*\n]*?[^\s*\n])?)\*(?!\*)`, // 11: italic
+    pkmTag.source, // 12: #tag
+  ].join("|"),
+  "gu",
+);
+
+/** A block's text as pieces: `code`, ==words==^[remark], [[page]] links, ((block)) refs, URLs, emphasis, #tags, and plain text. */
 export function piecesOf(body: string): Piece[] {
   const out: Piece[] = [];
   let at = 0;
@@ -41,19 +122,28 @@ export function piecesOf(body: string): Piece[] {
   };
   for (const m of body.matchAll(inline)) {
     const start = m.index;
+    text(body.slice(at, start));
     if (m[1] !== undefined) {
-      text(body.slice(at, start));
-      out.push({ kind: "remark", text: m[1], remark: (m[2] ?? "").replace(/^💬\s*/u, "").trim() });
-    } else if (m[3] !== undefined) {
-      text(body.slice(at, start));
-      const [page = "", words] = m[3].split("|");
-      out.push({ kind: "link", page: slugOf(page), text: (words ?? page).trim() });
+      out.push({ kind: "code", text: m[1] });
+    } else if (m[2] !== undefined) {
+      out.push({ kind: "remark", text: m[2], remark: (m[3] ?? "").replace(/^💬\s*/u, "").trim() });
     } else if (m[4] !== undefined) {
-      text(body.slice(at, start));
-      out.push({ kind: "ref", id: m[4] });
+      const [page = "", words] = m[4].split("|");
+      out.push({ kind: "link", page: slugOf(page), text: (words ?? page).trim() });
+    } else if (m[5] !== undefined) {
+      out.push({ kind: "ref", id: m[5] });
+    } else if (m[6] !== undefined && m[7] !== undefined) {
+      out.push({ kind: "url", text: m[6], url: m[7] });
+    } else if (m[8] !== undefined) {
+      out.push({ kind: "url", text: m[8], url: m[8] });
+    } else if (m[9] !== undefined) {
+      out.push({ kind: "bold", text: m[9] });
+    } else if (m[10] !== undefined) {
+      out.push({ kind: "strike", text: m[10] });
+    } else if (m[11] !== undefined) {
+      out.push({ kind: "italic", text: m[11] });
     } else {
-      text(body.slice(at, start));
-      out.push({ kind: "tag", page: slugOf(m[5] ?? ""), text: `#${m[5] ?? ""}` });
+      out.push({ kind: "tag", page: slugOf(m[12] ?? ""), text: `#${m[12] ?? ""}` });
     }
     at = start + m[0].length;
   }

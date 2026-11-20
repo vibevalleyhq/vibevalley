@@ -15,22 +15,33 @@ export function Checkbox(props: {
   class?: string | undefined;
 }) {
   const on = () => props.checked || props.indeterminate === true;
+  const disabled = () => props.disabled === true;
   return (
     <Base
       checked={props.checked}
       indeterminate={props.indeterminate}
       disabled={props.disabled}
+      hitSlop={4}
       accessibilityLabel={props.label}
       testID={props.testid}
       onChange={(e) => props.onChange(e.checked)}
       class={[
-        // Under the pointer the edge is muted, ticked or not.
-        "size-4 shrink-0 items-center justify-center rounded-xs border",
-        on() ? "border-accent bg-accent hover:border-muted" : "border-line bg-page hover:border-muted",
-        props.disabled === true ? "opacity-50" : "",
+        "size-4 shrink-0 items-center justify-center rounded-xs border transition duration-120 ease-out",
+        on()
+          ? disabled()
+            ? "border-accent bg-accent"
+            : "border-accent bg-accent hover:border-accent-hover hover:bg-accent-hover"
+          : disabled()
+            ? "border-idle bg-page"
+            : "border-idle bg-page hover:border-muted hover:bg-hover",
+        disabled() ? "opacity-50" : "focus-visible:outline-2 focus-visible:outline-focus",
         props.class ?? "",
       ].join(" ")}
-      indicator={<Icon name={props.indeterminate === true ? "partly" : "ticked"} size={12} tone="page" />}
+      indicator={
+        <If when={on()}>
+          <Icon name={props.indeterminate === true ? "partly" : "ticked"} size={12} tone="page" />
+        </If>
+      }
     />
   );
 }

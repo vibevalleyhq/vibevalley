@@ -5,6 +5,9 @@ import { Button } from "nsh/base";
 import { act } from "../bridge";
 import { pressTransition } from "../motion";
 import { radius, tok } from "../tokens";
+import { SurfaceIcon, type SurfaceIconName, TipBubble } from "./shared";
+
+export type RailRunningState = "working" | "ready" | "idle";
 
 export type RailTab = {
   id: number;
@@ -12,6 +15,7 @@ export type RailTab = {
   active: boolean;
   kind: string;
   running?: boolean;
+  runningState?: RailRunningState;
   runningAgent?: string | null;
   runningLabel?: string | null;
   attention?: boolean;
@@ -40,9 +44,9 @@ export type RailProject = {
 
 export type RailFrame = { projects: RailProject[]; panel: string; inspectorOpen?: boolean };
 
-const panels = [
-  { id: "files", glyph: "▤", label: "Files" },
-  { id: "git", glyph: "⑂", label: "Source Control" },
+const panels: { id: string; icon: SurfaceIconName; label: string }[] = [
+  { id: "files", icon: "folder", label: "Files" },
+  { id: "git", icon: "git-branch", label: "Source Control" },
 ];
 
 export function ProjectRail(props: { frame: RailFrame | null }) {
@@ -57,7 +61,7 @@ export function ProjectRail(props: { frame: RailFrame | null }) {
         <Button
           onPress={() => act({ type: "activate_project", id: proj.id })}
           accessibilityLabel={`${proj.name}${proj.shortcut ? `, ${proj.shortcut}` : ""}`}
-          tooltip={`${proj.name} — ${proj.path}${proj.shortcut ? ` (${proj.shortcut})` : ""}`}
+          tooltip={<TipBubble text={`${proj.name} — ${proj.path}${proj.shortcut ? ` (${proj.shortcut})` : ""}`} />}
           class="active:scale-[0.98]"
           style={{
             width: 36,
@@ -70,6 +74,7 @@ export function ProjectRail(props: { frame: RailFrame | null }) {
             borderColor: proj.active ? p().primary : p().border,
             ...pressTransition(),
           }}
+          hoverStyle={proj.active ? undefined : { backgroundColor: p().subtle }}
         >
           <Text style={{ fontSize: 12, fontWeight: "600", color: proj.active ? p().onPrimary : p().text }}>{proj.initials}</Text>
           {proj.attention ? (
@@ -83,29 +88,37 @@ export function ProjectRail(props: { frame: RailFrame | null }) {
       <Button
         onPress={() => act({ type: "add_project" })}
         accessibilityLabel="Add project"
-        class="hover:bg-[#f0f0f0] dark:hover:bg-[#232326]"
-        style={{ width: 36, height: 36, borderRadius: radius.md, alignItems: "center", justifyContent: "center" }}
+        tooltip={<TipBubble text="Add project" />}
+        class="active:scale-[0.98]"
+        style={{ width: 36, height: 36, borderRadius: radius.md, alignItems: "center", justifyContent: "center", ...pressTransition() }}
+        hoverStyle={{ backgroundColor: p().tile }}
       >
-        <Text style={{ fontSize: 18, color: p().muted }}>+</Text>
+        <SurfaceIcon name="plus" size={14} color={p().muted} />
       </Button>
       <View style={{ flex: 1 }} />
-      {panels.map((panel) => (
-        <Button
-          onPress={() => act({ type: "show_panel", panel: panel.id })}
-          accessibilityLabel={panel.label}
-          tooltip={panel.label}
-          style={{
-            width: 36,
-            height: 32,
-            borderRadius: radius.sm,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: props.frame?.panel === panel.id ? p().subtle : "transparent",
-          }}
-        >
-          <Text style={{ fontSize: 15, color: props.frame?.panel === panel.id ? p().ink : p().muted }}>{panel.glyph}</Text>
-        </Button>
-      ))}
+      {panels.map((panel) => {
+        const active = props.frame?.panel === panel.id;
+        return (
+          <Button
+            onPress={() => act({ type: "show_panel", panel: panel.id })}
+            accessibilityLabel={panel.label}
+            tooltip={<TipBubble text={panel.label} />}
+            class="active:scale-[0.98]"
+            style={{
+              width: 36,
+              height: 32,
+              borderRadius: radius.sm,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: active ? p().subtle : "transparent",
+              ...pressTransition(),
+            }}
+            hoverStyle={active ? undefined : { backgroundColor: p().tile }}
+          >
+            <SurfaceIcon name={panel.icon} size={14} color={active ? p().ink : p().muted} />
+          </Button>
+        );
+      })}
     </View>
   );
 }

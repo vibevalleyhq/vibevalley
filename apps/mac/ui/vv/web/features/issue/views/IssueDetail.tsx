@@ -11,7 +11,7 @@ import { closedText, plainText } from "@vibevalley/protocol/rules";
 import { hostApi } from "../../../../../bridge";
 import { createMemo } from "../../../../solid";
 import { useNow } from "../../../base/dom";
-import { wallClockText } from "../../../base/format";
+import { shortMomentText } from "../../../base/format";
 import { useAgent } from "../../../infra/agents";
 import { ready } from "../../../infra/query";
 import { useIntents } from "../../../state/intent";
@@ -23,6 +23,7 @@ import { Icon } from "../../../ui/Icon";
 import { IconButton } from "../../../ui/IconButton";
 import { Markdown } from "../../../ui/Markdown";
 import { Dot } from "../../../ui/Tag";
+import { Bubble } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { IssueArtifacts } from "../../artifact";
 import { createSessionEvents } from "../../session/events";
@@ -92,34 +93,49 @@ export function IssueDetail(props: {
 
   /** lead is read as it renders: the lead changes as the issue moves on. */
   const button = (a: IssueAct, lead: () => boolean) => (
-    <Button testID={`act-${a}`} tone={lead() ? "primary" : acts.rejecting(a) ? "danger" : "plain"} disabled={acts.disabled(a)} onPress={() => go(a)}>
+    <Button
+      testID={`act-${a}`}
+      tone={lead() ? "primary" : acts.rejecting(a) || a === "close" ? "danger" : "plain"}
+      disabled={acts.disabled(a)}
+      onPress={() => go(a)}
+    >
       {acts.label(a)}
     </Button>
   );
 
+  const copyText = (value: string) => {
+    void Clipboard.writeText(value);
+    toast(t("web.base.rich.copied"));
+  };
+
   const parent = () => issues().find((item) => item.id === props.issue.parent);
   const tone = () => stageTone[s().stage.state];
   const heading = (
-    <View class="pr-10">
+    <View>
       <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-1.5 flex-row flex-wrap items-center gap-1">
         <Text class="text-xs text-muted">{s().repo || t("web.issue.detail.noRepo")}</Text>
         <If when={s().inFamily ? props.onParent : undefined}>
           {(onParent) => (
             <>
               <Icon name="next" size={12} tone="muted" />
-              <View role="button" testID="parent-issue" onPress={() => onParent()()}>
+              <View
+                role="button"
+                testID="parent-issue"
+                onPress={() => onParent()()}
+                class="-mx-1 rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover"
+              >
                 <Text class="text-xs text-water">{parent()?.title ?? t("web.issue.family.parent")}</Text>
               </View>
             </>
           )}
         </If>
         <Icon name="next" size={12} tone="muted" />
-        <Text class="shrink-0 text-sm text-muted">{`#${props.issue.number}`}</Text>
+        <Text class="shrink-0 font-mono text-xs text-muted tabular-nums">{`#${props.issue.number}`}</Text>
       </View>
       <View class="flex-row flex-wrap items-baseline gap-x-2">
         <IssueTitle shown={s().title} full={live().title} editable={s().open} state={labeled().state("title")} onSave={(title) => setLabel({ title })} />
       </View>
-      <View class="mt-1.5 flex-row items-start gap-2" accessibilityLabel={t("web.issue.detail.now")} testID="issue-now">
+      <View class="mt-2 flex-row items-start gap-2" accessibilityLabel={t("web.issue.detail.now")} testID="issue-now">
         <View class="mt-1.5">
           <Dot tone={tone()} size={8} ring={false} />
         </View>
@@ -127,7 +143,7 @@ export function IssueDetail(props: {
         <View class="min-w-0 flex-1 flex-row flex-wrap">
           <Each of={s().statusParts(now(), timeline()?.spent?.cny)}>
             {(part, i) => (
-              <Text class={`text-sm ${tone() === "berry" ? "text-berry" : "text-ink"}`} style={tone() === "berry" ? undefined : { opacity: 0.8 }}>
+              <Text class={`text-sm tabular-nums ${tone() === "berry" ? "text-berry" : "text-ink"}`} style={tone() === "berry" ? undefined : { opacity: 0.8 }}>
                 {`${i() > 0 ? " · " : ""}${part()}`}
               </Text>
             )}
@@ -162,7 +178,7 @@ export function IssueDetail(props: {
     <>
       <If when={failedCheck()}>
         {(check) => (
-          <Note tone="berry">
+          <Note tone="berry" class="mb-4">
             <Fold
               testID="failed-project-check"
               defaultOpen
@@ -183,7 +199,7 @@ export function IssueDetail(props: {
       </If>
       <If when={s().description}>
         <View testID="issue-requirement">
-          <SheetLabel>{t("web.issue.detail.full")}</SheetLabel>
+          <SheetLabel first={!failedCheck()}>{t("web.issue.detail.full")}</SheetLabel>
           <Markdown size="sm" text={s().description} />
         </View>
       </If>
@@ -195,7 +211,7 @@ export function IssueDetail(props: {
       <If when={s().ask}>
         {(ask) => (
           <View accessibilityLabel={t("web.issue.detail.yours")} testID="issue-ask" class="mb-5">
-            <SheetLabel>{t("web.issue.detail.yours")}</SheetLabel>
+            <SheetLabel first={!failedCheck() && !s().description}>{t("web.issue.detail.yours")}</SheetLabel>
             <Note tone={ask().tone}>
               <Text class="text-sm font-semibold text-ink">{ask().head}</Text>
               <If
@@ -265,10 +281,10 @@ export function IssueDetail(props: {
       </If>
 
       <View accessibilityLabel={t("web.issue.detail.progress")} testID="issue-progress">
-        <View class="mt-6 mb-1.5 flex-row items-baseline">
+        <View class={`${!failedCheck() && !s().description && !s().ask ? "mt-0" : "mt-6"} mb-2 flex-row items-baseline gap-2`}>
           <Text class="text-xs font-semibold text-muted">{t("web.issue.detail.progress")}</Text>
           <If when={s().criteria.length > 0}>
-            <Text class="ml-2 text-xs text-muted">{t("web.issue.detail.met", { met: s().met, of: s().criteria.length })}</Text>
+            <Text class="text-xs text-muted tabular-nums">{t("web.issue.detail.met", { met: s().met, of: s().criteria.length })}</Text>
           </If>
         </View>
         <If when={s().doing}>
@@ -323,7 +339,7 @@ export function IssueDetail(props: {
                   else={<Text class="text-sm text-muted">{t("web.issue.detail.noChanges")}</Text>}
                 >
                   <View class="gap-2">
-                    <Text class="text-sm text-ink">{changesLine(c())}</Text>
+                    <Text class="text-sm text-ink tabular-nums">{changesLine(c())}</Text>
                     <If when={c().conflicts.length > 0}>
                       <Text class="text-sm text-berry">{t("web.issue.detail.conflict", { base: c().base, files: list(c().conflicts) })}</Text>
                     </If>
@@ -349,7 +365,11 @@ export function IssueDetail(props: {
         </If>
         <If when={props.issue.pullRequest}>
           {(pr) => (
-            <View role="link" class="mt-1 self-start" onPress={() => void hostApi.openUrl(pr().url)}>
+            <View
+              role="link"
+              class="-mx-1 mt-1 self-start rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover"
+              onPress={() => void hostApi.openUrl(pr().url)}
+            >
               <Text class="text-sm text-water">{t("shared.join.aside", { text: `PR #${pr().number}`, aside: pr().state })}</Text>
             </View>
           )}
@@ -395,8 +415,8 @@ export function IssueDetail(props: {
     const all = s().stage.acts.map((a) => a.act);
     return s().ask ? all.filter((a) => a === "close" || a === "stop") : all;
   };
-  // Each status the issue can move to is one of its acts: picking it runs that act, with its dialog or its box.
-  const statusMoves = () => s().stage.acts.flatMap((a) => (a.does === "move" ? [{ act: a.act, status: a.status }] : []));
+  // Status transitions shown in the Status picker; destructive `close` lives in the dedicated danger button below so Cancel is never duplicated.
+  const statusMoves = () => s().stage.acts.flatMap((a) => (a.does === "move" && a.act !== "close" ? [{ act: a.act, status: a.status }] : []));
   // Two acts to one status (reject and resume both go back to work) say which act each is.
   const statusOptions = () => {
     const moves = statusMoves();
@@ -408,9 +428,13 @@ export function IssueDetail(props: {
     }
     return options;
   };
+  const distinctProfile = () => {
+    const name = agent()?.name;
+    return name && name !== head().name ? name : undefined;
+  };
   const side = (
     <>
-      <SheetLabel>{t("web.issue.detail.properties")}</SheetLabel>
+      <SheetLabel first>{t("web.issue.detail.properties")}</SheetLabel>
       <Property label={t("web.issue.detail.status")}>
         <Pick<IssueAct | "now">
           label={t("web.issue.detail.status")}
@@ -450,22 +474,30 @@ export function IssueDetail(props: {
       <Property label={t("web.issue.detail.helper")}>{s().whoLine}</Property>
       <If when={agent()?.model}>{(model) => <Property label={t("web.issue.detail.model")}>{model()}</Property>}</If>
       <If when={sideActs().length > 0 || head().worktree}>
-        <View class="my-3 flex-row flex-wrap gap-2">
+        <View class="mt-3 flex-row flex-wrap items-center gap-2">
           <Each of={sideActs()}>{(a) => button(a(), () => !s().ask && a() === s().lead)}</Each>
           <If when={head().worktree}>{(worktree) => <OpenTerminal cwd={worktree()} title={`#${props.issue.number}`} testid="issue-open-workspace" />}</If>
         </View>
       </If>
-      <SheetLabel>{t("web.issue.detail.time")}</SheetLabel>
-      <Property label={t("web.issue.detail.opened")}>{wallClockText(props.issue.createdAt)}</Property>
-      <Property label={t("web.issue.detail.started")}>{wallClockText((props.sessions[0] ?? head()).hiredAt)}</Property>
+      <SheetLabel divider>{t("web.issue.detail.time")}</SheetLabel>
+      <Property label={t("web.issue.detail.opened")}>
+        <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.issue.createdAt, now())}</Text>
+      </Property>
+      <Property label={t("web.issue.detail.started")}>
+        <Text class="text-sm text-ink tabular-nums">{shortMomentText((props.sessions[0] ?? head()).hiredAt, now())}</Text>
+      </Property>
       <If when={s().ask && s().stage.since}>
-        {(at) => <Property label={t("web.issue.detail.waiting")}>{t("web.issue.detail.since", { clock: wallClockText(at()) })}</Property>}
+        {(at) => (
+          <Property label={t("web.issue.detail.waiting")}>
+            <Text class="text-sm text-ink tabular-nums">{t("web.issue.detail.since", { clock: shortMomentText(at(), now()) })}</Text>
+          </Property>
+        )}
       </If>
       <If when={live().deliveryEvidence?.reviews.at(-1)}>
         {(review) => (
-          <Property
-            label={t("web.issue.changes.reviewVersion")}
-          >{`${review().revision.baseCommit.slice(0, 8)} → ${review().revision.tree.slice(0, 12)}`}</Property>
+          <Property label={t("web.issue.changes.reviewVersion")}>
+            <Text class="font-mono text-xs text-ink">{`${review().revision.baseCommit.slice(0, 8)} → ${review().revision.tree.slice(0, 12)}`}</Text>
+          </Property>
         )}
       </If>
       <If when={!failedCheck() ? live().deliveryEvidence?.check : undefined}>
@@ -483,49 +515,61 @@ export function IssueDetail(props: {
         )}
       </If>
       <If when={live().deliveryEvidence?.mergedCommit}>
-        {(commit) => <Property label={t("web.issue.changes.mergedCommit")}>{commit().slice(0, 12)}</Property>}
+        {(commit) => (
+          <Property label={t("web.issue.changes.mergedCommit")}>
+            <Text class="font-mono text-xs text-ink">{commit().slice(0, 12)}</Text>
+          </Property>
+        )}
       </If>
       <If when={props.issue.reviewedAt}>
         {(at) => (
           <Property label={t("web.issue.detail.reviewed")}>
-            <Text class="text-sm text-accent">{wallClockText(at())}</Text>
+            <Text class="text-sm text-accent tabular-nums">{shortMomentText(at(), now())}</Text>
           </Property>
         )}
       </If>
-      <If when={props.issue.closedAt}>{(at) => <Property label={t("web.issue.detail.closedAt")}>{wallClockText(at())}</Property>}</If>
+      <If when={props.issue.closedAt}>
+        {(at) => (
+          <Property label={t("web.issue.detail.closedAt")}>
+            <Text class="text-sm text-ink tabular-nums">{shortMomentText(at(), now())}</Text>
+          </Property>
+        )}
+      </If>
       <More>
         <If when={s().crewLine}>
           <Property label={t("web.issue.detail.crew")}>{s().crewLine}</Property>
         </If>
-        <Property label={t("web.issue.detail.profile")}>{agent()?.name ?? head().name}</Property>
+        <If when={distinctProfile()}>{(profile) => <Property label={t("web.issue.detail.profile")}>{profile()}</Property>}</If>
         <If when={head().branch}>
-          <Property label={t("web.issue.detail.branch")}>
-            <Text class="font-mono text-xs text-ink">{head().branch}</Text>
-          </Property>
-        </If>
-        <If when={head().worktree}>
-          {(worktree) => (
-            <Property label="worktree">
+          {(branch) => (
+            <Property align="start" label={t("web.issue.detail.branch")}>
               <View class="flex-row items-start gap-1">
-                <Text class="min-w-0 flex-1 font-mono text-xs text-ink" style={{ userSelect: "text" }}>
-                  {worktree()}
+                <Text class="min-w-0 flex-1 pt-1 font-mono text-xs text-ink" style={{ userSelect: "text" }}>
+                  {branch()}
                 </Text>
-                <IconButton icon="copy" size={14} label={t("web.issue.detail.copyPath")} onClick={() => void Clipboard.writeText(worktree())} />
-                <IconButton
-                  testid="open-terminal"
-                  icon="terminal"
-                  size={14}
-                  label="Terminal"
-                  onClick={() => void hostApi.openTerminal({ cwd: worktree(), title: `#${props.issue.number}` })}
-                />
+                <IconButton icon="copy" size={14} label={t("web.base.rich.copy")} onClick={() => copyText(branch())} />
               </View>
             </Property>
           )}
         </If>
-        <Property label={t("web.issue.detail.took")}>{s().usedLine(steps(), now())}</Property>
+        <If when={head().worktree}>
+          {(worktree) => (
+            <Property align="start" label="worktree">
+              <View class="flex-row items-start gap-1">
+                <Text class="min-w-0 flex-1 pt-1 font-mono text-xs text-ink" style={{ userSelect: "text" }}>
+                  {worktree()}
+                </Text>
+                <IconButton icon="copy" size={14} label={t("web.issue.detail.copyPath")} onClick={() => copyText(worktree())} />
+              </View>
+            </Property>
+          )}
+        </If>
+        <Property label={t("web.issue.detail.took")}>
+          <Text class="text-sm text-ink tabular-nums">{s().usedLine(steps(), now())}</Text>
+        </Property>
         <If when={s().resolvedFindings.length > 0}>
-          <Property label={t("web.issue.detail.resolved")}>
-            <View>
+          <Property align="start" label={t("web.issue.detail.resolved")}>
+            <View class="pt-0.5">
               <Each of={s().resolvedFindings}>
                 {(f) => (
                   <Text class="text-sm text-faint" style={{ textDecorationLine: "line-through" }}>
@@ -568,12 +612,12 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
             <View
               role="button"
               accessibilityLabel={t("web.issue.detail.rename")}
-              tooltip={<Text>{t("web.issue.detail.rename")}</Text>}
+              tooltip={<Bubble text={t("web.issue.detail.rename")} />}
               onPress={() => {
                 typed = props.full;
                 editing.set(true);
               }}
-              class="-mx-1 self-start rounded-sm px-1 hover:bg-hover"
+              class="-mx-1 self-start rounded-sm px-1 transition duration-120 ease-out hover:bg-hover"
             >
               <Text role="header" testID="issue-title" class="text-lg font-semibold text-ink" style={{ numberOfLines: 2 }}>
                 {props.shown}

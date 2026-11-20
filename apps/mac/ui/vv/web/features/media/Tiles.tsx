@@ -11,6 +11,7 @@ import { ago } from "../../base/format";
 import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
+import { Bubble } from "../../ui/Tip";
 import { artifactIcon, artifactSuffix, kindLabel } from "../artifact";
 import { durationText, extOf, justify, kindOf, type Placed } from "./items";
 
@@ -58,7 +59,7 @@ export function MakingTiles(props: { jobs: readonly MediaJob[]; width: number; h
                 <If when={props.jobs[p().index]}>
                   {(job) => (
                     <View testID="library-making" class="shrink-0 min-w-0" style={{ width: p().width, height: p().height + captionPx }}>
-                      <View class="flex-1 min-h-0 items-center justify-center gap-2 rounded-md border border-dashed border-wheat bg-hover p-2">
+                      <View class="flex-1 min-h-0 items-center justify-center gap-2 rounded-md border border-dashed border-wheat bg-side p-2">
                         <Icon name="wait" size={20} tone="wheat" />
                         <Text class="text-center text-xs text-ink">{job().phaseText}</Text>
                       </View>
@@ -165,13 +166,14 @@ function Tile(props: {
       role="button"
       testID="library-item"
       accessibilityLabel={file().name}
+      tooltip={<Bubble text={file().name} />}
       onPress={() => props.onPick({ add: false, range: false })}
       class="absolute shrink-0 min-w-0"
       style={{ left: props.x, top: props.y, width: props.width, height: props.height + captionPx }}
     >
       <View
-        class={`flex-1 min-h-0 items-center justify-center overflow-hidden rounded-md border-2 bg-hover ${
-          props.active || props.picked ? "border-accent" : "border-transparent hover:border-line"
+        class={`flex-1 min-h-0 items-center justify-center overflow-hidden rounded-md bg-side transition duration-120 ease-out ${
+          props.active || props.picked ? "border-2 border-accent" : "border border-line hover:border-faint"
         }`}
       >
         <If
@@ -179,15 +181,15 @@ function Tile(props: {
           else={
             <View class="items-center justify-center gap-1">
               <Icon name={kindIcon[kind() === "audio" ? "audio" : kind() === "video" ? "video" : "other"]} size={24} tone="muted" />
-              <If when={extOf(file().name)}>{(ext) => <Text class="text-xs font-medium text-ink">{ext()}</Text>}</If>
-              <If when={props.seen?.seconds}>{(s) => <Text class="text-xs text-faint">{durationText(s())}</Text>}</If>
+              <If when={extOf(file().name)}>{(ext) => <Text class="font-mono text-2xs font-medium text-ink">{ext()}</Text>}</If>
+              <If when={props.seen?.seconds}>{(s) => <Text class="font-mono text-2xs text-faint tabular-nums">{durationText(s())}</Text>}</If>
             </View>
           }
         >
           {(src) => <Image src={src()} style={{ width: props.width, height: props.height, objectFit: "cover" }} />}
         </If>
       </View>
-      <Text class={`pt-1.5 truncate text-xs ${props.picked ? "text-ink font-medium" : "text-muted"}`}>{file().name}</Text>
+      <Text class={`pt-1.5 truncate text-xs ${props.picked ? "font-medium text-ink" : "text-muted"}`}>{file().name}</Text>
     </View>
   );
 }
@@ -212,6 +214,7 @@ export function ArtifactTiles(props: {
               testID={`library-artifact-${a().id}`}
               accessibilityLabel={a().title}
               accessibilityState={{ selected: picked() }}
+              tooltip={<Bubble text={a().title} />}
               onPress={() => {
                 const ts = Date.now();
                 if (ts - lastPress < 350 && picked()) {
@@ -221,22 +224,22 @@ export function ArtifactTiles(props: {
                 }
                 lastPress = ts;
               }}
-              class={`w-56 shrink-0 gap-2 rounded-lg border-2 bg-side p-3 transition duration-120 ease-out hover:bg-hover ${
-                picked() ? "border-accent bg-selected" : "border-line"
+              class={`w-56 shrink-0 gap-2.5 rounded-lg p-3 transition duration-120 ease-out ${
+                picked() ? "border-2 border-accent bg-selected" : "border border-line bg-page hover:border-faint hover:bg-hover"
               }`}
             >
-              <View class="flex-row items-center gap-2">
-                <View class="size-9 shrink-0 items-center justify-center rounded-md bg-page border border-line">
-                  <Icon name={artifactIcon(a())} size={20} tone="muted" />
+              <View class="flex-row items-center gap-2.5">
+                <View class="size-8 shrink-0 items-center justify-center rounded-md bg-side">
+                  <Icon name={artifactIcon(a())} size={16} tone={picked() ? "ink" : "muted"} />
                 </View>
                 <View class="min-w-0 flex-1 gap-0.5">
                   <View class="flex-row flex-wrap items-center gap-1">
-                    <View class="rounded-sm bg-page px-1.5 py-0.5 border border-line">
+                    <View class="h-5 items-center justify-center rounded-sm bg-side px-1.5">
                       <Text class="text-2xs font-medium text-ink">{kindLabel(a())}</Text>
                     </View>
                     <If when={a().isDefault}>
-                      <View class="rounded-sm bg-accent px-1.5 py-0.5">
-                        <Text class="text-2xs font-medium text-page">{t("web.artifact.types.defaultBadge")}</Text>
+                      <View class="h-5 items-center justify-center rounded-sm bg-accent px-1.5">
+                        <Text class="text-2xs font-semibold text-page">{t("web.artifact.types.defaultBadge")}</Text>
                       </View>
                     </If>
                   </View>
@@ -252,8 +255,9 @@ export function ArtifactTiles(props: {
                   role="button"
                   testID={`library-artifact-open-${a().id}`}
                   accessibilityLabel={t("web.library.inspector.openWorkbench")}
+                  tooltip={<Bubble text={t("web.library.inspector.openWorkbench")} />}
                   onPress={() => props.onOpen(a().id)}
-                  class="size-6 items-center justify-center rounded-sm hover:bg-page"
+                  class="size-6 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-selected"
                 >
                   <Icon name="open" size={12} tone="muted" />
                 </View>

@@ -133,18 +133,18 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   };
 
   const bar = () => (
-    <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3">
-      <A href="/agents" testID="back">
-        <Text class="text-sm text-muted hover:underline">{t("web.agent.all")}</Text>
+    <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
+      <A href="/agents" testID="back" class="group rounded-md px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover">
+        <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
       </A>
       <Text class="text-sm text-faint">/</Text>
-      <View class="min-w-0 flex-1 flex-row items-center gap-3">
+      <View class="min-w-0 flex-1 flex-row items-center gap-2.5">
         <Text class="truncate text-lg font-semibold text-ink">{draft().name || t("web.agent.unnamed")}</Text>
         <View
           testID={`profile-${isNew ? "new" : dirty() ? "dirty" : "saved"}`}
-          class={`shrink-0 rounded-sm px-1.5 ${isNew || dirty() ? "bg-hat" : "bg-hover"}`}
+          class={`shrink-0 rounded-sm px-1.5 py-0.5 ${isNew || dirty() ? "bg-hat" : "bg-hover"}`}
         >
-          <Text class={`text-xs ${isNew || dirty() ? "text-bark-900" : "text-muted"}`}>
+          <Text class={`text-xs font-medium ${isNew || dirty() ? "text-bark-900" : "text-muted"}`}>
             {isNew ? t("web.agent.isNew") : dirty() ? t("web.agent.unsaved") : t("web.agent.saved")}
           </Text>
         </View>
@@ -167,7 +167,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
                 {t("web.agent.talk")}
               </Button>
               <If when={dirty()}>
-                <Button testID="discard" onPress={() => draft.set(saved())}>
+                <Button tone="quiet" testID="discard" onPress={() => draft.set(saved())}>
                   {t("web.agent.discard")}
                 </Button>
               </If>
@@ -185,11 +185,11 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
     <If
       when={!trajectories()}
       else={
-        <View class="h-full min-h-0 flex-1 gap-3 px-4 pb-4">
+        <View class="h-full min-h-0 flex-1 gap-3 bg-page px-4 pb-4">
           {bar()}
-          <View class="flex-row items-center gap-3">
-            <View role="button" onPress={() => trajectories.set(false)}>
-              <Text class="text-sm text-muted hover:underline">{t("web.agent.backToProfile")}</Text>
+          <View class="flex-row items-center gap-2.5">
+            <View role="button" onPress={() => trajectories.set(false)} class="group rounded-md px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover">
+              <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.backToProfile")}</Text>
             </View>
             <View tooltip={<Bubble text={t("web.agent.trajectoriesHint")} />}>
               <Text class="text-sm font-semibold text-ink">{t("web.agent.trajectories")}</Text>
@@ -201,7 +201,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
         </View>
       }
     >
-      <View testID="agent-page" class="h-full min-h-0 flex-1 px-4 pb-4">
+      <View testID="agent-page" class="h-full min-h-0 flex-1 bg-page px-4 pb-4">
         {bar()}
         <If when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={(a) => draft.set(a)} />}</If>
         <Scroll class="min-h-0 flex-1" contentClass="min-h-full gap-3 pt-3 lg:flex-row">
@@ -217,9 +217,9 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
                     role="button"
                     accessibilityState={{ selected: pose() === p().pose }}
                     onPress={() => pose.set(p().pose)}
-                    class={`h-6 justify-center rounded-full px-2.5 ${pose() === p().pose ? "bg-ink" : "bg-hover hover:bg-selected"}`}
+                    class={`h-6 justify-center rounded-full px-2.5 transition duration-120 ease-out ${pose() === p().pose ? "bg-ink" : "bg-hover hover:bg-selected"}`}
                   >
-                    <Text class={`text-xs ${pose() === p().pose ? "text-page" : "text-ink"}`}>{p().label}</Text>
+                    <Text class={`text-xs ${pose() === p().pose ? "font-medium text-page" : "text-ink"}`}>{p().label}</Text>
                   </View>
                 )}
               </Each>

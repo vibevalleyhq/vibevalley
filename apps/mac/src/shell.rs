@@ -128,6 +128,8 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
         KeyBinding::new("cmd-v", EditPaste, Some("EditMenu")),
         KeyBinding::new("cmd-a", EditSelectAll, Some("EditMenu")),
         KeyBinding::new("cmd-,", OpenSettings, Some("Shell")),
+        KeyBinding::new("cmd-k", CommandPalette, Some("Shell")),
+        KeyBinding::new("cmd-shift-p", CommandPalette, Some("Shell")),
         KeyBinding::new("cmd-h", Hide, Some("Shell")),
         KeyBinding::new("cmd-alt-h", HideOthers, Some("Shell")),
         KeyBinding::new("cmd-w", CloseWindow, Some("Shell")),
@@ -149,7 +151,6 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
         KeyBinding::new("cmd-9", ActivateProject9, Some("Workspace")),
         KeyBinding::new("cmd-b", ToggleSidebar, Some("Workspace")),
         KeyBinding::new("cmd-p", GoToFile, Some("Workspace")),
-        KeyBinding::new("cmd-shift-p", CommandPalette, Some("Workspace")),
         KeyBinding::new("cmd-shift-f", SearchProject, Some("Workspace")),
         KeyBinding::new("cmd-t", NewTerminal, Some("Workspace")),
         KeyBinding::new("cmd-w", CloseTab, Some("Workspace")),
@@ -175,7 +176,14 @@ const ACTIVE_KEY: &str = "app.active_project";
 const SIDEBAR_MIN: f32 = 180.0;
 const SIDEBAR_MAX: f32 = 560.0;
 
-type GitSnapshot = (Repo, Status, Vec<Branch>, Vec<Worktree>, Vec<Commit>);
+type GitSnapshot = (
+    Repo,
+    Status,
+    Vec<Branch>,
+    Vec<Worktree>,
+    HashMap<PathBuf, frames::WorktreeActivity>,
+    Vec<Commit>,
+);
 
 /// UI-side state of one open project: its tree, git state and file index.
 pub struct ProjectView {
@@ -185,6 +193,7 @@ pub struct ProjectView {
     pub tones: HashMap<PathBuf, &'static str>,
     pub branches: Vec<Branch>,
     pub worktrees: Vec<Worktree>,
+    pub worktree_activity: HashMap<PathBuf, frames::WorktreeActivity>,
     pub log: Vec<Commit>,
     pub git_error: Option<String>,
     pub git_busy: bool,
@@ -229,6 +238,7 @@ pub struct Shell {
     pub ws: Workspace<TermSession>,
     pub loaded: bool,
     server_ready: bool,
+    workbench_ready: bool,
     island: Option<crate::island::Island>,
     /// VibeValley's opening over the window until the projects are in (`VIBEVALLEY_NO_OPENING=1` skips it).
     pub launch: Option<Entity<crate::pixel::view::PixelView>>,
@@ -250,6 +260,7 @@ pub struct Shell {
     pub panel: Panel,
     pub inspector_open: bool,
     pub inspector_width: f32,
+    pub last_route: Option<String>,
     pub sidebar_width: f32,
     pub sidebar_visible: bool,
     /// Last `host.tray` summary, `host.locale` and `host.opening` from the views.
@@ -295,7 +306,10 @@ impl Shell {
         let workbench_sub = cx.subscribe_in(&workbench, window, |this, _, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
             HostedEvent::HostCall { op, payload, reply } => this.host_call(op, payload.clone(), reply.clone(), window, cx),
-            HostedEvent::Ready => {}
+            HostedEvent::Ready => {
+                this.workbench_ready = true;
+                this.finish_opening(true, cx);
+            }
         });
         let (fs_tx, fs_rx) = flume::unbounded::<(ProjectId, Vec<FsChange>)>();
         cx.spawn(async move |this, cx| {
@@ -347,8 +361,9 @@ impl Shell {
             ws: Workspace::new(),
             loaded: false,
             server_ready: matches!(already_settled, Some(Ok(()))),
+            workbench_ready: false,
             island: None,
-            launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none() && already_settled.is_none())
+            launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none() && !matches!(already_settled, Some(Err(_))))
                 .then(|| cx.new(|cx| crate::pixel::view::PixelView::new("opening:launch", json!({}), cx))),
             load_error: match &already_settled {
                 Some(Err(e)) => Some(e.clone()),
@@ -367,8 +382,9 @@ impl Shell {
             global_rail_width: 76.0,
             palette: None,
             panel: Panel::Files,
-            inspector_open: true,
-            inspector_width: 280.0,
+            inspector_open: Ui::get(cx).settings.inspector_open,
+            inspector_width: Ui::get(cx).settings.inspector_width,
+            last_route: None,
             sidebar_width: Ui::get(cx).settings.sidebar_width,
             sidebar_visible: Ui::get(cx).settings.sidebar_visible,
             tray: None,
@@ -508,8 +524,18 @@ impl Shell {
                     let was_ui_size = Ui::get(cx).settings.ui_font_size;
                     this.sidebar_width = settings.sidebar_width;
                     this.sidebar_visible = settings.sidebar_visible;
+                    this.inspector_open = settings.inspector_open;
+                    this.inspector_width = settings.inspector_width;
+                    let saved_route = settings.last_route.clone();
                     let ui_size = settings.ui_font_size;
                     Ui::apply(settings, cx);
+                    if let Some(route) = saved_route
+                        && !route.is_empty()
+                        && route != "/issues"
+                    {
+                        this.last_route = Some(route.clone());
+                        this.workbench.update(cx, |v, cx| v.navigate(&route, cx));
+                    }
                     if Ui::get(cx).colors.dark != was_dark {
                         this.theme_changed(cx);
                     }
@@ -558,7 +584,7 @@ impl Shell {
     /// The opening says it is there (or failed), then gives way after a moment.
     fn finish_opening(&mut self, ok: bool, cx: &mut Context<Self>) {
         let Some(opening) = self.launch.clone() else { return };
-        if ok && (!self.loaded || !self.server_ready || self.load_error.is_some()) {
+        if ok && (!self.loaded || !self.server_ready || !self.workbench_ready || self.load_error.is_some()) {
             return;
         }
         opening.update(cx, |v, _| {
@@ -575,7 +601,7 @@ impl Shell {
             return;
         }
         cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(std::time::Duration::from_millis(900)).await;
+            cx.background_executor().timer(std::time::Duration::from_millis(350)).await;
             let _ = this.update(cx, |s, cx| {
                 s.launch = None;
                 cx.notify();
@@ -777,6 +803,7 @@ impl Shell {
                 tones: HashMap::new(),
                 branches: Vec::new(),
                 worktrees: Vec::new(),
+                worktree_activity: HashMap::new(),
                 log: Vec::new(),
                 git_error: None,
                 git_busy: false,
@@ -878,18 +905,63 @@ impl Shell {
                 let branches = repo.branches().unwrap_or_default();
                 let worktrees = repo.worktrees().unwrap_or_default();
                 let log = repo.log(None, 0, 50).unwrap_or_default();
-                Ok(Some((repo, status, branches, worktrees, log)))
+                let mut worktree_activity = HashMap::new();
+                if worktrees.len() > 1 {
+                    let cur_root = repo.root().to_path_buf();
+                    for w in &worktrees {
+                        let act = if w.path == cur_root {
+                            let conflicts = status
+                                .entries
+                                .iter()
+                                .filter(|e| e.index == vibevalley_git::Change::Conflicted || e.worktree == vibevalley_git::Change::Conflicted)
+                                .count();
+                            frames::WorktreeActivity {
+                                changed: status.entries.len(),
+                                conflicts,
+                                ahead: status.ahead,
+                                behind: status.behind,
+                                summary: log.first().map(|c| c.summary.clone()),
+                            }
+                        } else if let Ok(Some(wrepo)) = Repo::discover(&w.path) {
+                            let wstatus = wrepo.status().ok();
+                            let wlog = wrepo.log(None, 0, 1).unwrap_or_default();
+                            let (changed, conflicts, ahead, behind) = match wstatus {
+                                Some(st) => {
+                                    let conflicts = st
+                                        .entries
+                                        .iter()
+                                        .filter(|e| e.index == vibevalley_git::Change::Conflicted || e.worktree == vibevalley_git::Change::Conflicted)
+                                        .count();
+                                    (st.entries.len(), conflicts, st.ahead, st.behind)
+                                }
+                                None => (0, 0, 0, 0),
+                            };
+                            frames::WorktreeActivity {
+                                changed,
+                                conflicts,
+                                ahead,
+                                behind,
+                                summary: wlog.first().map(|c| c.summary.clone()),
+                            }
+                        } else {
+                            frames::WorktreeActivity::default()
+                        };
+                        worktree_activity.insert(w.path.clone(), act);
+                    }
+                }
+                Ok(Some((repo, status, branches, worktrees, worktree_activity, log)))
             },
             move |s, result, cx| {
                 if let Some(pv) = s.projects.get_mut(&id) {
                     pv.git_busy = false;
                     match result {
-                        Ok(Some((repo, status, branches, worktrees, log))) => {
+                        Ok(Some((repo, status, branches, worktrees, worktree_activity, log))) => {
                             pv.tones = frames::path_tones(repo.root(), &status);
                             pv.repo_root = Some(repo.root().to_path_buf());
                             pv.status = Some(status);
                             pv.branches = branches;
                             pv.worktrees = worktrees;
+                            pv.worktree_activity = worktree_activity;
                             pv.log = log;
                             pv.git_error = None;
                         }
@@ -1007,22 +1079,23 @@ impl Shell {
                     .tabs()
                     .map(|t| {
                         let title = names.get(&t.id).cloned().unwrap_or_else(|| crate::panes::tab_title(self, t, cx));
-                        let (kind, running, running_agent, running_label, attention) = match &t.kind {
+                        let (kind, running, running_state, running_agent, running_label, attention) = match &t.kind {
                             PaneKind::Terminal { terminal_id, .. } => {
-                                let status = self.terminals.get(terminal_id).and_then(|v| v.view.read(cx).running_status());
+                                let status = self.terminals.get(terminal_id).map(|v| v.view.read(cx).terminal_status()).unwrap_or_default();
                                 let att = p.terminal(terminal_id).is_some_and(|e| e.attention);
                                 (
                                     "terminal",
-                                    status.is_some(),
-                                    status.as_ref().map(|(a, _)| a.clone()),
-                                    status.map(|(_, l)| l),
+                                    status.state == crate::terminal::RunningState::Working,
+                                    status.state.as_str(),
+                                    status.agent,
+                                    status.label,
                                     att,
                                 )
                             }
-                            PaneKind::File { .. } => ("file", false, None, None, false),
-                            PaneKind::Diff { .. } => ("diff", false, None, None, false),
-                            PaneKind::Hosted { .. } => ("hosted", false, None, None, false),
-                            PaneKind::Pixel { .. } => ("pixel", false, None, None, false),
+                            PaneKind::File { .. } => ("file", false, "idle", None, None, false),
+                            PaneKind::Diff { .. } => ("diff", false, "idle", None, None, false),
+                            PaneKind::Hosted { .. } => ("hosted", false, "idle", None, None, false),
+                            PaneKind::Pixel { .. } => ("pixel", false, "idle", None, None, false),
                         };
                         json!({
                             "id": t.id,
@@ -1030,6 +1103,7 @@ impl Shell {
                             "active": active_tab == Some(t.id),
                             "kind": kind,
                             "running": running,
+                            "runningState": running_state,
                             "runningAgent": running_agent,
                             "runningLabel": running_label,
                             "attention": attention,
@@ -1046,6 +1120,8 @@ impl Shell {
                     status: pv.status.as_ref(),
                     branches: &pv.branches,
                     worktrees: &pv.worktrees,
+                    worktree_activity: &pv.worktree_activity,
+                    current_root: pv.repo_root.as_deref(),
                     log: &pv.log,
                     error: pv.git_error.as_deref(),
                     busy: pv.git_busy,
@@ -1081,6 +1157,10 @@ impl Shell {
                 }
                 if !path.starts_with("/farm") && path != "/tree" && path != "/map" {
                     self.native_pixel = None;
+                }
+                if self.last_route.as_deref() != Some(path.as_str()) {
+                    self.last_route = Some(path);
+                    self.save_settings(cx);
                 }
                 cx.notify();
             }
@@ -1177,6 +1257,8 @@ impl Shell {
             Action::Discard { paths } => self.git_op(move |r| r.discard(&paths), cx),
             Action::Commit { message } => self.git_op(move |r| r.commit(&message).map(|_| ()), cx),
             Action::Checkout { branch } => self.git_op(move |r| r.checkout(&branch), cx),
+            Action::AddWorktree { branch } => self.add_worktree(branch, window, cx),
+            Action::RemoveWorktree { path, force } => self.remove_worktree(path, force, window, cx),
             Action::RefreshGit => {
                 if let Some(id) = active {
                     self.refresh_git(id, cx);
@@ -1319,7 +1401,7 @@ impl Shell {
         {
             *origin = link;
         }
-        let slot = self.make_terminal(&id, spec, cx);
+        let slot = self.make_terminal(&id, spec, window, cx);
         self.terminals.insert(id.clone(), slot);
         self.layout_changed(window, cx);
         Ok(id)
@@ -1488,14 +1570,7 @@ impl Shell {
                 };
                 match choice {
                     Some(choice) => {
-                        let was_dark = Ui::get(cx).colors.dark;
-                        let mut settings = Ui::get(cx).settings.clone();
-                        settings.theme = choice;
-                        Ui::apply(settings, cx);
-                        if Ui::get(cx).colors.dark != was_dark {
-                            self.theme_changed(cx);
-                        }
-                        self.save_settings(cx);
+                        self.set_theme(choice, cx);
                         Envelope::void()
                     }
                     None => refusal(BizCode::InvalidInput, "theme is light, dark or system"),
@@ -1716,6 +1791,124 @@ impl Shell {
         reply.send(envelope);
     }
 
+    fn add_worktree(&mut self, branch: String, window: &mut Window, cx: &mut Context<Self>) {
+        let branch = branch.trim().to_string();
+        if branch.is_empty() {
+            return;
+        }
+        let Some(active_id) = self.ws.active_id() else { return };
+        let Some(pv) = self.projects.get(&active_id) else { return };
+        let main_root = pv
+            .worktrees
+            .iter()
+            .find(|w| w.is_main)
+            .map(|w| w.path.clone())
+            .or_else(|| pv.repo_root.clone())
+            .unwrap_or_else(|| pv.tree.root.clone());
+        let repo_name = main_root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "repo".into());
+        let slug: String = branch
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+            .collect();
+        let target_dir = main_root
+            .parent()
+            .unwrap_or_else(|| Path::new("/tmp"))
+            .join(".worktrees")
+            .join(format!("{repo_name}-{slug}"));
+        if let Some(pv) = self.projects.get_mut(&active_id) {
+            pv.git_busy = true;
+            pv.git_error = None;
+        }
+        self.push_sidebar(cx);
+        let window_handle = window.window_handle();
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_spawn(async move {
+                    if let Some(parent) = target_dir.parent() {
+                        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+                    }
+                    let Some(repo) = Repo::discover(&main_root).map_err(|e| e.to_string())? else {
+                        return Err("not a git repository".into());
+                    };
+                    let created = repo.worktree_add(&target_dir, &branch, None).map_err(|e| e.to_string())?;
+                    Ok::<PathBuf, String>(created.root().to_path_buf())
+                })
+                .await;
+            let _ = cx.update_window(window_handle, |_, window, cx| {
+                let _ = this.update(cx, |s, cx| match result {
+                    Ok(new_path) => {
+                        s.refresh_summaries(cx);
+                        if let Some(id) = s.ws.active_id() {
+                            s.refresh_git(id, cx);
+                        }
+                        s.activate_path(new_path, window, cx, |_, _, _| {});
+                    }
+                    Err(e) => {
+                        if let Some(pv) = s.projects.get_mut(&active_id) {
+                            pv.git_busy = false;
+                            pv.git_error = Some(e);
+                        }
+                        s.push_sidebar(cx);
+                    }
+                });
+            });
+        })
+        .detach();
+    }
+
+    fn remove_worktree(&mut self, path: PathBuf, force: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(active_id) = self.ws.active_id() else { return };
+        let Some(pv) = self.projects.get(&active_id) else { return };
+        let main_root = pv
+            .worktrees
+            .iter()
+            .find(|w| w.is_main)
+            .map(|w| w.path.clone())
+            .or_else(|| pv.repo_root.clone())
+            .unwrap_or_else(|| pv.tree.root.clone());
+        // Never remove the main worktree.
+        if path == main_root {
+            return;
+        }
+        // If the removed worktree is open as a workspace project, close it first and switch to the main repo.
+        let closing_id = self.ws.projects().iter().find(|p| p.info.path == path).map(|p| p.info.id);
+        if let Some(cid) = closing_id {
+            if self.ws.active_id() == Some(cid) {
+                self.activate_path(main_root.clone(), window, cx, |_, _, _| {});
+            }
+            self.close_project(cid, cx);
+        }
+        let target_id = self.ws.active_id().unwrap_or(active_id);
+        if let Some(pv) = self.projects.get_mut(&target_id) {
+            pv.git_busy = true;
+            pv.git_error = None;
+        }
+        self.push_sidebar(cx);
+        Self::bg(
+            cx,
+            move || -> Result<(), String> {
+                let Some(repo) = Repo::discover(&main_root).map_err(|e| e.to_string())? else {
+                    return Err("not a git repository".into());
+                };
+                repo.worktree_remove(&path, force).map_err(|e| e.to_string())
+            },
+            move |s, result, cx| {
+                if let Err(e) = result {
+                    if let Some(pv) = s.projects.get_mut(&target_id) {
+                        pv.git_busy = false;
+                        pv.git_error = Some(e);
+                    }
+                    s.push_sidebar(cx);
+                    return;
+                }
+                s.refresh_summaries(cx);
+                if let Some(id) = s.ws.active_id() {
+                    s.refresh_git(id, cx);
+                }
+            },
+        );
+    }
+
     fn git_op(&mut self, op: impl FnOnce(&Repo) -> vibevalley_git::Result<()> + Send + 'static, cx: &mut Context<Self>) {
         let Some(id) = self.ws.active_id() else { return };
         let Some(root) = self.projects.get(&id).map(|p| p.repo_root.clone().unwrap_or(p.tree.root.clone())) else {
@@ -1774,7 +1967,14 @@ impl Shell {
         if let Some(p) = &mut self.palette {
             p.open = false;
         }
-        self.focus_active_pane(window, cx);
+        if self.native_workspace {
+            self.focus_active_pane(window, cx);
+        } else if self.native_pixel.is_some() {
+            window.focus(&self.focus, cx);
+        } else {
+            let handle = self.workbench.read(cx).focus_handle(cx);
+            window.focus(&handle, cx);
+        }
         cx.notify();
     }
 
@@ -1789,7 +1989,7 @@ impl Shell {
         let query = p.query.clone();
         match mode {
             PaletteMode::Commands => {
-                let frame = frames::palette(mode, &query, frames::palette_commands(), false, None);
+                let frame = frames::palette(mode, &query, shell_palette_commands(), false, None);
                 p.view.update(cx, |v, cx| v.push("palette", frame, cx));
             }
             PaletteMode::Files => {
@@ -1872,6 +2072,20 @@ impl Shell {
             return;
         }
         match id {
+            "nav.issues" => self.navigate_workbench("/issues", cx),
+            "nav.chat" => self.navigate_workbench("/chat", cx),
+            "nav.library" => self.navigate_workbench("/library", cx),
+            "nav.pkm" => self.navigate_workbench("/pkm", cx),
+            "nav.agents" => self.navigate_workbench("/agents", cx),
+            "nav.runtimes" => self.navigate_workbench("/runtimes", cx),
+            "nav.repos" => self.navigate_workbench("/repos", cx),
+            "nav.catalog" => self.navigate_workbench("/catalog", cx),
+            "nav.farm" => self.navigate_workbench("/farm", cx),
+            "nav.workspace" => {
+                self.show_workspace(cx);
+                self.with_workspace_project(window, cx, |_, _, _, _| {});
+            }
+            "nav.settings" => self.navigate_workbench("/settings", cx),
             "terminal.new" => self.new_terminal(None, window, cx),
             "pane.split_right" => self.split(Axis::Horizontal, window, cx),
             "pane.split_down" => self.split(Axis::Vertical, window, cx),
@@ -1895,12 +2109,23 @@ impl Shell {
                 }
             }
             "sidebar.toggle" => self.toggle_sidebar(cx),
+            "inspector.toggle" => self.toggle_inspector(cx),
             "font.increase" => self.adjust_font_size(1.0, cx),
             "font.decrease" => self.adjust_font_size(-1.0, cx),
             "font.reset" => self.reset_font_size(cx),
+            "theme.dark" => self.set_theme(ThemeChoice::Dark, cx),
+            "theme.light" => self.set_theme(ThemeChoice::Light, cx),
+            "theme.system" => self.set_theme(ThemeChoice::System, cx),
             "theme.toggle" => self.toggle_theme(cx),
             other => eprintln!("unknown command {other}"),
         }
+    }
+
+    fn navigate_workbench(&mut self, route: &str, cx: &mut Context<Self>) {
+        self.native_workspace = false;
+        self.native_pixel = None;
+        self.workbench.update(cx, |v, cx| v.navigate(route, cx));
+        cx.notify();
     }
 
     fn show_workspace(&mut self, cx: &mut Context<Self>) {
@@ -1990,7 +2215,7 @@ impl Shell {
             let Ok(id) = id else { return };
             let Some(project) = s.ws.project_mut(id) else { return };
             let (id, _) = project.new_terminal_tab();
-            let slot = s.make_terminal(&id, spec, cx);
+            let slot = s.make_terminal(&id, spec, window, cx);
             s.terminals.insert(id, slot);
             s.layout_changed(window, cx);
         });
@@ -2030,7 +2255,7 @@ impl Shell {
         {
             return;
         }
-        let slot = self.make_terminal(&id, SpawnSpec::shell(cwd), cx);
+        let slot = self.make_terminal(&id, SpawnSpec::shell(cwd), window, cx);
         self.terminals.insert(id, slot);
         self.layout_changed(window, cx);
     }
@@ -2104,7 +2329,7 @@ impl Shell {
                         },
                         None => SpawnSpec::shell(root.clone()),
                     };
-                    let slot = self.make_terminal(&terminal_id, spec, cx);
+                    let slot = self.make_terminal(&terminal_id, spec, window, cx);
                     self.terminals.insert(terminal_id, slot);
                 }
                 kind => {
@@ -2118,35 +2343,48 @@ impl Shell {
         }
     }
 
-    fn make_terminal(&mut self, id: &str, spec: SpawnSpec, cx: &mut Context<Self>) -> TerminalSlot {
+    fn make_terminal(&mut self, id: &str, spec: SpawnSpec, window: &mut Window, cx: &mut Context<Self>) -> TerminalSlot {
         let cwd = spec.cwd.clone();
         let initial_title = spec.title.clone();
         let view = cx.new(|cx| TerminalView::new(spec, cx));
         let tid = id.to_string();
-        let sub = cx.subscribe(&view, move |this: &mut Shell, view, event: &TerminalEvent, cx| {
+        let sub = cx.subscribe_in(&view, window, move |this: &mut Shell, view, event: &TerminalEvent, window, cx| {
             let owner = this.ws.projects().iter().find(|p| p.layout.terminal_ids().contains(&tid)).map(|p| p.id());
             let Some(owner) = owner else { return };
             let on_screen = this.ws.active_id() == Some(owner);
-            let Some(project) = this.ws.project_mut(owner) else { return };
             match event {
+                TerminalEvent::OpenLink(target) => {
+                    let term_cwd = view.read(cx).directory();
+                    this.open_terminal_link(target, &term_cwd, window, cx);
+                    return;
+                }
                 TerminalEvent::Spawned => {
-                    if let Some(session) = view.read(cx).session() {
+                    if let Some(session) = view.read(cx).session()
+                        && let Some(project) = this.ws.project_mut(owner)
+                    {
                         project.attach_terminal(&tid, session.clone(), cwd.clone(), initial_title.clone());
                     }
                 }
                 TerminalEvent::TitleChanged => {
                     let title = view.read(cx).title().map(str::to_string);
-                    if let Some(entry) = project.terminal_mut(&tid) {
+                    if let Some(project) = this.ws.project_mut(owner)
+                        && let Some(entry) = project.terminal_mut(&tid)
+                    {
                         entry.title = title;
                     }
                 }
                 TerminalEvent::Bell | TerminalEvent::CommandFinished => {
-                    if !on_screen && let Some(entry) = project.terminal_mut(&tid) {
+                    if !on_screen
+                        && let Some(project) = this.ws.project_mut(owner)
+                        && let Some(entry) = project.terminal_mut(&tid)
+                    {
                         entry.attention = true;
                     }
                 }
                 TerminalEvent::Exited => {
-                    if let Some(entry) = project.terminal_mut(&tid) {
+                    if let Some(project) = this.ws.project_mut(owner)
+                        && let Some(entry) = project.terminal_mut(&tid)
+                    {
                         entry.exited = true;
                     }
                 }
@@ -2156,6 +2394,31 @@ impl Shell {
             cx.notify();
         });
         TerminalSlot { view, _sub: sub }
+    }
+
+    fn open_terminal_link(&mut self, target: &str, terminal_cwd: &Path, window: &mut Window, cx: &mut Context<Self>) {
+        if target.starts_with("http://") || target.starts_with("https://") {
+            cx.open_url(target);
+            return;
+        }
+        let (raw_path, line) = parse_file_target(target);
+        let decoded = if let Some(rest) = raw_path.strip_prefix("file://") {
+            percent_decode(rest)
+        } else {
+            raw_path.to_string()
+        };
+        let path = Path::new(&decoded);
+        let resolved = if path.is_absolute() {
+            path.is_file().then(|| path.to_path_buf())
+        } else {
+            self.ws.active().map(|p| p.root().join(path)).filter(|p| p.is_file()).or_else(|| {
+                let from_cwd = terminal_cwd.join(path);
+                from_cwd.is_file().then_some(from_cwd)
+            })
+        };
+        if let Some(file) = resolved {
+            self.open_file(file, line, window, cx);
+        }
     }
 
     fn make_pane(&mut self, pid: ProjectId, root: &Path, kind: PaneKind, window: &mut Window, cx: &mut Context<Self>) -> PaneSlot {
@@ -2178,6 +2441,10 @@ impl Shell {
                             window,
                             cx,
                         );
+                    }
+                    crate::viewer::ViewerEvent::Reveal => {
+                        let path = view.read(cx).path().to_path_buf();
+                        Self::bg(cx, move || crate::host::reveal(&path), |_, _, _| {});
                     }
                 });
                 PaneSlot {
@@ -2295,6 +2562,9 @@ impl Shell {
         let mut settings = Ui::get(cx).settings.clone();
         settings.sidebar_width = self.sidebar_width;
         settings.sidebar_visible = self.sidebar_visible;
+        settings.inspector_open = self.inspector_open;
+        settings.inspector_width = self.inspector_width;
+        settings.last_route = self.last_route.clone();
         Self::bg(
             cx,
             move || vibevalley_workspace::persist::save_setting(&*store, SETTINGS_KEY, &settings),
@@ -2314,6 +2584,7 @@ impl Shell {
 
     pub fn toggle_inspector(&mut self, cx: &mut Context<Self>) {
         self.inspector_open = !self.inspector_open;
+        self.save_settings(cx);
         self.push_sidebar(cx);
         cx.notify();
     }
@@ -2346,12 +2617,20 @@ impl Shell {
         cx.notify();
     }
 
-    pub fn toggle_theme(&mut self, cx: &mut Context<Self>) {
+    pub fn set_theme(&mut self, choice: ThemeChoice, cx: &mut Context<Self>) {
+        let was_dark = Ui::get(cx).colors.dark;
         let mut settings = Ui::get(cx).settings.clone();
-        settings.theme = if Ui::get(cx).colors.dark { ThemeChoice::Light } else { ThemeChoice::Dark };
+        settings.theme = choice;
         Ui::apply(settings, cx);
-        self.theme_changed(cx);
+        if Ui::get(cx).colors.dark != was_dark {
+            self.theme_changed(cx);
+        }
         self.save_settings(cx);
+    }
+
+    pub fn toggle_theme(&mut self, cx: &mut Context<Self>) {
+        let choice = if Ui::get(cx).colors.dark { ThemeChoice::Light } else { ThemeChoice::Dark };
+        self.set_theme(choice, cx);
     }
 
     fn apply_ui_font_size(&mut self, cx: &mut Context<Self>) {
@@ -2454,6 +2733,7 @@ impl Shell {
         }
         if self.resizing_inspector {
             self.resizing_inspector = false;
+            self.save_settings(cx);
         }
         if self.dragging_split.take().is_some() {
             self.schedule_save(cx);
@@ -2526,6 +2806,12 @@ impl Render for Shell {
             .text_color(colors.text)
             .key_context("Shell")
             .track_focus(&self.focus)
+            .capture_any_mouse_down(|_, _, _| crate::host::restore_window_first_responder())
+            .on_mouse_down(MouseButton::Left, |e, window, _| {
+                if e.click_count == 2 && f32::from(e.position.y) <= 36.0 {
+                    window.zoom_window();
+                }
+            })
             .on_action(cx.listener(|s, _: &OpenAbout, _, cx| {
                 s.native_workspace = false;
                 s.native_pixel = None;
@@ -2624,7 +2910,7 @@ impl Render for Shell {
                     .children(self.sidebar_visible.then(|| {
                         div()
                             .id("sidebar-divider")
-                            .w(px(4.0))
+                            .w(px(1.0))
                             .h_full()
                             .flex_none()
                             .bg(colors.border)
@@ -2632,10 +2918,10 @@ impl Render for Shell {
                             .on_mouse_down(MouseButton::Left, cx.listener(|s, _, _, _| s.resizing_sidebar = true))
                     }))
                     .child(div().flex_1().h_full().min_w_0().child(main))
-                    .children(self.inspector_open.then(|| {
+                    .children((self.inspector_open && f32::from(window.viewport_size().width) >= 1040.0).then(|| {
                         div()
                             .id("inspector-divider")
-                            .w(px(4.0))
+                            .w(px(1.0))
                             .h_full()
                             .flex_none()
                             .bg(colors.border)
@@ -2643,7 +2929,7 @@ impl Render for Shell {
                             .on_mouse_down(MouseButton::Left, cx.listener(|s, _, _, _| s.resizing_inspector = true))
                     }))
                     .children(
-                        self.inspector_open
+                        (self.inspector_open && f32::from(window.viewport_size().width) >= 1040.0)
                             .then(|| div().w(inspector_w).h_full().flex_none().child(self.inspector.clone())),
                     )
             }))
@@ -2695,6 +2981,45 @@ impl Render for Shell {
     }
 }
 
+fn shell_palette_commands() -> Vec<Value> {
+    let mut items = vec![
+        json!({ "id": "nav.workspace", "label": "前往工作区", "detail": "/workspace", "group": "导航" }),
+        json!({ "id": "nav.chat", "label": "前往聊天", "detail": "/chat", "group": "导航" }),
+        json!({ "id": "nav.issues", "label": "前往工单", "detail": "/issues", "group": "导航" }),
+        json!({ "id": "nav.library", "label": "前往素材库", "detail": "/library", "group": "导航" }),
+        json!({ "id": "nav.pkm", "label": "前往笔记", "detail": "/pkm", "group": "导航" }),
+        json!({ "id": "nav.agents", "label": "前往档案", "detail": "/agents", "group": "导航" }),
+        json!({ "id": "nav.runtimes", "label": "前往农机", "detail": "/runtimes", "group": "导航" }),
+        json!({ "id": "nav.repos", "label": "前往仓库", "detail": "/repos", "group": "导航" }),
+        json!({ "id": "nav.catalog", "label": "前往图鉴", "detail": "/catalog", "group": "导航" }),
+        json!({ "id": "nav.farm", "label": "前往农场", "detail": "/farm", "group": "导航" }),
+        json!({ "id": "nav.settings", "label": "前往设置", "detail": "/settings", "group": "导航", "shortcut": "mod+," }),
+        json!({ "id": "theme.dark", "label": "切换主题：深色", "detail": "dark", "group": "外观" }),
+        json!({ "id": "theme.light", "label": "切换主题：浅色", "detail": "light", "group": "外观" }),
+        json!({ "id": "theme.system", "label": "切换主题：跟随系统", "detail": "system", "group": "外观" }),
+        json!({ "id": "inspector.toggle", "label": "切换右侧检查器", "detail": "inspector", "group": "视图" }),
+    ];
+    items.extend(frames::palette_commands());
+    items
+}
+
+/// Splits an optional `:line` or `:line:col` suffix from a terminal link target.
+fn parse_file_target(target: &str) -> (&str, Option<u32>) {
+    let trimmed = target.strip_suffix(':').unwrap_or(target);
+    let Some((left, last)) = trimmed.rsplit_once(':') else {
+        return (trimmed, None);
+    };
+    let Ok(n1) = last.parse::<u32>() else {
+        return (trimmed, None);
+    };
+    if let Some((path, line_str)) = left.rsplit_once(':')
+        && let Ok(line) = line_str.parse::<u32>()
+    {
+        return (path, Some(line));
+    }
+    (left, Some(n1))
+}
+
 fn first_workspace_repo(work_root: &Path) -> Option<PathBuf> {
     let entries = std::fs::read_dir(work_root).ok()?;
     let mut dirs: Vec<PathBuf> = entries.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.is_dir()).collect();
@@ -2731,5 +3056,15 @@ mod url_tests {
     fn file_urls_decode() {
         assert_eq!(super::percent_decode("/tmp/%E6%88%AA%E5%9B%BE%201.png"), "/tmp/截图 1.png");
         assert_eq!(super::percent_decode("/a%zzb%"), "/a%zzb%");
+    }
+
+    #[test]
+    fn terminal_file_targets_parse_line_and_column() {
+        assert_eq!(super::parse_file_target("src/main.rs"), ("src/main.rs", None));
+        assert_eq!(super::parse_file_target("src/main.rs:42"), ("src/main.rs", Some(42)));
+        assert_eq!(super::parse_file_target("src/main.rs:42:10"), ("src/main.rs", Some(42)));
+        assert_eq!(super::parse_file_target("src/main.rs:42:10:"), ("src/main.rs", Some(42)));
+        assert_eq!(super::parse_file_target("/abs/path/file.ts:12"), ("/abs/path/file.ts", Some(12)));
+        assert_eq!(super::parse_file_target("dir/file:name.rs"), ("dir/file:name.rs", None));
     }
 }

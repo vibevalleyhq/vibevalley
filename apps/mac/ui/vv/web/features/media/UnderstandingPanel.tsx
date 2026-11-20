@@ -1,20 +1,26 @@
 // Ported from VibeValley apps/web/src/features/media/UnderstandingPanel.tsx.
-import { cleanup, signal, Text, View } from "nsh";
+import { cleanup, Clipboard, Image, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { ArtifactId, Attachment, MediaUnderstandingAuthorizationRequest, MediaUnderstandingJob, MediaUnderstandingRequest } from "@vibevalley/protocol";
 
+import { useTimeout } from "../../base/timer";
 import { api, reasonOf } from "../../infra/api";
+import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { useCore } from "../../infra/frame";
 import { providerQuery, ready, useQuery } from "../../infra/query";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { Checkbox } from "../../ui/Checkbox";
 import { ConfirmButton } from "../../ui/ConfirmButton";
+import { fileKind, kindIcon, sizeText } from "../../ui/domain/AttachmentTile";
 import { Field, Select, TextArea, TextInput } from "../../ui/Field";
+import { Icon } from "../../ui/Icon";
+import { IconButton } from "../../ui/IconButton";
 import { Card, Quiet } from "../../ui/layout";
+import { Dot } from "../../ui/Tag";
 import { TextLink } from "../../ui/TextLink";
-import { JobActions, Refusal, SourceLine } from "./JobFacts";
+import { FactGrid, JobActions, NoticeBanner, PhasePill, Refusal, SectionHeading, SourceLine } from "./JobFacts";
 import { publicationKey } from "./publication";
 
 const maximumTokens = 8192;
@@ -24,6 +30,8 @@ export function UnderstandingPanel(props: { file: Attachment }) {
   const core = useCore();
   const query = useQuery(providerQuery);
   const status = () => ready(query, undefined);
+  const thumbUrl = useAttachmentUrl(() => props.file.id);
+  const kind = () => fileKind(props.file.type);
   const jobs = () => {
     const file = props.file.id;
     return (core()?.media ?? []).filter((job): job is MediaUnderstandingJob => job.kind === "understanding" && job.inputs.some((input) => input.hash === file));
@@ -88,20 +96,36 @@ export function UnderstandingPanel(props: { file: Attachment }) {
   };
 
   return (
-    <View testID="understanding-panel" class="min-w-0 gap-4">
+    <View testID="understanding-panel" class="max-w-3xl min-w-0 gap-4">
       <Card title={t("web.media.understanding.title")}>
-        <Text class="text-sm text-muted">{t("web.media.understanding.notice")}</Text>
-        <If when={status()?.understanding} else={<Quiet>{query.error() ? reasonOf(query.error()) : t("web.media.understanding.configure")}</Quiet>}>
+        <NoticeBanner tone="info">{t("web.media.understanding.notice")}</NoticeBanner>
+        <If
+          when={status()?.understanding}
+          else={<NoticeBanner tone="warn">{query.error() ? reasonOf(query.error()) : t("web.media.understanding.configure")}</NoticeBanner>}
+        >
           {(binding) => (
-            <Text testID="understanding-connection" class="text-xs text-muted">
-              {`${binding().connection} · ${binding().model}`}
-            </Text>
+            <View class="flex-row items-center gap-2 rounded-md bg-side px-3 py-2">
+              <Dot tone="leaf" size={6} ring={false} />
+              <Text testID="understanding-connection" class="min-w-0 flex-1 truncate font-mono text-xs text-muted">
+                {`${binding().connection} · ${binding().model}`}
+              </Text>
+            </View>
           )}
         </If>
-        <View class="min-w-0 gap-3">
-          <Text testID="understanding-file" class="text-xs text-muted">
-            {props.file.name}
-          </Text>
+        <View class="min-w-0 gap-3.5">
+          <View class="flex-row items-center gap-3 rounded-md bg-side p-2.5">
+            <View class="h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-line bg-page">
+              <If when={kind() === "image" ? thumbUrl() : undefined} else={<Icon name={kindIcon[kind()]} size={20} tone="muted" />}>
+                {(src) => <Image src={src()} style={{ width: 44, height: 44, objectFit: "cover" }} />}
+              </If>
+            </View>
+            <View class="min-w-0 flex-1 gap-0.5">
+              <Text testID="understanding-file" class="truncate text-sm font-medium text-ink">
+                {props.file.name}
+              </Text>
+              <Text class="truncate font-mono text-2xs text-muted tabular-nums">{`${props.file.type} · ${sizeText(props.file.size)}`}</Text>
+            </View>
+          </View>
           <Field label={t("web.media.understanding.prompt")}>
             <TextArea
               testID="understanding-prompt"
@@ -112,30 +136,37 @@ export function UnderstandingPanel(props: { file: Attachment }) {
               onInput={(v) => prompt.set(v.slice(0, 64_000))}
             />
           </Field>
-          <Field label={t("web.media.understanding.tokens")}>
-            <TextInput
-              testID="understanding-tokens"
-              accessibilityLabel={t("web.media.understanding.tokens")}
-              disabled={frozen()}
-              value={String(tokens())}
-              onInput={(v) => tokens.set(Math.min(maximumTokens, Math.max(1, Number(v.replace(/\D/gu, "")) || 1)))}
-            />
-          </Field>
-          <Field label={t("web.media.understanding.executor")}>
-            <Select
-              label={t("web.media.understanding.executor")}
-              placeholder={t("web.media.understanding.direct")}
-              testid="understanding-channel"
-              disabled={frozen()}
-              value={channel()}
-              onChange={(v) => channel.set(v)}
-              options={(core()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id }))}
-            />
-          </Field>
+          <View class="flex-row gap-3">
+            <View class="min-w-0 flex-1">
+              <Field label={t("web.media.understanding.tokens")}>
+                <TextInput
+                  testID="understanding-tokens"
+                  accessibilityLabel={t("web.media.understanding.tokens")}
+                  class="font-mono tabular-nums"
+                  disabled={frozen()}
+                  value={String(tokens())}
+                  onInput={(v) => tokens.set(Math.min(maximumTokens, Math.max(1, Number(v.replace(/\D/gu, "")) || 1)))}
+                />
+              </Field>
+            </View>
+            <View class="min-w-0 flex-1">
+              <Field label={t("web.media.understanding.executor")}>
+                <Select
+                  label={t("web.media.understanding.executor")}
+                  placeholder={t("web.media.understanding.direct")}
+                  testid="understanding-channel"
+                  disabled={frozen()}
+                  value={channel()}
+                  onChange={(v) => channel.set(v)}
+                  options={(core()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id }))}
+                />
+              </Field>
+            </View>
+          </View>
           <If when={channel()}>
-            <Text class="text-sm text-muted">{t("web.media.understanding.authorizationNotice")}</Text>
+            <NoticeBanner tone="info">{t("web.media.understanding.authorizationNotice")}</NoticeBanner>
           </If>
-          <View class="flex-row items-start gap-2">
+          <View class="flex-row items-start gap-2 rounded-md bg-side px-3 py-2.5">
             <Checkbox
               testid="understanding-consent"
               label={t("web.media.understanding.consent")}
@@ -146,31 +177,35 @@ export function UnderstandingPanel(props: { file: Attachment }) {
                 consent.set(checked && current?.understanding ? { connection: current.understanding.connection, revision: current.revision } : undefined);
               }}
             />
-            <Text class="min-w-0 flex-1 text-sm text-ink">{t("web.media.understanding.consent")}</Text>
+            <Text class="min-w-0 flex-1 text-xs leading-relaxed text-ink">{t("web.media.understanding.consent")}</Text>
           </View>
         </View>
         <If when={submitted()}>
-          <Text class="text-xs text-muted">{t("web.media.understanding.pending")}</Text>
+          <NoticeBanner tone="warn">{t("web.media.understanding.pending")}</NoticeBanner>
         </If>
         <If when={act.busy() && submitted() === undefined}>
-          <Text testID="understanding-uploading" class="text-sm text-muted">
-            {t("web.media.understanding.uploading")}
-          </Text>
+          <View class="flex-row flex-wrap items-center justify-between gap-2 rounded-md bg-side px-3 py-2">
+            <View class="flex-row items-center gap-2">
+              <Dot tone="water" size={6} ring={false} />
+              <Text testID="understanding-uploading" class="text-xs text-water">
+                {t("web.media.understanding.uploading")}
+              </Text>
+            </View>
+            <Button testID="understanding-stop-upload" tone="danger" icon="stop" onPress={() => transfer?.abort()}>
+              {t("web.media.understanding.stopUpload")}
+            </Button>
+          </View>
         </If>
-        <View class="flex-row flex-wrap gap-2">
+        <View class="flex-row flex-wrap items-center gap-2 border-t border-line pt-3">
           <Button
             testID="understanding-submit"
             tone="primary"
+            icon="understand"
             disabled={act.busy() || (submitted() === undefined && (!approved() || !status()?.understanding || !prompt().trim()))}
             onPress={() => void submit()}
           >
             {submitted() ? t("web.media.resubmit") : channel() ? t("web.media.understanding.authorize") : t("web.media.understanding.submit")}
           </Button>
-          <If when={act.busy() && submitted() === undefined}>
-            <Button testID="understanding-stop-upload" onPress={() => transfer?.abort()}>
-              {t("web.media.understanding.stopUpload")}
-            </Button>
-          </If>
           <If when={submitted()}>
             <ConfirmButton
               testid="understanding-new"
@@ -189,7 +224,7 @@ export function UnderstandingPanel(props: { file: Attachment }) {
         <Refusal error={error()} testid="understanding-error" />
       </Card>
       <If when={jobs().length > 0}>
-        <Text class="text-base font-semibold text-ink">{t("web.media.understanding.history")}</Text>
+        <SectionHeading title={t("web.media.understanding.history")} count={jobs().length} />
       </If>
       <Each of={jobs()} key={(job) => job.id}>
         {(job) => <UnderstandingCard job={job()} />}
@@ -201,6 +236,8 @@ export function UnderstandingPanel(props: { file: Attachment }) {
 function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
   const error = signal<string | undefined>(undefined);
   const saved = signal<ArtifactId | undefined>(undefined);
+  const copied = signal(false);
+  const later = useTimeout();
   const sent = signal(false);
   const act = createAct((e) => error.set(e));
   const save = () => {
@@ -210,20 +247,35 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
     return act.run(async () => saved.set((await api.artifact.create({ title: job.prompt.slice(0, 80), kind: "markdown", content })).id));
   };
   return (
-    <Card title={props.job.phaseText}>
+    <Card title={props.job.model} action={<PhasePill phase={props.job.phase} text={props.job.phaseText} />}>
       <View testID="understanding-job" class="min-w-0 gap-3">
-        <Text class="text-xs text-muted">{`${props.job.model} · ${props.job.connection} · ${props.job.id}`}</Text>
-        <Text class="text-sm text-ink">{props.job.prompt}</Text>
-        <SourceLine source={props.job.source} testid="understanding-source" />
+        <FactGrid>
+          <Text class="font-mono text-2xs text-muted tabular-nums">{`${props.job.model} · ${props.job.connection} · ${props.job.id}`}</Text>
+          <SourceLine source={props.job.source} testid="understanding-source" />
+          <View class="flex-row flex-wrap items-center gap-1.5">
+            <Each of={props.job.inputs}>
+              {(input) => (
+                <View class="rounded-xs bg-hover px-1.5 py-px">
+                  <Text class="font-mono text-2xs text-muted">{input().name}</Text>
+                </View>
+              )}
+            </Each>
+          </View>
+          <Text testID="understanding-cleanup-status" class="text-2xs text-faint">
+            {props.job.cleanupText}
+          </Text>
+        </FactGrid>
+        <Text class="text-sm font-medium text-ink">{props.job.prompt}</Text>
         <If when={props.job.phase === "authorized" ? props.job.authorization : undefined}>
           {(approval) => (
-            <>
-              <Text testID="understanding-authorization" class="text-sm text-muted">
+            <View class="min-w-0 gap-2 rounded-md bg-side p-3">
+              <Text testID="understanding-authorization" class="text-xs text-muted">
                 {t("web.media.understanding.authorization", { channel: approval().channel })}
               </Text>
               <View class="flex-row">
                 <Button
                   testID="understanding-delegate"
+                  icon="send"
                   disabled={act.busy() || sent()}
                   onPress={() => {
                     const id = props.job.id;
@@ -241,55 +293,67 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
                   {sent() ? t("web.media.understanding.delegated") : t("web.media.understanding.delegate")}
                 </Button>
               </View>
-            </>
+            </View>
           )}
         </If>
-        <Each of={props.job.inputs}>{(input) => <Text class="text-xs text-muted">{input().name}</Text>}</Each>
-        <If when={props.job.problem}>{(problem) => <Text class="text-sm text-berry">{problem()}</Text>}</If>
-        <Text testID="understanding-cleanup-status" class="text-xs text-muted">
-          {props.job.cleanupText}
-        </Text>
+        <If when={props.job.problem}>{(problem) => <NoticeBanner tone="error">{problem()}</NoticeBanner>}</If>
         <If when={props.job.result} else={<Quiet>{t("web.media.usageUnknown")}</Quiet>}>
           {(result) => (
-            <>
+            <View class="min-w-0 gap-2.5 rounded-md bg-side p-3">
+              <View class="flex-row items-center justify-between gap-2">
+                <Text class="text-xs font-semibold text-ink">{t("web.library.understood")}</Text>
+                <View class="flex-row items-center gap-1.5">
+                  <IconButton
+                    icon={copied() ? "check" : "copy"}
+                    size={14}
+                    label={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
+                    onClick={() =>
+                      void Clipboard.writeText(result().text).then(() => {
+                        copied.set(true);
+                        later(() => copied.set(false), 1500);
+                      })
+                    }
+                  />
+                  <If
+                    when={saved()}
+                    else={
+                      <Button testID="understanding-save" icon="artifacts" disabled={act.busy()} onPress={() => void save()}>
+                        {t("web.media.understanding.save")}
+                      </Button>
+                    }
+                  >
+                    {(id) => (
+                      <TextLink href={`/artifacts/${id()}`} testid="understanding-saved">
+                        {t("web.media.understanding.open")}
+                      </TextLink>
+                    )}
+                  </If>
+                </View>
+              </View>
               <If when={result().status === "incomplete"}>
-                <Text testID="understanding-truncated" class="text-sm text-berry">
+                <NoticeBanner tone="warn" testid="understanding-truncated">
                   {t("web.media.understanding.truncated")}
-                </Text>
+                </NoticeBanner>
               </If>
-              <Text testID="understanding-result" class="text-sm text-ink">
+              <Text testID="understanding-result" class="text-sm leading-relaxed text-ink" style={{ userSelect: "text" }}>
                 {result().text}
               </Text>
-              <Text testID="understanding-usage" class="text-xs text-muted">
+              <Text testID="understanding-usage" class="border-t border-line pt-2 font-mono text-2xs text-muted tabular-nums">
                 {`${t("web.media.understanding.usage", {
                   input: result().usage.inputTokens,
                   output: result().usage.outputTokens,
                   total: result().usage.totalTokens,
                 })} · ${result().model}`}
               </Text>
-              <If
-                when={saved()}
-                else={
-                  <View class="flex-row">
-                    <Button testID="understanding-save" disabled={act.busy()} onPress={() => void save()}>
-                      {t("web.media.understanding.save")}
-                    </Button>
-                  </View>
-                }
-              >
-                {(id) => (
-                  <TextLink href={`/artifacts/${id()}`} testid="understanding-saved">
-                    {t("web.media.understanding.open")}
-                  </TextLink>
-                )}
-              </If>
-            </>
+            </View>
           )}
         </If>
         <JobActions job={props.job} act={act} prefix="understanding">
           <If when={props.job.canCleanup}>
             <ConfirmButton
               testid="understanding-cleanup"
+              tone="danger"
+              icon="delete"
               label={t("web.media.understanding.cleanup")}
               question={t("web.media.understanding.cleanupAsk")}
               disabled={act.busy()}

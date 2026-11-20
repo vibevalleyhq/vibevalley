@@ -192,6 +192,11 @@ impl Frame {
         self.view.plays.get(&s.id).map(|p| p.station.round() as i32).unwrap_or(-1)
     }
 
+    pub fn stage_of(&self, s: &Session) -> Option<&vibevalley_protocol::IssueStage> {
+        let id = s.issue.as_deref()?;
+        self.state.issues.iter().find(|i| i.id == id)?.stage.as_ref()
+    }
+
     pub fn plot_of(&self, s: &Session) -> Option<&PlotView> {
         self.view.plots.get(s.plot_key())
     }

@@ -16,8 +16,8 @@ export function MotionStoreView(props: StoreViewerProps) {
     <View testID="motion-store-view" class="min-h-0 min-w-0 flex-1">
       <If when={snapshot().error}>
         {(err) => (
-          <View class="px-3 py-2">
-            <Text class="text-xs text-berry">{err()}</Text>
+          <View class="border-b border-line bg-bad-soft px-3 py-2">
+            <Text class="text-xs font-medium text-berry">{err()}</Text>
           </View>
         )}
       </If>

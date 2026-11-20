@@ -33,9 +33,9 @@ export type Asked<A> = QueryResult<A>;
 
 export function Stat(props: { label: string; value: string }) {
   return (
-    <View class="min-w-18">
+    <View class="min-w-18 gap-0.5">
       <Text class="text-xs text-muted">{props.label}</Text>
-      <Text class="text-sm font-medium text-ink" style={{ numberOfLines: 2 }}>
+      <Text class="text-sm font-medium tabular-nums text-ink" style={{ numberOfLines: 2 }}>
         {props.value}
       </Text>
     </View>
@@ -90,19 +90,19 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
             <View
               role="image"
               accessibilityLabel={list(shares().map((s) => `${s.label} ${percent(s.share)}`))}
-              class="h-14 flex-row overflow-hidden rounded-md bg-bark p-1"
+              class="h-14 flex-row gap-px overflow-hidden rounded-md bg-bark p-1"
             >
               <Each of={shares()} key={(s) => s.label}>
                 {(s) => (
                   <View
                     tooltip={<Bubble text={`${s().label} · ${percent(s().share)}`} />}
-                    class="min-w-1"
+                    class="min-w-1 rounded-xs"
                     style={{ flexGrow: Math.max(1, Math.round(s().share * 10000)), flexBasis: 0, backgroundColor: s().color }}
                   />
                 )}
               </Each>
             </View>
-            <View class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+            <View class="grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
               <Each of={shares()} key={(s) => s.label}>
                 {(s) => (
                   <View class="flex-row items-center gap-3">
@@ -110,12 +110,12 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
                       <LangMark color={s().color} size={32} />
                     </SpriteOr>
                     <View class="min-w-0 flex-1 gap-1">
-                      <View class="flex-row">
+                      <View class="flex-row items-baseline gap-2">
                         <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{s().label}</Text>
-                        <Text class="text-sm text-muted">{percent(s().share)}</Text>
+                        <Text class="text-sm tabular-nums text-muted">{percent(s().share)}</Text>
                       </View>
                       <Bar share={s().share < 0.02 ? 0.02 : s().share} color={s().color} />
-                      <Text class="text-xs text-muted">{t("web.repo.linesAndFiles", { lines: number(s().lines), files: number(s().files) })}</Text>
+                      <Text class="text-xs tabular-nums text-muted">{t("web.repo.linesAndFiles", { lines: number(s().lines), files: number(s().files) })}</Text>
                     </View>
                   </View>
                 )}
@@ -175,7 +175,7 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
       }
     >
       <Card title={t("web.repo.calendar")} action={aside()} testid="repo-calendar">
-        <View class="grid grid-cols-4 gap-6">
+        <View class="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Stat label={t("web.repo.inYear")} value={worked() ? t("web.repo.commits", { n: number(streaks().total) }) : "…"} />
           <Stat label={t("web.repo.daysWorked")} value={worked() ? t("web.repo.days", { n: streaks().days }) : "…"} />
           <Stat label={t("web.repo.longest")} value={worked() ? t("web.repo.days", { n: streaks().longest }) : "…"} />
@@ -224,7 +224,7 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
           </View>
         </ScrollRow>
         <View class="flex-row flex-wrap items-center justify-between gap-2">
-          <Text class="text-xs text-muted">{line()}</Text>
+          <Text class="text-xs tabular-nums text-muted">{line()}</Text>
           <View class="flex-row items-center gap-1">
             <Text class="text-xs text-muted">{t("web.repo.fewer")}</Text>
             <Each of={[0, 1, 2, 3, 4]}>
@@ -283,9 +283,9 @@ export function Hands(props: { activity?: RepoActivity | undefined }) {
                     {(a) => <AgentFace agentId={a().id} name={a().name} look={a().look} runtime={a().runtime} size={32} />}
                   </If>
                   <View class="min-w-0 flex-1 gap-1">
-                    <View class="flex-row">
+                    <View class="flex-row items-baseline gap-2">
                       <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{author().name}</Text>
-                      <Text class="text-xs text-muted">{t("web.repo.times", { n: number(author().commits) })}</Text>
+                      <Text class="text-xs tabular-nums text-muted">{t("web.repo.times", { n: number(author().commits) })}</Text>
                     </View>
                     <Bar share={author().commits / top()} color={mix("leaf", 1)} />
                   </View>
@@ -295,7 +295,7 @@ export function Hands(props: { activity?: RepoActivity | undefined }) {
           </Each>
         </View>
         <If when={rest() > 0}>
-          <Text class="text-xs text-muted">{t("web.repo.rest", { people: authors().length - hands, commits: number(rest()) })}</Text>
+          <Text class="text-xs tabular-nums text-muted">{t("web.repo.rest", { people: authors().length - hands, commits: number(rest()) })}</Text>
         </If>
       </Card>
     </If>
@@ -386,8 +386,8 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
       <If when={busy()}>
         <Text class="text-sm text-muted">{importing() === "github" ? t("web.repo.downloading") : t("web.repo.making")}</Text>
       </If>
-      <View class="flex-row justify-end gap-2 pt-2">
-        <Button disabled={busy()} testID="cancel" onPress={() => props.onDone()}>
+      <View class="flex-row justify-end gap-2 border-t border-line pt-3">
+        <Button tone="quiet" disabled={busy()} testID="cancel" onPress={() => props.onDone()}>
           {t("web.repo.cancel")}
         </Button>
         <Button tone="primary" testID="submit" disabled={!canSubmit()} onPress={() => void submit()}>

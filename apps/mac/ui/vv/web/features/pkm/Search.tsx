@@ -112,7 +112,7 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
   keymap.bind({ up: () => move(-1), down: () => move(1) }, { when: "always" });
   return (
     <View class="gap-3">
-      <View class="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3">
+      <View class="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 transition duration-120 ease-out hover:border-faint focus-within:border-focus">
         <Icon name="search" size={16} tone="muted" />
         <Input
           autoFocus
@@ -131,6 +131,19 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
           }}
           class="min-w-0 flex-1 text-base text-ink"
         />
+        <If when={query().length > 0}>
+          <View
+            role="button"
+            accessibilityLabel={t("web.issue.page.clear")}
+            onPress={() => {
+              setQuery("");
+              setActive(0);
+            }}
+            class="size-5 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
+          >
+            <Icon name="close" size={12} tone="muted" />
+          </View>
+        </If>
       </View>
       <View class="flex-row flex-wrap items-center gap-1" accessibilityLabel={t("web.pkm.search.filters")}>
         <Filter on={tier() === undefined} label={t("web.pkm.search.all")} testid="pkm-search-all" onToggle={() => pick(() => setTier(undefined))} />
@@ -166,7 +179,7 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
                     accessibilityState={{ selected: active() === r().index }}
                     onMouseEnter={() => setActive(r().index)}
                     onPress={() => open(r().row)}
-                    class={`rounded-md px-2 py-1.5 ${active() === r().index ? "bg-selected" : ""}`}
+                    class={`rounded-md px-2.5 py-1.5 transition duration-120 ease-out ${active() === r().index ? "bg-selected" : "hover:bg-hover"}`}
                   >
                     <FoundRow row={r().row} words={words()} />
                   </View>
@@ -176,6 +189,26 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
           )}
         </Each>
       </Scroll>
+      <View class="flex-row items-center gap-3 border-t border-line pt-2">
+        <View class="flex-row items-center gap-1">
+          <View class="rounded-xs bg-hover px-1.5 py-px">
+            <Text class="font-mono text-2xs text-muted">↑↓</Text>
+          </View>
+          <Text class="text-2xs text-faint">{t("web.base.shortcuts.say.move")}</Text>
+        </View>
+        <View class="flex-row items-center gap-1">
+          <View class="rounded-xs bg-hover px-1.5 py-px">
+            <Text class="font-mono text-2xs text-muted">⏎</Text>
+          </View>
+          <Text class="text-2xs text-faint">{t("web.base.shortcuts.say.pick")}</Text>
+        </View>
+        <View class="flex-row items-center gap-1">
+          <View class="rounded-xs bg-hover px-1.5 py-px">
+            <Text class="font-mono text-2xs text-muted">Esc</Text>
+          </View>
+          <Text class="text-2xs text-faint">{t("web.base.lightbox.close")}</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -217,9 +250,9 @@ function Filter(props: { on: boolean; label: string; testid: string; onToggle: (
       testID={props.testid}
       accessibilityState={{ selected: props.on }}
       onPress={() => props.onToggle()}
-      class={`group h-6 justify-center rounded-full px-2.5 ${props.on ? "bg-selected" : "hover:bg-hover"}`}
+      class={`group h-6 justify-center rounded-full border px-2.5 transition duration-120 ease-out ${props.on ? "border-faint bg-selected" : "border-transparent hover:bg-hover"}`}
     >
-      <Text class={`text-xs ${props.on ? "text-ink" : "text-muted group-hover:text-ink"}`}>{props.label}</Text>
+      <Text class={`text-xs ${props.on ? "font-medium text-ink" : "text-muted group-hover:text-ink"}`}>{props.label}</Text>
     </View>
   );
 }

@@ -243,7 +243,7 @@ fn runtimes(
 ) -> Registry {
     let mut registry = Registry::new();
     for r in vibevalley_oar::default_runtimes().list() {
-        if r.id() != vibevalley_oar::vibevalley::ID {
+        if r.id() != vibevalley_oar::vibevalley::ID && r.id() != "scripted" {
             registry.register(r.clone());
         }
     }

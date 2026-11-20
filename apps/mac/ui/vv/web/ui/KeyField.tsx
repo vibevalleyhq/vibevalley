@@ -30,14 +30,14 @@ export function KeyMark(props: { status: KeyStatus; removing?: boolean }) {
         role="image"
         testID={`key-mark-${props.removing === true ? "removing" : (props.status.source ?? "unset")}`}
         accessibilityLabel={text()}
-        class="shrink-0 flex-row items-center gap-0.5 rounded-sm"
+        class="shrink-0 flex-row items-center gap-1 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
       >
         {/* Said, not only drawn: a hollow dot did not read as "none saved". The key itself shows as its last four. */}
         <If when={props.removing === true || props.status.source !== null} else={<Text class="text-2xs text-faint">{t("web.base.form.unset")}</Text>}>
           {/* Berry and leaf: Icon's own colours for these two marks. */}
           <Icon name={props.removing === true ? "cross" : "check"} size={12} />
           <If when={props.removing !== true && props.status.hint}>
-            <Text class="font-mono text-2xs text-muted">{props.status.hint}</Text>
+            <Text class="font-mono text-2xs text-muted tabular-nums">{props.status.hint}</Text>
           </If>
         </If>
       </View>
@@ -60,15 +60,15 @@ export function KeyField(props: {
 }) {
   return (
     <View class="gap-1.5">
-      <View class="flex-row items-center gap-1.5">
-        <Text class={props.small === true ? "text-xs font-medium text-muted" : "text-sm font-semibold text-ink"}>{props.label}</Text>
+      <View class="min-h-4 flex-row items-center gap-1.5">
+        <Text class={`min-w-0 truncate ${props.small === true ? "text-xs font-medium text-muted" : "text-sm font-semibold text-ink"}`}>{props.label}</Text>
         <KeyMark status={props.status} removing={props.removing} />
         <If when={props.tip}>{(tip) => <Hint text={tip()} />}</If>
         <View class="flex-1" />
         <If when={props.link}>{(l) => <OutLink href={l().href} label={l().label} />}</If>
       </View>
-      <View class="flex-row items-center gap-1">
-        <View class="min-w-0 flex-1" style={{ opacity: props.removing ? 0.4 : 1, pointerEvents: props.removing ? "none" : "auto" }}>
+      <View class="flex-row items-center gap-1.5">
+        <View class="min-w-0 flex-1" style={{ opacity: props.removing ? 0.5 : 1, pointerEvents: props.removing ? "none" : "auto" }}>
           {props.children}
         </View>
         <If when={props.status.source === "settings"}>
@@ -87,12 +87,12 @@ export function KeyField(props: {
 /** Save and undo, shown while there is something to save; `left` says what went wrong. */
 export function SaveBar(props: { dirty: boolean; busy: boolean; onSave: () => void; onUndo: () => void; left?: JSX.Element; extra?: JSX.Element }) {
   return (
-    <View testID={props.dirty ? "save-bar-dirty" : "save-bar"} class="flex-row items-center gap-2 border-t border-line bg-page py-2.5">
+    <View testID={props.dirty ? "save-bar-dirty" : "save-bar"} class="min-h-12 flex-row items-center gap-2 border-t border-line bg-page py-2.5">
       <View class="min-w-0 flex-1">{props.left}</View>
       {props.extra}
       <If when={props.dirty}>
         <Button tone="quiet" icon="undo" testID="undo" onPress={() => props.onUndo()}>
-          <Text class="text-sm text-muted">{t("web.base.form.undo")}</Text>
+          {t("web.base.form.undo")}
         </Button>
       </If>
       <Button tone="primary" testID="save" disabled={!props.dirty || props.busy} onPress={() => props.onSave()}>

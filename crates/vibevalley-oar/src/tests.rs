@@ -232,10 +232,20 @@ fn record_round_trips() {
 #[test]
 fn default_registry_lists_the_builtin_runtimes() {
     let registry = default_runtimes();
-    for id in ["claude", "codex", "vibevalley", "scripted"] {
+    for id in [
+        "claude",
+        "codex",
+        "antigravity",
+        "grok",
+        "kimi",
+        "codebuddy",
+        "opencode",
+        "vibevalley",
+        "scripted",
+    ] {
         assert!(registry.get(id).is_some(), "{id}");
     }
-    assert!(registry.list().iter().any(|r| r.id().starts_with("acp:")));
+    assert!(registry.get("acp:gemini").is_none());
     assert!(matches!(registry.require("nope"), Err(AgentError::UnknownRuntime(_))));
 }
 

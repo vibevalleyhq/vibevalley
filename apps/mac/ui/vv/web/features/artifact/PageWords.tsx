@@ -15,6 +15,8 @@ import { useRouter } from "../../infra/router";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
+import { Icon } from "../../ui/Icon";
+import { IconButton } from "../../ui/IconButton";
 import { toast } from "../../ui/toasts";
 import { artifactHref } from "./ArtifactCard";
 import type { Frame } from "./frame";
@@ -55,13 +57,26 @@ export function PageWords(props: { artifact: Artifact; version: number; frame: F
   });
   return (
     <If when={picked()}>
-      <View testID="artifact-words" class="gap-1.5">
-        <Text class="text-xs font-semibold text-muted">{t("web.artifact.edit.title")}</Text>
-        <If when={latest() ? picked() : undefined} else={<Text class="text-xs text-faint">{t("web.artifact.edit.older")}</Text>}>
+      <View testID="artifact-words" class="gap-2 rounded-lg border border-line bg-page p-3">
+        <View class="flex-row items-center justify-between gap-2">
+          <View class="flex-row items-center gap-1.5">
+            <Icon name="edit" size={12} tone="muted" />
+            <Text class="text-xs font-semibold text-muted">{t("web.artifact.edit.title")}</Text>
+          </View>
+          <IconButton icon="close" size={12} label={t("web.base.form.never")} onClick={() => picked.set(undefined)} />
+        </View>
+        <If
+          when={latest() ? picked() : undefined}
+          else={
+            <View class="rounded-md bg-side px-2.5 py-2">
+              <Text class="text-xs leading-relaxed text-muted">{t("web.artifact.edit.older")}</Text>
+            </View>
+          }
+        >
           {(p) => (
             <>
-              <View testID="artifact-words-quote" class="border-l-2 border-wheat pl-2">
-                <Text class="line-clamp-3 text-xs text-muted">{p().exact.trim()}</Text>
+              <View testID="artifact-words-quote" class="rounded-r-xs border-l-2 border-wheat bg-side py-1.5 pr-2.5 pl-2.5">
+                <Text class="line-clamp-3 text-xs leading-relaxed text-muted">{p().exact.trim()}</Text>
               </View>
               <TextArea
                 testID="artifact-words-text"
@@ -72,11 +87,18 @@ export function PageWords(props: { artifact: Artifact; version: number; frame: F
                 onFocus={() => focused.set(true)}
                 onBlur={() => focused.set(false)}
               />
-              <View class="flex-row items-center justify-end gap-2">
-                <Button onPress={() => picked.set(undefined)}>{t("web.base.form.never")}</Button>
-                <Button tone="primary" testID="artifact-words-save" disabled={act.busy()} onPress={() => void save()}>
-                  {t("web.artifact.edit.save")}
-                </Button>
+              <View class="flex-row items-center justify-between gap-2">
+                <View class="rounded-xs border border-line bg-side px-1.5 py-0.5">
+                  <Text class="font-mono text-2xs text-faint">⌘↵</Text>
+                </View>
+                <View class="flex-row items-center gap-1.5">
+                  <Button tone="quiet" onPress={() => picked.set(undefined)}>
+                    {t("web.base.form.never")}
+                  </Button>
+                  <Button tone="primary" testID="artifact-words-save" disabled={act.busy()} onPress={() => void save()}>
+                    {t("web.artifact.edit.save")}
+                  </Button>
+                </View>
               </View>
             </>
           )}

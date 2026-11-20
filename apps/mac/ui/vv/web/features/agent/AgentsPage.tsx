@@ -44,7 +44,7 @@ function NewCard(props: { href: string; label: string; testID?: string; tall?: b
       accessibilityLabel={props.label}
       onMouseEnter={() => hovered.set(true)}
       onMouseLeave={() => hovered.set(false)}
-      class={`${props.tall === true ? "min-h-44" : "min-h-32"} items-center justify-center gap-2 rounded-lg border border-dashed`}
+      class={`${props.tall === true ? "min-h-44" : "min-h-32"} items-center justify-center gap-2 rounded-lg border border-dashed transition duration-120 ease-out hover:bg-hover`}
       style={{ borderColor: hovered() ? mix("leaf", 0.6) : mix("ink", 0.2) }}
     >
       <Icon name="add" size={24} tone={hovered() ? "ok-ink" : "muted"} />
@@ -62,14 +62,14 @@ function AgentsPage() {
   const skills = createMemo(() => new Map(ready(allSkills, []).map((s) => [s.id, s.name])));
   const problems = useAgentProblems(agents);
   return (
-    <Scroll testID="agents-page" class="h-full flex-1" contentClass="gap-6 px-4 pt-4 pb-8">
-      <View class="flex-row flex-wrap items-end justify-end gap-3">
+    <Scroll testID="agents-page" class="h-full flex-1 bg-page" contentClass="gap-5 px-5 pt-4 pb-8">
+      <View class="flex-row flex-wrap items-center justify-end gap-3">
         <View class="flex-row flex-wrap items-center gap-2">
           <A
             href="/agents/templates"
             testID="open-templates"
             tooltip={<Bubble text={t("web.agent.templates.openLine")} />}
-            class="h-7 flex-row items-center gap-1.5 rounded-md border border-line px-2.5 hover:bg-hover"
+            class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
           >
             <Icon name="folder" size={14} />
             <Text class="text-sm text-ink">{t("web.agent.templates.open")}</Text>
@@ -77,25 +77,39 @@ function AgentsPage() {
           <A
             href="/agents/new"
             testID="new-agent"
-            class="h-7 flex-row items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 hover:bg-accent-hover"
+            class="h-7 flex-row items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 transition duration-120 ease-out hover:bg-accent-hover active:translate-y-px"
           >
             <Icon name="add" size={14} tone="page" />
             <Text class="text-sm text-page">{t("web.agent.list.make")}</Text>
           </A>
         </View>
       </View>
-      <Text role="header" class="text-sm font-semibold text-muted">
-        {t("web.agent.list.orchestrators")}
-      </Text>
+      <View class="flex-row items-center gap-2">
+        <Text role="header" class="text-sm font-semibold text-muted">
+          {t("web.agent.list.orchestrators")}
+        </Text>
+        <If when={orchestrators().length > 0}>
+          <View class="rounded-sm bg-hover px-1.5 py-px">
+            <Text class="text-2xs font-medium tabular-nums text-muted">{String(orchestrators().length)}</Text>
+          </View>
+        </If>
+      </View>
       <View class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         <Each of={orchestrators()} key={(a) => a.id}>
           {(a) => <OrchestratorCard agent={a()} />}
         </Each>
         <NewCard href="/agents/new?role=orchestrator" testID="new-orchestrator" label={t("web.agent.list.makeOrchestrator")} />
       </View>
-      <Text role="header" class="text-sm font-semibold text-muted">
-        {t("web.agent.list.helpers")}
-      </Text>
+      <View class="flex-row items-center gap-2 pt-1">
+        <Text role="header" class="text-sm font-semibold text-muted">
+          {t("web.agent.list.helpers")}
+        </Text>
+        <If when={agents().length > 0}>
+          <View class="rounded-sm bg-hover px-1.5 py-px">
+            <Text class="text-2xs font-medium tabular-nums text-muted">{String(agents().length)}</Text>
+          </View>
+        </If>
+      </View>
       {/* The default orchestrator is always there: once it shows, the profiles are read. */}
       <If when={orchestrators().length > 0 && agents().length === 0}>
         <A href="/agents/templates" class="self-start">
@@ -202,10 +216,12 @@ function AgentCard(props: {
             act: props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable"),
             name: props.agent.name,
           })}
-          class="rounded-md border border-line bg-page px-2 py-0.5 hover:bg-side"
+          class="group rounded-md border border-line bg-page px-2 py-0.5 transition duration-120 ease-out hover:bg-hover"
           style={{ opacity: hovered ? 1 : 0 }}
         >
-          <Text class="text-xs font-medium text-muted">{props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable")}</Text>
+          <Text class="text-xs font-medium text-muted group-hover:text-ink">
+            {props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable")}
+          </Text>
         </View>
       )}
     >
@@ -227,8 +243,8 @@ function AgentCard(props: {
           <View class="flex-row items-center gap-2">
             <Text class="min-w-0 shrink truncate text-base font-semibold text-ink">{props.agent.name}</Text>
             <If when={props.here > 0}>
-              <View class="shrink-0 rounded-sm bg-hat px-1.5">
-                <Text class="text-xs text-bark-900">{t("web.agent.list.here", { n: props.here })}</Text>
+              <View class="shrink-0 rounded-sm bg-hat px-1.5 py-0.5">
+                <Text class="text-xs font-medium tabular-nums text-bark-900">{t("web.agent.list.here", { n: props.here })}</Text>
               </View>
             </If>
           </View>
@@ -247,7 +263,7 @@ function AgentCard(props: {
         <View class="flex-row flex-wrap gap-1 pt-3">
           <Each of={props.agent.skills}>
             {(id) => (
-              <View class="rounded-sm bg-hover px-1.5">
+              <View class="rounded-sm bg-hover px-1.5 py-0.5">
                 <Text class="text-xs text-ink">{props.skillName.get(id()) ?? id()}</Text>
               </View>
             )}
@@ -258,12 +274,12 @@ function AgentCard(props: {
         <View tooltip={<Bubble text={t("web.agent.list.tallyHint")} />} class="flex-row">
           <Text class="text-xs text-muted">
             {`${t("web.agent.list.hired")} `}
-            <Text class="font-medium text-ink">{String(Math.round(props.tally?.hired ?? 0))}</Text>
+            <Text class="font-medium tabular-nums text-ink">{String(Math.round(props.tally?.hired ?? 0))}</Text>
           </Text>
         </View>
         <Text class="text-xs text-muted">
           {`${t("web.agent.list.merged")} `}
-          <Text class="font-medium text-ok-ink">{String(Math.round(props.tally?.harvested ?? 0))}</Text>
+          <Text class="font-medium tabular-nums text-ok-ink">{String(Math.round(props.tally?.harvested ?? 0))}</Text>
         </Text>
         <If
           when={props.errors.length > 0}

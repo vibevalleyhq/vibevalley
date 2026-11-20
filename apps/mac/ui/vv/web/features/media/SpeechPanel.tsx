@@ -11,7 +11,9 @@ import { Button } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { Field, Select, TextArea } from "../../ui/Field";
 import { Card, Quiet } from "../../ui/layout";
-import { AudioMetadataLine, AudioUsageLine, JobActions, Refusal, ResultAudio, SourceLine } from "./JobFacts";
+import { Dot } from "../../ui/Tag";
+import { Bubble } from "../../ui/Tip";
+import { AudioMetadataLine, AudioUsageLine, FactGrid, JobActions, NoticeBanner, PhasePill, Refusal, ResultAudio, SectionHeading, SourceLine } from "./JobFacts";
 import { publicationKey } from "./publication";
 import { ReleaseAssets } from "./ReleaseAssets";
 import { playSpeech } from "./stream";
@@ -105,111 +107,139 @@ export function SpeechPanel() {
   };
 
   return (
-    <View testID="speech-panel" class="min-w-0 gap-4">
-      <Card title={t("web.media.speech.title")}>
-        <Text class="text-sm text-muted">{t("web.media.speech.notice")}</Text>
-        <If when={status()?.speech} else={<Quiet>{query.error() ? reasonOf(query.error()) : t("web.media.speech.configure")}</Quiet>}>
-          <Text testID="speech-connection" class="text-xs text-muted">
-            {t("web.media.speech.binding", {
-              account: status()?.connections.find((item) => item.id === status()?.speech?.connection)?.name ?? "",
-              connection: status()?.speech?.connection ?? "",
-              model: status()?.speech?.model ?? "",
-              revision: status()?.revision ?? 0,
-            })}
-          </Text>
+    <View testID="speech-panel" class="max-w-3xl min-w-0 gap-4">
+      <Card
+        title={t("web.media.speech.title")}
+        action={
+          <View tooltip={<Bubble text={t("web.media.speech.refresh")} />}>
+            <Button
+              testID="speech-refresh"
+              tone="quiet"
+              icon="refresh"
+              disabled={act.busy() || query.fetching()}
+              onPress={() => void act.run(() => query.refetch())}
+            >
+              {t("web.media.speech.refresh")}
+            </Button>
+          </View>
+        }
+      >
+        <NoticeBanner tone="info">{t("web.media.speech.notice")}</NoticeBanner>
+        <If when={status()?.speech} else={<NoticeBanner tone="warn">{query.error() ? reasonOf(query.error()) : t("web.media.speech.configure")}</NoticeBanner>}>
+          <View class="flex-row items-center gap-2 rounded-md bg-side px-3 py-2">
+            <Dot tone="leaf" size={6} ring={false} />
+            <Text testID="speech-connection" class="min-w-0 flex-1 truncate font-mono text-xs text-muted tabular-nums">
+              {t("web.media.speech.binding", {
+                account: status()?.connections.find((item) => item.id === status()?.speech?.connection)?.name ?? "",
+                connection: status()?.speech?.connection ?? "",
+                model: status()?.speech?.model ?? "",
+                revision: status()?.revision ?? 0,
+              })}
+            </Text>
+          </View>
         </If>
-        <Button testID="speech-refresh" disabled={act.busy() || query.fetching()} onPress={() => void act.run(() => query.refetch())}>
-          {t("web.media.speech.refresh")}
-        </Button>
-        <View class="min-w-0 gap-3">
-          <Field label={t("web.media.speech.voice")} hint={t("web.media.speech.voiceHint")}>
-            <Select
-              label={t("web.media.speech.voice")}
-              testid="speech-voice"
-              placeholder={t("web.media.speech.chooseVoice")}
-              disabled={act.busy() || submitted() !== undefined || voices.fetching() || !status()?.speech}
-              value={voice()?.id ?? ""}
-              options={options()}
-              onChange={(id) => selected.set({ scope: scope(), id, name: options().find((item) => item.value === id)?.label ?? id })}
-            />
-          </Field>
-          <If when={status()?.speech}>
-            <View class="flex-row flex-wrap gap-2">
-              <Button
-                testID="speech-voices-first"
-                disabled={voices.fetching()}
-                onPress={() => {
-                  const first = page()?.scope !== scope() || !page()?.after;
-                  page.set(undefined);
-                  if (first) void act.run(() => voices.refetch());
-                }}
-              >
-                {t("web.media.speech.firstVoices")}
-              </Button>
-              <Button
-                testID="speech-voices-next"
-                disabled={voices.fetching() || ready(voices, undefined)?.hasMore !== true}
-                onPress={() => {
-                  const after = ready(voices, undefined)?.nextCursor;
-                  if (after) page.set({ scope: scope(), after });
-                }}
-              >
-                {t("web.media.speech.nextVoices")}
-              </Button>
+        <View class="min-w-0 gap-3.5">
+          <View class="min-w-0 gap-2">
+            <Field label={t("web.media.speech.voice")} hint={t("web.media.speech.voiceHint")}>
+              <Select
+                label={t("web.media.speech.voice")}
+                testid="speech-voice"
+                placeholder={t("web.media.speech.chooseVoice")}
+                disabled={act.busy() || submitted() !== undefined || voices.fetching() || !status()?.speech}
+                value={voice()?.id ?? ""}
+                options={options()}
+                onChange={(id) => selected.set({ scope: scope(), id, name: options().find((item) => item.value === id)?.label ?? id })}
+              />
+            </Field>
+            <If when={status()?.speech}>
+              <View class="flex-row flex-wrap items-center gap-2">
+                <Button
+                  testID="speech-voices-first"
+                  icon="refresh"
+                  disabled={voices.fetching()}
+                  onPress={() => {
+                    const first = page()?.scope !== scope() || !page()?.after;
+                    page.set(undefined);
+                    if (first) void act.run(() => voices.refetch());
+                  }}
+                >
+                  {t("web.media.speech.firstVoices")}
+                </Button>
+                <Button
+                  testID="speech-voices-next"
+                  icon="next"
+                  disabled={voices.fetching() || ready(voices, undefined)?.hasMore !== true}
+                  onPress={() => {
+                    const after = ready(voices, undefined)?.nextCursor;
+                    if (after) page.set({ scope: scope(), after });
+                  }}
+                >
+                  {t("web.media.speech.nextVoices")}
+                </Button>
+                <If when={voices.fetching()}>
+                  <Text class="text-xs text-muted">{t("web.base.form.asking")}</Text>
+                </If>
+              </View>
+              <If when={voices.status() === "success" && ready(voices, undefined)?.voices.length === 0}>
+                <Quiet>{t("web.media.speech.emptyVoices")}</Quiet>
+              </If>
+              <Refusal error={voices.error() ? reasonOf(voices.error()) : undefined} />
+            </If>
+          </View>
+          <View class="flex-row gap-3">
+            <View class="min-w-0 flex-1">
+              <Field label={t("web.media.speech.format")}>
+                <Select
+                  label={t("web.media.speech.format")}
+                  testid="speech-format"
+                  disabled={act.busy() || submitted() !== undefined || execution() === "streaming"}
+                  value={execution() === "streaming" ? "pcm" : format()}
+                  onChange={(v) => format.set(v)}
+                  options={MediaAudioFormatValues.map((value) => ({ value, label: value.toUpperCase() }))}
+                />
+              </Field>
             </View>
-            <If when={voices.fetching()}>
-              <Quiet>{t("web.base.form.asking")}</Quiet>
-            </If>
-            <If when={voices.status() === "success" && ready(voices, undefined)?.voices.length === 0}>
-              <Quiet>{t("web.media.speech.emptyVoices")}</Quiet>
-            </If>
-            <Refusal error={voices.error() ? reasonOf(voices.error()) : undefined} />
-          </If>
-          <Field label={t("web.media.speech.format")}>
-            <Select
-              label={t("web.media.speech.format")}
-              testid="speech-format"
-              disabled={act.busy() || submitted() !== undefined || execution() === "streaming"}
-              value={execution() === "streaming" ? "pcm" : format()}
-              onChange={(v) => format.set(v)}
-              options={MediaAudioFormatValues.map((value) => ({ value, label: value.toUpperCase() }))}
-            />
-          </Field>
-          <Field label={t("web.media.speech.execution")}>
-            <Select
-              label={t("web.media.speech.execution")}
-              testid="speech-execution"
-              disabled={act.busy() || submitted() !== undefined}
-              value={execution()}
-              onChange={(v) => execution.set(v)}
-              options={[
-                { value: "synchronous", label: t("web.media.speech.synchronous") },
-                { value: "asynchronous", label: t("web.media.speech.asynchronous") },
-                ...(flashSupported() ? [{ value: "streaming" as const, label: t("web.audio.flashTitle") }] : []),
-              ]}
-            />
-          </Field>
-          <Field label={t("web.media.speech.text")}>
-            <TextArea
-              testID="speech-text"
-              accessibilityLabel={t("web.media.speech.text")}
-              rows={5}
-              disabled={act.busy() || submitted() !== undefined}
-              value={text()}
-              onInput={(v) => text.set(v.slice(0, 10_000))}
-            />
-          </Field>
+            <View class="min-w-0 flex-1">
+              <Field label={t("web.media.speech.execution")}>
+                <Select
+                  label={t("web.media.speech.execution")}
+                  testid="speech-execution"
+                  disabled={act.busy() || submitted() !== undefined}
+                  value={execution()}
+                  onChange={(v) => execution.set(v)}
+                  options={[
+                    { value: "synchronous", label: t("web.media.speech.synchronous") },
+                    { value: "asynchronous", label: t("web.media.speech.asynchronous") },
+                    ...(flashSupported() ? [{ value: "streaming" as const, label: t("web.audio.flashTitle") }] : []),
+                  ]}
+                />
+              </Field>
+            </View>
+          </View>
+          <View class="min-w-0 gap-1">
+            <Field label={t("web.media.speech.text")}>
+              <TextArea
+                testID="speech-text"
+                accessibilityLabel={t("web.media.speech.text")}
+                rows={5}
+                disabled={act.busy() || submitted() !== undefined}
+                value={text()}
+                onInput={(v) => text.set(v.slice(0, 10_000))}
+              />
+            </Field>
+            <Text class="text-right font-mono text-2xs text-faint tabular-nums">{`${text().length} / 10,000`}</Text>
+          </View>
         </View>
         <If when={execution() === "streaming"}>
-          <Text testID="speech-flash-notice" class="text-sm text-muted">
+          <NoticeBanner tone="warn" testid="speech-flash-notice">
             {t("web.audio.flashNotice")}
-          </Text>
+          </NoticeBanner>
         </If>
         <If when={submitted()}>
           {(sent) => (
-            <View testID="speech-request" class="min-w-0 gap-1">
+            <View testID="speech-request" class="min-w-0 gap-1 rounded-md bg-side px-3 py-2">
               <Text class="text-xs text-muted">{t("web.media.speech.pending")}</Text>
-              <Text class="text-xs text-muted">
+              <Text class="truncate font-mono text-2xs text-faint tabular-nums">
                 {[
                   t("web.media.speech.binding", {
                     account: sent().name,
@@ -218,28 +248,32 @@ export function SpeechPanel() {
                     revision: sent().request.revision,
                   }),
                   sent().request.voice,
-                  sent().request.format,
+                  sent().request.format.toUpperCase(),
                   sent().request.id,
                 ].join(" · ")}
               </Text>
             </View>
           )}
         </If>
-        <View class="flex-row flex-wrap gap-2">
+        <View class="flex-row flex-wrap items-center gap-2 border-t border-line pt-3">
           <Button
             testID="speech-generate"
             tone="primary"
+            icon={execution() === "streaming" ? "play" : "generate"}
             disabled={act.busy() || (!submitted() && (!status()?.speech || !voice() || !text().trim()))}
             onPress={() => void submit()}
           >
             {submitted() ? t("web.media.resubmit") : execution() === "streaming" ? t("web.audio.flashStart") : t("web.media.speech.submit")}
           </Button>
           <If when={live()}>
-            <Button testID="speech-flash-stop" onPress={stop}>
+            <Button testID="speech-flash-stop" tone="danger" icon="stop" onPress={stop}>
               {t("web.audio.flashStop")}
             </Button>
             <If when={draining()}>
-              <Text class="text-sm text-muted">{t("web.audio.flashDraining")}</Text>
+              <View class="flex-row items-center gap-1.5">
+                <Dot tone="water" size={6} ring={false} />
+                <Text class="text-xs text-water">{t("web.audio.flashDraining")}</Text>
+              </View>
             </If>
           </If>
           <If when={submitted()}>
@@ -258,7 +292,7 @@ export function SpeechPanel() {
         </View>
         <Refusal error={error()} testid="speech-error" />
       </Card>
-      <Text class="text-base font-semibold text-ink">{t("web.media.speech.history")}</Text>
+      <SectionHeading title={t("web.media.speech.history")} count={jobs().length} />
       <If when={jobs().length > 0} else={<Quiet>{t("web.media.speech.empty")}</Quiet>}>
         <Each of={jobs()} key={(job) => job.id}>
           {(job) => <SpeechJobCard job={job()} />}
@@ -274,6 +308,7 @@ function SpeechJobCard(props: { job: MediaSpeechJob }) {
   const posted = signal(false);
   const error = signal<string | undefined>(undefined);
   const act = createAct((e) => error.set(e));
+  const failed = () => props.job.phase === "failed" || props.job.phase === "download_failed";
 
   const publish = (attachment: string) => {
     const id = channel();
@@ -287,23 +322,22 @@ function SpeechJobCard(props: { job: MediaSpeechJob }) {
   };
 
   return (
-    <Card title={props.job.phaseText}>
+    <Card title={props.job.voice || props.job.model} action={<PhasePill phase={props.job.phase} text={props.job.phaseText} />}>
       <View testID="speech-job" class="min-w-0 gap-3">
-        <Text testID="speech-format-result" class="text-xs text-muted">
-          {[props.job.model, props.job.connection, props.job.revision, props.job.voice, props.job.format, props.job.id].join(" · ")}
-        </Text>
-        <SourceLine source={props.job.source} testid="speech-source" />
-        <AudioMetadataLine metadata={props.job.metadata} testid="speech-metadata" />
-        <AudioUsageLine usage={props.job.usage} testid="speech-usage" />
-        <If when={props.job.canRelease}>
-          <ReleaseAssets id={props.job.id} />
-        </If>
-        <Text class="text-sm text-ink">{props.job.prompt}</Text>
+        <FactGrid>
+          <Text testID="speech-format-result" class="font-mono text-2xs text-muted tabular-nums">
+            {[props.job.model, props.job.connection, props.job.revision, props.job.voice, props.job.format.toUpperCase(), props.job.id].join(" · ")}
+          </Text>
+          <SourceLine source={props.job.source} testid="speech-source" />
+          <AudioMetadataLine metadata={props.job.metadata} testid="speech-metadata" />
+          <AudioUsageLine usage={props.job.usage} testid="speech-usage" />
+        </FactGrid>
+        <Text class="text-sm leading-relaxed text-ink">{props.job.prompt}</Text>
         <If when={props.job.problem}>
           {(problem) => (
-            <Text testID="speech-problem" class="text-sm text-muted">
+            <NoticeBanner tone={failed() ? "error" : "warn"} testid="speech-problem">
               {problem()}
-            </Text>
+            </NoticeBanner>
           )}
         </If>
         <ResultAudio
@@ -312,36 +346,40 @@ function SpeechJobCard(props: { job: MediaSpeechJob }) {
           pcm={props.job.format === "pcm"}
           prefix="speech"
           save={t("web.media.speech.save")}
+          duration={props.job.metadata?.duration}
+          format={props.job.format}
         />
         <If when={props.job.attachment}>
           {(file) => (
-            <>
-              <Field label={t("web.media.channel")}>
-                <Select
-                  label={t("web.media.channel")}
-                  testid="speech-channel"
-                  disabled={act.busy()}
-                  placeholder={t("web.media.chooseChannel")}
-                  value={channel()}
-                  onChange={(v) => {
-                    channel.set(v);
-                    posted.set(false);
-                  }}
-                  options={(core()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id }))}
-                />
-              </Field>
-              <View class="flex-row">
-                <Button testID="speech-publish" disabled={act.busy() || !channel() || posted()} onPress={() => void publish(file().id)}>
-                  {posted() ? t("web.media.published") : t("web.media.speech.publish")}
-                </Button>
-              </View>
-            </>
+            <View class="flex-row flex-wrap items-center gap-2">
+              <Select
+                label={t("web.media.channel")}
+                testid="speech-channel"
+                size="control"
+                class="w-44"
+                disabled={act.busy()}
+                placeholder={t("web.media.chooseChannel")}
+                value={channel()}
+                onChange={(v) => {
+                  channel.set(v);
+                  posted.set(false);
+                }}
+                options={(core()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id }))}
+              />
+              <Button testID="speech-publish" icon="send" disabled={act.busy() || !channel() || posted()} onPress={() => void publish(file().id)}>
+                {posted() ? t("web.media.published") : t("web.media.speech.publish")}
+              </Button>
+            </View>
           )}
+        </If>
+        <If when={props.job.canRelease}>
+          <ReleaseAssets id={props.job.id} />
         </If>
         <JobActions job={props.job} act={act} prefix="speech">
           <If when={props.job.canResume === true}>
             <Button
               testID="speech-resume"
+              icon="retry"
               disabled={act.busy()}
               onPress={() => {
                 const id = props.job.id;

@@ -94,7 +94,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
         </View>
         <View class="flex-row items-center justify-end gap-2 border-t border-line pt-3">
           <Text class="mr-auto text-xs text-faint">{t("web.issue.new.keys")}</Text>
-          <Button testID="issue-new-dialog-never" onPress={() => props.onClose()}>
+          <Button tone="quiet" testID="issue-new-dialog-never" onPress={() => props.onClose()}>
             {t("web.base.form.never")}
           </Button>
           <Button tone="primary" testID="issue-new-keep" disabled={!text().trim() || saving()} onPress={() => void keep()}>

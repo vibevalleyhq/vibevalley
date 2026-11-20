@@ -33,10 +33,10 @@
   },
   "artifactKind": {
     "all": "全部作品",
-    "canvas": "视觉画板 (.visual.html)",
-    "slides": "幻灯片 (.slide.html)",
-    "dashboard": "仪表盘 (.dashboard.html)",
-    "whiteboard": "白板 (.whiteboard)",
+    "canvas": "视觉画板",
+    "slides": "幻灯片",
+    "dashboard": "仪表盘",
+    "whiteboard": "白板",
     "page": "网页与文档"
   },
   "newArtifact": "新建作品",

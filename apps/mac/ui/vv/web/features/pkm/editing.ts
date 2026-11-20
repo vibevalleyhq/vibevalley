@@ -1,5 +1,6 @@
 export {
   type Around,
+  autoPair,
   type Caret,
   type Command,
   commandAction,

@@ -8,7 +8,7 @@ import { Icon } from "./Icon";
 import { Hint } from "./Tip";
 import { mix } from "./tone";
 
-const box = "rounded-md border border-line bg-page px-2.5 py-1.5 placeholder:text-faint focus:border-focus text-ink";
+const box = "rounded-md border border-line bg-page px-2.5 py-1.5 text-ink placeholder:text-faint transition duration-120 ease-out";
 
 type ControlAppearance = {
   /** Placement only: margins, grow, a width when `wide` is false. */
@@ -51,7 +51,14 @@ export function TextInput(props: TextInputProps) {
       onFocus={props.onFocus}
       onBlur={props.onBlur}
       ref={props.ref}
-      class={[box, props.wide !== false ? "w-full" : "", props.text === "lg" ? "text-lg font-semibold" : "text-sm", "h-8", props.class ?? ""].join(" ")}
+      class={[
+        box,
+        props.disabled === true ? "bg-side opacity-50" : "hover:border-faint focus:border-focus",
+        props.wide !== false ? "w-full" : "",
+        props.text === "lg" ? "text-lg font-semibold" : "text-sm",
+        "h-8",
+        props.class ?? "",
+      ].join(" ")}
     />
   );
 }
@@ -75,7 +82,13 @@ export function TextArea(props: TextInputProps & { rows?: number; submit?: boole
       onBlur={props.onBlur}
       ref={props.ref}
       style={{ minHeight: (props.rows ?? 3) * 20 + 14 }}
-      class={[box, props.wide !== false ? "w-full" : "", props.text === "lg" ? "text-lg font-semibold" : "text-sm", props.class ?? ""].join(" ")}
+      class={[
+        box,
+        props.disabled === true ? "bg-side opacity-50" : "hover:border-faint focus:border-focus",
+        props.wide !== false ? "w-full" : "",
+        props.text === "lg" ? "text-lg font-semibold" : "text-sm",
+        props.class ?? "",
+      ].join(" ")}
     />
   );
 }
@@ -84,7 +97,7 @@ export function TextArea(props: TextInputProps & { rows?: number; submit?: boole
 export function Field(props: { label: string; hint?: string | undefined; children: JSX.Element }) {
   return (
     <View class="gap-1">
-      <View class="flex-row items-center gap-1.5">
+      <View class="min-h-4 flex-row items-center gap-1.5">
         <Text class="text-xs font-medium text-muted">{props.label}</Text>
         <If when={props.hint}>{(hint) => <Hint text={hint()} />}</If>
       </View>
@@ -118,7 +131,26 @@ export function Select<V extends string>(props: {
   const offered = (v: string): v is V => all().some((o) => o.value === v);
   const shown = () => all().find((o) => o.value === props.value)?.label ?? props.placeholder ?? "";
   const tinted = () => props.filter === true && props.value !== "";
+  const disabled = () => props.disabled === true;
   const textClass = () => (props.text === "xs" ? "text-xs" : "text-sm");
+  const triggerSurface = () => {
+    if (props.state === "failed") return "border-berry bg-bad-soft";
+    if (props.state === "pending" || tinted()) return "";
+    if (props.quiet === true) return disabled() ? "border-transparent bg-transparent" : "border-transparent bg-transparent hover:border-line hover:bg-page";
+    return disabled() ? "border-line bg-page" : "border-line bg-page hover:border-faint hover:bg-hover";
+  };
+  const triggerStyle = () => {
+    if (props.state === "pending") return { borderColor: mix("wheat", 0.55), backgroundColor: mix("wheat", 0.1) };
+    if (props.state !== "failed" && tinted()) return { borderColor: mix("accent", 0.45), backgroundColor: mix("accent", 0.1) };
+    return undefined;
+  };
+  const labelColor = () => {
+    if (props.value === "") return "text-faint";
+    if (props.state === "failed") return "text-berry";
+    if (props.state === "pending") return "text-warn-ink";
+    if (tinted()) return "font-medium text-ok-ink";
+    return "text-ink";
+  };
   return (
     <Base
       testID={props.testid}
@@ -132,22 +164,40 @@ export function Select<V extends string>(props: {
       }}
       offset={4}
       align="start"
-      popupClass="max-h-72 rounded-lg border border-line bg-page p-1 shadow-float"
-      itemClass={`h-7 rounded-md px-2 ${textClass()} text-ink focus:bg-hover selected:font-medium disabled:opacity-50`}
+      popupClass="max-h-72 rounded-lg border border-line bg-page p-1 shadow-float transition duration-120 ease-out"
+      popupStartingClass="opacity-0"
+      popupEndingClass="opacity-0"
+      listClass="gap-0.5"
+      itemClass="group h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out focus:bg-hover selected:bg-selected disabled:opacity-50"
+      renderItem={(entry) => (
+        <View class="min-w-0 flex-1 flex-row items-center gap-2">
+          <Text class={`min-w-0 flex-1 truncate ${textClass()} text-ink group-selected:font-medium group-disabled:text-faint`}>{entry.title}</Text>
+          <View class="size-3.5 shrink-0 items-center justify-center opacity-0 group-selected:opacity-100">
+            <Icon name="ticked" size={12} tone="accent" />
+          </View>
+        </View>
+      )}
       class={props.class}
       trigger={
         <View
           testID={props.testid ? `${props.testid}-trigger` : undefined}
+          accessibilityState={{ busy: props.state === "pending", invalid: props.state === "failed" }}
           class={[
-            "min-w-0 flex-row items-center gap-1.5 rounded-md border",
+            "min-w-0 flex-row items-center gap-1.5 rounded-md border transition duration-120 ease-out",
             props.size === "control" ? "h-7 px-2" : "h-8 px-2.5",
-            props.quiet === true ? "border-transparent hover:border-line hover:bg-page" : tinted() ? "" : "border-line bg-page hover:bg-hover",
-            props.disabled === true ? "opacity-50" : "",
+            triggerSurface(),
+            disabled() ? "opacity-50" : "aria-expanded:border-focus focus-visible:outline-2 focus-visible:outline-focus",
           ].join(" ")}
-          style={tinted() ? { borderColor: mix("accent", 0.4), backgroundColor: mix("accent", 0.08) } : undefined}
+          style={triggerStyle()}
         >
-          <Text class={`truncate min-w-0 flex-1 ${textClass()} ${props.value === "" ? "text-faint" : "text-ink"}`}>{shown()}</Text>
-          <Icon name="choose" size={12} tone="muted" />
+          <Text class={`min-w-0 flex-1 truncate ${textClass()} ${labelColor()}`}>{shown()}</Text>
+          <If when={props.state === "pending"}>
+            <Icon name="wait" size={12} tone="warn-ink" />
+          </If>
+          <If when={props.state === "failed"}>
+            <Icon name="cross" size={12} />
+          </If>
+          <Icon name="choose" size={12} tone={props.state === "failed" ? "berry" : tinted() ? "ok-ink" : "muted"} />
         </View>
       }
     />

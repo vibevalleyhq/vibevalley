@@ -12,6 +12,7 @@ import { useOrchestrators } from "../../../infra/agents";
 import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Icon } from "../../../ui/Icon";
 import { IconButton } from "../../../ui/IconButton";
+import { Bubble } from "../../../ui/Tip";
 import { type BoardCard, cardAgent, cardLook, cardRepo, closedShown, laneLabel, laneStatus } from "../model/cards";
 import { type Grouping, groupRows, laneOrder, type Ordering, orderRows, type RowGroup, rowKeys } from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
@@ -55,7 +56,7 @@ export function IssueList(props: {
   return (
     <If when={!props.loading} else={<EmptyNote>{t("web.issue.reading")}</EmptyNote>}>
       <Scroll testID="issue-list" class="min-h-0 flex-1" onLayout={box.onLayout}>
-        <View class="px-3 pb-3">
+        <View class="px-3 pb-4">
           <Each of={groupRows(props.cards, props.grouping, rowKeys)} key={(g) => g.key}>
             {(g) => {
               const groupLane = () => g().lane;
@@ -84,7 +85,7 @@ export function IssueList(props: {
                 const l = groupLane();
                 switch (props.grouping) {
                   case "status":
-                    return l ? <StatusMark status={laneStatus[l]} /> : undefined;
+                    return l ? <StatusMark status={laneStatus[l]} size={14} /> : undefined;
                   case "repo":
                     return <Icon name="folder" size={14} tone="muted" />;
                   case "agent":
@@ -100,47 +101,70 @@ export function IssueList(props: {
                 }
               };
               return (
-                <View accessibilityLabel={label()} testID="issue-group" class="mb-1">
+                <View accessibilityLabel={label()} testID="issue-group" class="mb-1.5">
                   {/* A head of words on the page, not a bar: its line under it sets the group off. */}
-                  <View class="mt-2 h-8.5 flex-row items-center border-b border-line bg-page pr-1">
+                  <View class="mt-2 h-8.5 flex-row items-center rounded-t-md border-b border-line bg-page pr-1 transition duration-120 ease-out hover:bg-hover">
                     <View
                       role="button"
                       testID={`issue-group-${g().key || "none"}`}
                       onPress={() => fold(g().key)}
                       accessibilityLabel={isFolded() ? t("web.issue.list.unfold", { group: label() }) : t("web.issue.list.fold", { group: label() })}
-                      class="h-full min-w-0 flex-1 flex-row items-center gap-2.5 px-2.5"
+                      class="h-full min-w-0 flex-1 flex-row items-center gap-2 px-2.5"
                     >
-                      <View style={{ transform: [{ rotate: isFolded() ? "0deg" : "90deg" }] }}>
+                      <View
+                        class="w-4 shrink-0 items-center justify-center"
+                        style={{
+                          transform: [{ rotate: isFolded() ? "0deg" : "90deg" }],
+                          transitionProperty: "transform",
+                          transitionDuration: 120,
+                        }}
+                      >
                         <Icon name="expand" size={10} tone="muted" />
                       </View>
-                      {icon()}
+                      <If when={props.grouping !== "none"}>
+                        <View class="w-4 shrink-0 items-center justify-center">{icon()}</View>
+                      </If>
                       <Text class="truncate text-sm font-semibold text-ink">{label()}</Text>
-                      <Text class="text-xs text-muted">{`${g().rows.length}`}</Text>
+                      <View class="shrink-0 rounded-full bg-hover px-1.5 py-px">
+                        <Text class="text-2xs font-medium text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+                          {`${g().rows.length}`}
+                        </Text>
+                      </View>
                     </View>
                     <If when={canAdd(g())}>
-                      <IconButton testid="issue-group-add" icon="add" label={t("web.issue.list.writeIn", { group: label() })} onClick={() => add(g())} />
+                      <IconButton
+                        testid="issue-group-add"
+                        icon="add"
+                        size={14}
+                        label={t("web.issue.list.writeIn", { group: label() })}
+                        onClick={() => add(g())}
+                      />
                     </If>
                   </View>
                   <If when={!isFolded()}>
-                    <Each of={rows()} key={(c) => c.id}>
-                      {(c) => {
-                        const l = groupLane();
-                        return (
-                          <Row
-                            card={c()}
-                            wide={wide()}
-                            selected={c().id === props.selected}
-                            showRepo={props.grouping !== "repo"}
-                            groupStatus={props.grouping === "status" && l ? laneStatus[l] : undefined}
-                            onOpen={props.onOpen}
-                            nameOf={nameOf()}
-                          />
-                        );
-                      }}
-                    </Each>
-                    <If when={hidden() > 0 || (groupLane() === "closed" && props.older && g().rows.length > closedShown)}>
-                      <OlderLink hidden={hidden()} onClick={props.onOlder} />
-                    </If>
+                    <View class="mt-0.5 gap-px">
+                      <Each of={rows()} key={(c) => c.id}>
+                        {(c) => {
+                          const l = groupLane();
+                          return (
+                            <Row
+                              card={c()}
+                              wide={wide()}
+                              selected={c().id === props.selected}
+                              showRepo={props.grouping !== "repo"}
+                              groupStatus={props.grouping === "status" && l ? laneStatus[l] : undefined}
+                              onOpen={props.onOpen}
+                              nameOf={nameOf()}
+                            />
+                          );
+                        }}
+                      </Each>
+                      <If when={hidden() > 0 || (groupLane() === "closed" && props.older && g().rows.length > closedShown)}>
+                        <View class="pt-1">
+                          <OlderLink hidden={hidden()} onClick={props.onOlder} />
+                        </View>
+                      </If>
+                    </View>
                   </If>
                 </View>
               );
@@ -166,6 +190,8 @@ function Row(props: {
   const now = () => Date.now();
   const look = () => cardLook(props.card, props.nameOf, issues(), now());
   const repo = () => cardRepo(props.card);
+  const shownFlags = () => (props.wide ? look().flags : look().flags.slice(0, 1));
+  const hasTrailingMarks = () => Boolean(look().progress) || shownFlags().length > 0;
   return (
     <View
       role="button"
@@ -179,38 +205,46 @@ function Row(props: {
       }}
       accessibilityLabel={look().title}
       accessibilityState={{ selected: props.selected }}
-      tooltip={look().detail ? <Text>{look().detail}</Text> : undefined}
+      tooltip={look().detail ? <Bubble text={look().detail} /> : undefined}
       onPress={() => props.onOpen(props.card.id)}
-      class={`h-9.5 flex-row items-center gap-2.5 rounded-md px-2.5 ${props.selected ? "bg-selected" : "hover:bg-hover"}`}
+      class={`min-h-9.5 flex-row items-center gap-2.5 rounded-md px-2.5 py-1.5 transition duration-120 ease-out ${props.selected ? "bg-selected" : "hover:bg-hover"}`}
     >
-      <View class="w-3.5 shrink-0 items-center">
+      <View class="w-4 shrink-0 items-center justify-center">
         <If when={look().priority === "urgent" || look().priority === "high" ? look().priority : undefined}>
           {(pr) => <PriorityMark priority={pr()} size={13} />}
         </If>
       </View>
       <If when={props.wide}>
-        <Text class="w-11 shrink-0 truncate text-xs text-muted">{look().number}</Text>
+        <Text class="w-11 shrink-0 truncate font-mono text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+          {look().number ?? ""}
+        </Text>
       </If>
-      <View class="w-3.5 shrink-0 items-center">
+      <View class="w-4 shrink-0 items-center justify-center">
         <If when={props.groupStatus === undefined || (look().status !== props.groupStatus && !(props.groupStatus === "todo" && look().status === "backlog"))}>
           <StatusMark status={look().status} tone={look().statusTone} size={13} />
         </If>
       </View>
-      <View class="min-w-0 flex-1">
-        <Text class="truncate text-sm text-ink">{look().title}</Text>
+      <View class="min-w-0 flex-1 gap-0.5">
+        <Text class="truncate text-sm font-medium text-ink">{look().title}</Text>
         <If when={look().wait}>{(wait) => <Text class="truncate text-xs text-water">{wait()}</Text>}</If>
       </View>
-      <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
-      <Each of={props.wide ? look().flags : look().flags.slice(0, 1)}>{(f) => <FlagChip text={f().text} tone={f().tone} />}</Each>
-      <If when={props.showRepo && props.wide}>
-        <Text class="w-30 shrink-0 truncate text-xs text-muted">{repo() ?? ""}</Text>
+      <If when={hasTrailingMarks()}>
+        <View class="shrink-0 flex-row items-center gap-1.5">
+          <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
+          <Each of={shownFlags()}>{(f) => <FlagChip text={f().text} tone={f().tone} />}</Each>
+        </View>
       </If>
-      <View class="w-4.5 shrink-0 items-center">
+      <If when={props.showRepo && props.wide}>
+        <Text class="w-28 shrink-0 truncate text-xs text-muted">{repo() ?? ""}</Text>
+      </If>
+      <View class="w-5 shrink-0 items-center justify-center">
         <If when={cardAgent(props.card) || props.card.kind === "orchestrator"}>
           <CardFace card={props.card} size={18} />
         </If>
       </View>
-      <Text class={`${props.wide ? "w-18" : "w-14"} shrink-0 text-right text-xs text-muted`}>{ago(rowKeys(props.card).updatedAt, now())}</Text>
+      <Text class={`${props.wide ? "w-16" : "w-13"} shrink-0 text-right text-xs text-faint`} style={{ fontVariant: ["tabular-nums"] }}>
+        {ago(rowKeys(props.card).updatedAt, now())}
+      </Text>
     </View>
   );
 }

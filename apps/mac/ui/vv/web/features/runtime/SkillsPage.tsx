@@ -2,7 +2,8 @@
 // skills book (installed by runtime, built in, the farm's own) and the
 // skill editor on the same form model (infra/form, vendored). Its route,
 // /settings/skills, is the settings page's.
-import { Scroll, signal, Text, View } from "nsh";
+import { Scroll, signal, Text, View, type JSX } from "nsh";
+import { Input } from "nsh/base";
 import { z } from "zod";
 
 import { list as listed, t } from "@vibevalley/i18n";
@@ -23,9 +24,11 @@ import { AgentFace } from "../../ui/domain/Face";
 import { runtimeName } from "../../ui/domain/RuntimeBadge";
 import { TextArea, TextInput } from "../../ui/Field";
 import { Form, formControl, FormField, formMessages } from "../../ui/Form";
+import { Icon } from "../../ui/Icon";
 import { Card, Empty } from "../../ui/layout";
 import { Markdown } from "../../ui/Markdown";
 import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
+import { Bubble } from "../../ui/Tip";
 import { type InstalledSkill, installedSkills } from "./quota";
 import { SkillInput } from "./skill-form";
 
@@ -43,6 +46,9 @@ export const useSkills = () => useQuery(skillsQuery);
 export function SkillsPage(props: { id?: string | undefined }) {
   const router = useRouter();
   const query = signal("");
+  const installedOpen = signal(true);
+  const builtInOpen = signal(true);
+  const ownOpen = signal(true);
   const skills = useSkills();
   const runtimes = useRuntimes();
   const catalog = () => ready(runtimes, []);
@@ -80,63 +86,99 @@ export function SkillsPage(props: { id?: string | undefined }) {
       <Scroll
         accessibilityLabel={t("web.runtime.library.book")}
         testID="skills-book"
-        class="max-h-80 shrink-0 rounded-lg border border-line bg-page lg:max-h-none lg:w-72"
-        contentClass="gap-2 p-2"
+        class="max-h-80 shrink-0 rounded-lg border border-line bg-side lg:max-h-none lg:w-72"
+        contentClass="gap-2 p-2.5"
       >
-        <Text role="header" class="px-2 pt-1.5 text-base font-semibold text-ink">
+        <Text role="header" class="px-1.5 pt-1 text-base font-semibold text-ink">
           {t("web.runtime.library.book")}
         </Text>
-        <TextInput
-          testID="skills-search"
-          accessibilityLabel={t("web.runtime.library.search")}
-          placeholder={t("web.runtime.library.searchHint")}
-          value={query()}
-          onInput={(v) => query.set(v)}
-        />
+        <View class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:border-faint focus-within:border-focus">
+          <Icon name="search" size={14} tone="faint" />
+          <Input
+            testID="skills-search"
+            accessibilityLabel={t("web.runtime.library.search")}
+            placeholder={t("web.runtime.library.searchHint")}
+            value={query()}
+            onChange={(e) => query.set(e.value)}
+            class="min-w-0 flex-1 text-sm text-ink placeholder:text-faint"
+          />
+          <If when={query().length > 0}>
+            <View
+              role="button"
+              accessibilityLabel={t("web.issue.page.clear")}
+              tooltip={<Bubble text={t("web.issue.page.clear")} />}
+              onPress={() => query.set("")}
+              class="size-4 shrink-0 items-center justify-center rounded-xs hover:bg-hover"
+            >
+              <Icon name="close" size={10} tone="muted" />
+            </View>
+          </If>
+        </View>
         <If when={runtimes.error()}>
-          <Text class="px-2 text-xs text-berry">
+          <Text class="px-1.5 text-xs text-berry">
             {t("web.runtime.library.noRuntimes")}
             {reasonOf(runtimes.error())}
           </Text>
         </If>
-        <Heading>{t("web.runtime.library.installed", { count: count(list().length, installed().length) })}</Heading>
-        <If when={installed().length === 0}>
-          <Text class="px-2 text-xs text-muted">{t("web.runtime.library.noneReported")}</Text>
+        <SectionHeading
+          title={t("web.runtime.library.installed", { count: count(list().length, installed().length) })}
+          open={installedOpen() || q() !== ""}
+          onToggle={() => installedOpen.set(!installedOpen())}
+        />
+        <If when={installedOpen() || q() !== ""}>
+          <If when={installed().length === 0}>
+            <Text class="px-2 text-xs text-muted">{t("web.runtime.library.noneReported")}</Text>
+          </If>
+          <If when={installed().length > 0 && list().length === 0}>
+            <Text class="px-2 text-xs text-muted">{t("web.runtime.library.noMatch")}</Text>
+          </If>
+          <View class="gap-0.5">
+            <Each of={list()} key={(s) => s.name}>
+              {(s) => (
+                <Entry
+                  to={skillPath(installedPrefix + s().name)}
+                  on={open()?.name === s().name}
+                  title={s().name}
+                  detail={listed(s().runtimes.map((x) => runtimeName(catalog(), x.runtime)))}
+                />
+              )}
+            </Each>
+          </View>
         </If>
-        <If when={installed().length > 0 && list().length === 0}>
-          <Text class="px-2 text-xs text-muted">{t("web.runtime.library.noMatch")}</Text>
+        <SectionHeading
+          title={t("web.runtime.library.builtIn", { count: count(builtInShown().length, builtIns().length) })}
+          open={builtInOpen() || q() !== ""}
+          onToggle={() => builtInOpen.set(!builtInOpen())}
+        />
+        <If when={builtInOpen() || q() !== ""}>
+          <View class="gap-0.5" testID="built-in-skills">
+            <Each of={builtInShown()} key={(s) => s.id}>
+              {(s) => <Entry to={skillPath(s().id)} on={shownBuiltIn()?.id === s().id} title={s().name} detail={s().description} />}
+            </Each>
+          </View>
         </If>
-        <View class="gap-0.5">
-          <Each of={list()} key={(s) => s.name}>
-            {(s) => (
-              <Entry
-                to={skillPath(installedPrefix + s().name)}
-                on={open()?.name === s().name}
-                title={s().name}
-                detail={listed(s().runtimes.map((x) => runtimeName(catalog(), x.runtime)))}
-              />
-            )}
-          </Each>
-        </View>
-        <Heading>{t("web.runtime.library.builtIn", { count: count(builtInShown().length, builtIns().length) })}</Heading>
-        <View class="gap-0.5" testID="built-in-skills">
-          <Each of={builtInShown()} key={(s) => s.id}>
-            {(s) => <Entry to={skillPath(s().id)} on={shownBuiltIn()?.id === s().id} title={s().name} detail={s().description} />}
-          </Each>
-        </View>
-        <View class="flex-row items-center gap-2 px-2 pt-3">
-          <Text role="header" class="flex-1 text-xs font-semibold text-muted">
-            {t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}
-          </Text>
-          <A href={skillPath("new")} testID="new-skill" class="h-6 justify-center rounded-md bg-accent px-2 hover:bg-accent-hover">
-            <Text class="text-xs text-page">{t("web.runtime.library.newSkill")}</Text>
-          </A>
-        </View>
-        <View class="gap-0.5">
-          <Each of={ownShown()} key={(s) => s.id}>
-            {(s) => <Entry to={skillPath(s().id)} on={!creating() && selected()?.id === s().id} title={s().name} detail={s().description} />}
-          </Each>
-        </View>
+        <SectionHeading
+          title={t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}
+          open={ownOpen() || q() !== ""}
+          onToggle={() => ownOpen.set(!ownOpen())}
+          action={
+            <A
+              href={skillPath("new")}
+              testID="new-skill"
+              class="h-6 flex-row items-center gap-1 rounded-md bg-accent px-2 transition duration-120 ease-out hover:bg-accent-hover active:translate-y-px"
+            >
+              <Icon name="add" size={12} tone="page" />
+              <Text class="text-xs font-medium text-page">{t("web.runtime.library.newSkill")}</Text>
+            </A>
+          }
+        />
+        <If when={ownOpen() || q() !== ""}>
+          <View class="gap-0.5">
+            <Each of={ownShown()} key={(s) => s.id}>
+              {(s) => <Entry to={skillPath(s().id)} on={!creating() && selected()?.id === s().id} title={s().name} detail={s().description} />}
+            </Each>
+          </View>
+        </If>
       </Scroll>
       <Scroll class="min-h-0 min-w-0 flex-1">
         <If when={creating()}>
@@ -151,7 +193,7 @@ export function SkillsPage(props: { id?: string | undefined }) {
           <Empty
             icon="skill"
             action={
-              <Button icon="add" onPress={() => router.navigate(skillPath("new"))}>
+              <Button tone="primary" icon="add" onPress={() => router.navigate(skillPath("new"))}>
                 {t("web.runtime.library.newSkill")}
               </Button>
             }
@@ -164,11 +206,24 @@ export function SkillsPage(props: { id?: string | undefined }) {
   );
 }
 
-function Heading(props: { children: string }) {
+function SectionHeading(props: { title: string; open: boolean; onToggle: () => void; action?: JSX.Element }) {
   return (
-    <Text role="header" class="px-2 pt-2 text-xs font-semibold text-muted">
-      {props.children}
-    </Text>
+    <View class="flex-row items-center gap-1 pt-2">
+      <View
+        role="button"
+        accessibilityState={{ expanded: props.open }}
+        onPress={props.onToggle}
+        class="group h-6 min-w-0 flex-1 flex-row items-center gap-1 rounded-sm px-1 transition duration-120 ease-out hover:bg-hover"
+      >
+        <View class={`w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out ${props.open ? "rotate-90" : ""}`}>
+          <Icon name="expand" size={12} tone="faint" />
+        </View>
+        <Text role="header" class="min-w-0 flex-1 truncate text-xs font-semibold tabular-nums text-muted group-hover:text-ink">
+          {props.title}
+        </Text>
+      </View>
+      {props.action}
+    </View>
   );
 }
 
@@ -178,7 +233,7 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
       href={props.to}
       testID="skill-entry"
       accessibilityState={{ selected: props.on }}
-      class={`rounded-md px-2 py-1.5 ${props.on ? "bg-selected hover:bg-hover" : "hover:bg-hover"}`}
+      class={`rounded-md px-2 py-1.5 transition duration-120 ease-out ${props.on ? "bg-selected" : "hover:bg-hover"}`}
     >
       <Text class="truncate text-sm font-medium text-ink">{props.title}</Text>
       <If when={props.detail}>
@@ -197,7 +252,7 @@ function BuiltInCard(props: { skill: Skill }) {
   };
   return (
     <Card title={props.skill.name} class="max-w-3xl">
-      <View testID="built-in-skill" class="gap-1.5">
+      <View testID="built-in-skill" class="gap-3">
         <Text class="text-xs text-muted">{t("web.runtime.library.builtInNote")}</Text>
         <If when={props.skill.description !== ""}>
           <Text class="text-sm text-ink">{props.skill.description}</Text>
@@ -217,7 +272,10 @@ function SkillUsers(props: { agents: readonly Agent[] }) {
         <View class="flex-row flex-wrap gap-2">
           <Each of={props.agents} key={(a) => a.id}>
             {(a) => (
-              <A href={`/agents/${encodeURIComponent(a().id)}`} class="flex-row items-center gap-1.5 rounded-md bg-hover py-1 pr-3 pl-1 hover:bg-selected">
+              <A
+                href={`/agents/${encodeURIComponent(a().id)}`}
+                class="flex-row items-center gap-1.5 rounded-md bg-hover py-1 pr-3 pl-1 transition duration-120 ease-out hover:bg-selected"
+              >
                 <AgentFace agentId={a().id} name={a().name} runtime={a().runtime} look={a().look} size={26} />
                 <Text class="text-sm font-medium text-ink">{a().name}</Text>
               </A>
@@ -243,10 +301,12 @@ function InstalledCard(props: { skill: InstalledSkill; catalog: readonly Runtime
         </Text>
         <Each of={props.skill.runtimes}>
           {(x) => (
-            <View class="flex-row items-center gap-2.5 rounded-md bg-hover px-3 py-2">
+            <View class="flex-row items-center gap-2.5 rounded-md bg-side px-3 py-2">
               <RuntimeIcon runtime={x().runtime} size={28} />
-              <Text class="w-24 text-sm font-medium text-ink">{runtimeName(props.catalog, x().runtime)}</Text>
-              <Text class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{x().source ?? ""}</Text>
+              <Text class="w-24 shrink-0 truncate text-sm font-medium text-ink">{runtimeName(props.catalog, x().runtime)}</Text>
+              <View class="min-w-0 flex-1" tooltip={x().source ? <Bubble text={x().source ?? ""} /> : undefined}>
+                <Text class="truncate font-mono text-xs text-muted">{x().source ?? ""}</Text>
+              </View>
             </View>
           )}
         </Each>

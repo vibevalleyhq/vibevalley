@@ -38,12 +38,12 @@ export function PkmPage(props: { rest: string }) {
       >
         <Sidebar slug={slug()} pages={pages()} error={vault.error()} />
       </View>
-      <View class={`min-h-0 min-w-0 flex-1 ${nav() ? "hidden lg:flex" : ""}`}>
+      <View class={`min-h-0 min-w-0 flex-1 bg-page ${nav() ? "hidden lg:flex" : ""}`}>
         <If when={slug()} else={<Days pages={pages()} />}>
           {(s) => (
             <Keyed key={s()}>
               {() => (
-                <Scroll class="min-h-0 flex-1">
+                <Scroll class="min-h-0 flex-1" contentClass="min-h-full">
                   <Opened slug={s()} pages={pages()} point={search().get("b") ?? undefined} />
                 </Scroll>
               )}
@@ -86,10 +86,13 @@ function Days(props: { pages: readonly PkmPageSummary[] }) {
       .toSorted((a, b) => (b.day ?? "").localeCompare(a.day ?? ""))
       .slice(0, daysShown);
   return (
-    <Scroll testID="pkm-days" accessibilityState={{ busy: act.busy() }} class="min-h-0 flex-1" contentClass="xl:flex-row xl:items-start">
-      <View class="mx-auto w-full max-w-3xl min-w-0 gap-6 px-4 py-4 xl:flex-1">
+    <Scroll testID="pkm-days" accessibilityState={{ busy: act.busy() }} class="min-h-0 flex-1" contentClass="min-h-full xl:flex-row xl:items-stretch">
+      <View class="mx-auto w-full max-w-3xl min-w-0 gap-6 px-5 py-5 xl:flex-1">
         <View class="lg:hidden">
-          <Link href="/pkm?nav" class="group flex-row items-center gap-1.5 self-start rounded-md px-2 py-1 hover:bg-hover">
+          <Link
+            href="/pkm?nav"
+            class="group h-7 flex-row items-center gap-1.5 self-start rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
+          >
             <Icon name="calendar" size={14} tone="muted" />
             <Text class="text-sm text-muted group-hover:text-ink">{t("web.pkm.list.label")}</Text>
           </Link>
@@ -101,7 +104,7 @@ function Days(props: { pages: readonly PkmPageSummary[] }) {
       </View>
       <View
         accessibilityLabel={t("web.pkm.rail.label")}
-        class="mx-auto w-full max-w-3xl border-t border-line px-4 py-4 xl:mx-0 xl:w-72 xl:shrink-0 xl:border-t-0 xl:border-l"
+        class="mx-auto w-full max-w-3xl border-t border-line bg-side px-4 py-4 xl:mx-0 xl:w-72 xl:shrink-0 xl:border-t-0 xl:border-l"
       >
         <Calendar pages={props.pages} open={today()} />
       </View>

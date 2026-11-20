@@ -390,6 +390,10 @@ fn runtimes_over_the_hub() {
     assert_eq!(info["installation"]["via"], "bundled");
     assert!(live.recv_timeout(std::time::Duration::from_secs(2)).is_ok());
 
+    // Once available and enabled, scripted sorts ahead of unprobed/unavailable runtimes.
+    let sorted = hub.call_as(vibevalley_protocol::Caller::User, "runtime.list", json!(null)).data.unwrap();
+    assert_eq!(sorted.as_array().unwrap()[0]["id"], "scripted");
+
     let missing = hub.call_as(vibevalley_protocol::Caller::User, "runtime.refresh", json!({ "id": "nobody" }));
     assert_eq!(missing.biz_code, BizCode::RuntimeNotFound.code());
 

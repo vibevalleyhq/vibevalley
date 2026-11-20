@@ -13,8 +13,7 @@
 // blocks. A row is dragged by its bullet as a pan gesture (nsh has no HTML
 // drag and drop): OutlineView measures the rows and says where it would
 // land. Not ported: the phone toolbar (Toolbar).
-import { effect, keymap, PanResponder, signal, Text, untracked, View, type JSX } from "nsh";
-import type { InputRef, ViewRef } from "nsh";
+import { Clipboard, effect, keymap, Overlay, PanResponder, signal, Text, untracked, View, type Bounds, type InputRef, type JSX, type ViewRef } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -28,11 +27,14 @@ import { api } from "../../infra/api";
 import { useLatest } from "../../state/atom";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
+import { Bubble } from "../../ui/Tip";
+import { toast } from "../../ui/toasts";
 import { mix, tone } from "../../ui/tone";
 import { Body } from "./Body";
 import { dayKey } from "./days";
 import {
   type Around,
+  autoPair,
   type Caret,
   type Command,
   commandAction,
@@ -48,6 +50,7 @@ import {
   saved,
   type Shut,
 } from "./editing";
+import { headingOf } from "./outline";
 import type { DropAt } from "./selection";
 
 export interface Writing {
@@ -92,6 +95,7 @@ export function Row(props: {
   /** shift: picking up to it instead of writing in it. */
   onOpen: (at: number | "end", shift: boolean) => void;
   onMarker: (marker: PkmMarker | undefined) => void;
+  onMakeIssue?: () => void;
   /** The row's view, to scroll to it and to measure it under a drag. */
   onRef?: (ref: ViewRef | undefined) => void;
   /** Where the blocks being dragged would land on this row. */
@@ -134,7 +138,7 @@ export function Row(props: {
         )}
       </If>
       <Each of={Array.from({ length: props.block.depth }, (_, i) => i)}>
-        {(i) => <View class="absolute inset-y-0 border-l border-line" style={{ left: i() * indentPx + 9 }} />}
+        {(i) => <View class="absolute inset-y-0 border-l border-line" style={{ left: i() * indentPx + 7.5 }} />}
       </Each>
       <View
         {...pan.panHandlers}
@@ -144,15 +148,23 @@ export function Row(props: {
         testID="pkm-bullet"
         // A leaf's bullet folds nothing, and is still what the row is dragged by.
         onPress={() => props.parent && props.onToggle()}
-        class="mt-1 h-4 w-4 shrink-0 items-center justify-center rounded-xs hover:bg-hover"
+        class="mt-1 h-4 w-4 shrink-0 items-center justify-center rounded-xs transition duration-120 ease-out hover:bg-hover"
       >
-        <View
-          class={`h-1.5 w-1.5 rounded-full bg-muted ${props.parent && !props.folded ? "group-hover:opacity-0" : ""}`}
-          style={props.parent && props.folded ? { borderWidth: 3, borderColor: tone("line"), width: 12, height: 12 } : undefined}
-        />
-        <If when={props.parent && !props.folded}>
-          <View class="absolute opacity-0 group-hover:opacity-100">
-            <Icon name="choose" size={12} tone="muted" />
+        <If
+          when={props.parent && props.folded}
+          else={
+            <>
+              <View class={`h-1.5 w-1.5 rounded-full bg-muted ${props.parent ? "group-hover:opacity-0" : ""}`} />
+              <If when={props.parent}>
+                <View class="absolute opacity-0 group-hover:opacity-100">
+                  <Icon name="choose" size={11} tone="muted" />
+                </View>
+              </If>
+            </>
+          }
+        >
+          <View class="h-4 w-4 items-center justify-center rounded-xs bg-selected">
+            <Icon name="expand" size={10} tone="ink" />
           </View>
         </If>
       </View>
@@ -163,9 +175,9 @@ export function Row(props: {
             testID="pkm-marker"
             accessibilityState={{ checked: l().checked }}
             accessibilityLabel={t(`web.pkm.marker.${props.block.marker ?? "TODO"}`)}
-            tooltip={t(`web.pkm.marker.${props.block.marker ?? "TODO"}`)}
+            tooltip={<Bubble text={t(`web.pkm.marker.${props.block.marker ?? "TODO"}`)} />}
             onPress={() => props.onMarker(props.block.marker === "DONE" ? "TODO" : "DONE")}
-            class="mt-1 h-4 w-4 shrink-0 items-center justify-center rounded-xs border"
+            class="mt-1 h-4 w-4 shrink-0 items-center justify-center rounded-xs border transition duration-120 ease-out"
             style={{ borderColor: tone(l().border), ...(fillOf(l().fill) ? { backgroundColor: fillOf(l().fill) } : {}) }}
           >
             <If when={l().icon}>{(icon) => <Icon name={icon()} size={10} tone={l().ink} />}</If>
@@ -182,7 +194,7 @@ export function Row(props: {
               accessibilityHint={t("web.pkm.page.edit")}
               // A link inside it takes its own press (Body), so following one does not open the box.
               onPress={(e) => props.onOpen("end", e.modifiers.shift)}
-              class="min-h-6 justify-center rounded-sm px-1"
+              class="min-h-6 rounded-sm px-1 py-0.5"
             >
               <If when={props.block.body} else={<Text class="text-sm text-faint">{" "}</Text>}>
                 <Body text={props.block.body} refs={props.refs} class={`text-sm ${done() ? "text-muted line-through" : "text-ink"}`} />
@@ -193,6 +205,37 @@ export function Row(props: {
           {props.children}
         </If>
       </View>
+      <If when={!props.focus && props.block.body.trim() !== ""}>
+        <View class="mt-0.5 shrink-0 flex-row items-center gap-0.5 opacity-0 group-hover:opacity-100">
+          <View
+            role="button"
+            testID="pkm-copy-ref"
+            accessibilityLabel={t("web.pkm.page.copyRef")}
+            tooltip={<Bubble text={t("web.pkm.page.copyRef")} />}
+            onPress={() => {
+              void Clipboard.writeText(`((${props.block.id}))`);
+              toast(t("web.pkm.page.copiedRef"));
+            }}
+            class="h-5 w-5 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-selected"
+          >
+            <Icon name="copy" size={11} tone="muted" />
+          </View>
+          <If when={props.onMakeIssue}>
+            {(make) => (
+              <View
+                role="button"
+                testID="pkm-to-issue"
+                accessibilityLabel={t("web.pkm.page.toIssue")}
+                tooltip={<Bubble text={t("web.pkm.page.toIssue")} />}
+                onPress={() => make()()}
+                class="h-5 w-5 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-selected"
+              >
+                <Icon name="issues" size={11} tone="muted" />
+              </View>
+            )}
+          </If>
+        </View>
+      </If>
       <If when={props.comments > 0}>
         <View
           testID="pkm-bubble"
@@ -201,7 +244,9 @@ export function Row(props: {
           style={{ backgroundColor: mix("wheat", 0.2) }}
         >
           <Icon name="thread" size={10} tone="warn-ink" />
-          <Text class="text-2xs text-warn-ink">{String(props.comments)}</Text>
+          <Text class="text-2xs font-medium text-warn-ink" style={{ fontVariant: ["tabular-nums"] }}>
+            {String(props.comments)}
+          </Text>
         </View>
       </If>
     </View>
@@ -215,6 +260,7 @@ const commands = (todayTitle: string): (Command & { readonly label: string })[] 
   { key: "clear", marker: undefined, label: t("web.pkm.command.clear") },
   { key: "h1", text: "# ", label: t("web.pkm.command.h1") },
   { key: "h2", text: "## ", label: t("web.pkm.command.h2") },
+  { key: "code", text: "```\n\n```", caretOffset: 4, label: t("web.pkm.command.code") },
   { key: "today", text: `[[${todayTitle}]]`, label: t("web.pkm.command.today") },
 ];
 
@@ -241,12 +287,27 @@ export function Editor(props: {
   onLeave: (extend: "up" | "down" | undefined) => void;
 }) {
   let el: InputRef | undefined;
+  const anchor = signal<ViewRef | undefined>(undefined);
+  const caretBox = signal<Bounds | undefined>(undefined);
   const id = untrack(() => props.block.id);
   // The box's words and selection as the input last said; `placed` moves the caret.
   const draft = signal(untrack(() => props.block.body));
   const sel = signal({ start: 0, end: 0 });
   const placed = signal<{ start: number; end?: number } | undefined>(undefined);
-  const height = signal(24);
+  const fenceMode = () => {
+    const s = draft().trimStart();
+    return s.startsWith("```") || s.startsWith("~~~");
+  };
+  const editorLook = () => {
+    if (fenceMode()) return "font-mono text-xs";
+    const level = headingOf(draft())?.level;
+    return level === 1 ? "text-lg font-semibold" : level === 2 ? "text-base font-semibold" : level === 3 ? "text-sm font-semibold" : "text-sm";
+  };
+  const minHeight = () => {
+    const level = fenceMode() ? undefined : headingOf(draft())?.level;
+    return level === 1 ? 30 : level === 2 ? 27 : 24;
+  };
+  const height = signal(untrack(minHeight));
   const focused = signal(false);
   const shut = signal<Shut | undefined>(undefined);
   const picked = signal(0);
@@ -264,8 +325,13 @@ export function Editor(props: {
   };
   createEffect(
     () => props.focus,
-    (f) => {
-      if (!f) return;
+    (f, before) => {
+      if (!f) {
+        caretBox.set(undefined);
+        return;
+      }
+      // `props.focus` tracks `b()` in OutlineView; ignore autosave re-runs of the same focus token so the caret is not yanked to the end.
+      if (f === before) return;
       const body = untrack(() => props.block.body);
       if (untracked(draft) !== body && !untracked(focused)) draft.set(body);
       const value = untracked(draft);
@@ -334,6 +400,12 @@ export function Editor(props: {
   let handedOn = false;
   const hand = (a: EditAction & { kind: "ops" }) => {
     if (a.focus.block !== id) handedOn = true;
+    else {
+      const updated = a.ops.findLast((o) => o.op === "update" && o.block === id && o.body !== undefined);
+      if (updated?.op === "update" && updated.body !== undefined && updated.body !== untracked(draft)) {
+        write(updated.body, a.focus.at === "end" ? updated.body.length : a.focus.at);
+      }
+    }
     props.act(a);
   };
   const key = (e: Keys) => {
@@ -416,7 +488,7 @@ export function Editor(props: {
     },
   };
   return (
-    <View testID="pkm-editing" class="z-20">
+    <View ref={(r) => anchor.set(r)} testID="pkm-editing">
       <Input
         ref={(r) => (el = r)}
         multiline
@@ -435,6 +507,7 @@ export function Editor(props: {
         }}
         onBlur={() => {
           focused.set(false);
+          caretBox.set(undefined);
           if (!handedOn) save();
           // A block moved under the caret (Tab, Alt+↑↓) loses the focus for a moment; only a box left for good closes.
           leaving(() => {
@@ -448,9 +521,23 @@ export function Editor(props: {
         onChange={(e) => {
           const was = untracked(draft);
           const at = Math.max(0, untracked(sel).start + (e.value.length - was.length));
-          const mark = untracked(composing) ? undefined : typedMarks(e.value, at, noteMarks);
+          const composingNow = untracked(composing);
+          const mark = composingNow ? undefined : typedMarks(e.value, at, noteMarks);
+          const nextValue = mark ? e.value.slice(0, mark.from) + mark.text + e.value.slice(mark.to) : e.value;
+          const nextAt = mark ? mark.from + mark.text.length : at;
+          const paired = composingNow ? undefined : autoPair(was, nextValue, nextAt);
+          if (paired) {
+            write(paired.value, paired.caret);
+            caretTo(paired.caret);
+            picked.set(0);
+            later(save, 800);
+            return;
+          }
           if (mark) {
-            write(e.value.slice(0, mark.from) + mark.text + e.value.slice(mark.to), mark.from + mark.text.length);
+            write(nextValue, nextAt);
+            caretTo(nextAt);
+            picked.set(0);
+            later(save, 800);
             return;
           }
           draft.set(e.value);
@@ -464,6 +551,7 @@ export function Editor(props: {
           sel.set({ start: e.start, end: e.end });
           caretTo(e.start);
         }}
+        onCaretMove={(e) => caretBox.set(e.pageBounds.size.height > 0 ? e.pageBounds : undefined)}
         onSubmit={() => key(keys("Enter"))}
         onKeyPress={(e) => {
           const { start, end } = untracked(sel);
@@ -474,23 +562,29 @@ export function Editor(props: {
           if (a?.kind === "ops") hand(a);
           else if (e.text) el?.insertText(e.text);
         }}
-        onContentSizeChange={(e) => height.set(Math.max(24, e.size.height))}
-        class="w-full rounded-sm bg-hover px-1 text-sm text-ink"
+        onContentSizeChange={(e) => height.set(Math.max(untracked(minHeight), Math.ceil(e.size.height - 0.05) + 4))}
+        class={`w-full rounded-sm bg-hover px-1 py-0.5 text-ink ${editorLook()}`}
         style={{ height: height() }}
       />
       <If when={choices().length > 0}>
-        <View
+        <Overlay
+          anchor={caretBox() ?? anchor()}
+          placement="bottom"
+          align="start"
+          offset={4}
+          margin={8}
           testID="pkm-complete"
-          class="absolute left-0 z-20 mt-1 max-h-64 w-80 max-w-full rounded-lg border border-line bg-page p-1 shadow-float"
-          style={{ top: height() }}
+          class="max-h-64 w-80 max-w-full rounded-lg border border-line bg-page p-1 shadow-float"
         >
           <Each of={choices()} key={(c) => c.key}>
             {(c, i) => (
               <View
                 role="option"
                 testID="pkm-choice"
+                focusable={false}
                 accessibilityLabel={c().label}
                 accessibilityState={{ selected: i() === Math.min(picked(), choices().length - 1) }}
+                onMouseEnter={() => picked.set(i())}
                 onPress={() => {
                   c().pick();
                   el?.focus();
@@ -502,7 +596,7 @@ export function Editor(props: {
               </View>
             )}
           </Each>
-        </View>
+        </Overlay>
       </If>
     </View>
   );

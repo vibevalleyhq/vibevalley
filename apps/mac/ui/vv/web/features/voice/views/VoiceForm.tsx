@@ -22,6 +22,7 @@ import { useSaveSettings } from "../../../infra/settings";
 import { createAct } from "../../../ui/act";
 import { Button } from "../../../ui/Button";
 import { Select, TextInput } from "../../../ui/Field";
+import { Icon } from "../../../ui/Icon";
 import { IconLink, OutLink } from "../../../ui/IconButton";
 import { KeyField, SaveBar } from "../../../ui/KeyField";
 import { Card, Quiet, SecretInput } from "../../../ui/layout";
@@ -155,7 +156,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
       <TextInput
         testID={`voice-${k}`}
         accessibilityLabel={numberLabel[k]}
-        class="font-mono"
+        class="font-mono tabular-nums"
         value={String(draft()[k])}
         onInput={(value) => set({ ...draft(), [k]: Number(value.replace(/\D/gu, "")) })}
       />
@@ -171,9 +172,12 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
       left={
         <If when={error() ?? problem()}>
           {(e) => (
-            <Text testID="voice-problem" class="text-sm text-berry">
-              {e()}
-            </Text>
+            <View class="flex-row items-center gap-1.5 self-start rounded-md bg-bad-soft px-2.5 py-1">
+              <Icon name="cross" size={12} />
+              <Text testID="voice-problem" role="alert" class="min-w-0 text-xs font-medium text-berry">
+                {e()}
+              </Text>
+            </View>
           )}
         </If>
       }
@@ -211,8 +215,11 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
       else={
         <View testID={`voice-${props.view}`} class="min-h-0 gap-3">
           <If when={props.view === "moss"}>
-            <View class="flex-row flex-wrap items-center gap-3">
-              <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
+            <View class="max-w-4xl flex-row flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-page px-4 py-3">
+              <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                <Icon name="plug" size={14} tone="muted" />
+                <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
+              </View>
               <MossVerify />
             </View>
             <NativeCall />
@@ -241,13 +248,14 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             </Card>
           </If>
           <If when={props.view === "call"}>
-            <View class="max-w-4xl flex-row items-center gap-2 px-1">
+            <View class="max-w-4xl flex-row flex-wrap items-center gap-2 rounded-lg bg-side px-3.5 py-2">
               <Hint
                 text={t("web.voice.voice.intro") + t("web.voice.voice.orchestratorPage") + t("web.voice.voice.period") + " " + t("web.voice.voice.nextCall")}
               />
+              <Text class="text-xs text-muted">{t("web.voice.voice.nextCall")}</Text>
               <View class="flex-1" />
               <IconLink href="/orchestrator/voice" icon="agents" label={t("web.voice.voice.orchestratorPage")} />
-              <Hint text={t("web.base.form.storedIn", { file: base().file })} />
+              <Hint icon="file" text={t("web.base.form.storedIn", { file: base().file })} />
             </View>
             <Card title={t("web.voice.voice.line")} class="max-w-4xl">
               <Cols>
@@ -262,7 +270,15 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 </Labeled>
               </Cols>
             </Card>
-            <Card title={t("web.voice.voice.listen")} action={<Text class="text-sm text-muted">{t("web.voice.voice.listenParts")}</Text>} class="max-w-4xl">
+            <Card
+              title={t("web.voice.voice.listen")}
+              action={
+                <View class="rounded-sm bg-side px-2 py-0.5">
+                  <Text class="text-xs font-medium text-muted">{t("web.voice.voice.listenParts")}</Text>
+                </View>
+              }
+              class="max-w-4xl"
+            >
               <Cols>
                 <Labeled label={t("web.voice.voice.asr")} hint={asr().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
                   <Segmented
@@ -315,7 +331,15 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 {number("idleSeconds")}
               </Cols>
             </Card>
-            <Card title={t("web.voice.voice.think")} action={<Text class="text-sm text-muted">{answerLabel[answer().vendor]}</Text>} class="max-w-4xl">
+            <Card
+              title={t("web.voice.voice.think")}
+              action={
+                <View class="rounded-sm bg-side px-2 py-0.5">
+                  <Text class="text-xs font-medium text-muted">{answerLabel[answer().vendor]}</Text>
+                </View>
+              }
+              class="max-w-4xl"
+            >
               <Labeled label={t("web.voice.voice.who")} hint={answerHint()}>
                 <Segmented
                   label={t("web.voice.voice.who")}
@@ -326,7 +350,10 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 />
               </Labeled>
               <If when={answer().vendor === "moss"}>
-                <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
+                <View class="flex-row items-center gap-2 rounded-md bg-side px-3 py-2">
+                  <Icon name="plug" size={14} tone="muted" />
+                  <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
+                </View>
               </If>
               <If when={variant(answer(), "vendor", "agora")}>
                 {(a) => (
@@ -381,7 +408,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
           <If when={props.view === "dictation"}>
             {/* The page's title already says Dictation: the card has none of its own. */}
             <Card class="max-w-4xl">
-              <View class="flex-row flex-wrap items-center gap-x-3 gap-y-2">
+              <View class="flex-row flex-wrap items-center gap-x-3 gap-y-2 border-b border-line pb-3">
                 <Segmented
                   label={t("web.voice.voice.dictationVia")}
                   testid="dictation-via"
@@ -393,7 +420,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                   onChange={(via) => dictation.set({ ...dictation(), via })}
                 />
                 <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2">
-                  <Text class="text-sm text-muted">
+                  <Text class="text-xs leading-relaxed text-muted">
                     {dictation().via === "moss" ? t("web.voice.voice.dictationMossIntro") : t("web.voice.voice.dictationIntro")}
                   </Text>
                   <If when={dictation().via === "own"}>
@@ -404,7 +431,8 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               <If
                 when={dictation().via === "own"}
                 else={
-                  <View testID="dictation-provider-link">
+                  <View testID="dictation-provider-link" class="flex-row items-center gap-2 rounded-md bg-side px-3 py-2.5">
+                    <Icon name="plug" size={14} tone="muted" />
                     <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
                   </View>
                 }

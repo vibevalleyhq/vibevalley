@@ -5,7 +5,7 @@
 // Images of the app's art (ui/pixel/atlas.ts). The check ground is drawn
 // on a Canvas (CSS's repeating conic gradient) behind the large picture and
 // the frames; a grid tile is on the plain paper. The fps slider is nsh's.
-import { Canvas, Clipboard, Image, signal, Text, View, type JSX, type ViewStyle } from "nsh";
+import { Canvas, Clipboard, colorScheme, Image, signal, Text, View, type JSX, type ViewStyle } from "nsh";
 import { Slider } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -16,6 +16,7 @@ import { useTimeout } from "../../base/timer";
 import { useRouter } from "../../infra/router";
 import { Button, Words } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
+import { IconButton } from "../../ui/IconButton";
 import { Card, Toggle } from "../../ui/layout";
 import { useCursorUrl, useSpriteUrl } from "../../ui/pixel/atlas";
 import { Segmented } from "../../ui/Segmented";
@@ -40,6 +41,7 @@ export function GroundBox(props: { ground: Ground; class?: string; style?: ViewS
         <Canvas
           style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}
           draw={(ctx) => {
+            colorScheme();
             ctx.fillStyle = tone("catalog-check");
             const { width, height } = ctx.canvas;
             for (let y = 0; y < height; y += 6) for (let x = (y / 6) % 2 === 0 ? 0 : 6; x < width; x += 12) ctx.fillRect(x, y, 6, 6);
@@ -79,19 +81,28 @@ function Copy(props: { text: string }) {
     done.set(true);
     later(() => done.set(false), 1200);
   };
+  const label = () => (done() ? t("web.catalog.copied") : t("web.catalog.copy"));
   return (
-    <View role="button" onPress={() => void copy()} class="shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 hover:bg-hover">
+    <View
+      role="button"
+      accessibilityLabel={label()}
+      tooltip={<Bubble text={label()} />}
+      onPress={() => void copy()}
+      class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md px-1.5 transition duration-120 ease-out active:translate-y-px ${
+        done() ? "bg-ok-soft" : "hover:bg-hover"
+      }`}
+    >
       <Icon name={done() ? "check" : "copy"} size={12} tone="muted" />
-      <Text class="text-xs text-muted">{done() ? t("web.catalog.copied") : t("web.catalog.copy")}</Text>
+      <Text class={`text-xs ${done() ? "font-medium text-ok-ink" : "text-muted"}`}>{label()}</Text>
     </View>
   );
 }
 
 function Row(props: { label: string; children: JSX.Element }) {
   return (
-    <View class="flex-row gap-2">
-      <Text class="w-16 shrink-0 text-sm text-muted">{props.label}</Text>
-      <View class="min-w-0 flex-1 flex-row items-center gap-1">{props.children}</View>
+    <View class="min-h-6 flex-row items-center gap-2.5">
+      <Text class="w-16 shrink-0 text-xs font-medium text-muted">{props.label}</Text>
+      <View class="min-w-0 flex-1 flex-row items-center gap-1.5">{props.children}</View>
     </View>
   );
 }
@@ -99,7 +110,7 @@ function Row(props: { label: string; children: JSX.Element }) {
 function Code(props: { text: string }) {
   return (
     <>
-      <View tooltip={<Bubble text={props.text} />} class="min-w-0 shrink rounded-sm bg-hover px-1.5 py-px">
+      <View tooltip={<Bubble text={props.text} />} class="min-w-0 flex-1 rounded-sm border border-line bg-side px-2 py-0.5">
         <Text class="truncate font-mono text-2xs text-ink">{props.text}</Text>
       </View>
       <Copy text={props.text} />
@@ -150,8 +161,24 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
   const remake = () => remakeOf(props.picture);
   const scales = () => [...new Set([1, 2, 4, 8, scale()])].toSorted((a, b) => a - b);
   return (
-    <Card title={props.picture.name} action={<Copy text={props.picture.name} />} testid="picture-detail" item={props.picture.name}>
-      <GroundBox ground={props.ground} checked class="max-h-88 min-h-40 items-center justify-center rounded-md p-3">
+    <Card
+      title={
+        <View tooltip={<Bubble text={props.picture.name} />} class="min-w-0">
+          <Text role="header" class="truncate font-mono text-sm font-semibold text-ink">
+            {props.picture.name}
+          </Text>
+        </View>
+      }
+      action={
+        <View class="shrink-0 flex-row items-center gap-1">
+          <Copy text={props.picture.name} />
+          <IconButton icon="close" size={14} label={t("web.base.lightbox.close")} onClick={() => router.navigate("/catalog")} />
+        </View>
+      }
+      testid="picture-detail"
+      item={props.picture.name}
+    >
+      <GroundBox ground={props.ground} checked class="max-h-88 min-h-44 items-center justify-center rounded-md border border-line p-4">
         <View style={{ width: shown().w * scale(), height: shown().h * scale() }}>
           <Img p={shown()} scale={scale()} />
           <If when={marks()}>
@@ -160,7 +187,7 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
           </If>
         </View>
       </GroundBox>
-      <View class="flex-row flex-wrap items-center gap-2">
+      <View class="flex-row flex-wrap items-center justify-between gap-2">
         <Segmented
           label={t("web.catalog.zoom")}
           value={String(scale())}
@@ -171,12 +198,12 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
       </View>
       <If when={frames()}>
         {(f) => (
-          <View class="gap-1.5 rounded-lg bg-hover p-2">
+          <View class="gap-2 rounded-lg border border-line bg-side p-2.5">
             <View class="flex-row items-center gap-2">
-              <Button testID="play" onPress={() => playing.set(!playing())}>
+              <Button icon={playing() ? "stop" : "play"} testID="play" onPress={() => playing.set(!playing())}>
                 <Words>{playing() ? t("web.catalog.stop") : t("web.catalog.play")}</Words>
               </Button>
-              <Text class="text-xs text-muted">{t("web.catalog.frames", { n: f().length })}</Text>
+              <Text class="text-xs text-muted tabular-nums">{t("web.catalog.frames", { n: f().length })}</Text>
               <View class="flex-1" />
               <Slider
                 min={1}
@@ -184,30 +211,34 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
                 value={fps()}
                 onChange={(e) => typeof e.value === "number" && fps.set(e.value)}
                 accessibilityLabel={t("web.catalog.fps")}
-                class="w-24"
-                trackClass="h-4 justify-center"
-                indicatorClass="h-1 rounded-full bg-selected"
-                rangeClass="rounded-full bg-leaf"
-                thumbClass="size-3 rounded-full border border-leaf bg-page shadow-raise focus-visible:border-focus"
+                class="w-22"
+                trackClass="h-6 justify-center"
+                indicatorClass="h-1.5 rounded-full bg-selected"
+                rangeClass="rounded-full bg-accent"
+                thumbClass="size-3.5 rounded-full border border-accent bg-page shadow-raise focus-visible:outline-2 focus-visible:outline-focus"
               />
-              <Text class="w-14 text-xs text-muted">{t("web.catalog.perSecond", { n: fps() })}</Text>
+              <Text class="w-14 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{t("web.catalog.perSecond", { n: fps() })}</Text>
             </View>
-            <View class="flex-row flex-wrap gap-1">
+            <View class="flex-row flex-wrap gap-1.5">
               <Each of={f()}>
                 {(name, i) => (
                   <If when={props.byName.get(name())}>
-                    {(p) => (
-                      <View
-                        role="button"
-                        accessibilityLabel={name()}
-                        onPress={() => router.navigate(`/catalog/${encodeURIComponent(name())}`)}
-                        class={`rounded-sm ${playing() && i() === frame() % f().length ? "border-2 border-focus" : ""}`}
-                      >
-                        <GroundBox ground={props.ground} checked class="h-11 w-11 items-center justify-center rounded-sm">
-                          <Img p={p()} scale={fitScale(p(), 38)} />
-                        </GroundBox>
-                      </View>
-                    )}
+                    {(p) => {
+                      const active = () => playing() && i() === frame() % f().length;
+                      return (
+                        <View
+                          role="button"
+                          accessibilityLabel={name()}
+                          tooltip={<Bubble text={name()} />}
+                          onPress={() => router.navigate(`/catalog/${encodeURIComponent(name())}`)}
+                          class={`rounded-md border-2 p-px transition duration-120 ease-out ${active() ? "border-focus" : "border-transparent hover:border-line"}`}
+                        >
+                          <GroundBox ground={props.ground} checked class="h-11 w-11 items-center justify-center rounded-sm">
+                            <Img p={p()} scale={fitScale(p(), 38)} />
+                          </GroundBox>
+                        </View>
+                      );
+                    }}
                   </If>
                 )}
               </Each>
@@ -217,20 +248,23 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
       </If>
       <View class="gap-1.5">
         <Row label={t("web.catalog.size")}>
-          <Text class="text-sm text-ink">{t("web.catalog.pixels", { w: numberText(props.picture.w), h: numberText(props.picture.h) })}</Text>
+          <Text class="font-mono text-xs text-ink tabular-nums">
+            {t("web.catalog.pixels", { w: numberText(props.picture.w), h: numberText(props.picture.h) })}
+          </Text>
         </Row>
         <Row label={t("web.catalog.anchor")}>
-          <Text class="text-sm text-ink">{`(${numberText(props.picture.ax)}, ${numberText(props.picture.ay)})`}</Text>
+          <Text class="font-mono text-xs text-ink tabular-nums">{`(${numberText(props.picture.ax)}, ${numberText(props.picture.ay)})`}</Text>
         </Row>
         <If when={headOf(props.picture)}>
           {(head) => (
             <Row label={t("web.catalog.head")}>
-              <Text class="text-sm text-ink">{`(${numberText(head().x)}, ${numberText(head().y)})`}</Text>
+              <Text class="font-mono text-xs text-ink tabular-nums">{`(${numberText(head().x)}, ${numberText(head().y)})`}</Text>
             </Row>
           )}
         </If>
+        <View class="my-1 border-t border-line" />
         <Row label={t("web.catalog.from")}>
-          <If when={props.picture.sheet} else={<Text class="text-xs text-muted">{t("web.catalog.unrecorded")}</Text>}>
+          <If when={props.picture.sheet} else={<Text class="text-xs text-faint">{t("web.catalog.unrecorded")}</Text>}>
             {(sheet) => <Code text={sheet()} />}
           </If>
         </Row>
@@ -266,8 +300,12 @@ export function CursorTile(props: { name: string; hx: number; hy: number; ground
     return n && ratio !== undefined && ratio !== 0 ? n.w * ratio : height;
   };
   return (
-    <View testID="cursor" class="w-26 items-center gap-1 p-1">
-      <GroundBox ground={props.ground} checked class="h-16 w-full items-center justify-center rounded-md">
+    <View
+      testID="cursor"
+      tooltip={<Bubble text={`${props.name} · (${numberText(props.hx)}, ${numberText(props.hy)})`} />}
+      class="group w-26 items-center gap-1.5 rounded-lg p-1.5 transition duration-120 ease-out hover:bg-hover"
+    >
+      <GroundBox ground={props.ground} checked class="h-16 w-full items-center justify-center rounded-md border border-line">
         <View style={{ height, width: widthPx() }}>
           <If when={url(props.name)}>
             {(src) => <Image src={src()} style={{ height, width: widthPx() }} onLoad={(e) => natural.set({ w: e.size.width, h: e.size.height })} />}
@@ -282,7 +320,7 @@ export function CursorTile(props: { name: string; hx: number; hy: number; ground
           </If>
         </View>
       </GroundBox>
-      <Text class="font-mono text-xs text-muted">{props.name}</Text>
+      <Text class="w-full truncate text-center font-mono text-2xs text-muted group-hover:text-ink">{props.name}</Text>
     </View>
   );
 }

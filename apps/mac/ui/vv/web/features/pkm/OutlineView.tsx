@@ -15,11 +15,13 @@ import type { PkmBlock, PkmBlockOp, PkmPageSummary, PkmPageView } from "@vibeval
 
 import { createEffect, createMemo, createSignal, untrack } from "../../../solid";
 import { useTimeout } from "../../base/timer";
+import { api, newSendKey } from "../../infra/api";
 import { useQueryClient } from "../../infra/query";
+import { createAct } from "../../ui/act";
 import { toast } from "../../ui/toasts";
 import { mix } from "../../ui/tone";
 import type { Around, EditAction, Focus, Keys } from "./editing";
-import { hasChildren, visibleBlocks } from "./outline";
+import { hasChildren, headingOf, visibleBlocks } from "./outline";
 import { Editor, indentPx, newId, Row } from "./OutlineEditor";
 import { type DropAt, dropAt, dropOps, outlineText, pickAction, type Picked, pickedIds, stepped } from "./selection";
 import { pkmPageQuery, refreshVault } from "./vault";
@@ -28,6 +30,17 @@ import { PageWriter, pageServer } from "./writer";
 type Rect = { x: number; y: number; w: number; h: number };
 
 const keys = (key: string, mods: Partial<Omit<Keys, "key">> = {}): Keys => ({ key, shiftKey: false, altKey: false, metaKey: false, ctrlKey: false, ...mods });
+
+function issueTitleOf(body: string): string {
+  const first = (body.split("\n").find((l) => l.trim() !== "") ?? "").trim();
+  const h = headingOf(first);
+  return first
+    .slice(h?.prefix ?? 0)
+    .replace(/\[\[([^[\]|]+)\|([^[\]]+)\]\]/gu, "$2")
+    .replace(/\[\[([^[\]]+)\]\]/gu, "$1")
+    .trim()
+    .slice(0, 120);
+}
 
 /** point: a block to show and light up (?b= in the address). */
 export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSummary[]; point?: string | undefined; onEditing: (on: boolean) => void }) {
@@ -47,6 +60,17 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
   const [picked, setPicked] = createSignal<Picked>();
   const [lit, setLit] = createSignal<string>();
   const unlight = useTimeout();
+  const makeAct = createAct();
+  const makeIssue = (block: PkmBlock) => {
+    const title = issueTitleOf(block.body);
+    if (!title) return;
+    const outline = outlineText(blocks(), [block.id]);
+    const description = outline !== `- ${title}` ? `${outline}\n\n[[${props.view.page.title}]]` : `[[${props.view.page.title}]]`;
+    void makeAct.run(async () => {
+      await api.issue.create({ title, description, requestKey: newSendKey() });
+      toast(t("web.pkm.page.issueMade"));
+    });
+  };
   const rows = new Map<string, ViewRef>();
   const editing = () => focus()?.block;
   createEffect(
@@ -261,6 +285,7 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
             onToggle={() => toggle(b().id)}
             onOpen={(at, shift) => open(b().id, at, shift)}
             onMarker={(marker) => run([marker ? { op: "set_marker", block: b().id, marker } : { op: "set_marker", block: b().id }])}
+            onMakeIssue={() => makeIssue(b())}
             onRef={(r) => (r ? rows.set(b().id, r) : rows.delete(b().id))}
             dropping={dropping()?.target === b().id ? dropping()?.at : undefined}
             dragged={dragged().includes(b().id)}
@@ -285,12 +310,12 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
         role="button"
         testID="pkm-append"
         onPress={writeOn}
-        class={`flex-row items-start gap-1 rounded-sm py-px ${blocks().length !== 0 ? "opacity-0 group-hover:opacity-100" : ""}`}
+        class={`flex-row items-start gap-1 rounded-sm py-px transition duration-120 ease-out hover:bg-hover ${blocks().length !== 0 ? "opacity-0 group-hover:opacity-100" : ""}`}
       >
         <View class="mt-1 h-4 w-4 shrink-0 items-center justify-center">
           <View class="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: mix("faint", 0.4) }} />
         </View>
-        <Text class="min-h-6 px-1 text-sm text-faint">{t("web.pkm.page.append")}</Text>
+        <Text class="min-h-6 px-1 py-0.5 text-sm text-faint">{t("web.pkm.page.append")}</Text>
       </View>
     </View>
   );

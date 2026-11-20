@@ -3,7 +3,7 @@
 // the posed helper on its bed, from the app's art (ui/pixel/atlas.ts); the
 // stage's radial ground is drawn on a Canvas. While the art is not
 // installed, an outfit is its name and the stage shows the helper's face.
-import { Canvas, Image, Text, View, type JSX } from "nsh";
+import { Canvas, colorScheme, Image, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, OutfitValues, SpeciesValues } from "@vibevalley/protocol";
@@ -113,7 +113,7 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
       accessibilityLabel={props.label}
       accessibilityState={{ selected: props.active }}
       onPress={() => props.onClick()}
-      class={`items-center gap-0.5 rounded-md border px-1 pt-1 pb-1.5 ${props.active ? "bg-selected" : "border-line hover:bg-hover"}`}
+      class={`items-center gap-0.5 rounded-md border px-1 pt-1 pb-1.5 transition duration-120 ease-out ${props.active ? "bg-selected" : "border-line hover:bg-hover"}`}
       style={props.active ? { borderColor: mix("ink", 0.4) } : undefined}
     >
       {props.children}
@@ -140,6 +140,7 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
       <Canvas
         style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}
         draw={(ctx) => {
+          colorScheme();
           const { width, height } = ctx.canvas;
           // CSS's radial-gradient(60% 60% at 50% 45%, center, middle 60%, edge), as a circle on the larger side.
           const g = ctx.createRadialGradient(width / 2, height * 0.45, 0, width / 2, height * 0.45, Math.max(width, height) * 0.6);
@@ -173,16 +174,16 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
       </If>
       <View class="absolute inset-x-0 bottom-4 items-center gap-1">
         <View class="rounded-md px-3 py-0.5" style={{ backgroundColor: mix("paper", 0.92) }}>
-          <Text class="text-lg text-ink">{props.draft.name || t("web.agent.unnamedAgent")}</Text>
+          <Text class="text-lg font-semibold text-bark-900">{props.draft.name || t("web.agent.unnamedAgent")}</Text>
         </View>
         <If when={props.draft.duty}>
-          <View class="max-w-96 rounded-sm px-2 py-px" style={{ backgroundColor: mix("paper", 0.75) }}>
-            <Text class="text-center text-xs text-ink">{props.draft.duty}</Text>
+          <View class="max-w-96 rounded-sm px-2 py-0.5" style={{ backgroundColor: mix("paper", 0.78) }}>
+            <Text class="text-center text-xs text-bark-900">{props.draft.duty}</Text>
           </View>
         </If>
       </View>
-      <View class="absolute top-3 right-4 rounded-sm px-2 py-px" style={{ backgroundColor: mix("paper", 0.75) }}>
-        <Text class="text-xs text-ink">{`${speciesLabel[cast().species]} · ${outfitLabel[cast().outfit]} · ${pose()}`}</Text>
+      <View class="absolute top-3 right-4 rounded-sm px-2 py-0.5" style={{ backgroundColor: mix("paper", 0.78) }}>
+        <Text class="text-xs font-medium text-bark-900">{`${speciesLabel[cast().species]} · ${outfitLabel[cast().outfit]} · ${pose()}`}</Text>
       </View>
     </View>
   );

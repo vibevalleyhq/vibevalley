@@ -87,9 +87,9 @@ export function Slider(props: SliderProps) {
 
   keymap.bind({ left: () => nudge(-1), right: () => nudge(1) }, { passThrough: true });
 
-  const thumbSize = 12;
-  const fillWidth = () => Math.round(ratio() * trackWidth());
+  const thumbSize = 14;
   const thumbLeft = () => Math.round(ratio() * Math.max(0, trackWidth() - thumbSize));
+  const fillWidth = () => (trackWidth() > 0 ? Math.round(thumbLeft() + thumbSize / 2) : 0);
 
   return (
     <View
@@ -109,15 +109,19 @@ export function Slider(props: SliderProps) {
         trackWidth.set(e.bounds.size.width);
         refreshBounds();
       }}
-      class={`relative h-5 min-w-20 justify-center ${props.disabled === true ? "opacity-50" : ""} ${props.class ?? ""}`}
+      class={`group relative h-6 min-w-20 justify-center rounded-full ${props.disabled === true ? "opacity-50" : ""} ${props.class ?? ""}`}
       style={{ cursor: props.disabled === true ? "default" : "pointer" }}
     >
       <View class="h-1.5 w-full overflow-hidden rounded-full bg-selected">
         <View class="h-full rounded-full bg-accent" style={{ width: fillWidth() }} />
       </View>
       <View
-        class={`absolute h-3 w-3 rounded-full border bg-page shadow-raise ${dragging() || focused() ? "border-focus" : "border-line"}`}
-        style={{ left: thumbLeft(), top: 4 }}
+        class={[
+          "absolute size-3.5 rounded-full border-2 bg-page shadow-raise transition duration-120 ease-out",
+          props.disabled === true ? "border-idle" : dragging() || focused() ? "border-focus" : "border-accent group-hover:border-focus",
+          focused() ? "outline-2 outline-focus" : "",
+        ].join(" ")}
+        style={{ left: thumbLeft(), top: 5 }}
       />
     </View>
   );

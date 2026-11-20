@@ -24,10 +24,13 @@ import { api } from "../../infra/api";
 import { followArtifact, followSuggestions } from "../../infra/gateway";
 import { ready, useAgents } from "../../infra/query";
 import { createAct } from "../../ui/act";
+import { Button } from "../../ui/Button";
 import { Checkbox } from "../../ui/Checkbox";
 import { hexColor, swatches } from "../../ui/domain/cast";
 import { AgentFace } from "../../ui/domain/Face";
 import { Icon } from "../../ui/Icon";
+import type { IconName } from "../../ui/icons";
+import { Bubble } from "../../ui/Tip";
 import { tone } from "../../ui/tone";
 import { knownTypes, plainOf } from "./blocks";
 import { BlockEditor, type EditBlock } from "./editor";
@@ -199,8 +202,14 @@ export function BlocksView(props: {
       class="min-h-0 flex-1"
     >
       <If when={!props.onRail}>{suggestionsList()}</If>
-      <View class="pb-2 pl-8.75">
-        <Text class={`truncate text-xs ${(version(), editor.error !== undefined) ? "text-berry" : "text-muted"}`}>
+      <View class="min-h-5 flex-row items-center gap-1.5 pb-2 pl-8.75">
+        <If when={(version(), editor.error !== undefined)}>
+          <View class="size-1.5 shrink-0 rounded-full bg-berry" />
+        </If>
+        <If when={(version(), editor.error === undefined && (editor.busy || editor.othersWriting))}>
+          <View class="size-1.5 shrink-0 rounded-full bg-wheat" />
+        </If>
+        <Text class={`truncate text-xs tabular-nums ${(version(), editor.error !== undefined) ? "font-medium text-berry" : "text-muted"}`}>
           {(version(), editor.blocks.length > 0 || editor.busy || editor.error !== undefined) ? status() : ""}
         </Text>
       </View>
@@ -214,7 +223,7 @@ export function BlocksView(props: {
           testID="artifact-append"
           accessibilityLabel={t("web.artifact.blocks.append")}
           onPress={() => editor.append()}
-          class="h-16 w-full pl-8.75"
+          class="h-16 w-full pt-1.5 pl-8.75"
         >
           <Text class="text-base text-faint">{(version(), editor.blocks.length === 0 && !editor.busy) ? t("web.artifact.blocks.start") : ""}</Text>
         </View>
@@ -234,9 +243,12 @@ function SuggestionsList(props: {
   const open = () => props.list.filter((s) => s.status === "open");
   return (
     <If when={open().length > 0}>
-      <View testID="artifact-suggestions" class="mb-2 shrink-0 rounded-lg border border-line bg-page p-2">
-        <View class="px-1 pb-1">
+      <View testID="artifact-suggestions" class="mb-2.5 shrink-0 rounded-lg border border-line bg-page p-2.5">
+        <View class="flex-row items-center justify-between gap-2 px-0.5 pb-1.5">
           <Text class="text-xs font-semibold text-muted">{t("web.artifact.suggestions.title", { n: open().length })}</Text>
+          <View class="rounded-full bg-hover px-1.5 py-px">
+            <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{String(open().length)}</Text>
+          </View>
         </View>
         <Each of={open()} key={(s) => s.id}>
           {(s, i) => {
@@ -251,37 +263,33 @@ function SuggestionsList(props: {
               <View
                 testID="artifact-suggestion"
                 accessibilityValue={{ text: stale() ? "stale" : "open" }}
-                class={`gap-1 border-line px-1 py-1.5 ${i() > 0 ? "border-t" : ""}`}
+                class={`gap-1.5 border-line px-0.5 py-2 ${i() > 0 ? "border-t" : ""}`}
               >
                 <View class="flex-row items-center gap-1.5">
                   <AgentFace agentId={s().author} look={agent()?.look} runtime={agent()?.runtime} size={16} />
-                  <Text class="min-w-0 flex-1 truncate text-xs text-muted">
+                  <Text class="min-w-0 flex-1 truncate text-xs text-muted tabular-nums">
                     {`${t("web.artifact.suggestions.by", { name: who() })} ${t("web.artifact.suggestions.rev", { rev: s().baseRev })}`}
                   </Text>
                 </View>
                 <SuggestionDiff suggestion={s()} block={block()} />
                 <If when={stale()}>
-                  <Text class="text-xs text-berry">{t("web.artifact.suggestions.stale")}</Text>
+                  <View class="rounded-sm bg-bad-soft px-2 py-1">
+                    <Text class="text-xs font-medium text-berry">{t("web.artifact.suggestions.stale")}</Text>
+                  </View>
                 </If>
-                <View class="flex-row gap-1.5">
-                  <View
-                    role="button"
+                <View class="flex-row items-center gap-1.5 pt-0.5">
+                  <Button
+                    tone="primary"
+                    size="compact"
                     testID="suggestion-accept"
                     disabled={stale() || props.working === s().id}
                     onPress={() => props.onAccept(s())}
-                    class={`rounded-md bg-leaf px-2 py-0.5 ${stale() || props.working === s().id ? "opacity-50" : ""}`}
                   >
-                    <Text class="text-xs text-page">{t("web.artifact.suggestions.accept")}</Text>
-                  </View>
-                  <View
-                    role="button"
-                    testID="suggestion-reject"
-                    disabled={props.working === s().id}
-                    onPress={() => props.onReject(s())}
-                    class={`rounded-md bg-hover px-2 py-0.5 ${props.working === s().id ? "opacity-50" : ""}`}
-                  >
-                    <Text class="text-xs text-muted">{t("web.artifact.suggestions.reject")}</Text>
-                  </View>
+                    {t("web.artifact.suggestions.accept")}
+                  </Button>
+                  <Button tone="plain" size="compact" testID="suggestion-reject" disabled={props.working === s().id} onPress={() => props.onReject(s())}>
+                    {t("web.artifact.suggestions.reject")}
+                  </Button>
                 </View>
               </View>
             );
@@ -343,21 +351,27 @@ function SuggestionDiff(props: { suggestion: Suggestion; block: EditBlock | unde
     <If
       when={change().delete === true}
       else={
-        <View class="gap-0.5">
+        <View class="gap-1">
           <If when={change().type !== undefined}>
-            <Text class="text-sm text-ink">{t("web.artifact.suggestions.type", { type: typeName(change().type ?? "") })}</Text>
+            <Text class="text-xs font-medium text-ink">{t("web.artifact.suggestions.type", { type: typeName(change().type ?? "") })}</Text>
           </If>
           <If when={change().attrs !== undefined}>
-            <Text class="text-sm text-ink">{t("web.artifact.suggestions.attrs", { attrs: attrText(change().attrs ?? {}) })}</Text>
+            <Text class="text-xs text-muted">{t("web.artifact.suggestions.attrs", { attrs: attrText(change().attrs ?? {}) })}</Text>
           </If>
           <If when={change().text !== undefined}>
-            <Text class="text-sm text-muted line-through">{props.block?.text ?? ""}</Text>
-            <Text class="text-sm text-leaf">{plainOf(change().text ?? [])}</Text>
+            <View class="gap-0.5 rounded-sm bg-side px-2 py-1.5">
+              <If when={(props.block?.text ?? "") !== ""}>
+                <Text class="text-xs text-muted line-through">{props.block?.text ?? ""}</Text>
+              </If>
+              <Text class="text-xs font-medium text-ok-ink">{plainOf(change().text ?? [])}</Text>
+            </View>
           </If>
         </View>
       }
     >
-      <Text class="text-sm text-berry">{t("web.artifact.suggestions.delete")}</Text>
+      <View class="rounded-sm bg-bad-soft px-2 py-1">
+        <Text class="text-xs font-medium text-berry">{t("web.artifact.suggestions.delete")}</Text>
+      </View>
     </If>
   );
 }
@@ -370,11 +384,11 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
   const mark = (): JSX.Element | undefined => {
     switch (r().type) {
       case "bulleted":
-        return <Text class="text-base text-ink">•</Text>;
+        return <Text class="text-base text-muted">•</Text>;
       case "numbered":
-        return <Text class="text-base text-ink">{`${r().number ?? 1}.`}</Text>;
+        return <Text class="text-base text-muted tabular-nums">{`${r().number ?? 1}.`}</Text>;
       case "memory_item":
-        return <Text class="text-xs text-muted">{t("web.artifact.blocks.memoryItem")}</Text>;
+        return <Text class="text-xs font-medium text-muted">{t("web.artifact.blocks.memoryItem")}</Text>;
       case "todo":
         return (
           <Checkbox
@@ -391,6 +405,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
   const box = () => (r().type === "quote" ? "border-l-3 border-line pl-3" : r().type === "code" ? "rounded-md bg-code-bg px-3 py-2" : "");
   const kind = () =>
     !knownTypes.has(r().type) ? "unknown" : r().type === "divider" ? "divider" : r().type === "image" ? "image" : r().type === "issue_ref" ? "issue" : "text";
+  const authorTip = () => (r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : t("web.artifact.blocks.wrote", { who: writer() }));
   return (
     <View
       testID="artifact-block"
@@ -405,9 +420,9 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
       </View>
       <View
         testID="artifact-author-bar"
-        tooltip={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : t("web.artifact.blocks.wrote", { who: writer() })}
+        tooltip={<Bubble text={authorTip()} />}
         accessibilityLabel={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : undefined}
-        class={`mt-0.5 mr-2.5 shrink-0 rounded-sm ${r().writing ? "w-1 animate-pulse" : "w-0.75"}`}
+        class={`mt-0.5 mr-2.5 shrink-0 rounded-sm transition duration-120 ease-out ${r().writing ? "w-1 animate-pulse" : "w-0.75"}`}
         style={{ height: barHeight(r().type), backgroundColor: authorColor(r().updatedBy, props.agent) }}
       />
       <View class="shrink-0" style={{ width: 20 * r().depth }} />
@@ -416,8 +431,9 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
         <If
           when={kind() === "text"}
           else={
-            <If when={kind() !== "divider"} else={<View class="my-2 h-px bg-line" />}>
+            <If when={kind() !== "divider"} else={<View class="my-2.5 h-px bg-line" />}>
               <Placeholder
+                icon={kind() === "image" ? "image" : kind() === "issue" ? "issues" : "info"}
                 text={
                   kind() === "image"
                     ? t("web.artifact.blocks.image", { alt: r().attrs.alt ?? "", src: r().attrs.src ?? "" }).trim()
@@ -439,7 +455,9 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
           </View>
         </If>
         <If when={r().problem}>
-          <Text class="text-xs text-berry">{r().problem ?? ""}</Text>
+          <View class="mt-1 rounded-sm bg-bad-soft px-2 py-1">
+            <Text class="text-xs font-medium text-berry">{r().problem ?? ""}</Text>
+          </View>
         </If>
       </View>
       <If when={props.onQuote}>
@@ -447,9 +465,9 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
           role="button"
           testID="artifact-quote-block"
           accessibilityLabel={t("web.artifact.canvas.quote")}
-          tooltip={t("web.artifact.canvas.quote")}
+          tooltip={<Bubble text={t("web.artifact.canvas.quote")} />}
           onPress={() => props.onQuote?.({ id: r().block.id, rev: r().block.rev, type: r().type, text: r().text })}
-          class="mt-0.5 ml-1 size-6 shrink-0 items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-hover"
+          class="mt-0.5 ml-1 size-6 shrink-0 items-center justify-center rounded-md opacity-0 transition duration-120 ease-out group-hover:opacity-100 hover:bg-hover focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
         >
           <Icon name="chat" size={14} tone="muted" />
         </View>
@@ -458,10 +476,11 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
   );
 }
 
-function Placeholder(props: { text: string }) {
+function Placeholder(props: { icon: IconName; text: string }) {
   return (
-    <View class="rounded-md bg-hover px-2.5 py-1.5">
-      <Text class="text-sm text-muted">{props.text}</Text>
+    <View class="flex-row items-center gap-2 rounded-md border border-dashed border-line bg-side px-3 py-2">
+      <Icon name={props.icon} size={14} tone="muted" />
+      <Text class="min-w-0 flex-1 text-sm text-muted">{props.text}</Text>
     </View>
   );
 }

@@ -34,6 +34,16 @@ export function momentText(at: number) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
 }
 
+/** A compact timestamp: HH:MM today, M/D HH:MM earlier this year, YYYY/M/D HH:MM before that. */
+export function shortMomentText(at: number, now = Date.now()) {
+  const d = new Date(Math.round(at));
+  const ref = new Date(Math.round(now));
+  const clock = `${two(d.getHours())}:${two(d.getMinutes())}`;
+  if (d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate()) return clock;
+  const date = d.getFullYear() === ref.getFullYear() ? `${d.getMonth() + 1}/${d.getDate()}` : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  return `${date} ${clock}`;
+}
+
 // The server says money the same way (protocol.Yuan, SpentText) in what it writes to the chat.
 export const yuan = (cny: number) => (cny > 0 && cny < 0.01 ? t("web.base.money.underCent") : `¥${cny.toFixed(2)}`);
 

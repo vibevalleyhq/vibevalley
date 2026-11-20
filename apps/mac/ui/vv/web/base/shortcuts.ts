@@ -14,7 +14,7 @@ export interface Shortcut {
 }
 
 export const shortcuts = [
-  { id: "switcher", place: "everywhere", keys: ["mod", "K"] },
+  { id: "switcher", place: "everywhere", keys: ["mod", "J"] },
   { id: "sheet", place: "everywhere", keys: ["?"] },
   { id: "close", place: "everywhere", keys: ["esc"] },
   { id: "send", place: "composer", keys: ["enter"] },

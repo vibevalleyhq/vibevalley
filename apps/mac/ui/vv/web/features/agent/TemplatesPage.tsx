@@ -36,10 +36,10 @@ export function TemplatesPage() {
     });
   };
   return (
-    <Scroll testID="templates-page" class="h-full flex-1" contentClass="gap-6 px-4 pt-4 pb-8">
+    <Scroll testID="templates-page" class="h-full flex-1 bg-page" contentClass="gap-6 px-5 pt-4 pb-8">
       <View class="gap-1">
-        <A href="/agents" class="self-start">
-          <Text class="text-xs text-muted hover:underline">{t("web.agent.all")}</Text>
+        <A href="/agents" class="group self-start rounded-md px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover">
+          <Text class="text-xs text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
         </A>
         <View class="flex-row items-center gap-1.5">
           <Text role="header" class="text-2xl font-semibold text-ink">
@@ -57,7 +57,7 @@ export function TemplatesPage() {
           onInput={(v) => path.set(v)}
           onSubmit={() => void add()}
           wide={false}
-          class="min-w-0 flex-1"
+          class="h-7 min-w-0 flex-1"
         />
         <Button testID="template-add" disabled={adding.busy() || !path().trim()} onPress={() => void add()}>
           {t("web.agent.templates.add")}
@@ -130,8 +130,8 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
         <View class="min-w-0 flex-1 gap-0.5">
           <View class="flex-row items-center gap-2">
             <Text class="truncate text-base font-semibold text-ink">{template().name}</Text>
-            <View class="shrink-0 rounded-sm bg-hover px-1.5">
-              <Text class="text-xs text-muted">{t(`web.agent.role.${template().role}`)}</Text>
+            <View class="shrink-0 rounded-sm bg-hover px-1.5 py-0.5">
+              <Text class="text-xs font-medium text-muted">{t(`web.agent.role.${template().role}`)}</Text>
             </View>
           </View>
           <Text class="text-sm text-muted" style={{ numberOfLines: 2 }}>
@@ -146,7 +146,7 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
         </View>
       </View>
       <If when={open()}>
-        <View testID="template-persona" class="gap-2 rounded-md bg-hover p-3">
+        <View testID="template-persona" class="gap-2 rounded-md bg-side p-3">
           <If when={template().tags.length > 0}>
             <Text class="text-sm text-muted">{`${t("web.agent.tags")}${t("web.agent.colon")}${list(template().tags)}`}</Text>
           </If>
@@ -162,11 +162,11 @@ function TemplateCard(props: { template: AgentTemplate; runtime?: RuntimeInfo | 
         </View>
       </If>
       <View class="mt-auto flex-row flex-wrap items-center gap-2 border-t border-line pt-3">
-        <Text class="flex-1 text-xs text-muted">
+        <Text class="flex-1 text-xs tabular-nums text-muted">
           {(template().installed.length > 0 ? t("web.agent.templates.installed", { n: template().installed.length }) : "") +
             (template().source === "added" ? t("web.agent.templates.addedHere") : "")}
         </Text>
-        <Button testID="template-look" onPress={() => open.set(!open())}>
+        <Button tone="quiet" testID="template-look" onPress={() => open.set(!open())}>
           {open() ? t("web.agent.templates.fold") : t("web.agent.templates.look")}
         </Button>
         <If when={template().source === "added"}>

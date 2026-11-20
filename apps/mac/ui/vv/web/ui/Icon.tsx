@@ -2,7 +2,7 @@
 // none, so the same path data (vv/icons.py → icons.ts) is drawn on Canvas.
 // A canvas cannot inherit the text color (CSS currentColor): callers pass
 // `color` (a color) or `tone` (a theme token), else it is `ink`.
-import { Canvas, Path2D } from "nsh";
+import { Canvas, colorScheme, Path2D } from "nsh";
 
 import { type IconName, type IconShape, icons } from "./icons";
 import { tone as toneOf } from "./tone";
@@ -35,9 +35,13 @@ export function Icon(props: { name: IconName; size?: IconSize | number; label?: 
       accessibilityLabel={props.label}
       style={{ width: size(), height: size(), flexShrink: 0 }}
       draw={(cx) => {
+        // Read reactive theme/props inside draw so Canvas's render_effect repaints on dark/light switches and prop updates.
+        colorScheme();
         const shapes: readonly IconShape[] = icons[props.name];
         const c = color();
-        cx.scale(size() / 24, size() / 24);
+        const sz = size();
+        if (sz <= 0) return;
+        cx.scale(sz / 24, sz / 24);
         for (const s of shapes) {
           const p = pathOf(s.d);
           cx.globalAlpha = s.opacity ?? 1;

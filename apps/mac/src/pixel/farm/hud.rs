@@ -7,7 +7,7 @@ use vibevalley_i18n::t;
 use super::scene::{FarmScene, FarmTool};
 use super::world::{BEDS, PLOT_H, VillageHit, YARD_PLACES};
 use crate::pixel::draw::{Color, DrawList, HudOp, rgba};
-use crate::pixel::sky::{FARM_CUT, clock_text, frame_whole};
+use crate::pixel::sky::{FARM_CUT, clock_text, frame_cover};
 
 const INK: Color = rgba(0x3a2a18, 1.0);
 const PAPER: Color = [0.99, 0.96, 0.88, 0.98];
@@ -84,7 +84,7 @@ pub struct Layout {
 impl Layout {
     pub fn new(f: &FarmScene) -> Self {
         let (w, h) = f.view_size;
-        let frame = frame_whole(f.view_size, (f.world.level.width, f.world.level.height), FARM_CUT);
+        let frame = frame_cover(f.view_size, (f.world.level.width, f.world.level.height), FARM_CUT);
         let (nav, tools, phone) = chrome::layout(f, frame);
         let pw = (w - 24.0).clamp(1.0, 430.0);
         let ph = (h - 40.0).clamp(1.0, 360.0);
@@ -135,7 +135,7 @@ pub fn hit(f: &FarmScene, x: f32, y: f32) -> Option<Action> {
             return Some(control.action.clone());
         }
     }
-    let fr = frame_whole(f.view_size, (f.world.level.width, f.world.level.height), FARM_CUT);
+    let fr = frame_cover(f.view_size, (f.world.level.width, f.world.level.height), FARM_CUT);
     if chrome::repo_sign(f, fr).contains(x, y) {
         return Some(Action::Route("/repos".into()));
     }
@@ -303,7 +303,7 @@ fn rows(f: &FarmScene, panel: Panel) -> Vec<Row> {
 
 pub fn draw(f: &FarmScene, list: &mut DrawList, _scale: f32) {
     let l = Layout::new(f);
-    let fr = frame_whole(f.view_size, (list.width, list.height), FARM_CUT);
+    let fr = frame_cover(f.view_size, (list.width, list.height), FARM_CUT);
     list.hud_view = true;
     let level = &f.frame.view.level;
     chrome::draw_overlay(f, list, fr);

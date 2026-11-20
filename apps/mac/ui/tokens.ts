@@ -1,6 +1,5 @@
-// VibeValley design tokens (docs/design/components.md section 2), mirroring
-// affectUI's --aui-* variables. The GPUI side keeps the same values in
-// apps/mac/src/theme.rs.
+// VibeValley native shell design tokens, aligned with the warm-stone workbench
+// palette (apps/mac/ui/vv/theme.json) and GPUI theme (apps/mac/src/theme.rs).
 import { colorScheme } from "nsh";
 
 export type Palette = {
@@ -23,52 +22,52 @@ export type Palette = {
   /// Primary button fill (the dark gradient's base; inverted in dark mode).
   primary: string;
   onPrimary: string;
-  /// Pane background behind cards; matches the terminal background.
+  /// Sidebar and inspector background; mirrors theme.rs `surface` and workbench `side`.
   canvas: string;
 };
 
 const light: Palette = {
-  ink: "#171717",
-  text: "#6b6b6b",
-  muted: "#8a8a8a",
-  faint: "#b5b5b5",
-  surface: "#ffffff",
-  subtle: "#f0f0f0",
-  tile: "#f5f5f5",
-  border: "#e7e7e7",
-  focus: "rgba(0,96,226,0.7)",
-  ok: "#1e8a4f",
-  alert: "#e6730e",
-  danger: "#c4320a",
-  codeKey: "#171717",
-  codeStr: "#0b8576",
-  codeNum: "#b25e00",
-  codeLit: "#8a35d6",
-  primary: "#1f1f1f",
-  onPrimary: "#ffffff",
-  canvas: "#fafafa",
+  ink: "#1c1917",
+  text: "#4a4540",
+  muted: "#5e5852",
+  faint: "#716a64",
+  surface: "#fcfcfb",
+  subtle: "#e7e5e0",
+  tile: "#efeeeb",
+  border: "#e6e4e0",
+  focus: "rgba(77,122,42,0.75)",
+  ok: "#3f7329",
+  alert: "#b45d0e",
+  danger: "#a83a2c",
+  codeKey: "#1c1917",
+  codeStr: "#1f7a72",
+  codeNum: "#a6560c",
+  codeLit: "#7e42b8",
+  primary: "#1c1917",
+  onPrimary: "#fcfcfb",
+  canvas: "#f6f5f3",
 };
 
 const dark: Palette = {
-  ink: "#ededed",
-  text: "#a1a1a1",
-  muted: "#7c7c7c",
-  faint: "#6b6b70",
-  surface: "#161618",
-  subtle: "#232326",
-  tile: "#1d1d20",
-  border: "rgba(255,255,255,0.10)",
-  focus: "rgba(77,141,255,0.8)",
-  ok: "#41bd74",
-  alert: "#f28a2e",
-  danger: "#ff8a7a",
-  codeKey: "#ededed",
-  codeStr: "#4fc3b4",
-  codeNum: "#f2a15c",
-  codeLit: "#cfaef5",
-  primary: "#ededed",
-  onPrimary: "#161618",
-  canvas: "#111113",
+  ink: "#ecebe8",
+  text: "#bbb6af",
+  muted: "#a9a49e",
+  faint: "#8b867f",
+  surface: "#21201d",
+  subtle: "#312f2b",
+  tile: "#282623",
+  border: "rgba(236,235,232,0.11)",
+  focus: "rgba(141,187,92,0.8)",
+  ok: "#7fae4f",
+  alert: "#e5a93c",
+  danger: "#e47d6d",
+  codeKey: "#ecebe8",
+  codeStr: "#5bbfb2",
+  codeNum: "#e5a93c",
+  codeLit: "#c9a7eb",
+  primary: "#ecebe8",
+  onPrimary: "#151413",
+  canvas: "#1b1a18",
 };
 
 /** The palette of the scheme shown now (reactive). */
@@ -94,12 +93,12 @@ export function cardShadow(p: Palette) {
     ? [{ x: 0, y: 0, blur: 0, spread: 1, color: p.border, inset: true }]
     : [
         { x: 0, y: 0, blur: 0, spread: 1, color: p.border, inset: true },
-        { x: 0, y: 1, blur: 2, spread: 0, color: "rgba(0,0,0,0.04)", inset: false },
+        { x: 0, y: 1, blur: 2, spread: 0, color: "rgba(28,25,23,0.05)", inset: false },
       ];
 }
 
 /** `danger` at 6 % fill with a 16 % ring, for error boxes. */
 export function dangerTint(p: Palette) {
-  const base = p === dark ? "255,138,122" : "196,50,10";
+  const base = p === dark ? "228,125,109" : "168,58,44";
   return { fill: `rgba(${base},0.06)`, ring: `rgba(${base},0.16)` };
 }

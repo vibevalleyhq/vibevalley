@@ -20,11 +20,12 @@ vibevalley-terminal = { version = "0.1.0", path = "../../crates/vibevalley-termi
 vibevalley-workspace = { version = "0.1.0", path = "../../crates/vibevalley-workspace" }
 flume = "0.12.0"
 gpui-kit = { version = "0.10.0", default-features = false, features = ["gpui-fast"] }
+gltf = { version = "1", default-features = false, features = ["names", "utils"] }
 image = { workspace = true }
 indexmap = "2.14.2"
 nsh-base = { version = "0.6.0", default-features = false }
 nsh-engine = { version = "0.6.0", default-features = false }
-nsh-platform-gpui = { version = "0.6.0", default-features = false, features = ["js", "webview", "editor", "highlight", "svg"] }
+nsh-platform-gpui = { version = "0.6.0", default-features = false, features = ["js", "crypto", "webview", "editor", "highlight", "svg"] }
 objc2 = "0.6.5"
 objc2-app-kit = { version = "0.3.2", features = ["NSApplication", "NSImage"] }
 objc2-foundation = { version = "0.3.2", features = ["NSString"] }

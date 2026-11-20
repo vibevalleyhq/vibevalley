@@ -22,9 +22,11 @@ import { useRouter, useSearchValues } from "../../../infra/router";
 import { useIntents } from "../../../state/intent";
 import { rememberPick } from "../../../state/prefs";
 import { createAct } from "../../../ui/act";
+import { Button } from "../../../ui/Button";
 import { Select, TextInput } from "../../../ui/Field";
 import { Icon } from "../../../ui/Icon";
 import { Segmented } from "../../../ui/Segmented";
+import { Bubble } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardRepo, filterAny, filterShows, type Lane, noFilter } from "../model/cards";
 import { type BoardLook, boardLook, boardViews, viewLabel } from "../model/display";
@@ -40,6 +42,7 @@ import { FamilyDetail } from "./FamilyDetail";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
+import { createIssueChrome, IssueChromeContext } from "./Sheet";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 
 type Closing = { issue: Issue; session: Session | undefined; review: boolean; lane?: Lane };
@@ -172,37 +175,46 @@ export function IssuesPage(props: { rest: string }) {
                 {reasonOf(history.error())}
               </Text>
             </If>
-            <Toolbar filter={filter()} cards={all()} shown={shown().length} onFilter={setFilter} look={look()} onLook={setLook} />
+            <If when={history.loading() || history.error() !== undefined || history.rows() === undefined || all().length > 0}>
+              <Toolbar filter={filter()} cards={all()} shown={shown().length} onFilter={setFilter} look={look()} onLook={setLook} onNew={() => startNew({})} />
+            </If>
             <If
-              when={look().view === "board"}
+              when={!history.loading() && !history.error() && history.rows() !== undefined && all().length === 0}
               else={
-                <IssueList
-                  cards={shown()}
-                  loading={history.loading()}
-                  selected={returnTo()}
-                  older={older()}
-                  grouping={look().grouping}
-                  ordering={look().ordering}
-                  onOlder={() => older.set(!older())}
-                  onOpen={open}
-                  onAdd={addInList}
-                />
+                <If
+                  when={look().view === "board"}
+                  else={
+                    <IssueList
+                      cards={shown()}
+                      loading={history.loading()}
+                      selected={returnTo()}
+                      older={older()}
+                      grouping={look().grouping}
+                      ordering={look().ordering}
+                      onOlder={() => older.set(!older())}
+                      onOpen={open}
+                      onAdd={addInList}
+                    />
+                  }
+                >
+                  <IssueBoard
+                    cards={shown()}
+                    loading={history.loading()}
+                    selected={returnTo()}
+                    older={older()}
+                    ordering={look().ordering}
+                    onOlder={() => older.set(!older())}
+                    onOpen={open}
+                    onDrop={(c, to) => void drop(c, to)}
+                    onRetry={(c) => void retry(c)}
+                    onPutBack={(c) => c.move && moves.drop(c.move.key)}
+                    onPlace={(c, before) => void place(c, before)}
+                    onNew={() => startNew({})}
+                  />
+                </If>
               }
             >
-              <IssueBoard
-                cards={shown()}
-                loading={history.loading()}
-                selected={returnTo()}
-                older={older()}
-                ordering={look().ordering}
-                onOlder={() => older.set(!older())}
-                onOpen={open}
-                onDrop={(c, to) => void drop(c, to)}
-                onRetry={(c) => void retry(c)}
-                onPutBack={(c) => c.move && moves.drop(c.move.key)}
-                onPlace={(c, before) => void place(c, before)}
-                onNew={() => startNew({})}
-              />
+              <IssuesOnboarding onNavigate={(path) => router.navigate(path)} onNew={() => startNew({})} />
             </If>
           </>
         }
@@ -262,15 +274,19 @@ function Detail(props: {
     <If
       when={card()}
       else={
-        <If when={props.known} else={<Text class="text-sm text-muted">{t("web.issue.reading")}</Text>}>
-          {/* A link to an issue the farm does not have says so, instead of quietly showing the board. */}
-          <View testID="issue-not-found">
-            <Text role="header" class="text-lg font-semibold text-ink">
-              {t("web.issue.page.notFound")}
-            </Text>
-            <Text class="mt-3 text-sm text-muted">{t("web.issue.page.notFoundLine", { id: props.id })}</Text>
+        <Scroll class="min-h-0 flex-1">
+          <View class="w-full max-w-200 self-center px-6 py-8">
+            <If when={props.known} else={<Text class="text-sm text-muted">{t("web.issue.reading")}</Text>}>
+              {/* A link to an issue the farm does not have says so, instead of quietly showing the board. */}
+              <View testID="issue-not-found">
+                <Text role="header" class="text-lg font-semibold text-ink">
+                  {t("web.issue.page.notFound")}
+                </Text>
+                <Text class="mt-3 text-sm text-muted">{t("web.issue.page.notFoundLine", { id: props.id })}</Text>
+              </View>
+            </If>
           </View>
-        </If>
+        </Scroll>
       }
     >
       <Each of={shows("todo")}>{() => <TodoDetail item={cardOf("todo").issue} onDone={props.open} />}</Each>
@@ -288,12 +304,14 @@ function Detail(props: {
       <Each of={shows("orchestrator")}>{() => <OrchestratorIssueDetail issue={cardOf("orchestrator").issue} />}</Each>
       <Each of={shows("missing")}>
         {() => (
-          <View>
-            <Text role="header" class="text-xl font-semibold text-ink">
-              {cardOf("missing").issue.title}
-            </Text>
-            <Text class="mt-3 text-sm text-ink">{t("web.issue.page.missing", { what: list(cardOf("missing").missing) })}</Text>
-          </View>
+          <Scroll class="min-h-0 flex-1">
+            <View class="w-full max-w-200 self-center px-6 py-8">
+              <Text role="header" class="text-xl font-semibold text-ink">
+                {cardOf("missing").issue.title}
+              </Text>
+              <Text class="mt-3 text-sm text-ink">{t("web.issue.page.missing", { what: list(cardOf("missing").missing) })}</Text>
+            </View>
+          </Scroll>
         )}
       </Each>
       <Each of={shows("family")}>
@@ -312,23 +330,53 @@ function Detail(props: {
 
 /** An issue's own page, at its URL: Issues or Escape goes back to the board as it was left. */
 function IssueView(props: { onBack: () => void; backLabel: string; blocked: () => boolean; children: JSX.Element }) {
-  // A dialog over the issue, or a field being written in, has Escape first.
-  keymap.bind("escape", () => !props.blocked() && props.onBack(), { when: "notEditing" });
+  const chrome = createIssueChrome();
+  // A dialog over the issue, or a field being written in, has Escape first; on narrow screens Escape closes the inspector drawer first.
+  keymap.bind(
+    "escape",
+    () => {
+      if (props.blocked()) return;
+      if (!chrome.wide() && chrome.drawerOpen()) {
+        chrome.closeDrawer();
+        return;
+      }
+      props.onBack();
+    },
+    { when: "notEditing" },
+  );
   return (
-    <Scroll testID="issue-scroll" class="min-h-0 flex-1">
-      <View testID="issue" class="w-full max-w-300 self-center px-6 pt-3 pb-10">
-        <View
-          role="button"
-          testID="issue-close"
-          onPress={() => props.onBack()}
-          class="mb-3 flex-row items-center gap-1 self-start rounded-md px-1.5 py-0.5 hover:bg-hover"
-        >
-          <Icon name="back" size={14} tone="muted" />
-          <Text class="text-sm text-muted">{props.backLabel}</Text>
+    <IssueChromeContext.Provider value={chrome}>
+      <View testID="issue" class="min-h-0 flex-1">
+        <View class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4">
+          <View
+            role="button"
+            testID="issue-close"
+            onPress={() => props.onBack()}
+            class="-ml-2 h-7 flex-row items-center gap-1 rounded-md px-2 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+          >
+            <Icon name="back" size={14} tone="muted" />
+            <Text class="text-sm font-medium text-muted">{props.backLabel}</Text>
+          </View>
+          <If when={chrome.hasSheet()}>
+            <View
+              role="button"
+              testID="issue-inspector-toggle"
+              accessibilityLabel={t("web.issue.detail.properties")}
+              accessibilityState={{ selected: chrome.inspectorVisible() }}
+              tooltip={<Bubble text={t("web.issue.detail.properties")} placement="bottom" />}
+              onPress={() => chrome.toggleInspector()}
+              class={`h-7 flex-row items-center gap-1.5 rounded-md border px-2 transition duration-120 ease-out active:translate-y-px ${
+                chrome.inspectorVisible() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
+              }`}
+            >
+              <Icon name="info" size={14} tone={chrome.inspectorVisible() ? "ink" : "muted"} />
+              <Text class={`text-xs font-medium ${chrome.inspectorVisible() ? "text-ink" : "text-muted"}`}>{t("web.issue.detail.properties")}</Text>
+            </View>
+          </If>
         </View>
-        {props.children}
+        <View class="min-h-0 flex-1">{props.children}</View>
       </View>
-    </Scroll>
+    </IssueChromeContext.Provider>
   );
 }
 
@@ -339,6 +387,7 @@ function Toolbar(props: {
   onFilter: (f: BoardFilter) => void;
   look: BoardLook;
   onLook: (l: BoardLook) => void;
+  onNew: () => void;
 }) {
   const nameOf = useNameOf();
   const repos = () => [...new Set(props.cards.map(cardRepo).filter((p): p is string => !!p))].toSorted();
@@ -346,7 +395,7 @@ function Toolbar(props: {
   return (
     <View class="flex-row flex-wrap items-center gap-2 px-3 pt-3 pb-2.5">
       <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
-        <View class="h-7 w-60 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2">
+        <View class="h-7 w-60 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:border-faint focus-within:border-focus">
           <Icon name="search" size={14} tone="muted" />
           <TextInput
             testID="issue-search"
@@ -356,8 +405,18 @@ function Toolbar(props: {
             accessibilityLabel={t("web.issue.page.findLabel")}
             class="h-6 flex-1 border-0 bg-transparent px-0 py-0"
           />
+          <If when={props.filter.query.length > 0}>
+            <View
+              role="button"
+              accessibilityLabel={t("web.issue.page.clear")}
+              onPress={() => props.onFilter({ ...props.filter, query: "" })}
+              class="size-4.5 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
+            >
+              <Icon name="close" size={10} tone="muted" />
+            </View>
+          </If>
         </View>
-        <Icon name="filter" size={16} label={t("web.issue.page.filter")} tone="muted" />
+        <Icon name="filter" size={14} label={t("web.issue.page.filter")} tone="muted" />
         <Select
           size="control"
           class="max-w-48"
@@ -381,9 +440,16 @@ function Toolbar(props: {
           onChange={(agent) => props.onFilter({ ...props.filter, agent })}
         />
         <If when={filterAny(props.filter)}>
-          <Text class="text-xs text-muted">{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</Text>
-          <View role="button" testID="filter-clear" onPress={() => props.onFilter(noFilter)}>
-            <Text class="text-sm text-water">{t("web.issue.page.clear")}</Text>
+          <Text class="text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+            {t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}
+          </Text>
+          <View
+            role="button"
+            testID="filter-clear"
+            onPress={() => props.onFilter(noFilter)}
+            class="h-7 flex-row items-center rounded-md px-2 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+          >
+            <Text class="text-xs font-medium text-water">{t("web.issue.page.clear")}</Text>
           </View>
         </If>
       </View>
@@ -396,7 +462,76 @@ function Toolbar(props: {
           options={boardViews.map((v) => ({ value: v, label: viewLabel[v] }))}
         />
         <DisplayMenu look={props.look} onChange={props.onLook} />
+        <View tooltip={<Bubble text={`${t("web.issue.new.title")} (C)`} />}>
+          <Button icon="add" testID="issue-toolbar-new" onPress={props.onNew}>
+            {t("web.issue.new.card")}
+          </Button>
+        </View>
       </View>
     </View>
+  );
+}
+
+function IssuesOnboarding(props: { onNavigate: (path: string) => void; onNew: () => void }) {
+  return (
+    <Scroll testID="issues-empty-onboarding" class="min-h-0 flex-1">
+      <View class="mx-auto my-8 w-full max-w-160 px-6">
+        <View class="rounded-xl border border-line bg-page p-6">
+          <Text role="header" class="text-lg font-semibold text-ink">
+            开始使用 VibeValley
+          </Text>
+          <Text class="mt-1 text-sm text-muted">按下面三步准备好环境，就能把工单派给帮工干活。</Text>
+          <View class="mt-5 gap-2.5">
+            <View testID="onboarding-step-runtimes" class="flex-row items-center gap-3 rounded-lg bg-side p-3.5">
+              <View class="h-6 w-6 shrink-0 items-center justify-center rounded-full bg-selected">
+                <Text class="text-xs font-semibold text-ink" style={{ fontVariant: ["tabular-nums"] }}>
+                  1
+                </Text>
+              </View>
+              <View class="min-w-0 flex-1">
+                <Text class="text-sm font-medium text-ink">检查或配置农机</Text>
+                <Text class="mt-0.5 text-xs text-muted">确认本机已安装并启用编码 agent（如 Claude Code、Codex 等）</Text>
+              </View>
+              <Button icon="runtimes" testID="onboarding-runtimes" onPress={() => props.onNavigate("/runtimes")}>
+                配置农机
+              </Button>
+            </View>
+            <View testID="onboarding-step-repos" class="flex-row items-center gap-3 rounded-lg bg-side p-3.5">
+              <View class="h-6 w-6 shrink-0 items-center justify-center rounded-full bg-selected">
+                <Text class="text-xs font-semibold text-ink" style={{ fontVariant: ["tabular-nums"] }}>
+                  2
+                </Text>
+              </View>
+              <View class="min-w-0 flex-1">
+                <Text class="text-sm font-medium text-ink">添加代码仓库</Text>
+                <Text class="mt-0.5 text-xs text-muted">绑定本机 Git 仓库，帮工会在独立工作目录里改动代码</Text>
+              </View>
+              <Button icon="repos" testID="onboarding-repos" onPress={() => props.onNavigate("/repos")}>
+                添加仓库
+              </Button>
+            </View>
+            <View testID="onboarding-step-start" class="flex-row items-start gap-3 rounded-lg bg-side p-3.5">
+              <View class="mt-0.5 h-6 w-6 shrink-0 items-center justify-center rounded-full bg-selected">
+                <Text class="text-xs font-semibold text-ink" style={{ fontVariant: ["tabular-nums"] }}>
+                  3
+                </Text>
+              </View>
+              <View class="min-w-0 flex-1">
+                <Text class="text-sm font-medium text-ink">创建第一条工单，或在聊天中派活</Text>
+                <Text class="mt-0.5 text-xs text-muted">写下需求直接派给帮工，或按 C 键新建工单，也可以在聊天里让助手帮你拆解</Text>
+                <View class="mt-2.5 flex-row flex-wrap items-center gap-2">
+                  <Button tone="primary" icon="add" testID="onboarding-new-issue" onPress={props.onNew}>
+                    新建工单
+                  </Button>
+                  <Button icon="chat" testID="onboarding-chat" onPress={() => props.onNavigate("/chat")}>
+                    去聊天派活
+                  </Button>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Scroll>
   );
 }
