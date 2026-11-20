@@ -1,7 +1,6 @@
 //! What the farm knows of each runtime before probing it, and the rules
 //! that read a runtime's facts: money stops, session options, a profile's
-//! problems, choosing a profile, the quota in words. Ported from VibeValley
-//! `modules/agent/presets.ts` and `quota.ts`.
+//! problems, choosing a profile, the quota in words.
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;

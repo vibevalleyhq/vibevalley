@@ -17,7 +17,7 @@
 | [附件查询](crates/vibevalley-server/src/modules/attachment/sql/queries.sql) | sqlc 为 SQLx 生成按哈希读取和首次写入元数据的接口。相同哈希保留首次记录的名字和类型。 |
 | `crates/vibevalley-server/src/modules/attachment.rs` | `Attachments`：`attach`（上传）、`keep`（这里做出来的字节）、`keep_staged`（媒体输入写在暂存目录、已算好哈希的大文件）、`of`（一组 id 的附件，缺一个就拒绝）、`file`、`path_of`；`open_sqlx_db` 打开各模块共用的 `server.db` |
 | `crates/vibevalley-http/src/media.rs`、`crates/vibevalley-http/src/lib.rs` | `GET /api/v1/attachment/<id>`（经 `attachment.file` 取路径）；`attachment.create` 走通用的命令入口 |
-| `packages/protocol/src/attachment/` | `Attachment`、`AttachmentUpload`、`attachmentPath`、`attachmentMax`（Rust 类型由它生成） |
+| `crates/vibevalley-protocol/src/contract/attachment.rs`、`packages/protocol/src/attachment/` | `Attachment`、`AttachmentUpload`、`attachmentPath`、`attachmentMax`（Rust 为源，TS 形状由它生成） |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`attachment.*`）。
 

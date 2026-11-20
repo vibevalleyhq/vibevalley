@@ -1,12 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/IssuesPage.tsx:
-// the same model calls (cards from the issue history and the frame, moves
-// as intents, the filter in the address), the board or the list, the
-// display menu, the issue / todo / family details, the new issue sheet and
-// the close and reopen dialogs. Keys: C writes a new issue and Escape
-// leaves an issue, through nsh's keymap (not while a field has the focus or
-// a dialog is up). Cards are dragged on the board with pan gestures
-// (Board.tsx). The toolbar's container query (views
-// above the filters when narrow) is not carried: the row wraps instead.
 import { keymap, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
@@ -76,7 +67,7 @@ export function IssuesPage(props: { rest: string }) {
     if (!router.location().pathname.startsWith("/issues/")) return;
     const path = router.history.previous()?.pathname;
     if (path === "/map") return t("web.farm.native.map");
-    if (path === "/farm" || path?.startsWith("/farm/")) return t("web.base.farm");
+    if (path === "/farm" || path?.startsWith("/farm/") === true) return t("web.base.farm");
   };
   const returnTo = signal<string>();
   const open = (to: string | undefined) => {
@@ -208,7 +199,12 @@ export function IssuesPage(props: { rest: string }) {
         }
       >
         {/* Keyed by the id, a plain value; the detail keeps the card it last found (see Detail). */}
-        <Each of={id() === undefined ? [] : [id() as string]}>
+        <Each
+          of={(() => {
+            const cur = id();
+            return cur === undefined ? [] : [cur];
+          })()}
+        >
           {(at) => (
             <IssueView onBack={() => open(undefined)} backLabel={fromScene() ?? t("web.issue.page.backToBoard")} blocked={dialogUp}>
               <Detail

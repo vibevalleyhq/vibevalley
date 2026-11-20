@@ -1,0 +1,21 @@
+[
+  "cynefin-beta\n  complex\n    \"Emergent practice\"\n    \"Probe-sense-respond\"\n  clear\n    \"Best practice\"\n",
+  "cynefin-beta\n  complex\n    \"A\"\n  complicated\n    \"B\"\n  clear\n    \"C\"\n  chaotic\n    \"D\"\n  confusion\n    \"E\"\n",
+  "cynefin-beta\n  complex\n",
+  "cynefin-beta\n  complex\n    \"First item\"\n    \"Second item\"\n    \"Third item\"\n",
+  "cynefin-beta\n  %% This is a comment\n  complex\n    \"Item\"\n  %% Another comment\n",
+  "cynefin-beta\n  complex\n    \"Practice\"\n  complicated\n    \"Analysis\"\n  complex --> complicated : \"Pattern found\"\n",
+  "cynefin-beta\n  complex\n    \"A\"\n  complicated\n    \"B\"\n  complex --> complicated\n",
+  "cynefin-beta\n  complex\n    \"A\"\n  complicated\n    \"B\"\n  clear\n    \"C\"\n  complex --> complicated : \"Analyzed\"\n  complicated --> clear : \"Codified\"\n  chaotic --> complex : \"Stabilized\"\n",
+  "cynefin-beta\n  accTitle: Cynefin Framework Overview\n  complex\n    \"Emergent\"\n",
+  "cynefin-beta\n  accDescr: A diagram showing the five Cynefin domains\n  complex\n    \"Emergent\"\n",
+  "cynefin-beta\n  title My Cynefin Map\n  complex\n    \"Emergent\"\n",
+  "cynefin-beta\n  title Team Practices\n  accTitle: Cynefin for team practices\n  complex\n    \"Retrospectives\"\n    \"Pair programming\"\n  complicated\n    \"Code review\"\n    \"Architecture decisions\"\n  clear\n    \"Deployment checklist\"\n  chaotic\n    \"Incident response\"\n  confusion\n    \"New initiative\"\n  complex --> complicated : \"Pattern emerges\"\n  complicated --> clear : \"Best practice found\"\n  chaotic --> complex : \"Stabilized\"\n  confusion --> chaotic : \"Crisis detected\"\n",
+  "cynefin-beta\n  complex\n    \"A\"\n  complicated\n    \"B\"\n  complex --> complex : \"Self-reflection\"\n  complex --> complicated : \"Pattern found\"\n  complicated --> complicated\n",
+  "cynefin-beta\n  complex\n    \"A\"\n  complex --> complex\n",
+  "cynefin-beta\n  title First Diagram\n  complex\n    \"Alpha\"\n    \"Beta\"\n  complicated\n    \"Gamma\"\n  complex --> complicated : \"Move\"\n",
+  "cynefin-beta\n  title Second Diagram\n  chaotic\n    \"Delta\"\n",
+  "cynefin-beta\n  title Incident Response\n\n  complex\n    \"Investigate root cause\"\n    \"Run chaos experiment\"\n\n  complicated\n    \"Analyze performance data\"\n    \"Expert review needed\"\n\n  clear\n    \"Restart service\"\n    \"Apply known fix\"\n\n  chaotic\n    \"Page on-call immediately\"\n\n  confusion\n    \"Unknown failure mode\"\n",
+  "cynefin-beta\n  title Strategy Categorization\n\n  complex\n    \"Market research\"\n\n  complicated\n    \"Competitive analysis\"\n\n  clear\n    \"Standard pricing\"\n\n  chaotic\n    \"Crisis management\"\n\n  complex --> complicated : \"Pattern identified\"\n  complicated --> clear : \"Best practice codified\"\n  clear --> chaotic : \"Complacency\"\n  chaotic --> complex : \"Stabilized\"\n",
+  "cynefin-beta\n  title Cynefin Framework\n\n  complex\n  complicated\n  clear\n  chaotic\n"
+]

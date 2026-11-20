@@ -94,7 +94,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
   const secrets = signal<Partial<Record<Key, string>>>({});
   const cleared = signal<ReadonlySet<Key>>(new Set());
   const error = signal<string | undefined>(undefined);
-  const act = createAct(error.set);
+  const act = createAct((e) => error.set(e));
   const busy = act.busy;
   // The settings as saved now: a save answers with them, and the form keeps the draft over them.
   const base = signal(start);
@@ -232,7 +232,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                       class="font-mono"
                       placeholder={t("web.voice.voice.hex")}
                       value={appId()}
-                      onInput={appId.set}
+                      onInput={(v) => appId.set(v)}
                     />
                   </KeyField>
                 </Cell>

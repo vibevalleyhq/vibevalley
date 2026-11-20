@@ -22,7 +22,6 @@
 | `closedText` | `issues.ts` | What its close says: done with what it delivered, or canceled and why. |
 | `omitUndefined` | `omit.ts` |  |
 | `isOneOf` | `oneOf.ts` |  |
-| `validKey` | `order.ts` |  |
 | `keyBetween` | `order.ts` | A key after a and before b; "" for a is the start, "" for b the end. |
 | `spanText` | `phase.ts` | A short span: seconds under a minute (at least one), else minutes. |
 | `plainText` | `plain.ts` |  |
@@ -82,6 +81,7 @@
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |
 | `faultOf` | `api.ts` | The fault a refusal or connection failure carries. |
 | `newSendKey` | `api.ts` | A client's key for one send: a retry with the same key is the same message, said once. |
+| `sha256Hex` | `api.ts` | Lowercase hex SHA-256 digest of UTF-8 `text`, computed in Rust with WebCrypto fallback for headless tests. |
 | `createRequestKey` | `api.ts` | The request key of one thing the user may send again (a form's create, a button's). a new one after. |
 | `attachmentData` | `attachment.ts` | A file's bytes as attachment.create takes them: base64. |
 | `fileUrl` | `attachmentFile.ts` |  |

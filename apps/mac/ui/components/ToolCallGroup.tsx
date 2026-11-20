@@ -48,7 +48,7 @@ export function ToolCallGroup(props: ToolCallGroupProps) {
     untracked(() => {
       if (now === was) return;
       was = now;
-      announce(now ? "Using tools…" : `${groupLabel(props.calls)}${failed() ? `, ${failed()} failed` : ""}`);
+      announce(now ? "Using tools…" : `${groupLabel(props.calls)}${failed() > 0 ? `, ${failed()} failed` : ""}`);
     });
   });
 
@@ -76,7 +76,7 @@ export function ToolCallGroup(props: ToolCallGroupProps) {
         <View
           onPress={toggle}
           role="button"
-          accessibilityLabel={`${title()}${failed() ? `, ${failed()} failed` : ""}`}
+          accessibilityLabel={`${title()}${failed() > 0 ? `, ${failed()} failed` : ""}`}
           accessibilityState={{ expanded: open() }}
           style={{
             minHeight: 44,

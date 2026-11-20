@@ -50,6 +50,22 @@ bool vv_audio_play(const char *path, double position, char *error, size_t capaci
     return ok;
 }
 
+bool vv_audio_play_data(const unsigned char *bytes, size_t length, char *error, size_t capacity) {
+    __block bool ok = false;
+    dispatch_sync(queue(), ^{ @autoreleasepool {
+        NSData *data = [NSData dataWithBytes:bytes length:length];
+        NSError *problem = nil;
+        AVAudioPlayer *next = [[AVAudioPlayer alloc] initWithData:data error:&problem];
+        if (!next) { failure(error, capacity, problem.localizedDescription); return; }
+        if (![next prepareToPlay]) { failure(error, capacity, @"audio output is unavailable"); return; }
+        stop();
+        if (![next play]) { failure(error, capacity, @"audio playback could not start"); return; }
+        filePlayer = next;
+        ok = true;
+    }});
+    return ok;
+}
+
 bool vv_audio_seek(double position, char *error, size_t capacity) {
     __block bool ok = false;
     dispatch_sync(queue(), ^{ @autoreleasepool {

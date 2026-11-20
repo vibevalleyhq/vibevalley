@@ -193,6 +193,7 @@ const HtmlAnchor = z.object({
 export const ArtifactHtmlEdit = z.object({
   id: ArtifactId,
   version: z.number(),
+  path: z.exactOptional(z.string()),
   anchor: HtmlAnchor,
   text: z.string(),
 }) satisfies Codec<T.ArtifactHtmlEdit>;

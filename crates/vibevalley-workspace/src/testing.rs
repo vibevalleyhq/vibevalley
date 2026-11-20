@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use crate::store::{Project, ProjectId, SavedTerminal, StoreError};
 use serde_json::Value;
-use vibevalley_store::{Project, ProjectId, SavedTerminal, StoreError};
 
 use crate::persist::Persistence;
 use crate::workspace::TerminalHandle;
@@ -20,10 +20,10 @@ pub struct MemStore {
 }
 
 impl Persistence for MemStore {
-    fn projects(&self) -> vibevalley_store::Result<Vec<Project>> {
+    fn projects(&self) -> crate::store::Result<Vec<Project>> {
         Ok(self.projects.lock().unwrap().clone())
     }
-    fn add_project(&self, path: &Path) -> vibevalley_store::Result<Project> {
+    fn add_project(&self, path: &Path) -> crate::store::Result<Project> {
         let mut projects = self.projects.lock().unwrap();
         if let Some(p) = projects.iter().find(|p| p.path == path) {
             return Ok(p.clone());
@@ -39,43 +39,43 @@ impl Persistence for MemStore {
         projects.push(project.clone());
         Ok(project)
     }
-    fn remove_project(&self, id: ProjectId) -> vibevalley_store::Result<()> {
+    fn remove_project(&self, id: ProjectId) -> crate::store::Result<()> {
         self.projects.lock().unwrap().retain(|p| p.id != id);
         Ok(())
     }
-    fn rename_project(&self, id: ProjectId, name: &str) -> vibevalley_store::Result<()> {
+    fn rename_project(&self, id: ProjectId, name: &str) -> crate::store::Result<()> {
         let mut projects = self.projects.lock().unwrap();
         let p = projects.iter_mut().find(|p| p.id == id).ok_or(StoreError::NotFound)?;
         p.name = name.to_string();
         Ok(())
     }
-    fn reorder_projects(&self, ids: &[ProjectId]) -> vibevalley_store::Result<()> {
+    fn reorder_projects(&self, ids: &[ProjectId]) -> crate::store::Result<()> {
         for p in self.projects.lock().unwrap().iter_mut() {
             p.position = ids.iter().position(|i| *i == p.id).unwrap_or(usize::MAX) as i64;
         }
         Ok(())
     }
-    fn touch_project(&self, _id: ProjectId) -> vibevalley_store::Result<()> {
+    fn touch_project(&self, _id: ProjectId) -> crate::store::Result<()> {
         Ok(())
     }
-    fn layout(&self, id: ProjectId) -> vibevalley_store::Result<Option<Value>> {
+    fn layout(&self, id: ProjectId) -> crate::store::Result<Option<Value>> {
         Ok(self.layouts.lock().unwrap().get(&id).cloned())
     }
-    fn set_layout(&self, id: ProjectId, layout: &Value) -> vibevalley_store::Result<()> {
+    fn set_layout(&self, id: ProjectId, layout: &Value) -> crate::store::Result<()> {
         self.layouts.lock().unwrap().insert(id, layout.clone());
         Ok(())
     }
-    fn terminals(&self, id: ProjectId) -> vibevalley_store::Result<Vec<SavedTerminal>> {
+    fn terminals(&self, id: ProjectId) -> crate::store::Result<Vec<SavedTerminal>> {
         Ok(self.terminals.lock().unwrap().get(&id).cloned().unwrap_or_default())
     }
-    fn set_terminals(&self, id: ProjectId, terminals: &[SavedTerminal]) -> vibevalley_store::Result<()> {
+    fn set_terminals(&self, id: ProjectId, terminals: &[SavedTerminal]) -> crate::store::Result<()> {
         self.terminals.lock().unwrap().insert(id, terminals.to_vec());
         Ok(())
     }
-    fn setting(&self, key: &str) -> vibevalley_store::Result<Option<Value>> {
+    fn setting(&self, key: &str) -> crate::store::Result<Option<Value>> {
         Ok(self.settings.lock().unwrap().get(key).cloned())
     }
-    fn set_setting(&self, key: &str, value: &Value) -> vibevalley_store::Result<()> {
+    fn set_setting(&self, key: &str, value: &Value) -> crate::store::Result<()> {
         self.settings.lock().unwrap().insert(key.to_string(), value.clone());
         Ok(())
     }

@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Form.tsx. There is no <form>:
-// `Form` gives its children a `submit` to call (a submit button, Return in
-// a field), and the summary of what is wrong sits under them. Moving the
-// focus to the first wrong field after a refused submit is not ported
-// (nsh has no query over the views); formControl gives what nsh's inputs take.
 import { Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

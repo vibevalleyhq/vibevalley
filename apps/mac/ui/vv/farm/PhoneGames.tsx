@@ -43,47 +43,40 @@ function PadKey(props: { button: PadButton }) {
       press(props.button, down);
     }
   };
+  const label = () => (props.button === "a" || props.button === "b" ? props.button.toUpperCase() : t(`web.farm.phone.key.${props.button}`));
   const side = () => (props.button === "a" || props.button === "b" ? undefined : cross[props.button]);
   return (
     <View
       role="button"
       testID={`pad-${props.button}`}
-      accessibilityLabel={side() ? t(`web.farm.phone.key.${props.button as keyof typeof cross}`) : props.button.toUpperCase()}
+      accessibilityLabel={label()}
       onPressDown={() => toggle(true)}
       onPressUp={() => toggle(false)}
       onMouseLeave={() => toggle(false)}
-      style={
+      class={
         side()
-          ? { position: "absolute", left: side()?.[0], top: side()?.[1], width: 16, height: 16, backgroundColor: held() ? "#1e140b" : "#2f1f13" }
-          : {
-              alignItems: "center",
-              justifyContent: "center",
-              width: 24,
-              height: 24,
-              borderWidth: 2,
-              borderColor: "#2f1f13",
-              backgroundColor: "#c84a3a",
-              top: held() ? 1 : 0,
-            }
+          ? `absolute h-4 w-4 ${held() ? "bg-bark-950" : "bg-bark-900"}`
+          : `h-6 w-6 items-center justify-center border-2 border-bark-900 bg-berry-500 ${held() ? "top-[1px]" : "top-0"}`
       }
+      style={side() ? { left: side()?.[0], top: side()?.[1] } : undefined}
     >
       <If when={!side()}>
-        <Text style={{ fontFamily: "Fusion Pixel 12px Prop zh-Hans", fontSize: 12, color: "#f7e8c4" }}>{props.button.toUpperCase()}</Text>
+        <Text class="font-pixel text-xs text-cream-50">{props.button.toUpperCase()}</Text>
       </If>
     </View>
   );
 }
 export function GamePad() {
   return (
-    <View testID="pad" style={{ marginTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4 }}>
-      <View style={{ width: 48, height: 48, position: "relative" }}>
-        <View style={{ position: "absolute", left: 16, top: 16, width: 16, height: 16, backgroundColor: "#2f1f13" }} />
+    <View testID="pad" class="mt-2 flex-row items-center justify-between px-1">
+      <View class="relative h-12 w-12">
+        <View class="absolute top-4 left-4 h-4 w-4 bg-bark-900" />
         <PadKey button="up" />
         <PadKey button="down" />
         <PadKey button="left" />
         <PadKey button="right" />
       </View>
-      <View style={{ flexDirection: "row", gap: 8 }}>
+      <View class="flex-row gap-2">
         <PadKey button="b" />
         <PadKey button="a" />
       </View>

@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/app/Root.tsx: the router, the state
-// frames, the atoms' registry and the query cache around every page. The
-// opening cover (infra/opening.ts) is the app's to lift: nothing to reveal.
 import { cleanup, type JSX } from "nsh";
 
 import { createFrames, frames, FramesContext } from "../infra/frame";

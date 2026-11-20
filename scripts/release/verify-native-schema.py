@@ -131,7 +131,7 @@ def generation_gate(config, sqlc, root):
     version = subprocess.check_output([sqlc, "version"], cwd=root, text=True).strip().removeprefix("v")
     assert ci_versions == [version], (ci_versions, version)
     subprocess.run([sqlc, "diff"], cwd=root, check=True)
-    sample = next(s for s in config["sql"] if s["queries"].startswith("crates/vibevalley-store/"))
+    sample = next(s for s in config["sql"] if s["queries"].startswith("crates/vibevalley-workspace/"))
     with tempfile.TemporaryDirectory(prefix="sqlc-stale-") as tmp:
         folder = Path(tmp)
         shutil.copytree(root / sample["schema"], folder / "schema")
@@ -183,7 +183,7 @@ def audit(live, sqlc, root, go_repo):
     expected = {scope: sqlite3.connect(":memory:") for scope in ("host", "home")}
     for spec in config["sql"]:
         assert spec["engine"] == "sqlite"
-        scope = "host" if spec["queries"].startswith("crates/vibevalley-store/") else "home"
+        scope = "host" if spec["queries"].startswith("crates/vibevalley-workspace/") else "home"
         q = source_files(spec["queries"], root)
         queries[spec["codegen"][0]["out"]] = sum(len(re.findall(r"^-- name: ", p.read_text(), re.M)) for p in q)
         for path in source_files(spec["schema"], root):

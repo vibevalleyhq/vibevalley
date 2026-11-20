@@ -16,7 +16,7 @@ impl Storage {
     }
 
     fn from_override(path: Option<PathBuf>) -> Self {
-        let database = path.unwrap_or_else(vibevalley_store::Store::default_path);
+        let database = path.unwrap_or_else(vibevalley_workspace::Store::default_path);
         let views = if database.file_name() == Some(std::ffi::OsStr::new("state.db")) {
             database.with_file_name("nsh")
         } else {
@@ -51,31 +51,146 @@ pub fn notify(title: &str, body: &str) -> Result<(), String> {
     }
 }
 
-/// The largest base64 sound `play_audio_data` takes (2 MB).
-pub const MAX_SOUND_BASE64: usize = 2 << 20;
 /// The largest file `read_file` hands a view.
 const MAX_READ: u64 = 50 << 20;
+/// Maximum byte count `random_bytes_hex` yields in a single call.
+const MAX_RANDOM_BYTES: usize = 4096;
 
-/// Plays a sound given as base64 (a WAV the view synthesised): written to a
-/// file of its own in the temp dir, then played as a file.
-pub fn play_audio_data(data: &str, kind: &str) -> Result<(), String> {
-    use base64::Engine as _;
-    let bytes = base64::engine::general_purpose::STANDARD.decode(data.trim()).map_err(|e| e.to_string())?;
-    let ext = match kind {
-        "audio/mpeg" | "audio/mp3" => "mp3",
-        "audio/aac" | "audio/mp4" | "audio/x-m4a" => "m4a",
-        "audio/aiff" | "audio/x-aiff" => "aiff",
-        _ => "wav",
-    };
-    let dir = std::env::temp_dir().join("vibevalley-sounds");
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let mut hasher = std::hash::DefaultHasher::new();
-    std::hash::Hash::hash(&bytes, &mut hasher);
-    let path = dir.join(format!("{:016x}.{ext}", std::hash::Hasher::finish(&hasher)));
-    if !path.is_file() {
-        std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SpriteManifestEntry {
+    pub w: f64,
+    pub h: f64,
+    pub ax: f64,
+    pub ay: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hx: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hy: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rail_size: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub yard: Option<Vec<f64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sheet: Option<String>,
+}
+
+pub type PixelManifest = std::collections::BTreeMap<String, SpriteManifestEntry>;
+
+fn load_pixel_manifest(path: &Path) -> Result<PixelManifest, String> {
+    let raw = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    serde_json::from_str(&raw).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Reads and caches `assets/pixel/sprites.json` once per process so the UI bundle
+/// does not inline the 105 KB manifest.
+pub fn pixel_manifest() -> Result<&'static PixelManifest, String> {
+    static CACHED: std::sync::OnceLock<PixelManifest> = std::sync::OnceLock::new();
+    if let Some(manifest) = CACHED.get() {
+        return Ok(manifest);
     }
-    play_audio(&path)
+    let path = crate::pixel::assets_dir().join("pixel/sprites.json");
+    let parsed = load_pixel_manifest(&path)?;
+    Ok(CACHED.get_or_init(|| parsed))
+}
+
+fn encode_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for &b in bytes {
+        out.push(HEX[(b >> 4) as usize] as char);
+        out.push(HEX[(b & 0x0f) as usize] as char);
+    }
+    out
+}
+
+/// Lowercase hex SHA-256 digest of UTF-8 `text`.
+pub fn sha256_hex(text: &str) -> String {
+    use sha2::{Digest as _, Sha256};
+    let digest = Sha256::digest(text.as_bytes());
+    encode_hex(&digest)
+}
+
+/// Generates `length` uniformly random bytes using OS CSPRNG entropy via `uuid::Uuid::new_v4`
+/// whitened with SHA-256, returned as lowercase hex.
+pub fn random_bytes_hex(length: usize) -> Result<String, String> {
+    use sha2::{Digest as _, Sha256};
+    if length == 0 || length > MAX_RANDOM_BYTES {
+        return Err(format!("randomBytes length must be between 1 and {MAX_RANDOM_BYTES}"));
+    }
+    let mut bytes = Vec::with_capacity(length);
+    while bytes.len() < length {
+        let mut hasher = Sha256::new();
+        // Three v4 UUIDs carry 366 bits of OS CSPRNG entropy, whitening out the fixed version/variant bits.
+        for _ in 0..3 {
+            hasher.update(uuid::Uuid::new_v4().as_bytes());
+        }
+        let block = hasher.finalize();
+        let take = (length - bytes.len()).min(block.len());
+        bytes.extend_from_slice(&block[..take]);
+    }
+    Ok(encode_hex(&bytes))
+}
+
+/// 256-bit OS CSPRNG seed (64 lowercase hex chars) injected into each hosted view's `host.params`.
+pub fn random_seed_hex() -> String {
+    random_bytes_hex(32).expect("32 is within MAX_RANDOM_BYTES")
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Sha256Request {
+    text: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RandomBytesRequest {
+    length: usize,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QrRequest {
+    text: String,
+    #[serde(default = "default_qr_border")]
+    border: usize,
+}
+
+fn default_qr_border() -> usize {
+    2
+}
+
+/// Handles fast, stateless host ops (`host.sha256`, `host.randomBytes`, `host.qr`,
+/// `host.pixelManifest`) on either the engine thread or the shell fallback path.
+pub fn handle_stateless_op(op: &str, payload: &Value) -> Option<vibevalley_bridge::Envelope> {
+    use serde_json::json;
+    use vibevalley_bridge::{BizCode, Envelope, refusal};
+    match op {
+        "host.sha256" => Some(match serde_json::from_value::<Sha256Request>(payload.clone()) {
+            Ok(req) => Envelope::ok(json!({ "hex": sha256_hex(&req.text) })),
+            Err(e) => refusal(BizCode::InvalidInput, format!("sha256: {e}")),
+        }),
+        "host.randomBytes" => Some(match serde_json::from_value::<RandomBytesRequest>(payload.clone()) {
+            Ok(req) => match random_bytes_hex(req.length) {
+                Ok(hex) => Envelope::ok(json!({ "hex": hex })),
+                Err(e) => refusal(BizCode::InvalidInput, e),
+            },
+            Err(e) => refusal(BizCode::InvalidInput, format!("randomBytes: {e}")),
+        }),
+        "host.qr" => Some(match serde_json::from_value::<QrRequest>(payload.clone()) {
+            Ok(req) => match crate::qr::encode(&req.text, req.border) {
+                Ok(matrix) => Envelope::ok(json!(matrix)),
+                Err(e) => refusal(BizCode::InvalidInput, e),
+            },
+            Err(e) => refusal(BizCode::InvalidInput, format!("qr: {e}")),
+        }),
+        "host.pixelManifest" => Some(match pixel_manifest() {
+            Ok(manifest) => Envelope::ok(json!(manifest)),
+            Err(e) => refusal(BizCode::NotFound, e),
+        }),
+        _ => None,
+    }
 }
 
 /// A regular file's bytes as base64, with its name and a type guessed from
@@ -153,10 +268,6 @@ pub fn copy_file(source: &Path, target: &Path) -> Result<(), String> {
     }
     std::fs::copy(source, target).map_err(|e| e.to_string())?;
     Ok(())
-}
-
-pub fn play_audio(path: &Path) -> Result<(), String> {
-    crate::audio::play(path, 0.0)
 }
 
 /// Opens `path` in its default app.
@@ -266,5 +377,29 @@ mod tests {
         );
         assert!(read_file(dir.path()).is_err());
         assert!(read_file(&dir.path().join("nope")).is_err());
+    }
+
+    #[test]
+    fn sha256_and_random_bytes_and_stateless_host_ops() {
+        assert_eq!(sha256_hex("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        let a = random_bytes_hex(16).unwrap();
+        let b = random_bytes_hex(16).unwrap();
+        assert_eq!(a.len(), 32);
+        assert_ne!(a, b);
+        assert_eq!(random_seed_hex().len(), 64);
+        assert!(random_bytes_hex(0).is_err());
+        assert!(random_bytes_hex(MAX_RANDOM_BYTES + 1).is_err());
+
+        let sha_env = handle_stateless_op("host.sha256", &serde_json::json!({ "text": "abc" })).unwrap();
+        assert_eq!(sha_env.biz_code, 0);
+        assert_eq!(sha_env.data.unwrap()["hex"], "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+
+        let qr_env = handle_stateless_op("host.qr", &serde_json::json!({ "text": "hello", "border": 2 })).unwrap();
+        assert_eq!(qr_env.biz_code, 0);
+        assert_eq!(qr_env.data.unwrap()["size"], 25);
+
+        let manifest = pixel_manifest().unwrap();
+        assert!(manifest.len() > 700);
+        assert!(manifest.contains_key("bear-farmer-down"));
     }
 }

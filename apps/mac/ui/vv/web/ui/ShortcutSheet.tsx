@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/ShortcutSheet.tsx: every shortcut,
-// by where it works, drawn from base/shortcuts.ts; `?` outside a text field
-// opens it.
 import { keymap, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

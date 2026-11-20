@@ -40,7 +40,7 @@
 - **自带的技能只读，按 id 引用**：技能列表先列自带的（`builtIn: true`），再列用户自己写的；`skill.update`、`skill.delete` 碰到自带的一律拒绝，新建技能不占它们的 id。档案只存技能的 id，所以 VibeValley 一更新，勾了它的档案都拿到新版本。模板在 `agent.json` 的 `skills` 里写自带技能的 id，安装时勾上；按模板更新时再勾上，用户另勾的留着。任何档案都能勾自带的技能。
 - **从模板按需安装与更新**：新农场默认只装 `orchestrator` 及 `agent.starters` 指定的模板；`agent.template.update` 仅覆盖 `duty`、`tags`、人设和 `worktree`，保留用户改过的名称、外观、农机与模型。
 - **外观确定性补齐**：缺省外观按档案 `id` 哈希取模补齐，前后端算法一致。
-- **农机列表**：线上沿用 TS 版的农机 id（`claude`、`codex`、`opencode`、`vibevalley`…）；Rust 的 oar 只驱动 Claude Code、Codex、ACP（opencode 注册为 `acp:opencode`）、`vibevalley` 与测试用的 `scripted`，没有驱动的农机显示为没装。
+- **农机列表**：`vibevalley-oar` 默认注册 `claude`、`codex`、ACP 农机（`acp:gemini`、`grok`、`kimi`、`codebuddy`、`opencode`）、SDK 农机（`qwen`、`qoder`）、自研 `vibevalley` 与测试用 `scripted`；`pi` 仅在 `VIBEVALLEY_TEST_RUNTIMES=1` 沙箱下作为替身注册，`cursor` 与未注册驱动的农机显示为不支持。各驱动协议与用量归约见[帮工](docs/subsystems/session.md#一次农机执行怎样复核)。
 - **预检与开会话共用同一套规则**：合并农机默认设置与档案覆盖后，统一检查农机安装、额度预算与选项兼容性；预检与派活调同一函数，唤醒已有 `Session` 时不重复检查启停与派活预算。
 - **探测代数防倒退**：完整探测分配递增序号，慢返回的旧探测不覆盖新缓存；探测结果经 `/api/v1/live` 的 `Runtime` 窄事件推送，不进 `SpaceState`。
 
@@ -94,7 +94,7 @@
 
 ## 还没做的
 
-- 启用并验证 opencode、grok、kimi、antigravity、cursor：[其他农机提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
+- `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证（计费、配额、插话、取消与跨版本恢复）：[持久执行与驱动验收](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
 - 档案配置 `toolsets`，技能库改用 Agent Skills 文件夹按需加载：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
 
 ## 怎么验证

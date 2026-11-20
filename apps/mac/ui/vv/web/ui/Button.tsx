@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Button.tsx: the same tones and
-// sizes. nsh's text styles do not come down from a View, so the words are
-// a Text of their own in the tone's ink.
 import { Text, View, type JSX } from "nsh";
 
 import { Icon } from "./Icon";
@@ -23,7 +20,7 @@ const inkClass: Record<Ink, string> = { ink: "text-ink", page: "text-page", berr
 export function Words(props: { children?: JSX.Element; ink?: Ink; class?: string }) {
   return (
     <If when={typeof props.children === "string" || typeof props.children === "number"} else={props.children}>
-      <Text class={`truncate ${props.class ?? "text-sm"} ${inkClass[props.ink ?? "ink"]}`}>{props.children as string}</Text>
+      <Text class={`truncate ${props.class ?? "text-sm"} ${inkClass[props.ink ?? "ink"]}`}>{props.children}</Text>
     </If>
   );
 }

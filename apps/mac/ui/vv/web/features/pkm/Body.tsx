@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/pkm/Body.tsx: a block's words
-// with its links, tags, remarks and read-out ((refs)) as spans of one Text.
-// A link's press does not reach the block under it (nsh gives the press to
-// the innermost pressable). The remark's note is its tooltip.
 import { Text } from "nsh";
 
 import { t } from "@vibevalley/i18n";

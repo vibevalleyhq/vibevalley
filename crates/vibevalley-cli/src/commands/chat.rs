@@ -2,20 +2,30 @@
 //! assistant in a channel (`--orchestrator`).
 
 use std::io::{BufRead, IsTerminal, Write};
+#[cfg(feature = "local-chat")]
 use std::path::PathBuf;
+#[cfg(feature = "local-chat")]
 use std::sync::Arc;
 use std::time::Duration;
 
 use clap::{ArgMatches, Command};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "local-chat")]
 use vibevalley_i18n::t;
+#[cfg(feature = "local-chat")]
 use vibevalley_oar::{
     AgentError, ContentBlock, Event, EventKind, Installation, PermissionDecision, PermissionMode, Session as OarSession, SessionOptions, StopReason, Usage,
 };
+#[cfg(not(feature = "local-chat"))]
+use vibevalley_protocol::Next;
 use vibevalley_protocol::{Actor, AgentRole, ChannelMessageListInput, ChatMessage, PhaseView, SayRequest, ops};
 
-use crate::farm::{Ctx, Done, Failure, Format, decode_failure, exit, no_dry_run};
-use crate::tree::{arg, cmd, flag, get, int, joined, maybe_words, number, on, text};
+#[cfg(feature = "local-chat")]
+use crate::farm::Format;
+use crate::farm::{Ctx, Done, Failure, decode_failure, exit, no_dry_run};
+#[cfg(feature = "local-chat")]
+use crate::tree::get;
+use crate::tree::{arg, cmd, flag, int, joined, maybe_words, number, on, text};
 
 pub fn command() -> Command {
     cmd(
@@ -40,6 +50,7 @@ pub fn command() -> Command {
     ])
 }
 
+#[cfg(feature = "local-chat")]
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct LocalReply {
@@ -73,6 +84,7 @@ pub fn run(ctx: &Ctx, m: &ArgMatches) -> Done {
     run_local(ctx, m, prompt)
 }
 
+#[cfg(feature = "local-chat")]
 fn map_oar_error(e: AgentError) -> Failure {
     match e {
         AgentError::UnknownRuntime(_) | AgentError::Unsupported { .. } => Failure::usage("InvalidValue", e.to_string()),
@@ -81,6 +93,21 @@ fn map_oar_error(e: AgentError) -> Failure {
     }
 }
 
+#[cfg(not(feature = "local-chat"))]
+fn run_local(_ctx: &Ctx, _m: &ArgMatches, _initial: String) -> Done {
+    let mut f = Failure::new(
+        exit::REFUSED,
+        "Unsupported",
+        "local chat requires building vibevalley-cli with `--features local-chat` (or pass `--orchestrator` to talk through the running server)",
+    );
+    f.next = vec![Next {
+        say: "Talk to the server's orchestrator over HTTP".into(),
+        run: Some(vec!["chat".into(), "--orchestrator".into()]),
+    }];
+    Err(f)
+}
+
+#[cfg(feature = "local-chat")]
 fn run_local(ctx: &Ctx, m: &ArgMatches, initial: String) -> Done {
     let runtime_id = arg(m, "runtime");
     let registry = vibevalley_oar::default_runtimes();
@@ -119,6 +146,7 @@ fn run_local(ctx: &Ctx, m: &ArgMatches, initial: String) -> Done {
     res
 }
 
+#[cfg(feature = "local-chat")]
 fn local_turn(ctx: &Ctx, session: &Arc<dyn OarSession>, events: &mut dyn Iterator<Item = Event>, prompt: &str, plan: bool, stream: bool) -> Done {
     session.prompt(vec![ContentBlock::Text(prompt.to_string())]).map_err(map_oar_error)?;
     let mut text = String::new();

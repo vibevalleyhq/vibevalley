@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/ToastHost.tsx: the toasts
-// (ui/toasts.ts, VibeValley's own) at the bottom of the page.
 import { Overlay, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

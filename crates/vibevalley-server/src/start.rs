@@ -291,7 +291,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     } else if config.offline_media {
         crate::offline::network()
     } else {
-        (Arc::new(modules::media::vendor::Ureq), Arc::new(modules::media::vendor::Ureq))
+        (Arc::new(modules::media::vendor::Http), Arc::new(modules::media::vendor::Http))
     };
     modules::provider::install(&hub, Arc::new(modules::provider::Provider::new(setting.clone(), vendor.clone())));
     let voice_fetch = vendor.clone();

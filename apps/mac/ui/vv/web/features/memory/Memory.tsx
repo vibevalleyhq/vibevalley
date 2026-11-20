@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/memory/Memory.tsx: a helper's
-// memory (what it did, the next recall, notes by repo) and the
-// orchestrator's notes. group-hover is a hover signal per item; the repo
-// box's <datalist> is a row of the repos to pick from.
 import { signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -255,7 +251,7 @@ function RecallPreview(props: { agent: string }) {
           placeholder={t("web.memory.memory.pick")}
           value={where()}
           options={repos().map((p) => ({ value: p, label: p }))}
-          onChange={repo.set}
+          onChange={(v) => repo.set(v)}
         />
         <TextInput
           testID="recall-words"
@@ -263,7 +259,7 @@ function RecallPreview(props: { agent: string }) {
           accessibilityLabel={t("web.memory.memory.words")}
           placeholder={t("web.memory.memory.wordsHint")}
           value={text()}
-          onInput={text.set}
+          onInput={(v) => text.set(v)}
         />
       </View>
       <If when={lines().length > 0} else={<Quiet>{where() ? t("web.memory.memory.blank") : t("web.memory.memory.noRepos")}</Quiet>}>
@@ -313,7 +309,7 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
   const error = signal<string | undefined>(undefined);
   const reposQuery = useRepos();
   // A refusal shows under the box, where the words are; the key stays until a note went in, so a retry is that note.
-  const act = createAct(error.set);
+  const act = createAct((e) => error.set(e));
   const key = createRequestKey();
   const write = async () => {
     const agent = props.agent;
@@ -344,7 +340,7 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
         rows={2}
         placeholder={props.withRepo === true ? t("web.memory.memory.noteRepo") : t("web.memory.memory.noteOrchestrator")}
         value={text()}
-        onInput={text.set}
+        onInput={(v) => text.set(v)}
       />
       <View class="flex-row items-center gap-2 pt-1">
         <If when={props.withRepo} else={<View class="flex-1" />}>
@@ -355,7 +351,7 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
             accessibilityLabel={t("web.memory.memory.repo")}
             placeholder={t("web.memory.memory.repoHint")}
             value={repo()}
-            onInput={repo.set}
+            onInput={(v) => repo.set(v)}
           />
         </If>
         <Button tone="primary" testID="note-write" disabled={!text().trim() || act.busy()} onPress={() => void write()}>

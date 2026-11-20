@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/Marks.tsx: the
-// SVG marks are drawn on nsh Canvas (no SVG in nsh) with the same
-// geometry; colors are the theme tokens the CSS variables named. Faces are
-// ui/domain/Face's (an initial until the pixel sprites are drawn here).
 import { Canvas, Path2D, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -117,7 +113,7 @@ export function ProgressMark(props: { done: number; total: number }) {
   return (
     <View class="flex-row items-center gap-1">
       <Canvas
-        style={{ width: 13, height: 13 }}
+        class="h-[13px] w-[13px]"
         draw={(cx) => {
           cx.lineWidth = 2;
           cx.strokeStyle = tone("line");
@@ -171,9 +167,7 @@ export function NoFaceMark(props: { size?: number }) {
 export function FlagChip(props: { text: string; tone: Tone }) {
   return (
     <View class="rounded-sm px-1.5" style={{ backgroundColor: mix(props.tone, 0.18) }}>
-      <Text class="text-2xs font-medium text-ink" style={{ lineHeight: 16, numberOfLines: 1 }}>
-        {props.text}
-      </Text>
+      <Text class="line-clamp-1 text-2xs leading-4 font-medium text-ink">{props.text}</Text>
     </View>
   );
 }

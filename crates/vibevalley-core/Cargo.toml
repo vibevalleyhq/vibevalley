@@ -9,8 +9,7 @@ description = "VibeValley's projection and rules on its wire types: reduce, fram
 vibevalley-cron = { version = "0.1.0", path = "../vibevalley-cron" }
 vibevalley-i18n = { version = "0.1.0", path = "../vibevalley-i18n" }
 vibevalley-protocol = { version = "0.1.0", path = "../vibevalley-protocol" }
-jiff = "1.0.1"
-regex = "1.13.1"
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
-thiserror = "2.0.21"
+jiff = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

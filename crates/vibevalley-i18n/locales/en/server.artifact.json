@@ -44,7 +44,6 @@
     "noBlock": "There is no block {id}",
     "noId": "The new block has no id",
     "taken": "Block {id} already exists",
-    "unknownType": "Unknown block type {type}",
     "badKey": "Not a valid order key: {key}",
     "missing": "There is no such block",
     "noText": "This block has no text",

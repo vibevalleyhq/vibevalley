@@ -19,10 +19,10 @@ import { SpriteIcon } from "../web/ui/pixel/icons";
 
 const close = () => host.post("action", { type: "dismiss_farm_form" });
 const route = (path: string) => host.post("action", { type: "global_route", path });
-const pixelFont = "Fusion Pixel 12px Prop zh-Hans";
 
-function Words(props: { children: JSX.Element; size?: number }) {
-  return <Text style={{ fontFamily: pixelFont, fontSize: props.size ?? 13, color: "#46301d" }}>{props.children}</Text>;
+function Words(props: { children: JSX.Element; size?: 16 | 18 }) {
+  const sizeClass = props.size === 18 ? "text-[18px]" : props.size === 16 ? "text-lg" : "text-sm";
+  return <Text class={`font-pixel text-bark-800 ${sizeClass}`}>{props.children}</Text>;
 }
 
 function Key(props: { title: string; primary?: boolean; disabled?: boolean; id?: string; onPress: () => void }) {
@@ -33,14 +33,7 @@ function Key(props: { title: string; primary?: boolean; disabled?: boolean; id?:
       testID={props.id}
       disabled={props.disabled}
       onPress={props.onPress}
-      style={{
-        backgroundColor: props.primary ? "#b4cb7c" : "#eedcb2",
-        borderWidth: 2,
-        borderColor: "#67482d",
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        opacity: props.disabled ? 0.5 : 1,
-      }}
+      class={`border-2 border-bark-600 px-2 py-1 ${props.primary === true ? "bg-leaf-300" : "bg-cream-100"} ${props.disabled === true ? "opacity-50" : ""}`}
     >
       <Words>{props.title}</Words>
     </View>
@@ -48,13 +41,13 @@ function Key(props: { title: string; primary?: boolean; disabled?: boolean; id?:
 }
 
 function Buttons(props: { children: JSX.Element }) {
-  return <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "center" }}>{props.children}</View>;
+  return <View class="flex-row flex-wrap items-center gap-1.5">{props.children}</View>;
 }
 
 function Shell(props: { title: string; icon: string; children: JSX.Element }) {
   return (
-    <View class="flex-1" style={{ backgroundColor: "#f7e8c4", borderWidth: 2, borderColor: "#2f1f13", padding: 16, gap: 12 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+    <View class="flex-1 gap-3 border-2 border-bark-900 bg-cream-50 p-4">
+      <View class="flex-row items-center gap-[7px]">
         <SpriteIcon name={props.icon} size={24} />
         <View class="flex-1">
           <Words size={18}>{props.title}</Words>
@@ -63,7 +56,7 @@ function Shell(props: { title: string; icon: string; children: JSX.Element }) {
           <SpriteIcon name="button-close" size={18} />
         </View>
       </View>
-      <Scroll style={{ flex: 1 }} contentStyle={{ gap: 8, paddingBottom: 8 }}>
+      <Scroll class="flex-1" contentClass="gap-2 pb-2">
         {props.children}
       </Scroll>
     </View>
@@ -71,7 +64,7 @@ function Shell(props: { title: string; icon: string; children: JSX.Element }) {
 }
 
 function Sow() {
-  const repo = String(host.params.repo ?? "");
+  const repo = typeof host.params.repo === "string" ? host.params.repo : "";
   const station = Number(host.params.station);
   const agents = useWorkAgents(true);
   const repos = useRepos();
@@ -135,7 +128,7 @@ function Sow() {
         else={
           <>
             <Words>{t("web.farm.sow.homeless")}</Words>
-            <Words>{ready(repos, []).length ? t("web.farm.sow.toMap") : t("web.farm.sow.noRepos")}</Words>
+            <Words>{ready(repos, []).length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noRepos")}</Words>
             <If when={ready(repos, []).length > 0} else={<Key title={t("web.farm.sow.makeRepo")} onPress={() => route("/repos")} />}>
               <Key title={t("web.farm.native.map")} onPress={() => route("/map")} />
             </If>
@@ -152,15 +145,15 @@ function Sow() {
                   <Each of={bag().recent}>{(text) => <Key title={text()} onPress={() => words.set(text())} />}</Each>
                 </Buttons>
               </If>
-              <If when={bag().kinds.some((k) => k.templates.length)}>
+              <If when={bag().kinds.some((k) => k.templates.length > 0)}>
                 <Words>{t("web.farm.sow.kinds")}</Words>
                 <Buttons>
-                  <Each of={bag().kinds.filter((k) => k.templates.length)}>
+                  <Each of={bag().kinds.filter((k) => k.templates.length > 0)}>
                     {(k) => <Key title={k().name} primary={kind() === k().id} onPress={() => kind.set(k().id)} />}
                   </Each>
                 </Buttons>
                 <Buttons>
-                  <Each of={(bag().kinds.find((k) => k.id === kind()) ?? bag().kinds.find((k) => k.templates.length))?.templates ?? []}>
+                  <Each of={(bag().kinds.find((k) => k.id === kind()) ?? bag().kinds.find((k) => k.templates.length > 0))?.templates ?? []}>
                     {(seed) => <Key title={seed().title} onPress={() => words.set(seed().text)} />}
                   </Each>
                 </Buttons>
@@ -169,7 +162,7 @@ function Sow() {
           )}
         </If>
         <Words>{t("web.farm.sow.own")}</Words>
-        <TextArea value={words()} onInput={words.set} placeholder={t("web.farm.sow.jobHint")} rows={3} testID="sow-text" />
+        <TextArea value={words()} onInput={(v) => words.set(v)} placeholder={t("web.farm.sow.jobHint")} rows={3} testID="sow-text" />
         <Words>{t("web.farm.sow.who")}</Words>
         <Buttons>
           <Key title={t("web.farm.sow.orchestratorPicks")} primary={!who()} onPress={() => who.set("")} />
@@ -261,7 +254,7 @@ function Work(props: { kind: string; issue: () => Issue }) {
             </>
           )}
         </Each>
-        <TextArea testID="plot-answer-words" value={words()} onInput={words.set} placeholder={t("web.issue.detail.sayIt")} />
+        <TextArea testID="plot-answer-words" value={words()} onInput={(v) => words.set(v)} placeholder={t("web.issue.detail.sayIt")} />
         <Key id="plot-answer" primary title={t("web.issue.detail.answer")} disabled={busy() || !words().trim()} onPress={() => void submit("answer")} />
       </If>
       <If when={props.kind === "water"}>
@@ -272,7 +265,7 @@ function Work(props: { kind: string; issue: () => Issue }) {
             {(i) => <Key title={t(`web.farm.water.drops.${i()}`)} onPress={() => words.set(t(`web.farm.water.drops.${i()}`))} />}
           </Each>
         </Buttons>
-        <TextArea testID="water-words" value={words()} onInput={words.set} placeholder={t("web.farm.water.hint")} />
+        <TextArea testID="water-words" value={words()} onInput={(v) => words.set(v)} placeholder={t("web.farm.water.hint")} />
         <Key
           id="water-send"
           primary
@@ -310,7 +303,9 @@ function Work(props: { kind: string; issue: () => Issue }) {
                 <Key
                   id="harvest-take"
                   primary
-                  title={change().commits.length || change().files.length ? t("web.farm.harvest.take", { base: change().base }) : t("web.farm.harvest.letGo")}
+                  title={
+                    change().commits.length > 0 || change().files.length > 0 ? t("web.farm.harvest.take", { base: change().base }) : t("web.farm.harvest.letGo")
+                  }
                   disabled={busy()}
                   onPress={() => void submit("complete", "", change())}
                 />
@@ -332,7 +327,8 @@ function Work(props: { kind: string; issue: () => Issue }) {
 function Content() {
   const core = useCore();
   const issue = () => core()?.issues.find((i) => i.id === host.params.issue);
-  if (host.params.kind === "sow") return <Sow />;
+  const kind = typeof host.params.kind === "string" ? host.params.kind : "";
+  if (kind === "sow") return <Sow />;
   return (
     <If
       when={issue()}
@@ -342,7 +338,7 @@ function Content() {
         </Shell>
       }
     >
-      {(item) => <Work kind={String(host.params.kind)} issue={item} />}
+      {(item) => <Work kind={kind} issue={item} />}
     </If>
   );
 }

@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/domain/PoseSprite.tsx: a helper in
-// a pose, `height` tall, walking through its frames. Not ported: each pose's
-// CSS keyframes (style.css pose-*: a bob, a lean); nsh has no custom
-// keyframes from TSX, so the other poses stand still.
 import { Image, signal, View } from "nsh";
 
 import { createEffect } from "../../../solid";

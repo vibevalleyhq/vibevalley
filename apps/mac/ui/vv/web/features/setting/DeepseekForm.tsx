@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/setting/DeepseekForm.tsx: the
-// same form (infra/form) over the key; the save bar submits it through the
-// Form's submit rather than a DOM form's requestSubmit.
 import { signal, untracked, View } from "nsh";
 import { z } from "zod";
 

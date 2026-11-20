@@ -156,7 +156,7 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
   let day = "";
   return messages.map((m, i) => {
     const label = dayLabel(m.at, now);
-    const before = messages[i - 1];
+    const before = i > 0 ? messages[i - 1] : undefined;
     const thread = threads.get(m.id);
     const item: FeedItem = {
       message: m,

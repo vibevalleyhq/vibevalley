@@ -1,19 +1,9 @@
 import { Canvas, Text, View, type CanvasRenderingContext2D, type JSX, type ViewStyle } from "nsh";
 
-import { lcd } from "./lcd";
-
 export function Words(props: { children: JSX.Element; align?: "center" | "right"; dim?: boolean; style?: ViewStyle }) {
+  const alignClass = props.align === "center" ? "text-center" : props.align === "right" ? "text-right" : "";
   return (
-    <Text
-      style={{
-        fontFamily: "Fusion Pixel 12px Prop zh-Hans",
-        fontSize: 12,
-        lineHeight: 18,
-        color: props.dim ? lcd.dark : lcd.ink,
-        textAlign: props.align,
-        ...props.style,
-      }}
-    >
+    <Text class={`font-pixel text-xs leading-[18px] ${props.dim === true ? "text-lcd-dark" : "text-lcd-ink"} ${alignClass}`} style={props.style}>
       {props.children}
     </Text>
   );
@@ -29,8 +19,8 @@ export function Board(props: {
 }) {
   const zoom = () => props.zoom ?? 1;
   return (
-    <View style={{ position: "relative", width: props.width * zoom(), height: props.height * zoom(), flexShrink: 0 }}>
-      <View style={{ position: "absolute", left: -2, top: -2, right: -2, bottom: -2, borderWidth: 2, borderColor: lcd.ink, pointerEvents: "none" }} />
+    <View class="relative shrink-0" style={{ width: props.width * zoom(), height: props.height * zoom() }}>
+      <View class="pointer-events-none absolute -inset-0.5 border-2 border-lcd-ink" />
       <Canvas
         testID={props.id}
         accessible
@@ -48,20 +38,8 @@ export function Board(props: {
 }
 export function Cover(props: { lines: string[]; solid?: boolean }) {
   return (
-    <View
-      style={{
-        pointerEvents: "none",
-        position: "absolute",
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: props.solid ? "transparent" : "#c9dc9acc",
-      }}
-    >
-      <View style={{ backgroundColor: props.solid ? lcd.paper : "transparent", paddingHorizontal: 4 }}>
+    <View class={`pointer-events-none absolute inset-0 items-center justify-center ${props.solid === true ? "bg-transparent" : "bg-lcd-panel"}`}>
+      <View class={`px-1 ${props.solid === true ? "bg-lcd-paper" : "bg-transparent"}`}>
         <Words align="center">{props.lines.join("\n")}</Words>
       </View>
     </View>
@@ -69,7 +47,7 @@ export function Cover(props: { lines: string[]; solid?: boolean }) {
 }
 export function Stats(props: { label: string; value: number | string }) {
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", width: "100%" }}>
+    <View class="w-full flex-row justify-between">
       <Words>{props.label}</Words>
       <Words>{props.value}</Words>
     </View>
@@ -77,7 +55,7 @@ export function Stats(props: { label: string; value: number | string }) {
 }
 export function Help(props: { lines: string[] }) {
   return (
-    <View style={{ flex: 1, justifyContent: "flex-end", marginBottom: 5 }}>
+    <View class="mb-[5px] flex-1 justify-end">
       <Words dim align="center">
         {props.lines.join("\n")}
       </Words>

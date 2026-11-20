@@ -1,17 +1,6 @@
-// Ported from VibeValley apps/web/src/features/channel/views/Composer.tsx:
-// the same box (composing.ts's createComposer), names and commands menu,
-// reply and quoted-block bars, pending files and uploads. The textarea is
-// nsh/base's multiline Input: Return reaches the composer as onSubmit,
-// Shift+Return breaks the line; the menu's keys (arrows, Tab, Escape), ↑ to
-// edit the last message and Escape to let go of a reply are keymap bindings
-// held while the box has the focus. Full-width marks typed by an input
-// method (＠, 、) become @ and / as there (typedMarks), read from the text.
-// The attach button opens the system's panel (nsh Picker.pickFiles, files
-// with their bytes). Files dropped on the pane come as file: URLs; the
-// host reads them (host.readFile) and they upload as picked ones do. Not
-// here: dictation (features/voice, phase 4).
 import { computed, effect, keymap, Picker, signal, Text, untracked, View, type JSX } from "nsh";
 import { Input, Progress } from "nsh/base";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { userId } from "@vibevalley/protocol";
@@ -369,7 +358,7 @@ export function Composer(props: {
           <BoxButton icon="attach" testid="attach" label={t("web.channel.composer.attach")} onPress={() => void pick()} disabled={!props.channel} />
           <EmojiPopover
             open={emoji()}
-            onOpenChange={emoji.set}
+            onOpenChange={(v) => emoji.set(v)}
             label={t("web.channel.emoji.open")}
             testid="emoji"
             onPick={(e) => {
@@ -437,6 +426,8 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
   );
 }
 
+const ReadFileData = z.object({ data: z.string(), type: z.string(), name: z.string() });
+
 /** Dropped files' bytes, read by the host, uploaded in turn. */
 async function dropped(channel: string, uris: readonly string[]) {
   const files: File[] = [];
@@ -446,7 +437,7 @@ async function dropped(channel: string, uris: readonly string[]) {
       uploadFailed(read.message);
       continue;
     }
-    const { data, type, name } = read.data as { data: string; type: string; name: string };
+    const { data, type, name } = ReadFileData.parse(read.data);
     files.push(new File([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))], name, { type }));
   }
   if (files.length > 0) await attachFiles(channel, files, uploadFailed);

@@ -18,7 +18,8 @@ export function usePad(listen: Listener) {
   }
   cleanup(
     host.on("farm-key-up", (key) => {
-      const button = keys[String(key)];
+      if (typeof key !== "string") return;
+      const button = keys[key];
       if (button) listen(button, false);
     }),
   );

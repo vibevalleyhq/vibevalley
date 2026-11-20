@@ -73,13 +73,7 @@ export function SubagentProgress(props: { session: string; progress: SubagentSum
                   ago: ago(thread().updatedAt, props.now),
                 })}
               </Text>
-              <If when={lastActivity(thread())}>
-                {(activity) => (
-                  <Text class="text-xs text-ink" style={{ numberOfLines: 3 }}>
-                    {activity()}
-                  </Text>
-                )}
-              </If>
+              <If when={lastActivity(thread())}>{(activity) => <Text class="line-clamp-3 text-xs text-ink">{activity()}</Text>}</If>
               <If when={thread().parentThreadId}>
                 {(parent) => <Text class="text-xs text-muted">{t("web.session.subagents.creator", { who: labels().name(parent()) })}</Text>}
               </If>
@@ -118,7 +112,7 @@ function ThreadLog(props: { session: string; run: string; thread: string; now: n
   return (
     <View testID="subagent-log">
       <If when={log().length > 0} else={<Text class="text-xs text-muted">{t("web.session.subagents.noLog")}</Text>}>
-        <Scroll style={{ maxHeight: 352 }} accessibilityLabel={t("web.session.log.process")}>
+        <Scroll class="max-h-88" accessibilityLabel={t("web.session.log.process")}>
           <Each of={log()} key={(step) => step.seq}>
             {(step) => <WorkLogStep step={step()} now={props.now} />}
           </Each>

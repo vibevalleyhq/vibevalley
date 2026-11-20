@@ -50,8 +50,6 @@ fn texts(events: &[Event]) -> String {
         .collect()
 }
 
-// ---- scripted runtime: session behavior ----------------------------------
-
 #[test]
 fn every_subscriber_gets_every_event_in_order() {
     let runtime = ScriptedRuntime::new("s", Script::echo());
@@ -239,8 +237,6 @@ fn default_registry_lists_the_builtin_runtimes() {
     assert!(matches!(registry.require("nope"), Err(AgentError::UnknownRuntime(_))));
 }
 
-// ---- projectors fed with captured traces ---------------------------------
-
 fn fixture(name: &str) -> Vec<Value> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name);
     std::fs::read_to_string(&path)
@@ -376,8 +372,6 @@ fn codex_edit_asks_for_approval_and_runs_the_command() {
     assert!(events.iter().any(turn_finished));
 }
 
-// ---- ACP ---------------------------------------------------------------------
-
 #[test]
 fn acp_session_new_from_opencode_lists_models() {
     let session = received("acp-opencode-error.jsonl")
@@ -442,8 +436,6 @@ fn installed_runtimes_report_their_login() {
         println!("{id}: {:?}", runtime.installation());
     }
 }
-
-// ---- vibevalley (built-in, on vibevalley-agent) ---------------------------------
 
 mod vv {
     use std::collections::VecDeque;

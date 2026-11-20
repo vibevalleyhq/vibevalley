@@ -149,14 +149,11 @@ const issues: Issue[] = [
 ];
 
 const history = (all: readonly Issue[], known: readonly SessionView[]): IssueHistory[] =>
-  all.map(
-    (i) =>
-      ({
-        issue: i,
-        sessions: known.filter((s) => i.assignments.some((a) => a.executions.some((e) => e.session === s.id))),
-        missingSessions: [],
-      }) as unknown as IssueHistory,
-  );
+  all.map((i) => ({
+    issue: i,
+    sessions: known.filter((s) => i.assignments.some((a) => a.executions.some((e) => e.session === s.id))),
+    missingSessions: [],
+  }));
 
 /** A fixture with the issue pages' own cases added. */
 export function withIssues(fixture: { state: StateFrame; responses: Record<string, unknown> }): { state: StateFrame; responses: Record<string, unknown> } {
@@ -164,7 +161,7 @@ export function withIssues(fixture: { state: StateFrame; responses: Record<strin
   const allIssues = [...space.issues, ...issues];
   const allSessions = [...space.sessions, ...sessions];
   return {
-    state: { ...fixture.state, state: { ...fixture.state.state, issues: allIssues, sessions: allSessions } as unknown as StateFrame["state"] },
+    state: { ...fixture.state, state: { ...fixture.state.state, issues: allIssues, sessions: allSessions } },
     responses: {
       ...fixture.responses,
       ...responses,

@@ -1,7 +1,6 @@
-import { computed, Scroll, signal, Text, View, WebView } from "nsh";
+import { computed, effect, Scroll, signal, Text, View, WebView } from "nsh";
 import { z } from "zod";
 
-import { compileTokensCss, contrastRatio, parseTokensSpec } from "@vibevalley/artifact/tokens";
 import { t } from "@vibevalley/i18n";
 
 import { api } from "../../infra/api";
@@ -14,7 +13,7 @@ import { Icon } from "../../ui/Icon";
 import { Markdown } from "../../ui/Markdown";
 import { Tabs } from "../../ui/Tabs";
 import { toast } from "../../ui/toasts";
-import { useReportViewContext, useStoreEntries, useStoreViewHtml } from "./store";
+import { EMPTY_INSPECTED_TOKENS, inspectDesignTokens, type InspectedTokensSpec, useReportViewContext, useStoreEntries, useStoreViewHtml } from "./store";
 import type { StoreViewerProps } from "./StoreArtifactView";
 
 type DsTab = "overview" | "colors" | "typography" | "components" | "tokensJson";
@@ -63,9 +62,43 @@ export function DesignSystemView(props: StoreViewerProps) {
 
   const seq = () => (snapshot().seq > 0 ? snapshot().seq : props.artifact.seq);
   const tokensRaw = () => snapshot().entries.get("project/tokens.json")?.value ?? "{}";
-  const parsedTokens = computed(() => parseTokensSpec(tokensRaw()));
-  const compiledCss = computed(() => compileTokensCss(tokensRaw()));
+  const parsedTokens = signal<InspectedTokensSpec>(EMPTY_INSPECTED_TOKENS);
+  const draftCssLength = signal(0);
+  const compiledCss = () => parsedTokens().css;
   const readmeText = () => snapshot().entries.get("project/README.md")?.value ?? `# ${props.artifact.title}`;
+
+  let tokensRun = 0;
+  effect(() => {
+    const raw = tokensRaw();
+    const myRun = ++tokensRun;
+    void inspectDesignTokens(raw).then(
+      (spec) => {
+        if (myRun === tokensRun) parsedTokens.set(spec);
+      },
+      () => {
+        if (myRun === tokensRun) parsedTokens.set(EMPTY_INSPECTED_TOKENS);
+      },
+    );
+  });
+
+  let draftRun = 0;
+  effect(() => {
+    if (tab() !== "tokensJson") return;
+    const raw = tokensDraft() ?? tokensRaw();
+    const myRun = ++draftRun;
+    if (!isJsonValid(raw)) {
+      draftCssLength.set(0);
+      return;
+    }
+    void inspectDesignTokens(raw).then(
+      (spec) => {
+        if (myRun === draftRun) draftCssLength.set(spec.css.length);
+      },
+      () => {
+        if (myRun === draftRun) draftCssLength.set(0);
+      },
+    );
+  });
 
   const components = computed(() => {
     const raw = snapshot().entries.get("project/design-system.json")?.value;
@@ -91,7 +124,7 @@ export function DesignSystemView(props: StoreViewerProps) {
   const activeComponent = () => {
     const id = selectedComponent();
     const all = components();
-    return (id ? all.find((c) => c.id === id) : undefined) ?? all[0];
+    return (id ? all.find((c) => c.id === id) : undefined) ?? all.at(0);
   };
 
   const componentView = useStoreViewHtml(() => {
@@ -115,9 +148,6 @@ export function DesignSystemView(props: StoreViewerProps) {
       activeTab: tab(),
     }),
   );
-
-  const surfaceLight = () => parsedTokens().colors.find((c) => c.id === "surface" || c.id === "page")?.light;
-  const surfaceDark = () => parsedTokens().colors.find((c) => c.id === "surface" || c.id === "page")?.dark;
 
   const toggleDefault = () => {
     const next = !props.artifact.isDefault;
@@ -200,13 +230,7 @@ export function DesignSystemView(props: StoreViewerProps) {
             <Each of={parsedTokens().colors}>
               {(item) => {
                 const c = () => item();
-                const chosenBg = () => (previewTheme() === "dark" ? surfaceDark() : surfaceLight());
-                const chosenHex = () => (previewTheme() === "dark" ? c().dark : c().light);
-                const ratio = () => {
-                  const bg = chosenBg();
-                  if (!bg || c().id === "surface" || c().id === "page") return undefined;
-                  return contrastRatio(chosenHex(), bg);
-                };
+                const ratio = () => (previewTheme() === "dark" ? c().contrastDark : c().contrastLight);
                 return (
                   <View testID="ds-color-swatch" class="w-60 shrink-0 gap-2 rounded-lg border border-line bg-side p-3">
                     <View class="flex-row gap-2">
@@ -377,9 +401,7 @@ export function DesignSystemView(props: StoreViewerProps) {
         <View testID="ds-tokens-editor" class="min-h-0 flex-1 gap-2 p-4">
           <TextArea rows={16} value={draftValue()} onInput={(val) => tokensDraft.set(val)} class="min-h-0 flex-1 font-mono text-xs" />
           <View class="flex-row items-center justify-between gap-2">
-            <Text class={`text-xs ${draftValid() ? "text-muted" : "text-berry"}`}>
-              {draftValid() ? `${compileTokensCss(draftValue()).length} B compiled CSS` : "Invalid JSON"}
-            </Text>
+            <Text class={`text-xs ${draftValid() ? "text-muted" : "text-berry"}`}>{draftValid() ? `${draftCssLength()} B compiled CSS` : "Invalid JSON"}</Text>
             <Button tone="primary" testID="ds-save-tokens" disabled={act.busy() || !draftValid()} onPress={saveTokens}>
               {t("web.artifact.designSystem.saveTokens")}
             </Button>

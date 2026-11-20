@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/infra/router/link.tsx. A link is a
-// pressable View: an address inside the page navigates the router, any
-// other http(s)/mailto one opens through the host (ui/bridge.ts hostApi).
-// `NavLink` marks the current place with `accessibilityState.selected`
-// and passes `current` to a function child.
 import { effect, split, untracked, View, type JSX, type ViewProps } from "nsh";
 
 import { hostApi } from "../../../../bridge";
@@ -74,5 +69,5 @@ export function Navigate(props: { href: string }): JSX.Element {
     const href = props.href;
     untracked(() => queueMicrotask(() => router.navigate(href, { replace: true })));
   });
-  return null as unknown as JSX.Element;
+  return null;
 }

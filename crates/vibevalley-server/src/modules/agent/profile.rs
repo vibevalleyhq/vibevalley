@@ -1,7 +1,6 @@
 //! The profiles, skills and runtime settings kept in `<home>/config.json`,
 //! and the templates profiles are installed from (built in, and added under
-//! `<home>/agent-templates`). Ported from VibeValley
-//! `modules/agent/profile.ts` and `template.ts`.
+//! `<home>/agent-templates`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -98,8 +97,6 @@ fn read_stored(text: &str) -> Result<Stored, String> {
         settings: file.settings,
     })
 }
-
-// ----- templates (template.ts) -----
 
 #[derive(Deserialize, Default)]
 struct LookFile {
@@ -673,8 +670,6 @@ impl Profiles {
         }
         Ok(Preview { does })
     }
-
-    // ----- templates -----
 
     /// Built in, then added; re-read on each call so a folder added or
     /// removed by hand shows at once.

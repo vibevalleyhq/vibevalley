@@ -1,13 +1,3 @@
-// Ported from VibeValley apps/web/src/features/pkm/OutlineView.tsx: a
-// page's outline written through PageWriter (drawn at once, sent in order,
-// the server's copy taken when nothing of ours is on the way), folding,
-// picking blocks (Shift+click, Shift+↑↓ out of a box) and what keys do to
-// the picked ones (selection.ts pickAction) as keymap bindings held while
-// blocks are picked, ⌘C/⌘X copying them as an outline through nsh's
-// Clipboard. ?b= scrolls to its block (the row's reveal) and lights it.
-// Rows are dragged by their bullet: where every row is is measured as the
-// drag starts, and the row under the pointer says where the blocks would
-// land (selection.ts dropAt, dropOps). Not ported: the phone toolbar.
 import { Clipboard, effect, keymap, Text, untracked, View, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";

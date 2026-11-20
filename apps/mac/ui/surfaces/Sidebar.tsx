@@ -5,11 +5,46 @@
 import { effect, host, Image, Scroll, signal, Text, View } from "nsh";
 import { Button } from "nsh/base";
 
+import { t } from "@vibevalley/i18n";
+
 import { act, call, frame, frameRev, hostApi } from "../bridge";
 import { radius, tok, type as ty } from "../tokens";
 import { FileTree, type FilesFrame } from "./FileTree";
 import { GitPanel, type GitFrame, type GitTab } from "./GitPanel";
-import { ProjectRail, type RailFrame, type RailProject, type RailTab } from "./ProjectRail";
+
+type RailTab = {
+  id: number;
+  title: string;
+  active: boolean;
+  kind: string;
+  running?: boolean;
+  runningAgent?: string | null;
+  runningLabel?: string | null;
+  attention?: boolean;
+};
+
+type RailWorktree = {
+  path: string;
+  branch: string | null;
+  main: boolean;
+};
+
+type RailProject = {
+  id: number;
+  name: string;
+  path: string;
+  initials: string;
+  active: boolean;
+  attention: boolean;
+  terminals: number;
+  shortcut: string | null;
+  branch?: string | null;
+  mainRoot?: string | null;
+  worktrees?: RailWorktree[];
+  tabs?: RailTab[];
+};
+
+type RailFrame = { projects: RailProject[]; panel: string; inspectorOpen?: boolean };
 
 type VvRepo = { name: string; path: string; git?: boolean; last?: number };
 type VvSession = {
@@ -58,15 +93,15 @@ type RepoNode = {
 
 const KNOWN_RUNTIME_LOGOS = new Set(["claude", "codex", "opencode", "cursor", "kimi", "pi", "dsh", "grok", "antigravity"]);
 
-function runtimeLogoOf(agent: string | undefined | null): string | undefined {
+function runtimeLogoOf(agent?: string): string | undefined {
   if (!agent) return undefined;
-  const key = agent.toLowerCase().replace(/^acp:/, "");
+  const key = agent.toLowerCase().replace(/^acp:/u, "");
   return KNOWN_RUNTIME_LOGOS.has(key) ? `logo-${key}` : undefined;
 }
 
-function normPath(p: string | undefined | null): string {
+function normPath(p?: string): string {
   if (!p) return "";
-  const trimmed = p.replace(/\/+$/, "");
+  const trimmed = p.replace(/\/+$/u, "");
   return trimmed || "/";
 }
 
@@ -79,13 +114,13 @@ export function Sidebar() {
   const vvRepos = signal<VvRepo[]>([]);
   const pixelDir = signal<string | undefined>(typeof host.params.pixelDir === "string" ? host.params.pixelDir : undefined);
 
-  if (host.available() && (host.params.contextual === true || host.params.role === "inspector")) {
+  if (host.available()) {
     if (!pixelDir()) {
       void hostApi.pixelDir().then((env) => {
         if (env.bizCode === 0 && env.data?.path) pixelDir.set(env.data.path);
       });
     }
-    if (host.params.contextual === true) {
+    if (host.params.role !== "inspector") {
       effect(() => {
         void vvRev();
         void call<VvRepo[]>("repo.list", {}).then((env) => {
@@ -105,7 +140,6 @@ export function Sidebar() {
     return dir && name ? `file://${encodeURI(`${dir}/${name}.png`)}` : undefined;
   };
 
-  // ---- Right-side Inspector (Files / Diff / Branch / History) ------------
   const gitTab = signal<GitTab>("changes");
   if (host.params.role === "inspector") {
     const gitCount = () => (git()?.staged?.length ?? 0) + (git()?.changes?.length ?? 0) + (git()?.conflicts?.length ?? 0);
@@ -124,7 +158,7 @@ export function Sidebar() {
           }}
         >
           {[
-            { id: "files", label: "文件", onSelect: () => act({ type: "show_panel", panel: "files" }) },
+            { id: "files", label: t("web.shell.sidebar.files"), onSelect: () => act({ type: "show_panel", panel: "files" }) },
             {
               id: "git:changes",
               label: gitCount() > 0 ? `Diff (${gitCount()})` : "Diff",
@@ -174,20 +208,6 @@ export function Sidebar() {
     );
   }
 
-  // ---- Legacy non-contextual mode -----------------------------------------
-  if (host.params.contextual !== true) {
-    return (
-      <View style={{ flex: 1, flexDirection: "row", backgroundColor: p().canvas }}>
-        <ProjectRail frame={rail()} />
-        <View style={{ flex: 1 }}>
-          {panel() === "files" ? <FileTree frame={files()} /> : null}
-          {panel() === "git" ? <GitPanel frame={git()} /> : null}
-        </View>
-      </View>
-    );
-  }
-
-  // ---- Left Workspace Tree: Repos -> (Worktree groups) -> Terminal Tabs ---
   const activePath = () => normPath(rail()?.projects.find((proj) => proj.active)?.path ?? files()?.root);
   const sessions = () => vvState()?.state?.sessions ?? [];
   const issues = () => vvState()?.state?.issues ?? [];
@@ -337,16 +357,16 @@ export function Sidebar() {
     if (own.length === 0 || other.length === 0) return [{ title: "", repos: all }];
     return [
       { title: "", repos: own },
-      { title: "其他文件夹", repos: other },
+      { title: t("web.shell.sidebar.otherFolders"), repos: other },
     ];
   };
 
   const renderTabRow = (group: WorktreeGroup, tab: RailTab, indent: number) => {
     const isSelected = group.active && tab.active;
     const runningAgent = tab.runningAgent || (group.sessionRunning ? group.sessionAgent : undefined);
-    const isRunning = Boolean(tab.running || group.sessionRunning);
+    const isRunning = (tab.running ?? false) || group.sessionRunning;
     const logoSrc = spriteSrc(runtimeLogoOf(runningAgent));
-    const runText = runningAgent && runningAgent !== "cmd" ? `${runningAgent} 正在运行` : "正在运行";
+    const runText = runningAgent && runningAgent !== "cmd" ? t("web.shell.sidebar.runningAgent", { agent: runningAgent }) : t("web.shell.sidebar.running");
     return (
       <View
         style={{
@@ -399,14 +419,14 @@ export function Sidebar() {
               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p().ok }} />
               <Text style={{ fontSize: 10.5, fontWeight: "600", color: p().ok }}>{runText}</Text>
             </View>
-          ) : tab.attention ? (
+          ) : tab.attention === true ? (
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p().alert }} />
           ) : null}
         </Button>
         {tab.kind === "terminal" || group.tabs.length > 1 ? (
           <Button
             onPress={() => act({ type: "close_tab_at", path: group.path, tab_id: tab.id })}
-            accessibilityLabel={`关闭 ${tab.title}`}
+            accessibilityLabel={t("web.shell.sidebar.closeTab", { title: tab.title })}
             style={{ width: 18, height: 18, borderRadius: 4, alignItems: "center", justifyContent: "center" }}
           >
             <Text style={{ fontSize: 12, color: p().muted }}>×</Text>
@@ -429,13 +449,13 @@ export function Sidebar() {
           borderBottomColor: p().border,
         }}
       >
-        <Text style={{ ...ty.label, fontSize: 12, fontWeight: "600", color: p().ink }}>仓库与终端</Text>
+        <Text style={{ ...ty.label, fontSize: 12, fontWeight: "600", color: p().ink }}>{t("web.shell.sidebar.title")}</Text>
         <Button
           onPress={() => act({ type: "add_project" })}
-          accessibilityLabel="添加仓库"
+          accessibilityLabel={t("web.shell.sidebar.addRepo")}
           style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.sm, backgroundColor: p().tile }}
         >
-          <Text style={{ fontSize: 11.5, color: p().text }}>＋ 仓库</Text>
+          <Text style={{ fontSize: 11.5, color: p().text }}>{t("web.shell.sidebar.addRepoButton")}</Text>
         </Button>
       </View>
 
@@ -473,15 +493,15 @@ export function Sidebar() {
                       </Button>
                       <Button
                         onPress={() => act({ type: "new_terminal_at", path: repo.path })}
-                        accessibilityLabel={`新终端：${repo.name}`}
+                        accessibilityLabel={t("web.shell.sidebar.newTerminal", { name: repo.name })}
                         style={{ width: 22, height: 22, borderRadius: 5, alignItems: "center", justifyContent: "center" }}
                       >
-                        <Text style={{ fontSize: 14, color: p().muted }}>＋</Text>
+                        <Text style={{ fontSize: 14, color: p().muted }}>+</Text>
                       </Button>
                       {repo.projectId !== undefined && !repo.vibevalley ? (
                         <Button
                           onPress={() => act({ type: "close_project", id: repo.projectId! })}
-                          accessibilityLabel={`关闭文件夹：${repo.name}`}
+                          accessibilityLabel={t("web.shell.sidebar.closeFolder", { name: repo.name })}
                           style={{ width: 20, height: 20, borderRadius: 4, alignItems: "center", justifyContent: "center" }}
                         >
                           <Text style={{ fontSize: 12, color: p().muted }}>×</Text>
@@ -491,7 +511,7 @@ export function Sidebar() {
 
                     {/* Default case: no extra worktrees -> render terminal tabs directly under Repo */}
                     {!hasMultipleWorktrees ? (
-                      <View style={{ gap: 2 }}>{(repo.groups[0]?.tabs ?? []).map((tab) => renderTabRow(repo.groups[0]!, tab, 12))}</View>
+                      <View style={{ gap: 2 }}>{(repo.groups[0]?.tabs ?? []).map((tab) => renderTabRow(repo.groups[0], tab, 12))}</View>
                     ) : (
                       /* Multiple worktrees -> render each worktree as a group with its terminal tabs */
                       <View style={{ gap: 6, paddingLeft: 6 }}>
@@ -512,15 +532,15 @@ export function Sidebar() {
                                     numberOfLines: 1,
                                   }}
                                 >
-                                  {group.isMain ? `${group.label} · 主目录` : group.label}
+                                  {group.isMain ? t("web.shell.sidebar.mainWorktree", { label: group.label }) : group.label}
                                 </Text>
                               </Button>
                               <Button
                                 onPress={() => act({ type: "new_terminal_at", path: group.path })}
-                                accessibilityLabel={`新终端：${group.label}`}
+                                accessibilityLabel={t("web.shell.sidebar.newTerminal", { name: group.label })}
                                 style={{ width: 20, height: 20, borderRadius: 4, alignItems: "center", justifyContent: "center" }}
                               >
-                                <Text style={{ fontSize: 13, color: p().muted }}>＋</Text>
+                                <Text style={{ fontSize: 13, color: p().muted }}>+</Text>
                               </Button>
                             </View>
                             <View style={{ gap: 2 }}>{group.tabs.map((tab) => renderTabRow(group, tab, 18))}</View>

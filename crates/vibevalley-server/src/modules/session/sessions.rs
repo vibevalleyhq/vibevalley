@@ -520,8 +520,6 @@ impl Sessions {
         Ok(())
     }
 
-    // ----- a session's events -----
-
     fn current(&self, session: &str, generation: u64) -> bool {
         lock(&self.0.live).get(session).is_some_and(|l| l.generation == generation)
     }

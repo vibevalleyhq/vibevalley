@@ -15,18 +15,6 @@
       "types": "./dist/editing.d.ts",
       "default": "./src/editing.ts"
     },
-    "./graph": {
-      "types": "./dist/graph.d.ts",
-      "default": "./src/graph.ts"
-    },
-    "./markdown": {
-      "types": "./dist/markdown.d.ts",
-      "default": "./src/markdown.ts"
-    },
-    "./para": {
-      "types": "./dist/para.d.ts",
-      "default": "./src/para.ts"
-    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "default": "./src/selection.ts"

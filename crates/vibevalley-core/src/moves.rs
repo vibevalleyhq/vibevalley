@@ -1,5 +1,4 @@
-//! The moves a user may make on the board. Ported from VibeValley
-//! `apps/server/src/modules/issue/moves.ts` (`statusMove`, `statusMoves`).
+//! The moves a user may make on the board.
 //! The reasons are values, not sentences: the UI words them.
 
 use serde::{Deserialize, Serialize};

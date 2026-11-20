@@ -5,7 +5,7 @@ use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use gpui_kit::{
+use gpui::{
     AnyElement, AppContext as _, Context, EventEmitter, FocusHandle, Focusable, HighlightStyle, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
     Render, StatefulInteractiveElement as _, Styled as _, StyledText, Window, div, px, uniform_list,
 };
@@ -271,7 +271,7 @@ impl DiffView {
 impl EventEmitter<DiffChanged> for DiffView {}
 
 impl Focusable for DiffView {
-    fn focus_handle(&self, _: &gpui_kit::App) -> FocusHandle {
+    fn focus_handle(&self, _: &gpui::App) -> FocusHandle {
         self.focus.clone()
     }
 }
@@ -499,7 +499,7 @@ trait WhenOn {
     fn when_on(self, on: bool, bg: Hsla) -> Self;
 }
 
-impl WhenOn for gpui_kit::Stateful<gpui_kit::Div> {
+impl WhenOn for gpui::Stateful<gpui::Div> {
     fn when_on(self, on: bool, bg: Hsla) -> Self {
         if on { self.bg(bg) } else { self }
     }

@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/session/WorkLog.tsx: a
-// session's steps by run, and the folded run under a report. The log's
-// height (CSS --log-height, 22rem) is the `height` prop; a long text is cut
-// at its lines without the fading mask.
 import { Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -55,7 +51,7 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
           >
             <Icon name="log" size={14} tone="muted" />
             <Text class="text-xs font-medium text-muted">{text()}</Text>
-            <View style={{ opacity: 0.6 }}>
+            <View class="opacity-60">
               <Icon name={open() ? "collapse" : "enlarge"} size={10} tone="muted" />
             </View>
           </View>
@@ -293,10 +289,8 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
           </If>
           <If when={input()}>
             {(text) => (
-              <Scroll class="rounded-md bg-code-bg px-2.5 py-2" style={{ maxHeight: 160 }}>
-                <Text class="font-mono text-xs text-code-ink" style={{ userSelect: "text" }}>
-                  {text()}
-                </Text>
+              <Scroll class="max-h-40 rounded-md bg-code-bg px-2.5 py-2">
+                <Text class="select-text font-mono text-xs text-code-ink">{text()}</Text>
               </Scroll>
             )}
           </If>
@@ -305,10 +299,8 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
             else={<Text class="text-xs text-muted">{props.step.ok === undefined ? t("web.session.log.pending") : t("web.session.log.noOutput")}</Text>}
           >
             {(out) => (
-              <Scroll class="rounded-md bg-hover px-2.5 py-2" style={{ maxHeight: 224 }}>
-                <Text class="font-mono text-xs text-ink" style={{ userSelect: "text" }}>
-                  {out()}
-                </Text>
+              <Scroll class="max-h-56 rounded-md bg-hover px-2.5 py-2">
+                <Text class="select-text font-mono text-xs text-ink">{out()}</Text>
               </Scroll>
             )}
           </If>

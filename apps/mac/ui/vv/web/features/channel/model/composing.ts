@@ -1,11 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/model/composing.ts
-// (not vendored: it reads a DOM textarea and uploads with XMLHttpRequest).
-// The same intents, drafts and menu rules. What changed: the composer is
-// told where the caret is (`caret(at)`, from Input's onSelectionChange) and
-// places it through `place` instead of the textarea's setSelectionRange;
-// `onKey` takes the key alone (Enter, Tab, arrows, Escape from the view's
-// keymap); an upload is one attachment.create through the transport, its
-// progress whole when it is in.
 import { computed } from "nsh";
 import { z } from "zod";
 
@@ -195,7 +187,7 @@ export function createComposer(core: () => SpaceView | undefined, place: (caret:
       }
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        const picked = list[Math.min(active(), list.length - 1)];
+        const picked = list.at(Math.min(active(), list.length - 1));
         if (picked) choose(picked);
         return;
       }

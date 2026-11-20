@@ -1,0 +1,44 @@
+{
+  "sidebar": {
+    "title": "仓库与终端",
+    "addRepo": "添加仓库",
+    "addRepoButton": "+ 仓库",
+    "otherFolders": "其他文件夹",
+    "running": "正在运行",
+    "runningAgent": "{agent} 正在运行",
+    "closeTab": "关闭 {title}",
+    "newTerminal": "新终端：{name}",
+    "closeFolder": "关闭文件夹：{name}",
+    "mainWorktree": "{label} · 主目录",
+    "files": "文件"
+  },
+  "git": {
+    "loading": "正在读取 Git 状态…",
+    "notRepo": "当前目录不是 Git 仓库。",
+    "refresh": "刷新 Git",
+    "tab": {
+      "changes": "变更",
+      "changesCount": "变更 ({count})",
+      "branches": "分支 ({count})",
+      "commits": "历史"
+    },
+    "commitPlaceholder": "输入提交信息…",
+    "commitStaged": "提交暂存变更 ({count})",
+    "noStaged": "暂无暂存文件",
+    "conflicts": "冲突",
+    "staged": "已暂存",
+    "unstageAll": "全部取消暂存",
+    "stagedEmpty": "暂无已暂存的文件。",
+    "changes": "未暂存变更",
+    "stageAll": "全部暂存",
+    "clean": "工作目录干净，没有未提交改动。",
+    "branches": "本地分支",
+    "currentBranch": "{name}，当前分支",
+    "switchBranch": "切换到 {name}",
+    "noBranches": "未找到本地分支。",
+    "worktrees": "工作树",
+    "mainWorktree": "主工作树",
+    "commits": "提交记录",
+    "noCommits": "暂无提交记录。"
+  }
+}

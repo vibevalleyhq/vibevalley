@@ -55,7 +55,7 @@
 
 ## 和谁打交道
 
-- **记性（`memory`）**：共用它的中英文分词（`crates/vibevalley-memory/src/gse.rs`）。
+- **记性（`memory`）**：共用它的中英文分词（`crates/vibevalley-server/src/modules/memory/gse.rs`）。
 - **助手与工具（`orchestrator`、`tool`）**：助手现状含 `01_Projects` 活跃项目；当轮纯用户发言自动附入最多 3 个相关笔记块。
 
 ## 为什么这样

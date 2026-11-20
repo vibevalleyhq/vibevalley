@@ -113,7 +113,7 @@ export type HtmlAnchorKind = (typeof HtmlAnchorKindValues)[number];
  */
 export type HtmlAnchor = { kind: HtmlAnchorKind, exact: string, prefix: string, suffix: string, };
 
-export type ArtifactHtmlEdit = { id: ArtifactId, version: number, anchor: HtmlAnchor, text: string, };
+export type ArtifactHtmlEdit = { id: ArtifactId, version: number, path?: string, anchor: HtmlAnchor, text: string, };
 
 export type ArtifactUpdateRequest = { id: ArtifactId, title?: string, display?: ArtifactDisplay, isDefault?: boolean, };
 

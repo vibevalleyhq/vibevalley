@@ -46,7 +46,7 @@ export interface RunView {
 /** The last top-level thing it said, if any. */
 export function answerOf(r: RunView) {
   for (let i = r.steps.length - 1; i >= 0; i--) {
-    const s = r.steps[i];
+    const s = r.steps.at(i);
     if (s && s.type === "assistant/message" && s.under === undefined) return s;
   }
   return undefined;
@@ -82,7 +82,7 @@ export function spansOf(r: RunView, end: number): Span[] {
 }
 
 export function runMs(r: RunView, end: number) {
-  const first = allOf(r)[0];
+  const first = allOf(r).at(0);
   return first ? Math.max(0, end - first.time) : 0;
 }
 
@@ -202,7 +202,7 @@ export function runLabel(steps: SessionEvent[], orchestrator: boolean) {
   const tools = steps.filter((s) => s.type === "tool/call").length;
   if (steps.length === 0 || (orchestrator && tools === 0)) return undefined;
   // The orchestrator's run, folded: how long it thought and what it used.
-  const [first] = steps;
+  const first = steps.at(0);
   const last = steps.at(-1);
   const took = orchestrator && first && last && steps.length > 1 ? last.time - first.time : undefined;
   if (took !== undefined && took >= 1000) return t("web.session.runs.thoughtFor", { took: tookText(took), n: tools });
@@ -234,7 +234,7 @@ export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfal
   const runs: [number, number][] = [];
   const spans: LaneSpan[] = [];
   groups.forEach((steps, g) => {
-    const first = steps[0];
+    const first = steps.at(0);
     const last = steps.at(-1);
     if (!first || !last) return;
     const from = first.time;

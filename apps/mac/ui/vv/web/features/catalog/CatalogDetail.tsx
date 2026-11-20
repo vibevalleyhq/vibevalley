@@ -1,10 +1,3 @@
-// Ported from VibeValley apps/web/src/features/catalog/CatalogDetail.tsx:
-// the grounds, a picture at whole-step zoom, one picture's detail (anchor
-// and head marks, frames played at a chosen rate, where it was cut from and
-// the commands that make it again), a cursor's tile. Pictures are nsh
-// Images of the app's art (ui/pixel/atlas.ts). The check ground is drawn
-// on a Canvas (CSS's repeating conic gradient) behind the large picture and
-// the frames; a grid tile is on the plain paper. The fps slider is nsh's.
 import { Canvas, Clipboard, Image, signal, Text, View, type JSX, type ViewStyle } from "nsh";
 import { Slider } from "nsh/base";
 
@@ -38,7 +31,7 @@ export function GroundBox(props: { ground: Ground; class?: string; style?: ViewS
     <View class={`overflow-hidden ${groundClass[props.ground]} ${props.class ?? ""}`} style={props.style}>
       <If when={props.ground === "check" && props.checked === true}>
         <Canvas
-          style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}
+          class="absolute inset-0"
           draw={(ctx) => {
             ctx.fillStyle = tone("catalog-check");
             const { width, height } = ctx.canvas;
@@ -113,8 +106,8 @@ function Mark(props: { at: { x: number; y: number }; scale: number; head?: boole
       when={props.head === true}
       else={
         <View style={{ position: "absolute", left: props.at.x * props.scale - 6, top: props.at.y * props.scale - 6, width: 12, height: 12 }}>
-          <View class="bg-berry-500" style={{ position: "absolute", left: 0, top: 5, width: 12, height: 2 }} />
-          <View class="bg-berry-500" style={{ position: "absolute", left: 5, top: 0, width: 2, height: 12 }} />
+          <View class="absolute top-[5px] left-0 h-0.5 w-3 bg-berry-500" />
+          <View class="absolute top-0 left-[5px] h-3 w-0.5 bg-berry-500" />
         </View>
       }
     >

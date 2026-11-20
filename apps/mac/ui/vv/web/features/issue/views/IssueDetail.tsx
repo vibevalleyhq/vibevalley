@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/IssueDetail.tsx:
-// the same blocks, acts and side. The steps' <details> is a Fold; the
-// title is renamed in an Input (Return or leaving keeps it, Escape lets it
-// go). VibeValley's addition: the worktree opens a terminal there.
 import { Clipboard, keymap, signal, Text, View, type ViewRef } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
@@ -200,15 +196,7 @@ export function IssueDetail(props: {
               <Text class="text-sm font-semibold text-ink">{ask().head}</Text>
               <If
                 when={live().conflict}
-                else={
-                  <If when={ask().line}>
-                    {(line) => (
-                      <Text class="mt-1 text-sm text-ink" style={{ numberOfLines: 4 }}>
-                        {plainText(line())}
-                      </Text>
-                    )}
-                  </If>
-                }
+                else={<If when={ask().line}>{(line) => <Text class="mt-1 line-clamp-4 text-sm text-ink">{plainText(line())}</Text>}</If>}
               >
                 {(conflict) => <ConflictFiles files={conflict().files} worktree={head().worktree} />}
               </If>
@@ -235,7 +223,14 @@ export function IssueDetail(props: {
             </If>
             <View class="mt-2.5 flex-row flex-wrap gap-2">
               {/* Keyed by the act, as VibeValley's keyed Show: another lead is another button. */}
-              <Each of={s().lead ? [s().lead as IssueAct] : []}>{(lead) => button(lead(), () => true)}</Each>
+              <Each
+                of={(() => {
+                  const lead = s().lead;
+                  return lead ? [lead] : [];
+                })()}
+              >
+                {(lead) => button(lead(), () => true)}
+              </Each>
               <Each of={s().others.filter((a) => a !== "close" && a !== "stop")}>{(a) => button(a(), () => false)}</Each>
             </View>
           </View>
@@ -330,7 +325,7 @@ export function IssueDetail(props: {
                     <Fold
                       testID="changed-files"
                       open={filesOpen()}
-                      onToggle={filesOpen.set}
+                      onToggle={(v) => filesOpen.set(v)}
                       label={t("web.issue.detail.changedFiles")}
                       summary={t("web.issue.detail.fileCount", { n: c().files.length })}
                     >
@@ -372,7 +367,7 @@ export function IssueDetail(props: {
             testID="issue-steps-fold"
             label={t("web.issue.detail.steps")}
             summary={steps().length > 0 ? stepsLine(steps()) : undefined}
-            onToggle={showSteps.set}
+            onToggle={(v) => showSteps.set(v)}
           >
             <If when={steps().length > 0 ? steps() : undefined} else={<Text class="text-xs text-faint">{noStepsText(head())}</Text>}>
               {(st) => <WorkLog steps={st()} />}
@@ -507,9 +502,7 @@ export function IssueDetail(props: {
           {(worktree) => (
             <Property label="worktree">
               <View class="flex-row items-start gap-1">
-                <Text class="min-w-0 flex-1 font-mono text-xs text-ink" style={{ userSelect: "text" }}>
-                  {worktree()}
-                </Text>
+                <Text class="min-w-0 flex-1 select-text font-mono text-xs text-ink">{worktree()}</Text>
                 <IconButton icon="copy" size={14} label={t("web.issue.detail.copyPath")} onClick={() => void Clipboard.writeText(worktree())} />
                 <IconButton
                   testid="open-terminal"
@@ -526,13 +519,7 @@ export function IssueDetail(props: {
         <If when={s().resolvedFindings.length > 0}>
           <Property label={t("web.issue.detail.resolved")}>
             <View>
-              <Each of={s().resolvedFindings}>
-                {(f) => (
-                  <Text class="text-sm text-faint" style={{ textDecorationLine: "line-through" }}>
-                    {f().text}
-                  </Text>
-                )}
-              </Each>
+              <Each of={s().resolvedFindings}>{(f) => <Text class="text-sm text-faint line-through">{f().text}</Text>}</Each>
             </View>
           </Property>
         </If>
@@ -560,7 +547,7 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
           <If
             when={props.editable}
             else={
-              <Text role="header" testID="issue-title" class="text-lg font-semibold text-ink" style={{ numberOfLines: 2 }}>
+              <Text role="header" testID="issue-title" class="line-clamp-2 text-lg font-semibold text-ink">
                 {props.shown}
               </Text>
             }
@@ -575,7 +562,7 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
               }}
               class="-mx-1 self-start rounded-sm px-1 hover:bg-hover"
             >
-              <Text role="header" testID="issue-title" class="text-lg font-semibold text-ink" style={{ numberOfLines: 2 }}>
+              <Text role="header" testID="issue-title" class="line-clamp-2 text-lg font-semibold text-ink">
                 {props.shown}
               </Text>
             </View>

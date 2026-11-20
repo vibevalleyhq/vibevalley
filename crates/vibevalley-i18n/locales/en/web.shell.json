@@ -1,0 +1,44 @@
+{
+  "sidebar": {
+    "title": "Repos & terminals",
+    "addRepo": "Add repository",
+    "addRepoButton": "+ Repo",
+    "otherFolders": "Other folders",
+    "running": "Running",
+    "runningAgent": "{agent} running",
+    "closeTab": "Close {title}",
+    "newTerminal": "New terminal: {name}",
+    "closeFolder": "Close folder: {name}",
+    "mainWorktree": "{label} · main",
+    "files": "Files"
+  },
+  "git": {
+    "loading": "Loading Git status…",
+    "notRepo": "This folder is not a Git repository.",
+    "refresh": "Refresh Git",
+    "tab": {
+      "changes": "Changes",
+      "changesCount": "Changes ({count})",
+      "branches": "Branches ({count})",
+      "commits": "Commits"
+    },
+    "commitPlaceholder": "Commit message…",
+    "commitStaged": "Commit staged ({count})",
+    "noStaged": "No staged files",
+    "conflicts": "Conflicts",
+    "staged": "Staged",
+    "unstageAll": "Unstage all",
+    "stagedEmpty": "No staged files.",
+    "changes": "Changes",
+    "stageAll": "Stage all",
+    "clean": "Working tree clean, no uncommitted changes.",
+    "branches": "Branches",
+    "currentBranch": "{name}, current branch",
+    "switchBranch": "Switch to {name}",
+    "noBranches": "No local branches found.",
+    "worktrees": "Worktrees",
+    "mainWorktree": "Main worktree",
+    "commits": "Commit history",
+    "noCommits": "No commits yet."
+  }
+}

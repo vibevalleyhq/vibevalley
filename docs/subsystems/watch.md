@@ -25,24 +25,21 @@
 
 ### 读频道的事件
 
-- **每个事件按提交的次序处理一次，写话等它处理完才返回**：频道每次提交一条消息或一次删除，就在 `Channel.committed` 上发出一个事件（带 `channel_event.seq`）；观察层一个一个地处理（路由，或撤回还在等的投递）。频道的写话（`say`、`speak`、`post`、`note`、`remove`）在提交、放开频道的锁以后等观察层处理完它的事件再返回（`Chat::await_reader`），所以写话返回时路由已经做完、熔断与跳数的通知已经写下；处理失败（不是 `ApiError` 的拒绝）让这次写话失败，事件留着。农场的通知（`notice`）不等：它不叫醒谁，观察层处理事件时也会写它。
-- **游标只在效果落盘以后往前走**：开机读完游标后的事件之前，游标不动；处理完一个事件、它的路由提交了，游标才走到它；为一条私聊消息拉起帮工时，游标停在这条前面，直到帮工拉起来；一个事件在线处理失败后，游标停在它前面，等下次开机。
-- **至少处理一次，不重复投递**：触发的 id 就是消息的 id，`recordTrigger` 按 `(source, key)` 幂等；开机再读的事件先问 `Session.isRouted`，路由过的跳过；投递按 `(会话, 信)` 唯一。开机再读时一条路由不了的记日志放过，不反复试。
-- **私聊里补说的话按当时补投**：私聊帮工拉起时，期间用户又说的话再路由一次（`committedOf`），因为一封信每个会话一份。
+- **每个事件按提交的次序处理一次，写话等它处理完才返回**：频道每次提交一条消息或一次删除，就在 `Chat::committed` 上发出事件（带 `channel_event.seq`）；观察层的路由线程顺序处理（路由，或清除对应消息的内存待发项）。频道的写话在提交、放开频道锁以后通过 `Chat::await_reader` 等观察层处理完该序号再返回；农场的通知（`notice`）不等。
+- **游标只在处理后往前走**：开机先从 `watch_cursor` 读回上次序号并经 `Chat::events`、`Chat::committed_of` 补读漏掉的事件，再接实时流；每处理完一条事件推进游标。
 
 ### 三道刹车（`hearers.rs` 的 `brakes`）
 
-每一次自动叫醒都过这三道：观察层路由的每一句话（`@` 提及、私聊、串、汇报、连接器和通话带进来的、巡查的提醒）先过 `brakes`，再把带着 `held_by` 的听众交给 `Issue.route`（用户在工单串里的话进工单的蓄水池，其余的由它交 `Session.route` 投递）；不是话的触发（定时任务、GitHub、派活）来自 `system`，只受熔断约束，由 `Session` 按观察层的决定拦着。
+每一次聊天路由都先过这三道：观察层算好听众后过 `brakes`，再按目标分发——用户在工单串里的话连同内存里积攒的待发项经 `Board::tell_message` 交给工单，帮工的唤醒话经 `Board::tell_message` 交给对应工单，助手的唤醒话经 `Orchestrator::hear` 交出（不唤醒的经 `Orchestrator::overhear` 捎带）。
 
 | 刹车 | 拦什么 | 放开 |
 |---|---|---|
-| 跳数上限 `hopLimit` = 4 | 一处（`deliveryScope`）自用户上次说话起，agent 的话叫醒人满 4 次，再叫醒的记 `hop_limit`；农场在那里说一次（`untilUserSpeaks`） | 用户在那里说话 |
-| 冷却 60 秒 | agent 的话 60 秒内再叫醒同一个帮工（助手不冷却）记 `cooldown` | 时间过去 |
-| 熔断 `wakeBreaker` = 3 | 一个帮工连续 3 次叫醒都没开口（`Session.deliveries` 的 `EmptyWake`）就熔断：观察层让 `Session.holdWakes` 拦住它、贴通知，之后不是用户的话记 `wake_breaker` | 用户点它的名叫醒它，或它离场；它开口说话（`Spoke`）清零计数 |
+| 跳数上限 `hopLimit` = 4 | 一处（`channel:<id>`）自用户上次说话起，agent 的话叫醒人满 4 次，再叫醒的记 `HopLimit`；农场在那里说一次（`untilUserSpeaks`） | 用户在那里说话 |
+| 冷却 60 秒 | agent 的话 60 秒内再叫醒同一个帮工（助手不冷却）记 `Cooldown` | 时间过去 |
+| 熔断 `wakeBreaker` = 3 | 一个帮工连续 3 次叫醒都没开口就熔断：之后不是用户的话记 `WakeBreaker` | 用户点它的名叫醒它，或它离场；它开口说话清零计数 |
 
-- 被拦下的投递照样写进信箱，随下一次合法的叫醒一起带上。
+- 被拦下或非唤醒的帮工消息留在观察层内存（`State::waiting`），随下一次合法的叫醒一并带上；成功交给帮工后记 `Chat::mark_seen` 并贴 👀。
 - 用户的话三道都不拦；跳数和冷却只看 agent 的话。
-- 开机时跳数和最近一次叫醒从投递里读回（`Session.agentWakes`：自用户在一处最新的路由起 agent 叫醒了几次，每个会话最近一次被 agent 叫醒的时间，都按投递写下的时间，不看触发自己带的时间）。
 
 ### 收件箱
 
@@ -67,30 +64,30 @@
 
 **一句话路由**
 
-1. 频道提交消息，发出事件；观察层取到它（在线），或开机从游标后读到它（`Channel.events`、`committedOf`）。
-2. 算听众：`to` 指定的助手，或 `whoHears`（私聊的对面、被 `@` 的、串的主人和成员、频道的成员、在场帮工的知晓）；过 `brakes`；记 `Trigger`，交 `Issue.route`。
-3. 用户的话把那一处的跳数清零、放开它叫醒的熔断帮工；agent 的话记下叫醒了谁。被跳数拦下时在那里说一次通知。
-4. 私聊里用户对档案说话、还没有帮工时，拉起私聊帮工（`hireWith`，它的头几件输入是私聊里用户说过的）。
-5. 游标往前走；等这个事件的写话返回。
+1. 频道提交消息并经 `Chat::committed` 发出事件；观察层在线接收，或开机从 `watch_cursor` 后经 `Chat::events`、`Chat::committed_of` 补读。
+2. 算听众：带 `ingress_recipient` 直接指向目标助手，否则用 `who_hears`（私聊对面、被 `@` 的、串的主人和成员、频道成员、在场帮工知晓）；过 `brakes`。
+3. 用户的话清零该处跳数并放开被点名的熔断帮工；agent 的话记录跳数与冷却。触发跳数上限时在频道发一次通知。
+4. 唤醒目标分流给 `Board::tell_message`（工单与帮工）或 `Orchestrator::hear`（助手），成功后记 `Chat::mark_seen` 并贴 👀；非唤醒或被拦下的帮工消息暂存内存 `State::waiting`。私聊里用户对帮工档案说话且尚无在场帮工时，拉起私聊帮工。
+5. 推进游标并唤醒等待该序号的频道写话。
 
 **帮工的串和回执**
 
-1. `Session.news` 的 `Hired`：给帮工排席位，工单没有串就发派活消息、在它下面开串，有串就在串里发接手通知；帮工的「家」记成那个串。`Left`：帮工离席，撤回它没收的投递，清它的跳数和熔断。`Reported`：把它这一轮的结论贴进串（叫停的不贴）。
-2. `Session.deliveries` 的 `Consumed`：先记看过（`Channel.markSeen`），再贴 👀；`EmptyWake`：数熔断。
+1. 订阅 `Hub::watch` 的 `Transition`（`SessionChanged`、`SessionLeft`、`SessionReported`），送入独立的 `news` 线程（避免在 `Hub::apply` 锁内回写频道死锁）。
+2. 新雇帮工时排席位并开启或复用工单串；帮工离场时离席、清空内存待发项与熔断；一轮汇报时把结论贴进工单串（按帮工与轮次去重，叫停的不贴），启动时补投未投出的待发汇报。
 
 ## 和谁打交道
 
-- **频道（`channel`）**：读事件（`committed`、`events`、`committedOf`）、等写话（`awaitReader`）、排席位（`seat`）、开串和私聊、贴汇报（`note`）、通知（`notice`）、看过与回应、回执（`userReceipt`、`userReadReports`）；登记删频道的理由（在那里的帮工）。
-- **帮工（`session`）**：`recordTrigger`、`isRouted`、`hireWith`、`withdrawEnvelope`、`withdrawDeliveries`、`holdWakes`、`agentWakes`、`waitingOn`、`hired`、`live`；订阅 `news`、`deliveries`；建好时经 `Session.useChat` 给信箱一个只读的 `ChatView`（默认频道、未读）。
-- **工单（`issue`）**：`route`（带着刹车定下的听众；工单的入口：是工单的进蓄水池，不是的投给听众），收件箱读看板（`onBoard`）。工单不调观察层：工单的话说进帮工的家或工单串，由观察层路由。
-- **接口（`http`）**：`channel.direct.create` 是 `direct`，`channel.message.previewDelete` 是 `previewRemove`（加上还在等的投递数）。
+- **频道（`channel`）**：读事件（`committed`、`events`、`committed_of`）、等写话（`await_reader`）、排席位（`seat`、`ensure_seated`）、开串和私聊、贴汇报（`note`）、通知（`notice`）、看过与回应（`mark_seen`、`react`）；登记删频道的守卫（`guard_removal`）。
+- **工单板与帮工（`issue`、`session`）**：经 `Board::tell_message` 投递给工单和帮工，按 `Hub` 的会话事实维护工单串与汇报。
+- **助手（`orchestrator`）**：唤醒消息交 `Orchestrator::hear`，旁听消息交 `Orchestrator::overhear`。
+- **接口（`http`）**：注册 `channel.direct.create`、`issue.comment.create` 与 `channel.message.previewDelete`（加上内存里还在等的待发条数）。
 
 ## 为什么这样
 
 - **频道纯聊天，帮工纯干活，规矩在中间一层**：频道（`modules/channel`）不调工单板，工单板（`modules/issue`、`modules/session`）不认识频道；谁听见、刹车、开串和回执都要同时知道聊天和会话，放在这两者之上，两边都不用回调对方。
 - **用持久的游标读事件，不用内存里的回调**：提交和路由分属两个事务，中间崩溃时游标还在路由前面，开机接着读；路由按触发的 id 幂等，读两遍不会投两遍。
 - **写话等观察层处理完再返回**：页面、工具和测试都靠「说完就已经路由了」：跳数通知紧跟着那句话、删消息立刻撤回投递。等待放在提交和放锁以后，观察层处理事件时可以随便用频道。
-- **一处算刹车**：叫醒是从聊天进来的（或观察层自己的巡查），刹车放在它进来的地方，用户的话在同一处清零；`Session` 只照 `held_by` 写信、照 `holdWakes` 不叫醒，不再自己判断。
+- **一处算刹车**：叫醒是从聊天进来的，刹车放在它进来的地方，用户的话在同一处清零；工单与会话不再各自重复判断跳数、冷却与熔断。
 - **一套现算规则**：收件箱、通知和巡查共用同一份规则与文案（`vibevalley-core`），各端不会不一致。
 
 ## 还没做的

@@ -17,6 +17,8 @@ fn main() {
                     || stem == "cli"
                     || stem == "server"
                     || stem.starts_with("server.")
+                    || stem == "web.base"
+                    || stem == "web.pkm"
                     || stem == "web.farm"
                     || stem.starts_with("web.farm."))
             {

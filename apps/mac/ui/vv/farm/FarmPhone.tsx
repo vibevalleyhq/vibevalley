@@ -19,47 +19,32 @@ type Calls = { open: boolean; narrow: boolean; ringing: InboxItem | null; missed
 type Voice = { phase: "idle" | "connecting" | "live" | "stopping"; problem: string | null; heard: string; said: string };
 const games = ["blocks", "sokoban", "dino", "bugs", "merge"] as const;
 const isGame = (screen: Screen): screen is GameId => games.some((g) => g === screen);
-const colors = { ink: "#22341a", dark: "#3d5a2a", paper: "#c9dc9a", pale: "#e8f0c8", light: "#b9cf8c", rule: "#9fb07a", bark: "#67482d" };
 const close = () => host.post("action", { type: "dismiss_farm_form" });
 const route = (path: string) => host.post("action", { type: "global_route", path });
 
-function Label(props: { children: JSX.Element; size?: number; color?: string }) {
-  return <Text style={{ fontSize: props.size ?? 12, fontFamily: "Fusion Pixel 12px Prop zh-Hans", color: props.color ?? colors.ink }}>{props.children}</Text>;
+const labelTone = {
+  ink: "text-lcd-ink",
+  pale: "text-lcd-pale",
+  muted: "text-bark-500",
+  cream: "text-cream-50",
+  error: "text-phone-failed",
+} as const;
+
+function Label(props: { children: JSX.Element; size?: 14 | 18 | 20; tone?: keyof typeof labelTone }) {
+  const sizeClass = props.size === 20 ? "text-xl" : props.size === 18 ? "text-[18px]" : props.size === 14 ? "text-base" : "text-xs";
+  return <Text class={`font-pixel ${sizeClass} ${labelTone[props.tone ?? "ink"]}`}>{props.children}</Text>;
 }
 function Press(props: { children: JSX.Element; run: () => void; id?: string; selected?: boolean }) {
   return (
-    <View
-      testID={props.id}
-      role="button"
-      onPress={props.run}
-      style={{ paddingHorizontal: 6, paddingVertical: 4, backgroundColor: props.selected ? colors.dark : colors.light }}
-    >
-      <Label color={props.selected ? colors.pale : colors.ink}>{props.children}</Label>
+    <View testID={props.id} role="button" onPress={props.run} class={`px-1.5 py-1 ${props.selected === true ? "bg-lcd-dark" : "bg-lcd-light"}`}>
+      <Label tone={props.selected === true ? "pale" : "ink"}>{props.children}</Label>
     </View>
   );
 }
 function IconKey(props: { label: string; run: () => void; children: JSX.Element; id: string }) {
   return (
-    <View
-      testID={props.id}
-      role="button"
-      accessibilityLabel={props.label}
-      onPress={props.run}
-      style={{ width: "33.333%", alignItems: "center", gap: 4, paddingBottom: 12 }}
-    >
-      <View
-        style={{
-          width: 44,
-          height: 44,
-          backgroundColor: colors.pale,
-          borderWidth: 2,
-          borderColor: colors.dark,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {props.children}
-      </View>
+    <View testID={props.id} role="button" accessibilityLabel={props.label} onPress={props.run} class="w-1/3 items-center gap-1 pb-3">
+      <View class="h-11 w-11 items-center justify-center border-2 border-lcd-dark bg-lcd-pale">{props.children}</View>
       <Label>{props.label}</Label>
     </View>
   );
@@ -69,7 +54,7 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
   const core = useCore();
   const chosen = signal<string | undefined>(undefined);
   const menu = signal(false);
-  const rooms = () => core()?.chat?.channels.filter((c) => !c.archived) ?? [];
+  const rooms = () => core()?.chat?.channels.filter((c) => c.archived === undefined) ?? [];
   const room = () => rooms().find((c) => c.id === chosen()) ?? rooms().find((c) => c.default) ?? rooms()[0];
   const messages = useFollowed(() => room()?.id);
   const input = signal("");
@@ -94,9 +79,9 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
     }
   };
   return (
-    <View testID="farm-chat" style={{ flex: 1, minWidth: 0, backgroundColor: "#f7e8c4" }}>
-      <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#e2c995", padding: 4, gap: 3 }}>
-        <View role="button" testID="chat-channel" onPress={() => menu.set(!menu())} style={{ flex: 1 }}>
+    <View testID="farm-chat" class="min-w-0 flex-1 bg-cream-50">
+      <View class="flex-row items-center gap-[3px] bg-cream-200 p-1">
+        <View role="button" testID="chat-channel" onPress={() => menu.set(!menu())} class="flex-1">
           <Label>{room()?.title ?? t("web.farm.chat.channels")}</Label>
         </View>
         <View role="button" accessibilityLabel={t("web.farm.chat.enlarge")} onPress={props.resize}>
@@ -107,7 +92,7 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
         </View>
       </View>
       <If when={menu()}>
-        <Scroll style={{ maxHeight: 172 }}>
+        <Scroll class="max-h-[172px]">
           <Each of={rooms()} key={(c) => c.id}>
             {(c) => (
               <Press
@@ -123,14 +108,14 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
           </Each>
         </Scroll>
       </If>
-      <Scroll style={{ flex: 1 }} contentStyle={{ padding: 8, gap: 6 }}>
-        <If when={!messages().messages.length}>
+      <Scroll class="flex-1" contentClass="gap-1.5 p-2">
+        <If when={messages().messages.length === 0}>
           <Label>{t("web.farm.chat.greeting")}</Label>
         </If>
         <Each of={messages().messages} key={(m) => m.id}>
           {(m) => (
-            <View testID="farm-message" style={{ padding: 6, backgroundColor: "#eedcb2" }}>
-              <Label color="#7f5b3b">{m().name}</Label>
+            <View testID="farm-message" class="bg-cream-100 p-1.5">
+              <Label tone="muted">{m().name}</Label>
               <Label>{m().text}</Label>
             </View>
           )}
@@ -138,9 +123,9 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
         <If when={props.heard()}>{(s) => <Label>{s()}</Label>}</If>
         <If when={props.said()}>{(s) => <Label>{s()}</Label>}</If>
       </Scroll>
-      <If when={problem()}>{(s) => <Label color="#963326">{s()}</Label>}</If>
-      <View style={{ padding: 5, gap: 4 }}>
-        <TextArea value={input()} onInput={input.set} rows={2} submit testID="farm-chat-input" onSubmit={(s) => void send(s)} />
+      <If when={problem()}>{(s) => <Label tone="error">{s()}</Label>}</If>
+      <View class="gap-1 p-[5px]">
+        <TextArea value={input()} onInput={(v) => input.set(v)} rows={2} submit testID="farm-chat-input" onSubmit={(s) => void send(s)} />
         <Press id="farm-chat-send" run={() => void send(input())}>
           {t("web.farm.chat.send")}
         </Press>
@@ -238,34 +223,21 @@ function Handset(props: { calls: () => Calls }) {
   ];
   const time = () => [clock().getHours(), clock().getMinutes()].map((n) => String(n).padStart(2, "0")).join(":");
   return (
-    <View style={{ flex: 1, flexDirection: "row", alignItems: "stretch" }}>
-      <View
-        testID="farm-phone"
-        style={{ flex: 1, backgroundColor: colors.bark, borderWidth: 2, borderColor: "#2f1f13", paddingHorizontal: 8, paddingTop: 8, paddingBottom: 10 }}
-      >
-        <View style={{ alignSelf: "center", width: 40, height: 4, backgroundColor: "#1e140b", marginBottom: 8 }} />
-        <View style={{ flex: 1, borderWidth: 2, borderColor: "#2f1f13", backgroundColor: colors.paper }}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 6,
-              paddingVertical: 2,
-              borderBottomWidth: 2,
-              borderColor: colors.dark,
-              gap: 4,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 1 }}>
-              <Each of={[3, 5, 7, 9]}>{(h) => <View style={{ width: 2, height: h(), backgroundColor: colors.ink }} />}</Each>
+    <View class="flex-1 flex-row items-stretch">
+      <View testID="farm-phone" class="flex-1 border-2 border-bark-900 bg-bark-600 px-2 pt-2 pb-2.5">
+        <View class="mb-2 h-1 w-10 self-center bg-bark-950" />
+        <View class="flex-1 border-2 border-bark-900 bg-lcd-paper">
+          <View class="flex-row items-center gap-1 border-b-2 border-lcd-dark px-1.5 py-0.5">
+            <View class="flex-row items-end gap-[1px]">
+              <Each of={[3, 5, 7, 9]}>{(h) => <View class="w-0.5 bg-lcd-ink" style={{ height: h() }} />}</Each>
             </View>
-            <View role="button" testID="phone-home" onPress={back} style={{ flex: 1 }}>
+            <View role="button" testID="phone-home" onPress={back} class="flex-1">
               <Label>{t("web.farm.phone.brand")}</Label>
             </View>
             <Label>{time()}</Label>
-            <View style={{ width: 14, height: 8, borderWidth: 2, borderColor: colors.ink, backgroundColor: colors.light }} />
+            <View class="h-2 w-[14px] border-2 border-lcd-ink bg-lcd-light" />
           </View>
-          <View style={{ flex: 1, flexDirection: "row" }}>
+          <View class="flex-1 flex-row">
             <If when={!chatOnly()}>
               <View style={{ flex: unfolded() ? 0 : 1, width: game() ? 332 : unfolded() ? 296 : 212 }}>
                 <If
@@ -273,7 +245,7 @@ function Handset(props: { calls: () => Calls }) {
                   else={
                     <>
                       <If when={app() === "home"}>
-                        <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 8, paddingTop: 16 }}>
+                        <View class="flex-row flex-wrap px-2 pt-4">
                           <Each of={helpers}>
                             {(a) => (
                               <IconKey id={a().id} label={a().label} run={a().run}>
@@ -284,7 +256,7 @@ function Handset(props: { calls: () => Calls }) {
                         </View>
                       </If>
                       <If when={app() === "games"}>
-                        <View testID="phone-games" style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 8, paddingTop: 16 }}>
+                        <View testID="phone-games" class="flex-row flex-wrap px-2 pt-4">
                           <Each of={games}>
                             {(g) => (
                               <IconKey id={g()} label={t(`web.farm.phone.game.${g()}`)} run={() => app.set(g())}>
@@ -296,7 +268,7 @@ function Handset(props: { calls: () => Calls }) {
                       </If>
                       <If when={game()}>{(id) => <PhoneGame id={id()} onBack={() => app.set("games")} />}</If>
                       <If when={app() === "log" || app() === "missed"}>
-                        <View style={{ flexDirection: "row" }}>
+                        <View class="flex-row">
                           <Press selected={app() === "missed"} run={() => app.set("missed")}>
                             {t("web.farm.phone.missed", { n: props.calls().missed.length })}
                           </Press>
@@ -304,12 +276,12 @@ function Handset(props: { calls: () => Calls }) {
                             {t("web.farm.phone.log")}
                           </Press>
                         </View>
-                        <Scroll style={{ flex: 1 }} contentStyle={{ padding: 6, gap: 4 }}>
+                        <Scroll class="flex-1" contentClass="gap-1 p-1.5">
                           <If
                             when={app() === "missed"}
                             else={
                               <>
-                                <If when={!props.calls().log.length}>
+                                <If when={props.calls().log.length === 0}>
                                   <Label>{t("web.farm.phone.noCalls")}</Label>
                                 </If>
                                 <Each of={props.calls().log}>
@@ -322,7 +294,7 @@ function Handset(props: { calls: () => Calls }) {
                               </>
                             }
                           >
-                            <If when={!props.calls().missed.length}>
+                            <If when={props.calls().missed.length === 0}>
                               <Label>{t("web.farm.phone.noMissed")}</Label>
                             </If>
                             <Each of={props.calls().missed}>
@@ -337,7 +309,7 @@ function Handset(props: { calls: () => Calls }) {
                         <Press run={() => void dial()}>{t("web.farm.phone.callOrchestrator")}</Press>
                       </If>
                       <If when={app() === "orchestrator"}>
-                        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 8 }}>
+                        <View class="flex-1 items-center justify-center gap-2">
                           <SpriteIcon name="manager-face" size={60} />
                           <Label size={18}>{t("web.farm.phone.manager")}</Label>
                           <Label>{error() || activeCall().problem || t(active() ? "web.farm.phone.phase.live" : "web.farm.phone.phase.idle")}</Label>
@@ -350,13 +322,13 @@ function Handset(props: { calls: () => Calls }) {
                   }
                 >
                   {(item) => (
-                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
+                    <View class="flex-1 items-center justify-center gap-3">
                       <Label>{t("web.farm.phone.ringing")}</Label>
                       <SpriteIcon name="manager-face" size={60} />
                       <Label size={20}>{item().who}</Label>
                       <Label>{item().words.label}</Label>
                       <Label>{item().text}</Label>
-                      <View style={{ flexDirection: "row", gap: 16 }}>
+                      <View class="flex-row gap-4">
                         <Press id="decline" run={() => settle(item(), false)}>
                           {t("web.farm.phone.decline")}
                         </Press>
@@ -390,9 +362,9 @@ function Handset(props: { calls: () => Calls }) {
           accessibilityLabel={t("web.farm.phone.openChat")}
           testID="phone-chat"
           onPress={() => unfolded.set(true)}
-          style={{ alignSelf: "flex-start", marginTop: 64, width: 32, padding: 6, backgroundColor: colors.bark, borderWidth: 2, borderColor: "#2f1f13" }}
+          class="mt-16 w-8 self-start border-2 border-bark-900 bg-bark-600 p-1.5"
         >
-          <Label color="#f7e8c4" size={14}>
+          <Label tone="cream" size={14}>
             {[...t("web.farm.phone.chatTab")].join("\n")}
           </Label>
         </View>
@@ -401,10 +373,27 @@ function Handset(props: { calls: () => Calls }) {
   );
 }
 
+const emptyCalls: Calls = { open: false, narrow: false, ringing: null, missed: [], log: [] };
+
+function isCalls(value: unknown): value is Calls {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "open" in value &&
+    typeof value.open === "boolean" &&
+    "narrow" in value &&
+    typeof value.narrow === "boolean" &&
+    "missed" in value &&
+    Array.isArray(value.missed) &&
+    "log" in value &&
+    Array.isArray(value.log)
+  );
+}
+
 export function FarmPhone() {
   setLocale(host.params.locale === "en" ? "en" : "zh");
   useBridge();
-  const initial = host.params.calls as unknown as Calls;
+  const initial = isCalls(host.params.calls) ? host.params.calls : emptyCalls;
   const updates = frame<Calls>("calls");
   const calls = () => updates() ?? initial;
   return (

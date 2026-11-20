@@ -19,7 +19,7 @@ crates/vibevalley-agent/   VibeValley 自己的 agent：模型请求（DeepSeek�
 crates/vibevalley-cli/     命令行（二进制 vibevalley，clap）：照领域模型一条命令一个操作，经 HTTP 调服务端
 crates/vibevalley-home/    家目录在磁盘上的约定：在哪、server.json、语言；服务端、命令行、原生应用共用
 crates/vibevalley-i18n/    对用户说的话：locales/<语言>/<宿主.模块>.json 的词典，Rust 里 t("key")
-crates/vibevalley-*        其余：git、files、terminal、workspace 和 store（应用外壳的项目、布局、终端）、memory、pkm、artifact、cron
+crates/vibevalley-*        其余：git、files、highlight、terminal、workspace（应用外壳的项目、布局、终端与持久化）、pkm、artifact、cron
 apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
                            ui/ 是 nsh 跑的 TSX：surfaces/ 和 components/ 是外壳的面，vv/web/ 是工作台（app、features/<概念>、ui、state、infra、base）
 apps/island/               刘海上的灵动岛（Swift）：单独的小程序（apps/island/README.md）

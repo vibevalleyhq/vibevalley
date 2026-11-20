@@ -1,8 +1,5 @@
 //! Drafting an issue (refine): what the drafting session is told and how its
-//! draft is read back. Ported from VibeValley
-//! `apps/server/src/modules/issue/refinement.ts` (`parseRefinement`,
-//! `refinementDescription`, `kept`) and `prompts.ts` (`refinementBrief`).
-//! VibeValley's prompts are in English.
+//! draft is read back.
 
 use serde::{Deserialize, Deserializer};
 

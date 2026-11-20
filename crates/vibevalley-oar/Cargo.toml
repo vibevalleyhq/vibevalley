@@ -1,24 +1,34 @@
 [package]
 name = "vibevalley-oar"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autotests = false
+
+[[test]]
+name = "suite"
+path = "tests/suite.rs"
+
+[[test]]
+name = "live"
+path = "tests/live.rs"
 
 [dependencies]
 vibevalley-durable = { version="0.1.0", path="../vibevalley-durable" }
 agent-client-protocol = "5.2.0"
-base64 = "0.23.1"
+base64 = { workspace = true }
 vibevalley-agent = { version = "0.1.0", path = "../vibevalley-agent" }
 vibevalley-home = { path = "../vibevalley-home" }
 nix = { version = "0.32.0", features = ["signal", "process"] }
-flume = "0.12.0"
-futures = "0.3.34"
-jiff = "1.0.1"
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
-thiserror = "2.0.21"
-uuid = { version = "1.29.2", features = ["v4"] }
-
-tempfile = "3.27.0"
+flume = { workspace = true }
+futures-util = { workspace = true }
+jiff = { workspace = true }
+pollster = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+tempfile = { workspace = true }
 
 [dev-dependencies]
 proptest = "1.12.0"

@@ -203,8 +203,6 @@ pub fn parse_search(text: &str) -> SearchQuery {
     q
 }
 
-// ----- link previews (embeds.ts) -----
-
 const EMBED_MAX: usize = 3;
 const EMBED_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 const BODY_MAX: usize = 512 * 1024;
@@ -337,45 +335,76 @@ pub fn embed_of(url: &str, html: &str) -> Option<Embed> {
 /// `readEmbed`: a link's preview, or none when it cannot be read (not
 /// public, not a page, too slow, too big).
 pub fn read_embed(link: &str) -> Option<Embed> {
-    use std::io::Read;
+    enum Hop {
+        Redirect(String),
+        Html(Vec<u8>),
+        Stop,
+    }
+
     let mut url = url::Url::parse(link).ok()?;
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .max_redirects(0)
-        .timeout_global(Some(EMBED_TIMEOUT))
-        .http_status_as_error(false)
-        .build()
-        .into();
+    let client = crate::public_http::no_redirect_client().ok()?.clone();
     for _ in 0..=REDIRECTS_MAX {
         if !reachable(&url, &resolve_all) {
             return None;
         }
-        let res = agent
-            .get(url.as_str())
-            .header("accept", "text/html")
-            .header("user-agent", "VibeValley link preview")
-            .call()
-            .ok()?;
-        let status = res.status().as_u16();
-        if (300..400).contains(&status) {
-            let next = res.headers().get("location")?.to_str().ok()?.to_string();
-            url = url.join(&next).ok()?;
-            continue;
+        let target = url.to_string();
+        let client = client.clone();
+        match crate::public_http::run_http(async move {
+            let mut res = match client
+                .get(&target)
+                .timeout(EMBED_TIMEOUT)
+                .header("accept", "text/html")
+                .header("user-agent", "VibeValley link preview")
+                .send()
+                .await
+            {
+                Ok(r) => r,
+                Err(_) => return Hop::Stop,
+            };
+            let status = res.status().as_u16();
+            if (300..400).contains(&status) {
+                return match res.headers().get("location").and_then(|v| v.to_str().ok()) {
+                    Some(next) => Hop::Redirect(next.to_string()),
+                    None => Hop::Stop,
+                };
+            }
+            let html = res
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .contains("text/html");
+            if !(200..300).contains(&status) || !html {
+                return Hop::Stop;
+            }
+            let mut bytes = Vec::new();
+            loop {
+                let chunk = match res.chunk().await {
+                    Ok(Some(c)) => c,
+                    Ok(None) => break,
+                    Err(_) => {
+                        if bytes.is_empty() {
+                            return Hop::Stop;
+                        }
+                        break;
+                    }
+                };
+                let remaining = BODY_MAX.saturating_sub(bytes.len());
+                if remaining == 0 {
+                    break;
+                }
+                let take = chunk.len().min(remaining);
+                bytes.extend_from_slice(&chunk[..take]);
+                if bytes.len() >= BODY_MAX {
+                    break;
+                }
+            }
+            Hop::Html(bytes)
+        }) {
+            Hop::Redirect(next) => url = url.join(&next).ok()?,
+            Hop::Html(bytes) => return embed_of(link, &String::from_utf8_lossy(&bytes)),
+            Hop::Stop => return None,
         }
-        let html = res
-            .headers()
-            .get("content-type")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .contains("text/html");
-        if !(200..300).contains(&status) || !html {
-            return None;
-        }
-        let mut bytes = vec![];
-        let read = res.into_body().into_reader().take(BODY_MAX as u64).read_to_end(&mut bytes);
-        if read.is_err() && bytes.is_empty() {
-            return None;
-        }
-        return embed_of(link, &String::from_utf8_lossy(&bytes));
     }
     None
 }

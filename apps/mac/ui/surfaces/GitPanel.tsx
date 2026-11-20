@@ -5,6 +5,8 @@
 import { Scroll, signal, Text, View } from "nsh";
 import { Button, Input } from "nsh/base";
 
+import { t } from "@vibevalley/i18n";
+
 import { act } from "../bridge";
 import { radius, tok, type as ty } from "../tokens";
 import { Empty, IconButton, PrimaryButton, SectionHead, toneColor } from "./shared";
@@ -68,11 +70,11 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     act({ type: "commit", message: text });
     message.set("");
   };
-  if (!f()?.repo) {
+  if (f()?.repo !== true) {
     return (
       <View style={{ flex: 1 }}>
         <SectionHead title="Source Control" />
-        <Empty text={f()?.busy || !f() ? "正在读取 Git 状态…" : (f()?.error ?? "当前目录不是 Git 仓库。")} />
+        <Empty text={f()?.busy === true || !f() ? t("web.shell.git.loading") : (f()?.error ?? t("web.shell.git.notRepo"))} />
       </View>
     );
   }
@@ -94,9 +96,9 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
         }}
       >
         <Text style={{ ...ty.mono, fontSize: 12, color: p().ink, flex: 1, numberOfLines: 1 }}>⑂ {f()?.branch ?? `detached ${f()?.head ?? ""}`}</Text>
-        {f()?.ahead ? <Text style={{ ...ty.label, color: p().muted }}>↑{f()?.ahead}</Text> : null}
-        {f()?.behind ? <Text style={{ ...ty.label, color: p().muted }}>↓{f()?.behind}</Text> : null}
-        <IconButton label="刷新 Git" glyph="⟳" onPress={() => act({ type: "refresh_git" })} />
+        {(f()?.ahead ?? 0) > 0 ? <Text style={{ ...ty.label, color: p().muted }}>↑{f()?.ahead}</Text> : null}
+        {(f()?.behind ?? 0) > 0 ? <Text style={{ ...ty.label, color: p().muted }}>↓{f()?.behind}</Text> : null}
+        <IconButton label={t("web.shell.git.refresh")} glyph="⟳" onPress={() => act({ type: "refresh_git" })} />
       </View>
 
       {/* Sub-navigation when not driven by parent header */}
@@ -113,9 +115,12 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
         >
           {(
             [
-              { id: "changes", label: changedCount() > 0 ? `变更 (${changedCount()})` : "变更" },
-              { id: "branches", label: `分支 (${f()?.branches?.length ?? 0})` },
-              { id: "commits", label: "历史" },
+              {
+                id: "changes",
+                label: changedCount() > 0 ? t("web.shell.git.tab.changesCount", { count: changedCount() }) : t("web.shell.git.tab.changes"),
+              },
+              { id: "branches", label: t("web.shell.git.tab.branches", { count: f()?.branches?.length ?? 0 }) },
+              { id: "commits", label: t("web.shell.git.tab.commits") },
             ] as const
           ).map((item) => {
             const cur = activeTab() === item.id;
@@ -146,7 +151,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               <Input
                 value={message()}
                 onChange={({ value }) => message.set(value)}
-                placeholder="输入提交信息 (Commit message)…"
+                placeholder={t("web.shell.git.commitPlaceholder")}
                 multiline
                 style={{
                   minHeight: 56,
@@ -160,51 +165,59 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 }}
               />
               <PrimaryButton
-                label={f()?.staged?.length ? `提交暂存变更 (${f()?.staged?.length})` : "暂无暂存文件"}
-                disabled={!f()?.staged?.length || !message().trim()}
+                label={(f()?.staged?.length ?? 0) > 0 ? t("web.shell.git.commitStaged", { count: f()?.staged?.length ?? 0 }) : t("web.shell.git.noStaged")}
+                disabled={(f()?.staged?.length ?? 0) === 0 || !message().trim()}
                 onPress={commit}
               />
               {f()?.error ? <Text style={{ ...ty.label, color: p().danger }}>{f()?.error}</Text> : null}
             </View>
-            {f()?.conflicts?.length ? (
+            {(f()?.conflicts?.length ?? 0) > 0 ? (
               <View>
-                <SectionHead title="冲突 (Conflicts)" count={f()?.conflicts?.length} />
+                <SectionHead title={t("web.shell.git.conflicts")} count={f()?.conflicts?.length} />
                 <Each of={f()?.conflicts ?? []} key={(r) => r.path}>
                   {(row) => <FileRow row={row()} staged={false} />}
                 </Each>
               </View>
             ) : null}
             <SectionHead
-              title="已暂存 (Staged)"
+              title={t("web.shell.git.staged")}
               count={f()?.staged?.length ?? 0}
               right={
-                f()?.staged?.length ? (
-                  <IconButton label="全部取消暂存" glyph="−" onPress={() => act({ type: "unstage", paths: (f()?.staged ?? []).map((r) => r.path) })} />
+                (f()?.staged?.length ?? 0) > 0 ? (
+                  <IconButton
+                    label={t("web.shell.git.unstageAll")}
+                    glyph="−"
+                    onPress={() => act({ type: "unstage", paths: (f()?.staged ?? []).map((r) => r.path) })}
+                  />
                 ) : undefined
               }
             />
-            {f()?.staged?.length ? (
+            {(f()?.staged?.length ?? 0) > 0 ? (
               <Each of={f()?.staged ?? []} key={(r) => r.path}>
                 {(row) => <FileRow row={row()} staged />}
               </Each>
             ) : (
-              <Empty text="暂无已暂存的文件。" />
+              <Empty text={t("web.shell.git.stagedEmpty")} />
             )}
             <SectionHead
-              title="工作区变更 (Changes)"
+              title={t("web.shell.git.changes")}
               count={f()?.changes?.length ?? 0}
               right={
-                f()?.changes?.length ? (
-                  <IconButton label="全部暂存" glyph="+" onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })} />
+                (f()?.changes?.length ?? 0) > 0 ? (
+                  <IconButton
+                    label={t("web.shell.git.stageAll")}
+                    glyph="+"
+                    onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
+                  />
                 ) : undefined
               }
             />
-            {f()?.changes?.length ? (
+            {(f()?.changes?.length ?? 0) > 0 ? (
               <Each of={f()?.changes ?? []} key={(r) => r.path}>
                 {(row) => <FileRow row={row()} staged={false} />}
               </Each>
             ) : (
-              <Empty text="工作区干净，没有未提交改动。" />
+              <Empty text={t("web.shell.git.clean")} />
             )}
           </View>
         ) : null}
@@ -212,13 +225,13 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
         {/* 2. BRANCHES & WORKTREES VIEW */}
         {activeTab() === "branches" ? (
           <View>
-            <SectionHead title="本地分支 (Branches)" count={f()?.branches?.length ?? 0} />
-            {f()?.branches?.length ? (
+            <SectionHead title={t("web.shell.git.branches")} count={f()?.branches?.length ?? 0} />
+            {(f()?.branches?.length ?? 0) > 0 ? (
               <Each of={f()?.branches ?? []} key={(b) => b.name}>
                 {(b) => (
                   <Button
                     onPress={() => !b().head && act({ type: "checkout", branch: b().name })}
-                    accessibilityLabel={b().head ? `${b().name}, 当前分支` : `切换到 ${b().name}`}
+                    accessibilityLabel={b().head ? t("web.shell.git.currentBranch", { name: b().name }) : t("web.shell.git.switchBranch", { name: b().name })}
                     class="hover:bg-[#f0f0f0] dark:hover:bg-[#232326]"
                     style={{
                       height: 30,
@@ -247,11 +260,11 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 )}
               </Each>
             ) : (
-              <Empty text="未找到本地分支。" />
+              <Empty text={t("web.shell.git.noBranches")} />
             )}
             {(f()?.worktrees?.length ?? 0) > 0 ? (
               <View>
-                <SectionHead title="工作树 (Worktrees)" count={f()?.worktrees?.length} />
+                <SectionHead title={t("web.shell.git.worktrees")} count={f()?.worktrees?.length} />
                 <Each of={f()?.worktrees ?? []} key={(w) => w.path}>
                   {(w) => (
                     <Button
@@ -263,7 +276,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                         <Text style={{ ...ty.mono, fontSize: 12, fontWeight: "600", color: p().ink, numberOfLines: 1, flex: 1 }}>
                           ⑂ {w().branch ?? "(detached)"}
                         </Text>
-                        {w().main ? <Text style={{ fontSize: 11, color: p().muted }}>主工作树</Text> : null}
+                        {w().main ? <Text style={{ fontSize: 11, color: p().muted }}>{t("web.shell.git.mainWorktree")}</Text> : null}
                       </View>
                       <Text style={{ ...ty.label, color: p().muted, numberOfLines: 1, textOverflow: "ellipsis-start" }}>{w().path}</Text>
                     </Button>
@@ -277,8 +290,8 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
         {/* 3. COMMIT HISTORY VIEW */}
         {activeTab() === "commits" ? (
           <View>
-            <SectionHead title="提交记录 (Commit History)" count={f()?.log?.length ?? 0} />
-            {f()?.log?.length ? (
+            <SectionHead title={t("web.shell.git.commits")} count={f()?.log?.length ?? 0} />
+            {(f()?.log?.length ?? 0) > 0 ? (
               <Each of={f()?.log ?? []} key={(c) => c.id}>
                 {(c) => (
                   <Button
@@ -305,7 +318,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 )}
               </Each>
             ) : (
-              <Empty text="暂无提交记录。" />
+              <Empty text={t("web.shell.git.noCommits")} />
             )}
           </View>
         ) : null}

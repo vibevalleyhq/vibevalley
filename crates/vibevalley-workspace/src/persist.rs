@@ -3,8 +3,8 @@
 
 use std::path::Path;
 
+use crate::store::{Project, ProjectId, Result, SavedTerminal};
 use serde_json::Value;
-use vibevalley_store::{Project, ProjectId, Result, SavedTerminal};
 
 pub trait Persistence: Send + Sync {
     fn projects(&self) -> Result<Vec<Project>>;
@@ -21,42 +21,42 @@ pub trait Persistence: Send + Sync {
     fn set_setting(&self, key: &str, value: &Value) -> Result<()>;
 }
 
-impl Persistence for vibevalley_store::Store {
+impl Persistence for crate::store::Store {
     fn projects(&self) -> Result<Vec<Project>> {
-        vibevalley_store::Store::projects(self)
+        crate::store::Store::projects(self)
     }
     fn add_project(&self, path: &Path) -> Result<Project> {
-        vibevalley_store::Store::add_project(self, path)
+        crate::store::Store::add_project(self, path)
     }
     fn remove_project(&self, id: ProjectId) -> Result<()> {
-        vibevalley_store::Store::remove_project(self, id)
+        crate::store::Store::remove_project(self, id)
     }
     fn rename_project(&self, id: ProjectId, name: &str) -> Result<()> {
-        vibevalley_store::Store::rename_project(self, id, name)
+        crate::store::Store::rename_project(self, id, name)
     }
     fn reorder_projects(&self, ids_in_order: &[ProjectId]) -> Result<()> {
-        vibevalley_store::Store::reorder_projects(self, ids_in_order)
+        crate::store::Store::reorder_projects(self, ids_in_order)
     }
     fn touch_project(&self, id: ProjectId) -> Result<()> {
-        vibevalley_store::Store::touch_project(self, id)
+        crate::store::Store::touch_project(self, id)
     }
     fn layout(&self, id: ProjectId) -> Result<Option<Value>> {
-        vibevalley_store::Store::layout(self, id)
+        crate::store::Store::layout(self, id)
     }
     fn set_layout(&self, id: ProjectId, layout: &Value) -> Result<()> {
-        vibevalley_store::Store::set_layout(self, id, layout)
+        crate::store::Store::set_layout(self, id, layout)
     }
     fn terminals(&self, id: ProjectId) -> Result<Vec<SavedTerminal>> {
-        vibevalley_store::Store::terminals(self, id)
+        crate::store::Store::terminals(self, id)
     }
     fn set_terminals(&self, id: ProjectId, terminals: &[SavedTerminal]) -> Result<()> {
-        vibevalley_store::Store::set_terminals(self, id, terminals)
+        crate::store::Store::set_terminals(self, id, terminals)
     }
     fn setting(&self, key: &str) -> Result<Option<Value>> {
-        vibevalley_store::Store::setting(self, key)
+        crate::store::Store::setting(self, key)
     }
     fn set_setting(&self, key: &str, value: &Value) -> Result<()> {
-        vibevalley_store::Store::set_setting(self, key, value)
+        crate::store::Store::set_setting(self, key, value)
     }
 }
 
@@ -71,6 +71,6 @@ pub fn load_setting<T: serde::de::DeserializeOwned + Default>(store: &dyn Persis
 }
 
 pub fn save_setting<T: serde::Serialize>(store: &dyn Persistence, key: &str, value: &T) -> Result<()> {
-    let value = serde_json::to_value(value).map_err(|e| vibevalley_store::StoreError::Db(e.to_string()))?;
+    let value = serde_json::to_value(value).map_err(|e| crate::store::StoreError::Db(e.to_string()))?;
     store.set_setting(key, &value)
 }

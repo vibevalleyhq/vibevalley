@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/agent/AgentPage.tsx: a
-// helper's profile (the look, the stage, the configuration tabs, what is
-// wrong with it) or an orchestrator's, and the trajectories of the helpers
-// it sent. VibeValley adds: a terminal at the profile's work folder.
 import { Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

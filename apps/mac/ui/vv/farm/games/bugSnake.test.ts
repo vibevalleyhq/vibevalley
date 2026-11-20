@@ -23,7 +23,7 @@ const crawl = (g: BugSnake, n: number) => Array.from({ length: n }).reduce<BugSn
 /** The pilot: of the ways that do not end the run (up, right, down, left in that order, never back), the first nearest the bug or else the seed. */
 function pilot(g: BugSnake): SnakeHeading {
   const target = g.bug ?? g.food;
-  const head = g.body[0]!;
+  const head = g.body[0];
   const kept = g.grow > 0 ? g.body : g.body.slice(0, -1);
   const back: Record<SnakeHeading, SnakeHeading> = { up: "down", down: "up", left: "right", right: "left" };
   let best = g.heading;

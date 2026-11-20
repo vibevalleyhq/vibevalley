@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/ChannelSidebar.tsx.
-// A channel is reordered by dragging its row onto another as a pan gesture
-// (nsh has no HTML drag and drop): the rows are measured as the drag starts.
-// The direct picker is nsh/base's Popover rather than an absolutely placed
-// list.
 import { cleanup, keymap, PanResponder, Scroll, signal, Text, untracked, View, type JSX, type ViewRef } from "nsh";
 import { Popover } from "nsh/base";
 
@@ -305,7 +300,7 @@ function ChannelRow(props: { channel: Channel; here: boolean; unread: number; on
       class={`flex-row items-center gap-2 rounded-md px-2.5 py-1 ${props.here ? "bg-selected" : "hover:bg-hover"} ${props.reorder.dragged() === props.channel.id ? "opacity-40" : ""}`}
     >
       <If when={props.reorder.over() === props.channel.id}>
-        <View testID="channel-drop-before" class="absolute inset-x-0 top-0 h-0.5 rounded-full bg-accent" style={{ pointerEvents: "none" }} />
+        <View testID="channel-drop-before" class="pointer-events-none absolute inset-x-0 top-0 h-0.5 rounded-full bg-accent" />
       </If>
       <Text class="text-sm text-faint">{markOf(props.channel)}</Text>
       <Text

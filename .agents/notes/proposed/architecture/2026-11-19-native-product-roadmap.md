@@ -82,7 +82,7 @@ SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均�
 
 | 顺序 | 迁移边界 | 通过条件 |
 | --- | --- | --- |
-| 1．宿主存储 | 先迁 `vibevalley-store` 的 `state.db`。项目列表、布局和终端保存共用宿主的数据库入口。沿用 WAL、外键、同步级别和 5 秒锁等待设置。宿主在后台执行数据库工作。 | 用隔离的旧库副本打开原生工作台。重排项目并保存布局和终端，退出后重开核对。批量保存中途失败时应能读回原记录。检查真实应用的依赖树只链接一份 SQLite。[宿主入口](apps/mac/src/shell.rs) · [存储与事务](crates/vibevalley-store/src/lib.rs) · [已有测试](crates/vibevalley-store/src/tests.rs) |
+| 1．宿主存储 | 先迁 `vibevalley-store` 的 `state.db`。项目列表、布局和终端保存共用宿主的数据库入口。沿用 WAL、外键、同步级别和 5 秒锁等待设置。宿主在后台执行数据库工作。 | 用隔离的旧库副本打开原生工作台。重排项目并保存布局和终端，退出后重开核对。批量保存中途失败时应能读回原记录。检查真实应用的依赖树只链接一份 SQLite。[宿主入口](apps/mac/src/shell.rs) · [存储与事务](crates/vibevalley-workspace/src/store/mod.rs) · [已有测试](crates/vibevalley-workspace/src/store/tests.rs) |
 | 2．服务端账本 | 以完整业务事务为单位切换驱动。工单与会话的同批写入共用一笔 SQLx 事务。提交成功后才更新内存和通知订阅者。再按模块迁服务端的其他查询。 | 在写入中途制造失败。重开数据库后两项记录均应保持原值，订阅者也应保留旧状态。[工单账本](crates/vibevalley-server/src/modules/ledger.rs) |
 | 3．持久执行 | 最后迁 `vibevalley-durable`。保持原有提交、去重和恢复边界。通过各生产入口验收后，移除对应的 `rusqlite` 直接依赖。 | 用第三节的三个中断时点重跑主线。按同一条用户回复核对轮次、工作目录和汇报。[持久执行存储](crates/vibevalley-durable/src/store.rs) |
 

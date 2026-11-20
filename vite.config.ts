@@ -1,6 +1,14 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { defineConfig } from "vite-plus";
 
 import { says } from "./scripts/audit/oxlint-plugin.ts";
+
+// `apps/mac/ui/.nsh/tsconfig.json` is generated on macOS by `nsh check` (and is gitignored).
+// Linux CI (`ci.yml`) cannot install the macOS-only nsh CLI, so type-aware lint skips `apps/mac/ui/**`
+// only when `.nsh/tsconfig.json` is absent; `mac:check` runs `nsh check` then `vp lint apps/mac/ui`.
+const hasNshTypes = existsSync(resolve(import.meta.dirname, "apps/mac/ui/.nsh/tsconfig.json"));
 
 // What no-restricted-imports says, each written once: what is wrong, how to fix it, and where to look
 // (scripts/audit/oxlint-plugin.ts, says; its test reads these too).
@@ -53,18 +61,14 @@ export default defineConfig({
       "sql:check": { command: "sqlc diff && python3 scripts/release/verify-native-schema.py --queries-only", cache: false },
       "mac:check": {
         command:
-          "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build && ../../../.tools/bin/nsh test vv/app/issues.test.tsx",
+          "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build && cd ../../.. && vp lint --deny-warnings apps/mac/ui && vpx scripts/audit/mac-tests.ts",
         cache: false,
       },
-      "release:verify": [
-        "vp run rust:check",
-        "vp run protocol:check",
-        "vp run sql:check",
-        "vp run packages:check",
-        "vp run scripts:test",
-        "vp run mac:check",
-        "vp run docs:verify",
-      ],
+      "release:verify": {
+        command: "true",
+        dependsOn: ["rust:check", "protocol:check", "sql:check", "packages:check", "scripts:test", "mac:check", "docs:verify"],
+        cache: false,
+      },
     },
   },
   // scripts/'s own tests; each package has its vite.config.ts with its own.
@@ -82,8 +86,7 @@ export default defineConfig({
     },
   },
   lint: {
-    // The native views run on nsh, not the DOM: `nsh check` types them (vp run mac:check) until the lint rules know nsh.
-    ignorePatterns: ["crates/**", "apps/mac/ui/**"],
+    ignorePatterns: hasNshTypes ? ["crates/**", "apps/mac/ui/.nsh/**", "apps/mac/ui/build/**"] : ["crates/**", "apps/mac/ui/**"],
     // oxlint's defaults and import for no-cycle; listing plugins replaces the defaults.
     plugins: ["eslint", "typescript", "unicorn", "oxc", "import"],
     jsPlugins: [
@@ -173,7 +176,7 @@ export default defineConfig({
       {
         // Shipped code lets no any through: what JSON, a library or a cast gives untyped is typed where it comes in.
         // Tests and scripts read JSON they wrote themselves.
-        files: ["apps/*/src/**", "packages/*/src/**"],
+        files: ["apps/*/src/**", "apps/mac/ui/**", "packages/*/src/**"],
         rules: {
           "typescript/no-unsafe-argument": "error",
           "typescript/no-unsafe-assignment": "error",
@@ -183,7 +186,18 @@ export default defineConfig({
         },
       },
       {
-        files: ["**/*.test.ts", "**/*.test.tsx", "packages/*/src/testing/**", "packages/testkit/src/**"],
+        files: [
+          "**/*.test.ts",
+          "**/*.test.tsx",
+          "apps/mac/ui/**/fixtures/**",
+          "apps/mac/ui/**/*.story.tsx",
+          "apps/mac/ui/**/story.tsx",
+          "apps/mac/ui/**/stories/**",
+          "apps/mac/ui/vv/app/fakeHost.ts",
+          "apps/mac/ui/vv/polyfill.ts",
+          "packages/*/src/testing/**",
+          "packages/testkit/src/**",
+        ],
         rules: {
           "typescript/no-unsafe-argument": "off",
           "typescript/no-unsafe-assignment": "off",
@@ -193,19 +207,36 @@ export default defineConfig({
         },
       },
       {
+        // nsh 0.6.0's generated `test.d.ts` types `test(name, body: () => void)` without `Promise<void>`, so async tests fire no-misused-promises.
+        files: ["apps/mac/ui/**/*.test.ts", "apps/mac/ui/**/*.test.tsx"],
+        rules: { "typescript/no-misused-promises": "off" },
+      },
+      {
         // A test's cast is checked by the test: a wrong claim fails the expectation that reads it.
-        files: ["**/*.test.ts", "**/*.test.tsx", "apps/*/test/**", "packages/*/test/**", "packages/*/src/testing/**", "packages/testkit/src/**"],
+        files: [
+          "**/*.test.ts",
+          "**/*.test.tsx",
+          "apps/*/test/**",
+          "apps/mac/ui/**/fixtures/**",
+          "apps/mac/ui/**/*.story.tsx",
+          "apps/mac/ui/**/story.tsx",
+          "apps/mac/ui/**/stories/**",
+          "apps/mac/ui/vv/app/fakeHost.ts",
+          "packages/*/test/**",
+          "packages/*/src/testing/**",
+          "packages/testkit/src/**",
+        ],
         rules: { "typescript/no-unsafe-type-assertion": "off" },
       },
       {
         // The tests wait on conditions, not on the clock (scripts/audit/oxlint-plugin.ts, no-test-sleep).
-        files: ["apps/*/src/**/*.test.ts", "apps/*/src/**/*.test.tsx", "packages/*/src/**/*.test.ts"],
+        files: ["apps/*/src/**/*.test.ts", "apps/*/src/**/*.test.tsx", "apps/mac/ui/**/*.test.ts", "apps/mac/ui/**/*.test.tsx", "packages/*/src/**/*.test.ts"],
         rules: { "vibevalley/no-test-sleep": "error" },
       },
       {
         // What the shipped code says to the user is in the catalogs (crates/vibevalley-i18n/locales, read as t("key");
         // scripts/audit/oxlint-plugin.ts, no-cjk-literal): Chinese is written only there and in the tests.
-        files: ["apps/*/src/**", "packages/*/src/**"],
+        files: ["apps/*/src/**", "apps/mac/ui/**", "packages/*/src/**"],
         rules: { "vibevalley/no-cjk-literal": "error" },
       },
       {
@@ -214,6 +245,14 @@ export default defineConfig({
           "packages/i18n/src/catalogs.ts",
           // The site's bilingual marketing copy has its own typed dictionaries.
           "apps/site/src/i18n/**",
+          // QuickJS Intl.DateTimeFormat("zh-CN") polyfill formats Chinese calendar tokens.
+          "apps/mac/ui/vv/polyfill.ts",
+          // Story/demo sample data and test fixtures.
+          "apps/mac/ui/**/*.samples.ts",
+          "apps/mac/ui/**/*.story.tsx",
+          "apps/mac/ui/**/story.tsx",
+          "apps/mac/ui/**/stories/**",
+          "apps/mac/ui/**/fixtures/**",
           "**/*.test.ts",
           "**/*.test.tsx",
           "packages/*/src/testing/**",
@@ -222,8 +261,9 @@ export default defineConfig({
       },
       {
         // Markup takes its looks from `class` (Tailwind utilities, vv-tailwind), never a written-out `style` (style-attrs).
-        files: ["apps/site/src/**"],
-        excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
+        // Shell surfaces (`apps/mac/ui/{surfaces,components}/**`) intentionally use `tok()` style objects instead of Tailwind classes.
+        files: ["apps/site/src/**", "apps/mac/ui/vv/**"],
+        excludeFiles: ["**/*.test.ts", "**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
         rules: { "vibevalley/style-attrs": "error" },
       },
       {
@@ -237,13 +277,15 @@ export default defineConfig({
         rules: { "vibevalley/global-doors": "error" },
       },
       {
-        // The door: what a page shares with the shell that hosts it.
-        files: ["packages/protocol/src/host.ts"],
+        // The doors: what a page shares with the shell that hosts it, and QuickJS's polyfill surface.
+        files: ["packages/protocol/src/host.ts", "apps/mac/ui/vv/polyfill.ts"],
         rules: { "vibevalley/global-doors": ["error", { door: true }] },
       },
       {
         // One word for none (scripts/audit/oxlint-plugin.ts, one-absent).
         files: ["apps/**", "packages/**"],
+        // `native.ts` is owned by the parallel pinyin-rust branch; left untouched to preserve zero file overlap.
+        excludeFiles: ["apps/mac/ui/vv/web/ui/rich/native.ts"],
         rules: { "vibevalley/one-absent": "error" },
       },
       {

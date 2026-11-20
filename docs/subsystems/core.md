@@ -34,7 +34,7 @@
 - **「事实」专指 `Hub::apply` 的输入**：农机能力叫 `RuntimeSupport`，会话事件映射叫 `Reaction`，一条频道消息和它的听众叫 `ChannelHearers`，排序键叫 `RowKeys`。
 - **事实命名表达发生了什么**：实体新增或更新叫 `<实体>Changed`，移除叫 `<实体>Removed`，生命周期结清用动词过去式（`sessionPhaseChanged`、`sessionReported`、`sessionLeft`）。
 - **批次原子可见，单条保留因果**：`Hub::apply`（`crates/vibevalley-server/src/lib.rs`）是同步函数：在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）与特效，再一次性替换可见状态、递增一次 `seq`，然后按序发布事实、`Transition` 和特效，返回前全部做完。状态在一把锁里换，各线程都可以就地调 `apply`。`reduce` 不得修改传入的旧状态。
-- **先落库，后发事实**：各模块先提交数据库事务或文件，再调 `Hub::apply`。重启时从空状态由各模块从库（`state.db`、`server.db`）恢复。
+- **先落库，后发事实**：各模块先提交数据库事务或文件，再调 `Hub::apply`。重启时从空状态由各模块从 `server.db` 及家目录文件恢复。
 - **按依赖重算工单派生状态**：`reduce` 仅在工单或会话集合引用变化时重算工单状态与动作（`withIssueStatuses`）；聊天或花费事实不触发工单重算。一轮进行中的 `sessionPhaseChanged` 只改了 `doing` 或 `spent`（`since`、`quietSince` 不变，`phaseAffectsIssue`）时也跳过重算。
 - **界面文案只在出帧时填充**：`frame_of` 在状态副本上填入 `phaseText`、`actionText`、`whenText`、工单 `stage` 与可执行动作；`reduce` 与持久层不含界面文案。
 
@@ -51,9 +51,10 @@
 
 SSE 以外的路由：
 
-- `GET /api/v1/attachment/<id>`：附件；`GET /api/v1/artifact/<id>/<version>`：网页 Artifact。
+- `GET /api/v1/attachment/<id>`：附件；`GET /api/v1/artifact/<id>/<version>` 与 `GET /api/v1/artifact/<id>/view`：网页与结构化 Artifact 沙箱视图。
 - `PUT`、`GET /api/v1/media/input/<id>/content`：上传和读取媒体输入；`GET /api/v1/media/speech/<id>/stream`：合成语音的流（[媒体](docs/subsystems/media.md)）。
 - `/mcp`：帮工的工具（[频道](docs/subsystems/channel.md)）。
+- `/chord/ws`：执行治理文档 `space` 的 WebSocket 订阅（快照、按修订号续读与 `budget.raise` 命令，见 [Chord](crates/vibevalley-chord/README.md)）。
 
 - **客户端拥有流与订阅的生命周期**：原生页面经 `crates/vibevalley-bridge` 直接收发 `StateFrame`、`LiveEvent` 与订阅事件，视图关闭或取消订阅时立即释放 `Subscription`；命令行的 `sse_events`（`crates/vibevalley-cli/src/farm.rs`）在 HTTP SSE 上按空行分帧解码，坏帧、HTTP 拒绝或退出时立即释放连接。
 - **心跳**：每条 SSE 连接（含工单观察流和订阅流）每 20 秒发 `: ping` 心跳；订阅方断开时释放源订阅。
@@ -83,7 +84,7 @@ SSE 以外的路由：
 
 **服务端启动**
 
-1. `start`（`crates/vibevalley-server/src/start.rs`）从空状态起 `Hub`，按序打开设置、游戏、档案和农机、`state.db`（`vibevalley-store`）、仓库、记性、轨迹、工单板、定时任务、附件、频道、素材库、媒体、Artifact、笔记、助手、观察层；各自从库读回并施加初始事实。
+1. `start`（`crates/vibevalley-server/src/start.rs`）从空状态起 `Hub`，按序打开设置、游戏、AI 服务、档案和农机、仓库、记性、轨迹、工单板（共用 `server.db`）、PR 与分支发布、定时任务、附件、媒体输入、频道、素材库、媒体任务、Artifact、笔记、助手、观察层与连接器；各自从 `server.db` 与家目录文件读回并施加初始事实。
 2. 工单板接回停机时在场的会话；观察层按游标读完漏读的频道事件。
 3. `main.rs` 绑定端口（`VIBEVALLEY_PORT=0` 时取任意端口），写出 `server.json`，`--ready-json` 打印 `{"url","pid"}`。
 

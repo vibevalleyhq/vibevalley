@@ -1,7 +1,6 @@
 //! `repo.*` and `github.*`: the repositories under `<work root>/repos`,
 //! made or cloned by name, their activity and languages, and whether gh
-//! can open pull requests on them. Ported from VibeValley
-//! `modules/repo/{repo,github,stats}.ts` and `handlers/repo.ts`.
+//! can open pull requests on them.
 //!
 //! git is the system binary (as everywhere in VibeValley); the calls here
 //! (`init`, `clone`, `log --all`) are ones `vibevalley-git` does not offer.
@@ -733,8 +732,6 @@ mod tests {
         assert_eq!((counts[0].name.as_str(), counts[0].files), ("Rust", 2));
     }
 }
-
-// ----- templates (`issue.templates`, `creation.ts`) -----
 
 const STACK_FILES: [&str; 11] = [
     "go.mod",

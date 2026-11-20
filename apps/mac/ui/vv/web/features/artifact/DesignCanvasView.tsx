@@ -1,7 +1,7 @@
 import { Scroll, Text, View } from "nsh";
 import { z } from "zod";
 
-import { type StorePropDef, storeMessageOf, writePropsIntoDcHtml } from "@vibevalley/artifact/viewers";
+import { type StorePropDef, storeMessageOf } from "@vibevalley/artifact/viewers";
 import { t } from "@vibevalley/i18n";
 
 import { createMemo, createSignal } from "../../../solid";
@@ -14,7 +14,7 @@ import { Slider } from "../../ui/Slider";
 import { toast } from "../../ui/toasts";
 import type { Frame } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
-import { useReportViewContext, useStoreEntries } from "./store";
+import { useReportViewContext, useStoreEntries, writeArtifactEntryProps } from "./store";
 import type { StoreViewerProps } from "./StoreArtifactView";
 
 const ArtboardSchema = z.object({
@@ -88,7 +88,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
   const activeArtboard = () => {
     const id = selectedId();
     const all = artboards();
-    return (id ? all.find((a) => a.id === id) : undefined) ?? all[0];
+    return (id ? all.find((a) => a.id === id) : undefined) ?? all.at(0);
   };
   const activePath = () => {
     const ab = activeArtboard();
@@ -125,11 +125,10 @@ export function DesignCanvasView(props: StoreViewerProps) {
 
   const savePropDefaults = () => {
     const path = activePath();
-    const raw = snapshot().entries.get(path)?.value;
-    if (!raw || propDefs().length === 0) return;
-    const nextHtml = writePropsIntoDcHtml(raw, propValues());
+    if (!snapshot().entries.has(path) || propDefs().length === 0) return;
+    const values = propValues();
     void act.run(async () => {
-      await client.batch([{ op: "set", path, kind: "text", value: nextHtml }]);
+      await writeArtifactEntryProps({ id: props.artifact.id, path, values });
       toast(t("web.artifact.design.savedProps"));
     });
   };

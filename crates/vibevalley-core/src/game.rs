@@ -1,7 +1,5 @@
 //! The farm as the state shows it: plays, stations, plots, level and the
-//! effects facts set off. Ported from VibeValley
-//! `apps/server/src/modules/game/view.ts`; achievements from
-//! `modules/agent/seeds{,.en}.json` (copied into `data/`).
+//! effects facts set off; achievements come from `data/seeds{,.en}.json`.
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::OnceLock;
@@ -357,8 +355,6 @@ pub fn view_of(state: &SpaceState) -> FarmView {
         achievements: standings_of(state.progress.as_ref()),
     }
 }
-
-// ----- achievements -----
 
 /// An achievement as `seeds.json` defines it.
 #[derive(Debug, Clone, Deserialize)]

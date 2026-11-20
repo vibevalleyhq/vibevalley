@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-use gpui_kit::App;
+use gpui::App;
 use serde_json::{Value, json};
 
 use releases::{Manual, Release, Stage};

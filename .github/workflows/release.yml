@@ -45,12 +45,39 @@ jobs:
             exit 1
           fi
       - run: rustup show && brew install zig
+      - name: Restore Rust and Swift build cache
+        id: mac-build-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/release/deps/
+            target/release/build/
+            target/release/.fingerprint/
+            apps/island/.build/
+          key: release-mac-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'apps/island/Package.swift') }}
+          restore-keys: release-mac-${{ runner.os }}-${{ runner.arch }}-
       - run: vp run nsh:install
       - run: vp run package:mac --version "${TAG#v}"
         env:
           TAG: ${{ github.ref_name }}
           VIBEVALLEY_SIGN_IDENTITY: ${{ vars.VIBEVALLEY_SIGN_IDENTITY }}
           VIBEVALLEY_NOTARY_PROFILE: ${{ vars.VIBEVALLEY_NOTARY_PROFILE }}
+      - name: Save Rust and Swift build cache
+        if: success() && steps.mac-build-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/release/deps/
+            target/release/build/
+            target/release/.fingerprint/
+            apps/island/.build/
+          key: ${{ steps.mac-build-cache.outputs.cache-primary-key }}
       - name: Draft the release
         env:
           GH_TOKEN: ${{ github.token }}

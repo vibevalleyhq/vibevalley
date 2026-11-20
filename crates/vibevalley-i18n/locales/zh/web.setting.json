@@ -96,7 +96,12 @@
       "system": "跟随系统"
     },
     "scale": "界面大小",
-    "scaleHint": "缩放整个工作台；农场按整数倍放大，不跟着变"
+    "scaleHint": "缩放整个工作台；农场按整数倍放大，不跟着变",
+    "monoFont": "终端与代码字体",
+    "monoFontRow": "终端与代码字体（支持 Nerd Font）",
+    "monoFontHint": "用于终端、Diff 与文件预览的等宽字体，内置 Nerd Font 图标回退链",
+    "terminalFontSize": "终端字号",
+    "terminalFontSizeHint": "也可在工作目录随时按 ⌘+ / ⌘- / ⌘0 调整"
   },
   "models": {
     "deepseekHint": "助手和 VibeValley 自己的帮工用它"

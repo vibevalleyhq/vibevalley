@@ -159,8 +159,6 @@ impl Hub {
         hub
     }
 
-    // ----- the state -----
-
     /// The state now.
     pub fn state_now(&self) -> SpaceState {
         lock(&self.core).state().clone()
@@ -218,8 +216,6 @@ impl Hub {
         self.watchers.write().unwrap_or_else(|e| e.into_inner()).push(watcher);
     }
 
-    // ----- live events (core.ts sessionEvent, notice, runtime) -----
-
     fn publish_live(&self, event: LiveEvent) {
         lock(&self.streams).live.retain(|tx| tx.send(event.clone()).is_ok());
     }
@@ -243,8 +239,6 @@ impl Hub {
     pub fn runtime(&self, info: RuntimeInfo) {
         self.publish_live(LiveEvent::Runtime(LiveEventRuntime { at: now(), info }));
     }
-
-    // ----- endpoints -----
 
     /// Answers `O` with `handler`, replacing any earlier one.
     pub fn on<O: Op>(&self, handler: impl Fn(&Ctx, O::Input) -> Result<O::Result, ApiError> + Send + Sync + 'static) {
@@ -306,8 +300,6 @@ impl Hub {
             Err(err) => Envelope::failure(&err),
         }
     }
-
-    // ----- subscriptions (rpc.ts) -----
 
     /// Serves subscription `S` with `open`: it decodes nothing itself, gets
     /// the payload typed, and sends events into the sink from any thread

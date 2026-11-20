@@ -19,6 +19,7 @@ test("the shelves, a shelf, a search", async () => {
   const { app, fake } = await start("/catalog");
   expect(app.count("id:catalog-shelves")).toBe(1);
   expect(fake.calls.map((c) => c.op)).toContain("host.pixelDir");
+  expect(fake.calls.map((c) => c.op)).toContain("host.pixelManifest");
   const all = app.count("id:picture");
   expect(all).toBeGreaterThan(700);
   await app.press("id:shelf-dog");
@@ -45,14 +46,13 @@ test("the cursors", async () => {
   expect(app.count("id:cursor")).toBeGreaterThan(3);
 });
 
-test("the sounds: a press renders the recipe and hands the host a WAV", async () => {
+test("the sounds: a press asks the host to play the named sound", async () => {
   const { app, fake } = await start("/catalog/sounds");
   expect(app.count("id:sound")).toBe(29);
   await app.type("id:catalog-search", "coin");
   await app.waitUntil(() => app.count("id:sound") === 1);
   await app.press("id:sound");
   await fake.pump(app);
-  const play = fake.calls.find((c) => c.op === "host.playAudio")?.payload as { data: string; type: string } | undefined;
-  expect(play?.type).toBe("audio/wav");
-  expect(atob(play?.data ?? "").slice(0, 4)).toBe("RIFF");
+  const play = fake.calls.find((c) => c.op === "host.playSound")?.payload as { name: string } | undefined;
+  expect(play).toEqual({ name: "coin" });
 });

@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/features/media/UnderstandingPanel.tsx.
 import { cleanup, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -118,7 +117,7 @@ export function UnderstandingPanel(props: { file: Attachment }) {
               accessibilityLabel={t("web.media.understanding.tokens")}
               disabled={frozen()}
               value={String(tokens())}
-              onInput={(v) => tokens.set(Math.min(maximumTokens, Math.max(1, Number(v.replace(/\D/gu, "")) || 1)))}
+              onInput={(v) => tokens.set(Math.min(maximumTokens, Math.max(1, Number(v.replace(/\D/gu, "")))))}
             />
           </Field>
           <Field label={t("web.media.understanding.executor")}>

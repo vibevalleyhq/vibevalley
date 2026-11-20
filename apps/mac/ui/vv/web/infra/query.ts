@@ -1,16 +1,28 @@
 import { z } from "zod";
 
-import { type ProviderVoiceRequest, VibeValleyApiError } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
+import {
+  type Agent,
+  type AgentTemplate,
+  type ProviderStatus,
+  type ProviderVoiceListing,
+  type ProviderVoiceRequest,
+  type RepoSummary,
+  type RuntimeInfo,
+  type SettingsStatus,
+  VibeValleyApiError,
+} from "@vibevalley/protocol";
 
 import { CursorManifest, SpriteManifest } from "../base/manifests";
-import { cursorManifest, spriteManifest } from "../ui/pixel/manifests";
+import { cursorManifest, loadSpriteManifest } from "../ui/pixel/manifests";
 import { api, ApiConnectionError } from "./api";
 import type { FramesSource } from "./frame";
 import { defineQuery, type QueryClient } from "./query/cache";
 import { useQuery } from "./query/solid";
 export { defineQuery, type QueryClient } from "./query/cache";
 export { QueryProvider, ready, useQuery, useQueryClient, type QueryResult } from "./query/solid";
+
+/** Pass-through schema for responses already typed by the trusted in-process Rust bridge. */
+const trusted = <T>(): z.ZodType<T> => z.custom<T>(() => true);
 
 export const retryRead = {
   retry: 1,
@@ -28,7 +40,7 @@ export function refetchOnRelink(source: FramesSource, client: QueryClient) {
 const spritesQuery = defineQuery({
   schema: SpriteManifest,
   key: () => ["sprites"],
-  fetch: (): Promise<unknown> => Promise.resolve(spriteManifest),
+  fetch: (): Promise<unknown> => loadSpriteManifest(),
   staleTime: Infinity,
   ...retryRead,
 });
@@ -40,43 +52,43 @@ export const cursorsQuery = defineQuery({
   ...retryRead,
 });
 export const agentsQuery = defineQuery({
-  schema: z.array(S.Agent),
+  schema: trusted<Agent[]>(),
   key: () => ["agents"],
   fetch: (_: void, context) => api.agent.list(context),
   ...retryRead,
 });
 const templatesQuery = defineQuery({
-  schema: z.array(S.AgentTemplate),
+  schema: trusted<AgentTemplate[]>(),
   key: () => ["agent-templates"],
   fetch: (_: void, context) => api.agent.template.list(context),
   ...retryRead,
 });
 const reposQuery = defineQuery({
-  schema: z.array(S.RepoSummary),
+  schema: trusted<RepoSummary[]>(),
   key: () => ["repos"],
   fetch: (_: void, context) => api.repo.list(context),
   ...retryRead,
 });
 export const providerVoicesQuery = defineQuery({
-  schema: S.ProviderVoiceListing,
+  schema: trusted<ProviderVoiceListing>(),
   key: (input: ProviderVoiceRequest) => ["provider-voices", input.connection, input.revision, input.after ?? null],
   fetch: (input, context) => api.provider.voice.list(input, context),
 });
 
 export const providerQuery = defineQuery({
-  schema: S.ProviderStatus,
+  schema: trusted<ProviderStatus>(),
   key: () => ["providers"],
   fetch: (_: void, context) => api.provider.get(context),
   ...retryRead,
 });
 export const settingsQuery = defineQuery({
-  schema: S.SettingsStatus,
+  schema: trusted<SettingsStatus>(),
   key: () => ["settings"],
   fetch: (_: void, context) => api.setting.get(context),
   ...retryRead,
 });
 export const runtimesQuery = defineQuery({
-  schema: z.array(S.RuntimeInfo),
+  schema: trusted<RuntimeInfo[]>(),
   key: () => ["runtimes"],
   fetch: (_: void, context) => api.runtime.list(context),
   ...retryRead,

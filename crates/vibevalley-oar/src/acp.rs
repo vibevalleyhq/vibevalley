@@ -3,7 +3,7 @@
 //! The connection is the `agent-client-protocol` crate's `Client.v1()` over a
 //! line transport bound to a child process we start ourselves (so cwd, env
 //! and termination stay ours). It runs on one private thread per session
-//! with `futures::executor`; no async runtime is required of the caller.
+//! with `pollster`; no async runtime is required of the caller.
 //!
 //! How `SessionOptions` map onto ACP:
 //! - `resume`: `session/resume` when the agent advertises it, else
@@ -909,12 +909,15 @@ async fn serve(
 fn connection_thread(
     shared: Arc<Shared>,
     child: Arc<LineChild>,
-    incoming: futures::channel::mpsc::UnboundedReceiver<std::io::Result<String>>,
+    incoming: flume::Receiver<Option<std::io::Result<String>>>,
     opts: SessionOptions,
     commands: flume::Receiver<Command>,
     ready: flume::Sender<Result<Opened>>,
 ) {
-    let outgoing = Box::pin(futures::sink::unfold(child, |child, line: String| async move {
+    let incoming = Box::pin(futures_util::stream::unfold(incoming, |rx| async move {
+        rx.recv_async().await.ok().flatten().map(|line| (line, rx))
+    }));
+    let outgoing = Box::pin(futures_util::sink::unfold(child, |child, line: String| async move {
         child.write_line(&line).map_err(|e| std::io::Error::other(e.to_string()))?;
         Ok::<_, std::io::Error>(child)
     }));
@@ -944,7 +947,7 @@ fn connection_thread(
         .connect_with(Lines::new(outgoing, incoming), |cx: ConnectionTo<Agent>| {
             serve(cx, serving, opts, commands, ready)
         });
-    let result = futures::executor::block_on(connection);
+    let result = pollster::block_on(connection);
     let child_error = shared.child.get().map(|c| c.stderr_text()).unwrap_or_default();
     let mut message = match &result {
         Ok(()) => format!("{} closed the connection", shared.runtime_id),
@@ -1129,7 +1132,7 @@ impl AcpRuntime {
             commands: commands_tx,
             cwd: opts.cwd.clone(),
         });
-        let (incoming_tx, incoming_rx) = futures::channel::mpsc::unbounded::<std::io::Result<String>>();
+        let (incoming_tx, incoming_rx) = flume::unbounded::<Option<std::io::Result<String>>>();
         let on_line = {
             let incoming = incoming_tx.clone();
             let shared = shared.clone();
@@ -1139,11 +1142,13 @@ impl AcpRuntime {
                 {
                     lock(&shared.updates).push_back(line.to_string());
                 }
-                let _ = incoming.unbounded_send(Ok(line.to_string()));
+                let _ = incoming.send(Some(Ok(line.to_string())));
             }
         };
         // Closing the stream is how the connection learns the agent is gone.
-        let on_exit = move |_code: Option<i32>, _stderr: String| incoming_tx.close_channel();
+        let on_exit = move |_code: Option<i32>, _stderr: String| {
+            let _ = incoming_tx.send(None);
+        };
         let child = LineChild::spawn(
             Spawn {
                 label: &self.spec.id,

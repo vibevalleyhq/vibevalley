@@ -78,7 +78,7 @@ test("regression: resizing the global shell changes its rail without navigating"
   await app.setViewport(600, 600);
   await fake.pump(app);
   expect(fake.acts.filter((a) => a.type === "global_route").length).toBe(routes);
-  expect(fake.acts.filter((a) => a.type === "global_rail").at(-1)).toEqual({ type: "global_rail", rail_width: 68 });
+  expect(fake.acts.findLast((a) => a.type === "global_rail")).toEqual({ type: "global_rail", rail_width: 68 });
 });
 
 test("/farm goes to the repo worked in most recently and asks the shell for its farm; /tree asks for the tree", async () => {
@@ -87,7 +87,7 @@ test("/farm goes to the repo worked in most recently and asks the shell for its 
   await fake.pump(app);
   await fake.pump(app);
   expect(app.count("id:farm")).toBe(1);
-  expect(fake.acts.filter((a) => a.type === "openFarm").at(-1)).toEqual({ type: "openFarm", repo: "vibevalley" });
+  expect(fake.acts.findLast((a) => a.type === "openFarm")).toEqual({ type: "openFarm", repo: "vibevalley" });
   const tree = fakeHost({ state, responses }, { route: "/tree" });
   const treeApp = await open("./main.tsx", { width: 1200, height: 720, colorScheme: "light", platform: "macos", host: tree.options });
   await tree.pump(treeApp);

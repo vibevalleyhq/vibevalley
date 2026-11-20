@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/PresenterPage.tsx:
-// the speaker's view of a deck (both html and store-backed slides): this slide,
-// the next, its notes and the time. VibeValley opens it as a popup window that
-// follows the workbench's tab over a BroadcastChannel; here it is a page of the
-// same view (with a way back to the deck), so no BroadcastChannel is needed.
 import { cleanup, keymap, Scroll, signal, Text, View, WebView } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -14,11 +9,11 @@ import { useRouter } from "../../infra/router";
 import { shownTheme } from "../../state/prefs";
 import { Button } from "../../ui/Button";
 import { IconButton } from "../../ui/IconButton";
-import { artifactHref, useArtifact, useArtifactContent } from "./ArtifactCard";
-import { createFrame, framed, shim } from "./frame";
+import { artifactHref, useArtifact } from "./ArtifactCard";
+import { createFrame, shim, withShellQuery } from "./frame";
 import { elapsedText, presenterOf, stepped } from "./slides";
 import { Slide } from "./SlidesControls";
-import { useStoreViewHtml } from "./store";
+import { useArtifactPage, useStoreViewHtml } from "./store";
 
 function withSlideQuery(html: string, at: number, still: boolean): string {
   const asked = new URLSearchParams();
@@ -50,18 +45,18 @@ function Presenter(props: { id: string; version: number }) {
   const router = useRouter();
   const artifact = useArtifact(() => props.id);
   const isStore = () => artifact.data()?.body === "store";
-  const content = useArtifactContent(() => ({ id: props.id, version: props.version }));
+  const htmlPage = useArtifactPage(() => (isStore() ? undefined : { id: props.id, version: props.version, theme: shownTheme() }));
   const storeView = useStoreViewHtml(() => (isStore() ? { id: artifactId(props.id), theme: shownTheme(), seq: props.version } : undefined));
   const currentHtml = () => {
     if (isStore()) return storeView.html();
-    const c = content.data();
-    return c ? framed({ page: c.content, display: "slides", theme: shownTheme() }) : undefined;
+    const raw = htmlPage.html();
+    return raw !== undefined ? withShellQuery(raw) : undefined;
   };
   const frame = createFrame();
   const pages = () => frame.shown().ready?.pages ?? 0;
   const statusText = () => {
     const state = frame.state();
-    const error = isStore() ? storeView.error() : content.error();
+    const error = isStore() ? storeView.error() : htmlPage.error();
     if (error) return t("web.artifact.presenter.loadFailure", { reason: typeof error === "string" ? error : reasonOf(error) });
     if (typeof state === "object") return t("web.artifact.presenter.loadFailure", { reason: state.error });
     return frame.shown().ready ? t("web.artifact.presenter.empty") : t("web.artifact.presenter.waiting");
@@ -149,7 +144,7 @@ function Presenter(props: { id: string; version: number }) {
         </If>
         <Text class="text-xs text-faint">{t("web.artifact.presenter.notes")}</Text>
         <Scroll class="min-h-0 flex-1">
-          <Text testID="presenter-notes" class="text-lg text-ink" style={{ lineHeight: 28.8 }}>
+          <Text testID="presenter-notes" class="text-lg leading-[28.8px] text-ink">
             {pages() > 0 ? notes() || t("web.artifact.presenter.noNotes") : ""}
           </Text>
         </Scroll>

@@ -1,9 +1,3 @@
-// Ported from VibeValley apps/web/src/app/Shell.tsx: the rail of places,
-// the desk over a page, the page, and the quick switcher on Ctrl/⌘K (nsh's
-// keymap for base/shortcuts.ts's window listener), the notes search and the
-// shortcut sheet.
-// The orchestrator's pixel face at the rail's top is the farm's icon while
-// the art is not installed.
 import { effect, host, keymap, Scroll, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -132,8 +126,8 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
             <Slot
               to="/workspace"
               place="workspace"
-              label="工作区与终端"
-              name="工作区"
+              label={t("web.base.place.workspace.label")}
+              name={t("web.base.place.workspace.name")}
               current={location().pathname === "/workspace"}
               icon={railIcon("terminal", () => location().pathname === "/workspace")}
             />
