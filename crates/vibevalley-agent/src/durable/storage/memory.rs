@@ -2,7 +2,7 @@
 //! Also provides the deterministic `MemoryState` / `MemoryTx` model shared with `JsonlStorage`.
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
@@ -79,6 +79,69 @@ pub(crate) enum JournalOp {
     },
 }
 
+#[derive(Clone, Debug)]
+pub(crate) enum UndoOp {
+    RestoreDocument {
+        key: DocKey,
+        prev: Option<Box<Document>>,
+    },
+    RemoveConversation {
+        id: String,
+    },
+    RestoreConversationSeq {
+        id: String,
+        next_seq: i64,
+        updated_at_ms: i64,
+    },
+    RemoveEntry {
+        conversation_id: String,
+        seq: i64,
+    },
+    RestoreHead {
+        conversation_id: String,
+        head_seq: i64,
+    },
+    RemoveSubmission {
+        id: String,
+        req_key: (String, String),
+    },
+    RestoreSubmissionStatus {
+        id: String,
+        status: SubmissionStatus,
+        updated_at_ms: i64,
+    },
+    RestoreSubmission {
+        id: String,
+        status: SubmissionStatus,
+        result: Value,
+        updated_at_ms: i64,
+    },
+    RemoveTask {
+        id: String,
+        dedup_key: Option<(String, String)>,
+    },
+    RestoreTask {
+        id: String,
+        prev: Box<Task>,
+    },
+    PopSignal {
+        id: String,
+        insert_seq: u64,
+        prev_next_signal_seq: u64,
+        task_id: String,
+        signal_name: String,
+        signal_key: Option<(String, String, String)>,
+    },
+    UnconsumeSignal {
+        idx: usize,
+        insert_seq: u64,
+        task_id: String,
+        signal_name: String,
+        prev_consumed: bool,
+        prev_consumed_at_ms: i64,
+    },
+}
+
 #[derive(Clone, Default)]
 pub(crate) struct MemoryState {
     pub(crate) conversations: HashMap<String, Conversation>,
@@ -89,12 +152,129 @@ pub(crate) struct MemoryState {
     pub(crate) tasks: HashMap<String, Task>,
     pub(crate) task_by_dedup: HashMap<(String, String), String>,
     pub(crate) signals: Vec<(u64, Signal)>,
+    pub(crate) signal_by_id: HashMap<String, usize>,
     pub(crate) signal_by_key: HashMap<(String, String, String), usize>,
+    pub(crate) pending_signals: HashMap<(String, String), BTreeSet<(u64, usize)>>,
     pub(crate) next_signal_seq: u64,
 }
 
 impl MemoryState {
     pub(crate) fn apply_op(&mut self, op: &JournalOp) -> Result<()> {
+        self.apply_op_inner(op, None)
+    }
+
+    pub(crate) fn apply_op_with_undo(&mut self, op: &JournalOp, undo: &mut Vec<UndoOp>) -> Result<()> {
+        self.apply_op_inner(op, Some(undo))
+    }
+
+    pub(crate) fn rollback(&mut self, mut undo: Vec<UndoOp>) {
+        while let Some(entry) = undo.pop() {
+            match entry {
+                UndoOp::RestoreDocument { key, prev } => match prev {
+                    Some(doc) => {
+                        self.documents.insert(key, *doc);
+                    }
+                    None => {
+                        self.documents.remove(&key);
+                    }
+                },
+                UndoOp::RemoveConversation { id } => {
+                    self.conversations.remove(&id);
+                }
+                UndoOp::RestoreConversationSeq { id, next_seq, updated_at_ms } => {
+                    if let Some(conv) = self.conversations.get_mut(&id) {
+                        conv.next_seq = next_seq;
+                        conv.updated_at_ms = updated_at_ms;
+                    }
+                }
+                UndoOp::RemoveEntry { conversation_id, seq } => {
+                    if let Some(map) = self.entries.get_mut(&conversation_id) {
+                        map.remove(&seq);
+                        if map.is_empty() {
+                            self.entries.remove(&conversation_id);
+                        }
+                    }
+                }
+                UndoOp::RestoreHead { conversation_id, head_seq } => {
+                    if let Some(conv) = self.conversations.get_mut(&conversation_id) {
+                        conv.head_seq = head_seq;
+                    }
+                }
+                UndoOp::RemoveSubmission { id, req_key } => {
+                    self.submissions.remove(&id);
+                    self.submission_by_req.remove(&req_key);
+                }
+                UndoOp::RestoreSubmissionStatus { id, status, updated_at_ms } => {
+                    if let Some(sub) = self.submissions.get_mut(&id) {
+                        sub.status = status;
+                        sub.updated_at_ms = updated_at_ms;
+                    }
+                }
+                UndoOp::RestoreSubmission {
+                    id,
+                    status,
+                    result,
+                    updated_at_ms,
+                } => {
+                    if let Some(sub) = self.submissions.get_mut(&id) {
+                        sub.status = status;
+                        sub.result = result;
+                        sub.updated_at_ms = updated_at_ms;
+                    }
+                }
+                UndoOp::RemoveTask { id, dedup_key } => {
+                    self.tasks.remove(&id);
+                    if let Some(dk) = dedup_key {
+                        self.task_by_dedup.remove(&dk);
+                    }
+                }
+                UndoOp::RestoreTask { id, prev } => {
+                    self.tasks.insert(id, *prev);
+                }
+                UndoOp::PopSignal {
+                    id,
+                    insert_seq,
+                    prev_next_signal_seq,
+                    task_id,
+                    signal_name,
+                    signal_key,
+                } => {
+                    let expected_idx = self.signals.len().saturating_sub(1);
+                    self.signals.pop();
+                    self.signal_by_id.remove(&id);
+                    if let Some(sk) = signal_key {
+                        self.signal_by_key.remove(&sk);
+                    }
+                    let pending_key = (task_id, signal_name);
+                    if let Some(set) = self.pending_signals.get_mut(&pending_key) {
+                        set.remove(&(insert_seq, expected_idx));
+                        if set.is_empty() {
+                            self.pending_signals.remove(&pending_key);
+                        }
+                    }
+                    self.next_signal_seq = prev_next_signal_seq;
+                }
+                UndoOp::UnconsumeSignal {
+                    idx,
+                    insert_seq,
+                    task_id,
+                    signal_name,
+                    prev_consumed,
+                    prev_consumed_at_ms,
+                } => {
+                    if let Some((_, sig)) = self.signals.get_mut(idx) {
+                        sig.consumed = prev_consumed;
+                        sig.consumed_at_ms = prev_consumed_at_ms;
+                        if !prev_consumed {
+                            self.pending_signals.entry((task_id, signal_name)).or_default().insert((insert_seq, idx));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn apply_op_inner(&mut self, op: &JournalOp, undo: Option<&mut Vec<UndoOp>>) -> Result<()> {
         match op {
             JournalOp::PutDocument {
                 scope_kind,
@@ -105,8 +285,8 @@ impl MemoryState {
                 updated_at_ms,
             } => {
                 let key = (scope_kind.clone(), scope_id.clone(), doc_kind.clone());
-                self.documents.insert(
-                    key,
+                let prev = self.documents.insert(
+                    key.clone(),
                     Document {
                         scope_kind: scope_kind.clone(),
                         scope_id: scope_id.clone(),
@@ -116,19 +296,33 @@ impl MemoryState {
                         updated_at_ms: *updated_at_ms,
                     },
                 );
+                if let Some(log) = undo {
+                    log.push(UndoOp::RestoreDocument { key, prev: prev.map(Box::new) });
+                }
             }
             JournalOp::DeleteDocument {
                 scope_kind,
                 scope_id,
                 doc_kind,
             } => {
-                self.documents.remove(&(scope_kind.clone(), scope_id.clone(), doc_kind.clone()));
+                let key = (scope_kind.clone(), scope_id.clone(), doc_kind.clone());
+                if let Some(prev) = self.documents.remove(&key)
+                    && let Some(log) = undo
+                {
+                    log.push(UndoOp::RestoreDocument {
+                        key,
+                        prev: Some(Box::new(prev)),
+                    });
+                }
             }
             JournalOp::InsertConversation { conversation } => {
                 if self.conversations.contains_key(&conversation.id) {
                     return Err(Error::Commit(format!("duplicate conversation {}", conversation.id)));
                 }
                 self.conversations.insert(conversation.id.clone(), conversation.clone());
+                if let Some(log) = undo {
+                    log.push(UndoOp::RemoveConversation { id: conversation.id.clone() });
+                }
             }
             JournalOp::AdvanceSequence {
                 conversation_id,
@@ -139,6 +333,13 @@ impl MemoryState {
                     .conversations
                     .get_mut(conversation_id)
                     .ok_or_else(|| Error::Missing(conversation_id.clone()))?;
+                if let Some(log) = undo {
+                    log.push(UndoOp::RestoreConversationSeq {
+                        id: conversation_id.clone(),
+                        next_seq: conv.next_seq,
+                        updated_at_ms: conv.updated_at_ms,
+                    });
+                }
                 conv.next_seq = *next_seq;
                 conv.updated_at_ms = *updated_at_ms;
             }
@@ -148,14 +349,21 @@ impl MemoryState {
                     return Err(Error::Commit(format!("duplicate entry {}:{}", entry.conversation_id, entry.seq)));
                 }
                 map.insert(entry.seq, entry.clone());
-            }
-            JournalOp::SetHead { conversation_id, head_seq } => {
-                if let Some(conv) = self.conversations.get_mut(conversation_id) {
-                    conv.head_seq = *head_seq;
+                if let Some(log) = undo {
+                    log.push(UndoOp::RemoveEntry {
+                        conversation_id: entry.conversation_id.clone(),
+                        seq: entry.seq,
+                    });
                 }
             }
-            JournalOp::ResetHead { conversation_id, head_seq } => {
+            JournalOp::SetHead { conversation_id, head_seq } | JournalOp::ResetHead { conversation_id, head_seq } => {
                 if let Some(conv) = self.conversations.get_mut(conversation_id) {
+                    if let Some(log) = undo {
+                        log.push(UndoOp::RestoreHead {
+                            conversation_id: conversation_id.clone(),
+                            head_seq: conv.head_seq,
+                        });
+                    }
                     conv.head_seq = *head_seq;
                 }
             }
@@ -170,11 +378,24 @@ impl MemoryState {
                         submission.conversation_id, submission.request_id
                     )));
                 }
-                self.submission_by_req.insert(req_key, submission.id.clone());
+                self.submission_by_req.insert(req_key.clone(), submission.id.clone());
                 self.submissions.insert(submission.id.clone(), submission.clone());
+                if let Some(log) = undo {
+                    log.push(UndoOp::RemoveSubmission {
+                        id: submission.id.clone(),
+                        req_key,
+                    });
+                }
             }
             JournalOp::SetSubmissionStatus { id, status, updated_at_ms } => {
                 if let Some(sub) = self.submissions.get_mut(id) {
+                    if let Some(log) = undo {
+                        log.push(UndoOp::RestoreSubmissionStatus {
+                            id: id.clone(),
+                            status: sub.status,
+                            updated_at_ms: sub.updated_at_ms,
+                        });
+                    }
                     sub.status = *status;
                     sub.updated_at_ms = *updated_at_ms;
                 }
@@ -186,8 +407,16 @@ impl MemoryState {
                 updated_at_ms,
             } => {
                 if let Some(sub) = self.submissions.get_mut(id) {
+                    let prev_result = std::mem::replace(&mut sub.result, result.clone());
+                    if let Some(log) = undo {
+                        log.push(UndoOp::RestoreSubmission {
+                            id: id.clone(),
+                            status: sub.status,
+                            result: prev_result,
+                            updated_at_ms: sub.updated_at_ms,
+                        });
+                    }
                     sub.status = *status;
-                    sub.result = result.clone();
                     sub.updated_at_ms = *updated_at_ms;
                 }
             }
@@ -195,17 +424,32 @@ impl MemoryState {
                 if self.tasks.contains_key(&task.id) {
                     return Err(Error::Commit(format!("duplicate task {}", task.id)));
                 }
-                if !task.dedup_key.is_empty() {
+                let dedup_key = if task.dedup_key.is_empty() {
+                    None
+                } else {
                     let dk = (task.owner_task_id.clone(), task.dedup_key.clone());
                     if self.task_by_dedup.contains_key(&dk) {
                         return Err(Error::Commit(format!("duplicate task dedup {}:{}", task.owner_task_id, task.dedup_key)));
                     }
-                    self.task_by_dedup.insert(dk, task.id.clone());
-                }
+                    self.task_by_dedup.insert(dk.clone(), task.id.clone());
+                    Some(dk)
+                };
                 self.tasks.insert(task.id.clone(), task.clone());
+                if let Some(log) = undo {
+                    log.push(UndoOp::RemoveTask {
+                        id: task.id.clone(),
+                        dedup_key,
+                    });
+                }
             }
             JournalOp::UpdateTask { task } => {
                 if let Some(existing) = self.tasks.get_mut(&task.id) {
+                    if let Some(log) = undo {
+                        log.push(UndoOp::RestoreTask {
+                            id: task.id.clone(),
+                            prev: Box::new(existing.clone()),
+                        });
+                    }
                     existing.status = task.status;
                     existing.terminal_reason = task.terminal_reason.clone();
                     existing.restart_count = task.restart_count;
@@ -223,21 +467,73 @@ impl MemoryState {
                 }
             }
             JournalOp::InsertSignal { insert_seq, signal } => {
-                self.next_signal_seq = self.next_signal_seq.max(*insert_seq);
-                if !signal.signal_key.is_empty() {
+                if self.signal_by_id.contains_key(&signal.id) {
+                    return Err(Error::Commit(format!("duplicate signal {}", signal.id)));
+                }
+                let signal_key = if signal.signal_key.is_empty() {
+                    None
+                } else {
                     let sk = (signal.task_id.clone(), signal.signal_name.clone(), signal.signal_key.clone());
                     if self.signal_by_key.contains_key(&sk) {
                         return Err(Error::Commit(format!("duplicate signal key {sk:?}")));
                     }
-                    let idx = self.signals.len();
-                    self.signal_by_key.insert(sk, idx);
+                    Some(sk)
+                };
+                let prev_next_signal_seq = self.next_signal_seq;
+                self.next_signal_seq = self.next_signal_seq.max(*insert_seq);
+                let idx = self.signals.len();
+                if let Some(sk) = &signal_key {
+                    self.signal_by_key.insert(sk.clone(), idx);
+                }
+                self.signal_by_id.insert(signal.id.clone(), idx);
+                if !signal.consumed {
+                    self.pending_signals
+                        .entry((signal.task_id.clone(), signal.signal_name.clone()))
+                        .or_default()
+                        .insert((*insert_seq, idx));
                 }
                 self.signals.push((*insert_seq, signal.clone()));
+                if let Some(log) = undo {
+                    log.push(UndoOp::PopSignal {
+                        id: signal.id.clone(),
+                        insert_seq: *insert_seq,
+                        prev_next_signal_seq,
+                        task_id: signal.task_id.clone(),
+                        signal_name: signal.signal_name.clone(),
+                        signal_key,
+                    });
+                }
             }
             JournalOp::ConsumeSignal { id, consumed_at_ms } => {
-                if let Some((_, sig)) = self.signals.iter_mut().find(|(_, s)| s.id == *id) {
+                if let Some(&idx) = self.signal_by_id.get(id)
+                    && let Some((insert_seq, sig)) = self.signals.get_mut(idx)
+                {
+                    let seq = *insert_seq;
+                    let prev_consumed = sig.consumed;
+                    let prev_consumed_at_ms = sig.consumed_at_ms;
+                    let task_id = sig.task_id.clone();
+                    let signal_name = sig.signal_name.clone();
                     sig.consumed = true;
                     sig.consumed_at_ms = *consumed_at_ms;
+                    if !prev_consumed {
+                        let key = (task_id.clone(), signal_name.clone());
+                        if let Some(set) = self.pending_signals.get_mut(&key) {
+                            set.remove(&(seq, idx));
+                            if set.is_empty() {
+                                self.pending_signals.remove(&key);
+                            }
+                        }
+                    }
+                    if let Some(log) = undo {
+                        log.push(UndoOp::UnconsumeSignal {
+                            idx,
+                            insert_seq: seq,
+                            task_id,
+                            signal_name,
+                            prev_consumed,
+                            prev_consumed_at_ms,
+                        });
+                    }
                 }
             }
         }
@@ -388,31 +684,44 @@ impl StorageRead for MemoryRead<'_> {
     }
 }
 
-pub(crate) struct MemoryTx {
-    pub(crate) state: RefCell<MemoryState>,
+pub(crate) struct MemoryTx<'a> {
+    pub(crate) state: RefCell<&'a mut MemoryState>,
+    pub(crate) undo: RefCell<Vec<UndoOp>>,
     pub(crate) ops: RefCell<Vec<JournalOp>>,
     record_ops: bool,
 }
 
-impl MemoryTx {
-    pub(crate) fn new(state: MemoryState, record_ops: bool) -> Self {
+impl<'a> MemoryTx<'a> {
+    pub(crate) fn new(state: &'a mut MemoryState, record_ops: bool) -> Self {
         Self {
             state: RefCell::new(state),
+            undo: RefCell::new(Vec::new()),
             ops: RefCell::new(Vec::new()),
             record_ops,
         }
     }
 
     fn record(&self, op: JournalOp) -> Result<()> {
-        self.state.borrow_mut().apply_op(&op)?;
+        let mut state = self.state.borrow_mut();
+        let mut undo = self.undo.borrow_mut();
+        state.apply_op_with_undo(&op, &mut undo)?;
         if self.record_ops {
             self.ops.borrow_mut().push(op);
         }
         Ok(())
     }
+
+    pub(crate) fn rollback(self) {
+        let state = self.state.into_inner();
+        state.rollback(self.undo.into_inner());
+    }
+
+    pub(crate) fn into_parts(self) -> (Vec<JournalOp>, Vec<UndoOp>) {
+        (self.ops.into_inner(), self.undo.into_inner())
+    }
 }
 
-impl StorageRead for MemoryTx {
+impl StorageRead for MemoryTx<'_> {
     fn document(&self, scope: &str, id: &str, kind: &str) -> Result<Option<Document>> {
         MemoryRead(&self.state.borrow()).document(scope, id, kind)
     }
@@ -472,7 +781,7 @@ impl StorageRead for MemoryTx {
     }
 }
 
-impl StorageWrite for MemoryTx {
+impl StorageWrite for MemoryTx<'_> {
     fn put_document(&self, scope: &str, id: &str, kind: &str, state: &Value, now_ms: i64) -> Result<i64> {
         let rev = self
             .state
@@ -593,23 +902,24 @@ impl StorageWrite for MemoryTx {
     }
 
     fn consume_first_signal(&self, task_id: &str, name: &str, now_ms: i64) -> Result<Option<Signal>> {
-        let candidate = {
+        let candidate_id = {
             let state = self.state.borrow();
             state
-                .signals
-                .iter()
-                .filter(|(_, s)| !s.consumed && s.task_id == task_id && s.signal_name == name)
-                .min_by_key(|(seq, _)| *seq)
+                .pending_signals
+                .get(&(task_id.to_owned(), name.to_owned()))
+                .and_then(|pending| pending.first().copied())
+                .and_then(|(_, idx)| state.signals.get(idx))
                 .map(|(_, s)| s.id.clone())
         };
-        let Some(id) = candidate else {
+        let Some(id) = candidate_id else {
             return Ok(None);
         };
         self.record(JournalOp::ConsumeSignal {
             id: id.clone(),
             consumed_at_ms: now_ms,
         })?;
-        Ok(self.state.borrow().signals.iter().find(|(_, s)| s.id == id).map(|(_, s)| s.clone()))
+        let state = self.state.borrow();
+        Ok(state.signal_by_id.get(&id).and_then(|&idx| state.signals.get(idx)).map(|(_, s)| s.clone()))
     }
 }
 
@@ -661,11 +971,10 @@ fn flush_memory(state_mutex: &Mutex<MemoryState>, hub: &LiveHub, now: i64, force
         return Ok(());
     }
     let mut state = state_mutex.lock().unwrap_or_else(|e| e.into_inner());
-    let mut staging = state.clone();
     let mut events = Vec::with_capacity(disk_batch.len());
     let mut keys = Vec::with_capacity(disk_batch.len());
     for (key, value) in disk_batch {
-        let rev = staging.documents.get(&key).map_or(1, |d| d.rev + 1);
+        let rev = state.documents.get(&key).map_or(1, |d| d.rev + 1);
         let doc = Document {
             scope_kind: key.0.clone(),
             scope_id: key.1.clone(),
@@ -674,7 +983,7 @@ fn flush_memory(state_mutex: &Mutex<MemoryState>, hub: &LiveHub, now: i64, force
             state: value,
             updated_at_ms: now,
         };
-        staging.documents.insert(key.clone(), doc.clone());
+        state.documents.insert(key.clone(), doc.clone());
         events.push(DocumentEvent {
             document: doc,
             durable: true,
@@ -682,7 +991,6 @@ fn flush_memory(state_mutex: &Mutex<MemoryState>, hub: &LiveHub, now: i64, force
         });
         keys.push(key);
     }
-    *state = staging;
     hub.complete_disk_flush(&keys, events);
     Ok(())
 }
@@ -711,19 +1019,20 @@ impl StorageBackend for MemoryStorage {
         }
         self.0.hub.record_request();
         let now = self.0.hub.now_ms();
-        let staging = MemoryTx::new(state.clone(), false);
+        let staging = MemoryTx::new(&mut state, false);
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&staging, &staging, None, now)));
         match outcome {
             Ok(Ok(write_outcome)) => {
-                *state = staging.state.into_inner();
                 self.0.hub.record_commit_and_publish(write_outcome.events, write_outcome.tasks_changed);
                 Ok(())
             }
             Ok(Err(err)) => {
+                staging.rollback();
                 self.0.hub.record_failure();
                 Err(err)
             }
             Err(panic) => {
+                staging.rollback();
                 self.0.hub.record_failure();
                 drop(state);
                 std::panic::resume_unwind(panic)

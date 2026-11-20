@@ -23,6 +23,14 @@ tester.run("no-test-sleep", rule("no-test-sleep"), {
   ],
 });
 
+tester.run("no-component-interval", rule("no-component-interval"), {
+  valid: ["const clock = useNow();", "useInterval(() => tick(), 1000);", "obj.setInterval(f, 1000);"],
+  invalid: [
+    { code: "const t = setInterval(f, 1000);", errors: [{ messageId: "interval" }] },
+    { code: "const t = globalThis.setInterval(f, 1000);", errors: [{ messageId: "interval" }] },
+  ],
+});
+
 tester.run("no-comment-divider", rule("no-comment-divider"), {
   valid: ["// The lease outlives the request: a retry finds it.\nlet a = 1;", "/** Docs. */\nlet a = 1;"],
   invalid: [

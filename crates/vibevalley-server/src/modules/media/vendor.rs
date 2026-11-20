@@ -515,9 +515,10 @@ impl Moss {
         let pauses_ok = if pro {
             !text.contains("[pause")
         } else {
-            let re = regex::Regex::new(r"\[pause[^\]]*\]").expect("regex");
-            let good = regex::Regex::new(r"^\[pause (?:0\.[1-9]\d*|[1-9](?:\.\d+)?|10(?:\.0+)?)s\]$").expect("regex");
-            re.find_iter(text).all(|m| good.is_match(m.as_str()))
+            static PAUSE_ANY: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| regex::Regex::new(r"\[pause[^\]]*\]").expect("regex"));
+            static PAUSE_GOOD: std::sync::LazyLock<regex::Regex> =
+                std::sync::LazyLock::new(|| regex::Regex::new(r"^\[pause (?:0\.[1-9]\d*|[1-9](?:\.\d+)?|10(?:\.0+)?)s\]$").expect("regex"));
+            PAUSE_ANY.find_iter(text).all(|m| PAUSE_GOOD.is_match(m.as_str()))
         };
         if !super::super::provider::SPEECH_MODELS.contains(&model) || !text_ok(text, 10000) || !audio_id(voice) || !FORMATS.contains(&format) || !pauses_ok {
             return Err(invalid_input());

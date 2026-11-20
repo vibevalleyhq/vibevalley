@@ -62,6 +62,7 @@ struct JsonlState {
     mem: MemoryState,
     next_tx_id: u64,
     stamp: DiskStamp,
+    open_files: HashMap<PathBuf, File>,
 }
 
 struct JsonlInner {
@@ -125,7 +126,12 @@ impl JsonlStorage {
         Ok(Self(Arc::new(JsonlInner {
             dir,
             opts,
-            state: Mutex::new(JsonlState { mem, next_tx_id, stamp }),
+            state: Mutex::new(JsonlState {
+                mem,
+                next_tx_id,
+                stamp,
+                open_files: HashMap::new(),
+            }),
             lock_file: Mutex::new(lock_file),
             hub: LiveHub::new(Arc::new(clock)),
         })))
@@ -329,7 +335,22 @@ fn load_and_maybe_repair(dir: &Path, opts: JsonlOptions) -> Result<(MemoryState,
     Ok((mem, next_tx_id, stamp))
 }
 
-fn persist_journal_ops(dir: &Path, tx_id: u64, now: i64, ops: &[JournalOp], fsync: bool) -> Result<()> {
+fn open_cached_append<'a>(open_files: &'a mut HashMap<PathBuf, File>, path: &Path) -> Result<&'a mut File> {
+    if !open_files.contains_key(path) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|e| Error::Commit(e.to_string()))?;
+        }
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .map_err(|e| Error::Commit(format!("open {}: {e}", path.display())))?;
+        open_files.insert(path.to_path_buf(), file);
+    }
+    Ok(open_files.get_mut(path).expect("inserted above"))
+}
+
+fn persist_journal_ops(dir: &Path, tx_id: u64, now: i64, ops: &[JournalOp], fsync: bool, open_files: &mut HashMap<PathBuf, File>) -> Result<()> {
     if ops.is_empty() {
         return Ok(());
     }
@@ -345,19 +366,12 @@ fn persist_journal_ops(dir: &Path, tx_id: u64, now: i64, ops: &[JournalOp], fsyn
     }
 
     for (path, lines) in by_file {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| Error::Commit(e.to_string()))?;
-        }
-        let mut f = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-            .map_err(|e| Error::Commit(format!("open {}: {e}", path.display())))?;
         let mut buf = String::new();
         for line in lines {
             buf.push_str(&line);
             buf.push('\n');
         }
+        let f = open_cached_append(open_files, &path)?;
         f.write_all(buf.as_bytes()).map_err(|e| Error::Commit(e.to_string()))?;
         f.flush().map_err(|e| Error::Commit(e.to_string()))?;
         if fsync {
@@ -366,17 +380,13 @@ fn persist_journal_ops(dir: &Path, tx_id: u64, now: i64, ops: &[JournalOp], fsyn
     }
 
     let commits_path = dir.join(COMMITS_FILE);
-    let mut marker_file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&commits_path)
-        .map_err(|e| Error::Commit(format!("open {}: {e}", commits_path.display())))?;
     let mut marker = serde_json::to_string(&CommitRecord {
         tx: tx_id,
         at_ms: now,
         op_count: ops.len(),
     })?;
     marker.push('\n');
+    let marker_file = open_cached_append(open_files, &commits_path)?;
     marker_file.write_all(marker.as_bytes()).map_err(|e| Error::Commit(e.to_string()))?;
     marker_file.flush().map_err(|e| Error::Commit(e.to_string()))?;
     if fsync {
@@ -402,12 +412,15 @@ fn flush_jsonl(inner: &JsonlInner, now: i64, force: bool) -> Result<()> {
     }
     let mut state = inner.state.lock().unwrap_or_else(|e| e.into_inner());
     let tx_id = state.next_tx_id;
-    let mut staging = state.mem.clone();
+    let JsonlState {
+        mem, next_tx_id, open_files, ..
+    } = &mut *state;
+    let mut undo = Vec::new();
     let mut ops = Vec::with_capacity(disk_batch.len());
     let mut events = Vec::with_capacity(disk_batch.len());
     let mut keys = Vec::with_capacity(disk_batch.len());
     for (key, value) in disk_batch {
-        let rev = staging.documents.get(&key).map_or(1, |d| d.rev + 1);
+        let rev = mem.documents.get(&key).map_or(1, |d| d.rev + 1);
         let op = JournalOp::PutDocument {
             scope_kind: key.0.clone(),
             scope_id: key.1.clone(),
@@ -416,7 +429,10 @@ fn flush_jsonl(inner: &JsonlInner, now: i64, force: bool) -> Result<()> {
             state: value.clone(),
             updated_at_ms: now,
         };
-        staging.apply_op(&op)?;
+        if let Err(err) = mem.apply_op_with_undo(&op, &mut undo) {
+            mem.rollback(undo);
+            return Err(err);
+        }
         ops.push(op);
         let doc = Document {
             scope_kind: key.0.clone(),
@@ -433,10 +449,11 @@ fn flush_jsonl(inner: &JsonlInner, now: i64, force: bool) -> Result<()> {
         });
         keys.push(key);
     }
-    persist_journal_ops(&inner.dir, tx_id, now, &ops, inner.opts.fsync)?;
-    state.mem = staging;
-    state.next_tx_id = tx_id + 1;
-    state.stamp = read_disk_stamp(&inner.dir);
+    if let Err(err) = persist_journal_ops(&inner.dir, tx_id, now, &ops, inner.opts.fsync, open_files) {
+        mem.rollback(undo);
+        return Err(err);
+    }
+    *next_tx_id = tx_id + 1;
     inner.hub.complete_disk_flush(&keys, events);
     Ok(())
 }
@@ -481,29 +498,33 @@ impl StorageBackend for JsonlStorage {
         }
         self.0.hub.record_request();
         let now = self.0.hub.now_ms();
-        let staging = MemoryTx::new(state.mem.clone(), true);
+        let staging = MemoryTx::new(&mut state.mem, true);
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&staging, &staging, None, now)));
         match outcome {
             Ok(Ok(write_outcome)) => {
-                let ops = staging.ops.into_inner();
+                let (ops, undo) = staging.into_parts();
                 if !ops.is_empty() {
                     let tx_id = state.next_tx_id;
-                    if let Err(err) = persist_journal_ops(&self.0.dir, tx_id, now, &ops, self.0.opts.fsync) {
+                    let JsonlState {
+                        mem, next_tx_id, open_files, ..
+                    } = &mut *state;
+                    if let Err(err) = persist_journal_ops(&self.0.dir, tx_id, now, &ops, self.0.opts.fsync, open_files) {
+                        mem.rollback(undo);
                         self.0.hub.record_failure();
                         return Err(err);
                     }
-                    state.next_tx_id = tx_id + 1;
-                    state.stamp = read_disk_stamp(&self.0.dir);
+                    *next_tx_id = tx_id + 1;
                 }
-                state.mem = staging.state.into_inner();
                 self.0.hub.record_commit_and_publish(write_outcome.events, write_outcome.tasks_changed);
                 Ok(())
             }
             Ok(Err(err)) => {
+                staging.rollback();
                 self.0.hub.record_failure();
                 Err(err)
             }
             Err(panic) => {
+                staging.rollback();
                 self.0.hub.record_failure();
                 drop(state);
                 std::panic::resume_unwind(panic)
@@ -590,6 +611,7 @@ impl StorageBackend for JsonlStorage {
             flush_jsonl(&self.0, self.0.hub.now_ms(), true)?;
         }
         self.0.hub.mark_closed();
+        self.0.state.lock().unwrap_or_else(|e| e.into_inner()).open_files.clear();
         self.0.lock_file.lock().unwrap_or_else(|e| e.into_inner()).take();
         Ok(())
     }

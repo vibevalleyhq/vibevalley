@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use gpui_kit::{
-    App, Bounds, Corners, Font, FontFeatures, FontStyle, FontWeight, Hsla, Pixels, RenderImage, Rgba, SharedString, TextAlign, TextRun, Window, fill, outline,
-    point, px, size,
+    App, Bounds, Corners, Font, FontFeatures, FontStyle, FontWeight, Hsla, Pixels, RenderImage, Rgba, ShapedLine, SharedString, TextAlign, TextRun, Window,
+    fill, outline, point, px, size,
 };
 use image::RgbaImage;
 use smallvec::SmallVec;
@@ -37,17 +37,36 @@ fn hsla(c: Color) -> Hsla {
 }
 
 #[derive(Hash, PartialEq, Eq, Clone)]
+enum KeyKind {
+    Sprite { name: String, lit: bool },
+    Image { key: String, lit: bool },
+    Glow([u8; 3]),
+    Hud(String),
+}
+
+#[derive(Hash, PartialEq, Eq, Clone)]
 struct Key {
-    name: String,
+    kind: KeyKind,
     flip: bool,
     alpha: u8,
     w: u32,
     h: u32,
 }
 
+#[derive(Hash, PartialEq, Eq, Clone)]
+struct TextKey {
+    text: String,
+    size_tenths: u16,
+    color: [u32; 4],
+    max_w_tenths: Option<u32>,
+}
+
+const TEXT_CACHE_CAP: usize = 512;
+
 #[derive(Default)]
 pub struct SpriteCache {
     images: HashMap<Key, Arc<RenderImage>>,
+    text_cache: HashMap<TextKey, Arc<ShapedLine>>,
     farm_texture: Option<gpui_kit::DynamicTexture>,
     farm_size: (u32, u32),
     /// Pictures made per frame (Op::Image): dropped once a paint does not use them.
@@ -93,10 +112,16 @@ impl SpriteCache {
                 let _ = window.drop_image(img);
             }
             self.dynamic.clear();
+            self.text_cache.clear();
             self.device_scale = device_scale;
         }
         if self.light != light {
-            let old: Vec<Key> = self.images.keys().filter(|k| k.name.starts_with(LIT)).cloned().collect();
+            let old: Vec<Key> = self
+                .images
+                .keys()
+                .filter(|k| matches!(k.kind, KeyKind::Sprite { lit: true, .. } | KeyKind::Image { lit: true, .. }))
+                .cloned()
+                .collect();
             for k in old {
                 self.dynamic.remove(&k);
                 if let Some(img) = self.images.remove(&k) {
@@ -145,8 +170,91 @@ impl SpriteCache {
     }
 }
 
-/// Starts the cache name of a picture shaded by the sky's light.
-const LIT: &str = "lit:";
+fn shape_hud_line(text: &str, font_size: f32, color: Color, window: &mut Window) -> ShapedLine {
+    let font = Font {
+        family: PIXEL_FONT.into(),
+        features: FontFeatures::default(),
+        fallbacks: None,
+        weight: FontWeight::NORMAL,
+        style: FontStyle::Normal,
+    };
+    let run = TextRun {
+        len: text.len(),
+        font,
+        color: hsla(color),
+        background_color: None,
+        underline: None,
+        strikethrough: None,
+    };
+    window
+        .text_system()
+        .shape_line(SharedString::from(text.to_string()), px(font_size), &[run], None)
+}
+
+fn color_bits(color: Color) -> [u32; 4] {
+    color.map(|c| if c == 0.0 { 0 } else { c.to_bits() })
+}
+
+fn cached_hud_line(cache: &mut SpriteCache, text: &str, font_size: f32, color: Color, max_w: Option<f32>, window: &mut Window) -> Arc<ShapedLine> {
+    let key = TextKey {
+        text: text.to_owned(),
+        size_tenths: (font_size * 10.0).round().clamp(0.0, u16::MAX as f32) as u16,
+        color: color_bits(color),
+        max_w_tenths: max_w.map(|w| (w * 10.0).round().max(0.0) as u32),
+    };
+    if let Some(hit) = cache.text_cache.get(&key) {
+        return Arc::clone(hit);
+    }
+    let line = if let Some(max_w) = max_w {
+        let mut shaped = shape_hud_line(text, font_size, color, window);
+        if f32::from(shaped.width) > max_w {
+            let ends: Vec<usize> = text.char_indices().map(|(i, _)| i).collect();
+            let (mut lo, mut hi) = (0, ends.len());
+            while lo < hi {
+                let mid = (lo + hi) / 2;
+                let candidate = shape_hud_line(&format!("{}…", &text[..ends[mid]]), font_size, color, window);
+                if f32::from(candidate.width) <= max_w {
+                    lo = mid + 1;
+                } else {
+                    hi = mid;
+                }
+            }
+            let end = if lo == 0 { 0 } else { ends[lo - 1] };
+            shaped = shape_hud_line(&format!("{}…", &text[..end]), font_size, color, window);
+        }
+        Arc::new(shaped)
+    } else {
+        Arc::new(shape_hud_line(text, font_size, color, window))
+    };
+    if cache.text_cache.len() >= TEXT_CACHE_CAP {
+        cache.text_cache.clear();
+    }
+    cache.text_cache.insert(key, Arc::clone(&line));
+    line
+}
+
+fn paint_hud_picture(
+    cache: &mut SpriteCache,
+    hud_origin: gpui_kit::Point<Pixels>,
+    key: &str,
+    raster: &dyn Fn(u32, u32) -> RgbaImage,
+    [x, y, w, h]: [f32; 4],
+    window: &mut Window,
+) {
+    let (dw, dh) = ((w * window.scale_factor()).round() as u32, (h * window.scale_factor()).round() as u32);
+    let k = Key {
+        kind: KeyKind::Hud(key.to_owned()),
+        flip: false,
+        alpha: 8,
+        w: dw,
+        h: dh,
+    };
+    cache.dynamic.insert(k.clone(), true);
+    if let Some(img) = cache.get(k, || Some(raster(dw, dh))) {
+        let b = Bounds::new(hud_origin + point(px(x), px(y)), size(px(w), px(h)));
+        let _ = window.paint_image(b, b, Corners::default(), img, 0, false);
+    }
+}
 
 /// How `list` sits in `bounds`: edge-to-edge cover (clamped by `FARM_CUT`) or fitted open canvas.
 pub fn framing(list: &DrawList, bounds: Bounds<Pixels>) -> Framing {
@@ -199,7 +307,7 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
         };
         for (index, op) in list.ops.iter().enumerate().filter(|_| !painted) {
             let light = list.light_on(index);
-            let lit = |name: &str| if light.is_some() { format!("{LIT}{name}") } else { name.to_string() };
+            let is_lit = light.is_some();
             let shaded = |mut img: RgbaImage| {
                 if let Some(l) = light {
                     shade(&mut img, l);
@@ -216,7 +324,10 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                     }
                     let (w, h) = (dev(info.w), dev(info.h));
                     let key = Key {
-                        name: lit(name),
+                        kind: KeyKind::Sprite {
+                            name: name.clone(),
+                            lit: is_lit,
+                        },
                         flip: *flip,
                         alpha: a,
                         w,
@@ -235,7 +346,7 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                     }
                     let (dw, dh) = (dev(*w), dev(*h));
                     let k = Key {
-                        name: lit(key),
+                        kind: KeyKind::Image { key: key.clone(), lit: is_lit },
                         flip: false,
                         alpha: a,
                         w: dw,
@@ -257,9 +368,13 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                         continue;
                     }
                     let d = dev(r * 2.0);
-                    let name = format!("glow:{:.3}:{:.3}:{:.3}", color[0], color[1], color[2]);
+                    let qrgb = [
+                        (color[0].clamp(0.0, 1.0) * 255.0).round() as u8,
+                        (color[1].clamp(0.0, 1.0) * 255.0).round() as u8,
+                        (color[2].clamp(0.0, 1.0) * 255.0).round() as u8,
+                    ];
                     let k = Key {
-                        name,
+                        kind: KeyKind::Glow(qrgb),
                         flip: false,
                         alpha: step,
                         w: d,
@@ -283,47 +398,28 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
         } else {
             origin
         };
-        let mut picture = |key: &str, raster: &dyn Fn(u32, u32) -> RgbaImage, x: f32, y: f32, w: f32, h: f32, window: &mut Window| {
-            let (dw, dh) = ((w * window.scale_factor()).round() as u32, (h * window.scale_factor()).round() as u32);
-            let k = Key {
-                name: key.to_string(),
-                flip: false,
-                alpha: 8,
-                w: dw,
-                h: dh,
-            };
-            cache.dynamic.insert(k.clone(), true);
-            if let Some(img) = cache.get(k, || Some(raster(dw, dh))) {
-                let b = Bounds::new(hud_origin + point(px(x), px(y)), size(px(w), px(h)));
-                let _ = window.paint_image(b, b, Corners::default(), img, 0, false);
-            }
-        };
         for (key, image, x, y, w, h) in &list.hud_images {
-            picture(key, &|w, h| vibevalley_pixel::css_pixelated(image, w, h), *x, *y, *w, *h, window);
+            paint_hud_picture(
+                cache,
+                hud_origin,
+                key,
+                &|w, h| vibevalley_pixel::css_pixelated(image, w, h),
+                [*x, *y, *w, *h],
+                window,
+            );
         }
-        let shape = |text: &str, font_size: f32, color: Color, window: &mut Window| {
-            let font = Font {
-                family: PIXEL_FONT.into(),
-                features: FontFeatures::default(),
-                fallbacks: None,
-                weight: FontWeight::NORMAL,
-                style: FontStyle::Normal,
-            };
-            let run = TextRun {
-                len: text.len(),
-                font,
-                color: hsla(color),
-                background_color: None,
-                underline: None,
-                strikethrough: None,
-            };
-            window
-                .text_system()
-                .shape_line(SharedString::from(text.to_string()), px(font_size), &[run], None)
-        };
+        let mut pre_shaped: Vec<Option<Arc<ShapedLine>>> = Vec::new();
         let labels = super::farm::islands::label_ops(list, s);
-        let mut clip: Option<Bounds<Pixels>> = None;
         for op in list.hud.iter().chain(labels.iter()) {
+            let shaped = match op {
+                HudOp::Text { text, size, color, .. } => Some(cached_hud_line(cache, text, *size, *color, None, window)),
+                HudOp::TextIn { text, size, color, w, .. } => Some(cached_hud_line(cache, text, *size, *color, Some(*w), window)),
+                _ => None,
+            };
+            pre_shaped.push(shaped);
+        }
+        let mut clip: Option<Bounds<Pixels>> = None;
+        for (op, shaped) in list.hud.iter().chain(labels.iter()).zip(pre_shaped.iter()) {
             if let HudOp::Clip(c) = op {
                 clip = c.map(|[x, y, w, h]| Bounds::new(hud_origin + point(px(x), px(y)), size(px(w), px(h))).intersect(&bounds));
                 continue;
@@ -339,48 +435,29 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                         window.paint_quad(outline(b, hsla(*border), gpui_kit::BorderStyle::Solid));
                     }
                 }
-                HudOp::Text {
-                    x,
-                    y,
-                    text,
-                    size: font_size,
-                    color,
-                } => {
-                    let line = shape(text, *font_size, *color, window);
-                    let _ = line.paint(hud_origin + point(px(*x), px(*y)), px(font_size * 1.25), TextAlign::Left, None, window, cx);
-                }
-                HudOp::TextIn {
-                    x,
-                    y,
-                    w,
-                    text,
-                    size: font_size,
-                    color,
-                } => {
-                    let mut line = shape(text, *font_size, *color, window);
-                    if f32::from(line.width) > *w {
-                        let ends: Vec<usize> = text.char_indices().map(|(i, _)| i).collect();
-                        let (mut lo, mut hi) = (0, ends.len());
-                        while lo < hi {
-                            let mid = (lo + hi) / 2;
-                            let candidate = shape(&format!("{}…", &text[..ends[mid]]), *font_size, *color, window);
-                            if f32::from(candidate.width) <= *w {
-                                lo = mid + 1;
-                            } else {
-                                hi = mid;
-                            }
-                        }
-                        let end = if lo == 0 { 0 } else { ends[lo - 1] };
-                        line = shape(&format!("{}…", &text[..end]), *font_size, *color, window);
+                HudOp::Text { x, y, size: font_size, .. } => {
+                    if let Some(line) = shaped {
+                        let _ = line.paint(hud_origin + point(px(*x), px(*y)), px(font_size * 1.25), TextAlign::Left, None, window, cx);
                     }
-                    let at = hud_origin + point(px(*x), px(*y));
-                    let text_bounds = Bounds::new(at, size(px(w.max(0.0)), px(font_size * 1.25))).intersect(&mask.bounds);
-                    window.with_content_mask(Some(gpui_kit::ContentMask { bounds: text_bounds }), |window| {
-                        let _ = line.paint(at, px(font_size * 1.25), TextAlign::Left, None, window, cx);
-                    });
                 }
-                HudOp::Image { key, image, x, y, w, h } => picture(key, &|w, h| vibevalley_pixel::css_pixelated(image, w, h), *x, *y, *w, *h, window),
-                HudOp::Bitmap { key, render, x, y, w, h } => picture(key, render.as_ref(), *x, *y, *w, *h, window),
+                HudOp::TextIn { x, y, w, size: font_size, .. } => {
+                    if let Some(line) = shaped {
+                        let at = hud_origin + point(px(*x), px(*y));
+                        let text_bounds = Bounds::new(at, size(px(w.max(0.0)), px(font_size * 1.25))).intersect(&mask.bounds);
+                        window.with_content_mask(Some(gpui_kit::ContentMask { bounds: text_bounds }), |window| {
+                            let _ = line.paint(at, px(font_size * 1.25), TextAlign::Left, None, window, cx);
+                        });
+                    }
+                }
+                HudOp::Image { key, image, x, y, w, h } => paint_hud_picture(
+                    cache,
+                    hud_origin,
+                    key,
+                    &|w, h| vibevalley_pixel::css_pixelated(image, w, h),
+                    [*x, *y, *w, *h],
+                    window,
+                ),
+                HudOp::Bitmap { key, render, x, y, w, h } => paint_hud_picture(cache, hud_origin, key, render.as_ref(), [*x, *y, *w, *h], window),
                 HudOp::Clip(_) => {}
             });
         }

@@ -10,9 +10,52 @@ import { big, tookText } from "../../base/format";
 
 /** The steps kept for one session's log in the page. */
 const stepLimit = 240;
+const emptySteps: SessionEvent[] = [];
+
+function groupByRun(steps: readonly SessionEvent[]): Map<string, SessionEvent[]> {
+  const byRun = new Map<string, SessionEvent[]>();
+  for (const s of steps) {
+    if (s.run === undefined) continue;
+    let bucket = byRun.get(s.run);
+    if (!bucket) {
+      bucket = [];
+      byRun.set(s.run, bucket);
+    }
+    bucket.push(s);
+  }
+  return byRun;
+}
+
+function stepsEqual(a: readonly SessionEvent[], b: readonly SessionEvent[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (x === undefined || y === undefined || x.seq !== y.seq || x.revision !== y.revision) return false;
+  }
+  return true;
+}
 
 /** By seq and revision, independent of HTTP/live arrival order; the last stepLimit kept. */
-function mergeSteps(log: SessionEvent[], incoming: SessionEvent[]) {
+export function mergeSteps(log: SessionEvent[], incoming: SessionEvent[]): SessionEvent[] {
+  if (incoming.length === 0) return log;
+  if (incoming.length === 1) {
+    const s = incoming[0];
+    if (s === undefined) return log;
+    const last = log.at(-1);
+    if (!last) return [s];
+    if (s.seq > last.seq) {
+      if (log.length >= stepLimit) return [...log.slice(log.length - stepLimit + 1), s];
+      return [...log, s];
+    }
+    if (s.seq === last.seq) {
+      if (s.revision <= last.revision) return log;
+      const next = log.slice();
+      next[next.length - 1] = s;
+      return next;
+    }
+  }
   const bySeq = new Map(log.map((s) => [s.seq, s]));
   for (const s of incoming) {
     const before = bySeq.get(s.seq);
@@ -373,7 +416,9 @@ export function tagOf(step: SessionEvent, asked?: string, issue = false): string
 interface Log {
   readonly id: string;
   steps: SessionEvent[];
+  byRun: Map<string, SessionEvent[]>;
   readonly listeners: Set<(steps: SessionEvent[]) => void>;
+  readonly runListeners: Map<string, Set<(steps: SessionEvent[]) => void>>;
   reading: { during: SessionEvent[]; again: boolean } | undefined;
 }
 
@@ -389,49 +434,115 @@ export class SessionLogs {
     this.follow = follow;
   }
 
-  subscribe(id: string, listener: (steps: SessionEvent[]) => void): () => void {
+  private ensureLog(id: string): { readonly log: Log; readonly isFirst: boolean } {
     let log = this.logs.get(id);
+    const hadSubscribers = log ? log.listeners.size > 0 || log.runListeners.size > 0 : false;
     if (!log) {
-      log = { id, steps: [], listeners: new Set(), reading: undefined };
+      log = { id, steps: [], byRun: new Map(), listeners: new Set(), runListeners: new Map(), reading: undefined };
       this.logs.set(id, log);
     }
-    log.listeners.add(listener);
-    listener(log.steps);
+    return { log, isFirst: !hadSubscribers };
+  }
+
+  private ensureFollow() {
     this.stop ??= this.follow(
       (event) => {
         if (event.type !== "event") return;
         const current = this.logs.get(event.id);
         if (!current) return;
         if (current.reading) current.reading.during = mergeSteps(current.reading.during, [event.activity]);
-        this.publish(current, mergeSteps(current.steps, [event.activity]));
+        this.applyActivity(current, event.activity);
       },
       () => {
         for (const current of this.logs.values()) void this.refresh(current);
       },
     );
-    if (log.listeners.size === 1) void this.refresh(log);
+  }
+
+  private dropIfIdle(id: string, log: Log) {
+    if (log.listeners.size > 0 || log.runListeners.size > 0) return;
+    this.logs.delete(id);
+    if (this.logs.size === 0) {
+      this.stop?.();
+      this.stop = undefined;
+    }
+  }
+
+  subscribe(id: string, listener: (steps: SessionEvent[]) => void): () => void {
+    const { log, isFirst } = this.ensureLog(id);
+    log.listeners.add(listener);
+    listener(log.steps);
+    this.ensureFollow();
+    if (isFirst) void this.refresh(log);
     return () => {
       log.listeners.delete(listener);
-      if (log.listeners.size > 0) return;
-      this.logs.delete(id);
-      if (this.logs.size === 0) {
-        this.stop?.();
-        this.stop = undefined;
-      }
+      this.dropIfIdle(id, log);
     };
   }
 
-  private publish(log: Log, steps: SessionEvent[]) {
-    if (
-      steps.length === log.steps.length &&
-      steps.every((s, i) => {
-        const prev = log.steps[i];
-        return prev !== undefined && s.seq === prev.seq && s.revision === prev.revision;
-      })
-    )
+  subscribeRun(id: string, run: string, listener: (steps: SessionEvent[]) => void): () => void {
+    const { log, isFirst } = this.ensureLog(id);
+    let set = log.runListeners.get(run);
+    if (!set) {
+      set = new Set();
+      log.runListeners.set(run, set);
+    }
+    set.add(listener);
+    listener(log.byRun.get(run) ?? emptySteps);
+    this.ensureFollow();
+    if (isFirst) void this.refresh(log);
+    return () => {
+      const listeners = log.runListeners.get(run);
+      if (listeners) {
+        listeners.delete(listener);
+        if (listeners.size === 0) log.runListeners.delete(run);
+      }
+      this.dropIfIdle(id, log);
+    };
+  }
+
+  private applyActivity(log: Log, activity: SessionEvent) {
+    const prevHead = log.steps[0];
+    const nextSteps = mergeSteps(log.steps, [activity]);
+    if (stepsEqual(log.steps, nextSteps)) return;
+    const evictedHead = log.steps.length >= stepLimit && prevHead !== undefined && nextSteps[0]?.seq !== prevHead.seq;
+    log.steps = nextSteps;
+    for (const listener of log.listeners) listener(nextSteps);
+
+    if (log.runListeners.size === 0) {
+      log.byRun = groupByRun(nextSteps);
       return;
+    }
+    if (!evictedHead && activity.run !== undefined) {
+      const prevSlice = log.byRun.get(activity.run) ?? emptySteps;
+      const nextSlice = mergeSteps(prevSlice, [activity]);
+      if (!stepsEqual(prevSlice, nextSlice)) {
+        log.byRun.set(activity.run, nextSlice);
+        const set = log.runListeners.get(activity.run);
+        if (set) for (const listener of set) listener(nextSlice);
+      }
+      return;
+    }
+    this.reconcileByRun(log, nextSteps);
+  }
+
+  private reconcileByRun(log: Log, nextSteps: SessionEvent[]) {
+    const nextByRun = groupByRun(nextSteps);
+    for (const [run, set] of log.runListeners) {
+      const prevSlice = log.byRun.get(run) ?? emptySteps;
+      const nextSlice = nextByRun.get(run) ?? emptySteps;
+      if (!stepsEqual(prevSlice, nextSlice)) {
+        for (const listener of set) listener(nextSlice);
+      }
+    }
+    log.byRun = nextByRun;
+  }
+
+  private publish(log: Log, steps: SessionEvent[]) {
+    if (stepsEqual(log.steps, steps)) return;
     log.steps = steps;
     for (const listener of log.listeners) listener(steps);
+    this.reconcileByRun(log, steps);
   }
 
   private async refresh(log: Log): Promise<void> {

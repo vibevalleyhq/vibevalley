@@ -469,13 +469,14 @@ pub fn cloudflared(port: u16) -> Result<Tunnel, String> {
             _ => e.to_string(),
         })?;
     let (found, address) = flume::bounded::<String>(1);
-    let pattern = regex::Regex::new(r"https://[a-z0-9-]+\.trycloudflare\.com").expect("the quick tunnel's address");
+    static TUNNEL_URL: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"https://[a-z0-9-]+\.trycloudflare\.com").expect("the quick tunnel's address"));
     // Both streams are read until it exits, so it never blocks on a write.
     let read = |stream: Box<dyn Read + Send>| {
-        let (found, pattern) = (found.clone(), pattern.clone());
+        let found = found.clone();
         std::thread::spawn(move || {
             for line in BufReader::new(stream).lines().map_while(Result::ok) {
-                if let Some(m) = pattern.find(&line) {
+                if let Some(m) = TUNNEL_URL.find(&line) {
                     let _ = found.try_send(m.as_str().to_string());
                 }
             }

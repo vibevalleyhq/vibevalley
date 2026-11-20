@@ -2,16 +2,54 @@
 // nsh has the thing. There is no DOM: focus refs, click-away and the
 // viewport come from nsh (autoFocus props, Overlay's onPressOutside,
 // windowSize).
-import { untracked, type Accessor, type JSX } from "nsh";
+import { signal, untracked, type Accessor, type JSX } from "nsh";
 
-import { createEffect, createSignal } from "../../solid";
-import { useInterval } from "./timer";
+import { createEffect, createSignal, onSettled } from "../../solid";
 
-/** The time, a new reading every `ms`: for "3m ago" that keeps up without anything else changing. */
+interface ClockBucket {
+  readonly read: Accessor<number>;
+  readonly write: (v: number) => void;
+  refs: number;
+  timer: ReturnType<typeof setInterval> | undefined;
+}
+
+const clockBuckets = new Map<number, ClockBucket>();
+
+function acquireClockBucket(ms: number): ClockBucket {
+  let bucket = clockBuckets.get(ms);
+  if (!bucket) {
+    const now = signal(Date.now());
+    bucket = {
+      read: () => now(),
+      write: (v) => now.set(v),
+      refs: 0,
+      timer: undefined,
+    };
+    clockBuckets.set(ms, bucket);
+  }
+  return bucket;
+}
+
+/** The time, a new reading every `ms`: pooled per interval across active subscribers. */
 export function useNow(ms = 30_000): Accessor<number> {
-  const [now, setNow] = createSignal(Date.now());
-  useInterval(() => setNow(Date.now()), ms);
-  return now;
+  const bucket = acquireClockBucket(ms);
+  onSettled(() => {
+    if (!clockBuckets.has(ms)) clockBuckets.set(ms, bucket);
+    if (bucket.refs === 0) {
+      bucket.write(Date.now());
+      bucket.timer = setInterval(() => bucket.write(Date.now()), ms);
+    }
+    bucket.refs++;
+    return () => {
+      bucket.refs--;
+      if (bucket.refs === 0) {
+        clearInterval(bucket.timer);
+        bucket.timer = undefined;
+        if (clockBuckets.get(ms) === bucket) clockBuckets.delete(ms);
+      }
+    };
+  });
+  return bucket.read;
 }
 
 /** Rebuilds its children whenever `key` changes, as a React key does: their state starts over. */

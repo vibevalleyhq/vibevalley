@@ -15,7 +15,7 @@ import { Markdown } from "../../ui/Markdown";
 import { Dot } from "../../ui/Tag";
 import { Bubble } from "../../ui/Tip";
 import { mix } from "../../ui/tone";
-import { createSessionEvents } from "./events";
+import { createRunEvents } from "./events";
 import {
   answerOf,
   farmToolText,
@@ -51,16 +51,20 @@ function usageLineText(step: SessionEvent): string {
   });
 }
 
+function RunClockLog(props: { steps: SessionEvent[] }) {
+  const now = useNow();
+  return <WorkLog steps={props.steps} now={now()} asked={t("web.session.log.heard")} class="mt-1.5" />;
+}
+
 /** Under a report or the orchestrator's answer: the run behind it, folded to one line until opened. */
 export function RunSteps(props: { session: string; run: string | undefined; orchestrator?: boolean }) {
   const open = signal(false);
-  const all = createSessionEvents(
+  const steps = createRunEvents(
     () => props.session,
+    () => props.run,
     () => !!props.run,
   );
-  const steps = () => all().filter((e) => e.run === props.run);
   const label = () => (props.run ? runLabel(steps(), props.orchestrator ?? false) : undefined);
-  const now = useNow();
   return (
     <If when={label()}>
       {(text) => (
@@ -84,7 +88,7 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
             <Text class="text-xs font-medium text-muted tabular-nums">{text()}</Text>
           </View>
           <If when={open()}>
-            <WorkLog steps={steps()} now={now()} asked={t("web.session.log.heard")} class="mt-1.5" />
+            <RunClockLog steps={steps()} />
           </If>
         </View>
       )}

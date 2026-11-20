@@ -333,7 +333,11 @@ fn dump_pixels(
     shell: &Shell,
     path: &std::path::Path,
     cx: &mut App,
-) -> Vec<(PathBuf, crate::pixel::draw::DrawList, Option<std::sync::Arc<crate::pixel::atlas::Atlas>>)> {
+) -> Vec<(
+    PathBuf,
+    std::sync::Arc<crate::pixel::draw::DrawList>,
+    Option<std::sync::Arc<crate::pixel::atlas::Atlas>>,
+)> {
     let mut out = Vec::new();
     if let Some(slot) = &shell.native_pixel {
         slot.view.update(cx, |v, _| v.draw_unpainted());

@@ -11,7 +11,7 @@
 //! `gateway/http/api.ts` and `rpc.ts`.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 use std::time::Duration;
 
@@ -93,6 +93,7 @@ struct Streams {
 /// (`Arc<Hub>`).
 pub struct Hub {
     core: Mutex<Core>,
+    core_seq: AtomicI64,
     space: chord_space::Space,
     workbench: workbench_frames::WorkbenchFrames,
     execution: std::sync::OnceLock<std::sync::Weak<modules::orchestrator::Orchestrator>>,
@@ -133,10 +134,12 @@ impl Hub {
     pub fn new(state: SpaceState) -> Arc<Hub> {
         let (kicks, kicked) = flume::unbounded();
         let core = Core::new(state);
+        let seq = core.seq();
         let first = core.frame(vec![]);
         let space = chord_space::Space::new();
         let hub = Arc::new(Hub {
             core: Mutex::new(core),
+            core_seq: AtomicI64::new(seq),
             space,
             workbench: workbench_frames::WorkbenchFrames::new(first),
             execution: std::sync::OnceLock::new(),
@@ -175,10 +178,17 @@ impl Hub {
         lock(&self.core).seq()
     }
 
-    fn refresh_frame_words(&self) {
-        if self.workbench.snapshot().locale != vibevalley_i18n::locale() {
-            let core = lock(&self.core);
-            self.workbench.replace(core.frame(vec![]));
+    fn sync_workbench(&self) {
+        let target_seq = self.core_seq.load(Ordering::Acquire);
+        let locale = vibevalley_i18n::locale();
+        let snap = self.workbench.snapshot();
+        if snap.frame.seq >= target_seq && snap.locale == locale {
+            return;
+        }
+        let core = lock(&self.core);
+        let snap = self.workbench.snapshot();
+        if snap.frame.seq < core.seq() || snap.locale != locale {
+            self.workbench.replace_if_newer(core.frame(vec![]));
         }
     }
 
@@ -195,8 +205,7 @@ impl Hub {
             let mut core = lock(&self.core);
             let changes = core.apply(facts);
             if !changes.transitions.is_empty() {
-                let frame = core.frame(vec![]);
-                self.workbench.replace(frame);
+                self.core_seq.store(core.seq(), Ordering::Release);
             }
             changes
         };
@@ -354,13 +363,23 @@ fn frames(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Vec<GameEffect>>) {
     while let Ok(mut effects) = kicked.recv() {
         let deadline = std::time::Instant::now() + Duration::from_millis(STATE_EVERY_MS);
         let Some(leading) = hub.upgrade() else { return };
-        leading.refresh_frame_words();
-        leading.workbench.publish(true);
+        let target_seq = leading.core_seq.load(Ordering::Acquire);
+        if leading.workbench.should_publish(target_seq, true) {
+            leading.sync_workbench();
+            leading.workbench.publish(true);
+        }
         drop(leading);
         std::thread::sleep(deadline.saturating_duration_since(std::time::Instant::now()));
         effects.extend(kicked.drain().flatten());
         let Some(hub) = hub.upgrade() else { return };
-        hub.refresh_frame_words();
+        let has_stream_subscribers = {
+            let streams = lock(&hub.streams);
+            !streams.frames.is_empty() || !streams.states.is_empty()
+        };
+        if !hub.workbench.has_watchers() && !has_stream_subscribers {
+            continue;
+        }
+        hub.sync_workbench();
         hub.workbench.publish(false);
         let snapshot = hub.workbench.snapshot();
         let mut streams = lock(&hub.streams);
@@ -448,7 +467,7 @@ impl Server for Hub {
     }
 
     fn state(&self) -> flume::Receiver<Value> {
-        self.refresh_frame_words();
+        self.sync_workbench();
         let (tx, rx) = flume::unbounded();
         let mut streams = lock(&self.streams);
         let _ = tx.send(self.workbench.snapshot().wire().clone());
@@ -457,7 +476,7 @@ impl Server for Hub {
     }
 
     fn watch_workbench(&self, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(&Value)) {
-        self.refresh_frame_words();
+        self.sync_workbench();
         self.workbench.watch(stop, receive);
     }
 

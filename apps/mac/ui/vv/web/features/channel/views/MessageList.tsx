@@ -14,7 +14,7 @@ import { useNow } from "../../../base/dom";
 import { tookText, spentText } from "../../../base/format";
 import { useAgent, useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
-import { useCore } from "../../../infra/frame";
+import { useCore, useIssue, useSession, useSessionsMap, useThreadOwner } from "../../../infra/frame";
 import { useRouter, Link as A } from "../../../infra/router";
 import { useLatest } from "../../../state/atom";
 import { useIntents } from "../../../state/intent";
@@ -31,7 +31,7 @@ import { RunSteps } from "../../session/WorkLog";
 import { chatSay, editingId, pendingLines, setEditingId } from "../model/composing";
 import { followed, useMessage } from "../model/follow";
 import { useMarkedFollowed, useMarkRead } from "../model/marks";
-import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "../model/places";
+import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, unreadIn } from "../model/places";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
 
@@ -411,13 +411,9 @@ function Frame(props: {
 
 /** A dispatch said as what it is for the user: who went to which issue; one line until it is opened, then the whole task. */
 function Dispatch(props: { m: ChatMessage }) {
-  const core = useCore();
   const open = signal(false);
-  const sent = () => (core()?.sessions ?? []).find((s) => s.id === props.m.session);
-  const issue = () => {
-    const id = sent()?.issue;
-    return id ? (core()?.issues ?? []).find((i) => i.id === id) : undefined;
-  };
+  const sent = useSession(() => props.m.session);
+  const issue = useIssue(() => sent()?.issue);
   return (
     <View testID="dispatch" class="flex-row items-start gap-1.5">
       <View class="min-w-0 flex-1">
@@ -469,7 +465,7 @@ function MessageRow(props: {
   where?: string | undefined;
   onJump?: (() => void) | undefined;
 }) {
-  const core = useCore();
+  const sessionsById = useSessionsMap();
   const editing = () => editingId() === props.m.id;
   const setEditing = (on: boolean) => setEditingId(on ? props.m.id : undefined);
   const orchestrators = useOrchestrators();
@@ -478,14 +474,15 @@ function MessageRow(props: {
       ? t("web.channel.messages.user")
       : (orchestrators().find((a) => a.id === who)?.name ??
         (who === defaultOrchestrator ? t("web.channel.orchestrator") : undefined) ??
-        (core()?.sessions ?? []).find((h) => h.id === who)?.name ??
+        sessionsById().get(who)?.name ??
         who);
   const meta = () =>
     [props.where ? t("web.channel.messages.inThread", { address: props.where }) : "", props.m.pinned !== undefined ? t("web.channel.messages.pinned") : ""]
       .filter(Boolean)
       .join(" · ");
   const agentOf = useAgent(() => props.m.agent);
-  const session = () => (actorRoleOf(props.m.actor) === "worker" ? (core()?.sessions ?? []).find((h) => h.id === props.m.from) : undefined);
+  const workerSession = useSession(() => (actorRoleOf(props.m.actor) === "worker" ? props.m.from : undefined));
+  const session = workerSession;
   const who = () => {
     if (actorRoleOf(props.m.actor) !== "worker") return "";
     const agent = agentOf();
@@ -594,12 +591,11 @@ function MessageRow(props: {
 }
 
 function ThreadPreview(props: { thread: Channel }) {
-  const core = useCore();
   const router = useRouter();
   const now = useNow();
   const unread = () => unreadIn(props.thread);
   const last = () => props.thread.last;
-  const session = () => threadOwnerOf(props.thread, core()?.sessions ?? []);
+  const session = useThreadOwner(() => props.thread);
   return (
     <View
       role="button"

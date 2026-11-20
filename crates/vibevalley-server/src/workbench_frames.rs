@@ -44,8 +44,25 @@ impl WorkbenchFrames {
         }))
     }
 
-    pub fn replace(&self, frame: StateFrame) {
-        lock(&self.0).latest = Arc::new(Snapshot::new(frame));
+    pub fn has_watchers(&self) -> bool {
+        !lock(&self.0).watchers.is_empty()
+    }
+
+    pub fn should_publish(&self, seq: i64, leading: bool) -> bool {
+        let current = lock(&self.0);
+        let now = Instant::now();
+        !current.watchers.is_empty()
+            && !current
+                .last
+                .is_some_and(|(sent, time)| sent == seq || (leading && now.duration_since(time) < Duration::from_millis(STATE_EVERY_MS)))
+    }
+
+    pub fn replace_if_newer(&self, frame: StateFrame) {
+        let locale = vibevalley_i18n::locale();
+        let mut current = lock(&self.0);
+        if current.latest.frame.seq < frame.seq || (current.latest.frame.seq == frame.seq && current.latest.locale != locale) {
+            current.latest = Arc::new(Snapshot::new(frame));
+        }
     }
 
     pub fn snapshot(&self) -> Arc<Snapshot> {
@@ -113,7 +130,7 @@ mod tests {
         });
         assert_eq!(received.recv_timeout(Duration::from_secs(2)).unwrap(), 0);
         for seq in 1..=512 {
-            feed.replace(StateFrame { seq, ..frame.clone() });
+            feed.replace_if_newer(StateFrame { seq, ..frame.clone() });
             feed.publish(false);
         }
         {
@@ -126,5 +143,56 @@ mod tests {
         drop(stop);
         watch.join().unwrap();
         assert!(lock(&feed.0).watchers.is_empty());
+    }
+
+    #[test]
+    fn lazy_workbench_sync_builds_frame_on_demand_and_delivers_burst_final_seq() {
+        use std::sync::mpsc;
+        use vibevalley_protocol::{CallState, Fact, FactCallChanged};
+
+        let hub = crate::Hub::new(empty_space_state());
+        for n in 1..=10 {
+            let fact = Fact::CallChanged(FactCallChanged {
+                at: n,
+                state: CallState::Idle,
+                reason: format!("r{n}"),
+            });
+            hub.apply(vec![fact]);
+        }
+        assert_eq!(hub.frame().seq, 10);
+
+        let rx = crate::Server::state(&*hub);
+        let first = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(first["seq"], 10);
+
+        let (stop, stopped) = flume::bounded(0);
+        let (tx, got) = mpsc::channel();
+        let h = hub.clone();
+        let t = std::thread::spawn(move || {
+            crate::Server::watch_workbench(&*h, &stopped, &mut |val| {
+                let _ = tx.send(val["seq"].as_i64().unwrap());
+            });
+        });
+        assert_eq!(got.recv_timeout(Duration::from_secs(2)).unwrap(), 10);
+
+        for n in 11..=20 {
+            let fact = Fact::CallChanged(FactCallChanged {
+                at: n,
+                state: CallState::Idle,
+                reason: format!("r{n}"),
+            });
+            hub.apply(vec![fact]);
+        }
+
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut last_seq = 10;
+        while last_seq < 20 && Instant::now() < deadline {
+            if let Ok(seq) = got.recv_timeout(Duration::from_millis(200)) {
+                last_seq = seq;
+            }
+        }
+        assert_eq!(last_seq, 20);
+        drop(stop);
+        t.join().unwrap();
     }
 }

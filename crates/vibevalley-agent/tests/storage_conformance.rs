@@ -476,3 +476,105 @@ fn custom_third_party_storage_backend_passes_conformance() -> DurableResult<()> 
         Ok(store)
     })
 }
+
+fn seed_all_journal_ops(store: &Store) -> DurableResult<()> {
+    store.write(|tx| {
+        tx.create_conversation("conv-1", "deepseek-flash")?;
+        tx.append_entry("conv-1", "pi.user", &json!({"text": "seed"}))?;
+        tx.put_document("conversation", "conv-1", "pi.state", &json!({"v": 1}))?;
+        tx.submit("conv-1", "req-seed", "prompt", &json!({"k": 1}), None)?;
+        let mut task = vibevalley_agent::durable::Task::new("seed", "init");
+        task.id = "task-seed".into();
+        task.conversation_id = "conv-1".into();
+        task.dedup_key = "dk-seed".into();
+        tx.create_task(task)?;
+        tx.send_signal("task-seed", "sig", Some("k1"), &json!({"n": 1}))?;
+        Ok(())
+    })
+}
+
+fn assert_seed_state_intact(store: &Store, label: &str) -> DurableResult<()> {
+    store.read(|r| {
+        assert_eq!(r.conversation("conv-1")?.provider_affinity, "deepseek-flash", "{label}");
+        assert_eq!(r.entries("conv-1", 1)?.len(), 1, "{label}");
+        assert_eq!(r.document("conversation", "conv-1", "pi.state")?.unwrap().state, json!({"v": 1}), "{label}");
+        assert!(r.document("conversation", "conv-1", "pi.temp")?.is_none(), "{label}");
+        assert_eq!(r.submissions("conv-1")?.len(), 1, "{label}");
+        assert!(r.task_by_dedup("", "dk-seed")?.is_some(), "{label}");
+        assert!(r.task_by_dedup("", "dk-aborted")?.is_none(), "{label}");
+        assert!(r.conversation("conv-aborted").is_err(), "{label}");
+        let pending = r.signals("task-seed", false)?;
+        assert_eq!(pending.len(), 1, "{label}");
+        assert_eq!(pending[0].payload, json!({"n": 1}), "{label}");
+        Ok(())
+    })
+}
+
+fn apply_uncommitted_mutations(tx: &mut vibevalley_agent::durable::Tx<'_>) -> DurableResult<()> {
+    tx.create_conversation("conv-aborted", "deepseek-pro")?;
+    tx.append_entry("conv-1", "pi.assistant", &json!({"text": "rolled back"}))?;
+    tx.put_document("conversation", "conv-1", "pi.state", &json!({"v": 99}))?;
+    tx.put_document("conversation", "conv-1", "pi.temp", &json!({"temp": true}))?;
+    tx.submit("conv-1", "req-aborted", "prompt", &json!({"k": 2}), None)?;
+    let mut task = vibevalley_agent::durable::Task::new("aborted", "init");
+    task.id = "task-aborted".into();
+    task.conversation_id = "conv-1".into();
+    task.dedup_key = "dk-aborted".into();
+    tx.create_task(task)?;
+    assert!(tx.consume_first_signal("task-seed", "sig")?.is_some());
+    tx.send_signal("task-seed", "sig", Some("k-aborted"), &json!({"n": 2}))?;
+    Ok(())
+}
+
+#[test]
+fn memory_and_jsonl_undo_rollback_preserves_state_and_indices_on_error_and_panic() -> DurableResult<()> {
+    let dir = tempdir().unwrap();
+    let stores: [(&str, Store); 2] = [
+        ("memory", Store::from_backend(Arc::new(MemoryStorage::new()))),
+        (
+            "jsonl",
+            Store::jsonl_with_options(
+                dir.path(),
+                JsonlOptions {
+                    fsync: false,
+                    read_only: false,
+                },
+            )?,
+        ),
+    ];
+
+    for (label, store) in &stores {
+        seed_all_journal_ops(store)?;
+        assert_seed_state_intact(store, label)?;
+
+        let err = store.write(|tx| {
+            apply_uncommitted_mutations(tx)?;
+            Err::<(), _>(vibevalley_agent::durable::Error::Invalid("intentional abort".into()))
+        });
+        assert!(err.is_err(), "{label}");
+        assert_seed_state_intact(store, label)?;
+
+        let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _: DurableResult<()> = store.write(|tx| {
+                apply_uncommitted_mutations(tx)?;
+                panic!("boom");
+            });
+        }));
+        assert!(panicked.is_err(), "{label}");
+        assert_seed_state_intact(store, label)?;
+
+        // Signals inserted and consumed after rollbacks still follow strict FIFO order.
+        store.write(|tx| {
+            for i in 0..200 {
+                tx.send_signal("task-seed", "fifo", None, &json!({ "i": i }))?;
+            }
+            for i in 0..200 {
+                let sig = tx.consume_first_signal("task-seed", "fifo")?.expect("pending fifo signal");
+                assert_eq!(sig.payload, json!({ "i": i }));
+            }
+            assert!(tx.consume_first_signal("task-seed", "fifo")?.is_none());
+            Ok(())
+        })?;
+    }
+    Ok(())
+}
