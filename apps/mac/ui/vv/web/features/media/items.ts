@@ -10,6 +10,7 @@ import {
   type LibraryOriginKind,
   type LibrarySort,
   type MediaJob,
+  type MediaSummary,
   type MediaUnderstandingJob,
   userId,
 } from "@vibevalley/protocol";
@@ -208,9 +209,18 @@ export const countsOf = (given: {
   return { where: byWhere, kind: byKind, channels, agents };
 };
 
-/** Excludes understanding jobs, which produce no file. */
-export const making = (jobs: readonly MediaJob[]): MediaJob[] =>
-  jobs.filter((job) => job.kind !== "understanding" && (job.phase === "queued" || job.phase === "generating" || job.phase === "downloading"));
+/** Excludes understanding jobs, which produce no file; consumes Rust `MediaSummary.activeIds` when present. */
+export const making = (jobs: readonly MediaJob[], summary?: MediaSummary): MediaJob[] => {
+  if (summary !== undefined) {
+    if (summary.activeCount <= 0 || summary.activeIds.length === 0) return [];
+    const byId = new Map(jobs.map((job) => [job.id, job]));
+    return summary.activeIds.flatMap((id) => {
+      const job = byId.get(id);
+      return job !== undefined ? [job] : [];
+    });
+  }
+  return jobs.filter((job) => job.kind !== "understanding" && (job.phase === "queued" || job.phase === "generating" || job.phase === "downloading"));
+};
 
 export interface Placed {
   readonly index: number;

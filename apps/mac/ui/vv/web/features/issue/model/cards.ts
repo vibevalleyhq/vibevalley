@@ -1,5 +1,5 @@
 import { list, t } from "@vibevalley/i18n";
-import type { Issue, IssueHistory, IssueStatus, Priority, Session, SessionView, SpaceView } from "@vibevalley/protocol";
+import type { BoardSummary, Issue, IssueHistory, IssueLane, IssueStatus, Priority, Session, SessionView, SpaceView } from "@vibevalley/protocol";
 import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
 
 import { ago, tookText } from "../../../base/format";
@@ -9,7 +9,7 @@ import { endedAt, assignedOnDuty, issueSession, issueTag, needsWorktreeCheck, ty
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
 
-export type Lane = "todo" | "working" | "waiting" | "closed";
+export type Lane = IssueLane;
 
 export const lanes: Lane[] = ["todo", "working", "waiting", "closed"];
 
@@ -86,11 +86,11 @@ export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";
 export type BoardCard = (
   | { kind: "todo"; id: string; lane: Lane; issue: Issue }
   /** `sessions` are the real live and ended ones, oldest first; `session` the one on the farm now. */
-  | { kind: "issue"; id: string; lane: Lane; issue: Issue; sessions: Session[]; tag: IssueTag; session?: SessionView }
+  | { kind: "issue"; id: string; lane: Lane; issue: Issue; sessions: Session[]; tag: IssueTag; session?: SessionView; needsWorktreeCheck?: boolean }
   | { kind: "missing"; id: string; lane: Lane; issue: Issue; missing: string[] }
   /** An issue for the orchestrator: open while the orchestrator works on it, closed once it has answered; never dragged. */
   | { kind: "orchestrator"; id: string; lane: Lane; issue: Issue }
-  | { kind: "family"; id: string; lane: Lane; issue: Issue; children: Issue[] }
+  | { kind: "family"; id: string; lane: Lane; issue: Issue; children: Issue[]; progress?: { readonly done: number; readonly total: number } }
 ) & { readonly move?: CardMove };
 
 export const cardRepo = (c: BoardCard) => c.issue.repo;
@@ -98,6 +98,7 @@ export const cardAgent = (c: BoardCard) => assignedAgentOf(c.issue);
 
 export function buildCards(rows: IssueHistory[], core: SpaceView | undefined, orchestrators: ReadonlySet<string>): BoardCard[] {
   const cards: BoardCard[] = [];
+  const byIssue = core?.boardSummary?.byIssue;
   const families = new Map<string, Issue[]>();
   for (const row of rows) {
     if (!row.issue.parent) continue;
@@ -107,8 +108,37 @@ export function buildCards(rows: IssueHistory[], core: SpaceView | undefined, or
   }
   for (const row of rows) {
     const issue = row.issue;
-    const base = { id: issue.id, lane: laneOf(issue.status), issue };
+    const summary = byIssue?.[issue.id];
+    const base = { id: issue.id, lane: summary?.lane ?? laneOf(issue.status), issue };
     const children = families.get(issue.id) ?? [];
+    if (summary !== undefined) {
+      switch (summary.cardKind) {
+        case "family":
+          cards.push({ kind: "family", ...base, children, progress: { done: summary.familyDone, total: summary.familyTotal } });
+          break;
+        case "orchestrator":
+          cards.push({ kind: "orchestrator", ...base });
+          break;
+        case "todo":
+          cards.push({ kind: "todo", ...base });
+          break;
+        case "issue":
+          if (row.missingSessions.length > 0 || row.sessions.length === 0) cards.push({ kind: "missing", ...base, missing: row.missingSessions });
+          else
+            cards.push(
+              omitUndefined({
+                kind: "issue" as const,
+                ...base,
+                sessions: row.sessions,
+                tag: issueTag(issue),
+                session: issueSession(core, issue),
+                needsWorktreeCheck: summary.needsWorktreeCheck,
+              }),
+            );
+          break;
+      }
+      continue;
+    }
     if (children.length > 0) cards.push({ kind: "family", ...base, children });
     else if (assignedOnDuty(issue, orchestrators)) cards.push({ kind: "orchestrator", ...base });
     else {
@@ -118,6 +148,42 @@ export function buildCards(rows: IssueHistory[], core: SpaceView | undefined, or
     }
   }
   return cards;
+}
+
+/** Whether the displayed cards match the unfiltered frame projection with no older history or in-flight optimistic moves. */
+function usesSummaryLaneCounts(summary: BoardSummary | undefined, cards: readonly BoardCard[], filtered: boolean, older: boolean): summary is BoardSummary {
+  return summary !== undefined && !filtered && !older && cards.every((c) => c.move === undefined);
+}
+
+/** Unified lane count shared by wide column headers and narrow lane tabs. */
+export function laneCountOf(lane: Lane, cards: readonly BoardCard[], summary: BoardSummary | undefined, filtered: boolean, older: boolean): number {
+  if (usesSummaryLaneCounts(summary, cards, filtered, older)) {
+    switch (lane) {
+      case "todo":
+        return summary.laneCounts.todo;
+      case "working":
+        return summary.laneCounts.working;
+      case "waiting":
+        return summary.laneCounts.waiting;
+      case "closed":
+        return summary.laneCounts.closed;
+    }
+  }
+  return cards.filter((c) => c.lane === lane).length;
+}
+
+/** Active worker slot usage (`runningSlots / maxRunning`) for the working lane header. */
+export function runningSlotsOf(
+  cards: readonly BoardCard[],
+  summary: BoardSummary | undefined,
+  filtered: boolean,
+  fallbackMax: number,
+): { taken: number; of: number } {
+  if (summary !== undefined && !filtered) {
+    return { taken: summary.runningSlots, of: summary.maxRunning };
+  }
+  const taken = cards.filter((c) => c.lane === "working" && c.kind === "issue" && c.session?.phase._tag === "working").length;
+  return { taken, of: summary?.maxRunning ?? fallbackMax };
 }
 
 function cardWords(c: BoardCard): (string | undefined)[] {
@@ -174,7 +240,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
         priority: c.issue.priority,
         flags: [{ text: t(`shared.stage.${c.issue.stage.state}`), tone: stageTone[c.issue.stage.state] }],
         detail: c.issue.description,
-        progress: { done: c.children.filter((child) => child.status === "done" || child.status === "canceled").length, total: c.children.length },
+        progress: c.progress ?? { done: c.children.filter((child) => child.status === "done" || child.status === "canceled").length, total: c.children.length },
       };
     case "todo": {
       const item = c.issue;
@@ -211,7 +277,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
             : t(`shared.stage.${st.state}`),
           tone: stageTone[st.state],
         });
-      if (tagOpen(tag) && needsWorktreeCheck(now0)) {
+      if (c.needsWorktreeCheck ?? (tagOpen(tag) && needsWorktreeCheck(now0))) {
         flags.unshift({ text: t("web.issue.run.reconcile"), tone: "wheat" });
       }
       if (issue.canceled === "lost") flags.push({ text: t("web.issue.card.lost"), tone: "berry" });

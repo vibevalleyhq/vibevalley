@@ -23,7 +23,7 @@ import { Icon } from "../../../ui/Icon";
 import { TextLink } from "../../../ui/TextLink";
 import { Bubble } from "../../../ui/Tip";
 import { useMarkedChat } from "../model/marks";
-import { archivedOf, channelName, chatPath, directsOf, groupsOf, sessionThreadOf, topsOf, unreadIn, unreadUnder } from "../model/places";
+import { archivedOf, channelName, chatPath, directsOf, groupsOf, sessionThreadOf, topsOf, unreadTotal, unreadUnder } from "../model/places";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots, phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
 
@@ -82,21 +82,27 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
   };
   const act = createAct();
   const reorder = createReorder((id, onto) => void act.run(() => api.channel.update({ id, before: onto.id, category: onto.category })));
-  const unreadSum = (list: readonly Channel[]) => list.reduce((sum, c) => sum + unreadUnder(chat(), c), 0);
+  const channelSummary = () => (chat() === core()?.chat ? core()?.channelSummary : undefined);
+  const totalUnread = () => unreadTotal(chat(), channelSummary());
+  const unreadOf = (c: Channel) => unreadUnder(chat(), c, channelSummary());
+  const unreadSum = (list: readonly Channel[]) => list.reduce((sum, c) => sum + unreadOf(c), 0);
   const helpersUnread = () =>
     sessions().reduce((sum, h) => {
       const th = sessionThreadOf(chat(), h);
-      return sum + (th ? unreadIn(th) : 0);
+      return sum + (th ? unreadOf(th) : 0);
     }, 0);
-  const row = (c: Channel) => (
-    <ChannelRow channel={c} here={c.id === props.channel?.id} unread={unreadUnder(chat(), c)} onClick={() => go(c)} reorder={reorder} />
-  );
+  const row = (c: Channel) => <ChannelRow channel={c} here={c.id === props.channel?.id} unread={unreadOf(c)} onClick={() => go(c)} reorder={reorder} />;
   return (
     <View accessibilityLabel={t("web.channel.side")} testID="channels-side" class="w-full flex-1 border-r border-line bg-side">
       <View class="h-16.5 shrink-0 flex-row items-center gap-2 border-b border-line px-4">
         <Text role="header" class="min-w-0 flex-1 truncate text-xl font-semibold text-ink">
           {t("web.channel.tab.chat")}
         </Text>
+        <If when={totalUnread() > 0}>
+          <View testID="chat-unread-total">
+            <Count n={totalUnread()} />
+          </View>
+        </If>
         <BarButton icon="search" size={16} testid="farm-search-open" label={t("web.channel.farmSearch.open")} onPress={() => props.onSearch()} />
       </View>
       <Scroll class="flex-1" contentClass="px-3 py-3">
@@ -372,7 +378,7 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
   const thread = () => sessionThreadOf(core()?.chat, props.h);
   const unread = () => {
     const current = thread();
-    return current ? unreadIn(current) : 0;
+    return current ? unreadUnder(core()?.chat, current, core()?.channelSummary) : 0;
   };
   const phase = () => phaseText(props.h, now());
   return (
@@ -385,7 +391,7 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
         if (current) props.onShow(current);
       }}
       tooltip={<Bubble text={`${props.h.name} · ${phase()}`} />}
-      class={`h-8 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out ${props.active ? "bg-selected" : "hover:bg-hover"}`}
+      class={`h-8 flex-row items-center gap-2 overflow-hidden rounded-md px-2 transition duration-120 ease-out ${props.active ? "bg-selected" : "hover:bg-hover"}`}
     >
       <View class="min-w-0 flex-1 flex-row items-center gap-2">
         <View class="relative shrink-0">
@@ -396,10 +402,12 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
         </View>
         <Text class={`min-w-0 flex-1 truncate text-sm text-ink ${props.active || unread() > 0 ? "font-semibold" : "font-medium"}`}>{props.h.name}</Text>
       </View>
-      <View class="shrink-0 flex-row items-center gap-1.5">
-        <View class="max-w-24 flex-row items-center gap-1">
+      <View class="min-w-0 shrink flex-row items-center gap-1.5 pr-1.5">
+        <View class="min-w-0 max-w-24 flex-row items-center gap-1 overflow-hidden">
           <PhaseGlyph phase={props.h.phase} size={12} />
-          <Text class="min-w-0 truncate text-2xs text-muted">{phase()}</Text>
+          <Text class="min-w-0 shrink truncate text-2xs text-muted" style={{ numberOfLines: 1 }}>
+            {phase()}
+          </Text>
         </View>
         <If when={unread() > 0}>
           <Count n={unread()} />

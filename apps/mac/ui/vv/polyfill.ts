@@ -1,4 +1,4 @@
-import { colorScheme } from "nsh";
+import { colorScheme, host } from "nsh";
 
 // What nsh's JS engine (still in 0.6.0) lacks and the reused VibeValley code calls.
 // Import it first in every entry that loads VibeValley modules.
@@ -97,6 +97,7 @@ if (!g2.window) {
     }),
   };
 }
-if (!g2.document) g2.document = { documentElement: { dataset: {}, style: { setProperty: () => {} } } };
+const initialLocale = (host as { params?: { locale?: unknown } }).params?.locale === "en" ? "en" : "zh";
+if (!g2.document) g2.document = { documentElement: { dataset: { locale: initialLocale }, style: { setProperty: () => {} } } };
 
 export {};

@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import { type Chat, type ChatMessage, type Channel, type Issue, type Session, type SpaceState } from "@vibevalley/protocol";
+import { type Channel, type ChannelSummary, type Chat, type ChatMessage, type Issue, type Session, type SpaceState } from "@vibevalley/protocol";
 import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
 
 import { compareText, or, spelled } from "../../../base/search";
@@ -85,12 +85,17 @@ export function linkedMessages(text: string, chat: Chat | undefined, host: strin
 
 export const unreadIn = (c: Channel) => c.unread ?? 0;
 
-export const unreadTotal = (chat: Chat | undefined) => (chat?.channels ?? []).reduce((n, c) => n + unreadIn(c), 0);
+export const unreadTotal = (chat: Chat | undefined, summary?: ChannelSummary) =>
+  summary !== undefined ? summary.unreadTotal : (chat?.channels ?? []).reduce((n, c) => n + unreadIn(c), 0);
 
 export const newestUnread = (c: Channel) => (unreadIn(c) > 0 ? c.lastNumber : undefined);
 
-export const unreadUnder = (chat: Chat | undefined, channel: Channel) =>
-  (chat?.channels ?? []).filter((c) => c.id === channel.id || c.parent === channel.id).reduce((n, c) => n + unreadIn(c), 0);
+export const unreadUnder = (chat: Chat | undefined, channel: Channel, summary?: ChannelSummary) => {
+  if (summary !== undefined && Object.hasOwn(summary.unreadUnder, channel.id)) {
+    return summary.unreadUnder[channel.id] ?? 0;
+  }
+  return (chat?.channels ?? []).filter((c) => c.id === channel.id || c.parent === channel.id).reduce((n, c) => n + unreadIn(c), 0);
+};
 
 const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => xs?.findLast(test);
 
@@ -223,7 +228,12 @@ const switchMax = 12;
 export function switchTargets(
   chat: Chat | undefined,
   query: string,
-  named: { readonly issues?: Issue[]; readonly sessions?: Session[]; readonly profiles?: readonly { id: string; name: string }[] } = {},
+  named: {
+    readonly issues?: Issue[];
+    readonly sessions?: Session[];
+    readonly profiles?: readonly { id: string; name: string }[];
+    readonly channelSummary?: ChannelSummary | undefined;
+  } = {},
 ): SwitchTarget[] {
   const all = (chat?.channels ?? []).filter((c) => c.archived === undefined);
   const at = (c: Channel) => c.last?.at ?? c.at;
@@ -232,7 +242,7 @@ export function switchTargets(
     ...all.map((c): SwitchTarget => {
       switch (c.type) {
         case "channel":
-          return { kind: "channel", id: c.id, label: `#${channelName(c)}`, hint: c.category, unread: unreadUnder(chat, c), at: at(c) };
+          return { kind: "channel", id: c.id, label: `#${channelName(c)}`, hint: c.category, unread: unreadUnder(chat, c, named.channelSummary), at: at(c) };
         case "direct":
           return { kind: "direct", id: c.id, label: `@${channelName(c)}`, hint: t("web.channel.switcher.direct"), unread: unreadIn(c), at: at(c) };
         case "thread":

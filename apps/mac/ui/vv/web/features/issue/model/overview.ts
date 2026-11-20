@@ -1,11 +1,11 @@
 import { t } from "@vibevalley/i18n";
-import type { DoingView, Issue, IssueStage, IssueStageKind, Session, SessionEvent, SessionView } from "@vibevalley/protocol";
+import type { BoardSummary, DoingView, Issue, IssuePromptKind, IssueStage, IssueStageKind, Session, SessionEvent, SessionView } from "@vibevalley/protocol";
 import { shortTitle } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { spanText, tookText } from "../../../base/format";
 import type { Tone } from "./cards";
-import { endedAt, issueTitle } from "./issue";
+import { endedAt, issueTitle, needsWorktreeCheck } from "./issue";
 /** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */
 const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -45,46 +45,75 @@ function criteriaRows(issue: Issue): CriterionRow[] {
   });
 }
 
-/** The one thing the user is asked for, worded; undefined when nothing is asked of the user. */
-function userQuestion(stage: IssueStage, issue: Issue, head: Session): UserQuestion | undefined {
-  const who = head.name;
-  const said = head.lastRun?.summary;
+/** Derives a prompt kind locally only when `StateFrame.state.boardSummary` does not carry this issue. */
+function fallbackPromptOf(stage: IssueStage, issue: Issue): IssuePromptKind | undefined {
   switch (stage.state) {
     case "asking":
-      return { head: t("web.issue.issue.asking", { who, n: issue.questions.length }), line: t("web.issue.issue.askingLine"), tone: "wheat" };
+      return "asking";
     case "reviewing":
-      if (issue.deliveryEvidence?.check?.status === "failed") {
-        return { head: t("web.issue.issue.reviewAfterFailedCheck"), ...(said ? { line: said } : {}), tone: "wheat" };
-      }
-      return issue.reviewedAt !== undefined
-        ? { head: t("web.issue.issue.reviewed"), ...(said ? { line: said } : {}), tone: "leaf" }
-        : { head: t("web.issue.issue.handedBack", { who }), ...(said ? { line: said } : {}), tone: "wheat" };
-    case "stuck":
-      switch (stage.stuck) {
+      if (issue.deliveryEvidence?.check?.status === "failed") return "review_after_failed_check";
+      return issue.reviewedAt !== undefined ? "reviewed" : "handed_back";
+    case "stuck": {
+      const reason = stage.stuck;
+      if (reason === undefined) return "stuck_unknown";
+      switch (reason) {
         case "conflict":
-          return {
-            head: t("web.issue.issue.conflict", { base: issue.conflict?.base ?? t("web.issue.issue.main") }),
-            ...(issue.conflict ? { line: issue.conflict.files.join(t("web.issue.issue.and")) } : {}),
-            tone: "berry",
-          };
+          return "stuck_conflict";
         case "failed":
-          return { head: t("web.issue.issue.failed"), ...(said ? { line: said } : {}), tone: "berry" };
+          return "stuck_failed";
         case "interrupted":
-          return { head: t("web.issue.issue.interrupted"), ...(said ? { line: said } : {}), tone: "wheat" };
+          return "stuck_interrupted";
         case "quiet":
-          return { head: t("web.issue.issue.quiet", { who }), line: t("web.issue.issue.quietLine"), tone: "berry" };
-        // No reason given: under exactOptionalPropertyTypes a case undefined does not make this switch exhaustive.
-        default:
-          return { head: t("web.issue.issue.stuck"), tone: "berry" };
+          return "stuck_quiet";
       }
+    }
     case "canceled":
-      return stage.lead === "reopen" ? { head: t("web.issue.issue.canceled"), line: t("web.issue.issue.reopenLine"), tone: "faint" } : undefined;
+      return stage.lead === "reopen" ? "canceled_reopenable" : undefined;
     case "draft":
     case "queued":
     case "working":
     case "done":
       return undefined;
   }
+}
+
+/** Formats the structured Rust `IssuePromptKind` into localized UI copy (exhaustive across every variant). */
+function userQuestionFromPrompt(prompt: IssuePromptKind, issue: Issue, head: Session): UserQuestion {
+  const who = head.name;
+  const said = head.lastRun?.summary;
+  switch (prompt) {
+    case "asking":
+      return { head: t("web.issue.issue.asking", { who, n: issue.questions.length }), line: t("web.issue.issue.askingLine"), tone: "wheat" };
+    case "review_after_failed_check":
+      return { head: t("web.issue.issue.reviewAfterFailedCheck"), ...(said ? { line: said } : {}), tone: "wheat" };
+    case "reviewed":
+      return { head: t("web.issue.issue.reviewed"), ...(said ? { line: said } : {}), tone: "leaf" };
+    case "handed_back":
+      return { head: t("web.issue.issue.handedBack", { who }), ...(said ? { line: said } : {}), tone: "wheat" };
+    case "stuck_conflict":
+      return {
+        head: t("web.issue.issue.conflict", { base: issue.conflict?.base ?? t("web.issue.issue.main") }),
+        ...(issue.conflict ? { line: issue.conflict.files.join(t("web.issue.issue.and")) } : {}),
+        tone: "berry",
+      };
+    case "stuck_failed":
+      return { head: t("web.issue.issue.failed"), ...(said ? { line: said } : {}), tone: "berry" };
+    case "stuck_interrupted":
+      return { head: t("web.issue.issue.interrupted"), ...(said ? { line: said } : {}), tone: "wheat" };
+    case "stuck_quiet":
+      return { head: t("web.issue.issue.quiet", { who }), line: t("web.issue.issue.quietLine"), tone: "berry" };
+    case "stuck_unknown":
+      return { head: t("web.issue.issue.stuck"), tone: "berry" };
+    case "canceled_reopenable":
+      return { head: t("web.issue.issue.canceled"), line: t("web.issue.issue.reopenLine"), tone: "faint" };
+  }
+}
+
+/** The one thing the user is asked for, worded; undefined when nothing is asked of the user. */
+function userQuestion(stage: IssueStage, issue: Issue, head: Session, boardSummary?: BoardSummary): UserQuestion | undefined {
+  const entry = boardSummary?.byIssue[issue.id];
+  const prompt = entry !== undefined ? entry.prompt : fallbackPromptOf(stage, issue);
+  return prompt !== undefined ? userQuestionFromPrompt(prompt, issue, head) : undefined;
 }
 
 const emptySession = (issue: Issue): Session => ({
@@ -101,7 +130,7 @@ const emptySession = (issue: Issue): Session => ({
 });
 
 /** `sessions` oldest first; `session` the one on the farm now, if any. */
-export function issueState(issue: Issue, sessions: Session[], session: SessionView | undefined, issues: Issue[]) {
+export function issueState(issue: Issue, sessions: Session[], session: SessionView | undefined, issues: Issue[], boardSummary?: BoardSummary) {
   const head = session ?? sessions.at(-1) ?? emptySession(issue);
   const first = sessions[0] ?? head;
   const parent = issues.find((item) => item.id === issue.parent);
@@ -143,7 +172,9 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
     repo: issue.repo ?? head.repo,
     parentText: parent?.title ?? issue.parent ?? "",
-    ask: userQuestion(stage, issue, head),
+    ask: userQuestion(stage, issue, head, boardSummary),
+    needsWorktreeCheck:
+      boardSummary?.byIssue[issue.id]?.needsWorktreeCheck ?? (stage.state !== "done" && stage.state !== "canceled" && needsWorktreeCheck(head)),
     /** The lead act and the rest the user may do, as the server says. */
     lead: stage.lead,
     others: stage.acts.map((a) => a.act).filter((a) => a !== stage.lead),

@@ -61,6 +61,7 @@ function SwitcherBody(props: { onClose: () => void }) {
       issues: core()?.issues ?? [],
       sessions: core()?.sessions ?? [],
       profiles: profiles(),
+      channelSummary: core()?.channelSummary,
     });
     const channels = chat.filter((s) => s.kind === "channel");
     const threads = chat.filter((s) => s.kind === "thread");

@@ -199,6 +199,8 @@ export function IssuesPage(props: { rest: string }) {
                 >
                   <IssueBoard
                     cards={shown()}
+                    summary={core()?.boardSummary}
+                    filtered={filterAny(filter())}
                     loading={history.loading()}
                     selected={returnTo()}
                     older={older()}

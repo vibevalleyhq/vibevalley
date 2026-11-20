@@ -8,13 +8,27 @@
 import { cleanup, PanResponder, Scroll, signal, Text, View, windowSize, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { maxRunning } from "@vibevalley/protocol";
+import { type BoardSummary, maxRunning } from "@vibevalley/protocol";
 
 import { Icon } from "../../../ui/Icon";
 import type { IconName } from "../../../ui/icons";
 import { Bubble, Hint } from "../../../ui/Tip";
 import { mix } from "../../../ui/tone";
-import { type BoardCard, cardAgent, cardLook, cardMove, cardRepo, closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "../model/cards";
+import {
+  type BoardCard,
+  cardAgent,
+  cardLook,
+  cardMove,
+  cardRepo,
+  closedShown,
+  type Lane,
+  laneCountOf,
+  laneLabel,
+  lanes,
+  laneStatus,
+  ownStatus,
+  runningSlotsOf,
+} from "../model/cards";
 import { laneOrder, type Ordering } from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
@@ -45,6 +59,8 @@ const emptyText: Record<Lane, string> = {
 
 export interface BoardProps {
   cards: BoardCard[];
+  summary?: BoardSummary | undefined;
+  filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
   older: boolean;
@@ -143,6 +159,8 @@ export function IssueBoard(props: BoardProps) {
   const lane = signal<Lane>(props.cards.find((card) => card.id === props.selected)?.lane ?? "todo");
   const narrow = () => windowSize().width < 700;
   const drag = createDrag(() => props);
+  const countOf = (l: Lane) => laneCountOf(l, props.cards, props.summary, props.filtered === true, props.older);
+  const workingSlots = () => runningSlotsOf(props.cards, props.summary, props.filtered === true, maxRunning);
   return (
     <View ref={drag.setRoot} class="min-h-0 flex-1 px-3 pb-3">
       <If when={narrow()}>
@@ -157,8 +175,12 @@ export function IssueBoard(props: BoardProps) {
                 class={`h-7 flex-1 flex-row items-center justify-center gap-1 rounded-sm px-1.5 ${lane() === l() ? "bg-page shadow-raise" : "hover:bg-hover"}`}
               >
                 <Text class={`truncate text-xs ${lane() === l() ? "font-medium text-ink" : "text-muted"}`}>{laneLabel[l()]}</Text>
-                <Text class={`text-2xs ${lane() === l() ? "text-muted" : "text-faint"}`} style={{ fontVariant: ["tabular-nums"] }}>
-                  {String(props.cards.filter((c) => c.lane === l()).length)}
+                <Text
+                  testID={`board-lane-tab-count-${l()}`}
+                  class={`text-2xs ${lane() === l() ? "text-muted" : "text-faint"}`}
+                  style={{ fontVariant: ["tabular-nums"] }}
+                >
+                  {String(countOf(l()))}
                 </Text>
               </View>
             )}
@@ -169,7 +191,14 @@ export function IssueBoard(props: BoardProps) {
         <Each of={lanes}>
           {(l) => (
             <If when={!narrow() || l() === lane()}>
-              <LaneView board={props} lane={l()} cards={props.cards.filter((c) => c.lane === l())} drag={drag} />
+              <LaneView
+                board={props}
+                lane={l()}
+                cards={props.cards.filter((c) => c.lane === l())}
+                count={countOf(l())}
+                slots={l() === "working" ? workingSlots() : undefined}
+                drag={drag}
+              />
             </If>
           )}
         </Each>
@@ -197,17 +226,13 @@ export function IssueBoard(props: BoardProps) {
   );
 }
 
-function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; drag: Drag }) {
+function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; count: number; slots?: { taken: number; of: number } | undefined; drag: Drag }) {
   const p = () => props.board;
   const over = () => props.drag.over() === props.lane;
   const folded = () => props.lane === "closed" && !p().older && props.cards.length > closedShown;
   const ordered = () => laneOrder(props.lane, props.cards, p().ordering);
   const shown = () => (folded() ? ordered().slice(0, closedShown) : ordered());
   const hidden = () => (folded() ? ordered().length - closedShown : 0);
-  const head = () =>
-    props.lane === "working"
-      ? t("web.issue.board.spots", { taken: props.cards.filter((c) => c.kind === "issue").length, of: maxRunning })
-      : `${props.cards.length}`;
   const hasBody = () => p().loading || props.cards.length > 0 || props.lane !== "todo";
   return (
     <View
@@ -218,15 +243,22 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; dr
       class={`max-h-full min-w-55 flex-1 self-start rounded-lg border px-2 pt-1.5 pb-2 ${over() ? "border-leaf" : "border-transparent bg-hover"}`}
       style={over() ? { backgroundColor: mix("leaf", 0.15) } : undefined}
     >
-      <View class="h-7 shrink-0 flex-row items-center gap-2 px-1">
+      <View class="h-7 shrink-0 flex-row items-center gap-1.5 px-1">
         <StatusMark status={laneStatus[props.lane]} />
-        <Text role="header" class="text-sm font-semibold text-ink">
+        <Text role="header" class="shrink-0 text-sm font-semibold text-ink">
           {laneLabel[props.lane]}
         </Text>
-        <Text class="text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
-          {head()}
+        <Text testID={`lane-count-${props.lane}`} class="shrink-0 text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+          {String(props.count)}
         </Text>
-        <View class="ml-auto">
+        <If when={props.slots}>
+          {(slots) => (
+            <Text testID="lane-working-slots" class="min-w-0 shrink truncate text-2xs text-faint" style={{ fontVariant: ["tabular-nums"], numberOfLines: 1 }}>
+              {`· ${t("web.issue.board.spots", slots())}`}
+            </Text>
+          )}
+        </If>
+        <View class="ml-auto shrink-0">
           <Hint text={emptyText[props.lane]} />
         </View>
       </View>

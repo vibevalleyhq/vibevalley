@@ -114,7 +114,9 @@ export function LibraryPage() {
   const all = (): readonly LibraryItem[] => ready(items, undefined) ?? [];
   const allArtifacts = (): readonly Artifact[] => ready(artifactsQuery, undefined) ?? [];
   const jobs = (): readonly MediaJob[] => core()?.media ?? [];
-  const working = () => making(jobs());
+  const mediaSummary = () => core()?.mediaSummary;
+  const working = () => making(jobs(), mediaSummary());
+  const activeMediaCount = () => mediaSummary()?.activeCount ?? working().length;
   const list = createMemo(() => {
     const current = scope();
     return showsMediaInScope(current) ? shown({ items: all(), where: where(), kind: scopeKindFilter(current) }) : [];
@@ -356,7 +358,7 @@ export function LibraryPage() {
     { when: "notEditing", passThrough: true },
   );
 
-  const empty = () => all().length === 0 && allArtifacts().length === 0 && working().length === 0 && typed().trim() === "";
+  const empty = () => all().length === 0 && allArtifacts().length === 0 && activeMediaCount() === 0 && typed().trim() === "";
   const nothingShown = () => list().length === 0 && visibleArtifacts().length === 0;
 
   return (
@@ -479,7 +481,7 @@ export function LibraryPage() {
                 </Empty>
               }
             >
-              <If when={working().length > 0}>
+              <If when={activeMediaCount() > 0 && working().length > 0}>
                 <MakingTiles jobs={working()} width={inner()} height={tile()} label={(job) => t(`web.library.job.${job.kind}`)} />
               </If>
               <If when={!nothingShown()} else={<Quiet>{t("web.library.nothingShown")}</Quiet>}>

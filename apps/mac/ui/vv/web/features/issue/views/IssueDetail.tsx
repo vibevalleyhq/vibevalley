@@ -13,6 +13,7 @@ import { createMemo } from "../../../../solid";
 import { useNow } from "../../../base/dom";
 import { shortMomentText } from "../../../base/format";
 import { useAgent } from "../../../infra/agents";
+import { useCore } from "../../../infra/frame";
 import { ready } from "../../../infra/query";
 import { useIntents } from "../../../state/intent";
 import { createAct } from "../../../ui/act";
@@ -31,7 +32,6 @@ import { SubagentProgress } from "../../session/SubagentProgress";
 import { createIssueActs } from "../model/acts";
 import { changesLine } from "../model/changes";
 import { useIssueChanges, useIssues, useIssueTimeline } from "../model/history";
-import { needsWorktreeCheck } from "../model/issue";
 import { issueMove, movedIssue } from "../model/moves";
 import { issueState, noStepsText, stageTone } from "../model/overview";
 import { issueSet, labeledIssue, sendLabel } from "../model/write";
@@ -51,13 +51,14 @@ export function IssueDetail(props: {
   onClose: (session: Session, review: boolean) => void;
   onParent?: (() => void) | undefined;
 }) {
+  const core = useCore();
   const issues = useIssues();
   const now = useNow();
   const moves = useIntents(issueMove);
   const sets = useIntents(issueSet);
   const labeled = () => labeledIssue(issues().find((item) => item.id === props.issue.id) ?? props.issue, sets.list());
   const live = () => labeled().issue;
-  const s = createMemo(() => issueState(movedIssue(live(), moves.list()), props.sessions, props.session, issues()));
+  const s = createMemo(() => issueState(movedIssue(live(), moves.list()), props.sessions, props.session, issues(), core()?.boardSummary));
   const head = () => s().head;
   // The box under the block holds an answer, the findings of reject, a word to the helper, or what a reopen asks for.
   const acts = createIssueActs(() => props.issue, {
@@ -203,7 +204,7 @@ export function IssueDetail(props: {
           <Markdown size="sm" text={s().description} />
         </View>
       </If>
-      <If when={s().open && needsWorktreeCheck(head())}>
+      <If when={s().needsWorktreeCheck}>
         <ReconcileWorktree onChanges={changesAction()} />
       </If>
       <If when={head().subagents}>{(progress) => <SubagentProgress session={head().id} progress={progress()} now={now()} />}</If>
