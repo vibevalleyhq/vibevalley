@@ -36,7 +36,7 @@ const orchestrator = (text: string, more: Partial<ChatMessage> = {}) =>
 const helper = (text: string, more: Partial<ChatMessage> = {}) =>
   msg({ kind: "agent", id: "w1", role: "worker", name: "老周" }, "w1", "老周", text, { agent: "laozhou", ...more });
 
-export const messages: ChatMessage[] = [
+const messages: ChatMessage[] = [
   user("登录过期的问题谁来修？"),
   orchestrator("派给老周了，在工单 #18 里。"),
   orchestrator("他说半小时左右。"),

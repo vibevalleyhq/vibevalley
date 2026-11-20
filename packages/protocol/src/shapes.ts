@@ -225,7 +225,6 @@ export {
   type IssueStageKind,
   type IssueStatus,
   type IssueStatusRequest,
-  IssueStatusValues,
   type IssueTimeline,
   type IssueUpdate,
   type Milestone,

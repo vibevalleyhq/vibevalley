@@ -7,7 +7,7 @@ const now = Date.now();
 const min = 60_000;
 const day = 24 * 60 * min;
 
-export const provider: ProviderStatus = {
+const provider: ProviderStatus = {
   revision: 3,
   connections: [{ id: "moss-main", name: "MOSS", adapter: "moss", enabled: true, key: { source: "settings", hint: "…a41c" } }],
   image: { connection: "moss-main", model: "moss-image-1" },

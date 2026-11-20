@@ -100,6 +100,6 @@ Artifact 使用 SQLx 访问 SQLite。sqlc 从 Artifact 与频道的正式表结�
 - `packages/artifact/src/artifact.test.ts`、`store.test.ts`：外壳消息与 `vv.timeline` 注入、复合后缀推断、JSON Merge Patch、设计令牌编译与对比度、白板 SVG 净化、`.dc.html` `data-props` 回写与 Store CSP 头测试。
 - `crates/vibevalley-artifact/tests/golden.rs`：Rust 引擎的块操作、Markdown 往返、HTML 检查、划词改字、Store 补丁、设计令牌、初始模板与视图拼装对着 `packages/artifact` 写出的 golden（`vp run protocol:check` 重写并比对）。
 - `crates/vibevalley-server/tests/artifact.rs`：HTML 与 Markdown 交稿、七种类型双语指南读取、Store 批处理与 `ifRev` 冲突、白板 SVG 净化、`artifact.view` 与默认设计体系令牌注入、`artifact.entry.follow` 回放与实时 SSE、块协同与建议，以及 `artifact.issue` `ON DELETE SET NULL` 外键测试。
-- `apps/mac/ui/vv/app/artifacts.test.tsx`：Artifact 与 `/library` 统一交付物页面在样例数据上的页面测试（`nsh/test`）。
+- `apps/mac/ui/vv/app/scenarios.test.tsx`：Artifact 与 `/library` 统一交付物页面在多密度虚拟时钟场景下的页面测试（`nsh/test`）。
 
 演讲者视图在 HTML 发回页数后显示页码、下一页与备注。尚未收到回执时，页面显示「等待演示页就绪」。载入错误显示具体原因（[原生页面验收](.agents/skills/vv-acceptance/references/app.md#演示页的就绪回执)）。

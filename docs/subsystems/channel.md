@@ -102,4 +102,4 @@
 
 - `crates/vibevalley-server/tests/channel.rs`：频道、私聊、串、消息与订阅经端点走一遍。
 - `crates/vibevalley-server/tests/watch.rs`：写话等路由、交给帮工。
-- `apps/mac/ui/vv/app/chat.test.tsx`：聊天页在样例数据上的页面测试（`nsh/test`）。
+- `apps/mac/ui/vv/app/scenarios.test.tsx`、`apps/mac/ui/vv/app/interactions.test.tsx`：聊天页渲染与消息发送/实时推流的虚拟时钟页面测试（`nsh/test`）。

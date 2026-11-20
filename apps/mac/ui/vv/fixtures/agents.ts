@@ -233,7 +233,7 @@ const skills: Skill[] = [
   { id: "release-notes", name: "发版说明", description: "从合并的工单写一段发版说明", body: "按用户看得见的变化分组，一句话一条。" },
 ];
 
-export const repos: RepoSummary[] = [
+const repos: RepoSummary[] = [
   { name: "vibevalley", path: "/Users/farmer/code/vibevalley", git: true, last: now - 3 * hour, maxSessions: 3, pullRequest: { available: true, reason: "" } },
   {
     name: "site",

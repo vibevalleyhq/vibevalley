@@ -2,9 +2,7 @@
 // carries (VibeValley's LibraryPage and panel stories): a generated picture,
 // an uploaded recording and a fetched page, one job of every kind, and a
 // MOSS account with every use bound.
-import type { LibraryItem, MediaJob, ProviderStatus, ProviderVoiceListing } from "@vibevalley/protocol";
-
-import { provider } from "./settings";
+import type { LibraryItem, MediaJob, ProviderVoiceListing } from "@vibevalley/protocol";
 
 const min = 60_000;
 const now = Date.now();
@@ -180,15 +178,6 @@ export const mediaJobs: MediaJob[] = [
     ...stamps(25),
   },
 ];
-
-/** The settings account with every generation use bound, as a farm that set them all up. */
-export const boundProvider: ProviderStatus = {
-  ...provider,
-  speech: { connection: "moss-main", model: "moss-tts-1.5-flash" },
-  speakers: { connection: "moss-main", model: "moss-speakers" },
-  voiceDesign: { connection: "moss-main", model: "moss-voice-design" },
-  transcription: { connection: "moss-main", model: "moss-transcribe-diarize-pro" },
-};
 
 const voices: ProviderVoiceListing = {
   connection: "moss-main",

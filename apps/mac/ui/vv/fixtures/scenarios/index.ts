@@ -12,8 +12,6 @@ export const SCENARIO_NOW = 1_795_194_443_624;
 
 export type ScenarioDensity = "empty" | "minimal" | "typical" | "dense" | "extreme";
 
-export const densities: readonly ScenarioDensity[] = ["empty", "minimal", "typical", "dense", "extreme"];
-
 const MIN_MS = 60_000;
 const baseResponses = workbenchResponsesJson as Record<string, unknown>;
 
