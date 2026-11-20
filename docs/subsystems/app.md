@@ -127,7 +127,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 ## 还没做的
 
-还没搬过来的页面和宿主能力，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「剩下的」。
+真实音频与麦克风验收、Developer ID 签名公证与签名包全路由截图验收，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「剩下的」。
 
 ## 怎么验证
 

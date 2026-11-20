@@ -8,10 +8,10 @@
 |---|---|
 | Cargo 工作区（`crates/*`、`apps/mac`）、pnpm 工作区（剩下的 TS 包与页面）、依赖版本、构建与检查 | 各 crate、各包的对外约定（各自的 `README.md` 或 `lib.rs` 开头） |
 | 服务端模块的划分与启动顺序 | 各模块的业务行为（对应子系统文档） |
-| 契约（`packages/protocol` 的 zod）与生成的 Rust 类型（`vibevalley-protocol`） | 核心状态折叠与接口路由（[核心状态](docs/subsystems/core.md)） |
+| 契约（`crates/vibevalley-protocol` 的 Rust 源与生成的 `packages/protocol` TS 类型） | 核心状态折叠与接口路由（[核心状态](docs/subsystems/core.md)） |
 | SQLite 存储、表在哪个模块 | 业务表含义（各子系统）与家目录文件（[架构](docs/architecture.md#存了什么)） |
 | 测试分层、测试用的替身农机 | 页面分层与宿主打包（[客户端](docs/subsystems/app.md)） |
-| 词典（`packages/i18n`，Rust 经 `vibevalley-i18n` 编进二进制）与模型提示（`assets/`）分工 | 界面用词标准（[用语表](docs/README.md#用语)） |
+| 词典（`crates/vibevalley-i18n/locales/`，编进 Rust 并生成 `packages/i18n`）与模型提示（`assets/`）分工 | 界面用词标准（[用语表](docs/README.md#用语)） |
 
 ## 在哪
 

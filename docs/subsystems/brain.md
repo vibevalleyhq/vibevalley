@@ -15,6 +15,7 @@
 | 位置 | 职责 |
 |---|---|
 | `crates/vibevalley-agent/src/conversation.rs` | `Brain`（模型、系统提示、工具、压缩门槛）与 `Conversation`：`send`、`resume`（接着跑没跑完的一轮）、`compact`、`abort_handle`；转写的每一条 `Entry` 先追加进 JSONL 再显示 |
+| `crates/vibevalley-agent/src/generation/` | 持久生成引擎：`mod.rs`（阶段调度）、`governance.rs`（工具审批与会话预算暂停/唤醒）、`transcript.rs`（软/硬/溢出四级压缩）、`grading.rs`（独立只读评审）；依托 `crates/vibevalley-durable`（任务树、睡眠、早到信号、级联取消、崩溃断路）与 `crates/vibevalley-durable-codemode`（QuickJS 脚本任务） |
 | `crates/vibevalley-agent/src/model.rs` | 消息与 `ModelClient`；`OpenAiClient::deepseek` 读 DeepSeek 的流，含 `reasoning_content` 与 `reasoning_effort` |
 | `crates/vibevalley-agent/src/tool.rs` | `Tool`、`ToolOutput`；`coding_tools`：`read`、`write`、`edit`、`bash`（工作目录是帮工的） |
 | `crates/vibevalley-agent/src/kit.rs` | 技能（`default_skill_dirs`、`scan_skills`、`LoadSkill`）、记性（`MemoryPort`、`FileMemory`、`Remember`、`RewriteMemory`）、任务图（`todo_tools`）、帮手（`SpawnAgent`） |
@@ -62,6 +63,7 @@
 ## 还没做的
 
 - 按档案 `toolsets` 分配工具、助手也能加载技能：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
+- 原生界面手工触发压缩、普通对话入口创建 CodeMode 脚本任务与真模型阈值验收：[持久执行与驱动验收](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
 
 ## 怎么验证
 
