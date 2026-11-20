@@ -165,7 +165,7 @@ function readStateSummaries(): StateFrameSummary[] {
       issues: asArray(state?.get("issues")).length,
       sessions: asArray(state?.get("sessions")).length,
       inbox: asArray(raw.get("inbox")).length,
-      plots: asArray(view?.get("plots")).length,
+      plots: asFields(view?.get("plots"))?.size ?? 0,
       crons: asArray(state?.get("crons")).length,
       connectors: asArray(state?.get("connectors")).length,
       mediaJobs: asArray(state?.get("media")).length,
