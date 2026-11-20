@@ -1,10 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/SlidesControls.tsx:
-// a deck's controls: step, the slide's title, thumbnails (each a still web
-// view of its slide), showing it and the speaker's view. Present fills the
-// view with the deck (there is no fullscreen element); the speaker's view
-// is /present in this same view (no popup window), so the BroadcastChannel
-// that keeps two windows on one slide is not needed. Not ported: the PDF
-// (the shell's ?print=1 opens a print dialog no web view here has).
 import { Scroll, Text, View, WebView } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -12,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { useRouter } from "../../infra/router";
 import { shownTheme } from "../../state/prefs";
 import { IconButton } from "../../ui/IconButton";
-import { withShellQuery } from "./frame";
+import { pickShim, withShellQuery } from "./frame";
 import type { Controls } from "./HtmlFrame";
 import { presenterHref, stepped } from "./slides";
 import { useArtifactPage } from "./store";
@@ -83,10 +76,6 @@ export function SlidesControls(props: Controls) {
   );
 }
 
-/** One slide, still: no keys or clicks of its own. A web view takes the pointer over its box, so a press inside it is
- * told out (`picked`) and given to `onPress`. */
-const picked = String.raw`addEventListener("click", (e) => { e.preventDefault(); try { window.nsh.postMessage("pick"); } catch {} }, true);`;
-
 export function Slide(props: { id: string; version: number; at: number; class?: string; onPress?: () => void }) {
   const page = useArtifactPage(() => ({ id: props.id, version: props.version, theme: shownTheme() }));
   return (
@@ -97,7 +86,7 @@ export function Slide(props: { id: string; version: number; at: number; class?: 
             html={withShellQuery(html(), { at: props.at, still: true })}
             incognito
             scrollable={false}
-            injectedJavaScriptBeforeContentLoaded={picked}
+            injectedJavaScriptBeforeContentLoaded={pickShim}
             onMessage={(e) => e.data === "pick" && props.onPress?.()}
             accessibilityElementsHidden
             class="h-full w-full"

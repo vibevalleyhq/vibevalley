@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/pkm/Search.tsx: the notes
-// search over the page (pages by title, blocks from pkm.search), with the
-// tier, TODO and "links here" filters. ↑↓ move the pick (keymap while it is
-// open), Return opens it (the input's submit).
 import { keymap, Scroll, Text, View, windowSize } from "nsh";
 import { Input } from "nsh/base";
 
@@ -126,7 +122,7 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
             setActive(0);
           }}
           onSubmit={() => {
-            const row = rows()[active()];
+            const row = active() >= 0 ? rows().at(active()) : undefined;
             if (row) open(row);
           }}
           class="min-w-0 flex-1 text-base text-ink"

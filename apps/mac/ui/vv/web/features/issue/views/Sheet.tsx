@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/Sheet.tsx: the
-// same parts. The sheet's @container query (side beside the main column
-// from 760px) is the sheet's own width read with onLayout; the fold's
-// arrow turns without its 180ms rotation.
 import { signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -16,7 +12,7 @@ import { type Stage, stageLabel, stages } from "../model/issue";
 function Say(props: { children?: JSX.Element; class?: string }) {
   return (
     <If when={typeof props.children === "string" || typeof props.children === "number"} else={props.children}>
-      <Text class={props.class ?? "text-sm text-ink"}>{props.children as string}</Text>
+      <Text class={props.class ?? "text-sm text-ink"}>{props.children}</Text>
     </If>
   );
 }

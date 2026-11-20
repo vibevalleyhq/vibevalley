@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/ChannelPanels.tsx.
-// Pins and the thread list are the contents of the head's popovers (the
-// page puts them in nsh/base Popovers, which place and close them) rather
-// than boxes placed under their buttons; a thread's rename and archive show
-// on the row under the pointer, as group-hover does there.
 import { computed, keymap, Scroll, signal, Text, untracked, View } from "nsh";
 import { Input } from "nsh/base";
 
@@ -78,9 +73,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
               <Text class="text-xs font-semibold text-ink">{m().from === userId ? t("web.channel.messages.user") : m().name}</Text>
               <Text class="text-xs text-muted">{workbenchClock(m().at)}</Text>
             </View>
-            <Text class="text-sm text-ink" style={{ numberOfLines: 3 }}>
-              {m().text}
-            </Text>
+            <Text class="line-clamp-3 text-sm text-ink">{m().text}</Text>
           </View>
         )}
       </Each>
@@ -353,7 +346,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
         <RenameBox
           value={name()}
           label={t("web.channel.threadList.rename", { title: props.title })}
-          onInput={name.set}
+          onInput={(v) => name.set(v)}
           onSave={save}
           onCancel={() => renaming.set(false)}
         />
@@ -433,7 +426,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
           testID="farm-search-input"
           autoFocus
           value={text()}
-          onInput={text.set}
+          onInput={(v) => text.set(v)}
           placeholder={t("web.channel.farmSearch.hint")}
           accessibilityLabel={t("web.channel.farmSearch.title")}
           class="flex-1"
@@ -472,9 +465,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
                 <Text class="text-xs font-semibold text-ink">{h().message.from === userId ? t("web.channel.messages.user") : h().message.name}</Text>
                 <Text class="text-xs text-muted">{workbenchClock(h().message.at)}</Text>
               </View>
-              <Text class="text-sm text-ink" style={{ numberOfLines: 2 }}>
-                {h().message.text}
-              </Text>
+              <Text class="line-clamp-2 text-sm text-ink">{h().message.text}</Text>
             </View>
           )}
         </Each>

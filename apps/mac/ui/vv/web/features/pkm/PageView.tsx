@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/pkm/PageView.tsx: a page
-// open (header with tier, rail toggle and more; properties; the outline) and
-// its rail (calendar, remarks with suggested rewrites, backlinks, contents);
-// in the stream of days, a day's outline under its linked title. Copying
-// goes through nsh's Clipboard. Below xl the rail sits under the page.
 import { Clipboard, Text, View } from "nsh";
 import { z } from "zod";
 

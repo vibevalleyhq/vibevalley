@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/IssueList.tsx:
-// Linear's list, grouped as picked. The group heads are not sticky (nsh's
-// Scroll has no sticky children yet); the @container breakpoint (640px:
-// number, repo and the second flag show) is the list's laid-out width.
 import { Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

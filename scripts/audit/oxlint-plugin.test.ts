@@ -28,6 +28,7 @@ tester.run("no-comment-divider", rule("no-comment-divider"), {
   invalid: [
     { code: "// ── Helpers ──\nlet a = 1;", errors: [{ messageId: "divider" }] },
     { code: "// ----------\nlet a = 1;", errors: [{ messageId: "divider" }] },
+    { code: "// ---- Section ----\nlet a = 1;", errors: [{ messageId: "divider" }] },
     { code: "/* ======== */\nlet a = 1;", errors: [{ messageId: "divider" }] },
   ],
 });
@@ -56,6 +57,7 @@ tester.run("style-attrs", rule("style-attrs"), {
     { code: "const v = <div classList={{ open: true }} />", filename: "a.tsx", errors: [{ messageId: "classAttr" }] },
     { code: "const v = <div style={{ 'margin-left': '12px' }} />", filename: "a.tsx", errors: [{ messageId: "fixedStyle" }] },
     { code: "const v = <div style={{ height: 48, color: `red` }} />", filename: "a.tsx", errors: [{ messageId: "fixedStyle" }] },
+    { code: "const v = <View style={{ flex: 1, gap: 8 }} />", filename: "a.tsx", errors: [{ messageId: "fixedStyle" }] },
     { code: "const v = <div style='display: grid' />", filename: "a.tsx", errors: [{ messageId: "fixedStyle" }] },
   ],
 });
@@ -134,6 +136,7 @@ describe("what a rule says", () => {
     expect(catalogOf("/repo/apps/mac/ui/vv/web/ui/pixel/Toast.tsx")).toBe("web.ui.pixel");
     expect(catalogOf("/repo/apps/mac/ui/vv/web/ui/Button.tsx")).toBe("web");
     expect(catalogOf("/repo/apps/mac/ui/vv/web/app/Shell.tsx")).toBe("web");
+    expect(catalogOf("/repo/apps/mac/ui/surfaces/Sidebar.tsx")).toBe("web.shell");
     expect(catalogOf("/repo/packages/pkm/src/outline.ts")).toBe("shared");
     expect(catalogOf("/repo/apps/site/src/sections/Hero.tsx")).toBe("shared");
   });

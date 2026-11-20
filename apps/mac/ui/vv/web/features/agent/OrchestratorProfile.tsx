@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/agent/OrchestratorProfile.tsx:
-// the same profile bar, fields and looks (base-ui's RadioGroup is a row
-// of radio tiles here). The orchestrator's own page is phase 2.
 import { Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

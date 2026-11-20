@@ -20,8 +20,6 @@ const QUESTION_MAX: usize = 16_000;
 /// A commentary frame carries at most this many characters.
 const COMMENTARY_CHARS: usize = 2000;
 
-// ----- what MOSS says -----
-
 #[derive(Deserialize)]
 struct Call {
     call_id: String,
@@ -153,8 +151,6 @@ pub fn tool_ack(raw: &str) -> Option<String> {
 pub fn session_updated(raw: &str) -> bool {
     matches!(said(raw), Some(Said::SessionUpdated { data: Some(Updated { error: Some(Problem::Text(e)) }) }) if e.is_empty())
 }
-
-// ----- what the farm says to MOSS -----
 
 #[derive(Serialize)]
 struct Persona<'a> {
@@ -288,8 +284,6 @@ pub fn response_create(call_id: &str) -> String {
         response: CallIds { call_ids: [call_id] },
     })
 }
-
-// ----- whether MOSS Live takes the key -----
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {

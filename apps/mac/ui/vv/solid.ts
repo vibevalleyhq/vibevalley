@@ -17,6 +17,7 @@ export function createSignal<T>(value?: T, options?: SignalOptions<T>): [Accesso
     const box = signal<{ v: T | undefined }>({ v: value });
     const get = () => box().v;
     const set: Setter<T | undefined> = (next) => {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Solid's updater callback narrows `T | ((prev) => T)` via typeof check
       const v = typeof next === "function" ? (next as (p: T | undefined) => T | undefined)(untracked(get)) : next;
       box.set({ v });
       return v;
@@ -26,8 +27,9 @@ export function createSignal<T>(value?: T, options?: SignalOptions<T>): [Accesso
   const s = signal<T | undefined>(value);
   const set: Setter<T | undefined> = (next) => {
     const prev = untracked(() => s());
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Solid's updater callback narrows `T | ((prev) => T)` via typeof check
     const v = typeof next === "function" ? (next as (p: T | undefined) => T | undefined)(prev) : next;
-    if (!(equals && prev !== undefined && v !== undefined && equals(prev as T, v as T))) s.set(v);
+    if (!(equals && prev !== undefined && v !== undefined && equals(prev, v))) s.set(v);
     return v;
   };
   return [() => s(), set];
@@ -58,6 +60,7 @@ export function createEffect<T>(
     prev = value;
     if (skip || !apply) return;
     const done = untracked(() => apply(value, before));
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Solid effect apply returns an optional zero-arg cleanup function
     return typeof done === "function" ? (done as () => void) : undefined;
   });
 }
@@ -75,6 +78,7 @@ export const deep = <T>(value: T): T => value;
 
 export type Context<T> = NshContext<T>;
 export function createContext<T>(defaultValue?: T): Context<T> {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- matches Solid's createContext(undefined) overload
   return context<T>(defaultValue as T);
 }
 /** An nsh context is its own accessor. */

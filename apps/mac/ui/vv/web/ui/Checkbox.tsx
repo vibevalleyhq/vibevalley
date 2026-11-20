@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Checkbox.tsx on nsh/base's Checkbox.
 import { Checkbox as Base } from "nsh/base";
 
 import { Icon } from "./Icon";

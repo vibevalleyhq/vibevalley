@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/ArtifactCanvas.tsx:
-// an artifact opened beside the talk (chat's ?artifact=), with a link to its
-// own page; a blocks one's blocks can be quoted into the box.
 import { Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

@@ -1,7 +1,4 @@
-//! Pull-request rules, pure parts only. Ported from VibeValley
-//! `apps/server/src/modules/issue/landing.ts` (`landingRouteOf`,
-//! `goesByPullRequest`), `merge.ts` (`finishesWithPullRequest`) and
-//! `github.ts` (`checksVerdict`).
+//! Pull-request rules, pure parts only.
 
 use serde::{Deserialize, Serialize};
 

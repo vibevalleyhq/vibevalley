@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/MoreMenu.tsx on nsh/base's Menu.
 import { Text, View } from "nsh";
 import { Menu, MenuItem, MenuSeparator } from "nsh/base";
 

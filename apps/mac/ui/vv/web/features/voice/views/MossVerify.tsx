@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/features/voice/views/MossVerify.tsx.
 import { signal, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

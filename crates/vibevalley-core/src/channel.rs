@@ -1,6 +1,4 @@
-//! The chat as the state keeps it. Ported from VibeValley
-//! `apps/server/src/modules/channel/messages.ts` (the state's part) and
-//! `modules/watch/items.ts` (`forUser`).
+//! The chat as the state keeps it.
 
 use vibevalley_protocol::*;
 

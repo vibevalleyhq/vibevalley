@@ -1,7 +1,4 @@
-//! What every VibeValley agent carries on itself: skills, memory, its own task
-//! graph. Ported from VibeValley `packages/agent/src/tools/{skills,memory,
-//! self,todo,todoTools}.ts` and `base/{dag,prompts}.ts`; the
-//! model-facing words are VibeValley's.
+//! What every VibeValley agent carries on itself: skills, memory, and its own task graph.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -12,8 +9,6 @@ use serde_json::{Value, json};
 
 use crate::model::ToolSpec;
 use crate::tool::{Tool, ToolOutput};
-
-// ---- skills ----------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillInfo {
@@ -128,8 +123,6 @@ pub fn read_skill(skills: &[SkillInfo], name: &str) -> Result<String, String> {
     Ok(format!("# {}\n（来自 {}）\n\n{}", s.name, s.path.display(), skill_body(&text)))
 }
 
-// ---- memory ----------------------------------------------------------------
-
 /// Cut from the top when the prompt carries it: the newest notes matter most.
 const MEMORY_PROMPT_CHARS: usize = 8_000;
 
@@ -219,8 +212,6 @@ fn civil_date(days: i64) -> String {
     format!("{y:04}-{m:02}-{d:02}")
 }
 
-// ---- self tools ------------------------------------------------------------
-
 fn spec(name: &str, description: &str, parameters: Value) -> ToolSpec {
     ToolSpec {
         name: name.into(),
@@ -307,8 +298,6 @@ impl Tool for RewriteMemory {
         }
     }
 }
-
-// ---- the agent's own task graph ---------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -610,8 +599,6 @@ impl Tool for TodoList {
         ToolOutput::ok(todo_text(&self.0.lock().unwrap_or_else(|p| p.into_inner())))
     }
 }
-
-// ---- helpers (spawn_agent) ---------------------------------------------------
 
 /// Makes the tools a helper gets: the parent's, without `spawn_agent`
 /// (helpers do not nest).

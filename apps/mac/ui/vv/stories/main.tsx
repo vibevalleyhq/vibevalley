@@ -16,4 +16,5 @@ const stories: Record<string, () => unknown> = {
   markdown: () => <MarkdownStory />,
 };
 
-mount(() => <View class="flex-1 bg-page pt-3">{(stories[String(host.params.story ?? "board")] ?? stories.board)() as never}</View>);
+const storyKey = typeof host.params.story === "string" ? host.params.story : "board";
+mount(() => <View class="flex-1 bg-page pt-3">{(stories[storyKey] ?? stories.board)() as never}</View>);

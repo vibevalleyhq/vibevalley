@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/QuickSwitcher.tsx:
-// base-ui's inline Combobox becomes nsh/base's Command (its own search field,
-// the keys, the highlight), fed the same switchTargets, then the notes whose
-// title has the words and a last line to search inside them.
 import { signal, Text, untracked, View } from "nsh";
 import { Command } from "nsh/base";
 

@@ -9,7 +9,7 @@ interface QrMatrix {
 }
 
 function isQrMatrix(data: unknown): data is QrMatrix {
-  if (!data || typeof data !== "object") return false;
+  if (typeof data !== "object" || data === null) return false;
   const candidate = data as { size?: unknown; rows?: unknown };
   return typeof candidate.size === "number" && candidate.size > 0 && Array.isArray(candidate.rows);
 }

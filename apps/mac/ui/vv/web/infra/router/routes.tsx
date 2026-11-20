@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/infra/router/routes.tsx: the same
-// route table, matching and nesting on nsh. `Show keyed` becomes a
-// one-row `Each`, which makes a new view whenever the matched route does.
 import { context, untracked, type Accessor, type JSX } from "nsh";
 
 import { createMemo } from "../../../solid";
@@ -86,7 +83,7 @@ export function Outlet() {
     <Each of={rows()}>
       {(definition) => {
         const d = untracked(definition);
-        const Page = (d.layout ?? d.component) as ViewFn;
+        const Page = d.layout ?? d.component;
         return (
           <DepthContext.Provider value={depth + 1}>
             <Page />

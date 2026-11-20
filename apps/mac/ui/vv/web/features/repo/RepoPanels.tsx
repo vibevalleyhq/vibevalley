@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/repo/RepoPanels.tsx: the
-// stats, languages, commit calendar, hands and the new repo form. The
-// pixel art (language logos, the calendar's crop tiles) comes from the
-// app (ui/pixel); without it a language is its colour, a day a tile in
-// the leaf's shades by its level. A day's line follows the pointer as there (onMouseEnter).
 import { Image, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
@@ -35,9 +30,7 @@ export function Stat(props: { label: string; value: string }) {
   return (
     <View class="min-w-18">
       <Text class="text-xs text-muted">{props.label}</Text>
-      <Text class="text-sm font-medium text-ink" style={{ numberOfLines: 2 }}>
-        {props.value}
-      </Text>
+      <Text class="line-clamp-2 text-sm font-medium text-ink">{props.value}</Text>
     </View>
   );
 }
@@ -256,7 +249,7 @@ export function Hands(props: { activity?: RepoActivity | undefined }) {
   const agents = useWorkAgents();
   const authors = () => props.activity?.authors ?? [];
   const top = () => {
-    const first = authors()[0];
+    const first = authors().at(0);
     return first && first.commits > 0 ? first.commits : 1;
   };
   const rest = () =>

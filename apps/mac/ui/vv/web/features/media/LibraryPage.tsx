@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/media/LibraryPage.tsx: unified
-// workspace library (/library) for media + deliverables, with origin/kind/artifact
-// rail filters, cross-filtered counts, search, sort, tile size presets, Picker
-// upload & FileDrop (auto-creating artifacts for compound suffixes), Lightbox,
-// Inspector (with host.saveFile), "New deliverable" type menu, and generation dialogs.
 import { effect, keymap, Picker, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { inferArtifactFromName } from "@vibevalley/artifact/html";

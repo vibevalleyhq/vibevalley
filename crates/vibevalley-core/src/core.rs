@@ -1,7 +1,6 @@
 //! The one live state, the facts that change it and the frames the page
-//! reads. Ported from VibeValley `apps/server/src/gateway/projection/`
-//! (`reduce.ts`, `frame.ts`) and `core/core.ts`: owners write to storage
-//! first, then apply facts; `reduce` is pure; the page reads frames.
+//! reads: owners write to storage first, then apply facts; `reduce` is pure;
+//! the page reads frames.
 
 use std::collections::BTreeMap;
 

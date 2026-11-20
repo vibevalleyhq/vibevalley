@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Segmented.tsx. The taken choice
-// sits on the page colour as there; VibeValley slides one thumb between
-// choices, here the thumb is the taken choice's own background (no slide).
 import { Text, View } from "nsh";
 
 import { Icon } from "./Icon";

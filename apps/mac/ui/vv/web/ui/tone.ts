@@ -3,7 +3,11 @@
 import { token } from "nsh";
 
 /** The theme color `name` (follows light and dark). */
-export const tone = (name: string): string => String((token as (n: string) => unknown)(name) ?? "#888888");
+export const tone = (name: string): string => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- nsh's `token` accepts any dynamic theme key at runtime
+  const value = (token as (n: string) => unknown)(name);
+  return typeof value === "string" ? value : "#888888";
+};
 
 /** `name` at `part` (0..1) over transparent: color-mix(in srgb, name part%, transparent). */
 export function mix(name: string, part: number): string {

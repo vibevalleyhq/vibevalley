@@ -63,8 +63,6 @@ pub fn failed(reason: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::VoiceCallFailed, reason)
 }
 
-// ----- the join request -----
-
 #[derive(Debug, Serialize)]
 pub struct Join {
     pub name: String,
@@ -384,8 +382,6 @@ pub fn join(voice: &VoiceSettings, keys: &VendorKeys, line: Option<&CallLine>, j
         },
     })
 }
-
-// ----- the REST calls -----
 
 /// The first region of each area, on the area's own domain.
 pub fn base_url(area: Area) -> &'static str {

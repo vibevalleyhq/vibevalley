@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/infra/router/context.tsx: the same
-// exports on nsh. There is no browser history inside the app: the router
-// keeps a memory history (vendored history.ts), started at `initial`.
-// Hash anchors (scrollIntoView) are not ported.
 import { context, untracked, type Accessor, type JSX } from "nsh";
 
 import { createMemo } from "../../../solid";

@@ -5,6 +5,10 @@ import type { LiveEvent, StateFrame } from "@vibevalley/protocol";
 
 import type { Envelope, Transport } from "./transport";
 
+function isEnvelope(value: unknown): value is Envelope {
+  return typeof value === "object" && value !== null && "bizCode" in value && typeof value.bizCode === "number";
+}
+
 /** `subscriptions`: the events each subscription (by name) sends at once; it then stays open, as a quiet stream would. */
 export function fixtureTransport(fixture: {
   state: StateFrame;
@@ -18,14 +22,15 @@ export function fixtureTransport(fixture: {
     call: (op, payload) => {
       const r = fixture.responses[op];
       // A function answers by the payload (a vault served in memory).
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- fixture response functions accept one payload argument
       const v = typeof r === "function" ? (r as (p: unknown) => unknown)(payload) : r;
       const envelope: Envelope =
         op === "health"
           ? { bizCode: 0, message: "ok", data: null }
           : !(op in fixture.responses)
             ? { bizCode: 100005, message: `the fixture has no answer for ${op}` }
-            : v && typeof v === "object" && "bizCode" in v
-              ? (v as Envelope)
+            : isEnvelope(v)
+              ? v
               : { bizCode: 0, message: "ok", data: v };
       return Promise.resolve(envelope);
     },

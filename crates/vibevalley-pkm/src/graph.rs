@@ -1,7 +1,5 @@
 //! The vault as a whole: lookups, links between pages, search, the radar,
-//! export and renames. Ported from VibeValley `packages/pkm/src/graph.ts`
-//! (with `flatBlocks` from outline.ts, `dayOf` from para.ts and
-//! `plainText` from the protocol's rules); the wire shapes are VibeValley's.
+//! export and renames.
 //!
 //! A vault is a slice of pages in the order VibeValley's map holds them:
 //! first matches and ties follow it.
@@ -171,8 +169,6 @@ pub struct RefWords<'a> {
     pub broken: &'a dyn Fn(&str) -> String,
 }
 
-// ---- outline.ts, para.ts, rules/plain.ts -------------------------------------
-
 fn head_of(body: &str) -> String {
     static R: OnceLock<Regex> = OnceLock::new();
     let first = body.split('\n').next().unwrap_or("");
@@ -276,8 +272,6 @@ pub fn plain_text(markdown: &str) -> String {
     let text = without_emphasis(&text).replace('|', " ");
     re(&SPACE, r"\s+").replace_all(&text, " ").trim().to_string()
 }
-
-// ---- graph.ts ------------------------------------------------------------------
 
 /// The page a name means: its slug, its title in any case, or one of its
 /// `alias::` names.

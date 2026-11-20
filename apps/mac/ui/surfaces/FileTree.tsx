@@ -25,7 +25,7 @@ export function FileTree(props: { frame: FilesFrame | null }) {
     <View style={{ flex: 1 }}>
       <SectionHead title={props.frame?.name ?? "Files"} />
       {!props.frame || props.frame.items.length === 0 ? (
-        <Empty text={props.frame?.loading || !props.frame ? "Reading the project…" : "This folder is empty."} />
+        <Empty text={props.frame?.loading === true || !props.frame ? "Reading the project…" : "This folder is empty."} />
       ) : (
         <Tree
           items={props.frame.items}
@@ -57,7 +57,7 @@ export function FileTree(props: { frame: FilesFrame | null }) {
                   style={{
                     ...ty.body,
                     fontSize: 13,
-                    color: item?.hidden && item.tone === "clean" ? p().text : color,
+                    color: item?.hidden === true && item.tone === "clean" ? p().text : color,
                     numberOfLines: 1,
                     flex: 1,
                     fontStyle: item?.tone === "placeholder" ? "italic" : "normal",

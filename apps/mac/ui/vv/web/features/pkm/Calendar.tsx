@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/pkm/Calendar.tsx: the month
-// of journals, folded or not (kept on this machine); a day with no journal
-// makes one. A day's full name is its accessibility label.
 import { Text, View } from "nsh";
 import { z } from "zod";
 

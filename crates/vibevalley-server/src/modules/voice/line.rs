@@ -36,8 +36,6 @@ pub type OpenTunnel = Arc<dyn Fn(u16) -> Result<Tunnel, String> + Send + Sync>;
 /// nothing answered.
 pub type Answer = Arc<dyn Fn(&str, &mut dyn FnMut(String)) -> bool + Send + Sync>;
 
-// ----- OpenAI's chat completions, as far as a call asks -----
-
 #[derive(Deserialize)]
 struct Part {
     #[serde(rename = "type")]
@@ -164,8 +162,6 @@ fn chunk(id: &str, created: i64, model: &str, content: &str, stop: bool, first: 
     };
     format!("data: {}\n\n", serde_json::to_string(&chunk).unwrap_or_default())
 }
-
-// ----- the listener -----
 
 fn respond(stream: &mut TcpStream, status: u16, reason: &str, kind: &str, body: &[u8]) {
     let head = format!(
@@ -452,8 +448,6 @@ impl Drop for Line {
     }
 }
 
-// ----- the tunnel -----
-
 /// A quick tunnel to the port: cloudflared says its address on either
 /// stream, within 30 s or it is given up on.
 pub fn cloudflared(port: u16) -> Result<Tunnel, String> {
@@ -469,13 +463,14 @@ pub fn cloudflared(port: u16) -> Result<Tunnel, String> {
             _ => e.to_string(),
         })?;
     let (found, address) = flume::bounded::<String>(1);
-    let pattern = regex::Regex::new(r"https://[a-z0-9-]+\.trycloudflare\.com").expect("the quick tunnel's address");
+    static PATTERN: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"https://[a-z0-9-]+\.trycloudflare\.com").expect("the quick tunnel's address"));
     // Both streams are read until it exits, so it never blocks on a write.
     let read = |stream: Box<dyn Read + Send>| {
-        let (found, pattern) = (found.clone(), pattern.clone());
+        let found = found.clone();
         std::thread::spawn(move || {
             for line in BufReader::new(stream).lines().map_while(Result::ok) {
-                if let Some(m) = pattern.find(&line) {
+                if let Some(m) = PATTERN.find(&line) {
                     let _ = found.try_send(m.as_str().to_string());
                 }
             }

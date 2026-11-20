@@ -11,7 +11,7 @@ use vibevalley_core::Move;
 use vibevalley_oar::scripted::{Script, Step};
 use vibevalley_oar::{PermissionMode, Runtime, StopReason};
 use vibevalley_protocol::{Deliverable, IssueCanceled, IssueStageKind as StageKind, IssueStatus, Landing, Outcome, Phase, StuckReason};
-use vibevalley_server::modules::issue::{Board, NewIssue, Sent};
+use vibevalley_server::modules::issue::{Board, NewIssue};
 use vibevalley_server::modules::ledger::{BoardError, Undelivered};
 
 fn new(title: &str, repo: Option<&Path>) -> NewIssue {
@@ -721,9 +721,4 @@ fn a_queued_issue_waits_for_the_issue_it_is_blocked_by() {
     circle.parent = Some("2".into());
     circle.blocked_by = vec!["2".into()];
     assert!(w.board.create(circle).is_err());
-}
-
-#[allow(dead_code)]
-fn sent(s: &Sent) -> bool {
-    matches!(s, Sent::Working { .. })
 }

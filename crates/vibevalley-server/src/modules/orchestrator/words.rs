@@ -110,8 +110,6 @@ pub fn identity_note(name: &str, persona: &str) -> String {
     s
 }
 
-// ---- the situation (orchestrator.ts situation, prompts.ts situationWords) ----
-
 pub fn quota_line(quota: Option<&str>, low: bool, spent_today: Option<f64>, budget: f64) -> String {
     let mut today = String::new();
     if spent_today.is_some() || budget > 0.0 {
@@ -235,8 +233,6 @@ pub fn situation_delta(before: &str, now: &str) -> String {
     out.join("\n")
 }
 
-// ---- an input's line (lineWords) ----
-
 pub fn events_line(lines: &str) -> String {
     format!("【输入事件】\n{lines}\n\n原始载荷用 resource_read 读；资源 URI 不是聊天地址。用用户的语言回答。")
 }
@@ -261,8 +257,6 @@ pub const LINE_MAX: usize = 800;
 pub fn cut_note(length: usize, target: &str) -> String {
     format!("…（这条有 {length} 字，全文用 channel_message_list 读 {target}）")
 }
-
-// ---- tool answers (gateway/tool/prompts.ts) ----
 
 fn wan(n: i64) -> String {
     if n >= 10_000 {

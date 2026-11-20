@@ -74,9 +74,7 @@ const wbShim = String.raw`(() => {
   addEventListener("message", (e) => {
     const d = e.data;
     if (d && typeof d === "object" && typeof d.vibevalley === "string" && allowed.has(d.vibevalley)) {
-      try {
-        window.nsh.postMessage(JSON.stringify(d));
-      } catch {}
+      window.nsh?.postMessage(JSON.stringify(d));
     }
   });
 })();`;
@@ -773,10 +771,11 @@ export function WhiteboardView(props: StoreViewerProps) {
   const exportJson = () => {
     void act.run(async () => {
       const metaRaw = snapshot().entries.get("board/meta")?.value;
+      const meta: unknown = metaRaw ? JSON.parse(metaRaw) : undefined;
       const payload = {
         title: props.artifact.title,
         seq: seq(),
-        meta: metaRaw ? JSON.parse(metaRaw) : undefined,
+        meta,
         elements: elements().map(({ rev: _rev, raw: _raw, ...rest }) => rest),
       };
       const saved = await saveTextFile(`${safeFileBase()}.json`, "application/json", JSON.stringify(payload, null, 2));

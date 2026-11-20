@@ -233,11 +233,13 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       );
       const said = now0.lastRun?.summary;
       if (tag === "waiting" && said) lines.push(said);
-      const wait = session?.subagents?.waits.length
-        ? describeSubagents(session.subagents)
-            .waits.map((entry) => entry.text)
-            .join(" · ")
-        : undefined;
+      const subagents = session?.subagents;
+      const wait =
+        subagents && subagents.waits.length > 0
+          ? describeSubagents(subagents)
+              .waits.map((entry) => entry.text)
+              .join(" · ")
+          : undefined;
       if (wait) lines.push(wait);
       if (!tagOpen(tag)) lines.push(`${tagText(issue)} · ${ago(issue.closedAt ?? endedAt(head) ?? head.hiredAt, now)}`);
       return omitUndefined({

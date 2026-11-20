@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/pixel/icons.tsx. A sprite is an
-// nsh Image of its PNG (ui/pixel/atlas.ts); until the app said where the
-// art is, the box stays empty at the same size. nsh scales the small PNGs
-// up crisp enough at these sizes, so there is no image-rendering here.
-// reducedMotion is nsh's reduceMotion.
 import { Image, View, type JSX, type ViewStyle } from "nsh";
 
 import { ready, useSprites } from "../../infra/query";

@@ -1,10 +1,3 @@
-// Ported from VibeValley apps/web/src/features/session/Trajectory.tsx: a
-// session's trajectory (waterfall of runs, searchable rows, summary), the
-// "marked wrong" cases and the list of an agent's sessions. The waterfall's
-// width comes from onLayout instead of a ResizeObserver; "mark wrong"
-// shows while the pointer is over the row (onMouseEnter/Leave for CSS's
-// group-hover); a picked waterfall bar scrolls its row into view with
-// ViewRef.reveal.
 import { Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
 import { z } from "zod";
 
@@ -55,10 +48,7 @@ const laneNames: Record<Lane, string> = {
 };
 
 // Usage is not a step of the work: the page's own hover ground, with the theme's ink, in either theme.
-const tagFill = (step: SessionEvent) => (step.type === "llm/usage" ? tone("hover") : step.type === "llm/retry" ? "#f1dcab" : spanColor(step));
-
-const lightInk = "#fffaf0";
-const darkInk = "#2f1f13";
+const tagFill = (step: SessionEvent) => (step.type === "llm/usage" ? tone("hover") : step.type === "llm/retry" ? tone("cream-hover") : spanColor(step));
 
 const luminance = (hex: string) => {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/iu.exec(hex);
@@ -71,6 +61,8 @@ const luminance = (hex: string) => {
 /** The words on a fill: whichever ink stands out more from it (WCAG's ratio), so a mid-tone fill gets the readable one. */
 function inkOn(fill: string) {
   if (!/^#[0-9a-f]{6}$/iu.test(fill)) return tone("ink");
+  const lightInk = tone("paper");
+  const darkInk = tone("bark-900");
   const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   const l = luminance(fill);
   return ratio(l, luminance(lightInk)) >= ratio(l, luminance(darkInk)) ? lightInk : darkInk;
@@ -211,7 +203,7 @@ export function Trajectory(props: {
           wide={false}
           class="w-56"
           value={query()}
-          onInput={query.set}
+          onInput={(v) => query.set(v)}
         />
       </View>
       <WaterfallView
@@ -354,9 +346,7 @@ function ToolDetail(props: { step: SessionEvent }) {
       </Text>
       <If when={input()}>
         <Text class="text-xs text-muted">{t("web.session.trajectory.input")}</Text>
-        <Text class="font-mono text-xs text-ink" style={{ userSelect: "text" }}>
-          {input() ?? ""}
-        </Text>
+        <Text class="select-text font-mono text-xs text-ink">{input() ?? ""}</Text>
       </If>
       <Text class="text-xs text-muted">{t("web.session.trajectory.output")}</Text>
       <If
@@ -365,9 +355,7 @@ function ToolDetail(props: { step: SessionEvent }) {
           <Text class="text-xs text-muted">{props.step.ok === undefined ? t("web.session.trajectory.pending") : t("web.session.trajectory.noOutput")}</Text>
         }
       >
-        <Text class="font-mono text-xs text-ink" style={{ userSelect: "text" }}>
-          {props.step.output ?? ""}
-        </Text>
+        <Text class="select-text font-mono text-xs text-ink">{props.step.output ?? ""}</Text>
       </If>
     </View>
   );
@@ -418,13 +406,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
   return (
     <View testID="waterfall" class="h-10 flex-row">
       <View class="w-15 shrink-0 justify-between pl-2">
-        <Each of={lanes}>
-          {(l) => (
-            <Text class="text-2xs text-muted" style={{ lineHeight: 12 }}>
-              {laneNames[l()]}
-            </Text>
-          )}
-        </Each>
+        <Each of={lanes}>{(l) => <Text class="text-2xs leading-3 text-muted">{laneNames[l()]}</Text>}</Each>
       </View>
       <View onLayout={(e) => width.set(e.bounds.size.width)} class="min-w-0 flex-1 overflow-hidden">
         <Each of={[0, 1, 2]}>{(i) => <View class="absolute inset-x-0 h-3 rounded-sm bg-hover" style={{ top: i() * (lane + gap) }} />}</Each>
@@ -499,7 +481,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
             disabled={busy()}
             placeholder={t("web.session.trajectory.wantHint")}
             value={want()}
-            onInput={want.set}
+            onInput={(v) => want.set(v)}
             onSubmit={() => void submit()}
             class="flex-1"
           />

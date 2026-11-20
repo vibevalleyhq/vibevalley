@@ -18,7 +18,7 @@ import {
 const on = (board: number[], seed = 1): Merge => ({ ...newMerge(seed), board });
 const slid = (g: Merge) => g.board.map((v, i) => (i === g.sown ? 0 : v));
 const dirs: Record<string, MergeDirection> = { l: "left", u: "up", r: "right", d: "down" };
-const play = (seed: number, path: string) => [...path].reduce((g, c) => slideMerge(g, dirs[c]!), newMerge(seed));
+const play = (seed: number, path: string) => [...path].reduce((g, c) => slideMerge(g, dirs[c]), newMerge(seed));
 
 describe("merge", () => {
   test("a seed replays the recorded games", () => {
@@ -47,7 +47,7 @@ describe("merge", () => {
     const order: MergeDirection[] = ["left", "up", "right", "down"];
     while (!g.over && k < 5000) {
       r = (Math.imul(r, 1103515245) + 12345) | 0;
-      g = slideMerge(g, order[(r >>> 16) & 3]!);
+      g = slideMerge(g, order[(r >>> 16) & 3]);
       k++;
     }
     expect(g.board.join(",")).toBe("1,3,5,1,3,4,8,3,2,5,6,5,1,4,3,1");

@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/ActLines.tsx.
 import { Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -37,9 +36,7 @@ export function ActLines(props: {
         <Each of={props.words ?? []} key={(w) => w.key}>
           {(w) => (
             <View testID="issue-said" class="flex-row items-center gap-1.5">
-              <Text class="min-w-0 flex-1 text-sm text-ink" style={{ numberOfLines: 3 }}>
-                {w().text}
-              </Text>
+              <Text class="line-clamp-3 min-w-0 flex-1 text-sm text-ink">{w().text}</Text>
               <Text class={`shrink-0 text-xs ${w().state === "failed" ? "text-berry" : "text-muted"}`}>
                 {w().state === "sending" ? t("web.issue.acts.sending") : (w().reason ?? t("web.issue.acts.notSaid"))}
               </Text>

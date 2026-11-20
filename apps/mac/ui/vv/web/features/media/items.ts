@@ -127,8 +127,8 @@ export const shownArtifacts = (
   const kind = filter.artifactKind ?? "all";
   const inWhere = isArtifactIn(filter.where ?? { by: "all" });
   const filtered = all.filter((a) => inWhere(a) && artifactMatchesKind(a, kind) && artifactMatchesSearch(a, filter.search));
-  if (filter.sort === "name") return [...filtered].sort((a, b) => a.title.localeCompare(b.title));
-  return [...filtered].sort((a, b) => b.updated - a.updated);
+  if (filter.sort === "name") return filtered.toSorted((a, b) => a.title.localeCompare(b.title));
+  return filtered.toSorted((a, b) => b.updated - a.updated);
 };
 
 export interface ArtifactCounts {

@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/TodoDetail.tsx:
-// the draft and todo page, its talk box, fields and side, and the new repo
-// dialog.
 import { signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 
@@ -226,7 +223,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         class="mt-2.5"
         rows={2}
         value={word()}
-        onInput={word.set}
+        onInput={(v) => word.set(v)}
         submit
         onSubmit={() => canRefine() && void draft()}
         placeholder={questions().length > 0 ? t("web.issue.todo.answerHint") : refined() ? t("web.issue.todo.againHint") : t("web.issue.todo.whatHint")}
@@ -325,7 +322,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           options={[...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p }))}
         />
       </Property>
-      <View role="button" testID="new-repo" onPress={() => newRepo.set(true)} class="mb-1 self-start" style={{ marginLeft: 76 }}>
+      <View role="button" testID="new-repo" onPress={() => newRepo.set(true)} class="mb-1 ml-19 self-start">
         <Text class="text-xs text-water">{repos().length === 0 ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}</Text>
       </View>
       <Property label={t("web.issue.todo.priority")}>
@@ -410,7 +407,7 @@ function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => v
       <TextInput
         autoFocus
         value={name()}
-        onInput={name.set}
+        onInput={(v) => name.set(v)}
         onSubmit={() => name().trim() && void make()}
         placeholder={t("web.issue.todo.repoHint")}
         accessibilityLabel={t("web.issue.todo.repoName")}

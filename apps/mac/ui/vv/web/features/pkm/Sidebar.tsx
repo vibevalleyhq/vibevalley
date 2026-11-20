@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/pkm/Sidebar.tsx: find, today,
-// the radar (inbox, stale pages, overdue blocks), the pages by tier, each
-// tier folding. The list's fading edges are not ported (no mask images).
 import { Scroll, Text, View, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";

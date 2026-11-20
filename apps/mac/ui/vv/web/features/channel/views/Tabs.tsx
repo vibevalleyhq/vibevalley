@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/Tabs.tsx: a
-// channel's issues (the sessions arranged in it) and its crons. The second
-// press deletes a cron, as there; a press elsewhere does not take the first
-// back (no document listener): it goes back after a few seconds.
 import { effect, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

@@ -203,8 +203,6 @@ pub fn parse_search(text: &str) -> SearchQuery {
     q
 }
 
-// ----- link previews (embeds.ts) -----
-
 const EMBED_MAX: usize = 3;
 const EMBED_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 const BODY_MAX: usize = 512 * 1024;

@@ -64,8 +64,11 @@ const noCommentDivider = defineRule({
   create(context) {
     return {
       Program() {
-        for (const comment of context.sourceCode.getAllComments())
-          if (/[─━═]{2}/u.test(comment.value) || /^[-=*#~_/\s]{4,}$/u.test(comment.value.trim())) context.report({ loc: comment.loc, messageId: "divider" });
+        for (const comment of context.sourceCode.getAllComments()) {
+          const trimmed = comment.value.trim();
+          if (/[─━═]{2}/u.test(comment.value) || /^[-=*#~_/\s]{4,}$/u.test(trimmed) || /^[-=]{3,}\s|\s[-=]{3,}$/u.test(trimmed))
+            context.report({ loc: comment.loc, messageId: "divider" });
+        }
       },
     };
   },
@@ -83,6 +86,9 @@ function fixedStyle(node: ESTree.Node): boolean {
         (entry.value.type === "TemplateLiteral" && entry.value.expressions.length === 0)),
   );
 }
+
+/** nsh built-in host elements take `class` (Tailwind utilities, vv-tailwind), just like HTML tags on the site. */
+const nshElements = new Set(["View", "Text", "Scroll", "Image", "Input", "Canvas", "WebView", "List"]);
 
 const styleAttrs = defineRule({
   meta: {
@@ -106,7 +112,8 @@ const styleAttrs = defineRule({
         const attr = node.name.name;
         if (attr === "className" || attr === "classList") context.report({ node, messageId: "classAttr", data: { attr } });
         // A component's `style` is a prop it hands on (a story showing that it does); the element's own looks are what count.
-        const element = node.parent.type === "JSXOpeningElement" && node.parent.name.type === "JSXIdentifier" && /^[a-z]/u.test(node.parent.name.name);
+        const tag = node.parent.type === "JSXOpeningElement" && node.parent.name.type === "JSXIdentifier" ? node.parent.name.name : "";
+        const element = /^[a-z]/u.test(tag) || nshElements.has(tag);
         if (attr !== "style" || node.value === null || !element) return;
         const value = node.value.type === "JSXExpressionContainer" ? node.value.expression : node.value;
         if (fixedStyle(value)) context.report({ node, messageId: "fixedStyle" });
@@ -120,7 +127,9 @@ const han = /[\p{Script=Han}、，。：；（）！？「」【】〔〕]/u;
 
 /** The catalog a file's words belong in: the native app's pages have one per feature, everything else shares one. */
 export function catalogOf(filename: string): string {
-  const rest = /\/apps\/mac\/ui\/vv\/web\/(.*)$/u.exec(filename.replaceAll("\\", "/"))?.[1];
+  const normalized = filename.replaceAll("\\", "/");
+  if (/\/apps\/mac\/ui\/surfaces\//u.test(normalized)) return "web.shell";
+  const rest = /\/apps\/mac\/ui\/vv\/web\/(.*)$/u.exec(normalized)?.[1];
   if (rest === undefined) return "shared";
   const folders = rest
     .split("/")
@@ -293,7 +302,10 @@ const noCrossPackagePath = defineRule({
     if (from === undefined) return {};
     const check = (source: { type: string; value?: unknown; range: [number, number] } | null | undefined) => {
       if (source?.type !== "Literal" || typeof source.value !== "string" || !source.value.startsWith(".")) return;
-      const to = packageOf(resolve(dirname(context.filename), source.value));
+      const target = resolve(dirname(context.filename), source.value);
+      // Shared static assets (`assets/*.json`) live at the repository root, not in another workspace package.
+      if (target.startsWith(`${resolve(repo, "assets")}/`)) return;
+      const to = packageOf(target);
       if (to !== undefined && to.dir !== from.dir) context.report({ node: source, messageId: "cross", data: { spec: source.value, to: to.name } });
     };
     return {

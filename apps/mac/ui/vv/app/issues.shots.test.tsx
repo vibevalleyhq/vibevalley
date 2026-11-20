@@ -6,7 +6,7 @@ import "../polyfill";
 import { expect, open, test } from "nsh/test";
 
 type App = Awaited<ReturnType<typeof open>>;
-type Shot = { name: string; route?: string; session?: string; scheme: "light" | "dark"; width: number; ready: string; then?: (app: App) => Promise<void> };
+type Shot = { name: string; route?: string; session?: string; scheme: "light" | "dark"; width: number; ready: string; after?: (app: App) => Promise<void> };
 
 const steps = async (app: App) => {
   await app.press("id:issue-steps-fold");
@@ -14,8 +14,8 @@ const steps = async (app: App) => {
 };
 
 const shots: Shot[] = [
-  { name: "issue-working-light", route: "/issues/i32", scheme: "light", width: 1200, ready: "id:issue", then: steps },
-  { name: "issue-working-dark", route: "/issues/i32", scheme: "dark", width: 1200, ready: "id:issue", then: steps },
+  { name: "issue-working-light", route: "/issues/i32", scheme: "light", width: 1200, ready: "id:issue", after: steps },
+  { name: "issue-working-dark", route: "/issues/i32", scheme: "dark", width: 1200, ready: "id:issue", after: steps },
   { name: "issue-working-narrow", route: "/issues/i32", scheme: "light", width: 560, ready: "id:issue" },
   { name: "issue-review-light", route: "/issues/i31", scheme: "light", width: 1200, ready: "id:issue" },
   { name: "issue-asking-dark", route: "/issues/i33", scheme: "dark", width: 1200, ready: "id:issue" },
@@ -23,32 +23,32 @@ const shots: Shot[] = [
   { name: "issue-draft-dark", route: "/issues/i21", scheme: "dark", width: 1200, ready: "id:issue" },
   { name: "issue-family-light", route: "/issues/i40", scheme: "light", width: 1200, ready: "id:issue-family" },
   { name: "issue-family-narrow", route: "/issues/i40", scheme: "dark", width: 560, ready: "id:issue-family" },
-  { name: "issue-list-light", route: "/issues", scheme: "light", width: 1200, ready: "id:issues-page", then: (app) => app.press("id:issue-view-list") },
-  { name: "issue-list-dark", route: "/issues", scheme: "dark", width: 1200, ready: "id:issues-page", then: (app) => app.press("id:issue-view-list") },
-  { name: "issue-list-narrow", route: "/issues", scheme: "light", width: 560, ready: "id:issues-page", then: (app) => app.press("id:issue-view-list") },
+  { name: "issue-list-light", route: "/issues", scheme: "light", width: 1200, ready: "id:issues-page", after: (app) => app.press("id:issue-view-list") },
+  { name: "issue-list-dark", route: "/issues", scheme: "dark", width: 1200, ready: "id:issues-page", after: (app) => app.press("id:issue-view-list") },
+  { name: "issue-list-narrow", route: "/issues", scheme: "light", width: 560, ready: "id:issues-page", after: (app) => app.press("id:issue-view-list") },
   {
     name: "issue-display-light",
     route: "/issues",
     scheme: "light",
     width: 1200,
     ready: "id:issues-page",
-    then: async (app) => {
+    after: async (app) => {
       await app.press("id:issue-view-list");
       await app.press("id:display");
     },
   },
-  { name: "issue-new-light", route: "/issues", scheme: "light", width: 1200, ready: "id:issues-page", then: (app) => app.press("id:issue-new") },
-  { name: "issue-new-dark", route: "/issues", scheme: "dark", width: 1200, ready: "id:issues-page", then: (app) => app.press("id:issue-new") },
-  { name: "issue-close-light", route: "/issues/i31", scheme: "light", width: 1200, ready: "id:issue", then: (app) => app.press("id:act-close") },
-  { name: "issue-close-review-light", route: "/issues/i31", scheme: "light", width: 1200, ready: "id:issue", then: (app) => app.press("id:act-complete") },
-  { name: "issue-close-review-dark", route: "/issues/i31", scheme: "dark", width: 1200, ready: "id:issue", then: (app) => app.press("id:act-complete") },
+  { name: "issue-new-light", route: "/issues", scheme: "light", width: 1200, ready: "id:issues-page", after: (app) => app.press("id:issue-new") },
+  { name: "issue-new-dark", route: "/issues", scheme: "dark", width: 1200, ready: "id:issues-page", after: (app) => app.press("id:issue-new") },
+  { name: "issue-close-light", route: "/issues/i31", scheme: "light", width: 1200, ready: "id:issue", after: (app) => app.press("id:act-close") },
+  { name: "issue-close-review-light", route: "/issues/i31", scheme: "light", width: 1200, ready: "id:issue", after: (app) => app.press("id:act-complete") },
+  { name: "issue-close-review-dark", route: "/issues/i31", scheme: "dark", width: 1200, ready: "id:issue", after: (app) => app.press("id:act-complete") },
   ...(["light", "dark"] as const).map((scheme) => ({
     name: `issue-close-patch-${scheme}`,
     route: "/issues/i31",
     scheme,
     width: 1200,
     ready: "id:issue",
-    then: async (app: Parameters<NonNullable<(typeof shots)[number]["then"]>>[0]) => {
+    after: async (app: Parameters<NonNullable<(typeof shots)[number]["after"]>>[0]) => {
       await app.press("id:act-complete");
       await app.wait(500);
       await app.press("label:apps/web/src/base/session.ts");
@@ -69,7 +69,7 @@ for (const s of shots) {
     const app = await open("./issues.story.tsx", { width: s.width, height: 800, colorScheme: s.scheme, platform: "macos", host: { params } });
     await app.waitFor(s.ready);
     expect(app.count(s.ready)).toBeGreaterThan(0);
-    await s.then?.(app);
+    await s.after?.(app);
     await app.wait(200);
     try {
       await app.screenshot(`vv/app/shots/${s.name}.png`);

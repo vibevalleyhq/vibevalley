@@ -13,7 +13,7 @@ import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
 import { IconButton } from "../../ui/IconButton";
 import { toast } from "../../ui/toasts";
-import type { Frame } from "./frame";
+import { pickShim, type Frame } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
 import { presenterHref } from "./slides";
 import { useReportViewContext, useStoreEntries, useStoreViewHtml } from "./store";
@@ -39,8 +39,6 @@ interface SlideSummary {
   readonly title?: string | undefined;
   readonly notes?: string | undefined;
 }
-
-const pickedThumb = String.raw`addEventListener("click", (e) => { e.preventDefault(); try { window.nsh.postMessage("pick"); } catch {} }, true);`;
 
 function withStillAt(html: string, at: number): string {
   const read = "new URLSearchParams(location.search)";
@@ -88,7 +86,7 @@ export function SlidesStoreView(props: StoreViewerProps) {
   const at = () => shown()?.at?.page ?? 0;
   const frag = () => shown()?.at?.fragment ?? 0;
   const maxFrag = () => shown()?.ready?.fragments?.[at()] ?? 0;
-  const currentSlide = () => slideList()[at()];
+  const currentSlide = () => slideList().at(at());
   const currentSlidePath = () => {
     const cur = currentSlide();
     if (!cur) return "project/slides/s01.html";
@@ -284,9 +282,7 @@ export function SlidesStoreView(props: StoreViewerProps) {
           {(sel) => (
             <View testID="slides-inline-edit" class="gap-1.5 rounded-md border border-line bg-side p-2.5">
               <View class="border-l-2 border-wheat pl-2">
-                <Text class="text-xs text-muted" style={{ numberOfLines: 2 }}>
-                  {sel().anchor.exact.trim()}
-                </Text>
+                <Text class="line-clamp-2 text-xs text-muted">{sel().anchor.exact.trim()}</Text>
               </View>
               <TextArea rows={2} value={pickedText()} onInput={(val) => setPickedText(val)} />
               <View class="flex-row justify-end gap-1.5">
@@ -331,7 +327,7 @@ export function SlidesStoreView(props: StoreViewerProps) {
                         html={withStillAt(html(), i())}
                         incognito
                         scrollable={false}
-                        injectedJavaScriptBeforeContentLoaded={pickedThumb}
+                        injectedJavaScriptBeforeContentLoaded={pickShim}
                         onMessage={(e) => e.data === "pick" && goto(i())}
                         accessibilityElementsHidden
                         class="h-full w-full"

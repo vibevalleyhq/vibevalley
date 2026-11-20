@@ -183,7 +183,7 @@ const side = mergeSize * tile + (mergeSize + 1) * gap;
 function Crop(props: { stage: number; size: number; faint?: boolean }) {
   return (
     <Canvas
-      style={{ width: props.size, height: props.size, opacity: props.faint ? 0.25 : 1 }}
+      style={{ width: props.size, height: props.size, opacity: props.faint === true ? 0.25 : 1 }}
       draw={(cx) => {
         const cells = cellsOf(pictures[Math.min(props.stage, mergeGoal) - 1] ?? []);
         for (const c of cells) {
@@ -288,11 +288,11 @@ export function MergeGame() {
   };
 
   return (
-    <View testID="merge" style={{ flex: 1, alignItems: "center", gap: 6, paddingHorizontal: 8, paddingTop: 8 }}>
+    <View testID="merge" class="flex-1 items-center gap-1.5 px-2 pt-2">
       <Stats label={t("web.farm.phone.game.merge")} value={t("web.farm.phone.blocks.best") + " " + Math.max(top(), score())} />
       <Stats
         label={t("web.farm.phone.blocks.score") + " " + score()}
-        value={reached() ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}
+        value={reached() > 0 ? t("web.farm.phone.merge.reached", { stage: mergeStageName(reached()) }) : ""}
       />
       <View
         testID="merge-board"
@@ -318,14 +318,14 @@ export function MergeGame() {
                 width: tile,
                 alignItems: "center",
                 justifyContent: "center",
-                borderWidth: g()?.grown.includes(n()) ? 2 : 0,
+                borderWidth: g()?.grown.includes(n()) === true ? 2 : 0,
                 borderColor: lcd.ink,
-                backgroundColor: board()[n()] ? lcd.paper : lcd.light,
+                backgroundColor: (board()[n()] ?? 0) > 0 ? lcd.paper : lcd.light,
               }}
             >
               <If when={board()[n()]}>
                 {(stage) => (
-                  <View style={{ alignItems: "center" }}>
+                  <View class="items-center">
                     <Crop stage={stage()} size={36} />
                     <Words>{mergeStageName(stage())}</Words>
                   </View>
@@ -336,7 +336,7 @@ export function MergeGame() {
         </Each>
         <If when={overlay()}>{(lines) => <Cover lines={lines()} />}</If>
       </View>
-      <View accessible accessibilityLabel={t("web.farm.phone.merge.stages")} style={{ flexDirection: "row", gap: 2 }}>
+      <View accessible accessibilityLabel={t("web.farm.phone.merge.stages")} class="flex-row gap-0.5">
         <Each of={mergeStages}>{(_, i) => <Crop stage={i() + 1} size={24} faint={i() + 1 > reached()} />}</Each>
       </View>
       <Help lines={[t("web.farm.phone.merge.help"), t("web.farm.phone.merge.help2")]} />

@@ -1,6 +1,5 @@
-//! What a run costs. Ported from VibeValley
-//! `apps/server/src/modules/agent/price.ts`: DeepSeek's own models, in US
-//! dollars per million tokens, cache hits billed at the cache price.
+//! What a run costs: DeepSeek's models in US dollars per million tokens,
+//! cache hits billed at the cache price.
 
 use crate::model::Usage;
 

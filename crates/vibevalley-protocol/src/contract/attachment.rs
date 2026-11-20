@@ -1,17 +1,9 @@
 #![allow(clippy::large_enum_variant, clippy::enum_variant_names)]
 
-#[allow(unused_imports)]
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 #[cfg(feature = "ts-gen")]
 use ts_rs::TS;
-
-#[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
-use crate::wire::*;
 
 /// A file kept by the farm: id is the sha256 of its bytes, served at attachmentPath. A message says it as an attachment,
 /// a media job's result is one, a library item is one with where it came from.

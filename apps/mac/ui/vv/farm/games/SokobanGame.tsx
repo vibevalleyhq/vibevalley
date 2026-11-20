@@ -103,7 +103,7 @@ export function SokobanGame() {
     }
   };
   return (
-    <View testID="sokoban" style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
+    <View testID="sokoban" class="flex-1 gap-2 px-3 py-2">
       <Stats
         label={t("web.farm.phone.sokoban.title", { level: g().level + 1, of: warehouses.length })}
         value={t("web.farm.phone.sokoban.moves", { moves: g().moves, pushes: g().pushes })}
@@ -114,27 +114,23 @@ export function SokobanGame() {
         role="image"
         testID="sokoban-board"
         accessibilityLabel={t("web.farm.phone.sokoban.board", { placed: placed(), of: g().boxes.length })}
-        style={{ alignSelf: "center", width: 224, height: (224 * level().rows.length) / width() }}
+        class="w-56 self-center"
+        style={{ height: (224 * level().rows.length) / width() }}
         draw={draw}
       />
       <Words align="center">{t(done() ? (last() ? "web.farm.phone.sokoban.allIn" : "web.farm.phone.sokoban.done") : "web.farm.phone.sokoban.goal")}</Words>
-      <View style={{ flex: 1 }} />
-      <View style={{ flexDirection: "row", gap: 12, justifyContent: "center" }}>
+      <View class="flex-1" />
+      <View class="flex-row justify-center gap-3">
         <View
           role="button"
           testID="sokoban-undo"
           onPress={undo}
           disabled={g().history.length === 0}
-          style={{ opacity: g().history.length ? 1 : 0.4, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: lcd.ink }}
+          class={`border border-lcd-ink px-2 py-1 ${g().history.length > 0 ? "opacity-100" : "opacity-40"}`}
         >
           <Words>{t("web.farm.phone.sokoban.undo")}</Words>
         </View>
-        <View
-          role="button"
-          testID="sokoban-reset"
-          onPress={() => (done() ? advance() : restart())}
-          style={{ paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: lcd.ink }}
-        >
+        <View role="button" testID="sokoban-reset" onPress={() => (done() ? advance() : restart())} class="border border-lcd-ink px-2 py-1">
           <Words>A {t(done() ? (last() ? "web.farm.phone.sokoban.again" : "web.farm.phone.sokoban.next") : "web.farm.phone.sokoban.restart")}</Words>
         </View>
       </View>

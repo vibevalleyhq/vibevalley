@@ -108,21 +108,21 @@ export function BlocksGame(props: { big?: boolean }) {
     }
   };
   return (
-    <View testID="blocks" style={{ flex: 1, flexDirection: "row", alignItems: "flex-start", paddingTop: 8, paddingHorizontal: 8, gap: 16 }}>
+    <View testID="blocks" class="flex-1 flex-row items-start gap-4 px-2 pt-2">
       <Board label={t("web.farm.phone.blocks.well")} width={cell() * blocksWidth} height={cell() * blocksHeight} draw={draw}>
         <If when={!playing() || g()?.over === true}>
           <Cover
             lines={[
-              t(g()?.over ? "web.farm.phone.blocks.noRoom" : g() ? "web.farm.phone.paused" : "web.farm.phone.game.blocks"),
-              t("web.farm.phone.pressA", { what: t(g() && !g()?.over ? "web.farm.phone.resume" : "web.farm.phone.start") }),
+              t(g()?.over === true ? "web.farm.phone.blocks.noRoom" : g() ? "web.farm.phone.paused" : "web.farm.phone.game.blocks"),
+              t("web.farm.phone.pressA", { what: t(g() && g()?.over !== true ? "web.farm.phone.resume" : "web.farm.phone.start") }),
             ]}
           />
         </If>
       </Board>
-      <View style={{ flex: 1, height: "100%", gap: 8 }}>
+      <View class="h-full flex-1 gap-2">
         <Words>{t("web.farm.phone.blocks.next")}</Words>
         <Canvas
-          style={{ width: 36, height: 20, backgroundColor: lcd.light }}
+          class="h-5 w-9 bg-lcd-light"
           draw={(cx) => {
             const kind = g()?.next;
             if (kind) {

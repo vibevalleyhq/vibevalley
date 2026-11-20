@@ -182,8 +182,6 @@ fn next_frame(socket: &mut Socket) -> Result<Option<Message>, ()> {
     }
 }
 
-// ----- Feishu's frames, written here on their own: field numbers as in pbbp2.Frame -----
-
 fn put_varint(out: &mut Vec<u8>, mut n: u64) {
     while n >= 0x80 {
         out.push((n & 0x7f) as u8 | 0x80);

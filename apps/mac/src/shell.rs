@@ -584,8 +584,6 @@ impl Shell {
         .detach();
     }
 
-    // ---- projects -------------------------------------------------------
-
     pub fn activate_index(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(project) = self.ws.projects().get(index) {
             self.activate_path(project.root().to_owned(), window, cx, |_, _, _| {});
@@ -956,8 +954,6 @@ impl Shell {
         }
     }
 
-    // ---- frames -------------------------------------------------------------
-
     pub fn push_sidebar(&mut self, cx: &mut Context<Self>) {
         let rail_items: Vec<RailProject> = self
             .ws
@@ -1064,8 +1060,6 @@ impl Shell {
             v.push("git", git, cx);
         });
     }
-
-    // ---- actions from hosted views --------------------------------------
 
     pub fn on_action(&mut self, action: Action, window: &mut Window, cx: &mut Context<Self>) {
         let active = self.ws.active_id();
@@ -1752,8 +1746,6 @@ impl Shell {
         );
     }
 
-    // ---- palette --------------------------------------------------------
-
     pub fn open_palette(&mut self, mode: PaletteMode, window: &mut Window, cx: &mut Context<Self>) {
         if self.palette.is_none() {
             let dark = Ui::get(cx).colors.dark;
@@ -1936,8 +1928,6 @@ impl Shell {
         self.native_pixel = Some(PixelSlot { view, _sub: sub });
         cx.notify();
     }
-
-    // ---- panes ----------------------------------------------------------
 
     pub fn open_pane(&mut self, kind: PaneKind, window: &mut Window, cx: &mut Context<Self>) {
         if let PaneKind::Hosted { module, props } = &kind
@@ -2270,8 +2260,6 @@ impl Shell {
             },
         );
     }
-
-    // ---- persistence and theme -----------------------------------------
 
     fn schedule_save(&mut self, cx: &mut Context<Self>) {
         if self.save_pending || self.store.is_none() {

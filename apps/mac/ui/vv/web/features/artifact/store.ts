@@ -1,4 +1,5 @@
 import { cleanup, effect, signal, untracked, type Accessor } from "nsh";
+import { z } from "zod";
 
 import type { ShellTheme } from "@vibevalley/artifact/shell";
 import type {
@@ -11,7 +12,7 @@ import type {
   ArtifactType,
   ArtifactViewContext,
 } from "@vibevalley/protocol";
-import { artifactId } from "@vibevalley/protocol/schema";
+import { ArtifactEntryBatchResult as ArtifactEntryBatchResultSchema, artifactId } from "@vibevalley/protocol/schema";
 
 import { createExternal } from "../../base/external";
 import { api, reasonOf } from "../../infra/api";
@@ -290,10 +291,14 @@ export const EMPTY_INSPECTED_TOKENS: InspectedTokensSpec = {
   css: "",
 };
 
+const ArtifactPageData = z.object({ content: z.string() });
+const AttachmentPathData = z.object({ path: z.string() });
+
 /** Parses design-system tokens, computes WCAG contrast ratios, and compiles CSS via the Rust server. */
 export async function inspectDesignTokens(raw: string): Promise<InspectedTokensSpec> {
   const env = await transport().call("artifact.tokens.inspect", { raw });
   if (env.bizCode !== 0) throw new Error(env.message);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Rust `artifact.tokens.inspect` returns InspectedTokensSpec
   return env.data as InspectedTokensSpec;
 }
 
@@ -305,7 +310,7 @@ export async function writeArtifactEntryProps(input: {
 }): Promise<ArtifactEntryBatchResult> {
   const env = await transport().call("artifact.entry.writeProps", input);
   if (env.bizCode !== 0) throw new Error(env.message);
-  return env.data as ArtifactEntryBatchResult;
+  return ArtifactEntryBatchResultSchema.parse(env.data);
 }
 
 /** Fetches an HTML artifact's shell-wrapped page from the Rust server (`artifact.page`). */
@@ -341,7 +346,7 @@ export function useArtifactPage(
     void transport()
       .call("artifact.page", { id: p.id, version: p.version, shell: true, theme: p.theme })
       .then(async (env) => {
-        if (env.bizCode === 0) return (env.data as { readonly content: string }).content;
+        if (env.bizCode === 0) return ArtifactPageData.parse(env.data).content;
         // Fixtures that only stub `artifact.content.get` return RouteNotFound (100005).
         if (env.bizCode === 100005) {
           const raw = await api.artifact.content.get({ id: artifactId(p.id), version: p.version });
@@ -384,7 +389,7 @@ export async function saveTextFile(filename: string, mime: string, text: string)
   const att = await api.attachment.create({ name: filename, type: mime, data: utf8ToBase64(text) });
   const env = await transport().call("attachment.file", { id: att.id });
   if (env.bizCode !== 0) throw new Error(env.message);
-  const file = env.data as { readonly path: string };
+  const file = AttachmentPathData.parse(env.data);
   const res = await saveFile(file.path, filename);
   return res.saved;
 }

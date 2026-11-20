@@ -1,12 +1,10 @@
 //! An agent's memory: the words a memory is compared by (Chinese cut as gse
 //! cuts it, Latin and code words whole), recall scoring, de-duplication,
 //! eviction, search, and redaction of secrets before text leaves the
-//! machine. Ported from VibeValley `apps/server/src/modules/memory/
-//! {recall,prompts}.ts` and `apps/server/src/base/redact.ts`.
-//! Storage is the server's: these are pure functions over `Memory` rows.
+//! machine. Storage is the server's: these are pure functions over `Memory` rows.
 
 use std::collections::HashSet;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -69,21 +67,19 @@ pub struct Memory {
     pub source: Option<String>,
 }
 
-// ---- terms -----------------------------------------------------------------
-
 fn stopwords() -> &'static HashSet<String> {
-    static STOP: OnceLock<HashSet<String>> = OnceLock::new();
-    STOP.get_or_init(|| serde_json::from_str(include_str!("data/stopwords.json")).expect("bundled stopwords"))
+    static STOP: LazyLock<HashSet<String>> = LazyLock::new(|| serde_json::from_str(include_str!("data/stopwords.json")).expect("bundled stopwords"));
+    &STOP
 }
 
 fn has_han(s: &str) -> bool {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"\p{Han}").expect("regex")).is_match(s)
+    static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\p{Han}").expect("regex"));
+    RE.is_match(s)
 }
 
 fn code_words() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"[a-z0-9_][a-z0-9_.\-/]*[a-z0-9_]").expect("regex"))
+    static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[a-z0-9_][a-z0-9_.\-/]*[a-z0-9_]").expect("regex"));
+    &RE
 }
 
 /// Words in lower case, in order of appearance, each once: Chinese words of
@@ -127,6 +123,7 @@ fn in_common(a: &HashSet<String>, b: &HashSet<String>) -> usize {
     a.iter().filter(|t| b.contains(*t)).count()
 }
 
+#[cfg(test)]
 pub fn likeness(a: &HashSet<String>, b: &HashSet<String>) -> f64 {
     let shared = in_common(a, b);
     let all = a.len() + b.len() - shared;
@@ -135,14 +132,13 @@ pub fn likeness(a: &HashSet<String>, b: &HashSet<String>) -> f64 {
 
 /// Whether `text` is worth a new note: no note in the same scope says the
 /// same thing (equal, or ≥ 0.8 likeness).
+#[cfg(test)]
 pub fn is_new_note(memories: &[Memory], text: &str, repo: Option<&str>) -> bool {
     let terms = terms_of(text);
     !memories
         .iter()
         .any(|m| m.kind == MemoryKind::Note && m.repo.as_deref() == repo && (m.text == text || likeness(&terms_of(&m.text), &terms) >= 0.8))
 }
-
-// ---- words -----------------------------------------------------------------
 
 fn utf16_len(s: &str) -> usize {
     s.encode_utf16().count()
@@ -201,8 +197,6 @@ pub fn carried_memory(lines: &[String]) -> String {
 
 /// Authorship stays explicit when user-written notes become model input.
 pub const FROM_USER: &str = "用户交代：";
-
-// ---- recall ----------------------------------------------------------------
 
 /// What a turn recalls by. `matches`: full-text rank per memory id, higher
 /// better (the store's own index; 0 when absent).
@@ -314,11 +308,9 @@ pub fn search(
     out
 }
 
-// ---- redaction ---------------------------------------------------------------
-
+#[cfg(test)]
 fn shapes() -> &'static [Regex] {
-    static RE: OnceLock<Vec<Regex>> = OnceLock::new();
-    RE.get_or_init(|| {
+    static RE: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         [
             r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
             r"\bsk-[A-Za-z0-9_-]{16,}",
@@ -332,29 +324,30 @@ fn shapes() -> &'static [Regex] {
         .iter()
         .map(|p| Regex::new(p).expect("regex"))
         .collect()
-    })
+    });
+    &RE
 }
 
+#[cfg(test)]
 const REDACTED: &str = "[redacted]";
 
 /// Masks secrets before text leaves the machine (external memory sources,
 /// logs). The name and what joins it stay: `api_key=[redacted]`.
+#[cfg(test)]
 pub fn redact(text: &str) -> String {
-    static BEARER: OnceLock<Regex> = OnceLock::new();
-    static NAMED: OnceLock<Regex> = OnceLock::new();
-    let mut out = text.to_string();
-    for shape in shapes() {
-        out = shape.replace_all(&out, REDACTED).into_owned();
-    }
-    let bearer = BEARER.get_or_init(|| Regex::new(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]{8,}").expect("regex"));
-    out = bearer.replace_all(&out, format!("${{1}}{REDACTED}")).into_owned();
-    let named = NAMED.get_or_init(|| {
+    static BEARER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]{8,}").expect("regex"));
+    static NAMED: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
             r#"(?i)(\b[a-z0-9_.-]*(?:api[_-]?key|secret|token|password|passwd|access[_-]?key|certificate)[a-z0-9_]*["']?\s*[=:]\s*["']?)([^\s"',;]{6,})"#,
         )
         .expect("regex")
     });
-    named
+    let mut out = text.to_string();
+    for shape in shapes() {
+        out = shape.replace_all(&out, REDACTED).into_owned();
+    }
+    out = BEARER.replace_all(&out, format!("${{1}}{REDACTED}")).into_owned();
+    NAMED
         .replace_all(&out, |c: &regex::Captures| {
             if &c[2] == REDACTED {
                 c[0].to_string()
@@ -369,16 +362,17 @@ pub fn redact(text: &str) -> String {
 #[path = "rules_tests.rs"]
 mod tests;
 
-// ---- several sources ---------------------------------------------------------
 // From VibeValley sources.ts: the farm's own memory plus external sources
 // (Nowledge Mem, EverOS). Their scores are not comparable, so results are
 // taken in turn by rank, near-duplicates dropped.
 
 /// The name of the local source; other sources' ids carry `name:` before
 /// their own id.
+#[cfg(test)]
 pub const LOCAL: &str = "local";
 
 /// A recalled line from one source.
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct RecalledLine {
     pub id: String,
@@ -387,6 +381,7 @@ pub struct RecalledLine {
 }
 
 /// The id a user sees for a source's memory.
+#[cfg(test)]
 pub fn source_id(source: &str, id: &str) -> String {
     if source == LOCAL || id.is_empty() {
         id.to_string()
@@ -397,6 +392,7 @@ pub fn source_id(source: &str, id: &str) -> String {
 
 /// Which source a user-facing id belongs to, and its id there. An id whose
 /// prefix names no source is the first source's.
+#[cfg(test)]
 pub fn split_source_id<'a>(sources: &[&'a str], id: &'a str) -> (&'a str, &'a str) {
     if let Some((name, rest)) = id.split_once(':')
         && let Some(found) = sources.iter().find(|s| **s == name)
@@ -407,6 +403,7 @@ pub fn split_source_id<'a>(sources: &[&'a str], id: &'a str) -> (&'a str, &'a st
 }
 
 /// The ids in `skip` that belong to `source`, in its own id space.
+#[cfg(test)]
 pub fn skip_for(source: &str, skip: &HashSet<String>) -> HashSet<String> {
     skip.iter()
         .filter_map(|id| match id.split_once(':') {
@@ -419,6 +416,7 @@ pub fn skip_for(source: &str, skip: &HashSet<String>) -> HashSet<String> {
 
 /// Round-robin by rank across groups, dropping items whose text repeats or
 /// is ≥ 0.8 alike an earlier one, and those `keep` refuses.
+#[cfg(test)]
 pub fn interleave<T: Clone>(groups: &[Vec<T>], text: impl Fn(&T) -> &str, mut keep: impl FnMut(&T) -> bool) -> Vec<T> {
     let mut out = vec![];
     let mut seen: Vec<HashSet<String>> = vec![];
@@ -445,6 +443,7 @@ pub fn interleave<T: Clone>(groups: &[Vec<T>], text: impl Fn(&T) -> &str, mut ke
 }
 
 /// One recall from several sources, within the recall budget.
+#[cfg(test)]
 pub fn merge_recalled(groups: &[Vec<RecalledLine>]) -> Vec<RecalledLine> {
     let some: Vec<Vec<RecalledLine>> = groups.iter().filter(|g| !g.is_empty()).cloned().collect();
     if some.len() <= 1 {

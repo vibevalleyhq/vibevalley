@@ -471,8 +471,6 @@ impl Moss {
         parsed.ok_or_else(invalid_response)
     }
 
-    // ----- image -----
-
     /// `prepareMossImage`: the wire body, or refused.
     pub fn prepare_image(model: &str, prompt: &Value, width: i64, height: i64, extra: &Value) -> Result<Value, VendorError> {
         if !super::super::provider::IMAGE_MODELS.contains(&model) {
@@ -548,17 +546,16 @@ impl Moss {
         }
     }
 
-    // ----- speech -----
-
     /// `prepareMossSpeech` (the farm sends no language or metadata).
     pub fn prepare_speech(model: &str, text: &str, voice: &str, format: &str) -> Result<Value, VendorError> {
         let pro = model.starts_with("moss-tts-1.0-pro");
         let pauses_ok = if pro {
             !text.contains("[pause")
         } else {
-            let re = regex::Regex::new(r"\[pause[^\]]*\]").expect("regex");
-            let good = regex::Regex::new(r"^\[pause (?:0\.[1-9]\d*|[1-9](?:\.\d+)?|10(?:\.0+)?)s\]$").expect("regex");
-            re.find_iter(text).all(|m| good.is_match(m.as_str()))
+            static PAUSE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| regex::Regex::new(r"\[pause[^\]]*\]").expect("regex"));
+            static GOOD_PAUSE: std::sync::LazyLock<regex::Regex> =
+                std::sync::LazyLock::new(|| regex::Regex::new(r"^\[pause (?:0\.[1-9]\d*|[1-9](?:\.\d+)?|10(?:\.0+)?)s\]$").expect("regex"));
+            PAUSE.find_iter(text).all(|m| GOOD_PAUSE.is_match(m.as_str()))
         };
         if !super::super::provider::SPEECH_MODELS.contains(&model) || !text_ok(text, 10000) || !audio_id(voice) || !FORMATS.contains(&format) || !pauses_ok {
             return Err(invalid_input());
@@ -755,8 +752,6 @@ impl Moss {
         if done { Ok(()) } else { Err(StreamError::Vendor(invalid_response())) }
     }
 
-    // ----- several voices, designed voices, transcription -----
-
     /// `prepareMossSpeakers`.
     pub fn prepare_speakers(model: &str, sp: &[MediaSpeakersRequestSpeakers], sg: &[MediaSpeakersRequestSegments], format: &str) -> Result<Value, VendorError> {
         if !(1..=100).contains(&sp.len()) || !(1..=1000).contains(&sg.len()) {
@@ -921,8 +916,6 @@ impl Moss {
         if done { Ok(()) } else { Err(StreamError::Vendor(invalid_response())) }
     }
 
-    // ----- understanding -----
-
     /// `prepareMossUnderstanding`: `media` is `[(kind, file id)]`, one video or up to five images.
     pub fn prepare_understanding(model: &str, text: &str, media: &[(MediaInputKind, String)], max_tokens: i64) -> Result<Value, VendorError> {
         let images = media.iter().all(|(k, _)| *k == MediaInputKind::Image) && (1..=5).contains(&media.len());
@@ -998,8 +991,6 @@ impl Moss {
             },
         })
     }
-
-    // ----- files and voices -----
 
     /// `uploadMossFile`: the file's id and whether MOSS took it.
     pub fn upload(&self, key: &str, file: std::fs::File, size: i64, filename: &str, purpose: &str) -> Result<(String, Uploaded), VendorError> {

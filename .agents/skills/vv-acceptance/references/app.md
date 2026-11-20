@@ -80,35 +80,6 @@
 2. 将 `VIBEVALLEY_UI_BUNDLE` 指向该副本，按前文用隔离家目录启动应用。用 `VIBEVALLEY_STORE=/tmp/vv-app/state.db` 启动第一遍，等 `/tmp/vv-app/nsh/dev.vibevalley.ui/storage.json` 写入后退出。
 3. 将副本中的 `first` 改成 `second`。用同目录的 `other.db` 启动第二遍，核对 `/tmp/vv-app/other.db.nsh/dev.vibevalley.ui/storage.json` 的值为 `second`，第一个文件仍为 `first`。
 
-### 对齐 Web 和原生农场
-
-在 macOS 上准备 Go/Web 和 Rust 原生源码检出，按各自开发指南安装依赖。验收工具使用当前仓库的 Playwright Chromium 和 `uv`。Retina 屏幕用 `--dpr 2`，标准屏幕用 `--dpr 1`。输出目录应为空。[验收入口](scripts/release/verify-farm-frames.py)
-
-```sh
-python3 scripts/release/verify-farm-frames.py \
-  --web-root /path/to/go-checkout --native-root "$PWD" \
-  --dpr 2 --out .test/farm-parity/run-1
-```
-
-已有构建可传 `--go-binary`、`--web-dist`、`--native-binary`、`--native-bundle` 和 `--native-assets`。原生可执行文件应为启用 `shot` 的调试构建。若省略某端的源码目录，应提供对应的完整生产提交号（`--web-commit` 或 `--native-commit`）。清单分别记录检出状态和实际产物的 SHA-256。
-
-1. 工具启动隔离的 Go 服务提供正式 Web 构建。浏览器经本地回放层打开 `/farm/parity`。回放层在 SSE 连接中发送固定业务帧，并用同一份样例返回读取结果。
-2. 原生应用经 `hosted:vv` 打开同一路由。两端使用相同的工单、工作槽和作物。原生帧补上工单作用域对应的 `issue`，缺少的 `refining` 取 `false`。原始帧、转换后帧和接口响应都保存在证据目录。[固定业务帧](scripts/release/fixtures/farm-parity/state.json)
-3. 工具分别取 1280×800 白天、1280×800 夜间和 640×720 白天。每端每个场景取两张。浏览器核对画布就绪、字体和 HUD 时钟。原生核对业务帧序号、帮工、时钟和实际画布宽度。普通农场路由侧栏占 72 点，直开 `pixel:farm` 可能保留工作台的侧栏宽度。
-4. 查看 `result.json` 及其链接的各份 `metrics.json`。每个场景包含跨端对照、Web 重复采样和原生重复采样。报告覆盖全图、世界区、地块、侧栏、工具栏、时钟和帮工按钮。仓库木牌保留世界坐标取样区，另按按钮的实际边界测量。昼夜固定后，帮工和环境动画仍会推进。两个同端报告记录这部分噪声。[图像指标](scripts/release/compare-farm-frames.py)
-
-退出码 0 表示跨端与同端重复采样均过门槛。退出码 1 表示截图和指标已生成，存在未过门槛的区域。退出码 2 表示输入、构建、场景就绪或截图尺寸校验失败。交互动作与业务回执另在真实服务上验收。
-
-对同一原生构建分别采自然动画和固定步数两组图后，运行 `python3 scripts/release/report-farm-modes.py <自然组目录> <固定组目录> --out <汇总.json>`。脚本核对两组的业务帧、视口、Go 服务、原生构建、素材、Web 提交和比较器，按模式汇总全图与各区域的跨端和同端分数。
-
-### 核对固定步长的农场动画
-
-运行自然时序对照后，在新目录运行同一命令，并增加 `--firefly-seed 93471 --ticks 30`。受控模式从 `--web-root` 的 Git 提交重新构建浏览器页面。准备好锁文件对应的离线包。原生应用使用带 `shot` 的构建。[采帧入口](scripts/release/verify-farm-frames.py)
-
-两端等到相同业务序号后，各自执行指定次数的 1/60 秒步进。两端用同一串均匀随机数初始化萤火。场景仍执行飞行、闪烁、发光和渲染。Web 的跳动标牌也定位到该时刻。其他生物的随机输入单独核对。更换种子可复验读数顺序。[参考端输入适配](scripts/release/farm_motion.py) · [原生时钟](apps/mac/src/pixel/farm/capture.rs)
-
-受控目录保存参考端的输入补丁、种子、步数及其回执。萤火的坐标和强度只用于对账。数值相同仍应检查真实窗口的图像门槛。发布判断保留 `natural` 与 `fixed_ticks_firefly_seed` 两份结果。
-
 ## 证据
 
 - 脚本文件、起应用的命令、`app.log` 里每步的行。

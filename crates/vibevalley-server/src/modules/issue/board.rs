@@ -263,8 +263,6 @@ impl Board {
         self.0.ledger.change(id, change)
     }
 
-    // ----- what the user does -----
-
     pub fn create(&self, new: NewIssue) -> Result<Issue> {
         let _work = lock(&self.0.work);
         let repo = match &new.repo {
@@ -553,8 +551,6 @@ impl Board {
         }
     }
 
-    // ----- sending -----
-
     /// The issue's newest session, while it is on the board.
     pub(super) fn on_board(&self, issue: &Issue) -> Option<Session> {
         let id = issue.latest_session_id()?;
@@ -715,8 +711,6 @@ impl Board {
         self.refresh_queue_locked();
         Ok(Some(done))
     }
-
-    // ----- delivering -----
 
     /// Records a pull (or merge) request opened or updated for `reference`.
     /// When a followed PR merges on an issue that finishes with its PR, the

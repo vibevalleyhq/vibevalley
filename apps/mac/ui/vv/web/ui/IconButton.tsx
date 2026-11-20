@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/IconButton.tsx.
 import { Text, View } from "nsh";
 
 import { hostApi } from "../../../bridge";

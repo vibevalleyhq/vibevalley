@@ -1,6 +1,6 @@
 //! `voice.*` through its endpoints, offline: Agora's REST, the dictation
 //! address and MOSS answered by the test, the orchestrator by a scripted
-//! model. Ported from VibeValley `gateway/voice/voice.test.ts`.
+//! model.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};

@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/features/setting/GeneralPage.tsx.
 import { t } from "@vibevalley/i18n";
 
 import { setStart, StartValues, usePrefs } from "../../state/prefs";

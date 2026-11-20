@@ -1,9 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/HtmlFrame.tsx: one
-// html version or store artifact view with the controls its display asks for.
-// The <iframe> is an nsh WebView given the page (frame.ts says how it talks).
-// A web view is a native view over whatever nsh draws in its box and is left
-// out of the app's pictures; `covered` hides it (opacity 0 keeps the page
-// loaded) while something nsh draws must show over it, as a menu does.
 import { cleanup, untracked, View, WebView, type JSX } from "nsh";
 
 import type { Artifact, ArtifactDisplay } from "@vibevalley/protocol";
@@ -80,7 +74,7 @@ export function HtmlFrame(props: HtmlFrameProps) {
     return raw !== undefined ? withShellQuery(raw) : undefined;
   };
 
-  if (!untracked(() => props.hideControls) && !untracked(isStore)) {
+  if (untracked(() => props.hideControls) !== true && !untracked(isStore)) {
     useReportViewContext(
       () => props.artifact.id,
       () => {
