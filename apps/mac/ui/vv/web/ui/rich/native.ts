@@ -116,6 +116,7 @@ export interface VvRichModule {
   VvDiagram: (props: VvDiagramProps) => JSX.Element;
   VvGenUi: (props: VvGenUiProps) => JSX.Element;
   VvMarkdown: (props: VvMarkdownProps) => JSX.Element;
+  matchPinyin: (text: string, query: string) => boolean;
 }
 
 let cached: VvRichModule | null | undefined;

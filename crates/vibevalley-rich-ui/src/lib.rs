@@ -25,6 +25,7 @@ pub mod highlight;
 pub mod hooks;
 pub mod markdown;
 mod math;
+pub mod pinyin;
 pub mod theme;
 
 use nsh_core::element::Registry;
@@ -59,6 +60,7 @@ pub use markdown::{
     VvMarkdownSize, VvMentionPressEvent, VvTaskPressEvent, VvWikilinkPressEvent, clean_remark_note, is_incremental_streaming_safe, parse_vv_markdown,
     parse_wikilink_target, vv_markdown, vv_markdown_extensions, vv_markdown_options,
 };
+pub use pinyin::VvPinyin;
 pub use theme::{
     AdaptiveUi, CODE_FONT_MONO, DIAGRAM_FONT_SANS, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, UiPalette, vv_canvas_palette, vv_chart_palette, vv_pele_palette,
     vv_shiki_dark_theme, vv_shiki_light_theme,
@@ -79,6 +81,7 @@ pub fn registry() -> Registry {
         .register::<VvDiagram>()
         .register::<VvCanvas>()
         .register::<VvChart>()
-        .register::<VvGenUi>();
+        .register::<VvGenUi>()
+        .module::<VvPinyin>();
     set
 }

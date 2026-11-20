@@ -11658,6 +11658,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "vibevalley-pinyin"
+version = "0.1.0"
+
+[[package]]
 name = "vibevalley-pixel"
 version = "0.1.0"
 dependencies = [
@@ -11691,6 +11695,7 @@ version = "0.1.0"
 dependencies = [
  "nsh-base",
  "nsh-core",
+ "nsh-js",
  "ratex-font",
  "ratex-layout",
  "ratex-parser",
@@ -11704,6 +11709,7 @@ dependencies = [
  "vibevalley-genui",
  "vibevalley-i18n",
  "vibevalley-pele",
+ "vibevalley-pinyin",
  "vibevalley-pkm",
  "vibevalley-shiki",
  "zstd",
