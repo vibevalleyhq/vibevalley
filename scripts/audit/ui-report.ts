@@ -158,20 +158,18 @@ function readStateSummaries(): StateFrameSummary[] {
     const raw = asFields(readJson(file));
     if (!raw) continue;
     const state = asFields(raw.get("state"));
-    const call = asFields(state?.get("call"));
-    const farm = asFields(raw.get("farm"));
-    const media = asFields(raw.get("media"));
+    const view = asFields(raw.get("view"));
     rows.push({
       density,
       seq: asNum(raw.get("seq")),
       issues: asArray(state?.get("issues")).length,
       sessions: asArray(state?.get("sessions")).length,
       inbox: asArray(raw.get("inbox")).length,
-      plots: asArray(farm?.get("plots")).length,
-      crons: asArray(raw.get("crons")).length,
-      connectors: asArray(raw.get("connectors")).length,
-      mediaJobs: asArray(media?.get("jobs")).length,
-      callState: asStr(call?.get("state"), "idle"),
+      plots: asArray(view?.get("plots")).length,
+      crons: asArray(state?.get("crons")).length,
+      connectors: asArray(state?.get("connectors")).length,
+      mediaJobs: asArray(state?.get("media")).length,
+      callState: asStr(state?.get("call"), "idle"),
     });
   }
   return rows;
