@@ -28,7 +28,6 @@ export interface Heading {
   readonly prefix: number;
 }
 
-/** Leading `# `, `## `, or `### ` heading level and prefix length, if any. */
 export function headingOf(body: string): Heading | undefined {
   const m = /^(#{1,3})\s/u.exec(body);
   if (!m?.[1]) return undefined;
@@ -41,7 +40,7 @@ export type BodySegment = { readonly kind: "text"; readonly text: string } | { r
 
 const fenceOpen = /^(`{3,}|~{3,})([^\n]*)$/u;
 
-/** Splits a block containing at least one closed fenced code block into ordered text and code segments; undefined when none. */
+/** undefined when there is no closed fenced code block. */
 export function fencedCode(body: string): readonly BodySegment[] | undefined {
   if (!body.includes("```") && !body.includes("~~~")) return undefined;
   const lines = body.split("\n");
@@ -113,7 +112,7 @@ const inline = new RegExp(
   "gu",
 );
 
-/** A block's text as pieces: `code`, ==words==^[remark], [[page]] links, ((block)) refs, URLs, emphasis, #tags, and plain text. */
+/** Recognises `code`, ==words==^[remark], [[page]], ((block)), URLs, emphasis, #tags, and plain text. */
 export function piecesOf(body: string): Piece[] {
   const out: Piece[] = [];
   let at = 0;

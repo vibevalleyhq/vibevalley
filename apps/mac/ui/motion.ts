@@ -1,5 +1,4 @@
-// Motion table (docs/design/01-philosophy-and-tokens.md). Every duration goes
-// through `ms`, which is 0 under reduced motion so end states still apply.
+// Under reduced motion `ms` is 0, so end states still apply.
 import { LayoutAnimation, reduceMotion } from "nsh";
 
 export const ease = "cubic-bezier(0.2, 0, 0, 1)";

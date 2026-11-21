@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Splitter.tsx: the same widths kept
-// per pane in the prefs. The drag is a pan gesture (PanResponder) rather
-// than pointer capture; a double press puts the default back; the arrow
-// keys move it 16 points while it has the focus.
 import { keymap, PanResponder, signal, untracked, View, type Accessor } from "nsh";
 
 import { setWidth, usePrefs } from "../state/prefs";
@@ -12,7 +8,7 @@ export function usePaneWidth(pane: string, fallback: number, min: number, max: n
   return () => Math.min(max, Math.max(min, kept() ?? fallback));
 }
 
-/** A pane's edge the user drags to set its width (docs/design/05-audiovisual-and-artifacts.md). side: the edge it is on, so dragging outward widens the pane. */
+/** side: the edge it is on, so dragging outward widens the pane. */
 export function Splitter(props: { pane: string; side: "left" | "right"; width: number; min: number; max: number; label: string }) {
   const dragging = signal(false);
   const focused = signal(false);

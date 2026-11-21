@@ -304,7 +304,7 @@ export function toneColor(p: Palette, tone: string | undefined): string {
   }
 }
 
-export function CountBadge(props: { count: number; tone?: "default" | "danger" | "alert" }) {
+function CountBadge(props: { count: number; tone?: "default" | "danger" | "alert" }) {
   const p = () => tok();
   const tint = () => (props.tone === "danger" ? statusTint(p(), "danger") : props.tone === "alert" ? statusTint(p(), "alert") : null);
   const textColor = () => (props.tone === "danger" ? p().danger : props.tone === "alert" ? p().alert : p().muted);

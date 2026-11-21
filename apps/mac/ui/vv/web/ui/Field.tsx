@@ -92,7 +92,6 @@ export function TextArea(props: TextInputProps & { rows?: number; submit?: boole
   );
 }
 
-/** A compact single-line search bar: leading magnifier, focus ring, and an inline clear button that never resizes the box. */
 export function SearchField(props: {
   value: string;
   onInput: (value: string) => void;

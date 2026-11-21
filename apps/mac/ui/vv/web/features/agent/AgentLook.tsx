@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/agent/AgentLook.tsx: the
-// labeled field, the look panel and the stage: the outfits' sprites and
-// the posed helper on its bed, from the app's art (ui/pixel/atlas.ts); the
-// stage's radial ground is drawn on a Canvas. While the art is not
-// installed, an outfit is its name and the stage shows the helper's face.
 import { Canvas, colorScheme, Image, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

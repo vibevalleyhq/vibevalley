@@ -9,7 +9,7 @@ Status: proposed
 | 缺项 | 现状 | 问题 |
 |---|---|---|
 | 用户画像（`profile`） | `kind` 只有 `note`、`issue` 两种，用户偏好记成某个档案名下的 `note` | 帮工和别的助手拿不到用户的全局偏好 |
-| 干活经过（`episode`） | 只在会话轨迹里；自研 agent 对话压缩（`Entry::Compacted`，[对话实现](crates/vibevalley-agent/src/conversation.rs)）压掉的部分不进 `memory` 表 | `memory_search` 搜不到历史回合的具体上下文与改动文件 |
+| 干活经过（`episode`） | 只在会话轨迹里；自研 agent 对话压缩（`AgentEvent::Compacted`，[对话引擎](crates/vibevalley-agent/src/core/engine.rs)）压掉的部分不进 `memory` 表 | `memory_search` 搜不到历史回合的具体上下文与改动文件 |
 | 相似取代 | 没有 `replaced_by` 列；重合度 ≥ `0.8` 的新条目直接跳过 | 用户改了偏好，新说法记不进去，旧说法一直被召回 |
 
 ## Proposal

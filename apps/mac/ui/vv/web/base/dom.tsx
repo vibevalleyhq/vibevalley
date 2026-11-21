@@ -1,7 +1,4 @@
-// Ported from VibeValley apps/web/src/base/dom.tsx: the same exports where
-// nsh has the thing. There is no DOM: focus refs, click-away and the
-// viewport come from nsh (autoFocus props, Overlay's onPressOutside,
-// windowSize).
+// No DOM here: focus refs, click-away and the viewport come from nsh (autoFocus props, Overlay's onPressOutside, windowSize).
 import { signal, untracked, type Accessor, type JSX } from "nsh";
 
 import { createEffect, createSignal, onSettled } from "../../solid";

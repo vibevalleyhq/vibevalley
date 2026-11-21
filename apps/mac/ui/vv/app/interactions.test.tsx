@@ -1,4 +1,3 @@
-// Lean single-instance write-path and async race-condition guards that static frames cannot observe.
 import "../polyfill";
 import { expect, open, test } from "nsh/test";
 
@@ -38,7 +37,6 @@ test("write-path guards: draft retry idempotency, review tree check, answer, cha
   const clock = app.clock;
   if (!clock) throw new Error("interactions.test.tsx requires a manual virtual clock");
 
-  // 1a. Refused issue.create keeps draft and retries with identical requestKey.
   fake.respond("issue.create", () => {
     createCalls++;
     return acceptCreate ? { ...issue0, seq: fixture.state.seq + createCalls } : { bizCode: 300001, message: "Try again" };
@@ -61,7 +59,6 @@ test("write-path guards: draft retry idempotency, review tree check, answer, cha
   expect(retryCreates.length).toBe(2);
   expect(retryCreates[1]?.payload).toEqual(retryCreates[0]?.payload);
 
-  // 1b. Pending edits made while issue.create is in flight are preserved with a fresh requestKey.
   fake.clearCalls();
   await app.press("id:issue-new");
   await app.type("id:issue-new-text", "First");
@@ -79,7 +76,6 @@ test("write-path guards: draft retry idempotency, review tree check, answer, cha
   expect(editCreates.map((w) => w.title)).toEqual(["First", edited]);
   expect(editCreates[0]?.requestKey).not.toBe(editCreates[1]?.requestKey);
 
-  // 2. Review delivery blocks status=done on bizCode 300001 and fetches incremental diff since seen tree.
   const seenRev = { baseCommit: "base", tree: "seen" };
   const newRev = { baseCommit: "base", tree: "new" };
   let moved = false;
@@ -113,7 +109,6 @@ test("write-path guards: draft retry idempotency, review tree check, answer, cha
   expect(doneCalls.length).toBe(1);
   expect(doneCalls[0]?.payload).toMatchObject({ id: "i31", status: "done", revision: newRev });
 
-  // 3. Answering an asking issue sends the chosen option payload.
   const firstOpt = i33.questions[0]?.options[0];
   if (!firstOpt) throw new Error("i33 must carry at least one question option");
   await app.host.send("route", "/issues/i33");
@@ -126,7 +121,6 @@ test("write-path guards: draft retry idempotency, review tree check, answer, cha
   const answerCall = fake.calls.find((c) => c.op === "issue.comment.create" || c.op === "issue.answer");
   expect(answerCall?.payload).toMatchObject({ id: "i33", text: firstOpt });
 
-  // 4. Chat message send and live channel.follow push append in place.
   await app.host.send("route", "/chat");
   await fake.pump(app);
   fake.clearCalls();
@@ -149,7 +143,6 @@ test("write-path guards: draft retry idempotency, review tree check, answer, cha
   );
   expect(app.texts()).toContain("实时推送到达");
 
-  // 5. Legacy /orchestrator/trajectory redirects to /runs?session=orchestrator with approval polling and grant RPC payload.
   await app.host.send("route", "/orchestrator/trajectory");
   await fake.pump(app);
   await fake.pump(app);

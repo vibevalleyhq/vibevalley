@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/features/media/Inspector.tsx:
-// inspector pane for the selected library media item(s) or deliverable artifact.
 import { Image, Scroll, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

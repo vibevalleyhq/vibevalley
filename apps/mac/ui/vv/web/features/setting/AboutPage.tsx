@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/features/setting/AboutPage.tsx.
 import { Clipboard, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

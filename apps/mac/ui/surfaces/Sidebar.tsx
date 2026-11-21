@@ -1,7 +1,3 @@
-// The workspace sidebar (`host.params.contextual === true`):
-//   Left tree: Open Repos -> (Worktree groups when >1, else flat) -> Terminal Tabs
-//              with explicit fold/expand, aligned slot grid, and PTY-accurate status.
-//   Right inspector (`host.params.role === "inspector"`): Files and Git changes.
 import { Canvas, Clipboard, colorScheme, effect, host, Image, Path2D, Scroll, signal, Text, View, type JSX } from "nsh";
 import { Button, ContextMenu, MenuItem, MenuSeparator } from "nsh/base";
 
@@ -208,7 +204,7 @@ function disambiguatorMap(repos: RepoNode[]): Map<string, string> {
   return result;
 }
 
-/** Crisp 24x24 vector glyphs drawn on an nsh Canvas. */
+/** 24x24 vector glyphs. */
 
 type GlyphName = "chevron" | "plus" | "close" | "branch" | "terminal" | "file" | "diff" | "folder" | "collapseAll" | "expandAll";
 

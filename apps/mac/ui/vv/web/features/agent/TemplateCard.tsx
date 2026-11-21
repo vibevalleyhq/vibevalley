@@ -1,5 +1,3 @@
-// Shared starter & imported role template card with generated portrait, working style,
-// capability badges, expandable persona preview, and one-click adoption.
 import { signal, Text, View } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
@@ -45,7 +43,7 @@ export function matchesTemplateQuery(template: AgentTemplate, needle: string): b
   return hay.includes(needle);
 }
 
-export function resolveTargetRuntime(template: AgentTemplate, runtimes: readonly RuntimeInfo[]): { runtime: string; label: string; ready: boolean } {
+function resolveTargetRuntime(template: AgentTemplate, runtimes: readonly RuntimeInfo[]): { runtime: string; label: string; ready: boolean } {
   if (template.role === "orchestrator") {
     return { runtime: template.runtime, label: t("web.agent.templates.onServer"), ready: true };
   }

@@ -161,7 +161,6 @@ function drawToolIcon(cx: CanvasRenderingContext2D, glyph: string, size: number,
 
   switch (glyph) {
     case "$":
-      // Terminal prompt >_
       cx.beginPath();
       cx.moveTo(3.25, 4.75);
       cx.lineTo(6.75, 8);
@@ -171,7 +170,6 @@ function drawToolIcon(cx: CanvasRenderingContext2D, glyph: string, size: number,
       cx.stroke();
       break;
     case "◱":
-      // Document / read
       cx.beginPath();
       cx.moveTo(4.5, 2.5);
       cx.lineTo(9.25, 2.5);
@@ -189,7 +187,6 @@ function drawToolIcon(cx: CanvasRenderingContext2D, glyph: string, size: number,
       cx.stroke();
       break;
     case "✎":
-      // Pencil / edit
       cx.beginPath();
       cx.moveTo(10.75, 2.75);
       cx.lineTo(13.25, 5.25);
@@ -200,7 +197,6 @@ function drawToolIcon(cx: CanvasRenderingContext2D, glyph: string, size: number,
       cx.stroke();
       break;
     case "⌕":
-      // Magnifier / search
       cx.beginPath();
       cx.arc(7, 7, 3.75, 0, Math.PI * 2);
       cx.moveTo(9.8, 9.8);
@@ -208,7 +204,6 @@ function drawToolIcon(cx: CanvasRenderingContext2D, glyph: string, size: number,
       cx.stroke();
       break;
     case "◎":
-      // Globe / web fetch
       cx.beginPath();
       cx.arc(8, 8, 5, 0, Math.PI * 2);
       cx.moveTo(3, 8);
@@ -220,7 +215,6 @@ function drawToolIcon(cx: CanvasRenderingContext2D, glyph: string, size: number,
       cx.stroke();
       break;
     case "⧉":
-      // Linked squares / MCP
       cx.beginPath();
       cx.moveTo(3, 5);
       cx.lineTo(9, 5);
@@ -235,7 +229,6 @@ function drawToolIcon(cx: CanvasRenderingContext2D, glyph: string, size: number,
       cx.stroke();
       break;
     default:
-      // Sliders / generic tool
       cx.beginPath();
       cx.moveTo(3, 5);
       cx.lineTo(13, 5);

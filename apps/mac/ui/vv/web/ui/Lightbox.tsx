@@ -1,11 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Lightbox.tsx: pictures over the
-// page, one at a time, with the previous and next (also ← →), the name, the
-// original and close. nsh/base's Dialog is the <dialog> (Escape and a press
-// on the backdrop close it). The original opens in the system's app
-// (host.openFile) where VibeValley opens a browser tab, so a picture here
-// carries its file's path. A picture is shown a point per pixel, as the
-// browser shows it, fitted to the window. The backdrop's blur is not ported
-// (GPUI draws no backdrop filter).
 import { colorScheme, Image, keymap, signal, Text, View, windowSize } from "nsh";
 import { Dialog } from "nsh/base";
 
@@ -26,7 +18,6 @@ export interface Picture {
   readonly path?: string;
 }
 
-/** Pictures over the page, one at a time (docs/design/05-audiovisual-and-artifacts.md); the original opens in the system's app. */
 export function Lightbox(props: { pictures: readonly Picture[]; at: number | undefined; onAt: (at: number | undefined) => void }) {
   const count = () => props.pictures.length;
   const go = (step: number) => {

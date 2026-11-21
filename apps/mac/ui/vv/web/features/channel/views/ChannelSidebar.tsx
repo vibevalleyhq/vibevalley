@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/ChannelSidebar.tsx.
-// A channel is reordered by dragging its row onto another as a pan gesture
-// (nsh has no HTML drag and drop): the rows are measured as the drag starts.
-// The direct picker is nsh/base's Popover rather than an absolutely placed
-// list.
 import { cleanup, keymap, PanResponder, Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
 import { Popover } from "nsh/base";
 

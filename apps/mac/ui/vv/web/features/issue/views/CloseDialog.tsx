@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/CloseDialog.tsx:
-// the close and reopen dialogs and the changes review. Not ported: the
-// patch is nsh's DiffView (one column, + and - beside the lines, the code
-// coloured by the file's language) in place of Shiki in a web worker; a
-// patch DiffView cannot read (cut short) shows its lines tinted, uncoloured.
 import { cleanup, effect, Scroll, signal, Text, untracked, View } from "nsh";
 import { DiffView } from "nsh/base";
 
@@ -332,7 +327,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
   );
 }
 
-/** The dialog's buttons. A move is an intent: the dialog closes once it is sent, and the board and the issue's page show it moving, or refused with a retry. */
+/** A move is an intent, not awaited: the dialog closes once it is sent, and the board shows it moving, or refused with a retry. */
 function createPresses(lane: () => Lane | undefined) {
   const moves = useIntents(issueMove);
   const act = createAct();

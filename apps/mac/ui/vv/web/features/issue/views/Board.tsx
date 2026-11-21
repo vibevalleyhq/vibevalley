@@ -1,10 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/Board.tsx.
-// Same lanes, cards, marks and words; the model (cards.ts, display.ts,
-// history.ts) is VibeValley's own, vendored. Dragging is a pan gesture on
-// the card (nsh has no HTML drag and drop): where the lanes and cards are
-// is measured as it starts, the card follows the pointer as a ghost, and
-// the lane under it (or the todo card it would go before) is marked as
-// VibeValley's dragover marks it.
 import { cleanup, PanResponder, Scroll, signal, Text, View, windowSize, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";

@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/setting/SettingsPage.tsx: the
-// same sections, groups, search and resizable list, every section's forms.
-// Not here: MOSS Live's playground (microphone and camera, features/voice).
 import { Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

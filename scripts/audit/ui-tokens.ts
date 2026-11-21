@@ -20,7 +20,6 @@ const EXCLUDE_GLOBS = [
   "vv/web/ui/tone.ts",
   // Pixel asset registry, sprite manifests, and procedural pixel renderers.
   "vv/web/ui/pixel/**",
-  // Test files, fixtures, and story fixtures.
   "**/*.test.*",
   "**/*.story.*",
   "**/*.stories.*",
@@ -70,7 +69,6 @@ export interface Finding {
   readonly fix: string;
 }
 
-/** Narrow rule-level exemptions for files that legitimately deviate on one rule only. */
 const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
   // 5-state PKM task marker (TODO/DOING/DONE/WAIT/CANCELED), not binary <Checkbox>.
   "apps/mac/ui/vv/web/features/pkm/OutlineEditor.tsx": ["raw-control"],

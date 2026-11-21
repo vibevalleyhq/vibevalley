@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/repo/RepoPanels.tsx: the
-// stats, languages, commit calendar, hands and the new repo form. The
-// pixel art (language logos, the calendar's crop tiles) comes from the
-// app (ui/pixel); without it a language is its colour, a day a tile in
-// the leaf's shades by its level. A day's line follows the pointer as there (onMouseEnter).
 import { Image, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";

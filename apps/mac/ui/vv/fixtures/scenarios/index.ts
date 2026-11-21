@@ -1,4 +1,3 @@
-// Rust-derived scenario frames paired with deterministic SCENARIO_NOW responses.
 import type { ChatMessage, IssueHistory, SessionEvent, StateFrame } from "@vibevalley/protocol";
 
 import workbenchResponsesJson from "../workbench/responses.json";
@@ -95,7 +94,6 @@ function buildMessages(density: ScenarioDensity, now: number): ChatMessage[] {
   if (density === "minimal") return anchored.slice(0, 2);
   if (density === "typical" || density === "extreme" || density === "edge") return anchored;
 
-  // Dense: expand deterministically to 80 messages in #general with Markdown & code snippets.
   const extra = Array.from({ length: 80 - anchored.length }, (_, i) => {
     const n = anchored.length + i + 1;
     return {

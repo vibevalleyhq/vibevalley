@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/features/media/ImagePanel.tsx: image
-// generation form and recent image jobs.
 import { Image, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

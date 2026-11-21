@@ -47,7 +47,6 @@ const fallbackClasses = {
   rule: "my-2 border-line",
 };
 
-/** Compact workbench heading scale matching the surrounding text size. */
 const fallbackHeadings = (sm: boolean) =>
   sm
     ? { heading1: "text-base", heading2: "text-sm", heading3: "text-sm", heading4: "text-sm", heading5: "text-sm", heading6: "text-sm" }

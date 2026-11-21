@@ -75,7 +75,7 @@ export const Agent = z.object({
   from: z.exactOptional(AgentFrom),
 }) satisfies Codec<T.Agent>;
 
-export const TemplateCategory = z.enum(T.TemplateCategoryValues) satisfies Codec<T.TemplateCategory>;
+const TemplateCategory = z.enum(T.TemplateCategoryValues) satisfies Codec<T.TemplateCategory>;
 
 export const AgentTemplate = z.object({
   id: z.string(),

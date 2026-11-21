@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/NewIssue.tsx:
-// the sheet that writes a new issue from a few words. Command+Return keeps
-// it (a key binding while the sheet is up), as the form's submit did.
 import { cleanup, effect, keymap, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

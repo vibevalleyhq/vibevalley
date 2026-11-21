@@ -1,4 +1,3 @@
-// Isolated testbench mounting workbench UI primitives, virtual-clock hooks, and domain components under Root + ToastHost.
 import "../polyfill";
 import { mount, Scroll, signal, Text, View } from "nsh";
 import { z } from "zod";

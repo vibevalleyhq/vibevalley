@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/provider/ProviderPage.tsx: the
-// MOSS accounts (on the accounts page) and the uses each feature is bound to.
-// The <fieldset> is a View (each control is disabled on its own); the
-// adapted models' <details> is a fold opened by its summary.
 import { Scroll, signal, Text, untracked, View } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";

@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/Sheet.tsx: the
-// same parts. Wide layouts split into an independently scrollable main column
-// and a fixed right inspector; narrow layouts collapse the inspector into a
-// right slide-over drawer controlled from IssueView's top bar.
 import { context, effect, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -28,7 +24,7 @@ export interface IssueChrome {
 
 export const IssueChromeContext = context<IssueChrome | undefined>(undefined);
 
-/** Coordinates the top-bar inspector toggle in IssueView with IssueSheet's desktop/drawer split. */
+/** One toggle shared by IssueView's top bar and the sheet's desktop/drawer split. */
 export function createIssueChrome(): IssueChrome {
   const sheetCount = signal(0);
   const wide = signal(true);

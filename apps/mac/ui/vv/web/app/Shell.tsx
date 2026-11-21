@@ -25,7 +25,7 @@ const small = () => windowSize().width < 640;
 /** Short windows (<760px tall): tighten rail vertical rhythm so all 9 nav items fit without clipping. */
 const compactTall = () => windowSize().height < 760;
 
-/** A place on the rail: 24px icon (or the 38px farm anchor) with its short name underneath so it reads without hovering. */
+/** 24px icon (or the 38px farm anchor) with its short name underneath, so it reads without hovering. */
 function Slot(props: { to: string; place: string; label: string; name?: string; current?: boolean; badge?: number; hero?: boolean; icon: () => JSX.Element }) {
   const current = () => props.current === true;
   const hero = () => props.hero === true;
@@ -255,7 +255,6 @@ function deskRunPresentation(state: DeskRunState, workingCount: number): DeskRun
   }
 }
 
-/** The head over a page: its place, and the live runs status pill, which opens /runs. */
 function Desk(props: { place?: Place | undefined }) {
   const core = useCore();
   const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;

@@ -1,7 +1,4 @@
-// Ported from VibeValley apps/web/src/features/pkm/Body.tsx: a block's words
-// with its links, tags, remarks, inline Markdown, fenced code blocks and
-// read-out ((refs)). A link's or copy button's press does not reach the block
-// under it (nsh gives the press to the innermost pressable).
+// A link or copy button press does not reach the block under it: nsh gives presses to the innermost pressable.
 import { Clipboard, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

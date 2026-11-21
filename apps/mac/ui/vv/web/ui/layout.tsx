@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/layout.tsx: Split, ListCard,
-// ListRow, Card, Quiet, Empty, Toggle (nsh/base's Switch, as base-ui's)
-// and SecretInput. Not here: TextLink, titleBar and WindowStrip (the
-// desktop window's own strip is the GPUI app's).
 import { signal, Scroll, Text, untracked, View, type JSX } from "nsh";
 import { Switch } from "nsh/base";
 
@@ -23,7 +19,6 @@ const pageWidths: Record<PageWidth, string> = {
   wide: "w-full",
 };
 
-/** Standard page content container with consistent reading/management width and vertical rhythm. */
 export function PageBody(props: { width?: PageWidth | undefined; class?: string | undefined; testid?: string | undefined; children: JSX.Element }) {
   const width = () => props.width ?? "manage";
   return (
@@ -46,7 +41,6 @@ const kbdClasses: Record<KbdSize, { box: string; text: string }> = {
   },
 };
 
-/** Keycap label for keyboard shortcuts and inline key hints. */
 export function Kbd(props: { size?: KbdSize | undefined; children: JSX.Element }) {
   const size = () => kbdClasses[props.size ?? "sm"];
   return (
@@ -65,7 +59,7 @@ const bannerToneStyle: Record<BannerTone, { bg: string; text: string; mixColor: 
   info: { bg: "bg-side", text: "text-muted", mixColor: "line", icon: "info" },
 };
 
-/** Inline status or error notice; edge draws an edge-to-edge top strip under a viewer bar. */
+/** `edge` makes it an edge-to-edge top strip under a viewer bar. */
 export function Banner(props: {
   tone?: BannerTone | undefined;
   size?: "sm" | "md" | undefined;
@@ -102,7 +96,6 @@ export function Banner(props: {
   );
 }
 
-/** Collapsible sidebar section header with unified 10px chevron, optional right-side badge/count pill, and trailing action. */
 export function SidebarSection(props: {
   title: string;
   count?: number | undefined;
@@ -188,7 +181,7 @@ export function ListCard(props: { title: string; label?: string; action?: JSX.El
   );
 }
 
-/** A 2 px left accent bar for the selected row of a sidebar list (zero layout shift). */
+/** 2px accent bar, absolutely placed so selecting a row shifts no layout. */
 export function ActiveBar(props: { tall?: boolean; class?: string | undefined }) {
   return (
     <View class={`pointer-events-none absolute top-0 bottom-0 left-0.5 justify-center ${props.class ?? ""}`}>
@@ -251,7 +244,7 @@ export function Quiet(props: { children: JSX.Element }) {
   return <Text class="text-sm leading-relaxed text-muted">{props.children}</Text>;
 }
 
-/** A place with nothing in it yet (docs/design/02-atomic-components.md): its icon, why it is empty, and the next step if there is one. */
+/** `children`: why it is empty; `action`: the next step, if there is one. */
 export function Empty(props: { icon: IconName; children: JSX.Element; action?: JSX.Element; testid?: string; compact?: boolean | undefined }) {
   const compact = () => props.compact === true;
   return (

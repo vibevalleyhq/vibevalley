@@ -1,6 +1,4 @@
-// Ported from VibeValley apps/web/src/ui/Button.tsx: the same tones and
-// sizes. nsh's text styles do not come down from a View, so the words are
-// a Text of their own in the tone's ink.
+// nsh's text styles do not come down from a View, so the words are a Text of their own in the tone's ink.
 import { Text, View, type JSX } from "nsh";
 
 import { Link as A } from "../infra/router";
@@ -41,7 +39,6 @@ function buttonClass(tone: Tone, compact: boolean, disabled: boolean, extra?: st
     "flex-row items-center justify-center gap-1.5 rounded-md border transition duration-120 ease-out",
     compact ? "h-6 px-2" : "h-7 px-2.5",
     resting[tone],
-    // Disabled buttons skip hover cues and the 1px active press sink.
     disabled ? "opacity-50" : `${interactive[tone]} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`,
     extra ?? "",
   ].join(" ");
@@ -96,7 +93,6 @@ export function Button(props: {
   );
 }
 
-/** Router link styled identically to Button so page-bar actions stay unified across links and buttons. */
 export function ButtonLink(props: {
   href: string;
   tone?: Tone;

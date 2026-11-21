@@ -1,7 +1,4 @@
-// Ported from VibeValley apps/web/src/ui/domain/PoseSprite.tsx: a helper in
-// a pose, `height` tall, walking through its frames. Not ported: each pose's
-// CSS keyframes (style.css pose-*: a bob, a lean); nsh has no custom
-// keyframes from TSX, so the other poses stand still.
+// nsh has no custom keyframes from TSX: the walk moves through its frames, the other poses stand still.
 import { Image, View } from "nsh";
 
 import { useNow } from "../../base/dom";
@@ -32,7 +29,6 @@ function WalkingFrame(props: { cast: Cast; height: number }) {
   );
 }
 
-/** A helper standing, walking, working…, `height` tall. */
 export function PoseSprite(props: { cast: Cast; pose: Pose; height: number }) {
   const sprites = useSprites();
   const url = useSpriteUrl();

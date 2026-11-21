@@ -40,14 +40,12 @@ test("waterfallWidths dampens 11s vs 7h36m extreme ratio while preserving order 
   expect(widths[1]).toBeGreaterThan(widths[0]);
   expectClose(sumOf(widths), 560);
 
-  // Zero-duration run receives 0px while positive extreme runs keep >= minRunPx and sum to room.
   const withZero = waterfallWidths([0, elevenSeconds, sevenHours], 560);
   expect(withZero[0]).toBe(0);
   expect(withZero[1]).toBeGreaterThanOrEqual(44);
   expect(withZero[2]).toBeGreaterThan(withZero[1]);
   expectClose(sumOf(withZero), 560);
 
-  // Narrow room clamps minRunPx to room / count without exceeding room.
   const tight = waterfallWidths([1_000, 1_000_000], 60);
   expect(tight[0]).toBeGreaterThanOrEqual(30);
   expectClose(sumOf(tight), 60);

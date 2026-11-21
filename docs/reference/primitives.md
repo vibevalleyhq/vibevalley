@@ -72,8 +72,8 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `useWorkAgents` | `agents.ts` | The profiles work is sent to, the helpers; enabled, only those not switched off. Inactive helpers sort last. |
-| `sortRuntimes` | `agents.ts` | Active (available and enabled) runtimes first, then disabled, then unavailable, preserving preset order within each group. |
+| `useWorkAgents` | `agents.ts` | The profiles work is sent to, the helpers; enabled, only those not switched off. |
+| `sortRuntimes` | `agents.ts` |  |
 | `useOrchestrators` | `agents.ts` | The orchestrators' profiles, the default one first. |
 | `orchestratorLookOf` | `agents.ts` | An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. |
 | `useAgent` | `agents.ts` | A profile by its id, once the profiles are read; undefined for none or one gone. |

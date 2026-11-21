@@ -1,5 +1,3 @@
-// Converged Linear-style grouped list of orchestrators and helpers, with a
-// unified filter/search/action toolbar and an always-visible worker toggle.
 import { Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

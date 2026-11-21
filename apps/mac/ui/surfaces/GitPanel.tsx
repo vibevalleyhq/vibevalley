@@ -738,7 +738,6 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
         </View>
       ) : (
         <View style={{ flex: 1 }}>
-          {/* Top status bar: current branch + ahead/behind + refresh */}
           <View
             style={{
               height: 30,
@@ -821,7 +820,6 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
           ) : null}
 
           <Scroll style={{ flex: 1 }}>
-            {/* 1. DIFF / CHANGES VIEW */}
             {activeTab() === "changes" ? (
               <View>
                 {removeNotice() ? (
@@ -995,7 +993,6 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               </View>
             ) : null}
 
-            {/* 2. BRANCHES & WORKTREES VIEW */}
             {activeTab() === "branches" ? (
               <View>
                 <View style={{ paddingBottom: 4 }}>
@@ -1128,7 +1125,6 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               </View>
             ) : null}
 
-            {/* 3. COMMIT HISTORY VIEW */}
             {activeTab() === "commits" ? (
               <View>
                 <SectionHead

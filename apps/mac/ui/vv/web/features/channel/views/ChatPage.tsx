@@ -1,10 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/ChatPage.tsx:
-// the sidebar (a drawer below md), the channel with its head, tabs, list and
-// box, and a thread beside it (over it below lg) at its own width. The
-// thread list and the pins open in nsh/base Popovers under their buttons;
-// the message search field is an Input in the head. An artifact opened
-// beside the talk (?artifact=) is over it below lg; its blocks are quoted
-// into the box.
 import { signal, Text, untracked, View, windowSize, type JSX } from "nsh";
 import { Popover } from "nsh/base";
 

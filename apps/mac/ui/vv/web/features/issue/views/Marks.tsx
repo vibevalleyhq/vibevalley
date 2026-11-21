@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/Marks.tsx: the
-// SVG marks are drawn on nsh Canvas (no SVG in nsh) with the same
-// geometry; colors are the theme tokens the CSS variables named. Faces are
-// ui/domain/Face's (an initial until the pixel sprites are drawn here).
 import { Canvas, colorScheme, Path2D, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

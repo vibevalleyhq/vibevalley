@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/features/voice/views/MossVerify.tsx.
 import { signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -29,7 +28,6 @@ export function MossVerify() {
   return <MossVerifyView busy={act.busy()} result={result()} onCheck={() => void check()} />;
 }
 
-/** The check as it looks: nothing yet, asking, or the answer as a status pill with full reason on hover. */
 function MossVerifyView(props: { busy: boolean; result?: MossVerifyResult | undefined; onCheck: () => void }) {
   return (
     <View class="flex-row flex-wrap items-center gap-2">

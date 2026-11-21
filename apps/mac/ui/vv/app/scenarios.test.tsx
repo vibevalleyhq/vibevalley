@@ -1,4 +1,3 @@
-// Virtual-clock multi-density UI BDD suite driven by Rust-folded StateFrames from vibevalley-core::scenario.
 import "../polyfill";
 import { expect, open, test } from "nsh/test";
 
@@ -186,21 +185,18 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
     durationMs: 0,
   };
 
-  // Board -> List -> DisplayMenu.
   expect(app.count("id:issue-card")).toBe(fixture.state.state.issues.length);
   await app.press("id:issue-view-list");
   expect(app.count("id:issues-page")).toBe(1);
   await app.press("id:issue-view-board");
   row.stepsPassed++;
 
-  // Working issue detail with subagents, tool connection, and follow-the-run trajectory link.
   await visit(app, fake, "/issues/i18", row, () => {
     expect(app.count("id:issue")).toBe(1);
     expect(app.count("id:subagent-progress")).toBe(1);
     expect(app.count("id:issue-open-trajectory")).toBe(1);
   });
 
-  // Asking issue BDD: click option -> fires comment/answer RPC.
   fake.clearCalls();
   await visit(app, fake, "/issues/i33", row, () => {
     expect(app.count("id:issue-ask")).toBe(1);
@@ -211,7 +207,6 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   expect(fake.calls.some((c) => c.op === "issue.comment.create" || c.op === "issue.answer")).toBe(true);
   row.stepsPassed++;
 
-  // Review issue BDD: open complete dialog.
   await visit(app, fake, "/issues/i31", row, () => {
     expect(app.count("id:act-complete")).toBe(1);
   });
@@ -221,12 +216,10 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   await app.keyboard.press("escape");
   row.stepsPassed++;
 
-  // Family parent/child issue view.
   await visit(app, fake, "/issues/i40", row, () => {
     expect(app.count("id:issue-family")).toBe(1);
   });
 
-  // Chat BDD: live channel push + send message + live notice event.
   await visit(app, fake, "/chat", row, () => {
     expect(app.count("id:chat-page")).toBe(1);
   });
@@ -246,7 +239,6 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   await fake.pushLive(app, { type: "notice", at: SCENARIO_NOW, level: "info", text: "工作台连接已同步" });
   row.stepsPassed++;
 
-  // Legacy /orchestrator/trajectory redirects smoothly to /runs?session=orchestrator with PendingApprovals polling.
   await visit(app, fake, "/orchestrator/trajectory", row, () => {
     expect(app.count("id:runs-page")).toBe(1);
     expect(app.count("id:run-row-orchestrator")).toBe(1);
@@ -267,7 +259,6 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   expect(app.texts()).toContain("需要人工确认创建高优先级工单");
   row.stepsPassed++;
 
-  // Unified /runs hub: scope filters and worker run selection.
   await visit(app, fake, "/runs", row, () => {
     expect(app.count("id:runs-page")).toBe(1);
     expect(app.count("id:run-row-w1")).toBe(1);
@@ -281,7 +272,6 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   await fake.pump(app);
   row.stepsPassed++;
 
-  // Orchestrator config page keeps memory/voice tabs and links out to /runs.
   await visit(app, fake, "/orchestrator/memory", row, () => {
     expect(app.count("id:orchestrator-page")).toBe(1);
     expect(app.count("id:orchestrator-runs-link")).toBe(1);
@@ -478,7 +468,6 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     durationMs: 0,
   };
 
-  // BoardSummary consistency across wide columns & narrow lane tabs.
   const boardSummary = fixture.state.state.boardSummary;
   expect(boardSummary).toBeDefined();
   expect(boardSummary?.laneCounts).toEqual({ todo: 3, working: 8, waiting: 4, closed: 9 });
@@ -500,7 +489,6 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
   await app.setViewport(1280, 820);
   row.stepsPassed++;
 
-  // PR (review_after_failed_check), Branch (reviewed), Answer (handed_back), Interrupted (+worktree check), Quiet, deep 1-parent-6-child family.
   await visit(app, fake, "/issues/i-edge-pr-open", row, () => {
     expect(app.count("id:issue")).toBe(1);
     expect(app.count("id:issue-ask")).toBe(1);
@@ -531,7 +519,6 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.texts().some((s) => s.includes("子工单 6"))).toBe(true);
   });
 
-  // Library: all 8 MediaPhase jobs present + mediaSummary drives active-job MakingTiles (3 active, understanding excluded).
   const fileMediaPhases = new Set((fixture.state.state.media ?? []).filter((job) => job.kind !== "understanding").map((job) => job.phase));
   expect(fileMediaPhases).toEqual(new Set(["queued", "generating", "downloading", "ready", "failed", "unknown", "canceled", "download_failed"]));
   expect(fixture.state.state.mediaSummary).toEqual({
@@ -543,7 +530,6 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.count("id:library-making")).toBe(3);
   });
 
-  // Chat: channelSummary drives 1287 unread total badge and per-channel unreadUnder (1285 / 2).
   expect(fixture.state.state.channelSummary?.unreadTotal).toBe(1287);
   expect(fixture.state.state.channelSummary?.unreadUnder.general).toBe(1285);
   await visit(app, fake, "/chat", row, () => {
@@ -560,7 +546,6 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.shows("id:desk-status >> text:开工中 · 3 个在干活")).toBe(true);
   });
 
-  // Connectors (/settings/chat): verify edge's scanned/verify/pairing plus remaining connected/paused/waiting/off (all 7 ConnectorState).
   const seenConnectorStates = new Set<ConnectorState>();
   const recordConnectors = (list: readonly ConnectorStatus[]) => {
     for (const entry of list) seenConnectorStates.add(entry.state);

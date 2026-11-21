@@ -17,7 +17,6 @@ export interface FakeHost {
   readonly acts: { type: string; [key: string]: unknown }[];
   /** Override or add a canned/function RPC answer at runtime. */
   respond(op: string, answer: unknown): void;
-  /** Clear recorded RPC calls between BDD steps. */
   clearCalls(): void;
   /** Sends the queued events until none is left. */
   pump(app: App): Promise<void>;

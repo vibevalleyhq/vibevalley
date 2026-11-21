@@ -30,12 +30,10 @@ export function Tag(props: { icon?: IconName | undefined; label: string; tone: T
   );
 }
 
-/** What a dot says (docs/design/02-atomic-components.md). */
 export type DotTone = "leaf" | "wheat" | "berry" | "water" | "idle" | "faint" | "muted";
 
 export type CountPillTone = "neutral" | "bad";
 
-/** Compact tabular counter badge for sidebar groups, section headings, tabs, and rows. */
 export function CountPill(props: {
   count: string | number;
   active?: boolean | undefined;

@@ -63,13 +63,10 @@ describe("@vibevalley/pkm UI helpers", () => {
     expect(autoPair("[", "[[", 2)).toEqual({ value: "[[]]", caret: 2 });
     expect(autoPair("See [", "See [[", 6)).toEqual({ value: "See [[]]", caret: 6 });
     expect(autoPair("(", "((", 2)).toEqual({ value: "(())", caret: 2 });
-    // Does not double-pair before a word or triple bracket.
     expect(autoPair("[word", "[[word", 2)).toBeUndefined();
     expect(autoPair("[[", "[[[", 3)).toBeUndefined();
-    // Overtype-skips closing brackets inside an open pair.
     expect(autoPair("[[Note]]", "[[Note]]]", 7)).toEqual({ value: "[[Note]]", caret: 7 });
     expect(autoPair("[[Note]]", "[[Note]]]", 8)).toEqual({ value: "[[Note]]", caret: 8 });
-    // Backspace deletes an empty auto-inserted closer.
     expect(autoPair("[[]]", "[]]", 1)).toEqual({ value: "[", caret: 1 });
     expect(autoPair("(())", "())", 1)).toEqual({ value: "(", caret: 1 });
 

@@ -161,7 +161,6 @@ test("buildRunEntries deduplicates orchestrator sessions, sorts active runs firs
     issues: [makeIssue("i18", 18, "修复登录过期"), makeIssue("i33", 33, "弹窗确认")],
   });
 
-  // orch-1 must NOT duplicate as a worker entry.
   expect(entries.map((e) => `${e.kind}:${e.id}`)).toEqual([
     `orchestrator:${defaultOrchestrator}`,
     "worker:w-active",

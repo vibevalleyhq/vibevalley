@@ -1,4 +1,3 @@
-// Starter & local folder role templates gallery with category filtering and one-click adoption.
 import { Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

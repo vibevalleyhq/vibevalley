@@ -78,7 +78,7 @@ function fallbackPromptOf(stage: IssueStage, issue: Issue): IssuePromptKind | un
   }
 }
 
-/** Formats the structured Rust `IssuePromptKind` into localized UI copy (exhaustive across every variant). */
+/** Every prompt kind has copy: add one when a prompt kind is added. */
 function userQuestionFromPrompt(prompt: IssuePromptKind, issue: Issue, head: Session): UserQuestion {
   const who = head.name;
   const said = head.lastRun?.summary;

@@ -1,5 +1,3 @@
-// The palette: commands (⌘K / ⇧⌘P), files (⌘P, answered by Rust's FileIndex)
-// and project search (⇧⌘F), all on nsh's Command.
 import { Text, View } from "nsh";
 import { Command, type CommandItem } from "nsh/base";
 

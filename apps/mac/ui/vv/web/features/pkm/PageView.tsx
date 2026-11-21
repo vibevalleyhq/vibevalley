@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/pkm/PageView.tsx: a page
-// open (header with tier, rail toggle and more; properties; the outline) and
-// its rail (calendar, remarks with suggested rewrites, backlinks, contents);
-// in the stream of days, a day's outline under its linked title. Copying
-// goes through nsh's Clipboard. Below xl the rail sits under the page.
 import { Clipboard, effect, keymap, Text, View } from "nsh";
 import { Input } from "nsh/base";
 import { z } from "zod";
@@ -72,7 +67,7 @@ export function Opened(props: { slug: string; pages: readonly PkmPageSummary[]; 
   );
 }
 
-/** An uncreated [[page]] opened via a link: shows its inbound links and creates the file on first write. */
+/** Not created yet: the file is written on the first edit. */
 function FreshPage(props: { slug: string; pages: readonly PkmPageSummary[] }) {
   const client = useQueryClient();
   const router = useRouter();

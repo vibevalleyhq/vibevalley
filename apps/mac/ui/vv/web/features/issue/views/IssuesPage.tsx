@@ -153,7 +153,6 @@ export function IssuesPage(props: { rest: string }) {
     if (done?.replied) notice(done.replied.reply);
   };
 
-  // An issue is a page of its own (docs/design/03-conversation-and-work-streams.md): the board and the list give way to it, and Escape or Issues comes back.
   return (
     <View testID="issues-page" class="flex-1">
       <If
@@ -275,7 +274,6 @@ function Detail(props: {
         <Scroll class="min-h-0 flex-1">
           <View class="w-full max-w-200 self-center px-6 py-8">
             <If when={props.known} else={<Text class="text-sm text-muted">{t("web.issue.reading")}</Text>}>
-              {/* A link to an issue the farm does not have says so, instead of quietly showing the board. */}
               <View testID="issue-not-found">
                 <Text role="header" class="text-lg font-semibold text-ink">
                   {t("web.issue.page.notFound")}
@@ -329,7 +327,7 @@ function Detail(props: {
 /** An issue's own page, at its URL: Issues or Escape goes back to the board as it was left. */
 function IssueView(props: { onBack: () => void; backLabel: string; blocked: () => boolean; children: JSX.Element }) {
   const chrome = createIssueChrome();
-  // A dialog over the issue, or a field being written in, has Escape first; on narrow screens Escape closes the inspector drawer first.
+  // A dialog over the issue takes Escape first (blocked); on narrow screens the drawer closes before the page goes back.
   keymap.bind(
     "escape",
     () => {

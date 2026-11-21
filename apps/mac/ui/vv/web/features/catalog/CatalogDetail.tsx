@@ -1,10 +1,3 @@
-// Ported from VibeValley apps/web/src/features/catalog/CatalogDetail.tsx:
-// the grounds, a picture at whole-step zoom, one picture's detail (anchor
-// and head marks, frames played at a chosen rate, where it was cut from and
-// the commands that make it again), a cursor's tile. Pictures are nsh
-// Images of the app's art (ui/pixel/atlas.ts). The check ground is drawn
-// on a Canvas (CSS's repeating conic gradient) behind the large picture and
-// the frames; a grid tile is on the plain paper. The fps slider is nsh's.
 import { Canvas, Clipboard, colorScheme, Image, signal, Text, View, type JSX, type ViewStyle } from "nsh";
 import { Slider } from "nsh/base";
 

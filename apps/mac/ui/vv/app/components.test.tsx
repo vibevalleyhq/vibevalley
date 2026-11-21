@@ -1,4 +1,3 @@
-// Priority 2: Isolated internal component verification using nsh's virtual clock for instant timer & debounce transitions.
 import "../polyfill";
 import { expect, open, test } from "nsh/test";
 
@@ -15,7 +14,6 @@ test("all workbench controls, overlays, rich blocks, virtual-clock hooks, and do
   const clock = app.clock;
   if (!clock) throw new Error("components.test.tsx requires a manual virtual clock");
 
-  // 1. Controls: Button, disabled refusal, IconButton, ConfirmButton, Checkbox, Segmented, Tabs, Tag, Slider, Field, Chips, KeyField.
   expect(app.texts()).toContain("clicks:0");
   await app.press("id:btn-plain");
   await app.press("id:btn-primary");
@@ -72,7 +70,6 @@ test("all workbench controls, overlays, rich blocks, virtual-clock hooks, and do
   await app.press("label:移除 DeepSeek Key");
   expect(app.texts()).toContain("removing:true");
 
-  // 2. Overlays & DataTable: Dialog open/close, MoreMenu item selection, Toast auto-dismissal on virtual clock, DataTable sort & selection.
   await app.press("id:open-dialog");
   expect(app.count("id:comp-dialog")).toBe(1);
   await app.press("id:close-dialog");
@@ -93,7 +90,6 @@ test("all workbench controls, overlays, rich blocks, virtual-clock hooks, and do
   await app.press("id:comp-table >> id:table-select-page");
   expect(app.texts()).toContain("暂无数据");
 
-  // 3. Markdown & CodeBlock: fold/expand + copy -> copied -> reset after virtual-clock fastForward.
   expect(app.texts()).toContain("组件 Markdown");
   expect(app.count("id:long-code-section >> id:code-block")).toBe(1);
   await app.press("id:long-code-section >> text:展开");
@@ -103,7 +99,6 @@ test("all workbench controls, overlays, rich blocks, virtual-clock hooks, and do
   await clock.fastForward(1_600);
   expect(app.count("id:long-code-section >> text:已复制")).toBe(0);
 
-  // 4. Virtual-clock hooks & domain widgets: useNow + createSettled + PoseSprite walking + WorkLog + Trajectory + SubagentProgress.
   expect(app.texts()).toContain("settled:alpha");
   await app.press("id:bump-settled");
   await clock.fastForward(100);
@@ -114,7 +109,6 @@ test("all workbench controls, overlays, rich blocks, virtual-clock hooks, and do
   const momentBefore = app.texts().find((s) => s.startsWith("moment:"));
   expect(momentBefore).toBeDefined();
 
-  // Turn PoseSprite walking on, advance virtual clock by 65s -> updates WorkLog/ago without sleeping wall clock.
   await app.press("id:toggle-pose");
   expect(app.texts()).toContain("pose:walk");
   await clock.fastForward(65_000);

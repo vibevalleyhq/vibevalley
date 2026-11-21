@@ -217,7 +217,6 @@ const autoPairs: readonly (readonly [string, string])[] = [
   ["((", "))"],
 ];
 
-/** Auto-closes `[[` / `((` on single-char typing, skips over an existing closer when re-typed, and deletes the empty closer on Backspace. */
 export function autoPair(was: string, now: string, caret: number): { readonly value: string; readonly caret: number } | undefined {
   if (now.length === was.length + 1 && caret >= 1) {
     const typed = now[caret - 1];

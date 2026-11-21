@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/IssueDetail.tsx:
-// the same blocks, acts and side. The steps' <details> is a Fold; the
-// title is renamed in an Input (Return or leaving keeps it, Escape lets it
-// go). VibeValley's addition: the worktree opens a terminal there.
 import { Clipboard, keymap, signal, Text, View, type ViewRef } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
@@ -420,7 +416,7 @@ export function IssueDetail(props: {
     const all = s().stage.acts.map((a) => a.act);
     return s().ask ? all.filter((a) => a === "close" || a === "stop") : all;
   };
-  // Status transitions shown in the Status picker; destructive `close` lives in the dedicated danger button below so Cancel is never duplicated.
+  // Destructive close lives in the danger button below: listing it here too would duplicate it.
   const statusMoves = () => s().stage.acts.flatMap((a) => (a.does === "move" && a.act !== "close" ? [{ act: a.act, status: a.status }] : []));
   // Two acts to one status (reject and resume both go back to work) say which act each is.
   const statusOptions = () => {

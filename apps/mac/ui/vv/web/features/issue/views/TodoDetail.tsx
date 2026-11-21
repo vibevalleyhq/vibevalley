@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/TodoDetail.tsx:
-// the draft and todo page, its talk box, fields and side, and the new repo
-// dialog.
 import { signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 

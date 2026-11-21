@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/orchestrator/OrchestratorPage.tsx:
-// an orchestrator's head and config tabs (memory and voice). Trajectories now
-// live in /runs; old /orchestrator/trajectory URLs redirect there smoothly.
 import { Scroll, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

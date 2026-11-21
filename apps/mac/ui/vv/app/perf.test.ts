@@ -26,22 +26,18 @@ test("mergeSteps handles fast ascending appends, stale revisions, and stepLimit 
   const initial = mergeSteps([], [e1, e2]);
   expect(initial.map((s) => s.seq)).toEqual([1, 2]);
 
-  // Fast path: higher revision on tail replaces last element.
   const e2Rev2 = makeEvent(2, 2);
   const replaced = mergeSteps(initial, [e2Rev2]);
   expect(replaced.at(-1)?.revision).toBe(2);
 
-  // Fast path: equal or lower revision returns exact same array reference.
   expect(mergeSteps(replaced, [makeEvent(2, 2)])).toBe(replaced);
   expect(mergeSteps(replaced, [makeEvent(2, 1)])).toBe(replaced);
 
-  // Out-of-order middle event merges in seq order.
   const e3 = makeEvent(3, 1);
   const withThree = mergeSteps(replaced, [e3]);
   const withMid = mergeSteps(withThree, [makeEvent(0, 1)]);
   expect(withMid.map((s) => s.seq)).toEqual([0, 1, 2, 3]);
 
-  // Capped at 240 events.
   let log: SessionEvent[] = [];
   for (let i = 1; i <= 260; i++) log = mergeSteps(log, [makeEvent(i, 1)]);
   expect(log.length).toBe(240);

@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/features/media/Rail.tsx: origin,
-// file-kind, and deliverable facet filters with cross-filtered counts.
 import { Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

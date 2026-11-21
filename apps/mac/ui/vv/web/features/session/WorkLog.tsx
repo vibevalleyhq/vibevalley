@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/session/WorkLog.tsx: a
-// session's steps by run, and the folded run under a report. The log's
-// height (CSS --log-height, 22rem) is the `height` prop; a long text is cut
-// at its lines without the fading mask.
 import { Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

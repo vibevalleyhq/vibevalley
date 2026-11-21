@@ -7,7 +7,7 @@ import { createSettled } from "../base/dom";
 import { api } from "./api";
 import { defineQuery, retryRead, ready, useAgents, useQuery } from "./query";
 
-/** The profiles work is sent to, the helpers; enabled, only those not switched off. Inactive helpers sort last. */
+/** The profiles work is sent to, the helpers; enabled, only those not switched off. */
 export function useWorkAgents(enabled = false) {
   const all = useAgents();
   return (): Agent[] =>
@@ -18,7 +18,7 @@ export function useWorkAgents(enabled = false) {
 
 const runtimeOrder = (r: RuntimeInfo) => (r.installation.status === "available" ? (r.settings.enabled ? 0 : 1) : 2);
 
-/** Active (available and enabled) runtimes first, then disabled, then unavailable, preserving preset order within each group. */
+// toSorted is stable: the preset order stands within each group.
 export const sortRuntimes = (runtimes: readonly RuntimeInfo[]): RuntimeInfo[] => runtimes.toSorted((a, b) => runtimeOrder(a) - runtimeOrder(b));
 
 /** The orchestrators' profiles, the default one first. */
