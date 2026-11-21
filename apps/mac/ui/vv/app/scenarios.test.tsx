@@ -68,6 +68,10 @@ test("empty scenario keeps every major route stable across themes and narrow wid
   await visit(app, fake, "/agents", row, () => {
     expect(app.count("id:agents-page")).toBe(1);
   });
+  await visit(app, fake, "/runs", row, () => {
+    expect(app.count("id:runs-page")).toBe(1);
+    expect(app.count("id:runs-empty")).toBe(1);
+  });
   await visit(app, fake, "/artifacts", row, () => {
     expect(app.count("id:artifacts")).toBe(1);
   });
@@ -183,10 +187,11 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   await app.press("id:issue-view-board");
   row.stepsPassed++;
 
-  // Working issue detail with subagents & tool connection.
+  // Working issue detail with subagents, tool connection, and follow-the-run trajectory link.
   await visit(app, fake, "/issues/i18", row, () => {
     expect(app.count("id:issue")).toBe(1);
     expect(app.count("id:subagent-progress")).toBe(1);
+    expect(app.count("id:issue-open-trajectory")).toBe(1);
   });
 
   // Asking issue BDD: click option -> fires comment/answer RPC.
@@ -235,9 +240,10 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   await fake.pushLive(app, { type: "notice", at: SCENARIO_NOW, level: "info", text: "工作台连接已同步" });
   row.stepsPassed++;
 
-  // Orchestrator approval discovery via virtual clock fastForward (0ms wall wait!).
+  // Legacy /orchestrator/trajectory redirects smoothly to /runs?session=orchestrator with PendingApprovals polling.
   await visit(app, fake, "/orchestrator/trajectory", row, () => {
-    expect(app.count("id:orchestrator-page")).toBe(1);
+    expect(app.count("id:runs-page")).toBe(1);
+    expect(app.count("id:run-row-orchestrator")).toBe(1);
   });
   pendingApprovals = [
     {
@@ -255,6 +261,26 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   expect(app.texts()).toContain("需要人工确认创建高优先级工单");
   row.stepsPassed++;
 
+  // Unified /runs hub: scope filters and worker run selection.
+  await visit(app, fake, "/runs", row, () => {
+    expect(app.count("id:runs-page")).toBe(1);
+    expect(app.count("id:run-row-w1")).toBe(1);
+    expect(app.count("id:run-open-profile")).toBe(1);
+  });
+  await app.press("id:runs-scope-active");
+  await fake.pump(app);
+  expect(app.count("id:run-row-w1")).toBe(1);
+  expect(app.count("id:run-row-w3")).toBe(0);
+  await app.press("id:runs-scope-all");
+  await fake.pump(app);
+  row.stepsPassed++;
+
+  // Orchestrator config page keeps memory/voice tabs and links out to /runs.
+  await visit(app, fake, "/orchestrator/memory", row, () => {
+    expect(app.count("id:orchestrator-page")).toBe(1);
+    expect(app.count("id:orchestrator-runs-link")).toBe(1);
+  });
+
   await visit(app, fake, "/artifacts", row, () => {
     expect(app.count("id:artifacts")).toBe(1);
   });
@@ -269,7 +295,21 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   });
   await visit(app, fake, "/agents", row, () => {
     expect(app.count("id:agents-page")).toBe(1);
+    expect(app.count("id:agents-toolbar")).toBe(1);
+    expect(app.count("id:agent-card-orchestrator")).toBe(1);
+    expect(app.count("id:agent-card-laozhou")).toBe(1);
+    expect(app.count("id:toggle-on")).toBeGreaterThan(0);
+    expect(app.count("id:toggle-off")).toBeGreaterThan(0);
   });
+  await app.press("id:agents-role-filter-orchestrator");
+  expect(app.count("id:agent-card-orchestrator")).toBe(1);
+  expect(app.count("id:agent-card-laozhou")).toBe(0);
+  await app.press("id:agents-role-filter-all");
+  await app.type("id:agents-search", "不存在的档案");
+  expect(app.count("id:agents-empty-search")).toBe(1);
+  await app.press("id:agents-clear-filter");
+  expect(app.count("id:agent-card-laozhou")).toBe(1);
+  row.stepsPassed++;
   await visit(app, fake, "/catalog", row, () => {
     expect(app.count("id:catalog-page")).toBe(1);
   });
@@ -507,6 +547,12 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.shows("id:channel-row-general >> text:1285")).toBe(true);
   });
 
+  await visit(app, fake, "/runs", row, () => {
+    expect(app.count("id:runs-page")).toBe(1);
+    expect(app.count("id:run-row-orchestrator")).toBe(1);
+    expect(app.count("id:run-row-w-edge-fam4")).toBe(1);
+  });
+
   // Connectors (/settings/chat): verify edge's scanned/verify/pairing plus remaining connected/paused/waiting/off (all 7 ConnectorState).
   const seenConnectorStates = new Set<ConnectorState>();
   const recordConnectors = (list: readonly ConnectorStatus[]) => {
@@ -607,4 +653,21 @@ test("english locale renders issues, chat, and settings cleanly with zero crashe
   const settingsTexts = app.texts();
   expect(settingsTexts).toContain("General");
   expect(settingsTexts).toContain("Page language");
+
+  await app.host.send("route", "/runs");
+  await fake.pump(app);
+  await fake.pump(app);
+  expect(app.count("id:runs-page")).toBe(1);
+  const runsTexts = app.texts();
+  expect(runsTexts).toContain("Runs & trajectories");
+  expect(runsTexts).toContain("Active");
+
+  await app.host.send("route", "/agents");
+  await fake.pump(app);
+  await fake.pump(app);
+  expect(app.count("id:agents-page")).toBe(1);
+  const agentsTexts = app.texts();
+  expect(agentsTexts).toContain("Assistants");
+  expect(agentsTexts).toContain("Helpers");
+  expect(agentsTexts).toContain("New helper");
 });

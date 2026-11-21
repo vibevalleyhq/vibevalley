@@ -39,22 +39,12 @@ const noSupport: RuntimeSupport = { steer: false, refused: {}, capabilities: [],
 export const supportOf = (info: RuntimeInfo | undefined) => info?.support ?? noSupport;
 
 type Patch = (a: Agent) => void;
-type Tab = "who" | "runtime" | "persona" | "skills" | "tools" | "env" | "memory" | "trajectories";
+type Tab = "who" | "runtime" | "persona" | "skills" | "tools" | "env" | "memory";
 
-export function ConfigTabs(props: {
-  draft: Agent;
-  runtime?: RuntimeInfo | undefined;
-  patch: Patch;
-  nameTaken: boolean;
-  isNew: boolean;
-  onTrajectories: () => void;
-}) {
+export function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch; nameTaken: boolean; isNew: boolean }) {
   const tab = signal<Tab>("who");
   const support = () => supportOf(props.runtime);
-  const savedTabs: [Tab, string][] = [
-    ["memory", t("web.agent.tab.memory")],
-    ["trajectories", t("web.agent.trajectories")],
-  ];
+  const savedTabs: [Tab, string][] = [["memory", t("web.agent.tab.memory")]];
   const tabs = (): [Tab, string][] => [
     ["who", t("web.agent.tab.who")],
     ["runtime", t("web.agent.tab.runtime")],
@@ -71,7 +61,7 @@ export function ConfigTabs(props: {
       <Tabs
         label={t("web.agent.tabs")}
         value={tab()}
-        onChange={(v) => (v === "trajectories" ? props.onTrajectories() : tab.set(v))}
+        onChange={(v) => tab.set(v)}
         items={tabs().map(([value, label]) => ({ value, label }))}
         class="border-b border-line px-3 py-2"
       />

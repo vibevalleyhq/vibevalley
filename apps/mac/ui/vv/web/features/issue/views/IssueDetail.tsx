@@ -15,6 +15,7 @@ import { shortMomentText } from "../../../base/format";
 import { useAgent } from "../../../infra/agents";
 import { useCore } from "../../../infra/frame";
 import { ready } from "../../../infra/query";
+import { Link as A } from "../../../infra/router";
 import { useIntents } from "../../../state/intent";
 import { createAct } from "../../../ui/act";
 import { Button } from "../../../ui/Button";
@@ -27,6 +28,7 @@ import { Dot } from "../../../ui/Tag";
 import { Bubble } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { IssueArtifacts } from "../../artifact";
+import { runsHref } from "../../session";
 import { createSessionEvents } from "../../session/events";
 import { SubagentProgress } from "../../session/SubagentProgress";
 import { createIssueActs } from "../model/acts";
@@ -393,6 +395,16 @@ export function IssueDetail(props: {
             testID="issue-steps-fold"
             label={t("web.issue.detail.steps")}
             summary={steps().length > 0 ? stepsLine(steps()) : undefined}
+            aside={
+              <A
+                href={runsHref({ session: head().id, issue: props.issue.id })}
+                testID="issue-open-trajectory"
+                class="h-6 shrink-0 flex-row items-center gap-1 rounded-md px-2 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+              >
+                <Icon name="log" size={12} tone="muted" />
+                <Text class="text-xs font-medium text-muted">{t("web.issue.detail.openTrajectory")}</Text>
+              </A>
+            }
             onToggle={showSteps.set}
           >
             <If when={steps().length > 0 ? steps() : undefined} else={<Text class="text-xs text-faint">{noStepsText(head())}</Text>}>

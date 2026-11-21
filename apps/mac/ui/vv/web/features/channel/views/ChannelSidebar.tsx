@@ -16,12 +16,13 @@ import { api } from "../../../infra/api";
 import { orchestratorMood, orchestratorSession, type OrchestratorMood, useCore } from "../../../infra/frame";
 import { ready, settingsQuery, useAgents, useQuery } from "../../../infra/query";
 import { fixOf } from "../../../infra/readiness";
-import { useRouter } from "../../../infra/router";
+import { Link as A, useRouter } from "../../../infra/router";
 import { createAct } from "../../../ui/act";
 import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Icon } from "../../../ui/Icon";
 import { TextLink } from "../../../ui/TextLink";
 import { Bubble } from "../../../ui/Tip";
+import { runsHref } from "../../session";
 import { useMarkedChat } from "../model/marks";
 import { archivedOf, channelName, chatPath, directsOf, groupsOf, sessionThreadOf, topsOf, unreadTotal, unreadUnder } from "../model/places";
 import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots, phaseDot, phaseText } from "./presence";
@@ -438,44 +439,57 @@ function OrchestratorLine(props: { agent: string }) {
     <View
       testID="channel-orchestrator-line"
       accessibilityLabel={t("web.channel.orchestrator")}
-      class="flex-row items-center gap-2.5 border-t border-line px-3.5 py-2.5"
+      class="flex-row items-center gap-2 border-t border-line px-2 py-1.5"
     >
-      <View class="relative shrink-0">
-        <OrchestratorFace size={32} agent={props.agent} />
-        <View class="absolute -right-0.5 -bottom-0.5">
-          <Dot tone={dotTone()} size={7} />
+      <A
+        href={runsHref({ session: props.agent })}
+        testID="channel-orchestrator-runs"
+        accessibilityLabel={t("web.channel.orchestratorRuns")}
+        tooltip={<Bubble text={t("web.channel.orchestratorRuns")} />}
+        class="group min-w-0 flex-1 flex-row items-center gap-2.5 rounded-md px-1.5 py-1 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+      >
+        <View class="relative shrink-0">
+          <OrchestratorFace size={32} agent={props.agent} />
+          <View class="absolute -right-0.5 -bottom-0.5">
+            <Dot tone={dotTone()} size={7} />
+          </View>
         </View>
-      </View>
-      <View class="min-w-0 flex-1 gap-0.5">
-        <View class="flex-row items-center gap-1.5">
-          <Text class="min-w-0 truncate text-sm font-semibold text-ink">{profile()?.name || t("web.channel.orchestrator")}</Text>
-          <If when={since()}>{(at) => <Text class="shrink-0 font-mono text-2xs text-faint">{tookText(Math.max(0, clock() - at()))}</Text>}</If>
+        <View class="min-w-0 flex-1 gap-0.5">
+          <View class="flex-row items-center gap-1.5">
+            <Text class="min-w-0 truncate text-sm font-semibold text-ink">{profile()?.name || t("web.channel.orchestrator")}</Text>
+            <If when={since()}>{(at) => <Text class="shrink-0 font-mono text-2xs text-faint">{tookText(Math.max(0, clock() - at()))}</Text>}</If>
+          </View>
+          <View class="flex-row items-center gap-1.5">
+            <If
+              when={lacks()}
+              else={
+                <>
+                  <Text testID={`orchestrator-${now()}`} class="min-w-0 truncate text-xs text-muted">
+                    {orchestratorMoodLabels[now()]}
+                  </Text>
+                  <If when={now() === "thinking"}>
+                    <ThinkingDots />
+                  </If>
+                </>
+              }
+            >
+              {(fix) => <Text class="min-w-0 flex-1 truncate text-xs text-berry">{t("web.channel.lacks", { why: fix().words })}</Text>}
+            </If>
+          </View>
         </View>
-        <View class="flex-row items-center gap-1.5">
-          <If
-            when={lacks()}
-            else={
-              <>
-                <Text testID={`orchestrator-${now()}`} class="min-w-0 truncate text-xs text-muted">
-                  {orchestratorMoodLabels[now()]}
-                </Text>
-                <If when={now() === "thinking"}>
-                  <ThinkingDots />
-                </If>
-              </>
-            }
-          >
-            {(fix) => (
-              <>
-                <Text class="min-w-0 flex-1 truncate text-xs text-berry">{t("web.channel.lacks", { why: fix().words })}</Text>
-                <TextLink href={fix().href} testid="orchestrator-fix">
-                  {t("web.channel.lacksFix")}
-                </TextLink>
-              </>
-            )}
-          </If>
-        </View>
-      </View>
+        <If when={!lacks()}>
+          <Icon name="log" size={14} tone="faint" />
+        </If>
+      </A>
+      <If when={lacks()}>
+        {(fix) => (
+          <View class="shrink-0 pr-1.5">
+            <TextLink href={fix().href} testid="orchestrator-fix">
+              {t("web.channel.lacksFix")}
+            </TextLink>
+          </View>
+        )}
+      </If>
     </View>
   );
 }

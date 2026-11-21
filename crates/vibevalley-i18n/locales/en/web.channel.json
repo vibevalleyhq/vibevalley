@@ -283,5 +283,6 @@
     }
   },
   "lacks": "cannot answer: {why}",
-  "lacksFix": "Settings"
+  "lacksFix": "Settings",
+  "orchestratorRuns": "View assistant trajectory and pending approvals"
 }

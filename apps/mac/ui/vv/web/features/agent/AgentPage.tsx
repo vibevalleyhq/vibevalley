@@ -1,7 +1,7 @@
 // Ported from VibeValley apps/web/src/features/agent/AgentPage.tsx: a
 // helper's profile (the look, the stage, the configuration tabs, what is
-// wrong with it) or an orchestrator's, and the trajectories of the helpers
-// it sent. VibeValley adds: a terminal at the profile's work folder.
+// wrong with it) or an orchestrator's. VibeValley adds: a terminal at the
+// profile's work folder and a link into /runs for this profile's trajectories.
 import { Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -20,8 +20,7 @@ import { type Pose, randomLook, stagePoses } from "../../ui/domain/cast";
 import { OpenTerminal } from "../../ui/domain/OpenTerminal";
 import { runtimeName } from "../../ui/domain/RuntimeBadge";
 import { Icon } from "../../ui/Icon";
-import { Bubble } from "../../ui/Tip";
-import { TrajectoryList } from "../session/Trajectory";
+import { runsHref } from "../session";
 import { ConfigTabs, supportOf } from "./AgentConfig";
 import { LookPanel, Stage } from "./AgentLook";
 import { FromTemplate } from "./FromTemplate";
@@ -110,7 +109,6 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   const pose = signal<Pose>("idle");
   const saving = createAct();
   const talking = createAct();
-  const trajectories = signal(false);
   const router = useRouter();
   const client = useQueryClient();
   const runtimes = useRuntimes();
@@ -155,6 +153,14 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
           {(saved) => (
             <>
               <DeleteButton agent={saved()} />
+              <A
+                href={runsHref({ agent: saved().id })}
+                testID="agent-runs-link"
+                class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
+              >
+                <Icon name="log" size={14} tone="muted" />
+                <Text class="text-sm text-ink">{t("web.agent.runsLink")}</Text>
+              </A>
               <Button
                 icon="thread"
                 testID="talk"
@@ -182,63 +188,36 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   );
 
   return (
-    <If
-      when={!trajectories()}
-      else={
-        <View class="h-full min-h-0 flex-1 gap-3 bg-page px-4 pb-4">
-          {bar()}
-          <View class="flex-row items-center gap-2.5">
-            <View role="button" onPress={() => trajectories.set(false)} class="group rounded-md px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover">
-              <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.backToProfile")}</Text>
-            </View>
-            <View tooltip={<Bubble text={t("web.agent.trajectoriesHint")} />}>
-              <Text class="text-sm font-semibold text-ink">{t("web.agent.trajectories")}</Text>
-            </View>
-          </View>
-          <View testID="trajectories" class="min-h-0 flex-1">
-            <TrajectoryList agent={draft().id} />
+    <View testID="agent-page" class="h-full min-h-0 flex-1 bg-page px-4 pb-4">
+      {bar()}
+      <If when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={(a) => draft.set(a)} />}</If>
+      <Scroll class="min-h-0 flex-1" contentClass="min-h-full gap-3 pt-3 lg:flex-row">
+        <Scroll class="shrink-0 rounded-lg border border-line bg-page lg:w-76" contentClass="p-4">
+          <LookPanel draft={draft()} onChange={(look) => draft.set({ ...draft(), look })} />
+        </Scroll>
+        <View class="min-h-104 flex-1 overflow-hidden rounded-lg border border-line bg-page">
+          <Stage draft={draft()} pose={pose()} />
+          <View class="flex-row flex-wrap justify-center gap-1.5 p-3">
+            <Each of={stagePoses}>
+              {(p) => (
+                <View
+                  role="button"
+                  accessibilityState={{ selected: pose() === p().pose }}
+                  onPress={() => pose.set(p().pose)}
+                  class={`h-6 justify-center rounded-full px-2.5 transition duration-120 ease-out ${pose() === p().pose ? "bg-ink" : "bg-hover hover:bg-selected"}`}
+                >
+                  <Text class={`text-xs ${pose() === p().pose ? "font-medium text-page" : "text-ink"}`}>{p().label}</Text>
+                </View>
+              )}
+            </Each>
           </View>
         </View>
-      }
-    >
-      <View testID="agent-page" class="h-full min-h-0 flex-1 bg-page px-4 pb-4">
-        {bar()}
-        <If when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={(a) => draft.set(a)} />}</If>
-        <Scroll class="min-h-0 flex-1" contentClass="min-h-full gap-3 pt-3 lg:flex-row">
-          <Scroll class="shrink-0 rounded-lg border border-line bg-page lg:w-76" contentClass="p-4">
-            <LookPanel draft={draft()} onChange={(look) => draft.set({ ...draft(), look })} />
-          </Scroll>
-          <View class="min-h-104 flex-1 overflow-hidden rounded-lg border border-line bg-page">
-            <Stage draft={draft()} pose={pose()} />
-            <View class="flex-row flex-wrap justify-center gap-1.5 p-3">
-              <Each of={stagePoses}>
-                {(p) => (
-                  <View
-                    role="button"
-                    accessibilityState={{ selected: pose() === p().pose }}
-                    onPress={() => pose.set(p().pose)}
-                    class={`h-6 justify-center rounded-full px-2.5 transition duration-120 ease-out ${pose() === p().pose ? "bg-ink" : "bg-hover hover:bg-selected"}`}
-                  >
-                    <Text class={`text-xs ${pose() === p().pose ? "font-medium text-page" : "text-ink"}`}>{p().label}</Text>
-                  </View>
-                )}
-              </Each>
-            </View>
-          </View>
-          <View class="min-h-120 shrink-0 overflow-hidden rounded-lg border border-line bg-page lg:w-108">
-            <ConfigTabs
-              draft={draft()}
-              runtime={runtime()}
-              patch={(a) => draft.set(a)}
-              nameTaken={nameTaken()}
-              isNew={isNew}
-              onTrajectories={() => trajectories.set(true)}
-            />
-            <Problems problems={problems()} />
-          </View>
-        </Scroll>
-      </View>
-    </If>
+        <View class="min-h-120 shrink-0 overflow-hidden rounded-lg border border-line bg-page lg:w-108">
+          <ConfigTabs draft={draft()} runtime={runtime()} patch={(a) => draft.set(a)} nameTaken={nameTaken()} isNew={isNew} />
+          <Problems problems={problems()} />
+        </View>
+      </Scroll>
+    </View>
   );
 }
 

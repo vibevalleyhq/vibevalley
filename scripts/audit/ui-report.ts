@@ -75,7 +75,7 @@ const defaultOutDir = "/tmp/vv-ui-report";
 const scenarioDensities = ["empty", "minimal", "typical", "dense", "extreme", "edge"] as const;
 const dumpSlugs = ["empty", "minimal", "typical", "dense", "extreme", "edge", "en"] as const;
 const galleryScenarioFilters = ["all", "empty", "typical", "dense", "extreme", "edge", "en"] as const;
-const galleryViewFilters = ["all", "issues", "chat", "media", "workspace", "pixel", "dark", "narrow"] as const;
+const galleryViewFilters = ["all", "issues", "runs", "chat", "media", "workspace", "pixel", "dark", "narrow"] as const;
 
 function parseOutDir(argv: string[]): string {
   for (let i = 0; i < argv.length; i++) {
@@ -308,6 +308,7 @@ function classifyShot(name: string): { scenarios: string[]; views: string[] } {
   }
   const views: string[] = [];
   if (parts.includes("issues") || parts.includes("issue")) views.push("issues");
+  if (parts.includes("runs")) views.push("runs");
   if (parts.includes("chat")) views.push("chat");
   if (parts.includes("library") || parts.includes("artifacts")) views.push("media");
   if (
@@ -383,6 +384,12 @@ const frontendFsmRows = [
     states: "LibraryScope (all | media | artifact) × LibrarySelection (none | files | artifact | lightbox)",
     testSuite: "vv/app/libraryView.test.ts",
     summary: "收口素材库互斥筛选域、文件/Artifact 选区、Shift 范围多选与灯箱切换，移除清理 effect",
+  },
+  {
+    module: "features/session/runsView.ts",
+    states: "RunsScope (all | active | orchestrator | worker) × RunEntry (orchestrator | worker)",
+    testSuite: "vv/app/runsView.test.ts",
+    summary: "统一 /runs 运行与轨迹视图筛选、排序、状态映射及 URL 参数编解码",
   },
 ];
 
@@ -613,7 +620,7 @@ function renderHtml(outDir: string): string {
     <h1>VibeValley 虚拟时钟 UI &amp; 状态机收口验收报告</h1>
     <div class="meta">生成时间：${esc(uiReport?.generatedAt ?? new Date().toISOString())} · 输出目录：<code>${esc(outDir)}</code></div>
     <section class="kpis">
-      <div class="kpi"><div class="label">无头 UI 套件 (含 3 FSM 单测)</div><div class="val">${totalSuites} 套件 (${totalPassed}/${totalPassed + totalFailed})</div></div>
+      <div class="kpi"><div class="label">无头 UI 套件 (含 ${frontendFsmRows.length} FSM 单测)</div><div class="val">${totalSuites} 套件 (${totalPassed}/${totalPassed + totalFailed})</div></div>
       <div class="kpi"><div class="label">并发总耗时 (c=${uiReport?.concurrency ?? 4})</div><div class="val">${wallSecs}s</div></div>
       <div class="kpi"><div class="label">Rust 场景密度 &amp; 枚举覆盖</div><div class="val">${stateSummaries.length} 密度 · ${enumsFullyCovered}/${enumCoverage.length} 枚举</div></div>
       <div class="kpi"><div class="label">GPUI Metal 截图 / Dump 报错</div><div class="val">${shots.length} 张 / ${dumpErrors} 错</div></div>

@@ -245,7 +245,7 @@ export type {
   OrchestratorEval,
   OrchestratorEvalRequest,
 } from "./orchestrator/shapes";
-export type { Achievement, AgentTally, ChooseTitleRequest, Crop } from "./game/shapes";
+export type { Achievement, ChooseTitleRequest, Crop } from "./game/shapes";
 export { type Attachment, type AttachmentUpload } from "./attachment/shapes";
 export {
   type ConnectorID,

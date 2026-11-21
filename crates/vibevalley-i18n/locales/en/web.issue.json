@@ -146,6 +146,7 @@
     "unread": "Cannot be read.",
     "full": "What to do (in full)",
     "steps": "The helper's every step",
+    "openTrajectory": "Full trajectory",
     "runs": "Every round of work",
     "time": "Time",
     "opened": "Opened",

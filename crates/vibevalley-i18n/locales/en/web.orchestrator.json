@@ -28,7 +28,6 @@
   "orchestrator": {
     "tab": {
       "memory": "Memory",
-      "trajectory": "Trajectory",
       "voice": "Voice"
     },
     "all": "← All profiles",
@@ -36,6 +35,7 @@
     "intro": "The assistant is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
     "look": "It looks like {name}.",
     "profile": "Edit its profile",
+    "runsLink": "View runs",
     "tabs": "The assistant's",
     "heard": "Heard",
     "quiet": "The assistant has not spoken yet.",

@@ -54,7 +54,10 @@ const shots: Shot[] = [
       await app.press("label:apps/web/src/base/session.ts");
     },
   })),
-  { name: "orchestrator-trajectory-light", route: "/orchestrator/trajectory", scheme: "light", width: 1200, ready: "id:orchestrator-page" },
+  { name: "orchestrator-memory-light", route: "/orchestrator/memory", scheme: "light", width: 1200, ready: "id:orchestrator-page" },
+  { name: "orchestrator-trajectory-redirect-light", route: "/orchestrator/trajectory", scheme: "light", width: 1200, ready: "id:runs-page" },
+  { name: "runs-light", route: "/runs", scheme: "light", width: 1200, ready: "id:runs-page" },
+  { name: "runs-dark", route: "/runs", scheme: "dark", width: 1200, ready: "id:runs-page" },
   { name: "session-worklog-light", session: "worklog", scheme: "light", width: 900, ready: "id:session-story" },
   { name: "session-worklog-dark", session: "worklog", scheme: "dark", width: 900, ready: "id:session-story" },
   { name: "session-trajectory-light", session: "trajectory", scheme: "light", width: 1000, ready: "id:trajectory" },

@@ -89,12 +89,40 @@
     "marked": "Marked as a wrong round and kept as an eval",
     "want": "What this round should have done",
     "wantHint": "What it should do: such as \"ask me which repo first, do not send work right away\"",
-    "neverSent": "Nothing sent out yet.",
-    "sent": "Helpers sent out",
-    "here": "Here",
     "hired": "took the ticket {ago}",
-    "hiredAndLeft": "took the ticket {hired} · left {left}",
-    "pick": "Pick a helper to see its trajectory."
+    "hiredAndLeft": "took the ticket {hired} · left {left}"
+  },
+  "hub": {
+    "search": "Search runs and trajectories",
+    "searchHint": "Search name, ticket, repo…",
+    "scopeLabel": "Filter scope",
+    "scope": {
+      "all": "All",
+      "active": "Active",
+      "orchestrator": "Assistants",
+      "worker": "Helpers"
+    },
+    "list": "Runs",
+    "back": "← All runs",
+    "filterAgent": "Profile: {name}",
+    "filterIssue": "Ticket: {label}",
+    "clearFilter": "Clear filters",
+    "clear": "Clear",
+    "empty": "No runs yet.",
+    "emptyFiltered": "No runs match the current filters.",
+    "pick": "Pick a run to inspect its trajectory.",
+    "openIssue": "Open ticket",
+    "openProfile": "Open profile",
+    "orchestratorRole": "Assistant",
+    "status": {
+      "working": "Working",
+      "listening": "Listening",
+      "resting": "Idle",
+      "done": "Done",
+      "failed": "Failed",
+      "interrupted": "Interrupted",
+      "closed": "Closed"
+    }
   },
   "subagents": {
     "heading": "Subtasks",

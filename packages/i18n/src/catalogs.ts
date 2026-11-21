@@ -1395,10 +1395,7 @@ export const catalogs = {
       saving: "保存中…",
       create: "捏好了，保存",
       save: "保存",
-      backToProfile: "← 回到档案",
-      trajectoriesHint:
-        "它派出去的每个帮工，从接活起的每一步：收到的话、用的每个工具（点一行看输入和输出）、说的话。收工以后这些记录留 30 天，帮工本身一直列着。",
-      trajectories: "轨迹",
+      runsLink: "查看轨迹",
       remove: "删除",
       removeWhich: "删掉 {name}？",
       fine: "配置没问题，可以派活。",
@@ -1509,7 +1506,7 @@ export const catalogs = {
         newName: "新的助手",
         intro:
           "助手常驻、带队、自己不干活：听你说要做什么，派帮工去做，盯着进度，转告结果。它跑在 VibeValley 自己的 agent 上，有自己的私聊、记性和轨迹；把频道交给它照看，在那个频道里说话就是它回答。",
-        page: "它的记性和轨迹 →",
+        page: "它的记性与声音 →",
         nameTip: "频道里叫这个名字；别人用 @它的档案 id 叫它。",
         model: "模型",
         modelTip: "DeepSeek 的模型，留空用默认的。",
@@ -1520,20 +1517,23 @@ export const catalogs = {
         look: "长相",
       },
       list: {
+        filterLabel: "按类型筛选",
+        all: "全部",
         orchestrators: "助手",
         helpers: "帮工",
-        make: "捏一个新帮工",
-        makeOrchestrator: "添一个助手",
+        search: "搜索档案",
+        searchHint: "搜名字、职责、农机、标签…",
+        make: "新帮工",
+        makeOrchestrator: "添助手",
         orchestratorLine: "不当帮工：派活、盯进度、转告结果。",
-        ledger: "旧账",
-        voice: "声音",
+        orchestratorSummary: "常驻带队",
+        defaultBadge: "默认",
+        disabledBadge: "已停用",
         disable: "停用",
         enable: "启用",
         toggle: "{act} {name}",
-        here: "在场 {n}",
-        tallyHint: "从这份档案派出去的帮工，干的活收进主分支的次数",
-        hired: "雇过",
-        merged: "合进",
+        emptySearch: "没有符合条件的档案。",
+        clearFilter: "清掉筛选",
       },
       runtimeDefault: "农机默认",
       runtimeDefaultModel: "农机默认（{model}）",
@@ -1842,6 +1842,7 @@ export const catalogs = {
         workspace: { label: "工作目录", hint: "工作目录与终端" },
         chat: { label: "聊天", hint: "频道和串" },
         issues: { label: "工单", hint: "每张工单从写下到关上" },
+        runs: { label: "运行与轨迹", hint: "进行中的帮工、助手审批与历史轨迹" },
         agents: { label: "档案", hint: "档案：助手和帮工" },
         runtimes: { label: "农机", hint: "机器上的编码 agent" },
         repos: { label: "仓库", hint: "每个仓库一座岛" },
@@ -1855,6 +1856,7 @@ export const catalogs = {
       update: "更新",
       working: "开工中 · {n} 个在干活",
       off: "没开工",
+      runsHint: "查看进行中的帮工、助手审批与轨迹",
       chips: { drop: "去掉 {v}", valueOf: "{k} 的值", removeKey: "删除 {k}", remove: "删除", name: "变量名", value: "变量的值", valueHint: "值", add: "添加" },
       toasts: "提示",
       runtime: "运行工具：{name}",
@@ -2250,6 +2252,7 @@ export const catalogs = {
       },
       lacks: "回不了话：{why}",
       lacksFix: "去设置",
+      orchestratorRuns: "查看助手轨迹与待审批调用",
     },
     "web.connector": {
       connectors: {
@@ -2675,6 +2678,7 @@ export const catalogs = {
         unread: "读不到。",
         full: "要做的（完整说明）",
         steps: "帮工的每一步",
+        openTrajectory: "完整轨迹",
         runs: "每一轮",
         time: "时间",
         opened: "开单",
@@ -3084,12 +3088,13 @@ export const catalogs = {
         robot: { name: "机器人管家", blurb: "圆滚滚的农场机器人，脸上的屏会笑。" },
       },
       orchestrator: {
-        tab: { memory: "记性", trajectory: "轨迹", voice: "声音" },
+        tab: { memory: "记性", voice: "声音" },
         all: "← 全部档案",
         title: "助手",
         intro: "助手不当帮工：听你说要做什么，派帮工去做，盯着进度，转告结果。",
         look: "长相是{name}。",
         profile: "改它的档案",
+        runsLink: "查看轨迹",
         tabs: "助手的",
         heard: "收到",
         quiet: "助手还没开过口。",
@@ -3488,12 +3493,27 @@ export const catalogs = {
         marked: "标成了做错的一轮，存成了一条评测",
         want: "这一轮应该怎样",
         wantHint: "它应该怎样：比如「先问我是哪个仓库，别直接派活」",
-        neverSent: "还没派出去过。",
-        sent: "派出去的帮工",
-        here: "在场",
         hired: "{ago}接活",
         hiredAndLeft: "{hired}接活 · {left}走的",
-        pick: "选一个帮工，看它的轨迹。",
+      },
+      hub: {
+        search: "搜索运行与轨迹",
+        searchHint: "搜名字、工单、仓库…",
+        scopeLabel: "按范围看",
+        scope: { all: "全部", active: "进行中", orchestrator: "助手", worker: "帮工" },
+        list: "运行列表",
+        back: "← 全部运行",
+        filterAgent: "档案：{name}",
+        filterIssue: "工单：{label}",
+        clearFilter: "清掉筛选",
+        clear: "清除",
+        empty: "还没有运行记录。",
+        emptyFiltered: "没有符合当前筛选的运行。",
+        pick: "选一条运行，查看完整轨迹。",
+        openIssue: "看工单",
+        openProfile: "看档案",
+        orchestratorRole: "助手",
+        status: { working: "进行中", listening: "在听", resting: "待命", done: "已完成", failed: "失败", interrupted: "已中断", closed: "已结束" },
       },
       subagents: {
         heading: "子任务",
@@ -5389,10 +5409,7 @@ export const catalogs = {
       saving: "Saving…",
       create: "Done, save it",
       save: "Save",
-      backToProfile: "← Back to the profile",
-      trajectoriesHint:
-        "Every helper sent from it, every step since it took the ticket: what it heard, every tool it used (click a row for the input and output), what it said. Steps are kept 30 days after it leaves; the helper itself stays listed.",
-      trajectories: "Trajectories",
+      runsLink: "View runs",
       remove: "Delete",
       removeWhich: "Delete {name}?",
       fine: "The configuration is fine: it can be sent work.",
@@ -5508,7 +5525,7 @@ export const catalogs = {
         newName: "New assistant",
         intro:
           "An assistant stays, leads and does no work itself: it hears what you want done, sends helpers to do it, watches progress and passes on results. It runs on VibeValley's own agent, with its own direct messages, memory and trajectory; hand it a channel to look after, and what you say there it answers.",
-        page: "Its memory and trajectory →",
+        page: "Its memory and voice →",
         nameTip: "Its name in the chat; others call it with @ and its profile id.",
         model: "Model",
         modelTip: "A DeepSeek model; empty is the default one.",
@@ -5519,20 +5536,23 @@ export const catalogs = {
         look: "Look",
       },
       list: {
+        filterLabel: "Filter by role",
+        all: "All",
         orchestrators: "Assistants",
         helpers: "Helpers",
-        make: "Make a new helper",
-        makeOrchestrator: "Add an assistant",
+        search: "Search profiles",
+        searchHint: "Search name, duty, machine, tags…",
+        make: "New helper",
+        makeOrchestrator: "Add assistant",
         orchestratorLine: "Not a helper: sends work, watches progress, passes on results.",
-        ledger: "Ledger",
-        voice: "Voice",
+        orchestratorSummary: "Standing assistant",
+        defaultBadge: "Default",
+        disabledBadge: "Disabled",
         disable: "Disable",
         enable: "Enable",
         toggle: "{act} {name}",
-        here: "{n} here",
-        tallyHint: "How many times helpers sent from this profile got work merged into main",
-        hired: "Hired",
-        merged: "Merged",
+        emptySearch: "No profiles match the current filters.",
+        clearFilter: "Clear filters",
       },
       runtimeDefault: "The runtime's default",
       runtimeDefaultModel: "The runtime's default ({model})",
@@ -5842,6 +5862,7 @@ export const catalogs = {
         workspace: { label: "Workspace", hint: "Workspaces and terminals" },
         chat: { label: "Chat", hint: "Channels and threads" },
         issues: { label: "Tickets", hint: "Every ticket from written to closed" },
+        runs: { label: "Runs & trajectories", hint: "Active helpers, assistant approvals, and run trajectories" },
         agents: { label: "Profiles", hint: "Profiles: assistants and helpers" },
         runtimes: { label: "Machines", hint: "The coding agents on this computer" },
         repos: { label: "Repos", hint: "An island for each repo" },
@@ -5855,6 +5876,7 @@ export const catalogs = {
       update: "Update",
       working: "Open · {n} working",
       off: "Not open",
+      runsHint: "View active runs, assistant approvals, and trajectories",
       chips: {
         drop: "Remove {v}",
         valueOf: "{k}'s value",
@@ -6277,6 +6299,7 @@ export const catalogs = {
       },
       lacks: "cannot answer: {why}",
       lacksFix: "Settings",
+      orchestratorRuns: "View assistant trajectory and pending approvals",
     },
     "web.connector": {
       connectors: {
@@ -6739,6 +6762,7 @@ export const catalogs = {
         unread: "Cannot be read.",
         full: "What to do (in full)",
         steps: "The helper's every step",
+        openTrajectory: "Full trajectory",
         runs: "Every round of work",
         time: "Time",
         opened: "Opened",
@@ -7169,12 +7193,13 @@ export const catalogs = {
         robot: { name: "Robot butler", blurb: "A round farm robot whose face screen smiles." },
       },
       orchestrator: {
-        tab: { memory: "Memory", trajectory: "Trajectory", voice: "Voice" },
+        tab: { memory: "Memory", voice: "Voice" },
         all: "← All profiles",
         title: "Assistant",
         intro: "The assistant is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
         look: "It looks like {name}.",
         profile: "Edit its profile",
+        runsLink: "View runs",
         tabs: "The assistant's",
         heard: "Heard",
         quiet: "The assistant has not spoken yet.",
@@ -7622,12 +7647,27 @@ export const catalogs = {
         marked: "Marked as a wrong round and kept as an eval",
         want: "What this round should have done",
         wantHint: 'What it should do: such as "ask me which repo first, do not send work right away"',
-        neverSent: "Nothing sent out yet.",
-        sent: "Helpers sent out",
-        here: "Here",
         hired: "took the ticket {ago}",
         hiredAndLeft: "took the ticket {hired} · left {left}",
-        pick: "Pick a helper to see its trajectory.",
+      },
+      hub: {
+        search: "Search runs and trajectories",
+        searchHint: "Search name, ticket, repo…",
+        scopeLabel: "Filter scope",
+        scope: { all: "All", active: "Active", orchestrator: "Assistants", worker: "Helpers" },
+        list: "Runs",
+        back: "← All runs",
+        filterAgent: "Profile: {name}",
+        filterIssue: "Ticket: {label}",
+        clearFilter: "Clear filters",
+        clear: "Clear",
+        empty: "No runs yet.",
+        emptyFiltered: "No runs match the current filters.",
+        pick: "Pick a run to inspect its trajectory.",
+        openIssue: "Open ticket",
+        openProfile: "Open profile",
+        orchestratorRole: "Assistant",
+        status: { working: "Working", listening: "Listening", resting: "Idle", done: "Done", failed: "Failed", interrupted: "Interrupted", closed: "Closed" },
       },
       subagents: {
         heading: "Subtasks",
@@ -9318,7 +9358,6 @@ export interface Messages {
   "web.agent.all": undefined;
   "web.agent.available": undefined;
   "web.agent.backToAll": undefined;
-  "web.agent.backToProfile": undefined;
   "web.agent.can": { readonly runtime: string | number };
   "web.agent.cannot": undefined;
   "web.agent.checking": undefined;
@@ -9343,20 +9382,23 @@ export interface Messages {
   "web.agent.isNew": undefined;
   "web.agent.library": undefined;
   "web.agent.libraryTip": undefined;
+  "web.agent.list.all": undefined;
+  "web.agent.list.clearFilter": undefined;
+  "web.agent.list.defaultBadge": undefined;
   "web.agent.list.disable": undefined;
+  "web.agent.list.disabledBadge": undefined;
+  "web.agent.list.emptySearch": undefined;
   "web.agent.list.enable": undefined;
+  "web.agent.list.filterLabel": undefined;
   "web.agent.list.helpers": undefined;
-  "web.agent.list.here": { readonly n: string | number };
-  "web.agent.list.hired": undefined;
-  "web.agent.list.ledger": undefined;
   "web.agent.list.make": undefined;
   "web.agent.list.makeOrchestrator": undefined;
-  "web.agent.list.merged": undefined;
   "web.agent.list.orchestratorLine": undefined;
+  "web.agent.list.orchestratorSummary": undefined;
   "web.agent.list.orchestrators": undefined;
-  "web.agent.list.tallyHint": undefined;
+  "web.agent.list.search": undefined;
+  "web.agent.list.searchHint": undefined;
   "web.agent.list.toggle": { readonly act: string | number; readonly name: string | number };
-  "web.agent.list.voice": undefined;
   "web.agent.loading": undefined;
   "web.agent.looksAs": undefined;
   "web.agent.looksHint": undefined;
@@ -9419,6 +9461,7 @@ export interface Messages {
   "web.agent.role.orchestrator": undefined;
   "web.agent.role.worker": undefined;
   "web.agent.roleHint": undefined;
+  "web.agent.runsLink": undefined;
   "web.agent.runtimeDefault": undefined;
   "web.agent.runtimeDefaultModel": { readonly model: string | number };
   "web.agent.save": undefined;
@@ -9462,8 +9505,6 @@ export interface Messages {
   "web.agent.templates.update": { readonly version: string | number };
   "web.agent.templates.updateHint": undefined;
   "web.agent.templates.updated": undefined;
-  "web.agent.trajectories": undefined;
-  "web.agent.trajectoriesHint": undefined;
   "web.agent.unnamed": undefined;
   "web.agent.unnamedAgent": undefined;
   "web.agent.unreported": undefined;
@@ -9825,6 +9866,8 @@ export interface Messages {
   "web.base.place.issues.label": undefined;
   "web.base.place.repos.hint": undefined;
   "web.base.place.repos.label": undefined;
+  "web.base.place.runs.hint": undefined;
+  "web.base.place.runs.label": undefined;
   "web.base.place.runtimes.hint": undefined;
   "web.base.place.runtimes.label": undefined;
   "web.base.place.settings.hint": undefined;
@@ -9846,6 +9889,7 @@ export interface Messages {
   "web.base.route.home": undefined;
   "web.base.route.invalid": undefined;
   "web.base.route.missing": undefined;
+  "web.base.runsHint": undefined;
   "web.base.runtime": { readonly name: string | number };
   "web.base.secret.hide": undefined;
   "web.base.secret.peek": undefined;
@@ -10179,6 +10223,7 @@ export interface Messages {
   "web.channel.noHelpers": undefined;
   "web.channel.nobodyOnIt": undefined;
   "web.channel.orchestrator": undefined;
+  "web.channel.orchestratorRuns": undefined;
   "web.channel.pins.failed": { readonly why: string | number };
   "web.channel.pins.none": undefined;
   "web.channel.pins.open": undefined;
@@ -10635,6 +10680,7 @@ export interface Messages {
   "web.issue.detail.noRuns": undefined;
   "web.issue.detail.nothingToSee": undefined;
   "web.issue.detail.now": undefined;
+  "web.issue.detail.openTrajectory": undefined;
   "web.issue.detail.opened": undefined;
   "web.issue.detail.orchestratorStuck": undefined;
   "web.issue.detail.priority": undefined;
@@ -11086,8 +11132,8 @@ export interface Messages {
   "web.orchestrator.orchestrator.look": { readonly name: string | number };
   "web.orchestrator.orchestrator.profile": undefined;
   "web.orchestrator.orchestrator.quiet": undefined;
+  "web.orchestrator.orchestrator.runsLink": undefined;
   "web.orchestrator.orchestrator.tab.memory": undefined;
-  "web.orchestrator.orchestrator.tab.trajectory": undefined;
   "web.orchestrator.orchestrator.tab.voice": undefined;
   "web.orchestrator.orchestrator.tabs": undefined;
   "web.orchestrator.orchestrator.title": undefined;
@@ -11439,6 +11485,32 @@ export interface Messages {
   "web.runtime.unsupportedWhy": { readonly why: string | number };
   "web.runtime.usedBy": { readonly n: string | number };
   "web.runtime.windowLeft": { readonly label: string | number; readonly pct: string | number };
+  "web.session.hub.back": undefined;
+  "web.session.hub.clear": undefined;
+  "web.session.hub.clearFilter": undefined;
+  "web.session.hub.empty": undefined;
+  "web.session.hub.emptyFiltered": undefined;
+  "web.session.hub.filterAgent": { readonly name: string | number };
+  "web.session.hub.filterIssue": { readonly label: string | number };
+  "web.session.hub.list": undefined;
+  "web.session.hub.openIssue": undefined;
+  "web.session.hub.openProfile": undefined;
+  "web.session.hub.orchestratorRole": undefined;
+  "web.session.hub.pick": undefined;
+  "web.session.hub.scope.active": undefined;
+  "web.session.hub.scope.all": undefined;
+  "web.session.hub.scope.orchestrator": undefined;
+  "web.session.hub.scope.worker": undefined;
+  "web.session.hub.scopeLabel": undefined;
+  "web.session.hub.search": undefined;
+  "web.session.hub.searchHint": undefined;
+  "web.session.hub.status.closed": undefined;
+  "web.session.hub.status.done": undefined;
+  "web.session.hub.status.failed": undefined;
+  "web.session.hub.status.interrupted": undefined;
+  "web.session.hub.status.listening": undefined;
+  "web.session.hub.status.resting": undefined;
+  "web.session.hub.status.working": undefined;
   "web.session.log.all": undefined;
   "web.session.log.failed": undefined;
   "web.session.log.farm": undefined;
@@ -11515,7 +11587,6 @@ export interface Messages {
   "web.session.trajectory.cacheHit": { readonly pct: string | number };
   "web.session.trajectory.earlier": undefined;
   "web.session.trajectory.failed": undefined;
-  "web.session.trajectory.here": undefined;
   "web.session.trajectory.hired": { readonly ago: string | number };
   "web.session.trajectory.hiredAndLeft": { readonly hired: string | number; readonly left: string | number };
   "web.session.trajectory.input": undefined;
@@ -11524,20 +11595,17 @@ export interface Messages {
   "web.session.trajectory.lane.tool": undefined;
   "web.session.trajectory.marked": undefined;
   "web.session.trajectory.modelTime": { readonly took: string | number };
-  "web.session.trajectory.neverSent": undefined;
   "web.session.trajectory.noMatch": undefined;
   "web.session.trajectory.noOutput": undefined;
   "web.session.trajectory.ok": undefined;
   "web.session.trajectory.output": undefined;
   "web.session.trajectory.pending": undefined;
-  "web.session.trajectory.pick": undefined;
   "web.session.trajectory.quiet": undefined;
   "web.session.trajectory.run": { readonly n: string | number };
   "web.session.trajectory.running": undefined;
   "web.session.trajectory.runs": { readonly n: number };
   "web.session.trajectory.search": undefined;
   "web.session.trajectory.searchHint": undefined;
-  "web.session.trajectory.sent": undefined;
   "web.session.trajectory.steps": { readonly n: number };
   "web.session.trajectory.tokens": { readonly input: string | number; readonly output: string | number };
   "web.session.trajectory.tool": { readonly name: string | number };

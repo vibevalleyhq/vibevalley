@@ -22,7 +22,7 @@ import { usePixelDir } from "../ui/pixel/atlas";
 import { ShortcutSheet } from "../ui/ShortcutSheet";
 import { Bubble, Hint } from "../ui/Tip";
 import { mix } from "../ui/tone";
-import { type Place, places, settingsPlace } from "./places";
+import { type Place, places, runsPlace, settingsPlace } from "./places";
 
 const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;
 
@@ -209,12 +209,13 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
   );
 }
 
-/** The head over a page: its place, and the farm's state, which goes back to the farm. */
+/** The head over a page: its place, and the live runs status pill, which opens /runs. */
 function Desk(props: { place?: Place | undefined }) {
   const core = useCore();
   const live = () => core()?.call === "live";
   const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
   const status = () => (live() ? t("web.base.working", { n: working() }) : t("web.base.off"));
+  const onRuns = () => props.place?.id === "runs";
   return (
     <View testID="desk" class="h-16.5 shrink-0 flex-row items-center justify-between gap-4 border-b border-line px-5">
       <If when={props.place} else={<View class="flex-1" />}>
@@ -232,11 +233,13 @@ function Desk(props: { place?: Place | undefined }) {
         )}
       </If>
       <A
-        href="/farm"
+        href="/runs"
         accessibilityLabel={status()}
         testID="desk-status"
-        tooltip={<Bubble text={t("web.base.farm")} placement="bottom" />}
-        class="h-7 shrink-0 flex-row items-center gap-2 rounded-full border border-line bg-side px-3 transition duration-120 ease-out hover:bg-selected active:translate-y-px"
+        tooltip={<Bubble text={t("web.base.runsHint")} placement="bottom" />}
+        class={`h-7 shrink-0 flex-row items-center gap-2 rounded-full border px-3 transition duration-120 ease-out active:translate-y-px ${
+          onRuns() ? "border-focus bg-selected" : "border-line bg-side hover:bg-selected"
+        }`}
       >
         <View class="size-3.5 shrink-0 items-center justify-center rounded-full" style={live() ? { backgroundColor: mix("leaf", 0.2) } : undefined}>
           <View class={`size-2 rounded-full ${live() ? "bg-leaf" : "bg-idle"}`} />
@@ -250,7 +253,11 @@ function Desk(props: { place?: Place | undefined }) {
 export function Shell(props: { children: JSX.Element }) {
   const matches = useMatches();
   const meta = () => matches().at(-1)?.meta;
-  const here = () => places.find((place) => place.id === meta()?.place);
+  const here = () => {
+    const id = meta()?.place;
+    if (id === runsPlace.id) return runsPlace;
+    return places.find((place) => place.id === id);
+  };
   const inFarm = () => meta()?.skin === "farm";
   // Ctrl+J (⌘J on a Mac) opens the channel quick switcher without colliding with global ⌘K command palette.
   keymap.bind("mod+j", () => switcher.toggle(), { when: "always" });

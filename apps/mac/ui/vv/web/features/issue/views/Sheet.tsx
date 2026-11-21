@@ -138,6 +138,7 @@ export function Fold(props: {
   open?: boolean;
   defaultOpen?: boolean;
   leading?: JSX.Element;
+  aside?: JSX.Element;
   testID?: string;
   onToggle?: (open: boolean) => void;
   children: JSX.Element;
@@ -151,21 +152,24 @@ export function Fold(props: {
   };
   return (
     <View class="border-b border-line">
-      <View
-        role="button"
-        testID={props.testID}
-        accessibilityState={{ expanded: open() }}
-        onPress={toggle}
-        class="-mx-2 flex-row items-center gap-2 rounded-md px-2 py-2.5 transition duration-120 ease-out hover:bg-hover"
-      >
-        <View class="size-3.5 shrink-0 items-center justify-center" style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}>
-          <Icon name="expand" size={10} tone="muted" />
+      <View class="flex-row items-center gap-2">
+        <View
+          role="button"
+          testID={props.testID}
+          accessibilityState={{ expanded: open() }}
+          onPress={toggle}
+          class="-mx-2 min-w-0 flex-1 flex-row items-center gap-2 rounded-md px-2 py-2.5 transition duration-120 ease-out hover:bg-hover"
+        >
+          <View class="size-3.5 shrink-0 items-center justify-center" style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}>
+            <Icon name="expand" size={10} tone="muted" />
+          </View>
+          {props.leading}
+          <Text class="shrink-0 text-sm font-semibold text-ink">{props.label}</Text>
+          <If when={props.summary}>
+            <Text class="min-w-0 truncate text-xs text-muted tabular-nums">{props.summary}</Text>
+          </If>
         </View>
-        {props.leading}
-        <Text class="shrink-0 text-sm font-semibold text-ink">{props.label}</Text>
-        <If when={props.summary}>
-          <Text class="min-w-0 truncate text-xs text-muted tabular-nums">{props.summary}</Text>
-        </If>
+        {props.aside}
       </View>
       <If when={open()}>
         <View class="pb-3 pl-5.5">{props.children}</View>

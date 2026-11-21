@@ -283,5 +283,6 @@
     }
   },
   "lacks": "回不了话：{why}",
-  "lacksFix": "去设置"
+  "lacksFix": "去设置",
+  "orchestratorRuns": "查看助手轨迹与待审批调用"
 }

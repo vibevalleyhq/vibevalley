@@ -149,9 +149,11 @@ test("write-path guards: draft retry idempotency, review tree check, answer, cha
   );
   expect(app.texts()).toContain("实时推送到达");
 
-  // 5. Orchestrator approval polling over virtual clock and grant RPC payload.
+  // 5. Legacy /orchestrator/trajectory redirects to /runs?session=orchestrator with approval polling and grant RPC payload.
   await app.host.send("route", "/orchestrator/trajectory");
   await fake.pump(app);
+  await fake.pump(app);
+  expect(app.count("id:runs-page")).toBe(1);
   fake.clearCalls();
   pendingApprovals = [
     {

@@ -1,24 +1,18 @@
 // Ported from VibeValley apps/web/src/features/session/Trajectory.tsx: a
-// session's trajectory (waterfall of runs, searchable rows, summary), the
-// "marked wrong" cases and the list of an agent's sessions. The waterfall's
-// width comes from onLayout instead of a ResizeObserver; "mark wrong"
-// shows while the pointer is over the row (onMouseEnter/Leave for CSS's
-// group-hover); a picked waterfall bar scrolls its row into view with
-// ViewRef.reveal.
+// session's trajectory (waterfall of runs, searchable rows, summary) and the
+// "marked wrong" cases. The waterfall's width comes from onLayout instead of
+// a ResizeObserver; "mark wrong" shows while the pointer is over the row
+// (onMouseEnter/Leave for CSS's group-hover); a picked waterfall bar scrolls
+// its row into view with ViewRef.reveal.
 import { colorScheme, Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
-import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, Session, SessionEvent } from "@vibevalley/protocol";
 import { oneLine } from "@vibevalley/protocol/rules";
-import * as S from "@vibevalley/protocol/schema";
 
 import { createMemo } from "../../../solid";
-import { Keyed, useNow } from "../../base/dom";
+import { useNow } from "../../base/dom";
 import { ago } from "../../base/format";
-import { api, reasonOf } from "../../infra/api";
-import { useCore } from "../../infra/frame";
-import { defineQuery, ready, retryRead, useQuery } from "../../infra/query";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { TextInput } from "../../ui/Field";
@@ -137,6 +131,7 @@ export function TrajectoryLog(props: {
   id: string;
   asked?: string;
   empty?: string;
+  working?: boolean;
   onMarkWrong?: MarkWrong;
   title?: string;
   about?: string;
@@ -165,7 +160,7 @@ export function TrajectoryLog(props: {
           </View>
         }
       >
-        <Trajectory steps={steps()} now={now()} asked={props.asked} onMarkWrong={props.onMarkWrong} head={head()} />
+        <Trajectory steps={steps()} now={now()} asked={props.asked} working={props.working === true} onMarkWrong={props.onMarkWrong} head={head()} />
       </If>
     </View>
   );
@@ -708,106 +703,5 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
         </View>
       </If>
     </View>
-  );
-}
-
-/** The helpers an agent sent, a list to pick from beside the picked one's trajectory. */
-const sessionsQuery = defineQuery({
-  schema: z.array(S.Session),
-  key: (agent: string) => ["sessions", agent],
-  fetch: (agent, context) => api.session.list({ agent }, context),
-  ...retryRead,
-});
-export function TrajectoryList(props: { agent: string }) {
-  const core = useCore();
-  const heads = useQuery(() => sessionsQuery(props.agent));
-  const picked = signal<string>();
-  const now = useNow();
-  const list = () => ready(heads, undefined);
-  const open = () => {
-    const all = list();
-    return all?.find((h) => h.id === (picked() ?? all[0]?.id));
-  };
-  const box = signal(0);
-  const wide = () => box() === 0 || box() >= 768;
-  return (
-    <If when={list()} else={<Quiet>{heads.error() ? reasonOf(heads.error()) : t("web.base.reading")}</Quiet>}>
-      {(all) => (
-        <If when={all().length > 0} else={<Quiet>{t("web.session.trajectory.neverSent")}</Quiet>}>
-          <View onLayout={(e) => box.set(e.bounds.size.width)} class={`min-h-0 flex-1 gap-3 ${wide() ? "flex-row" : ""}`}>
-            <Scroll
-              accessibilityLabel={t("web.session.trajectory.sent")}
-              class={`shrink-0 ${wide() ? "w-64" : ""}`}
-              contentClass="gap-1"
-              style={wide() ? undefined : { maxHeight: 132 }}
-            >
-              <Each of={all()} key={(h) => h.id}>
-                {(h) => {
-                  const ended = () => {
-                    const phase = h().phase;
-                    return phase._tag === "closed" ? phase.at : undefined;
-                  };
-                  const active = () => ended() === undefined;
-                  const isPicked = () => h().id === open()?.id;
-                  const sentText = () => {
-                    const left = ended();
-                    return left === undefined
-                      ? t("web.session.trajectory.hired", { ago: ago(h().hiredAt, now()) })
-                      : t("web.session.trajectory.hiredAndLeft", { hired: ago(h().hiredAt, now()), left: ago(left, now()) });
-                  };
-                  return (
-                    <View
-                      role="button"
-                      testID="sent-session"
-                      accessibilityState={{ selected: isPicked() }}
-                      onPress={() => picked.set(h().id)}
-                      class={`w-full gap-0.5 rounded-md border px-2.5 py-2 transition duration-120 ease-out ${
-                        isPicked() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
-                      }`}
-                    >
-                      <View class="flex-row items-center gap-1.5">
-                        <Dot tone={active() ? "leaf" : "idle"} size={6} ring={false} />
-                        <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{h().name}</Text>
-                        <If when={active()}>
-                          <View class="shrink-0 rounded-sm bg-ok-soft px-1.5 py-px">
-                            <Text class="text-2xs font-medium text-ok-ink">{t("web.session.trajectory.here")}</Text>
-                          </View>
-                        </If>
-                      </View>
-                      <View class="flex-row items-center gap-1.5 pl-3.5">
-                        <If when={h().repo}>
-                          <Text class="shrink-0 font-mono text-2xs text-muted">{h().repo ?? ""}</Text>
-                          <Text class="text-2xs text-faint">·</Text>
-                        </If>
-                        <Text class="min-w-0 flex-1 truncate text-2xs text-faint tabular-nums">{sentText()}</Text>
-                      </View>
-                      <If when={h().brief}>
-                        <Text class="truncate pl-3.5 text-xs text-muted">{oneLine(h().brief).trim()}</Text>
-                      </If>
-                    </View>
-                  );
-                }}
-              </Each>
-            </Scroll>
-            <View class="min-h-0 min-w-0 flex-1">
-              <If when={open()} else={<Quiet>{t("web.session.trajectory.pick")}</Quiet>}>
-                {(o) => (
-                  <Keyed key={o().id}>
-                    {() => (
-                      <TrajectoryLog
-                        id={o().id}
-                        subagents={(core()?.sessions.find((session) => session.id === o().id) ?? o()).subagents}
-                        title={o().brief ? `${o().name} · ${oneLine(o().brief).trim()}` : o().name}
-                        about={o().brief}
-                      />
-                    )}
-                  </Keyed>
-                )}
-              </If>
-            </View>
-          </View>
-        </If>
-      )}
-    </If>
   );
 }
