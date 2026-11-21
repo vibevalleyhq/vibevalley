@@ -14,7 +14,7 @@ import { api, reasonOf } from "../../infra/api";
 import { agentsQuery, ready, useAgents, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A, useRouter, useSearch } from "../../infra/router";
 import { createAct } from "../../ui/act";
-import { Button } from "../../ui/Button";
+import { Button, ButtonLink } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { type Pose, randomLook, stagePoses } from "../../ui/domain/cast";
 import { OpenTerminal } from "../../ui/domain/OpenTerminal";
@@ -153,14 +153,9 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
           {(saved) => (
             <>
               <DeleteButton agent={saved()} />
-              <A
-                href={runsHref({ agent: saved().id })}
-                testID="agent-runs-link"
-                class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
-              >
-                <Icon name="log" size={14} tone="muted" />
-                <Text class="text-sm text-ink">{t("web.agent.runsLink")}</Text>
-              </A>
+              <ButtonLink href={runsHref({ agent: saved().id })} icon="log" testID="agent-runs-link">
+                {t("web.agent.runsLink")}
+              </ButtonLink>
               <Button
                 icon="thread"
                 testID="talk"

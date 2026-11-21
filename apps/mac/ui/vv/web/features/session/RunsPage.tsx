@@ -13,8 +13,8 @@ import { useOrchestrators } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { useCore } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useAgents, useQuery } from "../../infra/query";
-import { Link as A, useRouter, useSearch } from "../../infra/router";
-import { Button } from "../../ui/Button";
+import { useRouter, useSearch } from "../../infra/router";
+import { Button, ButtonLink } from "../../ui/Button";
 import { AgentFace, OrchestratorFace } from "../../ui/domain/Face";
 import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
@@ -519,26 +519,14 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
             <View class="shrink-0 flex-row flex-wrap items-center gap-2">
               <If when={workerIssueId()}>
                 {(issueId) => (
-                  <A
-                    href={`/issues/${encodeURIComponent(issueId())}`}
-                    testID="run-open-issue"
-                    class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
-                  >
-                    <Icon name="issues" size={14} tone="muted" />
-                    <Text class="text-xs font-medium text-ink">
-                      {workerIssueNumber() !== undefined ? `#${workerIssueNumber()} ${t("web.session.hub.openIssue")}` : t("web.session.hub.openIssue")}
-                    </Text>
-                  </A>
+                  <ButtonLink href={`/issues/${encodeURIComponent(issueId())}`} icon="issues" testID="run-open-issue">
+                    {workerIssueNumber() !== undefined ? `#${workerIssueNumber()} ${t("web.session.hub.openIssue")}` : t("web.session.hub.openIssue")}
+                  </ButtonLink>
                 )}
               </If>
-              <A
-                href={`/agents/${encodeURIComponent(profileId())}`}
-                testID="run-open-profile"
-                class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
-              >
-                <Icon name="agents" size={14} tone="muted" />
-                <Text class="text-xs font-medium text-ink">{t("web.session.hub.openProfile")}</Text>
-              </A>
+              <ButtonLink href={`/agents/${encodeURIComponent(profileId())}`} icon="agents" testID="run-open-profile">
+                {t("web.session.hub.openProfile")}
+              </ButtonLink>
             </View>
           </View>
         </View>

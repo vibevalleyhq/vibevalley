@@ -16,6 +16,7 @@ import { cursorsQuery, ready, useQuery, useSprites } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
+import { Banner } from "../../ui/layout";
 import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "../../ui/pixel/sound";
 import { Segmented } from "../../ui/Segmented";
 import { Tabs } from "../../ui/Tabs";
@@ -178,15 +179,6 @@ function ShelfSection(props: { title: string; count: string; hint?: string; chil
   );
 }
 
-function EmptyNotice(props: { text: string; dashed?: boolean }) {
-  return (
-    <View class={`flex-row items-center gap-2 rounded-lg px-3.5 py-3 ${props.dashed === true ? "border border-dashed border-line bg-side" : "bg-side"}`}>
-      <Icon name="info" size={14} tone="faint" />
-      <Text class="min-w-0 flex-1 text-xs leading-relaxed text-muted">{props.text}</Text>
-    </View>
-  );
-}
-
 function Tile(props: { p: Picture; selected: boolean; has: (n: string) => boolean; ground: Ground }) {
   const router = useRouter();
   return (
@@ -279,10 +271,14 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
             onGround={(g) => ground.set(g)}
           />
           <If when={!selected() && shown().length > 0}>
-            <EmptyNotice text={t("web.catalog.pick")} />
+            <Banner tone="info" size="sm">
+              {t("web.catalog.pick")}
+            </Banner>
           </If>
           <If when={shown().length === 0}>
-            <EmptyNotice text={t("web.catalog.noMatch")} dashed />
+            <Banner tone="info" size="sm">
+              {t("web.catalog.noMatch")}
+            </Banner>
           </If>
           <Each of={visible()} key={(s) => s.id}>
             {(s) => {
@@ -355,9 +351,18 @@ function Cursors(props: { tabs: JSX.Element }) {
       />
       <ShelfSection title={t("web.catalog.tab.cursors")} count={countBadge()}>
         <Text class="text-xs leading-relaxed text-muted">{t("web.catalog.cursorsNote")}</Text>
-        <If when={data() !== null} else={<EmptyNotice text={t("web.catalog.noCursors")} dashed />}>
+        <If
+          when={data() !== null}
+          else={
+            <Banner tone="info" size="sm">
+              {t("web.catalog.noCursors")}
+            </Banner>
+          }
+        >
           <If when={all()?.length === 0}>
-            <EmptyNotice text={t("web.catalog.noMatch")} dashed />
+            <Banner tone="info" size="sm">
+              {t("web.catalog.noMatch")}
+            </Banner>
           </If>
           <If when={(all()?.length ?? 0) > 0}>
             <View class="flex-row flex-wrap gap-1.5">
@@ -401,15 +406,16 @@ function Sounds(props: { tabs: JSX.Element }) {
         placeholder={t("web.catalog.soundsFind")}
         countText={query().trim() !== "" ? `${matchedTotal()} / ${total}` : undefined}
       />
-      <View class="flex-row items-center gap-2 rounded-lg bg-side px-3.5 py-2.5">
-        <Icon name="audio" size={14} tone="muted" />
-        <Text class="min-w-0 flex-1 text-xs leading-relaxed text-muted">
+      <Banner tone="info" size="sm" icon="audio">
+        <Text class="text-xs leading-relaxed text-muted">
           {t("web.catalog.soundsRecipes")} <Text class="font-mono text-2xs text-ink">ui/vv/web/ui/pixel/sound.ts</Text>
           {t("web.catalog.soundsMuted")}
         </Text>
-      </View>
+      </Banner>
       <If when={matchedTotal() === 0}>
-        <EmptyNotice text={t("web.catalog.noMatch")} dashed />
+        <Banner tone="info" size="sm">
+          {t("web.catalog.noMatch")}
+        </Banner>
       </If>
       <Each of={SOUND_GROUPS}>
         {(g) => {

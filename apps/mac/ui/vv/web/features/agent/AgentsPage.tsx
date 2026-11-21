@@ -11,11 +11,11 @@ import { api } from "../../infra/api";
 import { ready, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { createAct } from "../../ui/act";
-import { Button } from "../../ui/Button";
+import { Button, ButtonLink } from "../../ui/Button";
 import { AgentFace, OrchestratorFace } from "../../ui/domain/Face";
 import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
-import { PageBody, Toggle } from "../../ui/layout";
+import { Empty, PageBody, Toggle } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
 import { Bubble } from "../../ui/Tip";
 import { AgentPage } from "./AgentPage";
@@ -116,43 +116,33 @@ function AgentsPage() {
             />
           </View>
           <View class="flex-row flex-wrap items-center gap-2">
-            <A
-              href="/agents/templates"
-              testID="open-templates"
-              tooltip={<Bubble text={t("web.agent.templates.openLine")} />}
-              class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
-            >
-              <Icon name="folder" size={14} tone="muted" />
-              <Text class="text-sm text-ink">{t("web.agent.templates.open")}</Text>
-            </A>
-            <A
-              href="/agents/new?role=orchestrator"
-              testID="new-orchestrator"
-              class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
-            >
-              <Icon name="add" size={14} tone="muted" />
-              <Text class="text-sm text-ink">{t("web.agent.list.makeOrchestrator")}</Text>
-            </A>
-            <A
-              href="/agents/new"
-              testID="new-agent"
-              class="h-7 flex-row items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 transition duration-120 ease-out hover:border-accent-hover hover:bg-accent-hover active:translate-y-px"
-            >
-              <Icon name="add" size={14} tone="page" />
-              <Text class="text-sm font-medium text-page">{t("web.agent.list.make")}</Text>
-            </A>
+            <ButtonLink href="/agents/templates" testID="open-templates" icon="folder" tooltip={<Bubble text={t("web.agent.templates.openLine")} />}>
+              {t("web.agent.templates.open")}
+            </ButtonLink>
+            <ButtonLink href="/agents/new?role=orchestrator" testID="new-orchestrator" icon="add">
+              {t("web.agent.list.makeOrchestrator")}
+            </ButtonLink>
+            <ButtonLink href="/agents/new" tone="primary" testID="new-agent" icon="add">
+              {t("web.agent.list.make")}
+            </ButtonLink>
           </View>
         </View>
 
         <If
           when={!noMatches()}
           else={
-            <View testID="agents-empty-search" class="items-center justify-center gap-3 rounded-lg border border-line bg-side px-6 py-10">
-              <Text class="text-sm text-muted">{t("web.agent.list.emptySearch")}</Text>
-              <Button testID="agents-clear-filter" size="compact" onPress={clearFilters}>
-                {t("web.agent.list.clearFilter")}
-              </Button>
-            </View>
+            <Empty
+              compact
+              testid="agents-empty-search"
+              icon="search"
+              action={
+                <Button testID="agents-clear-filter" size="compact" onPress={clearFilters}>
+                  {t("web.agent.list.clearFilter")}
+                </Button>
+              }
+            >
+              {t("web.agent.list.emptySearch")}
+            </Empty>
           }
         >
           <If when={showsOrchestrators(roleFilter()) && (visibleOrchestrators().length > 0 || !hasFilter())}>

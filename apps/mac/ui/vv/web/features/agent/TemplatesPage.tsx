@@ -14,6 +14,7 @@ import { ConfirmButton } from "../../ui/ConfirmButton";
 import { AgentFace, OrchestratorFace } from "../../ui/domain/Face";
 import { runtimeName } from "../../ui/domain/RuntimeBadge";
 import { TextInput } from "../../ui/Field";
+import { PageBody } from "../../ui/layout";
 import { Hint } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
 import { useSkills } from "../runtime/SkillsPage";
@@ -36,40 +37,45 @@ export function TemplatesPage() {
     });
   };
   return (
-    <Scroll testID="templates-page" class="h-full flex-1 bg-page" contentClass="gap-6 px-5 pt-4 pb-8">
-      <View class="gap-1">
-        <A href="/agents" class="group self-start rounded-md px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover">
-          <Text class="text-xs text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
-        </A>
-        <View class="flex-row items-center gap-1.5">
-          <Text role="header" class="text-2xl font-semibold text-ink">
-            {t("web.agent.templates.title")}
-          </Text>
-          <Hint text={t("web.agent.templates.intro")} />
+    <Scroll testID="templates-page" class="h-full flex-1 bg-page" contentClass="px-5 pt-4 pb-8">
+      <PageBody width="manage" class="gap-6">
+        <View class="gap-1">
+          <A
+            href="/agents"
+            class="group self-start rounded-md px-1.5 py-0.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+          >
+            <Text class="text-xs text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
+          </A>
+          <View class="flex-row items-center gap-1.5">
+            <Text role="header" class="text-xl font-semibold text-ink">
+              {t("web.agent.templates.title")}
+            </Text>
+            <Hint text={t("web.agent.templates.intro")} />
+          </View>
         </View>
-      </View>
-      <View class="flex-row items-center gap-2">
-        <TextInput
-          testID="template-folder"
-          accessibilityLabel={t("web.agent.templates.folder")}
-          placeholder={t("web.agent.templates.folderHint")}
-          value={path()}
-          onInput={(v) => path.set(v)}
-          onSubmit={() => void add()}
-          wide={false}
-          class="h-7 min-w-0 flex-1"
-        />
-        <Button testID="template-add" disabled={adding.busy() || !path().trim()} onPress={() => void add()}>
-          {t("web.agent.templates.add")}
-        </Button>
-      </View>
-      <View class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-        <Each of={sorted()} key={(template) => template.id}>
-          {(template) => (
-            <TemplateCard template={template()} runtime={ready(runtimes, []).find((r) => r.id === template().runtime)} runtimes={ready(runtimes, [])} />
-          )}
-        </Each>
-      </View>
+        <View class="flex-row items-center gap-2">
+          <TextInput
+            testID="template-folder"
+            accessibilityLabel={t("web.agent.templates.folder")}
+            placeholder={t("web.agent.templates.folderHint")}
+            value={path()}
+            onInput={(v) => path.set(v)}
+            onSubmit={() => void add()}
+            wide={false}
+            class="h-7 min-w-0 flex-1"
+          />
+          <Button testID="template-add" disabled={adding.busy() || !path().trim()} onPress={() => void add()}>
+            {t("web.agent.templates.add")}
+          </Button>
+        </View>
+        <View class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <Each of={sorted()} key={(template) => template.id}>
+            {(template) => (
+              <TemplateCard template={template()} runtime={ready(runtimes, []).find((r) => r.id === template().runtime)} runtimes={ready(runtimes, [])} />
+            )}
+          </Each>
+        </View>
+      </PageBody>
     </Scroll>
   );
 }

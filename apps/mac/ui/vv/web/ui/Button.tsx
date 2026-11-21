@@ -3,6 +3,7 @@
 // a Text of their own in the tone's ink.
 import { Text, View, type JSX } from "nsh";
 
+import { Link as A } from "../infra/router";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { mix, tone as toneColor } from "./tone";
@@ -35,6 +36,32 @@ export function Words(props: { children?: JSX.Element; ink?: Ink; class?: string
   );
 }
 
+function buttonClass(tone: Tone, compact: boolean, disabled: boolean, extra?: string | undefined) {
+  return [
+    "flex-row items-center justify-center gap-1.5 rounded-md border transition duration-120 ease-out",
+    compact ? "h-6 px-2" : "h-7 px-2.5",
+    resting[tone],
+    // Disabled buttons skip hover cues and the 1px active press sink.
+    disabled ? "opacity-50" : `${interactive[tone]} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`,
+    extra ?? "",
+  ].join(" ");
+}
+
+function ButtonContent(props: { tone: Tone; compact: boolean; icon?: IconName | undefined; children?: JSX.Element }) {
+  const wordClass = () => {
+    const base = props.compact ? "text-xs" : "text-sm";
+    return props.tone === "primary" ? `${base} font-medium` : base;
+  };
+  return (
+    <>
+      <If when={props.icon}>{(name) => <Icon name={name()} size={props.compact ? 12 : 14} tone={inks[props.tone]} />}</If>
+      <Words ink={inks[props.tone]} class={wordClass()}>
+        {props.children}
+      </Words>
+    </>
+  );
+}
+
 export function Button(props: {
   tone?: Tone;
   size?: "compact" | "control" | undefined;
@@ -50,10 +77,6 @@ export function Button(props: {
   const tone = () => props.tone ?? "plain";
   const compact = () => props.size === "compact";
   const disabled = () => props.disabled === true;
-  const wordClass = () => {
-    const base = compact() ? "text-xs" : "text-sm";
-    return tone() === "primary" ? `${base} font-medium` : base;
-  };
   return (
     <View
       role="button"
@@ -62,21 +85,44 @@ export function Button(props: {
       tooltip={props.tooltip}
       disabled={props.disabled}
       onPress={() => props.onPress?.()}
-      class={[
-        "flex-row items-center justify-center gap-1.5 rounded-md border transition duration-120 ease-out",
-        compact() ? "h-6 px-2" : "h-7 px-2.5",
-        resting[tone()],
-        // Disabled buttons skip hover cues and the 1px active press sink.
-        disabled() ? "opacity-50" : `${interactive[tone()]} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`,
-        props.class ?? "",
-      ].join(" ")}
+      class={buttonClass(tone(), compact(), disabled(), props.class)}
       style={tone() === "danger" ? { borderColor: mix("berry", 0.35) } : undefined}
       hoverStyle={!disabled() && tone() === "danger" ? { borderColor: toneColor("berry"), backgroundColor: toneColor("bad-soft") } : undefined}
     >
-      <If when={props.icon}>{(name) => <Icon name={name()} size={compact() ? 12 : 14} tone={inks[tone()]} />}</If>
-      <Words ink={inks[tone()]} class={wordClass()}>
+      <ButtonContent tone={tone()} compact={compact()} icon={props.icon}>
         {props.children}
-      </Words>
+      </ButtonContent>
     </View>
+  );
+}
+
+/** Router link styled identically to Button so page-bar actions stay unified across links and buttons. */
+export function ButtonLink(props: {
+  href: string;
+  tone?: Tone;
+  size?: "compact" | "control" | undefined;
+  icon?: IconName | undefined;
+  children?: JSX.Element;
+  class?: string | undefined;
+  testID?: string | undefined;
+  accessibilityLabel?: string | undefined;
+  tooltip?: JSX.Element | undefined;
+}) {
+  const tone = () => props.tone ?? "plain";
+  const compact = () => props.size === "compact";
+  return (
+    <A
+      href={props.href}
+      testID={props.testID}
+      accessibilityLabel={props.accessibilityLabel}
+      tooltip={props.tooltip}
+      class={buttonClass(tone(), compact(), false, props.class)}
+      style={tone() === "danger" ? { borderColor: mix("berry", 0.35) } : undefined}
+      hoverStyle={tone() === "danger" ? { borderColor: toneColor("berry"), backgroundColor: toneColor("bad-soft") } : undefined}
+    >
+      <ButtonContent tone={tone()} compact={compact()} icon={props.icon}>
+        {props.children}
+      </ButtonContent>
+    </A>
   );
 }

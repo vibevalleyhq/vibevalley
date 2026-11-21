@@ -17,13 +17,12 @@ import { type Submission, useForm } from "../../infra/form";
 import { defineQuery, ready, retryRead, useAgents, useQuery, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
 import { createAct } from "../../ui/act";
-import { Button } from "../../ui/Button";
+import { Button, ButtonLink } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { AgentFace } from "../../ui/domain/Face";
 import { runtimeName } from "../../ui/domain/RuntimeBadge";
 import { SearchField, TextArea, TextInput } from "../../ui/Field";
 import { Form, formControl, FormField, formMessages } from "../../ui/Form";
-import { Icon } from "../../ui/Icon";
 import { ActiveBar, Card, Empty, SidebarSection } from "../../ui/layout";
 import { Markdown } from "../../ui/Markdown";
 import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
@@ -145,14 +144,9 @@ export function SkillsPage(props: { id?: string | undefined }) {
           open={ownOpen() || q() !== ""}
           onToggle={() => ownOpen.set(!ownOpen())}
           action={
-            <A
-              href={skillPath("new")}
-              testID="new-skill"
-              class="h-6 flex-row items-center gap-1 rounded-md bg-accent px-2 transition duration-120 ease-out hover:bg-accent-hover active:translate-y-px"
-            >
-              <Icon name="add" size={12} tone="page" />
-              <Text class="text-xs font-medium text-page">{t("web.runtime.library.newSkill")}</Text>
-            </A>
+            <ButtonLink href={skillPath("new")} tone="primary" size="compact" icon="add" testID="new-skill">
+              {t("web.runtime.library.newSkill")}
+            </ButtonLink>
           }
         >
           <Each of={ownShown()} key={(s) => s.id}>

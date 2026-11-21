@@ -12,11 +12,10 @@ import { api } from "../../infra/api";
 import { useQueryClient } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
 import { createAct } from "../../ui/act";
-import { Button } from "../../ui/Button";
+import { Button, ButtonLink } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { OrchestratorFace } from "../../ui/domain/Face";
 import { Field, TextArea, TextInput } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
 import { Bubble } from "../../ui/Tip";
 import { orchestratorLooks } from "../orchestrator/looks";
 import { runsHref } from "../session";
@@ -118,14 +117,9 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
                       onConfirm={remove}
                     />
                   </If>
-                  <A
-                    href={runsHref({ session: saved().id })}
-                    testID="agent-runs-link"
-                    class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
-                  >
-                    <Icon name="log" size={14} tone="muted" />
-                    <Text class="text-sm text-ink">{t("web.agent.runsLink")}</Text>
-                  </A>
+                  <ButtonLink href={runsHref({ session: saved().id })} icon="log" testID="agent-runs-link">
+                    {t("web.agent.runsLink")}
+                  </ButtonLink>
                   <Button icon="thread" testID="talk" disabled={act.busy()} onPress={talk}>
                     {t("web.agent.talk")}
                   </Button>

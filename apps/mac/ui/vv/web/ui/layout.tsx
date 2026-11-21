@@ -252,11 +252,15 @@ export function Quiet(props: { children: JSX.Element }) {
 }
 
 /** A place with nothing in it yet (docs/design/02-atomic-components.md): its icon, why it is empty, and the next step if there is one. */
-export function Empty(props: { icon: IconName; children: JSX.Element; action?: JSX.Element; testid?: string }) {
+export function Empty(props: { icon: IconName; children: JSX.Element; action?: JSX.Element; testid?: string; compact?: boolean | undefined }) {
+  const compact = () => props.compact === true;
   return (
-    <View testID={props.testid ?? "empty"} class="min-h-48 flex-1 items-center justify-center p-6">
+    <View
+      testID={props.testid ?? "empty"}
+      class={compact() ? "items-center justify-center rounded-lg border border-line bg-side px-6 py-8" : "min-h-48 flex-1 items-center justify-center p-6"}
+    >
       <View class="max-w-sm items-center gap-3.5">
-        <Icon name={props.icon} size={48} tone="faint" />
+        <Icon name={props.icon} size={compact() ? 24 : 48} tone="faint" />
         <Text class="text-center text-sm leading-relaxed text-muted">{props.children}</Text>
         <If when={props.action}>
           <View class="pt-0.5">{props.action}</View>
