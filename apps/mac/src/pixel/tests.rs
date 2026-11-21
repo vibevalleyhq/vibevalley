@@ -58,37 +58,10 @@ fn regression_overlapping_helpers_draw_and_hit_in_arrival_order_at_the_same_anim
             _ => None,
         })
         .collect();
-    let [first, last] = &bodies[..] else {
-        panic!("expected two helpers: {bodies:?}")
-    };
-    let stride = first.strip_prefix("owl-farmer-walk-side@").unwrap();
-    assert_eq!(last.strip_prefix("fox-farmer-walk-side@"), Some(stride));
+    assert_eq!(bodies, ["owl-farmer-side", "fox-farmer-side"]);
     let at = scene.helper_feet("a-last").unwrap();
     assert_eq!(scene.helper_feet("z-first"), Some(at));
     assert_eq!(scene.hit_at(at + level::pt(0., -8.)), Some(farm::world::VillageHit::Session("a-last".into())));
-}
-
-#[test]
-fn regression_blacksmith_fire_and_anvil_land_on_the_baked_workshop() {
-    let (world, atlas) = load_village().unwrap();
-    let forge = world.lights.iter().find(|l| matches!(l.source, farm::world::LightSource::Forge)).unwrap().at;
-    let anvil = world.emitter("anvil").unwrap();
-    for point in [forge, anvil] {
-        assert_eq!(atlas.landmark_at(point).map(|(id, _)| id), Some("runtimes"));
-    }
-
-    let map = atlas.image("map").unwrap();
-    let (x, y) = ((forge.x * atlas.density).round() as u32, (forge.y * atlas.density).round() as u32);
-    let r = atlas.density.ceil() as u32;
-    let on_live_coals = (y.saturating_sub(r)..=y + r).any(|y| {
-        (x.saturating_sub(r)..=x + r).any(|x| {
-            map.get_pixel_checked(x, y).is_some_and(|p| {
-                let [red, green, blue, _] = p.0;
-                red >= 220 && red.saturating_sub(green) >= 25 && green.saturating_sub(blue) >= 40
-            })
-        })
-    });
-    assert!(on_live_coals, "forge light {forge:?} missed the baked coals");
 }
 
 #[test]
@@ -112,16 +85,6 @@ fn farm_walks_helpers_to_their_work() {
     assert_eq!(goal("s-cmd"), "workshop");
     assert_eq!(goal("s-ripe"), "plot:front");
     assert_eq!(goal("s-queue"), "queue:0");
-    for (id, clip) in [
-        ("s-read", "read"),
-        ("s-cmd", "hammer"),
-        ("s-edit", "hoe"),
-        ("s-ask", "ask"),
-        ("s-stuck", "worry"),
-    ] {
-        let actor = actors.iter().find(|a| a["id"] == id).unwrap();
-        assert!(actor["sprite"].as_str().unwrap().contains(&format!("-{clip}@")), "{actor:#}");
-    }
     assert!(actors.iter().all(|a| a["walking"] == false), "{state:#}");
     assert_eq!(state["beds"][4], "wheat");
     assert_eq!(state["beds"][6], "flowering", "level 6 clears the first locked bed");
@@ -133,73 +96,6 @@ fn farm_walks_helpers_to_their_work() {
     save("farm-day", &img);
     scene.clock.set_time_of_day(0.95);
     save("farm-night", &raster(&scene.draw(3.0), Some(&atlas), 2.0));
-}
-
-#[test]
-fn regression_fox_starts_each_station_clip_after_its_feet_stop() {
-    use farm::frame::Crop;
-    use vibevalley_protocol::IssueStageKind;
-
-    let (world, atlas) = load_village().unwrap();
-    let mut scene = FarmScene::new(world, atlas.clone());
-    let mut frame = Frame::parse(&fixture("state.json"));
-    frame.state.sessions.retain(|s| s.id == "s-edit");
-    let worker = &frame.state.sessions[0];
-    let issue_id = worker.issue.clone().unwrap();
-    scene.agent_looks.insert(worker.agent.clone(), ("fox".into(), "farmer".into()));
-    for (action, stage, crop, clip) in [
-        ("edit_file", IssueStageKind::Working, Crop::Leafy, "hoe"),
-        ("run_command", IssueStageKind::Working, Crop::Leafy, "hammer"),
-        ("wait", IssueStageKind::Asking, Crop::Dry, "ask"),
-        ("wait", IssueStageKind::Stuck, Crop::Dry, "worry"),
-    ] {
-        frame.seq += 1;
-        frame.state.sessions[0].phase.doing.as_mut().unwrap().action = action.into();
-        frame.state.issues.iter_mut().find(|i| i.id == issue_id).unwrap().stage.as_mut().unwrap().state = stage;
-        frame.view.plots.get_mut(&issue_id).unwrap().crop = crop;
-        scene.apply_frame(frame.clone());
-        let mut samples = [false; 8];
-        for _ in 0..600 {
-            scene.tick(1. / 30.);
-            let state = scene.debug_state();
-            let actor = &state["actors"][0];
-            let name = actor["sprite"].as_str().unwrap();
-            if actor["walking"] == true {
-                assert!(name.starts_with("fox-farmer-walk-"), "{name}");
-            } else if let Some(sample) = name.strip_prefix(&format!("fox-farmer-{clip}@")) {
-                let index: usize = sample.parse().unwrap();
-                if !samples[index] && matches!(index, 2 | 5) && std::env::var_os("VIBEVALLEY_PIXEL_OUT").is_some() {
-                    save(&format!("fox-{clip}-{index}"), &raster(&scene.draw(2.), Some(&atlas), 2.));
-                }
-                samples[index] = true;
-                if samples.iter().all(|seen| *seen) {
-                    break;
-                }
-            }
-        }
-        assert_eq!(samples, [true; 8], "{clip}");
-    }
-}
-
-#[test]
-fn regression_oblique_soil_accepts_clicks_only_on_its_visible_pixels() {
-    let (world, atlas) = load_village().unwrap();
-    let mut scene = FarmScene::new(world, atlas.clone());
-    let center_bed = 4;
-    let foot = projection::ground(scene.world.plot_at(center_bed));
-    let (left, top) = atlas.top_left("plot-empty", foot.x, foot.y, false).unwrap();
-    let sprite = atlas.image("plot-empty").unwrap();
-    let mut opaque = 0;
-    let mut clear = 0;
-    for (x, y, pixel) in sprite.enumerate_pixels() {
-        let point = level::pt(left + (x as f32 + 0.5) / atlas.density, top + (y as f32 + 0.5) / atlas.density);
-        let selected = scene.hit_at(point) == Some(farm::world::VillageHit::Plot(center_bed));
-        assert_eq!(selected, pixel[3] >= 128, "mismatch at {point:?}");
-        if selected { opaque += 1 } else { clear += 1 }
-    }
-    assert!(opaque > 100 && clear > 100);
-    scene.point(Some(level::pt(left + 1., top + 1.)));
-    assert_ne!(scene.hover, Some(farm::world::VillageHit::Plot(center_bed)));
 }
 
 #[test]
@@ -222,9 +118,6 @@ fn map_draws_an_island_per_repo() {
     assert_eq!(islands[3]["spots"], serde_json::json!(["open", "shut"]));
     let list = map.draw(1.6);
     assert!(list.fit);
-    let label_rows: Vec<_> = list.hud_art.iter().map(|(_, y, _)| *y).collect();
-    assert_eq!(label_rows.len(), 4);
-    assert!(label_rows[0] == label_rows[1] && label_rows[2] == label_rows[3] && label_rows[0] < label_rows[2]);
     let img = raster(&list, Some(&atlas), 2.0);
     save("map", &img);
     // A click on the middle of the first island's picture finds something on it.
@@ -233,62 +126,6 @@ fn map_draws_an_island_per_repo() {
         matches!(hit, Some(MapHit::Island(_)) | Some(MapHit::Plot { .. }) | Some(MapHit::Sow(_))),
         "{hit:?}"
     );
-}
-
-#[test]
-fn regression_map_fills_wide_pane_without_letterbox_seam() {
-    if !assets_dir().join("pixel/sprites.json").exists() {
-        return;
-    }
-    use super::farm::islands::{MapScene, RepoSummary};
-    let atlas = load_atlas().unwrap();
-    let mut map = MapScene::new(atlas.clone());
-    map.apply_frame(Frame::parse(&fixture("state.json")));
-    map.set_repos(serde_json::from_value::<Vec<RepoSummary>>(fixture("responses.json")["repo.list"].clone()).unwrap());
-    let view = (1278.0, 848.0);
-    map.view_size = Some(view);
-    map.tick(0.1);
-    let list = map.draw(view.0 / view.1);
-    let f = sky::fit_framing(view, (list.width, list.height));
-    assert!(f.bx.x > 40.0, "expected horizontal margin to test wide pane: {f:?}");
-    let img = draw::raster_view(&list, Some(&atlas), view);
-    save("map-wide", &img);
-    let sea = [0xcf, 0xe3, 0xd6, 255];
-    let grid = [0xb7, 0xd2, 0xc4, 255];
-    // Margins and centre share the exact same sea colour (no 0.7x dark pillarbox / bright inner highlight).
-    for (x, y) in [(4, 4), (1273, 4), (4, 843), (639, 4)] {
-        let px = img.get_pixel(x, y).0;
-        assert!(px == sea || px == grid, "unexpected pixel at ({x},{y}): {px:?}");
-    }
-    let left_margin_grid = (0..f.bx.x as u32).any(|x| img.get_pixel(x, 840).0 == grid);
-    let right_margin_grid = ((f.bx.x + f.bx.w) as u32..img.width()).any(|x| img.get_pixel(x, 840).0 == grid);
-    assert!(left_margin_grid && right_margin_grid, "grid must continue across margins");
-}
-
-#[test]
-fn regression_farm_fills_standard_pane_without_dark_border() {
-    if !assets_dir().join("village.ldtk").exists() {
-        return;
-    }
-    let (world, atlas) = load_village().unwrap();
-    let mut scene = FarmScene::new(world, atlas.clone());
-    scene.frame = Frame::parse(&fixture("state.json"));
-    scene.clock.set_time_of_day(0.50);
-    let view = (1278.0, 848.0);
-    scene.view_size = view;
-    scene.tick(0.1);
-    let list = scene.draw(3.0);
-    let f = sky::frame_cover(view, (list.width, list.height), sky::FARM_CUT);
-    assert_eq!((f.shown.x, f.shown.y, f.shown.w, f.shown.h), (0.0, 0.0, view.0, view.1));
-    let img = draw::raster_view(&list, Some(&atlas), view);
-    save("farm-wide", &img);
-    // Corners are lit grass/river from the village rather than a darkened #1b2318 veil border.
-    let dark_bg = [0x1b, 0x23, 0x18];
-    for (x, y) in [(2, 2), (1275, 2), (2, 845), (1275, 845)] {
-        let p = img.get_pixel(x, y).0;
-        let diff: u32 = (0..3).map(|c| p[c].abs_diff(dark_bg[c]) as u32).sum();
-        assert!(diff > 40, "dark border pixel at ({x},{y}): {p:?}");
-    }
 }
 
 #[test]

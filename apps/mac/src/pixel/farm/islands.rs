@@ -9,7 +9,6 @@ use serde::Deserialize;
 use super::super::atlas::Atlas;
 use super::super::draw::{DrawList, HudOp, Op, rgba};
 use super::super::level::{Box2, Point, pt};
-use super::super::projection::island_offset;
 use super::frame::{Frame, Issue, PlotView, Session};
 use super::scene::cast_prefix;
 
@@ -78,7 +77,13 @@ pub fn islands_of(repos: &[RepoSummary], frame: &Frame) -> Vec<Island> {
                 .iter()
                 .map(|s| Spot::Taken {
                     session: Box::new((*s).clone()),
-                    pose: map_pose(s, frame.plot_of(s), frame.stage_of(s)),
+                    pose: map_pose(
+                        s,
+                        frame.state.issues.iter().any(|i| {
+                            Some(&i.id) == s.issue.as_ref()
+                                && i.stage.as_ref().and_then(|stage| stage.stuck) == Some(vibevalley_protocol::StuckReason::Conflict)
+                        }),
+                    ),
                     plot: frame.plot_of(s).cloned().unwrap_or(PlotView {
                         crop: super::frame::Crop::Seeded,
                         badge: None,
@@ -133,7 +138,7 @@ const HEAD: f32 = 15.0;
 const ROW_PITCH: f32 = 36.0;
 const MAX_COL_PITCH: f32 = 54.0;
 
-/// Feet stay in session order. Depth ordering belongs to the drawing pass.
+/// Each returned point is a plot's foot, inside `yard`.
 pub fn plots_in(yard: Box2, n: usize) -> Vec<Point> {
     if n == 0 {
         return Vec::new();
@@ -154,20 +159,12 @@ pub fn plots_in(yard: Box2, n: usize) -> Vec<Point> {
         .map(|i| {
             let row = i / per_row;
             let in_row = per_row.min(n - row * per_row);
-            project_in_yard(
-                yard,
-                pt(
-                    cx + ((i % per_row) as f32 - (in_row as f32 - 1.0) / 2.0) * pitch,
-                    first_bottom + row as f32 * ROW_PITCH,
-                ),
+            pt(
+                cx + ((i % per_row) as f32 - (in_row as f32 - 1.0) / 2.0) * pitch,
+                first_bottom + row as f32 * ROW_PITCH,
             )
         })
         .collect()
-}
-
-fn project_in_yard(yard: Box2, p: Point) -> Point {
-    let center = pt((yard.x0 + yard.x1) * 0.5, (yard.y0 + yard.y1) * 0.5);
-    center + island_offset(pt(p.x - center.x, p.y - center.y))
 }
 
 pub const ISLAND_LOOKS: [&str; 6] = [
@@ -185,24 +182,13 @@ pub fn island_look(repo: &str) -> &'static str {
 }
 
 /// A helper on the map: the pose's sprite suffix.
-fn map_pose(s: &Session, plot: Option<&PlotView>, stage: Option<&vibevalley_protocol::IssueStage>) -> &'static str {
-    if stage.is_some_and(|s| s.stuck == Some(vibevalley_protocol::StuckReason::Conflict)) || s.phase.tag == "failed" {
-        return "worry";
-    }
-    match super::world::pose_of(s, plot.map_or(super::frame::Crop::Sprout, |p| p.crop), stage) {
-        super::world::Pose::Ask => return "ask@5",
-        super::world::Pose::Worry => return "worry",
-        super::world::Pose::Cheer => return "cheer",
-        super::world::Pose::Idle | super::world::Pose::Think | super::world::Pose::Hoe | super::world::Pose::Work => {}
-    }
+fn map_pose(s: &Session, conflict: bool) -> &'static str {
     match s.phase.tag.as_str() {
+        "failed" => "worry",
+        "done" | "resting" if conflict => "worry",
         "working" => match s.doing() {
-            Some("edit_file") => "hoe@5",
-            Some("run_command" | "mcp") => "hammer@2",
-            Some("read_file" | "search") => "read",
-            Some("web") => "tinker-1",
-            Some("wait") => "sit",
-            _ => "side",
+            Some("thinking") | Some("speaking_text") => "side",
+            _ => "work",
         },
         "done" => "cheer",
         _ => "down",
@@ -236,41 +222,6 @@ impl MapHit {
     }
 }
 
-struct MapTarget {
-    sprite: String,
-    bounds: Box2,
-    action: MapHit,
-}
-
-impl MapTarget {
-    fn paint(list: &mut DrawList, hits: &mut Vec<Self>, atlas: &Atlas, name: &str, foot: Point, action: MapHit) {
-        let Some(info) = atlas.get(name) else { return };
-        let Some((x, y)) = atlas.top_left(name, foot.x, foot.y, false) else { return };
-        list.sprite(atlas, name, foot.x, foot.y, false, 1.0);
-        hits.push(Self {
-            sprite: name.to_owned(),
-            bounds: Box2 {
-                x0: x,
-                y0: y,
-                x1: x + info.w,
-                y1: y + info.h,
-            },
-            action,
-        });
-    }
-
-    fn contains(&self, atlas: &Atlas, p: Point) -> bool {
-        let b = self.bounds;
-        if !b.contains(p) {
-            return false;
-        }
-        let Some(image) = atlas.image(&self.sprite) else { return false };
-        let x = ((p.x - b.x0) / (b.x1 - b.x0) * image.width() as f32) as u32;
-        let y = ((p.y - b.y0) / (b.y1 - b.y0) * image.height() as f32) as u32;
-        image.get_pixel_checked(x, y).is_some_and(|pixel| pixel[3] >= 128)
-    }
-}
-
 pub struct MapScene {
     pub atlas: Arc<Atlas>,
     frame: Frame,
@@ -278,9 +229,8 @@ pub struct MapScene {
     pub islands: Vec<Island>,
     pub agent_looks: HashMap<String, (String, String)>,
     pub load_error: Option<String>,
-    hits: Vec<MapTarget>,
+    hits: Vec<(Box2, MapHit)>,
     pub hover: Option<MapHit>,
-    pub view_size: Option<(f32, f32)>,
     t: f32,
 }
 
@@ -295,7 +245,6 @@ impl MapScene {
             load_error: None,
             hits: Vec::new(),
             hover: None,
-            view_size: None,
             t: 0.0,
         }
     }
@@ -333,13 +282,13 @@ impl MapScene {
         let label_h = 30.0;
         let cols = (1..=n)
             .min_by(|&a, &b| {
-                let fitted_height = |c: usize| {
+                let ratio = |c: usize| {
                     let rows = n.div_ceil(c);
                     let w = c as f32 * (cw + GAP) + GAP;
                     let h = rows as f32 * (ch + label_h + GAP) + GAP;
-                    h.max(w / aspect.max(0.1))
+                    ((w / h).ln() - aspect.max(0.1).ln()).abs()
                 };
-                fitted_height(a).total_cmp(&fitted_height(b))
+                ratio(a).total_cmp(&ratio(b))
             })
             .unwrap_or(1);
         let rows = n.div_ceil(cols);
@@ -347,7 +296,18 @@ impl MapScene {
         let height = rows as f32 * (ch + label_h + GAP) + GAP;
         let mut list = DrawList::new(width, height, rgba(0xcfe3d6, 1.0));
         list.fit = true;
-        list.grid = Some((32.0, rgba(0xb7d2c4, 1.0)));
+        // The sea's grid, as the map paper's dashed lines.
+        let grid = rgba(0xb7d2c4, 1.0);
+        let mut x = 32.0;
+        while x < width {
+            list.rect(x, 0.0, 1.0, height, grid);
+            x += 32.0;
+        }
+        let mut y = 32.0;
+        while y < height {
+            list.rect(0.0, y, width, 1.0, grid);
+            y += 32.0;
+        }
         self.hits.clear();
         if let Some(error) = &self.load_error {
             list.hud_art.push((width / 2., 3., error.clone()));
@@ -361,8 +321,22 @@ impl MapScene {
             let left = GAP + col as f32 * (cw + GAP) + (cw - info.w) / 2.0;
             let top = GAP + row as f32 * (ch + label_h + GAP) + (ch - info.h);
             let bob = ((self.t * 0.8 + i as f32).sin() * 1.0).round();
-            let foot = pt(left + info.ax, top + bob + info.ay + 1.0 / atlas.density);
-            MapTarget::paint(&mut list, &mut self.hits, &atlas, name, foot, MapHit::Island(island.repo.clone()));
+            list.ops.push(Op::Sprite {
+                name: name.into(),
+                x: left,
+                y: top + bob,
+                flip: false,
+                alpha: 1.0,
+            });
+            self.hits.push((
+                Box2 {
+                    x0: left,
+                    y0: top,
+                    x1: left + info.w,
+                    y1: top + info.h,
+                },
+                MapHit::Island(island.repo.clone()),
+            ));
             let yard = atlas.yard(name).unwrap_or(Box2 {
                 x0: info.w * 0.25,
                 y0: info.h * 0.25,
@@ -375,35 +349,48 @@ impl MapScene {
                 x1: left + yard.x1,
                 y1: top + bob + yard.y1,
             };
-            let mut plots: Vec<_> = island.spots.iter().zip(plots_in(yard, island.spots.len())).collect();
-            plots.sort_by(|a, b| a.1.y.total_cmp(&b.1.y));
-            for (spot, foot) in plots {
+            for (spot, foot) in island.spots.iter().zip(plots_in(yard, island.spots.len())) {
                 match spot {
                     Spot::Taken { session, plot, pose } => {
-                        let action = MapHit::Plot {
-                            agent: session.agent.clone(),
-                            worktree: session.worktree.clone(),
-                            issue: session.issue.clone(),
-                        };
-                        let crop = format!("island/plot-{}", plot.crop.name());
-                        MapTarget::paint(&mut list, &mut self.hits, &atlas, &crop, foot, action.clone());
+                        list.sprite(&atlas, &format!("plot-{}", plot.crop.name()), foot.x, foot.y, false, 1.0);
                         let configured = self.agent_looks.get(&session.agent).map(|(sp, outfit)| (sp.as_str(), outfit.as_str()));
                         let look = cast_prefix(configured, &session.agent, &atlas);
                         let pose = format!("{look}-{pose}");
                         let pose = if atlas.has(&pose) { pose } else { format!("{look}-down") };
-                        MapTarget::paint(&mut list, &mut self.hits, &atlas, &pose, foot + island_offset(pt(0.0, -10.0)), action);
+                        list.sprite(&atlas, &pose, foot.x, foot.y - 10.0, false, 1.0);
+                        self.hits.push((
+                            Box2 {
+                                x0: foot.x - PLOT_W / 2.0,
+                                y0: foot.y - PLOT_H - 14.0,
+                                x1: foot.x + PLOT_W / 2.0,
+                                y1: foot.y,
+                            },
+                            MapHit::Plot {
+                                agent: session.agent.clone(),
+                                worktree: session.worktree.clone(),
+                                issue: session.issue.clone(),
+                            },
+                        ));
                     }
                     Spot::Open => {
-                        let action = MapHit::Sow(island.repo.clone());
-                        MapTarget::paint(&mut list, &mut self.hits, &atlas, "island/plot-empty", foot, action.clone());
-                        MapTarget::paint(&mut list, &mut self.hits, &atlas, "map-stake", foot + island_offset(pt(9.0, -12.0)), action);
+                        list.sprite(&atlas, "plot-empty", foot.x, foot.y, false, 1.0);
+                        list.sprite(&atlas, "map-stake", foot.x + 9.0, foot.y - 12.0, false, 1.0);
+                        self.hits.push((
+                            Box2 {
+                                x0: foot.x - PLOT_W / 2.0,
+                                y0: foot.y - PLOT_H,
+                                x1: foot.x + PLOT_W / 2.0,
+                                y1: foot.y,
+                            },
+                            MapHit::Sow(island.repo.clone()),
+                        ));
                     }
-                    Spot::Shut => list.sprite(&atlas, "island/plot-locked", foot.x, foot.y, false, 1.0),
+                    Spot::Shut => list.sprite(&atlas, "plot-locked", foot.x, foot.y, false, 1.0),
                 }
             }
+            let gate = pt((yard.x0 + yard.x1) / 2.0, yard.y1 + 6.0);
             for (k, _) in island.queued.iter().take(3).enumerate() {
-                let sack = project_in_yard(yard, pt((yard.x0 + yard.x1) / 2.0 + 20.0 + k as f32 * 12.0, yard.y1 + 14.0));
-                list.sprite(&atlas, "map-sack", sack.x, sack.y, false, 1.0);
+                list.sprite(&atlas, "map-sack", gate.x + 20.0 + k as f32 * 12.0, gate.y + 8.0, false, 1.0);
             }
             let mut tally = if island.summary.is_some() {
                 vibevalley_i18n::t(
@@ -425,23 +412,14 @@ impl MapScene {
             }
             list.hud_art.push((left + info.w / 2.0, top + info.h + 6.0, tally));
         }
-        let (vx0, vy0, vx1, vy1) = if let Some(view) = self.view_size {
-            let f = super::super::sky::fit_framing(view, (width, height));
-            let x0 = -f.bx.x / f.scale;
-            let y0 = -f.bx.y / f.scale;
-            (x0, y0, x0 + view.0 / f.scale, y0 + view.1 / f.scale)
-        } else {
-            (0.0, 0.0, width, height)
-        };
         let cloud = atlas.get("map-cloud");
         if let Some(c) = cloud {
-            let span = (vx1 - vx0) + c.w;
             for k in 0..2 {
-                let x = vx0 + ((self.t * 4.0 + k as f32 * span / 2.0) % span) - c.w;
+                let x = ((self.t * 4.0 + k as f32 * width / 2.0) % (width + c.w)) - c.w;
                 list.ops.push(Op::Sprite {
                     name: "map-cloud".into(),
                     x,
-                    y: vy0 + 10.0 + k as f32 * (vy1 - vy0) / 2.0,
+                    y: 10.0 + k as f32 * height / 2.0,
                     flip: false,
                     alpha: 0.75,
                 });
@@ -450,8 +428,8 @@ impl MapScene {
         if let Some(c) = atlas.get("map-compass") {
             list.ops.push(Op::Sprite {
                 name: "map-compass".into(),
-                x: vx1 - c.w - 8.0,
-                y: vy1 - c.h - 8.0,
+                x: width - c.w - 8.0,
+                y: height - c.h - 8.0,
                 flip: false,
                 alpha: 0.8,
             });
@@ -461,7 +439,7 @@ impl MapScene {
 
     pub fn hit_at(&self, p: Point) -> Option<MapHit> {
         // Plots and stakes were pushed after their island: the last match is on top.
-        self.hits.iter().rev().find(|hit| hit.contains(&self.atlas, p)).map(|hit| hit.action.clone())
+        self.hits.iter().rev().find(|(b, _)| b.contains(p)).map(|(_, h)| h.clone())
     }
 
     pub fn debug_state(&self) -> serde_json::Value {
@@ -509,43 +487,9 @@ mod tests {
         };
         let p = plots_in(yard, 4);
         assert_eq!(p.len(), 4);
-        let column = island_offset(pt(MAX_COL_PITCH, 0.0));
-        let row = island_offset(pt(0.0, ROW_PITCH));
-        assert!(column.x > 0.0 && column.y > 0.0 && row.x < 0.0 && row.y > 0.0);
-        for (foot, expected) in [(p[1], p[0] + column), (p[2], p[0] + row)] {
-            assert!((foot.x - expected.x).abs() < 1e-4 && (foot.y - expected.y).abs() < 1e-4);
-        }
+        assert_eq!(p[0].y, p[1].y);
+        assert_eq!(p[2].y, p[0].y + ROW_PITCH);
         assert!(plots_in(yard, 0).is_empty());
-    }
-
-    #[test]
-    fn regression_transparent_corners_of_slanted_plots_do_not_open_issues() {
-        use crate::pixel::{assets_dir, load_atlas};
-
-        if !assets_dir().join("pixel/sprites.json").exists() {
-            return;
-        }
-        let atlas = load_atlas().unwrap();
-        let mut map = MapScene::new(atlas.clone());
-        let mut list = DrawList::default();
-        let foot = pt(90.0, 80.0);
-        let crop = "island/plot-sprout";
-        let issue = MapHit::Plot {
-            agent: "fox".into(),
-            worktree: None,
-            issue: Some("i17".into()),
-        };
-        MapTarget::paint(&mut list, &mut map.hits, &atlas, crop, foot, issue.clone());
-        let bounds = map.hits[0].bounds;
-        let image = atlas.image(crop).unwrap();
-        let x = image.width() / 2;
-        let y = (0..image.height())
-            .rev()
-            .find(|y| image.get_pixel(x, *y)[3] >= 128 && image.get_pixel(1, *y)[3] < 128)
-            .unwrap();
-        let point = |x: u32| pt(bounds.x0 + (x as f32 + 0.5) / atlas.density, bounds.y0 + (y as f32 + 0.5) / atlas.density);
-        assert_eq!(map.hit_at(point(x)), Some(issue));
-        assert_eq!(map.hit_at(point(1)), None);
     }
 
     #[test]

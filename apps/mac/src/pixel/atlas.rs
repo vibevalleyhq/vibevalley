@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use super::glb::{SpriteCanvas, helper_standing, painted_sprite};
 use image::RgbaImage;
 use serde::Deserialize;
 
@@ -35,13 +34,9 @@ struct RawSprite {
 
 pub struct Atlas {
     dir: PathBuf,
-    pub(super) landmarks: Option<super::landmarks::Landmarks>,
     sprites: HashMap<String, SpriteInfo>,
     yards: HashMap<String, super::level::Box2>,
     pub density: f32,
-    models: Mutex<super::glb::ModelLibrary>,
-    model_sizes: Mutex<HashMap<String, SpriteCanvas>>,
-    ink: Mutex<HashMap<String, super::level::Box2>>,
     normals: Mutex<HashMap<String, Arc<RgbaImage>>>,
     images: Mutex<HashMap<String, Option<Arc<RgbaImage>>>>,
 }
@@ -51,12 +46,7 @@ impl Atlas {
     /// the sprite named `map` when there is one, else `fallback_density`.
     pub fn load(dir: &Path, fallback_density: f32) -> Result<Atlas, String> {
         let text = std::fs::read_to_string(dir.join("sprites.json")).map_err(|e| format!("{}: {e}", dir.display()))?;
-        let mut atlas = Atlas::parse(dir, &text, fallback_density)?;
-        let mask = dir.join("yard-landmarks.png");
-        if mask.try_exists().map_err(|e| format!("{}: {e}", mask.display()))? {
-            atlas.landmarks = Some(super::landmarks::Landmarks::load(&mask)?);
-        }
-        Ok(atlas)
+        Atlas::parse(dir, &text, fallback_density)
     }
 
     pub fn parse(dir: &Path, text: &str, fallback_density: f32) -> Result<Atlas, String> {
@@ -93,100 +83,22 @@ impl Atlas {
                 )
             })
             .collect();
-        let models_dir = dir.parent().map(|p| p.join("models")).unwrap_or_else(|| dir.join("models"));
         Ok(Atlas {
-            landmarks: None,
             dir: dir.to_path_buf(),
             sprites,
             yards,
             density,
-            models: Mutex::new(super::glb::ModelLibrary::new(models_dir)),
-            model_sizes: Mutex::new(HashMap::new()),
-            ink: Mutex::new(HashMap::new()),
             normals: Mutex::new(HashMap::new()),
             images: Mutex::new(HashMap::new()),
         })
     }
 
     pub fn has(&self, name: &str) -> bool {
-        self.sprites.contains_key(painted_sprite(name, false).as_ref())
-    }
-
-    pub fn landmark_at(&self, screen: super::level::Point) -> Option<(&'static str, f32)> {
-        self.landmarks.as_ref()?.at(screen)
-    }
-
-    fn canvas(&self, name: &str) -> Option<SpriteCanvas> {
-        let source = self.sprites.get(painted_sprite(name, false).as_ref())?;
-        let painted = SpriteCanvas {
-            width: (source.w * self.density).round().max(1.0) as u32,
-            height: (source.h * self.density).round().max(1.0) as u32,
-            foot_x: source.ax * self.density,
-            foot_y: source.ay * self.density + 1.0,
-            density: self.density,
-            pixels_per_unit: None,
-        };
-        let key = name.split_once('@').map_or(name, |(clip, _)| clip);
-        let mut sizes = self.model_sizes.lock().ok()?;
-        if let Some(size) = sizes.get(key) {
-            return Some(*size);
-        }
-        let standing_height = helper_standing(name)
-            .and_then(|standing| self.sprites.get(&standing))
-            .map(|standing| standing.h * self.density);
-        let size = if standing_height.is_some() || key.starts_with("plot-") || key.starts_with("island/plot-") {
-            self.models.lock().ok()?.model_canvas(name, painted, standing_height).unwrap_or(painted)
-        } else {
-            painted
-        };
-        sizes.insert(key.into(), size);
-        Some(size)
+        self.sprites.contains_key(name)
     }
 
     pub fn get(&self, name: &str) -> Option<SpriteInfo> {
-        let canvas = self.canvas(name)?;
-        Some(SpriteInfo {
-            w: canvas.width as f32 / self.density,
-            h: canvas.height as f32 / self.density,
-            ax: canvas.foot_x / self.density,
-            ay: (canvas.foot_y - 1.0) / self.density,
-        })
-    }
-
-    pub fn visible_box(&self, name: &str, x: f32, y: f32, flip: bool) -> Option<super::level::Box2> {
-        let info = self.get(name)?;
-        let (x, y) = self.top_left(name, x, y, flip)?;
-        let mut cache = self.ink.lock().ok()?;
-        let ink = match cache.get(name) {
-            Some(&ink) => ink,
-            None => {
-                let image = self.image(name)?;
-                let mut ink = super::level::Box2 {
-                    x0: info.w,
-                    y0: info.h,
-                    x1: 0.0,
-                    y1: 0.0,
-                };
-                for (px, py, _) in image.enumerate_pixels().filter(|(_, _, pixel)| pixel[3] >= 128) {
-                    ink.x0 = ink.x0.min(px as f32 / self.density);
-                    ink.y0 = ink.y0.min(py as f32 / self.density);
-                    ink.x1 = ink.x1.max((px + 1) as f32 / self.density);
-                    ink.y1 = ink.y1.max((py + 1) as f32 / self.density);
-                }
-                if ink.x0 >= ink.x1 || ink.y0 >= ink.y1 {
-                    return None;
-                }
-                cache.insert(name.into(), ink);
-                ink
-            }
-        };
-        let (left, right) = if flip { (info.w - ink.x1, info.w - ink.x0) } else { (ink.x0, ink.x1) };
-        Some(super::level::Box2 {
-            x0: x + left,
-            y0: y + ink.y0,
-            x1: x + right,
-            y1: y + ink.y1,
-        })
+        self.sprites.get(name).copied()
     }
 
     /// The box of the yard a building's or island's picture covers, art pixels from its top left.
@@ -203,36 +115,17 @@ impl Atlas {
         names.iter().copied().find(|n| self.has(n)).or(names.last().copied()).unwrap_or("")
     }
 
-    /// The decoded sprite (straight RGBA, `density` pixels per art pixel);
-    /// renders from `assets/models/*.glb` when a 3D voxel model exists, else
-    /// decodes the PNG beside `sprites.json`. Cached after first use.
+    /// The decoded PNG (straight RGBA, `density` pixels per art pixel); `None`
+    /// when it is not in the atlas or cannot be read. Decoded once.
     pub fn image(&self, name: &str) -> Option<Arc<RgbaImage>> {
         if let Some(found) = self.images.lock().ok()?.get(name) {
             return found.clone();
         }
-        let canvas = self.canvas(name)?;
-        let rendered = self.models.lock().ok().and_then(|mut lib| lib.render_sprite(name, canvas));
-        let decoded = rendered
-            .or_else(|| {
-                let painted = painted_sprite(name, true);
-                let image = decode(&self.dir.join(format!("{painted}.png")))?;
-                let original = self.sprites.get(painted.as_ref())?;
-                if canvas.width == image.width()
-                    && canvas.height == image.height()
-                    && canvas.foot_x == original.ax * self.density
-                    && canvas.foot_y == original.ay * self.density + 1.0
-                {
-                    return Some(image);
-                }
-                let mut aligned = RgbaImage::new(canvas.width, canvas.height);
-                image::imageops::replace(
-                    &mut aligned,
-                    &image,
-                    (canvas.foot_x - original.ax * self.density).round() as i64,
-                    (canvas.foot_y - 1.0 - original.ay * self.density).round() as i64,
-                );
-                Some(aligned)
-            })
+        let decoded = self
+            .sprites
+            .contains_key(name)
+            .then(|| decode(&self.dir.join(format!("{name}.png"))))
+            .flatten()
             .map(Arc::new);
         self.images.lock().ok()?.insert(name.to_string(), decoded.clone());
         decoded
@@ -245,7 +138,7 @@ impl Atlas {
             .or_insert_with(|| {
                 let shape = if name == "map" {
                     vibevalley_pixel::Normals::Ground
-                } else if name.starts_with("plot-") || name.starts_with("island/plot-") {
+                } else if name.starts_with("plot-") {
                     vibevalley_pixel::Normals::Plot
                 } else {
                     vibevalley_pixel::Normals::Sprite

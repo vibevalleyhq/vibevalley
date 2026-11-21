@@ -96,7 +96,6 @@ pub struct PixelView {
     phone: Option<(Entity<HostedView>, Subscription)>,
     sheet_request: Option<Value>,
     sheet: Option<(Entity<HostedView>, Subscription)>,
-    activation_sub: Option<Subscription>,
     pending_phase: Option<(super::opening::Phase, f32)>,
     command_pending: bool,
 }
@@ -121,47 +120,41 @@ impl PixelView {
             }
         })
         .detach();
-        let initial_scene = if kind == "opening:launch" {
-            // Load the launch splash synchronously so frame 0 paints the opening scene instead of a dark placeholder.
-            Scene::Opening(Box::new(OpeningScene::load(None)))
-        } else {
-            let load_kind = kind.to_string();
-            let task = cx.background_executor().spawn(async move { load(&load_kind) });
-            cx.spawn(async move |this, cx| {
-                let scene = task.await;
-                let _ = this.update(cx, |v, cx| {
-                    v.scene = scene;
-                    if let (Scene::Opening(o), Some((phase, progress))) = (&mut v.scene, v.pending_phase) {
-                        o.phase = phase;
-                        o.progress = progress;
-                    }
-                    let frame = v.frame.clone();
-                    v.on_frame(frame, cx);
-                    if let (Scene::Farm(f), Some(repo)) = (&mut v.scene, v.props["repo"].as_str()) {
-                        f.repo = Some(repo.to_string());
-                    }
-                    if matches!(v.scene, Scene::Farm(_) | Scene::Map(_)) {
-                        v.fetch_agents(cx);
-                    }
-                    if matches!(v.scene, Scene::Farm(_)) {
-                        v.fetch_runtimes(cx);
-                    }
-                    if matches!(v.scene, Scene::Map(_)) {
-                        v.fetch_repos(cx);
-                    }
-                    if matches!(v.scene, Scene::Tree(_)) {
-                        v.fetch_memories(cx);
-                    }
-                    cx.notify();
-                });
-            })
-            .detach();
-            Scene::Loading
-        };
+        let load_kind = kind.to_string();
+        let task = cx.background_executor().spawn(async move { load(&load_kind) });
+        cx.spawn(async move |this, cx| {
+            let scene = task.await;
+            let _ = this.update(cx, |v, cx| {
+                v.scene = scene;
+                if let (Scene::Opening(o), Some((phase, progress))) = (&mut v.scene, v.pending_phase) {
+                    o.phase = phase;
+                    o.progress = progress;
+                }
+                let frame = v.frame.clone();
+                v.on_frame(frame, cx);
+                if let (Scene::Farm(f), Some(repo)) = (&mut v.scene, v.props["repo"].as_str()) {
+                    f.repo = Some(repo.to_string());
+                }
+                if matches!(v.scene, Scene::Farm(_) | Scene::Map(_)) {
+                    v.fetch_agents(cx);
+                }
+                if matches!(v.scene, Scene::Farm(_)) {
+                    v.fetch_runtimes(cx);
+                }
+                if matches!(v.scene, Scene::Map(_)) {
+                    v.fetch_repos(cx);
+                }
+                if matches!(v.scene, Scene::Tree(_)) {
+                    v.fetch_memories(cx);
+                }
+                cx.notify();
+            });
+        })
+        .detach();
         PixelView {
             kind: kind.to_string(),
             props,
-            scene: initial_scene,
+            scene: Scene::Loading,
             frame: Value::Null,
             focus: cx.focus_handle(),
             cache: SpriteCache::default(),
@@ -175,7 +168,6 @@ impl PixelView {
             phone: None,
             sheet_request: None,
             sheet: None,
-            activation_sub: None,
             command_pending: false,
         }
     }
@@ -712,7 +704,6 @@ impl PixelView {
                 Some(f.draw(scale))
             }
             Scene::Map(m) => {
-                m.view_size = Some(view);
                 m.tick(dt);
                 Some(m.draw(aspect))
             }
@@ -761,14 +752,6 @@ fn load(kind: &str) -> Scene {
 
 impl Render for PixelView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self.activation_sub.is_none() {
-            self.activation_sub = Some(cx.observe_window_activation(window, |this, window, cx| {
-                if window.is_window_active() {
-                    this.last = Instant::now();
-                    cx.notify();
-                }
-            }));
-        }
         self.mount_sheet(window, cx);
         let list = self.draw().map(Arc::new);
         if let Scene::Farm(f) = &mut self.scene {

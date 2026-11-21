@@ -115,14 +115,10 @@ pub struct FarmLight {
 
 #[derive(Clone, Default)]
 pub struct DrawList {
-    /// Consecutive, depth-sorted yard sprite groups and their projected ground Y.
-    pub occludable: Vec<(std::ops::Range<usize>, f32)>,
     /// Art pixels of the picture (the framing fits this).
     pub width: f32,
     pub height: f32,
     pub background: Color,
-    /// Optional seamless paper grid `(step_art_px, color)` painted edge-to-edge across the pane.
-    pub grid: Option<(f32, Color)>,
     pub ops: Vec<Op>,
     pub hud: Vec<HudOp>,
     /// Labels centred on art points, drawn as view text.
@@ -145,11 +141,9 @@ pub struct DrawList {
 impl DrawList {
     pub fn new(width: f32, height: f32, background: Color) -> DrawList {
         DrawList {
-            occludable: Vec::new(),
             width,
             height,
             background,
-            grid: None,
             ops: Vec::new(),
             hud: Vec::new(),
             hud_art: Vec::new(),
@@ -312,110 +306,74 @@ fn blit(target: &mut RgbaImage, img: &RgbaImage, x: i64, y: i64) {
 pub fn farm_picture(list: &DrawList, atlas: &Atlas, light: &FarmLight) -> RgbaImage {
     use vibevalley_pixel::{Brush, Surface};
     let mut surface = Surface::new(list.width as u32, list.height as u32, atlas.density as u32, to_rgba(list.background));
-    let paint = |surface: &mut Surface, op: &Op, lit: bool, tint: [f32; 3], feet: Option<f32>| {
-        let occlusion = feet.and_then(|y| atlas.landmarks.as_ref().map(|mask| (&mask.depth, y)));
-        match op {
-            Op::Sprite { name, x, y, flip, alpha } => {
-                if let (Some(info), Some(image)) = (atlas.get(name), atlas.image(name)) {
-                    let normal = lit.then(|| atlas.normals(name, &image));
-                    surface.paint_with_depth(
-                        &image,
-                        normal.as_deref(),
-                        Brush {
-                            flip: *flip,
-                            alpha: *alpha,
-                            tint,
-                            ..Brush::at(*x, *y, info.w, info.h)
-                        },
-                        occlusion,
-                    );
-                }
-            }
-            Op::Image { key, image, x, y, w, h, alpha } => {
-                let normal = (lit && atlas.has(key)).then(|| atlas.normals(key, image));
-                surface.paint_with_depth(
-                    image,
+    let paint = |surface: &mut Surface, op: &Op, lit: bool, tint: [f32; 3]| match op {
+        Op::Sprite { name, x, y, flip, alpha } => {
+            if let (Some(info), Some(image)) = (atlas.get(name), atlas.image(name)) {
+                let normal = lit.then(|| atlas.normals(name, &image));
+                surface.paint(
+                    &image,
                     normal.as_deref(),
                     Brush {
+                        flip: *flip,
                         alpha: *alpha,
                         tint,
-                        ..Brush::at(*x, *y, *w, *h)
-                    },
-                    occlusion,
-                );
-            }
-            Op::Rect { x, y, w, h, color } => surface.paint(&RgbaImage::from_pixel(1, 1, to_rgba(*color)), None, Brush::at(*x, *y, *w, *h)),
-            Op::Glow { x, y, r, color } => {
-                let size = (r * 2.).round().max(1.) as u32;
-                let glow = cached_glow_image(size, *color);
-                surface.paint(
-                    &glow,
-                    None,
-                    Brush {
-                        additive: true,
-                        ..Brush::at(x - r, y - r, r * 2., r * 2.)
+                        ..Brush::at(*x, *y, info.w, info.h)
                     },
                 );
             }
+        }
+        Op::Image { key, image, x, y, w, h, alpha } => {
+            let normal = (lit && atlas.has(key)).then(|| atlas.normals(key, image));
+            surface.paint(
+                image,
+                normal.as_deref(),
+                Brush {
+                    alpha: *alpha,
+                    tint,
+                    ..Brush::at(*x, *y, *w, *h)
+                },
+            );
+        }
+        Op::Rect { x, y, w, h, color } => surface.paint(&RgbaImage::from_pixel(1, 1, to_rgba(*color)), None, Brush::at(*x, *y, *w, *h)),
+        Op::Glow { x, y, r, color } => {
+            let size = (r * 2.).round().max(1.) as u32;
+            let glow = cached_glow_image(size, *color);
+            surface.paint(
+                &glow,
+                None,
+                Brush {
+                    additive: true,
+                    ..Brush::at(x - r, y - r, r * 2., r * 2.)
+                },
+            );
         }
     };
-    let mut groups = list.occludable.iter().peekable();
-    for (index, op) in list.ops[..light.foreground.start].iter().enumerate() {
-        while groups.peek().is_some_and(|(r, _)| r.end <= index) {
-            groups.next();
-        }
-        let feet = groups.peek().and_then(|(r, y)| r.contains(&index).then_some(*y));
-        paint(&mut surface, op, true, [1.; 3], feet);
+    for op in &list.ops[..light.foreground.start] {
+        paint(&mut surface, op, true, [1.; 3]);
     }
     surface.shade(&light.lighting);
     for op in &list.ops[light.foreground.end..] {
-        paint(&mut surface, op, false, [1.; 3], None);
+        paint(&mut surface, op, false, [1.; 3]);
     }
     let tint = list.light.unwrap_or([1.; 3]).map(|c| (c * 0.82 * 255.).round().clamp(0., 255.) / 255.);
     for op in &list.ops[light.foreground.clone()] {
-        paint(&mut surface, op, false, tint, None);
+        paint(&mut surface, op, false, tint);
     }
     surface.finish()
 }
 
-fn paint_grid(target: &mut RgbaImage, step: f32, color: Color, light: Option<[f32; 3]>, k: f32, ox: f32, oy: f32) {
-    if step <= 0.0 || k <= 0.0 {
-        return;
+/// The list's art layer at `k` pixels per art pixel, on the CPU (no HUD
+/// text; HUD boxes are drawn). For checking scenes without a screen.
+pub fn raster(list: &DrawList, atlas: Option<&Atlas>, k: f32) -> RgbaImage {
+    let (w, h) = ((list.width * k).round() as u32, (list.height * k).round() as u32);
+    if let (Some(light), Some(atlas)) = (&list.farm_light, atlas) {
+        return vibevalley_pixel::nearest(&farm_picture(list, atlas, light), w, h, false);
     }
-    let pitch = step * k;
-    let line = to_rgba(shade_color(color, light));
-    let thickness = k.round().max(1.0) as i64;
-    let (tw, th) = (target.width() as i64, target.height() as i64);
-    let kx0 = (-ox / pitch).ceil() as i32;
-    let kx1 = ((tw as f32 - ox) / pitch).floor() as i32;
-    for i in kx0..=kx1 {
-        let x0 = (ox + i as f32 * pitch).round() as i64;
-        for dx in 0..thickness {
-            let x = x0 + dx;
-            if x >= 0 && x < tw {
-                for y in 0..th {
-                    blend(target.get_pixel_mut(x as u32, y as u32), line);
-                }
-            }
-        }
+    let mut target = RgbaImage::from_pixel(w.max(1), h.max(1), to_rgba([list.background[0], list.background[1], list.background[2], 1.0]));
+    let px = |v: f32| (v * k).round() as i64;
+    if let Some(l) = list.light {
+        shade(&mut target, l);
     }
-    let ky0 = (-oy / pitch).ceil() as i32;
-    let ky1 = ((th as f32 - oy) / pitch).floor() as i32;
-    for j in ky0..=ky1 {
-        let y0 = (oy + j as f32 * pitch).round() as i64;
-        for dy in 0..thickness {
-            let y = y0 + dy;
-            if y >= 0 && y < th {
-                for x in 0..tw {
-                    blend(target.get_pixel_mut(x as u32, y as u32), line);
-                }
-            }
-        }
-    }
-}
-
-fn paint_ops(target: &mut RgbaImage, list: &DrawList, atlas: Option<&Atlas>, k: f32, ox: f32, oy: f32) {
-    let px = |o: f32, v: f32| (o + v * k).round() as i64;
     for (index, op) in list.ops.iter().enumerate() {
         let light = list.light_on(index);
         match op {
@@ -428,43 +386,26 @@ fn paint_ops(target: &mut RgbaImage, list: &DrawList, atlas: Option<&Atlas>, k: 
                 if let Some(l) = light {
                     shade(&mut img, l);
                 }
-                blit(target, &img, px(ox, *x), px(oy, *y));
+                blit(&mut target, &img, px(*x), px(*y));
             }
             Op::Image { image, x, y, w, h, alpha, .. } => {
                 let mut img = resample(image, (w * k).round() as u32, (h * k).round() as u32, false, *alpha);
                 if let Some(l) = light {
                     shade(&mut img, l);
                 }
-                blit(target, &img, px(ox, *x), px(oy, *y));
+                blit(&mut target, &img, px(*x), px(*y));
             }
             Op::Rect { x, y, w, h, color } => {
                 let color = &shade_color(*color, light);
                 let img = RgbaImage::from_pixel((w * k).round().max(1.0) as u32, (h * k).round().max(1.0) as u32, to_rgba(*color));
-                blit(target, &img, px(ox, *x), px(oy, *y));
+                blit(&mut target, &img, px(*x), px(*y));
             }
             Op::Glow { x, y, r, color } => {
                 let img = glow_image((r * 2.0 * k).round() as u32, *color);
-                blit(target, &img, px(ox, x - r), px(oy, y - r));
+                blit(&mut target, &img, px(x - r), px(y - r));
             }
         }
     }
-}
-
-/// The list's art layer at `k` pixels per art pixel, on the CPU (no HUD
-/// text; HUD boxes are drawn). For checking scenes without a screen.
-pub fn raster(list: &DrawList, atlas: Option<&Atlas>, k: f32) -> RgbaImage {
-    let (w, h) = ((list.width * k).round() as u32, (list.height * k).round() as u32);
-    if let (Some(light), Some(atlas)) = (&list.farm_light, atlas) {
-        return vibevalley_pixel::nearest(&farm_picture(list, atlas, light), w, h, false);
-    }
-    let mut target = RgbaImage::from_pixel(w.max(1), h.max(1), to_rgba([list.background[0], list.background[1], list.background[2], 1.0]));
-    if let Some(l) = list.light {
-        shade(&mut target, l);
-    }
-    if let Some((step, color)) = list.grid {
-        paint_grid(&mut target, step, color, list.light, k, 0.0, 0.0);
-    }
-    paint_ops(&mut target, list, atlas, k, 0.0, 0.0);
     target
 }
 
@@ -473,27 +414,12 @@ pub fn raster(list: &DrawList, atlas: Option<&Atlas>, k: f32) -> RgbaImage {
 /// checking a HUD's layout without a screen.
 #[cfg(test)]
 pub fn raster_view(list: &DrawList, atlas: Option<&Atlas>, view: (f32, f32)) -> RgbaImage {
-    let f = if list.fit {
-        super::sky::fit_framing(view, (list.width, list.height))
-    } else {
-        super::sky::frame_cover(view, (list.width, list.height), super::sky::FARM_CUT)
-    };
+    let f = super::sky::frame_whole(view, (list.width, list.height), super::sky::FARM_CUT);
+    let art = raster(list, atlas, f.scale);
     let bg = shade_color(list.background, list.light);
-    let mut target = RgbaImage::from_pixel(view.0.round().max(1.0) as u32, view.1.round().max(1.0) as u32, to_rgba(bg));
-    if let (Some(light), Some(atlas)) = (&list.farm_light, atlas) {
-        let art = vibevalley_pixel::nearest(
-            &farm_picture(list, atlas, light),
-            f.bx.w.round().max(1.0) as u32,
-            f.bx.h.round().max(1.0) as u32,
-            false,
-        );
-        blit(&mut target, &art, f.bx.x.round() as i64, f.bx.y.round() as i64);
-    } else {
-        if let Some((step, color)) = list.grid {
-            paint_grid(&mut target, step, color, list.light, f.scale, f.bx.x, f.bx.y);
-        }
-        paint_ops(&mut target, list, atlas, f.scale, f.bx.x, f.bx.y);
-    }
+    let dim = to_rgba([bg[0] * 0.7, bg[1] * 0.7, bg[2] * 0.7, 1.0]);
+    let mut target = RgbaImage::from_pixel(view.0.round().max(1.0) as u32, view.1.round().max(1.0) as u32, dim);
+    blit(&mut target, &art, f.bx.x.round() as i64, f.bx.y.round() as i64);
     let (ox, oy) = if list.hud_view { (0.0, 0.0) } else { (f.bx.x, f.bx.y) };
     let mut clip: Option<[f32; 4]> = None;
     let put = |target: &mut RgbaImage, img: &RgbaImage, x: f32, y: f32, clip: Option<[f32; 4]>| {

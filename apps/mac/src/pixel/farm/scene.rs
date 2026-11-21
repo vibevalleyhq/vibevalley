@@ -9,25 +9,27 @@ use super::super::atlas::Atlas;
 use super::super::draw::{DrawList, Op, rgba};
 use super::super::level::{Box2, Point, pt};
 use super::super::nav::{Facing, Walker, frame_at};
-use super::super::projection::ground;
 use super::super::sky::{DayClock, clock_text, flat_light, sky_at};
 use super::frame::{Crop, Frame, Session};
 use super::hud::{self, Panel};
 use super::phone::Phone;
 use super::world::{
-    BEDS, Bed, Goal, GoalInput, LightSource, PLOT_H, Pose, PoseHold, REST_SPOTS, Stroll, StrollSpot, VillageHit, VillageWorld, Whereabouts, YARD_PLACES,
-    bed_of_station, box_corners, place_of_action, plot_calls, pose_of, projected_box, spots_for,
+    BEDS, Bed, Goal, GoalInput, PLOT_H, PLOT_W, Pose, PoseHold, REST_SPOTS, Stroll, StrollSpot, VillageHit, VillageWorld, Whereabouts, YARD_PLACES,
+    bed_of_station, place_of_action, plot_calls, pose_of, spots_for, village_hit_at,
 };
 
 const WALK_SPEED: f32 = 42.0;
-const STRIDE_LENGTH: f32 = 15.0;
+const WALK_FPS: f32 = 8.0;
 const FADE_S: f32 = 0.8;
 const GONE_S: f32 = 3.6;
+const LANTERN_DARK: f32 = 0.35;
 const WHERE_TICK: f32 = 0.3;
 const STROLL_TICK: f32 = 0.6;
 const HOP: [f32; 6] = [2.0, 4.0, 5.0, 4.0, 2.0, 1.0];
 const HOP_S: f32 = 0.3;
 const BACKGROUND: u32 = 0x2b3320;
+const LAMP: u32 = 0xffc46e;
+const LANTERN: u32 = 0xffd28c;
 
 const SPECIES: [&str; 7] = ["bear", "rabbit", "fox", "cat", "owl", "hedgehog", "raccoon"];
 
@@ -67,6 +69,16 @@ fn side_of(f: Facing) -> &'static str {
     }
 }
 
+fn place_frames(key: &str) -> Option<(&'static [&'static str], f32)> {
+    match key {
+        "bench" => Some((&["sit"], 1.0)),
+        "library" => Some((&["read"], 1.0)),
+        "workshop" => Some((&["hammer-1", "hammer-2"], 3.0)),
+        "mast" => Some((&["tinker-1", "tinker-2"], 1.5)),
+        _ => None,
+    }
+}
+
 struct Actor {
     walker: Walker,
     look: String,
@@ -78,52 +90,10 @@ struct Actor {
     hop_at: f32,
     where_: Option<Whereabouts>,
     stroll: Option<Stroll>,
-    pose: PoseHold,
+    pose: Option<PoseHold>,
     shown: Pose,
-    stride: f32,
-    travel_facing: Facing,
-    arrived_at: f32,
     /// Last drawn sprite box, for hits.
     bx: Box2,
-}
-
-impl Actor {
-    fn step(&mut self, goal: Goal, world: &VillageWorld, now: f32, dt: f32, pose: Pose) {
-        let shown = self.pose.next(pose, now);
-        let old = ground(pt(self.walker.x, self.walker.y));
-        self.walker.go(goal.at, &world.nav);
-        if self.walker.walking() || self.goal != goal || shown != self.shown {
-            self.arrived_at = now;
-        }
-        self.walker.step(dt);
-        let moved = ground(pt(self.walker.x, self.walker.y));
-        let (dx, dy) = (moved.x - old.x, moved.y - old.y);
-        let distance = dx.hypot(dy);
-        if distance > 0.01 {
-            self.stride = (self.stride + distance) % STRIDE_LENGTH;
-            self.travel_facing = if dx.abs() > dy.abs() {
-                if dx > 0. { Facing::Right } else { Facing::Left }
-            } else if dy > 0. {
-                Facing::Down
-            } else {
-                Facing::Up
-            };
-        }
-        self.goal = goal;
-        self.shown = shown;
-    }
-
-    fn lift(&self, now: f32) -> f32 {
-        let since = now - self.hop_at;
-        if since >= HOP_S {
-            return 0.;
-        }
-        HOP[((since / HOP_S * HOP.len() as f32) as usize).min(HOP.len() - 1)]
-    }
-
-    fn stationary_frame(&self, now: f32, fps: f32) -> usize {
-        frame_at(now - self.arrived_at, 8, fps)
-    }
 }
 
 /// The six farm tools (keys 1..6).
@@ -340,7 +310,7 @@ impl FarmScene {
                         if let Some(s) = r.session_id.as_ref().and_then(|id| frame.state.sessions.iter().find(|s| &s.id == id))
                             && let Some(b) = bed_of_station(frame.station_of(s))
                         {
-                            self.life.coin(ground(self.world.plot_at(b.index) + pt(0., -PLOT_H / 2.)));
+                            self.life.coin(self.world.plot_at(b.index) + pt(0., -PLOT_H / 2.));
                         }
                     }
                     GameEffect::LevelUp(_) => self.sounds.push("levelUp"),
@@ -355,7 +325,7 @@ impl FarmScene {
 
     pub fn helper_feet(&self, id: &str) -> Option<Point> {
         let a = self.actors.get(id)?;
-        a.left_at.is_none().then(|| ground(pt(a.walker.x, a.walker.y)))
+        a.left_at.is_none().then_some(pt(a.walker.x.round(), a.walker.y.round()))
     }
 
     pub fn show_toast(&mut self, text: impl Into<String>) {
@@ -364,7 +334,7 @@ impl FarmScene {
 
     pub fn play_bed_fx(&mut self, bed: usize) {
         self.bed_pressed = Some((bed, self.t + 0.15));
-        self.life.bed(ground(self.world.plot_at(bed) + pt(0., -PLOT_H / 2.)), self.tool);
+        self.life.bed(self.world.plot_at(bed) + pt(0., -PLOT_H / 2.), self.tool);
     }
 
     fn random(&mut self) -> f32 {
@@ -463,8 +433,8 @@ impl FarmScene {
         for s in &workers {
             let station = self.frame.station_of(s);
             let crop = self.crop_of(s);
-            let pose = pose_of(s, crop, self.frame.stage_of(s));
-            let calls = pose == Pose::Ask || plot_calls(crop);
+            let pose = pose_of(s, crop);
+            let calls = plot_calls(crop);
             let queue_index = if station < 0 {
                 queued += 1;
                 queued - 1
@@ -525,18 +495,19 @@ impl FarmScene {
                     hop_at: -10.0,
                     where_: (station >= 0).then(|| Whereabouts::new("plot", t, place_want)),
                     stroll: None,
-                    pose: PoseHold::new(pose, t),
+                    pose: None,
                     shown: pose,
-                    stride: 0.,
-                    travel_facing: Facing::Down,
-                    arrived_at: t,
                     bx: Box2::default(),
                 }
             });
             actor.look = look;
             actor.station = station;
             actor.bed = bed_of_station(station);
-            actor.step(goal, world, t, dt, pose);
+            actor.goal = goal.clone();
+            actor.walker.go(goal.at, &world.nav);
+            actor.walker.step(dt);
+            let hold = actor.pose.get_or_insert_with(|| PoseHold::new(pose, t));
+            actor.shown = hold.next(pose, t);
         }
         let present: Vec<&str> = workers.iter().map(|s| s.id.as_str()).collect();
         let gate = self.world.gate;
@@ -548,12 +519,16 @@ impl FarmScene {
             if t - left >= GONE_S {
                 return false;
             }
-            let goal = Goal {
+            a.goal = Goal {
                 key: "gate".into(),
                 at: gate,
                 facing: None,
             };
-            a.step(goal, &self.world, t, dt, Pose::Idle);
+            a.walker.go(gate, &self.world.nav);
+            a.walker.step(dt);
+            if let Some(h) = a.pose.as_mut() {
+                a.shown = h.next(Pose::Idle, t);
+            }
             if !a.walker.walking() {
                 a.gone_for += dt;
             }
@@ -564,25 +539,17 @@ impl FarmScene {
             .actors
             .values()
             .filter(|a| a.walker.walking())
-            .map(|a| ground(pt(a.walker.x, a.walker.y)))
+            .map(|a| pt(a.walker.x, a.walker.y))
             .collect::<Vec<_>>();
         let ripe = BEDS
             .iter()
             .filter(|b| b.station >= 0 && super::world::is_ripe(self.crop_of_bed(**b, false)))
-            .map(|b| projected_box(self.world.plot_box(b.index)))
+            .map(|b| self.world.plot_box(b.index))
             .collect::<Vec<_>>();
         let activity = super::life::Activity {
             walkers: &walkers,
             library: on_site("library"),
             workshop: on_site("workshop"),
-            hammer_strike: self.actors.values().any(|a| {
-                !a.walker.walking()
-                    && a.shown == Pose::Work
-                    && a.goal.key == "workshop"
-                    && matches!(a.goal.facing, Some(Facing::Right | Facing::Left))
-                    && a.stationary_frame(t, 8.) == 5
-                    && a.stationary_frame(t - dt, 8.) != 5
-            }),
             mast: on_site("mast"),
             bench: on_site("bench"),
             ripe: &ripe,
@@ -591,59 +558,32 @@ impl FarmScene {
         self.life.step(&self.world, t, dt, 1. - super::super::sky::sun_of(self.clock.tod), activity);
     }
 
-    pub(super) fn plot_foot(&self, index: usize) -> Point {
-        ground(self.world.plot_at(index))
+    fn sessions_hit_boxes(&self) -> Vec<(String, Box2)> {
+        let mut v: Vec<(String, Box2, f32)> = self
+            .actors
+            .iter()
+            .filter(|(_, a)| a.left_at.is_none())
+            .map(|(id, a)| (id.clone(), a.bx, a.walker.y))
+            .collect();
+        v.sort_by_key(|item| (item.2 * 10.).round() as i32);
+        v.into_iter().map(|(id, b, _)| (id, b)).collect()
     }
 
-    fn sprite_contains(&self, name: &str, feet: Point, flip: bool, p: Point) -> bool {
-        let Some((x, y)) = self.atlas.top_left(name, feet.x, feet.y, flip) else {
-            return false;
-        };
-        let (u, v) = ((p.x - x) * self.atlas.density, (p.y - y) * self.atlas.density);
-        let Some(info) = self.atlas.get(name) else { return false };
-        if u < 0. || v < 0. || u >= info.w * self.atlas.density || v >= info.h * self.atlas.density {
-            return false;
-        }
-        self.atlas.image(name).is_some_and(|image| {
-            let x = if flip { image.width() - 1 - u as u32 } else { u as u32 };
-            image.get_pixel_checked(x, v as u32).is_some_and(|pixel| pixel[3] >= 128)
+    fn dog_box(&self) -> Option<Box2> {
+        let name = self.dog_picture();
+        let info = self.atlas.get(name)?;
+        let (x, y) = self.atlas.top_left(name, self.world.dog.x, self.world.dog.y, false)?;
+        Some(Box2 {
+            x0: x,
+            y0: y,
+            x1: x + info.w,
+            y1: y + info.h,
         })
     }
 
     pub fn hit_at(&self, p: Point) -> Option<VillageHit> {
-        let mut nearest = self.atlas.landmark_at(p).map(|(id, depth)| (depth, VillageHit::Spot(id)));
-        let mut consider = |hit, depth: f32, inside: bool| {
-            if inside && nearest.as_ref().is_none_or(|(last, _)| depth >= *last) {
-                nearest = Some((depth, hit));
-            }
-        };
-        for bed in BEDS {
-            let b = self.world.plot_box(bed.index);
-            let at = self.plot_foot(bed.index);
-            let name = format!("plot-{}", self.crop_of_bed(bed, false).name());
-            consider(
-                VillageHit::Plot(bed.index),
-                ground(pt((b.x0 + b.x1) * 0.5, (b.y0 + b.y1) * 0.5)).y,
-                self.sprite_contains(&name, at, false, p),
-            );
-        }
-        for prop in &self.world.props {
-            let at = ground(prop.at);
-            if let Some(place) = YARD_PLACES.iter().find(|place| place.id == prop.spot) {
-                consider(VillageHit::Spot(place.id), at.y, self.sprite_contains(&prop.sprite, at, false, p));
-            }
-        }
-        let manager = ground(self.world.orchestrator);
-        consider(VillageHit::Spot("manager"), manager.y, self.sprite_contains("manager", manager, false, p));
-        let dog = ground(self.world.dog);
-        consider(VillageHit::Dog, dog.y, self.sprite_contains(self.dog_picture(), dog, false, p));
-        for (id, a) in self.actors.iter().filter(|(_, a)| a.left_at.is_none() && a.bx.contains(p)) {
-            let (name, flip) = actor_picture(a, self.t as f32);
-            let at = ground(pt(a.walker.x, a.walker.y));
-            let feet = pt(at.x.round(), at.y.round() - a.lift(self.t as f32));
-            consider(VillageHit::Session(id.clone()), at.y, self.sprite_contains(&name, feet, flip, p));
-        }
-        nearest.map(|(_, hit)| hit)
+        let plots: Vec<(usize, Box2)> = BEDS.iter().map(|b| (b.index, self.world.plot_box(b.index))).collect();
+        village_hit_at(&self.sessions_hit_boxes(), self.dog_box(), &self.world.spot_boxes, &plots, p)
     }
 
     /// The pointer moved to `p` (art pixels), or left.
@@ -687,7 +627,7 @@ impl FarmScene {
             },
             Some(VillageHit::Dog) => {
                 self.sounds.push(self.dog.pet(self.t as f32));
-                self.life.heart(ground(self.world.dog) + pt(1., -20.));
+                self.life.heart(self.world.dog + pt(1., -20.));
                 FarmTap::Dog
             }
             None => {
@@ -763,22 +703,18 @@ impl FarmScene {
             *y = 0.0;
         }
         // Everything standing on the ground, drawn by the y of its feet.
-        let mut layers: Vec<(f32, Vec<Op>)> = Vec::new();
+        let mut ground: Vec<(f32, Vec<Op>)> = Vec::new();
         let hover_bed = self.hovered_bed();
         let hover_spot = match &self.hover {
             Some(VillageHit::Spot(s)) => Some(*s),
             _ => None,
         };
-        let workers = self.workers();
         let leaving_stations: Vec<i32> = self.actors.values().filter(|a| a.left_at.is_some()).map(|a| a.station).collect();
-        let attention_pulse = 0.45 + 0.45 * (self.t as f32 * 3.5).sin();
         for bed in BEDS {
-            let footprint = w.plot_box(bed.index);
-            let at = self.plot_foot(bed.index);
-            let session = (bed.unlock_level.is_none() && bed.station >= 0)
-                .then(|| workers.iter().find(|s| self.frame.station_of(s) == bed.station))
-                .flatten();
-            let leaving = bed.unlock_level.is_none() && leaving_stations.contains(&bed.station) && session.is_none();
+            let at = w.plot_at(bed.index);
+            let leaving = bed.unlock_level.is_none()
+                && leaving_stations.contains(&bed.station)
+                && !self.workers().iter().any(|s| self.frame.station_of(s) == bed.station);
             let crop = self.crop_of_bed(bed, leaving);
             let hot = hover_bed == Some(bed.index);
             let mut ops = Vec::new();
@@ -800,69 +736,63 @@ impl FarmScene {
                 1.0,
             );
             ops.extend(l.ops);
-            let ring = if hot {
-                Some(rgba(0xffe9a0, 1.0))
-            } else if let Some(s) = session {
-                let tone = self.frame.plot_of(s).and_then(|p| p.badge.as_ref()).map(|b| b.tone.as_str());
-                let hex = match tone {
-                    Some("wait") => Some(0xffa94d),
-                    Some("ripe") => Some(0xffe066),
-                    Some("bug") => Some(0xff6b57),
-                    Some("stuck") => Some(0x7db7db),
-                    _ if crop == Crop::Dry => Some(0xffa94d),
-                    _ if super::world::is_ripe(crop) => Some(0xffe066),
-                    _ if crop == Crop::Withered => Some(0xff6b57),
-                    _ => None,
-                };
-                hex.map(|c| rgba(c, attention_pulse))
-            } else {
-                None
-            };
-            if let Some(ring) = ring {
-                let corners = box_corners(footprint).map(ground);
-                for (i, corner) in corners.iter().enumerate() {
-                    let next = corners[(i + 1) % corners.len()];
-                    let delta = pt(next.x - corner.x, next.y - corner.y);
-                    let steps = delta.x.abs().max(delta.y.abs()).ceil().max(1.) as i32;
-                    for step in 0..steps {
-                        let f = step as f32 / steps as f32;
-                        ops.push(Op::Rect {
-                            x: (corner.x + f * delta.x).round(),
-                            y: (corner.y + f * delta.y).round(),
-                            w: 1.,
-                            h: 1.,
-                            color: ring,
-                        });
-                    }
-                }
+            if hot {
+                let (x0, y0) = (at.x - PLOT_W / 2.0 - 1.0, at.y - PLOT_H - 4.0);
+                let ring = rgba(0xffe9a0, 1.0);
+                ops.push(Op::Rect {
+                    x: x0,
+                    y: y0,
+                    w: PLOT_W + 2.0,
+                    h: 1.0,
+                    color: ring,
+                });
+                ops.push(Op::Rect {
+                    x: x0,
+                    y: y0 + PLOT_H + 4.0,
+                    w: PLOT_W + 2.0,
+                    h: 1.0,
+                    color: ring,
+                });
+                ops.push(Op::Rect {
+                    x: x0,
+                    y: y0,
+                    w: 1.0,
+                    h: PLOT_H + 5.0,
+                    color: ring,
+                });
+                ops.push(Op::Rect {
+                    x: x0 + PLOT_W + 1.0,
+                    y: y0,
+                    w: 1.0,
+                    h: PLOT_H + 5.0,
+                    color: ring,
+                });
             }
-            layers.push((ground(pt((footprint.x0 + footprint.x1) * 0.5, (footprint.y0 + footprint.y1) * 0.5)).y, ops));
+            ground.push((at.y - PLOT_H, ops));
         }
         for p in &w.props {
             if !atlas.has(&p.sprite) {
                 continue;
             }
-            let at = ground(p.at);
             let lift = if hover_spot == Some(p.spot.as_str()) { 1.0 } else { 0.0 };
             let mut l = DrawList::default();
             contact_shadow(
                 &mut l,
-                at + pt(0., -1.),
+                p.at + pt(0., -1.),
                 (atlas.get(&p.sprite).map_or(10., |s| s.w * 0.9)).round().max(10.),
                 5.,
                 0.5,
                 1.,
             );
-            l.sprite(&atlas, &p.sprite, at.x, at.y - lift, false, 1.0);
-            layers.push((at.y, l.ops));
+            l.sprite(&atlas, &p.sprite, p.at.x, p.at.y - lift, false, 1.0);
+            ground.push((p.at.y, l.ops));
         }
         {
             let mut l = DrawList::default();
-            let at = ground(w.orchestrator);
-            footing(&mut l, at, 14., self.clock.tod, 1.);
+            footing(&mut l, w.orchestrator, 14., self.clock.tod, 1.);
             let lift = if hover_spot == Some("manager") { 1.0 } else { 0.0 };
-            self.manager_picture(&mut l, "orchestrator", at + pt(0., -lift));
-            layers.push((at.y, l.ops));
+            self.manager_picture(&mut l, "orchestrator", w.orchestrator + pt(0., -lift));
+            ground.push((w.orchestrator.y, l.ops));
         }
         for (i, profile) in self
             .profiles
@@ -870,21 +800,19 @@ impl FarmScene {
             .filter(|p| p.role == vibevalley_protocol::AgentRole::Orchestrator && p.id != "orchestrator")
             .enumerate()
         {
-            let at = ground(w.orchestrator + pt(if i % 2 == 0 { 1. } else { -1. } * 18. * (i / 2 + 1) as f32, 2.));
+            let at = w.orchestrator + pt(if i % 2 == 0 { 1. } else { -1. } * 18. * (i / 2 + 1) as f32, 2.);
             let mut l = DrawList::default();
-            footing(&mut l, at, 14., self.clock.tod, 1.);
             self.manager_picture(&mut l, &profile.id, at);
-            layers.push((at.y, l.ops));
+            ground.push((at.y, l.ops));
         }
         {
             let mut l = DrawList::default();
-            let at = ground(w.dog);
-            footing(&mut l, at, 16., self.clock.tod, 1.);
+            footing(&mut l, w.dog, 16., self.clock.tod, 1.);
             let mut look = self.dog.look(self.t as f32, self.hover == Some(VillageHit::Dog));
             if self.pressed == Some(Some(VillageHit::Dog)) {
                 look.grow = -1.;
             }
-            let (x, y) = atlas.top_left(look.sprite, at.x, at.y - look.lift, false).unwrap_or((at.x, at.y));
+            let (x, y) = atlas.top_left(look.sprite, w.dog.x, w.dog.y - look.lift, false).unwrap_or((w.dog.x, w.dog.y));
             if let (Some(info), Some(image)) = (atlas.get(look.sprite), atlas.image(look.sprite)) {
                 l.ops.push(Op::Image {
                     key: look.sprite.into(),
@@ -896,7 +824,7 @@ impl FarmScene {
                     alpha: 1.,
                 });
             }
-            layers.push((at.y, l.ops));
+            ground.push((w.dog.y, l.ops));
         }
         let t = self.t as f32;
         let mut boxes = Vec::new();
@@ -905,28 +833,36 @@ impl FarmScene {
             if alpha <= 0.0 {
                 continue;
             }
-            let (name, flip) = actor_picture(a, t);
-            let lift = a.lift(t);
-            let feet = ground(pt(a.walker.x, a.walker.y));
-            let (x, y) = (feet.x.round(), feet.y.round());
+            let (name, flip, mut lift) = actor_picture(a, self.t, &atlas);
+            let since = t - a.hop_at;
+            if since < HOP_S {
+                lift += HOP[((since / HOP_S * HOP.len() as f32) as usize).min(HOP.len() - 1)];
+            }
+            let (x, y) = (a.walker.x.round(), a.walker.y.round());
             let mut l = DrawList::default();
             footing(&mut l, pt(x, y), 12., self.clock.tod, alpha);
             l.sprite(&atlas, &name, x, y - lift, flip, alpha);
-            if let Some(ink) = atlas.visible_box(&name, x, y - lift, flip) {
-                boxes.push((id.clone(), ink));
+            if let (Some(info), Some((x0, y0))) = (atlas.get(&name), atlas.top_left(&name, x, y - lift, flip)) {
+                boxes.push((
+                    id.clone(),
+                    Box2 {
+                        x0,
+                        y0,
+                        x1: x0 + info.w,
+                        y1: y0 + info.h,
+                    },
+                ));
             }
-            layers.push((feet.y, l.ops));
+            ground.push((a.walker.y, l.ops));
         }
         for (id, b) in boxes {
             if let Some(a) = self.actors.get_mut(&id) {
                 a.bx = b;
             }
         }
-        layers.sort_by_key(|item| (item.0 * 10.).round() as i32);
-        for (depth, ops) in layers {
-            let start = list.ops.len();
+        ground.sort_by_key(|item| (item.0 * 10.).round() as i32);
+        for (_, ops) in ground {
             list.ops.extend(ops);
-            list.occludable.push((start..list.ops.len(), depth));
         }
         self.life.draw_ground(&mut list, &atlas, t, 1. - super::super::sky::sun_of(self.clock.tod));
         let w = &self.world;
@@ -951,7 +887,7 @@ impl FarmScene {
                 });
             }
         }
-        // Sky grading applies before the emitters and HUD.
+        // Light: the sky darkens the picture, lamps and lanterns shine through.
         let foreground_end = list.ops.len();
         let mut lamps = Vec::new();
         let sky = sky_at(self.clock.tod);
@@ -959,30 +895,47 @@ impl FarmScene {
         list.light = Some(flat);
         list.lit = list.ops.len();
         let night = sky.night;
-        for light in &w.lights {
-            let (color, intensity, halo) = match light.source {
-                LightSource::Window => (0xffd399, 0.80 * night, 0.12),
-                LightSource::Lamp => (0xffc579, 1.10 * night, 0.22),
-                LightSource::Forge => {
-                    let coals = 0.90 + 0.07 * (t * 7.).sin() + 0.03 * (t * 13.).sin();
-                    (0xff974c, (0.22 + 0.60 * night) * coals, 0.16)
-                }
-            };
-            if intensity > 0.02 {
+        if night > 0.02 {
+            for (i, (at, r)) in w.lights.iter().enumerate() {
+                let flicker = 0.9 + 0.1 * frame_at(t + i as f32 * 0.37, 2, 3.0) as f32;
                 lamps.push(vibevalley_pixel::PointLight {
-                    x: light.at.x,
-                    y: light.at.y,
-                    z: 5.,
-                    radius: light.radius,
-                    color: rgba(color, 1.)[..3].try_into().unwrap(),
-                    intensity,
+                    x: at.x,
+                    y: at.y,
+                    z: 14.,
+                    radius: r * 2.6,
+                    color: rgba(LAMP, 1.)[..3].try_into().unwrap(),
+                    intensity: 1.3 * night * flicker,
                 });
                 list.ops.push(Op::Glow {
-                    x: light.at.x,
-                    y: light.at.y,
-                    r: (light.radius * 0.30).max(2.),
-                    color: rgba(color, halo * intensity),
+                    x: at.x,
+                    y: at.y,
+                    r: (r * 0.8).round().max(4.0),
+                    color: rgba(LAMP, 0.55 * night * flicker),
                 });
+            }
+        }
+        if night > LANTERN_DARK {
+            let shine = (night - LANTERN_DARK) / (1.0 - LANTERN_DARK);
+            for a in self.actors.values() {
+                let alpha = (1.0 - a.gone_for / FADE_S).max(0.0) * shine;
+                let side = if a.walker.facing == Facing::Left { -5.0 } else { 5.0 };
+                let (x, y) = (a.walker.x.round() + side, a.walker.y.round() - 11.0);
+                lamps.push(vibevalley_pixel::PointLight {
+                    x,
+                    y,
+                    z: 10.,
+                    radius: 34.,
+                    color: rgba(LANTERN, 1.)[..3].try_into().unwrap(),
+                    intensity: 0.6 * alpha,
+                });
+                list.ops.push(Op::Glow {
+                    x,
+                    y,
+                    r: 9.0,
+                    color: rgba(LANTERN, 0.5 * alpha),
+                });
+                list.rect(x - 1.0, y - 1.0, 2.0, 3.0, rgba(0xffb347, alpha));
+                list.rect(x - 1.0, y, 2.0, 1.0, rgba(0xfff1c2, alpha));
             }
         }
         self.life.draw_lights(&mut list, &atlas, t, night, &mut lamps);
@@ -1011,8 +964,8 @@ impl FarmScene {
             .map(|(id, a)| {
                 serde_json::json!({
                     "id": id, "look": a.look, "goal": a.goal.key, "at": [a.walker.x.round(), a.walker.y.round()],
-                    "screenFeet": self.helper_feet(id).map(|p| [p.x.round(),p.y.round()]), "walking": a.walker.walking(), "pose": format!("{:?}", a.shown), "station": a.station,
-                    "leaving": a.left_at.is_some(), "sprite": actor_picture(a, self.t as f32).0,
+                    "walking": a.walker.walking(), "pose": format!("{:?}", a.shown), "station": a.station,
+                    "leaving": a.left_at.is_some(),
                 })
             })
             .collect();
@@ -1047,30 +1000,34 @@ fn stroll_on(actor: &mut Actor, allowed: &[StrollSpot], working: bool, t: f32, r
     });
 }
 
-fn actor_picture(a: &Actor, now: f32) -> (String, bool) {
-    let facing = a.goal.facing.unwrap_or(a.travel_facing);
-    let (clip, sample, flip) = if a.walker.walking() {
-        let dir = match a.travel_facing {
-            Facing::Left | Facing::Right => "walk-side",
-            Facing::Up => "walk-up",
-            Facing::Down => "walk-down",
-        };
-        (dir, (a.stride * 8. / STRIDE_LENGTH) as usize, a.travel_facing == Facing::Left)
+fn actor_picture(a: &Actor, t: f64, atlas: &Atlas) -> (String, bool, f32) {
+    let look = &a.look;
+    let has = |n: &str| atlas.has(n);
+    let (name, flip, lift) = if a.walker.walking() {
+        let dir = side_of(a.walker.facing);
+        let cycle = [format!("{dir}-1"), dir.to_string(), format!("{dir}-2"), dir.to_string()];
+        (format!("{look}-{}", cycle[frame_at(t, 4, WALK_FPS)]), a.walker.facing == Facing::Left, 0.0)
+    } else if let Some((frames, fps)) = place_frames(&a.goal.key).filter(|(f, _)| has(&format!("{look}-{}", f[0]))) {
+        (
+            format!("{look}-{}", frames[frame_at(t, frames.len(), fps)]),
+            a.goal.facing == Some(Facing::Left),
+            0.0,
+        )
     } else {
-        let (clip, fps, flip) = match (a.goal.key.as_str(), a.shown) {
-            ("library", _) => ("read", 4., false),
-            ("bench", _) => ("sit", 3., false),
-            ("workshop", Pose::Work) if matches!(facing, Facing::Left | Facing::Right) => ("hammer", 8., facing == Facing::Left),
-            ("mast", _) => ("tinker", 6., false),
-            (_, Pose::Ask) => ("ask", 5., false),
-            (_, Pose::Cheer) => ("cheer", 6., false),
-            (_, Pose::Worry) => ("worry", 4., false),
-            (key, Pose::Hoe) if key.starts_with("bed:") => ("hoe", 7., facing == Facing::Left),
-            _ => (side_of(facing), 3., facing == Facing::Left),
-        };
-        (clip, a.stationary_frame(now, fps), flip)
+        let facing = a.goal.facing.unwrap_or(a.walker.facing);
+        match a.shown {
+            Pose::Work if place_frames(&a.goal.key).is_some() => (format!("{look}-{}", side_of(facing)), facing == Facing::Left, 0.0),
+            Pose::Work => (format!("{look}-work"), false, 0.0),
+            Pose::Cheer => (format!("{look}-cheer"), false, frame_at(t, 2, 2.0) as f32 * 2.0),
+            Pose::Worry => (format!("{look}-worry"), false, 0.0),
+            _ => (format!("{look}-{}", side_of(facing)), facing == Facing::Left, 0.0),
+        }
     };
-    (format!("{}-{clip}@{sample}", a.look), flip)
+    if has(&name) {
+        (name, flip, lift)
+    } else {
+        (format!("{look}-down"), false, lift)
+    }
 }
 
 fn contact_shadow(list: &mut DrawList, at: Point, w: f32, h: f32, alpha: f32, stretch: f32) {
@@ -1109,9 +1066,10 @@ fn footing(list: &mut DrawList, at: Point, w: f32, tod: f32, fade: f32) {
     contact_shadow(
         list,
         at + pt((reach / 2.).round(), 0.),
-        w,
+        w + 4.,
         4.,
-        fade * (0.33 + 0.10 * (1. - sky.night)),
-        1. + reach.abs() / 15.,
+        fade * 0.3 * (0.35 + 0.65 * (1. - sky.night)),
+        1. + reach.abs() / 8.,
     );
+    contact_shadow(list, at, w, 4., fade * 0.5, 1.);
 }

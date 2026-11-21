@@ -56,10 +56,10 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [01-philosophy-and-tokens.md](docs/design/01-philosophy-and-tokens.md) | 设计哲学与令牌体系：十条判断准绳、五端色阶与语义四色、圆角边框阴影、字体图标梯级与动效曲线 |
 | [02-atomic-components.md](docs/design/02-atomic-components.md) | 基础原子组件与交互控件：按钮、表单、开关、状态标签、弹窗表格分栏、领域原子与外壳组件对照 |
 | [03-conversation-and-work-streams.md](docs/design/03-conversation-and-work-streams.md) | 会话核心流、工单板与运行轨迹引擎：频道排版、Composer 斜杠与提及、`/runs` 瀑布图、看板与档案额度 |
-| [04-motion-and-pixel-rendering.md](docs/design/04-motion-and-pixel-rendering.md) | 动效物理学、像素三渲二与光影系统：GLB 光栅、384×256 投影与 2.5D 遮挡、昼夜光影、寻路与防抖物理 |
+| [04-motion-and-pixel-rendering.md](docs/design/04-motion-and-pixel-rendering.md) | 动效物理学、2D 像素渲染与光影系统：精灵图集与法线推导、384×256 整数取景、昼夜光影、寻路与防抖物理 |
 | [05-audiovisual-and-artifacts.md](docs/design/05-audiovisual-and-artifacts.md) | 视听多媒体、Artifact 与终端交互物理：独占音频、8-bit 音效、素材库灯箱、双轨分栏、Diff/文件/终端链接 |
 | [06-desktop-architecture-and-topology.md](docs/design/06-desktop-architecture-and-topology.md) | 桌面架构、全页面清单与状态机拓扑：macOS 多载体宿主、角色与全路由清单、显式 FSM、响应式、快捷键与容灾 |
-| [07-engineering-config-and-assets.md](docs/design/07-engineering-config-and-assets.md) | 工程配置、跨平台接口与像素资产管线：`nsh` Solid 适配、桌面桥接、体素/像素管线与 6 档密级测试报告 |
+| [07-engineering-config-and-assets.md](docs/design/07-engineering-config-and-assets.md) | 工程配置、跨平台接口与像素资产管线：`nsh` Solid 适配、桌面桥接、像素管线与 6 档密级测试报告 |
 | [08-agent-ui-guide.md](docs/design/08-agent-ui-guide.md) | AI Agent UI 开发与审查指南：载体判别、样式与状态约束及提交前核对清单 |
 | [09-design-system-audit.md](docs/design/09-design-system-audit.md) | 跨载体设计系统横向差异审计：令牌错位、双源组件、手绘图形/手搓控件与静态检查缺口 |
 

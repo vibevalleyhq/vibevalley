@@ -11,7 +11,7 @@
  "iid": "949e0daf-96fd-404b-8c4e-97ec68fbdb50",
  "jsonVersion": "1.5.3",
  "appBuildId": 473703,
- "nextUid": 27,
+ "nextUid": 24,
  "identifierStyle": "Capitalize",
  "toc": [],
  "worldLayout": "Free",
@@ -631,80 +631,6 @@
       "allowedRefsEntityUid": null,
       "allowedRefTags": [],
       "tilesetUid": null
-     },
-     {
-      "identifier": "kind",
-      "doc": null,
-      "__type": "String",
-      "uid": 24,
-      "type": "F_String",
-      "isArray": false,
-      "canBeNull": false,
-      "arrayMinLength": null,
-      "arrayMaxLength": null,
-      "editorDisplayMode": "ValueOnly",
-      "editorDisplayScale": 1,
-      "editorDisplayPos": "Above",
-      "editorLinkStyle": "StraightArrow",
-      "editorDisplayColor": null,
-      "editorAlwaysShow": false,
-      "editorShowInWorld": true,
-      "editorCutLongValues": true,
-      "editorTextSuffix": null,
-      "editorTextPrefix": null,
-      "useForSmartColor": false,
-      "exportToToc": false,
-      "searchable": false,
-      "min": null,
-      "max": null,
-      "regex": null,
-      "acceptFileTypes": null,
-      "defaultOverride": null,
-      "textLanguageMode": null,
-      "symmetricalRef": false,
-      "autoChainRef": true,
-      "allowOutOfLevelRef": true,
-      "allowedRefs": "OnlySame",
-      "allowedRefsEntityUid": null,
-      "allowedRefTags": [],
-      "tilesetUid": null
-     },
-     {
-      "identifier": "height",
-      "doc": null,
-      "__type": "Float",
-      "uid": 25,
-      "type": "F_Float",
-      "isArray": false,
-      "canBeNull": false,
-      "arrayMinLength": null,
-      "arrayMaxLength": null,
-      "editorDisplayMode": "ValueOnly",
-      "editorDisplayScale": 1,
-      "editorDisplayPos": "Above",
-      "editorLinkStyle": "StraightArrow",
-      "editorDisplayColor": null,
-      "editorAlwaysShow": false,
-      "editorShowInWorld": true,
-      "editorCutLongValues": true,
-      "editorTextSuffix": null,
-      "editorTextPrefix": null,
-      "useForSmartColor": false,
-      "exportToToc": false,
-      "searchable": false,
-      "min": null,
-      "max": null,
-      "regex": null,
-      "acceptFileTypes": null,
-      "defaultOverride": null,
-      "textLanguageMode": null,
-      "symmetricalRef": false,
-      "autoChainRef": true,
-      "allowOutOfLevelRef": true,
-      "allowedRefs": "OnlySame",
-      "allowedRefsEntityUid": null,
-      "allowedRefTags": [],
-      "tilesetUid": null
      }
     ]
    },
@@ -888,43 +814,6 @@
       "__type": "String",
       "uid": 23,
       "type": "F_String",
-      "isArray": false,
-      "canBeNull": false,
-      "arrayMinLength": null,
-      "arrayMaxLength": null,
-      "editorDisplayMode": "ValueOnly",
-      "editorDisplayScale": 1,
-      "editorDisplayPos": "Above",
-      "editorLinkStyle": "StraightArrow",
-      "editorDisplayColor": null,
-      "editorAlwaysShow": false,
-      "editorShowInWorld": true,
-      "editorCutLongValues": true,
-      "editorTextSuffix": null,
-      "editorTextPrefix": null,
-      "useForSmartColor": false,
-      "exportToToc": false,
-      "searchable": false,
-      "min": null,
-      "max": null,
-      "regex": null,
-      "acceptFileTypes": null,
-      "defaultOverride": null,
-      "textLanguageMode": null,
-      "symmetricalRef": false,
-      "autoChainRef": true,
-      "allowOutOfLevelRef": true,
-      "allowedRefs": "OnlySame",
-      "allowedRefsEntityUid": null,
-      "allowedRefTags": [],
-      "tilesetUid": null
-     },
-     {
-      "identifier": "height",
-      "doc": null,
-      "__type": "Float",
-      "uid": 26,
-      "type": "F_Float",
       "isArray": false,
       "canBeNull": false,
       "arrayMinLength": null,
@@ -1438,8 +1327,8 @@
       {
        "__identifier": "Place",
        "__grid": [
-        284,
-        86
+        290,
+        90
        ],
        "__pivot": [
         0.5,
@@ -1453,8 +1342,8 @@
        "height": 8,
        "defUid": 3,
        "px": [
-        284,
-        86
+        290,
+        90
        ],
        "fieldInstances": [
         {
@@ -1488,8 +1377,8 @@
          ]
         }
        ],
-       "__worldX": 284,
-       "__worldY": 86
+       "__worldX": 290,
+       "__worldY": 90
       },
       {
        "__identifier": "Place",
@@ -2270,8 +2159,8 @@
       {
        "__identifier": "Light",
        "__grid": [
-        70,
-        70
+        71,
+        61
        ],
        "__pivot": [
         0.5,
@@ -2285,64 +2174,34 @@
        "height": 6,
        "defUid": 13,
        "px": [
-        70,
-        70
+        71,
+        61
        ],
        "fieldInstances": [
         {
          "__identifier": "r",
          "__type": "Int",
-         "__value": 14,
+         "__value": 22,
          "__tile": null,
          "defUid": 14,
          "realEditorValues": [
           {
            "id": "V_Int",
            "params": [
-            14
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "kind",
-         "__type": "String",
-         "__value": "window",
-         "__tile": null,
-         "defUid": 24,
-         "realEditorValues": [
-          {
-           "id": "V_String",
-           "params": [
-            "window"
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 1.12,
-         "__tile": null,
-         "defUid": 25,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            1.12
+            22
            ]
           }
          ]
         }
        ],
-       "__worldX": 70,
-       "__worldY": 70
+       "__worldX": 71,
+       "__worldY": 61
       },
       {
        "__identifier": "Light",
        "__grid": [
-        163,
-        77
+        172,
+        58
        ],
        "__pivot": [
         0.5,
@@ -2356,64 +2215,34 @@
        "height": 6,
        "defUid": 13,
        "px": [
-        163,
-        77
+        172,
+        58
        ],
        "fieldInstances": [
         {
          "__identifier": "r",
          "__type": "Int",
-         "__value": 13,
+         "__value": 22,
          "__tile": null,
          "defUid": 14,
          "realEditorValues": [
           {
            "id": "V_Int",
            "params": [
-            13
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "kind",
-         "__type": "String",
-         "__value": "window",
-         "__tile": null,
-         "defUid": 24,
-         "realEditorValues": [
-          {
-           "id": "V_String",
-           "params": [
-            "window"
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 1.06,
-         "__tile": null,
-         "defUid": 25,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            1.06
+            22
            ]
           }
          ]
         }
        ],
-       "__worldX": 163,
-       "__worldY": 77
+       "__worldX": 172,
+       "__worldY": 58
       },
       {
        "__identifier": "Light",
        "__grid": [
-        190,
-        80
+        186,
+        54
        ],
        "__pivot": [
         0.5,
@@ -2427,150 +2256,8 @@
        "height": 6,
        "defUid": 13,
        "px": [
-        190,
-        80
-       ],
-       "fieldInstances": [
-        {
-         "__identifier": "r",
-         "__type": "Int",
-         "__value": 10,
-         "__tile": null,
-         "defUid": 14,
-         "realEditorValues": [
-          {
-           "id": "V_Int",
-           "params": [
-            10
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "kind",
-         "__type": "String",
-         "__value": "lamp",
-         "__tile": null,
-         "defUid": 24,
-         "realEditorValues": [
-          {
-           "id": "V_String",
-           "params": [
-            "lamp"
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 1.35,
-         "__tile": null,
-         "defUid": 25,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            1.35
-           ]
-          }
-         ]
-        }
-       ],
-       "__worldX": 190,
-       "__worldY": 80
-      },
-      {
-       "__identifier": "Light",
-       "__grid": [
-        212,
-        77
-       ],
-       "__pivot": [
-        0.5,
-        0.5
-       ],
-       "__tags": [],
-       "__tile": null,
-       "__smartColor": "#FFC46E",
-       "iid": "e92a04d7-7bdf-4b0a-a016-28c5d2d0a89f",
-       "width": 6,
-       "height": 6,
-       "defUid": 13,
-       "px": [
-        212,
-        77
-       ],
-       "fieldInstances": [
-        {
-         "__identifier": "r",
-         "__type": "Int",
-         "__value": 13,
-         "__tile": null,
-         "defUid": 14,
-         "realEditorValues": [
-          {
-           "id": "V_Int",
-           "params": [
-            13
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "kind",
-         "__type": "String",
-         "__value": "window",
-         "__tile": null,
-         "defUid": 24,
-         "realEditorValues": [
-          {
-           "id": "V_String",
-           "params": [
-            "window"
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 1.06,
-         "__tile": null,
-         "defUid": 25,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            1.06
-           ]
-          }
-         ]
-        }
-       ],
-       "__worldX": 212,
-       "__worldY": 77
-      },
-      {
-       "__identifier": "Light",
-       "__grid": [
-        330,
-        73
-       ],
-       "__pivot": [
-        0.5,
-        0.5
-       ],
-       "__tags": [],
-       "__tile": null,
-       "__smartColor": "#FFC46E",
-       "iid": "a0c0c67c-dd03-4758-bd3b-1500c87aaa12",
-       "width": 6,
-       "height": 6,
-       "defUid": 13,
-       "px": [
-        330,
-        73
+        186,
+        54
        ],
        "fieldInstances": [
         {
@@ -2587,46 +2274,98 @@
            ]
           }
          ]
-        },
+        }
+       ],
+       "__worldX": 186,
+       "__worldY": 54
+      },
+      {
+       "__identifier": "Light",
+       "__grid": [
+        339,
+        58
+       ],
+       "__pivot": [
+        0.5,
+        0.5
+       ],
+       "__tags": [],
+       "__tile": null,
+       "__smartColor": "#FFC46E",
+       "iid": "e92a04d7-7bdf-4b0a-a016-28c5d2d0a89f",
+       "width": 6,
+       "height": 6,
+       "defUid": 13,
+       "px": [
+        339,
+        58
+       ],
+       "fieldInstances": [
         {
-         "__identifier": "kind",
-         "__type": "String",
-         "__value": "forge",
+         "__identifier": "r",
+         "__type": "Int",
+         "__value": 22,
          "__tile": null,
-         "defUid": 24,
+         "defUid": 14,
          "realEditorValues": [
           {
-           "id": "V_String",
+           "id": "V_Int",
            "params": [
-            "forge"
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 0.57,
-         "__tile": null,
-         "defUid": 25,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            0.57
+            22
            ]
           }
          ]
         }
        ],
-       "__worldX": 330,
-       "__worldY": 73
+       "__worldX": 339,
+       "__worldY": 58
       },
       {
        "__identifier": "Light",
        "__grid": [
-        348,
-        128
+        318,
+        66
+       ],
+       "__pivot": [
+        0.5,
+        0.5
+       ],
+       "__tags": [],
+       "__tile": null,
+       "__smartColor": "#FFC46E",
+       "iid": "a0c0c67c-dd03-4758-bd3b-1500c87aaa12",
+       "width": 6,
+       "height": 6,
+       "defUid": 13,
+       "px": [
+        318,
+        66
+       ],
+       "fieldInstances": [
+        {
+         "__identifier": "r",
+         "__type": "Int",
+         "__value": 26,
+         "__tile": null,
+         "defUid": 14,
+         "realEditorValues": [
+          {
+           "id": "V_Int",
+           "params": [
+            26
+           ]
+          }
+         ]
+        }
+       ],
+       "__worldX": 318,
+       "__worldY": 66
+      },
+      {
+       "__identifier": "Light",
+       "__grid": [
+        350,
+        112
        ],
        "__pivot": [
         0.5,
@@ -2640,58 +2379,28 @@
        "height": 6,
        "defUid": 13,
        "px": [
-        348,
-        128
+        350,
+        112
        ],
        "fieldInstances": [
         {
          "__identifier": "r",
          "__type": "Int",
-         "__value": 16,
+         "__value": 26,
          "__tile": null,
          "defUid": 14,
          "realEditorValues": [
           {
            "id": "V_Int",
            "params": [
-            16
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "kind",
-         "__type": "String",
-         "__value": "lamp",
-         "__tile": null,
-         "defUid": 24,
-         "realEditorValues": [
-          {
-           "id": "V_String",
-           "params": [
-            "lamp"
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 1.66,
-         "__tile": null,
-         "defUid": 25,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            1.66
+            26
            ]
           }
          ]
         }
        ],
-       "__worldX": 348,
-       "__worldY": 128
+       "__worldX": 350,
+       "__worldY": 112
       },
       {
        "__identifier": "Gate",
@@ -2797,7 +2506,7 @@
        "__identifier": "Fx",
        "__grid": [
         48,
-        43
+        2
        ],
        "__pivot": [
         0,
@@ -2812,7 +2521,7 @@
        "defUid": 22,
        "px": [
         48,
-        43
+        2
        ],
        "fieldInstances": [
         {
@@ -2829,31 +2538,16 @@
            ]
           }
          ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 3.73,
-         "__tile": null,
-         "defUid": 26,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            3.73
-           ]
-          }
-         ]
         }
        ],
        "__worldX": 48,
-       "__worldY": 43
+       "__worldY": 2
       },
       {
        "__identifier": "Fx",
        "__grid": [
-        160,
-        50
+        158,
+        16
        ],
        "__pivot": [
         0,
@@ -2867,8 +2561,8 @@
        "height": 3,
        "defUid": 22,
        "px": [
-        160,
-        50
+        158,
+        16
        ],
        "fieldInstances": [
         {
@@ -2885,31 +2579,16 @@
            ]
           }
          ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 3.61,
-         "__tile": null,
-         "defUid": 26,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            3.61
-           ]
-          }
-         ]
         }
        ],
-       "__worldX": 160,
-       "__worldY": 50
+       "__worldX": 158,
+       "__worldY": 16
       },
       {
        "__identifier": "Fx",
        "__grid": [
-        328,
-        50
+        345,
+        15
        ],
        "__pivot": [
         0,
@@ -2923,8 +2602,8 @@
        "height": 3,
        "defUid": 22,
        "px": [
-        328,
-        50
+        345,
+        15
        ],
        "fieldInstances": [
         {
@@ -2941,31 +2620,16 @@
            ]
           }
          ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 4.63,
-         "__tile": null,
-         "defUid": 26,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            4.63
-           ]
-          }
-         ]
         }
        ],
-       "__worldX": 328,
-       "__worldY": 50
+       "__worldX": 345,
+       "__worldY": 15
       },
       {
        "__identifier": "Fx",
        "__grid": [
         299,
-        83
+        75
        ],
        "__pivot": [
         0,
@@ -2980,7 +2644,7 @@
        "defUid": 22,
        "px": [
         299,
-        83
+        75
        ],
        "fieldInstances": [
         {
@@ -2997,31 +2661,16 @@
            ]
           }
          ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 0.85,
-         "__tile": null,
-         "defUid": 26,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            0.85
-           ]
-          }
-         ]
         }
        ],
        "__worldX": 299,
-       "__worldY": 83
+       "__worldY": 75
       },
       {
        "__identifier": "Fx",
        "__grid": [
-        22,
-        148
+        18,
+        73
        ],
        "__pivot": [
         0,
@@ -3035,8 +2684,8 @@
        "height": 4,
        "defUid": 22,
        "px": [
-        22,
-        148
+        18,
+        73
        ],
        "fieldInstances": [
         {
@@ -3053,25 +2702,10 @@
            ]
           }
          ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 7.6,
-         "__tile": null,
-         "defUid": 26,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            7.6
-           ]
-          }
-         ]
         }
        ],
-       "__worldX": 22,
-       "__worldY": 148
+       "__worldX": 18,
+       "__worldY": 73
       },
       {
        "__identifier": "Fx",
@@ -3106,21 +2740,6 @@
            "id": "V_String",
            "params": [
             "pond"
-           ]
-          }
-         ]
-        },
-        {
-         "__identifier": "height",
-         "__type": "Float",
-         "__value": 0.0,
-         "__tile": null,
-         "defUid": 26,
-         "realEditorValues": [
-          {
-           "id": "V_Float",
-           "params": [
-            0.0
            ]
           }
          ]

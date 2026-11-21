@@ -20,7 +20,6 @@ vibevalley-terminal = { version = "0.1.0", path = "../../crates/vibevalley-termi
 vibevalley-workspace = { version = "0.1.0", path = "../../crates/vibevalley-workspace" }
 flume = "0.12.0"
 gpui-kit = { version = "0.10.0", default-features = false, features = ["gpui-fast"] }
-gltf = { version = "1", default-features = false, features = ["names", "utils"] }
 image = { workspace = true }
 indexmap = "2.14.2"
 nsh-base = { version = "0.6.0", default-features = false }

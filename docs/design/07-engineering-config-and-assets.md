@@ -25,13 +25,12 @@
   - 检测 `host.available() && host.params.view !== undefined` 自动切换为 `desktop` 宿主实现（否则回落至无宿主的 `browser` 兼容兜底，用于脱离 macOS 壳的单元测试与组件故事）。
   - 暴露的能力包括：系统命令行工具探测/安装/卸载（`commandLine`）、系统原生通知（`notify`）、状态栏摘要同步（`tray`）、应用主题与语言切换（`theme` / `locale`）、Finder 定位打开文件（`reveal`）、开场加载进度回传（`opening`）以及每秒轮询 Zod 校验后的原生应用自更新状态（`update`：`watch` / `check` / `install`）。
 
-## 7.3 像素字、3D 体素烘焙与素材加工管线
+## 7.3 像素字与素材加工管线
 
-VibeValley 的全部像素图、矢量图标与体素模型在独立工程目录下管理并输出至根目录 `assets/`：
+VibeValley 的全部像素图与矢量图标在独立工程目录下管理并输出至根目录 `assets/`：
 
 | 资产门类 | 源目录与加工工具 | 成品输出位置与消费方式 |
 | --- | --- | --- |
-| **体素 3D 角色与建筑** | `design/voxel/`（`build_all.py`、`character_rig.py`、`companions.py`、`kaykit.py`、`world_props.py`、`landmark_mask.py`、`pixel_bake.py` 等 Blender/Python 脚本及 `materials/` 贴图） | 导出 `.glb` 至 `assets/models/`（77+ 模型）；部分静态背景与地图直接由 `pixel_bake.py` 配合 `assets/village-camera.json` 参数烘焙为固定正交图（`map` 等），同步生成 `assets/pixel/yard-landmarks.png` 2.5D 深度/交互掩码；角色/农机等动态多帧动画则在运行时由 `apps/mac/src/pixel/glb.rs` 实时光栅 |
 | **2D 像素精绘、切图与提示词** | `design/pixel/`（`prompts/`、`process.py`、`straighten.py`、`title_layers.py`、`hd_batch.sh`）与 `design/assets/`、`design/art.sh` | 经纠偏、去杂与网格规整后沉淀到 `assets/pixel/`（配 `sprites.json` 记录逻辑宽高 `w/h`、足底锚点 `ax/ay` 与 `yard` 框）与 `assets/cursors/`（配 `cursors.json`）；工作台通过 `apps/mac/ui/vv/web/ui/pixel/manifests.ts` 直接引入 JSON 清单并从 `host.pixelDir` 加载 PNG |
 | **像素字体** | `assets/fonts/`（`fusion-pixel-12px-proportional-zh_hans.otf` 与开源授权文本 `fusion-pixel-OFL.txt`） | 注册给 `nsh` 与 GPUI 的像素文字体名 `Fusion Pixel 12px Prop zh-Hans`，保证中英混排在整倍缩放下笔划锐利清晰 |
 | **工作台线条图标与农机 Logo** | `apps/mac/ui/vv/web/ui/icons.ts`、`design/pixel/icons/`、`design/pixel/logos/` | `icons.ts` 内置 `reicon` SVG 路径集合（`<Icon name>`）；农机品牌与工具图标同时在像素目录维护静态切片供 `RuntimeIcon` 与像素农具栏消费 |

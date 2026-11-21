@@ -8,7 +8,7 @@
 |---|---|
 | 384×256 的像素村、整数倍缩放裁边、LDtk 地图、A* 寻路、昼夜天色 | 地块庄稼与木牌状态的计算（`crates/vibevalley-core/src/game.rs` 的 `plot_of`，[游戏](docs/subsystems/game.md)） |
 | 帮工在院子里的去处（`Whereabouts`）、朝向、姿势与 800ms 最短保持时间 | 帮工真实阶段与工单状态流转（[帮工](docs/subsystems/session.md)、[工单](docs/subsystems/issue.md)） |
-| 仓库群岛地图、记忆树、开场、图鉴的贴图书架 | 哪些事项进 Inbox（[收件箱](docs/subsystems/watch.md#收件箱)）、像素渲染（[像素三渲二与光影](docs/design/04-motion-and-pixel-rendering.md)）与工作台各页（[桌面架构与页面清单](docs/design/06-desktop-architecture-and-topology.md)） |
+| 仓库群岛地图、记忆树、开场、图鉴的贴图书架 | 哪些事项进 Inbox（[收件箱](docs/subsystems/watch.md#收件箱)）、像素渲染（[像素渲染与光影](docs/design/04-motion-and-pixel-rendering.md)）与工作台各页（[桌面架构与页面清单](docs/design/06-desktop-architecture-and-topology.md)） |
 | 点地块、院内建筑、岛屿时去哪一页或开哪个终端（`PixelEvent`） | 窗口、标签页和工作台的路由（[客户端](docs/subsystems/app.md)） |
 
 ## 在哪
@@ -17,7 +17,7 @@
 |---|---|
 | `apps/mac/src/pixel/view.rs` | `PixelView`：一个像素窗格，收状态帧、走时钟、把点按变成 `PixelEvent`（去工作台的路由、换场景、开终端） |
 | `apps/mac/src/pixel/draw.rs`、`element.rs` | `DrawList`（贴图、矩形、光晕，加上叠在上面的字和框）；GPUI 的绘制（最近邻重采样到整设备像素，按尺寸缓存）；`raster` 在 CPU 上画同一张 |
-| `apps/mac/src/pixel/atlas.rs`、`glb.rs`、`level.rs` | 贴图尺寸和脚底锚点、体素模型正交取帧、LDtk 地图的可走格子与物件 |
+| `apps/mac/src/pixel/atlas.rs`、`level.rs` | 贴图尺寸和脚底锚点、LDtk 地图的可走格子与物件 |
 | `apps/mac/src/pixel/farm/frame.rs` | 场景读的那部分 `StateFrame`，宽松解码 |
 | `apps/mac/src/pixel/farm/world.rs` | 院子的地点和规则：9 块地 `BEDS`、院内建筑 `YARD_PLACES`、去处 `place_of_action`、`Whereabouts`、姿势 `pose_of` 与 `PoseHold` |
 | `apps/mac/src/pixel/farm/scene.rs` | `FarmScene`：照最新一帧画村子并让它一直动，按可见像素和深度识别点到的物件；六把农具 `FarmTool` |
@@ -51,8 +51,6 @@
   - 2 倍密贴图按密度映射回逻辑坐标（`atlas.rs`）。
   - 画面只取整数倍缩放，农场左右每边最多裁 5%、上下最多裁 8%（`FARM_CUT`）。
 - **像素保持锐利**：GPUI 采样是线性的，所以每张图先在 CPU 上最近邻重采样到它盖住的设备像素再 1:1 画（`element.rs`）。
-- **三渲二**：院子和仓库岛按固定正交镜头烘焙成像素底图。模型脚底、木牌、灯源和田块按[同一台相机](assets/village-camera.json)投影，帮工仍沿 LDtk 原网格走。指向田地时用鼠标对应的画面像素判定；三栋屋的屋顶、侧墙和门廊有从同机位导出的命中与遮挡深度图。
-- **角色按站姿定比例**：各动作沿用同一只帮工的站立比例和脚底锚点，取帧时为耳尖、尾巴和举起的工具留足画幅。前后遮挡由投影后的脚底深度决定。
 - **六把农具对应数字键 1–6**（`FarmTool`）：手、浇水、捉虫、除草、收获、铲子。捉虫、铲子只执行服务端 `Issue.stage.acts` 给出的重试或叫停；点有待回答工单的地块，在农场面板选答案或输入回复。收获面板用用户看到的文件树版本审查并完成工单。若树已变化，面板保留工单并列出新增差异。一次只发一条命令，失败显示服务端原因，成功后才亮地块。
 - **悬浮与未读提示**：鼠标指向地块或地上的帮工时，卡片显示作物、仓库和所选农具当前能做的事。服务端未提供动作时，卡片显示原因。频道按钮的未读数随频道状态更新；手机角标优先显示未接来电。
 - **HUD 按窗格定位**：工具栏和树的文字不随像素村裁边；窄窗导航分两行，文字裁切，面板分页，打开面板时挡住背后的地块点击。夜间乘色只作用于地面和角色，灯光与 HUD 保持自己的颜色。
@@ -75,8 +73,7 @@
 
 - **核心状态与游戏（`core`、`game`）**：读 `StateFrame` 的 `state`、`view`。
 - **外壳（`apps/mac/src/shell.rs`）**：`PixelEvent` 交给 `Shell::on_pixel_event`，由它开工作台的页、换像素场景或开终端。
-- **素材流水线**：Blender 从 [体素模型源文件](design/voxel/README.md) 导出角色和地块到 `assets/models/`，院子与岛屿烘焙到 `assets/pixel/`。图集从 `sprites.json` 读取尺寸和锚点，按名字缓存模型取帧或 PNG。`VIBEVALLEY_ASSETS` 可以指定整组素材的位置。
-- **环境换肤**：工坊、水井、草甸小屋和风车复用 [KayKit 模型](design/voxel/kaykit_assets/README.md)。建筑与围栏共用橡木、青瓦、窑砖和石材四张底色贴图，图案按部件定向铺设。工坊自带的砧台对齐帮工落锤点，炉口和烟囱各有一个地图锚点。更换建筑外形后，要从同一机位重新烘焙底图和建筑遮罩。
+- **素材流水线**：`design/pixel/` 处理贴图并导出到 `assets/pixel/`，图集从 `sprites.json` 读取尺寸和脚底锚点（`VIBEVALLEY_ASSETS` 可以指定整组素材的位置）；`vibevalley-pixel` 在 CPU 上完成最近邻缩放、法线图推导与昼夜灯光合成。
 
 ## 为什么这样
 

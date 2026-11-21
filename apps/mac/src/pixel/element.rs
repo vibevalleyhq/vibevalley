@@ -17,7 +17,7 @@ use smallvec::SmallVec;
 
 use super::atlas::Atlas;
 use super::draw::{Color, DrawList, HudOp, Op, glow_image, resample, shade, shade_color};
-use super::sky::{FARM_CUT, Framing, fit_framing, frame_cover};
+use super::sky::{FARM_CUT, Framing, frame_whole};
 
 pub const PIXEL_FONT: &str = "Fusion Pixel 12px Prop zh-Hans";
 
@@ -256,13 +256,22 @@ fn paint_hud_picture(
     }
 }
 
-/// How `list` sits in `bounds`: edge-to-edge cover (clamped by `FARM_CUT`) or fitted open canvas.
+/// How `list` sits in `bounds`: the farm's whole-pixel framing.
 pub fn framing(list: &DrawList, bounds: Bounds<Pixels>) -> Framing {
     let view = (f32::from(bounds.size.width), f32::from(bounds.size.height));
     if !list.fit {
-        return frame_cover(view, (list.width, list.height), FARM_CUT);
+        return frame_whole(view, (list.width, list.height), FARM_CUT);
     }
-    fit_framing(view, (list.width, list.height))
+    let fits = (view.0 / list.width).min(view.1 / list.height);
+    let scale = if fits >= 1.0 { (fits * 2.0).floor() / 2.0 } else { fits.max(0.1) };
+    let (w, h) = (list.width * scale, list.height * scale);
+    let bx = super::sky::Rect {
+        x: ((view.0 - w) / 2.0).round(),
+        y: ((view.1 - h) / 2.0).round(),
+        w,
+        h,
+    };
+    Framing { scale, bx, shown: bx }
 }
 
 /// Paints the list into `bounds` framed by `f`.
@@ -273,33 +282,40 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
     let device = s * window.scale_factor();
     cache.reset(device, list.light.map(|l| l.map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8)), window);
     let background = shade_color(list.background, list.light);
-    window.paint_quad(fill(bounds, hsla(background)));
+    window.paint_quad(fill(bounds, hsla([background[0] * 0.7, background[1] * 0.7, background[2] * 0.7, 1.0])));
     let origin = bounds.origin + point(px(f.bx.x), px(f.bx.y));
     let at = |x: f32, y: f32| origin + point(px(x * s), px(y * s));
     let dev = |v: f32| (v * device).round().max(1.0) as u32;
     window.with_content_mask(Some(gpui_kit::ContentMask { bounds }), |window| {
-        let pic = Bounds::new(origin, size(px(f.bx.w), px(f.bx.h)));
-        if let Some((step, color)) = list.grid
-            && step > 0.0
+        let pic = Bounds::new(at(0.0, 0.0), size(px(list.width * s), px(list.height * s)));
+        if list.farm_light.is_some()
+            && let Some(atlas) = atlas
+            && let Some(map) = atlas.image("map")
         {
-            let pitch = step * s;
-            let line = hsla(shade_color(color, list.light));
-            let thickness = px(s.max(1.0));
-            let view_w = f32::from(bounds.size.width);
-            let view_h = f32::from(bounds.size.height);
-            let kx0 = (-f.bx.x / pitch).ceil() as i32;
-            let kx1 = ((view_w - f.bx.x) / pitch).floor() as i32;
-            for i in kx0..=kx1 {
-                let x = bounds.origin.x + px((f.bx.x + i as f32 * pitch).round());
-                window.paint_quad(fill(Bounds::new(point(x, bounds.origin.y), size(thickness, bounds.size.height)), line));
+            window.paint_quad(fill(bounds, hsla(list.background)));
+            let cover = (f32::from(bounds.size.width) / list.width).max(f32::from(bounds.size.height) / list.height);
+            let (mw, mh) = (list.width * cover, list.height * cover);
+            let (dw, dh) = (
+                (mw * window.scale_factor()).round().max(1.) as u32,
+                (mh * window.scale_factor()).round().max(1.) as u32,
+            );
+            let key = Key {
+                kind: KeyKind::Hud("village-backdrop".into()),
+                flip: false,
+                alpha: 8,
+                w: dw,
+                h: dh,
+            };
+            cache.dynamic.insert(key.clone(), true);
+            if let Some(image) = cache.get(key, || Some(vibevalley_pixel::nearest(&map, dw, dh, false))) {
+                let back = Bounds::new(bounds.center() - point(px(mw / 2.), px(mh / 2.)), size(px(mw), px(mh)));
+                let _ = window.paint_image(back, back, Corners::default(), image, 0, false);
             }
-            let ky0 = (-f.bx.y / pitch).ceil() as i32;
-            let ky1 = ((view_h - f.bx.y) / pitch).floor() as i32;
-            for j in ky0..=ky1 {
-                let y = bounds.origin.y + px((f.bx.y + j as f32 * pitch).round());
-                window.paint_quad(fill(Bounds::new(point(bounds.origin.x, y), size(bounds.size.width, thickness)), line));
-            }
+            let mut veil = list.background;
+            veil[3] = 0.7;
+            window.paint_quad(fill(bounds, hsla(veil)));
         }
+        window.paint_quad(fill(pic, hsla(background)));
         let painted = if let (Some(light), Some(atlas)) = (&list.farm_light, atlas) {
             cache.paint_farm(&super::draw::farm_picture(list, atlas, light), pic, window)
         } else {
