@@ -13,7 +13,6 @@ import {
   type VoiceSettings,
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
-import * as S from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -75,7 +74,6 @@ export function VoiceForm(props: { part: VoicePart; view?: LineView }) {
 
 /** What the server says is wrong with the draft, asked a moment after it last changed. */
 const problemQuery = defineQuery({
-  schema: S.Validation,
   key: (a: { input: SettingsUpdate; token: string }) => ["settings-check", a.token],
   fetch: (a, context) => api.setting.validate(a.input, context),
   gcTime: 0,

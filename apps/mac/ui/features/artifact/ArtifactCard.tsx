@@ -1,8 +1,7 @@
 import { Text, View } from "nsh";
-import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { Artifact, ArtifactBody, ArtifactCard as Card, ArtifactDisplay, ArtifactListRequest, ArtifactType } from "@vibevalley/protocol";
+import type { ArtifactBody, ArtifactCard as Card, ArtifactDisplay, ArtifactListRequest, ArtifactType } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 
 import { Icon } from "../../design/Icon";
@@ -14,17 +13,12 @@ import { artifactSuffixOf } from "./html";
 
 // Artifacts (docs/subsystems/artifact.md) are not in the frame.
 const fresh = 5_000;
-function trusted<T>(): z.ZodType<T> {
-  return z.custom<T>(() => true);
-}
 
 const artifactQuery = defineQuery({
-  schema: trusted<Artifact>(),
   key: (id: string) => ["artifacts", "one", id],
   fetch: (id, context) => api.artifact.get({ id: artifactId(id) }, context),
 });
 const artifactsQuery = defineQuery({
-  schema: trusted<Artifact[]>(),
   key: (q: ArtifactListRequest) => ["artifacts", "list", q.channel ?? null, q.issue ?? null, q.artifactType ?? null],
   fetch: (q, context) => api.artifact.list(q, context),
   ...retryRead,

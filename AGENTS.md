@@ -20,7 +20,7 @@ crates/server/             服务端（二进制 vibevalley-server）：src/modu
                            lib.rs 组装 Hub，start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
 crates/cli/                命令行（二进制 vibevalley，clap）：照领域模型一条命令一个操作，经 HTTP 调服务端
 apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳（src/shell/*）、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
-                           crates/ 是桌面独占支撑 crate（pixel、terminal、workspace、highlight）；
+                           crates/ 是桌面独占支撑 crate（pixel、terminal、workspace）；
                            ui/ 是 nsh 跑的 TSX：app（含 6 项主导航，详见 docs/subsystems/app.md）、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含笔记与作品前端引擎、5 栏设置）、farm、infra
 apps/island/               刘海上的灵动岛（Swift）：单独的小程序（apps/island/README.md）
 apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成），图和像素字用根目录 assets/ 的

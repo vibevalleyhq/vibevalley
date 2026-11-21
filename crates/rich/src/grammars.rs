@@ -79,6 +79,12 @@ pub const BUNDLED_GRAMMARS: &[BundledGrammar] = &[
         json: SWIFT_TM,
     },
     BundledGrammar {
+        canonical: "zig",
+        editor_names: &["Zig"],
+        aliases: &[],
+        json: ZIG_TM,
+    },
+    BundledGrammar {
         canonical: "sql",
         editor_names: &["SQL"],
         aliases: &["sqlite", "postgres", "postgresql", "mysql"],
@@ -513,5 +519,32 @@ const MERMAID_TM: &str = r##"{
     { "name": "constant.language.direction.mermaid", "match": "\\b(?:TB|TD|BT|RL|LR)\\b" },
     { "name": "keyword.operator.arrow.mermaid", "match": "(?:<-->|-->|---|-\\.-|-\\.->|==>|->>|-->>|->|--x|--\\)|-x)" },
     { "name": "constant.numeric.mermaid", "match": "\\b[0-9]+(?:\\.[0-9]+)?\\b" }
+  ]
+}"##;
+
+const ZIG_TM: &str = r##"{
+  "name": "zig",
+  "scopeName": "source.zig",
+  "patterns": [
+    { "name": "comment.line.double-slash.zig", "match": "//.*$" },
+    { "name": "string.unquoted.multiline.zig", "match": "\\\\\\\\.*$" },
+    {
+      "name": "string.quoted.double.zig",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.zig", "match": "\\\\(?:[nrt'\"\\\\]|x[0-9a-fA-F]{2}|u\\{[0-9a-fA-F]+\\})" }
+      ]
+    },
+    { "name": "string.quoted.single.zig", "match": "'(?:\\\\(?:[nrt'\"\\\\]|x[0-9a-fA-F]{2}|u\\{[0-9a-fA-F]+\\})|[^'\\\\])'" },
+    { "name": "support.function.builtin.zig", "match": "@[a-zA-Z_][a-zA-Z0-9_]*" },
+    { "name": "constant.language.zig", "match": "\\b(?:true|false|null|undefined)\\b" },
+    { "name": "keyword.control.zig", "match": "\\b(?:if|else|switch|while|for|break|continue|return|defer|errdefer|try|catch|orelse|unreachable|async|await|suspend|resume|nosuspend|and|or)\\b" },
+    { "name": "storage.type.zig", "match": "\\b(?:const|var|fn|pub|struct|enum|union|error|test|comptime|inline|noinline|export|extern|packed|align|allowzero|volatile|threadlocal|linksection|callconv|usingnamespace|asm|opaque|anyframe)\\b" },
+    { "name": "support.type.primitive.zig", "match": "\\b(?:void|noreturn|bool|anyerror|anytype|anyopaque|type|comptime_int|comptime_float|usize|isize|c_char|c_short|c_ushort|c_int|c_uint|c_long|c_ulong|c_longlong|c_ulonglong|f16|f32|f64|f80|f128|[iu][0-9]+)\\b" },
+    { "name": "entity.name.function.zig", "match": "\\b[a-z_][a-zA-Z0-9_]*(?=\\s*\\()" },
+    { "name": "entity.name.type.zig", "match": "\\b[A-Z][a-zA-Z0-9_]*\\b" },
+    { "name": "constant.numeric.zig", "match": "\\b(?:0x[0-9a-fA-F_]+|0b[01_]+|0o[0-7_]+|[0-9][0-9_]*(?:\\.[0-9_]+)?(?:[eE][+-]?[0-9_]+)?)\\b" },
+    { "name": "keyword.operator.zig", "match": "(?:==|!=|<=|>=|=>|\\+\\+|\\*\\*|<<|>>|\\.\\.\\.|\\.\\.|\\.\\*|\\.\\?|[+\\-*/%&|^~!<>?=:])" }
   ]
 }"##;

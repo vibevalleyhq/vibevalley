@@ -8,7 +8,6 @@ percent-encoding = "2.3.2"
 base64 = "0.23.1"
 vibevalley-files = { version = "0.1.0", path = "../../crates/files" }
 vibevalley-git = { version = "0.1.0", path = "../../crates/git" }
-vibevalley-highlight = { version = "0.1.0", path = "crates/highlight" }
 vibevalley-i18n = { version = "0.1.0", path = "../../crates/i18n" }
 vibevalley-pixel = { version = "0.1.0", path = "crates/pixel" }
 vibevalley-protocol = { version = "0.1.0", path = "../../crates/protocol" }

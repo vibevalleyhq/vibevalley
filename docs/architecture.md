@@ -58,7 +58,7 @@ flowchart LR
 - **服务与传输（`crates/server`）**：`src/lib.rs` 的 `Hub` 持有核心状态和接口表，`src/modules/` 按 `work`、`team`、`collab`、`content`、`skin`、`infra` 六个业务域分组，`src/start.rs` 照依赖次序打开各模块（任务板拆成 `work/issue`、`work/session`、`work/workplace`，都只经 `work/ledger.rs` 写）；`src/transport/` 收拢服务接口（`api`）、进程内桥（`bridge`）、Chord 状态同步（`chord`）和 HTTP 门（`http`：命令、SSE、`/mcp`）。
 - **运行与引擎（`crates/runtime`、`crates/rich`、`crates/engines`）**：`crates/runtime` 合拢 `oar/`（Claude Code、Codex、ACP、自研 `vibevalley` 与 scripted）与自研 `agent/`（只接 DeepSeek，[自研 agent](docs/subsystems/brain.md)）；`crates/rich` 基于 `crates/engines/{onig,pele,shiki}` 提供原生富内容组件与文本引擎（`engine/{canvas,chart,genui,pinyin}`）。
 - **存储（SQLite + 文件）**：模块各自在家目录的 `server.db` 建表（`create table if not exists`），任务、执行会话、每轮与待带的话也在同一个库；没有迁移，形状变了直接改。
-- **客户端（`apps/mac`、`crates/cli`）**：原生应用带着服务端（外壳拆为 `apps/mac/src/shell/` 八个文件，独占支撑库在 `apps/mac/crates/{pixel,terminal,workspace,highlight}`），工作台（`apps/mac/ui/{app,workspace,design,features,farm,infra}`）是 nsh 跑的 TSX，像素场景由 Rust 画（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)）；命令行经 `server.json` 找到运行中的服务端。
+- **客户端（`apps/mac`、`crates/cli`）**：原生应用带着服务端（外壳拆为 `apps/mac/src/shell/` 八个文件，独占支撑库在 `apps/mac/crates/{pixel,terminal,workspace}`），工作台（`apps/mac/ui/{app,workspace,design,features,farm,infra}`）是 nsh 跑的 TSX，像素场景由 Rust 画（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)）；命令行经 `server.json` 找到运行中的服务端。
 
 ## 核心状态
 

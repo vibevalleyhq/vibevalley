@@ -1,10 +1,12 @@
 //! Pure-Rust syntax highlighting powered by `vibevalley-shiki` (`vibevalley-onig`).
 //!
-//! Serves two consumers from one shared grammar/theme registry:
+//! Serves three consumers from one shared grammar/theme registry:
 //! 1. `VvCodeBlock` (full color + font-style spans reacting to light/dark mode, with LRU cache).
 //! 2. `nsh_base::editor` (`<Editor>` and `<DiffView>`) via [`ShikiEditorHighlighter`] registered
 //!    in [`register_shiki_editor_highlighters`], keeping highlighting 100% functional even with
 //!    `nsh-base/highlight` (`syntect`/`two-face`/`onig_sys`) disabled.
+//! 3. Theme-independent line tokenization via [`tokenize_scopes`] for viewers that map scopes
+//!    to palette tokens at render time.
 
 use std::collections::BTreeMap;
 use std::ops::Range;
@@ -294,6 +296,49 @@ fn make_code_cache_key(code: &str, language: Option<&str>, dark: bool) -> CodeCa
 /// Resolves the innermost TextMate scope stack into an `nsh_base::editor::EditorToken`.
 pub fn editor_token_from_scopes(scopes: &[String]) -> Option<EditorToken> {
     scopes.iter().rev().find_map(|scope| EditorToken::from_scope(scope))
+}
+
+/// One tokenized byte range on a line, carrying its TextMate scope stack from outermost to innermost.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScopedSpan {
+    pub range: Range<usize>,
+    pub scopes: Vec<String>,
+}
+
+/// Tokenizes `code` line-by-line in `language` (propagating TextMate state across lines)
+/// and returns theme-independent scope stacks per line.
+pub fn tokenize_scopes(code: &str, language: &str) -> Vec<Vec<ScopedSpan>> {
+    let (grammar, theme) = {
+        let guard = engine().read().unwrap_or_else(|p| p.into_inner());
+        (guard.resolve_grammar(language), Arc::clone(&guard.editor_theme))
+    };
+    let Some(grammar) = grammar else {
+        return Vec::new();
+    };
+    let mut state: Option<StateStack> = None;
+    let mut out = Vec::new();
+    for (line, _) in split_lines(code) {
+        let Ok(res) = grammar.tokenize_line_with_theme(line, state.as_ref(), &theme, Some(LINE_TIME_LIMIT)) else {
+            out.push(Vec::new());
+            continue;
+        };
+        let content_len = line.len();
+        let mut spans = Vec::with_capacity(res.tokens.len());
+        for tok in res.tokens {
+            let start = tok.start_index.min(content_len);
+            let end = tok.end_index.min(content_len);
+            if start >= end || !line.is_char_boundary(start) || !line.is_char_boundary(end) {
+                continue;
+            }
+            spans.push(ScopedSpan {
+                range: start..end,
+                scopes: tok.scopes,
+            });
+        }
+        out.push(spans);
+        state = Some(res.rule_stack);
+    }
+    out
 }
 
 #[derive(Default)]

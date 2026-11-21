@@ -11,7 +11,7 @@ use gpui::{
     IntoElement, ObjectFit, ParentElement as _, Render, ScrollStrategy, StatefulInteractiveElement as _, Styled as _, StyledImage as _, StyledText,
     UniformListScrollHandle, Window, div, hsla, img, px, uniform_list,
 };
-use vibevalley_files::{FileContent, HighlightSpan, Language};
+use vibevalley_files::{FileContent, HighlightKind, HighlightSpan, Language};
 
 use crate::theme::{Palette, Ui};
 
@@ -46,10 +46,104 @@ pub struct FileViewer {
     reloads: u64,
 }
 
+fn matches_scope(scope: &str, prefix: &str) -> bool {
+    scope == prefix || scope.strip_prefix(prefix).is_some_and(|rest| rest.starts_with('.'))
+}
+
+fn highlight_kind_from_scopes(scopes: &[String]) -> Option<HighlightKind> {
+    for scope in scopes.iter().rev() {
+        if matches_scope(scope, "meta.embedded") {
+            return None;
+        }
+        if matches_scope(scope, "comment") {
+            return Some(HighlightKind::Comment);
+        }
+        if matches_scope(scope, "markup.heading") {
+            return Some(HighlightKind::Heading);
+        }
+        if matches_scope(scope, "markup.bold") || matches_scope(scope, "markup.italic") {
+            return Some(HighlightKind::Emphasis);
+        }
+        if matches_scope(scope, "string.other.link") || matches_scope(scope, "markup.underline.link") {
+            return Some(HighlightKind::Link);
+        }
+        if matches_scope(scope, "constant.character.escape") {
+            return Some(HighlightKind::Constant);
+        }
+        if matches_scope(scope, "string") || matches_scope(scope, "markup.inline.raw") || matches_scope(scope, "markup.fenced_code") {
+            return Some(HighlightKind::String);
+        }
+        if matches_scope(scope, "constant.numeric") {
+            return Some(HighlightKind::Number);
+        }
+        if matches_scope(scope, "constant") {
+            return Some(HighlightKind::Constant);
+        }
+        if matches_scope(scope, "keyword.operator") {
+            return Some(HighlightKind::Operator);
+        }
+        if matches_scope(scope, "keyword") || matches_scope(scope, "storage") || matches_scope(scope, "variable.language") {
+            return Some(HighlightKind::Keyword);
+        }
+        if matches_scope(scope, "entity.name.function") || matches_scope(scope, "support.function") {
+            return Some(HighlightKind::Function);
+        }
+        if matches_scope(scope, "entity.name.tag") || matches_scope(scope, "meta.tag") {
+            return Some(HighlightKind::Tag);
+        }
+        if matches_scope(scope, "entity.other.attribute-name") || matches_scope(scope, "meta.attribute") {
+            return Some(HighlightKind::Attribute);
+        }
+        if matches_scope(scope, "support.type.property-name")
+            || matches_scope(scope, "variable.other.property")
+            || matches_scope(scope, "meta.object-literal.key")
+        {
+            return Some(HighlightKind::Property);
+        }
+        if matches_scope(scope, "entity.name.type")
+            || matches_scope(scope, "support.type")
+            || matches_scope(scope, "entity.name.class")
+            || matches_scope(scope, "entity.name.struct")
+        {
+            return Some(HighlightKind::Type);
+        }
+        if matches_scope(scope, "variable") {
+            return Some(HighlightKind::Variable);
+        }
+        if matches_scope(scope, "punctuation") {
+            return Some(HighlightKind::Punctuation);
+        }
+    }
+    None
+}
+
+fn highlight_lines(text: &str, language: &Language) -> Vec<Vec<HighlightSpan>> {
+    vibevalley_rich::tokenize_scopes(text, &language.0)
+        .into_iter()
+        .map(|line_spans| {
+            let mut merged: Vec<HighlightSpan> = Vec::new();
+            for span in line_spans {
+                let Some(kind) = highlight_kind_from_scopes(&span.scopes) else {
+                    continue;
+                };
+                if let Some(last) = merged.last_mut()
+                    && last.kind == kind
+                    && last.range.end == span.range.start
+                {
+                    last.range.end = span.range.end;
+                } else {
+                    merged.push(HighlightSpan { range: span.range, kind });
+                }
+            }
+            merged
+        })
+        .collect()
+}
+
 /// Splits `text` into lines with their highlight spans (blocking; run off
 /// the UI thread).
 pub fn prepare(text: &str, language: Option<&Language>) -> Vec<Line> {
-    let spans = language.map(|l| vibevalley_highlight::highlight(text, l)).unwrap_or_default();
+    let spans = language.map(|l| highlight_lines(text, l)).unwrap_or_default();
     let mut spans = spans.into_iter();
     text.lines()
         .map(|line| Line {
@@ -554,5 +648,50 @@ mod tests {
         let (name, dir) = split_display_path(Path::new("/tmp/project/src/viewer.rs"));
         assert_eq!(name, "viewer.rs");
         assert_eq!(dir.as_deref(), Some("/tmp/project/src"));
+    }
+
+    #[test]
+    fn prepare_highlights_every_supported_language() {
+        for &name in vibevalley_files::SUPPORTED {
+            let sample = match name {
+                "rust" => "pub fn greet() -> i32 { 42 }",
+                "typescript" | "javascript" => "export const count: number = 1;",
+                "tsx" => "export const App = () => <View>hi</View>;",
+                "json" => "{\"key\": \"value\", \"ok\": true}",
+                "toml" => "[package]\nname = \"vibevalley\"",
+                "yaml" => "name: vibevalley\nenabled: true",
+                "markdown" => "# Title\n**bold** [site](https://example.com)",
+                "python" => "def greet(name):\n    return f\"hi {name}\"",
+                "go" => "package main\nfunc main() { return }",
+                "bash" => "# comment\nif [ -f Cargo.toml ]; then echo \"ok\"; fi",
+                "html" => "<div class=\"card\">hello</div>",
+                "css" => ".card { color: #ff00aa; padding: 8px; }",
+                "c" | "cpp" => "#include <stdio.h>\nint main() { return 0; }",
+                "zig" => "const std = @import(\"std\");\npub fn main() void {}",
+                "swift" => "struct Farm { let acres: Int = 4 }",
+                other => panic!("unhandled supported language in test: {other}"),
+            };
+            let lang = Language(name.to_string());
+            let lines = prepare(sample, Some(&lang));
+            assert!(
+                lines.iter().any(|l| !l.spans.is_empty()),
+                "supported language `{name}` produced no highlight spans for sample"
+            );
+        }
+    }
+
+    #[test]
+    fn prepare_propagates_multiline_state_and_markdown_kinds() {
+        let rust = Language("rust".into());
+        let lines = prepare("/* line 1\nline 2 */\nfn main() {}", Some(&rust));
+        assert_eq!(lines.len(), 3);
+        assert!(lines[1].spans.iter().any(|s| s.kind == HighlightKind::Comment));
+        assert!(lines[2].spans.iter().any(|s| s.kind == HighlightKind::Keyword && s.range == (0..2)));
+
+        let md = Language("markdown".into());
+        let md_lines = prepare("# Title\n**bold** [site](https://example.com)", Some(&md));
+        assert!(md_lines[0].spans.iter().any(|s| s.kind == HighlightKind::Heading));
+        assert!(md_lines[1].spans.iter().any(|s| s.kind == HighlightKind::Emphasis));
+        assert!(md_lines[1].spans.iter().any(|s| s.kind == HighlightKind::Link));
     }
 }

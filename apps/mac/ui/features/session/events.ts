@@ -1,7 +1,4 @@
-import { z } from "zod";
-
 import type { SessionEvent } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 
 import { api } from "../../infra/api";
 import { subscribeLive } from "../../infra/frame";
@@ -10,7 +7,6 @@ import { type Accessor, createEffect, createSignal } from "../../infra/solid";
 import { SessionLogs } from "./runs";
 
 const eventQuery = defineQuery({
-  schema: z.array(S.SessionEvent),
   key: (a: { id: string; read: number }) => ["session-events", a.id, a.read],
   fetch: (a, context) => api.session.event.list({ id: a.id }, context),
   gcTime: 0,

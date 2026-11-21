@@ -1,25 +1,17 @@
-import { z } from "zod";
-
-import type { PkmPageView, PkmRadar, PkmVault } from "@vibevalley/protocol";
-
 import { api } from "../../infra/api";
 import { defineQuery, retryRead, useQuery, type QueryClient } from "../../infra/query";
 
 const fresh = 5_000;
-const trusted = <T>(): z.ZodType<T> => z.custom<T>(() => true);
 const vaultQuery = defineQuery({
-  schema: trusted<PkmVault>(),
   key: () => ["pkm", "vault"],
   fetch: (_: void, context) => api.pkm.page.list(context),
   ...retryRead,
 });
 export const pkmPageQuery = defineQuery({
-  schema: trusted<PkmPageView>(),
   key: (page: string) => ["pkm", "page", page],
   fetch: (page, context) => api.pkm.page.get({ page }, context),
 });
 const radarQuery = defineQuery({
-  schema: trusted<PkmRadar>(),
   key: () => ["pkm", "radar"],
   fetch: (_: void, context) => api.pkm.radar.get({}, context),
   ...retryRead,

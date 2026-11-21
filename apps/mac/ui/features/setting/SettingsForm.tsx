@@ -12,7 +12,6 @@ import {
   type SettingsUpdate,
 } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
-import * as S from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../design/act";
 import { SettingRow, SettingsGroup } from "../../design/domain/settings";
@@ -276,7 +275,7 @@ function SourceField(props: { draft: SourceDraft; last: boolean; set: (change: P
 }
 
 /** What the server found of gh (github.status); the refresh asks it to look again. */
-const githubQuery = defineQuery({ schema: S.GitHubStatus, key: () => ["github"], fetch: (_: void, context) => api.github.get(context), ...retryRead });
+const githubQuery = defineQuery({ key: () => ["github"], fetch: (_: void, context) => api.github.get(context), ...retryRead });
 export function GitHub() {
   const refreshed = signal<GitHubStatus | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
