@@ -19,6 +19,7 @@ import { createAct } from "../../../ui/act";
 import { Dialog } from "../../../ui/Dialog";
 import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Icon } from "../../../ui/Icon";
+import { Kbd } from "../../../ui/layout";
 import { Bubble } from "../../../ui/Tip";
 import { notesSearch, noteTargets, pkmHref, usePkmVault } from "../../pkm";
 import { chatPath, type SwitchTarget, switchTargets } from "../model/places";
@@ -149,21 +150,15 @@ function SwitcherBody(props: { onClose: () => void }) {
       footer={
         <View class="flex-row items-center gap-3 border-t border-line pt-2.5">
           <View class="flex-row items-center gap-1.5">
-            <View class="rounded-xs border border-line bg-hover px-1.5 py-px">
-              <Text class="font-mono text-2xs text-muted">↑↓</Text>
-            </View>
+            <Kbd>↑↓</Kbd>
             <Text class="text-2xs text-faint">{t("web.base.shortcuts.say.move")}</Text>
           </View>
           <View class="flex-row items-center gap-1.5">
-            <View class="rounded-xs border border-line bg-hover px-1.5 py-px">
-              <Text class="font-mono text-2xs text-muted">⏎</Text>
-            </View>
+            <Kbd>⏎</Kbd>
             <Text class="text-2xs text-faint">{t("web.base.shortcuts.say.pick")}</Text>
           </View>
           <View class="flex-row items-center gap-1.5">
-            <View class="rounded-xs border border-line bg-hover px-1.5 py-px">
-              <Text class="font-mono text-2xs text-muted">Esc</Text>
-            </View>
+            <Kbd>Esc</Kbd>
             <Text class="text-2xs text-faint">{t("web.base.lightbox.close")}</Text>
           </View>
         </View>

@@ -11,6 +11,7 @@ import { defineQuery, retryRead, useQuery, useQueryClient } from "../../infra/qu
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
+import { Banner } from "../../ui/layout";
 import { Bubble } from "../../ui/Tip";
 import { mix } from "../../ui/tone";
 
@@ -65,12 +66,7 @@ export function PendingApprovals(props: { conversationId: string }) {
         </If>
       }
     >
-      <View class="flex-row items-center gap-2 rounded-lg border border-berry bg-bad-soft px-3.5 py-2">
-        <Icon name="cross" size={14} />
-        <Text testID="orchestrator-approvals-error" class="min-w-0 flex-1 text-sm font-medium text-berry">
-          {t("web.orchestrator.approval.unavailable", { why: reasonOf(query.error()) })}
-        </Text>
-      </View>
+      <Banner testID="orchestrator-approvals-error">{t("web.orchestrator.approval.unavailable", { why: reasonOf(query.error()) })}</Banner>
     </If>
   );
 }

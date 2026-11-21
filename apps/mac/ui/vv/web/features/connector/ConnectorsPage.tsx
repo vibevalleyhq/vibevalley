@@ -17,8 +17,7 @@ import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { Field, Select, TextInput } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
-import { Card, ListCard, ListRow, Quiet, SecretInput, Split } from "../../ui/layout";
+import { Banner, Card, ListCard, ListRow, Quiet, SecretInput, Split } from "../../ui/layout";
 import { SpriteOr } from "../../ui/pixel/icons";
 import { Qr } from "../../ui/Qr";
 import { TextLink } from "../../ui/TextLink";
@@ -300,24 +299,12 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
           </Row>
         </View>
         <If when={state() === "paused" ? props.status.pausedUntil : undefined}>
-          {(until) => (
-            <View class="flex-row items-center gap-2 rounded-md border border-berry bg-bad-soft px-3 py-2">
-              <Icon name="cross" size={14} />
-              <Text class="min-w-0 flex-1 text-sm font-medium text-berry tabular-nums">
-                {t("web.connector.connectors.paused", { clock: wallClockText(until()) })}
-              </Text>
-            </View>
-          )}
+          {(until) => <Banner textClass="tabular-nums">{t("web.connector.connectors.paused", { clock: wallClockText(until()) })}</Banner>}
         </If>
         {disconnect()}
       </If>
       <If when={props.status.error}>
-        <View class="flex-row items-center gap-2 rounded-md border border-berry bg-bad-soft px-3 py-2">
-          <Icon name="cross" size={14} />
-          <Text testID="connector-error" class="min-w-0 flex-1 text-sm font-medium text-berry">
-            {props.status.error}
-          </Text>
-        </View>
+        <Banner testID="connector-error">{props.status.error}</Banner>
       </If>
     </Card>
   );

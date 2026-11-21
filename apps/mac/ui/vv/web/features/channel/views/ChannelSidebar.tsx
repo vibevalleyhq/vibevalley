@@ -20,7 +20,7 @@ import { Link as A, useRouter } from "../../../infra/router";
 import { createAct } from "../../../ui/act";
 import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Icon } from "../../../ui/Icon";
-import { ActiveBar } from "../../../ui/layout";
+import { ActiveBar, Kbd } from "../../../ui/layout";
 import { TextLink } from "../../../ui/TextLink";
 import { Bubble } from "../../../ui/Tip";
 import { runsHref } from "../../session";
@@ -116,9 +116,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
         >
           <Icon name="search" size={14} tone="faint" />
           <Text class="min-w-0 flex-1 truncate text-sm text-muted">{t("web.channel.switcher.open")}</Text>
-          <View class="shrink-0 rounded-xs border border-line bg-hover px-1.5 py-px">
-            <Text class="font-mono text-2xs text-muted">{keymap.label("mod+j")}</Text>
-          </View>
+          <Kbd>{keymap.label("mod+j")}</Kbd>
         </View>
         <Section
           item="channels"

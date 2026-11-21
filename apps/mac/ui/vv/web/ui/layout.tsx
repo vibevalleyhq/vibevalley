@@ -12,6 +12,7 @@ import { TextInput, type TextInputProps } from "./Field";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Bubble, Hint } from "./Tip";
+import { mix } from "./tone";
 
 type PageWidth = "prose" | "manage" | "wide";
 
@@ -27,6 +28,65 @@ export function PageBody(props: { width?: PageWidth | undefined; class?: string 
   return (
     <View testID={props.testid} class={`gap-5 ${pageWidths[width()]} ${props.class ?? ""}`}>
       {props.children}
+    </View>
+  );
+}
+
+type KbdSize = "sm" | "md";
+
+const kbdClasses: Record<KbdSize, { box: string; text: string }> = {
+  sm: {
+    box: "shrink-0 items-center justify-center rounded-xs border border-line bg-hover px-1.5 py-px",
+    text: "font-mono text-2xs font-medium text-muted tabular-nums",
+  },
+  md: {
+    box: "min-w-6 items-center justify-center rounded-xs border border-line bg-side px-1.5 py-0.5 shadow-raise",
+    text: "font-mono text-2xs font-medium text-ink tabular-nums",
+  },
+};
+
+/** Keycap label for keyboard shortcuts and inline key hints. */
+export function Kbd(props: { size?: KbdSize | undefined; children: JSX.Element }) {
+  const size = () => kbdClasses[props.size ?? "sm"];
+  return (
+    <View class={size().box}>
+      <Text class={size().text}>{props.children}</Text>
+    </View>
+  );
+}
+
+export type BannerTone = "bad" | "warn" | "ok" | "info";
+
+const bannerToneStyle: Record<BannerTone, { bg: string; text: string; mixColor: string; icon: IconName }> = {
+  bad: { bg: "bg-bad-soft", text: "text-berry", mixColor: "berry", icon: "cross" },
+  warn: { bg: "bg-warn-soft", text: "text-warn-ink", mixColor: "wheat", icon: "warn" },
+  ok: { bg: "bg-ok-soft", text: "text-ok-ink", mixColor: "leaf", icon: "check" },
+  info: { bg: "bg-side", text: "text-muted", mixColor: "line", icon: "info" },
+};
+
+/** Inline status or error notice; edge draws an edge-to-edge top strip under a viewer bar. */
+export function Banner(props: {
+  tone?: BannerTone | undefined;
+  edge?: boolean | undefined;
+  role?: "alert" | undefined;
+  testID?: string | undefined;
+  class?: string | undefined;
+  textClass?: string | undefined;
+  children: JSX.Element;
+}) {
+  const s = () => bannerToneStyle[props.tone ?? "bad"];
+  const edge = () => props.edge === true;
+  return (
+    <View
+      class={`flex-row items-start gap-2 ${edge() ? "border-b border-line px-3 py-2" : "rounded-md border px-3 py-2"} ${s().bg} ${props.class ?? ""}`}
+      style={edge() ? undefined : { borderColor: mix(s().mixColor, 0.25) }}
+    >
+      <View class="mt-0.5 shrink-0">
+        <Icon name={s().icon} size={edge() ? 12 : 14} tone={props.tone === "info" ? "muted" : undefined} />
+      </View>
+      <Text testID={props.testID} role={props.role} class={`min-w-0 flex-1 ${edge() ? "text-xs font-medium" : "text-sm"} ${s().text} ${props.textClass ?? ""}`}>
+        {props.children}
+      </Text>
     </View>
   );
 }

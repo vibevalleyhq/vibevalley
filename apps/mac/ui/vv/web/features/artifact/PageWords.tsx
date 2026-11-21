@@ -17,6 +17,7 @@ import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
+import { Kbd } from "../../ui/layout";
 import { toast } from "../../ui/toasts";
 import { artifactHref } from "./ArtifactCard";
 import type { Frame } from "./frame";
@@ -88,9 +89,7 @@ export function PageWords(props: { artifact: Artifact; version: number; frame: F
                 onBlur={() => focused.set(false)}
               />
               <View class="flex-row items-center justify-between gap-2">
-                <View class="rounded-xs border border-line bg-side px-1.5 py-0.5">
-                  <Text class="font-mono text-2xs text-faint">⌘↵</Text>
-                </View>
+                <Kbd>⌘↵</Kbd>
                 <View class="flex-row items-center gap-1.5">
                   <Button tone="quiet" onPress={() => picked.set(undefined)}>
                     {t("web.base.form.never")}

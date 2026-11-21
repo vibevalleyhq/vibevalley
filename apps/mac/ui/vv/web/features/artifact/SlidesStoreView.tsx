@@ -12,6 +12,7 @@ import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
 import { IconButton } from "../../ui/IconButton";
+import { Banner } from "../../ui/layout";
 import { toast } from "../../ui/toasts";
 import type { Frame } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
@@ -202,13 +203,7 @@ export function SlidesStoreView(props: StoreViewerProps) {
 
   return (
     <View testID="slides-store-view" class="min-h-0 min-w-0 flex-1">
-      <If when={snapshot().error}>
-        {(err) => (
-          <View class="border-b border-line bg-bad-soft px-3 py-2">
-            <Text class="text-xs font-medium text-berry">{err()}</Text>
-          </View>
-        )}
-      </If>
+      <If when={snapshot().error}>{(err) => <Banner edge>{err()}</Banner>}</If>
 
       <HtmlFrame
         artifact={props.artifact}

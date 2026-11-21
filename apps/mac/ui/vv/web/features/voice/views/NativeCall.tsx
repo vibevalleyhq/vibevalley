@@ -8,7 +8,7 @@ import { transport } from "../../../infra/transport";
 import { createAct } from "../../../ui/act";
 import { Button } from "../../../ui/Button";
 import { Icon } from "../../../ui/Icon";
-import { Card } from "../../../ui/layout";
+import { Banner, Card } from "../../../ui/layout";
 import { Dot } from "../../../ui/Tag";
 import { Bubble } from "../../../ui/Tip";
 import { mix } from "../../../ui/tone";
@@ -162,14 +162,9 @@ export function NativeCall() {
         </View>
         <If when={error() ?? state().problem}>
           {(why) => (
-            <View class="flex-row items-start gap-2 rounded-md border bg-bad-soft px-3 py-2" style={{ borderColor: mix("berry", 0.3) }}>
-              <View class="mt-0.5 shrink-0">
-                <Icon name="cross" size={14} />
-              </View>
-              <Text testID="native-call-error" role="alert" class="min-w-0 flex-1 text-sm text-berry">
-                {why()}
-              </Text>
-            </View>
+            <Banner testID="native-call-error" role="alert">
+              {why()}
+            </Banner>
           )}
         </If>
         <If when={state().heard}>

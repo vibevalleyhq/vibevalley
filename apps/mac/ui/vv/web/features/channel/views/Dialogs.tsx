@@ -20,6 +20,7 @@ import { Dialog } from "../../../ui/Dialog";
 import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Field, TextArea, TextInput } from "../../../ui/Field";
 import { Icon } from "../../../ui/Icon";
+import { Banner } from "../../../ui/layout";
 import { Segmented } from "../../../ui/Segmented";
 import { Bubble } from "../../../ui/Tip";
 import { mix } from "../../../ui/tone";
@@ -80,18 +81,7 @@ function Form(props: {
   return (
     <View class="gap-3.5">
       {props.children}
-      <If when={props.error}>
-        {(error) => (
-          <View class="flex-row items-start gap-2 rounded-md border bg-bad-soft px-3 py-2" style={{ borderColor: mix("berry", 0.25) }}>
-            <View class="mt-0.5 shrink-0">
-              <Icon name="cross" size={14} />
-            </View>
-            <Text role="alert" class="min-w-0 flex-1 text-sm text-berry">
-              {error()}
-            </Text>
-          </View>
-        )}
-      </If>
+      <If when={props.error}>{(error) => <Banner role="alert">{error()}</Banner>}</If>
       <View class="flex-row items-center justify-end gap-2 border-t border-line pt-3">
         <Button tone="quiet" testID="cancel" onPress={() => props.onCancel()}>
           {t("web.channel.dialog.cancel")}

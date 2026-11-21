@@ -9,6 +9,7 @@ import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
+import { Banner } from "../../ui/layout";
 import { toast } from "../../ui/toasts";
 import type { Frame } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
@@ -172,13 +173,7 @@ export function DashboardView(props: StoreViewerProps) {
         </View>
       </View>
 
-      <If when={snapshot().error}>
-        {(err) => (
-          <View class="border-b border-line bg-bad-soft px-3 py-2">
-            <Text class="text-xs font-medium text-berry">{err()}</Text>
-          </View>
-        )}
-      </If>
+      <If when={snapshot().error}>{(err) => <Banner edge>{err()}</Banner>}</If>
 
       <View class="min-h-0 flex-1 lg:flex-row">
         <HtmlFrame

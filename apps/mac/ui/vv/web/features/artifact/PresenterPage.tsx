@@ -14,7 +14,7 @@ import { useRouter } from "../../infra/router";
 import { shownTheme } from "../../state/prefs";
 import { Button } from "../../ui/Button";
 import { IconButton } from "../../ui/IconButton";
-import { Empty } from "../../ui/layout";
+import { Empty, Kbd } from "../../ui/layout";
 import { artifactHref, useArtifact, useArtifactContent } from "./ArtifactCard";
 import { createFrame, framed, shim } from "./frame";
 import { elapsedText, presenterOf, stepped } from "./slides";
@@ -28,14 +28,6 @@ function withSlideQuery(html: string, at: number, still: boolean): string {
   const read = "new URLSearchParams(location.search)";
   const idx = html.lastIndexOf(read);
   return idx < 0 ? html : `${html.slice(0, idx)}new URLSearchParams(${JSON.stringify(asked.toString())})${html.slice(idx + read.length)}`;
-}
-
-function HintKey(props: { children: string }) {
-  return (
-    <View class="min-w-5 items-center justify-center rounded-xs border border-line bg-page px-1.5 py-0.5 shadow-raise">
-      <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{props.children}</Text>
-    </View>
-  );
 }
 
 export function PresenterPage() {
@@ -146,12 +138,12 @@ function Presenter(props: { id: string; version: number }) {
           </View>
           <View class="flex-row flex-wrap items-center justify-between gap-2 px-0.5">
             <View class="flex-row items-center gap-1.5">
-              <HintKey>←</HintKey>
-              <HintKey>→</HintKey>
+              <Kbd size="md">←</Kbd>
+              <Kbd size="md">→</Kbd>
               <Text class="text-xs text-faint">{t("web.base.shortcuts.say.flip")}</Text>
             </View>
             <View class="flex-row items-center gap-1.5">
-              <HintKey>Esc</HintKey>
+              <Kbd size="md">Esc</Kbd>
               <Text class="text-xs text-faint">{t("web.artifact.page.all")}</Text>
             </View>
           </View>

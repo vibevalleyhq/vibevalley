@@ -10,7 +10,7 @@ import { ready } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
-import { Empty } from "../../ui/layout";
+import { Banner, Empty } from "../../ui/layout";
 import { Bubble } from "../../ui/Tip";
 import { artifactIcon, kindLabel, useArtifact } from "./ArtifactCard";
 import { BlocksView, type QuoteTarget } from "./BlocksView";
@@ -63,9 +63,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
         </View>
       </View>
       <If when={artifact.error()}>
-        <View class="m-3 rounded-md border border-berry bg-bad-soft px-3 py-2">
-          <Text class="text-sm text-berry">{reasonOf(artifact.error())}</Text>
-        </View>
+        <Banner class="m-3">{reasonOf(artifact.error())}</Banner>
       </If>
       <If when={shown()}>
         {(a) => (

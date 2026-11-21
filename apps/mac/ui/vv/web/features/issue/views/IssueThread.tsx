@@ -14,6 +14,7 @@ import { defineQuery, ready, retryRead, useQuery } from "../../../infra/query";
 import { createAct } from "../../../ui/act";
 import { Button } from "../../../ui/Button";
 import { Icon } from "../../../ui/Icon";
+import { Banner } from "../../../ui/layout";
 import { Markdown } from "../../../ui/Markdown";
 import { Bubble } from "../../../ui/Tip";
 import { mix } from "../../../ui/tone";
@@ -39,16 +40,7 @@ export function IssueThread(props: { issue: string }) {
   return (
     <View testID="issue-conversation" accessibilityLabel={t("web.issue.conversation.title")}>
       <SheetLabel>{t("web.issue.conversation.title")}</SheetLabel>
-      <If when={feed().error}>
-        {(error) => (
-          <View class="mb-3 flex-row items-start gap-2 rounded-md border bg-bad-soft px-3 py-2" style={{ borderColor: mix("berry", 0.25) }}>
-            <View class="mt-0.5 shrink-0">
-              <Icon name="cross" size={14} />
-            </View>
-            <Text class="min-w-0 flex-1 text-sm text-berry">{error()}</Text>
-          </View>
-        )}
-      </If>
+      <If when={feed().error}>{(error) => <Banner class="mb-3">{error()}</Banner>}</If>
       <If when={thread() && feed().ready && !feed().complete}>
         <Button
           tone="quiet"

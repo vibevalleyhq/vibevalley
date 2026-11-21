@@ -9,6 +9,7 @@ import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { Checkbox } from "../../ui/Checkbox";
 import { Select, TextInput } from "../../ui/Field";
+import { Banner } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
 import { Slider } from "../../ui/Slider";
 import { toast } from "../../ui/toasts";
@@ -207,13 +208,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
         </View>
       </View>
 
-      <If when={snapshot().error}>
-        {(err) => (
-          <View class="border-b border-line bg-bad-soft px-3 py-2">
-            <Text class="text-xs font-medium text-berry">{err()}</Text>
-          </View>
-        )}
-      </If>
+      <If when={snapshot().error}>{(err) => <Banner edge>{err()}</Banner>}</If>
 
       <If
         when={mode() === "focus"}

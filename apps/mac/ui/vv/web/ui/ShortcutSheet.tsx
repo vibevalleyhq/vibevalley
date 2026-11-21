@@ -7,6 +7,7 @@ import { t } from "@vibevalley/i18n";
 
 import { keyCap, shortcutPlaces, shortcuts } from "../base/shortcuts";
 import { Dialog } from "./Dialog";
+import { Kbd } from "./layout";
 
 export function ShortcutSheet() {
   const open = signal(false);
@@ -15,14 +16,6 @@ export function ShortcutSheet() {
     <Dialog open={open()} onClose={() => open.set(false)} title={t("web.base.shortcuts.title")} testid="shortcuts">
       <Shortcuts />
     </Dialog>
-  );
-}
-
-function Kbd(props: { children: string }) {
-  return (
-    <View class="min-w-6 items-center justify-center rounded-xs border border-line bg-side px-1.5 py-0.5 shadow-raise">
-      <Text class="font-mono text-2xs font-medium text-ink tabular-nums">{props.children}</Text>
-    </View>
   );
 }
 
@@ -42,7 +35,7 @@ function Shortcuts() {
                 <View class="min-h-7 flex-row items-center justify-between gap-4 rounded-sm px-1.5 py-1 transition duration-120 ease-out hover:bg-hover">
                   <Text class="min-w-0 flex-1 text-sm text-ink">{t(`web.base.shortcuts.say.${s().id}`)}</Text>
                   <View class="shrink-0 flex-row items-center justify-end gap-1">
-                    <Each of={s().keys}>{(key) => <Kbd>{keyCap(key())}</Kbd>}</Each>
+                    <Each of={s().keys}>{(key) => <Kbd size="md">{keyCap(key())}</Kbd>}</Each>
                   </View>
                 </View>
               )}
