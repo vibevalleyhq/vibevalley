@@ -574,7 +574,7 @@ export class VibeValleyApi {
       list: (options?: { signal?: AbortSignal }): Promise<T.AgentTemplate[]> =>
         this.call<T.AgentTemplate[]>("agent.template.list", "/api/v1/agent/template/list", undefined, options),
       /** A new profile from a template; installing one again makes another. */
-      install: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Agent> =>
+      install: (a: { id: string; runtime?: string | undefined }, options?: { signal?: AbortSignal }): Promise<T.Agent> =>
         this.call<T.Agent>("agent.template.install", "/api/v1/agent/template/install", a, options),
       /** A profile made again from its template's version now. */
       update: (a: { agent: string }, options?: { signal?: AbortSignal }): Promise<T.Agent> =>

@@ -27,15 +27,15 @@ fn farm() -> Farm {
     let mut registry = vibevalley_oar::Registry::new();
     registry.register(vibevalley_server::testing::helper());
     let starters = [
+        "fullstack",
+        "architect",
         "backend",
         "tester",
         "frontend",
         "docs",
         "scout",
-        "night",
-        "claude",
-        "codex",
-        "lab",
+        "designer",
+        "product",
         "slides",
         "collector",
         "pages",

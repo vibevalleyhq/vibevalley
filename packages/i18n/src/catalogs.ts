@@ -1402,6 +1402,9 @@ export const catalogs = {
       problems: "派不出去的原因",
       cannot: "派不出去：",
       random: "随机一个",
+      avatar: "角色头像",
+      avatarHint: "在工作台与聊天里展示这个头像；留空时显示农场里的小动物。",
+      avatarAnimal: "默认小动物",
       looksAs: "在农场里是",
       looksHint: "只是长相：同一台农机 可以是不同的动物。",
       wears: "穿什么",
@@ -1485,22 +1488,26 @@ export const catalogs = {
         add: "加进来",
         added: "模板「{name}」加进来了，还没装",
         onServer: "跑在 VibeValley 自己的 agent 上",
-        runsOn: "写给 {runtime}，这台机器上有",
         notHere: "写给 {runtime}，这台机器上没有：装上以后在档案里换一台农机",
         noPersona: "没写人设。",
-        installed: "装了 {n} 份",
         addedHere: " · 本机加进来的",
-        skills: "带着技能：{skills}",
         skill: "技能「{name}」：{description}",
-        look: "看看",
         fold: "收起",
         removeSure: "真的删掉模板",
-        install: "装上",
-        none: "还没有帮工：从模板装几个，或者自己捏一个。",
         from: "来自模板「{name}」第 {version} 版",
         update: "照模板更新到第 {version} 版",
         updateHint: "用模板的新版本盖掉职责、适合的活、人设和交给农机的方式；名字、长相、农机、模型和环境不动。",
         updated: "照模板更新好了",
+        galleryTitle: "开箱即用的模板",
+        galleryIntro: "按分工挑一份模板：自带风格、人设与技能，一键采用即可派活。",
+        manageLink: "全部模板与导入 →",
+        adopt: "一键采用",
+        adopted: "已采用 {n}",
+        adoptedToast: "已采用「{name}」",
+        willUse: "将用 {runtime}",
+        style: "风格 · {style}",
+        preview: "人设",
+        category: { all: "全部", engineering: "研发工程", product: "产品设计", research: "调研文档", orchestration: "助手" },
       },
       orchestrator: {
         newName: "新的助手",
@@ -2014,7 +2021,6 @@ export const catalogs = {
       recut: "重新切",
       cursorsIntro: "鼠标在农场里的样子：平时、指着能点的、拿着工具时。",
       cursorsFind: "找：指针的名字（glove、water、harvest……）",
-      cursors: "指针 · {n}",
       cursorsNote:
         "红点是点下去落在哪。平时是手套，指着能点的伸出食指；拿着工具时是那件工具，能用的带闪光，用不上的带禁止标记。切自 design/pixel/raw/ui-cursors.png（design/pixel/process.py ui-cursors）。",
       noCursors: "这个版本没有带上指针的图（assets/cursors）。",
@@ -5413,6 +5419,9 @@ export const catalogs = {
       problems: "Why it cannot be sent",
       cannot: "Cannot be sent: ",
       random: "A random one",
+      avatar: "Role avatar",
+      avatarHint: "Shown in lists and chat; when unset, the farm animal face is shown.",
+      avatarAnimal: "Animal face",
       looksAs: "On the farm it is",
       looksHint: "Only looks: the same runtime can be different animals.",
       wears: "Wears",
@@ -5501,22 +5510,26 @@ export const catalogs = {
         add: "Add it",
         added: 'The template "{name}" is added, not installed yet',
         onServer: "Runs on VibeValley's own agent",
-        runsOn: "Written for {runtime}, which this machine has",
         notHere: "Written for {runtime}, which this machine lacks: once installed, pick another machine in the profile",
         noPersona: "No persona.",
-        installed: "{n} installed",
         addedHere: " · added on this machine",
-        skills: "Comes with skills: {skills}",
         skill: 'Skill "{name}": {description}',
-        look: "Look",
         fold: "Fold",
         removeSure: "Really delete the template",
-        install: "Install",
-        none: "No helpers yet: install some from a template, or make one yourself.",
         from: 'From the template "{name}", version {version}',
         update: "Update to the template's version {version}",
         updateHint: "The template's new version replaces the duty, tags, persona and how it is given; the name, look, machine, model and environment stay.",
         updated: "Updated from the template",
+        galleryTitle: "Starter templates",
+        galleryIntro: "Adopt a ready-to-use role with a working style, persona, and skills.",
+        manageLink: "All templates & import →",
+        adopt: "Adopt",
+        adopted: "{n} adopted",
+        adoptedToast: 'Adopted "{name}"',
+        willUse: "Uses {runtime}",
+        style: "Style · {style}",
+        preview: "Persona",
+        category: { all: "All", engineering: "Engineering", product: "Product & Design", research: "Research & Docs", orchestration: "Assistants" },
       },
       orchestrator: {
         newName: "New assistant",
@@ -6046,7 +6059,6 @@ export const catalogs = {
       recut: "Cut again",
       cursorsIntro: "The mouse on the farm: normally, over something clickable, and holding a tool.",
       cursorsFind: "Find: a cursor's name (glove, water, harvest…)",
-      cursors: "Cursors · {n}",
       cursorsNote:
         "The red dot is where a click lands. Normally a glove, a pointing finger over something clickable; holding a tool, that tool, sparkling where it can be used and with a no-entry mark where it cannot. Cut from design/pixel/raw/ui-cursors.png (design/pixel/process.py ui-cursors).",
       noCursors: "This build has no cursor pictures (assets/cursors).",
@@ -9351,6 +9363,9 @@ export interface Messages {
   "web.agent.add": undefined;
   "web.agent.all": undefined;
   "web.agent.available": undefined;
+  "web.agent.avatar": undefined;
+  "web.agent.avatarAnimal": undefined;
+  "web.agent.avatarHint": undefined;
   "web.agent.backToAll": undefined;
   "web.agent.can": { readonly runtime: string | number };
   "web.agent.cannot": undefined;
@@ -9477,28 +9492,36 @@ export interface Messages {
   "web.agent.templates.add": undefined;
   "web.agent.templates.added": { readonly name: string | number };
   "web.agent.templates.addedHere": undefined;
+  "web.agent.templates.adopt": undefined;
+  "web.agent.templates.adopted": { readonly n: string | number };
+  "web.agent.templates.adoptedToast": { readonly name: string | number };
+  "web.agent.templates.category.all": undefined;
+  "web.agent.templates.category.engineering": undefined;
+  "web.agent.templates.category.orchestration": undefined;
+  "web.agent.templates.category.product": undefined;
+  "web.agent.templates.category.research": undefined;
   "web.agent.templates.fold": undefined;
   "web.agent.templates.folder": undefined;
   "web.agent.templates.folderHint": undefined;
   "web.agent.templates.from": { readonly name: string | number; readonly version: string | number };
-  "web.agent.templates.install": undefined;
-  "web.agent.templates.installed": { readonly n: string | number };
+  "web.agent.templates.galleryIntro": undefined;
+  "web.agent.templates.galleryTitle": undefined;
   "web.agent.templates.intro": undefined;
-  "web.agent.templates.look": undefined;
+  "web.agent.templates.manageLink": undefined;
   "web.agent.templates.noPersona": undefined;
-  "web.agent.templates.none": undefined;
   "web.agent.templates.notHere": { readonly runtime: string | number };
   "web.agent.templates.onServer": undefined;
   "web.agent.templates.open": undefined;
   "web.agent.templates.openLine": undefined;
+  "web.agent.templates.preview": undefined;
   "web.agent.templates.removeSure": undefined;
-  "web.agent.templates.runsOn": { readonly runtime: string | number };
   "web.agent.templates.skill": { readonly description: string | number; readonly name: string | number };
-  "web.agent.templates.skills": { readonly skills: string | number };
+  "web.agent.templates.style": { readonly style: string | number };
   "web.agent.templates.title": undefined;
   "web.agent.templates.update": { readonly version: string | number };
   "web.agent.templates.updateHint": undefined;
   "web.agent.templates.updated": undefined;
+  "web.agent.templates.willUse": { readonly runtime: string | number };
   "web.agent.unnamed": undefined;
   "web.agent.unnamedAgent": undefined;
   "web.agent.unreported": undefined;
@@ -9968,7 +9991,6 @@ export interface Messages {
   "web.catalog.copied": undefined;
   "web.catalog.copy": undefined;
   "web.catalog.count": { readonly n: string | number };
-  "web.catalog.cursors": { readonly n: string | number };
   "web.catalog.cursorsFind": undefined;
   "web.catalog.cursorsIntro": undefined;
   "web.catalog.cursorsNote": undefined;

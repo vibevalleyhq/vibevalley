@@ -41,6 +41,8 @@ export {
   type Skill,
   type Species,
   SpeciesValues,
+  type TemplateCategory,
+  TemplateCategoryValues,
 } from "./agent/shapes";
 export {
   type InventoryEntry,

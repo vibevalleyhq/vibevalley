@@ -3,12 +3,12 @@
 import { Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type Agent, defaultOrchestrator, type RuntimeInfo } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, type RuntimeInfo, TemplateCategoryValues } from "@vibevalley/protocol";
 
 import { createMemo } from "../../../solid";
 import { useAgentProblems, useOrchestrators, useWorkAgents } from "../../infra/agents";
 import { api } from "../../infra/api";
-import { ready, useQueryClient, useRuntimes } from "../../infra/query";
+import { ready, useAgentTemplates, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { createAct } from "../../ui/act";
 import { Button, ButtonLink } from "../../ui/Button";
@@ -17,9 +17,11 @@ import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Empty, PageBody, Toggle } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
-import { Bubble } from "../../ui/Tip";
+import { CountPill, Dot } from "../../ui/Tag";
+import { Bubble, Hint } from "../../ui/Tip";
 import { AgentPage } from "./AgentPage";
 import { orchestratorHref } from "./OrchestratorProfile";
+import { type CategoryFilter, categoryLabel, matchesTemplateQuery, TemplateCard, templateCategoryOf } from "./TemplateCard";
 import { TemplatesPage } from "./TemplatesPage";
 
 type RoleFilter = "all" | "orchestrator" | "worker";
@@ -62,10 +64,12 @@ export function AgentsRoute(props: { rest: string }) {
 function AgentsPage() {
   const agents = useWorkAgents();
   const orchestrators = useOrchestrators();
+  const templates = useAgentTemplates();
   const runtimes = useRuntimes();
   const problems = useAgentProblems(agents);
 
   const roleFilter = signal<RoleFilter>("all");
+  const category = signal<CategoryFilter>("all");
   const query = signal("");
   const width = signal(0);
   const wide = () => width() === 0 || width() >= 680;
@@ -79,12 +83,23 @@ function AgentsPage() {
   const visibleWorkers = createMemo(() =>
     showsWorkers(roleFilter()) ? agents().filter((a) => matchesProfileQuery(a, runtimeById().get(a.runtime), needle())) : [],
   );
+  const roleMatchedTemplates = createMemo(() =>
+    ready(templates, []).filter(
+      (tpl) => (tpl.role === "orchestrator" ? showsOrchestrators(roleFilter()) : showsWorkers(roleFilter())) && matchesTemplateQuery(tpl, needle()),
+    ),
+  );
+  const visibleTemplates = createMemo(() =>
+    category() === "all" ? roleMatchedTemplates() : roleMatchedTemplates().filter((tpl) => templateCategoryOf(tpl) === category()),
+  );
 
   const hasFilter = () => roleFilter() !== "all" || needle().length > 0;
-  const noMatches = () => hasFilter() && visibleOrchestrators().length === 0 && visibleWorkers().length === 0;
+  const noMatches = () => hasFilter() && visibleOrchestrators().length === 0 && visibleWorkers().length === 0 && visibleTemplates().length === 0;
+  const hasProfileSection = () =>
+    (showsOrchestrators(roleFilter()) && visibleOrchestrators().length > 0) || (showsWorkers(roleFilter()) && visibleWorkers().length > 0);
 
   const clearFilters = () => {
     roleFilter.set("all");
+    category.set("all");
     query.set("");
   };
 
@@ -145,46 +160,68 @@ function AgentsPage() {
             </Empty>
           }
         >
-          <If when={showsOrchestrators(roleFilter()) && (visibleOrchestrators().length > 0 || !hasFilter())}>
+          <If when={showsOrchestrators(roleFilter()) && visibleOrchestrators().length > 0}>
             <GroupSection title={t("web.agent.list.orchestrators")} count={visibleOrchestrators().length} testid="agents-group-orchestrators">
-              <If when={visibleOrchestrators().length > 0}>
-                <View class="overflow-hidden rounded-lg border border-line bg-page">
-                  <Each of={visibleOrchestrators()} key={(a) => a.id}>
-                    {(a, i) => <OrchestratorRow agent={a()} first={i() === 0} wide={wide()} />}
-                  </Each>
-                </View>
-              </If>
+              <View class="overflow-hidden rounded-lg border border-line bg-page">
+                <Each of={visibleOrchestrators()} key={(a) => a.id}>
+                  {(a, i) => <OrchestratorRow agent={a()} first={i() === 0} wide={wide()} />}
+                </Each>
+              </View>
             </GroupSection>
           </If>
 
-          <If when={showsWorkers(roleFilter()) && (visibleWorkers().length > 0 || !hasFilter())}>
+          <If when={showsWorkers(roleFilter()) && visibleWorkers().length > 0}>
             <GroupSection title={t("web.agent.list.helpers")} count={visibleWorkers().length} testid="agents-group-workers">
-              {/* The default orchestrator is always there: once it shows, the profiles are read. */}
-              <If
-                when={visibleWorkers().length > 0}
-                else={
-                  <If when={orchestrators().length > 0 && agents().length === 0}>
-                    <A href="/agents/templates" class="self-start">
-                      <Text class="text-sm text-muted hover:underline">{t("web.agent.templates.none")}</Text>
-                    </A>
-                  </If>
-                }
-              >
-                <View class="overflow-hidden rounded-lg border border-line bg-page">
-                  <Each of={visibleWorkers()} key={(a) => a.id}>
-                    {(a, i) => (
-                      <WorkerRow
-                        agent={a()}
-                        runtime={runtimeById().get(a().runtime)}
-                        errors={(problems()[a().id] ?? []).filter((item) => item.level === "error").map((item) => item.text)}
-                        first={i() === 0}
-                        wide={wide()}
-                      />
-                    )}
-                  </Each>
-                </View>
-              </If>
+              <View class="overflow-hidden rounded-lg border border-line bg-page">
+                <Each of={visibleWorkers()} key={(a) => a.id}>
+                  {(a, i) => (
+                    <WorkerRow
+                      agent={a()}
+                      runtime={runtimeById().get(a().runtime)}
+                      errors={(problems()[a().id] ?? []).filter((item) => item.level === "error").map((item) => item.text)}
+                      first={i() === 0}
+                      wide={wide()}
+                    />
+                  )}
+                </Each>
+              </View>
             </GroupSection>
+          </If>
+
+          <If when={ready(templates, []).length > 0}>
+            <View testID="agents-templates-gallery" class={hasProfileSection() ? "gap-3 border-t border-line pt-5" : "gap-3"}>
+              <View class="flex-row flex-wrap items-center justify-between gap-2">
+                <View class="flex-row items-center gap-2">
+                  <Text role="header" class="text-xs font-semibold text-muted">
+                    {t("web.agent.templates.galleryTitle")}
+                  </Text>
+                  <CountPill count={visibleTemplates().length} />
+                  <Hint text={t("web.agent.templates.galleryIntro")} />
+                </View>
+                <ButtonLink href="/agents/templates" tone="quiet" size="compact" testID="gallery-manage-templates">
+                  {t("web.agent.templates.manageLink")}
+                </ButtonLink>
+              </View>
+              <Segmented
+                testid="templates-category-filter"
+                label={t("web.agent.templates.galleryTitle")}
+                value={category()}
+                onChange={category.set}
+                options={[
+                  { value: "all", label: categoryLabel("all"), count: roleMatchedTemplates().length },
+                  ...TemplateCategoryValues.map((cat) => ({
+                    value: cat,
+                    label: categoryLabel(cat),
+                    count: roleMatchedTemplates().filter((tpl) => templateCategoryOf(tpl) === cat).length,
+                  })),
+                ]}
+              />
+              <View class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                <Each of={visibleTemplates()} key={(tpl) => tpl.id}>
+                  {(tpl) => <TemplateCard template={tpl()} runtimes={ready(runtimes, [])} />}
+                </Each>
+              </View>
+            </View>
           </If>
         </If>
       </PageBody>
@@ -200,9 +237,7 @@ function GroupSection(props: { title: string; count: number; testid: string; chi
           {props.title}
         </Text>
         <If when={props.count > 0}>
-          <View class="rounded-sm bg-hover px-1.5 py-px">
-            <Text class="text-2xs font-medium text-muted tabular-nums">{String(props.count)}</Text>
-          </View>
+          <CountPill count={props.count} />
         </If>
       </View>
       {props.children}
@@ -235,7 +270,7 @@ function OrchestratorRow(props: { agent: Agent; first: boolean; wide: boolean })
   const summary = () => props.agent.model || t("web.agent.list.orchestratorSummary");
   return (
     <RowShell agent={props.agent} to={orchestratorHref(props.agent.id)} first={props.first} trailing={<View class="w-7" />}>
-      <View class="h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-hover">
+      <View class="h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-side">
         <OrchestratorFace size={34} agent={props.agent.id} />
       </View>
       <View class="min-w-0 flex-1 gap-0.5">
@@ -335,7 +370,7 @@ function WorkerRow(props: { agent: Agent; runtime?: RuntimeInfo | undefined; err
       <If when={props.wide}>
         <View class="shrink-0 flex-row items-center gap-3">
           <View class="w-52 flex-row items-center gap-1.5">
-            <View class={`h-1.75 w-1.75 shrink-0 rounded-full ${available() ? "bg-leaf" : "bg-berry"}`} />
+            <Dot tone={available() ? "leaf" : "berry"} size={7} ring={false} />
             <Text class="min-w-0 flex-1 truncate text-xs text-muted" style={{ numberOfLines: 1 }}>
               {runtimeSpec()}
             </Text>

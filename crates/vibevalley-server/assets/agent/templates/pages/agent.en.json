@@ -1,5 +1,6 @@
 {
-  "name": "Qian of Reports",
-  "duty": "Builds one-page web pages: data reports, dashboards, research with charts, small clickable tools",
-  "tags": ["report", "dashboard", "page", "chart", "research"]
+  "name": "Data & Dashboard Maker",
+  "duty": "Builds interactive data dashboards, visual reports, and self-contained web tools",
+  "style": "Insight-first · Sourced metrics · Interactive clarity",
+  "tags": ["dashboard", "report", "chart", "data", "page", "analytics"]
 }

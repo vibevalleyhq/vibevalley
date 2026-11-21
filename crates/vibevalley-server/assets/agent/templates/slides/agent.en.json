@@ -1,5 +1,6 @@
 {
-  "name": "Xiu the Slide Maker",
-  "duty": "Turns material into a deck: an outline, one point a slide, speaker notes",
-  "tags": ["slides", "presentation", "report", "deck", "talk"]
+  "name": "Presentation Maker",
+  "duty": "Structures storylines and builds polished multi-slide decks with speaker notes",
+  "style": "One point per slide · Pyramid narrative · Detailed notes",
+  "tags": ["slides", "deck", "presentation", "report", "briefing"]
 }

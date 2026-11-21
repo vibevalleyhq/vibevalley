@@ -1,0 +1,25 @@
+{
+  "id": "designer",
+  "version": 1,
+  "role": "worker",
+  "category": "product",
+  "name": "UI/UX 设计师",
+  "duty": "打磨视觉层级、设计令牌、界面一致性与交互细节稿",
+  "style": "克制秩序 · 令牌统一 · 视觉精雕",
+  "tags": ["设计", "ui", "ux", "视觉", "规范", "令牌", "排版", "原型"],
+  "runtime": "claude",
+  "effort": "high",
+  "worktree": true,
+  "look": {
+    "eye": "#ff9de2",
+    "build": "hopper",
+    "head": "dome",
+    "body": "#f3e9da",
+    "trim": "#8a5cc4",
+    "hat": "#9580e6",
+    "species": "cat",
+    "outfit": "gardener",
+    "avatar": "avatar-designer"
+  },
+  "skills": ["artifacts"]
+}

@@ -8,7 +8,7 @@ import { Canvas, colorScheme, Image, Text, View, type JSX } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { type Agent, OutfitValues, SpeciesValues } from "@vibevalley/protocol";
 
-import { ready, useSprites } from "../../infra/query";
+import { ready, useAgentTemplates, useSprites } from "../../infra/query";
 import { Button } from "../../ui/Button";
 import { castOf, castPrefix, cropSprite, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "../../ui/domain/cast";
 import { AgentFace } from "../../ui/domain/Face";
@@ -43,10 +43,47 @@ export function Labeled(props: {
   );
 }
 
+const avatarOrder = [
+  "avatar-orchestrator",
+  "avatar-fullstack",
+  "avatar-architect",
+  "avatar-frontend",
+  "avatar-backend",
+  "avatar-reviewer",
+  "avatar-tester",
+  "avatar-designer",
+  "avatar-product",
+  "avatar-scout",
+  "avatar-docs",
+  "avatar-pages",
+  "avatar-slides",
+  "avatar-collector",
+] as const;
+
 export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"]) => void }) {
   const cast = () => castOf(props.draft.look, props.draft.id);
   const sprites = useSprites();
+  const templates = useAgentTemplates();
   const url = useSpriteUrl();
+  const avatars = () => {
+    const all = ready(sprites, undefined);
+    if (!all) return [];
+    const order = new Map<string, number>(avatarOrder.map((id, i) => [id, i]));
+    return Object.keys(all)
+      .filter((name) => name.startsWith("avatar-"))
+      .toSorted((a, b) => {
+        const ia = order.get(a);
+        const ib = order.get(b);
+        if (ia !== undefined && ib !== undefined) return ia - ib;
+        if (ia !== undefined) return -1;
+        if (ib !== undefined) return 1;
+        return a.localeCompare(b);
+      });
+  };
+  const avatarLabel = (id: string) => {
+    const tpl = ready(templates, []).find((item) => item.look.avatar === id);
+    return tpl?.name ?? id.replace(/^avatar-/u, "");
+  };
   return (
     <View class="gap-5">
       <View class="flex-row">
@@ -54,6 +91,31 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
           {t("web.agent.random")}
         </Button>
       </View>
+      <If when={avatars().length > 0}>
+        <Labeled label={t("web.agent.avatar")} hint={t("web.agent.avatarHint")}>
+          <View class="grid grid-cols-4 gap-1.5">
+            <Tile
+              active={!props.draft.look.avatar}
+              label={t("web.agent.avatarAnimal")}
+              onClick={() => props.onChange({ ...props.draft.look, avatar: undefined })}
+            >
+              <AgentFace
+                agentId={props.draft.id}
+                name={speciesLabel[cast().species]}
+                look={{ ...props.draft.look, avatar: undefined, species: cast().species, outfit: cast().outfit }}
+                size={40}
+              />
+            </Tile>
+            <Each of={avatars()}>
+              {(id) => (
+                <Tile active={props.draft.look.avatar === id()} label={avatarLabel(id())} onClick={() => props.onChange({ ...props.draft.look, avatar: id() })}>
+                  <AgentFace agentId={props.draft.id} name={avatarLabel(id())} look={{ ...props.draft.look, avatar: id() }} size={40} />
+                </Tile>
+              )}
+            </Each>
+          </View>
+        </Labeled>
+      </If>
       <Labeled label={t("web.agent.looksAs")} hint={t("web.agent.looksHint")}>
         <View class="grid grid-cols-4 gap-1.5">
           <Each of={SpeciesValues}>
@@ -67,7 +129,7 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
                   agentId={props.draft.id}
                   name={speciesLabel[species()]}
                   runtime={props.draft.runtime}
-                  look={{ ...props.draft.look, species: species(), outfit: cast().outfit }}
+                  look={{ ...props.draft.look, avatar: undefined, species: species(), outfit: cast().outfit }}
                   size={48}
                 />
               </Tile>
@@ -118,7 +180,7 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
       }`}
     >
       {props.children}
-      <Text class={`text-xs font-medium ${props.active ? "text-ink" : "text-muted"}`}>{props.label}</Text>
+      <Text class={`max-w-full truncate text-center text-xs font-medium ${props.active ? "text-ink" : "text-muted"}`}>{props.label}</Text>
     </View>
   );
 }

@@ -58,7 +58,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
   const dirty = () => isNew || !same(props.saved, draft());
   const nameTaken = () => props.all.some((a) => a.id !== draft().id && a.name === draft().name.trim());
   const patch = (p: Partial<Agent>) => draft.set({ ...draft(), ...p });
-  const setLook = (orchestrator: OrchestratorLook) => patch({ look: { ...draft().look, orchestrator } });
+  const setLook = (orchestrator: OrchestratorLook) => patch({ look: { ...draft().look, orchestrator, avatar: undefined } });
 
   const save = () => {
     const d = draft();

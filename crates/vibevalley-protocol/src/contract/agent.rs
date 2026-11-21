@@ -299,6 +299,38 @@ pub struct Look {
     pub trim: String,
     pub hat: String,
     pub eye: String,
+    /// Optional generated portrait sprite name (`avatar-*`), used instead of the animal face when set.
+    #[serde(default)]
+    pub avatar: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum TemplateCategory {
+    Engineering,
+    Product,
+    Research,
+    Orchestration,
+}
+
+impl TemplateCategory {
+    pub const ALL: [TemplateCategory; 4] = [
+        TemplateCategory::Engineering,
+        TemplateCategory::Product,
+        TemplateCategory::Research,
+        TemplateCategory::Orchestration,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TemplateCategory::Engineering => "engineering",
+            TemplateCategory::Product => "product",
+            TemplateCategory::Research => "research",
+            TemplateCategory::Orchestration => "orchestration",
+        }
+    }
 }
 
 /// Where a profile came from: a template's id and the version it had then.
@@ -385,6 +417,10 @@ pub struct AgentTemplate {
     pub look: Look,
     pub persona: String,
     pub source: AgentTemplateSource,
+    /// Built-in role category (`engineering`, `product`, `research`, `orchestration`).
+    pub category: Option<TemplateCategory>,
+    /// Concise summary of this template's working style and strengths.
+    pub style: Option<String>,
     /// The built-in skills a profile installed from it has ticked, by id.
     pub skills: Vec<String>,
     /// The profiles installed from it, by id.
@@ -440,6 +476,7 @@ pub struct AgentDeleteInput {
 #[serde(rename_all = "camelCase")]
 pub struct AgentTemplateInstallInput {
     pub id: String,
+    pub runtime: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -487,6 +524,7 @@ crate::typescript::module! {
     AgentFrom,
     Agent,
     AgentTemplateSource,
+    TemplateCategory,
     AgentTemplate,
     AgentValidateRequest,
     AgentValidation,

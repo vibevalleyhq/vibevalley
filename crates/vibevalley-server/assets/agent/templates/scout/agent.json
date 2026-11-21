@@ -1,11 +1,13 @@
 {
   "id": "scout",
-  "version": 1,
+  "version": 2,
   "role": "worker",
-  "name": "情报 Grok",
-  "duty": "查资料、读外部文档、调研方案",
-  "tags": ["查", "调研", "agora", "资料", "接口怎么调"],
-  "runtime": "pi",
+  "category": "research",
+  "name": "技术调研员",
+  "duty": "查阅源码、官方文档与社区实践，对比方案并给出有出处的结论",
+  "style": "出处可溯 · 事实推断分离 · 结论先行",
+  "tags": ["调研", "查资料", "源码", "官方文档", "选型", "对比", "research"],
+  "runtime": "claude",
   "effort": "high",
   "worktree": true,
   "look": {
@@ -16,6 +18,7 @@
     "trim": "#b0503f",
     "hat": "#4f86d9",
     "species": "owl",
-    "outfit": "gardener"
+    "outfit": "gardener",
+    "avatar": "avatar-scout"
   }
 }

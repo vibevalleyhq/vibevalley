@@ -1,5 +1,6 @@
 {
-  "name": "Yan the Reviewer",
-  "duty": "Reviews a branch's or an issue's changes: reads, never edits, lists findings by severity",
-  "tags": ["review", "code review", "check", "changes"]
+  "name": "Code Reviewer",
+  "duty": "Read-only audit of diffs for correctness, edge cases, security, and test coverage",
+  "style": "Read-only audit · Evidence-cited · Severity-ranked",
+  "tags": ["review", "code review", "audit", "diff", "check"]
 }

@@ -8,7 +8,7 @@ import { colorScheme, effect, host, keymap, Scroll, Text, View, windowSize, type
 
 import { t } from "@vibevalley/i18n";
 
-import { variant } from "../base/dom";
+import { Keyed, variant } from "../base/dom";
 import { QuickSwitcher, switcher } from "../features/channel";
 import { waitingOnUser } from "../features/inbox";
 import { NotesSearch } from "../features/pkm";
@@ -277,7 +277,7 @@ function Desk(props: { place?: Place | undefined }) {
       <If when={props.place} else={<View class="flex-1" />}>
         {(place) => (
           <View class="min-w-0 flex-1 flex-row items-center gap-2.5">
-            <Icon name={place().icon} size={20} />
+            <Keyed key={place().icon}>{() => <Icon name={place().icon} size={20} />}</Keyed>
             {/* What the place is goes beside its name, on hover: a sentence under every head was read once and then only took room. */}
             <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
               <Text role="header" class="truncate text-lg font-semibold text-ink">
