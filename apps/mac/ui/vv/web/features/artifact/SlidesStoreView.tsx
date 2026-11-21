@@ -331,10 +331,9 @@ export function SlidesStoreView(props: StoreViewerProps) {
                     accessibilityLabel={t("web.artifact.slides.slide", { at: i() + 1, title: slideTitle(i()) })}
                     accessibilityState={{ selected: selected() }}
                     onPress={() => goto(i())}
-                    class={`h-18 w-32 shrink-0 overflow-hidden rounded-md border bg-side transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                    class={`relative h-18 w-32 shrink-0 overflow-hidden rounded-md border bg-side transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
                       selected() ? "border-accent shadow-raise" : "border-line hover:border-faint"
                     }`}
-                    style={selected() ? { borderWidth: 2 } : undefined}
                   >
                     <If when={thumbView.html()}>
                       {(html) => (
@@ -350,7 +349,10 @@ export function SlidesStoreView(props: StoreViewerProps) {
                         />
                       )}
                     </If>
-                    <View class={`absolute top-1 right-1 rounded-xs px-1.5 py-px ${selected() ? "bg-accent" : "border border-line bg-page"}`}>
+                    <If when={selected()}>
+                      <View class="pointer-events-none absolute inset-0 rounded-sm border border-accent" />
+                    </If>
+                    <View class={`absolute top-1 right-1 rounded-xs border px-1.5 py-px ${selected() ? "border-accent bg-accent" : "border-line bg-page"}`}>
                       <Text class={`font-mono text-2xs font-medium tabular-nums ${selected() ? "text-page" : "text-muted"}`}>{String(i() + 1)}</Text>
                     </View>
                   </View>

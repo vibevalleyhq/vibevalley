@@ -60,4 +60,42 @@ describe("ui-tokens guardrail", () => {
     const extra = scanUiTokens("apps/mac/ui/vv/web/features/agent/AgentsPage.tsx", 'export const Extra = () => <View style={{ color: "#123456" }} />;');
     expect(extra).toHaveLength(1);
   });
+
+  it("flags conditional border thickness and geometry shifts on interactive elements", () => {
+    const file = "apps/mac/ui/vv/web/features/example/Demo.tsx";
+    const src = [
+      "export function Demo(props: { picked: boolean }) {",
+      '  return <View role="button" class={props.picked ? "border-2 border-accent" : "border border-line"} />;',
+      "}",
+      "export function Thumb(props: { selected: boolean }) {",
+      '  return <View role="button" class="border border-line" style={props.selected ? { borderWidth: 2 } : undefined} />;',
+      "}",
+      "export function PaddingProp(props: { active: boolean }) {",
+      "  return <View style={{ paddingVertical: props.active ? 3 : 0 }} />;",
+      "}",
+    ].join("\n");
+    const findings = scanUiTokens(file, src);
+    expect(findings.map((f) => ({ line: f.line, rule: f.rule }))).toEqual([
+      { line: 2, rule: "selection-layout-shift" },
+      { line: 5, rule: "selection-layout-shift" },
+      { line: 8, rule: "selection-layout-shift" },
+    ]);
+  });
+
+  it("allows constant border thickness, row dividers, dashed borders, and fixed dots", () => {
+    const file = "apps/mac/ui/vv/web/features/example/Demo.tsx";
+    const src = [
+      "export function Card(props: { active: boolean; last: boolean; dashed: boolean; saved?: boolean }) {",
+      "  return (",
+      "    <>",
+      '      <View role="button" class={`rounded-md border ${props.active ? "border-accent bg-selected" : "border-transparent hover:bg-hover"}`} />',
+      '      <View class={`py-1 ${props.last ? "" : "border-b border-line"}`} />',
+      '      <View class={props.dashed ? "border border-dashed border-line" : ""} />',
+      '      <View class={`h-2 w-2 rounded-full ${props.saved ? "bg-leaf" : "border border-faint"}`} />',
+      "    </>",
+      "  );",
+      "}",
+    ].join("\n");
+    expect(scanUiTokens(file, src)).toEqual([]);
+  });
 });

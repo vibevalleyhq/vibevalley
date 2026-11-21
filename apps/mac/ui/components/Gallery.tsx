@@ -34,7 +34,7 @@ function SchemeOption(props: { label: string; active: boolean; onSelect: () => v
       hoverStyle={{ backgroundColor: props.active ? p().surface : p().subtle }}
       focusVisibleStyle={{ outlineWidth: 2, outlineColor: p().focus, outlineOffset: 2, outlineStyle: "solid" }}
     >
-      <Text style={{ fontSize: 11.5, lineHeight: 14, fontWeight: props.active ? "600" : "500", color: props.active ? p().ink : p().muted }}>{props.label}</Text>
+      <Text style={{ fontSize: 11.5, lineHeight: 14, fontWeight: "500", color: props.active ? p().ink : p().muted }}>{props.label}</Text>
     </Button>
   );
 }
@@ -59,9 +59,7 @@ function FilterChip(props: { label: string; active: boolean; onPress: () => void
       hoverStyle={{ backgroundColor: props.active ? p().primary : p().subtle }}
       focusVisibleStyle={{ outlineWidth: 2, outlineColor: p().focus, outlineOffset: 2, outlineStyle: "solid" }}
     >
-      <Text style={{ fontSize: 11.5, lineHeight: 14, fontWeight: props.active ? "600" : "500", color: props.active ? p().onPrimary : p().text }}>
-        {props.label}
-      </Text>
+      <Text style={{ fontSize: 11.5, lineHeight: 14, fontWeight: "500", color: props.active ? p().onPrimary : p().text }}>{props.label}</Text>
     </Button>
   );
 }

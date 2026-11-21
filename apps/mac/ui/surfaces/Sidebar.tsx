@@ -545,7 +545,7 @@ export function Sidebar() {
                   ...pressTransition(),
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: isCur ? "600" : "500", color: isCur ? p().ink : p().muted }}>{item.label}</Text>
+                <Text style={{ fontSize: 12, fontWeight: "500", color: isCur ? p().ink : p().muted }}>{item.label}</Text>
                 {count > 0 ? (
                   <View
                     style={{
@@ -1136,7 +1136,7 @@ export function Sidebar() {
           borderWidth: 1,
           borderColor: showActiveCard ? p().border : "transparent",
           backgroundColor: showActiveCard ? p().surface : "transparent",
-          paddingVertical: showActiveCard ? 3 : 0,
+          paddingVertical: 2,
           gap: 1,
         }}
       >

@@ -172,8 +172,8 @@ function Tile(props: {
       style={{ left: props.x, top: props.y, width: props.width, height: props.height + captionPx }}
     >
       <View
-        class={`flex-1 min-h-0 items-center justify-center overflow-hidden rounded-md bg-side transition duration-120 ease-out ${
-          props.active || props.picked ? "border-2 border-accent" : "border border-line hover:border-faint"
+        class={`relative flex-1 min-h-0 items-center justify-center overflow-hidden rounded-md border bg-side transition duration-120 ease-out ${
+          props.active || props.picked ? "border-accent" : "border-line hover:border-faint"
         }`}
       >
         <If
@@ -187,6 +187,9 @@ function Tile(props: {
           }
         >
           {(src) => <Image src={src()} style={{ width: props.width, height: props.height, objectFit: "cover" }} />}
+        </If>
+        <If when={props.active || props.picked}>
+          <View class="pointer-events-none absolute inset-0 rounded-sm border border-accent" />
         </If>
       </View>
       <Text class={`pt-1.5 truncate text-xs ${props.picked ? "font-medium text-ink" : "text-muted"}`}>{file().name}</Text>
@@ -224,8 +227,8 @@ export function ArtifactTiles(props: {
                 }
                 lastPress = ts;
               }}
-              class={`w-56 shrink-0 gap-2.5 rounded-lg p-3 transition duration-120 ease-out ${
-                picked() ? "border-2 border-accent bg-selected" : "border border-line bg-page hover:border-faint hover:bg-hover"
+              class={`relative w-56 shrink-0 gap-2.5 rounded-lg border p-3 transition duration-120 ease-out ${
+                picked() ? "border-accent bg-selected shadow-raise" : "border-line bg-page hover:border-faint hover:bg-hover"
               }`}
             >
               <View class="flex-row items-center gap-2.5">
@@ -262,6 +265,9 @@ export function ArtifactTiles(props: {
                   <Icon name="open" size={12} tone="muted" />
                 </View>
               </View>
+              <If when={picked()}>
+                <View class="pointer-events-none absolute inset-0 rounded-md border border-accent" />
+              </If>
             </View>
           );
         }}

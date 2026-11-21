@@ -197,7 +197,7 @@ export function Palette() {
             return (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                 <KeyCap label={hint.keys} surface="surface" active={active()} />
-                <Text style={{ fontSize: 11, fontWeight: active() ? "600" : "400", color: active() ? p().ink : p().faint }}>{hint.label}</Text>
+                <Text style={{ fontSize: 11, fontWeight: "500", color: active() ? p().ink : p().faint }}>{hint.label}</Text>
               </View>
             );
           })}

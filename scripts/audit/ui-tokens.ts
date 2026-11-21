@@ -32,8 +32,27 @@ const HEX_LITERAL_RE = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-f
 const RGB_CALL_RE = /\brgba?\s*\(/gu;
 const TAILWIND_ARBITRARY_RE = /\b(?:bg|text|border|ring|outline|fill|stroke|from|to|via|rounded|shadow)-\[[^\]]+\]/gu;
 const HEX_ALPHA_SUFFIX_RE = /^[0-9a-fA-F]{2}$/u;
+const FULL_BORDER_TWO_RE = /\bborder-2\b/u;
+const FULL_BORDER_ONE_RE = /(?:^|\s)border(?:\s|$)/u;
+const FIXED_DOT_CLASS_RE = /\b(?:h-2\s+w-2|size-\d)/u;
+const SELECTION_TEST_RE = /\b(?:selected|active|picked|current|on|focus|focused)\b/iu;
 
-export type ViolationRule = "hardcoded-color" | "arbitrary-tailwind" | "raw-control";
+const BOX_GEOMETRY_STYLE_KEYS = new Set([
+  "borderWidth",
+  "borderLeftWidth",
+  "borderRightWidth",
+  "borderTopWidth",
+  "borderBottomWidth",
+  "padding",
+  "paddingVertical",
+  "paddingHorizontal",
+  "paddingTop",
+  "paddingBottom",
+  "paddingLeft",
+  "paddingRight",
+]);
+
+export type ViolationRule = "hardcoded-color" | "arbitrary-tailwind" | "raw-control" | "selection-layout-shift";
 
 export interface Finding {
   readonly file: string;
@@ -127,6 +146,129 @@ function jsxAttrStringValue(attr: AstNode): string | undefined {
     return val.expression.value;
   }
   return undefined;
+}
+
+function jsxAttrName(attr: AstNode): string | undefined {
+  return isAstNode(attr.name) && attr.name.type === "JSXIdentifier" && typeof attr.name.name === "string" ? attr.name.name : undefined;
+}
+
+function stringLiteralOf(node: unknown): string | undefined {
+  return isAstNode(node) && node.type === "Literal" && typeof node.value === "string" ? node.value : undefined;
+}
+
+function propertyKeyName(prop: AstNode): string | undefined {
+  const key = prop.key;
+  if (!isAstNode(key)) return undefined;
+  if (key.type === "Identifier" && typeof key.name === "string") return key.name;
+  if (key.type === "Literal" && typeof key.value === "string") return key.value;
+  return undefined;
+}
+
+function isInteractiveJsxElement(el: AstNode | undefined): boolean {
+  if (!el || !Array.isArray(el.attributes)) return false;
+  for (const attr of el.attributes) {
+    if (!isAstNode(attr) || attr.type !== "JSXAttribute") continue;
+    const name = jsxAttrName(attr);
+    if (name === "onPress" || name === "accessibilityState") return true;
+    if (name === "role") {
+      const role = jsxAttrStringValue(attr);
+      if (role === "button" || role === "tab" || role === "radio" || role === "checkbox" || role === "option") return true;
+    }
+  }
+  return false;
+}
+
+function staticClassTextOf(attr: AstNode): string {
+  const val = attr.value;
+  if (!isAstNode(val)) return "";
+  if (val.type === "Literal" && typeof val.value === "string") return val.value;
+  if (val.type === "JSXExpressionContainer" && isAstNode(val.expression) && val.expression.type === "TemplateLiteral" && Array.isArray(val.expression.quasis)) {
+    return val.expression.quasis.filter(isAstNode).map(rawTemplateText).join(" ");
+  }
+  return "";
+}
+
+function boxBorderWidth(classNames: string): 0 | 1 | 2 {
+  if (FULL_BORDER_TWO_RE.test(classNames)) return 2;
+  if (FULL_BORDER_ONE_RE.test(classNames)) return 1;
+  return 0;
+}
+
+function styleGeometryKeysOf(expr: unknown): Set<string> {
+  const out = new Set<string>();
+  if (!isAstNode(expr) || expr.type !== "ObjectExpression" || !Array.isArray(expr.properties)) return out;
+  for (const prop of expr.properties) {
+    if (!isAstNode(prop) || prop.type !== "Property") continue;
+    const key = propertyKeyName(prop);
+    if (key && BOX_GEOMETRY_STYLE_KEYS.has(key)) out.add(key);
+  }
+  return out;
+}
+
+function checkSelectionLayoutShift(out: Finding[], file: string, line: number, source: string, node: AstNode, ancestors: readonly AstNode[]): void {
+  const attr = ancestors.findLast((a) => a.type === "JSXAttribute");
+  if (!attr) return;
+  const attrName = jsxAttrName(attr);
+  const start = typeof node.start === "number" ? node.start : 0;
+  const end = typeof node.end === "number" ? node.end : 0;
+  const snippet = source.slice(start, end);
+
+  if (attrName === "class") {
+    const cons = stringLiteralOf(node.consequent);
+    const alt = stringLiteralOf(node.alternate);
+    if (cons === undefined || alt === undefined) return;
+    if (cons.includes("border-dashed") || alt.includes("border-dashed")) return;
+    if (FIXED_DOT_CLASS_RE.test(staticClassTextOf(attr))) return;
+
+    const w1 = boxBorderWidth(cons);
+    const w2 = boxBorderWidth(alt);
+    if (w1 === w2) return;
+
+    const testSlice = isAstNode(node.test)
+      ? source.slice(typeof node.test.start === "number" ? node.test.start : 0, typeof node.test.end === "number" ? node.test.end : 0)
+      : "";
+    const jsxEl = ancestors.findLast((a) => a.type === "JSXOpeningElement");
+    if ((w1 > 0 && w2 > 0) || isInteractiveJsxElement(jsxEl) || SELECTION_TEST_RE.test(testSlice)) {
+      out.push({
+        file,
+        line,
+        rule: "selection-layout-shift",
+        snippet,
+        fix: "keep border thickness constant across states (use `border-transparent` or a `pointer-events-none absolute inset-0` overlay)",
+      });
+    }
+    return;
+  }
+
+  if (attrName === "style") {
+    const parent = ancestors[ancestors.length - 1];
+    if (parent && parent.type === "Property") {
+      const key = propertyKeyName(parent);
+      if (key && BOX_GEOMETRY_STYLE_KEYS.has(key)) {
+        out.push({
+          file,
+          line,
+          rule: "selection-layout-shift",
+          snippet: `${key}: ${snippet}`,
+          fix: "keep `borderWidth` and `padding` constant across states so selection never resizes the box",
+        });
+      }
+      return;
+    }
+
+    const consKeys = styleGeometryKeysOf(node.consequent);
+    const altKeys = styleGeometryKeysOf(node.alternate);
+    const changed = [...consKeys].some((k) => !altKeys.has(k)) || [...altKeys].some((k) => !consKeys.has(k));
+    if (changed) {
+      out.push({
+        file,
+        line,
+        rule: "selection-layout-shift",
+        snippet,
+        fix: "keep `borderWidth` and `padding` constant across states (render active rings or strips via an absolute overlay)",
+      });
+    }
+  }
 }
 
 function pushRegexMatches(out: Finding[], file: string, line: number, rule: ViolationRule, text: string, re: RegExp, fix: string): void {
@@ -231,6 +373,11 @@ export function scanUiTokens(relFile: string, source: string): Finding[] {
           fix: "use `Toggle` from `apps/mac/ui/vv/web/ui/layout.tsx` instead of raw `<Switch`",
         });
       }
+      continue;
+    }
+
+    if (node.type === "ConditionalExpression") {
+      checkSelectionLayoutShift(rawFindings, normalized, line, source, node, ancestors);
       continue;
     }
 

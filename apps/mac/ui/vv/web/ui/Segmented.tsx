@@ -66,7 +66,7 @@ export function Segmented<T extends string>(props: {
               ].join(" ")}
             >
               <If when={o().icon}>{(name) => <Icon name={name()} size={14} tone={on() ? "ink" : "muted"} />}</If>
-              <Text class={`min-w-0 truncate text-sm ${on() ? "font-medium text-ink" : disabled() ? "text-muted" : "text-muted group-hover:text-ink"}`}>
+              <Text class={`min-w-0 truncate text-sm font-medium ${on() ? "text-ink" : disabled() ? "text-muted" : "text-muted group-hover:text-ink"}`}>
                 {o().label}
               </Text>
               <If when={o().count !== undefined}>

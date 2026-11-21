@@ -206,7 +206,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
                   onPress={() => pose.set(p().pose)}
                   class={`h-6 justify-center rounded-full px-2.5 transition duration-120 ease-out ${pose() === p().pose ? "bg-ink" : "bg-hover hover:bg-selected"}`}
                 >
-                  <Text class={`text-xs ${pose() === p().pose ? "font-medium text-page" : "text-ink"}`}>{p().label}</Text>
+                  <Text class={`text-xs font-medium ${pose() === p().pose ? "text-page" : "text-ink"}`}>{p().label}</Text>
                 </View>
               )}
             </Each>

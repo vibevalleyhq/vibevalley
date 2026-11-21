@@ -197,7 +197,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
                     style={on() ? { borderColor: mix("leaf", 1) } : undefined}
                   >
                     <OrchestratorFace size={48} look={look().id} />
-                    <Text class={`text-xs ${on() ? "font-semibold text-ink" : "text-muted"}`}>{look().name}</Text>
+                    <Text class={`text-xs font-medium ${on() ? "text-ink" : "text-muted"}`}>{look().name}</Text>
                   </View>
                 );
               }}

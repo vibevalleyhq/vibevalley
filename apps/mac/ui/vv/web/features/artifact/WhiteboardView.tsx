@@ -804,7 +804,7 @@ export function WhiteboardView(props: StoreViewerProps) {
           active() ? "bg-selected" : "hover:bg-hover"
         }`}
       >
-        <Text class={`text-xs ${active() ? "font-semibold text-ink" : "font-medium text-muted"}`}>{label}</Text>
+        <Text class={`text-xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{label}</Text>
       </View>
     );
   };

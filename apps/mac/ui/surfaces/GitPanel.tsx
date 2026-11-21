@@ -631,8 +631,8 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   paddingHorizontal: 10,
                   borderRadius: 6,
                   backgroundColor: !newBranch().trim() || creatingWt() ? p().tile : p().primary,
-                  borderWidth: !newBranch().trim() || creatingWt() ? 1 : 0,
-                  borderColor: p().border,
+                  borderWidth: 1,
+                  borderColor: !newBranch().trim() || creatingWt() ? p().border : p().primary,
                   justifyContent: "center",
                 }}
               >

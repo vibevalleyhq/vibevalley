@@ -117,7 +117,7 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
       style={props.active ? { borderColor: mix("ink", 0.4) } : undefined}
     >
       {props.children}
-      <Text class={`text-xs ${props.active ? "font-semibold text-ink" : "text-muted"}`}>{props.label}</Text>
+      <Text class={`text-xs font-medium ${props.active ? "text-ink" : "text-muted"}`}>{props.label}</Text>
     </View>
   );
 }

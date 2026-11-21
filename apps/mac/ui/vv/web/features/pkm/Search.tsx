@@ -252,7 +252,7 @@ function Filter(props: { on: boolean; label: string; testid: string; onToggle: (
       onPress={() => props.onToggle()}
       class={`group h-6 justify-center rounded-full border px-2.5 transition duration-120 ease-out ${props.on ? "border-faint bg-selected" : "border-transparent hover:bg-hover"}`}
     >
-      <Text class={`text-xs ${props.on ? "font-medium text-ink" : "text-muted group-hover:text-ink"}`}>{props.label}</Text>
+      <Text class={`text-xs font-medium ${props.on ? "text-ink" : "text-muted group-hover:text-ink"}`}>{props.label}</Text>
     </View>
   );
 }

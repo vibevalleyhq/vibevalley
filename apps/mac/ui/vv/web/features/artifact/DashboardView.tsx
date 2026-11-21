@@ -234,7 +234,7 @@ export function DashboardView(props: StoreViewerProps) {
                             active() ? "bg-selected" : "hover:bg-hover"
                           }`}
                         >
-                          <Text class={`text-xs ${active() ? "font-semibold text-ink" : "font-medium text-muted"}`}>{ds()}</Text>
+                          <Text class={`text-xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{ds()}</Text>
                         </View>
                       );
                     }}

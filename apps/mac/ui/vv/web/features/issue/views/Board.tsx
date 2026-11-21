@@ -175,7 +175,7 @@ export function IssueBoard(props: BoardProps) {
                 accessibilityState={{ selected: lane() === l() }}
                 class={`h-7 flex-1 flex-row items-center justify-center gap-1 rounded-sm px-1.5 ${lane() === l() ? "bg-page shadow-raise" : "hover:bg-hover"}`}
               >
-                <Text class={`truncate text-xs ${lane() === l() ? "font-medium text-ink" : "text-muted"}`}>{laneLabel[l()]}</Text>
+                <Text class={`truncate text-xs font-medium ${lane() === l() ? "text-ink" : "text-muted"}`}>{laneLabel[l()]}</Text>
                 <Text
                   testID={`board-lane-tab-count-${l()}`}
                   class={`text-2xs ${lane() === l() ? "text-muted" : "text-faint"}`}
@@ -355,14 +355,10 @@ function CardView(props: {
   });
   const before = () => props.drag.before() === props.card.id;
   const urgency = () => cardUrgencyTone(props.card);
-  const cardStyle = () => {
-    const u = urgency();
-    return {
-      transitionProperty: "colors,shadow",
-      transitionDuration: 180,
-      ...(u !== undefined ? { borderLeftWidth: 3, borderLeftColor: tone(u) } : {}),
-    };
-  };
+  const cardStyle = () => ({
+    transitionProperty: "colors,shadow",
+    transitionDuration: 180,
+  });
   return (
     <View ref={(r) => props.drag.card(props.card.id, r, () => props.placeable)}>
       <If when={before()}>
@@ -384,12 +380,13 @@ function CardView(props: {
         accessibilityState={{ selected: props.selected, busy: props.card.move?.state === "moving" }}
         tooltip={look().detail ? <Bubble text={look().detail} /> : undefined}
         class={[
-          "rounded-lg border px-2.5 py-2",
+          "relative overflow-hidden rounded-lg border px-2.5 py-2",
           props.selected ? "border-faint bg-selected" : "border-line bg-page hover:border-faint hover:shadow-raise",
           props.card.move?.state === "moving" ? "opacity-70" : props.drag.dragging()?.id === props.card.id ? "opacity-40" : "",
         ].join(" ")}
         style={cardStyle()}
       >
+        <If when={urgency()}>{(u) => <View class="pointer-events-none absolute inset-y-0 left-0 w-0.75" style={{ backgroundColor: tone(u()) }} />}</If>
         <If when={hasMeta()}>
           <View class="flex-row items-center gap-1">
             <If when={look().number}>

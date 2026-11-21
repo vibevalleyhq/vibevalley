@@ -26,6 +26,9 @@
    - 任何列表行、卡片标题或带徽标的水平行，弹性文字父容器必须带 `min-w-0 flex-1`，文字节点带 `truncate`；管理类列表页用 `<PageBody width="manage">`（`max-w-5xl`），文档/设置页用 `prose`（`max-w-3xl`）以免宽屏拉伸过长。
    - 开关与复选框一律复用 `Toggle`（行内用 `bare`）与 `Checkbox`，多态范围切换用 `Segmented`（支持 `count` / `countTone`），禁止手搓 `<Switch` 或 `role="checkbox"`。
    - 外框 `rounded-lg` (`8px`) 内层嵌 `rounded-md` (`6px`) 或 `rounded-sm` (`4px`)，内层圆角始终小于等于外框减内边距。
+4. **选中态与聚焦态零位移原则**：
+   - 选中、聚焦或激活状态严禁改变元素外盒尺寸或挤动兄弟元素：禁止在选中态切换不同的 `borderWidth`（如 `border` 与 `border-2` 互切、`borderWidth: 1` 与 `0`/`2` 互切）、条件 `padding`、横排自适应宽度控件上的字重跳变（`font-normal` ↔ `font-medium`/`font-semibold`），以及向水平布局内插入流内占宽元素。
+   - 需要更强描边、左竖条或聚焦条时，保持外框恒定 `border`（无框态配 `border-transparent`），并在容器内叠放 `pointer-events-none absolute inset-0`（或 GPUI `.absolute()`）的非占位指示层；横排选项卡/胶囊统一保持 `font-medium`，仅通过表面抬升、边框色调与墨水对比区分选中态（静态规则由 `scripts/audit/ui-tokens.ts` 的 `selection-layout-shift` 检查）。
 
 ## 8.3 状态、并发与键盘可达性
 

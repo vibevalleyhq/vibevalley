@@ -316,14 +316,27 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         };
         let indicator = if attention {
             Some(div().size(px(6.0)).flex_none().rounded_full().bg(colors.warning))
-        } else if active && focused && multi_group {
-            Some(div().size(px(5.0)).flex_none().rounded_full().bg(colors.accent))
+        } else {
+            None
+        };
+        let focused_bar = if active && focused && multi_group {
+            Some(
+                div()
+                    .absolute()
+                    .bottom_0()
+                    .left(px(8.0))
+                    .right(px(8.0))
+                    .h(px(2.0))
+                    .rounded_full()
+                    .bg(colors.accent),
+            )
         } else {
             None
         };
         tabs_row = tabs_row.child(
             div()
                 .id(("tab", tab_id as usize))
+                .relative()
                 .h(px(26.0))
                 .pl(px(10.0))
                 .pr(px(4.0))
@@ -354,6 +367,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                     }
                     shell.layout_changed(window, cx);
                 }))
+                .children(focused_bar)
                 .children(indicator)
                 .child(div().overflow_hidden().text_ellipsis().whitespace_nowrap().child(title))
                 .child(

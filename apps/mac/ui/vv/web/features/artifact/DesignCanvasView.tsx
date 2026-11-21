@@ -192,7 +192,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
                     active() ? "border-accent bg-selected" : "border-line bg-page hover:border-faint hover:bg-hover"
                   }`}
                 >
-                  <Text class={`text-xs ${active() ? "font-semibold text-ink" : "text-muted"}`}>{ab().title}</Text>
+                  <Text class={`text-xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{ab().title}</Text>
                 </View>
               );
             }}

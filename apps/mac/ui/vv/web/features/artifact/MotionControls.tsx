@@ -124,7 +124,7 @@ export function MotionControls(props: Controls) {
                     active() ? "border-accent bg-selected" : "border-line bg-side hover:border-faint hover:bg-hover"
                   }`}
                 >
-                  <Text class={`text-2xs tabular-nums ${active() ? "font-medium text-ink" : "text-muted"}`}>{`${ch().label} (${ch().at.toFixed(1)}s)`}</Text>
+                  <Text class={`text-2xs font-medium tabular-nums ${active() ? "text-ink" : "text-muted"}`}>{`${ch().label} (${ch().at.toFixed(1)}s)`}</Text>
                 </View>
               );
             }}

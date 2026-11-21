@@ -477,8 +477,8 @@ export function PrimaryButton(props: { label: string; onPress: () => void; disab
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: props.disabled ? p().tile : p().primary,
-        borderWidth: props.disabled ? 1 : 0,
-        borderColor: p().border,
+        borderWidth: 1,
+        borderColor: props.disabled ? p().border : p().primary,
         opacity: props.disabled ? 0.75 : 1,
         ...pressTransition(),
       }}

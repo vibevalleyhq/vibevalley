@@ -416,7 +416,7 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
       </View>
       <View class="min-w-0 flex-1 gap-0.5">
         <View class="flex-row items-center gap-1.5">
-          <Text class={`min-w-0 shrink truncate text-sm text-ink ${props.selected ? "font-semibold" : "font-medium"}`}>{entryName(props.entry)}</Text>
+          <Text class="min-w-0 shrink truncate text-sm font-medium text-ink">{entryName(props.entry)}</Text>
           <If when={props.entry.kind === "orchestrator"}>
             <View class="shrink-0 rounded-sm bg-hover px-1.5 py-px">
               <Text class="text-2xs font-medium text-muted">{t("web.session.hub.orchestratorRole")}</Text>
