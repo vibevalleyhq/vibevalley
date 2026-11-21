@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（18 篇）
+## proposed（17 篇）
 
 ### feature
 
@@ -17,7 +17,6 @@
 ### architecture
 
 - 2026-11-21 [工作台 UI 状态机与 Rust 领域投影收口架构](.agents/notes/proposed/architecture/2026-11-21-ui-state-machine-consolidation.md)
-- 2026-11-21 [方案 C：从零视角收口信息架构、术语、前端双轨与 Rust Workspace](.agents/notes/proposed/architecture/2026-11-21-radical-simplification.md)
 - 2026-11-19 [原生工作台长期计划：从派出第一单到放心管理多份工作](.agents/notes/proposed/architecture/2026-11-19-native-product-roadmap.md)
 - 2026-11-18 [在原生版复刻 Chord、持久执行、oar 和 Web 农场](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)
 - 2026-11-14 [原生的 VibeValley：Rust 服务端为准，激进重构，删掉 Electron、TS 服务端、页面和手机壳](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)

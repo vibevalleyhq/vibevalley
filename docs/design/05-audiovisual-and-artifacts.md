@@ -68,7 +68,7 @@ Artifact 页面实现于 `apps/mac/ui/features/artifact/`（`ArtifactsPage.tsx`�
 - 设定 `MAX_BYTES = 8 * 1024 * 1024`（8MB）硬阈值，超过阈值或二进制文件直接呈现体量提示而不拖垮 UI 线程。
 - 语法高亮与分行切分（`prepare()`）放于后台线程执行，通过 `clip_spans` 对字符边界做安全裁剪防止多字节 UTF-8 越界崩溃；支持跳转行定位（`scroll_to_line`）、图片预览、Markdown 触发宿主渲染预览及系统 `$EDITOR` 打开。
 
-### GPU 终端与可点击链接引擎（`apps/mac/src/terminal/` & `crates/vibevalley-terminal/src/links.rs`）
+### GPU 终端与可点击链接引擎（`apps/mac/src/terminal/` & `apps/mac/crates/terminal/src/links.rs`）
 
 - **逐列锁定排版（`terminal/element.rs`）**：窄字符按批量合并并强制每字步进 1 列宽；宽字符（CJK 与 Emoji）独立塑形并严格定位到 `col * cell_width`，彻底杜绝回退字体把同一行后续竖线和光标挤歪。
 - **行缓存与平滑滚动**：`RowCache` 以行 `Arc<Row>` 身份做增量缓存，单帧仅重塑真正变化的行；滚轮追踪像素余数 `scroll_remainder`，按 `line_height` 精确折算整行滚动步长；内边距固定 `PADDING = 6.0`。

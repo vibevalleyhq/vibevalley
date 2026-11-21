@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn reads_vibevalleys_empty_frame_and_a_session() {
-        let f = Frame::parse(&vibevalley_bridge::fake::empty_frame(3));
+        let f = Frame::parse(&vibevalley_server::transport::bridge::fake::empty_frame(3));
         assert_eq!(f.seq, 3);
         assert!(f.state.sessions.is_empty());
         let f = Frame::parse(&json!({

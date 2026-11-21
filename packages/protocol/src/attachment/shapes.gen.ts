@@ -1,4 +1,4 @@
-// Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
+// Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 /**
  * A file kept by the farm: id is the sha256 of its bytes, served at attachmentPath. A message says it as an attachment,

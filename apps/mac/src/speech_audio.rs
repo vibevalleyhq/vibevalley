@@ -4,7 +4,7 @@ use std::time::Duration;
 use base64::Engine as _;
 use serde::Serialize;
 use vibevalley_protocol::MediaSpeechEvent;
-use vibevalley_server_api::media::{SharedSpeechStreams, SpeechClaim};
+use vibevalley_server::transport::api::media::{SharedSpeechStreams, SpeechClaim};
 
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]

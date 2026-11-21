@@ -19,10 +19,10 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/skin/game.rs` | `Game`：账本落盘（`ledger.jsonl`）、订阅事实、commit 统计调度（`count_commits`）、称号（`choose_title`）与空地预约（`want`） |
-| `crates/vibevalley-core/src/progress.rs` | 账本条目提取（`entries_for`）、进度折叠纯函数（`progress_fold`、`progress_step`）、金币（`harvest_coins`） |
-| `crates/vibevalley-core/src/game.rs` | 等级（`level_for_commits`）、地块映射（`plot_of`）、帧视图（`view_of`）、特效（`effects_of`）、地块分配（`free_station`、`stationed`）、成就（`achievements`） |
-| `crates/vibevalley-core/data/seeds.json` | 内置成就定义 |
+| `crates/server/src/modules/skin/game.rs` | `Game`：账本落盘（`ledger.jsonl`）、订阅事实、commit 统计调度（`count_commits`）、称号（`choose_title`）与空地预约（`want`） |
+| `crates/core/src/progress.rs` | 账本条目提取（`entries_for`）、进度折叠纯函数（`progress_fold`、`progress_step`）、金币（`harvest_coins`） |
+| `crates/core/src/game.rs` | 等级（`level_for_commits`）、地块映射（`plot_of`）、帧视图（`view_of`）、特效（`effects_of`）、地块分配（`free_station`、`stationed`）、成就（`achievements`） |
+| `crates/core/data/seeds.json` | 内置成就定义 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`game.achievement.list`、`game.title.set`）。
 
@@ -69,4 +69,4 @@
 
 ## 怎么验证
 
-- `crates/vibevalley-server/tests/game.rs`：收成按 commit 与连胜给金币、账本经重启折回并跳过读不懂的行、每个仓库的 commit 只数一次。
+- `crates/server/tests/game.rs`：收成按 commit 与连胜给金币、账本经重启折回并跳过读不懂的行、每个仓库的 commit 只数一次。

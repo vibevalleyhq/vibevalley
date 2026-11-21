@@ -73,7 +73,7 @@ export type {
   RepoSummary,
   RepoTemplates,
   SubmitBranch,
-} from "./repo/shapes";
+} from "./repo/shapes.gen";
 export {
   type DoingView,
   type IssueAnswer,
@@ -87,7 +87,7 @@ export {
   type SessionEventType,
   type SessionView,
   type ToolAction,
-} from "./session/shapes";
+} from "./session/shapes.gen";
 export {
   type Channel,
   type ChannelEvent,
@@ -107,7 +107,7 @@ export {
   type OnSet,
   type ReactionSet,
   type SayRequest,
-} from "./channel/shapes";
+} from "./channel/shapes.gen";
 export {
   type Artifact,
   type ArtifactBody,
@@ -159,7 +159,7 @@ export {
   type SuggestionCreate,
   type SuggestionEvent,
   type TextSpan,
-} from "./artifact/shapes";
+} from "./artifact/shapes.gen";
 export {
   type PkmBacklink,
   type PkmBlock,
@@ -196,7 +196,7 @@ export {
   type PkmTransclusion,
   type PkmUndo,
   type PkmVault,
-} from "./pkm/shapes";
+} from "./pkm/shapes.gen";
 export {
   type AppliedIssue,
   type Assignment,
@@ -225,18 +225,18 @@ export {
   type Priority,
   PriorityValues,
   type Question,
-} from "./issue/shapes";
-export { type Cron, type CronRequest, type CronUpdate, type CronView } from "./cron/shapes";
-export type { InboxItem } from "./inbox/shapes";
+} from "./issue/shapes.gen";
+export { type Cron, type CronRequest, type CronUpdate, type CronView } from "./cron/shapes.gen";
+export type { InboxItem } from "./inbox/shapes.gen";
 export type {
   OrchestratorApproval,
   OrchestratorApprovalListInput,
   OrchestratorApprovalResolveInput,
   OrchestratorEval,
   OrchestratorEvalRequest,
-} from "./orchestrator/shapes";
-export type { Achievement, ChooseTitleRequest, Crop } from "./game/shapes";
-export { type Attachment, type AttachmentUpload } from "./attachment/shapes";
+} from "./orchestrator/shapes.gen";
+export type { Achievement, ChooseTitleRequest, Crop } from "./game/shapes.gen";
+export { type Attachment, type AttachmentUpload } from "./attachment/shapes.gen";
 export {
   type ConnectorID,
   ConnectorIDValues,
@@ -245,7 +245,7 @@ export {
   type ConnectorState,
   type ConnectorStatus,
   type VerifyRequest,
-} from "./connector/shapes";
+} from "./connector/shapes.gen";
 export {
   type AgoraGrant,
   type Area,
@@ -287,7 +287,7 @@ export {
   type Readiness,
   type SettingsStatus,
   type SettingsUpdate,
-} from "./setting/shapes";
+} from "./setting/shapes.gen";
 export type {
   ProviderConnectionUpdate,
   ProviderModelListing,
@@ -296,7 +296,7 @@ export type {
   ProviderUpdate,
   ProviderVoiceListing,
   ProviderVoiceRequest,
-} from "./provider/shapes";
+} from "./provider/shapes.gen";
 export {
   type MediaAudioFormat,
   MediaAudioFormatValues,

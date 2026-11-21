@@ -15,14 +15,14 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-core/src/core.rs` | `Core`：`reduce`、`frame_of`、`Transition`；状态折叠和出帧的纯函数 |
-| `crates/vibevalley-server/src/lib.rs` | `Hub`：持有 `Core`、按操作名注册处理函数（`Hub::on`）和订阅（`Hub::on_subscription`），`Hub::apply` 施加事实，按 `STATE_EVERY_MS` 出帧，`live` 事件 |
-| `crates/vibevalley-server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手、观察层，注册所有端点 |
-| `crates/vibevalley-server/src/main.rs` | 二进制 `vibevalley-server`：`--web`、`--ready-json`，读环境变量，写 `server.json` |
-| `crates/vibevalley-protocol/src/contract/` | `SpaceState`、`Fact`、`StateFrame`、`LiveEvent` 与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
-| `crates/vibevalley-protocol/src/envelope.rs` | 全信封、`BizCode`、`ApiError` |
-| `crates/vibevalley-http/src/lib.rs` | axum 路由：命令接口、`/state`、`/live`、订阅流、工单观察流、附件、网页 Artifact、`/mcp`；来源校验 `from_the_farm`；`media.rs` 媒体输入与语音流 |
-| `crates/vibevalley-cli/src/` | 命令行 `vibevalley`：`main.rs` 入口与全局参数、`farm.rs` 找服务端、`commands/` 按领域的子命令 |
+| `crates/core/src/core.rs` | `Core`：`reduce`、`frame_of`、`Transition`；状态折叠和出帧的纯函数 |
+| `crates/server/src/lib.rs` | `Hub`：持有 `Core`、按操作名注册处理函数（`Hub::on`）和订阅（`Hub::on_subscription`），`Hub::apply` 施加事实，按 `STATE_EVERY_MS` 出帧，`live` 事件 |
+| `crates/server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手、观察层，注册所有端点 |
+| `crates/server/src/main.rs` | 二进制 `vibevalley-server`：`--web`、`--ready-json`，读环境变量，写 `server.json` |
+| `crates/protocol/src/contract/` | `SpaceState`、`Fact`、`StateFrame`、`LiveEvent` 与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
+| `crates/protocol/src/envelope.rs` | 全信封、`BizCode`、`ApiError` |
+| `crates/server/src/transport/http/mod.rs` | axum 路由：命令接口、`/state`、`/live`、订阅流、工单观察流、附件、网页 Artifact、`/mcp`；来源校验 `from_the_farm`；`media.rs` 媒体输入与语音流 |
+| `crates/cli/src/` | 命令行 `vibevalley`：`main.rs` 入口与全局参数、`farm.rs` 找服务端、`commands/` 按领域的子命令 |
 
 全部接口与权限矩阵见生成的 [capabilities.md](docs/reference/capabilities.md)。
 
@@ -33,7 +33,7 @@
 - **单一内存投影，按事实演进**：`SpaceState` 只在 `Hub::apply(facts)` 中修改。未改变状态的事实不广播、不递增 `seq`、不触发特效。
 - **「事实」专指 `Hub::apply` 的输入**：农机能力叫 `RuntimeSupport`，会话事件映射叫 `Reaction`，一条频道消息和它的听众叫 `ChannelHearers`，排序键叫 `RowKeys`。
 - **事实命名表达发生了什么**：实体新增或更新叫 `<实体>Changed`，移除叫 `<实体>Removed`，生命周期结清用动词过去式（`sessionPhaseChanged`、`sessionReported`、`sessionLeft`）。
-- **批次原子可见，单条保留因果**：`Hub::apply`（`crates/vibevalley-server/src/lib.rs`）是同步函数：在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）与特效，再一次性替换可见状态、递增一次 `seq`，然后按序发布事实、`Transition` 和特效，返回前全部做完。状态在一把锁里换，各线程都可以就地调 `apply`。`reduce` 不得修改传入的旧状态。
+- **批次原子可见，单条保留因果**：`Hub::apply`（`crates/server/src/lib.rs`）是同步函数：在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）与特效，再一次性替换可见状态、递增一次 `seq`，然后按序发布事实、`Transition` 和特效，返回前全部做完。状态在一把锁里换，各线程都可以就地调 `apply`。`reduce` 不得修改传入的旧状态。
 - **先落库，后发事实**：各模块先提交数据库事务或文件，再调 `Hub::apply`。重启时从空状态由各模块从 `server.db` 及家目录文件恢复。
 - **按依赖重算工单派生状态**：`reduce` 仅在工单或会话集合引用变化时重算工单状态与动作（`withIssueStatuses`）；聊天或花费事实不触发工单重算。一轮进行中的 `sessionPhaseChanged` 只改了 `doing` 或 `spent`（`since`、`quietSince` 不变，`phaseAffectsIssue`）时也跳过重算。
 - **界面文案只在出帧时填充**：`frame_of` 在状态副本上填入 `phaseText`、`actionText`、`whenText`、工单 `stage` 与可执行动作；`reduce` 与持久层不含界面文案。
@@ -54,9 +54,9 @@ SSE 以外的路由：
 - `GET /api/v1/attachment/<id>`：附件；`GET /api/v1/artifact/<id>/<version>` 与 `GET /api/v1/artifact/<id>/view`：网页与结构化 Artifact 沙箱视图。
 - `PUT`、`GET /api/v1/media/input/<id>/content`：上传和读取媒体输入；`GET /api/v1/media/speech/<id>/stream`：合成语音的流（[媒体](docs/subsystems/media.md)）。
 - `/mcp`：帮工的工具（[频道](docs/subsystems/channel.md)）。
-- `/chord/ws`：执行治理文档 `space` 的 WebSocket 订阅（快照、按修订号续读与 `budget.raise` 命令，见 [Chord](crates/vibevalley-chord/README.md)）。
+- `/chord/ws`：执行治理文档 `space` 的 WebSocket 订阅（快照、按修订号续读与 `budget.raise` 命令，见 [Chord](crates/server/src/transport/chord/README.md)）。
 
-- **客户端拥有流与订阅的生命周期**：原生页面经 `crates/vibevalley-bridge` 直接收发 `StateFrame`、`LiveEvent` 与订阅事件，视图关闭或取消订阅时立即释放 `Subscription`；命令行的 `sse_events`（`crates/vibevalley-cli/src/farm.rs`）在 HTTP SSE 上按空行分帧解码，坏帧、HTTP 拒绝或退出时立即释放连接。
+- **客户端拥有流与订阅的生命周期**：原生页面经 `crates/server/src/transport/bridge` 直接收发 `StateFrame`、`LiveEvent` 与订阅事件，视图关闭或取消订阅时立即释放 `Subscription`；命令行的 `sse_events`（`crates/cli/src/farm.rs`）在 HTTP SSE 上按空行分帧解码，坏帧、HTTP 拒绝或退出时立即释放连接。
 - **心跳**：每条 SSE 连接（含工单观察流和订阅流）每 20 秒发 `: ping` 心跳；订阅方断开时释放源订阅。
 - **写接口返回 `seq` 对齐画面帧**：工单写接口（`issue.create`、`issue.update`、`issue.status.update`、`issue.comment.create`）在 `Hub::apply` 后返回当前 `seq`，页面以 `frame.seq >= reply.seq` 作为意图结算条件。
 
@@ -64,12 +64,12 @@ SSE 以外的路由：
 
 - **统一 `POST /api/v1/<路径>` 与全信封 JSON 响应**：操作名中的 `.` 换为 `/` 即路径（如 `issue.status.update` → `/api/v1/issue/status/update`），参数统一放入 JSON 请求体。所有 JSON 接口统一返回全信封：成功返回 HTTP `200` 与 `{ bizCode: 0, message: "ok", data? }`（无返回值接口省略 `data`）；网关拒绝与业务错误按 `bizCodeMeta` 映射标准 HTTP 状态码（`400`、`401`、`403`、`404`、`405`、`409`、`413`、`415`、`500`、`502`、`503`），响应体统一为 `{ bizCode, message, error?: { next?, settings? } }`。二进制下载、HTML 预览、SSE 与 NDJSON 流保持各自媒体类型。
 - **六位分段业务码 `BizCode`**：`BizCode`（契约里定义，Rust 在 `envelope.rs`）（成功为 `0`；`100xxx` 网关与协议、`200xxx` 鉴权与局域网、`300xxx` 工单与仓库、`400xxx` 会话与助手、`500xxx` 频道与连接器、`600xxx` 产物与知识库、`700xxx` 语音与媒体配置），经 `bizCodeMeta` 静态绑定 HTTP 状态码、语义分类 `kind` 与可重试性 `retryable`。
-- **严格来源校验**：命令接口、订阅流和媒体路由都经 `from_the_farm`（`crates/vibevalley-http/src/lib.rs`）：`Host` 为回环地址；若有浏览器 `Origin` 则须与 `Host` 同源，`Sec-Fetch-Site` 仅接受 `same-origin` 或 `none`，否则返回 `403`（`BizCode.Forbidden`）。
-- **请求幂等键 `requestKey`**：`issue.create`、`issue.status.update`、`channel.thread.create`、`memory.create` 接受 `requestKey`（最长 64 字符，超长返回 `409` `BizCode.RequestKeyTooLong`）。同一个键五分钟内重试拿到第一次的回答（`crates/vibevalley-server/src/base.rs`），失败不缓存。
+- **严格来源校验**：命令接口、订阅流和媒体路由都经 `from_the_farm`（`crates/server/src/transport/http/mod.rs`）：`Host` 为回环地址；若有浏览器 `Origin` 则须与 `Host` 同源，`Sec-Fetch-Site` 仅接受 `same-origin` 或 `none`，否则返回 `403`（`BizCode.Forbidden`）。
+- **请求幂等键 `requestKey`**：`issue.create`、`issue.status.update`、`channel.thread.create`、`memory.create` 接受 `requestKey`（最长 64 字符，超长返回 `409` `BizCode.RequestKeyTooLong`）。同一个键五分钟内重试拿到第一次的回答（`crates/server/src/base.rs`），失败不缓存。
 - **开关写成幂等设值**：回应、置顶、归档定义为带 `on: boolean` 的 `*.set` 接口，重复设置相同值不产生副作用。
 - **破坏性操作配对试跑 `dryRun`**：删除、合并、关单接口在 `endpoints` 中指向对应的 `preview<动词>` 接口。试跑与真做共用同一套前置判断函数，试跑不写库、不碰 git。
 - **拒绝响应附带下一步 `next`**：业务拒绝与未找到错误在 `error.next` 中携带 `{ say, run? }[]`，给出可直接运行的 CLI 命令或指引。
-- **CLI 是纯 HTTP 客户端**：`crates/vibevalley-cli` 不载入服务端、不直连数据库，通过 `--server`、`VIBEVALLEY_SERVER` 或 `$VIBEVALLEY_HOME/server.json`（`crates/vibevalley-home`）连接服务端；失败时 stderr 打一行 JSON，退出码同 TS 版。
+- **CLI 是纯 HTTP 客户端**：`crates/cli` 不载入服务端、不直连数据库，通过 `--server`、`VIBEVALLEY_SERVER` 或 `$VIBEVALLEY_HOME/server.json`（`crates/protocol/src/home.rs`）连接服务端；失败时 stderr 打一行 JSON，退出码同 TS 版。
 - **拥有者负责协调与身份分配**：处理器只传业务意图，由拥有者模块协调内部步骤并在锁内分配新实体 ID；查询缺失关联时列入 `missingSessions`，不伪造缺省对象。
 
 ## 怎么走
@@ -84,7 +84,7 @@ SSE 以外的路由：
 
 **服务端启动**
 
-1. `start`（`crates/vibevalley-server/src/start.rs`）从空状态起 `Hub`，按序打开设置、游戏、AI 服务、档案和农机、仓库、记性、轨迹、工单板（共用 `server.db`）、PR 与分支发布、定时任务、附件、媒体输入、频道、素材库、媒体任务、Artifact、笔记、助手、观察层与连接器；各自从 `server.db` 与家目录文件读回并施加初始事实。
+1. `start`（`crates/server/src/start.rs`）从空状态起 `Hub`，按序打开设置、游戏、AI 服务、档案和农机、仓库、记性、轨迹、工单板（共用 `server.db`）、PR 与分支发布、定时任务、附件、媒体输入、频道、素材库、媒体任务、Artifact、笔记、助手、观察层与连接器；各自从 `server.db` 与家目录文件读回并施加初始事实。
 2. 工单板接回停机时在场的会话；观察层按游标读完漏读的频道事件。
 3. `main.rs` 绑定端口（`VIBEVALLEY_PORT=0` 时取任意端口），写出 `server.json`，`--ready-json` 打印 `{"url","pid"}`。
 
@@ -108,7 +108,7 @@ SSE 以外的路由：
 
 ## 怎么验证
 
-- `crates/vibevalley-core/tests/projection.rs`：`reduce` 与 `frame_of` 对 golden。
-- `crates/vibevalley-server/tests/contract.rs`：信封、按端点的类型解码入参、`can`。
-- `crates/vibevalley-server/tests/start.rs`：整个服务端起来、经 HTTP 走一遍。
-- `crates/vibevalley-cli/tests/cli.rs`：命令行对着真的 `vibevalley-server`。
+- `crates/core/tests/projection.rs`：`reduce` 与 `frame_of` 对 golden。
+- `crates/server/tests/contract.rs`：信封、按端点的类型解码入参、`can`。
+- `crates/server/tests/start.rs`：整个服务端起来、经 HTTP 走一遍。
+- `crates/cli/tests/cli.rs`：命令行对着真的 `vibevalley-server`。

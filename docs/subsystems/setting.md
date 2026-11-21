@@ -16,10 +16,10 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/main.rs` | 读参数（`--web`、`--ready-json`）和环境变量，组装 `ServerConfig`，只听 `127.0.0.1` |
-| `crates/vibevalley-server/src/start.rs` | `ServerConfig`（家目录、空间根、钥匙、内置模板、测试开关）与开机组装 |
-| `crates/vibevalley-server/src/modules/infra/setting.rs` | `Setting`：`settings.json` 读成 `Stored`；`Secret`；`status`、`validate`、`save`；语音默认值与差异；就绪状态 |
-| `crates/vibevalley-home/src/lib.rs` | 家目录在哪（`VIBEVALLEY_HOME`，默认 `~/.vibevalley`）、`server.json`、保存的语言 |
+| `crates/server/src/main.rs` | 读参数（`--web`、`--ready-json`）和环境变量，组装 `ServerConfig`，只听 `127.0.0.1` |
+| `crates/server/src/start.rs` | `ServerConfig`（家目录、空间根、钥匙、内置模板、测试开关）与开机组装 |
+| `crates/server/src/modules/infra/setting.rs` | `Setting`：`settings.json` 读成 `Stored`；`Secret`；`status`、`validate`、`save`；语音默认值与差异；就绪状态 |
+| `crates/protocol/src/home.rs` | 家目录在哪（`VIBEVALLEY_HOME`，默认 `~/.vibevalley`）、`server.json`、保存的语言 |
 | `apps/mac/ui/features/setting/` | 工作台设置页 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`setting.get`、`setting.validate`、`setting.update`）。
@@ -61,5 +61,5 @@
 
 ## 怎么验证
 
-- `crates/vibevalley-server/tests/setting.rs`：这里存的钥匙压过启动配置且只显示末四位、有一项不对整份不存、语音只存差异、语音厂商的钥匙只给提示且就绪跟着连接走。
+- `crates/server/tests/setting.rs`：这里存的钥匙压过启动配置且只显示末四位、有一项不对整份不存、语音只存差异、语音厂商的钥匙只给提示且就绪跟着连接走。
 - `apps/mac/ui/app/scenarios.test.tsx`、`apps/mac/ui/app/components.test.tsx`：设置页与表单控件的虚拟时钟页面测试（`nsh/test`）。

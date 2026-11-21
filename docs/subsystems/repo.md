@@ -16,9 +16,9 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/work/repo.rs` | `repo.*`、`github.*`：`<工作目录>/repos` 下按名字新建或克隆、活跃度与语言（`tokei`）、`gh` 能不能开 PR |
-| `crates/vibevalley-git/src/repo.rs` | git 封装：状态、diff、分支、worktree、冲突预检（`merge_check`）、无检出合入（`merge_into`：`merge-tree` + `commit-tree` + `update-ref`） |
-| `crates/vibevalley-server/src/modules/work/workplace/mod.rs`、`crates/vibevalley-server/src/modules/work/workplace/git.rs`、`crates/vibevalley-server/src/modules/work/workplace/check.rs` | `Workplace`：确保仓库在（`ensure_repo`）、工单的 worktree 与分支（`worktree`、`base`）、改动（`changes`）、交付（`land`）、子工单合进父分支（`join`）、帮工走时收拾 worktree 和分支（`release`）、跑 `.vibevalley/check`；不读工单板的状态 |
+| `crates/server/src/modules/work/repo.rs` | `repo.*`、`github.*`：`<工作目录>/repos` 下按名字新建或克隆、活跃度与语言（`tokei`）、`gh` 能不能开 PR |
+| `crates/git/src/repo.rs` | git 封装：状态、diff、分支、worktree、冲突预检（`merge_check`）、无检出合入（`merge_into`：`merge-tree` + `commit-tree` + `update-ref`） |
+| `crates/server/src/modules/work/workplace/mod.rs`、`crates/server/src/modules/work/workplace/git.rs`、`crates/server/src/modules/work/workplace/check.rs` | `Workplace`：确保仓库在（`ensure_repo`）、工单的 worktree 与分支（`worktree`、`base`）、改动（`changes`）、交付（`land`）、子工单合进父分支（`join`）、帮工走时收拾 worktree 和分支（`release`）、跑 `.vibevalley/check`；不读工单板的状态 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`repo.*`、`github.*`、`issue.diff.get`）。
 
@@ -45,7 +45,7 @@
 
 1. 固定目标分支和工单分支的提交，在临时 worktree 生成候选提交。合并预检发现冲突时，保留工单并返回冲突文件。
 2. 在候选提交上运行 `.vibevalley/check`。未配置脚本的仓库可直接交付。检查失败时返回末尾 40 行。检查改写候选提交或已跟踪文件时，服务也会拒绝交付。
-3. 核对工单分支仍指向原提交。通过本地 Git 的旧值校验将目标分支推进到候选提交。目标前进后重新生成候选并复查。合并钩子在候选检出中执行。本地引用更新跳过推送钩子。Git 拒绝更新目标检出时，向调用方返回原因。[实现](crates/vibevalley-git/src/verified_merge.rs)
+3. 核对工单分支仍指向原提交。通过本地 Git 的旧值校验将目标分支推进到候选提交。目标前进后重新生成候选并复查。合并钩子在候选检出中执行。本地引用更新跳过推送钩子。Git 拒绝更新目标检出时，向调用方返回原因。[实现](crates/git/src/verified_merge.rs)
 
 工单改动接口返回审查基线提交和工单文件树。文件补丁来自这两个固定的 Git 对象。工单未提交的文件也包含在补丁中。传入上次显示的文件树时，接口在 `sinceReview` 返回变化的补丁。已经通过的审查会保留文件树引用，清理工单 worktree 后仍可核对。
 
@@ -70,6 +70,6 @@
 
 ## 怎么验证
 
-- `crates/vibevalley-git/src/tests.rs`：git 封装、冲突预检与无检出合入。
-- `crates/vibevalley-server/tests/issue_board.rs`：合并、冲突、检查失败退回、留分支。
+- `crates/git/src/tests.rs`：git 封装、冲突预检与无检出合入。
+- `crates/server/tests/issue_board.rs`：合并、冲突、检查失败退回、留分支。
 - `apps/mac/src/pixel/tests.rs` 的 `map_draws_an_island_per_repo`：群岛地图一个仓库一座岛。

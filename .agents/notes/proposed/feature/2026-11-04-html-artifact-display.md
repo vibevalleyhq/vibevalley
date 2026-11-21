@@ -13,7 +13,7 @@ Status: proposed
 
 1. **元素选择器锚点**：`HtmlAnchor` 扩展 `{ kind: "element", css: string }`。用户在预览工具栏开启「点选元素」后点击页面元素，外壳脚本计算唯一定位的 CSS 选择器并经 `postMessage` 传给工作台。
 2. **画布内评论角标与定位**：工作台将带锚点的评论列表传给外壳脚本，在对应文字或元素旁绘制编号角标；点击角标高亮评论，点击评论滚动定位至该锚点并闪烁提示。
-3. **对话旁栏接入与高度回报**：`ArtifactCanvas.tsx` 接上 `PageWords`，旁栏里也能划词改字与点选元素；外壳（`crates/vibevalley-artifact/src/shell.rs`）监听尺寸变化并经 `postMessage` 回报高度。
+3. **对话旁栏接入与高度回报**：`ArtifactCanvas.tsx` 接上 `PageWords`，旁栏里也能划词改字与点选元素；外壳（`crates/core/src/artifact/shell.rs`）监听尺寸变化并经 `postMessage` 回报高度。
 
 ## Alternatives considered
 

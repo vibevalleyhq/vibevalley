@@ -14,7 +14,7 @@
 
 | 不用 | 它说的是 | 换成 |
 |---|---|---|
-| `rules.ts` | 能在测试的规则层测 | 它决定的事：`due.ts`、`patrol.ts`、`report.ts`；解析某个概念的，合进那个概念的文件（工单的细化在 `crates/vibevalley-core/src/refine.rs`） |
+| `rules.ts` | 能在测试的规则层测 | 它决定的事：`due.ts`、`patrol.ts`、`report.ts`；解析某个概念的，合进那个概念的文件（工单的细化在 `crates/core/src/refine.rs`） |
 | `state.ts`、`data.ts`、`hooks.ts` | 在框架里的角色 | 它管的东西：`groups.ts`、`calendar.ts`、`lanes.ts` |
 | `utils`、`helpers`、`common`、`misc`、`lib` | 没有归属 | 用它的概念；两个模块都用的，放进下层拥有它的模块 |
 | `text.ts` | 形式是文字 | 说给谁、说什么：`digest.ts`、`mentions.ts` |
@@ -76,7 +76,7 @@
 
 | 什么 | 形状 | 例子 |
 |---|---|---|
-| 服务端的模块 | 单数，概念的词 | `crates/vibevalley-server/src/modules/work/issue/`、`collab/channel/` |
+| 服务端的模块 | 单数，概念的词 | `crates/server/src/modules/work/issue/`、`collab/channel/` |
 | 页面的 feature | 和服务端的模块同名 | `apps/mac/ui/features/issue` |
 | 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/testkit` 是 `@vibevalley/testkit` |
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |

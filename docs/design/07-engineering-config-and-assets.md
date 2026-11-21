@@ -40,7 +40,7 @@ VibeValley 的全部像素图与矢量图标在独立工程目录下管理并输
 
 为避免真实端到端调试高成本以及盲测漏掉长文本、极端并发与深浅主题缺陷，UI 测试与截图验收采用**确定性真实核心状态注入 + 双端光栅核验**：
 
-1. **核心状态 6 档密级生成器（`crates/vibevalley-core/src/scenario.rs`）**：
+1. **核心状态 6 档密级生成器（`crates/core/src/scenario.rs`）**：
    - 使用 Rust 侧真实的 `Core::apply` 与 `reduce` 规则驱动 `ScenarioBuilder`（固定纪元时间 `SCENARIO_NOW`）构造 6 个真实密度快照（`Density`）：`Empty`（空引导）、`Minimal`（单主单）、`Typical`（常态多单与聊天）、`Dense`（高频并发）、`Extreme`（超长中文句子、长 URL、长 Commit SHA 等极端压力文本）与 `Edge`（异常与边界枚举组合）。
    - 导出固件确保工作台单元测试拿到的是与生产服务端**完全同源**的 `status`、`stage`、`moves`、`inbox`、`phaseText` 与 `view.plots`。
 2. **工作台组件/交互/截图套件（`apps/mac/ui/app/` & `scripts/audit/mac-tests.ts`）**：

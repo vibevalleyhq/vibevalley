@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { ArtifactId, BlockId, IssueId, SuggestionId } from "../common/schema";
-import * as T from "./shapes";
+import * as T from "./shapes.gen";
 
 const ArtifactBody = z.enum(T.ArtifactBodyValues) satisfies Codec<T.ArtifactBody>;
 

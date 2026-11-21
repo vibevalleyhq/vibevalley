@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import type { Codec } from "../codec";
-import * as T from "./shapes";
-import { PkmMoveAtValues, PkmMoveDirectionValues } from "./shapes";
+import * as T from "./shapes.gen";
+import { PkmMoveAtValues, PkmMoveDirectionValues } from "./shapes.gen";
 
 const pkmProps = z.record(z.string(), z.string());
 const PkmTier = z.enum(T.PkmTierValues) satisfies Codec<T.PkmTier>;

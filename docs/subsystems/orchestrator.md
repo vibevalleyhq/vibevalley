@@ -15,11 +15,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/team/orchestrator/mod.rs` | `Orchestrator`：每个助手档案一个 `vibevalley-agent` 的持久对话（SQLite 队列与 `Harness`），收观察层交来的话和没指定档案的定时任务，拼现状、跑一轮、把回复写回频道 |
-| `crates/vibevalley-server/src/modules/team/orchestrator/words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/vibevalley-server/assets/orchestrator/prompts.json` |
-| `crates/vibevalley-server/src/modules/team/tool/mod.rs` | 助手和帮工共用的工具：每个工具一个参数结构体，宽松解析写一处，按调用者分支；工具名、说明与 JSON Schema 在 `crates/vibevalley-server/assets/tools/orchestrator.json`、`crates/vibevalley-server/assets/tools/helper.json` |
-| `crates/vibevalley-server/src/modules/team/tool/issue.rs`、`chat.rs`、`notes.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、笔记与 Artifact 与媒体、仓库与定时任务、记性 |
-| `crates/vibevalley-server/src/modules/team/mcp/resource.rs` | `resource_read`：解析 `vv://` URI，按会话裁剪只读权限、分页 |
+| `crates/server/src/modules/team/orchestrator/mod.rs` | `Orchestrator`：每个助手档案一个 `vibevalley-runtime::agent` 的持久对话（SQLite 队列与 `Harness`），收观察层交来的话和没指定档案的定时任务，拼现状、跑一轮、把回复写回频道 |
+| `crates/server/src/modules/team/orchestrator/words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/server/assets/orchestrator/prompts.json` |
+| `crates/server/src/modules/team/tool/mod.rs` | 助手和帮工共用的工具：每个工具一个参数结构体，宽松解析写一处，按调用者分支；工具名、说明与 JSON Schema 在 `crates/server/assets/tools/orchestrator.json`、`crates/server/assets/tools/helper.json` |
+| `crates/server/src/modules/team/tool/issue.rs`、`chat.rs`、`notes.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、笔记与 Artifact 与媒体、仓库与定时任务、记性 |
+| `crates/server/src/modules/team/mcp/resource.rs` | `resource_read`：解析 `vv://` URI，按会话裁剪只读权限、分页 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`orchestrator.*`）。
 
@@ -43,7 +43,7 @@
 
 工具策略要求确认时，执行器保存待批调用并暂停该任务。用户在助手的「执行轨迹」里核对工具名、参数与审批原因，也可以用 `vibevalley approval list --format json` 找到调用。CLI 的 `approval resolve` 接收对话 ID、任务 ID、工具调用 ID 和 `approve` 或 `deny`。工作台和 CLI 使用同一条 Rust 审批契约。
 
-执行器在同一个 SQLite 事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/vibevalley-server/src/modules/team/orchestrator/execution.rs) · [决策事务](crates/vibevalley-agent/src/extensions/governance.rs)
+执行器在同一个 SQLite 事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/server/src/modules/team/orchestrator/execution.rs) · [决策事务](crates/runtime/src/agent/extensions/governance.rs)
 
 ## 怎么走
 
@@ -57,11 +57,11 @@
 
 - **观察层与频道（`watch`、`channel`）**：观察层交来输入；回复经频道 `post` 写回。
 - **工单与定时任务**：经工具调 `Board` 和 `Crons`；指派给助手的工单跑完后进 `in_review` 等用户点头。
-- **自研 agent 与记性（`vibevalley-agent`、`memory`）**：对话、模型调用与压缩在 `vibevalley-agent`（[VibeValley 自己的 agent](docs/subsystems/brain.md)）；记性工具读写档案的记忆。
+- **自研 agent 与记性（`vibevalley-runtime::agent`、`memory`）**：对话、模型调用与压缩在 `vibevalley-runtime::agent`（[VibeValley 自己的 agent](docs/subsystems/brain.md)）；记性工具读写档案的记忆。
 
 ## 为什么这样
 
-- **编排策略与对话循环分离**：对话循环、压缩在 `vibevalley-agent`，`modules/team/orchestrator` 只管来源分发、现状拼装与工具绑定。
+- **编排策略与对话循环分离**：对话循环、压缩在 `vibevalley-runtime::agent`，`modules/team/orchestrator` 只管来源分发、现状拼装与工具绑定。
 - **工具对齐协议接口，不起别名**：保证 HTTP、CLI、助手和帮工对同一件事使用完全相同的名字与参数校验。
 - **代码硬拦未授权合并，不靠提示词防注入**：在工具里按当轮是否有用户原话拦截工单修改与合并，防止帮工汇报中的提示注入触发合并或花钱。
 - **调研记成 `deliver: answer` 工单交给帮工，助手不读代码**：避免读取大量代码撑爆助手常驻对话上下文并破坏前缀缓存。
@@ -74,6 +74,6 @@
 
 ## 怎么验证
 
-- `crates/vibevalley-server/tests/orchestrator.rs`：用脚本模型让助手听见用户的话、调工具建工单。
-- `crates/vibevalley-server/tests/mcp.rs`：帮工经 `/mcp` 调同一套工具与 `resource_read`。
+- `crates/server/tests/orchestrator.rs`：用脚本模型让助手听见用户的话、调工具建工单。
+- `crates/server/tests/mcp.rs`：帮工经 `/mcp` 调同一套工具与 `resource_read`。
 - `orchestrator.eval.create` 已在服务端实现（落盘至 `<家目录>/evals/<id>.json`）；真模型回放评测集尚未接入。

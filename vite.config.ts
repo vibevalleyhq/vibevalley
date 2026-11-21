@@ -234,7 +234,7 @@ export default defineConfig({
         rules: { "vibevalley/no-test-sleep": "error" },
       },
       {
-        // What the shipped code says to the user is in the catalogs (crates/vibevalley-i18n/locales, read as t("key");
+        // What the shipped code says to the user is in the catalogs (crates/i18n/locales, read as t("key");
         // scripts/audit/oxlint-plugin.ts, no-cjk-literal): Chinese is written only there and in the tests.
         files: ["apps/*/src/**", "apps/mac/ui/**", "packages/*/src/**"],
         rules: { "vibevalley/no-cjk-literal": "error" },

@@ -281,13 +281,13 @@ const RULES: readonly Rule[] = [
     says: "the issue's own words (docs/subsystems/issue.md 状态和用语): 完成 (complete) and what it delivered (合进了主分支…), 改动, 问题 (等你回答), 计划; phase done, graph ready; farm words are for the farm's skin",
     // The farm's skin (with the pixel pieces the skins share) and the game say it their way.
     except:
-      /^(apps\/(?:web\/src\/(?:farm|ui\/pixel)|mac\/ui\/(?:farm|design\/pixel))\/|apps\/web\/test\/farm-|apps\/server\/src\/modules\/game\/|crates\/vibevalley-server\/src\/modules\/skin\/game(?:\.rs|\/))/u,
+      /^(apps\/(?:web\/src\/(?:farm|ui\/pixel)|mac\/ui\/(?:farm|design\/pixel))\/|apps\/web\/test\/farm-|apps\/server\/src\/modules\/game\/|crates\/server\/src\/modules\/skin\/game(?:\.rs|\/))/u,
   },
   {
     name: "a word list for an issue's or a session's state outside the protocol's rules",
     pattern:
       /(?<!Partial<)Record<(Outcome|StuckReason|IssueStatus|IssueStageKind|IssueAct|Landing|IssueCanceled|Deliverable|SessionClose|Priority), string>|\bcompleted: "做完|\binterrupted: "(叫停|被叫停|停下)/u,
-    says: "the shared catalog's words (crates/vibevalley-i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
+    says: "the shared catalog's words (crates/i18n/locales/*/shared.json: status, attention, stuck, act, outcome, delivered, canceled, deliverable, priority): say a sentence with them, do not keep another list",
     except: /^packages\/protocol\/src\/rules\//u,
   },
 
@@ -454,22 +454,21 @@ const RULES: readonly Rule[] = [
     pattern:
       /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model|records)|issue\/records|mailbox\/chat|session\/(?:takeIn|shapes|records)|farm\/support|base\/util|ui\/richRules|repo\/shapes|testing\/(?:helper|until|issues|said|agents)|farm\/world\/places|features\/voice\/(?:agora|moss)|features\/channel\/(?:emoji|feed|switcher|draft)|features\/issue\/(?:lanes|rows|queries)|features\/artifact\/queries|memory\/store|artifact\/spans|tool\/(?:cron|memory|channel|definition)|infra\/live|state\/latest)(?:\.tsx?)?["'`]|\b(issueRecords|IssueRecords|sessionRecords|SessionRecords|channelRecords|ChannelRecords)\b/u,
     says: "channel/{channel,messages,rooms,hub}.ts, issue/lifecycle.ts, mailbox/envelope.ts, session/{briefing,registry,signals}.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts, repo/workplace.ts, features/issue/{history,cards}.ts, features/artifact/ArtifactCard.tsx, testing/{worker,layers,world}.ts, farm/world/world.ts, features/voice/{call,mossLine}.ts, features/channel/{EmojiPicker.tsx,places.ts,composing.ts}, memory/memory.ts, artifact/ops.ts, tool/{tool,schemas}.ts, infra/frame.ts, state/atom.ts",
-    // The retired files were the server's and the page's; the contract's concept folders (session/shapes.ts) are today's.
     dirs: ["apps/server/src", "apps/web/src", "apps/mac/ui"],
   },
 ];
 
 // A catalog says what the user reads, in the glossary's words (docs/README.md).
-const userWords = (source: string) => source.startsWith("crates/vibevalley-i18n/locales/") || source === "apps/web/test/english.spec.ts";
+const userWords = (source: string) => source.startsWith("crates/i18n/locales/") || source === "apps/web/test/english.spec.ts";
 const han = /\p{Script=Han}/u;
 
 function placeOf(ns: string): string {
   if (ns === "shared") return "packages/protocol/src/rules/words.ts";
-  if (ns === "cli") return "crates/vibevalley-cli/src/words.rs";
+  if (ns === "cli") return "crates/cli/src/words.rs";
   if (ns === "mac") return "apps/mac/src/words.rs";
   const [host, ...parts] = ns.split(".");
   if (host === "server") {
-    if (parts[0] === "game") return "crates/vibevalley-server/src/modules/skin/game/words.rs";
+    if (parts[0] === "game") return "crates/server/src/modules/skin/game/words.rs";
     return `apps/server/src/${[...parts, "words.ts"].join("/")}`;
   }
   if (host === "web" && parts.length > 0) {
@@ -487,7 +486,7 @@ export function staleNamesIn(source: string, text: string): string[] {
   const hits: string[] = [];
   const lines = text.split("\n");
   const isCatalog = userWords(source);
-  const file = source.startsWith("crates/vibevalley-i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
+  const file = source.startsWith("crates/i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
       const inScope = rule.dirs
@@ -503,7 +502,7 @@ export function staleNamesIn(source: string, text: string): string[] {
 }
 
 if (import.meta.main) {
-  const catalogs = globSync("crates/vibevalley-i18n/locales/*/*.json", { cwd: root }).toSorted();
+  const catalogs = globSync("crates/i18n/locales/*/*.json", { cwd: root }).toSorted();
   const files = [
     ...new Set(DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx,rs}`, { cwd: root, exclude: (f) => f.includes("node_modules") || f.endsWith("/build") }))),
   ].toSorted();

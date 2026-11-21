@@ -46,7 +46,7 @@
      target/debug/vibevalley-mac 2> /tmp/vv-app/app.log
    ```
 
-   - 要一座有工单、有帮工的样例农场而不起服务端：加 `VIBEVALLEY_FAKE_SERVER=crates/vibevalley-bridge/fixtures/farm`（`state.json` 和 `responses.json`）。
+   - 要一座有工单、有帮工的样例农场而不起服务端：加 `VIBEVALLEY_FAKE_SERVER=crates/server/fixtures/farm`（`state.json` 和 `responses.json`）。
    - 要真的服务端里的数据：不设 `VIBEVALLEY_FAKE_SERVER`，应用自己在 `VIBEVALLEY_HOME` 里起服务端并写 `server.json`；另开一个终端用同一个 `VIBEVALLEY_HOME` 跑命令行造数据（`VIBEVALLEY_HOME=/tmp/vv-app/home target/debug/vibevalley issue create …`），脚本里先 `wait` 够久。
    - 验收目录里的 `state.db` 与 `nsh/` 分别保存宿主和页面数据。自定义库名使用同目录的 `<库名>.nsh/`。库是空的时候，起应用的那个目录就是第一个项目。
 

@@ -16,9 +16,9 @@ DeepSeek（助手的对话模型）的钥匙在设置里，不是连接。
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/team/provider.rs` | `Provider`：`status`、`update`（`connections_over` 把更新叠到当前配置上，不对就拒）、`models`、`voices`；`Use` 是九个用途的闭集，各带自己的模型列表；`Providers::account` 给用的地方一个账号（连接、revision、模型、钥匙） |
-| `crates/vibevalley-server/src/modules/content/media/vendor.rs` | MOSS 的 HTTP 调用（生图、语音、文件、理解），响应进门即解码 |
-| `crates/vibevalley-protocol/src/contract/provider.rs`、`packages/protocol/src/provider/` | 公共形状和接口（Rust 为源，TS 形状由它生成） |
+| `crates/server/src/modules/team/provider.rs` | `Provider`：`status`、`update`（`connections_over` 把更新叠到当前配置上，不对就拒）、`models`、`voices`；`Use` 是九个用途的闭集，各带自己的模型列表；`Providers::account` 给用的地方一个账号（连接、revision、模型、钥匙） |
+| `crates/server/src/modules/content/media/vendor.rs` | MOSS 的 HTTP 调用（生图、语音、文件、理解），响应进门即解码 |
+| `crates/protocol/src/contract/provider.rs`、`packages/protocol/src/provider/` | 公共形状和接口（Rust 为源，TS 形状由它生成） |
 | `apps/mac/ui/features/provider/` | `/settings/models` 的连接与默认用途表单 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`provider.*`）。
@@ -41,5 +41,5 @@ DeepSeek（助手的对话模型）的钥匙在设置里，不是连接。
 
 ## 怎么验证
 
-- `crates/vibevalley-server/tests/provider.rs`：不对的连接修改被拒、没配好的连接不当默认、保留钥匙、跟着 revision 走。
-- `crates/vibevalley-server/tests/setting.rs`：语音厂商的钥匙只给提示，就绪状态跟着连接走。
+- `crates/server/tests/provider.rs`：不对的连接修改被拒、没配好的连接不当默认、保留钥匙、跟着 revision 走。
+- `crates/server/tests/setting.rs`：语音厂商的钥匙只给提示，就绪状态跟着连接走。

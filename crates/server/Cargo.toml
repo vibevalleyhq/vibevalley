@@ -1,0 +1,59 @@
+[package]
+name = "vibevalley-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autotests = false
+description = "VibeValley's server in process: state hub, domain modules, and HTTP/bridge/chord transports"
+
+[[test]]
+name = "suite"
+path = "tests/suite.rs"
+
+[[test]]
+name = "publish"
+path = "tests/publish.rs"
+
+[[test]]
+name = "chord_document"
+path = "tests/chord_document.rs"
+
+[[test]]
+name = "chord_link"
+path = "tests/chord_link.rs"
+
+[dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio", "ws"] }
+base64 = { workspace = true }
+crc32fast = "1.5.5"
+flate2 = "1.1.11"
+flume = { workspace = true }
+futures-util = { workspace = true }
+include_dir = "0.7.4"
+jiff = { workspace = true }
+pollster = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+rustls = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_path_to_error = "0.1.20"
+sha2 = { workspace = true }
+sqlx = { workspace = true }
+symphonia = { version = "0.6.1", default-features = false, features = ["wav", "mp3", "isomp4", "flac", "ogg", "mkv"] }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+tokio-util = { version = "0.7.20", features = ["rt"] }
+url = { workspace = true }
+uuid = { workspace = true }
+vibevalley-core = { version = "0.1.0", path = "../core" }
+vibevalley-files = { version = "0.1.0", path = "../files" }
+vibevalley-git = { version = "0.1.0", path = "../git" }
+vibevalley-i18n = { version = "0.1.0", path = "../i18n" }
+vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
+vibevalley-runtime = { version = "0.1.0", path = "../runtime" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+ureq = { workspace = true }

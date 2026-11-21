@@ -391,7 +391,7 @@ pub fn ready() -> bool {
 }
 
 pub fn host_call(op: &str, reply: crate::hosted::Replier, cx: &mut App) {
-    use vibevalley_bridge::{BizCode, Envelope, refusal};
+    use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
     let updater = updater().clone();
     match op {
         "host.updateState" => reply.send(Envelope::ok(updater.state())),

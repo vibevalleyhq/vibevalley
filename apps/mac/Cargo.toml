@@ -5,20 +5,17 @@ edition = "2024"
 
 [dependencies]
 percent-encoding = "2.3.2"
-vibevalley-pixel = { version = "0.1.0", path = "../../crates/vibevalley-pixel" }
-vibevalley-server-api = { version = "0.1.0", path = "../../crates/vibevalley-server-api" }
 base64 = "0.23.1"
-vibevalley-i18n = { version = "0.1.0", path = "../../crates/vibevalley-i18n" }
-vibevalley-protocol = { version = "0.1.0", path = "../../crates/vibevalley-protocol" }
-vibevalley-bridge = { version = "0.1.0", path = "../../crates/vibevalley-bridge" }
-vibevalley-files = { version = "0.1.0", path = "../../crates/vibevalley-files" }
-vibevalley-highlight = { version = "0.1.0", path = "../../crates/vibevalley-highlight" }
-vibevalley-git = { version = "0.1.0", path = "../../crates/vibevalley-git" }
-vibevalley-server = { version = "0.1.0", path = "../../crates/vibevalley-server" }
-vibevalley-http = { version = "0.1.0", path = "../../crates/vibevalley-http" }
-vibevalley-terminal = { version = "0.1.0", path = "../../crates/vibevalley-terminal" }
-vibevalley-workspace = { version = "0.1.0", path = "../../crates/vibevalley-workspace" }
-vibevalley-rich-ui = { version = "0.1.0", path = "../../crates/vibevalley-rich-ui" }
+vibevalley-files = { version = "0.1.0", path = "../../crates/files" }
+vibevalley-git = { version = "0.1.0", path = "../../crates/git" }
+vibevalley-highlight = { version = "0.1.0", path = "crates/highlight" }
+vibevalley-i18n = { version = "0.1.0", path = "../../crates/i18n" }
+vibevalley-pixel = { version = "0.1.0", path = "crates/pixel" }
+vibevalley-protocol = { version = "0.1.0", path = "../../crates/protocol" }
+vibevalley-rich = { version = "0.1.0", path = "../../crates/rich" }
+vibevalley-server = { version = "0.1.0", path = "../../crates/server" }
+vibevalley-terminal = { version = "0.1.0", path = "crates/terminal" }
+vibevalley-workspace = { version = "0.1.0", path = "crates/workspace" }
 flume = "0.12.0"
 gpui = { package = "gpui-fast", version = "0.1.17", default-features = false, features = ["font-kit"] }
 gpui-platform = { package = "gpui-fast-platform", version = "0.1.17", default-features = false, features = ["font-kit"] }

@@ -4,7 +4,7 @@ import { ArtifactCard, ArtifactViewContext, BlockRef, QuotedBlock } from "../art
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { Actor, MessageId, Outcome, SessionId, Spent } from "../common/schema";
-import * as T from "./shapes";
+import * as T from "./shapes.gen";
 
 export const MessageKind = z.enum(T.MessageKindValues) satisfies Codec<T.MessageKind>;
 

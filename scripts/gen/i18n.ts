@@ -9,7 +9,7 @@ import { messageUses } from "./i18n-uses.ts";
 
 const root = join(import.meta.dirname, "../..");
 const pkg = join(root, "packages/i18n");
-const dictionaries = join(root, "crates/vibevalley-i18n");
+const dictionaries = join(root, "crates/i18n");
 const localesDir = join(dictionaries, "locales");
 const catalogsFile = join(pkg, "src/catalogs.ts");
 const locales = ["zh", "en"] as const;
@@ -33,7 +33,7 @@ const namespaces = (locale: Locale) =>
         .toSorted()
     : [];
 
-/** Rust-only namespaces (`server.*`, `cli`, `desktop`) stay in `crates/vibevalley-i18n`; TS bundles only UI catalogs. */
+/** Rust-only namespaces (`server.*`, `cli`, `desktop`) stay in `crates/i18n`; TS bundles only UI catalogs. */
 const isUiNamespace = (ns: string) => ns === "shared" || ns.startsWith("web.");
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
@@ -57,7 +57,7 @@ function generated(): string {
   const zh = messages("zh", isUiNamespace);
   const all = locales.map((l) => messages(l, isUiNamespace));
   // The catalogs are written in as data, not imported as JSON: every bundler and Node read a .ts the same way.
-  const lines = ["// Written by `vpx scripts/gen/i18n.ts gen` from crates/vibevalley-i18n/locales: do not edit.", ""];
+  const lines = ["// Written by `vpx scripts/gen/i18n.ts gen` from crates/i18n/locales: do not edit.", ""];
   lines.push("/** Each language's catalogs by namespace. */", "export const catalogs = {");
   for (const locale of locales) {
     lines.push(`  ${locale}: {`);

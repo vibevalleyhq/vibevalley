@@ -15,11 +15,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/collab/watch/mod.rs` | `Watch`：按游标读频道事件、路由、席位与串、私聊帮工、汇报、回执；投递经 `Board::tell` |
-| `crates/vibevalley-server/src/modules/collab/watch/hearers.rs` | 谁听见一句话（`who_hears`）、这次投递算什么（`event_of`）、三道刹车 `brakes`、跳数与冷却的记账 `Reach`、熔断 `WakeBreaker`，纯函数 |
-| `crates/vibevalley-core/src/inbox.rs` | 收件箱：`inbox`、`inbox_entries`、新事项识别 `fresh_of` |
-| `crates/vibevalley-core/src/patrol.rs` | 巡查的纯函数 `patrol_step`、宽限期 `grace`、对助手说的话 `patrol_text` |
-| 表 `watch_cursor`（`crates/vibevalley-server/src/modules/collab/channel/db.rs`） | 观察层读到 `channel_event` 的哪一号（只往前） |
+| `crates/server/src/modules/collab/watch/mod.rs` | `Watch`：按游标读频道事件、路由、席位与串、私聊帮工、汇报、回执；投递经 `Board::tell` |
+| `crates/server/src/modules/collab/watch/hearers.rs` | 谁听见一句话（`who_hears`）、这次投递算什么（`event_of`）、三道刹车 `brakes`、跳数与冷却的记账 `Reach`、熔断 `WakeBreaker`，纯函数 |
+| `crates/core/src/inbox.rs` | 收件箱：`inbox`、`inbox_entries`、新事项识别 `fresh_of` |
+| `crates/core/src/patrol.rs` | 巡查的纯函数 `patrol_step`、宽限期 `grace`、对助手说的话 `patrol_text` |
+| 表 `watch_cursor`（`crates/server/src/modules/collab/channel/db.rs`） | 观察层读到 `channel_event` 的哪一号（只往前） |
 
 ## 模型和不变量
 
@@ -96,6 +96,6 @@
 
 ## 怎么验证
 
-- `crates/vibevalley-server/tests/watch.rs`：频道里的话路由到帮工。
-- `crates/vibevalley-server/src/modules/collab/watch/hearers.rs` 里的单元测试：三道刹车的次序、跳数和冷却的记账、熔断。
-- `crates/vibevalley-core/src/tests.rs`、`crates/vibevalley-core/src/tests_round2.rs`：收件箱事项与巡查的宽限期。
+- `crates/server/tests/watch.rs`：频道里的话路由到帮工。
+- `crates/server/src/modules/collab/watch/hearers.rs` 里的单元测试：三道刹车的次序、跳数和冷却的记账、熔断。
+- `crates/core/src/tests.rs`、`crates/core/src/tests_round2.rs`：收件箱事项与巡查的宽限期。

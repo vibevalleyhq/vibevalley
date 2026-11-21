@@ -1,4 +1,4 @@
-// Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
+// Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { ActorKind, SessionId } from "../common/shapes.gen";
 import type { MemorySourceInfo } from "../setting/shapes.gen";

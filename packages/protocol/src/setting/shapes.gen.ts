@@ -1,4 +1,4 @@
-// Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
+// Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { KeyStatus, Locale } from "../common/shapes.gen";
 import type { AgoraAppID, Dictation, SettingsUpdateVoice, VoiceSettings } from "../voice/shapes.gen";

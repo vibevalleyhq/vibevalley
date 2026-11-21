@@ -30,7 +30,7 @@ Status: proposed
 
 **首次执行记录（2026-11-19）。** 在同一台 arm64 Mac 上，两份干净检出均完成首次派单、Git 差异审查和合并。空 Cargo 构建目录编译服务端与 CLI 用时 131.82 秒。相同检出热构建用时 0.53 秒。从空发布构建目录打出本地签名包用时 574.19 秒。基线提交为 `275732ef1`。另一台 Mac、Developer ID 签名和公证仍待验收。
 
-**本地试用包。** arm64 版本 `0.0.1-alpha.3` 来自提交 `389c17071`，使用本地签名。包内应用和 CLI 通过回答问题、按已审文件树合并、Git 写入后强制退出三项验收。原生服务启动本机 Codex 0.170.0 后，核心帧显示两个子线程同时运行。回环模型分别返回成功和失败。重开应用仍可读到两个结果。[三单验收](scripts/release/verify-native-work.py) · [Codex 回环模型](crates/vibevalley-oar/tests/fixtures/capture_codex_collaboration.py)
+**本地试用包。** arm64 版本 `0.0.1-alpha.3` 来自提交 `389c17071`，使用本地签名。包内应用和 CLI 通过回答问题、按已审文件树合并、Git 写入后强制退出三项验收。原生服务启动本机 Codex 0.170.0 后，核心帧显示两个子线程同时运行。回环模型分别返回成功和失败。重开应用仍可读到两个结果。[三单验收](scripts/release/verify-native-work.py) · [Codex 回环模型](crates/runtime/tests/fixtures/capture_codex_collaboration.py)
 
 ### 二、开发者拿到仓库，怎样得到同一个程序
 
@@ -51,16 +51,16 @@ Status: proposed
 
 | 范围 | 选择与理由 | 何时采用 |
 | --- | --- | --- |
-| Codex 子线程 | 保留本机 `codex app-server` 子进程。将 CLI 导出的 JSON Schema 用作版本对照。用 Serde 只解码驱动消费的通知。上游 `codex-app-server-client` 还直接依赖服务端、核心执行和登录模块。整包嵌入会新增一套随应用发版的 Codex 依赖。 | CLI 0.170.0 导出了 329 个 Schema 文件。协作协议有 9 种工具和 7 种子线程状态。首批只覆盖派出、等待、发消息和终态。未知通知保留原始记录。用真实样本验证哪些通知会送到当前连接。[驱动](crates/vibevalley-oar/src/codex.rs) · [官方客户端依赖](https://github.com/openai/codex/blob/main/codex-rs/app-server-client/Cargo.toml) |
-| MCP 客户端 | 内置助手使用 `rmcp`。SDK 可接管握手、请求匹配、工具枚举和传输。应用保留工具命名、只读提示、结果展示和重放规则。现有工具调用是同步接口，SDK 使用异步接口。 | 客户端已接入标准输入输出和 Streamable HTTP。服务端的 MCP 入口另行评估。[现有客户端](crates/vibevalley-agent/src/resources/mcp/mod.rs) · [现有行为测试](crates/vibevalley-agent/tests/mcp.rs) · [官方 Rust SDK](https://github.com/modelcontextprotocol/rust-sdk) |
-| 事件顺序测试 | oar 的开发依赖使用 `proptest`。锁文件已有 1.12.0。真实回放证明厂商发过什么；属性测试可生成满足因果约束的重复、延迟和交错事件，并缩小失败样本。 | 两项回归已接入测试。等待和发消息保持原创建者，重复终态只结算一次。[属性测试](crates/vibevalley-oar/src/codex/subagents.rs) · [proptest](https://github.com/proptest-rs/proptest) |
-| Git 查询与交付 | 保留系统 Git 执行写入、worktree、合并和快照。现有状态查询使用 `git status --porcelain=v2`。若频繁启动进程拖慢巡视，可对照 `gix` 的只读状态接口。 | 先测一次窗口刷新唤起几次 Git。先消除重复查询，再比较同一仓库的冷、热读取。暂存、未暂存、未跟踪文件及 worktree 结果均应一致。选择读取库与验证最终合并内容分别验收。[现有 Git 入口](crates/vibevalley-git/src/repo.rs) · [gix 状态接口](https://docs.rs/gix/latest/gix/struct.Repository.html#method.status) |
+| Codex 子线程 | 保留本机 `codex app-server` 子进程。将 CLI 导出的 JSON Schema 用作版本对照。用 Serde 只解码驱动消费的通知。上游 `codex-app-server-client` 还直接依赖服务端、核心执行和登录模块。整包嵌入会新增一套随应用发版的 Codex 依赖。 | CLI 0.170.0 导出了 329 个 Schema 文件。协作协议有 9 种工具和 7 种子线程状态。首批只覆盖派出、等待、发消息和终态。未知通知保留原始记录。用真实样本验证哪些通知会送到当前连接。[驱动](crates/runtime/src/oar/codex.rs) · [官方客户端依赖](https://github.com/openai/codex/blob/main/codex-rs/app-server-client/Cargo.toml) |
+| MCP 客户端 | 内置助手使用 `rmcp`。SDK 可接管握手、请求匹配、工具枚举和传输。应用保留工具命名、只读提示、结果展示和重放规则。现有工具调用是同步接口，SDK 使用异步接口。 | 客户端已接入标准输入输出和 Streamable HTTP。服务端的 MCP 入口另行评估。[现有客户端](crates/runtime/src/agent/resources/mcp/mod.rs) · [现有行为测试](crates/runtime/tests/mcp.rs) · [官方 Rust SDK](https://github.com/modelcontextprotocol/rust-sdk) |
+| 事件顺序测试 | oar 的开发依赖使用 `proptest`。锁文件已有 1.12.0。真实回放证明厂商发过什么；属性测试可生成满足因果约束的重复、延迟和交错事件，并缩小失败样本。 | 两项回归已接入测试。等待和发消息保持原创建者，重复终态只结算一次。[属性测试](crates/runtime/src/oar/codex/subagents.rs) · [proptest](https://github.com/proptest-rs/proptest) |
+| Git 查询与交付 | 保留系统 Git 执行写入、worktree、合并和快照。现有状态查询使用 `git status --porcelain=v2`。若频繁启动进程拖慢巡视，可对照 `gix` 的只读状态接口。 | 先测一次窗口刷新唤起几次 Git。先消除重复查询，再比较同一仓库的冷、热读取。暂存、未暂存、未跟踪文件及 worktree 结果均应一致。选择读取库与验证最终合并内容分别验收。[现有 Git 入口](crates/git/src/repo.rs) · [gix 状态接口](https://docs.rs/gix/latest/gix/struct.Repository.html#method.status) |
 | SQLite | 选用 SQLx 的 SQLite 驱动。沿用数据库文件和表结构。SQLite 对同一数据库只允许一个写事务。 | 已在宿主、服务端和持久执行中采用。并发写入仍以事务提交耗时为准。[SQLite 隔离规则](https://www.sqlite.org/isolation.html) · [SQLx](https://github.com/launchbadge/sqlx) |
 | 桌面宿主 | 保留 GPUI 与 nsh。现有终端、像素场景和窗口已经接入原生宿主。Tauri 在 macOS 使用系统 WebKit。迁移还需重新连接页面、终端和农场输入。 | 若候选包出现能稳定复现的宿主缺陷，先做最小样例。用相同任务比较输入法、键盘焦点、终端输入、农场帧耗和签名包体积，再决定是否换宿主。[原生客户端](docs/subsystems/app.md) · [Tauri 的 WebView](https://v2.tauri.app/reference/webview-versions/) |
 
-**MCP 实测范围。** 本机服务测试覆盖标准输入输出、HTTP 的 JSON 与 SSE 响应、工具枚举和调用。取消执行中的调用后，同一服务上的另一项工具仍可调用。最后一个工具释放时，子进程退出。SDK 对安装包体积的单项影响仍待测量。[客户端回归](crates/vibevalley-agent/tests/mcp.rs)
+**MCP 实测范围。** 本机服务测试覆盖标准输入输出、HTTP 的 JSON 与 SSE 响应、工具枚举和调用。取消执行中的调用后，同一服务上的另一项工具仍可调用。最后一个工具释放时，子进程退出。SDK 对安装包体积的单项影响仍待测量。[客户端回归](crates/runtime/tests/mcp.rs)
 
-**Codex 的验收样本。** `spawnAgent` 的接收者可以建立父子关系。`wait` 的接收者只进入本次等待清单。Codex 等待邮箱时可以省略接收者，界面显示「等待协作消息」。alpha.2 的服务实际启动本机 Codex CLI 0.170.0，使用回环模型派出两支子线程。核心帧先显示两支运行与根线程等待。随后一支完成，另一支失败。退出应用后重开，原轮仍有两个终态。[线程归属](crates/vibevalley-oar/src/codex/subagents.rs) · [回放样本](crates/vibevalley-oar/tests/fixtures/codex-0.170.0-collaboration.json)
+**Codex 的验收样本。** `spawnAgent` 的接收者可以建立父子关系。`wait` 的接收者只进入本次等待清单。Codex 等待邮箱时可以省略接收者，界面显示「等待协作消息」。alpha.2 的服务实际启动本机 Codex CLI 0.170.0，使用回环模型派出两支子线程。核心帧先显示两支运行与根线程等待。随后一支完成，另一支失败。退出应用后重开，原轮仍有两个终态。[线程归属](crates/runtime/src/oar/codex/subagents.rs) · [回放样本](crates/runtime/tests/fixtures/codex-0.170.0-collaboration.json)
 
 **构建依赖的复核。** 对 macOS 应用运行 `cargo tree --locked --offline` 反查依赖。Axum 引入 `tokio-tungstenite` 0.29。nsh 和应用代码均使用 0.28。单独升级应用的直接依赖后，nsh 仍会引入 0.28。待上游版本一致时再复测冷构建耗时和应用体积。[宿主依赖](apps/mac/Cargo.toml)
 
@@ -70,9 +70,9 @@ sqlc 1.31.1 的内置 JSON 生成器支持 `gen.json.out: ir`。执行 `sqlc gen
 
 12 组查询共 258 条，其中单行查询 61 条、多行查询 59 条、执行语句 131 条、返回影响行数的语句 7 条。在隔离目录读取真实插件输入并重新生成，12 份 Rust 源文件与工作树逐字节一致。[正式配置](sqlc.yaml) · [生成规则](docs/subsystems/foundation.md#契约规则和数据库)
 
-SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均与 sqlc 对上。对于 sqlc 标为非空的结果列，SQLx 将 60 处标为可空，另有 1 处无法推断。在普通 SQLite 表中，直接写 SQL 可向未声明 `NOT NULL` 的 `TEXT PRIMARY KEY` 写入空值。生产写入入口要求字符串主键。会话左连接的关联记录缺失时，生成函数读回 `None`。增加关联再回滚后，读数恢复为 `None`。[会话查询](crates/vibevalley-server/src/modules/work/session/sql/queries.sql) · [SQLite 主键约束](https://www.sqlite.org/lang_createtable.html#the_primary_key)
+SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均与 sqlc 对上。对于 sqlc 标为非空的结果列，SQLx 将 60 处标为可空，另有 1 处无法推断。在普通 SQLite 表中，直接写 SQL 可向未声明 `NOT NULL` 的 `TEXT PRIMARY KEY` 写入空值。生产写入入口要求字符串主键。会话左连接的关联记录缺失时，生成函数读回 `None`。增加关联再回滚后，读数恢复为 `None`。[会话查询](crates/server/src/modules/work/session/sql/queries.sql) · [SQLite 主键约束](https://www.sqlite.org/lang_createtable.html#the_primary_key)
 
-素材库排序曾在 `ORDER BY CASE` 中引用 `sqlc.arg(sort)`。sqlc 1.31.1 会将这个参数原样留在 SQL 中。正式查询在公用表表达式中绑定排序参数。CI 用 SQLite 对导出的 SQL 执行 `EXPLAIN`，按 IR 的参数个数绑定空值，旧写法会在此处失败。[素材库查询](crates/vibevalley-server/src/modules/content/library/sql/queries.sql) · [CI 检查](scripts/release/verify-native-schema.py)
+素材库排序曾在 `ORDER BY CASE` 中引用 `sqlc.arg(sort)`。sqlc 1.31.1 会将这个参数原样留在 SQL 中。正式查询在公用表表达式中绑定排序参数。CI 用 SQLite 对导出的 SQL 执行 `EXPLAIN`，按 IR 的参数个数绑定空值，旧写法会在此处失败。[素材库查询](crates/server/src/modules/content/library/sql/queries.sql) · [CI 检查](scripts/release/verify-native-schema.py)
 
 社区插件 `sqlc-gen-rust` 0.1.12 生成的 SQLx 0.8.6 代码在 0.9.1 下出现类型与生命周期错误。项目采用自有插件，沿用 sqlc 的 SQL 分析器。维护者只需维护本项目使用的 SQLite 类型和查询返回方式。[生成器](scripts/gen/sqlc-rust/generate.ts) · [社区插件](https://github.com/tunamaguro/sqlc-gen-rust/tree/v0.1.12)
 
@@ -82,9 +82,9 @@ SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均�
 
 | 顺序 | 迁移边界 | 通过条件 |
 | --- | --- | --- |
-| 1．宿主存储 | 先迁 `vibevalley-store` 的 `state.db`。项目列表、布局和终端保存共用宿主的数据库入口。沿用 WAL、外键、同步级别和 5 秒锁等待设置。宿主在后台执行数据库工作。 | 用隔离的旧库副本打开原生工作台。重排项目并保存布局和终端，退出后重开核对。批量保存中途失败时应能读回原记录。检查真实应用的依赖树只链接一份 SQLite。[宿主入口](apps/mac/src/shell/mod.rs) · [存储与事务](crates/vibevalley-workspace/src/store/mod.rs) · [已有测试](crates/vibevalley-workspace/src/store/tests.rs) |
-| 2．服务端账本 | 以完整业务事务为单位切换驱动。工单与会话的同批写入共用一笔 SQLx 事务。提交成功后才更新内存和通知订阅者。再按模块迁服务端的其他查询。 | 在写入中途制造失败。重开数据库后两项记录均应保持原值，订阅者也应保留旧状态。[工单账本](crates/vibevalley-server/src/modules/work/ledger.rs) |
-| 3．持久执行 | 最后迁 `vibevalley-durable`。保持原有提交、去重和恢复边界。通过各生产入口验收后，移除对应的 `rusqlite` 直接依赖。 | 用第三节的三个中断时点重跑主线。按同一条用户回复核对轮次、工作目录和汇报。[持久执行存储](crates/vibevalley-agent/src/durable/store.rs) |
+| 1．宿主存储 | 先迁 `vibevalley-store` 的 `state.db`。项目列表、布局和终端保存共用宿主的数据库入口。沿用 WAL、外键、同步级别和 5 秒锁等待设置。宿主在后台执行数据库工作。 | 用隔离的旧库副本打开原生工作台。重排项目并保存布局和终端，退出后重开核对。批量保存中途失败时应能读回原记录。检查真实应用的依赖树只链接一份 SQLite。[宿主入口](apps/mac/src/shell/mod.rs) · [存储与事务](apps/mac/crates/workspace/src/store/mod.rs) · [已有测试](apps/mac/crates/workspace/src/store/tests.rs) |
+| 2．服务端账本 | 以完整业务事务为单位切换驱动。工单与会话的同批写入共用一笔 SQLx 事务。提交成功后才更新内存和通知订阅者。再按模块迁服务端的其他查询。 | 在写入中途制造失败。重开数据库后两项记录均应保持原值，订阅者也应保留旧状态。[工单账本](crates/server/src/modules/work/ledger.rs) |
+| 3．持久执行 | 最后迁 `vibevalley-durable`。保持原有提交、去重和恢复边界。通过各生产入口验收后，移除对应的 `rusqlite` 直接依赖。 | 用第三节的三个中断时点重跑主线。按同一条用户回复核对轮次、工作目录和汇报。[持久执行存储](crates/runtime/src/agent/durable/store.rs) |
 
 每个阶段保留相同输入和旧实现的结果，供迁移对照。若对账失败，回退该阶段的代码。两套驱动可存在于同一应用中；同一笔业务事务应由一个驱动完整提交。
 
@@ -96,12 +96,12 @@ SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均�
 
 | 模块 | 职责 | 调用方可以据此判断什么 |
 | --- | --- | --- |
-| 工单板与会话 | 工单板分派工单。会话关联输入、轮次、厂商会话和工作目录。根线程报告轮末后，会话才可结算该轮。 | 子线程先结束时，主轮仍可执行。根线程报告完成后，用户仍应能独立判断改动是否已合并。[会话](crates/vibevalley-server/src/modules/work/session/sessions.rs) |
+| 工单板与会话 | 工单板分派工单。会话关联输入、轮次、厂商会话和工作目录。根线程报告轮末后，会话才可结算该轮。 | 子线程先结束时，主轮仍可执行。根线程报告完成后，用户仍应能独立判断改动是否已合并。[会话](crates/server/src/modules/work/session/sessions.rs) |
 | oar | 驱动把厂商通知解码成带来源的事件。Codex 自己派出的子线程属于本轮。用户另邀一个帮工档案时，按工单小队模型建会话。 | 厂商子线程不会占用另一个产品帮工的身份。[工单小队提案](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md) |
-| 工单账本与工作目录 | 账本保存业务结算。Git 和文件系统保存外部命令造成的改动。宿主保存窗口布局。 | 查询回复标识可找到对应轮次。查询该轮的工作目录和基线提交可核对磁盘改动。[工单账本](crates/vibevalley-server/src/modules/work/ledger.rs) |
-| 核心状态 | Rust 契约定义动作和状态。核心归约用同一组事实生成工单、收件箱和农场视图。高频命令输出进入工作日志。 | 工作台经进程内桥、CLI 经 HTTP `/api/v1` 读同一张工单。Chord 客户端续订 `space` 后应读到最新的持久执行通知和审批状态。[订阅与执行治理](crates/vibevalley-chord/README.md) · [系统架构](docs/architecture.md) · [核心状态](docs/subsystems/core.md) |
+| 工单账本与工作目录 | 账本保存业务结算。Git 和文件系统保存外部命令造成的改动。宿主保存窗口布局。 | 查询回复标识可找到对应轮次。查询该轮的工作目录和基线提交可核对磁盘改动。[工单账本](crates/server/src/modules/work/ledger.rs) |
+| 核心状态 | Rust 契约定义动作和状态。核心归约用同一组事实生成工单、收件箱和农场视图。高频命令输出进入工作日志。 | 工作台经进程内桥、CLI 经 HTTP `/api/v1` 读同一张工单。Chord 客户端续订 `space` 后应读到最新的持久执行通知和审批状态。[订阅与执行治理](crates/server/src/transport/chord/README.md) · [系统架构](docs/architecture.md) · [核心状态](docs/subsystems/core.md) |
 
-**恢复规则。** 同一条回复应有稳定标识。服务收到重复回复时，应返回原执行记录。不同回复按会话现有的排队或插话规则执行。以下用例从工单串发出回复，使用临时 Git 仓库，并真实终止服务进程。[已有主线测试](crates/vibevalley-server/tests/mainline.rs)
+**恢复规则。** 同一条回复应有稳定标识。服务收到重复回复时，应返回原执行记录。不同回复按会话现有的排队或插话规则执行。以下用例从工单串发出回复，使用临时 Git 仓库，并真实终止服务进程。[已有主线测试](crates/server/tests/mainline.rs)
 
 | 终止进程的时点 | 重启后重送同一条回复的预期结果 |
 | --- | --- |
@@ -113,11 +113,11 @@ SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均�
 
 ### 四、第一项产品改动：Codex 多 agent 进度
 
-Codex CLI 0.170.0 的协议区分协作调用状态与子线程状态。`spawnAgent` 调用完成时，子线程可能刚开始执行。原生基线会把协作调用记作工具调用。工单当前动作主要来自根线程。[Codex 驱动](crates/vibevalley-oar/src/codex.rs) · [工作日志](apps/mac/ui/features/session/WorkLog.tsx)
+Codex CLI 0.170.0 的协议区分协作调用状态与子线程状态。`spawnAgent` 调用完成时，子线程可能刚开始执行。原生基线会把协作调用记作工具调用。工单当前动作主要来自根线程。[Codex 驱动](crates/runtime/src/oar/codex.rs) · [工作日志](apps/mac/ui/features/session/WorkLog.tsx)
 
-工作树中的 oar 已有自行启动子会话的 `Pool`。Codex 内部创建的线程由 Codex 启动。负责人应从 Codex 通知验证这些线程在工作台的可见性。[子会话池](crates/vibevalley-oar/src/subagent.rs)
+工作树中的 oar 已有自行启动子会话的 `Pool`。Codex 内部创建的线程由 Codex 启动。负责人应从 Codex 通知验证这些线程在工作台的可见性。[子会话池](crates/runtime/src/oar/subagent.rs)
 
-2026-11-19，负责人用实际 Codex CLI 0.170.0 启动两个子线程。模型响应来自本机回环服务。两次采样均确认一支完成、一支失败。脱敏样本保留 21 条通知和两份线程补读结果。重开 CLI 后可读回指定子轮的终态。派出事件保留子线程路径，任务原文可能缺失。[实收样本](crates/vibevalley-oar/tests/fixtures/codex-0.170.0-collaboration.json) · [采样脚本](crates/vibevalley-oar/tests/fixtures/capture_codex_collaboration.py) · [回放与乱序测试](crates/vibevalley-oar/tests/codex_collaboration.rs)
+2026-11-19，负责人用实际 Codex CLI 0.170.0 启动两个子线程。模型响应来自本机回环服务。两次采样均确认一支完成、一支失败。脱敏样本保留 21 条通知和两份线程补读结果。重开 CLI 后可读回指定子轮的终态。派出事件保留子线程路径，任务原文可能缺失。[实收样本](crates/runtime/tests/fixtures/codex-0.170.0-collaboration.json) · [采样脚本](crates/runtime/tests/fixtures/capture_codex_collaboration.py) · [回放与乱序测试](crates/runtime/tests/oar/codex_collaboration.rs)
 
 | 输入或条件 | 工单应显示的结果 |
 | --- | --- |
@@ -129,9 +129,9 @@ Codex CLI 0.170.0 的协议区分协作调用状态与子线程状态。`spawnAg
 
 #### 重连后，哪些进度仍然可信
 
-工作日志按会话保留最近 240 步。页面用步骤序号和修订号合并补读结果与实时通知。一个子线程还在执行时，后续日志就可能挤掉它的派出记录。进度总览应能在这条记录移出后保留子任务。[服务端日志](crates/vibevalley-server/src/modules/work/session/journal.rs) · [页面补读](apps/mac/ui/features/session/runs.ts)
+工作日志按会话保留最近 240 步。页面用步骤序号和修订号合并补读结果与实时通知。一个子线程还在执行时，后续日志就可能挤掉它的派出记录。进度总览应能在这条记录移出后保留子任务。[服务端日志](crates/server/src/modules/work/session/journal.rs) · [页面补读](apps/mac/ui/features/session/runs.ts)
 
-服务端用运行实例编号隔离旧实例的迟到事件。Codex 恢复根线程时传入 `excludeTurns: true`。服务端再按子线程和原轮次标识调用 `thread/read` 核对终态。缺少匹配记录时保留最后一次确认的状态。[会话实例](crates/vibevalley-server/src/modules/work/session/sessions.rs) · [Codex 恢复请求](crates/vibevalley-oar/src/codex.rs)
+服务端用运行实例编号隔离旧实例的迟到事件。Codex 恢复根线程时传入 `excludeTurns: true`。服务端再按子线程和原轮次标识调用 `thread/read` 核对终态。缺少匹配记录时保留最后一次确认的状态。[会话实例](crates/server/src/modules/work/session/sessions.rs) · [Codex 恢复请求](crates/runtime/src/oar/codex.rs)
 
 | 中断位置 | 恢复策略 | 首月验收 |
 | --- | --- | --- |
@@ -147,14 +147,14 @@ Codex CLI 0.170.0 的协议区分协作调用状态与子线程状态。`spawnAg
 | --- | --- | --- |
 | 派出第一张工单 | 从选择仓库进入农机配置和派单。分别说明找不到可执行文件、未登录和厂商拒绝启动的原因。每种错误提供对应入口。 | 首次使用者从空家目录走到第一份可审查的 Git 差异。记录失败位置、耗时和求助次数。 |
 | 找到等自己的工单 | 总览列出待回答、待审查和待核对的工单。地块打开对应工单。窄窗保留工单名称、状态和主动作。 | 在三单并行时，用键盘从总览打开工单，再返回原位置。用相同状态、时刻、窗口和像素比验收农场。状态应有文字或形状提示。[设计规范](docs/design/01-philosophy-and-tokens.md) · [农场](docs/subsystems/farm.md) |
-| 审查并合并 | 工单显示目标、变更文件、检查结果和受检提交。文件、Git 差异和终端均打开本单的工作目录。 | 各执行一次检查失败、合并冲突和成功合并。失败时可回到冲突文件或失败检查。成功时可查到最终提交。[交付模块](crates/vibevalley-server/src/modules/work/workplace/mod.rs) |
+| 审查并合并 | 工单显示目标、变更文件、检查结果和受检提交。文件、Git 差异和终端均打开本单的工作目录。 | 各执行一次检查失败、合并冲突和成功合并。失败时可回到冲突文件或失败检查。成功时可查到最终提交。[交付模块](crates/server/src/modules/work/workplace/mod.rs) |
 | 选用新视角或周边功能 | 工作台沿用两种主题和现有设计令牌。农场先按专项计划核对画面和交互。斜俯视先做一个固定镜头。 | 用同一场景比较找单耗时、遮挡、误点和帧耗。语音、媒体、笔记与 Artifact 沿用各自入口。真实音频与媒体结果另记设备和厂商版本。[原生端验收](.agents/skills/vv-acceptance/references/app.md) · [媒体验收](.agents/skills/vv-acceptance/references/media.md) |
 
 **演讲者视图。** 真实服务保存三页 HTML 文稿后，工作台在深、浅两种主题下均完成第 1、2、3、2 页和返回详情的操作。当前与下一页读取自两个 WKWebView，宿主显示对应讲稿。锁屏时系统未能截取合成整窗，正文由 WebView 原生快照核对。旧脚本在创建子视图所需的首次绘制之前等回执。修正后，nsh 0.5.0、0.5.1 和 0.6.0 的 AppKit 与 GPUI 均能读到正文。[复验方法](.agents/skills/vv-acceptance/references/app.md#演示页的就绪回执)
 
 #### 审查和检查各对哪份代码有效
 
-本地交付把人工审查、项目检查和最终提交绑定到 Git 对象。alpha.2 的三单验收保存了受审文件树、候选文件树和最终提交。单独检查主分支与工单分支会漏掉组合后的失败。项目检查在准备合入的文件树上运行。[审查入口](crates/vibevalley-server/src/modules/work/issue/edits.rs) · [合并实现](crates/vibevalley-git/src/verified_merge.rs)
+本地交付把人工审查、项目检查和最终提交绑定到 Git 对象。alpha.2 的三单验收保存了受审文件树、候选文件树和最终提交。单独检查主分支与工单分支会漏掉组合后的失败。项目检查在准备合入的文件树上运行。[审查入口](crates/server/src/modules/work/issue/edits.rs) · [合并实现](crates/git/src/verified_merge.rs)
 
 | 证据 | 对应内容 | 内容变化时的动作 |
 | --- | --- | --- |
@@ -171,8 +171,8 @@ Codex CLI 0.170.0 的协议区分协作调用状态与子线程状态。`spawnAg
 | 评审对象 | 取舍 | 验证 |
 | --- | --- | --- |
 | 事件命名 | 为「协作调用结束」和「子线程结束」分别建模。调用记录保留厂商状态。 | 回放派出成功的通知。此时调用可结束，子线程可继续运行。 |
-| 工具动作 | 基线驱动发出 `commandExecution`。会话按 `exec_command` 等别名分类，因此该命令落入 `Other`。由驱动给出动作类别和原名。会话读类别，工作日志保留原名。 | 回放现有命令样本，断言工单显示「运行命令」。未知工具仍显示原名。迁完对应调用方后删除失去用途的别名分支。[驱动映射](crates/vibevalley-oar/src/codex.rs) · [会话动作](crates/vibevalley-server/src/modules/work/session/sessions.rs) |
-| 账本提交 | 保留 `Ledger::apply_locked` 中可见的提交顺序。SQLite 成功提交后，账本才更新内存并通知订阅者。若拆出写库函数，外层仍持有事务。 | 制造写入失败。订阅者应继续看到提交前的状态。仅在顺序可能被误改处，用注释说明后果。[账本实现](crates/vibevalley-server/src/modules/work/ledger.rs) |
+| 工具动作 | 基线驱动发出 `commandExecution`。会话按 `exec_command` 等别名分类，因此该命令落入 `Other`。由驱动给出动作类别和原名。会话读类别，工作日志保留原名。 | 回放现有命令样本，断言工单显示「运行命令」。未知工具仍显示原名。迁完对应调用方后删除失去用途的别名分支。[驱动映射](crates/runtime/src/oar/codex.rs) · [会话动作](crates/server/src/modules/work/session/sessions.rs) |
+| 账本提交 | 保留 `Ledger::apply_locked` 中可见的提交顺序。SQLite 成功提交后，账本才更新内存并通知订阅者。若拆出写库函数，外层仍持有事务。 | 制造写入失败。订阅者应继续看到提交前的状态。仅在顺序可能被误改处，用注释说明后果。[账本实现](crates/server/src/modules/work/ledger.rs) |
 | 更新包校验 | 打包脚本根据发布文件计算摘要。更新程序根据收到的文件独立计算摘要。两处计算分别承担发布和接收责任。 | 用损坏的 ZIP 检验接收端能否发现差异。抽取共用代码前，指出哪条规则需同步修改。仅转发参数的封装可删除；拥有资源的封装应保留释放责任。[打包脚本](scripts/release/package.ts) · [更新校验](apps/mac/src/update/fetch.rs) |
 
 第 1 周，负责人沿一次命令回放找出解释厂商字段的模块。第 1 个月先修命令动作分类。保持行为的重构应单独提交，便于和功能变化分别评审。

@@ -8,7 +8,7 @@
 |---|---|
 | 笔记库目录管理、Markdown 与大纲树互转（`parse` / `print`） | 帮工和助手交付的文档与网页（[Artifact](docs/subsystems/artifact.md)） |
 | 块操作（`PkmBlockOp`）、双链、标签、块引用、反链与全文检索 | 档案的经验记忆存储（[记性](docs/subsystems/memory.md)） |
-| 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 助手与帮工的 `pkm_*` 工具（`crates/vibevalley-server/src/modules/team/tool/notes.rs`） |
+| 闪念捕获、网页剪藏、话题聚类、改名合并、导出与按文件撤销 | 助手与帮工的 `pkm_*` 工具（`crates/server/src/modules/team/tool/notes.rs`） |
 | 行内批注与改写建议（`pkm_comment`）的创建、接受与拒绝 | |
 
 ## 在哪
@@ -16,9 +16,9 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/mac/ui/features/pkm/` | 客户端大纲编辑器与工作台笔记页：块操作与树折叠（`tree.ts`）、行内切片与大纲视图模型（`outline.ts`）、键盘编辑与补全（`editing.ts`）、多块框选与拖拽（`selection.ts`）、日历日期（`days.ts`、`localDay.ts`）、乐观写入队列（`writer.ts`）与 `PkmPage`/`OutlineEditor` 等 TSX 页面 |
-| [笔记服务](crates/vibevalley-server/src/modules/content/pkm/mod.rs)、[数据库查询](crates/vibevalley-server/src/modules/content/pkm/sql/queries.sql) | 笔记服务读写并监听 Markdown 文件。sqlc 为批注、全文索引和撤销记录生成 SQLx 查询。 |
-| `crates/vibevalley-pkm/src/` | 服务端大纲引擎与单一真相源：Markdown 解析与打印、PARA 目录映射、双链反链与块引用图谱（`graph.rs`）；维护 `crates/vibevalley-pkm/golden` 回归测例 |
-| `crates/vibevalley-cli/src/commands/pkm.rs` | `vibevalley pkm ...` |
+| [笔记服务](crates/server/src/modules/content/pkm/mod.rs)、[数据库查询](crates/server/src/modules/content/pkm/sql/queries.sql) | 笔记服务读写并监听 Markdown 文件。sqlc 为批注、全文索引和撤销记录生成 SQLx 查询。 |
+| `crates/core/src/pkm/` | 服务端大纲引擎与单一真相源：Markdown 解析与打印、PARA 目录映射、双链反链与块引用图谱（`graph.rs`）；维护 `crates/core/golden/pkm` 回归测例 |
+| `crates/cli/src/commands/pkm.rs` | `vibevalley pkm ...` |
 | `packages/protocol/src/pkm/`、`apps/mac/ui/features/pkm/tree.ts` | 笔记契约与客户端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |
 | `$VIBEVALLEY_WORK_ROOT/pkm/` | 默认笔记根目录（`00_Inbox`–`04_Archives`、`journals/`、`.pkm/snapshots/`） |
 
@@ -49,12 +49,12 @@
 ## 怎么走
 
 1. **闪念捕获（`pkm.capture`）**：未指定页面时追加到今日日记 `journals/YYYY_MM_DD.md` 并标 `LATER #inbox`；指定页面时追加到该页末尾。
-2. **全文检索（`pkm.search`）**：加载或写回时用 `gse` 分词并按块去重合并后，以 `ON CONFLICT(page, block) DO UPDATE` 写进 `pkm_term` 表（`primary key (page, block)`，位于 `server.db`），匹配和打分在 Rust 里做（前缀匹配，照 TS 版 `ts_rank` 的算法）；按分数、整句命中与 PARA 层级权重排序（`crates/vibevalley-server/src/modules/content/pkm/db.rs`）。
+2. **全文检索（`pkm.search`）**：加载或写回时用 `gse` 分词并按块去重合并后，以 `ON CONFLICT(page, block) DO UPDATE` 写进 `pkm_term` 表（`primary key (page, block)`，位于 `server.db`），匹配和打分在 Rust 里做（前缀匹配，照 TS 版 `ts_rank` 的算法）；按分数、整句命中与 PARA 层级权重排序（`crates/server/src/modules/content/pkm/db.rs`）。
 3. **改名与合并（`pkm.page.rename`）**：目标页不存在时重命名并记 `alias::`；目标页已存在时合并块并删除旧文件，同时更新全库 `[[旧名]]`。
 
 ## 和谁打交道
 
-- **记性（`memory`）**：共用它的中英文分词（`crates/vibevalley-server/src/modules/team/memory/gse.rs`）。
+- **记性（`memory`）**：共用它的中英文分词（`crates/server/src/modules/team/memory/gse.rs`）。
 - **助手与工具（`orchestrator`、`tool`）**：助手现状含 `01_Projects` 活跃项目；当轮纯用户发言自动附入最多 3 个相关笔记块。
 
 ## 为什么这样
@@ -68,7 +68,7 @@
 
 ## 怎么验证
 
-- `apps/mac/ui/features/pkm/tree.test.ts`、`crates/vibevalley-pkm/src/tests.rs`：客户端测 `slugOf` 与 `applyBlockOps`（`nsh/test`），Rust 一侧跑大纲无损往返、按需 `id::`、反链展开与 `crates/vibevalley-pkm/golden` 回归测例。
-- `crates/vibevalley-server/tests/pkm.rs`：建页与挪页、读外部编辑器写的、按操作改块保留 id 并撤销、闪念进今天的日记。
+- `apps/mac/ui/features/pkm/tree.test.ts`、`crates/core/src/pkm/tests.rs`：客户端测 `slugOf` 与 `applyBlockOps`（`nsh/test`），Rust 一侧跑大纲无损往返、按需 `id::`、反链展开与 `crates/core/golden/pkm` 回归测例。
+- `crates/server/tests/pkm.rs`：建页与挪页、读外部编辑器写的、按操作改块保留 id 并撤销、闪念进今天的日记。
 - `apps/mac/ui/features/pkm/pkm.test.ts`：编辑、选择与日记视图的纯函数。
 - `apps/mac/ui/app/scenarios.test.tsx`：笔记页在多密度虚拟时钟场景下的页面测试（`nsh/test`）。

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { Codec } from "../codec";
-import * as T from "./shapes";
+import * as T from "./shapes.gen";
 
 const ConnectorID = z.enum(T.ConnectorIDValues) satisfies Codec<T.ConnectorID>;
 

@@ -4,7 +4,7 @@ import type { Codec } from "../codec";
 import { IssueId, SessionId } from "../common/schema";
 import { Repo } from "../repo/schema";
 import { doingFields } from "../session/schema";
-import * as T from "./shapes";
+import * as T from "./shapes.gen";
 
 export const AchievementCategory = z.enum(T.AchievementCategoryValues) satisfies Codec<T.AchievementCategory>;
 

@@ -19,7 +19,7 @@ mod late;
 
 /// The server every hosted view talks to (`call`, `state`, `live`,
 /// subscriptions), shared app-wide.
-pub struct BridgeHub(pub vibevalley_bridge::Hub);
+pub struct BridgeHub(pub vibevalley_server::transport::bridge::Hub);
 
 impl gpui::Global for BridgeHub {}
 
@@ -34,21 +34,21 @@ impl BridgeHub {
     pub fn install(cx: &mut App) {
         let (ready, startup) = tokio::sync::watch::channel(None);
         cx.set_global(ServerStartup(startup));
-        let server: std::sync::Arc<dyn vibevalley_bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
+        let server: std::sync::Arc<dyn vibevalley_server::transport::bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
             Some(dir) => {
-                let fake = vibevalley_bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir));
+                let fake = vibevalley_server::transport::bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir));
                 let _ = ready.send_replace(Some(fake.as_ref().map(|_| ()).map_err(ToString::to_string)));
-                std::sync::Arc::new(fake.unwrap_or_else(|_| vibevalley_bridge::fake::FakeServer::new()))
+                std::sync::Arc::new(fake.unwrap_or_else(|_| vibevalley_server::transport::bridge::fake::FakeServer::new()))
             }
             None => std::sync::Arc::new(late::LateServer::spawn(move || {
                 let home = server_home();
                 match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
                     Ok(started) => {
-                        let hub: std::sync::Arc<dyn vibevalley_bridge::Server> = started.hub.clone();
+                        let hub: std::sync::Arc<dyn vibevalley_server::transport::bridge::Server> = started.hub.clone();
                         let port: u16 = std::env::var("VIBEVALLEY_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(0);
                         let addr = format!("127.0.0.1:{port}").parse().expect("an address");
                         // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
-                        let (listener, announced) = match vibevalley_http::serve(started.hub.clone(), addr) {
+                        let (listener, announced) = match vibevalley_server::transport::http::serve(started.hub.clone(), addr) {
                             Ok(listener) => {
                                 started.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
                                 match vibevalley_server::home::announce(&home, &listener.url()) {
@@ -72,18 +72,18 @@ impl BridgeHub {
                     }
                     Err(e) => {
                         let _ = ready.send_replace(Some(Err(format!("vibevalley server: {e}"))));
-                        std::sync::Arc::new(vibevalley_bridge::fake::FakeServer::new())
+                        std::sync::Arc::new(vibevalley_server::transport::bridge::fake::FakeServer::new())
                     }
                 }
             })),
         };
-        cx.set_global(BridgeHub(vibevalley_bridge::Hub::new(server, 4)));
+        cx.set_global(BridgeHub(vibevalley_server::transport::bridge::Hub::new(server, 4)));
     }
 }
 
 struct ChannelOutlet(nsh_engine::HostChannel);
 
-impl vibevalley_bridge::Outlet for ChannelOutlet {
+impl vibevalley_server::transport::bridge::Outlet for ChannelOutlet {
     fn send(&self, event: &str, data: Value) {
         let _ = self.0.send(event.to_string(), data);
     }
@@ -103,7 +103,7 @@ impl std::fmt::Debug for Replier {
 }
 
 impl Replier {
-    pub fn send(self, envelope: vibevalley_bridge::Envelope) {
+    pub fn send(self, envelope: vibevalley_server::transport::bridge::Envelope) {
         let _ = self
             .channel
             .send(format!("reply:{}", self.id), serde_json::to_value(envelope).unwrap_or(Value::Null));
@@ -221,7 +221,7 @@ pub struct HostedView {
     applied: HashMap<String, u64>,
     ready: bool,
     errors: Vec<String>,
-    _bridge: Option<std::sync::Arc<vibevalley_bridge::Client>>,
+    _bridge: Option<std::sync::Arc<vibevalley_server::transport::bridge::Client>>,
 }
 
 impl HostedView {
@@ -230,7 +230,7 @@ impl HostedView {
     pub fn new(view: &str, params: Map<String, Value>, dark: bool, window: &mut Window, cx: &mut Context<Self>) -> Self {
         // nsh serves only nsh/base's core part unless the host names more; register both nsh/base and vibevalley/rich.
         static UI_SETS: std::sync::Once = std::sync::Once::new();
-        UI_SETS.call_once(|| nsh_platform_gpui::set_ui_sets(vec![nsh_base::registry(), vibevalley_rich_ui::registry()]));
+        UI_SETS.call_once(|| nsh_platform_gpui::set_ui_sets(vec![nsh_base::registry(), vibevalley_rich::registry()]));
         let (tx, rx) = flume::unbounded::<Value>();
         let (err_tx, err_rx) = flume::unbounded::<String>();
         let options = AppOptions {
@@ -273,9 +273,12 @@ impl HostedView {
                     if op == "host.pixelDir" {
                         if let Some(id) = v["id"].as_str() {
                             let env = if has_pixel_dir {
-                                vibevalley_bridge::Envelope::ok(json!({ "path": pixel_dir }))
+                                vibevalley_server::transport::bridge::Envelope::ok(json!({ "path": pixel_dir }))
                             } else {
-                                vibevalley_bridge::refusal(vibevalley_bridge::BizCode::NotFound, "the pixel art is not installed")
+                                vibevalley_server::transport::bridge::refusal(
+                                    vibevalley_server::transport::bridge::BizCode::NotFound,
+                                    "the pixel art is not installed",
+                                )
                             };
                             let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));
                         }
@@ -398,7 +401,7 @@ impl HostedView {
 
 /// Handles the server half of the bridge on the engine thread; `false` for
 /// actions the shell handles (including `call`s of `host.*` ops).
-fn route_to_bridge(bridge: &vibevalley_bridge::Client, v: &Value) -> bool {
+fn route_to_bridge(bridge: &vibevalley_server::transport::bridge::Client, v: &Value) -> bool {
     let s = |k: &str| v[k].as_str().unwrap_or_default().to_string();
     match v["type"].as_str() {
         Some("call") if !s("op").starts_with("host.") => bridge.call(&s("id"), s("op"), v["payload"].clone()),

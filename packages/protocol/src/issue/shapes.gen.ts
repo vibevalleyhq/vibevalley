@@ -1,4 +1,4 @@
-// Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
+// Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes.gen";
 import type { Conflict, ReviewRevision } from "../repo/shapes.gen";

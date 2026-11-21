@@ -175,7 +175,7 @@ impl Shell {
     /// The `host.*` ops of the bridge: VibeValley's host capabilities
     /// (packages/protocol/src/host.ts) and VibeValley's terminal.
     pub fn host_call(&mut self, op: &str, payload: Value, reply: crate::hosted::Replier, window: &mut Window, cx: &mut Context<Self>) {
-        use vibevalley_bridge::{BizCode, Envelope, refusal};
+        use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
         if op.starts_with("host.update") {
             return crate::update::host_call(op, reply, cx);
         }

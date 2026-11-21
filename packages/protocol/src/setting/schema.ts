@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Codec } from "../codec";
 import { KeyStatus, Locale } from "../common/schema";
 import { AgoraAppID, Dictation, SettingsUpdateVoice, VoiceSettings } from "../voice/schema";
-import * as T from "./shapes";
+import * as T from "./shapes.gen";
 
 export const MemorySourceInfo = z.object({
   name: z.string(),

@@ -12,7 +12,7 @@ VibeValley 在工作台微交互上保持克制，而在原生像素农场中实
 
 原生应用的 5 个像素场景（`Farm`、`Map`、`Tree`、`Opening`、`Catalog`）共享同一管线：逻辑构建帧列表 [`DrawList`](apps/mac/src/pixel/draw.rs) → CPU 光照合成/最近邻光栅 → [`SpriteCache`](apps/mac/src/pixel/element.rs) 缓存 → GPUI 1:1 绘出。
 
-### 2D 精灵图集与法线推导（`apps/mac/src/pixel/atlas.rs` & `crates/vibevalley-pixel/src/`）
+### 2D 精灵图集与法线推导（`apps/mac/src/pixel/atlas.rs` & `apps/mac/crates/pixel/src/`）
 
 - **单图切片与足底锚点**：`assets/pixel/sprites.json` 记录每张 2D PNG 切片的尺寸 `(w, h)` 与足底锚点 `(ax, ay)`（以及建筑 `yard` 框）。标准密度 `density = 2.0`（2× PNG 像素对应 1 逻辑像素），由 `map` 底图尺寸自动导出。
 - **自动法线与地面照明（`vibevalley-pixel`）**：引擎从 2D 精灵与建筑的 Alpha 剪影与表面梯度直接推导出 2D 凹凸法线（`Normals::Ground` / `Plot` / `Sprite`），在 CPU 上结合太阳高度角、点光源衰减与表面材质调色生成细腻的昼夜明暗，无需额外 3D 模型或离线法线贴图。
@@ -32,7 +32,7 @@ VibeValley 在工作台微交互上保持克制，而在原生像素农场中实
 - **光照曲线**：
   - 日出平滑窗 `[0.22, 0.30]`，日落平滑窗 `[0.76, 0.84]`，`dusk_of` 在 `0.26` 与 `0.80` 处形成双黄昏/破晓峰值。
   - 环境底色在 `DAY_AMBIENT [0.62, 0.64, 0.68]`、`DUSK_AMBIENT [0.66, 0.5, 0.46]` 与 `NIGHT_AMBIENT [0.26, 0.32, 0.52]` 间平滑混合；并混合对应 `Grade`（曝光 `exposure`、饱和度 `saturation`、暗部抬升 `lift`、阴影/高光偏色与暗角 `vignette`）。
-- **点光源与云雾（`crates/vibevalley-pixel/src/light.rs`）**：
+- **点光源与云雾（`apps/mac/crates/pixel/src/light.rs`）**：
   - `Window`（`0xffd399`, 仅夜间亮）、`Lamp`（`0xffc579`, 强夜间光）、`Forge`（`0xff974c`, 叠加双正弦 `7rad/s` 与 `13rad/s` 炭火闪烁脉动，全天带底光）以及夜间萤火虫；按光源影响能量降序排序进 `Lighting::lamps`。
   - 云影与晨雾采用跨着色器/CPU 严格一致的 `cloud_hash()` 确定性噪声算法，防止不同显卡与无头验收帧产生云团漂移差异。
 - **前景与 HUD 抗压暗分离（`farm_picture`）**：

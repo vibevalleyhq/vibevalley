@@ -3,7 +3,7 @@ import { z } from "zod";
 import { AgentRoleValues } from "../agent/shapes";
 import type { Codec } from "../codec";
 import { IssueId, Outcome, Retry, SessionId, Spent } from "../common/schema";
-import * as T from "./shapes";
+import * as T from "./shapes.gen";
 
 const SessionAction = z.enum(T.SessionActionValues) satisfies Codec<T.SessionAction>;
 

@@ -1,4 +1,4 @@
-// Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
+// Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { ArtifactCard, ArtifactViewContext, BlockRef, QuotedBlock } from "../artifact/shapes.gen";
 import type { Attachment } from "../attachment/shapes.gen";

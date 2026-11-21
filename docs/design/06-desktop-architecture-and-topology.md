@@ -7,7 +7,7 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 | 宿主模块 | 职责与实现位置 | 通信 / 渲染方式 |
 | --- | --- | --- |
 | **主窗口外壳（`Shell`）** | 管理窗口根视图、菜单栏、热键上下文、原生分屏工作区、像素场景栈与 `OpeningScene` 遮罩（`apps/mac/src/shell/`） | GPUI 根实体；同时托管最多 3 个 `HostedView`（`workbench` 主路由、`sidebar` contextual 边栏、`inspector` 右侧检查器）及弹出的 `Palette` 命令面板 |
-| **进程内通信桥（`BridgeHub`）** | 衔接宿主视图 `call`、`frame:state` 帧广播、`live` 增量事件与流式 `subscribe`（`apps/mac/src/hosted/` 与 `crates/vibevalley-bridge/`） | 线程安全通道直连进程内 `vibevalley-server`（无需绕回本地 loopback HTTP） |
+| **进程内通信桥（`BridgeHub`）** | 衔接宿主视图 `call`、`frame:state` 帧广播、`live` 增量事件与流式 `subscribe`（`apps/mac/src/hosted/` 与 `crates/server/src/transport/bridge/`） | 线程安全通道直连进程内 `vibevalley-server`（无需绕回本地 loopback HTTP） |
 | **刘海灵动岛（`apps/island`）** | 悬停在 Mac 刘海位置的常驻态浮窗，实时速览正在运行与等待回应的工单（`Island.swift`、`Geometry.swift`、`apps/mac/src/island.rs`） | `Shell` 启动子进程并通过管道推送 `glance(&frame)`（最多 `12` 条精简行）；窗口配置为无边框 `NSPanel`（`.nonactivatingPanel` + `canJoinAllSpaces` + `mainMenuWindow + 3` 层级），几何参数：`wing: 72`、`tabWidth: 200`、`openWidth: 420`、`rowHeight: 28`、`maxRows = 6`；环境变量 `VIBEVALLEY_NO_ISLAND` 可禁用；点击直接发回工单 ID 唤醒主窗切至 `/issues/:id` |
 | **系统菜单栏托盘（`tray.rs`）** | 在系统状态栏驻留 `18×18` 嫩芽像素图标（`assets/pixel/app-sprout.png`），显示即时活动摘要并提供「打开主窗 / 退出」（`apps/mac/src/tray.rs`） | AppKit `NSStatusBar` + `flume` 通道通知 GPUI 主线程激活窗口 |
 

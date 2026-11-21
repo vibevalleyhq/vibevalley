@@ -2,13 +2,13 @@
 
 The contracts between the server and the views (the shapes on the wire, their Schemas, the endpoints, the subscriptions,
 and the few pure rules both sides run), and between the page and the program around it (the host). The shapes and the
-endpoint table are Rust's: `crates/vibevalley-protocol/src/contract/` is the source, and `src/<concept>/shapes.gen.ts`
+endpoint table are Rust's: `crates/protocol/src/contract/` is the source, and `src/<concept>/shapes.gen.ts`
 and `src/endpoints.gen.ts` are written from it (`vp run protocol:ts`; `cargo test` fails when they are stale). The zod
 Schemas, `api.ts`, the rules and the client are hand-written here for the native app's views (`apps/mac/ui`). No files, no network.
 
 | Entry | What |
 |---|---|
-| `@vibevalley/protocol` | `src/<concept>/shapes.ts`, a folder per concept named as the Rust contract's module: its `shapes.gen.ts` and the constants and paths kept here, gathered by `src/shapes.ts`, and `src/client.ts` (`VibeValleyApi`, written by `vp run api:client` from the endpoint table) |
+| `@vibevalley/protocol` | `src/<concept>/` (generated `shapes.gen.ts`, plus `shapes.ts` where hand-written helpers/constants live), gathered by `src/shapes.ts`, and `src/client.ts` (`VibeValleyApi`, written by `vp run api:client` from the endpoint table) |
 | `@vibevalley/protocol/schema` | a Schema for every shape, in `src/<concept>/schema.ts` beside it, each typed `Codec<T.X>` (`z.ZodType<T.X, Wire<T.X>>` in `src/codec.ts`, the wire side without the ids' brands): it fails to compile when the two differ |
 | `@vibevalley/protocol/api` | `endpoints` (method, path, parameters, request and answer Schemas, who may call) and `Handlers`, put together from each concept's `src/<concept>/api.ts` (`api.test.ts` holds it to the served table, `endpoints.gen.ts`); `BizCode`, `bizCodeMeta`, `ApiError`, `ApiErrorEnvelope`, `ApiVoidEnvelope`, `apiSuccessEnvelope`, `Endpoint` and `input` from `src/endpoint.ts` |
 | `@vibevalley/protocol/rpc` | `subscriptions` and `Subscriptions`: what a page follows a channel, the farm's reports and an artifact by, each over SSE at `subscriptionPath` (`GET /api/v1/subscribe/<name>?payload=…`, `subscriptionUrl`) |

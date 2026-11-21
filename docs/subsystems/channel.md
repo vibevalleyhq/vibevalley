@@ -2,7 +2,7 @@
 
 频道（`Channel`）是用户、助手和帮工说话的地方，含公共频道 `channel`（默认 `general` 叫「田头」）、私聊 `direct` 和工单串 `thread` 三类通道。外部聊天软件（微信、飞书、QQ）经连接器（`modules/collab/connector`）各接到一个频道上：用户在那边对机器人说的话记成他在这个频道里说的，农场里该用户听的话（助手的话、汇报、派活、`@` 他的）在他还没在农场里读到时发到那边。
 
-连接器按平台和外部消息标识登记入站消息。一批消息与读取游标在同一个 SQLite 事务中保存。换绑账号时，连接器同时清除旧入站记录并退役旧待发消息。重启后只读取 `pending` 状态的出站分片，按序号投递。平台已接收但本地尚未记录回执的分片仍可能重发。[连接器查询](crates/vibevalley-server/src/modules/collab/connector/sql/queries.sql)
+连接器按平台和外部消息标识登记入站消息。一批消息与读取游标在同一个 SQLite 事务中保存。换绑账号时，连接器同时清除旧入站记录并退役旧待发消息。重启后只读取 `pending` 状态的出站分片，按序号投递。平台已接收但本地尚未记录回执的分片仍可能重发。[连接器查询](crates/server/src/modules/collab/connector/sql/queries.sql)
 
 ## 读取频道消息
 
@@ -24,12 +24,12 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/collab/channel/mod.rs` | `Chat`：频道、私聊、串的增删改查，写话（`say`、`speak`、`post`、`notice`），每条消息连同带序号的事件（`channel_event`）在一个事务里落库；提交后发给读者（`Chat::committed`），写话等读者处理完（`Chat::await_reader`）；端点也在这里注册 |
-| [频道表结构](crates/vibevalley-server/src/modules/collab/channel/sql/schema.sql)、[命名查询](crates/vibevalley-server/src/modules/collab/channel/sql/queries.sql)、`db.rs` | sqlc 生成 SQLx 查询。频道连接在 `server.db` 上读写消息、串和观察游标。 |
-| `crates/vibevalley-server/src/modules/collab/channel/model.rs` | 写事务在频道锁内更新镜像。回滚恢复原镜像，提交后才向订阅者发布。 |
-| `crates/vibevalley-server/src/modules/collab/channel/words.rs` | `@` 识别、地址解析、搜索过滤与公网链接预览 |
-| `crates/vibevalley-server/src/modules/collab/watch/` | 读者：[观察层](docs/subsystems/watch.md)按自己的游标读事件、排席位、路由、开串、回执 |
-| `crates/vibevalley-http/src/lib.rs` | 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)） |
+| `crates/server/src/modules/collab/channel/mod.rs` | `Chat`：频道、私聊、串的增删改查，写话（`say`、`speak`、`post`、`notice`），每条消息连同带序号的事件（`channel_event`）在一个事务里落库；提交后发给读者（`Chat::committed`），写话等读者处理完（`Chat::await_reader`）；端点也在这里注册 |
+| [频道表结构](crates/server/src/modules/collab/channel/sql/schema.sql)、[命名查询](crates/server/src/modules/collab/channel/sql/queries.sql)、`db.rs` | sqlc 生成 SQLx 查询。频道连接在 `server.db` 上读写消息、串和观察游标。 |
+| `crates/server/src/modules/collab/channel/model.rs` | 写事务在频道锁内更新镜像。回滚恢复原镜像，提交后才向订阅者发布。 |
+| `crates/server/src/modules/collab/channel/words.rs` | `@` 识别、地址解析、搜索过滤与公网链接预览 |
+| `crates/server/src/modules/collab/watch/` | 读者：[观察层](docs/subsystems/watch.md)按自己的游标读事件、排席位、路由、开串、回执 |
+| `crates/server/src/transport/http/mod.rs` | 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)） |
 | 表 `channel`、`channel_participant`、`channel_message`、`channel_mention`、`channel_member`、`channel_read_cursor`、`channel_seen`、`channel_event` | 频道与消息；`channel_seen` 是参与者在聊天之外收下的消息，`channel_event` 是按提交次序编号的事件（`posted`、`removed`） |
 | 表 `watch_cursor` | 观察层读到 `channel_event` 的哪一号 |
 
@@ -60,7 +60,7 @@
 
 用户发言可带 `to`（一个助手的档案 id）：只交给他，不交给成员，`to` 不是助手就拒绝；输入框的 `/imagegen` 用它把生图交给这里的助手（[媒体](docs/subsystems/media.md)）。
 
-「这里的助手」（`Chat::orchestrator_in`，`T.Channel.orchestrator`）由频道一处算（`crates/vibevalley-server/src/modules/collab/channel/mod.rs`，按助手的席位认谁是助手）：私聊是对面（他是助手时），否则是频道成员里的默认助手或第一个助手，都没有就是默认助手；泛称的「@助手」、派活说明的署名、没指定人的工单和定时任务、没人收的机器事件都交给它。
+「这里的助手」（`Chat::orchestrator_in`，`T.Channel.orchestrator`）由频道一处算（`crates/server/src/modules/collab/channel/mod.rs`，按助手的席位认谁是助手）：私聊是对面（他是助手时），否则是频道成员里的默认助手或第一个助手，都没有就是默认助手；泛称的「@助手」、派活说明的署名、没指定人的工单和定时任务、没人收的机器事件都交给它。
 
 | 发言者与位置 | 唤醒目标 | 被动通知（仅知晓） |
 |---|---|---|
@@ -96,6 +96,6 @@
 
 ## 怎么验证
 
-- `crates/vibevalley-server/tests/channel.rs`：频道、私聊、串、消息与订阅经端点走一遍。
-- `crates/vibevalley-server/tests/watch.rs`：写话等路由、交给帮工。
+- `crates/server/tests/channel.rs`：频道、私聊、串、消息与订阅经端点走一遍。
+- `crates/server/tests/watch.rs`：写话等路由、交给帮工。
 - `apps/mac/ui/app/scenarios.test.tsx`、`apps/mac/ui/app/interactions.test.tsx`：聊天页渲染与消息发送/实时推流的虚拟时钟页面测试（`nsh/test`）。
