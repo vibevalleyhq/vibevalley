@@ -27,11 +27,11 @@ import { defineAtom } from "../../state/atom";
 import { defineStored } from "../../state/stored";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
+import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
 import { ActiveBar, Empty } from "../../ui/layout";
 import { type MoreItem, MoreMenu } from "../../ui/MoreMenu";
-import { Bubble } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
 import { artifactHref, artifactIcon, artifactSuffix, artifactTypeIcon, kindLabel, useArtifact, useArtifacts } from "./ArtifactCard";
 import { BlocksView } from "./BlocksView";
@@ -120,29 +120,15 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
           class="min-h-0 flex-1 shrink-0 flex-col gap-3 border-line bg-side p-3 lg:w-64 lg:flex-none lg:border-r"
         >
           <View class="flex-row items-center gap-1">
-            <View class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 transition duration-120 ease-out focus-within:border-focus">
-              <Icon name="search" size={14} tone="faint" />
-              <Input
-                testID="artifact-search"
-                value={query()}
-                onChange={(e) => query.set(e.value)}
-                placeholder={t("web.artifact.page.find")}
-                accessibilityLabel={t("web.artifact.page.find")}
-                class="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint"
-              />
-              <If when={query().length > 0}>
-                <View
-                  role="button"
-                  testID="artifact-search-clear"
-                  accessibilityLabel={t("web.issue.page.clear")}
-                  tooltip={<Bubble text={t("web.issue.page.clear")} />}
-                  onPress={() => query.set("")}
-                  class="h-4 w-4 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
-                >
-                  <Icon name="close" size={12} tone="muted" />
-                </View>
-              </If>
-            </View>
+            <SearchField
+              testid="artifact-search"
+              clearTestid="artifact-search-clear"
+              value={query()}
+              onInput={query.set}
+              placeholder={t("web.artifact.page.find")}
+              label={t("web.artifact.page.find")}
+              class="min-w-0 flex-1"
+            />
             <IconButton icon="add" label={t("web.artifact.page.new")} testid="new-artifact" disabled={making.busy()} onClick={() => void create("docs")} />
             <MoreMenu
               icon="choose"

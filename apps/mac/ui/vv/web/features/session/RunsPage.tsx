@@ -16,12 +16,11 @@ import { defineQuery, ready, retryRead, useAgents, useQuery } from "../../infra/
 import { Link as A, useRouter, useSearch } from "../../infra/router";
 import { Button } from "../../ui/Button";
 import { AgentFace, OrchestratorFace } from "../../ui/domain/Face";
-import { TextInput } from "../../ui/Field";
+import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { ActiveBar, Quiet } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
 import { Dot, type DotTone } from "../../ui/Tag";
-import { Bubble } from "../../ui/Tip";
 import { mix } from "../../ui/tone";
 import { markWrongOf } from "../orchestrator/looks";
 import { PendingApprovals } from "../orchestrator/PendingApprovals";
@@ -248,28 +247,16 @@ export function RunsPage() {
       class={`min-h-0 flex-col bg-side ${wide() ? "w-80 shrink-0 border-r border-line" : "flex-1"}`}
     >
       <View class="shrink-0 gap-2 border-b border-line p-3">
-        <View class="flex-row items-center gap-1">
-          <TextInput
-            testID="runs-search"
-            accessibilityLabel={t("web.session.hub.search")}
-            placeholder={t("web.session.hub.searchHint")}
-            value={query()}
-            onInput={query.set}
-            class="h-7 min-w-0 flex-1"
-          />
-          <If when={query().length > 0}>
-            <View
-              role="button"
-              testID="runs-search-clear"
-              accessibilityLabel={t("web.session.hub.clear")}
-              tooltip={<Bubble text={t("web.session.hub.clear")} />}
-              onPress={() => query.set("")}
-              class="h-7 w-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover active:translate-y-px"
-            >
-              <Icon name="close" size={12} tone="muted" />
-            </View>
-          </If>
-        </View>
+        <SearchField
+          testid="runs-search"
+          clearTestid="runs-search-clear"
+          clearLabel={t("web.session.hub.clear")}
+          value={query()}
+          onInput={query.set}
+          placeholder={t("web.session.hub.searchHint")}
+          label={t("web.session.hub.search")}
+          class="w-full"
+        />
         <Segmented
           testid="runs-scope"
           label={t("web.session.hub.scopeLabel")}

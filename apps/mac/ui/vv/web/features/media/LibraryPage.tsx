@@ -4,7 +4,6 @@
 // upload & FileDrop (auto-creating artifacts for compound suffixes), Lightbox,
 // Inspector (with host.saveFile), "New deliverable" type menu, and generation dialogs.
 import { effect, keymap, Picker, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
-import { Input } from "nsh/base";
 
 import { inferArtifactFromName } from "@vibevalley/artifact/html";
 import { t } from "@vibevalley/i18n";
@@ -24,14 +23,13 @@ import { prefsNow, setLibraryTile } from "../../state/prefs";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
-import { Select } from "../../ui/Field";
+import { SearchField, Select } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Empty, Quiet } from "../../ui/layout";
 import { Lightbox, type Picture } from "../../ui/Lightbox";
 import { type MoreItem, MoreMenu } from "../../ui/MoreMenu";
 import { readFiles } from "../../ui/picked";
 import { Segmented } from "../../ui/Segmented";
-import { Bubble } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
 import { artifactTypeIcon, createTypedArtifact, useArtifacts } from "../artifact";
 import { AudioPanel } from "./AudioPanel";
@@ -394,29 +392,15 @@ export function LibraryPage() {
           accessibilityLabel={t("web.library.title")}
           class="min-h-14 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line px-4 py-2.5"
         >
-          <View class="h-7 w-56 min-w-40 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 transition duration-120 ease-out focus-within:border-focus">
-            <Icon name="search" size={14} tone="faint" />
-            <Input
-              testID="library-search"
-              placeholder={t("web.library.search")}
-              accessibilityLabel={t("web.library.search")}
-              value={text()}
-              onChange={(e) => text.set(e.value)}
-              class="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint"
-            />
-            <If when={text().length > 0}>
-              <View
-                role="button"
-                testID="library-search-clear"
-                accessibilityLabel={t("web.issue.page.clear")}
-                tooltip={<Bubble text={t("web.issue.page.clear")} />}
-                onPress={() => text.set("")}
-                class="h-4 w-4 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
-              >
-                <Icon name="close" size={12} tone="muted" />
-              </View>
-            </If>
-          </View>
+          <SearchField
+            testid="library-search"
+            clearTestid="library-search-clear"
+            value={text()}
+            onInput={text.set}
+            placeholder={t("web.library.search")}
+            label={t("web.library.search")}
+            class="w-56 min-w-40"
+          />
           <Select
             label={t("web.library.sortLabel")}
             testid="library-sort"

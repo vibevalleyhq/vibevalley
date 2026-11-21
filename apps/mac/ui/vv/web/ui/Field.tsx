@@ -4,8 +4,10 @@
 import { Text, View, type InputRef, type JSX } from "nsh";
 import { Input, Select as Base } from "nsh/base";
 
+import { t } from "@vibevalley/i18n";
+
 import { Icon } from "./Icon";
-import { Hint } from "./Tip";
+import { Bubble, Hint } from "./Tip";
 import { mix } from "./tone";
 
 const box = "rounded-md border border-line bg-page px-2.5 py-1.5 text-ink placeholder:text-faint transition duration-120 ease-out";
@@ -90,6 +92,47 @@ export function TextArea(props: TextInputProps & { rows?: number; submit?: boole
         props.class ?? "",
       ].join(" ")}
     />
+  );
+}
+
+/** A compact single-line search bar: leading magnifier, focus ring, and an inline clear button that never resizes the box. */
+export function SearchField(props: {
+  value: string;
+  onInput: (value: string) => void;
+  placeholder?: string | undefined;
+  label: string;
+  testid?: string | undefined;
+  clearTestid?: string | undefined;
+  clearLabel?: string | undefined;
+  class?: string | undefined;
+}) {
+  const clearLabel = () => props.clearLabel ?? t("web.issue.page.clear");
+  return (
+    <View
+      class={`h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:border-faint focus-within:border-focus ${props.class ?? ""}`}
+    >
+      <Icon name="search" size={14} tone="faint" />
+      <Input
+        testID={props.testid}
+        accessibilityLabel={props.label}
+        placeholder={props.placeholder}
+        value={props.value}
+        onChange={(e) => props.onInput(e.value)}
+        class="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint"
+      />
+      <If when={props.value.length > 0}>
+        <View
+          role="button"
+          testID={props.clearTestid}
+          accessibilityLabel={clearLabel()}
+          tooltip={<Bubble text={clearLabel()} />}
+          onPress={() => props.onInput("")}
+          class="size-4.5 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          <Icon name="close" size={10} tone="muted" />
+        </View>
+      </If>
+    </View>
   );
 }
 

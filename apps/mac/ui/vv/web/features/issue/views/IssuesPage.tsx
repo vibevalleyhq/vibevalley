@@ -23,7 +23,7 @@ import { useIntents } from "../../../state/intent";
 import { rememberPick } from "../../../state/prefs";
 import { createAct } from "../../../ui/act";
 import { Button } from "../../../ui/Button";
-import { Select, TextInput } from "../../../ui/Field";
+import { SearchField, Select } from "../../../ui/Field";
 import { Icon } from "../../../ui/Icon";
 import { Segmented } from "../../../ui/Segmented";
 import { Bubble } from "../../../ui/Tip";
@@ -397,27 +397,14 @@ function Toolbar(props: {
   return (
     <View class="flex-row flex-wrap items-center gap-2 px-3 pt-3 pb-2.5">
       <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
-        <View class="h-7 w-60 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:border-faint focus-within:border-focus">
-          <Icon name="search" size={14} tone="muted" />
-          <TextInput
-            testID="issue-search"
-            value={props.filter.query}
-            onInput={(query) => props.onFilter({ ...props.filter, query })}
-            placeholder={t("web.issue.page.find")}
-            accessibilityLabel={t("web.issue.page.findLabel")}
-            class="h-6 flex-1 border-0 bg-transparent px-0 py-0"
-          />
-          <If when={props.filter.query.length > 0}>
-            <View
-              role="button"
-              accessibilityLabel={t("web.issue.page.clear")}
-              onPress={() => props.onFilter({ ...props.filter, query: "" })}
-              class="size-4.5 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
-            >
-              <Icon name="close" size={10} tone="muted" />
-            </View>
-          </If>
-        </View>
+        <SearchField
+          testid="issue-search"
+          value={props.filter.query}
+          onInput={(query) => props.onFilter({ ...props.filter, query })}
+          placeholder={t("web.issue.page.find")}
+          label={t("web.issue.page.findLabel")}
+          class="w-60"
+        />
         <Icon name="filter" size={14} label={t("web.issue.page.filter")} tone="muted" />
         <Select
           size="control"

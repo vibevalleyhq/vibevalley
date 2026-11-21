@@ -13,7 +13,7 @@ import { Link as A } from "../../infra/router";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { AgentFace, OrchestratorFace } from "../../ui/domain/Face";
-import { TextInput } from "../../ui/Field";
+import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { PageBody, Toggle } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
@@ -104,28 +104,16 @@ function AgentsPage() {
                 { value: "worker", label: t("web.agent.list.helpers"), count: agents().length },
               ]}
             />
-            <View class="flex-row items-center gap-1">
-              <TextInput
-                testID="agents-search"
-                accessibilityLabel={t("web.agent.list.search")}
-                placeholder={t("web.agent.list.searchHint")}
-                wide={false}
-                class="h-7 w-56"
-                value={query()}
-                onInput={query.set}
-              />
-              <If when={query().length > 0}>
-                <View
-                  role="button"
-                  testID="agents-search-clear"
-                  accessibilityLabel={t("web.agent.list.clearFilter")}
-                  onPress={() => query.set("")}
-                  class="h-7 w-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover active:translate-y-px"
-                >
-                  <Icon name="close" size={12} tone="muted" />
-                </View>
-              </If>
-            </View>
+            <SearchField
+              testid="agents-search"
+              clearTestid="agents-search-clear"
+              clearLabel={t("web.agent.list.clearFilter")}
+              value={query()}
+              onInput={query.set}
+              placeholder={t("web.agent.list.searchHint")}
+              label={t("web.agent.list.search")}
+              class="w-56"
+            />
           </View>
           <View class="flex-row flex-wrap items-center gap-2">
             <A

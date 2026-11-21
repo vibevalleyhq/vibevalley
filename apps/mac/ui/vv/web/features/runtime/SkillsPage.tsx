@@ -3,7 +3,6 @@
 // skill editor on the same form model (infra/form, vendored). Its route,
 // /settings/skills, is the settings page's.
 import { Scroll, signal, Text, View, type JSX } from "nsh";
-import { Input } from "nsh/base";
 import { z } from "zod";
 
 import { list as listed, t } from "@vibevalley/i18n";
@@ -22,7 +21,7 @@ import { Button } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { AgentFace } from "../../ui/domain/Face";
 import { runtimeName } from "../../ui/domain/RuntimeBadge";
-import { TextArea, TextInput } from "../../ui/Field";
+import { SearchField, TextArea, TextInput } from "../../ui/Field";
 import { Form, formControl, FormField, formMessages } from "../../ui/Form";
 import { Icon } from "../../ui/Icon";
 import { Card, Empty } from "../../ui/layout";
@@ -92,28 +91,13 @@ export function SkillsPage(props: { id?: string | undefined }) {
         <Text role="header" class="px-1.5 pt-1 text-base font-semibold text-ink">
           {t("web.runtime.library.book")}
         </Text>
-        <View class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:border-faint focus-within:border-focus">
-          <Icon name="search" size={14} tone="faint" />
-          <Input
-            testID="skills-search"
-            accessibilityLabel={t("web.runtime.library.search")}
-            placeholder={t("web.runtime.library.searchHint")}
-            value={query()}
-            onChange={(e) => query.set(e.value)}
-            class="min-w-0 flex-1 text-sm text-ink placeholder:text-faint"
-          />
-          <If when={query().length > 0}>
-            <View
-              role="button"
-              accessibilityLabel={t("web.issue.page.clear")}
-              tooltip={<Bubble text={t("web.issue.page.clear")} />}
-              onPress={() => query.set("")}
-              class="size-4 shrink-0 items-center justify-center rounded-xs hover:bg-hover"
-            >
-              <Icon name="close" size={10} tone="muted" />
-            </View>
-          </If>
-        </View>
+        <SearchField
+          testid="skills-search"
+          value={query()}
+          onInput={query.set}
+          placeholder={t("web.runtime.library.searchHint")}
+          label={t("web.runtime.library.search")}
+        />
         <If when={runtimes.error()}>
           <Text class="px-1.5 text-xs text-berry">
             {t("web.runtime.library.noRuntimes")}

@@ -2,18 +2,17 @@
 // same sections, groups, search and resizable list, every section's forms.
 // Not here: MOSS Live's playground (microphone and camera, features/voice).
 import { Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
-import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
 import { matches } from "../../base/search";
 import { Link as A, Navigate } from "../../infra/router";
 import { SettingsPage as Page, SettingsSearch } from "../../ui/domain/settings";
+import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
 import { ActiveBar } from "../../ui/layout";
 import { Splitter, usePaneWidth } from "../../ui/Splitter";
-import { Bubble } from "../../ui/Tip";
 import { ConnectorsPage } from "../connector";
 import { MossAccounts, ProviderPage } from "../provider";
 import { SkillsPage } from "../runtime";
@@ -140,28 +139,13 @@ export function SettingsPage(props: { rest: string }) {
                 class={md() ? "flex-1" : "shrink"}
                 contentClass={`gap-4 p-3 ${md() ? "min-h-full" : ""}`}
               >
-                <View class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:border-faint focus-within:border-focus">
-                  <Icon name="search" size={14} tone="faint" />
-                  <Input
-                    testID="settings-search"
-                    accessibilityLabel={t("web.setting.nav.search")}
-                    placeholder={t("web.setting.nav.search")}
-                    value={query()}
-                    onChange={(e) => query.set(e.value)}
-                    class="min-w-0 flex-1 text-sm text-ink placeholder:text-faint"
-                  />
-                  <If when={query().length > 0}>
-                    <View
-                      role="button"
-                      accessibilityLabel={t("web.issue.page.clear")}
-                      tooltip={<Bubble text={t("web.issue.page.clear")} />}
-                      onPress={() => query.set("")}
-                      class="size-4 shrink-0 items-center justify-center rounded-xs hover:bg-hover"
-                    >
-                      <Icon name="close" size={10} tone="muted" />
-                    </View>
-                  </If>
-                </View>
+                <SearchField
+                  testid="settings-search"
+                  value={query()}
+                  onInput={query.set}
+                  placeholder={t("web.setting.nav.search")}
+                  label={t("web.setting.nav.search")}
+                />
                 <Each of={groups}>
                   {(g) => (
                     <If when={shown(g()).length > 0}>

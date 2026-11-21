@@ -15,7 +15,7 @@ import { useNow } from "../../base/dom";
 import { ago } from "../../base/format";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
-import { TextInput } from "../../ui/Field";
+import { SearchField, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Quiet } from "../../ui/layout";
 import { Markdown } from "../../ui/Markdown";
@@ -284,28 +284,15 @@ export function Trajectory(props: {
     <View testID="trajectory" class="min-h-0 flex-1">
       <View class="flex-row items-center gap-3 pb-2">
         <View class="min-w-0 flex-1">{props.head}</View>
-        <View class="flex-row items-center gap-1">
-          <TextInput
-            testID="trajectory-search"
-            accessibilityLabel={t("web.session.trajectory.search")}
-            placeholder={t("web.session.trajectory.searchHint")}
-            wide={false}
-            class="w-56"
-            value={query()}
-            onInput={query.set}
-          />
-          <If when={query().length > 0}>
-            <View
-              role="button"
-              accessibilityLabel={t("web.base.lightbox.close")}
-              tooltip={<Bubble text={t("web.base.lightbox.close")} />}
-              onPress={() => query.set("")}
-              class="h-7 w-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover active:translate-y-px"
-            >
-              <Icon name="close" size={12} tone="muted" />
-            </View>
-          </If>
-        </View>
+        <SearchField
+          testid="trajectory-search"
+          clearLabel={t("web.base.lightbox.close")}
+          value={query()}
+          onInput={query.set}
+          placeholder={t("web.session.trajectory.searchHint")}
+          label={t("web.session.trajectory.search")}
+          class="w-56"
+        />
       </View>
       <WaterfallView
         steps={props.steps}

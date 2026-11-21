@@ -5,7 +5,6 @@
 // rendered offline (ui/pixel/synth.ts). Below xl the detail sits over the
 // grid, as VibeValley's column does before it moves to the right.
 import { Scroll, signal, Text, View, type JSX } from "nsh";
-import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
@@ -15,6 +14,7 @@ import { spelled } from "../../base/search";
 import { useTimeout } from "../../base/timer";
 import { cursorsQuery, ready, useQuery, useSprites } from "../../infra/query";
 import { useRouter } from "../../infra/router";
+import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "../../ui/pixel/sound";
 import { Segmented } from "../../ui/Segmented";
@@ -101,28 +101,14 @@ function Search(props: {
 }) {
   return (
     <View class="flex-row flex-wrap items-center gap-2">
-      <View class="h-8 min-w-48 flex-1 flex-row items-center gap-2 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint focus-within:border-focus">
-        <Icon name="search" size={14} tone="muted" />
-        <Input
-          testID="catalog-search"
-          accessibilityLabel={t("web.catalog.find")}
-          placeholder={props.placeholder}
-          value={props.query}
-          onChange={(e) => props.onChange(e.value)}
-          class="min-w-0 flex-1 text-sm text-ink placeholder:text-faint"
-        />
-        <If when={props.query.length > 0}>
-          <View
-            role="button"
-            accessibilityLabel={t("web.issue.page.clear")}
-            tooltip={<Bubble text={t("web.issue.page.clear")} />}
-            onPress={() => props.onChange("")}
-            class="size-5 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-hover active:translate-y-px"
-          >
-            <Icon name="close" size={12} tone="muted" />
-          </View>
-        </If>
-      </View>
+      <SearchField
+        testid="catalog-search"
+        value={props.query}
+        onInput={props.onChange}
+        placeholder={props.placeholder}
+        label={t("web.catalog.find")}
+        class="min-w-48 flex-1"
+      />
       <If when={props.countText}>
         {(text) => (
           <View class="h-7 shrink-0 items-center justify-center rounded-md bg-side px-2">
