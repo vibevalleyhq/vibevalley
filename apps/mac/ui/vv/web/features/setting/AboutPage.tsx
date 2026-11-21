@@ -6,6 +6,7 @@ import { reasonOf } from "../../infra/api";
 import { currentHost } from "../../infra/host";
 import { ready, useSettings } from "../../infra/query";
 import { useUpdates } from "../../infra/settings";
+import { ButtonLink } from "../../ui/Button";
 import { SettingRow, SettingsGroup, SettingsPage } from "../../ui/domain/settings";
 import { IconButton } from "../../ui/IconButton";
 import { Quiet } from "../../ui/layout";
@@ -74,6 +75,13 @@ export function AboutPage() {
           </>
         )}
       </If>
+      <SettingsGroup title={t("web.setting.about.devTools")}>
+        <SettingRow label={t("web.setting.about.catalog")} hint={t("web.setting.about.catalogHint")} last>
+          <ButtonLink href="/catalog" icon="catalog" testID="open-catalog">
+            {t("web.setting.about.openCatalog")}
+          </ButtonLink>
+        </SettingRow>
+      </SettingsGroup>
     </SettingsPage>
   );
 }

@@ -218,7 +218,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
             <View class="max-w-4xl flex-row flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-page px-4 py-3">
               <View class="min-w-0 flex-1 flex-row items-center gap-2">
                 <Icon name="plug" size={14} tone="muted" />
-                <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
+                <TextLink href="/settings/models">{t("web.provider.manage")}</TextLink>
               </View>
               <MossVerify />
             </View>
@@ -352,7 +352,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
               <If when={answer().vendor === "moss"}>
                 <View class="flex-row items-center gap-2 rounded-md bg-side px-3 py-2">
                   <Icon name="plug" size={14} tone="muted" />
-                  <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
+                  <TextLink href="/settings/models">{t("web.provider.manage")}</TextLink>
                 </View>
               </If>
               <If when={variant(answer(), "vendor", "agora")}>
@@ -433,7 +433,7 @@ function Form(props: { status: SettingsStatus; part: VoicePart; view: LineView }
                 else={
                   <View testID="dictation-provider-link" class="flex-row items-center gap-2 rounded-md bg-side px-3 py-2.5">
                     <Icon name="plug" size={14} tone="muted" />
-                    <TextLink href="/settings/providers">{t("web.provider.manage")}</TextLink>
+                    <TextLink href="/settings/models">{t("web.provider.manage")}</TextLink>
                   </View>
                 }
               >

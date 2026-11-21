@@ -14,9 +14,10 @@ import { Icon } from "../ui/Icon";
 import type { IconName } from "../ui/icons";
 import { usePixelDir } from "../ui/pixel/atlas";
 import { ShortcutSheet } from "../ui/ShortcutSheet";
+import { Tabs } from "../ui/Tabs";
 import { Bubble, Hint } from "../ui/Tip";
 import { mix } from "../ui/tone";
-import { type Place, places, runsPlace, settingsPlace } from "./places";
+import { catalogPlace, type Place, places, runsPlace, settingsPlace } from "./places";
 
 const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;
 
@@ -79,7 +80,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
 /** One size up from a page's head (docs/design/01-philosophy-and-tokens.md). */
 const railIcon = (name: IconName, current: () => boolean) => () => <Icon name={name} size={24} color={current() ? mix("on-rail", 1) : mix("on-rail", 0.65)} />;
 
-const railGroups = ["work", "setup", "reference"] as const;
+const railGroups = ["work", "setup"] as const;
 
 function Rail(props: { here?: Place | undefined; farm: boolean }) {
   const pixelDir = usePixelDir();
@@ -143,16 +144,6 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
       <View class="self-center h-px w-8 shrink-0" style={{ backgroundColor: mix("on-rail", 0.1) }} />
       <Scroll class="flex-1" contentClass="items-center py-2">
         <View class="items-center gap-1">
-          <If when={globalShell}>
-            <Slot
-              to="/workspace"
-              place="workspace"
-              label={t("web.base.place.workspace.label")}
-              name={t("web.base.place.workspace.name")}
-              current={location().pathname === "/workspace"}
-              icon={railIcon("terminal", () => location().pathname === "/workspace")}
-            />
-          </If>
           <Each of={railGroups}>
             {(group, i) => (
               <View class="items-center gap-1">
@@ -160,17 +151,21 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
                   <View class="my-1 h-px w-8" style={{ backgroundColor: mix("on-rail", 0.1) }} />
                 </If>
                 <Each of={places.filter((p) => p.group === group() && p.id !== "settings")}>
-                  {(p) => (
-                    <Slot
-                      to={p().path}
-                      place={p().id}
-                      label={`${p().label} · ${p().hint}`}
-                      name={p().label}
-                      current={p() === props.here}
-                      badge={p().id === "issues" ? waiting() : 0}
-                      icon={railIcon(p().icon, () => p() === props.here)}
-                    />
-                  )}
+                  {(p) => {
+                    const to = () => (p().id === "workspace" && globalShell ? "/workspace" : p().path);
+                    const isCurrent = () => (p().id === "workspace" ? location().pathname === "/workspace" || p() === props.here : p() === props.here);
+                    return (
+                      <Slot
+                        to={to()}
+                        place={p().id}
+                        label={`${p().label} · ${p().hint}`}
+                        name={p().label}
+                        current={isCurrent()}
+                        badge={p().id === "issues" ? waiting() : 0}
+                        icon={railIcon(p().icon, isCurrent)}
+                      />
+                    );
+                  }}
                 </Each>
               </View>
             )}
@@ -257,6 +252,7 @@ function deskRunPresentation(state: DeskRunState, workingCount: number): DeskRun
 
 function Desk(props: { place?: Place | undefined }) {
   const core = useCore();
+  const location = useLocation();
   const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
   const runState = () => deskRunStateOf(core()?.call, working());
   const view = () => deskRunPresentation(runState(), working());
@@ -265,19 +261,58 @@ function Desk(props: { place?: Place | undefined }) {
     const bg = view().haloBg();
     return bg !== undefined ? { backgroundColor: bg } : undefined;
   };
+  const contentTab = () => {
+    const p = location().pathname;
+    if (p.startsWith("/artifacts")) return "content-artifacts";
+    if (p.startsWith("/pkm")) return "content-pkm";
+    return "content-library";
+  };
+  const teamTab = () => {
+    const p = location().pathname;
+    if (p.startsWith("/runtimes")) return "team-runtimes";
+    if (p.startsWith("/team/skills")) return "team-skills";
+    if (p.startsWith("/team/memory")) return "team-memory";
+    return "team-roles";
+  };
   return (
-    <View testID="desk" class="h-16.5 shrink-0 flex-row items-center justify-between gap-4 border-b border-line px-5">
+    <View testID="desk" class="min-h-16.5 shrink-0 flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-2">
       <If when={props.place} else={<View class="flex-1" />}>
         {(place) => (
-          <View class="min-w-0 flex-1 flex-row items-center gap-2.5">
-            <Keyed key={place().icon}>{() => <Icon name={place().icon} size={20} />}</Keyed>
-            {/* What the place is goes beside its name, on hover: a sentence under every head was read once and then only took room. */}
-            <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
-              <Text role="header" class="truncate text-lg font-semibold text-ink">
-                {place().label}
-              </Text>
-              <Hint text={place().hint} />
+          <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
+            <View class="min-w-0 flex-row items-center gap-2.5">
+              <Keyed key={place().icon}>{() => <Icon name={place().icon} size={20} />}</Keyed>
+              <View class="min-w-0 flex-row items-center gap-1.5">
+                <Text role="header" class="truncate text-lg font-semibold text-ink">
+                  {place().label}
+                </Text>
+                <Hint text={place().hint} />
+              </View>
             </View>
+            <If when={place().id === "content"}>
+              <Tabs
+                look="pills"
+                label={place().label}
+                value={contentTab()}
+                items={[
+                  { value: "content-library", label: t("web.base.tab.library"), icon: "media", href: "/library" },
+                  { value: "content-artifacts", label: t("web.base.tab.artifacts"), icon: "artifacts", href: "/artifacts" },
+                  { value: "content-pkm", label: t("web.base.tab.pkm"), icon: "notes", href: "/pkm" },
+                ]}
+              />
+            </If>
+            <If when={place().id === "team"}>
+              <Tabs
+                look="pills"
+                label={place().label}
+                value={teamTab()}
+                items={[
+                  { value: "team-roles", label: t("web.base.tab.roles"), icon: "agents", href: "/agents" },
+                  { value: "team-runtimes", label: t("web.base.tab.runtimes"), icon: "runtimes", href: "/runtimes" },
+                  { value: "team-skills", label: t("web.base.tab.skills"), icon: "skill", href: "/team/skills" },
+                  { value: "team-memory", label: t("web.base.tab.memory"), icon: "memory", href: "/team/memory" },
+                ]}
+              />
+            </If>
           </View>
         )}
       </If>
@@ -301,10 +336,12 @@ function Desk(props: { place?: Place | undefined }) {
 
 export function Shell(props: { children: JSX.Element }) {
   const matches = useMatches();
+  const location = useLocation();
   const meta = () => matches().at(-1)?.meta;
   const here = () => {
     const id = meta()?.place;
     if (id === runsPlace.id) return runsPlace;
+    if (id === catalogPlace.id) return catalogPlace;
     return places.find((place) => place.id === id);
   };
   const inFarm = () => meta()?.skin === "farm";
@@ -317,8 +354,8 @@ export function Shell(props: { children: JSX.Element }) {
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <View class="min-w-0 flex-1">
-        {/* The chat and the library draw their own one bar at the top: the place's name would be a second. */}
-        <If when={!inFarm() && here()?.id !== "chat" && here()?.id !== "library"}>
+        {/* Chat draws its own top bar; native workspace fills its own pane. */}
+        <If when={!inFarm() && here()?.id !== "chat" && location().pathname !== "/workspace"}>
           <Desk place={here()} />
         </If>
         <View class="min-h-0 flex-1">{props.children}</View>

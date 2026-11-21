@@ -9,44 +9,44 @@
     "delete": "删掉",
     "deleteAsk": "删掉「{title}」？对话里的卡片还在。",
     "deleted": "删掉了「{title}」",
-    "gone": "这份 Artifact 已经删掉了，或者没有这份 Artifact。",
+    "gone": "这份作品已经删掉了，或者没有这份作品。",
     "frame": "「{title}」第 {version} 稿",
-    "list": "全部 Artifact",
+    "list": "全部作品",
     "new": "新建",
-    "none": "还没有 Artifact：写个标题新建一篇，或者让帮工交一份上来。",
-    "all": "全部 Artifact",
+    "none": "还没有作品：写个标题新建一篇，或者让执行会话交一份上来。",
+    "all": "全部作品",
     "forIssue": "为 #{number} 做的",
-    "untitled": "没起名的 Artifact",
+    "untitled": "没起名的作品",
     "find": "按标题找",
     "nothingFound": "没有标题对得上的",
     "title": "标题",
     "more": "更多",
     "group": {
-      "delivered": "帮工和助手交的",
+      "delivered": "执行会话和主助手交的",
       "mine": "我写的"
     },
     "rail": "这篇的旁注",
     "railShow": "打开旁注",
     "railHide": "收起旁注",
-    "backToLibrary": "返回素材库"
+    "backToLibrary": "返回媒体库"
   },
   "issue": {
-    "title": "Artifact"
+    "title": "作品"
   },
   "blocks": {
-    "memoryItem": "记性",
+    "memoryItem": "记忆",
     "saving": "在存……",
     "saved": "都存好了",
     "blocks": "{n} 块",
-    "helpersWriting": "帮工在写",
-    "demo": "演示：几个帮工一起写",
+    "helpersWriting": "执行会话在写",
+    "demo": "演示：几个执行会话一起写",
     "append": "在末尾写一段",
     "user": "你",
     "done": "做完了",
     "notDone": "没做完",
     "writing": "{who} 在写",
     "wrote": "{who} 写的",
-    "issue": "工单 {id}",
+    "issue": "任务 {id}",
     "unknown": "这一块是「{type}」，这个版本的客户端还画不了，只能看不能改",
     "block": "块 {id}",
     "heading": "标题",
@@ -57,9 +57,9 @@
     "start": "从这里开始写……"
   },
   "canvas": {
-    "label": "打开的 Artifact",
+    "label": "打开的作品",
     "close": "关掉",
-    "openPage": "在 Artifact 页打开",
+    "openPage": "在作品页打开",
     "quote": "带话"
   },
   "suggestions": {
@@ -81,8 +81,8 @@
       "code": "代码",
       "divider": "分隔线",
       "image": "图片",
-      "issueRef": "工单引用",
-      "memoryItem": "记性"
+      "issueRef": "任务引用",
+      "memoryItem": "记忆"
     },
     "attrLevel": "级别",
     "attrChecked": "勾选",
@@ -97,7 +97,7 @@
     "motion": "动画"
   },
   "types": {
-    "pick": "选一种要新建的 Artifact",
+    "pick": "选一种要新建的作品",
     "defaultBadge": "默认体系",
     "setDefault": "设为默认设计体系",
     "unsetDefault": "取消默认",
@@ -119,7 +119,7 @@
     "loop": "循环播放",
     "exportVideo": "导出视频",
     "exporting": "正在导出…",
-    "exported": "视频已存进素材库",
+    "exported": "视频已存进媒体库",
     "exportFailed": "导出失败：{why}",
     "tooLong": "超过 60 秒的动画暂不在浏览器内录屏导出",
     "chapters": "章节",
@@ -154,7 +154,7 @@
     "fitView": "适应画布",
     "elements": "{n} 个元素",
     "doubleClickEdit": "双击编辑文字",
-    "empty": "空白白板：用上方工具放图形和连线，或在对话里让助手/帮工一起画"
+    "empty": "空白白板：用上方工具放图形和连线，或在对话里让主助手/执行会话一起画"
   },
   "design": {
     "canvas": "全部画板",
@@ -206,7 +206,7 @@
     "slide": "第 {at} 页 {title}"
   },
   "presenter": {
-    "missing": "没说要讲哪一份幻灯片：从 Artifact 的「演讲者视图」打开。",
+    "missing": "没说要讲哪一份幻灯片：从作品的「演讲者视图」打开。",
     "current": "这一页",
     "next": "下一页",
     "end": "这是最后一页",

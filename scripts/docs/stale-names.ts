@@ -2,15 +2,9 @@ import { existsSync, globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
-const TS_DIRS = [
-  "apps/mac/ui/vv/web",
-  "packages/protocol/src",
-  "packages/artifact/src",
-  "packages/pkm/src",
-  "apps/server/src",
-  "apps/web/src",
-  "apps/web/test",
-];
+const TS_DIRS = ["apps/mac/ui/vv/web", "packages/protocol/src", "packages/artifact/src", "packages/pkm/src"];
+// Legacy path prefixes kept only so synthetic path assertions in stale-names.test.ts match scope without scanning removed dirs.
+const LEGACY_TEST_DIRS = ["apps/server/src", "apps/web/src", "apps/web/test"];
 // The native port keeps oar's and its own Rust/workspace words where rules do not name `dirs`.
 const NATIVE_DIRS = ["crates", "apps/mac/src", "apps/mac/ui"];
 const DIRS = [...TS_DIRS, ...NATIVE_DIRS];
@@ -62,15 +56,15 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "管家 for the assistant",
-    // 管家 is the built-in assistant's default name (templates/orchestrator/agent.json) and a look's (机器人管家), not the role.
+    // 管家 is the built-in orchestrator's default name (templates/orchestrator/agent.json) and a look's (机器人管家), not the role.
     pattern: /(?<!机器人)管家/u,
-    says: "the agent the user talks to is 助手 in the page, the prompts and the docs (assistant in English); 管家 is only the default assistant's name, which the user can change; the code name stays orchestrator (docs/README.md 用语)",
+    says: "the agent the user talks to is 主助手 in the page, the prompts and the docs (assistant in English); 管家 is only the default orchestrator's name, which the user can change; the code name stays orchestrator (docs/README.md 用语)",
     dirs: DIRS,
   },
   {
-    name: "产出 or 稿子 for an artifact",
+    name: "产出 or 稿子 for a work artifact",
     pattern: /产出|稿子/u,
-    says: "the page and the prompts call an artifact Artifact, and an html one's versions 第 N 稿 (a block's revisions are 第 N 版) (docs/README.md 用语)",
+    says: "the page and the prompts call an artifact 作品, and an html one's versions 第 N 稿 (a block's revisions are 第 N 版) (docs/README.md 用语)",
     dirs: DIRS,
   },
   {
@@ -334,7 +328,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a profile called a helper's where the user reads it",
     pattern: /帮工档案/u,
-    says: "档案 (a profile): its role is 助手 or 帮工; the tools' words for a model may still say 帮工档案 for the profiles work goes to",
+    says: "角色 (a profile): its role is 主助手 or 执行角色; tools for a model name roles or agents explicitly (docs/README.md 用语)",
     dirs: ["apps/web/src", "apps/mac/ui/vv/web", "apps/server/src"],
     // On the server only user catalogs (locales/server.*.json) are the user's; orchestrator/words.rs and prompts.ts are a model's.
     except: /^apps\/server\/src\/(?!.*\/words\.ts$)/u,
@@ -391,7 +385,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a run inside the server under the execution name",
     pattern: /\b(AgentExecution|ExecutionBusy)\b|session\/execution(\.test)?\.ts/u,
-    says: "a run is a Run: the in-process agent's is InProcessRun (session/inProcessRun.ts), refused with RunBusy; 执行 is not a name for a helper (docs/README.md 用语)",
+    says: "a run is a Run: the in-process agent's is InProcessRun (session/inProcessRun.ts), refused with RunBusy; 执行 is not a name for a session alone (docs/README.md 用语: 执行会话)",
   },
   {
     name: "the inbox module under the notice name",
@@ -430,7 +424,7 @@ const RULES: readonly Rule[] = [
     name: "the orchestrator in a local called manager",
     // The village's manager sprite and keys are strings (yard.manager.hint, "manager-face").
     pattern: /\b(?:const|let|var|function)\s+manager\b|\(manager[,:)]|(?<![."\w-])manager\??\.[a-z]/u,
-    says: "orchestrator (or the profile's id): manager is only the English page's word for 助手",
+    says: "orchestrator (or the profile's id): manager is only the English farm's word for 主助手",
   },
   {
     name: "a service under a plural name",
@@ -494,7 +488,9 @@ export function staleNamesIn(source: string, text: string): string[] {
   const file = source.startsWith("crates/vibevalley-i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
-      const inScope = rule.dirs ? rule.dirs.some((dir) => file.startsWith(dir + "/")) : isCatalog || TS_DIRS.some((dir) => file.startsWith(dir + "/"));
+      const inScope = rule.dirs
+        ? rule.dirs.some((dir) => file.startsWith(dir + "/"))
+        : isCatalog || TS_DIRS.some((dir) => file.startsWith(dir + "/")) || LEGACY_TEST_DIRS.some((dir) => file.startsWith(dir + "/"));
       if (!inScope) continue;
       if (rule.except?.test(file) === true) continue;
       if (isCatalog && !han.test(rule.pattern.source)) continue;

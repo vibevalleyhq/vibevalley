@@ -338,7 +338,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
         label={t("web.agent.library")}
         tip={t("web.agent.libraryTip")}
         aside={
-          <A href="/settings/skills">
+          <A href="/team/skills">
             <Text class="text-xs text-muted underline">{t("web.agent.manageLibrary")}</Text>
           </A>
         }

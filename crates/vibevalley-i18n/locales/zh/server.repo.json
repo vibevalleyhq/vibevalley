@@ -10,7 +10,7 @@
     "noAccount": "无法确认 GitHub 登录账号"
   },
   "notRepoName": "「{name}」不能当仓库名：用一个简单的英文文件夹名，比如 clock-in",
-  "outside": "仓库必须在工作目录里面，不能链接到外面",
+  "outside": "仓库必须在工作区里面，不能链接到外面",
   "commit": {
     "initial": "初始提交（VibeValley 建的仓库）",
     "initialShort": "初始提交"

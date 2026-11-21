@@ -10,37 +10,42 @@
       "hint": "Channels and threads"
     },
     "issues": {
-      "label": "Tickets",
-      "hint": "Every ticket from written to closed"
+      "label": "Tasks",
+      "hint": "Every task from creation to completion"
     },
     "runs": {
       "label": "Runs & trajectories",
-      "hint": "Active helpers, assistant approvals, and run trajectories"
+      "hint": "Active sessions, orchestrator approvals, and trajectories"
     },
-    "agents": {
-      "label": "Profiles",
-      "hint": "Profiles: assistants and helpers"
+    "workspace": {
+      "hint": "Manage repositories and workspaces",
+      "name": "Workspace"
     },
-    "runtimes": {
-      "label": "Machines",
-      "hint": "The coding agents on this computer"
+    "content": {
+      "label": "Content",
+      "hint": "Library, artifacts, and notes"
     },
-    "repos": {
-      "label": "Repos",
-      "hint": "An island for each repo"
+    "team": {
+      "label": "Team",
+      "hint": "Roles, engines, skills, and memory"
     },
     "catalog": {
       "label": "Catalog",
-      "hint": "Assets: every picture, cursor and sound the farm uses, and the workbench's kit"
+      "hint": "Assets: pixel sprites, cursors, sounds, and workbench UI kit"
     },
     "settings": {
       "label": "Settings",
-      "hint": "General, appearance, models, memory, skills, voice, connections"
-    },
-    "workspace": {
-      "label": "Working folder & terminals",
-      "name": "Terminals"
+      "hint": "General & appearance, models & keys, voice, connections, about"
     }
+  },
+  "tab": {
+    "library": "Library",
+    "artifacts": "Artifacts",
+    "pkm": "Notes",
+    "roles": "Roles",
+    "runtimes": "Engines",
+    "skills": "Skills",
+    "memory": "Memory"
   },
   "link": {
     "connecting": "Connecting",

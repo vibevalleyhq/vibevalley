@@ -1,7 +1,7 @@
 {
   "language": {
     "title": "语言",
-    "line": "界面上的字、助手和帮工回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
+    "line": "界面上的字、主助手和执行会话回你的话、发到聊天软件的汇报，都用这种话。换了以后页面会重新打开。",
     "zh": "中文",
     "en": "English",
     "label": "界面语言"
@@ -24,11 +24,11 @@
     "user": "{label} 的 user_id",
     "userHint": "你在 EverOS 里的 user_id（空着用默认的那个）",
     "read": "读",
-    "readHint": "开工想起、帮工翻记性时也问它",
+    "readHint": "开工想起、执行会话翻记忆时也问它",
     "write": "写",
     "writeHint": "记下的也送一份过去",
     "everything": "读全部",
-    "everythingHint": "不只读 VibeValley 替帮工记的，你在里面的记忆每个帮工都读得到"
+    "everythingHint": "不只读 VibeValley 替执行会话记的，你在里面的记忆每个执行会话都读得到"
   },
   "github": {
     "noGh": "没装 gh",
@@ -43,51 +43,39 @@
   "nav": {
     "label": "设置的分区",
     "search": "搜索设置…",
-    "general": "通用",
+    "general": "通用与外观",
     "appearance": "外观",
-    "about": "关于",
-    "memory": "记性",
-    "skills": "技能",
+    "models": "模型与密钥",
+    "voice": "语音与通话",
+    "connections": "外部连接",
+    "about": "关于与数据",
+    "memory": "记忆",
     "call": "通话线路",
     "dictation": "听写",
     "chat": "聊天软件",
-    "width": "导航的宽窄（拖动，双击回默认）",
-    "accounts": "账号与钥匙"
-  },
-  "groups": {
-    "options": "选项",
-    "helpers": "帮工",
-    "voice": "语音",
-    "connect": "连接"
+    "width": "导航的宽窄（拖动，双击回默认）"
   },
   "words": {
-    "general": "语言 language 启动 打开 工作台 农场",
-    "appearance": "主题 深色 浅色 暗色 dark light 界面大小 缩放 字号",
-    "about": "版本 家目录 设置文件 version",
-    "memory": "Nowledge EverOS 记性 记忆",
-    "skills": "技能 skill",
-    "call": "声网 Agora 电话 识别 合成 谁接电话 区域",
-    "moss": "MOSS 试音 key 实时",
-    "dictation": "听写 转写 语音输入",
-    "github": "gh PR 登录",
-    "chat": "微信 飞书 QQ 连接器 配对",
-    "accounts": "钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型"
+    "general": "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号",
+    "models": "密钥 钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型 绑定",
+    "voice": "声网 Agora 电话 通话 MOSS Live 实时 视觉 听写 转写 语音",
+    "connections": "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
+    "about": "版本 家目录 设置文件 数据 素材图鉴 version catalog"
   },
   "scope": {
     "farm": "对整个 VibeValley",
     "device": "只对这台设备"
   },
   "general": {
-    "languageHint": "界面、助手和帮工说的话都用它",
+    "languageHint": "界面、主助手和执行会话说的话都用它",
     "start": "启动时打开",
     "startHint": "打开应用、或者打开首页时先进哪里",
     "starts": {
       "workbench": "工作台",
-      "farm": "农场"
+      "farm": "像素农场"
     }
   },
   "appearance": {
-    "intro": "只改工作台；农场、记忆树是画出来的，有自己的颜色和昼夜。",
     "theme": "主题",
     "themeHint": "跟随系统时随电脑的浅色和深色变",
     "themes": {
@@ -96,18 +84,19 @@
       "system": "跟随系统"
     },
     "scale": "界面大小",
-    "scaleHint": "缩放整个工作台；农场按整数倍放大，不跟着变",
+    "scaleHint": "缩放整个工作台；像素农场按整数倍放大，不跟着变",
     "monoFont": "终端与代码字体",
     "monoFontRow": "终端与代码字体（支持 Nerd Font）",
     "monoFontHint": "用于终端、Diff 与文件预览的等宽字体，内置 Nerd Font 图标回退链",
     "terminalFontSize": "终端字号",
-    "terminalFontSizeHint": "也可在工作目录随时按 ⌘+ / ⌘- / ⌘0 调整"
+    "terminalFontSizeHint": "也可在工作区随时按 ⌘+ / ⌘- / ⌘0 调整"
   },
   "models": {
-    "deepseekHint": "助手和 VibeValley 自己的帮工用它"
+    "intro": "配置主助手、执行会话与语音功能的模型账号和 API 密钥。",
+    "deepseekHint": "主助手和 VibeValley 自研执行会话用它"
   },
   "memory": {
-    "intro": "帮工还能去外面的记性里查、往里记。"
+    "intro": "执行会话还能去外面的记忆来源里查、往里记。"
   },
   "about": {
     "version": "版本",
@@ -120,12 +109,16 @@
     "repos": "仓库目录",
     "reposHint": "这个空间的仓库，每个文件夹都是一个 git 仓库",
     "worktrees": "工作树目录",
-    "worktreesHint": "帮工干活时每张工单自己的检出",
+    "worktreesHint": "执行会话运行时每个任务自己的检出",
     "pkm": "笔记库",
     "pkmHint": "这个空间的 PARA 目录和日记",
     "copy": "复制路径",
     "copied": "路径复制好了",
     "reveal": "在访达里显示",
+    "devTools": "开发与图鉴",
+    "catalog": "素材图鉴",
+    "catalogHint": "查看像素角色、指针、声音与工作台组件样式",
+    "openCatalog": "打开素材图鉴",
     "update": "更新",
     "updateHint": "桌面版从 GitHub 上的发布自己更新",
     "upToDate": "已是最新",
@@ -143,12 +136,12 @@
     "check": "检查更新",
     "restart": "重启更新",
     "restartQuestion": "重启到新版本？",
-    "workingQuestion": "{n} 个帮工在干活，重启会打断它们。现在重启？",
+    "workingQuestion": "{n} 个执行会话在运行，重启会打断它们。现在重启？",
     "newFarmQuestion": "新版本从新的数据开始，旧的留在家目录里。现在重启？",
     "download": "去下载",
     "cli": "命令行",
-    "cliHint": "装上以后，在终端里用 {command} 读写这个农场，本机的 agent 也能用",
-    "cliReady": "在终端里用 {command}；本机的 agent 也能用它读写这个农场",
+    "cliHint": "装上以后，在终端里用 {command} 读写这个 VibeValley，本机的 agent 也能用",
+    "cliReady": "在终端里用 {command}；本机的 agent 也能用它读写这个 VibeValley",
     "cliNotOnPath": "已经装到 {link}，但 ~/.local/bin 不在 PATH 里：在 ~/.zshrc 里加一行 export PATH=\"$HOME/.local/bin:$PATH\"",
     "cliTaken": "{link} 已经有别的文件，没有换掉：先挪开它再装",
     "cliInstall": "安装",
@@ -164,7 +157,7 @@
     "dictationUrl": "还没填听写的地址"
   },
   "feature": {
-    "orchestrator": "助手",
+    "orchestrator": "主助手",
     "image": "生图",
     "understanding": "媒体理解",
     "speech": "单人语音",
@@ -180,8 +173,5 @@
     "ready": "{feature}：可以用了",
     "lacks": "{feature}：{why}",
     "fix": "去设置"
-  },
-  "accounts": {
-    "intro": "所有供应商的账号和钥匙都在这里；每个账号能用哪些模型也在这里看。每个功能用哪个账号，在「用途」里选。"
   }
 }

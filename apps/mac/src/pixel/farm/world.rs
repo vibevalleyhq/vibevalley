@@ -127,7 +127,7 @@ pub const YARD_PLACES: [YardPlace; 9] = [
     YardPlace {
         id: "skills",
         label: "web.farm.menu.skills",
-        opens: "/settings/skills",
+        opens: "/team/skills",
     },
 ];
 

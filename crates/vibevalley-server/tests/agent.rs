@@ -312,7 +312,7 @@ fn an_added_template_is_installed_and_deleted() {
     assert_eq!(s.add_template(&folder.to_string_lossy()).unwrap_err().biz_code, BizCode::AgentRefused);
     let lead = s.install_template("lead").unwrap();
     assert!(lead.role == AgentRole::Orchestrator && s.is_orchestrator(&lead.id));
-    assert!(s.preview_remove_template("lead").unwrap().does[0].contains("1 份档案留着"));
+    assert!(s.preview_remove_template("lead").unwrap().does[0].contains("1 份角色留着"));
     assert_eq!(s.remove_template("backend").unwrap_err().biz_code, BizCode::AgentRefused);
     s.remove_template("lead").unwrap();
     assert!(!s.templates().iter().any(|t| t.id == "lead"));

@@ -94,7 +94,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
     }
     let opts = opts.expect("the helper was opened");
     let rules = opts.append_system_prompt.clone().unwrap_or_default();
-    assert!(rules.contains("## 在码农场物语干活的规矩") && rules.contains("「farm」"), "{rules}");
+    assert!(rules.contains("## 在 VibeValley 工作的规矩") && rules.contains("「farm」"), "{rules}");
     assert!(rules.contains("所有仓库都用 2 个空格缩进。"), "the house rules: {rules}");
     assert!(rules.contains("issue_report"), "{rules}");
     let token = opts
@@ -127,7 +127,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
 
     let stranger = rpc(&door, "not-a-token", 3, "tools/call", json!({ "name": "session_list", "arguments": {} }));
     assert_eq!(stranger["result"]["isError"], true);
-    assert_eq!(text_of(&stranger), "没认出你是谁：这些工具只给帮工用");
+    assert_eq!(text_of(&stranger), "没认出你是谁：这些工具只给执行会话用");
 
     let said = rpc(
         &door,

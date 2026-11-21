@@ -141,7 +141,7 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
     assert_eq!(&names[..3], ["issue_list", "issue_get", "issue_create"]);
     assert!(names.contains(&"remember") && names.contains(&"load_skill"), "{names:?}");
     let system = first.messages[0].content.clone().unwrap_or_default();
-    assert!(system.starts_with("你是码农场物语的助手"), "{system}");
+    assert!(system.starts_with("你是 VibeValley 的主助手"), "{system}");
     let input = first.messages.last().unwrap().content.clone().unwrap_or_default();
     assert!(
         input.contains("【现在】") && input.contains("【现状】") && input.contains("仓库（工作目录"),

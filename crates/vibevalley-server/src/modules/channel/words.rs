@@ -12,14 +12,14 @@ use vibevalley_protocol::{DEFAULT_ORCHESTRATOR, EVERYONE, Embed, USER_ID};
 /// in where the place is known.
 pub fn chat_named(token: &str) -> Option<&'static str> {
     Some(match token {
-        "助手" | "manager" => DEFAULT_ORCHESTRATOR,
+        "主助手" | "助手" | "manager" => DEFAULT_ORCHESTRATOR,
         "用户" | "user" => USER_ID,
         "所有人" | "everyone" => EVERYONE,
         _ => return None,
     })
 }
 
-const CHAT_NAMES: [&str; 6] = ["助手", "用户", "所有人", "manager", "user", "everyone"];
+const CHAT_NAMES: [&str; 7] = ["主助手", "助手", "用户", "所有人", "manager", "user", "everyone"];
 
 /// `mentionOf`: how the page writes a mention of one of the chat's names.
 pub fn mention_of(id: &str) -> Option<String> {

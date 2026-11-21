@@ -82,6 +82,10 @@ pub enum Action {
     GlobalRoute {
         path: String,
     },
+    /// Another hosted surface (such as the workspace sidebar) asks the workbench router to navigate.
+    OpenRoute {
+        path: String,
+    },
     GlobalRail {
         rail_width: f32,
     },

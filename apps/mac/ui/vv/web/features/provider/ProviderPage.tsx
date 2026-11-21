@@ -11,7 +11,6 @@ import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { Checkbox } from "../../ui/Checkbox";
 import { ConfirmButton } from "../../ui/ConfirmButton";
-import { SettingsPage } from "../../ui/domain/settings";
 import { Field, Select, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { OutLink } from "../../ui/IconButton";
@@ -63,9 +62,8 @@ const editable = (status: ProviderStatus): ProviderUpdate => ({
   vision: status.vision,
 });
 
-/** Which of the providers' settings a place shows: the MOSS accounts (with the other keys, on the accounts page), or
- * the uses each feature is bound to. Each saves the whole settings, its own part changed. */
-type ProviderPart = "accounts" | "uses";
+/** Which of the providers' settings a place shows: the MOSS accounts, the uses each feature is bound to, or both in one form. */
+type ProviderPart = "accounts" | "uses" | "all";
 
 function Provider(props: { part: ProviderPart }) {
   const query = useQuery(providerQuery);
@@ -76,18 +74,8 @@ function Provider(props: { part: ProviderPart }) {
   );
 }
 
-/** The uses: which account and model each feature calls. */
-export function ProviderPage() {
-  return (
-    <SettingsPage title={t("web.provider.title")} hint={t("web.provider.intro")}>
-      <Provider part="uses" />
-    </SettingsPage>
-  );
-}
-
-/** The MOSS accounts, for the accounts page. */
-export function MossAccounts() {
-  return <Provider part="accounts" />;
+export function ProviderModels() {
+  return <Provider part="all" />;
 }
 
 function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
@@ -153,7 +141,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
   const boundCount = () => adaptedUses.filter((use) => Boolean(draft()[use])).length;
   return (
     <View accessibilityLabel={t("web.provider.title")} class="min-w-0 max-w-4xl gap-6" testID="provider-form">
-      <If when={props.part === "accounts"}>
+      <If when={props.part !== "uses"}>
         <View class="min-w-0 gap-3">
           <View class="flex-row flex-wrap items-center gap-2">
             <View class="min-w-0 flex-1 flex-row items-center gap-2">
@@ -319,7 +307,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
           </Each>
         </View>
       </If>
-      <If when={props.part === "uses"}>
+      <If when={props.part !== "accounts"}>
         <Card
           title={t("web.provider.uses")}
           action={

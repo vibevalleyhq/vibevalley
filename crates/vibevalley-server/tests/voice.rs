@@ -423,7 +423,7 @@ fn a_join_that_agora_refuses_frees_the_grant_and_a_missing_key_says_where_to_fix
         json!({ "channel": grant["channel"], "uid": grant["uid"] }),
         BizCode::VoiceCallFailed,
     );
-    assert_eq!(refused.message, "请助手进频道失败：HTTP 403: no such project");
+    assert_eq!(refused.message, "请主助手进频道失败：HTTP 403: no such project");
 }
 
 #[test]

@@ -673,7 +673,7 @@ fn weixin_is_scanned_and_verified_and_the_users_words_reach_the_default_channel_
     let answer = nth(&world, "weixin", 0);
     assert_eq!(
         (answer.to.as_str(), answer.text.as_str(), answer.reply.as_str()),
-        (USER, "【助手】\n收到：帮我看看打卡页", "ctx-a")
+        (USER, "【主助手】\n收到：帮我看看打卡页", "ctx-a")
     );
     let general = s.chat.default_channel();
     assert_eq!(said_in(&s, &general), vec!["帮我看看打卡页"]);
@@ -711,7 +711,7 @@ fn weixin_is_tied_to_another_channel_and_a_quoted_reply_goes_to_its_thread() {
     post(&general, "默认频道里的话");
     world.wx(USER, "打卡页怎么样了", "ctx-c");
     let answer = nth(&world, "weixin", 0);
-    assert_eq!((answer.text.as_str(), answer.reply.as_str()), ("【助手】\n收到：打卡页怎么样了", "ctx-c"));
+    assert_eq!((answer.text.as_str(), answer.reply.as_str()), ("【主助手】\n收到：打卡页怎么样了", "ctx-c"));
     assert_eq!(said_in(&s, &clock_in), vec!["打卡页怎么样了"]);
     assert!(said_in(&s, &general).is_empty());
     // What goes out is offered in the order it was said: the answer is out, so the default channel's earlier words
@@ -726,7 +726,7 @@ fn weixin_is_tied_to_another_channel_and_a_quoted_reply_goes_to_its_thread() {
     let thread = s.chat.thread_under(&root).unwrap();
     post(&thread, "串里的话");
     let threaded = nth(&world, "weixin", 1);
-    assert_eq!(threaded.text, "【助手 · 在工单串里】\n串里的话");
+    assert_eq!(threaded.text, "【主助手 · 在任务话题里】\n串里的话");
     world.wx_log.lock().unwrap().push(json!({
         "message_id": 7_000_000_000_000_009_999u64,
         "from_user_id": USER,
@@ -758,7 +758,7 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     assert!(world.by("weixin").is_empty());
     world.restricted.store(false, Ordering::SeqCst);
     let held = nth(&world, "weixin", 0);
-    assert_eq!((held.text.as_str(), held.reply.as_str()), ("【助手】\n收到：一", "ctx-1"));
+    assert_eq!((held.text.as_str(), held.reply.as_str()), ("【主助手】\n收到：一", "ctx-1"));
     pending(0, "sent");
 
     // A read in the workbench withdraws what has not gone out.
@@ -800,7 +800,7 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     *world.opened.lock().unwrap() = "ctx-fresh".into();
     world.wx(USER, "六", "ctx-fresh");
     let fresh = nth(&world, "weixin", 1);
-    assert_eq!((fresh.text.as_str(), fresh.reply.as_str()), ("【助手】\n收到：六", "ctx-fresh"));
+    assert_eq!((fresh.text.as_str(), fresh.reply.as_str()), ("【主助手】\n收到：六", "ctx-fresh"));
     pending(0, "nothing pending");
     std::thread::sleep(Duration::from_millis(400));
     assert_eq!(world.by("weixin").len(), 2);
@@ -827,7 +827,7 @@ fn weixin_goes_on_after_a_restart_and_rests_when_its_login_is_stale() {
         // No login this time: the account kept is gone on with.
         assert_eq!(status(&s, "weixin")["state"], "connected");
         world.wx(USER, "重启以后", "ctx-r");
-        assert_eq!(nth(&world, "weixin", 0).text, "【助手】\n收到：重启以后");
+        assert_eq!(nth(&world, "weixin", 0).text, "【主助手】\n收到：重启以后");
 
         world.wx_stale.store(true, Ordering::SeqCst);
         let resting = reaches(&s, "weixin", "paused");
@@ -882,7 +882,7 @@ fn qq_pairs_by_its_code_takes_only_the_users_words_and_listens_again_after_the_g
     let answer = nth(&world, "qq", 1);
     assert_eq!(
         (answer.to.as_str(), answer.text.as_str(), answer.reply.as_str()),
-        ("user-openid", "【助手】\n收到：跑一下测试", last.as_str())
+        ("user-openid", "【主助手】\n收到：跑一下测试", last.as_str())
     );
     let general = s.chat.default_channel();
     assert_eq!(said_in(&s, &general), vec!["跑一下测试"]);
@@ -959,7 +959,7 @@ fn the_feishu_bot_is_made_by_a_scan_and_takes_only_the_users_direct_words() {
     let answer = nth(&world, "feishu", 0);
     assert_eq!(
         (answer.to.as_str(), answer.text.as_str(), answer.reply.as_str()),
-        ("ou_user", "【助手】\n收到：看看日志", "")
+        ("ou_user", "【主助手】\n收到：看看日志", "")
     );
     assert_eq!(said_in(&s, &s.chat.default_channel()), vec!["看看日志"]);
     // Every event is acknowledged, taken or not.
@@ -974,7 +974,7 @@ fn the_feishu_bot_is_made_by_a_scan_and_takes_only_the_users_direct_words() {
             ..Posting::default()
         })
         .unwrap();
-    assert_eq!(nth(&world, "feishu", 1).text, "【助手】\n部署好了");
+    assert_eq!(nth(&world, "feishu", 1).text, "【主助手】\n部署好了");
 
     let out = call(&s, "connector.logout", json!({ "id": "feishu" }));
     assert_eq!(out["state"], "off");

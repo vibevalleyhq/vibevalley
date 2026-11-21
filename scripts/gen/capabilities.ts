@@ -27,10 +27,10 @@ const head = `# 能力表
 
 | 谁 | 是谁 | 从哪个入口 |
 |---|---|---|
-| 用户 | 用户在农场那台电脑上 | 页面、命令行 |
+| 用户 | 用户在运行 VibeValley 的这台电脑上 | 页面、命令行 |
 | 连进来的设备 | 用户配对过的手机、另一台电脑 | 「连接到本机」随手机壳砍掉了，Rust 服务端没有这道门；这一列留在契约里 |
-| 助手 | 助手 | 它的工具；Rust 服务端的工具清单在 \`crates/vibevalley-server/assets/tools/orchestrator.json\`，以那份为准 |
-| 帮工 | 在干活的帮工 | 经 \`/mcp\` 拿的工具，清单在 \`crates/vibevalley-server/assets/tools/helper.json\` |
+| 主助手 | 主助手 | 它的工具；Rust 服务端的工具清单在 \`crates/vibevalley-server/assets/tools/orchestrator.json\`，以那份为准 |
+| 执行会话 | 运行中的执行会话 | 经 \`/mcp\` 拿的工具，清单在 \`crates/vibevalley-server/assets/tools/helper.json\` |
 
 \`GET /api/v1/state\`、\`GET /api/v1/events\` 和 \`GET /api/v1/live\` 是 SSE，不在 \`endpoints\` 里：用户和连进来的设备都能读；\`/state\` 给折好的帧，\`/live\` 只给页面要的三种 side event，\`/events\` 留给调试。接口都在 \`/api/v1\` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
 `;
@@ -43,7 +43,7 @@ for (const e of endpoints) {
 const mark = (on: boolean) => (on ? "✓" : " ");
 let text = head;
 for (const [g, list] of groups) {
-  text += `\n## ${g}\n\n${maybe(`cli.group.${g}.about`) ?? ""}\n\n| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 助手 | 帮工 |\n|---|---|---|---|---|---|---|\n`;
+  text += `\n## ${g}\n\n${maybe(`cli.group.${g}.about`) ?? ""}\n\n| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |\n|---|---|---|---|---|---|---|\n`;
   for (const e of list)
     text += `| \`${e.op}\` | ${t(`cli.op.${e.op}`)} | \`${pathOf(e.op)}\` | ${mark(e.can.includes("user"))} | ${mark(e.can.includes("remote"))} | ${mark(e.can.includes("orchestrator"))} | ${mark(e.can.includes("session"))} |\n`;
 }

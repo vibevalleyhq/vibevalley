@@ -1,9 +1,3 @@
-// The agents, runtimes and repos pages on their own fixture
-// (vv/fixtures/agents.ts) without a host, for pictures on a real host:
-// `host.params.route` picks the page; `skill` shows the skills book
-// (features/runtime/SkillsPage) alone, its route /settings/skills being
-// the settings page's. The frame is a quiet one of its own, so the
-// pictures do not hang on the other areas' fixtures.
 import "../polyfill";
 import { host, mount, View } from "nsh";
 

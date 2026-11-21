@@ -1,2 +1,2 @@
-export { SettingsPage } from "./SettingsPage";
+export { SettingsPage, TeamMemoryPage } from "./SettingsPage";
 export { Readiness } from "./Readiness";

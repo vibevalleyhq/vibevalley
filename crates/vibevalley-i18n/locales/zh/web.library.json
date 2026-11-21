@@ -1,20 +1,19 @@
 {
-  "title": "素材库",
-  "hint": "生成的、你上传的、帮工拿回来的文件都在这里。",
+  "title": "媒体库",
   "upload": "上传",
   "uploading": "正在上传…",
   "make": "生成",
   "makeTitle": "生成",
-  "empty": "还没有素材",
-  "emptyHow": "生成一张图或一段语音、上传或拖进来一个文件，或者在聊天里让帮工把找到的东西放进来。",
-  "nothingShown": "没有符合筛选的素材。",
-  "drop": "松开，放进素材库",
+  "empty": "还没有媒体文件",
+  "emptyHow": "生成一张图或一段语音、上传或拖进来一个文件，或者在对话里让执行会话把找到的东西放进来。",
+  "nothingShown": "没有符合筛选的内容。",
+  "drop": "松开，放进媒体库",
   "rail": {
     "where": "来路",
     "kind": "种类",
     "artifacts": "作品交付",
     "channels": "来自频道",
-    "agents": "来自帮工",
+    "agents": "来自执行会话",
     "anyWhere": "全部来路",
     "anyKind": "全部种类"
   },
@@ -22,7 +21,7 @@
     "all": "全部",
     "generated": "生成的",
     "uploaded": "你上传的",
-    "fetched": "帮工拿回来的"
+    "fetched": "执行会话拿回来的"
   },
   "kind": {
     "all": "全部",
@@ -59,10 +58,10 @@
   },
   "from": {
     "generated": "生成的 · {job}",
-    "uploadedHere": "你在素材库上传的",
+    "uploadedHere": "你在媒体库上传的",
     "uploadedIn": "你在 {channel} 发的",
     "fetchedUrl": "{agent} 从 {url} 拿回来的",
-    "fetchedPath": "{agent} 从工作目录的 {path} 拿回来的"
+    "fetchedPath": "{agent} 从工作区的 {path} 拿回来的"
   },
   "inspector": {
     "kind": "种类",
@@ -83,8 +82,8 @@
   "sendTo": "发到频道",
   "sentTo": "发到了 {channel}",
   "remove": "从库里拿掉",
-  "removeAsk": "从素材库拿掉「{name}」？聊天里发过的照样能打开。",
-  "removeSome": "从素材库拿掉这 {n} 个？聊天里发过的照样能打开。",
+  "removeAsk": "从媒体库拿掉「{name}」？对话里发过的照样能打开。",
+  "removeSome": "从媒体库拿掉这 {n} 个？对话里发过的照样能打开。",
   "removeSure": "拿掉",
   "keep": "算了",
   "understand": "理解",

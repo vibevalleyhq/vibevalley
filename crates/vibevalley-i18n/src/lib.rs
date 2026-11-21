@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn regression_desktop_terminal_errors_are_embedded_in_both_languages() {
-        assert!(t_in("zh", "desktop.terminal.missingFolder", &[]).contains("工作目录"));
+        assert!(t_in("zh", "desktop.terminal.missingFolder", &[]).contains("工作区"));
         assert!(t_in("en", "desktop.terminal.missingFolder", &[]).contains("working directory"));
     }
 

@@ -2822,7 +2822,7 @@
     "from": {
      "kind": "orchestrator"
     },
-    "who": "助手",
+    "who": "主助手",
     "text": "message 2 @user",
     "at": 1794500120000,
     "target": {
@@ -2831,7 +2831,7 @@
     },
     "words": {
      "label": "找你",
-     "title": "助手 叫你",
+     "title": "主助手 叫你",
      "body": "message 2 @user",
      "tray": ""
     }
@@ -2865,7 +2865,7 @@
     "from": {
      "kind": "orchestrator"
     },
-    "who": "助手",
+    "who": "主助手",
     "text": "Daily digest",
     "at": 1794500000000,
     "target": {
@@ -2874,7 +2874,7 @@
     },
     "words": {
      "label": "定时任务等你同意",
-     "title": "助手想定一个定时任务",
+     "title": "主助手想定一个定时任务",
      "body": "「Daily digest」：同意了才开始",
      "tray": "定时任务「Daily digest」等你同意"
     }

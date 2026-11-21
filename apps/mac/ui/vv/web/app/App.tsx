@@ -17,9 +17,9 @@ import { OrchestratorPage } from "../features/orchestrator";
 import { PkmPage } from "../features/pkm";
 import { ReposPage } from "../features/repo";
 import { sortRepos } from "../features/repo/repos";
-import { RuntimesPage } from "../features/runtime";
+import { RuntimesPage, SkillsPage } from "../features/runtime";
 import { RunsPage } from "../features/session";
-import { SettingsPage } from "../features/setting";
+import { SettingsPage, TeamMemoryPage } from "../features/setting";
 import { ready, useRepos } from "../infra/query";
 import { Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useParams } from "../infra/router";
 import type { RouterHistory } from "../infra/router/history";
@@ -129,7 +129,7 @@ const routes: readonly RouteDefinition[] = [
     ),
     children: [
       { path: "/tree", meta: { skin: "farm" }, component: Tree },
-      { path: "/map", meta: { place: "repos" }, component: RepoMap },
+      { path: "/map", meta: { place: "workspace" }, component: RepoMap },
       { path: "/farm", meta: { skin: "farm" }, component: FarmHome },
       { path: "/farm/", meta: { skin: "farm" }, component: () => <Farm repo="" /> },
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
@@ -138,14 +138,18 @@ const routes: readonly RouteDefinition[] = [
       page("/runs", "runs", () => <RunsPage />),
       page("/chat", "chat", () => <ChatPage />),
       page("/settings", "settings", (rest) => <SettingsPage rest={rest()} />),
-      page("/orchestrator", "agents", (rest) => <OrchestratorPage rest={rest()} />),
-      page("/agents", "agents", (rest) => <AgentsRoute rest={rest()} />),
-      page("/runtimes", "runtimes", (rest) => <RuntimesPage rest={rest()} />),
-      page("/repos", "repos", (rest) => <ReposPage rest={rest()} />),
+      { path: "/team", component: () => <Navigate href="/agents" /> },
+      page("/team/skills", "team", (rest) => <SkillsPage id={rest() ? decodeURIComponent(rest()) : undefined} />),
+      page("/team/memory", "team", () => <TeamMemoryPage />),
+      page("/orchestrator", "team", (rest) => <OrchestratorPage rest={rest()} />),
+      page("/agents", "team", (rest) => <AgentsRoute rest={rest()} />),
+      page("/runtimes", "team", (rest) => <RuntimesPage rest={rest()} />),
+      page("/repos", "workspace", (rest) => <ReposPage rest={rest()} />),
       page("/catalog", "catalog", (rest) => <CatalogPage rest={rest()} />),
-      page("/library", "library", () => <LibraryPage />),
-      page("/artifacts", "library", (rest) => <ArtifactsPage rest={rest()} chat={(p) => <ChannelSidePane {...p} />} />),
-      page("/pkm", "pkm", (rest) => <PkmPage rest={rest()} />),
+      { path: "/content", component: () => <Navigate href="/library" /> },
+      page("/library", "content", () => <LibraryPage />),
+      page("/artifacts", "content", (rest) => <ArtifactsPage rest={rest()} chat={(p) => <ChannelSidePane {...p} />} />),
+      page("/pkm", "content", (rest) => <PkmPage rest={rest()} />),
     ],
   },
 ];

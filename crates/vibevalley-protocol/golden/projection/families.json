@@ -4808,7 +4808,7 @@
     "from": {
      "kind": "orchestrator"
     },
-    "who": "助手",
+    "who": "主助手",
     "text": "Issue 30",
     "at": 1794501860000,
     "target": {
@@ -4817,9 +4817,9 @@
     },
     "words": {
      "label": "合不进去",
-     "title": "助手 的活合进主分支会冲突",
+     "title": "主助手 的活合进主分支会冲突",
      "body": "Issue 30",
-     "tray": "助手 的活会冲突"
+     "tray": "主助手 的活会冲突"
     }
    },
    {
@@ -4828,7 +4828,7 @@
     "from": {
      "kind": "orchestrator"
     },
-    "who": "助手",
+    "who": "主助手",
     "text": "Issue 20",
     "at": 1794501320000,
     "target": {
@@ -4837,9 +4837,9 @@
     },
     "words": {
      "label": "等你看",
-     "title": "助手 做完了",
+     "title": "主助手 做完了",
      "body": "Issue 20",
-     "tray": "助手 做完了，等你看"
+     "tray": "主助手 做完了，等你看"
     }
    }
   ],

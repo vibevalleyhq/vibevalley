@@ -27,7 +27,7 @@ import { type InstalledSkill, installedSkills } from "./quota";
 import { SkillInput } from "./skill-form";
 
 const installedPrefix = "installed:";
-const skillPath = (id?: string) => (id === undefined ? "/settings/skills" : `/settings/skills/${encodeURIComponent(id)}`);
+const skillPath = (id?: string) => (id === undefined ? "/team/skills" : `/team/skills/${encodeURIComponent(id)}`);
 
 const skillsQuery = defineQuery({
   schema: z.array(S.Skill),

@@ -6,41 +6,46 @@
   },
   "place": {
     "chat": {
-      "label": "聊天",
-      "hint": "频道和串"
+      "label": "对话",
+      "hint": "频道与话题"
     },
     "issues": {
-      "label": "工单",
-      "hint": "每张工单从写下到关上"
+      "label": "任务",
+      "hint": "每件任务从记下到完成"
     },
     "runs": {
       "label": "运行与轨迹",
-      "hint": "进行中的帮工、助手审批与历史轨迹"
+      "hint": "执行会话、主助手审批与历史轨迹"
     },
-    "agents": {
-      "label": "档案",
-      "hint": "档案：助手和帮工"
+    "workspace": {
+      "hint": "管理仓库与工作区",
+      "name": "工作区"
     },
-    "runtimes": {
-      "label": "农机",
-      "hint": "机器上的编码 agent"
+    "content": {
+      "label": "内容",
+      "hint": "媒体库、作品与笔记"
     },
-    "repos": {
-      "label": "仓库",
-      "hint": "每个仓库一座岛"
+    "team": {
+      "label": "团队",
+      "hint": "角色、引擎、技能与记忆"
     },
     "catalog": {
-      "label": "图鉴",
-      "hint": "素材：农场用的每张图、每个指针、每个声音，和工作台的界面零件"
+      "label": "素材图鉴",
+      "hint": "像素与界面素材：每张图、指针、声音和工作台零件"
     },
     "settings": {
       "label": "设置",
-      "hint": "通用、外观、模型、记性、技能、语音、连接"
-    },
-    "workspace": {
-      "label": "工作目录与终端",
-      "name": "终端"
+      "hint": "通用与外观、模型与密钥、语音与通话、外部连接、关于与数据"
     }
+  },
+  "tab": {
+    "library": "媒体库",
+    "artifacts": "作品",
+    "pkm": "笔记",
+    "roles": "角色",
+    "runtimes": "引擎",
+    "skills": "技能",
+    "memory": "记忆"
   },
   "link": {
     "connecting": "连接中",
@@ -51,9 +56,9 @@
   "farm": "回农场",
   "farmShort": "农场",
   "update": "更新",
-  "working": "开工中 · {n} 个在干活",
-  "off": "没开工",
-  "runsHint": "查看进行中的帮工、助手审批与轨迹",
+  "working": "运行中 · {n} 个执行会话",
+  "off": "未启动",
+  "runsHint": "查看执行会话、主助手审批与轨迹",
   "chips": {
     "drop": "去掉 {v}",
     "valueOf": "{k} 的值",
@@ -67,7 +72,7 @@
   "toasts": "提示",
   "runtime": "运行工具：{name}",
   "user": "你",
-  "orchestrator": "助手",
+  "orchestrator": "主助手",
   "unreachable": "暂时连不上服务端，请等它恢复后重试。",
   "query": {
     "invalidResponse": "返回的数据格式不符，已有的有效结果已保留。"
@@ -197,14 +202,14 @@
       "everywhere": "到处",
       "composer": "输入框",
       "lists": "菜单和名单",
-      "issues": "工单",
+      "issues": "任务",
       "pictures": "看图",
-      "library": "素材库",
-      "farm": "农场",
+      "library": "媒体库",
+      "farm": "像素农场",
       "desktop": "桌面版（系统全局）"
     },
     "say": {
-      "switcher": "跳到频道、串、私聊",
+      "switcher": "跳到频道、话题、私聊",
       "sheet": "打开这张表",
       "close": "关掉对话框、菜单、浮层",
       "send": "发出去",
@@ -219,9 +224,9 @@
       "names": "按住写出院子里每样东西的名字",
       "farmMenu": "放下农具，或打开菜单",
       "debug": "调试台",
-      "voice": "跟助手说话（在设置里能换）",
-      "command": "命令：记工单、让助手记住、叫停、私聊",
-      "newIssue": "新工单",
+      "voice": "跟主助手说话（在设置里能换）",
+      "command": "命令：建任务、让主助手记住、叫停、私聊",
+      "newIssue": "新建任务",
       "libraryMove": "在素材之间挪",
       "libraryLook": "全屏看选中的图",
       "libraryRemove": "从库里拿掉选中的"
@@ -241,7 +246,7 @@
   "updateReady": "{next} 已下好，去「关于」重启",
   "intent": {
     "timedOut": "等了太久没回音，可以重试",
-    "offline": "没连上农场，这一下没发出去"
+    "offline": "没连上 VibeValley，这一下没发出去"
   },
   "pickTooLarge": "{name} 没加上：超过 512 MiB 了",
   "openTerminal": "在这里打开终端"

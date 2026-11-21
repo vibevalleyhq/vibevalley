@@ -6,10 +6,10 @@
   "dictationUrl": "听写的地址要是 http(s) 开头的完整地址，到 /v1 为止，比如本机的 http://127.0.0.1:8080/v1",
   "dictationModel": "听写要填模型名，比如本机 speech-server 的 qwen3，或 OpenAI 的 gpt-4o-mini-transcribe",
   "memory": {
-    "twice": "同一种记性来源只能接一个：{kind}",
-    "noUrl": "要接上记性来源，先填它的地址",
-    "url": "记性来源的地址要是 http(s) 开头的完整地址，比如 Nowledge Mem 的 http://127.0.0.1:14242/mcp/",
-    "keySpace": "记性来源的 key 里不该有空格"
+    "twice": "同一种记忆来源只能接一个：{kind}",
+    "noUrl": "要接上记忆来源，先填它的地址",
+    "url": "记忆来源的地址要是 http(s) 开头的完整地址，比如 Nowledge Mem 的 http://127.0.0.1:14242/mcp/",
+    "keySpace": "记忆来源的 key 里不该有空格"
   },
   "voice": {
     "label": {
@@ -23,7 +23,7 @@
     "url": "大模型的地址要是 http(s) 开头的完整地址，比如 https://api.openai.com/v1/chat/completions",
     "voiceId": "音色不能空着：选一个或填 MiniMax 的音色 id",
     "microsoft": "微软合成要填区域和音色名",
-    "persona": "助手的人设不能空着"
+    "persona": "主助手的人设不能空着"
   },
   "defaults": {
     "failureMessage": "我这边卡了一下，你再说一遍？"

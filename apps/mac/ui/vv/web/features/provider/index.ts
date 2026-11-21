@@ -1,1 +1,1 @@
-export { MossAccounts, ProviderPage } from "./ProviderPage";
+export { ProviderModels } from "./ProviderPage";

@@ -1,20 +1,20 @@
 # AGENTS.md
 
-VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：工单派给 agent 档案，服务端为它派一个帮工（经 Rust 的 oar 驱动本机的编码 agent），按档案设置在仓库目录或工单的 worktree 里一轮一轮干活，用户看改动、合进主分支；用户、助手（替用户派活的 agent）和帮工在群聊里说话。外面画成一座农场：仓库是岛，在做的工单是一块地，帮工在地上干活，群聊是田头（[概念](docs/concepts.md)）。它是全原生的，只支持 macOS，只在本机用：服务端和命令行是 Rust（`crates/`），应用是 `apps/mac`（GPUI 窗口，里面带着服务端；工作台是 nsh 跑的 TSX 页面，像素农场由 Rust 画）；契约、词典、工具说明和提示以 Rust 为源，TS 由它生成。还在做的部分见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)。改 `crates/`、`apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
+VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：任务派给角色（Agent），服务端为它派一个执行会话（Session，经 Rust 的 oar 驱动本机的编码引擎），按角色设置在仓库目录或任务的 worktree 里一轮一轮运行，用户看改动、合进主分支；用户、主助手（替用户派活的 agent）和执行会话在频道里说话。外面另有一层像素农场皮肤：仓库是岛，在做的任务是一块地，帮工在地上干活，默认频道画成田头（[概念](docs/concepts.md)）。它是全原生的，只支持 macOS，只在本机用：服务端和命令行是 Rust（`crates/`），应用是 `apps/mac`（GPUI 窗口，里面带着服务端；工作台是 nsh 跑的 TSX 页面，像素农场由 Rust 画）；契约、词典、工具说明和提示以 Rust 为源，TS 由它生成。还在做的部分见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)。改 `crates/`、`apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
 
 ## 目录
 
 ```
 crates/vibevalley-server/  服务端（二进制 vibevalley-server）：src/modules 按单数概念分深模块（agent、artifact、attachment、channel、cron、game、issue、
                            ledger、library、media、memory、mcp、orchestrator、pkm、provider、pull、repo、session、setting、tool、watch、workplace；
-                           工单板拆成 issue（状态与交付）、session（帮工和每一轮）、workplace（worktree 与合并），都只经 ledger 写），lib.rs 组装 Hub，
-                           start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、Artifact 类型指南（artifact/types/）、助手和帮工的提示
+                           任务板拆成 issue（状态与交付）、session（执行会话和每一轮）、workplace（worktree 与合并），都只经 ledger 写），lib.rs 组装 Hub，
+                           start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
 crates/vibevalley-http/    HTTP 门（/api/v1、SSE、/mcp）：照契约的接口表把请求交给服务端
 crates/vibevalley-server-api/  服务端对桥和 HTTP 门的接口（Server trait）
 crates/vibevalley-bridge/  页面和进程内服务端之间的桥（Hub），和顶替服务端的样例（fake）
-crates/vibevalley-core/    核心状态与规则：reduce、frame_of、工单的状态和阶段、收件箱、巡查、农场的画面、简报和起草
+crates/vibevalley-core/    核心状态与规则：reduce、frame_of、任务的状态和阶段、收件箱、巡查、农场的画面、简报和起草
 crates/vibevalley-protocol/  契约的源：src/contract 一个概念一个文件；typescript.rs 写出 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
-crates/vibevalley-oar/     oar 的 Rust 实现：Claude Code、Codex、ACP、自研 vibevalley 和测试用的 scripted 农机
+crates/vibevalley-oar/     oar 的 Rust 实现：Claude Code、Codex、ACP、自研 vibevalley 和测试用的 scripted 引擎
 crates/vibevalley-agent/   VibeValley 自己的 agent：模型请求（DeepSeek）、工具、对话循环和压缩
 crates/vibevalley-cli/     命令行（二进制 vibevalley，clap）：照领域模型一条命令一个操作，经 HTTP 调服务端
 crates/vibevalley-home/    家目录在磁盘上的约定：在哪、server.json、语言；服务端、命令行、原生应用共用
@@ -71,7 +71,7 @@ vp run release alpha|beta|final                                 # beta/final 先
 
 Rust 照 `rust-toolchain.toml`，Node 24（`.node-version`），Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务）。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `crates/` 要重新构建、重启它。
 
-一件事的主线：oar 的会话事件 → 服务端读成事实 → `vibevalley-core` 的 `reduce` 折进核心状态 → 折好的 `StateFrame` 经桥推给应用里的页面（HTTP 门上是 `GET /api/v1/state` 的 SSE）；会话和助手的每一步记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
+一件事的主线：oar 的会话事件 → 服务端读成事实 → `vibevalley-core` 的 `reduce` 折进核心状态 → 折好的 `StateFrame` 经桥推给应用里的页面（HTTP 门上是 `GET /api/v1/state` 的 SSE）；执行会话和主助手的每一步记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
 
 ## 怎么让 agent 做对
 
@@ -88,7 +88,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 
 - **Rust 为准，速度优先**：服务端的行为以 Rust 为准；成本高、价值低的就砍掉或简化，记进[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「砍掉的」。
 - **先有概念，再有皮**：服务端按实际概念分模块（[概念](docs/concepts.md)）；农场只画它们，游戏规则只读事件算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）。
-- **核心状态只有一份**：帮工或农场的新状态加进契约的形状与事实，在 `vibevalley-core` 的 `reduce` 里折叠，只经事实施加，不在服务端或页面另存一份（[核心状态](docs/subsystems/core.md)）。
+- **核心状态只有一份**：执行会话或农场的新状态加进契约的形状与事实，在 `vibevalley-core` 的 `reduce` 里折叠，只经事实施加，不在服务端或页面另存一份（[核心状态](docs/subsystems/core.md)）。
 - **边界解码一次，门内全是类型**：HTTP、文件、厂商响应、模型给的工具参数，各在进门处用 serde 解码成结构体和 enum；门内不传 `serde_json::Value`、不按字符串分支；钥匙包进 `Secret`（打印只出提示）；页面在边界用 Zod 解码（`satisfies Codec<T.X>`）（[类型驱动与进门解码](docs/style/module-design.md)）。
 - **深模块**：每个模块对外一个窄接口；不靠一个带 `kind` 的入口复用多种操作（[模块设计](docs/style/module-design.md)）。
 - **封闭的联合穷尽处理**：Rust 的 `match` 不写吞掉新成员的 `_`；TS 按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员（`switch-exhaustiveness-check` 查）。
@@ -97,14 +97,14 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层、旧数据兜底或迁移脚本；对外 HTTP `v1` 是唯一例外（[接口版本](docs/subsystems/core.md)）。
 - **页面不折事实**：页面只读推来的 `StateFrame` 并写画面摆法，请求只经 `Transport`；缺数据就补进契约与 `reduce` 或调接口问服务端（[客户端](docs/subsystems/app.md)）。
 - **处理函数要薄**：HTTP 门、桥和页面组件只做转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。
-- **帮工没有权限确认**：服务端只听 `127.0.0.1`，帮工只在工作目录开工（[帮工](docs/subsystems/session.md)）。
+- **执行会话没有权限确认**：服务端只听 `127.0.0.1`，执行会话只在工作区开工（[执行会话](docs/subsystems/session.md)）。
 - **包之间只经包名**：TS 跨包只经 `package.json` 的 `exports` 写 `@vibevalley/*`（`no-cross-package-path` 查）；Rust 跨 crate 只经 `Cargo.toml` 的依赖。
-- **图标分两套**：工作台用 `apps/mac/ui/vv/web/ui/icons.ts` 注册的 reicon 线条图标（`<Icon name>`），像素皮与头像、农机 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
+- **图标分两套**：工作台用 `apps/mac/ui/vv/web/ui/icons.ts` 注册的 reicon 线条图标（`<Icon name>`），像素皮与头像、引擎 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
 - **界面照田间工作台**：工作台的颜色、圆角、字号、阴影和缓动一律走令牌（`apps/mac/ui/vv/theme.json` 与 `apps/mac/ui/nsh.json`），外壳的走 `apps/mac/ui/tokens.ts` 与 `apps/mac/src/theme.rs`；照 [设计系统](docs/design/README.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)，class 写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
 - **密钥**：家目录的 `settings.json` 不进仓库；日志、快照和文档里不出现真实密钥。
 - **话放在哪**：对用户的话进 `crates/vibevalley-i18n/locales/{zh,en}/<宿主.模块>.json`，Rust 调 `vibevalley_i18n::t`，TS 调 `t("key")`（`vpx scripts/gen/i18n.ts check` 查漏翻）；对模型的话用中文写进 `crates/vibevalley-server/assets`（[话放在哪](docs/subsystems/foundation.md)）。
 - **代码风格**：代码和接口用实际业务概念，种地双关只留在农场的皮里（`stale-names.ts` 查，[用语表](docs/README.md#用语)）；命名站在领域视角说管什么事，不用 `utils`、`state` 一类泛词（[命名](docs/style/naming.md)）；英文注释只写不看就会改错的约束与原因（[代码风格](docs/style/code.md)）。
-- **测试**：行为在能发现出错的最低层测；服务端的测试在 `crates/*/tests`，用 scripted 农机与真 git 离线跑；页面的测试用 `nsh/test` 喂样例的 `Transport`，像素场景在 CPU 上画出来查；不写硬编码睡眠等待（TS 由 `no-test-sleep` 查）；修缺陷补 `regression` 测试。
+- **测试**：行为在能发现出错的最低层测；服务端的测试在 `crates/*/tests`，用 scripted 引擎与真 git 离线跑；页面的测试用 `nsh/test` 喂样例的 `Transport`，像素场景在 CPU 上画出来查；不写硬编码睡眠等待（TS 由 `no-test-sleep` 查）；修缺陷补 `regression` 测试。
 - **改完要验证**：先跑最窄的静态与单元检查；改了接口、服务、页面或像素场景，照 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 在真实程序上验收并附上证据。
 - **分支、提交和 PR**：同批改动默认合一个 PR，只经 squash 合入 `main`；分支 `<类>/<主题>`，提交与 PR 用英文写改完后的行为（标题不超过 100 字符、不带 agent 署名，commit-msg hook 与 CI 查），操作照 [vv-pr](.agents/skills/vv-pr/SKILL.md)（[分支、提交和 PR](docs/development.md)）。
 - **文档和 Note**：改行为同改对应文档（优先改 `docs/subsystems/`，见 [文档规矩](docs/AGENTS.md)）；非平凡改动先写 `proposed/` Note，上线后把长期成立的沉淀进子系统并删掉 Note（[什么时候写](.agents/notes/README.md#什么时候写)）。
