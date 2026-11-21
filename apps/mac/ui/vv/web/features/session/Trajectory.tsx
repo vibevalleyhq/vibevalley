@@ -54,7 +54,8 @@ const laneNames: Record<Lane, string> = {
 };
 
 interface TagTone {
-  readonly bg: () => string;
+  readonly bgClass: string;
+  readonly bgStyle?: () => string;
   readonly text: string;
 }
 
@@ -62,39 +63,39 @@ interface TagTone {
 function tagToneOf(step: SessionEvent): TagTone {
   switch (step.type) {
     case "user/message":
-      return { bg: () => mix("wheat", 0.22), text: "text-ink" };
+      return { bgClass: "bg-warn-soft", text: "text-warn-ink" };
     case "memory/recalled":
     case "assistant/message":
-      return { bg: () => mix("ok-soft", 1), text: "text-ok-ink" };
+      return { bgClass: "bg-ok-soft", text: "text-ok-ink" };
     case "assistant/thinking":
-      return { bg: () => mix("hover", 1), text: "text-muted" };
+      return { bgClass: "bg-hover", text: "text-muted" };
     case "llm/retry":
-      return { bg: () => mix("wheat", 0.22), text: "text-ink" };
+      return { bgClass: "bg-warn-soft", text: "text-warn-ink" };
     case "llm/usage":
-      return { bg: () => mix("hover", 1), text: "text-faint" };
+      return { bgClass: "bg-hover", text: "text-faint" };
     case "run/error":
-      return { bg: () => mix("bad-soft", 1), text: "text-berry" };
+      return { bgClass: "bg-bad-soft", text: "text-berry" };
     case "tool/call":
-      if (step.ok === false) return { bg: () => mix("bad-soft", 1), text: "text-berry" };
-      if (step.ok === undefined) return { bg: () => mix("water", 0.14), text: "text-water" };
+      if (step.ok === false) return { bgClass: "bg-bad-soft", text: "text-berry" };
+      if (step.ok === undefined) return { bgClass: "", bgStyle: () => mix("water", 0.14), text: "text-water" };
       switch (step.action ?? "other") {
         case "read_file":
         case "search":
         case "web":
-          return { bg: () => mix("water", 0.14), text: "text-water" };
+          return { bgClass: "", bgStyle: () => mix("water", 0.14), text: "text-water" };
         case "edit_file":
-          return { bg: () => mix("ok-soft", 1), text: "text-ok-ink" };
+          return { bgClass: "bg-ok-soft", text: "text-ok-ink" };
         case "wait":
-          return { bg: () => mix("wheat", 0.22), text: "text-ink" };
+          return { bgClass: "bg-warn-soft", text: "text-warn-ink" };
         case "run_command":
         case "mcp":
         case "other":
-          return { bg: () => mix("hover", 1), text: "text-ink" };
+          return { bgClass: "bg-hover", text: "text-ink" };
       }
     case "run/start":
     case "run/end":
     case "tool/result":
-      return { bg: () => mix("hover", 1), text: "text-muted" };
+      return { bgClass: "bg-hover", text: "text-muted" };
   }
 }
 
@@ -331,7 +332,7 @@ export function Trajectory(props: {
                     accessibilityState={{ expanded: isRunOpen() }}
                     accessibilityLabel={isRunOpen() ? t("web.session.log.fold") : t("web.session.log.unfold")}
                     onPress={() => toggleRun(group().key)}
-                    class="mb-0.5 flex-row items-center gap-2 rounded-md px-2 py-1 transition duration-120 ease-out hover:bg-hover"
+                    class="mb-0.5 flex-row items-center gap-2 rounded-md px-2 py-1 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
                   >
                     <View
                       class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
@@ -430,8 +431,12 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
           <Icon name="expand" size={10} tone="muted" />
         </View>
         <View
-          class={`mt-px shrink-0 rounded-sm px-1.5 py-px ${sub() ? "ml-2.5 w-19.5 border-l-2" : "w-22"}`}
-          style={[{ backgroundColor: tagTone().bg() }, sub() ? { borderColor: mix("leaf", 0.65) } : {}]}
+          class={`mt-px shrink-0 rounded-sm px-1.5 py-px ${sub() ? "ml-2.5 w-19.5 border-l-2" : "w-22"} ${tagTone().bgClass}`}
+          style={(() => {
+            const bg = tagTone().bgStyle;
+            const border = sub() ? { borderColor: mix("leaf", 0.65) } : undefined;
+            return bg || border ? { ...(bg ? { backgroundColor: bg() } : {}), ...border } : undefined;
+          })()}
         >
           <Text class={`truncate text-center text-2xs font-medium ${tagTone().text}`}>{props.spec.tag}</Text>
         </View>
@@ -512,7 +517,7 @@ function ToolDetail(props: { step: SessionEvent }) {
   const failed = () => props.step.ok === false;
   const stateLabel = () =>
     running() ? t("web.session.trajectory.running") : props.step.ok ? t("web.session.trajectory.ok") : t("web.session.trajectory.failed");
-  const badgeBg = () => (running() ? mix("water", 0.14) : failed() ? mix("bad-soft", 1) : mix("ok-soft", 1));
+  const badgeClass = () => (running() ? "" : failed() ? "bg-bad-soft" : "bg-ok-soft");
   const badgeText = () => (running() ? "text-water" : failed() ? "text-berry" : "text-ok-ink");
   return (
     <View class="mt-1 mr-2 mb-1.5 ml-7.5 gap-1.5 rounded-md border border-line bg-side p-2.5">
@@ -520,7 +525,7 @@ function ToolDetail(props: { step: SessionEvent }) {
         <If when={props.step.tool}>
           <Text class="font-mono text-xs text-muted">{t("web.session.trajectory.tool", { name: props.step.tool ?? "" })}</Text>
         </If>
-        <View class="rounded-sm px-1.5 py-px" style={{ backgroundColor: badgeBg() }}>
+        <View class={`rounded-sm px-1.5 py-px ${badgeClass()}`} style={running() ? { backgroundColor: mix("water", 0.14) } : undefined}>
           <Text class={`text-2xs font-medium ${badgeText()}`}>{stateLabel()}</Text>
         </View>
       </View>
@@ -649,7 +654,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
           testID="mark-wrong"
           tooltip={<Bubble text={t("web.session.trajectory.wrong")} />}
           onPress={() => writing.set(true)}
-          class="absolute top-0.5 right-1 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 shadow-raise transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+          class="absolute top-0.5 right-1 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 shadow-raise transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover active:translate-y-px"
           style={{ opacity: over() ? 1 : 0 }}
           focusStyle={{ opacity: 1 }}
         >

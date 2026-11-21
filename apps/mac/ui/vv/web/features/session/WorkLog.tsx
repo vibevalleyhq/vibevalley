@@ -36,10 +36,10 @@ import {
 
 type LineKind = "retry" | "usage" | "error";
 
-const lineKinds: Record<LineKind, { readonly bg: () => string; readonly text: string; readonly iconTone: string }> = {
-  retry: { bg: () => mix("wheat", 0.14), text: "text-ink", iconTone: "warn-ink" },
-  usage: { bg: () => mix("hover", 1), text: "text-muted", iconTone: "muted" },
-  error: { bg: () => mix("bad-soft", 1), text: "text-berry", iconTone: "berry" },
+const lineKinds: Record<LineKind, { readonly bgClass: string; readonly text: string; readonly iconTone: string }> = {
+  retry: { bgClass: "bg-warn-soft", text: "text-warn-ink", iconTone: "warn-ink" },
+  usage: { bgClass: "bg-hover", text: "text-muted", iconTone: "muted" },
+  error: { bgClass: "bg-bad-soft", text: "text-berry", iconTone: "berry" },
 };
 
 function usageLineText(step: SessionEvent): string {
@@ -190,7 +190,7 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
           role="button"
           testID="run-see"
           onPress={() => toggled.set(true)}
-          class="flex-row items-center gap-1.5 self-start rounded-md px-2 py-1 transition duration-120 ease-out hover:bg-hover"
+          class="flex-row items-center gap-1.5 self-start rounded-md px-2 py-1 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
         >
           <Icon name="expand" size={10} tone="water" />
           <Text class="text-xs font-medium text-water tabular-nums">{t("web.session.log.see", { n: props.run.steps.length })}</Text>
@@ -242,7 +242,7 @@ function Folded(props: { text: string; lines: number; markdown?: boolean; muted?
         <View
           role="button"
           onPress={() => open.set(!open())}
-          class="mt-1 flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover"
+          class="mt-1 flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
         >
           <Text class="text-xs font-medium text-water">{open() ? t("web.session.log.less") : t("web.session.log.all")}</Text>
         </View>
@@ -270,7 +270,7 @@ function Box(props: { tint?: string; dashed?: boolean; label: string; step: Sess
 function Line(props: { mark: IconName; step: SessionEvent; now: number; kind: LineKind; text?: string }) {
   const style = () => lineKinds[props.kind];
   return (
-    <View testID="step" class="flex-row items-start gap-2 rounded-md px-2.5 py-1.5" style={{ backgroundColor: style().bg() }}>
+    <View testID="step" class={`flex-row items-start gap-2 rounded-md px-2.5 py-1.5 ${style().bgClass}`}>
       <View class="mt-0.5 h-3.5 w-3.5 shrink-0 items-center justify-center">
         <Icon name={props.mark} size={12} tone={style().iconTone} />
       </View>
@@ -330,7 +330,7 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
   const running = () => props.step.ok === undefined;
   const failed = () => props.step.ok === false;
   const state = () => (running() ? t("web.session.log.running") : props.step.ok ? t("web.session.log.ok") : t("web.session.log.failed"));
-  const badgeBg = () => (running() ? mix("water", 0.14) : failed() ? mix("bad-soft", 1) : mix("ok-soft", 1));
+  const badgeClass = () => (running() ? "" : failed() ? "bg-bad-soft" : "bg-ok-soft");
   const badgeText = () => (running() ? "text-water" : failed() ? "text-berry" : "text-ok-ink");
   return (
     <View testID="step">
@@ -339,7 +339,7 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
         testID="tool-step"
         onPress={() => open.set(!open())}
         accessibilityState={{ expanded: open() }}
-        class={`w-full flex-row items-center gap-2 rounded-md px-2 py-1.5 transition duration-120 ease-out ${
+        class={`w-full flex-row items-center gap-2 rounded-md px-2 py-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
           failed() ? "hover:bg-hover" : open() ? "bg-hover" : "hover:bg-hover"
         }`}
         style={failed() ? { backgroundColor: open() ? mix("bad-soft", 0.85) : mix("bad-soft", 0.45) } : undefined}
@@ -368,7 +368,7 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
             <If when={props.step.tool}>
               <Text class="font-mono text-xs text-muted">{t("web.session.log.tool", { name: props.step.tool ?? "" })}</Text>
             </If>
-            <View class="rounded-sm px-1.5 py-px" style={{ backgroundColor: badgeBg() }}>
+            <View class={`rounded-sm px-1.5 py-px ${badgeClass()}`} style={running() ? { backgroundColor: mix("water", 0.14) } : undefined}>
               <Text class={`text-2xs font-medium ${badgeText()}`}>{state()}</Text>
             </View>
           </View>

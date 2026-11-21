@@ -11,7 +11,6 @@ import { Icon } from "../../../ui/Icon";
 import { Banner, Card } from "../../../ui/layout";
 import { Dot } from "../../../ui/Tag";
 import { Bubble } from "../../../ui/Tip";
-import { mix } from "../../../ui/tone";
 
 const CallState = z.object({
   phase: z.enum(["idle", "connecting", "live", "stopping"]),
@@ -35,11 +34,11 @@ const phaseMeta = (phase: CallPhase, elapsed: string) => {
     case "idle":
       return undefined;
     case "connecting":
-      return { dot: "wheat" as const, bgClass: "", wheat: true, textClass: "text-warn-ink", label: t("web.voice.moss.connecting"), mono: false };
+      return { dot: "wheat" as const, bgClass: "bg-warn-soft", textClass: "text-warn-ink", label: t("web.voice.moss.connecting"), mono: false };
     case "live":
-      return { dot: "leaf" as const, bgClass: "bg-ok-soft", wheat: false, textClass: "text-ok-ink", label: elapsed, mono: true };
+      return { dot: "leaf" as const, bgClass: "bg-ok-soft", textClass: "text-ok-ink", label: elapsed, mono: true };
     case "stopping":
-      return { dot: "wheat" as const, bgClass: "", wheat: true, textClass: "text-warn-ink", label: t("web.voice.moss.hangUp"), mono: false };
+      return { dot: "wheat" as const, bgClass: "bg-warn-soft", textClass: "text-warn-ink", label: t("web.voice.moss.hangUp"), mono: false };
   }
 };
 
@@ -49,10 +48,7 @@ function PhasePill(props: { phase: CallPhase; muted: boolean; elapsed: string })
     <View class="flex-row items-center gap-1.5">
       <If when={meta()} else={<Dot tone="idle" size={7} ring={false} />}>
         {(m) => (
-          <View
-            class={`h-6 flex-row items-center gap-1.5 rounded-sm px-2 ${m().bgClass}`}
-            style={m().wheat ? { backgroundColor: mix("wheat", 0.22) } : undefined}
-          >
+          <View class={`h-6 flex-row items-center gap-1.5 rounded-sm px-2 ${m().bgClass}`}>
             <Dot tone={m().dot} size={6} ring={false} />
             <Text class={`text-xs font-medium ${m().mono ? "font-mono tabular-nums" : ""} ${m().textClass}`}>{m().label}</Text>
           </View>

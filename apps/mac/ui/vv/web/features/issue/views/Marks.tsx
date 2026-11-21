@@ -181,20 +181,24 @@ export function NoFaceMark(props: { size?: number }) {
   );
 }
 
-const flagStyles: Record<Tone, { bg: () => string; text: string }> = {
-  leaf: { bg: () => tone("ok-soft"), text: "text-ok-ink" },
-  berry: { bg: () => tone("bad-soft"), text: "text-berry" },
-  wheat: { bg: () => mix("wheat", 0.22), text: "text-warn-ink" },
-  water: { bg: () => mix("water", 0.16), text: "text-water" },
-  muted: { bg: () => mix("muted", 0.14), text: "text-muted" },
-  faint: { bg: () => mix("faint", 0.14), text: "text-muted" },
+const flagStyles: Record<Tone, { bgClass: string; bgStyle?: () => string; text: string }> = {
+  leaf: { bgClass: "bg-ok-soft", text: "text-ok-ink" },
+  berry: { bgClass: "bg-bad-soft", text: "text-berry" },
+  wheat: { bgClass: "bg-warn-soft", text: "text-warn-ink" },
+  water: { bgClass: "", bgStyle: () => mix("water", 0.16), text: "text-water" },
+  muted: { bgClass: "", bgStyle: () => mix("muted", 0.14), text: "text-muted" },
+  faint: { bgClass: "", bgStyle: () => mix("faint", 0.14), text: "text-muted" },
 };
 
 /** A small flag on a card or row: only the things the user should notice. */
 export function FlagChip(props: { text: string; tone: Tone }) {
   const look = () => flagStyles[props.tone];
+  const bgStyle = () => {
+    const bg = look().bgStyle;
+    return bg ? { backgroundColor: bg() } : undefined;
+  };
   return (
-    <View class="rounded-sm px-1.5" style={{ backgroundColor: look().bg() }}>
+    <View class={`rounded-sm px-1.5 ${look().bgClass}`} style={bgStyle()}>
       <Text class={`text-2xs font-medium ${look().text}`} style={{ lineHeight: 16, numberOfLines: 1 }}>
         {props.text}
       </Text>

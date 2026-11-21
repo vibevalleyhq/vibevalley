@@ -234,12 +234,12 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
       case "day":
       case "week":
       case "month":
-        return { box: "bg-ok-soft", ink: "text-ok-ink", style: undefined };
+        return { box: "bg-ok-soft", ink: "text-ok-ink" };
       case "quarter":
-        return { box: "", ink: "text-warn-ink", style: { backgroundColor: mix("wheat", 0.22) } };
+        return { box: "bg-warn-soft", ink: "text-warn-ink" };
       case "older":
       case "never":
-        return { box: "bg-hover", ink: "text-muted", style: undefined };
+        return { box: "bg-hover", ink: "text-muted" };
     }
   };
   return (
@@ -252,7 +252,7 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
           <Text role="header" class="truncate text-xl font-semibold text-ink">
             {props.repo.name}
           </Text>
-          <View class={`rounded-sm px-1.5 py-0.5 ${badge().box}`} style={badge().style}>
+          <View class={`rounded-sm px-1.5 py-0.5 ${badge().box}`}>
             <Text class={`text-xs font-medium ${badge().ink}`}>{recencyText(recency())}</Text>
           </View>
         </View>

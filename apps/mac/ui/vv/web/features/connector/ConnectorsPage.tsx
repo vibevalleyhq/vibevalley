@@ -23,7 +23,6 @@ import { Qr } from "../../ui/Qr";
 import { CountPill } from "../../ui/Tag";
 import { TextLink } from "../../ui/TextLink";
 import { Bubble } from "../../ui/Tip";
-import { mix } from "../../ui/tone";
 import { channelLabel, topsOf } from "../channel";
 
 const connectorLabel: Record<ConnectorID, string> = {
@@ -73,13 +72,10 @@ const stateDot: Record<StateKind, string> = {
 
 function StateBadge(props: { state: ConnectorState }) {
   const kind = () => stateKind(props.state);
-  const boxClass = () => (kind() === "ok" ? "bg-ok-soft" : kind() === "bad" ? "bg-bad-soft" : kind() === "idle" ? "bg-hover" : "");
+  const boxClass = () => (kind() === "ok" ? "bg-ok-soft" : kind() === "bad" ? "bg-bad-soft" : kind() === "wait" ? "bg-warn-soft" : "bg-hover");
   const textClass = () => (kind() === "ok" ? "text-ok-ink" : kind() === "bad" ? "text-berry" : kind() === "wait" ? "text-warn-ink" : "text-muted");
   return (
-    <View
-      class={`h-6 shrink-0 flex-row items-center gap-1.5 rounded-full px-2.5 ${boxClass()}`}
-      style={kind() === "wait" ? { backgroundColor: mix("wheat", 0.22) } : undefined}
-    >
+    <View class={`h-6 shrink-0 flex-row items-center gap-1.5 rounded-full px-2.5 ${boxClass()}`}>
       <View class={`size-1.5 shrink-0 rounded-full ${stateDot[kind()]}`} />
       <Text class={`text-xs font-medium ${textClass()}`}>{stateLabel[props.state]}</Text>
     </View>
@@ -150,7 +146,7 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
                   trailing={
                     <View class="shrink-0 flex-row items-center gap-1.5">
                       <If when={pending() > 0}>
-                        <View class="rounded-full px-1.5 py-px" style={{ backgroundColor: mix("wheat", 0.22) }}>
+                        <View class="rounded-full bg-warn-soft px-1.5 py-px">
                           <Text class="font-mono text-2xs font-medium text-warn-ink tabular-nums">{String(pending())}</Text>
                         </View>
                       </If>

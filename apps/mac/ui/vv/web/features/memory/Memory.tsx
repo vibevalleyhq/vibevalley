@@ -18,6 +18,7 @@ import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { Select, TextArea, TextInput } from "../../ui/Field";
 import { Quiet } from "../../ui/layout";
+import { CountPill } from "../../ui/Tag";
 
 /** Notes not tied to a repo. */
 const everywhere = "*";
@@ -57,7 +58,7 @@ function Section(props: { title: string; count?: number; aside?: string | undefi
           {props.title}
         </Text>
         <If when={props.count !== undefined}>
-          <Text class="text-xs text-muted">{String(props.count)}</Text>
+          <CountPill count={props.count ?? 0} />
         </If>
         <View class="flex-1" />
         <If when={props.aside}>
@@ -83,9 +84,11 @@ function Pill(props: { label: string; on: boolean; onClick: () => void; testid?:
       testID={props.testid}
       accessibilityState={{ selected: props.on }}
       onPress={() => props.onClick()}
-      class={`h-6 justify-center rounded-full px-2.5 ${props.on ? "bg-ink" : "bg-hover hover:bg-selected"}`}
+      class={`h-6 justify-center rounded-full border px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+        props.on ? "border-accent bg-selected" : "border-transparent bg-hover hover:bg-selected"
+      }`}
     >
-      <Text class={`text-xs ${props.on ? "text-page" : "text-ink"}`}>{props.label}</Text>
+      <Text class={`text-xs font-medium ${props.on ? "text-ink" : "text-muted"}`}>{props.label}</Text>
     </View>
   );
 }
@@ -381,7 +384,12 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
           <View class="flex-row flex-wrap gap-1">
             <Each of={suggested()}>
               {(name) => (
-                <View role="button" testID={`note-repo-${name()}`} onPress={() => repo.set(name())} class="rounded-sm px-1.5 py-0.5 hover:bg-hover">
+                <View
+                  role="button"
+                  testID={`note-repo-${name()}`}
+                  onPress={() => repo.set(name())}
+                  class="rounded-sm px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+                >
                   <Text class="font-mono text-2xs text-muted">{name()}</Text>
                 </View>
               )}

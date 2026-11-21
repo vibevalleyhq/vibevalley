@@ -285,10 +285,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
                             const look = () => kindLook[f().status];
                             return (
                               <View class="flex-row items-center gap-1.5 rounded-sm border border-line bg-page px-1.5 py-0.5">
-                                <View
-                                  class={`h-4 min-w-4 items-center justify-center rounded-xs px-0.5 ${look() ? "" : "bg-selected"}`}
-                                  style={look() ? { backgroundColor: look()?.bg() } : undefined}
-                                >
+                                <View class={`h-4 min-w-4 items-center justify-center rounded-xs px-0.5 ${look()?.bgClass ?? "bg-selected"}`}>
                                   <Text class={`text-2xs font-semibold ${look()?.ink ?? "text-ink"}`}>{kind().mark}</Text>
                                 </View>
                                 <Text class="font-mono text-xs text-ink">{f().path}</Text>
@@ -473,10 +470,10 @@ function PlusMinus(props: { added: number; removed: number; aligned?: boolean })
   );
 }
 
-const kindLook: Record<string, { bg: () => string; ink: string }> = {
-  A: { bg: () => mix("ok-soft", 1), ink: "text-ok-ink" },
-  M: { bg: () => mix("wheat", 0.22), ink: "text-warn-ink" },
-  D: { bg: () => mix("bad-soft", 1), ink: "text-berry" },
+const kindLook: Record<string, { bgClass: string; ink: string }> = {
+  A: { bgClass: "bg-ok-soft", ink: "text-ok-ink" },
+  M: { bgClass: "bg-warn-soft", ink: "text-warn-ink" },
+  D: { bgClass: "bg-bad-soft", ink: "text-berry" },
 };
 
 function FileRow(props: { file: ChangedFile; conflict: boolean; last: boolean; reserveChevron: boolean }) {
@@ -505,11 +502,7 @@ function FileRow(props: { file: ChangedFile; conflict: boolean; last: boolean; r
             </If>
           </View>
         </If>
-        <View
-          accessibilityLabel={kind().label}
-          class={`h-5 w-5 shrink-0 items-center justify-center rounded-sm ${look() ? "" : "bg-selected"}`}
-          style={look() ? { backgroundColor: look()?.bg() } : undefined}
-        >
+        <View accessibilityLabel={kind().label} class={`h-5 w-5 shrink-0 items-center justify-center rounded-sm ${look()?.bgClass ?? "bg-selected"}`}>
           <Text class={`text-2xs font-semibold ${look()?.ink ?? "text-ink"}`}>{kind().mark}</Text>
         </View>
         <Text class={`min-w-0 flex-1 truncate font-mono text-xs ${props.conflict ? "text-berry" : "text-ink"}`}>{props.file.path}</Text>

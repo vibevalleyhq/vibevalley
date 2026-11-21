@@ -87,7 +87,11 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
     <Scroll testID="orchestrator-profile" class="h-full flex-1 bg-page" contentClass="px-5 pb-8">
       <View class="max-w-3xl gap-4">
         <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
-          <A href="/agents" testID="back" class="group rounded-md px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover">
+          <A
+            href="/agents"
+            testID="back"
+            class="group rounded-md px-1.5 py-0.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+          >
             <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
           </A>
           <Text class="text-sm text-faint">/</Text>
@@ -98,9 +102,9 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
             </View>
             <View
               testID={`profile-${isNew ? "new" : dirty() ? "dirty" : "saved"}`}
-              class={`shrink-0 rounded-sm px-1.5 py-0.5 ${dirty() ? "bg-hat" : "bg-hover"}`}
+              class={`shrink-0 rounded-sm px-1.5 py-0.5 ${dirty() ? "bg-warn-soft" : "bg-hover"}`}
             >
-              <Text class={`text-xs font-medium ${dirty() ? "text-bark-900" : "text-muted"}`}>
+              <Text class={`text-xs font-medium ${dirty() ? "text-warn-ink" : "text-muted"}`}>
                 {isNew ? t("web.agent.isNew") : dirty() ? t("web.agent.unsaved") : t("web.agent.saved")}
               </Text>
             </View>

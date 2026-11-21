@@ -88,8 +88,7 @@ function statusMeta(status: RunStatusBadge): StatusPresentation {
       return {
         label: t("web.session.hub.status.resting"),
         dot: "wheat",
-        pillClass: "",
-        pillBg: () => mix("wheat", 0.22),
+        pillClass: "bg-warn-soft",
         textClass: "text-warn-ink",
       };
     case "done":
@@ -110,8 +109,7 @@ function statusMeta(status: RunStatusBadge): StatusPresentation {
       return {
         label: t("web.session.hub.status.interrupted"),
         dot: "wheat",
-        pillClass: "",
-        pillBg: () => mix("wheat", 0.22),
+        pillClass: "bg-warn-soft",
         textClass: "text-warn-ink",
       };
     case "closed":
@@ -280,7 +278,7 @@ export function RunsPage() {
                     testID="runs-clear-agent"
                     accessibilityLabel={t("web.session.hub.clear")}
                     onPress={clearAgent}
-                    class="size-4 shrink-0 items-center justify-center rounded-full hover:bg-hover"
+                    class="size-4 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
                   >
                     <Icon name="close" size={10} tone="muted" />
                   </View>
@@ -296,7 +294,7 @@ export function RunsPage() {
                     testID="runs-clear-issue"
                     accessibilityLabel={t("web.session.hub.clear")}
                     onPress={clearIssue}
-                    class="size-4 shrink-0 items-center justify-center rounded-full hover:bg-hover"
+                    class="size-4 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
                   >
                     <Icon name="close" size={10} tone="muted" />
                   </View>
@@ -478,7 +476,7 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
               role="button"
               testID="runs-back"
               onPress={props.onBack}
-              class="-ml-1.5 self-start rounded-md px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover"
+              class="-ml-1.5 self-start rounded-md px-1.5 py-0.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
             >
               <Text class="text-xs font-medium text-muted">{t("web.session.hub.back")}</Text>
             </View>

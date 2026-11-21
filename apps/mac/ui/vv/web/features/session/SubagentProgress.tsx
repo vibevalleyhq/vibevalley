@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { createMemo } from "../../../solid";
 import { ago } from "../../base/format";
 import { Icon } from "../../ui/Icon";
+import { Banner } from "../../ui/layout";
 import { CountPill, Dot, type DotTone } from "../../ui/Tag";
 import { Bubble } from "../../ui/Tip";
 import { mix } from "../../ui/tone";
@@ -20,19 +21,20 @@ type StepStatus = NonNullable<Thread["steps"]>[number]["status"];
 interface StatusMeta {
   readonly dot: DotTone;
   readonly glyph: "check" | "cross" | "warn" | "dot";
-  readonly pillBg: () => string;
+  readonly pillClass: string;
+  readonly pillBg?: () => string;
   readonly pillText: string;
 }
 
 const statusMeta: Record<ThreadStatus, StatusMeta> = {
-  pendingInit: { dot: "wheat", glyph: "dot", pillBg: () => mix("wheat", 0.22), pillText: "text-ink" },
-  running: { dot: "water", glyph: "dot", pillBg: () => mix("water", 0.14), pillText: "text-water" },
-  interrupted: { dot: "wheat", glyph: "warn", pillBg: () => mix("wheat", 0.22), pillText: "text-ink" },
-  completed: { dot: "leaf", glyph: "check", pillBg: () => mix("ok-soft", 1), pillText: "text-ok-ink" },
-  errored: { dot: "berry", glyph: "cross", pillBg: () => mix("bad-soft", 1), pillText: "text-berry" },
-  shutdown: { dot: "muted", glyph: "dot", pillBg: () => mix("hover", 1), pillText: "text-muted" },
-  notFound: { dot: "muted", glyph: "dot", pillBg: () => mix("hover", 1), pillText: "text-muted" },
-  unknown: { dot: "muted", glyph: "dot", pillBg: () => mix("hover", 1), pillText: "text-muted" },
+  pendingInit: { dot: "wheat", glyph: "dot", pillClass: "bg-warn-soft", pillText: "text-warn-ink" },
+  running: { dot: "water", glyph: "dot", pillClass: "", pillBg: () => mix("water", 0.14), pillText: "text-water" },
+  interrupted: { dot: "wheat", glyph: "warn", pillClass: "bg-warn-soft", pillText: "text-warn-ink" },
+  completed: { dot: "leaf", glyph: "check", pillClass: "bg-ok-soft", pillText: "text-ok-ink" },
+  errored: { dot: "berry", glyph: "cross", pillClass: "bg-bad-soft", pillText: "text-berry" },
+  shutdown: { dot: "muted", glyph: "dot", pillClass: "bg-hover", pillText: "text-muted" },
+  notFound: { dot: "muted", glyph: "dot", pillClass: "bg-hover", pillText: "text-muted" },
+  unknown: { dot: "muted", glyph: "dot", pillClass: "bg-hover", pillText: "text-muted" },
 };
 
 const stepStatusText: Record<StepStatus, string> = {
@@ -68,17 +70,9 @@ export function SubagentProgress(props: { session: string; progress: SubagentSum
       </View>
       <If when={props.progress.disconnectedAt}>
         {(at) => (
-          <View
-            class="flex-row items-start gap-2 rounded-md border px-2.5 py-2"
-            style={{ backgroundColor: mix("wheat", 0.14), borderColor: mix("wheat", 0.35) }}
-          >
-            <View class="mt-0.5 shrink-0">
-              <Icon name="warn" size={12} />
-            </View>
-            <Text testID="subagent-disconnected" class="min-w-0 flex-1 text-xs text-ink tabular-nums">
-              {t("web.session.subagents.disconnected", { ago: ago(at(), props.now) })}
-            </Text>
-          </View>
+          <Banner tone="warn" size="sm" testID="subagent-disconnected" textClass="tabular-nums">
+            {t("web.session.subagents.disconnected", { ago: ago(at(), props.now) })}
+          </Banner>
         )}
       </If>
       <Each of={labels().waits} key={(wait) => wait.key}>
@@ -113,7 +107,7 @@ export function SubagentProgress(props: { session: string; progress: SubagentSum
                 testID={`subagent-${thread().threadId}`}
                 accessibilityLabel={t("web.session.subagents.openLog", { task: labels().name(thread().threadId) })}
                 accessibilityState={{ expanded: isOpen() }}
-                class={`gap-1 px-2.5 py-2 transition duration-120 ease-out ${isOpen() ? "bg-hover" : "hover:bg-hover"}`}
+                class={`gap-1 px-2.5 py-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${isOpen() ? "bg-hover" : "hover:bg-hover"}`}
                 onPress={() => picked.set(isOpen() ? undefined : { session: props.session, run: props.progress.run, thread: thread().threadId })}
               >
                 <View class="flex-row items-center gap-2">
@@ -129,7 +123,13 @@ export function SubagentProgress(props: { session: string; progress: SubagentSum
                     <If when={stepsCount() > 0}>
                       <Text class="font-mono text-2xs text-muted tabular-nums">{`${stepsDone()}/${stepsCount()}`}</Text>
                     </If>
-                    <View class="rounded-sm px-1.5 py-px" style={{ backgroundColor: meta().pillBg() }}>
+                    <View
+                      class={`rounded-sm px-1.5 py-px ${meta().pillClass}`}
+                      style={(() => {
+                        const bg = meta().pillBg;
+                        return bg ? { backgroundColor: bg() } : undefined;
+                      })()}
+                    >
                       <Text class={`text-2xs font-medium ${meta().pillText}`}>{t(`web.session.subagents.status.${status()}`)}</Text>
                     </View>
                     <View tooltip={<Bubble text={observedText()} />}>

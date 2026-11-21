@@ -85,10 +85,7 @@ export function Diagram(props: { source: string }) {
         else={
           <If when={failed()} else={<CodeBlock code={props.source} language="mermaid" />}>
             <View class="gap-1.5">
-              <View
-                class="flex-row items-start gap-2 rounded-md border px-3 py-2"
-                style={{ backgroundColor: mix("bad-soft", 1), borderColor: mix("berry", 0.3) }}
-              >
+              <View class="flex-row items-start gap-2 rounded-md border bg-bad-soft px-3 py-2" style={{ borderColor: mix("berry", 0.25) }}>
                 <View class="mt-0.5 shrink-0">
                   <Icon name="cross" size={12} />
                 </View>
@@ -101,7 +98,7 @@ export function Diagram(props: { source: string }) {
                   accessibilityState={{ expanded: errorSourceOpen() }}
                   tooltip={<Bubble text={errorSourceOpen() ? t("web.base.rich.less") : t("web.base.rich.more")} />}
                   onPress={() => errorSourceOpen.set(!errorSourceOpen())}
-                  class="h-6 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 transition duration-120 ease-out hover:bg-hover"
+                  class="h-6 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
                 >
                   <View
                     class="h-3.5 w-3.5 items-center justify-center transition-transform duration-120 ease-out"
@@ -135,7 +132,7 @@ export function Diagram(props: { source: string }) {
                   accessibilityState={{ expanded: showSource() }}
                   tooltip={<Bubble text={showSource() ? t("web.base.rich.less") : t("web.base.rich.more")} />}
                   onPress={() => showSource.set(!showSource())}
-                  class="h-6 flex-row items-center gap-1 rounded-sm px-1.5 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+                  class="h-6 flex-row items-center gap-1 rounded-sm px-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover active:translate-y-px"
                 >
                   <View
                     class="h-3.5 w-3.5 items-center justify-center transition-transform duration-120 ease-out"
@@ -150,7 +147,7 @@ export function Diagram(props: { source: string }) {
                   accessibilityLabel={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
                   tooltip={<Bubble text={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
                   onPress={copySource}
-                  class="h-6 flex-row items-center gap-1 rounded-sm px-1.5 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+                  class="h-6 flex-row items-center gap-1 rounded-sm px-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover active:translate-y-px"
                 >
                   <Icon name={copied() ? "check" : "copy"} size={12} tone="muted" />
                 </View>
