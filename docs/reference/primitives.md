@@ -36,7 +36,7 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `useNow` | `dom.tsx` | The time, a new reading every `ms`: for "3m ago" that keeps up without anything else changing. |
+| `useNow` | `dom.tsx` | The time, a new reading every `ms`: pooled per interval across active subscribers. |
 | `Keyed` | `dom.tsx` | Rebuilds its children whenever `key` changes, as a React key does: their state starts over. |
 | `createSettled` | `dom.tsx` | The value once it has stopped changing for `ms`: what is asked of the server while someone types. |
 | `variant` | `dom.tsx` |  |
@@ -46,6 +46,7 @@
 | `wallClockText` | `format.ts` |  |
 | `numberText` | `format.ts` | A whole number without its .0, as the server writes ids and counts. |
 | `momentText` | `format.ts` | A moment as a date and a time of day. |
+| `shortMomentText` | `format.ts` | A compact timestamp: HH:MM today, M/D HH:MM earlier this year, YYYY/M/D HH:MM before that. |
 | `yuan` | `format.ts` |  |
 | `big` | `format.ts` | A large count: ten thousands in Chinese (10k units), thousands in English (12k). |
 | `spentText` | `format.ts` |  |
@@ -72,7 +73,8 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `useWorkAgents` | `agents.ts` | The profiles work is sent to, the helpers; enabled, only those not switched off. |
+| `useWorkAgents` | `agents.ts` | The profiles work is sent to, the helpers; enabled, only those not switched off. Inactive helpers sort last. |
+| `sortRuntimes` | `agents.ts` | Active (available and enabled) runtimes first, then disabled, then unavailable, preserving preset order within each group. |
 | `useOrchestrators` | `agents.ts` | The orchestrators' profiles, the default one first. |
 | `orchestratorLookOf` | `agents.ts` | An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. |
 | `useAgent` | `agents.ts` | A profile by its id, once the profiles are read; undefined for none or one gone. |
@@ -109,6 +111,10 @@
 | `createFrames` | `frame.ts` | The frames above as a reactive object: each read follows the newest frame. |
 | `useFrames` | `frame.ts` | The nearest provided frames, else the app's one stream. |
 | `useCore` | `frame.ts` | The folded state. undefined until the first frame. |
+| `useSessionsMap` | `frame.ts` |  |
+| `useSession` | `frame.ts` |  |
+| `useIssue` | `frame.ts` |  |
+| `useThreadOwner` | `frame.ts` |  |
 | `orchestratorSession` | `frame.ts` |  |
 | `orchestratorMood` | `frame.ts` |  |
 | `rawFrame` | `frame.ts` | The frame as it came: a new object each time. |

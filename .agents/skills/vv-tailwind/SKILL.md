@@ -18,7 +18,7 @@ description: 在 VibeValley 的工作台（apps/mac/ui/vv/web，nsh 的 Tailwind
 
 ## 先读哪里
 
-1. [界面怎么做](docs/style/design.md)：挑哪一档令牌、原子组件的样子、交之前的自查。
+1. [哲学与令牌](docs/design/01-philosophy-and-tokens.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)：挑哪一档令牌、原子组件的样子、交之前的自查。
 2. 令牌的文件（上表）。
 3. 照着抄的零件：[Button](apps/mac/ui/vv/web/ui/Button.tsx)（变体表、按下、禁用、字另起一个 `Text`）、[Tag](apps/mac/ui/vv/web/ui/Tag.tsx)（半透明的底、`Dot` 的动态尺寸）、[Icon](apps/mac/ui/vv/web/ui/Icon.tsx)（颜色按令牌名传）。
 

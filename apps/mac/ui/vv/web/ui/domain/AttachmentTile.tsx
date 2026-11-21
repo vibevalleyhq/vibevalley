@@ -22,7 +22,7 @@ export const kindIcon: Record<FileKind, IconName> = { image: "image", video: "pl
 export const sizeText = (bytes: number) =>
   bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-/** A file as a tile (docs/style/design.md): the icon of its kind, its name and its size. */
+/** A file as a tile (docs/design/02-atomic-components.md): the icon of its kind, its name and its size. */
 export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void) | undefined; testid?: string }) {
   const kind = () => fileKind(props.file.type);
   const url = useAttachmentUrl(() => props.file.id);

@@ -162,7 +162,7 @@ export function IssuesPage(props: { rest: string }) {
     if (done?.replied) notice(done.replied.reply);
   };
 
-  // An issue is a page of its own (docs/style/design.md): the board and the list give way to it, and Escape or Issues comes back.
+  // An issue is a page of its own (docs/design/03-conversation-and-work-streams.md): the board and the list give way to it, and Escape or Issues comes back.
   return (
     <View testID="issues-page" class="flex-1">
       <If

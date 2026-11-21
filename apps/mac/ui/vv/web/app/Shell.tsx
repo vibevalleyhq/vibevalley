@@ -74,7 +74,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
           testID="rail-badge"
           class={`absolute ${small() ? "top-0.5 right-0.5" : "top-0.5 right-1"} h-4 min-w-4 items-center justify-center rounded-full border border-rail bg-wheat px-1`}
         >
-          {/* Dark bark ink on wheat keeps >7:1 contrast in both light and dark themes (docs/style/design.md). */}
+          {/* Dark bark ink on wheat keeps >7:1 contrast in both light and dark themes (docs/design/01-philosophy-and-tokens.md). */}
           <Text class="font-sans text-2xs leading-none font-semibold text-bark-900 tabular-nums">{badgeText()}</Text>
         </View>
       </If>
@@ -82,7 +82,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
   );
 }
 
-/** One size up from a page's head (docs/style/design.md). */
+/** One size up from a page's head (docs/design/01-philosophy-and-tokens.md). */
 const railIcon = (name: IconName, current: () => boolean) => () => <Icon name={name} size={24} color={current() ? mix("on-rail", 1) : mix("on-rail", 0.65)} />;
 
 const railGroups = ["work", "setup", "reference"] as const;

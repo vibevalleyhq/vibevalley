@@ -7,7 +7,7 @@ import { Canvas, colorScheme, Path2D } from "nsh";
 import { type IconName, type IconShape, icons } from "./icons";
 import { tone as toneOf } from "./tone";
 
-// The size ladder (docs/style/design.md).
+// The size ladder (docs/design/01-philosophy-and-tokens.md).
 export type IconSize = 10 | 12 | 14 | 16 | 20 | 24 | 48;
 
 /** The marks keep their colour wherever they stand, over a caller's colour too: met is green, unmet red, unsure amber. */

@@ -95,7 +95,7 @@ export function Quiet(props: { children: JSX.Element }) {
   return <Text class="text-sm leading-relaxed text-muted">{props.children}</Text>;
 }
 
-/** A place with nothing in it yet (docs/style/design.md): its icon, why it is empty, and the next step if there is one. */
+/** A place with nothing in it yet (docs/design/02-atomic-components.md): its icon, why it is empty, and the next step if there is one. */
 export function Empty(props: { icon: IconName; children: JSX.Element; action?: JSX.Element; testid?: string }) {
   return (
     <View testID={props.testid ?? "empty"} class="min-h-48 flex-1 items-center justify-center p-6">

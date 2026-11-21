@@ -1,4 +1,4 @@
-// Motion table (docs/design/components.md section 3). Every duration goes
+// Motion table (docs/design/01-philosophy-and-tokens.md). Every duration goes
 // through `ms`, which is 0 under reduced motion so end states still apply.
 import { reduceMotion } from "nsh";
 

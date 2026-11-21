@@ -30,7 +30,7 @@ export function Tag(props: { icon?: IconName | undefined; label: string; tone: T
   );
 }
 
-/** What a dot says (docs/style/design.md). */
+/** What a dot says (docs/design/02-atomic-components.md). */
 export type DotTone = "leaf" | "wheat" | "berry" | "water" | "idle" | "faint" | "muted";
 
 const dotBg: Record<DotTone, string> = {

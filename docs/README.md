@@ -46,8 +46,22 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 |---|---|
 | [concept-map.md](docs/reference/concept-map.md) | 概念在各层的名字：农场里、界面、协议、HTTP、服务端、存储、oar |
 | [capabilities.md](docs/reference/capabilities.md) | 每个接口谁能调；`scripts/gen/capabilities.ts` 写出 |
-| [farm-ui.md](docs/reference/farm-ui.md) | 界面清单、角色、轨迹和精力瓶 |
 | [primitives.md](docs/reference/primitives.md) | TS 地基文件夹导出的共用原语和一句话说明；写帮手之前先查；`scripts/gen/primitives.ts` 写出 |
+
+设计系统与界面架构（`design/`）：
+
+| 文档 | 讲什么 |
+|---|---|
+| [design/README.md](docs/design/README.md) | 设计系统全景：田间工作台与像素农场双皮职责、五大渲染载体与分篇索引 |
+| [01-philosophy-and-tokens.md](docs/design/01-philosophy-and-tokens.md) | 设计哲学与令牌体系：十条判断准绳、五端色阶与语义四色、圆角边框阴影、字体图标梯级与动效曲线 |
+| [02-atomic-components.md](docs/design/02-atomic-components.md) | 基础原子组件与交互控件：按钮、表单、开关、状态标签、弹窗表格分栏、领域原子与外壳组件对照 |
+| [03-conversation-and-work-streams.md](docs/design/03-conversation-and-work-streams.md) | 会话核心流、工单板与运行轨迹引擎：频道排版、Composer 斜杠与提及、`/runs` 瀑布图、看板与档案额度 |
+| [04-motion-and-pixel-rendering.md](docs/design/04-motion-and-pixel-rendering.md) | 动效物理学、像素三渲二与光影系统：GLB 光栅、384×256 投影与 2.5D 遮挡、昼夜光影、寻路与防抖物理 |
+| [05-audiovisual-and-artifacts.md](docs/design/05-audiovisual-and-artifacts.md) | 视听多媒体、Artifact 与终端交互物理：独占音频、8-bit 音效、素材库灯箱、双轨分栏、Diff/文件/终端链接 |
+| [06-desktop-architecture-and-topology.md](docs/design/06-desktop-architecture-and-topology.md) | 桌面架构、全页面清单与状态机拓扑：macOS 多载体宿主、角色与全路由清单、显式 FSM、响应式、快捷键与容灾 |
+| [07-engineering-config-and-assets.md](docs/design/07-engineering-config-and-assets.md) | 工程配置、跨平台接口与像素资产管线：`nsh` Solid 适配、桌面桥接、体素/像素管线与 6 档密级测试报告 |
+| [08-agent-ui-guide.md](docs/design/08-agent-ui-guide.md) | AI Agent UI 开发与审查指南：载体判别、样式与状态约束及提交前核对清单 |
+| [09-design-system-audit.md](docs/design/09-design-system-audit.md) | 跨载体设计系统横向差异审计：令牌错位、双源组件、手绘图形/手搓控件与静态检查缺口 |
 
 怎么写（`style/`）：
 
@@ -56,7 +70,6 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [module-design.md](docs/style/module-design.md) | 架构、模块边界与测试设计：责任和边界、类型驱动与进门解码、显式状态、错误契约与测试证据、检查工具 |
 | [code.md](docs/style/code.md) | 代码：格式、叫法、注释写什么不写什么 |
 | [naming.md](docs/style/naming.md) | 命名：名字站在领域的视角，不用的名字，文件、代码、接口、表、词典的键和测试标记的形状，改名 |
-| [design.md](docs/style/design.md) | 界面：田间工作台的审美、令牌（表面、颜色、圆角、控件、线和影、字、图标、动效）、原子和模式、给 agent 的清单 |
 | [writing.md](docs/style/writing.md) | 文字：写什么、删什么，词和格式怎么写；文档、Note、skill、提交说明、注释和回复都用 |
 
 ## 用语

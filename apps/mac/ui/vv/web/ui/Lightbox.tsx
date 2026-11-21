@@ -26,7 +26,7 @@ export interface Picture {
   readonly path?: string;
 }
 
-/** Pictures over the page, one at a time (docs/style/design.md); the original opens in the system's app. */
+/** Pictures over the page, one at a time (docs/design/05-audiovisual-and-artifacts.md); the original opens in the system's app. */
 export function Lightbox(props: { pictures: readonly Picture[]; at: number | undefined; onAt: (at: number | undefined) => void }) {
   const count = () => props.pictures.length;
   const go = (step: number) => {

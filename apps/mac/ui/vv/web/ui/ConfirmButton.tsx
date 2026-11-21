@@ -8,7 +8,7 @@ import type { IconName } from "./icons";
 import { Bubble } from "./Tip";
 import { mix } from "./tone";
 
-/** A button for what cannot be taken back (docs/style/design.md): the first press asks in place, the question, the action's own button and a way back. */
+/** A button for what cannot be taken back (docs/design/02-atomic-components.md): the first press asks in place, the question, the action's own button and a way back. */
 export function ConfirmButton(props: {
   label: string;
   question?: string;
