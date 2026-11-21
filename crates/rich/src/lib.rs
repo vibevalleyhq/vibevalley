@@ -47,9 +47,9 @@ pub use diagram::{
 pub use genui::{VvGenUi, VvGenUiActionEvent, VvGenUiElement, VvGenUiEvent, VvGenUiProps, vv_gen_ui};
 pub use grammars::{BUNDLED_GRAMMARS, BundledGrammar, MERMAID_LANGUAGE};
 pub use highlight::{
-    CodeSpan, HighlightedCode, HighlightedLine, ShikiEditorHighlighter, cached_highlight_code, clear_code_highlight_cache, code_highlight_cache_stats,
-    editor_token_from_scopes, highlight_code, loaded_languages, register_grammar_json, register_raw_grammar, register_raw_theme,
-    register_shiki_editor_highlighters, register_theme_json,
+    CodeSpan, HighlightedCode, HighlightedLine, ScopedSpan, ShikiEditorHighlighter, cached_highlight_code, clear_code_highlight_cache,
+    code_highlight_cache_stats, editor_token_from_scopes, highlight_code, loaded_languages, register_grammar_json, register_raw_grammar, register_raw_theme,
+    register_shiki_editor_highlighters, register_theme_json, tokenize_scopes,
 };
 pub use hooks::{
     ChartRenderer, ChartRendererContext, GenUiAction, GenUiActionSink, GenUiRenderer, GenUiRendererContext, RenderedSvg, active_chart_renderer,

@@ -3,7 +3,6 @@ import { signal, Text, View, type JSX } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
-import * as S from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -20,13 +19,11 @@ import { defineQuery, ready, retryRead, useQuery, useQueryClient, useRepos } fro
 const everywhere = "*";
 
 const memoryQuery = defineQuery({
-  schema: S.MemoryList,
   key: (agent: string) => ["memory", agent],
   fetch: (agent, context) => api.memory.list({ agent }, context),
   ...retryRead,
 });
 const recallQuery = defineQuery({
-  schema: S.RecallPreview,
   key: (a: { agent: string; repo: string; text: string; version: number }) => ["recall", a.agent, a.repo, a.text, a.version],
   fetch: (a, context) => api.memory.recall({ agent: a.agent, repo: a.repo, text: a.text }, context),
   ...retryRead,

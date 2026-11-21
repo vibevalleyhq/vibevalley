@@ -5,7 +5,8 @@ use nsh_base::editor::{EditorHighlighter, EditorTextEdit, EditorToken, editor};
 use nsh_core::element::{Registry, Root};
 use nsh_core::prelude::*;
 use vibevalley_rich::{
-    BUNDLED_GRAMMARS, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, SPECIFIER, ShikiEditorHighlighter, highlight_code, loaded_languages, register_grammar_json, registry,
+    BUNDLED_GRAMMARS, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, SPECIFIER, ShikiEditorHighlighter, highlight_code, loaded_languages, register_grammar_json,
+    registry, tokenize_scopes,
 };
 
 use support::TestHarness;
@@ -82,6 +83,17 @@ fn bundled_grammars_compile_and_tokenize_across_languages() {
             assert!(span.range.start < span.range.end);
         }
     }
+
+    // Zig grammar and theme-independent `tokenize_scopes` work on multi-line code.
+    let zig_src = "const std = @import(\"std\");\npub fn main() void {}\n";
+    let zig_spans = tokenize_scopes(zig_src, "zig");
+    assert!(!zig_spans.is_empty());
+    assert!(
+        zig_spans[0]
+            .iter()
+            .any(|s| s.scopes.iter().any(|sc| sc.starts_with("support.function.builtin")))
+    );
+    assert!(zig_spans[1].iter().any(|s| s.scopes.iter().any(|sc| sc.starts_with("storage.type"))));
 }
 
 #[test]

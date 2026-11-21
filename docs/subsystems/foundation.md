@@ -26,7 +26,7 @@
 | `crates/core/src/` | 纯规则中心：`reduce`、出帧、状态派生、收件箱、依赖、定时任务（`cron/`）、笔记大纲（`pkm/`）、作品引擎（`artifact/`） |
 | `crates/runtime/src/` | `oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
 | `crates/rich/`、`crates/engines/{onig,pele,shiki}` | 原生富内容组件与内部引擎（`canvas`、`chart`、`genui`、`pinyin`）及底层正则/高亮/图谱引擎 |
-| `apps/mac/crates/workspace/src/store/mod.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局；连同 `pixel`、`terminal`、`highlight` 共 4 个桌面支撑 crate |
+| `apps/mac/crates/workspace/src/store/mod.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局；连同 `pixel`、`terminal` 共 3 个桌面支撑 crate |
 | `crates/i18n/src/lib.rs`、`crates/i18n/locales/` | 消息格式与词典；词典构建时编进去 |
 | `crates/server/src/testing.rs` | 测试和验收沙箱用的替身农机 `pi`（`VIBEVALLEY_TEST_RUNTIMES=1`） |
 | `packages/protocol/src/<概念>/` | 页面用的契约：生成的 `shapes.gen.ts`，手写的 `schema.ts`（Zod）和 `api.ts`（额外导出或别名才设 `shapes.ts`）；`src/rules/` 是页面用的纯函数规则；`src/client.ts` 是生成的 `VibeValleyApi` |
@@ -36,7 +36,7 @@
 ### 仓库和包
 
 - **Rust 为准**：服务端（`vibevalley-server`）、命令行（`vibevalley-cli`）、原生应用（`apps/mac`）都是 Rust；TS 只剩原生应用的页面（`apps/mac/ui`）和 4 个共用包（`packages/{protocol,i18n,testkit,tsrs}`）、官网（`apps/site`）与脚本（[原生的 VibeValley](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
-- **一个 Cargo 工作区（17 个 crate）**：成员按层组织为 `crates/*`（`protocol`、`i18n`、`core`、`git`、`files`、`runtime`、`rich`、`server`、`cli`）、`crates/engines/{onig,pele,shiki}`、`apps/mac` 与桌面支撑 `apps/mac/crates/{pixel,terminal,workspace,highlight}`（包名仍保留 `vibevalley-*`，使 `core` 不遮蔽 `::core`），版本与 edition 写在根 `Cargo.toml` 的 `[workspace.package]`，依赖各 crate 自己写；`vp run rust:check` 跑 `cargo fmt --check`、`cargo clippy -D warnings` 与 `cargo test`。
+- **一个 Cargo 工作区（16 个 crate）**：成员按层组织为 `crates/*`（`protocol`、`i18n`、`core`、`git`、`files`、`runtime`、`rich`、`server`、`cli`）、`crates/engines/{onig,pele,shiki}`、`apps/mac` 与桌面支撑 `apps/mac/crates/{pixel,terminal,workspace}`（包名仍保留 `vibevalley-*`，使 `core` 不遮蔽 `::core`），版本与 edition 写在根 `Cargo.toml` 的 `[workspace.package]`，依赖各 crate 自己写；`vp run rust:check` 跑 `cargo fmt --check`、`cargo clippy -D warnings` 与 `cargo test`。
 - **TS 依赖版本集中**：版本在 `pnpm-workspace.yaml` 的 catalog，各包写 `catalog:`（`scripts/audit/catalog.test.ts` 查）。
 - **跨包走包名**：TS 跨包写 `@vibevalley/*`（`no-cross-package-path` 查）；`apps/mac/ui` 经 `nsh.json` 的别名解析它们；`packages/*` 的类型导出指向 `dist/*.d.ts`（`vp run packages:build`）。
 

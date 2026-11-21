@@ -1,5 +1,4 @@
 import { Text, View } from "nsh";
-import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
@@ -20,7 +19,6 @@ import { issueThreadOf } from "../../channel/model/places";
 import { SheetLabel } from "./Sheet";
 
 const conversationQuery = defineQuery({
-  schema: z.string().nullable(),
   key: (id: string) => ["issues", "conversation", id],
   fetch: (id, context) => api.issue.conversation.get({ id }, context),
   ...retryRead,

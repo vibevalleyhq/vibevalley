@@ -17,7 +17,6 @@ members = [
   "apps/mac/crates/pixel",
   "apps/mac/crates/terminal",
   "apps/mac/crates/workspace",
-  "apps/mac/crates/highlight",
 ]
 exclude = ["apps/mac/ui"]
 

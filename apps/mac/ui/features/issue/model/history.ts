@@ -1,8 +1,5 @@
-import { z } from "zod";
-
 import { t } from "@vibevalley/i18n";
 import { type Issue, type IssueHistory, defaultOrchestrator, type Session } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 
 import { api } from "../../../infra/api";
 import { useCore } from "../../../infra/frame";
@@ -12,25 +9,21 @@ import { boardRows, historyKey } from "./cards";
 
 /** Every issue with its real sessions: the frame's issues as the frame has them, the history (issue.history.list) for the sessions that left and, with `older`, the issues the frame no longer keeps (rows.ts). */
 const historyQuery = defineQuery({
-  schema: z.array(S.IssueHistory),
   key: () => ["issues", "history"],
   fetch: (_: void, context) => api.issue.history.list(context),
   ...retryRead,
 });
 const changesQuery = defineQuery({
-  schema: S.Changes,
   key: (input: { id: string; sinceTree?: string }) => ["issues", "changes", input.id, input.sinceTree ?? ""],
   fetch: (input, context) => api.issue.diff.get(input, context),
   ...retryRead,
 });
 const timelineQuery = defineQuery({
-  schema: S.IssueTimeline,
   key: (a: { id: string; state: string; rounds: number; findings: number }) => ["issues", "timeline", a.id, a.state, a.rounds, a.findings],
   fetch: (a, context) => api.issue.timeline.get({ id: a.id }, context),
   ...retryRead,
 });
 const runsQuery = defineQuery({
-  schema: z.array(S.Run),
   key: (a: { id: string; version: string }) => ["issues", "runs", a.id, a.version],
   fetch: (a, context) => api.issue.run.list({ id: a.id }, context),
   ...retryRead,

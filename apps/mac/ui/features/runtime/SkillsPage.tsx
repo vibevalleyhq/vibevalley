@@ -1,9 +1,7 @@
 import { Scroll, signal, Text, View } from "nsh";
-import { z } from "zod";
 
 import { list as listed, t } from "@vibevalley/i18n";
 import type { Agent, RuntimeInfo, Skill } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../design/act";
 import { Button, ButtonLink } from "../../design/Button";
@@ -30,7 +28,6 @@ const installedPrefix = "installed:";
 const skillPath = (id?: string) => (id === undefined ? "/team/skills" : `/team/skills/${encodeURIComponent(id)}`);
 
 const skillsQuery = defineQuery({
-  schema: z.array(S.Skill),
   key: () => ["skills"],
   fetch: (_: void, context) => api.skill.list(context),
   ...retryRead,

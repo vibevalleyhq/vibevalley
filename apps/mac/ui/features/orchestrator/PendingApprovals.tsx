@@ -1,9 +1,7 @@
 import { Scroll, signal, Text, View } from "nsh";
-import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorApproval } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -16,7 +14,6 @@ import { momentText, wallClockText } from "../../infra/base/format";
 import { defineQuery, retryRead, useQuery, useQueryClient } from "../../infra/query";
 
 const approvalsQuery = defineQuery({
-  schema: z.array(S.OrchestratorApproval),
   key: (conversationId: string) => ["orchestrator-approvals", conversationId],
   fetch: (conversationId, context) => api.orchestrator.approval.list({ conversationId }, context),
   ...retryRead,

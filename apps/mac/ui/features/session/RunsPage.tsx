@@ -1,10 +1,8 @@
 import { Scroll, signal, Text, untracked, View } from "nsh";
-import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { Look, OrchestratorEval } from "@vibevalley/protocol";
 import { oneLine } from "@vibevalley/protocol/rules";
-import * as S from "@vibevalley/protocol/schema";
 
 import { Button, ButtonLink } from "../../design/Button";
 import { AgentFace, OrchestratorFace } from "../../design/domain/Face";
@@ -44,7 +42,6 @@ const markWrongOf =
     api.orchestrator.eval.create({ agent, on, want });
 
 const allSessionsQuery = defineQuery({
-  schema: z.array(S.Session),
   key: () => ["sessions", "all"],
   fetch: (_: void, context) => api.session.list({}, context),
   ...retryRead,

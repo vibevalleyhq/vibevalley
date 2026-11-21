@@ -283,12 +283,35 @@ class Entry<T> implements EntryBase {
   };
 }
 
-export function defineQuery<A = void, T = never>(
-  options: Policy & { schema: QuerySchema<T>; key: (input: A) => QueryKey; fetch: (input: A, context: { signal: AbortSignal }) => Promise<unknown> },
-): (input: A) => QueryDescriptor<T> {
+export const defineQuery: {
+  <A = void, T = never>(
+    options: Policy & { schema: QuerySchema<T>; key: (input: A) => QueryKey; fetch: (input: A, context: { signal: AbortSignal }) => Promise<unknown> },
+  ): (input: A) => QueryDescriptor<T>;
+  <A = void, T = never>(
+    options: Policy & { schema?: undefined; key: (input: A) => QueryKey; fetch: (input: A, context: { signal: AbortSignal }) => Promise<T> },
+  ): (input: A) => QueryDescriptor<T>;
+} = <A = void, T = never>(
+  options:
+    | (Policy & { schema: QuerySchema<T>; key: (input: A) => QueryKey; fetch: (input: A, context: { signal: AbortSignal }) => Promise<unknown> })
+    | (Policy & { schema?: undefined; key: (input: A) => QueryKey; fetch: (input: A, context: { signal: AbortSignal }) => Promise<T> }),
+): ((input: A) => QueryDescriptor<T>) => {
   for (const n of [options.staleTime ?? 0, options.gcTime ?? 300_000]) if (n < 0 || Number.isNaN(n)) throw new Error("Query durations must be nonnegative");
   if (!Number.isInteger(options.retry ?? 0) || (options.retry ?? 0) < 0) throw new Error("Query retry must be a nonnegative integer");
-  const decoder = queryDecoder(options.schema);
+  let readFor: (input: A) => (signal: AbortSignal) => Promise<T>;
+  let check: (value: T) => T;
+  let same: (left: T, right: T) => boolean;
+  if (options.schema !== undefined) {
+    const decoder = queryDecoder(options.schema);
+    const schemaFetch = options.fetch;
+    readFor = (input) => async (signal) => decoder.decode(await schemaFetch(input, { signal }), signal);
+    check = decoder.check;
+    same = decoder.same;
+  } else {
+    const directFetch = options.fetch;
+    readFor = (input) => (signal) => directFetch(input, { signal });
+    check = (value) => value;
+    same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+  }
   const stores = new WeakMap<Scope, Map<string, Entry<T>>>();
   return (input) => {
     const key = Object.freeze([...options.key(input)]);
@@ -306,26 +329,17 @@ export function defineQuery<A = void, T = never>(
         const found = store.get(id);
         if (found) return found;
         const entries = store;
-        const entry = new Entry(
-          key,
-          options,
-          scope,
-          async (signal) => decoder.decode(await options.fetch(input, { signal }), signal),
-          decoder.check,
-          decoder.same,
-          options,
-          () => {
-            entries.delete(id);
-            scope.entries.delete(id);
-          },
-        );
+        const entry = new Entry(key, options, scope, readFor(input), check, same, options, () => {
+          entries.delete(id);
+          scope.entries.delete(id);
+        });
         entries.set(id, entry);
         scope.entries.set(id, entry);
         return entry;
       },
     };
   };
-}
+};
 
 export function createQueryClient() {
   const scope: Scope = { entries: new Map(), activity: new Set(), closed: false, active: 0 };

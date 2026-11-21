@@ -2,7 +2,6 @@ import { Clipboard, host, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
 
 import { Button, ButtonLink } from "../../design/Button";
 import { Dialog } from "../../design/Dialog";
@@ -24,13 +23,11 @@ import { type Asked, CommitCalendar, Hands, Languages, NewRepoForm, Stat } from 
 import { languageShares, number, sortRepos } from "./repos";
 
 const languagesQuery = defineQuery({
-  schema: S.RepoLanguages,
   key: (id: string) => ["repo-languages", id],
   fetch: (id, context) => api.repo.language.list({ id }, context),
   ...retryRead,
 });
 const activityQuery = defineQuery({
-  schema: S.RepoActivity,
   key: (id: string) => ["repo-activity", id],
   fetch: (id, context) => api.repo.activity.get({ id }, context),
   ...retryRead,
