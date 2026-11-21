@@ -89,10 +89,10 @@ export function ReposPage(props: { rest: string }) {
   return (
     // The list is the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
     <View testID="repos-page" class="h-full min-h-0 flex-1 md:flex-row">
-      <Scroll class="max-h-60 shrink-0 border-b border-line bg-side md:max-h-none md:w-72 md:border-r md:border-b-0" contentClass="px-2 py-3">
+      <Scroll class="max-h-60 shrink-0 border-b border-line bg-side md:max-h-none md:w-70 md:border-r md:border-b-0" contentClass="px-2 py-3">
         <ListCard
           bare
-          title={t("web.repo.title")}
+          title={t("web.repo.list")}
           label={t("web.repo.list")}
           testid="repos"
           action={
@@ -101,7 +101,14 @@ export function ReposPage(props: { rest: string }) {
             </Button>
           }
         >
-          <Text class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.repo.repos")}</Text>
+          <View class="flex-row items-center justify-between px-2 pt-1 pb-1.5">
+            <Text class="text-xs text-muted">{t("web.repo.repos")}</Text>
+            <If when={sorted().length > 0}>
+              <View class="rounded-sm bg-hover px-1.5 py-px">
+                <Text class="text-2xs font-medium text-muted tabular-nums">{String(sorted().length)}</Text>
+              </View>
+            </If>
+          </View>
           <If when={ready(list, undefined)} else={<Text class="px-2.5 pb-2 text-sm text-muted">{t("web.repo.finding")}</Text>}>
             <If when={sorted().length > 0} else={<Text class="px-2.5 pb-2 text-sm text-muted">{t("web.repo.none")}</Text>}>
               <ListRow to="/repos" item="" active={!selected()} title={t("web.repo.all")} line={t("web.repo.allLine")} />
@@ -128,7 +135,7 @@ export function ReposPage(props: { rest: string }) {
           </If>
         </ListCard>
       </Scroll>
-      <Scroll class="min-h-120 min-w-0 flex-1 md:min-h-0" contentClass="p-3">
+      <Scroll class="min-h-120 min-w-0 flex-1 bg-page md:min-h-0" contentClass="p-4">
         {/* Keyed by the name, a plain value: the panel's queries ask about this one repo for its life. */}
         <If when={selected()?.name} else={<RepoMapLink />}>
           {(name) => <Keyed key={name()}>{() => <RepoPanel name={untrack(name)} repos={sorted} now={now()} />}</Keyed>}
@@ -153,7 +160,7 @@ function RepoMapLink() {
       icon="farm"
       testid="repos-map"
       action={
-        <Button icon="farm" testID="open-repo-map" onPress={() => router.navigate("/map")}>
+        <Button tone="primary" icon="farm" testID="open-repo-map" onPress={() => router.navigate("/map")}>
           {t("web.farm.native.map")}
         </Button>
       }
@@ -222,18 +229,31 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
     return count !== undefined ? t("web.repo.kinds", { n: count }) : notCounted() ? t("web.repo.uncounted") : "…";
   };
   const busy = () => props.languages.fetching() || props.activity.fetching();
+  const badge = () => {
+    switch (recency()) {
+      case "day":
+      case "week":
+      case "month":
+        return { box: "bg-ok-soft", ink: "text-ok-ink" };
+      case "quarter":
+        return { box: "bg-warn-soft", ink: "text-warn-ink" };
+      case "older":
+      case "never":
+        return { box: "bg-hover", ink: "text-muted" };
+    }
+  };
   return (
     <View testID="repo-overview" class="flex-row flex-wrap items-center gap-4 rounded-lg border border-line bg-page p-4">
       <View class="h-24 w-24 shrink-0 items-center justify-center rounded-lg bg-hover">
         <Plot recency={recency()} size={80} label={t("web.repo.recency.label", { label: recencyText(recency()) })} />
       </View>
       <View class="min-w-0 flex-1 gap-3">
-        <View class="flex-row flex-wrap items-center gap-3">
+        <View class="flex-row flex-wrap items-center gap-2.5">
           <Text role="header" class="truncate text-xl font-semibold text-ink">
             {props.repo.name}
           </Text>
-          <View class="rounded-sm px-1.5" style={{ backgroundColor: mix("leaf", 0.3) }}>
-            <Text class="text-xs text-ink">{recencyText(recency())}</Text>
+          <View class={`rounded-sm px-1.5 py-0.5 ${badge().box}`}>
+            <Text class={`text-xs font-medium ${badge().ink}`}>{recencyText(recency())}</Text>
           </View>
         </View>
         <View class="flex-row flex-wrap gap-x-6 gap-y-2">
@@ -243,7 +263,7 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
           <Stat label={t("web.repo.languages")} value={languageTotal()} />
         </View>
         <View class="flex-row items-center gap-1.5">
-          <Icon name="folder" size={14} />
+          <Icon name="folder" size={14} tone="muted" />
           <View class="min-w-0 shrink" tooltip={<Bubble text={props.repo.path} />}>
             <Text class="truncate font-mono text-xs text-muted">{props.repo.path}</Text>
           </View>
@@ -261,7 +281,7 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
             void Promise.allSettled([props.languages.refetch(), props.activity.refetch()]);
           }}
         />
-        <If when={counted()}>{(c) => <Text class="text-xs text-muted">{t("web.repo.countedAgo", { ago: since(c().at, props.now) })}</Text>}</If>
+        <If when={counted()}>{(c) => <Text class="text-xs tabular-nums text-faint">{t("web.repo.countedAgo", { ago: since(c().at, props.now) })}</Text>}</If>
       </View>
     </View>
   );

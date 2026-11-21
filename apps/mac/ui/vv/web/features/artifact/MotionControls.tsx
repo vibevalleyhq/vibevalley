@@ -78,10 +78,17 @@ export function MotionControls(props: Controls) {
   };
 
   const timeLabel = () => t("web.artifact.motion.time", { at: time().toFixed(2), duration: duration().toFixed(2) });
+  const activeChapterAt = () => {
+    let found: number | undefined;
+    for (const ch of chapters()) {
+      if (ch.at <= time() + 0.05) found = ch.at;
+    }
+    return found;
+  };
 
   return (
     <View testID="motion-controls" class="shrink-0 gap-2 border-t border-line bg-page px-3 py-2">
-      <View class="flex-row flex-wrap items-center gap-1.5">
+      <View class="min-h-7 flex-row flex-wrap items-center gap-1.5">
         <IconButton
           icon={playing() ? "stop" : "play"}
           label={playing() ? t("web.artifact.motion.pause") : t("web.artifact.motion.play")}
@@ -90,10 +97,12 @@ export function MotionControls(props: Controls) {
         />
         <IconButton icon="previous" label={t("web.artifact.motion.prevFrame")} testid="motion-prev-frame" onClick={() => stepFrame(-1)} />
         <IconButton icon="next" label={t("web.artifact.motion.nextFrame")} testid="motion-next-frame" onClick={() => stepFrame(1)} />
+        <View class="mx-0.5 h-4 w-px bg-line" />
         <Slider min={0} max={duration()} step={0.01} value={time()} onChange={seek} label={timeLabel()} testid="motion-scrub" class="min-w-28 flex-1" />
-        <Text testID="motion-time" class="text-xs text-muted tabular-nums">
+        <Text testID="motion-time" class="font-mono text-xs text-muted tabular-nums">
           {`${timeLabel()} · ${fps()} fps`}
         </Text>
+        <View class="mx-0.5 h-4 w-px bg-line" />
         <IconButton icon="refresh" label={t("web.artifact.motion.loop")} testid="motion-loop" pressed={loop()} onClick={() => setLoop((v) => !v)} />
         <Button icon="video" testID="motion-export" disabled={recording() || saveAct.busy()} onPress={exportVideo}>
           {recording() || saveAct.busy() ? t("web.artifact.motion.exporting") : t("web.artifact.motion.exportVideo")}
@@ -103,16 +112,22 @@ export function MotionControls(props: Controls) {
       <If when={chapters().length > 0}>
         <View accessibilityLabel={t("web.artifact.motion.chapters")} testID="motion-chapters" class="flex-row flex-wrap items-center gap-1.5">
           <Each of={chapters()}>
-            {(ch) => (
-              <View
-                role="button"
-                testID="motion-chapter"
-                onPress={() => seek(ch().at)}
-                class="rounded-full border border-line bg-side px-2.5 py-0.5 hover:bg-hover"
-              >
-                <Text class="text-2xs text-muted">{`${ch().label} (${ch().at.toFixed(1)}s)`}</Text>
-              </View>
-            )}
+            {(ch) => {
+              const active = () => activeChapterAt() === ch().at;
+              return (
+                <View
+                  role="button"
+                  testID="motion-chapter"
+                  accessibilityState={{ selected: active() }}
+                  onPress={() => seek(ch().at)}
+                  class={`h-6 flex-row items-center gap-1 rounded-full border px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                    active() ? "border-accent bg-selected" : "border-line bg-side hover:border-faint hover:bg-hover"
+                  }`}
+                >
+                  <Text class={`text-2xs font-medium tabular-nums ${active() ? "text-ink" : "text-muted"}`}>{`${ch().label} (${ch().at.toFixed(1)}s)`}</Text>
+                </View>
+              );
+            }}
           </Each>
         </View>
       </If>

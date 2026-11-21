@@ -62,4 +62,4 @@
 ## 怎么验证
 
 - `crates/vibevalley-server/tests/setting.rs`：这里存的钥匙压过启动配置且只显示末四位、有一项不对整份不存、语音只存差异、语音厂商的钥匙只给提示且就绪跟着连接走。
-- `apps/mac/ui/vv/app/settings.test.tsx`：设置页在样例数据上的页面测试（`nsh/test`）。
+- `apps/mac/ui/vv/app/scenarios.test.tsx`、`apps/mac/ui/vv/app/components.test.tsx`：设置页与表单控件的虚拟时钟页面测试（`nsh/test`）。

@@ -12,8 +12,13 @@ import { createAct } from "../../../ui/act";
 import { Button } from "../../../ui/Button";
 import { Checkbox } from "../../../ui/Checkbox";
 import { Dialog } from "../../../ui/Dialog";
+import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Field, TextArea, TextInput } from "../../../ui/Field";
+import { Icon } from "../../../ui/Icon";
+import { Banner } from "../../../ui/layout";
 import { Segmented } from "../../../ui/Segmented";
+import { Bubble } from "../../../ui/Tip";
+import { mix } from "../../../ui/tone";
 import { channelName } from "../model/places";
 
 /** A text field with the values it knows offered under it: what a datalist offers there. */
@@ -23,16 +28,16 @@ function Offered(props: { value: string; onChange: (v: string) => void; offered:
     <View class="gap-1.5">
       <TextInput testID={props.testid} value={props.value} onInput={props.onChange} placeholder={props.placeholder} />
       <If when={shown().length > 0}>
-        <View class="flex-row flex-wrap gap-1">
+        <View class="flex-row flex-wrap gap-1.5">
           <Each of={shown()}>
             {(o) => (
               <View
                 role="button"
                 testID={`${props.testid}-offer-${o()}`}
                 onPress={() => props.onChange(o())}
-                class="rounded-sm border border-line px-1.5 py-0.5 hover:bg-hover"
+                class="group rounded-md border border-line bg-side px-2 py-0.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
               >
-                <Text class="text-xs text-muted">{o()}</Text>
+                <Text class="text-xs text-muted group-hover:text-ink">{o()}</Text>
               </View>
             )}
           </Each>
@@ -69,17 +74,11 @@ function Form(props: {
     if (ok() && !props.busy) void props.onSubmit();
   };
   return (
-    <View class="gap-4">
+    <View class="gap-3.5">
       {props.children}
-      <If when={props.error}>
-        {(error) => (
-          <Text role="alert" class="text-sm text-berry">
-            {error()}
-          </Text>
-        )}
-      </If>
-      <View class="flex-row justify-end gap-3 pt-2">
-        <Button testID="cancel" onPress={() => props.onCancel()}>
+      <If when={props.error}>{(error) => <Banner role="alert">{error()}</Banner>}</If>
+      <View class="flex-row items-center justify-end gap-2 border-t border-line pt-3">
+        <Button tone="quiet" testID="cancel" onPress={() => props.onCancel()}>
           {t("web.channel.dialog.cancel")}
         </Button>
         <Button tone="primary" testID="submit" disabled={props.busy || !ok()} onPress={submit}>
@@ -248,11 +247,11 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
     if ((await form.save()) !== undefined) props.onClose();
   };
   return (
-    <View class="gap-5">
+    <View class="gap-4">
       <Form submit={t("web.channel.dialog.save")} onSubmit={submit} onCancel={() => props.onClose()} busy={form.busy()} error={form.error()}>
         <If when={top()}>
           <Field label={t("web.channel.manage.name")} hint={t("web.channel.dialog.nameHint")}>
-            <TextInput testID="channel-name" value={form.name()} onInput={form.setName} />
+            <TextInput testID="channel-name" value={form.name()} onInput={form.setName} onSubmit={() => form.ready() && void submit()} />
           </Field>
           <Field label={t("web.channel.dialog.description")}>
             <TextArea
@@ -267,16 +266,20 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
             <RepoInput value={form.repo()} onChange={form.setRepo} />
           </Field>
           <Field label={t("web.channel.manage.members")} hint={t("web.channel.manage.membersHint")}>
-            <View class="gap-1.5">
+            <View class="gap-1">
               <Each of={orchestrators()} key={(a) => a.id}>
-                {(a) => (
-                  <Checkbox
-                    testid={`channel-member-${a().id}`}
-                    label={a().name}
-                    checked={form.members().includes(a().id)}
-                    onChange={(on) => form.setMember(a().id, on)}
-                  />
-                )}
+                {(a) => {
+                  const checked = () => form.members().includes(a().id);
+                  return (
+                    <View class="flex-row items-center gap-2 rounded-md px-1.5 py-1 transition duration-120 ease-out hover:bg-hover">
+                      <Checkbox testid={`channel-member-${a().id}`} label={a().name} checked={checked()} onChange={(on) => form.setMember(a().id, on)} />
+                      <View role="button" onPress={() => form.setMember(a().id, !checked())} class="min-w-0 flex-1 flex-row items-center gap-2">
+                        <OrchestratorFace size={18} agent={a().id} />
+                        <Text class="min-w-0 flex-1 truncate text-sm text-ink">{a().name}</Text>
+                      </View>
+                    </View>
+                  );
+                }}
               </Each>
             </View>
           </Field>
@@ -317,35 +320,63 @@ function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: ()
     });
   };
   return (
-    <View class="gap-2 border-t border-line pt-4">
+    <View class="gap-2.5 border-t border-line pt-4">
       <View class="flex-row flex-wrap items-center gap-2">
-        <Button testID="channel-archive" disabled={busy()} onPress={() => void act("archive")} accessibilityLabel={t("web.channel.manage.archiveHint")}>
-          {props.channel.archived !== undefined ? t("web.channel.manage.unarchive") : t("web.channel.manage.archive")}
-        </Button>
-        <If
-          when={does()}
-          else={
-            <Button tone="danger" testID="channel-remove" disabled={busy()} onPress={() => void act("preview")}>
-              {t("web.channel.manage.remove")}
-            </Button>
-          }
-        >
-          <Button tone="danger" testID="channel-remove-sure" disabled={busy()} onPress={() => void act("delete")}>
-            {t("web.channel.manage.removeSure")}
+        <View tooltip={<Bubble text={t("web.channel.manage.archiveHint")} />}>
+          <Button
+            icon="archive"
+            testID="channel-archive"
+            disabled={busy()}
+            onPress={() => void act("archive")}
+            accessibilityLabel={t("web.channel.manage.archiveHint")}
+          >
+            {props.channel.archived !== undefined ? t("web.channel.manage.unarchive") : t("web.channel.manage.archive")}
+          </Button>
+        </View>
+        <If when={!does()}>
+          <Button tone="danger" icon="delete" testID="channel-remove" disabled={busy()} onPress={() => void act("preview")}>
+            {t("web.channel.manage.remove")}
           </Button>
         </If>
       </View>
       <If when={does()}>
         {(lines) => (
-          <View>
-            <Text class="text-sm text-muted">{t("web.channel.manage.removeWill")}</Text>
-            <View class="pl-2">
-              <Each of={lines()}>{(line) => <Text class="text-sm text-ink">{`• ${line()}`}</Text>}</Each>
+          <View class="gap-2 rounded-lg border bg-bad-soft px-3 py-2.5" style={{ borderColor: mix("berry", 0.25) }}>
+            <View class="flex-row items-center gap-1.5">
+              <Icon name="warn" size={14} />
+              <Text class="text-xs font-semibold text-berry">{t("web.channel.manage.removeWill")}</Text>
+            </View>
+            <View class="gap-1 pl-1">
+              <Each of={lines()}>
+                {(line) => (
+                  <View class="flex-row items-start gap-1.5">
+                    <Text class="text-xs text-berry">·</Text>
+                    <Text class="min-w-0 flex-1 text-xs leading-relaxed text-ink">{line()}</Text>
+                  </View>
+                )}
+              </Each>
+            </View>
+            <View class="flex-row items-center justify-end gap-2 pt-1">
+              <Button tone="quiet" disabled={busy()} onPress={() => does.set(undefined)}>
+                {t("web.channel.dialog.cancel")}
+              </Button>
+              <Button tone="danger" icon="delete" testID="channel-remove-sure" disabled={busy()} onPress={() => void act("delete")}>
+                {t("web.channel.manage.removeSure")}
+              </Button>
             </View>
           </View>
         )}
       </If>
-      <If when={error()}>{(e) => <Text class="text-sm text-berry">{e()}</Text>}</If>
+      <If when={error()}>
+        {(e) => (
+          <View class="flex-row items-start gap-1.5">
+            <View class="mt-0.5 shrink-0">
+              <Icon name="cross" size={14} />
+            </View>
+            <Text class="min-w-0 flex-1 text-xs text-berry">{e()}</Text>
+          </View>
+        )}
+      </If>
     </View>
   );
 }

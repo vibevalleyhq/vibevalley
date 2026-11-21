@@ -17,12 +17,12 @@ import { defineAtom } from "../../state/atom";
 import { defineStored } from "../../state/stored";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
+import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
-import { Empty } from "../../ui/layout";
+import { ActiveBar, Empty, SidebarSection } from "../../ui/layout";
 import { type MoreItem, MoreMenu } from "../../ui/MoreMenu";
 import { toast } from "../../ui/toasts";
-import { tone } from "../../ui/tone";
 import { artifactHref, artifactIcon, artifactSuffix, artifactTypeIcon, kindLabel, useArtifact, useArtifacts } from "./ArtifactCard";
 import { BlocksView } from "./BlocksView";
 import type { BlockEditor } from "./editor";
@@ -103,95 +103,93 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
   };
   return (
     <View testID="artifacts" class="h-full min-h-0 flex-1 lg:flex-row">
-      <View
-        accessibilityLabel={t("web.artifact.page.list")}
-        testID="artifact-list"
-        class={`min-h-0 shrink-0 gap-3 border-line bg-side p-3 lg:w-64 lg:border-r ${
-          presenting() ? "hidden" : listOpen.get() ? (id() ? "hidden lg:flex" : "flex-1 lg:flex-none") : id() ? "hidden" : "flex-1 lg:hidden"
-        }`}
-      >
-        <View class="flex-row items-center gap-1.5">
-          <View class="h-8 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 focus-within:border-focus">
-            <Icon name="search" size={14} tone="muted" />
-            <Input
-              testID="artifact-search"
+      <If when={!presenting() && !id()}>
+        <View
+          accessibilityLabel={t("web.artifact.page.list")}
+          testID="artifact-list"
+          class="min-h-0 flex-1 shrink-0 flex-col gap-3 border-line bg-side p-3 lg:w-64 lg:flex-none lg:border-r"
+        >
+          <View class="flex-row items-center gap-1">
+            <SearchField
+              testid="artifact-search"
+              clearTestid="artifact-search-clear"
               value={query()}
-              onChange={(e) => query.set(e.value)}
+              onInput={(v) => query.set(v)}
               placeholder={t("web.artifact.page.find")}
-              accessibilityLabel={t("web.artifact.page.find")}
-              class="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint"
+              label={t("web.artifact.page.find")}
+              class="min-w-0 flex-1"
+            />
+            <IconButton icon="add" label={t("web.artifact.page.new")} testid="new-artifact" disabled={making.busy()} onClick={() => void create("docs")} />
+            <MoreMenu
+              icon="choose"
+              label={t("web.artifact.types.pick")}
+              testid="new-artifact-type"
+              items={newTypeItems()}
+              open={typeMenu()}
+              onOpenChange={(o) => typeMenu.set(o)}
             />
           </View>
-          <IconButton icon="add" label={t("web.artifact.page.new")} testid="new-artifact" disabled={making.busy()} onClick={() => void create("docs")} />
-          <MoreMenu
-            icon="choose"
-            label={t("web.artifact.types.pick")}
-            testid="new-artifact-type"
-            items={newTypeItems()}
-            open={typeMenu()}
-            onOpenChange={(o) => typeMenu.set(o)}
-          />
-        </View>
-        <If when={all.error()}>
-          <Text class="px-2 text-xs text-berry">{reasonOf(all.error())}</Text>
-        </If>
-        <If when={all.status() === "success" && list().length === 0}>
-          <Text class="px-2 text-xs text-muted lg:hidden">{t("web.artifact.page.none")}</Text>
-        </If>
-        <If when={list().length > 0 && shown().length === 0}>
-          <Text class="px-2 text-xs text-muted">{t("web.artifact.page.nothingFound")}</Text>
-        </If>
-        <Scroll class="-mx-2 min-h-0 flex-1" contentClass="gap-2 px-2">
-          <Each of={groups().filter((g) => g.rows.length > 0)} key={(g) => g.key}>
-            {(g) => (
-              <View testID={`artifact-group-${g().key}`} class="gap-0.5">
-                <View
-                  role="button"
-                  accessibilityState={{ expanded: !shut().has(g().key) }}
-                  onPress={() => toggle(g().key)}
-                  class="group flex-row items-center gap-1 px-1 pt-1"
-                >
-                  <Icon name={shut().has(g().key) ? "expand" : "choose"} size={12} tone="muted" />
-                  <Text class="text-xs font-semibold text-muted group-hover:text-ink">{t(`web.artifact.page.group.${g().key}`)}</Text>
-                  <Text class="text-xs text-faint">{String(g().rows.length)}</Text>
-                </View>
-                <If when={!shut().has(g().key)}>
-                  <Each of={g().rows} key={(a) => a.id}>
-                    {(a) => (
-                      <A
-                        href={artifactHref(a().id)}
-                        testID={`artifact-row-${a().id}`}
-                        accessibilityState={{ selected: a().id === open() }}
-                        class={[
-                          "flex-row items-start gap-2 rounded-md px-2 py-1.5 transition duration-120 ease-out",
-                          a().id === id() ? "bg-selected" : a().id === open() ? "hover:bg-hover lg:bg-selected" : "hover:bg-hover",
-                        ].join(" ")}
-                      >
-                        <View class="mt-0.5 shrink-0">
-                          <Icon name={artifactIcon(a())} size={16} tone="muted" />
-                        </View>
-                        <View class="min-w-0 flex-1">
-                          <Text class="truncate text-sm font-medium text-ink">{a().title}</Text>
-                          <Text
-                            class={`truncate text-xs ${a().id === open() ? "" : "text-muted"}`}
-                            style={a().id === open() ? { color: tone("ink"), opacity: 0.75 } : undefined}
+          <If when={all.error()}>
+            <Text class="px-2 text-xs text-berry">{reasonOf(all.error())}</Text>
+          </If>
+          <If when={all.status() === "success" && list().length === 0}>
+            <Text class="px-2 text-xs text-muted lg:hidden">{t("web.artifact.page.none")}</Text>
+          </If>
+          <If when={list().length > 0 && shown().length === 0}>
+            <Text class="px-2 text-xs text-muted">{t("web.artifact.page.nothingFound")}</Text>
+          </If>
+          <Scroll class="-mx-2 min-h-0 flex-1" contentClass="gap-2.5 px-2">
+            <Each of={groups().filter((g) => g.rows.length > 0)} key={(g) => g.key}>
+              {(g) => {
+                const expanded = () => !shut().has(g().key);
+                return (
+                  <SidebarSection
+                    testID={`artifact-group-${g().key}`}
+                    title={t(`web.artifact.page.group.${g().key}`)}
+                    count={g().rows.length}
+                    open={expanded()}
+                    onToggle={() => toggle(g().key)}
+                  >
+                    <Each of={g().rows} key={(a) => a.id}>
+                      {(a) => {
+                        const selected = () => a().id === open();
+                        return (
+                          <A
+                            href={artifactHref(a().id)}
+                            testID={`artifact-row-${a().id}`}
+                            accessibilityState={{ selected: selected() }}
+                            class={[
+                              "relative flex-row items-start gap-2 rounded-md px-2 py-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus",
+                              a().id === id() ? "bg-selected" : selected() ? "hover:bg-hover lg:bg-selected" : "hover:bg-hover",
+                            ].join(" ")}
                           >
-                            {[
-                              `${kindLabel(a())} (${artifactSuffix(a())})`,
-                              ...(a().body === "html" ? [t("web.artifact.card.version", { version: a().version })] : []),
-                              ago(a().updated, now()),
-                            ].join(" · ")}
-                          </Text>
-                        </View>
-                      </A>
-                    )}
-                  </Each>
-                </If>
-              </View>
-            )}
-          </Each>
-        </Scroll>
-      </View>
+                            <If when={a().id === id() || selected()}>
+                              <ActiveBar tall class={a().id === id() ? undefined : "hidden lg:flex"} />
+                            </If>
+                            <View class="mt-0.5 shrink-0">
+                              <Icon name={artifactIcon(a())} size={16} tone={selected() ? "ink" : "muted"} />
+                            </View>
+                            <View class="min-w-0 flex-1 gap-0.5">
+                              <Text class="truncate text-sm font-medium text-ink">{a().title}</Text>
+                              <Text class="truncate text-xs text-muted">
+                                {[
+                                  `${kindLabel(a())} (${artifactSuffix(a())})`,
+                                  ...(a().body === "html" ? [t("web.artifact.card.version", { version: a().version })] : []),
+                                  ago(a().updated, now()),
+                                ].join(" · ")}
+                              </Text>
+                            </View>
+                          </A>
+                        );
+                      }}
+                    </Each>
+                  </SidebarSection>
+                );
+              }}
+            </Each>
+          </Scroll>
+        </View>
+      </If>
       <View class={`min-h-0 min-w-0 flex-1 ${id() ? "" : "hidden lg:flex"}`}>
         <If
           when={open()}
@@ -313,7 +311,7 @@ function Title(props: { artifact: Artifact }) {
         focused.set(false);
         void save();
       }}
-      class="-mx-1 h-8 min-w-0 flex-1 rounded-md bg-transparent px-1 text-xl font-semibold text-ink hover:bg-hover focus:bg-hover"
+      class="-mx-1.5 h-8 min-w-0 flex-1 rounded-md bg-transparent px-1.5 text-lg font-semibold text-ink transition duration-120 ease-out hover:bg-hover focus:bg-hover"
     />
   );
 }
@@ -399,55 +397,48 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat; presenting: Pres
             </View>
           </If>
           <If when={!presenting()}>
-            <View class={`gap-1 ${wide() ? "" : "lg:pl-8.75"}`}>
+            <View class={`gap-1.5 ${wide() ? "" : "lg:pl-8.75"}`}>
               <View class="flex-row items-center gap-2">
                 <A
                   href="/library"
                   testID="artifact-back-library"
-                  class="h-7 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:bg-hover"
+                  class="h-7 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
                 >
                   <Icon name="back" size={14} tone="muted" />
                   <Text class="text-xs font-medium text-muted">{t("web.artifact.page.backToLibrary")}</Text>
                 </A>
-                <View class="hidden lg:flex">
-                  <IconButton
-                    icon={props.listOpen ? "previous" : "expand"}
-                    label={props.listOpen ? t("web.artifact.page.listHide") : t("web.artifact.page.listShow")}
-                    testid="artifact-list-toggle"
-                    pressed={props.listOpen}
-                    onClick={props.onToggleList}
-                  />
-                </View>
                 <Title artifact={props.artifact} />
-                <IconButton
-                  icon="thread"
-                  label={rail.get() ? t("web.artifact.page.railHide") : t("web.artifact.page.railShow")}
-                  testid="artifact-rail-toggle"
-                  pressed={rail.get()}
-                  onClick={() => rail.update((on) => !on)}
-                />
-                <MoreMenu label={t("web.artifact.page.more")} testid="artifact-more" items={more()} open={menu()} onOpenChange={(o) => menu.set(o)} />
+                <View class="shrink-0 flex-row items-center gap-1">
+                  <IconButton
+                    icon="thread"
+                    label={rail.get() ? t("web.artifact.page.railHide") : t("web.artifact.page.railShow")}
+                    testid="artifact-rail-toggle"
+                    pressed={rail.get()}
+                    onClick={() => rail.update((on) => !on)}
+                  />
+                  <MoreMenu label={t("web.artifact.page.more")} testid="artifact-more" items={more()} open={menu()} onOpenChange={(o) => menu.set(o)} />
+                </View>
               </View>
               <View class="flex-row flex-wrap items-center gap-x-2 gap-y-1">
-                <View class="rounded-sm bg-selected px-1.5 py-0.5">
+                <View class="h-5 items-center justify-center rounded-sm bg-selected px-1.5">
                   <Text class="text-2xs font-medium text-ink">{kindLabel(props.artifact)}</Text>
                 </View>
-                <View testID="artifact-suffix" class="rounded-sm border border-line bg-page px-1.5 py-0.5">
+                <View testID="artifact-suffix" class="h-5 items-center justify-center rounded-sm border border-line bg-side px-1.5">
                   <Text class="font-mono text-2xs text-muted">{artifactSuffix(props.artifact)}</Text>
                 </View>
                 <If when={props.artifact.isDefault}>
-                  <View testID="artifact-default-badge" class="rounded-sm bg-accent px-1.5 py-0.5">
-                    <Text class="text-2xs font-medium text-page">{t("web.artifact.types.defaultBadge")}</Text>
+                  <View testID="artifact-default-badge" class="h-5 items-center justify-center rounded-sm bg-accent px-1.5">
+                    <Text class="text-2xs font-semibold text-page">{t("web.artifact.types.defaultBadge")}</Text>
                   </View>
                 </If>
-                <Text class="text-xs text-muted">·</Text>
+                <Text class="text-xs text-faint">·</Text>
                 <If when={html() ? version() : undefined}>
                   {(v) => (
                     <>
-                      <Text testID="artifact-shown-version" class="text-xs text-muted">
+                      <Text testID="artifact-shown-version" class="font-mono text-xs text-muted tabular-nums">
                         {t("web.artifact.card.version", { version: v().version })}
                       </Text>
-                      <Text class="text-xs text-muted">·</Text>
+                      <Text class="text-xs text-faint">·</Text>
                     </>
                   )}
                 </If>
@@ -464,22 +455,22 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat; presenting: Pres
                             v().version === version()?.version ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
                           }`}
                         >
-                          <Text class={`text-2xs font-medium ${v().version === version()?.version ? "text-ink" : "text-muted"}`}>
+                          <Text class={`font-mono text-2xs font-medium tabular-nums ${v().version === version()?.version ? "text-ink" : "text-muted"}`}>
                             {t("web.artifact.card.version", { version: v().version })}
                           </Text>
                         </View>
                       )}
                     </Each>
                   </View>
-                  <Text class="text-xs text-muted">·</Text>
+                  <Text class="text-xs text-faint">·</Text>
                 </If>
                 <Text class="text-xs text-muted">{t("web.artifact.page.by", { name: props.artifact.byName })}</Text>
-                <Text class="text-xs text-muted">·</Text>
+                <Text class="text-xs text-faint">·</Text>
                 <Text class="text-xs text-muted">{t("web.artifact.page.updated", { when: ago(props.artifact.updated, now()) })}</Text>
                 <If when={issue()}>
                   {(i) => (
                     <>
-                      <Text class="text-xs text-muted">·</Text>
+                      <Text class="text-xs text-faint">·</Text>
                       <A href={`/issues/${i().id}`} testID="artifact-issue" class="group">
                         <Text class="text-xs text-water group-hover:underline">{t("web.artifact.page.forIssue", { number: i().number })}</Text>
                       </A>
@@ -539,7 +530,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat; presenting: Pres
         <View
           accessibilityLabel={t("web.artifact.page.rail")}
           testID="artifact-rail"
-          class="max-h-96 min-h-0 shrink-0 border-t border-line xl:max-h-full xl:w-88 xl:border-t-0 xl:border-l"
+          class="max-h-96 min-h-0 shrink-0 border-t border-line bg-side xl:max-h-full xl:w-88 xl:border-t-0 xl:border-l"
         >
           <If when={!wide() ? suggestions() : undefined}>
             {(s) => (

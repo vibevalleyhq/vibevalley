@@ -11333,18 +11333,32 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "vibevalley-agent"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "flume 0.12.0",
- "reqwest",
+ "globset",
+ "ignore",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_ast_visit",
+ "oxc_parser",
+ "oxc_span",
+ "pollster 0.4.0",
+ "quickjs-jit",
+ "regex",
  "rmcp",
  "rustls",
+ "schemars 1.2.3",
  "serde",
  "serde_json",
  "sha2 0.11.1",
+ "sqlx",
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
- "vibevalley-durable",
- "vibevalley-durable-codemode",
+ "ureq",
+ "uuid",
+ "vibevalley-home",
+ "vibevalley-oar",
 ]
 
 [[package]]
@@ -11420,6 +11434,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "ureq",
+ "vibevalley-agent",
  "vibevalley-core",
  "vibevalley-home",
  "vibevalley-http",
@@ -11451,38 +11466,6 @@ dependencies = [
  "serde",
  "serde_json",
  "vibevalley-i18n",
-]
-
-[[package]]
-name = "vibevalley-durable"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "flume 0.12.0",
- "pollster 0.4.0",
- "serde",
- "serde_json",
- "sqlx",
- "tempfile",
- "thiserror 2.0.21",
- "uuid",
-]
-
-[[package]]
-name = "vibevalley-durable-codemode"
-version = "0.1.0"
-dependencies = [
- "flume 0.12.0",
- "oxc_allocator",
- "oxc_ast",
- "oxc_ast_visit",
- "oxc_parser",
- "oxc_span",
- "quickjs-jit",
- "serde",
- "serde_json",
- "tempfile",
- "vibevalley-durable",
 ]
 
 [[package]]
@@ -11636,9 +11619,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "uuid",
- "vibevalley-agent",
- "vibevalley-durable",
- "vibevalley-home",
 ]
 
 [[package]]
@@ -11749,7 +11729,6 @@ dependencies = [
  "vibevalley-chord",
  "vibevalley-core",
  "vibevalley-cron",
- "vibevalley-durable",
  "vibevalley-files",
  "vibevalley-git",
  "vibevalley-home",
@@ -11793,6 +11772,8 @@ dependencies = [
  "serde",
  "tempfile",
  "thiserror 2.0.21",
+ "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]

@@ -1,5 +1,6 @@
 {
-  "name": "Tester Wu",
-  "duty": "Runs tests, fixes tests, watches CI",
-  "tags": ["test", "test", "ci", "run them", "failing"]
+  "name": "QA Test Engineer",
+  "duty": "Writes unit, integration, and regression suites, diagnoses failures, and fixes flaky checks",
+  "style": "Edge coverage · Zero fake passes · Regression guard",
+  "tags": ["test", "qa", "regression", "integration", "ci", "flaky"]
 }

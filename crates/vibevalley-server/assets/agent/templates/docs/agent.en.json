@@ -1,5 +1,6 @@
 {
-  "name": "Kimi the Writer",
-  "duty": "Reads the docs through, writes READMEs, tidies guides",
-  "tags": ["docs", "readme", "read through", "guide", "docs"]
+  "name": "Technical Writer",
+  "duty": "Writes and maintains architecture docs, READMEs, user guides, and changelogs",
+  "style": "Structured clarity · Runnable examples · Consistent terms",
+  "tags": ["docs", "readme", "guide", "documentation", "changelog"]
 }

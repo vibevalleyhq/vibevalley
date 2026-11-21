@@ -23,6 +23,10 @@ import { transport } from "../../infra/transport";
 /** Live state of whichever artifact viewer is currently mounted, attached to outgoing chat/reply messages. */
 export const activeArtifactViewContext = signal<ArtifactViewContext | undefined>(undefined);
 
+export function clearActiveArtifactViewContext(): void {
+  activeArtifactViewContext.set(undefined);
+}
+
 export function useReportViewContext(id: () => ArtifactId, compute: () => Omit<ArtifactViewContext, "artifactId">) {
   effect(() => {
     const next: ArtifactViewContext = { artifactId: id(), ...compute() };

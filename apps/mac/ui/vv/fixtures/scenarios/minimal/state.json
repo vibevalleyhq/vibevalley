@@ -1,0 +1,323 @@
+{
+  "seq": 1,
+  "state": {
+    "call": "live",
+    "callReason": "",
+    "chat": {
+      "channels": [
+        {
+          "id": "general",
+          "type": "channel",
+          "default": true,
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "general",
+          "description": "团队默认频道",
+          "subjectKind": null,
+          "lastNumber": 2,
+          "replies": 0,
+          "title": "general",
+          "at": 1795194443624
+        }
+      ],
+      "userMentions": []
+    },
+    "issues": [
+      {
+        "id": "i1",
+        "number": 1,
+        "title": "修复登录过期跳转",
+        "description": "会话过期后自动回到登录页并保留提示。",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "~/vibevalley",
+        "assignments": [
+          {
+            "id": "as-i1",
+            "issue": "i1",
+            "agent": "laozhou",
+            "assignedAt": 1795194263624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w1",
+                "startedAt": 1795194263624
+              }
+            ]
+          }
+        ],
+        "priority": "high",
+        "createdAt": 1795190843624,
+        "queuedAt": 1795194263624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": ["过期会话回到登录页"],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795194323624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      }
+    ],
+    "connectors": [],
+    "machines": [],
+    "sessions": [
+      {
+        "id": "w1",
+        "role": "worker",
+        "name": "老周",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "~/vibevalley",
+        "branch": "issue-1-init",
+        "hiredAt": 1795193963624,
+        "runs": 1,
+        "spent": {
+          "tokens": 42000,
+          "cny": 0.08
+        },
+        "issue": "i1",
+        "refining": false,
+        "phase": {
+          "_tag": "working",
+          "since": 1795194323624,
+          "doing": {
+            "action": "edit_file",
+            "label": "session.ts",
+            "actionText": "改文件"
+          }
+        },
+        "phaseText": "在改文件：session.ts"
+      }
+    ],
+    "crons": [
+      {
+        "id": "c1",
+        "name": "每天站会",
+        "text": "巡检：每天站会",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "daily",
+          "time": "09:30"
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795190843624,
+        "lastRun": 1795194443624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每天 09:30",
+        "nextText": "11/21 09:30"
+      }
+    ],
+    "boardSummary": {
+      "laneCounts": {
+        "todo": 0,
+        "working": 1,
+        "waiting": 0,
+        "closed": 0
+      },
+      "runningSlots": 1,
+      "maxRunning": 6,
+      "byIssue": {
+        "i1": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        }
+      }
+    },
+    "mediaSummary": {
+      "activeCount": 0,
+      "activeIds": []
+    },
+    "channelSummary": {
+      "unreadTotal": 0,
+      "unreadUnder": {
+        "general": 0
+      }
+    }
+  },
+  "inbox": [],
+  "view": {
+    "level": {
+      "level": 1,
+      "xp": 0,
+      "need": 10
+    },
+    "plots": {
+      "i1": {
+        "crop": "sprout"
+      }
+    },
+    "plays": {
+      "w1": {
+        "station": 0,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      }
+    },
+    "achievements": [
+      {
+        "id": "s_open",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_hire",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_tell",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_review",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_voice",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_split",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_call",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "harvests",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "first_try",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "big_graph",
+        "tier": 0,
+        "count": 0,
+        "next": 3
+      },
+      {
+        "id": "farm_level",
+        "tier": 0,
+        "count": 0,
+        "next": 5
+      },
+      {
+        "id": "steady",
+        "tier": 0,
+        "count": 0,
+        "next": 5
+      },
+      {
+        "id": "untangle",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "comeback",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "thrifty",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "every_machine",
+        "tier": 0,
+        "count": 0,
+        "next": 2
+      },
+      {
+        "id": "handoff",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "parallel_graph",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "night_owl",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "weekend",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "full_house",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      }
+    ]
+  },
+  "effects": []
+}

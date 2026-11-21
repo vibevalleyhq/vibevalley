@@ -41,7 +41,7 @@ export function UpdateRow(props: { state: Accessor<UpdateState | undefined>; las
     <If when={props.state()}>
       {(s) => (
         <SettingRow label={t("web.setting.about.update")} hint={t("web.setting.about.updateHint")} last={props.last}>
-          <Text testID="update-state" class="text-sm text-muted">
+          <Text testID="update-state" class="text-sm tabular-nums text-muted">
             {updateWords(s())}
           </Text>
           <If when={s()._tag === "idle" || s()._tag === "failed"}>

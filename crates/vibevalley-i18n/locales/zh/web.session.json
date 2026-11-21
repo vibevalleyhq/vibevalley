@@ -75,7 +75,7 @@
     "run": "第 {n} 轮",
     "earlier": "更早",
     "search": "搜索轨迹",
-    "searchHint": "搜索",
+    "searchHint": "搜索步骤、工具、参数...",
     "noMatch": "没有对得上的一步。",
     "pending": "还没返回",
     "noOutput": "没有输出",
@@ -89,12 +89,40 @@
     "marked": "标成了做错的一轮，存成了一条评测",
     "want": "这一轮应该怎样",
     "wantHint": "它应该怎样：比如「先问我是哪个仓库，别直接派活」",
-    "neverSent": "还没派出去过。",
-    "sent": "派出去的帮工",
-    "here": "在场",
     "hired": "{ago}接活",
-    "hiredAndLeft": "{hired}接活 · {left}走的",
-    "pick": "选一个帮工，看它的轨迹。"
+    "hiredAndLeft": "{hired}接活 · {left}走的"
+  },
+  "hub": {
+    "search": "搜索运行与轨迹",
+    "searchHint": "搜名字、工单、仓库…",
+    "scopeLabel": "按范围看",
+    "scope": {
+      "all": "全部",
+      "active": "进行中",
+      "orchestrator": "助手",
+      "worker": "帮工"
+    },
+    "list": "运行列表",
+    "back": "← 全部运行",
+    "filterAgent": "档案：{name}",
+    "filterIssue": "工单：{label}",
+    "clearFilter": "清掉筛选",
+    "clear": "清除",
+    "empty": "还没有运行记录。",
+    "emptyFiltered": "没有符合当前筛选的运行。",
+    "pick": "选一条运行，查看完整轨迹。",
+    "openIssue": "看工单",
+    "openProfile": "看档案",
+    "orchestratorRole": "助手",
+    "status": {
+      "working": "进行中",
+      "listening": "在听",
+      "resting": "待命",
+      "done": "已完成",
+      "failed": "失败",
+      "interrupted": "已中断",
+      "closed": "已结束"
+    }
   },
   "subagents": {
     "heading": "子任务",

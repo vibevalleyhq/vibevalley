@@ -1,12 +1,14 @@
-import { signal, View } from "nsh";
+import { signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
 import { api } from "../../../infra/api";
 import { createAct } from "../../../ui/act";
+import { Button } from "../../../ui/Button";
 import { Icon } from "../../../ui/Icon";
-import { IconButton } from "../../../ui/IconButton";
-import { Tip } from "../../../ui/Tip";
+import { Dot } from "../../../ui/Tag";
+import { Bubble, Tip } from "../../../ui/Tip";
+import { mix } from "../../../ui/tone";
 
 type MossVerifyResult = { readonly ok: true } | { readonly ok: false; readonly why: string };
 
@@ -26,19 +28,24 @@ export function MossVerify() {
   return <MossVerifyView busy={act.busy()} result={result()} onCheck={() => void check()} />;
 }
 
-/** The check as it looks: nothing yet, asking, or the answer as a mark with its reason on hover. */
 function MossVerifyView(props: { busy: boolean; result?: MossVerifyResult | undefined; onCheck: () => void }) {
   return (
-    <View class="flex-row items-center gap-1.5">
-      <IconButton icon="plug" testid="moss-verify" label={t("web.voice.voice.moss.verify")} disabled={props.busy} onClick={() => props.onCheck()} />
+    <View class="flex-row flex-wrap items-center gap-2">
       <If
         when={props.busy}
         else={
           <If when={props.result}>
             {(r) => (
               <Tip text={said(r())}>
-                <View role="image" accessible testID={r().ok ? "moss-ok" : "moss-problem"} accessibilityLabel={said(r())}>
-                  <Icon name={r().ok ? "check" : "warn"} size={14} />
+                <View
+                  role="image"
+                  accessible
+                  testID={r().ok ? "moss-ok" : "moss-problem"}
+                  accessibilityLabel={said(r())}
+                  class={`h-6 flex-row items-center gap-1.5 rounded-sm px-2 ${r().ok ? "bg-ok-soft" : "max-w-64 bg-bad-soft"}`}
+                >
+                  <Icon name={r().ok ? "check" : "cross"} size={12} />
+                  <Text class={`min-w-0 truncate text-xs font-medium ${r().ok ? "text-ok-ink" : "text-berry"}`}>{said(r())}</Text>
                 </View>
               </Tip>
             )}
@@ -46,11 +53,29 @@ function MossVerifyView(props: { busy: boolean; result?: MossVerifyResult | unde
         }
       >
         <Tip text={t("web.voice.voice.moss.checking")}>
-          <View role="image" accessible accessibilityLabel={t("web.voice.voice.moss.checking")}>
-            <Icon name="wait" size={14} />
+          <View
+            role="image"
+            accessible
+            accessibilityLabel={t("web.voice.voice.moss.checking")}
+            class="h-6 flex-row items-center gap-1.5 rounded-sm px-2"
+            style={{ backgroundColor: mix("water", 0.14) }}
+          >
+            <Dot tone="water" size={6} ring={false} />
+            <Text class="text-xs font-medium text-water">{t("web.voice.voice.moss.checking")}</Text>
           </View>
         </Tip>
       </If>
+      <Button
+        icon="plug"
+        size="compact"
+        testID="moss-verify"
+        accessibilityLabel={t("web.voice.voice.moss.verify")}
+        tooltip={<Bubble text={t("web.voice.voice.moss.verify")} />}
+        disabled={props.busy}
+        onPress={() => props.onCheck()}
+      >
+        {t("web.voice.voice.moss.verify")}
+      </Button>
     </View>
   );
 }

@@ -105,8 +105,9 @@ if (Reflect.get(globalThis, "window") === undefined) {
     }),
   });
 }
+const initialLocale = (host as { params?: { locale?: unknown } }).params?.locale === "en" ? "en" : "zh";
 if (Reflect.get(globalThis, "document") === undefined) {
-  Reflect.set(globalThis, "document", { documentElement: { dataset: {}, style: { setProperty: () => {} } } });
+  Reflect.set(globalThis, "document", { documentElement: { dataset: { locale: initialLocale }, style: { setProperty: () => {} } } });
 }
 
 // Synchronous `crypto.getRandomValues` and `crypto.randomUUID` when `nsh-platform-gpui`

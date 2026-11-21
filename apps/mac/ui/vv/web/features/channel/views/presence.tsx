@@ -5,7 +5,7 @@ import { actorRoleOf, spanText } from "@vibevalley/protocol/rules";
 
 import { useNow } from "../../../base/dom";
 import { useAgent } from "../../../infra/agents";
-import { useCore } from "../../../infra/frame";
+import { useSession } from "../../../infra/frame";
 import { AgentFace, OrchestratorFace, UserFace } from "../../../ui/domain/Face";
 import { Icon, type IconSize } from "../../../ui/Icon";
 import { actionIcon, type IconName } from "../../../ui/icons";
@@ -84,8 +84,7 @@ export function HelperFace(props: { agent: string; runtime?: string | undefined;
 }
 
 export function SenderFace(props: { m: ChatMessage; size?: number }) {
-  const core = useCore();
-  const session = () => core()?.sessions.find((s) => s.id === (props.m.session ?? props.m.from));
+  const session = useSession(() => props.m.session ?? props.m.from);
   const size = () => props.size ?? 36;
   return (
     <If
@@ -119,8 +118,8 @@ export function ThinkingDots() {
 
 export function Count(props: { n: number }) {
   return (
-    <View class="shrink-0 rounded-full bg-accent px-1.5">
-      <Text class="text-xs font-semibold text-page">{String(props.n)}</Text>
+    <View class="h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-accent px-1.5">
+      <Text class="font-mono text-2xs font-semibold text-page">{String(props.n)}</Text>
     </View>
   );
 }

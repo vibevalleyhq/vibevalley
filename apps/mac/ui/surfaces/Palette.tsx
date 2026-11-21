@@ -1,72 +1,194 @@
-// The palette: commands (⇧⌘P), files (⌘P, answered by Rust's FileIndex)
-// and project search (⇧⌘F), all on nsh's Command.
 import { Text, View } from "nsh";
 import { Command, type CommandItem } from "nsh/base";
 
+import { t } from "@vibevalley/i18n";
+
 import { act, frame } from "../bridge";
-import { tok, type as ty } from "../tokens";
+import { radius, tok, type as ty } from "../tokens";
+import { SurfaceIcon, type SurfaceIconName } from "./shared";
 
+type PaletteMode = "commands" | "files" | "search";
 type Item = CommandItem & { detail?: string };
-type PaletteFrame = { mode: "commands" | "files" | "search"; query: string; items: Item[]; loading: boolean; note: string | null };
+type PaletteFrame = { mode: PaletteMode; query: string; items: Item[]; loading: boolean; note: string | null };
 
-const placeholders = {
-  commands: "Type a command…",
-  files: "Go to file…",
-  search: "Search in project…",
+const modeIcons: Record<PaletteMode, SurfaceIconName> = {
+  commands: "commands",
+  files: "file",
+  search: "search",
 };
+
+const modeKeys: readonly { mode: PaletteMode; keys: string }[] = [
+  { mode: "commands", keys: "⌘K" },
+  { mode: "files", keys: "⌘P" },
+  { mode: "search", keys: "⇧⌘F" },
+];
+
+function KeyCap(props: { label: string; surface?: "tile" | "surface"; active?: boolean }) {
+  const p = () => tok();
+  return (
+    <View
+      style={{
+        height: 19,
+        minWidth: 20,
+        paddingHorizontal: 5,
+        borderRadius: radius.sm,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: props.surface === "surface" ? p().surface : p().tile,
+        borderWidth: 1,
+        borderColor: p().border,
+        flexShrink: 0,
+      }}
+    >
+      <Text style={{ ...ty.mono, fontSize: 10.5, color: props.active === true ? p().ink : p().muted }}>{props.label}</Text>
+    </View>
+  );
+}
 
 export function Palette() {
   const f = frame<PaletteFrame>("palette");
   const p = () => tok();
-  const mode = () => f()?.mode ?? "commands";
+  const mode = (): PaletteMode => f()?.mode ?? "commands";
+
+  const detailFor = (id: string): string => {
+    const list = f()?.items;
+    if (!list) return "";
+    for (const item of list) {
+      if (item.id === id) return item.detail ?? "";
+    }
+    return "";
+  };
+
   return (
-    <View style={{ flex: 1, backgroundColor: p().surface }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: p().surface,
+        borderWidth: 1,
+        borderColor: p().border,
+        borderRadius: radius.tray,
+        overflow: "hidden",
+      }}
+    >
       <Command
         items={f()?.items ?? []}
         query={mode() === "commands" ? undefined : (f()?.query ?? "")}
         filterable={mode() === "commands"}
         loading={f()?.loading ?? false}
         autoFocus
-        placeholder={placeholders[mode()]}
-        accessibilityLabel={mode() === "files" ? "Files" : mode() === "search" ? "Search results" : "Commands"}
+        placeholder={t(`web.shell.palette.placeholder.${mode()}`)}
+        accessibilityLabel={t(`web.shell.palette.a11y.${mode()}`)}
         onQueryChange={({ query }) => {
           if (mode() !== "commands") act({ type: mode() === "search" ? "search" : "palette_query", query });
         }}
         onSelect={({ id }) => act({ type: "palette_select", id })}
         onCancel={() => act({ type: "palette_close" })}
         class="flex-1"
-        searchBarClass="flex-row items-center gap-2 px-3"
-        searchStyle={{ height: 44, flex: 1, fontSize: 14, color: p().ink }}
-        searchBarStyle={{ borderBottomWidth: 1, borderBottomColor: p().border }}
-        listClass="flex-1 p-1"
-        groupStyle={{ ...ty.label, color: p().muted, paddingHorizontal: 8, paddingVertical: 6 }}
-        itemClass="group h-9 flex-row items-center rounded-md px-2 focus:bg-[#f0f0f0] dark:focus:bg-[#232326]"
-        empty={
-          <Text style={{ ...ty.body, color: p().muted, padding: 16, textAlign: "center" }}>
-            {f()?.note ?? (mode() === "files" ? "No file matches." : mode() === "search" ? "No matches." : "No command matches.")}
-          </Text>
+        searchPrefix={
+          <View style={{ width: 20, height: 20, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <SurfaceIcon name={modeIcons[mode()]} size={15} color={p().muted} />
+          </View>
         }
-        renderItem={(entry) => (
-          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <Text
+        searchSuffix={
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            {f()?.loading === true ? <Text style={{ fontSize: 11, color: p().faint }}>{t("web.shell.palette.searching")}</Text> : null}
+            <View
               style={{
-                ...ty.body,
-                fontSize: 13,
-                color: p().ink,
-                numberOfLines: 1,
-                flexShrink: 1,
-                fontFamily: mode() === "search" ? ty.mono.fontFamily : undefined,
+                height: 20,
+                paddingHorizontal: 7,
+                borderRadius: radius.sm,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: p().tile,
+                borderWidth: 1,
+                borderColor: p().border,
               }}
             >
-              {entry.label}
-            </Text>
-            <Text style={{ ...ty.label, color: p().muted, numberOfLines: 1, flex: 1, textOverflow: "ellipsis-start" }}>
-              {f()?.items.find((i) => i.id === entry.id)?.detail ?? ""}
-            </Text>
-            <Text style={{ ...ty.label, color: p().muted }}>{entry.shortcutLabel ?? ""}</Text>
+              <Text style={{ fontSize: 11, fontWeight: "500", color: p().muted }}>{t(`web.shell.palette.mode.${mode()}`)}</Text>
+            </View>
           </View>
-        )}
+        }
+        searchBarClass="flex-row items-center gap-2.5 px-3.5"
+        searchStyle={{ height: 46, flex: 1, fontSize: 14, color: p().ink }}
+        searchBarStyle={{ borderBottomWidth: 1, borderBottomColor: p().border }}
+        listClass="flex-1 p-1.5"
+        groupStyle={{ fontSize: 11, fontWeight: "600", color: p().faint, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 4 }}
+        separator
+        separatorStyle={{ height: 1, backgroundColor: p().border, marginVertical: 4, marginHorizontal: 8 }}
+        itemClass="group h-9 w-full flex-row items-center rounded-md px-2.5 hover:bg-hover focus:bg-selected"
+        empty={
+          <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 36, paddingHorizontal: 20, gap: 8 }}>
+            <SurfaceIcon name={modeIcons[mode()]} size={20} color={p().faint} />
+            <Text style={{ fontSize: 13, color: p().muted, textAlign: "center" }}>{f()?.note ?? t(`web.shell.palette.empty.${mode()}`)}</Text>
+          </View>
+        }
+        renderItem={(entry) => {
+          const detail = () => detailFor(entry.id);
+          return (
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%", minWidth: 0 }}>
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <View style={{ width: 18, height: 18, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <SurfaceIcon name={modeIcons[mode()]} size={13} color={p().faint} />
+                </View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "500",
+                    color: p().ink,
+                    numberOfLines: 1,
+                    flexShrink: 1,
+                    fontFamily: mode() === "search" ? ty.mono.fontFamily : undefined,
+                  }}
+                >
+                  {entry.label}
+                </Text>
+                {detail() ? (
+                  <Text style={{ fontSize: 11, color: p().muted, numberOfLines: 1, flexShrink: 1, textOverflow: "ellipsis-start" }}>{detail()}</Text>
+                ) : null}
+              </View>
+              {entry.shortcutLabel ? <KeyCap label={entry.shortcutLabel} /> : null}
+            </View>
+          );
+        }}
       />
+      <View
+        style={{
+          height: 32,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 14,
+          borderTopWidth: 1,
+          borderTopColor: p().border,
+          backgroundColor: p().canvas,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <KeyCap label="↑↓" surface="surface" />
+            <Text style={{ fontSize: 11, color: p().muted }}>{t("web.shell.palette.footer.select")}</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <KeyCap label="↵" surface="surface" />
+            <Text style={{ fontSize: 11, color: p().muted }}>{t("web.shell.palette.footer.run")}</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <KeyCap label="Esc" surface="surface" />
+            <Text style={{ fontSize: 11, color: p().muted }}>{t("web.shell.palette.footer.close")}</Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          {modeKeys.map((hint) => {
+            const active = () => mode() === hint.mode;
+            return (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <KeyCap label={hint.keys} surface="surface" active={active()} />
+                <Text style={{ fontSize: 11, fontWeight: "500", color: active() ? p().ink : p().faint }}>{t(`web.shell.palette.mode.${hint.mode}`)}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
     </View>
   );
 }

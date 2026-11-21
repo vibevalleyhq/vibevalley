@@ -13,6 +13,10 @@
       "label": "Tickets",
       "hint": "Every ticket from written to closed"
     },
+    "runs": {
+      "label": "Runs & trajectories",
+      "hint": "Active helpers, assistant approvals, and run trajectories"
+    },
     "agents": {
       "label": "Profiles",
       "hint": "Profiles: assistants and helpers"
@@ -49,6 +53,7 @@
   "update": "Update",
   "working": "Open · {n} working",
   "off": "Not open",
+  "runsHint": "View active runs, assistant approvals, and trajectories",
   "chips": {
     "drop": "Remove {v}",
     "valueOf": "{k}'s value",

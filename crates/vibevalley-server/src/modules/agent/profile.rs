@@ -12,7 +12,7 @@ use serde_json::Value;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
     Agent, AgentFrom, AgentRole, AgentTemplate, AgentTemplateSource, ApiError, BizCode, Build, DEFAULT_ORCHESTRATOR, Head, Look, ORCHESTRATOR_RUNTIME,
-    OrchestratorLook, Outfit, PersonaMode, Preview, RuntimeSettings, Skill, Species,
+    OrchestratorLook, Outfit, PersonaMode, Preview, RuntimeSettings, Skill, Species, TemplateCategory,
 };
 
 use super::presets::default_settings;
@@ -109,6 +109,7 @@ struct LookFile {
     trim: Option<String>,
     hat: Option<String>,
     eye: Option<String>,
+    avatar: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -119,6 +120,8 @@ struct TemplateFile {
     role: AgentRole,
     name: String,
     duty: Option<String>,
+    category: Option<TemplateCategory>,
+    style: Option<String>,
     tags: Option<Vec<String>>,
     runtime: Option<String>,
     model: Option<String>,
@@ -133,6 +136,7 @@ struct TemplateFile {
 struct WordsFile {
     name: Option<String>,
     duty: Option<String>,
+    style: Option<String>,
     tags: Option<Vec<String>>,
 }
 
@@ -182,8 +186,10 @@ fn template_from(text_of: &dyn Fn(&str) -> Option<String>, dir: &str, source: Ag
     let words = words.unwrap_or(WordsFile {
         name: None,
         duty: None,
+        style: None,
         tags: None,
     });
+    let style = words.style.or(item.style).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
     Ok(AgentTemplate {
         id: item.id,
         version: item.version,
@@ -210,9 +216,12 @@ fn template_from(text_of: &dyn Fn(&str) -> Option<String>, dir: &str, source: Ag
             trim: look.trim.unwrap_or_default(),
             hat: look.hat.unwrap_or_default(),
             eye: look.eye.unwrap_or_default(),
+            avatar: look.avatar.filter(|s| !s.is_empty()),
         },
         persona,
         source,
+        category: item.category,
+        style,
         skills: item.skills.unwrap_or_default(),
         installed: vec![],
     })
@@ -262,11 +271,11 @@ pub fn built_in_skills() -> Vec<Skill> {
         .filter_map(|id| {
             let read = |f: &str| BUILT_IN.get_file(format!("skills/{id}/{f}")).and_then(|f| f.contents_utf8());
             let text = (if en { read("SKILL.en.md") } else { None }).or_else(|| read("SKILL.md"))?;
-            let head = vibevalley_agent::kit::front_matter(text);
+            let head = vibevalley_agent::resources::skills::front_matter(text);
             Some(Skill {
                 name: head.get("name").cloned().unwrap_or_else(|| id.clone()),
                 description: head.get("description").cloned().unwrap_or_default(),
-                body: vibevalley_agent::kit::skill_body(text),
+                body: vibevalley_agent::resources::skills::skill_body(text),
                 built_in: Some(true),
                 id,
             })
@@ -336,12 +345,17 @@ fn updated_from(item: &AgentTemplate, a: &Agent) -> Agent {
             skills.push(s.clone());
         }
     }
+    let mut look = a.look.clone();
+    if look.avatar.is_none() {
+        look.avatar = item.look.avatar.clone();
+    }
     Agent {
         duty: item.duty.clone(),
         tags: item.tags.clone(),
         persona: item.persona.clone(),
         persona_mode: item.persona_mode,
         worktree: item.worktree,
+        look,
         skills,
         from: Some(AgentFrom {
             template: item.id.clone(),
@@ -687,7 +701,7 @@ impl Profiles {
         all
     }
 
-    fn template_of(&self, id: &str) -> Option<AgentTemplate> {
+    pub fn template_of(&self, id: &str) -> Option<AgentTemplate> {
         self.templates().into_iter().find(|x| x.id == id)
     }
 
@@ -704,7 +718,17 @@ impl Profiles {
     }
 
     pub fn install_template(&self, id: &str) -> Result<Agent, ApiError> {
-        let item = self.template_of(id).ok_or_else(|| Self::no_template(id))?;
+        self.install_template_with_runtime(id, None)
+    }
+
+    pub fn install_template_with_runtime(&self, id: &str, runtime_override: Option<(String, PersonaMode)>) -> Result<Agent, ApiError> {
+        let mut item = self.template_of(id).ok_or_else(|| Self::no_template(id))?;
+        if let Some((runtime, persona_mode)) = runtime_override
+            && item.role != AgentRole::Orchestrator
+        {
+            item.runtime = runtime;
+            item.persona_mode = persona_mode;
+        }
         let made = self.change(|s| {
             let made = with_cast(installed(&item, &s.agents, None));
             s.agents.push(made.clone());

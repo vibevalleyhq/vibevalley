@@ -9,7 +9,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | 窗口外壳：项目栏、侧栏（文件、源码管理）、分栏和标签页、终端、文件和 diff 查看、命令面板、主题和字号 | `StateFrame` 的折叠与拼装（[核心状态](docs/subsystems/core.md)） |
 | 在进程里起服务端，放出本机回环的 HTTP 门，写 `server.json` | 服务端内部的组装（[地基](docs/subsystems/foundation.md)） |
 | 页面和服务端之间的桥：调用、状态帧、事件、订阅 | 协议形状与接口定义（[地基](docs/subsystems/foundation.md#契约规则和数据库)） |
-| 工作台：路由、外框、页面的分层、乐观意图与本机存下的选择、浅色和深色主题 | 各页的细节（[界面清单](docs/reference/farm-ui.md)）、界面怎么做（[界面](docs/style/design.md)） |
+| 工作台：路由、外框、页面的分层、乐观意图与本机存下的选择、浅色和深色主题 | 全页面清单与状态机（[桌面架构与页面清单](docs/design/06-desktop-architecture-and-topology.md)）、设计系统与令牌（[设计系统全景](docs/design/README.md)） |
 | 宿主能力（`host.*`）：通知、主题、语言、打开文件和网址、终端、播放声音 | 像素场景画什么（[农场的皮](docs/subsystems/farm.md)） |
 |  | 命令行（`crates/vibevalley-cli`，[开发](docs/development.md#只用命令行派一个活)） |
 
@@ -29,7 +29,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | `apps/mac/ui/App.tsx`、`bridge.ts`、`surfaces/`、`components/` | TSX 包的入口（按 `host.params.view` 挑视图）、桥的页面一半、外壳的面（侧栏、命令面板、Markdown 窗格）和它们的零件 |
 | `apps/mac/ui/vv/VibeValley.tsx`、`vv/web/` | 工作台：`app/`（路由表 `App.tsx`、导航 `places.ts`、外框 `Shell.tsx`）、`features/<概念>/`、`ui/`、`state/`、`infra/`、`base/` |
 | `apps/mac/ui/vv/solid.ts`、`polyfill.ts` | 工作台的页面沿用 Solid 的写法；这两个文件在 nsh 的响应式上给出它们用到的那部分 |
-| `apps/mac/ui/vv/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[界面](docs/style/design.md#令牌)） |
+| `apps/mac/ui/vv/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)） |
 | `crates/vibevalley-bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
 | `crates/vibevalley-workspace/` | 项目、布局和终端的模型，和它们存的库（`store`） |
 | `packages/protocol/src/host.ts` | `Host` 接口：页面能向宿主要的东西 |

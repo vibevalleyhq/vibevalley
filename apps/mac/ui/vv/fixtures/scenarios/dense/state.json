@@ -1,0 +1,4924 @@
+{
+  "seq": 2,
+  "state": {
+    "call": "connecting",
+    "callReason": "正在建立实时语音连接",
+    "media": [
+      {
+        "kind": "image",
+        "id": "job-img-ready",
+        "prompt": "像素风麦田与小木屋",
+        "model": "moss-image-1",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "user"
+        },
+        "usage": {
+          "images": 1,
+          "width": 1024,
+          "height": 1024
+        },
+        "phase": "ready",
+        "phaseText": "已生成",
+        "problem": "",
+        "attachment": {
+          "id": "lib-poster",
+          "name": "farm-poster.png",
+          "type": "image/png",
+          "size": 482113
+        },
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1795192643624,
+        "updatedAt": 1795192703624
+      },
+      {
+        "kind": "speech",
+        "id": "job-speech-ready",
+        "prompt": "今天的回归测试全部通过。",
+        "model": "moss-tts-1.5-flash",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "orchestrator",
+          "agent": "orchestrator",
+          "channel": "general"
+        },
+        "voice": "voice-warm",
+        "format": "wav",
+        "contentType": "audio/wav",
+        "usage": {
+          "inputCharacters": 12
+        },
+        "canResume": false,
+        "canRelease": true,
+        "phase": "ready",
+        "phaseText": "已生成",
+        "problem": "",
+        "attachment": {
+          "id": "lib-speech",
+          "name": "speech.wav",
+          "type": "audio/wav",
+          "size": 115244
+        },
+        "resultInput": null,
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1795193243624,
+        "updatedAt": 1795193303624
+      }
+    ],
+    "chat": {
+      "channels": [
+        {
+          "id": "design",
+          "type": "channel",
+          "default": false,
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "design",
+          "description": "UI 与设计系统",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "design",
+          "at": 1795190843624
+        },
+        {
+          "id": "dm-laozhou",
+          "type": "direct",
+          "default": false,
+          "peer": "profile:laozhou",
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "老周",
+          "description": "",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "老周",
+          "at": 1795193843624
+        },
+        {
+          "id": "general",
+          "type": "channel",
+          "default": true,
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "general",
+          "description": "日常协作与进度同步",
+          "subjectKind": null,
+          "lastNumber": 3,
+          "replies": 0,
+          "unread": 1,
+          "title": "general",
+          "last": {
+            "from": "w1",
+            "name": "老周",
+            "text": "工单 #18 正在收尾。",
+            "at": 1795194323624
+          },
+          "at": 1795194323624
+        },
+        {
+          "id": "t-login",
+          "type": "thread",
+          "default": false,
+          "orchestrator": "orchestrator",
+          "parent": "general",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "rootNumber": 1,
+          "description": "",
+          "subjectKind": "issue",
+          "subjectId": "i18",
+          "replies": 4,
+          "title": "登录过期讨论",
+          "at": 1795194143624
+        }
+      ],
+      "userMentions": [
+        {
+          "message": {
+            "id": "m-mention",
+            "number": 3,
+            "channel": "general",
+            "from": "w2",
+            "actor": {
+              "kind": "agent",
+              "id": "xiaolin",
+              "role": "worker",
+              "name": "小林"
+            },
+            "name": "小林",
+            "kind": "chat",
+            "text": "@user 请看一眼 #33 的默认配置选型。",
+            "mentions": [],
+            "outcome": null,
+            "spoken": false,
+            "at": 1795194263624,
+            "revision": 1,
+            "reactions": [],
+            "attachments": [],
+            "embeds": []
+          },
+          "channel": "general",
+          "address": "#general"
+        }
+      ]
+    },
+    "commits": {
+      "total": 42,
+      "repos": []
+    },
+    "progress": {
+      "coins": 1280,
+      "streak": 4,
+      "bestStreak": 9,
+      "counts": {
+        "harvested": 14,
+        "reviewed": 11
+      },
+      "unlocked": [
+        {
+          "id": "first_harvest",
+          "tier": 1,
+          "at": 1795108043624
+        }
+      ],
+      "title": {
+        "id": "first_harvest",
+        "tier": 1
+      },
+      "agents": {
+        "laozhou": {
+          "hired": 8,
+          "harvested": 6,
+          "failed": 1
+        }
+      },
+      "multiplier": 1.2
+    },
+    "issues": [
+      {
+        "id": "i10",
+        "number": 10,
+        "title": "取消的旧版同步实验",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "assignments": [],
+        "priority": "low",
+        "createdAt": 1795064843624,
+        "closedAt": 1795122443624,
+        "canceled": "dismissed",
+        "blockedBy": [],
+        "status": "canceled",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "canceled",
+          "since": 1795122443624,
+          "lead": "reopen",
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i12",
+        "number": 12,
+        "title": "设置页面按功能重新分组",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "medium",
+        "createdAt": 1795108043624,
+        "closedAt": 1795176443624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "reviewedAt": 1795176443624,
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795176443624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d153",
+        "number": 153,
+        "title": "高密度压测工单 #153：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795148543624,
+        "queuedAt": 1795185263624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795185263624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d152",
+        "number": 152,
+        "title": "高密度压测工单 #152：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795148843624,
+        "closedAt": 1795185323624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795185323624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d149",
+        "number": 149,
+        "title": "高密度压测工单 #149：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795149743624,
+        "queuedAt": 1795185503624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795185503624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d148",
+        "number": 148,
+        "title": "高密度压测工单 #148：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795150043624,
+        "closedAt": 1795185563624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795185563624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d145",
+        "number": 145,
+        "title": "高密度压测工单 #145：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795150943624,
+        "queuedAt": 1795185743624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795185743624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d144",
+        "number": 144,
+        "title": "高密度压测工单 #144：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795151243624,
+        "closedAt": 1795185803624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795185803624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d141",
+        "number": 141,
+        "title": "高密度压测工单 #141：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795152143624,
+        "queuedAt": 1795185983624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795185983624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d140",
+        "number": 140,
+        "title": "高密度压测工单 #140：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795152443624,
+        "closedAt": 1795186043624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795186043624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d137",
+        "number": 137,
+        "title": "高密度压测工单 #137：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795153343624,
+        "queuedAt": 1795186223624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795186223624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d136",
+        "number": 136,
+        "title": "高密度压测工单 #136：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795153643624,
+        "closedAt": 1795186283624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795186283624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d133",
+        "number": 133,
+        "title": "高密度压测工单 #133：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795154543624,
+        "queuedAt": 1795186463624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795186463624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d132",
+        "number": 132,
+        "title": "高密度压测工单 #132：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795154843624,
+        "closedAt": 1795186523624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795186523624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d129",
+        "number": 129,
+        "title": "高密度压测工单 #129：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795155743624,
+        "queuedAt": 1795186703624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795186703624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d128",
+        "number": 128,
+        "title": "高密度压测工单 #128：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795156043624,
+        "closedAt": 1795186763624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795186763624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d125",
+        "number": 125,
+        "title": "高密度压测工单 #125：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795156943624,
+        "queuedAt": 1795186943624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795186943624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d124",
+        "number": 124,
+        "title": "高密度压测工单 #124：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795157243624,
+        "closedAt": 1795187003624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795187003624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d121",
+        "number": 121,
+        "title": "高密度压测工单 #121：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795158143624,
+        "queuedAt": 1795187183624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795187183624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d120",
+        "number": 120,
+        "title": "高密度压测工单 #120：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795158443624,
+        "closedAt": 1795187243624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795187243624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i40",
+        "number": 40,
+        "title": "拆单总览：原生工作台冷启动提速",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795158443624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795158443624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d117",
+        "number": 117,
+        "title": "高密度压测工单 #117：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795159343624,
+        "queuedAt": 1795187423624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795187423624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d116",
+        "number": 116,
+        "title": "高密度压测工单 #116：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795159643624,
+        "closedAt": 1795187483624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795187483624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d113",
+        "number": 113,
+        "title": "高密度压测工单 #113：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795160543624,
+        "queuedAt": 1795187663624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795187663624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d112",
+        "number": 112,
+        "title": "高密度压测工单 #112：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795160843624,
+        "closedAt": 1795187723624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795187723624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d109",
+        "number": 109,
+        "title": "高密度压测工单 #109：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795161743624,
+        "queuedAt": 1795187903624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795187903624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d108",
+        "number": 108,
+        "title": "高密度压测工单 #108：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795162043624,
+        "closedAt": 1795187963624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795187963624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i41",
+        "number": 41,
+        "title": "子工单 A：延迟构建工作台状态帧",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "medium",
+        "createdAt": 1795162043624,
+        "closedAt": 1795190843624,
+        "delivered": "merged_into_parent",
+        "parent": "i40",
+        "blockedBy": [],
+        "status": "done",
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795190843624,
+          "acts": []
+        }
+      },
+      {
+        "id": "i-d105",
+        "number": 105,
+        "title": "高密度压测工单 #105：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795162943624,
+        "queuedAt": 1795188143624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795188143624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d104",
+        "number": 104,
+        "title": "高密度压测工单 #104：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795163243624,
+        "closedAt": 1795188203624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795188203624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d101",
+        "number": 101,
+        "title": "高密度压测工单 #101：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "high",
+        "createdAt": 1795164143624,
+        "queuedAt": 1795188383624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795188383624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d100",
+        "number": 100,
+        "title": "高密度压测工单 #100：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "urgent",
+        "createdAt": 1795164443624,
+        "closedAt": 1795188443624,
+        "delivered": "merged",
+        "blockedBy": [],
+        "status": "done",
+        "moves": ["backlog"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "since": 1795188443624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i42",
+        "number": 42,
+        "title": "子工单 B：复用像素纹理与文本缓存",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [],
+        "priority": "medium",
+        "createdAt": 1795165643624,
+        "queuedAt": 1795192643624,
+        "parent": "i40",
+        "blockedBy": ["i41"],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795192643624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i21",
+        "number": 21,
+        "title": "写一句话就能起草工单",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "assignments": [],
+        "priority": "low",
+        "createdAt": 1795180043624,
+        "blockedBy": [],
+        "status": "backlog",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "refining": {
+          "session": "w5",
+          "name": "起草员"
+        },
+        "stage": {
+          "state": "draft",
+          "since": 1795180043624,
+          "acts": []
+        }
+      },
+      {
+        "id": "i22",
+        "number": 22,
+        "title": "看板拖拽与列表快捷键切换",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i22",
+            "issue": "i22",
+            "agent": "laozhou",
+            "assignedAt": 1795192943624,
+            "executions": []
+          }
+        ],
+        "priority": "high",
+        "createdAt": 1795183643624,
+        "queuedAt": 1795192943624,
+        "blockedBy": [],
+        "status": "todo",
+        "moves": ["backlog", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "since": 1795192943624,
+          "acts": [
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i18",
+        "number": 18,
+        "title": "修好登录过期跳转",
+        "description": "过期的会话目前一直报错转圈，应在过期时自动跳回登录页并提示原因。",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i18",
+            "issue": "i18",
+            "agent": "laozhou",
+            "assignedAt": 1795193243624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w1",
+                "startedAt": 1795193243624
+              }
+            ]
+          }
+        ],
+        "priority": "urgent",
+        "createdAt": 1795176443624,
+        "queuedAt": 1795193243624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": ["过期回到登录页", "展示过期原因提示", "补齐回归测试"],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795194263624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i33",
+        "number": 33,
+        "title": "选择新终端标签的默认 Shell",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i33",
+            "issue": "i33",
+            "agent": "xiaolin",
+            "assignedAt": 1795192043624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w2",
+                "startedAt": 1795192043624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795172843624,
+        "queuedAt": 1795192043624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["todo", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [
+          {
+            "question": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
+            "options": ["使用用户默认配置", "强制使用登录 Shell"]
+          }
+        ],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "asking",
+          "since": 1795194143624,
+          "lead": "answer",
+          "acts": [
+            {
+              "does": "say",
+              "act": "answer"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i31",
+        "number": 31,
+        "title": "补齐看板列表视图与 Esc 聚焦恢复",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i31",
+            "issue": "i31",
+            "agent": "laozhou",
+            "assignedAt": 1795187243624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w3",
+                "startedAt": 1795187243624
+              }
+            ]
+          }
+        ],
+        "priority": "high",
+        "createdAt": 1795169243624,
+        "queuedAt": 1795187243624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": ["列表视图按状态分组", "Esc 回到对应泳道卡片"],
+        "checks": [
+          {
+            "criterion": 0,
+            "result": "met",
+            "proof": "ListView 分组测试通过"
+          },
+          {
+            "criterion": 1,
+            "result": "met",
+            "proof": "keyboard escape 回归通过"
+          }
+        ],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193543624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i34",
+        "number": 34,
+        "title": "像素画布首次加载字体回退",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i34",
+            "issue": "i34",
+            "agent": "ajie",
+            "assignedAt": 1795189043624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w4",
+                "startedAt": 1795189043624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795165643624,
+        "queuedAt": 1795189043624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["todo", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "stuck",
+          "since": 1795193723624,
+          "stuck": "failed",
+          "lead": "cure",
+          "acts": [
+            {
+              "does": "move",
+              "act": "cure",
+              "status": "todo",
+              "words": "none"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d102",
+        "number": 102,
+        "title": "高密度压测工单 #102：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d102",
+            "issue": "i-d102",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795163843624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d103",
+        "number": 103,
+        "title": "高密度压测工单 #103：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d103",
+            "issue": "i-d103",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795163543624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d106",
+        "number": 106,
+        "title": "高密度压测工单 #106：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d106",
+            "issue": "i-d106",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795162643624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d107",
+        "number": 107,
+        "title": "高密度压测工单 #107：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d107",
+            "issue": "i-d107",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795162343624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d110",
+        "number": 110,
+        "title": "高密度压测工单 #110：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d110",
+            "issue": "i-d110",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795161443624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d111",
+        "number": 111,
+        "title": "高密度压测工单 #111：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d111",
+            "issue": "i-d111",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795161143624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d114",
+        "number": 114,
+        "title": "高密度压测工单 #114：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d114",
+            "issue": "i-d114",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795160243624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d115",
+        "number": 115,
+        "title": "高密度压测工单 #115：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d115",
+            "issue": "i-d115",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795159943624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d118",
+        "number": 118,
+        "title": "高密度压测工单 #118：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d118",
+            "issue": "i-d118",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795159043624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d119",
+        "number": 119,
+        "title": "高密度压测工单 #119：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d119",
+            "issue": "i-d119",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795158743624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d122",
+        "number": 122,
+        "title": "高密度压测工单 #122：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d122",
+            "issue": "i-d122",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795157843624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d123",
+        "number": 123,
+        "title": "高密度压测工单 #123：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d123",
+            "issue": "i-d123",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795157543624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d126",
+        "number": 126,
+        "title": "高密度压测工单 #126：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d126",
+            "issue": "i-d126",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795156643624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d127",
+        "number": 127,
+        "title": "高密度压测工单 #127：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d127",
+            "issue": "i-d127",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795156343624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d130",
+        "number": 130,
+        "title": "高密度压测工单 #130：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d130",
+            "issue": "i-d130",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795155443624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d131",
+        "number": 131,
+        "title": "高密度压测工单 #131：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d131",
+            "issue": "i-d131",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795155143624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d134",
+        "number": 134,
+        "title": "高密度压测工单 #134：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d134",
+            "issue": "i-d134",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795154243624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d135",
+        "number": 135,
+        "title": "高密度压测工单 #135：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d135",
+            "issue": "i-d135",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795153943624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d138",
+        "number": 138,
+        "title": "高密度压测工单 #138：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d138",
+            "issue": "i-d138",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795153043624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d139",
+        "number": 139,
+        "title": "高密度压测工单 #139：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d139",
+            "issue": "i-d139",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795152743624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d142",
+        "number": 142,
+        "title": "高密度压测工单 #142：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d142",
+            "issue": "i-d142",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795151843624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d143",
+        "number": 143,
+        "title": "高密度压测工单 #143：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d143",
+            "issue": "i-d143",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795151543624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d146",
+        "number": 146,
+        "title": "高密度压测工单 #146：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d146",
+            "issue": "i-d146",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795150643624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d147",
+        "number": 147,
+        "title": "高密度压测工单 #147：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d147",
+            "issue": "i-d147",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795150343624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d150",
+        "number": 150,
+        "title": "高密度压测工单 #150：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d150",
+            "issue": "i-d150",
+            "agent": "laozhou",
+            "assignedAt": 1795194383624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w8",
+                "startedAt": 1795194383624
+              }
+            ]
+          }
+        ],
+        "priority": "medium",
+        "createdAt": 1795149443624,
+        "queuedAt": 1795194383624,
+        "blockedBy": [],
+        "status": "in_progress",
+        "moves": ["canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "since": 1795193963624,
+          "acts": [
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "stop",
+              "act": "stop"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      },
+      {
+        "id": "i-d151",
+        "number": 151,
+        "title": "高密度压测工单 #151：优化工作台渲染与帧同步",
+        "description": "",
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "repo": "vibevalley",
+        "assignments": [
+          {
+            "id": "as-i-d151",
+            "issue": "i-d151",
+            "agent": "xiaolin",
+            "assignedAt": 1795194323624,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w10",
+                "startedAt": 1795194323624
+              }
+            ]
+          }
+        ],
+        "priority": "low",
+        "createdAt": 1795149143624,
+        "queuedAt": 1795194323624,
+        "blockedBy": [],
+        "status": "in_review",
+        "moves": ["todo", "done", "canceled"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "since": 1795193843624,
+          "lead": "complete",
+          "acts": [
+            {
+              "does": "move",
+              "act": "complete",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "does": "move",
+              "act": "reject",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "does": "say",
+              "act": "tell"
+            },
+            {
+              "does": "move",
+              "act": "close",
+              "status": "canceled",
+              "words": "none"
+            }
+          ]
+        }
+      }
+    ],
+    "connectors": [
+      {
+        "id": "weixin",
+        "state": "connected",
+        "qr": "",
+        "pairCode": "",
+        "channel": "general",
+        "user": "田头助手",
+        "since": 1795190843624,
+        "lastInbound": 1795190903624,
+        "pending": 0,
+        "error": ""
+      },
+      {
+        "id": "feishu",
+        "state": "waiting",
+        "qr": "",
+        "pairCode": "",
+        "channel": "design",
+        "since": 1795193843624,
+        "lastInbound": 1795193903624,
+        "pending": 2,
+        "error": ""
+      },
+      {
+        "id": "qq",
+        "state": "off",
+        "qr": "",
+        "pairCode": "",
+        "since": 1795192943624,
+        "lastInbound": 1795193003624,
+        "pending": 0,
+        "error": ""
+      }
+    ],
+    "machines": [
+      {
+        "id": "local",
+        "name": "Mac Studio",
+        "here": true,
+        "online": true,
+        "joinedAt": 1795021643624
+      }
+    ],
+    "sessions": [
+      {
+        "id": "w1",
+        "role": "worker",
+        "name": "老周",
+        "agent": "laozhou",
+        "runtime": "codex",
+        "brief": "",
+        "repo": "vibevalley",
+        "branch": "issue-18-login",
+        "worktree": "/tmp/vibevalley/.worktrees/i18",
+        "hiredAt": 1795193243624,
+        "runs": 2,
+        "spent": {
+          "tokens": 182400,
+          "cny": 0.42
+        },
+        "issue": "i18",
+        "refining": false,
+        "subagents": {
+          "run": "run-2",
+          "rootThreadId": "main",
+          "threads": [
+            {
+              "threadId": "sub-check",
+              "agentName": "reviewer",
+              "parentThreadId": "main",
+              "turnId": "t-1",
+              "steps": [
+                {
+                  "step": "核对 token 过期时间",
+                  "status": "completed"
+                },
+                {
+                  "step": "补充单元测试",
+                  "status": "inProgress"
+                }
+              ],
+              "task": "检查登录边界与回归用例",
+              "status": "running",
+              "lastActivity": "运行 login.test.ts",
+              "lastAction": "run_command",
+              "updatedAt": 1795194383624
+            },
+            {
+              "threadId": "sub-done",
+              "agentName": "scout",
+              "parentThreadId": "main",
+              "task": "梳理现有鉴权中间件",
+              "status": "completed",
+              "lastAction": "read_file",
+              "updatedAt": 1795194323624
+            }
+          ],
+          "waits": [
+            {
+              "threadId": "main",
+              "callId": "wait-1",
+              "targets": ["sub-check"]
+            }
+          ]
+        },
+        "toolConnections": [
+          {
+            "server": "vibevalley-mcp",
+            "status": "ready"
+          }
+        ],
+        "phase": {
+          "_tag": "working",
+          "since": 1795194263624,
+          "doing": {
+            "action": "edit_file",
+            "label": "session.ts",
+            "actionText": "改文件"
+          }
+        },
+        "phaseText": "在改文件：session.ts"
+      },
+      {
+        "id": "w2",
+        "role": "worker",
+        "name": "小林",
+        "agent": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "branch": "issue-33-shell",
+        "hiredAt": 1795192043624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "发现两种终端启动方式，需确认默认行为。",
+          "at": 1795194143624,
+          "spent": {
+            "tokens": 64000,
+            "cny": 0.14
+          }
+        },
+        "issue": "i33",
+        "refining": false,
+        "phase": {
+          "_tag": "resting"
+        },
+        "phaseText": "歇着（上一轮做完了）"
+      },
+      {
+        "id": "w3",
+        "role": "worker",
+        "name": "老周",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "branch": "issue-31-board",
+        "hiredAt": 1795187243624,
+        "runs": 2,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "补齐看板列表分组与键盘返回测试。",
+          "at": 1795193543624,
+          "spent": {
+            "tokens": 120000,
+            "cny": 0.29
+          }
+        },
+        "issue": "i31",
+        "refining": false,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      },
+      {
+        "id": "w4",
+        "role": "worker",
+        "name": "阿杰",
+        "agent": "ajie",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795189043624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "failed",
+          "summary": "测试环境缺少原生字体文件，断言失败。",
+          "at": 1795193723624,
+          "spent": {
+            "tokens": 33000,
+            "cny": 0.06
+          }
+        },
+        "issue": "i34",
+        "refining": false,
+        "phase": {
+          "_tag": "failed"
+        },
+        "phaseText": "这一轮没做成"
+      },
+      {
+        "id": "w5",
+        "role": "worker",
+        "name": "起草员",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "hiredAt": 1795193843624,
+        "runs": 1,
+        "issue": "i21",
+        "refining": true,
+        "phase": {
+          "_tag": "working",
+          "since": 1795194203624,
+          "doing": {
+            "action": "read_file",
+            "label": "App.tsx",
+            "actionText": "读文件"
+          }
+        },
+        "phaseText": "在读文件：App.tsx"
+      },
+      {
+        "id": "w6",
+        "role": "worker",
+        "name": "帮工6",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795194083624,
+        "runs": 1,
+        "issue": "i-d6",
+        "refining": false,
+        "phase": {
+          "_tag": "working",
+          "since": 1795194083624,
+          "doing": {
+            "action": "run_command",
+            "label": "cargo test module_6",
+            "actionText": "跑命令"
+          }
+        },
+        "phaseText": "在跑命令：cargo test module_6"
+      },
+      {
+        "id": "w7",
+        "role": "worker",
+        "name": "帮工7",
+        "agent": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795194023624,
+        "runs": 1,
+        "issue": "i-d7",
+        "refining": false,
+        "phase": {
+          "_tag": "working",
+          "since": 1795194023624,
+          "doing": {
+            "action": "run_command",
+            "label": "cargo test module_7",
+            "actionText": "跑命令"
+          }
+        },
+        "phaseText": "在跑命令：cargo test module_7"
+      },
+      {
+        "id": "w8",
+        "role": "worker",
+        "name": "帮工8",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795193963624,
+        "runs": 1,
+        "issue": "i-d8",
+        "refining": false,
+        "phase": {
+          "_tag": "working",
+          "since": 1795193963624,
+          "doing": {
+            "action": "run_command",
+            "label": "cargo test module_8",
+            "actionText": "跑命令"
+          }
+        },
+        "phaseText": "在跑命令：cargo test module_8"
+      },
+      {
+        "id": "w9",
+        "role": "worker",
+        "name": "帮工9",
+        "agent": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795193903624,
+        "runs": 1,
+        "issue": "i-d9",
+        "refining": false,
+        "phase": {
+          "_tag": "working",
+          "since": 1795193903624,
+          "doing": {
+            "action": "run_command",
+            "label": "cargo test module_9",
+            "actionText": "跑命令"
+          }
+        },
+        "phaseText": "在跑命令：cargo test module_9"
+      },
+      {
+        "id": "w10",
+        "role": "worker",
+        "name": "帮工10",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795193843624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "模块 10 测试通过。",
+          "at": 1795193843624,
+          "spent": {
+            "tokens": 20000,
+            "cny": 0.05
+          }
+        },
+        "issue": "i-d10",
+        "refining": false,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      },
+      {
+        "id": "w11",
+        "role": "worker",
+        "name": "帮工11",
+        "agent": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795193783624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "模块 11 测试通过。",
+          "at": 1795193783624,
+          "spent": {
+            "tokens": 20000,
+            "cny": 0.05
+          }
+        },
+        "issue": "i-d11",
+        "refining": false,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      },
+      {
+        "id": "w12",
+        "role": "worker",
+        "name": "帮工12",
+        "agent": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "repo": "vibevalley",
+        "hiredAt": 1795193723624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "模块 12 测试通过。",
+          "at": 1795193723624,
+          "spent": {
+            "tokens": 20000,
+            "cny": 0.05
+          }
+        },
+        "issue": "i-d12",
+        "refining": false,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      }
+    ],
+    "crons": [
+      {
+        "id": "c1",
+        "name": "每天站会播报",
+        "text": "巡检：每天站会播报",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "daily",
+          "time": "09:30"
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795021643624,
+        "lastRun": 1795025243624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每天 09:30",
+        "nextText": "11/19 09:30"
+      },
+      {
+        "id": "c2",
+        "name": "每周五回归巡检",
+        "text": "巡检：每周五回归巡检",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "weekly",
+          "days": [5],
+          "time": "17:00"
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1794935243624,
+        "lastRun": 1794938843624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每周五 17:00",
+        "nextText": "11/20 17:00"
+      },
+      {
+        "id": "c3",
+        "name": "定时巡检 #3",
+        "text": "巡检：定时巡检 #3",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 45
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": false,
+        "created": 1795183643624,
+        "lastRun": 1795187243624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 45 分钟",
+        "nextText": "关着"
+      },
+      {
+        "id": "c4",
+        "name": "定时巡检 #4",
+        "text": "巡检：定时巡检 #4",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 60
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795180043624,
+        "lastRun": 1795183643624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 1 小时",
+        "nextText": "11/20 23:07"
+      },
+      {
+        "id": "c5",
+        "name": "定时巡检 #5",
+        "text": "巡检：定时巡检 #5",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 75
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": false,
+        "created": 1795176443624,
+        "lastRun": 1795180043624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 75 分钟",
+        "nextText": "关着"
+      },
+      {
+        "id": "c6",
+        "name": "定时巡检 #6",
+        "text": "巡检：定时巡检 #6",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 90
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795172843624,
+        "lastRun": 1795176443624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 90 分钟",
+        "nextText": "11/20 21:37"
+      },
+      {
+        "id": "c7",
+        "name": "定时巡检 #7",
+        "text": "巡检：定时巡检 #7",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 105
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": false,
+        "created": 1795169243624,
+        "lastRun": 1795172843624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 105 分钟",
+        "nextText": "关着"
+      },
+      {
+        "id": "c8",
+        "name": "定时巡检 #8",
+        "text": "巡检：定时巡检 #8",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 120
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795165643624,
+        "lastRun": 1795169243624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 2 小时",
+        "nextText": "11/20 20:07"
+      },
+      {
+        "id": "c9",
+        "name": "定时巡检 #9",
+        "text": "巡检：定时巡检 #9",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 135
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": false,
+        "created": 1795162043624,
+        "lastRun": 1795165643624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 135 分钟",
+        "nextText": "关着"
+      },
+      {
+        "id": "c10",
+        "name": "定时巡检 #10",
+        "text": "巡检：定时巡检 #10",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 150
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795158443624,
+        "lastRun": 1795162043624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 150 分钟",
+        "nextText": "11/20 18:37"
+      }
+    ],
+    "boardSummary": {
+      "laneCounts": {
+        "todo": 17,
+        "working": 17,
+        "waiting": 14,
+        "closed": 17
+      },
+      "runningSlots": 6,
+      "maxRunning": 6,
+      "byIssue": {
+        "i-d100": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d101": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d102": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d103": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d104": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d105": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d106": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d107": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d108": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d109": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d110": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d111": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d112": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d113": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d114": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d115": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d116": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d117": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d118": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d119": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d120": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d121": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d122": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d123": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d124": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d125": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d126": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d127": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d128": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d129": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d130": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d131": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d132": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d133": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d134": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d135": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d136": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d137": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d138": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d139": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d140": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d141": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d142": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d143": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d144": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d145": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d146": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d147": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d148": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d149": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d150": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d151": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i-d152": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i-d153": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i10": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "canceled_reopenable"
+        },
+        "i12": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i18": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i21": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i22": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i31": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i33": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "asking"
+        },
+        "i34": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "stuck_failed"
+        },
+        "i40": {
+          "lane": "working",
+          "cardKind": "family",
+          "familyDone": 1,
+          "familyTotal": 2,
+          "needsWorktreeCheck": false
+        },
+        "i41": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i42": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        }
+      }
+    },
+    "mediaSummary": {
+      "activeCount": 0,
+      "activeIds": []
+    },
+    "channelSummary": {
+      "unreadTotal": 1,
+      "unreadUnder": {
+        "design": 0,
+        "dm-laozhou": 0,
+        "general": 1,
+        "t-login": 0
+      }
+    }
+  },
+  "inbox": [
+    {
+      "id": "m-mention",
+      "kind": "mention",
+      "from": {
+        "kind": "session",
+        "id": "w2",
+        "name": "小林",
+        "agent": ""
+      },
+      "who": "小林",
+      "text": "@user 请看一眼 #33 的默认配置选型。",
+      "at": 1795194263624,
+      "target": {
+        "kind": "chat",
+        "channel": "general"
+      },
+      "words": {
+        "label": "找你",
+        "title": "小林 叫你",
+        "body": "@user 请看一眼 #33 的默认配置选型。",
+        "tray": ""
+      }
+    },
+    {
+      "id": "w2:ask:1",
+      "kind": "ask",
+      "from": {
+        "kind": "session",
+        "id": "w2",
+        "name": "小林",
+        "agent": "xiaolin"
+      },
+      "who": "小林",
+      "text": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
+      "at": 1795194143624,
+      "target": {
+        "kind": "session",
+        "id": "w2"
+      },
+      "words": {
+        "label": "有问题问你",
+        "title": "小林 有问题问你",
+        "body": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
+        "tray": ""
+      }
+    },
+    {
+      "id": "w10:review:1",
+      "kind": "review",
+      "from": {
+        "kind": "session",
+        "id": "w10",
+        "name": "帮工10",
+        "agent": "laozhou"
+      },
+      "who": "帮工10",
+      "text": "模块 10 测试通过。",
+      "at": 1795193843624,
+      "target": {
+        "kind": "session",
+        "id": "w10"
+      },
+      "words": {
+        "label": "等你看",
+        "title": "帮工10 做完了",
+        "body": "模块 10 测试通过。",
+        "tray": "帮工10 做完了，等你看"
+      }
+    },
+    {
+      "id": "w11:review:1",
+      "kind": "review",
+      "from": {
+        "kind": "session",
+        "id": "w11",
+        "name": "帮工11",
+        "agent": "xiaolin"
+      },
+      "who": "帮工11",
+      "text": "模块 11 测试通过。",
+      "at": 1795193783624,
+      "target": {
+        "kind": "session",
+        "id": "w11"
+      },
+      "words": {
+        "label": "等你看",
+        "title": "帮工11 做完了",
+        "body": "模块 11 测试通过。",
+        "tray": "帮工11 做完了，等你看"
+      }
+    },
+    {
+      "id": "w4:fix:1",
+      "kind": "fix",
+      "from": {
+        "kind": "session",
+        "id": "w4",
+        "name": "阿杰",
+        "agent": "ajie"
+      },
+      "who": "阿杰",
+      "text": "测试环境缺少原生字体文件，断言失败。",
+      "at": 1795193723624,
+      "target": {
+        "kind": "session",
+        "id": "w4"
+      },
+      "words": {
+        "label": "活没做成",
+        "title": "阿杰 没做成",
+        "body": "测试环境缺少原生字体文件，断言失败。",
+        "tray": "阿杰 没做成"
+      }
+    },
+    {
+      "id": "w12:review:1",
+      "kind": "review",
+      "from": {
+        "kind": "session",
+        "id": "w12",
+        "name": "帮工12",
+        "agent": "laozhou"
+      },
+      "who": "帮工12",
+      "text": "模块 12 测试通过。",
+      "at": 1795193723624,
+      "target": {
+        "kind": "session",
+        "id": "w12"
+      },
+      "words": {
+        "label": "等你看",
+        "title": "帮工12 做完了",
+        "body": "模块 12 测试通过。",
+        "tray": "帮工12 做完了，等你看"
+      }
+    },
+    {
+      "id": "w3:review:2",
+      "kind": "review",
+      "from": {
+        "kind": "session",
+        "id": "w3",
+        "name": "老周",
+        "agent": "laozhou"
+      },
+      "who": "老周",
+      "text": "补齐看板列表分组与键盘返回测试。",
+      "at": 1795193543624,
+      "target": {
+        "kind": "session",
+        "id": "w3"
+      },
+      "words": {
+        "label": "等你看",
+        "title": "老周 做完了",
+        "body": "补齐看板列表分组与键盘返回测试。",
+        "tray": "老周 做完了，等你看"
+      }
+    }
+  ],
+  "view": {
+    "level": {
+      "level": 3,
+      "xp": 12,
+      "need": 30
+    },
+    "plots": {
+      "i-d10": {
+        "crop": "carrot",
+        "badge": {
+          "text": "可收获",
+          "tone": "ripe"
+        }
+      },
+      "i-d11": {
+        "crop": "wheat",
+        "badge": {
+          "text": "可收获",
+          "tone": "ripe"
+        }
+      },
+      "i-d12": {
+        "crop": "carrot",
+        "badge": {
+          "text": "可收获",
+          "tone": "ripe"
+        }
+      },
+      "i-d6": {
+        "crop": "sprout"
+      },
+      "i-d7": {
+        "crop": "sprout"
+      },
+      "i-d8": {
+        "crop": "sprout"
+      },
+      "i-d9": {
+        "crop": "sprout"
+      },
+      "i18": {
+        "crop": "sprout"
+      },
+      "i21": {
+        "crop": "sprout"
+      },
+      "i31": {
+        "crop": "flowering",
+        "badge": {
+          "text": "等你验收",
+          "tone": "wait"
+        }
+      },
+      "i33": {
+        "crop": "dry",
+        "badge": {
+          "text": "等你回答",
+          "tone": "wait"
+        }
+      },
+      "i34": {
+        "crop": "withered",
+        "badge": {
+          "text": "有虫",
+          "tone": "bug"
+        }
+      }
+    },
+    "plays": {
+      "w1": {
+        "station": 0,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w10": {
+        "station": -1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w11": {
+        "station": -1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w12": {
+        "station": -1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w2": {
+        "station": 1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w3": {
+        "station": 2,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w4": {
+        "station": 3,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w5": {
+        "station": 0,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w6": {
+        "station": 4,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w7": {
+        "station": 5,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w8": {
+        "station": -1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w9": {
+        "station": -1,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      }
+    },
+    "achievements": [
+      {
+        "id": "s_open",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_hire",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_tell",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_review",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_voice",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_split",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "s_call",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "harvests",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "first_try",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "big_graph",
+        "tier": 0,
+        "count": 0,
+        "next": 3
+      },
+      {
+        "id": "farm_level",
+        "tier": 0,
+        "count": 0,
+        "next": 5
+      },
+      {
+        "id": "steady",
+        "tier": 0,
+        "count": 0,
+        "next": 5
+      },
+      {
+        "id": "untangle",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "comeback",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "thrifty",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "every_machine",
+        "tier": 0,
+        "count": 0,
+        "next": 2
+      },
+      {
+        "id": "handoff",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "parallel_graph",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "night_owl",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "weekend",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      },
+      {
+        "id": "full_house",
+        "tier": 0,
+        "count": 0,
+        "next": 1
+      }
+    ]
+  },
+  "effects": []
+}

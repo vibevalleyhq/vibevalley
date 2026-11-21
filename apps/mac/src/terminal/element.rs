@@ -15,7 +15,7 @@ use gpui::{
 };
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
-use vibevalley_terminal::{CursorShape, Row, Snapshot, TermSize};
+use vibevalley_terminal::{CursorShape, LinkSpan, Row, Snapshot, TermSize};
 
 use super::TerminalView;
 use crate::theme::{Palette, Ui, hsla};
@@ -39,6 +39,24 @@ impl Geometry {
             row: (row.max(0.0) as u16).min(self.size.rows.saturating_sub(1)),
             col: (col.max(0.0) as u16).min(self.size.cols.saturating_sub(1)),
         }
+    }
+
+    /// Returns the grid cell strictly containing `position`, or `None` outside the grid.
+    pub fn cell_at_exact(&self, position: Point<Pixels>) -> Option<vibevalley_terminal::Point> {
+        let col = ((position.x - self.origin.x) / self.cell_width).floor();
+        let row = ((position.y - self.origin.y) / self.line_height).floor();
+        if col < 0.0 || row < 0.0 {
+            return None;
+        }
+        let col = col as u32;
+        let row = row as u32;
+        if col >= u32::from(self.size.cols) || row >= u32::from(self.size.rows) {
+            return None;
+        }
+        Some(vibevalley_terminal::Point {
+            row: row as u16,
+            col: col as u16,
+        })
     }
 
     fn cell_origin(&self, row: u16, col: u16) -> Point<Pixels> {
@@ -287,6 +305,7 @@ pub struct Prepaint {
     rows: Vec<Rc<ShapedRow>>,
     cursor_text: Option<ShapedLine>,
     marked: Option<ShapedLine>,
+    hover_spans: Vec<LinkSpan>,
     colors: Palette,
     font_size: Pixels,
     blink_on: bool,
@@ -353,9 +372,15 @@ impl Element for TerminalElement {
             size: term_size,
         };
 
-        let (snapshot, cache, marked, blink_on) = self.view.update(cx, |view, cx| {
+        let (snapshot, cache, marked, blink_on, hover_spans) = self.view.update(cx, |view, cx| {
             view.set_geometry(geometry, cx);
-            (view.snapshot(), view.row_cache.clone(), view.marked.clone(), view.blink_on)
+            (
+                view.snapshot(),
+                view.row_cache.clone(),
+                view.marked.clone(),
+                view.blink_on,
+                view.hovered_link_spans(),
+            )
         });
 
         let mut rows_out = Vec::new();
@@ -422,6 +447,7 @@ impl Element for TerminalElement {
             rows: rows_out,
             cursor_text,
             marked,
+            hover_spans,
             colors,
             font_size,
             blink_on,
@@ -493,6 +519,28 @@ impl Element for TerminalElement {
                 for (col, line) in &row.texts {
                     let _ = line.paint(g.cell_origin(i as u16, *col), g.line_height, TextAlign::Left, None, window, cx);
                 }
+            }
+
+            for span in &state.hover_spans {
+                if span.row >= g.size.rows || span.end_col <= span.start_col {
+                    continue;
+                }
+                let start = span.start_col.min(g.size.cols);
+                let end = span.end_col.min(g.size.cols);
+                if end <= start {
+                    continue;
+                }
+                let origin = g.cell_origin(span.row, start);
+                let underline_color = snapshot
+                    .rows
+                    .get(usize::from(span.row))
+                    .and_then(|row| row.runs.iter().find(|run| start >= run.start_col && start < run.start_col + run.cols))
+                    .map(|run| if run.style.bg.is_some() { hsla(run.style.fg) } else { colors.info })
+                    .unwrap_or(colors.info);
+                let y = (origin.y + g.line_height - px(2.0)).floor();
+                let x0 = origin.x.floor();
+                let x1 = (origin.x + g.cell_width * (end - start) as f32).ceil();
+                window.paint_quad(fill(Bounds::new(point(x0, y), size(x1 - x0, px(1.0))), underline_color));
             }
 
             let composing = state.marked.is_some();

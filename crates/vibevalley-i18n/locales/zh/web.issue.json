@@ -146,6 +146,7 @@
     "unread": "读不到。",
     "full": "要做的（完整说明）",
     "steps": "帮工的每一步",
+    "openTrajectory": "完整轨迹",
     "runs": "每一轮",
     "time": "时间",
     "opened": "开单",
@@ -379,5 +380,19 @@
     "title": "讨论与交付记录",
     "older": "加载更早的消息",
     "empty": "需求讨论、执行反馈与交付会保留在这里"
+  },
+  "onboarding": {
+    "title": "开始使用 VibeValley",
+    "subtitle": "按下面三步准备好环境，就能把工单派给帮工干活。",
+    "step1Title": "检查或配置农机",
+    "step1Desc": "确认本机已安装并启用编码 agent（如 Claude Code、Codex 等）",
+    "step1Action": "配置农机",
+    "step2Title": "添加代码仓库",
+    "step2Desc": "绑定本机 Git 仓库，帮工会在独立工作目录里改动代码",
+    "step2Action": "添加仓库",
+    "step3Title": "创建第一条工单，或在聊天中派活",
+    "step3Desc": "写下需求直接派给帮工，或按 C 键新建工单，也可以在聊天里让助手帮你拆解",
+    "newIssue": "新建工单",
+    "openChat": "去聊天派活"
   }
 }

@@ -29,7 +29,7 @@ fn graded_issue(
     config
         .tool_permissions
         .overrides
-        .insert("vibevalley__issue_report".into(), vibevalley_agent::generation::governance::Policy::AlwaysAllow);
+        .insert("vibevalley__issue_report".into(), vibevalley_agent::extensions::governance::Policy::AlwaysAllow);
     let server = vibevalley_server::start(config).unwrap();
     let listener = vibevalley_http::serve(server.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     server.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));

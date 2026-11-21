@@ -3,7 +3,10 @@ import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
-const field = "h-8 min-w-0 rounded-md border border-line bg-page px-2 font-mono text-sm text-ink placeholder:text-faint focus:border-focus";
+import { Icon } from "./Icon";
+import { Bubble } from "./Tip";
+
+const field = "h-8 min-w-0 rounded-md border border-line bg-page px-2.5 font-mono text-sm text-ink placeholder:text-faint transition duration-120 ease-out";
 
 /** Words as chips: enter (or a comma) adds the typed one, backspace on an empty box takes the last off. */
 export function ChipsInput(props: { value: readonly string[]; onChange: (v: string[]) => void; placeholder?: string; label: string; disabled?: boolean }) {
@@ -15,20 +18,24 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
   };
   return (
     <View
-      class={`min-h-8 w-full flex-row flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1 ${props.disabled === true ? "opacity-50" : ""}`}
+      class={[
+        "min-h-8 w-full flex-row flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1 transition duration-120 ease-out",
+        props.disabled === true ? "bg-side opacity-50" : "hover:border-faint focus-within:border-focus",
+      ].join(" ")}
     >
       <Each of={props.value}>
         {(v) => (
-          <View class="flex-row items-center gap-0.5 rounded-sm bg-hover py-px pr-0.5 pl-1.5">
-            <Text class="text-xs text-ink">{v()}</Text>
+          <View class="h-6 flex-row items-center gap-1 rounded-sm bg-hover pr-0.5 pl-1.5">
+            <Text class="text-xs font-medium text-ink">{v()}</Text>
             <View
               role="button"
               disabled={props.disabled}
               accessibilityLabel={t("web.base.chips.drop", { v: v() })}
+              tooltip={<Bubble text={t("web.base.chips.drop", { v: v() })} />}
               onPress={() => props.onChange(props.value.filter((x) => x !== v()))}
-              class="rounded-sm px-1 hover:bg-selected"
+              class="size-4 items-center justify-center rounded-xs transition duration-120 ease-out hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <Text class="text-xs text-muted">×</Text>
+              <Icon name="close" size={10} tone="muted" />
             </View>
           </View>
         )}
@@ -58,6 +65,8 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
   const key = signal("");
   const val = signal("");
   const rows = () => Object.entries(props.value);
+  const addDisabled = () => props.disabled === true || key().trim() === "";
+  const inputClass = () => (props.disabled === true ? `${field} bg-side` : `${field} hover:border-faint focus:border-focus`);
   const add = () => {
     if (!key().trim()) return;
     props.onChange({ ...props.value, [key().trim()]: val() });
@@ -72,12 +81,12 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           const k = () => row()[0];
           return (
             <View class="flex-row items-center gap-1.5">
-              <Text class="w-40 truncate font-mono text-sm text-ink">{k()}</Text>
+              <Text class="w-40 shrink-0 truncate font-mono text-sm text-ink">{k()}</Text>
               <Input
                 testID={`pair-value-${k()}`}
                 accessibilityLabel={t("web.base.chips.valueOf", { k: k() })}
                 readonly={props.disabled}
-                class={`${field} flex-1`}
+                class={`${inputClass()} flex-1`}
                 value={row()[1]}
                 onChange={(e) => props.onChange({ ...props.value, [k()]: e.value })}
               />
@@ -85,10 +94,14 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
                 role="button"
                 disabled={props.disabled}
                 accessibilityLabel={t("web.base.chips.removeKey", { k: k() })}
+                tooltip={<Bubble text={t("web.base.chips.removeKey", { k: k() })} />}
                 onPress={() => props.onChange(Object.fromEntries(rows().filter(([x]) => x !== k())))}
-                class="rounded-sm px-1.5"
+                class={[
+                  "group h-8 shrink-0 items-center justify-center rounded-md px-2 transition duration-120 ease-out",
+                  props.disabled === true ? "" : "hover:bg-bad-soft focus-visible:outline-2 focus-visible:outline-focus",
+                ].join(" ")}
               >
-                <Text class="text-xs text-muted">{t("web.base.chips.remove")}</Text>
+                <Text class="text-xs text-muted group-hover:text-berry">{t("web.base.chips.remove")}</Text>
               </View>
             </View>
           );
@@ -100,7 +113,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           accessibilityLabel={t("web.base.chips.name")}
           readonly={props.disabled}
           placeholder="NAME"
-          class={`${field} w-40`}
+          class={`${inputClass()} w-40 shrink-0`}
           value={key()}
           onChange={(e) => key.set(e.value)}
           onSubmit={add}
@@ -110,7 +123,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           accessibilityLabel={t("web.base.chips.value")}
           readonly={props.disabled}
           placeholder={t("web.base.chips.valueHint")}
-          class={`${field} flex-1`}
+          class={`${inputClass()} flex-1`}
           value={val()}
           onChange={(e) => val.set(e.value)}
           onSubmit={add}
@@ -118,9 +131,12 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
         <View
           role="button"
           testID="new-pair-add"
-          disabled={props.disabled === true || key().trim() === ""}
+          disabled={addDisabled()}
           onPress={add}
-          class={`h-7 justify-center rounded-md border border-line px-2.5 hover:bg-hover ${props.disabled === true || key().trim() === "" ? "opacity-50" : ""}`}
+          class={[
+            "h-8 shrink-0 items-center justify-center rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out",
+            addDisabled() ? "opacity-50" : "hover:border-faint hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus",
+          ].join(" ")}
         >
           <Text class="text-sm text-ink">{t("web.base.chips.add")}</Text>
         </View>

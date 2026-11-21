@@ -35,7 +35,7 @@ const noTestSleep = defineRule({
       sleep: says(
         "a test that waits a set time guesses how long the work takes: slow when it is quick, flaky when it is slow",
         "wait for a condition with `vi.waitFor` or the native app's `waitUntil`; advance fake timers with `vi.advanceTimersByTimeAsync(ms)`",
-        "apps/mac/ui/vv/app/app.test.tsx",
+        "apps/mac/ui/vv/app/scenarios.test.tsx",
       ),
     },
   },
@@ -365,10 +365,30 @@ const subpackageLayersRule = defineRule({
   },
 });
 
+const noComponentInterval = defineRule({
+  meta: {
+    messages: {
+      interval: says(
+        "calling `setInterval` directly inside a component creates an unpooled timer per mounted instance",
+        "pool shared clocks through `useNow(ms)` (`apps/mac/ui/vv/web/base/dom.tsx`) or `useInterval` (`apps/mac/ui/vv/web/base/timer.ts`)",
+        "apps/mac/ui/vv/web/base/dom.tsx",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        if (clockCall(node.callee, context) === "setInterval") context.report({ node, messageId: "interval" });
+      },
+    };
+  },
+});
+
 export default definePlugin({
   meta: { name: "vibevalley" },
   rules: {
     "no-test-sleep": noTestSleep,
+    "no-component-interval": noComponentInterval,
     "no-comment-divider": noCommentDivider,
     "no-cjk-literal": noCjkLiteral,
     "style-attrs": styleAttrs,

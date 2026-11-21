@@ -9,8 +9,10 @@ import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { Checkbox } from "../../ui/Checkbox";
 import { Select, TextInput } from "../../ui/Field";
+import { Banner } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
 import { Slider } from "../../ui/Slider";
+import { CountPill } from "../../ui/Tag";
 import { toast } from "../../ui/toasts";
 import type { Frame } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
@@ -162,7 +164,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
 
   return (
     <View testID="design-canvas-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side">
-      <View class="shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3 py-2">
+      <View class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3 py-2">
         <Segmented
           label={t("web.artifact.design.canvas")}
           testid="design-mode"
@@ -187,9 +189,11 @@ export function DesignCanvasView(props: StoreViewerProps) {
                     setSelectedId(ab().id);
                     setMode("focus");
                   }}
-                  class={`rounded-full border px-2.5 py-0.5 ${active() ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"}`}
+                  class={`h-7 flex-row items-center rounded-md border px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                    active() ? "border-accent bg-selected" : "border-line bg-page hover:border-faint hover:bg-hover"
+                  }`}
                 >
-                  <Text class={`text-xs ${active() ? "font-medium text-ink" : "text-muted"}`}>{ab().title}</Text>
+                  <Text class={`text-xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{ab().title}</Text>
                 </View>
               );
             }}
@@ -197,20 +201,14 @@ export function DesignCanvasView(props: StoreViewerProps) {
         </View>
 
         <View class="ml-auto flex-row items-center gap-2">
-          <Text class="text-xs text-muted tabular-nums">{t("web.artifact.design.artboards", { n: artboards().length })}</Text>
+          <Text class="font-mono text-xs text-muted tabular-nums">{t("web.artifact.design.artboards", { n: artboards().length })}</Text>
           <Button icon="add" testID="design-add-artboard" disabled={act.busy()} onPress={addArtboard}>
             {t("web.artifact.design.addArtboard")}
           </Button>
         </View>
       </View>
 
-      <If when={snapshot().error}>
-        {(err) => (
-          <View class="px-3 py-2">
-            <Text class="text-xs text-berry">{err()}</Text>
-          </View>
-        )}
-      </If>
+      <If when={snapshot().error}>{(err) => <Banner edge>{err()}</Banner>}</If>
 
       <If
         when={mode() === "focus"}
@@ -218,11 +216,14 @@ export function DesignCanvasView(props: StoreViewerProps) {
           <Scroll testID="design-artboards-grid" class="min-h-0 flex-1" contentClass="gap-4 p-4">
             <Each of={artboards()}>
               {(ab) => (
-                <View testID="design-artboard-card" class="gap-2 rounded-lg border border-line bg-page p-3 shadow-raise">
-                  <View class="flex-row items-center justify-between gap-2">
+                <View testID="design-artboard-card" class="overflow-hidden rounded-lg border border-line bg-page shadow-raise">
+                  <View class="flex-row items-center justify-between gap-2 border-b border-line px-3.5 py-2.5">
                     <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{ab().title}</Text>
-                    <Text class="text-2xs text-muted tabular-nums">{`${ab().width}×${ab().height}`}</Text>
+                    <View class="rounded-xs bg-side px-1.5 py-0.5">
+                      <Text class="font-mono text-2xs text-muted tabular-nums">{`${ab().width}×${ab().height}`}</Text>
+                    </View>
                     <Button
+                      size="compact"
                       onPress={() => {
                         setSelectedId(ab().id);
                         setMode("focus");
@@ -231,7 +232,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
                       {t("web.artifact.design.focus")}
                     </Button>
                   </View>
-                  <View class="h-72 overflow-hidden rounded-md border border-line bg-page">
+                  <View class="h-72 overflow-hidden bg-page">
                     <HtmlFrame
                       artifact={props.artifact}
                       version={seq()}
@@ -266,17 +267,29 @@ export function DesignCanvasView(props: StoreViewerProps) {
           />
 
           <View testID="design-props-panel" class="max-h-80 shrink-0 border-t border-line bg-page lg:max-h-none lg:w-72 lg:border-t-0 lg:border-l">
-            <Scroll contentClass="gap-3 p-3">
+            <View class="shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-side px-3 py-2">
               <Text class="text-xs font-semibold text-muted">{t("web.artifact.design.props")}</Text>
-              <If when={propDefs().length > 0} else={<Text class="text-xs text-faint">{t("web.artifact.design.noProps")}</Text>}>
-                <View class="gap-2.5">
+              <If when={propDefs().length > 0}>
+                <CountPill count={propDefs().length} />
+              </If>
+            </View>
+            <Scroll class="min-h-0 flex-1" contentClass="gap-3 p-3">
+              <If
+                when={propDefs().length > 0}
+                else={
+                  <View class="rounded-md bg-side px-3 py-2.5">
+                    <Text class="text-xs leading-relaxed text-faint">{t("web.artifact.design.noProps")}</Text>
+                  </View>
+                }
+              >
+                <View class="gap-3">
                   <Each of={propDefs()}>
                     {(def) => {
                       const current = () => propValues()[def().name] ?? def().value;
                       const label = () => def().label ?? def().name;
                       return (
                         <View testID="design-prop-control" class="gap-1">
-                          <Text class="text-xs font-medium text-ink">{label()}</Text>
+                          <Text class="text-xs font-medium text-muted">{label()}</Text>
                           <If when={def().type === "select"}>
                             <Select
                               label={label()}
@@ -301,13 +314,23 @@ export function DesignCanvasView(props: StoreViewerProps) {
                                 label={label()}
                                 class="flex-1"
                               />
-                              <View class="min-w-8 items-end">
-                                <Text class="text-xs text-muted tabular-nums">{String(current())}</Text>
+                              <View class="min-w-9 items-end">
+                                <Text class="font-mono text-xs text-muted tabular-nums">{String(current())}</Text>
                               </View>
                             </View>
                           </If>
                           <If when={def().type === "text" || def().type === "color"}>
-                            <TextInput value={String(current())} onInput={(val) => updateProp(def().name, val)} accessibilityLabel={label()} class="text-xs" />
+                            <View class="flex-row items-center gap-1.5">
+                              <If when={def().type === "color"}>
+                                <View class="size-6 shrink-0 rounded-sm border border-line" style={{ backgroundColor: String(current()) }} />
+                              </If>
+                              <TextInput
+                                value={String(current())}
+                                onInput={(val) => updateProp(def().name, val)}
+                                accessibilityLabel={label()}
+                                class={`min-w-0 flex-1 text-xs ${def().type === "color" ? "font-mono" : ""}`}
+                              />
+                            </View>
                           </If>
                         </View>
                       );

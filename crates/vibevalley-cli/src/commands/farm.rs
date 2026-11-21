@@ -284,6 +284,7 @@ pub fn run_agent(ctx: &Ctx, m: &ArgMatches) -> Done {
                     trim: String::new(),
                     hat: String::new(),
                     eye: String::new(),
+                    avatar: None,
                 },
                 from: None,
             };

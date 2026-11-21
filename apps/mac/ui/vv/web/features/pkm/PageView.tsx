@@ -1,13 +1,15 @@
-import { Clipboard, Text, View } from "nsh";
+import { Clipboard, effect, keymap, Text, View } from "nsh";
+import { Input } from "nsh/base";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { PkmBacklink, PkmComment, PkmPageSummary, PkmPageView, PkmTier } from "@vibevalley/protocol";
+import type { PkmBacklink, PkmComment, PkmPageSummary, PkmPageView, PkmSearchHit, PkmTier } from "@vibevalley/protocol";
 
 import { createSignal } from "../../../solid";
-import { api } from "../../infra/api";
+import { api, faultOf } from "../../infra/api";
 import { ready, useQueryClient } from "../../infra/query";
 import { Link, useRouter } from "../../infra/router";
+import { useLatest } from "../../state/atom";
 import { defineStored } from "../../state/stored";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
@@ -16,6 +18,7 @@ import { IconButton } from "../../ui/IconButton";
 import { Empty } from "../../ui/layout";
 import { type MoreItem, MoreMenu } from "../../ui/MoreMenu";
 import { Dot, type DotTone } from "../../ui/Tag";
+import { Bubble } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
 import { mix } from "../../ui/tone";
 import { Body } from "./Body";
@@ -32,16 +35,21 @@ const tierOfOne = (tier: PkmTier) => t(`web.pkm.tierOne.${tier}`);
 
 const rail = defineStored("pkm.rail", z.boolean(), true);
 
+const titleFromSlug = (slug: string) => slug.replace(/__/gu, "/").replace(/-/gu, " ");
+
 /** compact: in the stream of days, the column alone, its title a link to the day's own page. */
 export function Opened(props: { slug: string; pages: readonly PkmPageSummary[]; point?: string | undefined; compact?: boolean }) {
   const [editing, setEditing] = createSignal(false);
   const found = usePkmPage(() => props.slug, editing);
+  const notFound = () => found.status() === "error" && faultOf(found.error()).tag === "Missing";
   return (
     <If
       when={ready(found, undefined)}
       else={
         <If when={found.status() === "error"}>
-          <Empty icon="file">{t("web.pkm.gone")}</Empty>
+          <If when={props.compact !== true && notFound()} else={<Empty icon="file">{t("web.pkm.gone")}</Empty>}>
+            <FreshPage slug={props.slug} pages={props.pages} />
+          </If>
         </If>
       }
     >
@@ -56,6 +64,79 @@ export function Opened(props: { slug: string; pages: readonly PkmPageSummary[]; 
         />
       )}
     </If>
+  );
+}
+
+/** Not created yet: the file is written on the first edit. */
+function FreshPage(props: { slug: string; pages: readonly PkmPageSummary[] }) {
+  const client = useQueryClient();
+  const router = useRouter();
+  const act = createAct();
+  const [draft, setDraft] = createSignal("");
+  const title = () => titleFromSlug(props.slug);
+  const inbound = useLatest(
+    () => props.slug,
+    (linkedTo) => api.pkm.search({ linkedTo, limit: 20 }),
+  );
+  const hits = (): readonly PkmSearchHit[] => {
+    const a = inbound();
+    return a?.state === "done" ? a.value : [];
+  };
+  const create = () => {
+    const body = draft().trim();
+    const markdown = body ? `- ${body.replace(/\n/gu, "\n  ")}\n` : "-\n";
+    return act.run(async () => {
+      const page = await api.pkm.page.save({ title: title(), tier: "inbox", markdown });
+      await refreshQueries(client);
+      if (page.slug !== props.slug) router.navigate(pkmHref(page.slug), { replace: true });
+    });
+  };
+  return (
+    <View testID="pkm-fresh" accessibilityLabel={props.slug} class="mx-auto w-full max-w-3xl min-w-0 gap-4 px-4 py-4">
+      <View class="gap-2">
+        <View class="flex-row items-center gap-2">
+          <Text role="header" testID="pkm-title" class="min-w-0 flex-1 truncate text-xl font-semibold text-ink">
+            {title()}
+          </Text>
+          <Button tone="primary" icon="add" testID="pkm-create-page" disabled={act.busy()} onPress={() => void create()}>
+            {t("web.pkm.page.create")}
+          </Button>
+        </View>
+        <Text class="text-sm text-muted">{t("web.pkm.page.freshHint")}</Text>
+      </View>
+      <View class="flex-row items-start gap-1 rounded-sm py-px">
+        <View class="mt-1 h-4 w-4 shrink-0 items-center justify-center">
+          <View class="h-1.5 w-1.5 rounded-full bg-muted" />
+        </View>
+        <View class="min-w-0 flex-1">
+          <Input
+            autoFocus
+            testID="pkm-fresh-input"
+            value={draft()}
+            placeholder={t("web.pkm.page.freshPlaceholder")}
+            onChange={(e) => setDraft(e.value)}
+            onSubmit={() => void create()}
+            class="min-h-6 w-full rounded-sm bg-hover px-1 py-0.5 text-sm text-ink"
+          />
+        </View>
+      </View>
+      <View testID="pkm-backlinks" class="mt-4 gap-2 border-t border-line pt-4">
+        <Text role="header" class="text-xs font-semibold text-muted">
+          {t("web.pkm.backlinks.title", { n: hits().length })}
+        </Text>
+        <If when={hits().length > 0} else={<Text class="text-xs text-faint">{t("web.pkm.backlinks.none")}</Text>}>
+          <Each of={hits()} key={(h) => h.block}>
+            {(h) => (
+              <BacklinkRow
+                link={{ page: h().page, pageTitle: h().pageTitle, tier: h().tier, block: h().block, path: h().path, body: h().body }}
+                refs={[]}
+                day={props.pages.find((p) => p.slug === h().page)?.day}
+              />
+            )}
+          </Each>
+        </If>
+      </View>
+    </View>
   );
 }
 
@@ -83,20 +164,22 @@ function Shown(props: {
         </View>
       }
     >
-      <View testID="pkm-page" accessibilityLabel={page().slug} class="xl:flex-row xl:items-start">
-        <View class="mx-auto w-full max-w-3xl min-w-0 gap-4 px-4 py-4 xl:flex-1">
+      <View testID="pkm-page" accessibilityLabel={page().slug} class="min-h-full xl:flex-row xl:items-stretch">
+        <View class="mx-auto w-full max-w-3xl min-w-0 gap-4 px-5 py-5 xl:flex-1">
           <Header view={props.view} summary={props.summary} />
           {outline()}
+          <View class="mt-4 border-t border-line pt-4">
+            <Backlinks view={props.view} pages={props.pages} />
+          </View>
         </View>
         <If when={rail.get()}>
           <View
             accessibilityLabel={t("web.pkm.rail.label")}
             testID="pkm-rail"
-            class="mx-auto w-full max-w-3xl shrink-0 gap-5 border-t border-line px-4 py-4 xl:mx-0 xl:w-72 xl:border-t-0 xl:border-l"
+            class="mx-auto w-full max-w-3xl shrink-0 gap-5 border-t border-line bg-side px-4 py-4 xl:mx-0 xl:w-72 xl:border-t-0 xl:border-l"
           >
             <Calendar pages={props.pages} open={props.summary?.day} />
             <Comments view={props.view} />
-            <Backlinks view={props.view} pages={props.pages} />
             <Contents view={props.view} />
           </View>
         </If>
@@ -111,6 +194,37 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
   const router = useRouter();
   const page = () => props.view.page;
   const act = createAct();
+  const canRename = () => props.summary?.day === undefined && page().tier !== "journal";
+  const [renaming, setRenaming] = createSignal(false);
+  const [titleDraft, setTitleDraft] = createSignal("");
+  let cancelled = false;
+  const startRename = () => {
+    if (!canRename()) return;
+    cancelled = false;
+    setTitleDraft(page().title);
+    setRenaming(true);
+  };
+  const cancelRename = () => {
+    cancelled = true;
+    setRenaming(false);
+  };
+  const commitRename = () => {
+    if (cancelled) return undefined;
+    const to = titleDraft().trim();
+    const from = page().title;
+    setRenaming(false);
+    if (!to || to === from) return undefined;
+    return act.run(async () => {
+      const done = await api.pkm.page.rename({ from, to });
+      toast(t("web.pkm.page.renamed", { title: to }));
+      await refreshPkm();
+      router.navigate(pkmHref(done.into), { replace: true });
+    });
+  };
+  effect(() => {
+    if (!renaming()) return;
+    return keymap.bind("escape", cancelRename, { when: "always" });
+  });
   const move = (tier: PkmTier) => {
     const { slug, tier: was } = page();
     if (tier === was) return undefined;
@@ -142,6 +256,7 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
       void refreshPkm();
     });
   const more = (): MoreItem[] => [
+    ...(canRename() ? [{ key: "rename", label: t("web.pkm.page.rename"), icon: "edit" as const, onSelect: startRename }] : []),
     { key: "export", label: t("web.pkm.page.export"), icon: "copy", onSelect: () => void exportIt() },
     { key: "path", label: t("web.pkm.page.copyFile", { file: page().file }), icon: "file", onSelect: () => void copyFile() },
     { key: "undo", label: t("web.pkm.page.undo"), icon: "undo", onSelect: () => void undo() },
@@ -154,9 +269,41 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
         </Button>
       </View>
       <View class="flex-row items-center gap-2">
-        <Text role="header" testID="pkm-title" class="min-w-0 flex-1 truncate text-xl font-semibold text-ink">
-          {titleFor(page().title, props.summary?.day)}
-        </Text>
+        <If
+          when={renaming()}
+          else={
+            <If
+              when={canRename()}
+              else={
+                <Text role="header" testID="pkm-title" class="min-w-0 flex-1 truncate text-xl font-semibold text-ink">
+                  {titleFor(page().title, props.summary?.day)}
+                </Text>
+              }
+            >
+              <View
+                role="button"
+                tooltip={<Bubble text={t("web.pkm.page.rename")} />}
+                onPress={startRename}
+                class="-mx-1 min-w-0 flex-1 rounded-sm px-1 transition duration-120 ease-out hover:bg-hover"
+              >
+                <Text role="header" testID="pkm-title" class="truncate text-xl font-semibold text-ink">
+                  {titleFor(page().title, props.summary?.day)}
+                </Text>
+              </View>
+            </If>
+          }
+        >
+          <Input
+            autoFocus
+            testID="pkm-title-input"
+            accessibilityLabel={t("web.pkm.page.rename")}
+            value={titleDraft()}
+            onChange={(e) => setTitleDraft(e.value)}
+            onSubmit={() => void commitRename()}
+            onBlur={() => void commitRename()}
+            class="-mx-1 min-w-0 flex-1 rounded-sm border border-focus bg-page px-1.5 text-xl font-semibold text-ink"
+          />
+        </If>
         <Select
           testid="pkm-tier-select"
           label={t("web.pkm.page.tier")}
@@ -256,17 +403,22 @@ function Props(props: { view: PkmPageView }) {
             )}
           </Each>
           <If when={rest().length > 0}>
-            <View role="button" testID="pkm-props-more" onPress={() => setAll((a) => !a)} class="group">
+            <View
+              role="button"
+              testID="pkm-props-more"
+              onPress={() => setAll((a) => !a)}
+              class="group rounded-sm px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover"
+            >
               <Text class="text-xs text-muted group-hover:text-ink">{all() ? t("web.pkm.props.fewer") : t("web.pkm.props.more", { n: rest().length })}</Text>
             </View>
           </If>
         </View>
         <If when={all()}>
-          <View class="gap-0.5">
+          <View class="gap-1 rounded-md bg-side px-2.5 py-2">
             <Each of={rest()} key={([k]) => k}>
               {(entry) => (
                 <View class="flex-row gap-3">
-                  <Text class="w-20 text-xs text-muted">{entry()[0]}</Text>
+                  <Text class="w-20 shrink-0 text-xs font-medium text-muted">{entry()[0]}</Text>
                   <View testID={`pkm-prop-${entry()[0]}`} class="min-w-0 flex-1">
                     <Body text={entry()[1]} refs={props.view.transclusions} class="text-xs text-ink" />
                   </View>
@@ -310,7 +462,7 @@ function CommentCard(props: { comment: PkmComment; body: string; slug: string })
     });
   };
   return (
-    <View testID="pkm-comment" accessibilityLabel={props.comment.id} class="gap-1.5 rounded-lg border border-line p-2.5">
+    <View testID="pkm-comment" accessibilityLabel={props.comment.id} class="gap-1.5 rounded-lg border border-line bg-page p-2.5">
       <View role="button" testID="pkm-comment-at" onPress={() => router.navigate(pkmHref(props.slug, props.comment.block), { replace: true })} class="group">
         <Text class="truncate text-xs text-muted group-hover:text-ink">{t("web.pkm.comments.on", { span: props.comment.span ?? props.body })}</Text>
       </View>
@@ -395,22 +547,24 @@ function Contents(props: { view: PkmPageView }) {
   const tops = () => props.view.page.blocks.filter((b) => b.depth === 0 && b.body.trim() !== "");
   return (
     <If when={tops().length >= 3}>
-      <View testID="pkm-contents" class="gap-0.5">
+      <View testID="pkm-contents" class="gap-1">
         <Text role="header" class="text-xs font-semibold text-muted">
           {t("web.pkm.rail.contents")}
         </Text>
-        <Each of={tops()} key={(b) => b.id}>
-          {(b) => (
-            <View
-              role="link"
-              onPress={() => router.navigate(pkmHref(props.view.page.slug, b().id), { replace: true })}
-              class="rounded-md px-2 py-0.5 hover:bg-hover"
-            >
-              {/* A heading's #s come off: the list is one size. */}
-              <Body text={(b().body.split("\n")[0] ?? "").replace(/^#+\s*/u, "")} refs={props.view.transclusions} class="truncate text-xs text-muted" />
-            </View>
-          )}
-        </Each>
+        <View class="gap-0.5">
+          <Each of={tops()} key={(b) => b.id}>
+            {(b) => (
+              <View
+                role="link"
+                onPress={() => router.navigate(pkmHref(props.view.page.slug, b().id), { replace: true })}
+                class="-mx-2 rounded-md px-2 py-1 transition duration-120 ease-out hover:bg-hover"
+              >
+                {/* A heading's #s come off: the list is one size. */}
+                <Body text={(b().body.split("\n")[0] ?? "").replace(/^#+\s*/u, "")} refs={props.view.transclusions} class="truncate text-xs text-muted" />
+              </View>
+            )}
+          </Each>
+        </View>
       </View>
     </If>
   );

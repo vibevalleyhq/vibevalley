@@ -1,5 +1,7 @@
 #![allow(clippy::large_enum_variant, clippy::enum_variant_names)]
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 #[cfg(feature = "ts-gen")]
@@ -1212,6 +1214,154 @@ pub struct IssueRefineInput {
     pub edit: Option<IssueUpdate>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum IssueLane {
+    #[serde(rename = "todo")]
+    Todo,
+    #[serde(rename = "working")]
+    Working,
+    #[serde(rename = "waiting")]
+    Waiting,
+    #[serde(rename = "closed")]
+    Closed,
+}
+
+impl IssueLane {
+    pub const ALL: [IssueLane; 4] = [IssueLane::Todo, IssueLane::Working, IssueLane::Waiting, IssueLane::Closed];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IssueLane::Todo => "todo",
+            IssueLane::Working => "working",
+            IssueLane::Waiting => "waiting",
+            IssueLane::Closed => "closed",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum IssueCardKind {
+    #[serde(rename = "todo")]
+    Todo,
+    #[serde(rename = "issue")]
+    Issue,
+    #[serde(rename = "family")]
+    Family,
+    #[serde(rename = "orchestrator")]
+    Orchestrator,
+}
+
+impl IssueCardKind {
+    pub const ALL: [IssueCardKind; 4] = [IssueCardKind::Todo, IssueCardKind::Issue, IssueCardKind::Family, IssueCardKind::Orchestrator];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IssueCardKind::Todo => "todo",
+            IssueCardKind::Issue => "issue",
+            IssueCardKind::Family => "family",
+            IssueCardKind::Orchestrator => "orchestrator",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum IssuePromptKind {
+    #[serde(rename = "asking")]
+    Asking,
+    #[serde(rename = "review_after_failed_check")]
+    ReviewAfterFailedCheck,
+    #[serde(rename = "reviewed")]
+    Reviewed,
+    #[serde(rename = "handed_back")]
+    HandedBack,
+    #[serde(rename = "stuck_conflict")]
+    StuckConflict,
+    #[serde(rename = "stuck_failed")]
+    StuckFailed,
+    #[serde(rename = "stuck_interrupted")]
+    StuckInterrupted,
+    #[serde(rename = "stuck_quiet")]
+    StuckQuiet,
+    #[serde(rename = "stuck_unknown")]
+    StuckUnknown,
+    #[serde(rename = "canceled_reopenable")]
+    CanceledReopenable,
+}
+
+impl IssuePromptKind {
+    pub const ALL: [IssuePromptKind; 10] = [
+        IssuePromptKind::Asking,
+        IssuePromptKind::ReviewAfterFailedCheck,
+        IssuePromptKind::Reviewed,
+        IssuePromptKind::HandedBack,
+        IssuePromptKind::StuckConflict,
+        IssuePromptKind::StuckFailed,
+        IssuePromptKind::StuckInterrupted,
+        IssuePromptKind::StuckQuiet,
+        IssuePromptKind::StuckUnknown,
+        IssuePromptKind::CanceledReopenable,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IssuePromptKind::Asking => "asking",
+            IssuePromptKind::ReviewAfterFailedCheck => "review_after_failed_check",
+            IssuePromptKind::Reviewed => "reviewed",
+            IssuePromptKind::HandedBack => "handed_back",
+            IssuePromptKind::StuckConflict => "stuck_conflict",
+            IssuePromptKind::StuckFailed => "stuck_failed",
+            IssuePromptKind::StuckInterrupted => "stuck_interrupted",
+            IssuePromptKind::StuckQuiet => "stuck_quiet",
+            IssuePromptKind::StuckUnknown => "stuck_unknown",
+            IssuePromptKind::CanceledReopenable => "canceled_reopenable",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BoardLaneCounts {
+    pub todo: i64,
+    pub working: i64,
+    pub waiting: i64,
+    pub closed: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BoardIssueSummary {
+    pub lane: IssueLane,
+    pub card_kind: IssueCardKind,
+    pub family_done: i64,
+    pub family_total: i64,
+    pub needs_worktree_check: bool,
+    pub prompt: Option<IssuePromptKind>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BoardSummary {
+    pub lane_counts: BoardLaneCounts,
+    pub running_slots: i64,
+    pub max_running: i64,
+    pub by_issue: BTreeMap<String, BoardIssueSummary>,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "issue";
@@ -1219,6 +1369,12 @@ crate::typescript::module! {
     IssueCanceled,
     Priority,
     IssueStatus,
+    IssueLane,
+    IssueCardKind,
+    IssuePromptKind,
+    BoardLaneCounts,
+    BoardIssueSummary,
+    BoardSummary,
     PullRequestState,
     PullRequest,
     Finding,

@@ -15,10 +15,15 @@ export interface FakeHost {
   readonly calls: { op: string; payload: unknown }[];
   /** The actions for the shell itself (`act`: openFarm, openTree, ...), in order. */
   readonly acts: { type: string; [key: string]: unknown }[];
+  /** Override or add a canned/function RPC answer at runtime. */
+  respond(op: string, answer: unknown): void;
+  clearCalls(): void;
   /** Sends the queued events until none is left. */
   pump(app: App): Promise<void>;
   /** A new frame to every watcher (seq one up), as fake.setState. */
   setState(app: App, state: Record<string, unknown>): Promise<void>;
+  /** Push a server LiveEvent on `frame:live`. */
+  pushLive(app: App, event: unknown): Promise<void>;
   /** The subscriptions asked for and not stopped: name and payload by id. */
   readonly subscriptions: Map<string, { name: string; payload: unknown }>;
   /** An event to every open subscription of `name` (whose payload `matches`, when given). */
@@ -31,14 +36,16 @@ export function fakeHost(fixture: { state: unknown; responses: Record<string, un
   const queue: [string, unknown][] = [];
   const calls: { op: string; payload: unknown }[] = [];
   const acts: { type: string; [key: string]: unknown }[] = [];
+  const responses: Record<string, unknown> = { ...fixture.responses };
   let state = fixture.state as Record<string, unknown>;
   let rev = 0;
+  let liveRev = 0;
   let watching = false;
   const subscriptions = new Map<string, { name: string; payload: unknown }>();
   const answer = (op: string, payload: unknown): unknown => {
     if (op === "health") return { bizCode: 0, message: "ok", data: null };
-    if (!(op in fixture.responses)) return { bizCode: 100005, message: `the fake server has no answer for ${op}` };
-    const r = fixture.responses[op];
+    if (!(op in responses)) return { bizCode: 100005, message: `the fake server has no answer for ${op}` };
+    const r = responses[op];
     const v = typeof r === "function" ? (r as (p: unknown) => unknown)(payload) : r;
     return v !== null && typeof v === "object" && "bizCode" in v ? v : { bizCode: 0, message: "ok", data: v };
   };
@@ -68,10 +75,20 @@ export function fakeHost(fixture: { state: unknown; responses: Record<string, un
     options: { params: { view: "vibevalley", ...params }, handlers: { action, ready: null } },
     calls,
     acts,
+    respond: (op, value) => {
+      responses[op] = value;
+    },
+    clearCalls: () => {
+      calls.length = 0;
+    },
     pump,
     setState: async (app, next) => {
       state = { ...next, seq: Number(state.seq ?? 0) + 1 };
       if (watching) queue.push(["frame:state", { rev: ++rev, data: state }]);
+      await pump(app);
+    },
+    pushLive: async (app, event) => {
+      queue.push(["frame:live", { rev: ++liveRev, data: event }]);
       await pump(app);
     },
     subscriptions,

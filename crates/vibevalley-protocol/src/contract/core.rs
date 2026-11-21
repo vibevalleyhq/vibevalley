@@ -50,6 +50,9 @@ pub struct SpaceView {
     pub machines: Vec<Machine>,
     pub sessions: Vec<SessionView>,
     pub crons: Vec<CronView>,
+    pub board_summary: Option<BoardSummary>,
+    pub media_summary: Option<MediaSummary>,
+    pub channel_summary: Option<ChannelSummary>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

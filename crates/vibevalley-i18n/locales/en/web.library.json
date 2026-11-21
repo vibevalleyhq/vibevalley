@@ -33,10 +33,10 @@
   },
   "artifactKind": {
     "all": "All deliverables",
-    "canvas": "Visual (.visual.html)",
-    "slides": "Slides (.slide.html)",
-    "dashboard": "Dashboard (.dashboard.html)",
-    "whiteboard": "Whiteboard (.whiteboard)",
+    "canvas": "Visual",
+    "slides": "Slides",
+    "dashboard": "Dashboard",
+    "whiteboard": "Whiteboard",
     "page": "Pages & docs"
   },
   "newArtifact": "New deliverable",

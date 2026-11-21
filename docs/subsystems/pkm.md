@@ -72,4 +72,4 @@
 - `packages/pkm/src/outline.test.ts`、`crates/vibevalley-pkm/src/tests.rs`：大纲无损往返、按需 `id::`、反链展开（Rust 一侧对着 golden）。
 - `crates/vibevalley-server/tests/pkm.rs`：建页与挪页、读外部编辑器写的、按操作改块保留 id 并撤销、闪念进今天的日记。
 - `packages/pkm/src/pkm.test.ts`：编辑、选择与日记视图的纯函数。
-- `apps/mac/ui/vv/app/notes.test.tsx`、`apps/mac/ui/vv/app/pkm.test.ts`：笔记页在样例数据上的页面测试（`nsh/test`）。
+- `apps/mac/ui/vv/app/scenarios.test.tsx`：笔记页在多密度虚拟时钟场景下的页面测试（`nsh/test`）。

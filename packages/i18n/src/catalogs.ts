@@ -85,16 +85,16 @@ export const catalogs = {
       saving: "保存中…",
       create: "捏好了，保存",
       save: "保存",
-      backToProfile: "← 回到档案",
-      trajectoriesHint:
-        "它派出去的每个帮工，从接活起的每一步：收到的话、用的每个工具（点一行看输入和输出）、说的话。收工以后这些记录留 30 天，帮工本身一直列着。",
-      trajectories: "轨迹",
+      runsLink: "查看轨迹",
       remove: "删除",
       removeWhich: "删掉 {name}？",
       fine: "配置没问题，可以派活。",
       problems: "派不出去的原因",
       cannot: "派不出去：",
       random: "随机一个",
+      avatar: "角色头像",
+      avatarHint: "在工作台与聊天里展示这个头像；留空时显示农场里的小动物。",
+      avatarAnimal: "默认小动物",
       looksAs: "在农场里是",
       looksHint: "只是长相：同一台农机 可以是不同的动物。",
       wears: "穿什么",
@@ -178,28 +178,32 @@ export const catalogs = {
         add: "加进来",
         added: "模板「{name}」加进来了，还没装",
         onServer: "跑在 VibeValley 自己的 agent 上",
-        runsOn: "写给 {runtime}，这台机器上有",
         notHere: "写给 {runtime}，这台机器上没有：装上以后在档案里换一台农机",
         noPersona: "没写人设。",
-        installed: "装了 {n} 份",
         addedHere: " · 本机加进来的",
-        skills: "带着技能：{skills}",
         skill: "技能「{name}」：{description}",
-        look: "看看",
         fold: "收起",
         removeSure: "真的删掉模板",
-        install: "装上",
-        none: "还没有帮工：从模板装几个，或者自己捏一个。",
         from: "来自模板「{name}」第 {version} 版",
         update: "照模板更新到第 {version} 版",
         updateHint: "用模板的新版本盖掉职责、适合的活、人设和交给农机的方式；名字、长相、农机、模型和环境不动。",
         updated: "照模板更新好了",
+        galleryTitle: "开箱即用的模板",
+        galleryIntro: "按分工挑一份模板：自带风格、人设与技能，一键采用即可派活。",
+        manageLink: "全部模板与导入 →",
+        adopt: "一键采用",
+        adopted: "已采用 {n}",
+        adoptedToast: "已采用「{name}」",
+        willUse: "将用 {runtime}",
+        style: "风格 · {style}",
+        preview: "人设",
+        category: { all: "全部", engineering: "研发工程", product: "产品设计", research: "调研文档", orchestration: "助手" },
       },
       orchestrator: {
         newName: "新的助手",
         intro:
           "助手常驻、带队、自己不干活：听你说要做什么，派帮工去做，盯着进度，转告结果。它跑在 VibeValley 自己的 agent 上，有自己的私聊、记性和轨迹；把频道交给它照看，在那个频道里说话就是它回答。",
-        page: "它的记性和轨迹 →",
+        page: "它的记性与声音 →",
         nameTip: "频道里叫这个名字；别人用 @它的档案 id 叫它。",
         model: "模型",
         modelTip: "DeepSeek 的模型，留空用默认的。",
@@ -210,20 +214,23 @@ export const catalogs = {
         look: "长相",
       },
       list: {
+        filterLabel: "按类型筛选",
+        all: "全部",
         orchestrators: "助手",
         helpers: "帮工",
-        make: "捏一个新帮工",
-        makeOrchestrator: "添一个助手",
+        search: "搜索档案",
+        searchHint: "搜名字、职责、农机、标签…",
+        make: "新帮工",
+        makeOrchestrator: "添助手",
         orchestratorLine: "不当帮工：派活、盯进度、转告结果。",
-        ledger: "旧账",
-        voice: "声音",
+        orchestratorSummary: "常驻带队",
+        defaultBadge: "默认",
+        disabledBadge: "已停用",
         disable: "停用",
         enable: "启用",
         toggle: "{act} {name}",
-        here: "在场 {n}",
-        tallyHint: "从这份档案派出去的帮工，干的活收进主分支的次数",
-        hired: "雇过",
-        merged: "合进",
+        emptySearch: "没有符合条件的档案。",
+        clearFilter: "清掉筛选",
       },
       runtimeDefault: "农机默认",
       runtimeDefaultModel: "农机默认（{model}）",
@@ -254,8 +261,6 @@ export const catalogs = {
         rail: "这篇的旁注",
         railShow: "打开旁注",
         railHide: "收起旁注",
-        listShow: "展开列表",
-        listHide: "收起列表",
         backToLibrary: "返回素材库",
       },
       issue: { title: "Artifact" },
@@ -533,6 +538,7 @@ export const catalogs = {
       place: {
         chat: { label: "聊天", hint: "频道和串" },
         issues: { label: "工单", hint: "每张工单从写下到关上" },
+        runs: { label: "运行与轨迹", hint: "进行中的帮工、助手审批与历史轨迹" },
         agents: { label: "档案", hint: "档案：助手和帮工" },
         runtimes: { label: "农机", hint: "机器上的编码 agent" },
         repos: { label: "仓库", hint: "每个仓库一座岛" },
@@ -547,6 +553,7 @@ export const catalogs = {
       update: "更新",
       working: "开工中 · {n} 个在干活",
       off: "没开工",
+      runsHint: "查看进行中的帮工、助手审批与轨迹",
       chips: { drop: "去掉 {v}", valueOf: "{k} 的值", removeKey: "删除 {k}", remove: "删除", name: "变量名", value: "变量的值", valueHint: "值", add: "添加" },
       toasts: "提示",
       runtime: "运行工具：{name}",
@@ -705,7 +712,6 @@ export const catalogs = {
       recut: "重新切",
       cursorsIntro: "鼠标在农场里的样子：平时、指着能点的、拿着工具时。",
       cursorsFind: "找：指针的名字（glove、water、harvest……）",
-      cursors: "指针 · {n}",
       cursorsNote:
         "红点是点下去落在哪。平时是手套，指着能点的伸出食指；拿着工具时是那件工具，能用的带闪光，用不上的带禁止标记。切自 design/pixel/raw/ui-cursors.png（design/pixel/process.py ui-cursors）。",
       noCursors: "这个版本没有带上指针的图（assets/cursors）。",
@@ -854,6 +860,10 @@ export const catalogs = {
         attach: "附上文件",
         uploadFailed: "没传上去：{why}",
         command: "命令",
+        artifactContext: "当前上下文：{title}",
+        artifactSlide: "第 {n} 页",
+        clearContext: "移除本次附带的上下文",
+        runningHint: "正在处理中，可直接补充说明或点击停止",
       },
       manage: {
         name: "名称",
@@ -943,6 +953,7 @@ export const catalogs = {
       },
       lacks: "回不了话：{why}",
       lacksFix: "去设置",
+      orchestratorRuns: "查看助手轨迹与待审批调用",
     },
     "web.connector": {
       connectors: {
@@ -1178,6 +1189,7 @@ export const catalogs = {
       app: { missed: "未接", channels: "频道", games: "游戏" },
       game: { blocks: "方块", sokoban: "推箱子", dino: "小恐龙", bugs: "贪吃虫", merge: "种田 2048" },
       phone: "手机",
+      new: "新",
       brand: "农场通",
       openChat: "展开田头",
       key: { up: "上", left: "左", right: "右", down: "下" },
@@ -1367,6 +1379,7 @@ export const catalogs = {
         unread: "读不到。",
         full: "要做的（完整说明）",
         steps: "帮工的每一步",
+        openTrajectory: "完整轨迹",
         runs: "每一轮",
         time: "时间",
         opened: "开单",
@@ -1550,6 +1563,20 @@ export const catalogs = {
         editsKept: "刚才的内容已提交，修改后的草稿已保留。",
       },
       conversation: { title: "讨论与交付记录", older: "加载更早的消息", empty: "需求讨论、执行反馈与交付会保留在这里" },
+      onboarding: {
+        title: "开始使用 VibeValley",
+        subtitle: "按下面三步准备好环境，就能把工单派给帮工干活。",
+        step1Title: "检查或配置农机",
+        step1Desc: "确认本机已安装并启用编码 agent（如 Claude Code、Codex 等）",
+        step1Action: "配置农机",
+        step2Title: "添加代码仓库",
+        step2Desc: "绑定本机 Git 仓库，帮工会在独立工作目录里改动代码",
+        step2Action: "添加仓库",
+        step3Title: "创建第一条工单，或在聊天中派活",
+        step3Desc: "写下需求直接派给帮工，或按 C 键新建工单，也可以在聊天里让助手帮你拆解",
+        newIssue: "新建工单",
+        openChat: "去聊天派活",
+      },
     },
     "web.library": {
       title: "素材库",
@@ -1565,14 +1592,7 @@ export const catalogs = {
       rail: { where: "来路", kind: "种类", artifacts: "作品交付", channels: "来自频道", agents: "来自帮工", anyWhere: "全部来路", anyKind: "全部种类" },
       origin: { all: "全部", generated: "生成的", uploaded: "你上传的", fetched: "帮工拿回来的" },
       kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
-      artifactKind: {
-        all: "全部作品",
-        canvas: "视觉画板 (.visual.html)",
-        slides: "幻灯片 (.slide.html)",
-        dashboard: "仪表盘 (.dashboard.html)",
-        whiteboard: "白板 (.whiteboard)",
-        page: "网页与文档",
-      },
+      artifactKind: { all: "全部作品", canvas: "视觉画板", slides: "幻灯片", dashboard: "仪表盘", whiteboard: "白板", page: "网页与文档" },
       newArtifact: "新建作品",
       search: "搜索名字",
       sortLabel: "排序",
@@ -1783,12 +1803,13 @@ export const catalogs = {
         robot: { name: "机器人管家", blurb: "圆滚滚的农场机器人，脸上的屏会笑。" },
       },
       orchestrator: {
-        tab: { memory: "记性", trajectory: "轨迹", voice: "声音" },
+        tab: { memory: "记性", voice: "声音" },
         all: "← 全部档案",
         title: "助手",
         intro: "助手不当帮工：听你说要做什么，派帮工去做，盯着进度，转告结果。",
         look: "长相是{name}。",
         profile: "改它的档案",
+        runsLink: "查看轨迹",
         tabs: "助手的",
         heard: "收到",
         quiet: "助手还没开过口。",
@@ -1801,7 +1822,7 @@ export const catalogs = {
     "web.pkm": {
       place: { label: "笔记", hint: "你自己的笔记：每天的日记、PARA 分好的大纲页、反链和润色建议" },
       tier: { project: "项目", area: "领域", resource: "资源", inbox: "收件箱", journal: "日记", archive: "归档" },
-      list: { label: "页面和日历", find: "搜笔记", open: "{n} 项没做完", today: "今天" },
+      list: { label: "页面和日历", find: "搜笔记", newPage: "新建页面", newPagePlaceholder: "输入标题，回车建页", open: "{n} 项没做完", today: "今天" },
       calendar: { label: "日历", previous: "上个月", next: "下个月" },
       radar: { inbox: "收件箱", stale: "搁着", overdue: "过期", days: "{n} 天没动" },
       gone: "没有这一页，或者它的文件已经删掉了。",
@@ -1824,6 +1845,15 @@ export const catalogs = {
         refFrom: "引自「{page}」",
         notSaved: "没存上：{why}",
         outline: "大纲",
+        rename: "重命名页面",
+        renamed: "改名成了「{title}」",
+        create: "创建这一页",
+        freshHint: "这一页还没有建，写第一条就会自动保存。",
+        freshPlaceholder: "写下第一条，回车创建…",
+        copyRef: "复制块引用",
+        copiedRef: "块引用复制好了",
+        toIssue: "转成工单",
+        issueMade: "建好工单了",
       },
       props: {
         deadline: "截止 {day}",
@@ -1835,7 +1865,16 @@ export const catalogs = {
         fewer: "收起属性",
       },
       marker: { TODO: "待办", DOING: "在做", DONE: "做完了", NOW: "现在做", LATER: "以后做", WAITING: "在等", CANCELED: "不做了" },
-      command: { todo: "标成待办", doing: "标成在做", done: "标成做完了", clear: "去掉标记", h1: "大标题", h2: "小标题", today: "链到今天的日记" },
+      command: {
+        todo: "标成待办",
+        doing: "标成在做",
+        done: "标成做完了",
+        clear: "去掉标记",
+        h1: "大标题",
+        h2: "小标题",
+        code: "代码块",
+        today: "链到今天的日记",
+      },
       complete: { newPage: "新页面" },
       rail: { label: "这一页的旁注", show: "打开旁注", hide: "收起旁注", contents: "这页的大纲" },
       search: {
@@ -1901,7 +1940,6 @@ export const catalogs = {
       adapted: "能用的模型",
     },
     "web.repo": {
-      title: "仓库",
       list: "仓库列表",
       add: "新增仓库",
       repos: "代码库",
@@ -1994,9 +2032,7 @@ export const catalogs = {
       notFound: "没找到",
       checking: "检测中…",
       noRuntimes: "读不到农机：",
-      title: "农机",
       list: "农机列表",
-      intro: "机器上的编码 agent",
       usedBy: " · {n} 个 agent",
       reading: "读取中…",
       bundled: "随 oar 一起装",
@@ -2155,7 +2191,7 @@ export const catalogs = {
         run: "第 {n} 轮",
         earlier: "更早",
         search: "搜索轨迹",
-        searchHint: "搜索",
+        searchHint: "搜索步骤、工具、参数...",
         noMatch: "没有对得上的一步。",
         pending: "还没返回",
         noOutput: "没有输出",
@@ -2169,12 +2205,27 @@ export const catalogs = {
         marked: "标成了做错的一轮，存成了一条评测",
         want: "这一轮应该怎样",
         wantHint: "它应该怎样：比如「先问我是哪个仓库，别直接派活」",
-        neverSent: "还没派出去过。",
-        sent: "派出去的帮工",
-        here: "在场",
         hired: "{ago}接活",
         hiredAndLeft: "{hired}接活 · {left}走的",
-        pick: "选一个帮工，看它的轨迹。",
+      },
+      hub: {
+        search: "搜索运行与轨迹",
+        searchHint: "搜名字、工单、仓库…",
+        scopeLabel: "按范围看",
+        scope: { all: "全部", active: "进行中", orchestrator: "助手", worker: "帮工" },
+        list: "运行列表",
+        back: "← 全部运行",
+        filterAgent: "档案：{name}",
+        filterIssue: "工单：{label}",
+        clearFilter: "清掉筛选",
+        clear: "清除",
+        empty: "还没有运行记录。",
+        emptyFiltered: "没有符合当前筛选的运行。",
+        pick: "选一条运行，查看完整轨迹。",
+        openIssue: "看工单",
+        openProfile: "看档案",
+        orchestratorRole: "助手",
+        status: { working: "进行中", listening: "在听", resting: "待命", done: "已完成", failed: "失败", interrupted: "已中断", closed: "已结束" },
       },
       subagents: {
         heading: "子任务",
@@ -2364,39 +2415,117 @@ export const catalogs = {
       sidebar: {
         title: "仓库与终端",
         addRepo: "添加仓库",
-        addRepoButton: "+ 仓库",
+        addRepoButton: "仓库",
+        addRepoTooltip: "添加本地仓库或文件夹",
         otherFolders: "其他文件夹",
         running: "正在运行",
         runningAgent: "{agent} 正在运行",
+        ready: "待命",
+        readyAgent: "{agent} 待命",
+        needsAttention: "需要关注",
+        terminalCount: "{n} 个终端",
+        workingCount: "{n} 运行中",
+        readyCount: "{n} 待命",
+        attentionCount: "{n} 需要关注",
         closeTab: "关闭 {title}",
         newTerminal: "新终端：{name}",
         closeFolder: "关闭文件夹：{name}",
         mainWorktree: "{label} · 主目录",
+        mainLabel: "主目录",
+        collapseAll: "折叠全部",
+        expandCurrent: "展开当前",
+        collapseItem: "折叠 {name}",
+        expandItem: "展开 {name}",
+        collapseSection: "折叠 {title}",
+        expandSection: "展开 {title}",
+        newTerminalHere: "在此新建终端",
+        revealInFinder: "在 Finder 中显示",
+        copyPath: "复制路径",
+        removeWorktree: "删除工作树",
         files: "文件",
+        filesTip: "工作目录文件",
+        gitChanges: "变更",
+        gitChangesTip: "工作目录改动与暂存",
+        gitBranches: "分支",
+        gitBranchesTip: "本地分支与工作树",
+        gitCommits: "提交",
+        gitCommitsTip: "提交历史记录",
+      },
+      fileTree: {
+        title: "文件",
+        collapseAllDirs: "折叠全部目录",
+        loading: "正在读取目录…",
+        empty: "此目录为空。",
+        copyRelPath: "复制相对路径",
+        copyAbsPath: "复制绝对路径",
+        revealInFinder: "在 Finder 中显示",
+        newTerminalInDir: "在此目录新建终端",
       },
       git: {
+        title: "版本控制",
         loading: "正在读取 Git 状态…",
         notRepo: "当前目录不是 Git 仓库。",
         refresh: "刷新 Git",
+        justNow: "刚刚",
+        minutesAgo: "{n}分钟前",
+        hoursAgo: "{n}小时前",
+        daysAgo: "{n}天前",
+        confirmDiscard: "确认丢弃",
+        cancel: "取消",
+        unstagePath: "取消暂存 {path}",
+        discardPath: "丢弃改动 {path}",
+        stagePath: "暂存 {path}",
         tab: { changes: "变更", changesCount: "变更 ({count})", branches: "分支 ({count})", commits: "历史" },
         commitPlaceholder: "输入提交信息…",
+        committing: "正在提交…",
+        commitSuccess: "提交成功",
         commitStaged: "提交暂存变更 ({count})",
         noStaged: "暂无暂存文件",
+        stageAllCount: "一键暂存全部变更 ({count})",
         conflicts: "冲突",
         staged: "已暂存",
         unstageAll: "全部取消暂存",
         stagedEmpty: "暂无已暂存的文件。",
-        changes: "未暂存变更",
+        changes: "未暂存",
         stageAll: "全部暂存",
         clean: "工作目录干净，没有未提交改动。",
         branches: "本地分支",
+        filterBranches: "过滤分支名…",
+        noMatchingBranches: "没有匹配的本地分支。",
         currentBranch: "{name}，当前分支",
         switchBranch: "切换到 {name}",
+        switching: "切换中…",
         noBranches: "未找到本地分支。",
         worktrees: "工作树",
-        mainWorktree: "主工作树",
+        newWorktree: "新建工作树",
+        creatingWorktree: "创建中…",
+        createWorktreeBtn: "新建",
+        newBranchPlaceholder: "新分支名，如 feat/login",
+        createBtn: "创建",
+        mainLabel: "主目录",
+        removing: "正在删除…",
+        removedWorktree: "已删除工作树 {label}",
+        removeFailed: "删除失败：{why}",
+        wtConflictsCount: "{n} 冲突",
+        wtChangedCount: "{n} 变更",
+        wtClean: "干净",
+        wtDirtyPrompt: "包含未提交变更",
+        wtConfirmDeletePrompt: "确认删除该工作树？",
+        wtForceDelete: "强制删除",
+        wtConfirmDelete: "确认删除",
+        wtRemoveMenu: "删除工作树…",
+        wtRunning: "干活中",
         commits: "提交记录",
         noCommits: "暂无提交记录。",
+      },
+      section: { collapse: "折叠 {title}", expand: "展开 {title}" },
+      palette: {
+        placeholder: { commands: "输入命令或跳转到任意页面…", files: "跳转到文件…", search: "在项目中搜索文本…" },
+        mode: { commands: "命令", files: "文件", search: "搜索" },
+        a11y: { commands: "命令", files: "文件", search: "搜索结果" },
+        searching: "搜索中…",
+        empty: { commands: "没有匹配的命令。", files: "没有匹配的文件。", search: "没有匹配结果。" },
+        footer: { select: "选择", run: "执行", close: "关闭" },
       },
     },
     "web.tree": { sky: "农场的记忆星空" },
@@ -2654,16 +2783,16 @@ export const catalogs = {
       saving: "Saving…",
       create: "Done, save it",
       save: "Save",
-      backToProfile: "← Back to the profile",
-      trajectoriesHint:
-        "Every helper sent from it, every step since it took the ticket: what it heard, every tool it used (click a row for the input and output), what it said. Steps are kept 30 days after it leaves; the helper itself stays listed.",
-      trajectories: "Trajectories",
+      runsLink: "View runs",
       remove: "Delete",
       removeWhich: "Delete {name}?",
       fine: "The configuration is fine: it can be sent work.",
       problems: "Why it cannot be sent",
       cannot: "Cannot be sent: ",
       random: "A random one",
+      avatar: "Role avatar",
+      avatarHint: "Shown in lists and chat; when unset, the farm animal face is shown.",
+      avatarAnimal: "Animal face",
       looksAs: "On the farm it is",
       looksHint: "Only looks: the same runtime can be different animals.",
       wears: "Wears",
@@ -2752,28 +2881,32 @@ export const catalogs = {
         add: "Add it",
         added: 'The template "{name}" is added, not installed yet',
         onServer: "Runs on VibeValley's own agent",
-        runsOn: "Written for {runtime}, which this machine has",
         notHere: "Written for {runtime}, which this machine lacks: once installed, pick another machine in the profile",
         noPersona: "No persona.",
-        installed: "{n} installed",
         addedHere: " · added on this machine",
-        skills: "Comes with skills: {skills}",
         skill: 'Skill "{name}": {description}',
-        look: "Look",
         fold: "Fold",
         removeSure: "Really delete the template",
-        install: "Install",
-        none: "No helpers yet: install some from a template, or make one yourself.",
         from: 'From the template "{name}", version {version}',
         update: "Update to the template's version {version}",
         updateHint: "The template's new version replaces the duty, tags, persona and how it is given; the name, look, machine, model and environment stay.",
         updated: "Updated from the template",
+        galleryTitle: "Starter templates",
+        galleryIntro: "Adopt a ready-to-use role with a working style, persona, and skills.",
+        manageLink: "All templates & import →",
+        adopt: "Adopt",
+        adopted: "{n} adopted",
+        adoptedToast: 'Adopted "{name}"',
+        willUse: "Uses {runtime}",
+        style: "Style · {style}",
+        preview: "Persona",
+        category: { all: "All", engineering: "Engineering", product: "Product & Design", research: "Research & Docs", orchestration: "Assistants" },
       },
       orchestrator: {
         newName: "New assistant",
         intro:
           "An assistant stays, leads and does no work itself: it hears what you want done, sends helpers to do it, watches progress and passes on results. It runs on VibeValley's own agent, with its own direct messages, memory and trajectory; hand it a channel to look after, and what you say there it answers.",
-        page: "Its memory and trajectory →",
+        page: "Its memory and voice →",
         nameTip: "Its name in the chat; others call it with @ and its profile id.",
         model: "Model",
         modelTip: "A DeepSeek model; empty is the default one.",
@@ -2784,20 +2917,23 @@ export const catalogs = {
         look: "Look",
       },
       list: {
+        filterLabel: "Filter by role",
+        all: "All",
         orchestrators: "Assistants",
         helpers: "Helpers",
-        make: "Make a new helper",
-        makeOrchestrator: "Add an assistant",
+        search: "Search profiles",
+        searchHint: "Search name, duty, machine, tags…",
+        make: "New helper",
+        makeOrchestrator: "Add assistant",
         orchestratorLine: "Not a helper: sends work, watches progress, passes on results.",
-        ledger: "Ledger",
-        voice: "Voice",
+        orchestratorSummary: "Standing assistant",
+        defaultBadge: "Default",
+        disabledBadge: "Disabled",
         disable: "Disable",
         enable: "Enable",
         toggle: "{act} {name}",
-        here: "{n} here",
-        tallyHint: "How many times helpers sent from this profile got work merged into main",
-        hired: "Hired",
-        merged: "Merged",
+        emptySearch: "No profiles match the current filters.",
+        clearFilter: "Clear filters",
       },
       runtimeDefault: "The runtime's default",
       runtimeDefaultModel: "The runtime's default ({model})",
@@ -2828,8 +2964,6 @@ export const catalogs = {
         rail: "Beside this artifact",
         railShow: "Show the side panel",
         railHide: "Hide the side panel",
-        listShow: "Show list",
-        listHide: "Hide list",
         backToLibrary: "Back to library",
       },
       issue: { title: "Artifacts" },
@@ -3108,6 +3242,7 @@ export const catalogs = {
       place: {
         chat: { label: "Chat", hint: "Channels and threads" },
         issues: { label: "Tickets", hint: "Every ticket from written to closed" },
+        runs: { label: "Runs & trajectories", hint: "Active helpers, assistant approvals, and run trajectories" },
         agents: { label: "Profiles", hint: "Profiles: assistants and helpers" },
         runtimes: { label: "Machines", hint: "The coding agents on this computer" },
         repos: { label: "Repos", hint: "An island for each repo" },
@@ -3122,6 +3257,7 @@ export const catalogs = {
       update: "Update",
       working: "Open · {n} working",
       off: "Not open",
+      runsHint: "View active runs, assistant approvals, and trajectories",
       chips: {
         drop: "Remove {v}",
         valueOf: "{k}'s value",
@@ -3295,7 +3431,6 @@ export const catalogs = {
       recut: "Cut again",
       cursorsIntro: "The mouse on the farm: normally, over something clickable, and holding a tool.",
       cursorsFind: "Find: a cursor's name (glove, water, harvest…)",
-      cursors: "Cursors · {n}",
       cursorsNote:
         "The red dot is where a click lands. Normally a glove, a pointing finger over something clickable; holding a tool, that tool, sparkling where it can be used and with a no-entry mark where it cannot. Cut from design/pixel/raw/ui-cursors.png (design/pixel/process.py ui-cursors).",
       noCursors: "This build has no cursor pictures (assets/cursors).",
@@ -3447,6 +3582,10 @@ export const catalogs = {
         attach: "Attach a file",
         uploadFailed: "Not uploaded: {why}",
         command: "Commands",
+        artifactContext: "Context: {title}",
+        artifactSlide: "Slide {n}",
+        clearContext: "Remove attached context",
+        runningHint: "Working — send a follow-up or click stop",
       },
       manage: {
         name: "Name",
@@ -3545,6 +3684,7 @@ export const catalogs = {
       },
       lacks: "cannot answer: {why}",
       lacksFix: "Settings",
+      orchestratorRuns: "View assistant trajectory and pending approvals",
     },
     "web.connector": {
       connectors: {
@@ -3791,6 +3931,7 @@ export const catalogs = {
       app: { missed: "Missed", channels: "Chat", games: "Games" },
       game: { blocks: "Blocks", sokoban: "Sokoban", dino: "Dino", bugs: "Bug snake", merge: "Farm 2048" },
       phone: "Phone",
+      new: "NEW",
       brand: "FarmTel",
       openChat: "Open the farm chat",
       key: { up: "Up", left: "Left", right: "Right", down: "Down" },
@@ -4006,6 +4147,7 @@ export const catalogs = {
         unread: "Cannot be read.",
         full: "What to do (in full)",
         steps: "The helper's every step",
+        openTrajectory: "Full trajectory",
         runs: "Every round of work",
         time: "Time",
         opened: "Opened",
@@ -4194,6 +4336,20 @@ export const catalogs = {
         editsKept: "The previous version was submitted. Your edits are still in the draft.",
       },
       conversation: { title: "Discussion and delivery", older: "Load earlier messages", empty: "Requirements, execution feedback and deliveries stay here" },
+      onboarding: {
+        title: "Get started with VibeValley",
+        subtitle: "Complete these three steps to dispatch tickets to helpers.",
+        step1Title: "Check or configure runtimes",
+        step1Desc: "Verify a local coding agent (such as Claude Code or Codex) is installed and enabled.",
+        step1Action: "Configure runtimes",
+        step2Title: "Add a repository",
+        step2Desc: "Link a local Git repository so helpers can work in isolated worktrees.",
+        step2Action: "Add repository",
+        step3Title: "Create your first ticket or dispatch in chat",
+        step3Desc: "Describe what to build for a helper, press C to create a ticket, or ask the assistant in chat to break it down.",
+        newIssue: "New ticket",
+        openChat: "Open chat",
+      },
     },
     "web.library": {
       title: "Library",
@@ -4217,14 +4373,7 @@ export const catalogs = {
       },
       origin: { all: "All", generated: "Generated", uploaded: "Uploaded", fetched: "Brought back" },
       kind: { all: "All", image: "Images", audio: "Audio", video: "Video", other: "Other" },
-      artifactKind: {
-        all: "All deliverables",
-        canvas: "Visual (.visual.html)",
-        slides: "Slides (.slide.html)",
-        dashboard: "Dashboard (.dashboard.html)",
-        whiteboard: "Whiteboard (.whiteboard)",
-        page: "Pages & docs",
-      },
+      artifactKind: { all: "All deliverables", canvas: "Visual", slides: "Slides", dashboard: "Dashboard", whiteboard: "Whiteboard", page: "Pages & docs" },
       newArtifact: "New deliverable",
       search: "Search names",
       sortLabel: "Sort",
@@ -4443,12 +4592,13 @@ export const catalogs = {
         robot: { name: "Robot butler", blurb: "A round farm robot whose face screen smiles." },
       },
       orchestrator: {
-        tab: { memory: "Memory", trajectory: "Trajectory", voice: "Voice" },
+        tab: { memory: "Memory", voice: "Voice" },
         all: "← All profiles",
         title: "Assistant",
         intro: "The assistant is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
         look: "It looks like {name}.",
         profile: "Edit its profile",
+        runsLink: "View runs",
         tabs: "The assistant's",
         heard: "Heard",
         quiet: "The assistant has not spoken yet.",
@@ -4466,7 +4616,14 @@ export const catalogs = {
     "web.pkm": {
       place: { label: "Notes", hint: "Your own notes: daily journals, outline pages sorted by PARA, backlinks and suggested rewrites" },
       tier: { project: "Projects", area: "Areas", resource: "Resources", inbox: "Inbox", journal: "Journals", archive: "Archive" },
-      list: { label: "Pages and calendar", find: "Search notes", open: "{n} open", today: "Today" },
+      list: {
+        label: "Pages and calendar",
+        find: "Search notes",
+        newPage: "New page",
+        newPagePlaceholder: "Page title, Enter to create",
+        open: "{n} open",
+        today: "Today",
+      },
       calendar: { label: "Calendar", previous: "Previous month", next: "Next month" },
       radar: { inbox: "Inbox", stale: "Stale", overdue: "Overdue", days: "{n} days untouched" },
       gone: "There is no such page, or its file was deleted.",
@@ -4489,6 +4646,15 @@ export const catalogs = {
         refFrom: "From “{page}”",
         notSaved: "Not saved: {why}",
         outline: "Outline",
+        rename: "Rename page",
+        renamed: "Renamed to “{title}”",
+        create: "Create this page",
+        freshHint: "This page does not exist yet. Write the first block to create it.",
+        freshPlaceholder: "Write the first block, Enter to create…",
+        copyRef: "Copy block ref",
+        copiedRef: "Block ref copied",
+        toIssue: "Turn into issue",
+        issueMade: "Issue created",
       },
       props: {
         deadline: "Due {day}",
@@ -4507,6 +4673,7 @@ export const catalogs = {
         clear: "Clear the mark",
         h1: "Heading",
         h2: "Subheading",
+        code: "Code block",
         today: "Link today's journal",
       },
       complete: { newPage: "New page" },
@@ -4591,7 +4758,6 @@ export const catalogs = {
       adapted: "Models it can use",
     },
     "web.repo": {
-      title: "Repos",
       list: "Repos",
       add: "New repo",
       repos: "Code bases",
@@ -4684,9 +4850,7 @@ export const catalogs = {
       notFound: "not found",
       checking: "checking…",
       noRuntimes: "The machines could not be read: ",
-      title: "Machines",
       list: "Machines",
-      intro: "The coding agents on this computer",
       usedBy: " · {n} agents",
       reading: "Reading…",
       bundled: "installed with oar",
@@ -4865,7 +5029,7 @@ export const catalogs = {
         run: "Round {n}",
         earlier: "Earlier",
         search: "Search the trajectory",
-        searchHint: "Search",
+        searchHint: "Filter steps, tools, args...",
         noMatch: "No step matches.",
         pending: "Not returned yet",
         noOutput: "No output",
@@ -4879,12 +5043,27 @@ export const catalogs = {
         marked: "Marked as a wrong round and kept as an eval",
         want: "What this round should have done",
         wantHint: 'What it should do: such as "ask me which repo first, do not send work right away"',
-        neverSent: "Nothing sent out yet.",
-        sent: "Helpers sent out",
-        here: "Here",
         hired: "took the ticket {ago}",
         hiredAndLeft: "took the ticket {hired} · left {left}",
-        pick: "Pick a helper to see its trajectory.",
+      },
+      hub: {
+        search: "Search runs and trajectories",
+        searchHint: "Search name, ticket, repo…",
+        scopeLabel: "Filter scope",
+        scope: { all: "All", active: "Active", orchestrator: "Assistants", worker: "Helpers" },
+        list: "Runs",
+        back: "← All runs",
+        filterAgent: "Profile: {name}",
+        filterIssue: "Ticket: {label}",
+        clearFilter: "Clear filters",
+        clear: "Clear",
+        empty: "No runs yet.",
+        emptyFiltered: "No runs match the current filters.",
+        pick: "Pick a run to inspect its trajectory.",
+        openIssue: "Open ticket",
+        openProfile: "Open profile",
+        orchestratorRole: "Assistant",
+        status: { working: "Working", listening: "Listening", resting: "Idle", done: "Done", failed: "Failed", interrupted: "Interrupted", closed: "Closed" },
       },
       subagents: {
         heading: "Subtasks",
@@ -5076,39 +5255,117 @@ export const catalogs = {
       sidebar: {
         title: "Repos & terminals",
         addRepo: "Add repository",
-        addRepoButton: "+ Repo",
+        addRepoButton: "Repo",
+        addRepoTooltip: "Add a local repository or folder",
         otherFolders: "Other folders",
         running: "Running",
         runningAgent: "{agent} running",
+        ready: "Ready",
+        readyAgent: "{agent} ready",
+        needsAttention: "Needs attention",
+        terminalCount: "{n} terminals",
+        workingCount: "{n} running",
+        readyCount: "{n} ready",
+        attentionCount: "{n} attention",
         closeTab: "Close {title}",
         newTerminal: "New terminal: {name}",
         closeFolder: "Close folder: {name}",
         mainWorktree: "{label} · main",
+        mainLabel: "main",
+        collapseAll: "Collapse all",
+        expandCurrent: "Expand current",
+        collapseItem: "Collapse {name}",
+        expandItem: "Expand {name}",
+        collapseSection: "Collapse {title}",
+        expandSection: "Expand {title}",
+        newTerminalHere: "New terminal here",
+        revealInFinder: "Reveal in Finder",
+        copyPath: "Copy path",
+        removeWorktree: "Delete worktree",
         files: "Files",
+        filesTip: "Workspace files",
+        gitChanges: "Changes",
+        gitChangesTip: "Workspace changes & staged",
+        gitBranches: "Branches",
+        gitBranchesTip: "Local branches & worktrees",
+        gitCommits: "Commits",
+        gitCommitsTip: "Commit history",
+      },
+      fileTree: {
+        title: "Files",
+        collapseAllDirs: "Collapse all folders",
+        loading: "Reading the project…",
+        empty: "This folder is empty.",
+        copyRelPath: "Copy relative path",
+        copyAbsPath: "Copy full path",
+        revealInFinder: "Reveal in Finder",
+        newTerminalInDir: "New terminal in folder",
       },
       git: {
+        title: "Source Control",
         loading: "Loading Git status…",
         notRepo: "This folder is not a Git repository.",
         refresh: "Refresh Git",
+        justNow: "Just now",
+        minutesAgo: "{n}m ago",
+        hoursAgo: "{n}h ago",
+        daysAgo: "{n}d ago",
+        confirmDiscard: "Discard",
+        cancel: "Cancel",
+        unstagePath: "Unstage {path}",
+        discardPath: "Discard changes in {path}",
+        stagePath: "Stage {path}",
         tab: { changes: "Changes", changesCount: "Changes ({count})", branches: "Branches ({count})", commits: "Commits" },
         commitPlaceholder: "Commit message…",
+        committing: "Committing…",
+        commitSuccess: "Committed",
         commitStaged: "Commit staged ({count})",
         noStaged: "No staged files",
+        stageAllCount: "Stage all changes ({count})",
         conflicts: "Conflicts",
         staged: "Staged",
         unstageAll: "Unstage all",
         stagedEmpty: "No staged files.",
-        changes: "Changes",
+        changes: "Unstaged",
         stageAll: "Stage all",
         clean: "Working tree clean, no uncommitted changes.",
         branches: "Branches",
+        filterBranches: "Filter branches…",
+        noMatchingBranches: "No matching local branches.",
         currentBranch: "{name}, current branch",
         switchBranch: "Switch to {name}",
+        switching: "Switching…",
         noBranches: "No local branches found.",
         worktrees: "Worktrees",
-        mainWorktree: "Main worktree",
+        newWorktree: "New worktree",
+        creatingWorktree: "Creating…",
+        createWorktreeBtn: "New",
+        newBranchPlaceholder: "New branch, e.g. feat/login",
+        createBtn: "Create",
+        mainLabel: "main",
+        removing: "Deleting…",
+        removedWorktree: "Deleted worktree {label}",
+        removeFailed: "Delete failed: {why}",
+        wtConflictsCount: "{n} conflicts",
+        wtChangedCount: "{n} changed",
+        wtClean: "clean",
+        wtDirtyPrompt: "Has uncommitted changes",
+        wtConfirmDeletePrompt: "Delete this worktree?",
+        wtForceDelete: "Force delete",
+        wtConfirmDelete: "Confirm delete",
+        wtRemoveMenu: "Delete worktree…",
+        wtRunning: "Working",
         commits: "Commit history",
         noCommits: "No commits yet.",
+      },
+      section: { collapse: "Collapse {title}", expand: "Expand {title}" },
+      palette: {
+        placeholder: { commands: "Type a command or jump to any page…", files: "Jump to a file…", search: "Search text in project…" },
+        mode: { commands: "Commands", files: "Files", search: "Search" },
+        a11y: { commands: "Commands", files: "Files", search: "Search results" },
+        searching: "Searching…",
+        empty: { commands: "No matching commands.", files: "No matching files.", search: "No matching results." },
+        footer: { select: "Select", run: "Run", close: "Close" },
       },
     },
     "web.tree": { sky: "The farm's sky of memories" },
@@ -5367,8 +5624,10 @@ export interface Messages {
   "web.agent.add": undefined;
   "web.agent.all": undefined;
   "web.agent.available": undefined;
+  "web.agent.avatar": undefined;
+  "web.agent.avatarAnimal": undefined;
+  "web.agent.avatarHint": undefined;
   "web.agent.backToAll": undefined;
-  "web.agent.backToProfile": undefined;
   "web.agent.can": { readonly runtime: string | number };
   "web.agent.cannot": undefined;
   "web.agent.checking": undefined;
@@ -5393,20 +5652,23 @@ export interface Messages {
   "web.agent.isNew": undefined;
   "web.agent.library": undefined;
   "web.agent.libraryTip": undefined;
+  "web.agent.list.all": undefined;
+  "web.agent.list.clearFilter": undefined;
+  "web.agent.list.defaultBadge": undefined;
   "web.agent.list.disable": undefined;
+  "web.agent.list.disabledBadge": undefined;
+  "web.agent.list.emptySearch": undefined;
   "web.agent.list.enable": undefined;
+  "web.agent.list.filterLabel": undefined;
   "web.agent.list.helpers": undefined;
-  "web.agent.list.here": { readonly n: string | number };
-  "web.agent.list.hired": undefined;
-  "web.agent.list.ledger": undefined;
   "web.agent.list.make": undefined;
   "web.agent.list.makeOrchestrator": undefined;
-  "web.agent.list.merged": undefined;
   "web.agent.list.orchestratorLine": undefined;
+  "web.agent.list.orchestratorSummary": undefined;
   "web.agent.list.orchestrators": undefined;
-  "web.agent.list.tallyHint": undefined;
+  "web.agent.list.search": undefined;
+  "web.agent.list.searchHint": undefined;
   "web.agent.list.toggle": { readonly act: string | number; readonly name: string | number };
-  "web.agent.list.voice": undefined;
   "web.agent.loading": undefined;
   "web.agent.looksAs": undefined;
   "web.agent.looksHint": undefined;
@@ -5469,6 +5731,7 @@ export interface Messages {
   "web.agent.role.orchestrator": undefined;
   "web.agent.role.worker": undefined;
   "web.agent.roleHint": undefined;
+  "web.agent.runsLink": undefined;
   "web.agent.runtimeDefault": undefined;
   "web.agent.runtimeDefaultModel": { readonly model: string | number };
   "web.agent.save": undefined;
@@ -5490,30 +5753,36 @@ export interface Messages {
   "web.agent.templates.add": undefined;
   "web.agent.templates.added": { readonly name: string | number };
   "web.agent.templates.addedHere": undefined;
+  "web.agent.templates.adopt": undefined;
+  "web.agent.templates.adopted": { readonly n: string | number };
+  "web.agent.templates.adoptedToast": { readonly name: string | number };
+  "web.agent.templates.category.all": undefined;
+  "web.agent.templates.category.engineering": undefined;
+  "web.agent.templates.category.orchestration": undefined;
+  "web.agent.templates.category.product": undefined;
+  "web.agent.templates.category.research": undefined;
   "web.agent.templates.fold": undefined;
   "web.agent.templates.folder": undefined;
   "web.agent.templates.folderHint": undefined;
   "web.agent.templates.from": { readonly name: string | number; readonly version: string | number };
-  "web.agent.templates.install": undefined;
-  "web.agent.templates.installed": { readonly n: string | number };
+  "web.agent.templates.galleryIntro": undefined;
+  "web.agent.templates.galleryTitle": undefined;
   "web.agent.templates.intro": undefined;
-  "web.agent.templates.look": undefined;
+  "web.agent.templates.manageLink": undefined;
   "web.agent.templates.noPersona": undefined;
-  "web.agent.templates.none": undefined;
   "web.agent.templates.notHere": { readonly runtime: string | number };
   "web.agent.templates.onServer": undefined;
   "web.agent.templates.open": undefined;
   "web.agent.templates.openLine": undefined;
+  "web.agent.templates.preview": undefined;
   "web.agent.templates.removeSure": undefined;
-  "web.agent.templates.runsOn": { readonly runtime: string | number };
   "web.agent.templates.skill": { readonly description: string | number; readonly name: string | number };
-  "web.agent.templates.skills": { readonly skills: string | number };
+  "web.agent.templates.style": { readonly style: string | number };
   "web.agent.templates.title": undefined;
   "web.agent.templates.update": { readonly version: string | number };
   "web.agent.templates.updateHint": undefined;
   "web.agent.templates.updated": undefined;
-  "web.agent.trajectories": undefined;
-  "web.agent.trajectoriesHint": undefined;
+  "web.agent.templates.willUse": { readonly runtime: string | number };
   "web.agent.unnamed": undefined;
   "web.agent.unnamedAgent": undefined;
   "web.agent.unreported": undefined;
@@ -5619,8 +5888,6 @@ export interface Messages {
   "web.artifact.page.group.delivered": undefined;
   "web.artifact.page.group.mine": undefined;
   "web.artifact.page.list": undefined;
-  "web.artifact.page.listHide": undefined;
-  "web.artifact.page.listShow": undefined;
   "web.artifact.page.more": undefined;
   "web.artifact.page.new": undefined;
   "web.artifact.page.none": undefined;
@@ -5878,6 +6145,8 @@ export interface Messages {
   "web.base.place.issues.label": undefined;
   "web.base.place.repos.hint": undefined;
   "web.base.place.repos.label": undefined;
+  "web.base.place.runs.hint": undefined;
+  "web.base.place.runs.label": undefined;
   "web.base.place.runtimes.hint": undefined;
   "web.base.place.runtimes.label": undefined;
   "web.base.place.settings.hint": undefined;
@@ -5899,6 +6168,7 @@ export interface Messages {
   "web.base.route.home": undefined;
   "web.base.route.invalid": undefined;
   "web.base.route.missing": undefined;
+  "web.base.runsHint": undefined;
   "web.base.runtime": { readonly name: string | number };
   "web.base.secret.hide": undefined;
   "web.base.secret.peek": undefined;
@@ -5983,7 +6253,6 @@ export interface Messages {
   "web.catalog.copied": undefined;
   "web.catalog.copy": undefined;
   "web.catalog.count": { readonly n: string | number };
-  "web.catalog.cursors": { readonly n: string | number };
   "web.catalog.cursorsFind": undefined;
   "web.catalog.cursorsIntro": undefined;
   "web.catalog.cursorsNote": undefined;
@@ -6074,14 +6343,18 @@ export interface Messages {
   "web.channel.commands.stop.name": undefined;
   "web.channel.commands.stop.needs": undefined;
   "web.channel.commands.stop.note": undefined;
+  "web.channel.composer.artifactContext": { readonly title: string | number };
+  "web.channel.composer.artifactSlide": { readonly n: string | number };
   "web.channel.composer.attach": undefined;
   "web.channel.composer.cancelQuote": undefined;
   "web.channel.composer.cancelReply": undefined;
+  "web.channel.composer.clearContext": undefined;
   "web.channel.composer.command": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
   "web.channel.composer.quotedBlock": { readonly text: string | number };
   "web.channel.composer.replying": { readonly name: string | number };
+  "web.channel.composer.runningHint": undefined;
   "web.channel.composer.send": undefined;
   "web.channel.composer.sendHint": undefined;
   "web.channel.composer.stopHint": undefined;
@@ -6232,6 +6505,7 @@ export interface Messages {
   "web.channel.noHelpers": undefined;
   "web.channel.nobodyOnIt": undefined;
   "web.channel.orchestrator": undefined;
+  "web.channel.orchestratorRuns": undefined;
   "web.channel.pins.failed": { readonly why: string | number };
   "web.channel.pins.none": undefined;
   "web.channel.pins.open": undefined;
@@ -6502,6 +6776,7 @@ export interface Messages {
   "web.farm.phone.merge.stages": undefined;
   "web.farm.phone.merge.start": undefined;
   "web.farm.phone.missed": { readonly n: string | number };
+  "web.farm.phone.new": undefined;
   "web.farm.phone.noCalls": undefined;
   "web.farm.phone.noMissed": undefined;
   "web.farm.phone.openChat": undefined;
@@ -6687,6 +6962,7 @@ export interface Messages {
   "web.issue.detail.noRuns": undefined;
   "web.issue.detail.nothingToSee": undefined;
   "web.issue.detail.now": undefined;
+  "web.issue.detail.openTrajectory": undefined;
   "web.issue.detail.opened": undefined;
   "web.issue.detail.orchestratorStuck": undefined;
   "web.issue.detail.priority": undefined;
@@ -6810,6 +7086,18 @@ export interface Messages {
   "web.issue.new.title": undefined;
   "web.issue.new.words": undefined;
   "web.issue.noHelper": undefined;
+  "web.issue.onboarding.newIssue": undefined;
+  "web.issue.onboarding.openChat": undefined;
+  "web.issue.onboarding.step1Action": undefined;
+  "web.issue.onboarding.step1Desc": undefined;
+  "web.issue.onboarding.step1Title": undefined;
+  "web.issue.onboarding.step2Action": undefined;
+  "web.issue.onboarding.step2Desc": undefined;
+  "web.issue.onboarding.step2Title": undefined;
+  "web.issue.onboarding.step3Desc": undefined;
+  "web.issue.onboarding.step3Title": undefined;
+  "web.issue.onboarding.subtitle": undefined;
+  "web.issue.onboarding.title": undefined;
   "web.issue.orchestrator": undefined;
   "web.issue.page.allHelpers": undefined;
   "web.issue.page.allRepos": undefined;
@@ -7138,8 +7426,8 @@ export interface Messages {
   "web.orchestrator.orchestrator.look": { readonly name: string | number };
   "web.orchestrator.orchestrator.profile": undefined;
   "web.orchestrator.orchestrator.quiet": undefined;
+  "web.orchestrator.orchestrator.runsLink": undefined;
   "web.orchestrator.orchestrator.tab.memory": undefined;
-  "web.orchestrator.orchestrator.tab.trajectory": undefined;
   "web.orchestrator.orchestrator.tab.voice": undefined;
   "web.orchestrator.orchestrator.tabs": undefined;
   "web.orchestrator.orchestrator.title": undefined;
@@ -7154,6 +7442,7 @@ export interface Messages {
   "web.pkm.calendar.next": undefined;
   "web.pkm.calendar.previous": undefined;
   "web.pkm.command.clear": undefined;
+  "web.pkm.command.code": undefined;
   "web.pkm.command.doing": undefined;
   "web.pkm.command.done": undefined;
   "web.pkm.command.h1": undefined;
@@ -7171,6 +7460,8 @@ export interface Messages {
   "web.pkm.gone": undefined;
   "web.pkm.list.find": undefined;
   "web.pkm.list.label": undefined;
+  "web.pkm.list.newPage": undefined;
+  "web.pkm.list.newPagePlaceholder": undefined;
   "web.pkm.list.open": { readonly n: string | number };
   "web.pkm.list.today": undefined;
   "web.pkm.marker.CANCELED": undefined;
@@ -7183,11 +7474,17 @@ export interface Messages {
   "web.pkm.page.append": undefined;
   "web.pkm.page.collapse": undefined;
   "web.pkm.page.copiedFile": undefined;
+  "web.pkm.page.copiedRef": undefined;
   "web.pkm.page.copyFile": { readonly file: string | number };
+  "web.pkm.page.copyRef": undefined;
+  "web.pkm.page.create": undefined;
   "web.pkm.page.edit": undefined;
   "web.pkm.page.expand": undefined;
   "web.pkm.page.export": undefined;
   "web.pkm.page.exported": undefined;
+  "web.pkm.page.freshHint": undefined;
+  "web.pkm.page.freshPlaceholder": undefined;
+  "web.pkm.page.issueMade": undefined;
   "web.pkm.page.missingRef": undefined;
   "web.pkm.page.more": undefined;
   "web.pkm.page.moved": { readonly tier: string | number };
@@ -7195,7 +7492,10 @@ export interface Messages {
   "web.pkm.page.nothingToUndo": undefined;
   "web.pkm.page.outline": undefined;
   "web.pkm.page.refFrom": { readonly page: string | number };
+  "web.pkm.page.rename": undefined;
+  "web.pkm.page.renamed": { readonly title: string | number };
   "web.pkm.page.tier": undefined;
+  "web.pkm.page.toIssue": undefined;
   "web.pkm.page.undo": undefined;
   "web.pkm.page.undone": { readonly what: string | number };
   "web.pkm.place.hint": undefined;
@@ -7355,7 +7655,6 @@ export interface Messages {
   "web.repo.rows.6": undefined;
   "web.repo.thenRecount": undefined;
   "web.repo.times": { readonly n: string | number };
-  "web.repo.title": undefined;
   "web.repo.uncounted": undefined;
   "web.repo.whatLanguages": undefined;
   "web.repo.who": undefined;
@@ -7399,7 +7698,6 @@ export interface Messages {
   "web.runtime.env": undefined;
   "web.runtime.envHint": undefined;
   "web.runtime.inProcess": undefined;
-  "web.runtime.intro": undefined;
   "web.runtime.left": { readonly pct: string | number };
   "web.runtime.library.body": undefined;
   "web.runtime.library.bodyExample": undefined;
@@ -7470,7 +7768,6 @@ export interface Messages {
   "web.runtime.spentTodayBudget": { readonly budget: string | number; readonly spent: string | number };
   "web.runtime.steer": undefined;
   "web.runtime.subscription": { readonly tier: string | number };
-  "web.runtime.title": undefined;
   "web.runtime.tools": undefined;
   "web.runtime.unlimited": undefined;
   "web.runtime.unreadable": { readonly why: string | number };
@@ -7479,6 +7776,32 @@ export interface Messages {
   "web.runtime.unsupportedWhy": { readonly why: string | number };
   "web.runtime.usedBy": { readonly n: string | number };
   "web.runtime.windowLeft": { readonly label: string | number; readonly pct: string | number };
+  "web.session.hub.back": undefined;
+  "web.session.hub.clear": undefined;
+  "web.session.hub.clearFilter": undefined;
+  "web.session.hub.empty": undefined;
+  "web.session.hub.emptyFiltered": undefined;
+  "web.session.hub.filterAgent": { readonly name: string | number };
+  "web.session.hub.filterIssue": { readonly label: string | number };
+  "web.session.hub.list": undefined;
+  "web.session.hub.openIssue": undefined;
+  "web.session.hub.openProfile": undefined;
+  "web.session.hub.orchestratorRole": undefined;
+  "web.session.hub.pick": undefined;
+  "web.session.hub.scope.active": undefined;
+  "web.session.hub.scope.all": undefined;
+  "web.session.hub.scope.orchestrator": undefined;
+  "web.session.hub.scope.worker": undefined;
+  "web.session.hub.scopeLabel": undefined;
+  "web.session.hub.search": undefined;
+  "web.session.hub.searchHint": undefined;
+  "web.session.hub.status.closed": undefined;
+  "web.session.hub.status.done": undefined;
+  "web.session.hub.status.failed": undefined;
+  "web.session.hub.status.interrupted": undefined;
+  "web.session.hub.status.listening": undefined;
+  "web.session.hub.status.resting": undefined;
+  "web.session.hub.status.working": undefined;
   "web.session.log.all": undefined;
   "web.session.log.failed": undefined;
   "web.session.log.farm": undefined;
@@ -7555,7 +7878,6 @@ export interface Messages {
   "web.session.trajectory.cacheHit": { readonly pct: string | number };
   "web.session.trajectory.earlier": undefined;
   "web.session.trajectory.failed": undefined;
-  "web.session.trajectory.here": undefined;
   "web.session.trajectory.hired": { readonly ago: string | number };
   "web.session.trajectory.hiredAndLeft": { readonly hired: string | number; readonly left: string | number };
   "web.session.trajectory.input": undefined;
@@ -7564,20 +7886,17 @@ export interface Messages {
   "web.session.trajectory.lane.tool": undefined;
   "web.session.trajectory.marked": undefined;
   "web.session.trajectory.modelTime": { readonly took: string | number };
-  "web.session.trajectory.neverSent": undefined;
   "web.session.trajectory.noMatch": undefined;
   "web.session.trajectory.noOutput": undefined;
   "web.session.trajectory.ok": undefined;
   "web.session.trajectory.output": undefined;
   "web.session.trajectory.pending": undefined;
-  "web.session.trajectory.pick": undefined;
   "web.session.trajectory.quiet": undefined;
   "web.session.trajectory.run": { readonly n: string | number };
   "web.session.trajectory.running": undefined;
   "web.session.trajectory.runs": { readonly n: number };
   "web.session.trajectory.search": undefined;
   "web.session.trajectory.searchHint": undefined;
-  "web.session.trajectory.sent": undefined;
   "web.session.trajectory.steps": { readonly n: number };
   "web.session.trajectory.tokens": { readonly input: string | number; readonly output: string | number };
   "web.session.trajectory.tool": { readonly name: string | number };
@@ -7730,42 +8049,127 @@ export interface Messages {
   "web.setting.words.memory": undefined;
   "web.setting.words.moss": undefined;
   "web.setting.words.skills": undefined;
+  "web.shell.fileTree.collapseAllDirs": undefined;
+  "web.shell.fileTree.copyAbsPath": undefined;
+  "web.shell.fileTree.copyRelPath": undefined;
+  "web.shell.fileTree.empty": undefined;
+  "web.shell.fileTree.loading": undefined;
+  "web.shell.fileTree.newTerminalInDir": undefined;
+  "web.shell.fileTree.revealInFinder": undefined;
+  "web.shell.fileTree.title": undefined;
   "web.shell.git.branches": undefined;
+  "web.shell.git.cancel": undefined;
   "web.shell.git.changes": undefined;
   "web.shell.git.clean": undefined;
   "web.shell.git.commitPlaceholder": undefined;
   "web.shell.git.commitStaged": { readonly count: string | number };
+  "web.shell.git.commitSuccess": undefined;
   "web.shell.git.commits": undefined;
+  "web.shell.git.committing": undefined;
+  "web.shell.git.confirmDiscard": undefined;
   "web.shell.git.conflicts": undefined;
+  "web.shell.git.createBtn": undefined;
+  "web.shell.git.createWorktreeBtn": undefined;
+  "web.shell.git.creatingWorktree": undefined;
   "web.shell.git.currentBranch": { readonly name: string | number };
+  "web.shell.git.daysAgo": { readonly n: string | number };
+  "web.shell.git.discardPath": { readonly path: string | number };
+  "web.shell.git.filterBranches": undefined;
+  "web.shell.git.hoursAgo": { readonly n: string | number };
+  "web.shell.git.justNow": undefined;
   "web.shell.git.loading": undefined;
-  "web.shell.git.mainWorktree": undefined;
+  "web.shell.git.mainLabel": undefined;
+  "web.shell.git.minutesAgo": { readonly n: string | number };
+  "web.shell.git.newBranchPlaceholder": undefined;
+  "web.shell.git.newWorktree": undefined;
   "web.shell.git.noBranches": undefined;
   "web.shell.git.noCommits": undefined;
+  "web.shell.git.noMatchingBranches": undefined;
   "web.shell.git.noStaged": undefined;
   "web.shell.git.notRepo": undefined;
   "web.shell.git.refresh": undefined;
+  "web.shell.git.removeFailed": { readonly why: string | number };
+  "web.shell.git.removedWorktree": { readonly label: string | number };
+  "web.shell.git.removing": undefined;
   "web.shell.git.stageAll": undefined;
+  "web.shell.git.stageAllCount": { readonly count: string | number };
+  "web.shell.git.stagePath": { readonly path: string | number };
   "web.shell.git.staged": undefined;
   "web.shell.git.stagedEmpty": undefined;
   "web.shell.git.switchBranch": { readonly name: string | number };
+  "web.shell.git.switching": undefined;
   "web.shell.git.tab.branches": { readonly count: string | number };
   "web.shell.git.tab.changes": undefined;
   "web.shell.git.tab.changesCount": { readonly count: string | number };
   "web.shell.git.tab.commits": undefined;
+  "web.shell.git.title": undefined;
   "web.shell.git.unstageAll": undefined;
+  "web.shell.git.unstagePath": { readonly path: string | number };
   "web.shell.git.worktrees": undefined;
+  "web.shell.git.wtChangedCount": { readonly n: string | number };
+  "web.shell.git.wtClean": undefined;
+  "web.shell.git.wtConfirmDelete": undefined;
+  "web.shell.git.wtConfirmDeletePrompt": undefined;
+  "web.shell.git.wtConflictsCount": { readonly n: string | number };
+  "web.shell.git.wtDirtyPrompt": undefined;
+  "web.shell.git.wtForceDelete": undefined;
+  "web.shell.git.wtRemoveMenu": undefined;
+  "web.shell.git.wtRunning": undefined;
+  "web.shell.palette.a11y.commands": undefined;
+  "web.shell.palette.a11y.files": undefined;
+  "web.shell.palette.a11y.search": undefined;
+  "web.shell.palette.empty.commands": undefined;
+  "web.shell.palette.empty.files": undefined;
+  "web.shell.palette.empty.search": undefined;
+  "web.shell.palette.footer.close": undefined;
+  "web.shell.palette.footer.run": undefined;
+  "web.shell.palette.footer.select": undefined;
+  "web.shell.palette.mode.commands": undefined;
+  "web.shell.palette.mode.files": undefined;
+  "web.shell.palette.mode.search": undefined;
+  "web.shell.palette.placeholder.commands": undefined;
+  "web.shell.palette.placeholder.files": undefined;
+  "web.shell.palette.placeholder.search": undefined;
+  "web.shell.palette.searching": undefined;
+  "web.shell.section.collapse": { readonly title: string | number };
+  "web.shell.section.expand": { readonly title: string | number };
   "web.shell.sidebar.addRepo": undefined;
   "web.shell.sidebar.addRepoButton": undefined;
+  "web.shell.sidebar.addRepoTooltip": undefined;
+  "web.shell.sidebar.attentionCount": { readonly n: string | number };
   "web.shell.sidebar.closeFolder": { readonly name: string | number };
   "web.shell.sidebar.closeTab": { readonly title: string | number };
+  "web.shell.sidebar.collapseAll": undefined;
+  "web.shell.sidebar.collapseItem": { readonly name: string | number };
+  "web.shell.sidebar.collapseSection": { readonly title: string | number };
+  "web.shell.sidebar.copyPath": undefined;
+  "web.shell.sidebar.expandCurrent": undefined;
+  "web.shell.sidebar.expandItem": { readonly name: string | number };
+  "web.shell.sidebar.expandSection": { readonly title: string | number };
   "web.shell.sidebar.files": undefined;
+  "web.shell.sidebar.filesTip": undefined;
+  "web.shell.sidebar.gitBranches": undefined;
+  "web.shell.sidebar.gitBranchesTip": undefined;
+  "web.shell.sidebar.gitChanges": undefined;
+  "web.shell.sidebar.gitChangesTip": undefined;
+  "web.shell.sidebar.gitCommits": undefined;
+  "web.shell.sidebar.gitCommitsTip": undefined;
+  "web.shell.sidebar.mainLabel": undefined;
   "web.shell.sidebar.mainWorktree": { readonly label: string | number };
+  "web.shell.sidebar.needsAttention": undefined;
   "web.shell.sidebar.newTerminal": { readonly name: string | number };
+  "web.shell.sidebar.newTerminalHere": undefined;
   "web.shell.sidebar.otherFolders": undefined;
+  "web.shell.sidebar.ready": undefined;
+  "web.shell.sidebar.readyAgent": { readonly agent: string | number };
+  "web.shell.sidebar.readyCount": { readonly n: string | number };
+  "web.shell.sidebar.removeWorktree": undefined;
+  "web.shell.sidebar.revealInFinder": undefined;
   "web.shell.sidebar.running": undefined;
   "web.shell.sidebar.runningAgent": { readonly agent: string | number };
+  "web.shell.sidebar.terminalCount": { readonly n: string | number };
   "web.shell.sidebar.title": undefined;
+  "web.shell.sidebar.workingCount": { readonly n: string | number };
   "web.tree.sky": undefined;
   "web.ui.pixel.sound.group.field": undefined;
   "web.ui.pixel.sound.group.reward": undefined;

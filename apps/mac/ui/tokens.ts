@@ -1,6 +1,4 @@
-// VibeValley design tokens (docs/design/components.md section 2), mirroring
-// affectUI's --aui-* variables. The GPUI side keeps the same values in
-// apps/mac/src/theme.rs.
+// Generated from design/tokens.json by scripts/gen/tokens.ts — do not edit by hand.
 import { colorScheme } from "nsh";
 
 export type Palette = {
@@ -20,55 +18,55 @@ export type Palette = {
   codeStr: string;
   codeNum: string;
   codeLit: string;
-  /// Primary button fill (the dark gradient's base; inverted in dark mode).
+  /** Primary button fill (accent in both light and dark modes). */
   primary: string;
   onPrimary: string;
-  /// Pane background behind cards; matches the terminal background.
+  /** Sidebar and inspector background; mirrors theme.rs `surface` and workbench `side`. */
   canvas: string;
 };
 
 const light: Palette = {
-  ink: "#171717",
-  text: "#6b6b6b",
-  muted: "#8a8a8a",
-  faint: "#b5b5b5",
-  surface: "#ffffff",
-  subtle: "#f0f0f0",
-  tile: "#f5f5f5",
-  border: "#e7e7e7",
-  focus: "rgba(0,96,226,0.7)",
-  ok: "#1e8a4f",
-  alert: "#e6730e",
-  danger: "#c4320a",
-  codeKey: "#171717",
-  codeStr: "#0b8576",
-  codeNum: "#b25e00",
-  codeLit: "#8a35d6",
-  primary: "#1f1f1f",
-  onPrimary: "#ffffff",
-  canvas: "#fafafa",
+  ink: "#1c1917",
+  text: "#4a4540",
+  muted: "#5e5852",
+  faint: "#716a64",
+  surface: "#fcfcfb",
+  subtle: "#e7e5e0",
+  tile: "#efeeeb",
+  border: "#e6e4e0",
+  focus: "rgba(77,122,42,0.75)",
+  ok: "#74a046",
+  alert: "#94531f",
+  danger: "#a83a2c",
+  codeKey: "#1c1917",
+  codeStr: "#1f7a72",
+  codeNum: "#a6560c",
+  codeLit: "#7e42b8",
+  primary: "#4d7a2a",
+  onPrimary: "#fcfcfb",
+  canvas: "#f6f5f3",
 };
 
 const dark: Palette = {
-  ink: "#ededed",
-  text: "#a1a1a1",
-  muted: "#7c7c7c",
-  faint: "#6b6b70",
-  surface: "#161618",
-  subtle: "#232326",
-  tile: "#1d1d20",
-  border: "rgba(255,255,255,0.10)",
-  focus: "rgba(77,141,255,0.8)",
-  ok: "#41bd74",
-  alert: "#f28a2e",
-  danger: "#ff8a7a",
-  codeKey: "#ededed",
-  codeStr: "#4fc3b4",
-  codeNum: "#f2a15c",
-  codeLit: "#cfaef5",
-  primary: "#ededed",
-  onPrimary: "#161618",
-  canvas: "#111113",
+  ink: "#ecebe8",
+  text: "#bbb6af",
+  muted: "#a9a49e",
+  faint: "#8b867f",
+  surface: "#21201d",
+  subtle: "#312f2b",
+  tile: "#282623",
+  border: "rgba(236,235,232,0.11)",
+  focus: "rgba(141,187,92,0.8)",
+  ok: "#8dbb5c",
+  alert: "#e5a93c",
+  danger: "#e47d6d",
+  codeKey: "#ecebe8",
+  codeStr: "#5bbfb2",
+  codeNum: "#e5a93c",
+  codeLit: "#c9a7eb",
+  primary: "#7fae4f",
+  onPrimary: "#151413",
+  canvas: "#1b1a18",
 };
 
 /** The palette of the scheme shown now (reactive). */
@@ -79,14 +77,14 @@ export function tok(): Palette {
 const fontMono = "Menlo";
 
 export const type = {
-  title: { fontSize: 14, lineHeight: 20 },
-  body: { fontSize: 13.5, lineHeight: 19 },
-  mono: { fontSize: 12.5, fontFamily: fontMono },
+  title: { fontSize: 14, lineHeight: 22 },
+  body: { fontSize: 13, lineHeight: 20 },
+  mono: { fontSize: 12, fontFamily: fontMono },
   label: { fontSize: 12 },
   code: { fontSize: 12, lineHeight: 19, fontFamily: fontMono },
 } as const;
 
-export const radius = { sm: 7, md: 10, lg: 16, button: 9, card: 12, tray: 22 } as const;
+export const radius = { sm: 4, md: 6, lg: 8, button: 6, card: 8, tray: 12 } as const;
 
 /** Card ring: an inset 1 px border ring plus a faint drop in light mode. */
 export function cardShadow(p: Palette) {
@@ -94,12 +92,20 @@ export function cardShadow(p: Palette) {
     ? [{ x: 0, y: 0, blur: 0, spread: 1, color: p.border, inset: true }]
     : [
         { x: 0, y: 0, blur: 0, spread: 1, color: p.border, inset: true },
-        { x: 0, y: 1, blur: 2, spread: 0, color: "rgba(0,0,0,0.04)", inset: false },
+        { x: 0, y: 1, blur: 2, spread: 0, color: "rgba(28,25,23,0.05)", inset: false },
       ];
+}
+
+/** Return a `#rrggbb` or `rgba(...)` token at `alpha` (0..1) opacity. */
+export function tint(color: string, alpha: number): string {
+  if (color.startsWith("#") && color.length === 7) {
+    const n = parseInt(color.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+  }
+  return color.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/u, `rgba($1,$2,$3,${alpha})`);
 }
 
 /** `danger` at 6 % fill with a 16 % ring, for error boxes. */
 export function dangerTint(p: Palette) {
-  const base = p === dark ? "255,138,122" : "196,50,10";
-  return { fill: `rgba(${base},0.06)`, ring: `rgba(${base},0.16)` };
+  return { fill: tint(p.danger, 0.06), ring: tint(p.danger, 0.16) };
 }

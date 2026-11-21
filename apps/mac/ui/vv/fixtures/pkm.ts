@@ -183,11 +183,18 @@ function served<P>(answer: (payload: P) => unknown, snapshot: unknown) {
   return Object.assign((payload: P) => answer(payload), { toJSON: () => snapshot });
 }
 
-function search(r: { text?: string; tier?: PkmTier; marker?: string; limit?: number }): PkmSearchHit[] {
+function search(r: { text?: string; tier?: PkmTier; marker?: string; linkedTo?: string; limit?: number }): PkmSearchHit[] {
   const words = (r.text ?? "").toLowerCase().split(/\s+/u).filter(Boolean);
+  const linked = r.linkedTo?.toLowerCase();
   return [...pages.values()]
     .flatMap(({ page }) => page.blocks.map((b) => ({ page, b })))
-    .filter(({ page, b }) => (!r.tier || page.tier === r.tier) && (!r.marker || b.marker === r.marker) && words.every((w) => b.body.toLowerCase().includes(w)))
+    .filter(
+      ({ page, b }) =>
+        (!r.tier || page.tier === r.tier) &&
+        (!r.marker || b.marker === r.marker) &&
+        (!linked || b.body.toLowerCase().includes(`[[${linked}`) || b.body.toLowerCase().includes(`#${linked}`)) &&
+        words.every((w) => b.body.toLowerCase().includes(w)),
+    )
     .slice(0, r.limit ?? 10)
     .map(({ page, b }) => ({
       block: b.id,
@@ -227,6 +234,25 @@ export const responses: Record<string, unknown> = {
     if (!s) return refused(`no page ${p.page}`);
     s.page = { ...s.page, tier: p.tier };
     return s.page;
+  }, null),
+  "pkm.page.save": served((p: { title: string; tier?: PkmTier; markdown?: string }) => {
+    const title = p.title.trim();
+    const slug = title.toLowerCase().replace(/\s+/gu, "-");
+    const lines = (p.markdown ?? "")
+      .split("\n")
+      .map((l) => l.replace(/^-\s?/u, "").trim())
+      .filter(Boolean);
+    put(title, p.tier ?? "inbox", lines.length > 0 ? lines.map((l) => [0, l] as Row) : [[0, ""]], { slug });
+    return pages.get(slug)?.page;
+  }, null),
+  "pkm.page.rename": served((p: { from: string; to: string }) => {
+    const oldSlug = p.from.trim().toLowerCase().replace(/\s+/gu, "-");
+    const s = pages.get(oldSlug);
+    if (!s) return refused(`no page ${p.from}`);
+    const newSlug = p.to.trim().toLowerCase().replace(/\s+/gu, "-");
+    pages.delete(oldSlug);
+    pages.set(newSlug, { ...s, page: { ...s.page, slug: newSlug, title: p.to.trim() } });
+    return { pages: [newSlug], into: newSlug };
   }, null),
   "pkm.page.export": served(
     (p: { page: string }) => ({ markdown: (pages.get(p.page)?.page.blocks ?? []).map((b) => `${"  ".repeat(b.depth)}- ${b.body}`).join("\n") }),

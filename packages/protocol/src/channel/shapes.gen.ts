@@ -7,6 +7,8 @@ import type { Actor, MessageId, Outcome, SessionId, Spent } from "../common/shap
 export const MessageKindValues = ["chat", "dispatch", "report", "notice"] as const;
 export type MessageKind = (typeof MessageKindValues)[number];
 
+export type ChannelSummary = { unreadTotal: number, unreadUnder: { [key in string]: number }, };
+
 export const NotifyValues = ["all", "mentions", "none"] as const;
 export type Notify = (typeof NotifyValues)[number];
 

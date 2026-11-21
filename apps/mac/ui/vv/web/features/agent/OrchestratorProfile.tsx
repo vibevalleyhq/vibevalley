@@ -9,13 +9,13 @@ import { api } from "../../infra/api";
 import { useQueryClient } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
 import { createAct } from "../../ui/act";
-import { Button } from "../../ui/Button";
+import { Button, ButtonLink } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { OrchestratorFace } from "../../ui/domain/Face";
 import { Field, TextArea, TextInput } from "../../ui/Field";
 import { Bubble } from "../../ui/Tip";
-import { mix } from "../../ui/tone";
 import { orchestratorLooks } from "../orchestrator/looks";
+import { runsHref } from "../session";
 import { FromTemplate } from "./FromTemplate";
 
 /** features/orchestrator/OrchestratorPage.tsx's, which comes with phase 2. */
@@ -55,7 +55,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
   const dirty = () => isNew || !same(props.saved, draft());
   const nameTaken = () => props.all.some((a) => a.id !== draft().id && a.name === draft().name.trim());
   const patch = (p: Partial<Agent>) => draft.set({ ...draft(), ...p });
-  const setLook = (orchestrator: OrchestratorLook) => patch({ look: { ...draft().look, orchestrator } });
+  const setLook = (orchestrator: OrchestratorLook) => patch({ look: { ...draft().look, orchestrator, avatar: undefined } });
 
   const save = () => {
     const d = draft();
@@ -81,20 +81,27 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
   };
 
   return (
-    <Scroll testID="orchestrator-profile" class="h-full flex-1" contentClass="px-4 pb-8">
+    <Scroll testID="orchestrator-profile" class="h-full flex-1 bg-page" contentClass="px-5 pb-8">
       <View class="max-w-3xl gap-4">
-        <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3">
-          <A href="/agents" testID="back">
-            <Text class="text-sm text-muted hover:underline">{t("web.agent.all")}</Text>
+        <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
+          <A
+            href="/agents"
+            testID="back"
+            class="group rounded-md px-1.5 py-0.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+          >
+            <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
           </A>
           <Text class="text-sm text-faint">/</Text>
-          <View class="min-w-0 flex-1 flex-row items-center gap-3">
+          <View class="min-w-0 flex-1 flex-row items-center gap-2.5">
             <Text class="truncate text-lg font-semibold text-ink">{draft().name || t("web.agent.unnamed")}</Text>
-            <View class="shrink-0 rounded-sm bg-hover px-1.5">
-              <Text class="text-xs text-muted">{t("web.agent.role.orchestrator")}</Text>
+            <View class="shrink-0 rounded-sm bg-hover px-1.5 py-0.5">
+              <Text class="text-xs font-medium text-muted">{t("web.agent.role.orchestrator")}</Text>
             </View>
-            <View testID={`profile-${isNew ? "new" : dirty() ? "dirty" : "saved"}`} class={`shrink-0 rounded-sm px-1.5 ${dirty() ? "bg-hat" : "bg-hover"}`}>
-              <Text class={`text-xs ${dirty() ? "text-bark-900" : "text-muted"}`}>
+            <View
+              testID={`profile-${isNew ? "new" : dirty() ? "dirty" : "saved"}`}
+              class={`shrink-0 rounded-sm px-1.5 py-0.5 ${dirty() ? "bg-warn-soft" : "bg-hover"}`}
+            >
+              <Text class={`text-xs font-medium ${dirty() ? "text-warn-ink" : "text-muted"}`}>
                 {isNew ? t("web.agent.isNew") : dirty() ? t("web.agent.unsaved") : t("web.agent.saved")}
               </Text>
             </View>
@@ -111,11 +118,14 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
                       onConfirm={remove}
                     />
                   </If>
+                  <ButtonLink href={runsHref({ session: saved().id })} icon="log" testID="agent-runs-link">
+                    {t("web.agent.runsLink")}
+                  </ButtonLink>
                   <Button icon="thread" testID="talk" disabled={act.busy()} onPress={talk}>
                     {t("web.agent.talk")}
                   </Button>
                   <If when={dirty()}>
-                    <Button testID="discard" onPress={() => draft.set(saved())}>
+                    <Button tone="quiet" testID="discard" onPress={() => draft.set(saved())}>
                       {t("web.agent.discard")}
                     </Button>
                   </If>
@@ -177,11 +187,12 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
                     accessibilityState={{ checked: on() }}
                     tooltip={<Bubble text={look().blurb} />}
                     onPress={() => setLook(look().id)}
-                    class={`items-center gap-1 rounded-lg border p-2 hover:bg-hover ${on() ? "bg-selected" : "border-line"}`}
-                    style={on() ? { borderColor: mix("leaf", 1) } : undefined}
+                    class={`items-center gap-1 rounded-lg border p-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                      on() ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
+                    }`}
                   >
                     <OrchestratorFace size={48} look={look().id} />
-                    <Text class="text-xs text-ink">{look().name}</Text>
+                    <Text class={`text-xs font-medium ${on() ? "text-ink" : "text-muted"}`}>{look().name}</Text>
                   </View>
                 );
               }}

@@ -40,7 +40,7 @@ Status: proposed
 | --- | --- | --- |
 | 安装与启动 | 在开发指南写明依赖顺序、nsh 位置、页面资源和隔离目录。记录 Node、Rust、nsh、Zig、Xcode 和 CI 主机版本。 | 同一提交在两台 Mac 上可启动。记录冷构建、热构建和改一个文件后的耗时。若结果不同，定位工具版本或缓存输入。[开发指南](docs/development.md) |
 | 生成物 | 协议、词典和样例各保留一个写入入口。脚本写明输入、输出路径和失败退出码。 | 在临时目录连续生成两次。第二次应无新增差异。验收脚本应只写隔离家目录和工作目录。 |
-| 提交检查 | 驱动改动先跑协议回放。服务改动先跑脚本农机和真实 Git。原生页面先跑 nsh 行为测试。 | 集成时跑 `rust:check`、`protocol:check`、`mac:check` 和 `docs:verify`。`mac:check` 执行类型检查、打包和工单行为测试。在隔离副本中将完成按钮接到关闭操作后，完成与复核两项测试失败。[工单行为测试](apps/mac/ui/vv/app/issues.test.tsx) |
+| 提交检查 | 驱动改动先跑协议回放。服务改动先跑脚本农机和真实 Git。原生页面先跑 nsh 行为测试。 | 集成时跑 `rust:check`、`protocol:check`、`mac:check` 和 `docs:verify`。`mac:check` 执行类型检查、打包和虚拟时钟行为测试。在隔离副本中将完成按钮接到关闭操作后，完成与复核两项测试失败。[虚拟时钟场景测试](apps/mac/ui/vv/app/scenarios.test.tsx) · [写路径用例](apps/mac/ui/vv/app/interactions.test.tsx) |
 | 打包与更新 | 用 `package:mac` 产出应用、CLI、灵动岛、页面资源、ZIP 和 DMG。用 `update-check` 演练两个版本之间的更新。 | 干净 Mac 可安装签名包。清单的版本、架构、大小和摘要与实物一致。损坏包应被拒绝，原版本仍可启动。[打包脚本](scripts/release/package.ts) · [更新演练](scripts/release/update-check.ts) · [发版工作流](.github/workflows/release.yml) |
 
 如果维护者更名 CI 检查，应同时更新分支保护设置。
@@ -52,7 +52,7 @@ Status: proposed
 | 范围 | 选择与理由 | 何时采用 |
 | --- | --- | --- |
 | Codex 子线程 | 保留本机 `codex app-server` 子进程。将 CLI 导出的 JSON Schema 用作版本对照。用 Serde 只解码驱动消费的通知。上游 `codex-app-server-client` 还直接依赖服务端、核心执行和登录模块。整包嵌入会新增一套随应用发版的 Codex 依赖。 | CLI 0.170.0 导出了 329 个 Schema 文件。协作协议有 9 种工具和 7 种子线程状态。首批只覆盖派出、等待、发消息和终态。未知通知保留原始记录。用真实样本验证哪些通知会送到当前连接。[驱动](crates/vibevalley-oar/src/codex.rs) · [官方客户端依赖](https://github.com/openai/codex/blob/main/codex-rs/app-server-client/Cargo.toml) |
-| MCP 客户端 | 内置助手使用 `rmcp`。SDK 可接管握手、请求匹配、工具枚举和传输。应用保留工具命名、只读提示、结果展示和重放规则。现有工具调用是同步接口，SDK 使用异步接口。 | 客户端已接入标准输入输出和 Streamable HTTP。服务端的 MCP 入口另行评估。[现有客户端](crates/vibevalley-agent/src/mcp.rs) · [现有行为测试](crates/vibevalley-agent/tests/mcp.rs) · [官方 Rust SDK](https://github.com/modelcontextprotocol/rust-sdk) |
+| MCP 客户端 | 内置助手使用 `rmcp`。SDK 可接管握手、请求匹配、工具枚举和传输。应用保留工具命名、只读提示、结果展示和重放规则。现有工具调用是同步接口，SDK 使用异步接口。 | 客户端已接入标准输入输出和 Streamable HTTP。服务端的 MCP 入口另行评估。[现有客户端](crates/vibevalley-agent/src/resources/mcp/mod.rs) · [现有行为测试](crates/vibevalley-agent/tests/mcp.rs) · [官方 Rust SDK](https://github.com/modelcontextprotocol/rust-sdk) |
 | 事件顺序测试 | oar 的开发依赖使用 `proptest`。锁文件已有 1.12.0。真实回放证明厂商发过什么；属性测试可生成满足因果约束的重复、延迟和交错事件，并缩小失败样本。 | 两项回归已接入测试。等待和发消息保持原创建者，重复终态只结算一次。[属性测试](crates/vibevalley-oar/src/codex/subagents.rs) · [proptest](https://github.com/proptest-rs/proptest) |
 | Git 查询与交付 | 保留系统 Git 执行写入、worktree、合并和快照。现有状态查询使用 `git status --porcelain=v2`。若频繁启动进程拖慢巡视，可对照 `gix` 的只读状态接口。 | 先测一次窗口刷新唤起几次 Git。先消除重复查询，再比较同一仓库的冷、热读取。暂存、未暂存、未跟踪文件及 worktree 结果均应一致。选择读取库与验证最终合并内容分别验收。[现有 Git 入口](crates/vibevalley-git/src/repo.rs) · [gix 状态接口](https://docs.rs/gix/latest/gix/struct.Repository.html#method.status) |
 | SQLite | 选用 SQLx 的 SQLite 驱动。沿用数据库文件和表结构。SQLite 对同一数据库只允许一个写事务。 | 已在宿主、服务端和持久执行中采用。并发写入仍以事务提交耗时为准。[SQLite 隔离规则](https://www.sqlite.org/isolation.html) · [SQLx](https://github.com/launchbadge/sqlx) |
@@ -84,7 +84,7 @@ SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均�
 | --- | --- | --- |
 | 1．宿主存储 | 先迁 `vibevalley-store` 的 `state.db`。项目列表、布局和终端保存共用宿主的数据库入口。沿用 WAL、外键、同步级别和 5 秒锁等待设置。宿主在后台执行数据库工作。 | 用隔离的旧库副本打开原生工作台。重排项目并保存布局和终端，退出后重开核对。批量保存中途失败时应能读回原记录。检查真实应用的依赖树只链接一份 SQLite。[宿主入口](apps/mac/src/shell.rs) · [存储与事务](crates/vibevalley-workspace/src/store/mod.rs) · [已有测试](crates/vibevalley-workspace/src/store/tests.rs) |
 | 2．服务端账本 | 以完整业务事务为单位切换驱动。工单与会话的同批写入共用一笔 SQLx 事务。提交成功后才更新内存和通知订阅者。再按模块迁服务端的其他查询。 | 在写入中途制造失败。重开数据库后两项记录均应保持原值，订阅者也应保留旧状态。[工单账本](crates/vibevalley-server/src/modules/ledger.rs) |
-| 3．持久执行 | 最后迁 `vibevalley-durable`。保持原有提交、去重和恢复边界。通过各生产入口验收后，移除对应的 `rusqlite` 直接依赖。 | 用第三节的三个中断时点重跑主线。按同一条用户回复核对轮次、工作目录和汇报。[持久执行存储](crates/vibevalley-durable/src/store.rs) |
+| 3．持久执行 | 最后迁 `vibevalley-durable`。保持原有提交、去重和恢复边界。通过各生产入口验收后，移除对应的 `rusqlite` 直接依赖。 | 用第三节的三个中断时点重跑主线。按同一条用户回复核对轮次、工作目录和汇报。[持久执行存储](crates/vibevalley-agent/src/durable/store.rs) |
 
 每个阶段保留相同输入和旧实现的结果，供迁移对照。若对账失败，回退该阶段的代码。两套驱动可存在于同一应用中；同一笔业务事务应由一个驱动完整提交。
 
@@ -146,7 +146,7 @@ Codex CLI 0.170.0 的协议区分协作调用状态与子线程状态。`spawnAg
 | 用户任务 | 界面要求 | 验收任务 |
 | --- | --- | --- |
 | 派出第一张工单 | 从选择仓库进入农机配置和派单。分别说明找不到可执行文件、未登录和厂商拒绝启动的原因。每种错误提供对应入口。 | 首次使用者从空家目录走到第一份可审查的 Git 差异。记录失败位置、耗时和求助次数。 |
-| 找到等自己的工单 | 总览列出待回答、待审查和待核对的工单。地块打开对应工单。窄窗保留工单名称、状态和主动作。 | 在三单并行时，用键盘从总览打开工单，再返回原位置。用相同状态、时刻、窗口和像素比验收农场。状态应有文字或形状提示。[设计规范](docs/style/design.md) · [农场](docs/subsystems/farm.md) |
+| 找到等自己的工单 | 总览列出待回答、待审查和待核对的工单。地块打开对应工单。窄窗保留工单名称、状态和主动作。 | 在三单并行时，用键盘从总览打开工单，再返回原位置。用相同状态、时刻、窗口和像素比验收农场。状态应有文字或形状提示。[设计规范](docs/design/01-philosophy-and-tokens.md) · [农场](docs/subsystems/farm.md) |
 | 审查并合并 | 工单显示目标、变更文件、检查结果和受检提交。文件、Git 差异和终端均打开本单的工作目录。 | 各执行一次检查失败、合并冲突和成功合并。失败时可回到冲突文件或失败检查。成功时可查到最终提交。[交付模块](crates/vibevalley-server/src/modules/workplace/mod.rs) |
 | 选用新视角或周边功能 | 工作台沿用两种主题和现有设计令牌。农场先按专项计划核对画面和交互。斜俯视先做一个固定镜头。 | 用同一场景比较找单耗时、遮挡、误点和帧耗。语音、媒体、笔记与 Artifact 沿用各自入口。真实音频与媒体结果另记设备和厂商版本。[原生端验收](.agents/skills/vv-acceptance/references/app.md) · [媒体验收](.agents/skills/vv-acceptance/references/media.md) |
 

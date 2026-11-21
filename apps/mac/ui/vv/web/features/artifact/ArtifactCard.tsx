@@ -116,15 +116,21 @@ export function ArtifactCard(props: { card: Card }) {
       href={href()}
       testID="artifact-card"
       accessibilityLabel={t("web.artifact.card.open", { title: props.card.title })}
-      class="mt-1 w-full max-w-md flex-row items-center gap-3 rounded-lg border border-line bg-page px-3 py-2 transition duration-120 ease-out hover:bg-hover"
+      class="group mt-1 w-full max-w-md flex-row items-center gap-3 rounded-lg border border-line bg-page px-3 py-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
     >
-      <View class="size-9 shrink-0 items-center justify-center rounded-md bg-hover">
+      <View class="size-9 shrink-0 items-center justify-center rounded-md bg-side">
         <Icon name={artifactIcon(props.card)} size={20} tone="muted" />
       </View>
-      <View class="min-w-0 flex-1">
-        <Text class="truncate text-sm font-semibold text-ink">{props.card.title}</Text>
-        <Text class="truncate text-xs text-muted">{cardLine(props.card)}</Text>
+      <View class="min-w-0 flex-1 gap-0.5">
+        <View class="flex-row items-center gap-1.5">
+          <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{props.card.title}</Text>
+          <View class="shrink-0 rounded-xs bg-hover px-1.5 py-px">
+            <Text class="font-mono text-2xs text-muted">{artifactSuffix(props.card)}</Text>
+          </View>
+        </View>
+        <Text class="truncate text-xs text-muted tabular-nums">{cardLine(props.card)}</Text>
       </View>
+      <Icon name="next" size={12} tone="faint" />
     </A>
   );
 }

@@ -150,13 +150,13 @@ pub struct HostedRepo {
 }
 
 pub fn hosted_origin(url: &str) -> Option<HostedRepo> {
-    static RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    static HOSTED_ORIGIN: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
         regex::Regex::new(
             r"^(?:https://(github\.com|gitlab\.com)/|ssh://git@(github\.com|gitlab\.com)/|git@(github\.com|gitlab\.com):)([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)/?$",
         )
         .expect("regex")
     });
-    let m = RE.captures(url)?;
+    let m = HOSTED_ORIGIN.captures(url)?;
     let host = m.get(1).or(m.get(2)).or(m.get(3))?.as_str().to_string();
     let name = m.get(4)?.as_str();
     let name = name.strip_suffix(".git").unwrap_or(name).to_string();
@@ -469,15 +469,15 @@ impl Publisher {
                 None => (e.to_string(), String::new()),
             })
             .collect();
-        static REWRITE: std::sync::LazyLock<regex::Regex> =
+        static URL_REWRITE: std::sync::LazyLock<regex::Regex> =
             std::sync::LazyLock::new(|| regex::Regex::new(r"^url\..*\.(insteadof|pushinsteadof)$").expect("regex"));
-        if config.iter().any(|(k, _)| REWRITE.is_match(k)) {
+        if config.iter().any(|(k, _)| URL_REWRITE.is_match(k)) {
             return Err(refused("URL rewrite configuration"));
         }
-        static REMOTE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| regex::Regex::new(r"^remote\.(.+)\.[^.]+$").expect("regex"));
+        static REMOTE_NAME: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| regex::Regex::new(r"^remote\.(.+)\.[^.]+$").expect("regex"));
         let mut names: Vec<String> = vec![];
         for (k, _) in &config {
-            if let Some(n) = REMOTE.captures(k).and_then(|c| c.get(1))
+            if let Some(n) = REMOTE_NAME.captures(k).and_then(|c| c.get(1))
                 && !names.iter().any(|x| x == n.as_str())
             {
                 names.push(n.as_str().to_string());

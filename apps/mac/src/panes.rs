@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Bounds, Context, Entity, FocusHandle, Focusable, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels, Point,
-    StatefulInteractiveElement as _, Styled as _, Window, canvas, div, px, relative,
+    AnyElement, App, Bounds, Context, Entity, FocusHandle, Focusable, Hsla, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels,
+    Point, StatefulInteractiveElement as _, Styled as _, Window, canvas, div, px, relative,
 };
 use vibevalley_workspace::{Axis, Group, Layout, Node, PaneKind, Tab, TabId};
 
@@ -15,7 +15,7 @@ use crate::diff::DiffView;
 use crate::hosted::HostedView;
 use crate::pixel::view::PixelView;
 use crate::shell::Shell;
-use crate::theme::Ui;
+use crate::theme::{Palette, Ui};
 use crate::viewer::FileViewer;
 
 #[derive(Clone)]
@@ -129,10 +129,12 @@ fn render_node(shell: &mut Shell, layout: &Layout, node: &Node, window: &mut Win
                 };
                 container = container.child(cell);
                 if i + 1 < s.children.len() {
+                    let divider_hover = colors.accent;
                     let divider = div()
                         .id(("divider", (id as usize) * 64 + i))
                         .flex_none()
                         .bg(colors.border)
+                        .hover(move |s| s.bg(divider_hover))
                         .on_mouse_down(MouseButton::Left, cx.listener(move |shell, _, _, _| shell.dragging_split = Some((id, i))));
                     container = container.child(if horizontal {
                         divider.w(px(1.0)).h_full().cursor_col_resize()
@@ -158,10 +160,12 @@ impl FlexDir for gpui::Div {
 
 /// Named work links keep their label while programs change the terminal title.
 pub fn terminal_name(t: &crate::terminal::TerminalView) -> String {
-    if let Some(title) = t.link_title() {
+    if let Some(title) = t.link_title().filter(|s| !is_default_title(s)) {
         return title.to_owned();
     }
-    if let Some((_, label)) = t.running_status() {
+    if let Some((_, label)) = t.running_status()
+        && !is_default_title(&label)
+    {
         return label;
     }
     match t.title().map(str::trim).filter(|s| !s.is_empty() && !is_default_title(s)) {
@@ -193,10 +197,25 @@ pub fn numbered_titles<'a>(shell: &Shell, tabs: impl Iterator<Item = &'a Tab>, c
     out
 }
 
-/// `user@host`, `user@host:~/dir` and the like.
+/// Default shell-generated titles that add noise in tabs and the sidebar:
+/// `user@host`, `user@host:~/dir`, `zsh — user@host`, bare paths (`~/...`, `/...`),
+/// or raw shell paths (`/bin/zsh`, `-zsh`).
 pub(crate) fn is_default_title(title: &str) -> bool {
-    let first = title.split_whitespace().next().unwrap_or("");
-    first.contains('@') && !first.starts_with('@') && first.split('@').next().is_some_and(|u| !u.is_empty() && !u.contains('/'))
+    let trimmed = title.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+    if trimmed.starts_with("~/") || trimmed.starts_with('/') || trimmed == "~" {
+        return true;
+    }
+    let bare = trimmed.trim_start_matches('-').rsplit('/').next().unwrap_or(trimmed);
+    if matches!(bare, "zsh" | "bash" | "sh" | "fish" | "nu" | "pwsh" | "login") {
+        return true;
+    }
+    trimmed.split_whitespace().any(|tok| {
+        let tok = tok.trim_matches(|c: char| matches!(c, '(' | ')' | '[' | ']' | ':' | ','));
+        tok.contains('@') && !tok.starts_with('@') && tok.split_once('@').is_some_and(|(u, h)| !u.is_empty() && !h.is_empty() && !u.contains('/'))
+    })
 }
 
 fn shell_name() -> String {
@@ -246,10 +265,13 @@ pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
 
 fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, cx: &mut Context<Shell>) -> AnyElement {
     let colors = Ui::get(cx).colors.clone();
+    let hover_bg = colors.hover;
+    let text_color = colors.text;
     let focused = layout.focused == g.id;
     let group_id = g.id;
     let pid = shell.ws.active_id().unwrap_or_default();
     let groups = layout.groups();
+    let multi_group = groups.len() > 1;
     let is_first_group = groups.first().is_some_and(|first| first.id == group_id);
     let is_last_group = groups.last().is_some_and(|last| last.id == group_id);
     let sidebar_visible = shell.sidebar_visible;
@@ -260,26 +282,28 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         .h_full()
         .flex_1()
         .min_w_0()
+        .px(px(6.0))
         .flex()
         .flex_row()
         .items_center()
+        .gap(px(4.0))
         .overflow_x_scroll();
     if is_first_group && !sidebar_visible {
         tabs_row = tabs_row.child(
             div()
                 .id("expand-left-sidebar")
-                .h(px(26.0))
-                .px(px(8.0))
-                .ml(px(6.0))
-                .mr(px(4.0))
+                .size(px(26.0))
+                .mr(px(2.0))
+                .flex_none()
                 .flex()
                 .items_center()
                 .justify_center()
-                .rounded(px(5.0))
-                .text_size(px(13.0))
-                .text_color(colors.muted)
-                .hover(|s| s.bg(colors.hover))
-                .child("◧")
+                .rounded(px(6.0))
+                .border_1()
+                .border_color(transparent())
+                .cursor_pointer()
+                .hover(move |s| s.bg(hover_bg))
+                .child(panel_icon(false, colors.muted, false))
                 .on_mouse_down(MouseButton::Left, cx.listener(|s, _, _, cx| s.toggle_sidebar(cx))),
         );
     }
@@ -292,21 +316,50 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
             PaneKind::Terminal { terminal_id, .. } => shell.ws.active().and_then(|p| p.terminal(terminal_id)).is_some_and(|t| t.attention),
             _ => false,
         };
+        let indicator = if attention {
+            Some(div().size(px(6.0)).flex_none().rounded_full().bg(colors.warning))
+        } else {
+            None
+        };
+        let focused_bar = if active && focused && multi_group {
+            Some(
+                div()
+                    .absolute()
+                    .bottom_0()
+                    .left(px(8.0))
+                    .right(px(8.0))
+                    .h(px(2.0))
+                    .rounded_full()
+                    .bg(colors.accent),
+            )
+        } else {
+            None
+        };
         tabs_row = tabs_row.child(
             div()
                 .id(("tab", tab_id as usize))
-                .h_full()
-                .px(px(10.0))
+                .relative()
+                .h(px(26.0))
+                .pl(px(10.0))
+                .pr(px(4.0))
                 .flex()
                 .flex_row()
                 .items_center()
                 .gap(px(6.0))
-                .max_w(px(220.0))
-                .text_size(px(12.5))
-                .border_r_1()
-                .border_color(colors.border)
-                .when_active(active, colors.bg, colors.text, colors.muted)
-                .hover(|s| s.bg(colors.hover))
+                .max_w(px(210.0))
+                .rounded(px(6.0))
+                .border_1()
+                .text_size(px(12.0))
+                .cursor_pointer()
+                .tab_style(active, &colors)
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_down(
+                    MouseButton::Middle,
+                    cx.listener(move |shell, _, window, cx| {
+                        cx.stop_propagation();
+                        shell.close_tab(tab_id, window, cx);
+                    }),
+                )
                 .on_click(cx.listener(move |shell, _, window, cx| {
                     if let Some(p) = shell.ws.active_mut() {
                         p.layout.activate(tab_id);
@@ -316,19 +369,25 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                     }
                     shell.layout_changed(window, cx);
                 }))
-                .children(attention.then(|| div().size(px(6.0)).rounded_full().bg(colors.warning)))
+                .children(focused_bar)
+                .children(indicator)
                 .child(div().overflow_hidden().text_ellipsis().whitespace_nowrap().child(title))
                 .child(
                     div()
                         .id(("close", tab_id as usize))
-                        .size(px(16.0))
+                        .size(px(18.0))
+                        .flex_none()
                         .flex()
                         .items_center()
                         .justify_center()
                         .rounded(px(4.0))
-                        .text_color(colors.muted)
-                        .hover(|s| s.bg(colors.hover))
+                        .pb(px(1.0))
+                        .text_size(px(13.0))
+                        .text_color(if active { colors.muted } else { colors.faint })
+                        .cursor_pointer()
+                        .hover(move |s| s.bg(hover_bg).text_color(text_color))
                         .child("×")
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .on_click(cx.listener(move |shell, _, window, cx| {
                             cx.stop_propagation();
                             shell.close_tab(tab_id, window, cx);
@@ -339,15 +398,18 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
     tabs_row = tabs_row.child(
         div()
             .id(("new-tab", group_id as usize))
-            .size(px(24.0))
-            .ml(px(4.0))
+            .size(px(26.0))
+            .flex_none()
             .flex()
             .items_center()
             .justify_center()
-            .rounded(px(5.0))
-            .text_color(colors.muted)
-            .hover(|s| s.bg(colors.hover))
-            .child("+")
+            .rounded(px(6.0))
+            .border_1()
+            .border_color(transparent())
+            .cursor_pointer()
+            .hover(move |s| s.bg(hover_bg))
+            .child(plus_icon(colors.muted))
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(cx.listener(move |shell, _, window, cx| {
                 if let Some(p) = shell.ws.active_mut() {
                     p.layout.focus_group(group_id);
@@ -368,24 +430,32 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         .child(tabs_row);
 
     if is_last_group {
-        bar = bar.child(
-            div()
-                .id("toggle-inspector")
-                .h(px(26.0))
-                .px(px(8.0))
-                .mr(px(8.0))
-                .flex_none()
-                .flex()
-                .items_center()
-                .justify_center()
-                .rounded(px(5.0))
-                .text_size(px(13.0))
-                .bg(if inspector_open { colors.elevated } else { gpui::hsla(0.0, 0.0, 0.0, 0.0) })
-                .text_color(if inspector_open { colors.text } else { colors.muted })
-                .hover(|s| s.bg(colors.hover))
-                .child("◨")
-                .on_mouse_down(MouseButton::Left, cx.listener(|s, _, _, cx| s.toggle_inspector(cx))),
-        );
+        let inspector_btn = div()
+            .id("toggle-inspector")
+            .size(px(26.0))
+            .ml(px(4.0))
+            .mr(px(6.0))
+            .flex_none()
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(6.0))
+            .border_1()
+            .cursor_pointer()
+            .on_mouse_down(MouseButton::Left, cx.listener(|s, _, _, cx| s.toggle_inspector(cx)));
+        let inspector_btn = if inspector_open {
+            inspector_btn
+                .bg(colors.elevated)
+                .border_color(colors.border)
+                .child(panel_icon(true, colors.text, true))
+        } else {
+            inspector_btn
+                .bg(transparent())
+                .border_color(transparent())
+                .hover(move |s| s.bg(hover_bg))
+                .child(panel_icon(true, colors.muted, false))
+        };
+        bar = bar.child(inspector_btn);
     }
     let content: AnyElement = match g.active_tab() {
         Some(Tab {
@@ -406,8 +476,6 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         .size_full()
         .flex()
         .flex_col()
-        .border_t_2()
-        .border_color(if focused { colors.accent.opacity(0.6) } else { colors.surface })
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |shell, _, _, cx| {
@@ -424,13 +492,60 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         .into_any_element()
 }
 
+fn transparent() -> Hsla {
+    gpui::hsla(0.0, 0.0, 0.0, 0.0)
+}
+
+fn panel_icon(right: bool, color: Hsla, filled: bool) -> AnyElement {
+    let pane_fill = if filled { Hsla { a: 0.24, ..color } } else { transparent() };
+    let pane = div().w(px(4.5)).h_full().bg(pane_fill);
+    let divider = div().w(px(1.0)).h_full().bg(color);
+    let main = div().flex_1().h_full();
+    let frame = div()
+        .w(px(14.0))
+        .h(px(11.0))
+        .flex()
+        .flex_row()
+        .rounded(px(2.5))
+        .border_1()
+        .border_color(color)
+        .overflow_hidden();
+    let frame = if right {
+        frame.child(main).child(divider).child(pane)
+    } else {
+        frame.child(pane).child(divider).child(main)
+    };
+    frame.into_any_element()
+}
+
+fn plus_icon(color: Hsla) -> AnyElement {
+    div()
+        .size(px(10.0))
+        .flex()
+        .flex_col()
+        .items_center()
+        .child(div().w(px(1.5)).h(px(4.25)).rounded(px(0.75)).bg(color))
+        .child(div().w(px(10.0)).h(px(1.5)).rounded(px(0.75)).bg(color))
+        .child(div().w(px(1.5)).h(px(4.25)).rounded(px(0.75)).bg(color))
+        .into_any_element()
+}
+
 trait TabLook {
-    fn when_active(self, active: bool, bg: gpui::Hsla, text: gpui::Hsla, muted: gpui::Hsla) -> Self;
+    fn tab_style(self, active: bool, colors: &Palette) -> Self;
 }
 
 impl TabLook for gpui::Stateful<gpui::Div> {
-    fn when_active(self, active: bool, bg: gpui::Hsla, text: gpui::Hsla, muted: gpui::Hsla) -> Self {
-        if active { self.bg(bg).text_color(text) } else { self.text_color(muted) }
+    fn tab_style(self, active: bool, colors: &Palette) -> Self {
+        if active {
+            self.bg(colors.bg).border_color(colors.border).text_color(colors.text)
+        } else {
+            let hover = colors.hover;
+            let text = colors.text;
+            self.bg(transparent())
+                .border_color(transparent())
+                .text_color(colors.muted)
+                .hover(move |s| s.bg(hover).text_color(text))
+        }
     }
 }
 
@@ -439,6 +554,11 @@ mod name_tests {
     #[test]
     fn a_shells_own_title_is_not_a_name() {
         assert!(super::is_default_title("lucasay@Caos-MacBook-Pro:~/farm"));
+        assert!(super::is_default_title("lucasay@mac"));
+        assert!(super::is_default_title("zsh — lucasay@mac: ~/orca/projects/vibevalley"));
+        assert!(super::is_default_title("~/orca/projects/vibevalley"));
+        assert!(super::is_default_title("/Users/lucasay/orca/projects/vibevalley"));
+        assert!(super::is_default_title("-zsh"));
         assert!(super::is_default_title("me@host"));
         assert!(!super::is_default_title("vim notes.md"));
         assert!(!super::is_default_title("@team"));

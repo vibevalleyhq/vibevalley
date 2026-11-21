@@ -1,6 +1,7 @@
-import { Text, View } from "nsh";
+import { View } from "nsh";
 
 import { createSignal } from "../../../solid";
+import { Banner } from "../../ui/layout";
 import type { Frame } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
 import { MotionControls } from "./MotionControls";
@@ -14,13 +15,7 @@ export function MotionStoreView(props: StoreViewerProps) {
 
   return (
     <View testID="motion-store-view" class="min-h-0 min-w-0 flex-1">
-      <If when={snapshot().error}>
-        {(err) => (
-          <View class="px-3 py-2">
-            <Text class="text-xs text-berry">{err()}</Text>
-          </View>
-        )}
-      </If>
+      <If when={snapshot().error}>{(err) => <Banner edge>{err()}</Banner>}</If>
       <HtmlFrame
         artifact={props.artifact}
         version={seq()}

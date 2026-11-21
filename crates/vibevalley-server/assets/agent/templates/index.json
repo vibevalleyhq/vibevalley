@@ -1,1 +1,16 @@
-["orchestrator", "backend", "tester", "frontend", "docs", "scout", "night", "claude", "codex", "lab", "slides", "collector", "pages", "reviewer"]
+[
+  "orchestrator",
+  "fullstack",
+  "architect",
+  "frontend",
+  "backend",
+  "reviewer",
+  "tester",
+  "designer",
+  "product",
+  "scout",
+  "docs",
+  "pages",
+  "slides",
+  "collector"
+]

@@ -8,7 +8,7 @@ export function usePaneWidth(pane: string, fallback: number, min: number, max: n
   return () => Math.min(max, Math.max(min, kept() ?? fallback));
 }
 
-/** A pane's edge the user drags to set its width (docs/style/design.md). side: the edge it is on, so dragging outward widens the pane. */
+/** side: the edge it is on, so dragging outward widens the pane. */
 export function Splitter(props: { pane: string; side: "left" | "right"; width: number; min: number; max: number; label: string }) {
   const dragging = signal(false);
   const focused = signal(false);
@@ -47,9 +47,11 @@ export function Splitter(props: { pane: string; side: "left" | "right"; width: n
       focusable
       onFocus={() => focused.set(true)}
       onBlur={() => focused.set(false)}
-      class={`absolute top-0 bottom-0 z-10 w-2 cursor-col-resize items-center ${props.side === "left" ? "-left-1" : "-right-1"}`}
+      class={`group absolute top-0 bottom-0 z-10 w-2 cursor-col-resize items-center ${props.side === "left" ? "-left-1" : "-right-1"}`}
     >
-      <View class={`h-full w-0.5 ${dragging() || focused() ? "bg-focus" : "hover:bg-focus"}`} />
+      <View
+        class={`h-full w-0.5 rounded-full transition duration-120 ease-out ${dragging() || focused() ? "bg-focus" : "bg-transparent group-hover:bg-focus"}`}
+      />
     </View>
   );
 }

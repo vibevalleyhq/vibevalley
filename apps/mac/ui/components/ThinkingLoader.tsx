@@ -9,7 +9,8 @@
 import { cleanup, createMotion, effect, reduceMotion, signal, Text, View } from "nsh";
 
 import { durations, ease, formatElapsed, ms } from "../motion";
-import { tok, type as ty } from "../tokens";
+import { SurfaceIcon } from "../surfaces/shared";
+import { cardShadow, tok, type as ty } from "../tokens";
 import type { AgentEvent } from "./shapes";
 
 export type ThinkingLoaderProps = {
@@ -88,18 +89,20 @@ export function ThinkingLoader(props: ThinkingLoaderProps) {
         alignItems: "center",
         alignSelf: "flex-start",
         maxWidth: "100%",
-        gap: 8,
-        height: 30,
-        paddingHorizontal: pill() ? 12 : 0,
+        gap: 7,
+        height: pill() ? 30 : 24,
+        paddingLeft: pill() ? 10 : 0,
+        paddingRight: pill() ? 12 : 0,
         borderRadius: 999,
         backgroundColor: pill() ? p().surface : "transparent",
-        borderWidth: pill() ? 1 : 0,
-        borderColor: p().border,
+        boxShadow: pill() ? cardShadow(p()) : [],
       }}
     >
       <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         {done() ? (
-          <Text style={{ fontSize: 12, lineHeight: 14, color: p().ok, ...check.style }}>✓</Text>
+          <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center", ...check.style }}>
+            <SurfaceIcon name="check" size={12} color={p().ok} strokeWidth={1.7} />
+          </View>
         ) : (
           <View
             style={{
@@ -107,7 +110,7 @@ export function ThinkingLoader(props: ThinkingLoaderProps) {
               height: 12,
               borderRadius: 6,
               borderWidth: 1.5,
-              borderColor: p().faint,
+              borderColor: p().subtle,
               borderTopColor: p().ink,
               animationName: reduceMotion() ? "none" : "spin",
               animationDuration: durations.spinner,
@@ -118,8 +121,9 @@ export function ThinkingLoader(props: ThinkingLoaderProps) {
       </View>
       <Text
         style={{
-          ...ty.body,
-          fontSize: 13,
+          fontSize: 12.5,
+          lineHeight: 16,
+          fontWeight: "500",
           color: done() ? p().text : p().ink,
           numberOfLines: 1,
           flexShrink: 0,
@@ -132,10 +136,33 @@ export function ThinkingLoader(props: ThinkingLoaderProps) {
         {label()}
       </Text>
       {props.thought && !done() ? (
-        <Text style={{ ...ty.label, color: p().muted, numberOfLines: 1, flexShrink: 1, writingDirection: "auto" }}>{props.thought}</Text>
+        <Text
+          style={{
+            fontSize: 12,
+            lineHeight: 16,
+            color: p().muted,
+            numberOfLines: 1,
+            flexShrink: 1,
+            minWidth: 0,
+            writingDirection: "auto",
+          }}
+        >
+          {props.thought}
+        </Text>
       ) : null}
       {done() ? null : (
-        <Text style={{ ...ty.label, color: p().muted, fontVariant: ["tabular-nums"], flexShrink: 0 }}>{formatElapsed(Math.max(0, now() - props.sinceMs))}</Text>
+        <Text
+          style={{
+            fontFamily: ty.mono.fontFamily,
+            fontSize: 11.5,
+            lineHeight: 16,
+            color: p().muted,
+            fontVariant: ["tabular-nums"],
+            flexShrink: 0,
+          }}
+        >
+          {formatElapsed(Math.max(0, now() - props.sinceMs))}
+        </Text>
       )}
     </View>
   );

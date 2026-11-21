@@ -6,7 +6,6 @@
 
 ### feature
 
-- 2026-11-19 [把农场帮工做成可以转身和拿工具的像素 3D 角色](.agents/notes/proposed/feature/2026-11-19-voxel-farmhands.md)
 - 2026-11-11 [工单详情的经过合成一条活动流](.agents/notes/proposed/feature/2026-11-11-issue-activity-stream.md)
 - 2026-11-04 [网页 Artifact 的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)
 - 2026-10-22 [记忆树：接真数据与手艺播种](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
@@ -17,6 +16,7 @@
 
 ### architecture
 
+- 2026-11-21 [工作台 UI 状态机与 Rust 领域投影收口架构](.agents/notes/proposed/architecture/2026-11-21-ui-state-machine-consolidation.md)
 - 2026-11-19 [原生工作台长期计划：从派出第一单到放心管理多份工作](.agents/notes/proposed/architecture/2026-11-19-native-product-roadmap.md)
 - 2026-11-18 [在原生版复刻 Chord、持久执行、oar 和 Web 农场](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)
 - 2026-11-14 [原生的 VibeValley：Rust 服务端为准，激进重构，删掉 Electron、TS 服务端、页面和手机壳](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)

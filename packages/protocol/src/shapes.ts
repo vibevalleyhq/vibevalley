@@ -41,6 +41,8 @@ export {
   type Skill,
   type Species,
   SpeciesValues,
+  type TemplateCategory,
+  TemplateCategoryValues,
 } from "./agent/shapes";
 export {
   type InventoryEntry,
@@ -90,6 +92,7 @@ export {
   type Channel,
   type ChannelEvent,
   type ChannelRequest,
+  type ChannelSummary,
   type ChannelUnread,
   type ChannelUpdate,
   type Chat,
@@ -197,6 +200,7 @@ export {
 export {
   type AppliedIssue,
   type Assignment,
+  type BoardSummary,
   type CommentRequest,
   type Deliverable,
   DeliverableValues,
@@ -205,6 +209,8 @@ export {
   type IssueAction,
   type IssueFilter,
   type IssueHistory,
+  type IssueLane,
+  type IssuePromptKind,
   type IssueRefineRequest,
   type IssueRequest,
   type IssueReviewRequest,
@@ -213,7 +219,6 @@ export {
   type IssueStageKind,
   type IssueStatus,
   type IssueStatusRequest,
-  IssueStatusValues,
   type IssueTimeline,
   type IssueUpdate,
   type Milestone,
@@ -230,7 +235,7 @@ export type {
   OrchestratorEval,
   OrchestratorEvalRequest,
 } from "./orchestrator/shapes";
-export type { Achievement, AgentTally, ChooseTitleRequest, Crop } from "./game/shapes";
+export type { Achievement, ChooseTitleRequest, Crop } from "./game/shapes";
 export { type Attachment, type AttachmentUpload } from "./attachment/shapes";
 export {
   type ConnectorID,
@@ -304,6 +309,7 @@ export {
   type MediaSource,
   type MediaSpeechJob,
   type MediaSpeechRequest,
+  type MediaSummary,
   type MediaUnderstandingAuthorizationRequest,
   type MediaUnderstandingJob,
   type MediaUnderstandingRequest,

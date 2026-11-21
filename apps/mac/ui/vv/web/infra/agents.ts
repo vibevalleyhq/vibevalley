@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { type Agent, type AgentProblem, defaultOrchestrator, type OrchestratorLook } from "@vibevalley/protocol";
+import { type Agent, type AgentProblem, defaultOrchestrator, type OrchestratorLook, type RuntimeInfo } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { createSettled } from "../base/dom";
@@ -10,8 +10,16 @@ import { defineQuery, retryRead, ready, useAgents, useQuery } from "./query";
 /** The profiles work is sent to, the helpers; enabled, only those not switched off. */
 export function useWorkAgents(enabled = false) {
   const all = useAgents();
-  return (): Agent[] => ready(all, []).filter((a) => a.role === "worker" && (!enabled || a.enabled));
+  return (): Agent[] =>
+    ready(all, [])
+      .filter((a) => a.role === "worker" && (!enabled || a.enabled))
+      .toSorted((a, b) => Number(b.enabled) - Number(a.enabled));
 }
+
+const runtimeOrder = (r: RuntimeInfo) => (r.installation.status === "available" ? (r.settings.enabled ? 0 : 1) : 2);
+
+// toSorted is stable: the preset order stands within each group.
+export const sortRuntimes = (runtimes: readonly RuntimeInfo[]): RuntimeInfo[] => runtimes.toSorted((a, b) => runtimeOrder(a) - runtimeOrder(b));
 
 /** The orchestrators' profiles, the default one first. */
 export function useOrchestrators() {

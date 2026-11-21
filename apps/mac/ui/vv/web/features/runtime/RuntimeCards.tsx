@@ -29,7 +29,8 @@ import { Icon } from "../../ui/Icon";
 import { Card, Quiet, Toggle } from "../../ui/layout";
 import { SpriteOr } from "../../ui/pixel/icons";
 import { Segmented } from "../../ui/Segmented";
-import { Hint } from "../../ui/Tip";
+import { Bubble, Hint } from "../../ui/Tip";
+import { mix } from "../../ui/tone";
 import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
 
 const toneChoices1 = {
@@ -51,7 +52,7 @@ const capabilityLabel: Record<RuntimeCapability, string> = {
 };
 
 /** The quota as a row of cells, filled to what is left. */
-export function Stamina(props: { quota: Quota; cells?: number; width: number; height: number }) {
+export function Stamina(props: { quota: Quota; cells?: number; width?: number; height: number }) {
   const cells = () => props.cells ?? 10;
   const lit = () => Math.round(props.quota.fill * cells());
   return (
@@ -59,11 +60,16 @@ export function Stamina(props: { quota: Quota; cells?: number; width: number; he
       role="progressbar"
       accessibilityLabel={props.quota.text}
       accessibilityValue={{ min: 0, max: 100, now: Math.round(props.quota.fill * 100) }}
-      class="flex-row gap-px rounded-sm bg-bark-800 p-px"
-      style={{ width: props.width, height: props.height }}
+      class={`flex-row gap-px rounded-sm bg-bark-800 p-px ${props.width === undefined ? "w-full max-w-56" : ""}`}
+      style={{ ...(props.width !== undefined ? { width: props.width } : {}), height: props.height }}
     >
       <Each of={Array.from({ length: cells() }, (_, i) => i)}>
-        {(i) => <View class={`flex-1 rounded-xs ${i() < lit() ? toneChoices1[props.quota.level] : "bg-line"}`} />}
+        {(i) => (
+          <View
+            class={`flex-1 rounded-xs ${i() < lit() ? toneChoices1[props.quota.level] : ""}`}
+            style={i() < lit() ? undefined : { backgroundColor: mix("paper", 0.18) }}
+          />
+        )}
       </Each>
     </View>
   );
@@ -115,7 +121,7 @@ export function Usage(props: { info: RuntimeInfo; terminalDirectory?: string | u
                   <SpriteOr name={bottleSprite(quota())} size={52}>
                     <Bottle quota={quota()} size={52} />
                   </SpriteOr>
-                  <Text class="text-sm text-ink">{quota().short || "—"}</Text>
+                  <Text class="text-sm font-medium tabular-nums text-ink">{quota().short || "—"}</Text>
                 </View>
                 <View class="min-w-0 flex-1 gap-2.5">
                   <If when={variant(usage(), "status", "balance")}>
@@ -124,7 +130,7 @@ export function Usage(props: { info: RuntimeInfo; terminalDirectory?: string | u
                         <Text class={`text-sm ${!u().available ? "text-berry" : "text-ink"}`}>
                           {t("web.runtime.balance", { provider: u().provider, enough: u().available })}
                         </Text>
-                        <Text class="text-sm text-muted">
+                        <Text class="text-sm tabular-nums text-muted">
                           {(props.info.settings.dailyBudget ?? 0) > 0
                             ? t("web.runtime.spentTodayBudget", { spent: yuan(props.info.spentToday ?? 0), budget: yuan(props.info.settings.dailyBudget ?? 0) })
                             : t("web.runtime.spentToday", { spent: yuan(props.info.spentToday ?? 0) })}
@@ -161,9 +167,9 @@ function Window(props: { window: UsageWindow }) {
   const label = () => windowLabel(props.window.label);
   return (
     <View class="gap-1">
-      <View class="flex-row">
-        <Text class="flex-1 text-xs text-muted">{label()}</Text>
-        <Text class="text-xs text-ink">{t("web.runtime.left", { pct: pct(left()) })}</Text>
+      <View class="flex-row items-baseline gap-2">
+        <Text class="min-w-0 flex-1 truncate text-xs text-muted">{label()}</Text>
+        <Text class="text-xs font-medium tabular-nums text-ink">{t("web.runtime.left", { pct: pct(left()) })}</Text>
       </View>
       <Stamina
         quota={{
@@ -172,10 +178,11 @@ function Window(props: { window: UsageWindow }) {
           short: `${pct(left())}%`,
           text: t("web.runtime.windowLeft", { label: label(), pct: pct(left()) }),
         }}
-        width={220}
         height={10}
       />
-      <If when={props.window.resetsAt}>{(at) => <Text class="text-xs text-muted">{t("web.runtime.resets", { moment: momentText(at()) })}</Text>}</If>
+      <If when={props.window.resetsAt}>
+        {(at) => <Text class="text-xs tabular-nums text-muted">{t("web.runtime.resets", { moment: momentText(at()) })}</Text>}
+      </If>
     </View>
   );
 }
@@ -204,11 +211,13 @@ export function SupportCard(props: { info: RuntimeInfo }) {
           </Each>
         </If>
         <Text class="pt-2 text-xs font-medium text-muted">{t("web.runtime.queries")}</Text>
-        <View class="flex-row flex-wrap gap-1">
+        <View class="flex-row flex-wrap gap-1.5">
           <Each of={RuntimeCapabilityValues}>
             {(c) => (
-              <View class={`rounded-sm px-1.5 py-px ${support().capabilities.includes(c()) ? "bg-selected" : "border border-line"}`}>
-                <Text class={`text-xs ${support().capabilities.includes(c()) ? "text-ink" : "text-muted line-through"}`}>{capabilityLabel[c()]}</Text>
+              <View class={`rounded-sm px-1.5 py-0.5 ${support().capabilities.includes(c()) ? "bg-selected" : "bg-hover"}`}>
+                <Text class={`text-xs ${support().capabilities.includes(c()) ? "font-medium text-ink" : "text-faint line-through"}`}>
+                  {capabilityLabel[c()]}
+                </Text>
               </View>
             )}
           </Each>
@@ -285,7 +294,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
       action={
         <If when={dirty()}>
           <View class="flex-row gap-2">
-            <Button testID="discard" onPress={() => draft.set(props.info.settings)}>
+            <Button tone="quiet" testID="discard" onPress={() => draft.set(props.info.settings)}>
               {t("web.runtime.discard")}
             </Button>
             <Button tone="primary" testID="save" disabled={saving.busy()} onPress={() => void save()}>
@@ -381,8 +390,8 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
         <>
           <Text class="font-mono text-sm text-ink">{value()}</Text>
           <If when={model().isDefault}>
-            <View class="ml-2 rounded-sm bg-ok-soft px-1.5">
-              <Text class="text-xs text-ok-ink">{t("web.runtime.default")}</Text>
+            <View class="ml-2 rounded-sm bg-ok-soft px-1.5 py-0.5">
+              <Text class="text-xs font-medium text-ok-ink">{t("web.runtime.default")}</Text>
             </View>
           </If>
         </>
@@ -397,7 +406,7 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
   return (
     <Card
       title={t("web.runtime.models")}
-      action={<If when={props.info.models}>{(m) => <Text class="text-sm text-muted">{t("web.runtime.modelCount", { n: m().length })}</Text>}</If>}
+      action={<If when={props.info.models}>{(m) => <Text class="text-sm tabular-nums text-muted">{t("web.runtime.modelCount", { n: m().length })}</Text>}</If>}
     >
       <If
         when={props.info.models}
@@ -411,17 +420,19 @@ export function ModelsCard(props: { info: RuntimeInfo }) {
 
 export function InventoryCard(props: { title: string; entries: InventoryEntry[] | null }) {
   return (
-    <Card title={props.title} action={<If when={props.entries}>{(e) => <Text class="text-sm text-muted">{String(e().length)}</Text>}</If>}>
+    <Card title={props.title} action={<If when={props.entries}>{(e) => <Text class="text-sm tabular-nums text-muted">{String(e().length)}</Text>}</If>}>
       <If when={props.entries} else={<Quiet>{t("web.runtime.unreported")}</Quiet>}>
         {(entries) => (
           <If when={entries().length > 0} else={<Quiet>{t("web.runtime.none")}</Quiet>}>
-            <View class="gap-1">
+            <View class="gap-1.5">
               <Each of={entries()}>
                 {(e) => (
-                  <View>
-                    <Text class={`font-mono text-sm ${e().enabled === false ? "text-muted line-through" : "text-ink"}`}>{e().name}</Text>
+                  <View class="min-w-0">
+                    <Text class={`truncate font-mono text-sm ${e().enabled === false ? "text-muted line-through" : "text-ink"}`}>{e().name}</Text>
                     <If when={e().description}>
-                      <Text class="truncate text-xs text-muted">{e().description}</Text>
+                      <View class="min-w-0" tooltip={<Bubble text={e().description} />}>
+                        <Text class="truncate text-xs text-muted">{e().description}</Text>
+                      </View>
                     </If>
                   </View>
                 )}

@@ -189,6 +189,10 @@ export const MediaSpeechJob = z.object({
   updatedAt: z.number(),
 }) satisfies Codec<T.MediaSpeechJob>;
 export const MediaJob = z.union([MediaImageJob, MediaUnderstandingJob, MediaSpeechJob, MediaAudioJob]) satisfies Codec<T.MediaJob>;
+export const MediaSummary = z.object({
+  activeCount: z.number(),
+  activeIds: z.array(z.string()),
+}) satisfies Codec<T.MediaSummary>;
 export const MediaJobRequest = z.object({ id: z.string() }) satisfies Codec<T.MediaJobRequest>;
 export const FactMediaChanged = z.object({
   type: z.literal("mediaChanged"),

@@ -46,23 +46,37 @@ fn leads(prev: Option<char>) -> bool {
     }
 }
 
+fn match_worker_mention(rest: &str) -> Option<&str> {
+    let bytes = rest.as_bytes();
+    if bytes.first() != Some(&b'w') {
+        return None;
+    }
+    let digits_end = 1 + bytes[1..].iter().take_while(|b| b.is_ascii_digit()).count();
+    (digits_end > 1).then_some(&rest[..digits_end])
+}
+
 /// `mentionsIn`: who some words name, once each, in order. Code names no
 /// one; the longest name is tried first, and a name ends where its token
 /// ends (`@w3你看` names w3).
 pub fn mentions_in(text: &str, names: &Nameable) -> Vec<String> {
     let mut alts: Vec<&str> = names.orchestrators.iter().map(String::as_str).chain(CHAT_NAMES).collect();
     alts.sort_by_key(|a| std::cmp::Reverse(a.encode_utf16().count()));
-    let pattern = format!("@(w[0-9]+|{})", alts.iter().map(|a| regex::escape(a)).collect::<Vec<_>>().join("|"));
-    let Ok(re) = Regex::new(&pattern) else { return vec![] };
     let prose = FENCE.replace_all(text, " ");
     let prose = TICK.replace_all(&prose, " ");
     let mut found: Vec<String> = vec![];
-    for m in re.captures_iter(&prose) {
-        let whole = m.get(0).expect("match");
-        if !leads(prose[..whole.start()].chars().next_back()) {
+    let mut cursor = 0;
+    while let Some(rel) = prose[cursor..].find('@') {
+        let at_idx = cursor + rel;
+        let rest = &prose[at_idx + 1..];
+        let matched = match_worker_mention(rest).or_else(|| alts.iter().copied().find(|alt| !alt.is_empty() && rest.starts_with(alt)));
+        let Some(token) = matched else {
+            cursor = at_idx + 1;
+            continue;
+        };
+        cursor = at_idx + 1 + token.len();
+        if !leads(prose[..at_idx].chars().next_back()) {
             continue;
         }
-        let token = &m[1];
         let id = match chat_named(token) {
             Some(DEFAULT_ORCHESTRATOR) => names.here.to_string(),
             Some(named) => named.to_string(),
@@ -440,6 +454,9 @@ mod tests {
         assert_eq!(mentions_in("@助手 看看，@agent-12 也看看，@agent-1", &names), ["lead", "agent-12", "agent-1"]);
         assert_eq!(mentions_in("@orchestrator 你呢 `@lead`", &names), ["orchestrator"]);
         assert!(named("@lead 在吗").is_empty());
+        assert_eq!(mentions_in("@w12你好，@agent-123", &names), ["w12", "agent-12"]);
+        assert_eq!(mentions_in("@w1@w2, @w1,@w2 and a@w3 and @助手你看", &names), ["w1", "w2", "lead"]);
+        assert_eq!(mentions_in("```\n@w9 @助手\n```\n`@w8` @w4", &names), ["w4"]);
     }
 
     #[test]

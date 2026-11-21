@@ -7,19 +7,20 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use gpui::{
-    AppContext as _, Context, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, InteractiveElement as _, IntoElement, ObjectFit,
-    ParentElement as _, Render, ScrollStrategy, StatefulInteractiveElement as _, Styled as _, StyledImage as _, StyledText, UniformListScrollHandle, Window,
-    div, img, px, uniform_list,
+    AnyElement, AppContext as _, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, Hsla, InteractiveElement as _,
+    IntoElement, ObjectFit, ParentElement as _, Render, ScrollStrategy, StatefulInteractiveElement as _, Styled as _, StyledImage as _, StyledText,
+    UniformListScrollHandle, Window, div, hsla, img, px, uniform_list,
 };
 use vibevalley_files::{FileContent, HighlightSpan, Language};
 
-use crate::theme::Ui;
+use crate::theme::{Palette, Ui};
 
 const MAX_BYTES: u64 = 8 * 1024 * 1024;
 
 pub enum ViewerEvent {
     OpenInEditor,
     Preview,
+    Reveal,
 }
 
 pub struct Line {
@@ -158,20 +159,121 @@ impl Focusable for FileViewer {
     }
 }
 
-fn button(id: &'static str, label: &'static str, colors: &crate::theme::Palette) -> gpui::Stateful<gpui::Div> {
-    div()
+fn transparent() -> Hsla {
+    hsla(0.0, 0.0, 0.0, 0.0)
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    let b = bytes as f64;
+    if b >= GB {
+        format!("{:.1} GB", b / GB)
+    } else if b >= MB {
+        format!("{:.1} MB", b / MB)
+    } else if b >= KB {
+        format!("{:.1} KB", b / KB)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+fn split_display_path(path: &Path) -> (String, Option<String>) {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_string_lossy().into_owned());
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).map(|p| match &home {
+        Some(h) if p == h => "~".to_string(),
+        Some(h) => match p.strip_prefix(h) {
+            Ok(rel) => format!("~/{}", rel.display()),
+            Err(_) => p.to_string_lossy().into_owned(),
+        },
+        None => p.to_string_lossy().into_owned(),
+    });
+    (name, parent)
+}
+
+#[derive(Clone, Copy)]
+enum ButtonTone {
+    Quiet,
+    Plain,
+    Accent,
+}
+
+fn action_button(id: &'static str, label: &'static str, tone: ButtonTone, colors: &Palette) -> gpui::Stateful<gpui::Div> {
+    let hover = colors.hover;
+    let text = colors.text;
+    let base = div()
         .id(id)
-        .h(px(22.0))
+        .h(px(24.0))
         .px(px(8.0))
+        .flex_none()
         .flex()
         .items_center()
-        .rounded(px(6.0))
+        .justify_center()
+        .rounded(px(5.0))
         .border_1()
-        .border_color(colors.border)
-        .text_size(px(12.0))
-        .text_color(colors.text)
-        .hover(|s| s.bg(colors.hover))
-        .child(label)
+        .cursor_pointer()
+        .text_size(px(11.5))
+        .font_weight(FontWeight::MEDIUM)
+        .child(label);
+    match tone {
+        ButtonTone::Quiet => base
+            .bg(transparent())
+            .border_color(transparent())
+            .text_color(colors.muted)
+            .hover(move |s| s.bg(hover).text_color(text)),
+        ButtonTone::Plain => base
+            .bg(colors.elevated)
+            .border_color(colors.border)
+            .text_color(colors.text)
+            .hover(move |s| s.bg(hover)),
+        ButtonTone::Accent => base
+            .bg(colors.selected)
+            .border_color(Hsla { a: 0.35, ..colors.accent })
+            .text_color(colors.accent)
+            .hover(move |s| s.bg(hover)),
+    }
+}
+
+fn state_card(title: &'static str, detail: String, hint: Option<&'static str>, danger: bool, colors: &Palette) -> AnyElement {
+    let (bg, border, title_color) = if danger {
+        (colors.removed_bg, Hsla { a: 0.35, ..colors.danger }, colors.danger)
+    } else {
+        (colors.surface, colors.border, colors.text)
+    };
+    div()
+        .size_full()
+        .flex()
+        .items_center()
+        .justify_center()
+        .p(px(24.0))
+        .child(
+            div()
+                .max_w(px(440.0))
+                .px(px(20.0))
+                .py(px(16.0))
+                .rounded(px(8.0))
+                .border_1()
+                .border_color(border)
+                .bg(bg)
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap(px(6.0))
+                .child(div().text_size(px(13.0)).font_weight(FontWeight::SEMIBOLD).text_color(title_color).child(title))
+                .child(
+                    div()
+                        .text_size(px(12.0))
+                        .text_color(if danger { colors.text } else { colors.muted })
+                        .child(detail),
+                )
+                .children(hint.map(|h| div().pt(px(2.0)).text_size(px(11.5)).text_color(colors.faint).child(h))),
+        )
+        .into_any_element()
 }
 
 impl Render for FileViewer {
@@ -180,61 +282,154 @@ impl Render for FileViewer {
         let colors = ui.colors.clone();
         let mono = ui.mono();
         let font_size = ui.settings.terminal_font_size;
-        let line_height = (font_size * 1.5).round();
+        let line_height = (font_size * 1.65).round().max(21.0);
+        let (file_name, parent_dir) = split_display_path(&self.path);
+        let (lang_badge, meta_text) = match &self.state {
+            State::Text { lines, language } => {
+                let count = if lines.len() == 1 {
+                    "1 line".to_string()
+                } else {
+                    format!("{} lines", lines.len())
+                };
+                (language.as_ref().map(|l| l.0.clone()), Some(count))
+            }
+            State::Image => (Some("image".to_string()), None),
+            State::Binary(size) | State::TooLarge(size) => (None, Some(format_bytes(*size))),
+            State::Loading | State::Error(_) => (None, None),
+        };
         let toolbar = div()
-            .h(px(30.0))
+            .h(px(34.0))
             .flex_none()
             .flex()
             .flex_row()
             .items_center()
-            .gap(px(6.0))
-            .px(px(10.0))
+            .gap(px(8.0))
+            .px(px(12.0))
             .border_b_1()
             .border_color(colors.border)
             .bg(colors.surface)
             .child(
                 div()
                     .flex_1()
-                    .overflow_hidden()
-                    .text_ellipsis()
-                    .whitespace_nowrap()
-                    .text_size(px(12.0))
+                    .min_w_0()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(px(6.0))
+                    .child(
+                        div()
+                            .flex_none()
+                            .text_size(px(12.5))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(colors.text)
+                            .child(file_name),
+                    )
+                    .children(parent_dir.map(|dir| {
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .text_ellipsis()
+                            .whitespace_nowrap()
+                            .text_size(px(11.5))
+                            .text_color(colors.faint)
+                            .child(dir)
+                    })),
+            )
+            .children(lang_badge.map(|lang| {
+                div()
+                    .flex_none()
+                    .h(px(20.0))
+                    .px(px(6.0))
+                    .flex()
+                    .items_center()
+                    .rounded(px(4.0))
+                    .bg(colors.hover)
+                    .text_size(px(11.0))
                     .text_color(colors.muted)
-                    .child(self.path.to_string_lossy().into_owned()),
-            )
-            .children(
-                self.is_markdown()
-                    .then(|| button("preview", "Preview", &colors).on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::Preview)))),
-            )
-            .child(button("reload", "Reload", &colors).on_click(cx.listener(|v, _, _, cx| v.reload(cx))))
-            .child(button("editor", "Open in $EDITOR", &colors).on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::OpenInEditor))));
-        let message = |text: String| {
-            div()
+                    .child(lang)
+            }))
+            .children(meta_text.map(|meta| {
+                div()
+                    .flex_none()
+                    .font_family(mono.clone())
+                    .text_size(px(11.5))
+                    .text_color(colors.faint)
+                    .child(meta)
+            }))
+            .child(
+                div()
+                    .flex_none()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(px(4.0))
+                    .children(self.is_markdown().then(|| {
+                        action_button("preview", "Preview", ButtonTone::Accent, &colors).on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::Preview)))
+                    }))
+                    .child(
+                        action_button("copy-path", "Copy path", ButtonTone::Quiet, &colors).on_click(cx.listener(|v, _, _, cx| {
+                            cx.write_to_clipboard(ClipboardItem::new_string(v.path.to_string_lossy().into_owned()));
+                        })),
+                    )
+                    .child(action_button("reload", "Reload", ButtonTone::Quiet, &colors).on_click(cx.listener(|v, _, _, cx| v.reload(cx))))
+                    .child(action_button("reveal", "Reveal", ButtonTone::Quiet, &colors).on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::Reveal))))
+                    .child(
+                        action_button("editor", "Open in $EDITOR", ButtonTone::Plain, &colors)
+                            .on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::OpenInEditor))),
+                    ),
+            );
+        let body = match &self.state {
+            State::Loading => div()
                 .size_full()
                 .flex()
                 .items_center()
                 .justify_center()
                 .text_color(colors.muted)
-                .text_size(px(13.0))
-                .child(text)
-        };
-        let body = match &self.state {
-            State::Loading => message("Loading…".into()).into_any_element(),
-            State::Error(e) => message(format!("Could not open this file: {e}")).into_any_element(),
-            State::Binary(size) => message(format!("Binary file, {size} bytes. Not shown.")).into_any_element(),
-            State::TooLarge(size) => message(format!("This file is {size} bytes, too large to show.")).into_any_element(),
+                .text_size(px(12.5))
+                .child("Loading file…")
+                .into_any_element(),
+            State::Error(e) => state_card("Could not open file", e.clone(), None, true, &colors),
+            State::Binary(size) => state_card(
+                "Binary file",
+                format!("{} ({size} bytes) — preview is not available.", format_bytes(*size)),
+                Some("Use Open in $EDITOR or Reveal to inspect it externally."),
+                false,
+                &colors,
+            ),
+            State::TooLarge(size) => state_card(
+                "File too large to preview",
+                format!("{} exceeds the {} viewer limit.", format_bytes(*size), format_bytes(MAX_BYTES)),
+                Some("Open it in $EDITOR to view the full file."),
+                false,
+                &colors,
+            ),
             State::Image => div()
                 .size_full()
-                .p(px(16.0))
-                .child(img(self.path.clone()).size_full().object_fit(ObjectFit::Contain))
+                .p(px(20.0))
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(
+                    div()
+                        .size_full()
+                        .rounded(px(8.0))
+                        .border_1()
+                        .border_color(colors.border)
+                        .bg(colors.surface)
+                        .p(px(16.0))
+                        .child(img(self.path.clone()).size_full().object_fit(ObjectFit::Contain)),
+                )
                 .into_any_element(),
-            State::Text { lines, .. } if lines.is_empty() => message("This file is empty.".into()).into_any_element(),
+            State::Text { lines, .. } if lines.is_empty() => state_card("Empty file", "This file has no content yet.".into(), None, false, &colors),
             State::Text { lines, .. } => {
                 let lines = lines.clone();
-                let gutter = (lines.len().to_string().len() as f32 * font_size * 0.62 + 16.0).ceil();
+                let digits = lines.len().max(1).to_string().len().max(3);
+                let gutter = (digits as f32 * font_size * 0.64 + 24.0).ceil().max(48.0);
                 let colors = colors.clone();
                 uniform_list("lines", lines.len(), move |range, _, cx| {
                     let ui = Ui::get(cx);
+                    let row_hover = colors.hover;
                     range
                         .map(|i| {
                             let line = &lines[i];
@@ -250,25 +445,43 @@ impl Render for FileViewer {
                             });
                             div()
                                 .h(px(line_height))
+                                .w_full()
                                 .flex()
                                 .flex_row()
+                                .items_center()
+                                .hover(move |s| s.bg(row_hover))
                                 .child(
                                     div()
                                         .w(px(gutter))
+                                        .h_full()
                                         .flex_none()
-                                        .pr(px(10.0))
+                                        .pr(px(12.0))
                                         .flex()
+                                        .items_center()
                                         .justify_end()
+                                        .bg(colors.surface)
+                                        .border_r_1()
+                                        .border_color(colors.border)
                                         .text_color(colors.faint)
                                         .child((i + 1).to_string()),
                                 )
-                                .child(div().whitespace_nowrap().text_color(colors.text).child(
-                                    StyledText::new(line.text.replace('\t', "    ")).with_highlights(if line.text.contains('\t') {
-                                        Vec::new()
-                                    } else {
-                                        highlights.collect()
-                                    }),
-                                ))
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w_0()
+                                        .h_full()
+                                        .flex()
+                                        .items_center()
+                                        .pl(px(14.0))
+                                        .pr(px(16.0))
+                                        .whitespace_nowrap()
+                                        .text_color(colors.text)
+                                        .child(StyledText::new(line.text.replace('\t', "    ")).with_highlights(if line.text.contains('\t') {
+                                            Vec::new()
+                                        } else {
+                                            highlights.collect()
+                                        })),
+                                )
                         })
                         .collect()
                 })
@@ -327,5 +540,19 @@ mod tests {
         let lines = prepare("fn main() {}\n// hi", Some(&lang));
         assert_eq!(lines.len(), 2);
         assert!(!lines[0].spans.is_empty(), "rust is highlighted");
+    }
+
+    #[test]
+    fn formats_byte_sizes_human_readably() {
+        assert_eq!(format_bytes(512), "512 B");
+        assert_eq!(format_bytes(1536), "1.5 KB");
+        assert_eq!(format_bytes(8 * 1024 * 1024), "8.0 MB");
+    }
+
+    #[test]
+    fn splits_file_name_from_parent_directory() {
+        let (name, dir) = split_display_path(Path::new("/tmp/project/src/viewer.rs"));
+        assert_eq!(name, "viewer.rs");
+        assert_eq!(dir.as_deref(), Some("/tmp/project/src"));
     }
 }

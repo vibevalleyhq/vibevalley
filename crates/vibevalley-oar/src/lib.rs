@@ -19,14 +19,13 @@ pub mod acp;
 pub use accounting::TokenTotals;
 mod claude;
 mod codex;
-mod core;
+pub mod core;
 mod frames;
 mod process;
 pub mod record;
 pub mod scripted;
 mod sdk;
 pub mod subagent;
-pub mod vibevalley;
 pub mod voyage;
 
 pub use crate::core::{StatusFold, derive_status, rejection};
@@ -743,7 +742,6 @@ pub fn default_runtimes() -> Registry {
     }
     registry.register(Arc::new(sdk::SdkRuntime::Qwen));
     registry.register(Arc::new(sdk::SdkRuntime::Qoder));
-    registry.register(Arc::new(vibevalley::VibeValleyRuntime::from_env()));
     registry.register(Arc::new(scripted::ScriptedRuntime::demo()));
     registry
 }

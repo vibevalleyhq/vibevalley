@@ -26,23 +26,31 @@ import {
 
 const fallbackClasses = {
   link: "text-water underline",
-  blockquote: "my-0 border-l-2 border-line pl-3 text-muted",
-  code: "rounded-sm border-0 bg-hover px-1 font-mono text-xs",
-  heading: "mt-0 mb-0 font-semibold",
-  heading1: "text-lg",
+  strong: "font-semibold text-ink",
+  blockquote: "my-1 border-l-2 border-faint py-0.5 pl-3 text-muted",
+  alert: "my-1.5 rounded-md border border-line bg-side px-3 py-1.5",
+  code: "rounded-sm border border-line bg-side px-1.5 py-px font-mono text-xs text-ink",
+  keyboard: "rounded-xs border border-line bg-side px-1 py-px font-mono text-2xs text-ink",
+  heading: "mt-1 mb-0.5 font-semibold text-ink",
   paragraph: "my-1",
-  list: "my-0 pl-5",
-  listItem: "my-0.5",
-  listItemContent: "gap-0",
-  taskMarker: "mt-1 size-3.5",
-  table: "my-2",
-  tableHead: "bg-transparent",
-  tableCell: "border border-line px-2 py-0",
-  tableHeaderCell: "bg-transparent font-semibold text-ink",
+  list: "my-0.5 pl-5",
+  listItem: "my-0.5 items-start",
+  listMarker: "text-muted tabular-nums",
+  listItemContent: "min-w-0 flex-1 gap-0",
+  taskMarker: "mt-0.5 size-3.5 rounded-xs border border-faint bg-page",
+  taskMarkerChecked: "border-accent bg-accent text-page",
+  table: "my-2 overflow-hidden rounded-md border border-line",
+  tableHead: "bg-side",
+  tableRow: "border-b border-line",
+  tableCell: "border border-line px-2 py-1 text-ink",
+  tableHeaderCell: "bg-side font-semibold text-ink",
   rule: "my-2 border-line",
 };
 
-const fallbackHeadings = (size: string) => ({ heading2: size, heading3: size, heading4: size, heading5: size, heading6: size });
+const fallbackHeadings = (sm: boolean) =>
+  sm
+    ? { heading1: "text-base", heading2: "text-sm", heading3: "text-sm", heading4: "text-sm", heading5: "text-sm", heading6: "text-sm" }
+    : { heading1: "text-lg", heading2: "text-base", heading3: "text-sm", heading4: "text-sm", heading5: "text-sm", heading6: "text-sm" };
 
 export interface MarkdownProps {
   text: string;
@@ -66,6 +74,7 @@ export interface MarkdownProps {
 /** Chat text, descriptions, notes, and reports. */
 export function Markdown(props: MarkdownProps) {
   const router = useRouter();
+  const small = () => props.size === "sm";
   const openLink = (url: string) => {
     if (url.startsWith("/")) router.navigate(url);
     else void hostApi.openUrl(url);
@@ -110,8 +119,8 @@ export function Markdown(props: MarkdownProps) {
       selectable={props.selectable ?? true}
       classes={{
         ...fallbackClasses,
-        ...fallbackHeadings(props.size === "sm" ? "text-sm" : "text-base"),
-        root: `min-w-0 gap-0 text-ink ${props.size === "sm" ? "text-sm" : "text-base"} ${props.class ?? ""}`,
+        ...fallbackHeadings(small()),
+        root: `min-w-0 gap-0 text-ink ${small() ? "text-sm" : "text-base"} ${props.class ?? ""}`,
       }}
       renderCodeBlock={(block) => {
         switch (block.language) {

@@ -20,7 +20,7 @@ export interface AgentHandlers {
   /** The templates a profile can be installed from: the built-in ones, then those added on this machine. */
   readonly "agent.template.list": () => Promise<T.AgentTemplate[]>;
   /** A new profile from a template; installing one again makes another. */
-  readonly "agent.template.install": (a: { readonly id: string }) => Promise<T.Agent>;
+  readonly "agent.template.install": (a: { readonly id: string; readonly runtime?: string | undefined }) => Promise<T.Agent>;
   /** A profile made again from its template's version now. */
   readonly "agent.template.update": (a: { readonly agent: string }) => Promise<T.Agent>;
   /** A template folder on this machine copied in beside the built-in ones; nothing is installed. */
@@ -92,7 +92,7 @@ export const agentEndpoints: readonly Endpoint[] = [
   {
     op: "agent.template.install",
     about: ["id"],
-    input: input({ id: z.string() }),
+    input: input({ id: z.string(), runtime: z.exactOptional(z.string()) }),
     result: S.Agent,
     can: ["user"],
   },

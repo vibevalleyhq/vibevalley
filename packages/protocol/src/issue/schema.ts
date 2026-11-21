@@ -14,6 +14,35 @@ const Priority = z.enum(T.PriorityValues) satisfies Codec<T.Priority>;
 
 export const IssueStatus = z.enum(T.IssueStatusValues) satisfies Codec<T.IssueStatus>;
 
+export const IssueLane = z.enum(T.IssueLaneValues) satisfies Codec<T.IssueLane>;
+
+export const IssueCardKind = z.enum(T.IssueCardKindValues) satisfies Codec<T.IssueCardKind>;
+
+export const IssuePromptKind = z.enum(T.IssuePromptKindValues) satisfies Codec<T.IssuePromptKind>;
+
+export const BoardLaneCounts = z.object({
+  todo: z.number(),
+  working: z.number(),
+  waiting: z.number(),
+  closed: z.number(),
+}) satisfies Codec<T.BoardLaneCounts>;
+
+export const BoardIssueSummary = z.object({
+  lane: IssueLane,
+  cardKind: IssueCardKind,
+  familyDone: z.number(),
+  familyTotal: z.number(),
+  needsWorktreeCheck: z.boolean(),
+  prompt: z.exactOptional(IssuePromptKind),
+}) satisfies Codec<T.BoardIssueSummary>;
+
+export const BoardSummary = z.object({
+  laneCounts: BoardLaneCounts,
+  runningSlots: z.number(),
+  maxRunning: z.number(),
+  byIssue: z.record(z.string(), BoardIssueSummary),
+}) satisfies Codec<T.BoardSummary>;
+
 const PullRequestState = z.enum(T.PullRequestStateValues) satisfies Codec<T.PullRequestState>;
 
 const PullRequest = z.object({

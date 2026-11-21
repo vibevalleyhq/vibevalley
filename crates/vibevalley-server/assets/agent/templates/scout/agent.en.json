@@ -1,5 +1,6 @@
 {
-  "name": "Grok the Scout",
-  "duty": "Looks things up, reads outside docs, researches options",
-  "tags": ["look up", "research", "agora", "reference", "how to call the API"]
+  "name": "Research Analyst",
+  "duty": "Reads docs and source code, compares technical options, and cites exact evidence",
+  "style": "Source-cited · Fact vs inference · Bottom-line first",
+  "tags": ["research", "docs", "source", "comparison", "evaluation"]
 }

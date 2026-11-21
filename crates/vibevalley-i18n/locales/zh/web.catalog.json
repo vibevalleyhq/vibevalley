@@ -38,7 +38,6 @@
   "recut": "重新切",
   "cursorsIntro": "鼠标在农场里的样子：平时、指着能点的、拿着工具时。",
   "cursorsFind": "找：指针的名字（glove、water、harvest……）",
-  "cursors": "指针 · {n}",
   "cursorsNote": "红点是点下去落在哪。平时是手套，指着能点的伸出食指；拿着工具时是那件工具，能用的带闪光，用不上的带禁止标记。切自 design/pixel/raw/ui-cursors.png（design/pixel/process.py ui-cursors）。",
   "noCursors": "这个版本没有带上指针的图（assets/cursors）。",
   "soundsIntro": "农场里的每个声音，点一下就能听。",

@@ -1,10 +1,28 @@
-import { cleanup, PanResponder, signal, Text, View, windowSize, type JSX, type ViewRef } from "nsh";
+import { cleanup, PanResponder, Scroll, signal, Text, View, windowSize, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { maxRunning } from "@vibevalley/protocol";
+import { type BoardSummary, maxRunning } from "@vibevalley/protocol";
 
-import { mix } from "../../../ui/tone";
-import { type BoardCard, cardAgent, cardLook, cardMove, cardRepo, closedShown, type Lane, laneLabel, lanes, laneStatus, ownStatus } from "../model/cards";
+import { Icon } from "../../../ui/Icon";
+import type { IconName } from "../../../ui/icons";
+import { Bubble, Hint } from "../../../ui/Tip";
+import { mix, tone } from "../../../ui/tone";
+import {
+  type BoardCard,
+  cardAgent,
+  cardLook,
+  cardMove,
+  cardRepo,
+  cardUrgencyTone,
+  closedShown,
+  type Lane,
+  laneCountOf,
+  laneLabel,
+  lanes,
+  laneStatus,
+  ownStatus,
+  runningSlotsOf,
+} from "../model/cards";
 import { laneOrder, type Ordering } from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
@@ -12,8 +30,12 @@ import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Ma
 /** Under the closed ones: how many older are folded away, or back to the recent ones. */
 export function OlderLink(props: { hidden: number; onClick: () => void }) {
   return (
-    <View onPress={() => props.onClick()} role="button" class="self-center py-1">
-      <Text class="text-sm text-water">{props.hidden > 0 ? t("web.issue.board.earlier", { n: props.hidden }) : t("web.issue.board.recent")}</Text>
+    <View
+      onPress={() => props.onClick()}
+      role="button"
+      class="self-center rounded-md px-2.5 py-1 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+    >
+      <Text class="text-xs font-medium text-water">{props.hidden > 0 ? t("web.issue.board.earlier", { n: props.hidden }) : t("web.issue.board.recent")}</Text>
     </View>
   );
 }
@@ -31,6 +53,8 @@ const emptyText: Record<Lane, string> = {
 
 export interface BoardProps {
   cards: BoardCard[];
+  summary?: BoardSummary | undefined;
+  filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
   older: boolean;
@@ -129,10 +153,12 @@ export function IssueBoard(props: BoardProps) {
   const lane = signal<Lane>(props.cards.find((card) => card.id === props.selected)?.lane ?? "todo");
   const narrow = () => windowSize().width < 700;
   const drag = createDrag(() => props);
+  const countOf = (l: Lane) => laneCountOf(l, props.cards, props.summary, props.filtered === true, props.older);
+  const workingSlots = () => runningSlotsOf(props.cards, props.summary, props.filtered === true, maxRunning);
   return (
     <View ref={drag.setRoot} class="min-h-0 flex-1 px-3 pb-3">
       <If when={narrow()}>
-        <View accessibilityLabel={t("web.issue.board.whichLane")} class="mb-2 flex-row rounded-md bg-hover p-0.5">
+        <View accessibilityLabel={t("web.issue.board.whichLane")} class="mb-2 flex-row gap-0.5 rounded-md border border-line bg-side p-0.5">
           <Each of={lanes}>
             {(l) => (
               <View
@@ -140,10 +166,15 @@ export function IssueBoard(props: BoardProps) {
                 onPress={() => lane.set(l())}
                 role="tab"
                 accessibilityState={{ selected: lane() === l() }}
-                class={`flex-1 items-center rounded-sm py-1 ${lane() === l() ? "bg-page shadow-raise" : ""}`}
+                class={`h-7 flex-1 flex-row items-center justify-center gap-1 rounded-sm px-1.5 ${lane() === l() ? "bg-elevated shadow-raise" : "hover:bg-hover"}`}
               >
-                <Text class={`text-sm ${lane() === l() ? "text-ink" : "text-muted"}`}>
-                  {`${laneLabel[l()]} ${props.cards.filter((c) => c.lane === l()).length}`}
+                <Text class={`truncate text-xs font-medium ${lane() === l() ? "text-ink" : "text-muted"}`}>{laneLabel[l()]}</Text>
+                <Text
+                  testID={`board-lane-tab-count-${l()}`}
+                  class={`text-2xs ${lane() === l() ? "text-muted" : "text-faint"}`}
+                  style={{ fontVariant: ["tabular-nums"] }}
+                >
+                  {String(countOf(l()))}
                 </Text>
               </View>
             )}
@@ -154,7 +185,14 @@ export function IssueBoard(props: BoardProps) {
         <Each of={lanes}>
           {(l) => (
             <If when={!narrow() || l() === lane()}>
-              <LaneView board={props} lane={l()} cards={props.cards.filter((c) => c.lane === l())} drag={drag} />
+              <LaneView
+                board={props}
+                lane={l()}
+                cards={props.cards.filter((c) => c.lane === l())}
+                count={countOf(l())}
+                slots={l() === "working" ? workingSlots() : undefined}
+                drag={drag}
+              />
             </If>
           )}
         </Each>
@@ -163,7 +201,7 @@ export function IssueBoard(props: BoardProps) {
         {(g) => (
           <View
             testID="drag-ghost"
-            class="absolute rounded-lg border border-line bg-page px-2.5 py-2 shadow-float"
+            class="absolute rounded-lg border border-line bg-elevated px-2.5 py-2 shadow-float"
             style={{
               left: (drag.at()?.x ?? 0) - g().origin.x - g().dx,
               top: (drag.at()?.y ?? 0) - g().origin.y - g().dy,
@@ -180,34 +218,40 @@ export function IssueBoard(props: BoardProps) {
   );
 }
 
-function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; drag: Drag }) {
+function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; count: number; slots?: { taken: number; of: number } | undefined; drag: Drag }) {
   const p = () => props.board;
   const over = () => props.drag.over() === props.lane;
   const folded = () => props.lane === "closed" && !p().older && props.cards.length > closedShown;
   const ordered = () => laneOrder(props.lane, props.cards, p().ordering);
   const shown = () => (folded() ? ordered().slice(0, closedShown) : ordered());
   const hidden = () => (folded() ? ordered().length - closedShown : 0);
-  const head = () =>
-    props.lane === "working"
-      ? t("web.issue.board.spots", { taken: props.cards.filter((c) => c.kind === "issue").length, of: maxRunning })
-      : `${props.cards.length}`;
+  const hasBody = () => p().loading || props.cards.length > 0 || props.lane !== "todo";
   return (
     <View
       ref={(r) => props.drag.lane(props.lane, r)}
       accessibilityLabel={laneLabel[props.lane]}
       testID={`lane-${props.lane}`}
       accessibilityState={{ selected: over() }}
-      class={`max-h-full min-w-55 flex-1 self-start rounded-lg border px-2 pt-1.5 pb-2 ${over() ? "border-leaf" : "border-transparent bg-hover"}`}
+      class={`max-h-full min-w-55 flex-1 self-start rounded-lg border px-2 pt-1.5 pb-2 ${over() ? "border-leaf" : "border-transparent bg-side"}`}
       style={over() ? { backgroundColor: mix("leaf", 0.15) } : undefined}
     >
-      <View class="h-7 flex-row items-center gap-2 px-1">
+      <View class="h-7 shrink-0 flex-row items-center gap-1.5 px-1">
         <StatusMark status={laneStatus[props.lane]} />
-        <Text role="header" class="text-sm font-semibold text-ink">
+        <Text role="header" class="shrink-0 text-sm font-semibold text-ink">
           {laneLabel[props.lane]}
         </Text>
-        <Text class="text-xs text-muted">{head()}</Text>
-        <View tooltip={<Text>{emptyText[props.lane]}</Text>} accessibilityLabel={emptyText[props.lane]} class="ml-auto">
-          <Text class="text-xs text-faint">ⓘ</Text>
+        <Text testID={`lane-count-${props.lane}`} class="shrink-0 text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+          {String(props.count)}
+        </Text>
+        <If when={props.slots}>
+          {(slots) => (
+            <Text testID="lane-working-slots" class="min-w-0 shrink truncate text-2xs text-faint" style={{ fontVariant: ["tabular-nums"], numberOfLines: 1 }}>
+              {`· ${t("web.issue.board.spots", slots())}`}
+            </Text>
+          )}
+        </If>
+        <View class="ml-auto shrink-0">
+          <Hint text={emptyText[props.lane]} />
         </View>
       </View>
       <If when={props.lane === "todo"}>
@@ -216,54 +260,56 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; dr
           role="button"
           testID="issue-new"
           accessibilityLabel={t("web.issue.new.title")}
-          class="mt-1.5 h-9 w-full flex-row items-center justify-center gap-1.5 rounded-md border border-dashed border-line"
-          hoverStyle={{ backgroundColor: "transparent" }}
+          class="group mt-1.5 h-9 w-full shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-dashed border-line transition duration-120 ease-out hover:border-faint hover:bg-page active:translate-y-px"
         >
-          <Text class="text-sm text-faint">{`+ ${t("web.issue.new.card")}`}</Text>
+          <Icon name="add" size={14} tone="muted" />
+          <Text class="text-sm font-medium text-muted group-hover:text-ink">{t("web.issue.new.card")}</Text>
         </View>
       </If>
-      <View class="mt-2 min-h-0 gap-1.5">
-        {p().loading ? (
-          <Text class="px-1 text-xs text-faint">{t("web.issue.reading")}</Text>
-        ) : props.cards.length === 0 && props.lane !== "todo" ? (
-          <View testID="lane-empty" class={`h-12 rounded-md border border-dashed ${over() ? "border-leaf" : "border-line"}`} />
-        ) : (
-          <>
-            <Each of={shown()} key={(c) => c.id}>
-              {(c) => (
-                <CardView
-                  card={c()}
-                  selected={c().id === p().selected}
-                  onOpen={p().onOpen}
-                  onRetry={p().onRetry}
-                  onPutBack={p().onPutBack}
-                  drag={props.drag}
-                  // Anything but manual hides the user's order of todo, so a card cannot be dropped between two there.
-                  placeable={c().kind === "todo" && p().ordering === "manual"}
-                />
-              )}
-            </Each>
-            <If when={hidden() > 0 || (props.lane === "closed" && p().older && props.cards.length > closedShown)}>
-              <OlderLink hidden={hidden()} onClick={p().onOlder} />
-            </If>
-          </>
-        )}
-      </View>
+      <If when={hasBody()}>
+        <Scroll class="mt-2 min-h-0 shrink" contentClass="gap-1.5 pb-0.5">
+          {p().loading ? (
+            <Text class="px-1 text-xs text-faint">{t("web.issue.reading")}</Text>
+          ) : props.cards.length === 0 ? (
+            <View testID="lane-empty" class={`h-12 rounded-md border border-dashed ${over() ? "border-leaf" : "border-line"}`} />
+          ) : (
+            <>
+              <Each of={shown()} key={(c) => c.id}>
+                {(c) => (
+                  <CardView
+                    card={c()}
+                    selected={c().id === p().selected}
+                    onOpen={p().onOpen}
+                    onRetry={p().onRetry}
+                    onPutBack={p().onPutBack}
+                    drag={props.drag}
+                    // Anything but manual hides the user's order of todo, so a card cannot be dropped between two there.
+                    placeable={c().kind === "todo" && p().ordering === "manual"}
+                  />
+                )}
+              </Each>
+              <If when={hidden() > 0 || (props.lane === "closed" && p().older && props.cards.length > closedShown)}>
+                <OlderLink hidden={hidden()} onClick={p().onOlder} />
+              </If>
+            </>
+          )}
+        </Scroll>
+      </If>
     </View>
   );
 }
 
-function SmallIconButton(props: { label: string; glyph: string; onPress: () => void; testID?: string }): JSX.Element {
+function SmallIconButton(props: { label: string; icon: IconName; onPress: () => void; testID?: string }): JSX.Element {
   return (
     <View
       onPress={props.onPress}
       role="button"
       testID={props.testID}
       accessibilityLabel={props.label}
-      tooltip={<Text>{props.label}</Text>}
-      class="h-6 w-6 items-center justify-center rounded-md hover:bg-hover"
+      tooltip={<Bubble text={props.label} />}
+      class="h-6 w-6 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-selected active:translate-y-px"
     >
-      <Text class="text-sm text-muted">{props.glyph}</Text>
+      <Icon name={props.icon} size={14} tone="muted" />
     </View>
   );
 }
@@ -280,7 +326,8 @@ function CardView(props: {
   const nameOf = useNameOf();
   const issues = useIssues();
   const look = () => cardLook(props.card, nameOf(), issues(), Date.now());
-  const where = () => [look().number, cardRepo(props.card)].filter(Boolean).join(" · ");
+  const repo = () => cardRepo(props.card);
+  const hasMeta = () => Boolean(look().number || repo());
   const loud = () => {
     const pr = look().priority;
     return pr === "urgent" || pr === "high" ? pr : undefined;
@@ -298,6 +345,11 @@ function CardView(props: {
     onPanResponderTerminate: () => props.drag.end(false),
   });
   const before = () => props.drag.before() === props.card.id;
+  const urgency = () => cardUrgencyTone(props.card);
+  const cardStyle = () => ({
+    transitionProperty: "colors,shadow",
+    transitionDuration: 180,
+  });
   return (
     <View ref={(r) => props.drag.card(props.card.id, r, () => props.placeable)}>
       <If when={before()}>
@@ -317,18 +369,32 @@ function CardView(props: {
         testID="issue-card"
         accessibilityLabel={look().title}
         accessibilityState={{ selected: props.selected, busy: props.card.move?.state === "moving" }}
-        tooltip={look().detail ? <Text>{look().detail}</Text> : undefined}
+        tooltip={look().detail ? <Bubble text={look().detail} /> : undefined}
         class={[
-          "rounded-lg border border-line px-2.5 pt-2 pb-2 transition duration-180",
-          props.selected ? "bg-selected" : "bg-page hover:shadow-raise",
+          "relative overflow-hidden rounded-lg border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus",
+          props.selected ? "border-accent bg-selected" : "border-line bg-elevated hover:border-faint hover:shadow-raise",
           props.card.move?.state === "moving" ? "opacity-70" : props.drag.dragging()?.id === props.card.id ? "opacity-40" : "",
         ].join(" ")}
+        style={cardStyle()}
       >
-        <If when={where()}>
-          <Text class="line-clamp-1 text-2xs text-muted">{where()}</Text>
+        <If when={urgency()}>{(u) => <View class="pointer-events-none absolute inset-y-0 left-0 w-0.75" style={{ backgroundColor: tone(u()) }} />}</If>
+        <If when={hasMeta()}>
+          <View class="flex-row items-center gap-1">
+            <If when={look().number}>
+              {(num) => (
+                <Text class="shrink-0 font-mono text-2xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+                  {num()}
+                </Text>
+              )}
+            </If>
+            <If when={look().number && repo()}>
+              <Text class="shrink-0 text-2xs text-faint">·</Text>
+            </If>
+            <If when={repo()}>{(r) => <Text class="min-w-0 flex-1 truncate text-2xs text-muted">{r()}</Text>}</If>
+          </View>
         </If>
-        <Text class="mt-0.5 line-clamp-2 text-sm font-medium text-ink">{look().title}</Text>
-        <If when={look().wait}>{(wait) => <Text class="mt-1 line-clamp-2 text-xs text-water">{wait()}</Text>}</If>
+        <Text class={`${hasMeta() ? "mt-1 " : ""}line-clamp-2 text-sm leading-snug font-medium text-ink`}>{look().title}</Text>
+        <If when={look().wait}>{(wait) => <Text class="mt-1 line-clamp-2 text-xs leading-snug text-water">{wait()}</Text>}</If>
         {/* Only what differs from the lane's default: its own status, a high priority, who works it, how far, its flags. */}
         <If when={marks()}>
           <View testID="card-marks" class="mt-2 flex-row flex-wrap items-center gap-1.5">
@@ -346,10 +412,10 @@ function CardView(props: {
       </View>
       <If when={props.card.move?.state === "failed" ? props.card.move : undefined}>
         {(m) => (
-          <View testID="move-failed" class="mt-1 flex-row items-center gap-1.5 px-1">
-            <Text class="line-clamp-1 min-w-0 flex-1 text-xs text-berry">{m().reason ?? t("web.issue.board.moveFailed")}</Text>
-            <SmallIconButton testID="move-retry" label={t("web.issue.board.retryMove")} glyph="↻" onPress={() => props.onRetry(props.card)} />
-            <SmallIconButton testID="move-put-back" label={t("web.issue.board.putBack")} glyph="↶" onPress={() => props.onPutBack(props.card)} />
+          <View testID="move-failed" class="mt-1 flex-row items-center gap-1 px-1">
+            <Text class="min-w-0 flex-1 truncate text-xs text-berry">{m().reason ?? t("web.issue.board.moveFailed")}</Text>
+            <SmallIconButton testID="move-retry" label={t("web.issue.board.retryMove")} icon="retry" onPress={() => props.onRetry(props.card)} />
+            <SmallIconButton testID="move-put-back" label={t("web.issue.board.putBack")} icon="undo" onPress={() => props.onPutBack(props.card)} />
           </View>
         )}
       </If>

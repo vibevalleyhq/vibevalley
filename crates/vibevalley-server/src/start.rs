@@ -35,7 +35,7 @@ pub struct ServerConfig {
     /// The runtimes; none is every built-in one, VibeValley's own reading
     /// the DeepSeek key from the settings.
     pub registry: Option<Arc<Registry>>,
-    pub tool_permissions: vibevalley_agent::generation::governance::Permissions,
+    pub tool_permissions: vibevalley_agent::extensions::governance::Permissions,
     /// Probe every runtime at start, in the background.
     pub probe_runtimes: bool,
     /// Override whether `gh` and repository PR capabilities are probed at boot
@@ -238,18 +238,18 @@ fn failed(what: &str) -> impl Fn(&dyn std::fmt::Display) -> StartError + '_ {
 fn runtimes(
     setting: &Arc<Setting>,
     home: &std::path::Path,
-    execution: Arc<std::sync::OnceLock<vibevalley_agent::generation::workers::SharedExecution>>,
+    execution: Arc<std::sync::OnceLock<vibevalley_agent::harness::SharedExecution>>,
     model: Option<Arc<dyn vibevalley_agent::ModelClient>>,
 ) -> Registry {
     let mut registry = Registry::new();
     for r in vibevalley_oar::default_runtimes().list() {
-        if r.id() != vibevalley_oar::vibevalley::ID {
+        if r.id() != vibevalley_agent::runtime::ID && r.id() != "scripted" {
             registry.register(r.clone());
         }
     }
     let s = setting.clone();
     let builtin =
-        vibevalley_oar::vibevalley::VibeValleyRuntime::new(Arc::new(move || s.deepseek_api_key()), home.join("conversations")).with_execution(execution);
+        vibevalley_agent::runtime::VibeValleyRuntime::new(Arc::new(move || s.deepseek_api_key()), home.join("conversations")).with_execution(execution);
     registry.register(Arc::new(match model {
         Some(model) => builtin.with_client(model),
         None => builtin,
@@ -415,10 +415,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         client: config.model_client.clone(),
     })
     .map_err(|e| failed("durable execution")(&e))?;
-    let _ = execution.set(vibevalley_agent::generation::workers::SharedExecution {
-        generation: orchestrator.execution.generation.clone(),
-        scheduler: orchestrator.execution.scheduler.clone(),
-    });
+    let _ = execution.set(vibevalley_agent::harness::SharedExecution::new(orchestrator.execution.harness.clone()));
     let _ = hub.execution.set(Arc::downgrade(&orchestrator));
     hub.space.attach(orchestrator.execution.store()).map_err(|e| failed("durable projection")(&e))?;
     modules::orchestrator::install(&hub, orchestrator.clone());

@@ -14,11 +14,8 @@ name = "live"
 path = "tests/live.rs"
 
 [dependencies]
-vibevalley-durable = { version="0.1.0", path="../vibevalley-durable" }
 agent-client-protocol = "5.2.0"
 base64 = { workspace = true }
-vibevalley-agent = { version = "0.1.0", path = "../vibevalley-agent" }
-vibevalley-home = { path = "../vibevalley-home" }
 nix = { version = "0.32.0", features = ["signal", "process"] }
 flume = { workspace = true }
 futures-util = { workspace = true }

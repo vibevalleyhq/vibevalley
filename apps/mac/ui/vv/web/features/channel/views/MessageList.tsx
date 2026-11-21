@@ -9,7 +9,7 @@ import { useNow } from "../../../base/dom";
 import { tookText, spentText } from "../../../base/format";
 import { useAgent, useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
-import { useCore } from "../../../infra/frame";
+import { useCore, useIssue, useSession, useSessionsMap, useThreadOwner } from "../../../infra/frame";
 import { useRouter, Link as A } from "../../../infra/router";
 import { useLatest } from "../../../state/atom";
 import { useIntents } from "../../../state/intent";
@@ -18,6 +18,7 @@ import { Icon } from "../../../ui/Icon";
 import type { IconName } from "../../../ui/icons";
 import { Markdown } from "../../../ui/Markdown";
 import { Tag, type TagTone } from "../../../ui/Tag";
+import { Bubble } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { mix } from "../../../ui/tone";
 import { ArtifactCard } from "../../artifact";
@@ -25,7 +26,7 @@ import { RunSteps } from "../../session/WorkLog";
 import { chatSay, editingId, pendingLines, setEditingId } from "../model/composing";
 import { followed, useMessage } from "../model/follow";
 import { useMarkedFollowed, useMarkRead } from "../model/marks";
-import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, threadOwnerOf, unreadIn } from "../model/places";
+import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, unreadIn } from "../model/places";
 import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
 
@@ -238,12 +239,14 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
             role="button"
             testID="to-latest"
             onPress={toLatest}
-            class="flex-row items-center gap-1.5 rounded-full border border-line bg-page px-3 py-1 shadow-float hover:bg-hover"
+            class="h-7 flex-row items-center gap-1.5 rounded-full border border-line bg-elevated px-3 shadow-float transition duration-120 ease-out hover:bg-hover active:translate-y-px"
           >
             <View style={{ transform: [{ rotate: "90deg" }] }}>
-              <Icon name="expand" size={12} />
+              <Icon name="expand" size={12} tone="muted" />
             </View>
-            <Text class="text-xs text-ink">{unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}</Text>
+            <Text class="text-xs font-medium text-ink">
+              {unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}
+            </Text>
           </View>
         </View>
       </If>
@@ -378,10 +381,12 @@ function Frame(props: {
       <View class="flex-row gap-3">
         <View class="w-10 shrink-0">
           <If when={props.continues !== true}>
-            {props.face}
-            <If when={props.dot}>
-              <View class="absolute top-6.5 left-6.5">{props.dot}</View>
-            </If>
+            <View class="relative h-9 w-9">
+              {props.face}
+              <If when={props.dot}>
+                <View class="absolute -right-0.5 -bottom-0.5">{props.dot}</View>
+              </If>
+            </View>
           </If>
         </View>
         <View class="min-w-0 flex-1 pb-0.5">
@@ -401,13 +406,9 @@ function Frame(props: {
 
 /** A dispatch said as what it is for the user: who went to which issue; one line until it is opened, then the whole task. */
 function Dispatch(props: { m: ChatMessage }) {
-  const core = useCore();
   const open = signal(false);
-  const sent = () => (core()?.sessions ?? []).find((s) => s.id === props.m.session);
-  const issue = () => {
-    const id = sent()?.issue;
-    return id ? (core()?.issues ?? []).find((i) => i.id === id) : undefined;
-  };
+  const sent = useSession(() => props.m.session);
+  const issue = useIssue(() => sent()?.issue);
   return (
     <View testID="dispatch" class="flex-row items-start gap-1.5">
       <View class="min-w-0 flex-1">
@@ -442,9 +443,10 @@ function Dispatch(props: { m: ChatMessage }) {
         onPress={() => open.set(!open())}
         accessibilityLabel={open() ? t("web.channel.messages.foldDispatch") : t("web.channel.messages.unfoldDispatch")}
         accessibilityState={{ expanded: open() }}
-        class="mt-1.25 opacity-50 hover:opacity-100"
+        tooltip={<Bubble text={open() ? t("web.channel.messages.foldDispatch") : t("web.channel.messages.unfoldDispatch")} />}
+        class="h-6 w-6 shrink-0 items-center justify-center rounded-md opacity-70 transition duration-120 ease-out hover:bg-hover hover:opacity-100"
       >
-        <Icon name={open() ? "collapse" : "enlarge"} size={12} />
+        <Icon name={open() ? "collapse" : "enlarge"} size={12} tone="muted" />
       </View>
     </View>
   );
@@ -458,7 +460,7 @@ function MessageRow(props: {
   where?: string | undefined;
   onJump?: (() => void) | undefined;
 }) {
-  const core = useCore();
+  const sessionsById = useSessionsMap();
   const editing = () => editingId() === props.m.id;
   const setEditing = (on: boolean) => setEditingId(on ? props.m.id : undefined);
   const orchestrators = useOrchestrators();
@@ -467,14 +469,15 @@ function MessageRow(props: {
       ? t("web.channel.messages.user")
       : (orchestrators().find((a) => a.id === who)?.name ??
         (who === defaultOrchestrator ? t("web.channel.orchestrator") : undefined) ??
-        (core()?.sessions ?? []).find((h) => h.id === who)?.name ??
+        sessionsById().get(who)?.name ??
         who);
   const meta = () =>
     [props.where ? t("web.channel.messages.inThread", { address: props.where }) : "", props.m.pinned !== undefined ? t("web.channel.messages.pinned") : ""]
       .filter(Boolean)
       .join(" · ");
   const agentOf = useAgent(() => props.m.agent);
-  const session = () => (actorRoleOf(props.m.actor) === "worker" ? (core()?.sessions ?? []).find((h) => h.id === props.m.from) : undefined);
+  const workerSession = useSession(() => (actorRoleOf(props.m.actor) === "worker" ? props.m.from : undefined));
+  const session = workerSession;
   const who = () => {
     if (actorRoleOf(props.m.actor) !== "worker") return "";
     const agent = agentOf();
@@ -485,7 +488,7 @@ function MessageRow(props: {
   return (
     <Frame
       face={<SenderFace m={props.m} />}
-      dot={<If when={session()}>{(s) => <Dot tone={phaseDot(s().phase)} size={11} />}</If>}
+      dot={<If when={session()}>{(s) => <Dot tone={phaseDot(s().phase)} size={8} />}</If>}
       name={props.m.actor.kind === "user" ? t("web.channel.messages.user") : props.m.name}
       meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}${meta() ? `  ${meta()}` : ""}`}
       continues={props.continues}
@@ -505,7 +508,7 @@ function MessageRow(props: {
                 role="button"
                 testID="message-jump"
                 onPress={() => jump()()}
-                class="absolute -top-3 right-2 z-10 rounded-md border border-line bg-page px-2 py-0.5 shadow-float"
+                class="absolute -top-3 right-2 z-10 rounded-md border border-line bg-elevated px-2 py-0.5 shadow-float"
               >
                 <Text class="text-xs text-ink">{t("web.channel.more.jump")}</Text>
               </View>
@@ -583,21 +586,20 @@ function MessageRow(props: {
 }
 
 function ThreadPreview(props: { thread: Channel }) {
-  const core = useCore();
   const router = useRouter();
   const now = useNow();
   const unread = () => unreadIn(props.thread);
   const last = () => props.thread.last;
-  const session = () => threadOwnerOf(props.thread, core()?.sessions ?? []);
+  const session = useThreadOwner(() => props.thread);
   return (
     <View
       role="button"
       testID={`thread-preview-${props.thread.id}`}
       onPress={() => router.navigate(chatPath(props.thread))}
-      class="mt-2 w-full max-w-xl gap-1 rounded-lg border border-line px-3 py-2 hover:bg-hover"
+      class="mt-2 w-full max-w-xl gap-1.5 rounded-lg border border-line bg-page px-3 py-2 transition duration-120 ease-out hover:bg-hover"
     >
       <View class="w-full flex-row items-center gap-1.5">
-        <Icon name="thread" size={16} />
+        <Icon name="thread" size={14} tone="accent" />
         <Text class="text-sm font-semibold text-accent">
           {props.thread.replies > 0
             ? t("web.channel.replies", { n: props.thread.replies })
@@ -611,13 +613,13 @@ function ThreadPreview(props: { thread: Channel }) {
         <If when={session()} else={<View class="flex-1" />}>
           {(s) => (
             <>
-              <PhaseGlyph phase={s().phase} />
+              <PhaseGlyph phase={s().phase} size={12} />
               <Text class="min-w-0 flex-1 truncate text-xs text-muted">{phaseText(s(), now())}</Text>
             </>
           )}
         </If>
         <View class="opacity-60">
-          <Icon name="expand" size={12} />
+          <Icon name="expand" size={12} tone="muted" />
         </View>
       </View>
       <If when={last()}>

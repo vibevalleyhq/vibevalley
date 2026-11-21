@@ -16,8 +16,8 @@ use crate::base::open_sqlx_db_at;
 use crate::modules::{issue::db as issue_db, session::db as session_db};
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
+use vibevalley_agent::durable::Sqlite;
 use vibevalley_core::{Applied, Core, Refusal};
-use vibevalley_durable::Sqlite;
 use vibevalley_oar::PermissionMode;
 use vibevalley_protocol::{
     Assignment, Conflict, CriterionCheck, Execution, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome, Phase, PullRequest,
@@ -27,7 +27,7 @@ use vibevalley_protocol::{
 #[derive(Debug, thiserror::Error)]
 pub enum BoardError {
     #[error("durable: {0}")]
-    Durable(#[from] vibevalley_durable::Error),
+    Durable(#[from] vibevalley_agent::durable::Error),
     #[error("no issue {0}")]
     NoIssue(String),
     #[error("move refused: {0:?}")]
@@ -387,7 +387,7 @@ pub type CronOfIssue = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 pub type PullOfIssue = Arc<dyn Fn(&str) -> Option<PullRequest> + Send + Sync>;
 
 pub struct Ledger {
-    pub(crate) durable: vibevalley_durable::Store,
+    pub(crate) durable: vibevalley_agent::durable::Store,
     db: Mutex<SqliteConnection>,
     facts: Arc<dyn Facts>,
     /// Held across every apply and every read-modify-apply of an issue.
@@ -434,7 +434,7 @@ impl Ledger {
     pub fn open(path: &Path, facts: Arc<dyn Facts>) -> Result<(Ledger, Opened)> {
         let mut conn = database(path)?;
         let db = Sqlite::new(&mut conn);
-        let durable = vibevalley_durable::Store::open(path)?;
+        let durable = vibevalley_agent::durable::Store::open(path)?;
         let extras = session_db::extras(&db)?;
         let (stored, issues) = load(&db)?;
         let mut sessions = Vec::new();
@@ -447,11 +447,11 @@ impl Ledger {
             if session.phase.is_working()
                 && !lost
                 && !session.refining
-                && session.runtime == vibevalley_oar::vibevalley::ID
+                && session.runtime == vibevalley_agent::runtime::ID
                 && let Some(extra) = extras.get(&session.id)
                 && let (Some(run), Some(vendor)) = (extra.run.as_deref(), extra.agent_session.as_deref())
                 && durable
-                    .read(|tx| tx.submission_by_request(&vibevalley_agent::generation::workers::worker_conversation(vendor), &format!("work:{run}")))?
+                    .read(|tx| tx.submission_by_request(&vibevalley_agent::harness::worker_conversation(vendor), &format!("work:{run}")))?
                     .is_some()
             {
                 opened.recoverable.push(session.id.clone());
@@ -633,7 +633,7 @@ impl Ledger {
         id: &str,
         change: IssueChange,
         batch: impl FnOnce(Fact) -> Vec<Fact>,
-        also: impl FnOnce(&mut vibevalley_durable::Tx<'_>) -> vibevalley_durable::Result<()>,
+        also: impl FnOnce(&mut vibevalley_agent::durable::Tx<'_>) -> vibevalley_agent::durable::Result<()>,
     ) -> Result<Issue> {
         let id = {
             let _write = lock(&self.write);
@@ -647,7 +647,7 @@ impl Ledger {
         self.issue(&id).ok_or(BoardError::NoIssue(id))
     }
 
-    fn apply_locked(&self, facts: Vec<Fact>, also: impl FnOnce(&mut vibevalley_durable::Tx<'_>) -> vibevalley_durable::Result<()>) -> Result<()> {
+    fn apply_locked(&self, facts: Vec<Fact>, also: impl FnOnce(&mut vibevalley_agent::durable::Tx<'_>) -> vibevalley_agent::durable::Result<()>) -> Result<()> {
         let mut prospective = self.state();
         self.durable.write(|write| {
             also(write)?;

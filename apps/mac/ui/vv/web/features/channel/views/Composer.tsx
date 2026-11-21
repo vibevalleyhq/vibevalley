@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { userId } from "@vibevalley/protocol";
-import type { BlockRef, Channel } from "@vibevalley/protocol";
+import type { ArtifactViewContext, BlockRef, Channel } from "@vibevalley/protocol";
 
 import { typedMarks } from "../../../base/typedMarks";
 import { api } from "../../../infra/api";
@@ -21,7 +21,7 @@ import { readFiles } from "../../../ui/picked";
 import { Bubble } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { mix } from "../../../ui/tone";
-import { activeArtifactViewContext } from "../../artifact/store";
+import { activeArtifactViewContext, clearActiveArtifactViewContext } from "../../artifact/store";
 import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying, type ComposerKey } from "../model/composing";
 import { followed } from "../model/follow";
 import { EmojiPopover } from "./EmojiPicker";
@@ -46,7 +46,25 @@ const key = (name: string, shiftKey = false): ComposerKey & { prevented: boolean
   return k;
 };
 
-function BoxButton(props: { icon: IconName; label: string; testid: string; onPress: () => void; disabled?: boolean; class?: string; tone?: string }) {
+function artifactContextLabel(ctx: ArtifactViewContext): string {
+  const parts = [t("web.channel.composer.artifactContext", { title: ctx.title })];
+  if (ctx.slideIndex !== undefined) parts.push(t("web.channel.composer.artifactSlide", { n: ctx.slideIndex + 1 }));
+  else if (ctx.activeArtboard) parts.push(ctx.activeArtboard);
+  else if (ctx.activeTab) parts.push(ctx.activeTab);
+  else if (ctx.activeDataset) parts.push(ctx.activeDataset);
+  return parts.join(" · ");
+}
+
+function BoxButton(props: {
+  icon: IconName;
+  label: string;
+  testid: string;
+  onPress: () => void;
+  disabled?: boolean;
+  class?: string;
+  tone?: string;
+  iconSize?: 12 | 14 | 16;
+}) {
   return (
     <View
       role="button"
@@ -55,9 +73,11 @@ function BoxButton(props: { icon: IconName; label: string; testid: string; onPre
       tooltip={<Bubble text={props.label} />}
       disabled={props.disabled}
       onPress={() => props.onPress()}
-      class={`h-7 w-7 items-center justify-center rounded-md hover:bg-hover ${props.disabled === true ? "opacity-50" : ""} ${props.class ?? ""}`}
+      class={`h-7 w-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover ${
+        props.disabled === true ? "opacity-50" : "active:translate-y-px"
+      } ${props.class ?? ""}`}
     >
-      <Icon name={props.icon} size={16} tone={props.tone ?? "ink"} />
+      <Icon name={props.icon} size={props.iconSize ?? 16} tone={props.tone ?? "muted"} />
     </View>
   );
 }
@@ -185,13 +205,13 @@ export function Composer(props: {
   };
 
   return (
-    <View testID="composer" class="border-t border-line px-4 pt-3 pb-4">
+    <View testID="composer" class="border-t border-line px-4 pt-2.5 pb-3.5">
       <If when={box.offered().length > 0}>
         <View
           role="listbox"
           accessibilityLabel={t("web.channel.composer.who")}
           testID="mentions"
-          class="absolute right-4 bottom-full left-4 z-30 -mb-2 max-h-72 rounded-lg border border-line bg-page p-1 shadow-float"
+          class="absolute right-4 bottom-full left-4 z-30 -mb-2 max-h-72 rounded-lg border border-line bg-elevated p-1 shadow-float"
         >
           <Each of={box.offered()} key={(n) => n.token}>
             {(n, i) => (
@@ -202,7 +222,7 @@ export function Composer(props: {
                 onMouseEnter={() => box.setActive(i())}
                 focusable={false}
                 onPress={() => box.choose(n())}
-                class={`flex-row items-center gap-2 rounded-md px-2 py-1 ${i() === box.active() ? "bg-selected" : ""}`}
+                class={`flex-row items-center gap-2 rounded-md px-2 py-1.5 ${i() === box.active() ? "bg-selected" : ""}`}
               >
                 <If
                   when={n().session}
@@ -238,20 +258,24 @@ export function Composer(props: {
       </If>
       <If when={problem()}>
         {(p) => (
-          <Text role="alert" testID="chat-problem" class="mb-1.5 text-xs text-berry">
+          <Text role="alert" testID="chat-problem" class="mb-2 text-xs text-berry">
             {p()}
           </Text>
         )}
       </If>
       <If when={(props.quoted?.length ?? 0) > 0}>
-        <View class="mb-1.5 gap-1">
+        <View class="mb-2 gap-1">
           <Each of={props.quoted ?? []} key={(q) => q.ref.blockId}>
             {(q) => (
-              <View testID={`quoted-block-${q().ref.blockId}`} class="flex-row items-center gap-2 rounded-md bg-hover px-3 py-1.5">
+              <View
+                testID={`quoted-block-${q().ref.blockId}`}
+                class="flex-row items-center gap-2 rounded-md border-l-2 border-wheat bg-side py-1 pr-1.5 pl-2.5"
+              >
                 <Icon name="artifacts" size={12} tone="muted" />
                 <Text class="min-w-0 flex-1 truncate text-xs text-muted">{t("web.channel.composer.quotedBlock", { text: q().text })}</Text>
                 <BoxButton
                   icon="close"
+                  iconSize={12}
                   testid="quoted-block-remove"
                   label={t("web.channel.composer.cancelQuote")}
                   onPress={() => props.onRemoveQuote?.(q().ref.blockId)}
@@ -264,7 +288,7 @@ export function Composer(props: {
       </If>
       <If when={replying()}>
         {(m) => (
-          <View testID="replying" class="mb-1.5 flex-row items-center gap-2 rounded-md bg-hover px-3 py-1.5">
+          <View testID="replying" class="mb-2 flex-row items-center gap-2 rounded-md border border-line bg-side py-1 pr-1.5 pl-2.5">
             <Icon name="reply" size={12} tone="muted" />
             <Text class="min-w-0 flex-1 truncate text-xs text-muted">
               {t("shared.join.labeled", {
@@ -274,6 +298,7 @@ export function Composer(props: {
             </Text>
             <BoxButton
               icon="close"
+              iconSize={12}
               testid="cancel-reply"
               label={t("web.channel.composer.cancelReply")}
               onPress={() => props.channel && drafts.reply(props.channel.id, undefined)}
@@ -282,8 +307,24 @@ export function Composer(props: {
           </View>
         )}
       </If>
+      <If when={activeArtifactViewContext()}>
+        {(ctx) => (
+          <View testID="artifact-context-pill" class="mb-2 h-6 flex-row items-center gap-1.5 self-start rounded-full border border-line bg-side pr-1 pl-2.5">
+            <Icon name="artifacts" size={12} tone="muted" />
+            <Text class="max-w-72 truncate text-xs text-ink">{artifactContextLabel(ctx())}</Text>
+            <BoxButton
+              icon="close"
+              iconSize={12}
+              testid="artifact-context-clear"
+              label={t("web.channel.composer.clearContext")}
+              onPress={clearActiveArtifactViewContext}
+              class="h-5 w-5 rounded-full"
+            />
+          </View>
+        )}
+      </If>
       <If when={draft().files.length > 0 || uploading().length > 0}>
-        <View class="mb-1.5 flex-row flex-wrap gap-1.5">
+        <View class="mb-2 flex-row flex-wrap gap-1.5">
           <Each of={draft().files} key={(f) => f.id}>
             {(f) => <AttachmentTile testid="pending-file" file={f()} onRemove={() => props.channel && drafts.drop(props.channel.id, f().id)} />}
           </Each>
@@ -292,7 +333,7 @@ export function Composer(props: {
               <Progress
                 value={u().percent}
                 accessibilityLabel={u().name}
-                class="h-10 flex-row items-center rounded-md border border-line bg-page px-2"
+                class="h-10 flex-row items-center rounded-md border border-line bg-page px-2.5"
                 trackClass="absolute inset-0"
                 indicatorClass="h-full"
                 indicatorStyle={{ backgroundColor: mix("leaf", 0.2) }}
@@ -303,7 +344,7 @@ export function Composer(props: {
           </Each>
         </View>
       </If>
-      <View class={`rounded-lg border bg-page ${focused() ? "border-focus" : "border-line"}`}>
+      <View class={`rounded-lg border bg-page transition duration-120 ease-out ${focused() ? "border-focus" : "border-line"}`}>
         <Input
           multiline
           submitBehavior="submit"
@@ -335,9 +376,9 @@ export function Composer(props: {
             box.blur();
           }}
           onPaste={(e) => attach(e.files ?? [])}
-          class="max-h-50 min-h-13 w-full px-3 pt-2.5 pb-1 text-base text-ink"
+          class="max-h-50 min-h-12 w-full px-3 pt-2.5 pb-1.5 text-sm text-ink"
         />
-        <View class="h-9 flex-row items-center gap-1 px-2 pb-2">
+        <View class="h-9 flex-row items-center gap-1 px-2 pb-1.5">
           <If when={props.channel?.type !== "direct"}>
             <BoxButton
               icon="mention"
@@ -354,7 +395,12 @@ export function Composer(props: {
             onPress={startCommand}
             disabled={props.channel === undefined}
           />
-          <View class="flex-1" />
+          <If when={box.stoppable()} else={<View class="flex-1" />}>
+            <View testID="composer-running-hint" class="min-w-0 flex-1 flex-row items-center gap-1.5 px-1.5">
+              <View class="h-1.5 w-1.5 shrink-0 rounded-full bg-leaf" />
+              <Text class="min-w-0 flex-1 truncate text-xs text-muted">{t("web.channel.composer.runningHint")}</Text>
+            </View>
+          </If>
           <BoxButton icon="attach" testid="attach" label={t("web.channel.composer.attach")} onPress={() => void pick()} disabled={!props.channel} />
           <EmojiPopover
             open={emoji()}
@@ -366,14 +412,19 @@ export function Composer(props: {
               insert(e);
             }}
             trigger={
-              <View class={`h-7 w-7 items-center justify-center rounded-md hover:bg-hover ${props.channel ? "" : "opacity-50"}`}>
-                <Icon name="react" size={16} />
+              <View
+                class={`h-7 w-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover ${
+                  props.channel ? "active:translate-y-px" : "opacity-50"
+                }`}
+              >
+                <Icon name="react" size={16} tone="muted" />
               </View>
             }
           />
           <If when={box.stoppable()}>
             <BoxButton
               icon="stop"
+              iconSize={14}
               testid="stop"
               label={t("web.channel.composer.stopHint")}
               onPress={() => void stop()}
@@ -388,9 +439,11 @@ export function Composer(props: {
             tooltip={<Bubble text={t("web.channel.composer.sendHint")} />}
             disabled={!box.canSend()}
             onPress={() => void box.send()}
-            class={`h-7 w-7 items-center justify-center rounded-md border ${box.canSend() ? "border-accent bg-accent hover:bg-accent-hover" : "border-transparent opacity-50"}`}
+            class={`h-7 w-7 shrink-0 items-center justify-center rounded-md border transition duration-120 ease-out ${
+              box.canSend() ? "border-accent bg-accent hover:bg-accent-hover active:translate-y-px" : "border-transparent bg-hover opacity-50"
+            }`}
           >
-            <Icon name="send" size={16} tone={box.canSend() ? "page" : "ink"} />
+            <Icon name="send" size={14} tone={box.canSend() ? "page" : "muted"} />
           </View>
         </View>
       </View>

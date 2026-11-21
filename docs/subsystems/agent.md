@@ -38,31 +38,32 @@
 - **`duty` 供阅读，`tags` 供匹配**：`duty` 是一句话职责说明；`tags` 是关键词数组。
 - **挑档案顺序（`presets.rs`）**：依次匹配：点名的档案名或 ID → 点名的农机上首个可用档案 → 用户界面选定的档案 → 工单文字命中 `Agent.tags` 最多的可用档案。建单和起草都用它。
 - **自带的技能只读，按 id 引用**：技能列表先列自带的（`builtIn: true`），再列用户自己写的；`skill.update`、`skill.delete` 碰到自带的一律拒绝，新建技能不占它们的 id。档案只存技能的 id，所以 VibeValley 一更新，勾了它的档案都拿到新版本。模板在 `agent.json` 的 `skills` 里写自带技能的 id，安装时勾上；按模板更新时再勾上，用户另勾的留着。任何档案都能勾自带的技能。
-- **从模板按需安装与更新**：新农场默认只装 `orchestrator` 及 `agent.starters` 指定的模板；`agent.template.update` 仅覆盖 `duty`、`tags`、人设和 `worktree`，保留用户改过的名称、外观、农机与模型。
-- **外观确定性补齐**：缺省外观按档案 `id` 哈希取模补齐，前后端算法一致。
+- **从模板按需安装与更新**：新农场默认只装 `orchestrator` 及 `agent.starters` 指定的模板；用户在工作台一键采用时由服务端优先匹配本机已安装且启用的农机并按需调整 `personaMode`；`agent.template.update` 仅覆盖 `duty`、`tags`、人设和 `worktree`，保留用户改过的名称、外观、农机与模型（旧档案尚未带头像时顺带继承模板头像）。
+- **外观确定性补齐**：缺省外观按档案 `id` 哈希取模补齐，前后端算法一致；通用角色头像位于 `assets/pixel/avatar-*.png` 并登记在 `sprites.json` 中，优先于动物头像显示在工作台列表与卡片中。
 - **农机列表**：`vibevalley-oar` 默认注册 `claude`、`codex`、ACP 农机（`acp:gemini`、`grok`、`kimi`、`codebuddy`、`opencode`）、SDK 农机（`qwen`、`qoder`）、自研 `vibevalley` 与测试用 `scripted`；`pi` 仅在 `VIBEVALLEY_TEST_RUNTIMES=1` 沙箱下作为替身注册，`cursor` 与未注册驱动的农机显示为不支持。各驱动协议与用量归约见[帮工](docs/subsystems/session.md#一次农机执行怎样复核)。
 - **预检与开会话共用同一套规则**：合并农机默认设置与档案覆盖后，统一检查农机安装、额度预算与选项兼容性；预检与派活调同一函数，唤醒已有 `Session` 时不重复检查启停与派活预算。
 - **探测代数防倒退**：完整探测分配递增序号，慢返回的旧探测不覆盖新缓存；探测结果经 `/api/v1/live` 的 `Runtime` 窄事件推送，不进 `SpaceState`。
 
 ## 内置的模板
 
-内置模板位于 `crates/vibevalley-server/assets/agent/templates/`（顺序见 `index.json`），除默认助手 `orchestrator` 外含 13 个帮工模板；最后四个各勾着一个 VibeValley 自带的技能（`assets/agent/skills/<id>/`）：
+内置模板位于 `crates/vibevalley-server/assets/agent/templates/`（顺序见 `index.json`），含默认助手 `orchestrator` 与 13 个覆盖全流程的通用帮工角色模板（均配有风格标签 `style`、分类 `category`、`avatar-*` 像素头像及中英结构化人设）：
 
-| 档案名称 | 默认农机 | 动物外观 | 职责（`duty`） |
-|---|---|---|---|
-| 后端老周 | `pi` | 熊 | 写接口、改 server、跑 Go 测试 |
-| 测试小吴 | `pi` | 兔子 | 跑测试、修测试、盯 CI |
-| 前端阿郑 | `pi` | 小狐狸 | 页面、3D 场景、交互动画 |
-| 文档员 Kimi | `pi` | 猫 | 通读文档、写 README、整理说明 |
-| 情报 Grok | `pi` | 猫头鹰 | 查资料、读外部文档、调研方案 |
-| 夜班反重力 | `pi` | 浣熊 | 杂活、小改动、夜里补班 |
-| Claude 师傅 | `claude` | 熊 | 读大代码库、重构、查难缠的 bug |
-| Codex 老匠 | `codex` | 小狐狸 | 照工单把功能做出来，改到测试通过 |
-| Pi 实验员 | `pi` | 刺猬 | 写原型、试新做法 |
-| 幻灯片阿秀 | `pi` | 小狐狸 | 把一段内容做成幻灯片（技能 `slides`） |
-| 素材小陈 | `pi` | 兔子 | 去网上找图、找参考，放进素材库（技能 `collector`） |
-| 报表老钱 | `pi` | 熊 | 一页式的报表、看板、调研页（技能 `pages`） |
-| 审查老严 | `pi` | 浣熊 | 审一个分支或一张工单的改动，只读不改（技能 `reviewer`） |
+| 角色 ID | 档案名称 | 分类 | 能力/技能 | 职责（`duty`） |
+|---|---|---|---|---|
+| `orchestrator` | 全能助手 | 助手（`orchestration`） | 统筹派活 | 理解目标、拆解工单、统筹派活并汇总验收结果 |
+| `fullstack` | 全栈工程师 | 研发工程（`engineering`） | — | 端到端交付前后端功能、接口契约与自动化测试 |
+| `architect` | 系统架构师 | 研发工程（`engineering`） | — | 梳理模块边界、制定重构方案与排查深层疑难根因 |
+| `frontend` | 前端工程师 | 研发工程（`engineering`） | — | 实现界面组件、交互状态、响应式布局与浅深双主题一致性 |
+| `backend` | 后端工程师 | 研发工程（`engineering`） | — | 实现服务端接口、数据存储、状态机契约与稳定性测试 |
+| `reviewer` | 代码审查员 | 研发工程（`engineering`） | `reviewer` | 只读审查分支或工单改动，按严重程度定位缺陷、边界与测试缺口 |
+| `tester` | 测试工程师 | 研发工程（`engineering`） | — | 编写单元、集成与回归测试，排查失败根因并修复不稳定用例 |
+| `designer` | UI/UX 设计师 | 产品与设计（`product`） | `artifacts` | 打磨视觉层级、设计令牌、界面一致性与交互细节稿 |
+| `product` | 产品经理 | 产品与设计（`product`） | `artifacts` | 梳理用户痛点、定义功能范围、拆解工单与可测验收标准 |
+| `scout` | 技术调研员 | 调研与内容（`research`） | — | 查阅源码、官方文档与社区实践，对比方案并给出有出处的结论 |
+| `docs` | 技术文档师 | 调研与内容（`research`） | — | 编写与维护架构说明、README、开发指南及双语用户文档 |
+| `pages` | 数据看板师 | 产品与设计（`product`） | `pages`、`artifacts` | 搭建交互式数据看板、调研报表与自包含轻量网页工具 |
+| `slides` | 演示汇报师 | 产品与设计（`product`） | `slides` | 梳理叙事主线并制作结构化幻灯片套稿与演讲者备注 |
+| `collector` | 素材收集员 | 调研与内容（`research`） | `collector` | 按用途检索配图与设计参考，核验授权来源并归档入素材库 |
 
 ## 怎么走
 
@@ -101,4 +102,4 @@
 
 - `crates/vibevalley-server/tests/agent.rs`：删技能清引用、损坏配置留着、外观补齐、角色约束、新农场的档案、模板安装与更新、自带技能只读、农机经 hub、额度刷新。
 - `crates/vibevalley-server/src/modules/agent/presets.rs` 里的单元测试：预设、挑档案。
-- `apps/mac/ui/vv/app/agents.test.tsx`：档案页在样例数据上的页面测试（`nsh/test`）。
+- `apps/mac/ui/vv/app/scenarios.test.tsx`：档案、农机、仓库与工作台多密度虚拟时钟页面测试（`nsh/test`）。

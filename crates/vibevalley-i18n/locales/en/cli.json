@@ -887,5 +887,30 @@
   },
   "chat": {
     "session": "Session {session} (/exit or Ctrl-D to leave)"
+  },
+  "eval": {
+    "about": "Export durable JSONL trajectories, inspect runs, replay slices, and run agent evaluation suites",
+    "export": "Export a conversation and its task graph to a self-contained JSONL directory",
+    "inspect": "Analyze a JSONL directory or SQLite durable store, render timeline, or write HTML",
+    "replay": "Replay a sliced JSONL prefix into an isolated output directory and run graders",
+    "run": "Run an evaluation suite with isolated workspaces and balanced profile ordering",
+    "missingKey": "No DeepSeek API key is configured; set DEEPSEEK_API_KEY or save it via vibevalley setting update",
+    "arg": {
+      "conversation": "Conversation ID to export",
+      "path": "Path to a JSONL trajectory directory or SQLite database",
+      "spec": "Path to a ReplaySpec JSON file",
+      "suite": "Path to an EvalSuite JSON file"
+    },
+    "flag": {
+      "out": "Destination directory for exported store or trial outputs",
+      "source": "Source SQLite database or JSONL directory (defaults to home server.db)",
+      "atSeq": "Truncate root conversation at entry sequence N for prefix slice replay",
+      "noChildren": "Do not follow child subagent conversations when exporting",
+      "conversation": "Target conversation ID (defaults to root conversation)",
+      "timeline": "Include compact entry-by-entry timeline and task statuses",
+      "html": "Write a self-contained offline HTML report to this path",
+      "trials": "Override number of trials per task",
+      "profile": "Filter to named profile(s); may be passed multiple times"
+    }
   }
 }

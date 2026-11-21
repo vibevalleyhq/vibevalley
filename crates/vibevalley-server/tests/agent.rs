@@ -51,6 +51,7 @@ fn draft() -> Agent {
             trim: String::new(),
             hat: String::new(),
             eye: String::new(),
+            avatar: None,
         },
         from: None,
     }
@@ -228,9 +229,9 @@ fn a_new_farm_has_the_orchestrator_and_the_starters() {
     let all: Vec<(String, Option<String>)> = s.all().into_iter().map(|a| (a.id, a.from.map(|f| f.template))).collect();
     assert_eq!(all, vec![(DEFAULT_ORCHESTRATOR.into(), Some(DEFAULT_ORCHESTRATOR.into()))]);
     let home = tempfile::tempdir().unwrap();
-    let named = Profiles::open(home.path(), &["docs".into(), "nobody".into(), "lab".into()]).unwrap();
+    let named = Profiles::open(home.path(), &["docs".into(), "nobody".into(), "architect".into()]).unwrap();
     let ids: Vec<String> = named.all().into_iter().map(|a| a.id).collect();
-    assert_eq!(ids, vec![DEFAULT_ORCHESTRATOR, "docs", "lab"]);
+    assert_eq!(ids, vec![DEFAULT_ORCHESTRATOR, "docs", "architect"]);
 }
 
 #[test]
@@ -238,11 +239,14 @@ fn templates_install_and_update_when_asked() {
     let home = tempfile::tempdir().unwrap();
     let s = open(home.path());
     let second = s.install_template("backend").unwrap();
-    assert_eq!((second.id.as_str(), second.name.as_str()), ("backend-2", "后端老周 2"));
+    assert_eq!((second.id.as_str(), second.name.as_str()), ("backend-2", "后端工程师 2"));
     let from = second.from.clone().unwrap();
-    assert_eq!((from.template.as_str(), from.version), ("backend", 1));
+    assert_eq!((from.template.as_str(), from.version), ("backend", 2));
     let backend = s.templates().into_iter().find(|t| t.id == "backend").unwrap();
     assert_eq!(backend.installed, vec!["backend", "backend-2"]);
+    assert_eq!(backend.look.avatar.as_deref(), Some("avatar-backend"));
+    assert!(backend.style.as_deref().is_some_and(|st| !st.is_empty()));
+    assert_eq!(backend.category, Some(vibevalley_protocol::TemplateCategory::Engineering));
     assert_eq!(s.install_template("nobody").unwrap_err().biz_code, BizCode::AgentNotFound);
     let mut env = std::collections::BTreeMap::new();
     env.insert("CI".to_string(), "1".to_string());
@@ -252,7 +256,7 @@ fn templates_install_and_update_when_asked() {
         env: env.clone(),
         from: Some(vibevalley_protocol::AgentFrom {
             template: "backend".into(),
-            version: 0,
+            version: 1,
         }),
         ..second
     })
@@ -261,7 +265,7 @@ fn templates_install_and_update_when_asked() {
     assert_eq!(again.name, "后端二号");
     assert_eq!(again.persona, backend.persona);
     assert_eq!(again.env, env);
-    assert_eq!(again.from.unwrap().version, 1);
+    assert_eq!(again.from.unwrap().version, 2);
     let hand = s
         .create(Agent {
             name: "手捏的".into(),
@@ -359,10 +363,18 @@ fn built_in_skills_are_read_only_and_listed_first() {
         })
         .unwrap();
     assert_eq!((mine.id.as_str(), mine.built_in), ("reviewer-2", None));
-    for id in ["slides", "collector", "pages", "reviewer"] {
+    for (id, expected_skills) in [
+        ("slides", vec!["slides"]),
+        ("collector", vec!["collector"]),
+        ("pages", vec!["pages", "artifacts"]),
+        ("reviewer", vec!["reviewer"]),
+    ] {
         let t = s.templates().into_iter().find(|t| t.id == id).unwrap();
-        assert_eq!((t.role, t.skills.clone()), (AgentRole::Worker, vec![id.to_string()]));
-        assert_eq!(s.install_template(id).unwrap().skills, vec![id]);
+        assert_eq!(
+            (t.role, t.skills.clone()),
+            (AgentRole::Worker, expected_skills.iter().map(|s| s.to_string()).collect::<Vec<_>>())
+        );
+        assert_eq!(s.install_template(id).unwrap().skills, expected_skills);
     }
 }
 
@@ -390,6 +402,10 @@ fn runtimes_over_the_hub() {
     assert_eq!(info["installation"]["via"], "bundled");
     assert!(live.recv_timeout(std::time::Duration::from_secs(2)).is_ok());
 
+    // Once available and enabled, scripted sorts ahead of unprobed/unavailable runtimes.
+    let sorted = hub.call_as(vibevalley_protocol::Caller::User, "runtime.list", json!(null)).data.unwrap();
+    assert_eq!(sorted.as_array().unwrap()[0]["id"], "scripted");
+
     let missing = hub.call_as(vibevalley_protocol::Caller::User, "runtime.refresh", json!({ "id": "nobody" }));
     assert_eq!(missing.biz_code, BizCode::RuntimeNotFound.code());
 
@@ -413,6 +429,34 @@ fn runtimes_over_the_hub() {
 
     let listed = hub.call_as(vibevalley_protocol::Caller::User, "agent.list", json!(null));
     assert_eq!(listed.data.unwrap()[0]["id"], DEFAULT_ORCHESTRATOR);
+
+    // Re-enable scripted so installing a template through the hub automatically picks it instead of unavailable claude.
+    hub.call_as(
+        vibevalley_protocol::Caller::User,
+        "runtime.setting.update",
+        json!({ "id": "scripted", "enabled": true, "binPath": "", "defaultModel": "", "defaultEffort": "", "env": {} }),
+    );
+    let installed_auto = hub.call_as(vibevalley_protocol::Caller::User, "agent.template.install", json!({ "id": "fullstack" }));
+    let made: Agent = serde_json::from_value(installed_auto.data.unwrap()).unwrap();
+    assert_eq!(made.runtime, "scripted");
+    assert_eq!(made.look.avatar.as_deref(), Some("avatar-fullstack"));
+    let installed_codex = hub.call_as(
+        vibevalley_protocol::Caller::User,
+        "agent.template.install",
+        json!({ "id": "frontend", "runtime": "codex" }),
+    );
+    let frontend: Agent = serde_json::from_value(installed_codex.data.unwrap()).unwrap();
+    assert_eq!(frontend.runtime, "codex");
+    assert_eq!(frontend.persona_mode, PersonaMode::Append);
+
+    let installed_explicit = hub.call_as(
+        vibevalley_protocol::Caller::User,
+        "agent.template.install",
+        json!({ "id": "designer", "runtime": "kimi" }),
+    );
+    let designed: Agent = serde_json::from_value(installed_explicit.data.unwrap()).unwrap();
+    assert_eq!(designed.runtime, "kimi");
+    assert_eq!(designed.persona_mode, PersonaMode::Prompt);
 }
 
 /// The scripted runtime with an account whose usage the test sets.

@@ -76,6 +76,90 @@
   "sheet": "design/pixel/raw/ui-icons-extra.png",
   "w": 38
  },
+ "avatar-architect": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-backend": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-collector": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-designer": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-docs": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-frontend": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-fullstack": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-orchestrator": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-pages": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-product": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-reviewer": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-scout": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-slides": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
+ "avatar-tester": {
+  "ax": 64,
+  "ay": 127,
+  "h": 128,
+  "w": 128
+ },
  "banner-title": {
   "ax": 38,
   "ay": 33,
@@ -84,40 +168,40 @@
   "w": 76
  },
  "bear-farmer-cheer": {
-  "w": 49,
-  "h": 53,
   "ax": 24,
   "ay": 52,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 53,
   "hx": 24.5,
-  "hy": 15.9
+  "hy": 15.9,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 49
  },
  "bear-farmer-down": {
-  "w": 36,
-  "h": 56,
   "ax": 18,
   "ay": 55,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 56,
   "hx": 18.0,
-  "hy": 16.8
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 36
  },
  "bear-farmer-down-1": {
-  "w": 36,
-  "h": 57,
   "ax": 18,
   "ay": 56,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 57,
   "hx": 18.0,
-  "hy": 17.1
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 36
  },
  "bear-farmer-down-2": {
-  "w": 36,
-  "h": 56,
   "ax": 18,
   "ay": 55,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 56,
   "hx": 18.0,
-  "hy": 16.8
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 36
  },
  "bear-farmer-hammer-1": {
   "ax": 24,
@@ -141,31 +225,31 @@
   "w": 34
  },
  "bear-farmer-side": {
-  "w": 32,
-  "h": 56,
   "ax": 16,
   "ay": 55,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 56,
   "hx": 16.0,
-  "hy": 16.8
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 32
  },
  "bear-farmer-side-1": {
-  "w": 32,
-  "h": 56,
   "ax": 16,
   "ay": 55,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 56,
   "hx": 16.0,
-  "hy": 16.8
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 32
  },
  "bear-farmer-side-2": {
-  "w": 33,
-  "h": 57,
   "ax": 16,
   "ay": 56,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 57,
   "hx": 16.5,
-  "hy": 17.1
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 33
  },
  "bear-farmer-sit": {
   "ax": 17,
@@ -189,49 +273,49 @@
   "w": 34
  },
  "bear-farmer-up": {
-  "w": 36,
-  "h": 56,
   "ax": 18,
   "ay": 55,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 56,
   "hx": 18.0,
-  "hy": 16.8
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 36
  },
  "bear-farmer-up-1": {
-  "w": 36,
-  "h": 57,
   "ax": 18,
   "ay": 56,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 57,
   "hx": 18.0,
-  "hy": 17.1
+  "hy": 17.1,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 36
  },
  "bear-farmer-up-2": {
-  "w": 35,
-  "h": 56,
   "ax": 17,
   "ay": 55,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 56,
   "hx": 17.5,
-  "hy": 16.8
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 35
  },
  "bear-farmer-work": {
-  "w": 34,
-  "h": 60,
   "ax": 17,
   "ay": 58,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 60,
   "hx": 17.0,
-  "hy": 18.0
+  "hy": 18.0,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 34
  },
  "bear-farmer-worry": {
-  "w": 36,
-  "h": 56,
   "ax": 18,
   "ay": 55,
-  "sheet": "design/pixel/raw/char-bear.png",
+  "h": 56,
   "hx": 18.0,
-  "hy": 16.8
+  "hy": 16.8,
+  "sheet": "design/pixel/raw/char-bear.png",
+  "w": 36
  },
  "bear-gardener-cheer": {
   "ax": 25,
@@ -768,11 +852,11 @@
   "w": 34
  },
  "button-add": {
-  "w": 33,
-  "h": 34,
   "ax": 16,
   "ay": 33,
-  "sheet": "design/pixel/raw/glyphs.png"
+  "h": 34,
+  "sheet": "design/pixel/raw/glyphs.png",
+  "w": 33
  },
  "button-back": {
   "ax": 8,
@@ -782,11 +866,11 @@
   "w": 17
  },
  "button-close": {
-  "w": 33,
-  "h": 32,
   "ax": 16,
   "ay": 31,
-  "sheet": "design/pixel/raw/glyphs.png"
+  "h": 32,
+  "sheet": "design/pixel/raw/glyphs.png",
+  "w": 33
  },
  "button-collapse": {
   "ax": 12,
@@ -796,25 +880,25 @@
   "w": 25
  },
  "button-copy": {
-  "w": 37,
-  "h": 37,
   "ax": 18,
   "ay": 36,
-  "sheet": "design/pixel/raw/glyphs.png"
+  "h": 37,
+  "sheet": "design/pixel/raw/glyphs.png",
+  "w": 37
  },
  "button-delete": {
-  "w": 37,
-  "h": 41,
   "ax": 18,
   "ay": 40,
-  "sheet": "design/pixel/raw/glyphs.png"
+  "h": 41,
+  "sheet": "design/pixel/raw/glyphs.png",
+  "w": 37
  },
  "button-edit": {
-  "w": 30,
-  "h": 32,
   "ax": 15,
   "ay": 31,
-  "sheet": "design/pixel/raw/tools.png"
+  "h": 32,
+  "sheet": "design/pixel/raw/tools.png",
+  "w": 30
  },
  "button-enlarge": {
   "ax": 12,
@@ -824,18 +908,18 @@
   "w": 25
  },
  "button-filter": {
-  "w": 33,
-  "h": 23,
   "ax": 16,
   "ay": 22,
-  "sheet": "design/pixel/raw/tools.png"
+  "h": 23,
+  "sheet": "design/pixel/raw/tools.png",
+  "w": 33
  },
  "button-folder": {
-  "w": 31,
-  "h": 28,
   "ax": 15,
   "ay": 27,
-  "sheet": "design/pixel/raw/tools.png"
+  "h": 28,
+  "sheet": "design/pixel/raw/tools.png",
+  "w": 31
  },
  "button-hangup": {
   "ax": 13,
@@ -852,74 +936,74 @@
   "w": 23
  },
  "button-more": {
-  "w": 30,
-  "h": 9,
   "ax": 15,
   "ay": 8,
-  "sheet": "design/pixel/raw/tools.png"
+  "h": 9,
+  "sheet": "design/pixel/raw/tools.png",
+  "w": 30
  },
  "button-mute": {
-  "w": 37,
-  "h": 37,
   "ax": 18,
   "ay": 36,
-  "sheet": "design/pixel/raw/media.png"
+  "h": 37,
+  "sheet": "design/pixel/raw/media.png",
+  "w": 37
  },
  "button-next": {
-  "w": 21,
-  "h": 33,
   "ax": 10,
   "ay": 32,
-  "sheet": "design/pixel/raw/glyphs.png"
+  "h": 33,
+  "sheet": "design/pixel/raw/glyphs.png",
+  "w": 21
  },
  "button-open": {
-  "w": 30,
-  "h": 31,
   "ax": 15,
   "ay": 30,
-  "sheet": "design/pixel/raw/tools.png"
+  "h": 31,
+  "sheet": "design/pixel/raw/tools.png",
+  "w": 30
  },
  "button-pause": {
-  "w": 29,
-  "h": 34,
   "ax": 14,
   "ay": 33,
-  "sheet": "design/pixel/raw/media.png"
+  "h": 34,
+  "sheet": "design/pixel/raw/media.png",
+  "w": 29
  },
  "button-play": {
-  "w": 28,
-  "h": 31,
   "ax": 14,
   "ay": 30,
-  "sheet": "design/pixel/raw/media.png"
+  "h": 31,
+  "sheet": "design/pixel/raw/media.png",
+  "w": 28
  },
  "button-record": {
-  "w": 34,
-  "h": 33,
   "ax": 17,
   "ay": 32,
-  "sheet": "design/pixel/raw/media.png"
+  "h": 33,
+  "sheet": "design/pixel/raw/media.png",
+  "w": 34
  },
  "button-refresh": {
-  "w": 31,
-  "h": 33,
   "ax": 15,
   "ay": 32,
-  "sheet": "design/pixel/raw/tools.png"
+  "h": 33,
+  "sheet": "design/pixel/raw/tools.png",
+  "w": 31
  },
  "button-replay": {
-  "w": 42,
-  "h": 41,
   "ax": 21,
   "ay": 40,
-  "sheet": "design/pixel/raw/media.png"
+  "h": 41,
+  "sheet": "design/pixel/raw/media.png",
+  "w": 42
  },
  "button-search": {
-  "w": 32,
-  "h": 32,
   "ax": 16,
   "ay": 31,
-  "sheet": "design/pixel/raw/tools.png"
+  "h": 32,
+  "sheet": "design/pixel/raw/tools.png",
+  "w": 32
  },
  "button-send": {
   "ax": 14,
@@ -929,11 +1013,11 @@
   "w": 28
  },
  "button-settings": {
-  "w": 33,
-  "h": 33,
   "ax": 16,
   "ay": 32,
-  "sheet": "design/pixel/raw/tools.png"
+  "h": 33,
+  "sheet": "design/pixel/raw/tools.png",
+  "w": 33
  },
  "button-shrink": {
   "ax": 13,
@@ -943,18 +1027,18 @@
   "w": 26
  },
  "button-speaker": {
-  "w": 42,
-  "h": 38,
   "ax": 21,
   "ay": 37,
-  "sheet": "design/pixel/raw/media.png"
+  "h": 38,
+  "sheet": "design/pixel/raw/media.png",
+  "w": 42
  },
  "button-stop": {
-  "w": 30,
-  "h": 31,
   "ax": 15,
   "ay": 30,
-  "sheet": "design/pixel/raw/media.png"
+  "h": 31,
+  "sheet": "design/pixel/raw/media.png",
+  "w": 30
  },
  "button-thread": {
   "ax": 13,
@@ -964,11 +1048,11 @@
   "w": 26
  },
  "button-wait": {
-  "w": 35,
-  "h": 44,
   "ax": 17,
   "ay": 43,
-  "sheet": "design/pixel/raw/media.png"
+  "h": 44,
+  "sheet": "design/pixel/raw/media.png",
+  "w": 35
  },
  "cat-farmer-cheer": {
   "ax": 25,
@@ -1690,88 +1774,88 @@
   "w": 25
  },
  "dog-awake": {
-  "w": 33,
-  "h": 40,
   "ax": 16,
   "ay": 39,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 40,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 33
  },
  "dog-bark": {
-  "w": 37,
-  "h": 40,
   "ax": 18,
   "ay": 39,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 40,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 37
  },
  "dog-belly": {
-  "w": 48,
-  "h": 29,
   "ax": 24,
   "ay": 28,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 29,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 48
  },
  "dog-jump": {
-  "w": 36,
-  "h": 36,
   "ax": 18,
   "ay": 35,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 36,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 36
  },
  "dog-lie": {
-  "w": 38,
-  "h": 34,
   "ax": 19,
   "ay": 33,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 34,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 38
  },
  "dog-scratch": {
-  "w": 34,
-  "h": 38,
   "ax": 17,
   "ay": 37,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 38,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 34
  },
  "dog-sleep": {
-  "w": 43,
-  "h": 25,
   "ax": 21,
   "ay": 24,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 25,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 43
  },
  "dog-stand": {
-  "w": 42,
-  "h": 39,
   "ax": 21,
   "ay": 38,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 39,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 42
  },
  "dog-stretch": {
-  "w": 39,
-  "h": 39,
   "ax": 19,
   "ay": 38,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 39,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 39
  },
  "dog-wag-1": {
-  "w": 33,
-  "h": 40,
   "ax": 16,
   "ay": 39,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 40,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 33
  },
  "dog-wag-2": {
-  "w": 33,
-  "h": 40,
   "ax": 16,
   "ay": 39,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 40,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 33
  },
  "dog-yawn": {
-  "w": 31,
-  "h": 40,
   "ax": 15,
   "ay": 39,
-  "sheet": "design/pixel/raw/dog.png"
+  "h": 40,
+  "sheet": "design/pixel/raw/dog.png",
+  "w": 31
  },
  "emblem-big_graph": {
   "ax": 26,
@@ -3254,11 +3338,11 @@
   "w": 56
  },
  "icon-branch": {
-  "w": 23,
-  "h": 26,
   "ax": 11,
   "ay": 25,
-  "sheet": "design/pixel/raw/mapbits.png"
+  "h": 26,
+  "sheet": "design/pixel/raw/mapbits.png",
+  "w": 23
  },
  "icon-bug": {
   "ax": 21,
@@ -3310,11 +3394,11 @@
   "w": 53
  },
  "icon-fruit": {
-  "w": 43,
-  "h": 47,
   "ax": 21,
   "ay": 46,
-  "sheet": "design/pixel/raw/memory.png"
+  "h": 47,
+  "sheet": "design/pixel/raw/memory.png",
+  "w": 43
  },
  "icon-hand": {
   "ax": 19,
@@ -3331,18 +3415,18 @@
   "w": 45
  },
  "icon-leaf": {
-  "w": 38,
-  "h": 49,
   "ax": 19,
   "ay": 48,
-  "sheet": "design/pixel/raw/memory.png"
+  "h": 49,
+  "sheet": "design/pixel/raw/memory.png",
+  "w": 38
  },
  "icon-leaf-fall": {
-  "w": 38,
-  "h": 49,
   "ax": 19,
   "ay": 48,
-  "sheet": "design/pixel/raw/memory.png"
+  "h": 49,
+  "sheet": "design/pixel/raw/memory.png",
+  "w": 38
  },
  "icon-log": {
   "ax": 24,
@@ -3352,11 +3436,11 @@
   "w": 48
  },
  "icon-map": {
-  "w": 61,
-  "h": 48,
   "ax": 30,
   "ay": 47,
-  "sheet": "design/pixel/raw/mapbits.png"
+  "h": 48,
+  "sheet": "design/pixel/raw/mapbits.png",
+  "w": 61
  },
  "icon-pigeon": {
   "ax": 25,
@@ -3366,11 +3450,11 @@
   "w": 50
  },
  "icon-rings": {
-  "w": 45,
-  "h": 48,
   "ax": 22,
   "ay": 47,
-  "sheet": "design/pixel/raw/memory.png"
+  "h": 48,
+  "sheet": "design/pixel/raw/memory.png",
+  "w": 45
  },
  "icon-scarecrow": {
   "ax": 26,
@@ -3380,18 +3464,18 @@
   "w": 53
  },
  "icon-seed": {
-  "w": 45,
-  "h": 48,
   "ax": 22,
   "ay": 47,
-  "sheet": "design/pixel/raw/memory.png"
+  "h": 48,
+  "sheet": "design/pixel/raw/memory.png",
+  "w": 45
  },
  "icon-seed-gold": {
-  "w": 43,
-  "h": 48,
   "ax": 21,
   "ay": 47,
-  "sheet": "design/pixel/raw/memory.png"
+  "h": 48,
+  "sheet": "design/pixel/raw/memory.png",
+  "w": 43
  },
  "icon-seeds": {
   "ax": 22,
@@ -3436,11 +3520,11 @@
   "w": 47
  },
  "icon-stars": {
-  "w": 46,
-  "h": 45,
   "ax": 23,
   "ay": 44,
-  "sheet": "design/pixel/raw/memory.png"
+  "h": 45,
+  "sheet": "design/pixel/raw/memory.png",
+  "w": 46
  },
  "icon-task-board": {
   "ax": 29,
@@ -3457,11 +3541,11 @@
   "w": 42
  },
  "icon-tree": {
-  "w": 46,
-  "h": 59,
   "ax": 23,
   "ay": 58,
-  "sheet": "design/pixel/raw/memory.png"
+  "h": 59,
+  "sheet": "design/pixel/raw/memory.png",
+  "w": 46
  },
  "icon-trophy": {
   "ax": 24,
@@ -3492,82 +3576,82 @@
   "w": 48
  },
  "island-lavender": {
-  "w": 488,
-  "h": 330,
   "ax": 244,
   "ay": 329,
+  "h": 330,
+  "sheet": "design/pixel/raw/island-lavender.png",
+  "w": 488,
   "yard": [
    93,
    84,
    393,
    223
-  ],
-  "sheet": "design/pixel/raw/island-lavender.png"
+  ]
  },
  "island-meadow": {
-  "w": 583,
-  "h": 381,
   "ax": 291,
   "ay": 380,
+  "h": 381,
+  "sheet": "design/pixel/raw/island-meadow.png",
+  "w": 583,
   "yard": [
    141,
    103,
    441,
    251
-  ],
-  "sheet": "design/pixel/raw/island-meadow.png"
+  ]
  },
  "island-orchard": {
-  "w": 533,
-  "h": 345,
   "ax": 266,
   "ay": 344,
+  "h": 345,
+  "sheet": "design/pixel/raw/island-orchard.png",
+  "w": 533,
   "yard": [
    117,
    102,
    417,
    232
-  ],
-  "sheet": "design/pixel/raw/island-orchard.png"
+  ]
  },
  "island-pines": {
-  "w": 544,
-  "h": 387,
   "ax": 272,
   "ay": 386,
+  "h": 387,
+  "sheet": "design/pixel/raw/island-pines.png",
+  "w": 544,
   "yard": [
    115,
    122,
    415,
    249
-  ],
-  "sheet": "design/pixel/raw/island-pines.png"
+  ]
  },
  "island-pond": {
-  "w": 578,
-  "h": 384,
   "ax": 289,
   "ay": 383,
+  "h": 384,
+  "sheet": "design/pixel/raw/island-pond.png",
+  "w": 578,
   "yard": [
    129,
    93,
    429,
    261
-  ],
-  "sheet": "design/pixel/raw/island-pond.png"
+  ]
  },
  "island-windmill": {
-  "w": 542,
-  "h": 375,
   "ax": 271,
   "ay": 374,
+  "h": 375,
+  "sheet": "design/pixel/raw/island-windmill.png",
+  "w": 542,
   "yard": [
    120,
    109,
    420,
    245
-  ],
-  "sheet": "design/pixel/raw/island-windmill.png"
+  ]
  },
  "lang-c": {
   "ax": 22,
@@ -3850,11 +3934,11 @@
   "w": 46
  },
  "logo-dsh": {
-  "w": 46,
-  "h": 33,
   "ax": 23,
   "ay": 32,
-  "sheet": "design/pixel/raw/dsh.png"
+  "h": 33,
+  "sheet": "design/pixel/raw/dsh.png",
+  "w": 46
  },
  "logo-grok": {
   "ax": 26,
@@ -3892,11 +3976,11 @@
   "w": 59
  },
  "machine-dsh": {
-  "w": 58,
-  "h": 60,
   "ax": 29,
   "ay": 59,
-  "sheet": "design/pixel/raw/dsh.png"
+  "h": 60,
+  "sheet": "design/pixel/raw/dsh.png",
+  "w": 58
  },
  "machine-lantern": {
   "ax": 25,
@@ -3971,9 +4055,9 @@
   "ax": 27,
   "ay": 59,
   "h": 60,
+  "railSize": 38,
   "sheet": "design/pixel/raw/look-auntie.png",
-  "w": 55,
-  "railSize": 38
+  "w": 55
  },
  "manager-auntie-listen": {
   "ax": 16,
@@ -3993,9 +4077,9 @@
   "ax": 29,
   "ay": 62,
   "h": 63,
+  "railSize": 38,
   "sheet": "design/pixel/raw/look-farmer.png",
-  "w": 58,
-  "railSize": 38
+  "w": 58
  },
  "manager-foreman": {
   "ax": 18,
@@ -4008,9 +4092,9 @@
   "ax": 30,
   "ay": 63,
   "h": 64,
+  "railSize": 38,
   "sheet": "design/pixel/raw/look-foreman.png",
-  "w": 60,
-  "railSize": 38
+  "w": 60
  },
  "manager-foreman-listen": {
   "ax": 20,
@@ -4037,9 +4121,9 @@
   "ax": 27,
   "ay": 59,
   "h": 60,
+  "railSize": 38,
   "sheet": "design/pixel/raw/look-gardener.png",
-  "w": 54,
-  "railSize": 38
+  "w": 54
  },
  "manager-gardener-listen": {
   "ax": 15,
@@ -4066,9 +4150,9 @@
   "ax": 30,
   "ay": 64,
   "h": 65,
+  "railSize": 38,
   "sheet": "design/pixel/raw/look-grandpa.png",
-  "w": 61,
-  "railSize": 38
+  "w": 61
  },
  "manager-grandpa-listen": {
   "ax": 17,
@@ -4102,9 +4186,9 @@
   "ax": 28,
   "ay": 67,
   "h": 68,
+  "railSize": 38,
   "sheet": "design/pixel/raw/look-robot.png",
-  "w": 57,
-  "railSize": 38
+  "w": 57
  },
  "manager-robot-listen": {
   "ax": 21,
@@ -4135,53 +4219,53 @@
   "w": 768
  },
  "map-cloud": {
-  "w": 123,
-  "h": 74,
   "ax": 61,
   "ay": 73,
-  "sheet": "design/pixel/raw/mapbits.png"
+  "h": 74,
+  "sheet": "design/pixel/raw/mapbits.png",
+  "w": 123
  },
  "map-compass": {
-  "w": 81,
-  "h": 97,
   "ax": 40,
   "ay": 96,
-  "sheet": "design/pixel/raw/mapbits.png"
+  "h": 97,
+  "sheet": "design/pixel/raw/mapbits.png",
+  "w": 81
  },
  "map-sack": {
-  "w": 31,
-  "h": 28,
   "ax": 15,
   "ay": 27,
-  "sheet": "design/pixel/raw/mapbits.png"
+  "h": 28,
+  "sheet": "design/pixel/raw/mapbits.png",
+  "w": 31
  },
  "map-stake": {
-  "w": 24,
-  "h": 33,
   "ax": 12,
   "ay": 32,
-  "sheet": "design/pixel/raw/mapbits.png"
+  "h": 33,
+  "sheet": "design/pixel/raw/mapbits.png",
+  "w": 24
  },
  "mark-check": {
-  "w": 36,
-  "h": 31,
   "ax": 18,
   "ay": 30,
-  "sheet": "design/pixel/raw/glyphs.png"
+  "h": 31,
+  "sheet": "design/pixel/raw/glyphs.png",
+  "w": 36
  },
  "mark-cross": {
-  "w": 33,
-  "h": 32,
   "ax": 16,
   "ay": 31,
-  "sheet": "design/pixel/raw/glyphs.png"
+  "h": 32,
+  "sheet": "design/pixel/raw/glyphs.png",
+  "w": 33
  },
  "mark-warn": {
-  "w": 40,
-  "h": 37,
   "ax": 20,
   "ay": 36,
-  "sheet": "design/pixel/raw/glyphs.png"
+  "h": 37,
+  "sheet": "design/pixel/raw/glyphs.png",
+  "w": 40
  },
  "medal-bronze": {
   "ax": 32,
@@ -4819,11 +4903,11 @@
   "w": 33
  },
  "owner-face": {
-  "w": 61,
-  "h": 64,
   "ax": 30,
   "ay": 63,
-  "sheet": "design/pixel/raw/owner.png"
+  "h": 64,
+  "sheet": "design/pixel/raw/owner.png",
+  "w": 61
  },
  "plot-carrot": {
   "ax": 34,
@@ -6243,24 +6327,24 @@
   "w": 68
  },
  "tree-hill": {
-  "w": 384,
-  "h": 256,
   "ax": 0,
   "ay": 0,
-  "sheet": "design/pixel/raw/tree-hill.png"
+  "h": 256,
+  "sheet": "design/pixel/raw/tree-hill.png",
+  "w": 384
  },
  "tree-hill-night": {
-  "w": 384,
-  "h": 256,
   "ax": 0,
   "ay": 0,
-  "sheet": "design/pixel/raw/tree-hill-night.png"
+  "h": 256,
+  "sheet": "design/pixel/raw/tree-hill-night.png",
+  "w": 384
  },
  "tree-sky": {
-  "w": 384,
-  "h": 256,
   "ax": 0,
   "ay": 0,
-  "sheet": "design/pixel/raw/tree-sky.png"
+  "h": 256,
+  "sheet": "design/pixel/raw/tree-sky.png",
+  "w": 384
  }
 }

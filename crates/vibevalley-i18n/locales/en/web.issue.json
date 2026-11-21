@@ -146,6 +146,7 @@
     "unread": "Cannot be read.",
     "full": "What to do (in full)",
     "steps": "The helper's every step",
+    "openTrajectory": "Full trajectory",
     "runs": "Every round of work",
     "time": "Time",
     "opened": "Opened",
@@ -379,5 +380,19 @@
     "title": "Discussion and delivery",
     "older": "Load earlier messages",
     "empty": "Requirements, execution feedback and deliveries stay here"
+  },
+  "onboarding": {
+    "title": "Get started with VibeValley",
+    "subtitle": "Complete these three steps to dispatch tickets to helpers.",
+    "step1Title": "Check or configure runtimes",
+    "step1Desc": "Verify a local coding agent (such as Claude Code or Codex) is installed and enabled.",
+    "step1Action": "Configure runtimes",
+    "step2Title": "Add a repository",
+    "step2Desc": "Link a local Git repository so helpers can work in isolated worktrees.",
+    "step2Action": "Add repository",
+    "step3Title": "Create your first ticket or dispatch in chat",
+    "step3Desc": "Describe what to build for a helper, press C to create a ticket, or ask the assistant in chat to break it down.",
+    "newIssue": "New ticket",
+    "openChat": "Open chat"
   }
 }

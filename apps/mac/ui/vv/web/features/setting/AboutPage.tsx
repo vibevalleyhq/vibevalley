@@ -1,4 +1,4 @@
-import { Clipboard, Text } from "nsh";
+import { Clipboard, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -18,7 +18,9 @@ function PathRow(props: { label: string; hint: string; path: string; last?: bool
   return (
     <SettingRow label={props.label} hint={props.hint} last={props.last}>
       <Tip text={props.path}>
-        <Text class="max-w-80 truncate font-mono text-xs text-muted">{props.path}</Text>
+        <View class="max-w-80 rounded-sm bg-page px-2 py-0.5">
+          <Text class="truncate font-mono text-xs text-muted">{props.path}</Text>
+        </View>
       </Tip>
       <IconButton
         icon="copy"
@@ -49,7 +51,7 @@ export function AboutPage() {
           <>
             <SettingsGroup>
               <SettingRow label={t("web.setting.about.version")} hint={t("web.setting.about.versionHint")} last={!updates() && !cli.state()}>
-                <Text testID="about-version" class="font-mono text-sm text-ink">
+                <Text testID="about-version" class="font-mono text-sm tabular-nums text-ink">
                   {s().version}
                 </Text>
               </SettingRow>

@@ -1,6 +1,6 @@
 # 使用指南
 
-从打开农场走到收下第一份活。界面细节见 [farm-ui.md](docs/reference/farm-ui.md)，叫法见[用语](docs/README.md#用语)。
+从打开农场走到收下第一份活。界面细节见 [桌面架构与页面清单](docs/design/06-desktop-architecture-and-topology.md)，叫法见[用语](docs/README.md#用语)。
 
 ## 开始之前
 

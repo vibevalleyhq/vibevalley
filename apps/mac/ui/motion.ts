@@ -1,8 +1,7 @@
-// Motion table (docs/design/components.md section 3). Every duration goes
-// through `ms`, which is 0 under reduced motion so end states still apply.
+// Under reduced motion `ms` is 0, so end states still apply.
 import { LayoutAnimation, reduceMotion } from "nsh";
 
-export const ease = "cubic-bezier(0.22, 1, 0.36, 1)";
+export const ease = "cubic-bezier(0.2, 0, 0, 1)";
 
 export const durations = {
   press: 160,
@@ -27,7 +26,7 @@ export function pressTransition() {
   return {
     transitionProperty: "colors,opacity,transform",
     transitionDuration: ms(durations.press),
-    transitionTimingFunction: "ease",
+    transitionTimingFunction: ease,
   } as const;
 }
 

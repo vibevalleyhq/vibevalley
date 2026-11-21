@@ -143,7 +143,11 @@
     "cancelReply": "Cancel the reply",
     "attach": "Attach a file",
     "uploadFailed": "Not uploaded: {why}",
-    "command": "Commands"
+    "command": "Commands",
+    "artifactContext": "Context: {title}",
+    "artifactSlide": "Slide {n}",
+    "clearContext": "Remove attached context",
+    "runningHint": "Working — send a follow-up or click stop"
   },
   "manage": {
     "name": "Name",
@@ -283,5 +287,6 @@
     }
   },
   "lacks": "cannot answer: {why}",
-  "lacksFix": "Settings"
+  "lacksFix": "Settings",
+  "orchestratorRuns": "View assistant trajectory and pending approvals"
 }

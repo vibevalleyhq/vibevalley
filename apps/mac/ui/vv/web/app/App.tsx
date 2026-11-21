@@ -18,6 +18,7 @@ import { PkmPage } from "../features/pkm";
 import { ReposPage } from "../features/repo";
 import { sortRepos } from "../features/repo/repos";
 import { RuntimesPage } from "../features/runtime";
+import { RunsPage } from "../features/session";
 import { SettingsPage } from "../features/setting";
 import { ready, useRepos } from "../infra/query";
 import { Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useParams } from "../infra/router";
@@ -134,6 +135,7 @@ const routes: readonly RouteDefinition[] = [
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
       { path: "/workspace", meta: { place: "workspace" }, component: () => <View testID="native-workspace" class="flex-1" /> },
       page("/issues", "issues", (rest) => <IssuesPage rest={rest()} />, issueSearch),
+      page("/runs", "runs", () => <RunsPage />),
       page("/chat", "chat", () => <ChatPage />),
       page("/settings", "settings", (rest) => <SettingsPage rest={rest()} />),
       page("/orchestrator", "agents", (rest) => <OrchestratorPage rest={rest()} />),

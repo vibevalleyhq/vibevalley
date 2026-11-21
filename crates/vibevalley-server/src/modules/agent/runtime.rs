@@ -3,8 +3,8 @@
 //!
 //! VibeValley's runtime ids are kept on the wire; one that `vibevalley-oar`
 //! registers as `acp:<id>` (opencode) is found under it. Runtimes the
-//! registry has beyond VibeValley's list (`acp:gemini`, `scripted`) are
-//! listed after them under their own ids.
+//! registry has beyond VibeValley's list (for example `scripted` in tests)
+//! are listed after them under their own ids.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -269,7 +269,10 @@ impl Fleet {
     /// Points the runtime's binary at the saved `binPath`; empty searches
     /// PATH (`probeInstallation`).
     fn use_binary(id: &str, bin_path: &str) {
-        let command = id.strip_prefix("acp:").unwrap_or(id);
+        let command = match id.strip_prefix("acp:").unwrap_or(id) {
+            "antigravity" => "agy",
+            other => other,
+        };
         let path = Some(bin_path.trim()).filter(|p| !p.is_empty()).map(std::path::PathBuf::from);
         vibevalley_oar::set_binary(command, path);
     }
@@ -373,11 +376,22 @@ impl Fleet {
         lock(&self.held).get(id).cloned()
     }
 
+    /// Active (available and enabled) runtimes sort ahead of disabled or
+    /// unavailable ones, preserving preset order within each group.
+    fn runtime_order(info: &RuntimeInfo) -> u8 {
+        match info.installation {
+            Installation::Available(_) if info.settings.enabled => 0,
+            Installation::Available(_) => 1,
+            _ => 2,
+        }
+    }
+
     /// `runtimes`: at once, with `checking` for the ones not probed yet
     /// while they are probed in the background.
     pub fn runtimes(self: &Arc<Self>) -> Vec<RuntimeInfo> {
         let locale = vibevalley_i18n::locale();
-        self.ids()
+        let mut out: Vec<RuntimeInfo> = self
+            .ids()
             .into_iter()
             .map(|id| match self.held(&id) {
                 Some(hit) => {
@@ -392,7 +406,9 @@ impl Fleet {
                     self.placeholder(&id, 0)
                 }
             })
-            .collect()
+            .collect();
+        out.sort_by_key(Self::runtime_order);
+        out
     }
 
     /// `refresh` (blocking): none for a runtime the farm does not know.

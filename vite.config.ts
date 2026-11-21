@@ -294,6 +294,11 @@ export default defineConfig({
         excludeFiles: ["**/scripts/**"],
         rules: { "vibevalley/child-process-door": "error" },
       },
+      {
+        // Component views share bucketed clocks instead of spawning per-row timers (scripts/audit/oxlint-plugin.ts, no-component-interval).
+        files: ["apps/mac/ui/vv/web/features/**/*.tsx", "apps/mac/ui/vv/web/ui/**/*.tsx"],
+        rules: { "vibevalley/no-component-interval": "error" },
+      },
     ],
     // A disable comment whose rule no longer fires there is an error, so none outlives its reason.
     options: { typeAware: true, typeCheck: true, reportUnusedDisableDirectives: "error" },

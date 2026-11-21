@@ -427,3 +427,25 @@ fn regression_unread_channel_badge_stays_inside_the_chat_hit_area() {
         scene.frame.state.chat.channels[0].unread = None;
     }
 }
+
+#[test]
+fn static_pixel_scenes_do_not_request_animation_and_glow_cache_matches_raster() {
+    use view::Scene;
+
+    let atlas = Arc::new(atlas::Atlas::parse(std::path::Path::new("."), "{}", 1.0).unwrap());
+    assert!(!Scene::Loading.needs_animation());
+    assert!(!Scene::Failed("err".into()).needs_animation());
+    assert!(!Scene::Catalog(Box::new(catalog::CatalogScene::new(atlas))).needs_animation());
+
+    let color = draw::rgba(0xc6ff70, 0.5);
+    let cached_a = draw::cached_glow_image(12, color);
+    let cached_b = draw::cached_glow_image(12, color);
+    assert!(Arc::ptr_eq(&cached_a, &cached_b));
+    let expected = draw::glow_image(12, color);
+    assert_eq!(cached_a.dimensions(), expected.dimensions());
+    for (p_cached, p_expected) in cached_a.pixels().zip(expected.pixels()) {
+        for i in 0..4 {
+            assert!(p_cached.0[i].abs_diff(p_expected.0[i]) <= 1);
+        }
+    }
+}

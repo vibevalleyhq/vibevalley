@@ -31,8 +31,8 @@ Chord 执行治理文档（`/chord/ws`、`space`、`budget.raise`，见 [Chord](
 
 | 范围 | 已有实现 | 尚待补齐或实测 |
 | --- | --- | --- |
-| 压缩 | `crates/vibevalley-agent/src/generation/transcript.rs` 含手工、软/硬阈值与溢出四级 | 原生界面触发手工压缩；真实模型触达各阈值行为 |
-| CodeMode | `crates/vibevalley-durable-codemode`（QuickJS）与生成引擎阶段已注册并通过回放 | 普通助手或帮工对话创建 CodeMode 脚本任务的入口 |
+| 压缩 | `crates/vibevalley-agent/src/core/pipeline.rs` 与 `compaction/` 含手工、软/硬阈值与溢出四级 | 原生界面触发手工压缩；真实模型触达各阈值行为 |
+| CodeMode | `crates/vibevalley-agent/src/codemode/`（QuickJS）与执行引擎已注册并通过回放 | 普通助手或帮工对话创建 CodeMode 脚本任务的入口 |
 | 取消与预算 | 调度器级联取消、预算暂停与 `budget.raise` 已通过离线回归 | 真实厂商请求何时停止计费及厂商账单核对 |
 
 ### 三、完整农场视觉对照验收
@@ -47,7 +47,7 @@ Chord 执行治理文档（`/chord/ws`、`space`、`budget.raise`，见 [Chord](
 - 32×32 逻辑像素窗口（步长 16）每块中 RGB 最大通道差超过 12 的像素 ≤ 8%。
 - 重复采样固定画面以测量动态噪声。
 
-与体素 3D 角色的并行视觉评审见[像素 3D 帮工提案](.agents/notes/proposed/feature/2026-11-19-voxel-farmhands.md)；长期发布节奏见[原生工作台长期计划](.agents/notes/proposed/architecture/2026-11-19-native-product-roadmap.md)。
+长期发布节奏与视觉基线安排见[原生工作台长期计划](.agents/notes/proposed/architecture/2026-11-19-native-product-roadmap.md)。
 
 ## Alternatives considered
 

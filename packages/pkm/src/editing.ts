@@ -52,6 +52,23 @@ export type EditAction =
 /** The text typed into block, as an op; none when it is what the block has. */
 export const saved = (block: PkmBlock, value: string): PkmBlockOp[] => (value === block.body ? [] : [{ op: "update", block: block.id, body: value }]);
 
+/** Whether the caret lies between an opening and closing fenced code delimiter in the block. */
+function insideFence(value: string, start: number, end: number): boolean {
+  const before = value.slice(0, start).split("\n");
+  let fence = "";
+  for (const line of before) {
+    const m = /^(`{3,}|~{3,})/u.exec(line.trimStart());
+    if (!m?.[1]) continue;
+    if (!fence) fence = m[1];
+    else if (line.trim() === fence) fence = "";
+  }
+  if (!fence) return false;
+  return value
+    .slice(end)
+    .split("\n")
+    .some((line) => line.trim() === fence);
+}
+
 /** What a key in a block's box does; undefined for one the box handles itself (letters, Shift+Enter, ← →). */
 export function editAction(e: Keys, block: PkmBlock, caret: Caret, around: Around, newId: () => string): EditAction | undefined {
   const id = block.id;
@@ -71,6 +88,10 @@ export function editAction(e: Keys, block: PkmBlock, caret: Caret, around: Aroun
   if (e.key === "Enter" && !e.shiftKey && !e.altKey) {
     const before = caret.value.slice(0, caret.start);
     const after = caret.value.slice(caret.end);
+    if (insideFence(caret.value, caret.start, caret.end)) {
+      const next = `${before}\n${after}`;
+      return { kind: "ops", ops: saved(block, next), focus: { block: id, at: caret.start + 1 } };
+    }
     const fresh = newId();
     if (caret.start === 0 && after !== "")
       return { kind: "ops", ops: [...keep, { op: "insert_before", block: id, id: fresh, body: "" }], focus: { block: id, at: 0 } };
@@ -189,14 +210,51 @@ export function completed(value: string, caret: number, c: Completion, choice: s
   return { value: head + rest, caret: head.length };
 }
 
-/** The / commands: a marker, a heading, or today's journal as a link. */
-export type Command = { readonly key: string; readonly marker: PkmMarker | undefined } | { readonly key: string; readonly text: string };
+// Whitespace and Latin/CJK closing punctuation (，。；：！？）】」』) where auto-pairing a closer is safe.
+const autoPairBounds = /^[\s.,;:!?)\]}>\uFF0C\u3002\uFF1B\uFF1A\uFF01\uFF1F\uFF09\u3011\u300D\u300F]/u;
+const autoPairs: readonly (readonly [string, string])[] = [
+  ["[[", "]]"],
+  ["((", "))"],
+];
+
+export function autoPair(was: string, now: string, caret: number): { readonly value: string; readonly caret: number } | undefined {
+  if (now.length === was.length + 1 && caret >= 1) {
+    const typed = now[caret - 1];
+    const tail = now.slice(caret);
+    for (const [open, close] of autoPairs) {
+      if (caret >= 2 && now.slice(caret - 2, caret) === open) {
+        if (now[caret - 3] === open[0] || tail.startsWith(close)) return undefined;
+        if (tail !== "" && !autoPairBounds.test(tail)) return undefined;
+        return { value: now.slice(0, caret) + close + tail, caret };
+      }
+      // Overtype-skip when typing `]` or `)` directly onto an existing closer inside an open pair.
+      if (typed === close[0] && was[caret - 1] === typed && now.slice(0, caret - 1) === was.slice(0, caret - 1) && tail === was.slice(caret - 1)) {
+        const before = was.slice(0, caret - 1);
+        const lastOpen = before.lastIndexOf(open);
+        if (lastOpen >= 0 && before.lastIndexOf(close) < lastOpen) return { value: was, caret };
+      }
+    }
+  }
+  if (now.length === was.length - 1 && caret >= 1) {
+    for (const [open, close] of autoPairs) {
+      if (was.slice(caret - 1, caret + 3) === open + close && now.slice(0, caret) === was.slice(0, caret) && now.slice(caret) === was.slice(caret + 1)) {
+        return { value: now.slice(0, caret) + now.slice(caret + 2), caret };
+      }
+    }
+  }
+  return undefined;
+}
+
+/** The / commands: a marker, a heading, a code fence, or today's journal as a link. */
+export type Command =
+  | { readonly key: string; readonly marker: PkmMarker | undefined }
+  | { readonly key: string; readonly text: string; readonly caretOffset?: number };
 
 export function commandAction(block: PkmBlock, caret: Caret, c: Completion, command: Command): EditAction {
   const value = caret.value.slice(0, c.from) + ("text" in command ? command.text : "") + caret.value.slice(caret.start);
   const mark: PkmBlockOp[] =
     "marker" in command ? [command.marker ? { op: "set_marker", block: block.id, marker: command.marker } : { op: "set_marker", block: block.id }] : [];
   const ops: PkmBlockOp[] = [...saved(block, value), ...mark];
-  const at = c.from + ("text" in command ? command.text.length : 0);
+  const at = c.from + ("text" in command ? (command.caretOffset ?? command.text.length) : 0);
   return { kind: "ops", ops, focus: { block: block.id, at } };
 }

@@ -1,5 +1,6 @@
 {
-  "name": "Frontend Zheng",
-  "duty": "Pages, the 3D scene, interaction and animation",
-  "tags": ["frontend", "page", "panel", "captions", "animation", "robot", "dark mode", "ui"]
+  "name": "Frontend Engineer",
+  "duty": "Builds UI components, interaction flows, responsive layouts, and light/dark parity",
+  "style": "Component reuse · Crisp polish · Theme parity",
+  "tags": ["frontend", "ui", "component", "layout", "css", "dark mode", "interaction"]
 }

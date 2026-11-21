@@ -3,7 +3,8 @@
 //! paints a [`DrawList`]; [`raster`] paints the same list on the CPU, so a
 //! scene can be checked as a PNG without a screen.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use image::{Rgba, RgbaImage};
 
@@ -250,6 +251,32 @@ pub fn glow_image(size: u32, color: Color) -> RgbaImage {
     out
 }
 
+const GLOW_CACHE_CAP: usize = 256;
+
+/// Cached round glow quantized per RGBA channel byte so pulsing lights reuse generated bitmaps.
+pub fn cached_glow_image(size: u32, color: Color) -> Arc<RgbaImage> {
+    type GlowCache = OnceLock<Mutex<HashMap<(u32, [u8; 4]), Arc<RgbaImage>>>>;
+    static CACHE: GlowCache = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let size = size.max(1);
+    let q = color.map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8);
+    let key = (size, q);
+    {
+        let guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(hit) = guard.get(&key) {
+            return Arc::clone(hit);
+        }
+    }
+    let quantized = q.map(|b| b as f32 / 255.0);
+    let img = Arc::new(glow_image(size, quantized));
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    if guard.len() >= GLOW_CACHE_CAP {
+        guard.clear();
+    }
+    guard.insert(key, Arc::clone(&img));
+    img
+}
+
 fn to_rgba(c: Color) -> Rgba<u8> {
     let b = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
     Rgba([b(c[0]), b(c[1]), b(c[2]), b(c[3])])
@@ -310,8 +337,9 @@ pub fn farm_picture(list: &DrawList, atlas: &Atlas, light: &FarmLight) -> RgbaIm
         Op::Rect { x, y, w, h, color } => surface.paint(&RgbaImage::from_pixel(1, 1, to_rgba(*color)), None, Brush::at(*x, *y, *w, *h)),
         Op::Glow { x, y, r, color } => {
             let size = (r * 2.).round().max(1.) as u32;
+            let glow = cached_glow_image(size, *color);
             surface.paint(
-                &glow_image(size, *color),
+                &glow,
                 None,
                 Brush {
                     additive: true,

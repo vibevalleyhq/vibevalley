@@ -14,6 +14,8 @@
   "list": {
     "label": "Pages and calendar",
     "find": "Search notes",
+    "newPage": "New page",
+    "newPagePlaceholder": "Page title, Enter to create",
     "open": "{n} open",
     "today": "Today"
   },
@@ -47,7 +49,16 @@
     "missingRef": "Block not found",
     "refFrom": "From “{page}”",
     "notSaved": "Not saved: {why}",
-    "outline": "Outline"
+    "outline": "Outline",
+    "rename": "Rename page",
+    "renamed": "Renamed to “{title}”",
+    "create": "Create this page",
+    "freshHint": "This page does not exist yet. Write the first block to create it.",
+    "freshPlaceholder": "Write the first block, Enter to create…",
+    "copyRef": "Copy block ref",
+    "copiedRef": "Block ref copied",
+    "toIssue": "Turn into issue",
+    "issueMade": "Issue created"
   },
   "props": {
     "deadline": "Due {day}",
@@ -74,6 +85,7 @@
     "clear": "Clear the mark",
     "h1": "Heading",
     "h2": "Subheading",
+    "code": "Code block",
     "today": "Link today's journal"
   },
   "complete": {

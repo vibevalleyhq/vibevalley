@@ -5,17 +5,17 @@ import type { Agent, RuntimeInfo } from "@vibevalley/protocol";
 
 import { Keyed, variant } from "../../base/dom";
 import { wallClockText } from "../../base/format";
-import { useWorkAgents } from "../../infra/agents";
+import { sortRuntimes, useWorkAgents } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { ready, runtimesQuery, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
-import { hexColor } from "../../ui/domain/cast";
 import { AgentFace } from "../../ui/domain/Face";
 import { OpenTerminal } from "../../ui/domain/OpenTerminal";
 import { Card, ListCard, ListRow, Quiet, Split } from "../../ui/layout";
 import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
+import { Bubble } from "../../ui/Tip";
 import { quotaOf } from "./quota";
 import { InventoryCard, ModelsCard, SettingsCard, Stamina, SupportCard, Usage } from "./RuntimeCards";
 
@@ -41,7 +41,7 @@ const folderOf = (command: string) => (command.startsWith("/") ? command.slice(0
 export function RuntimesPage(props: { rest: string }) {
   const runtimes = useRuntimes();
   const agents = useWorkAgents();
-  const list = () => ready(runtimes, []);
+  const list = () => sortRuntimes(ready(runtimes, []));
   const selected = () => list().find((r) => r.id === props.rest) ?? list()[0];
   return (
     <If
@@ -53,12 +53,23 @@ export function RuntimesPage(props: { rest: string }) {
         </Text>
       }
     >
-      <View testID="runtimes-page" class="h-full flex-1">
+      <View testID="runtimes-page" class="h-full flex-1 bg-page">
         <Split
           edge
           list={
-            <ListCard bare title={t("web.runtime.title")} label={t("web.runtime.list")} testid="runtimes">
-              <Text class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.runtime.intro")}</Text>
+            <ListCard
+              bare
+              title={t("web.runtime.list")}
+              label={t("web.runtime.list")}
+              testid="runtimes"
+              action={
+                <If when={list().length > 0}>
+                  <View class="rounded-sm bg-hover px-1.5 py-px">
+                    <Text class="text-2xs font-medium text-muted tabular-nums">{String(list().length)}</Text>
+                  </View>
+                </If>
+              }
+            >
               <Each of={list()} key={(r) => r.id}>
                 {(r) => {
                   const ok = () => r().installation.status === "available";
@@ -118,10 +129,7 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
   return (
     <View testID="runtime-detail" class="max-w-4xl gap-3">
       <View class="flex-row items-center gap-4 px-1 pt-1 pb-2">
-        <View
-          class="h-18 w-18 shrink-0 items-center justify-center rounded-lg border border-line"
-          style={{ backgroundColor: `${hexColor(props.info.preset.look.hat)}33` }}
-        >
+        <View class="h-18 w-18 shrink-0 items-center justify-center rounded-lg border border-line bg-side">
           <View style={{ opacity: inst().status !== "available" ? 0.5 : 1 }}>
             <RuntimeIcon runtime={props.info.id} size={60} />
           </View>
@@ -135,10 +143,12 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
             <If when={variant(inst(), "status", "available")}>
               {(i) => (
                 <>
-                  <View class="rounded-sm bg-ok-soft px-1.5">
-                    <Text class="text-xs text-ok-ink">{`${t("web.runtime.available")} ${i().version ?? ""}`}</Text>
+                  <View class="rounded-sm bg-ok-soft px-1.5 py-0.5">
+                    <Text class="text-xs font-medium tabular-nums text-ok-ink">{`${t("web.runtime.available")} ${i().version ?? ""}`}</Text>
                   </View>
-                  <Text class="font-mono text-xs text-muted">{i().command}</Text>
+                  <View class="min-w-0 max-w-full shrink" tooltip={<Bubble text={i().command} />}>
+                    <Text class="truncate font-mono text-xs text-muted">{i().command}</Text>
+                  </View>
                   <If when={folderOf(i().command)}>{(cwd) => <OpenTerminal cwd={cwd()} title={props.info.preset.label} testid="runtime-terminal" />}</If>
                   <Text class="text-xs text-muted">{i().via === "bundled" ? t("web.runtime.bundled") : t("web.runtime.commandLine")}</Text>
                 </>
@@ -149,12 +159,16 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
                 <If
                   when={i().signInCommand}
                   else={
-                    <View class="rounded-sm bg-bad-soft px-1.5">
-                      <Text class="text-xs text-berry">{t("web.runtime.unsupportedWhy", { why: i().reason })}</Text>
+                    <View class="rounded-sm bg-bad-soft px-1.5 py-0.5">
+                      <Text class="text-xs font-medium text-berry">{t("web.runtime.unsupportedWhy", { why: i().reason })}</Text>
                     </View>
                   }
                 >
-                  {(command) => <Text class="font-mono text-xs text-muted">{command()}</Text>}
+                  {(command) => (
+                    <View class="min-w-0 max-w-full shrink" tooltip={<Bubble text={command()} />}>
+                      <Text class="truncate font-mono text-xs text-muted">{command()}</Text>
+                    </View>
+                  )}
                 </If>
               )}
             </If>
@@ -173,12 +187,12 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
                 </Button>
               </View>
             </If>
-            <Text class="text-xs text-muted">
+            <Text class="text-xs tabular-nums text-faint">
               {inst().status !== "checking" ? t("web.runtime.checkedAt", { clock: wallClockText(props.info.checkedAt) }) : t("web.runtime.checking")}
             </Text>
           </View>
         </View>
-        <Button disabled={refreshing.busy()} onPress={() => void refresh()}>
+        <Button icon="refresh" disabled={refreshing.busy()} onPress={() => void refresh()}>
           {refreshing.busy() ? t("web.runtime.checking") : t("web.runtime.recheck")}
         </Button>
       </View>
@@ -204,8 +218,8 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       <Card
         title={t("web.runtime.agents")}
         action={
-          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} testID="new-agent">
-            <Text class="text-xs text-muted underline">{t("web.runtime.makeAgent")}</Text>
+          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} testID="new-agent" class="group rounded-sm px-1.5 py-0.5 hover:bg-hover">
+            <Text class="text-xs text-muted underline group-hover:text-ink">{t("web.runtime.makeAgent")}</Text>
           </A>
         }
       >
@@ -215,10 +229,10 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
               {(a) => (
                 <A
                   href={`/agents/${encodeURIComponent(a().id)}`}
-                  class="flex-row items-center gap-1.5 rounded-md border border-line py-1 pr-3 pl-1 hover:bg-hover"
+                  class="flex-row items-center gap-1.5 rounded-md border border-line bg-page py-1 pr-3 pl-1 transition duration-120 ease-out hover:bg-hover"
                 >
                   <AgentFace agentId={a().id} name={a().name} runtime={a().runtime} look={a().look} size={26} />
-                  <Text class="text-sm text-ink">{a().name}</Text>
+                  <Text class="text-sm font-medium text-ink">{a().name}</Text>
                 </A>
               )}
             </Each>

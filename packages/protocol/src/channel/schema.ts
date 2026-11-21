@@ -94,6 +94,11 @@ export const Chat = z.object({
   userMentions: z.array(UserMention),
 }) satisfies Codec<T.Chat>;
 
+export const ChannelSummary = z.object({
+  unreadTotal: z.number(),
+  unreadUnder: z.record(z.string(), z.number()),
+}) satisfies Codec<T.ChannelSummary>;
+
 export const ChannelEvent = z.discriminatedUnion("_tag", [
   z.object({ _tag: z.literal("Message"), message: ChatMessage }),
   z.object({ _tag: z.literal("Reset") }),

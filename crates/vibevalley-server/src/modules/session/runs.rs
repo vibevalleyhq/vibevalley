@@ -47,7 +47,7 @@ impl Sessions {
                     for sub in tx
                         .submissions(&super::delivery::delivery_conversation(issue))?
                         .into_iter()
-                        .filter(|s| s.status == vibevalley_durable::SubmissionStatus::Queued)
+                        .filter(|s| s.status == vibevalley_agent::durable::SubmissionStatus::Queued)
                     {
                         super::delivery::bind(tx, &mut run, &sub)?;
                     }

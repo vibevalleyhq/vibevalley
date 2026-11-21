@@ -15,7 +15,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/orchestrator/mod.rs` | `Orchestrator`：每个助手档案一个 `vibevalley-agent` 的对话（`<家目录>/agent/<id>/conversation.jsonl`），收观察层交来的话和没指定档案的定时任务，拼现状、跑一轮、把回复写回频道 |
+| `crates/vibevalley-server/src/modules/orchestrator/mod.rs` | `Orchestrator`：每个助手档案一个 `vibevalley-agent` 的持久对话（SQLite 队列与 `Harness`），收观察层交来的话和没指定档案的定时任务，拼现状、跑一轮、把回复写回频道 |
 | `crates/vibevalley-server/src/modules/orchestrator/words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/vibevalley-server/assets/orchestrator/prompts.json` |
 | `crates/vibevalley-server/src/modules/tool/mod.rs` | 助手和帮工共用的工具：每个工具一个参数结构体，宽松解析写一处，按调用者分支；工具名、说明与 JSON Schema 在 `crates/vibevalley-server/assets/tools/orchestrator.json`、`crates/vibevalley-server/assets/tools/helper.json` |
 | `crates/vibevalley-server/src/modules/tool/issue.rs`、`chat.rs`、`notes.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、笔记与 Artifact 与媒体、仓库与定时任务、记性 |
@@ -37,13 +37,13 @@
 - **当轮用户授权检查（`Route.user`）**：仅当本轮批次含用户原话时 `Route.user` 为真；当前在 `cron_create`（后台回合创建的周期/派工任务存为 `pending` 待批）与媒体生成/理解工具中按此门禁拦截，其余四档工单变更硬拦截见下方提案。
 - **派活时挑档案**：顺序见[档案和农机](docs/subsystems/agent.md#模型和不变量)。
 - **整条消息落库**：完整回复生成后一次性写入频道。
-- **忙时来的输入排着，下一轮一起进**：Rust 版的自研 agent 不支持插话（TS 版把用户的话插进正在跑的一轮）。
+- **忙时来的输入排着，下一轮一起进**：内置引擎与 `WorkerDriver` 原生支持持久 `steer` 插话，但助手为了等同一批次的群聊输入整合后发给同一现状窗口，当前将忙时收到的消息留在信箱队列里，等本轮结束后合并进下一轮（详见 [VibeValley 自己的 agent](docs/subsystems/brain.md)）。
 
 ## 工具审批
 
 工具策略要求确认时，执行器保存待批调用并暂停该任务。用户在助手的「执行轨迹」里核对工具名、参数与审批原因，也可以用 `vibevalley approval list --format json` 找到调用。CLI 的 `approval resolve` 接收对话 ID、任务 ID、工具调用 ID 和 `approve` 或 `deny`。工作台和 CLI 使用同一条 Rust 审批契约。
 
-执行器在同一个 SQLite 事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/vibevalley-server/src/modules/orchestrator/execution.rs) · [决策事务](crates/vibevalley-agent/src/generation/governance.rs)
+执行器在同一个 SQLite 事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/vibevalley-server/src/modules/orchestrator/execution.rs) · [决策事务](crates/vibevalley-agent/src/extensions/governance.rs)
 
 ## 怎么走
 

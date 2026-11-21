@@ -8,6 +8,9 @@ import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
+import { IconButton } from "../../ui/IconButton";
+import { Banner } from "../../ui/layout";
+import { CountPill } from "../../ui/Tag";
 import { toast } from "../../ui/toasts";
 import type { Frame } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
@@ -139,14 +142,14 @@ export function DashboardView(props: StoreViewerProps) {
 
   return (
     <View testID="dashboard-view" class="min-h-0 min-w-0 flex-1">
-      <View class="shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3 py-2">
+      <View class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3 py-2">
         <If when={marks().length > 0}>
           <View
             testID="dashboard-provenance-badge"
-            class={`flex-row items-center gap-1 rounded-full px-2.5 py-0.5 ${mismatches() > 0 ? "bg-bad-soft" : "bg-ok-soft"}`}
+            class={`h-6 flex-row items-center gap-1.5 rounded-full px-2.5 ${mismatches() > 0 ? "bg-bad-soft" : "bg-ok-soft"}`}
           >
-            <Icon name={mismatches() > 0 ? "warn" : "check"} size={12} />
-            <Text class={`text-xs font-medium ${mismatches() > 0 ? "text-berry" : "text-ok-ink"}`}>
+            <Icon name={mismatches() > 0 ? "cross" : "check"} size={12} />
+            <Text class={`text-xs font-medium tabular-nums ${mismatches() > 0 ? "text-berry" : "text-ok-ink"}`}>
               {mismatches() > 0
                 ? t("web.artifact.dashboard.mismatches", { n: mismatches() })
                 : t("web.artifact.dashboard.verified", { ok: verified(), total: marks().length })}
@@ -171,13 +174,7 @@ export function DashboardView(props: StoreViewerProps) {
         </View>
       </View>
 
-      <If when={snapshot().error}>
-        {(err) => (
-          <View class="px-3 py-2">
-            <Text class="text-xs text-berry">{err()}</Text>
-          </View>
-        )}
-      </If>
+      <If when={snapshot().error}>{(err) => <Banner edge>{err()}</Banner>}</If>
 
       <View class="min-h-0 flex-1 lg:flex-row">
         <HtmlFrame
@@ -196,8 +193,24 @@ export function DashboardView(props: StoreViewerProps) {
 
         <If when={drawerOpen()}>
           <View testID="dashboard-sources" class="max-h-96 shrink-0 border-t border-line bg-side lg:max-h-none lg:w-96 lg:border-t-0 lg:border-l">
-            <Scroll contentClass="gap-3 p-3">
-              <If when={datasetNames().length > 0} else={<Text class="text-xs text-muted">{t("web.artifact.dashboard.noDatasets")}</Text>}>
+            <View class="shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3 py-2">
+              <View class="flex-row items-center gap-1.5">
+                <Text class="text-xs font-semibold text-muted">{t("web.artifact.dashboard.sources")}</Text>
+                <If when={datasetNames().length > 0}>
+                  <CountPill count={datasetNames().length} />
+                </If>
+              </View>
+              <IconButton icon="close" size={14} label={t("web.artifact.dashboard.hideSources")} onClick={() => setDrawer({ tag: "closed" })} />
+            </View>
+            <Scroll class="min-h-0 flex-1" contentClass="gap-3 p-3">
+              <If
+                when={datasetNames().length > 0}
+                else={
+                  <View class="rounded-md bg-page px-3 py-2.5">
+                    <Text class="text-xs text-muted">{t("web.artifact.dashboard.noDatasets")}</Text>
+                  </View>
+                }
+              >
                 <View class="flex-row flex-wrap items-center gap-1">
                   <Each of={datasetNames()}>
                     {(ds) => {
@@ -211,7 +224,9 @@ export function DashboardView(props: StoreViewerProps) {
                             setSelectedDataset(ds());
                             setDrawer({ tag: "browse" });
                           }}
-                          class={`rounded-md px-2.5 py-1 ${active() ? "bg-selected" : "hover:bg-hover"}`}
+                          class={`h-7 justify-center rounded-md px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                            active() ? "bg-selected" : "hover:bg-hover"
+                          }`}
                         >
                           <Text class={`text-xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{ds()}</Text>
                         </View>
@@ -224,17 +239,18 @@ export function DashboardView(props: StoreViewerProps) {
                   {(ds) => (
                     <View class="gap-3">
                       <View class="flex-row items-center justify-between gap-2">
-                        <Text class="text-xs text-muted tabular-nums">{t("web.artifact.dashboard.rows", { n: activeRows().length })}</Text>
+                        <Text class="font-mono text-xs text-muted tabular-nums">{t("web.artifact.dashboard.rows", { n: activeRows().length })}</Text>
                         <View class="flex-row items-center gap-1.5">
                           <Button
                             icon="download"
+                            size="compact"
                             testID="dashboard-export-csv"
                             disabled={act.busy()}
                             onPress={() => void act.run(() => exportCsvFile(ds(), activeRows()))}
                           >
                             {t("web.artifact.dashboard.exportCsv")}
                           </Button>
-                          <Button icon="edit" testID="dashboard-edit-json" onPress={openJsonEditor}>
+                          <Button icon="edit" size="compact" testID="dashboard-edit-json" onPress={openJsonEditor}>
                             {t("web.artifact.dashboard.editJson")}
                           </Button>
                         </View>
@@ -242,10 +258,12 @@ export function DashboardView(props: StoreViewerProps) {
 
                       <If when={editDraft()}>
                         {(draft) => (
-                          <View class="gap-2 rounded-md border border-line bg-page p-2">
+                          <View class="gap-2 rounded-md border border-line bg-page p-2.5">
                             <TextArea rows={7} value={draft()} onInput={(val) => setDrawer({ tag: "editJson", draft: val })} class="font-mono text-xs" />
-                            <View class="flex-row justify-end gap-1.5">
-                              <Button onPress={() => setDrawer({ tag: "browse" })}>{t("web.base.form.never")}</Button>
+                            <View class="flex-row items-center justify-end gap-1.5">
+                              <Button tone="quiet" onPress={() => setDrawer({ tag: "browse" })}>
+                                {t("web.base.form.never")}
+                              </Button>
                               <Button tone="primary" testID="dashboard-save-json" disabled={act.busy()} onPress={saveDatasetJson}>
                                 {t("web.artifact.dashboard.saveDataset")}
                               </Button>
@@ -258,10 +276,10 @@ export function DashboardView(props: StoreViewerProps) {
                         <View class="overflow-hidden rounded-md border border-line bg-page">
                           <Scroll horizontal>
                             <View>
-                              <View class="flex-row bg-side">
+                              <View class="min-h-8 flex-row items-center bg-side">
                                 <Each of={activeCols()}>
                                   {(col) => (
-                                    <View class="w-28 shrink-0 px-2 py-1.5">
+                                    <View class="w-28 shrink-0 px-2.5 py-1.5">
                                       <Text class="truncate text-xs font-semibold text-muted">{col()}</Text>
                                     </View>
                                   )}
@@ -269,11 +287,11 @@ export function DashboardView(props: StoreViewerProps) {
                               </View>
                               <Each of={activeRows().slice(0, 30)}>
                                 {(row) => (
-                                  <View class="flex-row border-t border-line">
+                                  <View class="min-h-8 flex-row items-center border-t border-line bg-page transition duration-120 ease-out hover:bg-hover">
                                     <Each of={activeCols()}>
                                       {(col) => (
-                                        <View class="w-28 shrink-0 px-2 py-1">
-                                          <Text class="truncate text-xs text-ink tabular-nums">{formatCellValue(row()[col()])}</Text>
+                                        <View class="w-28 shrink-0 px-2.5 py-1.5">
+                                          <Text class="truncate font-mono text-xs text-ink tabular-nums">{formatCellValue(row()[col()])}</Text>
                                         </View>
                                       )}
                                     </Each>

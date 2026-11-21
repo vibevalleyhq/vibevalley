@@ -20,13 +20,13 @@ pub struct RecordHeader {
     pub recorder: String,
 }
 
-pub(crate) struct RecordFile {
+pub struct RecordFile {
     file: File,
     last: Option<u64>,
     has_header: bool,
 }
 
-pub(crate) fn open_file(path: Option<&Path>) -> Result<Option<RecordFile>> {
+pub fn open_file(path: Option<&Path>) -> Result<Option<RecordFile>> {
     let Some(path) = path else { return Ok(None) };
     let mut file = OpenOptions::new()
         .create(true)
@@ -47,14 +47,14 @@ pub(crate) fn open_file(path: Option<&Path>) -> Result<Option<RecordFile>> {
     Ok(Some(RecordFile { file, last, has_header }))
 }
 
-pub(crate) struct Recorder {
+pub struct Recorder {
     file: Option<RecordFile>,
     writer: Option<Writer<File>>,
     header: Header,
     base: u64,
 }
 impl Recorder {
-    pub(crate) fn start(file: Option<RecordFile>, runtime: &str, session_id: &str, cwd: &Path, model: Option<&str>) -> Option<Self> {
+    pub fn start(file: Option<RecordFile>, runtime: &str, session_id: &str, cwd: &Path, model: Option<&str>) -> Option<Self> {
         let file = file?;
         let base = file.last.map_or(0, |s| s + 1);
         let mut header = Header::new(runtime, session_id, now_ms());

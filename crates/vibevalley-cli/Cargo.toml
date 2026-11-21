@@ -18,6 +18,7 @@ jiff = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 ureq = { workspace = true }
+vibevalley-agent = { path = "../vibevalley-agent" }
 vibevalley-core = { path = "../vibevalley-core" }
 vibevalley-home = { path = "../vibevalley-home" }
 vibevalley-i18n = { path = "../vibevalley-i18n" }

@@ -1,11 +1,13 @@
 {
   "id": "frontend",
-  "version": 1,
+  "version": 2,
   "role": "worker",
-  "name": "前端阿郑",
-  "duty": "页面、3D 场景、交互动画",
-  "tags": ["前端", "页面", "面板", "字幕", "动画", "机器人", "夜间模式", "ui"],
-  "runtime": "pi",
+  "category": "engineering",
+  "name": "前端工程师",
+  "duty": "实现界面组件、交互状态、响应式布局与浅深双主题一致性",
+  "style": "组件复用 · 细节克制 · 双主题一致",
+  "tags": ["前端", "页面", "组件", "样式", "布局", "交互", "暗色模式", "ui"],
+  "runtime": "claude",
   "effort": "high",
   "worktree": true,
   "look": {
@@ -13,8 +15,10 @@
     "build": "hopper",
     "head": "dome",
     "body": "#f4e6d4",
-    "trim": "#8a5cc4",
-    "hat": "#ff8fb1",
-    "species": "fox"
+    "trim": "#b0503f",
+    "hat": "#e8804f",
+    "species": "fox",
+    "outfit": "gardener",
+    "avatar": "avatar-frontend"
   }
 }

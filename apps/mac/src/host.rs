@@ -318,6 +318,29 @@ pub fn set_app_icon() {
     app.activateIgnoringOtherApps(true);
 }
 
+/// Returns macOS keyboard focus from an embedded native child view (such as a
+/// `WKWebView`) back to GPUI's `contentView` when the user clicks a GPUI surface.
+pub fn restore_window_first_responder() {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::NSApplication;
+    use objc2_foundation::MainThreadMarker;
+
+    let Some(mtm) = MainThreadMarker::new() else { return };
+    let app = NSApplication::sharedApplication(mtm);
+    unsafe {
+        let win: *mut AnyObject = msg_send![&*app, keyWindow];
+        if win.is_null() {
+            return;
+        }
+        let content: *mut AnyObject = msg_send![win, contentView];
+        let first: *mut AnyObject = msg_send![win, firstResponder];
+        if !content.is_null() && first != content {
+            let _: bool = msg_send![win, makeFirstResponder: content];
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

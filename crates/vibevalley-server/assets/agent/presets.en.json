@@ -197,7 +197,7 @@
     "vibevalley": {
       "steer": true,
       "refused": {},
-      "capabilities": ["listModels"],
+      "capabilities": ["listModels", "accountUsage", "skills", "mcpServers", "tools"],
       "inProcess": true
     },
     "codex": {

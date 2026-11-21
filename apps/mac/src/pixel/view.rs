@@ -61,6 +61,10 @@ pub enum Scene {
 }
 
 impl Scene {
+    pub fn needs_animation(&self) -> bool {
+        matches!(self, Scene::Farm(_) | Scene::Map(_) | Scene::Tree(_) | Scene::Opening(_))
+    }
+
     fn atlas(&self) -> Option<Arc<Atlas>> {
         match self {
             Scene::Farm(f) => Some(f.atlas.clone()),
@@ -84,7 +88,7 @@ pub struct PixelView {
     last: Instant,
     /// Where the picture was last painted, for pointer hits.
     placed: Rc<Cell<Option<Placed>>>,
-    pub last_list: Option<DrawList>,
+    pub last_list: Option<Arc<DrawList>>,
     pub frames_seen: u64,
     pub taps: Vec<String>,
     pub unpainted_draws: u64,
@@ -650,7 +654,7 @@ impl PixelView {
             "kind": self.kind,
             "frames_seen": self.frames_seen,
             "scene": scene,
-            "draw": self.last_list.as_ref().map(DrawList::census),
+            "draw": self.last_list.as_deref().map(DrawList::census),
             "cached_pictures": self.cache.len(),
             "pictures_made_last_paint": self.cache.made,
             "last_paint_ms": self.cache.last_paint_ms,
@@ -667,13 +671,13 @@ impl PixelView {
     /// the scene on and draws the list as `render` would.
     pub fn draw_unpainted(&mut self) {
         if self.last.elapsed().as_secs_f32() > 0.5 {
-            self.last_list = self.draw();
+            self.last_list = self.draw().map(Arc::new);
             self.unpainted_draws += 1;
         }
     }
 
     /// The last drawn list and its sprites, for a CPU raster.
-    pub fn snapshot(&self) -> Option<(DrawList, Option<Arc<Atlas>>)> {
+    pub fn snapshot(&self) -> Option<(Arc<DrawList>, Option<Arc<Atlas>>)> {
         Some((self.last_list.clone()?, self.scene.atlas()))
     }
 
@@ -749,7 +753,7 @@ fn load(kind: &str) -> Scene {
 impl Render for PixelView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.mount_sheet(window, cx);
-        let list = self.draw();
+        let list = self.draw().map(Arc::new);
         if let Scene::Farm(f) = &mut self.scene {
             for cue in f.drain_sounds() {
                 cx.emit(PixelEvent::Sound(cue));
@@ -761,7 +765,7 @@ impl Render for PixelView {
             Scene::Failed(e) => Some(e.clone()),
             _ => None,
         };
-        if list.is_some() {
+        if list.is_some() && self.scene.needs_animation() && window.is_window_active() {
             window.request_animation_frame();
         }
         let atlas = self.scene.atlas();

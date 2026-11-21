@@ -42,7 +42,11 @@ species: Species | null, outfit: Outfit | null,
 /**
  * An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A helper has null.
  */
-orchestrator: OrchestratorLook | null, build: Build, head: Head, body: string, trim: string, hat: string, eye: string, };
+orchestrator: OrchestratorLook | null, build: Build, head: Head, body: string, trim: string, hat: string, eye: string,
+/**
+ * Optional generated portrait sprite name (`avatar-*`), used instead of the animal face when set.
+ */
+avatar?: string, };
 
 /**
  * Where a profile came from: a template's id and the version it had then.
@@ -62,6 +66,9 @@ from?: AgentFrom, };
 export const AgentTemplateSourceValues = ["builtIn", "added"] as const;
 export type AgentTemplateSource = (typeof AgentTemplateSourceValues)[number];
 
+export const TemplateCategoryValues = ["engineering", "product", "research", "orchestration"] as const;
+export type TemplateCategory = (typeof TemplateCategoryValues)[number];
+
 /**
  * A recipe for a profile (agent.json and persona.md in a folder), in the farm's language: installing it makes a profile.
  */
@@ -74,6 +81,14 @@ version: number, role: AgentRole, name: string, duty: string, tags: Array<string
  * The runtime it is written for.
  */
 runtime: string, model: string, effort: string, personaMode: PersonaMode, worktree: boolean, look: Look, persona: string, source: AgentTemplateSource,
+/**
+ * Built-in role category (`engineering`, `product`, `research`, `orchestration`).
+ */
+category?: TemplateCategory,
+/**
+ * Concise summary of this template's working style and strengths.
+ */
+style?: string,
 /**
  * The built-in skills a profile installed from it has ticked, by id.
  */
@@ -95,7 +110,7 @@ builtIn?: boolean, };
 
 export type AgentDeleteInput = { id: string, };
 
-export type AgentTemplateInstallInput = { id: string, };
+export type AgentTemplateInstallInput = { id: string, runtime?: string, };
 
 export type AgentTemplateUpdateInput = { agent: string, };
 

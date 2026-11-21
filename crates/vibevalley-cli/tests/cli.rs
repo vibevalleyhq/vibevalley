@@ -27,15 +27,15 @@ fn farm() -> Farm {
     let mut registry = vibevalley_oar::Registry::new();
     registry.register(vibevalley_server::testing::helper());
     let starters = [
+        "fullstack",
+        "architect",
         "backend",
         "tester",
         "frontend",
         "docs",
         "scout",
-        "night",
-        "claude",
-        "codex",
-        "lab",
+        "designer",
+        "product",
         "slides",
         "collector",
         "pages",
@@ -130,6 +130,10 @@ const COMMANDS: &[&str] = &[
     "cron edit",
     "cron list",
     "doctor",
+    "eval export",
+    "eval inspect",
+    "eval replay",
+    "eval run",
     "issue comment",
     "issue create",
     "issue delete",
@@ -440,4 +444,97 @@ fn cron_at_agent_default_pkm_dry_run_and_doctor_setting_chat_work() {
         let msg = local_disabled.failure.as_ref().unwrap()["error"]["message"].as_str().unwrap();
         assert!(msg.contains("local-chat") && msg.contains("--orchestrator"), "{msg}");
     }
+}
+
+#[test]
+fn eval_export_and_inspect_work_end_to_end_on_sqlite_and_jsonl() {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("execution.db");
+    let jsonl_dir = dir.path().join("exported-jsonl");
+    let html_path = dir.path().join("trace.html");
+
+    let store = vibevalley_agent::durable::Store::open(&db_path).unwrap();
+    store
+        .write(|tx| {
+            tx.create_conversation("conv-cli", "deepseek-flash")?;
+            tx.append_entry("conv-cli", "pi.user", &serde_json::json!({ "text": "hello" }))?;
+            tx.append_entry(
+                "conv-cli",
+                "pi.assistant",
+                &serde_json::json!({
+                    "text": "",
+                    "toolCalls": [{ "id": "c1", "toolName": "read", "argsJson": { "path": "Cargo.toml" } }]
+                }),
+            )?;
+            tx.append_entry(
+                "conv-cli",
+                "pi.tool_result",
+                &serde_json::json!({ "toolCallId": "c1", "toolName": "read", "ok": true, "output": "ok" }),
+            )?;
+            tx.append_entry("conv-cli", "pi.assistant", &serde_json::json!({ "text": "all good" }))?;
+            Ok(())
+        })
+        .unwrap();
+    store.close().unwrap();
+
+    let exported = cli(
+        dir.path(),
+        &[
+            "eval",
+            "export",
+            "conv-cli",
+            "--source",
+            db_path.to_str().unwrap(),
+            "--out",
+            jsonl_dir.to_str().unwrap(),
+            "--format",
+            "json",
+        ],
+        &[],
+    );
+    assert_eq!(exported.code, 0, "{:?}", exported.failure);
+    let manifest: Value = serde_json::from_str(&exported.out).unwrap();
+    assert_eq!(manifest["rootConversationId"], "conv-cli");
+    assert_eq!(manifest["entriesExported"], 4);
+
+    let dry = cli(
+        dir.path(),
+        &[
+            "eval",
+            "export",
+            "conv-cli",
+            "--source",
+            db_path.to_str().unwrap(),
+            "--out",
+            jsonl_dir.to_str().unwrap(),
+            "--dry-run",
+        ],
+        &[],
+    );
+    assert_ne!(dry.code, 0);
+
+    let inspected_jsonl = cli(
+        dir.path(),
+        &[
+            "eval",
+            "inspect",
+            jsonl_dir.to_str().unwrap(),
+            "--html",
+            html_path.to_str().unwrap(),
+            "--format",
+            "json",
+        ],
+        &[],
+    );
+    assert_eq!(inspected_jsonl.code, 0, "{:?}", inspected_jsonl.failure);
+    let metrics_jsonl: Value = serde_json::from_str(&inspected_jsonl.out).unwrap();
+    assert_eq!(metrics_jsonl["conversationId"], "conv-cli");
+    assert_eq!(metrics_jsonl["turns"], 2);
+    assert_eq!(metrics_jsonl["toolCallsTotal"], 1);
+    assert!(html_path.is_file());
+    assert!(std::fs::read_to_string(&html_path).unwrap().contains("conv-cli"));
+
+    let inspected_sqlite = cli(dir.path(), &["eval", "inspect", db_path.to_str().unwrap(), "--timeline"], &[]);
+    assert_eq!(inspected_sqlite.code, 0, "{:?}", inspected_sqlite.failure);
+    assert!(inspected_sqlite.out.contains("Conversation: conv-cli"));
 }

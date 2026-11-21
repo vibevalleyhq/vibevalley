@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::support::{execute_sql, inspect_db};
 use serde_json::json;
-use vibevalley_durable::SubmissionStatus;
+use vibevalley_agent::durable::SubmissionStatus;
 use vibevalley_oar::Registry;
 use vibevalley_oar::scripted::{Script, ScriptedRuntime, Step};
 use vibevalley_protocol::{MessageKind, Outcome};

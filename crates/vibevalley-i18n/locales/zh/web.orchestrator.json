@@ -28,7 +28,6 @@
   "orchestrator": {
     "tab": {
       "memory": "记性",
-      "trajectory": "轨迹",
       "voice": "声音"
     },
     "all": "← 全部档案",
@@ -36,6 +35,7 @@
     "intro": "助手不当帮工：听你说要做什么，派帮工去做，盯着进度，转告结果。",
     "look": "长相是{name}。",
     "profile": "改它的档案",
+    "runsLink": "查看轨迹",
     "tabs": "助手的",
     "heard": "收到",
     "quiet": "助手还没开过口。",

@@ -11,7 +11,7 @@ use crate::channel::{with_channel, with_message, with_user_mentions};
 use crate::game::{effects_of, empty_play, free_station, play_of, played_doing, played_run, stationed, view_of};
 use crate::inbox::inbox;
 use crate::rules::{farm_of, phase_words};
-use crate::status::{is_on_duty, session_of, with_issue, with_issue_statuses};
+use crate::status::{board_summary, is_on_duty, session_of, with_issue, with_issue_statuses};
 
 /// `emptySpaceState`.
 pub fn empty_space_state() -> SpaceState {
@@ -453,6 +453,64 @@ pub fn cron_view(c: &Cron) -> CronView {
     }
 }
 
+fn is_active_media_phase(phase: MediaPhase) -> bool {
+    match phase {
+        MediaPhase::Queued | MediaPhase::Generating | MediaPhase::Downloading => true,
+        MediaPhase::Ready | MediaPhase::Failed | MediaPhase::Unknown | MediaPhase::Canceled | MediaPhase::DownloadFailed => false,
+    }
+}
+
+/// Active file-producing media jobs (excludes understanding jobs, which produce no file).
+pub fn media_summary(state: &SpaceState) -> MediaSummary {
+    let active_ids: Vec<String> = state
+        .media
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .filter_map(|job| match job {
+            MediaJob::MediaImageJob(j) => is_active_media_phase(j.phase).then(|| j.id.clone()),
+            MediaJob::MediaSpeechJob(j) => is_active_media_phase(j.phase).then(|| j.id.clone()),
+            MediaJob::MediaAudioJob(j) => {
+                let (id, phase) = match j {
+                    MediaAudioJob::Speakers { id, phase, .. }
+                    | MediaAudioJob::VoiceDesign { id, phase, .. }
+                    | MediaAudioJob::Clone { id, phase, .. }
+                    | MediaAudioJob::Transcription { id, phase, .. } => (id, *phase),
+                };
+                is_active_media_phase(phase).then(|| id.clone())
+            }
+            MediaJob::MediaUnderstandingJob(_) => None,
+        })
+        .collect();
+    MediaSummary {
+        active_count: active_ids.len() as i64,
+        active_ids,
+    }
+}
+
+/// Total unread count across all channels plus per-channel unread rolled up with direct child threads.
+pub fn channel_summary(state: &SpaceState) -> ChannelSummary {
+    let channels = state.chat.as_ref().map_or(&[][..], |c| &c.channels[..]);
+    let mut unread_total: i64 = 0;
+    let mut children_unread: BTreeMap<&str, i64> = BTreeMap::new();
+    for c in channels {
+        let n = c.unread.unwrap_or(0);
+        unread_total += n;
+        if let Some(parent) = c.parent.as_deref()
+            && parent != c.id.as_str()
+        {
+            *children_unread.entry(parent).or_default() += n;
+        }
+    }
+    let mut unread_under = BTreeMap::new();
+    for c in channels {
+        let own = c.unread.unwrap_or(0);
+        let kids = children_unread.get(c.id.as_str()).copied().unwrap_or(0);
+        unread_under.insert(c.id.clone(), own + kids);
+    }
+    ChannelSummary { unread_total, unread_under }
+}
+
 fn with_words(state: &SpaceState) -> SpaceView {
     let conflicts: std::collections::HashMap<&str, Option<&Conflict>> = state.issues.iter().map(|i| (i.id.as_str(), i.conflict.as_ref())).collect();
     SpaceView {
@@ -471,6 +529,9 @@ fn with_words(state: &SpaceState) -> SpaceView {
             .map(|h| session_view(h, h.issue.as_deref().and_then(|i| conflicts.get(i).copied().flatten())))
             .collect(),
         crons: state.crons.iter().map(cron_view).collect(),
+        board_summary: Some(board_summary(state)),
+        media_summary: Some(media_summary(state)),
+        channel_summary: Some(channel_summary(state)),
     }
 }
 
@@ -551,5 +612,39 @@ impl Core {
 
     pub fn frame(&self, effects: Vec<GameEffect>) -> StateFrame {
         frame_of(&self.state, effects, self.seq)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scenario::{Density, preset};
+
+    #[test]
+    fn dense_board_summary_reconciles_lane_counts_and_running_slots() {
+        let dense = preset(Density::Dense);
+        let board = dense.state.board_summary.as_ref().expect("board_summary");
+        let working_issues = dense.state.issues.iter().filter(|i| i.status == IssueStatus::InProgress).count() as i64;
+        assert_eq!(board.lane_counts.working, working_issues);
+        assert_eq!(board.running_slots, 6);
+        assert_eq!(board.max_running, MAX_RUNNING as i64);
+    }
+
+    #[test]
+    fn empty_state_produces_zeroed_summaries() {
+        let frame = Core::default().frame(vec![]);
+        let board = frame.state.board_summary.as_ref().expect("board_summary");
+        assert_eq!(board.lane_counts, BoardLaneCounts::default());
+        assert_eq!(board.running_slots, 0);
+        assert_eq!(board.max_running, MAX_RUNNING as i64);
+        assert!(board.by_issue.is_empty());
+
+        let media = frame.state.media_summary.as_ref().expect("media_summary");
+        assert_eq!(media.active_count, 0);
+        assert!(media.active_ids.is_empty());
+
+        let channel = frame.state.channel_summary.as_ref().expect("channel_summary");
+        assert_eq!(channel.unread_total, 0);
+        assert!(channel.unread_under.is_empty());
     }
 }

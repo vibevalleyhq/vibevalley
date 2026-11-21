@@ -12,6 +12,15 @@ export interface Place {
   readonly group: "work" | "setup" | "reference";
 }
 
+export const runsPlace: Place = {
+  id: "runs",
+  label: t("web.base.place.runs.label"),
+  hint: t("web.base.place.runs.hint"),
+  icon: "log",
+  path: "/runs",
+  group: "work",
+};
+
 export const settingsPlace: Place = {
   id: "settings",
   label: t("web.base.place.settings.label"),

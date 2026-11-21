@@ -6,7 +6,7 @@ import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
 import { createEffect, createSignal, untrack } from "../../../../solid";
-import { ago, wallClockText } from "../../../base/format";
+import { ago, shortMomentText } from "../../../base/format";
 import { useWorkAgents } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { ready, useQueryClient, useRepos } from "../../../infra/query";
@@ -14,6 +14,7 @@ import { useIntents } from "../../../state/intent";
 import { rememberPick } from "../../../state/prefs";
 import { createAct } from "../../../ui/act";
 import { Button } from "../../../ui/Button";
+import { ConfirmButton } from "../../../ui/ConfirmButton";
 import { Dialog } from "../../../ui/Dialog";
 import { TextArea, TextInput } from "../../../ui/Field";
 import { toast } from "../../../ui/toasts";
@@ -167,13 +168,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     <View>
       <If when={props.item.parent}>
         {(parent) => (
-          <View role="button" testID="parent-issue" class="mb-2 self-start" onPress={() => props.onDone(parent())}>
+          <View
+            role="button"
+            testID="parent-issue"
+            class="-mx-1 mb-2 self-start rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover"
+            onPress={() => props.onDone(parent())}
+          >
             <Text class="text-xs text-water">{t("web.issue.family.parent")}</Text>
           </View>
         )}
       </If>
       <If when={backlog()}>
-        <View class="mb-4 pr-10">
+        <View class="mb-4">
           <Stages at="talk" />
         </View>
       </If>
@@ -183,7 +189,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         onChange={(e) => edit({ title: e.value })}
         placeholder={t("web.issue.todo.titleHint")}
         accessibilityLabel={t("web.issue.todo.title")}
-        class={`${bare} px-2 py-1 text-xl font-semibold`}
+        class={`${bare} -mx-2 px-2 py-1 text-xl font-semibold`}
       />
     </View>
   );
@@ -252,7 +258,12 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         else={
           <>
             {talk()}
-            <View role="button" testID="issue-write-own" onPress={() => own.set(true)} class="mt-3 self-start rounded-sm">
+            <View
+              role="button"
+              testID="issue-write-own"
+              onPress={() => own.set(true)}
+              class="-mx-1.5 mt-3 self-start rounded-md px-1.5 py-1 transition duration-120 ease-out hover:bg-hover"
+            >
               <Text class="text-sm text-muted">{t("web.issue.todo.writeOwn")}</Text>
             </View>
           </>
@@ -265,7 +276,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           onChange={(e) => edit({ description: e.value })}
           placeholder={t("web.issue.todo.descriptionHint")}
           accessibilityLabel={t("web.issue.todo.description")}
-          class={`${bare} px-2 py-1.5 text-base`}
+          class={`${bare} -mx-2 px-2 py-1.5 text-base`}
           style={{ minHeight: 6 * 22 + 12 }}
         />
         <View class="mt-3 border-t border-line">
@@ -296,6 +307,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
 
   const side = (
     <>
+      <SheetLabel first>{t("web.issue.detail.properties")}</SheetLabel>
       <Property label={t("web.issue.todo.status")}>
         <View class="flex-row items-center gap-2">
           <View class={`h-2 w-2 rounded-full ${backlog() ? "bg-wheat" : "bg-water"}`} />
@@ -312,19 +324,26 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           options={agents().map((a) => ({ value: a.id, label: a.runtime ? `${a.name} · ${a.runtime}` : a.name }))}
         />
       </Property>
-      <Property label={t("web.issue.task.repo")}>
-        <Pick
-          label={t("web.issue.task.repo")}
-          testid="issue-repo"
-          value={d().repo}
-          placeholder={t("web.issue.todo.whichRepo")}
-          onChange={(v) => edit({ repo: v })}
-          options={[...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p }))}
-        />
+      <Property align="start" label={t("web.issue.task.repo")}>
+        <View class="gap-1">
+          <Pick
+            label={t("web.issue.task.repo")}
+            testid="issue-repo"
+            value={d().repo}
+            placeholder={t("web.issue.todo.whichRepo")}
+            onChange={(v) => edit({ repo: v })}
+            options={[...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p }))}
+          />
+          <View
+            role="button"
+            testID="new-repo"
+            onPress={() => newRepo.set(true)}
+            class="-ml-1 self-start rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover"
+          >
+            <Text class="text-xs text-water">{repos().length === 0 && !d().repo ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}</Text>
+          </View>
+        </View>
       </Property>
-      <View role="button" testID="new-repo" onPress={() => newRepo.set(true)} class="mb-1 ml-19 self-start">
-        <Text class="text-xs text-water">{repos().length === 0 ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}</Text>
-      </View>
       <Property label={t("web.issue.todo.priority")}>
         <Pick
           label={t("web.issue.todo.priority")}
@@ -344,13 +363,15 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         />
       </Property>
       <More>
-        <Property label={t("web.issue.task.written")}>{wallClockText(props.item.createdAt)}</Property>
+        <Property label={t("web.issue.task.written")}>
+          <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.item.createdAt)}</Text>
+        </Property>
       </More>
       <If when={queued()}>
         {(at) => (
-          <Note tone="water" class="mt-2 p-2.5">
+          <Note tone="water" class="mt-3 p-2.5">
             <Text class="text-sm text-ink">{t("web.issue.todo.inQueue", { ago: ago(at(), Date.now()) })}</Text>
-            <Button class="mt-1.5 self-start" testID="issue-unqueue" disabled={busy()} onPress={() => void unqueue()}>
+            <Button class="mt-2 self-start" testID="issue-unqueue" disabled={busy()} onPress={() => void unqueue()}>
               {t("web.issue.todo.unqueue")}
             </Button>
           </Note>
@@ -359,23 +380,27 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <View class="mt-4">
         <ActLines issue={props.item.id} />
       </View>
-      <View class="flex-row flex-wrap gap-2">
+      <View class="mt-2 gap-2 border-t border-line pt-3">
         <If when={edited()}>
-          <Button
-            testID="issue-save"
-            disabled={!canSave()}
-            onPress={() => {
-              const id = props.item.id;
-              const edit = unsaved();
-              if (edit) void act.run(async () => saved(await api.issue.update({ id, ...edit })));
-            }}
-          >
-            {t("web.issue.todo.save")}
-          </Button>
+          <View class="flex-row items-center gap-2">
+            <View class="h-1.5 w-1.5 shrink-0 rounded-full bg-wheat" />
+            <Button
+              tone="primary"
+              testID="issue-save"
+              disabled={!canSave()}
+              onPress={() => {
+                const id = props.item.id;
+                const edit = unsaved();
+                if (edit) void act.run(async () => saved(await api.issue.update({ id, ...edit })));
+              }}
+            >
+              {t("web.issue.todo.save")}
+            </Button>
+          </View>
         </If>
-        <Button tone="quiet" testID="issue-remove" disabled={busy()} onPress={() => void remove()}>
-          {t("web.issue.todo.remove")}
-        </Button>
+        <View class="flex-row flex-wrap items-center gap-2">
+          <ConfirmButton testid="issue-remove" tone="danger" label={t("web.issue.todo.remove")} disabled={busy()} onConfirm={remove} />
+        </View>
       </View>
       <If when={newRepo()}>
         <NewRepoDialog

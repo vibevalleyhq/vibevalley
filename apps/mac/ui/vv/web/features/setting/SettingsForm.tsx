@@ -216,7 +216,7 @@ function SourceField(props: { draft: SourceDraft; last: boolean; set: (change: P
         />
       </View>
       <If when={props.draft.open}>
-        <View class="gap-3 border-t border-line px-4 py-3">
+        <View class="gap-3 border-t border-line bg-page px-4 py-3">
           <TextInput
             testID="source-address"
             accessibilityLabel={t("web.setting.source.address", { label: label() })}
@@ -296,7 +296,7 @@ export function GitHub() {
           <SettingsGroup>
             <SettingRow label={t("web.setting.github.cli")} hint={t("web.setting.github.cliHint")} tip={s().reason || undefined}>
               <Icon name={s().installed ? "check" : "cross"} size={16} />
-              <Text class="font-mono text-sm text-ink">{s().installed ? (s().version ?? "") : t("web.setting.github.noGh")}</Text>
+              <Text class="font-mono text-sm tabular-nums text-ink">{s().installed ? (s().version ?? "") : t("web.setting.github.noGh")}</Text>
               <IconButton icon="refresh" testid="github-recheck" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
             </SettingRow>
             <SettingRow label={t("web.setting.github.login")} hint={t("web.setting.github.loginHint")} last>

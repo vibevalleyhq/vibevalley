@@ -47,7 +47,7 @@
 | `crates/vibevalley-server/src/modules/session/journal.rs` | 轨迹：每个会话的步骤存 `<家目录>/events/<id>.json`，变化时每 300 毫秒推一次、每 1.5 秒落盘 |
 | `crates/vibevalley-server/src/modules/session/mod.rs` | `session.*` 端点和 `issue.watch` 订阅流 |
 | `crates/vibevalley-server/src/modules/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
-| `crates/vibevalley-oar/src/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp.rs`、`sdk.rs`、`vibevalley.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 JSONL 记录流 |
+| `crates/vibevalley-oar/src/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp.rs`、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 JSONL 记录流（内置农机在 `crates/vibevalley-agent/src/runtime/mod.rs`） |
 
 ## 模型和不变量
 

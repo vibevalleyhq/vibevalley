@@ -133,7 +133,7 @@ fn split_command_line(line: &str) -> Result<Vec<String>> {
 /// The built-in ACP launch profiles.
 pub fn builtin_agents() -> Vec<AcpAgentSpec> {
     vec![
-        AcpAgentSpec::new("acp:gemini", "Gemini CLI (ACP)", "gemini", ["--acp"]),
+        AcpAgentSpec::new("antigravity", "Antigravity CLI", "agy", ["acp"]),
         AcpAgentSpec::new("grok", "Grok CLI", "grok", ["agent", "stdio"]),
         AcpAgentSpec::new("kimi", "Kimi CLI", "kimi", ["acp"]),
         AcpAgentSpec::new("codebuddy", "CodeBuddy CLI", "codebuddy", ["--acp"]),

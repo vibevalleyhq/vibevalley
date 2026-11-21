@@ -173,14 +173,14 @@ private func registerFont(_ path: String) -> String? {
   return CTFontDescriptorCopyAttribute(first, kCTFontNameAttribute) as? String
 }
 
-// The farm's colours (apps/web style.css): cream text, leaf for at work, wheat for waiting, red for stuck.
+// Palette aligned with design/tokens.json (cream-100 #eedcb2, muted dim #a89a7a, leaf-500 #74a046, wheat #e5a93c, berry-500 #c84a3a).
 private let cream = Color(red: 0xEE / 255, green: 0xDC / 255, blue: 0xB2 / 255)
 private let dim = Color(red: 0xA8 / 255, green: 0x9A / 255, blue: 0x7A / 255)
 private func toneColor(_ tone: Tone) -> Color {
   switch tone {
-  case .working: Color(red: 0x74 / 255, green: 0xA0 / 255, blue: 0x46 / 255)
-  case .waiting: Color(red: 0xE5 / 255, green: 0xA9 / 255, blue: 0x3C / 255)
-  case .stuck: Color(red: 0xC8 / 255, green: 0x4A / 255, blue: 0x3A / 255)
+  case .working: Color(red: 0x74 / 255, green: 0xA0 / 255, blue: 0x46 / 255) // leaf-500 #74a046
+  case .waiting: Color(red: 0xE5 / 255, green: 0xA9 / 255, blue: 0x3C / 255) // wheat #e5a93c
+  case .stuck: Color(red: 0xC8 / 255, green: 0x4A / 255, blue: 0x3A / 255) // berry-500 #c84a3a
   }
 }
 

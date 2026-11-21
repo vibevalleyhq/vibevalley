@@ -48,6 +48,7 @@ export const Look = z.object({
   trim: z.string(),
   hat: z.string(),
   eye: z.string(),
+  avatar: z.exactOptional(z.string()),
 }) satisfies Codec<T.Look>;
 
 const AgentFrom = z.object({ template: z.string(), version: z.number() }) satisfies Codec<T.AgentFrom>;
@@ -74,6 +75,8 @@ export const Agent = z.object({
   from: z.exactOptional(AgentFrom),
 }) satisfies Codec<T.Agent>;
 
+const TemplateCategory = z.enum(T.TemplateCategoryValues) satisfies Codec<T.TemplateCategory>;
+
 export const AgentTemplate = z.object({
   id: z.string(),
   version: z.number(),
@@ -89,6 +92,8 @@ export const AgentTemplate = z.object({
   look: Look,
   persona: z.string(),
   source: z.enum(T.AgentTemplateSourceValues),
+  category: z.exactOptional(TemplateCategory),
+  style: z.exactOptional(z.string()),
   skills: z.array(z.string()),
   installed: z.array(z.string()),
 }) satisfies Codec<T.AgentTemplate>;

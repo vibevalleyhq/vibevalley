@@ -16,9 +16,11 @@ import {
   sessionSystemPrompt,
 } from "@vibevalley/protocol";
 
+import { sortRuntimes } from "../../infra/agents";
 import { ready, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { Button } from "../../ui/Button";
+import { Checkbox } from "../../ui/Checkbox";
 import { ChipsInput, KeyValueEditor } from "../../ui/Chips";
 import { Select, TextArea, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
@@ -26,7 +28,7 @@ import { Toggle } from "../../ui/layout";
 import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
 import { Segmented } from "../../ui/Segmented";
 import { Tabs } from "../../ui/Tabs";
-import { mix } from "../../ui/tone";
+import { Bubble } from "../../ui/Tip";
 import { MemoryPanel } from "../memory";
 import { useSkills } from "../runtime/SkillsPage";
 import { Labeled } from "./AgentLook";
@@ -35,22 +37,12 @@ const noSupport: RuntimeSupport = { steer: false, refused: {}, capabilities: [],
 export const supportOf = (info: RuntimeInfo | undefined) => info?.support ?? noSupport;
 
 type Patch = (a: Agent) => void;
-type Tab = "who" | "runtime" | "persona" | "skills" | "tools" | "env" | "memory" | "trajectories";
+type Tab = "who" | "runtime" | "persona" | "skills" | "tools" | "env" | "memory";
 
-export function ConfigTabs(props: {
-  draft: Agent;
-  runtime?: RuntimeInfo | undefined;
-  patch: Patch;
-  nameTaken: boolean;
-  isNew: boolean;
-  onTrajectories: () => void;
-}) {
+export function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch; nameTaken: boolean; isNew: boolean }) {
   const tab = signal<Tab>("who");
   const support = () => supportOf(props.runtime);
-  const savedTabs: [Tab, string][] = [
-    ["memory", t("web.agent.tab.memory")],
-    ["trajectories", t("web.agent.trajectories")],
-  ];
+  const savedTabs: [Tab, string][] = [["memory", t("web.agent.tab.memory")]];
   const tabs = (): [Tab, string][] => [
     ["who", t("web.agent.tab.who")],
     ["runtime", t("web.agent.tab.runtime")],
@@ -67,7 +59,7 @@ export function ConfigTabs(props: {
       <Tabs
         label={t("web.agent.tabs")}
         value={tab()}
-        onChange={(v) => (v === "trajectories" ? props.onTrajectories() : tab.set(v))}
+        onChange={(v) => tab.set(v)}
         items={tabs().map(([value, label]) => ({ value, label }))}
         class="border-b border-line px-3 py-2"
       />
@@ -161,7 +153,7 @@ function ScrollBody(props: { children: JSX.Element }) {
 
 function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
   const all = useRuntimes();
-  const runtimes = () => ready(all, []);
+  const runtimes = () => sortRuntimes(ready(all, []));
   const choose = (info: RuntimeInfo) => {
     const f = supportOf(info);
     const cannotTakeSystemPrompt = !!f.refused[sessionAppendSystemPrompt] || !!f.refused[sessionSystemPrompt];
@@ -203,14 +195,15 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
                   accessibilityState={{ selected: active() }}
                   accessibilityLabel={info().preset.label}
                   onPress={() => choose(info())}
-                  class={`flex-row items-center gap-2 rounded-md border p-2 ${active() ? "bg-selected" : "border-line hover:bg-hover"}`}
-                  style={active() ? { borderColor: mix("ink", 0.4) } : undefined}
+                  class={`flex-row items-center gap-2 rounded-md border p-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                    active() ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
+                  }`}
                 >
                   <View style={{ opacity: ok() ? 1 : 0.5 }}>
                     <RuntimeIcon runtime={info().id} size={32} />
                   </View>
                   <View class="min-w-0 flex-1">
-                    <Text class={`truncate text-sm text-ink ${active() ? "font-semibold" : "font-medium"}`}>{info().preset.label}</Text>
+                    <Text class="truncate text-sm font-medium text-ink">{info().preset.label}</Text>
                     <Text class={`truncate text-xs ${ok() ? "text-muted" : "text-berry"}`}>{status()}</Text>
                   </View>
                 </View>
@@ -269,7 +262,7 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined
 function Support(props: { runtime: string; info?: RuntimeInfo | undefined }) {
   const support = () => supportOf(props.info);
   return (
-    <View class="gap-1.5 rounded-lg border border-line p-3">
+    <View class="gap-1.5 rounded-lg bg-side p-3">
       <Text role="header" class="text-sm font-semibold text-ink">
         {t("web.agent.can", { runtime: props.info ? props.info.preset.label : props.runtime })}
       </Text>
@@ -356,23 +349,17 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
               const on = () => props.draft.skills.includes(s().id);
               return (
                 <View
-                  role="checkbox"
-                  testID={`skill-${s().id}`}
-                  accessibilityState={{ checked: on() }}
-                  accessibilityLabel={s().name}
-                  onPress={() => toggle(s().id)}
-                  class={`flex-row items-start gap-2.5 rounded-md border p-2.5 ${on() ? "bg-selected" : "border-line hover:bg-hover"}`}
-                  style={on() ? { borderColor: mix("ink", 0.4) } : undefined}
+                  class={`flex-row items-start gap-2.5 rounded-md border p-2.5 transition duration-120 ease-out ${
+                    on() ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
+                  }`}
                 >
+                  <Checkbox testid={`skill-${s().id}`} checked={on()} onChange={() => toggle(s().id)} label={s().name} class="mt-0.5" />
                   <View
-                    class={`mt-0.5 size-4 shrink-0 items-center justify-center rounded-sm border bg-page ${on() ? "border-accent" : ""}`}
-                    style={on() ? undefined : { borderColor: mix("ink", 0.25) }}
+                    role="button"
+                    accessibilityLabel={s().name}
+                    onPress={() => toggle(s().id)}
+                    class="min-w-0 flex-1 rounded-xs focus-visible:outline-2 focus-visible:outline-focus"
                   >
-                    <If when={on()}>
-                      <Icon name="check" size={12} />
-                    </If>
-                  </View>
-                  <View class="min-w-0 flex-1">
                     <Text class="text-sm font-medium text-ink">
                       {s().name}
                       <If when={s().builtIn === true}>
@@ -425,19 +412,22 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
         <View class={`gap-1.5 ${mcpRefused() ? "opacity-50" : ""}`}>
           <Each of={props.draft.mcpServers} key={(s) => s.name}>
             {(s) => (
-              <View class="flex-row items-center gap-2 rounded-md border border-line px-3 py-2">
-                <View class="rounded-sm bg-selected px-1.5">
-                  <Text class="text-xs text-ink">{s().type}</Text>
+              <View class="flex-row items-center gap-2 rounded-md bg-side px-3 py-2">
+                <View class="rounded-sm bg-selected px-1.5 py-0.5">
+                  <Text class="font-mono text-2xs font-medium text-ink">{s().type}</Text>
                 </View>
                 <Text class="text-sm font-medium text-ink">{s().name}</Text>
-                <Text class="min-w-0 flex-1 truncate font-mono text-xs text-muted">{mcpTarget(s())}</Text>
+                <View class="min-w-0 flex-1" tooltip={<Bubble text={mcpTarget(s())} />}>
+                  <Text class="truncate font-mono text-xs text-muted">{mcpTarget(s())}</Text>
+                </View>
                 <View
                   role="button"
                   disabled={!!mcpRefused()}
                   accessibilityLabel={t("web.agent.removeNamed", { name: s().name })}
                   onPress={() => props.patch({ ...props.draft, mcpServers: props.draft.mcpServers.filter((x) => x.name !== s().name) })}
+                  class="group rounded-sm px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover"
                 >
-                  <Text class="text-xs text-muted">{t("web.agent.remove")}</Text>
+                  <Text class="text-xs text-muted group-hover:text-berry">{t("web.agent.remove")}</Text>
                 </View>
               </View>
             )}
@@ -457,7 +447,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
               disabled={!!mcpRefused()}
               placeholder={t("web.agent.name")}
               wide={false}
-              class="w-28"
+              class="h-7 w-28"
               value={name()}
               onInput={(v) => name.set(v)}
             />
@@ -466,7 +456,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
               disabled={!!mcpRefused()}
               placeholder={type() === "stdio" ? "npx -y @scope/server" : "https://…/mcp"}
               wide={false}
-              class="min-w-40 flex-1 font-mono"
+              class="h-7 min-w-40 flex-1 font-mono"
               value={target()}
               onInput={(v) => target.set(v)}
               onSubmit={add}
@@ -497,9 +487,9 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
                   <View
                     role="button"
                     onPress={() => props.patch({ ...props.draft, disallowedTools: [...props.draft.disallowedTools, tool().name] })}
-                    class="rounded-sm border border-line bg-page px-1.5 py-px hover:bg-hover"
+                    class="group rounded-sm border border-line bg-page px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover"
                   >
-                    <Text class="font-mono text-xs text-muted">{`+ ${tool().name}`}</Text>
+                    <Text class="font-mono text-xs text-muted group-hover:text-ink">{`+ ${tool().name}`}</Text>
                   </View>
                 )}
               </Each>
@@ -524,9 +514,15 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
               {(e) => (
                 <View class="flex-row items-baseline gap-2">
                   <Text class={`font-mono text-sm ${e().enabled === false ? "text-muted line-through" : "text-ink"}`}>{e().name}</Text>
-                  <Text class="min-w-0 flex-1 truncate text-xs text-muted">{e().description}</Text>
+                  <View class="min-w-0 flex-1" tooltip={e().description ? <Bubble text={e().description} /> : undefined}>
+                    <Text class="truncate text-xs text-muted">{e().description}</Text>
+                  </View>
                   <If when={e().source}>
-                    <Text class="max-w-40 truncate text-xs text-muted">{e().source}</Text>
+                    {(src) => (
+                      <View class="max-w-40 shrink-0" tooltip={<Bubble text={src()} />}>
+                        <Text class="truncate font-mono text-xs text-faint">{src()}</Text>
+                      </View>
+                    )}
                   </If>
                 </View>
               )}

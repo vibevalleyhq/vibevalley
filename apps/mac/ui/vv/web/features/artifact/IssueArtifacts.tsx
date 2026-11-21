@@ -12,11 +12,23 @@ export function IssueArtifacts(props: { issue: IssueId; heading: JSX.Element }) 
   return (
     <If when={(ready(all, undefined) ?? []).length > 0 ? ready(all, undefined) : undefined}>
       {(list) => (
-        <View accessibilityLabel={t("web.artifact.issue.title")} testID="issue-artifacts">
+        <View accessibilityLabel={t("web.artifact.issue.title")} testID="issue-artifacts" class="gap-1.5">
           {props.heading}
           <View class="gap-1.5">
             <Each of={list()} key={(a) => a.id}>
-              {(a) => <ArtifactCard card={{ id: a().id, title: a().title, body: a().body, version: a().version, note: a().versions.at(-1)?.note ?? "" }} />}
+              {(a) => (
+                <ArtifactCard
+                  card={{
+                    id: a().id,
+                    title: a().title,
+                    body: a().body,
+                    version: a().version,
+                    note: a().versions.at(-1)?.note ?? "",
+                    ...(a().display ? { display: a().display } : {}),
+                    ...(a().artifactType ? { artifactType: a().artifactType } : {}),
+                  }}
+                />
+              )}
             </Each>
           </View>
         </View>

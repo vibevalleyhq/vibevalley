@@ -7,6 +7,8 @@ import { ready } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
+import { Banner, Empty } from "../../ui/layout";
+import { Bubble } from "../../ui/Tip";
 import { artifactIcon, kindLabel, useArtifact } from "./ArtifactCard";
 import { BlocksView, type QuoteTarget } from "./BlocksView";
 import { HtmlFrame } from "./HtmlFrame";
@@ -22,16 +24,16 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
   const pageHref = () => `/artifacts/${encodeURIComponent(props.id)}${(pageVersion() ?? 0) > 0 ? `?v=${pageVersion()}` : ""}`;
   return (
     <View accessibilityLabel={t("web.artifact.canvas.label")} testID="artifact-canvas" class="min-h-0 min-w-0 flex-1 border-l border-line bg-page">
-      <View class="h-16.5 shrink-0 flex-row items-center gap-2 border-b border-line px-3">
+      <View class="h-14 shrink-0 flex-row items-center gap-2.5 border-b border-line bg-page px-3.5">
         <If when={shown()}>
           {(a) => (
             <>
-              <View class="size-8 shrink-0 items-center justify-center rounded-md bg-hover">
+              <View class="size-8 shrink-0 items-center justify-center rounded-md bg-side">
                 <Icon name={artifactIcon(a())} size={16} tone="muted" />
               </View>
-              <View class="min-w-0 flex-1">
+              <View class="min-w-0 flex-1 gap-0.5">
                 <Text class="truncate text-sm font-semibold text-ink">{a().title}</Text>
-                <Text class="truncate text-xs text-muted">
+                <Text class="truncate text-xs text-muted tabular-nums">
                   {[
                     kindLabel(a()),
                     ...(a().isDefault ? [t("web.artifact.types.defaultBadge")] : []),
@@ -42,17 +44,23 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
             </>
           )}
         </If>
-        <A href={pageHref()} testID="artifact-canvas-page" class="rounded-md px-2 py-1 hover:bg-hover">
-          <Text class="text-xs text-muted">{t("web.artifact.canvas.openPage")}</Text>
-        </A>
-        <If when={props.onClose}>
-          <IconButton icon="close" label={t("web.artifact.canvas.close")} testid="artifact-canvas-close" onClick={() => props.onClose?.()} />
-        </If>
+        <View class="shrink-0 flex-row items-center gap-1">
+          <A
+            href={pageHref()}
+            testID="artifact-canvas-page"
+            tooltip={<Bubble text={t("web.artifact.canvas.openPage")} />}
+            class="group h-7 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+          >
+            <Icon name="open" size={12} tone="muted" />
+            <Text class="text-xs font-medium text-muted group-hover:text-ink">{t("web.artifact.canvas.openPage")}</Text>
+          </A>
+          <If when={props.onClose}>
+            <IconButton icon="close" label={t("web.artifact.canvas.close")} testid="artifact-canvas-close" onClick={() => props.onClose?.()} />
+          </If>
+        </View>
       </View>
       <If when={artifact.error()}>
-        <View class="p-3">
-          <Text class="text-sm text-berry">{reasonOf(artifact.error())}</Text>
-        </View>
+        <Banner class="m-3">{reasonOf(artifact.error())}</Banner>
       </If>
       <If when={shown()}>
         {(a) => (
@@ -80,9 +88,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
         )}
       </If>
       <If when={artifact.status() === "success" && artifact.data() === undefined}>
-        <View class="p-3">
-          <Text class="text-sm text-muted">{t("web.artifact.page.gone")}</Text>
-        </View>
+        <Empty icon="artifacts">{t("web.artifact.page.gone")}</Empty>
       </If>
     </View>
   );

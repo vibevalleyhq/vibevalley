@@ -176,8 +176,8 @@ export function Cell(props: { children: JSX.Element }) {
 /** A label, what sits at its right (clear), the control and a hint under it; a cell of Cols. */
 export function Labeled(props: { label: string; hint?: string; aside?: JSX.Element; children: JSX.Element }) {
   const body = (
-    <View class="gap-1">
-      <View class="flex-row items-center gap-1.5">
+    <View class="gap-1.5">
+      <View class="min-h-4 flex-row items-center gap-1.5">
         <Text class="text-xs font-medium text-muted">{props.label}</Text>
         <If when={props.hint}>{(h) => <Hint text={h()} />}</If>
         <View class="flex-1" />
@@ -194,16 +194,36 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
   const answer = () => props.draft.answer;
   return (
     <View class="max-w-4xl gap-3">
-      <View class="flex-row flex-wrap items-center">
-        <Text class="text-sm text-muted">{t("web.voice.voice.persona.intro")}</Text>
-        <A href="/settings/call">
-          <Text class="text-sm text-muted underline">{t("web.voice.voice.section.label")}</Text>
+      <View class="flex-row flex-wrap items-center gap-x-1 rounded-lg bg-side px-3.5 py-2">
+        <View class="mr-0.5 shrink-0">
+          <Icon name="info" size={12} tone="faint" />
+        </View>
+        <Text class="text-xs leading-relaxed text-muted">{t("web.voice.voice.persona.intro")}</Text>
+        <A href="/settings/call" class="rounded-sm px-0.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus">
+          <Text class="text-xs font-medium text-water underline">{t("web.voice.voice.section.label")}</Text>
         </A>
-        <Text class="text-sm text-muted">{t("web.voice.voice.persona.page")}</Text>
+        <Text class="text-xs leading-relaxed text-muted">{t("web.voice.voice.persona.page")}</Text>
       </View>
-      <Card title={t("web.voice.voice.persona.open")} action={<Text class="text-sm text-muted">{t("web.voice.voice.persona.openParts")}</Text>}>
+      <Card
+        title={t("web.voice.voice.persona.open")}
+        action={
+          <View class="rounded-sm bg-side px-2 py-0.5">
+            <Text class="text-xs font-medium text-muted">{t("web.voice.voice.persona.openParts")}</Text>
+          </View>
+        }
+      >
         {/* The persona is the quick model's only: the orchestrator answering is itself, with its own prompt. */}
-        <If when={answer().vendor !== "orchestrator"} else={<Text class="text-sm text-muted">{t("web.voice.voice.persona.ownCall")}</Text>}>
+        <If
+          when={answer().vendor !== "orchestrator"}
+          else={
+            <View class="flex-row items-start gap-2 rounded-md bg-side px-3 py-2.5">
+              <View class="mt-0.5 shrink-0">
+                <Icon name="info" size={14} tone="faint" />
+              </View>
+              <Text class="min-w-0 flex-1 text-xs leading-relaxed text-muted">{t("web.voice.voice.persona.ownCall")}</Text>
+            </View>
+          }
+        >
           <Labeled label={t("web.voice.voice.persona.persona")} hint={t("web.voice.voice.persona.personaHint")}>
             <TextArea
               testID="persona"
@@ -232,7 +252,14 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
           </Labeled>
         </Cols>
       </Card>
-      <Card title={t("web.voice.voice.persona.speak")} action={<Text class="text-sm text-muted">{ttsLabel[tts().vendor]}</Text>}>
+      <Card
+        title={t("web.voice.voice.persona.speak")}
+        action={
+          <View class="rounded-sm bg-side px-2 py-0.5">
+            <Text class="text-xs font-medium text-muted">{ttsLabel[tts().vendor]}</Text>
+          </View>
+        }
+      >
         <Cols>
           <Labeled label={t("web.voice.voice.persona.tts")} hint={tts().vendor === "microsoft" ? t("web.voice.voice.microsoft") : t("web.voice.voice.hosted")}>
             <Segmented
@@ -288,13 +315,13 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
                       value={narrowed().voiceName}
                       onInput={(voiceName) => props.set({ ...props.draft, tts: { ...narrowed(), voiceName } })}
                     />
-                    <View class="flex-row flex-wrap gap-1">
+                    <View class="flex-row flex-wrap gap-1.5">
                       <Each of={microsoftVoices.filter((v) => v !== narrowed().voiceName)}>
                         {(v) => (
                           <View
                             role="button"
                             onPress={() => props.set({ ...props.draft, tts: { ...narrowed(), voiceName: v() } })}
-                            class="rounded-sm px-1.5 py-0.5 hover:bg-hover"
+                            class="rounded-sm border border-line bg-side px-2 py-0.5 transition duration-120 ease-out hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
                           >
                             <Text class="font-mono text-2xs text-muted">{v()}</Text>
                           </View>
@@ -364,32 +391,39 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
       <Each of={minimaxVoices}>
         {(v) => {
           const chosen = () => v().id === props.value;
+          const isPlaying = () => playing() === v().id;
           return (
             <View
-              class={`h-8.5 flex-row items-center rounded-md border ${chosen() ? "bg-selected" : "border-line bg-page"}`}
-              style={{ width: windowSize().width >= 640 ? "32.4%" : "48.6%", ...(chosen() ? { borderColor: mix("ink", 0.4) } : {}) }}
+              class={`h-8.5 flex-row items-center rounded-md border transition duration-120 ease-out ${
+                chosen() ? "border-accent bg-ok-soft" : "border-line bg-page hover:border-faint hover:bg-hover"
+              }`}
+              style={{ width: windowSize().width >= 640 ? "32.4%" : "48.6%" }}
             >
               <Tip text={t("web.voice.voice.persona.sample", { greeting: t("shared.greeting") })}>
                 <View
                   role="button"
                   testID={`voice-sample-${v().id}`}
                   accessibilityLabel={
-                    playing() === v().id ? t("web.voice.voice.persona.stop", { name: v().label }) : t("web.voice.voice.persona.play", { name: v().label })
+                    isPlaying() ? t("web.voice.voice.persona.stop", { name: v().label }) : t("web.voice.voice.persona.play", { name: v().label })
                   }
-                  class="ml-0.5 size-7 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
+                  class="ml-0.5 size-7 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+                  style={isPlaying() ? { backgroundColor: mix("water", 0.16) } : undefined}
                   onPress={() => play(v().id, v().sample)}
                 >
-                  <Icon name={playing() === v().id ? "stop" : "play"} size={16} />
+                  <Icon name={isPlaying() ? "stop" : "play"} size={14} tone={isPlaying() ? "water" : "muted"} />
                 </View>
               </Tip>
               <View
                 role="button"
                 testID={`voice-pick-${v().id}`}
                 accessibilityState={{ selected: chosen() }}
-                class="h-full min-w-0 flex-1 justify-center pr-2 pl-1"
+                class="h-full min-w-0 flex-1 flex-row items-center gap-1.5 pr-2 pl-1 focus-visible:outline-2 focus-visible:outline-focus"
                 onPress={() => props.onChange(v().id)}
               >
-                <Text class={`truncate text-sm ${chosen() ? "font-semibold text-ink" : "text-bark-800 hover:text-ink"}`}>{v().label}</Text>
+                <Text class={`min-w-0 flex-1 truncate text-sm ${chosen() ? "font-semibold text-ok-ink" : "text-ink"}`}>{v().label}</Text>
+                <If when={chosen()}>
+                  <Icon name="check" size={12} />
+                </If>
               </View>
             </View>
           );

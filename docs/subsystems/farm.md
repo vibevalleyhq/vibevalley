@@ -8,7 +8,7 @@
 |---|---|
 | 384×256 的像素村、整数倍缩放裁边、LDtk 地图、A* 寻路、昼夜天色 | 地块庄稼与木牌状态的计算（`crates/vibevalley-core/src/game.rs` 的 `plot_of`，[游戏](docs/subsystems/game.md)） |
 | 帮工在院子里的去处（`Whereabouts`）、朝向、姿势与 800ms 最短保持时间 | 帮工真实阶段与工单状态流转（[帮工](docs/subsystems/session.md)、[工单](docs/subsystems/issue.md)） |
-| 仓库群岛地图、记忆树、开场、图鉴的贴图书架 | 哪些事项进 Inbox（[收件箱](docs/subsystems/watch.md#收件箱)）与工作台各页（[farm-ui.md](docs/reference/farm-ui.md)） |
+| 仓库群岛地图、记忆树、开场、图鉴的贴图书架 | 哪些事项进 Inbox（[收件箱](docs/subsystems/watch.md#收件箱)）、像素渲染（[像素渲染与光影](docs/design/04-motion-and-pixel-rendering.md)）与工作台各页（[桌面架构与页面清单](docs/design/06-desktop-architecture-and-topology.md)） |
 | 点地块、院内建筑、岛屿时去哪一页或开哪个终端（`PixelEvent`） | 窗口、标签页和工作台的路由（[客户端](docs/subsystems/app.md)） |
 
 ## 在哪
@@ -17,10 +17,10 @@
 |---|---|
 | `apps/mac/src/pixel/view.rs` | `PixelView`：一个像素窗格，收状态帧、走时钟、把点按变成 `PixelEvent`（去工作台的路由、换场景、开终端） |
 | `apps/mac/src/pixel/draw.rs`、`element.rs` | `DrawList`（贴图、矩形、光晕，加上叠在上面的字和框）；GPUI 的绘制（最近邻重采样到整设备像素，按尺寸缓存）；`raster` 在 CPU 上画同一张 |
-| `apps/mac/src/pixel/atlas.rs`、`level.rs` | 贴图表（`assets/pixel/sprites.json` 加每个名字一张 PNG）、`assets/village.ldtk` 的可走格子和物件 |
+| `apps/mac/src/pixel/atlas.rs`、`level.rs` | 贴图尺寸和脚底锚点、LDtk 地图的可走格子与物件 |
 | `apps/mac/src/pixel/farm/frame.rs` | 场景读的那部分 `StateFrame`，宽松解码 |
-| `apps/mac/src/pixel/farm/world.rs` | 院子的地点和规则：9 块地 `BEDS`、院内建筑 `YARD_PLACES`、去处 `place_of_action`、`Whereabouts`、姿势 `pose_of` 与 `PoseHold`、命中 `village_hit_at` |
-| `apps/mac/src/pixel/farm/scene.rs` | `FarmScene`：照最新一帧画村子并让它一直动；六把农具 `FarmTool` |
+| `apps/mac/src/pixel/farm/world.rs` | 院子的地点和规则：9 块地 `BEDS`、院内建筑 `YARD_PLACES`、去处 `place_of_action`、`Whereabouts`、姿势 `pose_of` 与 `PoseHold` |
+| `apps/mac/src/pixel/farm/scene.rs` | `FarmScene`：照最新一帧画村子并让它一直动，按可见像素和深度识别点到的物件；六把农具 `FarmTool` |
 | `apps/mac/src/pixel/farm/hud.rs`、`apps/mac/ui/vv/farm/PhoneGames.tsx` | 农场 HUD 将手机放在按钮上方，手机的五个小游戏由 nsh 绘制，按键和十字键共用输入 |
 | `apps/mac/src/pixel/farm/islands.rs` | 仓库群岛地图：规则 `islands_of`、`plots_in`，画面 `MapScene` |
 | `apps/mac/src/pixel/nav.rs`、`sky.rs` | 网格 A* 与沿路走的 `Walker`；日钟 `DayClock`、天色、整像素取景 `frame_whole` |
@@ -45,6 +45,7 @@
 
 - **走位与姿势由当前动作驱动（`world.rs`）**：
   - 读、搜文件去书屋，跑命令与 MCP 去工坊，查网页去电台，等待坐长椅，其余留在地边（`place_of_action`）；庄稼成熟、干裂或枯萎时回到地块旁（`spots_for`）。
+  - 步行动作按帮工走过的距离取帧。到达书屋后打开书阅读，到达工坊后挥锤，改文件时在自己的田里挥锄。等用户回答时帮工收起工具、举手；长时间没动静或运行失败时显示担忧。
   - 换去处要目标维持 1.2 秒且原地待满 2 秒才动身（`Whereabouts::SETTLE`、`DWELL`），急的立即走；每个姿势至少保持 800ms（`POSE_MIN_S`）。
 - **384×256 逻辑网格加整数倍缩放裁边（`sky.rs` 的 `frame_whole`）**：
   - 2 倍密贴图按密度映射回逻辑坐标（`atlas.rs`）。
@@ -72,7 +73,7 @@
 
 - **核心状态与游戏（`core`、`game`）**：读 `StateFrame` 的 `state`、`view`。
 - **外壳（`apps/mac/src/shell.rs`）**：`PixelEvent` 交给 `Shell::on_pixel_event`，由它开工作台的页、换像素场景或开终端。
-- **素材流水线（`design/pixel/`）**：读 `process.py` 写出的 `assets/pixel/` 贴图与 `sprites.json`；位置可用 `VIBEVALLEY_ASSETS` 改。
+- **素材流水线**：`design/pixel/` 处理贴图并导出到 `assets/pixel/`，图集从 `sprites.json` 读取尺寸和脚底锚点（`VIBEVALLEY_ASSETS` 可以指定整组素材的位置）；`vibevalley-pixel` 在 CPU 上完成最近邻缩放、法线图推导与昼夜灯光合成。
 
 ## 为什么这样
 

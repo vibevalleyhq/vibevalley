@@ -110,7 +110,7 @@ fn run_local(_ctx: &Ctx, _m: &ArgMatches, _initial: String) -> Done {
 #[cfg(feature = "local-chat")]
 fn run_local(ctx: &Ctx, m: &ArgMatches, initial: String) -> Done {
     let runtime_id = arg(m, "runtime");
-    let registry = vibevalley_oar::default_runtimes();
+    let registry = vibevalley_agent::runtime::default_registry();
     let runtime = registry.require(&runtime_id).map_err(map_oar_error)?;
     match runtime.installation() {
         Installation::Available { .. } => {}

@@ -14,7 +14,8 @@ import { defineStored } from "../../state/stored";
 import { createAct } from "../../ui/act";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
-import { tone } from "../../ui/tone";
+import { Bubble } from "../../ui/Tip";
+import { mix, tone } from "../../ui/tone";
 import { dayTitle, monthTitle, monthWeeks, weekdayNames } from "./days";
 import { pkmHref, refreshVault } from "./vault";
 
@@ -23,15 +24,24 @@ const unfolded = defineStored("pkm.calendar", z.boolean(), true);
 /** open: the day of the journal open, if one is. */
 export function Calendar(props: { pages: readonly PkmPageSummary[]; open: string | undefined }) {
   return (
-    <View testID="pkm-calendar" accessibilityLabel={t("web.pkm.calendar.label")} class="gap-1">
+    <View testID="pkm-calendar" accessibilityLabel={t("web.pkm.calendar.label")} class="gap-2">
       <View
         role="button"
         testID="pkm-calendar-fold"
         accessibilityState={{ expanded: unfolded.get() }}
         onPress={() => unfolded.update((open) => !open)}
-        class="group flex-row items-center gap-1"
+        class="group -mx-1.5 h-7 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out hover:bg-hover"
       >
-        <Icon name={unfolded.get() ? "choose" : "expand"} size={12} tone="muted" />
+        <View
+          class="w-3.5 shrink-0 items-center justify-center"
+          style={{
+            transform: [{ rotate: unfolded.get() ? "90deg" : "0deg" }],
+            transitionProperty: "transform",
+            transitionDuration: 120,
+          }}
+        >
+          <Icon name="expand" size={10} tone="muted" />
+        </View>
         <Text class="text-xs font-semibold text-muted group-hover:text-ink">{t("web.pkm.calendar.label")}</Text>
       </View>
       <If when={unfolded.get()}>
@@ -64,50 +74,60 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
     });
   };
   return (
-    <View class="gap-1">
-      <View class="flex-row items-center">
-        <Text testID="pkm-calendar-month" class="flex-1 text-xs text-muted">
+    <View class="gap-1.5">
+      <View class="h-7 flex-row items-center gap-0.5">
+        <Text testID="pkm-calendar-month" class="flex-1 text-xs font-medium text-ink" style={{ fontVariant: ["tabular-nums"] }}>
           {monthTitle(month().year, month().month)}
         </Text>
         <IconButton icon="previous" size={12} label={t("web.pkm.calendar.previous")} testid="pkm-calendar-previous" onClick={() => shift(-1)} />
         <IconButton icon="next" size={12} label={t("web.pkm.calendar.next")} testid="pkm-calendar-next" onClick={() => shift(1)} />
       </View>
-      <View class="flex-row">
-        <Each of={weekdayNames()}>{(name) => <Text class="flex-1 text-center text-2xs text-faint">{name()}</Text>}</Each>
+      <View class="flex-row py-0.5">
+        <Each of={weekdayNames()}>{(name) => <Text class="flex-1 text-center text-2xs font-medium text-faint">{name()}</Text>}</Each>
       </View>
-      <Each of={monthWeeks(month().year, month().month)}>
-        {(week) => (
-          <View class="flex-row">
-            <Each of={week()}>
-              {(d) => {
-                const here = () => d().day === props.open;
-                const isToday = () => d().day === today();
-                return (
-                  <View class="flex-1 items-center">
-                    <View
-                      role="button"
-                      testID="pkm-day-cell"
-                      accessibilityLabel={dayTitle(d().day, today())}
-                      accessibilityState={{ selected: here(), disabled: act.busy() }}
-                      disabled={act.busy()}
-                      onPress={() => go(d().day)}
-                      class={`h-7 w-7 items-center justify-center rounded-md ${here() ? "bg-selected" : "hover:bg-hover"}`}
-                      style={isToday() ? { borderWidth: 1, borderColor: tone("accent") } : undefined}
-                    >
-                      <Text class={`text-xs ${d().inMonth ? "text-ink" : "text-faint"} ${here() ? "font-semibold" : ""}`}>
-                        {String(Number(d().day.slice(8)))}
-                      </Text>
-                      <If when={journals().has(d().day)}>
-                        <View testID="pkm-journal-dot" class="absolute bottom-0.5 h-1 w-1 rounded-full bg-accent" />
-                      </If>
+      <View class="gap-0.5">
+        <Each of={monthWeeks(month().year, month().month)}>
+          {(week) => (
+            <View class="flex-row">
+              <Each of={week()}>
+                {(d) => {
+                  const here = () => d().day === props.open;
+                  const isToday = () => d().day === today();
+                  const hasJournal = () => journals().has(d().day);
+                  return (
+                    <View class="flex-1 items-center">
+                      <View
+                        role="button"
+                        testID="pkm-day-cell"
+                        accessibilityLabel={dayTitle(d().day, today())}
+                        accessibilityState={{ selected: here(), disabled: act.busy() }}
+                        tooltip={<Bubble text={dayTitle(d().day, today()) ?? d().day} />}
+                        disabled={act.busy()}
+                        onPress={() => go(d().day)}
+                        class={`relative h-7 w-7 items-center justify-center rounded-md transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${here() ? "bg-selected" : "hover:bg-hover"}`}
+                        style={isToday() && !here() ? { backgroundColor: mix("accent", 0.08) } : undefined}
+                      >
+                        <If when={isToday()}>
+                          <View class="pointer-events-none absolute inset-0 rounded-md" style={{ borderWidth: 1.5, borderColor: tone("accent") }} />
+                        </If>
+                        <Text
+                          class={`text-xs font-medium ${isToday() && !here() ? "text-accent" : d().inMonth ? "text-ink" : "text-faint"}`}
+                          style={{ fontVariant: ["tabular-nums"] }}
+                        >
+                          {String(Number(d().day.slice(8)))}
+                        </Text>
+                        <If when={hasJournal()}>
+                          <View testID="pkm-journal-dot" class={`absolute bottom-0.5 h-1 w-1 rounded-full ${d().inMonth ? "bg-accent" : "bg-faint"}`} />
+                        </If>
+                      </View>
                     </View>
-                  </View>
-                );
-              }}
-            </Each>
-          </View>
-        )}
-      </Each>
+                  );
+                }}
+              </Each>
+            </View>
+          )}
+        </Each>
+      </View>
     </View>
   );
 }

@@ -15,7 +15,7 @@ export type TabsLook = "pills" | "line";
 
 const looks: Record<TabsLook, { list: string; tab: (on: boolean) => string }> = {
   pills: { list: "flex-row flex-wrap gap-0.5", tab: (on) => `h-7 rounded-md px-2.5 ${on ? "bg-selected" : "hover:bg-hover"}` },
-  line: { list: "flex-row gap-1", tab: (on) => `-mb-px border-b-2 px-2 pt-2 pb-1.5 ${on ? "border-ink" : "border-transparent"}` },
+  line: { list: "flex-row gap-1", tab: (on) => `-mb-px h-8 border-b-2 px-2.5 ${on ? "border-ink" : "border-transparent hover:border-line"}` },
 };
 
 export function Tabs<T extends string>(props: {
@@ -43,16 +43,10 @@ export function Tabs<T extends string>(props: {
                 if (href !== undefined) router.navigate(href);
                 props.onChange?.(item().value);
               }}
-              class={`flex-row items-center gap-1.5 ${look().tab(on())}`}
+              class={`group flex-row items-center gap-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${look().tab(on())}`}
             >
-              <If when={item().icon}>
-                {(icon) => (
-                  <View style={{ opacity: on() ? 1 : 0.7 }}>
-                    <Icon name={icon()} size={props.look === "line" ? 16 : 14} tone={on() ? "ink" : "muted"} />
-                  </View>
-                )}
-              </If>
-              <Text class={`text-sm ${on() ? "font-semibold text-ink" : "text-muted"}`}>{item().label}</Text>
+              <If when={item().icon}>{(icon) => <Icon name={icon()} size={props.look === "line" ? 16 : 14} tone={on() ? "ink" : "muted"} />}</If>
+              <Text class={`text-sm font-medium ${on() ? "text-ink" : "text-muted group-hover:text-ink"}`}>{item().label}</Text>
             </View>
           );
         }}

@@ -3,6 +3,7 @@
 mod approval;
 mod chat;
 mod doctor;
+mod eval;
 mod farm;
 mod issue;
 mod pkm;
@@ -41,6 +42,7 @@ pub fn tree() -> Command {
             pkm::command(),
             setting::command(),
             chat::command(),
+            eval::command(),
             approval::command(),
             doctor::command(),
         ])
@@ -61,6 +63,7 @@ pub fn run(ctx: &Ctx, m: &ArgMatches) -> Done {
         "pkm" => pkm::run(ctx, sub),
         "setting" => setting::run(ctx, sub),
         "chat" => chat::run(ctx, sub),
+        "eval" => eval::run(ctx, sub),
         "approval" => approval::run(ctx, sub),
         "doctor" => doctor::run(ctx),
         _ => Ok(()),
