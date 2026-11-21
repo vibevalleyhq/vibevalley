@@ -5,8 +5,8 @@ VibeValley 在工作台微交互上保持克制，而在原生像素农场中实
 ## 4.1 工作台微交互与合成属性约束
 
 - **合成优先级**：工作台过渡属性限制在 `colors`、`opacity`、`transform` 与明确宽/高小部件（如开关滑块），杜绝大面积表格或滚动列表使用宽泛的 `transition-all`。
-- **宿主折叠动画**：原生宿主集成面的多步骤折叠/展开（`apps/mac/ui/components/ToolCallCard.tsx` 等）调用 `apps/mac/ui/motion.ts` 中的 `animateLayout()`（内部封装 `nsh` 的 `LayoutAnimation.configureNext`），统一受 `reduceMotion()` 约束——当系统启用减弱动态效果时 `ms(d)` 直接返回 `0`，保证终态照常呈现而无动画延迟。
-- **高频计时降频**：运行耗时读秒（`formatElapsed`）按 `timerTick = 100ms` 步进刷新（1 分钟以内显示小数后一位 `0.1s`），兼顾跳动细腻与渲染开销。
+- **宿主按压反馈与减弱动态**：工作区外壳（`apps/mac/ui/workspace/`、`apps/mac/ui/design/surface.tsx`）调用 `apps/mac/ui/design/motion.ts` 中的 `ms()` 与 `pressTransition()`，统一受 `reduceMotion()` 约束——当系统启用减弱动态效果时 `ms(d)` 直接返回 `0`，保证终态照常呈现而无动画延迟。
+- **高频计时降频**：运行耗时读秒按 `100ms` 节拍或时间差刷新，兼顾跳动细腻与渲染开销。
 
 ## 4.2 Rust 2D 像素渲染与图集管线
 

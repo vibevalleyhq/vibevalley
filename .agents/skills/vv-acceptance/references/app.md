@@ -8,7 +8,7 @@
 - 改了 `apps/mac/src`（外壳、宿主能力、终端、像素场景）或 `assets` 的贴图、字体、地图。
 - 改了形状，想看服务端的新字段在页面上画出来。
 
-不用它：只改了 `apps/mac/ui/vv/web/infra`、`apps/mac/ui/vv/web/state` 或 feature 里的纯函数、测试已经覆盖的；只改了像素场景的规则、`apps/mac/src/pixel/tests.rs` 已经覆盖的（设 `VIBEVALLEY_PIXEL_OUT=<目录>` 跑 `cargo test -p vibevalley-mac pixel`，看它写出的 PNG）。
+不用它：只改了 `apps/mac/ui/infra` 或 feature 里的纯函数、测试已经覆盖的；只改了像素场景的规则、`apps/mac/src/pixel/tests.rs` 已经覆盖的（设 `VIBEVALLEY_PIXEL_OUT=<目录>` 跑 `cargo test -p vibevalley-mac pixel`，看它写出的 PNG）。
 
 ## 准备
 

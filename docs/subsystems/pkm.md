@@ -15,13 +15,12 @@
 
 | 位置 | 职责 |
 |---|---|
-| [`packages/pkm/`](packages/pkm/README.md) | 独立 PKM 与双链大纲纯领域包（`@vibevalley/pkm`）：Logseq 式 Markdown 解析与打印（`markdown.ts`）、PARA 目录映射（`para.ts`）、双链反链与块引用图谱（`graph.ts`）、前端大纲视图与行内切片（`view.ts`）、键盘编辑与补全状态机（`editing.ts`）、多块框选与拖拽（`selection.ts`）、日历日期（`days.ts`）与乐观写入队列（`writer.ts`） |
+| `apps/mac/ui/features/pkm/` | 客户端大纲编辑器与工作台笔记页：块操作与树折叠（`tree.ts`）、行内切片与大纲视图模型（`outline.ts`）、键盘编辑与补全（`editing.ts`）、多块框选与拖拽（`selection.ts`）、日历日期（`days.ts`、`localDay.ts`）、乐观写入队列（`writer.ts`）与 `PkmPage`/`OutlineEditor` 等 TSX 页面 |
 | [笔记服务](crates/vibevalley-server/src/modules/pkm/mod.rs)、[数据库查询](crates/vibevalley-server/src/modules/pkm/sql/queries.sql) | 笔记服务读写并监听 Markdown 文件。sqlc 为批注、全文索引和撤销记录生成 SQLx 查询。 |
-| `crates/vibevalley-pkm/src/` | 服务端跑的那份大纲引擎：解析与打印、PARA、双链图谱（`graph.rs`）；和 `packages/pkm` 对着 `crates/vibevalley-pkm/golden` 的测例 |
+| `crates/vibevalley-pkm/src/` | 服务端大纲引擎与单一真相源：Markdown 解析与打印、PARA 目录映射、双链反链与块引用图谱（`graph.rs`）；维护 `crates/vibevalley-pkm/golden` 回归测例 |
 | `crates/vibevalley-cli/src/commands/pkm.rs` | `vibevalley pkm ...` |
-| `packages/protocol/src/pkm/`、`packages/pkm/src/outline.ts` | 笔记契约与前后端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |
+| `packages/protocol/src/pkm/`、`apps/mac/ui/features/pkm/tree.ts` | 笔记契约与客户端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |
 | `$VIBEVALLEY_WORK_ROOT/pkm/` | 默认笔记根目录（`00_Inbox`–`04_Archives`、`journals/`、`.pkm/snapshots/`） |
-| `apps/mac/ui/vv/web/features/pkm/` | 工作台笔记页、大纲编辑器组件（消费 `@vibevalley/pkm`） |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`pkm.*`），CLI 命令为 `vibevalley pkm ...`。
 
@@ -69,7 +68,7 @@
 
 ## 怎么验证
 
-- `packages/pkm/src/outline.test.ts`、`crates/vibevalley-pkm/src/tests.rs`：大纲无损往返、按需 `id::`、反链展开（Rust 一侧对着 golden）。
+- `apps/mac/ui/features/pkm/tree.test.ts`、`crates/vibevalley-pkm/src/tests.rs`：客户端测 `slugOf` 与 `applyBlockOps`（`nsh/test`），Rust 一侧跑大纲无损往返、按需 `id::`、反链展开与 `crates/vibevalley-pkm/golden` 回归测例。
 - `crates/vibevalley-server/tests/pkm.rs`：建页与挪页、读外部编辑器写的、按操作改块保留 id 并撤销、闪念进今天的日记。
-- `packages/pkm/src/pkm.test.ts`：编辑、选择与日记视图的纯函数。
-- `apps/mac/ui/vv/app/scenarios.test.tsx`：笔记页在多密度虚拟时钟场景下的页面测试（`nsh/test`）。
+- `apps/mac/ui/features/pkm/pkm.test.ts`：编辑、选择与日记视图的纯函数。
+- `apps/mac/ui/app/scenarios.test.tsx`：笔记页在多密度虚拟时钟场景下的页面测试（`nsh/test`）。

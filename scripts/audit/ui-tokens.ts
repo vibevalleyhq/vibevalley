@@ -6,34 +6,29 @@ import { parseSync } from "vite";
 const root = resolve(import.meta.dirname, "../..");
 const uiRoot = resolve(root, "apps/mac/ui");
 
-const SCAN_GLOBS = [
-  "vv/web/app/**/*.{ts,tsx}",
-  "vv/web/features/**/*.{ts,tsx}",
-  "vv/web/ui/**/*.{ts,tsx}",
-  "surfaces/**/*.{ts,tsx}",
-  "components/**/*.{ts,tsx}",
-] as const;
+const SCAN_GLOBS = ["app/**/*.{ts,tsx}", "design/**/*.{ts,tsx}", "workspace/**/*.{ts,tsx}", "features/**/*.{ts,tsx}"] as const;
 const EXCLUDE_GLOBS = [
   // Swatch palette & validation helper (defines swatches and hexColor).
-  "vv/web/ui/domain/cast.ts",
+  "design/domain/cast.ts",
   // Runtime token lookup & alpha blender (`tone`, `mix`).
-  "vv/web/ui/tone.ts",
+  "design/tone.ts",
+  "design/tokens.ts",
   // Pixel asset registry, sprite manifests, and procedural pixel renderers.
-  "vv/web/ui/pixel/**",
+  "design/pixel/**",
   "**/*.test.*",
   "**/*.story.*",
   "**/*.stories.*",
   "**/fixtures/**",
   // GitHub Linguist external programming-language palette.
-  "vv/web/features/repo/repos.ts",
+  "features/repo/repos.ts",
   // Serialized Excalidraw SVG export fills and isolated WebView stylesheet.
-  "vv/web/features/artifact/WhiteboardView.tsx",
+  "features/artifact/WhiteboardView.tsx",
   // ISO QR specification requires strict #ffffff / #000000 contrast regardless of theme.
-  "vv/web/ui/Qr.tsx",
+  "design/Qr.tsx",
 ] as const;
 
-const SWITCH_PRIMITIVE = "apps/mac/ui/vv/web/ui/layout.tsx";
-const CHECKBOX_PRIMITIVE = "apps/mac/ui/vv/web/ui/Checkbox.tsx";
+const SWITCH_PRIMITIVE = "apps/mac/ui/design/layout.tsx";
+const CHECKBOX_PRIMITIVE = "apps/mac/ui/design/Checkbox.tsx";
 
 const HEX_LITERAL_RE = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-fA-F-])/gu;
 const RGB_CALL_RE = /\brgba?\s*\(/gu;
@@ -71,9 +66,11 @@ export interface Finding {
 
 const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
   // 5-state PKM task marker (TODO/DOING/DONE/WAIT/CANCELED), not binary <Checkbox>.
-  "apps/mac/ui/vv/web/features/pkm/OutlineEditor.tsx": ["raw-control"],
+  "apps/mac/ui/features/pkm/OutlineEditor.tsx": ["raw-control"],
   // Third-party WeChat/Feishu/QQ brand stand-ins and QR quiet frame.
-  "apps/mac/ui/vv/web/features/connector/ConnectorsPage.tsx": ["hardcoded-color"],
+  "apps/mac/ui/features/connector/ConnectorsPage.tsx": ["hardcoded-color"],
+  // Sandboxed WebView HTML CSS custom properties (--vv-*).
+  "apps/mac/ui/features/artifact/shell.ts": ["hardcoded-color"],
 };
 
 interface AstNode {
@@ -247,7 +244,7 @@ function checkSelectionLayoutShift(out: Finding[], file: string, line: number, s
   }
 
   if (attrName === "style") {
-    const isWebFile = file.startsWith("apps/mac/ui/vv/web/");
+    const isWebFile = !file.startsWith("apps/mac/ui/workspace/") && file !== "apps/mac/ui/design/surface.tsx";
     const testSlice = isAstNode(node.test)
       ? source.slice(typeof node.test.start === "number" ? node.test.start : 0, typeof node.test.end === "number" ? node.test.end : 0)
       : "";
@@ -305,7 +302,7 @@ function scanStringValue(out: Finding[], file: string, line: number, text: strin
     "arbitrary-tailwind",
     text,
     TAILWIND_ARBITRARY_RE,
-    "use canonical theme tokens from `design/tokens.json` (`apps/mac/ui/vv/theme.json` / `nsh.json`)",
+    "use canonical theme tokens from `design/tokens.json` (`apps/mac/ui/design/theme.json` / `nsh.json`)",
   );
   if (!checkColor) return;
   const masked = text.replace(TAILWIND_ARBITRARY_RE, (m) => " ".repeat(m.length));
@@ -316,9 +313,9 @@ function scanStringValue(out: Finding[], file: string, line: number, text: strin
     "hardcoded-color",
     masked,
     HEX_LITERAL_RE,
-    'use a semantic token class, `tone("...")`, or `mix("...", alpha)` from `ui/tone.ts`',
+    'use a semantic token class, `tone("...")`, or `mix("...", alpha)` from `design/tone.ts`',
   );
-  pushRegexMatches(out, file, line, "hardcoded-color", masked, RGB_CALL_RE, 'use `mix("...", alpha)` from `ui/tone.ts` instead of `rgb()` / `rgba()`');
+  pushRegexMatches(out, file, line, "hardcoded-color", masked, RGB_CALL_RE, 'use `mix("...", alpha)` from `design/tone.ts` instead of `rgb()` / `rgba()`');
 }
 
 export function isRuleExempt(file: string, rule: ViolationRule): boolean {
@@ -366,7 +363,7 @@ export function scanUiTokens(relFile: string, source: string): Finding[] {
               line: qLine,
               rule: "hardcoded-color",
               snippet: `\${${exprText}}${value}`,
-              fix: 'use `mix("...", alpha)` or a helper on `ui/tone.ts` instead of hex-alpha string concatenation',
+              fix: 'use `mix("...", alpha)` or a helper on `design/tone.ts` instead of hex-alpha string concatenation',
             });
           }
         }
@@ -381,7 +378,7 @@ export function scanUiTokens(relFile: string, source: string): Finding[] {
           line,
           rule: "raw-control",
           snippet: "<Switch",
-          fix: "use `Toggle` from `apps/mac/ui/vv/web/ui/layout.tsx` instead of raw `<Switch`",
+          fix: "use `Toggle` from `apps/mac/ui/design/layout.tsx` instead of raw `<Switch`",
         });
       }
       continue;
@@ -405,7 +402,7 @@ export function scanUiTokens(relFile: string, source: string): Finding[] {
         line,
         rule: "raw-control",
         snippet: 'role="checkbox"',
-        fix: 'use `Checkbox` from `apps/mac/ui/vv/web/ui/Checkbox.tsx` instead of custom `role="checkbox"`',
+        fix: 'use `Checkbox` from `apps/mac/ui/design/Checkbox.tsx` instead of custom `role="checkbox"`',
       });
     }
   }

@@ -15,9 +15,9 @@ VibeValley 在同一套核心状态与协议之上提供两张视觉皮肤，并
 
 | 载体 | 技术栈 | 代码位置 | 样式与令牌来源 |
 | --- | --- | --- | --- |
-| **工作台 Hosted Views** | `nsh` + Solid 2 兼容层 + Tailwind 令牌引擎 | `apps/mac/ui/vv/web/`、`apps/mac/ui/vv/farm/` | `apps/mac/ui/vv/theme.json`、`apps/mac/ui/nsh.json` |
+| **工作台 Hosted Views** | `nsh` + Solid 2 兼容层 + Tailwind 令牌引擎 | `apps/mac/ui/{app,features,infra}/`、`apps/mac/ui/farm/` | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` |
 | **原生应用外壳与像素场景** | Rust GPUI + 自研 CPU 2D 像素光栅引擎 | `apps/mac/src/`、`crates/vibevalley-pixel/` | `apps/mac/src/theme.rs`、`assets/village.ldtk`、`assets/pixel/` |
-| **宿主集成面** | `nsh` 基础元素 + 内联样式对象 | `apps/mac/ui/surfaces/`、`apps/mac/ui/components/` | `apps/mac/ui/tokens.ts`、`apps/mac/ui/motion.ts` |
+| **宿主集成面** | `nsh` 基础元素 + 内联样式对象（复用 `design` 令牌与原语） | `apps/mac/ui/workspace/`、`apps/mac/ui/design/surface.tsx` | `apps/mac/ui/design/tokens.ts`、`apps/mac/ui/design/motion.ts` |
 | **刘海灵动岛** | Swift `NSPanel` + AppKit / SwiftUI | `apps/island/Sources/VibeValleyIsland/Island.swift`、`apps/island/Sources/IslandCore/Geometry.swift` | 内部硬编码暖棕色与状态四色（[横向差异审计](docs/design/09-design-system-audit.md)） |
 | **官网静态站点** | Vite + Solid 2 + Tailwind CSS v4 | `apps/site/` | `apps/site/src/ui/global.css` |
 

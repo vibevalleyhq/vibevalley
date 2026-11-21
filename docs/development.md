@@ -39,7 +39,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 - `vp run rust:check`：`cargo fmt --check`、`cargo clippy --workspace --all-targets -D warnings` 与 `cargo test --workspace`（服务端、命令行、核心规则、原生应用）。
 - `vp run protocol:check` 校验 Rust 导出的 TypeScript 契约，并在临时目录生成 artifact 和 pkm 的 golden 与仓库逐个比较。用 `vp run protocol:ts` 和 `vp run goldens` 更新对应产物。
 - `vp run sql:check` 用 sqlc 1.31.1 校验 Rust 绑定，并用 Python 3 的 SQLite 预编译每条正式查询。
-- `vp run mac:check` 对原生页面运行 nsh 类型检查、打包与虚拟时钟 UI 验收套件。[场景用例](apps/mac/ui/vv/app/scenarios.test.tsx) 与 [交互用例](apps/mac/ui/vv/app/interactions.test.tsx)
+- `vp run mac:check` 对原生页面运行 nsh 类型检查、打包与虚拟时钟 UI 验收套件。[场景用例](apps/mac/ui/app/scenarios.test.tsx) 与 [交互用例](apps/mac/ui/app/interactions.test.tsx)
 - `vp check`：`apps/mac/ui` 以外的 TS 的格式（oxfmt）、lint（oxlint，带类型）与类型检查；`vp check --fix` 自动格式化。
 - `vp run packages:check`：打出各包的声明、`vp check`、各包的测试。
 - `vp run scripts:test`：`scripts/` 自己的测试。
@@ -126,4 +126,4 @@ python3 design/pixel/process.py map plots  # 仅切指定素材
 python3 design/pixel/rail_faces.py --check  # 校验导航栏六套头像在 1×、2× 屏上的像素
 ```
 
-切图规则见[工程流程](docs/subsystems/process.md#怎么走)。应用图标位于 `assets/icons/` 与 `apps/mac/resources/icon.icns`。音效配方在 `apps/mac/ui/vv/web/ui/pixel/sound.ts`（[农场的皮](docs/subsystems/farm.md#模型和不变量)）。官网位于 [apps/site/README.md](apps/site/README.md)，通过 `vp run site:deploy` 部署。
+切图规则见[工程流程](docs/subsystems/process.md#怎么走)。应用图标位于 `assets/icons/` 与 `apps/mac/resources/icon.icns`。音效配方在 `apps/mac/ui/design/pixel/sound.ts`（[农场的皮](docs/subsystems/farm.md#模型和不变量)）。官网位于 [apps/site/README.md](apps/site/README.md)，通过 `vp run site:deploy` 部署。

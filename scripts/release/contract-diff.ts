@@ -25,8 +25,7 @@ export function areaOf(path: string): string {
   const parts = path.split("/");
   if (parts[0] === "crates" && parts[1] === "vibevalley-server" && parts[2] === "src" && parts[3] === "modules" && parts.length > 4)
     return `server/${parts[4]}`;
-  if (parts[0] === "apps" && parts[1] === "mac" && parts[2] === "ui" && parts[3] === "vv" && parts[4] === "web" && parts[5] === "features" && parts.length > 6)
-    return `mac/${parts[6]}`;
+  if (parts[0] === "apps" && parts[1] === "mac" && parts[2] === "ui" && parts[3] === "features" && parts.length > 4) return `mac/${parts[4]}`;
   if (parts[0] === "crates" || parts[0] === "apps" || parts[0] === "packages") return `${parts[0]}/${parts[1]}`;
   return parts[0] ?? path;
 }

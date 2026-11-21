@@ -81,8 +81,8 @@ tester.run("no-cross-package-path", rule("no-cross-package-path"), {
   ],
   invalid: [
     { code: "import { a } from '../../packages/protocol/src/api.ts';", filename: inRepo("scripts/gen/capabilities.ts"), errors: [{ messageId: "cross" }] },
-    { code: "export * from '../../i18n/src/format.ts';", filename: inRepo("packages/pkm/src/x.ts"), errors: [{ messageId: "cross" }] },
-    { code: "const m = import('../../../../packages/i18n/src/format.ts');", filename: inRepo("apps/mac/ui/vv/x.ts"), errors: [{ messageId: "cross" }] },
+    { code: "export * from '../../i18n/src/format.ts';", filename: inRepo("packages/protocol/src/x.ts"), errors: [{ messageId: "cross" }] },
+    { code: "const m = import('../../../packages/i18n/src/format.ts');", filename: inRepo("apps/mac/ui/app/x.ts"), errors: [{ messageId: "cross" }] },
   ],
 });
 
@@ -96,10 +96,10 @@ tester.run("child-process-door", rule("child-process-door"), {
 
 tester.run("one-absent", rule("one-absent"), {
   valid: [
-    { code: "let a: string | undefined;", filename: "/repo/packages/pkm/src/a.ts" },
-    { code: "let a: string | null;", filename: "/repo/packages/pkm/src/a.ts" },
+    { code: "let a: string | undefined;", filename: "/repo/packages/protocol/src/a.ts" },
+    { code: "let a: string | null;", filename: "/repo/packages/protocol/src/a.ts" },
   ],
-  invalid: [{ code: "let a: string | null | undefined;", filename: "/repo/packages/pkm/src/a.ts", errors: [{ messageId: "both" }] }],
+  invalid: [{ code: "let a: string | null | undefined;", filename: "/repo/packages/protocol/src/a.ts", errors: [{ messageId: "both" }] }],
 });
 
 tester.run("global-doors", rule("global-doors"), {
@@ -140,12 +140,12 @@ describe("what a rule says", () => {
   });
 
   it("names the catalog the file's words belong in", () => {
-    expect(catalogOf("/repo/apps/mac/ui/vv/web/features/issue/views/Board.tsx")).toBe("web.issue");
-    expect(catalogOf("/repo/apps/mac/ui/vv/web/ui/pixel/Toast.tsx")).toBe("web.ui.pixel");
-    expect(catalogOf("/repo/apps/mac/ui/vv/web/ui/Button.tsx")).toBe("web");
-    expect(catalogOf("/repo/apps/mac/ui/vv/web/app/Shell.tsx")).toBe("web");
-    expect(catalogOf("/repo/apps/mac/ui/surfaces/Sidebar.tsx")).toBe("web.shell");
-    expect(catalogOf("/repo/packages/pkm/src/outline.ts")).toBe("shared");
+    expect(catalogOf("/repo/apps/mac/ui/features/issue/views/Board.tsx")).toBe("web.issue");
+    expect(catalogOf("/repo/apps/mac/ui/design/pixel/Toast.tsx")).toBe("web.ui.pixel");
+    expect(catalogOf("/repo/apps/mac/ui/design/Button.tsx")).toBe("web");
+    expect(catalogOf("/repo/apps/mac/ui/app/Shell.tsx")).toBe("web");
+    expect(catalogOf("/repo/apps/mac/ui/workspace/Sidebar.tsx")).toBe("web.shell");
+    expect(catalogOf("/repo/packages/protocol/src/client.ts")).toBe("shared");
     expect(catalogOf("/repo/apps/site/src/sections/Hero.tsx")).toBe("shared");
   });
 });

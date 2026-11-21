@@ -46,7 +46,7 @@ export default defineConfig({
       "packages:check": [
         "vp run packages:build",
         "vp check",
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/i18n --filter @vibevalley/testkit --filter @vibevalley/pkm --filter @vibevalley/artifact test",
+        "vp run --filter @vibevalley/protocol --filter @vibevalley/i18n --filter @vibevalley/testkit test",
       ],
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
       deadcode: "vpx scripts/audit/deadcode.ts",
@@ -193,8 +193,8 @@ export default defineConfig({
           "apps/mac/ui/**/*.story.tsx",
           "apps/mac/ui/**/story.tsx",
           "apps/mac/ui/**/stories/**",
-          "apps/mac/ui/vv/app/fakeHost.ts",
-          "apps/mac/ui/vv/polyfill.ts",
+          "apps/mac/ui/app/fakeHost.ts",
+          "apps/mac/ui/infra/polyfill.ts",
           "packages/*/src/testing/**",
           "packages/testkit/src/**",
         ],
@@ -221,7 +221,7 @@ export default defineConfig({
           "apps/mac/ui/**/*.story.tsx",
           "apps/mac/ui/**/story.tsx",
           "apps/mac/ui/**/stories/**",
-          "apps/mac/ui/vv/app/fakeHost.ts",
+          "apps/mac/ui/app/fakeHost.ts",
           "packages/*/test/**",
           "packages/*/src/testing/**",
           "packages/testkit/src/**",
@@ -246,7 +246,7 @@ export default defineConfig({
           // The site's bilingual marketing copy has its own typed dictionaries.
           "apps/site/src/i18n/**",
           // QuickJS Intl.DateTimeFormat("zh-CN") polyfill formats Chinese calendar tokens.
-          "apps/mac/ui/vv/polyfill.ts",
+          "apps/mac/ui/infra/polyfill.ts",
           // Story/demo sample data and test fixtures.
           "apps/mac/ui/**/*.samples.ts",
           "apps/mac/ui/**/*.story.tsx",
@@ -261,9 +261,9 @@ export default defineConfig({
       },
       {
         // Markup takes its looks from `class` (Tailwind utilities, vv-tailwind), never a written-out `style` (style-attrs).
-        // Shell surfaces (`apps/mac/ui/{surfaces,components}/**`) intentionally use `tok()` style objects instead of Tailwind classes.
-        files: ["apps/site/src/**", "apps/mac/ui/vv/**"],
-        excludeFiles: ["**/*.test.ts", "**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
+        // Shell surfaces (`apps/mac/ui/{workspace,design/surface.tsx}`) intentionally use `tok()` style objects instead of Tailwind classes.
+        files: ["apps/site/src/**", "apps/mac/ui/app/**", "apps/mac/ui/features/**", "apps/mac/ui/farm/**", "apps/mac/ui/design/**"],
+        excludeFiles: ["**/*.test.ts", "**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**", "apps/mac/ui/design/surface.tsx"],
         rules: { "vibevalley/style-attrs": "error" },
       },
       {
@@ -278,14 +278,14 @@ export default defineConfig({
       },
       {
         // The doors: what a page shares with the shell that hosts it, and QuickJS's polyfill surface.
-        files: ["packages/protocol/src/host.ts", "apps/mac/ui/vv/polyfill.ts"],
+        files: ["packages/protocol/src/host.ts", "apps/mac/ui/infra/polyfill.ts"],
         rules: { "vibevalley/global-doors": ["error", { door: true }] },
       },
       {
         // One word for none (scripts/audit/oxlint-plugin.ts, one-absent).
         files: ["apps/**", "packages/**"],
         // `native.ts` is owned by the parallel pinyin-rust branch; left untouched to preserve zero file overlap.
-        excludeFiles: ["apps/mac/ui/vv/web/ui/rich/native.ts"],
+        excludeFiles: ["apps/mac/ui/design/rich/native.ts"],
         rules: { "vibevalley/one-absent": "error" },
       },
       {
@@ -296,7 +296,7 @@ export default defineConfig({
       },
       {
         // Component views share bucketed clocks instead of spawning per-row timers (scripts/audit/oxlint-plugin.ts, no-component-interval).
-        files: ["apps/mac/ui/vv/web/features/**/*.tsx", "apps/mac/ui/vv/web/ui/**/*.tsx"],
+        files: ["apps/mac/ui/features/**/*.tsx", "apps/mac/ui/design/**/*.tsx"],
         rules: { "vibevalley/no-component-interval": "error" },
       },
     ],

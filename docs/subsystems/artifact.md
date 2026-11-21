@@ -19,12 +19,13 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档与�
 
 | 位置 | 职责 |
 |---|---|
-| [`packages/artifact/`](packages/artifact/README.md) | 独立 Artifact 纯领域包（`@vibevalley/artifact`）：块状态机 `Page`（`ops.ts`）、Markdown 互转（`markdown.ts`）、HTML CSP、白名单检查、复合后缀推断与划词改字（`html.ts`）、外壳与 `vv.timeline` 录屏运行时（`shell.ts`）、Store 校验与 JSON Merge Patch（`store.ts`）、设计令牌编译与对比度计算（`tokens.ts`）、Store 沙箱渲染器与 SVG/`.dc.html` 处理（`viewers.ts`）、初始模板（`starters.ts`）及块编辑器（`blocks.ts`、`editor.ts`） |
-| `crates/vibevalley-artifact/src/` | 服务端跑的那份 Rust 引擎：`ops.rs`、`markdown.rs`、`html.rs`、`shell.rs`、`store.rs`、`tokens.rs`、`viewers.rs`、`starters.rs`；与 `packages/artifact` 共用同一份 golden 测例 |
+| `crates/vibevalley-artifact/src/` | 服务端跑的那份 Rust 引擎与单一真相源：`ops.rs`、`markdown.rs`、`html.rs`、`shell.rs`、`store.rs`、`tokens.rs`、`viewers.rs`、`starters.rs`；维护 `crates/vibevalley-artifact/tests/golden` 回归测例 |
+| `crates/vibevalley-server/src/modules/artifact/` | 服务端 Artifact 读写、版本管理与 SSE 订阅 |
+| `apps/mac/ui/features/artifact/` 与 `apps/mac/ui/features/media/` | 原生应用 nsh TSX 页面与客户端辅助：块编辑器模型（`blocks.ts`、`editor.ts`）、HTML 后缀推断（`html.ts`）、WebView 外壳与 `vv.timeline` 消息守卫（`shell.ts`）、Store 消息守卫（`viewers.ts`），以及 `ArtifactsPage`（含可折叠列表与内嵌实时 `ChannelSidePane`）、`ArtifactCanvas`、`BlocksView`、`StoreArtifactView`、各类型专用视图（`SlidesStoreView`、`DashboardView`、`MotionStoreView`、`MotionControls`、`WhiteboardView`、`DesignCanvasView`、`DesignSystemView`）与 `/library` 统一交付物和素材视图 |
 | `crates/vibevalley-server/src/modules/artifact/` | `Artifacts`：`mod.rs`（总入口、HTML 与默认设计体系管理）、`blocks.rs`（块与建议持久化）、`entries.rs`（Store 条目批处理、乐观锁、`artifact.entry.follow` 与 `artifact.view` 拼装）、`types.rs`（嵌入 `crates/vibevalley-server/assets/artifact/types/` 的中英双语 `SKILL.md` / `SKILL.en.md` 与 `references/*.md`）、`db.rs` |
 | `crates/vibevalley-protocol/src/contract/artifact.rs`、`packages/protocol/src/artifact/` | 跨端契约（Rust 为源、生成 TS 形状与端点）、Zod Schema，以及 `packages/protocol/src/rules/order.ts`（`keyBetween`）与 `display.ts`（`htmlSandbox`） |
 | 表 `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion`、`artifact_entry`、`artifact_entry_change` | Artifact 主表（`issue` 列带 `references issue(id) on delete set null` 外键）、HTML 版本表、块与建议表、结构化条目表及增量变更日志表（均在 `server.db`） |
-| `apps/mac/ui/vv/web/features/artifact/` 与 `features/media/` | 原生应用 nsh TSX 页面：`ArtifactsPage`（含可折叠列表与内嵌实时 `ChannelSidePane`）、`ArtifactCanvas`、`BlocksView`、`StoreArtifactView` 及各类型专用视图（`SlidesStoreView`、`DashboardView`、`MotionStoreView`、`MotionControls`、`WhiteboardView`、`DesignCanvasView`、`DesignSystemView`）、`<artifact-view-context>` 上报，以及 `/library` 统一交付物与素材视图 |
+| `apps/mac/ui/features/artifact/` 与 `apps/mac/ui/features/media/` | 原生应用 nsh TSX 页面：`ArtifactsPage`（含可折叠列表与内嵌实时 `ChannelSidePane`）、`ArtifactCanvas`、`BlocksView`、`StoreArtifactView` 及各类型专用视图（`SlidesStoreView`、`DashboardView`、`MotionStoreView`、`MotionControls`、`WhiteboardView`、`DesignCanvasView`、`DesignSystemView`）、`<artifact-view-context>` 上报，以及 `/library` 统一交付物与素材视图 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*`、`GET /api/v1/artifact/<id>/<version>` 与 `GET /api/v1/artifact/<id>/view`）。
 
@@ -97,9 +98,9 @@ Artifact 使用 SQLx 访问 SQLite。sqlc 从 Artifact 与频道的正式表结�
 
 ## 怎么验证
 
-- `packages/artifact/src/artifact.test.ts`、`store.test.ts`：外壳消息与 `vv.timeline` 注入、复合后缀推断、JSON Merge Patch、设计令牌编译与对比度、白板 SVG 净化、`.dc.html` `data-props` 回写与 Store CSP 头测试。
-- `crates/vibevalley-artifact/tests/golden.rs`：Rust 引擎的块操作、Markdown 往返、HTML 检查、划词改字、Store 补丁、设计令牌、初始模板与视图拼装对着 `packages/artifact` 写出的 golden（`vp run protocol:check` 重写并比对）。
+- `apps/mac/ui/features/artifact/artifact.test.ts`：客户端编辑 span 快捷键、UTF-16 offset、iframe 外壳/Store 消息守卫与复合后缀推断（`nsh/test`）。
+- `crates/vibevalley-artifact/tests/golden.rs`：Rust 引擎的块操作、Markdown 往返、HTML 检查、划词改字、Store 补丁、设计令牌、初始模板与视图拼装回归 golden（`vp run protocol:check` / `vp run goldens` 校验）。
 - `crates/vibevalley-server/tests/artifact.rs`：HTML 与 Markdown 交稿、七种类型双语指南读取、Store 批处理与 `ifRev` 冲突、白板 SVG 净化、`artifact.view` 与默认设计体系令牌注入、`artifact.entry.follow` 回放与实时 SSE、块协同与建议，以及 `artifact.issue` `ON DELETE SET NULL` 外键测试。
-- `apps/mac/ui/vv/app/scenarios.test.tsx`：Artifact 与 `/library` 统一交付物页面在多密度虚拟时钟场景下的页面测试（`nsh/test`）。
+- `apps/mac/ui/app/scenarios.test.tsx`：Artifact 与 `/library` 统一交付物页面在多密度虚拟时钟场景下的页面测试（`nsh/test`）。
 
 演讲者视图在 HTML 发回页数后显示页码、下一页与备注。尚未收到回执时，页面显示「等待演示页就绪」。载入错误显示具体原因（[原生页面验收](.agents/skills/vv-acceptance/references/app.md#演示页的就绪回执)）。

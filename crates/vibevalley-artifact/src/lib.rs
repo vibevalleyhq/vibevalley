@@ -1,5 +1,4 @@
-//! VibeValley's `packages/artifact`, the part the
-//! server runs: block ops on a page, Markdown in and out, the HTML check,
+//! VibeValley's artifact engine that the server runs: block ops on a page, Markdown in and out, the HTML check,
 //! words edited in a page, the shell an html version is shown in, and the
 //! structured artifact store, tokens, starters, and sandboxed viewers.
 //! Golden-tested against VibeValley's own functions (`gen/artifact.ts`).

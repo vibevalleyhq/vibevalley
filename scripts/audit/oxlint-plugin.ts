@@ -35,7 +35,7 @@ const noTestSleep = defineRule({
       sleep: says(
         "a test that waits a set time guesses how long the work takes: slow when it is quick, flaky when it is slow",
         "wait for a condition with `vi.waitFor` or the native app's `waitUntil`; advance fake timers with `vi.advanceTimersByTimeAsync(ms)`",
-        "apps/mac/ui/vv/app/scenarios.test.tsx",
+        "apps/mac/ui/app/scenarios.test.tsx",
       ),
     },
   },
@@ -128,13 +128,17 @@ const han = /[\p{Script=Han}、，。：；（）！？「」【】〔〕]/u;
 /** The catalog a file's words belong in: the native app's pages have one per feature, everything else shares one. */
 export function catalogOf(filename: string): string {
   const normalized = filename.replaceAll("\\", "/");
-  if (/\/apps\/mac\/ui\/surfaces\//u.test(normalized)) return "web.shell";
-  const rest = /\/apps\/mac\/ui\/vv\/web\/(.*)$/u.exec(normalized)?.[1];
+  if (/\/apps\/mac\/ui\/workspace\//u.test(normalized)) return "web.shell";
+  const rest = /\/apps\/mac\/ui\/(.*)$/u.exec(normalized)?.[1];
   if (rest === undefined) return "shared";
-  const folders = rest
-    .split("/")
-    .slice(0, -1)
-    .filter((f) => f !== "features");
+  const parts = rest.split("/");
+  const top = parts[0];
+  const sub = parts.slice(1, -1);
+  let folders: string[];
+  if (top === "design") folders = ["ui", ...sub];
+  else if (top === "features" || top === "infra") folders = sub;
+  else if (top === "farm") folders = ["farm", ...sub];
+  else folders = [];
   for (let n = folders.length; n > 0; n--) {
     const name = ["web", ...folders.slice(0, n)].join(".");
     if (existsSync(resolve(repo, "crates/vibevalley-i18n/locales/zh", `${name}.json`))) return name;
@@ -370,8 +374,8 @@ const noComponentInterval = defineRule({
     messages: {
       interval: says(
         "calling `setInterval` directly inside a component creates an unpooled timer per mounted instance",
-        "pool shared clocks through `useNow(ms)` (`apps/mac/ui/vv/web/base/dom.tsx`) or `useInterval` (`apps/mac/ui/vv/web/base/timer.ts`)",
-        "apps/mac/ui/vv/web/base/dom.tsx",
+        "pool shared clocks through `useNow(ms)` (`apps/mac/ui/infra/base/dom.tsx`) or `useInterval` (`apps/mac/ui/infra/base/timer.ts`)",
+        "apps/mac/ui/infra/base/dom.tsx",
       ),
     },
   },

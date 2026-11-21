@@ -1,6 +1,6 @@
 //! The user's notes as VibeValley keeps them: Logseq-style Markdown outline
 //! files in PARA folders, the file the only truth. Port of VibeValley
-//! `packages/pkm/src/{markdown,outline,para}.ts`: `parse` then
+//! `apps/mac/ui/features/pkm/`: `parse` then
 //! `print` gives the same bytes; ids not written in the file are made from
 //! where the block is; links, tags and block references form the graph.
 

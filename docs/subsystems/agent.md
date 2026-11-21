@@ -12,7 +12,7 @@
 | 农机注册表、后台探测、模型与能力缓存、派活前配置解析（`Agent.resolve`） | 档案记忆的存储与召回（[记性](docs/subsystems/memory.md)） |
 | 档案可派性预检（`agentProblems`：农机缺失、选项不兼容、额度/预算耗尽） | 像素角色贴图渲染（[农场的皮](docs/subsystems/farm.md)） |
 | 每日花费 | 对话怎么拼提示、怎么压缩（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
-农机详情区分缺少可执行文件、首次需要登录和账户用量报告登录失效。找不到文件时可填写命令路径。登录入口打开本机终端，用户自行登录后可重新检测。探测出错时展示失败原因。[农机详情](apps/mac/ui/vv/web/features/runtime/RuntimesPage.tsx)
+农机详情区分缺少可执行文件、首次需要登录和账户用量报告登录失效。找不到文件时可填写命令路径。登录入口打开本机终端，用户自行登录后可重新检测。探测出错时展示失败原因。[农机详情](apps/mac/ui/features/runtime/RuntimesPage.tsx)
 
 
 ## 在哪
@@ -102,4 +102,4 @@
 
 - `crates/vibevalley-server/tests/agent.rs`：删技能清引用、损坏配置留着、外观补齐、角色约束、新农场的档案、模板安装与更新、自带技能只读、农机经 hub、额度刷新。
 - `crates/vibevalley-server/src/modules/agent/presets.rs` 里的单元测试：预设、挑档案。
-- `apps/mac/ui/vv/app/scenarios.test.tsx`：档案、农机、仓库与工作台多密度虚拟时钟页面测试（`nsh/test`）。
+- `apps/mac/ui/app/scenarios.test.tsx`：档案、农机、仓库与工作台多密度虚拟时钟页面测试（`nsh/test`）。

@@ -1,5 +1,4 @@
-//! vibevalley-artifact against VibeValley's own packages/artifact: the goldens
-//! in `tests/golden` are written by `gen/artifact.ts`.
+//! vibevalley-artifact golden regression checks against committed fixtures in `tests/golden`.
 
 use std::collections::BTreeMap;
 

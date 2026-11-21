@@ -7,11 +7,6 @@ import { importsOf } from "./source.ts";
 
 export type Layer = "rule" | "module" | "flow";
 
-export const layers: readonly Layer[] = ["rule", "module", "flow"];
-
-/** What a test of each layer may take, in ms. */
-export const budgetMs: Record<Layer, number> = { rule: 20, module: 300, flow: 2_000 };
-
 /** Imports that leave the process: the database, child processes, the network; pi-durable's SQLite storage and its
  * environment of files and commands. */
 const outside =

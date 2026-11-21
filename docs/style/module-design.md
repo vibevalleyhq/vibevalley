@@ -79,13 +79,13 @@
 
 ### 显式状态
 
-一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/mac/ui/vv/web/state/intent.ts)的 `IntentAt`、[媒体任务](crates/vibevalley-server/src/modules/media/jobs.rs)的 `Held`、[谁听见](crates/vibevalley-server/src/modules/watch/hearers.rs)的 `HeldBy`。Rust 里就是带数据的 enum，`match` 穷尽。
+一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/mac/ui/infra/state/intent.ts)的 `IntentAt`、[媒体任务](crates/vibevalley-server/src/modules/media/jobs.rs)的 `Held`、[谁听见](crates/vibevalley-server/src/modules/watch/hearers.rs)的 `HeldBy`。Rust 里就是带数据的 enum，`match` 穷尽。
 
-- **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/mac/ui/vv/web/infra/form/form.ts)）。硬并只会得到它们的乘积。
+- **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/mac/ui/infra/form/form.ts)）。硬并只会得到它们的乘积。
 - **永远同值的删掉副本。** 读源头，不另存一份跟着改。
 - **会被别处读原因的，先记原因再中断。** 记性源退役时同步记下原因和一个完成信号，再起一个任务去停：被中断的操作无论何时醒来都读得到原因。
 - **闭包里改的状态放进有类型的属性。** TypeScript 按初值收窄闭包外对 `let` 的读，看不到闭包里的赋值；放进标好类型的对象属性或有名字的类型。
-- **页面的帧不拆。** 页面拿到的是最新的整帧（[帧](apps/mac/ui/vv/web/infra/frame.ts)），按 id 的列表用 `Each` 保住行；不为了联合把帧改成按状态分开的几份。
+- **页面的帧不拆。** 页面拿到的是最新的整帧（[帧](apps/mac/ui/infra/frame.ts)），按 id 的列表用 `Each` 保住行；不为了联合把帧改成按状态分开的几份。
 
 一个函数里三个以上的 `let` 布尔多半是一条没写出来的线；真是几个独立的维度，就照上面分开放、各自起名。不用外部状态机运行时：服务端是 Rust enum 加 `match`（读改写在同一把锁里），页面是 TypeScript 判别联合、`state/` 的原子与组件内的信号加 `variant()`，都有编译期穷尽检查。
 
@@ -93,7 +93,7 @@
 
 - **三层错误各走其道**：外部 I/O 失败在调用处包成模块自己的错误类型并保留原因；业务拒绝返回契约的 `ApiError`（带 `BizCode`，可恢复时附带 `next`，见 [base.rs](crates/vibevalley-server/src/base.rs) 的 `missing`、`refused`）；内部数据自相矛盾是缺陷，不伪装成普通拒绝。
 - **内部失败是 `Result`，资源靠 `Drop`**：调用方要分辨的拒绝或故障是 `Result` 的错误 enum，不把 `refused: Option<String>` 塞进成功返回值。多步获取的资源用守卫对象（`Drop`）成对释放，失败时逆序回滚。
-- **线上只暴露闭合 `ApiError`，客户端无损转 `UiFault`**：内部细粒度的错误在服务端边界转为 `ApiError`，不泄漏到 HTTP 契约；客户端 `faultOf`（[apps/mac/ui/vv/web/infra/api.ts](apps/mac/ui/vv/web/infra/api.ts)）将全部 `ApiError`（含 `502`/`503`）归类为明确的业务拒绝并保留 `next`、`settings` 与 `retryable`。
+- **线上只暴露闭合 `ApiError`，客户端无损转 `UiFault`**：内部细粒度的错误在服务端边界转为 `ApiError`，不泄漏到 HTTP 契约；客户端 `faultOf`（[apps/mac/ui/infra/api.ts](apps/mac/ui/infra/api.ts)）将全部 `ApiError`（含 `502`/`503`）归类为明确的业务拒绝并保留 `next`、`settings` 与 `retryable`。
 
 ### 从测试困难诊断设计，避免先补工具
 

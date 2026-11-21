@@ -5,10 +5,10 @@ import { z } from "zod";
 
 const root = resolve(import.meta.dirname, "../..");
 const tokensPath = resolve(root, "design/tokens.json");
-const themeJsonPath = resolve(root, "apps/mac/ui/vv/theme.json");
+const themeJsonPath = resolve(root, "apps/mac/ui/design/theme.json");
 const nshJsonPath = resolve(root, "apps/mac/ui/nsh.json");
-const tokensTsPath = resolve(root, "apps/mac/ui/tokens.ts");
-const motionTsPath = resolve(root, "apps/mac/ui/motion.ts");
+const tokensTsPath = resolve(root, "apps/mac/ui/design/tokens.ts");
+const motionTsPath = resolve(root, "apps/mac/ui/design/motion.ts");
 const themeTokensRsPath = resolve(root, "apps/mac/src/theme_tokens.rs");
 const siteCssPath = resolve(root, "apps/site/src/ui/global.css");
 
@@ -387,9 +387,9 @@ function cubicBezierCss(tuple: readonly [number, number, number, number]): strin
 
 export function syncMotionTs(tokens: DesignTokens, currentRaw: string): string {
   const easeCss = cubicBezierCss(tokens.motion.ease.out);
-  const replaced = currentRaw.replace(/^export const ease = "[^"]+";/mu, `export const ease = "${easeCss}";`);
-  if (replaced === currentRaw && !currentRaw.includes(`export const ease = "${easeCss}";`)) {
-    throw new Error("Could not locate `export const ease = ...` in apps/mac/ui/motion.ts");
+  const replaced = currentRaw.replace(/^(?:export )?const ease = "[^"]+";/mu, `const ease = "${easeCss}";`);
+  if (replaced === currentRaw && !currentRaw.includes(`const ease = "${easeCss}";`)) {
+    throw new Error("Could not locate `const ease = ...` in apps/mac/ui/design/motion.ts");
   }
   return replaced;
 }

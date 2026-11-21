@@ -4,9 +4,7 @@
   "description": "The native app's views (nsh TSX): nsh resolves bare imports from node_modules and @vibevalley/* through nsh.json's aliases.",
   "type": "module",
   "dependencies": {
-    "@vibevalley/artifact": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
-    "@vibevalley/pkm": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "zod": "catalog:"
   }

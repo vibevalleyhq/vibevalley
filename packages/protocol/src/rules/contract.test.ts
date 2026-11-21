@@ -8,7 +8,15 @@ import { edgesOf, exportsOf } from "@vibevalley/testkit/source";
 const root = join(import.meta.dirname, "../../../..");
 const here = import.meta.dirname;
 /** What runs beside the server: the page and the shells around it. */
-const outside = ["apps/mac/ui/vv", "apps/mac/ui/components", "apps/mac/ui/surfaces", "packages/artifact/src", "packages/pkm/src"];
+const outside = [
+  "apps/mac/ui/app",
+  "apps/mac/ui/design",
+  "apps/mac/ui/workspace",
+  "apps/mac/ui/features",
+  "apps/mac/ui/farm",
+  "apps/mac/ui/infra",
+  "apps/mac/ui/fixtures",
+];
 
 function files(dir: string): string[] {
   let names: string[];

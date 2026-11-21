@@ -2,7 +2,7 @@ import { existsSync, globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
-const TS_DIRS = ["apps/mac/ui/vv/web", "packages/protocol/src", "packages/artifact/src", "packages/pkm/src"];
+const TS_DIRS = ["apps/mac/ui/app", "apps/mac/ui/features", "apps/mac/ui/design", "apps/mac/ui/infra", "apps/mac/ui/farm", "packages/protocol/src"];
 // Legacy path prefixes kept only so synthetic path assertions in stale-names.test.ts match scope without scanning removed dirs.
 const LEGACY_TEST_DIRS = ["apps/server/src", "apps/web/src", "apps/web/test"];
 // The native port keeps oar's and its own Rust/workspace words where rules do not name `dirs`.
@@ -230,7 +230,7 @@ const RULES: readonly Rule[] = [
     pattern: /\b(Standing|StandingValues|IssueStanding|standingLabel|standingOf|standingIn|standingTone|standingWantsOwner)\b|\.standing\b/u,
     says: "IssueStageKind, IssueStage, issueStageOf, issueStageIn; an achievement's standing (AchievementStanding) stays",
     // The achievements panel's standings are an achievement's tier.
-    except: /^apps\/(web\/src|mac\/ui\/vv\/web)\/farm\/panels\/Achievements\.tsx$/u,
+    except: /^apps\/(?:web\/src|mac\/ui)\/farm\/panels\/Achievements\.tsx$/u,
   },
   {
     name: "an issue's stage under the attention type name",
@@ -268,7 +268,7 @@ const RULES: readonly Rule[] = [
     pattern: /\b(Manager|Manager[A-Z]\w*|manager[A-Z]\w*|\w+Manager\w*)\b/u,
     says: "Orchestrator, defaultOrchestrator, OrchestratorShape, forOrchestrator; the farm's art and map keep their manager names (manager-face, Manager)",
     // The village map's entity is Manager (public/village.ldtk).
-    except: /^apps\/(web\/src|mac\/ui\/vv\/web)\/farm\/world\/(level|world)\.ts$/u,
+    except: /^apps\/(?:web\/src|mac\/ui)\/farm\/world\/(level|world)\.ts$/u,
   },
   {
     name: "the orchestrator under the assistant name",
@@ -281,7 +281,7 @@ const RULES: readonly Rule[] = [
     says: "the issue's own words (docs/subsystems/issue.md 状态和用语): 完成 (complete) and what it delivered (合进了主分支…), 改动, 问题 (等你回答), 计划; phase done, graph ready; farm words are for the farm's skin",
     // The farm's skin (with the pixel pieces the skins share) and the game say it their way.
     except:
-      /^(apps\/(web\/src|mac\/ui\/vv\/web)\/(farm|ui\/pixel)\/|apps\/web\/test\/farm-|apps\/server\/src\/modules\/game\/|crates\/vibevalley-server\/src\/modules\/game\/)/u,
+      /^(apps\/(?:web\/src\/(?:farm|ui\/pixel)|mac\/ui\/(?:farm|design\/pixel))\/|apps\/web\/test\/farm-|apps\/server\/src\/modules\/game\/|crates\/vibevalley-server\/src\/modules\/game\/)/u,
   },
   {
     name: "a word list for an issue's or a session's state outside the protocol's rules",
@@ -307,18 +307,18 @@ const RULES: readonly Rule[] = [
       "apps/web/src/features",
       "apps/web/src/base",
       "apps/web/src/ui",
-      "apps/mac/ui/vv/web/features",
-      "apps/mac/ui/vv/web/base",
-      "apps/mac/ui/vv/web/ui",
+      "apps/mac/ui/features",
+      "apps/mac/ui/infra",
+      "apps/mac/ui/design",
     ],
     // What the user types in a test is the user's words; the pixel pieces are the skins' own.
-    except: /\.test\.ts$|^apps\/(web\/src|mac\/ui\/vv\/web)\/ui\/pixel\//u,
+    except: /\.test\.ts$|^apps\/(?:web\/src\/ui|mac\/ui\/design)\/pixel\//u,
   },
   {
     name: "the repo map's farm words in the workbench",
     pattern: /\b(growthOf|Growth|TillingCalendar|Deed|Planted|logoInBed|SowHere|plotsIn|sessionInPlot|onSow)\b|web\.repo\.(map|repo|growth)\b/u,
-    says: "the repos page says recency (recencyOf, Recency), Overview, Languages, CommitCalendar, logoInBar; the map, its plots and its sowing are the farm's (apps/mac/ui/vv/web/farm/map, web.farm.map.*), handed in as ReposSkin",
-    dirs: ["apps/web/src/features", "apps/web/src/base", "apps/web/src/ui", "apps/mac/ui/vv/web/features", "apps/mac/ui/vv/web/base", "apps/mac/ui/vv/web/ui"],
+    says: "the repos page says recency (recencyOf, Recency), Overview, Languages, CommitCalendar, logoInBar; the map, its plots and its sowing are the farm's (apps/mac/ui/farm/map, web.farm.map.*), handed in as ReposSkin",
+    dirs: ["apps/web/src/features", "apps/web/src/base", "apps/web/src/ui", "apps/mac/ui/features", "apps/mac/ui/infra", "apps/mac/ui/design"],
   },
   {
     name: "the one orchestrator under its old names",
@@ -329,7 +329,7 @@ const RULES: readonly Rule[] = [
     name: "a profile called a helper's where the user reads it",
     pattern: /帮工档案/u,
     says: "角色 (a profile): its role is 主助手 or 执行角色; tools for a model name roles or agents explicitly (docs/README.md 用语)",
-    dirs: ["apps/web/src", "apps/mac/ui/vv/web", "apps/server/src"],
+    dirs: ["apps/web/src", "apps/mac/ui/app", "apps/mac/ui/design", "apps/mac/ui/features", "apps/mac/ui/infra", "apps/mac/ui/workspace", "apps/server/src"],
     // On the server only user catalogs (locales/server.*.json) are the user's; orchestrator/words.rs and prompts.ts are a model's.
     except: /^apps\/server\/src\/(?!.*\/words\.ts$)/u,
   },
@@ -355,9 +355,9 @@ const RULES: readonly Rule[] = [
       "apps/web/src/features",
       "apps/web/src/base",
       "apps/web/src/ui",
-      "apps/mac/ui/vv/web/features",
-      "apps/mac/ui/vv/web/base",
-      "apps/mac/ui/vv/web/ui",
+      "apps/mac/ui/features",
+      "apps/mac/ui/infra",
+      "apps/mac/ui/design",
     ],
   },
   {
@@ -397,7 +397,7 @@ const RULES: readonly Rule[] = [
     pattern:
       /\b(Round|RoundView|roundsOf|roundLabel|roundMs|liveRound|failedRound|finishedRound|TurnSteps|turnLabel)\b|features\/session\/rounds\b|web\.session\.rounds\.|web\.session\.trajectory\.rounds?\b|web\.issue\.card\.turns?\b/u,
     says: "the log shows the server's runs, one view each (runs.ts: RunView, runsOf, runTitle, runMs, RunSteps, runLabel; web.session.runs.*, web.issue.card.run(s)); 一轮 is the user's word for a Run",
-    dirs: ["apps/web/src", "apps/web/test", "apps/mac/ui/vv/web"],
+    dirs: ["apps/web/src", "apps/web/test", "apps/mac/ui/features", "apps/mac/ui/app"],
   },
   {
     name: "an agent's own todo under the task name",
@@ -455,7 +455,7 @@ const RULES: readonly Rule[] = [
       /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model|records)|issue\/records|mailbox\/chat|session\/(?:takeIn|shapes|records)|farm\/support|base\/util|ui\/richRules|repo\/shapes|testing\/(?:helper|until|issues|said|agents)|farm\/world\/places|features\/voice\/(?:agora|moss)|features\/channel\/(?:emoji|feed|switcher|draft)|features\/issue\/(?:lanes|rows|queries)|features\/artifact\/queries|memory\/store|artifact\/spans|tool\/(?:cron|memory|channel|definition)|infra\/live|state\/latest)(?:\.tsx?)?["'`]|\b(issueRecords|IssueRecords|sessionRecords|SessionRecords|channelRecords|ChannelRecords)\b/u,
     says: "channel/{channel,messages,rooms,hub}.ts, issue/lifecycle.ts, mailbox/envelope.ts, session/{briefing,registry,signals}.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts, repo/workplace.ts, features/issue/{history,cards}.ts, features/artifact/ArtifactCard.tsx, testing/{worker,layers,world}.ts, farm/world/world.ts, features/voice/{call,mossLine}.ts, features/channel/{EmojiPicker.tsx,places.ts,composing.ts}, memory/memory.ts, artifact/ops.ts, tool/{tool,schemas}.ts, infra/frame.ts, state/atom.ts",
     // The retired files were the server's and the page's; the contract's concept folders (session/shapes.ts) are today's.
-    dirs: ["apps/server/src", "apps/web/src", "apps/mac/ui/vv/web"],
+    dirs: ["apps/server/src", "apps/web/src", "apps/mac/ui"],
   },
 ];
 
@@ -463,7 +463,6 @@ const RULES: readonly Rule[] = [
 const userWords = (source: string) => source.startsWith("crates/vibevalley-i18n/locales/") || source === "apps/web/test/english.spec.ts";
 const han = /\p{Script=Han}/u;
 
-/** Where a catalog's words are said: web.farm.phone is apps/mac/ui/vv/web/farm/phone's, web.setting apps/mac/ui/vv/web/features/setting's, server.game the Rust server's game module's, shared both sides'. */
 function placeOf(ns: string): string {
   if (ns === "shared") return "packages/protocol/src/rules/words.ts";
   if (ns === "cli") return "crates/vibevalley-cli/src/words.rs";
@@ -474,9 +473,12 @@ function placeOf(ns: string): string {
     return `apps/server/src/${[...parts, "words.ts"].join("/")}`;
   }
   if (host === "web" && parts.length > 0) {
-    const feature = `apps/mac/ui/vv/web/features/${parts[0]}`;
+    if (parts[0] === "shell") return "apps/mac/ui/workspace/words.ts";
+    if (parts[0] === "base") return "apps/mac/ui/infra/base/words.ts";
+    if (parts[0] === "ui") return `apps/mac/ui/design/${parts.slice(1).concat("words.ts").join("/")}`;
+    const feature = `apps/mac/ui/features/${parts[0]}`;
     if (existsSync(resolve(root, feature))) return `${feature}/${parts.slice(1).concat("words.ts").join("/")}`;
-    return `apps/mac/ui/vv/web/${[...parts, "words.ts"].join("/")}`;
+    return `apps/mac/ui/${[...parts, "words.ts"].join("/")}`;
   }
   return `apps/${host}/src/${[...parts, "words.ts"].join("/")}`;
 }

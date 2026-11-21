@@ -4,7 +4,7 @@ export default defineConfig({
   test: { include: ["src/**/*.test.ts"] },
   // The types other packages check against (package.json's exports.
   pack: {
-    entry: ["src/budgets.ts", "src/pyramid.ts", "src/source.ts"],
+    entry: ["src/pyramid.ts", "src/source.ts"],
     outDir: "dist",
     clean: true,
     fixedExtension: false,

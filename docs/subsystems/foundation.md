@@ -83,7 +83,7 @@
 | 规则 | 纯函数 | 各 crate 的 `#[cfg(test)]` 与 `src/tests.rs`（如 `crates/vibevalley-core/src/tests.rs`） |
 | 模块 | 模块的类型、真 git、脚本农机（`vibevalley-oar` 的 `scripted`）、脚本模型 | `crates/vibevalley-server/tests/issue_board.rs`、`crates/vibevalley-server/tests/*.rs` |
 | 服务端整体 | 起真的 `vibevalley-server`、经 HTTP | `crates/vibevalley-server/tests/start.rs`、`crates/vibevalley-cli/tests/cli.rs` |
-| 页面 | `nsh/test`，样例的 `Transport` | `apps/mac/ui/vv/app/*.test.tsx`、`apps/mac/ui/components/*.test.tsx` |
+| 页面 | `nsh/test`，样例的 `Transport` | `apps/mac/ui/app/*.test.tsx`、`apps/mac/ui/features/*/*.test.ts` |
 | 像素场景 | 真的素材、样例帧，在 CPU 上画 | `apps/mac/src/pixel/tests.rs` |
 
 - **不靠睡眠等待**：Rust 测试用 `until` 轮询条件；TS 测试禁止写死 `setTimeout` 或 `waitForTimeout`（`vibevalley/no-test-sleep` 查）。

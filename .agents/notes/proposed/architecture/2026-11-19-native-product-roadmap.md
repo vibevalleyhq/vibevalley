@@ -40,7 +40,7 @@ Status: proposed
 | --- | --- | --- |
 | 安装与启动 | 在开发指南写明依赖顺序、nsh 位置、页面资源和隔离目录。记录 Node、Rust、nsh、Zig、Xcode 和 CI 主机版本。 | 同一提交在两台 Mac 上可启动。记录冷构建、热构建和改一个文件后的耗时。若结果不同，定位工具版本或缓存输入。[开发指南](docs/development.md) |
 | 生成物 | 协议、词典和样例各保留一个写入入口。脚本写明输入、输出路径和失败退出码。 | 在临时目录连续生成两次。第二次应无新增差异。验收脚本应只写隔离家目录和工作目录。 |
-| 提交检查 | 驱动改动先跑协议回放。服务改动先跑脚本农机和真实 Git。原生页面先跑 nsh 行为测试。 | 集成时跑 `rust:check`、`protocol:check`、`mac:check` 和 `docs:verify`。`mac:check` 执行类型检查、打包和虚拟时钟行为测试。在隔离副本中将完成按钮接到关闭操作后，完成与复核两项测试失败。[虚拟时钟场景测试](apps/mac/ui/vv/app/scenarios.test.tsx) · [写路径用例](apps/mac/ui/vv/app/interactions.test.tsx) |
+| 提交检查 | 驱动改动先跑协议回放。服务改动先跑脚本农机和真实 Git。原生页面先跑 nsh 行为测试。 | 集成时跑 `rust:check`、`protocol:check`、`mac:check` 和 `docs:verify`。`mac:check` 执行类型检查、打包和虚拟时钟行为测试。在隔离副本中将完成按钮接到关闭操作后，完成与复核两项测试失败。[虚拟时钟场景测试](apps/mac/ui/app/scenarios.test.tsx) · [写路径用例](apps/mac/ui/app/interactions.test.tsx) |
 | 打包与更新 | 用 `package:mac` 产出应用、CLI、灵动岛、页面资源、ZIP 和 DMG。用 `update-check` 演练两个版本之间的更新。 | 干净 Mac 可安装签名包。清单的版本、架构、大小和摘要与实物一致。损坏包应被拒绝，原版本仍可启动。[打包脚本](scripts/release/package.ts) · [更新演练](scripts/release/update-check.ts) · [发版工作流](.github/workflows/release.yml) |
 
 如果维护者更名 CI 检查，应同时更新分支保护设置。
@@ -113,7 +113,7 @@ SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均�
 
 ### 四、第一项产品改动：Codex 多 agent 进度
 
-Codex CLI 0.170.0 的协议区分协作调用状态与子线程状态。`spawnAgent` 调用完成时，子线程可能刚开始执行。原生基线会把协作调用记作工具调用。工单当前动作主要来自根线程。[Codex 驱动](crates/vibevalley-oar/src/codex.rs) · [工作日志](apps/mac/ui/vv/web/features/session/WorkLog.tsx)
+Codex CLI 0.170.0 的协议区分协作调用状态与子线程状态。`spawnAgent` 调用完成时，子线程可能刚开始执行。原生基线会把协作调用记作工具调用。工单当前动作主要来自根线程。[Codex 驱动](crates/vibevalley-oar/src/codex.rs) · [工作日志](apps/mac/ui/features/session/WorkLog.tsx)
 
 工作树中的 oar 已有自行启动子会话的 `Pool`。Codex 内部创建的线程由 Codex 启动。负责人应从 Codex 通知验证这些线程在工作台的可见性。[子会话池](crates/vibevalley-oar/src/subagent.rs)
 
@@ -129,7 +129,7 @@ Codex CLI 0.170.0 的协议区分协作调用状态与子线程状态。`spawnAg
 
 #### 重连后，哪些进度仍然可信
 
-工作日志按会话保留最近 240 步。页面用步骤序号和修订号合并补读结果与实时通知。一个子线程还在执行时，后续日志就可能挤掉它的派出记录。进度总览应能在这条记录移出后保留子任务。[服务端日志](crates/vibevalley-server/src/modules/session/journal.rs) · [页面补读](apps/mac/ui/vv/web/features/session/runs.ts)
+工作日志按会话保留最近 240 步。页面用步骤序号和修订号合并补读结果与实时通知。一个子线程还在执行时，后续日志就可能挤掉它的派出记录。进度总览应能在这条记录移出后保留子任务。[服务端日志](crates/vibevalley-server/src/modules/session/journal.rs) · [页面补读](apps/mac/ui/features/session/runs.ts)
 
 服务端用运行实例编号隔离旧实例的迟到事件。Codex 恢复根线程时传入 `excludeTurns: true`。服务端再按子线程和原轮次标识调用 `thread/read` 核对终态。缺少匹配记录时保留最后一次确认的状态。[会话实例](crates/vibevalley-server/src/modules/session/sessions.rs) · [Codex 恢复请求](crates/vibevalley-oar/src/codex.rs)
 
