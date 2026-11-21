@@ -822,6 +822,42 @@ export const icons = {
       evenodd: 1,
     },
   ], // Download
+  minus: [{ d: "M6 12H18", stroke: 1.5, cap: "round", join: "round" }],
+  branch: [
+    { d: "M6.5 3.7 A2.3 2.3 0 1 0 6.5 8.3 A2.3 2.3 0 1 0 6.5 3.7 Z", stroke: 1.8, cap: "round", join: "round" },
+    { d: "M6.5 15.7 A2.3 2.3 0 1 0 6.5 20.3 A2.3 2.3 0 1 0 6.5 15.7 Z", stroke: 1.8, cap: "round", join: "round" },
+    { d: "M17.5 6.2 A2.3 2.3 0 1 0 17.5 10.8 A2.3 2.3 0 1 0 17.5 6.2 Z", stroke: 1.8, cap: "round", join: "round" },
+    { d: "M6.5 8.3 V15.7", stroke: 1.8, cap: "round", join: "round" },
+    { d: "M17.5 10.8 C17.5 14.5 13 15.7 6.5 15.7", stroke: 1.8, cap: "round", join: "round" },
+  ],
+  diff: [
+    {
+      d: "M5.5 3.5 H18.5 Q20.5 3.5 20.5 5.5 V18.5 Q20.5 20.5 18.5 20.5 H5.5 Q3.5 20.5 3.5 18.5 V5.5 Q3.5 3.5 5.5 3.5 Z",
+      stroke: 1.75,
+      cap: "round",
+      join: "round",
+    },
+    { d: "M12 7 V11.5", stroke: 1.75, cap: "round", join: "round" },
+    { d: "M9.75 9.25 H14.25", stroke: 1.75, cap: "round", join: "round" },
+    { d: "M9.75 15.5 H14.25", stroke: 1.75, cap: "round", join: "round" },
+  ],
+  collapseAll: [
+    { d: "M7 4.5 L12 9 L17 4.5", stroke: 1.9, cap: "round", join: "round" },
+    { d: "M7 19.5 L12 15 L17 19.5", stroke: 1.9, cap: "round", join: "round" },
+  ],
+  expandAll: [
+    { d: "M7 9 L12 4.5 L17 9", stroke: 1.9, cap: "round", join: "round" },
+    { d: "M7 15 L12 19.5 L17 15", stroke: 1.9, cap: "round", join: "round" },
+  ],
+  lock: [
+    {
+      d: "M7.875 11.25 H16.125 Q18 11.25 18 13.125 V17.625 Q18 19.5 16.125 19.5 H7.875 Q6 19.5 6 17.625 V13.125 Q6 11.25 7.875 11.25 Z",
+      stroke: 1.75,
+      cap: "round",
+      join: "round",
+    },
+    { d: "M8.625 11.25 V8.25 A3.375 3.375 0 0 1 15.375 8.25 V11.25", stroke: 1.75, cap: "round", join: "round" },
+  ],
 } satisfies Record<string, readonly IconShape[]>;
 
 export type IconName = keyof typeof icons;

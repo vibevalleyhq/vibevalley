@@ -14,7 +14,7 @@ description: 在 VibeValley 的工作台（apps/mac/ui，nsh 的 Tailwind class�
 | 令牌在哪 | 颜色在 `apps/mac/ui/design/theme.json`，字号、圆角、缓动、字体、阴影在 `apps/mac/ui/nsh.json` 的 `tailwind` | `apps/site/src/ui/global.css` 的 `@theme static` |
 | 谁查 | `vp run mac:check` 只查类型；lint 不扫 `apps/mac/ui` | `vp check`：`vibevalley/style-attrs` 拦 `className`、`classList` 和只写死值的 `style` |
 
-工作区外壳组件（`apps/mac/ui/workspace`、`apps/mac/ui/design/surface.tsx`）主要用对象 `style` 读 `apps/mac/ui/design/tokens.ts` 的 `tok()`，值和 `apps/mac/src/theme.rs` 一样，同时复用 `design/Tip` 的 `Bubble` 与 `design/Button` 的 `Button`。
+工作区外壳组件（`apps/mac/ui/workspace/`）与工作台同样使用 `theme.json` / `nsh.json` 的 Tailwind class，并通过 [chrome.tsx](apps/mac/ui/workspace/chrome.tsx) 复用 `design/Icon`、`design/Tip` 的 `Bubble` 与 `design/Button` 的 `Button`。
 
 ## 先读哪里
 

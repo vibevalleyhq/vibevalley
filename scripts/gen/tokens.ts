@@ -7,8 +7,6 @@ const root = resolve(import.meta.dirname, "../..");
 const tokensPath = resolve(root, "design/tokens.json");
 const themeJsonPath = resolve(root, "apps/mac/ui/design/theme.json");
 const nshJsonPath = resolve(root, "apps/mac/ui/nsh.json");
-const tokensTsPath = resolve(root, "apps/mac/ui/design/tokens.ts");
-const motionTsPath = resolve(root, "apps/mac/ui/design/motion.ts");
 const themeTokensRsPath = resolve(root, "apps/mac/src/theme_tokens.rs");
 const siteCssPath = resolve(root, "apps/site/src/ui/global.css");
 
@@ -253,145 +251,8 @@ export function renderNshJson(tokens: DesignTokens, currentRaw: string): string 
   return `${stringifyCompactArrays(updated)}\n`;
 }
 
-export function renderTokensTs(tokens: DesignTokens): string {
-  const l = tokens.semantic.light;
-  const d = tokens.semantic.dark;
-  const r = tokens.geometry.radius;
-  const smFont = tokens.geometry.fontSize.sm;
-  const baseFont = tokens.geometry.fontSize.base;
-  const xsFont = tokens.geometry.fontSize.xs;
-  if (!smFont || !baseFont || !xsFont) {
-    throw new Error("design/tokens.json geometry.fontSize must define xs, sm, and base");
-  }
-  const titleLine = Math.round(baseFont[0] * baseFont[1]);
-  const bodyLine = Math.round(smFont[0] * smFont[1]);
-  const darkBorder = d.shell["border-rgba"] ?? d.shell.border;
-
-  return `// Generated from design/tokens.json by scripts/gen/tokens.ts — do not edit by hand.
-import { colorScheme } from "nsh";
-
-export type Palette = {
-  ink: string;
-  text: string;
-  muted: string;
-  faint: string;
-  surface: string;
-  subtle: string;
-  tile: string;
-  border: string;
-  focus: string;
-  ok: string;
-  alert: string;
-  danger: string;
-  codeKey: string;
-  codeStr: string;
-  codeNum: string;
-  codeLit: string;
-  /** Primary button fill (accent in both light and dark modes). */
-  primary: string;
-  onPrimary: string;
-  /** Sidebar and inspector background; mirrors theme.rs \`surface\` and workbench \`side\`. */
-  canvas: string;
-};
-
-const light: Palette = {
-  ink: "${l.ink}",
-  text: "${l.shell.text}",
-  muted: "${l.muted}",
-  faint: "${l.faint}",
-  surface: "${l.page}",
-  subtle: "${l.shell.subtle}",
-  tile: "${l.shell.tile}",
-  border: "${l.shell.border}",
-  focus: "${l.shell["focus-ring"]}",
-  ok: "${l.leaf}",
-  alert: "${l["warn-ink"]}",
-  danger: "${l.berry}",
-  codeKey: "${l.ink}",
-  codeStr: "${l.syntax[15] ?? "#1f7a72"}",
-  codeNum: "${l.shell["code-num"]}",
-  codeLit: "${l.syntax[14] ?? "#7e42b8"}",
-  primary: "${l.accent}",
-  onPrimary: "${l.page}",
-  canvas: "${l.side}",
-};
-
-const dark: Palette = {
-  ink: "${d.ink}",
-  text: "${d.shell.text}",
-  muted: "${d.muted}",
-  faint: "${d.faint}",
-  surface: "${d.elevated}",
-  subtle: "${d.shell.subtle}",
-  tile: "${d.shell.tile}",
-  border: "${darkBorder}",
-  focus: "${d.shell["focus-ring"]}",
-  ok: "${d.leaf}",
-  alert: "${d.wheat}",
-  danger: "${d.berry}",
-  codeKey: "${d.ink}",
-  codeStr: "${d.syntax[15] ?? "#5bbfb2"}",
-  codeNum: "${d.shell["code-num"]}",
-  codeLit: "${d.syntax[14] ?? "#c9a7eb"}",
-  primary: "${d.accent}",
-  onPrimary: "${d.page}",
-  canvas: "${d.side}",
-};
-
-/** The palette of the scheme shown now (reactive). */
-export function tok(): Palette {
-  return colorScheme() === "dark" ? dark : light;
-}
-
-const fontMono = "${tokens.geometry.fontFamily.mono}";
-
-export const type = {
-  title: { fontSize: ${baseFont[0]}, lineHeight: ${titleLine} },
-  body: { fontSize: ${smFont[0]}, lineHeight: ${bodyLine} },
-  mono: { fontSize: ${xsFont[0]}, fontFamily: fontMono },
-  label: { fontSize: ${xsFont[0]} },
-  code: { fontSize: ${xsFont[0]}, lineHeight: 19, fontFamily: fontMono },
-} as const;
-
-export const radius = { sm: ${r.sm}, md: ${r.md}, lg: ${r.lg}, button: ${r.md}, card: ${r.lg}, tray: ${r.xl} } as const;
-
-/** Card ring: an inset 1 px border ring plus a faint drop in light mode. */
-export function cardShadow(p: Palette) {
-  return p === dark
-    ? [{ x: 0, y: 0, blur: 0, spread: 1, color: p.border, inset: true }]
-    : [
-        { x: 0, y: 0, blur: 0, spread: 1, color: p.border, inset: true },
-        { x: 0, y: 1, blur: 2, spread: 0, color: "rgba(28,25,23,0.05)", inset: false },
-      ];
-}
-
-/** Return a \`#rrggbb\` or \`rgba(...)\` token at \`alpha\` (0..1) opacity. */
-export function tint(color: string, alpha: number): string {
-  if (color.startsWith("#") && color.length === 7) {
-    const n = parseInt(color.slice(1), 16);
-    return \`rgba(\${(n >> 16) & 255},\${(n >> 8) & 255},\${n & 255},\${alpha})\`;
-  }
-  return color.replace(/rgba\\(([^,]+),([^,]+),([^,]+),[^)]+\\)/u, \`rgba($1,$2,$3,\${alpha})\`);
-}
-
-/** \`danger\` at 6 % fill with a 16 % ring, for error boxes. */
-export function dangerTint(p: Palette) {
-  return { fill: tint(p.danger, 0.06), ring: tint(p.danger, 0.16) };
-}
-`;
-}
-
 function cubicBezierCss(tuple: readonly [number, number, number, number]): string {
   return `cubic-bezier(${tuple.join(", ")})`;
-}
-
-export function syncMotionTs(tokens: DesignTokens, currentRaw: string): string {
-  const easeCss = cubicBezierCss(tokens.motion.ease.out);
-  const replaced = currentRaw.replace(/^(?:export )?const ease = "[^"]+";/mu, `const ease = "${easeCss}";`);
-  if (replaced === currentRaw && !currentRaw.includes(`const ease = "${easeCss}";`)) {
-    throw new Error("Could not locate `const ease = ...` in apps/mac/ui/design/motion.ts");
-  }
-  return replaced;
 }
 
 export function syncSiteGlobalCss(tokens: DesignTokens, currentRaw: string): string {
@@ -478,13 +339,10 @@ export interface TargetOutput {
 
 export function generateTokenTargets(tokens: DesignTokens): TargetOutput[] {
   const nshRaw = readFileSync(nshJsonPath, "utf8");
-  const motionRaw = readFileSync(motionTsPath, "utf8");
   const siteCssRaw = readFileSync(siteCssPath, "utf8");
   return [
     { path: themeJsonPath, content: renderThemeJson(tokens) },
     { path: nshJsonPath, content: renderNshJson(tokens, nshRaw) },
-    { path: tokensTsPath, content: renderTokensTs(tokens) },
-    { path: motionTsPath, content: syncMotionTs(tokens, motionRaw) },
     { path: themeTokensRsPath, content: renderThemeTokensRs(tokens) },
     { path: siteCssPath, content: syncSiteGlobalCss(tokens, siteCssRaw) },
   ];

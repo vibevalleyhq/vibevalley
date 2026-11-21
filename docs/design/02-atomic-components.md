@@ -1,6 +1,6 @@
 # 第二篇：基础原子组件与交互控件
 
-工作台全部基础 UI 原语位于 `apps/mac/ui/design/`，遵循 `nsh` 样式规范（`Text` 单独声明字色字号、禁用 `className` 而是传 `class`、接收调用方 `class?: string` 只补外观未声明的间距与对齐）。工作区外壳（`apps/mac/ui/workspace/`）复用同一目录下的 `design/Button`（`Button`）、`design/Tip`（`Bubble`）与 `design/surface.tsx`。
+工作台全部基础 UI 原语位于 `apps/mac/ui/design/`，遵循 `nsh` 样式规范（`Text` 单独声明字色字号、禁用 `className` 而是传 `class`、接收调用方 `class?: string` 只补外观未声明的间距与对齐）。工作区外壳（`apps/mac/ui/workspace/`）复用 `design/` 原语（`Button`、`Icon`、`ActiveBar`、`Bubble`、`mix()`），并通过 `workspace/chrome.tsx` 组合外壳专用的分栏头、菜单类与小型图标按钮。
 
 ## 2.1 按钮控件梯级
 
@@ -94,6 +94,6 @@
 | `SettingsPage` / `SettingsGroup` / `SettingRow` / `KeyRow` | `apps/mac/ui/design/domain/settings.tsx` | 设置二级页共用布局壳，串联 `SettingsSearch` 实现设置项关键词检索与 `mix("wheat", 0.15)` 高亮匹配行 |
 | `usePixelDir` / `useSpriteUrl` / `useCursorUrl` | `apps/mac/ui/design/pixel/atlas.ts` | 通过 `host.pixelDir` 向原生壳索取本机图片目录路径并拼接 `file://` URL；缺图目录时静默退回占位 |
 
-## 2.6 工作区外壳共享原语（`apps/mac/ui/design/surface.tsx` 与 `apps/mac/ui/workspace/`）
+## 2.6 工作区外壳共享原语（`apps/mac/ui/workspace/chrome.tsx`）
 
-`apps/mac/ui/workspace/` 承载原生工作区外壳（`Sidebar.tsx`、`FileTree.tsx`、`GitPanel.tsx`、`Palette.tsx`、`MarkdownPane.tsx`、`BridgeProbe.tsx`），与工作台共用 `apps/mac/ui/design/` 下的原语与令牌：直接复用 `apps/mac/ui/design/Button.tsx`（`Button`）、`apps/mac/ui/design/Tip.tsx`（`Bubble`），以及 `apps/mac/ui/design/tokens.ts`（`tok()`、`radius`、`cardShadow`、`dangerTint`、`tint()`）与 `apps/mac/ui/design/motion.ts`（`ms()`、`pressTransition()`）；外壳共享样式与图形原语（`SurfaceIcon`、`IconButton`、`focusRing()`、`contextMenuItemStyle`、`contextMenuPopupStyle`）集中于 `apps/mac/ui/design/surface.tsx`。
+`apps/mac/ui/workspace/` 承载原生工作区外壳（`Sidebar.tsx`、`FileTree.tsx`、`GitPanel.tsx`、`Palette.tsx`、`MarkdownPane.tsx`、`BridgeProbe.tsx`），与工作台使用同一套 `theme.json` / `nsh.json` Tailwind 类名、`<Icon name>`、`<ActiveBar />`、`design/Button.tsx`（`Button`）与 `design/Tip.tsx`（`Bubble`）；外壳共享的节标题 `SectionHead`、紧凑图标按钮 `ShellIconButton`、空提示 `PanelEmpty` 与右键菜单样式类集中于 `apps/mac/ui/workspace/chrome.tsx`。

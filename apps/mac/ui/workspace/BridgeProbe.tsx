@@ -2,7 +2,6 @@
 // contract once and reports the results to the shell (debug dump "probe").
 import { Text, View } from "nsh";
 
-import { tok } from "../design/tokens";
 import { act, call, frame, frameRev, hostApi, onLive, subscribe, type Envelope } from "../infra/bridge";
 
 type StateFrame = { seq: number; state: { issues: unknown[] } };
@@ -38,8 +37,8 @@ export function BridgeProbe() {
     setTimeout(report, 1500);
   })();
   return (
-    <View style={{ flex: 1, padding: 16, backgroundColor: tok().canvas }}>
-      <Text style={{ color: tok().ink }}>
+    <View class="flex-1 bg-side p-4">
+      <Text class="text-sm text-ink">
         Bridge probe: state seq {state()?.seq ?? "…"}, rev {rev()}
       </Text>
     </View>

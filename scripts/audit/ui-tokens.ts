@@ -12,7 +12,6 @@ const EXCLUDE_GLOBS = [
   "design/domain/cast.ts",
   // Runtime token lookup & alpha blender (`tone`, `mix`).
   "design/tone.ts",
-  "design/tokens.ts",
   // Pixel asset registry, sprite manifests, and procedural pixel renderers.
   "design/pixel/**",
   "**/*.test.*",
@@ -244,14 +243,10 @@ function checkSelectionLayoutShift(out: Finding[], file: string, line: number, s
   }
 
   if (attrName === "style") {
-    const isWebFile = !file.startsWith("apps/mac/ui/workspace/") && file !== "apps/mac/ui/design/surface.tsx";
-    const testSlice = isAstNode(node.test)
-      ? source.slice(typeof node.test.start === "number" ? node.test.start : 0, typeof node.test.end === "number" ? node.test.end : 0)
-      : "";
     const parent = ancestors[ancestors.length - 1];
     if (parent && parent.type === "Property") {
       const key = propertyKeyName(parent);
-      if (key && BOX_GEOMETRY_STYLE_KEYS.has(key) && (key === "borderWidth" || isWebFile || SELECTION_TEST_RE.test(testSlice))) {
+      if (key && BOX_GEOMETRY_STYLE_KEYS.has(key)) {
         out.push({
           file,
           line,
@@ -266,8 +261,7 @@ function checkSelectionLayoutShift(out: Finding[], file: string, line: number, s
     const consKeys = styleGeometryKeysOf(node.consequent);
     const altKeys = styleGeometryKeysOf(node.alternate);
     const diffKeys = [...[...consKeys].filter((k) => !altKeys.has(k)), ...[...altKeys].filter((k) => !consKeys.has(k))];
-    const changed = diffKeys.some((k) => k === "borderWidth" || isWebFile || SELECTION_TEST_RE.test(testSlice));
-    if (changed) {
+    if (diffKeys.length > 0) {
       out.push({
         file,
         line,

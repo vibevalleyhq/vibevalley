@@ -126,7 +126,7 @@ tester.run("ui-layer-boundaries", rule("ui-layer-boundaries"), {
     { code: "import { api } from '../../infra/api';", filename: "/repo/apps/mac/ui/features/issue/Board.tsx" },
     { code: "import { perform } from '../features/issue/acts';", filename: "/repo/apps/mac/ui/farm/FarmForm.tsx" },
     { code: "import { Root } from '../infra/Root';", filename: "/repo/apps/mac/ui/farm/FarmForm.tsx" },
-    { code: "import { tok } from '../design/tokens';", filename: "/repo/apps/mac/ui/workspace/Sidebar.tsx" },
+    { code: "import { mix } from '../design/tone';", filename: "/repo/apps/mac/ui/workspace/Sidebar.tsx" },
     { code: "import { IssuesPage } from '../features/issue/IssuesPage';", filename: "/repo/apps/mac/ui/app/Workbench.tsx" },
     { code: "import { FarmForm } from './farm/FarmForm';\nimport { Sidebar } from './workspace/Sidebar';", filename: "/repo/apps/mac/ui/App.tsx" },
     { code: "import { Root } from '../infra/Root';", filename: "/repo/apps/mac/ui/app/issues.story.tsx" },

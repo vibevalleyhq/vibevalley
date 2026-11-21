@@ -5,8 +5,7 @@
 ## 8.1 开发前核对：先查概念归属与现有原语
 
 1. **先分清改动归属哪个渲染载体**：
-   - 工作台页面（`apps/mac/ui/{app,features,farm}/`）：用 `nsh` Tailwind 令牌 class + `apps/mac/ui/design/` 原子。
-   - 工作区外壳（`apps/mac/ui/workspace/` 与 `apps/mac/ui/design/surface.tsx`）：复用 `design/Button`、`design/Tip`，内联样式用 `apps/mac/ui/design/tokens.ts` 的 `tok()` + `apps/mac/ui/design/motion.ts`。
+   - 工作台与工作区外壳页面（`apps/mac/ui/{App.tsx,app,features,farm,workspace}/`）：统一用 `nsh` Tailwind 令牌 class + `apps/mac/ui/design/` 原子；工作区外壳共享节头与菜单样式集中在 `apps/mac/ui/workspace/chrome.tsx`。
    - 官网站点（`apps/site/`）：用 Tailwind CSS v4 读 `apps/site/src/ui/global.css` 的 `@theme static`。
    - 原生 GPUI/像素/终端（`apps/mac/src/`）：用 Rust `theme.rs` 与 `pixel::draw::DrawList`。
 2. **复用已有的共用原语**：新建跨模块帮手或状态原语前，先查 [primitives.md](docs/reference/primitives.md) 与 `apps/mac/ui/design/` 目录，禁止抄写第二份功能重叠的按钮、标签、弹窗、分栏或复选框。
@@ -25,19 +24,19 @@
 3. **单行防撑破、控件复用与圆角降档**：
    - 任何列表行、卡片标题或带徽标的水平行，弹性文字父容器必须带 `min-w-0 flex-1`，文字节点带 `truncate`；管理类列表页用 `<PageBody width="manage">`（`max-w-5xl`），文档/设置页用 `prose`（`max-w-3xl`）以免宽屏拉伸过长。
    - 控件一律优先复用共用原语：检索框用 `SearchField`，动作链接用 `ButtonLink`，数量徽标用 `CountPill`，行内报错/通知用 `Banner`，键帽提示用 `Kbd`，侧栏折叠组用 `SidebarSection`，空搜索用 `Empty` (`compact`)，开关与复选框用 `Toggle` / `Checkbox`，分段切换用 `Segmented`，禁止在业务页手搓第二份。
-   - 外框 `rounded-lg` (`8px`) 内层嵌 `rounded-md` (`6px`) 或 `rounded-sm` (`4px`)，内层圆角始终小于等于外框减内边距；宿主工作区（`apps/mac/ui/workspace/`）统一取 `radius.sm`/`md`/`lg`/`tray` 令牌与 `apps/mac/ui/design/surface.tsx` 的 `focusRing(p())`。
+   - 外框 `rounded-lg` (`8px`) 内层嵌 `rounded-md` (`6px`) 或 `rounded-sm` (`4px`)，内层圆角始终小于等于外框减内边距。
 4. **选中态与聚焦态零位移原则**：
    - 选中、聚焦或激活状态严禁改变元素外盒尺寸或挤动兄弟元素：禁止在选中态切换不同的 `borderWidth`（如 `border` 与 `border-2` 互切、`borderWidth: 1` 与 `0`/`2` 互切）、条件 `padding`、横排自适应宽度控件与侧栏行上的字重跳变（`font-normal` ↔ `font-medium`/`font-semibold`），以及向水平布局内插入流内占宽元素。
    - 需要更强描边、左竖条或聚焦条时，保持外框恒定 `border`（无框态配 `border-transparent`），并在容器内叠放 `pointer-events-none absolute inset-0`（或 GPUI `.absolute()`）的非占位指示层；横排选项卡/胶囊统一保持 `font-medium`（静态规则由 `scripts/audit/ui-tokens.ts` 的 `selection-layout-shift` 检查）。
 5. **跨端视觉语法与按压反馈统一**：
-   - 侧栏单选列表统一采用 `bg-selected` + 左侧 `2px` 竖条 `<ActiveBar />`（宿主侧栏用 `p().primary`）+ 恒定 `font-medium`（未读消息等语义徽标除外）。
+   - 侧栏单选列表统一采用 `bg-selected` + 左侧 `2px` 竖条 `<ActiveBar />` + 恒定 `font-medium`（未读消息等语义徽标除外）。
    - 选中态边框统一用 `border-accent bg-selected`；`border-focus` 与 `outline-focus` 严格保留给键盘 `focus-visible` 与输入框 `focus-within`。
-   - 按压反馈不改变几何尺寸（工作台用 `active:translate-y-px`，原生宿主外壳用 `opacity: 0.82`，禁止 `active:scale-*` 缩框）；提示气泡统一采用深墨水底色与 `14%` 反色边界（`Bubble`）。
+   - 按压反馈不改变几何尺寸（工作台用 `active:translate-y-px`，工作区外壳紧凑控件用 `active:opacity-80`，禁止 `active:scale-*` 缩框）；提示气泡统一采用深墨水底色与 `14%` 反色边界（`Bubble`）。
 6. **双主题四级表面抬升规则（Light / Dark Parity）**：
    - 背景严格遵守 `rail → side → page → elevated` 四级递增，确保深色模式下浮层始终比主底更亮而不出现「深色沉底倒挂」：
-     - 所有携带 `shadow-float` 的弹窗（`Dialog`）、菜单（`MoreMenu`）、下拉列表（`Select`）、弹层（`Popover` / `DisplayMenu`）、浮动操作条以及在 `bg-side` 容器内抬起的控件（`Segmented` 滑块、看板卡片 `Board`）统一使用 `bg-elevated`。
+     - 所有携带 `shadow-float` 的弹窗（`Dialog`）、菜单（`MoreMenu` / 工作区右键菜单）、下拉列表（`Select`）、弹层（`Popover` / `DisplayMenu`）、浮动操作条以及在 `bg-side` 容器内抬起的控件（`Segmented` 滑块、看板卡片 `Board`、命令面板 `Palette`）统一使用 `bg-elevated`。
      - 开关与滑块的圆钮（`ToggleSwitch`、`Slider`、`CatalogDetail`）在浅/深双主题下统一使用暖纸白 `bg-paper` 保持实体触感。
-     - 工作区外壳（`apps/mac/ui/workspace/`）一律从 `apps/mac/ui/design/tokens.ts` 调用 `tok()`、`cardShadow()`、`tint()`，右键菜单复用 `apps/mac/ui/design/surface.tsx` 的 `contextMenuItemStyle` / `contextMenuPopupStyle`，禁止写死 `rgba(...)` 或亮/暗手工特例。
+     - 工作台与工作区外壳禁止写死 `rgba(...)` 或亮/暗手工特例。
 
 ## 8.3 状态、并发与键盘可达性
 

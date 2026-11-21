@@ -3,16 +3,17 @@ import { Command, type CommandItem } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
-import { SurfaceIcon, type SurfaceIconName } from "../design/surface";
-import { radius, tok, type as ty } from "../design/tokens";
+import { Icon } from "../design/Icon";
+import type { IconName } from "../design/icons";
 import { act, frame } from "../infra/bridge";
+import { startEllipsis } from "./chrome";
 
 type PaletteMode = "commands" | "files" | "search";
 type Item = CommandItem & { detail?: string };
 type PaletteFrame = { mode: PaletteMode; query: string; items: Item[]; loading: boolean; note: string | null };
 
-const modeIcons: Record<PaletteMode, SurfaceIconName> = {
-  commands: "commands",
+const modeIcons: Record<PaletteMode, IconName> = {
+  commands: "command",
   files: "file",
   search: "search",
 };
@@ -24,30 +25,19 @@ const modeKeys: readonly { mode: PaletteMode; keys: string }[] = [
 ];
 
 function KeyCap(props: { label: string; surface?: "tile" | "surface"; active?: boolean }) {
-  const p = () => tok();
   return (
     <View
-      style={{
-        height: 19,
-        minWidth: 20,
-        paddingHorizontal: 5,
-        borderRadius: radius.sm,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: props.surface === "surface" ? p().surface : p().tile,
-        borderWidth: 1,
-        borderColor: p().border,
-        flexShrink: 0,
-      }}
+      class={`h-5 min-w-5 shrink-0 items-center justify-center rounded-sm border border-line px-1.5 ${
+        props.surface === "surface" ? "bg-elevated" : "bg-hover"
+      }`}
     >
-      <Text style={{ ...ty.mono, fontSize: 10.5, color: props.active === true ? p().ink : p().muted }}>{props.label}</Text>
+      <Text class={`font-mono text-2xs ${props.active === true ? "text-ink" : "text-muted"}`}>{props.label}</Text>
     </View>
   );
 }
 
 export function Palette() {
   const f = frame<PaletteFrame>("palette");
-  const p = () => tok();
   const mode = (): PaletteMode => f()?.mode ?? "commands";
 
   const detailFor = (id: string): string => {
@@ -60,16 +50,7 @@ export function Palette() {
   };
 
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: p().surface,
-        borderWidth: 1,
-        borderColor: p().border,
-        borderRadius: radius.tray,
-        overflow: "hidden",
-      }}
-    >
+    <View class="flex-1 overflow-hidden rounded-xl border border-line bg-elevated">
       <Command
         items={f()?.items ?? []}
         query={mode() === "commands" ? undefined : (f()?.query ?? "")}
@@ -85,65 +66,44 @@ export function Palette() {
         onCancel={() => act({ type: "palette_close" })}
         class="flex-1"
         searchPrefix={
-          <View style={{ width: 20, height: 20, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <SurfaceIcon name={modeIcons[mode()]} size={15} color={p().muted} />
+          <View class="size-5 shrink-0 items-center justify-center">
+            <Icon name={modeIcons[mode()]} size={15} tone="muted" />
           </View>
         }
         searchSuffix={
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            {f()?.loading === true ? <Text style={{ fontSize: 11, color: p().faint }}>{t("web.shell.palette.searching")}</Text> : null}
-            <View
-              style={{
-                height: 20,
-                paddingHorizontal: 7,
-                borderRadius: radius.sm,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: p().tile,
-                borderWidth: 1,
-                borderColor: p().border,
-              }}
-            >
-              <Text style={{ fontSize: 11, fontWeight: "500", color: p().muted }}>{t(`web.shell.palette.mode.${mode()}`)}</Text>
+          <View class="shrink-0 flex-row items-center gap-1.5">
+            {f()?.loading === true ? <Text class="text-2xs text-faint">{t("web.shell.palette.searching")}</Text> : null}
+            <View class="h-5 items-center justify-center rounded-sm border border-line bg-hover px-1.5">
+              <Text class="text-2xs font-medium text-muted">{t(`web.shell.palette.mode.${mode()}`)}</Text>
             </View>
           </View>
         }
-        searchBarClass="flex-row items-center gap-2.5 px-3.5"
-        searchStyle={{ height: 46, flex: 1, fontSize: 14, color: p().ink }}
-        searchBarStyle={{ borderBottomWidth: 1, borderBottomColor: p().border }}
+        searchBarClass="flex-row items-center gap-2.5 border-b border-line px-3.5"
+        searchClass="h-11 flex-1 text-base text-ink placeholder:text-faint"
         listClass="flex-1 p-1.5"
-        groupStyle={{ fontSize: 11, fontWeight: "600", color: p().faint, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 4 }}
+        groupClass="px-2.5 pt-2 pb-1 text-2xs font-semibold text-faint"
         separator
-        separatorStyle={{ height: 1, backgroundColor: p().border, marginVertical: 4, marginHorizontal: 8 }}
+        separatorClass="mx-2 my-1 h-px bg-line"
         itemClass="group h-9 w-full flex-row items-center rounded-md px-2.5 hover:bg-hover focus:bg-selected"
         empty={
-          <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 36, paddingHorizontal: 20, gap: 8 }}>
-            <SurfaceIcon name={modeIcons[mode()]} size={20} color={p().faint} />
-            <Text style={{ fontSize: 13, color: p().muted, textAlign: "center" }}>{f()?.note ?? t(`web.shell.palette.empty.${mode()}`)}</Text>
+          <View class="items-center justify-center gap-2 px-5 py-9">
+            <Icon name={modeIcons[mode()]} size={20} tone="faint" />
+            <Text class="text-center text-sm text-muted">{f()?.note ?? t(`web.shell.palette.empty.${mode()}`)}</Text>
           </View>
         }
         renderItem={(entry) => {
           const detail = () => detailFor(entry.id);
           return (
-            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%", minWidth: 0 }}>
-              <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 }}>
-                <View style={{ width: 18, height: 18, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <SurfaceIcon name={modeIcons[mode()]} size={13} color={p().faint} />
+            <View class="w-full min-w-0 flex-1 flex-row items-center justify-between gap-2.5">
+              <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                <View class="size-4.5 shrink-0 items-center justify-center">
+                  <Icon name={modeIcons[mode()]} size={13} tone="faint" />
                 </View>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "500",
-                    color: p().ink,
-                    numberOfLines: 1,
-                    flexShrink: 1,
-                    fontFamily: mode() === "search" ? ty.mono.fontFamily : undefined,
-                  }}
-                >
-                  {entry.label}
-                </Text>
+                <Text class={`shrink truncate text-sm font-medium text-ink ${mode() === "search" ? "font-mono" : ""}`}>{entry.label}</Text>
                 {detail() ? (
-                  <Text style={{ fontSize: 11, color: p().muted, numberOfLines: 1, flexShrink: 1, textOverflow: "ellipsis-start" }}>{detail()}</Text>
+                  <Text class="shrink truncate text-2xs text-muted" style={startEllipsis}>
+                    {detail()}
+                  </Text>
                 ) : null}
               </View>
               {entry.shortcutLabel ? <KeyCap label={entry.shortcutLabel} /> : null}
@@ -151,39 +111,28 @@ export function Palette() {
           );
         }}
       />
-      <View
-        style={{
-          height: 32,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 14,
-          borderTopWidth: 1,
-          borderTopColor: p().border,
-          backgroundColor: p().canvas,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+      <View class="h-8 flex-row items-center justify-between border-t border-line bg-side px-3.5">
+        <View class="flex-row items-center gap-2.5">
+          <View class="flex-row items-center gap-1">
             <KeyCap label="↑↓" surface="surface" />
-            <Text style={{ fontSize: 11, color: p().muted }}>{t("web.shell.palette.footer.select")}</Text>
+            <Text class="text-2xs text-muted">{t("web.shell.palette.footer.select")}</Text>
           </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <View class="flex-row items-center gap-1">
             <KeyCap label="↵" surface="surface" />
-            <Text style={{ fontSize: 11, color: p().muted }}>{t("web.shell.palette.footer.run")}</Text>
+            <Text class="text-2xs text-muted">{t("web.shell.palette.footer.run")}</Text>
           </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <View class="flex-row items-center gap-1">
             <KeyCap label="Esc" surface="surface" />
-            <Text style={{ fontSize: 11, color: p().muted }}>{t("web.shell.palette.footer.close")}</Text>
+            <Text class="text-2xs text-muted">{t("web.shell.palette.footer.close")}</Text>
           </View>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <View class="flex-row items-center gap-2.5">
           {modeKeys.map((hint) => {
             const active = () => mode() === hint.mode;
             return (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <View class="flex-row items-center gap-1">
                 <KeyCap label={hint.keys} surface="surface" active={active()} />
-                <Text style={{ fontSize: 11, fontWeight: "500", color: active() ? p().ink : p().faint }}>{t(`web.shell.palette.mode.${hint.mode}`)}</Text>
+                <Text class={`text-2xs font-medium ${active() ? "text-ink" : "text-faint"}`}>{t(`web.shell.palette.mode.${hint.mode}`)}</Text>
               </View>
             );
           })}
