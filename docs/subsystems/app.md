@@ -26,7 +26,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | `apps/mac/src/pixel/` | 像素场景（引擎在 `apps/mac/crates/pixel`）：农场、地图、记忆树、开场、图鉴（[农场的皮](docs/subsystems/farm.md)） |
 | `apps/mac/crates/` | 桌面端独占支撑 crate：`pixel`、`terminal`、`workspace`（项目、布局、终端与宿主 `state.db` 持久化） |
 | `crates/rich/` | 原生富内容组件集（`VvMarkdown`、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`、`VvGenUi`、`VvPinyin`）与内部渲染引擎 `engine/` |
-| `apps/mac/src/theme.rs`、`apps/mac/ui/design/tokens.ts` | 外壳的主题和设置；两边从 `design/tokens.json` 同步生成 |
+| `apps/mac/src/theme.rs`、`apps/mac/src/theme_tokens.rs` | 外壳的主题和设置；从 `design/tokens.json` 同步生成 |
 | `apps/mac/src/debug.rs` | 不看屏幕检查应用的两个入口：状态转储和脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） |
 | `apps/mac/ui/App.tsx`、`workspace/` | TSX 包入口（按 `host.params.view` 挑视图）与外壳工作区（侧栏、文件树、Git、命令面板、Markdown 窗格） |
 | `apps/mac/ui/{app,features,design,infra}/` | 工作台共 6 个顶级目录：入口外壳 `app/`（路由表 `Workbench.tsx`、6 项一级导航 `places.ts`、外框 `Shell.tsx`）、领域切片 `features/<概念>/`（含 5 栏设置页、笔记与 Artifact 纯逻辑引擎）、共享原语与表面 `design/`、底层运行时与状态 `infra/`（`bridge.ts`、`solid.ts`、`polyfill.ts`、`state/`），另加 `workspace/` 与 `farm/` |

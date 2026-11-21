@@ -2,17 +2,30 @@
 //   - "changes": commit box, conflicts, staged & unstaged file diffs
 //   - "branches": current branch, local branches (click to checkout) & worktrees
 //   - "commits": commit history log (click to open commit diff)
-import { Clipboard, effect, Scroll, signal, Text, View } from "nsh";
+import { Clipboard, effect, Scroll, signal, Text, View, type TextStyle } from "nsh";
 import { Button, ContextMenu, Input, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
 import { Button as DesignButton } from "../design/Button";
-import { pressTransition } from "../design/motion";
-import { contextMenuItemStyle, contextMenuPopupStyle, Empty, focusRing, IconButton, SectionHead, statusTint, SurfaceIcon, toneColor } from "../design/surface";
+import { Icon } from "../design/Icon";
+import { ActiveBar } from "../design/layout";
 import { Bubble } from "../design/Tip";
-import { radius, tok, type as ty } from "../design/tokens";
+import { mix } from "../design/tone";
 import { act, frame, hostApi } from "../infra/bridge";
+import {
+  gitToneTextClass,
+  menuDangerItemClass,
+  menuItemClass,
+  menuPopupClass,
+  menuSeparatorClass,
+  PanelEmpty,
+  SectionHead,
+  ShellIconButton,
+  startEllipsis,
+} from "./chrome";
+
+const autoDirection: TextStyle = { writingDirection: "auto" };
 
 export type GitRow = { path: string; code: string; tone: string };
 export type GitWorktree = {
@@ -61,7 +74,6 @@ function formatCommitTime(epochSec: number): string {
 }
 
 function FileRow(props: { row: GitRow; staged: boolean }) {
-  const p = () => tok();
   const hovered = signal(false);
   const confirmingDiscard = signal(false);
   const name = () => props.row.path.split("/").pop() ?? props.row.path;
@@ -71,17 +83,7 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
     <View
       onMouseEnter={() => hovered.set(true)}
       onMouseLeave={() => hovered.set(false)}
-      style={{
-        height: 26,
-        marginHorizontal: 6,
-        paddingHorizontal: 6,
-        borderRadius: radius.md,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        backgroundColor: showActions() ? p().tile : "transparent",
-        ...pressTransition(),
-      }}
+      class={`mx-1.5 h-6.5 flex-row items-center gap-1 rounded-md px-1.5 transition duration-120 ease-out ${showActions() ? "bg-hover" : "bg-transparent"}`}
     >
       <Button
         onPress={() => {
@@ -90,98 +92,62 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
         }}
         accessibilityLabel={`Open diff of ${props.row.path}`}
         tooltip={<Bubble text={props.row.path} />}
-        focusVisibleStyle={focusRing(p())}
-        style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, height: 26, borderRadius: radius.sm }}
+        class="h-6.5 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <Text
-          style={{
-            fontSize: 13,
-            lineHeight: 18,
-            color: toneColor(p(), props.row.tone),
-            numberOfLines: 1,
-            flexShrink: 1,
-          }}
-        >
-          {name()}
-        </Text>
+        <Text class={`shrink truncate text-sm ${gitToneTextClass(props.row.tone)}`}>{name()}</Text>
         {dir() ? (
-          <Text
-            style={{
-              fontSize: 11,
-              lineHeight: 16,
-              color: p().muted,
-              numberOfLines: 1,
-              flex: 1,
-              minWidth: 0,
-              textOverflow: "ellipsis-start",
-            }}
-          >
+          <Text class="min-w-0 flex-1 truncate text-2xs text-muted" style={startEllipsis}>
             {dir()}
           </Text>
         ) : null}
       </Button>
       {confirmingDiscard() ? (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}>
+        <View class="shrink-0 flex-row items-center gap-1">
           <Button
             onPress={() => {
               confirmingDiscard.set(false);
               act({ type: "discard", paths: [props.row.path] });
             }}
-            activeStyle={{ opacity: 0.82 }}
-            focusVisibleStyle={focusRing(p())}
-            style={{ height: 20, paddingHorizontal: 6, borderRadius: radius.sm, backgroundColor: p().danger, justifyContent: "center", ...pressTransition() }}
+            class="h-5 justify-center rounded-sm bg-berry px-1.5 transition duration-120 ease-out active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
           >
-            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().onPrimary }}>{t("web.shell.git.confirmDiscard")}</Text>
+            <Text class="text-2xs font-medium text-page">{t("web.shell.git.confirmDiscard")}</Text>
           </Button>
           <Button
             onPress={() => confirmingDiscard.set(false)}
-            activeStyle={{ opacity: 0.82 }}
-            focusVisibleStyle={focusRing(p())}
-            hoverStyle={{ backgroundColor: p().border }}
-            style={{ height: 20, paddingHorizontal: 6, borderRadius: radius.sm, backgroundColor: p().subtle, justifyContent: "center", ...pressTransition() }}
+            class="h-5 justify-center rounded-sm bg-selected px-1.5 transition duration-120 ease-out hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
           >
-            <Text style={{ fontSize: 11, lineHeight: 14, color: p().text }}>{t("web.shell.git.cancel")}</Text>
+            <Text class="text-2xs text-ink">{t("web.shell.git.cancel")}</Text>
           </Button>
         </View>
       ) : hovered() ? (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 0 }}>
+        <View class="shrink-0 flex-row items-center gap-0.5">
           {props.staged ? (
-            <IconButton
-              label={t("web.shell.git.unstagePath", { path: props.row.path })}
+            <ShellIconButton
+              compact
               icon="minus"
+              label={t("web.shell.git.unstagePath", { path: props.row.path })}
               onPress={() => act({ type: "unstage", paths: [props.row.path] })}
             />
           ) : (
             <>
-              <IconButton
-                label={t("web.shell.git.discardPath", { path: props.row.path })}
+              <ShellIconButton
+                compact
+                danger
                 icon="undo"
-                hoverColor={p().danger}
+                label={t("web.shell.git.discardPath", { path: props.row.path })}
                 onPress={() => confirmingDiscard.set(true)}
               />
-              <IconButton
+              <ShellIconButton
+                compact
+                icon="add"
                 label={t("web.shell.git.stagePath", { path: props.row.path })}
-                icon="plus"
                 onPress={() => act({ type: "stage", paths: [props.row.path] })}
               />
             </>
           )}
         </View>
       ) : null}
-      <Text
-        style={{
-          fontFamily: ty.mono.fontFamily,
-          fontSize: 11,
-          lineHeight: 16,
-          fontWeight: "600",
-          width: 16,
-          textAlign: "center",
-          flexShrink: 0,
-          color: toneColor(p(), props.row.tone),
-        }}
-      >
-        {props.row.code}
-      </Text>
+      <Text class={`w-4 shrink-0 text-center font-mono text-2xs font-semibold ${gitToneTextClass(props.row.tone)}`}>{props.row.code}</Text>
     </View>
   );
 }
@@ -208,7 +174,6 @@ function WorktreeRow(props: {
   removeError: () => { path: string; text: string } | null;
   onConfirmRemove: (w: GitWorktree, force: boolean) => void;
 }) {
-  const p = () => tok();
   const w = () => props.w;
   const dirty = () => (w().changed ?? 0) > 0 || (w().conflicts ?? 0) > 0;
   const confirming = () => props.pendingRemove() === w().path;
@@ -219,33 +184,9 @@ function WorktreeRow(props: {
   };
   const trigger = (
     <View
-      style={{
-        position: "relative",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        gap: 4,
-        backgroundColor: w().current === true ? p().subtle : "transparent",
-        opacity: isRemoving() ? 0.6 : 1,
-        borderBottomWidth: 1,
-        borderBottomColor: p().border,
-        ...pressTransition(),
-      }}
-      hoverStyle={{ backgroundColor: w().current === true ? p().subtle : p().tile }}
+      class={`relative gap-1 border-b border-line px-3 py-2 transition duration-120 ease-out ${w().current === true ? "bg-selected" : "bg-transparent hover:bg-hover"} ${isRemoving() ? "opacity-60" : ""}`}
     >
-      {w().current === true ? (
-        <View
-          style={{
-            position: "absolute",
-            left: 2,
-            top: 6,
-            bottom: 6,
-            width: 2,
-            borderRadius: 999,
-            backgroundColor: p().primary,
-            pointerEvents: "none",
-          }}
-        />
-      ) : null}
+      {w().current === true ? <ActiveBar /> : null}
       <Button
         disabled={isRemoving()}
         onPress={() => {
@@ -253,110 +194,51 @@ function WorktreeRow(props: {
           act({ type: "activate_path", path: w().path });
         }}
         tooltip={<Bubble text={w().path} />}
-        focusVisibleStyle={focusRing(p())}
-        style={{ gap: 4, borderRadius: radius.sm }}
+        class="gap-1 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 20 }}>
-          <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 5 }}>
-            <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <SurfaceIcon name="git-branch" size={12} color={w().current === true ? p().ink : p().muted} />
+        <View class="min-h-5 flex-row items-center gap-2">
+          <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
+            <View class="size-3.5 shrink-0 items-center justify-center">
+              <Icon name="branch" size={12} tone={w().current === true ? "ink" : "muted"} />
             </View>
-            <Text
-              style={{
-                fontFamily: ty.mono.fontFamily,
-                fontSize: 12,
-                lineHeight: 16,
-                fontWeight: "500",
-                color: p().ink,
-                numberOfLines: 1,
-                flexShrink: 1,
-                minWidth: 0,
-              }}
-            >
-              {w().branch ?? "(detached)"}
-            </Text>
+            <Text class="min-w-0 shrink truncate font-mono text-xs font-medium text-ink">{w().branch ?? "(detached)"}</Text>
             {w().main ? (
               <View
-                style={{
-                  height: 16,
-                  paddingHorizontal: 5,
-                  borderRadius: radius.sm,
-                  backgroundColor: w().current === true ? p().surface : p().tile,
-                  borderWidth: 1,
-                  borderColor: p().border,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
+                class={`h-4 shrink-0 items-center justify-center rounded-sm border border-line px-1.5 ${w().current === true ? "bg-elevated" : "bg-hover"}`}
               >
-                <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted }}>{t("web.shell.git.mainLabel")}</Text>
+                <Text class="text-2xs text-muted">{t("web.shell.git.mainLabel")}</Text>
               </View>
             ) : null}
-            {w().locked ? <SurfaceIcon name="lock" size={11} color={p().faint} /> : null}
+            {w().locked ? <Icon name="lock" size={11} tone="faint" /> : null}
           </View>
-          <View style={{ flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 5 }}>
+          <View class="shrink-0 flex-row items-center gap-1.5">
             {isRemoving() ? (
-              <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().muted }}>{t("web.shell.git.removing")}</Text>
+              <Text class="text-2xs font-medium text-muted">{t("web.shell.git.removing")}</Text>
             ) : (
               <>
                 {(w().ahead ?? 0) > 0 ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 1 }}>
-                    <SurfaceIcon name="arrow-up" size={9} color={p().ok} />
-                    <Text style={{ fontFamily: ty.mono.fontFamily, fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().ok }}>{w().ahead}</Text>
+                  <View class="flex-row items-center gap-0.5">
+                    <Icon name="moveUp" size={10} tone="leaf" />
+                    <Text class="font-mono text-2xs font-medium text-leaf">{w().ahead}</Text>
                   </View>
                 ) : null}
                 {(w().behind ?? 0) > 0 ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 1 }}>
-                    <SurfaceIcon name="arrow-down" size={9} color={p().alert} />
-                    <Text style={{ fontFamily: ty.mono.fontFamily, fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().alert }}>{w().behind}</Text>
+                  <View class="flex-row items-center gap-0.5">
+                    <Icon name="moveDown" size={10} tone="warn-ink" />
+                    <Text class="font-mono text-2xs font-medium text-warn-ink">{w().behind}</Text>
                   </View>
                 ) : null}
                 {(w().conflicts ?? 0) > 0 ? (
-                  <View
-                    style={{
-                      height: 18,
-                      paddingHorizontal: 6,
-                      borderRadius: radius.sm,
-                      backgroundColor: statusTint(p(), "danger").fill,
-                      borderWidth: 1,
-                      borderColor: statusTint(p(), "danger").ring,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().danger }}>
-                      {t("web.shell.git.wtConflictsCount", { n: w().conflicts ?? 0 })}
-                    </Text>
+                  <View class="h-4.5 items-center justify-center rounded-sm border bg-bad-soft px-1.5" style={{ borderColor: mix("berry", 0.25) }}>
+                    <Text class="text-2xs font-medium text-berry">{t("web.shell.git.wtConflictsCount", { n: w().conflicts ?? 0 })}</Text>
                   </View>
                 ) : (w().changed ?? 0) > 0 ? (
-                  <View
-                    style={{
-                      height: 18,
-                      paddingHorizontal: 6,
-                      borderRadius: radius.sm,
-                      backgroundColor: statusTint(p(), "alert").fill,
-                      borderWidth: 1,
-                      borderColor: statusTint(p(), "alert").ring,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().alert }}>
-                      {t("web.shell.git.wtChangedCount", { n: w().changed ?? 0 })}
-                    </Text>
+                  <View class="h-4.5 items-center justify-center rounded-sm border bg-warn-soft px-1.5" style={{ borderColor: mix("wheat", 0.25) }}>
+                    <Text class="text-2xs font-medium text-warn-ink">{t("web.shell.git.wtChangedCount", { n: w().changed ?? 0 })}</Text>
                   </View>
                 ) : (
-                  <View
-                    style={{
-                      height: 18,
-                      paddingHorizontal: 6,
-                      borderRadius: radius.sm,
-                      backgroundColor: w().current === true ? p().surface : p().tile,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted }}>{t("web.shell.git.wtClean")}</Text>
+                  <View class={`h-4.5 items-center justify-center rounded-sm px-1.5 ${w().current === true ? "bg-elevated" : "bg-hover"}`}>
+                    <Text class="text-2xs text-muted">{t("web.shell.git.wtClean")}</Text>
                   </View>
                 )}
               </>
@@ -364,112 +246,52 @@ function WorktreeRow(props: {
           </View>
         </View>
         {props.badge ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 19 }}>
-            <View
-              style={{
-                width: props.running === true ? 6 : 5,
-                height: props.running === true ? 6 : 5,
-                borderRadius: 999,
-                backgroundColor: props.running === true ? p().ok : p().faint,
-                flexShrink: 0,
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 11,
-                lineHeight: 15,
-                fontWeight: props.running === true ? "500" : "400",
-                color: props.running === true ? p().ok : p().muted,
-                numberOfLines: 1,
-                flex: 1,
-                minWidth: 0,
-              }}
-            >
-              {props.badge}
-            </Text>
+          <View class="flex-row items-center gap-1.5 pl-5">
+            <View class={`size-1.5 shrink-0 rounded-full ${props.running === true ? "bg-leaf" : "bg-faint"}`} />
+            <Text class={`min-w-0 flex-1 truncate text-2xs ${props.running === true ? "font-medium text-leaf" : "text-muted"}`}>{props.badge}</Text>
           </View>
         ) : null}
-        {w().summary ? <Text style={{ fontSize: 12, lineHeight: 16, color: p().text, numberOfLines: 1, paddingLeft: 19 }}>{w().summary}</Text> : null}
-        <Text
-          style={{
-            fontFamily: ty.mono.fontFamily,
-            fontSize: 11,
-            lineHeight: 14,
-            color: p().faint,
-            numberOfLines: 1,
-            textOverflow: "ellipsis-start",
-            paddingLeft: 19,
-          }}
-        >
+        {w().summary ? <Text class="truncate pl-5 text-xs text-ink">{w().summary}</Text> : null}
+        <Text class="truncate pl-5 font-mono text-2xs text-faint" style={startEllipsis}>
           {w().path}
         </Text>
       </Button>
       {confirming() && !isRemoving() ? (
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 6, paddingTop: 4 }}>
-          <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted }}>
-            {dirty() ? t("web.shell.git.wtDirtyPrompt") : t("web.shell.git.wtConfirmDeletePrompt")}
-          </Text>
+        <View class="flex-row items-center justify-end gap-1.5 pt-1">
+          <Text class="text-2xs text-muted">{dirty() ? t("web.shell.git.wtDirtyPrompt") : t("web.shell.git.wtConfirmDeletePrompt")}</Text>
           <Button
             onPress={() => props.onConfirmRemove(w(), dirty())}
-            activeStyle={{ opacity: 0.82 }}
-            focusVisibleStyle={focusRing(p())}
-            style={{
-              height: 22,
-              paddingHorizontal: 8,
-              borderRadius: radius.sm,
-              backgroundColor: p().danger,
-              justifyContent: "center",
-              ...pressTransition(),
-            }}
+            class="h-5.5 justify-center rounded-sm bg-berry px-2 transition duration-120 ease-out active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
           >
-            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().onPrimary }}>
-              {dirty() ? t("web.shell.git.wtForceDelete") : t("web.shell.git.wtConfirmDelete")}
-            </Text>
+            <Text class="text-2xs font-medium text-page">{dirty() ? t("web.shell.git.wtForceDelete") : t("web.shell.git.wtConfirmDelete")}</Text>
           </Button>
           <Button
             onPress={() => props.setPendingRemove(null)}
-            activeStyle={{ opacity: 0.82 }}
-            focusVisibleStyle={focusRing(p())}
-            style={{
-              height: 22,
-              paddingHorizontal: 7,
-              borderRadius: radius.sm,
-              backgroundColor: p().tile,
-              borderWidth: 1,
-              borderColor: p().border,
-              justifyContent: "center",
-              ...pressTransition(),
-            }}
-            hoverStyle={{ backgroundColor: p().subtle }}
+            class="h-5.5 justify-center rounded-sm border border-line bg-hover px-2 transition duration-120 ease-out hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
           >
-            <Text style={{ fontSize: 11, lineHeight: 14, color: p().text }}>{t("web.shell.git.cancel")}</Text>
+            <Text class="text-2xs text-ink">{t("web.shell.git.cancel")}</Text>
           </Button>
         </View>
       ) : null}
-      {rowError() ? (
-        <Text style={{ fontSize: 11, lineHeight: 15, color: p().danger, paddingLeft: 19, paddingTop: 2 }}>
-          {t("web.shell.git.removeFailed", { why: rowError() ?? "" })}
-        </Text>
-      ) : null}
+      {rowError() ? <Text class="pt-0.5 pl-5 text-2xs text-berry">{t("web.shell.git.removeFailed", { why: rowError() ?? "" })}</Text> : null}
     </View>
   );
-  const itemStyle = contextMenuItemStyle;
   return (
-    <ContextMenu trigger={trigger} popupStyle={contextMenuPopupStyle(p())}>
-      <MenuItem onSelect={() => act({ type: "new_terminal_at", path: w().path })} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-        <Text style={{ fontSize: 12, color: p().ink }}>{t("web.shell.sidebar.newTerminalHere")}</Text>
+    <ContextMenu trigger={trigger} popupClass={menuPopupClass}>
+      <MenuItem onSelect={() => act({ type: "new_terminal_at", path: w().path })} class={menuItemClass}>
+        <Text class="text-xs text-ink">{t("web.shell.sidebar.newTerminalHere")}</Text>
       </MenuItem>
-      <MenuItem onSelect={() => void hostApi.reveal(w().path)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-        <Text style={{ fontSize: 12, color: p().ink }}>{t("web.shell.sidebar.revealInFinder")}</Text>
+      <MenuItem onSelect={() => void hostApi.reveal(w().path)} class={menuItemClass}>
+        <Text class="text-xs text-ink">{t("web.shell.sidebar.revealInFinder")}</Text>
       </MenuItem>
-      <MenuItem onSelect={() => void Clipboard.writeText(w().path)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-        <Text style={{ fontSize: 12, color: p().ink }}>{t("web.shell.sidebar.copyPath")}</Text>
+      <MenuItem onSelect={() => void Clipboard.writeText(w().path)} class={menuItemClass}>
+        <Text class="text-xs text-ink">{t("web.shell.sidebar.copyPath")}</Text>
       </MenuItem>
       {!w().main ? (
         <>
-          <MenuSeparator style={{ height: 1, marginVertical: 4, backgroundColor: p().border }} />
-          <MenuItem onSelect={() => props.setPendingRemove(w().path)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-            <Text style={{ fontSize: 12, color: p().danger }}>{t("web.shell.git.wtRemoveMenu")}</Text>
+          <MenuSeparator class={menuSeparatorClass} />
+          <MenuItem onSelect={() => props.setPendingRemove(w().path)} class={menuDangerItemClass}>
+            <Text class="text-xs text-berry">{t("web.shell.git.wtRemoveMenu")}</Text>
           </MenuItem>
         </>
       ) : null}
@@ -478,7 +300,6 @@ function WorktreeRow(props: {
 }
 
 export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
-  const p = () => tok();
   const message = signal("");
   const localTab = signal<GitTab>("changes");
   const folded = signal<Record<string, boolean>>({});
@@ -609,92 +430,40 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               if (next) ensureOpen(sectionKey);
             }}
             accessibilityLabel={t("web.shell.git.newWorktree")}
-            activeStyle={{ opacity: 0.82 }}
-            focusVisibleStyle={focusRing(p())}
-            style={{
-              height: 20,
-              paddingHorizontal: 6,
-              borderRadius: radius.md,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 3,
-              backgroundColor: p().tile,
-              ...pressTransition(),
-            }}
-            hoverStyle={{ backgroundColor: p().subtle }}
+            class="h-5 flex-row items-center gap-1 rounded-md bg-hover px-1.5 transition duration-120 ease-out hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
           >
-            <SurfaceIcon name="plus" size={10} color={p().text} />
-            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().text }}>
-              {creatingWt() ? t("web.shell.git.creatingWorktree") : t("web.shell.git.createWorktreeBtn")}
-            </Text>
+            <Icon name="add" size={10} tone="ink" />
+            <Text class="text-2xs font-medium text-ink">{creatingWt() ? t("web.shell.git.creatingWorktree") : t("web.shell.git.createWorktreeBtn")}</Text>
           </Button>
         }
       />
       {isOpen(sectionKey) ? (
         <View>
           {addingWt() ? (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                paddingHorizontal: 12,
-                paddingTop: 2,
-                paddingBottom: 8,
-                borderBottomWidth: 1,
-                borderBottomColor: p().border,
-              }}
-            >
+            <View class="flex-row items-center gap-1.5 border-b border-line px-3 pt-0.5 pb-2">
               <Input
                 value={newBranch()}
                 onChange={({ value }) => newBranch.set(value)}
                 onSubmit={submitNewWorktree}
                 placeholder={t("web.shell.git.newBranchPlaceholder")}
-                style={{
-                  flex: 1,
-                  height: 26,
-                  borderRadius: radius.md,
-                  borderWidth: 1,
-                  borderColor: p().border,
-                  backgroundColor: p().surface,
-                  color: p().ink,
-                  paddingHorizontal: 8,
-                  fontSize: 12,
-                }}
+                class="h-6.5 flex-1 rounded-md border border-line bg-elevated px-2 text-xs text-ink placeholder:text-faint hover:border-faint focus:border-focus"
               />
               <Button
                 onPress={submitNewWorktree}
                 disabled={!newBranch().trim() || creatingWt()}
-                activeStyle={!newBranch().trim() || creatingWt() ? undefined : { opacity: 0.82 }}
-                focusVisibleStyle={!newBranch().trim() || creatingWt() ? undefined : focusRing(p())}
-                style={{
-                  height: 26,
-                  paddingHorizontal: 10,
-                  borderRadius: radius.md,
-                  backgroundColor: !newBranch().trim() || creatingWt() ? p().tile : p().primary,
-                  borderWidth: 1,
-                  borderColor: !newBranch().trim() || creatingWt() ? p().border : p().primary,
-                  justifyContent: "center",
-                  ...pressTransition(),
-                }}
+                class={`h-6.5 justify-center rounded-md border px-2.5 transition duration-120 ease-out ${
+                  !newBranch().trim() || creatingWt()
+                    ? "border-line bg-hover"
+                    : "border-accent bg-accent hover:bg-accent-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+                }`}
               >
-                <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: !newBranch().trim() || creatingWt() ? p().muted : p().onPrimary }}>
-                  {t("web.shell.git.createBtn")}
-                </Text>
+                <Text class={`text-2xs font-medium ${!newBranch().trim() || creatingWt() ? "text-muted" : "text-page"}`}>{t("web.shell.git.createBtn")}</Text>
               </Button>
             </View>
           ) : null}
           {showNotice && removeNotice() ? (
-            <View
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                backgroundColor: statusTint(p(), "ok").fill,
-                borderBottomWidth: 1,
-                borderBottomColor: p().border,
-              }}
-            >
-              <Text style={{ fontSize: 11, lineHeight: 15, color: p().ok }}>{removeNotice()}</Text>
+            <View class="border-b border-line bg-ok-soft px-3 py-1.5">
+              <Text class="text-2xs text-ok-ink">{removeNotice()}</Text>
             </View>
           ) : null}
           <Each of={f()?.worktrees ?? []} key={(w) => w.path}>
@@ -720,61 +489,39 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
   );
 
   return (
-    <View style={{ flex: 1 }}>
+    <View class="flex-1">
       {f()?.repo !== true ? (
-        <View style={{ flex: 1 }}>
+        <View class="flex-1">
           <SectionHead title={t("web.shell.git.title")} borderBottom />
-          <Empty text={f()?.busy === true || !f() ? t("web.shell.git.loading") : (f()?.error ?? t("web.shell.git.notRepo"))} />
+          <PanelEmpty text={f()?.busy === true || !f() ? t("web.shell.git.loading") : (f()?.error ?? t("web.shell.git.notRepo"))} />
         </View>
       ) : (
-        <View style={{ flex: 1 }}>
-          <View
-            style={{
-              height: 30,
-              flexDirection: "row",
-              alignItems: "center",
-              paddingLeft: 12,
-              paddingRight: 8,
-              gap: 6,
-              borderBottomWidth: 1,
-              borderBottomColor: p().border,
-            }}
-          >
-            <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <SurfaceIcon name="git-branch" size={12} color={p().muted} />
+        <View class="flex-1">
+          <View class="h-7.5 flex-row items-center gap-1.5 border-b border-line pr-2 pl-3">
+            <View class="size-3.5 shrink-0 items-center justify-center">
+              <Icon name="branch" size={12} tone="muted" />
             </View>
-            <View style={{ flex: 1, minWidth: 0 }} tooltip={<Bubble text={branchLabel()} />}>
-              <Text style={{ fontFamily: ty.mono.fontFamily, fontSize: 12, lineHeight: 16, fontWeight: "500", color: p().ink, numberOfLines: 1 }}>
-                {branchLabel()}
-              </Text>
+            <View class="min-w-0 flex-1" tooltip={<Bubble text={branchLabel()} />}>
+              <Text class="truncate font-mono text-xs font-medium text-ink">{branchLabel()}</Text>
             </View>
             {(f()?.ahead ?? 0) > 0 ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 1, flexShrink: 0 }}>
-                <SurfaceIcon name="arrow-up" size={9} color={p().ok} />
-                <Text style={{ fontFamily: ty.mono.fontFamily, fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().ok }}>{f()?.ahead}</Text>
+              <View class="shrink-0 flex-row items-center gap-0.5">
+                <Icon name="moveUp" size={10} tone="leaf" />
+                <Text class="font-mono text-2xs font-medium text-leaf">{f()?.ahead}</Text>
               </View>
             ) : null}
             {(f()?.behind ?? 0) > 0 ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 1, flexShrink: 0 }}>
-                <SurfaceIcon name="arrow-down" size={9} color={p().alert} />
-                <Text style={{ fontFamily: ty.mono.fontFamily, fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().alert }}>{f()?.behind}</Text>
+              <View class="shrink-0 flex-row items-center gap-0.5">
+                <Icon name="moveDown" size={10} tone="warn-ink" />
+                <Text class="font-mono text-2xs font-medium text-warn-ink">{f()?.behind}</Text>
               </View>
             ) : null}
-            <IconButton label={t("web.shell.git.refresh")} icon="refresh" onPress={() => act({ type: "refresh_git" })} />
+            <ShellIconButton label={t("web.shell.git.refresh")} icon="refresh" onPress={() => act({ type: "refresh_git" })} />
           </View>
 
           {/* Sub-navigation when not driven by parent header */}
           {props.tab === undefined ? (
-            <View
-              style={{
-                flexDirection: "row",
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                gap: 4,
-                borderBottomWidth: 1,
-                borderBottomColor: p().border,
-              }}
-            >
+            <View class="flex-row gap-1 border-b border-line px-2.5 py-1.5">
               {(
                 [
                   {
@@ -789,61 +536,33 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 return (
                   <Button
                     onPress={() => localTab.set(item.id)}
-                    activeStyle={{ opacity: 0.82 }}
-                    focusVisibleStyle={focusRing(p())}
-                    style={{
-                      flex: 1,
-                      height: 24,
-                      borderRadius: radius.md,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: cur() ? p().subtle : "transparent",
-                      ...pressTransition(),
-                    }}
-                    hoverStyle={{ backgroundColor: cur() ? p().subtle : p().tile }}
+                    class={`h-6 flex-1 items-center justify-center rounded-md transition duration-120 ease-out active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus ${
+                      cur() ? "bg-selected" : "bg-transparent hover:bg-hover"
+                    }`}
                   >
-                    <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: cur() ? p().ink : p().muted }}>{item.label}</Text>
+                    <Text class={`text-2xs font-medium ${cur() ? "text-ink" : "text-muted"}`}>{item.label}</Text>
                   </Button>
                 );
               })}
             </View>
           ) : null}
 
-          <Scroll style={{ flex: 1 }}>
+          <Scroll class="flex-1">
             {activeTab() === "changes" ? (
               <View>
                 {removeNotice() ? (
-                  <View
-                    style={{
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      backgroundColor: statusTint(p(), "ok").fill,
-                      borderBottomWidth: 1,
-                      borderBottomColor: p().border,
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, lineHeight: 15, color: p().ok }}>{removeNotice()}</Text>
+                  <View class="border-b border-line bg-ok-soft px-3 py-1.5">
+                    <Text class="text-2xs text-ok-ink">{removeNotice()}</Text>
                   </View>
                 ) : null}
                 {(f()?.worktrees?.length ?? 0) > 1 ? renderWorktreesSection("changes-worktrees", t("web.shell.git.worktrees"), false, false) : null}
-                <View style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8, borderBottomWidth: 1, borderBottomColor: p().border }}>
+                <View class="gap-2 border-b border-line px-3 py-2.5">
                   <Input
                     value={message()}
                     onChange={({ value }) => message.set(value)}
                     placeholder={t("web.shell.git.commitPlaceholder")}
                     multiline
-                    style={{
-                      minHeight: 54,
-                      borderRadius: radius.md,
-                      borderWidth: 1,
-                      borderColor: p().border,
-                      backgroundColor: p().surface,
-                      color: p().ink,
-                      paddingHorizontal: 9,
-                      paddingVertical: 7,
-                      fontSize: 12,
-                      lineHeight: 17,
-                    }}
+                    class="min-h-14 rounded-md border border-line bg-elevated px-2.5 py-1.5 text-xs leading-normal text-ink placeholder:text-faint hover:border-faint focus:border-focus"
                   />
                   <DesignButton tone="primary" class="px-3" disabled={committing() || (f()?.staged?.length ?? 0) === 0 || !message().trim()} onPress={commit}>
                     {committing()
@@ -855,48 +574,24 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   {(f()?.staged?.length ?? 0) === 0 && (f()?.changes?.length ?? 0) > 0 ? (
                     <Button
                       onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
-                      activeStyle={{ opacity: 0.82 }}
-                      focusVisibleStyle={focusRing(p())}
-                      style={{
-                        height: 26,
-                        paddingHorizontal: 10,
-                        borderRadius: radius.md,
-                        flexDirection: "row",
-                        gap: 5,
-                        justifyContent: "center",
-                        alignItems: "center",
-                        backgroundColor: "transparent",
-                        borderWidth: 1,
-                        borderColor: p().border,
-                        ...pressTransition(),
-                      }}
-                      hoverStyle={{ backgroundColor: p().tile }}
+                      class="h-6.5 flex-row items-center justify-center gap-1 rounded-md border border-line bg-transparent px-2.5 transition duration-120 ease-out hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
                     >
-                      <SurfaceIcon name="plus" size={11} color={p().text} />
-                      <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: "500", color: p().text }}>
+                      <Icon name="add" size={11} tone="ink" />
+                      <Text class="text-xs font-medium text-ink">
                         {t("web.shell.git.stageAllCount", { count: (f()?.changes?.length ?? 0).toLocaleString() })}
                       </Text>
                     </Button>
                   ) : null}
-                  {commitNotice() ? <Text style={{ fontSize: 11, lineHeight: 15, color: p().ok }}>{commitNotice()}</Text> : null}
+                  {commitNotice() ? <Text class="text-2xs text-ok-ink">{commitNotice()}</Text> : null}
                   {f()?.error ? (
-                    <View
-                      style={{
-                        paddingHorizontal: 8,
-                        paddingVertical: 6,
-                        borderRadius: radius.md,
-                        backgroundColor: statusTint(p(), "danger").fill,
-                        borderWidth: 1,
-                        borderColor: statusTint(p(), "danger").ring,
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, lineHeight: 15, color: p().danger }}>{f()?.error}</Text>
+                    <View class="rounded-md border bg-bad-soft px-2 py-1.5" style={{ borderColor: mix("berry", 0.25) }}>
+                      <Text class="text-2xs text-berry">{f()?.error}</Text>
                     </View>
                   ) : null}
                 </View>
 
                 {(f()?.conflicts?.length ?? 0) > 0 ? (
-                  <View style={{ paddingBottom: 4 }}>
+                  <View class="pb-1">
                     <SectionHead
                       title={t("web.shell.git.conflicts")}
                       count={f()?.conflicts?.length}
@@ -906,7 +601,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                       onToggle={() => toggleSection("conflicts")}
                     />
                     {isOpen("conflicts") ? (
-                      <View style={{ gap: 1 }}>
+                      <View class="gap-px">
                         <Each of={f()?.conflicts ?? []} key={(r) => r.path}>
                           {(row) => <FileRow row={row()} staged={false} />}
                         </Each>
@@ -915,7 +610,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   </View>
                 ) : null}
 
-                <View style={{ paddingBottom: 4 }}>
+                <View class="pb-1">
                   <SectionHead
                     title={t("web.shell.git.staged")}
                     count={f()?.staged?.length ?? 0}
@@ -925,7 +620,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     borderTop={(f()?.conflicts?.length ?? 0) > 0}
                     right={
                       (f()?.staged?.length ?? 0) > 0 ? (
-                        <IconButton
+                        <ShellIconButton
                           label={t("web.shell.git.unstageAll")}
                           icon="minus"
                           onPress={() => act({ type: "unstage", paths: (f()?.staged ?? []).map((r) => r.path) })}
@@ -935,18 +630,18 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   />
                   {isOpen("staged") ? (
                     (f()?.staged?.length ?? 0) > 0 ? (
-                      <View style={{ gap: 1 }}>
+                      <View class="gap-px">
                         <Each of={f()?.staged ?? []} key={(r) => r.path}>
                           {(row) => <FileRow row={row()} staged />}
                         </Each>
                       </View>
                     ) : (
-                      <Empty text={t("web.shell.git.stagedEmpty")} compact />
+                      <PanelEmpty text={t("web.shell.git.stagedEmpty")} compact />
                     )
                   ) : null}
                 </View>
 
-                <View style={{ paddingBottom: 4 }}>
+                <View class="pb-1">
                   <SectionHead
                     title={t("web.shell.git.changes")}
                     count={f()?.changes?.length ?? 0}
@@ -956,9 +651,9 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     borderTop
                     right={
                       (f()?.changes?.length ?? 0) > 0 ? (
-                        <IconButton
+                        <ShellIconButton
                           label={t("web.shell.git.stageAll")}
-                          icon="plus"
+                          icon="add"
                           onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
                         />
                       ) : undefined
@@ -966,13 +661,13 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   />
                   {isOpen("changes") ? (
                     (f()?.changes?.length ?? 0) > 0 ? (
-                      <View style={{ gap: 1 }}>
+                      <View class="gap-px">
                         <Each of={f()?.changes ?? []} key={(r) => r.path}>
                           {(row) => <FileRow row={row()} staged={false} />}
                         </Each>
                       </View>
                     ) : (
-                      <Empty text={t("web.shell.git.clean")} compact />
+                      <PanelEmpty text={t("web.shell.git.clean")} compact />
                     )
                   ) : null}
                 </View>
@@ -981,7 +676,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
 
             {activeTab() === "branches" ? (
               <View>
-                <View style={{ paddingBottom: 4 }}>
+                <View class="pb-1">
                   <SectionHead
                     title={t("web.shell.git.branches")}
                     count={f()?.branches?.length ?? 0}
@@ -992,27 +687,18 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   {isOpen("branches") ? (
                     <View>
                       {(f()?.branches?.length ?? 0) > 6 ? (
-                        <View style={{ paddingHorizontal: 12, paddingTop: 2, paddingBottom: 6 }}>
+                        <View class="px-3 pt-0.5 pb-1.5">
                           <Input
                             value={branchQuery()}
                             onChange={({ value }) => branchQuery.set(value)}
                             placeholder={t("web.shell.git.filterBranches")}
-                            style={{
-                              height: 26,
-                              borderRadius: radius.md,
-                              borderWidth: 1,
-                              borderColor: p().border,
-                              backgroundColor: p().surface,
-                              color: p().ink,
-                              paddingHorizontal: 8,
-                              fontSize: 12,
-                            }}
+                            class="h-6.5 rounded-md border border-line bg-elevated px-2 text-xs text-ink placeholder:text-faint hover:border-faint focus:border-focus"
                           />
                         </View>
                       ) : null}
                       {(f()?.branches?.length ?? 0) > 0 ? (
                         filteredBranches().length > 0 ? (
-                          <View style={{ gap: 1 }}>
+                          <View class="gap-px">
                             <Each of={filteredBranches()} key={(b) => b.name}>
                               {(b) => (
                                 <Button
@@ -1026,70 +712,19 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                                   accessibilityLabel={
                                     b().head ? t("web.shell.git.currentBranch", { name: b().name }) : t("web.shell.git.switchBranch", { name: b().name })
                                   }
-                                  activeStyle={switchingBranch() !== null ? undefined : { opacity: 0.82 }}
-                                  focusVisibleStyle={switchingBranch() !== null ? undefined : focusRing(p())}
-                                  style={{
-                                    position: "relative",
-                                    height: 26,
-                                    marginHorizontal: 6,
-                                    paddingHorizontal: 6,
-                                    borderRadius: radius.md,
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    gap: 6,
-                                    backgroundColor: b().head ? p().subtle : "transparent",
-                                    ...pressTransition(),
-                                  }}
-                                  hoverStyle={{ backgroundColor: b().head ? p().subtle : p().tile }}
+                                  class={`relative mx-1.5 h-6.5 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out ${
+                                    switchingBranch() !== null ? "" : "active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+                                  } ${b().head ? "bg-selected" : "bg-transparent hover:bg-hover"}`}
                                 >
-                                  {b().head ? (
-                                    <View
-                                      style={{
-                                        position: "absolute",
-                                        left: 2,
-                                        top: 5,
-                                        bottom: 5,
-                                        width: 2,
-                                        borderRadius: 999,
-                                        backgroundColor: p().primary,
-                                        pointerEvents: "none",
-                                      }}
-                                    />
-                                  ) : null}
-                                  <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                    <SurfaceIcon name={b().head ? "check" : "git-branch"} size={12} color={b().head ? p().ok : p().faint} />
+                                  {b().head ? <ActiveBar /> : null}
+                                  <View class="size-3.5 shrink-0 items-center justify-center">
+                                    <Icon name={b().head ? "ticked" : "branch"} size={12} tone={b().head ? "leaf" : "faint"} />
                                   </View>
-                                  <Text
-                                    style={{
-                                      fontFamily: ty.mono.fontFamily,
-                                      fontSize: 12,
-                                      lineHeight: 16,
-                                      fontWeight: "500",
-                                      color: b().head ? p().ink : p().text,
-                                      numberOfLines: 1,
-                                      flex: 1,
-                                      minWidth: 0,
-                                    }}
-                                  >
-                                    {b().name}
-                                  </Text>
+                                  <Text class="min-w-0 flex-1 truncate font-mono text-xs font-medium text-ink">{b().name}</Text>
                                   {switchingBranch() === b().name ? (
-                                    <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().alert, flexShrink: 0 }}>
-                                      {t("web.shell.git.switching")}
-                                    </Text>
+                                    <Text class="shrink-0 text-2xs font-medium text-warn-ink">{t("web.shell.git.switching")}</Text>
                                   ) : b().upstream ? (
-                                    <Text
-                                      style={{
-                                        fontFamily: ty.mono.fontFamily,
-                                        fontSize: 11,
-                                        lineHeight: 14,
-                                        color: p().muted,
-                                        numberOfLines: 1,
-                                        maxWidth: "42%",
-                                        flexShrink: 0,
-                                        textOverflow: "ellipsis-start",
-                                      }}
-                                    >
+                                    <Text class="max-w-32 shrink-0 truncate font-mono text-2xs text-muted" style={startEllipsis}>
                                       {b().upstream}
                                     </Text>
                                   ) : null}
@@ -1098,10 +733,10 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                             </Each>
                           </View>
                         ) : (
-                          <Empty text={t("web.shell.git.noMatchingBranches")} compact />
+                          <PanelEmpty text={t("web.shell.git.noMatchingBranches")} compact />
                         )
                       ) : (
-                        <Empty text={t("web.shell.git.noBranches")} compact />
+                        <PanelEmpty text={t("web.shell.git.noBranches")} compact />
                       )}
                     </View>
                   ) : null}
@@ -1129,76 +764,30 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                           onPress={() => act({ type: "open_commit", id: c().id })}
                           accessibilityLabel={`Commit ${c().short}: ${c().summary}`}
                           tooltip={<Bubble text={`${c().short} · ${c().summary}`} />}
-                          activeStyle={{ opacity: 0.82 }}
-                          focusVisibleStyle={focusRing(p())}
-                          style={{
-                            paddingHorizontal: 12,
-                            paddingVertical: 7,
-                            gap: 3,
-                            borderBottomWidth: 1,
-                            borderBottomColor: p().border,
-                            ...pressTransition(),
-                          }}
-                          hoverStyle={{ backgroundColor: p().tile }}
+                          class="gap-1 border-b border-line px-3 py-2 transition duration-120 ease-out hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
                         >
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                            <Text
-                              style={{
-                                fontSize: 13,
-                                lineHeight: 18,
-                                color: p().ink,
-                                numberOfLines: 1,
-                                flex: 1,
-                                minWidth: 0,
-                                writingDirection: "auto",
-                              }}
-                            >
+                          <View class="flex-row items-center gap-2">
+                            <Text class="min-w-0 flex-1 truncate text-sm text-ink" style={autoDirection}>
                               {c().summary}
                             </Text>
-                            <View
-                              style={{
-                                minWidth: 68,
-                                height: 18,
-                                paddingHorizontal: 6,
-                                borderRadius: radius.sm,
-                                backgroundColor: p().surface,
-                                borderWidth: 1,
-                                borderColor: p().border,
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontFamily: ty.mono.fontFamily,
-                                  fontSize: 11,
-                                  lineHeight: 14,
-                                  fontVariant: ["tabular-nums"],
-                                  color: p().ok,
-                                  numberOfLines: 1,
-                                }}
-                              >
-                                {c().short}
-                              </Text>
+                            <View class="h-4.5 min-w-17 shrink-0 items-center justify-center rounded-sm border border-line bg-elevated px-1.5">
+                              <Text class="truncate font-mono text-2xs text-leaf tabular-nums">{c().short}</Text>
                             </View>
                           </View>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                            <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted, numberOfLines: 1, flex: 1, minWidth: 0 }}>{c().author}</Text>
-                            <Text style={{ fontSize: 11, lineHeight: 14, color: p().faint, flexShrink: 0, textAlign: "right" }}>
-                              {formatCommitTime(c().time)}
-                            </Text>
+                          <View class="flex-row items-center gap-2">
+                            <Text class="min-w-0 flex-1 truncate text-2xs text-muted">{c().author}</Text>
+                            <Text class="shrink-0 text-right text-2xs text-faint">{formatCommitTime(c().time)}</Text>
                           </View>
                         </Button>
                       )}
                     </Each>
                   ) : (
-                    <Empty text={t("web.shell.git.noCommits")} compact />
+                    <PanelEmpty text={t("web.shell.git.noCommits")} compact />
                   )
                 ) : null}
               </View>
             ) : null}
-            <View style={{ height: 16 }} />
+            <View class="h-4" />
           </Scroll>
         </View>
       )}

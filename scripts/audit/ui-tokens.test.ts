@@ -99,10 +99,10 @@ describe("ui-tokens guardrail", () => {
     expect(scanUiTokens(file, src)).toEqual([]);
   });
 
-  it("scans host surfaces and components while permitting static size props", () => {
+  it("scans workspace surfaces and components while permitting static size props", () => {
     const files = listWebUiFiles();
     expect(files).toContain("apps/mac/ui/workspace/Sidebar.tsx");
-    expect(files).toContain("apps/mac/ui/design/surface.tsx");
+    expect(files).toContain("apps/mac/ui/workspace/chrome.tsx");
     expect(files).toContain("apps/mac/ui/design/Button.tsx");
 
     const badHost = [
@@ -113,10 +113,10 @@ describe("ui-tokens guardrail", () => {
     expect(scanUiTokens("apps/mac/ui/workspace/Sidebar.tsx", badHost).map((f) => f.rule)).toEqual(["selection-layout-shift", "hardcoded-color"]);
 
     const goodHost = [
-      "export function Empty(props: { compact?: boolean }) {",
-      "  return <View style={{ paddingVertical: props.compact ? 6 : 10 }} />;",
+      "export function PanelEmpty(props: { text: string; compact?: boolean }) {",
+      '  return <Text class={`px-3 text-xs leading-relaxed text-muted ${props.compact === true ? "py-1.5" : "py-2.5"}`}>{props.text}</Text>;',
       "}",
     ].join("\n");
-    expect(scanUiTokens("apps/mac/ui/design/surface.tsx", goodHost)).toEqual([]);
+    expect(scanUiTokens("apps/mac/ui/workspace/chrome.tsx", goodHost)).toEqual([]);
   });
 });

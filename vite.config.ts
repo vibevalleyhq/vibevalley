@@ -261,9 +261,16 @@ export default defineConfig({
       },
       {
         // Markup takes its looks from `class` (Tailwind utilities, vv-tailwind), never a written-out `style` (style-attrs).
-        // Shell surfaces (`apps/mac/ui/{workspace,design/surface.tsx}`) intentionally use `tok()` style objects instead of Tailwind classes.
-        files: ["apps/site/src/**", "apps/mac/ui/app/**", "apps/mac/ui/features/**", "apps/mac/ui/farm/**", "apps/mac/ui/design/**"],
-        excludeFiles: ["**/*.test.ts", "**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**", "apps/mac/ui/design/surface.tsx"],
+        files: [
+          "apps/site/src/**",
+          "apps/mac/ui/App.tsx",
+          "apps/mac/ui/app/**",
+          "apps/mac/ui/features/**",
+          "apps/mac/ui/farm/**",
+          "apps/mac/ui/design/**",
+          "apps/mac/ui/workspace/**",
+        ],
+        excludeFiles: ["**/*.test.ts", "**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
         rules: { "vibevalley/style-attrs": "error" },
       },
       {

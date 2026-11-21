@@ -6,7 +6,6 @@ import { host, mount, Text, View, type Component } from "nsh";
 import { setLocale } from "@vibevalley/i18n";
 
 import { VibeValley } from "./app/VibeValley";
-import { tok } from "./design/tokens";
 import { FarmForm } from "./farm/FarmForm";
 import { FarmPhone } from "./farm/FarmPhone";
 import { viewName } from "./infra/bridge";
@@ -17,8 +16,8 @@ import { Sidebar } from "./workspace/Sidebar";
 
 function Unknown() {
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: tok().canvas }}>
-      <Text style={{ fontSize: 13, color: tok().muted }}>No hosted view named “{viewName()}”.</Text>
+    <View class="flex-1 items-center justify-center bg-side">
+      <Text class="text-sm text-muted">No hosted view named “{viewName()}”.</Text>
     </View>
   );
 }
