@@ -14,8 +14,8 @@ use vibevalley_oar::{
     Capabilities, ContentBlock, Event, Installation, ModelInfo, PermissionDecision, Registry, Runtime, Session, SessionOptions, SessionStatus,
 };
 use vibevalley_protocol::{Issue, IssueStageKind as StageKind};
-use vibevalley_server::modules::issue::Board;
-use vibevalley_server::modules::ledger::BoardConfig;
+use vibevalley_server::modules::work::issue::Board;
+use vibevalley_server::modules::work::ledger::BoardConfig;
 
 /// Opens a separate connection for assertions or SQLite failure injection.
 pub fn inspect_db(path: &Path) -> sqlx::SqliteConnection {

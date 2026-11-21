@@ -1,6 +1,6 @@
 # 语音
 
-听写、通话的凭据、通话本身，在 Rust 服务端的 `crates/vibevalley-server/src/modules/voice/`，接口是 `voice.*` 九个。服务端不碰音频：进声网的 RTC 频道、连 MOSS Live 的 socket、采集和播放，都是宿主（原生应用，和服务端同一个进程）的事。
+听写、通话的凭据、通话本身，在 Rust 服务端的 `crates/vibevalley-server/src/modules/collab/voice/`，接口是 `voice.*` 九个。服务端不碰音频：进声网的 RTC 频道、连 MOSS Live 的 socket、采集和播放，都是宿主（原生应用，和服务端同一个进程）的事。
 
 ## 在哪
 
@@ -13,8 +13,8 @@
 | `voice/moss.rs` | MOSS Live 的文字帧：`ask_orchestrator` 这个工具、会话设置、旁白、验 Key |
 | `voice/dictation.rs` | 听写：检查录音，发到 OpenAI 形状的 `/audio/transcriptions`（默认 MOSS，或用户自己的地址） |
 | `voice/prompts.rs` | 通话里对模型说的话 |
-| `modules/orchestrator/mod.rs` 的 `answer`、`brief` | 助手这一轮的话除了写进群聊，也交给等着它的那通电话（`Reply`） |
-| `modules/setting.rs` | `settings.json` 里的语音设置、声网凭据和各家的 Key |
+| `modules/team/orchestrator/mod.rs` 的 `answer`、`brief` | 助手这一轮的话除了写进群聊，也交给等着它的那通电话（`Reply`） |
+| `modules/infra/setting.rs` | `settings.json` 里的语音设置、声网凭据和各家的 Key |
 
 ## 原生 MOSS 通话
 

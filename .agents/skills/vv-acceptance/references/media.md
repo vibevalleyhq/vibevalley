@@ -4,7 +4,7 @@
 
 ## 什么时候用
 
-改了 `crates/vibevalley-server/src/modules/media`、音频协议、下载与附件、助手的媒体工具或素材库。模型列表能查、用途能绑定，不等于生成能用。
+改了 `crates/vibevalley-server/src/modules/content/media`、音频协议、下载与附件、助手的媒体工具或素材库。模型列表能查、用途能绑定，不等于生成能用。
 
 ## 准备
 

@@ -17,17 +17,17 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/media/jobs.rs` | 所有种类共用的一台任务机：表 `media_job`、收任务（八个在途）、按种类的执行槽、跑断了记未知、下载结果存成附件、跟厂商任务、取消、重取、释放、重启接续；生图与语音（含流式）两种 |
-| `crates/vibevalley-server/src/modules/media/audio.rs` | 多人对白、音色设计、音色克隆、转写：各自向厂商要什么、怎么看，转写流边收边存，结束后删厂商那份上传 |
-| `crates/vibevalley-server/src/modules/media/understanding.rs` | 图片／视频理解：上传、问一次、删上传；用户给助手的授权、到期与启动 |
-| `crates/vibevalley-server/src/modules/media/remote.rs` | 任务传给厂商的文件：发出前先记在任务上，只由原账号删除 |
-| `crates/vibevalley-server/src/modules/media/vendor.rs` | MOSS 的调用：每个请求经 `Fetch` 发出（测试替身照 MOSS 回答），不跟随重定向 |
-| `crates/vibevalley-server/src/modules/media/image_provider.rs`、`png.rs`、`validate.rs` | 生图请求的准备与可取消执行、PNG 校验、请求与格式校验 |
-| `crates/vibevalley-server/src/modules/media/inputs.rs` | 输入预留、上传、任务保留与回收 |
+| `crates/vibevalley-server/src/modules/content/media/jobs.rs` | 所有种类共用的一台任务机：表 `media_job`、收任务（八个在途）、按种类的执行槽、跑断了记未知、下载结果存成附件、跟厂商任务、取消、重取、释放、重启接续；生图与语音（含流式）两种 |
+| `crates/vibevalley-server/src/modules/content/media/audio.rs` | 多人对白、音色设计、音色克隆、转写：各自向厂商要什么、怎么看，转写流边收边存，结束后删厂商那份上传 |
+| `crates/vibevalley-server/src/modules/content/media/understanding.rs` | 图片／视频理解：上传、问一次、删上传；用户给助手的授权、到期与启动 |
+| `crates/vibevalley-server/src/modules/content/media/remote.rs` | 任务传给厂商的文件：发出前先记在任务上，只由原账号删除 |
+| `crates/vibevalley-server/src/modules/content/media/vendor.rs` | MOSS 的调用：每个请求经 `Fetch` 发出（测试替身照 MOSS 回答），不跟随重定向 |
+| `crates/vibevalley-server/src/modules/content/media/image_provider.rs`、`png.rs`、`validate.rs` | 生图请求的准备与可取消执行、PNG 校验、请求与格式校验 |
+| `crates/vibevalley-server/src/modules/content/media/inputs.rs` | 输入预留、上传、任务保留与回收 |
 | `crates/vibevalley-server/src/public_http.rs` | 下载与素材导入共用的公网 https 规则 |
-| `crates/vibevalley-server/src/modules/library.rs` | 素材库：`list`、`add`、`remove`、`preview_remove`；听事实记下生成结果与聊天附件 |
+| `crates/vibevalley-server/src/modules/content/library/mod.rs` | 素材库：`list`、`add`、`remove`、`preview_remove`；听事实记下生成结果与聊天附件 |
 | `crates/vibevalley-http/src/media.rs` | 本机二进制上传（`PUT /api/v1/media/input/:id/content`）与带范围的播放、语音流 |
-| `crates/vibevalley-server/src/modules/tool/notes.rs` | 助手与帮工的 `media_*`、`library_item_*` 工具 |
+| `crates/vibevalley-server/src/modules/team/tool/notes.rs` | 助手与帮工的 `media_*`、`library_item_*` 工具 |
 | `crates/vibevalley-server/src/offline.rs` | 测试用的离线 MOSS 与下载 |
 | `crates/vibevalley-protocol/src/contract/media.rs`、`packages/protocol/src/media/` | 媒体任务、输入与素材库的形状和接口（Rust 为源，TS 形状由它生成） |
 | `apps/mac/ui/features/media/` | `/library`：筛选栏、缩略图、详情栏、工具条、上传、键盘和「生成」对话框；排法、计数、筛选和键盘落点在 `items.ts` 纯函数 |
@@ -63,7 +63,7 @@ PCM WAV 的元数据警告会转入 RIFF 结构校验：容器长度、chunk 边
 
 所有输入预留（包括失败的和被任务保留的）最多 256 条、按每条声明大小保守计入 2 GiB 配额；相同内容也各占一条预留。未保留的预留和文件在 24 小时后回收，每分钟检查一次，接受新预留前也先回收。删除先落 `deleting` 标记，再清它的暂存文件，最后删记录；附件的字节不删，别处可能也在用。删除失败保留标记供下次检查恢复。断线、取消和失败会关闭写入并清理临时文件；未能清理的部分文件归原输入 ID，预留继续占配额，清理成功前不能再次接收文件或删掉预留。发布前先记录预期哈希，数据库拒绝提交且文件回滚也失败时，完整文件同样仍有所属预留。一个输入的回收失败不阻塞其余输入。本机上传可以明确重试，和可能计费的厂商调用不是同一种重试。
 
-服务器用 SQLx 在同一笔 SQLite 写事务内核对请求 ID 和在途配额、保留输入并登记任务。提交失败时，输入保留自动回滚。sqlc 从[媒体查询](crates/vibevalley-server/src/modules/media/sql/queries.sql)生成 Rust 接口。被保留的输入不按期限删除，也不能由用户单独删除。只有对应的保留者可以读它，读取前流式核对大小和哈希。文件丢失或内容损坏时标失败；修复只接受原内容，新内容必须新建输入。重复内容的发布也检查已有文件，损坏时用已核对的完整临时文件原子替换，不覆盖仍然完整的文件。
+服务器用 SQLx 在同一笔 SQLite 写事务内核对请求 ID 和在途配额、保留输入并登记任务。提交失败时，输入保留自动回滚。sqlc 从[媒体查询](crates/vibevalley-server/src/modules/content/media/sql/queries.sql)生成 Rust 接口。被保留的输入不按期限删除，也不能由用户单独删除。只有对应的保留者可以读它，读取前流式核对大小和哈希。文件丢失或内容损坏时标失败；修复只接受原内容，新内容必须新建输入。重复内容的发布也检查已有文件，损坏时用已核对的完整临时文件原子替换，不覆盖仍然完整的文件。
 
 重启把未结束的本机上传记为失败，清除暂存目录和没有记录引用的哈希文件；丢失文件的就绪记录改为失败。它不会自动重新读取用户的原始文件，更不会重传给厂商。
 
@@ -103,7 +103,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 
 ## 素材库
 
-素材库（`crates/vibevalley-server/src/modules/library.rs`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。页面照 Eagle 那样分三栏：左边按来路和种类筛，中间是按比例排满一行的缩略图，右边是选中的那一份；生成的表单收在「生成」对话框里。
+素材库（`crates/vibevalley-server/src/modules/content/library/mod.rs`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。页面照 Eagle 那样分三栏：左边按来路和种类筛，中间是按比例排满一行的缩略图，右边是选中的那一份；生成的表单收在「生成」对话框里。
 
 - **一份文件一张卡**：主键是附件的 id（内容的 SHA-256）。同一份字节再来只更新 `last_at`，来路照第一次的；生成的那条的时间不再变。
 - **来路是封闭的联合**（`LibraryOrigin`，按 `kind`）：
@@ -119,7 +119,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 - **选和键盘**：点一下选一个，⌘/Ctrl 点加减，Shift 点选一段；← → 按顺序走，↑ ↓ 去上下一行中间最近的那格（`neighbor`）；空格全屏看（`Lightbox`，← → 翻）；Delete 在详情栏里原地问一遍再拿掉；Esc 不选。文件拖到页面上或粘贴进来就上传。
 - **手机宽**（40rem 以下）：工具条在最上，筛选栏变成两个选择框（来路、种类），详情栏是从底下出来的面板。
 
-素材库按附件标识保存首次来源。后续再次收到同一附件时，只推进最近时间。生成任务标识与素材卡同时提交。列表先按选定的名称或大小排序，再按最近时间和附件标识排序。[素材库查询](crates/vibevalley-server/src/modules/library/sql/queries.sql)
+素材库按附件标识保存首次来源。后续再次收到同一附件时，只推进最近时间。生成任务标识与素材卡同时提交。列表先按选定的名称或大小排序，再按最近时间和附件标识排序。[素材库查询](crates/vibevalley-server/src/modules/content/library/sql/queries.sql)
 
 **素材库流转**
 

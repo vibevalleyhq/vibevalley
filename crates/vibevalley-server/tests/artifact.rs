@@ -7,7 +7,7 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, BlockCreate, BlockDelete, BlockUpdate, Caller, Envelope, SuggestionChange, SuggestionCreate, TextSpan};
 use vibevalley_server::Server;
-use vibevalley_server::modules::artifact::{Artifacts, Maker};
+use vibevalley_server::modules::content::artifact::{Artifacts, Maker};
 
 fn start(dir: &std::path::Path) -> vibevalley_server::Started {
     let mut registry = vibevalley_oar::Registry::new();

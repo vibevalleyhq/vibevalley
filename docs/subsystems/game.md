@@ -19,7 +19,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/game.rs` | `Game`：账本落盘（`ledger.jsonl`）、订阅事实、commit 统计调度（`count_commits`）、称号（`choose_title`）与空地预约（`want`） |
+| `crates/vibevalley-server/src/modules/skin/game.rs` | `Game`：账本落盘（`ledger.jsonl`）、订阅事实、commit 统计调度（`count_commits`）、称号（`choose_title`）与空地预约（`want`） |
 | `crates/vibevalley-core/src/progress.rs` | 账本条目提取（`entries_for`）、进度折叠纯函数（`progress_fold`、`progress_step`）、金币（`harvest_coins`） |
 | `crates/vibevalley-core/src/game.rs` | 等级（`level_for_commits`）、地块映射（`plot_of`）、帧视图（`view_of`）、特效（`effects_of`）、地块分配（`free_station`、`stationed`）、成就（`achievements`） |
 | `crates/vibevalley-core/data/seeds.json` | 内置成就定义 |

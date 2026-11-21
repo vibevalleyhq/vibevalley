@@ -6,7 +6,7 @@ use std::path::Path;
 use crate::support::*;
 use vibevalley_oar::scripted::{Script, Step};
 use vibevalley_protocol::{IssueConstraints, IssueStageKind as StageKind, IssueStatus, Landing};
-use vibevalley_server::modules::issue::{ChildDraft, NewIssue};
+use vibevalley_server::modules::work::issue::{ChildDraft, NewIssue};
 
 fn issue(title: &str, repo: &Path) -> NewIssue {
     NewIssue {

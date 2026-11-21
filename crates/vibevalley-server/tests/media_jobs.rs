@@ -10,7 +10,7 @@ use std::{
 use vibevalley_protocol::{ApiError, MediaImageRequest, MediaImageUsage};
 use vibevalley_server::{
     Server,
-    modules::media::image_provider::{self, Failure, Generated, ImageBackend, Prepared, Work},
+    modules::content::media::image_provider::{self, Failure, Generated, ImageBackend, Prepared, Work},
 };
 struct Backend {
     generations: AtomicUsize,
@@ -243,7 +243,7 @@ fn image_request_refinements_prevent_submission() {
 #[test]
 fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() {
     use std::sync::Mutex;
-    use vibevalley_server::modules::tool::{Route, held};
+    use vibevalley_server::modules::team::tool::{Route, held};
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::new("ok");
     let s = start(dir.path(), backend);

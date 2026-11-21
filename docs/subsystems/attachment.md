@@ -1,6 +1,6 @@
 # 附件
 
-农场留下的一份文件（`Attachments`，`crates/vibevalley-server/src/modules/attachment.rs`）：按内容的 SHA-256 存一次，有名字、媒体类型和大小。它不属于哪个用它的地方：消息带着附件的 id（界面叫「附件」），媒体任务的结果和输入是附件，网页 Artifact 的每一稿是一个附件，素材库的一条是一个附件加它的来路（界面叫「素材」）。农场只有这一处存文件的字节。
+农场留下的一份文件（`Attachments`，`crates/vibevalley-server/src/modules/content/attachment/mod.rs`）：按内容的 SHA-256 存一次，有名字、媒体类型和大小。它不属于哪个用它的地方：消息带着附件的 id（界面叫「附件」），媒体任务的结果和输入是附件，网页 Artifact 的每一稿是一个附件，素材库的一条是一个附件加它的来路（界面叫「素材」）。农场只有这一处存文件的字节。
 
 ## 管什么，不管什么
 
@@ -8,14 +8,14 @@
 |---|---|
 | `server.db` 的表 `attachment` 记名字、类型、大小；字节以 SHA-256 为键写在家目录的 `attachments/` 下 | 消息怎么带它、怎么画（[频道](docs/subsystems/channel.md)） |
 | 上传（`attachment.create`）：空的、超过上限的拒绝 | 生成和下载结果的任务（[媒体](docs/subsystems/media.md)） |
-| 按 id 读回字节和类型，经 `GET /api/v1/attachment/<id>` 带沙箱返回 | 素材的来路和列表（[素材库](docs/subsystems/media.md#素材库)，`crates/vibevalley-server/src/modules/library.rs`） |
+| 按 id 读回字节和类型，经 `GET /api/v1/attachment/<id>` 带沙箱返回 | 素材的来路和列表（[素材库](docs/subsystems/media.md#素材库)，`crates/vibevalley-server/src/modules/content/library/mod.rs`） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| [附件查询](crates/vibevalley-server/src/modules/attachment/sql/queries.sql) | sqlc 为 SQLx 生成按哈希读取和首次写入元数据的接口。相同哈希保留首次记录的名字和类型。 |
-| `crates/vibevalley-server/src/modules/attachment.rs` | `Attachments`：`attach`（上传）、`keep`（这里做出来的字节）、`keep_staged`（媒体输入写在暂存目录、已算好哈希的大文件）、`of`（一组 id 的附件，缺一个就拒绝）、`file`、`path_of`；`open_sqlx_db` 打开各模块共用的 `server.db` |
+| [附件查询](crates/vibevalley-server/src/modules/content/attachment/sql/queries.sql) | sqlc 为 SQLx 生成按哈希读取和首次写入元数据的接口。相同哈希保留首次记录的名字和类型。 |
+| `crates/vibevalley-server/src/modules/content/attachment/mod.rs` | `Attachments`：`attach`（上传）、`keep`（这里做出来的字节）、`keep_staged`（媒体输入写在暂存目录、已算好哈希的大文件）、`of`（一组 id 的附件，缺一个就拒绝）、`file`、`path_of`；`open_sqlx_db` 打开各模块共用的 `server.db` |
 | `crates/vibevalley-http/src/media.rs`、`crates/vibevalley-http/src/lib.rs` | `GET /api/v1/attachment/<id>`（经 `attachment.file` 取路径）；`attachment.create` 走通用的命令入口 |
 | `crates/vibevalley-protocol/src/contract/attachment.rs`、`packages/protocol/src/attachment/` | `Attachment`、`AttachmentUpload`、`attachmentPath`、`attachmentMax`（Rust 为源，TS 形状由它生成） |
 

@@ -5,7 +5,7 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 use vibevalley_core::empty_space_state;
-use vibevalley_server::modules::setting::{Setting, SettingConfig};
+use vibevalley_server::modules::infra::setting::{Setting, SettingConfig};
 use vibevalley_server::{Hub, Server};
 
 fn config(home: &Path) -> SettingConfig {
@@ -25,7 +25,7 @@ fn file(home: &Path) -> Value {
 
 fn hub(home: &Path) -> std::sync::Arc<Hub> {
     let hub = Hub::new(empty_space_state());
-    vibevalley_server::modules::setting::install(&hub, Setting::open(config(home)));
+    vibevalley_server::modules::infra::setting::install(&hub, Setting::open(config(home)));
     hub
 }
 

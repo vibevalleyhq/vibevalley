@@ -1,6 +1,6 @@
 # 仓库
 
-仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。服务端的 `modules/repo.rs` 管仓库新建与克隆、统计与 `gh` 检测；工单 worktree、冲突预检、`.vibevalley/check` 与合并在 `modules/workplace`（`Workplace`）里，工单板只告诉它工单号、仓库和帮工的 worktree，git 操作都经 `vibevalley-git` 调系统的 `git`。已有分支推送、PR/MR 发布与轮询由独立的 `modules/pull` 承担（[PR 与分支发布](docs/subsystems/pull.md)）。
+仓库（`Repo`）是空间 `$VIBEVALLEY_WORK_ROOT/repos/` 下的一个 git 仓库，在农场地图上画成一座岛。服务端的 `modules/work/repo.rs` 管仓库新建与克隆、统计与 `gh` 检测；工单 worktree、冲突预检、`.vibevalley/check` 与合并在 `modules/work/workplace`（`Workplace`）里，工单板只告诉它工单号、仓库和帮工的 worktree，git 操作都经 `vibevalley-git` 调系统的 `git`。已有分支推送、PR/MR 发布与轮询由独立的 `modules/work/pull` 承担（[PR 与分支发布](docs/subsystems/pull.md)）。
 
 ## 管什么，不管什么
 
@@ -16,9 +16,9 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/repo.rs` | `repo.*`、`github.*`：`<工作目录>/repos` 下按名字新建或克隆、活跃度与语言（`tokei`）、`gh` 能不能开 PR |
+| `crates/vibevalley-server/src/modules/work/repo.rs` | `repo.*`、`github.*`：`<工作目录>/repos` 下按名字新建或克隆、活跃度与语言（`tokei`）、`gh` 能不能开 PR |
 | `crates/vibevalley-git/src/repo.rs` | git 封装：状态、diff、分支、worktree、冲突预检（`merge_check`）、无检出合入（`merge_into`：`merge-tree` + `commit-tree` + `update-ref`） |
-| `crates/vibevalley-server/src/modules/workplace/mod.rs`、`crates/vibevalley-server/src/modules/workplace/git.rs`、`crates/vibevalley-server/src/modules/workplace/check.rs` | `Workplace`：确保仓库在（`ensure_repo`）、工单的 worktree 与分支（`worktree`、`base`）、改动（`changes`）、交付（`land`）、子工单合进父分支（`join`）、帮工走时收拾 worktree 和分支（`release`）、跑 `.vibevalley/check`；不读工单板的状态 |
+| `crates/vibevalley-server/src/modules/work/workplace/mod.rs`、`crates/vibevalley-server/src/modules/work/workplace/git.rs`、`crates/vibevalley-server/src/modules/work/workplace/check.rs` | `Workplace`：确保仓库在（`ensure_repo`）、工单的 worktree 与分支（`worktree`、`base`）、改动（`changes`）、交付（`land`）、子工单合进父分支（`join`）、帮工走时收拾 worktree 和分支（`release`）、跑 `.vibevalley/check`；不读工单板的状态 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`repo.*`、`github.*`、`issue.diff.get`）。
 
@@ -49,12 +49,12 @@
 
 工单改动接口返回审查基线提交和工单文件树。文件补丁来自这两个固定的 Git 对象。工单未提交的文件也包含在补丁中。传入上次显示的文件树时，接口在 `sinceReview` 返回变化的补丁。已经通过的审查会保留文件树引用，清理工单 worktree 后仍可核对。
 
-**发布已有分支（`repo.pr.submit`）**：已独立到 `modules/pull`，规则与流程见 [PR 与分支发布](docs/subsystems/pull.md)。
+**发布已有分支（`repo.pr.submit`）**：已独立到 `modules/work/pull`，规则与流程见 [PR 与分支发布](docs/subsystems/pull.md)。
 
 ## 和谁打交道
 
-- **工单板与帮工（`modules/issue`、`modules/session`）**：经 `Workplace` 开、复用、清工单的 worktree，读改动，预检冲突，跑检查，合并或合入父分支。
-- **PR 与分支发布（`modules/pull`）**：读取空间内仓库列表与 `gh` 远端解析约定。
+- **工单板与帮工（`modules/work/issue`、`modules/work/session`）**：经 `Workplace` 开、复用、清工单的 worktree，读改动，预检冲突，跑检查，合并或合入父分支。
+- **PR 与分支发布（`modules/work/pull`）**：读取空间内仓库列表与 `gh` 远端解析约定。
 - **游戏（`game`）**：读仓库的 commit 计数。
 
 ## 为什么这样

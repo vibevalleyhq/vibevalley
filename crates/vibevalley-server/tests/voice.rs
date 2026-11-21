@@ -9,11 +9,11 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use vibevalley_agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, Usage};
 use vibevalley_protocol::{BizCode, Caller, Envelope, VoiceFix};
-use vibevalley_server::modules::media::vendor::{Fetch, FetchError, Request, Response};
-use vibevalley_server::modules::setting::Secret;
-use vibevalley_server::modules::voice::line::Tunnel;
-use vibevalley_server::modules::voice::moss::{Realtime, Verdict};
-use vibevalley_server::modules::voice::{self, LineConfig, Voice};
+use vibevalley_server::modules::collab::voice::line::Tunnel;
+use vibevalley_server::modules::collab::voice::moss::{Realtime, Verdict};
+use vibevalley_server::modules::collab::voice::{self, LineConfig, Voice};
+use vibevalley_server::modules::content::media::vendor::{Fetch, FetchError, Request, Response};
+use vibevalley_server::modules::infra::setting::Secret;
 
 const APP: &str = "11111111111111111111111111111111";
 const CERTIFICATE: &str = "22222222222222222222222222222222";

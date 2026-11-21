@@ -12,7 +12,7 @@ use base64::Engine;
 use serde_json::{Value, json};
 
 use crate::lock;
-use crate::modules::media::vendor::{Fetch, FetchError, Request, Response};
+use crate::modules::content::media::vendor::{Fetch, FetchError, Request, Response};
 
 const MOSS: &str = "https://api.mosi.cn/v1";
 

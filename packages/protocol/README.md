@@ -20,7 +20,7 @@ Schemas, `api.ts`, the rules and the client are hand-written here for the native
 
 A capability a host lacks is absent, and the page draws by that, never by asking which host it is in. The page finds its
 host in `apps/mac/ui/infra/host.ts` (`currentHost()`): inside the native app each member is a `host.<name>` call
-over the bridge, answered by the shell (`apps/mac/src/shell.rs`, `host_call`; `host.info` lists what it answers);
+over the bridge, answered by the shell (`apps/mac/src/shell/host_bridge.rs`, `host_call`; `host.info` lists what it answers);
 headless tests and stories get a host with a name and nothing else ([the client](docs/subsystems/app.md#宿主)).
 
 ```bash

@@ -281,7 +281,7 @@ const RULES: readonly Rule[] = [
     says: "the issue's own words (docs/subsystems/issue.md 状态和用语): 完成 (complete) and what it delivered (合进了主分支…), 改动, 问题 (等你回答), 计划; phase done, graph ready; farm words are for the farm's skin",
     // The farm's skin (with the pixel pieces the skins share) and the game say it their way.
     except:
-      /^(apps\/(?:web\/src\/(?:farm|ui\/pixel)|mac\/ui\/(?:farm|design\/pixel))\/|apps\/web\/test\/farm-|apps\/server\/src\/modules\/game\/|crates\/vibevalley-server\/src\/modules\/game\/)/u,
+      /^(apps\/(?:web\/src\/(?:farm|ui\/pixel)|mac\/ui\/(?:farm|design\/pixel))\/|apps\/web\/test\/farm-|apps\/server\/src\/modules\/game\/|crates\/vibevalley-server\/src\/modules\/skin\/game(?:\.rs|\/))/u,
   },
   {
     name: "a word list for an issue's or a session's state outside the protocol's rules",
@@ -469,7 +469,7 @@ function placeOf(ns: string): string {
   if (ns === "mac") return "apps/mac/src/words.rs";
   const [host, ...parts] = ns.split(".");
   if (host === "server") {
-    if (parts[0] === "game") return "crates/vibevalley-server/src/modules/game/words.rs";
+    if (parts[0] === "game") return "crates/vibevalley-server/src/modules/skin/game/words.rs";
     return `apps/server/src/${[...parts, "words.ts"].join("/")}`;
   }
   if (host === "web" && parts.length > 0) {
