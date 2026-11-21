@@ -96,7 +96,7 @@ pub struct Hub {
     core_seq: AtomicI64,
     space: chord_space::Space,
     workbench: workbench_frames::WorkbenchFrames,
-    execution: std::sync::OnceLock<std::sync::Weak<modules::orchestrator::Orchestrator>>,
+    execution: std::sync::OnceLock<std::sync::Weak<modules::team::orchestrator::Orchestrator>>,
     handlers: RwLock<HashMap<&'static str, Handler>>,
     openers: RwLock<HashMap<&'static str, Opener>>,
     watchers: RwLock<Vec<Watcher>>,
@@ -115,12 +115,12 @@ pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Hub {
-    /// Streamed speech (`modules::media::jobs::Jobs`).
+    /// Streamed speech (`modules::content::media::jobs::Jobs`).
     pub fn attach_speech_streams(&self, streams: vibevalley_server_api::media::SharedSpeechStreams) {
         *self.speech.write().unwrap_or_else(|e| e.into_inner()) = Some(streams);
     }
 
-    /// The helpers' MCP door (`modules::mcp::Door`).
+    /// The helpers' MCP door (`modules::team::mcp::Door`).
     pub fn attach_mcp(&self, door: vibevalley_server_api::SharedMcp) {
         *self.mcp.write().unwrap_or_else(|e| e.into_inner()) = Some(door);
     }
@@ -397,7 +397,7 @@ fn frames(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Vec<GameEffect>>) {
 }
 
 /// The board's facts go into the server's one state.
-impl modules::ledger::Facts for Hub {
+impl modules::work::ledger::Facts for Hub {
     fn apply(&self, facts: Vec<Fact>) -> Applied {
         Hub::apply(self, facts)
     }
@@ -411,7 +411,7 @@ impl modules::ledger::Facts for Hub {
     }
 }
 
-impl modules::ledger::Facts for std::sync::Weak<Hub> {
+impl modules::work::ledger::Facts for std::sync::Weak<Hub> {
     fn apply(&self, facts: Vec<Fact>) -> Applied {
         match self.upgrade() {
             Some(hub) => Hub::apply(&hub, facts),

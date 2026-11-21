@@ -11,7 +11,7 @@ use vibevalley_protocol::{
     ApiError, BizCode, PkmBlockOp, PkmClipRequest, PkmClipRequestHighlights, PkmClusterRequest, PkmMarker, PkmMoveRequest, PkmPageRequest, PkmProposalRequest,
     PkmRenameRequest, PkmResolveRequest, PkmSearchRequest, PkmSourceUpdate, PkmTier,
 };
-use vibevalley_server::modules::pkm::Pkm;
+use vibevalley_server::modules::content::pkm::Pkm;
 use vibevalley_server_api::Server;
 
 struct Farm {

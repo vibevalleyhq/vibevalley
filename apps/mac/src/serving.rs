@@ -101,7 +101,7 @@ pub fn shutdown() {
     running.started.close();
 }
 
-pub fn voice() -> Result<std::sync::Arc<vibevalley_server::modules::voice::Voice>, String> {
+pub fn voice() -> Result<std::sync::Arc<vibevalley_server::modules::collab::voice::Voice>, String> {
     lock_running()
         .as_ref()
         .map(|r| r.started.voice.clone())

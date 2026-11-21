@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::support::*;
 use serde_json::{Value, json};
 use vibevalley_core::empty_space_state;
-use vibevalley_server::modules::issue::Board;
+use vibevalley_server::modules::work::issue::Board;
 use vibevalley_server::{Hub, Server, modules};
 
 fn call(hub: &Hub, op: &str, payload: Value) -> Value {
@@ -17,7 +17,7 @@ fn served(w: &World) -> Arc<Hub> {
     let hub = Hub::new(empty_space_state());
     modules::install(&hub);
     let board = Board::open_on(&w.store, w.registry.clone(), config(w.dir.path()), hub.clone()).unwrap();
-    modules::issue::install(&hub, board);
+    modules::work::issue::install(&hub, board);
     hub
 }
 

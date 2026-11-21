@@ -3,7 +3,7 @@ use std::{io::Cursor, path::Path, sync::Arc};
 use vibevalley_protocol::{BizCode, Caller, MediaInputPhase, MediaInputRequest};
 use vibevalley_server::{
     Hub,
-    modules::{
+    modules::content::{
         attachment::Attachments,
         media::inputs::{self, Inputs},
     },

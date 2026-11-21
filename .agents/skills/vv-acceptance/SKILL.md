@@ -1,6 +1,6 @@
 ---
 name: vv-acceptance
-description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的 Rust 服务端，用 Rust 命令行看接口和 /api/v1/state（crates/vibevalley-server、crates/vibevalley-core、crates/vibevalley-cli、crates/vibevalley-protocol）、用脚本驱动原生应用并截图（apps/mac、assets）、验媒体任务（crates/vibevalley-server/src/modules/media）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」；改了接口、服务、表结构、开机流程、页面、像素场景之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
+description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的 Rust 服务端，用 Rust 命令行看接口和 /api/v1/state（crates/vibevalley-server、crates/vibevalley-core、crates/vibevalley-cli、crates/vibevalley-protocol）、用脚本驱动原生应用并截图（apps/mac、assets）、验媒体任务（crates/vibevalley-server/src/modules/content/media）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」；改了接口、服务、表结构、开机流程、页面、像素场景之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
 ---
 
 # 验收

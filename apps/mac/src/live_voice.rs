@@ -6,7 +6,7 @@ use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest};
-use vibevalley_server::modules::voice::Voice;
+use vibevalley_server::modules::collab::voice::Voice;
 
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]

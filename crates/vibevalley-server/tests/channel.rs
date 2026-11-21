@@ -145,7 +145,7 @@ fn the_chat_through_its_endpoints() {
     // Reads: what the orchestrator says is unread until read.
     started
         .chat
-        .post(vibevalley_server::modules::channel::Posting {
+        .post(vibevalley_server::modules::collab::channel::Posting {
             from: "orchestrator".into(),
             channel: gid.clone(),
             text: "收到 @用户".into(),
@@ -210,8 +210,8 @@ fn the_chat_through_its_endpoints() {
 
     // Everything is there when the chat opens again.
     let hub2 = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
-    let files = vibevalley_server::modules::attachment::Attachments::open(dir.path()).unwrap();
-    let chat = vibevalley_server::modules::channel::Chat::open(dir.path(), &hub2, files, false).unwrap();
+    let files = vibevalley_server::modules::content::attachment::Attachments::open(dir.path()).unwrap();
+    let chat = vibevalley_server::modules::collab::channel::Chat::open(dir.path(), &hub2, files, false).unwrap();
     let list = chat.list().unwrap();
     assert_eq!(list[0].id, dev);
     assert_eq!(chat.history(&dev, None, None).unwrap().len(), 1);

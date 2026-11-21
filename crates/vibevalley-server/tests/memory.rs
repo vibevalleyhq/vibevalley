@@ -100,7 +100,7 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
 
 #[test]
 fn regression_replacing_an_agents_notes_rolls_back_the_entire_set() {
-    use vibevalley_server::modules::memory::{By, Note};
+    use vibevalley_server::modules::team::memory::{By, Note};
     let home = tempfile::tempdir().unwrap();
     let server = vibevalley_server::start(vibevalley_server::ServerConfig {
         probe_runtimes: false,

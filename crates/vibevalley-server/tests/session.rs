@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use serde_json::json;
 use vibevalley_core::empty_space_state;
 use vibevalley_protocol::{Caller, SessionEvent, ToolAction};
-use vibevalley_server::modules::session::{Journal, Trajectories};
+use vibevalley_server::modules::work::session::{Journal, Trajectories};
 use vibevalley_server::{Hub, Server};
 
 fn line(e: &SessionEvent) -> String {

@@ -9,7 +9,7 @@ use std::{
 use vibevalley_protocol::Caller;
 use vibevalley_server::{
     Server,
-    modules::media::vendor::{Fetch, Request},
+    modules::content::media::vendor::{Fetch, Request},
 };
 
 struct Network {
@@ -139,9 +139,9 @@ fn transcription(id: &str, revision: i64, input: &str, streaming: bool) -> Value
 fn understanding(id: &str, revision: i64, input: &str, prompt: &str) -> Value {
     json!({"id":id,"connection":"moss","revision":revision,"inputs":[input],"prompt":prompt,"allowUpload":true,"maxOutputTokens":512})
 }
-type Tools = (Vec<Box<dyn vibevalley_agent::Tool>>, Arc<Mutex<vibevalley_server::modules::tool::Route>>);
+type Tools = (Vec<Box<dyn vibevalley_agent::Tool>>, Arc<Mutex<vibevalley_server::modules::team::tool::Route>>);
 fn tools(s: &vibevalley_server::Started, channel: &str) -> Tools {
-    use vibevalley_server::modules::tool::{Route, held};
+    use vibevalley_server::modules::team::tool::{Route, held};
     let route = Arc::new(Mutex::new(Route {
         agent: "orchestrator".into(),
         channel: channel.into(),

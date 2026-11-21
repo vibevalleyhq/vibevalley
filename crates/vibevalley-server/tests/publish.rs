@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::json;
 use vibevalley_protocol::{BranchCheck, Caller, SubmitBranch};
-use vibevalley_server::modules::pull::{Answer, HostRun, Network, Publisher, hosted_origin};
+use vibevalley_server::modules::work::pull::{Answer, HostRun, Network, Publisher, hosted_origin};
 
 fn git(cwd: &Path, args: &[&str]) -> String {
     let o = std::process::Command::new("git").current_dir(cwd).args(args).output().unwrap();
@@ -217,7 +217,7 @@ fn the_repos_check_runs_before_the_push() {
 #[test]
 fn only_the_user_publishes() {
     let hub = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
-    vibevalley_server::modules::pull::publish::install(&hub, Arc::new(farm().publisher));
+    vibevalley_server::modules::work::pull::publish::install(&hub, Arc::new(farm().publisher));
     let asked = json!({ "cwd": "/tmp", "branch": "fix", "sha": "0", "base": "main", "title": "t", "body": "" });
     let e = hub.call_as(Caller::Remote, "repo.pr.submit", asked);
     // The hub's `can` refuses it before the endpoint's own rule does.

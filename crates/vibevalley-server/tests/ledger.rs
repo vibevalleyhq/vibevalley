@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::support::{execute_sql, inspect_db};
 use vibevalley_protocol::{Fact, Issue};
-use vibevalley_server::modules::ledger::{Ledger, LocalFacts};
+use vibevalley_server::modules::work::ledger::{Ledger, LocalFacts};
 
 #[test]
 fn regression_failed_batch_changes_neither_database_nor_core() {

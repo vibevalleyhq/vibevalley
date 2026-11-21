@@ -12,8 +12,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use tokio_tungstenite::tungstenite::{self, Message};
-use vibevalley_server::modules::channel::{Posting, Told};
-use vibevalley_server::modules::connector::{Options, Vendors};
+use vibevalley_server::modules::collab::channel::{Posting, Told};
+use vibevalley_server::modules::collab::connector::{Options, Vendors};
 use vibevalley_server::{Server, Started};
 
 const USER: &str = "o9cq80wkM5NnUserOfThisFarm@im.wechat";

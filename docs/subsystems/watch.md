@@ -1,6 +1,6 @@
 # 观察层
 
-`Watch`（`modules/watch`）站在频道、帮工和工单之上，按事件驱动 agent：读频道提交的事件，算出谁听见、过三道刹车、交给 `Session` 投递；给帮工开串、拉起私聊帮工、贴汇报、记看过和 👀；它也是用户的收件箱（`Inbox`）和巡查。频道只管说话，帮工只管干活，两边都不认识对方，中间的规矩都在这里。
+`Watch`（`modules/collab/watch`）站在频道、帮工和工单之上，按事件驱动 agent：读频道提交的事件，算出谁听见、过三道刹车、交给 `Session` 投递；给帮工开串、拉起私聊帮工、贴汇报、记看过和 👀；它也是用户的收件箱（`Inbox`）和巡查。频道只管说话，帮工只管干活，两边都不认识对方，中间的规矩都在这里。
 
 ## 管什么，不管什么
 
@@ -15,11 +15,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/watch/mod.rs` | `Watch`：按游标读频道事件、路由、席位与串、私聊帮工、汇报、回执；投递经 `Board::tell` |
-| `crates/vibevalley-server/src/modules/watch/hearers.rs` | 谁听见一句话（`who_hears`）、这次投递算什么（`event_of`）、三道刹车 `brakes`、跳数与冷却的记账 `Reach`、熔断 `WakeBreaker`，纯函数 |
+| `crates/vibevalley-server/src/modules/collab/watch/mod.rs` | `Watch`：按游标读频道事件、路由、席位与串、私聊帮工、汇报、回执；投递经 `Board::tell` |
+| `crates/vibevalley-server/src/modules/collab/watch/hearers.rs` | 谁听见一句话（`who_hears`）、这次投递算什么（`event_of`）、三道刹车 `brakes`、跳数与冷却的记账 `Reach`、熔断 `WakeBreaker`，纯函数 |
 | `crates/vibevalley-core/src/inbox.rs` | 收件箱：`inbox`、`inbox_entries`、新事项识别 `fresh_of` |
 | `crates/vibevalley-core/src/patrol.rs` | 巡查的纯函数 `patrol_step`、宽限期 `grace`、对助手说的话 `patrol_text` |
-| 表 `watch_cursor`（`crates/vibevalley-server/src/modules/channel/db.rs`） | 观察层读到 `channel_event` 的哪一号（只往前） |
+| 表 `watch_cursor`（`crates/vibevalley-server/src/modules/collab/channel/db.rs`） | 观察层读到 `channel_event` 的哪一号（只往前） |
 
 ## 模型和不变量
 
@@ -84,7 +84,7 @@
 
 ## 为什么这样
 
-- **频道纯聊天，帮工纯干活，规矩在中间一层**：频道（`modules/channel`）不调工单板，工单板（`modules/issue`、`modules/session`）不认识频道；谁听见、刹车、开串和回执都要同时知道聊天和会话，放在这两者之上，两边都不用回调对方。
+- **频道纯聊天，帮工纯干活，规矩在中间一层**：频道（`modules/collab/channel`）不调工单板，工单板（`modules/work/issue`、`modules/work/session`）不认识频道；谁听见、刹车、开串和回执都要同时知道聊天和会话，放在这两者之上，两边都不用回调对方。
 - **用持久的游标读事件，不用内存里的回调**：提交和路由分属两个事务，中间崩溃时游标还在路由前面，开机接着读；路由按触发的 id 幂等，读两遍不会投两遍。
 - **写话等观察层处理完再返回**：页面、工具和测试都靠「说完就已经路由了」：跳数通知紧跟着那句话、删消息立刻撤回投递。等待放在提交和放锁以后，观察层处理事件时可以随便用频道。
 - **一处算刹车**：叫醒是从聊天进来的，刹车放在它进来的地方，用户的话在同一处清零；工单与会话不再各自重复判断跳数、冷却与熔断。
@@ -92,10 +92,10 @@
 
 ## 还没做的
 
-- 巡查循环：Rust 服务端没有；外推由连接器自己读频道的提交事件和用户的已读（`modules/connector`），不经观察层；投递按会话排在内存里（随下一次叫醒带上），不是 TS 版的持久信箱。
+- 巡查循环：Rust 服务端没有；外推由连接器自己读频道的提交事件和用户的已读（`modules/collab/connector`），不经观察层；投递按会话排在内存里（随下一次叫醒带上），不是 TS 版的持久信箱。
 
 ## 怎么验证
 
 - `crates/vibevalley-server/tests/watch.rs`：频道里的话路由到帮工。
-- `crates/vibevalley-server/src/modules/watch/hearers.rs` 里的单元测试：三道刹车的次序、跳数和冷却的记账、熔断。
+- `crates/vibevalley-server/src/modules/collab/watch/hearers.rs` 里的单元测试：三道刹车的次序、跳数和冷却的记账、熔断。
 - `crates/vibevalley-core/src/tests.rs`、`crates/vibevalley-core/src/tests_round2.rs`：收件箱事项与巡查的宽限期。

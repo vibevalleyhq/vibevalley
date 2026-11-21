@@ -11,8 +11,8 @@ use vibevalley_core::Move;
 use vibevalley_oar::scripted::{Script, Step};
 use vibevalley_oar::{PermissionMode, Runtime, StopReason};
 use vibevalley_protocol::{Deliverable, IssueCanceled, IssueStageKind as StageKind, IssueStatus, Landing, Outcome, Phase, StuckReason};
-use vibevalley_server::modules::issue::{Board, NewIssue};
-use vibevalley_server::modules::ledger::{BoardError, Undelivered};
+use vibevalley_server::modules::work::issue::{Board, NewIssue};
+use vibevalley_server::modules::work::ledger::{BoardError, Undelivered};
 
 fn new(title: &str, repo: Option<&Path>) -> NewIssue {
     NewIssue {

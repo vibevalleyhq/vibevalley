@@ -20,16 +20,16 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档与�
 | 位置 | 职责 |
 |---|---|
 | `crates/vibevalley-artifact/src/` | 服务端跑的那份 Rust 引擎与单一真相源：`ops.rs`、`markdown.rs`、`html.rs`、`shell.rs`、`store.rs`、`tokens.rs`、`viewers.rs`、`starters.rs`；维护 `crates/vibevalley-artifact/tests/golden` 回归测例 |
-| `crates/vibevalley-server/src/modules/artifact/` | 服务端 Artifact 读写、版本管理与 SSE 订阅 |
+| `crates/vibevalley-server/src/modules/content/artifact/` | 服务端 Artifact 读写、版本管理与 SSE 订阅 |
 | `apps/mac/ui/features/artifact/` 与 `apps/mac/ui/features/media/` | 原生应用 nsh TSX 页面与客户端辅助：块编辑器模型（`blocks.ts`、`editor.ts`）、HTML 后缀推断（`html.ts`）、WebView 外壳与 `vv.timeline` 消息守卫（`shell.ts`）、Store 消息守卫（`viewers.ts`），以及 `ArtifactsPage`（含可折叠列表与内嵌实时 `ChannelSidePane`）、`ArtifactCanvas`、`BlocksView`、`StoreArtifactView`、各类型专用视图（`SlidesStoreView`、`DashboardView`、`MotionStoreView`、`MotionControls`、`WhiteboardView`、`DesignCanvasView`、`DesignSystemView`）与 `/library` 统一交付物和素材视图 |
-| `crates/vibevalley-server/src/modules/artifact/` | `Artifacts`：`mod.rs`（总入口、HTML 与默认设计体系管理）、`blocks.rs`（块与建议持久化）、`entries.rs`（Store 条目批处理、乐观锁、`artifact.entry.follow` 与 `artifact.view` 拼装）、`types.rs`（嵌入 `crates/vibevalley-server/assets/artifact/types/` 的中英双语 `SKILL.md` / `SKILL.en.md` 与 `references/*.md`）、`db.rs` |
+| `crates/vibevalley-server/src/modules/content/artifact/` | `Artifacts`：`mod.rs`（总入口、HTML 与默认设计体系管理）、`blocks.rs`（块与建议持久化）、`entries.rs`（Store 条目批处理、乐观锁、`artifact.entry.follow` 与 `artifact.view` 拼装）、`types.rs`（嵌入 `crates/vibevalley-server/assets/artifact/types/` 的中英双语 `SKILL.md` / `SKILL.en.md` 与 `references/*.md`）、`db.rs` |
 | `crates/vibevalley-protocol/src/contract/artifact.rs`、`packages/protocol/src/artifact/` | 跨端契约（Rust 为源、生成 TS 形状与端点）、Zod Schema，以及 `packages/protocol/src/rules/order.ts`（`keyBetween`）与 `display.ts`（`htmlSandbox`） |
 | 表 `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion`、`artifact_entry`、`artifact_entry_change` | Artifact 主表（`issue` 列带 `references issue(id) on delete set null` 外键）、HTML 版本表、块与建议表、结构化条目表及增量变更日志表（均在 `server.db`） |
 | `apps/mac/ui/features/artifact/` 与 `apps/mac/ui/features/media/` | 原生应用 nsh TSX 页面：`ArtifactsPage`（含可折叠列表与内嵌实时 `ChannelSidePane`）、`ArtifactCanvas`、`BlocksView`、`StoreArtifactView` 及各类型专用视图（`SlidesStoreView`、`DashboardView`、`MotionStoreView`、`MotionControls`、`WhiteboardView`、`DesignCanvasView`、`DesignSystemView`）、`<artifact-view-context>` 上报，以及 `/library` 统一交付物与素材视图 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*`、`GET /api/v1/artifact/<id>/<version>` 与 `GET /api/v1/artifact/<id>/view`）。
 
-Artifact 使用 SQLx 访问 SQLite。sqlc 从 Artifact 与频道的正式表结构生成命名查询。频道消息不存在时，左连接返回空引用；工单删除时 `artifact.issue` 由外键自动置空（`on delete set null`）。版本与 `asset` 条目的文件内容由附件库保管（[查询](crates/vibevalley-server/src/modules/artifact/sql/queries.sql)）。
+Artifact 使用 SQLx 访问 SQLite。sqlc 从 Artifact 与频道的正式表结构生成命名查询。频道消息不存在时，左连接返回空引用；工单删除时 `artifact.issue` 由外键自动置空（`on delete set null`）。版本与 `asset` 条目的文件内容由附件库保管（[查询](crates/vibevalley-server/src/modules/content/artifact/sql/queries.sql)）。
 
 频道中的 Artifact 卡片、版本号和消息引用由 `Chat::post_with` 在同一连接上提交。版本写入失败时，频道回滚消息和事件，恢复内存镜像。订阅者只收到已提交的卡片。
 

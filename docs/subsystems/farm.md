@@ -72,7 +72,7 @@
 ## 和谁打交道
 
 - **核心状态与游戏（`core`、`game`）**：读 `StateFrame` 的 `state`、`view`。
-- **外壳（`apps/mac/src/shell.rs`）**：`PixelEvent` 交给 `Shell::on_pixel_event`，由它开工作台的页、换像素场景或开终端。
+- **外壳（`apps/mac/src/shell/host_bridge.rs`）**：`PixelEvent` 交给 `Shell::on_pixel_event`，由它开工作台的页、换像素场景或开终端。
 - **素材流水线**：`design/pixel/` 处理贴图并导出到 `assets/pixel/`，图集从 `sprites.json` 读取尺寸和脚底锚点（`VIBEVALLEY_ASSETS` 可以指定整组素材的位置）；`vibevalley-pixel` 在 CPU 上完成最近邻缩放、法线图推导与昼夜灯光合成。
 
 ## 为什么这样

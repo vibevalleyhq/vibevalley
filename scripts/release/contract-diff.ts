@@ -23,8 +23,10 @@ export const contractKinds: readonly { readonly kind: string; readonly is: (path
 /** The area a path is in: a crate, an app or package's folder, a server module or a UI feature. */
 export function areaOf(path: string): string {
   const parts = path.split("/");
-  if (parts[0] === "crates" && parts[1] === "vibevalley-server" && parts[2] === "src" && parts[3] === "modules" && parts.length > 4)
-    return `server/${parts[4]}`;
+  if (parts[0] === "crates" && parts[1] === "vibevalley-server" && parts[2] === "src" && parts[3] === "modules") {
+    const modName = parts[5] && parts[5] !== "mod.rs" ? parts[5] : parts[4];
+    if (modName && modName !== "mod.rs") return `server/${modName.replace(/\.rs$/u, "")}`;
+  }
   if (parts[0] === "apps" && parts[1] === "mac" && parts[2] === "ui" && parts[3] === "features" && parts.length > 4) return `mac/${parts[4]}`;
   if (parts[0] === "crates" || parts[0] === "apps" || parts[0] === "packages") return `${parts[0]}/${parts[1]}`;
   return parts[0] ?? path;

@@ -4,8 +4,8 @@ use std::path::Path;
 
 use crate::support::*;
 use vibevalley_protocol::{IssueStageKind as StageKind, IssueStatus, IssueUpdate, MilestoneKind, Outcome, RunTriggerKind};
-use vibevalley_server::modules::issue::NewIssue;
-use vibevalley_server::modules::ledger::BoardError;
+use vibevalley_server::modules::work::issue::NewIssue;
+use vibevalley_server::modules::work::ledger::BoardError;
 
 fn new(title: &str, repo: Option<&Path>) -> NewIssue {
     NewIssue {

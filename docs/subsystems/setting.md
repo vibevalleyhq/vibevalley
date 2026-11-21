@@ -18,7 +18,7 @@
 |---|---|
 | `crates/vibevalley-server/src/main.rs` | 读参数（`--web`、`--ready-json`）和环境变量，组装 `ServerConfig`，只听 `127.0.0.1` |
 | `crates/vibevalley-server/src/start.rs` | `ServerConfig`（家目录、空间根、钥匙、内置模板、测试开关）与开机组装 |
-| `crates/vibevalley-server/src/modules/setting.rs` | `Setting`：`settings.json` 读成 `Stored`；`Secret`；`status`、`validate`、`save`；语音默认值与差异；就绪状态 |
+| `crates/vibevalley-server/src/modules/infra/setting.rs` | `Setting`：`settings.json` 读成 `Stored`；`Secret`；`status`、`validate`、`save`；语音默认值与差异；就绪状态 |
 | `crates/vibevalley-home/src/lib.rs` | 家目录在哪（`VIBEVALLEY_HOME`，默认 `~/.vibevalley`）、`server.json`、保存的语言 |
 | `apps/mac/ui/features/setting/` | 工作台设置页 |
 

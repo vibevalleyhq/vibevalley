@@ -6,7 +6,7 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 
 | 宿主模块 | 职责与实现位置 | 通信 / 渲染方式 |
 | --- | --- | --- |
-| **主窗口外壳（`Shell`）** | 管理窗口根视图、菜单栏、热键上下文、原生分屏工作区、像素场景栈与 `OpeningScene` 遮罩（`apps/mac/src/shell.rs`） | GPUI 根实体；同时托管最多 3 个 `HostedView`（`workbench` 主路由、`sidebar` contextual 边栏、`inspector` 右侧检查器）及弹出的 `Palette` 命令面板 |
+| **主窗口外壳（`Shell`）** | 管理窗口根视图、菜单栏、热键上下文、原生分屏工作区、像素场景栈与 `OpeningScene` 遮罩（`apps/mac/src/shell/`） | GPUI 根实体；同时托管最多 3 个 `HostedView`（`workbench` 主路由、`sidebar` contextual 边栏、`inspector` 右侧检查器）及弹出的 `Palette` 命令面板 |
 | **进程内通信桥（`BridgeHub`）** | 衔接宿主视图 `call`、`frame:state` 帧广播、`live` 增量事件与流式 `subscribe`（`apps/mac/src/hosted/` 与 `crates/vibevalley-bridge/`） | 线程安全通道直连进程内 `vibevalley-server`（无需绕回本地 loopback HTTP） |
 | **刘海灵动岛（`apps/island`）** | 悬停在 Mac 刘海位置的常驻态浮窗，实时速览正在运行与等待回应的工单（`Island.swift`、`Geometry.swift`、`apps/mac/src/island.rs`） | `Shell` 启动子进程并通过管道推送 `glance(&frame)`（最多 `12` 条精简行）；窗口配置为无边框 `NSPanel`（`.nonactivatingPanel` + `canJoinAllSpaces` + `mainMenuWindow + 3` 层级），几何参数：`wing: 72`、`tabWidth: 200`、`openWidth: 420`、`rowHeight: 28`、`maxRows = 6`；环境变量 `VIBEVALLEY_NO_ISLAND` 可禁用；点击直接发回工单 ID 唤醒主窗切至 `/issues/:id` |
 | **系统菜单栏托盘（`tray.rs`）** | 在系统状态栏驻留 `18×18` 嫩芽像素图标（`assets/pixel/app-sprout.png`），显示即时活动摘要并提供「打开主窗 / 退出」（`apps/mac/src/tray.rs`） | AppKit `NSStatusBar` + `flume` 通道通知 GPUI 主线程激活窗口 |
@@ -79,12 +79,12 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 | `< 640px` (`40rem` / `sm`) | 全局 Rail（`Shell.tsx`）与农庄手机（`chrome.rs`） | Rail 从 `76px` 收缩至 `68px` 且按钮隐去底部文字仅保留居中图标；农庄展开手机宽度不足 `640px` 时收起左侧菜单进入纯聊天布局（`chat_only`） |
 | `< 680px` | 农场像素 HUD（`chrome.rs`）与档案列表（`AgentsPage.tsx`） | 农场顶部右侧按钮流式折行、底部 6 把农具按钮单格从 `52px` 收缩至 `44px`；`AgentsPage` 隐藏行内右侧摘要/标签/农机列 |
 | `< 768px` (`48rem` / `md`) | 工作台多栏详情页面（`/runs`、`/issues`、`/chat` 等） | 左右分栏退化为单栏列表/详情切换，选中条目后切换详情并呈现「返回」按钮（`issues` 保留面包屑返回栈） |
-| `< 1040px` | 原生工作区检查器（`shell.rs`） | 右侧文件/Git 检查器栏及拖拽分隔线自动隐去，优先把水平像素留给代码/Diff/终端主视口 |
+| `< 1040px` | 原生工作区检查器（`shell/render.rs`） | 右侧文件/Git 检查器栏及拖拽分隔线自动隐去，优先把水平像素留给代码/Diff/终端主视口 |
 
 ## 6.5 全键盘操作与快捷键系统
 
 - **工作台快捷键注册表（`apps/mac/ui/infra/base/shortcuts.ts`）**：涵盖 8 大作用域（`everywhere`、`composer`、`lists`、`issues`、`pictures`、`library`、`farm`、`desktop`），包含 `Cmd/Mod+J` 快速切换、`?` 打开 `ShortcutSheet`、`Esc` 逐层关闭弹窗/退出编辑/回到看板、`C` 在工单页快速新建、`Up`/`Down`/`Enter` 列表漫游与回车进入、`Space`/`Delete` 素材库快速预览与删除、农场 `1…6` 切农具、按住 `Alt` 临时透显全员姓名、`Alt+Shift+Space` 全局语音热键。
-- **GPUI 原生作用域严格隔离（`apps/mac/src/shell.rs` `bind_keys`）**：
+- **GPUI 原生作用域严格隔离（`apps/mac/src/shell/menus.rs` `bind_keys`）**：
   - 全局级别保留 `Cmd+,`、`Cmd+K` / `Cmd+Shift+P` 调起命令面板、`Cmd+±/0` 缩放字号等；
   - `Cmd+1..9`（切项目）、`Cmd+B`（侧栏开关）、`Cmd+P`（速开文件）、`Cmd+Shift+F`（全库检索）、`Cmd+T`（新终端）、`Cmd+W`（关标签页）、`Cmd+D` / `Cmd+Shift+D`（左右/上下分屏）**全部限定于 `"Workspace"` 键位上下文**，在工作台输入框或表单聚焦时绝不劫持键位；
   - `Cmd+C`/`V`/`K` 等终端按键限定于 `"Terminal"` 上下文；`Escape` 优先级遵循由内向外（输入弹层 → 命令面板 → 灯箱 → 对话框 → 详情页返回列表 / 农场菜单）。

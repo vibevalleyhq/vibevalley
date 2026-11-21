@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, Fact, LibraryAddRequest};
-use vibevalley_server::modules::library::AddedBy;
+use vibevalley_server::modules::content::library::AddedBy;
 
 fn start(dir: &std::path::Path) -> vibevalley_server::Started {
     let mut registry = vibevalley_oar::Registry::new();

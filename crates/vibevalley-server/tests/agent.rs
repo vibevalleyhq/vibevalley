@@ -7,7 +7,7 @@ use std::sync::Arc;
 use serde_json::json;
 use vibevalley_protocol::{Agent, AgentRole, BizCode, Build, DEFAULT_ORCHESTRATOR, Head, Look, ORCHESTRATOR_RUNTIME, PersonaMode, Skill, Species};
 use vibevalley_server::Hub;
-use vibevalley_server::modules::agent::{Agents, Profiles, profile};
+use vibevalley_server::modules::team::agent::{Agents, Profiles, profile};
 
 fn starters() -> Vec<String> {
     profile::built_in_templates()
@@ -386,7 +386,7 @@ fn runtimes_over_the_hub() {
     let mut registry = vibevalley_oar::Registry::new();
     registry.register(Arc::new(vibevalley_oar::scripted::ScriptedRuntime::demo()));
     let agents = Agents::open(&hub, home.path(), &starters(), Arc::new(registry), false).unwrap();
-    vibevalley_server::modules::agent::install(&hub, agents);
+    vibevalley_server::modules::team::agent::install(&hub, agents);
     let live = vibevalley_server::Server::live(&*hub);
 
     let list = hub.call_as(vibevalley_protocol::Caller::User, "runtime.list", json!(null));

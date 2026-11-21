@@ -5,10 +5,11 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ## 目录
 
 ```
-crates/vibevalley-server/  服务端（二进制 vibevalley-server）：src/modules 按单数概念分深模块（agent、artifact、attachment、channel、cron、game、issue、
-                           ledger、library、media、memory、mcp、orchestrator、pkm、provider、pull、repo、session、setting、tool、watch、workplace；
-                           任务板拆成 issue（状态与交付）、session（执行会话和每一轮）、workplace（worktree 与合并），都只经 ledger 写），lib.rs 组装 Hub，
-                           start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
+crates/vibevalley-server/  服务端（二进制 vibevalley-server）：src/modules 按 6 个业务域分组（work：issue、session、workplace、repo、cron、pull、ledger；
+                           team：agent、orchestrator、memory、provider、tool、mcp；collab：channel、watch、connector、voice；
+                           content：attachment、library、media、artifact、pkm；skin：game；infra：setting、column、core；
+                           任务板拆成 work/issue（状态与交付）、work/session（执行会话和每一轮）、work/workplace（worktree 与合并），都只经 work/ledger 写），
+                           lib.rs 组装 Hub，start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
 crates/vibevalley-http/    HTTP 门（/api/v1、SSE、/mcp）：照契约的接口表把请求交给服务端
 crates/vibevalley-server-api/  服务端对桥和 HTTP 门的接口（Server trait）
 crates/vibevalley-bridge/  页面和进程内服务端之间的桥（Hub），和顶替服务端的样例（fake）
@@ -20,7 +21,7 @@ crates/vibevalley-cli/     命令行（二进制 vibevalley，clap）：照领�
 crates/vibevalley-home/    家目录在磁盘上的约定：在哪、server.json、语言；服务端、命令行、原生应用共用
 crates/vibevalley-i18n/    对用户说的话：locales/<语言>/<宿主.模块>.json 的词典，Rust 里 t("key")
 crates/vibevalley-*        其余：git、files、highlight、terminal、workspace（应用外壳的项目、布局、终端与持久化）、pkm、artifact、cron
-apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
+apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳（src/shell/*）、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
                            ui/ 是 nsh 跑的 TSX：app、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含笔记与作品前端引擎）、farm、infra
 apps/island/               刘海上的灵动岛（Swift）：单独的小程序（apps/island/README.md）
 apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成），图和像素字用根目录 assets/ 的

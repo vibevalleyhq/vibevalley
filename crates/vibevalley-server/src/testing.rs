@@ -125,7 +125,7 @@ fn turn(ask: &TurnAsk) -> Result<Vec<Step>, String> {
     if input.contains("只起草工单") {
         return Ok(draft(ask, &input));
     }
-    if input.contains(ANSWER_OPENING) || input.contains("结论读不出来") || persona.contains(crate::modules::session::ANSWER_ONLY) {
+    if input.contains(ANSWER_OPENING) || input.contains("结论读不出来") || persona.contains(crate::modules::work::session::ANSWER_ONLY) {
         return Ok(answer(ask, &input));
     }
     if input.contains("必败") {
@@ -278,34 +278,34 @@ mod tests {
 /// answers, `[media:unknown]` is an unknown outcome, `[media:download-failure]`
 /// fails its first download, and anything else is a PNG of the asked size.
 pub struct OfflineImages {
-    pub real: crate::modules::media::image_provider::Moss,
+    pub real: crate::modules::content::media::image_provider::Moss,
     failing: std::sync::Mutex<std::collections::HashSet<String>>,
     next: std::sync::atomic::AtomicUsize,
 }
 
 impl OfflineImages {
-    pub fn new(setting: Arc<crate::modules::setting::Setting>) -> Arc<OfflineImages> {
+    pub fn new(setting: Arc<crate::modules::infra::setting::Setting>) -> Arc<OfflineImages> {
         Arc::new(OfflineImages {
-            real: crate::modules::media::image_provider::Moss::new(setting),
+            real: crate::modules::content::media::image_provider::Moss::new(setting),
             failing: Default::default(),
             next: Default::default(),
         })
     }
 }
 
-impl crate::modules::media::image_provider::ImageBackend for OfflineImages {
+impl crate::modules::content::media::image_provider::ImageBackend for OfflineImages {
     fn prepare(
         &self,
         request: &vibevalley_protocol::MediaImageRequest,
-    ) -> Result<crate::modules::media::image_provider::Prepared, vibevalley_protocol::ApiError> {
+    ) -> Result<crate::modules::content::media::image_provider::Prepared, vibevalley_protocol::ApiError> {
         self.real.prepare(request)
     }
 
     fn generate<'a>(
         &'a self,
-        p: crate::modules::media::image_provider::Prepared,
-    ) -> crate::modules::media::image_provider::Work<'a, crate::modules::media::image_provider::Generated> {
-        use crate::modules::media::image_provider::{Failure, Generated};
+        p: crate::modules::content::media::image_provider::Prepared,
+    ) -> crate::modules::content::media::image_provider::Work<'a, crate::modules::content::media::image_provider::Generated> {
+        use crate::modules::content::media::image_provider::{Failure, Generated};
         Box::pin(async move {
             let prompt = p.body["prompt"].as_str().unwrap_or("").to_string();
             if prompt.contains("[media:hold]") {
@@ -329,8 +329,8 @@ impl crate::modules::media::image_provider::ImageBackend for OfflineImages {
         })
     }
 
-    fn download<'a>(&'a self, url: &'a str, width: i64, height: i64) -> crate::modules::media::image_provider::Work<'a, Vec<u8>> {
-        use crate::modules::media::image_provider::Failure;
+    fn download<'a>(&'a self, url: &'a str, width: i64, height: i64) -> crate::modules::content::media::image_provider::Work<'a, Vec<u8>> {
+        use crate::modules::content::media::image_provider::Failure;
         Box::pin(async move {
             if self.failing.lock().unwrap_or_else(|e| e.into_inner()).remove(url) {
                 return Err(Failure::Unknown);
@@ -372,6 +372,6 @@ pub fn png(width: u32, height: u32) -> Vec<u8> {
 mod png_tests {
     #[test]
     fn the_offline_png_is_valid_at_its_size() {
-        assert!(crate::modules::media::png::valid(&super::png(256, 512), 256, 512));
+        assert!(crate::modules::content::media::png::valid(&super::png(256, 512), 256, 512));
     }
 }

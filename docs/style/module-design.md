@@ -63,7 +63,7 @@
 
 三者不必拆成三个服务。只有职责可独立命名且能降低耦合时才提取，保留在原业务模块内；不新建一个收集所有规则的技术层。
 
-以定时任务为例，[到期计算](crates/vibevalley-cron/src/lib.rs)与[服务执行](crates/vibevalley-server/src/modules/cron/mod.rs)分别承担日期决定和持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
+以定时任务为例，[到期计算](crates/vibevalley-cron/src/lib.rs)与[服务执行](crates/vibevalley-server/src/modules/work/cron/mod.rs)分别承担日期决定和持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
 
 提取纯决定时，应保留「读取、判断、提交」的并发边界。把判断挪到锁外可能引入过期快照；函数变纯不代表整个流程变正确。
 
@@ -71,15 +71,15 @@
 
 让不变量住进类型，在系统入口一次性完成解析（Parse, don't validate），不在业务内部散落防御性判断或裸字符串约定：
 
-- **进门一次解析**：HTTP、命令行、工具参数、配置、落盘 JSON 与厂商响应在边界经 serde 一步解成结构体和 enum：端点的入参是契约的类型（`Hub::on::<O>`，[lib.rs](crates/vibevalley-server/src/lib.rs)）；模型给的工具参数经 [tool/mod.rs](crates/vibevalley-server/src/modules/tool/mod.rs) 的 `args` 宽松解析一次（数字字符串、`null` 当缺省写在这一处）再成参数结构体；`settings.json` 在 [setting.rs](crates/vibevalley-server/src/modules/setting.rs) 一次读成 `Stored`。格式错误当场失败，不兜底成默认值。
-- **密钥是 `Secret`**：钥匙和 token 包进 `Secret`（[setting.rs](crates/vibevalley-server/src/modules/setting.rs)），`Debug` 只出提示，取原文要显式 `expose()`。
+- **进门一次解析**：HTTP、命令行、工具参数、配置、落盘 JSON 与厂商响应在边界经 serde 一步解成结构体和 enum：端点的入参是契约的类型（`Hub::on::<O>`，[lib.rs](crates/vibevalley-server/src/lib.rs)）；模型给的工具参数经 [tool/mod.rs](crates/vibevalley-server/src/modules/team/tool/mod.rs) 的 `args` 宽松解析一次（数字字符串、`null` 当缺省写在这一处）再成参数结构体；`settings.json` 在 [setting.rs](crates/vibevalley-server/src/modules/infra/setting.rs) 一次读成 `Stored`。格式错误当场失败，不兜底成默认值。
+- **密钥是 `Secret`**：钥匙和 token 包进 `Secret`（[setting.rs](crates/vibevalley-server/src/modules/infra/setting.rs)），`Debug` 只出提示，取原文要显式 `expose()`。
 - **契约一份**：线上的形状以 Rust 的 [contract](crates/vibevalley-protocol/src/contract/mod.rs) 类型为源，TS 类型由它生成；页面收到的帧、事件和接口结果按同一份手写的 Schema 解码（`packages/protocol` 的 `schema.ts`，测试对着生成的类型查）。闭合词集是 enum，不重复内联字面量。
 - **未解析引用与主键分离**：用户、命令行或模型传入的名称、编号与地址（如 `#41`、频道名、`vv://`）按引用建模，在所属模块的入口一次解析成 id；模块内部与存储层只传已解析的 id。
 - **存储区分「缺省」与「损坏」**：可空列读成 `Option`，非空的损坏立即报错，不静默吞成缺省；只有外部不可信的载荷才容错。
 
 ### 显式状态
 
-一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/mac/ui/infra/state/intent.ts)的 `IntentAt`、[媒体任务](crates/vibevalley-server/src/modules/media/jobs.rs)的 `Held`、[谁听见](crates/vibevalley-server/src/modules/watch/hearers.rs)的 `HeldBy`。Rust 里就是带数据的 enum，`match` 穷尽。
+一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/mac/ui/infra/state/intent.ts)的 `IntentAt`、[媒体任务](crates/vibevalley-server/src/modules/content/media/jobs.rs)的 `Held`、[谁听见](crates/vibevalley-server/src/modules/collab/watch/hearers.rs)的 `HeldBy`。Rust 里就是带数据的 enum，`match` 穷尽。
 
 - **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/mac/ui/infra/form/form.ts)）。硬并只会得到它们的乘积。
 - **永远同值的删掉副本。** 读源头，不另存一份跟着改。

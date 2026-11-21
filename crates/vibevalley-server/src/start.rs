@@ -7,12 +7,12 @@ use std::sync::Arc;
 use vibevalley_oar::Registry;
 
 use crate::Hub;
-use crate::modules::issue::Board;
-use crate::modules::ledger::BoardConfig;
 use crate::modules::{
     self,
-    agent::Agents,
-    setting::{Setting, SettingConfig},
+    infra::setting::{Setting, SettingConfig},
+    team::agent::Agents,
+    work::issue::Board,
+    work::ledger::BoardConfig,
 };
 
 /// What the server starts with (VibeValley's `ServerConfig`, the parts
@@ -42,7 +42,7 @@ pub struct ServerConfig {
     /// (`None` follows `probe_runtimes`).
     pub probe_github: Option<bool>,
     /// Optional hosted-branch publisher override (offline tests).
-    pub publisher: Option<Arc<modules::pull::Publisher>>,
+    pub publisher: Option<Arc<modules::work::pull::Publisher>>,
     /// Poll open PRs every N seconds (`None` disables the background poller).
     pub poll_pulls: Option<u64>,
     /// Runs due crons every 20 s (`tickCrons`).
@@ -52,12 +52,12 @@ pub struct ServerConfig {
     /// Commits by these addresses count as the user's too (`gitEmails`).
     pub git_emails: Vec<String>,
     /// Media execution backend; defaults to MOSS. Tests inject a deterministic backend.
-    pub media_backend: Option<Arc<dyn modules::media::image_provider::ImageBackend>>,
+    pub media_backend: Option<Arc<dyn modules::content::media::image_provider::ImageBackend>>,
     /// The vendors answered offline (the page's tests): `testing::OfflineImages`.
     pub offline_media: bool,
     /// How the media vendor is reached and its results fetched, in place of the network: a test keeps one across
     /// restarts, so the vendor remembers what it was asked.
-    pub media_network: Option<(Arc<dyn modules::media::vendor::Fetch>, Arc<dyn modules::media::vendor::Fetch>)>,
+    pub media_network: Option<(Arc<dyn modules::content::media::vendor::Fetch>, Arc<dyn modules::content::media::vendor::Fetch>)>,
     /// The orchestrator and built-in workers can share an offline model.
     pub model_client: Option<Arc<dyn vibevalley_agent::ModelClient>>,
     /// The orchestrator hears the farm (VibeValley `listen`); a test without
@@ -68,9 +68,9 @@ pub struct ServerConfig {
     /// Rescans the vault when a file in it changes (VibeValley's own).
     pub watch_pkm: bool,
     /// Where the voice line listens and how Agora reaches it.
-    pub voice_line: modules::voice::LineConfig,
+    pub voice_line: modules::collab::voice::LineConfig,
     /// How the chat apps are reached and paced; tests point it at local stubs.
-    pub connector: modules::connector::Options,
+    pub connector: modules::collab::connector::Options,
 }
 
 impl ServerConfig {
@@ -115,7 +115,7 @@ impl ServerConfig {
             pkm_root: None,
             watch_pkm: true,
             voice_line: Default::default(),
-            connector: modules::connector::Options::default(),
+            connector: modules::collab::connector::Options::default(),
         }
     }
 
@@ -159,38 +159,38 @@ pub struct Started {
     pub agents: Arc<Agents>,
     pub board: Board,
     pub registry: Arc<Registry>,
-    pub repos: Arc<modules::repo::Repos>,
-    pub pulls: Arc<modules::pull::Pulls>,
-    pub crons: Arc<modules::cron::Crons>,
-    pub game: Arc<modules::game::Game>,
-    pub attachments: Arc<modules::attachment::Attachments>,
-    pub chat: Arc<modules::channel::Chat>,
+    pub repos: Arc<modules::work::repo::Repos>,
+    pub pulls: Arc<modules::work::pull::Pulls>,
+    pub crons: Arc<modules::work::cron::Crons>,
+    pub game: Arc<modules::skin::game::Game>,
+    pub attachments: Arc<modules::content::attachment::Attachments>,
+    pub chat: Arc<modules::collab::channel::Chat>,
     /// Routes the chat to the sessions and opens their threads.
-    pub watch: Arc<modules::watch::Watch>,
+    pub watch: Arc<modules::collab::watch::Watch>,
     /// The assistants: what the chat and the crons say to them.
-    pub orchestrator: Arc<modules::orchestrator::Orchestrator>,
+    pub orchestrator: Arc<modules::team::orchestrator::Orchestrator>,
     /// Session trajectories on disk and in memory.
-    pub trajectories: Arc<modules::session::Trajectories>,
+    pub trajectories: Arc<modules::work::session::Trajectories>,
     /// What the agents remember.
-    pub memories: Arc<modules::memory::Memories>,
+    pub memories: Arc<modules::team::memory::Memories>,
     /// Pages the user and the agents make.
-    pub artifacts: Arc<modules::artifact::Artifacts>,
+    pub artifacts: Arc<modules::content::artifact::Artifacts>,
     /// The user's notes.
-    pub pkm: Arc<modules::pkm::Pkm>,
+    pub pkm: Arc<modules::content::pkm::Pkm>,
     /// Durable media jobs and their executor.
-    pub media: Arc<modules::media::jobs::Jobs>,
+    pub media: Arc<modules::content::media::jobs::Jobs>,
     /// Media reservations, binary uploads and job references.
-    pub media_inputs: Arc<modules::media::inputs::Inputs>,
+    pub media_inputs: Arc<modules::content::media::inputs::Inputs>,
     /// Kept attachments as material.
-    pub library: Arc<modules::library::Library>,
+    pub library: Arc<modules::content::library::Library>,
     /// `vv://` reads for the orchestrator's and the helpers' `resource_read`.
-    pub resources: Arc<modules::mcp::Resources>,
+    pub resources: Arc<modules::team::mcp::Resources>,
     /// What the orchestrator's and the helpers' tools reach.
-    pub farm: Arc<modules::tool::Farm>,
+    pub farm: Arc<modules::team::tool::Farm>,
     /// Dictation, grants and calls.
-    pub voice: Arc<modules::voice::Voice>,
+    pub voice: Arc<modules::collab::voice::Voice>,
     /// The chat apps tied to channels.
-    pub connectors: Arc<modules::connector::Connectors>,
+    pub connectors: Arc<modules::collab::connector::Connectors>,
 }
 
 impl Started {
@@ -272,7 +272,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         std::fs::create_dir_all(&dir).map_err(|e| failed("the work root")(&e))?;
     }
     let hub = Hub::new(vibevalley_core::empty_space_state());
-    modules::core::install_version(&hub, &config.version);
+    modules::infra::core::install_version(&hub, &config.version);
     let setting = Setting::open(SettingConfig {
         home: config.home.clone(),
         work_root: config.work_root.clone(),
@@ -282,18 +282,19 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         agora_app_certificate: config.agora_app_certificate.clone(),
         voice_id: config.voice_id.clone(),
     });
-    modules::setting::install(&hub, setting.clone());
-    let game = modules::game::Game::open(&config.home, &hub);
-    modules::game::install(&hub, game.clone());
+    modules::infra::setting::install(&hub, setting.clone());
+    let game = modules::skin::game::Game::open(&config.home, &hub);
+    modules::skin::game::install(&hub, game.clone());
     // How MOSS is reached, and its results fetched; the page's tests answer it offline.
-    let (vendor, download): (Arc<dyn modules::media::vendor::Fetch>, Arc<dyn modules::media::vendor::Fetch>) = if let Some(network) = &config.media_network {
-        network.clone()
-    } else if config.offline_media {
-        crate::offline::network()
-    } else {
-        (Arc::new(modules::media::vendor::Http), Arc::new(modules::media::vendor::Http))
-    };
-    modules::provider::install(&hub, Arc::new(modules::provider::Provider::new(setting.clone(), vendor.clone())));
+    let (vendor, download): (Arc<dyn modules::content::media::vendor::Fetch>, Arc<dyn modules::content::media::vendor::Fetch>) =
+        if let Some(network) = &config.media_network {
+            network.clone()
+        } else if config.offline_media {
+            crate::offline::network()
+        } else {
+            (Arc::new(modules::content::media::vendor::Http), Arc::new(modules::content::media::vendor::Http))
+        };
+    modules::team::provider::install(&hub, Arc::new(modules::team::provider::Provider::new(setting.clone(), vendor.clone())));
     let voice_fetch = vendor.clone();
     let execution = Arc::new(std::sync::OnceLock::new());
     let registry = config
@@ -301,24 +302,24 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         .clone()
         .unwrap_or_else(|| Arc::new(runtimes(&setting, &config.home, execution.clone(), config.model_client.clone())));
     let agents = Agents::open(&hub, &config.home, &config.starters, registry.clone(), config.probe_runtimes).map_err(|e| failed("the profiles")(&e))?;
-    modules::agent::install(&hub, agents.clone());
+    modules::team::agent::install(&hub, agents.clone());
     let board_config = BoardConfig {
         worktrees_dir: config.work_root.join("worktrees"),
         data_dir: config.home.join("issues"),
         repos_dir: Some(config.work_root.join("repos")),
         ..BoardConfig::under(&config.home)
     };
-    let repos = modules::repo::Repos::open(&config.work_root, board_config.per_repo).map_err(|e| failed("the repos")(&e))?;
-    modules::repo::install(&hub, repos.clone());
+    let repos = modules::work::repo::Repos::open(&config.work_root, board_config.per_repo).map_err(|e| failed("the repos")(&e))?;
+    modules::work::repo::install(&hub, repos.clone());
     if config.probe_github.unwrap_or(config.probe_runtimes) {
         repos.probe_in_background();
     }
     game.count_commits(repos.clone(), config.git_emails.clone());
-    let publisher = config.publisher.clone().unwrap_or_else(|| Arc::new(modules::pull::Publisher::default()));
-    let memories = modules::memory::Memories::open(&config.home, agents.clone()).map_err(|e| failed("the memory")(&e.message))?;
-    modules::memory::install(&hub, memories.clone());
+    let publisher = config.publisher.clone().unwrap_or_else(|| Arc::new(modules::work::pull::Publisher::default()));
+    let memories = modules::team::memory::Memories::open(&config.home, agents.clone()).map_err(|e| failed("the memory")(&e.message))?;
+    modules::team::memory::install(&hub, memories.clone());
     agents.attach_memories(&memories);
-    let trajectories = modules::session::Trajectories::open(&config.home, &hub);
+    let trajectories = modules::work::session::Trajectories::open(&config.home, &hub);
     let board = Board::open_with(
         &config.home.join("server.db"),
         agents.clone(),
@@ -327,7 +328,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         |sessions| {
             let trajectories = trajectories.clone();
             sessions.on_news(move |news| {
-                if let modules::session::News::Step { session, cwd, step } = news {
+                if let modules::work::session::News::Step { session, cwd, step } = news {
                     trajectories.step(session, cwd, step.clone());
                 }
             });
@@ -335,22 +336,23 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         },
     )
     .map_err(|e| failed("the board")(&e))?;
-    let pulls = modules::pull::Pulls::open(&config.home, publisher, Some(repos.clone()), Some(board.clone()), None, None)
+    let pulls = modules::work::pull::Pulls::open(&config.home, publisher, Some(repos.clone()), Some(board.clone()), None, None)
         .map_err(|e| failed("the pulls")(&e.message))?;
-    modules::pull::install(&hub, pulls.clone(), config.poll_pulls);
-    modules::issue::install_on(&hub, board.clone(), Some(agents.clone()));
-    modules::session::install(&hub, board.clone(), trajectories.clone());
-    modules::repo::install_templates(&hub, repos.clone(), board.clone(), agents.clone());
-    let crons = modules::cron::Crons::open(&config.home, &hub, board.clone(), agents.clone()).map_err(|e| failed("the crons")(&e.message))?;
-    modules::cron::install(&hub, crons.clone(), config.tick_crons);
-    let attachments = modules::attachment::Attachments::open(&config.home).map_err(|e| failed("the attachments")(&e))?;
-    modules::attachment::install(&hub, attachments.clone());
-    let media_inputs = modules::media::inputs::Inputs::open(&config.home, attachments.clone()).map_err(|e| failed("the media inputs")(&e.message))?;
-    modules::media::inputs::install(&hub, media_inputs.clone());
-    let chat = modules::channel::Chat::open(&config.home, &hub, attachments.clone(), config.link_previews).map_err(|e| failed("the chat")(&e.message))?;
-    let library = modules::library::Library::open(&config.home, attachments.clone()).map_err(|e| failed("the library")(&e.message))?;
-    modules::library::install(&hub, library.clone());
-    let media = modules::media::jobs::Jobs::open(modules::media::jobs::Parts {
+    modules::work::pull::install(&hub, pulls.clone(), config.poll_pulls);
+    modules::work::issue::install_on(&hub, board.clone(), Some(agents.clone()));
+    modules::work::session::install(&hub, board.clone(), trajectories.clone());
+    modules::work::repo::install_templates(&hub, repos.clone(), board.clone(), agents.clone());
+    let crons = modules::work::cron::Crons::open(&config.home, &hub, board.clone(), agents.clone()).map_err(|e| failed("the crons")(&e.message))?;
+    modules::work::cron::install(&hub, crons.clone(), config.tick_crons);
+    let attachments = modules::content::attachment::Attachments::open(&config.home).map_err(|e| failed("the attachments")(&e))?;
+    modules::content::attachment::install(&hub, attachments.clone());
+    let media_inputs = modules::content::media::inputs::Inputs::open(&config.home, attachments.clone()).map_err(|e| failed("the media inputs")(&e.message))?;
+    modules::content::media::inputs::install(&hub, media_inputs.clone());
+    let chat =
+        modules::collab::channel::Chat::open(&config.home, &hub, attachments.clone(), config.link_previews).map_err(|e| failed("the chat")(&e.message))?;
+    let library = modules::content::library::Library::open(&config.home, attachments.clone()).map_err(|e| failed("the library")(&e.message))?;
+    modules::content::library::install(&hub, library.clone());
+    let media = modules::content::media::jobs::Jobs::open(modules::content::media::jobs::Parts {
         home: config.home.clone(),
         hub: Arc::downgrade(&hub),
         setting: setting.clone(),
@@ -360,34 +362,35 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         images: config
             .media_backend
             .clone()
-            .unwrap_or_else(|| -> Arc<dyn modules::media::image_provider::ImageBackend> {
+            .unwrap_or_else(|| -> Arc<dyn modules::content::media::image_provider::ImageBackend> {
                 if config.offline_media {
                     crate::testing::OfflineImages::new(setting.clone())
                 } else {
-                    Arc::new(modules::media::image_provider::Moss::new(setting.clone()))
+                    Arc::new(modules::content::media::image_provider::Moss::new(setting.clone()))
                 }
             }),
         vendor,
         download,
     })
     .map_err(|e| failed("media jobs")(&e.message))?;
-    modules::media::jobs::install(&hub, media.clone());
+    modules::content::media::jobs::install(&hub, media.clone());
     hub.attach_speech_streams(media.clone());
-    modules::channel::install(&hub, chat.clone(), agents.clone(), Some(game.clone()));
+    modules::collab::channel::install(&hub, chat.clone(), agents.clone(), Some(game.clone()));
     crons.attach_chat(&chat);
-    let artifacts = modules::artifact::Artifacts::open(&config.home, attachments.clone(), chat.clone()).map_err(|e| failed("the artifacts")(&e.message))?;
-    modules::artifact::install(&hub, artifacts.clone(), agents.clone(), board.clone());
+    let artifacts =
+        modules::content::artifact::Artifacts::open(&config.home, attachments.clone(), chat.clone()).map_err(|e| failed("the artifacts")(&e.message))?;
+    modules::content::artifact::install(&hub, artifacts.clone(), agents.clone(), board.clone());
     {
         let a = Arc::downgrade(&artifacts);
         chat.set_quoter(Arc::new(move |refs| a.upgrade().map(|a| a.quote(refs)).unwrap_or_default()));
     }
-    let pkm = modules::pkm::Pkm::open(&config.home, &pkm_root).map_err(|e| failed("the notes")(&e.message))?;
-    modules::pkm::install(&hub, pkm.clone());
+    let pkm = modules::content::pkm::Pkm::open(&config.home, &pkm_root).map_err(|e| failed("the notes")(&e.message))?;
+    modules::content::pkm::install(&hub, pkm.clone());
     if config.watch_pkm {
         pkm.watch();
     }
-    let resources = modules::mcp::Resources::with_pulls(board.clone(), chat.clone(), trajectories.clone(), pulls.clone());
-    let farm = Arc::new(modules::tool::Farm {
+    let resources = modules::team::mcp::Resources::with_pulls(board.clone(), chat.clone(), trajectories.clone(), pulls.clone());
+    let farm = Arc::new(modules::team::tool::Farm {
         board: board.clone(),
         chat: chat.clone(),
         agents: agents.clone(),
@@ -401,11 +404,11 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         library: library.clone(),
         resources: resources.clone(),
     });
-    hub.attach_mcp(modules::mcp::Door::new(farm.clone(), config.version.clone()));
-    modules::issue::install_conversation(&hub, board.clone(), chat.clone());
-    modules::issue::install_reviewed(&hub, board.clone(), game.clone());
+    hub.attach_mcp(modules::team::mcp::Door::new(farm.clone(), config.version.clone()));
+    modules::work::issue::install_conversation(&hub, board.clone(), chat.clone());
+    modules::work::issue::install_reviewed(&hub, board.clone(), game.clone());
     let key = setting.clone();
-    let orchestrator = modules::orchestrator::Orchestrator::open(modules::orchestrator::Parts {
+    let orchestrator = modules::team::orchestrator::Orchestrator::open(modules::team::orchestrator::Parts {
         hub: Arc::downgrade(&hub),
         farm: farm.clone(),
         home: config.home.clone(),
@@ -418,14 +421,14 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let _ = execution.set(vibevalley_agent::harness::SharedExecution::new(orchestrator.execution.harness.clone()));
     let _ = hub.execution.set(Arc::downgrade(&orchestrator));
     hub.space.attach(orchestrator.execution.store()).map_err(|e| failed("durable projection")(&e))?;
-    modules::orchestrator::install(&hub, orchestrator.clone());
+    modules::team::orchestrator::install(&hub, orchestrator.clone());
     board.refresh_queue().map_err(|e| failed("the queue")(&e))?;
     let listening = config.orchestrator_listens.then(|| orchestrator.clone());
     if let Some(o) = &listening {
         crons.attach_orchestrator(o);
     }
-    let watch = modules::watch::Watch::start_with(&hub, chat.clone(), board.clone(), agents.clone(), listening);
-    let voice = modules::voice::Voice::open(modules::voice::Parts {
+    let watch = modules::collab::watch::Watch::start_with(&hub, chat.clone(), board.clone(), agents.clone(), listening);
+    let voice = modules::collab::voice::Voice::open(modules::collab::voice::Parts {
         hub: Arc::downgrade(&hub),
         setting: setting.clone(),
         chat: chat.clone(),
@@ -435,10 +438,10 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         line: config.voice_line.clone(),
         pause: None,
     });
-    modules::voice::install(&hub, voice.clone());
-    let connectors =
-        modules::connector::Connectors::open(&config.home, &hub, chat.clone(), config.connector.clone()).map_err(|e| failed("the connectors")(&e.message))?;
-    modules::connector::install(&hub, connectors.clone());
+    modules::collab::voice::install(&hub, voice.clone());
+    let connectors = modules::collab::connector::Connectors::open(&config.home, &hub, chat.clone(), config.connector.clone())
+        .map_err(|e| failed("the connectors")(&e.message))?;
+    modules::collab::connector::install(&hub, connectors.clone());
     Ok(Started {
         hub,
         setting,
