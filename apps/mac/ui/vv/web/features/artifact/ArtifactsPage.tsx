@@ -30,7 +30,7 @@ import { Button } from "../../ui/Button";
 import { SearchField } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
-import { ActiveBar, Empty } from "../../ui/layout";
+import { ActiveBar, Empty, SidebarSection } from "../../ui/layout";
 import { type MoreItem, MoreMenu } from "../../ui/MoreMenu";
 import { toast } from "../../ui/toasts";
 import { artifactHref, artifactIcon, artifactSuffix, artifactTypeIcon, kindLabel, useArtifact, useArtifacts } from "./ArtifactCard";
@@ -153,62 +153,47 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
               {(g) => {
                 const expanded = () => !shut().has(g().key);
                 return (
-                  <View testID={`artifact-group-${g().key}`} class="gap-0.5">
-                    <View
-                      role="button"
-                      accessibilityState={{ expanded: expanded() }}
-                      onPress={() => toggle(g().key)}
-                      class="group h-7 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out hover:bg-hover"
-                    >
-                      <View
-                        class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
-                        style={{ transform: [{ rotate: expanded() ? "90deg" : "0deg" }] }}
-                      >
-                        <Icon name="expand" size={10} tone="faint" />
-                      </View>
-                      <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-muted group-hover:text-ink">
-                        {t(`web.artifact.page.group.${g().key}`)}
-                      </Text>
-                      <View class="shrink-0 rounded-full bg-hover px-1.5 py-px">
-                        <Text class="font-mono text-2xs font-medium text-faint tabular-nums group-hover:text-muted">{String(g().rows.length)}</Text>
-                      </View>
-                    </View>
-                    <If when={expanded()}>
-                      <Each of={g().rows} key={(a) => a.id}>
-                        {(a) => {
-                          const selected = () => a().id === open();
-                          return (
-                            <A
-                              href={artifactHref(a().id)}
-                              testID={`artifact-row-${a().id}`}
-                              accessibilityState={{ selected: selected() }}
-                              class={[
-                                "relative flex-row items-start gap-2 rounded-md px-2 py-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus",
-                                a().id === id() ? "bg-selected" : selected() ? "hover:bg-hover lg:bg-selected" : "hover:bg-hover",
-                              ].join(" ")}
-                            >
-                              <If when={a().id === id() || selected()}>
-                                <ActiveBar tall class={a().id === id() ? undefined : "hidden lg:flex"} />
-                              </If>
-                              <View class="mt-0.5 shrink-0">
-                                <Icon name={artifactIcon(a())} size={16} tone={selected() ? "ink" : "muted"} />
-                              </View>
-                              <View class="min-w-0 flex-1 gap-0.5">
-                                <Text class="truncate text-sm font-medium text-ink">{a().title}</Text>
-                                <Text class="truncate text-xs text-muted">
-                                  {[
-                                    `${kindLabel(a())} (${artifactSuffix(a())})`,
-                                    ...(a().body === "html" ? [t("web.artifact.card.version", { version: a().version })] : []),
-                                    ago(a().updated, now()),
-                                  ].join(" · ")}
-                                </Text>
-                              </View>
-                            </A>
-                          );
-                        }}
-                      </Each>
-                    </If>
-                  </View>
+                  <SidebarSection
+                    testID={`artifact-group-${g().key}`}
+                    title={t(`web.artifact.page.group.${g().key}`)}
+                    count={g().rows.length}
+                    open={expanded()}
+                    onToggle={() => toggle(g().key)}
+                  >
+                    <Each of={g().rows} key={(a) => a.id}>
+                      {(a) => {
+                        const selected = () => a().id === open();
+                        return (
+                          <A
+                            href={artifactHref(a().id)}
+                            testID={`artifact-row-${a().id}`}
+                            accessibilityState={{ selected: selected() }}
+                            class={[
+                              "relative flex-row items-start gap-2 rounded-md px-2 py-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus",
+                              a().id === id() ? "bg-selected" : selected() ? "hover:bg-hover lg:bg-selected" : "hover:bg-hover",
+                            ].join(" ")}
+                          >
+                            <If when={a().id === id() || selected()}>
+                              <ActiveBar tall class={a().id === id() ? undefined : "hidden lg:flex"} />
+                            </If>
+                            <View class="mt-0.5 shrink-0">
+                              <Icon name={artifactIcon(a())} size={16} tone={selected() ? "ink" : "muted"} />
+                            </View>
+                            <View class="min-w-0 flex-1 gap-0.5">
+                              <Text class="truncate text-sm font-medium text-ink">{a().title}</Text>
+                              <Text class="truncate text-xs text-muted">
+                                {[
+                                  `${kindLabel(a())} (${artifactSuffix(a())})`,
+                                  ...(a().body === "html" ? [t("web.artifact.card.version", { version: a().version })] : []),
+                                  ago(a().updated, now()),
+                                ].join(" · ")}
+                              </Text>
+                            </View>
+                          </A>
+                        );
+                      }}
+                    </Each>
+                  </SidebarSection>
                 );
               }}
             </Each>

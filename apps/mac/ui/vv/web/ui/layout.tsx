@@ -2,7 +2,7 @@
 // ListRow, Card, Quiet, Empty, Toggle (nsh/base's Switch, as base-ui's)
 // and SecretInput. Not here: TextLink, titleBar and WindowStrip (the
 // desktop window's own strip is the GPUI app's).
-import { signal, Scroll, Text, View, type JSX } from "nsh";
+import { signal, Scroll, Text, untracked, View, type JSX } from "nsh";
 import { Switch } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -87,6 +87,60 @@ export function Banner(props: {
       <Text testID={props.testID} role={props.role} class={`min-w-0 flex-1 ${edge() ? "text-xs font-medium" : "text-sm"} ${s().text} ${props.textClass ?? ""}`}>
         {props.children}
       </Text>
+    </View>
+  );
+}
+
+/** Collapsible sidebar section header with unified 10px chevron, optional right-side badge/count pill, and trailing action. */
+export function SidebarSection(props: {
+  title: string;
+  count?: number | undefined;
+  collapsedBadge?: JSX.Element | undefined;
+  action?: JSX.Element | undefined;
+  open?: boolean | undefined;
+  closed?: boolean | undefined;
+  onToggle?: (() => void) | undefined;
+  testID?: string | undefined;
+  toggleTestID?: string | undefined;
+  class?: string | undefined;
+  listClass?: string | undefined;
+  children: JSX.Element;
+}) {
+  const internal = signal(untracked(() => props.closed !== true));
+  const expanded = () => (props.open !== undefined ? props.open : internal());
+  const toggle = () => {
+    if (props.onToggle) props.onToggle();
+    else internal.set(!internal());
+  };
+  return (
+    <View testID={props.testID} accessibilityLabel={props.title} class={`gap-0.5 ${props.class ?? ""}`}>
+      <View class="h-7 flex-row items-center gap-1">
+        <View
+          role="button"
+          testID={props.toggleTestID}
+          accessibilityState={{ expanded: expanded() }}
+          onPress={toggle}
+          class="group h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+        >
+          <View
+            class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+            style={{ transform: [{ rotate: expanded() ? "90deg" : "0deg" }] }}
+          >
+            <Icon name="expand" size={10} tone="faint" />
+          </View>
+          <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-muted group-hover:text-ink">{props.title}</Text>
+          <If when={!expanded()}>{props.collapsedBadge}</If>
+          <If when={props.count !== undefined}>
+            <View class="shrink-0 rounded-full bg-hover px-1.5 py-px">
+              <Text class="font-mono text-2xs font-medium text-faint tabular-nums group-hover:text-muted">{String(props.count)}</Text>
+            </View>
+          </If>
+        </View>
+        {props.action}
+      </View>
+      <If when={expanded()}>
+        <View class={props.listClass ?? "gap-0.5"}>{props.children}</View>
+      </If>
     </View>
   );
 }

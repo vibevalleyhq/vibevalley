@@ -7,7 +7,7 @@ import { t } from "@vibevalley/i18n";
 import { Select } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
-import { ActiveBar } from "../../ui/layout";
+import { ActiveBar, SidebarSection } from "../../ui/layout";
 import { type ArtifactCounts, artifactFilterKinds, type ArtifactKindFilter, type Counts, type KindFilter, type Names, type Where, whereKey } from "./items";
 
 const originIcons: Record<"generated" | "uploaded" | "fetched", IconName> = {
@@ -36,34 +36,21 @@ const artifactKinds: readonly ArtifactKindFilter[] = ["all", ...artifactFilterKi
 function FacetSection(props: { id: string; title: string; count: number; hasActive?: boolean; children: JSX.Element }) {
   const open = signal(true);
   return (
-    <View testID={`library-section-${props.id}`} class="gap-0.5">
-      <View
-        role="button"
-        testID={`library-section-toggle-${props.id}`}
-        accessibilityState={{ expanded: open() }}
-        onPress={() => open.set(!open())}
-        class="group h-7 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out hover:bg-hover"
-      >
-        <View
-          class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
-          style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
-        >
-          <Icon name="expand" size={10} tone="faint" />
-        </View>
-        <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-muted group-hover:text-ink">{props.title}</Text>
-        <If when={!open() && props.hasActive === true}>
+    <SidebarSection
+      testID={`library-section-${props.id}`}
+      toggleTestID={`library-section-toggle-${props.id}`}
+      title={props.title}
+      open={open()}
+      onToggle={() => open.set(!open())}
+      count={open() ? undefined : props.count}
+      collapsedBadge={
+        <If when={props.hasActive === true}>
           <View class="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
         </If>
-        <If when={!open()}>
-          <View class="shrink-0 rounded-full bg-hover px-1.5 py-px">
-            <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{String(props.count)}</Text>
-          </View>
-        </If>
-      </View>
-      <If when={open()}>
-        <View class="gap-0.5">{props.children}</View>
-      </If>
-    </View>
+      }
+    >
+      {props.children}
+    </SidebarSection>
   );
 }
 

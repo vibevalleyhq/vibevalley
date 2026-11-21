@@ -2,7 +2,7 @@
 // skills book (installed by runtime, built in, the farm's own) and the
 // skill editor on the same form model (infra/form, vendored). Its route,
 // /settings/skills, is the settings page's.
-import { Scroll, signal, Text, View, type JSX } from "nsh";
+import { Scroll, signal, Text, View } from "nsh";
 import { z } from "zod";
 
 import { list as listed, t } from "@vibevalley/i18n";
@@ -24,7 +24,7 @@ import { runtimeName } from "../../ui/domain/RuntimeBadge";
 import { SearchField, TextArea, TextInput } from "../../ui/Field";
 import { Form, formControl, FormField, formMessages } from "../../ui/Form";
 import { Icon } from "../../ui/Icon";
-import { Card, Empty } from "../../ui/layout";
+import { ActiveBar, Card, Empty, SidebarSection } from "../../ui/layout";
 import { Markdown } from "../../ui/Markdown";
 import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
 import { Bubble } from "../../ui/Tip";
@@ -104,44 +104,43 @@ export function SkillsPage(props: { id?: string | undefined }) {
             {reasonOf(runtimes.error())}
           </Text>
         </If>
-        <SectionHeading
+        <SidebarSection
+          class="pt-2"
           title={t("web.runtime.library.installed", { count: count(list().length, installed().length) })}
           open={installedOpen() || q() !== ""}
           onToggle={() => installedOpen.set(!installedOpen())}
-        />
-        <If when={installedOpen() || q() !== ""}>
+        >
           <If when={installed().length === 0}>
             <Text class="px-2 text-xs text-muted">{t("web.runtime.library.noneReported")}</Text>
           </If>
           <If when={installed().length > 0 && list().length === 0}>
             <Text class="px-2 text-xs text-muted">{t("web.runtime.library.noMatch")}</Text>
           </If>
-          <View class="gap-0.5">
-            <Each of={list()} key={(s) => s.name}>
-              {(s) => (
-                <Entry
-                  to={skillPath(installedPrefix + s().name)}
-                  on={open()?.name === s().name}
-                  title={s().name}
-                  detail={listed(s().runtimes.map((x) => runtimeName(catalog(), x.runtime)))}
-                />
-              )}
-            </Each>
-          </View>
-        </If>
-        <SectionHeading
+          <Each of={list()} key={(s) => s.name}>
+            {(s) => (
+              <Entry
+                to={skillPath(installedPrefix + s().name)}
+                on={open()?.name === s().name}
+                title={s().name}
+                detail={listed(s().runtimes.map((x) => runtimeName(catalog(), x.runtime)))}
+              />
+            )}
+          </Each>
+        </SidebarSection>
+        <SidebarSection
+          class="pt-2"
           title={t("web.runtime.library.builtIn", { count: count(builtInShown().length, builtIns().length) })}
           open={builtInOpen() || q() !== ""}
           onToggle={() => builtInOpen.set(!builtInOpen())}
-        />
-        <If when={builtInOpen() || q() !== ""}>
+        >
           <View class="gap-0.5" testID="built-in-skills">
             <Each of={builtInShown()} key={(s) => s.id}>
               {(s) => <Entry to={skillPath(s().id)} on={shownBuiltIn()?.id === s().id} title={s().name} detail={s().description} />}
             </Each>
           </View>
-        </If>
-        <SectionHeading
+        </SidebarSection>
+        <SidebarSection
+          class="pt-2"
           title={t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}
           open={ownOpen() || q() !== ""}
           onToggle={() => ownOpen.set(!ownOpen())}
@@ -155,14 +154,11 @@ export function SkillsPage(props: { id?: string | undefined }) {
               <Text class="text-xs font-medium text-page">{t("web.runtime.library.newSkill")}</Text>
             </A>
           }
-        />
-        <If when={ownOpen() || q() !== ""}>
-          <View class="gap-0.5">
-            <Each of={ownShown()} key={(s) => s.id}>
-              {(s) => <Entry to={skillPath(s().id)} on={!creating() && selected()?.id === s().id} title={s().name} detail={s().description} />}
-            </Each>
-          </View>
-        </If>
+        >
+          <Each of={ownShown()} key={(s) => s.id}>
+            {(s) => <Entry to={skillPath(s().id)} on={!creating() && selected()?.id === s().id} title={s().name} detail={s().description} />}
+          </Each>
+        </SidebarSection>
       </Scroll>
       <Scroll class="min-h-0 min-w-0 flex-1">
         <If when={creating()}>
@@ -190,35 +186,17 @@ export function SkillsPage(props: { id?: string | undefined }) {
   );
 }
 
-function SectionHeading(props: { title: string; open: boolean; onToggle: () => void; action?: JSX.Element }) {
-  return (
-    <View class="flex-row items-center gap-1 pt-2">
-      <View
-        role="button"
-        accessibilityState={{ expanded: props.open }}
-        onPress={props.onToggle}
-        class="group h-6 min-w-0 flex-1 flex-row items-center gap-1 rounded-sm px-1 transition duration-120 ease-out hover:bg-hover"
-      >
-        <View class={`w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out ${props.open ? "rotate-90" : ""}`}>
-          <Icon name="expand" size={12} tone="faint" />
-        </View>
-        <Text role="header" class="min-w-0 flex-1 truncate text-xs font-semibold tabular-nums text-muted group-hover:text-ink">
-          {props.title}
-        </Text>
-      </View>
-      {props.action}
-    </View>
-  );
-}
-
 function Entry(props: { to: string; on: boolean; title: string; detail: string }) {
   return (
     <A
       href={props.to}
       testID="skill-entry"
       accessibilityState={{ selected: props.on }}
-      class={`rounded-md px-2 py-1.5 transition duration-120 ease-out ${props.on ? "bg-selected" : "hover:bg-hover"}`}
+      class={`relative rounded-md px-2 py-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.on ? "bg-selected" : "hover:bg-hover"}`}
     >
+      <If when={props.on}>
+        <ActiveBar tall />
+      </If>
       <Text class="truncate text-sm font-medium text-ink">{props.title}</Text>
       <If when={props.detail}>
         <Text class="truncate text-xs text-muted">{props.detail}</Text>

@@ -3,7 +3,7 @@
 // (nsh has no HTML drag and drop): the rows are measured as the drag starts.
 // The direct picker is nsh/base's Popover rather than an absolutely placed
 // list.
-import { cleanup, keymap, PanResponder, Scroll, signal, Text, untracked, View, type JSX, type ViewRef } from "nsh";
+import { cleanup, keymap, PanResponder, Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -20,7 +20,7 @@ import { Link as A, useRouter } from "../../../infra/router";
 import { createAct } from "../../../ui/act";
 import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Icon } from "../../../ui/Icon";
-import { ActiveBar, Kbd } from "../../../ui/layout";
+import { ActiveBar, Kbd, SidebarSection } from "../../../ui/layout";
 import { TextLink } from "../../../ui/TextLink";
 import { Bubble } from "../../../ui/Tip";
 import { runsHref } from "../../session";
@@ -239,38 +239,24 @@ function Section(props: {
   closed?: boolean;
   children: JSX.Element;
 }) {
-  const open = signal(untracked(() => props.closed !== true));
   return (
-    <View class={props.nested === true ? "mt-1 mb-1 pl-2" : "mb-3"} accessibilityLabel={props.title} testID={`side-section-${props.item}`}>
-      <View class="h-7 flex-row items-center gap-1">
-        <View
-          role="button"
-          testID="side-section-toggle"
-          accessibilityState={{ expanded: open() }}
-          onPress={() => open.set(!open())}
-          class="group h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out hover:bg-hover"
-        >
-          <View
-            class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
-            style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
-          >
-            <Icon name="expand" size={10} tone="faint" />
-          </View>
-          <Text class="min-w-0 truncate text-xs font-semibold text-muted group-hover:text-ink">{props.title}</Text>
-          <View class="shrink-0 rounded-full bg-hover px-1.5 py-px">
-            <Text class="font-mono text-2xs font-medium text-faint group-hover:text-muted">{String(props.count)}</Text>
-          </View>
-          <View class="flex-1" />
-          <If when={!open() && (props.unread ?? 0) > 0}>
-            <Count n={props.unread ?? 0} />
-          </If>
-        </View>
-        {props.action}
-      </View>
-      <If when={open()}>
-        <View class="mt-0.5 gap-0.5">{props.children}</View>
-      </If>
-    </View>
+    <SidebarSection
+      title={props.title}
+      count={props.count}
+      collapsedBadge={
+        <If when={(props.unread ?? 0) > 0}>
+          <Count n={props.unread ?? 0} />
+        </If>
+      }
+      action={props.action}
+      closed={props.closed}
+      testID={`side-section-${props.item}`}
+      toggleTestID="side-section-toggle"
+      class={props.nested === true ? "mt-1 mb-1 pl-2" : "mb-3"}
+      listClass="mt-0.5 gap-0.5"
+    >
+      {props.children}
+    </SidebarSection>
   );
 }
 

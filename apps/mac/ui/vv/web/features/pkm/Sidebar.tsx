@@ -14,7 +14,7 @@ import { Link, useRouter } from "../../infra/router";
 import { createAct } from "../../ui/act";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
-import { ActiveBar } from "../../ui/layout";
+import { ActiveBar, SidebarSection } from "../../ui/layout";
 import { Bubble } from "../../ui/Tip";
 import { mix } from "../../ui/tone";
 import { tierOrder } from "./outline";
@@ -136,59 +136,36 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
             const folded = () => shut().has(tier());
             return (
               <View ref={(r) => tier() === "inbox" && (inbox = r)} testID={`pkm-tier-${tier()}`} class="gap-px">
-                <View
-                  role="button"
-                  accessibilityState={{ expanded: !folded() }}
-                  onPress={() => toggle(tier())}
-                  class="group h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out hover:bg-hover"
-                >
-                  <View
-                    class="w-3.5 shrink-0 items-center justify-center"
-                    style={{
-                      transform: [{ rotate: folded() ? "0deg" : "90deg" }],
-                      transitionProperty: "transform",
-                      transitionDuration: 120,
+                <SidebarSection title={tierLabel(tier())} count={pages().length} open={!folded()} onToggle={() => toggle(tier())} listClass="gap-px">
+                  <Each of={pages()} key={(p) => p.slug}>
+                    {(p) => {
+                      const active = () => p().slug === props.slug;
+                      return (
+                        <Link
+                          href={pkmHref(p().slug)}
+                          testID="pkm-row"
+                          accessibilityLabel={p().title}
+                          accessibilityState={{ selected: active() }}
+                          class={`${row(active())} pl-7.5`}
+                        >
+                          <If when={active()}>
+                            <ActiveBar />
+                          </If>
+                          <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{p().title}</Text>
+                          <If when={p().open > 0}>
+                            <Text
+                              class="shrink-0 text-2xs font-medium text-faint"
+                              style={{ fontVariant: ["tabular-nums"] }}
+                              accessibilityHint={t("web.pkm.list.open", { n: p().open })}
+                            >
+                              {String(p().open)}
+                            </Text>
+                          </If>
+                        </Link>
+                      );
                     }}
-                  >
-                    <Icon name="expand" size={10} tone="faint" />
-                  </View>
-                  <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-muted group-hover:text-ink">{tierLabel(tier())}</Text>
-                  <Text class="shrink-0 text-2xs font-medium text-faint" style={{ fontVariant: ["tabular-nums"] }}>
-                    {String(pages().length)}
-                  </Text>
-                </View>
-                <If when={!folded()}>
-                  <View class="gap-px">
-                    <Each of={pages()} key={(p) => p.slug}>
-                      {(p) => {
-                        const active = () => p().slug === props.slug;
-                        return (
-                          <Link
-                            href={pkmHref(p().slug)}
-                            testID="pkm-row"
-                            accessibilityLabel={p().title}
-                            accessibilityState={{ selected: active() }}
-                            class={`${row(active())} pl-7.5`}
-                          >
-                            <If when={active()}>
-                              <ActiveBar />
-                            </If>
-                            <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{p().title}</Text>
-                            <If when={p().open > 0}>
-                              <Text
-                                class="shrink-0 text-2xs font-medium text-faint"
-                                style={{ fontVariant: ["tabular-nums"] }}
-                                accessibilityHint={t("web.pkm.list.open", { n: p().open })}
-                              >
-                                {String(p().open)}
-                              </Text>
-                            </If>
-                          </Link>
-                        );
-                      }}
-                    </Each>
-                  </View>
-                </If>
+                  </Each>
+                </SidebarSection>
               </View>
             );
           }}

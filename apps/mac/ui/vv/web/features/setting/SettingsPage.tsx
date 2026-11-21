@@ -150,7 +150,7 @@ export function SettingsPage(props: { rest: string }) {
                   {(g) => (
                     <If when={shown(g()).length > 0}>
                       <View class="gap-0.5">
-                        <Text class="px-2 pb-1 text-2xs font-semibold text-faint">{t(`web.setting.groups.${g()}`)}</Text>
+                        <Text class="px-2 pb-1 text-xs font-semibold text-muted">{t(`web.setting.groups.${g()}`)}</Text>
                         <Each of={shown(g())}>{(s) => <SectionLink section={s()} current={s() === current()} />}</Each>
                       </View>
                     </If>
