@@ -215,7 +215,7 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
                 trackClass="h-6 justify-center"
                 indicatorClass="h-1.5 rounded-full bg-selected"
                 rangeClass="rounded-full bg-accent"
-                thumbClass="size-3.5 rounded-full border border-accent bg-page shadow-raise focus-visible:outline-2 focus-visible:outline-focus"
+                thumbClass="size-3.5 rounded-full border border-accent bg-paper shadow-raise focus-visible:outline-2 focus-visible:outline-focus"
               />
               <Text class="w-14 shrink-0 text-right font-mono text-xs text-muted tabular-nums">{t("web.catalog.perSecond", { n: fps() })}</Text>
             </View>

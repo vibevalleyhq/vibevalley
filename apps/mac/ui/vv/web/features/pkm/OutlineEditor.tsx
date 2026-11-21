@@ -574,7 +574,7 @@ export function Editor(props: {
           offset={4}
           margin={8}
           testID="pkm-complete"
-          class="max-h-64 w-80 max-w-full rounded-lg border border-line bg-page p-1 shadow-float"
+          class="max-h-64 w-80 max-w-full rounded-lg border border-line bg-elevated p-1 shadow-float"
         >
           <Each of={choices()} key={(c) => c.key}>
             {(c, i) => (

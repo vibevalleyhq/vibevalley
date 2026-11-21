@@ -164,7 +164,7 @@ export function Select<V extends string>(props: {
       }}
       offset={4}
       align="start"
-      popupClass="max-h-72 rounded-lg border border-line bg-page p-1 shadow-float transition duration-120 ease-out"
+      popupClass="max-h-72 rounded-lg border border-line bg-elevated p-1 shadow-float transition duration-120 ease-out"
       popupStartingClass="opacity-0"
       popupEndingClass="opacity-0"
       listClass="gap-0.5"

@@ -13,7 +13,7 @@ import { Button } from "nsh/base";
 
 import { animateLayout, durations, ease, ms } from "../motion";
 import { SurfaceIcon, TipBubble } from "../surfaces/shared";
-import { cardShadow, dangerTint, radius, tok, type as ty, type Palette } from "../tokens";
+import { cardShadow, dangerTint, radius, tint, tok, type as ty, type Palette } from "../tokens";
 import type { AgentEvent } from "./shapes";
 
 export type ToolCallStatus = "running" | "done" | "failed";
@@ -572,7 +572,7 @@ function CodeSection(props: { label: string; value: unknown; tone?: "danger"; te
               right: 0,
               bottom: 0,
               height: 44,
-              backgroundImage: `linear-gradient(to bottom, ${alpha(p().canvas, 0)}, ${p().canvas})`,
+              backgroundImage: `linear-gradient(to bottom, ${tint(p().canvas, 0)}, ${p().canvas})`,
             }}
           />
         ) : null}
@@ -606,15 +606,6 @@ function CodeSection(props: { label: string; value: unknown; tone?: "danger"; te
       ) : null}
     </View>
   );
-}
-
-// A token at `a` opacity (a fade's transparent end), until tokens.ts has one.
-function alpha(color: string, a: number): string {
-  if (color.startsWith("#") && color.length === 7) {
-    const n = parseInt(color.slice(1), 16);
-    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-  }
-  return color.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/, `rgba($1,$2,$3,${a})`);
 }
 
 export function ToolCallCard(props: ToolCallCardProps) {

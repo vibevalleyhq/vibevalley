@@ -165,7 +165,7 @@ export function IssueBoard(props: BoardProps) {
   return (
     <View ref={drag.setRoot} class="min-h-0 flex-1 px-3 pb-3">
       <If when={narrow()}>
-        <View accessibilityLabel={t("web.issue.board.whichLane")} class="mb-2 flex-row gap-0.5 rounded-md bg-hover p-0.5">
+        <View accessibilityLabel={t("web.issue.board.whichLane")} class="mb-2 flex-row gap-0.5 rounded-md border border-line bg-side p-0.5">
           <Each of={lanes}>
             {(l) => (
               <View
@@ -173,7 +173,7 @@ export function IssueBoard(props: BoardProps) {
                 onPress={() => lane.set(l())}
                 role="tab"
                 accessibilityState={{ selected: lane() === l() }}
-                class={`h-7 flex-1 flex-row items-center justify-center gap-1 rounded-sm px-1.5 ${lane() === l() ? "bg-page shadow-raise" : "hover:bg-hover"}`}
+                class={`h-7 flex-1 flex-row items-center justify-center gap-1 rounded-sm px-1.5 ${lane() === l() ? "bg-elevated shadow-raise" : "hover:bg-hover"}`}
               >
                 <Text class={`truncate text-xs font-medium ${lane() === l() ? "text-ink" : "text-muted"}`}>{laneLabel[l()]}</Text>
                 <Text
@@ -208,7 +208,7 @@ export function IssueBoard(props: BoardProps) {
         {(g) => (
           <View
             testID="drag-ghost"
-            class="absolute rounded-lg border border-line bg-page px-2.5 py-2 shadow-float"
+            class="absolute rounded-lg border border-line bg-elevated px-2.5 py-2 shadow-float"
             style={{
               left: (drag.at()?.x ?? 0) - g().origin.x - g().dx,
               top: (drag.at()?.y ?? 0) - g().origin.y - g().dy,
@@ -241,7 +241,7 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
       accessibilityLabel={laneLabel[props.lane]}
       testID={`lane-${props.lane}`}
       accessibilityState={{ selected: over() }}
-      class={`max-h-full min-w-55 flex-1 self-start rounded-lg border px-2 pt-1.5 pb-2 ${over() ? "border-leaf" : "border-transparent bg-hover"}`}
+      class={`max-h-full min-w-55 flex-1 self-start rounded-lg border px-2 pt-1.5 pb-2 ${over() ? "border-leaf" : "border-transparent bg-side"}`}
       style={over() ? { backgroundColor: mix("leaf", 0.15) } : undefined}
     >
       <View class="h-7 shrink-0 flex-row items-center gap-1.5 px-1">
@@ -381,7 +381,7 @@ function CardView(props: {
         tooltip={look().detail ? <Bubble text={look().detail} /> : undefined}
         class={[
           "relative overflow-hidden rounded-lg border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus",
-          props.selected ? "border-accent bg-selected" : "border-line bg-page hover:border-faint hover:shadow-raise",
+          props.selected ? "border-accent bg-selected" : "border-line bg-elevated hover:border-faint hover:shadow-raise",
           props.card.move?.state === "moving" ? "opacity-70" : props.drag.dragging()?.id === props.card.id ? "opacity-40" : "",
         ].join(" ")}
         style={cardStyle()}

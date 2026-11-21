@@ -387,7 +387,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
         role="toolbar"
         testID="message-tools"
         accessibilityLabel={t("web.channel.tools.label")}
-        class="absolute -top-3 right-2 z-10 flex-row items-center gap-0.5 rounded-md border border-line bg-page p-0.5 shadow-float"
+        class="absolute -top-3 right-2 z-10 flex-row items-center gap-0.5 rounded-md border border-line bg-elevated p-0.5 shadow-float"
       >
         <If when={picking()}>
           <View accessibilityLabel={t("web.channel.tools.pick")} class="flex-row items-center gap-0.5 border-r border-line pr-0.5">

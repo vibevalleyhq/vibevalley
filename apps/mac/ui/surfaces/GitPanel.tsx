@@ -7,8 +7,19 @@ import { Button, ContextMenu, Input, MenuItem, MenuSeparator } from "nsh/base";
 
 import { act, frame, hostApi } from "../bridge";
 import { pressTransition } from "../motion";
-import { radius, tok, type as ty } from "../tokens";
-import { Empty, IconButton, PrimaryButton, SectionHead, statusTint, SurfaceIcon, TipBubble, toneColor } from "./shared";
+import { tok, type as ty } from "../tokens";
+import {
+  contextMenuItemStyle,
+  contextMenuPopupStyle,
+  Empty,
+  IconButton,
+  PrimaryButton,
+  SectionHead,
+  statusTint,
+  SurfaceIcon,
+  TipBubble,
+  toneColor,
+} from "./shared";
 
 export type GitRow = { path: string; code: string; tone: string };
 export type GitWorktree = {
@@ -213,12 +224,13 @@ function WorktreeRow(props: {
         <View
           style={{
             position: "absolute",
-            left: 0,
+            left: 2,
             top: 6,
             bottom: 6,
             width: 2,
-            borderRadius: 1,
-            backgroundColor: p().ok,
+            borderRadius: 999,
+            backgroundColor: p().primary,
+            pointerEvents: "none",
           }}
         />
       ) : null}
@@ -241,7 +253,7 @@ function WorktreeRow(props: {
                 fontFamily: ty.mono.fontFamily,
                 fontSize: 12,
                 lineHeight: 16,
-                fontWeight: w().current ? "600" : "500",
+                fontWeight: "500",
                 color: p().ink,
                 numberOfLines: 1,
                 flexShrink: 1,
@@ -410,19 +422,9 @@ function WorktreeRow(props: {
       {rowError() ? <Text style={{ fontSize: 11, lineHeight: 15, color: p().danger, paddingLeft: 19, paddingTop: 2 }}>删除失败：{rowError()}</Text> : null}
     </View>
   );
-  const itemStyle = { height: 26, paddingHorizontal: 10, borderRadius: 5, justifyContent: "center" as const };
+  const itemStyle = contextMenuItemStyle;
   return (
-    <ContextMenu
-      trigger={trigger}
-      popupStyle={{
-        minWidth: 168,
-        padding: 4,
-        borderRadius: radius.sm,
-        backgroundColor: p().surface,
-        borderWidth: 1,
-        borderColor: p().border,
-      }}
-    >
+    <ContextMenu trigger={trigger} popupStyle={contextMenuPopupStyle(p())}>
       <MenuItem onSelect={() => act({ type: "new_terminal_at", path: w().path })} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
         <Text style={{ fontSize: 12, color: p().ink }}>在此新建终端</Text>
       </MenuItem>
@@ -969,6 +971,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                                   }}
                                   accessibilityLabel={b().head ? `${b().name}, 当前分支` : `切换到 ${b().name}`}
                                   style={{
+                                    position: "relative",
                                     height: 26,
                                     marginHorizontal: 6,
                                     paddingHorizontal: 6,
@@ -981,6 +984,20 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                                   }}
                                   hoverStyle={{ backgroundColor: b().head ? p().subtle : p().tile }}
                                 >
+                                  {b().head ? (
+                                    <View
+                                      style={{
+                                        position: "absolute",
+                                        left: 2,
+                                        top: 5,
+                                        bottom: 5,
+                                        width: 2,
+                                        borderRadius: 999,
+                                        backgroundColor: p().primary,
+                                        pointerEvents: "none",
+                                      }}
+                                    />
+                                  ) : null}
                                   <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                     <SurfaceIcon name={b().head ? "check" : "git-branch"} size={12} color={b().head ? p().ok : p().faint} />
                                   </View>
@@ -989,7 +1006,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                                       fontFamily: ty.mono.fontFamily,
                                       fontSize: 12,
                                       lineHeight: 16,
-                                      fontWeight: b().head ? "600" : "400",
+                                      fontWeight: "500",
                                       color: b().head ? p().ink : p().text,
                                       numberOfLines: 1,
                                       flex: 1,

@@ -4,8 +4,8 @@ import { Clipboard, Text, View } from "nsh";
 import { ContextMenu, MenuItem, MenuSeparator, Tree, type TreeItem } from "nsh/base";
 
 import { act, hostApi } from "../bridge";
-import { radius, tok } from "../tokens";
-import { Empty, IconButton, SectionHead, SurfaceIcon, toneColor } from "./shared";
+import { tok } from "../tokens";
+import { contextMenuItemStyle, contextMenuPopupStyle, Empty, IconButton, SectionHead, SurfaceIcon, toneColor } from "./shared";
 
 export type FileItem = TreeItem & { tone?: string; hidden?: boolean; children?: FileItem[] };
 export type FilesFrame = { root?: string; name?: string; items: FileItem[]; expanded?: string[]; selected?: string | null; loading?: boolean };
@@ -30,7 +30,7 @@ export function FileTree(props: { frame: FilesFrame | null }) {
     const i = abs.lastIndexOf("/");
     return i > 0 ? abs.slice(0, i) : (props.frame?.root ?? abs);
   };
-  const itemStyle = { height: 26, paddingHorizontal: 10, borderRadius: 5, justifyContent: "center" as const };
+  const itemStyle = contextMenuItemStyle;
   return (
     <View style={{ flex: 1 }}>
       <SectionHead
@@ -138,17 +138,7 @@ export function FileTree(props: { frame: FilesFrame | null }) {
             );
             if (isPlaceholder()) return row;
             return (
-              <ContextMenu
-                trigger={row}
-                popupStyle={{
-                  minWidth: 168,
-                  padding: 4,
-                  borderRadius: radius.sm,
-                  backgroundColor: p().surface,
-                  borderWidth: 1,
-                  borderColor: p().border,
-                }}
-              >
+              <ContextMenu trigger={row} popupStyle={contextMenuPopupStyle(p())}>
                 <MenuItem onSelect={() => void Clipboard.writeText(relPath(entry.id))} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
                   <Text style={{ fontSize: 12, color: p().ink }}>复制相对路径</Text>
                 </MenuItem>

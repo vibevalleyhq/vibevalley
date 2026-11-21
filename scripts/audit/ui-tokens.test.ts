@@ -98,4 +98,25 @@ describe("ui-tokens guardrail", () => {
     ].join("\n");
     expect(scanUiTokens(file, src)).toEqual([]);
   });
+
+  it("scans host surfaces and components while permitting static size props", () => {
+    const files = listWebUiFiles();
+    expect(files).toContain("apps/mac/ui/surfaces/Sidebar.tsx");
+    expect(files).toContain("apps/mac/ui/components/StatusBadge.tsx");
+    expect(files).not.toContain("apps/mac/ui/components/Gallery.stories.tsx");
+
+    const badHost = [
+      "export function Row(props: { showActiveCard: boolean }) {",
+      '  return <View style={{ paddingVertical: props.showActiveCard ? 3 : 0, borderColor: "rgba(0,0,0,0.08)" }} />;',
+      "}",
+    ].join("\n");
+    expect(scanUiTokens("apps/mac/ui/surfaces/Sidebar.tsx", badHost).map((f) => f.rule)).toEqual(["selection-layout-shift", "hardcoded-color"]);
+
+    const goodHost = [
+      "export function Empty(props: { compact?: boolean }) {",
+      "  return <View style={{ paddingVertical: props.compact ? 6 : 10 }} />;",
+      "}",
+    ].join("\n");
+    expect(scanUiTokens("apps/mac/ui/surfaces/shared.tsx", goodHost)).toEqual([]);
+  });
 });

@@ -96,8 +96,16 @@ export function cardShadow(p: Palette) {
       ];
 }
 
+/** Return a `#rrggbb` or `rgba(...)` token at `alpha` (0..1) opacity. */
+export function tint(color: string, alpha: number): string {
+  if (color.startsWith("#") && color.length === 7) {
+    const n = parseInt(color.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+  }
+  return color.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/u, `rgba(\$1,\$2,\$3,${alpha})`);
+}
+
 /** `danger` at 6 % fill with a 16 % ring, for error boxes. */
 export function dangerTint(p: Palette) {
-  const base = p === dark ? "228,125,109" : "168,58,44";
-  return { fill: `rgba(${base},0.06)`, ring: `rgba(${base},0.16)` };
+  return { fill: tint(p.danger, 0.06), ring: tint(p.danger, 0.16) };
 }

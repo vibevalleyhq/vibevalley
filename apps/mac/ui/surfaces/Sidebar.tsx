@@ -7,11 +7,11 @@ import { Button, ContextMenu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { act, call, frame, frameRev, hostApi } from "../bridge";
 import { pressTransition } from "../motion";
-import { cardShadow, radius, tok, type as ty } from "../tokens";
+import { tint, tok, type as ty } from "../tokens";
 import { FileTree, type FilesFrame } from "./FileTree";
 import { GitPanel, type GitFrame, type GitTab } from "./GitPanel";
 import { ProjectRail, type RailFrame, type RailProject, type RailRunningState, type RailTab } from "./ProjectRail";
-import { statusTint, TipBubble } from "./shared";
+import { contextMenuItemStyle, contextMenuPopupStyle, statusTint, TipBubble } from "./shared";
 
 type VvRepo = { name: string; path: string; git?: boolean; last?: number };
 type VvSession = {
@@ -270,7 +270,6 @@ function Glyph(props: { name: GlyphName; size: number; color: string; rotateDeg?
 
 function StatusDots(props: { state: RailRunningState; attention?: boolean; readyRing?: boolean }) {
   const p = () => tok();
-  const dark = () => colorScheme() === "dark";
   const showWorking = () => props.state === "working";
   const showReady = () => props.state === "ready" && props.readyRing !== false;
   const showAttention = () => Boolean(props.attention);
@@ -284,7 +283,7 @@ function StatusDots(props: { state: RailRunningState; attention?: boolean; ready
             height: 6,
             borderRadius: 3,
             borderWidth: 1.5,
-            borderColor: dark() ? "rgba(65,189,116,0.65)" : "rgba(30,138,79,0.55)",
+            borderColor: tint(p().ok, 0.62),
           }}
         />
       ) : null}
@@ -295,7 +294,6 @@ function StatusDots(props: { state: RailRunningState; attention?: boolean; ready
 
 function CollapsedSummary(props: { summary: ActivitySummary }) {
   const p = () => tok();
-  const dark = () => colorScheme() === "dark";
   const s = () => props.summary;
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}>
@@ -307,7 +305,7 @@ function CollapsedSummary(props: { summary: ActivitySummary }) {
             height: 6,
             borderRadius: 3,
             borderWidth: 1.5,
-            borderColor: dark() ? "rgba(65,189,116,0.65)" : "rgba(30,138,79,0.55)",
+            borderColor: tint(p().ok, 0.62),
           }}
         />
       ) : null}
@@ -777,20 +775,9 @@ export function Sidebar() {
   };
 
   const withWorktreeMenu = (group: WorktreeGroup, trigger: JSX.Element) => {
-    const itemStyle = { height: 28, paddingHorizontal: 10, borderRadius: radius.md, justifyContent: "center" as const };
+    const itemStyle = contextMenuItemStyle;
     return (
-      <ContextMenu
-        trigger={trigger}
-        popupStyle={{
-          minWidth: 168,
-          padding: 4,
-          borderRadius: radius.lg,
-          backgroundColor: p().surface,
-          borderWidth: 1,
-          borderColor: p().border,
-          boxShadow: cardShadow(p()),
-        }}
-      >
+      <ContextMenu trigger={trigger} popupStyle={contextMenuPopupStyle(p())}>
         <MenuItem
           onSelect={() => {
             setFold(groupFoldKey(group), true);

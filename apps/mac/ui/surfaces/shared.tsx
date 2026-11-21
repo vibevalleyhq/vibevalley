@@ -3,7 +3,7 @@ import { Canvas, colorScheme, signal, Text, View, type CanvasRenderingContext2D,
 import { Button, Tooltip } from "nsh/base";
 
 import { ms, pressTransition } from "../motion";
-import { dangerTint, tok, type Palette, type as ty } from "../tokens";
+import { cardShadow, dangerTint, radius, tint, tok, type Palette, type as ty } from "../tokens";
 
 export type SurfaceIconName =
   | "chevron-right"
@@ -238,7 +238,7 @@ export function TipBubble(props: { text: string }) {
         borderRadius: 6,
         backgroundColor: p().ink,
         borderWidth: 1,
-        borderColor: p().border,
+        borderColor: tint(p().surface, 0.14),
       }}
       class="shadow-float transition duration-120 ease-out"
       startingClass="opacity-0"
@@ -249,13 +249,30 @@ export function TipBubble(props: { text: string }) {
   );
 }
 
+export const contextMenuItemStyle = {
+  height: 28,
+  paddingHorizontal: 10,
+  borderRadius: radius.md,
+  justifyContent: "center" as const,
+};
+
+export function contextMenuPopupStyle(p: Palette) {
+  return {
+    minWidth: 168,
+    padding: 4,
+    borderRadius: radius.lg,
+    backgroundColor: p.surface,
+    borderWidth: 1,
+    borderColor: p.border,
+    boxShadow: cardShadow(p),
+  };
+}
+
 export function statusTint(p: Palette, kind: "danger" | "alert" | "ok"): { fill: string; ring: string } {
   if (kind === "danger") return dangerTint(p);
   const dark = colorScheme() === "dark";
-  if (kind === "alert") {
-    return dark ? { fill: "rgba(242,138,46,0.12)", ring: "rgba(242,138,46,0.28)" } : { fill: "rgba(230,115,14,0.08)", ring: "rgba(230,115,14,0.20)" };
-  }
-  return dark ? { fill: "rgba(65,189,116,0.12)", ring: "rgba(65,189,116,0.26)" } : { fill: "rgba(30,138,79,0.08)", ring: "rgba(30,138,79,0.20)" };
+  const base = kind === "alert" ? p.alert : p.ok;
+  return { fill: tint(base, dark ? 0.14 : 0.09), ring: tint(base, dark ? 0.3 : 0.22) };
 }
 
 /** The color of a git tone ("modified", "added", ...). */
@@ -293,7 +310,7 @@ export function CountBadge(props: { count: number; tone?: "default" | "danger" |
         justifyContent: "center",
         flexShrink: 0,
         backgroundColor: tint()?.fill ?? p().tile,
-        borderWidth: tint() ? 1 : 0,
+        borderWidth: 1,
         borderColor: tint()?.ring ?? "transparent",
       }}
     >

@@ -4,25 +4,33 @@ import { resolve } from "node:path";
 import { parseSync } from "vite";
 
 const root = resolve(import.meta.dirname, "../..");
-const webRoot = resolve(root, "apps/mac/ui/vv/web");
+const uiRoot = resolve(root, "apps/mac/ui");
 
-const SCAN_GLOBS = ["app/**/*.{ts,tsx}", "features/**/*.{ts,tsx}", "ui/**/*.{ts,tsx}"] as const;
+const SCAN_GLOBS = [
+  "vv/web/app/**/*.{ts,tsx}",
+  "vv/web/features/**/*.{ts,tsx}",
+  "vv/web/ui/**/*.{ts,tsx}",
+  "surfaces/**/*.{ts,tsx}",
+  "components/**/*.{ts,tsx}",
+] as const;
 const EXCLUDE_GLOBS = [
   // Swatch palette & validation helper (defines swatches and hexColor).
-  "ui/domain/cast.ts",
+  "vv/web/ui/domain/cast.ts",
   // Runtime token lookup & alpha blender (`tone`, `mix`).
-  "ui/tone.ts",
+  "vv/web/ui/tone.ts",
   // Pixel asset registry, sprite manifests, and procedural pixel renderers.
-  "ui/pixel/**",
-  // Test files and story fixtures.
+  "vv/web/ui/pixel/**",
+  // Test files, fixtures, and story fixtures.
   "**/*.test.*",
   "**/*.story.*",
+  "**/*.stories.*",
+  "**/fixtures/**",
   // GitHub Linguist external programming-language palette.
-  "features/repo/repos.ts",
+  "vv/web/features/repo/repos.ts",
   // Serialized Excalidraw SVG export fills and isolated WebView stylesheet.
-  "features/artifact/WhiteboardView.tsx",
+  "vv/web/features/artifact/WhiteboardView.tsx",
   // ISO QR specification requires strict #ffffff / #000000 contrast regardless of theme.
-  "ui/Qr.tsx",
+  "vv/web/ui/Qr.tsx",
 ] as const;
 
 const SWITCH_PRIMITIVE = "apps/mac/ui/vv/web/ui/layout.tsx";
@@ -35,7 +43,7 @@ const HEX_ALPHA_SUFFIX_RE = /^[0-9a-fA-F]{2}$/u;
 const FULL_BORDER_TWO_RE = /\bborder-2\b/u;
 const FULL_BORDER_ONE_RE = /(?:^|\s)border(?:\s|$)/u;
 const FIXED_DOT_CLASS_RE = /\b(?:h-2\s+w-2|size-\d)/u;
-const SELECTION_TEST_RE = /\b(?:selected|active|picked|current|on|focus|focused)\b/iu;
+const SELECTION_TEST_RE = /(?:selected|active|picked|current|focus|focused|\bon\b)/iu;
 
 const BOX_GEOMETRY_STYLE_KEYS = new Set([
   "borderWidth",
@@ -241,10 +249,14 @@ function checkSelectionLayoutShift(out: Finding[], file: string, line: number, s
   }
 
   if (attrName === "style") {
+    const isWebFile = file.startsWith("apps/mac/ui/vv/web/");
+    const testSlice = isAstNode(node.test)
+      ? source.slice(typeof node.test.start === "number" ? node.test.start : 0, typeof node.test.end === "number" ? node.test.end : 0)
+      : "";
     const parent = ancestors[ancestors.length - 1];
     if (parent && parent.type === "Property") {
       const key = propertyKeyName(parent);
-      if (key && BOX_GEOMETRY_STYLE_KEYS.has(key)) {
+      if (key && BOX_GEOMETRY_STYLE_KEYS.has(key) && (key === "borderWidth" || isWebFile || SELECTION_TEST_RE.test(testSlice))) {
         out.push({
           file,
           line,
@@ -258,7 +270,8 @@ function checkSelectionLayoutShift(out: Finding[], file: string, line: number, s
 
     const consKeys = styleGeometryKeysOf(node.consequent);
     const altKeys = styleGeometryKeysOf(node.alternate);
-    const changed = [...consKeys].some((k) => !altKeys.has(k)) || [...altKeys].some((k) => !consKeys.has(k));
+    const diffKeys = [...[...consKeys].filter((k) => !altKeys.has(k)), ...[...altKeys].filter((k) => !consKeys.has(k))];
+    const changed = diffKeys.some((k) => k === "borderWidth" || isWebFile || SELECTION_TEST_RE.test(testSlice));
     if (changed) {
       out.push({
         file,
@@ -404,10 +417,10 @@ export function scanUiTokens(relFile: string, source: string): Finding[] {
 
 export function listWebUiFiles(): string[] {
   return globSync([...SCAN_GLOBS], {
-    cwd: webRoot,
+    cwd: uiRoot,
     exclude: [...EXCLUDE_GLOBS],
   })
-    .map((f) => `apps/mac/ui/vv/web/${f.replaceAll("\\", "/")}`)
+    .map((f) => `apps/mac/ui/${f.replaceAll("\\", "/")}`)
     .toSorted();
 }
 

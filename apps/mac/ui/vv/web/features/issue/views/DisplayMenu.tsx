@@ -25,7 +25,7 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
       placement="bottom"
       align="end"
       offset={6}
-      popupClass="w-85 rounded-lg border border-line bg-page p-3 shadow-float"
+      popupClass="w-85 rounded-lg border border-line bg-elevated p-3 shadow-float"
       trigger={
         <View
           testID="display"

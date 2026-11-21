@@ -19,7 +19,7 @@ export function Dialog(props: { open: boolean; onClose: () => void; title: strin
       animation="fade"
       onOpenChange={(e) => !e.open && props.onClose()}
       backdropClass="bg-scrim"
-      class="m-auto overflow-hidden rounded-lg border border-line bg-page shadow-float"
+      class="m-auto overflow-hidden rounded-lg border border-line bg-elevated shadow-float"
       style={{ width: width(), maxHeight: windowSize().height * 0.86 }}
     >
       <View class="min-h-12 flex-row items-center justify-between gap-3 border-b border-line py-2.5 pr-3.5 pl-5">

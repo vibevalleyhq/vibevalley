@@ -244,7 +244,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
             role="button"
             testID="to-latest"
             onPress={toLatest}
-            class="h-7 flex-row items-center gap-1.5 rounded-full border border-line bg-page px-3 shadow-float transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+            class="h-7 flex-row items-center gap-1.5 rounded-full border border-line bg-elevated px-3 shadow-float transition duration-120 ease-out hover:bg-hover active:translate-y-px"
           >
             <View style={{ transform: [{ rotate: "90deg" }] }}>
               <Icon name="expand" size={12} tone="muted" />
@@ -513,7 +513,7 @@ function MessageRow(props: {
                 role="button"
                 testID="message-jump"
                 onPress={() => jump()()}
-                class="absolute -top-3 right-2 z-10 rounded-md border border-line bg-page px-2 py-0.5 shadow-float"
+                class="absolute -top-3 right-2 z-10 rounded-md border border-line bg-elevated px-2 py-0.5 shadow-float"
               >
                 <Text class="text-xs text-ink">{t("web.channel.more.jump")}</Text>
               </View>

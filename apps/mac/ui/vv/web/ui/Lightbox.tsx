@@ -78,7 +78,7 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
             <View class="overflow-hidden rounded-lg border shadow-float" style={{ borderColor: mix("white", 0.14), backgroundColor: mix("ink-950", 0.45) }}>
               <Image src={p().src} accessibilityLabel={p().name} style={{ ...fit(), objectFit: "contain" }} />
             </View>
-            <View class="flex-row items-center gap-1 rounded-lg border border-line bg-page px-2.5 py-1.5 shadow-float">
+            <View class="flex-row items-center gap-1 rounded-lg border border-line bg-elevated px-2.5 py-1.5 shadow-float">
               <If when={count() > 1}>
                 <IconButton icon="previous" size={14} label={t("web.base.lightbox.prev")} onClick={() => go(-1)} testid="lightbox-prev" />
                 <Text class="min-w-10 px-1 text-center font-mono text-xs font-medium text-muted tabular-nums">{`${(props.at ?? 0) + 1} / ${count()}`}</Text>

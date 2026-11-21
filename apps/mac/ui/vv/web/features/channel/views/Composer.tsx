@@ -222,7 +222,7 @@ export function Composer(props: {
           role="listbox"
           accessibilityLabel={t("web.channel.composer.who")}
           testID="mentions"
-          class="absolute right-4 bottom-full left-4 z-30 -mb-2 max-h-72 rounded-lg border border-line bg-page p-1 shadow-float"
+          class="absolute right-4 bottom-full left-4 z-30 -mb-2 max-h-72 rounded-lg border border-line bg-elevated p-1 shadow-float"
         >
           <Each of={box.offered()} key={(n) => n.token}>
             {(n, i) => (

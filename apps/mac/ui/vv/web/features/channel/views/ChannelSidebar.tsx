@@ -151,7 +151,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
               placement="bottom"
               align="end"
               offset={4}
-              popupClass="max-h-80 w-56 rounded-lg border border-line bg-page p-1 shadow-float"
+              popupClass="max-h-80 w-56 rounded-lg border border-line bg-elevated p-1 shadow-float"
               trigger={
                 <View
                   testID="new-direct"

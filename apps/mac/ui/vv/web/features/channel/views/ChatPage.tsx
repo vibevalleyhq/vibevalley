@@ -159,7 +159,7 @@ function HeadPopover(props: {
       placement="bottom"
       align="end"
       offset={4}
-      popupClass="rounded-lg border border-line bg-page p-2 shadow-float"
+      popupClass="rounded-lg border border-line bg-elevated p-2 shadow-float"
       popupStyle={{ width: props.width, maxHeight: 448 }}
       trigger={
         <View

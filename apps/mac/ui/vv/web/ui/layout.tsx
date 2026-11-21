@@ -161,7 +161,7 @@ function ToggleSwitch(props: {
       onChange={(e) => props.onChange(e.checked)}
       class={props.class}
       trackClass="h-4 w-7 justify-center rounded-full border border-line bg-selected p-0.5 transition-colors duration-180 ease-out checked:border-accent checked:bg-accent focus-visible:outline-2 focus-visible:outline-focus"
-      thumbClass="size-2.5 rounded-full bg-page shadow-raise transition-transform duration-180 ease-out checked:translate-x-3"
+      thumbClass="size-2.5 rounded-full bg-paper shadow-raise transition-transform duration-180 ease-out checked:translate-x-3"
     />
   );
 }

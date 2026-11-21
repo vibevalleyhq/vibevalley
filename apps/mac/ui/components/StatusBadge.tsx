@@ -8,7 +8,7 @@
 import { colorScheme, createMotion, effect, reduceMotion, Text, View } from "nsh";
 
 import { durations, ease, ms } from "../motion";
-import { tok, type Palette } from "../tokens";
+import { tint, tok, type Palette } from "../tokens";
 
 /** The spec's three status forms plus `alert` (needs you) and `idle`. */
 export type Tone = "running" | "done" | "failed" | "alert" | "idle";
@@ -21,19 +21,10 @@ export type StatusBadgeProps = {
   testID?: string;
 };
 
-/** `#rrggbb` or `rgba(...)` token at `a` opacity, for tints of a token. */
-function tint(color: string, a: number): string {
-  if (color.startsWith("#") && color.length === 7) {
-    const n = parseInt(color.slice(1), 16);
-    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-  }
-  return color;
-}
-
 function colors(p: Palette, tone: Tone, dark: boolean): { fg: string; bg: string; ring: string; dot: string } {
   switch (tone) {
     case "running":
-      return { fg: p.ink, bg: dark ? "rgba(236,235,232,0.10)" : p.tile, ring: p.border, dot: p.ink };
+      return { fg: p.ink, bg: p.tile, ring: p.border, dot: p.ink };
     case "done":
       return { fg: p.ok, bg: tint(p.ok, dark ? 0.16 : 0.1), ring: tint(p.ok, dark ? 0.3 : 0.22), dot: p.ok };
     case "failed":

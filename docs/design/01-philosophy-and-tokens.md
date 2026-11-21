@@ -27,12 +27,12 @@
 | --- | --- | --- |
 | `apps/mac/ui/vv/theme.json` | 工作台 `cssVars.theme` 像素色与 `cssVars.{light,dark}` 语义变量 | `vpx scripts/gen/tokens.ts --check` |
 | `apps/mac/ui/nsh.json` | 工作台 `tailwind.{fontSize,radius,ease,fontFamily,shadow}` 静态配置 | `vpx scripts/gen/tokens.ts --check` |
-| `apps/mac/ui/tokens.ts` | 宿主集成面浅/深 `Palette`、`type`、`radius`、`cardShadow` 与 `dangerTint` | `vpx scripts/gen/tokens.ts --check` |
+| `apps/mac/ui/tokens.ts` | 宿主集成面浅/深 `Palette`、`type`、`radius`、`cardShadow`、`tint` 与 `dangerTint` | `vpx scripts/gen/tokens.ts --check` |
 | `apps/mac/src/theme_tokens.rs` | 原生壳 `DARK_*`/`LIGHT_*`、终端 16 色与语法 16 色常量 | `vpx scripts/gen/tokens.ts --check` |
 | `apps/mac/ui/motion.ts` | 同步 `ease` 减速度曲线（`cubic-bezier(0.2, 0, 0, 1)`） | `vpx scripts/gen/tokens.ts --check` |
 | `apps/site/src/ui/global.css` | 同步 `--ease-out` 减速度曲线（`cubic-bezier(0.2, 0, 0, 1)`） | `vpx scripts/gen/tokens.ts --check` |
 
-工作台页面代码由 `scripts/audit/ui-tokens.ts` 通过 AST 扫描校验（`apps/mac/ui/vv/web/{app,features,ui}`），拦截硬编码十六进制/`rgb()` 颜色、任意 Tailwind 值以及绕过 `Toggle`/`Checkbox` 原语的裸控件。
+UI 代码由 `scripts/audit/ui-tokens.ts` 通过 AST 扫描校验（覆盖工作台 `apps/mac/ui/vv/web/{app,features,ui}` 与宿主面 `apps/mac/ui/{surfaces,components}`），拦截硬编码十六进制/`rgb()` 颜色、任意 Tailwind 值、绕过 `Toggle`/`Checkbox` 原语的裸控件，以及会引发位移的条件边框或内边距切换。
 
 ### 工作台双主题令牌（`apps/mac/ui/vv/theme.json`）
 

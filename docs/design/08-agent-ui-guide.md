@@ -32,7 +32,12 @@
 5. **跨端视觉语法与按压反馈统一**：
    - 侧栏单选列表统一采用 `bg-selected` + 左侧 `2px` 竖条 `<ActiveBar />`（宿主侧栏用 `p().primary`）+ 恒定 `font-medium`（未读消息等语义徽标除外）。
    - 选中态边框统一用 `border-accent bg-selected`；`border-focus` 与 `outline-focus` 严格保留给键盘 `focus-visible` 与输入框 `focus-within`。
-   - 按压反馈不改变几何尺寸（工作台用 `active:translate-y-px`，原生宿主外壳用 `opacity: 0.82`，禁止 `active:scale-*` 缩框）；提示气泡统一采用深墨水底色与暖边界（`Bubble` / `TipBubble`）。
+   - 按压反馈不改变几何尺寸（工作台用 `active:translate-y-px`，原生宿主外壳用 `opacity: 0.82`，禁止 `active:scale-*` 缩框）；提示气泡统一采用深墨水底色与 `14%` 反色边界（`Bubble` / `TipBubble`）。
+6. **双主题四级表面抬升规则（Light / Dark Parity）**：
+   - 背景严格遵守 `rail → side → page → elevated` 四级递增，确保深色模式下浮层始终比主底更亮而不出现「深色沉底倒挂」：
+     - 所有携带 `shadow-float` 的弹窗（`Dialog`）、菜单（`MoreMenu`）、下拉列表（`Select`）、弹层（`Popover` / `DisplayMenu`）、浮动操作条以及在 `bg-side` 容器内抬起的控件（`Segmented` 滑块、看板卡片 `Board`）统一使用 `bg-elevated`。
+     - 开关与滑块的圆钮（`ToggleSwitch`、`Slider`、`CatalogDetail`）在浅/深双主题下统一使用暖纸白 `bg-paper` 保持实体触感。
+     - 原生宿主外壳与共享组件（`apps/mac/ui/{surfaces,components}/`）一律从 `apps/mac/ui/tokens.ts` 调用 `tok()`、`cardShadow()`、`tint()`，右键菜单复用 `surfaces/shared.tsx` 的 `contextMenuItemStyle` / `contextMenuPopupStyle`，禁止写死 `rgba(...)` 或亮/暗手工特例。
 
 ## 8.3 状态、并发与键盘可达性
 

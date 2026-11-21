@@ -279,7 +279,7 @@ export function EmojiPopover(props: {
       placement="top"
       align="end"
       offset={4}
-      popupClass="rounded-lg border border-line bg-page p-2 shadow-float"
+      popupClass="rounded-lg border border-line bg-elevated p-2 shadow-float"
       popupStyle={{ width, maxHeight: height }}
       trigger={
         <View testID={props.testid} accessibilityLabel={props.label} tooltip={<Bubble text={props.label} />}>
