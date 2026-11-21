@@ -224,6 +224,13 @@ export function SurfaceIcon(props: { name: SurfaceIconName; size?: number; color
   );
 }
 
+export const focusRing = (p: Palette) => ({
+  outlineWidth: 2,
+  outlineColor: p.focus,
+  outlineOffset: -2,
+  outlineStyle: "solid" as const,
+});
+
 export function TipBubble(props: { text: string }) {
   const p = () => tok();
   return (
@@ -235,7 +242,7 @@ export function TipBubble(props: { text: string }) {
         maxWidth: 260,
         paddingHorizontal: 10,
         paddingVertical: 6,
-        borderRadius: 6,
+        borderRadius: radius.md,
         backgroundColor: p().ink,
         borderWidth: 1,
         borderColor: tint(p().surface, 0.14),
@@ -404,12 +411,13 @@ export function SectionHead(props: {
             height: 24,
             flexDirection: "row",
             alignItems: "center",
-            borderRadius: 5,
+            borderRadius: radius.md,
             paddingHorizontal: 4,
             marginLeft: -4,
             ...pressTransition(),
           }}
           hoverStyle={{ backgroundColor: p().tile }}
+          focusVisibleStyle={focusRing(p())}
         >
           {labelRow()}
         </Button>
@@ -451,7 +459,7 @@ export function IconButton(props: {
       style={{
         width: 22,
         height: 22,
-        borderRadius: 5,
+        borderRadius: radius.md,
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
@@ -459,6 +467,7 @@ export function IconButton(props: {
         ...pressTransition(),
       }}
       hoverStyle={{ backgroundColor: props.disabled ? "transparent" : p().subtle }}
+      focusVisibleStyle={props.disabled ? undefined : focusRing(p())}
     >
       {resolvedIcon() ? (
         <SurfaceIcon name={resolvedIcon()!} size={props.size ?? 13} color={iconColor()} />
@@ -492,10 +501,11 @@ export function PrimaryButton(props: { label: string; onPress: () => void; disab
       onPress={props.onPress}
       disabled={props.disabled}
       activeStyle={props.disabled ? undefined : { opacity: 0.82 }}
+      focusVisibleStyle={props.disabled ? undefined : focusRing(p())}
       style={{
         height: 28,
         paddingHorizontal: 12,
-        borderRadius: 6,
+        borderRadius: radius.md,
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: props.disabled ? p().tile : p().primary,

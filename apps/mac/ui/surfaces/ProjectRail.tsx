@@ -5,7 +5,7 @@ import { Button } from "nsh/base";
 import { act } from "../bridge";
 import { pressTransition } from "../motion";
 import { radius, tok } from "../tokens";
-import { SurfaceIcon, type SurfaceIconName, TipBubble } from "./shared";
+import { focusRing, SurfaceIcon, type SurfaceIconName, TipBubble } from "./shared";
 
 export type RailRunningState = "working" | "ready" | "idle";
 
@@ -75,6 +75,7 @@ export function ProjectRail(props: { frame: RailFrame | null }) {
             ...pressTransition(),
           }}
           hoverStyle={proj.active ? undefined : { backgroundColor: p().subtle }}
+          focusVisibleStyle={focusRing(p())}
         >
           <Text style={{ fontSize: 12, fontWeight: "600", color: proj.active ? p().onPrimary : p().text }}>{proj.initials}</Text>
           {proj.attention ? (
@@ -92,6 +93,7 @@ export function ProjectRail(props: { frame: RailFrame | null }) {
         activeStyle={{ opacity: 0.82 }}
         style={{ width: 36, height: 36, borderRadius: radius.md, alignItems: "center", justifyContent: "center", ...pressTransition() }}
         hoverStyle={{ backgroundColor: p().tile }}
+        focusVisibleStyle={focusRing(p())}
       >
         <SurfaceIcon name="plus" size={14} color={p().muted} />
       </Button>
@@ -114,6 +116,7 @@ export function ProjectRail(props: { frame: RailFrame | null }) {
               ...pressTransition(),
             }}
             hoverStyle={active ? undefined : { backgroundColor: p().tile }}
+            focusVisibleStyle={focusRing(p())}
           >
             <SurfaceIcon name={panel.icon} size={14} color={active ? p().ink : p().muted} />
           </Button>

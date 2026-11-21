@@ -7,11 +7,12 @@ import { Button, ContextMenu, Input, MenuItem, MenuSeparator } from "nsh/base";
 
 import { act, frame, hostApi } from "../bridge";
 import { pressTransition } from "../motion";
-import { tok, type as ty } from "../tokens";
+import { radius, tok, type as ty } from "../tokens";
 import {
   contextMenuItemStyle,
   contextMenuPopupStyle,
   Empty,
+  focusRing,
   IconButton,
   PrimaryButton,
   SectionHead,
@@ -82,7 +83,7 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
         height: 26,
         marginHorizontal: 6,
         paddingHorizontal: 6,
-        borderRadius: 6,
+        borderRadius: radius.md,
         flexDirection: "row",
         alignItems: "center",
         gap: 4,
@@ -97,7 +98,8 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
         }}
         accessibilityLabel={`Open diff of ${props.row.path}`}
         tooltip={<TipBubble text={props.row.path} />}
-        style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, height: 26 }}
+        focusVisibleStyle={focusRing(p())}
+        style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, height: 26, borderRadius: radius.sm }}
       >
         <Text
           style={{
@@ -133,13 +135,18 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
               confirmingDiscard.set(false);
               act({ type: "discard", paths: [props.row.path] });
             }}
-            style={{ height: 20, paddingHorizontal: 6, borderRadius: 4, backgroundColor: p().danger, justifyContent: "center" }}
+            activeStyle={{ opacity: 0.82 }}
+            focusVisibleStyle={focusRing(p())}
+            style={{ height: 20, paddingHorizontal: 6, borderRadius: radius.sm, backgroundColor: p().danger, justifyContent: "center", ...pressTransition() }}
           >
             <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().onPrimary }}>确认丢弃</Text>
           </Button>
           <Button
             onPress={() => confirmingDiscard.set(false)}
-            style={{ height: 20, paddingHorizontal: 6, borderRadius: 4, backgroundColor: p().subtle, justifyContent: "center" }}
+            activeStyle={{ opacity: 0.82 }}
+            focusVisibleStyle={focusRing(p())}
+            hoverStyle={{ backgroundColor: p().border }}
+            style={{ height: 20, paddingHorizontal: 6, borderRadius: radius.sm, backgroundColor: p().subtle, justifyContent: "center", ...pressTransition() }}
           >
             <Text style={{ fontSize: 11, lineHeight: 14, color: p().text }}>取消</Text>
           </Button>
@@ -241,7 +248,8 @@ function WorktreeRow(props: {
           act({ type: "activate_path", path: w().path });
         }}
         tooltip={<TipBubble text={w().path} />}
-        style={{ gap: 4 }}
+        focusVisibleStyle={focusRing(p())}
+        style={{ gap: 4, borderRadius: radius.sm }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 20 }}>
           <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 5 }}>
@@ -267,7 +275,7 @@ function WorktreeRow(props: {
                 style={{
                   height: 16,
                   paddingHorizontal: 5,
-                  borderRadius: 4,
+                  borderRadius: radius.sm,
                   backgroundColor: w().current ? p().surface : p().tile,
                   borderWidth: 1,
                   borderColor: p().border,
@@ -303,7 +311,7 @@ function WorktreeRow(props: {
                     style={{
                       height: 18,
                       paddingHorizontal: 6,
-                      borderRadius: 4,
+                      borderRadius: radius.sm,
                       backgroundColor: statusTint(p(), "danger").fill,
                       borderWidth: 1,
                       borderColor: statusTint(p(), "danger").ring,
@@ -318,7 +326,7 @@ function WorktreeRow(props: {
                     style={{
                       height: 18,
                       paddingHorizontal: 6,
-                      borderRadius: 4,
+                      borderRadius: radius.sm,
                       backgroundColor: statusTint(p(), "alert").fill,
                       borderWidth: 1,
                       borderColor: statusTint(p(), "alert").ring,
@@ -333,7 +341,7 @@ function WorktreeRow(props: {
                     style={{
                       height: 18,
                       paddingHorizontal: 6,
-                      borderRadius: 4,
+                      borderRadius: radius.sm,
                       backgroundColor: w().current ? p().surface : p().tile,
                       alignItems: "center",
                       justifyContent: "center",
@@ -352,7 +360,7 @@ function WorktreeRow(props: {
               style={{
                 width: props.running ? 6 : 5,
                 height: props.running ? 6 : 5,
-                borderRadius: 3,
+                borderRadius: 999,
                 backgroundColor: props.running ? p().ok : p().faint,
                 flexShrink: 0,
               }}
@@ -392,26 +400,32 @@ function WorktreeRow(props: {
           <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted }}>{dirty() ? "包含未提交变更" : "确认删除该工作树？"}</Text>
           <Button
             onPress={() => props.onConfirmRemove(w(), dirty())}
+            activeStyle={{ opacity: 0.82 }}
+            focusVisibleStyle={focusRing(p())}
             style={{
               height: 22,
               paddingHorizontal: 8,
-              borderRadius: 4,
+              borderRadius: radius.sm,
               backgroundColor: p().danger,
               justifyContent: "center",
+              ...pressTransition(),
             }}
           >
             <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().onPrimary }}>{dirty() ? "强制删除" : "确认删除"}</Text>
           </Button>
           <Button
             onPress={() => props.setPendingRemove(null)}
+            activeStyle={{ opacity: 0.82 }}
+            focusVisibleStyle={focusRing(p())}
             style={{
               height: 22,
               paddingHorizontal: 7,
-              borderRadius: 4,
+              borderRadius: radius.sm,
               backgroundColor: p().tile,
               borderWidth: 1,
               borderColor: p().border,
               justifyContent: "center",
+              ...pressTransition(),
             }}
             hoverStyle={{ backgroundColor: p().subtle }}
           >
@@ -576,10 +590,12 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               if (next) ensureOpen(sectionKey);
             }}
             accessibilityLabel="新建工作树"
+            activeStyle={{ opacity: 0.82 }}
+            focusVisibleStyle={focusRing(p())}
             style={{
               height: 20,
               paddingHorizontal: 6,
-              borderRadius: 5,
+              borderRadius: radius.md,
               flexDirection: "row",
               alignItems: "center",
               gap: 3,
@@ -616,7 +632,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 style={{
                   flex: 1,
                   height: 26,
-                  borderRadius: 6,
+                  borderRadius: radius.md,
                   borderWidth: 1,
                   borderColor: p().border,
                   backgroundColor: p().surface,
@@ -628,14 +644,17 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               <Button
                 onPress={submitNewWorktree}
                 disabled={!newBranch().trim() || creatingWt()}
+                activeStyle={!newBranch().trim() || creatingWt() ? undefined : { opacity: 0.82 }}
+                focusVisibleStyle={!newBranch().trim() || creatingWt() ? undefined : focusRing(p())}
                 style={{
                   height: 26,
                   paddingHorizontal: 10,
-                  borderRadius: 6,
+                  borderRadius: radius.md,
                   backgroundColor: !newBranch().trim() || creatingWt() ? p().tile : p().primary,
                   borderWidth: 1,
                   borderColor: !newBranch().trim() || creatingWt() ? p().border : p().primary,
                   justifyContent: "center",
+                  ...pressTransition(),
                 }}
               >
                 <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: !newBranch().trim() || creatingWt() ? p().muted : p().onPrimary }}>
@@ -747,10 +766,12 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 return (
                   <Button
                     onPress={() => localTab.set(item.id)}
+                    activeStyle={{ opacity: 0.82 }}
+                    focusVisibleStyle={focusRing(p())}
                     style={{
                       flex: 1,
                       height: 24,
-                      borderRadius: 6,
+                      borderRadius: radius.md,
                       alignItems: "center",
                       justifyContent: "center",
                       backgroundColor: cur() ? p().subtle : "transparent",
@@ -791,7 +812,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     multiline
                     style={{
                       minHeight: 54,
-                      borderRadius: 6,
+                      borderRadius: radius.md,
                       borderWidth: 1,
                       borderColor: p().border,
                       backgroundColor: p().surface,
@@ -810,10 +831,12 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   {!f()?.staged?.length && (f()?.changes?.length ?? 0) > 0 ? (
                     <Button
                       onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
+                      activeStyle={{ opacity: 0.82 }}
+                      focusVisibleStyle={focusRing(p())}
                       style={{
                         height: 26,
                         paddingHorizontal: 10,
-                        borderRadius: 6,
+                        borderRadius: radius.md,
                         flexDirection: "row",
                         gap: 5,
                         justifyContent: "center",
@@ -837,7 +860,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                       style={{
                         paddingHorizontal: 8,
                         paddingVertical: 6,
-                        borderRadius: 6,
+                        borderRadius: radius.md,
                         backgroundColor: statusTint(p(), "danger").fill,
                         borderWidth: 1,
                         borderColor: statusTint(p(), "danger").ring,
@@ -945,7 +968,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                             placeholder="过滤分支名…"
                             style={{
                               height: 26,
-                              borderRadius: 6,
+                              borderRadius: radius.md,
                               borderWidth: 1,
                               borderColor: p().border,
                               backgroundColor: p().surface,
@@ -970,12 +993,14 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                                     }
                                   }}
                                   accessibilityLabel={b().head ? `${b().name}, 当前分支` : `切换到 ${b().name}`}
+                                  activeStyle={switchingBranch() !== null ? undefined : { opacity: 0.82 }}
+                                  focusVisibleStyle={switchingBranch() !== null ? undefined : focusRing(p())}
                                   style={{
                                     position: "relative",
                                     height: 26,
                                     marginHorizontal: 6,
                                     paddingHorizontal: 6,
-                                    borderRadius: 6,
+                                    borderRadius: radius.md,
                                     flexDirection: "row",
                                     alignItems: "center",
                                     gap: 6,
@@ -1070,6 +1095,8 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                           onPress={() => act({ type: "open_commit", id: c().id })}
                           accessibilityLabel={`Commit ${c().short}: ${c().summary}`}
                           tooltip={<TipBubble text={`${c().short} · ${c().summary}`} />}
+                          activeStyle={{ opacity: 0.82 }}
+                          focusVisibleStyle={focusRing(p())}
                           style={{
                             paddingHorizontal: 12,
                             paddingVertical: 7,
@@ -1099,7 +1126,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                                 minWidth: 68,
                                 height: 18,
                                 paddingHorizontal: 6,
-                                borderRadius: 4,
+                                borderRadius: radius.sm,
                                 backgroundColor: p().surface,
                                 borderWidth: 1,
                                 borderColor: p().border,

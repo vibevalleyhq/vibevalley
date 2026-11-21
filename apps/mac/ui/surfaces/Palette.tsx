@@ -4,7 +4,7 @@ import { Text, View } from "nsh";
 import { Command, type CommandItem } from "nsh/base";
 
 import { act, frame } from "../bridge";
-import { tok, type as ty } from "../tokens";
+import { radius, tok, type as ty } from "../tokens";
 import { SurfaceIcon, type SurfaceIconName } from "./shared";
 
 type PaletteMode = "commands" | "files" | "search";
@@ -43,7 +43,7 @@ function KeyCap(props: { label: string; surface?: "tile" | "surface"; active?: b
         height: 19,
         minWidth: 20,
         paddingHorizontal: 5,
-        borderRadius: 4,
+        borderRadius: radius.sm,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: props.surface === "surface" ? p().surface : p().tile,
@@ -78,7 +78,7 @@ export function Palette() {
         backgroundColor: p().surface,
         borderWidth: 1,
         borderColor: p().border,
-        borderRadius: 12,
+        borderRadius: radius.tray,
         overflow: "hidden",
       }}
     >
@@ -108,7 +108,7 @@ export function Palette() {
               style={{
                 height: 20,
                 paddingHorizontal: 7,
-                borderRadius: 5,
+                borderRadius: radius.sm,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: p().tile,

@@ -7,11 +7,11 @@ import { Button, ContextMenu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { act, call, frame, frameRev, hostApi } from "../bridge";
 import { pressTransition } from "../motion";
-import { tint, tok, type as ty } from "../tokens";
+import { radius, tint, tok, type as ty } from "../tokens";
 import { FileTree, type FilesFrame } from "./FileTree";
 import { GitPanel, type GitFrame, type GitTab } from "./GitPanel";
 import { ProjectRail, type RailFrame, type RailProject, type RailRunningState, type RailTab } from "./ProjectRail";
-import { contextMenuItemStyle, contextMenuPopupStyle, statusTint, TipBubble } from "./shared";
+import { contextMenuItemStyle, contextMenuPopupStyle, focusRing, statusTint, TipBubble } from "./shared";
 
 type VvRepo = { name: string; path: string; git?: boolean; last?: number };
 type VvSession = {
@@ -326,10 +326,11 @@ function ActionIconBtn(props: { icon: GlyphName; size?: number; label: string; o
       tooltip={<TipBubble text={props.label} />}
       hoverStyle={{ backgroundColor: p().subtle }}
       activeStyle={{ opacity: 0.82 }}
+      focusVisibleStyle={focusRing(p())}
       style={{
         width: ACTION_SIZE,
         height: ACTION_SIZE,
-        borderRadius: 4,
+        borderRadius: radius.sm,
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
@@ -352,10 +353,11 @@ function ChevronSlot(props: { expandable: boolean; expanded: boolean; label: str
       accessibilityLabel={props.label}
       hoverStyle={{ backgroundColor: p().subtle }}
       activeStyle={{ opacity: 0.82 }}
+      focusVisibleStyle={focusRing(p())}
       style={{
         width: CHEVRON_SLOT,
         height: 18,
-        borderRadius: 3,
+        borderRadius: radius.sm,
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
@@ -509,10 +511,11 @@ export function Sidebar() {
                 tooltip={<TipBubble text={item.tip} />}
                 hoverStyle={{ backgroundColor: isCur ? tabActiveBg() : tabHoverBg() }}
                 activeStyle={{ opacity: 0.82 }}
+                focusVisibleStyle={focusRing(p())}
                 style={{
                   height: 24,
                   paddingHorizontal: 8,
-                  borderRadius: 5,
+                  borderRadius: radius.md,
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "center",
@@ -835,7 +838,7 @@ export function Sidebar() {
           height: 28,
           paddingLeft: ROW_BASE_PAD + depth * INDENT_STEP,
           paddingRight: 6,
-          borderRadius: 6,
+          borderRadius: radius.md,
           backgroundColor: rowBg(isSelected, isHovered()),
           gap: 6,
           ...pressTransition(),
@@ -846,7 +849,8 @@ export function Sidebar() {
         <View style={{ width: CHEVRON_SLOT, height: 14, flexShrink: 0 }} />
         <Button
           onPress={() => act({ type: "activate_tab", path: group.path, tab_id: tab.id })}
-          style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, height: 28 }}
+          focusVisibleStyle={focusRing(p())}
+          style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, height: 28, borderRadius: radius.sm }}
         >
           <View style={{ width: ICON_SLOT, height: ICON_SLOT, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             {logoSrc ? (
@@ -917,7 +921,7 @@ export function Sidebar() {
               height: 28,
               paddingLeft: ROW_BASE_PAD + INDENT_STEP,
               paddingRight: 6,
-              borderRadius: 6,
+              borderRadius: radius.md,
               backgroundColor: rowBg(isSelected, isHovered()),
               gap: 6,
               ...pressTransition(),
@@ -932,7 +936,8 @@ export function Sidebar() {
             />
             <Button
               onPress={() => act({ type: "activate_path", path: group.path })}
-              style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, height: 28 }}
+              focusVisibleStyle={focusRing(p())}
+              style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, height: 28, borderRadius: radius.sm }}
             >
               <View style={{ width: ICON_SLOT, height: ICON_SLOT, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Glyph name="branch" size={14} color={group.sessionRunning ? p().ok : group.active ? p().ink : p().muted} />
@@ -1012,7 +1017,7 @@ export function Sidebar() {
           height: 28,
           paddingLeft: ROW_BASE_PAD,
           paddingRight: 6,
-          borderRadius: 6,
+          borderRadius: radius.md,
           backgroundColor: rowBg(isRepoSelected, isHovered()),
           gap: 6,
           ...pressTransition(),
@@ -1027,7 +1032,8 @@ export function Sidebar() {
         />
         <Button
           onPress={() => act({ type: "activate_path", path: repo.path })}
-          style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, height: 28 }}
+          focusVisibleStyle={focusRing(p())}
+          style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, height: 28, borderRadius: radius.sm }}
         >
           <View style={{ width: ICON_SLOT, height: ICON_SLOT, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             {plotSrc ? (
@@ -1101,7 +1107,7 @@ export function Sidebar() {
     return (
       <View
         style={{
-          borderRadius: 8,
+          borderRadius: radius.lg,
           borderWidth: 1,
           borderColor: showActiveCard ? p().border : "transparent",
           backgroundColor: showActiveCard ? p().surface : "transparent",
@@ -1144,10 +1150,11 @@ export function Sidebar() {
               tooltip={<TipBubble text={anyExpanded() ? "折叠全部" : "展开当前"} />}
               hoverStyle={{ backgroundColor: p().tile }}
               activeStyle={{ opacity: 0.82 }}
+              focusVisibleStyle={focusRing(p())}
               style={{
                 width: 22,
                 height: 22,
-                borderRadius: 5,
+                borderRadius: radius.md,
                 alignItems: "center",
                 justifyContent: "center",
                 ...pressTransition(),
@@ -1162,10 +1169,11 @@ export function Sidebar() {
             tooltip={<TipBubble text="添加本地仓库或文件夹" />}
             hoverStyle={{ backgroundColor: p().subtle }}
             activeStyle={{ opacity: 0.82 }}
+            focusVisibleStyle={focusRing(p())}
             style={{
               height: 22,
               paddingHorizontal: 7,
-              borderRadius: 5,
+              borderRadius: radius.md,
               flexDirection: "row",
               alignItems: "center",
               gap: 4,
@@ -1204,6 +1212,7 @@ export function Sidebar() {
                       }}
                       accessibilityLabel={isCollapsed ? `展开 ${section.title}` : `折叠 ${section.title}`}
                       hoverStyle={{ backgroundColor: p().tile }}
+                      focusVisibleStyle={focusRing(p())}
                       style={{
                         height: 24,
                         flexDirection: "row",
@@ -1212,7 +1221,7 @@ export function Sidebar() {
                         paddingLeft: ROW_BASE_PAD,
                         paddingRight: 6,
                         marginTop: 4,
-                        borderRadius: 5,
+                        borderRadius: radius.md,
                         gap: 6,
                         ...pressTransition(),
                       }}
