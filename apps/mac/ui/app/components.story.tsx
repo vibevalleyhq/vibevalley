@@ -34,9 +34,9 @@ import { SCENARIO_NOW, scenarios } from "../fixtures/scenarios";
 import { createSettled, useNow } from "../infra/base/dom";
 import { ago, shortMomentText } from "../infra/base/format";
 import { fixtureTransport } from "../infra/fixtures";
+import { Root } from "../infra/Root";
 import { defineColumns, useTable } from "../infra/table";
 import { setTransport } from "../infra/transport";
-import { Root } from "./Root";
 
 setTransport(fixtureTransport(scenarios.typical));
 

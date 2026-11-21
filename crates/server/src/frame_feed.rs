@@ -27,7 +27,7 @@ impl Snapshot {
     }
 }
 
-pub(super) struct WorkbenchFrames(Mutex<Published>);
+pub(super) struct FrameFeed(Mutex<Published>);
 
 struct Published {
     latest: Arc<Snapshot>,
@@ -35,7 +35,7 @@ struct Published {
     last: Option<(i64, Instant)>,
 }
 
-impl WorkbenchFrames {
+impl FrameFeed {
     pub fn new(frame: StateFrame) -> Self {
         Self(Mutex::new(Published {
             latest: Arc::new(Snapshot::new(frame)),
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn regression_a_stalled_workbench_holds_one_wakeup_and_drops_its_subscription() {
         let frame = Core::new(empty_space_state()).frame(vec![]);
-        let feed = Arc::new(WorkbenchFrames::new(frame.clone()));
+        let feed = Arc::new(FrameFeed::new(frame.clone()));
         let (stop, stopped) = flume::bounded(0);
         let (seen, received) = flume::bounded(1);
         let (release, blocked) = flume::bounded(0);

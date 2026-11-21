@@ -3,6 +3,7 @@ import { Scroll, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator } from "@vibevalley/protocol";
 
+import { orchestratorLooks } from "../../design/domain/cast";
 import { OrchestratorFace } from "../../design/domain/Face";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
@@ -13,7 +14,6 @@ import { Link as A, Navigate, useRouter } from "../../infra/router";
 import { OrchestratorMemoryPanel } from "../memory";
 import { runsHref } from "../session";
 import { VoiceForm } from "../voice";
-import { orchestratorLooks } from "./looks";
 
 const tabs = [
   { id: "memory", label: t("web.orchestrator.orchestrator.tab.memory"), icon: "memory" as IconName },

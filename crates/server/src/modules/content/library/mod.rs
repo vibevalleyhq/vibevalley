@@ -24,7 +24,7 @@ mod q;
 
 use crate::base::{LookIn, ModuleDb, missing};
 use crate::modules::content::attachment::{ATTACHMENT_MAX, Attachments};
-use crate::public_http::{public_https, public_v4};
+use crate::modules::infra::http::{no_redirect_client, public_https, public_v4, run_http};
 use crate::{Hub, lock, now};
 
 const LIST_MAX: i64 = 500;
@@ -323,11 +323,11 @@ fn download(address: &str) -> Result<(Vec<u8>, String, String), ApiError> {
             &[("url", address.into()), ("why", "Public IPv4 resolution required".into())],
         )));
     }
-    let client = crate::public_http::no_redirect_client()
+    let client = no_redirect_client()
         .map_err(|e| refused(t("server.library.notFetched", &[("url", "".into()), ("why", e.into())])))?
         .clone();
     let target = address.to_string();
-    let (bytes, kind) = crate::public_http::run_http(async move {
+    let (bytes, kind) = run_http(async move {
         let mut response = client.get(&target).timeout(DOWNLOAD).send().await.map_err(|e| {
             if e.is_timeout() {
                 refused(t("server.library.slow", &[]))

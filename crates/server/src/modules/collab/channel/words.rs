@@ -356,14 +356,14 @@ pub fn read_embed(link: &str) -> Option<Embed> {
     }
 
     let mut url = url::Url::parse(link).ok()?;
-    let client = crate::public_http::no_redirect_client().ok()?.clone();
+    let client = crate::modules::infra::http::no_redirect_client().ok()?.clone();
     for _ in 0..=REDIRECTS_MAX {
         if !reachable(&url, &resolve_all) {
             return None;
         }
         let target = url.to_string();
         let client = client.clone();
-        match crate::public_http::run_http(async move {
+        match crate::modules::infra::http::run_http(async move {
             let mut res = match client
                 .get(&target)
                 .timeout(EMBED_TIMEOUT)

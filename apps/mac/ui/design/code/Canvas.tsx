@@ -2,7 +2,7 @@
 // vibevalley-canvas + ImageSrc::svg_markup), with a clean fallback for stock `nsh test`.
 import { Text, View } from "nsh";
 
-import { richNative } from "../rich/native";
+import { richNative } from "../../infra/rich";
 
 export interface CanvasProps {
   data: string;

@@ -3,12 +3,11 @@ import { Image, pixelRatio, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type Look } from "@vibevalley/protocol";
 
-import { orchestratorLooks } from "../../features/orchestrator/looks";
 import { orchestratorLookOf } from "../../infra/agents";
 import { ready, useAgents, useSprites } from "../../infra/query";
 import { useSpriteUrl } from "../pixel/atlas";
 import { tone } from "../tone";
-import { castPrefix, hexColor } from "./cast";
+import { castPrefix, hexColor, orchestratorLooks } from "./cast";
 import { initialOf, RuntimeBadge } from "./RuntimeBadge";
 
 /** `hex` moved `part` of the way to white. */

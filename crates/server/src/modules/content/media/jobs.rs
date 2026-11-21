@@ -30,15 +30,16 @@ use vibevalley_protocol::{
 use super::image_provider::{Failure, ImageBackend, Prepared, Work};
 use super::remote::{RemoteFile, RemoteState};
 use super::understanding::Authorization;
-use super::vendor::{self, Account, Fetch, Moss, Outcome, Request, Task, TaskKind};
+use super::vendor::{self, Account, Moss, Outcome, Task, TaskKind};
 use super::{Stop, q};
 use crate::Hub;
 use crate::base::open_sqlx_db;
 use crate::modules::collab::channel::{Chat, Made, Posting};
 use crate::modules::content::attachment::{ATTACHMENT_MAX, Attachments};
 use crate::modules::content::media::inputs::Inputs;
+use crate::modules::infra::http::{Fetch, Request, public_https};
+use crate::modules::infra::provider::Use;
 use crate::modules::infra::setting::Setting;
-use crate::modules::team::provider::Use;
 use crate::now;
 
 /// Jobs active at once, every kind together.
@@ -1107,7 +1108,7 @@ impl Jobs {
 
     fn fetch_audio(&self, url: &str, format: MediaAudioFormat, id: &str, stop: &Stop) -> Result<Kept, String> {
         let parsed = url::Url::parse(url).map_err(|e| e.to_string())?;
-        if !crate::public_http::public_https(&parsed) {
+        if !public_https(&parsed) {
             return Err("not a public https address".into());
         }
         let types = vendor::audio_mimes(format.as_str());
@@ -1540,7 +1541,7 @@ impl Jobs {
 }
 
 /// A settings account with its key out and fingerprinted, as the vendor calls take it.
-fn keyed(a: crate::modules::team::provider::Account) -> Account {
+fn keyed(a: crate::modules::infra::provider::Account) -> Account {
     Account {
         fingerprint: vendor::fingerprint(a.key.expose()),
         key: a.key.expose().to_string(),

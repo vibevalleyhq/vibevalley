@@ -4,7 +4,6 @@ import { host, keymap, Scroll, signal, Text, View, type JSX } from "nsh";
 import { setLocale, t } from "@vibevalley/i18n";
 import type { Changes, Issue, IssueAct, RepoTemplates } from "@vibevalley/protocol";
 
-import { Root } from "../app/Root";
 import { TextArea } from "../design/Field";
 import { SpriteIcon } from "../design/pixel/icons";
 import { actionOf, perform } from "../features/issue/model/acts";
@@ -16,6 +15,7 @@ import { api, newSendKey, reasonOf } from "../infra/api";
 import { useBridge } from "../infra/bridged";
 import { useCore } from "../infra/frame";
 import { ready, useRepos } from "../infra/query";
+import { Root } from "../infra/Root";
 
 const close = () => host.post("action", { type: "dismiss_farm_form" });
 const route = (path: string) => host.post("action", { type: "global_route", path });

@@ -369,6 +369,70 @@ const subpackageLayersRule = defineRule({
   },
 });
 
+const uiLayers = new Set(["infra", "design", "features", "app", "farm", "workspace"]);
+const allowedUiImports: Readonly<Record<string, ReadonlySet<string>>> = {
+  infra: new Set(["infra"]),
+  design: new Set(["infra", "design"]),
+  features: new Set(["infra", "design", "features"]),
+  app: new Set(["infra", "design", "features", "app"]),
+  farm: new Set(["infra", "design", "features", "farm"]),
+  workspace: new Set(["infra", "design", "features", "workspace"]),
+};
+
+const uiLayerBoundaries = defineRule({
+  meta: {
+    messages: {
+      layer: says(
+        "apps/mac/ui/{{from}} cannot import from apps/mac/ui/{{to}}: UI layers flow one way (infra -> design -> features -> app | farm | workspace)",
+        "move the shared code down to a lower layer (infra or design), or lift the caller to the composition layer",
+        "docs/subsystems/app.md",
+      ),
+    },
+  },
+  create(context) {
+    const normalized = context.filename.replaceAll("\\", "/");
+    if (
+      /\.(?:test|spec|story)\.tsx?$/u.test(normalized) ||
+      /(?:^|\/)story\.tsx$/u.test(normalized) ||
+      /\/(?:stories|fixtures)\//u.test(normalized) ||
+      normalized.endsWith("/fakeHost.ts")
+    ) {
+      return {};
+    }
+    const match = /\/apps\/mac\/ui\/([^/]+)\/(.+)$/u.exec(normalized);
+    if (!match) return {};
+    const fromLayer = match[1];
+    const rest = match[2];
+    if (fromLayer === undefined || rest === undefined || !uiLayers.has(fromLayer)) return {};
+    const allowed = allowedUiImports[fromLayer];
+    if (!allowed) return {};
+
+    const checkSpec = (node: NonNullable<Parameters<typeof context.report>[0]["node"]>, spec: unknown) => {
+      if (typeof spec !== "string" || !spec.startsWith(".")) return;
+      const out = `${fromLayer}/${rest}`.split("/").slice(0, -1);
+      for (const part of spec.split("/")) {
+        if (part === "..") {
+          if (out.length === 0) return;
+          out.pop();
+        } else if (part !== ".") {
+          out.push(part);
+        }
+      }
+      const targetLayer = out[0] ?? "";
+      if (uiLayers.has(targetLayer) && !allowed.has(targetLayer)) {
+        context.report({ node, messageId: "layer", data: { from: fromLayer, to: targetLayer } });
+      }
+    };
+
+    return {
+      ImportDeclaration: (node) => checkSpec(node.source, node.source.value),
+      ExportNamedDeclaration: (node) => (node.source ? checkSpec(node.source, node.source.value) : undefined),
+      ExportAllDeclaration: (node) => checkSpec(node.source, node.source.value),
+      ImportExpression: (node) => (node.source.type === "Literal" ? checkSpec(node.source, node.source.value) : undefined),
+    };
+  },
+});
+
 const noComponentInterval = defineRule({
   meta: {
     messages: {
@@ -397,6 +461,7 @@ export default definePlugin({
     "no-cjk-literal": noCjkLiteral,
     "style-attrs": styleAttrs,
     "subpackage-layers": subpackageLayersRule,
+    "ui-layer-boundaries": uiLayerBoundaries,
     "no-cross-package-path": noCrossPackagePath,
     "child-process-door": childProcessDoor,
     "one-absent": oneAbsent,

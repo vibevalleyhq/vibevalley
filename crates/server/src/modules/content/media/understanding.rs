@@ -14,7 +14,7 @@ use vibevalley_protocol::{
 use super::Stop;
 use super::jobs::{Ask, Held, Jobs, Phase, Record, active, id_ok, refused};
 use super::vendor::{Account, Moss, Outcome};
-use crate::modules::team::provider::Use;
+use crate::modules::infra::provider::Use;
 use crate::now;
 
 /// How long the user's approval waits for the orchestrator.

@@ -11,5 +11,5 @@ pub mod work;
 
 /// Every module this build serves.
 pub fn install(hub: &Hub) {
-    infra::core::install(hub);
+    infra::install_health(hub);
 }

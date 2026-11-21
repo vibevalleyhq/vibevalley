@@ -22,12 +22,12 @@ import { SettingsPage, TeamMemoryPage } from "../features/setting";
 import { Keyed } from "../infra/base/dom";
 import { act } from "../infra/bridge";
 import { ready, useRepos } from "../infra/query";
+import { Root } from "../infra/Root";
 import { Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useParams } from "../infra/router";
 import type { RouterHistory } from "../infra/router/history";
 import { prefsNow } from "../infra/state/prefs";
 import { defineStored } from "../infra/state/stored";
 import { places } from "./places";
-import { Root } from "./Root";
 import { Shell } from "./Shell";
 
 const farmRoute = route("/farm/:repo", { params: z.object({ repo: z.string().min(1) }) });

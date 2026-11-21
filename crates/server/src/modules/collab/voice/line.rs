@@ -17,7 +17,7 @@ use vibevalley_i18n::t;
 
 use super::agora::{CallLine, ORCHESTRATOR_MODEL, Pause};
 use crate::lock;
-use crate::modules::content::media::vendor::{Fetch, Request};
+use crate::modules::infra::http::{Fetch, Request};
 use crate::modules::infra::setting::Secret;
 
 const BODY_MAX: usize = 1024 * 1024;
@@ -541,7 +541,7 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::*;
-    use crate::modules::content::media::vendor::{FetchError, Response};
+    use crate::modules::infra::http::{FetchError, Response};
 
     fn line(answer: Answer) -> Line {
         Line::new(

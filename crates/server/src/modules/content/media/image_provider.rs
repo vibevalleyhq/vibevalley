@@ -1,8 +1,9 @@
 //! MOSS image request preparation and cancelable execution. Secrets and signed
 //! URLs never enter errors. Download DNS is pinned to checked public addresses.
 use super::{inputs::refused, png};
+use crate::modules::infra::http::{public_https, public_v4};
+use crate::modules::infra::provider::{IMAGE_MODELS, Use};
 use crate::modules::infra::setting::Setting;
-use crate::modules::team::provider::{IMAGE_MODELS, Use};
 use serde_json::{Value, json};
 use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 use vibevalley_protocol::{ApiError, BizCode, MediaImageFormat, MediaImageRequest, MediaImageUsage};
@@ -199,16 +200,12 @@ impl ImageBackend for Moss {
         Box::pin(async move {
             tokio::time::timeout(Duration::from_secs(60), async {
                 let url = url::Url::parse(address).map_err(|_| Failure::Unknown)?;
-                if !crate::public_http::public_https(&url) {
+                if !public_https(&url) {
                     return Err(Failure::Unknown);
                 }
                 let host = url.host_str().ok_or(Failure::Unknown)?;
                 let addresses: Vec<_> = tokio::net::lookup_host((host, 443)).await.map_err(|_| Failure::Unknown)?.collect();
-                if addresses.is_empty()
-                    || addresses
-                        .iter()
-                        .any(|a| !matches!(a.ip(),std::net::IpAddr::V4(ip) if crate::public_http::public_v4(ip)))
-                {
+                if addresses.is_empty() || addresses.iter().any(|a| !matches!(a.ip(),std::net::IpAddr::V4(ip) if public_v4(ip))) {
                     return Err(Failure::Unknown);
                 }
                 let client = reqwest::Client::builder()

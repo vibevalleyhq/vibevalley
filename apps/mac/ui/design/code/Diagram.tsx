@@ -4,7 +4,7 @@ import { Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { richNative } from "../rich/native";
+import { richNative } from "../../infra/rich";
 
 export interface DiagramProps {
   source: string;

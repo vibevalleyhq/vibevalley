@@ -9,7 +9,7 @@ use std::{
 use vibevalley_protocol::Caller;
 use vibevalley_server::{
     Server,
-    modules::content::media::vendor::{Fetch, Request},
+    modules::infra::http::{Fetch, Request},
 };
 
 struct Network {

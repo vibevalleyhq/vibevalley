@@ -14,7 +14,7 @@ use vibevalley_protocol::{
 };
 
 use super::token::{self, BadCredentials, Issue};
-use crate::modules::content::media::vendor::{Fetch, FetchError, Request, read_max};
+use crate::modules::infra::http::{Fetch, FetchError, Request, read_max};
 use crate::modules::infra::setting::Secret;
 
 /// The agent's uid in every call's channel.
@@ -493,7 +493,7 @@ impl Client {
                 attempt += 1;
                 continue;
             }
-            let bytes = read_max(&mut response.body, 1 << 20, None).unwrap_or_default();
+            let bytes = read_max(&mut response.body, 1 << 20).unwrap_or_default();
             if (200..300).contains(&response.status) {
                 return Ok(bytes);
             }
@@ -579,7 +579,7 @@ mod tests {
     use serde_json::Value;
 
     use super::*;
-    use crate::modules::content::media::vendor::Response;
+    use crate::modules::infra::http::Response;
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]

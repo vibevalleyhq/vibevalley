@@ -642,9 +642,8 @@ pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
     hub.on::<ops::IssueConversationGet>(move |_, input| get(&b, &input.id).map(|_| None));
 }
 
-/// `issue.diff.get` that also tells the game: the user looking at a live
-/// session's changes is a `reviewed` entry (issue.ts `changes`, `core.did`).
-pub fn install_reviewed(hub: &Hub, board: Board, game: Arc<crate::modules::skin::game::Game>) {
+/// `issue.diff.get` that also reports to the caller hook when the user looks at a live session's changes.
+pub fn install_reviewed(hub: &Hub, board: Board, on_reviewed: Arc<dyn Fn(&str) + Send + Sync>) {
     hub.on::<ops::IssueDiffGet>(move |ctx, input| {
         let item = get(&board, &input.id)?;
         let changes = changes_of(&board, &item, input.since_tree.as_deref())?;
@@ -652,10 +651,7 @@ pub fn install_reviewed(hub: &Hub, board: Board, game: Arc<crate::modules::skin:
             && let Some(session) = item.latest_session_id()
             && board.read(|s| s.sessions.iter().any(|h| &h.id == session))
         {
-            game.record(vibevalley_protocol::LedgerEntry::Reviewed(vibevalley_protocol::LedgerEntryReviewed {
-                at: 0,
-                session: session.clone(),
-            }));
+            on_reviewed(session);
         }
         Ok(changes)
     });

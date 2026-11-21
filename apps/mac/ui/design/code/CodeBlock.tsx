@@ -5,8 +5,8 @@ import { Clipboard, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
+import { richNative, type VvCodeCopyEvent } from "../../infra/rich";
 import { Icon } from "../Icon";
-import { richNative, type VvCodeCopyEvent } from "../rich/native";
 import { mix } from "../tone";
 
 const defaultFoldLines = 16;

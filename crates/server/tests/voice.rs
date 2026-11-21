@@ -12,7 +12,7 @@ use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Me
 use vibevalley_server::modules::collab::voice::line::Tunnel;
 use vibevalley_server::modules::collab::voice::moss::{Realtime, Verdict};
 use vibevalley_server::modules::collab::voice::{self, LineConfig, Voice};
-use vibevalley_server::modules::content::media::vendor::{Fetch, FetchError, Request, Response};
+use vibevalley_server::modules::infra::http::{Fetch, FetchError, Request, Response};
 use vibevalley_server::modules::infra::setting::Secret;
 
 const APP: &str = "11111111111111111111111111111111";

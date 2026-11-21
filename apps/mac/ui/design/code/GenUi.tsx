@@ -2,7 +2,7 @@
 // via vibevalley-genui + native nsh elements), with a clean fallback for stock `nsh test`.
 import { Text, View } from "nsh";
 
-import { richNative, type VvGenUiActionEvent } from "../rich/native";
+import { richNative, type VvGenUiActionEvent } from "../../infra/rich";
 
 export interface GenUiProps {
   spec: string;

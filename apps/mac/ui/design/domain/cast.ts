@@ -1,5 +1,15 @@
 import { t } from "@vibevalley/i18n";
-import { BuildValues, type Crop, HeadValues, type Look, type Outfit, OutfitValues, type Species, SpeciesValues } from "@vibevalley/protocol";
+import {
+  BuildValues,
+  type Crop,
+  HeadValues,
+  type Look,
+  type OrchestratorLook,
+  type Outfit,
+  OutfitValues,
+  type Species,
+  SpeciesValues,
+} from "@vibevalley/protocol";
 
 export const speciesLabel: Record<Species, string> = {
   bear: t("web.base.cast.species.bear"),
@@ -89,6 +99,16 @@ export const stagePoses: readonly { pose: Pose; label: string; crop: Crop }[] = 
   { pose: "work", label: t("web.base.cast.pose.work"), crop: "leafy" },
   { pose: "cheer", label: t("web.base.cast.pose.cheer"), crop: "wheat" },
   { pose: "worry", label: t("web.base.cast.pose.worry"), crop: "withered" },
+];
+
+// Sprite manager-<id>; farmer is the plain one.
+export const orchestratorLooks: readonly { readonly id: OrchestratorLook; readonly name: string; readonly blurb: string }[] = [
+  { id: "farmer", name: t("web.orchestrator.looks.farmer.name"), blurb: t("web.orchestrator.looks.farmer.blurb") },
+  { id: "foreman", name: t("web.orchestrator.looks.foreman.name"), blurb: t("web.orchestrator.looks.foreman.blurb") },
+  { id: "auntie", name: t("web.orchestrator.looks.auntie.name"), blurb: t("web.orchestrator.looks.auntie.blurb") },
+  { id: "grandpa", name: t("web.orchestrator.looks.grandpa.name"), blurb: t("web.orchestrator.looks.grandpa.blurb") },
+  { id: "gardener", name: t("web.orchestrator.looks.gardener.name"), blurb: t("web.orchestrator.looks.gardener.blurb") },
+  { id: "robot", name: t("web.orchestrator.looks.robot.name"), blurb: t("web.orchestrator.looks.robot.blurb") },
 ];
 
 /** A swatch, or the parchment colour for one that is not #rrggbb. */

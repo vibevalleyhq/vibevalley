@@ -1,10 +1,10 @@
 import { cleanup, type JSX } from "nsh";
 
-import { createFrames, frames, FramesContext } from "../infra/frame";
-import { QueryProvider, refetchOnRelink, useQueryClient } from "../infra/query";
-import { Router } from "../infra/router";
-import type { RouterHistory } from "../infra/router/history";
-import { pageRegistry, RegistryContext } from "../infra/state/atom";
+import { createFrames, frames, FramesContext } from "./frame";
+import { QueryProvider, refetchOnRelink, useQueryClient } from "./query";
+import { Router } from "./router";
+import type { RouterHistory } from "./router/history";
+import { pageRegistry, RegistryContext } from "./state/atom";
 
 export function Root(props: { history?: RouterHistory; children: JSX.Element }) {
   return (
