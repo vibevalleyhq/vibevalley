@@ -53,7 +53,7 @@ export function PendingApprovals(props: { conversationId: string }) {
                   {t("web.orchestrator.approval.title")}
                 </Text>
               </View>
-              <View class="h-5 flex-row items-center rounded-full px-2" style={{ backgroundColor: mix("wheat", 0.22) }}>
+              <View class="h-5 flex-row items-center rounded-full bg-warn-soft px-2">
                 <Text class="font-mono text-2xs font-medium text-warn-ink tabular-nums">{String(pending().length)}</Text>
               </View>
             </View>

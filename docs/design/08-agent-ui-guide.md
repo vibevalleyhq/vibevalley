@@ -16,7 +16,7 @@
 
 1. **颜色与字号全部走令牌，写死 hex 必拒**：
    - 工作台只使用源自 `design/tokens.json` 并生成到 `apps/mac/ui/vv/theme.json` 的颜色类名（`bg-page` / `bg-side` / `bg-rail` / `text-ink` / `text-muted` / `border-line` / `bg-accent` / `leaf` / `wheat` / `berry` / `water` 等）和 `apps/mac/ui/nsh.json` 定义的 `fontSize` / `radius` / `ease` / `shadow`。
-   - 需要随主题自适应的半透明底色一律调用 `apps/mac/ui/vv/web/ui/tone.ts` 的 `mix(name, weight)`，不写硬编码 `#...29` 拼接或静态 hex。
+   - 需要随主题自适应的半透明底色一律调用 `apps/mac/ui/vv/web/ui/tone.ts` 的 `mix(name, weight)`；状态标签与提醒优先使用语义类组合（`bg-ok-soft text-ok-ink`、`bg-warn-soft text-warn-ink`、`bg-bad-soft text-berry`、`bg-hover text-muted`），工作台 UI 禁止直接拿像素画布色（如 `bg-hat`、`text-bark-900`）或手写 `mix("wheat", 0.22)` 当浅/深双主题状态徽标。
    - 新增语义色用途必须同步写入 `design/tokens.json` 后执行 `vpx scripts/gen/tokens.ts` 重生成，不直接手改生成产物。
 2. **遵循 `nsh` 写法规范（[vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)）**：
    - 文字颜色与字号不会从父级 `<View>` 继承，所有字体样式直接挂在 `<Text>` 上。
@@ -24,8 +24,8 @@
    - 多状态/变体样式表使用 `Record<Variant, string>` 映射每行写一档；调用方传入的 `class?: string` 仅补位置、外边距或弹性拉伸，需要覆盖组件内置背景/高度/圆角时显式给组件增开变体参数（`tone` / `size`）。
 3. **单行防撑破、控件复用与圆角降档**：
    - 任何列表行、卡片标题或带徽标的水平行，弹性文字父容器必须带 `min-w-0 flex-1`，文字节点带 `truncate`；管理类列表页用 `<PageBody width="manage">`（`max-w-5xl`），文档/设置页用 `prose`（`max-w-3xl`）以免宽屏拉伸过长。
-   - 开关与复选框一律复用 `Toggle`（行内用 `bare`）与 `Checkbox`，多态范围切换用 `Segmented`（支持 `count` / `countTone`），禁止手搓 `<Switch` 或 `role="checkbox"`。
-   - 外框 `rounded-lg` (`8px`) 内层嵌 `rounded-md` (`6px`) 或 `rounded-sm` (`4px`)，内层圆角始终小于等于外框减内边距。
+   - 控件一律优先复用共用原语：检索框用 `SearchField`，动作链接用 `ButtonLink`，数量徽标用 `CountPill`，行内报错/通知用 `Banner`，键帽提示用 `Kbd`，侧栏折叠组用 `SidebarSection`，空搜索用 `Empty` (`compact`)，开关与复选框用 `Toggle` / `Checkbox`，分段切换用 `Segmented`，禁止在业务页手搓第二份。
+   - 外框 `rounded-lg` (`8px`) 内层嵌 `rounded-md` (`6px`) 或 `rounded-sm` (`4px`)，内层圆角始终小于等于外框减内边距；宿主表面（`apps/mac/ui/surfaces/`）统一取 `radius.sm`/`md`/`lg`/`tray` 令牌与 `surfaces/shared.tsx` 的 `focusRing(p())`。
 4. **选中态与聚焦态零位移原则**：
    - 选中、聚焦或激活状态严禁改变元素外盒尺寸或挤动兄弟元素：禁止在选中态切换不同的 `borderWidth`（如 `border` 与 `border-2` 互切、`borderWidth: 1` 与 `0`/`2` 互切）、条件 `padding`、横排自适应宽度控件与侧栏行上的字重跳变（`font-normal` ↔ `font-medium`/`font-semibold`），以及向水平布局内插入流内占宽元素。
    - 需要更强描边、左竖条或聚焦条时，保持外框恒定 `border`（无框态配 `border-transparent`），并在容器内叠放 `pointer-events-none absolute inset-0`（或 GPUI `.absolute()`）的非占位指示层；横排选项卡/胶囊统一保持 `font-medium`（静态规则由 `scripts/audit/ui-tokens.ts` 的 `selection-layout-shift` 检查）。

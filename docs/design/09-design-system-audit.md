@@ -47,5 +47,5 @@
 
 ## 9.5 静态检查覆盖边界
 
-- **工作台（`apps/mac/ui/vv/web/`）**：`scripts/audit/ui-tokens.ts` 对 `app/`、`features/`、`ui/` 下全部 `.ts`/`.tsx` 执行 AST 扫描，阻断硬编码颜色（十六进制、`rgb()`/`rgba()`、hex-alpha 拼接）、任意 Tailwind 类名以及裸 `<Switch` / `role="checkbox"`（`OutlineEditor.tsx` 5 态任务格与 `ConnectorsPage.tsx` 第三方品牌色配置了精确规则豁免）；类型检查与打包通过 `nsh check` / `nsh build`（`vp run mac:check`）执行。
-- **外壳面板与扩展组件（`apps/mac/ui/surfaces/`、`apps/mac/ui/components/`）**：因不走 Tailwind class 且位于根目录 `vite.config.ts` 的 `lint.ignorePatterns`（`"apps/mac/ui/**"`）下，尚未接入 `oxlint` 类型规则或 `ui-tokens.ts` 颜色审计。
+- **工作台与原生宿主 UI（`apps/mac/ui/{vv/web,surfaces,components}/`）**：`scripts/audit/ui-tokens.ts` 对工作台（`vv/web/{app,features,ui}/`）及原生宿主面板与扩展组件（`surfaces/`、`components/`）下的 `.ts`/`.tsx` 执行 AST 扫描，阻断硬编码颜色（十六进制、`rgb()`/`rgba()`、hex-alpha 拼接）、任意 Tailwind 类名、裸 `<Switch` / `role="checkbox"` 以及选择/激活态几何位移（`selection-layout-shift`；`OutlineEditor.tsx` 5 态任务格与 `ConnectorsPage.tsx` 第三方品牌色配置了精确规则豁免）；类型检查与打包通过 `nsh check` / `nsh build`（`vp run mac:check`）执行。
+- **根级 `oxlint` 覆盖盲区**：由于 `vite.config.ts` 的 `lint.ignorePatterns` 仍包含 `"apps/mac/ui/**"`，外壳面板与扩展组件尚未接入根目录 `oxlint` 类型规则，仅依赖 `nsh check` 与 `scripts/audit/ui-tokens.ts` 把关。
