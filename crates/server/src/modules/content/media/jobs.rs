@@ -1477,8 +1477,10 @@ impl Jobs {
             r.phase = Phase::Generating;
             r.problem.clear();
         })?;
+        // Snapshot the Generating state before scheduling so the worker cannot race ahead of the caller's view.
+        let updated = self.found(r.id())?;
         self.schedule();
-        self.found(r.id())
+        Ok(updated)
     }
 
     pub fn resume(&self, id: &str) -> Result<MediaSpeechJob, ApiError> {

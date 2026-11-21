@@ -78,20 +78,27 @@ fn sanitize_whiteboard_element_json(artifact_type: Option<ArtifactType>, path: &
         return Ok(canonical_text.to_string());
     };
     let elem_type = map.get("type").and_then(Value::as_str);
-    if elem_type == Some("svg")
-        && let Some(svg) = map.get("svg").and_then(Value::as_str)
-    {
+    let is_svg_like = matches!(elem_type, Some("svg" | "sticker"));
+    let is_html = elem_type == Some("html");
+    let mut dirty = false;
+    if is_svg_like && let Some(svg) = map.get("svg").and_then(Value::as_str) {
         let clean = sanitize_whiteboard_svg(svg);
         map.insert("svg".into(), Value::String(clean));
-        return serde_json::to_string(&parsed).map_err(crate::base::internal);
+        dirty = true;
     }
-    if elem_type == Some("html")
-        && let Some(html) = map.get("html").and_then(Value::as_str)
-    {
+    if let Some(sticker_svg) = map.get("stickerSvg").and_then(Value::as_str) {
+        let clean = sanitize_whiteboard_svg(sticker_svg);
+        map.insert("stickerSvg".into(), Value::String(clean));
+        dirty = true;
+    }
+    if is_html && let Some(html) = map.get("html").and_then(Value::as_str) {
         let hp = store_html_problem(html);
         if !hp.is_empty() {
             return Err(refused(hp));
         }
+    }
+    if dirty {
+        return serde_json::to_string(&parsed).map_err(crate::base::internal);
     }
     Ok(canonical_text.to_string())
 }
@@ -929,5 +936,24 @@ mod tests {
             .unwrap();
         assert!(dc.value.as_deref().unwrap().contains(r#""value":"compact""#));
         artifacts.close();
+    }
+
+    #[test]
+    fn sanitize_whiteboard_element_strips_unsafe_sticker_and_svg_markup() {
+        let dirty_card = r#"{"id":"c1","type":"shape","shape":"card","title":"Demo","stickerSvg":"<svg viewBox='0 0 64 64' onload='alert(1)'><script>bad()</script><rect x='4' y='4' width='56' height='56' onclick='x()'/><path d='M8 8L56 56'/><circle cx='32' cy='32' r='8'/><a href='https://evil.example'><text>Hi</text></a></svg>"}"#;
+        let clean_card = sanitize_whiteboard_element_json(Some(ArtifactType::Whiteboard), "elements/c1", dirty_card).unwrap();
+        assert!(!clean_card.contains("<script"));
+        assert!(!clean_card.contains("onload"));
+        assert!(!clean_card.contains("onclick"));
+        assert!(!clean_card.contains("evil.example"));
+        assert!(clean_card.contains("<rect"));
+        assert!(clean_card.contains("<path"));
+        assert!(clean_card.contains("<circle"));
+
+        let dirty_sticker = r#"{"id":"st1","type":"sticker","x":10,"y":20,"w":80,"h":80,"svg":"<svg viewBox='0 0 64 64' onload='evil()'><script>x</script><circle cx='32' cy='32' r='20'/></svg>"}"#;
+        let clean_sticker = sanitize_whiteboard_element_json(Some(ArtifactType::Whiteboard), "elements/st1", dirty_sticker).unwrap();
+        assert!(!clean_sticker.contains("<script"));
+        assert!(!clean_sticker.contains("onload"));
+        assert!(clean_sticker.contains("<circle"));
     }
 }

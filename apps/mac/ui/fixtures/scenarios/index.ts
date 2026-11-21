@@ -1,4 +1,5 @@
 import type { ChatMessage, IssueHistory, SessionEvent, StateFrame } from "@vibevalley/protocol";
+import { StateFrame as StateFrameSchema } from "@vibevalley/protocol/schema";
 
 import workbenchResponsesJson from "../workbench/responses.json";
 import denseRaw from "./dense/state.json";
@@ -196,7 +197,7 @@ function responsesFor(density: ScenarioDensity, frame: StateFrame): Record<strin
 }
 
 function asFrame(raw: unknown): StateFrame {
-  return raw as StateFrame;
+  return StateFrameSchema.parse(raw);
 }
 
 const rawFrames: Record<ScenarioDensity, StateFrame> = {

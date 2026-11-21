@@ -70,6 +70,8 @@ const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
   "apps/mac/ui/features/connector/ConnectorsPage.tsx": ["hardcoded-color"],
   // Sandboxed WebView HTML CSS custom properties (--vv-*).
   "apps/mac/ui/features/artifact/shell.ts": ["hardcoded-color"],
+  // Pure whiteboard SVG illustrations, canvas themes, and WebView runtime stylesheet.
+  "apps/mac/ui/features/artifact/whiteboard.ts": ["hardcoded-color"],
 };
 
 interface AstNode {

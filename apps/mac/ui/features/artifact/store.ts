@@ -23,6 +23,13 @@ import type { ShellTheme } from "./shell";
 /** Live state of whichever artifact viewer is currently mounted, attached to outgoing chat/reply messages. */
 export const activeArtifactViewContext = signal<ArtifactViewContext | undefined>(undefined);
 
+/** Monotonic: consumers react to a bump, never to the number itself. */
+export const artifactChatFocus = signal(0);
+
+export function requestArtifactChatFocus(): void {
+  artifactChatFocus.set(untracked(artifactChatFocus) + 1);
+}
+
 export function clearActiveArtifactViewContext(): void {
   activeArtifactViewContext.set(undefined);
 }

@@ -50,7 +50,7 @@ export function Palette() {
   };
 
   return (
-    <View class="flex-1 overflow-hidden rounded-xl border border-line bg-elevated">
+    <View testID="palette-root" class="flex-1 overflow-hidden rounded-xl border border-line bg-elevated">
       <Command
         items={f()?.items ?? []}
         query={mode() === "commands" ? undefined : (f()?.query ?? "")}

@@ -22,8 +22,6 @@ const root = resolve(import.meta.dirname, "../..");
 const uiDir = resolve(root, "apps/mac/ui");
 const nsh = resolve(root, ".tools/bin/nsh");
 
-const isShotProbe = (file: string) => /(?:^|\/)(?:[^/]+\.)?shots\.test\.tsx$/u.test(file);
-
 function parseArgs(argv: string[]) {
   let concurrency = Number(process.env.MAC_TESTS_CONCURRENCY ?? 4);
   let filter = "";
@@ -106,7 +104,7 @@ async function main() {
     exclude: [".nsh/**", "build/**", "node_modules/**"],
   })
     .map((f) => f.replaceAll("\\", "/"))
-    .filter((f) => !isShotProbe(f) && (!filter || f.includes(filter)))
+    .filter((f) => !filter || f.includes(filter))
     .toSorted();
 
   if (all.length === 0) {

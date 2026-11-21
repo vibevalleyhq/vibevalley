@@ -13,6 +13,7 @@ export interface StoreViewerProps {
   readonly artifact: Artifact;
   readonly covered?: boolean;
   readonly onPresent?: (on: boolean) => void;
+  readonly onOpenChat?: () => void;
   readonly frameClass?: string;
 }
 

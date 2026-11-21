@@ -146,6 +146,7 @@
     "command": "命令",
     "artifactContext": "当前上下文：{title}",
     "artifactSlide": "第 {n} 页",
+    "artifactSelected": "已选 {n} 个元素",
     "clearContext": "移除本次附带的上下文",
     "runningHint": "正在处理中，可直接补充说明或点击停止"
   },

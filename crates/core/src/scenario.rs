@@ -1826,4 +1826,31 @@ mod tests {
         assert!(f5.seq > f4.seq);
         assert_eq!(f5.state.issues[0].status, IssueStatus::Done);
     }
+
+    #[test]
+    fn committed_scenario_fixtures_match_presets() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/mac/ui/fixtures/scenarios");
+        for density in Density::ALL {
+            let target = root.join(density.slug()).join("state.json");
+            let expected = serde_json::to_value(preset(density)).expect("serialize preset value");
+            let raw = std::fs::read_to_string(&target).unwrap_or_else(|e| {
+                panic!(
+                    "missing scenario fixture {} ({e}); run: cargo run -p vibevalley-core --features scenarios --example export_scenarios -- apps/mac/ui/fixtures/scenarios",
+                    target.display()
+                )
+            });
+            let actual: serde_json::Value = serde_json::from_str(&raw).unwrap_or_else(|e| {
+                panic!(
+                    "invalid scenario fixture {} ({e}); run: cargo run -p vibevalley-core --features scenarios --example export_scenarios -- apps/mac/ui/fixtures/scenarios",
+                    target.display()
+                )
+            });
+            assert_eq!(
+                actual,
+                expected,
+                "scenario fixture {} is out of date; run: cargo run -p vibevalley-core --features scenarios --example export_scenarios -- apps/mac/ui/fixtures/scenarios",
+                target.display()
+            );
+        }
+    }
 }

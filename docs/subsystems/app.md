@@ -135,5 +135,5 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 - `vp run rust:check`：`apps/mac` 和它用的 crate 的格式、clippy 与测试（`apps/mac/src/pixel/tests.rs` 用真的素材和替身服务端的样例画每个场景）。
 - `vp run mac:check`：`apps/mac/ui` 的 nsh 类型检查与打包。
-- `apps/mac/ui/app/*.test.tsx`、`apps/mac/ui/features/{pkm,artifact}/*.test.ts`：`nsh/test` 写的页面与领域逻辑测试和截图，用样例的 `Transport`。
-- 在真的应用上：照 [验收的应用分册](.agents/skills/vv-acceptance/references/app.md)，用 `VIBEVALLEY_DEBUG_SCRIPT` 走一遍并截图。
+- `apps/mac/ui/{app,workspace}/*.test.{ts,tsx}`、`apps/mac/ui/features/**`: `nsh/test` 写的页面、工作区外壳、主题令牌与领域逻辑测试，用样例的 `Transport`。
+- 在真的应用上：一键运行 `vp run ui:gallery`（[画廊脚本](scripts/audit/ui-gallery.ts)）或按 [验收的应用分册](.agents/skills/vv-acceptance/references/app.md)，用 `VIBEVALLEY_DEBUG_SCRIPT` 走一遍并截图。

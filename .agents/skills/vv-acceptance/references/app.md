@@ -18,6 +18,16 @@
 
 改宿主项目加载或终端恢复时，运行 `python3 scripts/release/verify-workspace-store.py target/debug/vibevalley-mac`。脚本从窗口动作打开新目录，并保持另一个 SQLite 写事务到下一次绘制。两个入口都应成功保存新项目。脚本只使用临时目录。
 
+## 一键验收画廊（推荐先跑）
+
+需要核对一组固定高频页面（`/issues`、`/chat`、`/runs`、`/agents`、`/pkm`、`/settings`、`/library`、`/workspace` 与 `/farm`，含 Light/Dark 与窄窗）并生成汇总报告时，直接运行：
+
+```bash
+vp run ui:gallery -- --out /tmp/vv-app-gallery
+```
+
+脚本会并发跑完 `mac-tests` 并将结果与 `SCENARIO_MATRIX` 汇总进输出目录，构建 `--features shot` 原生应用后，分别以 `typical` / `edge` 场景启动隔离窗口完成截图，硬断言每个 `<场景>-dump.json` 中 `loaded === true`、无 `load_error` 且所有视图 `errors` 为空，最后写出 `/tmp/vv-app-gallery/index.html`。排查单点交互或定制步骤时，按下面「步骤」手动写脚本。
+
 ## 步骤
 
 1. 建一个临时目录，写脚本文件。一行一步，`#` 开头的是注释；步骤在项目读完以后开始，每步之间隔 400 毫秒：

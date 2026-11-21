@@ -3,7 +3,22 @@
 // issue, an html page with two versions said in #general, a deck of slides
 // with speaker notes, and one the user made. Pages open by id, an html
 // version's page by id and version; a submit is taken as it is.
-import type { Artifact, ArtifactContent, ArtifactId, Block, BlockAck, BlockId, BlockSnapshot, BlockType, IssueId, TextSpan } from "@vibevalley/protocol";
+import type {
+  Artifact,
+  ArtifactContent,
+  ArtifactEntry,
+  ArtifactEntryBatchRequest,
+  ArtifactEntryBatchResult,
+  ArtifactEntrySnapshot,
+  ArtifactId,
+  Block,
+  BlockAck,
+  BlockId,
+  BlockSnapshot,
+  BlockType,
+  IssueId,
+  TextSpan,
+} from "@vibevalley/protocol";
 
 const min = 60_000;
 const now = Date.now();
@@ -101,6 +116,23 @@ const artifacts: Artifact[] = [
     at: now - 26 * 60 * min,
     updated: now - 25 * 60 * min,
   },
+  {
+    id: id("art-launch-board"),
+    title: "产品发布时间线",
+    body: "store",
+    artifactType: "whiteboard",
+    isDefault: false,
+    channel: "general",
+    said: { channel: "general", number: 5 },
+    issue: "i22" as IssueId,
+    by: "orchestrator",
+    byName: "助手",
+    version: 0,
+    seq: 18,
+    versions: [],
+    at: now - 40 * min,
+    updated: now - 2 * min,
+  },
 ];
 
 const contents: Record<string, Record<number, string>> = { "art-login": { 1: page1, 2: page2 }, "art-deck": { 1: deck } };
@@ -142,6 +174,240 @@ const blocks: Record<string, Block[]> = {
 const one = (p: unknown) => artifacts.find((a) => a.id === (p as { id: string }).id);
 const missing = { bizCode: 100004, message: "artifact not found" };
 
+function storeEntry(artifact: ArtifactId, path: string, valueObj: unknown, by = "orchestrator", rev = 1): ArtifactEntry {
+  const value = typeof valueObj === "string" ? valueObj : JSON.stringify(valueObj);
+  return {
+    artifactId: artifact,
+    path,
+    kind: "json",
+    mime: "application/json",
+    size: value.length,
+    rev,
+    updatedBy: by,
+    updated: now - 5 * min,
+    value,
+  };
+}
+
+const initialBoardEntries = (): Map<string, ArtifactEntry> => {
+  const aid = id("art-launch-board");
+  const rows: ArtifactEntry[] = [
+    storeEntry(aid, "board/meta", { title: "产品发布时间线", mode: "board", grid: true }),
+    storeEntry(aid, "elements/t-title", { id: "t-title", type: "text", variant: "title", x: 72, y: 36, w: 680, h: 48, label: "产品发布时间线" }),
+    storeEntry(aid, "elements/t-sub", {
+      id: "t-sub",
+      type: "text",
+      variant: "subtitle",
+      x: 72,
+      y: 84,
+      w: 680,
+      h: 28,
+      label: "从方案锁定到正式交付上线：全链路协同冲刺 12 天",
+      highlight: "12 天",
+    }),
+    storeEntry(aid, "elements/tl-main", {
+      id: "tl-main",
+      type: "timeline",
+      x: 72,
+      y: 268,
+      w: 840,
+      h: 96,
+      fill: "peach",
+      points: [
+        { x: 76, y: 356 },
+        { x: 240, y: 350 },
+        { x: 430, y: 312 },
+        { x: 640, y: 306 },
+        { x: 890, y: 264 },
+      ],
+      milestones: [
+        { t: 0.04, label: "Day 1", kind: "major" },
+        { t: 0.16, label: "Day 2", kind: "major" },
+        { t: 0.27, label: "Day 3", kind: "major" },
+        { t: 0.38, label: "4", kind: "minor" },
+        { t: 0.49, label: "5", kind: "minor", caption: "联调冲刺 4 天" },
+        { t: 0.6, label: "6", kind: "minor" },
+        { t: 0.72, label: "Day 7", kind: "major" },
+        { t: 0.85, label: "Day 8", kind: "major" },
+        { t: 0.96, label: "9", kind: "minor" },
+      ],
+    }),
+    storeEntry(aid, "elements/c-1", {
+      id: "c-1",
+      type: "shape",
+      shape: "card",
+      x: 64,
+      y: 174,
+      w: 160,
+      h: 108,
+      title: "锁定核心范围",
+      body: "核心功能已拍板",
+      fill: "sun",
+      sticker: "berry-lock",
+    }),
+    storeEntry(aid, "elements/c-2", {
+      id: "c-2",
+      type: "shape",
+      shape: "card",
+      x: 112,
+      y: 422,
+      w: 168,
+      h: 120,
+      title: "确认发布清单",
+      body: "拆解到每天交付物",
+      fill: "sun",
+      sticker: "chart-board",
+    }),
+    storeEntry(aid, "elements/c-3", {
+      id: "c-3",
+      type: "shape",
+      shape: "card",
+      x: 246,
+      y: 146,
+      w: 168,
+      h: 110,
+      title: "确定资源预算",
+      body: "算力与配额已就位",
+      fill: "sun",
+      sticker: "price-tag",
+    }),
+    storeEntry(aid, "elements/c-4", {
+      id: "c-4",
+      type: "shape",
+      shape: "card",
+      x: 298,
+      y: 372,
+      w: 170,
+      h: 108,
+      title: "批产核心模块",
+      body: "23 项任务并发推进",
+      fill: "sun",
+      sticker: "crate",
+    }),
+    storeEntry(aid, "elements/c-5", {
+      id: "c-5",
+      type: "shape",
+      shape: "card",
+      x: 640,
+      y: 114,
+      w: 176,
+      h: 114,
+      title: "准点抵达验收",
+      body: "进入主站发布通道",
+      fill: "peach",
+      sticker: "storefront",
+    }),
+    storeEntry(aid, "elements/c-6", {
+      id: "c-6",
+      type: "shape",
+      shape: "card",
+      x: 752,
+      y: 356,
+      w: 176,
+      h: 118,
+      title: "灰度与全量验证",
+      body: "先验 12 组，再放量 500",
+      fill: "peach",
+      sticker: "bowl",
+    }),
+    storeEntry(aid, "elements/s-truck", { id: "s-truck", type: "sticker", sticker: "truck", x: 462, y: 244, w: 112, h: 68, label: "运输交付" }),
+    storeEntry(aid, "elements/s-mascot", { id: "s-mascot", type: "sticker", sticker: "mascot", x: 752, y: 26, w: 72, h: 72, label: "老周" }),
+    storeEntry(aid, "elements/t-callout", {
+      id: "t-callout",
+      type: "text",
+      variant: "callout",
+      icon: "⚠",
+      x: 492,
+      y: 404,
+      w: 204,
+      h: 48,
+      label: "合包检查需等待终版配置锁定",
+    }),
+    storeEntry(aid, "elements/a-1", {
+      id: "a-1",
+      type: "arrow",
+      curve: "straight",
+      head: "none",
+      stroke: "#c96e52",
+      from: { id: "c-1", side: "s" },
+      to: { x: 112, y: 354 },
+    }),
+    storeEntry(aid, "elements/a-2", {
+      id: "a-2",
+      type: "arrow",
+      curve: "straight",
+      head: "none",
+      stroke: "#c96e52",
+      from: { id: "c-2", side: "n" },
+      to: { x: 204, y: 352 },
+    }),
+    storeEntry(aid, "elements/a-3", {
+      id: "a-3",
+      type: "arrow",
+      curve: "straight",
+      head: "none",
+      stroke: "#c96e52",
+      from: { id: "c-3", side: "s" },
+      to: { x: 298, y: 338 },
+    }),
+    storeEntry(aid, "elements/a-4", {
+      id: "a-4",
+      type: "arrow",
+      curve: "straight",
+      head: "none",
+      stroke: "#c96e52",
+      from: { id: "c-4", side: "n" },
+      to: { x: 392, y: 320 },
+    }),
+    storeEntry(aid, "elements/a-5", {
+      id: "a-5",
+      type: "arrow",
+      curve: "straight",
+      head: "none",
+      stroke: "#c96e52",
+      from: { id: "c-5", side: "s" },
+      to: { x: 676, y: 300 },
+    }),
+    storeEntry(aid, "elements/a-6", {
+      id: "a-6",
+      type: "arrow",
+      curve: "straight",
+      head: "none",
+      stroke: "#c96e52",
+      from: { id: "c-6", side: "n" },
+      to: { x: 780, y: 282 },
+    }),
+    storeEntry(aid, "elements/a-callout", {
+      id: "a-callout",
+      type: "arrow",
+      curve: "smooth",
+      head: "arrow",
+      stroke: "#c96e52",
+      from: { id: "t-callout", side: "e" },
+      to: { id: "c-6", side: "w" },
+    }),
+    storeEntry(aid, "presence/orch", { id: "orch", name: "主助手", color: "coral", x: 540, y: 88 }),
+    storeEntry(aid, "presence/helper", { id: "helper", name: "老周", color: "teal", x: 822, y: 74 }),
+    storeEntry(aid, "presence/user", { id: "user", name: "小林", color: "blue", x: 634, y: 454 }),
+  ];
+  return new Map(rows.map((e) => [e.path, e]));
+};
+
+const storeEntriesByArtifact = new Map<string, Map<string, ArtifactEntry>>([["art-launch-board", initialBoardEntries()]]);
+const storeSeqByArtifact = new Map<string, number>([["art-launch-board", 18]]);
+
+const listEntriesFor = (req: { id: string; prefix?: string }): ArtifactEntrySnapshot | typeof missing => {
+  const a = one(req);
+  if (!a) return missing;
+  const map = storeEntriesByArtifact.get(a.id) ?? new Map<string, ArtifactEntry>();
+  const prefix = req.prefix;
+  const entries = [...map.values()].filter((e) => (prefix ? e.path.startsWith(prefix) : true));
+  const seq = storeSeqByArtifact.get(a.id) ?? a.seq;
+  return { artifact: { ...a, seq }, seq, entries };
+};
+
+const defaultEntry = initialBoardEntries().get("elements/c-1")!;
+
 /** `{ op: data }`, a function of the call's payload where the answer depends on it. */
 export const responses: Record<string, unknown> = {
   "artifact.list": Object.assign(
@@ -165,6 +431,53 @@ export const responses: Record<string, unknown> = {
       return a ? { artifact: a, blocks: blocks[a.id] ?? [] } : missing;
     },
     { toJSON: (): BlockSnapshot => ({ artifact: artifacts[0], blocks: blocks["art-plan"] ?? [] }) },
+  ),
+  "artifact.entry.list": Object.assign((p: { id: string; prefix?: string }): ArtifactEntrySnapshot | typeof missing => listEntriesFor(p), {
+    toJSON: (): ArtifactEntrySnapshot => listEntriesFor({ id: "art-launch-board" }) as ArtifactEntrySnapshot,
+  }),
+  "artifact.entry.get": Object.assign(
+    (p: { id: string; path: string }): ArtifactEntry | typeof missing => {
+      const a = one(p);
+      if (!a) return missing;
+      return storeEntriesByArtifact.get(a.id)?.get(p.path) ?? missing;
+    },
+    { toJSON: (): ArtifactEntry => defaultEntry },
+  ),
+  "artifact.entry.batch": Object.assign(
+    (p: ArtifactEntryBatchRequest): ArtifactEntryBatchResult | typeof missing => {
+      const a = one(p);
+      if (!a) return missing;
+      let map = storeEntriesByArtifact.get(a.id);
+      if (!map) {
+        map = new Map();
+        storeEntriesByArtifact.set(a.id, map);
+      }
+      const updated: ArtifactEntry[] = [];
+      for (const w of p.writes) {
+        if (w.op === "delete") {
+          map.delete(w.path);
+          continue;
+        }
+        const prev = map.get(w.path);
+        let nextVal = w.value ?? prev?.value ?? "{}";
+        if (w.op === "patch" && prev?.value && w.value) {
+          const prevObj = JSON.parse(prev.value) as Record<string, unknown>;
+          const patchObj = JSON.parse(w.value) as Record<string, unknown>;
+          for (const [k, v] of Object.entries(patchObj)) {
+            if (v === null) delete prevObj[k];
+            else prevObj[k] = v;
+          }
+          nextVal = JSON.stringify(prevObj);
+        }
+        const entry = storeEntry(a.id, w.path, nextVal, "user", (prev?.rev ?? 0) + 1);
+        map.set(w.path, entry);
+        updated.push(entry);
+      }
+      const nextSeq = (storeSeqByArtifact.get(a.id) ?? a.seq) + 1;
+      storeSeqByArtifact.set(a.id, nextSeq);
+      return { applied: true, seq: nextSeq, entries: updated, conflicts: [] };
+    },
+    { toJSON: (): ArtifactEntryBatchResult => ({ applied: true, seq: 19, entries: [defaultEntry], conflicts: [] }) },
   ),
   "artifact.submit": Object.assign(
     (p: { batchId: string; lastSeq: number }): BlockAck => ({ batchId: p.batchId, seq: p.lastSeq + 1, results: [], blocks: [] }),
