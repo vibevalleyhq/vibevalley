@@ -250,7 +250,7 @@ function Filter(props: { on: boolean; label: string; testid: string; onToggle: (
       testID={props.testid}
       accessibilityState={{ selected: props.on }}
       onPress={() => props.onToggle()}
-      class={`group h-6 justify-center rounded-full border px-2.5 transition duration-120 ease-out ${props.on ? "border-faint bg-selected" : "border-transparent hover:bg-hover"}`}
+      class={`group h-6 justify-center rounded-full border px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.on ? "border-accent bg-selected" : "border-transparent hover:bg-hover"}`}
     >
       <Text class={`text-xs font-medium ${props.on ? "text-ink" : "text-muted group-hover:text-ink"}`}>{props.label}</Text>
     </View>

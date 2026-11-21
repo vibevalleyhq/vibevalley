@@ -228,18 +228,23 @@ export function TipBubble(props: { text: string }) {
   const p = () => tok();
   return (
     <Tooltip
-      delay={350}
+      delay={300}
       offset={6}
+      margin={8}
       style={{
         maxWidth: 260,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
         borderRadius: 6,
-        backgroundColor: p().primary,
+        backgroundColor: p().ink,
+        borderWidth: 1,
+        borderColor: p().border,
       }}
-      class="shadow-float"
+      class="shadow-float transition duration-120 ease-out"
+      startingClass="opacity-0"
+      endingClass="opacity-0"
     >
-      <Text style={{ fontSize: 11, lineHeight: 15, color: p().onPrimary }}>{props.text}</Text>
+      <Text style={{ fontSize: 12, lineHeight: 16, color: p().surface }}>{props.text}</Text>
     </Tooltip>
   );
 }
@@ -425,7 +430,7 @@ export function IconButton(props: {
       onMouseLeave={() => hovered.set(false)}
       accessibilityLabel={props.label}
       tooltip={<TipBubble text={props.label} />}
-      class="active:scale-[0.96]"
+      activeStyle={props.disabled ? undefined : { opacity: 0.82 }}
       style={{
         width: 22,
         height: 22,
@@ -469,7 +474,7 @@ export function PrimaryButton(props: { label: string; onPress: () => void; disab
     <Button
       onPress={props.onPress}
       disabled={props.disabled}
-      class={props.disabled ? "" : "active:scale-[0.98]"}
+      activeStyle={props.disabled ? undefined : { opacity: 0.82 }}
       style={{
         height: 28,
         paddingHorizontal: 12,

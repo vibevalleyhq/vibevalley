@@ -29,7 +29,7 @@ import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
-import { Empty } from "../../ui/layout";
+import { ActiveBar, Empty } from "../../ui/layout";
 import { type MoreItem, MoreMenu } from "../../ui/MoreMenu";
 import { Bubble } from "../../ui/Tip";
 import { toast } from "../../ui/toasts";
@@ -197,10 +197,13 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
                               testID={`artifact-row-${a().id}`}
                               accessibilityState={{ selected: selected() }}
                               class={[
-                                "flex-row items-start gap-2 rounded-md px-2 py-1.5 transition duration-120 ease-out",
+                                "relative flex-row items-start gap-2 rounded-md px-2 py-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus",
                                 a().id === id() ? "bg-selected" : selected() ? "hover:bg-hover lg:bg-selected" : "hover:bg-hover",
                               ].join(" ")}
                             >
+                              <If when={a().id === id() || selected()}>
+                                <ActiveBar tall class={a().id === id() ? undefined : "hidden lg:flex"} />
+                              </If>
                               <View class="mt-0.5 shrink-0">
                                 <Icon name={artifactIcon(a())} size={16} tone={selected() ? "ink" : "muted"} />
                               </View>

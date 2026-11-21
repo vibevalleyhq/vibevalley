@@ -27,8 +27,12 @@
    - 开关与复选框一律复用 `Toggle`（行内用 `bare`）与 `Checkbox`，多态范围切换用 `Segmented`（支持 `count` / `countTone`），禁止手搓 `<Switch` 或 `role="checkbox"`。
    - 外框 `rounded-lg` (`8px`) 内层嵌 `rounded-md` (`6px`) 或 `rounded-sm` (`4px`)，内层圆角始终小于等于外框减内边距。
 4. **选中态与聚焦态零位移原则**：
-   - 选中、聚焦或激活状态严禁改变元素外盒尺寸或挤动兄弟元素：禁止在选中态切换不同的 `borderWidth`（如 `border` 与 `border-2` 互切、`borderWidth: 1` 与 `0`/`2` 互切）、条件 `padding`、横排自适应宽度控件上的字重跳变（`font-normal` ↔ `font-medium`/`font-semibold`），以及向水平布局内插入流内占宽元素。
-   - 需要更强描边、左竖条或聚焦条时，保持外框恒定 `border`（无框态配 `border-transparent`），并在容器内叠放 `pointer-events-none absolute inset-0`（或 GPUI `.absolute()`）的非占位指示层；横排选项卡/胶囊统一保持 `font-medium`，仅通过表面抬升、边框色调与墨水对比区分选中态（静态规则由 `scripts/audit/ui-tokens.ts` 的 `selection-layout-shift` 检查）。
+   - 选中、聚焦或激活状态严禁改变元素外盒尺寸或挤动兄弟元素：禁止在选中态切换不同的 `borderWidth`（如 `border` 与 `border-2` 互切、`borderWidth: 1` 与 `0`/`2` 互切）、条件 `padding`、横排自适应宽度控件与侧栏行上的字重跳变（`font-normal` ↔ `font-medium`/`font-semibold`），以及向水平布局内插入流内占宽元素。
+   - 需要更强描边、左竖条或聚焦条时，保持外框恒定 `border`（无框态配 `border-transparent`），并在容器内叠放 `pointer-events-none absolute inset-0`（或 GPUI `.absolute()`）的非占位指示层；横排选项卡/胶囊统一保持 `font-medium`（静态规则由 `scripts/audit/ui-tokens.ts` 的 `selection-layout-shift` 检查）。
+5. **跨端视觉语法与按压反馈统一**：
+   - 侧栏单选列表统一采用 `bg-selected` + 左侧 `2px` 竖条 `<ActiveBar />`（宿主侧栏用 `p().primary`）+ 恒定 `font-medium`（未读消息等语义徽标除外）。
+   - 选中态边框统一用 `border-accent bg-selected`；`border-focus` 与 `outline-focus` 严格保留给键盘 `focus-visible` 与输入框 `focus-within`。
+   - 按压反馈不改变几何尺寸（工作台用 `active:translate-y-px`，原生宿主外壳用 `opacity: 0.82`，禁止 `active:scale-*` 缩框）；提示气泡统一采用深墨水底色与暖边界（`Bubble` / `TipBubble`）。
 
 ## 8.3 状态、并发与键盘可达性
 

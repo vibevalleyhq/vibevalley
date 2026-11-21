@@ -14,6 +14,7 @@ import { Link, useRouter } from "../../infra/router";
 import { createAct } from "../../ui/act";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
+import { ActiveBar } from "../../ui/layout";
 import { Bubble } from "../../ui/Tip";
 import { mix } from "../../ui/tone";
 import { tierOrder } from "./outline";
@@ -21,7 +22,8 @@ import { tierLabel } from "./PageView";
 import { notesSearch } from "./Search";
 import { pkmHref, refreshVault, usePkmRadar } from "./vault";
 
-const row = (here: boolean) => `h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out ${here ? "bg-selected" : "hover:bg-hover"}`;
+const row = (here: boolean) =>
+  `relative h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${here ? "bg-selected" : "hover:bg-hover"}`;
 
 /** slug: the page open, if any. */
 export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPageSummary[]; error?: unknown }) {
@@ -113,10 +115,13 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
       </View>
       <View class="gap-px">
         <Link href="/pkm" testID="pkm-today" accessibilityState={{ selected: props.slug === undefined }} class={row(props.slug === undefined)}>
+          <If when={props.slug === undefined}>
+            <ActiveBar />
+          </If>
           <View class="w-3.5 shrink-0 items-center justify-center">
             <Icon name="calendar" size={14} tone={props.slug === undefined ? "ink" : "faint"} />
           </View>
-          <Text class={`min-w-0 flex-1 truncate text-sm ${props.slug === undefined ? "font-medium text-ink" : "text-ink"}`}>{t("web.pkm.list.today")}</Text>
+          <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{t("web.pkm.list.today")}</Text>
         </Link>
         <Radar onInbox={() => inbox?.reveal({ vertical: "nearest" })} />
       </View>
@@ -165,7 +170,10 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
                             accessibilityState={{ selected: active() }}
                             class={`${row(active())} pl-7.5`}
                           >
-                            <Text class={`min-w-0 flex-1 truncate text-sm ${active() ? "font-medium text-ink" : "text-ink"}`}>{p().title}</Text>
+                            <If when={active()}>
+                              <ActiveBar />
+                            </If>
+                            <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{p().title}</Text>
                             <If when={p().open > 0}>
                               <Text
                                 class="shrink-0 text-2xs font-medium text-faint"
@@ -202,7 +210,7 @@ function Look(props: { icon: IconName; label: string; n: number; open?: boolean 
       <View class="w-3.5 shrink-0 items-center justify-center">
         <Icon name={props.icon} size={14} tone={props.danger === true ? "berry" : props.open === true ? "ink" : "faint"} />
       </View>
-      <Text class={`min-w-0 flex-1 truncate text-sm ${props.open === true ? "font-medium text-ink" : "text-ink"}`}>{props.label}</Text>
+      <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{props.label}</Text>
       <If when={props.open !== undefined}>
         <View
           class="shrink-0 items-center justify-center"

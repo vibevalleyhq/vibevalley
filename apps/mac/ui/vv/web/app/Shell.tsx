@@ -61,7 +61,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       <If when={!small() && props.name}>
         {(name) => (
           <Text
-            class={`w-full truncate text-center font-sans text-2xs leading-tight ${current() ? "font-medium" : ""}`}
+            class="w-full truncate text-center font-sans text-2xs leading-tight font-medium"
             style={{ color: current() ? mix("on-rail", 1) : mix("on-rail", 0.65) }}
           >
             {name()}
@@ -241,7 +241,7 @@ function deskRunPresentation(state: DeskRunState, workingCount: number): DeskRun
     case "idle":
       return {
         label: t("web.base.working", { n: 0 }),
-        pillClass: (onRuns) => (onRuns ? "border-focus bg-selected" : "border-line bg-side hover:bg-selected"),
+        pillClass: (onRuns) => (onRuns ? "border-accent bg-selected" : "border-line bg-side hover:bg-selected"),
         pillStyle: () => undefined,
         pillHoverStyle: () => undefined,
         haloBg: () => undefined,
@@ -251,7 +251,7 @@ function deskRunPresentation(state: DeskRunState, workingCount: number): DeskRun
     case "offline":
       return {
         label: t("web.base.off"),
-        pillClass: (onRuns) => (onRuns ? "border-focus bg-selected" : "border-line bg-side hover:bg-selected"),
+        pillClass: (onRuns) => (onRuns ? "border-accent bg-selected" : "border-line bg-side hover:bg-selected"),
         pillStyle: () => undefined,
         pillHoverStyle: () => undefined,
         haloBg: () => undefined,

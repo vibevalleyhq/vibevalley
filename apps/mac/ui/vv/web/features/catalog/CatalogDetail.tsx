@@ -231,7 +231,7 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
                           accessibilityLabel={name()}
                           tooltip={<Bubble text={name()} />}
                           onPress={() => router.navigate(`/catalog/${encodeURIComponent(name())}`)}
-                          class={`rounded-md border-2 p-px transition duration-120 ease-out ${active() ? "border-focus" : "border-transparent hover:border-line"}`}
+                          class={`rounded-md border-2 p-px transition duration-120 ease-out ${active() ? "border-accent" : "border-transparent hover:border-line"}`}
                         >
                           <GroundBox ground={props.ground} checked class="h-11 w-11 items-center justify-center rounded-sm">
                             <Img p={p()} scale={fitScale(p(), 38)} />

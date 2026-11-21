@@ -215,7 +215,7 @@ function Tile(props: { p: Picture; selected: boolean; has: (n: string) => boolea
       tooltip={<Bubble text={`${props.p.name} · ${numberText(props.p.w)}×${numberText(props.p.h)}`} />}
       onPress={() => router.navigate(`/catalog/${encodeURIComponent(props.p.name)}`)}
       class={`group w-23 items-center gap-1.5 rounded-lg border p-1 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
-        props.selected ? "border-focus bg-selected" : "border-transparent hover:bg-hover"
+        props.selected ? "border-accent bg-selected" : "border-transparent hover:bg-hover"
       }`}
     >
       <GroundBox ground={props.ground} class="h-20 w-20 items-center justify-center rounded-md border border-line">
@@ -226,7 +226,7 @@ function Tile(props: { p: Picture; selected: boolean; has: (n: string) => boolea
           </View>
         </If>
       </GroundBox>
-      <Text class={`w-full truncate text-center font-mono text-2xs ${props.selected ? "font-semibold text-ink" : "text-muted group-hover:text-ink"}`}>
+      <Text class={`w-full truncate text-center font-mono text-2xs font-medium ${props.selected ? "text-ink" : "text-muted group-hover:text-ink"}`}>
         {props.p.name}
       </Text>
     </View>

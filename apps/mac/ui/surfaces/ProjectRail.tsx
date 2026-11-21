@@ -62,7 +62,7 @@ export function ProjectRail(props: { frame: RailFrame | null }) {
           onPress={() => act({ type: "activate_project", id: proj.id })}
           accessibilityLabel={`${proj.name}${proj.shortcut ? `, ${proj.shortcut}` : ""}`}
           tooltip={<TipBubble text={`${proj.name} — ${proj.path}${proj.shortcut ? ` (${proj.shortcut})` : ""}`} />}
-          class="active:scale-[0.98]"
+          activeStyle={{ opacity: 0.82 }}
           style={{
             width: 36,
             height: 36,
@@ -89,7 +89,7 @@ export function ProjectRail(props: { frame: RailFrame | null }) {
         onPress={() => act({ type: "add_project" })}
         accessibilityLabel="Add project"
         tooltip={<TipBubble text="Add project" />}
-        class="active:scale-[0.98]"
+        activeStyle={{ opacity: 0.82 }}
         style={{ width: 36, height: 36, borderRadius: radius.md, alignItems: "center", justifyContent: "center", ...pressTransition() }}
         hoverStyle={{ backgroundColor: p().tile }}
       >
@@ -103,7 +103,7 @@ export function ProjectRail(props: { frame: RailFrame | null }) {
             onPress={() => act({ type: "show_panel", panel: panel.id })}
             accessibilityLabel={panel.label}
             tooltip={<TipBubble text={panel.label} />}
-            class="active:scale-[0.98]"
+            activeStyle={{ opacity: 0.82 }}
             style={{
               width: 36,
               height: 32,

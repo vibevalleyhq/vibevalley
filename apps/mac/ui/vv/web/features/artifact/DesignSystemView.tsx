@@ -11,6 +11,7 @@ import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { TextArea } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
+import { ActiveBar } from "../../ui/layout";
 import { Markdown } from "../../ui/Markdown";
 import { Tabs } from "../../ui/Tabs";
 import { toast } from "../../ui/toasts";
@@ -352,11 +353,14 @@ export function DesignSystemView(props: StoreViewerProps) {
                     testID="ds-component-item"
                     accessibilityState={{ selected: selected() }}
                     onPress={() => selectedComponent.set(comp().id)}
-                    class={`h-7 justify-center rounded-md px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                    class={`relative h-7 justify-center rounded-md px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
                       selected() ? "bg-selected" : "hover:bg-hover"
                     }`}
                   >
-                    <Text class={`truncate text-xs ${selected() ? "font-semibold text-ink" : "font-medium text-muted"}`}>{comp().title ?? comp().id}</Text>
+                    <If when={selected()}>
+                      <ActiveBar />
+                    </If>
+                    <Text class={`truncate text-xs font-medium ${selected() ? "text-ink" : "text-muted"}`}>{comp().title ?? comp().id}</Text>
                   </View>
                 );
               }}

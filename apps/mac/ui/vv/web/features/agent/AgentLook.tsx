@@ -113,8 +113,9 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
       accessibilityLabel={props.label}
       accessibilityState={{ selected: props.active }}
       onPress={() => props.onClick()}
-      class={`items-center gap-0.5 rounded-md border px-1 pt-1 pb-1.5 transition duration-120 ease-out ${props.active ? "bg-selected" : "border-line hover:bg-hover"}`}
-      style={props.active ? { borderColor: mix("ink", 0.4) } : undefined}
+      class={`items-center gap-0.5 rounded-md border px-1 pt-1 pb-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+        props.active ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
+      }`}
     >
       {props.children}
       <Text class={`text-xs font-medium ${props.active ? "text-ink" : "text-muted"}`}>{props.label}</Text>

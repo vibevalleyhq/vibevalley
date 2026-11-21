@@ -3,14 +3,15 @@
 //              with explicit fold/expand, aligned slot grid, and PTY-accurate status.
 //   Right inspector (`host.params.role === "inspector"`): Files and Git changes.
 import { Canvas, Clipboard, colorScheme, effect, host, Image, Path2D, Scroll, signal, Text, View, type JSX } from "nsh";
-import { Button, ContextMenu, MenuItem, MenuSeparator, Tooltip } from "nsh/base";
+import { Button, ContextMenu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { act, call, frame, frameRev, hostApi } from "../bridge";
 import { pressTransition } from "../motion";
-import { radius, tok, type as ty } from "../tokens";
+import { cardShadow, radius, tok, type as ty } from "../tokens";
 import { FileTree, type FilesFrame } from "./FileTree";
 import { GitPanel, type GitFrame, type GitTab } from "./GitPanel";
 import { ProjectRail, type RailFrame, type RailProject, type RailRunningState, type RailTab } from "./ProjectRail";
+import { statusTint, TipBubble } from "./shared";
 
 type VvRepo = { name: string; path: string; git?: boolean; last?: number };
 type VvSession = {
@@ -267,28 +268,6 @@ function Glyph(props: { name: GlyphName; size: number; color: string; rotateDeg?
   );
 }
 
-function TipBubble(props: { text: string }) {
-  const p = () => tok();
-  const dark = () => colorScheme() === "dark";
-  return (
-    <Tooltip
-      delay={350}
-      offset={6}
-      style={{
-        maxWidth: 260,
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 5,
-        backgroundColor: p().primary,
-        borderWidth: 1,
-        borderColor: dark() ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
-      }}
-    >
-      <Text style={{ fontSize: 11.5, lineHeight: 16, color: p().onPrimary }}>{props.text}</Text>
-    </Tooltip>
-  );
-}
-
 function StatusDots(props: { state: RailRunningState; attention?: boolean; readyRing?: boolean }) {
   const p = () => tok();
   const dark = () => colorScheme() === "dark";
@@ -342,15 +321,13 @@ function CollapsedSummary(props: { summary: ActivitySummary }) {
 
 function ActionIconBtn(props: { icon: GlyphName; size?: number; label: string; onPress: () => void; danger?: boolean }) {
   const p = () => tok();
-  const dark = () => colorScheme() === "dark";
-  const hoverBg = () => (dark() ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)");
   return (
     <Button
       onPress={props.onPress}
       accessibilityLabel={props.label}
       tooltip={<TipBubble text={props.label} />}
-      hoverStyle={{ backgroundColor: hoverBg() }}
-      activeStyle={{ opacity: 0.75 }}
+      hoverStyle={{ backgroundColor: p().subtle }}
+      activeStyle={{ opacity: 0.82 }}
       style={{
         width: ACTION_SIZE,
         height: ACTION_SIZE,
@@ -368,7 +345,6 @@ function ActionIconBtn(props: { icon: GlyphName; size?: number; label: string; o
 
 function ChevronSlot(props: { expandable: boolean; expanded: boolean; label: string; onToggle: () => void }) {
   const p = () => tok();
-  const dark = () => colorScheme() === "dark";
   if (!props.expandable) {
     return <View style={{ width: CHEVRON_SLOT, height: 14, flexShrink: 0 }} />;
   }
@@ -376,8 +352,8 @@ function ChevronSlot(props: { expandable: boolean; expanded: boolean; label: str
     <Button
       onPress={props.onToggle}
       accessibilityLabel={props.label}
-      hoverStyle={{ backgroundColor: dark() ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)" }}
-      activeStyle={{ opacity: 0.7 }}
+      hoverStyle={{ backgroundColor: p().subtle }}
+      activeStyle={{ opacity: 0.82 }}
       style={{
         width: CHEVRON_SLOT,
         height: 18,
@@ -450,15 +426,17 @@ export function Sidebar() {
   }
 
   const p = () => tok();
-  const dark = () => colorScheme() === "dark";
   const panel = () => rail()?.panel ?? "files";
 
   const rowBg = (selected: boolean, hovered: boolean) => {
-    if (selected && hovered) return dark() ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.085)";
     if (selected) return p().subtle;
-    if (hovered) return dark() ? "rgba(255,255,255,0.055)" : "rgba(0,0,0,0.045)";
+    if (hovered) return p().tile;
     return "transparent";
   };
+
+  const activeBar = () => (
+    <View style={{ position: "absolute", left: 2, top: 7, bottom: 7, width: 2, borderRadius: 999, backgroundColor: p().primary, pointerEvents: "none" }} />
+  );
 
   const spriteSrc = (name: string | undefined) => {
     const dir = pixelDir();
@@ -471,8 +449,8 @@ export function Sidebar() {
     const conflictCount = () => git()?.conflicts?.length ?? 0;
     const gitCount = () => (git()?.staged?.length ?? 0) + (git()?.changes?.length ?? 0) + conflictCount();
     const currentView = () => (panel() === "git" ? `git:${gitTab()}` : panel());
-    const tabHoverBg = () => (dark() ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.045)");
-    const tabActiveBg = () => (dark() ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.07)");
+    const tabHoverBg = () => p().tile;
+    const tabActiveBg = () => p().subtle;
 
     const inspectorTabs: { id: string; label: string; tip: string; badge?: () => number; danger?: () => boolean; onSelect: () => void }[] = [
       { id: "files", label: "文件", tip: "工作区文件", onSelect: () => act({ type: "show_panel", panel: "files" }) },
@@ -532,7 +510,7 @@ export function Sidebar() {
                 accessibilityLabel={count > 0 ? `${item.label} (${count})` : item.label}
                 tooltip={<TipBubble text={item.tip} />}
                 hoverStyle={{ backgroundColor: isCur ? tabActiveBg() : tabHoverBg() }}
-                activeStyle={{ opacity: 0.8 }}
+                activeStyle={{ opacity: 0.82 }}
                 style={{
                   height: 24,
                   paddingHorizontal: 8,
@@ -555,13 +533,7 @@ export function Sidebar() {
                       borderRadius: 999,
                       alignItems: "center",
                       justifyContent: "center",
-                      backgroundColor: isDanger
-                        ? dark()
-                          ? "rgba(255,138,122,0.18)"
-                          : "rgba(196,50,10,0.12)"
-                        : dark()
-                          ? "rgba(255,255,255,0.10)"
-                          : "rgba(0,0,0,0.07)",
+                      backgroundColor: isDanger ? statusTint(p(), "danger").fill : p().tile,
                     }}
                   >
                     <Text
@@ -805,17 +777,18 @@ export function Sidebar() {
   };
 
   const withWorktreeMenu = (group: WorktreeGroup, trigger: JSX.Element) => {
-    const itemStyle = { height: 28, paddingHorizontal: 10, borderRadius: 5, justifyContent: "center" as const };
+    const itemStyle = { height: 28, paddingHorizontal: 10, borderRadius: radius.md, justifyContent: "center" as const };
     return (
       <ContextMenu
         trigger={trigger}
         popupStyle={{
           minWidth: 168,
           padding: 4,
-          borderRadius: radius.sm,
+          borderRadius: radius.lg,
           backgroundColor: p().surface,
           borderWidth: 1,
           borderColor: p().border,
+          boxShadow: cardShadow(p()),
         }}
       >
         <MenuItem
@@ -869,6 +842,7 @@ export function Sidebar() {
         }}
         tooltip={<TipBubble text={formatTabTooltip(tab, group)} />}
         style={{
+          position: "relative",
           flexDirection: "row",
           alignItems: "center",
           height: 28,
@@ -877,8 +851,10 @@ export function Sidebar() {
           borderRadius: 6,
           backgroundColor: rowBg(isSelected, isHovered()),
           gap: 6,
+          ...pressTransition(),
         }}
       >
+        {isSelected ? activeBar() : null}
         {/* Leaf rows keep the exact 14px chevron slot so sibling icons & labels align vertically. */}
         <View style={{ width: CHEVRON_SLOT, height: 14, flexShrink: 0 }} />
         <Button
@@ -895,7 +871,7 @@ export function Sidebar() {
           <Text
             style={{
               fontSize: 12.5,
-              fontWeight: isSelected ? "500" : "400",
+              fontWeight: "500",
               color: isSelected ? p().ink : p().text,
               flex: 1,
               minWidth: 0,
@@ -948,6 +924,7 @@ export function Sidebar() {
             }}
             tooltip={<TipBubble text={tipText} />}
             style={{
+              position: "relative",
               flexDirection: "row",
               alignItems: "center",
               height: 28,
@@ -956,8 +933,10 @@ export function Sidebar() {
               borderRadius: 6,
               backgroundColor: rowBg(isSelected, isHovered()),
               gap: 6,
+              ...pressTransition(),
             }}
           >
+            {isSelected ? activeBar() : null}
             <ChevronSlot
               expandable={expandable}
               expanded={expanded}
@@ -975,7 +954,7 @@ export function Sidebar() {
                 <Text
                   style={{
                     fontSize: 12.5,
-                    fontWeight: group.active ? "500" : "400",
+                    fontWeight: "500",
                     color: group.active ? p().ink : p().text,
                     flexShrink: 1,
                     numberOfLines: 1,
@@ -1040,6 +1019,7 @@ export function Sidebar() {
         }}
         tooltip={<TipBubble text={repoTip} />}
         style={{
+          position: "relative",
           flexDirection: "row",
           alignItems: "center",
           height: 28,
@@ -1048,8 +1028,10 @@ export function Sidebar() {
           borderRadius: 6,
           backgroundColor: rowBg(isRepoSelected, isHovered()),
           gap: 6,
+          ...pressTransition(),
         }}
       >
+        {isRepoSelected ? activeBar() : null}
         <ChevronSlot
           expandable={expandable}
           expanded={expanded}
@@ -1071,7 +1053,7 @@ export function Sidebar() {
             <Text
               style={{
                 fontSize: 13,
-                fontWeight: repo.active ? "600" : "500",
+                fontWeight: "600",
                 color: p().ink,
                 flexShrink: 1,
                 numberOfLines: 1,
@@ -1173,8 +1155,8 @@ export function Sidebar() {
               onPress={toggleCollapseAll}
               accessibilityLabel={anyExpanded() ? "折叠全部" : "展开当前"}
               tooltip={<TipBubble text={anyExpanded() ? "折叠全部" : "展开当前"} />}
-              hoverStyle={{ backgroundColor: dark() ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)" }}
-              activeStyle={{ opacity: 0.75 }}
+              hoverStyle={{ backgroundColor: p().tile }}
+              activeStyle={{ opacity: 0.82 }}
               style={{
                 width: 22,
                 height: 22,
@@ -1191,8 +1173,8 @@ export function Sidebar() {
             onPress={() => act({ type: "add_project" })}
             accessibilityLabel="添加仓库"
             tooltip={<TipBubble text="添加本地仓库或文件夹" />}
-            hoverStyle={{ backgroundColor: dark() ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.07)" }}
-            activeStyle={{ opacity: 0.8 }}
+            hoverStyle={{ backgroundColor: p().subtle }}
+            activeStyle={{ opacity: 0.82 }}
             style={{
               height: 22,
               paddingHorizontal: 7,
@@ -1234,7 +1216,7 @@ export function Sidebar() {
                         if (isCollapsibleSection) otherSectionCollapsed.update((v) => !v);
                       }}
                       accessibilityLabel={isCollapsed ? `展开 ${section.title}` : `折叠 ${section.title}`}
-                      hoverStyle={{ backgroundColor: dark() ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)" }}
+                      hoverStyle={{ backgroundColor: p().tile }}
                       style={{
                         height: 24,
                         flexDirection: "row",

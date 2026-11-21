@@ -7,6 +7,7 @@ import { t } from "@vibevalley/i18n";
 import { Select } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
+import { ActiveBar } from "../../ui/layout";
 import { type ArtifactCounts, artifactFilterKinds, type ArtifactKindFilter, type Counts, type KindFilter, type Names, type Where, whereKey } from "./items";
 
 const originIcons: Record<"generated" | "uploaded" | "fetched", IconName> = {
@@ -74,14 +75,17 @@ function Row(props: { testid: string; icon: IconName; label: string; count: numb
       accessibilityLabel={`${props.label} ${props.count}`}
       accessibilityState={{ selected: props.here }}
       onPress={() => props.onPick()}
-      class={`h-7 shrink-0 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out ${props.here ? "bg-selected" : "hover:bg-hover"}`}
+      class={`relative h-7 shrink-0 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.here ? "bg-selected" : "hover:bg-hover"}`}
     >
+      <If when={props.here}>
+        <ActiveBar />
+      </If>
       <View class="w-3.5 shrink-0 items-center justify-center">
         <Icon name={props.icon} size={14} tone={props.here ? "ink" : "muted"} />
       </View>
-      <Text class={`min-w-0 flex-1 truncate text-sm text-ink ${props.here ? "font-medium" : ""}`}>{props.label}</Text>
+      <Text class={`min-w-0 flex-1 truncate text-sm font-medium ${props.here ? "text-ink" : "text-muted"}`}>{props.label}</Text>
       <View class={`shrink-0 rounded-full px-1.5 py-px ${props.here ? "bg-page" : ""}`}>
-        <Text class={`font-mono text-2xs tabular-nums ${props.here ? "font-medium text-ink" : "text-faint"}`}>{String(props.count)}</Text>
+        <Text class={`font-mono text-2xs font-medium tabular-nums ${props.here ? "text-ink" : "text-faint"}`}>{String(props.count)}</Text>
       </View>
     </View>
   );

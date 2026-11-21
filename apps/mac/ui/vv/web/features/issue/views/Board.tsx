@@ -380,8 +380,8 @@ function CardView(props: {
         accessibilityState={{ selected: props.selected, busy: props.card.move?.state === "moving" }}
         tooltip={look().detail ? <Bubble text={look().detail} /> : undefined}
         class={[
-          "relative overflow-hidden rounded-lg border px-2.5 py-2",
-          props.selected ? "border-faint bg-selected" : "border-line bg-page hover:border-faint hover:shadow-raise",
+          "relative overflow-hidden rounded-lg border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus",
+          props.selected ? "border-accent bg-selected" : "border-line bg-page hover:border-faint hover:shadow-raise",
           props.card.move?.state === "moving" ? "opacity-70" : props.drag.dragging()?.id === props.card.id ? "opacity-40" : "",
         ].join(" ")}
         style={cardStyle()}

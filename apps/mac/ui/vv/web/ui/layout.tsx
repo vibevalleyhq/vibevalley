@@ -65,6 +65,15 @@ export function ListCard(props: { title: string; label?: string; action?: JSX.El
   );
 }
 
+/** A 2 px left accent bar for the selected row of a sidebar list (zero layout shift). */
+export function ActiveBar(props: { tall?: boolean; class?: string | undefined }) {
+  return (
+    <View class={`pointer-events-none absolute top-0 bottom-0 left-0.5 justify-center ${props.class ?? ""}`}>
+      <View class={`${props.tall === true ? "h-4" : "h-3.5"} w-0.5 rounded-full bg-accent`} />
+    </View>
+  );
+}
+
 /** A row: a link to its detail, marked when it is the open one. */
 export function ListRow(props: { to: string; item?: string; active?: boolean; title: string; line?: string; leading?: JSX.Element; trailing?: JSX.Element }) {
   const active = () => props.active === true;
@@ -79,13 +88,11 @@ export function ListRow(props: { to: string; item?: string; active?: boolean; ti
       }`}
     >
       <If when={active()}>
-        <View class="absolute top-0 bottom-0 left-0.5 justify-center">
-          <View class="h-4 w-0.5 rounded-full bg-accent" />
-        </View>
+        <ActiveBar tall />
       </If>
       {props.leading}
       <View class="min-w-0 flex-1 gap-0.5">
-        <Text class={`truncate text-sm text-ink ${active() ? "font-semibold" : "font-medium"}`}>{props.title}</Text>
+        <Text class="truncate text-sm font-medium text-ink">{props.title}</Text>
         <If when={props.line}>
           <Text class="truncate text-xs text-muted">{props.line}</Text>
         </If>

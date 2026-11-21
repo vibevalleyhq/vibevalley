@@ -31,7 +31,6 @@ import { RuntimeIcon } from "../../ui/pixel/RuntimeIcon";
 import { Segmented } from "../../ui/Segmented";
 import { Tabs } from "../../ui/Tabs";
 import { Bubble } from "../../ui/Tip";
-import { mix } from "../../ui/tone";
 import { MemoryPanel } from "../memory";
 import { useSkills } from "../runtime/SkillsPage";
 import { Labeled } from "./AgentLook";
@@ -198,14 +197,15 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
                   accessibilityState={{ selected: active() }}
                   accessibilityLabel={info().preset.label}
                   onPress={() => choose(info())}
-                  class={`flex-row items-center gap-2 rounded-md border p-2 transition duration-120 ease-out ${active() ? "bg-selected" : "border-line hover:bg-hover"}`}
-                  style={active() ? { borderColor: mix("ink", 0.4) } : undefined}
+                  class={`flex-row items-center gap-2 rounded-md border p-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                    active() ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
+                  }`}
                 >
                   <View style={{ opacity: ok() ? 1 : 0.5 }}>
                     <RuntimeIcon runtime={info().id} size={32} />
                   </View>
                   <View class="min-w-0 flex-1">
-                    <Text class={`truncate text-sm text-ink ${active() ? "font-semibold" : "font-medium"}`}>{info().preset.label}</Text>
+                    <Text class="truncate text-sm font-medium text-ink">{info().preset.label}</Text>
                     <Text class={`truncate text-xs ${ok() ? "text-muted" : "text-berry"}`}>{status()}</Text>
                   </View>
                 </View>
@@ -351,8 +351,9 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
               const on = () => props.draft.skills.includes(s().id);
               return (
                 <View
-                  class={`flex-row items-start gap-2.5 rounded-md border p-2.5 transition duration-120 ease-out ${on() ? "bg-selected" : "border-line hover:bg-hover"}`}
-                  style={on() ? { borderColor: mix("ink", 0.4) } : undefined}
+                  class={`flex-row items-start gap-2.5 rounded-md border p-2.5 transition duration-120 ease-out ${
+                    on() ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
+                  }`}
                 >
                   <Checkbox testid={`skill-${s().id}`} checked={on()} onChange={() => toggle(s().id)} label={s().name} class="mt-0.5" />
                   <View

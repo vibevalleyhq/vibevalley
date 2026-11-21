@@ -20,6 +20,7 @@ import { Link as A, useRouter } from "../../../infra/router";
 import { createAct } from "../../../ui/act";
 import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Icon } from "../../../ui/Icon";
+import { ActiveBar } from "../../../ui/layout";
 import { TextLink } from "../../../ui/TextLink";
 import { Bubble } from "../../../ui/Tip";
 import { runsHref } from "../../session";
@@ -346,18 +347,19 @@ function ChannelRow(props: { channel: Channel; here: boolean; unread: number; on
       accessibilityLabel={channelName(props.channel)}
       accessibilityState={{ selected: props.here }}
       onPress={() => props.onClick?.()}
-      class={`h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out ${props.here ? "bg-selected" : "hover:bg-hover"} ${
+      class={`relative h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.here ? "bg-selected" : "hover:bg-hover"} ${
         props.reorder.dragged() === props.channel.id ? "opacity-40" : ""
       }`}
     >
+      <If when={props.here}>
+        <ActiveBar />
+      </If>
       <If when={props.reorder.over() === props.channel.id}>
         <View testID="channel-drop-before" class="absolute inset-x-0 top-0 h-0.5 rounded-full bg-accent" style={{ pointerEvents: "none" }} />
       </If>
       <Text class={`w-3.5 shrink-0 text-center font-mono text-sm ${props.here ? "text-muted" : "text-faint"}`}>{markOf(props.channel)}</Text>
       <Text
-        class={`min-w-0 flex-1 truncate text-sm ${props.here || props.unread > 0 ? "font-semibold" : "font-normal"} ${
-          quiet() && !props.here ? "text-muted" : "text-ink"
-        }`}
+        class={`min-w-0 flex-1 truncate text-sm ${props.unread > 0 ? "font-semibold" : "font-medium"} ${quiet() && !props.here ? "text-muted" : "text-ink"}`}
       >
         {channelName(props.channel)}
       </Text>
@@ -392,8 +394,11 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
         if (current) props.onShow(current);
       }}
       tooltip={<Bubble text={`${props.h.name} · ${phase()}`} />}
-      class={`h-8 flex-row items-center gap-2 overflow-hidden rounded-md px-2 transition duration-120 ease-out ${props.active ? "bg-selected" : "hover:bg-hover"}`}
+      class={`relative h-8 flex-row items-center gap-2 overflow-hidden rounded-md px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.active ? "bg-selected" : "hover:bg-hover"}`}
     >
+      <If when={props.active}>
+        <ActiveBar />
+      </If>
       <View class="min-w-0 flex-1 flex-row items-center gap-2">
         <View class="relative shrink-0">
           <HelperFace agent={props.h.agent} runtime={props.h.runtime} size={22} />
@@ -401,7 +406,7 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
             <Dot tone={phaseDot(props.h.phase)} size={6} />
           </View>
         </View>
-        <Text class={`min-w-0 flex-1 truncate text-sm text-ink ${props.active || unread() > 0 ? "font-semibold" : "font-medium"}`}>{props.h.name}</Text>
+        <Text class={`min-w-0 flex-1 truncate text-sm text-ink ${unread() > 0 ? "font-semibold" : "font-medium"}`}>{props.h.name}</Text>
       </View>
       <View class="min-w-0 shrink flex-row items-center gap-1.5 pr-1.5">
         <View class="min-w-0 max-w-24 flex-row items-center gap-1 overflow-hidden">

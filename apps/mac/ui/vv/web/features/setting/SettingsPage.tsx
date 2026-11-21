@@ -11,6 +11,7 @@ import { Link as A, Navigate } from "../../infra/router";
 import { SettingsPage as Page, SettingsSearch } from "../../ui/domain/settings";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
+import { ActiveBar } from "../../ui/layout";
 import { Splitter, usePaneWidth } from "../../ui/Splitter";
 import { Bubble } from "../../ui/Tip";
 import { ConnectorsPage } from "../connector";
@@ -198,12 +199,15 @@ function SectionLink(props: { section: Section; current: boolean }) {
       testID={`settings-section-${props.section.id}`}
       accessibilityLabel={props.section.label}
       accessibilityState={{ selected: props.current }}
-      class={`group h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out ${props.current ? "bg-selected" : "hover:bg-hover"}`}
+      class={`relative group h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.current ? "bg-selected" : "hover:bg-hover"}`}
     >
+      <If when={props.current}>
+        <ActiveBar />
+      </If>
       <View class="w-4 shrink-0 items-center justify-center">
         <Icon name={props.section.icon} size={14} tone={props.current ? "ink" : "muted"} />
       </View>
-      <Text class={`min-w-0 flex-1 truncate text-sm ${props.current ? "font-medium text-ink" : "text-muted group-hover:text-ink"}`}>{props.section.label}</Text>
+      <Text class={`min-w-0 flex-1 truncate text-sm font-medium ${props.current ? "text-ink" : "text-muted group-hover:text-ink"}`}>{props.section.label}</Text>
     </A>
   );
 }

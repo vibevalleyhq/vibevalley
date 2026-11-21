@@ -18,7 +18,7 @@ import { Button } from "../../ui/Button";
 import { AgentFace, OrchestratorFace } from "../../ui/domain/Face";
 import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
-import { Quiet } from "../../ui/layout";
+import { ActiveBar, Quiet } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
 import { Dot, type DotTone } from "../../ui/Tag";
 import { Bubble } from "../../ui/Tip";
@@ -400,10 +400,13 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
       accessibilityLabel={entryName(props.entry)}
       accessibilityState={{ selected: props.selected }}
       onPress={props.onSelect}
-      class={`flex-row items-start gap-2.5 rounded-md border px-2.5 py-2 transition duration-120 ease-out ${
+      class={`relative flex-row items-start gap-2.5 rounded-md border px-2.5 py-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
         props.selected ? "border-line bg-selected" : "border-transparent hover:bg-hover"
       }`}
     >
+      <If when={props.selected}>
+        <ActiveBar tall />
+      </If>
       <View class="mt-0.5 shrink-0">
         <If
           when={props.entry.kind === "orchestrator"}

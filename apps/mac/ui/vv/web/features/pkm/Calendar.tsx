@@ -107,14 +107,14 @@ function Month(props: { pages: readonly PkmPageSummary[]; open: string | undefin
                         tooltip={<Bubble text={dayTitle(d().day, today()) ?? d().day} />}
                         disabled={act.busy()}
                         onPress={() => go(d().day)}
-                        class={`relative h-7 w-7 items-center justify-center rounded-md transition duration-120 ease-out ${here() ? "bg-selected" : "hover:bg-hover"}`}
+                        class={`relative h-7 w-7 items-center justify-center rounded-md transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${here() ? "bg-selected" : "hover:bg-hover"}`}
                         style={isToday() && !here() ? { backgroundColor: mix("accent", 0.08) } : undefined}
                       >
                         <If when={isToday()}>
                           <View class="pointer-events-none absolute inset-0 rounded-md" style={{ borderWidth: 1.5, borderColor: tone("accent") }} />
                         </If>
                         <Text
-                          class={`text-xs ${here() || isToday() ? "font-semibold" : "font-normal"} ${isToday() && !here() ? "text-accent" : d().inMonth ? "text-ink" : "text-faint"}`}
+                          class={`text-xs font-medium ${isToday() && !here() ? "text-accent" : d().inMonth ? "text-ink" : "text-faint"}`}
                           style={{ fontVariant: ["tabular-nums"] }}
                         >
                           {String(Number(d().day.slice(8)))}

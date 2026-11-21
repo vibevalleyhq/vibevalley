@@ -12,6 +12,7 @@ import { useOrchestrators } from "../../../infra/agents";
 import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Icon } from "../../../ui/Icon";
 import { IconButton } from "../../../ui/IconButton";
+import { ActiveBar } from "../../../ui/layout";
 import { Bubble } from "../../../ui/Tip";
 import { type BoardCard, cardAgent, cardLook, cardRepo, closedShown, laneLabel, laneStatus } from "../model/cards";
 import { type Grouping, groupRows, laneOrder, type Ordering, orderRows, type RowGroup, rowKeys } from "../model/display";
@@ -207,8 +208,11 @@ function Row(props: {
       accessibilityState={{ selected: props.selected }}
       tooltip={look().detail ? <Bubble text={look().detail} /> : undefined}
       onPress={() => props.onOpen(props.card.id)}
-      class={`min-h-9.5 flex-row items-center gap-2.5 rounded-md px-2.5 py-1.5 transition duration-120 ease-out ${props.selected ? "bg-selected" : "hover:bg-hover"}`}
+      class={`relative min-h-9.5 flex-row items-center gap-2.5 rounded-md px-2.5 py-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.selected ? "bg-selected" : "hover:bg-hover"}`}
     >
+      <If when={props.selected}>
+        <ActiveBar />
+      </If>
       <View class="w-4 shrink-0 items-center justify-center">
         <If when={look().priority === "urgent" || look().priority === "high" ? look().priority : undefined}>
           {(pr) => <PriorityMark priority={pr()} size={13} />}

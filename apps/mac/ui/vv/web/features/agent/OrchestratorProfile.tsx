@@ -18,7 +18,6 @@ import { OrchestratorFace } from "../../ui/domain/Face";
 import { Field, TextArea, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Bubble } from "../../ui/Tip";
-import { mix } from "../../ui/tone";
 import { orchestratorLooks } from "../orchestrator/looks";
 import { runsHref } from "../session";
 import { FromTemplate } from "./FromTemplate";
@@ -193,8 +192,9 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
                     accessibilityState={{ checked: on() }}
                     tooltip={<Bubble text={look().blurb} />}
                     onPress={() => setLook(look().id)}
-                    class={`items-center gap-1 rounded-lg border p-2 transition duration-120 ease-out ${on() ? "bg-selected" : "border-line hover:bg-hover"}`}
-                    style={on() ? { borderColor: mix("leaf", 1) } : undefined}
+                    class={`items-center gap-1 rounded-lg border p-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                      on() ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
+                    }`}
                   >
                     <OrchestratorFace size={48} look={look().id} />
                     <Text class={`text-xs font-medium ${on() ? "text-ink" : "text-muted"}`}>{look().name}</Text>
