@@ -21,12 +21,12 @@
 | `apps/mac/src/pixel/farm/frame.rs` | 场景读的那部分 `StateFrame`，宽松解码 |
 | `apps/mac/src/pixel/farm/world.rs` | 院子的地点和规则：9 块地 `BEDS`、院内建筑 `YARD_PLACES`、去处 `place_of_action`、`Whereabouts`、姿势 `pose_of` 与 `PoseHold` |
 | `apps/mac/src/pixel/farm/scene.rs` | `FarmScene`：照最新一帧画村子并让它一直动，按可见像素和深度识别点到的物件；六把农具 `FarmTool` |
-| `apps/mac/src/pixel/farm/hud.rs`、`apps/mac/ui/vv/farm/PhoneGames.tsx` | 农场 HUD 将手机放在按钮上方，手机的五个小游戏由 nsh 绘制，按键和十字键共用输入 |
+| `apps/mac/src/pixel/farm/hud.rs`、`apps/mac/ui/farm/PhoneGames.tsx` | 农场 HUD 将手机放在按钮上方，手机的五个小游戏由 nsh 绘制，按键和十字键共用输入 |
 | `apps/mac/src/pixel/farm/islands.rs` | 仓库群岛地图：规则 `islands_of`、`plots_in`，画面 `MapScene` |
 | `apps/mac/src/pixel/nav.rs`、`sky.rs` | 网格 A* 与沿路走的 `Walker`；日钟 `DayClock`、天色、整像素取景 `frame_whole` |
 | `apps/mac/src/pixel/tree.rs`、`opening.rs`、`catalog.rs` | 记忆树、开场、图鉴的贴图书架 |
-| `apps/mac/ui/vv/web/features/catalog/` | 图鉴页（`/catalog`）：书架的分法 `shelves.ts`，指针和音效两个书架 |
-| `apps/mac/ui/vv/web/ui/pixel/` | 工作台里的像素零件：贴图图标、农机 logo、音效配方 `sound.ts` 与离线合成 `synth.ts` |
+| `apps/mac/ui/features/catalog/` | 图鉴页（`/catalog`）：书架的分法 `shelves.ts`，指针和音效两个书架 |
+| `apps/mac/ui/design/pixel/` | 工作台里的像素零件：贴图图标、农机 logo、音效配方 `sound.ts` 与离线合成 `synth.ts` |
 
 ## 模型和不变量
 
@@ -59,7 +59,7 @@
 - **像素手机**：点手机或按 P 开合。从「游戏」打开方块、推箱子、小恐龙、贪吃虫或种田 2048。方向键对应十字键，空格、Enter 或 Z 对应 A，X 对应 B。点屏幕上沿的「农场通」返回游戏目录。棋盘与最高分按各游戏规则保留在本次农场页面内。
 - **院内建筑即入口（`YARD_PLACES`）**：「工单」去 `/issues`，「档案」去 `/agents`，「工坊」去 `/runtimes`，「书屋」去 `/settings/skills`，点助手去 `/chat`；「小摊」「仓库」「任务与成就」「农场日志」是农场自己的面板。
 - **一座岛对应一个仓库。** 地图在仓库列表或业务帧变化时重算地块。动画帧只更新时间。[群岛场景](apps/mac/src/pixel/farm/islands.rs)
-- **音效没有音频文件**：配方在 `apps/mac/ui/vv/web/ui/pixel/sound.ts`，每次播放由 `synth.ts` 把配方合成一段 WAV，交宿主播放（`host.playAudio`）。
+- **音效没有音频文件**：配方在 `apps/mac/ui/design/pixel/sound.ts`，每次播放由 `synth.ts` 把配方合成一段 WAV，交宿主播放（`host.playAudio`）。
 
 ## 怎么走
 

@@ -5,7 +5,7 @@ export const FACTS = [
   // Helpers at work at once (maxRunning, packages/protocol/src/common/shapes.ts).
   { key: "plots", n: 6, icon: "plot-wheat" },
   { key: "achievements", n: 21, icon: "icon-trophy" },
-  // GameId in apps/mac/ui/vv/farm/PhoneGames.tsx.
+  // GameId in apps/mac/ui/farm/PhoneGames.tsx.
   { key: "games", n: 5, icon: "icon-star" },
   // WeChat, Feishu, QQ (packages/protocol/src/connector/shapes.ts, ConnectorIDValues).
   { key: "connectors", n: 3, icon: "icon-pigeon" },

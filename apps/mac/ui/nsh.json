@@ -14,7 +14,7 @@
     "picker": true,
     "webview": {}
   },
-  "theme": "vv/theme.json",
+  "theme": "design/theme.json",
   "tailwind": {
     "fontSize": {
       "2xs": [11, 1.2727],

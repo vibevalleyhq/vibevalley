@@ -10,7 +10,7 @@ describe("the contract diff", () => {
         "20\t5\tpackages/protocol/src/issue/shapes.gen.ts",
         "3\t0\tcrates/vibevalley-server/src/modules/issue/store.rs",
         "40\t15\tcrates/vibevalley-server/src/modules/issue/mod.rs",
-        "5\t5\tapps/mac/ui/vv/web/features/issue/Board.tsx",
+        "5\t5\tapps/mac/ui/features/issue/Board.tsx",
       ].join("\n"),
     );
     const s = summaryOf(changed, 4);
@@ -27,7 +27,7 @@ describe("the contract diff", () => {
   it("knows an area and a service's interface line", () => {
     expect([
       areaOf("crates/vibevalley-server/src/modules/channel/mod.rs"),
-      areaOf("apps/mac/ui/vv/web/features/board/X.tsx"),
+      areaOf("apps/mac/ui/features/board/X.tsx"),
       areaOf("crates/vibevalley-cli/src/main.rs"),
       areaOf("scripts/a.ts"),
     ]).toEqual(["server/channel", "mac/board", "crates/vibevalley-cli", "scripts"]);

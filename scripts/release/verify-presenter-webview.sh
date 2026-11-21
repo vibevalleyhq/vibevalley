@@ -50,7 +50,7 @@ for target in macos gpui; do
 done
 
 cd "$root/apps/mac/ui"
-if "$nsh" test vv/app/story.tsx --target gpui > "$probe/workbench.log" 2>&1 <<'JS'
+if "$nsh" test app/story.tsx --target gpui > "$probe/workbench.log" 2>&1 <<'JS'
 await app.setViewport(1200, 800);
 await app.press("id:place-artifacts");
 await app.press("id:artifact-row-art-deck");

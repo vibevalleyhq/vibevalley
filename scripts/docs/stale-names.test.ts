@@ -47,9 +47,9 @@ it("regression: stale service names are rejected while the config and the Settin
 });
 
 it("regression: native mac workbench UI, Rust crates, and i18n catalogs enforce glossary terms", () => {
-  expect(staleNamesIn("apps/mac/ui/vv/web/features/issue/IssueCard.tsx", 'const kind = "owner";')).toHaveLength(1);
-  expect(staleNamesIn("apps/mac/ui/vv/web/features/issue/IssueCard.tsx", "const t = '地里';")).toHaveLength(1);
-  expect(staleNamesIn("apps/mac/ui/vv/web/farm/hud/Hud.tsx", "const t = '收获';")).toEqual([]);
+  expect(staleNamesIn("apps/mac/ui/features/issue/IssueCard.tsx", 'const kind = "owner";')).toHaveLength(1);
+  expect(staleNamesIn("apps/mac/ui/features/issue/IssueCard.tsx", "const t = '地里';")).toHaveLength(1);
+  expect(staleNamesIn("apps/mac/ui/farm/hud/Hud.tsx", "const t = '收获';")).toEqual([]);
   expect(staleNamesIn("crates/vibevalley-server/src/modules/issue/board.rs", 'let msg = "问主人";')).toHaveLength(1);
   expect(staleNamesIn("crates/vibevalley-i18n/locales/zh/cli.json", '{ "help": "问管家" }')).toHaveLength(1);
   expect(staleNamesIn("crates/vibevalley-i18n/locales/zh/server.issue.json", '{ "done": "收获了" }')).toHaveLength(1);

@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use super::*;
 
-/// What VibeValley's own packages/pkm said (golden/gen.ts).
+/// What VibeValley's earlier TypeScript PKM parser produced (now checked by committed golden fixtures).
 fn golden() -> Value {
     serde_json::from_str(include_str!("../golden/golden.json")).unwrap()
 }

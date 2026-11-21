@@ -1,6 +1,6 @@
 //! Writes multi-density scenario `state.json` files from `vibevalley_core::scenario`.
 //!
-//! Run: `cargo run -p vibevalley-core --example export_scenarios -- apps/mac/ui/vv/fixtures/scenarios`
+//! Run: `cargo run -p vibevalley-core --example export_scenarios -- apps/mac/ui/fixtures/scenarios`
 
 use std::path::PathBuf;
 
@@ -10,7 +10,7 @@ fn main() {
     let out_root = std::env::args()
         .nth(1)
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("apps/mac/ui/vv/fixtures/scenarios"));
+        .unwrap_or_else(|| PathBuf::from("apps/mac/ui/fixtures/scenarios"));
 
     for density in Density::ALL {
         let dir = out_root.join(density.slug());

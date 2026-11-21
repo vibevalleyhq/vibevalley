@@ -4,7 +4,7 @@
 
 ## 3.1 频道与消息流排版
 
-频道视图分布在 `apps/mac/ui/vv/web/features/channel/`（核心视图文件：`ChannelSidebar.tsx`、`MessageList.tsx`、`MessageParts.tsx`、`presence.tsx`）：
+频道视图分布在 `apps/mac/ui/features/channel/`（核心视图文件：`ChannelSidebar.tsx`、`MessageList.tsx`、`MessageParts.tsx`、`presence.tsx`）：
 
 - **无气泡单行排布**：聊天流采用类似 Slack/Linear 评论的垂直全宽列表，不使用左右气泡。用户、助手与帮工均左对齐排布，依靠左侧 `28px`（或折叠时缩进对齐）头像、名字徽标与角色标签区分来源。
 - **头像折叠与未读分割**：同人连续消息紧凑衔接排布；跨发言者、跨日分隔或未读分界线（`DayLine`）处恢复完整消息头。
@@ -14,7 +14,7 @@
 
 ## 3.2 富文本输入与斜杠指令引擎
 
-底部消息输入框实现于 `apps/mac/ui/vv/web/features/channel/views/Composer.tsx` 及其模型文件 `commands.ts`、`composing.ts`、`mentions.ts`：
+底部消息输入框实现于 `apps/mac/ui/features/channel/views/Composer.tsx` 及其模型文件 `commands.ts`、`composing.ts`、`mentions.ts`：
 
 - **斜杠命令（`/`）**：输入行首键入 `/` 即刻展开结构化指令浮层（`z-20`），支持上下方向键与 `Enter` 选中插入或执行本地快捷工作流。
 - **精确 `@` 提及引擎**：使用共享规则 `packages/protocol/src/rules/channel.ts` 导出的 `mentionLead` 正则（`(?<![\p{Script=Latin}\p{N}_@])`）。邮箱写法（如 `a@b.com`）中的 `@` 不会误触发提及浮窗，而中文词尾紧接 `@` 仍可正常激活候选帮工/档案弹窗，使中文输入无需强迫前置空格。
@@ -23,13 +23,13 @@
 
 ## 3.3 思考态、运行中心（`/runs`）与瀑布轨迹引擎
 
-运行观察视图由 `apps/mac/ui/vv/web/features/session/` 与 `apps/mac/ui/vv/web/features/orchestrator/` 驱动：
+运行观察视图由 `apps/mac/ui/features/session/` 与 `apps/mac/ui/features/orchestrator/` 驱动：
 
 - **顶栏运行胶囊（`Shell.tsx` `desk-status`）**：以三态 `DeskRunState` 区分全局状态：`working`（活跃帮工数 `> 0`）使用浅叶绿底与绿环晕点并加粗显示在干活计数；`idle`（连接为 `live` 且活跃数为 `0`）退回中性 `bg-side border-line` 胶囊配实心绿点；`offline` 使用中性胶囊配 `bg-idle` 灰点。
 - **运行中心（`RunsPage.tsx` 与 `runsView.ts`）**：路由 `/runs`，通过查询参数 `?session=&scope=&agent=&issue=` 过滤与定位（搜索框输入保留为页面本地状态）。左侧列表顶部内置搜索框与 `<Segmented testid="runs-scope">` 切换组（`all` 全部 / `active` 进行中配 `water` 计数 / `orchestrator` 助手 / `worker` 帮工）；`RunListRow` 将 `6px` 状态圆点置于状态标签前，不遮挡 30px 像素头像；详情区内容收束在 `w-full max-w-5xl` 内，支持 `RunStatusBadge` 七态（`working`、`listening`、`resting`、`done`、`failed`、`interrupted`、`closed`）与活动时间 `runActivityAt`。
 - **助手代批栏（`PendingApprovals.tsx`）**：处于等待批准/确认的阻塞请求以醒目条带浮于顶部/详情区，用户可直接完成同意或驳回流转。
 - **瀑布时间线（`Trajectory.tsx` 内的 `WaterfallView`）**：
-  - 按每轮次拆分横排，清除轮间空闲空白（轮次间以 `4px` 固定间距衔接），纵向按 `asked`（收到）/ `model`（模型）/ `tool`（工具）顺序划分为三道固定泳道（`lane = 12px`、`gap = 3px`）；各轮宽度由 `apps/mac/ui/vv/web/features/session/runs.ts` 的 `waterfallWidths(durations, room)` 分配：正时长极差比 `<= 8` 时按线性比例切分，`> 8` 时按 `Math.sqrt(d)` 阻尼缩放并为每个正时长轮次保留 `minRunPx = Math.min(44, room / durations.length)` 保底宽度，避免长轮次将短轮次压成细缝。
+  - 按每轮次拆分横排，清除轮间空闲空白（轮次间以 `4px` 固定间距衔接），纵向按 `asked`（收到）/ `model`（模型）/ `tool`（工具）顺序划分为三道固定泳道（`lane = 12px`、`gap = 3px`）；各轮宽度由 `apps/mac/ui/features/session/runs.ts` 的 `waterfallWidths(durations, room)` 分配：正时长极差比 `<= 8` 时按线性比例切分，`> 8` 时按 `Math.sqrt(d)` 阻尼缩放并为每个正时长轮次保留 `minRunPx = Math.min(44, room / durations.length)` 保底宽度，避免长轮次将短轮次压成细缝。
   - 用颜色区分通道：`asked` 使用 `tone("wheat")`，`model` 使用 `tone("leaf")`，工具步骤按步骤颜色映射；单击任意色块（最小兜底 `2px` 宽）立即滚动定位到下方详情流对应步骤；搜索框提示文案指向步骤、工具与参数过滤。
 - **结构化工作日志与重连补读（`WorkLog.tsx` 与 `runs.ts`）**：
   - 服务端按会话保留最近 `240` 步日志；工作台断线或延迟打开时，通过 `runs.ts` 按步骤序号 `seq` 与修订号 `revision` 合并重连前后的历史轨迹与实时增量事件。
@@ -38,7 +38,7 @@
 
 ## 3.4 工单看板与独立详情页
 
-工单流分布在 `apps/mac/ui/vv/web/features/issue/`（`IssuesPage.tsx`、`Board.tsx`、`IssueDetail.tsx`、`NewIssue.tsx`、`CloseDialog.tsx`、`TodoDetail.tsx` 及纯逻辑模型 `overview.ts`、`cards.ts`、`closeFlow.ts`、`draftSubmit.ts`）：
+工单流分布在 `apps/mac/ui/features/issue/`（`IssuesPage.tsx`、`Board.tsx`、`IssueDetail.tsx`、`NewIssue.tsx`、`CloseDialog.tsx`、`TodoDetail.tsx` 及纯逻辑模型 `overview.ts`、`cards.ts`、`closeFlow.ts`、`draftSubmit.ts`）：
 
 - **总览与四列看板（`IssuesPage.tsx` / `Board.tsx` / `overview.ts` / `cards.ts`）**：
   - 工具栏右侧将 `+ 新工单`（`issue-toolbar-new`）作为主色调（`tone="primary"`）按钮；四段核心列展示 `todo`、`working`、`waiting`、`closed`。

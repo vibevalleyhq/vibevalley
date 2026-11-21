@@ -1,4 +1,4 @@
-//! VibeValley warm light/dark palettes synchronized with `apps/mac/ui/vv/theme.json`.
+//! VibeValley warm light/dark palettes synchronized with `apps/mac/ui/design/theme.json`.
 //!
 //! Supplies concrete colors for:
 //! - `nsh_core` native UI elements (`UiPalette` & `AdaptivePalette`)
@@ -138,7 +138,7 @@ pub(crate) fn shiki_rgba_to_hsla(c: vibevalley_shiki::Rgba) -> Hsla {
     rgba(packed).to_hsla()
 }
 
-/// Builds a resolved `vibevalley_pele::ThemePalette` matching `apps/mac/ui/vv/theme.json`.
+/// Builds a resolved `vibevalley_pele::ThemePalette` matching `apps/mac/ui/design/theme.json`.
 ///
 /// Always uses concrete hex colors (zero CSS `var()`/`color-mix()`) so `nsh_core::svg::rasterize`
 /// renders text and shapes identically on macOS retina displays.
@@ -188,7 +188,7 @@ pub fn vv_pele_palette(dark: bool) -> PeleThemePalette {
     }
 }
 
-/// Builds a resolved `vibevalley_chart::ThemePalette` matching `apps/mac/ui/vv/theme.json`.
+/// Builds a resolved `vibevalley_chart::ThemePalette` matching `apps/mac/ui/design/theme.json`.
 ///
 /// Uses concrete hex colors (zero CSS `var()`) and VibeValley's macOS UI font stack so
 /// `resvg` renders chart axes, legends, and labels accurately.
@@ -323,7 +323,7 @@ fn rule(scopes: &[&str], fg: &str, font_style: Option<&str>) -> RawThemeSetting 
     }
 }
 
-/// VibeValley warm light TextMate theme matching `apps/mac/ui/vv/theme.json`.
+/// VibeValley warm light TextMate theme matching `apps/mac/ui/design/theme.json`.
 pub fn vv_shiki_light_theme() -> RawTheme {
     let mut colors = BTreeMap::new();
     colors.insert("editor.foreground".to_owned(), "#1c1917".to_owned());
@@ -404,7 +404,7 @@ pub fn vv_shiki_light_theme() -> RawTheme {
     }
 }
 
-/// VibeValley warm dark TextMate theme matching `apps/mac/ui/vv/theme.json`.
+/// VibeValley warm dark TextMate theme matching `apps/mac/ui/design/theme.json`.
 pub fn vv_shiki_dark_theme() -> RawTheme {
     let mut colors = BTreeMap::new();
     colors.insert("editor.foreground".to_owned(), "#ecebe8".to_owned());

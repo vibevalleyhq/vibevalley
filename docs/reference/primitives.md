@@ -29,46 +29,9 @@
 | `same` | `same.ts` |  |
 | `stageWantsUser` | `stage.ts` | Questions the user for something: the page leads with it, the board flags it. |
 
-## `apps/mac/ui/vv/web/base`
+## `apps/mac/ui/infra`
 
-页面的纯地基
-
-| 名字 | 文件 | 说的是 |
-|---|---|---|
-| `useNow` | `dom.tsx` | The time, a new reading every `ms`: pooled per interval across active subscribers. |
-| `Keyed` | `dom.tsx` | Rebuilds its children whenever `key` changes, as a React key does: their state starts over. |
-| `createSettled` | `dom.tsx` | The value once it has stopped changing for `ms`: what is asked of the server while someone types. |
-| `variant` | `dom.tsx` |  |
-| `createExternal` | `external.ts` | A store outside Solid (subscribe, get) as an accessor. it notifies when `get` returns a different value. |
-| `ago` | `format.ts` |  |
-| `tookText` | `format.ts` |  |
-| `wallClockText` | `format.ts` |  |
-| `numberText` | `format.ts` | A whole number without its .0, as the server writes ids and counts. |
-| `momentText` | `format.ts` | A moment as a date and a time of day. |
-| `shortMomentText` | `format.ts` | A compact timestamp: HH:MM today, M/D HH:MM earlier this year, YYYY/M/D HH:MM before that. |
-| `yuan` | `format.ts` |  |
-| `big` | `format.ts` | A large count: ten thousands in Chinese (10k units), thousands in English (12k). |
-| `spentText` | `format.ts` |  |
-| `messageOf` | `format.ts` | What a thrown or rejected value says: an Error's message, anything else as text. |
-| `spanText` | `format.ts` | How long, in round words: rounded relative duration. |
-| `isObject` | `guards.ts` | Not null, not an array: a record to read keys of. |
-| `isObjectOrArray` | `guards.ts` | An object or an array. |
-| `SpriteManifest` | `manifests.ts` |  |
-| `CursorManifest` | `manifests.ts` |  |
-| `spelled` | `search.ts` | The text holds the query, ignoring case, or spells it in pinyin; query is lower case. |
-| `matches` | `search.ts` | Every word of the query is somewhere in the texts (spelled), ignoring case; an empty query matches everything. |
-| `compareText` | `search.ts` |  |
-| `or` | `search.ts` |  |
-| `shortcutPlaces` | `shortcuts.ts` |  |
-| `shortcuts` | `shortcuts.ts` |  |
-| `keyCap` | `shortcuts.ts` | A key's cap on the sheet. |
-| `useInterval` | `timer.ts` | fn every ms for as long as the reactive owner lives. |
-| `useTimeout` | `timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the reactive owner's end clears it. |
-| `typedMarks` | `typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
-
-## `apps/mac/ui/vv/web/infra`
-
-页面对外的地基：服务端、宿主、浏览器
+页面的纯地基、状态中间层与宿主适配
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
@@ -96,6 +59,45 @@
 | `uploadAudio` | `attachmentFile.ts` |  |
 | `playInput` | `attachmentFile.ts` |  |
 | `useInputFile` | `attachmentFile.ts` |  |
+| `useNow` | `base/dom.tsx` | The time, a new reading every `ms`: pooled per interval across active subscribers. |
+| `Keyed` | `base/dom.tsx` | Rebuilds its children whenever `key` changes, as a React key does: their state starts over. |
+| `createSettled` | `base/dom.tsx` | The value once it has stopped changing for `ms`: what is asked of the server while someone types. |
+| `variant` | `base/dom.tsx` |  |
+| `createExternal` | `base/external.ts` | A store outside Solid (subscribe, get) as an accessor. it notifies when `get` returns a different value. |
+| `ago` | `base/format.ts` |  |
+| `tookText` | `base/format.ts` |  |
+| `wallClockText` | `base/format.ts` |  |
+| `numberText` | `base/format.ts` | A whole number without its .0, as the server writes ids and counts. |
+| `momentText` | `base/format.ts` | A moment as a date and a time of day. |
+| `shortMomentText` | `base/format.ts` | A compact timestamp: HH:MM today, M/D HH:MM earlier this year, YYYY/M/D HH:MM before that. |
+| `yuan` | `base/format.ts` |  |
+| `big` | `base/format.ts` | A large count: ten thousands in Chinese (10k units), thousands in English (12k). |
+| `spentText` | `base/format.ts` |  |
+| `messageOf` | `base/format.ts` | What a thrown or rejected value says: an Error's message, anything else as text. |
+| `spanText` | `base/format.ts` | How long, in round words: rounded relative duration. |
+| `isObject` | `base/guards.ts` | Not null, not an array: a record to read keys of. |
+| `isObjectOrArray` | `base/guards.ts` | An object or an array. |
+| `SpriteManifest` | `base/manifests.ts` |  |
+| `CursorManifest` | `base/manifests.ts` |  |
+| `spelled` | `base/search.ts` | The text holds the query, ignoring case, or spells it in pinyin; query is lower case. |
+| `matches` | `base/search.ts` | Every word of the query is somewhere in the texts (spelled), ignoring case; an empty query matches everything. |
+| `compareText` | `base/search.ts` |  |
+| `or` | `base/search.ts` |  |
+| `shortcutPlaces` | `base/shortcuts.ts` |  |
+| `shortcuts` | `base/shortcuts.ts` |  |
+| `keyCap` | `base/shortcuts.ts` | A key's cap on the sheet. |
+| `useInterval` | `base/timer.ts` | fn every ms for as long as the reactive owner lives. |
+| `useTimeout` | `base/timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the reactive owner's end clears it. |
+| `typedMarks` | `base/typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
+| `call` | `bridge.ts` | One endpoint by name. Never rejects: failures are envelopes with a non-zero bizCode. |
+| `frame` | `bridge.ts` |  |
+| `frameRev` | `bridge.ts` | The frame's revision (reactive): goes up by one per frame this view received. |
+| `onFrame` | `bridge.ts` | Subscribes to each incoming frame payload on `name` (validating the FrameEnvelope wrapper). |
+| `onLive` | `bridge.ts` | Every LiveEvent from now on. Returns how to stop listening. |
+| `subscribe` | `bridge.ts` | One of rpc.ts's subscriptions (`channel.follow`, ...). `ended` gets `null` when the server ended it, |
+| `hostApi` | `bridge.ts` | The host's capabilities (packages/protocol's Host, desktop flavour) and the terminal. |
+| `act` | `bridge.ts` | Intent for the shell (VibeValley's own panels): open a file, stage, switch project... |
+| `viewName` | `bridge.ts` | Which surface this view shows (set by Rust before the bundle loads). |
 | `useBridge` | `bridged.ts` |  |
 | `fixtureTransport` | `fixtures.ts` | `subscriptions`: the events each subscription (by name) sends at once; it then stays open, as a quiet stream would. |
 | `useForm` | `form.ts` |  |
@@ -125,7 +127,6 @@
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `fetchArtifactView` | `gateway.ts` | Fetches a store artifact's rendered HTML viewer document through the native `artifact.view` op. |
 | `currentHost` | `host.ts` |  |
-| `localDay` | `localDay.ts` |  |
 | `retryRead` | `query.ts` |  |
 | `refetchOnRelink` | `query.ts` |  |
 | `cursorsQuery` | `query.ts` |  |
@@ -178,6 +179,47 @@
 | `search` | `router/search.ts` |  |
 | `useSaveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
 | `useUpdates` | `settings.ts` | The desktop's own update as it is now and as it changes (Host.update); undefined where the host is not updated from |
+| `createSignal` | `solid.ts` |  |
+| `createSignal` | `solid.ts` |  |
+| `createSignal` | `solid.ts` |  |
+| `createMemo` | `solid.ts` |  |
+| `createEffect` | `solid.ts` | Solid 2's split effect: `compute` is tracked, `apply(value, prev)` runs |
+| `onSettled` | `solid.ts` | Runs once the owner has mounted; its returned function runs when the owner goes. |
+| `onCleanup` | `solid.ts` |  |
+| `untrack` | `solid.ts` |  |
+| `deep` | `solid.ts` | Tracks a value as a whole; nsh's plain objects are not reactive, so the value is returned as it is. |
+| `createContext` | `solid.ts` |  |
+| `useContext` | `solid.ts` | An nsh context is its own accessor. |
+| `getOwner` | `solid.ts` | nsh has no owner handle; callers only test it for presence. |
+| `atom` | `state/atom.ts` |  |
+| `Registry` | `state/atom.ts` | Where atoms' values live: the page's one, or a test's or a story's own. |
+| `pageRegistry` | `state/atom.ts` | The page's one registry. |
+| `RegistryContext` | `state/atom.ts` | Every atom's value lives in one registry for the page; the page's own unless a test or a story gives another. |
+| `useRegistry` | `state/atom.ts` |  |
+| `useAtom` | `state/atom.ts` | An atom's value as an accessor: subscribed while the component lives, never suspending. |
+| `onPage` | `state/atom.ts` | The atom held for the registry's life, built and subscribed lazily on first access rather than at module import. |
+| `defineAtom` | `state/atom.ts` | A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). |
+| `linkIn` | `state/atom.ts` | Whether the state stream is up now, read from its source: subscribing would open and close the stream. |
+| `framesIn` | `state/atom.ts` | The registry's frames now. |
+| `subscribeFrames` | `state/atom.ts` | Hears each frame of the registry's source, and follows the source when a test swaps it; the stream stays open meanwhile. |
+| `useLatest` | `state/atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
+| `bySeq` | `state/intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. |
+| `defineIntent` | `state/intent.ts` |  |
+| `sendReplacing` | `state/intent.ts` | A setting the user changes again before the first change showed (a reaction off and on, a level picked twice). |
+| `useIntents` | `state/intent.ts` | A type's intents in the page's registry, with the list as an accessor. |
+| `ScaleValues` | `state/prefs.ts` | The workbench's size, in percent; the farm keeps its own whole-number scaling. |
+| `StartValues` | `state/prefs.ts` | Where / opens. |
+| `prefsNow` | `state/prefs.ts` | The choices now; read in a computation or a component, it follows them. |
+| `setTheme` | `state/prefs.ts` |  |
+| `setScale` | `state/prefs.ts` |  |
+| `setStart` | `state/prefs.ts` |  |
+| `setLibraryTile` | `state/prefs.ts` |  |
+| `setWidth` | `state/prefs.ts` | A pane's width; none puts it back to its default. |
+| `rememberPick` | `state/prefs.ts` | Who and where an issue was given to, for the next quick add and the farm's next job: "" for no one is the orchestrator's. |
+| `usePrefs` | `state/prefs.ts` | One of the choices, following it. |
+| `shownTheme` | `state/prefs.ts` | The theme the workbench shows: "system" worked out from the system's own. Read again when the choice changes. |
+| `defineStored` | `state/stored.ts` | A choice kept on this machine, read and set as the page's value; `name` is unique across the page. |
+| `orFallback` | `state/stored.ts` | A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not throw away the others. |
 | `useTable` | `table.ts` |  |
 | `defineColumns` | `table/model.ts` |  |
 | `createTable` | `table/model.ts` |  |
@@ -185,50 +227,12 @@
 | `setTransport` | `transport.ts` | Swaps the transport (at start-up: the bridge, or a story's fixtures). |
 | `onTransportChange` | `transport.ts` |  |
 
-## `apps/mac/ui/vv/web/state`
-
-页面的中间层：意图、存下的选择、原子
-
-| 名字 | 文件 | 说的是 |
-|---|---|---|
-| `atom` | `atom.ts` |  |
-| `Registry` | `atom.ts` | Where atoms' values live: the page's one, or a test's or a story's own. |
-| `pageRegistry` | `atom.ts` | The page's one registry. |
-| `RegistryContext` | `atom.ts` | Every atom's value lives in one registry for the page; the page's own unless a test or a story gives another. |
-| `useRegistry` | `atom.ts` |  |
-| `useAtom` | `atom.ts` | An atom's value as an accessor: subscribed while the component lives, never suspending. |
-| `onPage` | `atom.ts` | The atom held for the registry's life, built and subscribed lazily on first access rather than at module import. |
-| `defineAtom` | `atom.ts` | A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). |
-| `linkIn` | `atom.ts` | Whether the state stream is up now, read from its source: subscribing would open and close the stream. |
-| `framesIn` | `atom.ts` | The registry's frames now. |
-| `subscribeFrames` | `atom.ts` | Hears each frame of the registry's source, and follows the source when a test swaps it; the stream stays open meanwhile. |
-| `useLatest` | `atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
-| `bySeq` | `intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. |
-| `defineIntent` | `intent.ts` |  |
-| `sendReplacing` | `intent.ts` | A setting the user changes again before the first change showed (a reaction off and on, a level picked twice). |
-| `useIntents` | `intent.ts` | A type's intents in the page's registry, with the list as an accessor. |
-| `ScaleValues` | `prefs.ts` | The workbench's size, in percent; the farm keeps its own whole-number scaling. |
-| `StartValues` | `prefs.ts` | Where / opens. |
-| `prefsNow` | `prefs.ts` | The choices now; read in a computation or a component, it follows them. |
-| `setTheme` | `prefs.ts` |  |
-| `setScale` | `prefs.ts` |  |
-| `setStart` | `prefs.ts` |  |
-| `setLibraryTile` | `prefs.ts` |  |
-| `setWidth` | `prefs.ts` | A pane's width; none puts it back to its default. |
-| `rememberPick` | `prefs.ts` | Who and where an issue was given to, for the next quick add and the farm's next job: "" for no one is the orchestrator's. |
-| `usePrefs` | `prefs.ts` | One of the choices, following it. |
-| `shownTheme` | `prefs.ts` | The theme the workbench shows: "system" worked out from the system's own. Read again when the choice changes. |
-| `defineStored` | `stored.ts` | A choice kept on this machine, read and set as the page's value; `name` is unique across the page. |
-| `orFallback` | `stored.ts` | A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not throw away the others. |
-
 ## `packages/testkit/src`
 
 测试共用：等待、金字塔、语法树
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
-| `layers` | `pyramid.ts` |  |
-| `budgetMs` | `pyramid.ts` | What a test of each layer may take, in ms. |
 | `pyramid` | `pyramid.ts` | The layers of the files under root (a package's folder). |
 | `programOf` | `source.ts` | The file's program; path's extension says whether it is TSX. |
 | `edgesOf` | `source.ts` | Every import, export … from and dynamic import() of a string. |

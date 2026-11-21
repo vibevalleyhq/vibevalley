@@ -6,7 +6,7 @@ Status: proposed
 
 在全原生 macOS 迁移（PR #258–#262）合入 `main`（`17f9b1e6d`）之后，VibeValley 已明确成为一个**仅面向 macOS 本机单用户**的原生桌面工作台，但仓库和产品形态仍背着两层历史包袱：
 
-1. **信息架构过重**：工作台主侧栏（[places.ts](apps/mac/ui/vv/web/app/places.ts)、[Shell.tsx](apps/mac/ui/vv/web/app/Shell.tsx)）并列 11 个一级入口，开发者调试用的 `/catalog` 占在一级主栏，AI 团队配置被切碎在 `档案`、`农机`、设置里的 `技能` 与 `记忆` 四处，`/workspace` 与 `/repos` 平行并立，`素材库`、`/artifacts` 与 `笔记` 各自抢位；设置页拆成了 12 个子页。
+1. **信息架构过重**：工作台主侧栏（[places.ts](apps/mac/ui/app/places.ts)、[Shell.tsx](apps/mac/ui/app/Shell.tsx)）并列 11 个一级入口，开发者调试用的 `/catalog` 占在一级主栏，AI 团队配置被切碎在 `档案`、`农机`、设置里的 `技能` 与 `记忆` 四处，`/workspace` 与 `/repos` 平行并立，`素材库`、`/artifacts` 与 `笔记` 各自抢位；设置页拆成了 12 个子页。
 2. **术语体系过重**：[docs/README.md](docs/README.md) 维护 79 行词汇映射，`农机`、`档案`、`帮工`、`帮手`、`记性`、`田头`、`空位`、`串` 等内部或农场词泄漏进工作台与模型/CLI 文案，同时混着未汉化的 `Artifact`、`Inbox`。
 3. **前端与包结构有移植残留与双轨漂移**：磁盘上有 11 个 0 追踪文件的旧目录（`apps/web`、`apps/mobile`、`packages/{ai,async,base-ui,bridge,engine,health,home,provider,stories}`）；工作台深埋在 `apps/mac/ui/vv/web/` 五层嵌套里；宿主壳面（`apps/mac/ui/surfaces/`，读 `tokens.ts`）与工作台（`apps/mac/ui/vv/web/`，读 `theme.json`）分成两套组件和令牌读取链路；只有原生端使用的 `packages/pkm`、`packages/artifact` 仍隔包挂着。
 4. **Rust Workspace 与模块层次偏碎**：`crates/` 存在 29 个扁平 crate（含 100–600 行胶水 crate 如 `vibevalley-server-api`、`vibevalley-home`、`vibevalley-i18n`、`vibevalley-pixel`、`vibevalley-highlight`、`vibevalley-bridge`，以及只在桌面壳使用的 `terminal`/`workspace`/`pixel`/`highlight` 与核心服务端混排）；[crates/vibevalley-server/src/modules/mod.rs](crates/vibevalley-server/src/modules/mod.rs) 下 26 个模块完全平铺；[apps/mac/src/shell.rs](apps/mac/src/shell.rs) 超过 3,200 行。

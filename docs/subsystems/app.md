@@ -24,12 +24,12 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | `apps/mac/src/command_line.rs`、`tray.rs`、`island.rs` | 命令行符号链接、菜单栏摘要、灵动岛进程与工单摘要 |
 | `apps/mac/src/terminal/`、`viewer.rs`、`diff.rs` | 终端（`crates/vibevalley-terminal`）、文件查看、diff |
 | `apps/mac/src/pixel/` | 像素场景：农场、地图、记忆树、开场、图鉴（[农场的皮](docs/subsystems/farm.md)） |
-| `apps/mac/src/theme.rs`、`apps/mac/ui/tokens.ts` | 外壳的主题和设置；两边的值一样 |
+| `apps/mac/src/theme.rs`、`apps/mac/ui/design/tokens.ts` | 外壳的主题和设置；两边的值一样 |
 | `apps/mac/src/debug.rs` | 不看屏幕检查应用的两个入口：状态转储和脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） |
-| `apps/mac/ui/App.tsx`、`bridge.ts`、`surfaces/`、`components/` | TSX 包的入口（按 `host.params.view` 挑视图）、桥的页面一半、外壳的面（侧栏、命令面板、Markdown 窗格）和它们的零件 |
-| `apps/mac/ui/vv/VibeValley.tsx`、`vv/web/` | 工作台：`app/`（路由表 `App.tsx`、导航 `places.ts`、外框 `Shell.tsx`）、`features/<概念>/`、`ui/`、`state/`、`infra/`、`base/` |
-| `apps/mac/ui/vv/solid.ts`、`polyfill.ts` | 工作台的页面沿用 Solid 的写法；这两个文件在 nsh 的响应式上给出它们用到的那部分 |
-| `apps/mac/ui/vv/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)） |
+| `apps/mac/ui/App.tsx`、`infra/bridge.ts`、`workspace/` | TSX 包的入口（按 `host.params.view` 挑视图）、桥的页面一半、外壳工作区（侧栏、文件树、Git、命令面板、Markdown 窗格） |
+| `apps/mac/ui/{app,features,design,infra}/` | 工作台：`app/`（路由表 `Workbench.tsx`、导航 `places.ts`、外框 `Shell.tsx`）、`features/<概念>/`、`design/`（共用的设计原语与像素原语）、`infra/`（状态、请求桥、基础工具） |
+| `apps/mac/ui/infra/{solid,polyfill}.ts` | 工作台的页面沿用 Solid 的写法；这两个文件在 nsh 的响应式上给出它们用到的那部分 |
+| `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)） |
 | `crates/vibevalley-bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
 | `crates/vibevalley-workspace/` | 项目、布局和终端的模型，和它们存的库（`store`） |
 | `packages/protocol/src/host.ts` | `Host` 接口：页面能向宿主要的东西 |
@@ -46,9 +46,9 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 ### 工单里的子任务
 
-工单详情和档案的会话轨迹读取服务端的子任务摘要。每行显示任务、最近确认的状态、活动和时间。看板和工单列表也显示等待对象。等待对象与任务创建者分别显示。Codex 等待协作消息时，面板显示等待消息。若任务描述缺失，面板显示厂商提供的名称或线程标识。展开一行可看该线程报告的计划，以及该轮该线程的近期工作日志。日志只保留最近 240 步。较早的步骤移出后，页面仍保留服务端给出的任务摘要。进度连接中断时，面板显示中断时间与最后确认的状态。打开工单的轮次记录可查看以前各轮的子任务。[子任务面板](apps/mac/ui/vv/web/features/session/SubagentProgress.tsx)
+工单详情和档案的会话轨迹读取服务端的子任务摘要。每行显示任务、最近确认的状态、活动和时间。看板和工单列表也显示等待对象。等待对象与任务创建者分别显示。Codex 等待协作消息时，面板显示等待消息。若任务描述缺失，面板显示厂商提供的名称或线程标识。展开一行可看该线程报告的计划，以及该轮该线程的近期工作日志。日志只保留最近 240 步。较早的步骤移出后，页面仍保留服务端给出的任务摘要。进度连接中断时，面板显示中断时间与最后确认的状态。打开工单的轮次记录可查看以前各轮的子任务。[子任务面板](apps/mac/ui/features/session/SubagentProgress.tsx)
 
-工单的最近轮次带有工作目录核对标记时，看板、列表与详情从会话摘要显示核对提示。新轮执行期间，页面收起上一轮的提示。轮次记录保留历史提示。查看改动会打开该工单当前的 Git 差异。[工单详情](apps/mac/ui/vv/web/features/issue/views/IssueDetail.tsx)
+工单的最近轮次带有工作目录核对标记时，看板、列表与详情从会话摘要显示核对提示。新轮执行期间，页面收起上一轮的提示。轮次记录保留历史提示。查看改动会打开该工单当前的 Git 差异。[工单详情](apps/mac/ui/features/issue/views/IssueDetail.tsx)
 
 从看板或列表打开工单后，按 Escape 可回到原卡片。窄窗还会恢复原卡片所在的列。
 
@@ -62,7 +62,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 页面经 nsh 的 `host.post("action", …)` 发动作，Rust 经 `HostChannel` 的事件回（`crates/vibevalley-bridge/src/lib.rs` 开头的表）：
 
-| 页面（`apps/mac/ui/bridge.ts`） | 动作 | 回来的事件 |
+| 页面（`apps/mac/ui/infra/bridge.ts`） | 动作 | 回来的事件 |
 |---|---|---|
 | `call(op, payload)` | `call` | `reply:<id>`，契约的信封 `{ bizCode, message, data?, error? }` |
 | `frame("state")` | `watch` | `frame:state`，工作台的最新状态。页面用 `applied` 确认修订号。慢窗口可跳过中间修订。 |
@@ -71,7 +71,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | `hostApi.<名字>` | `call`，`op` 是 `host.<名字>` | 外壳的 `Shell::host_call` 答 |
 
 - **`call` 不抛**：失败是 `bizCode` 非 0 的信封；没有宿主或超时回 `ServiceUnavailable`。
-- **工作台的请求只经 `Transport`**（`apps/mac/ui/vv/web/infra/transport.ts`）：`VibeValleyApi.over` 直接在契约信封上收发，不绕合成的 HTTP `Request`/`Response`；应用里是桥（`bridged.ts` 的 `useBridge()`），测试和故事换成自己的（`infra/fixtures.ts`）；页面的代码不直接碰 `host`。
+- **工作台的请求只经 `Transport`**（`apps/mac/ui/infra/transport.ts`）：`VibeValleyApi.over` 直接在契约信封上收发，不绕合成的 HTTP `Request`/`Response`；应用里是桥（`bridged.ts` 的 `useBridge()`），测试和故事换成自己的（`infra/fixtures.ts`）；页面的代码不直接碰 `host`。
 
 ### 页面状态与数据流
 
@@ -133,5 +133,5 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 - `vp run rust:check`：`apps/mac` 和它用的 crate 的格式、clippy 与测试（`apps/mac/src/pixel/tests.rs` 用真的素材和替身服务端的样例画每个场景）。
 - `vp run mac:check`：`apps/mac/ui` 的 nsh 类型检查与打包。
-- `apps/mac/ui/vv/app/*.test.tsx`、`apps/mac/ui/components/*.test.tsx`：`nsh/test` 写的页面测试和截图，用样例的 `Transport`。
+- `apps/mac/ui/app/*.test.tsx`、`apps/mac/ui/features/{pkm,artifact}/*.test.ts`：`nsh/test` 写的页面与领域逻辑测试和截图，用样例的 `Transport`。
 - 在真的应用上：照 [验收的应用分册](.agents/skills/vv-acceptance/references/app.md)，用 `VIBEVALLEY_DEBUG_SCRIPT` 走一遍并截图。

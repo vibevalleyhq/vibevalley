@@ -13,7 +13,7 @@
 - **语音朗读状态机（`apps/mac/src/speech_audio.rs`）**：围绕四态枚举 `Phase` 运转：`Idle` → `Playing` → `Draining` → `Stopping`，并通过 `Claim` 句柄绑定服务端 `SharedSpeechStreams` 的生命周期回收通知。
 - **实时双工通话（`apps/mac/src/live_voice.rs`）**：独立 `moss-live` 线程建立 WebSocket 语音流，维护四态 `Phase`（`Idle` / `Connecting` / `Live` / `Stopping`）、静音开关 `muted` 以及实时识别双轨字幕 `heard` / `said`。
 
-### 程序化 8-bit 音效合成器（`apps/mac/src/audio.rs` 与 `apps/mac/ui/vv/web/ui/pixel/sound.ts`）
+### 程序化 8-bit 音效合成器（`apps/mac/src/audio.rs` 与 `apps/mac/ui/design/pixel/sound.ts`）
 
 像素农场的界面动作与帮工提示音由原生合成器实时计算 PCM 波形并缓存标准 WAV 字节序列：
 
@@ -22,7 +22,7 @@
 
 ## 5.2 多模态媒体查看与素材库
 
-素材库与多模态查看分布于 `apps/mac/ui/vv/web/features/media/` 与 `apps/mac/ui/vv/web/ui/Lightbox.tsx`：
+素材库与多模态查看分布于 `apps/mac/ui/features/media/` 与 `apps/mac/ui/design/Lightbox.tsx`：
 
 - **灯箱（`Lightbox.tsx`）**：点击图片或媒体附件后全屏浮动于页面上方（`bg-scrim z-30`），一次展示一张，支持键盘左右方向键（`left`/`right`）翻页、ESC 关闭以及「用系统应用打开原文件」。
 - **附件去重与展示（`AttachmentTile.tsx`）**：上传媒体经服务端按 SHA-256 哈希去重归档，工作台统一以统一磁贴渲染图标/缩略图、文件名与体积。
@@ -35,16 +35,16 @@
 
 应用内存在两层相互独立的分栏调节系统：
 
-1. **工作台页面内分栏（`apps/mac/ui/vv/web/ui/Splitter.tsx` 与 `state/prefs.ts`）**：
+1. **工作台页面内分栏（`apps/mac/ui/design/Splitter.tsx` 与 `apps/mac/ui/infra/state/prefs.ts`）**：
    - `Splitter` 在面板边缘放置 `1px` 视觉分割线配隐形扩宽拖拽热区，`side` 参数指明分栏线位于被调节面板的哪一侧，从而保证「向外拖动总是加宽面板、向内拖动总是收窄面板」。
-   - `usePaneWidth(pane, fallback, limits)` 实时写入 `state/prefs.ts`，通过 `state/stored.ts` 在 `localStorage` 中以 `vibevalley.prefs` 键落盘；读取使用 `orFallback(schema, default)` 做字段级 Zod 容错，避免单个损坏字段清零整份用户偏好。
+   - `usePaneWidth(pane, fallback, limits)` 实时写入 `apps/mac/ui/infra/state/prefs.ts`，通过 `state/stored.ts` 在 `localStorage` 中以 `vibevalley.prefs` 键落盘；读取使用 `orFallback(schema, default)` 做字段级 Zod 容错，避免单个损坏字段清零整份用户偏好。
 2. **原生 GPUI 壳侧边栏与多窗格树（`apps/mac/src/shell.rs` & `panes.rs`）**：
    - 原生工作区 `/workspace` 的左侧项目栏与右侧检查器默认宽度均为 `280.0`，拖拽允许范围为 `SIDEBAR_MIN = 180.0` 到 `SIDEBAR_MAX = 560.0`。右侧检查器在窗口宽度低于 `1040.0px` 时自动隐藏（不破坏已有偏好设置）。
    - 主工作区内部通过 `vibevalley_workspace::Layout` 树支持水平/垂直任意递归切分；`SplitBounds` 缓存上一帧每个拆分节点在屏幕上的几何矩形，拖拽分割线时直接计算被共享相邻子窗格之间的精确分配比例（截断在 `[0.0, 1.0]`）。
 
 ## 5.4 Artifact 三态运行时与沙箱预览
 
-Artifact 页面实现于 `apps/mac/ui/vv/web/features/artifact/`（`ArtifactsPage.tsx`、`PresenterPage.tsx`、`store.ts`、`HtmlFrame.tsx`）：
+Artifact 页面实现于 `apps/mac/ui/features/artifact/`（`ArtifactsPage.tsx`、`PresenterPage.tsx`、`store.ts`、`HtmlFrame.tsx`）：
 
 - **三种产物形态**：
   1. **结构化文档块（`blocks`）**：按块序列渲染的交互式富文档与图文组件。
@@ -78,5 +78,5 @@ Artifact 页面实现于 `apps/mac/ui/vv/web/features/artifact/`（`ArtifactsPag
 
 ### 工作台内嵌代码与图表（`CodeBlock.tsx` 与 `Diagram.tsx`）
 
-- **代码块（`apps/mac/ui/vv/web/ui/code/CodeBlock.tsx`）**：内嵌行内语法着色，默认超出 16 行时折叠并给出展开全文与一键复制按钮。
-- **图表（`apps/mac/ui/vv/web/ui/code/Diagram.tsx`）**：识别 Markdown 中的 Mermaid 图表栅栏块并调度渲染成可阅读矢量图。
+- **代码块（`apps/mac/ui/design/code/CodeBlock.tsx`）**：内嵌行内语法着色，默认超出 16 行时折叠并给出展开全文与一键复制按钮。
+- **图表（`apps/mac/ui/design/code/Diagram.tsx`）**：识别 Markdown 中的 Mermaid 图表栅栏块并调度渲染成可阅读矢量图。

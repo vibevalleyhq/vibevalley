@@ -20,7 +20,7 @@ pub struct ThemePalette {
 }
 
 impl ThemePalette {
-    /// VibeValley warm light workbench palette (`apps/mac/ui/vv/theme.json`).
+    /// VibeValley warm light workbench palette (`apps/mac/ui/design/theme.json`).
     pub fn light() -> Self {
         Self {
             background: "#fcfcfb".to_string(),
@@ -61,7 +61,7 @@ impl ThemePalette {
         }
     }
 
-    /// VibeValley warm dark workbench palette (`apps/mac/ui/vv/theme.json`).
+    /// VibeValley warm dark workbench palette (`apps/mac/ui/design/theme.json`).
     pub fn dark() -> Self {
         Self {
             background: "#151413".to_string(),

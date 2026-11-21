@@ -1,19 +1,19 @@
 // Entry of every hosted view. Rust sets `host.params.view` before the
 // bundle loads; one bundle serves all surfaces.
-import "./vv/polyfill";
+import "./infra/polyfill";
 import { host, mount, Text, View, type Component } from "nsh";
 
 import { setLocale } from "@vibevalley/i18n";
 
-import { viewName } from "./bridge";
-import { BridgeProbe } from "./surfaces/BridgeProbe";
-import { MarkdownPane } from "./surfaces/MarkdownPane";
-import { Palette } from "./surfaces/Palette";
-import { Sidebar } from "./surfaces/Sidebar";
-import { tok } from "./tokens";
-import { FarmForm } from "./vv/farm/FarmForm";
-import { FarmPhone } from "./vv/farm/FarmPhone";
-import { VibeValley } from "./vv/VibeValley";
+import { VibeValley } from "./app/VibeValley";
+import { tok } from "./design/tokens";
+import { FarmForm } from "./farm/FarmForm";
+import { FarmPhone } from "./farm/FarmPhone";
+import { viewName } from "./infra/bridge";
+import { BridgeProbe } from "./workspace/BridgeProbe";
+import { MarkdownPane } from "./workspace/MarkdownPane";
+import { Palette } from "./workspace/Palette";
+import { Sidebar } from "./workspace/Sidebar";
 
 function Unknown() {
   return (

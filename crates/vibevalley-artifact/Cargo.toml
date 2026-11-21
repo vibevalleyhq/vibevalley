@@ -3,7 +3,7 @@ name = "vibevalley-artifact"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "VibeValley's packages/artifact: block ops, Markdown in and out, the HTML check, words edited in a page, the shell"
+description = "VibeValley's artifact engine: block ops, Markdown in and out, the HTML check, words edited in a page, the shell"
 
 [dependencies]
 vibevalley-core = { version = "0.1.0", path = "../vibevalley-core" }

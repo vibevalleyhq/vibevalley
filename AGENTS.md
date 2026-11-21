@@ -21,14 +21,13 @@ crates/vibevalley-home/    家目录在磁盘上的约定：在哪、server.json
 crates/vibevalley-i18n/    对用户说的话：locales/<语言>/<宿主.模块>.json 的词典，Rust 里 t("key")
 crates/vibevalley-*        其余：git、files、highlight、terminal、workspace（应用外壳的项目、布局、终端与持久化）、pkm、artifact、cron
 apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
-                           ui/ 是 nsh 跑的 TSX：surfaces/ 和 components/ 是外壳的面，vv/web/ 是工作台（app、features/<概念>、ui、state、infra、base）
+                           ui/ 是 nsh 跑的 TSX：app、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含笔记与作品前端引擎）、farm、infra
 apps/island/               刘海上的灵动岛（Swift）：单独的小程序（apps/island/README.md）
 apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成），图和像素字用根目录 assets/ 的
 assets/                    全部的图、像素字、指针和像素村的地图
 packages/protocol/         页面用的契约：src/<概念>/shapes.gen.ts 和 endpoints.gen.ts 是生成的；Zod（schema.ts）、端点表（api.ts）、双端规则（rules/）、
                            client.ts、宿主接口（host.ts）是手写的
 packages/i18n/             页面里 t("key")：src/catalogs.ts 由 i18n:gen 从 crates/vibevalley-i18n/locales 写出
-packages/pkm/、artifact/   笔记和 Artifact 在页面这边的纯逻辑；和 Rust 的同名 crate 共用 golden
 packages/testkit/、tsrs/   测试共用的；vp check 用的 TypeScript（tsrs）
 design/                    生图提示词、脚本和切图规则；原图在单独的仓库 vibevalley-art，design/art.sh 链接进来
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
@@ -51,7 +50,7 @@ vp run rust:check                                               # 改完 crates/
 vp run protocol:ts                                              # 改了 crates/vibevalley-protocol/src/contract：重写 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
 sqlc generate                                                   # 改完 SQLite 表结构或命名查询：重写各模块的 generated/queries.rs
 vp run sql:check                                                # 用 sqlc 1.31.1 对账 Rust 绑定；用 Python 3 的 SQLite 按参数个数预编译每条查询
-vp run goldens                                                  # 改了 packages/pkm、packages/artifact 的规则：重写两个 crate 的 golden
+vp run goldens                                                  # 改了笔记/作品规则或对照用例：跑 Rust 两个 crate 的 golden 测试
 vp run protocol:check                                           # 生成的 TS 契约和两份 golden 是不是最新，和提交的不同就失败
 vp run mac:check                                                # 改完 apps/mac/ui：nsh 类型检查、打包和工单按钮行为测试
 vp check                                                        # 改完 apps/mac/ui 以外的 TS：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和类型；--fix 改格式
@@ -99,8 +98,8 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **处理函数要薄**：HTTP 门、桥和页面组件只做转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。
 - **执行会话没有权限确认**：服务端只听 `127.0.0.1`，执行会话只在工作区开工（[执行会话](docs/subsystems/session.md)）。
 - **包之间只经包名**：TS 跨包只经 `package.json` 的 `exports` 写 `@vibevalley/*`（`no-cross-package-path` 查）；Rust 跨 crate 只经 `Cargo.toml` 的依赖。
-- **图标分两套**：工作台用 `apps/mac/ui/vv/web/ui/icons.ts` 注册的 reicon 线条图标（`<Icon name>`），像素皮与头像、引擎 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
-- **界面照田间工作台**：工作台的颜色、圆角、字号、阴影和缓动一律走令牌（`apps/mac/ui/vv/theme.json` 与 `apps/mac/ui/nsh.json`），外壳的走 `apps/mac/ui/tokens.ts` 与 `apps/mac/src/theme.rs`；照 [设计系统](docs/design/README.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)，class 写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
+- **图标分两套**：工作台用 `apps/mac/ui/design/icons.ts` 注册的 reicon 线条图标（`<Icon name>`），像素皮与头像、引擎 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
+- **界面照田间工作台**：工作台和原生壳面的颜色、圆角、字号、阴影和缓动一律走 `design/tokens.json`（由 `vp run tokens:gen` 同步写出 `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json`、`apps/mac/ui/design/tokens.ts` 与 `apps/mac/src/theme_tokens.rs`）；照 [设计系统](docs/design/README.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)，class 写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
 - **密钥**：家目录的 `settings.json` 不进仓库；日志、快照和文档里不出现真实密钥。
 - **话放在哪**：对用户的话进 `crates/vibevalley-i18n/locales/{zh,en}/<宿主.模块>.json`，Rust 调 `vibevalley_i18n::t`，TS 调 `t("key")`（`vpx scripts/gen/i18n.ts check` 查漏翻）；对模型的话用中文写进 `crates/vibevalley-server/assets`（[话放在哪](docs/subsystems/foundation.md)）。
 - **代码风格**：代码和接口用实际业务概念，种地双关只留在农场的皮里（`stale-names.ts` 查，[用语表](docs/README.md#用语)）；命名站在领域视角说管什么事，不用 `utils`、`state` 一类泛词（[命名](docs/style/naming.md)）；英文注释只写不看就会改错的约束与原因（[代码风格](docs/style/code.md)）。

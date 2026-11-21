@@ -30,7 +30,7 @@
 | `crates/vibevalley-server/src/modules/tool/notes.rs` | 助手与帮工的 `media_*`、`library_item_*` 工具 |
 | `crates/vibevalley-server/src/offline.rs` | 测试用的离线 MOSS 与下载 |
 | `crates/vibevalley-protocol/src/contract/media.rs`、`packages/protocol/src/media/` | 媒体任务、输入与素材库的形状和接口（Rust 为源，TS 形状由它生成） |
-| `apps/mac/ui/vv/web/features/media/` | `/library`：筛选栏、缩略图、详情栏、工具条、上传、键盘和「生成」对话框；排法、计数、筛选和键盘落点在 `items.ts` 纯函数 |
+| `apps/mac/ui/features/media/` | `/library`：筛选栏、缩略图、详情栏、工具条、上传、键盘和「生成」对话框；排法、计数、筛选和键盘落点在 `items.ts` 纯函数 |
 
 接口权限见[接口清单](docs/reference/capabilities.md)（`media.*`、`library.*`）。生图、语音及任务读取对 `user` 与 `orchestrator` 开放，帮工没有生成权限；助手只有承接用户输入的一轮才能生成，自主巡查不能生成。
 
@@ -147,6 +147,6 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 - `crates/vibevalley-server/tests/media_kinds.rs`：离线 MOSS 上的多人对白、音色设计、克隆、转写（任务与流）和理解：同一请求不重做、结果与释放、厂商失败与未知、下载单独重试、手动接续、重启后接续或记未知、厂商文件清理与重试、助手凭授权启动理解。
 - `crates/vibevalley-server/tests/media_inputs.rs`：输入经暂存放进附件、删输入不删字节、伪装文件和不对的大小被拒、保留、准入回滚、过期与重启。
 - `crates/vibevalley-server/tests/library.rs`：聊天附件和完成任务各记一次、拿掉不删文件、来源不唯一或不是公网、不是调用者能给的被拒。
-- `apps/mac/ui/vv/app/scenarios.test.tsx`：素材库与多密度场景页面测试（`nsh/test`）。
+- `apps/mac/ui/app/scenarios.test.tsx`：素材库与多密度场景页面测试（`nsh/test`）。
 
 真实厂商、真实播放的验收方法见[媒体验收](.agents/skills/vv-acceptance/references/media.md)。

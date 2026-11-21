@@ -1,26 +1,26 @@
 ---
 name: vv-tailwind
-description: 在 VibeValley 的工作台（apps/mac/ui/vv/web，nsh 的 Tailwind class）和官网（apps/site，Tailwind v4）里写、改、评审样式：令牌在哪、class 只叫令牌的名字、半透明的颜色和动态的值怎么写、变体、零件怎么收调用方的 class、怎么截图验证。用在：新写或改界面样式；把写死的 style 换成 class；官网的 lint 报 vibevalley/style-attrs；用户说「Tailwind 写法」「换成 class」「样式不生效」。
+description: 在 VibeValley 的工作台（apps/mac/ui，nsh 的 Tailwind class）和官网（apps/site，Tailwind v4）里写、改、评审样式：令牌在哪、class 只叫令牌的名字、半透明的颜色和动态的值怎么写、变体、零件怎么收调用方的 class、怎么截图验证。用在：新写或改界面样式；把写死的 style 换成 class；官网的 lint 报 vibevalley/style-attrs；用户说「Tailwind 写法」「换成 class」「样式不生效」。
 ---
 
 # 写 Tailwind
 
 两处用 Tailwind 的写法，底下不是同一个东西：
 
-| | 工作台 `apps/mac/ui/vv/web` | 官网 `apps/site` |
+| | 工作台 `apps/mac/ui` | 官网 `apps/site` |
 |---|---|---|
 | 谁读 class | nsh（不是浏览器，没有 CSS 文件） | Tailwind v4 的 Vite 插件 |
 | 元素 | nsh 的 `View`、`Text` 等，属性是 `class` 和对象 `style` | DOM 元素 |
-| 令牌在哪 | 颜色在 `apps/mac/ui/vv/theme.json`，字号、圆角、缓动、字体、阴影在 `apps/mac/ui/nsh.json` 的 `tailwind` | `apps/site/src/ui/global.css` 的 `@theme static` |
+| 令牌在哪 | 颜色在 `apps/mac/ui/design/theme.json`，字号、圆角、缓动、字体、阴影在 `apps/mac/ui/nsh.json` 的 `tailwind` | `apps/site/src/ui/global.css` 的 `@theme static` |
 | 谁查 | `vp run mac:check` 只查类型；lint 不扫 `apps/mac/ui` | `vp check`：`vibevalley/style-attrs` 拦 `className`、`classList` 和只写死值的 `style` |
 
-外壳的面（`apps/mac/ui/surfaces`、`components`）不用 class：它们用对象 `style` 读 `apps/mac/ui/tokens.ts` 的 `tok()`，值和 `apps/mac/src/theme.rs` 一样。
+工作区外壳组件（`apps/mac/ui/workspace`、`apps/mac/ui/design/surface.tsx`）主要用对象 `style` 读 `apps/mac/ui/design/tokens.ts` 的 `tok()`，值和 `apps/mac/src/theme.rs` 一样，同时复用 `design/Tip` 的 `Bubble` 与 `design/Button` 的 `Button`。
 
 ## 先读哪里
 
 1. [哲学与令牌](docs/design/01-philosophy-and-tokens.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)：挑哪一档令牌、原子组件的样子、交之前的自查。
 2. 令牌的文件（上表）。
-3. 照着抄的零件：[Button](apps/mac/ui/vv/web/ui/Button.tsx)（变体表、按下、禁用、字另起一个 `Text`）、[Tag](apps/mac/ui/vv/web/ui/Tag.tsx)（半透明的底、`Dot` 的动态尺寸）、[Icon](apps/mac/ui/vv/web/ui/Icon.tsx)（颜色按令牌名传）。
+3. 照着抄的零件：[Button](apps/mac/ui/design/Button.tsx)（变体表、按下、禁用、字另起一个 `Text`）、[Tag](apps/mac/ui/design/Tag.tsx)（半透明的底、`Dot` 的动态尺寸）、[Icon](apps/mac/ui/design/Icon.tsx)（颜色按令牌名传）。
 
 ## 工作台：class 名就是令牌名
 
@@ -37,7 +37,7 @@ description: 在 VibeValley 的工作台（apps/mac/ui/vv/web，nsh 的 Tailwind
 
 - **新的用途先起名**：颜色加进 `theme.json`，`light` 和 `dark` 都写；别的加进 `nsh.json`。再用它的 class。
 - **字的样式写在 `Text` 上**：nsh 里字的颜色和字号不从外面的 `View` 传下来，所以零件把字另起一个 `Text`，自己带 `text-*`（`Button` 的 `Words`）。
-- **半透明的颜色用 `mix`**：nsh 没有 `color-mix`，写 `style={{ backgroundColor: mix("wheat", 0.25) }}`（`apps/mac/ui/vv/web/ui/tone.ts`，令牌名加 0–1 的份量）；按名字取一个令牌的颜色用 `tone("leaf")`。
+- **半透明的颜色用 `mix`**：nsh 没有 `color-mix`，写 `style={{ backgroundColor: mix("wheat", 0.25) }}`（`apps/mac/ui/design/tone.ts`，令牌名加 0–1 的份量）；按名字取一个令牌的颜色用 `tone("leaf")`。
 - **变体**：代码里用到的是 `hover:`、`active:`、`focus:`、`disabled:`、`placeholder:`，祖先写 `group`、后代写 `group-hover:`，断点 `sm:`(40rem)、`md:`(48rem)、`lg:`(64rem)。别的变体先在一个零件上试过再用。
 - **按数据算的值写 `style`**：宽高、坐标、按属性给的尺寸写成对象 `style`（驼峰的键、数字是点：`{ width: size(), height: size() }`）。
 - **多个变体用 `Record<Variant, string>`**，一种变体的 class 放一行（`Button` 的 `tones`）。

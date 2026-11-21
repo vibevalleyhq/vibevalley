@@ -77,7 +77,7 @@
 | 什么 | 形状 | 例子 |
 |---|---|---|
 | 服务端的模块 | 单数，概念的词 | `crates/vibevalley-server/src/modules/issue/`、`channel/` |
-| 页面的 feature | 和服务端的模块同名 | `apps/mac/ui/vv/web/features/issue` |
+| 页面的 feature | 和服务端的模块同名 | `apps/mac/ui/features/issue` |
 | 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/testkit` 是 `@vibevalley/testkit` |
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |

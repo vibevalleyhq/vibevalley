@@ -334,7 +334,7 @@ pub fn parse_wikilink_target(raw: &str) -> (String, String) {
     }
 }
 
-/// Strips the leading `💬` prefix from PKM inline remarks, matching `packages/pkm/src/view.ts`.
+/// Strips the leading `💬` prefix from PKM inline remarks, matching `apps/mac/ui/features/pkm/outline.ts`.
 pub fn clean_remark_note(raw: &str) -> String {
     raw.trim_start().strip_prefix('💬').unwrap_or(raw).trim().to_owned()
 }

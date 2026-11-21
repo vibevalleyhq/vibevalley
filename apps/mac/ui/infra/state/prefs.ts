@@ -1,0 +1,78 @@
+import { z } from "zod";
+
+import { ThemeChoice } from "@vibevalley/protocol/host";
+
+import type { Accessor } from "../solid";
+import { defineStored, orFallback } from "./stored";
+
+/** The workbench's size, in percent; the farm keeps its own whole-number scaling. */
+export const ScaleValues = [90, 100, 110, 125] as const;
+export type Scale = (typeof ScaleValues)[number];
+
+/** Where / opens. */
+export const StartValues = ["workbench", "farm"] as const;
+export type Start = (typeof StartValues)[number];
+
+const PrefsSchema = z.object({
+  /** Who the next job goes to: a profile's id, or "auto" for the orchestrator to choose. */
+  pick: orFallback(z.string().min(1), "auto"),
+  /** The repo the last issue was given to on this machine ("" none), for the next quick add. */
+  repo: orFallback(z.string(), ""),
+  pet: orFallback(z.string().min(1), "dog"),
+  theme: orFallback(ThemeChoice, "system"),
+  scale: orFallback(z.literal(ScaleValues), 100),
+  start: orFallback(z.literal(StartValues), "workbench"),
+  /** A pane's width the user dragged it to (ui/Splitter.tsx), by the pane's name; one not dragged has its default. */
+  widths: orFallback(z.record(z.string(), z.number()), {}),
+  /** The library's thumbnail row height, in px (features/media). */
+  libraryTile: orFallback(z.number(), 160),
+});
+
+type Prefs = z.output<typeof PrefsSchema>;
+
+const prefs = defineStored("prefs", PrefsSchema, {
+  pick: "auto",
+  repo: "",
+  pet: "dog",
+  theme: "system",
+  scale: 100,
+  start: "workbench",
+  widths: {},
+  libraryTile: 160,
+});
+
+/** The choices now; read in a computation or a component, it follows them. */
+export const prefsNow = prefs.get;
+
+const set = (patch: Partial<Prefs>) => prefs.update((p) => ({ ...p, ...patch }));
+
+export const setTheme = (theme: ThemeChoice) => set({ theme });
+export const setScale = (scale: Scale) => set({ scale });
+export const setStart = (start: Start) => set({ start });
+export const setLibraryTile = (libraryTile: number) => set({ libraryTile });
+/** A pane's width; none puts it back to its default. */
+export const setWidth = (pane: string, width: number | undefined) =>
+  prefs.update((p) => {
+    const { [pane]: _was, ...rest } = p.widths;
+    return { ...p, widths: width === undefined ? rest : { ...rest, [pane]: width } };
+  });
+
+/** Who and where an issue was given to, for the next quick add and the farm's next job: "" for no one is the orchestrator's. */
+export const rememberPick = (agent: string, repo: string) => {
+  if (!agent && !repo) return;
+  set({ pick: agent || "auto", repo });
+};
+
+/** One of the choices, following it. */
+export const usePrefs =
+  <T>(select: (p: Prefs) => T): Accessor<T> =>
+  () =>
+    select(prefs.get());
+
+const dark = () => window.matchMedia("(prefers-color-scheme: dark)");
+
+/** The theme the workbench shows: "system" worked out from the system's own. Read again when the choice changes. */
+export const shownTheme = (): "light" | "dark" => {
+  const { theme } = prefs.get();
+  return theme === "system" ? (dark().matches ? "dark" : "light") : theme;
+};
