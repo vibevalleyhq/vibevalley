@@ -35,6 +35,7 @@ VibeValley 的全部像素图、矢量图标与体素模型在独立工程目录
 | **2D 像素精绘、切图与提示词** | `design/pixel/`（`prompts/`、`process.py`、`straighten.py`、`title_layers.py`、`hd_batch.sh`）与 `design/assets/`、`design/art.sh` | 经纠偏、去杂与网格规整后沉淀到 `assets/pixel/`（配 `sprites.json` 记录逻辑宽高 `w/h`、足底锚点 `ax/ay` 与 `yard` 框）与 `assets/cursors/`（配 `cursors.json`）；工作台通过 `apps/mac/ui/vv/web/ui/pixel/manifests.ts` 直接引入 JSON 清单并从 `host.pixelDir` 加载 PNG |
 | **像素字体** | `assets/fonts/`（`fusion-pixel-12px-proportional-zh_hans.otf` 与开源授权文本 `fusion-pixel-OFL.txt`） | 注册给 `nsh` 与 GPUI 的像素文字体名 `Fusion Pixel 12px Prop zh-Hans`，保证中英混排在整倍缩放下笔划锐利清晰 |
 | **工作台线条图标与农机 Logo** | `apps/mac/ui/vv/web/ui/icons.ts`、`design/pixel/icons/`、`design/pixel/logos/` | `icons.ts` 内置 `reicon` SVG 路径集合（`<Icon name>`）；农机品牌与工具图标同时在像素目录维护静态切片供 `RuntimeIcon` 与像素农具栏消费 |
+| **多端设计令牌生成与护栏** | `design/tokens.json`、`scripts/gen/tokens.ts`、`scripts/audit/ui-tokens.ts` | 从单源 `tokens.json` 生成并校验 `theme.json`、`nsh.json`、`tokens.ts`、`theme_tokens.rs` 及 `motion.ts`/`global.css` 缓动曲线；`ui-tokens.ts` 对 `apps/mac/ui/vv/web/{app,features,ui}` 做 AST 扫描拦截硬编码色值、任意 Tailwind 类与裸控件 |
 
 ## 7.4 多密级测试场景与自动化验收报告管线
 

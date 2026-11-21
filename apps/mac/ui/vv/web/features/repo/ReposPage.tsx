@@ -89,10 +89,10 @@ export function ReposPage(props: { rest: string }) {
   return (
     // The list is the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
     <View testID="repos-page" class="h-full min-h-0 flex-1 md:flex-row">
-      <Scroll class="max-h-60 shrink-0 border-b border-line bg-side md:max-h-none md:w-72 md:border-r md:border-b-0" contentClass="px-2 py-3">
+      <Scroll class="max-h-60 shrink-0 border-b border-line bg-side md:max-h-none md:w-70 md:border-r md:border-b-0" contentClass="px-2 py-3">
         <ListCard
           bare
-          title={t("web.repo.title")}
+          title={t("web.repo.list")}
           label={t("web.repo.list")}
           testid="repos"
           action={
@@ -101,11 +101,11 @@ export function ReposPage(props: { rest: string }) {
             </Button>
           }
         >
-          <View class="flex-row items-center justify-between px-2.5 pt-1 pb-1.5">
+          <View class="flex-row items-center justify-between px-2 pt-1 pb-1.5">
             <Text class="text-xs text-muted">{t("web.repo.repos")}</Text>
             <If when={sorted().length > 0}>
               <View class="rounded-sm bg-hover px-1.5 py-px">
-                <Text class="text-2xs font-medium tabular-nums text-muted">{String(sorted().length)}</Text>
+                <Text class="text-2xs font-medium text-muted tabular-nums">{String(sorted().length)}</Text>
               </View>
             </If>
           </View>

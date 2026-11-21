@@ -3225,7 +3225,6 @@ export const catalogs = {
       adapted: "能用的模型",
     },
     "web.repo": {
-      title: "仓库",
       list: "仓库列表",
       add: "新增仓库",
       repos: "代码库",
@@ -3318,9 +3317,7 @@ export const catalogs = {
       notFound: "没找到",
       checking: "检测中…",
       noRuntimes: "读不到农机：",
-      title: "农机",
       list: "农机列表",
-      intro: "机器上的编码 agent",
       usedBy: " · {n} 个 agent",
       reading: "读取中…",
       bundled: "随 oar 一起装",
@@ -3479,7 +3476,7 @@ export const catalogs = {
         run: "第 {n} 轮",
         earlier: "更早",
         search: "搜索轨迹",
-        searchHint: "搜索",
+        searchHint: "搜索步骤、工具、参数...",
         noMatch: "没有对得上的一步。",
         pending: "还没返回",
         noOutput: "没有输出",
@@ -7359,7 +7356,6 @@ export const catalogs = {
       adapted: "Models it can use",
     },
     "web.repo": {
-      title: "Repos",
       list: "Repos",
       add: "New repo",
       repos: "Code bases",
@@ -7452,9 +7448,7 @@ export const catalogs = {
       notFound: "not found",
       checking: "checking…",
       noRuntimes: "The machines could not be read: ",
-      title: "Machines",
       list: "Machines",
-      intro: "The coding agents on this computer",
       usedBy: " · {n} agents",
       reading: "Reading…",
       bundled: "installed with oar",
@@ -7633,7 +7627,7 @@ export const catalogs = {
         run: "Round {n}",
         earlier: "Earlier",
         search: "Search the trajectory",
-        searchHint: "Search",
+        searchHint: "Filter steps, tools, args...",
         noMatch: "No step matches.",
         pending: "Not returned yet",
         noOutput: "No output",
@@ -11361,7 +11355,6 @@ export interface Messages {
   "web.repo.rows.6": undefined;
   "web.repo.thenRecount": undefined;
   "web.repo.times": { readonly n: string | number };
-  "web.repo.title": undefined;
   "web.repo.uncounted": undefined;
   "web.repo.whatLanguages": undefined;
   "web.repo.who": undefined;
@@ -11405,7 +11398,6 @@ export interface Messages {
   "web.runtime.env": undefined;
   "web.runtime.envHint": undefined;
   "web.runtime.inProcess": undefined;
-  "web.runtime.intro": undefined;
   "web.runtime.left": { readonly pct: string | number };
   "web.runtime.library.body": undefined;
   "web.runtime.library.bodyExample": undefined;
@@ -11476,7 +11468,6 @@ export interface Messages {
   "web.runtime.spentTodayBudget": { readonly budget: string | number; readonly spent: string | number };
   "web.runtime.steer": undefined;
   "web.runtime.subscription": { readonly tier: string | number };
-  "web.runtime.title": undefined;
   "web.runtime.tools": undefined;
   "web.runtime.unlimited": undefined;
   "web.runtime.unreadable": { readonly why: string | number };

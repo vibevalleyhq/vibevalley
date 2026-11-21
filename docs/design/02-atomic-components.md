@@ -32,7 +32,7 @@
 
 ### `Segmented`（`apps/mac/ui/vv/web/ui/Segmented.tsx`）
 
-用于在互斥枚举间切换（如角色过滤、视图模式、时间维度）。外层轨道容器采用 `rounded-md bg-hover p-0.5`（无外边框），各选项直接渲染在轨道内；激活项通过**自身的 `border-line bg-page shadow-raise` 与 `transition duration-120 ease-out`** 高亮，而非依赖独立的滑块元素。
+用于在互斥枚举间切换（如角色过滤、运行范围、视图模式、时间维度）。外层轨道容器采用 `rounded-md border border-line bg-side p-0.5`，各选项支持可选计数 `count` 与三档计数色调 `countTone`（`muted` / `water` / `wheat`）；激活项通过**自身的 `border-line bg-page shadow-raise` 与 `transition duration-120 ease-out`** 高亮，而非依赖独立的滑块元素。
 
 ### `Tabs`（`apps/mac/ui/vv/web/ui/Tabs.tsx`）
 
@@ -46,7 +46,7 @@
 | `Select` | `apps/mac/ui/vv/web/ui/Field.tsx` | 带触发按钮的下拉选择框，弹出菜单贴边锚定并走 `z-20` `shadow-float` |
 | `Field` / `Form` | `apps/mac/ui/vv/web/ui/Field.tsx`、`apps/mac/ui/vv/web/ui/Form.tsx` | 自动绑定 label、`hint`、`error` 校验红字与无障碍 `accessibilityLabel` |
 | `Checkbox` | `apps/mac/ui/vv/web/ui/Checkbox.tsx` | 带 `16×16` 圆角勾选框 (`rounded-xs`)、整行点击与标签对齐，键盘 `Space` 切换 |
-| `Toggle` | `apps/mac/ui/vv/web/ui/layout.tsx` | 胶囊轨道开关（`h-4 w-7` 对应 `16×28`，`duration-180 ease-out` 圆点位移） |
+| `Toggle` | `apps/mac/ui/vv/web/ui/layout.tsx` | 胶囊轨道开关（`h-4 w-7` 对应 `16×28`，`duration-180 ease-out` 圆点位移）；支持 `bare` 模式仅渲染开关控件本身用于列表行尾 |
 | `SecretInput` | `apps/mac/ui/vv/web/ui/layout.tsx` | 密钥输入框，支持明暗文一键显隐切换并防日志/剪贴板误泄 |
 | `Slider` | `apps/mac/ui/vv/web/ui/Slider.tsx` | 连续值拖拽滑块（带轨道进度填充与数值回显） |
 | `ChipsInput` / `KeyValueEditor` | `apps/mac/ui/vv/web/ui/Chips.tsx` | 标签多值输入条（支持回车成片、Backspace 退删）与环境变量/键值成对编辑表格 |
@@ -56,13 +56,13 @@
 
 | 组件 | 源文件 | 职责与外观 |
 | --- | --- | --- |
-| `Tag` | `apps/mac/ui/vv/web/ui/Tag.tsx` | `TagTone` 三态语义胶囊标签：`ok`（`bg-ok-soft` + `text-ok-ink`）、`bad`（`bg-bad-soft` + `text-berry`）与 `wait`（`mix("wheat", 0.22)` 底色 + `text-warn-ink`），字体固定为 `text-xs` |
-| `Dot` | `apps/mac/ui/vv/web/ui/Tag.tsx` | 实体状态圆点（可自定义直径并用于工作状态点、未读灯、连接态脉冲点） |
+| `Tag` | `apps/mac/ui/vv/web/ui/Tag.tsx` | `TagTone` 五态语义胶囊标签：`ok`（`bg-ok-soft` + `text-ok-ink`）、`bad`（`bg-bad-soft` + `text-berry`）、`wait`（`bg-warn-soft` + `text-warn-ink`）、`info`（`mix("water", 0.14)` 底色 + `text-water`）与 `neutral`（`bg-hover` + `text-muted`），字体固定为 `text-xs` |
+| `Dot` | `apps/mac/ui/vv/web/ui/Tag.tsx` | 实体状态圆点（支持 `ring` 外环选项与自定义直径，用于运行状态指示、未读灯与连接态圆点） |
 | `Count` | `apps/mac/ui/vv/web/features/channel/views/presence.tsx` | 纯数字小徽标，用于标签页与列表计数汇总 |
 | `PhaseGlyph` / `ThinkingDots` | `apps/mac/ui/vv/web/features/channel/views/presence.tsx` | 帮工正在思考/运行时的动画点阵与阶段状态小图标 |
 | `ToastHost` | `apps/mac/ui/vv/web/ui/ToastHost.tsx` | 全局悬浮反馈堆栈（`z-40`），承载由 `apps/mac/ui/vv/web/ui/toasts.ts` 发出的短时提示与带故障 `UiFault` 详情的报错横幅 |
 | `Empty` / `Quiet` | `apps/mac/ui/vv/web/ui/layout.tsx` | `Empty` 用于整页或空数据列表：`48px` 大图标 + 空原因 + 下一步可点击动作；`Quiet` 为轻量无框占位文案 |
-| `Card` / `ListCard` / `ListRow` / `Split` | `apps/mac/ui/vv/web/ui/layout.tsx` | 标准化列表容器与单行骨架：带底线分隔 `ListRow`、悬停亮底、统一左右缩进 |
+| `PageBody` / `Card` / `ListCard` / `ListRow` / `Split` | `apps/mac/ui/vv/web/ui/layout.tsx` | `PageBody` 统一管理页面内容阅读宽度（`prose` `max-w-3xl` / `manage` `max-w-5xl` / `wide` `w-full`）与 `gap-5` 垂直节奏；`Split` / `ListCard`（含无框 `bare` 侧栏模式） / `ListRow`（带选中左侧 `accent` 竖线与悬停亮底）组织侧栏列表布局 |
 | `Bubble` / `Tip` / `Hint` | `apps/mac/ui/vv/web/ui/Tip.tsx` | `Bubble` 供 `tooltip` 挂载微气泡；`Hint` 为问号图标悬浮解释 |
 
 ## 2.4 对话框、菜单、表格与分栏

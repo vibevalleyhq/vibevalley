@@ -75,7 +75,7 @@
     "run": "Round {n}",
     "earlier": "Earlier",
     "search": "Search the trajectory",
-    "searchHint": "Search",
+    "searchHint": "Filter steps, tools, args...",
     "noMatch": "No step matches.",
     "pending": "Not returned yet",
     "noOutput": "No output",

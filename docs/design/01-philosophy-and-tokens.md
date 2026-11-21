@@ -19,6 +19,21 @@
 
 ## 1.2 表面体系与色彩阶梯
 
+### 单源令牌生成与静态护栏（`design/tokens.json`）
+
+`design/tokens.json` 为工作台、原生壳、宿主集成面与官网动效的唯一令牌定义源，包含 `primitives`、`semantic.{light,dark}`、`geometry` 与 `motion` 四段。`scripts/gen/tokens.ts` 从该文件生成并同步六处产物：
+
+| 生成 / 同步目标 | 产出内容 | 校验方式 |
+| --- | --- | --- |
+| `apps/mac/ui/vv/theme.json` | 工作台 `cssVars.theme` 像素色与 `cssVars.{light,dark}` 语义变量 | `vpx scripts/gen/tokens.ts --check` |
+| `apps/mac/ui/nsh.json` | 工作台 `tailwind.{fontSize,radius,ease,fontFamily,shadow}` 静态配置 | `vpx scripts/gen/tokens.ts --check` |
+| `apps/mac/ui/tokens.ts` | 宿主集成面浅/深 `Palette`、`type`、`radius`、`cardShadow` 与 `dangerTint` | `vpx scripts/gen/tokens.ts --check` |
+| `apps/mac/src/theme_tokens.rs` | 原生壳 `DARK_*`/`LIGHT_*`、终端 16 色与语法 16 色常量 | `vpx scripts/gen/tokens.ts --check` |
+| `apps/mac/ui/motion.ts` | 同步 `ease` 减速度曲线（`cubic-bezier(0.2, 0, 0, 1)`） | `vpx scripts/gen/tokens.ts --check` |
+| `apps/site/src/ui/global.css` | 同步 `--ease-out` 减速度曲线（`cubic-bezier(0.2, 0, 0, 1)`） | `vpx scripts/gen/tokens.ts --check` |
+
+工作台页面代码由 `scripts/audit/ui-tokens.ts` 通过 AST 扫描校验（`apps/mac/ui/vv/web/{app,features,ui}`），拦截硬编码十六进制/`rgb()` 颜色、任意 Tailwind 值以及绕过 `Toggle`/`Checkbox` 原语的裸控件。
+
 ### 工作台双主题令牌（`apps/mac/ui/vv/theme.json`）
 
 工作台的颜色在 `apps/mac/ui/vv/theme.json` 中分为三组：`cssVars.light`、`cssVars.dark`（随系统或设置切换）与 `cssVars.theme`（不随主题切换）。
@@ -27,10 +42,11 @@
 | --- | --- | --- | --- | --- |
 | 三级表面 | `page` | `#fcfcfb` | `#151413` | 主工作区页面、可点击控件浅底 |
 | 三级表面 | `side` | `#f6f5f3` | `#1b1a18` | 次级面板、设置卡片、表格与弹窗底 |
+| 浮层表面 | `elevated` | `#fcfcfb` | `#21201d` | 抬起弹出卡片与浮层表面 |
 | 三级表面 | `rail` / `on-rail` | `#efeeeb` / `#1c1917` | `#121110` / `#ecebe8` | 全局左侧导航 Rail 槽位底与前景色 |
 | 交互态面 | `hover` | `#1c19170a` | `#ecebe80c` | 悬停底、轻量徽标底 |
 | 交互态面 | `selected` | `#1c191711` | `#ecebe814` | 列表/卡片当前选中底 |
-| 边框线条 | `line` | `#1c191714` | `#ecebe81a` | `1px` 主边框与分隔线 |
+| 边框线条 | `line` / `line-strong` | `#1c191714` / `#1c191724` | `#ecebe81a` / `#ecebe829` | `1px` 主边框与强调分隔线 |
 | 边框线条 | `focus` | `#74a046` | `#8dbb5c` | 键盘焦点环边框 |
 | 三级字色 | `ink` | `#1c1917` | `#ecebe8` | 标题、正文与高权重值 |
 | 三级字色 | `muted` | `#5e5852` | `#a9a49e` | 辅助说明、表头与副文本 |
@@ -43,7 +59,7 @@
 | 四态语义 | `water` | `#2c6aa3` | `#6aa6dc` | 正在执行、实时进行中、信息标记 |
 | 语义辅助与软底 | `bark` | `#5e5852` | `#a9a49e` | 中性暖褐辅助标签色 |
 | 语义深墨与软底 | `ok-ink` / `ok-soft` | `#3b6125` / `#e8f0de` | `#b0d488` / `#26331c` | 通过状态字色与柔和高亮底 |
-| 语义深墨与软底 | `warn-ink` | `#94531f` | `#e0a062` | `wheat` 浅底或浅徽标上的高对比文字色 |
+| 语义深墨与软底 | `warn-ink` / `warn-soft` | `#94531f` / `#fbf0d9` | `#e0a062` / `#332917` | `wheat` 浅底或浅徽标上的高对比文字与软底色 |
 | 语义深墨与软底 | `bad-soft` | `#f8e4e0` | `#3e231e` | 失败与危险提示柔和底 |
 | 非活跃状态 | `idle` | `#aca59e` | `#6f6a64` | 离线、停止、未激活指示点 |
 | 遮罩与代码 | `scrim` | `#1c191740` | `#00000080` | 弹窗与灯箱模态蒙层 |
@@ -61,13 +77,13 @@
 
 ### 原生外壳与官网等其余四端色系
 
-- **原生 GPUI（`apps/mac/src/theme.rs`）与宿主集成面（`apps/mac/ui/tokens.ts`）**：
-  - `Palette::dark`：`bg: #151413`, `surface: #1b1a18`, `elevated: #21201d`, `border: #2d2b27`, `text: #ecebe8`, `muted: #a9a49e`, `faint: #8b867f`, `accent: #7fae4f`, `danger: #e47d6d`, `warning: #e5a93c`, `info: #6aa6dc`, `added_bg: 0x7fae4f@0.14`, `removed_bg: 0xe47d6d@0.14`, `match_bg: 0xe5a93c@0.30`, `selected: 0x7fae4f@0.20`, `hover: 0xecebe8@0.07`。
+- **原生 GPUI（`apps/mac/src/theme.rs` 与生成的 `apps/mac/src/theme_tokens.rs`）与宿主集成面（`apps/mac/ui/tokens.ts`）**：
+  - `Palette::dark`：`bg: #151413`, `surface: #1b1a18`, `elevated: #21201d`, `border: #2d2b27`, `text: #ecebe8`, `muted: #a9a49e`, `faint: #8b867f`, `accent: #7fae4f`, `danger: #e47d6d`, `warning: #e5a93c`, `success: #7fae4f`, `info: #6aa6dc`, `added_bg: 0x7fae4f@0.14`, `removed_bg: 0xe47d6d@0.14`, `match_bg: 0xe5a93c@0.30`, `selected: 0x7fae4f@0.20`, `hover: 0xecebe8@0.07`。
   - `Palette::light`：`bg: #fcfcfb`, `surface: #f6f5f3`, `elevated: #fcfcfb`, `border: #e6e4e0`, `text: #1c1917`, `muted: #5e5852`, `faint: #716a64`, `accent: #4d7a2a`, `danger: #a83a2c`, `warning: #b45d0e`, `success: #3f7329`, `info: #2c6aa3`, `added_bg: 0x4d7a2a@0.13`, `removed_bg: 0xa83a2c@0.10`, `match_bg: 0xe5a93c@0.34`, `selected: 0x4d7a2a@0.14`, `hover: 0x1c1917@0.055`。
   - 终端与语法：`Palette` 内置 16 色 ANSI 调色板（`ansi[16]`）与 16 色代码语法色（`syntax[16]`）。
-  - `tokens.ts` 向 `surfaces/` 和 `components/` 暴露 `tok()`：包含浅/深两套 `surface` (`#fcfcfb`/`#21201d`)、`canvas` (`#f6f5f3`/`#1b1a18`)、`subtle` (`#e7e5e0`/`#312f2b`)、`tile` (`#efeeeb`/`#282623`)、`border` (`#e6e4e0`/`rgba(236,235,232,0.11)`)、`ok` (`#3f7329`/`#7fae4f`)、`alert` (`#b45d0e`/`#e5a93c`)、`danger` (`#a83a2c`/`#e47d6d`) 与代码着色色。
+  - `tokens.ts` 由 `scripts/gen/tokens.ts` 生成并向 `surfaces/` 和 `components/` 暴露 `tok()`：包含浅/深两套 `surface` (`#fcfcfb`/`#21201d`)、`canvas` (`#f6f5f3`/`#1b1a18`)、`subtle` (`#e7e5e0`/`#312f2b`)、`tile` (`#efeeeb`/`#282623`)、`border` (`#e6e4e0`/`rgba(236,235,232,0.11)`)、`ok` (`#74a046`/`#8dbb5c`)、`alert` (`#94531f`/`#e5a93c`)、`danger` (`#a83a2c`/`#e47d6d`)、`primary` (`#4d7a2a`/`#7fae4f`)、`onPrimary` (`#fcfcfb`/`#151413`) 与代码着色色。
 - **官网（`apps/site/src/ui/global.css`）**：通过 Tailwind v4 `@theme static` 清空 Tailwind 默认色板（`--color-*: initial`），显式定义 `cream-*`、`bark-*`、`leaf-*`、`wheat`、`berry`、`water`、`drop`、`shade`、`dusk`、`firefly`、`path*` 以及昼夜时段滤镜变量 `--sky`、`--ground`、`--smoke`、`--farmer`。
-- **灵动岛（`apps/island/Sources/VibeValleyIsland/Island.swift`）**：硬编码深棕底近白墨色 `cream` (`0.95, 0.92, 0.86`) 与 `dim` (`0.72, 0.68, 0.62`)，配合 `working` (`#97C467`)、`waiting` (`#E5A93C`)、`stuck` (`#E3685B`) 状态条。
+- **灵动岛（`apps/island/Sources/VibeValleyIsland/Island.swift`）**：手写同步 `design/tokens.json` 的固定暖棕调色常量，前景色采用 `cream` (`#eedcb2`) 与 `dim` (`#a89a7a`)，状态色采用 `working` (`#74a046`)、`waiting` (`#e5a93c`)、`stuck` (`#c84a3a`)。
 
 ## 1.3 控件尺寸与圆角矩阵
 
@@ -84,7 +100,7 @@
 | 载体 | 令牌 / 结构 | 数值 | 使用约束 |
 | --- | --- | --- | --- |
 | **工作台 (`apps/mac/ui/nsh.json`)** | `xs` / `sm` / `md` / `lg` / `xl` / `full` | `3px` / `4px` / `6px` / `8px` / `12px` / `9999px` | 遵循嵌套减一档：外框圆角减去内边距 ≥ 内层圆角 |
-| **宿主集成面 (`apps/mac/ui/tokens.ts`)** | `sm` / `md` / `lg` / `button` / `card` / `tray` | `7` / `10` / `16` / `9` / `12` / `22` | 独立视觉语言（与工作台相差约 1 档，详参第九篇） |
+| **宿主集成面 (`apps/mac/ui/tokens.ts`)** | `sm` / `md` / `lg` / `button` / `card` / `tray` | `4` / `6` / `8` / `6` / `8` / `12` | 与工作台共享 `design/tokens.json` `geometry.radius` 阶梯 |
 | **官网 (`apps/site/src/ui/global.css`)** | `--radius-*: initial` | 默认直角 `0px`（局部云朵用 `rounded-[3px]`，光晕用 `rounded-full`） | 保持像素复古锐利直边，配合 `--shadow-hard*` 硬偏置阴影 |
 | **灵动岛 (`apps/island/Sources/IslandCore/Geometry.swift`)** | `closed` / `open` | `10` / `16` | 收起为刘海耳翼小圆角，展开面板为 16px 圆角 |
 
@@ -94,14 +110,14 @@
 
 - **边框**：所有卡片、表单项与区块分界使用 `1px` `border-line`，焦点状态切换 `border-focus`（2px 聚焦轮廓 `outline-focus`）。卡片嵌套只在必要外框画一根闭合边框，内层分割使用浅色 `border-b border-line` 而不是再包一层外框。
 - **阴影（`apps/mac/ui/nsh.json`）**：
-  - `shadow-raise`：`0 1px 2px #1c191714`（浅浮分段器拇指、局部提示胶囊）。
-  - `shadow-float`：`0 8px 24px #1c191724`（下拉菜单、气泡提示、模态 `Dialog`）。
+  - `shadow-raise`：`0 1px 2px #00000018`（浅浮分段器拇指、局部提示胶囊）。
+  - `shadow-float`：`0 8px 24px #0000002e`（下拉菜单、气泡提示、模态 `Dialog`）。
   - `shadow-toggle-thumb`：`0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a`。
   - `shadow-px`：`2px 2px 0 #1e140a73`（像素卡硬边阴影）。
   - 官网 `global.css` 另定 `--shadow-hard` 与 `--shadow-hard-lg` 像素硬偏置阴影。
   - 原生工具调用卡 `apps/mac/ui/tokens.ts` 使用 `cardShadow` 配合亮/暗两套 rgba 边框光环与下影。
 
-> 注：`nsh.json` 中 `shadow.float` 与 `shadow.raise` 的 hex 目前在构建层写死为浅色石色（未绑定 `theme.json` 中随浅/深主题变化的 `float`/`raise` 变量），详参 [第九篇](docs/design/09-design-system-audit.md)。
+> 注：`nsh.json` 中 `tailwind.shadow` 的 `float` 与 `raise` 固定为静态 `#rrggbbaa` 值（不支持引用 `theme.json` 随浅/深主题切换的变量），具体边界见 [第九篇](docs/design/09-design-system-audit.md)。
 
 ### 叠放层级表（`z-index`）
 
@@ -152,7 +168,7 @@
 | `24` | 独立工具栏大图标、模态弹窗提示图标 |
 | `48` | `Empty` 空状态主视觉图标 |
 
-工作台与外壳中还存在与 `icons.ts` 独立的 Canvas 手绘图形集合（如 `surfaces/shared.tsx` 的 `SurfaceIcon` 与 `Sidebar.tsx` 的 `GLYPHS`），具体边界见 [第九篇](docs/design/09-design-system-audit.md)。
+工作台与外壳中还存在与 `icons.ts` 独立的 Canvas 手绘图形集合（如 `apps/mac/ui/surfaces/shared.tsx` 的 `SurfaceIcon`、`apps/mac/ui/surfaces/Sidebar.tsx` 的 `GLYPHS` 与 `apps/mac/ui/components/ToolCallCard.tsx` 的工具图标），具体边界见 [第九篇](docs/design/09-design-system-audit.md)。
 
 ## 1.6 动效时长与缓动曲线全集
 
@@ -161,6 +177,6 @@
 | 载体与配置源 | 时长阶梯 | 缓动曲线 / 函数 | 用途划分 |
 | --- | --- | --- | --- |
 | **工作台 (`apps/mac/ui/nsh.json`)** | `120ms` (`duration-120`)<br>`180ms` (`duration-180`)<br>`280ms` (`duration-280`) | `ease-out`: `cubic-bezier(0.2, 0.0, 0.0, 1.0)`<br>`ease-in`: `cubic-bezier(0.4, 0.0, 1.0, 1.0)`<br>`ease-in-out`: `cubic-bezier(0.4, 0.0, 0.2, 1.0)`<br>`ease-spring`: `cubic-bezier(0.34, 1.4, 0.64, 1.0)` | `120ms` 负责按钮按下、悬停、`Segmented` 激活换色；`180ms` 负责 `Toggle` 开关圆点滑移与焦点显现；`280ms` 负责较大区域或折展切换 |
-| **宿主集成面 (`apps/mac/ui/motion.ts`)** | `press: 160`、`expandOpacity: 240`、`foldOpacity: 300`、`statusSwap: 360`、`chevron: 360`、`expandHeight: 400`、`foldHeight: 460`、`spinner: 800`、`foldHold: 1100`、`copyConfirm: 1400`、`timerTick: 100` | `ease = "cubic-bezier(0.22, 1, 0.36, 1)"`；颜色/透明与按压 `pressTransition()` 用 `"ease"` | `ms(d)` 在 `reduceMotion()` 开启时强行降为 `0`；展开/收起调用 `LayoutAnimation.configureNext` |
-| **官网 (`apps/site/src/ui/global.css`)** | 过渡交互 `0.15s`–`0.25s`；像素场景帧动画 `steps(...)` | `--ease-out: cubic-bezier(0.4, 0, 0.2, 1)` | 兼顾 `@media (prefers-reduced-motion: reduce)` 与 `[data-off]` 静态降级关闭全部过渡和动画 |
+| **宿主集成面 (`apps/mac/ui/motion.ts`)** | `press: 160`、`expandOpacity: 240`、`foldOpacity: 300`、`statusSwap: 360`、`chevron: 360`、`expandHeight: 400`、`foldHeight: 460`、`spinner: 800`、`foldHold: 1100`、`copyConfirm: 1400`、`timerTick: 100` | `ease = "cubic-bezier(0.2, 0, 0, 1)"`（同步自 `design/tokens.json`） | `ms(d)` 在 `reduceMotion()` 开启时强行降为 `0`；展开/收起调用 `LayoutAnimation.configureNext` |
+| **官网 (`apps/site/src/ui/global.css`)** | 过渡交互 `0.15s`–`0.25s`；像素场景帧动画 `steps(...)` | `--ease-out: cubic-bezier(0.2, 0, 0, 1)`（同步自 `design/tokens.json`） | 兼顾 `@media (prefers-reduced-motion: reduce)` 与 `[data-off]` 静态降级关闭全部过渡和动画 |
 | **灵动岛 (`Island.swift`)** | 展收形变 `0.2s`；鼠标离开防误收宽限 `0.25s` | AppKit `easeOut` | 高频移入移出防闪烁保护 |

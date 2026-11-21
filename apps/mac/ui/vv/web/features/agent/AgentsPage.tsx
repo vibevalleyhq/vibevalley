@@ -15,7 +15,7 @@ import { Button } from "../../ui/Button";
 import { AgentFace, OrchestratorFace } from "../../ui/domain/Face";
 import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
-import { Toggle } from "../../ui/layout";
+import { PageBody, Toggle } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
 import { Bubble } from "../../ui/Tip";
 import { AgentPage } from "./AgentPage";
@@ -89,125 +89,127 @@ function AgentsPage() {
   };
 
   return (
-    <Scroll testID="agents-page" onLayout={(e) => width.set(e.bounds.size.width)} class="h-full flex-1 bg-page" contentClass="gap-5 px-5 pt-4 pb-8">
-      <View testID="agents-toolbar" class="flex-row flex-wrap items-center justify-between gap-3">
-        <View class="flex-row flex-wrap items-center gap-2">
-          <Segmented
-            testid="agents-role-filter"
-            label={t("web.agent.list.filterLabel")}
-            value={roleFilter()}
-            onChange={roleFilter.set}
-            options={[
-              { value: "all", label: t("web.agent.list.all") },
-              { value: "orchestrator", label: t("web.agent.list.orchestrators") },
-              { value: "worker", label: t("web.agent.list.helpers") },
-            ]}
-          />
-          <View class="flex-row items-center gap-1">
-            <TextInput
-              testID="agents-search"
-              accessibilityLabel={t("web.agent.list.search")}
-              placeholder={t("web.agent.list.searchHint")}
-              wide={false}
-              class="h-7 w-56"
-              value={query()}
-              onInput={query.set}
+    <Scroll testID="agents-page" onLayout={(e) => width.set(e.bounds.size.width)} class="h-full flex-1 bg-page" contentClass="px-5 pt-4 pb-8">
+      <PageBody width="manage">
+        <View testID="agents-toolbar" class="flex-row flex-wrap items-center justify-between gap-3">
+          <View class="flex-row flex-wrap items-center gap-2">
+            <Segmented
+              testid="agents-role-filter"
+              label={t("web.agent.list.filterLabel")}
+              value={roleFilter()}
+              onChange={roleFilter.set}
+              options={[
+                { value: "all", label: t("web.agent.list.all"), count: orchestrators().length + agents().length },
+                { value: "orchestrator", label: t("web.agent.list.orchestrators"), count: orchestrators().length },
+                { value: "worker", label: t("web.agent.list.helpers"), count: agents().length },
+              ]}
             />
-            <If when={query().length > 0}>
-              <View
-                role="button"
-                testID="agents-search-clear"
-                accessibilityLabel={t("web.agent.list.clearFilter")}
-                onPress={() => query.set("")}
-                class="h-7 w-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover active:translate-y-px"
-              >
-                <Icon name="close" size={12} tone="muted" />
-              </View>
-            </If>
+            <View class="flex-row items-center gap-1">
+              <TextInput
+                testID="agents-search"
+                accessibilityLabel={t("web.agent.list.search")}
+                placeholder={t("web.agent.list.searchHint")}
+                wide={false}
+                class="h-7 w-56"
+                value={query()}
+                onInput={query.set}
+              />
+              <If when={query().length > 0}>
+                <View
+                  role="button"
+                  testID="agents-search-clear"
+                  accessibilityLabel={t("web.agent.list.clearFilter")}
+                  onPress={() => query.set("")}
+                  class="h-7 w-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+                >
+                  <Icon name="close" size={12} tone="muted" />
+                </View>
+              </If>
+            </View>
           </View>
-        </View>
-        <View class="flex-row flex-wrap items-center gap-2">
-          <A
-            href="/agents/templates"
-            testID="open-templates"
-            tooltip={<Bubble text={t("web.agent.templates.openLine")} />}
-            class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
-          >
-            <Icon name="folder" size={14} tone="muted" />
-            <Text class="text-sm text-ink">{t("web.agent.templates.open")}</Text>
-          </A>
-          <A
-            href="/agents/new?role=orchestrator"
-            testID="new-orchestrator"
-            class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
-          >
-            <Icon name="add" size={14} tone="muted" />
-            <Text class="text-sm text-ink">{t("web.agent.list.makeOrchestrator")}</Text>
-          </A>
-          <A
-            href="/agents/new"
-            testID="new-agent"
-            class="h-7 flex-row items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 transition duration-120 ease-out hover:border-accent-hover hover:bg-accent-hover active:translate-y-px"
-          >
-            <Icon name="add" size={14} tone="page" />
-            <Text class="text-sm font-medium text-page">{t("web.agent.list.make")}</Text>
-          </A>
-        </View>
-      </View>
-
-      <If
-        when={!noMatches()}
-        else={
-          <View testID="agents-empty-search" class="items-center justify-center gap-3 rounded-lg border border-line bg-side px-6 py-10">
-            <Text class="text-sm text-muted">{t("web.agent.list.emptySearch")}</Text>
-            <Button testID="agents-clear-filter" size="compact" onPress={clearFilters}>
-              {t("web.agent.list.clearFilter")}
-            </Button>
-          </View>
-        }
-      >
-        <If when={showsOrchestrators(roleFilter()) && (visibleOrchestrators().length > 0 || !hasFilter())}>
-          <GroupSection title={t("web.agent.list.orchestrators")} count={visibleOrchestrators().length} testid="agents-group-orchestrators">
-            <If when={visibleOrchestrators().length > 0}>
-              <View class="overflow-hidden rounded-lg border border-line bg-page">
-                <Each of={visibleOrchestrators()} key={(a) => a.id}>
-                  {(a, i) => <OrchestratorRow agent={a()} first={i() === 0} wide={wide()} />}
-                </Each>
-              </View>
-            </If>
-          </GroupSection>
-        </If>
-
-        <If when={showsWorkers(roleFilter()) && (visibleWorkers().length > 0 || !hasFilter())}>
-          <GroupSection title={t("web.agent.list.helpers")} count={visibleWorkers().length} testid="agents-group-workers">
-            {/* The default orchestrator is always there: once it shows, the profiles are read. */}
-            <If
-              when={visibleWorkers().length > 0}
-              else={
-                <If when={orchestrators().length > 0 && agents().length === 0}>
-                  <A href="/agents/templates" class="self-start">
-                    <Text class="text-sm text-muted hover:underline">{t("web.agent.templates.none")}</Text>
-                  </A>
-                </If>
-              }
+          <View class="flex-row flex-wrap items-center gap-2">
+            <A
+              href="/agents/templates"
+              testID="open-templates"
+              tooltip={<Bubble text={t("web.agent.templates.openLine")} />}
+              class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
             >
-              <View class="overflow-hidden rounded-lg border border-line bg-page">
-                <Each of={visibleWorkers()} key={(a) => a.id}>
-                  {(a, i) => (
-                    <WorkerRow
-                      agent={a()}
-                      runtime={runtimeById().get(a().runtime)}
-                      errors={(problems()[a().id] ?? []).filter((item) => item.level === "error").map((item) => item.text)}
-                      first={i() === 0}
-                      wide={wide()}
-                    />
-                  )}
-                </Each>
-              </View>
-            </If>
-          </GroupSection>
+              <Icon name="folder" size={14} tone="muted" />
+              <Text class="text-sm text-ink">{t("web.agent.templates.open")}</Text>
+            </A>
+            <A
+              href="/agents/new?role=orchestrator"
+              testID="new-orchestrator"
+              class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
+            >
+              <Icon name="add" size={14} tone="muted" />
+              <Text class="text-sm text-ink">{t("web.agent.list.makeOrchestrator")}</Text>
+            </A>
+            <A
+              href="/agents/new"
+              testID="new-agent"
+              class="h-7 flex-row items-center gap-1.5 rounded-md border border-accent bg-accent px-2.5 transition duration-120 ease-out hover:border-accent-hover hover:bg-accent-hover active:translate-y-px"
+            >
+              <Icon name="add" size={14} tone="page" />
+              <Text class="text-sm font-medium text-page">{t("web.agent.list.make")}</Text>
+            </A>
+          </View>
+        </View>
+
+        <If
+          when={!noMatches()}
+          else={
+            <View testID="agents-empty-search" class="items-center justify-center gap-3 rounded-lg border border-line bg-side px-6 py-10">
+              <Text class="text-sm text-muted">{t("web.agent.list.emptySearch")}</Text>
+              <Button testID="agents-clear-filter" size="compact" onPress={clearFilters}>
+                {t("web.agent.list.clearFilter")}
+              </Button>
+            </View>
+          }
+        >
+          <If when={showsOrchestrators(roleFilter()) && (visibleOrchestrators().length > 0 || !hasFilter())}>
+            <GroupSection title={t("web.agent.list.orchestrators")} count={visibleOrchestrators().length} testid="agents-group-orchestrators">
+              <If when={visibleOrchestrators().length > 0}>
+                <View class="overflow-hidden rounded-lg border border-line bg-page">
+                  <Each of={visibleOrchestrators()} key={(a) => a.id}>
+                    {(a, i) => <OrchestratorRow agent={a()} first={i() === 0} wide={wide()} />}
+                  </Each>
+                </View>
+              </If>
+            </GroupSection>
+          </If>
+
+          <If when={showsWorkers(roleFilter()) && (visibleWorkers().length > 0 || !hasFilter())}>
+            <GroupSection title={t("web.agent.list.helpers")} count={visibleWorkers().length} testid="agents-group-workers">
+              {/* The default orchestrator is always there: once it shows, the profiles are read. */}
+              <If
+                when={visibleWorkers().length > 0}
+                else={
+                  <If when={orchestrators().length > 0 && agents().length === 0}>
+                    <A href="/agents/templates" class="self-start">
+                      <Text class="text-sm text-muted hover:underline">{t("web.agent.templates.none")}</Text>
+                    </A>
+                  </If>
+                }
+              >
+                <View class="overflow-hidden rounded-lg border border-line bg-page">
+                  <Each of={visibleWorkers()} key={(a) => a.id}>
+                    {(a, i) => (
+                      <WorkerRow
+                        agent={a()}
+                        runtime={runtimeById().get(a().runtime)}
+                        errors={(problems()[a().id] ?? []).filter((item) => item.level === "error").map((item) => item.text)}
+                        first={i() === 0}
+                        wide={wide()}
+                      />
+                    )}
+                  </Each>
+                </View>
+              </If>
+            </GroupSection>
+          </If>
         </If>
-      </If>
+      </PageBody>
     </Scroll>
   );
 }
@@ -254,7 +256,7 @@ function OrchestratorRow(props: { agent: Agent; first: boolean; wide: boolean })
   const isDefault = () => props.agent.id === defaultOrchestrator;
   const summary = () => props.agent.model || t("web.agent.list.orchestratorSummary");
   return (
-    <RowShell agent={props.agent} to={orchestratorHref(props.agent.id)} first={props.first}>
+    <RowShell agent={props.agent} to={orchestratorHref(props.agent.id)} first={props.first} trailing={<View class="w-7" />}>
       <View class="h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-hover">
         <OrchestratorFace size={34} agent={props.agent.id} />
       </View>
@@ -272,8 +274,13 @@ function OrchestratorRow(props: { agent: Agent; first: boolean; wide: boolean })
         </Text>
       </View>
       <If when={props.wide}>
-        <View class="shrink-0 flex-row items-center gap-2">
-          <Text class="text-xs text-muted">{summary()}</Text>
+        <View class="shrink-0 flex-row items-center gap-3">
+          <View class="w-52 flex-row items-center">
+            <Text class="min-w-0 flex-1 truncate text-xs text-muted" style={{ numberOfLines: 1 }}>
+              {summary()}
+            </Text>
+          </View>
+          <View class="w-28" />
         </View>
       </If>
     </RowShell>
@@ -349,21 +356,21 @@ function WorkerRow(props: { agent: Agent; runtime?: RuntimeInfo | undefined; err
       </View>
       <If when={props.wide}>
         <View class="shrink-0 flex-row items-center gap-3">
-          <View class="flex-row items-center gap-1.5">
+          <View class="w-52 flex-row items-center gap-1.5">
             <View class={`h-1.75 w-1.75 shrink-0 rounded-full ${available() ? "bg-leaf" : "bg-berry"}`} />
-            <Text class="text-xs text-muted">{runtimeSpec()}</Text>
+            <Text class="min-w-0 flex-1 truncate text-xs text-muted" style={{ numberOfLines: 1 }}>
+              {runtimeSpec()}
+            </Text>
           </View>
-          <If when={shownTags().length > 0}>
-            <View class="flex-row items-center gap-1">
-              <Each of={shownTags()}>
-                {(tag) => (
-                  <View class="rounded-sm bg-hover px-1.5 py-px">
-                    <Text class="text-2xs text-muted">{tag()}</Text>
-                  </View>
-                )}
-              </Each>
-            </View>
-          </If>
+          <View class="w-28 flex-row items-center justify-end gap-1 overflow-hidden">
+            <Each of={shownTags()}>
+              {(tag) => (
+                <View class="max-w-full shrink rounded-sm bg-hover px-1.5 py-px">
+                  <Text class="truncate text-2xs text-muted">{tag()}</Text>
+                </View>
+              )}
+            </Each>
+          </View>
         </View>
       </If>
     </RowShell>

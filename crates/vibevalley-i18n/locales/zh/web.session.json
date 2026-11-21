@@ -75,7 +75,7 @@
     "run": "第 {n} 轮",
     "earlier": "更早",
     "search": "搜索轨迹",
-    "searchHint": "搜索",
+    "searchHint": "搜索步骤、工具、参数...",
     "noMatch": "没有对得上的一步。",
     "pending": "还没返回",
     "noOutput": "没有输出",

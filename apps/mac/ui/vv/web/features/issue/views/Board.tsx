@@ -13,13 +13,14 @@ import { type BoardSummary, maxRunning } from "@vibevalley/protocol";
 import { Icon } from "../../../ui/Icon";
 import type { IconName } from "../../../ui/icons";
 import { Bubble, Hint } from "../../../ui/Tip";
-import { mix } from "../../../ui/tone";
+import { mix, tone } from "../../../ui/tone";
 import {
   type BoardCard,
   cardAgent,
   cardLook,
   cardMove,
   cardRepo,
+  cardUrgencyTone,
   closedShown,
   type Lane,
   laneCountOf,
@@ -353,6 +354,15 @@ function CardView(props: {
     onPanResponderTerminate: () => props.drag.end(false),
   });
   const before = () => props.drag.before() === props.card.id;
+  const urgency = () => cardUrgencyTone(props.card);
+  const cardStyle = () => {
+    const u = urgency();
+    return {
+      transitionProperty: "colors,shadow",
+      transitionDuration: 180,
+      ...(u !== undefined ? { borderLeftWidth: 3, borderLeftColor: tone(u) } : {}),
+    };
+  };
   return (
     <View ref={(r) => props.drag.card(props.card.id, r, () => props.placeable)}>
       <If when={before()}>
@@ -378,7 +388,7 @@ function CardView(props: {
           props.selected ? "border-faint bg-selected" : "border-line bg-page hover:border-faint hover:shadow-raise",
           props.card.move?.state === "moving" ? "opacity-70" : props.drag.dragging()?.id === props.card.id ? "opacity-40" : "",
         ].join(" ")}
-        style={{ transitionProperty: "colors,shadow", transitionDuration: 180 }}
+        style={cardStyle()}
       >
         <If when={hasMeta()}>
           <View class="flex-row items-center gap-1">

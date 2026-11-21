@@ -346,8 +346,24 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
         value={text()}
         onInput={text.set}
       />
-      <View class="flex-row items-center gap-2 pt-1">
-        <If when={props.withRepo} else={<View class="flex-1" />}>
+      <If
+        when={props.withRepo === true}
+        else={
+          <View class="flex-row items-center justify-between gap-3 pt-1">
+            <View class="min-w-0 flex-1">
+              <If when={error()} else={<Text class="text-xs text-faint">{t("web.memory.memory.noteHint")}</Text>}>
+                <Text testID="note-error" class="text-xs text-berry">
+                  {error()}
+                </Text>
+              </If>
+            </View>
+            <Button tone="primary" testID="note-write" class="shrink-0" disabled={!text().trim() || act.busy()} onPress={() => void write()}>
+              {t("web.base.write")}
+            </Button>
+          </View>
+        }
+      >
+        <View class="flex-row items-center gap-2 pt-1">
           <TextInput
             testID="note-repo"
             class="flex-1 font-mono"
@@ -357,29 +373,26 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
             value={repo()}
             onInput={repo.set}
           />
-        </If>
-        <Button tone="primary" testID="note-write" disabled={!text().trim() || act.busy()} onPress={() => void write()}>
-          {t("web.base.write")}
-        </Button>
-      </View>
-      <If when={props.withRepo === true && suggested().length > 0}>
-        <View class="flex-row flex-wrap gap-1">
-          <Each of={suggested()}>
-            {(name) => (
-              <View role="button" testID={`note-repo-${name()}`} onPress={() => repo.set(name())} class="rounded-sm px-1.5 py-0.5 hover:bg-hover">
-                <Text class="font-mono text-2xs text-muted">{name()}</Text>
-              </View>
-            )}
-          </Each>
+          <Button tone="primary" testID="note-write" class="shrink-0" disabled={!text().trim() || act.busy()} onPress={() => void write()}>
+            {t("web.base.write")}
+          </Button>
         </View>
-      </If>
-      <If
-        when={error()}
-        else={<Text class="text-xs text-faint">{props.withRepo === true ? t("web.memory.memory.noteHintRepo") : t("web.memory.memory.noteHint")}</Text>}
-      >
-        <Text testID="note-error" class="text-xs text-berry">
-          {error()}
-        </Text>
+        <If when={suggested().length > 0}>
+          <View class="flex-row flex-wrap gap-1">
+            <Each of={suggested()}>
+              {(name) => (
+                <View role="button" testID={`note-repo-${name()}`} onPress={() => repo.set(name())} class="rounded-sm px-1.5 py-0.5 hover:bg-hover">
+                  <Text class="font-mono text-2xs text-muted">{name()}</Text>
+                </View>
+              )}
+            </Each>
+          </View>
+        </If>
+        <If when={error()} else={<Text class="text-xs text-faint">{t("web.memory.memory.noteHintRepo")}</Text>}>
+          <Text testID="note-error" class="text-xs text-berry">
+            {error()}
+          </Text>
+        </If>
       </If>
     </View>
   );

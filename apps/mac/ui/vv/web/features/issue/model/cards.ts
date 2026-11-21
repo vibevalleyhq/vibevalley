@@ -1,5 +1,16 @@
 import { list, t } from "@vibevalley/i18n";
-import type { BoardSummary, Issue, IssueHistory, IssueLane, IssueStatus, Priority, Session, SessionView, SpaceView } from "@vibevalley/protocol";
+import type {
+  BoardSummary,
+  Issue,
+  IssueHistory,
+  IssueLane,
+  IssueStageKind,
+  IssueStatus,
+  Priority,
+  Session,
+  SessionView,
+  SpaceView,
+} from "@vibevalley/protocol";
 import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
 
 import { ago, tookText } from "../../../base/format";
@@ -334,6 +345,36 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
         flags,
         detail: t("web.issue.card.missing", { what: list(c.missing) }),
       };
+  }
+}
+
+function stageUrgencyTone(stage: IssueStageKind): "wheat" | "berry" | undefined {
+  switch (stage) {
+    case "asking":
+    case "reviewing":
+      return "wheat";
+    case "stuck":
+      return "berry";
+    case "draft":
+    case "queued":
+    case "working":
+    case "done":
+    case "canceled":
+      return undefined;
+  }
+}
+
+/** Left accent border tone for user-blocking board cards (`wheat` for waiting, `berry` for stuck/missing). */
+export function cardUrgencyTone(card: BoardCard): "wheat" | "berry" | undefined {
+  switch (card.kind) {
+    case "issue":
+    case "family":
+      return stageUrgencyTone(card.issue.stage.state);
+    case "missing":
+      return stageUrgencyTone(card.issue.stage.state) ?? "berry";
+    case "todo":
+    case "orchestrator":
+      return undefined;
   }
 }
 

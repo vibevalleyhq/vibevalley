@@ -40,6 +40,7 @@ import {
   tokensText,
   type TrajectorySummary,
   waterfallOf,
+  waterfallWidths,
 } from "./runs";
 import { SubagentProgress } from "./SubagentProgress";
 
@@ -575,8 +576,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
     if (width() <= 0 || runs.length === 0) return [];
     const room = Math.max(0, width() - between * (runs.length - 1));
     const took = runs.map(([a, b]) => b - a);
-    const total = took.reduce((n, t) => n + t, 0);
-    const widths = took.map((t) => (total > 0 ? (room * t) / total : room / runs.length));
+    const widths = waterfallWidths(took, room);
     const lefts: number[] = [];
     let x = 0;
     for (const w of widths) {

@@ -62,8 +62,19 @@ export function RuntimesPage(props: { rest: string }) {
         <Split
           edge
           list={
-            <ListCard bare title={t("web.runtime.title")} label={t("web.runtime.list")} testid="runtimes">
-              <Text class="px-2.5 pt-1 pb-1.5 text-xs text-muted">{t("web.runtime.intro")}</Text>
+            <ListCard
+              bare
+              title={t("web.runtime.list")}
+              label={t("web.runtime.list")}
+              testid="runtimes"
+              action={
+                <If when={list().length > 0}>
+                  <View class="rounded-sm bg-hover px-1.5 py-px">
+                    <Text class="text-2xs font-medium text-muted tabular-nums">{String(list().length)}</Text>
+                  </View>
+                </If>
+              }
+            >
               <Each of={list()} key={(r) => r.id}>
                 {(r) => {
                   const ok = () => r().installation.status === "available";

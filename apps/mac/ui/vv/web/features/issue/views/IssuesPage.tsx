@@ -465,7 +465,7 @@ function Toolbar(props: {
         />
         <DisplayMenu look={props.look} onChange={props.onLook} />
         <View tooltip={<Bubble text={`${t("web.issue.new.title")} (C)`} />}>
-          <Button icon="add" testID="issue-toolbar-new" onPress={props.onNew}>
+          <Button tone="primary" icon="add" testID="issue-toolbar-new" onPress={props.onNew}>
             {t("web.issue.new.card")}
           </Button>
         </View>

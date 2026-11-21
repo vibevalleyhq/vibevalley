@@ -19,6 +19,7 @@ import { AgentFace, OrchestratorFace } from "../../ui/domain/Face";
 import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Quiet } from "../../ui/layout";
+import { Segmented } from "../../ui/Segmented";
 import { Dot, type DotTone } from "../../ui/Tag";
 import { Bubble } from "../../ui/Tip";
 import { mix } from "../../ui/tone";
@@ -269,31 +270,18 @@ export function RunsPage() {
             </View>
           </If>
         </View>
-        <View role="radiogroup" accessibilityLabel={t("web.session.hub.scopeLabel")} testID="runs-scope" class="flex-row flex-wrap gap-1">
-          <Each of={runsScopes}>
-            {(item) => {
-              const on = () => scope() === item();
-              const count = () => (item() === "active" ? activeCount() : 0);
-              return (
-                <View
-                  role="radio"
-                  testID={`runs-scope-${item()}`}
-                  accessibilityLabel={scopeLabel(item())}
-                  accessibilityState={{ selected: on() }}
-                  onPress={() => setScope(item())}
-                  class={`h-6 flex-row items-center gap-1 rounded-md border px-2 transition duration-120 ease-out ${
-                    on() ? "border-line bg-page shadow-raise" : "border-transparent hover:bg-hover"
-                  }`}
-                >
-                  <Text class={`text-xs ${on() ? "font-medium text-ink" : "text-muted"}`}>{scopeLabel(item())}</Text>
-                  <If when={count() > 0}>
-                    <Text class={`font-mono text-2xs tabular-nums ${on() ? "text-water" : "text-faint"}`}>{String(count())}</Text>
-                  </If>
-                </View>
-              );
-            }}
-          </Each>
-        </View>
+        <Segmented
+          testid="runs-scope"
+          label={t("web.session.hub.scopeLabel")}
+          value={scope()}
+          onChange={setScope}
+          options={runsScopes.map((item) => ({
+            value: item,
+            label: scopeLabel(item),
+            count: item === "active" ? activeCount() : undefined,
+            countTone: "water",
+          }))}
+        />
         <If when={agentFilterName() !== undefined || issueFilterLabel() !== undefined}>
           <View class="flex-row flex-wrap items-center gap-1.5">
             <If when={agentFilterName()}>
@@ -416,7 +404,7 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
         props.selected ? "border-line bg-selected" : "border-transparent hover:bg-hover"
       }`}
     >
-      <View class="relative mt-0.5 shrink-0">
+      <View class="mt-0.5 shrink-0">
         <If
           when={props.entry.kind === "orchestrator"}
           else={
@@ -425,9 +413,6 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
         >
           <OrchestratorFace size={30} agent={props.entry.id} />
         </If>
-        <View class="absolute -right-0.5 -bottom-0.5">
-          <Dot tone={status().dot} size={7} />
-        </View>
       </View>
       <View class="min-w-0 flex-1 gap-0.5">
         <View class="flex-row items-center gap-1.5">
@@ -455,6 +440,7 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
           </Text>
         </If>
         <View class="flex-row items-center gap-1.5 pt-0.5">
+          <Dot tone={status().dot} size={6} ring={false} />
           <Text class={`shrink-0 text-2xs font-medium ${status().textClass}`}>{status().label}</Text>
           <If when={repo()}>
             {(r) => (
@@ -495,111 +481,115 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
 
   return (
     <View class="h-full min-h-0 flex-1 bg-page">
-      <View testID="run-detail-header" class="shrink-0 gap-2 border-b border-line px-5 py-3">
-        <If when={props.showBack}>
-          <View
-            role="button"
-            testID="runs-back"
-            onPress={props.onBack}
-            class="-ml-1.5 self-start rounded-md px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover"
-          >
-            <Text class="text-xs font-medium text-muted">{t("web.session.hub.back")}</Text>
+      <View testID="run-detail-header" class="shrink-0 border-b border-line px-5 py-3">
+        <View class="w-full max-w-5xl gap-2">
+          <If when={props.showBack}>
+            <View
+              role="button"
+              testID="runs-back"
+              onPress={props.onBack}
+              class="-ml-1.5 self-start rounded-md px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover"
+            >
+              <Text class="text-xs font-medium text-muted">{t("web.session.hub.back")}</Text>
+            </View>
+          </If>
+          <View class="flex-row flex-wrap items-center gap-3">
+            <View class="shrink-0">
+              <If
+                when={props.entry.kind === "orchestrator"}
+                else={
+                  props.entry.kind === "worker" ? (
+                    <AgentFace
+                      agentId={props.entry.session.agent}
+                      name={props.entry.session.name}
+                      runtime={props.entry.session.runtime}
+                      look={props.look}
+                      size={36}
+                    />
+                  ) : null
+                }
+              >
+                <OrchestratorFace size={36} agent={props.entry.id} />
+              </If>
+            </View>
+            <View class="min-w-0 flex-1 gap-0.5">
+              <View class="flex-row flex-wrap items-center gap-2">
+                <Text role="header" class="min-w-0 shrink truncate text-base font-semibold text-ink">
+                  {entryName(props.entry)}
+                </Text>
+                <View class={`h-5 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 ${status().pillClass}`} style={pillStyle()}>
+                  <Dot tone={status().dot} size={6} ring={false} />
+                  <Text class={`text-2xs font-medium ${status().textClass}`}>{status().label}</Text>
+                </View>
+              </View>
+              <If when={subLine()}>
+                <Text class="truncate text-xs text-muted">{subLine()}</Text>
+              </If>
+            </View>
+            <View class="shrink-0 flex-row flex-wrap items-center gap-2">
+              <If when={workerIssueId()}>
+                {(issueId) => (
+                  <A
+                    href={`/issues/${encodeURIComponent(issueId())}`}
+                    testID="run-open-issue"
+                    class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
+                  >
+                    <Icon name="issues" size={14} tone="muted" />
+                    <Text class="text-xs font-medium text-ink">
+                      {workerIssueNumber() !== undefined ? `#${workerIssueNumber()} ${t("web.session.hub.openIssue")}` : t("web.session.hub.openIssue")}
+                    </Text>
+                  </A>
+                )}
+              </If>
+              <A
+                href={`/agents/${encodeURIComponent(profileId())}`}
+                testID="run-open-profile"
+                class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
+              >
+                <Icon name="agents" size={14} tone="muted" />
+                <Text class="text-xs font-medium text-ink">{t("web.session.hub.openProfile")}</Text>
+              </A>
+            </View>
           </View>
-        </If>
-        <View class="flex-row flex-wrap items-center gap-3">
-          <View class="shrink-0">
+        </View>
+      </View>
+      <View class="min-h-0 flex-1 px-5 pt-3 pb-4">
+        <View class="min-h-0 w-full max-w-5xl flex-1 gap-3">
+          <If when={props.entry.kind === "orchestrator"}>
+            <PendingApprovals conversationId={props.entry.id} />
+          </If>
+          <View class="min-h-0 flex-1">
             <If
               when={props.entry.kind === "orchestrator"}
               else={
                 props.entry.kind === "worker" ? (
-                  <AgentFace
-                    agentId={props.entry.session.agent}
-                    name={props.entry.session.name}
-                    runtime={props.entry.session.runtime}
-                    look={props.look}
-                    size={36}
+                  <TrajectoryLog
+                    id={props.entry.id}
+                    working={props.entry.active}
+                    subagents={(props.entry.live ?? props.entry.session).subagents}
+                    title={
+                      props.entry.issue
+                        ? `#${props.entry.issue.number} ${props.entry.issue.title}`
+                        : props.entry.session.brief
+                          ? oneLine(props.entry.session.brief).trim()
+                          : entryName(props.entry)
+                    }
+                    about={props.entry.session.brief || undefined}
                   />
                 ) : null
               }
             >
-              <OrchestratorFace size={36} agent={props.entry.id} />
+              <TrajectoryLog
+                id={props.entry.id}
+                working={props.entry.active}
+                asked={t("web.orchestrator.orchestrator.heard")}
+                empty={t("web.orchestrator.orchestrator.quiet")}
+                title={t("web.orchestrator.orchestrator.trajectory")}
+                about={t("web.orchestrator.orchestrator.about")}
+                onMarkWrong={markWrongOf(props.entry.id)}
+              />
             </If>
           </View>
-          <View class="min-w-0 flex-1 gap-0.5">
-            <View class="flex-row flex-wrap items-center gap-2">
-              <Text role="header" class="min-w-0 shrink truncate text-base font-semibold text-ink">
-                {entryName(props.entry)}
-              </Text>
-              <View class={`h-5 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 ${status().pillClass}`} style={pillStyle()}>
-                <Dot tone={status().dot} size={6} ring={false} />
-                <Text class={`text-2xs font-medium ${status().textClass}`}>{status().label}</Text>
-              </View>
-            </View>
-            <If when={subLine()}>
-              <Text class="truncate text-xs text-muted">{subLine()}</Text>
-            </If>
-          </View>
-          <View class="shrink-0 flex-row flex-wrap items-center gap-2">
-            <If when={workerIssueId()}>
-              {(issueId) => (
-                <A
-                  href={`/issues/${encodeURIComponent(issueId())}`}
-                  testID="run-open-issue"
-                  class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
-                >
-                  <Icon name="issues" size={14} tone="muted" />
-                  <Text class="text-xs font-medium text-ink">
-                    {workerIssueNumber() !== undefined ? `#${workerIssueNumber()} ${t("web.session.hub.openIssue")}` : t("web.session.hub.openIssue")}
-                  </Text>
-                </A>
-              )}
-            </If>
-            <A
-              href={`/agents/${encodeURIComponent(profileId())}`}
-              testID="run-open-profile"
-              class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
-            >
-              <Icon name="agents" size={14} tone="muted" />
-              <Text class="text-xs font-medium text-ink">{t("web.session.hub.openProfile")}</Text>
-            </A>
-          </View>
-        </View>
-      </View>
-      <View class="min-h-0 flex-1 gap-3 px-5 pt-3 pb-4">
-        <If when={props.entry.kind === "orchestrator"}>
-          <PendingApprovals conversationId={props.entry.id} />
-        </If>
-        <View class="min-h-0 flex-1">
-          <If
-            when={props.entry.kind === "orchestrator"}
-            else={
-              props.entry.kind === "worker" ? (
-                <TrajectoryLog
-                  id={props.entry.id}
-                  working={props.entry.active}
-                  subagents={(props.entry.live ?? props.entry.session).subagents}
-                  title={
-                    props.entry.issue
-                      ? `#${props.entry.issue.number} ${props.entry.issue.title}`
-                      : props.entry.session.brief
-                        ? oneLine(props.entry.session.brief).trim()
-                        : entryName(props.entry)
-                  }
-                  about={props.entry.session.brief || undefined}
-                />
-              ) : null
-            }
-          >
-            <TrajectoryLog
-              id={props.entry.id}
-              working={props.entry.active}
-              asked={t("web.orchestrator.orchestrator.heard")}
-              empty={t("web.orchestrator.orchestrator.quiet")}
-              title={t("web.orchestrator.orchestrator.trajectory")}
-              about={t("web.orchestrator.orchestrator.about")}
-              onMarkWrong={markWrongOf(props.entry.id)}
-            />
-          </If>
         </View>
       </View>
     </View>

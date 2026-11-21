@@ -270,6 +270,30 @@ interface Waterfall {
   readonly spans: readonly LaneSpan[];
 }
 
+const WATERFALL_RATIO_THRESHOLD = 8;
+const WATERFALL_MIN_RUN_PX = 44;
+
+/** Allocates horizontal pixel widths for waterfall runs; dampens extreme duration ratios so short runs remain legible. */
+export function waterfallWidths(durations: readonly number[], room: number): number[] {
+  if (room <= 0 || durations.length === 0) return [];
+  const safe = durations.map((d) => (Number.isFinite(d) && d > 0 ? d : 0));
+  const total = safe.reduce((sum, d) => sum + d, 0);
+  if (total <= 0) return safe.map(() => room / safe.length);
+
+  const positive = safe.filter((d) => d > 0);
+  const minPos = Math.min(...positive);
+  const maxPos = Math.max(...positive);
+  if (maxPos / minPos <= WATERFALL_RATIO_THRESHOLD) {
+    return safe.map((d) => (room * d) / total);
+  }
+
+  const minRunPx = Math.min(WATERFALL_MIN_RUN_PX, room / safe.length);
+  const extraRoom = room - positive.length * minRunPx;
+  const weights = safe.map((d) => (d > 0 ? Math.sqrt(d) : 0));
+  const weightTotal = weights.reduce((sum, w) => sum + w, 0);
+  return safe.map((d, i) => (d > 0 ? minRunPx + (extraRoom * (weights[i] ?? 0)) / weightTotal : 0));
+}
+
 /** Lanes from the times the log already has. a step's time is when it began. */
 export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfall {
   const top = log.filter((e) => e.under === undefined && e.type !== "run/start" && e.type !== "run/end");
