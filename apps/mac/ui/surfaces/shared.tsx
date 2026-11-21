@@ -18,7 +18,9 @@ export type SurfaceIconName =
   | "file"
   | "arrow-up"
   | "arrow-down"
-  | "lock";
+  | "lock"
+  | "commands"
+  | "search";
 
 const GLYPH_TO_ICON: Record<string, SurfaceIconName> = {
   "⊟": "collapse-all",
@@ -183,6 +185,26 @@ function drawSurfaceIcon(cx: CanvasRenderingContext2D, name: SurfaceIconName, si
       cx.lineTo(5.75, 5.5);
       cx.arc(8, 5.5, 2.25, Math.PI, 0, false);
       cx.lineTo(10.25, 7.5);
+      cx.stroke();
+      break;
+    case "commands":
+      cx.beginPath();
+      cx.moveTo(3.2, 4.8);
+      cx.lineTo(6.8, 8.0);
+      cx.lineTo(3.2, 11.2);
+      cx.stroke();
+      cx.beginPath();
+      cx.moveTo(8.2, 11.2);
+      cx.lineTo(12.8, 11.2);
+      cx.stroke();
+      break;
+    case "search":
+      cx.beginPath();
+      cx.arc(7.1, 7.1, 4.3, 0, Math.PI * 2);
+      cx.stroke();
+      cx.beginPath();
+      cx.moveTo(10.3, 10.3);
+      cx.lineTo(13.4, 13.4);
       cx.stroke();
       break;
   }

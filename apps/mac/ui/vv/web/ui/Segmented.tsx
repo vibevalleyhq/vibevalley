@@ -7,10 +7,31 @@ import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Bubble } from "./Tip";
 
+type SegmentedCountTone = "muted" | "water" | "wheat";
+
+function countToneClass(tone: SegmentedCountTone, active: boolean): string {
+  switch (tone) {
+    case "muted":
+      return active ? "text-muted" : "text-faint";
+    case "water":
+      return "text-water";
+    case "wheat":
+      return "text-warn-ink";
+  }
+}
+
 /** Two to five choices, one of them taken. */
 export function Segmented<T extends string>(props: {
   value: T;
-  options: { value: T; label: string; icon?: IconName | undefined; disabled?: boolean | undefined; title?: string | undefined }[];
+  options: {
+    value: T;
+    label: string;
+    icon?: IconName | undefined;
+    count?: number | undefined;
+    countTone?: SegmentedCountTone | undefined;
+    disabled?: boolean | undefined;
+    title?: string | undefined;
+  }[];
   onChange: (v: T) => void;
   label: string;
   block?: boolean;
@@ -21,7 +42,7 @@ export function Segmented<T extends string>(props: {
       role="radiogroup"
       accessibilityLabel={props.label}
       testID={props.testid}
-      class={`flex-row flex-wrap gap-0.5 rounded-md bg-hover p-0.5 ${props.block === true ? "w-full" : "self-start"}`}
+      class={`flex-row flex-wrap gap-0.5 rounded-md border border-line bg-side p-0.5 ${props.block === true ? "w-full" : "self-start"}`}
     >
       <Each of={props.options}>
         {(o) => {
@@ -48,6 +69,9 @@ export function Segmented<T extends string>(props: {
               <Text class={`min-w-0 truncate text-sm ${on() ? "font-medium text-ink" : disabled() ? "text-muted" : "text-muted group-hover:text-ink"}`}>
                 {o().label}
               </Text>
+              <If when={o().count !== undefined}>
+                <Text class={`text-2xs tabular-nums ${countToneClass(o().countTone ?? "muted", on())}`}>{String(o().count ?? 0)}</Text>
+              </If>
             </View>
           );
         }}

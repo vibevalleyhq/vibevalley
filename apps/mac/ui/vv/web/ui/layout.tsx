@@ -13,6 +13,24 @@ import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Bubble, Hint } from "./Tip";
 
+type PageWidth = "prose" | "manage" | "wide";
+
+const pageWidths: Record<PageWidth, string> = {
+  prose: "w-full max-w-3xl",
+  manage: "w-full max-w-5xl",
+  wide: "w-full",
+};
+
+/** Standard page content container with consistent reading/management width and vertical rhythm. */
+export function PageBody(props: { width?: PageWidth | undefined; class?: string | undefined; testid?: string | undefined; children: JSX.Element }) {
+  const width = () => props.width ?? "manage";
+  return (
+    <View testID={props.testid} class={`gap-5 ${pageWidths[width()]} ${props.class ?? ""}`}>
+      {props.children}
+    </View>
+  );
+}
+
 /** edge: a page's own list as a side column against the rail (its ListCard bare), not a card in a page that already has one. */
 export function Split(props: { list: JSX.Element; children: JSX.Element; edge?: boolean }) {
   const edge = () => props.edge === true;
@@ -49,17 +67,25 @@ export function ListCard(props: { title: string; label?: string; action?: JSX.El
 
 /** A row: a link to its detail, marked when it is the open one. */
 export function ListRow(props: { to: string; item?: string; active?: boolean; title: string; line?: string; leading?: JSX.Element; trailing?: JSX.Element }) {
+  const active = () => props.active === true;
   return (
     <A
       href={props.to}
       testID={props.item === undefined ? "list-row" : `list-row-${props.item}`}
       accessibilityLabel={props.title}
-      accessibilityState={{ selected: props.active === true }}
-      class={`flex-row items-center gap-2.5 rounded-md px-2.5 py-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.active === true ? "bg-selected" : "hover:bg-hover"}`}
+      accessibilityState={{ selected: active() }}
+      class={`relative flex-row items-center gap-2.5 rounded-md border px-2.5 py-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+        active() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
+      }`}
     >
+      <If when={active()}>
+        <View class="absolute top-0 bottom-0 left-0.5 justify-center">
+          <View class="h-4 w-0.5 rounded-full bg-accent" />
+        </View>
+      </If>
       {props.leading}
       <View class="min-w-0 flex-1 gap-0.5">
-        <Text class={`truncate text-sm text-ink ${props.active === true ? "font-semibold" : "font-medium"}`}>{props.title}</Text>
+        <Text class={`truncate text-sm text-ink ${active() ? "font-semibold" : "font-medium"}`}>{props.title}</Text>
         <If when={props.line}>
           <Text class="truncate text-xs text-muted">{props.line}</Text>
         </If>
@@ -110,41 +136,78 @@ export function Empty(props: { icon: IconName; children: JSX.Element; action?: J
   );
 }
 
-/** An on/off with its label, and what it means under it (hint) or behind an info icon (tip). */
-export function Toggle(props: {
-  label: string;
-  /** What a screen reader says, where the label alone does not say which. */
-  ariaLabel?: string;
-  hint?: string | undefined;
-  tip?: string;
+function ToggleSwitch(props: {
   checked: boolean;
   onChange: (on: boolean) => void;
-  disabled?: boolean;
-  testid?: string;
+  disabled?: boolean | undefined;
+  ariaLabel: string;
+  testid?: string | undefined;
+  class?: string | undefined;
 }) {
   return (
-    <View class={`flex-row items-start gap-2.5 ${props.disabled === true ? "opacity-50" : ""}`}>
-      <Switch
-        testID={props.testid}
-        checked={props.checked}
-        disabled={props.disabled}
-        hitSlop={4}
-        accessibilityLabel={props.ariaLabel ?? props.label}
-        onChange={(e) => props.onChange(e.checked)}
-        class="mt-0.5 shrink-0"
-        trackClass="h-4 w-7 justify-center rounded-full border border-line bg-selected p-0.5 transition-colors duration-180 ease-out checked:border-accent checked:bg-accent focus-visible:outline-2 focus-visible:outline-focus"
-        thumbClass="size-2.5 rounded-full bg-page shadow-raise transition-transform duration-180 ease-out checked:translate-x-3"
-      />
-      <View class="min-w-0 flex-1 gap-0.5">
-        <View class="flex-row items-center gap-1.5">
-          <Text class="text-sm text-ink">{props.label}</Text>
-          <If when={props.tip}>{(tip) => <Hint text={tip()} />}</If>
+    <Switch
+      testID={props.testid}
+      checked={props.checked}
+      disabled={props.disabled}
+      hitSlop={4}
+      accessibilityLabel={props.ariaLabel}
+      onChange={(e) => props.onChange(e.checked)}
+      class={props.class}
+      trackClass="h-4 w-7 justify-center rounded-full border border-line bg-selected p-0.5 transition-colors duration-180 ease-out checked:border-accent checked:bg-accent focus-visible:outline-2 focus-visible:outline-focus"
+      thumbClass="size-2.5 rounded-full bg-page shadow-raise transition-transform duration-180 ease-out checked:translate-x-3"
+    />
+  );
+}
+
+/** An on/off with its label, and what it means under it (hint) or behind an info icon (tip); `bare` renders only the switch. */
+export function Toggle(props: {
+  label?: string | undefined;
+  /** What a screen reader says, where the label alone does not say which. */
+  ariaLabel?: string | undefined;
+  hint?: string | undefined;
+  tip?: string | undefined;
+  bare?: boolean | undefined;
+  checked: boolean;
+  onChange: (on: boolean) => void;
+  disabled?: boolean | undefined;
+  testid?: string | undefined;
+}) {
+  const bare = () => props.bare === true || !props.label;
+  const accessibilityLabel = () => props.ariaLabel ?? props.label ?? "";
+  return (
+    <If
+      when={!bare()}
+      else={
+        <ToggleSwitch
+          testid={props.testid}
+          checked={props.checked}
+          disabled={props.disabled}
+          ariaLabel={accessibilityLabel()}
+          onChange={props.onChange}
+          class={`shrink-0 ${props.disabled === true ? "opacity-50" : ""}`}
+        />
+      }
+    >
+      <View class={`flex-row items-start gap-2.5 ${props.disabled === true ? "opacity-50" : ""}`}>
+        <ToggleSwitch
+          testid={props.testid}
+          checked={props.checked}
+          disabled={props.disabled}
+          ariaLabel={accessibilityLabel()}
+          onChange={props.onChange}
+          class="mt-0.5 shrink-0"
+        />
+        <View class="min-w-0 flex-1 gap-0.5">
+          <View class="flex-row items-center gap-1.5">
+            <Text class="text-sm text-ink">{props.label ?? ""}</Text>
+            <If when={props.tip}>{(tip) => <Hint text={tip()} />}</If>
+          </View>
+          <If when={props.hint}>
+            <Text class="text-xs leading-relaxed text-muted">{props.hint}</Text>
+          </If>
         </View>
-        <If when={props.hint}>
-          <Text class="text-xs leading-relaxed text-muted">{props.hint}</Text>
-        </If>
       </View>
-    </View>
+    </If>
   );
 }
 

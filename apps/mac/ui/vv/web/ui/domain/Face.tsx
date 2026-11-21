@@ -14,6 +14,7 @@ import { orchestratorLooks } from "../../features/orchestrator/looks";
 import { orchestratorLookOf } from "../../infra/agents";
 import { ready, useAgents, useSprites } from "../../infra/query";
 import { useSpriteUrl } from "../pixel/atlas";
+import { tone } from "../tone";
 import { castPrefix, hexColor } from "./cast";
 import { initialOf, RuntimeBadge } from "./RuntimeBadge";
 
@@ -88,7 +89,7 @@ export function AgentFace(props: {
   };
   const name = () => props.name ?? ready(agents, []).find((a) => a.id === props.agentId)?.name ?? props.agentId;
   // The hat's colour lightened toward paper, opaque so the letter reads in both themes; the leaf wash without a hat.
-  const ground = () => (props.look?.hat ? toward(hexColor(props.look.hat), 0.6) : "#dcebc8");
+  const ground = () => (props.look?.hat ? toward(hexColor(props.look.hat), 0.6) : tone("avatar-leaf"));
   return (
     <View class="shrink-0" style={{ width: size(), height: size() }}>
       <If when={cut()} else={<Initial size={size()} letter={initialOf(name())} ground={ground()} muted={props.muted} />}>
@@ -127,8 +128,8 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
     return initialOf(agent?.name ?? orchestratorLooks.find((l) => l.id === (props.look ?? "farmer"))?.name ?? "?");
   };
   return (
-    <If when={cut()} else={<Initial size={size()} letter={letter()} ground="#cfe6f5" />}>
-      {(c) => <Crop size={size()} cut={c()} ground="#cfe6f5" />}
+    <If when={cut()} else={<Initial size={size()} letter={letter()} ground={tone("avatar-sky")} />}>
+      {(c) => <Crop size={size()} cut={c()} ground={tone("avatar-sky")} />}
     </If>
   );
 }

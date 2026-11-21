@@ -39,14 +39,25 @@ test("all workbench controls, overlays, rich blocks, virtual-clock hooks, and do
   expect(app.texts()).toContain("checked:true");
   await expect(app.press("id:chk-disabled")).rejects.toMatchObject({ code: "ERR_NSH_TEST_DISABLED" });
 
+  expect(app.texts()).toContain("3");
+  expect(app.texts()).toContain("0");
   await app.press("id:seg-mode-b");
   expect(app.texts()).toContain("seg:b");
+  expect(app.texts()).toContain("toggles:false/true");
+  await app.press("id:comp-toggle-labeled");
+  await app.press("id:comp-toggle-bare");
+  expect(app.texts()).toContain("toggles:true/false");
   await app.press("id:tab-t2");
   expect(app.texts()).toContain("tab:t2");
 
   expect(app.texts()).toContain("已就绪");
   expect(app.texts()).toContain("已失败");
   expect(app.texts()).toContain("等待确认");
+  expect(app.texts()).toContain("同步中");
+  expect(app.texts()).toContain("已归档");
+  expect(app.count("id:comp-page-body")).toBe(1);
+  expect(app.count("id:list-row-row-a")).toBe(1);
+  expect(app.count("id:list-row-row-b")).toBe(1);
 
   await app.clear("id:field-input");
   await app.type("id:field-input", "updated");

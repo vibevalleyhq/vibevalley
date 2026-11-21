@@ -1,10 +1,11 @@
 // The palette: commands (⌘K / ⇧⌘P), files (⌘P, answered by Rust's FileIndex)
 // and project search (⇧⌘F), all on nsh's Command.
-import { Canvas, colorScheme, Text, View, type CanvasRenderingContext2D } from "nsh";
+import { Text, View } from "nsh";
 import { Command, type CommandItem } from "nsh/base";
 
 import { act, frame } from "../bridge";
 import { tok, type as ty } from "../tokens";
+import { SurfaceIcon, type SurfaceIconName } from "./shared";
 
 type PaletteMode = "commands" | "files" | "search";
 type Item = CommandItem & { detail?: string };
@@ -28,65 +29,11 @@ const modeHints: readonly { mode: PaletteMode; keys: string; label: string }[] =
   { mode: "search", keys: "⇧⌘F", label: "搜索" },
 ];
 
-function drawModeGlyph(cx: CanvasRenderingContext2D, mode: PaletteMode, size: number) {
-  const u = size / 16;
-  switch (mode) {
-    case "commands":
-      cx.beginPath();
-      cx.moveTo(3.2 * u, 4.8 * u);
-      cx.lineTo(6.8 * u, 8.0 * u);
-      cx.lineTo(3.2 * u, 11.2 * u);
-      cx.stroke();
-      cx.beginPath();
-      cx.moveTo(8.2 * u, 11.2 * u);
-      cx.lineTo(12.8 * u, 11.2 * u);
-      cx.stroke();
-      break;
-    case "files":
-      cx.beginPath();
-      cx.moveTo(3.6 * u, 2.2 * u);
-      cx.lineTo(9.4 * u, 2.2 * u);
-      cx.lineTo(12.4 * u, 5.2 * u);
-      cx.lineTo(12.4 * u, 13.8 * u);
-      cx.lineTo(3.6 * u, 13.8 * u);
-      cx.closePath();
-      cx.stroke();
-      cx.beginPath();
-      cx.moveTo(9.4 * u, 2.2 * u);
-      cx.lineTo(9.4 * u, 5.2 * u);
-      cx.lineTo(12.4 * u, 5.2 * u);
-      cx.stroke();
-      break;
-    case "search":
-      cx.beginPath();
-      cx.arc(7.1 * u, 7.1 * u, 4.3 * u, 0, Math.PI * 2);
-      cx.stroke();
-      cx.beginPath();
-      cx.moveTo(10.3 * u, 10.3 * u);
-      cx.lineTo(13.4 * u, 13.4 * u);
-      cx.stroke();
-      break;
-  }
-}
-
-function ModeIcon(props: { mode: PaletteMode; size?: number; color: string }) {
-  const dim = () => props.size ?? 14;
-  return (
-    <Canvas
-      style={{ width: dim(), height: dim(), flexShrink: 0 }}
-      draw={(cx) => {
-        void colorScheme();
-        const s = dim();
-        cx.clearRect(0, 0, s, s);
-        cx.strokeStyle = props.color;
-        cx.lineWidth = 1.4;
-        cx.lineCap = "round";
-        cx.lineJoin = "round";
-        drawModeGlyph(cx, props.mode, s);
-      }}
-    />
-  );
-}
+const modeIcons: Record<PaletteMode, SurfaceIconName> = {
+  commands: "commands",
+  files: "file",
+  search: "search",
+};
 
 function KeyCap(props: { label: string; surface?: "tile" | "surface"; active?: boolean }) {
   const p = () => tok();
@@ -151,7 +98,7 @@ export function Palette() {
         class="flex-1"
         searchPrefix={
           <View style={{ width: 20, height: 20, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <ModeIcon mode={mode()} size={15} color={p().muted} />
+            <SurfaceIcon name={modeIcons[mode()]} size={15} color={p().muted} />
           </View>
         }
         searchSuffix={
@@ -183,7 +130,7 @@ export function Palette() {
         itemClass="group h-9 w-full flex-row items-center rounded-md px-2.5 hover:bg-hover focus:bg-selected"
         empty={
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 36, paddingHorizontal: 20, gap: 8 }}>
-            <ModeIcon mode={mode()} size={20} color={p().faint} />
+            <SurfaceIcon name={modeIcons[mode()]} size={20} color={p().faint} />
             <Text style={{ fontSize: 13, color: p().muted, textAlign: "center" }}>
               {f()?.note ?? (mode() === "files" ? "没有匹配的文件。" : mode() === "search" ? "没有匹配结果。" : "没有匹配的命令。")}
             </Text>
@@ -195,7 +142,7 @@ export function Palette() {
             <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%", minWidth: 0 }}>
               <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 }}>
                 <View style={{ width: 18, height: 18, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <ModeIcon mode={mode()} size={13} color={p().faint} />
+                  <SurfaceIcon name={modeIcons[mode()]} size={13} color={p().faint} />
                 </View>
                 <Text
                   style={{

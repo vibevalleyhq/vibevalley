@@ -5,15 +5,16 @@ import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { mix } from "./tone";
 
-/** What a tag says by its colour: done or new (ok), failed (bad), sent or stopped (wait). Its ink comes with it, so it
- * reads in both themes. */
-export type TagTone = "ok" | "bad" | "wait";
+/** What a tag says by its colour: done/new (ok), failed (bad), sent/stopped (wait), in-flight/active (info), or quiet (neutral). */
+export type TagTone = "ok" | "bad" | "wait" | "info" | "neutral";
 
 // Whole class names, so nsh's Tailwind reads every surface and text token cleanly in both themes.
 const tagTones: Record<TagTone, { bgClass: string; bgStyle?: () => string; textClass: string; iconTone: string }> = {
   ok: { bgClass: "bg-ok-soft", textClass: "text-ok-ink", iconTone: "ok-ink" },
   bad: { bgClass: "bg-bad-soft", textClass: "text-berry", iconTone: "berry" },
-  wait: { bgClass: "", bgStyle: () => mix("wheat", 0.22), textClass: "text-warn-ink", iconTone: "warn-ink" },
+  wait: { bgClass: "bg-warn-soft", textClass: "text-warn-ink", iconTone: "warn-ink" },
+  info: { bgClass: "", bgStyle: () => mix("water", 0.14), textClass: "text-water", iconTone: "water" },
+  neutral: { bgClass: "bg-hover", textClass: "text-muted", iconTone: "muted" },
 };
 
 export function Tag(props: { icon?: IconName | undefined; label: string; tone: TagTone }) {

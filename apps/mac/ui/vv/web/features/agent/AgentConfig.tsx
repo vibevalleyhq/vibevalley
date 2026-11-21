@@ -22,6 +22,7 @@ import { sortRuntimes } from "../../infra/agents";
 import { ready, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { Button } from "../../ui/Button";
+import { Checkbox } from "../../ui/Checkbox";
 import { ChipsInput, KeyValueEditor } from "../../ui/Chips";
 import { Select, TextArea, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
@@ -350,23 +351,16 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
               const on = () => props.draft.skills.includes(s().id);
               return (
                 <View
-                  role="checkbox"
-                  testID={`skill-${s().id}`}
-                  accessibilityState={{ checked: on() }}
-                  accessibilityLabel={s().name}
-                  onPress={() => toggle(s().id)}
                   class={`flex-row items-start gap-2.5 rounded-md border p-2.5 transition duration-120 ease-out ${on() ? "bg-selected" : "border-line hover:bg-hover"}`}
                   style={on() ? { borderColor: mix("ink", 0.4) } : undefined}
                 >
+                  <Checkbox testid={`skill-${s().id}`} checked={on()} onChange={() => toggle(s().id)} label={s().name} class="mt-0.5" />
                   <View
-                    class={`mt-0.5 size-4 shrink-0 items-center justify-center rounded-xs border transition duration-120 ease-out ${on() ? "border-accent bg-accent" : "bg-page"}`}
-                    style={on() ? undefined : { borderColor: mix("ink", 0.25) }}
+                    role="button"
+                    accessibilityLabel={s().name}
+                    onPress={() => toggle(s().id)}
+                    class="min-w-0 flex-1 rounded-xs focus-visible:outline-2 focus-visible:outline-focus"
                   >
-                    <If when={on()}>
-                      <Icon name="ticked" size={12} tone="page" />
-                    </If>
-                  </View>
-                  <View class="min-w-0 flex-1">
                     <Text class="text-sm font-medium text-ink">
                       {s().name}
                       <If when={s().builtIn === true}>

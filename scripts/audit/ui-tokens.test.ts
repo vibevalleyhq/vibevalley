@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { filterBaselineViolations, listWebUiFiles, ROUND2_BASELINE, scanAllWebUi, scanUiTokens } from "./ui-tokens.ts";
+import { listWebUiFiles, scanAllWebUi, scanUiTokens } from "./ui-tokens.ts";
 
 describe("ui-tokens guardrail", () => {
   it("flags hardcoded hex, rgb/rgba, and hex-alpha template concatenations", () => {
@@ -49,17 +49,15 @@ describe("ui-tokens guardrail", () => {
     expect(connectorFindings.map((f) => f.rule)).toEqual(["arbitrary-tailwind", "raw-control"]);
   });
 
-  it("excludes external/export-only files and allows strictly the Round 2 baseline", () => {
+  it("excludes external/export-only files and enforces zero violations across the workbench", () => {
     const files = listWebUiFiles();
     expect(files).not.toContain("apps/mac/ui/vv/web/features/repo/repos.ts");
     expect(files).not.toContain("apps/mac/ui/vv/web/features/artifact/WhiteboardView.tsx");
     expect(files).not.toContain("apps/mac/ui/vv/web/ui/Qr.tsx");
 
-    const all = scanAllWebUi();
-    expect(all).toHaveLength(ROUND2_BASELINE.length);
-    expect(filterBaselineViolations(all)).toEqual([]);
+    expect(scanAllWebUi()).toEqual([]);
 
     const extra = scanUiTokens("apps/mac/ui/vv/web/features/agent/AgentsPage.tsx", 'export const Extra = () => <View style={{ color: "#123456" }} />;');
-    expect(filterBaselineViolations([...all, ...extra])).toHaveLength(1);
+    expect(extra).toHaveLength(1);
   });
 });

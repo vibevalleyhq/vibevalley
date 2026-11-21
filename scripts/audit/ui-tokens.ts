@@ -43,13 +43,6 @@ export interface Finding {
   readonly fix: string;
 }
 
-export interface BaselineEntry {
-  readonly file: string;
-  readonly line: number;
-  readonly rule: ViolationRule;
-  readonly snippet: string;
-}
-
 /** Narrow rule-level exemptions for files that legitimately deviate on one rule only. */
 const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
   // 5-state PKM task marker (TODO/DOING/DONE/WAIT/CANCELED), not binary <Checkbox>.
@@ -57,40 +50,6 @@ const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
   // Third-party WeChat/Feishu/QQ brand stand-ins and QR quiet frame.
   "apps/mac/ui/vv/web/features/connector/ConnectorsPage.tsx": ["hardcoded-color"],
 };
-
-/** Temporary Round 1 -> Round 2 baseline (strictly the 5 files / 20 findings to retire in Round 2). */
-export const ROUND2_BASELINE: readonly BaselineEntry[] = [
-  { file: "apps/mac/ui/vv/web/features/agent/AgentConfig.tsx", line: 353, rule: "raw-control", snippet: 'role="checkbox"' },
-  { file: "apps/mac/ui/vv/web/features/agent/AgentsPage.tsx", line: 310, rule: "raw-control", snippet: "<Switch" },
-  {
-    file: "apps/mac/ui/vv/web/features/agent/AgentsPage.tsx",
-    line: 326,
-    rule: "hardcoded-color",
-    snippet: "${hexColor(props.agent.look.hat)}29",
-  },
-  {
-    file: "apps/mac/ui/vv/web/features/runtime/RuntimesPage.tsx",
-    line: 129,
-    rule: "hardcoded-color",
-    snippet: "${hexColor(props.info.preset.look.hat)}33",
-  },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 181, rule: "hardcoded-color", snippet: "#e5a93c" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 183, rule: "hardcoded-color", snippet: "#b4cb7c" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 185, rule: "hardcoded-color", snippet: "#c8a46e" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 187, rule: "hardcoded-color", snippet: "#74a046" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 190, rule: "hardcoded-color", snippet: "#efb84e" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 192, rule: "hardcoded-color", snippet: "#b8402f" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 196, rule: "hardcoded-color", snippet: "#e2c995" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 198, rule: "hardcoded-color", snippet: "#b8402f" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 203, rule: "hardcoded-color", snippet: "#4f8fbd" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 205, rule: "hardcoded-color", snippet: "#3f6427" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 207, rule: "hardcoded-color", snippet: "#67482d" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 209, rule: "hardcoded-color", snippet: "#e2c995" },
-  { file: "apps/mac/ui/vv/web/features/session/runs.ts", line: 212, rule: "hardcoded-color", snippet: "#9b7550" },
-  { file: "apps/mac/ui/vv/web/ui/domain/Face.tsx", line: 91, rule: "hardcoded-color", snippet: "#dcebc8" },
-  { file: "apps/mac/ui/vv/web/ui/domain/Face.tsx", line: 130, rule: "hardcoded-color", snippet: "#cfe6f5" },
-  { file: "apps/mac/ui/vv/web/ui/domain/Face.tsx", line: 131, rule: "hardcoded-color", snippet: "#cfe6f5" },
-];
 
 interface AstNode {
   readonly type: string;
@@ -314,15 +273,6 @@ export function scanAllWebUi(): Finding[] {
   return out;
 }
 
-function baselineKey(entry: Pick<BaselineEntry, "file" | "line" | "rule" | "snippet">): string {
-  return `${entry.file}:${entry.line}:${entry.rule}:${entry.snippet}`;
-}
-
-export function filterBaselineViolations(findings: readonly Finding[], baseline: readonly BaselineEntry[] = ROUND2_BASELINE): Finding[] {
-  const allowed = new Set(baseline.map(baselineKey));
-  return findings.filter((f) => !allowed.has(baselineKey(f)));
-}
-
 if (import.meta.main) {
   const listOnly = process.argv.includes("--list");
   const findings = scanAllWebUi();
@@ -333,12 +283,11 @@ if (import.meta.main) {
     console.log(`\nTotal non-excluded findings: ${findings.length}`);
     process.exit(0);
   }
-  const unexpected = filterBaselineViolations(findings);
-  if (unexpected.length > 0) {
-    for (const f of unexpected) {
+  if (findings.length > 0) {
+    for (const f of findings) {
       console.error(`${f.file}:${f.line} [${f.rule}] ${f.snippet}\n  Fix: ${f.fix}`);
     }
-    console.error(`\nFound ${unexpected.length} un-allowlisted design-token violation(s).`);
+    console.error(`\nFound ${findings.length} design-token violation(s).`);
     process.exit(1);
   }
 }

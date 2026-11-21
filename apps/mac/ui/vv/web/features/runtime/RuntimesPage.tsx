@@ -16,7 +16,6 @@ import { ready, runtimesQuery, useQueryClient, useRuntimes } from "../../infra/q
 import { Link as A } from "../../infra/router";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
-import { hexColor } from "../../ui/domain/cast";
 import { AgentFace } from "../../ui/domain/Face";
 import { OpenTerminal } from "../../ui/domain/OpenTerminal";
 import { Card, ListCard, ListRow, Quiet, Split } from "../../ui/layout";
@@ -124,10 +123,7 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
   return (
     <View testID="runtime-detail" class="max-w-4xl gap-3">
       <View class="flex-row items-center gap-4 px-1 pt-1 pb-2">
-        <View
-          class="h-18 w-18 shrink-0 items-center justify-center rounded-lg border border-line"
-          style={{ backgroundColor: `${hexColor(props.info.preset.look.hat)}33` }}
-        >
+        <View class="h-18 w-18 shrink-0 items-center justify-center rounded-lg border border-line bg-side">
           <View style={{ opacity: inst().status !== "available" ? 0.5 : 1 }}>
             <RuntimeIcon runtime={props.info.id} size={60} />
           </View>

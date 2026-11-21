@@ -29,6 +29,7 @@ import { RuntimeBadge } from "../web/ui/domain/RuntimeBadge";
 import { Field, TextInput } from "../web/ui/Field";
 import { IconButton } from "../web/ui/IconButton";
 import { KeyField } from "../web/ui/KeyField";
+import { ListCard, ListRow, PageBody, Toggle } from "../web/ui/layout";
 import { Markdown } from "../web/ui/Markdown";
 import { MoreMenu } from "../web/ui/MoreMenu";
 import { Segmented } from "../web/ui/Segmented";
@@ -120,6 +121,8 @@ function ComponentBench() {
   const confirmed = signal(0);
   const escConfirmed = signal(0);
   const checked = signal(false);
+  const toggleOn = signal(false);
+  const bareToggleOn = signal(true);
   const seg = signal<"a" | "b" | "c">("a");
   const tab = signal<"t1" | "t2">("t1");
   const chips = signal<readonly string[]>(["rust"]);
@@ -189,12 +192,15 @@ function ComponentBench() {
             value={seg()}
             onChange={(v) => seg.set(v)}
             options={[
-              { value: "a", label: "选项A" },
-              { value: "b", label: "选项B" },
+              { value: "a", label: "选项A", count: 3, countTone: "water" },
+              { value: "b", label: "选项B", count: 0, countTone: "wheat" },
               { value: "c", label: "选项C", disabled: true },
             ]}
           />
           <Text testID="seg-state">{`seg:${seg()}`}</Text>
+          <Toggle testid="comp-toggle-labeled" label="自动合并" checked={toggleOn()} onChange={toggleOn.set} />
+          <Toggle bare testid="comp-toggle-bare" ariaLabel="行开关" checked={bareToggleOn()} onChange={bareToggleOn.set} />
+          <Text testID="toggle-states">{`toggles:${String(toggleOn())}/${String(bareToggleOn())}`}</Text>
         </View>
 
         <View class="gap-1.5">
@@ -214,7 +220,16 @@ function ComponentBench() {
           <Tag tone="ok" label="已就绪" />
           <Tag tone="bad" label="已失败" />
           <Tag tone="wait" label="等待确认" />
+          <Tag tone="info" label="同步中" />
+          <Tag tone="neutral" label="已归档" />
         </View>
+
+        <PageBody width="prose" testid="comp-page-body">
+          <ListCard title="行列表" testid="comp-list">
+            <ListRow to="/row-a" item="row-a" active title="选中条目" line="左侧含主题色竖线标记" />
+            <ListRow to="/row-b" item="row-b" title="普通条目" line="透明边框保持对齐" />
+          </ListCard>
+        </PageBody>
 
         <View class="gap-2">
           <Field label="名称输入" hint="用于验证受控输入">

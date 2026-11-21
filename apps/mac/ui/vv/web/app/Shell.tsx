@@ -209,13 +209,69 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
   );
 }
 
+type DeskRunState = "working" | "idle" | "offline";
+
+function deskRunStateOf(call: string | undefined, working: number): DeskRunState {
+  if (working > 0) return "working";
+  return call === "live" ? "idle" : "offline";
+}
+
+interface DeskRunPresentation {
+  readonly label: string;
+  readonly pillClass: (onRuns: boolean) => string;
+  readonly pillStyle: (onRuns: boolean) => Record<string, string> | undefined;
+  readonly pillHoverStyle: (onRuns: boolean) => Record<string, string> | undefined;
+  readonly haloBg: () => string | undefined;
+  readonly dotClass: string;
+  readonly textClass: string;
+}
+
+function deskRunPresentation(state: DeskRunState, workingCount: number): DeskRunPresentation {
+  switch (state) {
+    case "working":
+      return {
+        label: t("web.base.working", { n: workingCount }),
+        pillClass: (onRuns) => (onRuns ? "border-focus bg-selected" : ""),
+        pillStyle: (onRuns) => (onRuns ? undefined : { backgroundColor: mix("leaf", 0.1), borderColor: mix("leaf", 0.45) }),
+        pillHoverStyle: (onRuns) => (onRuns ? undefined : { backgroundColor: mix("leaf", 0.16) }),
+        haloBg: () => mix("leaf", 0.25),
+        dotClass: "bg-leaf",
+        textClass: "font-semibold text-ink tabular-nums",
+      };
+    case "idle":
+      return {
+        label: t("web.base.working", { n: 0 }),
+        pillClass: (onRuns) => (onRuns ? "border-focus bg-selected" : "border-line bg-side hover:bg-selected"),
+        pillStyle: () => undefined,
+        pillHoverStyle: () => undefined,
+        haloBg: () => undefined,
+        dotClass: "bg-leaf",
+        textClass: "font-medium text-muted tabular-nums",
+      };
+    case "offline":
+      return {
+        label: t("web.base.off"),
+        pillClass: (onRuns) => (onRuns ? "border-focus bg-selected" : "border-line bg-side hover:bg-selected"),
+        pillStyle: () => undefined,
+        pillHoverStyle: () => undefined,
+        haloBg: () => undefined,
+        dotClass: "bg-idle",
+        textClass: "font-medium text-muted",
+      };
+  }
+}
+
 /** The head over a page: its place, and the live runs status pill, which opens /runs. */
 function Desk(props: { place?: Place | undefined }) {
   const core = useCore();
-  const live = () => core()?.call === "live";
   const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
-  const status = () => (live() ? t("web.base.working", { n: working() }) : t("web.base.off"));
+  const runState = () => deskRunStateOf(core()?.call, working());
+  const view = () => deskRunPresentation(runState(), working());
   const onRuns = () => props.place?.id === "runs";
+  const haloStyle = () => {
+    const bg = view().haloBg();
+    return bg !== undefined ? { backgroundColor: bg } : undefined;
+  };
   return (
     <View testID="desk" class="h-16.5 shrink-0 flex-row items-center justify-between gap-4 border-b border-line px-5">
       <If when={props.place} else={<View class="flex-1" />}>
@@ -234,17 +290,17 @@ function Desk(props: { place?: Place | undefined }) {
       </If>
       <A
         href="/runs"
-        accessibilityLabel={status()}
+        accessibilityLabel={view().label}
         testID="desk-status"
         tooltip={<Bubble text={t("web.base.runsHint")} placement="bottom" />}
-        class={`h-7 shrink-0 flex-row items-center gap-2 rounded-full border px-3 transition duration-120 ease-out active:translate-y-px ${
-          onRuns() ? "border-focus bg-selected" : "border-line bg-side hover:bg-selected"
-        }`}
+        class={`h-7 shrink-0 flex-row items-center gap-2 rounded-full border px-3 transition duration-120 ease-out active:translate-y-px ${view().pillClass(onRuns())}`}
+        style={view().pillStyle(onRuns())}
+        hoverStyle={view().pillHoverStyle(onRuns())}
       >
-        <View class="size-3.5 shrink-0 items-center justify-center rounded-full" style={live() ? { backgroundColor: mix("leaf", 0.2) } : undefined}>
-          <View class={`size-2 rounded-full ${live() ? "bg-leaf" : "bg-idle"}`} />
+        <View class="size-3.5 shrink-0 items-center justify-center rounded-full" style={haloStyle()}>
+          <View class={`size-2 rounded-full ${view().dotClass}`} />
         </View>
-        <Text class={`text-xs font-medium ${live() ? "text-ink" : "text-muted"}`}>{status()}</Text>
+        <Text class={`text-xs ${view().textClass}`}>{view().label}</Text>
       </A>
     </View>
   );

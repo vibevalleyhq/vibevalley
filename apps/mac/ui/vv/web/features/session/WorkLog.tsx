@@ -14,7 +14,7 @@ import { actionIcon, type IconName } from "../../ui/icons";
 import { Markdown } from "../../ui/Markdown";
 import { Dot } from "../../ui/Tag";
 import { Bubble } from "../../ui/Tip";
-import { mix } from "../../ui/tone";
+import { mix, tone } from "../../ui/tone";
 import { createRunEvents } from "./events";
 import {
   answerOf,
@@ -28,9 +28,9 @@ import {
   runTitle,
   type RunView,
   shownEvents,
-  spanColor,
   spanLabel,
   spansOf,
+  spanTone,
   tokensText,
 } from "./runs";
 
@@ -213,7 +213,7 @@ function TimeBar(props: { run: RunView; end: number }) {
         {(s) => (
           <View
             tooltip={<Bubble text={`${spanLabel(s().step)} · ${tookText(s().ms)}\n${s().step.text.split("\n")[0]}`} />}
-            style={{ flexGrow: Math.max(1, Math.round((Math.max(s().ms, least()) / least()) * 10)), flexBasis: 0, backgroundColor: spanColor(s().step) }}
+            style={{ flexGrow: Math.max(1, Math.round((Math.max(s().ms, least()) / least()) * 10)), flexBasis: 0, backgroundColor: tone(spanTone(s().step)) }}
           />
         )}
       </Each>

@@ -1,7 +1,6 @@
 // Converged Linear-style grouped list of orchestrators and helpers, with a
 // unified filter/search/action toolbar and an always-visible worker toggle.
 import { Scroll, signal, Text, View, type JSX } from "nsh";
-import { Switch } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, defaultOrchestrator, type RuntimeInfo } from "@vibevalley/protocol";
@@ -13,10 +12,10 @@ import { ready, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
-import { hexColor } from "../../ui/domain/cast";
 import { AgentFace, OrchestratorFace } from "../../ui/domain/Face";
 import { TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
+import { Toggle } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
 import { Bubble } from "../../ui/Tip";
 import { AgentPage } from "./AgentPage";
@@ -307,24 +306,18 @@ function WorkerRow(props: { agent: Agent; runtime?: RuntimeInfo | undefined; err
       muted={!props.agent.enabled}
       trailing={
         <View tooltip={<Bubble text={toggleLabel()} />}>
-          <Switch
-            testID={`toggle-${props.agent.enabled ? "on" : "off"}`}
+          <Toggle
+            bare
             checked={props.agent.enabled}
             disabled={act.busy()}
-            hitSlop={4}
-            accessibilityLabel={toggleLabel()}
+            ariaLabel={toggleLabel()}
+            testid={`toggle-${props.agent.enabled ? "on" : "off"}`}
             onChange={() => void toggle()}
-            class="shrink-0"
-            trackClass="h-4 w-7 justify-center rounded-full border border-line bg-selected p-0.5 transition-colors duration-180 ease-out checked:border-accent checked:bg-accent focus-visible:outline-2 focus-visible:outline-focus"
-            thumbClass="size-2.5 rounded-full bg-page shadow-raise transition-transform duration-180 ease-out checked:translate-x-3"
           />
         </View>
       }
     >
-      <View
-        class="h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-hover"
-        style={{ backgroundColor: `${hexColor(props.agent.look.hat)}29` }}
-      >
+      <View class="h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-side">
         <AgentFace
           agentId={props.agent.id}
           name={props.agent.name}

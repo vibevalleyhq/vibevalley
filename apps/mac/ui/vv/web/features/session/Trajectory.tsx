@@ -34,7 +34,7 @@ import {
   runsOf,
   secondsText,
   shownEvents,
-  spanColor,
+  spanTone,
   summaryOf,
   tagOf,
   tokensText,
@@ -311,7 +311,7 @@ export function Trajectory(props: {
         end={end()}
         colorOf={(seq) => {
           const s = bySeq().get(seq);
-          return s ? spanColor(s) : tone("bark-400");
+          return s ? tone(spanTone(s)) : tone("bark-400");
         }}
         onPick={show}
       />

@@ -174,42 +174,42 @@ export function spanLabel(step: SessionEvent) {
   }
 }
 
-/** The palette's colours. */
-export function spanColor(step: SessionEvent) {
+/** Theme token name for a step's timeline/waterfall colour. */
+export function spanTone(step: SessionEvent): string {
   switch (step.type) {
     case "user/message":
-      return "#e5a93c";
+      return "wheat";
     case "memory/recalled":
-      return "#b4cb7c";
+      return "leaf-300";
     case "assistant/thinking":
-      return "#c8a46e";
+      return "cream-300";
     case "assistant/message":
-      return "#74a046";
+      return "leaf-500";
     case "llm/retry":
     case "llm/usage":
-      return "#efb84e";
+      return "wheat-hover";
     case "run/error":
-      return "#b8402f";
+      return "berry";
     case "run/start":
     case "run/end":
     case "tool/result":
-      return "#e2c995";
+      return "cream-200";
     case "tool/call":
-      if (step.ok === false) return "#b8402f";
+      if (step.ok === false) return "berry";
       switch (step.action ?? "other") {
         case "read_file":
         case "search":
         case "web":
-          return "#4f8fbd";
+          return "water-500";
         case "edit_file":
-          return "#3f6427";
+          return "leaf-700";
         case "run_command":
-          return "#67482d";
+          return "bark-600";
         case "wait":
-          return "#e2c995";
+          return "cream-200";
         case "mcp":
         case "other":
-          return "#9b7550";
+          return "bark-400";
       }
   }
 }
