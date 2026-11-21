@@ -1,8 +1,8 @@
 // Motion table (docs/design/01-philosophy-and-tokens.md). Every duration goes
 // through `ms`, which is 0 under reduced motion so end states still apply.
-import { reduceMotion } from "nsh";
+import { LayoutAnimation, reduceMotion } from "nsh";
 
-export const ease = "cubic-bezier(0.22, 1, 0.36, 1)";
+export const ease = "cubic-bezier(0.2, 0, 0, 1)";
 
 export const durations = {
   press: 160,
@@ -27,7 +27,7 @@ export function pressTransition() {
   return {
     transitionProperty: "colors,opacity,transform",
     transitionDuration: ms(durations.press),
-    transitionTimingFunction: "ease",
+    transitionTimingFunction: ease,
   } as const;
 }
 
@@ -39,8 +39,6 @@ export function formatElapsed(msElapsed: number): string {
   if (m < 60) return `${m}m ${String(s % 60).padStart(2, "0")}s`;
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
 }
-
-import { LayoutAnimation } from "nsh";
 
 /** Animates the size changes of the next commit (expand, collapse, fold). */
 export function animateLayout(duration: number = durations.expandHeight): void {

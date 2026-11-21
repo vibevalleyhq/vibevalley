@@ -8,6 +8,7 @@
     "site:deploy": "vp run --filter @vibevalley/site deploy",
     "release": "vpx scripts/release/release.ts",
     "capabilities": "vpx scripts/gen/capabilities.ts",
+    "tokens:gen": "vpx scripts/gen/tokens.ts",
     "api:client": "vpx scripts/gen/api-client.ts",
     "i18n:gen": "vpx scripts/gen/i18n.ts gen",
     "protocol:ts": "VIBEVALLEY_WRITE_TS=1 cargo test -p vibevalley-protocol --features ts-gen --test typescript",

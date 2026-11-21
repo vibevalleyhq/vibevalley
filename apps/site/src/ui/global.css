@@ -87,7 +87,7 @@
   --text-shadow-soft: 2px 2px 0 rgb(30 20 10 / 0.6);
   --text-shadow-thin: 1px 1px 0 rgb(30 20 10 / 0.8);
   --text-shadow-title: 4px 4px 0 var(--color-bark-900), 0 0 24px rgb(30 20 10 / 0.5);
-  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --shadow-firefly: 0 0 6px 2px #ffd65abf;
   --scene-lantern-background: radial-gradient(circle, #ffd26e8c, #ffaa3c33 45%, transparent 70%);
   --scene-harvest-background: linear-gradient(#f6dc94 0%, #eab654 55%, #c98d32 100%);
