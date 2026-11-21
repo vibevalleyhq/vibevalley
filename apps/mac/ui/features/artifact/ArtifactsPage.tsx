@@ -29,7 +29,7 @@ import type { BlockEditor } from "./editor";
 import type { Frame } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
 import { PageWords } from "./PageWords";
-import { createTypedArtifact, exportMarkdownFile } from "./store";
+import { createTypedArtifact, exportMarkdownFile, requestArtifactChatFocus } from "./store";
 import { StoreArtifactView } from "./StoreArtifactView";
 
 const listOpen = defineStored("artifact.list", z.boolean(), true);
@@ -498,6 +498,10 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat; presenting: Pres
               artifact={props.artifact}
               covered={isCovered()}
               onPresent={(on) => props.presenting.set(on)}
+              onOpenChat={() => {
+                rail.set(true);
+                requestArtifactChatFocus();
+              }}
               frameClass={`min-h-0 w-full flex-1 bg-page ${presenting() ? "" : "rounded-lg border border-line"}`}
             />
           </If>

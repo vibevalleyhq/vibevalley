@@ -146,6 +146,7 @@
     "command": "Commands",
     "artifactContext": "Context: {title}",
     "artifactSlide": "Slide {n}",
+    "artifactSelected": "{n} selected",
     "clearContext": "Remove attached context",
     "runningHint": "Working — send a follow-up or click stop"
   },

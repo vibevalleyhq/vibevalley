@@ -105,7 +105,7 @@ put(
   "journal",
   [
     [0, "早上看了 [[VibeValley 原生移植]] 的进度"],
-    [0, "下午", { marker: undefined }],
+    [0, "下午"],
     [1, "大纲的选中和复制", { marker: "TODO" }],
     [1, "日历", { marker: "DONE" }],
   ],
@@ -229,13 +229,13 @@ export const responses: Record<string, unknown> = {
     if (!s) return refused(`no page ${p.page}`);
     s.page = { ...s.page, blocks: applied(s.page.blocks, p.ops), updated: Date.now() };
     return s.page;
-  }, null),
+  }, pages.get(project)?.page),
   "pkm.page.move": served((p: { page: string; tier: PkmTier }) => {
     const s = pages.get(p.page);
     if (!s) return refused(`no page ${p.page}`);
     s.page = { ...s.page, tier: p.tier };
     return s.page;
-  }, null),
+  }, pages.get(project)?.page),
   "pkm.page.save": served((p: { title: string; tier?: PkmTier; markdown?: string }) => {
     const title = p.title.trim();
     const slug = title.toLowerCase().replace(/\s+/gu, "-");
@@ -245,16 +245,19 @@ export const responses: Record<string, unknown> = {
       .filter(Boolean);
     put(title, p.tier ?? "inbox", lines.length > 0 ? lines.map((l) => [0, l] as Row) : [[0, ""]], { slug });
     return pages.get(slug)?.page;
-  }, null),
-  "pkm.page.rename": served((p: { from: string; to: string }) => {
-    const oldSlug = p.from.trim().toLowerCase().replace(/\s+/gu, "-");
-    const s = pages.get(oldSlug);
-    if (!s) return refused(`no page ${p.from}`);
-    const newSlug = p.to.trim().toLowerCase().replace(/\s+/gu, "-");
-    pages.delete(oldSlug);
-    pages.set(newSlug, { ...s, page: { ...s.page, slug: newSlug, title: p.to.trim() } });
-    return { pages: [newSlug], into: newSlug };
-  }, null),
+  }, pages.get(project)?.page),
+  "pkm.page.rename": served(
+    (p: { from: string; to: string }) => {
+      const oldSlug = p.from.trim().toLowerCase().replace(/\s+/gu, "-");
+      const s = pages.get(oldSlug);
+      if (!s) return refused(`no page ${p.from}`);
+      const newSlug = p.to.trim().toLowerCase().replace(/\s+/gu, "-");
+      pages.delete(oldSlug);
+      pages.set(newSlug, { ...s, page: { ...s.page, slug: newSlug, title: p.to.trim() } });
+      return { pages: [newSlug], into: newSlug };
+    },
+    { pages: [project], into: project },
+  ),
   "pkm.page.export": served(
     (p: { page: string }) => ({ markdown: (pages.get(p.page)?.page.blocks ?? []).map((b) => `${"  ".repeat(b.depth)}- ${b.body}`).join("\n") }),
     { markdown: "" },
@@ -272,6 +275,6 @@ export const responses: Record<string, unknown> = {
     const s = pages.get(c.page);
     if (s && p.accept && c.suggested) s.page = { ...s.page, blocks: applied(s.page.blocks, [{ op: "update", block: c.block, body: c.suggested }]) };
     return s?.page;
-  }, null),
+  }, pages.get(project)?.page),
   "pkm.undo": { undone: false },
 };

@@ -410,8 +410,7 @@ fn kitty_keyboard_protocol() {
 #[test]
 fn mouse_reporting() {
     let h = sh("stty raw -echo; printf '\\033[?1000h\\033[?1006hREADY'; cat -v");
-    let s = h.wait_for("mouse mode", |s| s.mouse_reporting);
-    assert!(screen_text(&s).contains("READY"));
+    let _s = h.wait_for("mouse mode and READY", |s| s.mouse_reporting && screen_text(s).contains("READY"));
     let at = Point { row: 2, col: 3 };
     let mods = Mods::default();
     h.session.send_mouse(MouseInput {
@@ -687,8 +686,8 @@ fn kill_takes_the_shells_children_with_it() {
     // A background child in the shell's own process group, which is what a
     // job started from an interactive shell looks like.
     // It ignores SIGHUP, so only a signal to the whole group can stop it.
-    let h = sh("trap '' HUP; sleep 600 & echo CHILD=$!; wait");
-    let s = h.wait_text("CHILD=");
+    let h = sh("trap '' HUP; sleep 600 & echo CHILD=$! END; wait");
+    let s = h.wait_text("END");
     let text = screen_text(&s);
     let pid: i32 = text
         .split("CHILD=")
@@ -728,13 +727,14 @@ fn history_shows_above_the_new_prompt() {
 
 #[test]
 fn alternate_scroll_is_reported_on_the_alternate_screen_only() {
-    let h = sh("printf 'MAIN'; sleep 0.2; printf '\\033[?1049hALT'; sleep 5");
+    let h = sh("printf 'MAIN'; read x; printf '\\033[?1049hALT'; read y");
     let s = h.wait_text("MAIN");
     assert!(!s.alternate_scroll);
+    h.session.send_text("\n");
     let s = h.wait_for("alt screen", |s| s.alt_screen);
     assert!(s.alternate_scroll, "alt screen without mouse reporting scrolls with arrow keys");
-    h.session.kill();
-    h.wait_exit();
+    h.session.send_text("\n");
+    assert_eq!(h.wait_exit(), Some(0));
 }
 
 #[test]

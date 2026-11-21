@@ -1,4 +1,4 @@
-import { computed, effect, keymap, Picker, signal, Text, untracked, View, type JSX } from "nsh";
+import { computed, effect, keymap, Picker, signal, Text, untracked, View, type InputRef, type JSX } from "nsh";
 import { Input, Progress } from "nsh/base";
 import { z } from "zod";
 
@@ -21,7 +21,7 @@ import { useCore } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { useIntents } from "../../../infra/state/intent";
 import { transport } from "../../../infra/transport";
-import { activeArtifactViewContext, clearActiveArtifactViewContext } from "../../artifact/store";
+import { activeArtifactViewContext, artifactChatFocus, clearActiveArtifactViewContext } from "../../artifact/store";
 import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying, type ComposerKey } from "../model/composing";
 import { followed } from "../model/follow";
 import { EmojiPopover } from "./EmojiPicker";
@@ -52,6 +52,9 @@ function artifactContextLabel(ctx: ArtifactViewContext): string {
   else if (ctx.activeArtboard) parts.push(ctx.activeArtboard);
   else if (ctx.activeTab) parts.push(ctx.activeTab);
   else if (ctx.activeDataset) parts.push(ctx.activeDataset);
+  if (ctx.selectedIds && ctx.selectedIds.length > 0) {
+    parts.push(t("web.channel.composer.artifactSelected", { n: ctx.selectedIds.length }));
+  }
   return parts.join(" · ");
 }
 
@@ -197,6 +200,14 @@ export function Composer(props: {
     if (box.text() === "") offs.push(keymap.bind("up", () => onKey("ArrowUp"), { when: "always" }));
     if (replying()) offs.push(keymap.bind("escape", () => onKey("Escape"), { when: "always" }));
     return () => offs.forEach((off) => off());
+  });
+  let inputRef: InputRef | undefined;
+  const initialChatFocusSeq = untracked(artifactChatFocus);
+  effect(() => {
+    const req = artifactChatFocus();
+    if (req > initialChatFocusSeq) {
+      queueMicrotask(() => inputRef?.focus());
+    }
   });
   const stopping = createAct();
   const stop = () => {
@@ -346,6 +357,9 @@ export function Composer(props: {
       </If>
       <View class={`rounded-lg border bg-page transition duration-120 ease-out ${focused() ? "border-focus" : "border-line"}`}>
         <Input
+          ref={(el) => {
+            inputRef = el;
+          }}
           multiline
           submitBehavior="submit"
           pasteBehavior="insert"

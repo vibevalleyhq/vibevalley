@@ -129,7 +129,7 @@ tester.run("ui-layer-boundaries", rule("ui-layer-boundaries"), {
     { code: "import { mix } from '../design/tone';", filename: "/repo/apps/mac/ui/workspace/Sidebar.tsx" },
     { code: "import { IssuesPage } from '../features/issue/IssuesPage';", filename: "/repo/apps/mac/ui/app/Workbench.tsx" },
     { code: "import { FarmForm } from './farm/FarmForm';\nimport { Sidebar } from './workspace/Sidebar';", filename: "/repo/apps/mac/ui/App.tsx" },
-    { code: "import { Root } from '../infra/Root';", filename: "/repo/apps/mac/ui/app/issues.story.tsx" },
+    { code: "import { Root } from '../infra/Root';", filename: "/repo/apps/mac/ui/app/components.story.tsx" },
     { code: "import { a } from '../../features/foo';", filename: "/repo/apps/mac/ui/design/Foo.test.tsx" },
   ],
   invalid: [

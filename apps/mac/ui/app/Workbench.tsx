@@ -158,7 +158,7 @@ export function App(props: { history?: RouterHistory }) {
   return (
     <Root history={props.history}>
       <Follow />
-      <View class="flex-1 bg-page">
+      <View testID="workbench-page" class="flex-1 bg-page">
         <Routes routes={routes} fallback={() => <MissingPage />} invalid={() => <MissingPage invalid />} />
         <ToastHost />
       </View>

@@ -364,17 +364,108 @@ export const catalogs = {
         select: "选择",
         rect: "矩形",
         sticky: "便签",
+        card: "卡片",
         diamond: "菱形",
         text: "文字",
         container: "分区容器",
+        pen: "画笔",
+        sticker: "贴纸",
         arrow: "连线箭头",
+        timeline: "时间线",
+        undo: "撤销",
+        redo: "重做",
+        duplicate: "复制",
+        chatWithOrchestrator: "问助手",
+        templateTimeline: "时间线模板",
+        templateArchitecture: "架构图模板",
+        inspector: "属性检查器",
+        label: "标题",
+        body: "正文",
+        fill: "配色",
+        variant: "文本样式",
+        highlight: "高亮词",
+        curve: "连线曲率",
+        style: "线型",
+        stickers: "顶部贴纸",
+        noSticker: "无贴纸",
+        save: "保存",
+        entryJson: "条目 JSON",
+        saveJson: "保存 JSON",
+        savedElement: "已保存元素",
+        exportedSvg: "已导出 SVG",
+        exportedJson: "已导出 JSON",
         deleteSelected: "删除选中",
         zoomIn: "放大",
         zoomOut: "缩小",
         fitView: "适应画布",
         elements: "{n} 个元素",
         doubleClickEdit: "双击编辑文字",
-        empty: "空白白板：用上方工具放图形和连线，或在对话里让主助手/执行会话一起画",
+        empty: "空白白板：从底部工具栏放置卡片、时间线与贴纸，或在对话里让主助手一起画",
+        emptyHint: "从底部工具栏放置卡片、时间线、连线与贴纸，或一键载入模板开始协作",
+        fillDefault: "默认",
+        fillSun: "暖黄",
+        fillPeach: "暖橘",
+        fillLeaf: "叶绿",
+        fillWater: "湖蓝",
+        fillLavender: "淡紫",
+        fillBerry: "莓红",
+        fillSide: "灰底",
+        curveSmooth: "平滑曲线",
+        curveOrthogonal: "直角折线",
+        curveStraight: "直线",
+        styleSolid: "实线",
+        styleDashed: "虚线",
+        variantBody: "正文",
+        variantTitle: "大标题",
+        variantSubtitle: "副标题",
+        variantCallout: "提示条",
+        tplArchTitle: "系统架构协同白板",
+        tplArchSubtitle: "前后端事件流、边界容器与核心存储拓扑（15 分钟评审）",
+        tplArchHighlight: "15 分钟",
+        tplArchZoneCore: "核心服务区",
+        tplArchZoneStore: "状态与持久层",
+        tplArchClient: "客户端工作台",
+        tplArchClientBody: "GPUI 壳面 + nsh TSX 交互页",
+        tplArchApi: "协议网关",
+        tplArchApiBody: "一次解码、流式帧与并发批写",
+        tplArchCore: "状态归约引擎",
+        tplArchCoreBody: "确定性 StateFrame 折叠",
+        tplArchSqlite: "SQLite + 轨迹库",
+        tplArchSqliteBody: "sqlc 编译期绑定检查",
+        tplArchCallout: "关键约束：页面只读 StateFrame，所有写操作经批提交接口",
+        tplTimeTitle: "产品发布时间线",
+        tplTimeSubtitle: "从方案锁定到正式交付上线：全链路协同冲刺 12 天",
+        tplTimeHighlight: "12 天",
+        tplTimeDay1: "Day 1",
+        tplTimeDay2: "Day 2",
+        tplTimeDay3: "Day 3",
+        tplTimeDay7: "Day 7",
+        tplTimeDay8: "Day 8",
+        tplTimeRoad: "联调与压测冲刺 4 天",
+        tplTimeStep1Title: "锁定核心范围",
+        tplTimeStep1Body: "核心功能已拍板",
+        tplTimeStep2Title: "确认发布清单",
+        tplTimeStep2Body: "拆解到每天交付物",
+        tplTimeStep3Title: "确定资源预算",
+        tplTimeStep3Body: "算力与配额已就位",
+        tplTimeStep4Title: "批产核心模块",
+        tplTimeStep4Body: "23 项任务并发推进",
+        tplTimeStep5Title: "准点抵达验收",
+        tplTimeStep5Body: "进入主站发布通道",
+        tplTimeStep6Title: "灰度与全量验证",
+        tplTimeStep6Body: "先验 12 组，再放量 500",
+        tplTimeCallout: "风险提示：合包检查需等待终版配置锁定",
+        tplDefaultTitle: "新建卡片",
+        tplDefaultBody: "双击编辑说明文字",
+        tplDefaultNote: "想法便签",
+        tplDefaultFrame: "分区边界",
+        tplDefaultHeading: "标题或批注",
+        tplDefaultTimelineStart: "阶段一",
+        tplDefaultTimelineMid: "阶段二",
+        tplDefaultTimelineEnd: "交付",
+        tplUser: "你",
+        tplAgentOrch: "主助手",
+        tplAgentHelper: "老周",
       },
       design: {
         canvas: "全部画板",
@@ -862,6 +953,7 @@ export const catalogs = {
         command: "命令",
         artifactContext: "当前上下文：{title}",
         artifactSlide: "第 {n} 页",
+        artifactSelected: "已选 {n} 个元素",
         clearContext: "移除本次附带的上下文",
         runningHint: "正在处理中，可直接补充说明或点击停止",
       },
@@ -3064,17 +3156,108 @@ export const catalogs = {
         select: "Select",
         rect: "Rectangle",
         sticky: "Sticky note",
+        card: "Card",
         diamond: "Diamond",
         text: "Text",
         container: "Container",
+        pen: "Pen",
+        sticker: "Sticker",
         arrow: "Arrow",
+        timeline: "Timeline",
+        undo: "Undo",
+        redo: "Redo",
+        duplicate: "Duplicate",
+        chatWithOrchestrator: "Ask Assistant",
+        templateTimeline: "Timeline template",
+        templateArchitecture: "Architecture template",
+        inspector: "Inspector",
+        label: "Title / Label",
+        body: "Body",
+        fill: "Fill",
+        variant: "Variant",
+        highlight: "Highlight",
+        curve: "Curve",
+        style: "Style",
+        stickers: "Sticker",
+        noSticker: "None",
+        save: "Save",
+        entryJson: "Entry JSON",
+        saveJson: "Save JSON",
+        savedElement: "Saved element",
+        exportedSvg: "Exported SVG",
+        exportedJson: "Exported JSON",
         deleteSelected: "Delete selected",
         zoomIn: "Zoom in",
         zoomOut: "Zoom out",
         fitView: "Fit view",
         elements: "{n} elements",
         doubleClickEdit: "Double-click to edit text",
-        empty: "Empty whiteboard: place shapes and arrows from the toolbar, or draw together in chat",
+        empty: "Empty whiteboard: place cards, timelines, and stickers from the toolbar, or draw together in chat",
+        emptyHint: "Place cards, timelines, connectors, and stickers from the bottom bar, or start from a template",
+        fillDefault: "Default",
+        fillSun: "Sun",
+        fillPeach: "Peach",
+        fillLeaf: "Leaf",
+        fillWater: "Water",
+        fillLavender: "Lavender",
+        fillBerry: "Berry",
+        fillSide: "Neutral",
+        curveSmooth: "Smooth",
+        curveOrthogonal: "Orthogonal",
+        curveStraight: "Straight",
+        styleSolid: "Solid",
+        styleDashed: "Dashed",
+        variantBody: "Body",
+        variantTitle: "Title",
+        variantSubtitle: "Subtitle",
+        variantCallout: "Callout",
+        tplArchTitle: "System Architecture Overview",
+        tplArchSubtitle: "Event flow, domain boundaries, and storage topology in 15 mins review",
+        tplArchHighlight: "15 mins",
+        tplArchZoneCore: "Core Services",
+        tplArchZoneStore: "State & Storage",
+        tplArchClient: "Desktop Workbench",
+        tplArchClientBody: "GPUI shell & reactive views",
+        tplArchApi: "HTTP / SSE Gateway",
+        tplArchApiBody: "Typed codecs & live stream",
+        tplArchCore: "Core Reducer",
+        tplArchCoreBody: "Deterministic StateFrame fold",
+        tplArchSqlite: "SQLite & Ledgers",
+        tplArchSqliteBody: "Compiled sqlc bindings",
+        tplArchCallout: "Rule: UI never folds facts locally; writes go through optimistic batches",
+        tplTimeTitle: "Product Launch Timeline",
+        tplTimeSubtitle: "From locked scope to holiday delivery in 12 days",
+        tplTimeHighlight: "12 days",
+        tplTimeDay1: "Day 1",
+        tplTimeDay2: "Day 2",
+        tplTimeDay3: "Day 3",
+        tplTimeDay7: "Day 7",
+        tplTimeDay8: "Day 8",
+        tplTimeRoad: "4 days on the road",
+        tplTimeStep1Title: "Lock scope",
+        tplTimeStep1Body: "Milestone v1 locked",
+        tplTimeStep2Title: "Build checklist",
+        tplTimeStep2Body: "How many deliverables?",
+        tplTimeStep3Title: "Lock budget",
+        tplTimeStep3Body: "What's the quota cost?",
+        tplTimeStep4Title: "Ship core batch",
+        tplTimeStep4Body: "23 parallel tasks",
+        tplTimeStep5Title: "Arrive for staging",
+        tplTimeStep5Body: "Ready in main depot",
+        tplTimeStep6Title: "Rollout test",
+        tplTimeStep6Body: "12 pilots, then 500",
+        tplTimeCallout: "Blocker: compliance check waits on the locked spec",
+        tplDefaultTitle: "New card",
+        tplDefaultBody: "Double-click to edit details",
+        tplDefaultNote: "Quick note",
+        tplDefaultFrame: "Zone",
+        tplDefaultHeading: "Heading",
+        tplDefaultTimelineStart: "Phase 1",
+        tplDefaultTimelineMid: "Phase 2",
+        tplDefaultTimelineEnd: "Launch",
+        tplUser: "You",
+        tplAgentOrch: "Assistant",
+        tplAgentHelper: "Helper",
       },
       design: {
         canvas: "All artboards",
@@ -3581,6 +3764,7 @@ export const catalogs = {
         command: "Commands",
         artifactContext: "Context: {title}",
         artifactSlide: "Slide {n}",
+        artifactSelected: "{n} selected",
         clearContext: "Remove attached context",
         runningHint: "Working — send a follow-up or click stop",
       },
@@ -5958,18 +6142,109 @@ export interface Messages {
   "web.artifact.types.unsetDefault": undefined;
   "web.artifact.types.whiteboard": undefined;
   "web.artifact.whiteboard.arrow": undefined;
+  "web.artifact.whiteboard.body": undefined;
+  "web.artifact.whiteboard.card": undefined;
+  "web.artifact.whiteboard.chatWithOrchestrator": undefined;
   "web.artifact.whiteboard.container": undefined;
+  "web.artifact.whiteboard.curve": undefined;
+  "web.artifact.whiteboard.curveOrthogonal": undefined;
+  "web.artifact.whiteboard.curveSmooth": undefined;
+  "web.artifact.whiteboard.curveStraight": undefined;
   "web.artifact.whiteboard.deleteSelected": undefined;
   "web.artifact.whiteboard.diamond": undefined;
   "web.artifact.whiteboard.doubleClickEdit": undefined;
+  "web.artifact.whiteboard.duplicate": undefined;
   "web.artifact.whiteboard.elements": { readonly n: string | number };
   "web.artifact.whiteboard.empty": undefined;
+  "web.artifact.whiteboard.emptyHint": undefined;
+  "web.artifact.whiteboard.entryJson": undefined;
+  "web.artifact.whiteboard.exportedJson": undefined;
+  "web.artifact.whiteboard.exportedSvg": undefined;
+  "web.artifact.whiteboard.fill": undefined;
+  "web.artifact.whiteboard.fillBerry": undefined;
+  "web.artifact.whiteboard.fillDefault": undefined;
+  "web.artifact.whiteboard.fillLavender": undefined;
+  "web.artifact.whiteboard.fillLeaf": undefined;
+  "web.artifact.whiteboard.fillPeach": undefined;
+  "web.artifact.whiteboard.fillSide": undefined;
+  "web.artifact.whiteboard.fillSun": undefined;
+  "web.artifact.whiteboard.fillWater": undefined;
   "web.artifact.whiteboard.fitView": undefined;
+  "web.artifact.whiteboard.highlight": undefined;
+  "web.artifact.whiteboard.inspector": undefined;
+  "web.artifact.whiteboard.label": undefined;
+  "web.artifact.whiteboard.noSticker": undefined;
   "web.artifact.whiteboard.pan": undefined;
+  "web.artifact.whiteboard.pen": undefined;
   "web.artifact.whiteboard.rect": undefined;
+  "web.artifact.whiteboard.redo": undefined;
+  "web.artifact.whiteboard.save": undefined;
+  "web.artifact.whiteboard.saveJson": undefined;
+  "web.artifact.whiteboard.savedElement": undefined;
   "web.artifact.whiteboard.select": undefined;
+  "web.artifact.whiteboard.sticker": undefined;
+  "web.artifact.whiteboard.stickers": undefined;
   "web.artifact.whiteboard.sticky": undefined;
+  "web.artifact.whiteboard.style": undefined;
+  "web.artifact.whiteboard.styleDashed": undefined;
+  "web.artifact.whiteboard.styleSolid": undefined;
+  "web.artifact.whiteboard.templateArchitecture": undefined;
+  "web.artifact.whiteboard.templateTimeline": undefined;
   "web.artifact.whiteboard.text": undefined;
+  "web.artifact.whiteboard.timeline": undefined;
+  "web.artifact.whiteboard.tplAgentHelper": undefined;
+  "web.artifact.whiteboard.tplAgentOrch": undefined;
+  "web.artifact.whiteboard.tplArchApi": undefined;
+  "web.artifact.whiteboard.tplArchApiBody": undefined;
+  "web.artifact.whiteboard.tplArchCallout": undefined;
+  "web.artifact.whiteboard.tplArchClient": undefined;
+  "web.artifact.whiteboard.tplArchClientBody": undefined;
+  "web.artifact.whiteboard.tplArchCore": undefined;
+  "web.artifact.whiteboard.tplArchCoreBody": undefined;
+  "web.artifact.whiteboard.tplArchHighlight": undefined;
+  "web.artifact.whiteboard.tplArchSqlite": undefined;
+  "web.artifact.whiteboard.tplArchSqliteBody": undefined;
+  "web.artifact.whiteboard.tplArchSubtitle": undefined;
+  "web.artifact.whiteboard.tplArchTitle": undefined;
+  "web.artifact.whiteboard.tplArchZoneCore": undefined;
+  "web.artifact.whiteboard.tplArchZoneStore": undefined;
+  "web.artifact.whiteboard.tplDefaultBody": undefined;
+  "web.artifact.whiteboard.tplDefaultFrame": undefined;
+  "web.artifact.whiteboard.tplDefaultHeading": undefined;
+  "web.artifact.whiteboard.tplDefaultNote": undefined;
+  "web.artifact.whiteboard.tplDefaultTimelineEnd": undefined;
+  "web.artifact.whiteboard.tplDefaultTimelineMid": undefined;
+  "web.artifact.whiteboard.tplDefaultTimelineStart": undefined;
+  "web.artifact.whiteboard.tplDefaultTitle": undefined;
+  "web.artifact.whiteboard.tplTimeCallout": undefined;
+  "web.artifact.whiteboard.tplTimeDay1": undefined;
+  "web.artifact.whiteboard.tplTimeDay2": undefined;
+  "web.artifact.whiteboard.tplTimeDay3": undefined;
+  "web.artifact.whiteboard.tplTimeDay7": undefined;
+  "web.artifact.whiteboard.tplTimeDay8": undefined;
+  "web.artifact.whiteboard.tplTimeHighlight": undefined;
+  "web.artifact.whiteboard.tplTimeRoad": undefined;
+  "web.artifact.whiteboard.tplTimeStep1Body": undefined;
+  "web.artifact.whiteboard.tplTimeStep1Title": undefined;
+  "web.artifact.whiteboard.tplTimeStep2Body": undefined;
+  "web.artifact.whiteboard.tplTimeStep2Title": undefined;
+  "web.artifact.whiteboard.tplTimeStep3Body": undefined;
+  "web.artifact.whiteboard.tplTimeStep3Title": undefined;
+  "web.artifact.whiteboard.tplTimeStep4Body": undefined;
+  "web.artifact.whiteboard.tplTimeStep4Title": undefined;
+  "web.artifact.whiteboard.tplTimeStep5Body": undefined;
+  "web.artifact.whiteboard.tplTimeStep5Title": undefined;
+  "web.artifact.whiteboard.tplTimeStep6Body": undefined;
+  "web.artifact.whiteboard.tplTimeStep6Title": undefined;
+  "web.artifact.whiteboard.tplTimeSubtitle": undefined;
+  "web.artifact.whiteboard.tplTimeTitle": undefined;
+  "web.artifact.whiteboard.tplUser": undefined;
+  "web.artifact.whiteboard.undo": undefined;
+  "web.artifact.whiteboard.variant": undefined;
+  "web.artifact.whiteboard.variantBody": undefined;
+  "web.artifact.whiteboard.variantCallout": undefined;
+  "web.artifact.whiteboard.variantSubtitle": undefined;
+  "web.artifact.whiteboard.variantTitle": undefined;
   "web.artifact.whiteboard.zoomIn": undefined;
   "web.artifact.whiteboard.zoomOut": undefined;
   "web.audio.account": undefined;
@@ -6341,6 +6616,7 @@ export interface Messages {
   "web.channel.commands.stop.needs": undefined;
   "web.channel.commands.stop.note": undefined;
   "web.channel.composer.artifactContext": { readonly title: string | number };
+  "web.channel.composer.artifactSelected": { readonly n: string | number };
   "web.channel.composer.artifactSlide": { readonly n: string | number };
   "web.channel.composer.attach": undefined;
   "web.channel.composer.cancelQuote": undefined;

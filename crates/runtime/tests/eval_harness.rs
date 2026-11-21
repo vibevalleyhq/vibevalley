@@ -139,6 +139,7 @@ fn telemetry_emits_pi_durable_schema_without_raw_payloads_and_skips_rolled_back_
     })?;
     let done = harness.scheduler().wait(&task.id, WAIT)?;
     assert_eq!(done.terminal_reason, "completed");
+    harness.close();
 
     let count_before_rollback = mem_sink.events().len();
     let err = store.write(|tx| {
@@ -174,7 +175,6 @@ fn telemetry_emits_pi_durable_schema_without_raw_payloads_and_skips_rolled_back_
     let parsed = read_telemetry_jsonl(&telemetry_path)?;
     assert_eq!(parsed.len(), events.len());
 
-    harness.close();
     store.close()?;
     Ok(())
 }

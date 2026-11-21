@@ -62,7 +62,7 @@ export const responses: Record<string, unknown> = {
   "provider.model.list": models,
   "voice.moss.verify": { problem: "" },
   "setting.validate": { problem: "" },
-  "connector.login": null,
-  "connector.logout": null,
-  "connector.channel.set": null,
+  "connector.login": connectors[0],
+  "connector.logout": { ...connectors[0], state: "off" },
+  "connector.channel.set": connectors[0],
 };

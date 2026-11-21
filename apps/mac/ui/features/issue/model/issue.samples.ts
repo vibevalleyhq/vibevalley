@@ -1,4 +1,4 @@
-import type { Changes, Issue, IssueAction, IssueStage, IssueStatus, Priority, SessionId, PhaseView, SessionView } from "@vibevalley/protocol";
+import type { Changes, Issue, IssueStage, IssueStatus, Priority, SessionId, PhaseView, SessionView } from "@vibevalley/protocol";
 import { issueId, sessionId } from "@vibevalley/protocol/schema";
 export const now = Date.now();
 export const min = 60_000;
@@ -12,7 +12,7 @@ const issueStageOf: Record<IssueStatus, IssueStage["state"]> = {
   canceled: "canceled",
 };
 
-export type SampleIssue = Omit<Partial<Issue>, "assignments"> & { readonly agent?: string | null; readonly sessionIds?: SessionId[] };
+type SampleIssue = Omit<Partial<Issue>, "assignments"> & { readonly agent?: string | null; readonly sessionIds?: SessionId[] };
 
 export const sampleIssue = (number: number, title: string, status: IssueStatus, priority: Priority, more: SampleIssue = {}): Issue => {
   const id = issueId(`i${number}`);
@@ -72,22 +72,6 @@ export const working = (since: number, quietSince?: number): PhaseView => ({
   doing: { action: "edit_file", label: "改 session.ts", actionText: "改文件" },
   ...(quietSince === undefined ? {} : { quietSince }),
 });
-
-// The buttons as the server gives them for each state (apps/server/src/issue/stage.ts): data here, not a rule.
-const move = (act: IssueAction["act"], status: IssueStatus, words: "none" | "required" = "none"): IssueAction => ({ act, does: "move", status, words });
-export const acts = {
-  start: move("start", "todo"),
-  close: move("close", "canceled"),
-  complete: move("complete", "done"),
-  reject: move("reject", "todo", "required"),
-  reopen: move("reopen", "todo", "required"),
-  cure: move("cure", "todo"),
-  resolve: move("resolve", "todo"),
-  resume: move("resume", "todo"),
-  tell: { act: "tell", does: "say" },
-  answer: { act: "answer", does: "say" },
-  stop: { act: "stop", does: "stop" },
-} satisfies Record<string, IssueAction>;
 
 export const sampleChanges: Changes = {
   repo: "vibevalley",

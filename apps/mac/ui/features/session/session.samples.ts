@@ -52,12 +52,3 @@ export const liveRun: SessionEvent[] = inRun("run-2", [
   ev(302, "assistant/thinking", "在过期前一秒和后一秒各测一次。"),
   ...tool(306, 0, "run_command", "bash", "vp test run src/base/session.test.ts", undefined),
 ]);
-
-export const failedRun: SessionEvent[] = inRun("run-3", [
-  ev(500, "run/start", ""),
-  ev(500, "user/message", "跑一遍全部测试。"),
-  ...tool(502, 3, "run_command", "bash", "vp run web:check", "error: DEEPSEEK_API_KEY is not set", false),
-  ev(506, "run/error", "这一轮没跑完：模型的钥匙没设（设置 › 模型）"),
-]);
-
-export const nowAfter = (log: readonly SessionEvent[]) => (log.at(-1)?.time ?? start) + 20_000;

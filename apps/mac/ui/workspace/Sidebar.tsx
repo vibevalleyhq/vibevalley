@@ -354,7 +354,7 @@ export function Sidebar() {
     ];
 
     return (
-      <View class="flex-1 bg-side">
+      <View testID="workspace-inspector" class="flex-1 bg-side">
         <View role="tablist" class="h-9 flex-row items-center gap-0.5 border-b border-line px-2">
           {inspectorTabs.map((item) => {
             const isCur = currentView() === item.id;
@@ -863,7 +863,7 @@ export function Sidebar() {
   };
 
   return (
-    <View class="flex-1 bg-side">
+    <View testID="workspace-sidebar" class="flex-1 bg-side">
       <View class="h-9 flex-row items-center justify-between border-b border-line pr-2 pl-3">
         <Text class="text-xs font-semibold text-ink">{t("web.shell.sidebar.title")}</Text>
         <View class="flex-row items-center gap-1">

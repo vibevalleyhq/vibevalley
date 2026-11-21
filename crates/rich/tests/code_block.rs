@@ -2,6 +2,7 @@ mod support;
 
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::sync::Mutex;
 
 use nsh_core::element::Root;
 use nsh_core::prelude::*;
@@ -12,12 +13,15 @@ use vibevalley_rich::{
 
 use support::TestHarness;
 
+static CACHE_LOCK: Mutex<()> = Mutex::new(());
+
 thread_local! {
     static RECORDED_COPIES: RefCell<Vec<VvCodeCopyEvent>> = const { RefCell::new(Vec::new()) };
 }
 
 #[test]
 fn highlight_code_uses_lru_cache_and_falls_back_cleanly_for_unknown_or_plain_languages() {
+    let _guard = CACHE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     clear_code_highlight_cache();
     let snippet = "const x: number = 42;\nexport default x;";
 
@@ -74,6 +78,7 @@ fn CodeBlockHarness(props: CodeBlockHarnessProps) -> impl IntoElement {
 
 #[test]
 fn vv_code_block_renders_themed_spans_reacts_to_dark_and_handles_copy_and_fold() {
+    let _guard = CACHE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     RECORDED_COPIES.with(|c| c.borrow_mut().clear());
     let short_code = "pub fn greet(name: &str) -> String {\n    format!(\"hi {name}\")\n}";
 
@@ -153,6 +158,7 @@ fn regression_all_rich_ui_i18n_keys_resolve_in_zh_and_en() {
 
 #[test]
 fn vv_code_block_folds_long_blocks_and_handles_large_async_offload_without_panicking() {
+    let _guard = CACHE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     // 24 lines (> 16 fold threshold), no language -> header shows localized line count.
     let long_code = (1..=24).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
 

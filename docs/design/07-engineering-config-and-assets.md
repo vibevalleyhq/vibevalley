@@ -43,9 +43,10 @@ VibeValley 的全部像素图与矢量图标在独立工程目录下管理并输
 1. **核心状态 6 档密级生成器（`crates/core/src/scenario.rs`）**：
    - 使用 Rust 侧真实的 `Core::apply` 与 `reduce` 规则驱动 `ScenarioBuilder`（固定纪元时间 `SCENARIO_NOW`）构造 6 个真实密度快照（`Density`）：`Empty`（空引导）、`Minimal`（单主单）、`Typical`（常态多单与聊天）、`Dense`（高频并发）、`Extreme`（超长中文句子、长 URL、长 Commit SHA 等极端压力文本）与 `Edge`（异常与边界枚举组合）。
    - 导出固件确保工作台单元测试拿到的是与生产服务端**完全同源**的 `status`、`stage`、`moves`、`inbox`、`phaseText` 与 `view.plots`。
-2. **工作台组件/交互/截图套件（`apps/mac/ui/app/` & `scripts/audit/mac-tests.ts`）**：
-   - 包含无头交互测试（`interactions.test.tsx`、`components.test.tsx`、`scenarios.test.tsx`）以及多页面多视口截图探针（`shots.test.tsx` 等）。
+2. **工作台组件/交互/工作区套件（`apps/mac/ui/` & `scripts/audit/mac-tests.ts`）**：
+   - 包含无头交互、主题令牌与外壳测试（`interactions.test.tsx`、`components.test.tsx`、`scenarios.test.tsx`、`theme.test.tsx`、`workspace/workspace.test.tsx`）。
    - `scripts/audit/mac-tests.ts` 并发驱动 `.tools/bin/nsh test` 执行工作台测试套件，解析每套用例通过/失败计数与耗时并生成结构化报告 JSON。
+   - 真实 GPUI 窗口截图验收通过 `vp run ui:gallery` 统一驱动（`scripts/audit/ui-gallery.ts`），输出固定页面、工作区与农场的 Light/Dark/窄窗截图并校验 `dump.json` 零报错。
 3. **像素场景无屏光栅自检与状态转储（`apps/mac/src/pixel/tests.rs` & `apps/mac/src/debug.rs`）**：
    - 像素测试直接在 CPU 上调用 `draw::raster` 生成实际 `RgbaImage` PNG（指定 `VIBEVALLEY_PIXEL_OUT` 可落盘查看），验证重叠帮工绘制顺序、点击命中盒与炭火地标对齐，不依赖图形显卡或屏幕窗口。
    - `debug.rs` 对外提供运行中窗口完整树与像素画布指标转储（缓存图片数、帧绘耗时 `last_paint_ms`、萤火虫采样坐标与点击事件历史 `taps`）。

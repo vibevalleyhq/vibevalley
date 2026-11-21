@@ -11,7 +11,7 @@ export function MarkdownPane() {
   const doc = frame<Doc>("doc");
   const native = richNative();
   return (
-    <Scroll class="flex-1 bg-page" contentClass="max-w-3xl p-6">
+    <Scroll testID="markdown-pane" class="flex-1 bg-page" contentClass="max-w-3xl p-6">
       {doc()?.error ? <Text class="text-sm text-berry">{doc()!.error}</Text> : null}
       {doc()?.markdown != null ? (
         native ? (
