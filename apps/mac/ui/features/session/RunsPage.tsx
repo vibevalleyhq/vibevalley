@@ -2,7 +2,7 @@ import { Scroll, signal, Text, untracked, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { Look } from "@vibevalley/protocol";
+import type { Look, OrchestratorEval } from "@vibevalley/protocol";
 import { oneLine } from "@vibevalley/protocol/rules";
 import * as S from "@vibevalley/protocol/schema";
 
@@ -22,7 +22,6 @@ import { useCore } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useAgents, useQuery } from "../../infra/query";
 import { useRouter, useSearch } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
-import { markWrongOf } from "../orchestrator/looks";
 import { PendingApprovals } from "../orchestrator/PendingApprovals";
 import {
   buildRunEntries,
@@ -38,6 +37,11 @@ import {
   runStatusOf,
 } from "./runsView";
 import { TrajectoryLog } from "./Trajectory";
+
+const markWrongOf =
+  (agent: string) =>
+  (on: number, want: string): Promise<OrchestratorEval> =>
+    api.orchestrator.eval.create({ agent, on, want });
 
 const allSessionsQuery = defineQuery({
   schema: z.array(S.Session),

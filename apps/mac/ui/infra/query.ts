@@ -12,10 +12,10 @@ import {
   VibeValleyApiError,
 } from "@vibevalley/protocol";
 
-import { cursorManifest, loadSpriteManifest } from "../design/pixel/manifests";
 import { api, ApiConnectionError } from "./api";
 import { CursorManifest, SpriteManifest } from "./base/manifests";
 import type { FramesSource } from "./frame";
+import { cursorManifest, loadSpriteManifest } from "./pixelManifests";
 import { defineQuery, type QueryClient } from "./query/cache";
 import { useQuery } from "./query/solid";
 export { defineQuery, type QueryClient } from "./query/cache";

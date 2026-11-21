@@ -119,6 +119,33 @@ tester.run("global-doors", rule("global-doors"), {
   ],
 });
 
+tester.run("ui-layer-boundaries", rule("ui-layer-boundaries"), {
+  valid: [
+    { code: "import { x } from '../infra/query';", filename: "/repo/apps/mac/ui/design/Face.tsx" },
+    { code: "import { Button } from '../../design/Button';", filename: "/repo/apps/mac/ui/features/issue/Board.tsx" },
+    { code: "import { api } from '../../infra/api';", filename: "/repo/apps/mac/ui/features/issue/Board.tsx" },
+    { code: "import { perform } from '../features/issue/acts';", filename: "/repo/apps/mac/ui/farm/FarmForm.tsx" },
+    { code: "import { Root } from '../infra/Root';", filename: "/repo/apps/mac/ui/farm/FarmForm.tsx" },
+    { code: "import { tok } from '../design/tokens';", filename: "/repo/apps/mac/ui/workspace/Sidebar.tsx" },
+    { code: "import { IssuesPage } from '../features/issue/IssuesPage';", filename: "/repo/apps/mac/ui/app/Workbench.tsx" },
+    { code: "import { FarmForm } from './farm/FarmForm';\nimport { Sidebar } from './workspace/Sidebar';", filename: "/repo/apps/mac/ui/App.tsx" },
+    { code: "import { Root } from '../infra/Root';", filename: "/repo/apps/mac/ui/app/issues.story.tsx" },
+    { code: "import { a } from '../../features/foo';", filename: "/repo/apps/mac/ui/design/Foo.test.tsx" },
+  ],
+  invalid: [
+    { code: "import { richNative } from '../../design/rich/native';", filename: "/repo/apps/mac/ui/infra/base/search.ts", errors: [{ messageId: "layer" }] },
+    {
+      code: "import { orchestratorLooks } from '../../features/orchestrator/looks';",
+      filename: "/repo/apps/mac/ui/design/domain/Face.tsx",
+      errors: [{ messageId: "layer" }],
+    },
+    { code: "import { Shell } from '../../app/Shell';", filename: "/repo/apps/mac/ui/features/issue/Board.tsx", errors: [{ messageId: "layer" }] },
+    { code: "import { Root } from '../app/Root';", filename: "/repo/apps/mac/ui/farm/FarmForm.tsx", errors: [{ messageId: "layer" }] },
+    { code: "import { FarmPhone } from '../farm/FarmPhone';", filename: "/repo/apps/mac/ui/workspace/Sidebar.tsx", errors: [{ messageId: "layer" }] },
+    { code: "import { FarmForm } from '../farm/FarmForm';", filename: "/repo/apps/mac/ui/app/Workbench.tsx", errors: [{ messageId: "layer" }] },
+  ],
+});
+
 const root = resolve(import.meta.dirname, "../..");
 
 describe("what a rule says", () => {

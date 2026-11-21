@@ -212,6 +212,14 @@ impl Game {
         }
     }
 
+    /// Records that the user inspected a live session's diff.
+    pub fn reviewed(&self, session: impl Into<String>) {
+        self.record(LedgerEntry::Reviewed(vibevalley_protocol::LedgerEntryReviewed {
+            at: 0,
+            session: session.into(),
+        }));
+    }
+
     /// The title the user wears; none of either is the plain title.
     pub fn choose_title(&self, achievement: Option<String>, tier: Option<i64>) {
         self.record(LedgerEntry::Titled(LedgerEntryTitled {

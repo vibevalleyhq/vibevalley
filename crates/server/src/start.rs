@@ -57,7 +57,7 @@ pub struct ServerConfig {
     pub offline_media: bool,
     /// How the media vendor is reached and its results fetched, in place of the network: a test keeps one across
     /// restarts, so the vendor remembers what it was asked.
-    pub media_network: Option<(Arc<dyn modules::content::media::vendor::Fetch>, Arc<dyn modules::content::media::vendor::Fetch>)>,
+    pub media_network: Option<(Arc<dyn modules::infra::http::Fetch>, Arc<dyn modules::infra::http::Fetch>)>,
     /// The orchestrator and built-in workers can share an offline model.
     pub model_client: Option<Arc<dyn vibevalley_runtime::agent::ModelClient>>,
     /// The orchestrator hears the farm (VibeValley `listen`); a test without
@@ -272,7 +272,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         std::fs::create_dir_all(&dir).map_err(|e| failed("the work root")(&e))?;
     }
     let hub = Hub::new(vibevalley_core::empty_space_state());
-    modules::infra::core::install_version(&hub, &config.version);
+    modules::infra::install_health_version(&hub, &config.version);
     let setting = Setting::open(SettingConfig {
         home: config.home.clone(),
         work_root: config.work_root.clone(),
@@ -286,15 +286,14 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let game = modules::skin::game::Game::open(&config.home, &hub);
     modules::skin::game::install(&hub, game.clone());
     // How MOSS is reached, and its results fetched; the page's tests answer it offline.
-    let (vendor, download): (Arc<dyn modules::content::media::vendor::Fetch>, Arc<dyn modules::content::media::vendor::Fetch>) =
-        if let Some(network) = &config.media_network {
-            network.clone()
-        } else if config.offline_media {
-            crate::offline::network()
-        } else {
-            (Arc::new(modules::content::media::vendor::Http), Arc::new(modules::content::media::vendor::Http))
-        };
-    modules::team::provider::install(&hub, Arc::new(modules::team::provider::Provider::new(setting.clone(), vendor.clone())));
+    let (vendor, download): (Arc<dyn modules::infra::http::Fetch>, Arc<dyn modules::infra::http::Fetch>) = if let Some(network) = &config.media_network {
+        network.clone()
+    } else if config.offline_media {
+        crate::offline::network()
+    } else {
+        (Arc::new(modules::infra::http::Http), Arc::new(modules::infra::http::Http))
+    };
+    modules::infra::provider::install(&hub, Arc::new(modules::infra::provider::Provider::new(setting.clone(), vendor.clone())));
     let voice_fetch = vendor.clone();
     let execution = Arc::new(std::sync::OnceLock::new());
     let registry = config
@@ -375,7 +374,10 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     .map_err(|e| failed("media jobs")(&e.message))?;
     modules::content::media::jobs::install(&hub, media.clone());
     hub.attach_speech_streams(media.clone());
-    modules::collab::channel::install(&hub, chat.clone(), agents.clone(), Some(game.clone()));
+    {
+        let g = game.clone();
+        modules::collab::channel::install(&hub, chat.clone(), agents.clone(), Some(Arc::new(move |station| g.want(station))));
+    }
     crons.attach_chat(&chat);
     let artifacts =
         modules::content::artifact::Artifacts::open(&config.home, attachments.clone(), chat.clone()).map_err(|e| failed("the artifacts")(&e.message))?;
@@ -406,7 +408,10 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     });
     hub.attach_mcp(modules::team::mcp::Door::new(farm.clone(), config.version.clone()));
     modules::work::issue::install_conversation(&hub, board.clone(), chat.clone());
-    modules::work::issue::install_reviewed(&hub, board.clone(), game.clone());
+    {
+        let g = game.clone();
+        modules::work::issue::install_reviewed(&hub, board.clone(), Arc::new(move |session| g.reviewed(session)));
+    }
     let key = setting.clone();
     let orchestrator = modules::team::orchestrator::Orchestrator::open(modules::team::orchestrator::Parts {
         hub: Arc::downgrade(&hub),

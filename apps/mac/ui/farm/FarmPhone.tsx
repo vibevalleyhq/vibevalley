@@ -4,7 +4,6 @@ import { cleanup, effect, host, keymap, Scroll, signal, Text, View, type JSX } f
 import { t, setLocale } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
 
-import { Root } from "../app/Root";
 import { TextArea } from "../design/Field";
 import { SpriteIcon } from "../design/pixel/icons";
 import { useFollowed } from "../features/channel/model/follow";
@@ -12,6 +11,7 @@ import { api, newSendKey, reasonOf } from "../infra/api";
 import { frame, call } from "../infra/bridge";
 import { useBridge } from "../infra/bridged";
 import { useCore } from "../infra/frame";
+import { Root } from "../infra/Root";
 import { GameIcon, GamePad, PhoneGame, type GameId } from "./PhoneGames";
 
 type Screen = "home" | "missed" | "log" | "orchestrator" | "games" | GameId;

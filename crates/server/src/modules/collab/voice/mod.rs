@@ -29,10 +29,10 @@ use self::line::{Line, OpenTunnel};
 use self::moss::{Realtime, Verdict};
 use self::token::Issue;
 use crate::modules::collab::channel::{Chat, Picked, Posting, Saying};
-use crate::modules::content::media::vendor::Fetch;
+use crate::modules::infra::http::Fetch;
+use crate::modules::infra::provider::Use;
 use crate::modules::infra::setting::{Secret, Setting};
 use crate::modules::team::orchestrator::Orchestrator;
-use crate::modules::team::provider::Use;
 use crate::{Hub, lock, now};
 
 /// How long a turn of the orchestrator is waited for before a call gives up on it.
@@ -222,7 +222,7 @@ impl Voice {
     }
 
     /// The account MOSS Live calls on, or why there is none, as the voice page says it.
-    fn live_account(&self) -> Result<crate::modules::team::provider::Account, ApiError> {
+    fn live_account(&self) -> Result<crate::modules::infra::provider::Account, ApiError> {
         self.setting
             .providers()
             .account(Use::Live)

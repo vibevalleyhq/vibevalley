@@ -1,4 +1,4 @@
-import { richNative } from "../../design/rich/native";
+import { richNative } from "../rich";
 
 const han = /\p{Script=Han}/u;
 

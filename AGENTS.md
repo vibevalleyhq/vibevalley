@@ -13,8 +13,8 @@ crates/runtime/            运行时与自研 agent（vibevalley-runtime）：oa
 crates/engines/            底层引擎：纯 Rust 正则（onig）、语法高亮（shiki）与图谱渲染（pele），供 crates/rich 使用
 crates/rich/               原生富内容组件与辅助（vibevalley-rich）：Markdown、代码块、图谱、画布、图表、GenUI 与拼音匹配（engine/ 含 canvas、chart、genui、pinyin）
 crates/server/             服务端（二进制 vibevalley-server）：src/modules 按 6 个业务域分组（work：issue、session、workplace、repo、cron、pull、ledger；
-                           team：agent、orchestrator、memory、provider、tool、mcp；collab：channel、watch、connector、voice；
-                           content：attachment、library、media、artifact、pkm；skin：game；infra：setting、column、core；
+                           team：agent、orchestrator、memory、tool、mcp；collab：channel、watch、connector、voice；
+                           content：attachment、library、media、artifact、pkm；skin：game；infra：setting、provider、http、column；
                            任务板拆成 work/issue（状态与交付）、work/session（执行会话和每一轮）、work/workplace（worktree 与合并），都只经 work/ledger 写），
                            src/transport/ 收拢接口契约（api）、进程内桥（bridge）、Chord（chord）与 HTTP 门（http）；
                            lib.rs 组装 Hub，start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示

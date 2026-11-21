@@ -24,7 +24,7 @@
 | `crates/server/src/modules/content/media/vendor.rs` | MOSS 的调用：每个请求经 `Fetch` 发出（测试替身照 MOSS 回答），不跟随重定向 |
 | `crates/server/src/modules/content/media/image_provider.rs`、`png.rs`、`validate.rs` | 生图请求的准备与可取消执行、PNG 校验、请求与格式校验 |
 | `crates/server/src/modules/content/media/inputs.rs` | 输入预留、上传、任务保留与回收 |
-| `crates/server/src/public_http.rs` | 下载与素材导入共用的公网 https 规则 |
+| `crates/server/src/modules/infra/http.rs` | 下载与素材导入共用的公网 https 规则与 HTTP 客户端 |
 | `crates/server/src/modules/content/library/mod.rs` | 素材库：`list`、`add`、`remove`、`preview_remove`；听事实记下生成结果与聊天附件 |
 | `crates/server/src/transport/http/media.rs` | 本机二进制上传（`PUT /api/v1/media/input/:id/content`）与带范围的播放、语音流 |
 | `crates/server/src/modules/team/tool/notes.rs` | 助手与帮工的 `media_*`、`library_item_*` 工具 |
@@ -110,7 +110,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
   - `generated`：媒体任务的 id 和种类；任务 `ready` 拿到附件时记，开机时按核心状态里已有的任务补齐。
   - `uploaded`：用户在聊天里发出带附件的话（记频道和消息），或在这页上传（两样都没有）。这页的上传是 `attachment.create` 再 `library.item.add({ attachment })`。
   - `fetched`：哪个档案、哪个帮工（会话）、从哪个网址或工作目录里的哪个文件。
-- **谁能给什么**：`library.item.add` 只收一种来源。经 HTTP 来的是用户，只能给已上传的附件；助手的工具只给网址，帮工的给网址或路径。网址只走公网 https（`public_http.rs`），最大 `attachmentMax`（25 MB），60 秒；路径解析了符号链接以后仍要在工作目录里。
+- **谁能给什么**：`library.item.add` 只收一种来源。经 HTTP 来的是用户，只能给已上传的附件；助手的工具只给网址，帮工的给网址或路径。网址只走公网 https（`infra/http.rs`），最大 `attachmentMax`（25 MB），60 秒；路径解析了符号链接以后仍要在工作目录里。
 - **拿掉只删这一条**：`library.item.delete` 不删附件，发过它的消息照样能打开。
 - **进行中任务实时对齐**：在做的生成任务读核心状态的 `media`，排在最前（麦色的虚线格）；完成的任务数一变，页面重读列表。
 - **搜和排在服务端，筛和数在页面**：`library.item.list` 的 `text` 按名字找（不分大小写），`sort` 是 `recent`（默认）、`name`、`size`；左栏的两组各按另一组选中的那项数（`countsOf`），来自频道、来自帮工两组照列表里出现的列出。

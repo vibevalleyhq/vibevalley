@@ -11,9 +11,9 @@ use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, DictationVia, VoiceFix};
 
 use super::agora::unavailable;
-use crate::modules::content::media::vendor::{Fetch, FetchError, MOSS, Request};
+use crate::modules::infra::http::{Fetch, FetchError, Request};
+use crate::modules::infra::provider::{MOSS, Use};
 use crate::modules::infra::setting::{Secret, Setting};
-use crate::modules::team::provider::Use;
 
 const AUDIO_MAX: usize = 25 << 20;
 

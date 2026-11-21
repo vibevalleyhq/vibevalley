@@ -284,9 +284,14 @@ export default defineConfig({
       {
         // One word for none (scripts/audit/oxlint-plugin.ts, one-absent).
         files: ["apps/**", "packages/**"],
-        // `native.ts` is owned by the parallel pinyin-rust branch; left untouched to preserve zero file overlap.
-        excludeFiles: ["apps/mac/ui/design/rich/native.ts"],
+        // Native Rust vibevalley/rich props accept JSON null or omitted optional fields across the JS bridge.
+        excludeFiles: ["apps/mac/ui/infra/rich.ts"],
         rules: { "vibevalley/one-absent": "error" },
+      },
+      {
+        // Native UI layers flow one way: infra -> design -> features -> (app | farm | workspace) (scripts/audit/oxlint-plugin.ts, ui-layer-boundaries).
+        files: ["apps/mac/ui/**"],
+        rules: { "vibevalley/ui-layer-boundaries": "error" },
       },
       {
         // Shipped code and its tests start no process; scripts do (scripts/audit/oxlint-plugin.ts, child-process-door).

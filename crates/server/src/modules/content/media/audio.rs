@@ -17,7 +17,7 @@ use vibevalley_protocol::{
 use super::Stop;
 use super::jobs::{Ask, Held, Jobs, Phase, Record, active, id_ok, refused};
 use super::vendor::{Account, Moss, Outcome, StreamError, TranscriptionEvent, VendorError};
-use crate::modules::team::provider::Use;
+use crate::modules::infra::provider::Use;
 
 /// The largest and longest sample a voice is cloned from.
 const SAMPLE_MAX: i64 = 10_000_000;

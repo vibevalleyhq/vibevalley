@@ -35,6 +35,7 @@
 
 | 名字 | 文件 | 说的是 |
 |---|---|---|
+| `Root` | `Root.tsx` |  |
 | `useWorkAgents` | `agents.ts` | The profiles work is sent to, the helpers; enabled, only those not switched off. |
 | `sortRuntimes` | `agents.ts` |  |
 | `useOrchestrators` | `agents.ts` | The orchestrators' profiles, the default one first. |
@@ -127,6 +128,8 @@
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `fetchArtifactView` | `gateway.ts` | Fetches a store artifact's rendered HTML viewer document through the native `artifact.view` op. |
 | `currentHost` | `host.ts` |  |
+| `loadSpriteManifest` | `pixelManifests.ts` | Lazily fetches `sprites.json` from Rust on first `useSprites()` call instead of inlining 105 KB into `bundle.js`. |
+| `cursorManifest` | `pixelManifests.ts` |  |
 | `retryRead` | `query.ts` |  |
 | `refetchOnRelink` | `query.ts` |  |
 | `cursorsQuery` | `query.ts` |  |
@@ -150,6 +153,7 @@
 | `useQuery` | `query/solid.tsx` |  |
 | `ready` | `query/solid.tsx` |  |
 | `fixOf` | `readiness.ts` | What a feature lacks, in words, and the settings page that fixes it (SettingsStatus.readiness says what lacks). |
+| `richNative` | `rich.ts` |  |
 | `appHistory` | `router/context.tsx` | The one history of the app's page, for code outside the tree (the host's "open this route"). |
 | `useRouter` | `router/context.tsx` |  |
 | `Router` | `router/context.tsx` |  |

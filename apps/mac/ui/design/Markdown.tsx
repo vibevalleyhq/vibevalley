@@ -5,12 +5,6 @@
 import { TextView } from "nsh/base";
 
 import { hostApi } from "../infra/bridge";
-import { useRouter } from "../infra/router";
-import { Canvas } from "./code/Canvas";
-import { Chart } from "./code/Chart";
-import { CodeBlock } from "./code/CodeBlock";
-import { Diagram } from "./code/Diagram";
-import { GenUi } from "./code/GenUi";
 import {
   richNative,
   type BlockRefPayload,
@@ -22,7 +16,13 @@ import {
   type VvMentionPressEvent,
   type VvTaskPressEvent,
   type VvWikilinkPressEvent,
-} from "./rich/native";
+} from "../infra/rich";
+import { useRouter } from "../infra/router";
+import { Canvas } from "./code/Canvas";
+import { Chart } from "./code/Chart";
+import { CodeBlock } from "./code/CodeBlock";
+import { Diagram } from "./code/Diagram";
+import { GenUi } from "./code/GenUi";
 
 const fallbackClasses = {
   link: "text-water underline",

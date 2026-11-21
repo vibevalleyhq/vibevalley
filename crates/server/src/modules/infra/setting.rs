@@ -14,8 +14,8 @@ use vibevalley_protocol::{
     VoiceAnswerOrchestrator, VoiceSettings, VoiceTTS, VoiceTTSMinimax, VoiceTTSMinimaxModel, ops,
 };
 
+use super::provider::{Providers, Use};
 use crate::Hub;
-use crate::modules::team::provider::{Providers, Use};
 
 const SILENCE_MS: (i64, i64) = (200, 2000);
 const INTERRUPT_MS: (i64, i64) = (80, 1000);

@@ -14,140 +14,8 @@ use vibevalley_protocol::{
 };
 
 use super::Stop;
-
-pub const MOSS: &str = "https://api.mosi.cn/v1";
-
-pub struct Request {
-    pub method: &'static str,
-    pub url: String,
-    pub headers: Vec<(String, String)>,
-    /// Its content type and bytes.
-    pub body: Option<(String, Box<dyn Read + Send>)>,
-    pub timeout: Duration,
-}
-
-pub struct Response {
-    pub status: u16,
-    pub headers: Vec<(String, String)>,
-    pub body: Box<dyn Read + Send>,
-}
-
-impl Response {
-    pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str())
-    }
-
-    /// The media type without parameters, lower-cased.
-    pub fn media_type(&self) -> String {
-        self.header("content-type").unwrap_or("").split(';').next().unwrap_or("").trim().to_lowercase()
-    }
-}
-
-#[derive(Debug)]
-pub enum FetchError {
-    Timeout,
-    Network(String),
-}
-
-/// How a request reaches the network (VibeValley's `fetch` / `publicFetch`).
-pub trait Fetch: Send + Sync {
-    fn fetch(&self, request: Request) -> Result<Response, FetchError>;
-}
-
-impl<F: Fn(Request) -> Result<Response, FetchError> + Send + Sync> Fetch for F {
-    fn fetch(&self, request: Request) -> Result<Response, FetchError> {
-        self(request)
-    }
-}
-
-/// `reqwest`, no redirects, statuses answered rather than failed.
-pub struct Http;
-
-impl Fetch for Http {
-    fn fetch(&self, r: Request) -> Result<Response, FetchError> {
-        let client = crate::public_http::no_redirect_client().map_err(FetchError::Network)?.clone();
-        let method = reqwest::Method::from_bytes(r.method.as_bytes()).map_err(|e| FetchError::Network(e.to_string()))?;
-        let (head_tx, head_rx) = flume::bounded::<Result<Response, FetchError>>(1);
-        crate::public_http::http_runtime().spawn(async move {
-            let mut req = client.request(method, &r.url).timeout(r.timeout);
-            for (k, v) in &r.headers {
-                req = req.header(k.as_str(), v.as_str());
-            }
-            if let Some((kind, mut reader)) = r.body {
-                req = req.header("content-type", kind);
-                let (body_tx, body_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(8);
-                tokio::task::spawn_blocking(move || {
-                    let mut buf = [0u8; 64 * 1024];
-                    loop {
-                        match reader.read(&mut buf) {
-                            Ok(0) => break,
-                            Ok(n) => {
-                                if body_tx.send(Ok(buf[..n].to_vec())).is_err() {
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                let _ = body_tx.send(Err(e));
-                                break;
-                            }
-                        }
-                    }
-                });
-                let stream = futures_util::stream::unfold(body_rx, |rx| async move { rx.recv_async().await.ok().map(|chunk| (chunk, rx)) });
-                req = req.body(reqwest::Body::wrap_stream(stream));
-            }
-            let mut response = match req.send().await {
-                Ok(res) => res,
-                Err(e) => {
-                    let err = if e.is_timeout() {
-                        FetchError::Timeout
-                    } else {
-                        FetchError::Network(e.to_string())
-                    };
-                    let _ = head_tx.send(Err(err));
-                    return;
-                }
-            };
-            let status = response.status().as_u16();
-            let headers = response
-                .headers()
-                .iter()
-                .filter_map(|(k, v)| Some((k.as_str().to_string(), v.to_str().ok()?.to_string())))
-                .collect();
-            let (res_tx, res_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(16);
-            if head_tx
-                .send(Ok(Response {
-                    status,
-                    headers,
-                    body: Box::new(crate::public_http::ChannelReader::new(res_rx)),
-                }))
-                .is_err()
-            {
-                return;
-            }
-            loop {
-                match response.chunk().await {
-                    Ok(Some(bytes)) => {
-                        if res_tx.send_async(Ok(bytes.to_vec())).await.is_err() {
-                            break;
-                        }
-                    }
-                    Ok(None) => break,
-                    Err(e) => {
-                        let io_err = if e.is_timeout() {
-                            std::io::Error::new(std::io::ErrorKind::TimedOut, e.to_string())
-                        } else {
-                            std::io::Error::other(e.to_string())
-                        };
-                        let _ = res_tx.send_async(Err(io_err)).await;
-                        break;
-                    }
-                }
-            }
-        });
-        head_rx.recv().map_err(|_| FetchError::Network("http task stopped".into()))?
-    }
-}
+use crate::modules::infra::http::{Fetch, FetchError, ReadError, Request, Response, read_max_until};
+use crate::modules::infra::provider::{IMAGE_MODELS, MOSS, SPEAKERS_MODELS, SPEECH_MODELS, TRANSCRIPTION_MODELS, UNDERSTANDING_MODELS, VOICE_DESIGN_MODELS};
 
 /// `MossErrorFields`: what failed, and whether the call may have taken effect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -229,21 +97,10 @@ pub fn fingerprint(key: &str) -> String {
 
 /// A body read whole, at most `max` bytes; past it `TooLarge`.
 pub fn read_max(body: &mut dyn Read, max: usize, stop: Option<&Stop>) -> Result<Vec<u8>, VendorError> {
-    let mut out = vec![];
-    let mut buf = [0u8; 65536];
-    loop {
-        if stop.is_some_and(Stop::aborted) {
-            return Err(VendorError::new(Reason::Network, Outcome::Unknown));
-        }
-        let n = body.read(&mut buf).map_err(|_| VendorError::new(Reason::Network, Outcome::Unknown))?;
-        if n == 0 {
-            return Ok(out);
-        }
-        if out.len() + n > max {
-            return Err(VendorError::new(Reason::TooLarge, Outcome::Unknown));
-        }
-        out.extend_from_slice(&buf[..n]);
-    }
+    read_max_until(body, max, || stop.is_some_and(Stop::aborted)).map_err(|e| match e {
+        ReadError::TooLarge => VendorError::new(Reason::TooLarge, Outcome::Unknown),
+        ReadError::Aborted | ReadError::Io => VendorError::new(Reason::Network, Outcome::Unknown),
+    })
 }
 
 fn code_points(s: &str, min: usize, max: usize) -> bool {
@@ -473,7 +330,7 @@ impl Moss {
 
     /// `prepareMossImage`: the wire body, or refused.
     pub fn prepare_image(model: &str, prompt: &Value, width: i64, height: i64, extra: &Value) -> Result<Value, VendorError> {
-        if !crate::modules::team::provider::IMAGE_MODELS.contains(&model) {
+        if !IMAGE_MODELS.contains(&model) {
             return Err(invalid_input());
         }
         let dim = |d: i64| (256..=2048).contains(&d) && d % 16 == 0;
@@ -557,12 +414,7 @@ impl Moss {
                 std::sync::LazyLock::new(|| regex::Regex::new(r"^\[pause (?:0\.[1-9]\d*|[1-9](?:\.\d+)?|10(?:\.0+)?)s\]$").expect("regex"));
             PAUSE_ANY.find_iter(text).all(|m| PAUSE_GOOD.is_match(m.as_str()))
         };
-        if !crate::modules::team::provider::SPEECH_MODELS.contains(&model)
-            || !text_ok(text, 10000)
-            || !audio_id(voice)
-            || !FORMATS.contains(&format)
-            || !pauses_ok
-        {
+        if !SPEECH_MODELS.contains(&model) || !text_ok(text, 10000) || !audio_id(voice) || !FORMATS.contains(&format) || !pauses_ok {
             return Err(invalid_input());
         }
         Ok(json!({ "model": model, "input": text, "voice_id": voice, "response_format": format, "delivery_method": "url", "stream": false }))
@@ -775,7 +627,7 @@ impl Moss {
                 return Err(invalid_input());
             }
         }
-        if !crate::modules::team::provider::SPEAKERS_MODELS.contains(&model) || !FORMATS.contains(&format) {
+        if !SPEAKERS_MODELS.contains(&model) || !FORMATS.contains(&format) {
             return Err(invalid_input());
         }
         Ok(json!({
@@ -790,11 +642,7 @@ impl Moss {
 
     /// `prepareMossVoiceDesign`.
     pub fn prepare_design(model: &str, text: &str, instruction: &str, format: &str) -> Result<Value, VendorError> {
-        if !crate::modules::team::provider::VOICE_DESIGN_MODELS.contains(&model)
-            || !text_ok(text, 10000)
-            || !text_ok(instruction, 10000)
-            || !FORMATS.contains(&format)
-        {
+        if !VOICE_DESIGN_MODELS.contains(&model) || !text_ok(text, 10000) || !text_ok(instruction, 10000) || !FORMATS.contains(&format) {
             return Err(invalid_input());
         }
         Ok(
@@ -806,7 +654,7 @@ impl Moss {
     pub fn prepare_transcription(model: &str, file_id: &str, diarize: Option<bool>, keyterms: Option<&Vec<String>>) -> Result<Value, VendorError> {
         let pro = model.starts_with("moss-transcribe-diarize-pro");
         let terms_ok = keyterms.is_none_or(|k| k.len() <= 20 && k.iter().all(|t| text_ok(t, 30)));
-        if !crate::modules::team::provider::TRANSCRIPTION_MODELS.contains(&model)
+        if !TRANSCRIPTION_MODELS.contains(&model)
             || !audio_id(file_id)
             || !terms_ok
             || (!pro && (diarize == Some(true) || keyterms.is_some_and(|k| !k.is_empty())))
@@ -928,7 +776,7 @@ impl Moss {
     pub fn prepare_understanding(model: &str, text: &str, media: &[(MediaInputKind, String)], max_tokens: i64) -> Result<Value, VendorError> {
         let images = media.iter().all(|(k, _)| *k == MediaInputKind::Image) && (1..=5).contains(&media.len());
         let video = media.len() == 1 && media[0].0 == MediaInputKind::Video;
-        if !crate::modules::team::provider::UNDERSTANDING_MODELS.contains(&model)
+        if !UNDERSTANDING_MODELS.contains(&model)
             || !text_ok(text, 64000)
             || !(images || video)
             || !(1..=8192).contains(&max_tokens)
@@ -1157,74 +1005,5 @@ fn sse(
         if pending.len() > max {
             return Err(StreamError::Vendor(VendorError::new(Reason::TooLarge, Outcome::Unknown)));
         }
-    }
-}
-
-#[cfg(test)]
-mod http_tests {
-    use std::io::{Cursor, Read, Write};
-    use std::net::TcpListener;
-
-    use super::*;
-
-    #[test]
-    fn http_fetch_streams_post_body_and_never_follows_redirects() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let handle = std::thread::spawn(move || {
-            // 1) POST with streamed body
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut req = Vec::new();
-            let mut chunk = [0u8; 1024];
-            loop {
-                let n = stream.read(&mut chunk).unwrap();
-                req.extend_from_slice(&chunk[..n]);
-                if req.windows(7).any(|w| w == b"payload") {
-                    break;
-                }
-            }
-            let raw = String::from_utf8_lossy(&req);
-            assert!(raw.starts_with("POST /upload HTTP/1.1"), "{raw}");
-            assert!(raw.to_ascii_lowercase().contains("x-test: ok"), "{raw}");
-            stream
-                .write_all(b"HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: 11\r\nConnection: close\r\n\r\n{\"ok\":true}")
-                .unwrap();
-
-            // 2) 302 redirect must be returned as-is, not followed
-            let (mut stream, _) = listener.accept().unwrap();
-            let _ = stream.read(&mut chunk);
-            stream
-                .write_all(b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/other\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
-                .unwrap();
-        });
-
-        let mut res = Http
-            .fetch(Request {
-                method: "POST",
-                url: format!("http://{addr}/upload"),
-                headers: vec![("x-test".into(), "ok".into())],
-                body: Some(("text/plain".into(), Box::new(Cursor::new(b"payload".to_vec())))),
-                timeout: Duration::from_secs(5),
-            })
-            .unwrap();
-        assert_eq!(res.status, 201);
-        assert_eq!(res.media_type(), "application/json");
-        let mut body = String::new();
-        res.body.read_to_string(&mut body).unwrap();
-        assert_eq!(body, "{\"ok\":true}");
-
-        let redirect = Http
-            .fetch(Request {
-                method: "GET",
-                url: format!("http://{addr}/redir"),
-                headers: vec![],
-                body: None,
-                timeout: Duration::from_secs(5),
-            })
-            .unwrap();
-        assert_eq!(redirect.status, 302);
-        assert_eq!(redirect.header("location"), Some("http://127.0.0.1:1/other"));
-
-        handle.join().unwrap();
     }
 }

@@ -2,9 +2,9 @@
 import { Scroll, Text, View } from "nsh";
 import { TextView } from "nsh/base";
 
-import { richNative } from "../design/rich/native";
 import { tok, type as ty } from "../design/tokens";
 import { frame, hostApi } from "../infra/bridge";
+import { richNative } from "../infra/rich";
 
 type Doc = { path: string; markdown?: string; error?: string };
 

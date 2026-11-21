@@ -27,11 +27,10 @@ pub use crate::transport::api::{Server, refusal};
 
 pub mod base;
 mod chord_space;
-mod workbench_frames;
+mod frame_feed;
 pub use vibevalley_protocol::home;
 pub mod modules;
 pub mod offline;
-mod public_http;
 mod start;
 pub mod testing;
 
@@ -96,7 +95,7 @@ pub struct Hub {
     core: Mutex<Core>,
     core_seq: AtomicI64,
     space: chord_space::Space,
-    workbench: workbench_frames::WorkbenchFrames,
+    feed: frame_feed::FrameFeed,
     execution: std::sync::OnceLock<std::sync::Weak<modules::team::orchestrator::Orchestrator>>,
     handlers: RwLock<HashMap<&'static str, Handler>>,
     openers: RwLock<HashMap<&'static str, Opener>>,
@@ -142,7 +141,7 @@ impl Hub {
             core: Mutex::new(core),
             core_seq: AtomicI64::new(seq),
             space,
-            workbench: workbench_frames::WorkbenchFrames::new(first),
+            feed: frame_feed::FrameFeed::new(first),
             execution: std::sync::OnceLock::new(),
             handlers: RwLock::default(),
             openers: RwLock::default(),
@@ -177,17 +176,17 @@ impl Hub {
         lock(&self.core).seq()
     }
 
-    fn sync_workbench(&self) {
+    fn sync_feed(&self) {
         let target_seq = self.core_seq.load(Ordering::Acquire);
         let locale = vibevalley_i18n::locale();
-        let snap = self.workbench.snapshot();
+        let snap = self.feed.snapshot();
         if snap.frame.seq >= target_seq && snap.locale == locale {
             return;
         }
         let core = lock(&self.core);
-        let snap = self.workbench.snapshot();
+        let snap = self.feed.snapshot();
         if snap.frame.seq < core.seq() || snap.locale != locale {
-            self.workbench.replace_if_newer(core.frame(vec![]));
+            self.feed.replace_if_newer(core.frame(vec![]));
         }
     }
 
@@ -357,9 +356,9 @@ fn frames(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Vec<GameEffect>>) {
         let deadline = std::time::Instant::now() + Duration::from_millis(STATE_EVERY_MS);
         let Some(leading) = hub.upgrade() else { return };
         let target_seq = leading.core_seq.load(Ordering::Acquire);
-        if leading.workbench.should_publish(target_seq, true) {
-            leading.sync_workbench();
-            leading.workbench.publish(true);
+        if leading.feed.should_publish(target_seq, true) {
+            leading.sync_feed();
+            leading.feed.publish(true);
         }
         drop(leading);
         std::thread::sleep(deadline.saturating_duration_since(std::time::Instant::now()));
@@ -369,12 +368,12 @@ fn frames(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Vec<GameEffect>>) {
             let streams = lock(&hub.streams);
             !streams.frames.is_empty() || !streams.states.is_empty()
         };
-        if !hub.workbench.has_watchers() && !has_stream_subscribers {
+        if !hub.feed.has_watchers() && !has_stream_subscribers {
             continue;
         }
-        hub.sync_workbench();
-        hub.workbench.publish(false);
-        let snapshot = hub.workbench.snapshot();
+        hub.sync_feed();
+        hub.feed.publish(false);
+        let snapshot = hub.feed.snapshot();
         let mut streams = lock(&hub.streams);
         if !streams.frames.is_empty() {
             let frame = if effects.is_empty() {
@@ -460,17 +459,17 @@ impl Server for Hub {
     }
 
     fn state(&self) -> flume::Receiver<Value> {
-        self.sync_workbench();
+        self.sync_feed();
         let (tx, rx) = flume::unbounded();
         let mut streams = lock(&self.streams);
-        let _ = tx.send(self.workbench.snapshot().wire().clone());
+        let _ = tx.send(self.feed.snapshot().wire().clone());
         streams.states.push(tx);
         rx
     }
 
     fn watch_workbench(&self, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(&Value)) {
-        self.sync_workbench();
-        self.workbench.watch(stop, receive);
+        self.sync_feed();
+        self.feed.watch(stop, receive);
     }
 
     fn live(&self) -> flume::Receiver<LiveEvent> {

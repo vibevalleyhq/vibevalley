@@ -13,12 +13,11 @@ use vibevalley_protocol::{
     ProviderModelListing, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceListingVoices, Readiness, ops,
 };
 
+use super::http::{Fetch, FetchError, Request, read_max};
+use super::setting::{Secret, Setting};
 use crate::Hub;
-use crate::modules::infra::setting::{Secret, Setting};
 
-const MOSS: &str = "https://api.mosi.cn/v1";
-
-use crate::modules::content::media::vendor::{Fetch, FetchError, Request};
+pub const MOSS: &str = "https://api.mosi.cn/v1";
 
 pub const IMAGE_MODELS: [&str; 4] = [
     "moss-image-base-1.0",
@@ -365,7 +364,7 @@ fn moss_get(fetch: &dyn Fetch, key: &Secret, url: &str, query: &[(&str, String)]
         }
     }
     let mut body = response.body;
-    let bytes = crate::modules::content::media::vendor::read_max(&mut body, 1 << 20, None).map_err(|_| refuse("server.provider.tooLarge"))?;
+    let bytes = read_max(&mut body, 1 << 20).map_err(|_| refuse("server.provider.tooLarge"))?;
     serde_json::from_slice(&bytes).map_err(|_| refuse("server.provider.invalidResponse"))
 }
 

@@ -8,9 +8,9 @@ import { SkillsPage } from "../features/runtime/SkillsPage";
 import { responses } from "../fixtures/agents";
 import { responses as pixelResponses } from "../fixtures/pixel";
 import { fixtureTransport } from "../infra/fixtures";
+import { Root } from "../infra/Root";
 import { appHistory } from "../infra/router";
 import { setTransport } from "../infra/transport";
-import { Root } from "./Root";
 import { App } from "./Workbench";
 
 const state: StateFrame = {

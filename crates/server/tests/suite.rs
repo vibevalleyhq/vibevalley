@@ -19,6 +19,7 @@ mod media_inputs;
 mod media_jobs;
 mod media_kinds;
 mod memory;
+mod module_boundaries;
 mod orchestrator;
 mod pkm;
 mod provider;

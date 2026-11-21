@@ -10,7 +10,8 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use super::prompts;
-use crate::modules::content::media::vendor::{Fetch, FetchError, MOSS, Request, read_max};
+use crate::modules::infra::http::{Fetch, FetchError, Request, read_max};
+use crate::modules::infra::provider::MOSS;
 use crate::modules::infra::setting::Secret;
 
 pub const TOOL: &str = "ask_orchestrator";
@@ -331,7 +332,7 @@ impl Realtime for HttpProbe {
         };
         match response.status {
             401 | 403 => {
-                let body = read_max(&mut response.body, 1 << 16, None).unwrap_or_default();
+                let body = read_max(&mut response.body, 1 << 16).unwrap_or_default();
                 let said = serde_json::from_slice::<ErrorBody>(&body).ok().and_then(|b| b.error).and_then(|e| e.message);
                 Verdict::Refused(safe(
                     &said.filter(|m| !m.is_empty()).unwrap_or_else(|| String::from_utf8_lossy(&body).into_owned()),
@@ -439,7 +440,7 @@ mod tests {
 
     #[test]
     fn the_key_is_asked_over_https_without_opening_a_session() {
-        use crate::modules::content::media::vendor::Response;
+        use crate::modules::infra::http::Response;
         let probe = |answer: Result<(u16, &'static str), FetchError>| {
             let answer = std::sync::Mutex::new(Some(answer));
             HttpProbe(Arc::new(move |r: Request| {

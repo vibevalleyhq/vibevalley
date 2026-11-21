@@ -77,6 +77,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 ### 页面状态与数据流
 
 - **页面只读 `StateFrame`**：`infra/frame.ts` 从 `Transport` 收帧，交出最新的整帧；按 id 的列表用 `Each` 保住行。
+- **UI 目录单向依赖**：`infra` → `design` → `features` → `{app, farm, workspace}`，`app`、`farm` 与 `workspace` 之间互不引用；由 `oxlint` 的 `vibevalley/ui-layer-boundaries` 规则拦截。
 - **状态中间层是 `state/`**：跨组件的状态 `defineAtom`（`atom.ts`）、本机存下的选择 `defineStored`（`stored.ts`、`prefs.ts`）、乐观意图 `defineIntent`（`intent.ts`）。
 - **乐观意图等帧 `seq` 追上后结算**：`Intent` 是按 `phase` 区分的判别联合；写操作带 `requestKey` 或 `sendKey` 叠在当前帧上，等到 `frame.seq >= reply.seq` 或频道出现对应消息才结算。
 - **错误是结构化的 `UiFault`**：`infra/api.ts` 的 `faultOf` 从信封里取出六位 `bizCode`、`reason`、`next`、`settings` 和由 `bizCodeMeta` 决定的 `retryable`，只挂在失败或降级的分支上。

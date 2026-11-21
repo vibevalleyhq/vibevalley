@@ -2736,7 +2736,7 @@ pub fn direct(chat: &Chat, agents: &Agents, reference: &str) -> Result<String, A
 
 /// `channel.*`, `channel.follow`, `channel.reports`; the orchestrators
 /// seated now and whenever a profile is kept.
-pub fn install(hub: &Hub, chat: Arc<Chat>, agents: Arc<Agents>, game: Option<Arc<crate::modules::skin::game::Game>>) {
+pub fn install(hub: &Hub, chat: Arc<Chat>, agents: Arc<Agents>, on_station: Option<Arc<dyn Fn(i64) + Send + Sync>>) {
     for agent in agents.profiles.orchestrators() {
         if let Err(e) = seat_orchestrator(&chat, &agents, &agent) {
             eprintln!("vibevalley-server: chat: seating {}: {}", agent.id, e.message);
@@ -2753,8 +2753,8 @@ pub fn install(hub: &Hub, chat: Arc<Chat>, agents: Arc<Agents>, game: Option<Arc
     hub.on::<ops::ChannelMessageSend>({
         let (c, a) = (chat.clone(), agents.clone());
         move |_, body| {
-            if let (Some(station), Some(game)) = (body.station, &game) {
-                game.want(station);
+            if let (Some(station), Some(on_station)) = (body.station, &on_station) {
+                on_station(station);
             }
             // A profile picked that is not there is not passed on.
             let blocks = c.quoted(body.blocks.as_deref().unwrap_or_default());

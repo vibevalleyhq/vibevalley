@@ -14,9 +14,9 @@ import { WorkLog } from "../features/session/WorkLog";
 import { withIssues } from "../fixtures/issues";
 import { responses, state } from "../fixtures/workbench";
 import { fixtureTransport } from "../infra/fixtures";
+import { Root } from "../infra/Root";
 import { appHistory } from "../infra/router";
 import { setTransport } from "../infra/transport";
-import { Root } from "./Root";
 import { App } from "./Workbench";
 
 setLocale(host.params.locale === "en" ? "en" : "zh");

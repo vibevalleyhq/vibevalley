@@ -7,6 +7,7 @@ import { same } from "@vibevalley/protocol/rules";
 import { createAct } from "../../design/act";
 import { Button, ButtonLink } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
+import { orchestratorLooks } from "../../design/domain/cast";
 import { OrchestratorFace } from "../../design/domain/Face";
 import { Field, TextArea, TextInput } from "../../design/Field";
 import { Bubble } from "../../design/Tip";
@@ -14,7 +15,6 @@ import { api } from "../../infra/api";
 import { useQueryClient } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
 import { untrack } from "../../infra/solid";
-import { orchestratorLooks } from "../orchestrator/looks";
 import { runsHref } from "../session";
 import { FromTemplate } from "./FromTemplate";
 
