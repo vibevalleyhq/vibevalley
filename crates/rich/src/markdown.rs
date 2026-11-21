@@ -12,8 +12,8 @@ use nsh_base::text_view::{
 };
 use nsh_core::keymap::Modifiers;
 use nsh_core::prelude::*;
-use vibevalley_core::pkm::slug_of;
 use vibevalley_i18n::t;
+use vibevalley_protocol::pkm_slug as slug_of;
 
 use crate::canvas::vv_canvas;
 use crate::chart::vv_chart;
@@ -203,7 +203,7 @@ pub struct VvMentionPressEvent {
 /// Payload for [`VvMarkdownEvent::WikilinkPress`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, JsObject)]
 pub struct VvWikilinkPressEvent {
-    /// Normalized page slug (`vibevalley_core::pkm::slug_of`).
+    /// Normalized page slug (`vibevalley_protocol::pkm_slug`).
     pub page: SharedString,
     /// Display text shown for the wikilink or tag.
     pub label: SharedString,

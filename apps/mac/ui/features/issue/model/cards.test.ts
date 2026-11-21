@@ -1,9 +1,9 @@
-import "../infra/polyfill";
+import "../../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
 import type { Issue, IssueId, IssueStageKind, Session, SessionId } from "@vibevalley/protocol";
 
-import { type BoardCard, cardUrgencyTone } from "../features/issue/model/cards";
+import { type BoardCard, cardUrgencyTone } from "./cards";
 
 function makeIssue(id: string, state: IssueStageKind): Issue {
   return {

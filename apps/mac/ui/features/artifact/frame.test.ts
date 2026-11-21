@@ -1,10 +1,10 @@
 // An html artifact's web view page (features/artifact/frame.ts): the policy
 // where the page's head starts, the shell's runtime reading the asked slide,
 // and what the page says taken only when it is the protocol's.
-import "../infra/polyfill";
+import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import { createFrame, withPolicy, withShellQuery } from "../features/artifact/frame";
+import { createFrame, withPolicy, withShellQuery } from "./frame";
 
 test("the policy goes in after <head>, else after the doctype, else first", () => {
   expect(withPolicy("<html><head><title>x</title></head></html>")).toMatch(/^<html><head><meta http-equiv="Content-Security-Policy"/u);

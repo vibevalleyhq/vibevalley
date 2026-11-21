@@ -103,7 +103,7 @@ pub enum Action {
         #[serde(default)]
         payload: Value,
     },
-    /// The bridge self-test's results (`ui/surfaces/BridgeProbe.tsx`).
+    /// The bridge self-test's results (`apps/mac/ui/workspace/BridgeProbe.tsx`).
     Probe {
         results: Value,
     },

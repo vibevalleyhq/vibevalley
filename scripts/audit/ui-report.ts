@@ -370,25 +370,25 @@ const frontendFsmRows = [
   {
     module: "features/issue/model/closeFlow.ts",
     states: "confirming | loadingDiff | loadFailed | reviewing | submitting | treeChanged | done",
-    testSuite: "app/closeFlow.test.ts",
+    testSuite: "features/issue/model/closeFlow.test.ts",
     summary: "收口关单复核、bizCode 300001 文件树变更增量拉取 (sinceTree) 与提交防重入",
   },
   {
     module: "features/issue/model/draftSubmit.ts",
     states: "editing | submitting | rejected | retainedDirty | committed",
-    testSuite: "app/draftSubmit.test.ts",
+    testSuite: "features/issue/model/draftSubmit.test.ts",
     summary: "收口新建工单草稿提交、同稿重试复用 requestKey 与在途改稿留稿轮换 key",
   },
   {
     module: "features/media/libraryView.ts",
     states: "LibraryScope (all | media | artifact) × LibrarySelection (none | files | artifact | lightbox)",
-    testSuite: "app/libraryView.test.ts",
+    testSuite: "features/media/libraryView.test.ts",
     summary: "收口素材库互斥筛选域、文件/Artifact 选区、Shift 范围多选与灯箱切换，移除清理 effect",
   },
   {
     module: "features/session/runsView.ts",
     states: "RunsScope (all | active | orchestrator | worker) × RunEntry (orchestrator | worker)",
-    testSuite: "app/runsView.test.ts",
+    testSuite: "features/session/runsView.test.ts",
     summary: "统一 /runs 运行与轨迹视图筛选、排序、状态映射及 URL 参数编解码",
   },
 ];

@@ -1,7 +1,7 @@
-import "../infra/polyfill";
+import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import { waterfallWidths } from "../features/session/runs";
+import { waterfallWidths } from "./runs";
 
 const sumOf = (xs: readonly number[]) => xs.reduce((total, x) => total + x, 0);
 

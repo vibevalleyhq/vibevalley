@@ -1,8 +1,8 @@
 // The changes review's check of a patch before DiffView draws it.
-import "../infra/polyfill";
+import "../../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import { wellFormed } from "../features/issue/views/CloseDialog";
+import { wellFormed } from "./CloseDialog";
 
 test("a patch whose hunks have the lines their headers count is well formed; one cut short is not", () => {
   expect(wellFormed("@@ -1,3 +1,4 @@\n a\n-b\n+c\n+d\n e\n")).toBe(true);

@@ -24,7 +24,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/modules/collab/channel/mod.rs` | `Chat`：频道、私聊、串的增删改查，写话（`say`、`speak`、`post`、`notice`），每条消息连同带序号的事件（`channel_event`）在一个事务里落库；提交后发给读者（`Chat::committed`），写话等读者处理完（`Chat::await_reader`）；端点也在这里注册 |
+| `crates/server/src/modules/collab/channel/` | `Chat` 核心、事务保存点（`store.rs`）、消息写入/编辑/搜索（`messages.rs`）、房间/游标/订阅流（`rooms.rs`）、DTO 与映射（`types.rs`）及 Hub 端点安装（`service.rs`）；每条消息连同带序号的事件（`channel_event`）在一个事务里落库，提交后发给读者（`Chat::committed`）并等读者处理完（`Chat::await_reader`） |
 | [频道表结构](crates/server/src/modules/collab/channel/sql/schema.sql)、[命名查询](crates/server/src/modules/collab/channel/sql/queries.sql)、`db.rs` | sqlc 生成 SQLx 查询。频道连接在 `server.db` 上读写消息、串和观察游标。 |
 | `crates/server/src/modules/collab/channel/model.rs` | 写事务在频道锁内更新镜像。回滚恢复原镜像，提交后才向订阅者发布。 |
 | `crates/server/src/modules/collab/channel/words.rs` | `@` 识别、地址解析、搜索过滤与公网链接预览 |
@@ -60,7 +60,7 @@
 
 用户发言可带 `to`（一个助手的档案 id）：只交给他，不交给成员，`to` 不是助手就拒绝；输入框的 `/imagegen` 用它把生图交给这里的助手（[媒体](docs/subsystems/media.md)）。
 
-「这里的助手」（`Chat::orchestrator_in`，`T.Channel.orchestrator`）由频道一处算（`crates/server/src/modules/collab/channel/mod.rs`，按助手的席位认谁是助手）：私聊是对面（他是助手时），否则是频道成员里的默认助手或第一个助手，都没有就是默认助手；泛称的「@助手」、派活说明的署名、没指定人的工单和定时任务、没人收的机器事件都交给它。
+「这里的助手」（`Chat::orchestrator_in`，`T.Channel.orchestrator`）由频道一处算（`crates/server/src/modules/collab/channel/store.rs`，按助手的席位认谁是助手）：私聊是对面（他是助手时），否则是频道成员里的默认助手或第一个助手，都没有就是默认助手；泛称的「@助手」、派活说明的署名、没指定人的工单和定时任务、没人收的机器事件都交给它。
 
 | 发言者与位置 | 唤醒目标 | 被动通知（仅知晓） |
 |---|---|---|

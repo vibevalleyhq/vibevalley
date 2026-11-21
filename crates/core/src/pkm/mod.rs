@@ -142,13 +142,7 @@ pub fn journal_day(file: &str) -> Option<String> {
     Some(format!("{}-{}-{}", &c[1], &c[2], &c[3]))
 }
 
-/// A page's name from its title: trimmed, lower case, spaces as dashes, `/`
-/// (or `\`) as `__`.
-pub fn slug_of(title: &str) -> String {
-    static WS: OnceLock<Regex> = OnceLock::new();
-    let s = title.trim().replace('\\', "/").replace('/', "__");
-    WS.get_or_init(|| Regex::new(r"\s+").expect("regex")).replace_all(&s, "-").to_lowercase()
-}
+pub use vibevalley_protocol::pkm_slug as slug_of;
 
 /// Every `#tag` name in a text. A tag may not follow a Latin letter, a digit
 /// or one of `_ / & #` (so C#, issue#12, a link's #part, an entity and a ##

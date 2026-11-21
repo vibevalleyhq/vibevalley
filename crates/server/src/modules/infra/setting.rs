@@ -325,7 +325,7 @@ impl Setting {
     /// Reads `<home>/settings.json`; one that cannot be read is set aside
     /// (`settings.json.bad`) and the settings start empty.
     pub fn open(config: SettingConfig) -> Arc<Setting> {
-        let file = config.home.join("settings.json");
+        let file = config.home.join(vibevalley_protocol::home::SETTINGS_FILE);
         let stored = match std::fs::read_to_string(&file) {
             Ok(text) => serde_json::from_str::<Stored>(&text).unwrap_or_else(|_| {
                 let _ = std::fs::rename(&file, file.with_extension("json.bad"));

@@ -303,3 +303,10 @@ impl Default for Deliverable {
         Deliverable::Change
     }
 }
+
+/// A PKM page's normalized slug from its title: trimmed, lower case,
+/// whitespace collapsed to `-`, `/` (or `\`) as `__`.
+pub fn pkm_slug(title: &str) -> String {
+    let s = title.trim().replace('\\', "/").replace('/', "__");
+    s.split_whitespace().collect::<Vec<_>>().join("-").to_lowercase()
+}

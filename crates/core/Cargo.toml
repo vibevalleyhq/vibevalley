@@ -5,6 +5,14 @@ edition.workspace = true
 license.workspace = true
 description = "VibeValley's domain state reduction, frame projection, schedule rules, PKM parser, and artifact engine"
 
+[features]
+default = []
+scenarios = []
+
+[[example]]
+name = "export_scenarios"
+required-features = ["scenarios"]
+
 [dependencies]
 vibevalley-i18n = { version = "0.1.0", path = "../i18n" }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }

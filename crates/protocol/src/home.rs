@@ -4,6 +4,26 @@
 
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
+
+pub const SERVER_FILE: &str = "server.json";
+pub const SETTINGS_FILE: &str = "settings.json";
+
+#[derive(Serialize, Deserialize)]
+struct ServerAnnouncement {
+    url: String,
+    pid: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedSettings {
+    #[serde(default)]
+    locale: Option<String>,
+    #[serde(default)]
+    deepseek_api_key: Option<String>,
+}
+
 /// `VIBEVALLEY_HOME`, else `~/.vibevalley`.
 pub fn home() -> PathBuf {
     if let Some(h) = std::env::var_os("VIBEVALLEY_HOME").filter(|h| !h.is_empty()) {
@@ -17,9 +37,14 @@ pub fn home() -> PathBuf {
 pub fn announce(home: &Path, url: &str) -> std::io::Result<Announced> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
-    let path = home.join("server.json");
+    let path = home.join(SERVER_FILE);
     let mut f = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&path)?;
-    writeln!(f, "{}", serde_json::json!({ "url": url, "pid": std::process::id() }))?;
+    let body = serde_json::to_string(&ServerAnnouncement {
+        url: url.to_string(),
+        pid: u64::from(std::process::id()),
+    })
+    .map_err(std::io::Error::other)?;
+    writeln!(f, "{body}")?;
     Ok(Announced { path })
 }
 
@@ -31,8 +56,8 @@ impl Drop for Announced {
     fn drop(&mut self) {
         let ours = std::fs::read_to_string(&self.path)
             .ok()
-            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
-            .is_some_and(|v| v["pid"].as_u64() == Some(u64::from(std::process::id())));
+            .and_then(|t| serde_json::from_str::<ServerAnnouncement>(&t).ok())
+            .is_some_and(|v| v.pid == u64::from(std::process::id()));
         if ours {
             let _ = std::fs::remove_file(&self.path);
         }
@@ -41,31 +66,34 @@ impl Drop for Announced {
 
 /// Where the server using `home` listens, while that server is running.
 pub fn announced(home: &Path) -> Option<String> {
-    let said: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(home.join("server.json")).ok()?).ok()?;
-    let pid = said["pid"].as_u64()?;
+    let said: ServerAnnouncement = serde_json::from_str(&std::fs::read_to_string(home.join(SERVER_FILE)).ok()?).ok()?;
     let alive = std::process::Command::new("kill")
-        .args(["-0", &pid.to_string()])
+        .args(["-0", &said.pid.to_string()])
         .stderr(std::process::Stdio::null())
         .status()
         .is_ok_and(|s| s.success());
     if !alive {
         return None;
     }
-    said["url"].as_str().map(String::from)
+    Some(said.url)
 }
 
 /// The language `settings.json` keeps: `en`, else `zh`.
 pub fn saved_locale(home: &Path) -> &'static str {
-    let said = std::fs::read_to_string(home.join("settings.json"))
+    let said = std::fs::read_to_string(home.join(SETTINGS_FILE))
         .ok()
-        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
-    if said.is_some_and(|v| v["locale"] == "en") { "en" } else { "zh" }
+        .and_then(|t| serde_json::from_str::<SavedSettings>(&t).ok());
+    if said.is_some_and(|v| v.locale.as_deref() == Some("en")) {
+        "en"
+    } else {
+        "zh"
+    }
 }
 
 /// The DeepSeek API key `settings.json` keeps, when non-empty.
 pub fn saved_deepseek_key(home: &Path) -> Option<String> {
-    let said: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(home.join("settings.json")).ok()?).ok()?;
-    said["deepseekApiKey"].as_str().map(str::trim).filter(|k| !k.is_empty()).map(String::from)
+    let said: SavedSettings = serde_json::from_str(&std::fs::read_to_string(home.join(SETTINGS_FILE)).ok()?).ok()?;
+    said.deepseek_api_key.as_deref().map(str::trim).filter(|k| !k.is_empty()).map(String::from)
 }
 
 #[cfg(test)]
