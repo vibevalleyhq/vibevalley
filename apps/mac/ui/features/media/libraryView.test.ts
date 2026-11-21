@@ -1,4 +1,4 @@
-import "../infra/polyfill";
+import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
 import {
@@ -25,7 +25,7 @@ import {
   selectScope,
   showsArtifactsInScope,
   showsMediaInScope,
-} from "../features/media/libraryView";
+} from "./libraryView";
 
 test("scope switching eliminates conflicting media kind and artifactKind states and clears incompatible selections", () => {
   expect(initialLibraryView.scope).toEqual({ kind: "all" });

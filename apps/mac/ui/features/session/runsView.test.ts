@@ -1,9 +1,9 @@
-import "../infra/polyfill";
+import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
 import { defaultOrchestrator, type Agent, type Issue, type IssueId, type Session, type SessionId, type SessionView } from "@vibevalley/protocol";
 
-import { buildRunEntries, filterRunEntries, parseRunsSearch, resolveSelectedRun, runActivityAt, runsHref, runStatusOf } from "../features/session/runsView";
+import { buildRunEntries, filterRunEntries, parseRunsSearch, resolveSelectedRun, runActivityAt, runsHref, runStatusOf } from "./runsView";
 
 const sid = (id: string) => id as SessionId;
 const iid = (id: string) => id as IssueId;

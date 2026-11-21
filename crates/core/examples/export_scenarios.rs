@@ -1,6 +1,6 @@
 //! Writes multi-density scenario `state.json` files from `vibevalley_core::scenario`.
 //!
-//! Run: `cargo run -p vibevalley-core --example export_scenarios -- apps/mac/ui/fixtures/scenarios`
+//! Run: `cargo run -p vibevalley-core --features scenarios --example export_scenarios -- apps/mac/ui/fixtures/scenarios`
 
 use std::path::PathBuf;
 

@@ -1,14 +1,7 @@
-import "../infra/polyfill";
+import "../../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import {
-  canSubmitDraft,
-  type DraftSubmitEvent,
-  type DraftSubmitState,
-  draftSubmitTransition,
-  initialDraftSubmit,
-  isSubmittingDraft,
-} from "../features/issue/model/draftSubmit";
+import { canSubmitDraft, type DraftSubmitEvent, type DraftSubmitState, draftSubmitTransition, initialDraftSubmit, isSubmittingDraft } from "./draftSubmit";
 
 const keyCounter = () => {
   let n = 0;

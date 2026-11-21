@@ -1,4 +1,4 @@
-import "../infra/polyfill";
+import "../../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
 import type { Changes } from "@vibevalley/protocol";
@@ -13,8 +13,8 @@ import {
   isCloseDiffEnabled,
   shouldSyncCloseDiff,
   sinceTreeOf,
-} from "../features/issue/model/closeFlow";
-import { sampleChanges } from "../features/issue/model/issue.samples";
+} from "./closeFlow";
+import { sampleChanges } from "./issue.samples";
 
 const changesWithRev = (tree: string, sinceReview?: Changes["sinceReview"]): Changes => ({
   ...sampleChanges,
