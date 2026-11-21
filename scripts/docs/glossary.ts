@@ -171,7 +171,7 @@ export function missingNames(glossary: Glossary, hasName: (identifier: string) =
 }
 
 /** Where the code names live: the shapes, the Rust crates and native app, and the page. */
-const codeDirs = ["packages/protocol/src", "crates", "apps/mac/src", "apps/mac/ui", "apps/web/src"];
+const codeDirs = ["packages/protocol/src", "crates", "apps/mac/src", "apps/mac/ui"];
 
 if (import.meta.main) {
   const root = resolve(import.meta.dirname, "../..");

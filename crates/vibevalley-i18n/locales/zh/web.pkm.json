@@ -1,7 +1,6 @@
 {
   "place": {
-    "label": "笔记",
-    "hint": "你自己的笔记：每天的日记、PARA 分好的大纲页、反链和润色建议"
+    "label": "笔记"
   },
   "tier": {
     "project": "项目",
@@ -57,8 +56,8 @@
     "freshPlaceholder": "写下第一条，回车创建…",
     "copyRef": "复制块引用",
     "copiedRef": "块引用复制好了",
-    "toIssue": "转成工单",
-    "issueMade": "建好工单了"
+    "toIssue": "转为任务",
+    "issueMade": "已创建任务"
   },
   "props": {
     "deadline": "截止 {day}",

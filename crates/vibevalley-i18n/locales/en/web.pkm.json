@@ -1,7 +1,6 @@
 {
   "place": {
-    "label": "Notes",
-    "hint": "Your own notes: daily journals, outline pages sorted by PARA, backlinks and suggested rewrites"
+    "label": "Notes"
   },
   "tier": {
     "project": "Projects",

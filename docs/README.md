@@ -74,61 +74,61 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 ## 用语
 
-叫法分两张表。下面这张是活本身的叫法：工作台、命令行、助手、工具和提醒都用它，中文界面用左边一列，英文界面用 English 一列。「不用」一列只管对用户说的话：中文界面不用其中的词，英文界面不用其中的英文词，English 一列里有的照用；代码和讲服务端的文档照「代码里」一列和实际的概念来（[concepts.md](docs/concepts.md)），代码里碰到「不用」里的词，只有指的是这一行的东西才算错。带括号说明的词只在那个意思上不用，「（中文界面）」的只在中文界面不用。界面上的字写在词典里（`crates/vibevalley-i18n/locales`），中英各一份（[话放在哪](docs/subsystems/foundation.md#话放在哪)）；工单的状态和动作只有一套词，在 `crates/vibevalley-i18n/locales/*/shared.json`（[状态和用语](docs/subsystems/issue.md#状态和用语)）。农场把这些画成种地，种地的词在[第二张表](#农场的皮)，只在农场的画面和游戏里用。`vpx scripts/gen/i18n.ts check` 照「不用」一列和种地的词查皮（农场、记忆树、像素零件、游戏和素材图鉴）以外的词典，`scripts/docs/glossary.ts` 查「代码里」一列的名字都还在代码里。
+叫法分两张表。下面这张是活本身的叫法：工作台、命令行、主助手、工具和提醒都用它，中文界面用左边一列，英文界面用 English 一列。「不用」一列只管对用户说的话：中文界面不用其中的词，英文界面不用其中的英文词，English 一列里有的照用；代码和讲服务端的文档照「代码里」一列和实际的概念来（[concepts.md](docs/concepts.md)），代码里碰到「不用」里的词，只有指的是这一行的东西才算错。带括号说明的词只在那个意思上不用，「（中文界面）」的只在中文界面不用。界面上的字写在词典里（`crates/vibevalley-i18n/locales`），中英各一份（[话放在哪](docs/subsystems/foundation.md#话放在哪)）；任务的状态和动作只有一套词，在 `crates/vibevalley-i18n/locales/*/shared.json`（[状态和用语](docs/subsystems/issue.md#状态和用语)）。农场把这些画成种地，种地的词在[第二张表](#农场的皮)，只在农场的画面和游戏里用。`vpx scripts/gen/i18n.ts check` 照「不用」一列和种地的词查皮（农场、记忆树、像素零件、游戏和素材图鉴）以外的词典，`scripts/docs/glossary.ts` 查「代码里」一列的名字都还在代码里。
 
 | 叫法 | English | 代码里 | 不用 |
 |---|---|---|---|
-| 助手 | assistant | orchestrator（角色是 `orchestrator` 的档案） | 管家（指这个角色时）、manager、工头（指助手时）、主 agent |
-| 帮工 | helper | Session（[concepts](docs/concepts.md#session-和-oar-会话)） | 工人、子 agent、worker、执行（指帮工时） |
+| 主助手 | assistant | orchestrator（角色是 `orchestrator` 的档案） | 管家（指这个角色时）、manager、工头（指主助手时）、主 agent |
+| 执行会话 | helper | `Session`（[concepts](docs/concepts.md#session-和-oar-会话)） | 工人、子 agent、worker、执行（指执行会话时）、帮工（中文界面） |
 | 在场 | here | `Session.hired`（核心状态里雇来的会话） | 地里 |
 | 一轮 | a round of work | `Run` | 一次干活、turn（指一轮时） |
-| 档案 | profile | agent（`Agent`） | 帮工档案、角色（指档案时） |
-| 农机 | machine | runtime（`RuntimeInfo`） | harness、引擎、runtime（中文界面） |
-| 工单 | ticket | issue（`Issue`） | job、ticket |
-| Artifact | artifact | artifact（`Artifact`，正文 `blocks`、`store` 或 `html`） | 稿子、草稿（指 Artifact 时）、产出、文档（指 Artifact 时）、doc（指 Artifact 时） |
+| 角色 | profile | agent（`Agent`） | 帮工档案、档案（中文界面） |
+| 引擎 | engine | runtime（`RuntimeInfo`） | harness、runtime（中文界面）、农机（中文界面） |
+| 任务 | ticket | issue（`Issue`） | job、ticket（中文界面）、工单（中文界面） |
+| 作品 | artifact | artifact（`Artifact`，正文 `blocks`、`store` 或 `html`） | 稿子、草稿（指作品时）、产出、文档（指作品时）、doc（指作品时）、Artifact（中文界面） |
 | 笔记 | notes | pkm（`Pkm`，一页 `PkmPage`，一块 `PkmBlock`） |  |
 | 仓库 | repo | repo（`RepoSummary`） | 一块地 |
 | 空间 | space | `SpaceState`；目录是 `work_root`（`VIBEVALLEY_WORK_ROOT`） | 世界、全图 |
 | 宿主 | host | `ServerConfig.home`（`$VIBEVALLEY_HOME`） |  |
-| 空位 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.room`；每台农机另有 `maxWorking` | 并发位、空地 |
-| 档案模板 | profile template | `AgentTemplate`（`agent.template.*`） | 种子、预设 |
-| 工单模板 | ticket template | issue template（`IssueTemplate`、`repo.template.list`） | seed |
+| 并发上限 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.room`；每个引擎另有 `maxWorking` | 并发位、空地、空位（中文界面） |
+| 角色模板 | profile template | `AgentTemplate`（`agent.template.*`） | 种子、预设 |
+| 任务模板 | ticket template | issue template（`IssueTemplate`、`repo.template.list`） | seed |
 | 阶段 | what it is doing | phase（`Session.phase`） | 状态（指阶段时） |
 | 核心状态 | core state | `SpaceState` |  |
 | VibeValley | VibeValley | 服务端、整个系统 | 农场（指系统时） |
 | 事实 | fact | `Fact` | patch |
 | 改动 | changes | `Changes`（`issue.diff.get`） | 差异、PR 详情、收成清单 |
-| 完成 | complete | 动作 `complete`；工单挪到 `done`（已完成） | 收获、合并（指完成时：合并只是交付的一种） |
-| 取消 | cancel | 动作 `close`；工单挪到 `canceled`（已取消） | 收工（指取消时：那是帮工离开） |
+| 完成 | complete | 动作 `complete`；任务挪到 `done`（已完成） | 收获、合并（指完成时：合并只是交付的一种） |
+| 取消 | cancel | 动作 `close`；任务挪到 `canceled`（已取消） | 收工（指取消时：那是执行会话离开） |
 | 关上 | closed | `is_closed`：`done` 或 `canceled` |  |
-| 聊清楚、安排活、完成 | talk it through, get it worked, finish | 工单的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` |  |
+| 聊清楚、安排活、完成 | talk it through, get it worked, finish | 任务的 `backlog`；`todo`、`in_progress`；`in_review` 到 `done` |  |
 | 验收 | review; pass, send back | `Issue.review`（`issue.review`；打回是带话挪回待办，`reject`） | 审核 |
 | 验收意见 | review note | finding（`Issue.findings`） | 草（农场的皮里用） |
 | 验收标准 | criteria | `Issue.criteria`、`CriterionCheck`、`CheckResult` |  |
 | 问题 | question | questions（`Issue.questions`、`Question`） | 缺肥 |
 | 轨迹 | trajectory | `SessionEvent`（服务端由 `Journal` 记，页面由 `Trajectory`、`WorkLog` 画） | 干活过程、日志（指轨迹时）、trace |
-| 记性 | memory | memory（`Memory`） | 记忆库 |
+| 记忆 | memory | memory（`Memory`） | 记忆库、记性（中文界面） |
 | 技能 | skill | skill（`Skill`） | 插件（指技能时） |
 | 人设 | persona | `persona.md`、`PersonaMode` |  |
-| 帮手 | subagent | subagent（Rust 的自研 agent 还没有） |  |
-| 自己的任务 | todo | `Todo`（工具 `todo_add`、`todo_update`、`todo_list`） |  |
-| 父工单 | parent issue | `Issue`（有子工单） | 计划图、TaskGraph |
-| 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | Task、步骤状态机 |
+| 子代理 | subagent | subagent（Rust 的自研 agent 还没有） | 帮手（中文界面，指子代理时） |
+| 待办清单 | todo | `Todo`（工具 `todo_add`、`todo_update`、`todo_list`） | 自己的任务（中文界面） |
+| 父任务 | parent issue | `Issue`（有子任务） | 计划图、TaskGraph、父工单（中文界面） |
+| 子任务 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | Task、步骤状态机、子工单（中文界面） |
 | 派活 | dispatch | hire（`Issue.hire`、事实 `FactSessionChanged`） |  |
 | 派工关联 | assignment | `Assignment`（`Issue.assignments`） |  |
-| 执行器 | executor | `Drivers`（档案经 oar 开会话） |  |
+| 执行器 | executor | `Drivers`（角色经 oar 开会话） |  |
 | 起草 | refine | refine（`refine`、`refinement_brief`） |  |
 | 用户 | user | user（`User`、`userId`） | 主人、owner |
-| 田头 | the farm chat | 默认频道（`default_channel`） | 群（指默认频道时） |
+| 默认频道 | the farm chat | 默认频道（`default_channel`） | 群（指默认频道时）、田头（中文界面） |
 | 私聊 | direct message | direct | 私信 |
-| 和帮工私聊 | talk | `Channel.direct`、`Session.channel` |  |
+| 和执行会话私聊 | talk | `Channel.direct`、`Session.channel` |  |
 | 频道 | channel | channel（`Channel`） | 群（指频道时）、群聊 |
-| 串 | thread | thread | 子频道 |
+| 话题 | thread | thread | 子频道、串（指话题时） |
 | 附件 | attachment | `Attachment`（`attachment` 表） |  |
-| 素材库 | library | `Library`（`media_library_item` 表） | 媒体（指这一页时） |
-| 工作目录 | working folder | `Workplace`（`workdir`） | 工作区 |
+| 媒体库 | library | `Library`（`media_library_item` 表） | 媒体（指这一页时）、素材库（中文界面） |
+| 工作区 | working folder | `Workplace`（`workdir`） | 工作目录（中文界面） |
 | 定时任务 | scheduled task | cron（`Cron`） | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
-| Inbox | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 通知（指 Inbox 时）、来电（农场的皮里用） |
+| 收件箱 | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 通知（指收件箱时）、来电（农场的皮里用）、Inbox（中文界面，指收件箱时） |
 | 提醒 | notice | `Core.notice`、`NoticeLevel`（事件流里是 `LiveEventNotice`） |  |
 | 巡查 | patrol | `patrolStep`（`Inbox.patrol`） |  |
 | 通话 | call | `VoiceCall`（`voice.call.*`） |  |
@@ -137,25 +137,29 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 ### 农场的皮
 
-农场把上面的东西画成种地。这些词只在农场的画面（`apps/mac/src/pixel`）和游戏（`crates/vibevalley-server/src/modules/game.rs`、账本、成就）里用，工单的状态、动作、拒绝、提醒、工具和助手的话都不用；代码由 `scripts/docs/stale-names.ts` 查，词典由 `vpx scripts/gen/i18n.ts check` 查（皮的命名空间除外）。地长什么样见[农场的皮](docs/subsystems/farm.md)。
+农场把上面的东西画成种地。这些词只在农场的画面（`apps/mac/src/pixel`）和游戏（`crates/vibevalley-server/src/modules/game.rs`、账本、成就）里用，任务的状态、动作、拒绝、提醒、工具和主助手的话都不用；代码由 `scripts/docs/stale-names.ts` 查，词典由 `vpx scripts/gen/i18n.ts check` 查（皮的命名空间除外）。地长什么样见[农场的皮](docs/subsystems/farm.md)。
 
 | 农场里 | English | 实际是 | 代码里 |
 |---|---|---|---|
-| 地 | plot | 一张工单（开 worktree 的代码工单带一个 worktree）；一座岛上的空位是这个仓库的空位 | `FarmView.plots` 按工单的 id 做键（`plotKeyOf`：重开的工单还是这块地）；像素村里的位置是 station，画出来的那块地在客户端叫 `Bed` |
-| 种子袋 | seed bag | 待办（排队等空位的工单） | `todo`、`queued_at` |
-| 播种袋里的种子 | seeds | 工单模板 | `IssueTemplate` |
-| 播种、发芽、长叶 | sow, sprout, leafy | 处理中 | `in_progress`，帮工 `working` |
-| 开花 | flowering | 等你看 | `in_review`，帮工 `done` |
+| 地 | plot | 一个任务（开 worktree 的代码任务带一个 worktree）；一座岛上的空位是这个仓库的并发上限 | `FarmView.plots` 按任务的 id 做键（`plotKeyOf`：重开的任务还是这块地）；像素村里的位置是 station，画出来的那块地在客户端叫 `Bed` |
+| 种子袋 | seed bag | 待办（排队等并发上限的任务） | `todo`、`queued_at` |
+| 播种袋里的种子 | seeds | 任务模板 | `IssueTemplate` |
+| 播种、发芽、长叶 | sow, sprout, leafy | 处理中 | `in_progress`，执行会话 `working` |
+| 开花 | flowering | 等你看 | `in_review`，执行会话 `done` |
 | 缺肥（地干裂）、施肥 | dry, water | 等你回答、回答 | `questions` |
 | 草、除草中 | weeds, weeding | 验收意见、带着意见再修一轮 | `findings` |
 | 收获 | harvest | 完成（收之前看改动） | 动作 `complete`、`Changes` |
 | 麦茬 | stubble | 已完成 | `done` |
-| 仓库 | warehouse | 合进主分支或 PR 合了的工单 | `delivered`：`merged`、`pull_request` |
-| 图纸桌 | issue board | 工单 | `Issue` |
+| 仓库 | warehouse | 合进主分支或 PR 合了的任务 | `delivered`：`merged`、`pull_request` |
+| 图纸桌 | issue board | 任务 | `Issue` |
 | 一季庄稼 | a crop | 一轮 | `Run` |
-| 地里 | in the field | 在场的帮工 | `Session.hired` |
-| 来电 | call | Inbox 里的一件 | `InboxItem` |
-| 农具 | tools | 农机 | `RuntimeInfo` |
+| 地里 | in the field | 在场的执行会话 | `Session.hired` |
+| 帮工 | helper | 在农场地里干活的执行会话 | `Session.hired` |
+| 来电 | call | 收件箱里的一件 | `InboxItem` |
+| 农机、农具 | machine, tools | 引擎 | `RuntimeInfo` |
+| 田头 | the farm chat | 默认频道 | `default_channel` |
+| 记性 | memory | 记忆 | `Memory` |
+| 空位 | spot | 并发上限 | `ServerConfig.repo.maxSessions`、`maxWorking` |
 | 技能书 | skill book | 技能 | `Skill` |
 | 账本 | ledger | 值得记的事；金币、连胜、成就由它折出来 | `LedgerEntry`（家目录的 `ledger.jsonl`） |
 | 成就 | achievement | 从账本折出来的里程碑 | `Achievement` |

@@ -702,7 +702,7 @@ mod tests {
         let none = VendorKeys::default();
         assert_eq!(problem(&voice, &none), None);
         voice.answer = serde_json::from_str(r#"{"vendor":"orchestrator"}"#).unwrap();
-        assert_eq!(problem(&voice, &none), Some(("助手的语音线路没接通".into(), None)));
+        assert_eq!(problem(&voice, &none), Some(("主助手的语音线路没接通".into(), None)));
         voice.answer = serde_json::from_str(r#"{"vendor":"deepseek","model":"deepseek-chat"}"#).unwrap();
         assert_eq!(problem(&voice, &none).unwrap().1, Some(VoiceFix::Models));
         let with_deepseek = VendorKeys {

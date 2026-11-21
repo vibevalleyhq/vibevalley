@@ -30,10 +30,10 @@
   },
   "terminal": {
     "noProject": "请先打开项目，再启动终端。",
-    "missingFolder": "工作目录已不存在，无法在此打开终端。",
+    "missingFolder": "工作区已不存在，无法在此打开终端。",
     "dismiss": "知道了"
   },
   "files": {
-    "missingInWorktree": "此工单的工作目录中无法打开 {path}"
+    "missingInWorktree": "此任务的工作区中无法打开 {path}"
   }
 }

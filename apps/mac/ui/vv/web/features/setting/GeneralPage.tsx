@@ -1,14 +1,14 @@
 import { t } from "@vibevalley/i18n";
 
 import { setStart, StartValues, usePrefs } from "../../state/prefs";
-import { SettingRow, SettingsGroup, SettingsPage } from "../../ui/domain/settings";
+import { SettingRow, SettingsGroup } from "../../ui/domain/settings";
 import { Segmented } from "../../ui/Segmented";
 import { LanguageChoice } from "./SettingsForm";
 
-export function GeneralPage() {
+export function GeneralGroups() {
   const start = usePrefs((p) => p.start);
   return (
-    <SettingsPage title={t("web.setting.nav.general")}>
+    <>
       <SettingsGroup note={t("web.setting.scope.farm")}>
         <SettingRow label={t("web.setting.language.label")} hint={t("web.setting.general.languageHint")} last>
           <LanguageChoice />
@@ -25,6 +25,6 @@ export function GeneralPage() {
           />
         </SettingRow>
       </SettingsGroup>
-    </SettingsPage>
+    </>
   );
 }

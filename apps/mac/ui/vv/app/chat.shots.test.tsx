@@ -11,8 +11,8 @@ const shots: { name: string; route: string; scheme: "light" | "dark"; width: num
   { name: "chat-narrow", route: "/chat", scheme: "light", width: 560, id: "chat-page" },
   { name: "chat-thread-light", route: "/chat/t-login", scheme: "light", width: 1400, id: "thread-pane" },
   { name: "settings-general-light", route: "/settings/general", scheme: "light", width: 1200, id: "settings-nav" },
-  { name: "settings-accounts-dark", route: "/settings/accounts", scheme: "dark", width: 1200, id: "settings-nav" },
-  { name: "settings-memory-light", route: "/settings/memory", scheme: "light", width: 1200, id: "settings-nav" },
+  { name: "settings-models-dark", route: "/settings/models", scheme: "dark", width: 1200, id: "settings-nav" },
+  { name: "team-memory-light", route: "/team/memory", scheme: "light", width: 1200, id: "team-memory-page" },
   { name: "settings-about-narrow", route: "/settings/about", scheme: "light", width: 560, id: "settings-nav" },
 ];
 

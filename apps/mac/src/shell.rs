@@ -1158,6 +1158,7 @@ impl Shell {
                 }
                 cx.notify();
             }
+            Action::OpenRoute { path } => self.navigate_workbench(&path, cx),
             Action::Applied { .. }
             | Action::Ready
             | Action::DismissFarmForm
@@ -2080,9 +2081,9 @@ impl Shell {
         match id {
             "nav.issues" => self.navigate_workbench("/issues", cx),
             "nav.chat" => self.navigate_workbench("/chat", cx),
-            "nav.library" => self.navigate_workbench("/library", cx),
+            "nav.content" | "nav.library" => self.navigate_workbench("/library", cx),
             "nav.pkm" => self.navigate_workbench("/pkm", cx),
-            "nav.agents" => self.navigate_workbench("/agents", cx),
+            "nav.team" | "nav.agents" => self.navigate_workbench("/agents", cx),
             "nav.runtimes" => self.navigate_workbench("/runtimes", cx),
             "nav.repos" => self.navigate_workbench("/repos", cx),
             "nav.catalog" => self.navigate_workbench("/catalog", cx),
@@ -3001,14 +3002,14 @@ impl Render for Shell {
 fn shell_palette_commands() -> Vec<Value> {
     let mut items = vec![
         json!({ "id": "nav.workspace", "label": "前往工作区", "detail": "/workspace", "group": "导航" }),
-        json!({ "id": "nav.chat", "label": "前往聊天", "detail": "/chat", "group": "导航" }),
-        json!({ "id": "nav.issues", "label": "前往工单", "detail": "/issues", "group": "导航" }),
-        json!({ "id": "nav.library", "label": "前往素材库", "detail": "/library", "group": "导航" }),
+        json!({ "id": "nav.chat", "label": "前往对话", "detail": "/chat", "group": "导航" }),
+        json!({ "id": "nav.issues", "label": "前往任务", "detail": "/issues", "group": "导航" }),
+        json!({ "id": "nav.content", "label": "前往内容", "detail": "/library", "group": "导航" }),
         json!({ "id": "nav.pkm", "label": "前往笔记", "detail": "/pkm", "group": "导航" }),
-        json!({ "id": "nav.agents", "label": "前往档案", "detail": "/agents", "group": "导航" }),
-        json!({ "id": "nav.runtimes", "label": "前往农机", "detail": "/runtimes", "group": "导航" }),
+        json!({ "id": "nav.team", "label": "前往团队", "detail": "/agents", "group": "导航" }),
+        json!({ "id": "nav.runtimes", "label": "前往引擎", "detail": "/runtimes", "group": "导航" }),
         json!({ "id": "nav.repos", "label": "前往仓库", "detail": "/repos", "group": "导航" }),
-        json!({ "id": "nav.catalog", "label": "前往图鉴", "detail": "/catalog", "group": "导航" }),
+        json!({ "id": "nav.catalog", "label": "前往素材图鉴", "detail": "/catalog", "group": "导航" }),
         json!({ "id": "nav.farm", "label": "前往农场", "detail": "/farm", "group": "导航" }),
         json!({ "id": "nav.settings", "label": "前往设置", "detail": "/settings", "group": "导航", "shortcut": "mod+," }),
         json!({ "id": "theme.dark", "label": "切换主题：深色", "detail": "dark", "group": "外观" }),

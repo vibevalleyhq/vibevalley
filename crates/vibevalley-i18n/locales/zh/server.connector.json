@@ -20,9 +20,9 @@
   "noConnector": "没有 {id} 这个连接",
   "noChannel": "没有叫 {name} 的频道",
   "line": {
-    "orchestrator": "助手",
+    "orchestrator": "主助手",
     "dispatch": "派活",
-    "thread": "在工单串里",
+    "thread": "在任务话题里",
     "head": "【{who}】",
     "headWhat": "【{who} · {what}】"
   },

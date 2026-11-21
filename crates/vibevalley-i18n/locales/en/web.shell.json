@@ -4,6 +4,7 @@
     "addRepo": "Add repository",
     "addRepoButton": "Repo",
     "addRepoTooltip": "Add a local repository or folder",
+    "manageRepos": "Manage repositories",
     "otherFolders": "Other folders",
     "running": "Running",
     "runningAgent": "{agent} running",

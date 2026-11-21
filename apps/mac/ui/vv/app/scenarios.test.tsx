@@ -59,13 +59,13 @@ test("empty scenario keeps every major route stable across themes and narrow wid
 
   expect(app.count("id:issues-page")).toBe(1);
   expect(app.count("id:issue-card")).toBe(0);
-  expect(app.shows("id:desk-status >> text:没开工")).toBe(true);
+  expect(app.shows("id:desk-status >> text:未启动")).toBe(true);
   row.stepsPassed++;
 
   await fake.setState(app, { ...fixture.state, state: { ...fixture.state.state, call: "live" } });
-  expect(app.shows("id:desk-status >> text:开工中 · 0 个在干活")).toBe(true);
+  expect(app.shows("id:desk-status >> text:运行中 · 0 个执行会话")).toBe(true);
   await fake.setState(app, fixture.state);
-  expect(app.shows("id:desk-status >> text:没开工")).toBe(true);
+  expect(app.shows("id:desk-status >> text:未启动")).toBe(true);
 
   await visit(app, fake, "/chat", row, () => {
     expect(app.count("id:chat-page")).toBe(1);
@@ -493,7 +493,7 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.count("id:issue")).toBe(1);
     expect(app.count("id:issue-ask")).toBe(1);
     expect(app.count("id:failed-project-check")).toBe(1);
-    expect(app.texts()).toContain("核对修复后，再次完成工单以重跑检查");
+    expect(app.texts()).toContain("核对修复后，再次完成任务以重跑检查");
   });
   await visit(app, fake, "/issues/i-edge-reviewed", row, () => {
     expect(app.count("id:issue-ask")).toBe(1);
@@ -507,7 +507,7 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
   await visit(app, fake, "/issues/i-edge-interrupted", row, () => {
     expect(app.count("id:issue-ask")).toBe(1);
     expect(app.texts()).toContain("这一轮停在半路");
-    expect(app.texts().some((s) => s.includes("核对工作目录"))).toBe(true);
+    expect(app.texts().some((s) => s.includes("核对工作区"))).toBe(true);
   });
   await visit(app, fake, "/issues/i-edge-quiet", row, () => {
     expect(app.count("id:issue-ask")).toBe(1);
@@ -543,7 +543,7 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.count("id:runs-page")).toBe(1);
     expect(app.count("id:run-row-orchestrator")).toBe(1);
     expect(app.count("id:run-row-w-edge-fam4")).toBe(1);
-    expect(app.shows("id:desk-status >> text:开工中 · 3 个在干活")).toBe(true);
+    expect(app.shows("id:desk-status >> text:运行中 · 3 个执行会话")).toBe(true);
   });
 
   const seenConnectorStates = new Set<ConnectorState>();
@@ -551,18 +551,27 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     for (const entry of list) seenConnectorStates.add(entry.state);
   };
   recordConnectors(fixture.state.state.connectors);
-  await visit(app, fake, "/settings/chat/weixin", row, () => {
+  await visit(app, fake, "/settings/connections/chat/weixin", row, () => {
     expect(app.count("id:connectors")).toBe(1);
     expect(app.count("id:connector-weixin")).toBe(1);
     expect(app.texts()).toContain("已扫码，等手机确认");
   });
-  await visit(app, fake, "/settings/chat/feishu", row, () => {
+  await visit(app, fake, "/settings/connections/chat/feishu", row, () => {
     expect(app.count("id:connector-feishu")).toBe(1);
     expect(app.texts()).toContain("要输入手机上的数字");
   });
-  await visit(app, fake, "/settings/chat/qq", row, () => {
+  await visit(app, fake, "/settings/connections/chat/qq", row, () => {
     expect(app.count("id:connector-qq")).toBe(1);
     expect(app.texts()).toContain("等你发配对码");
+  });
+  await visit(app, fake, "/settings/skills", row, () => {
+    expect(app.count("id:skills-book")).toBe(1);
+  });
+  await visit(app, fake, "/settings/memory", row, () => {
+    expect(app.count("id:team-memory-page")).toBe(1);
+  });
+  await visit(app, fake, "/settings/chat/weixin", row, () => {
+    expect(app.count("id:connector-weixin")).toBe(1);
   });
 
   const extraConnectors: ConnectorStatus[] = [
@@ -582,20 +591,20 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
   ];
   recordConnectors(extraConnectors);
   await fake.setState(app, { ...fixture.state, state: { ...fixture.state.state, connectors: extraConnectors } });
-  await visit(app, fake, "/settings/chat/weixin", row, () => {
+  await visit(app, fake, "/settings/connections/chat/weixin", row, () => {
     expect(app.texts()).toContain("已连接");
   });
-  await visit(app, fake, "/settings/chat/feishu", row, () => {
+  await visit(app, fake, "/settings/connections/chat/feishu", row, () => {
     expect(app.texts()).toContain("暂停中");
   });
-  await visit(app, fake, "/settings/chat/qq", row, () => {
+  await visit(app, fake, "/settings/connections/chat/qq", row, () => {
     expect(app.texts()).toContain("等你扫码");
   });
 
   const offConnector: ConnectorStatus[] = [{ id: "weixin", state: "off", qr: "", pairCode: "", pending: 0, error: "" }];
   recordConnectors(offConnector);
   await fake.setState(app, { ...fixture.state, state: { ...fixture.state.state, connectors: offConnector } });
-  await visit(app, fake, "/settings/chat/weixin", row, () => {
+  await visit(app, fake, "/settings/connections/chat/weixin", row, () => {
     expect(app.texts()).toContain("没连接");
   });
   expect(seenConnectorStates).toEqual(new Set(["off", "waiting", "scanned", "verify", "pairing", "connected", "paused"]));
@@ -643,7 +652,7 @@ test("english locale renders issues, chat, and settings cleanly with zero crashe
   await fake.pump(app);
   expect(app.count("id:settings-nav")).toBe(1);
   const settingsTexts = app.texts();
-  expect(settingsTexts).toContain("General");
+  expect(settingsTexts).toContain("General & Appearance");
   expect(settingsTexts).toContain("Page language");
 
   await app.host.send("route", "/runs");

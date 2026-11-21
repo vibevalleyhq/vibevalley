@@ -1,4 +1,4 @@
-import { Clipboard, Scroll, signal, Text, View } from "nsh";
+import { Clipboard, host, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
@@ -9,7 +9,7 @@ import { Keyed, useNow } from "../../base/dom";
 import { api } from "../../infra/api";
 import { defineQuery, ready, retryRead, useQuery, useRepos } from "../../infra/query";
 import { useRouter } from "../../infra/router";
-import { Button } from "../../ui/Button";
+import { Button, ButtonLink } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { OpenTerminal } from "../../ui/domain/OpenTerminal";
 import { Icon } from "../../ui/Icon";
@@ -96,9 +96,16 @@ export function ReposPage(props: { rest: string }) {
           label={t("web.repo.list")}
           testid="repos"
           action={
-            <Button icon="add" testID="new-repo" onPress={() => creating.set(true)}>
-              {t("web.repo.add")}
-            </Button>
+            <View class="flex-row items-center gap-1.5">
+              <If when={host.params.globalShell === true}>
+                <ButtonLink href="/workspace" icon="terminal" size="compact" testID="open-workspace">
+                  {t("web.repo.openWorkspace")}
+                </ButtonLink>
+              </If>
+              <Button icon="add" testID="new-repo" onPress={() => creating.set(true)}>
+                {t("web.repo.add")}
+              </Button>
+            </View>
           }
         >
           <View class="flex-row items-center justify-between px-2 pt-1 pb-1.5">

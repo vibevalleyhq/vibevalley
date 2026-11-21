@@ -101,7 +101,7 @@ function MarkStandIn(props: { id: ConnectorID; size: number }) {
   );
 }
 
-export function ConnectorsPage(props: { id?: string | undefined }) {
+export function ConnectorsPage(props: { id?: string | undefined; basePath?: string | undefined }) {
   const core = useCore();
   const selected = () => ConnectorIDValues.find((c) => c === props.id) ?? "weixin";
   const list = () => core()?.connectors;
@@ -132,7 +132,7 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
               const pending = () => Math.round(st()?.pending ?? 0);
               return (
                 <ListRow
-                  to={`/settings/chat/${c()}`}
+                  to={`${props.basePath ?? "/settings/connections/chat"}/${c()}`}
                   item={c()}
                   active={c() === selected()}
                   title={connectorLabel[c()]}

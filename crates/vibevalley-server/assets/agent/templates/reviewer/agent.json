@@ -4,7 +4,7 @@
   "role": "worker",
   "category": "engineering",
   "name": "代码审查员",
-  "duty": "只读审查分支或工单改动，按严重程度定位缺陷、边界与测试缺口",
+  "duty": "只读审查分支或任务改动，按严重程度定位缺陷、边界与测试缺口",
   "style": "只读审查 · 证据导向 · 分级定责",
   "tags": ["审查", "评审", "code review", "review", "检查", "改动"],
   "runtime": "claude",

@@ -206,7 +206,7 @@ function disambiguatorMap(repos: RepoNode[]): Map<string, string> {
 
 /** 24x24 vector glyphs. */
 
-type GlyphName = "chevron" | "plus" | "close" | "branch" | "terminal" | "file" | "diff" | "folder" | "collapseAll" | "expandAll";
+type GlyphName = "chevron" | "plus" | "close" | "branch" | "terminal" | "file" | "diff" | "folder" | "collapseAll" | "expandAll" | "repos";
 
 type GlyphStroke = {
   readonly d?: string;
@@ -254,6 +254,12 @@ const GLYPHS: Record<GlyphName, readonly GlyphStroke[]> = {
   expandAll: [
     { d: "M7 9 L12 4.5 L17 9", stroke: 2.0 },
     { d: "M7 15 L12 19.5 L17 15", stroke: 2.0 },
+  ],
+  repos: [
+    { d: "M4 4 H10 V10 H4 Z", stroke: 1.85 },
+    { d: "M14 4 H20 V10 H14 Z", stroke: 1.85 },
+    { d: "M4 14 H10 V20 H4 Z", stroke: 1.85 },
+    { d: "M14 14 H20 V20 H14 Z", stroke: 1.85 },
   ],
 };
 
@@ -1164,6 +1170,24 @@ export function Sidebar() {
       >
         <Text style={{ fontSize: 12, fontWeight: "600", color: p().ink }}>{t("web.shell.sidebar.title")}</Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Button
+            onPress={() => act({ type: "open_route", path: "/repos" })}
+            accessibilityLabel={t("web.shell.sidebar.manageRepos")}
+            tooltip={<TipBubble text={t("web.shell.sidebar.manageRepos")} />}
+            hoverStyle={{ backgroundColor: p().tile }}
+            activeStyle={{ opacity: 0.82 }}
+            focusVisibleStyle={focusRing(p())}
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: radius.md,
+              alignItems: "center",
+              justifyContent: "center",
+              ...pressTransition(),
+            }}
+          >
+            <Glyph name="repos" size={13} color={p().muted} />
+          </Button>
           {hasFoldableItems() ? (
             <Button
               onPress={toggleCollapseAll}

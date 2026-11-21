@@ -2,7 +2,7 @@
  {
   "op": "channel.message.send",
   "name": "channel_message_send",
-  "description": "在群聊里发一条消息。id 不填就是你自己的工单串；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的串。正文里写 @w3、@助手、@用户 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
+  "description": "在群聊里发一条消息。id 不填就是你自己的任务话题；#<频道> 是一个频道；#<频道>:<消息号> 是那条消息下面的话题。正文里写 @w3、@主助手、@用户 就是叫谁。目标里有你没看过的新消息时会先不发，把新消息给你看。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -11,7 +11,7 @@
      "type": "boolean"
     },
     "confirm": {
-     "description": "确实要发到频道的顶层，而不是刚读的那个串",
+     "description": "确实要发到频道的顶层，而不是刚读的那个话题",
      "type": "boolean"
     },
     "id": {
@@ -60,7 +60,7 @@
  {
   "op": "channel.message.list",
   "name": "channel_message_list",
-  "description": "读一个频道或一个串里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个串），助手读和用户的私聊写 @user；不填就是你正在回话的地方（帮工是自己的工单串）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
+  "description": "读一个频道或一个话题里说的话。id 写 #<频道>（比如 #general），或 #<频道>:<消息号>（一个话题），主助手读和用户的私聊写 @user；不填就是你正在回话的地方（执行会话是自己的任务话题）。unread 只读你还没读过的；before 填消息号往前翻。读过的算你看过了。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -68,7 +68,7 @@
      "type": "number"
     },
     "id": {
-     "description": "#general、#clock-in，或 #general:<消息号>；助手和用户的私聊是 @user",
+     "description": "#general、#clock-in，或 #general:<消息号>；主助手和用户的私聊是 @user",
      "type": "string"
     },
     "limit": {
@@ -94,7 +94,7 @@
  {
   "op": "session.list",
   "name": "session_list",
-  "description": "现在谁在场：每个帮工的编号、名字、农机、在哪个仓库、在做什么。",
+  "description": "现在谁在场：每个执行会话的编号、名字、引擎、在哪个仓库、在做什么。",
   "parameters": {
    "additionalProperties": true,
    "properties": {},
@@ -104,7 +104,7 @@
  {
   "op": "memory.search",
   "name": "memory_search",
-  "description": "在你的记性里找：你和用户以前替你的档案记下的话、做过的活。不填 repo 只找这个仓库的和所有仓库都用的；repo 写空字符串也找别的仓库的。干到一半想知道「这个仓库的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
+  "description": "在你的记忆里找：你和用户以前替你的角色记下的话、做过的活。不填 repo 只找这个仓库的和所有仓库都用的；repo 写空字符串也找别的仓库的。干到一半想知道「这个仓库的测试怎么跑」「上次这个坑怎么绕过去的」时用。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -123,7 +123,7 @@
  {
   "op": "memory.create",
   "name": "memory_create",
-  "description": "往你的记性里记一句，你的档案以后派出去的帮工开工时会想起。不填 repo 记这个仓库的；repo 写空字符串记成所有仓库都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
+  "description": "往你的记忆里记一句，你的角色以后派出去的执行会话开工时会想起。不填 repo 记这个仓库的；repo 写空字符串记成所有仓库都用的。只记以后还用得上的：约定、坑、命令，不记这一次的进度。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -197,7 +197,7 @@
  {
   "op": "pkm.capture",
   "name": "pkm_capture",
-  "description": "往用户今天的日记里记一句，标成 LATER #inbox，写上是你记的：用户让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建工单。",
+  "description": "往用户今天的日记里记一句，标成 LATER #inbox，写上是你记的：用户让你记下一个想法、一件以后要看的事时用；你自己的经验记 memory_create，要做的事建任务。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -242,12 +242,12 @@
  {
   "op": "artifact.block.create",
   "name": "artifact_block_create",
-  "description": "在一个一起写的 Artifact 里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 artifact_block_update。",
+  "description": "在一个一起写的作品里插一块：默认插在顶层末尾，用 parentId 指定父块、afterBlock 指定插在哪一块后面。写长的东西时一段一块，不要把整篇塞进一块；写一块要接着改，就用回答里的 id 和版本调 artifact_block_update。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "description": "作品的 id：卡片上、artifact_list 的回答里有",
      "type": "string"
     },
     "afterBlock": {
@@ -306,7 +306,7 @@
      "type": "boolean"
     },
     "id": {
-     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "description": "作品的 id：卡片上、artifact_list 的回答里有",
      "type": "string"
     },
     "language": {
@@ -346,7 +346,7 @@
      "type": "string"
     },
     "id": {
-     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "description": "作品的 id：卡片上、artifact_list 的回答里有",
      "type": "string"
     }
    },
@@ -360,12 +360,12 @@
  {
   "op": "issue.split",
   "name": "issue_split",
-  "description": "把你手上这张工单拆成几张子工单，挂在它下面，马上派给几个帮工分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 12 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。",
+  "description": "把你手上这个任务拆成几个子任务，挂在它下面，马上派给几个执行会话分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 12 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "tasks": {
-     "description": "子工单，每张一个帮工在自己的分支上做完、提交、单独验证",
+     "description": "子任务，每张一个执行会话在自己的分支上做完、提交、单独验证",
      "items": {
       "additionalProperties": false,
       "properties": {
@@ -374,11 +374,11 @@
         "type": "boolean"
        },
        "agent": {
-        "description": "帮工档案 id 或名字；不填继承父工单的帮工",
+        "description": "执行角色 id 或名字；不填继承父任务的执行会话",
         "type": "string"
        },
        "brief": {
-        "description": "这张子工单：目标、改哪里、做到什么算完、留给后面的步骤什么；做它的帮工只看得到它和前面步骤的结论",
+        "description": "这个子任务：目标、改哪里、做到什么算完、留给后面的步骤什么；做它的执行会话只看得到它和前面步骤的结论",
         "type": "string"
        },
        "check": {
@@ -422,7 +422,7 @@
      "type": "array"
     },
     "title": {
-     "description": "父工单的新标题；不填保留原标题",
+     "description": "父任务的新标题；不填保留原标题",
      "type": "string"
     }
    },
@@ -435,7 +435,7 @@
  {
   "op": "issue.report",
   "name": "issue_report",
-  "description": "结构化报告当前工单的一轮：summary 是净结果。prSubmit=true 提交 PR 后继续跟随 CI/评审；最终交给用户验收用 prSubmit=false。有问题或未满足的验收项则等用户。问题、验收凭据和记性只认这些字段，不从正文猜。用用户的语言填写。",
+  "description": "结构化报告当前任务的一轮：summary 是净结果。prSubmit=true 提交 PR 后继续跟随 CI/评审；最终交给用户验收用 prSubmit=false。有问题或未满足的验收项则等用户。问题、验收凭据和记忆只认这些字段，不从正文猜。用用户的语言填写。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -561,7 +561,7 @@
  {
   "op": "issue.pr.submit",
   "name": "issue_pr_submit",
-  "description": "在当前工单获用户明确授权、仓库启用 PR 且本地检查通过后，在本轮运行中推送分支并开立或更新 PR。summary 可填写这次实际改动，作为 PR 说明。它不会合并主分支或结束当前会话。",
+  "description": "在当前任务获用户明确授权、仓库启用 PR 且本地检查通过后，在本轮运行中推送分支并开立或更新 PR。summary 可填写这次实际改动，作为 PR 说明。它不会合并主分支或结束当前会话。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -575,7 +575,7 @@
  {
   "op": "artifact.list",
   "name": "artifact_list",
-  "description": "列出 Artifact：不填就是为你这张工单做的；channel 填 #<频道> 是在那里说过的。每行是 id、标题、是一起写的还是网页、第几稿、谁做的、最新这一稿改了什么。",
+  "description": "列出作品：不填就是为你这个任务做的；channel 填 #<频道> 是在那里说过的。每行是 id、标题、是一起写的还是网页、第几稿、谁做的、最新这一稿改了什么。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -593,7 +593,7 @@
      "type": "string"
     },
     "channel": {
-     "description": "在哪说：#<频道>，或 #<频道>:<消息号>（一个串）；不填就是你正在回话的地方",
+     "description": "在哪说：#<频道>，或 #<频道>:<消息号>（一个话题）；不填就是你正在回话的地方",
      "type": "string"
     }
    },
@@ -603,12 +603,12 @@
  {
   "op": "artifact.get",
   "name": "artifact_get",
-  "description": "看一份 Artifact：每一稿是谁做的、改了什么、在对话里哪条消息（用户的评论就是对它的回复）。",
+  "description": "看一份作品：每一稿是谁做的、改了什么、在对话里哪条消息（用户的评论就是对它的回复）。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "description": "作品的 id：卡片上、artifact_list 的回答里有",
      "type": "string"
     }
    },
@@ -621,12 +621,12 @@
  {
   "op": "artifact.content.get",
   "name": "artifact_content_get",
-  "description": "读一份 Artifact：网页读某一稿的全文，照用户的评论改下一稿前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
+  "description": "读一份作品：网页读某一稿的全文，照用户的评论改下一稿前先读；一起写的读每一块的 id、第几版、类型和字，改一块之前先读，artifact_block_update 要用这里的 id 和版本。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "description": "作品的 id：卡片上、artifact_list 的回答里有",
      "type": "string"
     },
     "version": {
@@ -643,7 +643,7 @@
  {
   "op": "artifact.create",
   "name": "artifact_create",
-  "description": "写一份 Artifact：要交给用户看、代码改动说不清的一整页，比如两种设计让用户挑、调研报告、对比表、带图的说明；也支持结构化多条目作品（传 artifactType 与 entries，动笔前先调 artifact_type_read 读规范）。单文件 html 可先写成工作目录里的文件再用 file 交上来（支持 *.slide.html / *.motion.html 等复合后缀自动识别 display）。它挂在你的工单上，你会在工单串里说一句带卡片的话，用户在工作台里点开看、回复卡片评论，评论会叫醒你。",
+  "description": "写一份作品：要交给用户看、代码改动说不清的一整页，比如两种设计让用户挑、调研报告、对比表、带图的说明；也支持结构化多条目作品（传 artifactType 与 entries，动笔前先调 artifact_type_read 读规范）。单文件 html 可先写成工作区里的文件再用 file 交上来（支持 *.slide.html / *.motion.html 等复合后缀自动识别 display）。它挂在你的任务上，你会在任务话题里说一句带卡片的话，用户在工作台里点开看、回复卡片评论，评论会叫醒你。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -652,7 +652,7 @@
      "type": "boolean"
     },
     "artifactType": {
-     "description": "结构化 Artifact 类型：docs（协作块文档）、slides（多文件演示稿）、dashboard（数据集+溯源看板）、motion（时间轴动态图形短片）、whiteboard（无限画布白板）、design（多画板 .dc.html 设计稿）、design-system（常驻设计令牌体系）。动笔前先调 artifact_type_read 读规范",
+     "description": "结构化作品类型：docs（协作块文档）、slides（多文件演示稿）、dashboard（数据集+溯源看板）、motion（时间轴动态图形短片）、whiteboard（无限画布白板）、design（多画板 .dc.html 设计稿）、design-system（常驻设计令牌体系）。动笔前先调 artifact_type_read 读规范",
      "enum": [
       "docs",
       "slides",
@@ -731,11 +731,11 @@
      "type": "array"
     },
     "file": {
-     "description": "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
+     "description": "你工作区里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
      "type": "string"
     },
     "isDefault": {
-     "description": "仅用于 design-system：设为全农场常驻默认令牌，视觉类 Artifact 会自动注入它的 CSS 变量",
+     "description": "仅用于 design-system：设为全局常驻默认令牌，视觉类作品会自动注入它的 CSS 变量",
      "type": "boolean"
     },
     "kind": {
@@ -765,7 +765,7 @@
  {
   "op": "artifact.version.create",
   "name": "artifact_version_create",
-  "description": "给一个网页（html）Artifact 出新的一稿（旧的留着）：照用户的评论改完以后用，note 写这一稿改了什么。会在第一稿说过的地方再说一句带卡片的话。一起写的 Artifact 不出新稿，一块一块改它。页面在沙箱里显示：连不了网、调不了农场的接口、不能提交表单、不能再嵌一个页面；样式和脚本写在这一个文件里，库只能从 cdn.jsdelivr.net、cdnjs.cloudflare.com 加载，字体和它的样式还能从 fonts.googleapis.com、fonts.gstatic.com 加载；图片、音视频内联成 data:；一稿最多 5 MB。交上来先查，从别处加载的会被退回，说哪一行、怎么改。",
+  "description": "给一个网页（html）作品出新的一稿（旧的留着）：照用户的评论改完以后用，note 写这一稿改了什么。会在第一稿说过的地方再说一句带卡片的话。一起写的作品不出新稿，一块一块改它。页面在沙箱里显示：连不了网、调不了农场的接口、不能提交表单、不能再嵌一个页面；样式和脚本写在这一个文件里，库只能从 cdn.jsdelivr.net、cdnjs.cloudflare.com 加载，字体和它的样式还能从 fonts.googleapis.com、fonts.gstatic.com 加载；图片、音视频内联成 data:；一稿最多 5 MB。交上来先查，从别处加载的会被退回，说哪一行、怎么改。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -778,11 +778,11 @@
      "type": "string"
     },
     "file": {
-     "description": "你工作目录里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
+     "description": "你工作区里的一个文件（相对路径），服务端去读它当这一版的全文；和 content 二选一",
      "type": "string"
     },
     "id": {
-     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "description": "作品的 id：卡片上、artifact_list 的回答里有",
      "type": "string"
     }
    },
@@ -836,12 +836,12 @@
  {
   "op": "artifact.entry.list",
   "name": "artifact_entry_list",
-  "description": "列出一个结构化 store Artifact 里的条目清单（路径、类型、rev 版本号、字节数；includeValues 为 true 时附带内容）。",
+  "description": "列出一个结构化 store 作品里的条目清单（路径、类型、rev 版本号、字节数；includeValues 为 true 时附带内容）。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "description": "作品的 id：卡片上、artifact_list 的回答里有",
      "type": "string"
     },
     "includeValues": {
@@ -862,12 +862,12 @@
  {
   "op": "artifact.entry.get",
   "name": "artifact_entry_get",
-  "description": "读取一个结构化 store Artifact 里某一条目的当前内容、类型与 rev 版本号。",
+  "description": "读取一个结构化 store 作品里某一条目的当前内容、类型与 rev 版本号。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "description": "作品的 id：卡片上、artifact_list 的回答里有",
      "type": "string"
     },
     "path": {
@@ -885,7 +885,7 @@
  {
   "op": "artifact.entry.batch",
   "name": "artifact_entry_batch",
-  "description": "对一个结构化 store Artifact 原子提交一批条目修改（set/patch/delete/copy，支持 ifRev 乐观锁与 announce 发卡片）。",
+  "description": "对一个结构化 store 作品原子提交一批条目修改（set/patch/delete/copy，支持 ifRev 乐观锁与 announce 发卡片）。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -894,7 +894,7 @@
      "type": "boolean"
     },
     "id": {
-     "description": "Artifact 的 id：卡片上、artifact_list 的回答里有",
+     "description": "作品的 id：卡片上、artifact_list 的回答里有",
      "type": "string"
     },
     "note": {
@@ -965,12 +965,12 @@
  {
   "op": "library.item.list",
   "name": "library_item_list",
-  "description": "列出素材库：生成的图和声音、用户上传的文件、帮工和助手拿回来的文件，最近的在前。每行是 id、名字、类型、大小、来路。要用户以前给过的图或文件，先在这里找。",
+  "description": "列出媒体库：生成的图和声音、用户上传的文件、执行会话和主助手拿回来的文件，最近的在前。每行是 id、名字、类型、大小、来路。要用户以前给过的图或文件，先在这里找。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "origin": {
-     "description": "只列哪一种来路：generated 生成的、uploaded 用户上传的、fetched 帮工和助手拿回来的；不填列全部",
+     "description": "只列哪一种来路：generated 生成的、uploaded 用户上传的、fetched 执行会话和主助手拿回来的；不填列全部",
      "enum": [
       "generated",
       "uploaded",
@@ -999,7 +999,7 @@
  {
   "op": "library.item.add",
   "name": "library_item_add",
-  "description": "把一个值得留的文件放进素材库，用户在素材库页能看到、下载、发到频道：用户要你找的图和文件，或者干活时找到、以后还用得上的。给公网的 https 网址（url），或你工作目录里的一个文件（path）。不要放中间产物、临时文件和代码。回答是它的 id，在消息里提到它用这个 id。",
+  "description": "把一个值得留的文件放进媒体库，用户在媒体库页能看到、下载、发到频道：用户要你找的图和文件，或者干活时找到、以后还用得上的。给公网的 https 网址（url），或你工作区里的一个文件（path）。不要放中间产物、临时文件和代码。回答是它的 id，在消息里提到它用这个 id。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -1008,7 +1008,7 @@
      "type": "string"
     },
     "path": {
-     "description": "你工作目录里的一个文件（相对路径），服务端去读；和 url 二选一",
+     "description": "你工作区里的一个文件（相对路径），服务端去读；和 url 二选一",
      "type": "string"
     },
     "url": {

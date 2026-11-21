@@ -269,7 +269,7 @@ fn dry_run_says_what_would_happen_and_changes_nothing_and_a_change_without_one_i
     let id = added.out.split("  ").next().unwrap().to_string();
     assert!(f.run(&["cron", "delete", &id, "--dry-run"]).out.contains("删掉定时任务「早上看看」"));
     assert!(f.run(&["cron", "list"]).out.contains(&id));
-    assert!(f.run(&["agent", "delete", "docs", "--dry-run"]).out.contains("删掉档案"));
+    assert!(f.run(&["agent", "delete", "docs", "--dry-run"]).out.contains("删掉角色"));
 }
 
 #[test]

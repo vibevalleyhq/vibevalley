@@ -1,6 +1,7 @@
 {
   "list": "Repos",
   "add": "New repo",
+  "openWorkspace": "Workspace",
   "repos": "Code bases",
   "all": "All",
   "allLine": "The whole map: an island for each repo",

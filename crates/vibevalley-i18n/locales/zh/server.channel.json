@@ -1,22 +1,22 @@
 {
   "name": {
     "user": "用户",
-    "orchestrator": "助手"
+    "orchestrator": "主助手"
   },
   "mention": {
-    "orchestrator": "@助手",
+    "orchestrator": "@主助手",
     "user": "@用户",
     "everyone": "@所有人"
   },
   "channelName": "频道名只能是字母、数字、汉字、- 和 _，最多 24 个字",
   "channelTaken": "已经有叫 {name} 的频道了",
-  "hopLimit": "帮工之间已经来回 {limit} 次了，先停一停：等用户说一句再接着叫人。",
+  "hopLimit": "执行会话之间已经来回 {limit} 次了，先停一停：等用户说一句再接着叫人。",
   "dispatch": {
-    "draft": "看代码，起草这张工单",
+    "draft": "看代码，起草这个任务",
     "repo": "仓库",
     "sent": "派 @{id}（{name}）去 {repo}：{what}",
-    "redraft": "这张工单交给 @{id}（{name}）再起草一版",
-    "handedOn": "这张工单交给 @{id}（{name}）接着做，第 {nth} 次派活"
+    "redraft": "这个任务交给 @{id}（{name}）再起草一版",
+    "handedOn": "这个任务交给 @{id}（{name}）接着做，第 {nth} 次派活"
   },
   "badTarget": "不认识这个地方：{target}（写 #<频道>，比如 #general；或 #<频道>:<消息号>）",
   "noMessage": "频道里没有 {n} 这条消息",
@@ -24,26 +24,26 @@
   "sendKeyLong": "sendKey 太长",
   "channelGone": "找不到这个频道",
   "noChannel": "没有 {id} 这个频道",
-  "notOrchestrator": "{id} 不是助手的档案：频道只能交给助手照看",
+  "notOrchestrator": "{id} 不是主助手的角色：频道只能交给主助手照看",
   "noMessageId": "没有 {id} 这条消息",
-  "threadOnlyTitle": "串只能改标题",
+  "threadOnlyTitle": "话题只能改标题",
   "defaultStays": "默认频道不能归档、不能删：先把别的频道设成默认",
   "deletesChannel": "删掉 {target}，连同它的 {threads} 个串和 {said} 条消息",
   "inUse": "删不了：{why}。可以归档它",
-  "helpersThere": "还有帮工在这个频道里干活",
+  "helpersThere": "还有执行会话在这个频道里干活",
   "connectorsThere": "接着连接器",
-  "issuesThere": "这里派过 {n} 张工单的活",
+  "issuesThere": "这里派过 {n} 个任务的活",
   "messageGone": "这条消息已经删了",
   "notYours": "只能改你自己说的话",
   "badEmoji": "回应是一个表情或一个短词，不带空格",
-  "threadOnlyInChannel": "串只开在频道里的消息下面",
+  "threadOnlyInChannel": "话题只开在频道里的消息下面",
   "deletes": "删掉 {target} 的第 {number} 条（{name}：{text}），号留着",
   "deletesDeliveries": "还没交出去的 {n} 份不再送",
-  "defaultIsChannel": "默认频道只能是一个频道，不能是私聊或串",
+  "defaultIsChannel": "默认频道只能是一个频道，不能是私聊或话题",
   "noDirect": "{target}：你和对方之间没有私聊",
   "noChannelNamed": "没有叫 #{name} 的频道。有：{tags}",
   "absent": "{who} 不在场，没送到",
-  "noProfileNamed": "没有叫 {key} 的档案",
+  "noProfileNamed": "没有叫 {key} 的角色",
   "talkFailed": "没有接上这个会话：{why}",
   "profileDisabled": "{name}已停用"
 }

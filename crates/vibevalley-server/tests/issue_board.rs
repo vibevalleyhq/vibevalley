@@ -308,7 +308,7 @@ fn words_for_a_queued_issue_go_with_it() {
     wait_stage(&w.board, "2", StageKind::Reviewing);
     let all = prompts.lock().unwrap().clone();
     assert!(
-        all.iter().any(|p| p.starts_with("mind the tests") && p.contains("这张工单原来是：Two")),
+        all.iter().any(|p| p.starts_with("mind the tests") && p.contains("这个任务原来是：Two")),
         "{all:?}"
     );
 }

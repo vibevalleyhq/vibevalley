@@ -199,7 +199,10 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
           <Icon name="info" size={12} tone="faint" />
         </View>
         <Text class="text-xs leading-relaxed text-muted">{t("web.voice.voice.persona.intro")}</Text>
-        <A href="/settings/call" class="rounded-sm px-0.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus">
+        <A
+          href="/settings/voice/call"
+          class="rounded-sm px-0.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+        >
           <Text class="text-xs font-medium text-water underline">{t("web.voice.voice.section.label")}</Text>
         </A>
         <Text class="text-xs leading-relaxed text-muted">{t("web.voice.voice.persona.page")}</Text>

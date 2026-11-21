@@ -43,35 +43,24 @@
   "nav": {
     "label": "Settings sections",
     "search": "Search settings…",
-    "general": "General",
+    "general": "General & Appearance",
     "appearance": "Appearance",
-    "about": "About",
+    "models": "Models & Keys",
+    "voice": "Voice",
+    "connections": "Connections",
+    "about": "About & Data",
     "memory": "Memory",
-    "skills": "Skills",
     "call": "Call line",
     "dictation": "Dictation",
     "chat": "Chat apps",
-    "width": "Navigation width (drag; double-click for the default)",
-    "accounts": "Accounts and keys"
-  },
-  "groups": {
-    "options": "Options",
-    "helpers": "Helpers",
-    "voice": "Voice",
-    "connect": "Connections"
+    "width": "Navigation width (drag; double-click for the default)"
   },
   "words": {
-    "general": "language start open workbench farm",
-    "appearance": "theme dark light size zoom scale font",
-    "about": "version home folder settings file",
-    "memory": "Nowledge EverOS memory recall",
-    "skills": "skill library",
-    "call": "Agora phone call recognition speech who answers area",
-    "moss": "MOSS try key realtime",
-    "dictation": "dictation transcription voice input",
-    "github": "gh PR login",
-    "chat": "WeChat Feishu Lark QQ connectors pairing",
-    "accounts": "keys accounts DeepSeek MOSS Agora API key models"
+    "general": "language start workbench farm theme dark light size zoom scale font",
+    "models": "keys accounts DeepSeek MOSS Agora API key models binding",
+    "voice": "Agora call phone recognition speech MOSS live realtime vision dictation transcription",
+    "connections": "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
+    "about": "version home folder settings data catalog"
   },
   "scope": {
     "farm": "For all of VibeValley",
@@ -87,7 +76,6 @@
     }
   },
   "appearance": {
-    "intro": "The workbench only; the farm and the memory tree are drawn and keep their own colours and day.",
     "theme": "Theme",
     "themeHint": "With the system, it follows the computer's light and dark",
     "themes": {
@@ -104,6 +92,7 @@
     "terminalFontSizeHint": "Also adjustable anytime in the terminal view with ⌘+ / ⌘- / ⌘0"
   },
   "models": {
+    "intro": "Configure model accounts, API keys, and feature bindings.",
     "deepseekHint": "The assistant and VibeValley's own helpers use it"
   },
   "memory": {
@@ -126,6 +115,10 @@
     "copy": "Copy the path",
     "copied": "Path copied",
     "reveal": "Show in Finder",
+    "devTools": "Developer tools",
+    "catalog": "Asset catalog",
+    "catalogHint": "Inspect sprites, cursors, sounds, and workbench UI components",
+    "openCatalog": "Open catalog",
     "update": "Updates",
     "updateHint": "The desktop app updates itself from the releases on GitHub",
     "upToDate": "Up to date",
@@ -180,8 +173,5 @@
     "ready": "{feature}: ready",
     "lacks": "{feature}: {why}",
     "fix": "Set it up"
-  },
-  "accounts": {
-    "intro": "Every vendor's accounts and keys are here, with the models each account can use. Which account each feature uses is chosen under Uses."
   }
 }

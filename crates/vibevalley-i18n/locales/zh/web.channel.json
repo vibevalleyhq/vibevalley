@@ -1,39 +1,39 @@
 {
   "tab": {
     "chat": "聊天",
-    "issues": "工单",
+    "issues": "任务",
     "crons": "定时任务"
   },
   "defaultRepo": "默认仓库 {repo}",
   "channels": "频道列表",
-  "defaultHint": "默认的频道：你、助手和帮工都在这儿",
+  "defaultHint": "默认的频道：你、主助手和执行会话都在这儿",
   "findHint": "在这个频道里找…",
   "find": "在这个频道里找",
   "findMessages": "找消息",
   "settings": "频道设置",
   "inChannel": "频道里的",
-  "empty": "{label} 还没人说话：跟助手说一件要做的事。",
+  "empty": "{label} 还没人说话：跟主助手说一件要做的事。",
   "sendTo": "发送消息至 {label}",
-  "side": "频道和帮工",
+  "side": "频道与执行会话",
   "channelsTitle": "频道",
   "directsTitle": "私聊",
   "newChannel": "创建频道",
-  "helpers": "帮工",
-  "noHelpers": "没有在场的帮工",
+  "helpers": "执行会话",
+  "noHelpers": "没有在场的执行会话",
   "mood": {
     "idle": "在歇着",
     "listening": "在听",
     "thinking": "在想",
     "speaking": "在说"
   },
-  "orchestrator": "助手",
-  "nobodyOnIt": "现在没有帮工在干，串还留着",
+  "orchestrator": "主助手",
+  "nobodyOnIt": "现在没有执行会话在干，串还留着",
   "replies": "{n} 条回复",
-  "thread": "串",
-  "closeThread": "关上串",
-  "threadEmpty": "串里还没人说话。在这里说的话，它的帮工会看到。",
-  "sayInThread": "在串里说，{name}会看到",
-  "reply": "回复这个串",
+  "thread": "话题",
+  "closeThread": "关上话题",
+  "threadEmpty": "话题里还没人说话。在这里说的话，它的执行会话会看到。",
+  "sayInThread": "在话题里说，{name}会看到",
+  "reply": "回复这个话题",
   "dialog": {
     "repoExample": "比如 clock-in",
     "cancel": "取消",
@@ -44,19 +44,19 @@
     "descriptionHint": "这个频道是做什么的？",
     "repo": "默认仓库（可不填）",
     "repoHint": "在这个频道里派活、没说仓库时，就在这个仓库里干",
-    "repoNone": "空着就没有：派活时助手要问在哪个仓库",
+    "repoNone": "空着就没有：派活时主助手要问在哪个仓库",
     "settingsOf": "# {name} 的设置",
     "save": "保存"
   },
   "issues": {
-    "empty": "这个频道里还没有工单。在聊天里跟助手说一件要做的事，它会派帮工，工单就列在这里。",
-    "thread": "工单串"
+    "empty": "这个频道里还没有任务。在聊天里跟主助手说一件要做的事，它会派执行会话，任务就列在这里。",
+    "thread": "任务话题"
   },
   "crons": {
-    "empty": "还没有定时任务：跟助手说「每天九点跑一遍测试」。",
+    "empty": "还没有定时任务：跟主助手说「每天九点跑一遍测试」。",
     "next": "下次 {next}",
     "direct": "直接派 {agent}",
-    "byOrchestrator": "助手定的",
+    "byOrchestrator": "主助手定的",
     "label": "定时任务「{name}」",
     "on": "开着",
     "off": "关着",
@@ -108,7 +108,7 @@
     "label": "这条消息能做的",
     "react": "回应",
     "reply": "回复",
-    "thread": "开一个串",
+    "thread": "开一个话题",
     "pin": "置顶",
     "unpin": "取消置顶",
     "edit": "改",
@@ -127,14 +127,14 @@
     "open": "成员",
     "title": "成员",
     "user": "你",
-    "none": "这里还没有帮工",
-    "inChannel": "频道里的助手"
+    "none": "这里还没有执行会话",
+    "inChannel": "频道里的主助手"
   },
   "composer": {
     "notSent": "没发出去：{why}",
     "who": "叫谁",
     "mention": "叫人",
-    "stopHint": "叫助手停下这一轮，派出去的帮工照常干活",
+    "stopHint": "叫主助手停下这一轮，派出去的执行会话照常干活",
     "send": "发送",
     "sendHint": "回车发送 · Shift+回车换行",
     "replying": "回复 {name}",
@@ -153,13 +153,13 @@
     "name": "名称",
     "category": "分组（可不填）",
     "categoryHint": "侧栏里按分组列频道",
-    "members": "频道里的助手",
-    "membersHint": "在频道里的助手能看到这里没 @ 人的话和汇报；一个都不在，就要 @ 才有人接",
+    "members": "频道里的主助手",
+    "membersHint": "在频道里的主助手能看到这里没 @ 人的话和汇报；一个都不在，就要 @ 才有人接",
     "notify": "提醒",
     "notifyAll": "全部",
     "notifyMentions": "只在有人 @你 时",
     "notifyNone": "不提醒",
-    "notifyHint": "不提醒的不算未读、不进 Inbox、不转到微信",
+    "notifyHint": "不提醒的不算未读、不进收件箱、不转到微信",
     "archive": "归档",
     "unarchive": "取消归档",
     "archiveHint": "归档的频道不在侧栏里，消息和地址都还在",
@@ -172,13 +172,13 @@
     "drag": "拖到另一个频道上，排在它前面"
   },
   "threadList": {
-    "title": "这个频道的串",
+    "title": "这个频道的话题",
     "none": "这个频道还没有串",
-    "archived": "已归档的串（{n}）",
+    "archived": "已归档的话题（{n}）",
     "rename": "给「{title}」改名",
     "archive": "归档「{title}」",
     "unarchive": "取消归档「{title}」",
-    "notify": "串的提醒"
+    "notify": "话题的提醒"
   },
   "more": {
     "label": "更多",
@@ -189,8 +189,8 @@
   },
   "switcher": {
     "open": "跳到…",
-    "title": "跳到频道、串或私聊",
-    "hint": "输入名字；# 只找频道和串，@ 只找私聊",
+    "title": "跳到频道、话题或私聊",
+    "hint": "输入名字；# 只找频道和话题，@ 只找私聊",
     "none": "没有找到",
     "direct": "私聊",
     "newDirect": "开一个私聊",
@@ -209,7 +209,7 @@
   "direct": {
     "add": "开一个私聊",
     "pick": "和谁私聊",
-    "none": "还没有档案",
+    "none": "还没有角色",
     "open": "和{name}私聊"
   },
   "emoji": {
@@ -233,48 +233,48 @@
     "preview": "链接预览"
   },
   "names": {
-    "issueThread": "工单串",
-    "talkThread": "{who}的串",
-    "thread": "串",
+    "issueThread": "任务话题",
+    "talkThread": "{who}的话题",
+    "thread": "话题",
     "mention": {
-      "orchestrator": "@助手",
+      "orchestrator": "@主助手",
       "user": "@用户",
       "everyone": "@所有人"
     },
     "orchestratorNote": "派活、拆计划、问进度",
     "everyone": "所有人",
-    "everyoneNote": "叫醒在场的每个帮工"
+    "everyoneNote": "叫醒在场的每个执行会话"
   },
-  "threadWidth": "串的宽窄（拖动，双击回默认）",
+  "threadWidth": "话题的宽窄（拖动，双击回默认）",
   "commands": {
     "issue": {
-      "name": "记一张工单",
+      "name": "记一个任务",
       "args": "标题",
       "note": "记进备选，在这个频道的仓库里",
-      "needs": "/issue 后面写工单的标题"
+      "needs": "/issue 后面写任务的标题"
     },
     "remember": {
-      "name": "让助手记住",
+      "name": "让主助手记住",
       "args": "一句话",
-      "note": "记进这里助手的记性",
+      "note": "记进这里主助手的记忆",
       "needs": "/remember 后面写要它记住的话"
     },
     "stop": {
-      "name": "叫停助手",
+      "name": "叫停主助手",
       "args": "",
-      "note": "这里的助手停下这一轮，派出去的帮工照常干活",
+      "note": "这里的主助手停下这一轮，派出去的执行会话照常干活",
       "needs": ""
     },
     "dm": {
       "name": "私聊",
       "args": "名字",
-      "note": "打开和这份档案的私聊",
-      "needs": "/dm 后面写档案的名字或 id"
+      "note": "打开和这份角色的私聊",
+      "needs": "/dm 后面写角色的名字或 id"
     },
     "imagegen": {
       "name": "生图",
       "args": "描述",
-      "note": "交给这里的助手用 MOSS 画一张，画好发回这里",
+      "note": "交给这里的主助手用 MOSS 画一张，画好发回这里",
       "needs": "/imagegen 后面写想要的画面",
       "nowhere": "先打开一个频道再生图",
       "notReady": "生图还没设置好：{why}，回车去设置"
@@ -283,10 +283,10 @@
       "issue": "记下了 #{n}",
       "remember": "记下了",
       "stop": "叫停了",
-      "imagegen": "交给助手了，画好会发到这里"
+      "imagegen": "交给主助手了，画好会发到这里"
     }
   },
   "lacks": "回不了话：{why}",
   "lacksFix": "去设置",
-  "orchestratorRuns": "查看助手轨迹与待审批调用"
+  "orchestratorRuns": "查看主助手轨迹与待审批调用"
 }
