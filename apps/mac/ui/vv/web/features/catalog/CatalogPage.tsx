@@ -19,6 +19,7 @@ import { Icon } from "../../ui/Icon";
 import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "../../ui/pixel/sound";
 import { Segmented } from "../../ui/Segmented";
 import { Tabs } from "../../ui/Tabs";
+import { CountPill } from "../../ui/Tag";
 import { Bubble } from "../../ui/Tip";
 import { CursorTile, Detail, fitScale, type Ground, GroundBox, grounds, Img } from "./CatalogDetail";
 import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, shelfOf, shelves } from "./shelves";
@@ -135,9 +136,7 @@ function ShelfButton(props: { id: string; label: string; count: number; on: bool
       }`}
     >
       <Text class={`min-w-0 flex-1 truncate text-sm text-ink ${props.on ? "font-semibold" : "font-normal"}`}>{props.label}</Text>
-      <View class={`shrink-0 rounded-full px-1.5 py-px ${props.on ? "bg-page" : "bg-hover"}`}>
-        <Text class={`font-mono text-2xs tabular-nums ${props.on ? "font-medium text-ink" : "text-faint group-hover:text-muted"}`}>{String(props.count)}</Text>
-      </View>
+      <CountPill count={props.count} active={props.on} hoverBright />
     </View>
   );
 }
@@ -163,9 +162,7 @@ function ShelfSection(props: { title: string; count: string; hint?: string; chil
         <Text role="header" class="shrink-0 text-sm font-semibold text-ink">
           {props.title}
         </Text>
-        <View class="shrink-0 rounded-full bg-hover px-2 py-px">
-          <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{props.count}</Text>
-        </View>
+        <CountPill count={props.count} />
         <If when={props.hint}>
           {(hint) => (
             <View tooltip={<Bubble text={hint()} />} class="min-w-0 flex-1 items-end">

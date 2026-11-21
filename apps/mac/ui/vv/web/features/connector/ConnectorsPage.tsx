@@ -20,6 +20,7 @@ import { Field, Select, TextInput } from "../../ui/Field";
 import { Banner, Card, ListCard, ListRow, Quiet, SecretInput, Split } from "../../ui/layout";
 import { SpriteOr } from "../../ui/pixel/icons";
 import { Qr } from "../../ui/Qr";
+import { CountPill } from "../../ui/Tag";
 import { TextLink } from "../../ui/TextLink";
 import { Bubble } from "../../ui/Tip";
 import { mix } from "../../ui/tone";
@@ -128,11 +129,7 @@ export function ConnectorsPage(props: { id?: string | undefined }) {
           title={t("web.connector.connectors.section.label")}
           label={t("web.connector.connectors.list")}
           testid="connectors"
-          action={
-            <View class="rounded-full bg-hover px-1.5 py-px">
-              <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{`${connectedCount()}/${ConnectorIDValues.length}`}</Text>
-            </View>
-          }
+          action={<CountPill count={`${connectedCount()}/${ConnectorIDValues.length}`} />}
         >
           <View class="px-2 pt-0.5 pb-2">
             <Text class="text-xs leading-relaxed text-muted">{t("web.connector.connectors.intro")}</Text>

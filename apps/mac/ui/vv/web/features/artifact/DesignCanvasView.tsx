@@ -12,6 +12,7 @@ import { Select, TextInput } from "../../ui/Field";
 import { Banner } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
 import { Slider } from "../../ui/Slider";
+import { CountPill } from "../../ui/Tag";
 import { toast } from "../../ui/toasts";
 import type { Frame } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
@@ -270,9 +271,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
             <View class="shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-side px-3 py-2">
               <Text class="text-xs font-semibold text-muted">{t("web.artifact.design.props")}</Text>
               <If when={propDefs().length > 0}>
-                <View class="rounded-full bg-hover px-1.5 py-px">
-                  <Text class="font-mono text-2xs text-muted tabular-nums">{String(propDefs().length)}</Text>
-                </View>
+                <CountPill count={propDefs().length} />
               </If>
             </View>
             <Scroll class="min-h-0 flex-1" contentClass="gap-3 p-3">

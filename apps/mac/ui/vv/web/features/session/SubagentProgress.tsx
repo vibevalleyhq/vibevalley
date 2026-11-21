@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { createMemo } from "../../../solid";
 import { ago } from "../../base/format";
 import { Icon } from "../../ui/Icon";
-import { Dot, type DotTone } from "../../ui/Tag";
+import { CountPill, Dot, type DotTone } from "../../ui/Tag";
 import { Bubble } from "../../ui/Tip";
 import { mix } from "../../ui/tone";
 import { createSessionEvents } from "./events";
@@ -64,9 +64,7 @@ export function SubagentProgress(props: { session: string; progress: SubagentSum
         <Text role="header" class="text-sm font-semibold text-ink">
           {t("web.session.subagents.heading")}
         </Text>
-        <View class="rounded-full bg-hover px-1.5 py-px">
-          <Text class="text-2xs font-medium text-muted tabular-nums">{String(props.progress.threads.length)}</Text>
-        </View>
+        <CountPill count={props.progress.threads.length} />
       </View>
       <If when={props.progress.disconnectedAt}>
         {(at) => (

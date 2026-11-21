@@ -9,7 +9,7 @@ import { createAct } from "../../ui/act";
 import { Button } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { Icon } from "../../ui/Icon";
-import { Dot } from "../../ui/Tag";
+import { CountPill, Dot } from "../../ui/Tag";
 import { Refusal } from "./JobFacts";
 
 export function ReleaseAssets(props: { id: string }) {
@@ -51,9 +51,7 @@ export function ReleaseAssets(props: { id: string }) {
                 <Icon name="expand" size={10} tone="muted" />
               </View>
               <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{t("web.media.releasePreview")}</Text>
-              <View class="rounded-full bg-hover px-1.5 py-px">
-                <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{String(value().does.length)}</Text>
-              </View>
+              <CountPill count={value().does.length} />
             </View>
             <If when={open()}>
               <View testID="media-release-preview" class="gap-1 pl-5.5">

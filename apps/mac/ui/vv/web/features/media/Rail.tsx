@@ -8,6 +8,7 @@ import { Select } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
 import { ActiveBar, SidebarSection } from "../../ui/layout";
+import { CountPill } from "../../ui/Tag";
 import { type ArtifactCounts, artifactFilterKinds, type ArtifactKindFilter, type Counts, type KindFilter, type Names, type Where, whereKey } from "./items";
 
 const originIcons: Record<"generated" | "uploaded" | "fetched", IconName> = {
@@ -71,9 +72,7 @@ function Row(props: { testid: string; icon: IconName; label: string; count: numb
         <Icon name={props.icon} size={14} tone={props.here ? "ink" : "muted"} />
       </View>
       <Text class={`min-w-0 flex-1 truncate text-sm font-medium ${props.here ? "text-ink" : "text-muted"}`}>{props.label}</Text>
-      <View class={`shrink-0 rounded-full px-1.5 py-px ${props.here ? "bg-page" : ""}`}>
-        <Text class={`font-mono text-2xs font-medium tabular-nums ${props.here ? "text-ink" : "text-faint"}`}>{String(props.count)}</Text>
-      </View>
+      <CountPill count={props.count} active={props.here} quiet hoverBright />
     </View>
   );
 }

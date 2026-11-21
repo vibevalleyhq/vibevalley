@@ -30,6 +30,7 @@ import { hexColor, swatches } from "../../ui/domain/cast";
 import { AgentFace } from "../../ui/domain/Face";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
+import { CountPill } from "../../ui/Tag";
 import { Bubble } from "../../ui/Tip";
 import { tone } from "../../ui/tone";
 import { knownTypes, plainOf } from "./blocks";
@@ -246,9 +247,7 @@ function SuggestionsList(props: {
       <View testID="artifact-suggestions" class="mb-2.5 shrink-0 rounded-lg border border-line bg-page p-2.5">
         <View class="flex-row items-center justify-between gap-2 px-0.5 pb-1.5">
           <Text class="text-xs font-semibold text-muted">{t("web.artifact.suggestions.title", { n: open().length })}</Text>
-          <View class="rounded-full bg-hover px-1.5 py-px">
-            <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{String(open().length)}</Text>
-          </View>
+          <CountPill count={open().length} />
         </View>
         <Each of={open()} key={(s) => s.id}>
           {(s, i) => {

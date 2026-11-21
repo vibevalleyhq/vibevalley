@@ -11,6 +11,7 @@ import { Link as A } from "../infra/router";
 import { TextInput, type TextInputProps } from "./Field";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { CountPill } from "./Tag";
 import { Bubble, Hint } from "./Tip";
 import { mix } from "./tone";
 
@@ -67,6 +68,8 @@ const bannerToneStyle: Record<BannerTone, { bg: string; text: string; mixColor: 
 /** Inline status or error notice; edge draws an edge-to-edge top strip under a viewer bar. */
 export function Banner(props: {
   tone?: BannerTone | undefined;
+  size?: "sm" | "md" | undefined;
+  icon?: IconName | undefined;
   edge?: boolean | undefined;
   role?: "alert" | undefined;
   testID?: string | undefined;
@@ -74,19 +77,27 @@ export function Banner(props: {
   textClass?: string | undefined;
   children: JSX.Element;
 }) {
-  const s = () => bannerToneStyle[props.tone ?? "bad"];
+  const tone = () => props.tone ?? "bad";
+  const s = () => bannerToneStyle[tone()];
   const edge = () => props.edge === true;
+  const small = () => edge() || props.size === "sm";
+  const info = () => tone() === "info";
+  const textSize = () => (edge() ? "text-xs font-medium" : props.size === "sm" ? "text-xs leading-relaxed" : "text-sm");
   return (
     <View
-      class={`flex-row items-start gap-2 ${edge() ? "border-b border-line px-3 py-2" : "rounded-md border px-3 py-2"} ${s().bg} ${props.class ?? ""}`}
-      style={edge() ? undefined : { borderColor: mix(s().mixColor, 0.25) }}
+      class={`flex-row items-start gap-2 ${
+        edge() ? "border-b border-line px-3 py-2" : `rounded-md border px-3 py-2 ${info() ? "border-line" : ""}`
+      } ${s().bg} ${props.class ?? ""}`}
+      style={edge() || info() ? undefined : { borderColor: mix(s().mixColor, 0.25) }}
     >
       <View class="mt-0.5 shrink-0">
-        <Icon name={s().icon} size={edge() ? 12 : 14} tone={props.tone === "info" ? "muted" : undefined} />
+        <Icon name={props.icon ?? s().icon} size={small() ? 12 : 14} tone={info() ? "muted" : undefined} />
       </View>
-      <Text testID={props.testID} role={props.role} class={`min-w-0 flex-1 ${edge() ? "text-xs font-medium" : "text-sm"} ${s().text} ${props.textClass ?? ""}`}>
-        {props.children}
-      </Text>
+      <If when={typeof props.children === "string"} else={<View class="min-w-0 flex-1">{props.children}</View>}>
+        <Text testID={props.testID} role={props.role} class={`min-w-0 flex-1 ${textSize()} ${s().text} ${props.textClass ?? ""}`}>
+          {props.children as string}
+        </Text>
+      </If>
     </View>
   );
 }
@@ -131,9 +142,7 @@ export function SidebarSection(props: {
           <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-muted group-hover:text-ink">{props.title}</Text>
           <If when={!expanded()}>{props.collapsedBadge}</If>
           <If when={props.count !== undefined}>
-            <View class="shrink-0 rounded-full bg-hover px-1.5 py-px">
-              <Text class="font-mono text-2xs font-medium text-faint tabular-nums group-hover:text-muted">{String(props.count)}</Text>
-            </View>
+            <CountPill count={props.count ?? 0} hoverBright />
           </If>
         </View>
         {props.action}

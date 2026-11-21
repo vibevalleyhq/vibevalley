@@ -22,6 +22,7 @@ import { Dialog } from "../../../ui/Dialog";
 import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Select, TextInput } from "../../../ui/Field";
 import { Icon } from "../../../ui/Icon";
+import { CountPill } from "../../../ui/Tag";
 import { Bubble } from "../../../ui/Tip";
 import { toast } from "../../../ui/toasts";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "../model/marks";
@@ -55,9 +56,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
       <View class="flex-row items-center justify-between px-2 py-1">
         <Text class="text-xs font-semibold text-muted">{t("web.channel.pins.title")}</Text>
         <If when={pinned() !== undefined}>
-          <View class="rounded-full bg-hover px-1.5 py-px">
-            <Text class="font-mono text-2xs text-faint">{String(pinned()?.length ?? 0)}</Text>
-          </View>
+          <CountPill count={pinned()?.length ?? 0} hoverBright />
         </If>
       </View>
       <If when={pinned()?.length === 0}>
@@ -120,9 +119,7 @@ export function Members(props: { channel: Channel }) {
     <Scroll accessibilityLabel={t("web.channel.members.title")} testID="members" class="w-60 shrink-0 border-l border-line bg-side" contentClass="gap-1 p-3">
       <View class="flex-row items-center justify-between px-1.5 pb-1.5">
         <Text class="text-xs font-semibold text-muted">{t("web.channel.members.title")}</Text>
-        <View class="rounded-full bg-hover px-1.5 py-px">
-          <Text class="font-mono text-2xs text-faint">{String(totalCount())}</Text>
-        </View>
+        <CountPill count={totalCount()} hoverBright />
       </View>
       <View class="flex-row items-center gap-2 rounded-md px-1.5 py-1.5">
         <View class="h-7 w-7 shrink-0 items-center justify-center rounded-full bg-selected">
@@ -306,9 +303,7 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
     <Scroll testID="thread-list" accessibilityLabel={t("web.channel.threadList.title")} contentClass="gap-0.5">
       <View class="flex-row items-center justify-between px-2 py-1">
         <Text class="text-xs font-semibold text-muted">{t("web.channel.threadList.title")}</Text>
-        <View class="rounded-full bg-hover px-1.5 py-px">
-          <Text class="font-mono text-2xs text-faint">{String(live().length)}</Text>
-        </View>
+        <CountPill count={live().length} hoverBright />
       </View>
       <If when={live().length === 0}>
         <Text testID="threads-empty" class="px-2 py-2 text-sm text-muted">

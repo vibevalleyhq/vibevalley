@@ -34,6 +34,35 @@ export function Tag(props: { icon?: IconName | undefined; label: string; tone: T
 /** What a dot says (docs/design/02-atomic-components.md). */
 export type DotTone = "leaf" | "wheat" | "berry" | "water" | "idle" | "faint" | "muted";
 
+export type CountPillTone = "neutral" | "bad";
+
+/** Compact tabular counter badge for sidebar groups, section headings, tabs, and rows. */
+export function CountPill(props: {
+  count: string | number;
+  active?: boolean | undefined;
+  tone?: CountPillTone | undefined;
+  hoverBright?: boolean | undefined;
+  quiet?: boolean | undefined;
+  class?: string | undefined;
+}) {
+  const tone = () => props.tone ?? "neutral";
+  const bg = () => {
+    if (tone() === "bad") return "bg-bad-soft";
+    if (props.active === true) return "bg-page";
+    return props.quiet === true ? "" : "bg-hover";
+  };
+  const fg = () => {
+    if (tone() === "bad") return "text-berry";
+    if (props.active === true) return "text-ink";
+    return props.hoverBright === true ? "text-faint group-hover:text-muted" : "text-muted";
+  };
+  return (
+    <View class={`shrink-0 rounded-full px-1.5 py-px ${bg()} ${props.class ?? ""}`}>
+      <Text class={`font-mono text-2xs font-medium tabular-nums ${fg()}`}>{String(props.count)}</Text>
+    </View>
+  );
+}
+
 const dotBg: Record<DotTone, string> = {
   leaf: "bg-leaf",
   wheat: "bg-wheat",

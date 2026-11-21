@@ -10,6 +10,7 @@ import { TextArea } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { IconButton } from "../../ui/IconButton";
 import { Banner } from "../../ui/layout";
+import { CountPill } from "../../ui/Tag";
 import { toast } from "../../ui/toasts";
 import type { Frame } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
@@ -196,9 +197,7 @@ export function DashboardView(props: StoreViewerProps) {
               <View class="flex-row items-center gap-1.5">
                 <Text class="text-xs font-semibold text-muted">{t("web.artifact.dashboard.sources")}</Text>
                 <If when={datasetNames().length > 0}>
-                  <View class="rounded-full bg-hover px-1.5 py-px">
-                    <Text class="font-mono text-2xs text-muted tabular-nums">{String(datasetNames().length)}</Text>
-                  </View>
+                  <CountPill count={datasetNames().length} />
                 </If>
               </View>
               <IconButton icon="close" size={14} label={t("web.artifact.dashboard.hideSources")} onClick={() => setDrawer({ tag: "closed" })} />

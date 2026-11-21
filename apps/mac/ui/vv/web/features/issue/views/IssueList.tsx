@@ -13,6 +13,7 @@ import { OrchestratorFace } from "../../../ui/domain/Face";
 import { Icon } from "../../../ui/Icon";
 import { IconButton } from "../../../ui/IconButton";
 import { ActiveBar } from "../../../ui/layout";
+import { CountPill } from "../../../ui/Tag";
 import { Bubble } from "../../../ui/Tip";
 import { type BoardCard, cardAgent, cardLook, cardRepo, closedShown, laneLabel, laneStatus } from "../model/cards";
 import { type Grouping, groupRows, laneOrder, type Ordering, orderRows, type RowGroup, rowKeys } from "../model/display";
@@ -126,11 +127,7 @@ export function IssueList(props: {
                         <View class="w-4 shrink-0 items-center justify-center">{icon()}</View>
                       </If>
                       <Text class="truncate text-sm font-semibold text-ink">{label()}</Text>
-                      <View class="shrink-0 rounded-full bg-hover px-1.5 py-px">
-                        <Text class="text-2xs font-medium text-muted" style={{ fontVariant: ["tabular-nums"] }}>
-                          {`${g().rows.length}`}
-                        </Text>
-                      </View>
+                      <CountPill count={g().rows.length} />
                     </View>
                     <If when={canAdd(g())}>
                       <IconButton

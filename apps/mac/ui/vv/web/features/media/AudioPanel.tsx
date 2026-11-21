@@ -29,7 +29,7 @@ import { Field, Select, TextArea, TextInput } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { Card, Quiet } from "../../ui/layout";
 import { Segmented } from "../../ui/Segmented";
-import { Dot } from "../../ui/Tag";
+import { CountPill, Dot } from "../../ui/Tag";
 import { TextLink } from "../../ui/TextLink";
 import { Bubble } from "../../ui/Tip";
 import { audioTimestamp, dialogueComplete, supportsStreamingTranscription, transcriptContent } from "./audio";
@@ -360,9 +360,7 @@ function SpeakersForm(props: { status: ProviderStatus | undefined }) {
         </View>
         <View class="flex-row items-center gap-2 border-t border-line pt-3">
           <Text class="text-sm font-semibold text-ink">{t("web.audio.dialogue")}</Text>
-          <View class="rounded-full bg-hover px-1.5 py-px">
-            <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{String(segments().length)}</Text>
-          </View>
+          <CountPill count={segments().length} />
         </View>
         <Each of={segments()} key={(segment) => segment.key}>
           {(segment, idx) => (
@@ -901,9 +899,7 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
                 <View class="flex-row items-center gap-2">
                   <Text class="text-xs font-semibold text-muted">{t("web.audio.timeline")}</Text>
                   <If when={result().segments.length > 0}>
-                    <View class="rounded-full bg-hover px-1.5 py-px">
-                      <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{String(result().segments.length)}</Text>
-                    </View>
+                    <CountPill count={result().segments.length} />
                   </If>
                 </View>
                 <If when={result().segments.length > 0} else={<Quiet>{t("web.audio.noTimestamps")}</Quiet>}>

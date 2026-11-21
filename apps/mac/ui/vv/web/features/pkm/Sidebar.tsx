@@ -15,8 +15,8 @@ import { createAct } from "../../ui/act";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
 import { ActiveBar, SidebarSection } from "../../ui/layout";
+import { CountPill } from "../../ui/Tag";
 import { Bubble } from "../../ui/Tip";
-import { mix } from "../../ui/tone";
 import { tierOrder } from "./outline";
 import { tierLabel } from "./PageView";
 import { notesSearch } from "./Search";
@@ -208,11 +208,7 @@ function Look(props: { icon: IconName; label: string; n: number; open?: boolean 
           </Text>
         }
       >
-        <View class="shrink-0 rounded-full px-1.5 py-px" style={{ backgroundColor: mix("berry", 0.14) }}>
-          <Text class="text-2xs font-semibold text-berry" style={{ fontVariant: ["tabular-nums"] }}>
-            {String(props.n)}
-          </Text>
-        </View>
+        <CountPill count={props.n} tone="bad" />
       </If>
     </View>
   );

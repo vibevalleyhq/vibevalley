@@ -30,6 +30,7 @@ import { Lightbox, type Picture } from "../../ui/Lightbox";
 import { type MoreItem, MoreMenu } from "../../ui/MoreMenu";
 import { readFiles } from "../../ui/picked";
 import { Segmented } from "../../ui/Segmented";
+import { CountPill } from "../../ui/Tag";
 import { toast } from "../../ui/toasts";
 import { artifactTypeIcon, createTypedArtifact, useArtifacts } from "../artifact";
 import { AudioPanel } from "./AudioPanel";
@@ -474,9 +475,7 @@ export function LibraryPage() {
                     <If when={list().length > 0}>
                       <View class="flex-row items-center gap-1.5">
                         <Text class="text-xs font-semibold text-muted">{t("web.library.rail.artifacts")}</Text>
-                        <View class="rounded-full bg-hover px-1.5 py-px">
-                          <Text class="font-mono text-2xs text-faint tabular-nums">{String(visibleArtifacts().length)}</Text>
-                        </View>
+                        <CountPill count={visibleArtifacts().length} hoverBright />
                       </View>
                     </If>
                     <ArtifactTiles
@@ -492,9 +491,7 @@ export function LibraryPage() {
                     <If when={visibleArtifacts().length > 0}>
                       <View class="flex-row items-center gap-1.5">
                         <Text class="text-xs font-semibold text-muted">{t("web.library.rail.kind")}</Text>
-                        <View class="rounded-full bg-hover px-1.5 py-px">
-                          <Text class="font-mono text-2xs text-faint tabular-nums">{String(list().length)}</Text>
-                        </View>
+                        <CountPill count={list().length} hoverBright />
                       </View>
                     </If>
                     <Tiles

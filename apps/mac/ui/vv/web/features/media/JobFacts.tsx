@@ -15,7 +15,8 @@ import { Button } from "../../ui/Button";
 import { ConfirmButton } from "../../ui/ConfirmButton";
 import { Icon } from "../../ui/Icon";
 import type { IconName } from "../../ui/icons";
-import { Dot, type DotTone } from "../../ui/Tag";
+import { Banner, type BannerTone as LayoutBannerTone } from "../../ui/layout";
+import { CountPill, Dot, type DotTone } from "../../ui/Tag";
 import { Bubble } from "../../ui/Tip";
 import { mix } from "../../ui/tone";
 import { audioTimestamp } from "./audio";
@@ -23,7 +24,8 @@ import { audioTimestamp } from "./audio";
 type AnyPhase = MediaJob["phase"];
 
 interface PhaseStyle {
-  readonly bg: () => string;
+  readonly bgClass: string;
+  readonly bgStyle?: () => string;
   readonly text: string;
   readonly glyph: "check" | "cross" | "dot";
   readonly dot?: DotTone;
@@ -32,28 +34,32 @@ interface PhaseStyle {
 function phaseStyleOf(phase: AnyPhase): PhaseStyle {
   switch (phase) {
     case "ready":
-      return { bg: () => mix("ok-soft", 1), text: "text-ok-ink", glyph: "check" };
+      return { bgClass: "bg-ok-soft", text: "text-ok-ink", glyph: "check" };
     case "queued":
     case "uploading":
     case "generating":
     case "downloading":
-      return { bg: () => mix("water", 0.14), text: "text-water", glyph: "dot", dot: "water" };
+      return { bgClass: "", bgStyle: () => mix("water", 0.14), text: "text-water", glyph: "dot", dot: "water" };
     case "authorized":
     case "incomplete":
     case "unknown":
-      return { bg: () => mix("wheat", 0.22), text: "text-warn-ink", glyph: "dot", dot: "wheat" };
+      return { bgClass: "bg-warn-soft", text: "text-warn-ink", glyph: "dot", dot: "wheat" };
     case "failed":
     case "download_failed":
-      return { bg: () => mix("bad-soft", 1), text: "text-berry", glyph: "cross" };
+      return { bgClass: "bg-bad-soft", text: "text-berry", glyph: "cross" };
     case "canceled":
-      return { bg: () => mix("hover", 1), text: "text-muted", glyph: "dot", dot: "muted" };
+      return { bgClass: "bg-hover", text: "text-muted", glyph: "dot", dot: "muted" };
   }
 }
 
 export function PhasePill(props: { phase: AnyPhase; text: string }) {
   const style = () => phaseStyleOf(props.phase);
+  const bgStyle = () => {
+    const bg = style().bgStyle;
+    return bg ? { backgroundColor: bg() } : undefined;
+  };
   return (
-    <View class="shrink-0 flex-row items-center gap-1.5 rounded-sm px-2 py-0.5" style={{ backgroundColor: style().bg() }}>
+    <View class={`shrink-0 flex-row items-center gap-1.5 rounded-sm px-2 py-0.5 ${style().bgClass}`} style={bgStyle()}>
       <If when={style().glyph === "check"}>
         <Icon name="check" size={12} />
       </If>
@@ -70,32 +76,24 @@ export function PhasePill(props: { phase: AnyPhase; text: string }) {
 
 type BannerTone = "info" | "warn" | "error";
 
-const bannerStyles: Record<
-  BannerTone,
-  { readonly bg: () => string; readonly border: () => string; readonly text: string; readonly icon: IconName; readonly iconTone: string }
-> = {
-  info: { bg: () => mix("side", 1), border: () => mix("line", 1), text: "text-muted", icon: "info", iconTone: "muted" },
-  warn: { bg: () => mix("wheat", 0.14), border: () => mix("wheat", 0.35), text: "text-ink", icon: "warn", iconTone: "warn-ink" },
-  error: { bg: () => mix("bad-soft", 1), border: () => mix("berry", 0.3), text: "text-berry", icon: "cross", iconTone: "berry" },
+const bannerToneMap: Record<BannerTone, LayoutBannerTone> = {
+  info: "info",
+  warn: "warn",
+  error: "bad",
 };
 
 export function NoticeBanner(props: { tone?: BannerTone; icon?: IconName; testid?: string; role?: "alert"; children: JSX.Element }) {
-  const s = () => bannerStyles[props.tone ?? "info"];
   return (
-    <View class="flex-row items-start gap-2 rounded-md border px-3 py-2" style={{ backgroundColor: s().bg(), borderColor: s().border() }}>
-      <View class="mt-0.5 shrink-0">
-        <Icon name={props.icon ?? s().icon} size={12} tone={s().iconTone} />
-      </View>
-      <If when={typeof props.children === "string"} else={<View class="min-w-0 flex-1">{props.children}</View>}>
-        <Text
-          role={props.role}
-          testID={props.testid}
-          class={`min-w-0 flex-1 text-xs leading-relaxed ${props.tone === "error" ? "font-medium" : ""} ${s().text}`}
-        >
-          {props.children as string}
-        </Text>
-      </If>
-    </View>
+    <Banner
+      tone={bannerToneMap[props.tone ?? "info"]}
+      size="sm"
+      icon={props.icon}
+      testID={props.testid}
+      role={props.role}
+      textClass={props.tone === "error" ? "font-medium" : undefined}
+    >
+      {props.children}
+    </Banner>
   );
 }
 
@@ -123,9 +121,7 @@ export function SectionHeading(props: { title: string; count?: number }) {
         {props.title}
       </Text>
       <If when={props.count !== undefined && props.count > 0}>
-        <View class="rounded-full bg-hover px-2 py-px">
-          <Text class="text-2xs font-medium text-muted tabular-nums">{String(props.count ?? 0)}</Text>
-        </View>
+        <CountPill count={props.count ?? 0} />
       </If>
     </View>
   );
