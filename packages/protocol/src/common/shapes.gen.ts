@@ -1,4 +1,4 @@
-// Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
+// Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 declare const brand: unique symbol;
 /** A string that is one kind of id: two kinds do not mix, and a plain string becomes one only where the kind is known (schema.ts). */

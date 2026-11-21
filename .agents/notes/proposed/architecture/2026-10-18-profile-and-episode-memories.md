@@ -4,12 +4,12 @@ Status: proposed
 
 ## Problem
 
-当前 Rust 服务端 `server.db` 的 `memory` 表（[记性](docs/subsystems/memory.md)，[建表语句](crates/vibevalley-server/src/modules/team/memory/sql/schema.sql)）仅包含 `kind`（`note` / `issue`）、`agent`、`body`、`terms`、`repo`、`session` 与召回计数，尚无 `scope`、`title`、`importance` 与 `replaced_by` 列，存在三项缺口：
+当前 Rust 服务端 `server.db` 的 `memory` 表（[记性](docs/subsystems/memory.md)，[建表语句](crates/server/src/modules/team/memory/sql/schema.sql)）仅包含 `kind`（`note` / `issue`）、`agent`、`body`、`terms`、`repo`、`session` 与召回计数，尚无 `scope`、`title`、`importance` 与 `replaced_by` 列，存在三项缺口：
 
 | 缺项 | 现状 | 问题 |
 |---|---|---|
 | 用户画像（`profile`） | `kind` 只有 `note`、`issue` 两种，用户偏好记成某个档案名下的 `note` | 帮工和别的助手拿不到用户的全局偏好 |
-| 干活经过（`episode`） | 只在会话轨迹里；自研 agent 对话压缩（`AgentEvent::Compacted`，[对话引擎](crates/vibevalley-agent/src/core/engine.rs)）压掉的部分不进 `memory` 表 | `memory_search` 搜不到历史回合的具体上下文与改动文件 |
+| 干活经过（`episode`） | 只在会话轨迹里；自研 agent 对话压缩（`AgentEvent::Compacted`，[对话引擎](crates/runtime/src/agent/core/engine.rs)）压掉的部分不进 `memory` 表 | `memory_search` 搜不到历史回合的具体上下文与改动文件 |
 | 相似取代 | 没有 `replaced_by` 列；重合度 ≥ `0.8` 的新条目直接跳过 | 用户改了偏好，新说法记不进去，旧说法一直被召回 |
 
 ## Proposal
@@ -19,9 +19,9 @@ Status: proposed
 | `profile` | 关于用户的事实与偏好 | 全农场共享（`scope = user`） | 用户添加、助手或帮工提交用户偏好 |
 | `episode` | 单轮任务经过（说明、汇报、改动文件），以及助手对话被压缩掉的部分 | 归属对应档案 | 会话收工时、自研 agent 压缩助手对话时 |
 
-1. **表结构**：在 `crates/vibevalley-server/src/modules/memory/sql/schema.sql` 为 `memory` 表增加 `scope`（`user` / `agent`）、`title`、`importance`（0–3）与 `replaced_by` 列，扩展 `kind` 支持 `profile`、`episode`；召回查询只读 `replaced_by is null` 的行，并重跑 `sqlc generate`。
+1. **表结构**：在 `crates/server/src/modules/memory/sql/schema.sql` 为 `memory` 表增加 `scope`（`user` / `agent`）、`title`、`importance`（0–3）与 `replaced_by` 列，扩展 `kind` 支持 `profile`、`episode`；召回查询只读 `replaced_by is null` 的行，并重跑 `sqlc generate`。
 2. **用户画像（`profile`）**：助手开始和压缩后按 `importance` 降序读取（上限 100 条 / 4000 字）拼入系统提示；帮工首轮拼入输入开头。
-3. **干活经过（`episode`）**：收工时写入工单标题、说明、汇报与改动文件（上限 4000 字）。助手的对话在 [compaction](crates/vibevalley-agent/src/compaction/mod.rs) 完成压缩并写出 `Compacted` 摘要时，同步将该次压掉的摘要写入一条 `episode`。`episode` 只给 `memory_search` 检索摘录，不进开工自动召回。
+3. **干活经过（`episode`）**：收工时写入工单标题、说明、汇报与改动文件（上限 4000 字）。助手的对话在 [compaction](crates/runtime/src/agent/compaction/mod.rs) 完成压缩并写出 `Compacted` 摘要时，同步将该次压掉的摘要写入一条 `episode`。`episode` 只给 `memory_search` 检索摘录，不进开工自动召回。
 4. **相似取代（`replaced_by`）**：新写入的 `note` 与已有条目分词重合度 ≥ `0.8` 时，在同一 SQLx 事务内插入新行并把旧行 `replaced_by` 指向新行；旧行不再召回，保留 30 天供界面对比。
 
 ## Alternatives considered

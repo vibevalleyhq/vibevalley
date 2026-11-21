@@ -1,4 +1,4 @@
-// Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
+// Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 export const ConnectorIDValues = ["weixin", "feishu", "qq"] as const;
 export type ConnectorID = (typeof ConnectorIDValues)[number];

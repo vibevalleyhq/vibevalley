@@ -1,7 +1,7 @@
 # 帮工
 
 帮工是「一个档案（`Agent`）干一件活」：会话（`Session`）和它的每一轮（`Run`）、工作目录、农机的执行和轨迹。Rust 版里这些在服务端的 `modules/work/session`：`Sessions` 雇帮工、跑每一轮、私聊、带话和叫停，另有 `session.*` 端点、轨迹和工单观察流；它由工单板（`modules/work/issue` 的 `Board`）叫来，一轮的汇报经 `Ledger` 写回工单，起草的一轮和每轮之后的排队交回工单板（`Rounds`）。
-- 处理工单时画成地里的小动物，处理私聊时关联频道；外部农机经 `vibevalley-oar` 驱动（Claude Code、Codex、OpenCode、Grok、Kimi、CodeBuddy、Qwen Code、Qoder 等），VibeValley 自己的 agent 是 oar 里的 `vibevalley` 农机。
+- 处理工单时画成地里的小动物，处理私聊时关联频道；外部农机经 `vibevalley-runtime::oar` 驱动（Claude Code、Codex、OpenCode、Grok、Kimi、CodeBuddy、Qwen Code、Qoder 等），VibeValley 自己的 agent 是 oar 里的 `vibevalley` 农机。
 - 一次触发到一次汇报是一轮 `Run`；一个 `Session` 可跨越多次 `Run` 与重启。
 
 ## 管什么，不管什么
@@ -22,17 +22,17 @@
 | OpenCode、Grok、Kimi、CodeBuddy | ACP 协商会话、模型、推理强度和工具。OpenCode、Grok 支持中途插话；Kimi 和 CodeBuddy 的工作规则随首条输入发送。 | 新会话累计已报告用量；恢复会话缺少可查的历史基线，标记未知。 |
 | Qwen Code、Qoder | SDK stream-json。Qwen 首个输入帧是 `initialize`，Qoder 的提示和 MCP 配置经私有文件传入。厂商 ID 到达后写回业务会话，供下一轮续接。 | 平面用量按轮累加；Qoder 缺少用量字段时保留未知。 |
 
-工单只按根轮已报告的输入与输出 token 之和结算。轮次、最后一次汇报和工单时间线共用该结果。输入或输出缺失时省略 `spent`。子线程单独归属，USD 成本留在驱动记录。累计数缺少上一轮边界时，服务等到下一对完整读数再算增量。[用量归约](crates/vibevalley-oar/src/accounting.rs) · [工单结算](crates/vibevalley-server/src/modules/work/session/sessions.rs)
+工单只按根轮已报告的输入与输出 token 之和结算。轮次、最后一次汇报和工单时间线共用该结果。输入或输出缺失时省略 `spent`。子线程单独归属，USD 成本留在驱动记录。累计数缺少上一轮边界时，服务等到下一对完整读数再算增量。[用量归约](crates/runtime/src/oar/accounting.rs) · [工单结算](crates/server/src/modules/work/session/sessions.rs)
 
-每个 `oar-voyage/3` JSONL 文件先写头，再写带序号、厂商会话 ID、轮次跨度和子 agent 路径的记录。原生进程帧、控制回执和生命周期标记分开存放。消费者可从已有序号订阅后续记录；同一路径重开时续写文件序号。[运行时接口](crates/vibevalley-oar/src/lib.rs) · [记录格式](crates/vibevalley-oar/src/voyage.rs)
+每个 `oar-voyage/3` JSONL 文件先写头，再写带序号、厂商会话 ID、轮次跨度和子 agent 路径的记录。原生进程帧、控制回执和生命周期标记分开存放。消费者可从已有序号订阅后续记录；同一路径重开时续写文件序号。[运行时接口](crates/runtime/src/oar/mod.rs) · [记录格式](crates/runtime/src/oar/voyage.rs)
 
-`cargo test -p vibevalley-oar` 使用真实子进程离线回放三类协议。样本中的响应和有序事件由 Go 基线 `a2c1851ab` 的 `pkg/oar/replaytest` 与实际驱动生成。验收逐条核对八种农机的帧类型、子 agent 路径和事件内容，另测恢复缺少用量基线、压缩期间排队、撤回、子会话限额和记录读回。[跨实现对照](crates/vibevalley-oar/tests/go_drivers.rs) · [生命周期](crates/vibevalley-oar/tests/lifecycle.rs)
+`cargo test -p vibevalley-runtime` 使用真实子进程离线回放三类协议。样本中的响应和有序事件由 Go 基线 `a2c1851ab` 的 `pkg/oar/replaytest` 与实际驱动生成。验收逐条核对八种农机的帧类型、子 agent 路径和事件内容，另测恢复缺少用量基线、压缩期间排队、撤回、子会话限额和记录读回。[跨实现对照](crates/runtime/tests/oar/go_drivers.rs) · [生命周期](crates/runtime/tests/oar/lifecycle.rs)
 
 ## Codex 子线程的进度
 
-服务端按业务轮次和厂商线程保存摘要。`session.get` 和核心帧返回当前摘要，`issue.run.list` 返回各轮的摘要。工作日志保留最近 240 步。用户重开工单后仍可查看已移出日志的子任务。[服务端归约](crates/vibevalley-server/src/modules/work/session/subagents.rs) · [重启回归](crates/vibevalley-server/tests/session/subagent_progress.rs)
+服务端按业务轮次和厂商线程保存摘要。`session.get` 和核心帧返回当前摘要，`issue.run.list` 返回各轮的摘要。工作日志保留最近 240 步。用户重开工单后仍可查看已移出日志的子任务。[服务端归约](crates/server/src/modules/work/session/subagents.rs) · [重启回归](crates/server/tests/session/subagent_progress.rs)
 
-创建者取自派出事件或线程元数据。等待记录以等待者和调用标识区分。Codex 等待协作邮箱时可以省略目标。此时工作台显示「等待协作消息」。厂商只提供路径时，工作台显示路径。计划步骤和终态取自厂商事件。[真实 CLI 通知样本](crates/vibevalley-oar/tests/fixtures/codex-0.170.0-collaboration.json)
+创建者取自派出事件或线程元数据。等待记录以等待者和调用标识区分。Codex 等待协作邮箱时可以省略目标。此时工作台显示「等待协作消息」。厂商只提供路径时，工作台显示路径。计划步骤和终态取自厂商事件。[真实 CLI 通知样本](crates/runtime/tests/fixtures/codex-0.170.0-collaboration.json)
 
 服务意外退出后，摘要保留最后观测时间和服务发现连接中断的时间。续接同一厂商根线程后，服务按子线程标识和原轮次标识补读。未匹配的子轮继续显示原记录。补读的终态不会补出缺失的中间活动。
 
@@ -40,14 +40,14 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/vibevalley-server/src/modules/work/session/sessions.rs` | `Sessions`：雇帮工（`hire`）、下一轮（`next_round`）、插话（`steer`，在干活的经 oar `steer` 插进这一轮）、叫停（`stop`）、放走（`dismiss`，worktree 交给 `Workplace` 收拾）、把农机的事件读成事实、结算一轮、静默检测、帮工的 `/mcp` 钥匙；重启时把在干活的会话记成打断；并发上限在 `BoardConfig`（`ledger.rs`：`space_limit` 6、`per_repo` 3、`quiet_after` 240 秒），由工单板数 |
-| `crates/vibevalley-server/src/modules/work/session/report.rs`、`runs.rs` | 一轮末尾的结构化汇报；每张工单的各轮 |
-| `crates/vibevalley-server/src/modules/work/session/talk.rs` | 私聊帮工：没有工单的会话，在自己的目录里一轮一轮答，答的话由观察层贴进私聊 |
-| `crates/vibevalley-server/src/modules/work/session/drivers.rs`、`crates/vibevalley-server/src/modules/team/agent/drive.rs` | 把工单指派的档案变成农机和启动参数（规矩、人设、记性、MCP） |
-| `crates/vibevalley-server/src/modules/work/session/journal.rs` | 轨迹：每个会话的步骤存 `<家目录>/events/<id>.json`，变化时每 300 毫秒推一次、每 1.5 秒落盘 |
-| `crates/vibevalley-server/src/modules/work/session/mod.rs` | `session.*` 端点和 `issue.watch` 订阅流 |
-| `crates/vibevalley-server/src/modules/team/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
-| `crates/vibevalley-oar/src/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp.rs`、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 JSONL 记录流（内置农机在 `crates/vibevalley-agent/src/runtime/mod.rs`） |
+| `crates/server/src/modules/work/session/sessions.rs` | `Sessions`：雇帮工（`hire`）、下一轮（`next_round`）、插话（`steer`，在干活的经 oar `steer` 插进这一轮）、叫停（`stop`）、放走（`dismiss`，worktree 交给 `Workplace` 收拾）、把农机的事件读成事实、结算一轮、静默检测、帮工的 `/mcp` 钥匙；重启时把在干活的会话记成打断；并发上限在 `BoardConfig`（`ledger.rs`：`space_limit` 6、`per_repo` 3、`quiet_after` 240 秒），由工单板数 |
+| `crates/server/src/modules/work/session/report.rs`、`runs.rs` | 一轮末尾的结构化汇报；每张工单的各轮 |
+| `crates/server/src/modules/work/session/talk.rs` | 私聊帮工：没有工单的会话，在自己的目录里一轮一轮答，答的话由观察层贴进私聊 |
+| `crates/server/src/modules/work/session/drivers.rs`、`crates/server/src/modules/team/agent/drive.rs` | 把工单指派的档案变成农机和启动参数（规矩、人设、记性、MCP） |
+| `crates/server/src/modules/work/session/journal.rs` | 轨迹：每个会话的步骤存 `<家目录>/events/<id>.json`，变化时每 300 毫秒推一次、每 1.5 秒落盘 |
+| `crates/server/src/modules/work/session/mod.rs` | `session.*` 端点和 `issue.watch` 订阅流 |
+| `crates/server/src/modules/team/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
+| `crates/runtime/src/oar/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp.rs`、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 JSONL 记录流（内置农机在 `crates/runtime/src/agent/runtime/mod.rs`） |
 
 ## 模型和不变量
 
@@ -82,7 +82,7 @@
 
 ## 怎么验证
 
-- `crates/vibevalley-server/tests/issue_board.rs`：开工、提问、失败、打断与续上、排队与上限、重启、静默、权限放行。
-- `crates/vibevalley-server/tests/session.rs`：轨迹的流式步骤、子 agent 的步骤、落盘读回、工单的观察流。
-- `crates/vibevalley-server/tests/mcp.rs`：`/mcp` 帮工门。
-- `crates/vibevalley-oar/src/tests.rs`、`crates/vibevalley-oar/tests/live.rs`：各家农机的适配（`live.rs` 要装了的农机）。
+- `crates/server/tests/issue_board.rs`：开工、提问、失败、打断与续上、排队与上限、重启、静默、权限放行。
+- `crates/server/tests/session.rs`：轨迹的流式步骤、子 agent 的步骤、落盘读回、工单的观察流。
+- `crates/server/tests/mcp.rs`：`/mcp` 帮工门。
+- `crates/runtime/src/oar/tests.rs`、`crates/runtime/tests/live.rs`：各家农机的适配（`live.rs` 要装了的农机）。

@@ -11330,101 +11330,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
-name = "vibevalley-agent"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "flume 0.12.0",
- "globset",
- "ignore",
- "oxc_allocator",
- "oxc_ast",
- "oxc_ast_visit",
- "oxc_parser",
- "oxc_span",
- "pollster 0.4.0",
- "quickjs-jit",
- "regex",
- "rmcp",
- "rustls",
- "schemars 1.2.3",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "sqlx",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "ureq",
- "uuid",
- "vibevalley-home",
- "vibevalley-oar",
-]
-
-[[package]]
-name = "vibevalley-artifact"
-version = "0.1.0"
-dependencies = [
- "htmlize",
- "lol_html",
- "regex",
- "serde",
- "serde_json",
- "url",
- "vibevalley-core",
- "vibevalley-i18n",
- "vibevalley-protocol",
-]
-
-[[package]]
-name = "vibevalley-bridge"
-version = "0.1.0"
-dependencies = [
- "flume 0.12.0",
- "serde_json",
- "vibevalley-protocol",
- "vibevalley-server-api",
-]
-
-[[package]]
-name = "vibevalley-canvas"
-version = "0.1.0"
-dependencies = [
- "resvg",
- "roxmltree 0.21.2",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "vibevalley-chart"
-version = "0.1.0"
-dependencies = [
- "roxmltree 0.21.2",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "usvg",
-]
-
-[[package]]
-name = "vibevalley-chord"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "flume 0.12.0",
- "futures-util",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "thiserror 2.0.21",
- "tokio",
- "tokio-tungstenite 0.29.0",
- "tokio-util",
-]
-
-[[package]]
 name = "vibevalley-cli"
 version = "0.1.0"
 dependencies = [
@@ -11434,13 +11339,10 @@ dependencies = [
  "serde_json",
  "tempfile",
  "ureq",
- "vibevalley-agent",
  "vibevalley-core",
- "vibevalley-home",
- "vibevalley-http",
  "vibevalley-i18n",
- "vibevalley-oar",
  "vibevalley-protocol",
+ "vibevalley-runtime",
  "vibevalley-server",
 ]
 
@@ -11448,24 +11350,16 @@ dependencies = [
 name = "vibevalley-core"
 version = "0.1.0"
 dependencies = [
+ "htmlize",
  "jiff 1.0.1",
+ "lol_html",
  "regex",
  "serde",
  "serde_json",
- "vibevalley-cron",
+ "sha2 0.11.1",
+ "url",
  "vibevalley-i18n",
  "vibevalley-protocol",
-]
-
-[[package]]
-name = "vibevalley-cron"
-version = "0.1.0"
-dependencies = [
- "jiff 1.0.1",
- "regex",
- "serde",
- "serde_json",
- "vibevalley-i18n",
 ]
 
 [[package]]
@@ -11479,15 +11373,6 @@ dependencies = [
  "notify",
  "nucleo-matcher",
  "tempfile",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "vibevalley-genui"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
  "thiserror 2.0.21",
 ]
 
@@ -11526,32 +11411,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vibevalley-home"
-version = "0.1.0"
-dependencies = [
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "vibevalley-http"
-version = "0.1.0"
-dependencies = [
- "axum",
- "flume 0.12.0",
- "futures-util",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "ureq",
- "vibevalley-bridge",
- "vibevalley-chord",
- "vibevalley-protocol",
- "vibevalley-server-api",
-]
-
-[[package]]
 name = "vibevalley-i18n"
 version = "0.1.0"
 dependencies = [
@@ -11587,38 +11446,16 @@ dependencies = [
  "unicode-segmentation",
  "unicode-width",
  "uuid",
- "vibevalley-bridge",
  "vibevalley-files",
  "vibevalley-git",
  "vibevalley-highlight",
- "vibevalley-http",
  "vibevalley-i18n",
  "vibevalley-pixel",
  "vibevalley-protocol",
- "vibevalley-rich-ui",
+ "vibevalley-rich",
  "vibevalley-server",
- "vibevalley-server-api",
  "vibevalley-terminal",
  "vibevalley-workspace",
-]
-
-[[package]]
-name = "vibevalley-oar"
-version = "0.1.0"
-dependencies = [
- "agent-client-protocol",
- "base64 0.23.1",
- "flume 0.12.0",
- "futures-util",
- "jiff 1.0.1",
- "nix 0.32.0",
- "pollster 0.4.0",
- "proptest",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "uuid",
 ]
 
 [[package]]
@@ -11638,25 +11475,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "vibevalley-pinyin"
-version = "0.1.0"
-
-[[package]]
 name = "vibevalley-pixel"
 version = "0.1.0"
 dependencies = [
  "image",
-]
-
-[[package]]
-name = "vibevalley-pkm"
-version = "0.1.0"
-dependencies = [
- "jiff 1.0.1",
- "regex",
- "serde",
- "serde_json",
- "sha2 0.11.1",
 ]
 
 [[package]]
@@ -11666,11 +11488,12 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "tempfile",
  "ts-rs",
 ]
 
 [[package]]
-name = "vibevalley-rich-ui"
+name = "vibevalley-rich"
 version = "0.1.0"
 dependencies = [
  "nsh-base",
@@ -11680,25 +11503,62 @@ dependencies = [
  "ratex-layout",
  "ratex-parser",
  "ratex-types",
+ "resvg",
  "roxmltree 0.21.2",
+ "serde",
  "serde_json",
+ "thiserror 2.0.21",
  "tokio",
  "ttf-parser",
- "vibevalley-canvas",
- "vibevalley-chart",
- "vibevalley-genui",
+ "usvg",
+ "vibevalley-core",
  "vibevalley-i18n",
  "vibevalley-pele",
- "vibevalley-pinyin",
- "vibevalley-pkm",
  "vibevalley-shiki",
  "zstd",
+]
+
+[[package]]
+name = "vibevalley-runtime"
+version = "0.1.0"
+dependencies = [
+ "agent-client-protocol",
+ "base64 0.23.1",
+ "flume 0.12.0",
+ "futures-util",
+ "globset",
+ "ignore",
+ "jiff 1.0.1",
+ "nix 0.32.0",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_ast_visit",
+ "oxc_parser",
+ "oxc_span",
+ "pollster 0.4.0",
+ "proptest",
+ "quickjs-jit",
+ "regex",
+ "rmcp",
+ "rustls",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "ureq",
+ "uuid",
+ "vibevalley-protocol",
 ]
 
 [[package]]
 name = "vibevalley-server"
 version = "0.1.0"
 dependencies = [
+ "axum",
  "base64 0.23.1",
  "crc32fast",
  "flate2",
@@ -11720,34 +11580,16 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-tungstenite 0.29.0",
+ "tokio-util",
  "ureq",
  "url",
  "uuid",
- "vibevalley-agent",
- "vibevalley-artifact",
- "vibevalley-bridge",
- "vibevalley-chord",
  "vibevalley-core",
- "vibevalley-cron",
  "vibevalley-files",
  "vibevalley-git",
- "vibevalley-home",
- "vibevalley-http",
  "vibevalley-i18n",
- "vibevalley-oar",
- "vibevalley-pkm",
  "vibevalley-protocol",
- "vibevalley-server-api",
-]
-
-[[package]]
-name = "vibevalley-server-api"
-version = "0.1.0"
-dependencies = [
- "flume 0.12.0",
- "serde_json",
- "vibevalley-chord",
- "vibevalley-protocol",
+ "vibevalley-runtime",
 ]
 
 [[package]]

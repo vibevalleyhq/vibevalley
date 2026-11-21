@@ -163,9 +163,9 @@ fn default_qr_border() -> usize {
 
 /// Handles fast, stateless host ops (`host.sha256`, `host.randomBytes`, `host.qr`,
 /// `host.pixelManifest`) on either the engine thread or the shell fallback path.
-pub fn handle_stateless_op(op: &str, payload: &Value) -> Option<vibevalley_bridge::Envelope> {
+pub fn handle_stateless_op(op: &str, payload: &Value) -> Option<vibevalley_server::transport::bridge::Envelope> {
     use serde_json::json;
-    use vibevalley_bridge::{BizCode, Envelope, refusal};
+    use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
     match op {
         "host.sha256" => Some(match serde_json::from_value::<Sha256Request>(payload.clone()) {
             Ok(req) => Envelope::ok(json!({ "hex": sha256_hex(&req.text) })),

@@ -1,6 +1,6 @@
 import type { Endpoint } from "../endpoint";
 import * as S from "./schema";
-import type * as T from "./shapes";
+import type * as T from "./shapes.gen";
 
 export interface ProviderHandlers {
   readonly "provider.get": () => Promise<T.ProviderStatus>;

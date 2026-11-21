@@ -5,30 +5,29 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ## 目录
 
 ```
-crates/vibevalley-server/  服务端（二进制 vibevalley-server）：src/modules 按 6 个业务域分组（work：issue、session、workplace、repo、cron、pull、ledger；
+crates/protocol/           契约与环境约定（vibevalley-protocol）：src/contract/ 一个概念一个文件，typescript.rs 写出 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts；home.rs 为家目录与 server.json 约定
+crates/i18n/               对用户说的话（vibevalley-i18n）：locales/<语言>/<宿主.模块>.json 的词典，Rust 里 t("key")
+crates/core/               核心状态与纯规则（vibevalley-core）：reduce、frame_of、任务状态和阶段、收件箱、巡查、农场画面、简报起草、定时任务（cron/）、笔记大纲（pkm/）与作品引擎（artifact/）
+crates/git/ · files/       仓库 Git 封装（vibevalley-git）与工作区文件搜索和监听（vibevalley-files）
+crates/runtime/            运行时与自研 agent（vibevalley-runtime）：oar/ 驱动（Claude Code、Codex、ACP、scripted）与 agent/ 模型请求（DeepSeek）、持久执行引擎、工具、对话循环和内置 vibevalley 运行时
+crates/engines/            底层引擎：纯 Rust 正则（onig）、语法高亮（shiki）与图谱渲染（pele），供 crates/rich 使用
+crates/rich/               原生富内容组件与辅助（vibevalley-rich）：Markdown、代码块、图谱、画布、图表、GenUI 与拼音匹配（engine/ 含 canvas、chart、genui、pinyin）
+crates/server/             服务端（二进制 vibevalley-server）：src/modules 按 6 个业务域分组（work：issue、session、workplace、repo、cron、pull、ledger；
                            team：agent、orchestrator、memory、provider、tool、mcp；collab：channel、watch、connector、voice；
                            content：attachment、library、media、artifact、pkm；skin：game；infra：setting、column、core；
                            任务板拆成 work/issue（状态与交付）、work/session（执行会话和每一轮）、work/workplace（worktree 与合并），都只经 work/ledger 写），
+                           src/transport/ 收拢接口契约（api）、进程内桥（bridge）、Chord（chord）与 HTTP 门（http）；
                            lib.rs 组装 Hub，start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
-crates/vibevalley-http/    HTTP 门（/api/v1、SSE、/mcp）：照契约的接口表把请求交给服务端
-crates/vibevalley-server-api/  服务端对桥和 HTTP 门的接口（Server trait）
-crates/vibevalley-bridge/  页面和进程内服务端之间的桥（Hub），和顶替服务端的样例（fake）
-crates/vibevalley-core/    核心状态与规则：reduce、frame_of、任务的状态和阶段、收件箱、巡查、农场的画面、简报和起草
-crates/vibevalley-protocol/  契约的源：src/contract 一个概念一个文件；typescript.rs 写出 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
-crates/vibevalley-oar/     oar 的 Rust 实现：Claude Code、Codex、ACP、自研 vibevalley 和测试用的 scripted 引擎
-crates/vibevalley-agent/   VibeValley 自己的 agent：模型请求（DeepSeek）、工具、对话循环和压缩
-crates/vibevalley-cli/     命令行（二进制 vibevalley，clap）：照领域模型一条命令一个操作，经 HTTP 调服务端
-crates/vibevalley-home/    家目录在磁盘上的约定：在哪、server.json、语言；服务端、命令行、原生应用共用
-crates/vibevalley-i18n/    对用户说的话：locales/<语言>/<宿主.模块>.json 的词典，Rust 里 t("key")
-crates/vibevalley-*        其余：git、files、highlight、terminal、workspace（应用外壳的项目、布局、终端与持久化）、pkm、artifact、cron
+crates/cli/                命令行（二进制 vibevalley，clap）：照领域模型一条命令一个操作，经 HTTP 调服务端
 apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳（src/shell/*）、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
-                           ui/ 是 nsh 跑的 TSX：app、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含笔记与作品前端引擎）、farm、infra
+                           crates/ 是桌面独占支撑 crate（pixel、terminal、workspace、highlight）；
+                           ui/ 是 nsh 跑的 TSX：app（含 6 项主导航，详见 docs/subsystems/app.md）、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含笔记与作品前端引擎、5 栏设置）、farm、infra
 apps/island/               刘海上的灵动岛（Swift）：单独的小程序（apps/island/README.md）
 apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成），图和像素字用根目录 assets/ 的
 assets/                    全部的图、像素字、指针和像素村的地图
 packages/protocol/         页面用的契约：src/<概念>/shapes.gen.ts 和 endpoints.gen.ts 是生成的；Zod（schema.ts）、端点表（api.ts）、双端规则（rules/）、
                            client.ts、宿主接口（host.ts）是手写的
-packages/i18n/             页面里 t("key")：src/catalogs.ts 由 i18n:gen 从 crates/vibevalley-i18n/locales 写出
+packages/i18n/             页面里 t("key")：src/catalogs.ts 由 i18n:gen 从 crates/i18n/locales 写出
 packages/testkit/、tsrs/   测试共用的；vp check 用的 TypeScript（tsrs）
 design/                    生图提示词、脚本和切图规则；原图在单独的仓库 vibevalley-art，design/art.sh 链接进来
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
@@ -48,7 +47,7 @@ cargo run -p vibevalley-mac                                     # 原生应用�
 cargo run -p vibevalley-server                                  # 只跑服务端，127.0.0.1:8787；VIBEVALLEY_HOME、VIBEVALLEY_WORK_ROOT、VIBEVALLEY_PORT 改位置
 cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、channel、repo、agent、session、runtime、memory、cron、artifact、pkm、setting、chat、doctor
 vp run rust:check                                               # 改完 crates/ 或 apps/mac/src：cargo fmt、clippy（-D warnings）、cargo test
-vp run protocol:ts                                              # 改了 crates/vibevalley-protocol/src/contract：重写 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
+vp run protocol:ts                                              # 改了 crates/protocol/src/contract：重写 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
 sqlc generate                                                   # 改完 SQLite 表结构或命名查询：重写各模块的 generated/queries.rs
 vp run sql:check                                                # 用 sqlc 1.31.1 对账 Rust 绑定；用 Python 3 的 SQLite 按参数个数预编译每条查询
 vp run goldens                                                  # 改了笔记/作品规则或对照用例：跑 Rust 两个 crate 的 golden 测试
@@ -60,7 +59,7 @@ vp run scripts:test                                             # 改完 scripts
 vp run site:check && vp run site:build                          # 改完 apps/site/：素材和静态生成测试，再构建
 vp run docs:verify                                              # 改完文档、Note 或 skill：格式、目录、链接、旧名字、用语、词典和生成的参考表
 vp run notes:catalog                                            # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
-vp run i18n:gen                                                 # 改了 crates/vibevalley-i18n/locales：重写 catalogs.ts；vpx scripts/gen/i18n.ts check|find <文字> 查问题、找键
+vp run i18n:gen                                                 # 改了 crates/i18n/locales：重写 catalogs.ts；vpx scripts/gen/i18n.ts check|find <文字> 查问题、找键
 vp run capabilities                                             # 改了 <概念>/api.ts 的 can：重写 docs/reference/capabilities.md
 vp run api:client                                               # 改了 <概念>/api.ts 的接口：重写 packages/protocol/src/client.ts
 vp run deadcode                                                 # knip 查 TS 里没人用的文件、导出和依赖
@@ -92,7 +91,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **边界解码一次，门内全是类型**：HTTP、文件、厂商响应、模型给的工具参数，各在进门处用 serde 解码成结构体和 enum；门内不传 `serde_json::Value`、不按字符串分支；钥匙包进 `Secret`（打印只出提示）；页面在边界用 Zod 解码（`satisfies Codec<T.X>`）（[类型驱动与进门解码](docs/style/module-design.md)）。
 - **深模块**：每个模块对外一个窄接口；不靠一个带 `kind` 的入口复用多种操作（[模块设计](docs/style/module-design.md)）。
 - **封闭的联合穷尽处理**：Rust 的 `match` 不写吞掉新成员的 `_`；TS 按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员（`switch-exhaustiveness-check` 查）。
-- **契约改在 Rust**：形状和接口表改 `crates/vibevalley-protocol/src/contract`，TS 的类型由它生成；页面要用的同改手写的 `schema.ts` 与 `api.ts`，它们的测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
+- **契约改在 Rust**：形状和接口表改 `crates/protocol/src/contract`，TS 的类型由它生成；页面要用的同改手写的 `schema.ts` 与 `api.ts`，它们的测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
 - **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、artifact 与 pkm 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。SQLite 查询绑定由 sqlc 生成，输入和输出见[配置](sqlc.yaml)。
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层、旧数据兜底或迁移脚本；对外 HTTP `v1` 是唯一例外（[接口版本](docs/subsystems/core.md)）。
 - **页面不折事实**：页面只读推来的 `StateFrame` 并写画面摆法，请求只经 `Transport`；缺数据就补进契约与 `reduce` 或调接口问服务端（[客户端](docs/subsystems/app.md)）。
@@ -102,7 +101,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **图标分两套**：工作台用 `apps/mac/ui/design/icons.ts` 注册的 reicon 线条图标（`<Icon name>`），像素皮与头像、引擎 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
 - **界面照田间工作台**：工作台和原生壳面的颜色、圆角、字号、阴影和缓动一律走 `design/tokens.json`（由 `vp run tokens:gen` 同步写出 `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json`、`apps/mac/ui/design/tokens.ts` 与 `apps/mac/src/theme_tokens.rs`）；照 [设计系统](docs/design/README.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)，class 写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
 - **密钥**：家目录的 `settings.json` 不进仓库；日志、快照和文档里不出现真实密钥。
-- **话放在哪**：对用户的话进 `crates/vibevalley-i18n/locales/{zh,en}/<宿主.模块>.json`，Rust 调 `vibevalley_i18n::t`，TS 调 `t("key")`（`vpx scripts/gen/i18n.ts check` 查漏翻）；对模型的话用中文写进 `crates/vibevalley-server/assets`（[话放在哪](docs/subsystems/foundation.md)）。
+- **话放在哪**：对用户的话进 `crates/i18n/locales/{zh,en}/<宿主.模块>.json`，Rust 调 `vibevalley_i18n::t`，TS 调 `t("key")`（`vpx scripts/gen/i18n.ts check` 查漏翻）；对模型的话用中文写进 `crates/server/assets`（[话放在哪](docs/subsystems/foundation.md)）。
 - **代码风格**：代码和接口用实际业务概念，种地双关只留在农场的皮里（`stale-names.ts` 查，[用语表](docs/README.md#用语)）；命名站在领域视角说管什么事，不用 `utils`、`state` 一类泛词（[命名](docs/style/naming.md)）；英文注释只写不看就会改错的约束与原因（[代码风格](docs/style/code.md)）。
 - **测试**：行为在能发现出错的最低层测；服务端的测试在 `crates/*/tests`，用 scripted 引擎与真 git 离线跑；页面的测试用 `nsh/test` 喂样例的 `Transport`，像素场景在 CPU 上画出来查；不写硬编码睡眠等待（TS 由 `no-test-sleep` 查）；修缺陷补 `regression` 测试。
 - **改完要验证**：先跑最窄的静态与单元检查；改了接口、服务、页面或像素场景，照 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 在真实程序上验收并附上证据。

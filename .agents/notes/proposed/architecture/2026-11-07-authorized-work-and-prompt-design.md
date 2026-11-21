@@ -6,8 +6,8 @@ Status: proposed
 
 工单已具备 `IssueMandate`（`explicitMandate` / `inferredMandate`）、`actsForUser` 基础拦截与完整标题落库（`shortTitle` 仅用于展示），但从「用户授权」到「持续推进并可信交付」仍有四处接缝：
 
-- **提示词仍鼓励大活拆单交回，且只读/起草靠提示词豁免而非工具隔离**：`crates/vibevalley-server/assets/`、`crates/vibevalley-server/src/modules/agent/drive.rs` 与 `crates/vibevalley-server/src/modules/orchestrator/words.rs` 中，只读调研（`deliver: "answer"`）与起草模式靠追加「不用提交」豁免句抵消通用执行规则，未与工具集权限对齐。
-- **后台回合派单与已批定时任务跨轮授权未精确分档**：后台无用户当轮原话（`Route.user` 为假）时，`crates/vibevalley-server/src/modules/tool/issue.rs` 中 `issue_create({ start: true })`、`issue_update`、`issue_status_update` 的四档硬拦截与用户亲自创建/批准的 `cron` 到期触发时的派工授权尚未按风险分档闭环。
+- **提示词仍鼓励大活拆单交回，且只读/起草靠提示词豁免而非工具隔离**：`crates/server/assets/`、`crates/server/src/modules/agent/drive.rs` 与 `crates/server/src/modules/orchestrator/words.rs` 中，只读调研（`deliver: "answer"`）与起草模式靠追加「不用提交」豁免句抵消通用执行规则，未与工具集权限对齐。
+- **后台回合派单与已批定时任务跨轮授权未精确分档**：后台无用户当轮原话（`Route.user` 为假）时，`crates/server/src/modules/tool/issue.rs` 中 `issue_create({ start: true })`、`issue_update`、`issue_status_update` 的四档硬拦截与用户亲自创建/批准的 `cron` 到期触发时的派工授权尚未按风险分档闭环。
 - **人工叫停与技术受阻未区分持久化来源**：人工暂停缺少跨重启保留的来源与解除条件记录，需防止普通进度询问或机器人 CI/Review 反馈把人工叫停的工单擅自唤醒。
 - **报告后连接断开可能覆盖已提交的成功汇报**：帮工已调用 `issue_report` 提交结论后若底层连接异常断开，需同时保留结构化汇报与断连错误事实。
 
@@ -33,7 +33,7 @@ Status: proposed
 | 用户确认完成（`done`） | 保留已完成事实；后续评论按明确重开规则判定，不静默重开 | 任意回合结束 |
 | 人工暂停 / 撤回授权 | 记录暂停来源与解除条件并跨重启保留；普通询问、机器人反馈与重启不自动解除 | 模型暂时无下一步 |
 
-- **按角色与模式装配提示词**：按助手 / 帮工与「执行 / 起草 / 只读问答」分块装配中文提示词（`crates/vibevalley-server/assets/` 与 `modules/agent/drive.rs`，遵循 [写作](docs/style/writing.md)），移除相互抵消的豁免句，并在服务端同步收窄只读/起草会话的可调写工具，记录提示前缀指纹。
+- **按角色与模式装配提示词**：按助手 / 帮工与「执行 / 起草 / 只读问答」分块装配中文提示词（`crates/server/assets/` 与 `modules/agent/drive.rs`，遵循 [写作](docs/style/writing.md)），移除相互抵消的豁免句，并在服务端同步收窄只读/起草会话的可调写工具，记录提示前缀指纹。
 - **报告后断连保留双事实**：会话已收到结构化 `issue_report` 后若底层进程或连接报错，同时保留汇报内容与真实错误记录，不抹掉已交回的结论。
 
 ## Alternatives considered

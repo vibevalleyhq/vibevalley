@@ -8,7 +8,7 @@ Status: proposed
 
 ## Proposal
 
-1. **纯函数仓库健康度（`crates/vibevalley-core` 与 `packages/protocol/src/rules`）**：按开着的工单与当日花费确定性算出三档健康度及原因工单列表，服务端、助手与页面共用：
+1. **纯函数仓库健康度（`crates/core` 与 `packages/protocol/src/rules`）**：按开着的工单与当日花费确定性算出三档健康度及原因工单列表，服务端、助手与页面共用：
    - **顺利（`on_track`）**：无 `stuck` 工单，且等用户的工单均未超过 24 小时。
    - **有风险（`at_risk`）**：存在 `stuck` 工单、等用户超 24 小时的工单，或当日花费超预算 80%。
    - **卡住了（`off_track`）**：`stuck` 工单超过在办半数，或存在等用户超 72 小时的工单。
@@ -27,4 +27,4 @@ Status: proposed
 
 ## Risks
 
-- 健康度时间与预算阈值需在实机使用后微调，统一收敛在 `crates/vibevalley-core`（与 `packages/protocol/src/rules`）维护。
+- 健康度时间与预算阈值需在实机使用后微调，统一收敛在 `crates/core`（与 `packages/protocol/src/rules`）维护。

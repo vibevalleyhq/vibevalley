@@ -8,7 +8,7 @@ Status: proposed
 
 ## Proposal
 
-1. **协议与接口（`memory.tree`）**：在 `crates/vibevalley-protocol/src/contract/memory.rs` 定义 `MemoryTree`（同步生成 TS 类型），新增 `memory.tree` 接口汇总全农场各档案的 `note`（叶）、`issue`（果）、候选手艺（种子）、`fading` 列表及共现关联边 `links`。
+1. **协议与接口（`memory.tree`）**：在 `crates/protocol/src/contract/memory.rs` 定义 `MemoryTree`（同步生成 TS 类型），新增 `memory.tree` 接口汇总全农场各档案的 `note`（叶）、`issue`（果）、候选手艺（种子）、`fading` 列表及共现关联边 `links`。
 2. **累计计数与成长阶段**：在 `server.db` 中持久化只增不减的累计运行轮数与累计召回次数，由服务端算出成长阶段（芽 / 小苗 / 小树 / 大树 / 老树）填入 `MemoryTree.stage`。
 3. **手艺播种进技能书**：用户在记忆树面板点击一颗手艺种子的「播种」并确认后，调用技能接口将其写入农场技能书（[档案和农机](docs/subsystems/agent.md)）。
 

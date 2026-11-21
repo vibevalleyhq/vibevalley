@@ -6,7 +6,7 @@
 use std::sync::{Arc, OnceLock};
 
 use serde_json::Value;
-use vibevalley_bridge::{Envelope, LiveEvent, Server};
+use vibevalley_server::transport::bridge::{Envelope, LiveEvent, Server};
 
 #[derive(Clone)]
 pub struct LateServer {
@@ -55,7 +55,7 @@ impl Server for LateServer {
     fn raise_budget(&self, input: Value) -> Envelope {
         self.server().raise_budget(input)
     }
-    fn space_document(&self) -> Option<vibevalley_server_api::Document> {
+    fn space_document(&self) -> Option<vibevalley_server::transport::api::Document> {
         self.server().space_document()
     }
     fn call(&self, op: &str, payload: Value) -> Envelope {
@@ -96,7 +96,7 @@ impl Server for LateServer {
 mod tests {
     use super::*;
     use serde_json::json;
-    use vibevalley_bridge::fake::FakeServer;
+    use vibevalley_server::transport::bridge::fake::FakeServer;
 
     #[test]
     fn regression_a_closed_workbench_does_not_wait_for_server_startup() {

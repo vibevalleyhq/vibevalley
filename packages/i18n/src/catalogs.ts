@@ -1,4 +1,4 @@
-// Written by `vpx scripts/gen/i18n.ts gen` from crates/vibevalley-i18n/locales: do not edit.
+// Written by `vpx scripts/gen/i18n.ts gen` from crates/i18n/locales: do not edit.
 
 /** Each language's catalogs by namespace. */
 export const catalogs = {

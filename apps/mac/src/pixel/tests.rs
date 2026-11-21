@@ -10,9 +10,7 @@ use super::farm::scene::FarmScene;
 use super::*;
 
 fn fixture(name: &str) -> serde_json::Value {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../crates/vibevalley-bridge/fixtures/farm")
-        .join(name);
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../crates/server/fixtures/farm").join(name);
     serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
 }
 

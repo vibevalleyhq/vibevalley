@@ -1,6 +1,24 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "apps/mac"]
+members = [
+  "crates/protocol",
+  "crates/i18n",
+  "crates/core",
+  "crates/git",
+  "crates/files",
+  "crates/runtime",
+  "crates/server",
+  "crates/cli",
+  "crates/rich",
+  "crates/engines/onig",
+  "crates/engines/pele",
+  "crates/engines/shiki",
+  "apps/mac",
+  "apps/mac/crates/pixel",
+  "apps/mac/crates/terminal",
+  "apps/mac/crates/workspace",
+  "apps/mac/crates/highlight",
+]
 exclude = ["apps/mac/ui"]
 
 [workspace.package]

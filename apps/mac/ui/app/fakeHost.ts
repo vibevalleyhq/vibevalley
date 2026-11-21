@@ -1,11 +1,4 @@
-// Plays the Rust side of the bridge in tests: the actions ui/bridge.ts
-// posts, answered as crates/vibevalley-bridge's hub and FakeServer answer them
-// (calls from `responses`, a function there called with the payload, else
-// RouteNotFound; `watch state` sends the
-// frame; a subscription is accepted and stays open, its events sent with
-// `emit` as `sub:<id>` = { event }, `end` ends it with { end: null }).
-// Replies queue until `pump` sends them, since a handler cannot send while
-// the app is posting.
+// Replies queue until `pump` sends them: a handler cannot send while the app is posting.
 import type { OpenOptions } from "nsh/test";
 
 type App = {

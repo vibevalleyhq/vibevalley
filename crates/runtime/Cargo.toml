@@ -1,0 +1,40 @@
+[package]
+name = "vibevalley-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "VibeValley agent runtimes: external CLI/ACP engines (oar) and built-in DeepSeek harness (agent)"
+
+[dependencies]
+agent-client-protocol = "5.2.0"
+base64 = { workspace = true }
+flume = { workspace = true }
+futures-util = { workspace = true }
+globset = "0.4.21"
+ignore = "0.4.34"
+jiff = { workspace = true }
+nix = { version = "0.32.0", features = ["signal", "process"] }
+oxc_allocator = "0.159.0"
+oxc_ast = "0.159.0"
+oxc_ast_visit = "0.159.0"
+oxc_parser = "0.159.0"
+oxc_span = "0.159.0"
+pollster = { workspace = true }
+regex = { workspace = true }
+rmcp = { version = "3.9.0", default-features = false, features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest-tls-no-provider"] }
+rquickjs = { package = "quickjs-jit", version = "0.14.2" }
+rustls = { workspace = true }
+schemars = "1.2.3"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+ureq = { version = "3.5.2", features = ["json"] }
+uuid = { workspace = true }
+vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
+
+[dev-dependencies]
+proptest = "1.12.0"

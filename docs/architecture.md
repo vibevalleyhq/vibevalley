@@ -10,8 +10,8 @@ flowchart LR
   end
 
   subgraph Server[服务端 vibevalley-server · 在应用的进程里，或单独跑]
-    BRIDGE[vibevalley-bridge<br/>进程内的桥]
-    HTTP[vibevalley-http · 127.0.0.1<br/>/api/v1、SSE、/mcp]
+    BRIDGE[transport/bridge<br/>进程内的桥]
+    HTTP[transport/http · 127.0.0.1<br/>/api/v1、SSE、/mcp]
     HUB[Hub<br/>核心状态 SpaceState]
     FM[主助手<br/>自研 agent + 工具]
     CHAT[频道<br/>群聊 · SQLite]
@@ -44,7 +44,7 @@ flowchart LR
 
 系统交互走两条线：
 
-- **命令**：接口表是 `vibevalley-protocol` 的 `ENDPOINTS`（`crates/vibevalley-protocol/src/contract/endpoints.rs`）。原生应用的页面经进程内的桥按操作名调（[客户端](docs/subsystems/app.md#桥)），命令行经 HTTP `POST /api/v1/<路径>` 调；两条路进的是同一个 `Hub`。执行会话通过服务端的 `/mcp` 调工具（[频道](docs/subsystems/channel.md)）。
+- **命令**：接口表是 `vibevalley-protocol` 的 `ENDPOINTS`（`crates/protocol/src/contract/endpoints.rs`）。原生应用的页面经进程内的桥按操作名调（[客户端](docs/subsystems/app.md#桥)），命令行经 HTTP `POST /api/v1/<路径>` 调；两条路进的是同一个 `Hub`。执行会话通过服务端的 `/mcp` 调工具（[频道](docs/subsystems/channel.md)）。
 - **状态**：服务端持有唯一的核心状态 `SpaceState`。状态每变一次产生一条事实（`Fact`），客户端只收折好的帧：桥上的 `frame:state`，HTTP 上的 `GET /api/v1/state`。
 
 只支持 macOS，只在本机：没有浏览器页面、手机壳和从别的设备进来的门（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
@@ -53,19 +53,18 @@ flowchart LR
 
 仓库目录结构见根目录 [AGENTS.md](AGENTS.md#目录)。
 
-- **契约（`crates/vibevalley-protocol` → `packages/protocol`）**：服务端与客户端唯一的共享契约，以 Rust 为源：`src/contract/` 一个概念一个文件，`typescript.rs` 写出 `packages/protocol/src/<概念>/shapes.gen.ts` 与 `endpoints.gen.ts`（`vp run protocol:ts`）；页面在边界解码用的 Zod（`schema.ts`）和带入参出参的端点表（`api.ts`）是手写的，由测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
-- **规则（`crates/vibevalley-core`）**：只读状态的纯函数：`reduce`、`frame_of`、任务的状态与阶段和可做的动作、收件箱、巡查、简报和起草、农场的画面（[核心状态](docs/subsystems/core.md)）。
-- **服务（`crates/vibevalley-server`）**：`src/lib.rs` 的 `Hub` 持有核心状态和接口表，模块用 `Hub::on` 按接口挂处理函数、只经 `Hub::apply` 改状态。`src/modules/` 一个概念一个模块（`mod.rs` 列全），`src/start.rs` 照依赖次序打开它们：设置、游戏、AI 服务、角色和引擎、仓库、记忆、轨迹、任务板（`modules/work/issue` 的 `Board`，执行会话在 `modules/work/session`，worktree 与合并在 `modules/work/workplace`，都经 `modules/work/ledger.rs` 写）、定时任务（`modules/work/cron`）、PR 与分支发布（`modules/work/pull`）、附件、媒体、频道、作品（`modules/content/artifact`）、笔记、工具和 `/mcp`、主助手、观察层。
-- **门（`crates/vibevalley-http`、`crates/vibevalley-bridge`）**：HTTP 门按接口表挂路由，SSE 给 `/state`、`/live`、`/events`，`/mcp` 交给服务端的工具；桥让原生应用的页面在进程内调同一个 `Server`（`crates/vibevalley-server-api`）。
-- **引擎（`crates/vibevalley-oar`、`crates/vibevalley-agent`）**：oar 的 Rust 实现驱动 Claude Code、Codex、ACP、自研 `vibevalley` 与测试用的 scripted；自研 agent 只接 DeepSeek（[自研 agent](docs/subsystems/brain.md)）。
+- **契约与环境约定（`crates/protocol` → `packages/protocol`）**：服务端与客户端唯一的共享契约，以 Rust 为源：`src/contract/` 一个概念一个文件，`typescript.rs` 写出 `packages/protocol/src/<概念>/shapes.gen.ts` 与 `endpoints.gen.ts`（`vp run protocol:ts`）；`home.rs` 约定家目录、`server.json` 与语言；页面在边界解码用的 Zod（`schema.ts`）和带入参出参的端点表（`api.ts`）是手写的，由测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
+- **规则（`crates/core`）**：纯函数规则层：`reduce`、`frame_of`、任务的状态与阶段和可做的动作、收件箱、巡查、简报和起草、农场的画面（[核心状态](docs/subsystems/core.md)），并收拢定时任务规则（`cron/`）、笔记大纲引擎（`pkm/`）与作品引擎（`artifact/`）。
+- **服务与传输（`crates/server`）**：`src/lib.rs` 的 `Hub` 持有核心状态和接口表，`src/modules/` 按 `work`、`team`、`collab`、`content`、`skin`、`infra` 六个业务域分组，`src/start.rs` 照依赖次序打开各模块（任务板拆成 `work/issue`、`work/session`、`work/workplace`，都只经 `work/ledger.rs` 写）；`src/transport/` 收拢服务接口（`api`）、进程内桥（`bridge`）、Chord 状态同步（`chord`）和 HTTP 门（`http`：命令、SSE、`/mcp`）。
+- **运行与引擎（`crates/runtime`、`crates/rich`、`crates/engines`）**：`crates/runtime` 合拢 `oar/`（Claude Code、Codex、ACP、自研 `vibevalley` 与 scripted）与自研 `agent/`（只接 DeepSeek，[自研 agent](docs/subsystems/brain.md)）；`crates/rich` 基于 `crates/engines/{onig,pele,shiki}` 提供原生富内容组件与文本引擎（`engine/{canvas,chart,genui,pinyin}`）。
 - **存储（SQLite + 文件）**：模块各自在家目录的 `server.db` 建表（`create table if not exists`），任务、执行会话、每轮与待带的话也在同一个库；没有迁移，形状变了直接改。
-- **客户端（`apps/mac`、`crates/vibevalley-cli`）**：原生应用带着服务端，工作台是 nsh 跑的 TSX，像素场景由 Rust 画（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)）；命令行经 `server.json` 找到运行中的服务端。
+- **客户端（`apps/mac`、`crates/cli`）**：原生应用带着服务端（外壳拆为 `apps/mac/src/shell/` 八个文件，独占支撑库在 `apps/mac/crates/{pixel,terminal,workspace,highlight}`），工作台（`apps/mac/ui/{app,workspace,design,features,farm,infra}`）是 nsh 跑的 TSX，像素场景由 Rust 画（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)）；命令行经 `server.json` 找到运行中的服务端。
 
 ## 核心状态
 
 `SpaceState`（契约的 `core` 形状）汇总实时状态：在场执行会话（主助手与执行会话）、最近的频道和话题、开着的与最近关闭的任务、定时任务、commit 数、游戏进度与地块动作（[核心状态](docs/subsystems/core.md)）。
 
-- **唯一修改入口**：只有 `Hub::apply` 修改 `SpaceState`。纯函数 `reduce`（`crates/vibevalley-core/src/core.rs`）计算新状态；不改变状态的事实不发送。
+- **唯一修改入口**：只有 `Hub::apply` 修改 `SpaceState`。纯函数 `reduce`（`crates/core/src/core.rs`）计算新状态；不改变状态的事实不发送。
 - **派生帧 `StateFrame`**：`GET /api/v1/state` 至多每 200 毫秒推送一帧。纯函数 `frame_of`（同一个文件）在状态副本上填入界面文案、任务 `stage` 与可执行动作，并计算收件箱、农场画面和特效。
 
 ## 事件流和接口
@@ -80,7 +79,7 @@ Host：
 
 | 路径 | 内容 |
 |---|---|
-| `server.json` | 当前运行服务端的地址与 pid（命令行据此找服务端，`crates/vibevalley-home`） |
+| `server.json` | 当前运行服务端的地址与 pid（命令行据此找服务端，`crates/protocol/src/home.rs`） |
 | `config.json` | 角色（主助手和执行角色）、技能书、引擎设置 |
 | `agent-templates/<id>/` | 从本机导入的角色模板 |
 | `settings.json` | 钥匙、AI 服务连接（权限 `0600`） |

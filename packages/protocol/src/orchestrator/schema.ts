@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { Codec } from "../codec";
-import type * as T from "./shapes";
+import type * as T from "./shapes.gen";
 
 export const OrchestratorEvalRequest = z.object({
   agent: z.exactOptional(z.string()),

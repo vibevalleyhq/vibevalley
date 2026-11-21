@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-Chord 执行治理文档（`/chord/ws`、`space`、`budget.raise`，见 [Chord](crates/vibevalley-chord/README.md)）、持久执行引擎（`crates/vibevalley-durable`、`crates/vibevalley-durable-codemode`、`crates/vibevalley-agent/src/generation/`）与 `crates/vibevalley-oar` 的八个 Go 基线外部驱动均已合入 `main` 并通过离线回放回归（现状沉淀见 [核心状态](docs/subsystems/core.md)、[VibeValley 自己的 agent](docs/subsystems/brain.md)、[助手](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)）。
+Chord 执行治理文档（`/chord/ws`、`space`、`budget.raise`，见 [Chord](crates/server/src/transport/chord/README.md)）、持久执行引擎（`crates/vibevalley-durable`、`crates/vibevalley-durable-codemode`、`crates/runtime/src/agent/generation/`）与 `crates/runtime/src/oar` 的八个 Go 基线外部驱动均已合入 `main` 并通过离线回放回归（现状沉淀见 [核心状态](docs/subsystems/core.md)、[VibeValley 自己的 agent](docs/subsystems/brain.md)、[助手](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)）。
 
 还剩三类未完成的实机与视觉验收缺口：
 
@@ -16,7 +16,7 @@ Chord 执行治理文档（`/chord/ws`、`space`、`budget.raise`，见 [Chord](
 
 ### 一、外部驱动实机验收缺口
 
-八个 Go 基线驱动均已在 Rust 注册并通过离线回放（[八驱动回放](crates/vibevalley-oar/tests/go_drivers.rs) · [生命周期回归](crates/vibevalley-oar/tests/lifecycle.rs) · [SDK 回放](crates/vibevalley-oar/tests/sdk_replay.rs)），下表仅列尚未完成实机核对的缺口：
+八个 Go 基线驱动均已在 Rust 注册并通过离线回放（[八驱动回放](crates/runtime/tests/oar/go_drivers.rs) · [生命周期回归](crates/runtime/tests/oar/lifecycle.rs) · [SDK 回放](crates/runtime/tests/oar/sdk_replay.rs)），下表仅列尚未完成实机核对的缺口：
 
 | 驱动 | 离线已覆盖 | 尚待真实 CLI 核对 |
 | --- | --- | --- |
@@ -31,8 +31,8 @@ Chord 执行治理文档（`/chord/ws`、`space`、`budget.raise`，见 [Chord](
 
 | 范围 | 已有实现 | 尚待补齐或实测 |
 | --- | --- | --- |
-| 压缩 | `crates/vibevalley-agent/src/core/pipeline.rs` 与 `compaction/` 含手工、软/硬阈值与溢出四级 | 原生界面触发手工压缩；真实模型触达各阈值行为 |
-| CodeMode | `crates/vibevalley-agent/src/codemode/`（QuickJS）与执行引擎已注册并通过回放 | 普通助手或帮工对话创建 CodeMode 脚本任务的入口 |
+| 压缩 | `crates/runtime/src/agent/core/pipeline.rs` 与 `compaction/` 含手工、软/硬阈值与溢出四级 | 原生界面触发手工压缩；真实模型触达各阈值行为 |
+| CodeMode | `crates/runtime/src/agent/codemode/`（QuickJS）与执行引擎已注册并通过回放 | 普通助手或帮工对话创建 CodeMode 脚本任务的入口 |
 | 取消与预算 | 调度器级联取消、预算暂停与 `budget.raise` 已通过离线回归 | 真实厂商请求何时停止计费及厂商账单核对 |
 
 ### 三、完整农场视觉对照验收
@@ -64,5 +64,5 @@ Chord 执行治理文档（`/chord/ws`、`space`、`budget.raise`，见 [Chord](
 
 ## Risks
 
-- SQLite 提交与外部命令执行之间始终存在崩溃窗口：外部命令已写文件或提交 Git 但工具结果尚未记账时，数据库去重只能约束任务与通知，需继续依赖调用 ID、工作目录核对标记与工具可重放声明（[副作用中断回归](crates/vibevalley-agent/src/tests.rs)）。
+- SQLite 提交与外部命令执行之间始终存在崩溃窗口：外部命令已写文件或提交 Git 但工具结果尚未记账时，数据库去重只能约束任务与通知，需继续依赖调用 ID、工作目录核对标记与工具可重放声明（[副作用中断回归](crates/runtime/src/agent/tests.rs)）。
 - 外部厂商 CLI 版本更新可能改变 ACP/SDK 协议字段，实机验收需记录具体 CLI 版本号并保留脱敏回放样本。

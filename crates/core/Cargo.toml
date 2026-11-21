@@ -1,0 +1,18 @@
+[package]
+name = "vibevalley-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "VibeValley's domain state reduction, frame projection, schedule rules, PKM parser, and artifact engine"
+
+[dependencies]
+vibevalley-i18n = { version = "0.1.0", path = "../i18n" }
+vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
+htmlize = { version = "1.1.0", features = ["unescape"] }
+jiff = { workspace = true }
+lol_html = "3.0.3"
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+url = { workspace = true }

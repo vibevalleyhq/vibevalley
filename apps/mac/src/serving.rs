@@ -79,7 +79,7 @@ impl OpeningPhase {
 
 pub struct Running {
     started: vibevalley_server::Started,
-    listener: Option<vibevalley_http::Listener>,
+    listener: Option<vibevalley_server::transport::http::Listener>,
     announced: Option<vibevalley_server::home::Announced>,
 }
 
@@ -89,7 +89,11 @@ fn lock_running() -> std::sync::MutexGuard<'static, Option<Running>> {
     RUNNING.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-pub fn set_running(started: vibevalley_server::Started, listener: Option<vibevalley_http::Listener>, announced: Option<vibevalley_server::home::Announced>) {
+pub fn set_running(
+    started: vibevalley_server::Started,
+    listener: Option<vibevalley_server::transport::http::Listener>,
+    announced: Option<vibevalley_server::home::Announced>,
+) {
     *lock_running() = Some(Running { started, listener, announced });
 }
 
@@ -108,9 +112,9 @@ pub fn voice() -> Result<std::sync::Arc<vibevalley_server::modules::collab::voic
         .ok_or_else(|| "the voice service is not ready".into())
 }
 
-pub fn speech() -> Result<vibevalley_server_api::media::SharedSpeechStreams, String> {
+pub fn speech() -> Result<vibevalley_server::transport::api::media::SharedSpeechStreams, String> {
     lock_running()
         .as_ref()
-        .map(|r| -> vibevalley_server_api::media::SharedSpeechStreams { r.started.media.clone() })
+        .map(|r| -> vibevalley_server::transport::api::media::SharedSpeechStreams { r.started.media.clone() })
         .ok_or_else(|| "the speech service is not ready".into())
 }

@@ -15,7 +15,7 @@ Status: proposed
 ### 砍掉的（不复刻，或简化）
 
 - **oar**：内置 Claude Code、Codex、ACP（`acp:gemini`、`grok`、`kimi`、`codebuddy`、`opencode`）、SDK（`qwen`、`qoder`）、自研 `vibevalley` 与测试用 `scripted`；不做运行时的 skills / MCP / tools 清单、额度与花费的逐厂商细节，不接 `cursor` 与 `dsh`。
-- **pi-ai / pi-durable**：自研 agent（`crates/vibevalley-agent`）只接 DeepSeek（OpenAI 兼容接口），不做多厂商路由与完整价目表。
+- **pi-ai / pi-durable**：自研 agent（`crates/runtime/src/agent`）只接 DeepSeek（OpenAI 兼容接口），不做多厂商路由与完整价目表。
 - **语音（声网 RTC）**：服务端已在 Rust 上重做（`modules/voice`）；原生页面跑在 nsh 上，宿主实现 MOSS Live 的 WebSocket 与原生音频，不接声网原生 SDK，当前边界见[语音](docs/subsystems/voice.md)。没搬的：通话中途的收件箱播报、声网区域切换、助手回复按 token 流式送出（改为按句）。
 - **外部聊天接入（微信、飞书、QQ）**：已在 Rust 上重做（`modules/connector`）；飞书长连接帧按协议手写，仅对着本地替身测过，尚未连真实飞书验证。
 - **手机壳与「连接到本机」**：已随 `apps/mobile` 删除，`lan.*` 与 `user.*`（账号、设备、授权）整个删除，只支持 macOS 本机单用户。

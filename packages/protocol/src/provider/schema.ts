@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { codePoints, KeyStatus } from "../common/schema";
-import type * as T from "./shapes";
+import type * as T from "./shapes.gen";
 
 const ProviderModel = z.object({ id: z.string(), owner: z.string() }) satisfies Codec<T.ProviderModel>;
 const ProviderConnection = z.object({

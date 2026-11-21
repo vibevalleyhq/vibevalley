@@ -1,6 +1,6 @@
 # 语音
 
-听写、通话的凭据、通话本身，在 Rust 服务端的 `crates/vibevalley-server/src/modules/collab/voice/`，接口是 `voice.*` 九个。服务端不碰音频：进声网的 RTC 频道、连 MOSS Live 的 socket、采集和播放，都是宿主（原生应用，和服务端同一个进程）的事。
+听写、通话的凭据、通话本身，在 Rust 服务端的 `crates/server/src/modules/collab/voice/`，接口是 `voice.*` 九个。服务端不碰音频：进声网的 RTC 频道、连 MOSS Live 的 socket、采集和播放，都是宿主（原生应用，和服务端同一个进程）的事。
 
 ## 在哪
 
@@ -46,7 +46,7 @@ MOSS Live 的电话没有声网：宿主照 `MossLine` 给的地址和 Key 连�
 - **主监听不上公网**：隧道只通到语音线路的端口；线路只认路径上的电话号和它的钥匙，其余一律 401 或 404。
 - **凭据跟着电话**：发凭据时的声网凭据一直用到这通电话结束，中途改设置不影响它；没用上的凭据一小时后作废，一份凭据只开一通电话。
 - **验 Key 不开会话**：`voice.moss.verify` 只带着 Key 问一次 MOSS 的实时地址，不采集也不发送音频。
-- **测试离线**：厂商经 `Fetch` 注入，隧道和重试的等待也能换掉（`crates/vibevalley-server/tests/voice.rs`）；令牌对着 `agora-token` 算出的值，join 请求对着 `tests/fixtures/voice-requests.json` 里 SDK 发过的请求。
+- **测试离线**：厂商经 `Fetch` 注入，隧道和重试的等待也能换掉（`crates/server/tests/voice.rs`）；令牌对着 `agora-token` 算出的值，join 请求对着 `tests/fixtures/voice-requests.json` 里 SDK 发过的请求。
 
 ## 没做的
 

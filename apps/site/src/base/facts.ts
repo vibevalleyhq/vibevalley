@@ -7,6 +7,6 @@ export const FACTS = [
   { key: "achievements", n: 21, icon: "icon-trophy" },
   // GameId in apps/mac/ui/farm/PhoneGames.tsx.
   { key: "games", n: 5, icon: "icon-star" },
-  // WeChat, Feishu, QQ (packages/protocol/src/connector/shapes.ts, ConnectorIDValues).
+  // WeChat, Feishu, QQ (packages/protocol/src/connector/shapes.gen.ts, ConnectorIDValues).
   { key: "connectors", n: 3, icon: "icon-pigeon" },
 ] as const;

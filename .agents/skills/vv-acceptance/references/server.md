@@ -4,11 +4,11 @@
 
 ## 什么时候用
 
-- 改了 `crates/vibevalley-server`（模块、端点、开机的 [start.rs](crates/vibevalley-server/src/start.rs)、[main.rs](crates/vibevalley-server/src/main.rs)）、`crates/vibevalley-core`、`crates/vibevalley-http`：新的或改过的接口、服务的行为、表结构。
-- 改了 `crates/vibevalley-protocol` 的接口或形状（生成到 `packages/protocol`）。
-- 改了命令行 `crates/vibevalley-cli`。
+- 改了 `crates/server`（模块、端点、开机的 [start.rs](crates/server/src/start.rs)、[main.rs](crates/server/src/main.rs)）、`crates/core`、`crates/server/src/transport/http`：新的或改过的接口、服务的行为、表结构。
+- 改了 `crates/protocol` 的接口或形状（生成到 `packages/protocol`）。
+- 改了命令行 `crates/cli`。
 
-真的帮工要本机登录的农机（`claude`、`codex`……）或 DeepSeek 的钥匙，会花钱，要先问用户；这里用 `--scripted-helper`：沙箱设 `VIBEVALLEY_TEST_RUNTIMES=1`，服务端只装一个照工单字眼干活的替身农机 `pi`（[testing.rs](crates/vibevalley-server/src/testing.rs)），别的农机都当没装。帮工的更多行为照样写测试（`crates/vibevalley-server/tests/`）。
+真的帮工要本机登录的农机（`claude`、`codex`……）或 DeepSeek 的钥匙，会花钱，要先问用户；这里用 `--scripted-helper`：沙箱设 `VIBEVALLEY_TEST_RUNTIMES=1`，服务端只装一个照工单字眼干活的替身农机 `pi`（[testing.rs](crates/server/src/testing.rs)），别的农机都当没装。帮工的更多行为照样写测试（`crates/server/tests/`）。
 
 ## 准备
 
@@ -48,7 +48,7 @@
    '
    ```
 
-   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue status 1 todo` 派出去，`issue show --watch` 等帮工交回来（经过的状态在 stderr），`issue diff` 是改动，`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「提交」写 `clock.ts` 并提交，别的字眼见 [testing.rs](crates/vibevalley-server/src/testing.rs)）。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/release/verify-server.test.ts` 跑着同样的一遍。
+   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue status 1 todo` 派出去，`issue show --watch` 等帮工交回来（经过的状态在 stderr），`issue diff` 是改动，`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「提交」写 `clock.ts` 并提交，别的字眼见 [testing.rs](crates/server/src/testing.rs)）。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/release/verify-server.test.ts` 跑着同样的一遍。
 
 4. 页面也改了的，再照 [app.md](.agents/skills/vv-acceptance/references/app.md) 起应用截图。
 
@@ -67,7 +67,7 @@
 
 ## 出错时
 
-- **`issue status 1 todo` 被拒或帮工不动**：没带 `--scripted-helper`，或标题里没有帮工认得的字眼（见 [testing.rs](crates/vibevalley-server/src/testing.rs)）。
+- **`issue status 1 todo` 被拒或帮工不动**：没带 `--scripted-helper`，或标题里没有帮工认得的字眼（见 [testing.rs](crates/server/src/testing.rs)）。
 - **行为还是旧的**：没重新 `cargo build -p vibevalley-server -p vibevalley-cli`，或 `CARGO_TARGET_DIR` 和构建时不同。
 
 ## 收拾

@@ -1,8 +1,0 @@
-[package]
-name = "vibevalley-pinyin"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-description = "Pure-Rust Hanyu Pinyin dictionary and continuous search matcher"
-
-[dependencies]

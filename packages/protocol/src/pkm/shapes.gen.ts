@@ -1,4 +1,4 @@
-// Generated from crates/vibevalley-protocol/src/contract (vp run protocol:ts). Do not edit.
+// Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 export const PkmTierValues = ["inbox", "project", "area", "resource", "archive", "journal"] as const;
 export type PkmTier = (typeof PkmTierValues)[number];

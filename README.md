@@ -42,10 +42,10 @@ flowchart LR
   rt --> repo[(你的项目<br/>项目目录或工单的 worktree)]
 ```
 
-- **一个服务端进程**（`crates/vibevalley-server`，Rust）：助手、帮工、田头、工单和交付、Artifact 和笔记、媒体都在里面；数据在家目录的 SQLite 和文件里。它跑在应用的进程里，也能单独跑。
+- **一个服务端进程**（`crates/server`，Rust）：助手、帮工、田头、工单和交付、Artifact 和笔记、媒体都在里面；数据在家目录的 SQLite 和文件里。它跑在应用的进程里，也能单独跑。
 - **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，页面只读折好的结果。
 - **客户端**：原生应用 `apps/mac`：GPUI 的窗口，工作台是 nsh 跑的 TSX 页面，像素农场由 Rust 画；命令行 `vibevalley` 经本机的 HTTP 调同一个服务端。只支持 macOS（[计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
-- **契约只写一次**：接口和形状按概念写在 `crates/vibevalley-protocol`，页面用的 TS 类型由它生成，服务端、页面和命令行用同一份。
+- **契约只写一次**：接口和形状按概念写在 `crates/protocol`，页面用的 TS 类型由它生成，服务端、页面和命令行用同一份。
 
 更多见 [docs/architecture.md](docs/architecture.md)。
 

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { IssueId, SessionId } from "../common/schema";
-import * as T from "./shapes";
+import * as T from "./shapes.gen";
 
 const InboxKind = z.enum(T.InboxKindValues) satisfies Codec<T.InboxKind>;
 

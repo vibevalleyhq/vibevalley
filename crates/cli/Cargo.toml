@@ -1,0 +1,28 @@
+[package]
+name = "vibevalley-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "vibevalley"
+path = "src/main.rs"
+
+[features]
+default = []
+local-chat = []
+
+[dependencies]
+clap = { version = "4.6.7", features = ["string"] }
+jiff = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+ureq = { workspace = true }
+vibevalley-core = { path = "../core" }
+vibevalley-i18n = { path = "../i18n" }
+vibevalley-protocol = { path = "../protocol" }
+vibevalley-runtime = { path = "../runtime" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+vibevalley-server = { path = "../server" }

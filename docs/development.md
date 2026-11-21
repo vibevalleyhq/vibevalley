@@ -47,7 +47,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 - `vp run docs:verify`：校验 Note、skill、文档链接、旧名字、用语表、词典与生成的参考表。
 - 帮工交付前，服务端运行工单 worktree 的 `.vibevalley/check`。脚本清除 `VIBEVALLEY_*` 和模型钥匙等环境变量，安装锁定版本的依赖，运行 `vp check --deny-warnings`。它按改动和新增文件选择 Rust、契约、SQL、页面和软件包的检查，最后运行 `docs:verify`。新 worktree 的 `.vibevalley/setup` 安装依赖并构建软件包声明。[仓库检查](.vibevalley/check)
 
-测试不连接真实模型：服务端的测试在 `crates/vibevalley-server/tests`，助手用替身模型，帮工用 oar 的 scripted 农机（`crates/vibevalley-server/src/testing.rs`）。页面的测试用 `nsh/test` 写在 `apps/mac/ui`，喂样例的 `Transport`；像素场景的测试在 `apps/mac/src/pixel/tests.rs`。
+测试不连接真实模型：服务端的测试在 `crates/server/tests`，助手用替身模型，帮工用 oar 的 scripted 农机（`crates/server/src/testing.rs`）。页面的测试用 `nsh/test` 写在 `apps/mac/ui`，喂样例的 `Transport`；像素场景的测试在 `apps/mac/src/pixel/tests.rs`。
 
 CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`sql:check`、`docs:verify`、脚本与软件包测试、`deadcode` 和官网构建。Rust 工作区和原生页面不在 CI 上查（macOS 机器一次要 16 到 44 分钟）：合并前在本机跑 `vp run release:verify`，它包含 `rust:check`、`protocol:check`、`sql:check` 和 `mac:check`。[CI 工作流](.github/workflows/ci.yml)
 
@@ -64,20 +64,20 @@ CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`sql:check`、`doc
 
 ## 改形状、规则和表
 
-- **形状**：改 `crates/vibevalley-protocol/src/contract/<概念>.rs`，运行 `vp run protocol:ts` 重写 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`；页面要解码它的，同改手写的 `schema.ts` 和 `api.ts`（各自的测试对着生成物查）；改接口后再运行 `vp run api:client` 和 `vp run capabilities`。
-- **规则**：服务端的规则是 `crates/vibevalley-core` 或所属模块里的纯函数，页面的在所属包里，在旁边的测试里用手写的例子写出改了的行为。
-- **表和查询。** 服务端模块共用 `server.db`，表名沿用「模块_概念」。宿主 `state.db` 的迁移按版本存放。改表或命名查询后，在根目录用 sqlc 1.31.1 执行 `sqlc generate`。CI 用 `sqlc diff` 对账，并用 `python3 scripts/release/verify-native-schema.py --queries-only` 在 SQLite 内存库预编译每条查询。修改生成器后运行 `scripts/gen/sqlc-rust/verify.sh`，检查重复生成、空值读写、事务回滚，以及错误参数类型和未知列能否被拒绝。[模块配置](sqlc.yaml) · [宿主迁移](crates/vibevalley-workspace/sql/migrations)
+- **形状**：改 `crates/protocol/src/contract/<概念>.rs`，运行 `vp run protocol:ts` 重写 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`；页面要解码它的，同改手写的 `schema.ts` 和 `api.ts`（各自的测试对着生成物查）；改接口后再运行 `vp run api:client` 和 `vp run capabilities`。
+- **规则**：服务端的规则是 `crates/core` 或所属模块里的纯函数，页面的在所属包里，在旁边的测试里用手写的例子写出改了的行为。
+- **表和查询。** 服务端模块共用 `server.db`，表名沿用「模块_概念」。宿主 `state.db` 的迁移按版本存放。改表或命名查询后，在根目录用 sqlc 1.31.1 执行 `sqlc generate`。CI 用 `sqlc diff` 对账，并用 `python3 scripts/release/verify-native-schema.py --queries-only` 在 SQLite 内存库预编译每条查询。修改生成器后运行 `scripts/gen/sqlc-rust/verify.sh`，检查重复生成、空值读写、事务回滚，以及错误参数类型和未知列能否被拒绝。[模块配置](sqlc.yaml) · [宿主迁移](apps/mac/crates/workspace/sql/migrations)
 - **旧名字**：`vp run names:verify` 检查代码与词典中的废弃命名；重命名后将旧名登记到 `scripts/docs/stale-names.ts`。
 
 ## 只用命令行派一个活
 
-命令行是 `crates/vibevalley-cli`（二进制 `vibevalley`），仓库内用 `cargo run -p vibevalley-cli -- <命令>` 运行。默认连接 `$VIBEVALLEY_HOME/server.json` 记录的服务端或 `http://127.0.0.1:8787`，可用 `--server` 或 `VIBEVALLEY_SERVER` 覆盖。
+命令行是 `crates/cli`（二进制 `vibevalley`），仓库内用 `cargo run -p vibevalley-cli -- <命令>` 运行。默认连接 `$VIBEVALLEY_HOME/server.json` 记录的服务端或 `http://127.0.0.1:8787`，可用 `--server` 或 `VIBEVALLEY_SERVER` 覆盖。
 
 - **设计原则**：clap，经 HTTP 用契约的类型调服务端，不替服务端做决定。路径为 `<资源> [<子资源>] <动词>`；说明按农场的语言取 `cli.*` 词典。
 - **工单**：`issue list|show|create|edit|status|comment|review|diff|timeline|delete`。`issue show --watch` 持续订阅状态流直到 `in_review`、`done` 或 `canceled`。
 - **其余**：`channel`、`repo`、`agent`、`session`（含 `events`）、`runtime`、`memory`、`cron`、`artifact`、`pkm`（`capture`、`search`、`radar`、`journal`、`page`）、`setting`（`get`、`update`、`validate`）、`chat`（本机农机编码会话，或 `--orchestrator` 在 `#general` 和助手对话）、`approval`（助手待审批工具调用的列出与决策）、`doctor`。
 - **输出与试跑**：默认输出单行短文本（首词为后续命令要用的 ID 或编号），`--format json` 输出协议原始结构。无试跑的写命令传 `--dry-run` 返回 `NoDryRun`（退出码 `2`）。
-- **错误与退出码**：失败时 stdout 为空，stderr 末行是一行 JSON，退出码按类（`crates/vibevalley-cli/src/farm.rs` 的 `exit`）；集成测试在 `crates/vibevalley-cli/tests/cli.rs`，起真的服务端。
+- **错误与退出码**：失败时 stdout 为空，stderr 末行是一行 JSON，退出码按类（`crates/cli/src/farm.rs` 的 `exit`）；集成测试在 `crates/cli/tests/cli.rs`，起真的服务端。
 
 **标准工单闭环**：
 

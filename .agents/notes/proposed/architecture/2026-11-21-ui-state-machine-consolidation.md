@@ -24,13 +24,13 @@ Status: proposed
 
 | 层 | 归属条件 | 唯一输入与输出 | 不应做的 |
 |---|---|---|---|
-| Rust 领域投影（`vibevalley-protocol` + `vibevalley-core`） | 仅由 `SpaceState` 确定性推导，且被多个视图（宽屏 / 窄屏 / 列表 / 详情）或多端（工作台 / 像素农场 / 灵动岛 / 命令行）共享 | 输入 `SpaceState`；在 [core.rs](crates/vibevalley-core/src/core.rs#L296-L304) 的 `frame_of`（`with_words`）产出结构化 enum、计数与标识，随 `StateFrame` 下发 | 不应输出拼好的本地化 UI 句子；不应把派生摘要写进 `SpaceState` 或落盘；Rust `match` 不应使用吞掉新变体的 `_` |
+| Rust 领域投影（`vibevalley-protocol` + `vibevalley-core`） | 仅由 `SpaceState` 确定性推导，且被多个视图（宽屏 / 窄屏 / 列表 / 详情）或多端（工作台 / 像素农场 / 灵动岛 / 命令行）共享 | 输入 `SpaceState`；在 [core.rs](crates/core/src/core.rs#L296-L304) 的 `frame_of`（`with_words`）产出结构化 enum、计数与标识，随 `StateFrame` 下发 | 不应输出拼好的本地化 UI 句子；不应把派生摘要写进 `SpaceState` 或落盘；Rust `match` 不应使用吞掉新变体的 `_` |
 | 前端显式 FSM（`apps/mac/ui/features/*/model/` 或同域纯模块） | 仅属于单个工作台窗口的瞬态交互（弹窗步骤、在途提交、筛选作用域、选区与灯箱、拖拽阶段、覆层互斥） | 导出封闭判别联合类型（discriminated union）与纯函数 `transition(state, event)`；每项特有数据只挂在对应的分支变体上 | 不应在组件内用 3 个以上散落布尔或可空 `signal` 拼装同一状态流；不应在 FSM 内直接调用网络、宿主或全局可变闭包 |
 | 薄 TSX 视图层（`apps/mac/ui/features/*/views/`） | 布局、令牌样式、无障碍标记、语言与皮肤文案映射 | 读取 `StateFrame` 投影或显式 FSM 状态，经 `t("key", params)` 渲染并派发事件或 `Intent` | 不应重算泳道人数、卡片归类或提示决策树；不应写清理 `effect` 修补互斥信号 |
 
 ### 二、下沉 Rust：结构化、无语言依赖的领域投影
 
-所有跨视图共享投影在 [vibevalley-protocol](crates/vibevalley-protocol/src/contract/core.rs) 中定义为封闭结构体与 enum，通过 `vp run protocol:ts` 生成 TS 类型，在 `packages/protocol/src/*/schema.ts` 补齐进门 Zod 校验，并在 [vibevalley-core/src/core.rs](crates/vibevalley-core/src/core.rs#L457-L476) 随 `StateFrame` 计算一次。
+所有跨视图共享投影在 [vibevalley-protocol](crates/protocol/src/contract/core.rs) 中定义为封闭结构体与 enum，通过 `vp run protocol:ts` 生成 TS 类型，在 `packages/protocol/src/*/schema.ts` 补齐进门 Zod 校验，并在 [vibevalley-core/src/core.rs](crates/core/src/core.rs#L457-L476) 随 `StateFrame` 计算一次。
 
 | 投影类型 | 挂载位置 | 承载字段与语义 | 替代的前端重复逻辑 |
 |---|---|---|---|
@@ -42,7 +42,7 @@ Status: proposed
 
 **保护双语与双皮肤的铁律**：Rust 领域投影应只传输结构化 enum（附 `pub const ALL` 与 `as_str`）、计数与实体 id，不应拼接任何本地化界面句子。
 
-1. **双语切换即时生效**：工作台支持中英双语即时切换；文案映射留在前端词典（`crates/vibevalley-i18n/locales/{zh,en}`），切语言不必让服务端重算或重发 `StateFrame`。
+1. **双语切换即时生效**：工作台支持中英双语即时切换；文案映射留在前端词典（`crates/i18n/locales/{zh,en}`），切语言不必让服务端重算或重发 `StateFrame`。
 2. **工作台与像素农场双皮肤隔离**：同一工单状态在工作台叫「待验收 / 等你回答」，在像素农场叫「开花 / 缺肥」（见 [用语表](docs/README.md#用语)）。协议层只传结构化枚举，两张皮肤各自映射到对应词汇，守住「先有概念，再有皮」。
 3. **现存文案字段边界**：`SessionView.phaseText`、`DoingView.actionText`、`CronView.whenText` 为已有过渡字段；新增投影不应效仿它们在 `with_words` 中调用 `t()` 拼句，后续再按域逐步收回客户端渲染。
 
@@ -75,7 +75,7 @@ Status: proposed
 
 | 层级 | 载体与命令 | 校验对象 | 耗时量级 |
 |---|---|---|---|
-| 1．Rust 契约与场景全覆盖 | [scenario.rs](crates/vibevalley-core/src/scenario.rs) + [export_scenarios.rs](crates/vibevalley-core/examples/export_scenarios.rs)；`cargo test -p vibevalley-core -p vibevalley-protocol` + `vp run protocol:check` | 通过真实 `Core::apply` 与 `reduce` 构建 `Density::ALL`（含新增 `Density::Edge` 边界密度）；单元测试对着 `IssueStatus::ALL`、`Priority::ALL`、`IssueStageKind::ALL`、`StuckReason::ALL`、`Deliverable::ALL`、`PullRequestState::ALL`、`Landing::ALL`、`IssueLane::ALL`、`IssueCardKind::ALL`、`IssuePromptKind::ALL`、`MediaPhase::ALL`、`ConnectorState::ALL`、`CallState::ALL`、`InboxKind::ALL` 断言 100% 覆盖并导出统一 `state.json`。 | 毫秒–秒级 |
+| 1．Rust 契约与场景全覆盖 | [scenario.rs](crates/core/src/scenario.rs) + [export_scenarios.rs](crates/core/examples/export_scenarios.rs)；`cargo test -p vibevalley-core -p vibevalley-protocol` + `vp run protocol:check` | 通过真实 `Core::apply` 与 `reduce` 构建 `Density::ALL`（含新增 `Density::Edge` 边界密度）；单元测试对着 `IssueStatus::ALL`、`Priority::ALL`、`IssueStageKind::ALL`、`StuckReason::ALL`、`Deliverable::ALL`、`PullRequestState::ALL`、`Landing::ALL`、`IssueLane::ALL`、`IssueCardKind::ALL`、`IssuePromptKind::ALL`、`MediaPhase::ALL`、`ConnectorState::ALL`、`CallState::ALL`、`InboxKind::ALL` 断言 100% 覆盖并导出统一 `state.json`。 | 毫秒–秒级 |
 | 2．前端 FSM 毫秒级纯单测 | `apps/mac/ui/app/{closeFlow,draftSubmit,libraryView}.test.ts`（`nsh/test`） | 直接驱动纯函数 `closeFlowTransition`、`draftSubmitTransition` 与 `libraryView` 转换函数，穷尽验证非法事件忽略、文件树变动增量复核、幂等键复用与轮换、Shift 范围多选与互斥清选，不挂载视图树。 | < 100 毫秒 / 套件 |
 | 3．虚拟时钟无头 BDD 套件 | [mac-tests.ts](scripts/audit/mac-tests.ts) 并发执行 [scenarios.test.tsx](apps/mac/ui/app/scenarios.test.tsx)、[interactions.test.tsx](apps/mac/ui/app/interactions.test.tsx)、[components.test.tsx](apps/mac/ui/app/components.test.tsx) | 消费 Rust 导出的多密度 `StateFrame`，用虚拟时钟快进检验轮询、相对时间、审批流、写路径竞态与窄视口（560×800）深浅主题渲染。 | 约 3 秒全量 |
 | 4．GPUI Metal 静态视觉图册 | `--features shot` 构建 `vibevalley-mac` + `VIBEVALLEY_FAKE_SERVER` + [ui-report.ts](scripts/audit/ui-report.ts)（步骤见 [验收应用](.agents/skills/vv-acceptance/references/app.md)） | 对多页面（看板、列表、详情、频道、素材库、Artifact、设置）、中英双语、深浅主题、宽窄窗口及 `Density::Edge` 边界数据（1287 / 999+ 未读、1 父 6 子 `blocked_by` 家族、`¥1,234.56` 大额花费、超长无断行 SHA / URL、开放 PR 伴失败检查输出）截成 PNG 画廊并核对 `dump.json` 零报错。 | 数十秒（合入前 / 视觉改动） |

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { ActorKind } from "../common/schema";
-import type * as T from "./shapes";
+import type * as T from "./shapes.gen";
 
 const CronWhenOnce = z.object({
   kind: z.literal("once"),

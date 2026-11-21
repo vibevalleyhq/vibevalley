@@ -15,13 +15,12 @@ export interface VerificationResult {
   address: string;
 }
 
-/** Every built-in template but the default orchestrator's (crates/vibevalley-server/assets/agent/templates/index.json). */
 const errorCode = (error: unknown): unknown => (typeof error === "object" && error !== null && "code" in error ? error.code : undefined);
 
 const starters = () =>
   z
     .array(z.string())
-    .parse(JSON.parse(readFileSync(join(import.meta.dirname, "../..", "crates", "vibevalley-server", "assets", "agent", "templates", "index.json"), "utf8")))
+    .parse(JSON.parse(readFileSync(join(import.meta.dirname, "../..", "crates", "server", "assets", "agent", "templates", "index.json"), "utf8")))
     .filter((id) => id !== "orchestrator")
     .join(",");
 

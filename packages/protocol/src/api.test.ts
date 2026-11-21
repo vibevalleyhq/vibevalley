@@ -45,7 +45,7 @@ describe("the endpoint table", () => {
     expect(missing).toEqual([]);
   });
 
-  test("is the table the server serves (crates/vibevalley-protocol/src/contract/endpoints.rs)", () => {
+  test("is the table the server serves (crates/protocol/src/contract/endpoints.rs)", () => {
     const row = (e: { op: string; can: readonly string[]; about: readonly string[]; dryRun?: string }) =>
       `${e.op} can [${e.can.join(" ")}] about [${e.about.join(" ")}]${e.dryRun ? ` dry run ${e.dryRun}` : ""}`;
     expect(endpoints.map(row).toSorted()).toEqual(servedEndpoints.map(row).toSorted());
