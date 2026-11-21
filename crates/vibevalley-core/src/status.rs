@@ -1,7 +1,6 @@
 //! An issue's board status, stage and moves, derived from what its sessions
-//! did. Ported from VibeValley `apps/server/src/modules/issue/status.ts` and
-//! `session/roster.ts`. Only the user's intent is stored (backlog, todo,
-//! done, canceled); in_progress and in_review are worked out here.
+//! did. Only the user's intent is stored (backlog, todo, done, canceled);
+//! in_progress and in_review are worked out here.
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -10,8 +9,6 @@ use vibevalley_protocol::*;
 
 use crate::moves::status_moves;
 use crate::rules::{compare_text, is_busy};
-
-// ----- roster (session/roster.ts) -----
 
 /// On duty: an orchestrator's standing session. The others are hired.
 pub fn is_on_duty(role: AgentRole) -> bool {
@@ -47,8 +44,6 @@ pub fn doing_of(h: &Session) -> Doing {
         },
     }
 }
-
-// ----- stage -----
 
 fn awaits_feedback(issue: &Issue, session: Option<&Session>) -> bool {
     session.is_some_and(|s| {
@@ -215,8 +210,6 @@ pub fn issue_stage_in(t: &Issue, state: &SpaceState) -> IssueStage {
     let session = t.latest_session_id().and_then(|id| session_of(state, id));
     issue_stage_of(t, session)
 }
-
-// ----- status -----
 
 struct Lookup<'a> {
     sessions: HashMap<&'a str, &'a Session>,

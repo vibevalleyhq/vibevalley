@@ -120,7 +120,10 @@ export function ImagePanel() {
                     accessibilityLabel={t("web.media.width")}
                     class="font-mono tabular-nums"
                     value={String(width())}
-                    onInput={(v) => width.set(Number(v) || 1024)}
+                    onInput={(v) => {
+                      const n = Number(v);
+                      width.set(Number.isFinite(n) && n > 0 ? n : 1024);
+                    }}
                   />
                 </Field>
               </View>
@@ -131,7 +134,10 @@ export function ImagePanel() {
                     accessibilityLabel={t("web.media.height")}
                     class="font-mono tabular-nums"
                     value={String(height())}
-                    onInput={(v) => height.set(Number(v) || 1024)}
+                    onInput={(v) => {
+                      const n = Number(v);
+                      height.set(Number.isFinite(n) && n > 0 ? n : 1024);
+                    }}
                   />
                 </Field>
               </View>
@@ -285,7 +291,7 @@ function JobCard(props: { job: MediaImageJob }) {
               <If when={url()}>
                 {(src) => (
                   <View class="self-start overflow-hidden rounded-md border border-line bg-side">
-                    <Image testID="media-image" src={src()} style={{ width: 280, height: 220, objectFit: "contain" }} />
+                    <Image testID="media-image" src={src()} class="h-55 w-70 object-contain" />
                   </View>
                 )}
               </If>

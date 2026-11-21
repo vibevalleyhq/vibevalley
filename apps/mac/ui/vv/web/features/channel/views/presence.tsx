@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/presence.tsx.
-// ThinkingDots do not bounce (no keyframes in nsh classes): three dots
-// light up in turn.
 import { Text, View } from "nsh";
 
 import { type ChatMessage, type Phase, type SessionView } from "@vibevalley/protocol";

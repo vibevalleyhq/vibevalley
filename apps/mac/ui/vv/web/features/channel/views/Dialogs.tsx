@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/Dialogs.tsx:
-// the same channel form (createChannelForm), new channel and channel
-// settings dialogs. A repo or a category is typed with the known ones
-// offered as chips under the field (a datalist there); Return in the name
-// field submits as the form's submit did.
 import { signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -153,13 +148,13 @@ function createChannelForm(channel?: Channel) {
       error.set(undefined);
     },
     description,
-    setDescription: description.set,
+    setDescription: (v: string) => description.set(v),
     repo,
-    setRepo: repo.set,
+    setRepo: (v: string) => repo.set(v),
     category,
-    setCategory: category.set,
+    setCategory: (v: string) => category.set(v),
     notify,
-    setNotify: notify.set,
+    setNotify: (v: "all" | "mentions" | "none") => notify.set(v),
     /** The orchestrators in the channel, by profile id. */
     members,
     /** Puts one in the channel, or takes it out. */

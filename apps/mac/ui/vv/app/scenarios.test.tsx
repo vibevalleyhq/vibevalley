@@ -230,7 +230,7 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   await visit(app, fake, "/chat", row, () => {
     expect(app.count("id:chat-page")).toBe(1);
   });
-  const baseMsg = (fixture.responses["channel.message.list"] as Array<Record<string, unknown>>)[0];
+  const baseMsg = (fixture.responses["channel.message.list"] as Array<Record<string, unknown>>).at(0);
   if (baseMsg) {
     await fake.emit(
       app,

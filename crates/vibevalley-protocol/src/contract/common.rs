@@ -1,16 +1,10 @@
 #![allow(clippy::large_enum_variant, clippy::enum_variant_names)]
 
-#[allow(unused_imports)]
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 #[cfg(feature = "ts-gen")]
 use ts_rs::TS;
 
-#[allow(unused_imports)]
-use super::*;
-#[allow(unused_imports)]
 use crate::wire::*;
 
 /// An issue's id (not its number).

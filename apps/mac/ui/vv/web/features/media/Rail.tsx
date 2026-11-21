@@ -136,10 +136,14 @@ export function Rail(props: {
             value={inArtifacts() ? `artifact:${props.artifactKind}` : props.kind}
             onChange={(v) => {
               if (v.startsWith("artifact:")) {
-                props.onArtifactKind?.(v.slice("artifact:".length) as ArtifactKindFilter);
+                const ak = artifactKinds.find((item) => item === v.slice("artifact:".length));
+                if (ak !== undefined) props.onArtifactKind?.(ak);
               } else {
-                props.onArtifactKind?.(undefined);
-                props.onKind(v as KindFilter);
+                const k = kinds.find((item) => item === v);
+                if (k !== undefined) {
+                  props.onArtifactKind?.(undefined);
+                  props.onKind(k);
+                }
               }
             }}
             options={[

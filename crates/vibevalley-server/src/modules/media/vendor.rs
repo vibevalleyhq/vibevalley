@@ -1,7 +1,7 @@
 //! The vendor calls media makes (VibeValley `platform/provider/provider.ts`'s
 //! `mossCalls` and `packages/provider/src/moss/*`): every request goes out
 //! through a [`Fetch`], so a test answers as MOSS does; the real one is
-//! ureq, never following a redirect (it would carry the key).
+//! `reqwest`, never following a redirect (it would carry the key).
 
 use std::io::Read;
 use std::sync::Arc;
@@ -60,51 +60,92 @@ impl<F: Fn(Request) -> Result<Response, FetchError> + Send + Sync> Fetch for F {
     }
 }
 
-/// ureq, no redirects, statuses answered rather than failed.
-pub struct Ureq;
+/// `reqwest`, no redirects, statuses answered rather than failed.
+pub struct Http;
 
-impl Fetch for Ureq {
+impl Fetch for Http {
     fn fetch(&self, r: Request) -> Result<Response, FetchError> {
-        let agent: ureq::Agent = ureq::Agent::config_builder()
-            .timeout_global(Some(r.timeout))
-            .max_redirects(0)
-            .http_status_as_error(false)
-            .build()
-            .into();
-        let failed = |e: ureq::Error| match e {
-            ureq::Error::Timeout(_) => FetchError::Timeout,
-            e => FetchError::Network(e.to_string()),
-        };
-        let response = match r.method {
-            "GET" | "DELETE" => {
-                let mut b = if r.method == "GET" { agent.get(&r.url) } else { agent.delete(&r.url) };
-                for (k, v) in &r.headers {
-                    b = b.header(k, v);
-                }
-                b.call().map_err(failed)?
+        let client = crate::public_http::no_redirect_client().map_err(FetchError::Network)?.clone();
+        let method = reqwest::Method::from_bytes(r.method.as_bytes()).map_err(|e| FetchError::Network(e.to_string()))?;
+        let (head_tx, head_rx) = flume::bounded::<Result<Response, FetchError>>(1);
+        crate::public_http::http_runtime().spawn(async move {
+            let mut req = client.request(method, &r.url).timeout(r.timeout);
+            for (k, v) in &r.headers {
+                req = req.header(k.as_str(), v.as_str());
             }
-            _ => {
-                let mut b = if r.method == "PUT" { agent.put(&r.url) } else { agent.post(&r.url) };
-                for (k, v) in &r.headers {
-                    b = b.header(k, v);
+            if let Some((kind, mut reader)) = r.body {
+                req = req.header("content-type", kind);
+                let (body_tx, body_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(8);
+                tokio::task::spawn_blocking(move || {
+                    let mut buf = [0u8; 64 * 1024];
+                    loop {
+                        match reader.read(&mut buf) {
+                            Ok(0) => break,
+                            Ok(n) => {
+                                if body_tx.send(Ok(buf[..n].to_vec())).is_err() {
+                                    break;
+                                }
+                            }
+                            Err(e) => {
+                                let _ = body_tx.send(Err(e));
+                                break;
+                            }
+                        }
+                    }
+                });
+                let stream = futures_util::stream::unfold(body_rx, |rx| async move { rx.recv_async().await.ok().map(|chunk| (chunk, rx)) });
+                req = req.body(reqwest::Body::wrap_stream(stream));
+            }
+            let mut response = match req.send().await {
+                Ok(res) => res,
+                Err(e) => {
+                    let err = if e.is_timeout() {
+                        FetchError::Timeout
+                    } else {
+                        FetchError::Network(e.to_string())
+                    };
+                    let _ = head_tx.send(Err(err));
+                    return;
                 }
-                match r.body {
-                    Some((kind, body)) => b.header("content-type", kind).send(ureq::SendBody::from_owned_reader(body)).map_err(failed)?,
-                    None => b.send_empty().map_err(failed)?,
+            };
+            let status = response.status().as_u16();
+            let headers = response
+                .headers()
+                .iter()
+                .filter_map(|(k, v)| Some((k.as_str().to_string(), v.to_str().ok()?.to_string())))
+                .collect();
+            let (res_tx, res_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(16);
+            if head_tx
+                .send(Ok(Response {
+                    status,
+                    headers,
+                    body: Box::new(crate::public_http::ChannelReader::new(res_rx)),
+                }))
+                .is_err()
+            {
+                return;
+            }
+            loop {
+                match response.chunk().await {
+                    Ok(Some(bytes)) => {
+                        if res_tx.send_async(Ok(bytes.to_vec())).await.is_err() {
+                            break;
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        let io_err = if e.is_timeout() {
+                            std::io::Error::new(std::io::ErrorKind::TimedOut, e.to_string())
+                        } else {
+                            std::io::Error::other(e.to_string())
+                        };
+                        let _ = res_tx.send_async(Err(io_err)).await;
+                        break;
+                    }
                 }
             }
-        };
-        let status = response.status().as_u16();
-        let headers = response
-            .headers()
-            .iter()
-            .filter_map(|(k, v)| Some((k.as_str().to_string(), v.to_str().ok()?.to_string())))
-            .collect();
-        Ok(Response {
-            status,
-            headers,
-            body: Box::new(response.into_body().into_reader()),
-        })
+        });
+        head_rx.recv().map_err(|_| FetchError::Network("http task stopped".into()))?
     }
 }
 
@@ -430,8 +471,6 @@ impl Moss {
         parsed.ok_or_else(invalid_response)
     }
 
-    // ----- image -----
-
     /// `prepareMossImage`: the wire body, or refused.
     pub fn prepare_image(model: &str, prompt: &Value, width: i64, height: i64, extra: &Value) -> Result<Value, VendorError> {
         if !super::super::provider::IMAGE_MODELS.contains(&model) {
@@ -506,8 +545,6 @@ impl Moss {
             _ => Err(invalid_response()),
         }
     }
-
-    // ----- speech -----
 
     /// `prepareMossSpeech` (the farm sends no language or metadata).
     pub fn prepare_speech(model: &str, text: &str, voice: &str, format: &str) -> Result<Value, VendorError> {
@@ -715,8 +752,6 @@ impl Moss {
         if done { Ok(()) } else { Err(StreamError::Vendor(invalid_response())) }
     }
 
-    // ----- several voices, designed voices, transcription -----
-
     /// `prepareMossSpeakers`.
     pub fn prepare_speakers(model: &str, sp: &[MediaSpeakersRequestSpeakers], sg: &[MediaSpeakersRequestSegments], format: &str) -> Result<Value, VendorError> {
         if !(1..=100).contains(&sp.len()) || !(1..=1000).contains(&sg.len()) {
@@ -881,8 +916,6 @@ impl Moss {
         if done { Ok(()) } else { Err(StreamError::Vendor(invalid_response())) }
     }
 
-    // ----- understanding -----
-
     /// `prepareMossUnderstanding`: `media` is `[(kind, file id)]`, one video or up to five images.
     pub fn prepare_understanding(model: &str, text: &str, media: &[(MediaInputKind, String)], max_tokens: i64) -> Result<Value, VendorError> {
         let images = media.iter().all(|(k, _)| *k == MediaInputKind::Image) && (1..=5).contains(&media.len());
@@ -958,8 +991,6 @@ impl Moss {
             },
         })
     }
-
-    // ----- files and voices -----
 
     /// `uploadMossFile`: the file's id and whether MOSS took it.
     pub fn upload(&self, key: &str, file: std::fs::File, size: i64, filename: &str, purpose: &str) -> Result<(String, Uploaded), VendorError> {
@@ -1118,5 +1149,74 @@ fn sse(
         if pending.len() > max {
             return Err(StreamError::Vendor(VendorError::new(Reason::TooLarge, Outcome::Unknown)));
         }
+    }
+}
+
+#[cfg(test)]
+mod http_tests {
+    use std::io::{Cursor, Read, Write};
+    use std::net::TcpListener;
+
+    use super::*;
+
+    #[test]
+    fn http_fetch_streams_post_body_and_never_follows_redirects() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = std::thread::spawn(move || {
+            // 1) POST with streamed body
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut req = Vec::new();
+            let mut chunk = [0u8; 1024];
+            loop {
+                let n = stream.read(&mut chunk).unwrap();
+                req.extend_from_slice(&chunk[..n]);
+                if req.windows(7).any(|w| w == b"payload") {
+                    break;
+                }
+            }
+            let raw = String::from_utf8_lossy(&req);
+            assert!(raw.starts_with("POST /upload HTTP/1.1"), "{raw}");
+            assert!(raw.to_ascii_lowercase().contains("x-test: ok"), "{raw}");
+            stream
+                .write_all(b"HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: 11\r\nConnection: close\r\n\r\n{\"ok\":true}")
+                .unwrap();
+
+            // 2) 302 redirect must be returned as-is, not followed
+            let (mut stream, _) = listener.accept().unwrap();
+            let _ = stream.read(&mut chunk);
+            stream
+                .write_all(b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/other\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                .unwrap();
+        });
+
+        let mut res = Http
+            .fetch(Request {
+                method: "POST",
+                url: format!("http://{addr}/upload"),
+                headers: vec![("x-test".into(), "ok".into())],
+                body: Some(("text/plain".into(), Box::new(Cursor::new(b"payload".to_vec())))),
+                timeout: Duration::from_secs(5),
+            })
+            .unwrap();
+        assert_eq!(res.status, 201);
+        assert_eq!(res.media_type(), "application/json");
+        let mut body = String::new();
+        res.body.read_to_string(&mut body).unwrap();
+        assert_eq!(body, "{\"ok\":true}");
+
+        let redirect = Http
+            .fetch(Request {
+                method: "GET",
+                url: format!("http://{addr}/redir"),
+                headers: vec![],
+                body: None,
+                timeout: Duration::from_secs(5),
+            })
+            .unwrap();
+        assert_eq!(redirect.status, 302);
+        assert_eq!(redirect.header("location"), Some("http://127.0.0.1:1/other"));
+
+        handle.join().unwrap();
     }
 }

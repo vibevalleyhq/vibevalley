@@ -1,9 +1,3 @@
-// Ported from VibeValley apps/web/src/features/session/Trajectory.tsx: a
-// session's trajectory (waterfall of runs, searchable rows, summary) and the
-// "marked wrong" cases. The waterfall's width comes from onLayout instead of
-// a ResizeObserver; "mark wrong" shows while the pointer is over the row
-// (onMouseEnter/Leave for CSS's group-hover); a picked waterfall bar scrolls
-// its row into view with ViewRef.reveal.
 import { colorScheme, Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -92,6 +86,7 @@ function tagToneOf(step: SessionEvent): TagTone {
         case "other":
           return { bgClass: "bg-hover", text: "text-ink" };
       }
+      break;
     case "run/start":
     case "run/end":
     case "tool/result":
@@ -235,7 +230,7 @@ export function Trajectory(props: {
       const isLast = idx === views.length - 1;
       const isLive = props.working === true && isLast;
       const runEnd = isLive ? end() : (lastTime(view) ?? end());
-      const firstStep = allSteps[0];
+      const firstStep = allSteps.at(0);
       const toolsCount = allSteps.filter((s) => s.type === "tool/call").length;
       let tokIn = 0;
       let tokOut = 0;
@@ -248,7 +243,7 @@ export function Trajectory(props: {
       out.push({
         key: view.run ?? `earlier-${firstStep?.seq ?? idx}`,
         label: view.run !== undefined ? t("web.session.trajectory.run", { n }) : t("web.session.trajectory.earlier"),
-        when: firstStep ? ago(firstStep.time, props.now) : "",
+        when: firstStep !== undefined ? ago(firstStep.time, props.now) : "",
         took: secondsText(runMs(view, runEnd)),
         stepsCount: allSteps.filter((s) => s.type !== "llm/usage").length,
         toolsCount,
@@ -289,7 +284,7 @@ export function Trajectory(props: {
           testid="trajectory-search"
           clearLabel={t("web.base.lightbox.close")}
           value={query()}
-          onInput={query.set}
+          onInput={(v) => query.set(v)}
           placeholder={t("web.session.trajectory.searchHint")}
           label={t("web.session.trajectory.search")}
           class="w-56"
@@ -516,7 +511,7 @@ function ToolDetail(props: { step: SessionEvent }) {
   const running = () => props.step.ok === undefined;
   const failed = () => props.step.ok === false;
   const stateLabel = () =>
-    running() ? t("web.session.trajectory.running") : props.step.ok ? t("web.session.trajectory.ok") : t("web.session.trajectory.failed");
+    running() ? t("web.session.trajectory.running") : props.step.ok === true ? t("web.session.trajectory.ok") : t("web.session.trajectory.failed");
   const badgeClass = () => (running() ? "" : failed() ? "bg-bad-soft" : "bg-ok-soft");
   const badgeText = () => (running() ? "text-water" : failed() ? "text-berry" : "text-ok-ink");
   return (
@@ -531,10 +526,8 @@ function ToolDetail(props: { step: SessionEvent }) {
       </View>
       <If when={input()}>
         <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.input")}</Text>
-        <Scroll class="rounded-md border border-line bg-code-bg px-2.5 py-2" style={{ maxHeight: 160 }}>
-          <Text class="font-mono text-xs text-code-ink" style={{ userSelect: "text" }}>
-            {input() ?? ""}
-          </Text>
+        <Scroll class="max-h-40 rounded-md border border-line bg-code-bg px-2.5 py-2">
+          <Text class="select-text font-mono text-xs text-code-ink">{input() ?? ""}</Text>
         </Scroll>
       </If>
       <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.output")}</Text>
@@ -543,12 +536,10 @@ function ToolDetail(props: { step: SessionEvent }) {
         else={<Text class="text-xs text-faint">{running() ? t("web.session.trajectory.pending") : t("web.session.trajectory.noOutput")}</Text>}
       >
         <Scroll
-          class={`rounded-md border px-2.5 py-2 ${failed() ? "bg-bad-soft" : "border-line bg-page"}`}
-          style={failed() ? { maxHeight: 224, borderColor: mix("berry", 0.3) } : { maxHeight: 224 }}
+          class={`max-h-56 rounded-md border px-2.5 py-2 ${failed() ? "bg-bad-soft" : "border-line bg-page"}`}
+          style={failed() ? { borderColor: mix("berry", 0.3) } : undefined}
         >
-          <Text class={`font-mono text-xs ${failed() ? "text-berry" : "text-ink"}`} style={{ userSelect: "text" }}>
-            {props.step.output ?? ""}
-          </Text>
+          <Text class={`select-text font-mono text-xs ${failed() ? "text-berry" : "text-ink"}`}>{props.step.output ?? ""}</Text>
         </Scroll>
       </If>
     </View>
@@ -682,7 +673,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
             disabled={busy()}
             placeholder={t("web.session.trajectory.wantHint")}
             value={want()}
-            onInput={want.set}
+            onInput={(v) => want.set(v)}
             onSubmit={() => void submit()}
             class="flex-1"
           />

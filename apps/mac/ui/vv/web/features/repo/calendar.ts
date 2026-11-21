@@ -48,8 +48,8 @@ export function calendarOf(days: readonly { day: string; commits: number }[], no
     }
     grid.push(column);
   }
-  const m0 = months[0];
-  const m1 = months[1];
+  const m0 = months.at(0);
+  const m1 = months.at(1);
   if (m0 && m1 && m1.week - m0.week < 3) months.shift();
   return { weeks: grid, months };
 }

@@ -20,15 +20,13 @@ interface Node {
 
 /** Where atoms' values live: the page's one, or a test's or a story's own. */
 export class Registry {
-  readonly #nodes = new Map<Atom<never>, Node>();
+  readonly #nodes = new Map<object, Node>();
 
   #node<A>(atom: Atom<A>): Node {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the map is keyed by the atom, and each node holds that atom's value
-    const key = atom as unknown as Atom<never>;
-    const existing = this.#nodes.get(key);
+    const existing = this.#nodes.get(atom);
     if (existing) return existing;
     const node: Node = { value: undefined, listeners: new Set() };
-    this.#nodes.set(key, node);
+    this.#nodes.set(atom, node);
     node.value = atom.init((value) => this.#put(node, value));
     return node;
   }

@@ -101,7 +101,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
   const listing = signal<ProviderModelListing | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
   const client = useQueryClient();
-  const act = createAct(error.set);
+  const act = createAct((v) => error.set(v));
   const dirty = () => !same(draft(), editable(base()));
   const accept = (status: ProviderStatus) => {
     base.set(status);
@@ -304,7 +304,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                               <Text class="text-2xs font-medium text-muted tabular-nums">{result().models.length}</Text>
                             </View>
                           </View>
-                          <Scroll style={{ maxHeight: 192 }} contentClass="gap-0.5">
+                          <Scroll class="max-h-48" contentClass="gap-0.5">
                             <Each of={result().models}>
                               {(model) => (
                                 <View class="rounded-sm px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover">

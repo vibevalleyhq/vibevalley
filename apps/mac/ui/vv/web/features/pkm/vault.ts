@@ -1,16 +1,29 @@
-import * as S from "@vibevalley/protocol/schema";
+import { z } from "zod";
+
+import type { PkmPageView, PkmRadar, PkmVault } from "@vibevalley/protocol";
 
 import { api } from "../../infra/api";
 import { defineQuery, retryRead, useQuery, type QueryClient } from "../../infra/query";
 
 const fresh = 5_000;
-const vaultQuery = defineQuery({ schema: S.PkmVault, key: () => ["pkm", "vault"], fetch: (_: void, context) => api.pkm.page.list(context), ...retryRead });
+const trusted = <T>(): z.ZodType<T> => z.custom<T>(() => true);
+const vaultQuery = defineQuery({
+  schema: trusted<PkmVault>(),
+  key: () => ["pkm", "vault"],
+  fetch: (_: void, context) => api.pkm.page.list(context),
+  ...retryRead,
+});
 export const pkmPageQuery = defineQuery({
-  schema: S.PkmPageView,
+  schema: trusted<PkmPageView>(),
   key: (page: string) => ["pkm", "page", page],
   fetch: (page, context) => api.pkm.page.get({ page }, context),
 });
-const radarQuery = defineQuery({ schema: S.PkmRadar, key: () => ["pkm", "radar"], fetch: (_: void, context) => api.pkm.radar.get({}, context), ...retryRead });
+const radarQuery = defineQuery({
+  schema: trusted<PkmRadar>(),
+  key: () => ["pkm", "radar"],
+  fetch: (_: void, context) => api.pkm.radar.get({}, context),
+  ...retryRead,
+});
 export const usePkmVault = () => useQuery(vaultQuery, { interval: () => fresh });
 /** Pause polling while editing; confirmed writes update the cached page. */
 export const usePkmPage = (slug: () => string, quiet: () => boolean = () => false) =>

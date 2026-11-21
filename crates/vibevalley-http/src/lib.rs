@@ -23,7 +23,7 @@
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
@@ -34,7 +34,6 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use futures_util::Stream;
-use regex::Regex;
 use serde_json::{Value, json};
 use vibevalley_protocol::{ApiError, BizCode, Envelope};
 use vibevalley_server_api::Server;
@@ -123,9 +122,18 @@ pub fn router(server: Shared) -> Router {
         .with_state(server)
 }
 
-fn loopback() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$").expect("regex"))
+fn is_loopback(host: &str) -> bool {
+    let Some(rest) = host
+        .strip_prefix("127.0.0.1")
+        .or_else(|| host.strip_prefix("localhost"))
+        .or_else(|| host.strip_prefix("[::1]"))
+    else {
+        return false;
+    };
+    match rest.strip_prefix(':') {
+        None => rest.is_empty(),
+        Some(port) => !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()),
+    }
 }
 
 /// Only this machine's own pages and tools.
@@ -134,7 +142,7 @@ pub fn from_the_farm(headers: &HeaderMap) -> bool {
     let host = header("host").unwrap_or("");
     let origin_ok = header("origin").is_none_or(|o| o == format!("http://{host}"));
     let site_ok = header("sec-fetch-site").is_none_or(|s| s == "same-origin" || s == "none");
-    loopback().is_match(host) && origin_ok && site_ok
+    is_loopback(host) && origin_ok && site_ok
 }
 
 /// The envelope as VibeValley sends it, with the HTTP status its code has.
@@ -281,14 +289,13 @@ async fn subscribe(
     }
 }
 
-fn artifact_id() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^[0-9a-f-]{36}$").expect("regex"))
+fn is_artifact_id(id: &str) -> bool {
+    id.len() == 36 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f' | b'-'))
 }
 
-fn artifact_version() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^[1-9]\d*$").expect("regex"))
+fn is_artifact_version(version: &str) -> bool {
+    let mut bytes = version.bytes();
+    matches!(bytes.next(), Some(b'1'..=b'9')) && bytes.all(|b| b.is_ascii_digit())
 }
 
 /// VibeValley's `artifact/:id/view`: what a structured store artifact's `<iframe src>` loads.
@@ -301,7 +308,7 @@ async fn artifact_view(
     if !from_the_farm(&headers) {
         return refuse(BizCode::Forbidden, "forbidden");
     }
-    if !artifact_id().is_match(&id) {
+    if !is_artifact_id(&id) {
         return StatusCode::NOT_FOUND.into_response();
     }
     let mut payload = serde_json::json!({ "id": id });
@@ -357,10 +364,10 @@ async fn artifact_page(
     if !from_the_farm(&headers) {
         return refuse(BizCode::Forbidden, "forbidden");
     }
-    let Some(version) = artifact_version().is_match(&version).then(|| version.parse::<u64>().ok()).flatten() else {
+    let Some(version) = is_artifact_version(&version).then(|| version.parse::<u64>().ok()).flatten() else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    if !artifact_id().is_match(&id) {
+    if !is_artifact_id(&id) {
         return StatusCode::NOT_FOUND.into_response();
     }
     let mut payload = serde_json::json!({ "id": id, "version": version });

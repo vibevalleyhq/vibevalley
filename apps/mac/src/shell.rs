@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::FutureExt as _;
-use gpui_kit::{
+use gpui::{
     AppContext as _, Context, Entity, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyBinding, MouseButton, MouseMoveEvent,
     ParentElement as _, PathPromptOptions, Pixels, Render, Styled as _, Subscription, Window, div, px,
 };
@@ -29,7 +29,7 @@ use crate::terminal::{SpawnSpec, TerminalEvent, TerminalView};
 use crate::theme::{Settings, ThemeChoice, Ui};
 use crate::viewer::FileViewer;
 
-gpui_kit::actions!(
+gpui::actions!(
     shell,
     [
         OpenAbout,
@@ -74,8 +74,8 @@ gpui_kit::actions!(
     ]
 );
 
-pub fn update_menus(cx: &mut gpui_kit::App) {
-    use gpui_kit::{Menu, MenuItem, OsAction, SystemMenuType};
+pub fn update_menus(cx: &mut gpui::App) {
+    use gpui::{Menu, MenuItem, OsAction, SystemMenuType};
     use vibevalley_i18n::t;
     let app = [("app", "VibeValley".into())];
     cx.set_menus(vec![
@@ -118,7 +118,7 @@ pub fn update_menus(cx: &mut gpui_kit::App) {
     ]);
 }
 
-pub fn bind_keys(cx: &mut gpui_kit::App) {
+pub fn bind_keys(cx: &mut gpui::App) {
     cx.bind_keys([
         // Attached to no element so keyboard presses pass through to focused views, while NSMenu shows key equivalents.
         KeyBinding::new("cmd-z", EditUndo, Some("EditMenu")),
@@ -234,7 +234,7 @@ pub struct PixelSlot {
 
 pub struct Shell {
     pub store: Option<Arc<Store>>,
-    project_open: Option<gpui_kit::Task<()>>,
+    project_open: Option<gpui::Task<()>>,
     pub ws: Workspace<TermSession>,
     pub loaded: bool,
     server_ready: bool,
@@ -609,8 +609,6 @@ impl Shell {
         })
         .detach();
     }
-
-    // ---- projects -------------------------------------------------------
 
     pub fn activate_index(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(project) = self.ws.projects().get(index) {
@@ -1028,8 +1026,6 @@ impl Shell {
         }
     }
 
-    // ---- frames -------------------------------------------------------------
-
     pub fn push_sidebar(&mut self, cx: &mut Context<Self>) {
         let rail_items: Vec<RailProject> = self
             .ws
@@ -1140,8 +1136,6 @@ impl Shell {
             v.push("git", git, cx);
         });
     }
-
-    // ---- actions from hosted views --------------------------------------
 
     pub fn on_action(&mut self, action: Action, window: &mut Window, cx: &mut Context<Self>) {
         let active = self.ws.active_id();
@@ -1719,14 +1713,25 @@ impl Shell {
             "host.playAudio" => {
                 let seconds = payload["position"].as_f64().unwrap_or(0.0);
                 let path = payload["path"].as_str().map(PathBuf::from);
-                let data = payload["data"].as_str().map(str::to_string);
-                let kind = text("type");
-                crate::audio::dispatch(reply, move || match (path, data) {
-                    (Some(path), None) => crate::audio::play(&path, seconds),
-                    (None, Some(data)) if data.len() <= crate::host::MAX_SOUND_BASE64 && seconds == 0.0 => crate::host::play_audio_data(&data, &kind),
-                    _ => Err("playAudio requires one file path or at most 2 MB of encoded sound".into()),
+                crate::audio::dispatch(reply, move || match path {
+                    Some(path) => crate::audio::play(&path, seconds),
+                    None => Err("playAudio requires a file path".into()),
                 });
                 return;
+            }
+            "host.playSound" => {
+                #[derive(serde::Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct PlaySoundRequest {
+                    name: crate::audio::SoundName,
+                }
+                match serde_json::from_value::<PlaySoundRequest>(payload.clone()) {
+                    Ok(req) => {
+                        crate::audio::dispatch(reply, move || crate::audio::play_sound(req.name));
+                        return;
+                    }
+                    Err(e) => refusal(BizCode::InvalidInput, format!("playSound: {e}")),
+                }
             }
             "host.seekAudio" => {
                 let seconds = payload["position"].as_f64().unwrap_or(f64::NAN);
@@ -1786,7 +1791,10 @@ impl Shell {
                     refusal(BizCode::NotFound, "the pixel art is not installed")
                 }
             }
-            other => refusal(BizCode::RouteNotFound, format!("the host has no op {other}")),
+            other => match crate::host::handle_stateless_op(other, &payload) {
+                Some(env) => env,
+                None => refusal(BizCode::RouteNotFound, format!("the host has no op {other}")),
+            },
         };
         reply.send(envelope);
     }
@@ -1930,8 +1938,6 @@ impl Shell {
             },
         );
     }
-
-    // ---- palette --------------------------------------------------------
 
     pub fn open_palette(&mut self, mode: PaletteMode, window: &mut Window, cx: &mut Context<Self>) {
         if self.palette.is_none() {
@@ -2148,8 +2154,6 @@ impl Shell {
         cx.notify();
     }
 
-    // ---- panes ----------------------------------------------------------
-
     pub fn open_pane(&mut self, kind: PaneKind, window: &mut Window, cx: &mut Context<Self>) {
         if let PaneKind::Hosted { module, props } = &kind
             && (module == "vv" || module == "vibevalley")
@@ -2193,7 +2197,7 @@ impl Shell {
         });
     }
 
-    fn next_terminal_directory(&self, cx: &gpui_kit::App) -> Option<PathBuf> {
+    fn next_terminal_directory(&self, cx: &gpui::App) -> Option<PathBuf> {
         let project = self.ws.active()?;
         if let Some(PaneKind::Terminal { terminal_id, .. }) = project.layout.active_tab().map(|t| &t.kind)
             && let Some(slot) = self.terminals.get(terminal_id)
@@ -2539,8 +2543,6 @@ impl Shell {
         );
     }
 
-    // ---- persistence and theme -----------------------------------------
-
     fn schedule_save(&mut self, cx: &mut Context<Self>) {
         if self.save_pending || self.store.is_none() {
             return;
@@ -2776,7 +2778,7 @@ impl Drop for Shell {
 }
 
 impl Focusable for Shell {
-    fn focus_handle(&self, _: &gpui_kit::App) -> FocusHandle {
+    fn focus_handle(&self, _: &gpui::App) -> FocusHandle {
         self.focus.clone()
     }
 }
@@ -2795,7 +2797,7 @@ impl Render for Shell {
                 .flex_col()
                 .items_center()
                 .pt(px(72.0))
-                .bg(gpui_kit::hsla(0.0, 0.0, 0.0, 0.25))
+                .bg(gpui::hsla(0.0, 0.0, 0.0, 0.25))
                 .key_context("Palette")
                 .on_action(cx.listener(|this, _: &ClosePalette, window, cx| this.close_palette(window, cx)))
                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| this.close_palette(window, cx)))
@@ -2843,22 +2845,22 @@ impl Render for Shell {
             .on_action(cx.listener(|_, _: &HideOthers, _, cx| cx.hide_other_apps()))
             .on_action(cx.listener(|_, _: &ShowAll, _, cx| cx.unhide_other_apps()))
             .on_action(cx.listener(|_, _: &EditUndo, w, cx| {
-                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-z").expect("keystroke"), cx);
+                w.dispatch_keystroke(gpui::Keystroke::parse("cmd-z").expect("keystroke"), cx);
             }))
             .on_action(cx.listener(|_, _: &EditRedo, w, cx| {
-                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-shift-z").expect("keystroke"), cx);
+                w.dispatch_keystroke(gpui::Keystroke::parse("cmd-shift-z").expect("keystroke"), cx);
             }))
             .on_action(cx.listener(|_, _: &EditCut, w, cx| {
-                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-x").expect("keystroke"), cx);
+                w.dispatch_keystroke(gpui::Keystroke::parse("cmd-x").expect("keystroke"), cx);
             }))
             .on_action(cx.listener(|_, _: &EditCopy, w, cx| {
-                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-c").expect("keystroke"), cx);
+                w.dispatch_keystroke(gpui::Keystroke::parse("cmd-c").expect("keystroke"), cx);
             }))
             .on_action(cx.listener(|_, _: &EditPaste, w, cx| {
-                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-v").expect("keystroke"), cx);
+                w.dispatch_keystroke(gpui::Keystroke::parse("cmd-v").expect("keystroke"), cx);
             }))
             .on_action(cx.listener(|_, _: &EditSelectAll, w, cx| {
-                w.dispatch_keystroke(gpui_kit::Keystroke::parse("cmd-a").expect("keystroke"), cx);
+                w.dispatch_keystroke(gpui::Keystroke::parse("cmd-a").expect("keystroke"), cx);
             }))
             .on_action(cx.listener(|_, _: &ToggleFullScreen, w, _| w.toggle_fullscreen()))
             .on_action(cx.listener(|_, _: &CloseWindow, w, _| w.remove_window()))

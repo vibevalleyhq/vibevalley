@@ -116,7 +116,7 @@ export function UnderstandingPanel(props: { file: Attachment }) {
           <View class="flex-row items-center gap-3 rounded-md bg-side p-2.5">
             <View class="h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-line bg-page">
               <If when={kind() === "image" ? thumbUrl() : undefined} else={<Icon name={kindIcon[kind()]} size={20} tone="muted" />}>
-                {(src) => <Image src={src()} style={{ width: 44, height: 44, objectFit: "cover" }} />}
+                {(src) => <Image src={src()} class="h-11 w-11 object-cover" />}
               </If>
             </View>
             <View class="min-w-0 flex-1 gap-0.5">
@@ -145,7 +145,10 @@ export function UnderstandingPanel(props: { file: Attachment }) {
                   class="font-mono tabular-nums"
                   disabled={frozen()}
                   value={String(tokens())}
-                  onInput={(v) => tokens.set(Math.min(maximumTokens, Math.max(1, Number(v.replace(/\D/gu, "")) || 1)))}
+                  onInput={(v) => {
+                    const n = Number(v.replace(/\D/gu, ""));
+                    tokens.set(Math.min(maximumTokens, Math.max(1, Number.isFinite(n) && n > 0 ? n : 1)));
+                  }}
                 />
               </Field>
             </View>
@@ -335,7 +338,7 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
                   {t("web.media.understanding.truncated")}
                 </NoticeBanner>
               </If>
-              <Text testID="understanding-result" class="text-sm leading-relaxed text-ink" style={{ userSelect: "text" }}>
+              <Text testID="understanding-result" class="text-sm leading-relaxed text-ink select-text">
                 {result().text}
               </Text>
               <Text testID="understanding-usage" class="border-t border-line pt-2 font-mono text-2xs text-muted tabular-nums">

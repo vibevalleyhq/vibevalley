@@ -65,6 +65,7 @@ export function selectScope(view: LibraryViewState, nextScope: LibraryScope): Li
         case "lightbox":
           return { scope, selection: cancelRemove(view.selection) };
       }
+      break;
     case "artifact":
       switch (view.selection.kind) {
         case "files":

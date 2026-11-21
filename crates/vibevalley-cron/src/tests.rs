@@ -1,5 +1,4 @@
-//! Ported from VibeValley `apps/server/src/modules/issue/when.test.ts`
-//! (the fold test belongs to the server). Times are Asia/Shanghai.
+//! Times are Asia/Shanghai.
 
 use super::*;
 

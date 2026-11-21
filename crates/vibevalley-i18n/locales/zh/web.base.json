@@ -5,10 +5,6 @@
     "home": "返回应用"
   },
   "place": {
-    "workspace": {
-      "label": "工作目录",
-      "hint": "工作目录与终端"
-    },
     "chat": {
       "label": "聊天",
       "hint": "频道和串"
@@ -40,6 +36,10 @@
     "settings": {
       "label": "设置",
       "hint": "通用、外观、模型、记性、技能、语音、连接"
+    },
+    "workspace": {
+      "label": "工作目录与终端",
+      "name": "终端"
     }
   },
   "link": {
@@ -243,5 +243,6 @@
     "timedOut": "等了太久没回音，可以重试",
     "offline": "没连上农场，这一下没发出去"
   },
-  "pickTooLarge": "{name} 没加上：超过 512 MiB 了"
+  "pickTooLarge": "{name} 没加上：超过 512 MiB 了",
+  "openTerminal": "在这里打开终端"
 }

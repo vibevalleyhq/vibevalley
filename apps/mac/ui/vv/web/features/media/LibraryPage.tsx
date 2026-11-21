@@ -397,7 +397,7 @@ export function LibraryPage() {
             testid="library-search"
             clearTestid="library-search-clear"
             value={text()}
-            onInput={text.set}
+            onInput={(v) => text.set(v)}
             placeholder={t("web.library.search")}
             label={t("web.library.search")}
             class="w-56 min-w-40"

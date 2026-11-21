@@ -1,7 +1,7 @@
 import { cleanup, effect, signal, untracked, type Accessor } from "nsh";
+import { z } from "zod";
 
 import type { ShellTheme } from "@vibevalley/artifact/shell";
-import { starterEntriesForType } from "@vibevalley/artifact/starters";
 import type {
   Artifact,
   ArtifactEntry,
@@ -12,6 +12,7 @@ import type {
   ArtifactType,
   ArtifactViewContext,
 } from "@vibevalley/protocol";
+import { ArtifactEntryBatchResult as ArtifactEntryBatchResultSchema, artifactId } from "@vibevalley/protocol/schema";
 
 import { createExternal } from "../../base/external";
 import { api, reasonOf } from "../../infra/api";
@@ -240,6 +241,141 @@ export function useStoreViewHtml(
   };
 }
 
+export interface InspectedColorSwatch {
+  readonly id: string;
+  readonly group: string;
+  readonly light: string;
+  readonly dark: string;
+  readonly note: string;
+  readonly contrastLight?: number;
+  readonly contrastDark?: number;
+}
+
+export interface InspectedTypeFamily {
+  readonly id: string;
+  readonly value: string;
+  readonly note: string;
+}
+
+export interface InspectedTokenValue {
+  readonly id: string;
+  readonly value: string;
+}
+
+export interface InspectedTypeStyle {
+  readonly id: string;
+  readonly family: string;
+  readonly size: string;
+  readonly weight: string;
+  readonly lineHeight: string;
+  readonly letterSpacing: string;
+  readonly sample: string;
+}
+
+export interface InspectedTokensSpec {
+  readonly themes: readonly string[];
+  readonly defaultTheme: string;
+  readonly colors: readonly InspectedColorSwatch[];
+  readonly families: readonly InspectedTypeFamily[];
+  readonly scale: readonly InspectedTokenValue[];
+  readonly styles: readonly InspectedTypeStyle[];
+  readonly space: readonly InspectedTokenValue[];
+  readonly radius: readonly InspectedTokenValue[];
+  readonly css: string;
+}
+
+export const EMPTY_INSPECTED_TOKENS: InspectedTokensSpec = {
+  themes: ["light", "dark"],
+  defaultTheme: "light",
+  colors: [],
+  families: [],
+  scale: [],
+  styles: [],
+  space: [],
+  radius: [],
+  css: "",
+};
+
+const ArtifactPageData = z.object({ content: z.string() });
+const AttachmentPathData = z.object({ path: z.string() });
+
+/** Parses design-system tokens, computes WCAG contrast ratios, and compiles CSS via the Rust server. */
+export async function inspectDesignTokens(raw: string): Promise<InspectedTokensSpec> {
+  const env = await transport().call("artifact.tokens.inspect", { raw });
+  if (env.bizCode !== 0) throw new Error(env.message);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Rust `artifact.tokens.inspect` returns InspectedTokensSpec
+  return env.data as InspectedTokensSpec;
+}
+
+/** Rewrites `data-props` defaults inside a `.dc.html` store entry via the Rust server. */
+export async function writeArtifactEntryProps(input: {
+  readonly id: ArtifactId;
+  readonly path: string;
+  readonly values: Readonly<Record<string, string | number | boolean>>;
+}): Promise<ArtifactEntryBatchResult> {
+  const env = await transport().call("artifact.entry.writeProps", input);
+  if (env.bizCode !== 0) throw new Error(env.message);
+  return ArtifactEntryBatchResultSchema.parse(env.data);
+}
+
+/** Fetches an HTML artifact's shell-wrapped page from the Rust server (`artifact.page`). */
+export function useArtifactPage(
+  params: () =>
+    | {
+        readonly id: string;
+        readonly version: number;
+        readonly theme: ShellTheme;
+      }
+    | undefined,
+): {
+  readonly html: Accessor<string | undefined>;
+  readonly loading: Accessor<boolean>;
+  readonly error: Accessor<string | undefined>;
+} {
+  const html = signal<string | undefined>(undefined);
+  const loading = signal(false);
+  const error = signal<string | undefined>(undefined);
+
+  let runId = 0;
+  effect(() => {
+    const p = params();
+    const myRun = ++runId;
+    if (!p) {
+      html.set(undefined);
+      loading.set(false);
+      error.set(undefined);
+      return;
+    }
+    loading.set(true);
+    error.set(undefined);
+    void transport()
+      .call("artifact.page", { id: p.id, version: p.version, shell: true, theme: p.theme })
+      .then(async (env) => {
+        if (env.bizCode === 0) return ArtifactPageData.parse(env.data).content;
+        // Fixtures that only stub `artifact.content.get` return RouteNotFound (100005).
+        if (env.bizCode === 100005) {
+          const raw = await api.artifact.content.get({ id: artifactId(p.id), version: p.version });
+          return raw.content;
+        }
+        throw new Error(env.message);
+      })
+      .then(
+        (content) => {
+          if (myRun !== runId) return;
+          html.set(content);
+          loading.set(false);
+        },
+        (err) => {
+          if (myRun !== runId) return;
+          error.set(reasonOf(err));
+          loading.set(false);
+        },
+      );
+  });
+
+  return { html, loading, error };
+}
+
 export function formatCellValue(val: unknown): string {
   if (val === null || val === undefined) return "";
   if (typeof val === "string") return val;
@@ -258,7 +394,7 @@ export async function saveTextFile(filename: string, mime: string, text: string)
   const att = await api.attachment.create({ name: filename, type: mime, data: utf8ToBase64(text) });
   const env = await transport().call("attachment.file", { id: att.id });
   if (env.bizCode !== 0) throw new Error(env.message);
-  const file = env.data as { readonly path: string };
+  const file = AttachmentPathData.parse(env.data);
   const res = await saveFile(file.path, filename);
   return res.saved;
 }
@@ -323,7 +459,6 @@ export async function createTypedArtifact(
     title,
     kind: "store",
     artifactType: choice,
-    entries: starterEntriesForType(choice, title),
     ...scope,
   });
 }

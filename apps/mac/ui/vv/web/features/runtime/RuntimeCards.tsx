@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/runtime/RuntimeCards.tsx:
-// the quota cells, the account, what it can do, its settings, models and
-// inventories. The account's energy bottle is a pixel sprite (ui/pixel);
-// without the art it is a bottle-shaped meter filled to what is left, in
-// the cells' colours.
 import { signal, Text, View, type JSX, type InputRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";

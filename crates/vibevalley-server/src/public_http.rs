@@ -1,5 +1,80 @@
-//! Public HTTPS policy shared by media download and library imports.
+//! Public HTTPS policy and shared blocking-to-async HTTP client plumbing.
+use std::future::Future;
+use std::io::Read;
 use std::net::Ipv4Addr;
+use std::sync::OnceLock;
+
+/// Shared tokio runtime for outbound `reqwest` calls from synchronous handlers and workers.
+pub(crate) fn http_runtime() -> &'static tokio::runtime::Runtime {
+    static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+    RT.get_or_init(|| {
+        crate::install_tls();
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .thread_name("vibevalley-http-client")
+            .enable_all()
+            .build()
+            .expect("http client runtime")
+    })
+}
+
+/// Shared no-redirect `reqwest::Client` so outbound calls never leak credentials across redirects.
+pub(crate) fn no_redirect_client() -> Result<&'static reqwest::Client, String> {
+    static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            crate::install_tls();
+            reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .map_err(|e| e.to_string())
+        })
+        .as_ref()
+        .map_err(Clone::clone)
+}
+
+pub(crate) fn run_http<T: Send + 'static>(work: impl Future<Output = T> + Send + 'static) -> T {
+    let (tx, rx) = flume::bounded(1);
+    http_runtime().spawn(async move {
+        let _ = tx.send(work.await);
+    });
+    rx.recv().expect("http client task completed")
+}
+
+/// Adapts a chunk channel from an async `reqwest::Response` into a synchronous [`Read`].
+pub(crate) struct ChannelReader {
+    rx: flume::Receiver<std::io::Result<Vec<u8>>>,
+    buf: Vec<u8>,
+    pos: usize,
+}
+
+impl ChannelReader {
+    pub(crate) fn new(rx: flume::Receiver<std::io::Result<Vec<u8>>>) -> Self {
+        Self { rx, buf: Vec::new(), pos: 0 }
+    }
+}
+
+impl Read for ChannelReader {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        while self.pos >= self.buf.len() {
+            match self.rx.recv() {
+                Ok(Ok(chunk)) => {
+                    if chunk.is_empty() {
+                        continue;
+                    }
+                    self.buf = chunk;
+                    self.pos = 0;
+                }
+                Ok(Err(e)) => return Err(e),
+                Err(_) => return Ok(0),
+            }
+        }
+        let n = (self.buf.len() - self.pos).min(out.len());
+        out[..n].copy_from_slice(&self.buf[self.pos..self.pos + n]);
+        self.pos += n;
+        Ok(n)
+    }
+}
 
 /// `publicIpv4`.
 pub(crate) fn public_v4(ip: Ipv4Addr) -> bool {

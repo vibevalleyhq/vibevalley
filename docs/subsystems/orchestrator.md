@@ -34,7 +34,7 @@
 - **工具说明以 Rust 为准**：工具的名字、说明和参数 Schema 在 `assets/tools/`，谁能调哪个由它列在哪个文件定。
 - **参数解析宽松但只在一处**：数字字符串、`"true"`、`null` 当缺省、多余字段忽略；解析失败时不执行工具，给模型的话统一一处写。
 - **`resource_read` 按会话权限只读裁剪并固定分页快照**：投递卡片只带摘要与 `vv://` 指针（Trigger、工单、频道、GitHub 评审线程、Artifact、记忆、仓库）。`resource_read` 不改业务表；助手可读全局资源，帮工仅可读自身工单、父工单、显式 `blockedBy` 工单及所在频道。
-- **改工单与定周期任务须有当轮用户授权**：仅当本轮最新输入含用户原话时算替用户做事；否则调 `issue_update`、`issue_status_update` 直接拒绝，调周期/派工 `cron_create` 存为 `pending` 待批。
+- **当轮用户授权检查（`Route.user`）**：仅当本轮批次含用户原话时 `Route.user` 为真；当前在 `cron_create`（后台回合创建的周期/派工任务存为 `pending` 待批）与媒体生成/理解工具中按此门禁拦截，其余四档工单变更硬拦截见下方提案。
 - **派活时挑档案**：顺序见[档案和农机](docs/subsystems/agent.md#模型和不变量)。
 - **整条消息落库**：完整回复生成后一次性写入频道。
 - **忙时来的输入排着，下一轮一起进**：内置引擎与 `WorkerDriver` 原生支持持久 `steer` 插话，但助手为了等同一批次的群聊输入整合后发给同一现状窗口，当前将忙时收到的消息留在信箱队列里，等本轮结束后合并进下一轮（详见 [VibeValley 自己的 agent](docs/subsystems/brain.md)）。
@@ -76,4 +76,4 @@
 
 - `crates/vibevalley-server/tests/orchestrator.rs`：用脚本模型让助手听见用户的话、调工具建工单。
 - `crates/vibevalley-server/tests/mcp.rs`：帮工经 `/mcp` 调同一套工具与 `resource_read`。
-- 错轮评测（`orchestrator.eval.create`）与真模型回放：Rust 版还没有。
+- `orchestrator.eval.create` 已在服务端实现（落盘至 `<家目录>/evals/<id>.json`）；真模型回放评测集尚未接入。

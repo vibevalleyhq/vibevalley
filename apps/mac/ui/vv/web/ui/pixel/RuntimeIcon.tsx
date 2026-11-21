@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/pixel/RuntimeIcon.tsx: each
-// runtime's farm machine (a pixel sprite, ui/pixel/atlas.ts) with the
-// runtime's badge. Until the art's folder is known, a machine is a rounded
-// tile in the colour its sprite is mostly painted in.
 import { View } from "nsh";
 
 import { RuntimeBadge } from "../domain/RuntimeBadge";

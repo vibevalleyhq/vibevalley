@@ -1,11 +1,3 @@
-// Ported from VibeValley apps/web/src/features/inbox/Follow.tsx: on each
-// frame, a system notification for each call new in the inbox while the
-// window is not in front, and the tray's summary when it changed, through
-// the host (infra/host.ts: hostApi.notify, hostApi.tray); the page's locale
-// to the host once. The tab title is the window's (document.title there):
-// the desktop host takes the tray's title into the window title
-// (docs/vibevalley-port.md, Bridge). Not here: the voice shortcut (no global
-// hotkeys in GPUI, phase 4).
 import { effect, lifecycle, untracked } from "nsh";
 
 import { currentLocale } from "@vibevalley/i18n";

@@ -59,7 +59,7 @@ export function Keyed(props: { key: unknown; children: () => JSX.Element }) {
 
 /** The value once it has stopped changing for `ms`: what is asked of the server while someone types. */
 export function createSettled<T>(value: Accessor<T>, ms = 250): Accessor<T> {
-  const [settled, setSettled] = createSignal<T>(untracked(value) as Exclude<T, Function>);
+  const [settled, setSettled] = createSignal<T>(untracked(value));
   createEffect(value, (v) => {
     const t = setTimeout(() => setSettled(() => v), ms);
     return () => clearTimeout(t);

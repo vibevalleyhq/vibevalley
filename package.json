@@ -19,9 +19,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@vibevalley/artifact": "workspace:*",
     "@vibevalley/i18n": "workspace:*",
-    "@vibevalley/pkm": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
     "@vibevalley/testkit": "workspace:*",
     "knip": "catalog:",

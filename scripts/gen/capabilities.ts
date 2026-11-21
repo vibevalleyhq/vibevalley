@@ -1,10 +1,25 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { maybe, t } from "@vibevalley/i18n";
 import { endpoints, pathOf } from "@vibevalley/protocol/api";
 
-const out = join(import.meta.dirname, "../..", "docs/reference/capabilities.md");
+const root = join(import.meta.dirname, "../..");
+const out = join(root, "docs/reference/capabilities.md");
+
+interface Nested {
+  readonly [k: string]: string | Nested;
+}
+
+const cliMessages = new Map<string, string>();
+const walk = (prefix: string, v: string | Nested) => {
+  if (typeof v === "string") cliMessages.set(prefix, v);
+  else for (const [k, x] of Object.entries(v)) walk(`${prefix}.${k}`, x);
+};
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- cli.json is validated by scripts/gen/i18n.ts check
+walk("cli", JSON.parse(readFileSync(join(root, "crates/vibevalley-i18n/locales/zh/cli.json"), "utf8")) as Nested);
+
+const maybe = (key: string): string | undefined => cliMessages.get(key);
+const t = (key: string): string => cliMessages.get(key) ?? key;
 
 const head = `# 能力表
 

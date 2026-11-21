@@ -1,9 +1,3 @@
-// Ported from VibeValley apps/web/src/features/setting/SettingsForm.tsx: the
-// memory sources' form, GitHub's status, the farm's language and where the
-// settings are kept. A new language there reloads the page; here the words
-// are set again (setLocale) and the host told (Host.locale), and the page
-// is shown again at its address: words a module worked out as it loaded
-// keep the old language until the app starts again.
 import { signal, Text, untracked, View } from "nsh";
 
 import { setLocale, t, currentLocale } from "@vibevalley/i18n";

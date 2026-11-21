@@ -35,9 +35,7 @@ export function Stat(props: { label: string; value: string }) {
   return (
     <View class="min-w-18 gap-0.5">
       <Text class="text-xs text-muted">{props.label}</Text>
-      <Text class="text-sm font-medium tabular-nums text-ink" style={{ numberOfLines: 2 }}>
-        {props.value}
-      </Text>
+      <Text class="line-clamp-2 text-sm font-medium tabular-nums text-ink">{props.value}</Text>
     </View>
   );
 }
@@ -256,8 +254,8 @@ export function Hands(props: { activity?: RepoActivity | undefined }) {
   const agents = useWorkAgents();
   const authors = () => props.activity?.authors ?? [];
   const top = () => {
-    const first = authors()[0];
-    return first && first.commits > 0 ? first.commits : 1;
+    const first = authors().at(0);
+    return first !== undefined && first.commits > 0 ? first.commits : 1;
   };
   const rest = () =>
     authors()

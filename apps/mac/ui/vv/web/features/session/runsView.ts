@@ -95,6 +95,7 @@ export function runActivityAt(entry: RunEntry): number {
         case "failed":
           return live.lastRun?.at ?? live.hiredAt;
       }
+      break;
     }
     case "worker": {
       const phase = entry.live?.phase ?? entry.session.phase;
@@ -126,6 +127,7 @@ export function runStatusOf(entry: RunEntry): RunStatusBadge {
         case "closed":
           return "listening";
       }
+      break;
     }
     case "worker": {
       const phase = entry.live?.phase ?? entry.session.phase;
@@ -172,7 +174,8 @@ function compareRunEntries(a: RunEntry, b: RunEntry): number {
     if (b.id === defaultOrchestrator) return 1;
     const timeDiff = runActivityAt(b) - runActivityAt(a);
     if (timeDiff !== 0) return timeDiff;
-    return a.agent.name.localeCompare(b.agent.name) || a.id.localeCompare(b.id);
+    const nameDiff = a.agent.name.localeCompare(b.agent.name);
+    return nameDiff !== 0 ? nameDiff : a.id.localeCompare(b.id);
   }
 
   const closedDiff = Number(isClosedWorker(a)) - Number(isClosedWorker(b));

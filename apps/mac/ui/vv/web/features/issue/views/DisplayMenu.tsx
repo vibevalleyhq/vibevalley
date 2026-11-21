@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/DisplayMenu.tsx:
-// base-ui's Popover becomes nsh/base's, the same panel. Its pop-in
-// animation is not carried.
 import { Text, View } from "nsh";
 import { Popover } from "nsh/base";
 

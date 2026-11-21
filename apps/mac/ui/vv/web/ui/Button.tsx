@@ -31,12 +31,12 @@ const inkClass: Record<Ink, string> = { ink: "text-ink", page: "text-page", berr
 export function Words(props: { children?: JSX.Element; ink?: Ink; class?: string }) {
   return (
     <If when={typeof props.children === "string" || typeof props.children === "number"} else={props.children}>
-      <Text class={`min-w-0 truncate ${props.class ?? "text-sm"} ${inkClass[props.ink ?? "ink"]}`}>{props.children as string}</Text>
+      <Text class={`min-w-0 truncate ${props.class ?? "text-sm"} ${inkClass[props.ink ?? "ink"]}`}>{props.children}</Text>
     </If>
   );
 }
 
-function buttonClass(tone: Tone, compact: boolean, disabled: boolean, extra?: string | undefined) {
+function buttonClass(tone: Tone, compact: boolean, disabled: boolean, extra?: string) {
   return [
     "flex-row items-center justify-center gap-1.5 rounded-md border transition duration-120 ease-out",
     compact ? "h-6 px-2" : "h-7 px-2.5",

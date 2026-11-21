@@ -1,6 +1,3 @@
-//! Ported from VibeValley `apps/server/src/modules/issue/moves.test.ts`,
-//! plus checks of the inbox, board order and the core.
-
 use crate::*;
 
 fn assigned(sessions: &[&str]) -> Vec<Assignment> {

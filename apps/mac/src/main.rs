@@ -8,6 +8,7 @@ mod island;
 mod live_voice;
 mod panes;
 mod pixel;
+mod qr;
 mod serving;
 mod shell;
 mod speech_audio;
@@ -17,7 +18,7 @@ mod tray;
 mod update;
 mod viewer;
 
-use gpui_kit::{App, AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, px, size};
+use gpui::{App, AppContext as _, Bounds, Focusable as _, TitlebarOptions, WindowBounds, WindowOptions, point, px, size};
 
 pub fn ensure_main_window(cx: &mut App) {
     if !cx.windows().is_empty() {
@@ -33,28 +34,29 @@ pub fn ensure_main_window(cx: &mut App) {
         }),
         ..Default::default()
     };
-    let (window, shell) = gpui_kit::open_window(options, cx, |window, cx| {
-        let shell = cx.new(|cx| shell::Shell::new(window, cx));
-        window.focus(&gpui_kit::Focusable::focus_handle(shell.read(cx), cx), cx);
-        shell
-    })
-    .expect("failed to open window");
+    let mut built = None;
+    let window = cx
+        .open_window(options, |window, cx| {
+            let shell = cx.new(|cx| shell::Shell::new(window, cx));
+            window.focus(&shell.read(cx).focus_handle(cx), cx);
+            built = Some(shell.clone());
+            shell
+        })
+        .expect("failed to open window");
+    let shell = built.expect("open_window ran its build closure");
     host::set_app_icon();
-    if let Some(window) = window.downcast::<gpui_kit::base::Root>() {
-        debug::start(shell, window, cx);
-    }
+    debug::start(shell, window, cx);
 }
 
 fn main() {
     update::enter_bundle();
     vibevalley_i18n::set_locale(vibevalley_server::home::saved_locale(&hosted::server_home()));
-    let app = gpui_kit::application();
+    let app = gpui_platform::application();
     app.on_reopen(|cx| {
         ensure_main_window(cx);
         cx.activate(true);
     });
     app.run(|cx| {
-        gpui_kit::init(cx);
         host::set_app_icon();
         tray::install(cx);
         theme::Ui::apply(theme::Settings::default(), cx);

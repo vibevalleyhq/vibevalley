@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/infra/local-day.ts: today's local
-// day, told again at midnight. The page's visibility change is nsh's
-// lifecycle coming back to "active".
 import { effect, lifecycle } from "nsh";
 
 import { dayKey } from "@vibevalley/pkm/days";

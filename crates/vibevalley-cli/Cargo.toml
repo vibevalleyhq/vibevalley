@@ -8,20 +8,25 @@ license.workspace = true
 name = "vibevalley"
 path = "src/main.rs"
 
+[features]
+default = []
+local-chat = ["dep:vibevalley-oar"]
+
 [dependencies]
 clap = { version = "4.6.7", features = ["string"] }
 jiff = { workspace = true }
 serde = { workspace = true }
-serde_json = "1.0.154"
-ureq = { version = "3.5.2", features = ["json"] }
+serde_json = { workspace = true }
+ureq = { workspace = true }
 vibevalley-agent = { path = "../vibevalley-agent" }
 vibevalley-core = { path = "../vibevalley-core" }
 vibevalley-home = { path = "../vibevalley-home" }
 vibevalley-i18n = { path = "../vibevalley-i18n" }
-vibevalley-oar = { path = "../vibevalley-oar" }
+vibevalley-oar = { path = "../vibevalley-oar", optional = true }
 vibevalley-protocol = { path = "../vibevalley-protocol" }
 
 [dev-dependencies]
-tempfile = "3.27.0"
+tempfile = { workspace = true }
+vibevalley-oar = { path = "../vibevalley-oar" }
 vibevalley-server = { path = "../vibevalley-server" }
 vibevalley-http = { path = "../vibevalley-http" }

@@ -107,7 +107,7 @@ export function FactRow(props: { label: string; children: JSX.Element }) {
       <Text class="w-16 shrink-0 text-2xs text-faint">{props.label}</Text>
       <View class="min-w-0 flex-1">
         <If when={typeof props.children === "string"} else={props.children}>
-          <Text class="truncate font-mono text-2xs text-muted tabular-nums">{props.children as string}</Text>
+          <Text class="truncate font-mono text-2xs text-muted tabular-nums">{props.children}</Text>
         </If>
       </View>
     </View>
@@ -195,7 +195,7 @@ export function ResultAudio(props: {
   prefix: string;
   save: string;
   duration?: number | undefined;
-  format?: MediaAudioFormat | null | undefined;
+  format?: MediaAudioFormat;
 }) {
   const attached = useAttachmentFile(() => props.attachment ?? "");
   const input = useInputFile(() => props.input ?? "");

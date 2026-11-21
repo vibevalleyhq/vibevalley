@@ -95,7 +95,7 @@ export function Banner(props: {
       </View>
       <If when={typeof props.children === "string"} else={<View class="min-w-0 flex-1">{props.children}</View>}>
         <Text testID={props.testID} role={props.role} class={`min-w-0 flex-1 ${textSize()} ${s().text} ${props.textClass ?? ""}`}>
-          {props.children as string}
+          {props.children}
         </Text>
       </If>
     </View>
@@ -118,7 +118,7 @@ export function SidebarSection(props: {
   children: JSX.Element;
 }) {
   const internal = signal(untracked(() => props.closed !== true));
-  const expanded = () => (props.open !== undefined ? props.open : internal());
+  const expanded = () => props.open ?? internal();
   const toggle = () => {
     if (props.onToggle) props.onToggle();
     else internal.set(!internal());
@@ -234,7 +234,7 @@ export function Card(props: { title?: JSX.Element; action?: JSX.Element; childre
           <View class="min-w-0 flex-1">
             <If when={typeof props.title === "string"} else={props.title}>
               <Text role="header" class="truncate text-base font-semibold text-ink">
-                {props.title as string}
+                {props.title}
               </Text>
             </If>
           </View>

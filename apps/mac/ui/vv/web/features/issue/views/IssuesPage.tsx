@@ -1,12 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/IssuesPage.tsx:
-// the same model calls (cards from the issue history and the frame, moves
-// as intents, the filter in the address), the board or the list, the
-// display menu, the issue / todo / family details, the new issue sheet and
-// the close and reopen dialogs. Keys: C writes a new issue and Escape
-// leaves an issue, through nsh's keymap (not while a field has the focus or
-// a dialog is up). Cards are dragged on the board with pan gestures
-// (Board.tsx). The toolbar's container query (views
-// above the filters when narrow) is not carried: the row wraps instead.
 import { keymap, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
@@ -79,7 +70,7 @@ export function IssuesPage(props: { rest: string }) {
     if (!router.location().pathname.startsWith("/issues/")) return;
     const path = router.history.previous()?.pathname;
     if (path === "/map") return t("web.farm.native.map");
-    if (path === "/farm" || path?.startsWith("/farm/")) return t("web.base.farm");
+    if (path === "/farm" || path?.startsWith("/farm/") === true) return t("web.base.farm");
   };
   const returnTo = signal<string>();
   const open = (to: string | undefined) => {
@@ -222,7 +213,12 @@ export function IssuesPage(props: { rest: string }) {
         }
       >
         {/* Keyed by the id, a plain value; the detail keeps the card it last found (see Detail). */}
-        <Each of={id() === undefined ? [] : [id() as string]}>
+        <Each
+          of={(() => {
+            const cur = id();
+            return cur === undefined ? [] : [cur];
+          })()}
+        >
           {(at) => (
             <IssueView onBack={() => open(undefined)} backLabel={fromScene() ?? t("web.issue.page.backToBoard")} blocked={dialogUp}>
               <Detail
@@ -467,53 +463,47 @@ function IssuesOnboarding(props: { onNavigate: (path: string) => void; onNew: ()
       <View class="mx-auto my-8 w-full max-w-160 px-6">
         <View class="rounded-xl border border-line bg-page p-6">
           <Text role="header" class="text-lg font-semibold text-ink">
-            开始使用 VibeValley
+            {t("web.issue.onboarding.title")}
           </Text>
-          <Text class="mt-1 text-sm text-muted">按下面三步准备好环境，就能把工单派给帮工干活。</Text>
+          <Text class="mt-1 text-sm text-muted">{t("web.issue.onboarding.subtitle")}</Text>
           <View class="mt-5 gap-2.5">
             <View testID="onboarding-step-runtimes" class="flex-row items-center gap-3 rounded-lg bg-side p-3.5">
               <View class="h-6 w-6 shrink-0 items-center justify-center rounded-full bg-selected">
-                <Text class="text-xs font-semibold text-ink" style={{ fontVariant: ["tabular-nums"] }}>
-                  1
-                </Text>
+                <Text class="text-xs font-semibold text-ink tabular-nums">1</Text>
               </View>
               <View class="min-w-0 flex-1">
-                <Text class="text-sm font-medium text-ink">检查或配置农机</Text>
-                <Text class="mt-0.5 text-xs text-muted">确认本机已安装并启用编码 agent（如 Claude Code、Codex 等）</Text>
+                <Text class="text-sm font-medium text-ink">{t("web.issue.onboarding.step1Title")}</Text>
+                <Text class="mt-0.5 text-xs text-muted">{t("web.issue.onboarding.step1Desc")}</Text>
               </View>
               <Button icon="runtimes" testID="onboarding-runtimes" onPress={() => props.onNavigate("/runtimes")}>
-                配置农机
+                {t("web.issue.onboarding.step1Action")}
               </Button>
             </View>
             <View testID="onboarding-step-repos" class="flex-row items-center gap-3 rounded-lg bg-side p-3.5">
               <View class="h-6 w-6 shrink-0 items-center justify-center rounded-full bg-selected">
-                <Text class="text-xs font-semibold text-ink" style={{ fontVariant: ["tabular-nums"] }}>
-                  2
-                </Text>
+                <Text class="text-xs font-semibold text-ink tabular-nums">2</Text>
               </View>
               <View class="min-w-0 flex-1">
-                <Text class="text-sm font-medium text-ink">添加代码仓库</Text>
-                <Text class="mt-0.5 text-xs text-muted">绑定本机 Git 仓库，帮工会在独立工作目录里改动代码</Text>
+                <Text class="text-sm font-medium text-ink">{t("web.issue.onboarding.step2Title")}</Text>
+                <Text class="mt-0.5 text-xs text-muted">{t("web.issue.onboarding.step2Desc")}</Text>
               </View>
               <Button icon="repos" testID="onboarding-repos" onPress={() => props.onNavigate("/repos")}>
-                添加仓库
+                {t("web.issue.onboarding.step2Action")}
               </Button>
             </View>
             <View testID="onboarding-step-start" class="flex-row items-start gap-3 rounded-lg bg-side p-3.5">
               <View class="mt-0.5 h-6 w-6 shrink-0 items-center justify-center rounded-full bg-selected">
-                <Text class="text-xs font-semibold text-ink" style={{ fontVariant: ["tabular-nums"] }}>
-                  3
-                </Text>
+                <Text class="text-xs font-semibold text-ink tabular-nums">3</Text>
               </View>
               <View class="min-w-0 flex-1">
-                <Text class="text-sm font-medium text-ink">创建第一条工单，或在聊天中派活</Text>
-                <Text class="mt-0.5 text-xs text-muted">写下需求直接派给帮工，或按 C 键新建工单，也可以在聊天里让助手帮你拆解</Text>
+                <Text class="text-sm font-medium text-ink">{t("web.issue.onboarding.step3Title")}</Text>
+                <Text class="mt-0.5 text-xs text-muted">{t("web.issue.onboarding.step3Desc")}</Text>
                 <View class="mt-2.5 flex-row flex-wrap items-center gap-2">
                   <Button tone="primary" icon="add" testID="onboarding-new-issue" onPress={props.onNew}>
-                    新建工单
+                    {t("web.issue.onboarding.newIssue")}
                   </Button>
                   <Button icon="chat" testID="onboarding-chat" onPress={() => props.onNavigate("/chat")}>
-                    去聊天派活
+                    {t("web.issue.onboarding.openChat")}
                   </Button>
                 </View>
               </View>

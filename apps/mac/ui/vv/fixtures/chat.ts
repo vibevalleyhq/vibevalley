@@ -64,21 +64,20 @@ const messages: ChatMessage[] = [
   helper("（这条删了）", { deleted: now - min }),
 ] as ChatMessage[];
 
-const channel = (id: string, name: string, more: Partial<Channel> = {}): Channel =>
-  ({
-    id,
-    type: "channel",
-    default: false,
-    category: "",
-    notify: "all",
-    name,
-    description: "",
-    subjectKind: null,
-    replies: 0,
-    title: name,
-    at: now - 60 * min,
-    ...more,
-  }) as Channel;
+const channel = (id: string, name: string, more: Partial<Channel> = {}): Channel => ({
+  id,
+  type: "channel",
+  default: false,
+  category: "",
+  notify: "all",
+  name,
+  description: "",
+  subjectKind: null,
+  replies: 0,
+  title: name,
+  at: now - 60 * min,
+  ...more,
+});
 
 const last = messages.at(-2);
 
@@ -128,7 +127,7 @@ export const crons: CronView[] = [
     pending: false,
     whenText: "每天 09:30",
     nextText: "明天 09:30",
-  } as CronView,
+  },
 ];
 
 const voice = {

@@ -136,9 +136,7 @@ export function TemplateCard(props: { template: AgentTemplate; runtimes: readonl
               <CountPill count={t("web.agent.templates.adopted", { n: template().installed.length })} />
             </If>
           </View>
-          <Text class="text-xs leading-snug text-muted" style={{ numberOfLines: 2 }}>
-            {template().duty}
-          </Text>
+          <Text class="line-clamp-2 text-xs leading-snug text-muted">{template().duty}</Text>
         </View>
       </View>
 

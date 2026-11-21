@@ -246,8 +246,6 @@ impl Voice {
         state.grants.retain(|_, g| g.phase != GrantPhase::Issued || g.expires > at);
     }
 
-    // ----- grants -----
-
     /// `voice.grant.create`: a channel and uid of this call's own and the
     /// token that joins it; for a MOSS call the grant only names the call.
     pub fn grant(&self) -> Result<AgoraGrant, ApiError> {
@@ -298,8 +296,6 @@ impl Voice {
         grant.expires = now() + TOKEN_SECONDS as Millis * 1000;
         Ok(issued)
     }
-
-    // ----- calls -----
 
     /// `voice.call.start`: the grant's call begins. `about` is what rang:
     /// the orchestrator says it first, instead of the greeting.
@@ -633,8 +629,6 @@ impl Voice {
         });
     }
 
-    // ----- dictation and the MOSS key -----
-
     /// `voice.dictate`: one recording as text.
     pub fn dictate(&self, audio64: &str, format: &str) -> Result<Dictated, ApiError> {
         let to = dictation::transcriber(&self.setting)?;
@@ -661,8 +655,6 @@ impl Voice {
         };
         Validation { problem }
     }
-
-    // ----- the host's MOSS Live line -----
 
     /// For the host that holds the MOSS Live socket: where to connect and
     /// with which key, the frames to send, and where to bring the frames

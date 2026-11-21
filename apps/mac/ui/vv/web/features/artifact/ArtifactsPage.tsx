@@ -1,13 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/ArtifactsPage.tsx:
-// the list (delivered to the user, then the user's own) beside the one open:
-// Back-to-Library link, collapsible list toggle, title typed over in place,
-// top-header kind/suffix/default badges & version pills, blocks/html/store
-// viewers, and an embedded live ChannelSidePane in the rail.
-//
-// Changed for the app: a deck's Present fills this page with the deck (no
-// fullscreen element; Escape or the bar's button comes back). A web view is
-// drawn over whatever nsh draws in its box, so it is hidden (`covered`) while
-// a menu is open. Suggestions are drawn in the rail by BlocksView's onRail.
 import { effect, keymap, Scroll, signal, Text, untracked, View, type InputRef, type JSX } from "nsh";
 import { Input } from "nsh/base";
 import { z } from "zod";
@@ -124,7 +114,7 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
               testid="artifact-search"
               clearTestid="artifact-search-clear"
               value={query()}
-              onInput={query.set}
+              onInput={(v) => query.set(v)}
               placeholder={t("web.artifact.page.find")}
               label={t("web.artifact.page.find")}
               class="min-w-0 flex-1"
@@ -238,7 +228,7 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
   );
 }
 
-type Presenting = ReturnType<typeof signal<boolean>>;
+type Presenting = { (): boolean; set(value: boolean): void };
 
 function Opened(props: { id: string; chat: ArtifactChat; presenting: Presenting; covered: boolean; listOpen: boolean; onToggleList: () => void }) {
   const found = useArtifact(() => props.id);
@@ -454,7 +444,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat; presenting: Pres
                 </If>
                 <If when={html() && props.artifact.versions.length > 1}>
                   <View testID="artifact-versions" class="flex-row flex-wrap items-center gap-1">
-                    <Each of={[...props.artifact.versions].reverse()} key={(v) => v.version}>
+                    <Each of={props.artifact.versions.toReversed()} key={(v) => v.version}>
                       {(v) => (
                         <View
                           role="button"

@@ -40,7 +40,7 @@ export function Slider(props: SliderProps) {
   };
 
   const emitAtX = (pageX: number) => {
-    const w = trackSpan || untracked(trackWidth);
+    const w = trackSpan > 0 ? trackSpan : untracked(trackWidth);
     if (w <= 0) return;
     const nextRatio = clamp((pageX - trackLeft) / w, 0, 1);
     const next = snap(props.min + nextRatio * span(), props.min, props.max, props.step);

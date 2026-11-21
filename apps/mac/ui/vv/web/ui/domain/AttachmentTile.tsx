@@ -34,7 +34,7 @@ export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void
     >
       <View class="h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-line bg-side">
         <If when={kind() === "image" ? url() : undefined} else={<Icon name={kindIcon[kind()]} size={16} tone="muted" />}>
-          {(src) => <Image testID="attachment-thumb" src={src()} style={{ width: 32, height: 32, objectFit: "cover" }} />}
+          {(src) => <Image testID="attachment-thumb" src={src()} class="h-8 w-8 object-cover" />}
         </If>
       </View>
       <View class="min-w-0 flex-1 gap-0.5">

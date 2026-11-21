@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/pkm/PkmPage.tsx: the notes:
-// the side list, then a page open by its slug or the stream of days
-// (today's journal, made if there is none, then the five days before that
-// have one) beside the calendar. Narrower than lg, `?nav` shows the list in
-// place of the page.
 import { Scroll, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

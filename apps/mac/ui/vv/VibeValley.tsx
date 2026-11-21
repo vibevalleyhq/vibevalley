@@ -11,6 +11,8 @@ import { useBridge } from "./web/infra/bridged";
 import { appHistory } from "./web/infra/router";
 import { SOUNDS, playSound, type SoundName } from "./web/ui/pixel/sound";
 
+const isSoundName = (name: string): name is SoundName => Object.hasOwn(SOUNDS, name);
+
 export function VibeValley() {
   setLocale(host.params.locale === "en" ? "en" : "zh");
   useBridge();
@@ -22,7 +24,7 @@ export function VibeValley() {
   if (host.params.globalShell === true) {
     cleanup(
       host.on("farm-sound", (name) => {
-        if (typeof name === "string" && Object.hasOwn(SOUNDS, name)) playSound(name as SoundName);
+        if (typeof name === "string" && isSoundName(name)) playSound(name);
       }),
     );
     const changed = () => host.post("action", { type: "global_route", path: appHistory.read().pathname });

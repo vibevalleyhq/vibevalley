@@ -143,7 +143,11 @@
     "cancelReply": "不回复了",
     "attach": "附上文件",
     "uploadFailed": "没传上去：{why}",
-    "command": "命令"
+    "command": "命令",
+    "artifactContext": "当前上下文：{title}",
+    "artifactSlide": "第 {n} 页",
+    "clearContext": "移除本次附带的上下文",
+    "runningHint": "正在处理中，可直接补充说明或点击停止"
   },
   "manage": {
     "name": "名称",

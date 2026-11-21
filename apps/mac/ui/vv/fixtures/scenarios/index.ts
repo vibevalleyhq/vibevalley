@@ -20,7 +20,7 @@ function buildHistory(frame: StateFrame): IssueHistory[] {
   const byId = new Map<string, (typeof frame.state.sessions)[number]>(frame.state.sessions.map((s) => [s.id, s]));
   return frame.state.issues.map((issue) => {
     const sessions = issue.assignments.flatMap((a) => a.executions.map((e) => byId.get(e.session))).filter((s): s is NonNullable<typeof s> => s !== undefined);
-    return { issue, sessions, missingSessions: [] } as unknown as IssueHistory;
+    return { issue, sessions, missingSessions: [] };
   });
 }
 

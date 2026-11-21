@@ -623,7 +623,7 @@ function ThreadPreview(props: { thread: Channel }) {
             </>
           )}
         </If>
-        <View style={{ opacity: 0.6 }}>
+        <View class="opacity-60">
           <Icon name="expand" size={12} tone="muted" />
         </View>
       </View>

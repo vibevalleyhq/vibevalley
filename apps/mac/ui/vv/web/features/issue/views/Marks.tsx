@@ -126,7 +126,7 @@ export function ProgressMark(props: { done: number; total: number }) {
   return (
     <View class="flex-row items-center gap-1">
       <Canvas
-        style={{ width: 13, height: 13, flexShrink: 0 }}
+        class="h-[13px] w-[13px] shrink-0"
         draw={(cx) => {
           void colorScheme();
           const frac = part();
@@ -199,9 +199,7 @@ export function FlagChip(props: { text: string; tone: Tone }) {
   };
   return (
     <View class={`rounded-sm px-1.5 ${look().bgClass}`} style={bgStyle()}>
-      <Text class={`text-2xs font-medium ${look().text}`} style={{ lineHeight: 16, numberOfLines: 1 }}>
-        {props.text}
-      </Text>
+      <Text class={`line-clamp-1 text-2xs leading-4 font-medium ${look().text}`}>{props.text}</Text>
     </View>
   );
 }

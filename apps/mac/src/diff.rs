@@ -6,7 +6,7 @@ use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use gpui_kit::{
+use gpui::{
     AnyElement, AppContext as _, Context, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, Hsla, InteractiveElement as _, IntoElement,
     ParentElement as _, PathBuilder, Render, StatefulInteractiveElement as _, Styled as _, StyledText, Window, canvas, div, point, px, uniform_list,
 };
@@ -334,13 +334,13 @@ impl DiffView {
 impl EventEmitter<DiffChanged> for DiffView {}
 
 impl Focusable for DiffView {
-    fn focus_handle(&self, _: &gpui_kit::App) -> FocusHandle {
+    fn focus_handle(&self, _: &gpui::App) -> FocusHandle {
         self.focus.clone()
     }
 }
 
 fn transparent() -> Hsla {
-    gpui_kit::hsla(0.0, 0.0, 0.0, 0.0)
+    gpui::hsla(0.0, 0.0, 0.0, 0.0)
 }
 
 fn chevron_icon(expanded: bool, color: Hsla) -> AnyElement {
@@ -442,7 +442,7 @@ fn styled(text: &str, emphasis: &[Range<usize>], color: Hsla) -> StyledText {
     StyledText::new(text).with_highlights(highlights)
 }
 
-fn gutter_number(no: Option<u32>, width: f32, tinted: bool, border_right: bool, c: &Palette) -> gpui_kit::Div {
+fn gutter_number(no: Option<u32>, width: f32, tinted: bool, border_right: bool, c: &Palette) -> gpui::Div {
     let mut cell = div()
         .w(px(width))
         .h_full()

@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use gpui_kit::{
+use gpui::{
     App, Bounds, Corners, Font, FontFeatures, FontStyle, FontWeight, Hsla, Pixels, RenderImage, Rgba, ShapedLine, SharedString, TextAlign, TextRun, Window,
     fill, outline, point, px, size,
 };
@@ -67,7 +67,7 @@ const TEXT_CACHE_CAP: usize = 512;
 pub struct SpriteCache {
     images: HashMap<Key, Arc<RenderImage>>,
     text_cache: HashMap<TextKey, Arc<ShapedLine>>,
-    farm_texture: Option<gpui_kit::DynamicTexture>,
+    farm_texture: Option<gpui::DynamicTexture>,
     farm_size: (u32, u32),
     /// Pictures made per frame (Op::Image): dropped once a paint does not use them.
     dynamic: HashMap<Key, bool>,
@@ -133,7 +133,7 @@ impl SpriteCache {
     }
 
     fn paint_farm(&mut self, picture: &RgbaImage, bounds: Bounds<Pixels>, window: &mut Window) -> bool {
-        use gpui_kit::DevicePixels;
+        use gpui::DevicePixels;
         let w = (f32::from(bounds.size.width) * window.scale_factor()).round() as u32;
         let h = (f32::from(bounds.size.height) * window.scale_factor()).round() as u32;
         if w == 0 || h == 0 {
@@ -235,7 +235,7 @@ fn cached_hud_line(cache: &mut SpriteCache, text: &str, font_size: f32, color: C
 
 fn paint_hud_picture(
     cache: &mut SpriteCache,
-    hud_origin: gpui_kit::Point<Pixels>,
+    hud_origin: gpui::Point<Pixels>,
     key: &str,
     raster: &dyn Fn(u32, u32) -> RgbaImage,
     [x, y, w, h]: [f32; 4],
@@ -286,7 +286,7 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
     let origin = bounds.origin + point(px(f.bx.x), px(f.bx.y));
     let at = |x: f32, y: f32| origin + point(px(x * s), px(y * s));
     let dev = |v: f32| (v * device).round().max(1.0) as u32;
-    window.with_content_mask(Some(gpui_kit::ContentMask { bounds }), |window| {
+    window.with_content_mask(Some(gpui::ContentMask { bounds }), |window| {
         let pic = Bounds::new(at(0.0, 0.0), size(px(list.width * s), px(list.height * s)));
         if list.farm_light.is_some()
             && let Some(atlas) = atlas
@@ -440,7 +440,7 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                 clip = c.map(|[x, y, w, h]| Bounds::new(hud_origin + point(px(x), px(y)), size(px(w), px(h))).intersect(&bounds));
                 continue;
             }
-            let mask = gpui_kit::ContentMask {
+            let mask = gpui::ContentMask {
                 bounds: clip.unwrap_or(bounds),
             };
             window.with_content_mask(Some(mask), |window| match op {
@@ -448,7 +448,7 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                     let b = Bounds::new(hud_origin + point(px(*x), px(*y)), size(px(*w), px(*h)));
                     window.paint_quad(fill(b, hsla(*color)));
                     if let Some(border) = border {
-                        window.paint_quad(outline(b, hsla(*border), gpui_kit::BorderStyle::Solid));
+                        window.paint_quad(outline(b, hsla(*border), gpui::BorderStyle::Solid));
                     }
                 }
                 HudOp::Text { x, y, size: font_size, .. } => {
@@ -460,7 +460,7 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                     if let Some(line) = shaped {
                         let at = hud_origin + point(px(*x), px(*y));
                         let text_bounds = Bounds::new(at, size(px(w.max(0.0)), px(font_size * 1.25))).intersect(&mask.bounds);
-                        window.with_content_mask(Some(gpui_kit::ContentMask { bounds: text_bounds }), |window| {
+                        window.with_content_mask(Some(gpui::ContentMask { bounds: text_bounds }), |window| {
                             let _ = line.paint(at, px(font_size * 1.25), TextAlign::Left, None, window, cx);
                         });
                     }

@@ -19,29 +19,9 @@
       "types": "./dist/html.d.ts",
       "default": "./src/html.ts"
     },
-    "./markdown": {
-      "types": "./dist/markdown.d.ts",
-      "default": "./src/markdown.ts"
-    },
-    "./ops": {
-      "types": "./dist/ops.d.ts",
-      "default": "./src/ops.ts"
-    },
     "./shell": {
       "types": "./dist/shell.d.ts",
       "default": "./src/shell.ts"
-    },
-    "./starters": {
-      "types": "./dist/starters.d.ts",
-      "default": "./src/starters.ts"
-    },
-    "./store": {
-      "types": "./dist/store.d.ts",
-      "default": "./src/store.ts"
-    },
-    "./tokens": {
-      "types": "./dist/tokens.d.ts",
-      "default": "./src/tokens.ts"
     },
     "./viewers": {
       "types": "./dist/viewers.d.ts",
@@ -51,7 +31,6 @@
   "dependencies": {
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
-    "parse5": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

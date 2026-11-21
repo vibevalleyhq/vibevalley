@@ -1,19 +1,12 @@
-// Ported from VibeValley apps/web/src/features/artifact/HtmlFrame.tsx: one
-// html version or store artifact view with the controls its display asks for.
-// The <iframe> is an nsh WebView given the page (frame.ts says how it talks).
-// A web view is a native view over whatever nsh draws in its box and is left
-// out of the app's pictures; `covered` hides it (opacity 0 keeps the page
-// loaded) while something nsh draws must show over it, as a menu does.
 import { cleanup, untracked, View, WebView, type JSX } from "nsh";
 
 import type { Artifact, ArtifactDisplay } from "@vibevalley/protocol";
 
 import { shownTheme } from "../../state/prefs";
-import { useArtifactContent } from "./ArtifactCard";
-import { createFrame, type Frame, framed, shim } from "./frame";
+import { createFrame, type Frame, shim, withShellQuery } from "./frame";
 import { MotionControls } from "./MotionControls";
 import { SlidesControls } from "./SlidesControls";
-import { useReportViewContext, useStoreViewHtml } from "./store";
+import { useArtifactPage, useReportViewContext, useStoreViewHtml } from "./store";
 
 /** What the controls under a display are given. */
 export interface Controls {
@@ -61,7 +54,7 @@ export function HtmlFrame(props: HtmlFrameProps) {
   }
 
   const isStore = () => props.artifact.body === "store";
-  const content = useArtifactContent(() => ({ id: props.artifact.id, version: props.version }));
+  const htmlPage = useArtifactPage(() => (isStore() ? undefined : { id: props.artifact.id, version: props.version, theme: shownTheme() }));
   const storeView = useStoreViewHtml(() =>
     isStore()
       ? {
@@ -77,11 +70,11 @@ export function HtmlFrame(props: HtmlFrameProps) {
   const display = () => props.artifact.display ?? "page";
   const page = () => {
     if (isStore()) return storeView.html();
-    const c = content.data();
-    return c ? framed({ page: c.content, display: display(), theme: shownTheme() }) : undefined;
+    const raw = htmlPage.html();
+    return raw !== undefined ? withShellQuery(raw) : undefined;
   };
 
-  if (!untracked(() => props.hideControls) && !untracked(isStore)) {
+  if (untracked(() => props.hideControls) !== true && !untracked(isStore)) {
     useReportViewContext(
       () => props.artifact.id,
       () => {

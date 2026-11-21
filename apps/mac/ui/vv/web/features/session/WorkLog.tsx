@@ -329,7 +329,7 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
   const input = () => readableInput(props.step);
   const running = () => props.step.ok === undefined;
   const failed = () => props.step.ok === false;
-  const state = () => (running() ? t("web.session.log.running") : props.step.ok ? t("web.session.log.ok") : t("web.session.log.failed"));
+  const state = () => (running() ? t("web.session.log.running") : props.step.ok === true ? t("web.session.log.ok") : t("web.session.log.failed"));
   const badgeClass = () => (running() ? "" : failed() ? "bg-bad-soft" : "bg-ok-soft");
   const badgeText = () => (running() ? "text-water" : failed() ? "text-berry" : "text-ok-ink");
   return (
@@ -374,10 +374,8 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
           </View>
           <If when={input()}>
             {(text) => (
-              <Scroll class="rounded-md border border-line bg-code-bg px-2.5 py-2" style={{ maxHeight: 160 }}>
-                <Text class="font-mono text-xs text-code-ink" style={{ userSelect: "text" }}>
-                  {text()}
-                </Text>
+              <Scroll class="max-h-40 rounded-md border border-line bg-code-bg px-2.5 py-2">
+                <Text class="font-mono text-xs text-code-ink select-text">{text()}</Text>
               </Scroll>
             )}
           </If>
@@ -390,9 +388,7 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
                 class={`rounded-md border px-2.5 py-2 ${failed() ? "bg-bad-soft" : "border-line bg-side"}`}
                 style={failed() ? { maxHeight: 224, borderColor: mix("berry", 0.3) } : { maxHeight: 224 }}
               >
-                <Text class={`font-mono text-xs ${failed() ? "text-berry" : "text-ink"}`} style={{ userSelect: "text" }}>
-                  {out()}
-                </Text>
+                <Text class={`font-mono text-xs select-text ${failed() ? "text-berry" : "text-ink"}`}>{out()}</Text>
               </Scroll>
             )}
           </If>

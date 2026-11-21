@@ -5,13 +5,51 @@
 import { Canvas, Clipboard, colorScheme, effect, host, Image, Path2D, Scroll, signal, Text, View, type JSX } from "nsh";
 import { Button, ContextMenu, MenuItem, MenuSeparator } from "nsh/base";
 
+import { t } from "@vibevalley/i18n";
+
 import { act, call, frame, frameRev, hostApi } from "../bridge";
 import { pressTransition } from "../motion";
 import { radius, tint, tok, type as ty } from "../tokens";
 import { FileTree, type FilesFrame } from "./FileTree";
 import { GitPanel, type GitFrame, type GitTab } from "./GitPanel";
-import { ProjectRail, type RailFrame, type RailProject, type RailRunningState, type RailTab } from "./ProjectRail";
 import { contextMenuItemStyle, contextMenuPopupStyle, focusRing, statusTint, TipBubble } from "./shared";
+
+type RailRunningState = "working" | "ready" | "idle";
+
+type RailTab = {
+  id: number;
+  title: string;
+  active: boolean;
+  kind: string;
+  running?: boolean;
+  runningState?: RailRunningState;
+  runningAgent?: string | null;
+  runningLabel?: string | null;
+  attention?: boolean;
+};
+
+type RailWorktree = {
+  path: string;
+  branch: string | null;
+  main: boolean;
+};
+
+type RailProject = {
+  id: number;
+  name: string;
+  path: string;
+  initials: string;
+  active: boolean;
+  attention: boolean;
+  terminals: number;
+  shortcut: string | null;
+  branch?: string | null;
+  mainRoot?: string | null;
+  worktrees?: RailWorktree[];
+  tabs?: RailTab[];
+};
+
+type RailFrame = { projects: RailProject[]; panel: string; inspectorOpen?: boolean };
 
 type VvRepo = { name: string; path: string; git?: boolean; last?: number };
 type VvSession = {
@@ -77,21 +115,21 @@ const ACTION_SIZE = 20;
 
 const KNOWN_RUNTIME_LOGOS = new Set(["claude", "codex", "opencode", "cursor", "kimi", "pi", "dsh", "grok", "antigravity"]);
 
-function runtimeLogoOf(agent: string | undefined | null): string | undefined {
+function runtimeLogoOf(agent: string | undefined): string | undefined {
   if (!agent) return undefined;
-  const key = agent.toLowerCase().replace(/^acp:/, "");
+  const key = agent.toLowerCase().replace(/^acp:/u, "");
   return KNOWN_RUNTIME_LOGOS.has(key) ? `logo-${key}` : undefined;
 }
 
-function normPath(p: string | undefined | null): string {
+function normPath(p: string | undefined): string {
   if (!p) return "";
-  const trimmed = p.replace(/\/+$/, "");
+  const trimmed = p.replace(/\/+$/u, "");
   return trimmed || "/";
 }
 
 function tabRunningState(tab: RailTab): RailRunningState {
   if (tab.runningState) return tab.runningState;
-  return tab.running ? "working" : "idle";
+  return tab.running === true ? "working" : "idle";
 }
 
 function summarizeGroup(group: WorktreeGroup): ActivitySummary {
@@ -102,7 +140,7 @@ function summarizeGroup(group: WorktreeGroup): ActivitySummary {
     const state = tabRunningState(tab);
     if (state === "working") working += 1;
     else if (state === "ready") ready += 1;
-    if (tab.attention) attention += 1;
+    if (tab.attention === true) attention += 1;
   }
   return { working, ready, attention, tabs: group.tabs.length };
 }
@@ -149,15 +187,15 @@ function disambiguatorMap(repos: RepoNode[]): Map<string, string> {
     if (group.length < 2) continue;
     const parents = group.map((r) => {
       const segs = r.path.split("/").filter(Boolean);
-      return segs.length >= 2 ? segs[segs.length - 2]! : r.path;
+      return segs.length >= 2 ? segs[segs.length - 2] : r.path;
     });
     const parentCounts = new Map<string, number>();
     for (const parent of parents) {
       parentCounts.set(parent, (parentCounts.get(parent) ?? 0) + 1);
     }
     for (let i = 0; i < group.length; i++) {
-      const r = group[i]!;
-      const parent = parents[i]!;
+      const r = group[i];
+      const parent = parents[i];
       if ((parentCounts.get(parent) ?? 0) > 1) {
         const segs = r.path.split("/").filter(Boolean);
         const hint = segs.length >= 3 ? `${segs[segs.length - 3]}/${segs[segs.length - 2]}` : parent;
@@ -170,7 +208,7 @@ function disambiguatorMap(repos: RepoNode[]): Map<string, string> {
   return result;
 }
 
-// ---- Crisp Vector Glyphs (nsh Canvas, 24x24 box) ----------------------------
+/** Crisp 24x24 vector glyphs drawn on an nsh Canvas. */
 
 type GlyphName = "chevron" | "plus" | "close" | "branch" | "terminal" | "file" | "diff" | "folder" | "collapseAll" | "expandAll";
 
@@ -337,7 +375,7 @@ function ActionIconBtn(props: { icon: GlyphName; size?: number; label: string; o
         ...pressTransition(),
       }}
     >
-      <Glyph name={props.icon} size={props.size ?? 12} color={props.danger ? p().danger : p().muted} />
+      <Glyph name={props.icon} size={props.size ?? 12} color={props.danger === true ? p().danger : p().muted} />
     </Button>
   );
 }
@@ -376,11 +414,11 @@ function formatTabTooltip(tab: RailTab, group: WorktreeGroup): string {
     const label =
       tab.runningLabel && tab.runningLabel !== tab.title ? tab.runningLabel : tab.runningAgent && tab.runningAgent !== "cmd" ? tab.runningAgent : null;
     if (state === "working") {
-      parts.push(label ? `${label} 正在运行` : "正在运行");
+      parts.push(label ? t("web.shell.sidebar.runningAgent", { agent: label }) : t("web.shell.sidebar.running"));
     } else if (state === "ready") {
-      parts.push(label ? `${label} 待命` : "待命");
+      parts.push(label ? t("web.shell.sidebar.readyAgent", { agent: label }) : t("web.shell.sidebar.ready"));
     }
-    if (tab.attention) parts.push("需要关注");
+    if (tab.attention === true) parts.push(t("web.shell.sidebar.needsAttention"));
   }
   parts.push(group.path);
   return parts.join(" · ");
@@ -388,10 +426,10 @@ function formatTabTooltip(tab: RailTab, group: WorktreeGroup): string {
 
 function formatSummaryTooltip(base: string, summary: ActivitySummary, collapsed: boolean): string {
   const parts: string[] = [base];
-  if (collapsed && summary.tabs > 0) parts.push(`${summary.tabs} 个终端`);
-  if (summary.working > 0) parts.push(`${summary.working} 运行中`);
-  if (summary.ready > 0) parts.push(`${summary.ready} 待命`);
-  if (summary.attention > 0) parts.push(`${summary.attention} 需要关注`);
+  if (collapsed && summary.tabs > 0) parts.push(t("web.shell.sidebar.terminalCount", { n: summary.tabs }));
+  if (summary.working > 0) parts.push(t("web.shell.sidebar.workingCount", { n: summary.working }));
+  if (summary.ready > 0) parts.push(t("web.shell.sidebar.readyCount", { n: summary.ready }));
+  if (summary.attention > 0) parts.push(t("web.shell.sidebar.attentionCount", { n: summary.attention }));
   return parts.join(" · ");
 }
 
@@ -407,13 +445,13 @@ export function Sidebar() {
   const otherSectionCollapsed = signal(false);
   const hoveredKey = signal<string | null>(null);
 
-  if (host.available() && (host.params.contextual === true || host.params.role === "inspector")) {
+  if (host.available()) {
     if (!pixelDir()) {
       void hostApi.pixelDir().then((env) => {
         if (env.bizCode === 0 && env.data?.path) pixelDir.set(env.data.path);
       });
     }
-    if (host.params.contextual === true) {
+    if (host.params.role !== "inspector") {
       effect(() => {
         void vvRev();
         void call<VvRepo[]>("repo.list", {}).then((env) => {
@@ -443,7 +481,6 @@ export function Sidebar() {
     return dir && name ? `file://${encodeURI(`${dir}/${name}.png`)}` : undefined;
   };
 
-  // ---- Right-side Inspector (Files / Diff / Branch / History) ------------
   const gitTab = signal<GitTab>("changes");
   if (host.params.role === "inspector") {
     const conflictCount = () => git()?.conflicts?.length ?? 0;
@@ -453,11 +490,11 @@ export function Sidebar() {
     const tabActiveBg = () => p().subtle;
 
     const inspectorTabs: { id: string; label: string; tip: string; badge?: () => number; danger?: () => boolean; onSelect: () => void }[] = [
-      { id: "files", label: "文件", tip: "工作区文件", onSelect: () => act({ type: "show_panel", panel: "files" }) },
+      { id: "files", label: t("web.shell.sidebar.files"), tip: t("web.shell.sidebar.filesTip"), onSelect: () => act({ type: "show_panel", panel: "files" }) },
       {
         id: "git:changes",
-        label: "变更",
-        tip: "工作区改动与暂存",
+        label: t("web.shell.sidebar.gitChanges"),
+        tip: t("web.shell.sidebar.gitChangesTip"),
         badge: gitCount,
         danger: () => conflictCount() > 0,
         onSelect: () => {
@@ -467,8 +504,8 @@ export function Sidebar() {
       },
       {
         id: "git:branches",
-        label: "分支",
-        tip: "本地分支与工作树",
+        label: t("web.shell.sidebar.gitBranches"),
+        tip: t("web.shell.sidebar.gitBranchesTip"),
         onSelect: () => {
           gitTab.set("branches");
           if (panel() !== "git") act({ type: "show_panel", panel: "git" });
@@ -476,8 +513,8 @@ export function Sidebar() {
       },
       {
         id: "git:commits",
-        label: "提交",
-        tip: "提交历史记录",
+        label: t("web.shell.sidebar.gitCommits"),
+        tip: t("web.shell.sidebar.gitCommitsTip"),
         onSelect: () => {
           gitTab.set("commits");
           if (panel() !== "git") act({ type: "show_panel", panel: "git" });
@@ -554,20 +591,6 @@ export function Sidebar() {
     );
   }
 
-  // ---- Legacy non-contextual mode -----------------------------------------
-  if (host.params.contextual !== true) {
-    return (
-      <View style={{ flex: 1, flexDirection: "row", backgroundColor: p().canvas }}>
-        <ProjectRail frame={rail()} />
-        <View style={{ flex: 1 }}>
-          {panel() === "files" ? <FileTree frame={files()} /> : null}
-          {panel() === "git" ? <GitPanel frame={git()} /> : null}
-        </View>
-      </View>
-    );
-  }
-
-  // ---- Left Workspace Tree: Repos -> (Worktree groups) -> Terminal Tabs ---
   const activePath = () => normPath(rail()?.projects.find((proj) => proj.active)?.path ?? files()?.root);
   const sessions = () => vvState()?.state?.sessions ?? [];
   const issues = () => vvState()?.state?.issues ?? [];
@@ -773,7 +796,7 @@ export function Sidebar() {
     if (own.length === 0 || other.length === 0) return [{ id: "all", title: "", repos: all }];
     return [
       { id: "own", title: "", repos: own },
-      { id: "other", title: "其他文件夹", repos: other },
+      { id: "other", title: t("web.shell.sidebar.otherFolders"), repos: other },
     ];
   };
 
@@ -789,13 +812,13 @@ export function Sidebar() {
           style={itemStyle}
           hoverStyle={{ backgroundColor: p().subtle }}
         >
-          <Text style={{ fontSize: 12.5, color: p().ink }}>在此新建终端</Text>
+          <Text style={{ fontSize: 12.5, color: p().ink }}>{t("web.shell.sidebar.newTerminalHere")}</Text>
         </MenuItem>
         <MenuItem onSelect={() => void hostApi.reveal(group.path)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-          <Text style={{ fontSize: 12.5, color: p().ink }}>在 Finder 中显示</Text>
+          <Text style={{ fontSize: 12.5, color: p().ink }}>{t("web.shell.sidebar.revealInFinder")}</Text>
         </MenuItem>
         <MenuItem onSelect={() => void Clipboard.writeText(group.path)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-          <Text style={{ fontSize: 12.5, color: p().ink }}>复制路径</Text>
+          <Text style={{ fontSize: 12.5, color: p().ink }}>{t("web.shell.sidebar.copyPath")}</Text>
         </MenuItem>
         {!group.isMain ? (
           <>
@@ -805,7 +828,7 @@ export function Sidebar() {
               style={itemStyle}
               hoverStyle={{ backgroundColor: p().subtle }}
             >
-              <Text style={{ fontSize: 12.5, color: p().danger }}>删除工作树</Text>
+              <Text style={{ fontSize: 12.5, color: p().danger }}>{t("web.shell.sidebar.removeWorktree")}</Text>
             </MenuItem>
           </>
         ) : null}
@@ -820,7 +843,7 @@ export function Sidebar() {
     // Each terminal tab displays strictly its own PTY status (never polluted by group.sessionRunning).
     const state = tab.kind === "terminal" ? tabRunningState(tab) : "idle";
     const ownAgent = tab.kind === "terminal" ? tab.runningAgent : undefined;
-    const logoSrc = spriteSrc(runtimeLogoOf(ownAgent));
+    const logoSrc = spriteSrc(runtimeLogoOf(ownAgent ?? undefined));
     const canClose = tab.kind === "terminal" || group.tabs.length > 1;
     const tabIconColor = () => (state === "working" ? p().ok : isSelected ? p().ink : p().muted);
 
@@ -873,12 +896,12 @@ export function Sidebar() {
           </Text>
         </Button>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          {state !== "idle" || tab.attention ? <StatusDots state={state} attention={tab.attention} /> : null}
+          {state !== "idle" || tab.attention === true ? <StatusDots state={state} attention={tab.attention === true} /> : null}
           {canClose && isHovered() ? (
             <ActionIconBtn
               icon="close"
               size={11}
-              label={`关闭 ${tab.title}`}
+              label={t("web.shell.sidebar.closeTab", { title: tab.title })}
               onPress={() => {
                 if (hoveredKey() === rowKey) hoveredKey.set(null);
                 act({ type: "close_tab_at", path: group.path, tab_id: tab.id });
@@ -899,7 +922,7 @@ export function Sidebar() {
     const summary = summarizeGroup(group);
     const sessionLogo = group.sessionRunning ? spriteSrc(runtimeLogoOf(group.sessionAgent)) : undefined;
     const tipText = formatSummaryTooltip(
-      group.isMain ? `${group.label}（主目录） · ${group.path}` : `${group.label} · ${group.path}`,
+      group.isMain ? `${t("web.shell.sidebar.mainWorktree", { label: group.label })} · ${group.path}` : `${group.label} · ${group.path}`,
       summary,
       expandable && !expanded,
     );
@@ -931,7 +954,7 @@ export function Sidebar() {
             <ChevronSlot
               expandable={expandable}
               expanded={expanded}
-              label={expanded ? `折叠 ${group.label}` : `展开 ${group.label}`}
+              label={expanded ? t("web.shell.sidebar.collapseItem", { name: group.label }) : t("web.shell.sidebar.expandItem", { name: group.label })}
               onToggle={() => toggleFold(groupFoldKey(group), expanded)}
             />
             <Button
@@ -954,7 +977,9 @@ export function Sidebar() {
                 >
                   {group.label}
                 </Text>
-                {group.isMain ? <Text style={{ fontSize: 11, fontWeight: "500", color: p().faint, flexShrink: 0 }}>主目录</Text> : null}
+                {group.isMain ? (
+                  <Text style={{ fontSize: 11, fontWeight: "500", color: p().faint, flexShrink: 0 }}>{t("web.shell.sidebar.mainLabel")}</Text>
+                ) : null}
               </View>
             </Button>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}>
@@ -964,7 +989,7 @@ export function Sidebar() {
                   <ActionIconBtn
                     icon="plus"
                     size={12}
-                    label={`新终端：${group.label}`}
+                    label={t("web.shell.sidebar.newTerminal", { name: group.label })}
                     onPress={() => {
                       setFold(groupFoldKey(group), true);
                       act({ type: "new_terminal_at", path: group.path });
@@ -990,7 +1015,7 @@ export function Sidebar() {
   const renderRepoNode = (repo: RepoNode, disambiguators: Map<string, string>) => {
     const rowKey = `repo:${repo.path}`;
     const hasMultipleWorktrees = repo.groups.length > 1;
-    const mainGroup = repo.groups[0]!;
+    const mainGroup = repo.groups[0];
     const expandable = isRepoExpandable(repo);
     const expanded = isRepoExpanded(repo);
     const isHovered = () => hoveredKey() === rowKey;
@@ -1027,7 +1052,7 @@ export function Sidebar() {
         <ChevronSlot
           expandable={expandable}
           expanded={expanded}
-          label={expanded ? `折叠 ${repo.name}` : `展开 ${repo.name}`}
+          label={expanded ? t("web.shell.sidebar.collapseItem", { name: repo.name }) : t("web.shell.sidebar.expandItem", { name: repo.name })}
           onToggle={() => toggleFold(repoFoldKey(repo), expanded)}
         />
         <Button
@@ -1064,7 +1089,7 @@ export function Sidebar() {
               <ActionIconBtn
                 icon="plus"
                 size={12}
-                label={`新终端：${repo.name}`}
+                label={t("web.shell.sidebar.newTerminal", { name: repo.name })}
                 onPress={() => {
                   setFold(repoFoldKey(repo), true);
                   act({ type: "new_terminal_at", path: repo.path });
@@ -1074,7 +1099,7 @@ export function Sidebar() {
                 <ActionIconBtn
                   icon="close"
                   size={11}
-                  label={`关闭文件夹：${repo.name}`}
+                  label={t("web.shell.sidebar.closeFolder", { name: repo.name })}
                   onPress={() => {
                     if (hoveredKey() === rowKey) hoveredKey.set(null);
                     act({ type: "close_project", id: repo.projectId! });
@@ -1141,13 +1166,13 @@ export function Sidebar() {
           borderBottomColor: p().border,
         }}
       >
-        <Text style={{ fontSize: 12, fontWeight: "600", color: p().ink }}>仓库与终端</Text>
+        <Text style={{ fontSize: 12, fontWeight: "600", color: p().ink }}>{t("web.shell.sidebar.title")}</Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
           {hasFoldableItems() ? (
             <Button
               onPress={toggleCollapseAll}
-              accessibilityLabel={anyExpanded() ? "折叠全部" : "展开当前"}
-              tooltip={<TipBubble text={anyExpanded() ? "折叠全部" : "展开当前"} />}
+              accessibilityLabel={anyExpanded() ? t("web.shell.sidebar.collapseAll") : t("web.shell.sidebar.expandCurrent")}
+              tooltip={<TipBubble text={anyExpanded() ? t("web.shell.sidebar.collapseAll") : t("web.shell.sidebar.expandCurrent")} />}
               hoverStyle={{ backgroundColor: p().tile }}
               activeStyle={{ opacity: 0.82 }}
               focusVisibleStyle={focusRing(p())}
@@ -1165,8 +1190,8 @@ export function Sidebar() {
           ) : null}
           <Button
             onPress={() => act({ type: "add_project" })}
-            accessibilityLabel="添加仓库"
-            tooltip={<TipBubble text="添加本地仓库或文件夹" />}
+            accessibilityLabel={t("web.shell.sidebar.addRepo")}
+            tooltip={<TipBubble text={t("web.shell.sidebar.addRepoTooltip")} />}
             hoverStyle={{ backgroundColor: p().subtle }}
             activeStyle={{ opacity: 0.82 }}
             focusVisibleStyle={focusRing(p())}
@@ -1184,7 +1209,7 @@ export function Sidebar() {
             }}
           >
             <Glyph name="plus" size={11} color={p().text} />
-            <Text style={{ fontSize: 11, fontWeight: "500", color: p().text }}>仓库</Text>
+            <Text style={{ fontSize: 11, fontWeight: "500", color: p().text }}>{t("web.shell.sidebar.addRepoButton")}</Text>
           </Button>
         </View>
       </View>
@@ -1210,7 +1235,11 @@ export function Sidebar() {
                       onPress={() => {
                         if (isCollapsibleSection) otherSectionCollapsed.update((v) => !v);
                       }}
-                      accessibilityLabel={isCollapsed ? `展开 ${section.title}` : `折叠 ${section.title}`}
+                      accessibilityLabel={
+                        isCollapsed
+                          ? t("web.shell.sidebar.expandSection", { title: section.title })
+                          : t("web.shell.sidebar.collapseSection", { title: section.title })
+                      }
                       hoverStyle={{ backgroundColor: p().tile }}
                       focusVisibleStyle={focusRing(p())}
                       style={{

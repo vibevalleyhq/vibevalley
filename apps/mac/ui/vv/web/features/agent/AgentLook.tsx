@@ -15,8 +15,7 @@ import { AgentFace } from "../../ui/domain/Face";
 import { PoseSprite } from "../../ui/domain/PoseSprite";
 import { usePixelDir, useSpriteUrl } from "../../ui/pixel/atlas";
 import { Hint } from "../../ui/Tip";
-import { tone } from "../../ui/tone";
-import { mix } from "../../ui/tone";
+import { mix, tone } from "../../ui/tone";
 
 /** A label with what it means behind an info icon, what sits at its right, the control, and what is wrong under it. */
 export function Labeled(props: {
@@ -155,7 +154,7 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
                 >
                   <View class="h-16 items-center justify-center">
                     <If when={src()} else={<View class="h-8" />}>
-                      {(u) => <Image src={u()} style={{ height: 64, width: 41, objectFit: "contain" }} />}
+                      {(u) => <Image src={u()} class="h-16 w-[41px] object-contain" />}
                     </If>
                   </View>
                 </Tile>
@@ -201,7 +200,7 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
   return (
     <View class="min-h-72 flex-1 items-center justify-center overflow-hidden bg-agent-stage-middle">
       <Canvas
-        style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}
+        class="absolute inset-0"
         draw={(ctx) => {
           colorScheme();
           const { width, height } = ctx.canvas;
@@ -230,7 +229,7 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
       >
         <View testID="agent-stage-art" class="h-72 w-96 max-w-full">
           <If when={bed()}>{(b) => <Image src={b().src} style={{ position: "absolute", left: 13, bottom: 24, width: 288, height: b().height }} />}</If>
-          <View class="items-center" style={{ position: "absolute", right: 0, bottom: 8, width: 192 }}>
+          <View class="absolute right-0 bottom-2 w-48 items-center">
             <PoseSprite cast={cast()} pose={props.pose} height={224} />
           </View>
         </View>

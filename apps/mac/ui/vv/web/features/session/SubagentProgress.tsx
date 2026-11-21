@@ -203,7 +203,7 @@ function ThreadLog(props: { session: string; run: string; thread: string; now: n
   return (
     <View testID="subagent-log">
       <If when={log().length > 0} else={<Text class="text-xs text-faint">{t("web.session.subagents.noLog")}</Text>}>
-        <Scroll style={{ maxHeight: 352 }} contentClass="gap-1" accessibilityLabel={t("web.session.log.process")}>
+        <Scroll class="max-h-88" contentClass="gap-1" accessibilityLabel={t("web.session.log.process")}>
           <Each of={log()} key={(step) => step.seq}>
             {(step) => <WorkLogStep step={step()} now={props.now} />}
           </Each>

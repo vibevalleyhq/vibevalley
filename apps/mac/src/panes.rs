@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use gpui_kit::{
+use gpui::{
     AnyElement, App, Bounds, Context, Entity, FocusHandle, Focusable, Hsla, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels,
     Point, StatefulInteractiveElement as _, Styled as _, Window, canvas, div, px, relative,
 };
@@ -152,7 +152,7 @@ trait FlexDir {
     fn when_horizontal(self, horizontal: bool) -> Self;
 }
 
-impl FlexDir for gpui_kit::Div {
+impl FlexDir for gpui::Div {
     fn when_horizontal(self, horizontal: bool) -> Self {
         if horizontal { self.flex_row() } else { self.flex_col() }
     }
@@ -493,7 +493,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
 }
 
 fn transparent() -> Hsla {
-    gpui_kit::hsla(0.0, 0.0, 0.0, 0.0)
+    gpui::hsla(0.0, 0.0, 0.0, 0.0)
 }
 
 fn panel_icon(right: bool, color: Hsla, filled: bool) -> AnyElement {
@@ -534,7 +534,7 @@ trait TabLook {
     fn tab_style(self, active: bool, colors: &Palette) -> Self;
 }
 
-impl TabLook for gpui_kit::Stateful<gpui_kit::Div> {
+impl TabLook for gpui::Stateful<gpui::Div> {
     fn tab_style(self, active: bool, colors: &Palette) -> Self {
         if active {
             self.bg(colors.bg).border_color(colors.border).text_color(colors.text)

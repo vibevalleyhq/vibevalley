@@ -1,0 +1,16 @@
+[
+  "when parsing a journey diagram it",
+  "journey\ntitle Adding journey diagram functionality to mermaid",
+  "journey\n",
+  "accDescr: A user journey for family shopping\n",
+  "title Adding journey diagram functionality to mermaid\n",
+  "accDescr {\n        A user journey for\n        family shopping\n      }",
+  "accTitle: Adding acc journey diagram functionality to mermaid\n",
+  "A user journey for\nfamily shopping",
+  "Adding journey diagram functionality to mermaid",
+  "Adding acc journey diagram functionality to mermaid",
+  "journey\n    accTitle: The title\n    section Order from website",
+  "when using the journeyDb",
+  "A user journey for family shopping",
+  "journey\n    title My working day\n    section Go to work\n      Make tea: 5: Me\n      Go upstairs: 3: Me\n      Do work: 1: Me, Cat\n    section Go home\n      Go downstairs: 5: Me\n      Sit down: 5: Me\n"
+]

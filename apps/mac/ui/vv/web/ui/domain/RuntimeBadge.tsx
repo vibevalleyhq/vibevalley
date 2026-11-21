@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/domain/RuntimeBadge.tsx: the
-// runtime's pixel logo (logo-<id>, else icon-wrench) from the app's art
-// (ui/pixel/atlas.ts). Until the art's folder is known, the badge carries
-// the first letter of the runtime's name.
 import { Image, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

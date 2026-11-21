@@ -56,6 +56,7 @@ export function closeFlowTransition(state: CloseFlowState, event: CloseFlowEvent
         case "completed":
           return state;
       }
+      break;
 
     case "loadingDiff":
       switch (event.kind) {
@@ -74,6 +75,7 @@ export function closeFlowTransition(state: CloseFlowState, event: CloseFlowEvent
         case "completed":
           return state;
       }
+      break;
 
     case "loadFailed":
       switch (event.kind) {
@@ -92,6 +94,7 @@ export function closeFlowTransition(state: CloseFlowState, event: CloseFlowEvent
         case "completed":
           return state;
       }
+      break;
 
     case "reviewing":
       switch (event.kind) {
@@ -112,6 +115,7 @@ export function closeFlowTransition(state: CloseFlowState, event: CloseFlowEvent
         case "completed":
           return state;
       }
+      break;
 
     case "submitting":
       switch (event.kind) {
@@ -133,6 +137,7 @@ export function closeFlowTransition(state: CloseFlowState, event: CloseFlowEvent
             case "resolve":
               return { kind: "reviewing", changes: state.operation.changes, sinceTree: state.operation.sinceTree, notice: event.message };
           }
+          break;
         case "submitFailed":
           switch (state.operation.kind) {
             case "cancel":
@@ -141,6 +146,7 @@ export function closeFlowTransition(state: CloseFlowState, event: CloseFlowEvent
             case "resolve":
               return { kind: "reviewing", changes: state.operation.changes, sinceTree: state.operation.sinceTree, notice: event.message ?? "" };
           }
+          break;
         case "openReview":
         case "diffLoaded":
         case "diffFailed":
@@ -149,6 +155,7 @@ export function closeFlowTransition(state: CloseFlowState, event: CloseFlowEvent
         case "submitResolve":
           return state;
       }
+      break;
 
     case "treeChanged":
       switch (event.kind) {
@@ -167,6 +174,7 @@ export function closeFlowTransition(state: CloseFlowState, event: CloseFlowEvent
         case "completed":
           return state;
       }
+      break;
 
     case "done":
       switch (event.kind) {
@@ -204,6 +212,7 @@ export function closeDialogSurface(state: CloseFlowState): CloseDialogSurface {
         case "resolve":
           return { kind: "review", changes: state.operation.changes, notice: "", busy: true };
       }
+      break;
     case "done":
       return { kind: "done" };
   }

@@ -51,8 +51,7 @@ export function Splitter(props: { pane: string; side: "left" | "right"; width: n
       focusable
       onFocus={() => focused.set(true)}
       onBlur={() => focused.set(false)}
-      class={`group absolute top-0 bottom-0 z-10 w-2 items-center ${props.side === "left" ? "-left-1" : "-right-1"}`}
-      style={{ cursor: "col-resize" }}
+      class={`group absolute top-0 bottom-0 z-10 w-2 cursor-col-resize items-center ${props.side === "left" ? "-left-1" : "-right-1"}`}
     >
       <View
         class={`h-full w-0.5 rounded-full transition duration-120 ease-out ${dragging() || focused() ? "bg-focus" : "bg-transparent group-hover:bg-focus"}`}

@@ -3,6 +3,8 @@
 import { Text, View } from "nsh";
 import { Command, type CommandItem } from "nsh/base";
 
+import { t } from "@vibevalley/i18n";
+
 import { act, frame } from "../bridge";
 import { radius, tok, type as ty } from "../tokens";
 import { SurfaceIcon, type SurfaceIconName } from "./shared";
@@ -11,29 +13,17 @@ type PaletteMode = "commands" | "files" | "search";
 type Item = CommandItem & { detail?: string };
 type PaletteFrame = { mode: PaletteMode; query: string; items: Item[]; loading: boolean; note: string | null };
 
-const placeholders: Record<PaletteMode, string> = {
-  commands: "输入命令或跳转到任意页面…",
-  files: "跳转到文件…",
-  search: "在项目中搜索文本…",
-};
-
-const modeLabels: Record<PaletteMode, string> = {
-  commands: "命令",
-  files: "文件",
-  search: "搜索",
-};
-
-const modeHints: readonly { mode: PaletteMode; keys: string; label: string }[] = [
-  { mode: "commands", keys: "⌘K", label: "命令" },
-  { mode: "files", keys: "⌘P", label: "文件" },
-  { mode: "search", keys: "⇧⌘F", label: "搜索" },
-];
-
 const modeIcons: Record<PaletteMode, SurfaceIconName> = {
   commands: "commands",
   files: "file",
   search: "search",
 };
+
+const modeKeys: readonly { mode: PaletteMode; keys: string }[] = [
+  { mode: "commands", keys: "⌘K" },
+  { mode: "files", keys: "⌘P" },
+  { mode: "search", keys: "⇧⌘F" },
+];
 
 function KeyCap(props: { label: string; surface?: "tile" | "surface"; active?: boolean }) {
   const p = () => tok();
@@ -52,7 +42,7 @@ function KeyCap(props: { label: string; surface?: "tile" | "surface"; active?: b
         flexShrink: 0,
       }}
     >
-      <Text style={{ ...ty.mono, fontSize: 10.5, color: props.active ? p().ink : p().muted }}>{props.label}</Text>
+      <Text style={{ ...ty.mono, fontSize: 10.5, color: props.active === true ? p().ink : p().muted }}>{props.label}</Text>
     </View>
   );
 }
@@ -88,8 +78,8 @@ export function Palette() {
         filterable={mode() === "commands"}
         loading={f()?.loading ?? false}
         autoFocus
-        placeholder={placeholders[mode()]}
-        accessibilityLabel={mode() === "files" ? "Files" : mode() === "search" ? "Search results" : "Commands"}
+        placeholder={t(`web.shell.palette.placeholder.${mode()}`)}
+        accessibilityLabel={t(`web.shell.palette.a11y.${mode()}`)}
         onQueryChange={({ query }) => {
           if (mode() !== "commands") act({ type: mode() === "search" ? "search" : "palette_query", query });
         }}
@@ -103,7 +93,7 @@ export function Palette() {
         }
         searchSuffix={
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            {f()?.loading ? <Text style={{ fontSize: 11, color: p().faint }}>搜索中…</Text> : null}
+            {f()?.loading === true ? <Text style={{ fontSize: 11, color: p().faint }}>{t("web.shell.palette.searching")}</Text> : null}
             <View
               style={{
                 height: 20,
@@ -116,7 +106,7 @@ export function Palette() {
                 borderColor: p().border,
               }}
             >
-              <Text style={{ fontSize: 11, fontWeight: "500", color: p().muted }}>{modeLabels[mode()]}</Text>
+              <Text style={{ fontSize: 11, fontWeight: "500", color: p().muted }}>{t(`web.shell.palette.mode.${mode()}`)}</Text>
             </View>
           </View>
         }
@@ -131,9 +121,7 @@ export function Palette() {
         empty={
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 36, paddingHorizontal: 20, gap: 8 }}>
             <SurfaceIcon name={modeIcons[mode()]} size={20} color={p().faint} />
-            <Text style={{ fontSize: 13, color: p().muted, textAlign: "center" }}>
-              {f()?.note ?? (mode() === "files" ? "没有匹配的文件。" : mode() === "search" ? "没有匹配结果。" : "没有匹配的命令。")}
-            </Text>
+            <Text style={{ fontSize: 13, color: p().muted, textAlign: "center" }}>{f()?.note ?? t(`web.shell.palette.empty.${mode()}`)}</Text>
           </View>
         }
         renderItem={(entry) => {
@@ -180,24 +168,24 @@ export function Palette() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
             <KeyCap label="↑↓" surface="surface" />
-            <Text style={{ fontSize: 11, color: p().muted }}>选择</Text>
+            <Text style={{ fontSize: 11, color: p().muted }}>{t("web.shell.palette.footer.select")}</Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
             <KeyCap label="↵" surface="surface" />
-            <Text style={{ fontSize: 11, color: p().muted }}>执行</Text>
+            <Text style={{ fontSize: 11, color: p().muted }}>{t("web.shell.palette.footer.run")}</Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
             <KeyCap label="Esc" surface="surface" />
-            <Text style={{ fontSize: 11, color: p().muted }}>关闭</Text>
+            <Text style={{ fontSize: 11, color: p().muted }}>{t("web.shell.palette.footer.close")}</Text>
           </View>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          {modeHints.map((hint) => {
+          {modeKeys.map((hint) => {
             const active = () => mode() === hint.mode;
             return (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                 <KeyCap label={hint.keys} surface="surface" active={active()} />
-                <Text style={{ fontSize: 11, fontWeight: "500", color: active() ? p().ink : p().faint }}>{hint.label}</Text>
+                <Text style={{ fontSize: 11, fontWeight: "500", color: active() ? p().ink : p().faint }}>{t(`web.shell.palette.mode.${hint.mode}`)}</Text>
               </View>
             );
           })}

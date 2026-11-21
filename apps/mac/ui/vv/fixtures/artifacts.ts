@@ -164,7 +164,7 @@ export const responses: Record<string, unknown> = {
       const a = one(p);
       return a ? { artifact: a, blocks: blocks[a.id] ?? [] } : missing;
     },
-    { toJSON: (): BlockSnapshot => ({ artifact: artifacts[0] as Artifact, blocks: blocks["art-plan"] ?? [] }) },
+    { toJSON: (): BlockSnapshot => ({ artifact: artifacts[0], blocks: blocks["art-plan"] ?? [] }) },
   ),
   "artifact.submit": Object.assign(
     (p: { batchId: string; lastSeq: number }): BlockAck => ({ batchId: p.batchId, seq: p.lastSeq + 1, results: [], blocks: [] }),

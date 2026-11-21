@@ -173,8 +173,8 @@ test("buildRunEntries deduplicates orchestrator sessions, sorts active runs firs
   expect(entries[0]?.active).toBe(true);
   expect(entries[1]?.active).toBe(true);
   expect(entries[2]?.active).toBe(false);
-  expect(runActivityAt(entries[0]!)).toBe(9_000);
-  expect(runActivityAt(entries[4]!)).toBe(7_500);
+  expect(runActivityAt(entries[0])).toBe(9_000);
+  expect(runActivityAt(entries[4])).toBe(7_500);
   expect(entries[1]?.kind === "worker" ? entries[1].issue?.number : undefined).toBe(18);
 });
 

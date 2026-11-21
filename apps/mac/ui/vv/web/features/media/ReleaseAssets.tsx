@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/features/media/ReleaseAssets.tsx.
 import { signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

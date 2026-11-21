@@ -66,6 +66,7 @@ function fallbackPromptOf(stage: IssueStage, issue: Issue): IssuePromptKind | un
         case "quiet":
           return "stuck_quiet";
       }
+      break;
     }
     case "canceled":
       return stage.lead === "reopen" ? "canceled_reopenable" : undefined;

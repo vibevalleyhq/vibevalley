@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/features/issue/views/IssueSections.tsx:
-// the same sections. The steps list keeps its 420px height as a Scroll.
 import { Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -162,9 +160,7 @@ export function Runs(props: { issue: string; version: string; onChanges?: (() =>
               <View class="min-w-0 flex-1">
                 <Text class="text-sm text-ink">{runText(r(), now(), tookText)}</Text>
                 <If when={r().summary}>
-                  <Text class="mt-0.5 text-xs text-muted" style={{ numberOfLines: 2 }}>
-                    {r().summary}
-                  </Text>
+                  <Text class="mt-0.5 line-clamp-2 text-xs text-muted">{r().summary}</Text>
                 </If>
                 <If when={r().needsReconciliation}>
                   <ReconcileWorktree onChanges={props.onChanges} />
@@ -200,7 +196,7 @@ const stepWord: Partial<Record<SessionEvent["type"], string>> = {
 export function WorkLog(props: { steps: SessionEvent[] }) {
   const shown = () => props.steps.filter((e) => stepWord[e.type] !== undefined).slice(-240);
   return (
-    <Scroll testID="issue-steps" style={{ maxHeight: 420 }}>
+    <Scroll testID="issue-steps" class="max-h-[420px]">
       <Each of={shown()}>
         {(e, i) => (
           <View class={`flex-row gap-2.5 py-1 ${i() < shown().length - 1 ? "border-b" : ""}`} style={{ borderColor: mix("line", 0.6) }}>
@@ -208,9 +204,7 @@ export function WorkLog(props: { steps: SessionEvent[] }) {
             <Text class={`w-12 shrink-0 font-mono text-xs ${e().type === "run/error" ? "text-berry" : e().type === "tool/call" ? "text-water" : "text-muted"}`}>
               {stepWord[e().type] ?? ""}
             </Text>
-            <Text class="min-w-0 flex-1 text-sm text-ink" style={{ numberOfLines: 3 }}>
-              {e().type === "tool/call" ? (e().actionText ?? e().text) : e().text}
-            </Text>
+            <Text class="line-clamp-3 min-w-0 flex-1 text-sm text-ink">{e().type === "tool/call" ? (e().actionText ?? e().text) : e().text}</Text>
           </View>
         )}
       </Each>

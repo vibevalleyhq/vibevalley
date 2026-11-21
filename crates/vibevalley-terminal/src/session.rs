@@ -367,8 +367,6 @@ impl Session {
         (self.on_event)(event);
     }
 
-    // ---- output -----------------------------------------------------------
-
     fn feed(&mut self, data: &[u8]) {
         // Stopping at every OSC end hands control back right after a shell
         // integration mark, while the cursor is still where the mark was.
@@ -520,8 +518,6 @@ impl Session {
         .unwrap_or_default()
     }
 
-    // ---- snapshots --------------------------------------------------------
-
     fn held(&self, now: Instant) -> bool {
         self.hold_since.is_some_and(|since| now.duration_since(since) < MAX_HOLD)
     }
@@ -571,8 +567,6 @@ impl Session {
             self.emit(TermEvent::Dirty);
         }
     }
-
-    // ---- input ------------------------------------------------------------
 
     fn writable(&self) -> bool {
         self.child_exit.is_none() && !self.finished
@@ -665,8 +659,6 @@ impl Session {
         self.term.scroll_viewport(ScrollViewport::Delta(-(delta as isize)));
         self.dirty = true;
     }
-
-    // ---- selection --------------------------------------------------------
 
     fn viewport_point(&self, at: Point) -> GridPoint {
         let size = self.size.get();
@@ -766,8 +758,6 @@ impl Session {
         let text = String::from_utf8_lossy(&bytes).into_owned();
         (!text.is_empty()).then_some(text)
     }
-
-    // ---- lifecycle --------------------------------------------------------
 
     fn hangup(&self) {
         let Some(pid) = self.pty.pid else {

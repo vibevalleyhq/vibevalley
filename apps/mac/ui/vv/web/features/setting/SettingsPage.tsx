@@ -142,7 +142,7 @@ export function SettingsPage(props: { rest: string }) {
                 <SearchField
                   testid="settings-search"
                   value={query()}
-                  onInput={query.set}
+                  onInput={(v) => query.set(v)}
                   placeholder={t("web.setting.nav.search")}
                   label={t("web.setting.nav.search")}
                 />

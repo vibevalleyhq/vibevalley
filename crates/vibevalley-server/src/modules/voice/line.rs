@@ -36,8 +36,6 @@ pub type OpenTunnel = Arc<dyn Fn(u16) -> Result<Tunnel, String> + Send + Sync>;
 /// nothing answered.
 pub type Answer = Arc<dyn Fn(&str, &mut dyn FnMut(String)) -> bool + Send + Sync>;
 
-// ----- OpenAI's chat completions, as far as a call asks -----
-
 #[derive(Deserialize)]
 struct Part {
     #[serde(rename = "type")]
@@ -164,8 +162,6 @@ fn chunk(id: &str, created: i64, model: &str, content: &str, stop: bool, first: 
     };
     format!("data: {}\n\n", serde_json::to_string(&chunk).unwrap_or_default())
 }
-
-// ----- the listener -----
 
 fn respond(stream: &mut TcpStream, status: u16, reason: &str, kind: &str, body: &[u8]) {
     let head = format!(
@@ -451,8 +447,6 @@ impl Drop for Line {
         self.stop();
     }
 }
-
-// ----- the tunnel -----
 
 /// A quick tunnel to the port: cloudflared says its address on either
 /// stream, within 30 s or it is given up on.

@@ -159,7 +159,7 @@ export function Inspector(props: {
                         </View>
                       }
                     >
-                      {(src) => <Image src={src()} style={{ width: 240, height: 180, objectFit: "contain" }} />}
+                      {(src) => <Image src={src()} class="h-45 w-60 object-contain" />}
                     </If>
                   </View>
                   <If when={kind() === "audio" ? diskFile()?.path : undefined}>

@@ -48,12 +48,12 @@ const OPEN_MAX = 640;
 /** The short human line for a call, read from its arguments. */
 function callSummary(name: string, input: unknown): string {
   if (input === null || typeof input !== "object") return typeof input === "string" ? input : "";
-  const o = input as Record<string, unknown>;
   for (const key of ["description", "command", "file_path", "path", "pattern", "query", "url", "prompt"]) {
-    const v = o[key];
+    const v: unknown = Reflect.get(input, key);
     if (typeof v === "string" && v.trim()) return v.split("\n")[0];
   }
-  if (Array.isArray(o.changes)) return `${o.changes.length} file change${o.changes.length === 1 ? "" : "s"}`;
+  const changes: unknown = Reflect.get(input, "changes");
+  if (Array.isArray(changes)) return `${changes.length} file change${changes.length === 1 ? "" : "s"}`;
   return name;
 }
 
@@ -445,11 +445,11 @@ function toText(value: unknown): { text: string; json: boolean } {
 }
 
 // Strings (keys when a colon follows), literals and numbers; the rest is punctuation.
-const TOKEN = /("(?:[^"\\]|\\.)*")(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+const TOKEN = /("(?:[^"\\]|\\.)*")(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/gu;
 
 function highlight(text: string, p: Palette): JSX.Element[] {
   const out: JSX.Element[] = [];
-  const re = new RegExp(TOKEN.source, "g");
+  const re = new RegExp(TOKEN.source, "gu");
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
@@ -458,7 +458,7 @@ function highlight(text: string, p: Palette): JSX.Element[] {
       out.push(<Text style={{ color: p.codeKey }}>{m[1]}</Text>);
       out.push(<Text style={{ color: p.text }}>{m[2]}</Text>);
     } else if (m[1]) out.push(<Text style={{ color: p.codeStr }}>{m[1]}</Text>);
-    else if (/^[tfn]/.test(m[0])) out.push(<Text style={{ color: p.codeLit }}>{m[0]}</Text>);
+    else if (/^[tfn]/u.test(m[0])) out.push(<Text style={{ color: p.codeLit }}>{m[0]}</Text>);
     else out.push(<Text style={{ color: p.codeNum }}>{m[0]}</Text>);
     last = m.index + m[0].length;
   }
@@ -649,9 +649,9 @@ export function ToolCallCard(props: ToolCallCardProps) {
     <View
       testID={`tool-call-${props.call.id}`}
       style={{
-        borderRadius: props.nested ? 0 : radius.card,
-        backgroundColor: props.nested ? "transparent" : p().surface,
-        boxShadow: props.nested ? [] : cardShadow(p()),
+        borderRadius: props.nested === true ? 0 : radius.card,
+        backgroundColor: props.nested === true ? "transparent" : p().surface,
+        boxShadow: props.nested === true ? [] : cardShadow(p()),
         overflow: "hidden",
       }}
     >
@@ -663,11 +663,11 @@ export function ToolCallCard(props: ToolCallCardProps) {
         accessibilityLabel={`${props.call.name}: ${props.call.summary}`}
         accessibilityState={{ expanded: open() }}
         style={{
-          minHeight: props.nested ? 36 : 42,
+          minHeight: props.nested === true ? 36 : 42,
           flexDirection: "row",
           alignItems: "center",
           gap: 8,
-          paddingLeft: props.nested ? 28 : 10,
+          paddingLeft: props.nested === true ? 28 : 10,
           paddingRight: 12,
           transitionProperty: "colors",
           transitionDuration: ms(durations.press),
@@ -703,7 +703,7 @@ export function ToolCallCard(props: ToolCallCardProps) {
         <CallStatus status={props.call.status} startedMs={props.call.startedMs} endedMs={props.call.endedMs} />
       </View>
       {open() ? (
-        <View style={{ paddingLeft: props.nested ? 50 : 32, paddingRight: 12, paddingBottom: 12, paddingTop: 4, gap: 10, ...body.style }}>
+        <View style={{ paddingLeft: props.nested === true ? 50 : 32, paddingRight: 12, paddingBottom: 12, paddingTop: 4, gap: 10, ...body.style }}>
           {props.call.status === "failed" ? (
             <View
               role="alert"

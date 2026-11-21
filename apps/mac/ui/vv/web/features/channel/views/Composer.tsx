@@ -1,17 +1,6 @@
-// Ported from VibeValley apps/web/src/features/channel/views/Composer.tsx:
-// the same box (composing.ts's createComposer), names and commands menu,
-// reply and quoted-block bars, pending files and uploads. The textarea is
-// nsh/base's multiline Input: Return reaches the composer as onSubmit,
-// Shift+Return breaks the line; the menu's keys (arrows, Tab, Escape), ↑ to
-// edit the last message and Escape to let go of a reply are keymap bindings
-// held while the box has the focus. Full-width marks typed by an input
-// method (＠, 、) become @ and / as there (typedMarks), read from the text.
-// The attach button opens the system's panel (nsh Picker.pickFiles, files
-// with their bytes). Files dropped on the pane come as file: URLs; the
-// host reads them (host.readFile) and they upload as picked ones do. Not
-// here: dictation (features/voice, phase 4).
 import { computed, effect, keymap, Picker, signal, Text, untracked, View, type JSX } from "nsh";
 import { Input, Progress } from "nsh/base";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { userId } from "@vibevalley/protocol";
@@ -58,8 +47,8 @@ const key = (name: string, shiftKey = false): ComposerKey & { prevented: boolean
 };
 
 function artifactContextLabel(ctx: ArtifactViewContext): string {
-  const parts = [`当前上下文：${ctx.title}`];
-  if (ctx.slideIndex !== undefined) parts.push(`第 ${ctx.slideIndex + 1} 页`);
+  const parts = [t("web.channel.composer.artifactContext", { title: ctx.title })];
+  if (ctx.slideIndex !== undefined) parts.push(t("web.channel.composer.artifactSlide", { n: ctx.slideIndex + 1 }));
   else if (ctx.activeArtboard) parts.push(ctx.activeArtboard);
   else if (ctx.activeTab) parts.push(ctx.activeTab);
   else if (ctx.activeDataset) parts.push(ctx.activeDataset);
@@ -327,7 +316,7 @@ export function Composer(props: {
               icon="close"
               iconSize={12}
               testid="artifact-context-clear"
-              label="移除本次附带的上下文"
+              label={t("web.channel.composer.clearContext")}
               onPress={clearActiveArtifactViewContext}
               class="h-5 w-5 rounded-full"
             />
@@ -409,13 +398,13 @@ export function Composer(props: {
           <If when={box.stoppable()} else={<View class="flex-1" />}>
             <View testID="composer-running-hint" class="min-w-0 flex-1 flex-row items-center gap-1.5 px-1.5">
               <View class="h-1.5 w-1.5 shrink-0 rounded-full bg-leaf" />
-              <Text class="min-w-0 flex-1 truncate text-xs text-muted">正在处理中，可直接补充说明或点击停止</Text>
+              <Text class="min-w-0 flex-1 truncate text-xs text-muted">{t("web.channel.composer.runningHint")}</Text>
             </View>
           </If>
           <BoxButton icon="attach" testid="attach" label={t("web.channel.composer.attach")} onPress={() => void pick()} disabled={!props.channel} />
           <EmojiPopover
             open={emoji()}
-            onOpenChange={emoji.set}
+            onOpenChange={(v) => emoji.set(v)}
             label={t("web.channel.emoji.open")}
             testid="emoji"
             onPick={(e) => {
@@ -490,6 +479,8 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
   );
 }
 
+const ReadFileData = z.object({ data: z.string(), type: z.string(), name: z.string() });
+
 /** Dropped files' bytes, read by the host, uploaded in turn. */
 async function dropped(channel: string, uris: readonly string[]) {
   const files: File[] = [];
@@ -499,7 +490,7 @@ async function dropped(channel: string, uris: readonly string[]) {
       uploadFailed(read.message);
       continue;
     }
-    const { data, type, name } = read.data as { data: string; type: string; name: string };
+    const { data, type, name } = ReadFileData.parse(read.data);
     files.push(new File([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))], name, { type }));
   }
   if (files.length > 0) await attachFiles(channel, files, uploadFailed);

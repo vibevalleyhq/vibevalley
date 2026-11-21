@@ -565,7 +565,7 @@ function Patch(props: { text: string; path: string }) {
     <If
       when={wellFormed(props.text)}
       else={
-        <Scroll testID="patch" class="border-t border-line bg-page py-1" style={{ maxHeight: 320 }}>
+        <Scroll testID="patch" class="max-h-80 border-t border-line bg-page py-1">
           <TintedLines text={props.text} />
         </Scroll>
       }
@@ -597,9 +597,7 @@ function TintedLines(props: { text: string }) {
         const look = patchTone[patchMarkOf(line())];
         return (
           <View class="px-2.5" style={look.bg ? { backgroundColor: look.bg() } : undefined}>
-            <Text class={`font-mono text-xs ${look.ink}`} style={{ lineHeight: 17 }}>
-              {line() || " "}
-            </Text>
+            <Text class={`font-mono text-xs leading-[17px] ${look.ink}`}>{line() || " "}</Text>
           </View>
         );
       }}

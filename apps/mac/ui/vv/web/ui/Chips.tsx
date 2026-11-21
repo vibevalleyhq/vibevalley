@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Chips.tsx: the same chips and
-// pairs. Inputs are nsh/base's Input; a typed comma adds the words
-// before it.
 import { signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 
@@ -49,7 +46,7 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
         value={text()}
         placeholder={props.value.length === 0 ? props.placeholder : undefined}
         onChange={(e) => {
-          if (e.value.endsWith(",") || e.value.endsWith("，")) add(e.value.slice(0, -1));
+          if (e.value.endsWith(",") || e.value.endsWith("\uFF0C")) add(e.value.slice(0, -1));
           else text.set(e.value);
         }}
         onSubmit={() => add()}

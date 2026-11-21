@@ -10,7 +10,7 @@ import { fakeHost } from "./fakeHost";
 
 test("write-path guards: draft retry idempotency, review tree check, answer, chat send, and approval grant", async () => {
   const fixture = scenarios.typical;
-  const issue0 = fixture.state.state.issues[0];
+  const issue0 = fixture.state.state.issues.at(0);
   const i31 = fixture.state.state.issues.find((i) => i.id === "i31");
   const i33 = fixture.state.state.issues.find((i) => i.id === "i33");
   if (!issue0 || !i31 || !i33) throw new Error("typical scenario must include baseline issues");
@@ -103,7 +103,7 @@ test("write-path guards: draft retry idempotency, review tree check, answer, cha
   await app.press("id:review-complete");
   await fake.pump(app);
   expect(fake.calls.some((c) => c.op === "issue.status.update")).toBe(false);
-  expect(fake.calls.filter((c) => c.op === "issue.diff.get").at(-1)?.payload).toEqual({ id: "i31", sinceTree: "seen" });
+  expect(fake.calls.findLast((c) => c.op === "issue.diff.get")?.payload).toEqual({ id: "i31", sinceTree: "seen" });
   expect(app.count("id:changes-since-review")).toBe(1);
   expect(app.texts()).toContain("updated.txt");
 

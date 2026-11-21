@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/EmojiPicker.tsx:
-// the same groups and the same grid. VibeValley places it by hand beside the
-// button that opened it (a Portal, its own click-away and Escape); here it is
-// the content of an nsh/base Popover (EmojiPopover), which places it and
-// closes it on a press outside or Escape.
 import { Scroll, Text, View, type JSX } from "nsh";
 import { Popover } from "nsh/base";
 

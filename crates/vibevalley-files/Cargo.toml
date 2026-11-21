@@ -1,7 +1,8 @@
 [package]
 name = "vibevalley-files"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
 grep-matcher = "0.1.9"
@@ -10,8 +11,7 @@ grep-searcher = "0.1.17"
 ignore = "0.4.34"
 notify = "8.2.2"
 nucleo-matcher = "0.3.1"
-serde = { workspace = true }
-thiserror = "2.0.21"
+thiserror = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.27.0"
+tempfile = { workspace = true }

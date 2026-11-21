@@ -52,7 +52,7 @@ export function Opened(props: { slug: string; pages: readonly PkmPageSummary[]; 
       when={ready(found, undefined)}
       else={
         <If when={found.status() === "error"}>
-          <If when={!props.compact && notFound()} else={<Empty icon="file">{t("web.pkm.gone")}</Empty>}>
+          <If when={props.compact !== true && notFound()} else={<Empty icon="file">{t("web.pkm.gone")}</Empty>}>
             <FreshPage slug={props.slug} pages={props.pages} />
           </If>
         </If>

@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Dialog.tsx: base-ui's Dialog
-// becomes nsh/base's (a modal with a backdrop; Escape and a press on the
-// backdrop ask onClose), the same box and title bar.
 import { Scroll, Text, View, windowSize, type JSX } from "nsh";
 import { Dialog as Base } from "nsh/base";
 

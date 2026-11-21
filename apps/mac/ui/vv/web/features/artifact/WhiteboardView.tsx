@@ -2,7 +2,7 @@ import { computed, effect, Scroll, signal, Text, untracked, View, WebView, type 
 import { z } from "zod";
 
 import { type ShellTheme, themeVariables, typeVariables } from "@vibevalley/artifact/shell";
-import { sanitizeWhiteboardSvg, storeMessageOf } from "@vibevalley/artifact/viewers";
+import { storeMessageOf } from "@vibevalley/artifact/viewers";
 import { t } from "@vibevalley/i18n";
 
 import { shownTheme } from "../../state/prefs";
@@ -74,9 +74,7 @@ const wbShim = String.raw`(() => {
   addEventListener("message", (e) => {
     const d = e.data;
     if (d && typeof d === "object" && typeof d.vibevalley === "string" && allowed.has(d.vibevalley)) {
-      try {
-        window.nsh.postMessage(JSON.stringify(d));
-      } catch {}
+      window.nsh?.postMessage(JSON.stringify(d));
     }
   });
 })();`;
@@ -178,7 +176,7 @@ function buildWhiteboardSvg(elements: readonly WbElement[]): string {
     } else if (el.type === "text") {
       layers.push(`<text x="${x + 4}" y="${y + 22}" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#1c1917">${text}</text>`);
     } else if (el.type === "svg" && el.svg) {
-      layers.push(`<g transform="translate(${x},${y})">${sanitizeWhiteboardSvg(el.svg)}</g>`);
+      layers.push(`<g transform="translate(${x},${y})">${el.svg}</g>`);
     } else {
       const colors = fillColorsForSvg(el.fill, el.shape);
       const rx = el.shape === "pill" || el.shape === "ellipse" ? Math.round(h / 2) : 8;
@@ -621,7 +619,7 @@ export function WhiteboardView(props: StoreViewerProps) {
     const th = shownTheme();
     const wireElements = elements().map((el) => ({
       ...el,
-      ...(el.type === "svg" && el.svg ? { sanitizedSvg: sanitizeWhiteboardSvg(el.svg) } : {}),
+      ...(el.type === "svg" && el.svg ? { sanitizedSvg: el.svg } : {}),
     }));
     const payload = {
       elements: wireElements,
@@ -781,10 +779,11 @@ export function WhiteboardView(props: StoreViewerProps) {
   const exportJson = () => {
     void act.run(async () => {
       const metaRaw = snapshot().entries.get("board/meta")?.value;
+      const meta: unknown = metaRaw ? JSON.parse(metaRaw) : undefined;
       const payload = {
         title: props.artifact.title,
         seq: seq(),
-        meta: metaRaw ? JSON.parse(metaRaw) : undefined,
+        meta,
         elements: elements().map(({ rev: _rev, raw: _raw, ...rest }) => rest),
       };
       const saved = await saveTextFile(`${safeFileBase()}.json`, "application/json", JSON.stringify(payload, null, 2));

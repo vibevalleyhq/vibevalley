@@ -1,5 +1,4 @@
-//! The patrol: what has waited on the user too long, told to the
-//! orchestrator. Ported from VibeValley `apps/server/src/modules/watch/patrol.ts`.
+//! The patrol: what has waited on the user too long, told to the orchestrator.
 
 use std::collections::HashMap;
 

@@ -4,12 +4,12 @@ Status: proposed
 
 ## Problem
 
-记忆树（`/tree`，`apps/mac/src/pixel/tree.rs`）目前展示的是静态演示数据（`mock_memories`），尚未连接服务端的 `memory` 表与 EverOS 接口，点击「播种」也未真正写入技能书。
+记忆树（`/tree`，`apps/mac/src/pixel/tree.rs`）目前展示的是静态演示数据（`mock_memories`），尚未连接服务端的 `memory` 表，点击「播种」也未真正写入技能书。
 
 ## Proposal
 
-1. **协议与接口（`memory.tree`）**：将 `MemoryTree` 移入 `packages/protocol/src/memory/`，新增 `memory.tree` 接口汇总全农场各档案的 `note`（叶）、`issue` / EverOS case（果）、EverOS skill（种子）、`fading` 列表及共现关联边 `links`。
-2. **累计计数与成长阶段**：在数据库中持久化只增不减的累计运行轮数与累计召回次数，由服务端算出成长阶段（芽 / 小苗 / 小树 / 大树 / 老树）填入 `MemoryTree.stage`。
+1. **协议与接口（`memory.tree`）**：在 `crates/vibevalley-protocol/src/contract/memory.rs` 定义 `MemoryTree`（同步生成 TS 类型），新增 `memory.tree` 接口汇总全农场各档案的 `note`（叶）、`issue`（果）、候选手艺（种子）、`fading` 列表及共现关联边 `links`。
+2. **累计计数与成长阶段**：在 `server.db` 中持久化只增不减的累计运行轮数与累计召回次数，由服务端算出成长阶段（芽 / 小苗 / 小树 / 大树 / 老树）填入 `MemoryTree.stage`。
 3. **手艺播种进技能书**：用户在记忆树面板点击一颗手艺种子的「播种」并确认后，调用技能接口将其写入农场技能书（[档案和农机](docs/subsystems/agent.md)）。
 
 ## Alternatives considered
@@ -19,7 +19,7 @@ Status: proposed
 
 ## Acceptance criteria
 
-- 打开 `/tree` 从 `memory.tree` 读取真实记忆条目、阶段与共现连线，删除 `src/tree/mock.ts`。
+- 打开 `/tree` 从 `memory.tree` 读取真实记忆条目、阶段与共现连线，删除 `apps/mac/src/pixel/tree.rs` 中的 `mock_memories`。
 - 点击待播种手艺确认后写入农场技能书。
 
 ## Risks

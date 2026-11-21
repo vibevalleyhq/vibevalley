@@ -60,9 +60,7 @@ export function ActLines(props: {
                   <Icon name={failed() ? "cross" : "wait"} size={14} tone={failed() ? "berry" : "muted"} />
                 </View>
                 <View class="min-w-0 flex-1 gap-0.5">
-                  <Text class="text-sm text-ink" style={{ numberOfLines: 3 }}>
-                    {w().text}
-                  </Text>
+                  <Text class="line-clamp-3 text-sm text-ink">{w().text}</Text>
                   <If when={failed()}>
                     <Text class="text-xs text-berry">{w().reason ?? t("web.issue.acts.notSaid")}</Text>
                   </If>

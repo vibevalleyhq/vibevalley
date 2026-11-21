@@ -5,7 +5,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
-use gpui_kit::{
+use gpui::{
     App, AppContext as _, Bounds, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent, MouseButton,
     MouseDownEvent, MouseMoveEvent, ParentElement as _, Pixels, Point, Render, Styled as _, Subscription, Window, canvas, div, px,
 };
@@ -775,7 +775,7 @@ impl Render for PixelView {
             .id("pixel")
             .track_focus(&self.focus)
             .size_full()
-            .bg(gpui_kit::rgb(0x1d2316))
+            .bg(gpui::rgb(0x1d2316))
             .on_key_down(cx.listener(|v, e: &KeyDownEvent, _, cx| {
                 let Scene::Farm(f) = &mut v.scene else { return };
                 match e.keystroke.key.as_str() {
@@ -810,7 +810,7 @@ impl Render for PixelView {
                     _ => {}
                 }
             }))
-            .on_modifiers_changed(cx.listener(|v, event: &gpui_kit::ModifiersChangedEvent, _, cx| {
+            .on_modifiers_changed(cx.listener(|v, event: &gpui::ModifiersChangedEvent, _, cx| {
                 if let Scene::Farm(f) = &mut v.scene
                     && f.reveal_names != event.modifiers.alt
                 {
@@ -850,7 +850,7 @@ impl Render for PixelView {
             )
             .on_mouse_up(
                 MouseButton::Left,
-                cx.listener(|v, e: &gpui_kit::MouseUpEvent, _, cx| {
+                cx.listener(|v, e: &gpui::MouseUpEvent, _, cx| {
                     let p = v.art_point(e.position);
                     let hud = v.hud_point(e.position);
                     if let Scene::Farm(f) = &mut v.scene {
@@ -891,7 +891,7 @@ impl Render for PixelView {
                     }
                 }),
             )
-            .children(message.map(|m| div().p_4().text_color(gpui_kit::rgb(0xfdf6e3)).child(m)))
+            .children(message.map(|m| div().p_4().text_color(gpui::rgb(0xfdf6e3)).child(m)))
             .children(list.map(|list| {
                 canvas(
                     move |bounds, _, _| bounds,
@@ -923,7 +923,7 @@ impl Render for PixelView {
                 .flex()
                 .items_center()
                 .justify_center()
-                .bg(gpui_kit::rgba(0x2f1f134d))
+                .bg(gpui::rgba(0x2f1f134d))
                 .child(div().w(px(540.0)).max_w_full().h(px(430.0)).max_h_full().child(view))
         }))
     }

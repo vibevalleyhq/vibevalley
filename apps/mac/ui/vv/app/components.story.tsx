@@ -198,8 +198,8 @@ function ComponentBench() {
             ]}
           />
           <Text testID="seg-state">{`seg:${seg()}`}</Text>
-          <Toggle testid="comp-toggle-labeled" label="自动合并" checked={toggleOn()} onChange={toggleOn.set} />
-          <Toggle bare testid="comp-toggle-bare" ariaLabel="行开关" checked={bareToggleOn()} onChange={bareToggleOn.set} />
+          <Toggle testid="comp-toggle-labeled" label="自动合并" checked={toggleOn()} onChange={(v) => toggleOn.set(v)} />
+          <Toggle bare testid="comp-toggle-bare" ariaLabel="行开关" checked={bareToggleOn()} onChange={(v) => bareToggleOn.set(v)} />
           <Text testID="toggle-states">{`toggles:${String(toggleOn())}/${String(bareToggleOn())}`}</Text>
         </View>
 

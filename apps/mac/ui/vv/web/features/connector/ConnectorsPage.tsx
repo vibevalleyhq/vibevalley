@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/connector/ConnectorsPage.tsx:
-// the chat apps (WeChat, Feishu, QQ) as a list beside the open one's card.
-// The connectors' pixel sprites come from the app (ui/pixel); without the
-// art each is a tile in the app's own colour with its initial. The
-// <form>s submit from their button and the input's Return.
 import { signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -198,7 +193,7 @@ function Row(props: { label: string; numeric?: boolean; children: JSX.Element })
       <Text class="w-28 shrink-0 text-xs font-medium text-muted">{props.label}</Text>
       <View class="min-w-0 flex-1">
         <If when={typeof props.children === "string"} else={props.children}>
-          <Text class={`text-sm text-ink ${props.numeric === true ? "tabular-nums" : ""}`}>{props.children as string}</Text>
+          <Text class={`text-sm text-ink ${props.numeric === true ? "tabular-nums" : ""}`}>{props.children}</Text>
         </If>
       </View>
     </View>
@@ -261,7 +256,7 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
         <Text class="text-sm leading-relaxed text-ink">{t("web.connector.connectors.pairing", { app: label() })}</Text>
         <View class="flex-row">
           <View class="rounded-lg border border-line bg-side px-5 py-2.5">
-            <Text testID="connector-pair-code" class="select-text font-mono text-3xl font-semibold text-ink tabular-nums" style={{ letterSpacing: 4 }}>
+            <Text testID="connector-pair-code" class="select-text font-mono text-3xl font-semibold tracking-[4px] text-ink tabular-nums">
               {props.status.pairCode}
             </Text>
           </View>
@@ -307,7 +302,7 @@ function ChannelPick(props: { id: ConnectorID; current: string }) {
   const core = useCore();
   const error = signal<string | undefined>(undefined);
   // A refusal shows beside the pick.
-  const act = createAct(error.set);
+  const act = createAct((e) => error.set(e));
   const options = () => {
     const all = topsOf(core()?.chat).map((c) => ({ value: c.name ?? "", label: channelLabel(c) }));
     // The one it is in, even before the farm's chat has come.
@@ -360,7 +355,7 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
           class="font-mono"
           placeholder="102xxxxxx"
           value={appId()}
-          onInput={appId.set}
+          onInput={(v) => appId.set(v)}
           onSubmit={submit}
         />
       </Field>
@@ -370,7 +365,7 @@ function QqLogin(props: { busy: boolean; onLogin: (appId: string, secret: string
           accessibilityLabel="AppSecret"
           placeholder={t("web.connector.connectors.secret")}
           value={secret()}
-          onInput={secret.set}
+          onInput={(v) => secret.set(v)}
           onSubmit={submit}
         />
       </Field>
@@ -399,10 +394,7 @@ function LoginCode(props: { status: ConnectorStatus; busy: boolean; app: string;
   return (
     <View class="flex-row flex-wrap items-start gap-5">
       {/* QR codes require a high-contrast light quiet zone in both light and dark themes for phone cameras. */}
-      <View
-        class={`size-56 items-center justify-center rounded-lg border border-line p-2 ${props.status.qr ? "shadow-raise" : "bg-side"}`}
-        style={props.status.qr ? { backgroundColor: "#ffffff" } : undefined}
-      >
+      <View class={`size-56 items-center justify-center rounded-lg border border-line p-2 ${props.status.qr ? "bg-white shadow-raise" : "bg-side"}`}>
         <If when={props.status.qr} else={<Text class="text-xs text-muted">{t("web.connector.connectors.gettingQr")}</Text>}>
           {(qr) => <Qr text={qr()} label={t("web.connector.connectors.qr", { app: props.app })} />}
         </If>
@@ -417,7 +409,7 @@ function LoginCode(props: { status: ConnectorStatus; busy: boolean; app: string;
               accessibilityLabel={t("web.connector.connectors.phoneDigits")}
               placeholder={t("web.connector.connectors.phoneDigits")}
               value={code()}
-              onInput={code.set}
+              onInput={(v) => code.set(v)}
               onSubmit={send}
             />
             <Button tone="primary" testID="connector-verify" disabled={props.busy || !code().trim()} onPress={send}>

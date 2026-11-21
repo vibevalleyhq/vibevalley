@@ -116,10 +116,16 @@ const decodeApiError = (u: unknown) => {
   const r = ApiErrorEnvelope.safeParse(u);
   return r.success ? r.data : undefined;
 };
-const resultDecoders = new Map<string, { readonly hasData: boolean; readonly envelope: z.ZodType }>();
-for (const e of endpoints) {
-  resultDecoders.set(pathOf(e.op), { hasData: e.result !== undefined, envelope: e.result ? apiSuccessEnvelope(e.result) : ApiVoidEnvelope });
-}
+let resultDecoders: Map<string, { readonly hasData: boolean; readonly envelope: z.ZodType }> | undefined;
+const decoderFor = (path: string) => {
+  if (resultDecoders === undefined) {
+    resultDecoders = new Map();
+    for (const e of endpoints) {
+      resultDecoders.set(pathOf(e.op), { hasData: e.result !== undefined, envelope: e.result ? apiSuccessEnvelope(e.result) : ApiVoidEnvelope });
+    }
+  }
+  return resultDecoders.get(path);
+};
 
 const isObject = (u: unknown): u is Record<string, unknown> => typeof u === "object" && u !== null;
 
@@ -154,8 +160,22 @@ export class VibeValleyApi {
     return new VibeValleyApi("", undefined, undefined, caller);
   }
 ${[...groups].map(groupText).join("")}
+  private decodeBridgeEnvelope(path: string, raw: unknown): unknown {
+    if (isObject(raw) && raw.bizCode === 0) return raw.data;
+    const env = decodeApiError(raw);
+    if (env) {
+      const meta = bizCodeMeta[env.bizCode];
+      throw new VibeValleyApiError(meta.status, meta.kind, env.message, env.error, undefined, env.bizCode);
+    }
+    if (isObject(raw) && typeof raw.bizCode === "number" && raw.bizCode !== 0) {
+      const reason = typeof raw.message === "string" && raw.message !== "" ? raw.message : t("shared.serverAnswered", { status: 500 });
+      throw new VibeValleyApiError(500, undefined, reason);
+    }
+    throw new Error(\`\${path}: a response not in its shape\`);
+  }
+
   private decodeEnvelope(path: string, raw: unknown, text?: string): unknown {
-    const entry = resultDecoders.get(path);
+    const entry = decoderFor(path);
     const checked = entry ? entry.envelope.safeParse(raw) : undefined;
     if (checked && !checked.success) {
       const env = decodeApiError(raw);
@@ -196,7 +216,7 @@ ${[...groups].map(groupText).join("")}
                 },
               );
             });
-      value = this.decodeEnvelope(path, raw);
+      value = this.decodeBridgeEnvelope(path, raw);
     } else {
       const headers: Record<string, string> = this.key === undefined ? {} : { authorization: "Bearer " + this.key };
       const res = await this.fetcher(this.base + path, {
@@ -225,7 +245,7 @@ ${[...groups].map(groupText).join("")}
       const raw: unknown = text === "" ? undefined : JSON.parse(text);
       value = this.decodeEnvelope(path, raw, text);
     }
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked above with the endpoint's own result Schema from api.ts
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- HTTP responses are validated with api.ts schemas; in-process bridge responses come from the typed Rust server
     return value as R;
   }
 }

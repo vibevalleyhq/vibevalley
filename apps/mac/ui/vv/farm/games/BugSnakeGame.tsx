@@ -129,9 +129,9 @@ export function BugSnakeGame() {
     return over ? ended[over] : g() ? t("web.farm.phone.paused") : t("web.farm.phone.game.bugs");
   };
   return (
-    <View testID="bugs" style={{ flex: 1, alignItems: "center", paddingHorizontal: 4, paddingTop: 12 }}>
+    <View testID="bugs" class="flex-1 items-center px-1 pt-3">
       <Stats label={t("web.farm.phone.game.bugs")} value={t("web.farm.phone.blocks.best") + " " + five(Math.max(score(), top()))} />
-      <View style={{ width: "100%", marginTop: 4, marginBottom: 8 }}>
+      <View class="mt-1 mb-2 w-full">
         <Stats label={t("web.farm.phone.bugs.tally", { seeds: g()?.eaten ?? 0, bugs: g()?.bugs ?? 0 })} value={five(score())} />
       </View>
       <Board label={t("web.farm.phone.bugs.field")} width={width} height={height} zoom={zoom} draw={draw}>

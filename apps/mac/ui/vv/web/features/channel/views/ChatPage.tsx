@@ -67,7 +67,8 @@ function Chat() {
     const [path, query] = router.path().split("?");
     const params = new URLSearchParams(query ?? "");
     params.delete("artifact");
-    router.navigate(`${path}${params.toString() ? `?${params}` : ""}`, { replace: true });
+    const qs = params.toString();
+    router.navigate(`${path}${qs ? `?${qs}` : ""}`, { replace: true });
   };
   const quote = (id: string, block: QuoteTarget) => {
     const had = quoted();
@@ -227,7 +228,7 @@ function ChannelMain(props: {
                 testID="message-search"
                 autoFocus
                 value={search() ?? ""}
-                onInput={search.set}
+                onInput={(v) => search.set(v)}
                 placeholder={t("web.channel.findHint")}
                 accessibilityLabel={t("web.channel.find")}
               />
@@ -305,7 +306,7 @@ function ChannelMain(props: {
         look="line"
         label={t("web.channel.inChannel")}
         value={tab()}
-        onChange={tab.set}
+        onChange={(v) => tab.set(v)}
         items={(props.channel?.type === "direct" ? tabs.filter((entry) => entry.tab === "chat") : tabs).map((e) => ({
           value: e.tab,
           label: e.label,

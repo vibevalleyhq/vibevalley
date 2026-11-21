@@ -232,7 +232,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         class="mt-2.5"
         rows={2}
         value={word()}
-        onInput={word.set}
+        onInput={(v) => word.set(v)}
         submit
         onSubmit={() => canRefine() && void draft()}
         placeholder={questions().length > 0 ? t("web.issue.todo.answerHint") : refined() ? t("web.issue.todo.againHint") : t("web.issue.todo.whatHint")}
@@ -435,7 +435,7 @@ function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => v
       <TextInput
         autoFocus
         value={name()}
-        onInput={name.set}
+        onInput={(v) => name.set(v)}
         onSubmit={() => name().trim() && void make()}
         placeholder={t("web.issue.todo.repoHint")}
         accessibilityLabel={t("web.issue.todo.repoName")}

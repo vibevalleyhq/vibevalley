@@ -91,17 +91,17 @@ test("useNow shares one setInterval per interval bucket and clears when the last
   let createdIntervals = 0;
   const clearedIds: unknown[] = [];
 
-  globalThis.setInterval = ((_fn: (...args: unknown[]) => void, _ms?: number) => {
+  globalThis.setInterval = (_fn: (...args: unknown[]) => void, _ms?: number) => {
     activeIntervals++;
     createdIntervals++;
-    return createdIntervals as unknown as ReturnType<typeof setInterval>;
-  }) as typeof setInterval;
-  globalThis.clearInterval = ((id?: ReturnType<typeof setInterval>) => {
+    return createdIntervals;
+  };
+  globalThis.clearInterval = (id?: number) => {
     if (id !== undefined) {
       clearedIds.push(id);
       activeIntervals--;
     }
-  }) as typeof clearInterval;
+  };
 
   try {
     const mounted = signal(true);
@@ -137,8 +137,8 @@ test("frame indexed selectors resolve sessions, issues, and thread owners in O(1
   let pickedSession: SessionView | undefined;
   let pickedIssue: Issue | undefined;
   let threadOwner: SessionView | undefined;
-  const session = baseState.state.sessions[0];
-  const issue = baseState.state.issues[0];
+  const session = baseState.state.sessions.at(0);
+  const issue = baseState.state.issues.at(0);
   if (!session || !issue) throw new Error("expected fixture session and issue");
   const fakeThread = { id: "t-test", type: "thread", subjectKind: "talk", subjectId: session.id } as unknown as Channel;
 

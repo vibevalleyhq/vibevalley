@@ -1,10 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/domain/Face.tsx. The faces are
-// cut from the pixel sprites (ui/pixel/atlas.ts): an nsh Image placed in a
-// clipping box, as VibeValley places its <img>. Until the app said where
-// the art is (and when it is not installed), a face is the first letter of
-// the profile's name in a circle, tinted by its look's hat colour (a
-// helper) or on the orchestrators' sky blue. Not ported: the muted face's
-// grayscale (nsh has no filters); it is only faded.
 import { Image, pixelRatio, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -88,8 +81,8 @@ export function AgentFace(props: {
       return src ? { src, left: 0, top: 0, width: size(), height: size() } : undefined;
     }
     const name = `${castPrefix(props.look, props.agentId, (n) => n in all)}-down`;
-    const found = all[name] ? name : "bear-farmer-down";
-    const sp = all[found];
+    const found = Object.hasOwn(all, name) ? name : "bear-farmer-down";
+    const sp = Object.hasOwn(all, found) ? all[found] : undefined;
     const src = url(found);
     if (!sp || !src) return undefined;
     const k = size() / (sp.h * 0.5);
@@ -133,7 +126,7 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
     }
     const look = props.look ?? orchestratorLookOf(ready(agents, []), props.agent);
     const name = `manager-${look}-face` in all ? `manager-${look}-face` : "manager-face";
-    const sp = all[name];
+    const sp = Object.hasOwn(all, name) ? all[name] : undefined;
     if (!sp) return undefined;
     const dpr = pixelRatio();
     if (sp.railSize === size() && (dpr === 1 || dpr === 2)) {

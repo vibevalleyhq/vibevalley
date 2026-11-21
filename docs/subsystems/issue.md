@@ -85,7 +85,7 @@
 
 1. **无代码改动（`none`）**：助手工单、`deliver: answer` 或分支无新提交时，直接记 `delivered: none` 并关闭会话。
 2. **保留分支（`kept`）**：`deliver: branch` 且有提交时，保留分支并关闭会话，记 `delivered: kept`；工作树里未提交的改动不代提交。
-3. **提交 PR/MR（`pull_request`；Rust 版还没有，挪到完成会被拒绝）**：已有开放或已合入的结构化关联可完成；尚未提交时，仓库应已配置 PR 发布，用户点击完成会先运行检查并提交，发布失败就保持原状态；完成时记 `delivered: submitted`，不合并，保留未合入分支及未提交改动。远端状态变化只更新关联，不代替验收。
+3. **提交 PR/MR（`pull_request`）**：已有开放或已合入的结构化关联（`Issue.pull_request`，由用户经 `repo.pr.submit` 或帮工在获授权时经 `issue_pr_submit` 发布，见 [PR 与分支发布](docs/subsystems/pull.md)）时即可完成，记 `delivered: submitted`，不本地合并，保留未合入分支及未提交改动；尚未关联 PR/MR 时挪到完成会被拒绝（`server.issue.deliveryNeedsPr`）。远端状态变化只更新关联，不代替验收。
 4. **要求合入（`change`）**：
    - 普通工单提交剩余改动，按[本地合并](docs/subsystems/repo.md)交付。预检冲突时保存 `Issue.conflict` 并留在 `in_review`。候选检查失败时保留工单，按会话余量交回帮工修复。工单详情展开最近一次失败检查的命令、受检提交和输出。发生冲突时，用户可从详情或审查对话框打开该工单工作目录中的冲突文件。成功合入记 `merged`。
    - 子工单使用父分支和自身的验收命令，合入父分支记 `merged_into_parent`。
@@ -128,6 +128,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 ## 还没做的
 
 - 多帮工协作同一块地、逐条勾选持久化验收标准：[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
+- 工单详情的讨论、里程碑、步骤与轮次合为一条活动流：[工单详情的经过合成一条活动流](.agents/notes/proposed/feature/2026-11-11-issue-activity-stream.md)。
 
 ## 怎么验证
 

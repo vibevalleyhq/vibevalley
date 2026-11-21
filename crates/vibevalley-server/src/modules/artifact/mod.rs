@@ -18,13 +18,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 use sqlx::{Connection, SqliteConnection};
-use vibevalley_artifact::{artifact_headers, artifact_problem, html_check, html_edit, html_problem, infer_artifact_from_name, shell_theme_of, with_shell};
+use vibevalley_artifact::{
+    artifact_headers, artifact_problem, html_check, html_edit, html_problem, infer_artifact_from_name, shell_theme_of, starter_entries_for_type, with_shell,
+};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Artifact as Wire, ArtifactBody, ArtifactCard, ArtifactContent, ArtifactDisplay, ArtifactEntryBatchRequest, ArtifactHtmlEdit, ArtifactKind,
-    ArtifactListRequest, ArtifactMarkdown, ArtifactPage, ArtifactPageInput, ArtifactRequest, ArtifactSaid, ArtifactType, ArtifactUpdateRequest,
-    ArtifactVersion, ArtifactVersionRequest, BizCode, BlockAck, BlockCreate, BlockDelete, BlockRef, BlockSnapshot, BlockUpdate, Preview, QuotedBlock, USER_ID,
-    native_ops, ops, subscriptions,
+    ApiError, Artifact as Wire, ArtifactBody, ArtifactCard, ArtifactContent, ArtifactDisplay, ArtifactEntryBatchRequest, ArtifactEntryGetRequest,
+    ArtifactEntryKind, ArtifactEntryOp, ArtifactEntryWriteInput, ArtifactHtmlEdit, ArtifactKind, ArtifactListRequest, ArtifactMarkdown, ArtifactPage,
+    ArtifactPageInput, ArtifactRequest, ArtifactSaid, ArtifactType, ArtifactUpdateRequest, ArtifactVersion, ArtifactVersionRequest, BizCode, BlockAck,
+    BlockCreate, BlockDelete, BlockRef, BlockSnapshot, BlockUpdate, Preview, QuotedBlock, USER_ID, native_ops, ops, subscriptions,
 };
 
 pub use blocks::spans_of;
@@ -521,14 +523,16 @@ impl Artifacts {
         }
 
         let mut seq = 0;
-        if let Some(entries) = &req.entries
-            && !entries.is_empty()
-        {
+        let initial_entries = match &req.entries {
+            Some(entries) => entries.clone(),
+            None => artifact_type.map(|ty| starter_entries_for_type(ty, title)).unwrap_or_default(),
+        };
+        if !initial_entries.is_empty() {
             let seeded = self.batch_entries(
                 maker,
                 &ArtifactEntryBatchRequest {
                     id: id.clone(),
-                    writes: entries.clone(),
+                    writes: initial_entries,
                     note: None,
                     announce: Some(false),
                 },
@@ -666,9 +670,41 @@ impl Artifacts {
         self.get_now(&row.id)
     }
 
-    /// The user's words in place of some in the latest version, kept as
-    /// the next version.
+    /// The user's words in place of some in the latest version (or a store entry
+    /// when `path` is given), kept as the next version or entry revision.
     pub fn html_edit(&self, maker: &Maker, req: &ArtifactHtmlEdit) -> Result<Wire, ApiError> {
+        if let Some(path) = req.path.as_deref() {
+            let entry = self.get_entry(&ArtifactEntryGetRequest {
+                id: req.id.clone(),
+                path: path.into(),
+            })?;
+            let source = entry.value.as_deref().unwrap_or("");
+            let edited = html_edit(source, &req.anchor, &req.text).map_err(refused)?;
+            let res = self.batch_entries(
+                maker,
+                &ArtifactEntryBatchRequest {
+                    id: req.id.clone(),
+                    writes: vec![ArtifactEntryWriteInput {
+                        op: ArtifactEntryOp::Set,
+                        path: path.into(),
+                        kind: Some(ArtifactEntryKind::Text),
+                        value: Some(edited),
+                        from: None,
+                        mime: Some(entry.mime),
+                        if_rev: Some(entry.rev),
+                    }],
+                    note: None,
+                    announce: Some(false),
+                },
+            )?;
+            if !res.applied {
+                return Err(refused(t(
+                    "server.artifact.edit.stale",
+                    &[("version", entry.rev.into()), ("latest", res.seq.into())],
+                )));
+            }
+            return self.get_now(&req.id);
+        }
         let _rows = lock(&self.rows);
         let (row, v) = self.version_of(&mut self.db(), &req.id, Some(req.version))?;
         if row.body != "html" {
@@ -1036,6 +1072,11 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board:
         let a = a.clone();
         move |_, r| a.view(&r)
     });
+    hub.on::<native_ops::ArtifactEntryWriteProps>({
+        let a = a.clone();
+        move |_, r| a.write_entry_props(&Maker::user(), &r)
+    });
+    hub.on::<native_ops::ArtifactTokensInspect>(move |_, r| Ok(Artifacts::inspect_tokens(&r)));
     hub.on_subscription::<subscriptions::ArtifactFollow>({
         let a = a.clone();
         move |_, p, sink| a.follow(&p.id, p.after, sink)

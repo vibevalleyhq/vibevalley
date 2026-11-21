@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/IssueArtifacts.tsx.
 import { View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

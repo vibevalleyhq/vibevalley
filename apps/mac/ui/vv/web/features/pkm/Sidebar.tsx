@@ -127,7 +127,7 @@ export function Sidebar(props: { slug: string | undefined; pages: readonly PkmPa
       </View>
       <If when={props.error}>{(e) => <Text class="rounded-md px-2 py-1 text-xs text-berry">{reasonOf(e())}</Text>}</If>
       <Scroll testID="pkm-list" class="-mx-2 min-h-0 flex-1" contentClass="gap-3 px-2 pb-2">
-        <If when={shownTiers().length === 0 && !props.error}>
+        <If when={shownTiers().length === 0 && props.error === undefined}>
           <Text class="px-2 py-2 text-xs text-faint">{t("web.pkm.list.newPagePlaceholder")}</Text>
         </If>
         <Each of={shownTiers()}>

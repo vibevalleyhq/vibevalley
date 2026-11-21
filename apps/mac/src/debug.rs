@@ -13,7 +13,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use gpui_kit::{App, AppContext as _, Entity, Window, WindowHandle};
+use gpui::{App, AppContext as _, Entity, Window, WindowHandle};
 use serde_json::{Value, json};
 use vibevalley_workspace::{PaneKind, TabId};
 
@@ -117,7 +117,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
     })
 }
 
-pub fn start(shell: Entity<Shell>, window: WindowHandle<gpui_kit::base::Root>, cx: &mut App) {
+pub fn start(shell: Entity<Shell>, window: WindowHandle<Shell>, cx: &mut App) {
     if let Some(path) = std::env::var_os("VIBEVALLEY_DEBUG_DUMP").map(PathBuf::from) {
         let shell = shell.clone();
         cx.spawn(async move |cx| {
@@ -185,7 +185,7 @@ pub fn start(shell: Entity<Shell>, window: WindowHandle<gpui_kit::base::Root>, c
                 } else {
                     match bridge::parse_action(&value) {
                         Ok(action) => {
-                            let _ = window.update(cx, |_, window, cx| shell.update(cx, |s, cx| s.on_action(action, window, cx)));
+                            let _ = window.update(cx, |s, window, cx| s.on_action(action, window, cx));
                         }
                         Err(e) => eprintln!("debug script: {e}"),
                     }
@@ -200,7 +200,7 @@ pub fn start(shell: Entity<Shell>, window: WindowHandle<gpui_kit::base::Root>, c
 /// dispatch and paint paths as real events, so they work without a visible
 /// screen. Returns false for shell commands.
 fn run_window(cmd: &str, window: &mut Window, cx: &mut App) -> bool {
-    use gpui_kit::{KeyUpEvent, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput, point, px};
+    use gpui::{KeyUpEvent, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput, point, px};
     let press = |key: Keystroke, window: &mut Window, cx: &mut App| {
         window.draw(cx).clear(cx);
         let handled = window.dispatch_keystroke(key.clone(), cx);
@@ -222,7 +222,7 @@ fn run_window(cmd: &str, window: &mut Window, cx: &mut App) -> bool {
         "key" => {
             for text in arg.split_whitespace() {
                 // `parse` wants a static str; scripts are short.
-                match gpui_kit::Keystroke::parse(text.to_string().leak()) {
+                match gpui::Keystroke::parse(text.to_string().leak()) {
                     Ok(k) => {
                         let handled = press(k, window, cx);
                         eprintln!("debug script: key {text} handled={handled}");
@@ -358,7 +358,7 @@ fn dump_pixels(
     out
 }
 
-fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui_kit::Context<Shell>) {
+fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui::Context<Shell>) {
     let (name, arg) = cmd.split_once(':').unwrap_or((cmd, ""));
     match name {
         "resize" => {
@@ -369,7 +369,7 @@ fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui_kit::Context
                 && w > 0.0
                 && h > 0.0
             {
-                window.resize(gpui_kit::size(gpui_kit::px(w), gpui_kit::px(h)));
+                window.resize(gpui::size(gpui::px(w), gpui::px(h)));
             }
         }
         "new_terminal" => s.new_terminal(None, window, cx),

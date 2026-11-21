@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/features/runtime/SkillsPage.tsx: the
-// skills book (installed by runtime, built in, the farm's own) and the
-// skill editor on the same form model (infra/form, vendored). Its route,
-// /settings/skills, is the settings page's.
 import { Scroll, signal, Text, View } from "nsh";
 import { z } from "zod";
 
@@ -93,7 +89,7 @@ export function SkillsPage(props: { id?: string | undefined }) {
         <SearchField
           testid="skills-search"
           value={query()}
-          onInput={query.set}
+          onInput={(v) => query.set(v)}
           placeholder={t("web.runtime.library.searchHint")}
           label={t("web.runtime.library.search")}
         />

@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Tip.tsx: base-ui's Tooltip becomes
-// nsh/base's (an element's `tooltip`), the same bubble and delay.
 import { Text, View, type JSX } from "nsh";
 import { Tooltip, type Placement } from "nsh/base";
 

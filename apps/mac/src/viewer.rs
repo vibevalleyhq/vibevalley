@@ -6,7 +6,7 @@ use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use gpui_kit::{
+use gpui::{
     AnyElement, AppContext as _, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, Hsla, InteractiveElement as _,
     IntoElement, ObjectFit, ParentElement as _, Render, ScrollStrategy, StatefulInteractiveElement as _, Styled as _, StyledImage as _, StyledText,
     UniformListScrollHandle, Window, div, hsla, img, px, uniform_list,
@@ -154,7 +154,7 @@ impl FileViewer {
 impl EventEmitter<ViewerEvent> for FileViewer {}
 
 impl Focusable for FileViewer {
-    fn focus_handle(&self, _: &gpui_kit::App) -> FocusHandle {
+    fn focus_handle(&self, _: &gpui::App) -> FocusHandle {
         self.focus.clone()
     }
 }
@@ -203,7 +203,7 @@ enum ButtonTone {
     Accent,
 }
 
-fn action_button(id: &'static str, label: &'static str, tone: ButtonTone, colors: &Palette) -> gpui_kit::Stateful<gpui_kit::Div> {
+fn action_button(id: &'static str, label: &'static str, tone: ButtonTone, colors: &Palette) -> gpui::Stateful<gpui::Div> {
     let hover = colors.hover;
     let text = colors.text;
     let base = div()

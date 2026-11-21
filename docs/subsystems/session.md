@@ -47,7 +47,7 @@
 | `crates/vibevalley-server/src/modules/session/journal.rs` | 轨迹：每个会话的步骤存 `<家目录>/events/<id>.json`，变化时每 300 毫秒推一次、每 1.5 秒落盘 |
 | `crates/vibevalley-server/src/modules/session/mod.rs` | `session.*` 端点和 `issue.watch` 订阅流 |
 | `crates/vibevalley-server/src/modules/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
-| `crates/vibevalley-oar/src/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp.rs`、`scripted.rs`；`record.rs` 是 JSONL 记录流（内置农机在 `crates/vibevalley-agent/src/runtime/mod.rs`） |
+| `crates/vibevalley-oar/src/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp.rs`、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 JSONL 记录流（内置农机在 `crates/vibevalley-agent/src/runtime/mod.rs`） |
 
 ## 模型和不变量
 
@@ -77,9 +77,8 @@
 
 ## 还没做的
 
-- 拆 `Board`：工单、会话、工作目录三个模块，状态变化只经带类型的命令（[原生的 VibeValley](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md) 的 R4）。
-- TS 版的持久信箱与重投、多台机器、帮工 CLI 接入（`worker` 命令走 `/mcp` 的令牌）、MCP 连接观察：Rust 版没有或从简。
-- 接入更多农机：[其他农机提案](.agents/notes/proposed/feature/2026-10-10-other-runtimes.md)。
+- TS 版的持久信箱与重投、多台机器、MCP 连接观察：Rust 版从简，当前不在计划内。
+- `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证：[持久执行与驱动验收](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
 
 ## 怎么验证
 

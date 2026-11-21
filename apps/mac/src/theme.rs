@@ -1,7 +1,7 @@
 //! One theme for the terminal and the rest of the UI, plus the persisted
 //! settings that select and size it.
 
-use gpui_kit::{App, Global, Hsla, Rgba, SharedString};
+use gpui::{App, Global, Hsla, Rgba, SharedString};
 use serde::{Deserialize, Serialize};
 use vibevalley_files::HighlightKind;
 use vibevalley_terminal::Rgb;
@@ -236,15 +236,12 @@ impl Ui {
     /// Applies new settings everywhere.
     pub fn apply(settings: Settings, cx: &mut App) {
         let appearance_override = match settings.theme {
-            ThemeChoice::Dark => Some(gpui_kit::WindowAppearance::Dark),
-            ThemeChoice::Light => Some(gpui_kit::WindowAppearance::Light),
+            ThemeChoice::Dark => Some(gpui::WindowAppearance::Dark),
+            ThemeChoice::Light => Some(gpui::WindowAppearance::Light),
             ThemeChoice::System => None,
         };
         cx.set_window_appearance(appearance_override);
-        let system_dark = matches!(
-            cx.window_appearance(),
-            gpui_kit::WindowAppearance::Dark | gpui_kit::WindowAppearance::VibrantDark
-        );
+        let system_dark = matches!(cx.window_appearance(), gpui::WindowAppearance::Dark | gpui::WindowAppearance::VibrantDark);
         let epoch = cx.try_global::<Ui>().map_or(0, |ui| ui.epoch + 1);
         let mut ui = Ui::new(settings, system_dark);
         ui.epoch = epoch;

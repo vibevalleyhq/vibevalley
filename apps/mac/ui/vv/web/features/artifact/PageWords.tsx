@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/artifact/PageWords.tsx: the
-// words picked in an html page, written over in place (the next version).
-// The pick comes from the page's shell as a message (frame.ts `picked`).
-// The box's keys: ⌘Return saves (a keymap binding while it has the focus),
-// Escape lets the pick go.
 import { effect, keymap, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

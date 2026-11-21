@@ -9,15 +9,16 @@ use std::sync::{Arc, Mutex};
 use serde_json::Value;
 use sqlx::{Connection, SqliteConnection};
 use vibevalley_artifact::{
-    ENTRY_MAX_BYTES, ENTRY_MAX_COUNT, INLINE_EVENT_MAX_BYTES, RenderStoreOptions, apply_json_merge_patch, canonical_json, entry_path_problem,
-    format_store_summary, infer_entry_kind, infer_entry_mime, render_store_artifact_html, sanitize_whiteboard_svg, shell_theme_of, store_html_problem,
-    store_view_headers,
+    ENTRY_MAX_BYTES, ENTRY_MAX_COUNT, INLINE_EVENT_MAX_BYTES, RenderStoreOptions, apply_json_merge_patch, canonical_json, contrast_ratio, entry_path_problem,
+    format_store_summary, infer_entry_kind, infer_entry_mime, parse_tokens_spec, render_store_artifact_html, sanitize_whiteboard_svg, shell_theme_of,
+    store_html_problem, store_view_headers, write_props_into_dc_html,
 };
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, ArtifactBody, ArtifactCard, ArtifactEntry, ArtifactEntryBatchRequest, ArtifactEntryBatchResult, ArtifactEntryConflict, ArtifactEntryEvent,
-    ArtifactEntryGetRequest, ArtifactEntryKind, ArtifactEntryListRequest, ArtifactEntryOp, ArtifactEntrySnapshot, ArtifactPage, ArtifactType,
-    ArtifactViewInput, Attachment,
+    ArtifactEntryGetRequest, ArtifactEntryKind, ArtifactEntryListRequest, ArtifactEntryOp, ArtifactEntrySnapshot, ArtifactEntryWriteInput,
+    ArtifactEntryWritePropsInput, ArtifactPage, ArtifactTokensInspectInput, ArtifactType, ArtifactViewInput, Attachment, DesignPropValue, InspectedColorSwatch,
+    InspectedTokenValue, InspectedTokensSpec, InspectedTypeFamily, InspectedTypeStyle,
 };
 
 use super::blocks::relay;
@@ -123,6 +124,7 @@ impl Artifacts {
     pub fn list_entries(&self, req: &ArtifactEntryListRequest) -> Result<ArtifactEntrySnapshot, ApiError> {
         let mut db = self.db();
         let row = self.found_store(&mut db, &req.id)?;
+        let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
         let prefix = req.prefix.as_deref().map(str::trim).unwrap_or("");
         let include_values = req.include_values == Some(true);
         let rows = if prefix.is_empty() {
@@ -132,16 +134,28 @@ impl Artifacts {
         };
         let seq = row.seq;
         let artifact = self.assemble(&mut db, row)?;
-        Ok(ArtifactEntrySnapshot {
-            artifact,
-            seq,
-            entries: rows.iter().map(|r| entry_of(r, include_values)).collect(),
-        })
+        let entries = rows
+            .iter()
+            .map(|r| {
+                let mut e = entry_of(r, include_values);
+                if include_values
+                    && artifact_type == Some(ArtifactType::Whiteboard)
+                    && e.path.starts_with("elements/")
+                    && let Some(raw) = e.value.as_deref()
+                    && let Ok(clean) = sanitize_whiteboard_element_json(artifact_type, &e.path, raw)
+                {
+                    e.value = Some(clean);
+                }
+                e
+            })
+            .collect();
+        Ok(ArtifactEntrySnapshot { artifact, seq, entries })
     }
 
     pub fn get_entry(&self, req: &ArtifactEntryGetRequest) -> Result<ArtifactEntry, ApiError> {
         let mut db = self.db();
         let row = self.found_store(&mut db, &req.id)?;
+        let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
         check_path(&req.path)?;
         let entry = db::entry(&mut db, &req.id, &req.path).map_err(q)?.ok_or_else(|| {
             missing(
@@ -152,7 +166,15 @@ impl Artifacts {
                 LookIn::Artifact,
             )
         })?;
-        Ok(entry_of(&entry, true))
+        let mut out = entry_of(&entry, true);
+        if artifact_type == Some(ArtifactType::Whiteboard)
+            && out.path.starts_with("elements/")
+            && let Some(raw) = out.value.as_deref()
+            && let Ok(clean) = sanitize_whiteboard_element_json(artifact_type, &out.path, raw)
+        {
+            out.value = Some(clean);
+        }
+        Ok(out)
     }
 
     pub fn batch_entries(&self, maker: &Maker, req: &ArtifactEntryBatchRequest) -> Result<ArtifactEntryBatchResult, ApiError> {
@@ -651,5 +673,261 @@ impl Artifacts {
             .map(|(k, v)| (k.to_string(), v))
             .collect();
         Ok(ArtifactPage { content, headers })
+    }
+
+    /// Rewrites declared `data-props` defaults in a `.dc.html` store entry and commits the update.
+    pub fn write_entry_props(&self, maker: &Maker, req: &ArtifactEntryWritePropsInput) -> Result<ArtifactEntryBatchResult, ApiError> {
+        let entry = self.get_entry(&ArtifactEntryGetRequest {
+            id: req.id.clone(),
+            path: req.path.clone(),
+        })?;
+        let source = entry.value.as_deref().unwrap_or("");
+        let values: BTreeMap<String, Value> = req
+            .values
+            .iter()
+            .map(|(k, v)| {
+                let json_val = match v {
+                    DesignPropValue::Bool(b) => Value::Bool(*b),
+                    DesignPropValue::Number(n) => serde_json::Number::from_f64(*n).map_or(Value::Null, Value::Number),
+                    DesignPropValue::String(s) => Value::String(s.clone()),
+                };
+                (k.clone(), json_val)
+            })
+            .collect();
+        let updated = write_props_into_dc_html(source, &values);
+        self.batch_entries(
+            maker,
+            &ArtifactEntryBatchRequest {
+                id: req.id.clone(),
+                writes: vec![ArtifactEntryWriteInput {
+                    op: ArtifactEntryOp::Set,
+                    path: req.path.clone(),
+                    kind: Some(ArtifactEntryKind::Text),
+                    value: Some(updated),
+                    from: None,
+                    mime: Some(entry.mime),
+                    if_rev: Some(entry.rev),
+                }],
+                note: None,
+                announce: Some(false),
+            },
+        )
+    }
+
+    /// Parses a design-system `tokens.json` payload, computes WCAG contrast against the surface swatch, and compiles CSS.
+    pub fn inspect_tokens(req: &ArtifactTokensInspectInput) -> InspectedTokensSpec {
+        let parsed = parse_tokens_spec(&req.raw);
+        let surface_light = parsed.colors.iter().find(|c| c.id == "surface" || c.id == "page").map(|c| c.light.as_str());
+        let surface_dark = parsed.colors.iter().find(|c| c.id == "surface" || c.id == "page").map(|c| c.dark.as_str());
+        let colors = parsed
+            .colors
+            .iter()
+            .map(|c| {
+                let is_surface = c.id == "surface" || c.id == "page";
+                InspectedColorSwatch {
+                    id: c.id.clone(),
+                    group: c.group.clone(),
+                    light: c.light.clone(),
+                    dark: c.dark.clone(),
+                    note: c.note.clone(),
+                    contrast_light: if is_surface {
+                        None
+                    } else {
+                        surface_light.and_then(|bg| contrast_ratio(&c.light, bg))
+                    },
+                    contrast_dark: if is_surface {
+                        None
+                    } else {
+                        surface_dark.and_then(|bg| contrast_ratio(&c.dark, bg))
+                    },
+                }
+            })
+            .collect();
+        InspectedTokensSpec {
+            themes: parsed.themes,
+            default_theme: parsed.default_theme,
+            colors,
+            families: parsed
+                .families
+                .into_iter()
+                .map(|f| InspectedTypeFamily {
+                    id: f.id,
+                    value: f.value,
+                    note: f.note,
+                })
+                .collect(),
+            scale: parsed.scale.into_iter().map(|s| InspectedTokenValue { id: s.id, value: s.value }).collect(),
+            styles: parsed
+                .styles
+                .into_iter()
+                .map(|st| InspectedTypeStyle {
+                    id: st.id,
+                    family: st.family,
+                    size: st.size,
+                    weight: st.weight,
+                    line_height: st.line_height,
+                    letter_spacing: st.letter_spacing,
+                    sample: st.sample,
+                })
+                .collect(),
+            space: parsed.space.into_iter().map(|s| InspectedTokenValue { id: s.id, value: s.value }).collect(),
+            radius: parsed.radius.into_iter().map(|r| InspectedTokenValue { id: r.id, value: r.value }).collect(),
+            css: parsed.css,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::modules::attachment::Attachments;
+    use crate::modules::channel::Chat;
+    use vibevalley_protocol::{ArtifactHtmlEdit, ArtifactKind, ArtifactRequest, HtmlAnchor, HtmlAnchorKind};
+
+    fn test_artifacts() -> (tempfile::TempDir, Arc<Artifacts>) {
+        vibevalley_i18n::set_locale("zh");
+        let dir = tempfile::tempdir().unwrap();
+        let mut conn = pollster::block_on(crate::base::open_sqlx_db(dir.path())).unwrap();
+        pollster::block_on(sqlx::raw_sql("CREATE TABLE IF NOT EXISTS issue (id TEXT PRIMARY KEY)").execute(&mut conn)).unwrap();
+        drop(conn);
+        let hub = crate::Hub::new(vibevalley_core::empty_space_state());
+        let files = Attachments::open(dir.path()).unwrap();
+        let chat = Chat::open(dir.path(), &hub, files.clone(), false).unwrap();
+        let artifacts = Artifacts::open(dir.path(), files, chat).unwrap();
+        (dir, artifacts)
+    }
+
+    #[test]
+    fn inspect_tokens_computes_swatches_contrast_and_css() {
+        let starters = vibevalley_artifact::starter_entries_for_type(ArtifactType::DesignSystem, "Brand");
+        let raw = starters
+            .iter()
+            .find(|e| e.path == "project/tokens.json")
+            .and_then(|e| e.value.as_deref())
+            .unwrap();
+        let inspected = Artifacts::inspect_tokens(&ArtifactTokensInspectInput { raw: raw.to_string() });
+        assert!(inspected.colors.len() >= 4);
+        assert!(inspected.css.contains("[data-theme=\"light\"]"));
+        assert!(inspected.css.contains("[data-theme=\"dark\"]"));
+        let non_surface = inspected.colors.iter().find(|c| c.id != "surface" && c.id != "page").unwrap();
+        assert!(non_surface.contrast_light.is_some());
+        assert!(non_surface.contrast_dark.is_some());
+    }
+
+    #[test]
+    fn store_create_seeds_starters_and_supports_html_edit_and_write_props() {
+        let (_dir, artifacts) = test_artifacts();
+        let maker = Maker::user();
+
+        // 1. Omitting `entries` on a typed store seeds starters server-side.
+        let slides = artifacts
+            .create(
+                &maker,
+                &ArtifactRequest {
+                    title: "Q4 Deck".into(),
+                    kind: Some(ArtifactKind::Store),
+                    artifact_type: Some(ArtifactType::Slides),
+                    display: None,
+                    content: None,
+                    entries: None,
+                    is_default: None,
+                    announce: None,
+                    note: None,
+                    channel: None,
+                    issue: None,
+                },
+            )
+            .unwrap();
+        assert_eq!(slides.seq, 1);
+        let snap = artifacts
+            .list_entries(&ArtifactEntryListRequest {
+                id: slides.id.clone(),
+                prefix: None,
+                include_values: Some(true),
+            })
+            .unwrap();
+        let slide = snap
+            .entries
+            .iter()
+            .find(|e| e.path.starts_with("project/slides/") && e.path.ends_with(".html"))
+            .unwrap();
+        assert!(slide.value.as_deref().unwrap().contains("Q4 Deck"));
+
+        // 2. `html_edit` with `path` edits the slide entry via Rust `html_edit`.
+        let edited_art = artifacts
+            .html_edit(
+                &maker,
+                &ArtifactHtmlEdit {
+                    id: slides.id.clone(),
+                    version: slides.seq,
+                    path: Some(slide.path.clone()),
+                    anchor: HtmlAnchor {
+                        kind: HtmlAnchorKind::Text,
+                        exact: "Q4 Deck".into(),
+                        prefix: String::new(),
+                        suffix: String::new(),
+                    },
+                    text: "Q1 Roadmap".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(edited_art.seq, 2);
+        let updated_slide = artifacts
+            .get_entry(&ArtifactEntryGetRequest {
+                id: slides.id.clone(),
+                path: slide.path.clone(),
+            })
+            .unwrap();
+        assert!(updated_slide.value.as_deref().unwrap().contains("Q1 Roadmap"));
+
+        // 3. `write_entry_props` updates `data-props` defaults in a `.dc.html` entry.
+        let design = artifacts
+            .create(
+                &maker,
+                &ArtifactRequest {
+                    title: "Hero".into(),
+                    kind: Some(ArtifactKind::Store),
+                    artifact_type: Some(ArtifactType::Design),
+                    display: None,
+                    content: None,
+                    entries: Some(vec![ArtifactEntryWriteInput {
+                        op: ArtifactEntryOp::Set,
+                        path: "project/main.dc.html".into(),
+                        kind: Some(ArtifactEntryKind::Text),
+                        value: Some(
+                            r#"<x-dc data-props='[{"name":"density","type":"select","options":["comfortable","compact"],"value":"comfortable"}]'><div>Body</div></x-dc>"#
+                                .into(),
+                        ),
+                        from: None,
+                        mime: None,
+                        if_rev: None,
+                    }]),
+                    is_default: None,
+                    announce: None,
+                    note: None,
+                    channel: None,
+                    issue: None,
+                },
+            )
+            .unwrap();
+        let res = artifacts
+            .write_entry_props(
+                &maker,
+                &ArtifactEntryWritePropsInput {
+                    id: design.id.clone(),
+                    path: "project/main.dc.html".into(),
+                    values: BTreeMap::from([("density".into(), DesignPropValue::String("compact".into()))]),
+                },
+            )
+            .unwrap();
+        assert!(res.applied);
+        let dc = artifacts
+            .get_entry(&ArtifactEntryGetRequest {
+                id: design.id,
+                path: "project/main.dc.html".into(),
+            })
+            .unwrap();
+        assert!(dc.value.as_deref().unwrap().contains(r#""value":"compact""#));
+        artifacts.close();
     }
 }

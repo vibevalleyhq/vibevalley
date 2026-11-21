@@ -1,7 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/DataTable.tsx on its table model
-// (infra/table.ts, vendored): the same column controls, sorting, selection
-// and pages. There is no <table>: a row of cells per row, each column an
-// equal share of the width; the caption is the table's accessibility label.
 import { Text, View, type Accessor, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

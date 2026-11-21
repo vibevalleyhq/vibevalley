@@ -10,7 +10,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use gpui_kit::{
+use gpui::{
     App, AppContext as _, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent, Modifiers,
     ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement as _, Pixels, Point, Render, ScrollEvent,
     StatefulInteractiveElement as _, Styled as _, Window, div, point, px,
@@ -25,7 +25,7 @@ use element::{RowCache, TerminalElement};
 
 use crate::theme::Ui;
 
-gpui_kit::actions!(terminal, [Copy, Paste, Clear, ScrollPageUp, ScrollPageDown, ScrollToBottom]);
+gpui::actions!(terminal, [Copy, Paste, Clear, ScrollPageUp, ScrollPageDown, ScrollToBottom]);
 
 #[derive(Debug, Clone)]
 pub struct SpawnSpec {

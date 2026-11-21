@@ -8,9 +8,6 @@
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/pkm": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
-    "pele": "catalog:",
-    "pinyin-pro": "catalog:",
-    "uqr": "catalog:",
     "zod": "catalog:"
   }
 }

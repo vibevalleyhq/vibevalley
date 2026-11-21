@@ -16,7 +16,7 @@ path = "tests/publish.rs"
 
 [dependencies]
 vibevalley-chord = { version = "0.1.0", path = "../vibevalley-chord" }
-base64 = "0.23.1"
+base64 = { workspace = true }
 vibevalley-oar = { version = "0.1.0", path = "../vibevalley-oar" }
 vibevalley-artifact = { version = "0.1.0", path = "../vibevalley-artifact" }
 vibevalley-agent = { version = "0.1.0", path = "../vibevalley-agent" }
@@ -26,20 +26,19 @@ vibevalley-git = { version = "0.1.0", path = "../vibevalley-git" }
 vibevalley-i18n = { version = "0.1.0", path = "../vibevalley-i18n" }
 vibevalley-protocol = { version = "0.1.0", path = "../vibevalley-protocol" }
 vibevalley-server-api = { version = "0.1.0", path = "../vibevalley-server-api" }
-flume = "0.12.0"
+flume = { workspace = true }
 include_dir = "0.7.4"
 jiff = { workspace = true }
-regex = "1.13.1"
-sqlx = { version = "0.9.1", default-features = false, features = ["sqlite", "derive"] }
-pollster = "1.0.3"
+regex = { workspace = true }
+sqlx = { workspace = true }
+pollster = { workspace = true }
 serde = { workspace = true }
-serde_json = "1.0.154"
+serde_json = { workspace = true }
 vibevalley-home = { path = "../vibevalley-home" }
 serde_path_to_error = "0.1.20"
-thiserror = "2.0.21"
-sha2 = "0.11.1"
-ureq = { version = "3.5.2", features = ["json"] }
-url = "2.5.8"
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+url = { workspace = true }
 uuid = { workspace = true }
 vibevalley-pkm = { version = "0.1.0", path = "../vibevalley-pkm" }
 vibevalley-files = { version = "0.1.0", path = "../vibevalley-files" }
@@ -47,8 +46,8 @@ symphonia = { version = "0.6.1", default-features = false, features = ["wav", "m
 flate2 = "1.1.11"
 crc32fast = "1.5.5"
 
-reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "json"] }
-rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
+reqwest = { workspace = true }
+rustls = { workspace = true }
 tokio-tungstenite = { workspace = true }
 futures-util = { workspace = true }
 tokio = { workspace = true }
@@ -56,4 +55,5 @@ vibevalley-http = { version = "0.1.0", path = "../vibevalley-http" }
 
 [dev-dependencies]
 vibevalley-bridge = { version = "0.1.0", path = "../vibevalley-bridge" }
-tempfile = "3.27.0"
+tempfile = { workspace = true }
+ureq = { workspace = true }

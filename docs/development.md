@@ -75,7 +75,7 @@ CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`sql:check`、`doc
 
 - **设计原则**：clap，经 HTTP 用契约的类型调服务端，不替服务端做决定。路径为 `<资源> [<子资源>] <动词>`；说明按农场的语言取 `cli.*` 词典。
 - **工单**：`issue list|show|create|edit|status|comment|review|diff|timeline|delete`。`issue show --watch` 持续订阅状态流直到 `in_review`、`done` 或 `canceled`。
-- **其余**：`channel`、`repo`、`agent`、`session`（含 `events`）、`runtime`、`memory`、`cron`、`artifact`、`pkm`（`capture`、`search`、`radar`、`journal`、`page`）、`setting`（`get`、`update`、`validate`）、`chat`（本机农机编码会话，或 `--orchestrator` 在 `#general` 和助手对话）、`doctor`。
+- **其余**：`channel`、`repo`、`agent`、`session`（含 `events`）、`runtime`、`memory`、`cron`、`artifact`、`pkm`（`capture`、`search`、`radar`、`journal`、`page`）、`setting`（`get`、`update`、`validate`）、`chat`（本机农机编码会话，或 `--orchestrator` 在 `#general` 和助手对话）、`approval`（助手待审批工具调用的列出与决策）、`doctor`。
 - **输出与试跑**：默认输出单行短文本（首词为后续命令要用的 ID 或编号），`--format json` 输出协议原始结构。无试跑的写命令传 `--dry-run` 返回 `NoDryRun`（退出码 `2`）。
 - **错误与退出码**：失败时 stdout 为空，stderr 末行是一行 JSON，退出码按类（`crates/vibevalley-cli/src/farm.rs` 的 `exit`）；集成测试在 `crates/vibevalley-cli/tests/cli.rs`，起真的服务端。
 

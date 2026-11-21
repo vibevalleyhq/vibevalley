@@ -250,7 +250,7 @@ export function RunsPage() {
           clearTestid="runs-search-clear"
           clearLabel={t("web.session.hub.clear")}
           value={query()}
-          onInput={query.set}
+          onInput={(v) => query.set(v)}
           placeholder={t("web.session.hub.searchHint")}
           label={t("web.session.hub.search")}
           class="w-full"
@@ -423,9 +423,7 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
           </If>
         </View>
         <If when={entrySubtitle(props.entry)}>
-          <Text class="truncate text-xs text-muted" style={{ numberOfLines: 1 }}>
-            {entrySubtitle(props.entry)}
-          </Text>
+          <Text class="truncate text-xs text-muted">{entrySubtitle(props.entry)}</Text>
         </If>
         <View class="flex-row items-center gap-1.5 pt-0.5">
           <Dot tone={status().dot} size={6} ring={false} />

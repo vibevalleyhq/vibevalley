@@ -140,8 +140,6 @@ impl Bridge {
         self.env.closing.load(Ordering::SeqCst)
     }
 
-    // ----- the status -----
-
     pub fn status(&self) -> ConnectorStatus {
         let (account, progress, error) = {
             let s = lock(&self.shown);
@@ -237,8 +235,6 @@ impl Bridge {
             }
         }
     }
-
-    // ----- what goes out -----
 
     fn wake(&self) {
         let _ = self.wake.0.try_send(());
@@ -347,8 +343,6 @@ impl Bridge {
         }
         true
     }
-
-    // ----- what comes in -----
 
     fn quoted_channel(&self, ext: &str) -> Result<Option<String>, Held> {
         if ext.is_empty() {
@@ -526,8 +520,6 @@ impl Bridge {
         }
     }
 
-    // ----- the generations -----
-
     fn stop_generation(&self, current: &mut Option<Generation>) {
         let Some(g) = current.take() else { return };
         g.stop.set();
@@ -630,8 +622,6 @@ impl Bridge {
         drop(current);
         self.tell();
     }
-
-    // ----- the commands -----
 
     pub fn load(&self) {
         if let Err(e) = self.reload() {

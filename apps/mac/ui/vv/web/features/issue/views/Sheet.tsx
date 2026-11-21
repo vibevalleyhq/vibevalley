@@ -60,7 +60,7 @@ export function createIssueChrome(): IssueChrome {
 function Say(props: { children?: JSX.Element; class?: string }) {
   return (
     <If when={typeof props.children === "string" || typeof props.children === "number"} else={props.children}>
-      <Text class={props.class ?? "text-sm text-ink"}>{props.children as string}</Text>
+      <Text class={props.class ?? "text-sm text-ink"}>{props.children}</Text>
     </If>
   );
 }

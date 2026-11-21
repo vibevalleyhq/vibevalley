@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/voice/views/VoiceVendorFields.tsx:
-// the vendors' labels and first settings, the two-column grid (Cols, as a
-// wrapping row whose cells take half each from md), Labeled, and the voice agent's
-// section. MiniMax's samples ship with the app (apps/mac/ui/assets/voice-samples) and play on nsh's AudioPlayer. The
-// Microsoft voice's <datalist> is a row of the known names to pick from.
 import { AudioPlayer, cleanup, signal, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

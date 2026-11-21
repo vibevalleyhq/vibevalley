@@ -104,9 +104,7 @@ function ApprovalRow(props: { item: OrchestratorApproval; first: boolean; busy: 
         </View>
         <If when={expanded()}>
           <View class="rounded-md bg-side px-2.5 py-2">
-            <Text class="font-mono text-xs leading-relaxed text-ink" style={{ userSelect: "text" }}>
-              {props.item.argumentsJson}
-            </Text>
+            <Text class="font-mono text-xs leading-relaxed text-ink select-text">{props.item.argumentsJson}</Text>
           </View>
         </If>
       </View>

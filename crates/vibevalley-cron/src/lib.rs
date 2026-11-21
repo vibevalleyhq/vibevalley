@@ -77,8 +77,6 @@ pub struct CronRequest {
     pub tz: Option<String>,
 }
 
-// ---- zones -------------------------------------------------------------------
-
 /// A fixed offset from UTC, or a zone known by name.
 #[derive(Debug, Clone)]
 pub enum Zone {
@@ -155,8 +153,6 @@ fn instant_of(wall: i64, zone: &Zone) -> i64 {
         .min()
         .unwrap_or(wall - before)
 }
-
-// ---- schedules -----------------------------------------------------------------
 
 /// Empty sets mean any; `and`: both day fields must match, else either.
 #[derive(Debug, Clone)]
@@ -252,8 +248,6 @@ pub fn next_run(s: &Cron) -> Option<i64> {
     }
 }
 
-// ---- cron expressions ------------------------------------------------------------
-
 const FIELDS: [(i64, i64, &str); 5] = [(0, 59, "0"), (0, 23, "1"), (1, 31, "2"), (1, 12, "3"), (0, 7, "4")];
 
 /// Go's strconv.Atoi: an optional sign and ASCII digits.
@@ -333,8 +327,6 @@ fn parse_cron(expr: &str) -> Result<Spec, String> {
         and: f[2].starts_with('*') || f[4].starts_with('*'),
     })
 }
-
-// ---- words -------------------------------------------------------------------------
 
 fn weekday(d: i64) -> String {
     t(&format!("server.cron.weekdays.{d}"), &[])

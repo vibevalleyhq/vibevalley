@@ -87,7 +87,7 @@ export function SpeechPanel() {
     });
     return act.run(async () => {
       const job = await api.media.speech.create(request);
-      if (request.streaming) {
+      if (request.streaming === true) {
         stop();
         live.set(true);
         stopStream = playSpeech(

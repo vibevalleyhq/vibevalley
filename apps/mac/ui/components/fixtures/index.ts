@@ -26,7 +26,7 @@ const TIME_KEYS = new Set([
 
 function shifted<T>(value: T, by: number): T {
   if (Array.isArray(value)) return value.map((v) => shifted(v, by)) as T;
-  if (value && typeof value === "object") {
+  if (value !== null && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       out[k] = TIME_KEYS.has(k) && typeof v === "number" ? v + by : shifted(v, by);

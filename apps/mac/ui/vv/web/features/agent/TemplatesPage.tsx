@@ -71,7 +71,7 @@ export function TemplatesPage() {
           testid="templates-category-filter"
           label={t("web.agent.templates.title")}
           value={category()}
-          onChange={category.set}
+          onChange={(v) => category.set(v)}
           options={[
             { value: "all", label: categoryLabel("all"), count: all().length },
             ...TemplateCategoryValues.map((cat) => ({

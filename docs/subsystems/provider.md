@@ -1,6 +1,6 @@
 # AI 服务
 
-用户在「设置 → AI 服务」保存供应商连接（现在只有 MOSS），为每个用途（听写、生图、媒体理解、单人语音、多人对白、音色设计、长音频转写、Live、Vision）选连接和模型；用途可以共用一个账号，也可以各用各的。提交、预览、保存由[媒体任务](docs/subsystems/media.md)做；Rust 服务端现在只用到生图和单人语音两个用途（其余用途能存、能查模型，没人调用，见[语音](docs/subsystems/voice.md)）。
+用户在「设置 → AI 服务」保存供应商连接（现在只有 MOSS），为每个用途（听写、生图、媒体理解、单人语音、多人对白、音色设计、长音频转写、Live、Vision）选连接和模型；用途可以共用一个账号，也可以各用各的。除 `vision` 尚未接入外，其余八种用途均已由[媒体与素材库](docs/subsystems/media.md)与[语音](docs/subsystems/voice.md)调用。
 
 ## 管什么，不管什么
 
@@ -18,7 +18,7 @@ DeepSeek（助手的对话模型）的钥匙在设置里，不是连接。
 |---|---|
 | `crates/vibevalley-server/src/modules/provider.rs` | `Provider`：`status`、`update`（`connections_over` 把更新叠到当前配置上，不对就拒）、`models`、`voices`；`Use` 是九个用途的闭集，各带自己的模型列表；`Providers::account` 给用的地方一个账号（连接、revision、模型、钥匙） |
 | `crates/vibevalley-server/src/modules/media/vendor.rs` | MOSS 的 HTTP 调用（生图、语音、文件、理解），响应进门即解码 |
-| `packages/protocol/src/provider/` | 公共形状和接口（Rust 类型由它生成） |
+| `crates/vibevalley-protocol/src/contract/provider.rs`、`packages/protocol/src/provider/` | 公共形状和接口（Rust 为源，TS 形状由它生成） |
 | `apps/mac/ui/vv/web/features/provider/` | `/settings/providers` 的连接与默认用途表单 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`provider.*`）。

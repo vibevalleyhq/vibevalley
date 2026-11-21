@@ -48,7 +48,7 @@ export function fakeHost(fixture: { state: unknown; responses: Record<string, un
     if (!(op in responses)) return { bizCode: 100005, message: `the fake server has no answer for ${op}` };
     const r = responses[op];
     const v = typeof r === "function" ? (r as (p: unknown) => unknown)(payload) : r;
-    return v && typeof v === "object" && "bizCode" in v ? v : { bizCode: 0, message: "ok", data: v };
+    return v !== null && typeof v === "object" && "bizCode" in v ? v : { bizCode: 0, message: "ok", data: v };
   };
   const action = (data: unknown) => {
     const a = data as { type: string; id?: string; op?: string; payload?: unknown; topic?: string; name?: string };
@@ -63,7 +63,7 @@ export function fakeHost(fixture: { state: unknown; responses: Record<string, un
       watching = true;
       queue.push(["frame:state", { rev: ++rev, data: state }]);
     } else if (!["watch", "applied", "ready"].includes(a.type)) {
-      acts.push(a as { type: string });
+      acts.push(a);
     }
     return null;
   };

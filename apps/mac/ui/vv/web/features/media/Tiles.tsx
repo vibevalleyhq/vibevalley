@@ -1,6 +1,3 @@
-// Ported from VibeValley apps/web/src/features/media/Tiles.tsx: justified
-// rows of media tiles, lightweight native deliverable cards, and in-progress
-// generation jobs.
 import { effect, Image, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";

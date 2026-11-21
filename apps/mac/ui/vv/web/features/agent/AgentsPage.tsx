@@ -112,7 +112,7 @@ function AgentsPage() {
               testid="agents-role-filter"
               label={t("web.agent.list.filterLabel")}
               value={roleFilter()}
-              onChange={roleFilter.set}
+              onChange={(v) => roleFilter.set(v)}
               options={[
                 { value: "all", label: t("web.agent.list.all"), count: orchestrators().length + agents().length },
                 { value: "orchestrator", label: t("web.agent.list.orchestrators"), count: orchestrators().length },
@@ -124,7 +124,7 @@ function AgentsPage() {
               clearTestid="agents-search-clear"
               clearLabel={t("web.agent.list.clearFilter")}
               value={query()}
-              onInput={query.set}
+              onInput={(v) => query.set(v)}
               placeholder={t("web.agent.list.searchHint")}
               label={t("web.agent.list.search")}
               class="w-56"
@@ -206,7 +206,7 @@ function AgentsPage() {
                 testid="templates-category-filter"
                 label={t("web.agent.templates.galleryTitle")}
                 value={category()}
-                onChange={category.set}
+                onChange={(v) => category.set(v)}
                 options={[
                   { value: "all", label: categoryLabel("all"), count: roleMatchedTemplates().length },
                   ...TemplateCategoryValues.map((cat) => ({
@@ -282,16 +282,12 @@ function OrchestratorRow(props: { agent: Agent; first: boolean; wide: boolean })
             </View>
           </If>
         </View>
-        <Text class="truncate text-xs text-muted" style={{ numberOfLines: 1 }}>
-          {props.agent.duty || t("web.agent.list.orchestratorLine")}
-        </Text>
+        <Text class="truncate text-xs text-muted">{props.agent.duty || t("web.agent.list.orchestratorLine")}</Text>
       </View>
       <If when={props.wide}>
         <View class="shrink-0 flex-row items-center gap-3">
           <View class="w-52 flex-row items-center">
-            <Text class="min-w-0 flex-1 truncate text-xs text-muted" style={{ numberOfLines: 1 }}>
-              {summary()}
-            </Text>
+            <Text class="min-w-0 flex-1 truncate text-xs text-muted">{summary()}</Text>
           </View>
           <View class="w-28" />
         </View>
@@ -363,17 +359,13 @@ function WorkerRow(props: { agent: Agent; runtime?: RuntimeInfo | undefined; err
             </View>
           </If>
         </View>
-        <Text class="truncate text-xs text-muted" style={{ numberOfLines: 1 }}>
-          {props.agent.duty || runtimeSpec()}
-        </Text>
+        <Text class="truncate text-xs text-muted">{props.agent.duty || runtimeSpec()}</Text>
       </View>
       <If when={props.wide}>
         <View class="shrink-0 flex-row items-center gap-3">
           <View class="w-52 flex-row items-center gap-1.5">
             <Dot tone={available() ? "leaf" : "berry"} size={7} ring={false} />
-            <Text class="min-w-0 flex-1 truncate text-xs text-muted" style={{ numberOfLines: 1 }}>
-              {runtimeSpec()}
-            </Text>
+            <Text class="min-w-0 flex-1 truncate text-xs text-muted">{runtimeSpec()}</Text>
           </View>
           <View class="w-28 flex-row items-center justify-end gap-1 overflow-hidden">
             <Each of={shownTags()}>

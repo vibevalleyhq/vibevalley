@@ -3,6 +3,8 @@
 import { Clipboard, Text, View } from "nsh";
 import { ContextMenu, MenuItem, MenuSeparator, Tree, type TreeItem } from "nsh/base";
 
+import { t } from "@vibevalley/i18n";
+
 import { act, hostApi } from "../bridge";
 import { tok } from "../tokens";
 import { contextMenuItemStyle, contextMenuPopupStyle, Empty, IconButton, SectionHead, SurfaceIcon, toneColor } from "./shared";
@@ -22,7 +24,7 @@ export function FileTree(props: { frame: FilesFrame | null }) {
   const p = () => tok();
   const byId = () => index(props.frame?.items ?? [], new Map());
   const relPath = (abs: string) => {
-    const root = props.frame?.root?.replace(/\/+$/, "");
+    const root = props.frame?.root?.replace(/\/+$/u, "");
     return root && abs.startsWith(`${root}/`) ? abs.slice(root.length + 1) : abs;
   };
   const dirOf = (abs: string, folder: boolean) => {
@@ -34,15 +36,15 @@ export function FileTree(props: { frame: FilesFrame | null }) {
   return (
     <View style={{ flex: 1 }}>
       <SectionHead
-        title={props.frame?.name ?? "文件"}
+        title={props.frame?.name ?? t("web.shell.fileTree.title")}
         borderBottom
         right={
           (props.frame?.expanded?.length ?? 0) > 0 ? (
             <IconButton
-              label="折叠全部目录"
+              label={t("web.shell.fileTree.collapseAllDirs")}
               icon="collapse-all"
               onPress={() => {
-                for (const dir of [...(props.frame?.expanded ?? [])].reverse()) {
+                for (const dir of [...(props.frame?.expanded ?? [])].toReversed()) {
                   act({ type: "collapse_dir", path: dir });
                 }
               }}
@@ -51,13 +53,13 @@ export function FileTree(props: { frame: FilesFrame | null }) {
         }
       />
       {!props.frame || props.frame.items.length === 0 ? (
-        <Empty text={props.frame?.loading || !props.frame ? "正在读取目录…" : "此目录为空。"} />
+        <Empty text={props.frame?.loading === true || !props.frame ? t("web.shell.fileTree.loading") : t("web.shell.fileTree.empty")} />
       ) : (
         <Tree
           items={props.frame.items}
           expanded={props.frame.expanded ?? []}
           selected={props.frame.selected ?? null}
-          accessibilityLabel="Files"
+          accessibilityLabel={t("web.shell.fileTree.title")}
           class="flex-1"
           listClass="px-1.5 py-1.5"
           itemClass="group rounded-md hover:bg-hover selected:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
@@ -78,7 +80,7 @@ export function FileTree(props: { frame: FilesFrame | null }) {
             const labelColor = () => {
               const cur = item();
               if (cur?.tone === "placeholder") return p().faint;
-              if (cur?.hidden && cur.tone === "clean") return p().text;
+              if (cur?.hidden === true && cur.tone === "clean") return p().text;
               return toneColor(p(), cur?.tone);
             };
             const iconColor = () => {
@@ -140,21 +142,21 @@ export function FileTree(props: { frame: FilesFrame | null }) {
             return (
               <ContextMenu trigger={row} popupStyle={contextMenuPopupStyle(p())}>
                 <MenuItem onSelect={() => void Clipboard.writeText(relPath(entry.id))} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-                  <Text style={{ fontSize: 12, color: p().ink }}>复制相对路径</Text>
+                  <Text style={{ fontSize: 12, color: p().ink }}>{t("web.shell.fileTree.copyRelPath")}</Text>
                 </MenuItem>
                 <MenuItem onSelect={() => void Clipboard.writeText(entry.id)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-                  <Text style={{ fontSize: 12, color: p().ink }}>复制绝对路径</Text>
+                  <Text style={{ fontSize: 12, color: p().ink }}>{t("web.shell.fileTree.copyAbsPath")}</Text>
                 </MenuItem>
                 <MenuSeparator style={{ height: 1, marginVertical: 4, backgroundColor: p().border }} />
                 <MenuItem onSelect={() => void hostApi.reveal(entry.id)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-                  <Text style={{ fontSize: 12, color: p().ink }}>在 Finder 中显示</Text>
+                  <Text style={{ fontSize: 12, color: p().ink }}>{t("web.shell.fileTree.revealInFinder")}</Text>
                 </MenuItem>
                 <MenuItem
                   onSelect={() => act({ type: "new_terminal_at", path: dirOf(entry.id, entry.folder) })}
                   style={itemStyle}
                   hoverStyle={{ backgroundColor: p().subtle }}
                 >
-                  <Text style={{ fontSize: 12, color: p().ink }}>在此目录新建终端</Text>
+                  <Text style={{ fontSize: 12, color: p().ink }}>{t("web.shell.fileTree.newTerminalInDir")}</Text>
                 </MenuItem>
               </ContextMenu>
             );

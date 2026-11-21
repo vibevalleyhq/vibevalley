@@ -2,6 +2,8 @@
 import { Canvas, colorScheme, signal, Text, View, type CanvasRenderingContext2D, type Component } from "nsh";
 import { Button, Tooltip } from "nsh/base";
 
+import { t } from "@vibevalley/i18n";
+
 import { ms, pressTransition } from "../motion";
 import { cardShadow, dangerTint, radius, tint, tok, type Palette, type as ty } from "../tokens";
 
@@ -344,12 +346,12 @@ export function SectionHead(props: {
   const open = () => props.expanded !== false;
   const titleColor = () => {
     if (props.tone === "danger") return p().danger;
-    if (props.collapsible && hovered()) return p().ink;
+    if (props.collapsible === true && hovered()) return p().ink;
     return p().muted;
   };
   const labelRow = () => (
     <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6 }}>
-      {props.collapsible ? (
+      {props.collapsible === true ? (
         <View
           style={{
             width: 14,
@@ -393,18 +395,18 @@ export function SectionHead(props: {
         paddingLeft: 12,
         paddingRight: 8,
         gap: 6,
-        borderTopWidth: props.borderTop ? 1 : 0,
+        borderTopWidth: props.borderTop === true ? 1 : 0,
         borderTopColor: p().border,
-        borderBottomWidth: props.borderBottom ? 1 : 0,
+        borderBottomWidth: props.borderBottom === true ? 1 : 0,
         borderBottomColor: p().border,
       }}
     >
-      {props.collapsible ? (
+      {props.collapsible === true ? (
         <Button
           onPress={() => props.onToggle?.()}
           onMouseEnter={() => hovered.set(true)}
           onMouseLeave={() => hovered.set(false)}
-          accessibilityLabel={`${props.title}，${open() ? "折叠" : "展开"}`}
+          accessibilityLabel={open() ? t("web.shell.section.collapse", { title: props.title }) : t("web.shell.section.expand", { title: props.title })}
           style={{
             flex: 1,
             minWidth: 0,
@@ -424,7 +426,7 @@ export function SectionHead(props: {
       ) : (
         labelRow()
       )}
-      {props.right ? <View style={{ flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 0 }}>{props.right}</View> : null}
+      {props.right !== undefined ? <View style={{ flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 0 }}>{props.right}</View> : null}
     </View>
   );
 }
@@ -443,7 +445,7 @@ export function IconButton(props: {
   const hovered = signal(false);
   const resolvedIcon = () => props.icon ?? (props.glyph ? GLYPH_TO_ICON[props.glyph] : undefined);
   const iconColor = () => {
-    if (props.disabled) return p().faint;
+    if (props.disabled === true) return p().faint;
     if (hovered()) return props.hoverColor ?? props.color ?? p().ink;
     return props.color ?? p().muted;
   };
@@ -455,7 +457,7 @@ export function IconButton(props: {
       onMouseLeave={() => hovered.set(false)}
       accessibilityLabel={props.label}
       tooltip={<TipBubble text={props.label} />}
-      activeStyle={props.disabled ? undefined : { opacity: 0.82 }}
+      activeStyle={props.disabled === true ? undefined : { opacity: 0.82 }}
       style={{
         width: 22,
         height: 22,
@@ -463,11 +465,11 @@ export function IconButton(props: {
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-        opacity: props.disabled ? 0.5 : 1,
+        opacity: props.disabled === true ? 0.5 : 1,
         ...pressTransition(),
       }}
-      hoverStyle={{ backgroundColor: props.disabled ? "transparent" : p().subtle }}
-      focusVisibleStyle={props.disabled ? undefined : focusRing(p())}
+      hoverStyle={{ backgroundColor: props.disabled === true ? "transparent" : p().subtle }}
+      focusVisibleStyle={props.disabled === true ? undefined : focusRing(p())}
     >
       {resolvedIcon() ? (
         <SurfaceIcon name={resolvedIcon()!} size={props.size ?? 13} color={iconColor()} />
@@ -486,7 +488,7 @@ export function Empty(props: { text: string; compact?: boolean }) {
         lineHeight: 18,
         color: tok().muted,
         paddingHorizontal: 12,
-        paddingVertical: props.compact ? 6 : 10,
+        paddingVertical: props.compact === true ? 6 : 10,
       }}
     >
       {props.text}
@@ -500,22 +502,22 @@ export function PrimaryButton(props: { label: string; onPress: () => void; disab
     <Button
       onPress={props.onPress}
       disabled={props.disabled}
-      activeStyle={props.disabled ? undefined : { opacity: 0.82 }}
-      focusVisibleStyle={props.disabled ? undefined : focusRing(p())}
+      activeStyle={props.disabled === true ? undefined : { opacity: 0.82 }}
+      focusVisibleStyle={props.disabled === true ? undefined : focusRing(p())}
       style={{
         height: 28,
         paddingHorizontal: 12,
         borderRadius: radius.md,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: props.disabled ? p().tile : p().primary,
+        backgroundColor: props.disabled === true ? p().tile : p().primary,
         borderWidth: 1,
-        borderColor: props.disabled ? p().border : p().primary,
-        opacity: props.disabled ? 0.75 : 1,
+        borderColor: props.disabled === true ? p().border : p().primary,
+        opacity: props.disabled === true ? 0.75 : 1,
         ...pressTransition(),
       }}
     >
-      <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: "600", color: props.disabled ? p().muted : p().onPrimary }}>{props.label}</Text>
+      <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: "600", color: props.disabled === true ? p().muted : p().onPrimary }}>{props.label}</Text>
     </Button>
   );
 }

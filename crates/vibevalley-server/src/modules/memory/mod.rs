@@ -23,7 +23,6 @@ use crate::modules::agent::Agents;
 use crate::{Hub, lock, now};
 
 mod gse;
-#[allow(dead_code)]
 mod rules;
 
 use rules as m;

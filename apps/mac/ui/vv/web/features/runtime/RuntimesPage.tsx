@@ -1,8 +1,3 @@
-// Ported from VibeValley apps/web/src/features/runtime/RuntimesPage.tsx:
-// the runtimes as the page's side list, one runtime's detail beside it.
-// The machines' pixel sprites are the GPUI app's art (ui/pixel/RuntimeIcon);
-// the portrait's radial glow is a flat tint of the hat colour. VibeValley
-// adds: a terminal at the runtime's command's folder.
 import { Text, View, type InputRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";

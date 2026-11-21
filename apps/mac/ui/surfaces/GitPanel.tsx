@@ -5,6 +5,8 @@
 import { Clipboard, effect, Scroll, signal, Text, View } from "nsh";
 import { Button, ContextMenu, Input, MenuItem, MenuSeparator } from "nsh/base";
 
+import { t } from "@vibevalley/i18n";
+
 import { act, frame, hostApi } from "../bridge";
 import { pressTransition } from "../motion";
 import { radius, tok, type as ty } from "../tokens";
@@ -57,10 +59,10 @@ export type GitTab = "changes" | "branches" | "commits";
 function formatCommitTime(epochSec: number): string {
   const nowSec = Math.floor(Date.now() / 1000);
   const diff = nowSec - epochSec;
-  if (diff >= 0 && diff < 60) return "刚刚";
-  if (diff >= 60 && diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
-  if (diff >= 3600 && diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
-  if (diff >= 86400 && diff < 86400 * 7) return `${Math.floor(diff / 86400)}天前`;
+  if (diff >= 0 && diff < 60) return t("web.shell.git.justNow");
+  if (diff >= 60 && diff < 3600) return t("web.shell.git.minutesAgo", { n: Math.floor(diff / 60) });
+  if (diff >= 3600 && diff < 86400) return t("web.shell.git.hoursAgo", { n: Math.floor(diff / 3600) });
+  if (diff >= 86400 && diff < 86400 * 7) return t("web.shell.git.daysAgo", { n: Math.floor(diff / 86400) });
   const d = new Date(epochSec * 1000);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
@@ -139,7 +141,7 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
             focusVisibleStyle={focusRing(p())}
             style={{ height: 20, paddingHorizontal: 6, borderRadius: radius.sm, backgroundColor: p().danger, justifyContent: "center", ...pressTransition() }}
           >
-            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().onPrimary }}>确认丢弃</Text>
+            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().onPrimary }}>{t("web.shell.git.confirmDiscard")}</Text>
           </Button>
           <Button
             onPress={() => confirmingDiscard.set(false)}
@@ -148,17 +150,30 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
             hoverStyle={{ backgroundColor: p().border }}
             style={{ height: 20, paddingHorizontal: 6, borderRadius: radius.sm, backgroundColor: p().subtle, justifyContent: "center", ...pressTransition() }}
           >
-            <Text style={{ fontSize: 11, lineHeight: 14, color: p().text }}>取消</Text>
+            <Text style={{ fontSize: 11, lineHeight: 14, color: p().text }}>{t("web.shell.git.cancel")}</Text>
           </Button>
         </View>
       ) : hovered() ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 0 }}>
           {props.staged ? (
-            <IconButton label={`取消暂存 ${props.row.path}`} icon="minus" onPress={() => act({ type: "unstage", paths: [props.row.path] })} />
+            <IconButton
+              label={t("web.shell.git.unstagePath", { path: props.row.path })}
+              icon="minus"
+              onPress={() => act({ type: "unstage", paths: [props.row.path] })}
+            />
           ) : (
             <>
-              <IconButton label={`丢弃改动 ${props.row.path}`} icon="undo" hoverColor={p().danger} onPress={() => confirmingDiscard.set(true)} />
-              <IconButton label={`暂存 ${props.row.path}`} icon="plus" onPress={() => act({ type: "stage", paths: [props.row.path] })} />
+              <IconButton
+                label={t("web.shell.git.discardPath", { path: props.row.path })}
+                icon="undo"
+                hoverColor={p().danger}
+                onPress={() => confirmingDiscard.set(true)}
+              />
+              <IconButton
+                label={t("web.shell.git.stagePath", { path: props.row.path })}
+                icon="plus"
+                onPress={() => act({ type: "stage", paths: [props.row.path] })}
+              />
             </>
           )}
         </View>
@@ -188,9 +203,9 @@ type StateWorktreeMeta = {
   };
 };
 
-function normWtPath(p: string | undefined | null): string {
+function normWtPath(p: string | undefined): string {
   if (!p) return "";
-  return p.replace(/\/+$/, "") || "/";
+  return p.replace(/\/+$/u, "") || "/";
 }
 
 function WorktreeRow(props: {
@@ -219,15 +234,15 @@ function WorktreeRow(props: {
         paddingHorizontal: 12,
         paddingVertical: 8,
         gap: 4,
-        backgroundColor: w().current ? p().subtle : "transparent",
+        backgroundColor: w().current === true ? p().subtle : "transparent",
         opacity: isRemoving() ? 0.6 : 1,
         borderBottomWidth: 1,
         borderBottomColor: p().border,
         ...pressTransition(),
       }}
-      hoverStyle={{ backgroundColor: w().current ? p().subtle : p().tile }}
+      hoverStyle={{ backgroundColor: w().current === true ? p().subtle : p().tile }}
     >
-      {w().current ? (
+      {w().current === true ? (
         <View
           style={{
             position: "absolute",
@@ -254,7 +269,7 @@ function WorktreeRow(props: {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 20 }}>
           <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 5 }}>
             <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <SurfaceIcon name="git-branch" size={12} color={w().current ? p().ink : p().muted} />
+              <SurfaceIcon name="git-branch" size={12} color={w().current === true ? p().ink : p().muted} />
             </View>
             <Text
               style={{
@@ -276,7 +291,7 @@ function WorktreeRow(props: {
                   height: 16,
                   paddingHorizontal: 5,
                   borderRadius: radius.sm,
-                  backgroundColor: w().current ? p().surface : p().tile,
+                  backgroundColor: w().current === true ? p().surface : p().tile,
                   borderWidth: 1,
                   borderColor: p().border,
                   alignItems: "center",
@@ -284,14 +299,14 @@ function WorktreeRow(props: {
                   flexShrink: 0,
                 }}
               >
-                <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted }}>主目录</Text>
+                <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted }}>{t("web.shell.git.mainLabel")}</Text>
               </View>
             ) : null}
             {w().locked ? <SurfaceIcon name="lock" size={11} color={p().faint} /> : null}
           </View>
           <View style={{ flexShrink: 0, flexDirection: "row", alignItems: "center", gap: 5 }}>
             {isRemoving() ? (
-              <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().muted }}>正在删除…</Text>
+              <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().muted }}>{t("web.shell.git.removing")}</Text>
             ) : (
               <>
                 {(w().ahead ?? 0) > 0 ? (
@@ -319,7 +334,9 @@ function WorktreeRow(props: {
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().danger }}>{w().conflicts} 冲突</Text>
+                    <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().danger }}>
+                      {t("web.shell.git.wtConflictsCount", { n: w().conflicts ?? 0 })}
+                    </Text>
                   </View>
                 ) : (w().changed ?? 0) > 0 ? (
                   <View
@@ -334,7 +351,9 @@ function WorktreeRow(props: {
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().alert }}>{w().changed} 变更</Text>
+                    <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().alert }}>
+                      {t("web.shell.git.wtChangedCount", { n: w().changed ?? 0 })}
+                    </Text>
                   </View>
                 ) : (
                   <View
@@ -342,12 +361,12 @@ function WorktreeRow(props: {
                       height: 18,
                       paddingHorizontal: 6,
                       borderRadius: radius.sm,
-                      backgroundColor: w().current ? p().surface : p().tile,
+                      backgroundColor: w().current === true ? p().surface : p().tile,
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted }}>干净</Text>
+                    <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted }}>{t("web.shell.git.wtClean")}</Text>
                   </View>
                 )}
               </>
@@ -358,10 +377,10 @@ function WorktreeRow(props: {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 19 }}>
             <View
               style={{
-                width: props.running ? 6 : 5,
-                height: props.running ? 6 : 5,
+                width: props.running === true ? 6 : 5,
+                height: props.running === true ? 6 : 5,
                 borderRadius: 999,
-                backgroundColor: props.running ? p().ok : p().faint,
+                backgroundColor: props.running === true ? p().ok : p().faint,
                 flexShrink: 0,
               }}
             />
@@ -369,8 +388,8 @@ function WorktreeRow(props: {
               style={{
                 fontSize: 11,
                 lineHeight: 15,
-                fontWeight: props.running ? "500" : "400",
-                color: props.running ? p().ok : p().muted,
+                fontWeight: props.running === true ? "500" : "400",
+                color: props.running === true ? p().ok : p().muted,
                 numberOfLines: 1,
                 flex: 1,
                 minWidth: 0,
@@ -397,7 +416,9 @@ function WorktreeRow(props: {
       </Button>
       {confirming() && !isRemoving() ? (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 6, paddingTop: 4 }}>
-          <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted }}>{dirty() ? "包含未提交变更" : "确认删除该工作树？"}</Text>
+          <Text style={{ fontSize: 11, lineHeight: 14, color: p().muted }}>
+            {dirty() ? t("web.shell.git.wtDirtyPrompt") : t("web.shell.git.wtConfirmDeletePrompt")}
+          </Text>
           <Button
             onPress={() => props.onConfirmRemove(w(), dirty())}
             activeStyle={{ opacity: 0.82 }}
@@ -411,7 +432,9 @@ function WorktreeRow(props: {
               ...pressTransition(),
             }}
           >
-            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().onPrimary }}>{dirty() ? "强制删除" : "确认删除"}</Text>
+            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().onPrimary }}>
+              {dirty() ? t("web.shell.git.wtForceDelete") : t("web.shell.git.wtConfirmDelete")}
+            </Text>
           </Button>
           <Button
             onPress={() => props.setPendingRemove(null)}
@@ -429,30 +452,34 @@ function WorktreeRow(props: {
             }}
             hoverStyle={{ backgroundColor: p().subtle }}
           >
-            <Text style={{ fontSize: 11, lineHeight: 14, color: p().text }}>取消</Text>
+            <Text style={{ fontSize: 11, lineHeight: 14, color: p().text }}>{t("web.shell.git.cancel")}</Text>
           </Button>
         </View>
       ) : null}
-      {rowError() ? <Text style={{ fontSize: 11, lineHeight: 15, color: p().danger, paddingLeft: 19, paddingTop: 2 }}>删除失败：{rowError()}</Text> : null}
+      {rowError() ? (
+        <Text style={{ fontSize: 11, lineHeight: 15, color: p().danger, paddingLeft: 19, paddingTop: 2 }}>
+          {t("web.shell.git.removeFailed", { why: rowError() ?? "" })}
+        </Text>
+      ) : null}
     </View>
   );
   const itemStyle = contextMenuItemStyle;
   return (
     <ContextMenu trigger={trigger} popupStyle={contextMenuPopupStyle(p())}>
       <MenuItem onSelect={() => act({ type: "new_terminal_at", path: w().path })} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-        <Text style={{ fontSize: 12, color: p().ink }}>在此新建终端</Text>
+        <Text style={{ fontSize: 12, color: p().ink }}>{t("web.shell.sidebar.newTerminalHere")}</Text>
       </MenuItem>
       <MenuItem onSelect={() => void hostApi.reveal(w().path)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-        <Text style={{ fontSize: 12, color: p().ink }}>在 Finder 中显示</Text>
+        <Text style={{ fontSize: 12, color: p().ink }}>{t("web.shell.sidebar.revealInFinder")}</Text>
       </MenuItem>
       <MenuItem onSelect={() => void Clipboard.writeText(w().path)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-        <Text style={{ fontSize: 12, color: p().ink }}>复制路径</Text>
+        <Text style={{ fontSize: 12, color: p().ink }}>{t("web.shell.sidebar.copyPath")}</Text>
       </MenuItem>
       {!w().main ? (
         <>
           <MenuSeparator style={{ height: 1, marginVertical: 4, backgroundColor: p().border }} />
           <MenuItem onSelect={() => props.setPendingRemove(w().path)} style={itemStyle} hoverStyle={{ backgroundColor: p().subtle }}>
-            <Text style={{ fontSize: 12, color: p().danger }}>删除工作树…</Text>
+            <Text style={{ fontSize: 12, color: p().danger }}>{t("web.shell.git.wtRemoveMenu")}</Text>
           </MenuItem>
         </>
       ) : null}
@@ -488,7 +515,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     if (!session) return { badge: null, running: false };
     const issue = session.issue ? (vvState()?.state?.issues ?? []).find((i) => i.id === session.issue) : undefined;
     const running = session.phase._tag === "working";
-    const parts = [issue ? `#${issue.number} ${issue.title}` : session.name, running ? "干活中" : ""].filter(Boolean);
+    const parts = [issue ? `#${issue.number} ${issue.title}` : session.name, running ? t("web.shell.git.wtRunning") : ""].filter(Boolean);
     return { badge: parts.join(" · "), running };
   };
   const submitNewWorktree = () => {
@@ -500,7 +527,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     addingWt.set(false);
   };
   effect(() => {
-    if (creatingWt() && !f()?.busy) {
+    if (creatingWt() && f()?.busy !== true) {
       creatingWt.set(false);
     }
   });
@@ -519,13 +546,14 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     if (!stillPresent) {
       removing.set(null);
       removeError.set(null);
-      removeNotice.set(`已删除工作树 ${cur.label}`);
+      const notice = t("web.shell.git.removedWorktree", { label: cur.label });
+      removeNotice.set(notice);
       const timer = setTimeout(() => {
-        if (removeNotice() === `已删除工作树 ${cur.label}`) removeNotice.set(null);
+        if (removeNotice() === notice) removeNotice.set(null);
       }, 3000);
       return () => clearTimeout(timer);
     }
-    if (!frameVal.busy && frameVal.error) {
+    if (frameVal.busy !== true && frameVal.error) {
       removing.set(null);
       removeError.set({ path: cur.path, text: frameVal.error });
     }
@@ -544,13 +572,14 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
   effect(() => {
     const frameVal = f();
     if (!frameVal) return;
-    if (committing() && !frameVal.busy) {
+    if (committing() && frameVal.busy !== true) {
       committing.set(false);
       if (!frameVal.error && (frameVal.staged?.length ?? 0) === 0) {
         message.set("");
-        commitNotice.set("提交成功");
+        const notice = t("web.shell.git.commitSuccess");
+        commitNotice.set(notice);
         const timer = setTimeout(() => {
-          if (commitNotice() === "提交成功") commitNotice.set(null);
+          if (commitNotice() === notice) commitNotice.set(null);
         }, 2500);
         return () => clearTimeout(timer);
       }
@@ -560,7 +589,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     const target = switchingBranch();
     const frameVal = f();
     if (!target || !frameVal) return;
-    if (frameVal.branch === target || (!frameVal.busy && frameVal.error)) {
+    if (frameVal.branch === target || (frameVal.busy !== true && frameVal.error)) {
       switchingBranch.set(null);
     }
   });
@@ -589,7 +618,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               addingWt.set(next);
               if (next) ensureOpen(sectionKey);
             }}
-            accessibilityLabel="新建工作树"
+            accessibilityLabel={t("web.shell.git.newWorktree")}
             activeStyle={{ opacity: 0.82 }}
             focusVisibleStyle={focusRing(p())}
             style={{
@@ -605,7 +634,9 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
             hoverStyle={{ backgroundColor: p().subtle }}
           >
             <SurfaceIcon name="plus" size={10} color={p().text} />
-            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().text }}>{creatingWt() ? "创建中…" : "新建"}</Text>
+            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().text }}>
+              {creatingWt() ? t("web.shell.git.creatingWorktree") : t("web.shell.git.createWorktreeBtn")}
+            </Text>
           </Button>
         }
       />
@@ -628,7 +659,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 value={newBranch()}
                 onChange={({ value }) => newBranch.set(value)}
                 onSubmit={submitNewWorktree}
-                placeholder="新分支名，如 feat/login"
+                placeholder={t("web.shell.git.newBranchPlaceholder")}
                 style={{
                   flex: 1,
                   height: 26,
@@ -658,7 +689,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 }}
               >
                 <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: !newBranch().trim() || creatingWt() ? p().muted : p().onPrimary }}>
-                  创建
+                  {t("web.shell.git.createBtn")}
                 </Text>
               </Button>
             </View>
@@ -700,10 +731,10 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
 
   return (
     <View style={{ flex: 1 }}>
-      {!f()?.repo ? (
+      {f()?.repo !== true ? (
         <View style={{ flex: 1 }}>
-          <SectionHead title="版本控制" borderBottom />
-          <Empty text={f()?.busy || !f() ? "正在读取 Git 状态…" : (f()?.error ?? "当前目录不是 Git 仓库。")} />
+          <SectionHead title={t("web.shell.git.title")} borderBottom />
+          <Empty text={f()?.busy === true || !f() ? t("web.shell.git.loading") : (f()?.error ?? t("web.shell.git.notRepo"))} />
         </View>
       ) : (
         <View style={{ flex: 1 }}>
@@ -740,7 +771,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 <Text style={{ fontFamily: ty.mono.fontFamily, fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().alert }}>{f()?.behind}</Text>
               </View>
             ) : null}
-            <IconButton label="刷新 Git" icon="refresh" onPress={() => act({ type: "refresh_git" })} />
+            <IconButton label={t("web.shell.git.refresh")} icon="refresh" onPress={() => act({ type: "refresh_git" })} />
           </View>
 
           {/* Sub-navigation when not driven by parent header */}
@@ -757,9 +788,12 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
             >
               {(
                 [
-                  { id: "changes", label: changedCount() > 0 ? `变更 (${changedCount()})` : "变更" },
-                  { id: "branches", label: `分支 (${f()?.branches?.length ?? 0})` },
-                  { id: "commits", label: "历史" },
+                  {
+                    id: "changes",
+                    label: changedCount() > 0 ? t("web.shell.git.tab.changesCount", { count: changedCount() }) : t("web.shell.git.tab.changes"),
+                  },
+                  { id: "branches", label: t("web.shell.git.tab.branches", { count: f()?.branches?.length ?? 0 }) },
+                  { id: "commits", label: t("web.shell.git.tab.commits") },
                 ] as const
               ).map((item) => {
                 const cur = () => activeTab() === item.id;
@@ -803,12 +837,12 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     <Text style={{ fontSize: 11, lineHeight: 15, color: p().ok }}>{removeNotice()}</Text>
                   </View>
                 ) : null}
-                {(f()?.worktrees?.length ?? 0) > 1 ? renderWorktreesSection("changes-worktrees", "工作树", false, false) : null}
+                {(f()?.worktrees?.length ?? 0) > 1 ? renderWorktreesSection("changes-worktrees", t("web.shell.git.worktrees"), false, false) : null}
                 <View style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8, borderBottomWidth: 1, borderBottomColor: p().border }}>
                   <Input
                     value={message()}
                     onChange={({ value }) => message.set(value)}
-                    placeholder="输入提交信息…"
+                    placeholder={t("web.shell.git.commitPlaceholder")}
                     multiline
                     style={{
                       minHeight: 54,
@@ -824,11 +858,17 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     }}
                   />
                   <PrimaryButton
-                    label={committing() ? "正在提交…" : f()?.staged?.length ? `提交暂存变更 (${f()?.staged?.length})` : "暂无暂存文件"}
-                    disabled={committing() || !f()?.staged?.length || !message().trim()}
+                    label={
+                      committing()
+                        ? t("web.shell.git.committing")
+                        : (f()?.staged?.length ?? 0) > 0
+                          ? t("web.shell.git.commitStaged", { count: f()?.staged?.length ?? 0 })
+                          : t("web.shell.git.noStaged")
+                    }
+                    disabled={committing() || (f()?.staged?.length ?? 0) === 0 || !message().trim()}
                     onPress={commit}
                   />
-                  {!f()?.staged?.length && (f()?.changes?.length ?? 0) > 0 ? (
+                  {(f()?.staged?.length ?? 0) === 0 && (f()?.changes?.length ?? 0) > 0 ? (
                     <Button
                       onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
                       activeStyle={{ opacity: 0.82 }}
@@ -850,7 +890,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     >
                       <SurfaceIcon name="plus" size={11} color={p().text} />
                       <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: "500", color: p().text }}>
-                        {`一键暂存全部变更 (${(f()?.changes?.length ?? 0).toLocaleString()})`}
+                        {t("web.shell.git.stageAllCount", { count: (f()?.changes?.length ?? 0).toLocaleString() })}
                       </Text>
                     </Button>
                   ) : null}
@@ -871,10 +911,10 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   ) : null}
                 </View>
 
-                {f()?.conflicts?.length ? (
+                {(f()?.conflicts?.length ?? 0) > 0 ? (
                   <View style={{ paddingBottom: 4 }}>
                     <SectionHead
-                      title="冲突"
+                      title={t("web.shell.git.conflicts")}
                       count={f()?.conflicts?.length}
                       tone="danger"
                       collapsible
@@ -893,54 +933,62 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
 
                 <View style={{ paddingBottom: 4 }}>
                   <SectionHead
-                    title="已暂存"
+                    title={t("web.shell.git.staged")}
                     count={f()?.staged?.length ?? 0}
                     collapsible
                     expanded={isOpen("staged")}
                     onToggle={() => toggleSection("staged")}
-                    borderTop={Boolean(f()?.conflicts?.length)}
+                    borderTop={(f()?.conflicts?.length ?? 0) > 0}
                     right={
-                      f()?.staged?.length ? (
-                        <IconButton label="全部取消暂存" icon="minus" onPress={() => act({ type: "unstage", paths: (f()?.staged ?? []).map((r) => r.path) })} />
+                      (f()?.staged?.length ?? 0) > 0 ? (
+                        <IconButton
+                          label={t("web.shell.git.unstageAll")}
+                          icon="minus"
+                          onPress={() => act({ type: "unstage", paths: (f()?.staged ?? []).map((r) => r.path) })}
+                        />
                       ) : undefined
                     }
                   />
                   {isOpen("staged") ? (
-                    f()?.staged?.length ? (
+                    (f()?.staged?.length ?? 0) > 0 ? (
                       <View style={{ gap: 1 }}>
                         <Each of={f()?.staged ?? []} key={(r) => r.path}>
                           {(row) => <FileRow row={row()} staged />}
                         </Each>
                       </View>
                     ) : (
-                      <Empty text="暂无已暂存的文件。" compact />
+                      <Empty text={t("web.shell.git.stagedEmpty")} compact />
                     )
                   ) : null}
                 </View>
 
                 <View style={{ paddingBottom: 4 }}>
                   <SectionHead
-                    title="未暂存"
+                    title={t("web.shell.git.changes")}
                     count={f()?.changes?.length ?? 0}
                     collapsible
                     expanded={isOpen("changes")}
                     onToggle={() => toggleSection("changes")}
                     borderTop
                     right={
-                      f()?.changes?.length ? (
-                        <IconButton label="全部暂存" icon="plus" onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })} />
+                      (f()?.changes?.length ?? 0) > 0 ? (
+                        <IconButton
+                          label={t("web.shell.git.stageAll")}
+                          icon="plus"
+                          onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
+                        />
                       ) : undefined
                     }
                   />
                   {isOpen("changes") ? (
-                    f()?.changes?.length ? (
+                    (f()?.changes?.length ?? 0) > 0 ? (
                       <View style={{ gap: 1 }}>
                         <Each of={f()?.changes ?? []} key={(r) => r.path}>
                           {(row) => <FileRow row={row()} staged={false} />}
                         </Each>
                       </View>
                     ) : (
-                      <Empty text="工作区干净，没有未提交改动。" compact />
+                      <Empty text={t("web.shell.git.clean")} compact />
                     )
                   ) : null}
                 </View>
@@ -952,7 +1000,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               <View>
                 <View style={{ paddingBottom: 4 }}>
                   <SectionHead
-                    title="本地分支"
+                    title={t("web.shell.git.branches")}
                     count={f()?.branches?.length ?? 0}
                     collapsible
                     expanded={isOpen("branches")}
@@ -965,7 +1013,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                           <Input
                             value={branchQuery()}
                             onChange={({ value }) => branchQuery.set(value)}
-                            placeholder="过滤分支名…"
+                            placeholder={t("web.shell.git.filterBranches")}
                             style={{
                               height: 26,
                               borderRadius: radius.md,
@@ -979,8 +1027,8 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                           />
                         </View>
                       ) : null}
-                      {f()?.branches?.length ? (
-                        filteredBranches().length ? (
+                      {(f()?.branches?.length ?? 0) > 0 ? (
+                        filteredBranches().length > 0 ? (
                           <View style={{ gap: 1 }}>
                             <Each of={filteredBranches()} key={(b) => b.name}>
                               {(b) => (
@@ -992,7 +1040,9 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                                       act({ type: "checkout", branch: b().name });
                                     }
                                   }}
-                                  accessibilityLabel={b().head ? `${b().name}, 当前分支` : `切换到 ${b().name}`}
+                                  accessibilityLabel={
+                                    b().head ? t("web.shell.git.currentBranch", { name: b().name }) : t("web.shell.git.switchBranch", { name: b().name })
+                                  }
                                   activeStyle={switchingBranch() !== null ? undefined : { opacity: 0.82 }}
                                   focusVisibleStyle={switchingBranch() !== null ? undefined : focusRing(p())}
                                   style={{
@@ -1041,7 +1091,9 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                                     {b().name}
                                   </Text>
                                   {switchingBranch() === b().name ? (
-                                    <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().alert, flexShrink: 0 }}>切换中…</Text>
+                                    <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: "500", color: p().alert, flexShrink: 0 }}>
+                                      {t("web.shell.git.switching")}
+                                    </Text>
                                   ) : b().upstream ? (
                                     <Text
                                       style={{
@@ -1063,16 +1115,16 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                             </Each>
                           </View>
                         ) : (
-                          <Empty text="没有匹配的本地分支。" compact />
+                          <Empty text={t("web.shell.git.noMatchingBranches")} compact />
                         )
                       ) : (
-                        <Empty text="未找到本地分支。" compact />
+                        <Empty text={t("web.shell.git.noBranches")} compact />
                       )}
                     </View>
                   ) : null}
                 </View>
 
-                {(f()?.worktrees?.length ?? 0) > 0 ? renderWorktreesSection("branches-worktrees", "工作树", true, true) : null}
+                {(f()?.worktrees?.length ?? 0) > 0 ? renderWorktreesSection("branches-worktrees", t("web.shell.git.worktrees"), true, true) : null}
               </View>
             ) : null}
 
@@ -1080,7 +1132,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
             {activeTab() === "commits" ? (
               <View>
                 <SectionHead
-                  title="提交记录"
+                  title={t("web.shell.git.commits")}
                   count={f()?.log?.length ?? 0}
                   collapsible
                   expanded={isOpen("commits")}
@@ -1088,7 +1140,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   borderBottom={isOpen("commits") && (f()?.log?.length ?? 0) > 0}
                 />
                 {isOpen("commits") ? (
-                  f()?.log?.length ? (
+                  (f()?.log?.length ?? 0) > 0 ? (
                     <Each of={f()?.log ?? []} key={(c) => c.id}>
                       {(c) => (
                         <Button
@@ -1159,7 +1211,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                       )}
                     </Each>
                   ) : (
-                    <Empty text="暂无提交记录。" compact />
+                    <Empty text={t("web.shell.git.noCommits")} compact />
                   )
                 ) : null}
               </View>

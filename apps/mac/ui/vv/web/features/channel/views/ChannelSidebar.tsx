@@ -339,7 +339,7 @@ function ChannelRow(props: { channel: Channel; here: boolean; unread: number; on
         <ActiveBar />
       </If>
       <If when={props.reorder.over() === props.channel.id}>
-        <View testID="channel-drop-before" class="absolute inset-x-0 top-0 h-0.5 rounded-full bg-accent" style={{ pointerEvents: "none" }} />
+        <View testID="channel-drop-before" class="pointer-events-none absolute inset-x-0 top-0 h-0.5 rounded-full bg-accent" />
       </If>
       <Text class={`w-3.5 shrink-0 text-center font-mono text-sm ${props.here ? "text-muted" : "text-faint"}`}>{markOf(props.channel)}</Text>
       <Text
@@ -395,9 +395,7 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
       <View class="min-w-0 shrink flex-row items-center gap-1.5 pr-1.5">
         <View class="min-w-0 max-w-24 flex-row items-center gap-1 overflow-hidden">
           <PhaseGlyph phase={props.h.phase} size={12} />
-          <Text class="min-w-0 shrink truncate text-2xs text-muted" style={{ numberOfLines: 1 }}>
-            {phase()}
-          </Text>
+          <Text class="min-w-0 shrink truncate text-2xs text-muted">{phase()}</Text>
         </View>
         <If when={unread() > 0}>
           <Count n={unread()} />

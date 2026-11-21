@@ -356,6 +356,28 @@ mod tests {
     }
 
     #[test]
+    fn regression_web_base_and_pkm_rich_ui_keys_are_embedded_in_both_languages() {
+        for key in [
+            "web.base.rich.copy",
+            "web.base.rich.copied",
+            "web.base.rich.more",
+            "web.base.rich.less",
+            "web.base.rich.diagram",
+            "web.pkm.page.missingRef",
+        ] {
+            for lang in ["zh", "en"] {
+                let translated = t_in(lang, key, &[]);
+                assert!(!translated.starts_with("web."), "{lang} key {key} fell back to literal {translated:?}");
+            }
+        }
+        assert_eq!(t_in("zh", "web.base.rich.copy", &[]), "复制");
+        assert_eq!(t_in("en", "web.base.rich.copy", &[]), "Copy");
+        assert!(!t_in("zh", "web.base.rich.lines", &[("n", 12i64.into())]).starts_with("web."));
+        assert!(!t_in("en", "web.base.rich.diagramFailed", &[("why", "parse".into())]).starts_with("web."));
+        assert!(!t_in("zh", "web.pkm.page.refFrom", &[("page", "Home".into())]).starts_with("web."));
+    }
+
+    #[test]
     fn plural_select_and_exact_cases() {
         let text = "{n, plural, =0 {none} one {# item} other {# items}} {who, select, me {by me} other {by {who}}}";
         assert_eq!(format(text, &[("n", 0i64.into()), ("who", "me".into())]), "none by me");

@@ -5,10 +5,6 @@
     "home": "Back to the app"
   },
   "place": {
-    "workspace": {
-      "label": "Workspace",
-      "hint": "Workspaces and terminals"
-    },
     "chat": {
       "label": "Chat",
       "hint": "Channels and threads"
@@ -40,6 +36,10 @@
     "settings": {
       "label": "Settings",
       "hint": "General, appearance, models, memory, skills, voice, connections"
+    },
+    "workspace": {
+      "label": "Working folder & terminals",
+      "name": "Terminals"
     }
   },
   "link": {
@@ -243,5 +243,6 @@
     "timedOut": "No answer in time; try again",
     "offline": "Not connected to the farm, so this was not sent"
   },
-  "pickTooLarge": "{name} was not added: it is over 512 MiB"
+  "pickTooLarge": "{name} was not added: it is over 512 MiB",
+  "openTerminal": "Open a terminal here"
 }

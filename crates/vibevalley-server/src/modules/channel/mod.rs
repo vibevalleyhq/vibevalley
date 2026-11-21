@@ -102,8 +102,6 @@ fn optional(s: Option<&str>) -> Option<String> {
     (!text.is_empty()).then(|| text.to_string())
 }
 
-// ----- what a message carries besides its words (meta.ts) -----
-
 /// The profile and repo the user picked for what they said.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -268,8 +266,6 @@ pub fn to_message(row: &MsgRow) -> ChatMessage {
         view_context: meta.view_context.filter(|_| !gone),
     }
 }
-
-// ----- the chat as the layers above use it (contracts.ts) -----
 
 /// A file a message carries, as an agent reads it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -597,8 +593,6 @@ fn tx<T>(inner: &mut Inner, work: impl FnOnce(&mut Inner) -> Result<T, ApiError>
 }
 
 impl Inner {
-    // ----- store.ts -----
-
     fn add_member(&mut self, channel: &str, participant: &str, reason: &str, from: i64) -> Result<(), ApiError> {
         db::add_member(&self.db, channel, participant, reason, from).q()?;
         self.model.member_added(channel, participant);
@@ -669,8 +663,6 @@ impl Inner {
         }
         Ok(id)
     }
-
-    // ----- hub.ts -----
 
     fn is_orchestrator_seat(&self, id: &str) -> bool {
         self.model
@@ -969,8 +961,6 @@ impl Inner {
             .q()?
             .ok_or_else(|| missing(t("server.channel.noMessageId", &[("id", id.into())]), LookIn::Channel))
     }
-
-    // ----- writing.ts -----
 
     /// `settle`: who a message names, and who follows the thread from it.
     fn settle(&mut self, inserted: MsgRow) -> Result<(MsgRow, Vec<String>), ApiError> {
@@ -1411,8 +1401,6 @@ impl Chat {
             let _ = chat.change(&mut inner, &current, |db, revision, _| db::set_meta(db, &current.id, text.as_deref(), revision));
         });
     }
-
-    // ----- the user's words and the agents' (channel.ts) -----
 
     /// `say`: the user's words in a place; the farm goes live.
     pub fn say(&self, s: Saying) -> Result<(ChatMessage, bool), ApiError> {
@@ -2253,8 +2241,6 @@ impl Chat {
         self.hub.upgrade().and_then(|h| h.read(|s| s.chat.clone()))
     }
 
-    // ----- directory.ts -----
-
     /// A refusal of removals: what still points at a channel.
     pub fn guard_removal(&self, guard: impl Fn(&str) -> Vec<String> + Send + Sync + 'static) {
         self.guards.write().unwrap_or_else(|e| e.into_inner()).push(Arc::new(guard));
@@ -2607,8 +2593,6 @@ impl Chat {
         self.publish_channel(&inner, &was)?;
         self.publish_channel(&inner, id)
     }
-
-    // ----- mutations.ts' streams -----
 
     fn said(&self) -> flume::Receiver<ChatMessage> {
         let (tx, rx) = flume::unbounded();

@@ -39,7 +39,7 @@ export function GroundBox(props: { ground: Ground; class?: string; style?: ViewS
     <View class={`overflow-hidden ${groundClass[props.ground]} ${props.class ?? ""}`} style={props.style}>
       <If when={props.ground === "check" && props.checked === true}>
         <Canvas
-          style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}
+          class="absolute inset-0"
           draw={(ctx) => {
             colorScheme();
             ctx.fillStyle = tone("catalog-check");
@@ -124,8 +124,8 @@ function Mark(props: { at: { x: number; y: number }; scale: number; head?: boole
       when={props.head === true}
       else={
         <View style={{ position: "absolute", left: props.at.x * props.scale - 6, top: props.at.y * props.scale - 6, width: 12, height: 12 }}>
-          <View class="bg-berry-500" style={{ position: "absolute", left: 0, top: 5, width: 12, height: 2 }} />
-          <View class="bg-berry-500" style={{ position: "absolute", left: 5, top: 0, width: 2, height: 12 }} />
+          <View class="absolute top-[5px] left-0 h-0.5 w-3 bg-berry-500" />
+          <View class="absolute top-0 left-[5px] h-3 w-0.5 bg-berry-500" />
         </View>
       }
     >
@@ -146,11 +146,11 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
   const frame = signal(0);
   const frames = createMemo(() => framesOf(props.picture.name, props.has));
   createEffect(
-    () => [frames()?.join(), playing(), fps()] as const,
+    () => [frames()?.join(), playing(), fps(), frame()] as const,
     ([names, on, perSecond]) => {
       if (!names || !on || perSecond <= 0) return;
-      const timer = setInterval(() => frame.set(frame() + 1), 1000 / perSecond);
-      return () => clearInterval(timer);
+      const timer = setTimeout(() => frame.set(frame() + 1), 1000 / perSecond);
+      return () => clearTimeout(timer);
     },
   );
   const shown = () => {

@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Tabs.tsx: the same two looks; a
-// tab with an href goes there (the selection then follows the address).
 import { Text, View } from "nsh";
 
 import { useRouter } from "../infra/router";

@@ -217,9 +217,7 @@ export function IssueBoard(props: BoardProps) {
               pointerEvents: "none",
             }}
           >
-            <Text class="text-sm font-medium text-ink" style={{ numberOfLines: 2 }}>
-              {g().title}
-            </Text>
+            <Text class="line-clamp-2 text-sm font-medium text-ink">{g().title}</Text>
           </View>
         )}
       </If>
@@ -399,25 +397,11 @@ function CardView(props: {
             <If when={look().number && repo()}>
               <Text class="shrink-0 text-2xs text-faint">·</Text>
             </If>
-            <If when={repo()}>
-              {(r) => (
-                <Text class="min-w-0 flex-1 truncate text-2xs text-muted" style={{ numberOfLines: 1 }}>
-                  {r()}
-                </Text>
-              )}
-            </If>
+            <If when={repo()}>{(r) => <Text class="min-w-0 flex-1 truncate text-2xs text-muted">{r()}</Text>}</If>
           </View>
         </If>
-        <Text class={`${hasMeta() ? "mt-1" : ""} text-sm leading-snug font-medium text-ink`} style={{ numberOfLines: 2 }}>
-          {look().title}
-        </Text>
-        <If when={look().wait}>
-          {(wait) => (
-            <Text class="mt-1 text-xs leading-snug text-water" style={{ numberOfLines: 2 }}>
-              {wait()}
-            </Text>
-          )}
-        </If>
+        <Text class={`${hasMeta() ? "mt-1 " : ""}line-clamp-2 text-sm leading-snug font-medium text-ink`}>{look().title}</Text>
+        <If when={look().wait}>{(wait) => <Text class="mt-1 line-clamp-2 text-xs leading-snug text-water">{wait()}</Text>}</If>
         {/* Only what differs from the lane's default: its own status, a high priority, who works it, how far, its flags. */}
         <If when={marks()}>
           <View testID="card-marks" class="mt-2 flex-row flex-wrap items-center gap-1.5">
@@ -436,9 +420,7 @@ function CardView(props: {
       <If when={props.card.move?.state === "failed" ? props.card.move : undefined}>
         {(m) => (
           <View testID="move-failed" class="mt-1 flex-row items-center gap-1 px-1">
-            <Text class="min-w-0 flex-1 text-xs text-berry" style={{ numberOfLines: 1 }}>
-              {m().reason ?? t("web.issue.board.moveFailed")}
-            </Text>
+            <Text class="min-w-0 flex-1 truncate text-xs text-berry">{m().reason ?? t("web.issue.board.moveFailed")}</Text>
             <SmallIconButton testID="move-retry" label={t("web.issue.board.retryMove")} icon="retry" onPress={() => props.onRetry(props.card)} />
             <SmallIconButton testID="move-put-back" label={t("web.issue.board.putBack")} icon="undo" onPress={() => props.onPutBack(props.card)} />
           </View>

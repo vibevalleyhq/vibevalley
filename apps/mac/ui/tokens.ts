@@ -102,7 +102,7 @@ export function tint(color: string, alpha: number): string {
     const n = parseInt(color.slice(1), 16);
     return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
   }
-  return color.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/u, `rgba(\$1,\$2,\$3,${alpha})`);
+  return color.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/u, `rgba($1,$2,$3,${alpha})`);
 }
 
 /** `danger` at 6 % fill with a 16 % ring, for error boxes. */

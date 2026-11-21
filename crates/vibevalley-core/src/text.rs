@@ -1,8 +1,5 @@
-//! Reading what an agent said. Ported from VibeValley
-//! `apps/server/src/base/questions.ts` (`questionsFromText`),
-//! `base/json.ts` (`lastJsonBlock`) and `modules/session/report.ts`
-//! (`summaryOf`). VibeValley's agents are told to write in English, so the
-//! question marker is `Ask the user:`; VibeValley's `要问用户：` is read too.
+//! Reading what an agent said. Agents are told to write in English, so the
+//! question marker is `Ask the user:`; `要问用户：` is read too.
 
 use serde::de::DeserializeOwned;
 

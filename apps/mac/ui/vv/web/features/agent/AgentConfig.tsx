@@ -1,5 +1,3 @@
-// Ported from VibeValley apps/web/src/features/agent/AgentConfig.tsx: the
-// same tabs, fields and runtime rules.
 import { Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";

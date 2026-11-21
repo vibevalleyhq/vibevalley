@@ -8,7 +8,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use gpui_kit::{
+use gpui::{
     App, Bounds, Element, ElementId, Entity, FocusHandle, Font, FontFallbacks, FontStyle, FontWeight, GlobalElementId, Hsla, InputHandler, InspectorElementId,
     LayoutId, Pixels, Point, ShapedLine, SharedString, StrikethroughStyle, Style, TextAlign, TextRun, UTF16Selection, UnderlineStyle, Window, fill, font,
     outline, point, px, relative, size,
@@ -99,7 +99,7 @@ struct Fonts {
 /// few that every Mac or most developers have. A family that is not there
 /// resolves to a proportional font, whose `m` is not the width of the cells
 /// the glyphs are drawn in.
-fn installed_mono(family: SharedString, text_system: &gpui_kit::gpui::WindowTextSystem) -> SharedString {
+fn installed_mono(family: SharedString, text_system: &gpui::WindowTextSystem) -> SharedString {
     static INSTALLED: std::sync::OnceLock<std::collections::HashSet<String>> = std::sync::OnceLock::new();
     let installed = INSTALLED.get_or_init(|| text_system.all_font_names().into_iter().collect());
     if installed.contains(family.as_ref()) {
@@ -492,7 +492,7 @@ impl Element for TerminalElement {
             cx,
         );
 
-        window.with_content_mask(Some(gpui_kit::ContentMask { bounds }), |window| {
+        window.with_content_mask(Some(gpui::ContentMask { bounds }), |window| {
             for (i, row) in state.rows.iter().enumerate() {
                 for (col, cols, color) in &row.backgrounds {
                     let origin = g.cell_origin(i as u16, *col);
@@ -561,7 +561,7 @@ impl Element for TerminalElement {
                     .map_or(1, |(_, cols)| cols);
                 let cell = Bounds::new(cursor_origin, size(g.cell_width * wide as f32, g.line_height));
                 if !focused {
-                    window.paint_quad(outline(cell, color, gpui_kit::BorderStyle::Solid));
+                    window.paint_quad(outline(cell, color, gpui::BorderStyle::Solid));
                 } else if state.blink_on || !cursor.blinking {
                     match cursor.shape {
                         CursorShape::Block => {

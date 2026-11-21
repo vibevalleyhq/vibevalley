@@ -41,7 +41,7 @@ export function StatusBadge(props: StatusBadgeProps) {
   // affectUI's live dot breathes over 1.8 s; under reduced motion it stands still.
   const dot = createMotion();
   effect(() => {
-    if (!props.live || reduceMotion()) return dot.reset();
+    if (props.live !== true || reduceMotion()) return dot.reset();
     void dot.play({ duration: 1800, iterations: "infinite", keyframes: { opacity: [1, 0.32, 1], scale: [1, 0.86, 1] } });
   });
   return (
@@ -73,7 +73,7 @@ export function StatusBadge(props: StatusBadgeProps) {
           borderRadius: 3,
           backgroundColor: c().dot,
           flexShrink: 0,
-          ...(props.live ? dot.style : {}),
+          ...(props.live === true ? dot.style : {}),
         }}
       />
       <Text

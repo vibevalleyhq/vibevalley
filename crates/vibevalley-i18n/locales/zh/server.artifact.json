@@ -44,7 +44,6 @@
     "noBlock": "没有块 {id}",
     "noId": "新块没有 id",
     "taken": "块 {id} 已经有了",
-    "unknownType": "不认识的块类型 {type}",
     "badKey": "不是有效的顺序键：{key}",
     "missing": "没有这一块",
     "noText": "这一块没有字",

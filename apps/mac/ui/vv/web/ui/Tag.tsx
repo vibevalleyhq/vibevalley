@@ -1,4 +1,3 @@
-// Ported from VibeValley apps/web/src/ui/Tag.tsx.
 import { Text, View } from "nsh";
 
 import { Icon } from "./Icon";

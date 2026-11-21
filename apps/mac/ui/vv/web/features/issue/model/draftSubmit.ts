@@ -67,6 +67,7 @@ export function draftSubmitTransition(state: DraftSubmitState, event: DraftSubmi
         case "rejected":
           return state;
       }
+      break;
 
     case "submitting":
       switch (event.kind) {
@@ -86,6 +87,7 @@ export function draftSubmitTransition(state: DraftSubmitState, event: DraftSubmi
         case "submit":
           return state;
       }
+      break;
 
     case "rejected":
       switch (event.kind) {
@@ -107,6 +109,7 @@ export function draftSubmitTransition(state: DraftSubmitState, event: DraftSubmi
         case "rejected":
           return state;
       }
+      break;
 
     case "retainedDirty":
       switch (event.kind) {
@@ -125,6 +128,7 @@ export function draftSubmitTransition(state: DraftSubmitState, event: DraftSubmi
         case "rejected":
           return state;
       }
+      break;
 
     case "committed":
       switch (event.kind) {

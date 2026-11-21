@@ -42,7 +42,7 @@
     "fontFamily": {
       "sans": "PingFang SC",
       "mono": "Menlo",
-      "pixel": "FusionPixel"
+      "pixel": "Fusion Pixel 12px Prop zh-Hans"
     },
     "shadow": {
       "float": "0 8px 24px #0000002e",

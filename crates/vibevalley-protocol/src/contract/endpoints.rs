@@ -2,8 +2,6 @@ use crate::wire::{Caller, Endpoint};
 
 mod t {
     pub use crate::contract::*;
-    #[allow(unused_imports)]
-    pub use crate::wire::*;
 }
 
 /// Every endpoint, in VibeValley's order (`packages/protocol/src/api.ts`).
@@ -1724,8 +1722,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
 pub mod ops {
     use super::t;
     use crate::wire::Op;
-    #[allow(unused_imports)]
-    use std::collections::BTreeMap;
+
     pub struct AgentList;
     impl Op for AgentList {
         const NAME: &'static str = "agent.list";

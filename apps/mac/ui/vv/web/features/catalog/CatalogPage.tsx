@@ -1,9 +1,3 @@
-// Ported from VibeValley apps/web/src/features/catalog/CatalogPage.tsx: the
-// sprites by shelf with search and grounds, one picture's detail, and the
-// cursors and the sounds. The pictures and cursors are the app's art
-// (ui/pixel/atlas.ts), the manifests ship with the views; the sounds are
-// rendered offline (ui/pixel/synth.ts). Below xl the detail sits over the
-// grid, as VibeValley's column does before it moves to the right.
 import { Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
@@ -29,7 +23,7 @@ const usePictures = () => {
   const query = useSprites();
   return () => {
     const manifest = ready(query, undefined);
-    return manifest ? picturesOf(manifest as Record<string, Record<string, unknown>>) : undefined;
+    return manifest ? picturesOf(manifest) : undefined;
   };
 };
 
@@ -196,7 +190,7 @@ function Tile(props: { p: Picture; selected: boolean; has: (n: string) => boolea
       <GroundBox ground={props.ground} class="h-20 w-20 items-center justify-center rounded-md border border-line">
         <Img p={props.p} scale={fitScale(props.p, 72)} />
         <If when={framesOf(props.p.name, props.has)}>
-          <View class="rounded-xs bg-catalog-shade px-1 py-px" style={{ position: "absolute", top: 3, right: 3 }}>
+          <View class="absolute top-[3px] right-[3px] rounded-xs bg-catalog-shade px-1 py-px">
             <Text class="text-2xs font-medium text-paper">{t("web.catalog.moves")}</Text>
           </View>
         </If>
@@ -257,7 +251,13 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
             </Column>
           }
           right={
-            <Each of={selected() ? [selected() as Picture] : []} key={(p) => p.name}>
+            <Each
+              of={(() => {
+                const s = selected();
+                return s ? [s] : [];
+              })()}
+              key={(p) => p.name}
+            >
               {(s) => <Detail picture={s()} has={has} byName={byName()} ground={ground()} />}
             </Each>
           }

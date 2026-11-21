@@ -78,6 +78,7 @@
 ## 还没做的
 
 - 按档案 `toolsets` 分配工具、助手也能加载技能：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
+- 原生界面手工触发压缩、普通对话入口创建 CodeMode 脚本任务与真模型阈值验收：[持久执行与驱动验收](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
 
 ## 怎么验证
 

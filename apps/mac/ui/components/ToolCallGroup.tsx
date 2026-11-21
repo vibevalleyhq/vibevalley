@@ -52,7 +52,7 @@ export function ToolCallGroup(props: ToolCallGroupProps) {
     untracked(() => {
       if (now === was) return;
       was = now;
-      announce(now ? "Using tools…" : `${groupLabel(props.calls)}${failed() ? `, ${failed()} failed` : ""}`);
+      announce(now ? "Using tools…" : `${groupLabel(props.calls)}${failed() > 0 ? `, ${failed()} failed` : ""}`);
     });
   });
 
@@ -94,7 +94,7 @@ export function ToolCallGroup(props: ToolCallGroupProps) {
           onMouseEnter={() => hovered.set(true)}
           onMouseLeave={() => hovered.set(false)}
           role="button"
-          accessibilityLabel={`${title()}${failed() ? `, ${failed()} failed` : ""}`}
+          accessibilityLabel={`${title()}${failed() > 0 ? `, ${failed()} failed` : ""}`}
           accessibilityState={{ expanded: open() }}
           style={{
             minHeight: 42,

@@ -1,16 +1,3 @@
-// Ported from VibeValley apps/web/src/features/channel/views/MessageParts.tsx.
-// What differs: an attachment is a tile (its icon, name and size) for every
-// kind, and pictures do not open in a Lightbox: there is no HTTP inside the
-// app to read the bytes from (docs/vibevalley-port.md), and they come with
-// attachments over the bridge; a link preview's picture likewise.
-// (Now: attachment.file says where a file is: a picture shows itself and
-// opens in the Lightbox, a video plays in nsh's Video, a sound plays through
-// the host (host.playAudio: nsh has no audio on GPUI), any other file opens
-// in the system's app.) A long
-// body is folded by its laid-out height (onLayout) rather than a
-// ResizeObserver; the tools show while the pointer is over the row (the row
-// says so: `hovered`), as group-hover does there; "copy link" copies the
-// workbench path (no origin in a hosted view).
 import { Clipboard, Image, keymap, signal, Text, untracked, Video, View } from "nsh";
 import { Input } from "nsh/base";
 
@@ -64,7 +51,7 @@ export function ReplyQuote(props: { channel: string; number: number }) {
       onPress={() => router.navigate(messagePath(channelOf(core()?.chat, props.channel), props.number))}
       class="mb-0.5 w-full min-w-0 flex-row items-center gap-1.5"
     >
-      <View style={{ opacity: 0.6 }}>
+      <View class="opacity-60">
         <Icon name="reply" size={10} tone="muted" />
       </View>
       <If when={answered()} else={<Text class="text-xs text-muted">{`#${props.number}`}</Text>}>
@@ -184,7 +171,7 @@ function AttachmentPart(props: { file: Attachment; onKnown: (path: string) => vo
       onPress={open}
       class="flex-row items-center gap-2 rounded-md border border-line bg-page px-3 py-2 hover:bg-hover"
     >
-      <Icon name={kindIcon[fileKind(props.file.type)] as IconName} size={16} tone="muted" />
+      <Icon name={kindIcon[fileKind(props.file.type)]} size={16} tone="muted" />
       <View class="min-w-0">
         <Text class="max-w-64 truncate text-sm text-ink">{props.file.name}</Text>
         <Text class="text-xs text-muted">{kindWords(props.file)}</Text>
@@ -237,7 +224,7 @@ function AttachmentPart(props: { file: Attachment; onKnown: (path: string) => vo
             onPress={() => props.onZoom()}
             class="rounded-md hover:opacity-90"
           >
-            <Image src={fileUrl(f().path)} class="rounded-md border border-line" style={{ maxHeight: 256, maxWidth: 320, objectFit: "contain" }} />
+            <Image src={fileUrl(f().path)} class="max-h-64 max-w-80 rounded-md border border-line object-contain" />
           </View>
         </If>
       )}
@@ -262,14 +249,10 @@ export function Embeds(props: { embeds: readonly Embed[] }) {
                 <Text class="truncate text-xs text-muted">{e().site}</Text>
               </If>
               <If when={e().title}>
-                <Text class="text-sm font-semibold text-ok-ink" style={{ numberOfLines: 2 }}>
-                  {e().title}
-                </Text>
+                <Text class="line-clamp-2 text-sm font-semibold text-ok-ink">{e().title}</Text>
               </If>
               <If when={e().description}>
-                <Text class="text-xs text-ink" style={{ numberOfLines: 3 }}>
-                  {e().description}
-                </Text>
+                <Text class="line-clamp-3 text-xs text-ink">{e().description}</Text>
               </If>
             </View>
           </View>
@@ -316,7 +299,7 @@ function AddReaction(props: { m: ChatMessage; hovered: boolean }) {
     <View style={{ opacity: open() || props.hovered ? 1 : 0 }}>
       <EmojiPopover
         open={open()}
-        onOpenChange={open.set}
+        onOpenChange={(v) => open.set(v)}
         label={t("web.channel.emoji.more")}
         testid="add-reaction"
         onPick={(emoji) => {
@@ -474,7 +457,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           sure={sure()}
           label={sure() ? t("web.channel.tools.sure") : t("web.channel.tools.remove")}
           onPress={() => {
-            if (!sure()) return void menu.set("confirmDelete");
+            if (!sure()) return menu.set("confirmDelete");
             menu.set("closed");
             const id = props.m.id;
             void act.run(() => api.channel.message.delete({ id }));
@@ -575,16 +558,19 @@ function LinkedCard(props: { at: LinkedMessage }) {
       class="max-w-lg gap-0.5 rounded-md border-l-4 border-wheat bg-side px-3 py-2 hover:bg-hover"
     >
       <View class="flex-row items-baseline gap-2">
-        <Text class="text-xs font-semibold text-ink">{m() ? nameOf(m() as ChatMessage) : `#${props.at.number}`}</Text>
+        <Text class="text-xs font-semibold text-ink">
+          {(() => {
+            const said = m();
+            return said ? nameOf(said) : `#${props.at.number}`;
+          })()}
+        </Text>
         <Text class="text-xs text-muted">{channelLabel(where())}</Text>
         <If when={m()}>{(said) => <Text class="text-xs text-muted">{workbenchClock(said().at)}</Text>}</If>
       </View>
       <If when={m()}>
         {(said) => (
           <If when={said().deleted === undefined} else={<Text class="text-sm text-muted italic">{t("web.channel.messages.replyGone")}</Text>}>
-            <Text class="text-sm text-ink" style={{ numberOfLines: 3 }}>
-              {said().text || list(said().attachments.map((a) => a.name))}
-            </Text>
+            <Text class="line-clamp-3 text-sm text-ink">{said().text || list(said().attachments.map((a) => a.name))}</Text>
           </If>
         )}
       </If>
