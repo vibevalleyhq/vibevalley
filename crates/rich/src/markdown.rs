@@ -6,10 +6,15 @@
 //! `((block-ref))`, `==remark==^[note]`, and `#tag` via `MarkdownExtension::pattern`, and
 //! fenced `mermaid`, `canvas`, `chart`, and `genui` blocks via `MarkdownExtension::language`.
 
+use std::fs::File;
+use std::io::Read;
+use std::path::{Path, PathBuf};
+
 use nsh_base::text_view::{
-    CodeBlock, CustomNode, Document, MarkdownExtension, MarkdownOptions, Parser, TextViewClasses, TextViewLinkPressEvent, TextViewLinks, TextViewMath,
-    TextViewPart, TextViewParts, TextViewStyles, TextViewTaskPressEvent, text_view,
+    CodeBlock, CustomNode, Document, Image as TextViewImage, ImageLength, MarkdownExtension, MarkdownOptions, Parser, TextViewClasses, TextViewLinkPressEvent,
+    TextViewLinks, TextViewMath, TextViewPart, TextViewParts, TextViewStyles, TextViewTaskPressEvent, text_view,
 };
+use nsh_core::element::{ImageSrc, image_size};
 use nsh_core::keymap::Modifiers;
 use nsh_core::prelude::*;
 use vibevalley_i18n::t;
@@ -94,7 +99,7 @@ impl CustomNodeKind {
     }
 }
 
-/// Text scale preset for [`VvMarkdown`], matching VibeValley's `Markdown.tsx`.
+/// Text scale preset for [`VvMarkdown`], matching VibeValley's `Markdown.tsx` and `MarkdownPane.tsx`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PropEnum)]
 pub enum VvMarkdownSize {
     /// Standard chat / report typography (14pt body).
@@ -102,29 +107,255 @@ pub enum VvMarkdownSize {
     Base,
     /// Compact panel / sidebar / outline typography (13pt body).
     Sm,
+    /// Editorial standalone document typography (14.5pt body, clear heading hierarchy, generous spacing).
+    Doc,
 }
 
 impl VvMarkdownSize {
-    const fn body_pt(self) -> f32 {
+    pub const fn is_doc(self) -> bool {
+        matches!(self, Self::Doc)
+    }
+
+    pub const fn body_pt(self) -> f32 {
         match self {
             Self::Base => 14.0,
             Self::Sm => 13.0,
+            Self::Doc => 14.5,
         }
     }
 
-    const fn h1_pt(self) -> f32 {
-        match self {
-            Self::Base => 18.0,
-            Self::Sm => 16.0,
-        }
-    }
-
-    const fn line_height_pt(self) -> f32 {
+    pub const fn line_height_pt(self) -> f32 {
         match self {
             Self::Base => 22.0,
             Self::Sm => 20.0,
+            Self::Doc => 24.0,
         }
     }
+
+    pub const fn h1_pt(self) -> f32 {
+        match self {
+            Self::Base => 18.0,
+            Self::Sm => 16.0,
+            Self::Doc => 26.0,
+        }
+    }
+
+    pub const fn h1_line_height_pt(self) -> f32 {
+        match self {
+            Self::Base => 24.0,
+            Self::Sm => 22.0,
+            Self::Doc => 34.0,
+        }
+    }
+
+    pub const fn h2_pt(self) -> f32 {
+        match self {
+            Self::Base => 14.0,
+            Self::Sm => 13.0,
+            Self::Doc => 19.0,
+        }
+    }
+
+    pub const fn h2_line_height_pt(self) -> f32 {
+        match self {
+            Self::Base => 22.0,
+            Self::Sm => 20.0,
+            Self::Doc => 26.0,
+        }
+    }
+
+    pub const fn h3_pt(self) -> f32 {
+        match self {
+            Self::Base => 14.0,
+            Self::Sm => 13.0,
+            Self::Doc => 15.5,
+        }
+    }
+
+    pub const fn h3_line_height_pt(self) -> f32 {
+        match self {
+            Self::Base => 22.0,
+            Self::Sm => 20.0,
+            Self::Doc => 22.5,
+        }
+    }
+
+    pub const fn h4_pt(self) -> f32 {
+        match self {
+            Self::Base => 14.0,
+            Self::Sm => 13.0,
+            Self::Doc => 14.5,
+        }
+    }
+
+    pub const fn h5_pt(self) -> f32 {
+        match self {
+            Self::Base => 14.0,
+            Self::Sm => 13.0,
+            Self::Doc => 13.5,
+        }
+    }
+
+    pub const fn h6_pt(self) -> f32 {
+        match self {
+            Self::Base => 14.0,
+            Self::Sm => 13.0,
+            Self::Doc => 13.0,
+        }
+    }
+}
+
+/// Resolved destination of a Markdown image reference (`![alt](src)` or `<img src="...">`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResolvedMarkdownImage {
+    /// Remote HTTP(S) URL, inline `data:` URI, or bundled `asset:/` URI.
+    Remote { uri: String },
+    /// Verified readable local file (canonicalized absolute path accepted by `nsh-core`).
+    LocalFile { path: PathBuf, uri: String },
+    /// Unresolved or unreadable image reference (rendered as an explicit fallback badge).
+    Missing { raw: String },
+}
+
+const IMAGE_HEADER_PROBE_BYTES: usize = 65_536;
+const SMALL_INLINE_MAX_WIDTH: f32 = 160.0;
+const SMALL_INLINE_MAX_HEIGHT: f32 = 36.0;
+
+fn strip_query_and_fragment(raw: &str) -> &str {
+    raw.split(['?', '#']).next().unwrap_or(raw)
+}
+
+fn hex_nibble(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn percent_decode(raw: &str) -> String {
+    let bytes = raw.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let (Some(hi), Some(lo)) = (hex_nibble(bytes[i + 1]), hex_nibble(bytes[i + 2]))
+        {
+            out.push((hi << 4) | lo);
+            i += 3;
+            continue;
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn has_prefix_ignore_ascii_case(value: &str, prefix: &str) -> bool {
+    value.len() >= prefix.len() && value.is_char_boundary(prefix.len()) && value[..prefix.len()].eq_ignore_ascii_case(prefix)
+}
+
+fn verify_readable_local_file(candidate: &Path) -> Option<PathBuf> {
+    let canonical = std::fs::canonicalize(candidate).ok()?;
+    let meta = std::fs::metadata(&canonical).ok()?;
+    if !meta.is_file() {
+        return None;
+    }
+    File::open(&canonical).ok()?;
+    Some(canonical)
+}
+
+fn resolve_local_candidate(raw: &str, base: Option<&Path>) -> Option<PathBuf> {
+    let join = |segment: &str| -> PathBuf {
+        match base {
+            Some(dir) => dir.join(segment),
+            None => PathBuf::from(segment),
+        }
+    };
+
+    if let Some(found) = verify_readable_local_file(&join(raw)) {
+        return Some(found);
+    }
+
+    let stripped = strip_query_and_fragment(raw);
+    if stripped != raw
+        && let Some(found) = verify_readable_local_file(&join(stripped))
+    {
+        return Some(found);
+    }
+
+    let decoded = percent_decode(stripped);
+    if decoded != stripped
+        && let Some(found) = verify_readable_local_file(&join(&decoded))
+    {
+        return Some(found);
+    }
+
+    None
+}
+
+/// Resolves a Markdown image `src` against an optional document `base_dir`.
+///
+/// `nsh-core`'s image loader rejects relative paths (`docs/images/farm.png`, `./a.png`, `../b.png`),
+/// accepting only `http(s)://`, `data:`, `asset:/`, `file://`, and absolute filesystem paths.
+/// Resolving relative paths to canonical absolute paths lets local images load cleanly and fail
+/// explicitly when missing.
+pub fn resolve_markdown_image_src(raw_src: &str, base_dir: Option<&str>) -> ResolvedMarkdownImage {
+    let trimmed = raw_src.trim();
+    if trimmed.is_empty() {
+        return ResolvedMarkdownImage::Missing { raw: String::new() };
+    }
+
+    if has_prefix_ignore_ascii_case(trimmed, "https://")
+        || has_prefix_ignore_ascii_case(trimmed, "http://")
+        || has_prefix_ignore_ascii_case(trimmed, "data:")
+        || has_prefix_ignore_ascii_case(trimmed, "asset:/")
+    {
+        return ResolvedMarkdownImage::Remote { uri: trimmed.to_owned() };
+    }
+
+    if has_prefix_ignore_ascii_case(trimmed, "file://") {
+        let rest = &trimmed["file://".len()..];
+        let local = if has_prefix_ignore_ascii_case(rest, "localhost/") {
+            &rest["localhost".len()..]
+        } else {
+            rest
+        };
+        if Path::new(local).is_absolute()
+            && let Some(path) = resolve_local_candidate(local, None)
+        {
+            let uri = path.to_string_lossy().into_owned();
+            return ResolvedMarkdownImage::LocalFile { path, uri };
+        }
+        return ResolvedMarkdownImage::Missing { raw: trimmed.to_owned() };
+    }
+
+    if Path::new(trimmed).is_absolute() {
+        if let Some(path) = resolve_local_candidate(trimmed, None) {
+            let uri = path.to_string_lossy().into_owned();
+            return ResolvedMarkdownImage::LocalFile { path, uri };
+        }
+        return ResolvedMarkdownImage::Missing { raw: trimmed.to_owned() };
+    }
+
+    if let Some(dir) = base_dir.map(str::trim).filter(|d| !d.is_empty())
+        && let Some(path) = resolve_local_candidate(trimmed, Some(Path::new(dir)))
+    {
+        let uri = path.to_string_lossy().into_owned();
+        return ResolvedMarkdownImage::LocalFile { path, uri };
+    }
+
+    ResolvedMarkdownImage::Missing { raw: trimmed.to_owned() }
+}
+
+/// Probes natural pixel dimensions from a local raster image header without decoding full pixels.
+pub fn read_local_image_dimensions(path: &Path) -> Option<(f32, f32)> {
+    let file = File::open(path).ok()?;
+    let mut header = Vec::new();
+    file.take(IMAGE_HEADER_PROBE_BYTES as u64).read_to_end(&mut header).ok()?;
+    let size = nsh_core::picker::image_size(&header)?;
+    (size.width.0 > 0 && size.height.0 > 0).then_some((size.width.0 as f32, size.height.0 as f32))
 }
 
 /// Resolved PKM block transclusion passed to [`VvMarkdown`] for `((block-ref))` and `![[embed]]`.
@@ -148,9 +379,12 @@ pub struct BlockRefPayload {
 pub struct VvMarkdownProps {
     /// Markdown source text to render.
     pub text: Prop<SharedString>,
-    /// Typography scale (`"base"` or `"sm"`).
+    /// Typography scale (`"base"`, `"sm"`, or `"doc"`).
     #[prop(default)]
     pub size: Prop<VvMarkdownSize>,
+    /// Optional base directory used to resolve relative image paths (e.g. parent dir of a `.md` file).
+    #[prop(default)]
+    pub base_dir: Prop<Option<SharedString>>,
     /// Enable `@mention` inline parsing (default false).
     #[prop(default)]
     pub mentions: Prop<bool>,
@@ -339,47 +573,305 @@ pub fn clean_remark_note(raw: &str) -> String {
     raw.trim_start().strip_prefix('💬').unwrap_or(raw).trim().to_owned()
 }
 
-/// Builds VibeValley's default `TextViewParts` typography matching `Markdown.tsx`.
+const LINE_STRONG_LIGHT: Hsla = rgba(0x1c19_1724).to_hsla();
+const LINE_STRONG_DARK: Hsla = rgba(0xeceb_e829).to_hsla();
+const WARN_SOFT: AdaptiveColor = AdaptiveUi::pair(rgb(0xfbf0d9).to_hsla(), rgb(0x332917).to_hsla());
+const NOTE_SOFT: AdaptiveColor = AdaptiveUi::pair(rgba(0x2c6a_a312).to_hsla(), rgba(0x6aa6_dc1c).to_hsla());
+const IMPORTANT_SOFT: AdaptiveColor = AdaptiveUi::pair(rgba(0x7c5c_bd12).to_hsla(), rgba(0xb48e_f51c).to_hsla());
+const IMPORTANT_BORDER_LIGHT: Hsla = rgb(0x6e4eb2).to_hsla();
+const IMPORTANT_BORDER_DARK: Hsla = rgb(0xb48ef5).to_hsla();
+const TRANSPARENT: Hsla = rgba(0x0000_0000).to_hsla();
+
+/// Builds VibeValley's default `TextViewParts` typography matching `Markdown.tsx` and `MarkdownPane.tsx`.
 fn vv_text_view_parts(size: Prop<VvMarkdownSize>) -> TextViewParts {
     TextViewParts::new()
         .part(TextViewPart::Root, move |s| {
             s.min_w(px(0.0))
-                .gap(px(4.0))
+                .gap(move || px(if size.get().is_doc() { 10.0 } else { 4.0 }))
                 .text_size(move || Length::from(px(size.get().body_pt())))
                 .line_height(move || px(size.get().line_height_pt()))
                 .text_color(AdaptiveUi::INK)
         })
-        .part(TextViewPart::Paragraph, |s| s.my(px(2.0)))
-        .part(TextViewPart::Heading, |s| s.mt(px(0.0)).mb(px(0.0)).font_weight(FontWeight::SEMIBOLD))
-        .part(TextViewPart::Heading1, move |s| s.text_size(move || Length::from(px(size.get().h1_pt()))))
-        .part(TextViewPart::Heading2, move |s| s.text_size(move || Length::from(px(size.get().body_pt()))))
-        .part(TextViewPart::Heading3, move |s| s.text_size(move || Length::from(px(size.get().body_pt()))))
-        .part(TextViewPart::Heading4, move |s| s.text_size(move || Length::from(px(size.get().body_pt()))))
-        .part(TextViewPart::Heading5, move |s| s.text_size(move || Length::from(px(size.get().body_pt()))))
-        .part(TextViewPart::Heading6, move |s| s.text_size(move || Length::from(px(size.get().body_pt()))))
-        .part(TextViewPart::Link, |s| s.text_color(AdaptiveUi::WATER).underline())
-        .part(TextViewPart::Blockquote, |s| {
-            s.my(px(2.0))
-                .border_l(px(2.0))
+        .part(TextViewPart::Paragraph, move |s| s.my(move || px(if size.get().is_doc() { 4.0 } else { 2.0 })))
+        .part(TextViewPart::Heading, |s| {
+            s.mt(px(0.0)).mb(px(0.0)).font_weight(FontWeight::SEMIBOLD).text_color(AdaptiveUi::INK)
+        })
+        .part(TextViewPart::Heading1, move |s| {
+            s.text_size(move || Length::from(px(size.get().h1_pt())))
+                .line_height(move || px(size.get().h1_line_height_pt()))
+                .mt(move || px(if size.get().is_doc() { 4.0 } else { 0.0 }))
+                .mb(move || px(if size.get().is_doc() { 6.0 } else { 0.0 }))
+                .pb(move || px(if size.get().is_doc() { 10.0 } else { 0.0 }))
+                .border_b(move || AbsoluteLength::from(px(if size.get().is_doc() { 1.0 } else { 0.0 })))
                 .border_color(AdaptiveUi::LINE)
-                .pl(px(12.0))
+        })
+        .part(TextViewPart::Heading2, move |s| {
+            s.text_size(move || Length::from(px(size.get().h2_pt())))
+                .line_height(move || px(size.get().h2_line_height_pt()))
+                .mt(move || px(if size.get().is_doc() { 22.0 } else { 0.0 }))
+                .mb(move || px(if size.get().is_doc() { 4.0 } else { 0.0 }))
+                .pb(move || px(if size.get().is_doc() { 7.0 } else { 0.0 }))
+                .border_b(move || AbsoluteLength::from(px(if size.get().is_doc() { 1.0 } else { 0.0 })))
+                .border_color(AdaptiveUi::LINE)
+        })
+        .part(TextViewPart::Heading3, move |s| {
+            s.text_size(move || Length::from(px(size.get().h3_pt())))
+                .line_height(move || px(size.get().h3_line_height_pt()))
+                .mt(move || px(if size.get().is_doc() { 16.0 } else { 0.0 }))
+                .mb(move || px(if size.get().is_doc() { 2.0 } else { 0.0 }))
+        })
+        .part(TextViewPart::Heading4, move |s| {
+            s.text_size(move || Length::from(px(size.get().h4_pt())))
+                .mt(move || px(if size.get().is_doc() { 12.0 } else { 0.0 }))
+        })
+        .part(TextViewPart::Heading5, move |s| {
+            s.text_size(move || Length::from(px(size.get().h5_pt())))
+                .mt(move || px(if size.get().is_doc() { 8.0 } else { 0.0 }))
+        })
+        .part(TextViewPart::Heading6, move |s| {
+            s.text_size(move || Length::from(px(size.get().h6_pt()))).text_color(move || {
+                let palette = UiPalette::for_mode(dark());
+                if size.get().is_doc() { palette.muted } else { palette.ink }
+            })
+        })
+        .part(TextViewPart::Link, |s| {
+            s.text_color(AdaptiveUi::WATER)
+                .underline()
+                .text_decoration_color(move || UiPalette::for_mode(dark()).water.opacity(0.42))
+        })
+        .part(TextViewPart::Blockquote, move |s| {
+            s.my(move || px(if size.get().is_doc() { 6.0 } else { 2.0 }))
+                .border_l(move || AbsoluteLength::from(px(if size.get().is_doc() { 3.0 } else { 2.0 })))
+                .border_color(move || {
+                    let is_dark = dark();
+                    if size.get().is_doc() {
+                        if is_dark { LINE_STRONG_DARK } else { LINE_STRONG_LIGHT }
+                    } else {
+                        UiPalette::for_mode(is_dark).line
+                    }
+                })
+                .pl(move || px(if size.get().is_doc() { 14.0 } else { 12.0 }))
+                .pr(move || px(if size.get().is_doc() { 12.0 } else { 0.0 }))
+                .py(move || px(if size.get().is_doc() { 6.0 } else { 0.0 }))
+                .rounded_r(move || Length::from(px(if size.get().is_doc() { 6.0 } else { 0.0 })))
+                .bg(move || if size.get().is_doc() { UiPalette::for_mode(dark()).side } else { TRANSPARENT })
                 .text_color(AdaptiveUi::MUTED)
         })
-        .part(TextViewPart::Code, |s| {
+        .part(TextViewPart::Alert, move |s| {
+            s.my(move || px(if size.get().is_doc() { 8.0 } else { 4.0 }))
+                .py(move || px(if size.get().is_doc() { 12.0 } else { 8.0 }))
+                .px(move || px(if size.get().is_doc() { 14.0 } else { 12.0 }))
+                .rounded(px(8.0))
+                .border_1()
+                .border_l(px(3.0))
+                .text_color(AdaptiveUi::INK)
+        })
+        .part(TextViewPart::AlertNote, |s| {
+            s.bg(NOTE_SOFT).border_color(move || UiPalette::for_mode(dark()).water.opacity(0.45))
+        })
+        .part(TextViewPart::AlertTip, |s| {
+            s.bg(AdaptiveUi::OK_SOFT).border_color(move || UiPalette::for_mode(dark()).leaf.opacity(0.45))
+        })
+        .part(TextViewPart::AlertImportant, |s| {
+            s.bg(IMPORTANT_SOFT).border_color(move || {
+                let base = if dark() { IMPORTANT_BORDER_DARK } else { IMPORTANT_BORDER_LIGHT };
+                base.opacity(0.45)
+            })
+        })
+        .part(TextViewPart::AlertWarning, |s| {
+            s.bg(WARN_SOFT).border_color(move || UiPalette::for_mode(dark()).wheat.opacity(0.55))
+        })
+        .part(TextViewPart::AlertCaution, |s| {
+            s.bg(AdaptiveUi::BAD_SOFT).border_color(move || UiPalette::for_mode(dark()).berry.opacity(0.45))
+        })
+        .part(TextViewPart::Code, move |s| {
             s.rounded_sm()
                 .bg(AdaptiveUi::INLINE_CODE_BG)
-                .px(px(4.0))
+                .px(move || px(if size.get().is_doc() { 5.0 } else { 4.0 }))
+                .py(move || px(if size.get().is_doc() { 1.0 } else { 0.0 }))
                 .font_family(CODE_FONT_MONO)
-                .text_size(px(12.0))
+                .text_size(move || Length::from(px(if size.get().is_doc() { 12.5 } else { 12.0 })))
+                .text_color(AdaptiveUi::INK)
         })
-        .part(TextViewPart::List, |s| s.my(px(2.0)).pl(px(16.0)))
-        .part(TextViewPart::ListItem, |s| s.my(px(1.0)))
-        .part(TextViewPart::Table, |s| s.my(px(6.0)))
-        .part(TextViewPart::TableCell, |s| s.border_1().border_color(AdaptiveUi::LINE).px(px(8.0)).py(px(2.0)))
-        .part(TextViewPart::TableHeaderCell, |s| {
-            s.font_weight(FontWeight::SEMIBOLD).text_color(AdaptiveUi::INK)
+        .part(TextViewPart::List, move |s| {
+            s.my(move || px(if size.get().is_doc() { 4.0 } else { 2.0 }))
+                .pl(move || px(if size.get().is_doc() { 4.0 } else { 16.0 }))
         })
-        .part(TextViewPart::Rule, |s| s.my(px(6.0)).border_color(AdaptiveUi::LINE))
+        .part(TextViewPart::ListItem, move |s| s.my(move || px(if size.get().is_doc() { 2.5 } else { 1.0 })))
+        .part(TextViewPart::ListMarker, |s| s.text_color(AdaptiveUi::MUTED))
+        .part(TextViewPart::Table, move |s| {
+            s.my(move || px(if size.get().is_doc() { 10.0 } else { 6.0 }))
+                .text_size(move || Length::from(px(if size.get().is_doc() { 13.5 } else { 13.0 })))
+                .line_height(move || px(if size.get().is_doc() { 21.0 } else { 19.0 }))
+        })
+        .part(TextViewPart::TableScroll, move |s| {
+            s.rounded(move || Length::from(px(if size.get().is_doc() { 8.0 } else { 6.0 })))
+                .overflow_hidden()
+                .border_1()
+                .border_color(AdaptiveUi::LINE)
+        })
+        .part(TextViewPart::TableHead, |s| s.bg(AdaptiveUi::SIDE))
+        .part(TextViewPart::TableCell, move |s| {
+            s.border_r_1()
+                .border_b_1()
+                .border_color(AdaptiveUi::LINE)
+                .px(move || px(if size.get().is_doc() { 14.0 } else { 8.0 }))
+                .py(move || px(if size.get().is_doc() { 9.0 } else { 4.0 }))
+        })
+        .part(TextViewPart::TableHeaderCell, move |s| {
+            s.bg(AdaptiveUi::SIDE)
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(AdaptiveUi::INK)
+                .text_size(move || Length::from(px(if size.get().is_doc() { 13.0 } else { 12.5 })))
+        })
+        .part(TextViewPart::Rule, move |s| {
+            s.my(move || px(if size.get().is_doc() { 16.0 } else { 6.0 })).border_color(AdaptiveUi::LINE)
+        })
+}
+
+fn render_missing_image(alt: &str, raw: &str) -> AnyElement {
+    let label = alt.trim();
+    let title = if label.is_empty() { "Image unavailable" } else { label };
+    let path_hint = raw.trim();
+
+    view()
+        .test_id("vv-image-missing")
+        .flex_row()
+        .items_center()
+        .gap(px(8.0))
+        .px(px(12.0))
+        .py(px(8.0))
+        .my(px(4.0))
+        .rounded(px(8.0))
+        .border_1()
+        .border_color(AdaptiveUi::LINE)
+        .bg(AdaptiveUi::SIDE)
+        .max_w(relative(1.0))
+        .child(
+            text(title.to_owned())
+                .text_size(px(12.5))
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(AdaptiveUi::MUTED),
+        )
+        .when(!path_hint.is_empty(), |el| {
+            el.child(
+                text(path_hint.to_owned())
+                    .font_family(CODE_FONT_MONO)
+                    .text_size(px(11.5))
+                    .text_color(AdaptiveUi::FAINT),
+            )
+        })
+        .into_element()
+}
+
+fn render_resolved_image(img: &TextViewImage, uri: String, initial_natural: Option<Size<Points>>, size: VvMarkdownSize) -> AnyElement {
+    let width = img.width;
+    let height = img.height;
+    let natural = signal(initial_natural);
+    let load_failed = signal(false);
+
+    let has_explicit_box = matches!((width, height), (Some(ImageLength::Points(_)), Some(ImageLength::Points(_))));
+    if !has_explicit_box && initial_natural.is_none() {
+        let probe_uri = uri.clone();
+        spawn(async move {
+            match image_size(probe_uri).await {
+                Ok(measured) if measured.width.0 > 0 && measured.height.0 > 0 => {
+                    natural.set(Some(Size::new(px(measured.width.0 as f32), px(measured.height.0 as f32))));
+                }
+                Ok(_) | Err(_) => {
+                    load_failed.set(true);
+                }
+            }
+        });
+    }
+
+    let explicit_ratio = match (width, height) {
+        (Some(ImageLength::Points(w)), Some(ImageLength::Points(h))) if h > px(0.0) => Some(w / h),
+        _ => None,
+    };
+    let aspect = move || natural.get().filter(|s| s.width > px(0.0) && s.height > px(0.0)).map(|s| s.width / s.height);
+    let box_width = move || -> Length {
+        match (width, height) {
+            (Some(w), _) => DefiniteLength::from(w).into(),
+            (None, Some(ImageLength::Points(h))) => (h * aspect().unwrap_or(1.0)).into(),
+            (None, _) => natural.get().map_or(px(0.0), |s| s.width).into(),
+        }
+    };
+
+    let is_small_inline = initial_natural.is_some_and(|s| s.width < px(SMALL_INLINE_MAX_WIDTH) || s.height <= px(SMALL_INLINE_MAX_HEIGHT))
+        || matches!(width, Some(ImageLength::Points(w)) if w < px(SMALL_INLINE_MAX_WIDTH))
+        || matches!(height, Some(ImageLength::Points(h)) if h <= px(SMALL_INLINE_MAX_HEIGHT));
+
+    let alt = img.alt.clone();
+    let title = img.title.clone();
+    let raw_src = img.src.clone();
+
+    view()
+        .when(!is_small_inline, |v| v.w_full())
+        .child(dynamic(move || {
+            if load_failed.get() {
+                return render_missing_image(&alt, &raw_src);
+            }
+
+            let mut src = ImageSrc::from(uri.clone());
+            if let Some(nat) = initial_natural {
+                src = src.size(nat);
+            }
+
+            let img_el = image(src)
+                .test_id("vv-markdown-image")
+                .object_fit(ResizeMode::Contain)
+                .label(SharedString::from(alt.clone()))
+                .when_some(title.clone(), |el, t| el.hint(t))
+                .w_full()
+                .aspect_ratio(move || explicit_ratio.or_else(aspect).unwrap_or(16.0 / 10.0));
+
+            if is_small_inline {
+                return view().w(box_width).max_w(relative(1.0)).child(img_el.rounded(px(4.0))).into_element();
+            }
+
+            let frame = view()
+                .w(box_width)
+                .max_w(relative(1.0))
+                .rounded(px(if size.is_doc() { 10.0 } else { 8.0 }))
+                .overflow_hidden()
+                .border_1()
+                .border_color(AdaptiveUi::LINE)
+                .bg(AdaptiveUi::SIDE)
+                .child(img_el);
+
+            let caption = alt.trim();
+            view()
+                .w_full()
+                .flex_col()
+                .items_center()
+                .my(px(if size.is_doc() { 12.0 } else { 6.0 }))
+                .gap(px(8.0))
+                .child(frame)
+                .when(size.is_doc() && !caption.is_empty(), |el| {
+                    el.child(
+                        text(caption.to_owned())
+                            .test_id("vv-image-caption")
+                            .text_size(px(12.0))
+                            .line_height(px(18.0))
+                            .text_color(AdaptiveUi::MUTED)
+                            .text_center(),
+                    )
+                })
+                .into_element()
+        }))
+        .into_element()
+}
+
+fn render_markdown_image(img: &TextViewImage, base_dir: Option<&str>, size: VvMarkdownSize) -> AnyElement {
+    match resolve_markdown_image_src(&img.src, base_dir) {
+        ResolvedMarkdownImage::Missing { raw } => render_missing_image(&img.alt, &raw),
+        ResolvedMarkdownImage::LocalFile { path, uri } => {
+            let initial_natural = read_local_image_dimensions(&path).map(|(w, h)| Size::new(px(w), px(h)));
+            render_resolved_image(img, uri, initial_natural, size)
+        }
+        ResolvedMarkdownImage::Remote { uri } => render_resolved_image(img, uri, None, size),
+    }
 }
 
 fn with_optional_prefix(prefix: &str, token: Text) -> AnyElement {
@@ -584,6 +1076,7 @@ pub fn VvMarkdown(props: VvMarkdownProps, cx: Scope<VvMarkdownEvent>) -> impl In
     let streaming_prop = props.streaming;
     let selectable_prop = props.selectable;
     let size_prop = props.size;
+    let base_dir_prop = props.base_dir;
 
     text_view()
         .markdown(move || Some(props.text.get()))
@@ -593,6 +1086,13 @@ pub fn VvMarkdown(props: VvMarkdownProps, cx: Scope<VvMarkdownEvent>) -> impl In
         .links(props.links)
         .classes(props.classes)
         .styles(props.styles)
+        .render_image(move |img: &TextViewImage| {
+            let owned = img.clone();
+            dynamic(move || {
+                let base_dir = base_dir_prop.get();
+                render_markdown_image(&owned, base_dir.as_deref(), size_prop.get())
+            })
+        })
         .render_math(move |math: &TextViewMath| render_math_element(&math.tex, math.display, size_prop.get().body_pt(), selectable_prop.get()))
         .render_custom(move |node: &CustomNode| {
             let refs = refs_prop.get();

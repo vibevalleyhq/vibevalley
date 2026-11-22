@@ -1,15 +1,17 @@
 mod support;
 
 use std::cell::RefCell;
+use std::path::Path;
 
-use nsh_base::text_view::{Block, CustomNode, Inline};
+use nsh_base::text_view::{Alert, Block, CustomNode, Inline};
 use nsh_core::ViewKind;
 use nsh_core::element::Root;
 use nsh_core::prelude::*;
+use vibevalley_rich::markdown::{ResolvedMarkdownImage, read_local_image_dimensions, resolve_markdown_image_src};
 use vibevalley_rich::{
-    BlockRefPayload, CustomNodeKind, VvBlockRefPressEvent, VvCodeCopyEvent, VvEmbedPressEvent, VvIssuePressEvent, VvLinkPressEvent, VvMentionPressEvent,
-    VvTaskPressEvent, VvWikilinkPressEvent, clean_remark_note, is_incremental_streaming_safe, parse_vv_markdown, parse_wikilink_target, vv_markdown,
-    vv_markdown_extensions, vv_markdown_options,
+    BlockRefPayload, CustomNodeKind, VvBlockRefPressEvent, VvCodeCopyEvent, VvEmbedPressEvent, VvIssuePressEvent, VvLinkPressEvent, VvMarkdownSize,
+    VvMentionPressEvent, VvTaskPressEvent, VvWikilinkPressEvent, clean_remark_note, is_incremental_streaming_safe, parse_vv_markdown, parse_wikilink_target,
+    vv_markdown, vv_markdown_extensions, vv_markdown_options,
 };
 
 use support::TestHarness;
@@ -413,4 +415,211 @@ fn regression_ratex_math_updates_canvas_color_on_theme_toggle_without_resetting_
         "expected all math fills to return to light ink 0x{light_ink_rgba:08x}, got {restored_fills:08x?}"
     );
     assert!(harness.contains_text("State: true"), "GenUI state must survive Dark->Light toggle");
+}
+
+#[test]
+fn doc_size_preset_establishes_editorial_heading_hierarchy_and_preserves_chat_presets() {
+    assert_eq!(VvMarkdownSize::Base.body_pt(), 14.0);
+    assert_eq!(VvMarkdownSize::Base.line_height_pt(), 22.0);
+    assert_eq!(VvMarkdownSize::Base.h1_pt(), 18.0);
+    assert_eq!(VvMarkdownSize::Base.h2_pt(), 14.0);
+
+    assert_eq!(VvMarkdownSize::Sm.body_pt(), 13.0);
+    assert_eq!(VvMarkdownSize::Sm.line_height_pt(), 20.0);
+    assert_eq!(VvMarkdownSize::Sm.h1_pt(), 16.0);
+
+    assert!(VvMarkdownSize::Doc.is_doc());
+    assert!(!VvMarkdownSize::Base.is_doc());
+    assert!(!VvMarkdownSize::Sm.is_doc());
+    assert!(VvMarkdownSize::Doc.body_pt() > VvMarkdownSize::Base.body_pt());
+    assert!(VvMarkdownSize::Doc.line_height_pt() > VvMarkdownSize::Base.line_height_pt());
+    assert!(VvMarkdownSize::Doc.h1_pt() > VvMarkdownSize::Doc.h2_pt());
+    assert!(VvMarkdownSize::Doc.h2_pt() > VvMarkdownSize::Doc.h3_pt());
+    assert!(VvMarkdownSize::Doc.h3_pt() > VvMarkdownSize::Doc.h4_pt());
+    assert!(VvMarkdownSize::Doc.h4_pt() >= VvMarkdownSize::Doc.body_pt());
+}
+
+#[test]
+fn resolve_markdown_image_src_handles_relative_file_absolute_remote_and_missing_paths() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("repo root canonical");
+    let expected_farm = repo_root.join("docs/images/farm.png").canonicalize().expect("farm.png exists");
+    let repo_root_str = repo_root.to_string_lossy();
+    let docs_dir = repo_root.join("docs");
+    let docs_dir_str = docs_dir.to_string_lossy();
+    let subsystems_dir = repo_root.join("docs/subsystems");
+    let subsystems_dir_str = subsystems_dir.to_string_lossy();
+
+    // Repo-relative path (`docs/images/farm.png`) and query-stripped variant.
+    assert_eq!(
+        resolve_markdown_image_src("docs/images/farm.png", Some(&repo_root_str)),
+        ResolvedMarkdownImage::LocalFile {
+            path: expected_farm.clone(),
+            uri: expected_farm.to_string_lossy().into_owned(),
+        }
+    );
+    assert_eq!(
+        resolve_markdown_image_src("./images/farm.png?raw=1", Some(&docs_dir_str)),
+        ResolvedMarkdownImage::LocalFile {
+            path: expected_farm.clone(),
+            uri: expected_farm.to_string_lossy().into_owned(),
+        }
+    );
+    assert_eq!(
+        resolve_markdown_image_src("../images/farm.png", Some(&subsystems_dir_str)),
+        ResolvedMarkdownImage::LocalFile {
+            path: expected_farm.clone(),
+            uri: expected_farm.to_string_lossy().into_owned(),
+        }
+    );
+
+    // Absolute filesystem path and `file://` URI.
+    let abs_str = expected_farm.to_string_lossy().into_owned();
+    assert_eq!(
+        resolve_markdown_image_src(&abs_str, None),
+        ResolvedMarkdownImage::LocalFile {
+            path: expected_farm.clone(),
+            uri: abs_str.clone(),
+        }
+    );
+    assert_eq!(
+        resolve_markdown_image_src(&format!("file://{abs_str}"), None),
+        ResolvedMarkdownImage::LocalFile {
+            path: expected_farm.clone(),
+            uri: abs_str,
+        }
+    );
+
+    // Remote HTTP(S) & data URIs stay untouched as remote sources.
+    assert_eq!(
+        resolve_markdown_image_src("https://vibevalley.dev/banner.png", Some(&repo_root_str)),
+        ResolvedMarkdownImage::Remote {
+            uri: "https://vibevalley.dev/banner.png".to_owned(),
+        }
+    );
+    assert_eq!(
+        resolve_markdown_image_src("http://127.0.0.1:8790/img.png", None),
+        ResolvedMarkdownImage::Remote {
+            uri: "http://127.0.0.1:8790/img.png".to_owned(),
+        }
+    );
+    assert_eq!(
+        resolve_markdown_image_src("data:image/png;base64,AAAA", None),
+        ResolvedMarkdownImage::Remote {
+            uri: "data:image/png;base64,AAAA".to_owned(),
+        }
+    );
+
+    // Missing file and relative path without base_dir both yield Missing explicitly.
+    assert_eq!(
+        resolve_markdown_image_src("docs/images/nonexistent.png", Some(&repo_root_str)),
+        ResolvedMarkdownImage::Missing {
+            raw: "docs/images/nonexistent.png".to_owned(),
+        }
+    );
+    assert_eq!(
+        resolve_markdown_image_src("docs/images/farm.png", None),
+        ResolvedMarkdownImage::Missing {
+            raw: "docs/images/farm.png".to_owned(),
+        }
+    );
+
+    // Local PNG header probe reads natural dimensions synchronously.
+    let dims = read_local_image_dimensions(&expected_farm).expect("PNG dimensions readable");
+    assert_eq!(dims, (1440.0, 900.0));
+}
+
+#[test]
+fn real_readme_parses_html_h1_images_alerts_table_and_mermaid_cleanly() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("repo root canonical");
+    let readme = std::fs::read_to_string(repo_root.join("README.md")).expect("README.md readable");
+    let doc = parse_vv_markdown(&readme, false, false, false);
+
+    // `<h1 align="center">VibeValley · 码农场物语</h1>` must become a Level-1 Heading block.
+    assert!(
+        matches!(doc.blocks.first(), Some(Block::Heading { level: 1, .. })),
+        "expected README HTML <h1> to parse as Block::Heading level 1, got {:?}",
+        doc.blocks.first()
+    );
+
+    let mut image_srcs = Vec::new();
+    let mut alerts = Vec::new();
+    let mut has_table = false;
+    let mut has_mermaid = false;
+    for block in &doc.blocks {
+        match block {
+            Block::Paragraph { content } => {
+                for inline in content {
+                    if let Inline::Image(img) = inline {
+                        image_srcs.push(img.src.clone());
+                    }
+                }
+            }
+            Block::Blockquote { alert: Some(kind), .. } => alerts.push(*kind),
+            Block::Table(table) => {
+                has_table = table.columns() == 2 && !table.rows.is_empty();
+            }
+            Block::Custom(node) if CustomNodeKind::parse(&node.name) == Some(CustomNodeKind::Mermaid) => {
+                has_mermaid = true;
+            }
+            _ => {}
+        }
+    }
+
+    assert!(image_srcs.contains(&"docs/images/farm.png".to_owned()));
+    assert!(image_srcs.contains(&"docs/images/map.png".to_owned()));
+    assert!(alerts.contains(&Alert::Warning));
+    assert!(alerts.contains(&Alert::Note));
+    assert!(has_table);
+    assert!(has_mermaid);
+
+    let root_str = repo_root.to_string_lossy();
+    for src in &image_srcs {
+        assert!(
+            matches!(resolve_markdown_image_src(src, Some(&root_str)), ResolvedMarkdownImage::LocalFile { .. }),
+            "expected README image {src} to resolve locally"
+        );
+    }
+}
+
+#[component]
+fn DocPreviewWithImagesRoot() -> impl IntoElement {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("repo root canonical");
+    let base_dir = SharedString::from(repo_root.to_string_lossy().into_owned());
+    let md = concat!(
+        "<h1 align=\"center\">VibeValley</h1>\n\n",
+        "![Farm screenshot](docs/images/farm.png)\n\n",
+        "![Missing graphic](docs/images/missing-preview.png)\n",
+    );
+
+    vv_markdown().text(md).size(VvMarkdownSize::Doc).base_dir(Some(base_dir))
+}
+
+#[test]
+fn doc_preview_mounts_relative_image_with_nonzero_aspect_ratio_and_missing_fallback() {
+    let harness = TestHarness::mount(Root::of::<DocPreviewWithImagesRoot>());
+
+    assert!(harness.contains_text("VibeValley"));
+    assert!(harness.has_view_kind(ViewKind::Image));
+
+    // Resolved local relative PNG mounts with non-zero proportional frame + caption.
+    let img_id = harness.find_test_id("vv-markdown-image").expect("resolved local image mounted");
+    let img_frame = harness.frames.get(&img_id).copied().expect("resolved image frame");
+    assert!(
+        img_frame.size.width.0 > 100.0 && img_frame.size.height.0 > 60.0,
+        "resolved local image must lay out with non-zero dimensions, got {:?}",
+        img_frame.size
+    );
+    let rendered_aspect = img_frame.size.width.0 / img_frame.size.height.0;
+    assert!(
+        (rendered_aspect - (1440.0 / 900.0)).abs() < 0.08,
+        "expected 16:10 aspect ratio (~1.6), got {rendered_aspect} ({:?})",
+        img_frame.size
+    );
+    assert!(harness.find_test_id("vv-image-caption").is_some());
+    assert!(harness.contains_text("Farm screenshot"));
+
+    // Unresolvable image mounts clean fallback badge showing alt + path.
+    assert!(harness.find_test_id("vv-image-missing").is_some());
+    assert!(harness.contains_text("Missing graphic"));
+    assert!(harness.contains_text("docs/images/missing-preview.png"));
 }

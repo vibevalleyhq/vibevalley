@@ -54,7 +54,7 @@ export interface VvWikilinkPressEvent {
   label: string;
 }
 
-export type VvMarkdownSize = "base" | "sm";
+export type VvMarkdownSize = "base" | "sm" | "doc";
 
 export interface VvCanvasProps extends ComponentHostProps {
   data: string;
@@ -90,6 +90,7 @@ export interface VvGenUiProps extends ComponentHostProps {
 export interface VvMarkdownProps extends ComponentHostProps {
   text: string;
   size?: VvMarkdownSize;
+  baseDir?: string | null;
   mentions?: boolean;
   pkm?: boolean;
   refs?: readonly BlockRefPayload[];
