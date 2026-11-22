@@ -14,7 +14,8 @@
 - **合不合由你说了算。** 做完的活先给你看提交、diff 和会不会冲突，你说「完成」才合进主分支；冲突了让它自己解决。长任务拆成有先后的子工单，修 bug 先写一个**会失败的验收测试**，后面的子工单改不了它，最后一步要让它通过。
 - **服务端停了也不丢活。** 助手和自带的农机每一轮、每个工具调用先落盘再显示。助手答到一半服务端停了，重启后接着答完；进程崩在半路时，帮工也从断点接着做，这一轮只记一次。
 - **一眼看清谁在干什么。** 工作台照 Linear：看板、工单详情、每一步的轨迹（收到的话、每条命令和输出），哪一步不对就在那一步写评论。农场把同样的状态画出来：每个仓库是一座岛，在做的工单是一块地，读代码发芽、改文件长叶、做完结出麦子。
-- **窗口里和终端里都能派活。** macOS 应用之外，命令行 `vibevalley` 一条命令一个操作，对着同一个服务端。
+- **窗口里和终端里都能派活。** macOS 应用内置原生终端，命令行 `vibevalley` 一条命令一个操作，对着同一个服务端；在终端标签里跑 Claude Code、Codex、Cursor、Pi 等编码 agent 时，应用退到后台也会在单轮结束后发 macOS 系统通知。
+- **笔记、作品和素材收在一处。** 统一的内容中心共用可折叠侧栏、跨类型搜索和 19 套双语模板库，离开再回来自动恢复上次打开的位置；大纲笔记专注单栏编辑，媒体详情提供原生访达定位与音视频试听，结构化作品（含纯 Rust 原生无限白板 `VvWhiteboard`、幻灯片、数据看板、界面画板、设计体系、动态短片与单页网页）全出血展开并可随时唤出右侧协作对话。
 - **少操心。** 「每天九点跑一遍测试」这样的定时任务；不调模型的巡查，提醒没人回的提问、没动静的帮工、做完没收的活；每个农机的额度和每日预算，用完了就不再派。
 - **全在你的机器上。** 服务端只听 `127.0.0.1`，数据在你的家目录（`~/.vibevalley`）；帮工的记性、档案、笔记和 Artifact 都在本机。
 
@@ -44,7 +45,7 @@ flowchart LR
 
 - **一个服务端进程**（`crates/server`，Rust）：助手、帮工、田头、工单和交付、Artifact 和笔记、媒体都在里面；数据在家目录的 SQLite 和文件里。它跑在应用的进程里，也能单独跑。
 - **核心状态只有一份**：农场上的一切是一个值，只因「事实」而变（雇了一个帮工、开始一轮、跑了一条命令……）。服务端用纯函数把事实折进状态，页面只读折好的结果。
-- **客户端**：原生应用 `apps/mac`：GPUI 的窗口，工作台是 nsh 跑的 TSX 页面，像素农场由 Rust 画；命令行 `vibevalley` 经本机的 HTTP 调同一个服务端。只支持 macOS（[计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
+- **客户端**：原生应用 `apps/mac`：GPUI 的窗口和内置终端，工作台是 nsh 跑的 TSX 页面，像素农场与无限白板（`VvWhiteboard`）由 Rust 画；命令行 `vibevalley` 经本机的 HTTP 调同一个服务端。只支持 macOS（[计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
 - **契约只写一次**：接口和形状按概念写在 `crates/protocol`，页面用的 TS 类型由它生成，服务端、页面和命令行用同一份。
 
 更多见 [docs/architecture.md](docs/architecture.md)。
@@ -94,11 +95,11 @@ cargo run -p vibevalley-cli -- issue list     # 对着它
 ## 目录
 
 ```
-crates/            Rust：服务端（vibevalley-server）、命令行（vibevalley-cli）、核心规则、契约、oar、自研 agent……
-apps/mac/          原生应用：GPUI 的窗口和像素农场（Rust），工作台的页面（nsh TSX）
+crates/            Rust：服务端（vibevalley-server）、命令行（vibevalley-cli）、核心规则、契约、oar、自研 agent、原生富内容组件（rich）……
+apps/mac/          原生应用：GPUI 窗口、终端和像素农场（Rust），工作台页面（nsh TSX，含统一内容中心、大纲笔记与作品视图）
 apps/island/       刘海上的灵动岛（Swift）
 apps/site/         官网 vibevalley.dev（Solid 2 静态生成）
-packages/          页面用的 TS：生成的契约类型和它的 Zod、词典的目录、笔记和 Artifact 的纯逻辑
+packages/          页面用的 TS：生成的契约类型与 Zod、词典目录、测试共用与 tsrs
 assets/            图、像素字、指针和像素村的地图
 design/            像素素材的生图提示词、脚本和切图规则（原图和效果图在单独的仓库 vibevalley-art）
 docs/              文档：现在怎么用、怎么开发、各部分怎么工作

@@ -22,7 +22,7 @@
 
 2. 跑 `vp run rust:check`。
 3. 改了素材库的页面时，照[应用分册](.agents/skills/vv-acceptance/references/app.md)打开 `/library` 截图，浅色、深色各一张：没有横向溢出，费用未知、取消、截断的含义看得清，结果和动作都在图里。
-4. 改了接口时，照[服务端分册](.agents/skills/vv-acceptance/references/server.md)用 `verify-server.ts -- <脚本>`（理解和语音加 `--scripted-helper`）在隔离程序上走一遍：脚本自己生成 PNG，`media.input.create` 后向 `/api/v1/media/input/:id/content` PUT 二进制，再走要验的那条接口到 `ready`，接一次 `/api/v1/state` 核对状态流里没有钥匙和签名 URL。
+4. 改了接口时，照[服务端分册](.agents/skills/vv-acceptance/references/server.md)用 `verify-server.ts -- <脚本>`（理解和语音加 `--scripted-helper`）在隔离程序上走一遍：脚本自己生成 PNG，用 `vv media input upload <文件> --json` 上传并检查输入，再走要验的那条接口到 `ready`（`vv media job show <id> --json`），接一次 `vv state --json` 核对状态流里没有钥匙和签名 URL。
 
 ## 真实厂商
 

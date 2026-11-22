@@ -21,11 +21,10 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档与�
 |---|---|
 | `crates/core/src/artifact/` | 服务端跑的那份 Rust 引擎与单一真相源：`ops.rs`、`markdown.rs`、`html.rs`、`shell.rs`、`store.rs`、`tokens.rs`、`viewers.rs`、`starters.rs`；维护 `crates/core/tests/golden/artifact` 回归测例 |
 | `crates/server/src/modules/content/artifact/` | 服务端 Artifact 读写、版本管理与 SSE 订阅 |
-| `apps/mac/ui/features/artifact/` 与 `apps/mac/ui/features/media/` | 原生应用 nsh TSX 页面与客户端辅助：块编辑器模型（`blocks.ts`、`editor.ts`）、HTML 后缀推断（`html.ts`）、WebView 外壳与 `vv.timeline` 消息守卫（`shell.ts`）、Store 消息守卫（`viewers.ts`），以及 `ArtifactsPage`（含可折叠列表与内嵌实时 `ChannelSidePane`）、`ArtifactCanvas`、`BlocksView`、`StoreArtifactView`、各类型专用视图（`SlidesStoreView`、`DashboardView`、`MotionStoreView`、`MotionControls`、`WhiteboardView`、`DesignCanvasView`、`DesignSystemView`）与 `/library` 统一交付物和素材视图 |
+| `apps/mac/ui/features/artifact/`、`apps/mac/ui/features/content/` 与 `apps/mac/ui/features/media/` | 原生应用 nsh TSX 页面与客户端辅助：块编辑器模型（`blocks.ts`、`editor.ts`）、HTML 后缀推断（`html.ts`）、WebView 外壳与 `vv.timeline` 消息守卫（`shell.ts`）、Store 消息守卫（`viewers.ts`），以及 `ArtifactsPage`（单行 44px 页头、全出血画布、默认收起的可按需展开实时 `ChannelSidePane` 协作抽屉）、`ArtifactCanvas`、`BlocksView`、`StoreArtifactView`、各类型专用视图（`SlidesStoreView`、`DashboardView`、`MotionStoreView`、`MotionControls`、纯壳层 `WhiteboardView`（挂载 `crates/rich/` 的纯 Rust 原生 `VvWhiteboard`）、`DesignCanvasView`、`DesignSystemView`）、`<artifact-view-context>` 上报，以及 `ContentShell` 下的统一内容浏览与 19 套模板库 |
 | `crates/server/src/modules/content/artifact/` | `Artifacts`：`mod.rs`（总入口、HTML 与默认设计体系管理）、`blocks.rs`（块与建议持久化）、`entries.rs`（Store 条目批处理、乐观锁、`artifact.entry.follow` 与 `artifact.view` 拼装）、`types.rs`（嵌入 `crates/server/assets/artifact/types/` 的中英双语 `SKILL.md` / `SKILL.en.md` 与 `references/*.md`）、`db.rs` |
 | `crates/protocol/src/contract/artifact.rs`、`packages/protocol/src/artifact/` | 跨端契约（Rust 为源、生成 TS 形状与端点）、Zod Schema，以及 `packages/protocol/src/rules/order.ts`（`keyBetween`）与 `display.ts`（`htmlSandbox`） |
 | 表 `artifact`、`artifact_version`、`artifact_block`、`artifact_block_revision`、`artifact_change`、`artifact_suggestion`、`artifact_entry`、`artifact_entry_change` | Artifact 主表（`issue` 列带 `references issue(id) on delete set null` 外键）、HTML 版本表、块与建议表、结构化条目表及增量变更日志表（均在 `server.db`） |
-| `apps/mac/ui/features/artifact/` 与 `apps/mac/ui/features/media/` | 原生应用 nsh TSX 页面：`ArtifactsPage`（含可折叠列表与内嵌实时 `ChannelSidePane`）、`ArtifactCanvas`、`BlocksView`、`StoreArtifactView` 及各类型专用视图（`SlidesStoreView`、`DashboardView`、`MotionStoreView`、`MotionControls`、`WhiteboardView`、`DesignCanvasView`、`DesignSystemView`）、`<artifact-view-context>` 上报，以及 `/library` 统一交付物与素材视图 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*`、`GET /api/v1/artifact/<id>/<version>` 与 `GET /api/v1/artifact/<id>/view`）。
 
@@ -44,13 +43,13 @@ Artifact 使用 SQLx 访问 SQLite。sqlc 从 Artifact 与频道的正式表结�
   - **`slides`**：`"project/deck.json"` + `"project/deck.css"` + `project/slides/<id>.html`；支持 `16:9`（1920×1080）与 `4:3`（1440×1080）画幅、`.fragment` 分步揭示、备注、演讲者视图同步、`?print=1` 逐页打印，以及工作台划词改字、单页 HTML 编辑和增页。
   - **`dashboard`**：`datasets/<id>` + `dash/params` + `files/index.html`；沙箱注入 `window.dash`（`data`、`calc`、`params`、`onData`、`colors`），自动扫描页面内 `[data-source][data-field][data-agg]` 数字与源表核对，向宿主汇报核验徽章、点击数字联动打开右侧数据源抽屉、支持编辑 JSON 与导出 CSV。
   - **`motion`**：支持 `film/meta` + `"modules/scenes.json"` + `film/script` 纯时间函数 `window.CUT.render(t)`（带 `window.kit` 缓动、弹簧与字幕排布帮手），与单页 `display: "motion"` 共用工作台 `MotionControls`（播放/暂停、逐帧 `-1f`/`+1f`、章节跳转、循环，以及沙箱内按帧步进 `captureStream(0)` + `MediaRecorder` 导出确定性 WebM 视频存入素材库）。
-  - **`whiteboard`**：工作台用沙箱画布与原生 nsh 工具栏协作渲染 `board/meta` 与 `elements/<id>`（平移缩放、网格吸附、正交折线箭头 `bends`、容器、表格、经净化的内联 SVG、独立沙箱 `html` 小部件，以及帮工画图占位的 `claim` 虚线框），人类拖拽、连线、双击改字与帮工写 `elements/<id>` 实时互相同步。
+  - **`whiteboard`**：由 `crates/rich/` 的纯 Rust 原生组件 `VvWhiteboard`（`crates/rich/src/whiteboard.rs` 与 `engine/whiteboard/*`）直接在 GPUI 双层 `canvas` 上绘制与交互，`WhiteboardView` 只负责同步 `artifact_entry` 与实时会话状态并响应保存/聊天事件（不再经过 `<WebView>`）：支持无限平移缩放、方格/点阵网格、网格与间距吸附、对齐/分布/整理、25 款手绘贴纸、工作坊便签/胶囊计划流、容器顶部外浮标题、协作光标气泡建议条（`presence.status`）、工作坊计时器、压力感应 `pen`/`highlighter`、橡皮擦、正交折线箭头 `bends`、容器子级编组、表格、6 套双语模板（含启动工作坊 `Workshop`）、小地图、JSON Canvas `.canvas` 互通与 SVG / 2x PNG / JSON 导出，以及帮工占位的 `claim` 虚线框；人类操作与帮工写 `elements/<id>` 走同一 `artifact.entry.batch` 管线实时同步。
   - **`design`**：`"project/canvas.json"` + `.dc.html` 多画板探索；沙箱解析 `<x-dc data-props>`、`<helmet>` 与 `DCLogic`，右侧属性面板生成滑块、下拉、开关与输入框实时预览，点保存写回 `.dc.html` 默认值。
   - **`design-system`**：`"project/design-system.json"` + `"project/tokens.json"` + `project/README.md` + `project/components/<Name>/preview.html`；分栏查看文档、双主题色板与自动 WCAG 对比度徽章、字体字阶样张、组件沙箱预览与令牌源码，并可一键设为默认设计体系。
 
-### 统一 `/library` 入口、内嵌聊天与当前视图上下文（`<artifact-view-context>`）
+### 统一内容中心、全出血画布与当前视图上下文（`<artifact-view-context>`）
 
-- **统一交付物与素材入口（`/library`）**：侧边栏将素材与 Artifact 合并在 `/library`（移除独立的 Artifact 导航项），按类型筛选并支持拖拽/上传带复合后缀的文件自动建 Artifact；点开单件交付物进入 `/artifacts` 详情页，右侧内嵌实时 `ChannelSidePane` 以便边看作品边对话。
+- **统一内容中心与全出血详情页（`/library`、`/artifacts/:id`）**：Artifact 与大纲笔记、素材共用 `ContentShell` 下的可折叠 `ContentSidebar`（按 8 种精确类型筛选，全屏演示 `contentPresenting` 时自动收起侧栏），支持拖拽带复合后缀的文件建 Artifact 或经 `+ 新建` 19 套模板库直接起步。在 `/library` 单击作品卡直达 `/artifacts/:id`（无 `:id` 时自动打开最近作品）；详情页采用单行 44px 页头（返回、原地改名、类型/版本/作者与关联任务徽章、置顶、发到频道、按形态导出 Markdown / HTML / Store JSON、协作抽屉开关、转为任务与删除），`store` 与 `html` 类宽画布作品全出血铺满容器，`blocks` 文档保持居中阅读栏；右侧实时 `ChannelSidePane` 协作抽屉对画布类作品默认收起以保留最大视野，点击协作按钮或白板「问助手」即刻展开。
 - **当前视图上下文（`<artifact-view-context>`）**：工作台任意打开的 Artifact 视图将当前位置（如 `slideIndex`/`slideId`、`activeDataset`、`selectedIds`、`activeArtboard`、`activeTab`、`selectedBlockIds` 或播放秒数 `time`）写入当前视图上下文。用户在聊天框或内嵌 `ChannelSidePane` 发消息时，协议附带可选 `ArtifactViewContext`；频道将其存进 `channel_message.meta` JSON，并在投递给助手和帮工时拼成带不可信围栏（转义 `</`）的 `<artifact-view-context>` 块，使「把这一页标题改短」「放慢这里的转场」无需手动指明页码或秒数。
 
 ### 单页网页（`html`）
@@ -88,19 +87,19 @@ Artifact 使用 SQLx 访问 SQLite。sqlc 从 Artifact 与频道的正式表结�
 
 - **共享多条目 Store 底座，而不是每加一种类型建一套新表和新工具**：幻灯片、看板、短片、白板、界面画板和设计体系都需要局部增删改、按修订号防覆盖与增量流式同步；抽成统一的 `artifact_entry` + `artifact.entry.batch` 后，6 种结构化类型共用同一套持久化、SSE 与 MCP 工具面，同时保留 `blocks` 的逐段建议保护与 `html` 的零门槛单文件交付。
 - **技能指南按需读取，不塞进常驻系统提示**：每种创作类型的版式、配色、时间轴和防踩坑规范很长；放进 `artifact.type.read` 按语言与分册渐进披露，既让模型在动工时拿到完整工艺标准，又不挤占日常对话上下文。
-- **不可信代码一律关在无同源权限的独立视图路由里，连录屏也在沙箱内完成**：Store 中的 `.html`、`.dc.html`、看板脚本与短片脚本均经 `GET /api/v1/artifact/<id>/view` 配合 `sandbox allow-scripts`（无 `allow-same-origin`、`connect-src 'none'`）加载；`whiteboard` 对 SVG 经白名单剥离脚本并走 `data:image/svg+xml` 渲染，`motion` 视频导出在沙箱帧内完成合成后再经 `postMessage` 交宿主落盘，彻底阻断脚本触碰宿主接口。
+- **不可信代码一律关在无同源权限的独立视图路由里，连录屏也在沙箱内完成**：Store 中的 `.html`、`.dc.html`、看板脚本与短片脚本均经 `GET /api/v1/artifact/<id>/view` 配合 `sandbox allow-scripts`（无 `allow-same-origin`、`connect-src 'none'`）加载；`whiteboard` 对外部传入的 `svg` 与 `stickerSvg` 在服务端入库时经白名单剥离脚本后，全部交给纯 Rust `VvWhiteboard` 在原生画布与矢量/PNG 导出管线中渲染，`motion` 视频导出在沙箱帧内完成合成后再经 `postMessage` 交宿主落盘，彻底阻断脚本触碰宿主接口。
 
 ## 还没做的
 
 - 网页 Artifact 元素锚点、锚点评论标记与自适应高度回报：[网页 Artifact 的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)。
 - 父子工单分节绑定与按节确认定稿：[几个帮工同时写一篇文章](.agents/notes/proposed/feature/2026-10-20-block-editor-ux.md)。
-- 块编辑器在线光标、块内三方合并（`merged`）与修订历史找回。
+- 块编辑器在线光标、块内并发合并、统一实时感知与时间旅行回放：[Loro 协作内容引擎：四平面边界、实时感知、块内共编与时间旅行](.agents/notes/proposed/architecture/2026-11-22-loro-collaborative-content-engine.md)。
 
 ## 怎么验证
 
 - `apps/mac/ui/features/artifact/artifact.test.ts`：客户端编辑 span 快捷键、UTF-16 offset、iframe 外壳/Store 消息守卫与复合后缀推断（`nsh/test`）。
 - `crates/core/tests/artifact_golden.rs`：Rust 引擎的块操作、Markdown 往返、HTML 检查、划词改字、Store 补丁、设计令牌、初始模板与视图拼装回归 golden（`vp run protocol:check` / `vp run goldens` 校验）。
 - `crates/server/tests/artifact.rs`：HTML 与 Markdown 交稿、七种类型双语指南读取、Store 批处理与 `ifRev` 冲突、白板 SVG 净化、`artifact.view` 与默认设计体系令牌注入、`artifact.entry.follow` 回放与实时 SSE、块协同与建议，以及 `artifact.issue` `ON DELETE SET NULL` 外键测试。
-- `apps/mac/ui/app/scenarios.test.tsx`：Artifact 与 `/library` 统一交付物页面在多密度虚拟时钟场景下的页面测试（`nsh/test`）。
+- `apps/mac/ui/app/interactions.test.tsx`、`apps/mac/ui/app/scenarios.test.tsx`：全出血白板协作抽屉、统一内容上下文记忆与多密度虚拟时钟场景页面测试（`nsh/test`）。
 
 演讲者视图在 HTML 发回页数后显示页码、下一页与备注。尚未收到回执时，页面显示「等待演示页就绪」。载入错误显示具体原因（[原生页面验收](.agents/skills/vv-acceptance/references/app.md#演示页的就绪回执)）。

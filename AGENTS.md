@@ -18,7 +18,7 @@ crates/server/             服务端（二进制 vibevalley-server）：src/modu
                            任务板拆成 work/issue（状态与交付）、work/session（执行会话和每一轮）、work/workplace（worktree 与合并），都只经 work/ledger 写），
                            src/transport/ 收拢接口契约（api）、进程内桥（bridge）、Chord（chord）与 HTTP 门（http）；
                            lib.rs 组装 Hub，start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
-crates/cli/                命令行（二进制 vibevalley，clap）：照领域模型一条命令一个操作，经 HTTP 调服务端
+crates/cli/                命令行（二进制 vibevalley，clap）：按五大业务域（work/team/collab/content/infra）组织的纯 HTTP 客户端；评测另拆为可选二进制 vibevalley-eval（--features eval）
 apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳（src/shell/*）、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
                            crates/ 是桌面独占支撑 crate（pixel、terminal、workspace）；
                            ui/ 是 nsh 跑的 TSX：app（含 6 项主导航，详见 docs/subsystems/app.md）、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含笔记与作品前端引擎、5 栏设置）、farm、infra
@@ -43,9 +43,9 @@ scripts/                   gen/（生成物写出）、audit/（lint 插件、�
 ```bash
 vp install                                                      # 根目录：装 TS 依赖（Vite+ 带的 pnpm 12），打出各包的声明
 vp run nsh:install                                              # 把 nsh 的命令行装到 .tools/bin：打 apps/mac/ui 的包、跑 mac:check 之前
-cargo run -p vibevalley-mac                                     # 原生应用，里面带着服务端；VIBEVALLEY_HOME 改家目录
-cargo run -p vibevalley-server                                  # 只跑服务端，127.0.0.1:8787；VIBEVALLEY_HOME、VIBEVALLEY_WORK_ROOT、VIBEVALLEY_PORT 改位置
-cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、channel、repo、agent、session、runtime、memory、cron、artifact、pkm、setting、chat、doctor
+cargo run -p vibevalley-mac                                     # 原生应用，里面带着服务端；dev 通道默认 127.0.0.1:8790 与 ~/.vibevalley-dev，VIBEVALLEY_HOME、VIBEVALLEY_STORE 改位置
+cargo run -p vibevalley-server                                  # 只跑服务端；按发布通道默认端口（dev 8790 / alpha 8789 / beta 8788 / release 8787），VIBEVALLEY_CHANNEL、VIBEVALLEY_HOME、VIBEVALLEY_WORK_ROOT、VIBEVALLEY_PORT 改位置
+cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、session、repo、cron、agent、orchestrator、runtime、memory、channel、chat、artifact、pkm、library、media、attachment、state、setting、doctor（--json 输出原始 JSON）
 vp run rust:check                                               # 改完 crates/ 或 apps/mac/src：cargo fmt、clippy（-D warnings）、cargo test
 vp run protocol:ts                                              # 改了 crates/protocol/src/contract：重写 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
 sqlc generate                                                   # 改完 SQLite 表结构或命名查询：重写各模块的 generated/queries.rs

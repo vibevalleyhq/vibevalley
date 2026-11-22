@@ -9,12 +9,12 @@
 ```bash
 vp install                                   # 根目录：安装 TS 依赖，打出各包的声明
 vp run nsh:install                           # 把 nsh 的命令行装到 .tools/bin（打页面的包要用）
-cargo run -p vibevalley-mac                  # 原生应用（apps/mac）：窗口，里面带着服务端
-cargo run -p vibevalley-server               # 只跑服务端：监听 127.0.0.1:8787
+cargo run -p vibevalley-mac                  # 原生应用（apps/mac）：窗口，里面带着服务端（dev 默认 127.0.0.1:8790）
+cargo run -p vibevalley-server               # 只跑服务端：dev 默认监听 127.0.0.1:8790（正式版 8787）
 cargo run -p vibevalley-cli -- doctor        # 命令行，对着运行中的服务端
 ```
 
-- **目录**：设置与数据在 `~/.vibevalley`（`VIBEVALLEY_HOME`）；原生应用与单独跑的服务端都让帮工默认在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活，仓库在 `repos/`，worktree 在 `worktrees/`（[客户端](docs/subsystems/app.md#进程和服务端)、[设置和配置](docs/subsystems/setting.md#模型和不变量)）。
+- **通道、端口与目录**：端口、家目录与宿主库按发布通道隔离（`release` `8787` / `~/.vibevalley` / `VibeValley`，`beta` `8788` / `~/.vibevalley-beta` / `VibeValley-beta`，`alpha` `8789` / `~/.vibevalley-alpha` / `VibeValley-alpha`，未打包的 `dev` `8790` / `~/.vibevalley-dev` / `VibeValley-dev`），可用 `VIBEVALLEY_CHANNEL`、`VIBEVALLEY_PORT`、`VIBEVALLEY_HOME`、`VIBEVALLEY_STORE` 覆盖；原生应用与单独跑的服务端都让帮工默认在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活，仓库在 `repos/`，worktree 在 `worktrees/`（[客户端](docs/subsystems/app.md#进程和服务端)、[设置和配置](docs/subsystems/setting.md#发布通道默认端口与数据目录)）。
 - **重载**：服务端不自动重载，修改 `crates/` 需重新构建、重启。调试构建的应用从磁盘读 `apps/mac/ui/build/` 的页面包：改了 TSX 跑 `vp run mac:check` 重新打包，再重开应用，不用重新编译 Rust。
 - **不看屏幕检查应用**：`VIBEVALLEY_DEBUG_DUMP=<文件>` 每秒把外壳的状态写成 JSON，`VIBEVALLEY_DEBUG_SCRIPT=<文件>` 一行一步地驱动应用，带 `--features shot` 构建时能截图（[验收的应用分册](.agents/skills/vv-acceptance/references/app.md)）。
 
@@ -72,13 +72,13 @@ CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`sql:check`、`doc
 
 ## 只用命令行派一个活
 
-命令行是 `crates/cli`（二进制 `vibevalley`），仓库内用 `cargo run -p vibevalley-cli -- <命令>` 运行。默认连接 `$VIBEVALLEY_HOME/server.json` 记录的服务端或 `http://127.0.0.1:8787`，可用 `--server` 或 `VIBEVALLEY_SERVER` 覆盖。
+命令行是 `crates/cli`（二进制 `vibevalley`），仓库内用 `cargo run -p vibevalley-cli -- <命令>` 运行。默认连接当前发布通道家目录下的 `server.json` 记录的服务端，未记录时回落到当前通道默认端口（`dev` 为 `http://127.0.0.1:8790`，正式版为 `http://127.0.0.1:8787`），可用 `--server`、`VIBEVALLEY_SERVER` 或 `VIBEVALLEY_CHANNEL` 覆盖。
 
-- **设计原则**：clap，经 HTTP 用契约的类型调服务端，不替服务端做决定。路径为 `<资源> [<子资源>] <动词>`；说明按农场的语言取 `cli.*` 词典。
-- **工单**：`issue list|show|create|edit|status|comment|review|diff|timeline|delete`。`issue show --watch` 持续订阅状态流直到 `in_review`、`done` 或 `canceled`。
-- **其余**：`channel`、`repo`、`agent`、`session`（含 `events`）、`runtime`、`memory`、`cron`、`artifact`、`pkm`（`capture`、`search`、`radar`、`journal`、`page`）、`setting`（`get`、`update`、`validate`）、`chat`（本机农机编码会话，或 `--orchestrator` 在 `#general` 和助手对话）、`approval`（助手待审批工具调用的列出与决策）、`doctor`。
-- **输出与试跑**：默认输出单行短文本（首词为后续命令要用的 ID 或编号），`--format json` 输出协议原始结构。无试跑的写命令传 `--dry-run` 返回 `NoDryRun`（退出码 `2`）。
-- **错误与退出码**：失败时 stdout 为空，stderr 末行是一行 JSON，退出码按类（`crates/cli/src/farm.rs` 的 `exit`）；集成测试在 `crates/cli/tests/cli.rs`，起真的服务端。
+- **设计原则**：强类型 `clap`（英文 `--help`），纯 HTTP 客户端（不链接 `vibevalley-runtime`），按服务端五大业务域分目录（`crates/cli/src/domains/{work,team,collab,content,infra}`），路径为 `<资源> [<子资源>] <动词>`，不替服务端做决定；离线轨迹评测独立为可选二进制 `vibevalley-eval`（`cargo run -p vibevalley-cli --features eval --bin vibevalley-eval -- …`）。
+- **工单**：`issue list|show|watch|create|edit|status|comment|review|diff|timeline|delete`。`issue show --watch` 等待直到需要用户决策或结清，`issue watch [--follow]` 流式输出工单与轨迹事件（加 `--json` 输出 JSONL）。
+- **其余**：`work`（`session` 含 `events`、`repo` 含 `pr submit`、`cron`）、`team`（`agent`、`orchestrator open|stop|approval list|resolve`、`runtime`、`memory`）、`collab`（`channel` 含 `create|delete|pin|message`、`chat` 经 HTTP 与频道助手对话）、`content`（`artifact` 含 `entry list|get|set|batch`、`pkm capture|search|undo|journal|page`、`library`、`media job|input`、`attachment`）、`infra`（`state [--watch]`、`setting get|update|validate`、`doctor`）。
+- **输出与试跑**：默认输出单行短文本（首词为后续命令要用的 ID 或编号），全局 `--json` 输出协议原始结构。试跑由协议 `ENDPOINTS` 的 `dry_run` 单源驱动，无试跑的写命令传 `--dry-run` 返回 `NoDryRun`（退出码 `2`）。
+- **错误与退出码**：失败时 stdout 为空，stderr 末行是一行 JSON，退出码按类（`crates/cli/src/client.rs` 的 `exit`）；集成测试在 `crates/cli/tests/cli.rs`，起真的服务端。
 
 **标准工单闭环**：
 

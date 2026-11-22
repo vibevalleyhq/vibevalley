@@ -79,6 +79,7 @@
 
 - TS 版的持久信箱与重投、多台机器、MCP 连接观察：Rust 版从简，当前不在计划内。
 - `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证：[持久执行与驱动验收](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
+- Antigravity ACP 深度集成（仅 `agy >= 1.5.0`）、OAR 交互提问通道与工作区直连对话会话抽象：[OAR Antigravity ACP 集成与工作区直连对话标签页](.agents/notes/proposed/architecture/2026-11-22-oar-antigravity-and-workspace-chat.md)。
 
 ## 怎么验证
 

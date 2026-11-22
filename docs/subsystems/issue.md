@@ -93,7 +93,7 @@
 
 交付由 `Board` 在工单的锁里做：帮工在场时等它歇下，跑检查与合并，冲突和子工单冻结的文件直接写在工单上；失败时帮工留着，工单记下冲突、把要改的话带给帮工。子工单的检查由 `workplace/check.rs` 跑：验收子工单的检查要先失败、它改的文件冻结；其余的检查要过、冻结的文件不许动；然后合进父工单的分支。
 
-本地改动的审查通过时，工单保存时间、改动的基线提交和文件树，见 [仓库](docs/subsystems/repo.md)。审查窗口在完成前提交所见版本。若文件已变，窗口展示新增改动，用户可再次审查。CLI 也可把 `issue diff --format json` 的 `revision.baseCommit` 和 `revision.tree` 分别传给 `issue review --pass --base-commit … --tree …`。
+本地改动的审查通过时，工单保存时间、改动的基线提交和文件树，见 [仓库](docs/subsystems/repo.md)。审查窗口在完成前提交所见版本。若文件已变，窗口展示新增改动，用户可再次审查。CLI 也可把 `issue diff --json` 的 `revision.baseCommit` 和 `revision.tree` 分别传给 `issue review --pass --base-commit … --tree …`。
 
 本地交付把检查回执先写入 SQLite，再推进 Git 引用。回执记录目标分支和提交、工单文件树、候选提交和文件树，以及检查是否配置、是否通过和失败输出。工单完成时保存最终提交。若 Git 已接受候选而进程在结算前中断，服务重开时核对目标分支是否包含候选提交，再确认源目录没有新增改动。两项吻合时，服务认领原提交并完成结算。
 
@@ -154,4 +154,4 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 `GET /api/v1/issue/watch/:id` 是本机的 SSE 观察流，CLI `issue watch` 使用它。路由（`crates/server/src/transport/http/mod.rs`）只解析工单引用；`issue.watch` 订阅（`crates/server/src/modules/work/session/mod.rs`）先订阅实时事件，再读折好的工单和会话，补最近会话的保留轨迹。历史以批次发送（每批最多 241 条），实时发送 `SessionEvent`；新会话和进入交回阶段时补读历史，使尚未推送的末尾草稿也在退出前交出。`gap.before` 标明保留历史的起点；归档会话没有保留日志时发送不带 `before` 的 `gap`。`omittedSessions` 标明省略的较早会话数。
 
-缓冲、心跳和积压断开和其余 SSE 流一样（[SSE 流](docs/subsystems/core.md#sse-流和其余路由)），客户端重连补读。客户端只按会话、事件 `seq`、`revision` 去重，不比较不同连接的 Core 帧序号；宿主重启不改变轨迹的持久序号。状态来自服务端；`stageWantsUser`、完成和取消决定 `settled`，CLI 不重新判断业务进度。观察流结束只释放队列与连接，不停会话。JSONL 字段和退出方式见命令行 `vibevalley issue watch --help`（`crates/cli/src/commands/issue.rs`）。
+缓冲、心跳和积压断开和其余 SSE 流一样（[SSE 流](docs/subsystems/core.md#sse-流和其余路由)），客户端重连补读。客户端只按会话、事件 `seq`、`revision` 去重，不比较不同连接的 Core 帧序号；宿主重启不改变轨迹的持久序号。状态来自服务端；`stageWantsUser`、完成和取消决定 `settled`，CLI 不重新判断业务进度。观察流结束只释放队列与连接，不停会话。JSONL（`--json`）字段和退出方式见命令行 `vibevalley issue watch --help`（`crates/cli/src/domains/work/issue.rs`）。

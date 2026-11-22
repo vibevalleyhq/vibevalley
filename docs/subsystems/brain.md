@@ -1,6 +1,6 @@
 # VibeValley 自己的 agent
 
-助手和 `vibevalley` 农机的帮工跑在同一个自研的 agent 上：`crates/runtime/src/agent`。它把内置模型客户端、Durable SQLite 持久引擎、类型化工具、上下文压缩、资源与扩展、运行时挂架与内置 OAR 农机收拢成单向分层的单个 crate，只接 DeepSeek（OpenAI 兼容的 chat completions），不做多厂商路由（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)「砍掉的」）。终端里也能经 `vibevalley chat` 直接和本机农机或助手对话。
+助手和 `vibevalley` 农机的帮工跑在同一个自研的 agent 上：`crates/runtime/src/agent`。它把内置模型客户端、Durable SQLite 持久引擎、类型化工具、上下文压缩、资源与扩展、运行时挂架与内置 OAR 农机收拢成单向分层的单个 crate，只接 DeepSeek（OpenAI 兼容的 chat completions），不做多厂商路由（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)「砍掉的」）。终端里也能经 `vibevalley chat` 与服务端助手对话。
 
 ## 管什么，不管什么
 
@@ -29,7 +29,7 @@
 | `crates/runtime/src/agent/runtime/` | `vibevalley` 农机：照 oar 的 `Runtime` 契约，以 `worker:<session>` 跑在共享 `Harness` / `execution.db` 上，支持断点续跑、实时 `steer`、审批回复、`account_usage` 与子代理事件转发 |
 | `crates/runtime/src/agent/eval/` | 评测闭环（对齐 `pi-durable` JSONL 与 `pi-coding-agent-eval`）：[`trace.rs`](crates/runtime/src/agent/eval/trace.rs) 只读轨迹分析 / 时间线 / 离线 HTML 导出、[`profile.rs`](crates/runtime/src/agent/eval/profile.rs) 实验配置（`vanilla` / `codemode`）、[`grader.rs`](crates/runtime/src/agent/eval/grader.rs) 代码 + 轨迹 + Rubric 验收器、[`replay.rs`](crates/runtime/src/agent/eval/replay.rs) L2 前缀切片隔离重放、[`suite.rs`](crates/runtime/src/agent/eval/suite.rs) L3 隔离工作目录与均衡顺序 `EvalRunner`、[`stats.rs`](crates/runtime/src/agent/eval/stats.rs) `pass@k` / `pass^k` 与成对对比统计 |
 | `crates/server/src/modules/team/orchestrator/mod.rs` | 助手：每个助手档案一个对话（共享 SQLite `execution.db`），带农场的工具 |
-| `crates/cli/src/commands/chat.rs` 与 [`eval.rs`](crates/cli/src/commands/eval.rs) | `vibevalley chat`：在终端直接驱动本机农机或助手；`vibevalley eval`（`export` / `inspect` / `replay` / `run`）：SQLite→JSONL 提取、时间线/HTML 检视、切片重放与评测套运行 |
+| `crates/cli/src/domains/collab/chat.rs` 与 [`vibevalley_eval.rs`](crates/cli/src/bin/vibevalley_eval.rs) | `vibevalley chat`：在终端经 HTTP 与频道助手对话；可选二进制 `vibevalley-eval`（`--features eval`，`export` / `inspect` / `replay` / `run`）：SQLite→JSONL 提取、时间线/HTML 检视、切片重放与评测套运行 |
 
 内置农机与助手均使用档案的 MCP 配置。一个连接上的工具共用会话和后台运行时。连接和请求限时 120 秒。用户叫停调用时，客户端取消在途请求。其他工具仍可使用该连接。最后一个工具和连接持有者释放后，SDK 关闭标准输入并回收子进程。[客户端](crates/runtime/src/agent/resources/mcp/client.rs)
 
