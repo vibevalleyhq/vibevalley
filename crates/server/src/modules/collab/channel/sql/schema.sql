@@ -83,9 +83,19 @@ create table if not exists channel_event (
   message_id text not null,
   at integer not null
 );
-create table if not exists watch_cursor (
-  name text primary key,
-  seq integer not null
+create table if not exists channel_delivery (
+  id integer primary key autoincrement,
+  message_id text not null references channel_message (id) on delete cascade,
+  channel_id text not null references channel (id) on delete cascade,
+  recipient_kind text not null check (recipient_kind in ('session', 'issue', 'orchestrator', 'direct')),
+  recipient_id text not null,
+  reason text not null check (reason in ('mention', 'everyone', 'own_thread', 'member', 'channel', 'direct', 'addressed')),
+  wakes integer not null default 0,
+  held_by text check (held_by in ('hop_limit', 'cooldown')),
+  status text not null default 'pending' check (status in ('pending', 'delivered', 'withdrawn', 'failed')),
+  created_at integer not null,
+  settled_at integer,
+  unique (message_id, recipient_kind, recipient_id)
 );
 create unique index if not exists channel_by_name on channel (name) where name is not null and type <> 'thread';
 create index if not exists channel_by_subject on channel (subject_kind, subject_id);
@@ -96,6 +106,8 @@ create index if not exists channel_message_by_channel on channel_message (channe
 create index if not exists channel_message_by_sender on channel_message (sender_id, id);
 create unique index if not exists channel_message_send_key on channel_message (sender_id, send_key) where send_key is not null;
 create index if not exists channel_event_by_message on channel_event (message_id);
+create index if not exists channel_delivery_by_recipient on channel_delivery (recipient_kind, recipient_id, status, id);
+create index if not exists channel_delivery_by_message on channel_delivery (message_id, status);
 create index if not exists channel_member_by_participant on channel_member (participant_id);
 create index if not exists channel_read_cursor_by_channel on channel_read_cursor (channel_id);
 create index if not exists channel_seen_by_message on channel_seen (message_id);

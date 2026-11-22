@@ -27,6 +27,7 @@ pub use crate::transport::api::{Server, refusal};
 
 pub mod base;
 mod chord_space;
+pub mod event_bus;
 mod frame_feed;
 pub use vibevalley_protocol::home;
 pub mod modules;
@@ -78,10 +79,6 @@ impl Sink {
 
 type Opener = Arc<dyn Fn(&Hub, Value, Sink) -> Result<(), ApiError> + Send + Sync>;
 
-/// A reader of every transition (`Core.transitions` in VibeValley): told
-/// each fact with the state before and after, in order, after it is folded.
-pub type Watcher = Arc<dyn Fn(&Hub, &Transition) + Send + Sync>;
-
 #[derive(Default)]
 struct Streams {
     states: Vec<flume::Sender<Value>>,
@@ -96,10 +93,10 @@ pub struct Hub {
     core_seq: AtomicI64,
     space: chord_space::Space,
     feed: frame_feed::FrameFeed,
+    bus: event_bus::EventBus,
     execution: std::sync::OnceLock<std::sync::Weak<modules::team::orchestrator::Orchestrator>>,
     handlers: RwLock<HashMap<&'static str, Handler>>,
     openers: RwLock<HashMap<&'static str, Opener>>,
-    watchers: RwLock<Vec<Watcher>>,
     streams: Mutex<Streams>,
     subscriptions: Mutex<HashMap<u64, flume::Sender<()>>>,
     next_id: AtomicU64,
@@ -142,10 +139,10 @@ impl Hub {
             core_seq: AtomicI64::new(seq),
             space,
             feed: frame_feed::FrameFeed::new(first),
+            bus: event_bus::EventBus::new(),
             execution: std::sync::OnceLock::new(),
             handlers: RwLock::default(),
             openers: RwLock::default(),
-            watchers: RwLock::default(),
             streams: Mutex::default(),
             subscriptions: Mutex::default(),
             next_id: AtomicU64::new(1),
@@ -154,6 +151,7 @@ impl Hub {
             speech: RwLock::new(None),
             kicks,
         });
+        hub.bus.attach_hub(Arc::downgrade(&hub));
         let weak = Arc::downgrade(&hub);
         std::thread::Builder::new()
             .name("vibevalley-server-frames".into())
@@ -195,9 +193,9 @@ impl Hub {
         lock(&self.core).frame(vec![])
     }
 
-    /// Folds `facts` in as one commit (`Core.apply`): the watchers hear each
-    /// transition, the frame thread the effects. Owners store first, then
-    /// apply.
+    /// Folds `facts` in as one commit (`Core.apply`): publishes transitions
+    /// asynchronously on the event bus and kicks the frame thread with effects.
+    /// Owners store first, then apply.
     pub fn apply(&self, facts: Vec<Fact>) -> Applied {
         let applied = {
             let mut core = lock(&self.core);
@@ -210,19 +208,24 @@ impl Hub {
         if applied.transitions.is_empty() {
             return applied;
         }
-        let watchers = self.watchers.read().unwrap_or_else(|e| e.into_inner()).clone();
-        for t in &applied.transitions {
-            for w in &watchers {
-                w(self, t);
-            }
-        }
+        self.bus.publish(&applied.transitions);
         let _ = self.kicks.send(applied.effects.clone());
         applied
     }
 
-    /// Hears every transition from now on.
-    pub fn watch(&self, watcher: Watcher) {
-        self.watchers.write().unwrap_or_else(|e| e.into_inner()).push(watcher);
+    /// Subscribes to folded transitions on a dedicated bounded async worker
+    /// thread (`vibevalley-bus-{name}`).
+    pub fn subscribe_transitions(
+        &self,
+        name: &'static str,
+        handler: impl Fn(&Arc<Hub>, &Transition) + Send + Sync + 'static,
+    ) -> crate::event_bus::Subscription {
+        self.bus.subscribe(name, handler)
+    }
+
+    /// Cooperatively signals and joins all registered event bus subscribers.
+    pub fn close_bus(&self) {
+        self.bus.close();
     }
 
     fn publish_live(&self, event: LiveEvent) {

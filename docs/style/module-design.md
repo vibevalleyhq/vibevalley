@@ -79,7 +79,7 @@
 
 ### 显式状态
 
-一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/mac/ui/infra/state/intent.ts)的 `IntentAt`、[媒体任务](crates/server/src/modules/content/media/jobs.rs)的 `Held`、[谁听见](crates/server/src/modules/collab/watch/hearers.rs)的 `HeldBy`。Rust 里就是带数据的 enum，`match` 穷尽。
+一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/mac/ui/infra/state/intent.ts)的 `IntentAt`、[媒体任务](crates/server/src/modules/content/media/jobs.rs)的 `Held`、[谁听见](crates/server/src/modules/collab/channel/dispatch.rs)的 `HeldBy`。Rust 里就是带数据的 enum，`match` 穷尽。
 
 - **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/mac/ui/infra/form/form.ts)）。硬并只会得到它们的乘积。
 - **永远同值的删掉副本。** 读源头，不另存一份跟着改。

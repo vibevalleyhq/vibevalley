@@ -6,6 +6,7 @@ use vibevalley_protocol::{
 };
 
 use super::db::{ChannelRow, EventRow, MsgRow};
+use super::dispatch::QueuedDelivery;
 
 pub(super) fn new_id() -> String {
     uuid::Uuid::now_v7().to_string()
@@ -130,7 +131,7 @@ pub(super) fn reactions_text(r: &[(String, Vec<String>)]) -> Option<String> {
     (!kept.is_empty()).then(|| format!("{{{}}}", kept.join(",")))
 }
 
-fn message_kind(kind: &str) -> MessageKind {
+pub(super) fn message_kind(kind: &str) -> MessageKind {
     serde_json::from_value(Value::from(kind)).unwrap_or(MessageKind::Chat)
 }
 
@@ -474,4 +475,6 @@ pub(super) struct Written {
     pub(super) again: bool,
     pub(super) row: MsgRow,
     pub(super) event: Option<EventRow>,
+    pub(super) deliveries: Vec<QueuedDelivery>,
+    pub(super) hop_limit_hit: bool,
 }

@@ -104,7 +104,6 @@ impl Chat {
             }
             written
         };
-        self.handled(written.event.as_ref())?;
         Ok((to_message(&written.row), written.again))
     }
 
@@ -113,74 +112,68 @@ impl Chat {
     /// channel right after reading a thread elsewhere is confirmed once.
     pub fn speak(&self, s: Speaking) -> Result<Spoken, ApiError> {
         self.prepare_seat(&s.from);
-        let event;
-        let spoken = {
-            let mut inner = self.locked();
-            let text = s.text.trim();
-            if text.is_empty() {
-                return Err(refused(t("server.channel.empty", &[])));
-            }
-            let (channel, opened) = inner.resolve_target(&s.from, s.target.as_deref().unwrap_or(""))?;
-            if let Some(thread) = opened {
-                self.publish_channel(&inner, &thread)?;
-            }
-            let row = inner
-                .model
-                .channel(&channel)
-                .cloned()
-                .ok_or_else(|| refused(t("server.channel.channelGone", &[])))?;
-            let target = inner.target_of_channel(&row);
-            if let Some(again) = db::recent_duplicate(&inner.db, &s.from, &channel, text, now() - RETRY_WINDOW_MS).q()?
-                && let Some(m) = db::message_by_id(&inner.db, &again).q()?
-            {
-                return Ok(Spoken::Sent {
-                    message: Box::new(to_message(&m)),
-                    target,
-                    absent: vec![],
-                });
-            }
-            let last = inner.model.last_read.get(&s.from).cloned().unwrap_or_default();
-            if row.r#type != "thread" && !s.confirm && !last.is_empty() && last != target {
-                return Ok(Spoken::Confirm { target, last_read: last });
-            }
-            let unseen = db::unseen_in(&inner.db, &channel, &s.from).q()?;
-            if !unseen.is_empty() && !s.anyway {
-                let mut shown = vec![];
-                for id in unseen.iter().take(HELD_SHOWN) {
-                    if let Some(m) = db::message_by_id(&inner.db, id).q()? {
-                        shown.push(inner.addressed_of(&m, &self.files));
-                    }
-                }
-                if let Some(newest) = shown.last() {
-                    let n = newest.number;
-                    tx(&mut inner, |me| me.set_read(&s.from, &channel, n, now()))?;
-                }
-                let more = unseen.len() - shown.len();
-                return Ok(Spoken::Held { target, shown, more });
-            }
-            inner.answered(&channel, s.reply)?;
-            let written = self.write(
-                &mut inner,
-                Write {
-                    reply_to: s.reply,
-                    meta: Some(Meta {
-                        run: s.run.clone(),
-                        ..Meta::default()
-                    }),
-                    ..Write::new(&channel, &s.from, MessageKind::Chat, text)
-                },
-            )?;
-            let n = written.row.number;
-            tx(&mut inner, |me| me.set_read(&s.from, &channel, n, now()))?;
-            event = written.event.clone();
-            Spoken::Sent {
-                message: Box::new(to_message(&written.row)),
+        let mut inner = self.locked();
+        let text = s.text.trim();
+        if text.is_empty() {
+            return Err(refused(t("server.channel.empty", &[])));
+        }
+        let (channel, opened) = inner.resolve_target(&s.from, s.target.as_deref().unwrap_or(""))?;
+        if let Some(thread) = opened {
+            self.publish_channel(&inner, &thread)?;
+        }
+        let row = inner
+            .model
+            .channel(&channel)
+            .cloned()
+            .ok_or_else(|| refused(t("server.channel.channelGone", &[])))?;
+        let target = inner.target_of_channel(&row);
+        if let Some(again) = db::recent_duplicate(&inner.db, &s.from, &channel, text, now() - RETRY_WINDOW_MS).q()?
+            && let Some(m) = db::message_by_id(&inner.db, &again).q()?
+        {
+            return Ok(Spoken::Sent {
+                message: Box::new(to_message(&m)),
                 target,
-                absent: written.absent,
+                absent: vec![],
+            });
+        }
+        let last = inner.model.last_read.get(&s.from).cloned().unwrap_or_default();
+        if row.r#type != "thread" && !s.confirm && !last.is_empty() && last != target {
+            return Ok(Spoken::Confirm { target, last_read: last });
+        }
+        let unseen = db::unseen_in(&inner.db, &channel, &s.from).q()?;
+        if !unseen.is_empty() && !s.anyway {
+            let mut shown = vec![];
+            for id in unseen.iter().take(HELD_SHOWN) {
+                if let Some(m) = db::message_by_id(&inner.db, id).q()? {
+                    shown.push(inner.addressed_of(&m, &self.files));
+                }
             }
-        };
-        self.handled(event.as_ref())?;
-        Ok(spoken)
+            if let Some(newest) = shown.last() {
+                let n = newest.number;
+                tx(&mut inner, |me| me.set_read(&s.from, &channel, n, now()))?;
+            }
+            let more = unseen.len() - shown.len();
+            return Ok(Spoken::Held { target, shown, more });
+        }
+        inner.answered(&channel, s.reply)?;
+        let written = self.write(
+            &mut inner,
+            Write {
+                reply_to: s.reply,
+                meta: Some(Meta {
+                    run: s.run.clone(),
+                    ..Meta::default()
+                }),
+                ..Write::new(&channel, &s.from, MessageKind::Chat, text)
+            },
+        )?;
+        let n = written.row.number;
+        tx(&mut inner, |me| me.set_read(&s.from, &channel, n, now()))?;
+        Ok(Spoken::Sent {
+            message: Box::new(to_message(&written.row)),
+            target,
+            absent: written.absent,
+        })
     }
 
     /// `post`: words written as `from` into a place; the speaker has read
@@ -240,13 +233,16 @@ impl Chat {
                 persist,
             )?
         };
-        self.handled(written.event.as_ref())?;
         Ok((to_message(&written.row), written.again))
     }
 
     /// `notice`: the farm's line; best effort, never fails, wakes no one.
     pub fn notice(&self, n: Noticing) {
         let mut inner = self.locked();
+        self.notice_locked(&mut inner, n);
+    }
+
+    pub(super) fn notice_locked(&self, inner: &mut super::store::Inner, n: Noticing) {
         if n.until_user_speaks && db::notice_since_user(&inner.db, &n.channel, &n.code).unwrap_or(0) > 0 {
             return;
         }
@@ -258,7 +254,7 @@ impl Chat {
             send_key: Some(n.send_key),
             ..Write::new(&n.channel, "system", MessageKind::Notice, &n.text)
         };
-        if let Err(e) = self.write(&mut inner, w) {
+        if let Err(e) = self.write(inner, w) {
             eprintln!("vibevalley-server: chat: notice: {}", e.message);
         }
     }
@@ -270,34 +266,30 @@ impl Chat {
     }
 
     pub(crate) fn note_once(&self, n: Note, key: Option<String>) -> Result<String, ApiError> {
-        let written = {
-            let mut inner = self.locked();
-            if let Some(seat) = &n.seat {
-                tx(&mut inner, |me| me.seat(seat))?;
+        let mut inner = self.locked();
+        if let Some(seat) = &n.seat {
+            tx(&mut inner, |me| me.seat(seat))?;
+        }
+        let written = self.write(
+            &mut inner,
+            Write {
+                meta: Some(n.meta),
+                send_key: key,
+                thread: n.topic,
+                member: n.member,
+                ..Write::new(&n.channel, &n.from, n.kind, &n.text)
+            },
+        )?;
+        if let Some(mut seat) = n.seat {
+            if seat.home.is_none() && !written.thread.is_empty() {
+                seat.home = Some(written.thread.clone());
             }
-            let written = self.write(
-                &mut inner,
-                Write {
-                    meta: Some(n.meta),
-                    send_key: key,
-                    thread: n.topic,
-                    member: n.member,
-                    ..Write::new(&n.channel, &n.from, n.kind, &n.text)
-                },
-            )?;
-            if let Some(mut seat) = n.seat {
-                if seat.home.is_none() && !written.thread.is_empty() {
-                    seat.home = Some(written.thread.clone());
-                }
-                let at = now();
-                tx(&mut inner, |me| {
-                    me.seat(&seat)?;
-                    me.set_read(&seat.id, &n.channel, written.row.number, at)
-                })?;
-            }
-            written
-        };
-        self.handled(written.event.as_ref())?;
+            let at = now();
+            tx(&mut inner, |me| {
+                me.seat(&seat)?;
+                me.set_read(&seat.id, &n.channel, written.row.number, at)
+            })?;
+        }
         Ok(written.thread)
     }
 
@@ -337,33 +329,31 @@ impl Chat {
         Ok(changed)
     }
 
-    /// `remove`: its words go, its number stays.
+    /// `remove`: its words go, its number stays, pending deliveries are withdrawn immediately.
     pub fn remove(&self, id: &str) -> Result<(), ApiError> {
-        let event = {
-            let mut inner = self.locked();
-            let row = inner.message_of(id)?;
-            if row.deleted_at.is_some() {
-                return Err(refused(t("server.channel.messageGone", &[])));
-            }
-            let mut seq = 0;
-            let mut at = 0;
-            self.change(&mut inner, &row, |db, revision, now| {
-                db::delete_message(db, id, now, revision)?;
-                seq = db::insert_event(db, "removed", &row.channel_id, id, now)?;
-                at = now;
-                Ok(())
-            })?;
-            let event = EventRow {
-                seq,
-                kind: "removed".into(),
-                channel_id: row.channel_id.clone(),
-                message_id: id.into(),
-                at,
-            };
-            publish(&self.told, &Told::Removed(event.clone()));
-            event
+        let mut inner = self.locked();
+        let row = inner.message_of(id)?;
+        if row.deleted_at.is_some() {
+            return Err(refused(t("server.channel.messageGone", &[])));
+        }
+        let mut seq = 0;
+        let mut at = 0;
+        self.change(&mut inner, &row, |db, revision, now| {
+            db::delete_message(db, id, now, revision)?;
+            db::withdraw_deliveries_for_message(db, id, now)?;
+            seq = db::insert_event(db, "removed", &row.channel_id, id, now)?;
+            at = now;
+            Ok(())
+        })?;
+        let event = EventRow {
+            seq,
+            kind: "removed".into(),
+            channel_id: row.channel_id.clone(),
+            message_id: id.into(),
+            at,
         };
-        self.handled(Some(&event))
+        publish(&self.told, &Told::Removed(event));
+        Ok(())
     }
 
     pub fn preview_remove(&self, id: &str) -> Result<Preview, ApiError> {
@@ -373,17 +363,20 @@ impl Chat {
             return Err(refused(t("server.channel.messageGone", &[])));
         }
         let target = inner.model.channel(&row.channel_id).map(|c| inner.target_of_channel(c)).unwrap_or_default();
-        Ok(Preview {
-            does: vec![t(
-                "server.channel.deletes",
-                &[
-                    ("target", target.into()),
-                    ("number", row.number.into()),
-                    ("name", row.sender_name.as_str().into()),
-                    ("text", line_of(&row.body, LAST_MAX).into()),
-                ],
-            )],
-        })
+        let mut does = vec![t(
+            "server.channel.deletes",
+            &[
+                ("target", target.into()),
+                ("number", row.number.into()),
+                ("name", row.sender_name.as_str().into()),
+                ("text", line_of(&row.body, LAST_MAX).into()),
+            ],
+        )];
+        let pending = db::pending_deliveries_for_message(&inner.db, id).q()?;
+        if pending > 0 {
+            does.push(t("server.channel.deletesDeliveries", &[("n", pending.into())]));
+        }
+        Ok(Preview { does })
     }
 
     /// `reacting`: setting a reaction as it already is writes nothing.
@@ -458,28 +451,25 @@ impl Chat {
     /// `issueThread`: the issue's thread, opened under a notice in
     /// `channel` (else the default) when there is none.
     pub fn issue_thread(&self, issue: &str, title: &str, channel: Option<&str>) -> Result<String, ApiError> {
-        let written = {
-            let mut inner = self.locked();
-            if let Some(existing) = inner.model.thread_of_subject("issue", issue) {
-                return Ok(existing.to_string());
-            }
-            let place = channel.map(str::to_string).unwrap_or_else(|| inner.model.default_id());
-            if inner.model.channel(&place).is_none_or(|c| c.r#type != "channel") {
-                return Err(refused(t("server.channel.threadOnlyInChannel", &[])));
-            }
-            self.write(
-                &mut inner,
-                Write {
-                    thread: Some(ThreadSubject {
-                        kind: SubjectKind::Issue,
-                        id: issue.into(),
-                        owner: String::new(),
-                    }),
-                    ..Write::new(&place, "system", MessageKind::Notice, title)
-                },
-            )?
-        };
-        self.handled(written.event.as_ref())?;
+        let mut inner = self.locked();
+        if let Some(existing) = inner.model.thread_of_subject("issue", issue) {
+            return Ok(existing.to_string());
+        }
+        let place = channel.map(str::to_string).unwrap_or_else(|| inner.model.default_id());
+        if inner.model.channel(&place).is_none_or(|c| c.r#type != "channel") {
+            return Err(refused(t("server.channel.threadOnlyInChannel", &[])));
+        }
+        let written = self.write(
+            &mut inner,
+            Write {
+                thread: Some(ThreadSubject {
+                    kind: SubjectKind::Issue,
+                    id: issue.into(),
+                    owner: String::new(),
+                }),
+                ..Write::new(&place, "system", MessageKind::Notice, title)
+            },
+        )?;
         Ok(written.thread)
     }
 

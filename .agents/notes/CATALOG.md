@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（21 篇）
+## proposed（22 篇）
 
 ### feature
 
@@ -16,6 +16,7 @@
 
 ### architecture
 
+- 2026-11-22 [零兼容三核正交解耦：去 Watch 化、领域无关 Agent 核与状态切片](.agents/notes/proposed/architecture/2026-11-22-zero-compat-three-kernel-decoupling.md)
 - 2026-11-22 [工作台顶栏、页面交互精简与大纲笔记归属作品](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)
 - 2026-11-22 [Pure-Rust native collaborative whiteboard (`VvWhiteboard`)](.agents/notes/proposed/architecture/2026-11-22-native-rust-whiteboard.md)
 - 2026-11-22 [Loro 协作内容引擎：四平面边界、实时感知、块内共编与时间旅行](.agents/notes/proposed/architecture/2026-11-22-loro-collaborative-content-engine.md)

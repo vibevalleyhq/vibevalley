@@ -8,7 +8,7 @@
 
 | 管 | 不管（谁管） |
 |---|---|
-| `Session` 的创建、带话（插话或开下一轮）、叫停、交接与离场；worktree 的开、重置、清 | 谁听见一句话、三道刹车（[观察层](docs/subsystems/watch.md)） |
+| `Session` 的创建、带话（插话或开下一轮）、叫停、交接与离场；席位与删频道守卫、私聊异步拉起；worktree 的开、重置、清 | 谁听见一句话、两道环路刹车（[频道](docs/subsystems/channel.md)） |
 | 每一轮：触发来源、结局、汇报（`issue_report`）、问题；静默检测 | 工单状态机、验收、合并、拆单（[工单](docs/subsystems/issue.md)） |
 | 并发上限（全农场、每个仓库）、排队 | 农机安装探测、档案校验（[档案和农机](docs/subsystems/agent.md)） |
 | 轨迹（`SessionEvent`）的记录、推送与读回；`/mcp` 帮工门的令牌 | 记忆的存储与检索（[记性](docs/subsystems/memory.md)）；助手的编排（[助手](docs/subsystems/orchestrator.md)） |

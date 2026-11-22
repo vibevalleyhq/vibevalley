@@ -65,11 +65,36 @@ fn blank(kind: SessionEventType, text: String) -> SessionEvent {
     }
 }
 
+fn append_capped(dst: &mut String, units: &mut usize, truncated: &mut bool, delta: &str, max: usize) -> bool {
+    if *truncated || delta.is_empty() {
+        return false;
+    }
+    if delta.is_ascii() && *units + delta.len() <= max {
+        dst.push_str(delta);
+        *units += delta.len();
+        return true;
+    }
+    let before = dst.len();
+    for ch in delta.chars() {
+        let len = ch.len_utf16();
+        if *units + len > max {
+            dst.push('…');
+            *truncated = true;
+            break;
+        }
+        dst.push(ch);
+        *units += len;
+    }
+    dst.len() != before
+}
+
 enum Draft {
     None,
     Text {
         event: SessionEvent,
         who: String,
+        units: usize,
+        truncated: bool,
     },
     /// A call whose input is not known yet.
     Tool {
@@ -172,6 +197,15 @@ impl Journal {
         }
     }
 
+    fn next_deadline(&self) -> Option<Instant> {
+        match (self.pushing, self.saving) {
+            (Some(p), Some(s)) => Some((p + PUSH_AFTER).min(s + SAVE_AFTER)),
+            (Some(p), None) => Some(p + PUSH_AFTER),
+            (None, Some(s)) => Some(s + SAVE_AFTER),
+            (None, None) => None,
+        }
+    }
+
     fn parent_of(&self, from: From) -> Option<i64> {
         let (call, rest) = from.split_last()?;
         Some(self.started.get(&call_key(rest, call)).copied().unwrap_or(-1))
@@ -212,13 +246,18 @@ impl Journal {
         self.changed(n);
     }
 
-    fn make_draft(&mut self, e: SessionEvent, from: From, call: Option<String>) -> i64 {
+    fn make_draft(&mut self, e: SessionEvent, from: From, call: Option<String>, units: usize, truncated: bool) -> i64 {
         self.seal();
         let event = self.stamp(e, from);
         let n = event.seq;
         self.draft = match call {
             Some(_) => Draft::Tool { event },
-            None => Draft::Text { event, who: from.join("/") },
+            None => Draft::Text {
+                event,
+                who: from.join("/"),
+                units,
+                truncated,
+            },
         };
         self.changed(n);
         n
@@ -250,17 +289,27 @@ impl Journal {
             return;
         }
         let who = from.join("/");
-        if let Draft::Text { event, who: w } = &mut self.draft
+        if let Draft::Text {
+            event,
+            who: w,
+            units,
+            truncated,
+        } = &mut self.draft
             && event.r#type == kind
             && *w == who
         {
-            event.text = cut(&(event.text.clone() + text), TEXT_MAX);
-            event.revision += 1;
-            let n = event.seq;
-            self.changed(n);
+            if append_capped(&mut event.text, units, truncated, text, TEXT_MAX) {
+                event.revision += 1;
+                let n = event.seq;
+                self.changed(n);
+            }
             return;
         }
-        self.make_draft(blank(kind, cut(text, TEXT_MAX)), from, None);
+        let mut buf = String::with_capacity(text.len().min(TEXT_MAX));
+        let mut units = 0;
+        let mut truncated = false;
+        append_capped(&mut buf, &mut units, &mut truncated, text, TEXT_MAX);
+        self.make_draft(blank(kind, buf), from, None, units, truncated);
     }
 
     pub fn said(&mut self, text: &str, from: From) {
@@ -282,7 +331,7 @@ impl Journal {
                 step.input = Some(cut(&input, INPUT_MAX));
                 self.add(step, from)
             }
-            None => self.make_draft(step, from, Some(key.clone())),
+            None => self.make_draft(step, from, Some(key.clone()), 0, false),
         };
         self.calls.insert(key.clone(), n);
         self.started.insert(key, n);
@@ -405,7 +454,21 @@ pub(super) fn event_tokens_of(usage: &vibevalley_runtime::oar::Usage) -> Option<
 /// What a tool call is shown as: the command, file, pattern or address it
 /// names, near the session's folder; else the tool's name.
 pub(super) fn tool_detail(input: &serde_json::Value, cwd: &str) -> String {
-    let pick = ["command", "cmd", "file_path", "path", "notebook_path", "pattern", "url", "query"];
+    let pick = [
+        "command",
+        "cmd",
+        "file_path",
+        "filePath",
+        "TargetFile",
+        "targetFile",
+        "AbsolutePath",
+        "absolutePath",
+        "path",
+        "notebook_path",
+        "pattern",
+        "url",
+        "query",
+    ];
     let found = pick.iter().find_map(|k| match &input[*k] {
         serde_json::Value::String(s) if !s.is_empty() => Some(s.clone()),
         serde_json::Value::Array(a) if !a.is_empty() => Some(a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(" ")),
@@ -445,6 +508,7 @@ pub struct Trajectories {
     dir: PathBuf,
     open: Mutex<HashMap<String, Journal>>,
     hub: Weak<Hub>,
+    wake: flume::Sender<()>,
     stop: Mutex<Option<flume::Sender<()>>>,
     thread: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
@@ -474,28 +538,70 @@ impl Trajectories {
         let dir = home.join("events");
         let _ = std::fs::create_dir_all(&dir);
         let (stop_tx, stop_rx) = flume::bounded::<()>(0);
+        let (wake_tx, wake_rx) = flume::bounded::<()>(1);
         let t = Arc::new(Trajectories {
             dir,
             open: Mutex::default(),
             hub: Arc::downgrade(hub),
+            wake: wake_tx,
             stop: Mutex::new(Some(stop_tx)),
             thread: Mutex::new(None),
         });
         let weak = Arc::downgrade(&t);
         if let Ok(handle) = std::thread::Builder::new().name("vibevalley-journal".into()).spawn(move || {
+            enum Wake {
+                Stop,
+                Dirty,
+            }
             loop {
-                let stopped = !matches!(stop_rx.recv_timeout(Duration::from_millis(100)), Err(flume::RecvTimeoutError::Timeout));
+                if !matches!(stop_rx.try_recv(), Err(flume::TryRecvError::Empty)) {
+                    if let Some(t) = weak.upgrade() {
+                        t.finish_all();
+                    }
+                    return;
+                }
+                let deadline = {
+                    let Some(t) = weak.upgrade() else { return };
+                    if t.hub.strong_count() == 0 {
+                        t.finish_all();
+                        return;
+                    }
+                    t.next_deadline()
+                };
+                let woke = match deadline {
+                    None => flume::Selector::new()
+                        .recv(&stop_rx, |_| Wake::Stop)
+                        .recv(&wake_rx, |r| if r.is_ok() { Wake::Dirty } else { Wake::Stop })
+                        .wait(),
+                    Some(at) => match at.checked_duration_since(Instant::now()) {
+                        None => Wake::Dirty,
+                        Some(wait) => flume::Selector::new()
+                            .recv(&stop_rx, |_| Wake::Stop)
+                            .recv(&wake_rx, |r| if r.is_ok() { Wake::Dirty } else { Wake::Stop })
+                            .wait_timeout(wait)
+                            .unwrap_or(Wake::Dirty),
+                    },
+                };
                 let Some(t) = weak.upgrade() else { return };
-                if stopped || t.hub.strong_count() == 0 {
+                if matches!(woke, Wake::Stop) || t.hub.strong_count() == 0 {
                     t.finish_all();
                     return;
                 }
+                while wake_rx.try_recv().is_ok() {}
                 t.flush(false);
             }
         }) {
             *lock(&t.thread) = Some(handle);
         }
         t
+    }
+
+    fn next_deadline(&self) -> Option<Instant> {
+        lock(&self.open).values().filter_map(Journal::next_deadline).min()
+    }
+
+    fn notify_worker(&self) {
+        let _ = self.wake.try_send(());
     }
 
     fn file_of(&self, id: &str) -> PathBuf {
@@ -531,11 +637,18 @@ impl Trajectories {
         if !known_id(id) {
             return None;
         }
-        let mut open = lock(&self.open);
-        let j = open
-            .entry(id.to_string())
-            .or_insert_with(|| Journal::new(read_journal(&self.file_of(id)).unwrap_or_default()));
-        Some(f(j))
+        let (out, dirty) = {
+            let mut open = lock(&self.open);
+            let j = open
+                .entry(id.to_string())
+                .or_insert_with(|| Journal::new(read_journal(&self.file_of(id)).unwrap_or_default()));
+            let out = f(j);
+            (out, j.next_deadline().is_some())
+        };
+        if dirty {
+            self.notify_worker();
+        }
+        Some(out)
     }
 
     /// A session's log, oldest first; a run's only when `run` is given.
@@ -705,5 +818,81 @@ impl Trajectories {
                 hub.session_event(id, e);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use vibevalley_protocol::LiveEvent;
+
+    use super::*;
+    use crate::Server;
+
+    #[test]
+    fn run_on_appends_streaming_text_in_place_and_caps_at_text_max() {
+        let mut journal = Journal::new(vec![]);
+        for _ in 0..(TEXT_MAX + 50) {
+            journal.said("a", &[]);
+        }
+        let events = journal.events();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].text.len(), TEXT_MAX + '…'.len_utf8());
+        assert!(events[0].text.ends_with('…'));
+        assert_eq!(events[0].revision, TEXT_MAX as i64);
+
+        let mut cjk = Journal::new(vec![]);
+        let chunk = "中".repeat(2500);
+        cjk.said(&chunk, &[]);
+        cjk.said(&chunk, &[]);
+        cjk.said(&chunk, &[]);
+        let ev = &cjk.events()[0];
+        assert_eq!(ev.text.chars().count(), TEXT_MAX + 1);
+        assert!(ev.text.ends_with('…'));
+    }
+
+    #[test]
+    fn tool_detail_extracts_antigravity_and_camel_case_path_keys() {
+        let cwd = "/repo/project";
+        for key in ["TargetFile", "AbsolutePath", "targetFile", "absolutePath", "filePath"] {
+            let input = json!({ key: "/repo/project/src/main.rs" });
+            assert_eq!(tool_detail(&input, cwd), "src/main.rs", "failed for key {key}");
+        }
+        assert_eq!(tool_detail(&json!({ "TargetFile": "/other/file.rs" }), cwd), "/other/file.rs");
+    }
+
+    #[test]
+    fn trajectories_event_driven_worker_wakes_flushes_and_closes_when_idle() {
+        let home = tempfile::tempdir().unwrap();
+        let hub = Hub::new(vibevalley_core::Core::default().state().clone());
+
+        // Idle close returns immediately without polling delay.
+        let idle = Trajectories::open(home.path(), &hub);
+        assert!(idle.next_deadline().is_none());
+        let start = Instant::now();
+        idle.close();
+        assert!(start.elapsed() < Duration::from_secs(1));
+
+        let tr = Trajectories::open(home.path(), &hub);
+        let live = hub.live();
+        tr.step("w1", "", Step::Asked { text: "hello".into() });
+        assert!(tr.next_deadline().is_some());
+
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut saw_push = false;
+        while Instant::now() < deadline {
+            match live.recv_timeout(Duration::from_millis(50)) {
+                Ok(LiveEvent::Event(ev)) if ev.id == "w1" && ev.activity.text == "hello" => {
+                    saw_push = true;
+                    break;
+                }
+                Ok(_) => {}
+                Err(flume::RecvTimeoutError::Timeout) => {}
+                Err(flume::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+        assert!(saw_push, "event-driven journal worker should flush pending push at PUSH_AFTER");
+        tr.close();
+        assert!(home.path().join("events/w1.json").is_file());
     }
 }

@@ -243,11 +243,40 @@ join channel_read_cursor r on r.channel_id = m.channel_id and r.participant_id =
 where m.kind = 'report' and m.deleted_at is null
   and not exists (select 1 from channel_message n where n.channel_id = m.channel_id and n.sender_id = m.sender_id and n.kind = 'report' and n.number > m.number);
 
--- name: CursorOf :one
-select seq from watch_cursor where name = ?1;
+-- name: InsertDelivery :one
+insert into channel_delivery (message_id, channel_id, recipient_kind, recipient_id, reason, wakes, held_by, status, created_at)
+values (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8)
+returning id;
 
--- name: MoveCursor :exec
-insert into watch_cursor (name, seq) values (?1, ?2) on conflict (name) do update set seq = max(seq, excluded.seq);
+-- name: PendingDeliveriesByKind :many
+select id, message_id, channel_id, recipient_kind, recipient_id, reason, wakes, held_by, status, created_at, settled_at
+from channel_delivery
+where recipient_kind = ?1 and status = 'pending'
+order by id;
+
+-- name: PendingDeliveriesForRecipient :many
+select id, message_id, channel_id, recipient_kind, recipient_id, reason, wakes, held_by, status, created_at, settled_at
+from channel_delivery
+where recipient_kind = ?1 and recipient_id = ?2 and status = 'pending' and id <= ?3
+order by id;
+
+-- name: DeliveryIsPending :one
+select count(*) as total from channel_delivery where id = ?1 and status = 'pending';
+
+-- name: PendingDeliveriesForMessage :one
+select count(*) as total from channel_delivery where message_id = ?1 and status = 'pending';
+
+-- name: SettleDelivery :exec
+update channel_delivery set status = ?1, settled_at = ?2 where id = ?3 and status = 'pending';
+
+-- name: WithdrawDeliveriesForMessage :exec
+update channel_delivery set status = 'withdrawn', settled_at = ?1 where message_id = ?2 and status = 'pending';
+
+-- name: WithdrawDeliveriesForRecipient :exec
+update channel_delivery set status = 'withdrawn', settled_at = ?1 where recipient_kind = ?2 and recipient_id = ?3 and status = 'pending';
+
+-- name: RemoveChannelDeliveries :exec
+delete from channel_delivery where channel_id = ?1 or channel_id in (select id from channel where parent_id = ?1);
 
 -- name: RemoveThreadMessages :exec
 delete from channel_message where channel_id in (select id from channel where parent_id = ?1);

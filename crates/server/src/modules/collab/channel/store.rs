@@ -2,6 +2,7 @@ use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{ApiError, Channel, ChannelLast, ChannelUnread, DEFAULT_ORCHESTRATOR, EVERYONE, SubjectKind, USER_ID};
 
 use super::db::{self, ChannelRow, Connection, EventRow, MsgRow, ParticipantRow};
+use super::dispatch::Reach;
 use super::model::ChatModel;
 use super::types::{
     AddressedMessage, ArtifactRef, Committed, FileAt, Place, Seat, ThreadSubject, actor_of, channel_type, meta_of, meta_text, new_id, notify_of, subject_kind,
@@ -27,6 +28,7 @@ pub struct Inner {
     pub(super) db: Connection,
     pub(super) transaction_depth: usize,
     pub(super) model: ChatModel,
+    pub(super) reach: Reach,
 }
 
 /// A savepoint around `work`: on failure the tables and the model are as
@@ -36,15 +38,16 @@ pub struct Inner {
 pub(super) fn tx<T>(inner: &mut Inner, work: impl FnOnce(&mut Inner) -> Result<T, ApiError>) -> Result<T, ApiError> {
     struct Savepoint<'a> {
         inner: &'a mut Inner,
-        previous: Option<ChatModel>,
+        previous: Option<(ChatModel, Reach)>,
         undo: &'static str,
     }
     impl Drop for Savepoint<'_> {
         fn drop(&mut self) {
             self.inner.transaction_depth -= 1;
-            if let Some(previous) = self.previous.take() {
+            if let Some((previous_model, previous_reach)) = self.previous.take() {
                 let _ = db::control(&self.inner.db, self.undo);
-                self.inner.model = previous;
+                self.inner.model = previous_model;
+                self.inner.reach = previous_reach;
             }
         }
     }
@@ -53,7 +56,7 @@ pub(super) fn tx<T>(inner: &mut Inner, work: impl FnOnce(&mut Inner) -> Result<T
     } else {
         ("savepoint chat", "release chat", "rollback to chat; release chat")
     };
-    let previous = inner.model.clone();
+    let previous = (inner.model.clone(), inner.reach.clone());
     db::control(&inner.db, begin).q()?;
     inner.transaction_depth += 1;
     let mut guard = Savepoint {

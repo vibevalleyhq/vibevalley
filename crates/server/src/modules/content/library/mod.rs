@@ -3,8 +3,8 @@
 //! helper brought in, one item per file in `server.db`'s
 //! `media_library_item` (joined with the attachments' table).
 //!
-//! What the farm hears is recorded on a thread of its own: a hub watcher
-//! may run while the chat holds its write transaction.
+//! What the farm hears is recorded on its own event bus worker thread so
+//! recording never runs inside a chat write transaction.
 
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
@@ -121,8 +121,7 @@ fn item_of(row: q::GetItemRow) -> LibraryItem {
 pub struct Library {
     db: ModuleDb,
     files: Arc<Attachments>,
-    stop: Mutex<Option<flume::Sender<()>>>,
-    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    sub: Mutex<Option<crate::event_bus::Subscription>>,
 }
 
 impl Library {
@@ -130,18 +129,13 @@ impl Library {
         Ok(Arc::new(Library {
             db: ModuleDb::open(home, include_str!("sql/schema.sql")).map_err(db_failed)?,
             files,
-            stop: Mutex::new(None),
-            thread: Mutex::new(None),
+            sub: Mutex::new(None),
         }))
     }
 
     pub fn close(&self) {
-        let _ = lock(&self.stop).take();
-        if let Some(handle) = lock(&self.thread).take()
-            && handle.thread().id() != std::thread::current().id()
-        {
-            let _ = handle.join();
-        }
+        let prev = lock(&self.sub).take();
+        drop(prev);
     }
 
     fn found(&self, id: &str) -> Result<LibraryItem, ApiError> {
@@ -445,11 +439,6 @@ fn ready_made(job: &MediaJob) -> Option<(&str, JobKind, &str, i64)> {
     }
 }
 
-enum Heard {
-    Made(Vec<MediaJob>),
-    Said(Box<vibevalley_protocol::ChatMessage>),
-}
-
 /// The `library.item.*` endpoints (the user's), and the recording of what
 /// the farm hears.
 pub fn install(hub: &Hub, library: Arc<Library>) {
@@ -462,34 +451,20 @@ pub fn install(hub: &Hub, library: Arc<Library>) {
     let l = library.clone();
     hub.on::<ops::LibraryItemPreviewDelete>(move |_, r| l.preview_remove(&r.id));
 
-    let (tx, rx) = flume::unbounded::<Heard>();
-    let (stop_tx, stop_rx) = flume::bounded::<()>(0);
-    *lock(&library.stop) = Some(stop_tx);
-    hub.watch(Arc::new(move |_, tr| {
-        let heard = match &tr.fact {
-            Fact::MediaChanged(m) => Heard::Made(m.jobs.clone()),
-            Fact::MessageChanged(m) => Heard::Said(Box::new(m.message.clone())),
+    let weak = Arc::downgrade(&library);
+    let sub = hub.subscribe_transitions("library", move |_, tr| {
+        let Some(l) = weak.upgrade() else { return };
+        let done = match &tr.fact {
+            Fact::MediaChanged(m) => l.record_made(&m.jobs),
+            Fact::MessageChanged(m) => l.record_said(&m.message),
             _ => return,
         };
-        let _ = tx.send(heard);
-    }));
-    let weak = Arc::downgrade(&library);
-    if let Ok(handle) = std::thread::Builder::new().name("vibevalley-library".into()).spawn(move || {
-        loop {
-            let heard = flume::Selector::new().recv(&rx, |r| r.ok()).recv(&stop_rx, |_| None).wait();
-            let Some(heard) = heard else { return };
-            let Some(l) = weak.upgrade() else { return };
-            let done = match heard {
-                Heard::Made(jobs) => l.record_made(&jobs),
-                Heard::Said(message) => l.record_said(&message),
-            };
-            if let Err(e) = done {
-                eprintln!("vibevalley-server: library: recording: {}", e.message);
-            }
+        if let Err(e) = done {
+            eprintln!("vibevalley-server: library: recording: {}", e.message);
         }
-    }) {
-        *lock(&library.thread) = Some(handle);
-    }
+    });
+    let prev = lock(&library.sub).replace(sub);
+    drop(prev);
 }
 
 #[cfg(test)]
