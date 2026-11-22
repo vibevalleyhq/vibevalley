@@ -355,11 +355,16 @@ impl Sessions {
                 return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
             }
             let mut meta = self.workspace_snapshot(&session.id);
-            if let Some(m) = input.model.as_deref().map(str::trim).filter(|m| !m.is_empty()) {
+            let model_opt = input.model.as_deref().map(str::trim).filter(|m| !m.is_empty());
+            let effort_opt = input.effort.as_deref().map(str::trim).filter(|e| !e.is_empty());
+            let model_changed = model_opt.is_some_and(|m| meta.model.as_deref() != Some(m));
+            if let Some(m) = model_opt {
                 meta.model = Some(m.to_string());
             }
-            if let Some(e) = input.effort.as_deref().map(str::trim).filter(|e| !e.is_empty()) {
+            if let Some(e) = effort_opt {
                 meta.effort = Some(e.to_string());
+            } else if model_changed {
+                meta.effort = None;
             }
             if let Some(p) = input.permission_mode {
                 meta.permission_mode = p;
@@ -650,11 +655,14 @@ impl Sessions {
         };
         let model_opt = input.model.as_deref().map(str::trim).filter(|m| !m.is_empty());
         let effort_opt = input.effort.as_deref().map(str::trim).filter(|e| !e.is_empty());
+        let model_changed = model_opt.is_some_and(|m| next.model.as_deref() != Some(m));
         if let Some(m) = model_opt {
             next.model = Some(m.to_string());
         }
         if let Some(e) = effort_opt {
             next.effort = Some(e.to_string());
+        } else if model_changed {
+            next.effort = None;
         }
         if let Some(p) = input.permission_mode {
             next.permission_mode = p;

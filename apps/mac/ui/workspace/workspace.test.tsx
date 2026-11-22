@@ -800,3 +800,91 @@ test("workspace skeletons: 150ms anti-flash gate suppresses fast loads and rende
   });
   expect(pal.count("id:palette-skeleton")).toBe(0);
 });
+
+test("regression: ChatPane hides thought level and omits effort for Orchestrator (Neon) with empty effortLevels", async () => {
+  const baseSession = {
+    id: "sess-orch-1",
+    role: "worker",
+    name: "Antigravity",
+    agent: "antigravity",
+    runtime: "antigravity",
+    brief: "Orchestrator chat",
+    repo: "vibevalley",
+    worktree: "/work/vibevalley",
+    hiredAt: 1_700_000_000_000,
+    runs: 1,
+    refining: false,
+    phase: { _tag: "resting" },
+  };
+  const host = workspaceHost(
+    { view: "workspace-chat", tabId: 44, runtime: "antigravity", cwd: "/work/vibevalley", repo: "vibevalley" },
+    {
+      "runtime.list": [
+        {
+          id: "antigravity",
+          preset: {
+            id: "antigravity",
+            label: "Antigravity",
+            blurb: "ACP",
+            look: { species: null, outfit: null, orchestrator: null, build: "biped", head: "rounded", body: "blue", trim: "navy", hat: "slate", eye: "ink" },
+          },
+          support: { steer: true, refused: {}, capabilities: ["listModels"], inProcess: false, inSessionConfig: true },
+          installation: { status: "available", via: "executable", command: "agy", version: "1.5.14" },
+          models: [
+            { id: "gemini-4-neon", name: "Gemini 4 Neon", effortLevels: ["low", "medium", "high", "xhigh"], defaultEffort: "high", isDefault: true },
+            { id: "gemini-pro-orchestrator-neon", name: "Orchestrator (Neon)", effortLevels: [], isDefault: false },
+          ],
+          usage: null,
+          skills: null,
+          mcpServers: null,
+          tools: null,
+          settings: { enabled: true, binPath: "", defaultModel: "gemini-4-neon", defaultEffort: "high", env: {} },
+          stop: "ok",
+          checkedAt: 1_700_000_000_000,
+        },
+      ] satisfies RuntimeInfo[],
+      "session.openWorkspace": {
+        id: "sess-orch-1",
+        session: baseSession,
+        model: "gemini-pro-orchestrator-neon",
+        permissionMode: "acceptEdits",
+      },
+      "session.send": baseSession,
+      "session.setConfig": {
+        id: "sess-orch-1",
+        session: baseSession,
+        model: "gemini-4-neon",
+        permissionMode: "acceptEdits",
+      },
+    },
+  );
+
+  const app = await open("../App.story.tsx", { width: 820, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  await host.pump(app);
+
+  expect(app.count("id:chat-thought-level")).toBe(1);
+
+  await app.press("id:chat-model-select");
+  await app.press("id:chat-model-option-gemini-pro-orchestrator-neon");
+  await host.pump(app);
+  expect(app.count("id:chat-thought-level")).toBe(0);
+
+  host.clearCalls();
+  await app.type("id:chat-composer-input", "Plan the rollout");
+  await app.press("id:chat-send");
+  await host.pump(app);
+
+  const openCall = host.calls.find((c) => c.op === "session.openWorkspace");
+  expect(openCall).toBeDefined();
+  const payload = openCall?.payload as Record<string, unknown>;
+  expect(payload.model).toBe("gemini-pro-orchestrator-neon");
+  expect("effort" in payload).toBe(false);
+  expect(app.count("id:chat-thought-level")).toBe(0);
+
+  host.clearCalls();
+  await app.press("id:chat-model-select");
+  await app.press("id:chat-model-option-gemini-4-neon");
+  await host.pump(app);
+  expect(app.count("id:chat-thought-level")).toBe(1);
+  expect(host.calls).toContainEqual({ op: "session.setConfig", payload: { id: "sess-orch-1", model: "gemini-4-neon" } });
+});
