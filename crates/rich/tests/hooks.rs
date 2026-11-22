@@ -1,5 +1,3 @@
-mod support;
-
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
@@ -11,7 +9,7 @@ use vibevalley_rich::{
     clear_genui_renderer, register_chart_renderer, register_genui_renderer, vv_chart, vv_gen_ui, vv_markdown,
 };
 
-use support::{TestHarness, assert_inline_svg_image};
+use crate::support::{TestHarness, assert_inline_svg_image};
 
 static HOOK_TEST_LOCK: Mutex<()> = Mutex::new(());
 

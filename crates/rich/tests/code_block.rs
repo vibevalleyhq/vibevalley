@@ -1,5 +1,3 @@
-mod support;
-
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -11,7 +9,7 @@ use vibevalley_rich::{
     vv_code_block,
 };
 
-use support::TestHarness;
+use crate::support::TestHarness;
 
 static CACHE_LOCK: Mutex<()> = Mutex::new(());
 

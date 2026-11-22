@@ -25,14 +25,13 @@ import {
   SessionWorkspace as SessionWorkspaceSchema,
 } from "@vibevalley/protocol/session/schema";
 
-import { computeTelemetry, extractToolTarget, formatTokens, mergeSteps, shownEvents, type ChatTelemetry, type ToolTarget } from "../features/session/runs";
+import { computeTelemetry, extractToolTarget, formatTokens, mergeSteps, shownEvents } from "../features/session/runs";
 import { transport } from "../infra/transport";
 
 export {
   computeTelemetry,
   extractToolTarget,
   formatTokens,
-  type ChatTelemetry,
   type EventTokens,
   type SessionChildStep,
   type SessionEvent,
@@ -48,7 +47,6 @@ export {
   type SessionSwarmThread,
   type SessionWatchEvent,
   type SessionWorkspace,
-  type ToolTarget,
 };
 
 export interface ComposerFile {

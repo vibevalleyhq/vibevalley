@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -11,7 +9,9 @@ use vibevalley_pele::svg::edges::{Fill, OverFill, over_fills};
 use vibevalley_pele::svg::theme::{SvgTheme, ThemeMode, resolve_style};
 use vibevalley_pele::{ErrorCode, LinkInfo, ParseOptions, ParsedModel, RenderOptions, parse, render};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, load_fixture, resolved_options};
+use crate::support::{
+    Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, load_fixture, resolved_options,
+};
 
 fn parse_flow(src: &str) -> FlowDb {
     let mut db = FlowDb::new(FlowDbOptions::default());

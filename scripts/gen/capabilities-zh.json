@@ -371,7 +371,12 @@
       }
     },
     "session": {
+      "binding": {
+        "attach": "给执行会话挂载上下文绑定",
+        "detach": "从执行会话移除上下文绑定"
+      },
       "childTranscript": "读取子代理或协作组员最近的轨迹步骤",
+      "closeWorkspace": "关闭工作区直连对话会话并回收执行进程",
       "event": {
         "list": "读一个执行会话的轨迹，从早到晚"
       },

@@ -1,6 +1,6 @@
 # 验收服务端
 
-[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：在沙箱里调接口，看折好的核心状态；改了工单的走法，用命令行把一张工单派出去、交回来、完成。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：在沙箱里调接口，看按域切片（`/api/v1/slice/{name}`：`board`、`sessions`、`collab`、`inbox`、`ops` 与独立 `farm`）；改了工单的走法，用命令行把一张工单派出去、交回来、完成。
 
 ## 什么时候用
 
@@ -24,10 +24,10 @@
    vpx scripts/release/verify-server.ts
    ```
 
-2. 调这次改动的接口、看状态：
+2. 调这次改动的接口、看切片快照（`state --json` 拉全量 6 路快照，`state --slice <board|sessions|collab|inbox|ops|farm> [--watch] --json` 读或流式看单个 `/api/v1/slice/{name}`）：
 
    ```bash
-   vpx scripts/release/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" state --json && "$VIBEVALLEY_VERIFY_CLI" issue list --json'
+   vpx scripts/release/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" state --slice board --json && "$VIBEVALLEY_VERIFY_CLI" issue list --json'
    ```
 
    要造数据或断言，写进同一个子命令。

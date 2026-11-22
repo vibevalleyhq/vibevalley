@@ -63,7 +63,9 @@ fn the_ledger_folds_back_through_a_restart_and_skips_what_it_cannot_read() {
         let titled = hub.call_as(Caller::User, "game.title.set", json!({ "achievement": "harvests", "tier": 1 }));
         assert!(titled.error.is_none(), "{}", titled.message);
         let list = hub.call_as(Caller::User, "game.achievement.list", json!(null)).data.unwrap();
-        assert!(!list.as_array().unwrap().is_empty());
+        let parsed: vibevalley_protocol::AchievementList = serde_json::from_value(list).unwrap();
+        assert!(!parsed.items.is_empty());
+        assert!(!parsed.standings.is_empty());
         hub.close_bus();
         hub.read(|s| s.progress.clone()).unwrap()
     };

@@ -1,7 +1,4 @@
-#[path = "chart_common/mod.rs"]
-mod common;
-
-use common::assert_valid_resolved_svg;
+use crate::chart_common::assert_valid_resolved_svg;
 use vibevalley_rich::engine::chart::{
     Annotation, AreaMode, AreaSpec, AxisScale, BarMode, BarOrientation, BarSeries, BarSpec, BoxStats, BoxplotGroup, BoxplotSpec, ChartError, ChartKind,
     ChartSpec, HeatmapScale, HeatmapSpec, HistogramMode, HistogramSpec, Interpolation, LineSeries, LineSpec, NumberFormat, PieLabelFormat, PieSlice, PieSpec,

@@ -1,15 +1,13 @@
-mod support;
-
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashSet};
 use std::sync::{Arc, LazyLock};
 
+use crate::support::TestHarness;
 use nsh_core::canvas::{CanvasOp, PathOp};
 use nsh_core::element::Root;
 use nsh_core::prelude::*;
 use nsh_core::{EventKind, EventPayload};
 use resvg::tiny_skia;
-use support::TestHarness;
 use vibevalley_protocol::{ArtifactEntry, ArtifactEntryKind};
 use vibevalley_rich::engine::canvas::Canvas;
 use vibevalley_rich::engine::whiteboard::{
@@ -25,9 +23,18 @@ use vibevalley_rich::{
 
 static SYSTEM_FONTS: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| {
     let mut db = usvg::fontdb::Database::new();
-    db.load_system_fonts();
-    db.load_fonts_dir("/System/Library/Fonts");
-    db.load_fonts_dir("/Library/Fonts");
+    for path in [
+        "/System/Library/Fonts/HelveticaNeue.ttc",
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/System/Library/Fonts/STHeiti Medium.ttc",
+        "/System/Library/Fonts/Supplemental/Georgia.ttf",
+        "/System/Library/Fonts/Supplemental/Songti.ttc",
+    ] {
+        let _ = db.load_font_file(path);
+    }
+    if db.is_empty() {
+        db.load_system_fonts();
+    }
     Arc::new(db)
 });
 

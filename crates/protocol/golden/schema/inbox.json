@@ -7,7 +7,8 @@
   "conflict",
   "quiet",
   "mention",
-  "cron-ask"
+  "cron-ask",
+  "budget_reached"
  ],
  "InboxFrom": [
   {
@@ -24,6 +25,9 @@
   },
   {
    "kind": "orchestrator"
+  },
+  {
+   "kind": "runtime"
   }
  ],
  "InboxTarget": [
@@ -50,6 +54,15 @@
   {
    "kind": "chat",
    "channel": "s1475"
+  },
+  {
+   "kind": "runtime",
+   "taskId": "t1",
+   "sessionId": "w1"
+  },
+  {
+   "kind": "runtime",
+   "taskId": "t2"
   }
  ],
  "InboxWords": [

@@ -18,7 +18,7 @@ import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
 import { api } from "../../../infra/api";
 import { typedMarks } from "../../../infra/base/typedMarks";
-import { useCore } from "../../../infra/frame";
+import { useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { useIntents } from "../../../infra/state/intent";
 import { transport } from "../../../infra/transport";
@@ -94,7 +94,8 @@ export function Composer(props: {
   onClearQuote?: (() => void) | undefined;
   onRemoveQuote?: ((blockId: string) => void) | undefined;
 }) {
-  const core = useCore();
+  const collab = useCollabSlice();
+  const sessions = useSessionsSlice();
   const problem = signal<string | undefined>(undefined);
   const emoji = signal(false);
   const focused = signal(false);
@@ -111,7 +112,7 @@ export function Composer(props: {
     selection.set({ start: caret, end: caret });
     placed.set({ start: caret });
   };
-  const box = createComposer(core, place, {
+  const box = createComposer(collab, sessions, place, {
     ...(at ? { initial: untracked(() => draftOf(at).text) } : {}),
     says: useIntents(chatSay),
     target: () => {

@@ -3,14 +3,50 @@
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, Weak};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock, Weak};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::oar::record::Recorder;
+use crate::oar::voyage::normalize_trace_id;
 use crate::oar::{
     AgentError, Capabilities, ContentBlock, Event, EventKind, InteractionDecision, PermissionDecision, PermissionMode, Result, Session, SessionStatus,
-    StopReason, Usage,
+    StopReason, TurnOptions, Usage,
 };
+
+pub trait OarObserver: Send + Sync {
+    fn on_event(&self, session_id: &str, event: &Event);
+}
+
+static HAS_OBSERVER: AtomicBool = AtomicBool::new(false);
+static OBSERVER: RwLock<Option<Arc<dyn OarObserver>>> = RwLock::new(None);
+
+pub fn set_observer(observer: Option<Arc<dyn OarObserver>>) {
+    let has = observer.is_some();
+    // Drop the displaced observer outside the write lock: its Drop may drop a Session and emit SessionEnded.
+    let previous = {
+        let mut slot = OBSERVER.write().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous = std::mem::replace(&mut *slot, observer);
+        HAS_OBSERVER.store(has, Ordering::Release);
+        previous
+    };
+    drop(previous);
+}
+
+pub fn has_observer() -> bool {
+    HAS_OBSERVER.load(Ordering::Relaxed)
+}
+
+fn notify_observer(session_id: &str, event: &Event) {
+    // Clone and release the RwLock before invoking so callbacks may inspect session state or clear the observer without deadlocking.
+    let observer = {
+        let guard = OBSERVER.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        guard.clone()
+    };
+    if let Some(observer) = observer {
+        observer.on_event(session_id, event);
+    }
+}
 
 /// One-word reasons carried at the front of `AgentError::Rejected`
 /// (`"busy: a turn is running"`); see `AgentError::rejection_code`. The words
@@ -186,12 +222,14 @@ struct CoreState {
     manual_compaction: bool,
     input_id: String,
     span_id: String,
+    trace_id: Option<u64>,
 }
 
 struct QueuedInput {
     content: Vec<ContentBlock>,
     id: String,
     span: String,
+    trace_id: Option<u64>,
 }
 
 type TurnHook = Arc<dyn Fn() + Send + Sync>;
@@ -243,6 +281,7 @@ impl SessionCore {
                 manual_compaction: false,
                 input_id: String::new(),
                 span_id: String::new(),
+                trace_id: None,
             }),
             after_turn: Mutex::new(None),
         })
@@ -280,9 +319,9 @@ impl SessionCore {
         ) || self.runtime_id().starts_with("acp:")
     }
 
-    fn emit_locked(&self, state: &mut CoreState, agent_path: Vec<String>, mut kind: EventKind) {
+    fn emit_locked(&self, state: &mut CoreState, agent_path: Vec<String>, mut kind: EventKind) -> Option<(String, Event)> {
         if state.ended {
-            return;
+            return None;
         }
         if agent_path.is_empty() && self.external() {
             match &mut kind {
@@ -324,7 +363,8 @@ impl SessionCore {
             state.compacting = false;
             state.manual_compaction = false;
             state.span_id.clear();
-            return;
+            state.trace_id = None;
+            return None;
         }
         let event = Event {
             seq: state.next_seq,
@@ -338,6 +378,8 @@ impl SessionCore {
             state.span_id = format!("turn-{}", event.seq);
         }
         let mut envelope = crate::oar::voyage::Record::event(self.session_id(), &event);
+        // Zero locking and zero allocation when no observer is installed; callbacks run after callers drop `state`.
+        let observed = HAS_OBSERVER.load(Ordering::Relaxed).then(|| (envelope.session_id.clone(), event.clone()));
         if event.agent_path.is_empty() {
             if let EventKind::Error { message } = &event.kind {
                 state.last_error = Some(message.clone());
@@ -394,6 +436,7 @@ impl SessionCore {
         }
         if event.agent_path.is_empty() && matches!(event.kind, EventKind::TurnFinished { .. }) {
             state.span_id.clear();
+            state.trace_id = None;
         }
         state.subscribers.retain(|subscriber| subscriber.send(event.clone()).is_ok());
         if matches!(event.kind, EventKind::SessionEnded) {
@@ -407,6 +450,7 @@ impl SessionCore {
             state.history.pop_front();
         }
         state.history.push_back(event);
+        observed
     }
 
     fn record_locked(&self, state: &mut CoreState, mut record: crate::oar::voyage::Record) {
@@ -414,6 +458,7 @@ impl SessionCore {
         if record.span_id.is_empty() {
             record.span_id = state.span_id.clone();
         }
+        record.trace_id = normalize_trace_id(record.trace_id).or(state.trace_id);
         if let Some(recorder) = state.recorder.as_mut()
             && recorder.write(&record).is_err()
         {
@@ -529,6 +574,7 @@ impl SessionCore {
         record.raw = line.as_bytes().to_vec();
         record.frame_type = kind.to_string();
         record.span_id = state.span_id.clone();
+        record.trace_id = state.trace_id;
         self.flush_frame(&mut state, producer);
         state.frames.insert(producer, record);
         guard
@@ -536,9 +582,12 @@ impl SessionCore {
 
     pub(crate) fn emit(&self, agent_path: Vec<String>, kind: EventKind) {
         let finished_root_turn = agent_path.is_empty() && matches!(kind, EventKind::TurnFinished { .. });
-        {
+        let observed = {
             let mut state = self.lock();
-            self.emit_locked(&mut state, agent_path, kind);
+            self.emit_locked(&mut state, agent_path, kind)
+        };
+        if let Some((session_id, event)) = observed {
+            notify_observer(&session_id, &event);
         }
         if finished_root_turn {
             // Cloned out: the hook can finish another turn and re-enter `emit`.
@@ -587,58 +636,84 @@ impl SessionCore {
 
     /// Atomically: refuse when unreachable or busy, else record the turn's start.
     pub fn begin_turn(&self, prompt: &str) -> Result<()> {
-        self.begin_span(prompt, "", "")
+        self.begin_turn_with(prompt, TurnOptions::default())
     }
-    fn begin_span(&self, prompt: &str, input_id: &str, span: &str) -> Result<()> {
-        let mut state = self.lock();
-        if let Some(error) = Self::unreachable(&state) {
-            return Err(error);
+
+    pub fn begin_turn_with(&self, prompt: &str, opts: TurnOptions) -> Result<()> {
+        self.begin_span(prompt, "", "", opts.trace_id)
+    }
+
+    fn begin_span(&self, prompt: &str, input_id: &str, span: &str, trace_id: Option<u64>) -> Result<()> {
+        let observed = {
+            let mut state = self.lock();
+            if let Some(error) = Self::unreachable(&state) {
+                return Err(error);
+            }
+            if state.compacting {
+                return Err(rejected("compacting", "compaction is running"));
+            }
+            if state.fold.turn_active() {
+                return Err(rejected(rejection::BUSY, "a turn is running; use steer or queue"));
+            }
+            state.span_id = span.into();
+            state.input_id = input_id.into();
+            state.trace_id = normalize_trace_id(trace_id);
+            self.emit_locked(&mut state, Vec::new(), EventKind::TurnStarted { prompt: prompt.to_string() })
+        };
+        if let Some((session_id, event)) = observed {
+            notify_observer(&session_id, &event);
         }
-        if state.compacting {
-            return Err(rejected("compacting", "compaction is running"));
-        }
-        if state.fold.turn_active() {
-            return Err(rejected(rejection::BUSY, "a turn is running; use steer or queue"));
-        }
-        state.span_id = span.into();
-        state.input_id = input_id.into();
-        self.emit_locked(&mut state, Vec::new(), EventKind::TurnStarted { prompt: prompt.to_string() });
         Ok(())
     }
 
     /// Starts the turn when idle (`Ok(true)`), else holds the input (`Ok(false)`).
-    fn begin_turn_or_queue(&self, content: &[ContentBlock], id: &str, span: &str) -> Result<bool> {
-        let mut state = self.lock();
-        if let Some(error) = Self::unreachable(&state) {
-            return Err(error);
+    fn begin_turn_or_queue(&self, content: &[ContentBlock], id: &str, span: &str, trace_id: Option<u64>) -> Result<bool> {
+        let trace_id = normalize_trace_id(trace_id);
+        let observed = {
+            let mut state = self.lock();
+            if let Some(error) = Self::unreachable(&state) {
+                return Err(error);
+            }
+            if state.compacting && self.runtime_id() == "codex" {
+                return Err(rejected("compacting", "manual compaction is running"));
+            }
+            if state.compacting || state.fold.turn_active() || !state.queue.is_empty() {
+                state.queue.push_back(QueuedInput {
+                    content: content.to_vec(),
+                    id: id.into(),
+                    span: span.into(),
+                    trace_id,
+                });
+                return Ok(false);
+            }
+            state.span_id = span.into();
+            state.input_id = id.into();
+            state.trace_id = trace_id;
+            self.emit_locked(&mut state, Vec::new(), EventKind::TurnStarted { prompt: render_text(content) })
+        };
+        if let Some((session_id, event)) = observed {
+            notify_observer(&session_id, &event);
         }
-        if state.compacting && self.runtime_id() == "codex" {
-            return Err(rejected("compacting", "manual compaction is running"));
-        }
-        if state.compacting || state.fold.turn_active() || !state.queue.is_empty() {
-            state.queue.push_back(QueuedInput {
-                content: content.to_vec(),
-                id: id.into(),
-                span: span.into(),
-            });
-            return Ok(false);
-        }
-        state.span_id = span.into();
-        state.input_id = id.into();
-        self.emit_locked(&mut state, Vec::new(), EventKind::TurnStarted { prompt: render_text(content) });
         Ok(true)
     }
 
     fn next_queued(&self) -> Option<Vec<ContentBlock>> {
-        let mut state = self.lock();
-        if state.ended || state.compacting || state.fold.turn_active() {
-            return None;
+        let (next, observed) = {
+            let mut state = self.lock();
+            if state.ended || state.compacting || state.fold.turn_active() {
+                return None;
+            }
+            let input = state.queue.pop_front()?;
+            state.span_id = input.span;
+            state.input_id = input.id;
+            state.trace_id = input.trace_id;
+            let next = input.content;
+            let observed = self.emit_locked(&mut state, Vec::new(), EventKind::TurnStarted { prompt: render_text(&next) });
+            (next, observed)
+        };
+        if let Some((session_id, event)) = observed {
+            notify_observer(&session_id, &event);
         }
-        let input = state.queue.pop_front()?;
-        state.span_id = input.span;
-        state.input_id = input.id;
-        let next = input.content;
-        self.emit_locked(&mut state, Vec::new(), EventKind::TurnStarted { prompt: render_text(&next) });
         Some(next)
     }
 
@@ -649,32 +724,39 @@ impl SessionCore {
             self.lock().process_exit = Some(status);
         }
     }
-    pub(crate) fn finish(&self, error: Option<String>) {
-        let mut state = self.lock();
-        if state.ended {
-            return;
+    pub fn finish(&self, error: Option<String>) {
+        let observed = {
+            let mut state = self.lock();
+            if state.ended {
+                return;
+            }
+            let mut out: [Option<(String, Event)>; 3] = [None, None, None];
+            let disposed = state.disposed;
+            let clean = state.process_exit.as_ref().is_some_and(|(code, _)| *code == 0);
+            if let Some(message) = error.filter(|_| !clean)
+                && !disposed
+            {
+                state.exit_error = Some(message.clone());
+                out[0] = self.emit_locked(&mut state, Vec::new(), EventKind::Error { message });
+            }
+            if state.fold.turn_active() {
+                let reason = if disposed || clean { StopReason::Aborted } else { StopReason::Error };
+                out[1] = self.emit_locked(
+                    &mut state,
+                    Vec::new(),
+                    EventKind::TurnFinished {
+                        reason,
+                        usage: Usage::default(),
+                    },
+                );
+            }
+            state.queue.clear();
+            out[2] = self.emit_locked(&mut state, Vec::new(), EventKind::SessionEnded);
+            out
+        };
+        for (session_id, event) in observed.into_iter().flatten() {
+            notify_observer(&session_id, &event);
         }
-        let disposed = state.disposed;
-        let clean = state.process_exit.as_ref().is_some_and(|(code, _)| *code == 0);
-        if let Some(message) = error.filter(|_| !clean)
-            && !disposed
-        {
-            state.exit_error = Some(message.clone());
-            self.emit_locked(&mut state, Vec::new(), EventKind::Error { message });
-        }
-        if state.fold.turn_active() {
-            let reason = if disposed || clean { StopReason::Aborted } else { StopReason::Error };
-            self.emit_locked(
-                &mut state,
-                Vec::new(),
-                EventKind::TurnFinished {
-                    reason,
-                    usage: Usage::default(),
-                },
-            );
-        }
-        state.queue.clear();
-        self.emit_locked(&mut state, Vec::new(), EventKind::SessionEnded);
     }
 
     pub(crate) fn is_disposed(&self) -> bool {
@@ -781,8 +863,8 @@ impl<D: Driver> CoreSession<D> {
 }
 
 impl<D: Driver> CoreSession<D> {
-    fn legacy_control(&self, action: crate::oar::ControlAction, content: Vec<ContentBlock>) -> Result<()> {
-        let (_, error) = self.dispatch(action, content, "", "", "")?;
+    fn legacy_control(&self, action: crate::oar::ControlAction, content: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
+        let (_, error) = self.dispatch(action, content, "", "", "", opts)?;
         match error {
             Some(e) => Err(e),
             None => Ok(()),
@@ -795,17 +877,19 @@ impl<D: Driver> CoreSession<D> {
         arg: &str,
         input_id: &str,
         span_id: &str,
+        opts: TurnOptions,
     ) -> Result<(crate::oar::ControlOutcome, Option<AgentError>)> {
         use crate::oar::{ControlAction as A, ControlStatus as S};
+        let trace_id = normalize_trace_id(opts.trace_id);
         let result = match action {
             A::Prompt => self
                 .check(&content)
-                .and_then(|_| self.core.begin_span(&render_text(&content), input_id, span_id))
+                .and_then(|_| self.core.begin_span(&render_text(&content), input_id, span_id, trace_id))
                 .and_then(|_| self.run_turn(content)),
             A::Steer => self.steer_input(content),
             A::Queue if self.capabilities.queue => self
                 .check(&content)
-                .and_then(|_| self.core.begin_turn_or_queue(&content, input_id, span_id))
+                .and_then(|_| self.core.begin_turn_or_queue(&content, input_id, span_id, trace_id))
                 .and_then(|start| if start { self.run_turn(content) } else { Ok(()) }),
             A::Queue => Err(AgentError::Unsupported {
                 option: "queue".into(),
@@ -840,6 +924,7 @@ impl<D: Driver> CoreSession<D> {
                         state.compacting = true;
                         state.manual_compaction = true;
                         state.span_id = format!("compact-{}", state.records.len());
+                        state.trace_id = trace_id;
                         self.core.compact_event(&mut state, true, "manual");
                         drop(state);
                         let result = self.driver.compact();
@@ -849,6 +934,7 @@ impl<D: Driver> CoreSession<D> {
                             state.manual_compaction = false;
                             self.core.compact_event(&mut state, false, "failed");
                             state.span_id.clear();
+                            state.trace_id = None;
                         }
                         result
                     } else {
@@ -891,6 +977,7 @@ impl<D: Driver> CoreSession<D> {
         };
         let mut rec = crate::oar::voyage::Record::new(crate::oar::voyage::Kind::Control, self.id(), now_ms());
         rec.span_id = span;
+        rec.trace_id = trace_id.or(state.trace_id);
         let mut control = serde_json::json!({"action":action,"outcome":outcome});
         if !outcome.input_id.is_empty() {
             control["inputId"] = serde_json::json!(outcome.input_id);
@@ -945,7 +1032,17 @@ impl<D: Driver> Session for CoreSession<D> {
     }
 
     fn control(&self, action: crate::oar::ControlAction, arg: &str, input_id: &str, span_id: &str) -> Result<crate::oar::ControlOutcome> {
-        self.dispatch(action, vec![ContentBlock::Text(arg.into())], arg, input_id, span_id)
+        self.control_with(action, arg, input_id, span_id, TurnOptions::default())
+    }
+    fn control_with(
+        &self,
+        action: crate::oar::ControlAction,
+        arg: &str,
+        input_id: &str,
+        span_id: &str,
+        opts: TurnOptions,
+    ) -> Result<crate::oar::ControlOutcome> {
+        self.dispatch(action, vec![ContentBlock::Text(arg.into())], arg, input_id, span_id, opts)
             .map(|(outcome, _)| outcome)
     }
     fn wait(&self) -> Result<()> {
@@ -1015,16 +1112,22 @@ impl<D: Driver> Session for CoreSession<D> {
     }
 
     fn prompt(&self, content: Vec<ContentBlock>) -> Result<()> {
-        self.legacy_control(crate::oar::ControlAction::Prompt, content)
+        self.prompt_with(content, TurnOptions::default())
+    }
+    fn prompt_with(&self, content: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
+        self.legacy_control(crate::oar::ControlAction::Prompt, content, opts)
     }
     fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
-        self.legacy_control(crate::oar::ControlAction::Steer, content)
+        self.legacy_control(crate::oar::ControlAction::Steer, content, TurnOptions::default())
     }
     fn queue(&self, content: Vec<ContentBlock>) -> Result<()> {
-        self.legacy_control(crate::oar::ControlAction::Queue, content)
+        self.queue_with(content, TurnOptions::default())
+    }
+    fn queue_with(&self, content: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
+        self.legacy_control(crate::oar::ControlAction::Queue, content, opts)
     }
     fn abort(&self) -> Result<()> {
-        self.legacy_control(crate::oar::ControlAction::Abort, vec![])
+        self.legacy_control(crate::oar::ControlAction::Abort, vec![], TurnOptions::default())
     }
     fn respond_permission(&self, request_id: &str, decision: PermissionDecision) -> Result<()> {
         let path = {

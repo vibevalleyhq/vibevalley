@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -9,7 +7,9 @@ use vibevalley_pele::diagram::architecture::db::{ArchEdge, ArchGroup, ArchJuncti
 use vibevalley_pele::diagram::architecture::parser::{AlignDirection, Side, parse_architecture};
 use vibevalley_pele::{DiagramType, IconResolver, ParseOptions, RenderOptions, parse, render, supports};
 
-use support::{Lcg, Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{
+    Lcg, Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options,
+};
 
 #[derive(Debug, Clone, Copy)]
 struct Box2d {

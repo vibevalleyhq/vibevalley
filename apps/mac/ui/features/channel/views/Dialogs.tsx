@@ -18,7 +18,7 @@ import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
 import { useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
-import { useCore } from "../../../infra/frame";
+import { useCollabSlice } from "../../../infra/frame";
 import { ready, useRepos } from "../../../infra/query";
 import { channelName } from "../model/places";
 
@@ -239,11 +239,11 @@ export const notifyOptions = (): { value: Notify; label: string }[] => [
 function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onGone: () => void }) {
   // The dialog mounts the form when it opens: it starts from the channel as it is then.
   const form = createChannelForm(untracked(() => props.channel));
-  const core = useCore();
+  const collab = useCollabSlice();
   const orchestrators = useOrchestrators();
   const top = () => props.channel.type === "channel";
   // The groups the farm's channels are in, for the field to offer.
-  const categories = () => [...new Set((core()?.chat?.channels ?? []).flatMap((c) => (c.category ? [c.category] : [])))];
+  const categories = () => [...new Set((collab()?.chat?.channels ?? []).flatMap((c) => (c.category ? [c.category] : [])))];
   const submit = async () => {
     if ((await form.save()) !== undefined) props.onClose();
   };

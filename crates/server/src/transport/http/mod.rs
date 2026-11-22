@@ -2,31 +2,30 @@
 //! work against it unchanged: its CLI (`VIBEVALLEY_SERVER=…
 //! vibevalley issue list`), scripts, and later the LAN and phone paths.
 //!
-//! Same wire as VibeValley's `apps/server/src/gateway/http`:
+//! Wire:
 //! - `POST /api/v1/<op with . as />` with a JSON body → the envelope, HTTP
 //!   status from the business code's `bizCodeMeta`;
-//! - `GET /api/v1/state` and `/api/v1/live` (`/api/v1/events`) as
-//!   server-sent events, one `data:` line per frame or event, `: ping`
-//!   every 20 s;
+//! - `GET /api/v1/slice/<name>`: JSON snapshot when `Accept` contains
+//!   `application/json` or `?once=1`, otherwise SSE (`id: <seq>\ndata: <json>\n\n`,
+//!   `: ping` every 20 s) honoring `Last-Event-ID` or `?after=<seq>`;
+//! - `GET /api/v1/live` (`/api/v1/events`) as server-sent events;
 //! - `GET /api/v1/subscribe/<name>?payload=<JSON>`: a refusal before the
 //!   first event is a plain JSON error, then events;
 //! - `GET /api/v1/issue/watch/<id>`: the `issue.watch` subscription; an
-//!   empty 404 when it is refused, as VibeValley answers;
-//! - `GET /api/v1/attachment/<id>`: the stored file, by VibeValley's
-//!   `attachment.file` op;
-//! - `GET /api/v1/artifact/<id>/view?theme=…&path=…&elementId=…&print=1`: a
+//!   empty 404 when it is refused;
+//! - `GET /api/v1/attachment/<id>`: the stored file (`attachment.file`);
+//! - `GET /api/v1/artifact/<id>/view?theme=…&path=…&elementId=…&print=1`:
 //!   store artifact's rendered viewer with CSP headers (`artifact.view`);
-//! - `GET /api/v1/artifact/<id>/<version>?shell=1&theme=…&print=1`: an
+//! - `GET /api/v1/artifact/<id>/<version>?shell=1&theme=…&print=1`:
 //!   HTML artifact's page with the server's headers (`artifact.page`);
 //! - only the machine's own pages: a loopback `Host`, and an `Origin` (when
-//!   sent) equal to it, `Sec-Fetch-Site` same-origin or none (`fromTheFarm`).
+//!   sent) equal to it, `Sec-Fetch-Site` same-origin or none (`from_the_farm`).
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::transport::api::Server;
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
@@ -36,9 +35,10 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use futures_util::Stream;
 use serde_json::{Value, json};
-use vibevalley_protocol::{ApiError, BizCode, Envelope};
+use vibevalley_protocol::{ApiError, BizCode, Caller, Envelope, SliceKind};
 
-mod chord;
+use crate::transport::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Server};
+
 mod media;
 
 const HEARTBEAT: Duration = Duration::from_secs(20);
@@ -105,7 +105,7 @@ pub fn router(server: Shared) -> Router {
     Router::new()
         // Each GET path also matches ops of the same shape (POST
         // attachment/create, artifact/block/list): those go to `command`.
-        .route("/api/v1/state", get(state).post(command))
+        .route("/api/v1/slice/{name}", get(slice).post(command))
         .route("/api/v1/live", get(live).post(command))
         .route("/api/v1/events", get(live).post(command))
         .route("/api/v1/subscribe/{name}", get(subscribe).post(command))
@@ -116,7 +116,6 @@ pub fn router(server: Shared) -> Router {
         .route("/api/v1/media/input/{id}/content", get(media::content).put(media::upload).post(command))
         .route("/api/v1/media/speech/{id}/stream", get(media::speech).post(command))
         .route("/api/v1/{*path}", post(command).get(not_allowed))
-        .route("/chord/ws", get(chord::upgrade))
         .route("/mcp", post(mcp).get(not_allowed))
         .fallback(not_found)
         .with_state(server)
@@ -143,6 +142,28 @@ pub fn from_the_farm(headers: &HeaderMap) -> bool {
     let origin_ok = header("origin").is_none_or(|o| o == format!("http://{host}"));
     let site_ok = header("sec-fetch-site").is_none_or(|s| s == "same-origin" || s == "none");
     is_loopback(host) && origin_ok && site_ok
+}
+
+fn http_caller_context(headers: &HeaderMap) -> CallerContext {
+    let is_cli = headers
+        .get("x-vibevalley-client")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.eq_ignore_ascii_case("cli"));
+    let (id, kind, label) = if is_cli {
+        ("cli", ClientKind::Cli, "CLI")
+    } else {
+        ("http-loopback", ClientKind::HttpLoopback, "HTTP loopback")
+    };
+    CallerContext {
+        caller: Caller::User,
+        principal: CallerPrincipal::LocalOwner,
+        client: Some(ClientIdentity {
+            id: id.into(),
+            kind,
+            label: label.into(),
+        }),
+        trace_id: 0,
+    }
 }
 
 /// The envelope as VibeValley sends it, with the HTTP status its code has.
@@ -223,7 +244,8 @@ async fn command(State(server): State<Shared>, uri: axum::http::Uri, headers: He
             Err(e) => return refuse(BizCode::InvalidInput, e.to_string()),
         }
     };
-    match tokio::task::spawn_blocking(move || server.call(&op, payload)).await {
+    let ctx = http_caller_context(&headers);
+    match tokio::task::spawn_blocking(move || server.call_with(&ctx, &op, payload)).await {
         Ok(envelope) => reply(envelope),
         Err(e) => refuse(BizCode::InternalError, e.to_string()),
     }
@@ -242,11 +264,61 @@ fn sse<S: Stream<Item = Result<Event, Infallible>> + Send + 'static>(stream: S) 
     Sse::new(stream).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("ping")).into_response()
 }
 
-async fn state(State(server): State<Shared>, headers: HeaderMap) -> Response {
+/// `GET /api/v1/slice/{name}`: JSON snapshot when `Accept` contains
+/// `application/json` or `?once=1`; otherwise SSE (`id: <seq>\ndata: <json>\n\n`)
+/// honoring `Last-Event-ID` or `?after=<seq>`.
+async fn slice(
+    State(server): State<Shared>,
+    Path(name): Path<String>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Response {
     if !from_the_farm(&headers) {
         return refuse(BizCode::Forbidden, "forbidden");
     }
-    sse(events(server.state()))
+    let Some(kind) = SliceKind::from_str(&name) else {
+        return refuse(BizCode::RouteNotFound, format!("unknown slice {name}"));
+    };
+    let wants_json = query.get("once").map(String::as_str) == Some("1")
+        || headers
+            .get("accept")
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|accept| accept.contains("application/json"));
+    if wants_json {
+        let snapshot = match tokio::task::spawn_blocking(move || server.slice_snapshot(kind)).await {
+            Ok(v) => v,
+            Err(e) => return refuse(BizCode::InternalError, e.to_string()),
+        };
+        let body = serde_json::to_vec(&snapshot).unwrap_or_default();
+        return (StatusCode::OK, [("content-type", "application/json; charset=utf-8")], body).into_response();
+    }
+    let after_seq = query.get("after").and_then(|v| v.trim().parse::<i64>().ok()).or_else(|| {
+        headers
+            .get("last-event-id")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.trim().parse::<i64>().ok())
+    });
+
+    let (stop_tx, stop_rx) = flume::bounded::<()>(0);
+    let (tx, rx) = flume::bounded::<(i64, String)>(1);
+    let watch_server = server.clone();
+    let spawned = std::thread::Builder::new()
+        .name(format!("vibevalley-http-slice-{}", kind.as_str()))
+        .spawn(move || {
+            watch_server.watch_slice(kind, after_seq, &stop_rx, &mut |seq, value| {
+                let data = serde_json::to_string(value).unwrap_or_else(|_| "null".into());
+                flume::Selector::new().send(&tx, (seq, data), |_| ()).recv(&stop_rx, |_| ()).wait();
+            });
+        });
+    if let Err(e) = spawned {
+        return refuse(BizCode::InternalError, e.to_string());
+    }
+    let stream = futures_util::stream::unfold((rx, stop_tx), |(rx, stop_tx)| async move {
+        let (seq, data) = rx.recv_async().await.ok()?;
+        let event = Event::default().id(seq.to_string()).data(data);
+        Some((Ok::<_, Infallible>(event), (rx, stop_tx)))
+    });
+    sse(stream)
 }
 
 async fn live(State(server): State<Shared>, headers: HeaderMap) -> Response {

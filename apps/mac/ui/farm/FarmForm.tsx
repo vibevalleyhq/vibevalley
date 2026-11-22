@@ -13,7 +13,7 @@ import { createWriteKey, writeIssue } from "../features/issue/model/write";
 import { useWorkAgents } from "../infra/agents";
 import { api, newSendKey, reasonOf } from "../infra/api";
 import { useBridge } from "../infra/bridged";
-import { useCore } from "../infra/frame";
+import { useCollabSlice, useIssue, useSession } from "../infra/frame";
 import { readFarmFormParams, readHostLocale } from "../infra/hostParams";
 import { ready, useRepos } from "../infra/query";
 import { Root } from "../infra/Root";
@@ -74,8 +74,8 @@ function Sow() {
   const error = signal("");
   const seeds = signal<RepoTemplates | undefined>(undefined);
   const kind = signal("");
-  const core = useCore();
-  const channel = () => core()?.chat?.channels.find((c) => c.default)?.id;
+  const collab = useCollabSlice();
+  const channel = () => collab()?.chat?.channels.find((c) => c.default)?.id;
   const writeKey = createWriteKey();
   let message: { input: string; agent: string; channel: string; key: string } | undefined;
   const editsKept = signal(false);
@@ -192,10 +192,9 @@ function Work(props: { kind: string; issue: () => Issue }) {
   const words = signal("");
   const busy = signal(false);
   const error = signal("");
-  const core = useCore();
   const { session: targetSession, issue: targetIssue } = readFarmFormParams();
-  const slot = () => core()?.sessions.find((s) => s.id === targetSession);
-  const target = () => core()?.issues.find((i) => i.id === targetIssue);
+  const slot = useSession(() => targetSession);
+  const target = useIssue(() => targetIssue);
   const sinceTree = signal<string | undefined>(undefined);
   const changes = useIssueChanges(
     () => props.issue().id,
@@ -326,10 +325,9 @@ function Work(props: { kind: string; issue: () => Issue }) {
 }
 
 function Content() {
-  const core = useCore();
   const { issue: issueId, kind } = readFarmFormParams();
-  const issue = () => core()?.issues.find((i) => i.id === issueId);
   if (kind === "sow") return <Sow />;
+  const issue = useIssue(() => issueId);
   return (
     <If
       when={issue()}

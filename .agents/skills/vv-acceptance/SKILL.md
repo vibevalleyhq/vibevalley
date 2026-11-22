@@ -1,6 +1,6 @@
 ---
 name: vv-acceptance
-description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的 Rust 服务端，用 Rust 命令行看接口和 /api/v1/state（crates/server、crates/core、crates/cli、crates/protocol）、用脚本驱动原生应用并截图（apps/mac、assets）、验媒体任务（crates/server/src/modules/content/media）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」；改了接口、服务、表结构、开机流程、页面、像素场景之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
+description: 改完 VibeValley 的代码之后，在真的程序上验收、拿到证据再汇报：起一个和用户的数据隔开的 Rust 服务端，用 Rust 命令行看接口和 /api/v1/slice/{name}（crates/server、crates/core、crates/cli、crates/protocol）、用脚本驱动原生应用并截图（apps/mac、assets）、验媒体任务（crates/server/src/modules/content/media）。用在：用户说「验证一下」「验收」「跑起来看看」「截个图」；改了接口、服务、表结构、开机流程、页面、像素场景之后，说「做完了」之前，即使用户没开口；写 PR 的 Checks 要附证据时。只改了纯函数、测试已经覆盖的，或只改了注释和文档，跑测试就够。
 ---
 
 # 验收
@@ -13,7 +13,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 
 | 改了什么 | 读哪份 | 证明什么 |
 |---|---|---|
-| `crates/server`、`crates/core`、`crates/server/src/transport/http`、`crates/cli`、`crates/protocol` 的接口或形状；开机的流程 | [server.md](.agents/skills/vv-acceptance/references/server.md) | 隔开的服务端起得来，接口和 `/api/v1/state` 里有这次的改动；工单能派、交回、完成 |
+| `crates/server`、`crates/core`、`crates/server/src/transport/http`、`crates/cli`、`crates/protocol` 的接口或形状；开机的流程 | [server.md](.agents/skills/vv-acceptance/references/server.md) | 隔开的服务端起得来，接口和 `/api/v1/slice/{name}`（5 域切片与 `farm`）里有这次的改动；工单能派、交回、完成 |
 | `apps/mac/ui`、`apps/mac/src`、`assets` 的画面、组件、像素场景、贴图 | [app.md](.agents/skills/vv-acceptance/references/app.md) | 隔开的原生应用起得来，页面和像素场景画出来是对的（截图） |
 | `media`、生图协议、结果下载、助手媒体工具 | [media.md](.agents/skills/vv-acceptance/references/media.md) | 隔离程序的生成、落盘、发布与 Artifact 引用真的接通；费用和未知结果边界不变 |
 

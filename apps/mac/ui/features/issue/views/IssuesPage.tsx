@@ -15,7 +15,7 @@ import { toast } from "../../../design/toasts";
 import { useOrchestrators } from "../../../infra/agents";
 import { api, reasonOf } from "../../../infra/api";
 import { variant } from "../../../infra/base/dom";
-import { useCore } from "../../../infra/frame";
+import { useBoardSlice, useSessionsSlice } from "../../../infra/frame";
 import { useRouter, useSearchValues } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
@@ -42,7 +42,8 @@ type Closing = { issue: Issue; session: Session | undefined; review: boolean; la
 /** `rest` is the path after /issues/. */
 export function IssuesPage(props: { rest: string }) {
   const router = useRouter();
-  const core = useCore();
+  const board = useBoardSlice();
+  const sessions = useSessionsSlice();
   const id = () => (props.rest && props.rest !== "new" ? props.rest : undefined);
   // The repo and the helper are in the address, so a reload or a link keeps the board as filtered; the words typed
   // are not, being half a thought.
@@ -89,7 +90,7 @@ export function IssuesPage(props: { rest: string }) {
   const orchestratorIds = createMemo(() => new Set(orchestrators().map((a) => a.id)));
   const moves = useIntents(issueMove);
   const act = createAct();
-  const all = createMemo(() => movedCards(buildCards(history.rows() ?? [], core(), orchestratorIds()), moves.list()));
+  const all = createMemo(() => movedCards(buildCards(history.rows() ?? [], board(), sessions()?.sessions, orchestratorIds()), moves.list()));
   const shown = () => all().filter((c) => filterShows(filter(), c));
   const card = () => {
     const at = id();
@@ -190,7 +191,7 @@ export function IssuesPage(props: { rest: string }) {
                 >
                   <IssueBoard
                     cards={shown()}
-                    summary={core()?.boardSummary}
+                    summary={board()?.boardSummary}
                     filtered={filterAny(filter())}
                     loading={history.loading()}
                     selected={returnTo()}

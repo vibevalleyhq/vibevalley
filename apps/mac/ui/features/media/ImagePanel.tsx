@@ -13,7 +13,7 @@ import { Card, Quiet } from "../../design/layout";
 import { motionClass } from "../../design/motion";
 import { api } from "../../infra/api";
 import { openAttachment, useAttachmentUrl } from "../../infra/attachmentFile";
-import { useCore } from "../../infra/frame";
+import { useCollabSlice, useOpsSlice } from "../../infra/frame";
 import { Readiness } from "../setting";
 import { FactGrid, FactRow, JobActions, NoticeBanner, PhasePill, Refusal, SectionHeading, SourceLine } from "./JobFacts";
 import { publicationKey } from "./publication";
@@ -30,8 +30,8 @@ const sizePresets: readonly { readonly ratio: string; readonly width: number; re
 ];
 
 export function ImagePanel() {
-  const state = useCore();
-  const images = () => state()?.media?.filter((job): job is MediaImageJob => job.kind === "image") ?? [];
+  const ops = useOpsSlice();
+  const images = () => ops()?.media?.filter((job): job is MediaImageJob => job.kind === "image") ?? [];
   const prompt = signal("");
   const format = signal<"text" | "layout">("text");
   const width = signal(1024);
@@ -252,7 +252,7 @@ export function ImagePanel() {
 }
 
 function JobCard(props: { job: MediaImageJob }) {
-  const state = useCore();
+  const collab = useCollabSlice();
   const error = signal<string | undefined>(undefined);
   const channel = signal("");
   const posted = signal(false);
@@ -310,7 +310,7 @@ function JobCard(props: { job: MediaImageJob }) {
                     channel.set(value);
                     posted.set(false);
                   }}
-                  options={(state()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id }))}
+                  options={(collab()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id }))}
                 />
                 <Button testID="media-publish" icon="send" disabled={act.busy() || !channel() || posted()} onPress={() => void publish(file().id)}>
                   {posted() ? t("web.media.published") : t("web.media.publish")}

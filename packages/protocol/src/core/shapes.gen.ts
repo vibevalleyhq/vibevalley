@@ -4,7 +4,7 @@ import type { ChannelSummary, Chat, FactChannelChanged, FactChannelRemoved, Fact
 import type { SessionId } from "../common/shapes.gen";
 import type { ConnectorStatus, FactConnectorChanged } from "../connector/shapes.gen";
 import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/shapes.gen";
-import type { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/shapes.gen";
+import type { CommitCount, FactProgressChanged, FarmFrame, Progress, SessionPlay } from "../game/shapes.gen";
 import type { InboxItem } from "../inbox/shapes.gen";
 import type { BoardSummary, FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes.gen";
 import type { FactMediaChanged, MediaJob, MediaSummary } from "../media/shapes.gen";
@@ -30,16 +30,26 @@ sessions: Array<Session>, crons: Array<Cron>,
  */
 plays?: { [key in string]: SessionPlay }, };
 
-export type SpaceView = { call: CallState, callReason: string, media?: Array<MediaJob>, chat?: Chat, commits?: CommitCount, progress?: Progress, issues: Array<Issue>, connectors: Array<ConnectorStatus>, machines: Array<Machine>, sessions: Array<SessionView>, crons: Array<CronView>, boardSummary?: BoardSummary, mediaSummary?: MediaSummary, channelSummary?: ChannelSummary, };
+export const SliceKindValues = ["board", "sessions", "collab", "inbox", "ops", "farm"] as const;
+export type SliceKind = (typeof SliceKindValues)[number];
 
 export const NoticeLevelValues = ["info", "warn", "error"] as const;
 export type NoticeLevel = (typeof NoticeLevelValues)[number];
 
-export type StateFrame = {
+export type BoardSlice = { seq: number, issues: Array<Issue>, boardSummary?: BoardSummary, commits?: CommitCount, };
+
+export type SessionsSlice = { seq: number, sessions: Array<SessionView>, machines: Array<Machine>, };
+
+export type CollabSlice = { seq: number, chat?: Chat, channelSummary?: ChannelSummary, connectors: Array<ConnectorStatus>, };
+
+export type InboxSlice = { seq: number, items: Array<InboxItem>, call: CallState, callReason: string, };
+
+export type OpsSlice = { seq: number, crons: Array<CronView>, media?: Array<MediaJob>, mediaSummary?: MediaSummary, };
+
 /**
- * Goes up by one with every commit the core folds (Core.apply that changed the state): this frame shows every fold up to it.
+ * Offline snapshot, scenario, and fixture bundle; never served as an HTTP endpoint.
  */
-seq: number, state: SpaceView, inbox: Array<InboxItem>, view: FarmView, effects: Array<GameEffect>, };
+export type SliceBundle = { seq: number, board: BoardSlice, sessions: SessionsSlice, collab: CollabSlice, inbox: InboxSlice, ops: OpsSlice, farm: FarmFrame, };
 
 export type Health = { ok: boolean, version: string, };
 

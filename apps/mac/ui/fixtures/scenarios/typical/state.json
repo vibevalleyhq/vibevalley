@@ -1,210 +1,7 @@
 {
   "seq": 1,
-  "state": {
-    "call": "live",
-    "callReason": "",
-    "media": [
-      {
-        "kind": "image",
-        "id": "job-img-ready",
-        "prompt": "像素风麦田与小木屋",
-        "model": "moss-image-1",
-        "connection": "moss-main",
-        "revision": 1,
-        "source": {
-          "kind": "user"
-        },
-        "usage": {
-          "images": 1,
-          "width": 1024,
-          "height": 1024
-        },
-        "phase": "ready",
-        "phaseText": "已生成",
-        "problem": "",
-        "attachment": {
-          "id": "lib-poster",
-          "name": "farm-poster.png",
-          "type": "image/png",
-          "size": 482113
-        },
-        "canCancel": false,
-        "canRetryDownload": false,
-        "createdAt": 1795192643624,
-        "updatedAt": 1795192703624
-      },
-      {
-        "kind": "speech",
-        "id": "job-speech-ready",
-        "prompt": "今天的回归测试全部通过。",
-        "model": "moss-tts-1.5-flash",
-        "connection": "moss-main",
-        "revision": 1,
-        "source": {
-          "kind": "orchestrator",
-          "agent": "orchestrator",
-          "channel": "general"
-        },
-        "voice": "voice-warm",
-        "format": "wav",
-        "contentType": "audio/wav",
-        "usage": {
-          "inputCharacters": 12
-        },
-        "canResume": false,
-        "canRelease": true,
-        "phase": "ready",
-        "phaseText": "已生成",
-        "problem": "",
-        "attachment": {
-          "id": "lib-speech",
-          "name": "speech.wav",
-          "type": "audio/wav",
-          "size": 115244
-        },
-        "resultInput": null,
-        "canCancel": false,
-        "canRetryDownload": false,
-        "createdAt": 1795193243624,
-        "updatedAt": 1795193303624
-      }
-    ],
-    "chat": {
-      "channels": [
-        {
-          "id": "design",
-          "type": "channel",
-          "default": false,
-          "orchestrator": "orchestrator",
-          "category": "",
-          "position": 1,
-          "notify": "all",
-          "name": "design",
-          "description": "UI 与设计系统",
-          "subjectKind": null,
-          "replies": 0,
-          "title": "design",
-          "at": 1795190843624
-        },
-        {
-          "id": "dm-laozhou",
-          "type": "direct",
-          "default": false,
-          "peer": "profile:laozhou",
-          "orchestrator": "orchestrator",
-          "category": "",
-          "position": 1,
-          "notify": "all",
-          "name": "老周",
-          "description": "",
-          "subjectKind": null,
-          "replies": 0,
-          "title": "老周",
-          "at": 1795193843624
-        },
-        {
-          "id": "general",
-          "type": "channel",
-          "default": true,
-          "orchestrator": "orchestrator",
-          "category": "",
-          "position": 1,
-          "notify": "all",
-          "name": "general",
-          "description": "日常协作与进度同步",
-          "subjectKind": null,
-          "lastNumber": 3,
-          "replies": 0,
-          "unread": 1,
-          "title": "general",
-          "last": {
-            "from": "w1",
-            "name": "老周",
-            "text": "工单 #18 正在收尾。",
-            "at": 1795194323624
-          },
-          "at": 1795194323624
-        },
-        {
-          "id": "t-login",
-          "type": "thread",
-          "default": false,
-          "orchestrator": "orchestrator",
-          "parent": "general",
-          "category": "",
-          "position": 1,
-          "notify": "all",
-          "rootNumber": 1,
-          "description": "",
-          "subjectKind": "issue",
-          "subjectId": "i18",
-          "replies": 4,
-          "title": "登录过期讨论",
-          "at": 1795194143624
-        }
-      ],
-      "userMentions": [
-        {
-          "message": {
-            "id": "m-mention",
-            "number": 3,
-            "channel": "general",
-            "from": "w2",
-            "actor": {
-              "kind": "agent",
-              "id": "xiaolin",
-              "role": "worker",
-              "name": "小林"
-            },
-            "name": "小林",
-            "kind": "chat",
-            "text": "@user 请看一眼 #33 的默认配置选型。",
-            "mentions": [],
-            "outcome": null,
-            "spoken": false,
-            "at": 1795194263624,
-            "revision": 1,
-            "reactions": [],
-            "attachments": [],
-            "embeds": []
-          },
-          "channel": "general",
-          "address": "#general"
-        }
-      ]
-    },
-    "commits": {
-      "total": 42,
-      "repos": []
-    },
-    "progress": {
-      "coins": 1280,
-      "streak": 4,
-      "bestStreak": 9,
-      "counts": {
-        "harvested": 14,
-        "reviewed": 11
-      },
-      "unlocked": [
-        {
-          "id": "first_harvest",
-          "tier": 1,
-          "at": 1795108043624
-        }
-      ],
-      "title": {
-        "id": "first_harvest",
-        "tier": 1
-      },
-      "agents": {
-        "laozhou": {
-          "hired": 8,
-          "harvested": 6,
-          "failed": 1
-        }
-      },
-      "multiplier": 1.2
-    },
+  "board": {
+    "seq": 1,
     "issues": [
       {
         "id": "i10",
@@ -718,51 +515,106 @@
         }
       }
     ],
-    "connectors": [
-      {
-        "id": "weixin",
-        "state": "connected",
-        "qr": "",
-        "pairCode": "",
-        "channel": "general",
-        "user": "田头助手",
-        "since": 1795190843624,
-        "lastInbound": 1795190903624,
-        "pending": 0,
-        "error": ""
+    "boardSummary": {
+      "laneCounts": {
+        "todo": 3,
+        "working": 4,
+        "waiting": 1,
+        "closed": 3
       },
-      {
-        "id": "feishu",
-        "state": "waiting",
-        "qr": "",
-        "pairCode": "",
-        "channel": "design",
-        "since": 1795193843624,
-        "lastInbound": 1795193903624,
-        "pending": 2,
-        "error": ""
-      },
-      {
-        "id": "qq",
-        "state": "paused",
-        "qr": "",
-        "pairCode": "",
-        "since": 1795193243624,
-        "lastInbound": 1795193303624,
-        "pausedUntil": 1795196843624,
-        "pending": 0,
-        "error": ""
+      "runningSlots": 2,
+      "maxRunning": 6,
+      "byIssue": {
+        "i10": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "canceled_reopenable"
+        },
+        "i12": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i18": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i21": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i22": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i31": {
+          "lane": "waiting",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "handed_back"
+        },
+        "i33": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "asking"
+        },
+        "i34": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false,
+          "prompt": "stuck_failed"
+        },
+        "i40": {
+          "lane": "working",
+          "cardKind": "family",
+          "familyDone": 1,
+          "familyTotal": 2,
+          "needsWorktreeCheck": false
+        },
+        "i41": {
+          "lane": "closed",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        },
+        "i42": {
+          "lane": "todo",
+          "cardKind": "todo",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        }
       }
-    ],
-    "machines": [
-      {
-        "id": "local",
-        "name": "Mac Studio",
-        "here": true,
-        "online": true,
-        "joinedAt": 1795021643624
-      }
-    ],
+    },
+    "commits": {
+      "total": 42,
+      "repos": []
+    }
+  },
+  "sessions": {
+    "seq": 1,
     "sessions": [
       {
         "id": "w1",
@@ -987,6 +839,269 @@
         "phaseText": "在读文件：App.tsx"
       }
     ],
+    "machines": [
+      {
+        "id": "local",
+        "name": "Mac Studio",
+        "here": true,
+        "online": true,
+        "joinedAt": 1795021643624
+      }
+    ]
+  },
+  "collab": {
+    "seq": 1,
+    "chat": {
+      "channels": [
+        {
+          "id": "design",
+          "type": "channel",
+          "default": false,
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "design",
+          "description": "UI 与设计系统",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "design",
+          "at": 1795190843624
+        },
+        {
+          "id": "dm-laozhou",
+          "type": "direct",
+          "default": false,
+          "peer": "profile:laozhou",
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "老周",
+          "description": "",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "老周",
+          "at": 1795193843624
+        },
+        {
+          "id": "general",
+          "type": "channel",
+          "default": true,
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "general",
+          "description": "日常协作与进度同步",
+          "subjectKind": null,
+          "lastNumber": 3,
+          "replies": 0,
+          "unread": 1,
+          "title": "general",
+          "last": {
+            "from": "w1",
+            "name": "老周",
+            "text": "工单 #18 正在收尾。",
+            "at": 1795194323624
+          },
+          "at": 1795194323624
+        },
+        {
+          "id": "t-login",
+          "type": "thread",
+          "default": false,
+          "orchestrator": "orchestrator",
+          "parent": "general",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "rootNumber": 1,
+          "description": "",
+          "subjectKind": "issue",
+          "subjectId": "i18",
+          "replies": 4,
+          "title": "登录过期讨论",
+          "at": 1795194143624
+        }
+      ],
+      "userMentions": [
+        {
+          "message": {
+            "id": "m-mention",
+            "number": 3,
+            "channel": "general",
+            "from": "w2",
+            "actor": {
+              "kind": "agent",
+              "id": "xiaolin",
+              "role": "worker",
+              "name": "小林"
+            },
+            "name": "小林",
+            "kind": "chat",
+            "text": "@user 请看一眼 #33 的默认配置选型。",
+            "mentions": [],
+            "outcome": null,
+            "spoken": false,
+            "at": 1795194263624,
+            "revision": 1,
+            "reactions": [],
+            "attachments": [],
+            "embeds": []
+          },
+          "channel": "general",
+          "address": "#general"
+        }
+      ]
+    },
+    "channelSummary": {
+      "unreadTotal": 1,
+      "unreadUnder": {
+        "design": 0,
+        "dm-laozhou": 0,
+        "general": 1,
+        "t-login": 0
+      }
+    },
+    "connectors": [
+      {
+        "id": "weixin",
+        "state": "connected",
+        "qr": "",
+        "pairCode": "",
+        "channel": "general",
+        "user": "田头助手",
+        "since": 1795190843624,
+        "lastInbound": 1795190903624,
+        "pending": 0,
+        "error": ""
+      },
+      {
+        "id": "feishu",
+        "state": "waiting",
+        "qr": "",
+        "pairCode": "",
+        "channel": "design",
+        "since": 1795193843624,
+        "lastInbound": 1795193903624,
+        "pending": 2,
+        "error": ""
+      },
+      {
+        "id": "qq",
+        "state": "paused",
+        "qr": "",
+        "pairCode": "",
+        "since": 1795193243624,
+        "lastInbound": 1795193303624,
+        "pausedUntil": 1795196843624,
+        "pending": 0,
+        "error": ""
+      }
+    ]
+  },
+  "inbox": {
+    "seq": 1,
+    "items": [
+      {
+        "id": "m-mention",
+        "kind": "mention",
+        "from": {
+          "kind": "session",
+          "id": "w2",
+          "name": "小林",
+          "agent": ""
+        },
+        "who": "小林",
+        "text": "@user 请看一眼 #33 的默认配置选型。",
+        "at": 1795194263624,
+        "target": {
+          "kind": "chat",
+          "channel": "general"
+        },
+        "words": {
+          "label": "找你",
+          "title": "小林 叫你",
+          "body": "@user 请看一眼 #33 的默认配置选型。",
+          "tray": ""
+        }
+      },
+      {
+        "id": "w2:ask:1",
+        "kind": "ask",
+        "from": {
+          "kind": "session",
+          "id": "w2",
+          "name": "小林",
+          "agent": "xiaolin"
+        },
+        "who": "小林",
+        "text": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
+        "at": 1795194143624,
+        "target": {
+          "kind": "session",
+          "id": "w2"
+        },
+        "words": {
+          "label": "有问题问你",
+          "title": "小林 有问题问你",
+          "body": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
+          "tray": ""
+        }
+      },
+      {
+        "id": "w4:fix:1",
+        "kind": "fix",
+        "from": {
+          "kind": "session",
+          "id": "w4",
+          "name": "阿杰",
+          "agent": "ajie"
+        },
+        "who": "阿杰",
+        "text": "测试环境缺少原生字体文件，断言失败。",
+        "at": 1795193723624,
+        "target": {
+          "kind": "session",
+          "id": "w4"
+        },
+        "words": {
+          "label": "活没做成",
+          "title": "阿杰 没做成",
+          "body": "测试环境缺少原生字体文件，断言失败。",
+          "tray": "阿杰 没做成"
+        }
+      },
+      {
+        "id": "w3:review:2",
+        "kind": "review",
+        "from": {
+          "kind": "session",
+          "id": "w3",
+          "name": "老周",
+          "agent": "laozhou"
+        },
+        "who": "老周",
+        "text": "补齐看板列表分组与键盘返回测试。",
+        "at": 1795193543624,
+        "target": {
+          "kind": "session",
+          "id": "w3"
+        },
+        "words": {
+          "label": "等你看",
+          "title": "老周 做完了",
+          "body": "补齐看板列表分组与键盘返回测试。",
+          "tray": "老周 做完了，等你看"
+        }
+      }
+    ],
+    "call": "live",
+    "callReason": ""
+  },
+  "ops": {
+    "seq": 1,
     "crons": [
       {
         "id": "c1",
@@ -1030,412 +1145,185 @@
         "nextText": "11/20 17:00"
       }
     ],
-    "boardSummary": {
-      "laneCounts": {
-        "todo": 3,
-        "working": 4,
-        "waiting": 1,
-        "closed": 3
+    "media": [
+      {
+        "kind": "image",
+        "id": "job-img-ready",
+        "prompt": "像素风麦田与小木屋",
+        "model": "moss-image-1",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "user"
+        },
+        "usage": {
+          "images": 1,
+          "width": 1024,
+          "height": 1024
+        },
+        "phase": "ready",
+        "phaseText": "已生成",
+        "problem": "",
+        "attachment": {
+          "id": "lib-poster",
+          "name": "farm-poster.png",
+          "type": "image/png",
+          "size": 482113
+        },
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1795192643624,
+        "updatedAt": 1795192703624
       },
-      "runningSlots": 2,
-      "maxRunning": 6,
-      "byIssue": {
-        "i10": {
-          "lane": "closed",
-          "cardKind": "todo",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false,
-          "prompt": "canceled_reopenable"
+      {
+        "kind": "speech",
+        "id": "job-speech-ready",
+        "prompt": "今天的回归测试全部通过。",
+        "model": "moss-tts-1.5-flash",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "orchestrator",
+          "agent": "orchestrator",
+          "channel": "general"
         },
-        "i12": {
-          "lane": "closed",
-          "cardKind": "todo",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+        "voice": "voice-warm",
+        "format": "wav",
+        "contentType": "audio/wav",
+        "usage": {
+          "inputCharacters": 12
         },
-        "i18": {
-          "lane": "working",
-          "cardKind": "issue",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+        "canResume": false,
+        "canRelease": true,
+        "phase": "ready",
+        "phaseText": "已生成",
+        "problem": "",
+        "attachment": {
+          "id": "lib-speech",
+          "name": "speech.wav",
+          "type": "audio/wav",
+          "size": 115244
         },
-        "i21": {
-          "lane": "todo",
-          "cardKind": "todo",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
-        },
-        "i22": {
-          "lane": "todo",
-          "cardKind": "todo",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
-        },
-        "i31": {
-          "lane": "waiting",
-          "cardKind": "issue",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false,
-          "prompt": "handed_back"
-        },
-        "i33": {
-          "lane": "working",
-          "cardKind": "issue",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false,
-          "prompt": "asking"
-        },
-        "i34": {
-          "lane": "working",
-          "cardKind": "issue",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false,
-          "prompt": "stuck_failed"
-        },
-        "i40": {
-          "lane": "working",
-          "cardKind": "family",
-          "familyDone": 1,
-          "familyTotal": 2,
-          "needsWorktreeCheck": false
-        },
-        "i41": {
-          "lane": "closed",
-          "cardKind": "todo",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
-        },
-        "i42": {
-          "lane": "todo",
-          "cardKind": "todo",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
-        }
+        "resultInput": null,
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1795193243624,
+        "updatedAt": 1795193303624
       }
-    },
+    ],
     "mediaSummary": {
       "activeCount": 0,
       "activeIds": []
-    },
-    "channelSummary": {
-      "unreadTotal": 1,
-      "unreadUnder": {
-        "design": 0,
-        "dm-laozhou": 0,
-        "general": 1,
-        "t-login": 0
-      }
     }
   },
-  "inbox": [
-    {
-      "id": "m-mention",
-      "kind": "mention",
-      "from": {
-        "kind": "session",
-        "id": "w2",
-        "name": "小林",
-        "agent": ""
+  "farm": {
+    "seq": 1,
+    "view": {
+      "level": {
+        "level": 3,
+        "xp": 12,
+        "need": 30
       },
-      "who": "小林",
-      "text": "@user 请看一眼 #33 的默认配置选型。",
-      "at": 1795194263624,
-      "target": {
-        "kind": "chat",
-        "channel": "general"
-      },
-      "words": {
-        "label": "找你",
-        "title": "小林 叫你",
-        "body": "@user 请看一眼 #33 的默认配置选型。",
-        "tray": ""
-      }
-    },
-    {
-      "id": "w2:ask:1",
-      "kind": "ask",
-      "from": {
-        "kind": "session",
-        "id": "w2",
-        "name": "小林",
-        "agent": "xiaolin"
-      },
-      "who": "小林",
-      "text": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
-      "at": 1795194143624,
-      "target": {
-        "kind": "session",
-        "id": "w2"
-      },
-      "words": {
-        "label": "有问题问你",
-        "title": "小林 有问题问你",
-        "body": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
-        "tray": ""
-      }
-    },
-    {
-      "id": "w4:fix:1",
-      "kind": "fix",
-      "from": {
-        "kind": "session",
-        "id": "w4",
-        "name": "阿杰",
-        "agent": "ajie"
-      },
-      "who": "阿杰",
-      "text": "测试环境缺少原生字体文件，断言失败。",
-      "at": 1795193723624,
-      "target": {
-        "kind": "session",
-        "id": "w4"
-      },
-      "words": {
-        "label": "活没做成",
-        "title": "阿杰 没做成",
-        "body": "测试环境缺少原生字体文件，断言失败。",
-        "tray": "阿杰 没做成"
-      }
-    },
-    {
-      "id": "w3:review:2",
-      "kind": "review",
-      "from": {
-        "kind": "session",
-        "id": "w3",
-        "name": "老周",
-        "agent": "laozhou"
-      },
-      "who": "老周",
-      "text": "补齐看板列表分组与键盘返回测试。",
-      "at": 1795193543624,
-      "target": {
-        "kind": "session",
-        "id": "w3"
-      },
-      "words": {
-        "label": "等你看",
-        "title": "老周 做完了",
-        "body": "补齐看板列表分组与键盘返回测试。",
-        "tray": "老周 做完了，等你看"
-      }
-    }
-  ],
-  "view": {
-    "level": {
-      "level": 3,
-      "xp": 12,
-      "need": 30
-    },
-    "plots": {
-      "i18": {
-        "crop": "sprout"
-      },
-      "i21": {
-        "crop": "sprout"
-      },
-      "i31": {
-        "crop": "flowering",
-        "badge": {
-          "text": "等你验收",
-          "tone": "wait"
+      "plots": {
+        "i18": {
+          "crop": "sprout"
+        },
+        "i21": {
+          "crop": "sprout"
+        },
+        "i31": {
+          "crop": "flowering",
+          "badge": {
+            "text": "等你验收",
+            "tone": "wait"
+          }
+        },
+        "i33": {
+          "crop": "dry",
+          "badge": {
+            "text": "等你回答",
+            "tone": "wait"
+          }
+        },
+        "i34": {
+          "crop": "withered",
+          "badge": {
+            "text": "有虫",
+            "tone": "bug"
+          }
         }
       },
-      "i33": {
-        "crop": "dry",
-        "badge": {
-          "text": "等你回答",
-          "tone": "wait"
-        }
-      },
-      "i34": {
-        "crop": "withered",
-        "badge": {
-          "text": "有虫",
-          "tone": "bug"
+      "plays": {
+        "w1": {
+          "station": 0,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w2": {
+          "station": 1,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w3": {
+          "station": 2,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w4": {
+          "station": 3,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w5": {
+          "station": 4,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
         }
       }
     },
-    "plays": {
-      "w1": {
-        "station": 0,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
+    "progress": {
+      "coins": 1280,
+      "streak": 4,
+      "bestStreak": 9,
+      "counts": {
+        "harvested": 14,
+        "reviewed": 11
       },
-      "w2": {
-        "station": 1,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
+      "unlocked": [
+        {
+          "id": "first_harvest",
+          "tier": 1,
+          "at": 1795108043624
+        }
+      ],
+      "title": {
+        "id": "first_harvest",
+        "tier": 1
       },
-      "w3": {
-        "station": 2,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
+      "agents": {
+        "laozhou": {
+          "hired": 8,
+          "harvested": 6,
+          "failed": 1
+        }
       },
-      "w4": {
-        "station": 3,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w5": {
-        "station": 4,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      }
+      "multiplier": 1.2
     },
-    "achievements": [
-      {
-        "id": "s_open",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_hire",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_tell",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_review",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_voice",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_split",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_call",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "harvests",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "first_try",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "big_graph",
-        "tier": 0,
-        "count": 0,
-        "next": 3
-      },
-      {
-        "id": "farm_level",
-        "tier": 0,
-        "count": 0,
-        "next": 5
-      },
-      {
-        "id": "steady",
-        "tier": 0,
-        "count": 0,
-        "next": 5
-      },
-      {
-        "id": "untangle",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "comeback",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "thrifty",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "every_machine",
-        "tier": 0,
-        "count": 0,
-        "next": 2
-      },
-      {
-        "id": "handoff",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "parallel_graph",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "night_owl",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "weekend",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "full_house",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      }
-    ]
-  },
-  "effects": []
+    "effects": []
+  }
 }

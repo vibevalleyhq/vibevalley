@@ -107,7 +107,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
         "workbench": shell.workbench.read(cx).debug_state(),
         "pixel": shell.native_pixel.as_ref().map(|s| s.view.read(cx).debug_state()),
         "palette": shell.palette.as_ref().map(|p| json!({
-            "open": p.open, "mode": p.mode.name(), "query": p.query, "view": p.view.read(cx).debug_state(),
+            "open": p.open, "mode": p.mode.as_str(), "query": p.query, "view": p.view.read(cx).debug_state(),
         })),
         "live_terminal_views": shell.terminals.len(),
         "terminal_notice": shell.terminal_notice,

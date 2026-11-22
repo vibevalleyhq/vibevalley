@@ -300,7 +300,7 @@ pub fn effects_of(before: &SpaceState, fact: &Fact) -> Vec<GameEffect> {
 }
 
 /// `viewOf`: a plot per issue (the later hired session when two are on
-/// it), each session's play, the level and the achievements.
+/// it), each session's play, and the level.
 pub fn view_of(state: &SpaceState) -> FarmView {
     let mut latest: HashMap<&str, &Session> = HashMap::new();
     for h in &state.sessions {
@@ -353,7 +353,6 @@ pub fn view_of(state: &SpaceState) -> FarmView {
         level: farm_level_of(state),
         plots,
         plays: played,
-        achievements: standings_of(state.progress.as_ref()),
     }
 }
 
@@ -462,7 +461,7 @@ fn achievement_effect(id: &str, tier: i64) -> GameEffectAchievement {
     e
 }
 
-fn standings_of(p: Option<&Progress>) -> Vec<AchievementStanding> {
+pub fn standings_of(p: Option<&Progress>) -> Vec<AchievementStanding> {
     achievements()
         .iter()
         .map(|a| {

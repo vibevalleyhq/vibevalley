@@ -1,12 +1,10 @@
-import { z } from "zod";
-
 import { type Endpoint } from "../endpoint";
 import * as S from "../schema";
 import type * as T from "../shapes";
 
 export interface GameHandlers {
-  /** Every achievement, as the board has them. */
-  readonly "game.achievement.list": () => Promise<T.Achievement[]>;
+  /** Every achievement and its current standing. */
+  readonly "game.achievement.list": () => Promise<T.AchievementList>;
   readonly "game.title.set": (a: T.ChooseTitleRequest) => Promise<void>;
 }
 
@@ -15,7 +13,7 @@ export const gameEndpoints: readonly Endpoint[] = [
     op: "game.achievement.list",
     about: [],
     input: undefined,
-    result: z.array(S.Achievement),
+    result: S.AchievementList,
     can: ["user", "remote"],
   },
   {

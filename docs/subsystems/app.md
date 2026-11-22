@@ -1,14 +1,14 @@
 # 客户端
 
-VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibevalley-mac`）：GPUI 的窗口，里面带着服务端；工作台的页面是 nsh 跑的 TSX（`apps/mac/ui`），像素农场、地图、记忆树、开场和图鉴由 Rust 直接画（`apps/mac/src/pixel`）。页面只读服务端推来的 `StateFrame` 与查询接口，经进程内的桥发命令，不经 HTTP。没有浏览器页面、Electron 桌面版和手机壳，只支持 macOS（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
+VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibevalley-mac`）：GPUI 的窗口，里面带着服务端；工作台的页面是 nsh 跑的 TSX（`apps/mac/ui`），像素农场、地图、记忆树、开场和图鉴由 Rust 直接画（`apps/mac/src/pixel`）。页面按域只读服务端推来的独立切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）与查询接口，经进程内的桥发命令，不经 HTTP。没有浏览器页面、Electron 桌面版和手机壳，只支持 macOS（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
-| 窗口外壳：项目栏、侧栏（文件、源码管理）、分栏和标签页、终端、文件和 diff 查看、命令面板、主题和字号 | `StateFrame` 的折叠与拼装（[核心状态](docs/subsystems/core.md)） |
-| 在进程里起服务端，放出本机回环的 HTTP 门，写 `server.json` | 服务端内部的组装（[地基](docs/subsystems/foundation.md)） |
-| 页面和服务端之间的桥：调用、状态帧、事件、订阅 | 协议形状与接口定义（[地基](docs/subsystems/foundation.md#契约规则和数据库)） |
+| 窗口外壳：项目栏、侧栏（文件、源码管理）、分栏和标签页、终端、文件和 diff 查看、命令面板、主题和字号 | 核心状态折叠与切片投影（[核心状态](docs/subsystems/core.md)） |
+| 在进程里起服务端，放出本机回环的 HTTP 门，写 `server.json`，挂接 `HostDebugBridge` | 服务端内部的组装（[地基](docs/subsystems/foundation.md)） |
+| 页面和服务端之间的桥：调用、按域切片推送、事件、订阅，以及强类型 `Host*` 帧与 `HostAction` | 协议形状与接口定义（[地基](docs/subsystems/foundation.md#契约规则和数据库)） |
 | 工作台：路由、外框、页面的分层、乐观意图与本机存下的选择、浅色和深色主题 | 全页面清单与状态机（[桌面架构与页面清单](docs/design/06-desktop-architecture-and-topology.md)）、设计系统与令牌（[设计系统全景](docs/design/README.md)） |
 | 宿主能力（`host.*`）：通知、主题、语言、打开文件和网址、终端、播放声音 | 像素场景画什么（[农场的皮](docs/subsystems/farm.md)） |
 |  | 命令行（`crates/cli`，[开发](docs/development.md#只用命令行派一个活)） |
@@ -18,7 +18,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | 位置 | 职责 |
 |---|---|
 | `apps/mac/src/main.rs`、`shell/` | 开窗口；根视图 `Shell` 拆为 8 个职责文件（`mod.rs`、`projects.rs`、`panes.rs`、`render.rs`、`menus.rs`、`palette.rs`、`settings.rs`、`host_bridge.rs`）：项目、分栏布局、侧栏、命令面板、快捷键（`bind_keys`）与宿主接口 |
-| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，按 `is_workbench_view` 分别缓存与惰性装载双入口包（重型工作台 `App.tsx` → `ui/build`；轻量壳窗格 `ShellApp.tsx` → `ui/build-shell`）；`bridge.rs` 是页面发回来的动作（`Action`），`frames.rs` 是外壳推给侧栏和面板的帧，`late.rs` 让服务端在后台线程起来 |
+| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，按 `is_workbench_view` 分别缓存与惰性装载双入口包（重型工作台 `App.tsx` → `ui/build`；轻量壳窗格 `ShellApp.tsx` → `ui/build-shell`）；`bridge.rs` 与 `frames.rs` 复用 `vibevalley_protocol::HostAction` 及强类型 `Host*` 帧（`HostRailFrame`、`HostFileTreeFrame`、`HostGitPanelFrame`、`HostPaletteFrame`），`late.rs` 让服务端在后台线程起来 |
 | `apps/mac/src/host.rs` | 宿主能力的原生一半：系统通知、Finder 里显示、`open`、本地文件选择与另存、读文件 |
 | `apps/mac/src/audio.rs`、`audio.m` | AVFoundation 文件播放、跳播与有界 PCM 队列；宿主音频命令按桥的接收顺序执行 |
 | `apps/mac/src/command_line.rs`、`tray.rs`、`island.rs` | 命令行符号链接、菜单栏摘要、灵动岛进程与工单摘要 |
@@ -75,22 +75,22 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | 页面（`apps/mac/ui/infra/bridge.ts`） | 动作 | 回来的事件 |
 |---|---|---|
 | `call(op, payload)` | `call` | `reply:<id>`，契约的信封 `{ bizCode, message, data?, error? }` |
-| `frame("state")` | `watch` | `frame:state`，工作台的最新状态。页面用 `applied` 确认修订号。慢窗口可跳过中间修订。 |
+| `slice(kind, listener)` | `watch`（`topic: "slice:<kind>"`）、`unwatch` | `frame:slice:<kind>`，6 路独立域切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）。页面用 `applied` 确认修订号，慢窗口可跳过中间修订。 |
 | `frame("live")`、`onLive(fn)` | `watch` | `frame:live`，每个事件一个 `LiveEvent` |
 | `subscribe(name, payload, on, ended)` | `subscribe`、`unsubscribe` | `sub:<id>`，每个事件一次，结束一次 |
 | `hostApi.<名字>` | `call`，`op` 是 `host.<名字>` | 外壳的 `Shell::host_call` 答 |
 
-- **`call` 不抛**：失败是 `bizCode` 非 0 的信封；没有宿主或超时回 `ServiceUnavailable`。
+- **`call` 不抛**：失败是 `bizCode` 非 0 的信封；没有宿主或超时回 `ServiceUnavailable`。关闭工作区对话标签页直接经 `Server::call("session.closeWorkspace", ...)` 停机回收，不经进程全局静态锁；音频与语音句柄经 `Server::speech_streams()` / `Server::voice()` 获取。
 - **工作台按 6 个一级入口与 5 栏设置组织**：左侧导航主栏（`places.ts`）固定收敛为对话（`/chat`）、工单（`/issues`）、代码仓库与工作区（`/repos`）、内容（`/library`）、团队（`/agents`）与设置（`/settings`）6 项一级位置；运行中心（`/runs`）作为次级入口随工单/团队下钻可达；设置页收拢为「通用 / 模型 / 语音 / 连接 / 关于」5 栏，所有面向用户的菜单与设置沿用日常中文词汇（如模型、成员、设置），避免内部工程缩写或农场隐喻外溢。
 - **统一二元内容中心与上下文记忆**：`/library`、`/artifacts/*` 与 `/pkm/*` 共用嵌套布局 `ContentShell`（`apps/mac/ui/features/content/`），提供可折叠统一侧栏 `ContentSidebar`（收敛为「作品（含一等 `outline` 大纲笔记）+ 素材」二元模型，`⌘\` 切换，全屏演示 `contentPresenting` 时自动收起）、统一搜索 `ContentSearchModal`（优先检索作品与素材，兼容历史 `pkm` 兜底）与 19 套双语模板库 `TemplateModal`（`⌘N` 打开，笔记模板直接创建 `outline` 作品）。36px 顶栏 `<Desk>` 使用工作区同款 `sidebar` 面板图标切换侧栏（[icons.ts](apps/mac/ui/design/icons.ts)），`desk-content-search`、`desk-content-new` 与作品页 `artifact-back-library` 仅在侧栏收起（`!contentSidebarOpen`）时按需补位，避免与常驻侧栏同屏重复；作品详情页内置 `TimelineBar` 时间旅行抽屉。`ContentShell` 持续记录当前内容路径（剥离 `?make=`/`?nav`/`?understand` 瞬态参数），离开再点左栏「内容」或访问 `/content` 时经 `safeLastContentPath()` 恢复上次视图；裸 `/pkm` 优先导向最近 `outline` 作品，`/pkm/:slug` 保持深度链接可读。
-- **工作台的请求只经 `Transport`**（`apps/mac/ui/infra/transport.ts`）：`VibeValleyApi.over` 直接在契约信封上收发，不绕合成的 HTTP `Request`/`Response`；应用里是桥（`bridged.ts` 的 `useBridge()`），测试和故事换成自己的（`infra/fixtures.ts`）；页面的代码不直接碰 `host`。
+- **工作台的请求只经 `Transport`**（`apps/mac/ui/infra/transport.ts`）：`VibeValleyApi.over` 直接在契约信封上收发，不绕合成的 HTTP `Request`/`Response`；应用里是桥（`bridged.ts` 的 `useBridge()`），测试和故事换成基于 `SliceBundle` 的替身（`infra/fixtures.ts`）；页面的代码不直接碰 `host`。
 
 ### 页面状态与数据流
 
-- **页面只读 `StateFrame`**：`infra/frame.ts` 从 `Transport` 收帧，交出最新的整帧；按 id 的列表用 `Each` 保住行。
+- **页面按域只读独立切片**：`infra/frame.ts` 为 `board`、`sessions`、`collab`、`inbox`、`ops`、`farm` 维护各自独立的响应式信号（`useBoardSlice`、`useSessionsSlice`、`useCollabSlice`、`useInboxSlice`、`useOpsSlice`、`useFarmFrame`），单域变更不触发其他域消费者重算；外壳（`shell/mod.rs`）与灵动岛（`island.rs`）直接订阅 `SliceKind::Sessions` / `SliceKind::Inbox`；按 id 的列表用 `Each` 保住行。
 - **UI 目录单向依赖**：`infra` → `design` → `features` → `{app, farm, workspace}`，`app`、`farm` 与 `workspace` 之间互不引用；由 `oxlint` 的 `vibevalley/ui-layer-boundaries` 规则拦截。
 - **状态中间层是 `state/`**：跨组件的状态 `defineAtom`（`atom.ts`）、本机存下的选择 `defineStored`（`stored.ts`、`prefs.ts`）、乐观意图 `defineIntent`（`intent.ts`）。
-- **乐观意图等帧 `seq` 追上后结算**：`Intent` 是按 `phase` 区分的判别联合；写操作带 `requestKey` 或 `sendKey` 叠在当前帧上，等到 `frame.seq >= reply.seq` 或频道出现对应消息才结算。
+- **乐观意图等切片 `seq` 追上后结算**：`Intent` 是按 `phase` 区分的判别联合；写操作带 `requestKey` 或 `sendKey` 叠在当前切片上，等到对应切片的 `slice.seq >= reply.seq` 或频道出现对应消息才结算。
 - **错误是结构化的 `UiFault`**：`infra/api.ts` 的 `faultOf` 从信封里取出六位 `bizCode`、`reason`、`next`、`settings` 和由 `bizCodeMeta` 决定的 `retryable`，只挂在失败或降级的分支上。
 - **一次性读取走 `infra/query.ts`**：自有的 Query client 管缓存与失效，结果先经 Schema 解码。会话轨迹经 `features/session/runs.ts` 的 `SessionLogs` 先订直播流、再读快照并按 `seq` 与 `revision` 合并。
 - **按概念分 feature**：`features/<概念>/` 的名字和服务端的模块、契约的文件夹一样；路由表、导航和设置的分区以代码为准，这里不抄。

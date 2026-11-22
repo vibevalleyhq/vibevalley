@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use vibevalley_protocol::{ApiErrorKind, BizCode, Envelope, Next, Op, Preview};
+use vibevalley_protocol::{ApiErrorKind, BizCode, Envelope, Next, Op, Preview, SliceKind};
 
 use crate::output::Output;
 
@@ -186,11 +186,35 @@ impl Client {
             .http
             .post(&url)
             .header("content-type", "application/json")
+            .header("x-vibevalley-client", "cli")
             .send(body.to_string())
             .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
         let text = response.body_mut().read_to_string().map_err(|e| unreachable(&self.server, e))?;
         decode_envelope(status, &text)
+    }
+
+    /// Fetches raw JSON from a `GET` endpoint (e.g. `/api/v1/slice/<name>?once=1`).
+    pub fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, Failure> {
+        let url = self.url(path);
+        let mut response = self
+            .http
+            .get(&url)
+            .header("accept", "application/json")
+            .header("x-vibevalley-client", "cli")
+            .call()
+            .map_err(|e| unreachable(&self.server, e))?;
+        let status = response.status().as_u16();
+        let text = response.body_mut().read_to_string().map_err(|e| unreachable(&self.server, e))?;
+        if status >= 300 {
+            return Err(failure_of(status, &text));
+        }
+        serde_json::from_str(&text).map_err(decode_failure)
+    }
+
+    /// Fetches a single typed slice snapshot via `GET /api/v1/slice/<name>?once=1`.
+    pub fn slice<T: DeserializeOwned>(&self, kind: SliceKind) -> Result<T, Failure> {
+        self.get_json(&format!("/api/v1/slice/{}?once=1", kind.as_str()))
     }
 
     /// Executes a mutating op, or automatically runs its protocol `dry_run` preview op when `--dry-run` is set.

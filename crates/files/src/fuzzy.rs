@@ -345,13 +345,20 @@ mod tests {
         std::thread::scope(|scope| {
             for worker in 0..8 {
                 scope.spawn(move || {
-                    for n in (worker..FILES - 2).step_by(8) {
-                        let dir = root.join(format!("pkg{:02}/{}/mod{:03}", n % 40, words[n % words.len()], (n / 40) % 125));
-                        if !dir.exists() {
-                            let _ = fs::create_dir_all(&dir);
+                    for pkg in (worker..40).step_by(8) {
+                        let word = words[pkg % words.len()];
+                        for m in 0..125 {
+                            let dir = root.join(format!("pkg{pkg:02}/{word}/mod{m:03}"));
+                            fs::create_dir_all(&dir).unwrap();
+                            for k in 0..20 {
+                                let n = pkg + 40 * (m + 125 * k);
+                                if n >= FILES - 2 {
+                                    break;
+                                }
+                                let name = format!("{}_{n}.rs", words[(n / 7) % words.len()]);
+                                fs::File::create(dir.join(name)).unwrap();
+                            }
                         }
-                        let name = format!("{}_{n}.rs", words[(n / 7) % words.len()]);
-                        fs::write(dir.join(name), "").unwrap();
                     }
                 });
             }
@@ -387,5 +394,16 @@ mod tests {
         assert_eq!(index.query("terminal", 50).len(), 50);
         assert!(build.as_millis() < 2_000, "build took {build:?}");
         assert!(worst.as_millis() < 50, "slowest query took {worst:?}");
+
+        // Tear down the 40 generated trees in parallel instead of single-threaded TempDir::drop.
+        std::thread::scope(|scope| {
+            for worker in 0..8 {
+                scope.spawn(move || {
+                    for pkg in (worker..40).step_by(8) {
+                        let _ = fs::remove_dir_all(root.join(format!("pkg{pkg:02}")));
+                    }
+                });
+            }
+        });
     }
 }

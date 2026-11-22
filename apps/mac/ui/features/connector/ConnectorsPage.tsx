@@ -17,7 +17,7 @@ import { Bubble } from "../../design/Tip";
 import { api } from "../../infra/api";
 import { Keyed } from "../../infra/base/dom";
 import { momentText, wallClockText } from "../../infra/base/format";
-import { useCore } from "../../infra/frame";
+import { useCollabSlice } from "../../infra/frame";
 import { channelLabel, topsOf } from "../channel";
 
 const connectorLabel: Record<ConnectorID, string> = {
@@ -102,9 +102,9 @@ function MarkStandIn(props: { id: ConnectorID; size: number }) {
 }
 
 export function ConnectorsPage(props: { id?: string | undefined; basePath?: string | undefined }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   const selected = () => ConnectorIDValues.find((c) => c === props.id) ?? "weixin";
-  const list = () => core()?.connectors;
+  const list = () => collab()?.connectors;
   const of = (c: ConnectorID) => list()?.find((s) => s.id === c);
   const connectedCount = () => ConnectorIDValues.filter((c) => of(c)?.state === "connected").length;
   const lineOf = (c: ConnectorID) => {
@@ -201,8 +201,8 @@ function Row(props: { label: string; numeric?: boolean; children: JSX.Element })
 }
 
 function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
-  const core = useCore();
-  // What an action changes comes back in the core state, where the connectors say each status.
+  const collab = useCollabSlice();
+  // What an action changes comes back in the collab slice, where connectors report each status.
   const act = createAct();
   const busy = act.busy;
   const login = (input: ConnectorLogin = {}) => {
@@ -268,7 +268,7 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
         <View class="gap-2">
           <Row label={t("web.connector.connectors.user")}>{props.status.user ?? ""}</Row>
           <Row label={t("web.connector.connectors.channel")}>
-            <ChannelPick id={props.id} current={props.status.channel ?? defaultOf(core()?.chat)?.name ?? ""} />
+            <ChannelPick id={props.id} current={props.status.channel ?? defaultOf(collab()?.chat)?.name ?? ""} />
           </Row>
           <If when={props.status.since}>
             {(since) => (
@@ -299,12 +299,12 @@ function ConnectorCard(props: { id: ConnectorID; status: ConnectorStatus }) {
 }
 
 function ChannelPick(props: { id: ConnectorID; current: string }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   const error = signal<string | undefined>(undefined);
   // A refusal shows beside the pick.
   const act = createAct((e) => error.set(e));
   const options = () => {
-    const all = topsOf(core()?.chat).map((c) => ({ value: c.name ?? "", label: channelLabel(c) }));
+    const all = topsOf(collab()?.chat).map((c) => ({ value: c.name ?? "", label: channelLabel(c) }));
     // The one it is in, even before the farm's chat has come.
     if (!all.some((o) => o.value === props.current)) all.push({ value: props.current, label: props.current });
     return all;

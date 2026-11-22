@@ -4,6 +4,7 @@ mod sign;
 
 use vibevalley_i18n::t;
 
+use super::frame::IssueExt;
 use super::scene::{FarmScene, FarmTool};
 use super::world::{BEDS, PLOT_H, VillageHit, YARD_PLACES};
 use crate::pixel::draw::{Color, DrawList, HudOp, rgba};
@@ -230,7 +231,6 @@ fn rows(f: &FarmScene, panel: Panel) -> Vec<Row> {
         Panel::Log => {
             let mut channels: Vec<_> = f
                 .frame
-                .state
                 .chat
                 .channels
                 .iter()
@@ -257,29 +257,29 @@ fn rows(f: &FarmScene, panel: Panel) -> Vec<Row> {
         }
         Panel::Warehouse => f
             .frame
-            .state
             .issues
             .iter()
             .filter(|i| i.harvested() && (f.repo.is_none() || i.repo == f.repo))
             .map(|i| {
                 (
-                    format!("#{} {}", i.number.unwrap_or(0), i.title),
+                    format!("#{} {}", i.number, i.title),
                     f.frame
                         .view
                         .plots
                         .get(&i.id)
                         .and_then(|p| p.badge.as_ref())
                         .map(|b| b.text.clone())
-                        .unwrap_or_else(|| t(&format!("shared.status.{}", i.status), &[])),
+                        .unwrap_or_else(|| t(&format!("shared.status.{}", i.status.as_str()), &[])),
                     Some(format!("/issues/{}", i.id)),
                 )
             })
             .collect(),
         Panel::Achievements => f
             .achievements
+            .items
             .iter()
             .map(|a| {
-                let standing = f.frame.view.achievements.iter().find(|s| s.id == a.id);
+                let standing = f.achievements.standings.iter().find(|s| s.id == a.id);
                 let progress = standing
                     .map(|s| match s.next {
                         Some(n) => format!("{} / {n}", s.count),
@@ -293,7 +293,7 @@ fn rows(f: &FarmScene, panel: Panel) -> Vec<Row> {
             t("web.farm.native.shop", &[]),
             t(
                 "web.farm.panel.shopClosed",
-                &[("coins", f.frame.state.progress.as_ref().map(|p| p.coins).unwrap_or(0.0).into())],
+                &[("coins", f.frame.progress.as_ref().map(|p| p.coins).unwrap_or(0).into())],
             ),
             None,
         )],
@@ -329,7 +329,7 @@ pub fn draw(f: &FarmScene, list: &mut DrawList, _scale: f32) {
         text(list, rect(p.x + 12.0, p.y + 10.0, p.w - 52.0, 20.0), panel.title(), 16.0);
         text(list, rect(p.x + p.w - 38.0, p.y + 10.0, 32.0, 16.0), t("web.farm.native.close", &[]), 12.0);
         if panel == Panel::Ledger {
-            let coins = f.frame.state.progress.as_ref().map(|p| p.coins).unwrap_or(0.0);
+            let coins = f.frame.progress.as_ref().map(|p| p.coins).unwrap_or(0);
             let values = [
                 t(
                     "web.farm.native.progress",

@@ -13,13 +13,13 @@ use vibevalley_core::rules::{session_ids_of, stage_wants_user};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, BizCode, ChannelType, Fact, FactSessionReported, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, MessageKind, Outcome, Session,
-    SessionId, SessionWatchEvent, Subscription, ops, subscriptions,
+    SessionId, SessionWatchEvent, SliceKind, Subscription, ops, subscriptions,
 };
 
 use crate::base::{LookIn, missing};
 use crate::event_bus::Subscription as BusSubscription;
 use crate::modules::collab::channel::{
-    ChannelDispatched, Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Seat, meta_of, profile_id,
+    ChannelDispatched, Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Seat, Told, meta_of, profile_id,
 };
 use crate::modules::content::attachment::Attachments;
 use crate::modules::team::agent::Agents;
@@ -106,8 +106,16 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
     let b = board.clone();
     hub.on::<ops::SessionOpenWorkspace>(move |_, input| b.sessions().open_workspace(input).map_err(session_error));
     let b = board.clone();
+    hub.on::<ops::SessionCloseWorkspace>(move |_, input| {
+        b.sessions().close_workspace(&input.id);
+        Ok(())
+    });
+    let b = board.clone();
     let att = attachments;
-    hub.on::<ops::SessionSend>(move |_, input| b.sessions().send_workspace(input, att.as_deref()).map_err(session_error));
+    hub.on::<ops::SessionSend>(move |ctx, input| {
+        let trace_id = (ctx.trace_id != 0).then_some(ctx.trace_id);
+        b.sessions().send_workspace_with_trace(input, att.as_deref(), trace_id).map_err(session_error)
+    });
     let b = board.clone();
     hub.on::<ops::SessionRespondPermission>(move |_, input| b.sessions().respond_permission(input).map_err(session_error));
     let b = board.clone();
@@ -127,7 +135,7 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
     hub.on_subscription::<subscriptions::SessionWatch>(move |hub, input, sink| {
         let initial = b.session(&input.id).ok_or_else(|| helper_ref(&input.id))?;
         let live = hub.live();
-        let states = hub.state_frames();
+        let sessions_dirty = hub.watch_slice_signal(SliceKind::Sessions, false);
         let workspace_updates = b.sessions().watch_workspace(&initial.id);
         let sessions = b.sessions().clone();
         let tr = tr.clone();
@@ -135,7 +143,7 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
         let after_seq = input.after_seq;
         std::thread::Builder::new()
             .name("vibevalley-session-watch".into())
-            .spawn(move || watch_session(initial, after_seq, &hub, &sessions, states, live, workspace_updates, &tr, sink))
+            .spawn(move || watch_session(initial, after_seq, &hub, &sessions, sessions_dirty, live, workspace_updates, &tr, sink))
             .map_err(crate::base::internal)?;
         Ok(())
     });
@@ -148,12 +156,13 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
             .issue(&input.id)
             .ok_or_else(|| missing(t("server.issue.issueRef", &[("ref", input.id.clone().into())]), LookIn::Issue))?;
         let live = hub.live();
-        let states = hub.state_frames();
+        let board_dirty = hub.watch_slice_signal(SliceKind::Board, true);
+        let sessions_dirty = hub.watch_slice_signal(SliceKind::Sessions, false);
         let tr = tr.clone();
         let hub = me.clone();
         std::thread::Builder::new()
             .name("vibevalley-issue-watch".into())
-            .spawn(move || watch_issue(initial, &hub, states, live, &tr, sink))
+            .spawn(move || watch_issue(initial, &hub, board_dirty, sessions_dirty, live, &tr, sink))
             .map_err(crate::base::internal)?;
         Ok(())
     });
@@ -198,7 +207,7 @@ fn watch_session(
     after_seq: Option<i64>,
     hub: &std::sync::Weak<Hub>,
     sessions: &Sessions,
-    states: flume::Receiver<Arc<vibevalley_protocol::StateFrame>>,
+    sessions_dirty: flume::Receiver<()>,
     live: flume::Receiver<LiveEvent>,
     workspace_updates: flume::Receiver<()>,
     trajectories: &Trajectories,
@@ -234,13 +243,13 @@ fn watch_session(
         }
         let next = if workspace_open {
             flume::Selector::new()
-                .recv(&states, |r| r.ok().map(|_| Msg::State))
+                .recv(&sessions_dirty, |r| r.ok().map(|_| Msg::State))
                 .recv(&workspace_updates, |r| Some(if r.is_ok() { Msg::State } else { Msg::WorkspaceDropped }))
                 .recv(&live, |r| r.ok().map(|e| Msg::Live(Box::new(e))))
                 .wait_timeout(std::time::Duration::from_millis(500))
         } else {
             flume::Selector::new()
-                .recv(&states, |r| r.ok().map(|_| Msg::State))
+                .recv(&sessions_dirty, |r| r.ok().map(|_| Msg::State))
                 .recv(&live, |r| r.ok().map(|e| Msg::Live(Box::new(e))))
                 .wait_timeout(std::time::Duration::from_millis(500))
         };
@@ -301,7 +310,8 @@ const HISTORY: usize = 241;
 fn watch_issue(
     initial: Issue,
     hub: &std::sync::Weak<Hub>,
-    states: flume::Receiver<Arc<vibevalley_protocol::StateFrame>>,
+    board_dirty: flume::Receiver<()>,
+    sessions_dirty: flume::Receiver<()>,
     live: flume::Receiver<LiveEvent>,
     trajectories: &Trajectories,
     sink: Sink,
@@ -316,7 +326,8 @@ fn watch_issue(
             return;
         }
         let next = flume::Selector::new()
-            .recv(&states, |r| r.ok().map(Ok))
+            .recv(&board_dirty, |r| r.ok().map(Ok))
+            .recv(&sessions_dirty, |r| r.ok().map(Ok))
             .recv(&live, |r| r.ok().map(Err))
             .wait_timeout(std::time::Duration::from_millis(500));
         let got = match next {
@@ -444,6 +455,7 @@ impl SessionChat {
     pub fn start(hub: &Arc<Hub>, board: Board, chat: Arc<Chat>, agents: Arc<Agents>, ensure_issue_thread: Arc<dyn Fn(&Session) + Send + Sync>) -> Arc<Self> {
         let (stop_tx, stop_rx) = flume::bounded::<()>(0);
         let dispatches = chat.dispatches();
+        let committed = chat.committed();
         let sc = Arc::new(Self {
             hub: Arc::downgrade(hub),
             board,
@@ -506,17 +518,38 @@ impl SessionChat {
         let coordinator = std::thread::Builder::new()
             .name("vibevalley-session-direct".into())
             .spawn(move || {
+                enum CoordinatorEvent {
+                    Dispatched(ChannelDispatched),
+                    Removed(String),
+                    Ignore,
+                    Stop,
+                }
                 let Some(sc) = w.upgrade() else { return };
                 sc.boot();
                 drop(sc);
                 loop {
-                    let dispatched = flume::Selector::new().recv(&dispatches, |r| r.ok()).recv(&stop_rx, |_| None).wait();
-                    let Some(dispatched) = dispatched else { return };
+                    let event = flume::Selector::new()
+                        .recv(&dispatches, |r| match r {
+                            Ok(dispatched) => CoordinatorEvent::Dispatched(dispatched),
+                            Err(_) => CoordinatorEvent::Stop,
+                        })
+                        .recv(&committed, |r| match r {
+                            Ok(Told::Removed(ev)) => CoordinatorEvent::Removed(ev.message_id),
+                            Ok(Told::Posted(_)) => CoordinatorEvent::Ignore,
+                            Err(_) => CoordinatorEvent::Stop,
+                        })
+                        .recv(&stop_rx, |_| CoordinatorEvent::Stop)
+                        .wait();
                     let Some(sc) = w.upgrade() else { return };
                     if sc.closed.load(Ordering::Acquire) {
                         return;
                     }
-                    sc.route_dispatched(dispatched);
+                    match event {
+                        CoordinatorEvent::Dispatched(dispatched) => sc.route_dispatched(dispatched),
+                        CoordinatorEvent::Removed(message_id) => sc.withdraw_message_mailbox(&message_id),
+                        CoordinatorEvent::Ignore => {}
+                        CoordinatorEvent::Stop => return,
+                    }
                 }
             })
             .expect("session direct dispatch thread");
@@ -561,17 +594,18 @@ impl SessionChat {
         }
     }
 
+    fn withdraw_message_mailbox(&self, message_id: &str) {
+        for agent in self.agents.profiles.all() {
+            let key = direct_mail_key(&agent.id, message_id);
+            let _ = self.board.sessions().withdraw_mailbox(&key);
+        }
+    }
+
     fn on_transition(&self, hub: &Arc<Hub>, tr: &Transition) {
         if self.closed.load(Ordering::Acquire) {
             return;
         }
         match &tr.fact {
-            Fact::MessageChanged(f) if f.message.deleted.is_some() => {
-                for agent in self.agents.profiles.all() {
-                    let key = direct_mail_key(&agent.id, &f.message.id);
-                    let _ = self.board.sessions().withdraw_mailbox(&key);
-                }
-            }
             Fact::SessionChanged(f)
                 if f.session.is_direct_talker() && f.session.issue_id().is_none() && !tr.before.sessions.iter().any(|s| s.id == f.session.id) =>
             {

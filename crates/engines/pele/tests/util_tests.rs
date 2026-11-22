@@ -1,5 +1,3 @@
-mod support;
-
 use std::sync::OnceLock;
 use std::time::Instant;
 
@@ -14,7 +12,7 @@ use vibevalley_pele::{
     ErrorCode, METRICS_MEASURER, ParseOptions, Registry, RenderOptions, TextMeasurer, TextStyle, ThemeMode, detect_type, parse, render, render_model, supports,
 };
 
-use support::{Lcg, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, inert_problem, resolved_options};
+use crate::support::{Lcg, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, inert_problem, resolved_options};
 
 // Mermaid's original encodeEntities used as reference oracle on short lines.
 // JS regex `.` excludes both `\n` and `\r`, matching Rust `[^\r\n]`.

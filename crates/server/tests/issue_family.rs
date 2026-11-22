@@ -88,8 +88,9 @@ fn acceptance(mode: Mode) {
         assert_eq!(parent.status, IssueStatus::InReview);
         assert!(
             w.board
-                .frame()
+                .bundle()
                 .inbox
+                .items
                 .iter()
                 .any(|i| matches!(&i.target, vibevalley_protocol::InboxTarget::Issue(t) if t.id == parent.id))
         );
@@ -203,7 +204,7 @@ fn a_draft_writes_the_issue_up_and_leaves_no_trace() {
     assert_eq!(drafted.criteria, vec!["app --port 8080 serves"]);
     assert_eq!(drafted.questions[0].options, vec!["8080", "9090"]);
     assert_eq!((drafted.status, drafted.was_sent()), (IssueStatus::Backlog, false));
-    assert!(w.board.frame().state.sessions.is_empty());
+    assert!(w.board.bundle().sessions.sessions.is_empty());
     assert!(!w.dir.path().join("vibevalley/worktrees/app.1").exists());
     assert!(git(&main, &["branch", "--list", "vibevalley/issue-1"]).is_empty());
 }

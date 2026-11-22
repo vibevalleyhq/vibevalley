@@ -25,12 +25,17 @@ export const Achievement = z.object({
   tiers: z.array(AchievementTier),
 }) satisfies Codec<T.Achievement>;
 
-const AchievementStanding = z.object({
+export const AchievementStanding = z.object({
   id: z.string(),
   tier: z.number(),
   count: z.number(),
   next: z.exactOptional(z.number()),
 }) satisfies Codec<T.AchievementStanding>;
+
+export const AchievementList = z.object({
+  items: z.array(Achievement),
+  standings: z.array(AchievementStanding),
+}) satisfies Codec<T.AchievementList>;
 
 const PlayAction = z.object({ at: z.number(), ...doingFields }) satisfies Codec<T.PlayAction>;
 
@@ -112,7 +117,6 @@ export const FarmView = z.object({
   level: FarmLevel,
   plots: z.record(z.string(), PlotView),
   plays: z.record(z.string(), SessionPlayView),
-  achievements: z.array(AchievementStanding),
 }) satisfies Codec<T.FarmView>;
 
 const GameEffectReward = z.object({
@@ -143,12 +147,14 @@ const GameEffectAchievement = z.object({
   oneOff: z.boolean(),
 }) satisfies Codec<T.GameEffectAchievement>;
 
-export const GameEffect = z.discriminatedUnion("kind", [
-  GameEffectReward,
-  GameEffectPenalty,
-  GameEffectLevelUp,
-  GameEffectAchievement,
-]) satisfies Codec<T.GameEffect>;
+const GameEffect = z.discriminatedUnion("kind", [GameEffectReward, GameEffectPenalty, GameEffectLevelUp, GameEffectAchievement]) satisfies Codec<T.GameEffect>;
+
+export const FarmFrame = z.object({
+  seq: z.number(),
+  view: FarmView,
+  progress: z.exactOptional(Progress),
+  effects: z.array(GameEffect),
+}) satisfies Codec<T.FarmFrame>;
 
 const LedgerEntryHarvested = z.object({
   kind: z.literal("harvested"),

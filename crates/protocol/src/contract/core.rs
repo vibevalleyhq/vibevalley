@@ -33,26 +33,60 @@ pub struct SpaceState {
     pub plays: Option<BTreeMap<String, SessionPlay>>,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct SpaceView {
-    pub call: CallState,
-    pub call_reason: String,
-    pub media: Option<Vec<MediaJob>>,
-    pub chat: Option<Chat>,
-    pub commits: Option<CommitCount>,
-    pub progress: Option<Progress>,
-    pub issues: Vec<Issue>,
-    pub connectors: Vec<ConnectorStatus>,
-    pub machines: Vec<Machine>,
-    pub sessions: Vec<SessionView>,
-    pub crons: Vec<CronView>,
-    pub board_summary: Option<BoardSummary>,
-    pub media_summary: Option<MediaSummary>,
-    pub channel_summary: Option<ChannelSummary>,
+pub enum SliceKind {
+    Board,
+    Sessions,
+    Collab,
+    Inbox,
+    Ops,
+    Farm,
+}
+
+impl SliceKind {
+    pub const ALL: [SliceKind; 6] = [
+        SliceKind::Board,
+        SliceKind::Sessions,
+        SliceKind::Collab,
+        SliceKind::Inbox,
+        SliceKind::Ops,
+        SliceKind::Farm,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SliceKind::Board => "board",
+            SliceKind::Sessions => "sessions",
+            SliceKind::Collab => "collab",
+            SliceKind::Inbox => "inbox",
+            SliceKind::Ops => "ops",
+            SliceKind::Farm => "farm",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Option<SliceKind> {
+        match s {
+            "board" => Some(SliceKind::Board),
+            "sessions" => Some(SliceKind::Sessions),
+            "collab" => Some(SliceKind::Collab),
+            "inbox" => Some(SliceKind::Inbox),
+            "ops" => Some(SliceKind::Ops),
+            "farm" => Some(SliceKind::Farm),
+            _ => None,
+        }
+    }
+}
+
+impl std::str::FromStr for SliceKind {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        SliceKind::from_str(s).ok_or(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -80,17 +114,78 @@ impl NoticeLevel {
 }
 
 #[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BoardSlice {
+    pub seq: i64,
+    pub issues: Vec<Issue>,
+    pub board_summary: Option<BoardSummary>,
+    pub commits: Option<CommitCount>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionsSlice {
+    pub seq: i64,
+    pub sessions: Vec<SessionView>,
+    pub machines: Vec<Machine>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct CollabSlice {
+    pub seq: i64,
+    pub chat: Option<Chat>,
+    pub channel_summary: Option<ChannelSummary>,
+    pub connectors: Vec<ConnectorStatus>,
+}
+
+#[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct StateFrame {
-    /// Goes up by one with every commit the core folds (Core.apply that changed the state): this frame shows every fold up to it.
+pub struct InboxSlice {
     pub seq: i64,
-    pub state: SpaceView,
-    pub inbox: Vec<InboxItem>,
-    pub view: FarmView,
-    pub effects: Vec<GameEffect>,
+    pub items: Vec<InboxItem>,
+    pub call: CallState,
+    pub call_reason: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct OpsSlice {
+    pub seq: i64,
+    pub crons: Vec<CronView>,
+    pub media: Option<Vec<MediaJob>>,
+    pub media_summary: Option<MediaSummary>,
+}
+
+/// Offline snapshot, scenario, and fixture bundle; never served as an HTTP endpoint.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SliceBundle {
+    pub seq: i64,
+    pub board: BoardSlice,
+    pub sessions: SessionsSlice,
+    pub collab: CollabSlice,
+    pub inbox: InboxSlice,
+    pub ops: OpsSlice,
+    pub farm: FarmFrame,
 }
 
 #[skip_serializing_none]
@@ -309,9 +404,14 @@ pub struct ArtifactSuggestionFollowPayload {
 crate::typescript::module! {
     "core";
     types: [SpaceState,
-    SpaceView,
+    SliceKind,
     NoticeLevel,
-    StateFrame,
+    BoardSlice,
+    SessionsSlice,
+    CollabSlice,
+    InboxSlice,
+    OpsSlice,
+    SliceBundle,
     Health,
     Fact,
     ServerEventSnapshot,

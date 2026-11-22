@@ -12,7 +12,7 @@ import { mix } from "../../../design/tone";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
 import { momentText, shortMomentText } from "../../../infra/base/format";
-import { useCore } from "../../../infra/frame";
+import { useCollabSlice } from "../../../infra/frame";
 import { defineQuery, ready, retryRead, useQuery } from "../../../infra/query";
 import { followed, useFollowed } from "../../channel/model/follow";
 import { issueThreadOf } from "../../channel/model/places";
@@ -25,10 +25,10 @@ const conversationQuery = defineQuery({
 });
 
 export function IssueThread(props: { issue: string }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   const now = useNow();
   const location = useQuery(() => conversationQuery(props.issue));
-  const thread = () => issueThreadOf(core()?.chat, props.issue)?.id ?? ready(location, undefined) ?? undefined;
+  const thread = () => issueThreadOf(collab()?.chat, props.issue)?.id ?? ready(location, undefined) ?? undefined;
   const feed = useFollowed(thread);
   const act = createAct();
   const visible = () => feed().messages.filter((message) => message.deleted === undefined);

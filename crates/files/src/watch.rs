@@ -377,7 +377,24 @@ mod tests {
         w.wait_for("src/新 文件.rs", Some(FsChangeKind::Created));
 
         fs::write(w.root.join("src/existing.rs"), "new\n").unwrap();
-        w.wait_for("src/existing.rs", Some(FsChangeKind::Modified));
+        // FSEvents can retain ItemCreated across later writes to a recently created file.
+        w.wait_for_kind("src/existing.rs", |kind| matches!(kind, FsChangeKind::Created | FsChangeKind::Modified));
+
+        // Verify pure Modify events map deterministically to FsChangeKind::Modified.
+        let canonical = w.root.canonicalize().unwrap();
+        let mut filter = Filter::new(canonical.clone(), w.root.clone());
+        let mut modify_pending = Pending::default();
+        modify_pending.absorb(
+            notify::Event::new(EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Content))).add_path(canonical.join("src/existing.rs")),
+            &mut filter,
+        );
+        assert_eq!(
+            modify_pending.into_batch(&filter),
+            [FsChange {
+                path: w.root.join("src/existing.rs"),
+                kind: FsChangeKind::Modified,
+            }]
+        );
 
         fs::remove_file(w.root.join("doomed.txt")).unwrap();
         w.wait_for("doomed.txt", Some(FsChangeKind::Removed));

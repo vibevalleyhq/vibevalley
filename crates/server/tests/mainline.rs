@@ -9,7 +9,7 @@ use vibevalley_protocol::{BizCode, Caller, IssueStageKind, IssueStatus};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, ToolCall, Usage};
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step};
 use vibevalley_runtime::oar::{McpServer, Registry};
-use vibevalley_server::{Server, ServerConfig, Started};
+use vibevalley_server::{ServerConfig, Started};
 
 struct Model(Mutex<VecDeque<Completion>>);
 
@@ -56,14 +56,18 @@ fn call(url: &str, op: &str, input: Value) -> Value {
 }
 
 fn until<T>(server: &Started, what: &str, mut read: impl FnMut() -> Option<T>) -> T {
-    let frames = server.hub.state();
+    let board_dirty = server.hub.watch_slice_signal(vibevalley_protocol::SliceKind::Board, false);
+    let sessions_dirty = server.hub.watch_slice_signal(vibevalley_protocol::SliceKind::Sessions, false);
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
         if let Some(value) = read() {
             return value;
         }
         assert!(Instant::now() < deadline, "timed out: {what}");
-        let _ = frames.recv_timeout(Duration::from_millis(50));
+        let _ = flume::Selector::new()
+            .recv(&board_dirty, |_| ())
+            .recv(&sessions_dirty, |_| ())
+            .wait_timeout(Duration::from_millis(50));
     }
 }
 

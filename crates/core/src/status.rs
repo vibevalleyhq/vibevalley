@@ -454,7 +454,7 @@ pub fn issue_prompt_of(issue: &Issue) -> Option<IssuePromptKind> {
     }
 }
 
-/// Deterministic board summary folded into `SpaceView`: identical lane counts
+/// Deterministic board summary folded into `BoardSlice`: identical lane counts
 /// for wide and narrow views, active worker slot usage, and per-issue metadata.
 pub fn board_summary(state: &SpaceState) -> BoardSummary {
     let lookup = lookup_of(state);

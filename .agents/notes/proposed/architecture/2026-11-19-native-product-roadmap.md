@@ -99,7 +99,7 @@ SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均�
 | 工单板与会话 | 工单板分派工单。会话关联输入、轮次、厂商会话和工作目录。根线程报告轮末后，会话才可结算该轮。 | 子线程先结束时，主轮仍可执行。根线程报告完成后，用户仍应能独立判断改动是否已合并。[会话](crates/server/src/modules/work/session/sessions.rs) |
 | oar | 驱动把厂商通知解码成带来源的事件。Codex 自己派出的子线程属于本轮。用户另邀一个帮工档案时，按工单小队模型建会话。 | 厂商子线程不会占用另一个产品帮工的身份。[工单小队提案](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md) |
 | 工单账本与工作目录 | 账本保存业务结算。Git 和文件系统保存外部命令造成的改动。宿主保存窗口布局。 | 查询回复标识可找到对应轮次。查询该轮的工作目录和基线提交可核对磁盘改动。[工单账本](crates/server/src/modules/work/ledger.rs) |
-| 核心状态 | Rust 契约定义动作和状态。核心归约用同一组事实生成工单、收件箱和农场视图。高频命令输出进入工作日志。 | 工作台经进程内桥、CLI 经 HTTP `/api/v1` 读同一张工单。Chord 客户端续订 `space` 后应读到最新的持久执行通知和审批状态。[订阅与执行治理](crates/server/src/transport/chord/README.md) · [系统架构](docs/architecture.md) · [核心状态](docs/subsystems/core.md) |
+| 核心状态 | Rust 契约定义动作和状态。核心归约用同一组事实生成 5 域切片、收件箱和独立农场视图。高频命令输出进入工作日志。 | 工作台经进程内桥、CLI 经 HTTP `/api/v1/slice/{name}` 读同一张工单与切片；持久执行告警经 `RuntimeInboxObserver` 并入 `InboxSlice`。[系统架构](docs/architecture.md) · [核心状态](docs/subsystems/core.md) |
 
 **恢复规则。** 同一条回复应有稳定标识。服务收到重复回复时，应返回原执行记录。不同回复按会话现有的排队或插话规则执行。以下用例从工单串发出回复，使用临时 Git 仓库，并真实终止服务进程。[已有主线测试](crates/server/tests/mainline.rs)
 

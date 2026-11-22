@@ -2,7 +2,7 @@ import { Clipboard, computed, effect, host, Image, Scroll, signal, Text, untrack
 import { Button, ContextMenu, Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { Issue, SessionView } from "@vibevalley/protocol";
+import type { BoardSlice, SessionsSlice } from "@vibevalley/protocol";
 import { isFreeUserSession, isOrchestratorSession, sessionBranch, sessionIssueId, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { Icon } from "../design/Icon";
@@ -55,13 +55,6 @@ type RailProject = {
 type RailFrame = { projects: RailProject[]; panel: string; inspectorOpen?: boolean };
 
 type VvRepo = { name: string; path: string; git?: boolean; last?: number };
-type VvStateFrame = {
-  seq: number;
-  state?: {
-    sessions?: SessionView[];
-    issues?: Issue[];
-  };
-};
 
 type WorktreeGroup = {
   id: string;
@@ -299,17 +292,19 @@ export function Sidebar() {
   const rail = frame<RailFrame>("rail");
   const files = frame<FilesFrame>("files");
   const git = frame<GitFrame>("git");
-  const vvState = frame<VvStateFrame>("state");
   const vvRepos = signal<VvRepo[]>([]);
   const hostParams = readHostParams();
+  const isInspector = hostParams.role === "inspector";
+  const board = isInspector ? () => null : frame<BoardSlice>("slice:board");
+  const sessionsSlice = isInspector ? () => null : frame<SessionsSlice>("slice:sessions");
   const pixelDir = signal<string | undefined>(hostParams.pixelDir);
   const foldOverrides = signal<Record<string, boolean>>({});
   const hoveredKey = signal<string | null>(null);
   const openMenuKey = signal<string | null>(null);
   const sweepPhase = signal(false);
 
-  const sessions = () => vvState()?.state?.sessions ?? [];
-  const issues = () => vvState()?.state?.issues ?? [];
+  const sessions = () => sessionsSlice()?.sessions ?? [];
+  const issues = () => board()?.issues ?? [];
   const repoNamesKey = computed(() => {
     const names = new Set<string>();
     for (const s of sessions()) {

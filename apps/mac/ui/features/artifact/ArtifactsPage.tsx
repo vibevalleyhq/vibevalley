@@ -17,7 +17,7 @@ import { toast } from "../../design/toasts";
 import { api, newSendKey, reasonOf } from "../../infra/api";
 import { Keyed, useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
-import { useCore } from "../../infra/frame";
+import { useCollabSlice, useIssue } from "../../infra/frame";
 import { ready, useQueryClient } from "../../infra/query";
 import { richNative } from "../../infra/rich";
 import { Link as A, useRouter, useSearch } from "../../infra/router";
@@ -211,7 +211,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   const queries = useQueryClient();
   const search = useSearch();
   const router = useRouter();
-  const core = useCore();
+  const collab = useCollabSlice();
   const now = useNow();
   const asking = signal(false);
   const menu = signal(false);
@@ -227,8 +227,8 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   const railOpen = signal(!untracked(wide));
   const asked = () => Number(search().get("v"));
   const version = createMemo((): ArtifactVersion | undefined => props.artifact.versions.find((v) => v.version === asked()) ?? props.artifact.versions.at(-1));
-  const issue = () => (props.artifact.issue ? (core()?.issues ?? []).find((i) => i.id === props.artifact.issue) : undefined);
-  const channels = () => (core()?.chat?.channels ?? []).filter((c) => c.type === "channel" && c.archived === undefined);
+  const issue = useIssue(() => props.artifact.issue);
+  const channels = () => (collab()?.chat?.channels ?? []).filter((c) => c.type === "channel" && c.archived === undefined);
   /** Where its comments are: the version shown, else where it was first said. */
   const said = () => version() ?? props.artifact.said;
   const pick = (n: number) => router.navigate(artifactHref(props.artifact.id, n === props.artifact.version ? undefined : n), { replace: true });

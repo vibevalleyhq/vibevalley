@@ -1,5 +1,5 @@
 use gpui::KeyBinding;
-use serde_json::{Value, json};
+use vibevalley_protocol::{HostPaletteCommand, HostPaletteItem};
 
 use crate::hosted::frames;
 
@@ -149,23 +149,32 @@ pub fn bind_keys(cx: &mut gpui::App) {
     update_menus(cx);
 }
 
-pub(super) fn shell_palette_commands() -> Vec<Value> {
+pub(super) fn shell_palette_commands() -> Vec<HostPaletteItem> {
+    let cmd = |id: &str, label: &str, detail: &str, group: &str, shortcut: Option<&str>| {
+        HostPaletteItem::Command(HostPaletteCommand {
+            id: id.to_string(),
+            label: label.to_string(),
+            detail: Some(detail.to_string()),
+            group: group.to_string(),
+            shortcut: shortcut.map(str::to_string),
+        })
+    };
     let mut items = vec![
-        json!({ "id": "nav.workspace", "label": "前往工作区", "detail": "/workspace", "group": "导航" }),
-        json!({ "id": "nav.chat", "label": "前往对话", "detail": "/chat", "group": "导航" }),
-        json!({ "id": "nav.issues", "label": "前往任务", "detail": "/issues", "group": "导航" }),
-        json!({ "id": "nav.content", "label": "前往内容", "detail": "/library", "group": "导航" }),
-        json!({ "id": "nav.pkm", "label": "前往笔记", "detail": "/pkm", "group": "导航" }),
-        json!({ "id": "nav.team", "label": "前往团队", "detail": "/agents", "group": "导航" }),
-        json!({ "id": "nav.runtimes", "label": "前往引擎", "detail": "/runtimes", "group": "导航" }),
-        json!({ "id": "nav.repos", "label": "前往仓库", "detail": "/repos", "group": "导航" }),
-        json!({ "id": "nav.catalog", "label": "前往素材图鉴", "detail": "/catalog", "group": "导航" }),
-        json!({ "id": "nav.farm", "label": "前往农场", "detail": "/farm", "group": "导航" }),
-        json!({ "id": "nav.settings", "label": "前往设置", "detail": "/settings", "group": "导航", "shortcut": "mod+," }),
-        json!({ "id": "theme.dark", "label": "切换主题：深色", "detail": "dark", "group": "外观" }),
-        json!({ "id": "theme.light", "label": "切换主题：浅色", "detail": "light", "group": "外观" }),
-        json!({ "id": "theme.system", "label": "切换主题：跟随系统", "detail": "system", "group": "外观" }),
-        json!({ "id": "inspector.toggle", "label": "切换右侧检查器", "detail": "inspector", "group": "视图" }),
+        cmd("nav.workspace", "前往工作区", "/workspace", "导航", None),
+        cmd("nav.chat", "前往对话", "/chat", "导航", None),
+        cmd("nav.issues", "前往任务", "/issues", "导航", None),
+        cmd("nav.content", "前往内容", "/library", "导航", None),
+        cmd("nav.pkm", "前往笔记", "/pkm", "导航", None),
+        cmd("nav.team", "前往团队", "/agents", "导航", None),
+        cmd("nav.runtimes", "前往引擎", "/runtimes", "导航", None),
+        cmd("nav.repos", "前往仓库", "/repos", "导航", None),
+        cmd("nav.catalog", "前往素材图鉴", "/catalog", "导航", None),
+        cmd("nav.farm", "前往农场", "/farm", "导航", None),
+        cmd("nav.settings", "前往设置", "/settings", "导航", Some("mod+,")),
+        cmd("theme.dark", "切换主题：深色", "dark", "外观", None),
+        cmd("theme.light", "切换主题：浅色", "light", "外观", None),
+        cmd("theme.system", "切换主题：跟随系统", "system", "外观", None),
+        cmd("inspector.toggle", "切换右侧检查器", "inspector", "视图", None),
     ];
     items.extend(frames::palette_commands());
     items

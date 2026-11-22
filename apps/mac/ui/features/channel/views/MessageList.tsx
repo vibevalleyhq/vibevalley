@@ -17,7 +17,7 @@ import { useAgent, useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
 import { tookText, spentText } from "../../../infra/base/format";
-import { useCore, useIssue, useSession, useSessionsMap, useThreadOwner } from "../../../infra/frame";
+import { useCollabSlice, useIssue, useSession, useSessionsMap, useSessionsSlice, useThreadOwner } from "../../../infra/frame";
 import { useRouter, Link as A } from "../../../infra/router";
 import { createEffect } from "../../../infra/solid";
 import { useLatest } from "../../../infra/state/atom";
@@ -41,7 +41,8 @@ const outcomeTag: Record<Outcome, { label: string; tone: TagTone; icon: IconName
 
 /** A channel's messages, newest at the bottom; filter keeps those containing it. */
 export function MessageList(props: { channel: Channel | undefined; filter?: string | undefined; point?: number | undefined; emptyText: string }) {
-  const core = useCore();
+  const collab = useCollabSlice();
+  const sessions = useSessionsSlice();
   const router = useRouter();
   const id = () => props.channel?.id;
   const said = useMarkedFollowed(id);
@@ -102,16 +103,16 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const items = computed(() =>
     searching()
       ? feedOf(
-          core()?.chat,
+          collab()?.chat,
           [...(hits() ?? [])].toReversed().map((h) => h.message),
         )
-      : feedOf(core()?.chat, said().messages),
+      : feedOf(collab()?.chat, said().messages),
   );
   const addressOf = (m: ChatMessage) => (m.channel === id() ? undefined : hits()?.find((h) => h.message.id === m.id)?.address);
   const firstNew = () => (searching() ? undefined : said().messages.find((m) => m.number > readTo && m.from !== userId)?.id);
-  const parent = useMessage(() => (props.channel ? parentAt(core()?.chat, props.channel) : undefined));
+  const parent = useMessage(() => (props.channel ? parentAt(collab()?.chat, props.channel) : undefined));
   const hasOlder = () => !!id() && said().messages.length > 0 && !said().complete;
-  const typing = () => orchestratorTyping(core(), props.channel);
+  const typing = () => orchestratorTyping(sessions()?.sessions, props.channel);
   const clock = useNow();
   // Thinking or writing, and for how long the round has gone on.
   const roundText = (mood: "thinking" | "speaking", since: number | undefined) => {
@@ -229,7 +230,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
               firstNew={item().message.id === firstNew()}
               inChannel={props.channel?.type === "channel"}
               where={addressOf(item().message)}
-              onJump={searching() ? () => router.navigate(messagePath(channelOf(core()?.chat, item().message.channel), item().message.number)) : undefined}
+              onJump={searching() ? () => router.navigate(messagePath(channelOf(collab()?.chat, item().message.channel), item().message.number)) : undefined}
             />
           </View>
         )}

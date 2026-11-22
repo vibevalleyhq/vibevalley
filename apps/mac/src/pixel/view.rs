@@ -25,7 +25,7 @@ use super::sky::Framing;
 use super::tree::TreeScene;
 use crate::hosted::{BridgeHub, HostedEvent, HostedView};
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ActWords, IssueAction};
+use vibevalley_protocol::{AchievementList, ActWords, BoardSlice, CollabSlice, FarmFrame, InboxSlice, IssueAction, SessionsSlice, SliceKind};
 
 /// What a scene asks the shell for.
 #[derive(Debug, Clone)]
@@ -82,7 +82,7 @@ pub struct PixelView {
     pub kind: String,
     props: Value,
     pub scene: Scene,
-    frame: Value,
+    frame: Frame,
     focus: FocusHandle,
     cache: SpriteCache,
     last: Instant,
@@ -100,6 +100,7 @@ pub struct PixelView {
     command_pending: bool,
     /// Only reveals the cold-load indicator after 150ms so fast loads never flash.
     show_loading: bool,
+    _bridge: Option<Arc<vibevalley_server::transport::bridge::Client>>,
 }
 
 impl EventEmitter<PixelEvent> for PixelView {}
@@ -110,25 +111,61 @@ impl Focusable for PixelView {
     }
 }
 
+fn slices_for_scene(kind: &str) -> &'static [SliceKind] {
+    match kind {
+        "farm" => &[SliceKind::Farm, SliceKind::Board, SliceKind::Sessions, SliceKind::Inbox, SliceKind::Collab],
+        "map" => &[SliceKind::Farm, SliceKind::Board, SliceKind::Sessions],
+        "opening" | "opening:launch" => &[SliceKind::Board],
+        _ => &[],
+    }
+}
+
+struct SliceOutlet(flume::Sender<(String, Value)>);
+
+impl vibevalley_server::transport::bridge::Outlet for SliceOutlet {
+    fn send(&self, event: &str, data: Value) {
+        let _ = self.0.send((event.to_string(), data));
+    }
+}
+
 impl PixelView {
     pub fn new(kind: &str, props: Value, cx: &mut Context<Self>) -> PixelView {
-        let server = cx.global::<BridgeHub>().0.server().clone();
-        let rx = server.state();
-        cx.spawn(async move |this, cx| {
-            while let Ok(value) = rx.recv_async().await {
-                if this.update(cx, |v, cx| v.on_frame(value, cx)).is_err() {
-                    break;
+        let slices = slices_for_scene(kind);
+        let bridge_client = (!slices.is_empty()).then(|| {
+            let (tx, rx) = flume::unbounded::<(String, Value)>();
+            let identity = crate::hosted::next_client_identity(vibevalley_server::ClientKind::GpuiPixel, kind);
+            let client = Arc::new(cx.global::<BridgeHub>().0.attach(identity, Arc::new(SliceOutlet(tx))));
+            for slice in slices {
+                let topic = format!("slice:{}", slice.as_str());
+                if let Err(error) = client.watch(&topic) {
+                    eprintln!("pixel watch {topic}: {error}");
                 }
             }
-        })
-        .detach();
+            let ack_client = client.clone();
+            cx.spawn(async move |this, cx| {
+                while let Ok((event, envelope)) = rx.recv_async().await {
+                    let Some(topic) = event.strip_prefix("frame:") else {
+                        continue;
+                    };
+                    let rev = envelope["rev"].as_u64().unwrap_or(0);
+                    let data = envelope["data"].clone();
+                    let alive = this.update(cx, |v, cx| v.on_slice(topic, data, cx));
+                    ack_client.applied_slice(topic, rev);
+                    if alive.is_err() {
+                        break;
+                    }
+                }
+            })
+            .detach();
+            client
+        });
         let cached = try_load_cached(kind);
         let is_cached = cached.is_some();
         let mut view = PixelView {
             kind: kind.to_string(),
             props,
             scene: cached.unwrap_or(Scene::Loading),
-            frame: Value::Null,
+            frame: Frame::default(),
             focus: cx.focus_handle(),
             cache: SpriteCache::default(),
             last: Instant::now(),
@@ -143,6 +180,7 @@ impl PixelView {
             sheet: None,
             command_pending: false,
             show_loading: false,
+            _bridge: bridge_client,
         };
         if is_cached {
             view.on_scene_ready(cx);
@@ -178,8 +216,23 @@ impl PixelView {
             o.phase = phase;
             o.progress = progress;
         }
-        let frame = self.frame.clone();
-        self.on_frame(frame, cx);
+        if self.frames_seen > 0 {
+            if let Scene::Opening(o) = &mut self.scene
+                && !o.demo
+                && o.phase == super::opening::Phase::Starting
+            {
+                o.phase = super::opening::Phase::Reading;
+                o.progress = 40.0;
+            }
+            match &mut self.scene {
+                Scene::Farm(f) => {
+                    f.apply_frame(self.frame.clone());
+                    f.phone.feed(&f.frame.inbox, Instant::now());
+                }
+                Scene::Map(m) => m.apply_frame(self.frame.clone()),
+                _ => {}
+            }
+        }
         if let (Scene::Farm(f), Some(repo)) = (&mut self.scene, self.props["repo"].as_str()) {
             f.repo = Some(repo.to_string());
         }
@@ -197,7 +250,7 @@ impl PixelView {
         }
     }
 
-    fn on_frame(&mut self, value: Value, cx: &mut Context<Self>) {
+    fn on_slice(&mut self, topic: &str, value: Value, cx: &mut Context<Self>) {
         if value.is_null() {
             return;
         }
@@ -209,15 +262,53 @@ impl PixelView {
             o.phase = super::opening::Phase::Reading;
             o.progress = 40.0;
         }
-        match &mut self.scene {
-            Scene::Farm(f) => {
-                f.apply_frame(Frame::parse(&value));
-                f.phone.feed(&f.frame.inbox, Instant::now());
+        match topic {
+            "slice:farm" => {
+                let Ok(farm) = serde_json::from_value::<FarmFrame>(value) else { return };
+                self.frame.apply_farm(farm.clone());
+                match &mut self.scene {
+                    Scene::Farm(f) => f.apply_farm(farm),
+                    Scene::Map(m) => m.apply_farm(farm),
+                    _ => {}
+                }
             }
-            Scene::Map(m) => m.apply_frame(Frame::parse(&value)),
-            _ => {}
+            "slice:board" => {
+                let Ok(board) = serde_json::from_value::<BoardSlice>(value) else { return };
+                self.frame.apply_board(board.clone());
+                match &mut self.scene {
+                    Scene::Farm(f) => f.apply_board(board),
+                    Scene::Map(m) => m.apply_board(board),
+                    _ => {}
+                }
+            }
+            "slice:sessions" => {
+                let Ok(sessions) = serde_json::from_value::<SessionsSlice>(value) else {
+                    return;
+                };
+                self.frame.apply_sessions(sessions.clone());
+                match &mut self.scene {
+                    Scene::Farm(f) => f.apply_sessions(sessions),
+                    Scene::Map(m) => m.apply_sessions(sessions),
+                    _ => {}
+                }
+            }
+            "slice:inbox" => {
+                let Ok(inbox) = serde_json::from_value::<InboxSlice>(value) else { return };
+                self.frame.apply_inbox(inbox.clone());
+                if let Scene::Farm(f) = &mut self.scene {
+                    f.apply_inbox(inbox);
+                    f.phone.feed(&f.frame.inbox, Instant::now());
+                }
+            }
+            "slice:collab" => {
+                let Ok(collab) = serde_json::from_value::<CollabSlice>(value) else { return };
+                self.frame.apply_collab(collab.clone());
+                if let Scene::Farm(f) = &mut self.scene {
+                    f.apply_collab(collab);
+                }
+            }
+            _ => return,
         }
-        self.frame = value;
         cx.notify();
     }
 
@@ -494,16 +585,15 @@ impl PixelView {
         self.taps.push(format!("{tap:?}"));
         match tap {
             FarmTap::Plot { session: Some(id), issue, .. } if secondary => {
-                let s = f.frame.state.sessions.iter().find(|s| s.id == id);
+                let s = f.frame.sessions.iter().find(|s| s.id == id);
                 let cwd = s.and_then(|s| s.cwd.clone()).or_else(|| self.props["cwd"].as_str().map(String::from));
                 if let Some(cwd) = cwd {
                     cx.emit(PixelEvent::Terminal {
                         cwd,
                         title: issue
                             .as_ref()
-                            .and_then(|id| f.frame.state.issues.iter().find(|i| &i.id == id))
-                            .and_then(|i| i.number)
-                            .map(|n| format!("#{n}"))
+                            .and_then(|id| f.frame.issues.iter().find(|i| &i.id == id))
+                            .map(|i| format!("#{}", i.number))
                             .or(issue)
                             .unwrap_or(id),
                     });
@@ -514,9 +604,8 @@ impl PixelView {
             } => {
                 let action = issue
                     .as_ref()
-                    .and_then(|id| f.frame.state.issues.iter().find(|i| &i.id == id))
-                    .and_then(|i| i.stage.as_ref())
-                    .and_then(|stage| f.tool.action(stage))
+                    .and_then(|id| f.frame.issues.iter().find(|i| &i.id == id))
+                    .and_then(|i| f.tool.action(&i.stage))
                     .cloned();
                 let requested = match (f.tool, &action) {
                     (FarmTool::Hand, _) => Some("inspect"),
@@ -621,8 +710,8 @@ impl PixelView {
                 if let Scene::Farm(f) = &mut v.scene {
                     match reply.error() {
                         Some(e) => f.show_toast(e.message),
-                        None => match serde_json::from_value(reply.data.unwrap_or(Value::Null)) {
-                            Ok(items) => f.achievements = items,
+                        None => match serde_json::from_value::<AchievementList>(reply.data.unwrap_or(Value::Null)) {
+                            Ok(list) => f.achievements = list,
                             Err(e) => f.show_toast(e.to_string()),
                         },
                     }

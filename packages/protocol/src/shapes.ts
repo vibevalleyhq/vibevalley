@@ -22,7 +22,19 @@ export {
   userId,
   type Validation,
 } from "./common/shapes";
-export { type Health, type LiveEvent, pathOf, type SpaceState, type SpaceView, type StateFrame } from "./core/shapes";
+export {
+  type BoardSlice,
+  type CollabSlice,
+  type Health,
+  type InboxSlice,
+  type LiveEvent,
+  type OpsSlice,
+  pathOf,
+  type SessionsSlice,
+  type SliceBundle,
+  type SliceKind,
+  SliceKindValues,
+} from "./core/shapes";
 export {
   type Agent,
   type AgentProblem,
@@ -75,10 +87,8 @@ export type {
   SubmitBranch,
 } from "./repo/shapes.gen";
 export {
-  type ContextRef,
   type DoingView,
   type EventTokens,
-  type ExecutionPolicy,
   type IssueAnswer,
   type Phase,
   type PhaseView,
@@ -90,8 +100,6 @@ export {
   type SessionChildStep,
   type SessionChildTranscript,
   type SessionChildTranscriptInput,
-  type SessionController,
-  SessionControllerValues,
   type SessionEvent,
   type SessionEventListInput,
   type SessionEventPage,
@@ -277,7 +285,7 @@ export type {
   OrchestratorEval,
   OrchestratorEvalRequest,
 } from "./orchestrator/shapes.gen";
-export type { Achievement, ChooseTitleRequest, Crop } from "./game/shapes.gen";
+export type { AchievementList, ChooseTitleRequest, Crop, FarmFrame } from "./game/shapes.gen";
 export { type Attachment, type AttachmentUpload } from "./attachment/shapes.gen";
 export {
   type ConnectorID,

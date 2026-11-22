@@ -1,10 +1,7 @@
-#[path = "chart_common/mod.rs"]
-mod common;
-
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use common::{assert_valid_resolved_svg, extract_texts};
+use crate::chart_common::{assert_valid_resolved_svg, extract_texts};
 use vibevalley_rich::engine::chart::{
     Annotation, AxisScale, AxisSpec, BarMode, BarOrientation, BarSeries, BarSpec, ChartKind, ChartSpec, DefaultTextMeasurer, Interpolation, LegendPosition,
     LineSeries, LineSpec, NumberFormat, NumericScale, RenderOptions, TextMeasurer, TextMetrics, ValueAxisSide, XRef, format_value, nice_number, render,

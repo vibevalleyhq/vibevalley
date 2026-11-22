@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -11,7 +9,7 @@ use vibevalley_pele::diagram::block::lexer::tokenize;
 use vibevalley_pele::diagram::block::parser::parse_block;
 use vibevalley_pele::{ErrorCode, METRICS_MEASURER, ParseOptions, ParsedModel, RenderOptions, ThemeMode, detect_type, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 #[derive(Debug, Clone, Copy)]
 struct RectBox {

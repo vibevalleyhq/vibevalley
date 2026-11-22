@@ -156,9 +156,18 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
         .unwrap_or_default();
     assert_eq!(result, "记下了：#1「在 demo 里写 README」，在备选里，没开工");
 
-    // The trajectory has the turn.
+    // The trajectory has the turn, and the orchestrator writes an oar-voyage/3 record.
     let page = user("session.event.list", json!({ "id": "orchestrator" }));
     assert!(page.to_string().contains("issue_create"), "{page}");
+    let record_path = dir.path().join("records").join("orchestrator.jsonl");
+    let (header, recorded_events) = vibevalley_runtime::oar::read_record_with_header(&record_path).unwrap();
+    assert_eq!(header.as_ref().map(|h| h.format.as_str()), Some("oar-voyage/3"));
+    assert!(
+        recorded_events
+            .iter()
+            .any(|e| matches!(&e.kind, vibevalley_runtime::oar::EventKind::ToolCallStarted { name, .. } if name == "issue_create")),
+        "{recorded_events:?}"
+    );
 
     // The user marks that answer wrong: the turn is kept as a case to replay.
     let asked = page["events"]
@@ -189,12 +198,12 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
     assert_eq!(refusal(json!({ "on": said["seq"], "want": "x" })), vibevalley_protocol::BizCode::Refused.code());
 
     // A cron for no profile: said in #general, handed to the orchestrator.
-    let at = vibevalley_server::now() + 300;
+    let at = vibevalley_server::now() + 120;
     user(
         "cron.create",
         json!({ "name": "早会", "text": "看看昨天的活", "when": { "kind": "once", "at": at } }),
     );
-    std::thread::sleep(Duration::from_millis(400));
+    std::thread::sleep(Duration::from_millis(150));
     started.crons.tick();
     until("the cron's turn", || {
         let seen = model.seen.lock().unwrap();
@@ -481,11 +490,8 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
 
 #[test]
 fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
-    use vibevalley_protocol::{Envelope, Issue, OrchestratorApproval};
-    use vibevalley_server::transport::chord::{
-        link::{Endpoint, Error, Options, Principal},
-        ws,
-    };
+    use vibevalley_protocol::{Envelope, InboxFrom, InboxKind, InboxTarget, Issue, OrchestratorApproval, SliceKind};
+    use vibevalley_server::Server;
 
     let home = tempfile::tempdir().unwrap();
     let (model, cfg) = approval_fixture(home.path());
@@ -511,6 +517,11 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     assert_eq!(first.tool_call_id, "approval-1");
     assert_eq!(serde_json::from_str::<Value>(&first.arguments_json).unwrap(), json!({"title":"Approved work"}));
     assert!(list(json!({"conversationId":"another-assistant"})).is_empty());
+    // Durable permission_park alerts are ignored by RuntimeInboxObserver; budget_reached alerts project into InboxSlice.
+    assert!(
+        started.hub.inbox_slice().items.iter().all(|i| !matches!(i.from, InboxFrom::Runtime(_))),
+        "permission_park must not appear in InboxSlice"
+    );
     let decision = |approval: &OrchestratorApproval, approved: bool| json!({"conversationId":approval.conversation_id,"taskId":approval.task_id,"toolCallId":approval.tool_call_id,"approved":approved});
     let mut ambiguous = decision(&first, true);
     ambiguous.as_object_mut().unwrap().remove("toolCallId");
@@ -526,41 +537,47 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     assert_eq!(list(filter).into_iter().next().unwrap().tool_call_id, second.tool_call_id);
     assert_eq!(request("orchestrator/approval/resolve", decision(&second, false)).biz_code, 0);
 
-    let url = http.url().replace("http://", "ws://") + "/chord/ws";
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-    runtime.block_on(async {
-        let flow = async {
-            let (socket, _) = ws::dial(&url).await.unwrap();
-            assert!(
-                Endpoint::default()
-                    .connect(socket, Options::new(Principal::new("machine", "foreign")))
-                    .await
-                    .is_err()
-            );
-            let (socket, _) = ws::dial(&url).await.unwrap();
-            let link = Endpoint::default()
-                .connect(socket, Options::new(Principal::user_device("native-test")))
-                .await
-                .unwrap();
-            assert!(matches!(
-                link.call("approval.resolve", decision(&first, true), None).await,
-                Err(Error::Rpc(ref error)) if error.code == "not_found"
-            ));
-            let raised = link
-                .call(
-                    "budget.raise",
-                    json!({"conversationId":first.conversation_id,"taskId":first.task_id,"newMaxCostMicros":10_000}),
-                    None,
-                )
-                .await
-                .unwrap();
-            assert_eq!(raised["maxCostMicros"], 10_000);
-            link.close();
-        };
-        tokio::time::timeout(Duration::from_secs(10), flow)
-            .await
-            .expect("native Chord exchange timed out")
+    // Emit a durable pi.inbox budget_reached alert and verify it lands immediately in InboxSlice & slice_snapshot.
+    started
+        .orchestrator
+        .execution
+        .store()
+        .write(|tx| {
+            tx.alert(
+                Some(&first.conversation_id),
+                &json!({
+                    "kind": "budget_reached",
+                    "taskId": first.task_id,
+                    "conversationId": first.conversation_id,
+                    "title": "Session budget reached",
+                    "message": "Budget cap hit",
+                    "createdAtMs": 123456,
+                }),
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let runtime_alert = until("budget_reached alert in InboxSlice", || {
+        started.hub.inbox_slice().items.into_iter().find(|i| i.kind == InboxKind::BudgetReached)
     });
+    assert_eq!(runtime_alert.from, InboxFrom::Runtime(vibevalley_protocol::InboxFromRuntime {}));
+    assert_eq!(
+        runtime_alert.target,
+        InboxTarget::Runtime(vibevalley_protocol::InboxTargetRuntime {
+            task_id: first.task_id.clone(),
+            session_id: Some(first.conversation_id.clone()),
+        })
+    );
+    assert_eq!(runtime_alert.text, "Budget cap hit");
+    let snap = started.hub.slice_snapshot(SliceKind::Inbox);
+    assert!(snap["items"].as_array().unwrap().iter().any(|i| i["kind"] == "budget_reached"), "{snap}");
+    let raised = started.hub.raise_budget(json!({
+        "conversationId": first.conversation_id,
+        "taskId": first.task_id,
+        "newMaxCostMicros": 10_000,
+    }));
+    assert_eq!(raised.biz_code, 0, "{raised:?}");
+    assert_eq!(raised.data.unwrap()["maxCostMicros"], 10_000);
     until("assistant's approved round settled", || {
         let messages = started.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
         messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())

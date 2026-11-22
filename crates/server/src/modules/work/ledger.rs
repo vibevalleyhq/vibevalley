@@ -19,7 +19,7 @@ use sqlx::SqliteConnection;
 use vibevalley_core::{Applied, Core, Refusal};
 use vibevalley_protocol::{
     Assignment, Conflict, CriterionCheck, Execution, ExecutionPolicy, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome,
-    Phase, PullRequest, Question, Session, SpaceState, StateFrame as Frame,
+    Phase, PullRequest, Question, Session, SliceBundle, SpaceState,
 };
 use vibevalley_runtime::agent::durable::Sqlite;
 use vibevalley_runtime::oar::PermissionMode;
@@ -145,7 +145,7 @@ pub trait Facts: Send + Sync {
     fn apply(&self, facts: Vec<Fact>) -> Applied;
     /// Calls `f` once with the state now.
     fn read(&self, f: &mut dyn FnMut(&SpaceState));
-    fn frame(&self) -> Frame;
+    fn bundle(&self) -> SliceBundle;
 }
 
 /// What a session's work log is told.
@@ -174,8 +174,8 @@ impl Facts for LocalFacts {
         f(lock(&self.0).state())
     }
 
-    fn frame(&self) -> Frame {
-        lock(&self.0).frame(vec![])
+    fn bundle(&self) -> SliceBundle {
+        lock(&self.0).slice_bundle(vec![])
     }
 }
 
@@ -392,8 +392,8 @@ pub struct Ledger {
     facts: Arc<dyn Facts>,
     /// Held across every apply and every read-modify-apply of an issue.
     write: Mutex<()>,
-    /// Each subscriber's sender and a receiver to drop a stale frame with.
-    subscribers: Mutex<Vec<(flume::Sender<Frame>, flume::Receiver<Frame>)>>,
+    /// Each subscriber's sender and a receiver to drop a stale bundle with.
+    subscribers: Mutex<Vec<(flume::Sender<SliceBundle>, flume::Receiver<SliceBundle>)>>,
     cron_of_issue: Mutex<Option<CronOfIssue>>,
     pull_of_issue: Mutex<Option<PullOfIssue>>,
 }
@@ -421,11 +421,11 @@ fn loaded(sessions: Vec<Session>, issues: Vec<Issue>) -> Vec<Fact> {
 impl Ledger {
     /// The board as stored, without taking it: for reading while another
     /// process holds it.
-    pub fn snapshot(path: &Path) -> Result<Frame> {
+    pub fn snapshot(path: &Path) -> Result<SliceBundle> {
         let (sessions, issues) = load(&Sqlite::new(&mut database(path)?))?;
         let facts = LocalFacts::default();
         facts.apply(loaded(sessions, issues));
-        Ok(facts.frame())
+        Ok(facts.bundle())
     }
 
     /// Loads what is stored into `facts`. A working session was interrupted:
@@ -568,8 +568,8 @@ impl Ledger {
         Ok(query(&Sqlite::new(&mut lock(&self.db)))?)
     }
 
-    pub fn frame(&self) -> Frame {
-        self.facts.frame()
+    pub fn bundle(&self) -> SliceBundle {
+        self.facts.bundle()
     }
 
     /// Reads the state the board's facts went into.
@@ -602,11 +602,11 @@ impl Ledger {
         self.database(|db| session_db::past(db, id)).ok().flatten()
     }
 
-    /// The newest frame after every change; a receiver that falls behind
+    /// The newest slice bundle after every change; a receiver that falls behind
     /// skips to the newest.
-    pub fn subscribe(&self) -> flume::Receiver<Frame> {
+    pub fn subscribe(&self) -> flume::Receiver<SliceBundle> {
         let (tx, rx) = flume::bounded(1);
-        let _ = tx.try_send(self.facts.frame());
+        let _ = tx.try_send(self.facts.bundle());
         lock(&self.subscribers).push((tx, rx.clone()));
         rx
     }
@@ -698,10 +698,10 @@ impl Ledger {
         let applied = self.facts.apply(facts);
         let mut subscribers = lock(&self.subscribers);
         if !applied.transitions.is_empty() && !subscribers.is_empty() {
-            let frame = self.facts.frame();
+            let bundle = self.facts.bundle();
             subscribers.retain(|(tx, stale)| {
                 let _ = stale.try_recv();
-                !matches!(tx.try_send(frame.clone()), Err(flume::TrySendError::Disconnected(_)))
+                !matches!(tx.try_send(bundle.clone()), Err(flume::TrySendError::Disconnected(_)))
             });
         }
     }

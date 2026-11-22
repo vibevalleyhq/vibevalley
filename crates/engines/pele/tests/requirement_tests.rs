@@ -1,5 +1,3 @@
-mod support;
-
 use std::time::Instant;
 
 use regex::Regex;
@@ -12,7 +10,7 @@ use vibevalley_pele::svg::palette::PaletteOverrides;
 use vibevalley_pele::svg::theme::{SvgTheme, ThemeMode};
 use vibevalley_pele::{DiagramConfig, DiagramType, METRICS_MEASURER, ParseOptions, RenderOptions, parse, render, supports};
 
-use support::{
+use crate::support::{
     Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, load_fixture, resolved_options,
 };
 

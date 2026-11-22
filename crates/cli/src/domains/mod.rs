@@ -73,11 +73,11 @@ pub enum Command {
     /// Upload and download raw attachments
     Attachment(content::attachment::AttachmentCmd),
 
-    /// Snapshot or stream StateFrame updates from /api/v1/state
+    /// Snapshot or stream state slices from /api/v1/slice/<name>
     State(infra::state::StateCmd),
     /// Read, validate, and update server settings
     Setting(infra::setting::SettingCmd),
-    /// Verify home, server, SSE state stream, runtimes, and model key
+    /// Verify home, server, SSE slice stream, runtimes, and model key
     Doctor(infra::doctor::DoctorCmd),
 }
 

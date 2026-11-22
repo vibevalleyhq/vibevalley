@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use vibevalley_core::{Move, Refusal, status_move};
 use vibevalley_protocol::{
     Assignment, Deliverable, Fact, Issue, IssueCanceled, IssueConstraints, IssueStageKind as StageKind, IssueStatus, Priority, Run, RunTriggerKind, Session,
-    SpaceState, StateFrame as Frame, StuckReason,
+    SliceBundle, SpaceState, StuckReason,
 };
 use vibevalley_runtime::oar::Registry;
 
@@ -112,7 +112,7 @@ fn pending_delivery(issue: &Issue) -> Option<&vibevalley_protocol::ProjectCheckR
 impl Board {
     /// The board as stored, without taking it: for reading while another
     /// process holds it. Working sessions show as they were last stored.
-    pub fn snapshot(path: &std::path::Path) -> Result<Frame> {
+    pub fn snapshot(path: &std::path::Path) -> Result<SliceBundle> {
         Ledger::snapshot(path)
     }
 
@@ -217,8 +217,8 @@ impl Board {
         &self.0.workplaces
     }
 
-    pub fn frame(&self) -> Frame {
-        self.0.ledger.frame()
+    pub fn bundle(&self) -> SliceBundle {
+        self.0.ledger.bundle()
     }
 
     /// Reads the state the board's facts went into.
@@ -226,9 +226,9 @@ impl Board {
         self.0.ledger.read(f)
     }
 
-    /// The newest frame after every change; a receiver that falls behind
+    /// The newest slice bundle after every change; a receiver that falls behind
     /// skips to the newest.
-    pub fn subscribe(&self) -> flume::Receiver<Frame> {
+    pub fn subscribe(&self) -> flume::Receiver<SliceBundle> {
         self.0.ledger.subscribe()
     }
 

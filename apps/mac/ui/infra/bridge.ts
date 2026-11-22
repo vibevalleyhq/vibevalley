@@ -2,7 +2,7 @@
 //
 // Server traffic, in VibeValley's shapes:
 //   call(op, payload)            -> Promise<Envelope>        (action "call", event "reply:<id>")
-//   frame("state")               -> latest StateFrame        (action "watch", events "frame:state")
+//   watchSlice(kind, fn)         -> SliceMap[kind] stream    (actions "watch"/"unwatch", events "frame:slice:<kind>")
 //   frame("live") / onLive(fn)   -> LiveEvents               (action "watch", events "frame:live")
 //   subscribe(name, payload, on, ended) -> stop              (actions "subscribe"/"unsubscribe", events "sub:<id>")
 // Host capabilities (VibeValley's packages/protocol/src/host.ts, plus the terminal):
@@ -10,8 +10,9 @@
 //   = call("host.<name>", payload), answered by the shell.
 // Shell frames and actions (VibeValley's own panels): frame(<topic>) for topics Rust pushes,
 // act({ type, ... }) for intent back.
-import { host, signal, type Signal } from "nsh";
+import { cleanup, host, signal, type Signal } from "nsh";
 
+import type { SliceKind } from "@vibevalley/protocol";
 import type { CommandLineState, MotionChoice } from "@vibevalley/protocol/host";
 
 import { readHostViewName } from "./hostParams";
@@ -106,33 +107,99 @@ export type FrameEnvelope<T> = { rev: number; data: T };
 interface TopicEntry {
   readonly store: Signal<FrameEnvelope<unknown> | null>;
   readonly listeners: Set<(data: unknown) => void>;
+  latest: FrameEnvelope<unknown> | null;
+  watchers: number;
+  detach?: () => void;
 }
 
-const topics = new Map<string, TopicEntry>();
-/** Topics the server streams; the view asks for them once, on first use. */
-const serverTopics = new Set(["state", "live"]);
+const SLICE_PREFIX = "slice:";
+const isSliceTopic = (name: string): boolean => name.startsWith(SLICE_PREFIX);
 
-function topic(name: string): TopicEntry {
+const topics = new Map<string, TopicEntry>();
+/** Permanent server topics; the view asks for them once, on first use. */
+const serverTopics = new Set(["live"]);
+
+function ensureEntry(name: string): TopicEntry {
   let entry = topics.get(name);
   if (entry) return entry;
-  const store = signal<FrameEnvelope<unknown> | null>(null);
-  const listeners = new Set<(data: unknown) => void>();
-  entry = { store, listeners };
+  entry = {
+    store: signal<FrameEnvelope<unknown> | null>(null),
+    listeners: new Set(),
+    latest: null,
+    watchers: 0,
+  };
   topics.set(name, entry);
-  listenDetached(`frame:${name}`, (payload) => {
+  return entry;
+}
+
+function attachTopicListener(name: string, entry: TopicEntry): () => void {
+  return listenDetached(`frame:${name}`, (payload) => {
     if (!isFrameEnvelope(payload)) return;
-    store.set(payload);
-    // A state receipt releases the next workbench snapshot. Other non-live receipts feed the debug dump.
+    entry.latest = payload;
+    entry.store.set(payload);
+    // A slice receipt releases the next snapshot. Other non-live receipts feed the debug dump.
     if (name !== "live") host.post("action", { type: "applied", topic: name, rev: payload.rev });
-    for (const listener of [...listeners]) listener(payload.data);
+    for (const listener of [...entry.listeners]) listener(payload.data);
   });
+}
+
+function acquireSlice(name: string): { readonly entry: TopicEntry; readonly release: () => void } {
+  const entry = ensureEntry(name);
+  entry.watchers += 1;
+  if (entry.watchers === 1) {
+    entry.detach = attachTopicListener(name, entry);
+    if (host.available()) host.post("action", { type: "watch", topic: name });
+  }
+  let released = false;
+  return {
+    entry,
+    release: () => {
+      if (released) return;
+      released = true;
+      entry.watchers -= 1;
+      if (entry.watchers > 0) return;
+      entry.detach?.();
+      entry.detach = undefined;
+      entry.latest = null;
+      entry.store.set(null);
+      if (host.available()) host.post("action", { type: "unwatch", topic: name });
+    },
+  };
+}
+
+function topic(name: string): TopicEntry {
+  const existing = topics.get(name);
+  if (existing && existing.detach !== undefined) return existing;
+  const entry = ensureEntry(name);
+  entry.detach = attachTopicListener(name, entry);
   if (serverTopics.has(name) && host.available()) host.post("action", { type: "watch", topic: name });
   return entry;
 }
 
-/** The latest frame of `name` (reactive), `null` until the first one. `frame("state")` is the StateFrame. */
+/** Watches a server slice topic (`slice:<kind>`), delivering the newest cached frame if already active and unwatching when the last caller stops. */
+export function watchSlice(kind: SliceKind, listener: (data: unknown) => void): () => void {
+  const name = `${SLICE_PREFIX}${kind}`;
+  const { entry, release } = acquireSlice(name);
+  entry.listeners.add(listener);
+  if (entry.latest !== null) listener(entry.latest.data);
+  let active = true;
+  return () => {
+    if (!active) return;
+    active = false;
+    entry.listeners.delete(listener);
+    release();
+  };
+}
+
+/** The latest frame of `name` (reactive), `null` until the first one. Slice topics (`slice:<kind>`) watch on mount and unwatch on cleanup. */
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- each topic pushes its own contract shape from Rust
 export function frame<T = unknown>(name: string): () => T | null {
+  if (isSliceTopic(name)) {
+    const { entry, release } = acquireSlice(name);
+    cleanup(release);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Rust pushes each topic in its own contract shape
+    return () => (entry.store()?.data as T | undefined) ?? null;
+  }
   const { store } = topic(name);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Rust pushes each topic in its own contract shape
   return () => (store()?.data as T | undefined) ?? null;
@@ -140,12 +207,17 @@ export function frame<T = unknown>(name: string): () => T | null {
 
 /** The frame's revision (reactive): goes up by one per frame this view received. */
 export function frameRev(name: string): () => number {
+  if (isSliceTopic(name)) {
+    const { entry, release } = acquireSlice(name);
+    cleanup(release);
+    return () => entry.store()?.rev ?? 0;
+  }
   const { store } = topic(name);
   return () => store()?.rev ?? 0;
 }
 
 /** Subscribes to each incoming frame payload on `name` (validating the FrameEnvelope wrapper). */
-export function onFrame(name: string, listener: (data: unknown) => void): () => void {
+function onFrame(name: string, listener: (data: unknown) => void): () => void {
   const { listeners } = topic(name);
   listeners.add(listener);
   return () => {

@@ -70,8 +70,23 @@ opt-level = 2
 [profile.dev.package.nsh-engine]
 opt-level = 2
 
+[profile.dev.package.resvg]
+opt-level = 2
+
+[profile.dev.package.tiny-skia]
+opt-level = 2
+
+[profile.dev.package.vibevalley-files]
+opt-level = 2
+
+[profile.dev.package.vibevalley-pele]
+opt-level = 2
+
 [profile.dev.package.vibevalley-pixel]
 opt-level = 3
+
+[profile.dev.package.vibevalley-rich]
+opt-level = 2
 
 [profile.release]
 # Keep default unwinding (`panic = "unwind"`): nsh-core's SVG engine relies on catch_unwind.

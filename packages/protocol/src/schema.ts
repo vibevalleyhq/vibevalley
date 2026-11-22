@@ -22,7 +22,7 @@ export {
   SuggestionId,
   Validation,
 } from "./common/schema";
-export { Fact, Health, LiveEvent, ServerEvent, StateFrame } from "./core/schema";
+export { BoardSlice, CollabSlice, Fact, Health, InboxSlice, LiveEvent, OpsSlice, ServerEvent, SessionsSlice, SliceBundle, SliceKind } from "./core/schema";
 export { Agent, AgentTemplate, AgentValidateRequest, AgentValidation, Build, Head, Outfit, PersonaMode, Skill, Species } from "./agent/schema";
 export { ModelEntry, RuntimeInfo, RuntimePreset, RuntimeSettings, RuntimeSupport } from "./runtime/schema";
 export { Memory, MemoryList, MemoryRequest, MemorySearch, RecallPreview } from "./memory/schema";
@@ -206,7 +206,29 @@ export {
   OrchestratorEvalRequest,
 } from "./orchestrator/schema";
 export { InboxItem } from "./inbox/schema";
-export { Achievement, AchievementCategory, ChooseTitleRequest, LedgerEntry } from "./game/schema";
+export { Achievement, AchievementCategory, AchievementList, AchievementStanding, ChooseTitleRequest, FarmFrame, FarmView, LedgerEntry } from "./game/schema";
+export {
+  HostAction,
+  HostFileTreeFrame,
+  HostGitBranch,
+  HostGitCommit,
+  HostGitFileRow,
+  HostGitPanelFrame,
+  HostGitWorktree,
+  HostPaletteCommand,
+  HostPaletteFileMatch,
+  HostPaletteFrame,
+  HostPaletteItem,
+  HostPaletteMode,
+  HostPaletteSearchHit,
+  HostPanel,
+  HostRailFrame,
+  HostRailProject,
+  HostRailRunningState,
+  HostRailTab,
+  HostRailWorktree,
+  HostTreeItem,
+} from "./host/schema";
 export { Attachment, AttachmentUpload } from "./attachment/schema";
 export { ConnectorLogin, ConnectorsChannelRequest, ConnectorStatus, VerifyRequest } from "./connector/schema";
 export { AgoraGrant, Dictated, DictateRequest, SettingsUpdateVoice, VoiceCall, VoiceCallStart, VoiceGrantRenew, VoiceHeard, VoiceSaid } from "./voice/schema";

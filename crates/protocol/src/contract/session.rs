@@ -1027,6 +1027,15 @@ pub struct SessionOpenWorkspaceInput {
 }
 
 #[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCloseWorkspaceInput {
+    pub id: String,
+}
+
+#[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
@@ -1366,6 +1375,7 @@ crate::typescript::module! {
     SessionBindingInput,
     SessionContextFile,
     SessionOpenWorkspaceInput,
+    SessionCloseWorkspaceInput,
     SessionWorkspace,
     SessionSendInput,
     SessionRespondPermissionInput,

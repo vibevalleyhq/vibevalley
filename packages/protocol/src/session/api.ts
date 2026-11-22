@@ -12,6 +12,8 @@ export interface SessionHandlers {
   /** Its log, oldest first. `run` narrows to one run; cursor fields page history. */
   readonly "session.event.list": (a: T.SessionEventListInput) => Promise<T.SessionEventPage>;
   readonly "session.openWorkspace": (a: T.SessionOpenWorkspaceInput) => Promise<T.SessionWorkspace>;
+  /** Closes a direct workspace chat session, aborting any running turn without touching the project directory. */
+  readonly "session.closeWorkspace": (a: { readonly id: string }) => Promise<void>;
   /** Starts a turn when idle; steers the current turn when working. */
   readonly "session.send": (a: T.SessionSendInput) => Promise<T.Session>;
   readonly "session.respondPermission": (a: T.SessionRespondPermissionInput) => Promise<void>;
@@ -76,6 +78,13 @@ export const sessionEndpoints: readonly Endpoint[] = [
       title: z.exactOptional(z.string()),
     }),
     result: S.SessionWorkspace,
+    can: ["user", "remote"],
+  },
+  {
+    op: "session.closeWorkspace",
+    about: ["id"],
+    input: input({ id: z.string() }),
+    result: undefined,
     can: ["user", "remote"],
   },
   {

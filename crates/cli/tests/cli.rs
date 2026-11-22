@@ -330,7 +330,23 @@ fn state_snapshot_and_doctor_verify_sse_and_channel() {
 
     let state_json = srv.run(&["state", "--json"]).json();
     assert!(state_json["seq"].is_i64(), "{state_json}");
-    assert!(state_json["state"]["issues"].is_array(), "{state_json}");
+    assert!(state_json["board"]["issues"].is_array(), "{state_json}");
+    assert!(state_json["sessions"]["sessions"].is_array(), "{state_json}");
+    assert!(state_json["collab"].is_object(), "{state_json}");
+    assert!(state_json["inbox"]["items"].is_array(), "{state_json}");
+    assert!(state_json["ops"]["crons"].is_array(), "{state_json}");
+    assert!(state_json["farm"]["view"].is_object(), "{state_json}");
+
+    let board_json = srv.run(&["state", "--slice", "board", "--json"]).json();
+    assert!(board_json["seq"].is_i64(), "{board_json}");
+    assert!(board_json["issues"].is_array(), "{board_json}");
+
+    let inbox_text = srv.run(&["state", "--slice", "inbox"]);
+    assert_eq!(inbox_text.code, 0, "{:?}", inbox_text.failure);
+    assert!(inbox_text.out.contains("inbox") && inbox_text.out.contains("items "), "{}", inbox_text.out);
+
+    let watch_missing_slice = srv.run(&["state", "--watch"]);
+    assert_eq!((watch_missing_slice.code, watch_missing_slice.tag()), (2, "MissingOption"));
 
     // Configure settings & runtime so all 5 doctor checks pass
     let bad_key = srv.run(&["setting", "validate", "--deepseek-key", "bad"]);

@@ -19,7 +19,7 @@ import { useAgent } from "../../../infra/agents";
 import { useNow } from "../../../infra/base/dom";
 import { shortMomentText } from "../../../infra/base/format";
 import { hostApi } from "../../../infra/bridge";
-import { useCore } from "../../../infra/frame";
+import { useBoardSlice } from "../../../infra/frame";
 import { ready } from "../../../infra/query";
 import { Link as A } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
@@ -50,14 +50,14 @@ export function IssueDetail(props: {
   onClose: (session: Session, review: boolean) => void;
   onParent?: (() => void) | undefined;
 }) {
-  const core = useCore();
+  const board = useBoardSlice();
   const issues = useIssues();
   const now = useNow();
   const moves = useIntents(issueMove);
   const sets = useIntents(issueSet);
   const labeled = () => labeledIssue(issues().find((item) => item.id === props.issue.id) ?? props.issue, sets.list());
   const live = () => labeled().issue;
-  const s = createMemo(() => issueState(movedIssue(live(), moves.list()), props.sessions, props.session, issues(), core()?.boardSummary));
+  const s = createMemo(() => issueState(movedIssue(live(), moves.list()), props.sessions, props.session, issues(), board()?.boardSummary));
   const head = () => s().head;
   // The box under the block holds an answer, the findings of reject, a word to the helper, or what a reopen asks for.
   const acts = createIssueActs(() => props.issue, {

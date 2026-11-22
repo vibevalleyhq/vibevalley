@@ -118,16 +118,6 @@ pub enum RunningState {
     Idle,
 }
 
-impl RunningState {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Working => "working",
-            Self::Ready => "ready",
-            Self::Idle => "idle",
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TerminalStatus {
     pub state: RunningState,

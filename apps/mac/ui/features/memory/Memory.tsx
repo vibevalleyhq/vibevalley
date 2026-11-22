@@ -12,7 +12,7 @@ import { CountPill } from "../../design/Tag";
 import { api, createRequestKey } from "../../infra/api";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
-import { useCore } from "../../infra/frame";
+import { useSessionsMap } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useQuery, useQueryClient, useRepos } from "../../infra/query";
 
 /** Notes not tied to a repo. */
@@ -91,10 +91,9 @@ export function MemoryPanel(props: { agent: string }) {
   const viewQuery = useMemory(() => props.agent);
   const view = () => ready(viewQuery, undefined);
   const forget = createForget(() => props.agent);
-  const core = useCore();
+  const sessionsById = useSessionsMap();
   const now = useNow();
-  const sessions = () => new Map<string, string>((core()?.sessions ?? []).map((h) => [h.id, h.name]));
-  const sessionNameOf = (id: string | undefined) => (id === undefined ? t("web.memory.memory.helper") : (sessions().get(id) ?? id));
+  const sessionNameOf = (id: string | undefined) => (id === undefined ? t("web.memory.memory.helper") : (sessionsById().get(id)?.name ?? id));
   const all = () => view()?.memories ?? [];
   const sources = () => new Map((view()?.sources ?? []).map((s) => [s.name, s]));
   const notes = () => all().filter((m) => m.kind === "note");
@@ -105,7 +104,7 @@ export function MemoryPanel(props: { agent: string }) {
     m.author === "user"
       ? t("web.memory.memory.yours")
       : m.session
-        ? t("web.memory.memory.sessions", { name: sessions().get(m.session) ?? m.session })
+        ? t("web.memory.memory.sessions", { name: sessionsById().get(m.session)?.name ?? m.session })
         : m.author === "agent"
           ? t("web.memory.memory.orchestrators")
           : t("web.memory.memory.own");

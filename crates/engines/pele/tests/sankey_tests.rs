@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -12,7 +10,7 @@ use vibevalley_pele::diagram::sankey::lexer::tokenize;
 use vibevalley_pele::diagram::sankey::parser::prepare_text_for_parsing;
 use vibevalley_pele::{ErrorCode, METRICS_MEASURER, ParseOptions, ParsedModel, RenderOptions, TextMeasurer, TextStyle, parse, render, supports};
 
-use support::{
+use crate::support::{
     Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, load_fixture, resolved_options,
 };
 

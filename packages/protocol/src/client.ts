@@ -411,6 +411,9 @@ export class VibeValleyApi {
     get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Session> => this.call<T.Session>("session.get", "/api/v1/session/get", a, options),
     openWorkspace: (a: T.SessionOpenWorkspaceInput, options?: { signal?: AbortSignal }): Promise<T.SessionWorkspace> =>
       this.call<T.SessionWorkspace>("session.openWorkspace", "/api/v1/session/openWorkspace", a, options),
+    /** Closes a direct workspace chat session, aborting any running turn without touching the project directory. */
+    closeWorkspace: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> =>
+      this.call<void>("session.closeWorkspace", "/api/v1/session/closeWorkspace", a, options),
     /** Starts a turn when idle; steers the current turn when working. */
     send: (a: T.SessionSendInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
       this.call<T.Session>("session.send", "/api/v1/session/send", a, options),
@@ -557,9 +560,9 @@ export class VibeValleyApi {
 
   readonly game = {
     achievement: {
-      /** Every achievement, as the board has them. */
-      list: (options?: { signal?: AbortSignal }): Promise<T.Achievement[]> =>
-        this.call<T.Achievement[]>("game.achievement.list", "/api/v1/game/achievement/list", undefined, options),
+      /** Every achievement and its current standing. */
+      list: (options?: { signal?: AbortSignal }): Promise<T.AchievementList> =>
+        this.call<T.AchievementList>("game.achievement.list", "/api/v1/game/achievement/list", undefined, options),
     },
     title: {
       set: (a: T.ChooseTitleRequest, options?: { signal?: AbortSignal }): Promise<void> =>

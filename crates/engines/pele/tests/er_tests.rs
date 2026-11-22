@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -12,7 +10,7 @@ use vibevalley_pele::diagram::er::tokens::ErToken;
 use vibevalley_pele::diagram::er::{Cardinality, DocItem, ErDb, Identification, RelSpec, build_er_graph, parse_er};
 use vibevalley_pele::{ErrorCode, LinkInfo, MathSvg, MonospacePart, ParseOptions, ParsedModel, RenderOptions, detect_type, parse, render, supports};
 
-use support::{
+use crate::support::{
     Lcg, Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, load_fixture,
     resolved_options,
 };

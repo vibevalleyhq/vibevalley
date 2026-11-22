@@ -63,7 +63,7 @@ fn an_issue_goes_from_backlog_to_merged() {
     assert!(worktree.ends_with("worktrees/app.1"), "{worktree}");
     assert!(prompts.lock().unwrap()[0].starts_with("Add the feature"));
     assert!(prompts.lock().unwrap()[0].contains("1. it is there"));
-    let inbox = w.board.frame().inbox;
+    let inbox = w.board.bundle().inbox.items;
     assert_eq!(inbox.len(), 1);
     assert_eq!(inbox[0].kind, vibevalley_protocol::InboxKind::Review);
 
@@ -78,8 +78,8 @@ fn an_issue_goes_from_backlog_to_merged() {
     assert!(exists_on(&main, "main", "feature.txt"));
     assert!(!Path::new(&worktree).exists(), "the worktree is removed");
     assert!(!branch_exists(&main, "vibevalley/issue-1"), "the merged branch is deleted");
-    assert!(w.board.frame().state.sessions.is_empty(), "its session left");
-    assert!(w.board.frame().inbox.is_empty());
+    assert!(w.board.bundle().sessions.sessions.is_empty(), "its session left");
+    assert!(w.board.bundle().inbox.items.is_empty());
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn a_failed_round_is_cured_not_completed() {
     assert_eq!((stuck.status, stuck.stage.stuck), (IssueStatus::InProgress, Some(StuckReason::Failed)));
     assert!(!stuck.moves.contains(&IssueStatus::Done));
     assert!(matches!(w.board.move_to("1", IssueStatus::Done, None), Err(BoardError::Refused(_))));
-    assert_eq!(w.board.frame().inbox[0].kind, vibevalley_protocol::InboxKind::Fix);
+    assert_eq!(w.board.bundle().inbox.items[0].kind, vibevalley_protocol::InboxKind::Fix);
     // Cure: back to todo with the server's own words.
     assert_eq!(w.board.move_to("1", IssueStatus::Todo, None).unwrap(), Move::Round);
     let fixed = wait_stage(&w.board, "1", StageKind::Reviewing);
@@ -157,7 +157,7 @@ fn a_question_waits_for_the_answer_and_the_round_goes_on() {
     let asking = wait_stage(&w.board, "1", StageKind::Asking);
     assert_eq!(asking.status, IssueStatus::InProgress);
     assert_eq!(asking.questions[0].options, vec!["8080", "9090"]);
-    let inbox = w.board.frame().inbox;
+    let inbox = w.board.bundle().inbox.items;
     assert_eq!((inbox[0].kind, inbox[0].text.as_str()), (vibevalley_protocol::InboxKind::Ask, "Which port?"));
     w.board.tell("1", "Use 9090").unwrap();
     let done = wait_stage(&w.board, "1", StageKind::Reviewing);
@@ -202,7 +202,7 @@ fn an_interrupted_round_resumes_or_completes() {
     assert!(!session.last_run.unwrap().needs_reconciliation);
 
     assert!(stuck.moves.contains(&IssueStatus::Done), "what is there can be completed");
-    assert_eq!(w.board.frame().inbox[0].kind, vibevalley_protocol::InboxKind::Interrupted);
+    assert_eq!(w.board.bundle().inbox.items[0].kind, vibevalley_protocol::InboxKind::Interrupted);
     assert_eq!(w.board.move_to("1", IssueStatus::Todo, None).unwrap(), Move::Round);
     wait_stage(&w.board, "1", StageKind::Reviewing);
     w.board.move_to("1", IssueStatus::Done, None).unwrap();
@@ -223,7 +223,7 @@ fn canceling_lets_the_session_go_and_keeps_a_branch_with_work() {
     assert_eq!(w.board.move_to("1", IssueStatus::Canceled, None).unwrap(), Move::Cancel);
     let canceled = w.board.issue("1").unwrap();
     assert_eq!((canceled.status, canceled.canceled), (IssueStatus::Canceled, Some(IssueCanceled::Dismissed)));
-    assert!(w.board.frame().state.sessions.is_empty());
+    assert!(w.board.bundle().sessions.sessions.is_empty());
     assert!(!Path::new(&worktree).exists());
     assert!(exists_on(&main, "vibevalley/issue-1", "wip.txt") && exists_on(&main, "vibevalley/issue-1", "loose.txt"));
     // Reopened, it is sent again on the same branch.
@@ -240,7 +240,7 @@ fn canceling_lets_the_session_go_and_keeps_a_branch_with_work() {
 
 #[test]
 fn the_queue_waits_for_room_in_the_space_and_sends_the_next() {
-    let rt = HookRuntime::new("t", slow_first(400), |turn| {
+    let rt = HookRuntime::new("t", slow_first(150), |turn| {
         turn.commit(&format!("f{}.txt", turn.prompt.len()), "x\n");
         turn.done("ok");
     });
@@ -274,7 +274,7 @@ fn the_queue_waits_for_room_in_the_space_and_sends_the_next() {
 
 #[test]
 fn the_per_repo_limit_holds_one_repo_back_and_not_another() {
-    let rt = HookRuntime::new("t", slow_first(400), |turn| turn.done("ok"));
+    let rt = HookRuntime::new("t", slow_first(150), |turn| turn.done("ok"));
     let w = world(vec![rt], |c| {
         c.space_limit = 5;
         c.per_repo = 1;
@@ -296,7 +296,7 @@ fn the_per_repo_limit_holds_one_repo_back_and_not_another() {
 
 #[test]
 fn words_for_a_queued_issue_go_with_it() {
-    let rt = HookRuntime::new("t", slow_first(300), |turn| turn.done("ok"));
+    let rt = HookRuntime::new("t", slow_first(150), |turn| turn.done("ok"));
     let prompts = rt.prompts.clone();
     let w = world(vec![rt], |c| c.space_limit = 1);
     let main = repo(w.dir.path(), "app");
@@ -364,7 +364,7 @@ fn a_lost_worktree_cancels_its_issue_on_open() {
     let board = Board::open(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let lost = board.issue("1").unwrap();
     assert_eq!((lost.status, lost.canceled), (IssueStatus::Canceled, Some(IssueCanceled::Lost)));
-    assert!(board.frame().state.sessions.is_empty());
+    assert!(board.bundle().sessions.sessions.is_empty());
 }
 
 #[test]
@@ -405,7 +405,7 @@ fn a_merge_conflict_stays_in_review_and_resolve_sends_it_back() {
         (conflicted.status, conflicted.stage.stuck),
         (IssueStatus::InReview, Some(StuckReason::Conflict))
     );
-    assert_eq!(w.board.frame().inbox[0].kind, vibevalley_protocol::InboxKind::Conflict);
+    assert_eq!(w.board.bundle().inbox.items[0].kind, vibevalley_protocol::InboxKind::Conflict);
     // Resolve: back to its session with the server's words.
     w.board.move_to("1", IssueStatus::Todo, None).unwrap();
     let resolved = wait_stage(&w.board, "1", StageKind::Reviewing);
@@ -646,15 +646,15 @@ fn a_branch_issue_keeps_its_branch() {
 
 #[test]
 fn a_quiet_session_is_stuck_until_it_speaks() {
-    let script = Script::new().turn(vec![Step::sleep_ms(1_500), Step::text("back")]);
+    let script = Script::new().turn(vec![Step::sleep_ms(500), Step::text("back")]);
     let rt = HookRuntime::new("t", script, |turn| turn.done("ok"));
-    let w = world(vec![rt], |c| c.quiet_after = Duration::from_millis(300));
+    let w = world(vec![rt], |c| c.quiet_after = Duration::from_millis(120));
     let main = repo(w.dir.path(), "app");
     w.board.create(new("Quiet", Some(&main))).unwrap();
     w.board.move_to("1", IssueStatus::Todo, None).unwrap();
     let quiet = wait_issue(&w.board, "1", "quiet", |t| t.stage.stuck == Some(StuckReason::Quiet));
     assert_eq!(quiet.status, IssueStatus::InProgress);
-    assert_eq!(w.board.frame().inbox[0].kind, vibevalley_protocol::InboxKind::Quiet);
+    assert_eq!(w.board.bundle().inbox.items[0].kind, vibevalley_protocol::InboxKind::Quiet);
     wait_stage(&w.board, "1", StageKind::Reviewing);
 }
 
@@ -684,16 +684,16 @@ fn frames_reach_subscribers_newest_first() {
     let rt = HookRuntime::new("t", quick(), |turn| turn.done("ok"));
     let w = world(vec![rt], |_| {});
     let rx = w.board.subscribe();
-    assert_eq!(rx.recv().unwrap().state.issues.len(), 0);
+    assert_eq!(rx.recv().unwrap().board.issues.len(), 0);
     let main = repo(w.dir.path(), "app");
     for n in 0..5 {
         w.board.create(new(&format!("n{n}"), Some(&main))).unwrap();
     }
-    // Fell behind: only the newest frame waits.
-    assert_eq!(rx.recv().unwrap().state.issues.len(), 5);
+    // Fell behind: only the newest bundle waits.
+    assert_eq!(rx.recv().unwrap().board.issues.len(), 5);
     assert!(rx.try_recv().is_err());
     let snapshot = Board::snapshot(&w.store).unwrap();
-    assert_eq!(snapshot.state.issues.len(), 5);
+    assert_eq!(snapshot.board.issues.len(), 5);
 }
 
 #[test]

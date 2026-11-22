@@ -1,7 +1,8 @@
+use super::super::frame::{IssueExt, SessionExt};
 use super::*;
 use crate::pixel::sky::Framing;
 use unicode_width::UnicodeWidthStr;
-use vibevalley_protocol::{Agent, AgentRole};
+use vibevalley_protocol::{Agent, AgentRole, BadgeTone, Crop, SessionView};
 
 const PAPER: Color = rgba(0xf3e2b8, 1.0);
 const MUTED: Color = rgba(0x776046, 1.0);
@@ -84,7 +85,7 @@ pub struct Control {
 }
 
 fn unread(f: &FarmScene) -> i64 {
-    f.frame.state.chat.channels.iter().filter_map(|c| c.unread).sum()
+    f.frame.chat.channels.iter().filter_map(|c| c.unread).sum()
 }
 
 fn button(action: Action, icon: &'static str, title: &str, size: f32, unread: i64) -> (Action, Part, f32) {
@@ -113,17 +114,16 @@ fn helpers(f: &FarmScene) -> Vec<&Agent> {
 }
 
 fn friend_activity(f: &FarmScene) -> (usize, Option<Color>) {
-    use super::super::frame::Crop;
     let mut busy = 0;
     let mut stage = None;
     for agent in f.profiles.iter().filter(|a| a.role == AgentRole::Worker) {
-        let mine = f.frame.state.sessions.iter().filter(|s| s.profile_id() == Some(agent.id.as_str()));
+        let mine = f.frame.sessions.iter().filter(|s| s.profile_id() == Some(agent.id.as_str()));
         let crops = mine.clone().filter_map(|s| f.frame.plot_of(s)).map(|p| p.crop);
         if crops.clone().any(|crop| crop == Crop::Withered) {
             stage = Some(rgba(0xc84a3a, 1.));
         } else if crops.clone().any(super::super::world::is_ripe) {
             stage.get_or_insert(rgba(0xe5a93c, 1.));
-        } else if mine.into_iter().any(|s| s.phase.tag == "working") {
+        } else if mine.into_iter().any(|s| s.is_working()) {
             busy += 1;
         }
     }
@@ -329,11 +329,11 @@ pub(super) fn draw_controls(f: &FarmScene, list: &mut DrawList, layout: &Layout)
                 let level = &f.frame.view.level;
                 let x = b.x + 8.0;
                 let y = b.y + 7.0;
-                let lv = format!("Lv.{:.0}", level.level);
+                let lv = format!("Lv.{}", level.level);
                 label(list, x, line_top(y, 12., 14.), &lv, 12.0, rgba(0x3f6b2a, 1.0));
                 let coin_x = x + crate::pixel::font::width(&lv, 12.0) + 3.0;
                 sprite(f, list, "icon-coin", coin_x, y + 1.0, 12.0);
-                let coins = format!("{:.0}", f.frame.state.progress.as_ref().map(|p| p.coins).unwrap_or_default());
+                let coins = format!("{}", f.frame.progress.as_ref().map(|p| p.coins).unwrap_or_default());
                 label(list, coin_x + 15.0, line_top(y, 12., 14.), &coins, 12.0, rgba(0x2f1f13, 1.));
                 let clock_x = coin_x + 18.0 + crate::pixel::font::width(&coins, 12.0);
                 sprite(f, list, "icon-clock", clock_x, y + 1.0, 12.0);
@@ -346,8 +346,8 @@ pub(super) fn draw_controls(f: &FarmScene, list: &mut DrawList, layout: &Layout)
                         bar.x,
                         bar.y,
                         bar.w
-                            * if level.need > 0.0 {
-                                (level.xp / level.need).clamp(0.0, 1.0) as f32
+                            * if level.need > 0 {
+                                (level.xp as f32 / level.need as f32).clamp(0.0, 1.0)
                             } else {
                                 0.0
                             },
@@ -355,7 +355,7 @@ pub(super) fn draw_controls(f: &FarmScene, list: &mut DrawList, layout: &Layout)
                     ),
                     rgba(0x7ea64f, 1.0),
                 );
-                let next = BEDS.iter().filter_map(|b| b.unlock_level).find(|&n| n as f64 > level.level);
+                let next = BEDS.iter().filter_map(|b| b.unlock_level).find(|&n| i64::from(n) > level.level);
                 let params = [
                     ("xp", level.xp.into()),
                     ("need", level.need.into()),
@@ -477,13 +477,7 @@ pub(super) fn draw_controls(f: &FarmScene, list: &mut DrawList, layout: &Layout)
     }
 }
 
-fn hover_action(
-    f: &FarmScene,
-    bed: super::super::world::Bed,
-    crop: super::super::frame::Crop,
-    session: Option<&super::super::frame::Session>,
-) -> (bool, String) {
-    use super::super::frame::Crop;
+fn hover_action(f: &FarmScene, bed: super::super::world::Bed, crop: Crop, session: Option<&SessionView>) -> (bool, String) {
     use vibevalley_protocol::IssueAction;
     if let Some(level) = bed.unlock_level {
         return (
@@ -497,8 +491,8 @@ fn hover_action(
     }
     let stage = session
         .and_then(|s| s.issue_id())
-        .and_then(|id| f.frame.state.issues.iter().find(|i| i.id == id))
-        .and_then(|i| i.stage.as_ref());
+        .and_then(|id| f.frame.issues.iter().find(|i| i.id == id))
+        .map(|i| &i.stage);
     let action = stage.and_then(|s| f.tool.action(s));
     let (ok, key) = match (f.tool, session, action) {
         (FarmTool::Hand, _, _) => (true, if session.is_some() { "web.farm.aim.look" } else { "web.farm.aim.sow" }),
@@ -536,12 +530,10 @@ fn hover_action(
 }
 
 fn draw_plot_hover(f: &FarmScene, list: &mut DrawList, fr: Framing) {
-    use super::super::frame::Crop;
     let Some(i) = f.hovered_bed() else { return };
     let bed = BEDS[i];
     let session = f
         .frame
-        .state
         .sessions
         .iter()
         .find(|s| s.is_worker() && f.repo.as_deref().is_none_or(|r| s.repo_name() == Some(r)) && bed.station >= 0 && f.frame.station_of(s) == bed.station);
@@ -554,7 +546,7 @@ fn draw_plot_hover(f: &FarmScene, list: &mut DrawList, fr: Framing) {
         })
     } else if let Some(s) = session {
         let crop = if crop == Crop::Carrot { Crop::Wheat } else { crop };
-        format!("{} · {}", s.name, translate(&format!("web.farm.crop.{}", crop.name())))
+        format!("{} · {}", s.name, translate(&format!("web.farm.crop.{}", crop.as_str())))
     } else {
         t("web.farm.overlay.bare", &[("plot", (bed.station as i64 + 1).into())])
     };
@@ -648,23 +640,22 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
         let p = f.world.plot_at(bed.index);
         let (x, y) = at(p.x, p.y - PLOT_H / 2.0);
         let session =
-            f.frame.state.sessions.iter().find(|s| {
+            f.frame.sessions.iter().find(|s| {
                 s.is_worker() && f.repo.as_deref().is_none_or(|r| s.repo_name() == Some(r)) && bed.station >= 0 && f.frame.station_of(s) == bed.station
             });
         if let Some(s) = session {
             let badge = f.frame.plot_of(s).and_then(|p| p.badge.as_ref());
             if let Some(b) = badge {
-                let paper = match b.tone.as_str() {
-                    "ripe" => 0xe8b84a,
-                    "bug" => 0xb44b36,
-                    "stuck" => 0x4a728c,
-                    "rest" => 0xcdbb92,
-                    "wait" => 0xb4cb7c,
-                    _ => 0xf3e2b8,
+                let paper = match b.tone {
+                    BadgeTone::Ripe => 0xe8b84a,
+                    BadgeTone::Bug => 0xb44b36,
+                    BadgeTone::Stuck => 0x4a728c,
+                    BadgeTone::Rest => 0xcdbb92,
+                    BadgeTone::Wait => 0xb4cb7c,
                 };
                 let mut rows = vec![b.text.as_str()];
                 rows.extend(s.repo_name());
-                let ink = if matches!(b.tone.as_str(), "bug" | "stuck") {
+                let ink = if matches!(b.tone, BadgeTone::Bug | BadgeTone::Stuck) {
                     rgba(0xfff3dc, 1.0)
                 } else {
                     INK
@@ -674,7 +665,7 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
                 text_pin(list, (x, at(p.x, p.y - PLOT_H + 5.0).1 - 2.0), 1.0, &[repo], (3.0, 0.0), PAPER, MUTED);
             }
         } else if let Some(level) = bed.unlock_level
-            && f.frame.view.level.level < level as f64
+            && f.frame.view.level.level < i64::from(level)
         {
             text_pin(
                 list,
@@ -697,7 +688,7 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
             place_sign(f, list, id, i, x, y - 3. * fr.scale);
         }
         let count = match *id {
-            "warehouse" => f.frame.state.issues.iter().filter(|issue| issue.harvested()).count(),
+            "warehouse" => f.frame.issues.iter().filter(|issue| issue.harvested()).count(),
             "taskBoard" => f
                 .frame
                 .inbox
@@ -722,14 +713,14 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
         }
     }
     let m = f.world.orchestrator;
-    if f.frame.state.sessions.is_empty() && !f.reveal_names {
+    if f.frame.sessions.is_empty() && !f.reveal_names {
         let (x, y) = at(m.x, m.y - 34.0);
         pin(list, x, y - 4.0, &translate("web.farm.overlay.idle"), PAPER);
     }
-    for s in &f.frame.state.sessions {
+    for s in &f.frame.sessions {
         if let Some(p) = f.helper_feet(&s.id) {
             let doing = s.doing().unwrap_or("none");
-            let named = s.phase.tag == "working" && s.runs == 0;
+            let named = s.is_working() && s.runs == 0;
             if doing == "none" && !named {
                 continue;
             }
@@ -823,11 +814,18 @@ mod tests {
                 words: Default::default(),
             });
         }
-        for delivered in ["merged", "pull_request", "kept", "merged"] {
-            farm.frame.state.issues.push(crate::pixel::farm::frame::Issue {
-                delivered: Some(delivered.into()),
-                ..Default::default()
-            });
+        for (idx, delivered) in [
+            vibevalley_protocol::Landing::Merged,
+            vibevalley_protocol::Landing::PullRequest,
+            vibevalley_protocol::Landing::Kept,
+            vibevalley_protocol::Landing::Merged,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut issue = vibevalley_protocol::Issue::new(format!("i-{idx}"), idx as i64 + 1, "Demo", 0);
+            issue.delivered = Some(delivered);
+            farm.frame.issues.push(issue);
         }
         let fr = frame_whole(farm.view_size, (farm.world.level.width, farm.world.level.height), FARM_CUT);
         let mut draw = DrawList::default();

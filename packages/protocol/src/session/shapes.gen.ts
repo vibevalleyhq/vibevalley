@@ -173,6 +173,8 @@ export type SessionContextFile = { path: string, startLine?: number, endLine?: n
 
 export type SessionOpenWorkspaceInput = { sessionId?: string, runtime: string, cwd: string, repo?: string, model?: string, effort?: string, permissionMode?: SessionPermissionMode, title?: string, };
 
+export type SessionCloseWorkspaceInput = { id: string, };
+
 export type SessionWorkspace = { id: SessionId, session: Session, title?: string, model?: string, effort?: string, permissionMode: SessionPermissionMode, };
 
 export type SessionSendInput = { id: string, text: string, attachments?: Array<string>, contextFiles?: Array<SessionContextFile>, };

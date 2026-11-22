@@ -10,7 +10,7 @@ Status: proposed
 
 ## Proposal
 
-将剩余全仓收敛机会拆为两档挂账：**第一梯队（`C1`–`C14`）**为低争议清理与缺陷修复，**第二梯队（`S1`–`S6`）**涉及产品边界或依赖取舍，待后续逐项拍板后独立实施。
+将剩余全仓收敛机会拆为三组挂账：**第一梯队（`C1`–`C14`）**为低争议清理与缺陷修复，**第二梯队（`S1`–`S6`）**为产品边界与模块取舍（已明确拍板方向，按项排期实施），**延后收敛组（`I1`–`I3`）**负责统一进程内 IO 调度底座与常用依赖减压。
 
 ### 第一梯队：零争议收敛与缺陷修复（`C1`–`C14`）
 
@@ -29,20 +29,43 @@ Status: proposed
 13. **`C13`（运行时支持矩阵单源化与失效的 `spent_today` 决断）**：让 [presets.rs](crates/server/src/modules/team/agent/presets.rs) 与 [oar/mod.rs](crates/runtime/src/oar/mod.rs) 共享单一能力真源（去掉过时 `"dsh"` 预设与漂移字段），明确补齐 `spent_today` 统计或移除无效每日限额。
 14. **`C14`（边界 `serde_json::Value` 强类型收口）**：将媒体厂商应答、`gh`/`glab` CLI 输出、MCP 工具入参与 OAR 驱动 JSON 解析在进门处一次性解码为 `Deserialize` 结构体（[media/vendor.rs](crates/server/src/modules/content/media/vendor.rs)、[publish.rs](crates/server/src/modules/work/pull/publish.rs)、[claude.rs](crates/runtime/src/oar/claude.rs)）。
 
-### 第二梯队：待决策战略级裁剪（`S1`–`S6`）
+### 第二梯队：已拍板产品边界收敛（`S1`–`S6`）
 
-| 编号 | 所在与体量 | 核心事实 | 备选方案 |
+| 编号 | 所在与体量 | 核心事实 | 已拍板方向 |
 | :--- | :--- | :--- | :--- |
-| `S1` | `crates/rich` `genui` + `chart`（~19k 行） | 提示词与技能零引用，`onGenUiAction` 未接线 | 全删 / 仅删 `genui` 留 `chart` / 全留并补接线 |
-| `S2` | `pkm` 平行栈 vs `ArtifactType::Outline`（~7.7k 行） | [pkm.md](docs/subsystems/pkm.md) 现仍独立维护，而主工作台默认指向大纲作品 | 补 `.md` 导入后退役 `pkm` / 保留仓库并只清 8 个死接口 |
-| `S3` | `crates/runtime` `eval` + `OarExtension` + `codemode`（~7.6k 行 + 6 重型依赖） | 生产只跑 `SqliteStorage`，未挂载扩展却全量编译 `rquickjs` 与 5 个 `oxc_*` crate | 彻底删除 / 收拢进 Cargo `eval` 可选特性 |
-| `S4` | `collab/voice/` Agora + `cloudflared` + Dictation（~2.1k 行） | 原生端当前仅走 MOSS Live（[live_voice.rs](apps/mac/src/live_voice.rs)） | 全删未使用语音通道 / 仅收紧内部测试缝 |
-| `S5` | `crates/engines/pele` 33 种图谱（约 3.5–4 万行小众图） | 仅 [diagram.rs](crates/rich/src/diagram.rs) 调用，含大量小众非标图 | 裁剪为常用标准 Mermaid 图谱集 / 保持完整引擎 |
-| `S6` | `artifact/collab.rs` 旧 `presence/*` 拦截与 `blocks::demo`（~330 行） | 网页已走强类型接口，仅缺 helper MCP 专用工具 | 补工具删旧拦截并裁撤演示脚本 / 仅先结构化旧解析 |
+| `S1` | `crates/rich` `genui` + `chart`（~19k 行） | 提示词与技能零引用，`onGenUiAction` 未接线 | **保留并补全接线**：补齐提示词/技能引用与 `onGenUiAction` 交互闭环 |
+| `S2` | `pkm` 平行栈 vs `ArtifactType::Outline`（~7.7k 行） | [pkm.md](docs/subsystems/pkm.md) 现仍独立维护，而主工作台默认指向大纲作品 | **合并清理**：补齐 `.md` 导入等缺口后并入大纲作品，退役清理未用 `pkm` 平行栈与死接口 |
+| `S3` | `crates/runtime` `eval` + `OarExtension` + `codemode`（~7.6k 行 + 6 重型依赖） | 生产只跑 `SqliteStorage`，未挂载扩展却全量编译 `rquickjs` 与 5 个 `oxc_*` crate | **明确保留**：核心能力不得删除；仅可按需评估用 Cargo `eval` 可选特性降低日常编译开销 |
+| `S4` | `collab/voice/` Agora + `cloudflared` + Dictation（~2.1k 行） | 原生端当前仅走 MOSS Live（[live_voice.rs](apps/mac/src/live_voice.rs)） | **聚焦适配 MOSS Live**：围绕原生端 MOSS Live 收敛，淘汰未使用的 Agora / `cloudflared` / Dictation 路径 |
+| `S5` | `crates/engines/pele` 33 种图谱（约 3.5–4 万行） | 由 [diagram.rs](crates/rich/src/diagram.rs) 调用 | **完整保留**：已移入下方「核实保留基线（不得误删）」 |
+| `S6` | `artifact/collab.rs` 旧 `presence/*` 拦截与 `blocks::demo`（~330 行） | 网页已走强类型接口，仅缺 helper MCP 专用工具 | **淘汰旧的、迁移到新的**：补齐 helper MCP 专用工具后删除旧 `presence/*` 拦截与 `blocks::demo` 演示脚本 |
+
+### 延后收敛组：IO 调度收敛与常用依赖减压（`I1`–`I3`）
+
+当前全仓存在 7 处生产级独立 `tokio::runtime::Builder`、105 处 `std::thread::spawn` / `thread::Builder::new` 及多套手写停机通道、重试循环与锁解毒样板。待三核解耦落定后，应按 `I1` → `I2` → `I3` 收敛进程内 IO 调度与基础依赖，不应引入重型 Actor 框架（进程内模块间继续保持强类型 trait 直调）。
+
+1. **`I1`（单一共享 Tokio Runtime + `tokio_util` 生命周期原语）**：收拢 7 处独立 `tokio::runtime::Builder`（[transport/http/mod.rs](crates/server/src/transport/http/mod.rs)、[infra/http.rs](crates/server/src/modules/infra/http.rs)、[media/jobs.rs](crates/server/src/modules/content/media/jobs.rs)、[connector/adapter.rs](crates/server/src/modules/collab/connector/adapter.rs)、[mcp/client.rs](crates/runtime/src/agent/resources/mcp/client.rs)、[live_voice.rs](apps/mac/src/live_voice.rs)、[server/main.rs](crates/server/src/main.rs)）为单一进程级运行时与传入的 `Handle`。启用 [crates/server/Cargo.toml](crates/server/Cargo.toml) 已引入但几乎未用的 `tokio_util::sync::CancellationToken`（通过 `.child_token()` 按作用域树形级联取消）与 `tokio_util::task::TaskTracker`，取代全仓 60 余处手写 `std::thread::spawn` + `(flume::Sender<()>, JoinHandle<()>)` + `flume::Selector` 停机样板。
+2. **`I2`（标准 `tokio::sync` + `tokio-stream` 取代手写流与并发槽位）**：用 `tokio::sync::watch` 配合 `tokio_stream::wrappers::WatchStream` 简化脏帧合并推送（`SliceFeed` 与 SSE 切片流），用 `tokio::sync::broadcast` 承载 `LiveEvent` 扇出，用 `tokio::sync::Semaphore` 管理并发槽位与限流；同步 CPU 密集任务（Git、SQLite 批量查询、像素渲染）显式走 `tokio::task::spawn_blocking`，不阻塞异步工作线程。
+3. **`I3`（轻依赖减压清单）**：用成熟小 crate 替代仓库内反复手写的并发原语、重试、观测与缓存样板：
+
+| 依赖 | 取代目标与当前落点 | 收益 |
+| :--- | :--- | :--- |
+| `arc-swap` | 全局热读观察者与配置（`OarObserver`、`InvokeObserver`、`FaultGate`、`settings`，见 [oar/core.rs](crates/runtime/src/oar/core.rs)） | 无锁读替换 `RwLock`，消除锁内 Drop 触发的锁顺序死锁 |
+| `parking_lot` | 全仓 `std::sync::{Mutex, RwLock}` 与重复 `.lock().unwrap_or_else(\|e\| e.into_inner())` 解毒包装 | 锁无毒化、体积更小，测试期可开 `deadlock_detection` |
+| `backon` | `connector`、[ai/retry.rs](crates/runtime/src/agent/ai/retry.rs)、`session`、`update` 等多处手写指数退避与 jitter 循环 | 统一同步/异步退避策略与取消对接 |
+| `tracing` + `tracing-subscriber` | 零散 `eprintln!` 与手工 `trace_id` 透传 | DevTools V1 阶段接入，自定义 `Layer` 直驱四泳道事件采集 |
+| `moka`（或 `quick_cache`） | 手写 `Mutex<HashMap>` 缓存淘汰与并发击穿防护 | 提供有界容量、TTL 与单飞加载 |
+| 统一 `reqwest` / 评估 `notify-debouncer-mini` | 重复的 `ureq` 客户端（[cli/client.rs](crates/cli/src/client.rs)、[deepseek.rs](crates/runtime/src/agent/ai/providers/deepseek.rs)）与 [crates/files/Cargo.toml](crates/files/Cargo.toml) 下手写监听防抖 | 收拢单套 HTTP + TLS 栈，减少重复防抖状态机 |
+
+**分步落地优先级**：
+
+1. 第一步：落地 `I1` 与 `I2`，统一共享 Tokio Runtime，用 `CancellationToken`、`TaskTracker`、`watch` / `WatchStream` 与 `Semaphore` 替换多运行时和手写停机线程。
+2. 第二步：落地 `I3` 中的 `arc-swap`、`parking_lot`、`backon` 与 `reqwest` 收口（按需评估 `moka` 与 `notify-debouncer-mini`），清掉锁解毒与退避样板。
+3. 第三步：在 DevTools V1 启动时接入 `tracing` + `tracing-subscriber`，用 span 上下文替代手工 `trace_id` 传递并接通四泳道 `Layer`。
 
 ### 核实保留基线（不得误删）
 
-以下模块虽在单层检索中看似低引用，经子系统文档与跨端检索已核实为核心资产或刻意优化：`crates/core/src/scenario.rs`（`scenarios` 门控测试夹具）、`crates/rich/src/engine/pinyin/`（`VvPinyin` 全端检索）、`crates/engines/{onig,shiki}`（高亮）、`apps/mac/crates/pixel/`（独立 `opt-level=3` 渲染包）、`library/` 内容寻址表与 `artifact_collab` 双存、`Voice::speak` 与 `feishu.rs` Protobuf 解码。
+以下模块虽在单层检索中看似低引用，经子系统文档、跨端检索或产品拍板已核实为核心资产或刻意优化：`crates/core/src/scenario.rs`（`scenarios` 门控测试夹具）、`crates/rich/src/engine/pinyin/`（`VvPinyin` 全端检索）、`crates/engines/{onig,shiki,pele}`（高亮与 `S5` 完整 33 种图谱引擎）、`crates/runtime` 的 `eval` / `OarExtension` / `codemode`（`S3` 明确保留的核心能力，仅可按需评估 Cargo 可选特性减编）、`apps/mac/crates/pixel/`（独立 `opt-level=3` 渲染包）、`library/` 内容寻址表与 `artifact_collab` 双存、`Voice::speak` 与 `feishu.rs` Protobuf 解码。
 
 ## Alternatives considered
 
@@ -56,10 +79,10 @@ Status: proposed
 
 ## Acceptance criteria
 
-- 当任一 `C1`–`C14` 或 `S1`–`S6` 项进入实施时，对应修改需通过 `vp run release:verify`、`vp run deadcode` 与受影响模块的原生真机 `vv-acceptance`；
+- 当任一 `C1`–`C14`、`S1`–`S6` 或 `I1`–`I3` 项进入实施时，对应修改需通过 `vp run release:verify`、`vp run deadcode` 与受影响模块的原生真机 `vv-acceptance`；
 - 全部选定项沉淀或否决完毕后，将长期成立的架构不变量并入 `docs/subsystems/*.md` 并按 [Notes 流程](.agents/notes/README.md)删除本 Note。
 
 ## Risks
 
 - **文件行号与位置随三核重构漂移**：本 Note 仅绑定模块与文件路径职责，后续逐项开动前应先 `rg` 复核最新调用点；
-- **`S1`–`S6` 若延迟过久可能继续被新功能挂载**：在明确决策前应避免继续往未接入生产路径（如 `Hooks`、`genui`、`OarExtension`）新增功能代码。
+- **待淘汰旧路径若延迟过久可能继续被新功能挂载**：在 `C1`–`C14` 与 `S2` / `S4` / `S6` 清理落地前，不应继续往已决定淘汰的旧路径（如 `Hooks`、`pkm` 平行栈、Agora / `cloudflared` / Dictation、旧 `presence/*` 拦截）新增功能代码。

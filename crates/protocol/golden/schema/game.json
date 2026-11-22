@@ -402,15 +402,7 @@
       }
      ]
     }
-   },
-   "achievements": [
-    {
-     "id": "s2269",
-     "tier": 2270,
-     "count": 2271,
-     "next": 2272
-    }
-   ]
+   }
   },
   {
    "level": {
@@ -445,14 +437,7 @@
       }
      ]
     }
-   },
-   "achievements": [
-    {
-     "id": "s2287",
-     "tier": 2288,
-     "count": 2289
-    }
-   ]
+   }
   }
  ],
  "GameEffect": [
@@ -663,6 +648,34 @@
   {
    "id": "s2381",
    "station": 2382
+  }
+ ],
+ "FarmFrame": [
+  {
+   "seq": 1,
+   "view": {
+    "level": {
+     "level": 1,
+     "xp": 0,
+     "need": 10
+    },
+    "plots": {},
+    "plays": {}
+   },
+   "effects": []
+  }
+ ],
+ "AchievementList": [
+  {
+   "items": [],
+   "standings": [
+    {
+     "id": "s2269",
+     "tier": 1,
+     "count": 2,
+     "next": 5
+    }
+   ]
   }
  ]
 }

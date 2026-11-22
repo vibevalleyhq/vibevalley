@@ -1,5 +1,3 @@
-mod support;
-
 use std::time::Instant;
 
 use regex::Regex;
@@ -7,7 +5,7 @@ use vibevalley_pele::detect::DiagramType;
 use vibevalley_pele::diagram::ishikawa::lexer::tokenize;
 use vibevalley_pele::{METRICS_MEASURER, ParseOptions, ParsedModel, RenderOptions, TextMeasurer, TextStyle, detect_type, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 struct TextBox {
     left: f64,

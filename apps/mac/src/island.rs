@@ -4,7 +4,7 @@ use std::process::{Child, Command, Stdio};
 
 use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
-use vibevalley_protocol::{IssueStageKind, StateFrame};
+use vibevalley_protocol::{BoardSlice, IssueStageKind};
 
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Row {
@@ -29,9 +29,8 @@ struct Strip {
     waiting: String,
 }
 
-pub fn glance(frame: &StateFrame) -> Glance {
-    let mut rows: Vec<Row> = frame
-        .state
+pub fn glance(board: &BoardSlice) -> Glance {
+    let mut rows: Vec<Row> = board
         .issues
         .iter()
         .filter_map(|issue| {
@@ -181,5 +180,34 @@ mod tests {
         assert_eq!(opened_issue(r#"{"open":"../../settings"}"#), None);
         assert_eq!(opened_issue(r#"{"open":""}"#), None);
         assert_eq!(opened_issue("broken"), None);
+    }
+
+    #[test]
+    fn glance_reads_board_slice_stages_and_sorts_waiting_first() {
+        let mut working = vibevalley_protocol::Issue::new("i-1", 1, "Build", 1);
+        working.stage.state = IssueStageKind::Working;
+        let mut asking = vibevalley_protocol::Issue::new("i-2", 2, "Clarify", 2);
+        asking.stage.state = IssueStageKind::Asking;
+        let mut stuck = vibevalley_protocol::Issue::new("i-3", 3, "Fix", 3);
+        stuck.stage.state = IssueStageKind::Stuck;
+        let mut done = vibevalley_protocol::Issue::new("i-4", 4, "Done", 4);
+        done.stage.state = IssueStageKind::Done;
+
+        let board = BoardSlice {
+            seq: 5,
+            issues: vec![working, asking, stuck, done],
+            board_summary: None,
+            commits: None,
+        };
+        let out = glance(&board);
+        assert_eq!(out.working, 1);
+        assert_eq!(out.waiting, 2);
+        assert_eq!(out.rows.len(), 3);
+        assert_eq!(out.rows[0].issue, "i-2");
+        assert_eq!(out.rows[0].tone, "waiting");
+        assert_eq!(out.rows[1].issue, "i-3");
+        assert_eq!(out.rows[1].tone, "stuck");
+        assert_eq!(out.rows[2].issue, "i-1");
+        assert_eq!(out.rows[2].tone, "working");
     }
 }

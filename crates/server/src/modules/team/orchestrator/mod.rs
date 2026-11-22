@@ -845,7 +845,7 @@ impl Orchestrator {
         };
         lock(&me.cannot).clear();
         let text = self.input_of(me, &batch);
-        let mut run = Run::start(self, me, &route, format!("run-{}", requests[0]));
+        let mut run = Run::start(self, me, &route, format!("run-{}", requests[0]), Some(&model));
         run.ports = ports;
         run.asked(&text);
         let input = execution::TurnInput {
@@ -876,17 +876,30 @@ struct Run<'a> {
     durable: bool,
     /// The live answers this turn's words also go to, read out as they are.
     ports: Vec<flume::Sender<String>>,
+    /// Per-turn `oar-voyage/3` JSONL recorder (`<home>/records/<id>.jsonl`).
+    recorder: Mutex<Option<vibevalley_runtime::oar::record::Recorder>>,
+    record_seq: std::sync::atomic::AtomicU64,
 }
 
 impl<'a> Run<'a> {
     fn new(o: &'a Orchestrator, me: &'a Instance, route: &'a Route) -> Run<'a> {
-        Self::start(o, me, route, format!("run-{}", uuid::Uuid::now_v7()))
+        Self::start(o, me, route, format!("run-{}", uuid::Uuid::now_v7()), None)
     }
-    fn start(o: &'a Orchestrator, me: &'a Instance, route: &'a Route, run: String) -> Self {
+
+    fn open_recorder(o: &Orchestrator, id: &str, model: Option<&str>) -> Option<vibevalley_runtime::oar::record::Recorder> {
+        let dir = o.home.join("records");
+        std::fs::create_dir_all(&dir).ok()?;
+        let path = dir.join(format!("{id}.jsonl"));
+        let file = vibevalley_runtime::oar::record::open_file(Some(&path)).ok()??;
+        vibevalley_runtime::oar::record::Recorder::start(Some(file), ORCHESTRATOR_RUNTIME, id, o.farm.repos.root(), model)
+    }
+
+    fn start(o: &'a Orchestrator, me: &'a Instance, route: &'a Route, run: String, model: Option<&str>) -> Self {
         let started = o
             .trajectories
             .events(&me.id, Some(&run))
             .is_some_and(|steps| steps.iter().any(|step| step.r#type == SessionEventType::RunStart));
+        let recorder = Self::open_recorder(o, &me.id, model);
         let r = Run {
             o,
             me,
@@ -896,6 +909,8 @@ impl<'a> Run<'a> {
             calls: 0,
             durable: false,
             ports: vec![],
+            recorder: Mutex::new(recorder),
+            record_seq: std::sync::atomic::AtomicU64::new(0),
         };
         if !started {
             r.step(Step::RunStarted { run: r.run.clone() });
@@ -908,16 +923,34 @@ impl<'a> Run<'a> {
         self.o.trajectories.step(&self.me.id, "", step);
     }
 
+    fn record_event(&self, event: &vibevalley_runtime::oar::Event) {
+        let mut slot = lock(&self.recorder);
+        let Some(rec) = slot.as_mut() else { return };
+        let mut row = vibevalley_runtime::oar::voyage::Record::event(self.me.id.clone(), event);
+        row.seq = self.record_seq.fetch_add(1, Ordering::Relaxed);
+        row.span_id = self.run.clone();
+        let _ = rec.write(&row);
+    }
+
     fn agent(&self, kind: vibevalley_runtime::oar::EventKind) {
-        self.step(Step::Agent(vibevalley_runtime::oar::Event {
+        let event = vibevalley_runtime::oar::Event {
             seq: 0,
             agent_path: vec![],
             at_ms: now() as u64,
             kind,
-        }));
+        };
+        self.record_event(&event);
+        self.step(Step::Agent(event));
     }
 
     fn asked(&self, text: &str) {
+        let turn_started = vibevalley_runtime::oar::Event {
+            seq: 0,
+            agent_path: vec![],
+            at_ms: now() as u64,
+            kind: vibevalley_runtime::oar::EventKind::TurnStarted { prompt: text.into() },
+        };
+        self.record_event(&turn_started);
         if self
             .o
             .trajectories
@@ -1045,6 +1078,20 @@ impl<'a> Run<'a> {
                 Outcome::Failed
             }
         };
+        let stop_reason = match outcome {
+            Outcome::Completed => vibevalley_runtime::oar::StopReason::Completed,
+            Outcome::Interrupted => vibevalley_runtime::oar::StopReason::Aborted,
+            Outcome::Failed => vibevalley_runtime::oar::StopReason::Error,
+        };
+        self.record_event(&vibevalley_runtime::oar::Event {
+            seq: 0,
+            agent_path: vec![],
+            at_ms: now() as u64,
+            kind: vibevalley_runtime::oar::EventKind::TurnFinished {
+                reason: stop_reason,
+                usage: vibevalley_runtime::oar::Usage::default(),
+            },
+        });
         self.step(Step::RunEnded {
             run: self.run.clone(),
             outcome,

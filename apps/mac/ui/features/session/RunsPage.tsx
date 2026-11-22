@@ -16,7 +16,7 @@ import { useOrchestrators } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { Keyed, useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
-import { useCore } from "../../infra/frame";
+import { useBoardSlice, useSessionsSlice } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useAgents, useQuery } from "../../infra/query";
 import { useRouter, useSearch } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
@@ -159,7 +159,8 @@ function entryTiming(entry: RunEntry, now: number): string {
 }
 
 export function RunsPage() {
-  const core = useCore();
+  const board = useBoardSlice();
+  const sessionsSlice = useSessionsSlice();
   const router = useRouter();
   const search = useSearch();
   const now = useNow();
@@ -182,8 +183,8 @@ export function RunsPage() {
     buildRunEntries({
       orchestrators: orchestrators(),
       sessions: ready(sessions, []),
-      liveSessions: core()?.sessions ?? [],
-      issues: core()?.issues ?? [],
+      liveSessions: sessionsSlice()?.sessions ?? [],
+      issues: board()?.issues ?? [],
     }),
   );
 
@@ -213,7 +214,7 @@ export function RunsPage() {
   const issueFilterLabel = () => {
     const id = issueFilter();
     if (!id) return undefined;
-    const found = (core()?.issues ?? []).find((i) => i.id === id);
+    const found = (board()?.issues ?? []).find((i) => i.id === id);
     return found ? `#${found.number} ${found.title}` : id;
   };
 

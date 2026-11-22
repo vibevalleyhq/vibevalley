@@ -1282,14 +1282,14 @@ fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
     });
 
     // F1 leak isolation: 0-binding User session never enters board slots, inbox, FarmView plays/agents, memories, or issue_chat.
-    let frame = server.board.frame();
+    let bundle = server.board.bundle();
     let room = server.board.read(|s| vibevalley_core::rules::room_left(&s.sessions, "demo", 6, 4, ""));
     assert_eq!(room.farm, 6);
     assert_eq!(room.repo, Some(4));
-    assert!(frame.inbox.is_empty());
-    assert!(!frame.view.plays.contains_key(&sid));
-    assert!(frame.view.plots.is_empty());
-    assert!(frame.state.progress.as_ref().is_none_or(|p| p.agents.is_empty()));
+    assert!(bundle.inbox.items.is_empty());
+    assert!(!bundle.farm.view.plays.contains_key(&sid));
+    assert!(bundle.farm.view.plots.is_empty());
+    assert!(bundle.farm.progress.as_ref().is_none_or(|p| p.agents.is_empty()));
     assert!(server.memories.list("antigravity").unwrap().is_empty());
     let general = server.chat.default_channel();
     let msgs = call("channel.message.list", json!({ "id": general })).data.unwrap();
@@ -1321,5 +1321,9 @@ fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
     assert_eq!(detached.biz_code, 0, "{}", detached.message);
     assert_eq!(detached.data.unwrap()["bindings"], json!([]));
     assert!(!reopened.board.session(&sid).unwrap().is_board_worker());
+    assert!(vibevalley_server::Server::voice(&*reopened.hub).is_some(), "started hub exposes voice");
+    let closed = reopened.hub.call_as(Caller::User, "session.closeWorkspace", json!({ "id": sid }));
+    assert_eq!(closed.biz_code, 0, "{}", closed.message);
+    assert!(reopened.board.session(&sid).is_none());
     reopened.close();
 }

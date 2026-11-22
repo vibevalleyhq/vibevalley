@@ -17,7 +17,7 @@ pub use bridge::{Action, Outbox, Panel};
 
 mod late;
 
-/// The server every hosted view talks to (`call`, `state`, `live`,
+/// The server every hosted view talks to (`call`, slices, `live`,
 /// subscriptions), shared app-wide.
 pub struct BridgeHub(pub vibevalley_server::transport::bridge::Hub);
 
@@ -25,6 +25,62 @@ impl gpui::Global for BridgeHub {}
 
 pub struct ServerStartup(pub tokio::sync::watch::Receiver<Option<Result<(), String>>>);
 impl gpui::Global for ServerStartup {}
+
+/// Lightweight GPUI shell state snapshot exposed to `Hub::host_debug()`.
+#[derive(Clone)]
+pub struct ShellDebugHandle {
+    snapshot: std::sync::Arc<std::sync::RwLock<Value>>,
+}
+
+impl gpui::Global for ShellDebugHandle {}
+
+impl Default for ShellDebugHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ShellDebugHandle {
+    pub fn new() -> Self {
+        Self {
+            snapshot: std::sync::Arc::new(std::sync::RwLock::new(json!({}))),
+        }
+    }
+
+    pub fn update(&self, value: Value) {
+        *self.snapshot.write().unwrap_or_else(|e| e.into_inner()) = value;
+    }
+}
+
+impl vibevalley_server::HostDebugBridge for ShellDebugHandle {
+    fn snapshot(&self) -> Value {
+        self.snapshot.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+}
+
+pub fn next_client_identity(kind: vibevalley_server::ClientKind, label: impl Into<String>) -> vibevalley_server::ClientIdentity {
+    static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let seq = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    vibevalley_server::ClientIdentity {
+        id: format!("{}-{seq}", kind.as_str()),
+        kind,
+        label: label.into(),
+    }
+}
+
+fn client_identity_for(view: &str, params: &Map<String, Value>) -> vibevalley_server::ClientIdentity {
+    let (kind, label) = match view {
+        "vv" | "vibevalley" => (vibevalley_server::ClientKind::GpuiWorkbench, view.to_string()),
+        "sidebar" => {
+            let role = params.get("role").and_then(Value::as_str).unwrap_or("sidebar");
+            (vibevalley_server::ClientKind::GpuiSidebar, role.to_string())
+        }
+        "workspace-chat" => (vibevalley_server::ClientKind::GpuiChatPane, "workspace-chat".to_string()),
+        "farm-form" | "farm-phone" => (vibevalley_server::ClientKind::GpuiPixel, view.to_string()),
+        _ => (vibevalley_server::ClientKind::GpuiShell, view.to_string()),
+    };
+    next_client_identity(kind, label)
+}
 
 impl BridgeHub {
     /// The real server under VibeValley's own data folder, started off the UI
@@ -34,8 +90,22 @@ impl BridgeHub {
     pub fn install(cx: &mut App) {
         let (ready, startup) = tokio::sync::watch::channel(None);
         cx.set_global(ServerStartup(startup));
+        cx.set_global(crate::serving::RunningServer::new());
+        let host_debug = ShellDebugHandle::new();
+        cx.set_global(host_debug.clone());
+        let (running_tx, running_rx) = flume::bounded::<crate::serving::Running>(1);
+        cx.spawn(async move |cx| {
+            if let Ok(running) = running_rx.recv_async().await {
+                let close_now = cx.update(|cx| cx.global_mut::<crate::serving::RunningServer>().install(running));
+                if let Some(running) = close_now {
+                    cx.background_executor().spawn(async move { running.shutdown() }).detach();
+                }
+            }
+        })
+        .detach();
         let server: std::sync::Arc<dyn vibevalley_server::transport::bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
             Some(dir) => {
+                drop(running_tx);
                 let fake = vibevalley_server::transport::bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir));
                 let _ = ready.send_replace(Some(fake.as_ref().map(|_| ()).map_err(ToString::to_string)));
                 std::sync::Arc::new(fake.unwrap_or_else(|_| vibevalley_server::transport::bridge::fake::FakeServer::new()))
@@ -44,6 +114,7 @@ impl BridgeHub {
                 let home = server_home();
                 match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
                     Ok(started) => {
+                        started.hub.attach_host_debug(Some(std::sync::Arc::new(host_debug)));
                         let hub: std::sync::Arc<dyn vibevalley_server::transport::bridge::Server> = started.hub.clone();
                         let preference = port_preference_from(std::env::var("VIBEVALLEY_PORT").ok().as_deref(), vibevalley_protocol::home::default_port());
                         // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
@@ -69,7 +140,10 @@ impl BridgeHub {
                                 (None, None)
                             }
                         };
-                        crate::serving::set_running(started, listener, announced);
+                        let running = crate::serving::Running::new(started, listener, announced);
+                        if let Err(flume::SendError(running)) = running_tx.send(running) {
+                            running.shutdown();
+                        }
                         hub
                     }
                     Err(e) => {
@@ -322,8 +396,9 @@ impl HostedView {
             if has_pixel_dir {
                 params.insert("pixelDir".into(), json!(pixel_dir));
             }
+            let identity = client_identity_for(&name, &params);
             host.set_params(params);
-            let bridge = hub.map(|hub| std::sync::Arc::new(hub.attach(std::sync::Arc::new(ChannelOutlet(host.clone())))));
+            let bridge = hub.map(|hub| std::sync::Arc::new(hub.attach(identity, std::sync::Arc::new(ChannelOutlet(host.clone())))));
             client = bridge.clone();
             let reply_host = host.clone();
             // Runs on the engine thread. Server traffic and stateless host ops
@@ -481,9 +556,12 @@ fn route_to_bridge(bridge: &vibevalley_server::transport::bridge::Client, v: &Va
                 eprintln!("bridge: {e}");
             }
         }
-        Some("applied") if v["topic"] == "state" => {
-            if let Some(rev) = v["rev"].as_u64() {
-                bridge.applied_workbench(rev);
+        Some("applied") => {
+            if let Some(topic) = v["topic"].as_str()
+                && topic.starts_with("slice:")
+                && let Some(rev) = v["rev"].as_u64()
+            {
+                bridge.applied_slice(topic, rev);
             }
             return false;
         }
@@ -635,5 +713,130 @@ mod tests {
     fn embedded_bundle_accepts_non_empty_bytecode_with_empty_source() {
         let caps = capabilities_from(r#"{"host":["action"]}"#);
         let _bundle = build_embedded_bundle(&[1u8, 2, 3, 4], "", &caps);
+    }
+
+    #[test]
+    fn client_identity_maps_hosted_surfaces_to_distinct_kinds() {
+        let empty = Map::new();
+        let wb = client_identity_for("vv", &empty);
+        assert_eq!(wb.kind, vibevalley_server::ClientKind::GpuiWorkbench);
+        assert_eq!(wb.label, "vv");
+
+        let sb = client_identity_for("sidebar", &empty);
+        assert_eq!(sb.kind, vibevalley_server::ClientKind::GpuiSidebar);
+        assert_eq!(sb.label, "sidebar");
+
+        let mut insp_params = Map::new();
+        insp_params.insert("role".into(), json!("inspector"));
+        let insp = client_identity_for("sidebar", &insp_params);
+        assert_eq!(insp.kind, vibevalley_server::ClientKind::GpuiSidebar);
+        assert_eq!(insp.label, "inspector");
+        assert_ne!(sb.id, insp.id);
+
+        let chat = client_identity_for("workspace-chat", &empty);
+        assert_eq!(chat.kind, vibevalley_server::ClientKind::GpuiChatPane);
+
+        let phone = client_identity_for("farm-phone", &empty);
+        assert_eq!(phone.kind, vibevalley_server::ClientKind::GpuiPixel);
+
+        let pal = client_identity_for("palette", &empty);
+        assert_eq!(pal.kind, vibevalley_server::ClientKind::GpuiShell);
+    }
+
+    #[test]
+    fn route_to_bridge_watches_slices_forwards_applied_slice_and_unwatches() {
+        use std::sync::{Arc, Mutex};
+        use std::time::{Duration, Instant};
+        use vibevalley_server::transport::bridge::fake::{FakeServer, empty_bundle};
+        use vibevalley_server::transport::bridge::{Hub, Outlet, SliceKind};
+
+        #[derive(Default)]
+        struct Recorder(Mutex<Vec<(String, Value)>>);
+        impl Outlet for Recorder {
+            fn send(&self, event: &str, data: Value) {
+                self.0.lock().unwrap().push((event.to_string(), data));
+            }
+        }
+        impl Recorder {
+            fn named(&self, name: &str) -> Vec<Value> {
+                self.0.lock().unwrap().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+            }
+        }
+
+        let fake = Arc::new(FakeServer::from_bundle(empty_bundle(1)));
+        let hub = Hub::new(fake.clone(), 2);
+        let rec = Arc::new(Recorder::default());
+        let client = hub.attach(next_client_identity(vibevalley_server::ClientKind::GpuiWorkbench, "vv"), rec.clone());
+
+        for topic in [
+            "slice:board",
+            "slice:sessions",
+            "slice:collab",
+            "slice:inbox",
+            "slice:ops",
+            "slice:farm",
+            "live",
+        ] {
+            assert!(route_to_bridge(&client, &json!({ "type": "watch", "topic": topic })));
+        }
+        // Legacy "state" topic is rejected internally (watch prints error, no watcher attached).
+        assert!(route_to_bridge(&client, &json!({ "type": "watch", "topic": "state" })));
+
+        let start = Instant::now();
+        while rec.named("frame:slice:board").is_empty() {
+            assert!(start.elapsed() < Duration::from_secs(3), "timed out waiting for slice:board");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let rev = rec.named("frame:slice:board")[0]["rev"].as_u64().unwrap();
+        // `applied` acknowledges backpressure AND returns false so HostedView records debug bookkeeping.
+        assert!(!route_to_bridge(&client, &json!({ "type": "applied", "topic": "slice:board", "rev": rev })));
+
+        let mut next = empty_bundle(2);
+        next.board.issues.push(vibevalley_protocol::Issue::new("i-1", 1, "Updated", 2));
+        fake.swap_bundle(next);
+
+        let start = Instant::now();
+        while rec.named("frame:slice:board").len() < 2 {
+            assert!(
+                start.elapsed() < Duration::from_secs(3),
+                "timed out waiting for second slice:board after applied_slice"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(rec.named("frame:slice:board").last().unwrap()["data"]["issues"][0]["id"], "i-1");
+
+        assert!(route_to_bridge(&client, &json!({ "type": "unwatch", "topic": "slice:board" })));
+        let start = Instant::now();
+        while fake.slice_watchers(SliceKind::Board) != 0 {
+            assert!(start.elapsed() < Duration::from_secs(3), "timed out waiting for unwatch");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    fn shell_debug_handle_bridges_snapshots_into_server_hub() {
+        use vibevalley_protocol::{CallState, SpaceState};
+        use vibevalley_server::{HostDebugBridge, Server};
+
+        let hub = vibevalley_server::Hub::new(SpaceState {
+            call: CallState::Idle,
+            call_reason: String::new(),
+            media: None,
+            chat: None,
+            commits: None,
+            progress: None,
+            issues: vec![],
+            connectors: vec![],
+            machines: vec![],
+            sessions: vec![],
+            crons: vec![],
+            plays: None,
+        });
+        let handle = ShellDebugHandle::new();
+        hub.attach_host_debug(Some(std::sync::Arc::new(handle.clone())));
+        handle.update(json!({ "route": "/workspace", "nativeWorkspace": true }));
+        let bridge = hub.host_debug().expect("host debug bridge attached");
+        assert_eq!(bridge.snapshot()["route"], "/workspace");
+        assert_eq!(handle.snapshot()["nativeWorkspace"], true);
     }
 }

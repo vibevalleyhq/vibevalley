@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import type { Issue, Run, RunTrigger, Session, SessionView, SpaceView } from "@vibevalley/protocol";
+import type { Issue, Run, RunTrigger, Session, SessionView } from "@vibevalley/protocol";
 import { assignedAgentOf, closedText, latestSessionIdOf, sessionIdsOf } from "@vibevalley/protocol/rules";
 /** Assigned to an agent on duty (the orchestrators today): it answers it, no helper is hired for it. */
 export const assignedOnDuty = (issue: Issue, onDuty: ReadonlySet<string>) => onDuty.has(assignedAgentOf(issue) ?? "");
@@ -9,11 +9,11 @@ export const issueIs = (issue: Issue, id: string) => issue.id === id || sessionI
 /** undefined while it is still running. */
 export const endedAt = (s: Session) => (s.phase._tag === "closed" ? s.phase.at : undefined);
 
-export function issueSession(core: SpaceView | undefined, issue: Issue): SessionView | undefined {
-  if (!core || issue.closedAt !== undefined) return undefined;
+export function issueSession(sessions: readonly SessionView[] | undefined, issue: Issue): SessionView | undefined {
+  if (!sessions || issue.closedAt !== undefined) return undefined;
   const last = latestSessionIdOf(issue);
   if (last === undefined) return undefined;
-  return core.sessions.find((s) => s.id === last);
+  return sessions.find((s) => s.id === last);
 }
 
 export const isRefined = (issue: Issue) => issue.description !== "" || issue.criteria.length > 0;

@@ -1,10 +1,11 @@
 import { t } from "@vibevalley/i18n";
-import type { StateFrame } from "@vibevalley/protocol";
+import type { SliceKind } from "@vibevalley/protocol";
 
 import { faultOf, newSendKey, type UiFault } from "../api";
 import type { Link } from "../frame";
 import { type Accessor } from "../solid";
-import { atom, type Atom, framesIn, type Registry, subscribeFrames, useAtom, useRegistry } from "./atom";
+import type { SliceMap } from "../transport";
+import { atom, type Atom, linkIn, type Registry, sliceIn, subscribeLink, subscribeSlice, useAtom, useRegistry } from "./atom";
 
 /** An intent as the page reads it: its phase says where it is, and only a failed one has a fault. */
 export type Intent<I, R> = {
@@ -18,7 +19,7 @@ export type Intent<I, R> = {
 export type IntentAt<R> =
   | { /** Held back while the link was lost; sent once it is back. */ readonly phase: "queued" }
   | { readonly phase: "sending" }
-  | { /** Answered; waits until the frame shows it. */ readonly phase: "confirming"; readonly replied: { readonly reply: R } }
+  | { /** Answered; waits until the slice or watch shows it. */ readonly phase: "confirming"; readonly replied: { readonly reply: R } }
   | { /** Why, in the user's words (fault.reason) and as the page acts on it. */ readonly phase: "failed"; readonly fault: UiFault };
 
 type IntentState<R> =
@@ -40,33 +41,87 @@ function projectIntent<I, R>(key: string, input: I, state: IntentState<R>): Inte
   }
 }
 
-interface IntentKind<I, R> {
+interface SliceIntentKind<I, R, K extends SliceKind> {
+  /** The slice whose updates confirm this intent. */
+  readonly slice: K;
   /** Sends it with its key; a repeat with the same key is the same request. */
   readonly send: (input: I, key: string) => Promise<R>;
-  /** What the user sees shows the change. asked on every frame, whenever `watch` says, and when the server answers. */
-  readonly confirmed: (frame: StateFrame | undefined, intent: Intent<I, R>) => boolean;
-  /** A source the check reads besides the frame (a channel's messages): watched while the intent is kept. */
+  /** What the user sees shows the change. Asked on every slice update, whenever `watch` says, and when the server answers. */
+  readonly confirmed: (slice: SliceMap[K] | undefined, intent: Intent<I, R>) => boolean;
+  /** A source the check reads besides the slice (a channel's messages): watched while the intent is kept. */
   readonly watch?: (input: I, changed: () => void) => () => void;
-  /** While the state stream is lost a keyed kind queues and sends once it is back; one that is not safe to repeat refuses. */
+  /** While the link is lost a keyed kind queues and sends once it is back; one that is not safe to repeat refuses. */
   readonly whileLost: "queue" | "refuse";
   /** No sign of it this long after it was sent: failed, kept for a retry. */
   readonly timeoutMs: number;
 }
 
-/** A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. */
-export const bySeq = <I>(frame: StateFrame | undefined, intent: Intent<I, { readonly seq: number }>) =>
-  intent.replied !== undefined && frame !== undefined && frame.seq >= intent.replied.reply.seq;
+interface WatchIntentKind<I, R> {
+  readonly slice?: undefined;
+  readonly send: (input: I, key: string) => Promise<R>;
+  readonly confirmed: (intent: Intent<I, R>) => boolean;
+  readonly watch?: (input: I, changed: () => void) => () => void;
+  readonly whileLost: "queue" | "refuse";
+  readonly timeoutMs: number;
+}
+
+interface NormalizedIntentKind<I, R> {
+  readonly slice?: SliceKind;
+  readonly send: (input: I, key: string) => Promise<R>;
+  readonly confirmed: (registry: Registry, intent: Intent<I, R>) => boolean;
+  readonly watch?: (input: I, changed: () => void) => () => void;
+  readonly whileLost: "queue" | "refuse";
+  readonly timeoutMs: number;
+}
+
+/** A reply that carries the seq of the fold with its change (an issue moved): shown once the slice has caught up. */
+export const bySeq = <I>(slice: { readonly seq: number } | undefined, intent: Intent<I, { readonly seq: number }>) =>
+  intent.replied !== undefined && slice !== undefined && slice.seq >= intent.replied.reply.seq;
 
 export interface IntentType<I, R> {
-  readonly kind: IntentKind<I, R>;
+  readonly kind: NormalizedIntentKind<I, R>;
   /** The kept intents by key, in the order they were first sent; a settled one leaves nothing behind. */
   readonly kept: Atom<ReadonlyMap<string, Intent<I, R>>>;
   readonly all: Atom<readonly Intent<I, R>[]>;
   readonly runners: WeakMap<Registry, Intents<I, R>>;
 }
 
-export function defineIntent<I, R>(kind: IntentKind<I, R>): IntentType<I, R> {
-  return { kind, kept: atom<ReadonlyMap<string, Intent<I, R>>>(new Map()), all: atom<readonly Intent<I, R>[]>([]), runners: new WeakMap() };
+function isSliceIntent<I, R, K extends SliceKind>(kind: SliceIntentKind<I, R, K> | WatchIntentKind<I, R>): kind is SliceIntentKind<I, R, K> {
+  return kind.slice !== undefined;
+}
+
+export function defineIntent<I, R, K extends SliceKind>(kind: SliceIntentKind<I, R, K>): IntentType<I, R>;
+export function defineIntent<I, R>(kind: WatchIntentKind<I, R>): IntentType<I, R>;
+export function defineIntent<I, R, K extends SliceKind>(kind: SliceIntentKind<I, R, K> | WatchIntentKind<I, R>): IntentType<I, R> {
+  if (isSliceIntent(kind)) {
+    const { slice, confirmed } = kind;
+    return {
+      kind: {
+        slice,
+        send: kind.send,
+        confirmed: (registry, intent) => confirmed(sliceIn(registry, slice), intent),
+        ...(kind.watch === undefined ? {} : { watch: kind.watch }),
+        whileLost: kind.whileLost,
+        timeoutMs: kind.timeoutMs,
+      },
+      kept: atom<ReadonlyMap<string, Intent<I, R>>>(new Map()),
+      all: atom<readonly Intent<I, R>[]>([]),
+      runners: new WeakMap(),
+    };
+  }
+  const { confirmed } = kind;
+  return {
+    kind: {
+      send: kind.send,
+      confirmed: (_registry, intent) => confirmed(intent),
+      ...(kind.watch === undefined ? {} : { watch: kind.watch }),
+      whileLost: kind.whileLost,
+      timeoutMs: kind.timeoutMs,
+    },
+    kept: atom<ReadonlyMap<string, Intent<I, R>>>(new Map()),
+    all: atom<readonly Intent<I, R>[]>([]),
+    runners: new WeakMap(),
+  };
 }
 
 /** An intent on its way: `done` is the intent once the server answered (`replied`) or it failed (`status`), undefined when it was let go first. */
@@ -113,11 +168,10 @@ function makeRunner<I, R>(registry: Registry, type: IntentType<I, R>): Intents<I
   // A retry starts a new attempt: what an earlier one comes back with no longer decides the intent.
   const attempts = new Map<string, number>();
   const waiting = new Map<string, ((answered: Intent<I, R> | undefined) => void)[]>();
-  let unframe: (() => void) | undefined;
+  let unfollow: (() => void) | undefined;
   let link: Link | undefined;
 
   const get = (key: string) => registry.get(type.kept).get(key);
-  const frames = () => framesIn(registry);
   const keep = (kept: ReadonlyMap<string, Intent<I, R>>) => {
     registry.set(type.kept, kept);
     registry.set(type.all, [...kept.values()]);
@@ -144,15 +198,15 @@ function makeRunner<I, R>(registry: Registry, type: IntentType<I, R>): Intents<I
     kept.delete(key);
     keep(kept);
     if (kept.size === 0) {
-      unframe?.();
-      unframe = undefined;
+      unfollow?.();
+      unfollow = undefined;
     }
   };
 
   const check = (key: string) => {
     const intent = get(key);
     // Failed ones too: replied and then timed out waiting, or a reply lost after the change went in.
-    if (intent && intent.phase !== "queued" && kind.confirmed(frames().frame, intent)) remove(key);
+    if (intent && intent.phase !== "queued" && kind.confirmed(registry, intent)) remove(key);
   };
 
   const failed = (key: string, fault: UiFault) => {
@@ -176,18 +230,30 @@ function makeRunner<I, R>(registry: Registry, type: IntentType<I, R>): Intents<I
     );
   };
 
-  // While any intent is kept the frames are read, so the stream stays open even when the page that made it is gone.
+  // While any intent is kept the owning slice and link are followed, so confirmation stays live even when the page that made it is gone.
   const follow = () => {
-    if (unframe) return;
-    link = frames().link;
-    unframe = subscribeFrames(registry, (now) => {
-      const back = now.link === "open" && link !== "open";
-      link = now.link;
-      for (const key of [...registry.get(type.kept).keys()]) {
-        if (back && get(key)?.phase === "queued") dispatch(key);
-        else check(key);
-      }
-    });
+    if (unfollow) return;
+    link = linkIn(registry);
+    const offs: (() => void)[] = [
+      subscribeLink(registry, (now) => {
+        const back = now === "open" && link !== "open";
+        link = now;
+        for (const key of [...registry.get(type.kept).keys()]) {
+          if (back && get(key)?.phase === "queued") dispatch(key);
+          else check(key);
+        }
+      }),
+    ];
+    if (kind.slice !== undefined) {
+      offs.push(
+        subscribeSlice(registry, kind.slice, () => {
+          for (const key of [...registry.get(type.kept).keys()]) check(key);
+        }),
+      );
+    }
+    unfollow = () => {
+      for (const off of offs) off();
+    };
   };
 
   const dispatch = (key: string) => {
@@ -226,7 +292,7 @@ function makeRunner<I, R>(registry: Registry, type: IntentType<I, R>): Intents<I
         key,
         kind.watch(input, () => check(key)),
       );
-    const lost = frames().link === "lost";
+    const lost = linkIn(registry) === "lost";
     if (lost && kind.whileLost === "refuse") {
       const refused = put(key, input, {
         _tag: "failed",

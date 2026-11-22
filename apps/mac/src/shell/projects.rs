@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use futures_util::FutureExt as _;
 use gpui::{AppContext as _, Context, PathPromptOptions, Window};
-use serde_json::{Value, json};
+use serde_json::json;
 use vibevalley_files::{FileIndex, FsChange, Watcher};
 use vibevalley_git::{Branch, Commit, Repo, Status, Worktree};
 use vibevalley_workspace::{PaneKind, ProjectId, load_project};
@@ -458,6 +458,7 @@ impl Shell {
     }
 
     pub fn push_sidebar(&mut self, cx: &mut Context<Self>) {
+        self.publish_host_debug(cx);
         let sidebar_ready = self.sidebar.read(cx).is_ready();
         let inspector_ready = self.inspector_open && self.inspector.read(cx).is_ready();
         if !sidebar_ready && !inspector_ready {
@@ -467,46 +468,28 @@ impl Shell {
             .ws
             .projects()
             .iter()
-            .map(|p| RailProject {
-                id: p.id(),
-                name: &p.info.name,
-                path: p.root(),
-                active: Some(p.id()) == self.ws.active_id(),
-                attention: p.needs_attention() || self.chat_statuses.iter().any(|((pid, _), st)| *pid == p.id() && st.attention),
-                terminals: p.live_terminals(),
-            })
-            .collect();
-        let mut rail = frames::rail(&rail_items, self.panel.name());
-        rail["inspectorOpen"] = Value::Bool(self.inspector_open);
-        if let Some(arr) = rail["projects"].as_array_mut() {
-            for (i, p) in self.ws.projects().iter().enumerate() {
-                let Some(item) = arr.get_mut(i) else { continue };
+            .map(|p| {
                 let pv = self.projects.get(&p.id());
                 let summary = self.git_summaries.get(&p.id());
-                let worktrees = pv.map(|v| &v.worktrees).filter(|w| !w.is_empty()).or(summary.map(|s| &s.worktrees));
-                item["branch"] = json!(
-                    pv.and_then(|v| v.status.as_ref()?.branch.clone())
-                        .or_else(|| summary.and_then(|s| s.branch.clone()))
-                );
-                item["mainRoot"] = json!(worktrees.and_then(|ws| ws.iter().find(|w| w.is_main).map(|w| w.path.to_string_lossy().into_owned())));
-                item["worktrees"] = json!(
-                    worktrees
-                        .map(|ws| {
-                            ws.iter()
-                                .map(|w| {
-                                    json!({
-                                        "path": w.path.to_string_lossy(),
-                                        "branch": w.branch,
-                                        "main": w.is_main,
-                                    })
-                                })
-                                .collect::<Vec<_>>()
-                        })
-                        .unwrap_or_default()
-                );
+                let worktrees_src = pv.map(|v| &v.worktrees).filter(|w| !w.is_empty()).or(summary.map(|s| &s.worktrees));
+                let branch = pv
+                    .and_then(|v| v.status.as_ref()?.branch.clone())
+                    .or_else(|| summary.and_then(|s| s.branch.clone()));
+                let main_root = worktrees_src.and_then(|ws| ws.iter().find(|w| w.is_main).map(|w| w.path.to_string_lossy().into_owned()));
+                let worktrees = worktrees_src
+                    .map(|ws| {
+                        ws.iter()
+                            .map(|w| vibevalley_protocol::HostRailWorktree {
+                                path: w.path.to_string_lossy().into_owned(),
+                                branch: w.branch.clone(),
+                                main: w.is_main,
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
                 let active_tab = p.layout.active_tab().map(|t| t.id);
                 let names = crate::panes::numbered_titles(self, p.layout.tabs(), cx);
-                let tabs: Vec<Value> = p
+                let tabs: Vec<vibevalley_protocol::HostRailTab> = p
                     .layout
                     .tabs()
                     .map(|t| {
@@ -523,10 +506,15 @@ impl Shell {
                                 } else {
                                     status.label
                                 };
+                                let state = match status.state {
+                                    crate::terminal::RunningState::Working => vibevalley_protocol::HostRailRunningState::Working,
+                                    crate::terminal::RunningState::Ready => vibevalley_protocol::HostRailRunningState::Ready,
+                                    crate::terminal::RunningState::Idle => vibevalley_protocol::HostRailRunningState::Idle,
+                                };
                                 (
                                     "terminal",
                                     status.state == crate::terminal::RunningState::Working,
-                                    status.state.as_str(),
+                                    state,
                                     status.agent,
                                     running_label,
                                     att,
@@ -534,31 +522,55 @@ impl Shell {
                             }
                             PaneKind::Chat { runtime, .. } => {
                                 let st = self.chat_statuses.get(&(p.id(), t.id));
-                                let state = st.map(|s| s.status.as_str()).filter(|s| !s.is_empty()).unwrap_or("ready");
+                                let raw = st.map(|s| s.status.as_str()).filter(|s| !s.is_empty()).unwrap_or("ready");
+                                let state = match raw {
+                                    "working" => vibevalley_protocol::HostRailRunningState::Working,
+                                    "idle" => vibevalley_protocol::HostRailRunningState::Idle,
+                                    _ => vibevalley_protocol::HostRailRunningState::Ready,
+                                };
                                 let att = st.is_some_and(|s| s.attention);
-                                ("chat", state == "working", state, Some(runtime.clone()), None, att)
+                                (
+                                    "chat",
+                                    state == vibevalley_protocol::HostRailRunningState::Working,
+                                    state,
+                                    Some(runtime.clone()),
+                                    None,
+                                    att,
+                                )
                             }
-                            PaneKind::File { .. } => ("file", false, "idle", None, None, false),
-                            PaneKind::Diff { .. } => ("diff", false, "idle", None, None, false),
-                            PaneKind::Hosted { .. } => ("hosted", false, "idle", None, None, false),
-                            PaneKind::Pixel { .. } => ("pixel", false, "idle", None, None, false),
+                            PaneKind::File { .. } => ("file", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
+                            PaneKind::Diff { .. } => ("diff", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
+                            PaneKind::Hosted { .. } => ("hosted", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
+                            PaneKind::Pixel { .. } => ("pixel", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
                         };
-                        json!({
-                            "id": t.id,
-                            "title": title,
-                            "active": active_tab == Some(t.id),
-                            "kind": kind,
-                            "running": running,
-                            "runningState": running_state,
-                            "runningAgent": running_agent,
-                            "runningLabel": running_label,
-                            "attention": attention,
-                        })
+                        vibevalley_protocol::HostRailTab {
+                            id: t.id,
+                            title,
+                            active: active_tab == Some(t.id),
+                            kind: kind.to_string(),
+                            running: Some(running),
+                            running_state: Some(running_state),
+                            running_agent,
+                            running_label,
+                            attention: Some(attention),
+                        }
                     })
                     .collect();
-                item["tabs"] = Value::Array(tabs);
-            }
-        }
+                RailProject {
+                    id: p.id(),
+                    name: &p.info.name,
+                    path: p.root(),
+                    active: Some(p.id()) == self.ws.active_id(),
+                    attention: p.needs_attention() || self.chat_statuses.iter().any(|((pid, _), st)| *pid == p.id() && st.attention),
+                    terminals: p.live_terminals(),
+                    branch,
+                    main_root,
+                    worktrees: Some(worktrees),
+                    tabs: Some(tabs),
+                }
+            })
+            .collect();
+        let rail = frames::rail(&rail_items, self.panel, Some(self.inspector_open));
         let (files, git) = match self.ws.active_id().and_then(|id| self.projects.get(&id)) {
             Some(pv) => (
                 frames::file_tree(&pv.tree, &pv.tones),
@@ -573,7 +585,7 @@ impl Shell {
                     busy: pv.git_busy,
                 }),
             ),
-            None => (json!({ "items": [], "loading": !self.loaded }), json!({ "repo": false, "busy": !self.loaded })),
+            None => (frames::empty_file_tree(!self.loaded), frames::empty_git_panel(!self.loaded)),
         };
         if sidebar_ready {
             self.sidebar.update(cx, |v, cx| {

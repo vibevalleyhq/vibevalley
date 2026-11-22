@@ -79,16 +79,10 @@ impl Render for Shell {
                 }),
             )
             .on_action(cx.listener(|s, _: &OpenAbout, _, cx| {
-                s.native_workspace = false;
-                s.native_pixel = None;
-                s.workbench.update(cx, |v, cx| v.navigate("/settings/about", cx));
-                cx.notify();
+                s.navigate_workbench("/settings/about", cx);
             }))
             .on_action(cx.listener(|s, _: &OpenSettings, _, cx| {
-                s.native_workspace = false;
-                s.native_pixel = None;
-                s.workbench.update(cx, |v, cx| v.navigate("/settings", cx));
-                cx.notify();
+                s.navigate_workbench("/settings", cx);
             }))
             .on_action(cx.listener(|_, _: &Hide, _, cx| cx.hide()))
             .on_action(cx.listener(|_, _: &HideOthers, _, cx| cx.hide_other_apps()))

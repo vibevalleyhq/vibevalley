@@ -84,13 +84,13 @@ impl ScenarioBuilder {
         self.effects.extend(applied.effects);
     }
 
-    pub fn frame(&self) -> StateFrame {
-        self.core.frame(self.effects.clone())
+    pub fn bundle(&self) -> SliceBundle {
+        self.core.slice_bundle(self.effects.clone())
     }
 }
 
-/// Builds the canonical `StateFrame` for `density` at `SCENARIO_NOW`.
-pub fn preset(density: Density) -> StateFrame {
+/// Builds the canonical `SliceBundle` for `density` at `SCENARIO_NOW`.
+pub fn preset(density: Density) -> SliceBundle {
     let mut b = ScenarioBuilder::new(SCENARIO_NOW);
     match density {
         Density::Empty => {
@@ -189,7 +189,7 @@ pub fn preset(density: Density) -> StateFrame {
         Density::Extreme => build_extreme(&mut b),
         Density::Edge => return build_edge(&mut b),
     }
-    b.frame()
+    b.bundle()
 }
 
 fn build_typical(b: &mut ScenarioBuilder) {
@@ -686,7 +686,7 @@ fn build_extreme(b: &mut ScenarioBuilder) {
     b.apply(facts);
 }
 
-fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
+fn build_edge(b: &mut ScenarioBuilder) -> SliceBundle {
     let now = b.now();
     let mut facts = Vec::new();
 
@@ -1157,7 +1157,28 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
         unknown.stage.state = IssueStageKind::Stuck;
         unknown.stage.stuck = None;
     }
-    crate::frame_of(&state, b.effects.clone(), b.core.seq())
+    let seq = b.core.seq();
+    let budget_alert = InboxItem {
+        id: "durable:budget_reached:task-edge-budget:1795194383624:0".into(),
+        kind: InboxKind::BudgetReached,
+        from: InboxFrom::Runtime(InboxFromRuntime {}),
+        who: "Runtime".into(),
+        text: "预算已达上限，等待确认继续。".into(),
+        at: now - MIN_MS,
+        target: InboxTarget::Runtime(InboxTargetRuntime {
+            task_id: "task-edge-budget".into(),
+            session_id: Some("w-edge-pr".into()),
+        }),
+        words: InboxWords {
+            label: "预算上限".into(),
+            title: "运行预算已达上限".into(),
+            body: "预算已达上限，等待确认继续。".into(),
+            tray: "运行预算已达上限".into(),
+        },
+    };
+    let mut bundle = crate::slice_bundle(&state, b.effects.clone(), seq);
+    bundle.inbox = crate::inbox_slice(&state, seq, &[budget_alert]);
+    bundle
 }
 
 fn edge_image_job(id: &str, phase: MediaPhase, problem: &str, now: Millis) -> MediaJob {
@@ -1529,14 +1550,14 @@ mod tests {
         let mut saw_tools = false;
 
         for d in Density::ALL {
-            let frame = preset(d);
-            let json = serde_json::to_string(&frame).unwrap();
-            let decoded: StateFrame = serde_json::from_str(&json).unwrap();
-            assert_eq!(decoded, frame, "roundtrip mismatch for {:?}", d);
-            assert!(frame.seq > 0, "density {:?} did not apply facts cleanly", d);
+            let bundle = preset(d);
+            let json = serde_json::to_string(&bundle).unwrap();
+            let decoded: SliceBundle = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, bundle, "roundtrip mismatch for {:?}", d);
+            assert!(bundle.seq > 0, "density {:?} did not apply facts cleanly", d);
 
-            calls.insert(frame.state.call.as_str());
-            for item in &frame.state.issues {
+            calls.insert(bundle.inbox.call.as_str());
+            for item in &bundle.board.issues {
                 statuses.insert(item.status.as_str());
                 priorities.insert(item.priority.as_str());
                 if !item.blocked_by.is_empty() {
@@ -1546,7 +1567,7 @@ mod tests {
                     saw_family = true;
                 }
             }
-            for s in &frame.state.sessions {
+            for s in &bundle.sessions.sessions {
                 let tag = match s.phase {
                     PhaseView::Working(_) => "working",
                     PhaseView::Resting(_) => "resting",
@@ -1562,12 +1583,12 @@ mod tests {
                     saw_tools = true;
                 }
             }
-            saw_inbox |= !frame.inbox.is_empty();
-            saw_plots |= !frame.view.plots.is_empty();
-            saw_crons |= !frame.state.crons.is_empty();
-            saw_connectors |= !frame.state.connectors.is_empty();
-            saw_media |= frame.state.media.as_ref().is_some_and(|m| !m.is_empty());
-            saw_chat |= frame.state.chat.as_ref().is_some_and(|c| !c.channels.is_empty());
+            saw_inbox |= !bundle.inbox.items.is_empty();
+            saw_plots |= !bundle.farm.view.plots.is_empty();
+            saw_crons |= !bundle.ops.crons.is_empty();
+            saw_connectors |= !bundle.collab.connectors.is_empty();
+            saw_media |= bundle.ops.media.as_ref().is_some_and(|m| !m.is_empty());
+            saw_chat |= bundle.collab.chat.as_ref().is_some_and(|c| !c.channels.is_empty());
         }
 
         for status in IssueStatus::ALL {
@@ -1595,8 +1616,8 @@ mod tests {
 
         // Dense guarantees >= 60 issues including >15 closed for OlderLink coverage.
         let dense = preset(Density::Dense);
-        assert!(dense.state.issues.len() >= 60);
-        assert!(dense.state.issues.iter().filter(|i| i.status.is_closed()).count() > 15);
+        assert!(dense.board.issues.len() >= 60);
+        assert!(dense.board.issues.iter().filter(|i| i.status.is_closed()).count() > 15);
     }
 
     #[test]
@@ -1622,16 +1643,16 @@ mod tests {
         let mut saw_failed_pr_check = false;
 
         for density in Density::ALL {
-            let frame = preset(density);
-            call_states.insert(frame.state.call);
+            let bundle = preset(density);
+            call_states.insert(bundle.inbox.call);
 
-            for conn in &frame.state.connectors {
+            for conn in &bundle.collab.connectors {
                 connector_states.insert(conn.state);
             }
-            for item in &frame.inbox {
+            for item in &bundle.inbox.items {
                 inbox_kinds.insert(item.kind);
             }
-            if let Some(jobs) = &frame.state.media {
+            if let Some(jobs) = &bundle.ops.media {
                 for job in jobs {
                     match job {
                         MediaJob::MediaImageJob(j) => {
@@ -1653,7 +1674,7 @@ mod tests {
                     }
                 }
             }
-            for s in &frame.state.sessions {
+            for s in &bundle.sessions.sessions {
                 if s.last_run.as_ref().is_some_and(|r| r.needs_reconciliation) {
                     saw_needs_reconciliation = true;
                 }
@@ -1661,7 +1682,7 @@ mod tests {
                     saw_huge_spent = true;
                 }
             }
-            for item in &frame.state.issues {
+            for item in &bundle.board.issues {
                 deliverables.insert(item.deliver);
                 if let Some(reason) = item.stage.stuck {
                     stuck_reasons.insert(reason);
@@ -1685,15 +1706,15 @@ mod tests {
                 }
             }
 
-            let board = frame.state.board_summary.as_ref().expect("board_summary populated");
+            let board = bundle.board.board_summary.as_ref().expect("board_summary populated");
             assert_eq!(board.max_running, MAX_RUNNING as i64);
             assert_eq!(
                 board.lane_counts.todo + board.lane_counts.working + board.lane_counts.waiting + board.lane_counts.closed,
-                frame.state.issues.len() as i64,
+                bundle.board.issues.len() as i64,
                 "lane_counts must equal issue count for {:?}",
                 density
             );
-            assert_eq!(board.by_issue.len(), frame.state.issues.len());
+            assert_eq!(board.by_issue.len(), bundle.board.issues.len());
             for summary in board.by_issue.values() {
                 lanes.insert(summary.lane);
                 card_kinds.insert(summary.card_kind);
@@ -1708,7 +1729,7 @@ mod tests {
                 }
             }
 
-            let channel_summary = frame.state.channel_summary.as_ref().expect("channel_summary populated");
+            let channel_summary = bundle.collab.channel_summary.as_ref().expect("channel_summary populated");
             if channel_summary.unread_total >= 999 {
                 saw_999_unread = true;
             }
@@ -1758,15 +1779,15 @@ mod tests {
 
         // Verify Edge-specific summaries deterministically.
         let edge = preset(Density::Edge);
-        let media = edge.state.media_summary.as_ref().expect("edge media_summary");
+        let media = edge.ops.media_summary.as_ref().expect("edge media_summary");
         assert_eq!(media.active_count, 3);
         assert_eq!(media.active_ids, vec!["job-edge-queued", "job-edge-generating", "job-edge-downloading"]);
-        let chat = edge.state.channel_summary.as_ref().expect("edge channel_summary");
+        let chat = edge.collab.channel_summary.as_ref().expect("edge channel_summary");
         assert_eq!(chat.unread_total, 1287);
         assert_eq!(chat.unread_under.get("general"), Some(&1285));
         assert_eq!(chat.unread_under.get("t-edge-burst"), Some(&37));
         assert_eq!(chat.unread_under.get("dm-orch"), Some(&2));
-        let board = edge.state.board_summary.as_ref().expect("edge board_summary");
+        let board = edge.board.board_summary.as_ref().expect("edge board_summary");
         // Running worker slots in Edge: w-edge-quiet (Working) + w-edge-fam4 (Working) = 2; orch-1 (Orchestrator) is excluded.
         assert_eq!(board.running_slots, 2);
         let fam = board.by_issue.get("i-edge-family").expect("edge family summary");
@@ -1785,8 +1806,8 @@ mod tests {
             at: b.now(),
             issue: item.clone(),
         })]);
-        assert_eq!(b.frame().state.issues[0].status, IssueStatus::Todo);
-        let seq1 = b.frame().seq;
+        assert_eq!(b.bundle().board.issues[0].status, IssueStatus::Todo);
+        let seq1 = b.bundle().seq;
 
         b.advance_ms(MIN_MS);
         let mut sess = worker("w-step", "老周", "laozhou", "claude", b.now());
@@ -1803,10 +1824,10 @@ mod tests {
                 issue: item.clone(),
             }),
         ]);
-        let f2 = b.frame();
+        let f2 = b.bundle();
         assert!(f2.seq > seq1);
-        assert_eq!(f2.state.issues[0].status, IssueStatus::InProgress);
-        assert_eq!(f2.state.issues[0].stage.state, IssueStageKind::Working);
+        assert_eq!(f2.board.issues[0].status, IssueStatus::InProgress);
+        assert_eq!(f2.board.issues[0].stage.state, IssueStageKind::Working);
 
         b.advance_ms(2 * MIN_MS);
         item.questions = vec![Question {
@@ -1832,10 +1853,10 @@ mod tests {
                 issue: item.clone(),
             }),
         ]);
-        let f3 = b.frame();
+        let f3 = b.bundle();
         assert!(f3.seq > f2.seq);
-        assert_eq!(f3.state.issues[0].stage.state, IssueStageKind::Asking);
-        assert!(!f3.inbox.is_empty());
+        assert_eq!(f3.board.issues[0].stage.state, IssueStageKind::Asking);
+        assert!(!f3.inbox.items.is_empty());
 
         b.advance_ms(MIN_MS);
         item.questions.clear();
@@ -1843,18 +1864,18 @@ mod tests {
             at: b.now(),
             issue: item.clone(),
         })]);
-        let f4 = b.frame();
+        let f4 = b.bundle();
         assert!(f4.seq > f3.seq);
-        assert_eq!(f4.state.issues[0].status, IssueStatus::InReview);
-        assert_eq!(f4.state.issues[0].stage.state, IssueStageKind::Reviewing);
+        assert_eq!(f4.board.issues[0].status, IssueStatus::InReview);
+        assert_eq!(f4.board.issues[0].stage.state, IssueStageKind::Reviewing);
 
         b.advance_ms(MIN_MS);
         item.delivered = Some(Landing::Merged);
         item.closed_at = Some(b.now());
         b.apply(vec![Fact::IssueChanged(FactIssueChanged { at: b.now(), issue: item })]);
-        let f5 = b.frame();
+        let f5 = b.bundle();
         assert!(f5.seq > f4.seq);
-        assert_eq!(f5.state.issues[0].status, IssueStatus::Done);
+        assert_eq!(f5.board.issues[0].status, IssueStatus::Done);
     }
 
     #[test]

@@ -16,7 +16,7 @@ import { reasonOf } from "../../../infra/api";
 import { variant } from "../../../infra/base/dom";
 import { ago } from "../../../infra/base/format";
 import { hostApi } from "../../../infra/bridge";
-import { useCore } from "../../../infra/frame";
+import { useIssue } from "../../../infra/frame";
 import { ready } from "../../../infra/query";
 import { linkIn, useRegistry } from "../../../infra/state/atom";
 import { useIntents } from "../../../infra/state/intent";
@@ -52,8 +52,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
     mounted = false;
   });
   const registry = useRegistry();
-  const core = useCore();
-  const live = () => core()?.issues.find((i) => i.id === props.issue.id);
+  const live = useIssue(() => props.issue.id);
   const acts = () => (live()?.stage.acts ?? []).map((a) => a.act);
   const working = () => acts().includes("stop");
   const presses = createPresses(() => props.lane);

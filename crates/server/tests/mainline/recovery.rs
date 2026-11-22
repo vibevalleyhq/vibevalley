@@ -237,10 +237,10 @@ fn regression_replies_and_reports_across_process_exit() {
     assert_eq!(wire[2]["needsReconciliation"], true);
     let session = call(&url, "session.get", json!({"id": runs[2].session}));
     assert_eq!(session["lastRun"]["needsReconciliation"], true);
-    let frame = server.board.frame();
+    let bundle = server.board.bundle();
     assert!(
-        frame
-            .state
+        bundle
+            .sessions
             .sessions
             .iter()
             .find(|s| s.id == runs[2].session)

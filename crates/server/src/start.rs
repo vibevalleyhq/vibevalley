@@ -209,7 +209,7 @@ impl Started {
         self.issue_chat.close();
         self.session_chat.close();
         self.orchestrator.close();
-        self.hub.space.stop();
+        self.hub.runtime_inbox.stop();
         self.agents.fleet.close();
         self.repos.close();
         self.artifacts.close();
@@ -429,7 +429,9 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     .map_err(|e| failed("durable execution")(&e))?;
     let _ = execution.set(vibevalley_runtime::agent::harness::SharedExecution::new(orchestrator.execution.harness.clone()));
     let _ = hub.execution.set(Arc::downgrade(&orchestrator));
-    hub.space.attach(orchestrator.execution.store()).map_err(|e| failed("durable projection")(&e))?;
+    hub.runtime_inbox
+        .attach(orchestrator.execution.store(), &hub)
+        .map_err(|e| failed("durable projection")(&e))?;
     modules::team::orchestrator::install(&hub, orchestrator.clone());
     board.refresh_queue().map_err(|e| failed("the queue")(&e))?;
     let listening = config.orchestrator_listens.then(|| orchestrator.clone());
@@ -459,6 +461,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         pause: None,
     });
     modules::collab::voice::install(&hub, voice.clone());
+    hub.attach_voice(voice.clone());
     let connectors = modules::collab::connector::Connectors::open(&config.home, &hub, chat.clone(), config.connector.clone())
         .map_err(|e| failed("the connectors")(&e.message))?;
     modules::collab::connector::install(&hub, connectors.clone());

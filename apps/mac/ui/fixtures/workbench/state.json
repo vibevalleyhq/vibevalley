@@ -1,8 +1,260 @@
 {
   "seq": 1,
-  "state": {
-    "call": "live",
-    "callReason": "",
+  "board": {
+    "seq": 1,
+    "issues": [
+      {
+        "id": "i21",
+        "number": 21,
+        "title": "写一句话就能起草工单",
+        "priority": "medium",
+        "status": "backlog",
+        "createdAt": 1795318985180,
+        "assignments": [],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "draft",
+          "acts": []
+        }
+      },
+      {
+        "id": "i22",
+        "number": 22,
+        "title": "看板拖拽的手感",
+        "priority": "high",
+        "status": "todo",
+        "createdAt": 1795316765180,
+        "assignments": [
+          {
+            "id": "a22",
+            "issue": "i22",
+            "agent": "laozhou",
+            "assignedAt": 1795316765180,
+            "executions": []
+          }
+        ],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": ["todo"],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "acts": []
+        },
+        "repo": "vibevalley",
+        "queuedAt": 1795365305180
+      },
+      {
+        "id": "i23",
+        "number": 23,
+        "title": "灵动岛的动画",
+        "priority": "low",
+        "status": "todo",
+        "createdAt": 1795314545180,
+        "assignments": [],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "acts": []
+        }
+      },
+      {
+        "id": "i24",
+        "number": 24,
+        "title": "首页的加载条",
+        "priority": "medium",
+        "status": "todo",
+        "createdAt": 1795312325180,
+        "assignments": [
+          {
+            "id": "a24",
+            "issue": "i24",
+            "agent": "xiaolin",
+            "assignedAt": 1795312325180,
+            "executions": []
+          }
+        ],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "queued",
+          "acts": []
+        },
+        "repo": "vibevalley"
+      },
+      {
+        "id": "i18",
+        "number": 18,
+        "title": "修好登录",
+        "priority": "urgent",
+        "status": "in_progress",
+        "createdAt": 1795325645180,
+        "assignments": [
+          {
+            "id": "a18",
+            "issue": "i18",
+            "agent": "laozhou",
+            "assignedAt": 1795325645180,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w1",
+                "startedAt": 1795364405180
+              }
+            ]
+          }
+        ],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "working",
+          "acts": []
+        },
+        "repo": "vibevalley"
+      },
+      {
+        "id": "i17",
+        "number": 17,
+        "title": "补齐看板的测试",
+        "priority": "medium",
+        "status": "in_review",
+        "createdAt": 1795327865180,
+        "assignments": [
+          {
+            "id": "a17",
+            "issue": "i17",
+            "agent": "xiaolin",
+            "assignedAt": 1795327865180,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w2",
+                "startedAt": 1795364405180
+              }
+            ]
+          }
+        ],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "reviewing",
+          "acts": []
+        },
+        "repo": "vibevalley"
+      },
+      {
+        "id": "i12",
+        "number": 12,
+        "title": "设置按用途分组",
+        "priority": "medium",
+        "status": "done",
+        "createdAt": 1795338965180,
+        "assignments": [
+          {
+            "id": "a12",
+            "issue": "i12",
+            "agent": "laozhou",
+            "assignedAt": 1795338965180,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w3",
+                "startedAt": 1795364405180
+              }
+            ]
+          }
+        ],
+        "mandate": {
+          "strength": "explicit",
+          "maxBotReviewRounds": 3,
+          "autoSubmitPr": false
+        },
+        "moves": [],
+        "deliver": "change",
+        "findings": [],
+        "questions": [],
+        "description": "",
+        "blockedBy": [],
+        "criteria": [],
+        "checks": [],
+        "stage": {
+          "state": "done",
+          "acts": []
+        },
+        "repo": "vibevalley",
+        "closedAt": 1795358405180,
+        "delivered": "merged"
+      }
+    ]
+  },
+  "sessions": {
+    "seq": 1,
     "sessions": [
       {
         "id": "w1",
@@ -22,11 +274,11 @@
             "id": "i18"
           }
         ],
-        "hiredAt": 1795358573693,
+        "hiredAt": 1795363085180,
         "runs": 2,
         "phase": {
           "_tag": "working",
-          "since": 1795360913693,
+          "since": 1795365425180,
           "doing": {
             "action": "edit_file",
             "label": "改 session.ts",
@@ -57,7 +309,7 @@
             "id": "i17"
           }
         ],
-        "hiredAt": 1795358573693,
+        "hiredAt": 1795363085180,
         "runs": 2,
         "phase": {
           "_tag": "resting"
@@ -66,7 +318,7 @@
         "lastRun": {
           "outcome": "completed",
           "summary": "登录过期回到登录页，加了两条测试。",
-          "at": 1795360613693
+          "at": 1795365125180
         }
       },
       {
@@ -87,7 +339,7 @@
             "id": "i12"
           }
         ],
-        "hiredAt": 1795343093693,
+        "hiredAt": 1795347605180,
         "runs": 2,
         "phase": {
           "_tag": "done"
@@ -95,276 +347,10 @@
         "phaseText": ""
       }
     ],
-    "issues": [
-      {
-        "id": "i21",
-        "number": 21,
-        "title": "写一句话就能起草工单",
-        "priority": "medium",
-        "status": "backlog",
-        "createdAt": 1795314473693,
-        "assignments": [],
-        "mandate": {
-          "strength": "explicit",
-          "maxBotReviewRounds": 3,
-          "autoSubmitPr": false
-        },
-        "moves": [],
-        "deliver": "change",
-        "findings": [],
-        "questions": [],
-        "description": "",
-        "blockedBy": [],
-        "criteria": [],
-        "checks": [],
-        "stage": {
-          "state": "draft",
-          "acts": []
-        }
-      },
-      {
-        "id": "i22",
-        "number": 22,
-        "title": "看板拖拽的手感",
-        "priority": "high",
-        "status": "todo",
-        "createdAt": 1795312253693,
-        "assignments": [
-          {
-            "id": "a22",
-            "issue": "i22",
-            "agent": "laozhou",
-            "assignedAt": 1795312253693,
-            "executions": []
-          }
-        ],
-        "mandate": {
-          "strength": "explicit",
-          "maxBotReviewRounds": 3,
-          "autoSubmitPr": false
-        },
-        "moves": ["todo"],
-        "deliver": "change",
-        "findings": [],
-        "questions": [],
-        "description": "",
-        "blockedBy": [],
-        "criteria": [],
-        "checks": [],
-        "stage": {
-          "state": "queued",
-          "acts": []
-        },
-        "repo": "vibevalley",
-        "queuedAt": 1795360793693
-      },
-      {
-        "id": "i23",
-        "number": 23,
-        "title": "灵动岛的动画",
-        "priority": "low",
-        "status": "todo",
-        "createdAt": 1795310033693,
-        "assignments": [],
-        "mandate": {
-          "strength": "explicit",
-          "maxBotReviewRounds": 3,
-          "autoSubmitPr": false
-        },
-        "moves": [],
-        "deliver": "change",
-        "findings": [],
-        "questions": [],
-        "description": "",
-        "blockedBy": [],
-        "criteria": [],
-        "checks": [],
-        "stage": {
-          "state": "queued",
-          "acts": []
-        }
-      },
-      {
-        "id": "i24",
-        "number": 24,
-        "title": "首页的加载条",
-        "priority": "medium",
-        "status": "todo",
-        "createdAt": 1795307813693,
-        "assignments": [
-          {
-            "id": "a24",
-            "issue": "i24",
-            "agent": "xiaolin",
-            "assignedAt": 1795307813693,
-            "executions": []
-          }
-        ],
-        "mandate": {
-          "strength": "explicit",
-          "maxBotReviewRounds": 3,
-          "autoSubmitPr": false
-        },
-        "moves": [],
-        "deliver": "change",
-        "findings": [],
-        "questions": [],
-        "description": "",
-        "blockedBy": [],
-        "criteria": [],
-        "checks": [],
-        "stage": {
-          "state": "queued",
-          "acts": []
-        },
-        "repo": "vibevalley"
-      },
-      {
-        "id": "i18",
-        "number": 18,
-        "title": "修好登录",
-        "priority": "urgent",
-        "status": "in_progress",
-        "createdAt": 1795321133693,
-        "assignments": [
-          {
-            "id": "a18",
-            "issue": "i18",
-            "agent": "laozhou",
-            "assignedAt": 1795321133693,
-            "executions": [
-              {
-                "kind": "worker",
-                "session": "w1",
-                "startedAt": 1795359893693
-              }
-            ]
-          }
-        ],
-        "mandate": {
-          "strength": "explicit",
-          "maxBotReviewRounds": 3,
-          "autoSubmitPr": false
-        },
-        "moves": [],
-        "deliver": "change",
-        "findings": [],
-        "questions": [],
-        "description": "",
-        "blockedBy": [],
-        "criteria": [],
-        "checks": [],
-        "stage": {
-          "state": "working",
-          "acts": []
-        },
-        "repo": "vibevalley"
-      },
-      {
-        "id": "i17",
-        "number": 17,
-        "title": "补齐看板的测试",
-        "priority": "medium",
-        "status": "in_review",
-        "createdAt": 1795323353693,
-        "assignments": [
-          {
-            "id": "a17",
-            "issue": "i17",
-            "agent": "xiaolin",
-            "assignedAt": 1795323353693,
-            "executions": [
-              {
-                "kind": "worker",
-                "session": "w2",
-                "startedAt": 1795359893693
-              }
-            ]
-          }
-        ],
-        "mandate": {
-          "strength": "explicit",
-          "maxBotReviewRounds": 3,
-          "autoSubmitPr": false
-        },
-        "moves": [],
-        "deliver": "change",
-        "findings": [],
-        "questions": [],
-        "description": "",
-        "blockedBy": [],
-        "criteria": [],
-        "checks": [],
-        "stage": {
-          "state": "reviewing",
-          "acts": []
-        },
-        "repo": "vibevalley"
-      },
-      {
-        "id": "i12",
-        "number": 12,
-        "title": "设置按用途分组",
-        "priority": "medium",
-        "status": "done",
-        "createdAt": 1795334453693,
-        "assignments": [
-          {
-            "id": "a12",
-            "issue": "i12",
-            "agent": "laozhou",
-            "assignedAt": 1795334453693,
-            "executions": [
-              {
-                "kind": "worker",
-                "session": "w3",
-                "startedAt": 1795359893693
-              }
-            ]
-          }
-        ],
-        "mandate": {
-          "strength": "explicit",
-          "maxBotReviewRounds": 3,
-          "autoSubmitPr": false
-        },
-        "moves": [],
-        "deliver": "change",
-        "findings": [],
-        "questions": [],
-        "description": "",
-        "blockedBy": [],
-        "criteria": [],
-        "checks": [],
-        "stage": {
-          "state": "done",
-          "acts": []
-        },
-        "repo": "vibevalley",
-        "closedAt": 1795353893693,
-        "delivered": "merged"
-      }
-    ],
-    "crons": [
-      {
-        "id": "c1",
-        "name": "每天的站会",
-        "text": "看一眼昨天交的活，写三行进展发到这里。",
-        "channel": "general",
-        "when": {
-          "kind": "daily",
-          "time": "09:30"
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": true,
-        "created": 1794756293693,
-        "lastRun": 1795274693693,
-        "by": "user",
-        "pending": false,
-        "whenText": "每天 09:30",
-        "nextText": "明天 09:30"
-      }
-    ],
+    "machines": []
+  },
+  "collab": {
+    "seq": 1,
     "chat": {
       "channels": [
         {
@@ -378,7 +364,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "general",
-          "at": 1795357493693,
+          "at": 1795362005181,
           "repo": "vibevalley",
           "lastNumber": 11,
           "read": 8,
@@ -387,7 +373,7 @@
             "from": "orchestrator",
             "name": "助手",
             "text": "记下了：周五之前。",
-            "at": 1795359293693
+            "at": 1795363805181
           }
         },
         {
@@ -401,7 +387,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "设计",
-          "at": 1795357493693,
+          "at": 1795362005181,
           "unread": 2,
           "lastNumber": 4,
           "read": 2
@@ -417,7 +403,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "发版",
-          "at": 1795357493693
+          "at": 1795362005181
         },
         {
           "id": "t-login",
@@ -430,7 +416,7 @@
           "subjectKind": "issue",
           "replies": 4,
           "title": "修好登录",
-          "at": 1795357493693,
+          "at": 1795362005181,
           "parent": "general",
           "root": "m2",
           "rootNumber": 2,
@@ -441,7 +427,7 @@
             "from": "w1",
             "name": "老周",
             "text": "先看 session.ts。",
-            "at": 1795360493693
+            "at": 1795365005181
           }
         },
         {
@@ -455,7 +441,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "小林",
-          "at": 1795357493693,
+          "at": 1795362005181,
           "peer": "xiaolin"
         }
       ],
@@ -469,8 +455,8 @@
         "pairCode": "",
         "user": "用户",
         "channel": "general",
-        "since": 1795101893694,
-        "lastInbound": 1795360373694,
+        "since": 1795106405181,
+        "lastInbound": 1795364885181,
         "pending": 2,
         "error": ""
       },
@@ -481,6 +467,35 @@
         "pairCode": "",
         "pending": 0,
         "error": ""
+      }
+    ]
+  },
+  "inbox": {
+    "seq": 1,
+    "items": [],
+    "call": "live",
+    "callReason": ""
+  },
+  "ops": {
+    "seq": 1,
+    "crons": [
+      {
+        "id": "c1",
+        "name": "每天的站会",
+        "text": "看一眼昨天交的活，写三行进展发到这里。",
+        "channel": "general",
+        "when": {
+          "kind": "daily",
+          "time": "09:30"
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1794760805181,
+        "lastRun": 1795279205181,
+        "by": "user",
+        "pending": false,
+        "whenText": "每天 09:30",
+        "nextText": "明天 09:30"
       }
     ],
     "media": [
@@ -510,8 +525,8 @@
         },
         "canCancel": false,
         "canRetryDownload": false,
-        "createdAt": 1795359293694,
-        "updatedAt": 1795359313694
+        "createdAt": 1795363805181,
+        "updatedAt": 1795363825181
       },
       {
         "kind": "image",
@@ -530,8 +545,8 @@
         "problem": "",
         "canCancel": true,
         "canRetryDownload": false,
-        "createdAt": 1795361033694,
-        "updatedAt": 1795361053694
+        "createdAt": 1795365545181,
+        "updatedAt": 1795365565181
       },
       {
         "kind": "speech",
@@ -570,8 +585,8 @@
         "resultInput": null,
         "canCancel": false,
         "canRetryDownload": false,
-        "createdAt": 1795360373694,
-        "updatedAt": 1795360393694
+        "createdAt": 1795364885181,
+        "updatedAt": 1795364905181
       },
       {
         "model": "moss-speakers",
@@ -623,8 +638,8 @@
           ],
           "format": "mp3"
         },
-        "createdAt": 1795359893694,
-        "updatedAt": 1795359913694
+        "createdAt": 1795364405181,
+        "updatedAt": 1795364425181
       },
       {
         "model": "moss-transcribe-diarize-pro",
@@ -685,8 +700,8 @@
           "allowUpload": true,
           "diarize": true
         },
-        "createdAt": 1795358393694,
-        "updatedAt": 1795358413694
+        "createdAt": 1795362905181,
+        "updatedAt": 1795362925181
       },
       {
         "kind": "understanding",
@@ -728,22 +743,22 @@
         "canCancel": false,
         "canCleanup": false,
         "canRetryDownload": false,
-        "createdAt": 1795359593694,
-        "updatedAt": 1795359613694
+        "createdAt": 1795364105181,
+        "updatedAt": 1795364125181
       }
-    ],
-    "machines": []
+    ]
   },
-  "inbox": [],
-  "effects": [],
-  "view": {
-    "level": {
-      "level": 3,
-      "xp": 40,
-      "need": 300
+  "farm": {
+    "seq": 1,
+    "view": {
+      "level": {
+        "level": 3,
+        "xp": 40,
+        "need": 300
+      },
+      "plots": {},
+      "plays": {}
     },
-    "plots": {},
-    "plays": {},
-    "achievements": []
+    "effects": []
   }
 }

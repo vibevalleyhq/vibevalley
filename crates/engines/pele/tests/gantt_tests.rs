@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
@@ -12,7 +10,7 @@ use vibevalley_pele::diagram::gantt::db::{GanttDb, parse_duration};
 use vibevalley_pele::diagram::gantt::lexer::tokenize;
 use vibevalley_pele::{ErrorCode, LinkInfo, ParseOptions, ParsedModel, RenderOptions, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 fn dt(y: i64, m: i64, d: i64) -> i64 {
     make_date(y, m, d, 0, 0, 0, 0).unwrap()

@@ -7,10 +7,10 @@
 
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::path::PathBuf;
 
 use serde::Deserialize;
 use serde_json::{Value, json};
+pub use vibevalley_protocol::{HostAction as Action, HostPanel as Panel};
 
 /// Frames already sent, per topic: a frame equal to the last one is not sent
 /// again, so callers may push on every change without diffing themselves.
@@ -45,196 +45,6 @@ impl Outbox {
     pub fn rev(&self, topic: &str) -> u64 {
         self.last.get(topic).map_or(0, |e| e.0)
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Panel {
-    Files,
-    Git,
-}
-
-impl Panel {
-    pub fn name(self) -> &'static str {
-        match self {
-            Panel::Files => "files",
-            Panel::Git => "git",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Action {
-    DismissFarmForm,
-    FarmHandset {
-        unfolded: bool,
-        large: bool,
-        game: bool,
-        active_call: bool,
-    },
-    FarmCall {
-        id: String,
-        answered: bool,
-    },
-    SilenceFarmPhone,
-    /// The single application router selects a native content surface.
-    GlobalRoute {
-        path: String,
-    },
-    /// Another hosted surface (such as the workspace sidebar) asks the workbench router to navigate.
-    OpenRoute {
-        path: String,
-    },
-    GlobalRail {
-        rail_width: f32,
-    },
-    /// The view applied frame `rev` of `topic` (debug bookkeeping).
-    Applied {
-        topic: String,
-        rev: u64,
-    },
-    /// The view's script started and listens.
-    Ready,
-    /// A bridge call the shell answers (`host.*` ops; the rest go to the server).
-    Call {
-        id: String,
-        op: String,
-        #[serde(default)]
-        payload: Value,
-    },
-    /// The bridge self-test's results (`apps/mac/ui/workspace/BridgeProbe.tsx`).
-    Probe {
-        results: Value,
-    },
-    /// VibeValley's /farm and /farm/<repo>: the farm pane, "" for the whole farm.
-    #[serde(rename = "openFarm")]
-    OpenFarm {
-        #[serde(default)]
-        repo: String,
-    },
-    #[serde(rename = "openRepoMap")]
-    OpenRepoMap,
-    /// VibeValley's /tree: the memory tree pane.
-    #[serde(rename = "openTree")]
-    OpenTree,
-    /// A terminal pane at `cwd` (any worktree, repo, session or issue).
-    OpenTerminal {
-        cwd: PathBuf,
-        title: Option<String>,
-        command: Option<String>,
-    },
-
-    ActivateProject {
-        id: i64,
-    },
-    ActivatePath {
-        path: PathBuf,
-    },
-    ActivateTab {
-        path: PathBuf,
-        tab_id: u64,
-    },
-    CloseTabAt {
-        path: PathBuf,
-        tab_id: u64,
-    },
-    NewTerminalAt {
-        path: PathBuf,
-    },
-    NewChatAt {
-        path: PathBuf,
-        #[serde(default)]
-        runtime: Option<String>,
-    },
-    OpenFileAdjacent {
-        path: PathBuf,
-        #[serde(default)]
-        line: Option<u32>,
-    },
-    OpenDiffAdjacent {
-        path: Option<PathBuf>,
-        #[serde(default)]
-        staged: bool,
-    },
-    BindChatSession {
-        tab_id: u64,
-        session_id: String,
-        #[serde(default)]
-        runtime: Option<String>,
-    },
-    AddProject,
-    CloseProject {
-        id: i64,
-    },
-    ShowPanel {
-        panel: Panel,
-    },
-
-    ExpandDir {
-        path: PathBuf,
-    },
-    CollapseDir {
-        path: PathBuf,
-    },
-    OpenFile {
-        path: PathBuf,
-    },
-    RevealInTerminal {
-        path: PathBuf,
-    },
-
-    OpenDiff {
-        path: Option<PathBuf>,
-        staged: bool,
-    },
-    Stage {
-        paths: Vec<PathBuf>,
-    },
-    Unstage {
-        paths: Vec<PathBuf>,
-    },
-    Discard {
-        paths: Vec<PathBuf>,
-    },
-    Commit {
-        message: String,
-    },
-    Checkout {
-        branch: String,
-    },
-    AddWorktree {
-        branch: String,
-    },
-    RemoveWorktree {
-        path: PathBuf,
-        #[serde(default)]
-        force: bool,
-    },
-    OpenCommit {
-        id: String,
-    },
-    RefreshGit,
-
-    PaletteQuery {
-        query: String,
-    },
-    PaletteSelect {
-        id: String,
-    },
-    PaletteClose,
-
-    Search {
-        query: String,
-        #[serde(default)]
-        regex: bool,
-        #[serde(default)]
-        case_sensitive: bool,
-    },
-    OpenHit {
-        path: PathBuf,
-        line: u32,
-    },
 }
 
 pub fn parse_action(value: &Value) -> Result<Action, String> {
@@ -276,66 +86,77 @@ mod tests {
     }
 
     #[test]
-    fn actions_parse() {
-        assert_eq!(
-            parse_action(&json!({"type": "activate_project", "id": 3})).unwrap(),
-            Action::ActivateProject { id: 3 }
-        );
-        assert_eq!(
-            parse_action(&json!({"type": "activate_path", "path": "/tmp/repo"})).unwrap(),
-            Action::ActivatePath { path: "/tmp/repo".into() }
-        );
-        assert_eq!(
-            parse_action(&json!({"type": "stage", "paths": ["a.rs", "b/c.rs"]})).unwrap(),
-            Action::Stage {
-                paths: vec!["a.rs".into(), "b/c.rs".into()]
-            }
-        );
-        assert_eq!(
-            parse_action(&json!({"type": "search", "query": "fn"})).unwrap(),
-            Action::Search {
-                query: "fn".into(),
-                regex: false,
-                case_sensitive: false
-            }
-        );
-        assert_eq!(
-            parse_action(&json!({"type": "applied", "topic": "rail", "rev": 4})).unwrap(),
-            Action::Applied { topic: "rail".into(), rev: 4 }
-        );
-        assert_eq!(
-            parse_action(&json!({"type": "show_panel", "panel": "git"})).unwrap(),
-            Action::ShowPanel { panel: Panel::Git }
-        );
-        assert_eq!(
-            parse_action(&json!({"type": "new_chat_at", "path": "/tmp/repo", "runtime": "antigravity"})).unwrap(),
-            Action::NewChatAt {
-                path: "/tmp/repo".into(),
-                runtime: Some("antigravity".into()),
-            }
-        );
-        assert_eq!(
-            parse_action(&json!({"type": "open_file_adjacent", "path": "src/lib.rs", "line": 42})).unwrap(),
-            Action::OpenFileAdjacent {
-                path: "src/lib.rs".into(),
-                line: Some(42),
-            }
-        );
-        assert_eq!(
-            parse_action(&json!({"type": "open_diff_adjacent", "path": "src/lib.rs", "staged": true})).unwrap(),
-            Action::OpenDiffAdjacent {
-                path: Some("src/lib.rs".into()),
-                staged: true,
-            }
-        );
-        assert_eq!(
-            parse_action(&json!({"type": "bind_chat_session", "tab_id": 7, "session_id": "s1", "runtime": "claude"})).unwrap(),
-            Action::BindChatSession {
-                tab_id: 7,
-                session_id: "s1".into(),
-                runtime: Some("claude".into()),
-            }
-        );
+    fn actions_parse_and_round_trip() {
+        let cases = vec![
+            (json!({"type": "activate_project", "id": 3}), Action::ActivateProject { id: 3 }),
+            (
+                json!({"type": "activate_path", "path": "/tmp/repo"}),
+                Action::ActivatePath { path: "/tmp/repo".into() },
+            ),
+            (
+                json!({"type": "stage", "paths": ["a.rs", "b/c.rs"]}),
+                Action::Stage {
+                    paths: vec!["a.rs".into(), "b/c.rs".into()],
+                },
+            ),
+            (
+                json!({"type": "search", "query": "fn"}),
+                Action::Search {
+                    query: "fn".into(),
+                    regex: false,
+                    case_sensitive: false,
+                },
+            ),
+            (
+                json!({"type": "applied", "topic": "slice:board", "rev": 4}),
+                Action::Applied {
+                    topic: "slice:board".into(),
+                    rev: 4,
+                },
+            ),
+            (json!({"type": "show_panel", "panel": "git"}), Action::ShowPanel { panel: Panel::Git }),
+            (
+                json!({"type": "new_chat_at", "path": "/tmp/repo", "runtime": "antigravity"}),
+                Action::NewChatAt {
+                    path: "/tmp/repo".into(),
+                    runtime: Some("antigravity".into()),
+                },
+            ),
+            (
+                json!({"type": "open_file_adjacent", "path": "src/lib.rs", "line": 42}),
+                Action::OpenFileAdjacent {
+                    path: "src/lib.rs".into(),
+                    line: Some(42),
+                },
+            ),
+            (
+                json!({"type": "open_diff_adjacent", "path": "src/lib.rs", "staged": true}),
+                Action::OpenDiffAdjacent {
+                    path: Some("src/lib.rs".into()),
+                    staged: true,
+                },
+            ),
+            (
+                json!({"type": "bind_chat_session", "tab_id": 7, "session_id": "s1", "runtime": "claude"}),
+                Action::BindChatSession {
+                    tab_id: 7,
+                    session_id: "s1".into(),
+                    runtime: Some("claude".into()),
+                },
+            ),
+            (
+                json!({"type": "openFarm", "repo": "vibevalley"}),
+                Action::OpenFarm { repo: "vibevalley".into() },
+            ),
+            (json!({"type": "openRepoMap"}), Action::OpenRepoMap),
+            (json!({"type": "openTree"}), Action::OpenTree),
+        ];
+        for (raw, expected) in cases {
+            let parsed = parse_action(&raw).unwrap();
+            assert_eq!(parsed, expected);
+            let encoded = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(parse_action(&encoded).unwrap(), expected);
+        }
         assert!(parse_action(&json!({"type": "show_panel", "panel": "unknown"})).is_err());
     }
 

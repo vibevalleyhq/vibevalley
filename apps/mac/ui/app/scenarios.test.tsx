@@ -47,9 +47,9 @@ test("empty scenario keeps every major route stable across themes and narrow wid
 
   const row: DensityMatrixRow = {
     density: "empty",
-    issues: fixture.state.state.issues.length,
-    sessions: fixture.state.state.sessions.length,
-    inbox: fixture.state.inbox.length,
+    issues: fixture.state.board.issues.length,
+    sessions: fixture.state.sessions.sessions.length,
+    inbox: fixture.state.inbox.items.length,
     routes: ["/issues"],
     themes: ["light"],
     viewports: ["1280x820"],
@@ -64,7 +64,7 @@ test("empty scenario keeps every major route stable across themes and narrow wid
   expect(app.shows("id:rail-runs-status >> text:未启动")).toBe(false);
   row.stepsPassed++;
 
-  await fake.setState(app, { ...fixture.state, state: { ...fixture.state.state, call: "live" } });
+  await fake.setSlice(app, "inbox", { ...fixture.state.inbox, call: "live" });
   expect(app.count("id:rail-runs-status")).toBe(1);
   await fake.setState(app, fixture.state);
   expect(app.shows("id:rail-runs-status >> text:未启动")).toBe(false);
@@ -123,9 +123,9 @@ test("minimal scenario advances working duration on virtual clock across core vi
 
   const row: DensityMatrixRow = {
     density: "minimal",
-    issues: fixture.state.state.issues.length,
-    sessions: fixture.state.state.sessions.length,
-    inbox: fixture.state.inbox.length,
+    issues: fixture.state.board.issues.length,
+    sessions: fixture.state.sessions.sessions.length,
+    inbox: fixture.state.inbox.items.length,
     routes: ["/issues"],
     themes: ["light"],
     viewports: ["1280x820"],
@@ -177,9 +177,9 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
 
   const row: DensityMatrixRow = {
     density: "typical",
-    issues: fixture.state.state.issues.length,
-    sessions: fixture.state.state.sessions.length,
-    inbox: fixture.state.inbox.length,
+    issues: fixture.state.board.issues.length,
+    sessions: fixture.state.sessions.sessions.length,
+    inbox: fixture.state.inbox.items.length,
     routes: ["/issues"],
     themes: ["light"],
     viewports: ["1280x820"],
@@ -187,7 +187,7 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
     durationMs: 0,
   };
 
-  expect(app.count("id:issue-card")).toBe(fixture.state.state.issues.length);
+  expect(app.count("id:issue-card")).toBe(fixture.state.board.issues.length);
   await app.press("id:issue-view-list");
   expect(app.count("id:issues-page")).toBe(1);
   await app.press("id:issue-view-board");
@@ -344,9 +344,9 @@ test("dense scenario stresses 65 issues (OlderLink fold), 80 messages, 10 crons,
 
   const row: DensityMatrixRow = {
     density: "dense",
-    issues: fixture.state.state.issues.length,
-    sessions: fixture.state.state.sessions.length,
-    inbox: fixture.state.inbox.length,
+    issues: fixture.state.board.issues.length,
+    sessions: fixture.state.sessions.sessions.length,
+    inbox: fixture.state.inbox.items.length,
     routes: ["/issues"],
     themes: ["light"],
     viewports: ["1280x820"],
@@ -355,7 +355,7 @@ test("dense scenario stresses 65 issues (OlderLink fold), 80 messages, 10 crons,
   };
 
   // Board shows folded closed column (< total 65 since 17 closed > closedShown 15), and reconciles wide/narrow working count (17) + running slots (6 / 6).
-  const denseBoard = fixture.state.state.boardSummary;
+  const denseBoard = fixture.state.board.boardSummary;
   expect(denseBoard?.laneCounts.working).toBe(17);
   expect(denseBoard?.runningSlots).toBe(6);
   expect(denseBoard?.maxRunning).toBe(6);
@@ -363,7 +363,7 @@ test("dense scenario stresses 65 issues (OlderLink fold), 80 messages, 10 crons,
   expect(app.texts().some((s) => s.includes("6 / 6"))).toBe(true);
   const foldedCards = app.count("id:issue-card");
   expect(foldedCards).toBeGreaterThan(20);
-  expect(foldedCards).toBeLessThan(fixture.state.state.issues.length);
+  expect(foldedCards).toBeLessThan(fixture.state.board.issues.length);
   row.stepsPassed++;
 
   await app.press("id:issue-view-list");
@@ -413,9 +413,9 @@ test("extreme scenario verifies long CJK/EN strings, conflict files, failed chec
 
   const row: DensityMatrixRow = {
     density: "extreme",
-    issues: fixture.state.state.issues.length,
-    sessions: fixture.state.state.sessions.length,
-    inbox: fixture.state.inbox.length,
+    issues: fixture.state.board.issues.length,
+    sessions: fixture.state.sessions.sessions.length,
+    inbox: fixture.state.inbox.items.length,
     routes: ["/issues"],
     themes: ["light"],
     viewports: ["1280x820"],
@@ -423,7 +423,7 @@ test("extreme scenario verifies long CJK/EN strings, conflict files, failed chec
     durationMs: 0,
   };
 
-  expect(app.count("id:issue-card")).toBe(fixture.state.state.issues.length);
+  expect(app.count("id:issue-card")).toBe(fixture.state.board.issues.length);
   row.stepsPassed++;
 
   await visit(app, fake, "/issues/i-ext-conflict", row, () => {
@@ -460,9 +460,9 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
 
   const row: DensityMatrixRow = {
     density: "edge",
-    issues: fixture.state.state.issues.length,
-    sessions: fixture.state.state.sessions.length,
-    inbox: fixture.state.inbox.length,
+    issues: fixture.state.board.issues.length,
+    sessions: fixture.state.sessions.sessions.length,
+    inbox: fixture.state.inbox.items.length,
     routes: ["/issues"],
     themes: ["light"],
     viewports: ["1280x820"],
@@ -470,12 +470,12 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     durationMs: 0,
   };
 
-  const boardSummary = fixture.state.state.boardSummary;
+  const boardSummary = fixture.state.board.boardSummary;
   expect(boardSummary).toBeDefined();
   expect(boardSummary?.laneCounts).toEqual({ todo: 3, working: 8, waiting: 4, closed: 9 });
   expect(boardSummary?.runningSlots).toBe(2);
   expect(boardSummary?.maxRunning).toBe(6);
-  expect(app.count("id:issue-card")).toBe(fixture.state.state.issues.length);
+  expect(app.count("id:issue-card")).toBe(fixture.state.board.issues.length);
   expect(app.shows("id:lane-todo >> text:3")).toBe(true);
   expect(app.shows("id:lane-working >> text:8")).toBe(true);
   expect(app.shows("id:lane-waiting >> text:4")).toBe(true);
@@ -521,9 +521,9 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.texts().some((s) => s.includes("子工单 6"))).toBe(true);
   });
 
-  const fileMediaPhases = new Set((fixture.state.state.media ?? []).filter((job) => job.kind !== "understanding").map((job) => job.phase));
+  const fileMediaPhases = new Set((fixture.state.ops.media ?? []).filter((job) => job.kind !== "understanding").map((job) => job.phase));
   expect(fileMediaPhases).toEqual(new Set(["queued", "generating", "downloading", "ready", "failed", "unknown", "canceled", "download_failed"]));
-  expect(fixture.state.state.mediaSummary).toEqual({
+  expect(fixture.state.ops.mediaSummary).toEqual({
     activeCount: 3,
     activeIds: ["job-edge-queued", "job-edge-generating", "job-edge-downloading"],
   });
@@ -532,8 +532,8 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.count("id:library-making")).toBe(3);
   });
 
-  expect(fixture.state.state.channelSummary?.unreadTotal).toBe(1287);
-  expect(fixture.state.state.channelSummary?.unreadUnder.general).toBe(1285);
+  expect(fixture.state.collab.channelSummary?.unreadTotal).toBe(1287);
+  expect(fixture.state.collab.channelSummary?.unreadUnder.general).toBe(1285);
   await visit(app, fake, "/chat", row, () => {
     expect(app.count("id:chat-page")).toBe(1);
     expect(app.count("id:chat-unread-total")).toBe(1);
@@ -552,7 +552,7 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
   const recordConnectors = (list: readonly ConnectorStatus[]) => {
     for (const entry of list) seenConnectorStates.add(entry.state);
   };
-  recordConnectors(fixture.state.state.connectors);
+  recordConnectors(fixture.state.collab.connectors);
   await visit(app, fake, "/settings/connections/chat/weixin", row, () => {
     expect(app.count("id:connectors")).toBe(1);
     expect(app.count("id:connector-weixin")).toBe(1);
@@ -592,7 +592,7 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     { id: "qq", state: "waiting", qr: "https://example.com/qr-qq", pairCode: "", pending: 0, error: "" },
   ];
   recordConnectors(extraConnectors);
-  await fake.setState(app, { ...fixture.state, state: { ...fixture.state.state, connectors: extraConnectors } });
+  await fake.setSlice(app, "collab", { ...fixture.state.collab, connectors: extraConnectors });
   await visit(app, fake, "/settings/connections/chat/weixin", row, () => {
     expect(app.texts()).toContain("已连接");
   });
@@ -605,7 +605,7 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
 
   const offConnector: ConnectorStatus[] = [{ id: "weixin", state: "off", qr: "", pairCode: "", pending: 0, error: "" }];
   recordConnectors(offConnector);
-  await fake.setState(app, { ...fixture.state, state: { ...fixture.state.state, connectors: offConnector } });
+  await fake.setSlice(app, "collab", { ...fixture.state.collab, connectors: offConnector });
   await visit(app, fake, "/settings/connections/chat/weixin", row, () => {
     expect(app.texts()).toContain("没连接");
   });

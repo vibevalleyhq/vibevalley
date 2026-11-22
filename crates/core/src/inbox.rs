@@ -332,6 +332,7 @@ fn worded(b: Bare) -> InboxItem {
     let who = match &b.from {
         InboxFrom::Session(s) => s.name.clone(),
         InboxFrom::Orchestrator(_) => t("server.inbox.orchestrator", &[]),
+        InboxFrom::Runtime(_) => "runtime".to_string(),
     };
     let words = inbox_words(b.kind, &who, &clip(&b.text, 140));
     InboxItem {
@@ -398,6 +399,7 @@ fn inbox_words(kind: InboxKind, who: &str, text: &str) -> InboxWords {
             t("server.inbox.item.cron-ask.body", &[("text", text.into())]),
             t("server.inbox.item.cron-ask.tray", &[("text", text.into())]),
         ),
+        InboxKind::BudgetReached => ("budget_reached".to_string(), who.to_string(), text.to_string(), text.to_string()),
     };
     InboxWords { label, title, body, tray }
 }

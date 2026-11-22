@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::time::Instant;
@@ -11,7 +9,7 @@ use vibevalley_pele::diagram::venn::lexer::{IndentHost, VennLexer, VennToken};
 use vibevalley_pele::diagram::venn::types::VennSubset;
 use vibevalley_pele::{ErrorCode, METRICS_MEASURER, ParseOptions, ParsedModel, RenderOptions, TextMeasurer, TextStyle, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 fn svg_of(body: &str) -> String {
     render(&format!("venn-beta\n{body}"), &css_options()).unwrap().svg

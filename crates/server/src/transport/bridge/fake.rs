@@ -1,12 +1,11 @@
 //! A server for building views without the real one.
 //!
-//! State starts as VibeValley's empty farm frame (`frameAt(0)` in
-//! `apps/web/src/infra/testing.ts`). [`FakeServer::from_dir`] reads
-//! `state.json` (a `StateFrame`) and `responses.json` (`{ "<op>": <data> }`,
-//! or a whole envelope when the value has a `bizCode`). Views drive it with
-//! calls too:
+//! Backed by a `RwLock<SliceBundle>` plus 6 independent [`SliceFeed`]s.
+//! [`FakeServer::from_dir`] reads `state.json` (a [`SliceBundle`]) and
+//! `responses.json` (`{ "<op>": <data> }`, or a whole envelope when the value
+//! has a `bizCode`). Views drive it with calls too:
 //!
-//! - `fake.setState` `{ state }` replaces the frame (its `seq` goes up),
+//! - `fake.setBundle` / `fake.setState` `{ bundle | state }` swaps the bundle,
 //! - `fake.live` `{ event }` sends a `LiveEvent`,
 //! - `fake.emit` `{ name, event }` / `fake.end` `{ name }` drive subscriptions,
 //! - `fake.respond` `{ op, data }` sets a canned answer,
@@ -18,18 +17,57 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use serde_json::{Value, json};
+use vibevalley_protocol::{BoardSlice, CollabSlice, FarmFrame, InboxSlice, OpsSlice, SessionsSlice, SliceBundle, SliceKind};
 
-use crate::transport::bridge::{BizCode, Envelope, LiveEvent, Server, refusal};
+use crate::lock;
+use crate::slice_feed::SliceFeed;
+use crate::transport::api::{BizCode, CallerContext, ClientIdentity, Envelope, LiveEvent, Server, refusal};
+
+struct FakeFeeds {
+    board: SliceFeed<BoardSlice>,
+    sessions: SliceFeed<SessionsSlice>,
+    collab: SliceFeed<CollabSlice>,
+    inbox: SliceFeed<InboxSlice>,
+    ops: SliceFeed<OpsSlice>,
+    farm: SliceFeed<FarmFrame>,
+}
+
+impl FakeFeeds {
+    fn new(bundle: &SliceBundle) -> Self {
+        Self {
+            board: SliceFeed::new("slice:board", bundle.board.clone()),
+            sessions: SliceFeed::new("slice:sessions", bundle.sessions.clone()),
+            collab: SliceFeed::new("slice:collab", bundle.collab.clone()),
+            inbox: SliceFeed::new("slice:inbox", bundle.inbox.clone()),
+            ops: SliceFeed::new("slice:ops", bundle.ops.clone()),
+            farm: SliceFeed::new("slice:farm", bundle.farm.clone()),
+        }
+    }
+
+    fn replace_and_publish(&self, bundle: &SliceBundle) -> usize {
+        self.board.replace(bundle.board.clone());
+        self.sessions.replace(bundle.sessions.clone());
+        self.collab.replace(bundle.collab.clone());
+        self.inbox.replace(bundle.inbox.clone());
+        self.ops.replace(bundle.ops.clone());
+        self.farm.replace(bundle.farm.clone());
+        self.board.publish_forced()
+            + self.sessions.publish_forced()
+            + self.collab.publish_forced()
+            + self.inbox.publish_forced()
+            + self.ops.publish_forced()
+            + self.farm.publish_forced()
+    }
+}
 
 #[derive(Default)]
 struct Inner {
-    state: Value,
     responses: HashMap<String, Value>,
     calls: Vec<(String, Value)>,
-    state_txs: Vec<flume::Sender<Value>>,
+    last_client: Option<ClientIdentity>,
     live_txs: Vec<flume::Sender<LiveEvent>>,
     subs: HashMap<u64, (String, flume::Sender<Value>)>,
     next_sub: u64,
@@ -37,6 +75,8 @@ struct Inner {
 
 #[derive(Clone)]
 pub struct FakeServer {
+    bundle: Arc<RwLock<SliceBundle>>,
+    feeds: Arc<FakeFeeds>,
     inner: Arc<Mutex<Inner>>,
 }
 
@@ -46,75 +86,80 @@ impl Default for FakeServer {
     }
 }
 
-/// VibeValley's empty farm frame at `seq`.
-pub fn empty_frame(seq: u64) -> Value {
-    json!({
-        "seq": seq,
-        "state": { "call": "idle", "callReason": "", "sessions": [], "issues": [], "crons": [], "connectors": [], "machines": [] },
-        "inbox": [],
-        "effects": [],
-        "view": { "level": { "level": 1, "xp": 0, "need": 100 }, "plots": {}, "plays": {}, "achievements": [] },
-    })
+/// VibeValley's empty [`SliceBundle`] at `seq`.
+pub fn empty_bundle(seq: i64) -> SliceBundle {
+    vibevalley_core::slice_bundle(&vibevalley_core::empty_space_state(), vec![], seq)
 }
 
 impl FakeServer {
     pub fn new() -> FakeServer {
-        let inner = Inner {
-            state: empty_frame(0),
-            ..Default::default()
-        };
+        Self::from_bundle(empty_bundle(0))
+    }
+
+    pub fn from_bundle(bundle: SliceBundle) -> FakeServer {
+        let feeds = Arc::new(FakeFeeds::new(&bundle));
         FakeServer {
-            inner: Arc::new(Mutex::new(inner)),
+            bundle: Arc::new(RwLock::new(bundle)),
+            feeds,
+            inner: Arc::new(Mutex::new(Inner::default())),
         }
     }
 
-    /// Reads `state.json` and `responses.json` from `dir` when present.
+    /// Reads `state.json` (a [`SliceBundle`]) and `responses.json` from `dir` when present.
     pub fn from_dir(dir: &Path) -> Result<FakeServer, String> {
-        let fake = FakeServer::new();
-        let read = |name: &str| -> Result<Option<Value>, String> {
-            match std::fs::read_to_string(dir.join(name)) {
-                Ok(text) => serde_json::from_str(&text).map(Some).map_err(|e| format!("{name}: {e}")),
-                Err(_) => Ok(None),
-            }
+        let bundle = match std::fs::read_to_string(dir.join("state.json")) {
+            Ok(text) => serde_json::from_str::<SliceBundle>(&text).map_err(|e| format!("state.json: {e}"))?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => empty_bundle(0),
+            Err(e) => return Err(format!("state.json: {e}")),
         };
-        if let Some(state) = read("state.json")? {
-            fake.inner.lock().unwrap().state = state;
-        }
-        if let Some(Value::Object(map)) = read("responses.json")? {
-            fake.inner.lock().unwrap().responses.extend(map);
+        let fake = FakeServer::from_bundle(bundle);
+        match std::fs::read_to_string(dir.join("responses.json")) {
+            Ok(text) => {
+                let value: Value = serde_json::from_str(&text).map_err(|e| format!("responses.json: {e}"))?;
+                if let Value::Object(map) = value {
+                    lock(&fake.inner).responses.extend(map);
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("responses.json: {e}")),
         }
         Ok(fake)
     }
 
-    /// Replaces the frame, `seq` one above the last. Returns how many
-    /// watchers got it.
-    pub fn set_state(&self, mut state: Value) -> usize {
-        let mut inner = self.inner.lock().unwrap();
-        let seq = inner.state["seq"].as_u64().unwrap_or(0) + 1;
-        if let Some(obj) = state.as_object_mut() {
-            obj.insert("seq".into(), json!(seq));
-        }
-        inner.state = state.clone();
-        inner.state_txs.retain(|tx| tx.send(state.clone()).is_ok());
-        inner.state_txs.len()
+    /// Replaces the backing [`SliceBundle`] and notifies every slice watcher.
+    /// Returns the total number of active slice watchers notified.
+    pub fn swap_bundle(&self, bundle: SliceBundle) -> usize {
+        *self.bundle.write().unwrap_or_else(|e| e.into_inner()) = bundle.clone();
+        self.feeds.replace_and_publish(&bundle)
     }
 
-    pub fn state_now(&self) -> Value {
-        self.inner.lock().unwrap().state.clone()
+    pub fn bundle_now(&self) -> SliceBundle {
+        self.bundle.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    pub fn slice_watchers(&self, slice: SliceKind) -> usize {
+        match slice {
+            SliceKind::Board => self.feeds.board.watcher_count(),
+            SliceKind::Sessions => self.feeds.sessions.watcher_count(),
+            SliceKind::Collab => self.feeds.collab.watcher_count(),
+            SliceKind::Inbox => self.feeds.inbox.watcher_count(),
+            SliceKind::Ops => self.feeds.ops.watcher_count(),
+            SliceKind::Farm => self.feeds.farm.watcher_count(),
+        }
     }
 
     pub fn push_live(&self, event: LiveEvent) {
-        self.inner.lock().unwrap().live_txs.retain(|tx| tx.send(event.clone()).is_ok());
+        lock(&self.inner).live_txs.retain(|tx| tx.send(event.clone()).is_ok());
     }
 
     pub fn live_watchers(&self) -> usize {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock(&self.inner);
         inner.live_txs.retain(|tx| !tx.is_disconnected());
         inner.live_txs.len()
     }
 
     pub fn emit(&self, name: &str, event: Value) {
-        for (n, tx) in self.inner.lock().unwrap().subs.values() {
+        for (n, tx) in lock(&self.inner).subs.values() {
             if n == name {
                 let _ = tx.send(event.clone());
             }
@@ -123,31 +168,65 @@ impl FakeServer {
 
     /// Ends every subscription of `name` (drops its sender).
     pub fn end(&self, name: &str) {
-        self.inner.lock().unwrap().subs.retain(|_, (n, _)| n != name);
+        lock(&self.inner).subs.retain(|_, (n, _)| n != name);
     }
 
     pub fn respond(&self, op: &str, data: Value) {
-        self.inner.lock().unwrap().responses.insert(op.to_string(), data);
+        lock(&self.inner).responses.insert(op.to_string(), data);
     }
 
     pub fn calls(&self) -> Vec<(String, Value)> {
-        self.inner.lock().unwrap().calls.clone()
+        lock(&self.inner).calls.clone()
+    }
+
+    pub fn last_client(&self) -> Option<ClientIdentity> {
+        lock(&self.inner).last_client.clone()
     }
 
     pub fn subscriber_count(&self) -> usize {
-        self.inner.lock().unwrap().subs.len()
+        lock(&self.inner).subs.len()
     }
 }
 
 impl Server for FakeServer {
     fn call(&self, op: &str, payload: Value) -> Envelope {
-        self.inner.lock().unwrap().calls.push((op.to_string(), payload.clone()));
+        self.call_with(&CallerContext::local(), op, payload)
+    }
+
+    fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
+        {
+            let mut inner = lock(&self.inner);
+            inner.calls.push((op.to_string(), payload.clone()));
+            if let Some(client) = &ctx.client {
+                inner.last_client = Some(client.clone());
+            }
+        }
         let name = |key: &str| payload[key].as_str().unwrap_or_default().to_string();
         match op {
             "health" => Envelope::ok(json!({ "ok": true, "version": "fake" })),
-            "fake.setState" => {
-                self.set_state(payload["state"].clone());
-                Envelope::void()
+            "fake.setBundle" | "fake.setState" => {
+                let raw = if payload.get("bundle").is_some() {
+                    payload["bundle"].clone()
+                } else {
+                    payload["state"].clone()
+                };
+                match serde_json::from_value::<SliceBundle>(raw) {
+                    Ok(mut bundle) => {
+                        let next_seq = self.bundle_now().seq + 1;
+                        if bundle.seq <= self.bundle_now().seq {
+                            bundle.seq = next_seq;
+                            bundle.board.seq = next_seq;
+                            bundle.sessions.seq = next_seq;
+                            bundle.collab.seq = next_seq;
+                            bundle.inbox.seq = next_seq;
+                            bundle.ops.seq = next_seq;
+                            bundle.farm.seq = next_seq;
+                        }
+                        self.swap_bundle(bundle);
+                        Envelope::void()
+                    }
+                    Err(e) => refusal(BizCode::InvalidInput, format!("not a SliceBundle: {e}")),
+                }
             }
             "fake.live" => match serde_json::from_value::<LiveEvent>(payload["event"].clone()) {
                 Ok(event) => {
@@ -174,7 +253,7 @@ impl Server for FakeServer {
                     .map(|(op, payload)| json!({ "op": op, "payload": payload }))
                     .collect::<Vec<_>>()
             )),
-            _ => match self.inner.lock().unwrap().responses.get(op).cloned() {
+            _ => match lock(&self.inner).responses.get(op).cloned() {
                 Some(v) if v.get("bizCode").is_some() => {
                     serde_json::from_value(v).unwrap_or_else(|e| refusal(BizCode::InternalError, format!("bad canned envelope for {op}: {e}")))
                 }
@@ -184,17 +263,31 @@ impl Server for FakeServer {
         }
     }
 
-    fn state(&self) -> flume::Receiver<Value> {
-        let (tx, rx) = flume::unbounded();
-        let mut inner = self.inner.lock().unwrap();
-        let _ = tx.send(inner.state.clone());
-        inner.state_txs.push(tx);
-        rx
+    fn slice_snapshot(&self, slice: SliceKind) -> Value {
+        match slice {
+            SliceKind::Board => self.feeds.board.snapshot().wire().clone(),
+            SliceKind::Sessions => self.feeds.sessions.snapshot().wire().clone(),
+            SliceKind::Collab => self.feeds.collab.snapshot().wire().clone(),
+            SliceKind::Inbox => self.feeds.inbox.snapshot().wire().clone(),
+            SliceKind::Ops => self.feeds.ops.snapshot().wire().clone(),
+            SliceKind::Farm => self.feeds.farm.snapshot().wire().clone(),
+        }
+    }
+
+    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+        match slice {
+            SliceKind::Board => self.feeds.board.watch_since(after_seq, None, stop, receive),
+            SliceKind::Sessions => self.feeds.sessions.watch_since(after_seq, None, stop, receive),
+            SliceKind::Collab => self.feeds.collab.watch_since(after_seq, None, stop, receive),
+            SliceKind::Inbox => self.feeds.inbox.watch_since(after_seq, None, stop, receive),
+            SliceKind::Ops => self.feeds.ops.watch_since(after_seq, None, stop, receive),
+            SliceKind::Farm => self.feeds.farm.watch_since(after_seq, None, stop, receive),
+        }
     }
 
     fn live(&self) -> flume::Receiver<LiveEvent> {
         let (tx, rx) = flume::unbounded();
-        self.inner.lock().unwrap().live_txs.push(tx);
+        lock(&self.inner).live_txs.push(tx);
         rx
     }
 
@@ -203,7 +296,7 @@ impl Server for FakeServer {
             return Err(refusal(BizCode::ChannelNotFound, "no such channel"));
         }
         let (tx, rx) = flume::unbounded();
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = lock(&self.inner);
         inner.next_sub += 1;
         let id = inner.next_sub;
         inner.subs.insert(id, (name.to_string(), tx));
@@ -211,7 +304,7 @@ impl Server for FakeServer {
     }
 
     fn unsubscribe(&self, id: u64) {
-        self.inner.lock().unwrap().subs.remove(&id);
+        lock(&self.inner).subs.remove(&id);
     }
 }
 
@@ -220,14 +313,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn regression_farm_fixture_is_a_complete_state_frame() {
-        let frame: vibevalley_protocol::StateFrame = serde_json::from_str(include_str!("../../../fixtures/farm/state.json")).unwrap();
-        for issue in &frame.state.issues {
+    fn regression_farm_fixture_is_a_complete_slice_bundle() {
+        let bundle: SliceBundle = serde_json::from_str(include_str!("../../../fixtures/farm/state.json")).unwrap();
+        for issue in &bundle.board.issues {
             if issue.status == vibevalley_protocol::IssueStatus::InProgress {
                 let session = issue.latest_session_id().expect("a working issue has a worker execution");
-                assert!(frame.state.sessions.iter().any(|worker| &worker.id == session));
+                assert!(bundle.sessions.sessions.iter().any(|worker| &worker.id == session));
             }
         }
+        let responses: Value = serde_json::from_str(include_str!("../../../fixtures/farm/responses.json")).unwrap();
+        let _: vibevalley_protocol::AchievementList = serde_json::from_value(responses["game.achievement.list"].clone()).unwrap();
     }
 
     #[test]
@@ -238,8 +333,9 @@ mod tests {
         assert_eq!(fake.call("issue.list", json!({})).data, Some(json!([1, 2])));
         fake.respond("issue.create", json!({ "bizCode": 300002, "message": "no" }));
         assert_eq!(fake.call("issue.create", json!({})).biz_code, 300002);
-        fake.call("fake.setState", json!({ "state": empty_frame(0) }));
-        assert_eq!(fake.state_now()["seq"], 1);
+        fake.call("fake.setBundle", json!({ "bundle": empty_bundle(0) }));
+        assert_eq!(fake.bundle_now().seq, 1);
+        assert_eq!(fake.slice_snapshot(SliceKind::Board)["seq"], 1);
         let live = fake.call("fake.live", json!({ "event": { "type": "notice", "at": 1, "level": "info", "text": "hi" } }));
         assert_eq!(live.biz_code, 0, "{live:?}");
         assert_eq!(fake.call("fake.live", json!({ "event": { "type": "bogus" } })).biz_code, 100001);
@@ -251,10 +347,12 @@ mod tests {
     fn from_dir_reads_fixtures() {
         let dir = std::env::temp_dir().join(format!("vibevalley-bridge-fake-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("state.json"), r#"{"seq": 7, "state": {"issues": [{"id": "i1"}]}}"#).unwrap();
+        let mut bundle = empty_bundle(7);
+        bundle.board.issues.push(vibevalley_protocol::Issue::new("i1", 1, "Demo", 1));
+        std::fs::write(dir.join("state.json"), serde_json::to_string(&bundle).unwrap()).unwrap();
         std::fs::write(dir.join("responses.json"), r#"{"repo.list": [{"id": "r"}]}"#).unwrap();
         let fake = FakeServer::from_dir(&dir).unwrap();
-        assert_eq!(fake.state().recv().unwrap()["state"]["issues"][0]["id"], "i1");
+        assert_eq!(fake.slice_snapshot(SliceKind::Board)["issues"][0]["id"], "i1");
         assert_eq!(fake.call("repo.list", Value::Null).data.unwrap()[0]["id"], "r");
         std::fs::remove_dir_all(&dir).unwrap();
     }

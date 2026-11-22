@@ -1,12 +1,10 @@
-mod support;
-
 use std::time::Instant;
 
 use regex::Regex;
 use vibevalley_pele::detect::DiagramType;
 use vibevalley_pele::{ErrorCode, METRICS_MEASURER, ParseOptions, ParsedModel, RenderOptions, TextMeasurer, TextStyle, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, load_fixture, resolved_options};
 
 fn try_render_css(src: &str) -> Option<String> {
     match render(src, &css_options()) {

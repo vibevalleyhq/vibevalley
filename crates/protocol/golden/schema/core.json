@@ -3517,1117 +3517,130 @@
    ]
   }
  ],
- "SpaceView": [
+ "SliceKind": [
+  "board",
+  "sessions",
+  "collab",
+  "inbox",
+  "ops",
+  "farm"
+ ],
+ "BoardSlice": [
   {
-   "call": "idle",
-   "callReason": "s5092",
-   "chat": {
-    "channels": [
-     {
-      "archived": 5118,
-      "at": 5134,
-      "category": "s5116",
-      "default": false,
-      "description": "s5122",
-      "id": "s5110",
-      "last": {
-       "at": 5133,
-       "from": "s5130",
-       "name": "s5131",
-       "text": "s5132"
-      },
-      "lastNumber": 5125,
-      "members": [
-       "s5114"
-      ],
-      "name": "s5121",
-      "notify": "all",
-      "orchestrator": "s5113",
-      "parent": "s5115",
-      "peer": "s5112",
-      "position": 5117,
-      "read": 5127,
-      "replies": 5126,
-      "repo": "s5123",
-      "root": "s5119",
-      "rootNumber": 5120,
-      "subjectId": "s5124",
-      "subjectKind": "issue",
-      "title": "s5129",
-      "type": "channel",
-      "unread": 5128
-     }
-    ],
-    "userMentions": [
-     {
-      "address": "s5146",
-      "channel": "s5145",
-      "message": {
-       "actor": {
-        "id": "s5139",
-        "kind": "user"
-       },
-       "at": 5143,
-       "attachments": [],
-       "channel": "s5137",
-       "embeds": [],
-       "from": "s5138",
-       "id": "s5135",
-       "kind": "chat",
-       "mentions": [],
-       "name": "s5140",
-       "number": 5136,
-       "outcome": "completed",
-       "reactions": [],
-       "revision": 5144,
-       "spoken": true,
-       "text": "s5141"
-      }
-     }
-    ]
-   },
-   "commits": {
-    "repos": [
-     {
-      "commits": 5149,
-      "path": "s5148"
-     }
-    ],
-    "total": 5147
-   },
-   "connectors": [
-    {
-     "channel": "s5212",
-     "error": "s5218",
-     "id": "weixin",
-     "lastInbound": 5215,
-     "pairCode": "s5211",
-     "pausedUntil": 5216,
-     "pending": 5217,
-     "qr": "s5210",
-     "since": 5214,
-     "state": "off",
-     "user": "s5213"
-    }
-   ],
-   "crons": [
-    {
-     "agent": "s5255",
-     "by": "user",
-     "channel": "s5254",
-     "created": 5260,
-     "enabled": false,
-     "id": "s5251",
-     "lastRun": 5261,
-     "name": "s5252",
-     "nextText": "s5264",
-     "pending": true,
-     "repo": "s5256",
-     "text": "s5253",
-     "tz": "s5258",
-     "when": {
-      "at": 5257,
-      "kind": "once"
-     },
-     "whenText": "s5263"
-    }
-   ],
-   "issues": [
-    {
-     "answer": {
-      "conclusion": "s5205",
-      "evidence": [
-       "s5206"
-      ],
-      "next": [
-       "s5208"
-      ],
-      "unsure": [
-       "s5207"
-      ]
-     },
-     "assignments": [
-      {
-       "agent": "s5181",
-       "assignedAt": 5182,
-       "executions": [],
-       "id": "s5179",
-       "issue": "s5180"
-      }
-     ],
-     "blockedBy": [
-      "s5188"
-     ],
-     "canceled": "dismissed",
-     "checks": [
-      {
-       "criterion": 5199,
-       "proof": "s5200",
-       "result": "met"
-      }
-     ],
-     "closedAt": 5186,
-     "conflict": {
-      "base": "s5176",
-      "files": [
-       "s5177"
-      ]
-     },
-     "constraints": {
-      "acceptance": false,
-      "check": "s5165",
-      "frozen": [
-       "s5168"
-      ],
-      "scope": [
-       "s5166"
-      ]
-     },
-     "createdAt": 5184,
-     "criteria": [
-      "s5198"
-     ],
-     "cron": "s5189",
-     "deliver": "change",
-     "delivered": "merged",
-     "description": "s5172",
-     "findings": [
-      {
-       "at": 5195,
-       "id": "s5193",
-       "resolved": true,
-       "text": "s5194"
-      }
-     ],
-     "id": "s5169",
-     "lastRun": {
-      "endedAt": 5204,
-      "outcome": "completed",
-      "startedAt": 5203
-     },
-     "mandate": {
-      "autoSubmitPr": false,
-      "maxBotReviewRounds": 5174,
-      "originTriggerId": "s5173",
-      "strength": "explicit"
-     },
-     "moves": [
-      "backlog"
-     ],
-     "number": 5170,
-     "parent": "s5187",
-     "priority": "urgent",
-     "pullRequest": {
-      "number": 5191,
-      "state": "open",
-      "url": "s5190"
-     },
-     "questions": [
-      {
-       "options": [],
-       "question": "s5197"
-      }
-     ],
-     "queuedAt": 5185,
-     "rank": 5183,
-     "refining": {
-      "name": "s5202",
-      "session": "s5201"
-     },
-     "repo": "s5178",
-     "reviewedAt": 5192,
-     "stage": {
-      "acts": [
-       {
-        "act": "start",
-        "does": "move",
-        "status": "backlog",
-        "words": "none"
-       }
-      ],
-      "lead": "start",
-      "since": 5209,
-      "state": "draft",
-      "stuck": "failed"
-     },
-     "status": "backlog",
-     "title": "s5171"
-    }
-   ],
-   "machines": [
-    {
-     "here": false,
-     "id": "s5219",
-     "joinedAt": 5223,
-     "name": "s5220",
-     "online": true
-    }
-   ],
-   "media": [
-    {
-     "attachment": {
-      "id": "s5102",
-      "name": "s5103",
-      "size": 5105,
-      "type": "s5104"
-     },
-     "canCancel": true,
-     "canRetryDownload": false,
-     "connection": "s5096",
-     "createdAt": 5108,
-     "id": "s5093",
-     "kind": "image",
-     "model": "s5095",
-     "phase": "queued",
-     "phaseText": "s5100",
-     "problem": "s5101",
-     "prompt": "s5094",
-     "revision": 5097,
-     "source": {
-      "kind": "user"
-     },
-     "updatedAt": 5109,
-     "usage": {
-      "height": 1769,
-      "images": 1,
-      "width": 1768
-     }
-    }
-   ],
-   "progress": {
-    "agents": {
-     "k5160": {
-      "failed": 5163,
-      "harvested": 5162,
-      "hired": 5161
-     }
-    },
-    "bestStreak": 5152,
-    "coins": 5150,
-    "counts": {
-     "k5153": 5154
-    },
-    "multiplier": 5164,
-    "streak": 5151,
-    "title": {
-     "id": "s5158",
-     "tier": 5159
-    },
-    "unlocked": [
-     {
-      "at": 5157,
-      "id": "s5155",
-      "tier": 5156
-     }
-    ]
-   },
-   "sessions": [
-    {
-     "bindings": [
-      {
-       "id": "s5241",
-       "kind": "issue",
-       "refining": true
-      },
-      {
-       "id": "s5240",
-       "kind": "channel"
-      }
-     ],
-     "brief": "s5228",
-     "controller": "orchestrator",
-     "cwd": "s5231",
-     "hiredAt": 5232,
-     "id": "s5224",
-     "lastRun": {
-      "answer": {
-       "conclusion": "s5237",
-       "evidence": [],
-       "next": [],
-       "unsure": []
-      },
-      "at": 5235,
-      "outcome": "completed",
-      "spent": {
-       "tokens": 5236
-      },
-      "summary": "s5234"
-     },
-     "machine": "s5244",
-     "name": "s5225",
-     "phase": {
-      "_tag": "working",
-      "doing": {
-       "action": "run_command",
-       "actionText": "s5249",
-       "label": "s5248"
-      },
-      "quietSince": 5246,
-      "retry": {
-       "attempt": 5247
-      },
-      "since": 5245
-     },
-     "phaseText": "s5250",
-     "policy": {
-      "branch": "s5230",
-      "kind": "managedWorktree",
-      "repo": "s5229"
-     },
-     "profile": "s5226",
-     "role": "orchestrator",
-     "runs": 5233,
-     "runtime": "s5227",
-     "spent": {
-      "cny": 5239,
-      "tokens": 5238
-     },
-     "toolConnections": [
-      {
-       "server": "s5243",
-       "status": "unknown"
-      }
-     ]
-    }
-   ]
+   "seq": 1,
+   "issues": []
   },
   {
-   "call": "idle",
-   "callReason": "s5265",
-   "connectors": [
-    {
-     "error": "s5289",
-     "id": "weixin",
-     "pairCode": "s5287",
-     "pending": 5288,
-     "qr": "s5286",
-     "state": "off"
-    }
-   ],
-   "crons": [
-    {
-     "by": "user",
-     "channel": "s5310",
-     "created": 5314,
-     "enabled": false,
-     "id": "s5307",
-     "name": "s5308",
-     "nextText": "s5317",
-     "pending": false,
-     "text": "s5309",
-     "tz": "s5312",
-     "when": {
-      "at": 5311,
-      "kind": "once"
-     },
-     "whenText": "s5316"
-    }
-   ],
-   "issues": [
-    {
-     "assignments": [
-      {
-       "agent": "s5274",
-       "assignedAt": 5275,
-       "executions": [],
-       "id": "s5272",
-       "issue": "s5273"
-      }
-     ],
-     "blockedBy": [
-      "s5277"
-     ],
-     "checks": [
-      {
-       "criterion": 5284,
-       "proof": "s5285",
-       "result": "met"
-      }
-     ],
-     "createdAt": 5276,
-     "criteria": [
-      "s5283"
-     ],
-     "deliver": "change",
-     "description": "s5269",
-     "findings": [
-      {
-       "at": 5280,
-       "id": "s5278",
-       "resolved": false,
-       "text": "s5279"
-      }
-     ],
-     "id": "s5266",
-     "mandate": {
-      "autoSubmitPr": false,
-      "maxBotReviewRounds": 5270,
-      "strength": "explicit"
-     },
-     "moves": [
-      "backlog"
-     ],
-     "number": 5267,
-     "priority": "urgent",
-     "questions": [
-      {
-       "options": [],
-       "question": "s5282"
-      }
-     ],
-     "stage": {
-      "acts": [
-       {
-        "act": "start",
-        "does": "move",
-        "status": "backlog",
-        "words": "none"
-       }
-      ],
-      "state": "draft"
-     },
-     "status": "backlog",
-     "title": "s5268"
-    }
-   ],
+   "seq": 2,
+   "issues": [],
+   "commits": {
+    "total": 3,
+    "repos": [
+     {
+      "path": "demo",
+      "commits": 3
+     }
+    ]
+   }
+  }
+ ],
+ "SessionsSlice": [
+  {
+   "seq": 1,
+   "sessions": [],
+   "machines": []
+  },
+  {
+   "seq": 2,
+   "sessions": [],
    "machines": [
     {
+     "id": "local",
+     "name": "Mac",
      "here": true,
-     "id": "s5290",
-     "joinedAt": 5294,
-     "name": "s5291",
-     "online": false
-    }
-   ],
-   "sessions": [
-    {
-     "bindings": [],
-     "brief": "s5299",
-     "controller": "orchestrator",
-     "hiredAt": 5300,
-     "id": "s5295",
-     "name": "s5296",
-     "phase": {
-      "_tag": "working",
-      "doing": {
-       "action": "run_command",
-       "actionText": "s5305",
-       "label": "s5304"
-      },
-      "since": 5303
-     },
-     "phaseText": "s5306",
-     "policy": {
-      "kind": "sandboxDir"
-     },
-     "profile": "s5297",
-     "role": "orchestrator",
-     "runs": 5301,
-     "runtime": "s5298"
+     "online": true,
+     "joinedAt": 100
     }
    ]
   }
  ],
- "StateFrame": [
+ "CollabSlice": [
   {
-   "effects": [
-    {
-     "coins": 5492,
-     "kind": "reward",
-     "sessionId": "s5491",
-     "streak": 5493
-    }
-   ],
-   "inbox": [
-    {
-     "at": 5465,
-     "from": {
-      "agent": "s5462",
-      "id": "s5460",
-      "kind": "session",
-      "name": "s5461"
-     },
-     "id": "s5459",
-     "kind": "review",
-     "target": {
-      "id": "s5466",
-      "kind": "session"
-     },
-     "text": "s5464",
-     "who": "s5463",
-     "words": {
-      "body": "s5469",
-      "label": "s5467",
-      "title": "s5468",
-      "tray": "s5470"
-     }
-    }
-   ],
-   "seq": 5318,
-   "state": {
-    "call": "idle",
-    "callReason": "s5319",
-    "chat": {
-     "channels": [
-      {
-       "at": 5343,
-       "category": "s5339",
-       "default": true,
-       "description": "s5340",
-       "id": "s5337",
-       "notify": "all",
-       "replies": 5341,
-       "subjectKind": "issue",
-       "title": "s5342",
-       "type": "channel"
-      }
-     ],
-     "userMentions": [
-      {
-       "address": "s5355",
-       "channel": "s5354",
-       "message": {
-        "actor": {
-         "id": "s5348",
-         "kind": "user"
-        },
-        "at": 5352,
-        "attachments": [],
-        "channel": "s5346",
-        "embeds": [],
-        "from": "s5347",
-        "id": "s5344",
-        "kind": "chat",
-        "mentions": [],
-        "name": "s5349",
-        "number": 5345,
-        "outcome": "completed",
-        "reactions": [],
-        "revision": 5353,
-        "spoken": false,
-        "text": "s5350"
-       }
-      }
-     ]
-    },
-    "commits": {
-     "repos": [
-      {
-       "commits": 5358,
-       "path": "s5357"
-      }
-     ],
-     "total": 5356
-    },
-    "connectors": [
-     {
-      "channel": "s5411",
-      "error": "s5417",
-      "id": "weixin",
-      "lastInbound": 5414,
-      "pairCode": "s5410",
-      "pausedUntil": 5415,
-      "pending": 5416,
-      "qr": "s5409",
-      "since": 5413,
-      "state": "off",
-      "user": "s5412"
-     }
-    ],
-    "crons": [
-     {
-      "agent": "s5449",
-      "by": "user",
-      "channel": "s5448",
-      "created": 5454,
-      "enabled": false,
-      "id": "s5445",
-      "lastRun": 5455,
-      "name": "s5446",
-      "nextText": "s5458",
-      "pending": true,
-      "repo": "s5450",
-      "text": "s5447",
-      "tz": "s5452",
-      "when": {
-       "at": 5451,
-       "kind": "once"
-      },
-      "whenText": "s5457"
-     }
-    ],
-    "issues": [
-     {
-      "answer": {
-       "conclusion": "s5408",
-       "evidence": [],
-       "next": [],
-       "unsure": []
-      },
-      "assignments": [
-       {
-        "agent": "s5385",
-        "assignedAt": 5386,
-        "executions": [],
-        "id": "s5383",
-        "issue": "s5384"
-       }
-      ],
-      "blockedBy": [
-       "s5392"
-      ],
-      "canceled": "dismissed",
-      "checks": [
-       {
-        "criterion": 5403,
-        "proof": "s5404",
-        "result": "met"
-       }
-      ],
-      "closedAt": 5390,
-      "conflict": {
-       "base": "s5381",
-       "files": []
-      },
-      "constraints": {
-       "acceptance": true,
-       "frozen": [],
-       "scope": []
-      },
-      "createdAt": 5388,
-      "criteria": [
-       "s5402"
-      ],
-      "cron": "s5393",
-      "deliver": "change",
-      "delivered": "merged",
-      "description": "s5378",
-      "findings": [
-       {
-        "at": 5399,
-        "id": "s5397",
-        "resolved": true,
-        "text": "s5398"
-       }
-      ],
-      "id": "s5375",
-      "lastRun": {
-       "startedAt": 5407
-      },
-      "mandate": {
-       "autoSubmitPr": true,
-       "maxBotReviewRounds": 5379,
-       "strength": "explicit"
-      },
-      "moves": [
-       "backlog"
-      ],
-      "number": 5376,
-      "parent": "s5391",
-      "priority": "urgent",
-      "pullRequest": {
-       "number": 5395,
-       "state": "open",
-       "url": "s5394"
-      },
-      "questions": [
-       {
-        "options": [],
-        "question": "s5401"
-       }
-      ],
-      "queuedAt": 5389,
-      "rank": 5387,
-      "refining": {
-       "name": "s5406",
-       "session": "s5405"
-      },
-      "repo": "s5382",
-      "reviewedAt": 5396,
-      "stage": {
-       "acts": [],
-       "state": "draft"
-      },
-      "status": "backlog",
-      "title": "s5377"
-     }
-    ],
-    "machines": [
-     {
-      "here": true,
-      "id": "s5418",
-      "joinedAt": 5422,
-      "name": "s5419",
-      "online": false
-     }
-    ],
-    "media": [
-     {
-      "attachment": {
-       "id": "s5329",
-       "name": "s5330",
-       "size": 5332,
-       "type": "s5331"
-      },
-      "canCancel": false,
-      "canRetryDownload": true,
-      "connection": "s5323",
-      "createdAt": 5335,
-      "id": "s5320",
-      "kind": "image",
-      "model": "s5322",
-      "phase": "queued",
-      "phaseText": "s5327",
-      "problem": "s5328",
-      "prompt": "s5321",
-      "revision": 5324,
-      "source": {
-       "kind": "user"
-      },
-      "updatedAt": 5336,
-      "usage": {
-       "height": 1996,
-       "images": 1,
-       "width": 1995
-      }
-     }
-    ],
-    "progress": {
-     "agents": {
-      "k5369": {
-       "failed": 5372,
-       "harvested": 5371,
-       "hired": 5370
-      }
-     },
-     "bestStreak": 5361,
-     "coins": 5359,
-     "counts": {
-      "k5362": 5363
-     },
-     "multiplier": 5373,
-     "streak": 5360,
-     "title": {
-      "id": "s5367",
-      "tier": 5368
-     },
-     "unlocked": [
-      {
-       "at": 5366,
-       "id": "s5364",
-       "tier": 5365
-      }
-     ]
-    },
-    "sessions": [
-     {
-      "bindings": [
-       {
-        "id": "s5437",
-        "kind": "issue",
-        "refining": true
-       },
-       {
-        "id": "s5436",
-        "kind": "channel"
-       }
-      ],
-      "brief": "s5427",
-      "controller": "orchestrator",
-      "cwd": "s5430",
-      "hiredAt": 5431,
-      "id": "s5423",
-      "lastRun": {
-       "at": 5434,
-       "outcome": "completed",
-       "summary": "s5433"
-      },
-      "machine": "s5440",
-      "name": "s5424",
-      "phase": {
-       "_tag": "working",
-       "doing": {
-        "action": "run_command",
-        "actionText": "s5443",
-        "label": "s5442"
-       },
-       "since": 5441
-      },
-      "phaseText": "s5444",
-      "policy": {
-       "branch": "s5429",
-       "kind": "managedWorktree",
-       "repo": "s5428"
-      },
-      "profile": "s5425",
-      "role": "orchestrator",
-      "runs": 5432,
-      "runtime": "s5426",
-      "spent": {
-       "tokens": 5435
-      },
-      "toolConnections": [
-       {
-        "server": "s5439",
-        "status": "unknown"
-       }
-      ]
-     }
-    ]
-   },
-   "view": {
-    "achievements": [
-     {
-      "count": 5489,
-      "id": "s5487",
-      "next": 5490,
-      "tier": 5488
-     }
-    ],
-    "level": {
-     "level": 5471,
-     "need": 5473,
-     "xp": 5472
-    },
-    "plays": {
-     "k5476": {
-      "commands": [
-       "s5482"
-      ],
-      "counts": {
-       "k5479": 5480
-      },
-      "files": [
-       "s5481"
-      ],
-      "history": [
-       {
-        "action": "run_command",
-        "actionText": "s5486",
-        "at": 5484,
-        "label": "s5485"
-       }
-      ],
-      "runStartedAt": 5483,
-      "station": 5477,
-      "toolsThisRun": 5478
-     }
-    },
-    "plots": {
-     "k5474": {
-      "badge": {
-       "text": "s5475",
-       "tone": "ripe"
-      },
-      "crop": "empty"
-     }
-    }
-   }
+   "seq": 1,
+   "connectors": []
   },
   {
-   "effects": [
-    {
-     "coins": 5577,
-     "kind": "reward",
-     "streak": 5578
-    }
-   ],
-   "inbox": [
-    {
-     "at": 5554,
-     "from": {
-      "agent": "s5551",
-      "id": "s5549",
-      "kind": "session",
-      "name": "s5550"
-     },
-     "id": "s5548",
-     "kind": "review",
-     "target": {
-      "id": "s5555",
-      "kind": "session"
-     },
-     "text": "s5553",
-     "who": "s5552",
-     "words": {
-      "body": "s5558",
-      "label": "s5556",
-      "title": "s5557",
-      "tray": "s5559"
-     }
-    }
-   ],
-   "seq": 5494,
-   "state": {
-    "call": "idle",
-    "callReason": "s5495",
-    "connectors": [
-     {
-      "error": "s5519",
-      "id": "weixin",
-      "pairCode": "s5517",
-      "pending": 5518,
-      "qr": "s5516",
-      "state": "off"
-     }
-    ],
-    "crons": [
-     {
-      "by": "user",
-      "channel": "s5540",
-      "created": 5544,
-      "enabled": false,
-      "id": "s5537",
-      "name": "s5538",
-      "nextText": "s5547",
-      "pending": false,
-      "text": "s5539",
-      "tz": "s5542",
-      "when": {
-       "at": 5541,
-       "kind": "once"
-      },
-      "whenText": "s5546"
-     }
-    ],
-    "issues": [
-     {
-      "assignments": [
-       {
-        "agent": "s5504",
-        "assignedAt": 5505,
-        "executions": [],
-        "id": "s5502",
-        "issue": "s5503"
-       }
-      ],
-      "blockedBy": [
-       "s5507"
-      ],
-      "checks": [
-       {
-        "criterion": 5514,
-        "proof": "s5515",
-        "result": "met"
-       }
-      ],
-      "createdAt": 5506,
-      "criteria": [
-       "s5513"
-      ],
-      "deliver": "change",
-      "description": "s5499",
-      "findings": [
-       {
-        "at": 5510,
-        "id": "s5508",
-        "resolved": false,
-        "text": "s5509"
-       }
-      ],
-      "id": "s5496",
-      "mandate": {
-       "autoSubmitPr": false,
-       "maxBotReviewRounds": 5500,
-       "strength": "explicit"
-      },
-      "moves": [
-       "backlog"
-      ],
-      "number": 5497,
-      "priority": "urgent",
-      "questions": [
-       {
-        "options": [],
-        "question": "s5512"
-       }
-      ],
-      "stage": {
-       "acts": [],
-       "state": "draft"
-      },
-      "status": "backlog",
-      "title": "s5498"
-     }
-    ],
-    "machines": [
-     {
-      "here": true,
-      "id": "s5520",
-      "joinedAt": 5524,
-      "name": "s5521",
-      "online": false
-     }
-    ],
-    "sessions": [
-     {
-      "bindings": [],
-      "brief": "s5529",
-      "controller": "orchestrator",
-      "hiredAt": 5530,
-      "id": "s5525",
-      "name": "s5526",
-      "phase": {
-       "_tag": "working",
-       "doing": {
-        "action": "run_command",
-        "actionText": "s5535",
-        "label": "s5534"
-       },
-       "since": 5533
-      },
-      "phaseText": "s5536",
-      "policy": {
-       "kind": "sandboxDir"
-      },
-      "profile": "s5527",
-      "role": "orchestrator",
-      "runs": 5531,
-      "runtime": "s5528"
-     }
-    ]
+   "seq": 2,
+   "chat": {
+    "channels": [],
+    "userMentions": []
    },
-   "view": {
-    "achievements": [
-     {
-      "count": 5576,
-      "id": "s5574",
-      "tier": 5575
-     }
-    ],
-    "level": {
-     "level": 5560,
-     "need": 5562,
-     "xp": 5561
+   "connectors": []
+  }
+ ],
+ "InboxSlice": [
+  {
+   "seq": 1,
+   "items": [],
+   "call": "idle",
+   "callReason": ""
+  },
+  {
+   "seq": 2,
+   "items": [],
+   "call": "live",
+   "callReason": "on"
+  }
+ ],
+ "OpsSlice": [
+  {
+   "seq": 1,
+   "crons": []
+  },
+  {
+   "seq": 2,
+   "crons": [],
+   "media": []
+  }
+ ],
+ "SliceBundle": [
+  {
+   "seq": 1,
+   "board": {
+    "seq": 1,
+    "issues": []
+   },
+   "sessions": {
+    "seq": 1,
+    "sessions": [],
+    "machines": []
+   },
+   "collab": {
+    "seq": 1,
+    "connectors": []
+   },
+   "inbox": {
+    "seq": 1,
+    "items": [],
+    "call": "idle",
+    "callReason": ""
+   },
+   "ops": {
+    "seq": 1,
+    "crons": []
+   },
+   "farm": {
+    "seq": 1,
+    "view": {
+     "level": {
+      "level": 1,
+      "xp": 0,
+      "need": 10
+     },
+     "plots": {},
+     "plays": {}
     },
-    "plays": {
-     "k5564": {
-      "commands": [
-       "s5570"
-      ],
-      "counts": {
-       "k5567": 5568
-      },
-      "files": [
-       "s5569"
-      ],
-      "history": [
-       {
-        "action": "run_command",
-        "actionText": "s5573",
-        "at": 5571,
-        "label": "s5572"
-       }
-      ],
-      "station": 5565,
-      "toolsThisRun": 5566
-     }
-    },
-    "plots": {
-     "k5563": {
-      "crop": "empty"
-     }
-    }
+    "effects": []
    }
   }
  ]

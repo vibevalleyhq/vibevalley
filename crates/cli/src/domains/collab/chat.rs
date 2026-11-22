@@ -4,8 +4,8 @@ use std::io::{BufRead, IsTerminal, Write};
 use std::time::Duration;
 
 use clap::Args;
-use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{Actor, AgentRole, ChannelMessageListInput, ChatMessage, PhaseView, SayRequest, ops};
+use serde::Serialize;
+use vibevalley_protocol::{Actor, AgentRole, ChannelMessageListInput, ChatMessage, PhaseView, SayRequest, SessionsSlice, ops};
 
 use crate::client::{Client, Done, Failure, decode_failure, exit, no_dry_run};
 
@@ -28,22 +28,6 @@ pub struct ChatCmd {
 struct OrchestratorReply {
     channel: String,
     messages: Vec<ChatMessage>,
-}
-
-#[derive(Deserialize)]
-struct OrchestratorFrame {
-    state: OrchestratorState,
-}
-
-#[derive(Deserialize)]
-struct OrchestratorState {
-    sessions: Vec<OrchestratorSession>,
-}
-
-#[derive(Deserialize)]
-struct OrchestratorSession {
-    role: AgentRole,
-    phase: PhaseView,
 }
 
 pub fn run(client: &Client, cmd: ChatCmd) -> Done {
@@ -76,13 +60,12 @@ fn orchestrator_turn(client: &Client, channel: &str, prompt: &str, timeout_secs:
     })?;
     let mut saw_working = false;
     let mut replies: Vec<ChatMessage> = vec![];
-    client.sse("/api/v1/state", Some(Duration::from_secs(timeout_secs)), |data| {
-        let frame: OrchestratorFrame = serde_json::from_str(data).map_err(decode_failure)?;
-        let working = frame
-            .state
+    client.sse("/api/v1/slice/sessions", Some(Duration::from_secs(timeout_secs)), |data| {
+        let slice: SessionsSlice = serde_json::from_str(data).map_err(decode_failure)?;
+        let working = slice
             .sessions
             .iter()
-            .any(|s| s.role == AgentRole::Orchestrator && matches!(s.phase, PhaseView::Working(_)));
+            .any(|s| s.role == Some(AgentRole::Orchestrator) && matches!(s.phase, PhaseView::Working(_)));
         if working {
             saw_working = true;
             return Ok(true);

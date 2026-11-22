@@ -1,5 +1,3 @@
-mod support;
-
 use std::time::Instant;
 
 use vibevalley_pele::detect::DiagramType;
@@ -7,7 +5,7 @@ use vibevalley_pele::diagram::cynefin::DomainName;
 use vibevalley_pele::diagram::cynefin::boundaries::{FOLD, HORIZON, cliff, curve_path, ellipse_path, hash_string, resolve_seed, seeded_random, wave};
 use vibevalley_pele::{ParseOptions, ParsedModel, RenderOptions, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 const BASIC: &str = "cynefin-beta\n  title Incident Response\n  complex\n    \"Investigate root cause\"\n    \"Run chaos experiment\"\n  complicated\n    \"Expert review needed\"\n  clear\n    \"Restart service\"\n  chaotic\n    \"Page on-call immediately\"\n  confusion\n    \"Unknown failure mode\"\n";
 

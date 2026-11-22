@@ -1,0 +1,25 @@
+mod chart_common;
+mod support;
+
+mod canvas_engine;
+mod canvas_ops_history;
+mod canvas_spec_codec;
+mod canvas_svg_render;
+mod chart_and_genui;
+mod chart_chart_kinds;
+mod chart_ticks_and_layout;
+mod chart_validation_and_security;
+mod code_block;
+mod diagram_and_canvas;
+mod genui_compound_interest_tests;
+mod genui_dashboard_tests;
+mod genui_expr_tests;
+mod genui_stream_and_roundtrip_tests;
+mod hooks;
+mod i18n;
+mod markdown;
+mod pinyin;
+mod pinyin_match_continuous;
+mod registry_and_editor;
+mod whiteboard_engine;
+mod whiteboard_render;

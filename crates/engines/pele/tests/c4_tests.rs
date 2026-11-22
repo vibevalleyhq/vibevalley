@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::{BTreeSet, HashMap};
 use std::time::Instant;
 
@@ -10,7 +8,7 @@ use vibevalley_pele::diagram::c4::lexer::tokenize;
 use vibevalley_pele::diagram::c4::types::C4RelKind;
 use vibevalley_pele::{ErrorCode, LinkInfo, ParseOptions, ParsedModel, RenderOptions, parse, render, render_model, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 #[derive(Debug, Clone, Copy)]
 struct BoxRect {

@@ -11,7 +11,7 @@ import { Card, Quiet } from "../../design/layout";
 import { Dot } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { api, reasonOf } from "../../infra/api";
-import { useCore } from "../../infra/frame";
+import { useCollabSlice, useOpsSlice } from "../../infra/frame";
 import { providerQuery, providerVoicesQuery, ready, useQuery } from "../../infra/query";
 import { AudioMetadataLine, AudioUsageLine, FactGrid, JobActions, NoticeBanner, PhasePill, Refusal, ResultAudio, SectionHeading, SourceLine } from "./JobFacts";
 import { publicationKey } from "./publication";
@@ -19,7 +19,7 @@ import { ReleaseAssets } from "./ReleaseAssets";
 import { playSpeech } from "./stream";
 
 export function SpeechPanel() {
-  const core = useCore();
+  const ops = useOpsSlice();
   const query = useQuery(providerQuery);
   const status = () => ready(query, undefined);
   const scope = () => `${status()?.revision}:${status()?.speech?.connection}`;
@@ -60,7 +60,7 @@ export function SpeechPanel() {
     draining.set(false);
   };
   cleanup(stop);
-  const jobs = () => core()?.media?.filter((job): job is MediaSpeechJob => job.kind === "speech") ?? [];
+  const jobs = () => ops()?.media?.filter((job): job is MediaSpeechJob => job.kind === "speech") ?? [];
 
   const submit = () => {
     if (act.busy()) return;
@@ -303,7 +303,7 @@ export function SpeechPanel() {
 }
 
 function SpeechJobCard(props: { job: MediaSpeechJob }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   const channel = signal("");
   const posted = signal(false);
   const error = signal<string | undefined>(undefined);
@@ -364,7 +364,7 @@ function SpeechJobCard(props: { job: MediaSpeechJob }) {
                   channel.set(v);
                   posted.set(false);
                 }}
-                options={(core()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id }))}
+                options={(collab()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id }))}
               />
               <Button testID="speech-publish" icon="send" disabled={act.busy() || !channel() || posted()} onPress={() => void publish(file().id)}>
                 {posted() ? t("web.media.published") : t("web.media.speech.publish")}

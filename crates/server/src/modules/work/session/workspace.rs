@@ -15,7 +15,7 @@ use vibevalley_protocol::{
 };
 use vibevalley_runtime::oar::{
     AgentError, ContentBlock, InteractionDecision, InteractionOption, PermissionDecision, PermissionMode, RefusableOption, SessionOptions, StopReason,
-    SwarmMemberState, Usage,
+    SwarmMemberState, TurnOptions, Usage,
 };
 
 use super::db::SessionConfig;
@@ -531,6 +531,10 @@ impl Sessions {
     /// Sends a user message to a user workspace session: starts a turn when idle,
     /// or steers/queues when a turn is already running.
     pub fn send_workspace(&self, input: SessionSendInput, attachments: Option<&Attachments>) -> Result<Session> {
+        self.send_workspace_with_trace(input, attachments, None)
+    }
+
+    pub fn send_workspace_with_trace(&self, input: SessionSendInput, attachments: Option<&Attachments>, trace_id: Option<u64>) -> Result<Session> {
         let has_text = !input.text.trim().is_empty();
         let has_attachments = input.attachments.as_ref().is_some_and(|a| !a.is_empty());
         let has_context = input.context_files.as_ref().is_some_and(|f| !f.is_empty());
@@ -615,11 +619,12 @@ impl Sessions {
         }
         let settle_id = entry.id;
 
+        let turn_opts = TurnOptions { trace_id };
         if session.phase.is_working() {
             self.record(&session.id, Step::Asked { text: logged_text });
             let sent = match agent.steer(blocks.clone()) {
                 Ok(()) => Ok(()),
-                Err(_) => agent.queue(blocks),
+                Err(_) => agent.queue_with(blocks, turn_opts),
             };
             if let Err(e) = sent {
                 let _ = self
@@ -643,7 +648,7 @@ impl Sessions {
             brief,
         })])?;
         self.record(&session.id, Step::Asked { text: logged_text });
-        if let Err(e) = agent.prompt(blocks) {
+        if let Err(e) = agent.prompt_with(blocks, turn_opts) {
             let _ = self
                 .0
                 .ledger
@@ -931,7 +936,7 @@ mod tests {
 
     use vibevalley_core::Applied;
     use vibevalley_protocol::{
-        ContextRef, ExecutionPolicy, Fact, Outcome, Session, SessionController, SessionOpenWorkspaceInput, SessionSendInput, SpaceState, StateFrame,
+        ContextRef, ExecutionPolicy, Fact, Outcome, Session, SessionController, SessionOpenWorkspaceInput, SessionSendInput, SliceBundle, SpaceState,
     };
     use vibevalley_runtime::oar::{
         Capabilities, ControlAction, ControlOutcome, ControlStatus, Event, Installation, ModelInfo, Registry, Runtime, Session as OarSession, SessionOptions,
@@ -959,8 +964,8 @@ mod tests {
             self.inner.read(f);
         }
 
-        fn frame(&self) -> StateFrame {
-            self.inner.frame()
+        fn bundle(&self) -> SliceBundle {
+            self.inner.bundle()
         }
     }
 

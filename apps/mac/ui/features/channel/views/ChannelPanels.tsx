@@ -17,7 +17,7 @@ import { toast } from "../../../design/toasts";
 import { useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { Keyed, useNow } from "../../../infra/base/dom";
-import { orchestratorMood, useCore } from "../../../infra/frame";
+import { orchestratorMood, useBoardSlice, useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { Link as A, useRouter } from "../../../infra/router";
 import { useLatest } from "../../../infra/state/atom";
 import { useIntents } from "../../../infra/state/intent";
@@ -33,7 +33,7 @@ const bad = (reason: string) => toast(reason, "bad");
 
 /** Newest pinned first. */
 export function Pins(props: { channel: Channel; onPick: () => void }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   const router = useRouter();
   const answer = useLatest(
     () => props.channel.id,
@@ -72,7 +72,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
             testID={`pin-${m().id}`}
             class="gap-0.5 rounded-md px-2 py-1.5 hover:bg-hover"
             onPress={() => {
-              router.navigate(messagePath(channelOf(core()?.chat, m().channel), m().number));
+              router.navigate(messagePath(channelOf(collab()?.chat, m().channel), m().number));
               untracked(() => props.onPick)();
             }}
           >
@@ -89,7 +89,8 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
 }
 
 export function Members(props: { channel: Channel }) {
-  const core = useCore();
+  const collab = useCollabSlice();
+  const sessions = useSessionsSlice();
   const router = useRouter();
   const act = createAct();
   const now = useNow();
@@ -105,8 +106,8 @@ export function Members(props: { channel: Channel }) {
   const nameOf = (id: string) => orchestrators().find((a) => a.id === id)?.name || t("web.channel.orchestrator");
   const helpers = () => {
     if (props.channel.type === "direct") return [];
-    const fallback = defaultOf(core()?.chat)?.id;
-    return (core()?.sessions ?? []).filter((h) => h.role === "worker" && !isFreeUserSession(h) && (sessionChannelId(h) ?? fallback) === props.channel.id);
+    const fallback = defaultOf(collab()?.chat)?.id;
+    return (sessions()?.sessions ?? []).filter((h) => h.role === "worker" && !isFreeUserSession(h) && (sessionChannelId(h) ?? fallback) === props.channel.id);
   };
   const totalCount = () => 1 + inside().length + helpers().length;
   return (
@@ -123,7 +124,7 @@ export function Members(props: { channel: Channel }) {
       </View>
       <Each of={inside()}>
         {(id) => {
-          const mood = () => orchestratorMood(core(), id());
+          const mood = () => orchestratorMood(sessions()?.sessions, id());
           return (
             <View testID={`member-orchestrator-${id()}`} class="flex-row items-center gap-2 rounded-md px-1.5 py-1.5">
               <View class="relative shrink-0">
@@ -178,10 +179,11 @@ export function Members(props: { channel: Channel }) {
 }
 
 export function ThreadPane(props: { thread: Channel; point: number | undefined; onClose: () => void }) {
-  const core = useCore();
+  const board = useBoardSlice();
+  const sessionsSlice = useSessionsSlice();
   const notifies = useIntents(notifySet);
   const now = useNow();
-  const sessions = () => core()?.sessions ?? [];
+  const sessions = () => sessionsSlice()?.sessions ?? [];
   const session = () => threadOwnerOf(props.thread, sessions());
   const status = () => {
     const s = session();
@@ -200,7 +202,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
           </If>
         </View>
         <View class="min-w-0 flex-1 flex-row items-center gap-2 overflow-hidden">
-          <Text class="max-w-44 shrink-0 truncate text-sm font-semibold text-ink">{threadTitle(props.thread, core()?.issues, sessions())}</Text>
+          <Text class="max-w-44 shrink-0 truncate text-sm font-semibold text-ink">{threadTitle(props.thread, board()?.issues, sessions())}</Text>
           <View class="min-w-0 flex-1 flex-row items-center gap-1">
             <If when={session()}>{(s) => <PhaseGlyph phase={s().phase} size={12} />}</If>
             <Text class="min-w-0 flex-1 truncate text-xs text-muted">{status()}</Text>
@@ -276,13 +278,14 @@ export function ChannelSidePane(props: { channel?: string | undefined; issue?: s
 
 /** A channel's threads, the newest talked in first, each renamed or archived in place; the archived ones below. */
 export function ThreadList(props: { channel: Channel; onPick: () => void }) {
-  const core = useCore();
+  const board = useBoardSlice();
+  const sessions = useSessionsSlice();
   const router = useRouter();
   const showArchived = signal(false);
   const chat = useMarkedChat();
   const live = () => threadsIn(chat(), props.channel);
   const archived = () => threadsIn(chat(), props.channel, true);
-  const title = (channel: Channel) => threadTitle(channel, core()?.issues, core()?.sessions ?? []);
+  const title = (channel: Channel) => threadTitle(channel, board()?.issues, sessions()?.sessions ?? []);
   const item = (channel: Channel) => (
     <ThreadItem
       thread={channel}
@@ -437,7 +440,7 @@ export function FarmSearch(props: { open: boolean; onClose: () => void }) {
 }
 
 function FarmSearchBody(props: { onClose: () => void }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   const router = useRouter();
   const text = signal("");
   const search = useLatest(
@@ -491,7 +494,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
               tooltip={<Bubble text={h().address} />}
               class="gap-0.5 rounded-md px-2 py-1.5 hover:bg-hover"
               onPress={() => {
-                router.navigate(messagePath(channelOf(core()?.chat, h().message.channel), h().message.number));
+                router.navigate(messagePath(channelOf(collab()?.chat, h().message.channel), h().message.number));
                 untracked(() => props.onClose)();
               }}
             >

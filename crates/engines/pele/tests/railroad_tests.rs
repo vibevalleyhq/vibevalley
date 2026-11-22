@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -10,7 +8,7 @@ use vibevalley_pele::diagram::railroad::{Notation, RailroadNode, RailroadRule};
 use vibevalley_pele::util::yaml::YamlValue;
 use vibevalley_pele::{DiagramConfig, ParseOptions, ParsedModel, RenderOptions, detect_type, parse, render, supports};
 
-use support::{
+use crate::support::{
     Lcg, Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, load_fixture,
     resolved_options,
 };

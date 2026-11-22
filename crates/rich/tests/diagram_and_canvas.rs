@@ -1,5 +1,3 @@
-mod support;
-
 use std::sync::Mutex;
 
 use nsh_core::ViewKind;
@@ -7,7 +5,7 @@ use nsh_core::element::Root;
 use nsh_core::prelude::*;
 use vibevalley_rich::{canvas_cache_stats, clear_canvas_cache, clear_diagram_cache, diagram_cache_stats, render_canvas, render_diagram, vv_canvas, vv_diagram};
 
-use support::{TestHarness, assert_inline_svg_image};
+use crate::support::{TestHarness, assert_inline_svg_image};
 
 static DIAGRAM_CACHE_TEST_LOCK: Mutex<()> = Mutex::new(());
 

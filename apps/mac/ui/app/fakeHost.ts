@@ -1,10 +1,22 @@
 // Replies queue until `pump` sends them: a handler cannot send while the app is posting.
 import type { OpenOptions } from "nsh/test";
 
+import { SliceKindValues, type SliceBundle, type SliceKind } from "@vibevalley/protocol";
+
+import type { SliceMap } from "../infra/transport";
+
 type App = {
   host: { send(name: string, data?: unknown): Promise<void> };
   waitUntil?(condition: () => boolean, options?: { timeout?: number }): Promise<void>;
 };
+
+const SLICE_KIND_SET = new Set<string>(SliceKindValues);
+
+function parseSliceTopic(topic: string | undefined): SliceKind | undefined {
+  if (topic === undefined || !topic.startsWith("slice:")) return undefined;
+  const kind = topic.slice(6);
+  return SLICE_KIND_SET.has(kind) ? (kind as SliceKind) : undefined;
+}
 
 export interface FakeHost {
   readonly options: NonNullable<OpenOptions["host"]>;
@@ -18,8 +30,10 @@ export interface FakeHost {
   pump(app: App): Promise<void>;
   /** One pump per hop: an event can queue a further RPC, so a single pump is not enough. */
   pumpUntil(app: App, done: () => boolean, timeoutMs?: number): Promise<void>;
-  /** A new frame to every watcher (seq one up), as fake.setState. */
-  setState(app: App, state: Record<string, unknown>): Promise<void>;
+  /** A new SliceBundle to every watched slice (seq one up), as fake.setState. */
+  setState(app: App, state: SliceBundle): Promise<void>;
+  /** Updates a single slice and pushes it to watchers of that slice only. */
+  setSlice<K extends SliceKind>(app: App, kind: K, slice: SliceMap[K]): Promise<void>;
   /** Push a server LiveEvent on `frame:live`. */
   pushLive(app: App, event: unknown): Promise<void>;
   /** The subscriptions asked for and not stopped: name and payload by id. */
@@ -30,15 +44,15 @@ export interface FakeHost {
   end(app: App, name: string): Promise<void>;
 }
 
-export function fakeHost(fixture: { state: unknown; responses: Record<string, unknown> }, params: Record<string, unknown> = {}): FakeHost {
+export function fakeHost(fixture: { state: SliceBundle; responses: Record<string, unknown> }, params: Record<string, unknown> = {}): FakeHost {
   const queue: [string, unknown][] = [];
   const calls: { op: string; payload: unknown }[] = [];
   const acts: { type: string; [key: string]: unknown }[] = [];
   const responses: Record<string, unknown> = { ...fixture.responses };
-  let state = fixture.state as Record<string, unknown>;
-  let rev = 0;
+  let state: SliceBundle = fixture.state;
+  const sliceRevs: Record<SliceKind, number> = { board: 0, sessions: 0, collab: 0, inbox: 0, ops: 0, farm: 0 };
+  const watchedSlices = new Set<SliceKind>();
   let liveRev = 0;
-  let watching = false;
   const subscriptions = new Map<string, { name: string; payload: unknown }>();
   const answer = (op: string, payload: unknown): unknown => {
     if (op === "health") return { bizCode: 0, message: "ok", data: null };
@@ -56,10 +70,16 @@ export function fakeHost(fixture: { state: unknown; responses: Record<string, un
       subscriptions.set(a.id, { name: a.name ?? "", payload: a.payload });
     } else if (a.type === "unsubscribe" && a.id !== undefined) {
       subscriptions.delete(a.id);
-    } else if (a.type === "watch" && a.topic === "state") {
-      watching = true;
-      queue.push(["frame:state", { rev: ++rev, data: state }]);
-    } else if (!["watch", "applied", "ready"].includes(a.type)) {
+    } else if (a.type === "watch") {
+      const kind = parseSliceTopic(a.topic);
+      if (kind !== undefined) {
+        watchedSlices.add(kind);
+        queue.push([`frame:slice:${kind}`, { rev: ++sliceRevs[kind], data: state[kind] }]);
+      }
+    } else if (a.type === "unwatch") {
+      const kind = parseSliceTopic(a.topic);
+      if (kind !== undefined) watchedSlices.delete(kind);
+    } else if (!["applied", "ready"].includes(a.type)) {
       acts.push(a);
     }
     return null;
@@ -96,8 +116,29 @@ export function fakeHost(fixture: { state: unknown; responses: Record<string, un
     pump,
     pumpUntil,
     setState: async (app, next) => {
-      state = { ...next, seq: Number(state.seq ?? 0) + 1 };
-      if (watching) queue.push(["frame:state", { rev: ++rev, data: state }]);
+      const nextSeq = state.seq + 1;
+      state = {
+        ...next,
+        seq: nextSeq,
+        board: { ...next.board, seq: Math.max(next.board.seq, nextSeq) },
+        sessions: { ...next.sessions, seq: Math.max(next.sessions.seq, nextSeq) },
+        collab: { ...next.collab, seq: Math.max(next.collab.seq, nextSeq) },
+        inbox: { ...next.inbox, seq: Math.max(next.inbox.seq, nextSeq) },
+        ops: { ...next.ops, seq: Math.max(next.ops.seq, nextSeq) },
+        farm: { ...next.farm, seq: Math.max(next.farm.seq, nextSeq) },
+      };
+      for (const kind of watchedSlices) {
+        queue.push([`frame:slice:${kind}`, { rev: ++sliceRevs[kind], data: state[kind] }]);
+      }
+      await pump(app);
+    },
+    setSlice: async (app, kind, next) => {
+      const nextSeq = state.seq + 1;
+      const updated = { ...next, seq: Math.max(next.seq, nextSeq) };
+      state = { ...state, seq: nextSeq, [kind]: updated };
+      if (watchedSlices.has(kind)) {
+        queue.push([`frame:slice:${kind}`, { rev: ++sliceRevs[kind], data: updated }]);
+      }
       await pump(app);
     },
     pushLive: async (app, event) => {

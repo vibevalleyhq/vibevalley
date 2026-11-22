@@ -38,7 +38,7 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
       subscriptions.set(a.id, { name: a.name ?? "", payload: a.payload });
     } else if (a.type === "unsubscribe" && a.id !== undefined) {
       subscriptions.delete(a.id);
-    } else if (!["watch", "applied", "ready"].includes(a.type)) {
+    } else if (!["watch", "unwatch", "applied", "ready"].includes(a.type)) {
       acts.push(a);
     }
     return null;
@@ -95,9 +95,11 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   const app = await open("../App.story.tsx", { width: 280, height: 760, colorScheme: "light", platform: "macos", host: host.options });
   await host.pump(app);
 
-  await host.pushFrame(app, "state", { seq: 1, state: { sessions: [], issues: [] } });
+  await host.pushFrame(app, "slice:board", { seq: 1, issues: [] });
+  await host.pushFrame(app, "slice:sessions", { seq: 1, sessions: [], machines: [] });
   const repoListCallsAfterFirstState = host.calls.filter((c) => c.op === "repo.list").length;
-  await host.pushFrame(app, "state", { seq: 2, state: { sessions: [], issues: [] } });
+  await host.pushFrame(app, "slice:board", { seq: 2, issues: [] });
+  await host.pushFrame(app, "slice:sessions", { seq: 2, sessions: [], machines: [] });
   expect(host.calls.filter((c) => c.op === "repo.list").length).toBe(repoListCallsAfterFirstState);
   await host.pushFrame(app, "rail", {
     panel: "files",

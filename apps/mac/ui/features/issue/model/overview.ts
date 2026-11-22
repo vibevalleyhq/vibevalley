@@ -45,7 +45,7 @@ function criteriaRows(issue: Issue): CriterionRow[] {
   });
 }
 
-/** Derives a prompt kind locally only when `StateFrame.state.boardSummary` does not carry this issue. */
+/** Derives a prompt kind locally only when `BoardSlice.boardSummary` does not carry this issue. */
 function fallbackPromptOf(stage: IssueStage, issue: Issue): IssuePromptKind | undefined {
   switch (stage.state) {
     case "asking":

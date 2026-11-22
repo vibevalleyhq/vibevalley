@@ -1,90 +1,184 @@
-// VibeValley's infra/frame.ts with the same exports, fed by the transport
-// (vv/web/infra/transport.ts) instead of the SSE streams. Solid's store
-// and reconcile have no nsh equivalent: createFrames hands out the newest
-// frame whole, and keyed lists (`Each`) keep their rows by id.
+// Independent per-slice reactive streams fed by the transport (infra/transport.ts).
+// Each slice kind (`board`, `sessions`, `collab`, `inbox`, `ops`, `farm`) has its own
+// subscription and signal so updating one slice never re-runs consumers of another.
 import { cleanup, signal, type Accessor } from "nsh";
 
 import {
   defaultOrchestrator,
+  type BoardSlice,
   type Channel,
+  type CollabSlice,
+  type InboxSlice,
   type Issue,
   type LiveEvent,
+  type OpsSlice,
+  type SessionsSlice,
   type SessionView,
-  type StateFrame,
-  type SpaceState,
-  type SpaceView,
+  type SliceKind,
 } from "@vibevalley/protocol";
 import { isOrchestratorSession, sessionIssueId, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createContext, useContext } from "./solid";
-import { onTransportChange, transport } from "./transport";
+import { onTransportChange, transport, type SliceMap } from "./transport";
 
 export type Link = "connecting" | "open" | "lost";
 
-export interface Frames {
-  readonly frame: StateFrame | undefined;
-  readonly link: Link;
-  /** Frames received since the page opened. */
-  readonly count: number;
+const SLICE_KINDS: readonly SliceKind[] = ["board", "sessions", "collab", "inbox", "ops", "farm"];
+
+/** Reactive per-slice accessors and link status for a subtree. */
+export interface Slices {
+  readonly slice: <K extends SliceKind>(kind: K) => Accessor<SliceMap[K] | undefined>;
+  readonly link: Accessor<Link>;
 }
 
-/** Where the frames come from: frames below, or a source of a test's own. */
-export interface FramesSource {
-  readonly get: () => Frames;
-  readonly subscribe: (listener: () => void) => () => void;
+/** Where slices come from: the shared stream below, or a source of a test's own. */
+export interface SlicesSource {
+  readonly get: <K extends SliceKind>(kind: K) => SliceMap[K] | undefined;
+  readonly subscribe: (kind: SliceKind, listener: () => void) => () => void;
+  readonly link: () => Link;
+  readonly subscribeLink: (listener: () => void) => () => void;
 }
 
-let current: Frames = { frame: undefined, link: "connecting", count: 0 };
-const listeners = new Set<() => void>();
-let stop: (() => void) | undefined;
-
-function set(next: Frames) {
-  current = next;
-  for (const l of listeners) l();
+interface SliceChannel<T> {
+  value: T | undefined;
+  readonly listeners: Set<() => void>;
+  stop: (() => void) | undefined;
+  readonly connect: () => void;
+  readonly disconnect: () => boolean;
 }
 
-function connect() {
-  stop?.();
-  stop = transport().state((frame) => set({ frame, link: "open", count: current.count + 1 }));
+let currentLink: Link = "connecting";
+const linkListeners = new Set<() => void>();
+
+function setLink(next: Link): void {
+  if (currentLink === next) return;
+  currentLink = next;
+  for (const listener of [...linkListeners]) listener();
 }
+
+function makeChannel<K extends SliceKind>(kind: K): SliceChannel<SliceMap[K]> {
+  const channel: SliceChannel<SliceMap[K]> = {
+    value: undefined,
+    listeners: new Set(),
+    stop: undefined,
+    connect: () => {
+      channel.stop?.();
+      channel.stop = transport().slice(kind, (data) => {
+        channel.value = data;
+        setLink("open");
+        for (const listener of [...channel.listeners]) listener();
+      });
+    },
+    disconnect: () => {
+      if (!channel.stop) return false;
+      channel.stop();
+      channel.stop = undefined;
+      channel.value = undefined;
+      for (const listener of [...channel.listeners]) listener();
+      return true;
+    },
+  };
+  return channel;
+}
+
+const channels: { readonly [K in SliceKind]: SliceChannel<SliceMap[K]> } = {
+  board: makeChannel("board"),
+  sessions: makeChannel("sessions"),
+  collab: makeChannel("collab"),
+  inbox: makeChannel("inbox"),
+  ops: makeChannel("ops"),
+  farm: makeChannel("farm"),
+};
 
 onTransportChange(() => {
-  if (!stop) return;
-  set({ frame: undefined, link: "connecting", count: 0 });
-  connect();
+  const active: SliceKind[] = [];
+  for (const kind of SLICE_KINDS) {
+    if (channels[kind].disconnect()) active.push(kind);
+  }
+  setLink("connecting");
+  for (const kind of active) channels[kind].connect();
 });
 
-export const frames: FramesSource = {
-  get: (): Frames => current,
-  subscribe: (listener: () => void): (() => void) => {
-    listeners.add(listener);
-    if (!stop) connect();
+export const slices: SlicesSource = {
+  get: <K extends SliceKind>(kind: K): SliceMap[K] | undefined => channels[kind].value,
+  subscribe: (kind: SliceKind, listener: () => void): (() => void) => {
+    const channel = channels[kind];
+    channel.listeners.add(listener);
+    if (!channel.stop) channel.connect();
     return () => {
-      listeners.delete(listener);
-      if (listeners.size > 0) return;
-      stop?.();
-      stop = undefined;
+      channel.listeners.delete(listener);
+      if (channel.listeners.size > 0) return;
+      channel.stop?.();
+      channel.stop = undefined;
+      channel.value = undefined;
+    };
+  },
+  link: (): Link => currentLink,
+  subscribeLink: (listener: () => void): (() => void) => {
+    linkListeners.add(listener);
+    return () => {
+      linkListeners.delete(listener);
     };
   },
 };
 
-export const FramesContext = createContext<Frames>();
+export const SlicesContext = createContext<Slices>();
 
-interface FrameIndex {
-  readonly sessionsById: () => ReadonlyMap<string, SessionView>;
-  readonly sessionsByIssue: () => ReadonlyMap<string, SessionView>;
-  readonly issuesById: () => ReadonlyMap<string, Issue>;
+interface SliceIndex {
+  readonly sessionsById: Accessor<ReadonlyMap<string, SessionView>>;
+  readonly sessionsByIssue: Accessor<ReadonlyMap<string, SessionView>>;
+  readonly issuesById: Accessor<ReadonlyMap<string, Issue>>;
 }
 
-const frameIndices = new WeakMap<Frames, FrameIndex>();
+const sliceIndices = new WeakMap<Slices, SliceIndex>();
 const emptySessions = new Map<string, SessionView>();
 const emptyIssues = new Map<string, Issue>();
 
-/** The frames above as a reactive object: each read follows the newest frame. */
-export function createFrames(source: FramesSource = frames): Frames {
-  const now = signal<Frames>(source.get(), { equals: false });
-  const off = source.subscribe(() => now.set(source.get()));
-  cleanup(off);
+interface SliceSlot<T> {
+  accessor: Accessor<T | undefined> | undefined;
+  readonly ensure: () => Accessor<T | undefined>;
+}
+
+/** Per-slice reactive signals backed by `source`; each slice subscribes lazily on first use. */
+export function createSlices(source: SlicesSource = slices): Slices {
+  const disposers: (() => void)[] = [];
+
+  const linkSig = signal<Link>(source.link());
+  disposers.push(source.subscribeLink(() => linkSig.set(source.link())));
+
+  cleanup(() => {
+    for (const off of disposers) off();
+    disposers.length = 0;
+  });
+
+  function makeSlot<K extends SliceKind>(kind: K): SliceSlot<SliceMap[K]> {
+    const slot: SliceSlot<SliceMap[K]> = {
+      accessor: undefined,
+      ensure: () => {
+        if (slot.accessor) return slot.accessor;
+        const sig = signal<SliceMap[K] | undefined>(source.get(kind), { equals: false });
+        const off = source.subscribe(kind, () => sig.set(source.get(kind)));
+        disposers.push(off);
+        const read: Accessor<SliceMap[K] | undefined> = () => sig();
+        slot.accessor = read;
+        return read;
+      },
+    };
+    return slot;
+  }
+
+  const slots: { readonly [K in SliceKind]: SliceSlot<SliceMap[K]> } = {
+    board: makeSlot("board"),
+    sessions: makeSlot("sessions"),
+    collab: makeSlot("collab"),
+    inbox: makeSlot("inbox"),
+    ops: makeSlot("ops"),
+    farm: makeSlot("farm"),
+  };
+
+  function ensureSlice<K extends SliceKind>(kind: K): Accessor<SliceMap[K] | undefined> {
+    return slots[kind].ensure();
+  }
 
   let lastSessions: readonly SessionView[] | undefined;
   let sessionsById: ReadonlyMap<string, SessionView> = emptySessions;
@@ -93,7 +187,7 @@ export function createFrames(source: FramesSource = frames): Frames {
   let issuesById: ReadonlyMap<string, Issue> = emptyIssues;
 
   const syncSessions = () => {
-    const list = now().frame?.state.sessions;
+    const list = ensureSlice("sessions")()?.sessions;
     if (list !== lastSessions) {
       if (list && list.length > 0) {
         const byId = new Map<string, SessionView>();
@@ -114,25 +208,19 @@ export function createFrames(source: FramesSource = frames): Frames {
   };
 
   const syncIssues = () => {
-    const list = now().frame?.state.issues;
+    const list = ensureSlice("board")()?.issues;
     if (list !== lastIssues) {
       issuesById = list && list.length > 0 ? new Map(list.map((i) => [i.id, i])) : emptyIssues;
       lastIssues = list;
     }
   };
 
-  const handle: Frames = {
-    get frame() {
-      return now().frame;
-    },
-    get link() {
-      return now().link;
-    },
-    get count() {
-      return now().count;
-    },
+  const handle: Slices = {
+    slice: ensureSlice,
+    link: () => linkSig(),
   };
-  frameIndices.set(handle, {
+
+  sliceIndices.set(handle, {
     sessionsById: () => {
       syncSessions();
       return sessionsById;
@@ -146,26 +234,33 @@ export function createFrames(source: FramesSource = frames): Frames {
       return issuesById;
     },
   });
+
   return handle;
 }
 
-let shared: Frames | undefined;
-/** The nearest provided frames, else the app's one stream. */
-export const useFrames = (): Frames => useContext(FramesContext) ?? (shared ??= createFrames());
+let shared: Slices | undefined;
+/** The nearest provided slices, else the app's shared streams. */
+const useSlices = (): Slices => useContext(SlicesContext) ?? (shared ??= createSlices());
 
-/** The folded state. undefined until the first frame. */
-export function useCore(): () => SpaceView | undefined {
-  const f = useFrames();
-  return () => f.frame?.state;
+function useSlice<K extends SliceKind>(kind: K): Accessor<SliceMap[K] | undefined> {
+  return useSlices().slice(kind);
 }
 
+export const useBoardSlice = (): Accessor<BoardSlice | undefined> => useSlice("board");
+export const useSessionsSlice = (): Accessor<SessionsSlice | undefined> => useSlice("sessions");
+export const useCollabSlice = (): Accessor<CollabSlice | undefined> => useSlice("collab");
+export const useInboxSlice = (): Accessor<InboxSlice | undefined> => useSlice("inbox");
+export const useOpsSlice = (): Accessor<OpsSlice | undefined> => useSlice("ops");
+export const useLink = (): Accessor<Link> => useSlices().link;
+
 export function useSessionsMap(): Accessor<ReadonlyMap<string, SessionView>> {
-  const f = useFrames();
-  const idx = frameIndices.get(f);
+  const s = useSlices();
+  const idx = sliceIndices.get(s);
   if (idx) return idx.sessionsById;
+  const sessions = s.slice("sessions");
   return () => {
-    const list = f.frame?.state.sessions;
-    return list && list.length > 0 ? new Map(list.map((s) => [s.id, s])) : emptySessions;
+    const list = sessions()?.sessions;
+    return list && list.length > 0 ? new Map(list.map((x) => [x.id, x])) : emptySessions;
   };
 }
 
@@ -178,14 +273,17 @@ export function useSession(id: Accessor<string | undefined>): Accessor<SessionVi
 }
 
 export function useIssue(id: Accessor<string | undefined>): Accessor<Issue | undefined> {
-  const f = useFrames();
-  const idx = frameIndices.get(f);
+  const s = useSlices();
+  const idx = sliceIndices.get(s);
   const byId: Accessor<ReadonlyMap<string, Issue>> = idx
     ? idx.issuesById
-    : () => {
-        const list = f.frame?.state.issues;
-        return list && list.length > 0 ? new Map(list.map((i) => [i.id, i])) : emptyIssues;
-      };
+    : (() => {
+        const board = s.slice("board");
+        return () => {
+          const list = board()?.issues;
+          return list && list.length > 0 ? new Map(list.map((i) => [i.id, i])) : emptyIssues;
+        };
+      })();
   return () => {
     const key = id();
     return key !== undefined ? byId().get(key) : undefined;
@@ -193,16 +291,17 @@ export function useIssue(id: Accessor<string | undefined>): Accessor<Issue | und
 }
 
 export function useThreadOwner(thread: Accessor<Channel>): Accessor<SessionView | undefined> {
-  const f = useFrames();
-  const idx = frameIndices.get(f);
+  const s = useSlices();
+  const idx = sliceIndices.get(s);
+  const sessions = idx ? undefined : s.slice("sessions");
   return () => {
     const c = thread();
     if (c.subjectId === undefined) return undefined;
     if (c.subjectKind === "talk") {
-      return idx ? idx.sessionsById().get(c.subjectId) : f.frame?.state.sessions.find((s) => s.id === c.subjectId);
+      return idx ? idx.sessionsById().get(c.subjectId) : sessions?.()?.sessions.find((x) => x.id === c.subjectId);
     }
     if (c.subjectKind === "issue") {
-      return idx ? idx.sessionsByIssue().get(c.subjectId) : f.frame?.state.sessions.findLast((s) => sessionIssueId(s) === c.subjectId);
+      return idx ? idx.sessionsByIssue().get(c.subjectId) : sessions?.()?.sessions.findLast((x) => sessionIssueId(x) === c.subjectId);
     }
     return undefined;
   };
@@ -210,22 +309,15 @@ export function useThreadOwner(thread: Accessor<Channel>): Accessor<SessionView 
 
 export type OrchestratorMood = "idle" | "listening" | "thinking" | "speaking";
 
-export const orchestratorSession = (state: SpaceState | undefined, agent = defaultOrchestrator) =>
-  state?.sessions.find((session) => isOrchestratorSession(session) && sessionProfile(session) === agent);
+export const orchestratorSession = (sessions: readonly SessionView[] | undefined, agent = defaultOrchestrator) =>
+  sessions?.find((session) => isOrchestratorSession(session) && sessionProfile(session) === agent);
 
-export function orchestratorMood(state: SpaceState | undefined, agent = defaultOrchestrator): OrchestratorMood {
-  const phase = orchestratorSession(state, agent)?.phase;
+export function orchestratorMood(sessions: readonly SessionView[] | undefined, agent = defaultOrchestrator): OrchestratorMood {
+  const phase = orchestratorSession(sessions, agent)?.phase;
   if (!phase || phase._tag === "closed") return "idle";
   if (phase._tag !== "working") return "listening";
   return phase.doing.action === "speaking_text" ? "speaking" : "thinking";
 }
-
-/** The frame as it came: a new object each time. */
-export const rawFrame = (): Accessor<StateFrame | undefined> => {
-  const now = signal(frames.get().frame, { equals: false });
-  cleanup(frames.subscribe(() => now.set(frames.get().frame)));
-  return () => now();
-};
 
 /** Listens to the live events; returns how to stop. */
 export function subscribeLive(l: (e: LiveEvent) => void, connected?: () => void) {

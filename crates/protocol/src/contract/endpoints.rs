@@ -367,6 +367,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("SessionWorkspace"),
     },
     Endpoint {
+        op: "session.closeWorkspace",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionCloseWorkspaceInput"),
+        result: None,
+    },
+    Endpoint {
         op: "session.send",
         module: "session",
         about: &["id"],
@@ -877,7 +886,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
         input: None,
-        result: Some("Vec<Achievement>"),
+        result: Some("AchievementList"),
     },
     Endpoint {
         op: "game.title.set",
@@ -2117,6 +2126,13 @@ pub mod ops {
         type Input = t::SessionOpenWorkspaceInput;
         type Result = t::SessionWorkspace;
     }
+    /// Closes a direct workspace chat session, aborting any running turn without touching the project directory.
+    pub struct SessionCloseWorkspace;
+    impl Op for SessionCloseWorkspace {
+        const NAME: &'static str = "session.closeWorkspace";
+        type Input = t::SessionCloseWorkspaceInput;
+        type Result = ();
+    }
     /// Sends a user message to a workspace session (starts a turn when idle or steers when working).
     pub struct SessionSend;
     impl Op for SessionSend {
@@ -2488,12 +2504,12 @@ pub mod ops {
         type Input = t::ConnectorChannelSetInput;
         type Result = t::ConnectorStatus;
     }
-    /// Every achievement, as the board has them.
+    /// Every achievement and its current standing.
     pub struct GameAchievementList;
     impl Op for GameAchievementList {
         const NAME: &'static str = "game.achievement.list";
         type Input = ();
-        type Result = Vec<t::Achievement>;
+        type Result = t::AchievementList;
     }
     pub struct GameTitleSet;
     impl Op for GameTitleSet {

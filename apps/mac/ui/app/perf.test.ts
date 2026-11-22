@@ -1,13 +1,34 @@
 import { effect, signal } from "nsh";
 import { expect, test } from "nsh/test";
 
-import { type Channel, type Issue, type LiveEvent, type SessionEvent, type SessionId, type SessionView, type StateFrame } from "@vibevalley/protocol";
+import {
+  type Channel,
+  type Issue,
+  type LiveEvent,
+  type SessionEvent,
+  type SessionId,
+  type SessionView,
+  type SliceBundle,
+  type SliceKind,
+} from "@vibevalley/protocol";
 
 import "../infra/polyfill";
 import { mergeSteps, SessionLogs } from "../features/session/runs";
 import { state as baseState } from "../fixtures/workbench";
 import { useNow } from "../infra/base/dom";
-import { createFrames, FramesContext, type FramesSource, useIssue, useSession, useThreadOwner } from "../infra/frame";
+import {
+  createSlices,
+  type Link,
+  SlicesContext,
+  type SlicesSource,
+  useBoardSlice,
+  useCollabSlice,
+  useIssue,
+  useSession,
+  useSessionsSlice,
+  useThreadOwner,
+} from "../infra/frame";
+import type { SliceMap } from "../infra/transport";
 
 function makeEvent(seq: number, revision = 1, run = "r1"): SessionEvent {
   return {
@@ -17,6 +38,56 @@ function makeEvent(seq: number, revision = 1, run = "r1"): SessionEvent {
     type: "assistant/message",
     run,
     text: `step-${seq}-rev-${revision}`,
+  };
+}
+
+function createMockSlicesSource(initial: SliceBundle) {
+  const values: { [K in SliceKind]: SliceMap[K] } = {
+    board: initial.board,
+    sessions: initial.sessions,
+    collab: initial.collab,
+    inbox: initial.inbox,
+    ops: initial.ops,
+    farm: initial.farm,
+  };
+  const sliceListeners: { readonly [K in SliceKind]: Set<() => void> } = {
+    board: new Set(),
+    sessions: new Set(),
+    collab: new Set(),
+    inbox: new Set(),
+    ops: new Set(),
+    farm: new Set(),
+  };
+  let link: Link = "open";
+  const linkListeners = new Set<() => void>();
+
+  const source: SlicesSource = {
+    get: <K extends SliceKind>(kind: K): SliceMap[K] => values[kind],
+    subscribe: (kind: SliceKind, listener: () => void) => {
+      sliceListeners[kind].add(listener);
+      return () => {
+        sliceListeners[kind].delete(listener);
+      };
+    },
+    link: () => link,
+    subscribeLink: (listener) => {
+      linkListeners.add(listener);
+      return () => {
+        linkListeners.delete(listener);
+      };
+    },
+  };
+
+  return {
+    source,
+    push: <K extends SliceKind>(kind: K, next: SliceMap[K]) => {
+      values[kind] = next;
+      for (const listener of [...sliceListeners[kind]]) listener();
+    },
+    setLink: (next: Link) => {
+      link = next;
+      for (const listener of [...linkListeners]) listener();
+    },
   };
 }
 
@@ -119,39 +190,49 @@ test("useNow shares one setInterval per interval bucket and clears when the last
   }
 });
 
-test("frame indexed selectors resolve sessions, issues, and thread owners in O(1)", () => {
-  let currentFrame: StateFrame = baseState;
-  const listeners = new Set<() => void>();
-  const source: FramesSource = {
-    get: () => ({ frame: currentFrame, link: "open", count: currentFrame.seq }),
-    subscribe: (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-  };
+test("slice indexed selectors resolve in O(1) and isolate reactivity per slice", () => {
+  const mock = createMockSlicesSource(baseState);
 
   let pickedSession: SessionView | undefined;
   let pickedIssue: Issue | undefined;
   let threadOwner: SessionView | undefined;
-  const session = baseState.state.sessions.at(0);
-  const issue = baseState.state.issues.at(0);
+  let boardRuns = 0;
+  let sessionsRuns = 0;
+  let collabRuns = 0;
+
+  const session = baseState.sessions.sessions.at(0);
+  const issue = baseState.board.issues.at(0);
   if (!session || !issue) throw new Error("expected fixture session and issue");
   const fakeThread = { id: "t-test", type: "thread", subjectKind: "talk", subjectId: session.id } as unknown as Channel;
 
   const alive = signal(true);
   effect(() => {
     if (!alive()) return;
-    const f = createFrames(source);
-    FramesContext.Provider({
-      value: f,
+    const s = createSlices(mock.source);
+    SlicesContext.Provider({
+      value: s,
       get children() {
-        const s = useSession(() => session.id);
-        const i = useIssue(() => issue.id);
+        const board = useBoardSlice();
+        const sessions = useSessionsSlice();
+        const collab = useCollabSlice();
+        const selSession = useSession(() => session.id);
+        const selIssue = useIssue(() => issue.id);
         const owner = useThreadOwner(() => fakeThread);
+
         effect(() => {
-          pickedSession = s();
-          pickedIssue = i();
+          boardRuns++;
+          void board();
+          pickedIssue = selIssue();
+        });
+        effect(() => {
+          sessionsRuns++;
+          void sessions();
+          pickedSession = selSession();
           threadOwner = owner();
+        });
+        effect(() => {
+          collabRuns++;
+          void collab();
         });
         return null;
       },
@@ -161,16 +242,38 @@ test("frame indexed selectors resolve sessions, issues, and thread owners in O(1
   expect(pickedSession?.id).toBe(session.id);
   expect(pickedIssue?.id).toBe(issue.id);
   expect(threadOwner?.id).toBe(session.id);
+  expect(boardRuns).toBe(1);
+  expect(sessionsRuns).toBe(1);
+  expect(collabRuns).toBe(1);
 
-  currentFrame = {
-    ...baseState,
-    seq: baseState.seq + 1,
-    state: {
-      ...baseState.state,
-      sessions: baseState.state.sessions.map((s) => (s.id === session.id ? { ...s, name: "Renamed" } : s)),
-    },
-  };
-  for (const l of listeners) l();
+  // Updating collab must NEVER re-trigger board or sessions consumers.
+  mock.push("collab", { ...baseState.collab, seq: baseState.collab.seq + 1 });
+  expect(collabRuns).toBe(2);
+  expect(boardRuns).toBe(1);
+  expect(sessionsRuns).toBe(1);
+
+  // Updating sessions must re-trigger sessions consumers without touching board or collab.
+  mock.push("sessions", {
+    ...baseState.sessions,
+    seq: baseState.sessions.seq + 1,
+    sessions: baseState.sessions.sessions.map((x) => (x.id === session.id ? { ...x, name: "Renamed" } : x)),
+  });
   expect(pickedSession?.name).toBe("Renamed");
+  expect(threadOwner?.name).toBe("Renamed");
+  expect(sessionsRuns).toBe(2);
+  expect(boardRuns).toBe(1);
+  expect(collabRuns).toBe(2);
+
+  // Updating board must re-trigger board consumers without touching sessions or collab.
+  mock.push("board", {
+    ...baseState.board,
+    seq: baseState.board.seq + 1,
+    issues: baseState.board.issues.map((x) => (x.id === issue.id ? { ...x, title: "Updated title" } : x)),
+  });
+  expect(pickedIssue?.title).toBe("Updated title");
+  expect(boardRuns).toBe(2);
+  expect(sessionsRuns).toBe(2);
+  expect(collabRuns).toBe(2);
+
   alive.set(false);
 });

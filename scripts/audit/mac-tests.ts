@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { globSync, mkdirSync, writeFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import { dirname, resolve } from "node:path";
 
 interface SuiteResult {
@@ -21,9 +22,19 @@ interface MacTestReport {
 const root = resolve(import.meta.dirname, "../..");
 const uiDir = resolve(root, "apps/mac/ui");
 const nsh = resolve(root, ".tools/bin/nsh");
+const defaultConcurrency = Math.min(8, Math.max(4, availableParallelism()));
+
+// Schedule the slowest suites first (LPT) so the tail is bounded by the longest suite rather than starting it last.
+const SLOW_SUITES: readonly string[] = ["workspace/workspace.test.tsx", "app/interactions.test.tsx", "app/scenarios.test.tsx", "app/theme.test.tsx"];
+
+function suitePriority(file: string): number {
+  const pinned = SLOW_SUITES.indexOf(file);
+  if (pinned !== -1) return pinned;
+  return file.endsWith(".test.tsx") ? SLOW_SUITES.length : SLOW_SUITES.length + 1;
+}
 
 function parseArgs(argv: string[]) {
-  let concurrency = Number(process.env.MAC_TESTS_CONCURRENCY ?? 4);
+  let concurrency = Number(process.env.MAC_TESTS_CONCURRENCY ?? defaultConcurrency);
   let filter = "";
   let reportPath = "";
   for (let i = 0; i < argv.length; i++) {
@@ -42,7 +53,7 @@ function parseArgs(argv: string[]) {
       reportPath = arg.slice("--report=".length);
     }
   }
-  const safeConcurrency = Number.isFinite(concurrency) && concurrency >= 1 ? Math.floor(concurrency) : 4;
+  const safeConcurrency = Number.isFinite(concurrency) && concurrency >= 1 ? Math.floor(concurrency) : defaultConcurrency;
   return { concurrency: safeConcurrency, filter, reportPath };
 }
 
@@ -105,7 +116,10 @@ async function main() {
   })
     .map((f) => f.replaceAll("\\", "/"))
     .filter((f) => !filter || f.includes(filter))
-    .toSorted();
+    .toSorted((a, b) => {
+      const diff = suitePriority(a) - suitePriority(b);
+      return diff !== 0 ? diff : a.localeCompare(b);
+    });
 
   if (all.length === 0) {
     console.error("mac-tests: no headless test suites matched under apps/mac/ui");

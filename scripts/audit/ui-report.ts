@@ -29,7 +29,7 @@ interface ScenarioMatrixRow {
   durationMs: number;
 }
 
-interface StateFrameSummary {
+interface SliceBundleSummary {
   density: string;
   seq: number;
   issues: number;
@@ -170,8 +170,8 @@ function readScenarioMatrix(outDir: string): ScenarioMatrixRow[] {
     }));
 }
 
-function readScenarioData(): { summaries: StateFrameSummary[]; enumCoverage: EnumCoverageRow[] } {
-  const summaries: StateFrameSummary[] = [];
+function readScenarioData(): { summaries: SliceBundleSummary[]; enumCoverage: EnumCoverageRow[] } {
+  const summaries: SliceBundleSummary[] = [];
   const stuckReasons = new Set<string>();
   const deliverables = new Set<string>();
   const prStates = new Set<string>();
@@ -188,16 +188,21 @@ function readScenarioData(): { summaries: StateFrameSummary[]; enumCoverage: Enu
     const file = resolve(root, `apps/mac/ui/fixtures/scenarios/${density}/state.json`);
     const raw = asFields(readJson(file));
     if (!raw) continue;
-    const state = asFields(raw.get("state"));
-    const view = asFields(raw.get("view"));
-    const boardSummary = asFields(state?.get("boardSummary"));
-    const mediaSummary = asFields(state?.get("mediaSummary"));
-    const channelSummary = asFields(state?.get("channelSummary"));
-    const issues = asArray(state?.get("issues"));
-    const inbox = asArray(raw.get("inbox"));
-    const connectors = asArray(state?.get("connectors"));
-    const media = asArray(state?.get("media"));
-    const callState = asStr(state?.get("call"), "idle");
+    const board = asFields(raw.get("board"));
+    const sessionsSlice = asFields(raw.get("sessions"));
+    const collab = asFields(raw.get("collab"));
+    const inboxSlice = asFields(raw.get("inbox"));
+    const ops = asFields(raw.get("ops"));
+    const farm = asFields(raw.get("farm"));
+    const view = asFields(farm?.get("view"));
+    const boardSummary = asFields(board?.get("boardSummary"));
+    const mediaSummary = asFields(ops?.get("mediaSummary"));
+    const channelSummary = asFields(collab?.get("channelSummary"));
+    const issues = asArray(board?.get("issues"));
+    const inbox = asArray(inboxSlice?.get("items"));
+    const connectors = asArray(collab?.get("connectors"));
+    const media = asArray(ops?.get("media"));
+    const callState = asStr(inboxSlice?.get("call"), "idle");
 
     callStates.add(callState);
     for (const item of issues) {
@@ -248,10 +253,10 @@ function readScenarioData(): { summaries: StateFrameSummary[]; enumCoverage: Enu
       density,
       seq: asNum(raw.get("seq")),
       issues: issues.length,
-      sessions: asArray(state?.get("sessions")).length,
+      sessions: asArray(sessionsSlice?.get("sessions")).length,
       inbox: inbox.length,
       plots: asFields(view?.get("plots"))?.size ?? 0,
-      crons: asArray(state?.get("crons")).length,
+      crons: asArray(ops?.get("crons")).length,
       connectors: connectors.length,
       mediaJobs: media.length,
       callState,
@@ -270,7 +275,7 @@ function readScenarioData(): { summaries: StateFrameSummary[]; enumCoverage: Enu
     { name: "MediaPhase::ALL", expected: 8, observed: sorted(mediaPhases), source: "vibevalley-protocol/media" },
     { name: "ConnectorState::ALL", expected: 7, observed: sorted(connectorStates), source: "vibevalley-protocol/connector" },
     { name: "CallState::ALL", expected: 5, observed: sorted(callStates), source: "vibevalley-protocol/voice" },
-    { name: "InboxKind::ALL", expected: 8, observed: sorted(inboxKinds), source: "vibevalley-protocol/inbox" },
+    { name: "InboxKind::ALL", expected: 9, observed: sorted(inboxKinds), source: "vibevalley-protocol/inbox" },
     { name: "IssueLane::ALL", expected: 4, observed: sorted(lanes), source: "vibevalley-core/boardSummary" },
     { name: "IssueCardKind::ALL", expected: 4, observed: sorted(cardKinds), source: "vibevalley-core/boardSummary" },
     { name: "IssuePromptKind::ALL", expected: 10, observed: sorted(promptKinds), source: "vibevalley-core/boardSummary" },

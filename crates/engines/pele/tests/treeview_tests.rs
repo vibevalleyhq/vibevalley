@@ -1,5 +1,3 @@
-mod support;
-
 use std::cell::RefCell;
 use std::time::Instant;
 
@@ -8,7 +6,7 @@ use vibevalley_pele::detect::DiagramType;
 use vibevalley_pele::diagram::treeview::NodeType;
 use vibevalley_pele::{MonospacePart, ParseOptions, ParsedModel, RenderOptions, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 const TREE: &str = "treeView-beta\n    my-project/\n        src/\n            index.js\n        package.json\n    README.md\n";
 

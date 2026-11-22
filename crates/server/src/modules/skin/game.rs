@@ -259,11 +259,13 @@ impl Game {
 }
 
 pub fn install(hub: &Hub, game: Arc<Game>) {
-    hub.on::<ops::GameAchievementList>(|_, ()| {
-        Ok(vibevalley_core::game::achievements()
+    hub.on::<ops::GameAchievementList>(|ctx, ()| {
+        let items = vibevalley_core::game::achievements()
             .iter()
             .map(vibevalley_core::game::achievement_in_words)
-            .collect())
+            .collect();
+        let standings = ctx.hub.read(|s| vibevalley_core::game::standings_of(s.progress.as_ref()));
+        Ok(vibevalley_protocol::AchievementList { items, standings })
     });
     hub.on::<ops::GameTitleSet>(move |_, req| {
         game.choose_title(req.achievement, req.tier);

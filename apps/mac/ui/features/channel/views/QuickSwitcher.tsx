@@ -13,7 +13,7 @@ import { motionClass } from "../../../design/motion";
 import { Bubble } from "../../../design/Tip";
 import { useOrchestrators, useWorkAgents } from "../../../infra/agents";
 import { api } from "../../../infra/api";
-import { useCore } from "../../../infra/frame";
+import { useBoardSlice, useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { ready } from "../../../infra/query";
 import { useRouter } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
@@ -47,7 +47,9 @@ function displayLabel(target: SwitchTarget): string {
 }
 
 function SwitcherBody(props: { onClose: () => void }) {
-  const core = useCore();
+  const collab = useCollabSlice();
+  const board = useBoardSlice();
+  const sessions = useSessionsSlice();
   const router = useRouter();
   const profiles = useWorkAgents();
   const orchestrators = useOrchestrators();
@@ -55,11 +57,11 @@ function SwitcherBody(props: { onClose: () => void }) {
   const vault = usePkmVault();
   const grouped = createMemo(() => {
     const typed = query().trim();
-    const chat = switchTargets(core()?.chat, query(), {
-      issues: core()?.issues ?? [],
-      sessions: core()?.sessions ?? [],
+    const chat = switchTargets(collab()?.chat, query(), {
+      issues: board()?.issues ?? [],
+      sessions: sessions()?.sessions ?? [],
       profiles: profiles(),
-      channelSummary: core()?.channelSummary,
+      channelSummary: collab()?.channelSummary,
     });
     const channels = chat.filter((s) => s.kind === "channel");
     const threads = chat.filter((s) => s.kind === "thread");
@@ -90,14 +92,14 @@ function SwitcherBody(props: { onClose: () => void }) {
     untracked(() => props.onClose)();
     if (to.kind === "note") return router.navigate(pkmHref(to.id));
     if (to.kind === "notes") return notesSearch.open(to.id);
-    if (to.kind !== "profile") return router.navigate(chatPath(channelOf(untracked(core)?.chat, to.id)));
+    if (to.kind !== "profile") return router.navigate(chatPath(channelOf(untracked(collab)?.chat, to.id)));
     const agent = to.id;
     void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
   };
   const directPeer = (target: SwitchTarget): string | undefined => {
     if (target.kind === "profile") return target.id;
     if (target.kind !== "direct") return undefined;
-    return channelOf(core()?.chat, target.id)?.peer?.replace(/^profile:/u, "");
+    return channelOf(collab()?.chat, target.id)?.peer?.replace(/^profile:/u, "");
   };
   return (
     <Command

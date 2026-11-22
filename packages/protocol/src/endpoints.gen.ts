@@ -41,6 +41,7 @@ export const servedEndpoints = [
   { op: "session.get", can: ["user", "remote"], about: ["id"] },
   { op: "session.event.list", can: ["user", "remote"], about: ["id"] },
   { op: "session.openWorkspace", can: ["user", "remote"], about: [] },
+  { op: "session.closeWorkspace", can: ["user", "remote"], about: ["id"] },
   { op: "session.send", can: ["user", "remote"], about: ["id"] },
   { op: "session.respondPermission", can: ["user", "remote"], about: ["id"] },
   { op: "session.respondInteraction", can: ["user", "remote"], about: ["id"] },

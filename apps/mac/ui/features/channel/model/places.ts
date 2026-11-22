@@ -7,7 +7,7 @@ import {
   type ChatMessage,
   type Issue,
   type Session,
-  type SpaceState,
+  type SessionView,
 } from "@vibevalley/protocol";
 import { channelOf, defaultOf, isOrchestratorSession, sessionChannelId, sessionIssueId, sessionProfile } from "@vibevalley/protocol/rules";
 
@@ -194,11 +194,11 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
 }
 
 export function orchestratorTyping(
-  state: SpaceState | undefined,
+  sessions: readonly SessionView[] | undefined,
   channel: Channel | undefined,
 ): { readonly agent: string; readonly mood: "thinking" | "speaking"; readonly since?: number } | undefined {
   if (!channel) return undefined;
-  for (const session of state?.sessions ?? []) {
+  for (const session of sessions ?? []) {
     const phase = session.phase;
     if (isOrchestratorSession(session) && sessionChannelId(session) === channel.id && phase._tag === "working")
       return {

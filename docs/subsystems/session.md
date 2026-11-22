@@ -41,47 +41,47 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/modules/work/session/sessions.rs` | `Sessions`：雇帮工（`hire`）、下一轮（`next_round`）、插话（`steer`，在干活的经 oar `steer` 插进这一轮）、叫停（`stop`）、放走（`dismiss`，worktree 交给 `Workplace` 收拾）、把农机的事件读成事实、结算一轮、静默检测、帮工的 `/mcp` 钥匙；重启时把在干活的会话记成打断；并发上限在 `BoardConfig`（`ledger.rs`：`space_limit` 6、`per_repo` 3、`quiet_after` 240 秒），由工单板数 |
+| `crates/server/src/modules/work/session/sessions.rs`、`mailbox.rs`、`db.rs` | `Sessions`：领域无关 `AgentSession` 核心，管创建/雇佣（`hire`）、下一轮（`next_round`）、插话（`steer`）、叫停（`stop`）、放走（`dismiss`，worktree 交给 `Workplace` 收拾）、把农机事件读成事实、结算一轮、静默检测、帮工 `/mcp` 钥匙与持久 SQLite 信箱 `session_mailbox`（`mailbox.rs`，按 `idempotency_key` 去重并支持消费前撤回）；重启时把在干活的会话记成打断；并发上限在 `BoardConfig`（`ledger.rs`：`space_limit` 6、`per_repo` 3、`quiet_after` 240 秒），仅对工单受控会话计槽位 |
 | `crates/server/src/modules/work/session/report.rs`、`runs.rs` | 一轮末尾的结构化汇报；每张工单的各轮 |
-| `crates/server/src/modules/work/session/talk.rs` | 私聊帮工：没有工单的会话，在自己的目录里一轮一轮答，答的话由观察层贴进私聊 |
-| `crates/server/src/modules/work/session/workspace.rs` | 工作区直连对话会话（`open_workspace`、`send_workspace`、`respond_permission`、`respond_interaction`、`set_workspace_config`、`swarm_snapshot`、`read_child_transcript`、`session_title`）；配置与 `title` 原子落盘 `<数据目录>/workspace/<id>.json`，不占工单板并发上限、不进 `#general` 观察层 |
+| `crates/server/src/modules/work/session/talk.rs` | 私聊会话：绑定频道的 `AgentSession`，在独立目录里一轮一轮答，答的话经 `SessionChat` 贴进私聊 |
+| `crates/server/src/modules/work/session/workspace.rs` | 工作区直连对话会话（`open_workspace`、`close_workspace`、`send_workspace`、`respond_permission`、`respond_interaction`、`set_workspace_config`、`swarm_snapshot`、`read_child_transcript`、`session_title`）：作为 `controller: User` 的 `AgentSession` 统一落盘 `server.db` 的 `session` / `session_mailbox` / `session_event` 表，不占工单板并发上限、不进收件箱与像素农场 |
 | `crates/server/src/modules/work/session/drivers.rs`、`crates/server/src/modules/team/agent/drive.rs` | 把工单指派的档案变成农机和启动参数（规矩、人设、记性、MCP） |
-| `crates/server/src/modules/work/session/journal.rs` | 轨迹：每个会话的步骤存 `<家目录>/events/<id>.json`，变化时每 300 毫秒推一次、每 1.5 秒落盘；权限、交互提问与用量步骤立即刷盘 |
-| `crates/server/src/modules/work/session/mod.rs` | `session.*` 端点（含 `openWorkspace`、`send`、`respondPermission`、`respondInteraction`、`setConfig`、`childTranscript`）和 `issue.watch` / `session.watch` 订阅流（按 500 毫秒节拍去重同步 `title` 与 `swarm` 增量） |
+| `crates/server/src/modules/work/session/journal.rs` | 游标分页轨迹：每个会话的步骤落盘 SQLite `session_event` 表（按 `(session_id, seq)` 索引，经 `crates/server/src/db/{queries,generated}/work_session.*` 访问），变化时每 300 毫秒推一次、每 1.5 秒刷盘；权限、交互提问与用量步骤立即刷盘 |
+| `crates/server/src/modules/work/session/mod.rs` | `session.*` 端点（含 `openWorkspace`、`closeWorkspace`、`send`、`respondPermission`、`respondInteraction`、`setConfig`、`childTranscript`、`binding.attach`）和 `issue.watch` / `session.watch` 订阅流（按 `SessionsSlice` 与事件驱动同步 `title` 与 `swarm` 增量） |
 | `crates/server/src/modules/team/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
-| `crates/runtime/src/oar/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp/`（`mod.rs`、`antigravity.rs`、`antigravity_db.rs`、`antigravity_swarm.rs`）、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 JSONL 记录流（内置农机在 `crates/runtime/src/agent/runtime/mod.rs`） |
+| `crates/runtime/src/oar/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp/`（`mod.rs`、`antigravity.rs`、`antigravity_db.rs`、`antigravity_swarm.rs`）、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 `oar-voyage/3` JSONL 记录流（内置农机在 `crates/runtime/src/agent/runtime/mod.rs`），`core.rs` 预留关闭态零开销的全局 `OarObserver` 钩子并支持 `TurnOptions { trace_id }` 透传 |
 
 ## 模型和不变量
 
-- **`Session` 与 `Run` 分开**：`Session` 是档案的持续工作现场（工单的 worktree 或私聊的目录），编号单调递增；`Run` 是一次触发到一次结束汇报；底层 oar 会话可在同一 `Session` 下更换。
+- **领域无关的 `AgentSession` 执行核**：所有受管会话（工单执行、私聊对话、工作区直连对话）统一建模为领域无关的 `Session`（`controller: SessionController`、`role: Option<AgentRole>`、`profile: Option<String>`、`cwd: Option<String>`、`policy: ExecutionPolicy`、`bindings: Vec<ContextRef>`）。执行核不要求必须绑定工单或频道，可 0 绑定自由启动，也可在运行中经 `session.binding.attach` 动态挂载上下文；只有工单受控会话进入并发槽位、收件箱、像素农场与进度统计。
+- **`Session` 与 `Run` 分开**：`Session` 是档案或工作区的持续执行现场，编号单调递增；`Run` 是一次触发到一次结束汇报；底层 oar 会话可在同一 `Session` 下更换。
 - **在场阶段（`Session.phase`）**：`working`（可带 `quiet_since`）、`done`、`failed`、`resting`、`closed`。显式交回且没有待答问题才 `done`。
 - **结构化交接（`issue_report`）**：帮工经 `/mcp` 的 `issue_report` 交状态、问题、`checks` 与 `answer`（`Board::report`）；一轮没交汇报就从它说的话里读问题。
-- **带话**：会话在干活时插进当前一轮；歇着时开下一轮；对排队工单说的话随它一起交给帮工。没有 TS 版的持久信箱、投递状态机和四档紧急度：观察层排着的投递在内存里，随下一次叫醒带上。
-- **并发上限**：全农场最多 6 个在干活的会话，单仓库默认 3 个；满了工单留在 `todo`（`stage: queued`），空出来按看板顺序补派。
+- **统一持久信箱 `session_mailbox` 与带话**：工作区输入、私聊消息与工单评论均经 `session_mailbox`（按 `idempotency_key` 幂等去重，`pending` / `claimed` / `done` / `failed` / `withdrawn`）入队，支持消费前撤回与重启恢复；会话在干活时插进当前一轮，歇着时开下一轮，排队工单的话随派工一并交给帮工。
+- **并发上限**：全农场最多 6 个在干活的工单受控会话，单仓库默认 3 个；满了工单留在 `todo`（`stage: queued`），空出来按看板顺序补派；工作区直连会话（`controller: User`）不占工单并发槽位。
 - **无沙箱与无逐条权限确认（工单帮工）**：工单帮工在 worktree 里直接执行命令，农机的权限请求一律放行（`PermissionMode::Bypass`）；安全边界是服务端只听 `127.0.0.1`。
-- **工作区直连对话、Swarm 旁路与独立交互提问通道**：工作区直连会话（`issue: None`、`channel: None`、挂在工作区路径上）复用同一套 `oar::Session`、`Trajectories` 与 `voyage` 流，不占工单板 `space_limit` / `per_repo` 并发配额，也不进 `#general` 观察层派活；会话内可切换模型、思考深度与权限模式（`Ask` / `AcceptEdits` / `Bypass` / `ReadOnly`），真实会话标题经 `SessionWorkspace.title` 与 `watch_session` 实时同步，Antigravity Swarm 与子代理通过只读旁路（mtime 缓存 + `256 KiB` 尾部裁剪 + 防符号链接/路径穿越）按需暴露 `swarm` 状态与 `session.childTranscript`，不新增数据库表；其中 `InteractionRequested`（如 Antigravity 的 `interaction_*` 提问）进入 `WaitingReply`，**即使在 `Bypass` 模式下也绝不自动放行**。
+- **工作区直连对话、Swarm 旁路与独立交互提问通道**：工作区直连会话（`controller: User`、`policy: DirectCwd`、0 绑定启动）复用同一套 `AgentSession`、`oar::Session`、`session_mailbox`、`session_event` 与 `oar-voyage/3` 记录流，不占工单板 `space_limit` / `per_repo` 并发配额，也不进收件箱与像素农场；关闭标签页时由原生壳直接调 `session.closeWorkspace` 确定性停机回收；会话内可切换模型、思考深度与权限模式（`Ask` / `AcceptEdits` / `Bypass` / `ReadOnly`），真实会话标题经 `Session.title` 与 `SessionsSlice` 实时同步，Antigravity Swarm 与子代理通过只读旁路（mtime 缓存 + `256 KiB` 尾部裁剪 + 防符号链接/路径穿越）按需暴露 `swarm` 状态与 `session.childTranscript`；其中 `InteractionRequested`（如 Antigravity 的 `interaction_*` 提问）进入 `WaitingReply`，**即使在 `Bypass` 模式下也绝不自动放行**。
 - **会话向外发消息**：`Sessions::on_news` 订阅步骤与汇报中的记性；启动时在恢复中断轮之前挂上订阅，轨迹写入与记性落盘各自接收，会话不调用轨迹或记性服务。订阅同步完成，保持同一会话的步骤顺序。
-- **会话按列落盘**：`session`、`session_extra`、`session_run` 与计数器在 `server.db`，枚举和嵌套字段在读库边界解码，坏值使读取失败。
-- **轨迹单存文件**：按序记录每一步，流式草稿按 `revision` 原地增长，不进 `SpaceState`。
+- **会话、信箱与轨迹统一落 SQLite**：`session`、`session_extra`、`session_run`、`session_run_subagents`、`session_counter`、`session_mailbox` 与 `session_event` 全部存于 `server.db`（命名查询集中在 `crates/server/src/db/queries/work_session.sql`，sqlc 生成至 `crates/server/src/db/generated/work_session.rs`）；枚举和嵌套字段在读库边界解码，坏值使读取失败。流式草稿按 `(session_id, seq)` 与 `revision` 原地增长，不进 `SpaceState`。
 - **重启**：开机时还在干活的会话那一轮记 `interrupted`，会话停在 `resting`，工单进 `stuck: interrupted`，用户点「继续」或再说话时接着做；worktree 丢了的工单取消（`lost`）。
 
 ## 和谁打交道
 
 - **工单**：同在 `Board` 里。
-- **观察层（`watch`）**：频道的话经 `Board::tell` 交给帮工；会话的动静（开工、汇报、离场）经 hub 的事实和 `Board` 的消息流回观察层，由它开串、贴汇报。
+- **频道与事件总线（`channel`、`EventBus`）**：频道纯路由产出 `channel_delivery` 并经 `Chat::dispatches()` 异步投递给 `IssueChat`（`Board::tell_message`）与 `SessionChat`（私聊拉起与席位清理）；会话动静经 `Hub` 的异步 `EventBus` 通知下游模块开串、贴汇报。
 - **档案和农机、记性（`agent`、`memory`）**：开会话前经 `Drivers` 选农机、拼说明、召回记忆。
 
 ## 为什么这样
 
 - **用 oar 驱动农机，不自己写各家协议的循环**：Claude Code、Codex、ACP 各有各的协议，oar 收成一个会话接口（事件、插话、关闭）。Antigravity 仅支持 `agy >= 1.5.0` 并收在 `oar/acp/` 枚举分支里，避免旧版 PyInstaller 与客户端白名单包袱，任务会话、私聊与工作区直连共享同一实现。
-- **工作区直连对话复用 `Session { issue: None }`**：不另建独立的子进程管理器和对话表，直接复用 `Sessions`、`Trajectories` 与 `session.watch`，避免与工单会话双源漂移。
+- **工作区直连对话、私聊与工单统一复用领域无关 `AgentSession`**：不按场景拆平行进程管理器，也不用 `AgentRole::Worker` 伪装直连会话；所有会话共享 `Sessions`、`session_mailbox`、`session_event` 与 `session.watch`，通过 `controller`、`policy` 与 `bindings` 严格隔离上层消费者。
 - **不做命令级权限确认，靠工作目录与回环监听划边界**：逐条批准会让帮工停在命令上等人，与无人值守冲突。
 - **外部执行中断**。服务重启时，未结算的外部帮工轮次记为 `interrupted`。账本在同一笔事务中写入轮次的工作目录核对标记和会话的 `lastRun.needsReconciliation`。总览读取会话摘要。历史记录从 `issue.run.list` 读取该轮的 `needsReconciliation`。用户可核对工作目录和 Git 提交。重送同一条回复沿用原轮次。用户主动叫停的轮次保留普通中断状态。
-- **工单串汇报**。服务在同一笔事务中结算输入、保存轮次和登记待发汇报。启动时观察层补投待发汇报。工单串按帮工标识和轮次标识去重。
+- **工单串汇报**。服务在同一笔事务中结算输入、保存轮次和登记待发汇报。启动时 `IssueChat` 补投待发汇报。工单串按帮工标识和轮次标识去重。
 
 ## 还没做的
 
-- TS 版的持久信箱与重投、多台机器、MCP 连接观察：Rust 版从简，当前不在计划内。
+- 多台机器、MCP 连接观察：Rust 版从简，当前不在计划内。
 - `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证：[持久执行与驱动验收](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
 
 ## 怎么验证

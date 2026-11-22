@@ -5,13 +5,22 @@
 use std::path::PathBuf;
 
 use super::draw::raster;
-use super::farm::frame::Frame;
+use super::farm::frame::{Frame, SessionExt};
 use super::farm::scene::FarmScene;
 use super::*;
+use vibevalley_protocol::{AchievementList, IssueStage, IssueStageKind, PhaseView, SessionPlayView, SliceBundle, StuckReason};
 
 fn fixture(name: &str) -> serde_json::Value {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../crates/server/fixtures/farm").join(name);
     serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+}
+
+fn fixture_bundle() -> SliceBundle {
+    serde_json::from_value(fixture("state.json")).unwrap()
+}
+
+fn fixture_frame() -> Frame {
+    Frame::from_bundle(fixture_bundle())
 }
 
 pub(crate) fn save(name: &str, img: &image::RgbaImage) {
@@ -26,8 +35,8 @@ pub(crate) fn save(name: &str, img: &image::RgbaImage) {
 fn regression_overlapping_helpers_draw_and_hit_in_arrival_order_at_the_same_animation_step() {
     let (world, atlas) = load_village().unwrap();
     let mut scene = FarmScene::new(world, atlas);
-    let mut frame = Frame::parse(&fixture("state.json"));
-    let mut first = frame.state.sessions.iter().find(|s| s.id == "s-ripe").unwrap().clone();
+    let mut frame = fixture_frame();
+    let mut first = frame.sessions.iter().find(|s| s.id == "s-ripe").unwrap().clone();
     first.id = "z-first".into();
     first.profile = Some("owl".into());
     let mut last = first.clone();
@@ -36,13 +45,25 @@ fn regression_overlapping_helpers_draw_and_hit_in_arrival_order_at_the_same_anim
     for species in ["owl", "fox"] {
         scene.agent_looks.insert(species.into(), (species.into(), "farmer".into()));
     }
-    frame.view.plays.insert(first.id.clone(), farm::frame::Play { station: 0. });
-    frame.view.plays.insert(last.id.clone(), farm::frame::Play { station: 1. });
-    frame.state.sessions = vec![first];
+    frame.view.plays.insert(
+        first.id.clone(),
+        SessionPlayView {
+            station: 0,
+            ..Default::default()
+        },
+    );
+    frame.view.plays.insert(
+        last.id.clone(),
+        SessionPlayView {
+            station: 1,
+            ..Default::default()
+        },
+    );
+    frame.sessions = vec![first];
     scene.apply_frame(frame.clone());
     scene.tick(0.);
     frame.seq += 1;
-    frame.state.sessions.push(last);
+    frame.sessions.push(last);
     scene.apply_frame(frame);
     for _ in 0..30 {
         scene.tick(1. / 60.);
@@ -89,7 +110,12 @@ fn farm_walks_helpers_to_their_work() {
     let (world, atlas) = load_village().unwrap();
     assert_eq!((world.level.width, world.level.height), (384.0, 256.0));
     let mut scene = FarmScene::new(world, atlas.clone());
-    scene.frame = Frame::parse(&fixture("state.json"));
+    let bundle = fixture_bundle();
+    scene.apply_board(bundle.board);
+    scene.apply_sessions(bundle.sessions);
+    scene.apply_collab(bundle.collab);
+    scene.apply_inbox(bundle.inbox);
+    scene.apply_farm(bundle.farm);
     for _ in 0..(30 * 30) {
         scene.tick(1.0 / 30.0);
     }
@@ -122,7 +148,7 @@ fn map_draws_an_island_per_repo() {
     use super::farm::islands::{MapHit, MapScene, RepoSummary};
     let atlas = load_atlas().unwrap();
     let mut map = MapScene::new(atlas.clone());
-    map.apply_frame(Frame::parse(&fixture("state.json")));
+    map.apply_frame(fixture_frame());
     map.set_repos(serde_json::from_value::<Vec<RepoSummary>>(fixture("responses.json")["repo.list"].clone()).unwrap());
     map.tick(0.1);
     let state = map.debug_state();
@@ -146,13 +172,18 @@ fn map_draws_an_island_per_repo() {
 
 #[test]
 fn regression_map_uses_the_helpers_outfit_and_the_issues_conflict() {
-    let mut state = fixture("state.json");
-    let worker = &mut state["state"]["sessions"][0];
-    worker["phase"] = serde_json::json!({"_tag":"resting"});
-    state["state"]["issues"][0]["stage"] = serde_json::json!({"state":"stuck","stuck":"conflict","acts":[]});
+    let mut bundle = fixture_bundle();
+    bundle.sessions.sessions[0].phase = PhaseView::Resting(Default::default());
+    bundle.board.issues[0].stage = IssueStage {
+        state: IssueStageKind::Stuck,
+        stuck: Some(StuckReason::Conflict),
+        since: None,
+        lead: None,
+        acts: vec![],
+    };
     let (_, atlas) = load_village().unwrap();
     let mut map = farm::islands::MapScene::new(atlas);
-    map.apply_frame(Frame::parse(&state));
+    map.apply_frame(Frame::from_bundle(bundle));
     map.agent_looks.insert("agent-owl".into(), ("fox".into(), "farmer".into()));
     assert!(
         map.draw(1.5)
@@ -220,7 +251,7 @@ fn catalog_shelves_every_sprite() {
 fn regression_night_tints_ground_but_keeps_hud_readable() {
     let (world, atlas) = load_village().unwrap();
     let mut scene = FarmScene::new(world, atlas.clone());
-    scene.frame = Frame::parse(&fixture("state.json"));
+    scene.frame = fixture_frame();
     scene.clock.set_time_of_day(0.50);
     let day = scene.draw(2.0);
     scene.clock.set_time_of_day(0.92);
@@ -247,7 +278,7 @@ fn regression_farm_controls_stay_in_the_pane_and_modal_blocks_the_ground() {
     use farm::hud::{Action, Layout, Panel, hit};
     let (world, atlas) = load_village().unwrap();
     let mut scene = FarmScene::new(world, atlas.clone());
-    scene.frame = Frame::parse(&fixture("state.json"));
+    scene.frame = fixture_frame();
     for size in [(320.0, 400.0), (768.0, 512.0), (1200.0, 700.0)] {
         scene.view_size = size;
         let layout = Layout::new(&scene);
@@ -305,8 +336,8 @@ fn regression_tools_only_choose_actions_supplied_by_the_server() {
 fn regression_helper_outfits_change_on_the_next_frame() {
     let (world, atlas) = load_village().unwrap();
     let mut scene = FarmScene::new(world, atlas);
-    scene.frame = Frame::parse(&fixture("state.json"));
-    let worker = scene.frame.state.sessions.iter().find(|s| s.is_worker()).unwrap().clone();
+    scene.frame = fixture_frame();
+    let worker = scene.frame.sessions.iter().find(|s| s.is_worker()).unwrap().clone();
     let agent = worker.profile_id().unwrap_or("").to_string();
     scene.agent_looks.insert(agent.clone(), ("fox".into(), "farmer".into()));
     scene.tick(0.1);
@@ -344,22 +375,50 @@ fn regression_native_farm_labels_are_embedded_for_both_languages() {
 }
 
 #[test]
-fn farm_fixture_supplies_typed_chat_and_profiles() {
-    let frame = Frame::parse(&fixture("state.json"));
-    assert!(!frame.state.chat.channels.is_empty());
+fn farm_fixture_supplies_typed_chat_achievements_and_profiles() {
+    let frame = fixture_frame();
+    assert!(!frame.chat.channels.is_empty());
     let replies = fixture("responses.json");
     let agents: Vec<vibevalley_protocol::Agent> = serde_json::from_value(replies["agent.list"].clone()).unwrap();
     let messages: Vec<vibevalley_protocol::ChatMessage> = serde_json::from_value(replies["channel.message.list"].clone()).unwrap();
+    let achievements: AchievementList = serde_json::from_value(replies["game.achievement.list"].clone()).unwrap();
     assert!(!agents.is_empty());
-    assert_eq!(messages[0].channel, frame.state.chat.channels[0].id);
+    assert_eq!(messages[0].channel, frame.chat.channels[0].id);
     let (world, atlas) = load_village().unwrap();
     let mut scene = FarmScene::new(world, atlas);
     scene.frame = frame;
+    scene.achievements = achievements;
     scene.panel = Some(farm::hud::Panel::Log);
     let p = farm::hud::Layout::new(&scene).panel;
     assert_eq!(
         farm::hud::hit(&scene, p.x + 20.0, p.y + 50.0),
         Some(farm::hud::Action::Route(format!("/chat/{}", messages[0].channel)))
+    );
+
+    // Achievements panel renders items paired with standings from AchievementList.
+    scene.achievements = AchievementList {
+        items: vec![vibevalley_protocol::Achievement {
+            id: "first-harvest".into(),
+            category: vibevalley_protocol::AchievementCategory::Harvest,
+            title: "First Harvest".into(),
+            detail: "Ship one issue".into(),
+            unit: None,
+            wearable: false,
+            tiers: vec![],
+        }],
+        standings: vec![vibevalley_protocol::AchievementStanding {
+            id: "first-harvest".into(),
+            tier: 1,
+            count: 2,
+            next: Some(5),
+        }],
+    };
+    scene.panel = Some(farm::hud::Panel::Achievements);
+    let list = scene.draw(2.0);
+    assert!(
+        list.hud
+            .iter()
+            .any(|op| matches!(op, draw::HudOp::TextIn { text, .. } if text == "First Harvest · 2 / 5"))
     );
 }
 
@@ -369,23 +428,12 @@ fn regression_plot_hover_tracks_the_current_tool_and_offered_action() {
     use vibevalley_i18n::t;
     let (world, atlas) = load_village().unwrap();
     let mut scene = FarmScene::new(world, atlas);
-    scene.frame = Frame::parse(&fixture("state.json"));
+    scene.frame = fixture_frame();
     scene.hover = Some(VillageHit::Plot(4));
     scene.tool = FarmTool::Harvest;
     let can_harvest = t("web.farm.overlay.click", &[("text", t("web.farm.aim.harvestRipe", &[]).into())]);
     let offered = serde_json::from_value(serde_json::json!({"act":"complete","does":"move","status":"done","words":"none"})).unwrap();
-    scene
-        .frame
-        .state
-        .issues
-        .iter_mut()
-        .find(|i| i.id == "i-105")
-        .unwrap()
-        .stage
-        .as_mut()
-        .unwrap()
-        .acts
-        .push(offered);
+    scene.frame.issues.iter_mut().find(|i| i.id == "i-105").unwrap().stage.acts.push(offered);
     for size in [(568., 720.), (1208., 800.)] {
         scene.view_size = size;
         assert!(
@@ -396,18 +444,7 @@ fn regression_plot_hover_tracks_the_current_tool_and_offered_action() {
                 .any(|item| matches!(item, draw::HudOp::Text{text,..} if text==&can_harvest))
         );
     }
-    scene
-        .frame
-        .state
-        .issues
-        .iter_mut()
-        .find(|i| i.id == "i-105")
-        .unwrap()
-        .stage
-        .as_mut()
-        .unwrap()
-        .acts
-        .clear();
+    scene.frame.issues.iter_mut().find(|i| i.id == "i-105").unwrap().stage.acts.clear();
     let unavailable = t("web.farm.aim.unavailable", &[("state", t("shared.stage.reviewing", &[]).to_lowercase().into())]);
     let list = scene.draw(1.);
     assert!(list.hud.iter().any(|item| matches!(item,draw::HudOp::Text{text,..} if text==&unavailable)));
@@ -419,8 +456,8 @@ fn regression_unread_channel_badge_stays_inside_the_chat_hit_area() {
     use farm::hud::{Action, Layout, hit};
     let (world, atlas) = load_village().unwrap();
     let mut scene = FarmScene::new(world, atlas);
-    scene.frame = Frame::parse(&fixture("state.json"));
-    for channel in &mut scene.frame.state.chat.channels {
+    scene.frame = fixture_frame();
+    for channel in &mut scene.frame.chat.channels {
         channel.unread = None;
     }
     let chat = |f: &FarmScene| {
@@ -434,14 +471,14 @@ fn regression_unread_channel_badge_stays_inside_the_chat_hit_area() {
     for size in [(568., 720.), (1208., 800.)] {
         scene.view_size = size;
         let plain = chat(&scene);
-        scene.frame.state.chat.channels[0].unread = Some(12);
+        scene.frame.chat.channels[0].unread = Some(12);
         let with_badge = chat(&scene);
         assert!(with_badge.w > plain.w + 10.);
         assert_eq!(
             hit(&scene, with_badge.x + with_badge.w - 4., with_badge.y + 10.),
             Some(Action::Route("/chat".into()))
         );
-        scene.frame.state.chat.channels[0].unread = None;
+        scene.frame.chat.channels[0].unread = None;
     }
 }
 

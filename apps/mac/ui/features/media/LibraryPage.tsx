@@ -18,7 +18,7 @@ import { api } from "../../infra/api";
 import { attachmentData } from "../../infra/attachment";
 import { fileUrl, useAttachmentFile } from "../../infra/attachmentFile";
 import { hostApi } from "../../infra/bridge";
-import { useCore } from "../../infra/frame";
+import { useCollabSlice, useOpsSlice } from "../../infra/frame";
 import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
 import { useRouter, useSearchParams } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
@@ -135,7 +135,8 @@ function titleOfBucket(bucket: ContentBucket): string {
 }
 
 export function LibraryPage() {
-  const core = useCore();
+  const ops = useOpsSlice();
+  const collab = useCollabSlice();
   const agents = useAgents();
   const router = useRouter();
   const queries = useQueryClient();
@@ -155,8 +156,8 @@ export function LibraryPage() {
   const allMedia = (): readonly LibraryItem[] => ready(items, undefined) ?? [];
   const allArtifacts = (): readonly Artifact[] => ready(artifactsQuery, undefined) ?? [];
   const allNotes = (): readonly PkmPageSummary[] => ready(vaultQuery, undefined)?.pages ?? [];
-  const jobs = (): readonly MediaJob[] => core()?.media ?? [];
-  const mediaSummary = () => core()?.mediaSummary;
+  const jobs = (): readonly MediaJob[] => ops()?.media ?? [];
+  const mediaSummary = () => ops()?.mediaSummary;
   const working = () => making(jobs(), mediaSummary());
   const activeMediaCount = () => mediaSummary()?.activeCount ?? working().length;
 
@@ -225,7 +226,7 @@ export function LibraryPage() {
   const names: Names = {
     agent: (id) => (ready(agents, undefined) ?? []).find((a) => a.id === id)?.name ?? id,
     channel: (id) => {
-      const c = (core()?.chat?.channels ?? []).find((x) => x.id === id);
+      const c = (collab()?.chat?.channels ?? []).find((x) => x.id === id);
       return c === undefined ? id : `#${c.name ?? c.id}`;
     },
   };
@@ -579,7 +580,7 @@ export function LibraryPage() {
             names={names}
             asking={asking()}
             act={{
-              channels: core()?.chat?.channels ?? [],
+              channels: collab()?.chat?.channels ?? [],
               send: (channel) => void send(channel),
               understand: () => setSearch({ understand: chosen()[0]?.attachment.id }),
               look: () => look(chosen()[0]?.attachment.id),

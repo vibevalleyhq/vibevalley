@@ -10,18 +10,19 @@ import { Icon } from "../../../design/Icon";
 import { Empty } from "../../../design/layout";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
-import { useCore } from "../../../infra/frame";
+import { useCollabSlice, useOpsSlice, useSessionsSlice } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { chatPath, sessionThreadOf } from "../model/places";
 import { Dot, HelperFace, PhaseGlyph, phaseDot, phaseText } from "./presence";
 
 /** The sessions arranged in this channel; the general holds those arranged in no channel. */
 export function Sessions(props: { channel: Channel }) {
-  const core = useCore();
+  const sessionsSlice = useSessionsSlice();
+  const collab = useCollabSlice();
   const router = useRouter();
   const now = useNow();
   const sessions = () =>
-    (core()?.sessions ?? []).filter((h) => {
+    (sessionsSlice()?.sessions ?? []).filter((h) => {
       if (isFreeUserSession(h)) return false;
       const channelId = sessionChannelId(h);
       return channelId ? channelId === props.channel.id : props.channel.default;
@@ -38,7 +39,7 @@ export function Sessions(props: { channel: Channel }) {
       <Scroll class="flex-1" contentClass="gap-2.5 p-4">
         <Each of={sessions()} key={(h) => h.id}>
           {(h) => {
-            const thread = () => sessionThreadOf(core()?.chat, h());
+            const thread = () => sessionThreadOf(collab()?.chat, h());
             const meta = () => [`@${h().id}`, sessionRepo(h()), sessionBranch(h())].filter(Boolean).join(" · ");
             return (
               <View testID={`channel-session-${h().id}`} class="flex-row items-center gap-3 rounded-lg border border-line bg-page px-3.5 py-3 hover:bg-hover">
@@ -78,8 +79,8 @@ export function Sessions(props: { channel: Channel }) {
 }
 
 export function Crons(props: { channel: Channel }) {
-  const core = useCore();
-  const crons = () => (core()?.crons ?? []).filter((s) => s.channel === props.channel.id);
+  const ops = useOpsSlice();
+  const crons = () => (ops()?.crons ?? []).filter((s) => s.channel === props.channel.id);
   return (
     <If
       when={crons().length > 0}

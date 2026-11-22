@@ -72,7 +72,7 @@ impl Recorder {
             base,
         })
     }
-    pub(crate) fn write(&mut self, rec: &Record) -> Result<()> {
+    pub fn write(&mut self, rec: &Record) -> Result<()> {
         if let Some(file) = self.file.take() {
             self.writer = Some(if file.has_header {
                 Writer::from_existing(file.file, file.last)
@@ -82,6 +82,7 @@ impl Recorder {
         }
         let mut persisted = rec.clone();
         persisted.seq += self.base;
+        persisted.trace_id = crate::oar::voyage::normalize_trace_id(persisted.trace_id);
         self.writer.as_mut().expect("opened recorder").write(&persisted)
     }
 }

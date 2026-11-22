@@ -29,7 +29,7 @@ mod sdk;
 pub mod subagent;
 pub mod voyage;
 
-pub use crate::oar::core::{StatusFold, derive_status, rejection};
+pub use crate::oar::core::{OarObserver, StatusFold, derive_status, has_observer, rejection, set_observer};
 pub use crate::oar::record::{RecordHeader, read_record_with_header};
 
 #[derive(Debug, thiserror::Error)]
@@ -163,6 +163,12 @@ pub struct SessionOptions {
     /// Replaces the runtime's own system prompt (VibeValley's persona mode
     /// `replace`); `append_system_prompt` still goes after it.
     pub system_prompt: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TurnOptions {
+    /// Causal trace id propagated into recorded `voyage::Record` entries (`Some(0)` is treated as `None`).
+    pub trace_id: Option<u64>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -802,6 +808,9 @@ pub struct ControlOutcome {
 pub trait Session: Send + Sync {
     fn id(&self) -> String;
     fn control(&self, action: ControlAction, arg: &str, input_id: &str, span_id: &str) -> Result<ControlOutcome>;
+    fn control_with(&self, action: ControlAction, arg: &str, input_id: &str, span_id: &str, _opts: TurnOptions) -> Result<ControlOutcome> {
+        self.control(action, arg, input_id, span_id)
+    }
     fn usage(&self) -> Option<TokenTotals> {
         self.records()
             .iter()
@@ -851,10 +860,16 @@ pub trait Session: Send + Sync {
     fn events(&self) -> flume::Receiver<Event>;
     /// Starts a turn. Rejected while a turn is running (use `steer`/`queue`).
     fn prompt(&self, content: Vec<ContentBlock>) -> Result<()>;
+    fn prompt_with(&self, content: Vec<ContentBlock>, _opts: TurnOptions) -> Result<()> {
+        self.prompt(content)
+    }
     /// Injects a message into the running turn.
     fn steer(&self, content: Vec<ContentBlock>) -> Result<()>;
     /// Runs after the current turn finishes.
     fn queue(&self, content: Vec<ContentBlock>) -> Result<()>;
+    fn queue_with(&self, content: Vec<ContentBlock>, _opts: TurnOptions) -> Result<()> {
+        self.queue(content)
+    }
     fn abort(&self) -> Result<()>;
     fn respond_permission(&self, request_id: &str, decision: PermissionDecision) -> Result<()>;
     fn respond_interaction(&self, _request_id: &str, _decision: InteractionDecision) -> Result<()> {

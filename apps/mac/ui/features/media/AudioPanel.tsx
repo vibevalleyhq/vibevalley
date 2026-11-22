@@ -30,7 +30,7 @@ import { Bubble } from "../../design/Tip";
 import { api, reasonOf, sha256Hex } from "../../infra/api";
 import { type LocalFile, pickFile, playInput, uploadAudio } from "../../infra/attachmentFile";
 import { useTimeout } from "../../infra/base/timer";
-import { useCore } from "../../infra/frame";
+import { useOpsSlice } from "../../infra/frame";
 import { providerQuery, providerVoicesQuery, ready, useQuery } from "../../infra/query";
 import { audioTimestamp, dialogueComplete, supportsStreamingTranscription, transcriptContent } from "./audio";
 import { AudioMetadataLine, AudioUsageLine, FactGrid, JobActions, NoticeBanner, PhasePill, Refusal, ResultAudio, SectionHeading, SourceLine } from "./JobFacts";
@@ -55,14 +55,14 @@ const titleOf = (kind: AudioMode) => {
 const speakerId = (typed: string) => typed.replace(/[^a-zA-Z0-9_-]/gu, "").slice(0, 256);
 
 export function AudioPanel() {
-  const core = useCore();
+  const ops = useOpsSlice();
   const query = useQuery(providerQuery);
   const status = () => ready(query, undefined);
   const mode = signal<AudioMode>("speakers");
   const error = signal<string | undefined>(undefined);
   const act = createAct((e) => error.set(e));
   const jobs = () =>
-    core()?.media?.filter(
+    ops()?.media?.filter(
       (job): job is MediaAudioJob => job.kind === "speakers" || job.kind === "voiceDesign" || job.kind === "clone" || job.kind === "transcription",
     ) ?? [];
 
@@ -724,12 +724,12 @@ function UploadForm(props: { kind: "clone" | "transcription"; status: ProviderSt
 }
 
 function AudioJobCard(props: { job: MediaAudioJob }) {
-  const core = useCore();
+  const ops = useOpsSlice();
   const error = signal<string | undefined>(undefined);
   const name = signal("");
   const saveRequest = signal<MediaCloneRequest | undefined>(undefined);
   const originalSave = () => {
-    const job = core()?.media?.find(
+    const job = ops()?.media?.find(
       (item) =>
         item.kind === "clone" &&
         item.request.input === props.job.previewInput &&

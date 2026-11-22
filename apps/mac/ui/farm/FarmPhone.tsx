@@ -10,7 +10,7 @@ import { useFollowed } from "../features/channel/model/follow";
 import { api, newSendKey, reasonOf } from "../infra/api";
 import { frame, call } from "../infra/bridge";
 import { useBridge } from "../infra/bridged";
-import { useCore } from "../infra/frame";
+import { useCollabSlice } from "../infra/frame";
 import { readFarmPhoneParams, readHostLocale, type FarmCalls } from "../infra/hostParams";
 import { Root } from "../infra/Root";
 import { GameIcon, GamePad, PhoneGame, type GameId } from "./PhoneGames";
@@ -52,10 +52,10 @@ function IconKey(props: { label: string; run: () => void; children: JSX.Element;
 }
 
 function Chat(props: { fold: () => void; large: () => boolean; resize: () => void; heard: () => string; said: () => string }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   const chosen = signal<string | undefined>(undefined);
   const menu = signal(false);
-  const rooms = () => core()?.chat?.channels.filter((c) => c.archived === undefined) ?? [];
+  const rooms = () => collab()?.chat?.channels.filter((c) => c.archived === undefined) ?? [];
   const room = () => rooms().find((c) => c.id === chosen()) ?? rooms().find((c) => c.default) ?? rooms()[0];
   const messages = useFollowed(() => room()?.id);
   const input = signal("");
@@ -212,7 +212,15 @@ function Handset(props: { calls: () => Calls }) {
     host.post("action", { type: "farm_call", id: item.id, answered });
     if (!answered) return;
     void dial();
-    if (item.target.kind === "chat") route(`/chat/${encodeURIComponent(item.target.channel)}`);
+    switch (item.target.kind) {
+      case "chat":
+        route(`/chat/${encodeURIComponent(item.target.channel)}`);
+        break;
+      case "issue":
+      case "session":
+      case "runtime":
+        break;
+    }
   };
   const helpers = [
     { id: "missed", label: t("web.farm.phone.app.missed"), icon: "icon-bell", run: () => app.set("missed") },

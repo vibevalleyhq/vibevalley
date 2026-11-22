@@ -1,6 +1,7 @@
 //! VibeValley's projection and domain rules: core state folding (`reduce`),
-//! UI frame projection (`frame_of`), schedules (`cron`), notes (`pkm`), and
-//! artifacts (`artifact`).
+//! per-domain slice projections (`board_slice`, `sessions_slice`, `collab_slice`,
+//! `inbox_slice`, `ops_slice`, `farm_frame`), schedules (`cron`), notes (`pkm`),
+//! and artifacts (`artifact`).
 
 pub mod artifact;
 pub mod brief;
@@ -26,8 +27,8 @@ pub mod status;
 pub mod text;
 
 pub use crate::core::{
-    Applied, Core, Transition, channel_summary, cron_from_rules, cron_request_to_rules, cron_to_rules, cron_view, empty_space_state, frame_of, media_summary,
-    reduce, session_view,
+    Applied, Core, SliceMask, Transition, board_slice, channel_summary, collab_slice, cron_from_rules, cron_request_to_rules, cron_to_rules, cron_view,
+    empty_space_state, farm_frame, inbox_slice, media_summary, ops_slice, reduce, session_view, sessions_slice, slice_bundle,
 };
 pub use crate::deps::{
     CheckoutChecks, DagNode, DagProblem, acceptance_ancestors, blocked_issues, child_checks, dag_id_valid, dag_layers, dag_problems, dependency_problems,

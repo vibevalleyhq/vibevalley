@@ -19,7 +19,7 @@ import { mix } from "../../../design/tone";
 import { api, reasonOf } from "../../../infra/api";
 import { fileUrl, openAttachment, playAudio, useAttachmentFile } from "../../../infra/attachmentFile";
 import { hostApi } from "../../../infra/bridge";
-import { useCore } from "../../../infra/frame";
+import { useCollabSlice } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { createEffect } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
@@ -42,13 +42,13 @@ function useReact() {
 
 export function ReplyQuote(props: { channel: string; number: number }) {
   const answered = useMessage(() => ({ channel: props.channel, number: props.number }));
-  const core = useCore();
+  const collab = useCollabSlice();
   const router = useRouter();
   return (
     <View
       role="button"
       testID={`quote-${props.number}`}
-      onPress={() => router.navigate(messagePath(channelOf(core()?.chat, props.channel), props.number))}
+      onPress={() => router.navigate(messagePath(channelOf(collab()?.chat, props.channel), props.number))}
       class="mb-0.5 w-full min-w-0 flex-row items-center gap-1.5"
     >
       <View class="opacity-60">
@@ -341,7 +341,7 @@ function Tool(props: { icon: IconName; size?: 14 | 16; label: string; testid: st
 /** The row's tools; `shown` while the row is hovered, and while something they opened is. */
 export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit: () => void; shown: boolean }) {
   const router = useRouter();
-  const core = useCore();
+  const collab = useCollabSlice();
   const menu = signal<ToolbarMenu>("closed");
   const picking = () => menu() === "quickEmoji" || menu() === "fullEmoji";
   const everyEmoji = () => menu() === "fullEmoji";
@@ -356,7 +356,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
     markUnread(unreads, { channel, number }, bad);
   };
   const copyLink = () => {
-    const link = messagePath(channelOf(core()?.chat, props.m.channel), props.m.number);
+    const link = messagePath(channelOf(collab()?.chat, props.m.channel), props.m.number);
     void act.run(async () => {
       await Clipboard.writeText(link);
       toast(t("web.channel.more.copied"));
@@ -530,9 +530,9 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
 
 /** The farm's messages a message links to, each as it is now; a press goes there. */
 export function LinkedMessages(props: { text: string }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   // No page origin in a hosted view: links of the workbench's own form (`/chat/...?m=`) are the ones read.
-  const links = () => linkedMessages(props.text, core()?.chat, "vibevalley.local");
+  const links = () => linkedMessages(props.text, collab()?.chat, "vibevalley.local");
   return (
     <If when={links().length > 0}>
       <View class="mt-1 gap-1.5">
@@ -545,10 +545,10 @@ export function LinkedMessages(props: { text: string }) {
 }
 
 function LinkedCard(props: { at: LinkedMessage }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   const router = useRouter();
   const m = useMessage(() => props.at);
-  const where = () => channelOf(core()?.chat, props.at.channel);
+  const where = () => channelOf(collab()?.chat, props.at.channel);
   return (
     <View
       role="button"

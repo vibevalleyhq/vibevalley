@@ -2,18 +2,28 @@
 // contract once and reports the results to the shell (debug dump "probe").
 import { Text, View } from "nsh";
 
+import type { BoardSlice, SliceBundle } from "@vibevalley/protocol";
+
 import { act, call, frame, frameRev, hostApi, onLive, subscribe, type Envelope } from "../infra/bridge";
 
-type StateFrame = { seq: number; state: { issues: unknown[] } };
+const probeBundle: SliceBundle = {
+  seq: 2,
+  board: { seq: 2, issues: [] },
+  sessions: { seq: 2, sessions: [], machines: [] },
+  collab: { seq: 2, connectors: [] },
+  inbox: { seq: 2, items: [], call: "idle", callReason: "" },
+  ops: { seq: 2, crons: [] },
+  farm: { seq: 2, view: { level: { level: 1, xp: 0, need: 10 }, plots: {}, plays: {} }, effects: [] },
+};
 
 export function BridgeProbe() {
-  const state = frame<StateFrame>("state");
-  const rev = frameRev("state");
+  const board = frame<BoardSlice>("slice:board");
+  const rev = frameRev("slice:board");
   const results: Record<string, unknown> = {};
   const live: unknown[] = [];
   const events: unknown[] = [];
   onLive((e) => live.push(e));
-  const report = () => act({ type: "probe", results: { ...results, live, events, stateSeq: state()?.seq ?? null, stateRev: rev() } });
+  const report = () => act({ type: "probe", results: { ...results, live, events, stateSeq: board()?.seq ?? null, stateRev: rev() } });
   void (async () => {
     results.health = await call("health");
     results.missing = (await call("issue.nope", { id: 1 })).bizCode;
@@ -28,7 +38,7 @@ export function BridgeProbe() {
     results.refused = refused?.bizCode ?? null;
     await call("fake.emit", { name: "channel.follow", event: { n: 1 } });
     await call("fake.live", { event: { type: "notice", at: 1, level: "info", text: "probe" } });
-    await call("fake.setState", { state: { state: { issues: [{ id: "i1" }] } } });
+    await call("fake.setState", { state: probeBundle });
     await call("fake.end", { name: "channel.follow" });
     stop();
     results.terminal = await hostApi.openTerminal({ cwd: "/tmp", command: "echo PROBE_TERMINAL_$((40+2))" });
@@ -39,7 +49,7 @@ export function BridgeProbe() {
   return (
     <View class="flex-1 bg-side p-4">
       <Text class="text-sm text-ink">
-        Bridge probe: state seq {state()?.seq ?? "…"}, rev {rev()}
+        Bridge probe: board seq {board()?.seq ?? "…"}, rev {rev()}
       </Text>
     </View>
   );

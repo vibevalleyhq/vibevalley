@@ -61,6 +61,7 @@ impl Shell {
     pub fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
         self.sidebar_visible = !self.sidebar_visible;
         self.save_settings(cx);
+        self.publish_host_debug(cx);
         cx.notify();
     }
 

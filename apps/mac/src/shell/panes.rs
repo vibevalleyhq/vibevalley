@@ -18,14 +18,18 @@ impl Shell {
     pub(super) fn navigate_workbench(&mut self, route: &str, cx: &mut Context<Self>) {
         self.native_workspace = false;
         self.native_pixel = None;
+        self.last_route = Some(route.to_string());
         self.workbench.update(cx, |v, cx| v.navigate(route, cx));
+        self.publish_host_debug(cx);
         cx.notify();
     }
 
     pub(super) fn show_workspace(&mut self, cx: &mut Context<Self>) {
         self.native_workspace = true;
         self.native_pixel = None;
+        self.last_route = Some("/workspace".to_string());
         self.workbench.update(cx, |v, cx| v.navigate("/workspace", cx));
+        self.publish_host_debug(cx);
         cx.notify();
     }
 
@@ -39,6 +43,7 @@ impl Shell {
         });
         self.native_workspace = false;
         self.native_pixel = Some(PixelSlot { view, _sub: sub });
+        self.publish_host_debug(cx);
         cx.notify();
     }
 
@@ -46,10 +51,7 @@ impl Shell {
         if let PaneKind::Hosted { module, props } = &kind
             && (module == "vv" || module == "vibevalley")
         {
-            self.native_workspace = false;
-            self.native_pixel = None;
-            self.workbench.update(cx, |v, cx| v.navigate(props["route"].as_str().unwrap_or("/issues"), cx));
-            cx.notify();
+            self.navigate_workbench(props["route"].as_str().unwrap_or("/issues"), cx);
             return;
         }
         if let PaneKind::Pixel { scene, props } = kind {
@@ -618,8 +620,10 @@ impl Shell {
         if let Some(PaneKind::Terminal { terminal_id, .. }) = &closed {
             self.terminals.remove(terminal_id);
         }
-        if let Some(session_id) = closed_chat_session_id(closed.as_ref()) {
-            crate::serving::close_workspace_session(session_id);
+        if let Some(session_id) = closed_chat_session_id(closed.as_ref())
+            && let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>()
+        {
+            bridge.0.call("session.closeWorkspace".into(), json!({ "id": session_id }), |_| {});
         }
         self.panes.remove(&(pid, tab));
         self.chat_statuses.remove(&(pid, tab));

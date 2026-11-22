@@ -30,7 +30,7 @@ test("issue draft creation: retry keeps requestKey, mid-flight edit preserves dr
   let createCalls = 0;
 
   const { app, fake, fixture } = await mountApp("/issues", (f) => {
-    const issue0 = scenarios.typical.state.state.issues.at(0);
+    const issue0 = scenarios.typical.state.board.issues.at(0);
     if (!issue0) throw new Error("typical scenario must include baseline issues");
     f.respond("issue.create", () => {
       createCalls++;
@@ -77,7 +77,7 @@ test("issue close review: stale tree fetches diff sinceReview before permitting 
   let moved = false;
 
   const { app, fake } = await mountApp("/issues/i31", (f) => {
-    const i31 = scenarios.typical.state.state.issues.find((i) => i.id === "i31");
+    const i31 = scenarios.typical.state.board.issues.find((i) => i.id === "i31");
     if (!i31) throw new Error("typical scenario must include i31");
     f.respond("issue.diff.get", () =>
       moved
@@ -111,7 +111,7 @@ test("issue close review: stale tree fetches diff sinceReview before permitting 
 
 test("issue clarification: picking an answer option posts the selected response", async () => {
   const { app, fake, fixture } = await mountApp("/issues/i33");
-  const i33 = fixture.state.state.issues.find((i) => i.id === "i33");
+  const i33 = fixture.state.board.issues.find((i) => i.id === "i33");
   const firstOpt = i33?.questions[0]?.options[0];
   if (!firstOpt) throw new Error("i33 must carry at least one question option");
 
@@ -288,7 +288,7 @@ test("content hub: binary sidebar, outline template creation via artifact.create
 
   fake.clearCalls();
   await app.press("id:content-new-note-btn");
-  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.create"));
+  await fake.pumpUntil(app, () => created.length === 2 && app.value("id:artifact-title") === created[1]?.title);
   expect(fake.calls.find((c) => c.op === "artifact.create")?.payload).toMatchObject({ kind: "markdown", artifactType: "outline" });
 
   await app.press("id:content-nav-artifacts-all");
@@ -607,7 +607,7 @@ test("settings: appearance motion control dispatches host.motion, syncs host eve
   expect(bootOff.app.viewStyle("id:motion-system")?.backgroundColor).toBeUndefined();
 });
 
-test("regression: whiteboard ChannelSidePane survives artifact polling, remount after ready, and StateFrame updates without dropping channel.follow", async () => {
+test("regression: whiteboard ChannelSidePane survives artifact polling, remount after ready, and slice updates without dropping channel.follow", async () => {
   const { app, fake, fixture } = await mountApp("/artifacts/art-launch-board", (f) => {
     for (const [op, handler] of Object.entries(artifactResponses)) {
       f.respond(op, handler);
@@ -653,7 +653,7 @@ test("regression: whiteboard ChannelSidePane survives artifact polling, remount 
   expect(sendPayload?.sendKey).toBeTruthy();
   expect(app.count("id:pending-line-sending")).toBe(1);
 
-  // A fresh StateFrame must not detach the send intent's second `followed` listener.
+  // A fresh slice bundle update must not detach the send intent's second `followed` listener.
   await fake.setState(app, { ...fixture.state });
 
   const sampleMsg = (fixture.responses["channel.message.list"] as ChatMessage[] | undefined)?.[0];

@@ -10,7 +10,7 @@ import { Button } from "../../design/Button";
 import { TextInput } from "../../design/Field";
 import { IconButton } from "../../design/IconButton";
 import { toast } from "../../design/toasts";
-import { useCore } from "../../infra/frame";
+import { useSessionsSlice } from "../../infra/frame";
 import {
   richNative,
   type VvWhiteboardBatchEvent,
@@ -96,7 +96,7 @@ function buildHeadlessSvg(title: string, items: readonly FallbackElement[]): str
 export function WhiteboardView(props: StoreViewerProps) {
   const { client, snapshot } = useStoreEntries(() => props.artifact.id);
   const presence = useArtifactPresence(() => props.artifact.id);
-  const core = useCore();
+  const sessionsSlice = useSessionsSlice();
   const act = createAct();
   const selectedIds = signal<readonly string[]>([]);
 
@@ -136,7 +136,7 @@ export function WhiteboardView(props: StoreViewerProps) {
       }
     }
 
-    const sessions = core()?.sessions ?? [];
+    const sessions = sessionsSlice()?.sessions ?? [];
     for (const sess of sessions) {
       if (isFreeUserSession(sess) || sess.phase._tag !== "working") continue;
       const id = sessionProfile(sess) ?? sess.id;

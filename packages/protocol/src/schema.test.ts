@@ -108,3 +108,42 @@ test("a length counted in code points is told to a model's JSON Schema, and an e
   expect(prompt.safeParse("😀".repeat(4000)).success).toBe(true);
   expect(prompt.safeParse("a".repeat(4001)).success).toBe(false);
 });
+
+test("SliceBundle parses every exported Rust scenario fixture", () => {
+  const scenariosDir = new URL("../../../apps/mac/ui/fixtures/scenarios/", import.meta.url);
+  const dirs = readdirSync(scenariosDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .toSorted();
+  expect(dirs).toEqual(["dense", "edge", "empty", "extreme", "minimal", "typical"]);
+  for (const name of dirs) {
+    const raw: unknown = JSON.parse(readFileSync(new URL(`./${name}/state.json`, scenariosDir), "utf8"));
+    const bundle = S.SliceBundle.parse(raw);
+    expect(bundle.seq).toBeGreaterThanOrEqual(0);
+    expect(bundle.board.seq).toBe(bundle.seq);
+    expect(bundle.sessions.seq).toBe(bundle.seq);
+    expect(bundle.collab.seq).toBe(bundle.seq);
+    expect(bundle.inbox.seq).toBe(bundle.seq);
+    expect(bundle.ops.seq).toBe(bundle.seq);
+    expect(bundle.farm.seq).toBe(bundle.seq);
+  }
+});
+
+test("Host frame and action codecs parse every Rust golden sample", () => {
+  const raw = JSON.parse(readFileSync(new URL("../../../crates/protocol/golden/schema/host.json", import.meta.url), "utf8")) as Record<
+    string,
+    readonly unknown[]
+  >;
+  const schemas = new Map<string, z.ZodType>();
+  for (const [k, v] of Object.entries(S)) if (v instanceof z.ZodType) schemas.set(k, v);
+  let checked = 0;
+  for (const [name, samples] of Object.entries(raw)) {
+    const codec = schemas.get(name);
+    expect(codec, `missing schema export ${name}`).toBeDefined();
+    for (const sample of samples) {
+      codec!.parse(sample);
+      checked++;
+    }
+  }
+  expect(checked).toBeGreaterThan(25);
+});

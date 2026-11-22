@@ -27,6 +27,9 @@ fn typescript_matches_the_contract() {
     for (rel, text) in &files {
         let path = root.join(rel);
         if write {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).unwrap();
+            }
             std::fs::write(&path, text).unwrap();
         } else if std::fs::read_to_string(&path).ok().as_deref() != Some(text.as_str()) {
             stale.push(rel.clone());

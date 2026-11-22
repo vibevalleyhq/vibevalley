@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::BTreeSet;
 use std::time::Instant;
 
@@ -9,7 +7,7 @@ use vibevalley_pele::detect::DiagramType;
 use vibevalley_pele::diagram::journey::{JourneyModel, lexer::tokenize};
 use vibevalley_pele::{METRICS_MEASURER, ParseOptions, ParsedModel, RenderOptions, TextMeasurer, TextStyle, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 const DAY: &str = "journey\n  title My working day\n  section Go to work\n    Make tea: 5: Me\n    Go upstairs: 3: Me\n    Do work: 1: Me, Cat\n  section Go home\n    Go downstairs: 5: Me\n    Sit down: 5: Me\n";
 

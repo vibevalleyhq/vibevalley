@@ -1,11 +1,11 @@
-//! `doctor`: verify home/channel, server health, SSE `/api/v1/state`, runtimes, and model key.
+//! `doctor`: verify home/channel, server health, SSE `/api/v1/slice/board`, runtimes, and model key.
 
 use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::Args;
 use serde::Serialize;
-use vibevalley_protocol::{Installation, KeySource, Next, StateFrame, ops};
+use vibevalley_protocol::{BoardSlice, Installation, KeySource, Next, ops};
 
 use crate::client::{Client, Done, Failure, decode_failure, exit, fallback_server};
 use crate::output::line;
@@ -13,7 +13,7 @@ use crate::output::line;
 #[derive(Debug, Args)]
 #[command(after_help = "Examples:\n  vibevalley doctor\n  vibevalley doctor --json")]
 pub struct DoctorCmd {
-    /// Timeout in seconds for the /api/v1/state SSE check
+    /// Timeout in seconds for the /api/v1/slice/board SSE check
     #[arg(long, default_value_t = 5)]
     pub timeout: i64,
 }
@@ -132,9 +132,9 @@ pub fn run(client: &Client, cmd: DoctorCmd) -> Done {
 
     let mut state_seq: Option<i64> = None;
     let state_timeout = Duration::from_secs(cmd.timeout.max(1) as u64);
-    match client.sse("/api/v1/state", Some(state_timeout), |data| {
-        let frame: StateFrame = serde_json::from_str(data).map_err(decode_failure)?;
-        state_seq = Some(frame.seq);
+    match client.sse("/api/v1/slice/board", Some(state_timeout), |data| {
+        let slice: BoardSlice = serde_json::from_str(data).map_err(decode_failure)?;
+        state_seq = Some(slice.seq);
         Ok(false)
     }) {
         Ok(()) => checks.push(DoctorCheck::State {
@@ -146,8 +146,8 @@ pub fn run(client: &Client, cmd: DoctorCmd) -> Done {
             "state",
             failure.text,
             vec![Next {
-                say: "Inspect /api/v1/state directly".into(),
-                run: Some(vec!["state".into(), "--json".into()]),
+                say: "Inspect /api/v1/slice/board directly".into(),
+                run: Some(vec!["state".into(), "--slice".into(), "board".into(), "--json".into()]),
             }],
         )),
     }
