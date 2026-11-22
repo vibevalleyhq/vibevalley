@@ -13,6 +13,7 @@ use vibevalley_core::artifact::{
     format_store_summary, infer_entry_kind, infer_entry_mime, parse_tokens_spec, render_store_artifact_html, sanitize_whiteboard_svg, shell_theme_of,
     store_html_problem, store_view_headers, write_props_into_dc_html,
 };
+use vibevalley_core::collab::CommitMeta;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, ArtifactBody, ArtifactCard, ArtifactEntry, ArtifactEntryBatchRequest, ArtifactEntryBatchResult, ArtifactEntryConflict, ArtifactEntryEvent,
@@ -22,6 +23,7 @@ use vibevalley_protocol::{
 };
 
 use super::blocks::relay;
+use super::collab::{apply_legacy_presence_write, commit_meta_for_maker, is_presence_write};
 use super::{Artifacts, Maker, artifact_type_of, db, q, refused};
 use crate::base::{LookIn, missing};
 use crate::modules::collab::channel::{Made, Posting};
@@ -104,7 +106,7 @@ fn sanitize_whiteboard_element_json(artifact_type: Option<ArtifactType>, path: &
 }
 
 impl Artifacts {
-    fn entry_lock(&self, id: &str) -> Arc<Mutex<()>> {
+    pub(super) fn entry_lock(&self, id: &str) -> Arc<Mutex<()>> {
         let mut map = lock(&self.entry_locks);
         map.entry(id.to_string()).or_insert_with(|| Arc::new(Mutex::new(()))).clone()
     }
@@ -185,21 +187,32 @@ impl Artifacts {
     }
 
     pub fn batch_entries(&self, maker: &Maker, req: &ArtifactEntryBatchRequest) -> Result<ArtifactEntryBatchResult, ApiError> {
+        self.batch_entries_inner(maker, req, None)
+    }
+
+    pub fn batch_entries_with_meta(&self, maker: &Maker, req: &ArtifactEntryBatchRequest, meta: &CommitMeta) -> Result<ArtifactEntryBatchResult, ApiError> {
+        self.batch_entries_inner(maker, req, Some(meta))
+    }
+
+    fn batch_entries_inner(
+        &self,
+        maker: &Maker,
+        req: &ArtifactEntryBatchRequest,
+        explicit_meta: Option<&CommitMeta>,
+    ) -> Result<ArtifactEntryBatchResult, ApiError> {
         let write_lock = self.entry_lock(&req.id);
         let _guard = lock(&write_lock);
+
+        let (presence_writes, store_writes): (Vec<&ArtifactEntryWriteInput>, Vec<&ArtifactEntryWriteInput>) =
+            req.writes.iter().partition(|w| is_presence_write(w));
 
         let (row, current_rows) = {
             let mut db = self.db();
             let row = self.found_store(&mut db, &req.id)?;
-            if req.writes.is_empty() {
-                return Ok(ArtifactEntryBatchResult {
-                    applied: true,
-                    seq: row.seq,
-                    entries: vec![],
-                    conflicts: vec![],
-                });
+            for w in &presence_writes {
+                check_path(&w.path)?;
             }
-            for w in &req.writes {
+            for w in &store_writes {
                 check_path(&w.path)?;
                 if w.op == ArtifactEntryOp::Copy {
                     let from = w.from.as_deref().unwrap_or("").trim();
@@ -209,14 +222,32 @@ impl Artifacts {
                     check_path(from)?;
                 }
             }
+            // Intercept legacy `presence/*` writes purely into in-memory `PresenceHub`
+            // without touching `artifact_entry` or bumping `artifact.seq`.
+            if store_writes.is_empty() {
+                drop(db);
+                for w in &presence_writes {
+                    apply_legacy_presence_write(self, &req.id, &maker.by, w)?;
+                }
+                return Ok(ArtifactEntryBatchResult {
+                    applied: true,
+                    seq: row.seq,
+                    entries: vec![],
+                    conflicts: vec![],
+                });
+            }
             let rows = db::entries(&mut db, &req.id).map_err(q)?;
             (row, rows)
         };
 
+        for w in &presence_writes {
+            apply_legacy_presence_write(self, &req.id, &maker.by, w)?;
+        }
+
         // Resolve referenced attachments outside the DB lock to avoid nesting locks across modules.
         let existing_kinds: HashMap<String, ArtifactEntryKind> = current_rows.iter().map(|r| (r.path.clone(), entry_kind_of(&r.kind))).collect();
         let mut resolved_assets: HashMap<String, Attachment> = HashMap::new();
-        for w in &req.writes {
+        for w in &store_writes {
             if w.op != ArtifactEntryOp::Set {
                 continue;
             }
@@ -251,12 +282,13 @@ impl Artifacts {
             let mut db = self.db();
             let mut tx = pollster::block_on(db.begin()).map_err(q)?;
 
+            let collab_doc = self.load_or_bootstrap_store_doc(&mut tx, &row, &current_rows)?;
             let mut working: BTreeMap<String, db::EntryRow> = current_rows.into_iter().map(|r| (r.path.clone(), r)).collect();
 
             // Check optimistic concurrency preconditions before mutating any entry.
             let mut seen_paths: BTreeSet<String> = BTreeSet::new();
             let mut conflicts: Vec<ArtifactEntryConflict> = vec![];
-            for w in &req.writes {
+            for w in &store_writes {
                 let Some(expected_rev) = w.if_rev else { continue };
                 if !seen_paths.insert(w.path.clone()) {
                     continue;
@@ -287,7 +319,7 @@ impl Artifacts {
             let mut deleted_paths: BTreeSet<String> = BTreeSet::new();
             let max_kb = (ENTRY_MAX_BYTES / 1024) as i64;
 
-            for w in &req.writes {
+            for w in &store_writes {
                 match w.op {
                     ArtifactEntryOp::Delete => {
                         if working.remove(&w.path).is_some() {
@@ -550,6 +582,8 @@ impl Artifacts {
             let seq = row.seq + 1;
             db::add_entry_change(&mut tx, &req.id, seq, &maker.by, &changed_paths, &removed_paths, at).map_err(q)?;
             db::artifact_accepted(&mut tx, &req.id, seq, at).map_err(q)?;
+            let meta = explicit_meta.cloned().unwrap_or_else(|| commit_meta_for_maker(maker, req.note.clone(), at));
+            Self::sync_store_to_collab(&mut tx, &row.id, &collab_doc, &working, &changed_paths, &removed_paths, &meta)?;
             pollster::block_on(tx.commit()).map_err(q)?;
 
             let full_entries: Vec<ArtifactEntry> = changed_paths.iter().filter_map(|p| working.get(p).map(|r| entry_of(r, true))).collect();
@@ -674,7 +708,8 @@ impl Artifacts {
             element_id: req.element_id.clone(),
             default_tokens_json,
         };
-        let content = render_store_artifact_html(artifact_type, &entries, &options);
+        let rendered = render_store_artifact_html(artifact_type, &entries, &options);
+        let content = self.inject_presence_highlights(&req.id, rendered, true);
         let headers = store_view_headers(req.origin.as_deref(), req.print == Some(true))
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))

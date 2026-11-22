@@ -8,6 +8,8 @@ import type {
   ArtifactEntryEvent,
   ArtifactEntryWriteInput,
   ArtifactId,
+  ArtifactPresence,
+  ArtifactPresenceEvent,
   ArtifactType,
   ArtifactViewContext,
 } from "@vibevalley/protocol";
@@ -16,7 +18,7 @@ import { ArtifactEntryBatchResult as ArtifactEntryBatchResultSchema, artifactId 
 import { api, reasonOf } from "../../infra/api";
 import { saveFile } from "../../infra/attachmentFile";
 import { createExternal } from "../../infra/base/external";
-import { fetchArtifactView, followArtifactEntries } from "../../infra/gateway";
+import { fetchArtifactView, followArtifactEntries, followArtifactPresence } from "../../infra/gateway";
 import { transport } from "../../infra/transport";
 import type { ShellTheme } from "./shell";
 
@@ -444,10 +446,99 @@ export async function saveVideoToLibrary(title: string, base64: string, mimeType
   await api.library.item.add({ attachment: att.id, name: filename });
 }
 
+const presenceThrottleMs = 100;
+
+export interface ArtifactPresenceHandle {
+  readonly peers: Accessor<readonly ArtifactPresence[]>;
+  readonly publish: (presence: Omit<ArtifactPresence, "updatedAt">) => void;
+  readonly clear: (peerId?: string) => void;
+}
+
+export function useArtifactPresence(id: () => ArtifactId, opts?: { readonly enabled?: () => boolean }): ArtifactPresenceHandle {
+  const peers = signal<readonly ArtifactPresence[]>([]);
+  const map = new Map<string, ArtifactPresence>();
+  let lastSentAt = 0;
+  let pending: Omit<ArtifactPresence, "updatedAt"> | undefined;
+  let throttleTimer: ReturnType<typeof setTimeout> | undefined;
+  let publishedPeerId: string | undefined;
+  let activeArtifactId = untracked(id);
+
+  const applyEvent = (ev: ArtifactPresenceEvent) => {
+    switch (ev._tag) {
+      case "Snapshot":
+        map.clear();
+        for (const p of ev.peers) map.set(p.id, p);
+        peers.set([...map.values()]);
+        return;
+      case "Upsert":
+        map.set(ev.peer.id, ev.peer);
+        peers.set([...map.values()]);
+        return;
+      case "Remove":
+        if (map.delete(ev.peerId)) peers.set([...map.values()]);
+        return;
+    }
+  };
+
+  const sendUpdate = (targetId: ArtifactId, presence: Omit<ArtifactPresence, "updatedAt">) => {
+    lastSentAt = Date.now();
+    publishedPeerId = presence.id;
+    void api.artifact.presence.update({ id: targetId, presence: { ...presence, updatedAt: lastSentAt } }).catch(() => {});
+  };
+
+  const flushPending = () => {
+    throttleTimer = undefined;
+    if (pending === undefined) return;
+    const next = pending;
+    pending = undefined;
+    sendUpdate(activeArtifactId, next);
+  };
+
+  const clear = (peerId?: string) => {
+    clearTimeout(throttleTimer);
+    throttleTimer = undefined;
+    pending = undefined;
+    const targetPeer = peerId ?? publishedPeerId;
+    if (!targetPeer) return;
+    if (targetPeer === publishedPeerId) publishedPeerId = undefined;
+    void api.artifact.presence.update({ id: activeArtifactId, peerId: targetPeer }).catch(() => {});
+  };
+
+  const publish = (presence: Omit<ArtifactPresence, "updatedAt">) => {
+    const now = Date.now();
+    const wait = presenceThrottleMs - (now - lastSentAt);
+    if (wait <= 0) {
+      clearTimeout(throttleTimer);
+      throttleTimer = undefined;
+      pending = undefined;
+      sendUpdate(activeArtifactId, presence);
+      return;
+    }
+    pending = presence;
+    throttleTimer ??= setTimeout(flushPending, wait);
+  };
+
+  effect(() => {
+    const currentId = id();
+    const enabled = opts?.enabled ? opts.enabled() : true;
+    activeArtifactId = currentId;
+    map.clear();
+    peers.set([]);
+    if (!enabled) return;
+    const stop = followArtifactPresence(currentId, applyEvent);
+    return () => {
+      stop();
+      clear();
+    };
+  });
+
+  return { peers, publish, clear };
+}
+
 export async function createTypedArtifact(
   choice: ArtifactType | "html",
   title: string,
-  opts?: { readonly channel?: string; readonly issue?: string },
+  opts?: { readonly channel?: string; readonly issue?: string; readonly content?: string },
 ): Promise<Artifact> {
   const scope = {
     ...(opts?.channel ? { channel: opts.channel } : {}),
@@ -458,12 +549,20 @@ export async function createTypedArtifact(
       title,
       kind: "html",
       display: "page",
-      content: `<!doctype html>\n<html lang="zh">\n<head><meta charset="utf-8" /><title>${title}</title></head>\n<body style="padding:32px"><h1>${title}</h1><p>Ready to edit.</p></body>\n</html>`,
+      content:
+        opts?.content ??
+        `<!doctype html>\n<html lang="zh">\n<head><meta charset="utf-8" /><title>${title}</title></head>\n<body style="padding:32px"><h1>${title}</h1><p>Ready to edit.</p></body>\n</html>`,
       ...scope,
     });
   }
-  if (choice === "docs") {
-    return api.artifact.create({ title, kind: "markdown", artifactType: "docs", ...scope });
+  if (choice === "docs" || choice === "outline") {
+    return api.artifact.create({
+      title,
+      kind: "markdown",
+      artifactType: choice,
+      ...(opts?.content !== undefined ? { content: opts.content } : {}),
+      ...scope,
+    });
   }
   return api.artifact.create({
     title,

@@ -54,7 +54,6 @@
   "farmShort": "农场",
   "update": "更新",
   "working": "运行中 · {n} 个执行会话",
-  "off": "未启动",
   "runsHint": "查看执行会话、主助手审批与轨迹",
   "chips": {
     "drop": "去掉 {v}",

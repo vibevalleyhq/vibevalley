@@ -441,9 +441,8 @@ fn build_timeline_doc(copy: &TemplateCopy) -> BoardDoc {
                 color: PresenceColor::Coral,
                 x: 495.0,
                 y: 96.0,
-                status: None,
-                selected_ids: Vec::new(),
                 rev: 1,
+                ..Presence::default()
             },
             Presence {
                 id: "w1".to_owned(),
@@ -451,9 +450,8 @@ fn build_timeline_doc(copy: &TemplateCopy) -> BoardDoc {
                 color: PresenceColor::Teal,
                 x: 826.0,
                 y: 86.0,
-                status: None,
-                selected_ids: Vec::new(),
                 rev: 1,
+                ..Presence::default()
             },
             Presence {
                 id: "user".to_owned(),
@@ -461,9 +459,8 @@ fn build_timeline_doc(copy: &TemplateCopy) -> BoardDoc {
                 color: PresenceColor::Blue,
                 x: 636.0,
                 y: 454.0,
-                status: None,
-                selected_ids: Vec::new(),
                 rev: 1,
+                ..Presence::default()
             },
         ],
         seq: 0,
@@ -1229,9 +1226,8 @@ fn build_workshop_doc(copy: &TemplateCopy) -> BoardDoc {
                 color: PresenceColor::Leaf,
                 x: 344.0,
                 y: 388.0,
-                status: None,
-                selected_ids: Vec::new(),
                 rev: 1,
+                ..Presence::default()
             },
             Presence {
                 id: "rosa".to_owned(),
@@ -1239,9 +1235,8 @@ fn build_workshop_doc(copy: &TemplateCopy) -> BoardDoc {
                 color: PresenceColor::Blue,
                 x: 906.0,
                 y: 388.0,
-                status: None,
-                selected_ids: Vec::new(),
                 rev: 1,
+                ..Presence::default()
             },
             Presence {
                 id: "orchestrator".to_owned(),
@@ -1250,8 +1245,8 @@ fn build_workshop_doc(copy: &TemplateCopy) -> BoardDoc {
                 x: 212.0,
                 y: 658.0,
                 status: Some(proposal_note.to_owned()),
-                selected_ids: Vec::new(),
                 rev: 1,
+                ..Presence::default()
             },
         ],
         seq: 0,

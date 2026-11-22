@@ -1,4 +1,4 @@
-export { ArtifactCard, artifactIcon, artifactSuffix, artifactTypeIcon, kindLabel, useArtifacts } from "./ArtifactCard";
+export { ArtifactCard, artifactHref, artifactIcon, artifactSuffix, artifactTypeIcon, kindLabel, useArtifacts } from "./ArtifactCard";
 export { ArtifactCanvas } from "./ArtifactCanvas";
 export type { QuoteTarget } from "./BlocksView";
 export { ArtifactsPage } from "./ArtifactsPage";

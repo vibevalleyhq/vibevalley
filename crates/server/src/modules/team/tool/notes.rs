@@ -5,16 +5,18 @@
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+use vibevalley_core::collab::CommitMeta;
 use vibevalley_protocol::{
-    ArtifactEntryBatchRequest, ArtifactEntryGetRequest, ArtifactEntryListRequest, ArtifactKind, ArtifactListRequest, ArtifactRequest, ArtifactType,
-    ArtifactTypeReadRequest, ArtifactVersionRequest, BlockCreate, BlockDelete, BlockUpdate, LibraryAddRequest, LibraryListRequest, MediaImageRequest,
-    MediaSource, MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, PkmProposalRequest, PkmSearchRequest, Session,
+    ArtifactBody, ArtifactEntryBatchRequest, ArtifactEntryGetRequest, ArtifactEntryListRequest, ArtifactKind, ArtifactListRequest, ArtifactRequest,
+    ArtifactType, ArtifactTypeReadRequest, ArtifactVersionRequest, BlockCreate, BlockDelete, BlockUpdate, LibraryAddRequest, LibraryListRequest,
+    MediaImageRequest, MediaSource, MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, PkmProposalRequest, PkmSearchRequest, Session,
 };
 
 use super::{Farm, Who, given};
 use crate::modules::content::artifact::Maker;
 use crate::modules::content::library::AddedBy;
 use crate::modules::team::mcp::ResourceReadArgs;
+use crate::now;
 
 fn text<T: serde::Serialize>(v: &T) -> Result<String, String> {
     serde_json::to_string(v).map_err(|e| e.to_string())
@@ -227,13 +229,13 @@ pub struct ArtifactCreateArgs {
 }
 
 fn is_store_create(req: &ArtifactRequest, file: Option<&str>) -> bool {
-    req.artifact_type.is_some_and(|t| t != ArtifactType::Docs)
+    req.artifact_type.is_some_and(|t| t.body() == ArtifactBody::Store)
         || req.kind == Some(ArtifactKind::Store)
         || (req.entries.is_some() && req.content.is_none() && file.is_none())
 }
 
 fn prepare_artifact_create(req: &mut ArtifactRequest, file: Option<&str>) {
-    if is_store_create(req, file) || (req.artifact_type == Some(ArtifactType::Docs) && req.content.is_none() && file.is_none()) {
+    if is_store_create(req, file) || (req.artifact_type.is_some_and(|t| t.body() == ArtifactBody::Blocks) && req.content.is_none() && file.is_none()) {
         return;
     }
     if req.kind.is_none() && req.content.is_some() {
@@ -280,13 +282,30 @@ pub struct ArtifactVersionArgs {
     file: Option<String>,
 }
 
+fn commit_meta_for_who(who: &Who, summary: Option<String>) -> CommitMeta {
+    let at = now();
+    match who {
+        Who::Helper(me) => CommitMeta::session(&me.name, &me.agent, &me.id, me.runs.max(1) as u32, summary, at),
+        Who::Orchestrator(here) => CommitMeta {
+            author: here.agent.clone(),
+            agent: Some(here.agent.clone()),
+            session_id: None,
+            turn: None,
+            origin: format!("orchestrator:{}", here.agent),
+            summary,
+            at,
+        },
+    }
+}
+
 pub fn artifact_version(f: &Farm, who: &Who, mut a: ArtifactVersionArgs) -> Result<String, String> {
     if let Who::Helper(me) = who
         && let Some(content) = read_helper_file(me, &a.file)?
     {
         a.req.content = content;
     }
-    text(&f.artifacts.version(&maker_of(who), &a.req).map_err(|e| e.message)?)
+    let meta = commit_meta_for_who(who, a.req.note.clone());
+    text(&f.artifacts.version_with_meta(&maker_of(who), &a.req, &meta).map_err(|e| e.message)?)
 }
 
 #[derive(Deserialize)]
@@ -302,7 +321,8 @@ pub fn block_create(f: &Farm, who: &Who, a: BlockCreateArgs) -> Result<String, S
         Who::Helper(me) => me.agent.as_str(),
         Who::Orchestrator(here) => here.agent.as_str(),
     };
-    text(&f.artifacts.insert_block(&a.id, actor, &a.body).map_err(|e| e.message)?)
+    let meta = commit_meta_for_who(who, None);
+    text(&f.artifacts.insert_block_with_meta(&a.id, actor, &a.body, &meta).map_err(|e| e.message)?)
 }
 
 #[derive(Deserialize)]
@@ -318,7 +338,8 @@ pub fn block_update(f: &Farm, who: &Who, a: BlockUpdateArgs) -> Result<String, S
         Who::Helper(me) => me.agent.as_str(),
         Who::Orchestrator(here) => here.agent.as_str(),
     };
-    text(&f.artifacts.update_block(&a.id, actor, &a.body).map_err(|e| e.message)?)
+    let meta = commit_meta_for_who(who, None);
+    text(&f.artifacts.update_block_with_meta(&a.id, actor, &a.body, &meta).map_err(|e| e.message)?)
 }
 
 #[derive(Deserialize)]
@@ -334,7 +355,8 @@ pub fn block_delete(f: &Farm, who: &Who, a: BlockDeleteArgs) -> Result<String, S
         Who::Helper(me) => me.agent.as_str(),
         Who::Orchestrator(here) => here.agent.as_str(),
     };
-    text(&f.artifacts.delete_block(&a.id, actor, &a.body).map_err(|e| e.message)?)
+    let meta = commit_meta_for_who(who, None);
+    text(&f.artifacts.delete_block_with_meta(&a.id, actor, &a.body, &meta).map_err(|e| e.message)?)
 }
 
 pub fn artifact_type_list(f: &Farm, _: &Who, _: EmptyArgs) -> Result<String, String> {
@@ -357,7 +379,8 @@ pub fn artifact_entry_get(f: &Farm, _: &Who, mut req: ArtifactEntryGetRequest) -
 
 pub fn artifact_entry_batch(f: &Farm, who: &Who, mut req: ArtifactEntryBatchRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
-    text(&f.artifacts.batch_entries(&maker_of(who), &req).map_err(|e| e.message)?)
+    let meta = commit_meta_for_who(who, req.note.clone());
+    text(&f.artifacts.batch_entries_with_meta(&maker_of(who), &req, &meta).map_err(|e| e.message)?)
 }
 
 /// `file`: a file in the helper's own folder becomes the content.

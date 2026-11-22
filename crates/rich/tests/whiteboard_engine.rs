@@ -5,11 +5,12 @@ use vibevalley_rich::engine::canvas::{Canvas, End, Node as CanvasNode, Side};
 use vibevalley_rich::engine::whiteboard::{
     AlignOp, AnchorSide, ArrowCurve, ArrowEndpoint, ArrowHead, BoardAction, BoardCommand, BoardDoc, Camera, ControllerEffect, DEFAULT_HISTORY_LIMIT,
     DistributeAxis, ElementId, ElementKind, ElementRecord, ExtraFields, GridStyle, InkMode, MilestoneKind, Modifiers, Point2, PointerButton, PointerInput,
-    Presence, PresenceColor, Rect2, STICKERS, ShapeKind, SnapConfig, SnapGuide, SpatialIndex, StrokePoint, StrokeStyle, TemplateCopy, TemplateKind, TextAlign,
-    TextVariant, TimelineMilestone, Tool, UndoHistory, Vec2, WbFill, WhiteboardController, apply_command, apply_remote_entries, build_ink_outline,
-    build_template_doc, compute_align_deltas, compute_distribute_deltas, compute_move_snap, compute_resize_snap, compute_tidy_grid_deltas,
-    decode_board_entries, encode_element_patch, encode_element_write, encode_meta_write, encode_presence_write, import_json_canvas, project_point_to_polyline,
-    rotated_bbox, route_arrow, sample_polyline, simplify_stroke_points, sticker_drawing, strokes_hit_by_eraser,
+    Presence, PresenceColor, PresenceKind, PresenceViewport, Rect2, STICKERS, ShapeKind, SnapConfig, SnapGuide, SpatialIndex, StrokePoint, StrokeStyle,
+    TemplateCopy, TemplateKind, TextAlign, TextVariant, TimelineMilestone, Tool, UndoHistory, Vec2, WbFill, WhiteboardController, apply_command,
+    apply_remote_entries, build_ink_outline, build_template_doc, compute_align_deltas, compute_distribute_deltas, compute_move_snap, compute_resize_snap,
+    compute_tidy_grid_deltas, decode_board_entries, decode_presences_json, encode_element_patch, encode_element_write, encode_meta_write,
+    encode_presence_write, import_json_canvas, project_point_to_polyline, rotated_bbox, route_arrow, sample_polyline, simplify_stroke_points, sticker_drawing,
+    strokes_hit_by_eraser,
 };
 
 fn make_entry(path: &str, rev: i64, value: &str) -> ArtifactEntry {
@@ -298,6 +299,7 @@ fn codec_roundtrip_all_12_element_kinds_extra_fields_and_json_canvas() {
         status: Some("planning".to_owned()),
         selected_ids: vec![ElementId::new("el-card")],
         rev: 2,
+        ..Presence::default()
     });
 
     let mut entries = Vec::new();
@@ -875,4 +877,151 @@ fn controller_end_to_end_interactions_history_and_concurrency() {
     let rem = apply_remote_entries(&mut doc, &[], &["elements/item".to_owned()], 100);
     assert_eq!(rem, vec![ElementId::new("item")]);
     assert!(doc.elements.is_empty());
+}
+
+#[test]
+fn presence_decode_smooth_interpolation_follow_viewport_and_manual_exit() {
+    let raw = r##"[
+        {"id":"legacy-1","name":"Legacy Peer","color":"teal","x":180,"y":220,"status":"审阅中"},
+        {"id":"agent-hl","name":"Designer","color":"#3b82f6","kind":"highlight","x":400,"y":300,"w":260,"h":150,"status":"排版中","viewport":{"x":300,"y":200,"w":800,"h":500,"zoom":1.25},"updatedAt":100},
+        {"id":"agent-hl","name":"Designer","color":"#3b82f6","kind":"highlight","x":420,"y":310,"w":260,"h":150,"status":"排版中","viewport":{"x":320,"y":210,"w":800,"h":500,"zoom":1.25},"updatedAt":200},
+        {"id":"vp-only","name":"Observer","color":"lavender","kind":"viewport","viewport":{"x":900,"y":600,"w":600,"h":400,"zoom":0.9},"updatedAt":150},
+        {"id":"claim-1","name":"Coder","color":"coral","kind":"claim","x":50,"y":80,"w":220,"h":120,"status":"重构模块"}
+    ]"##;
+    let decoded = decode_presences_json(raw);
+    assert_eq!(decoded.len(), 4, "duplicate id must keep newer updatedAt");
+
+    let legacy = decoded.iter().find(|p| p.id == "legacy-1").unwrap();
+    assert_eq!(legacy.kind, PresenceKind::Cursor);
+    assert_eq!(legacy.color, PresenceColor::Teal);
+    assert!(legacy.has_cursor);
+
+    let hl = decoded.iter().find(|p| p.id == "agent-hl").unwrap();
+    assert_eq!(hl.kind, PresenceKind::Highlight);
+    assert_eq!(hl.custom_color.as_deref(), Some("#3b82f6"));
+    assert_eq!(hl.x, 420.0);
+    assert_eq!(hl.region_rect(), Some(Rect2::new(420.0, 310.0, 260.0, 150.0)));
+    assert_eq!(
+        hl.viewport,
+        Some(PresenceViewport {
+            x: 320.0,
+            y: 210.0,
+            w: 800.0,
+            h: 500.0,
+            zoom: Some(1.25),
+        })
+    );
+
+    let vp_only = decoded.iter().find(|p| p.id == "vp-only").unwrap();
+    assert_eq!(vp_only.kind, PresenceKind::Viewport);
+    assert!(!vp_only.has_cursor);
+    assert_eq!(vp_only.focus_point(), Point2::new(1200.0, 800.0));
+
+    let claim = decoded.iter().find(|p| p.id == "claim-1").unwrap();
+    assert_eq!(claim.kind, PresenceKind::Claim);
+    assert_eq!(claim.region_rect(), Some(Rect2::new(50.0, 80.0, 220.0, 120.0)));
+
+    // Smooth cursor interpolation: initial spawn has zero animation; subsequent moves glide & settle cleanly.
+    let mut ctrl = WhiteboardController::new(BoardDoc::new("Collab"));
+    ctrl.set_viewport_size(1200.0, 760.0);
+    ctrl.smooth_animations = true;
+
+    let initial = decode_presences_json(r#"[{"id":"p1","name":"Planner","color":"coral","x":100,"y":100,"status":"规划中"}]"#);
+    ctrl.apply_live_presences(&[], initial);
+    assert!(!ctrl.needs_animation(), "first presence spawn must not spin idle animation");
+
+    let moved = decode_presences_json(r#"[{"id":"p1","name":"Planner","color":"coral","x":400,"y":280,"status":"规划中"}]"#);
+    ctrl.apply_live_presences(&[], moved);
+    assert!(ctrl.needs_animation());
+
+    let step1 = ctrl.step_animations(0.016, false);
+    assert!(step1.presence_moved);
+    assert!(!step1.camera_moved);
+    let mid_pose = ctrl.displayed_pose(&ctrl.doc.presences[0]);
+    assert!(mid_pose.x > 100.0 && mid_pose.x < 400.0, "cursor should interpolate smoothly");
+    assert!(mid_pose.y > 100.0 && mid_pose.y < 280.0);
+
+    for _ in 0..80 {
+        if !ctrl.needs_animation() {
+            break;
+        }
+        ctrl.step_animations(0.016, false);
+    }
+    assert!(!ctrl.needs_animation(), "cursor animation must settle with zero idle spins");
+    let final_pose = ctrl.displayed_pose(&ctrl.doc.presences[0]);
+    assert!((final_pose.x - 400.0).abs() < 1e-6);
+    assert!((final_pose.y - 280.0).abs() < 1e-6);
+
+    // Reduced-motion degradation (`instant = true`) snaps immediately in one step.
+    let moved2 = decode_presences_json(r#"[{"id":"p1","name":"Planner","color":"coral","x":900,"y":600}]"#);
+    ctrl.apply_live_presences(&[], moved2);
+    let snap_res = ctrl.step_animations(0.016, true);
+    assert!(snap_res.presence_moved);
+    assert!(!snap_res.still_animating);
+    assert!((ctrl.displayed_pose(&ctrl.doc.presences[0]).x - 900.0).abs() < 1e-6);
+
+    // Follow mode tracks remote viewport smoothly (pan + zoom) and exits immediately on manual input.
+    let with_vp =
+        decode_presences_json(r#"[{"id":"p1","name":"Planner","color":"coral","x":1200,"y":800,"viewport":{"x":900,"y":600,"w":600,"h":400,"zoom":1.4}}]"#);
+    ctrl.apply_live_presences(&[], with_vp);
+    let follow_effs = ctrl.run_action(BoardAction::FollowActor(Some("p1".to_owned())));
+    assert_eq!(ctrl.follow_actor.as_deref(), Some("p1"));
+    assert!(follow_effs.contains(&ControllerEffect::FollowChanged(Some("p1".to_owned()))));
+    assert!(ctrl.needs_animation(), "smooth follow queues camera interpolation");
+
+    for _ in 0..100 {
+        if !ctrl.needs_animation() {
+            break;
+        }
+        ctrl.step_animations(0.016, false);
+    }
+    assert!(!ctrl.needs_animation());
+    let vis = ctrl.camera.visible_world_rect(1200.0, 760.0);
+    assert!((vis.center().x - 1200.0).abs() < 2.0, "camera centered on followed viewport X");
+    assert!((vis.center().y - 800.0).abs() < 2.0, "camera centered on followed viewport Y");
+    assert!((ctrl.camera.zoom - 1.4).abs() < 0.05, "camera zoom matches followed viewport");
+
+    // Manual pan drag immediately exits Follow mode.
+    let pan_effs = ctrl.handle_pointer_down(PointerInput {
+        screen_pos: Point2::new(300.0, 300.0),
+        clicks: 1,
+        button: PointerButton::Middle,
+        modifiers: Modifiers::default(),
+        pressure: 0.5,
+    });
+    assert!(ctrl.follow_actor.is_none());
+    assert!(pan_effs.contains(&ControllerEffect::FollowChanged(None)));
+    ctrl.handle_pointer_up(PointerInput {
+        screen_pos: Point2::new(340.0, 300.0),
+        clicks: 1,
+        button: PointerButton::Middle,
+        modifiers: Modifiers::default(),
+        pressure: 0.5,
+    });
+
+    // Re-enter Follow, then exit via wheel.
+    ctrl.run_action(BoardAction::FollowActor(Some("p1".to_owned())));
+    assert_eq!(ctrl.follow_actor.as_deref(), Some("p1"));
+    let wheel_effs = ctrl.handle_wheel(Point2::new(400.0, 300.0), 10.0, 0.0, true, Modifiers::default());
+    assert!(ctrl.follow_actor.is_none());
+    assert!(wheel_effs.contains(&ControllerEffect::FollowChanged(None)));
+
+    // Re-enter Follow, then exit via Reset View (ResetZoom).
+    ctrl.run_action(BoardAction::FollowActor(Some("p1".to_owned())));
+    let reset_effs = ctrl.run_action(BoardAction::ResetZoom);
+    assert!(ctrl.follow_actor.is_none());
+    assert!(reset_effs.contains(&ControllerEffect::FollowChanged(None)));
+    assert!((ctrl.camera.zoom - 1.0).abs() < 1e-6);
+
+    // Re-enter Follow, then exit via Escape key.
+    ctrl.run_action(BoardAction::FollowActor(Some("p1".to_owned())));
+    let esc_effs = ctrl.handle_key_down("Escape", Modifiers::default());
+    assert!(ctrl.follow_actor.is_none());
+    assert!(esc_effs.contains(&ControllerEffect::FollowChanged(None)));
+
+    // Re-enter Follow, then followed peer goes offline -> auto-exits Follow.
+    ctrl.run_action(BoardAction::FollowActor(Some("p1".to_owned())));
+    let gone_effs = ctrl.apply_live_presences(&[], Vec::new());
+    assert!(ctrl.follow_actor.is_none());
+    assert!(gone_effs.contains(&ControllerEffect::FollowChanged(None)));
 }

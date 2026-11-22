@@ -106,14 +106,19 @@ select artifact_id, seq, batch_id, block_ids, results from artifact_change
   where artifact_id = ?1 and seq > ?2 order by seq limit ?3;
 
 -- name: AddSuggestion :exec
-insert into artifact_suggestion (id, artifact_id, block_id, author, at_rev, change, status, created_at)
-  values (?1, ?2, ?3, ?4, ?5, ?6, 'open', ?7);
+insert into artifact_suggestion (id, artifact_id, block_id, author, origin, at_rev, change, cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text, status, created_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 'open', ?14);
+
+-- name: UpdateSuggestion :exec
+update artifact_suggestion
+  set at_rev = ?2, change = ?3, cursor_start = ?4, cursor_end = ?5, start_offset = ?6, end_offset = ?7, anchor_text = ?8, replacement_text = ?9
+  where id = ?1 and status = 'open';
 
 -- name: Suggestion :one
-select id, artifact_id, block_id, author, at_rev, change, status, created_at, resolved_at, resolved_by from artifact_suggestion where id = ?1;
+select id, artifact_id, block_id, author, origin, at_rev, change, cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text, status, created_at, resolved_at, resolved_by from artifact_suggestion where id = ?1;
 
 -- name: Suggestions :many
-select id, artifact_id, block_id, author, at_rev, change, status, created_at, resolved_at, resolved_by from artifact_suggestion where artifact_id = ?1 order by created_at, id limit ?2;
+select id, artifact_id, block_id, author, origin, at_rev, change, cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text, status, created_at, resolved_at, resolved_by from artifact_suggestion where artifact_id = ?1 order by created_at, id limit ?2;
 
 -- name: ResolveSuggestion :exec
 update artifact_suggestion set status = ?2, resolved_at = ?3, resolved_by = ?4 where id = ?1 and status = 'open';
@@ -159,3 +164,13 @@ select seq, paths, deleted
 
 -- name: PruneArtifactEntryChanges :exec
 delete from artifact_entry_change where created_at < ?1;
+
+-- name: ArtifactCollab :one
+select snapshot from artifact_collab where artifact_id = ?1;
+
+-- name: UpsertArtifactCollab :exec
+insert into artifact_collab (artifact_id, snapshot, updated_at)
+  values (?1, ?2, ?3)
+  on conflict (artifact_id) do update set
+    snapshot = excluded.snapshot,
+    updated_at = excluded.updated_at;

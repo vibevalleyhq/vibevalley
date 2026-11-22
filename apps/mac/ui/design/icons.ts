@@ -858,6 +858,15 @@ export const icons = {
     },
     { d: "M8.625 11.25 V8.25 A3.375 3.375 0 0 1 15.375 8.25 V11.25", stroke: 1.75, cap: "round", join: "round" },
   ],
+  sidebar: [
+    {
+      d: "M5 4.5 H19 Q21 4.5 21 6.5 V17.5 Q21 19.5 19 19.5 H5 Q3 19.5 3 17.5 V6.5 Q3 4.5 5 4.5 Z",
+      stroke: 1.75,
+      cap: "round",
+      join: "round",
+    },
+    { d: "M9.25 4.5 V19.5", stroke: 1.75, cap: "round", join: "round" },
+  ],
 } satisfies Record<string, readonly IconShape[]>;
 
 export type IconName = keyof typeof icons;

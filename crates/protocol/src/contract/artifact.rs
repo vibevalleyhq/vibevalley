@@ -37,6 +37,8 @@ impl ArtifactBody {
 pub enum ArtifactType {
     #[serde(rename = "docs")]
     Docs,
+    #[serde(rename = "outline")]
+    Outline,
     #[serde(rename = "slides")]
     Slides,
     #[serde(rename = "dashboard")]
@@ -52,8 +54,9 @@ pub enum ArtifactType {
 }
 
 impl ArtifactType {
-    pub const ALL: [ArtifactType; 7] = [
+    pub const ALL: [ArtifactType; 8] = [
         ArtifactType::Docs,
+        ArtifactType::Outline,
         ArtifactType::Slides,
         ArtifactType::Dashboard,
         ArtifactType::Motion,
@@ -66,12 +69,26 @@ impl ArtifactType {
     pub fn as_str(self) -> &'static str {
         match self {
             ArtifactType::Docs => "docs",
+            ArtifactType::Outline => "outline",
             ArtifactType::Slides => "slides",
             ArtifactType::Dashboard => "dashboard",
             ArtifactType::Motion => "motion",
             ArtifactType::Whiteboard => "whiteboard",
             ArtifactType::Design => "design",
             ArtifactType::DesignSystem => "design-system",
+        }
+    }
+
+    /// Which storage body backs this structured artifact type.
+    pub fn body(self) -> ArtifactBody {
+        match self {
+            ArtifactType::Docs | ArtifactType::Outline => ArtifactBody::Blocks,
+            ArtifactType::Slides
+            | ArtifactType::Dashboard
+            | ArtifactType::Motion
+            | ArtifactType::Whiteboard
+            | ArtifactType::Design
+            | ArtifactType::DesignSystem => ArtifactBody::Store,
         }
     }
 }
@@ -1155,6 +1172,10 @@ pub struct Suggestion {
     pub created_at: i64,
     pub resolved_at: Option<i64>,
     pub resolved_by: Option<String>,
+    pub cursor_start: Option<String>,
+    pub cursor_end: Option<String>,
+    pub start_offset: Option<u32>,
+    pub end_offset: Option<u32>,
 }
 
 #[skip_serializing_none]
@@ -1346,6 +1367,224 @@ pub struct ArtifactDemoInput {
     pub id: ArtifactId,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum ArtifactPresenceKind {
+    #[serde(rename = "cursor")]
+    Cursor,
+    #[serde(rename = "block_cursor")]
+    BlockCursor,
+    #[serde(rename = "selection")]
+    Selection,
+    #[serde(rename = "highlight")]
+    Highlight,
+    #[serde(rename = "viewport")]
+    Viewport,
+}
+
+impl ArtifactPresenceKind {
+    pub const ALL: [ArtifactPresenceKind; 5] = [
+        ArtifactPresenceKind::Cursor,
+        ArtifactPresenceKind::BlockCursor,
+        ArtifactPresenceKind::Selection,
+        ArtifactPresenceKind::Highlight,
+        ArtifactPresenceKind::Viewport,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ArtifactPresenceKind::Cursor => "cursor",
+            ArtifactPresenceKind::BlockCursor => "block_cursor",
+            ArtifactPresenceKind::Selection => "selection",
+            ArtifactPresenceKind::Highlight => "highlight",
+            ArtifactPresenceKind::Viewport => "viewport",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ViewportRect {
+    pub x: JsNumber,
+    pub y: JsNumber,
+    pub w: JsNumber,
+    pub h: JsNumber,
+    pub zoom: Option<JsNumber>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactPresence {
+    /// Stable actor/peer identifier (e.g. "user" or "session:<id>").
+    pub id: String,
+    pub name: String,
+    pub color: Option<String>,
+    pub kind: ArtifactPresenceKind,
+    pub x: Option<JsNumber>,
+    pub y: Option<JsNumber>,
+    pub w: Option<JsNumber>,
+    pub h: Option<JsNumber>,
+    pub status: Option<String>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::BlockId>"))]
+    pub block_id: Option<BlockId>,
+    pub offset: Option<u32>,
+    pub end_offset: Option<u32>,
+    pub selector: Option<String>,
+    pub path: Option<String>,
+    pub viewport: Option<ViewportRect>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::SessionId>"))]
+    pub session_id: Option<SessionId>,
+    pub updated_at: i64,
+}
+
+/// Omit `presence` to remove the caller's live presence entry immediately.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactPresenceUpdateRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+    pub presence: Option<ArtifactPresence>,
+    pub peer_id: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactPresenceFollowRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "_tag")]
+pub enum ArtifactPresenceEvent {
+    #[serde(rename = "Snapshot", rename_all = "camelCase")]
+    Snapshot { peers: Vec<ArtifactPresence> },
+    #[serde(rename = "Upsert", rename_all = "camelCase")]
+    Upsert { peer: ArtifactPresence },
+    #[serde(rename = "Remove", rename_all = "camelCase")]
+    Remove { peer_id: String },
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactHistoryEntry {
+    /// Encoded Loro frontiers identifying this commit snapshot.
+    pub frontiers: String,
+    pub author: String,
+    pub agent: Option<String>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::SessionId>"))]
+    pub session_id: Option<SessionId>,
+    pub turn: Option<i64>,
+    pub origin: String,
+    pub summary: Option<String>,
+    pub at: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactHistoryListRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+    pub limit: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactHistoryPreviewRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+    pub frontiers: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactHistoryPreviewResult {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub artifact_id: ArtifactId,
+    pub body: ArtifactBody,
+    pub artifact_type: Option<ArtifactType>,
+    pub frontiers: String,
+    pub entry: Option<ArtifactHistoryEntry>,
+    pub blocks: Option<Vec<Block>>,
+    pub entries: Option<Vec<ArtifactEntry>>,
+    pub html: Option<String>,
+    pub markdown: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactHistoryRestoreRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+    pub frontiers: String,
+    pub note: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactHistoryForkRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+    pub frontiers: String,
+    pub title: Option<String>,
+    pub channel: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactHistoryUndoOriginRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+    pub origin: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactHistoryCompactRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "artifact";
@@ -1429,7 +1668,21 @@ crate::typescript::module! {
     ArtifactSuggestionCreateInput,
     ArtifactSuggestionAcceptInput,
     ArtifactMarkdownGetInput,
-    ArtifactDemoInput];
+    ArtifactDemoInput,
+    ArtifactPresenceKind,
+    ViewportRect,
+    ArtifactPresence,
+    ArtifactPresenceUpdateRequest,
+    ArtifactPresenceFollowRequest,
+    ArtifactPresenceEvent,
+    ArtifactHistoryEntry,
+    ArtifactHistoryListRequest,
+    ArtifactHistoryPreviewRequest,
+    ArtifactHistoryPreviewResult,
+    ArtifactHistoryRestoreRequest,
+    ArtifactHistoryForkRequest,
+    ArtifactHistoryUndoOriginRequest,
+    ArtifactHistoryCompactRequest];
     aliases: [ShellCount,
     ShellTime,
     ShellWords];

@@ -11,7 +11,6 @@ export interface SessionHandlers {
   readonly "session.get": (a: { readonly id: string }) => Promise<T.Session>;
   /** Its log, oldest first. run gives one run's only. */
   readonly "session.event.list": (a: { readonly id: string; readonly run?: string }) => Promise<T.SessionEvent[]>;
-  /** Opens or resumes a direct workspace chat session in a directory with no issue. */
   readonly "session.openWorkspace": (a: T.SessionOpenWorkspaceInput) => Promise<T.SessionWorkspace>;
   /** Starts a turn when idle; steers the current turn when working. */
   readonly "session.send": (a: T.SessionSendInput) => Promise<T.Session>;

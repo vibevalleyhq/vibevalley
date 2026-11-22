@@ -130,6 +130,24 @@ export interface VvWhiteboardExportEvent {
   content: string;
 }
 
+export interface VvWhiteboardCursorEvent {
+  x: number;
+  y: number;
+  viewportX: number;
+  viewportY: number;
+  viewportW: number;
+  viewportH: number;
+  zoom: number;
+}
+
+export interface VvWhiteboardViewportEvent {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  zoom: number;
+}
+
 export interface VvWhiteboardProps extends ComponentHostProps {
   entriesJson: string;
   presencesJson?: string;
@@ -141,6 +159,8 @@ export interface VvWhiteboardProps extends ComponentHostProps {
   onSelectionChange?: (event: VvWhiteboardSelectionEvent) => void;
   onOpenChat?: (event: VvWhiteboardChatEvent) => void;
   onExport?: (event: VvWhiteboardExportEvent) => void;
+  onCursorMove?: (event: VvWhiteboardCursorEvent) => void;
+  onViewportChange?: (event: VvWhiteboardViewportEvent) => void;
 }
 
 export interface VvRichModule {

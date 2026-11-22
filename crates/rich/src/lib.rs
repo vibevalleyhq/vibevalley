@@ -68,8 +68,8 @@ pub use theme::{
     vv_shiki_dark_theme, vv_shiki_light_theme,
 };
 pub use whiteboard::{
-    VvWhiteboard, VvWhiteboardBatchEvent, VvWhiteboardChatEvent, VvWhiteboardElement, VvWhiteboardEvent, VvWhiteboardExportEvent, VvWhiteboardProps,
-    VvWhiteboardSelectionEvent, vv_whiteboard,
+    VvWhiteboard, VvWhiteboardBatchEvent, VvWhiteboardChatEvent, VvWhiteboardCursorEvent, VvWhiteboardElement, VvWhiteboardEvent, VvWhiteboardExportEvent,
+    VvWhiteboardProps, VvWhiteboardSelectionEvent, VvWhiteboardViewportEvent, vv_whiteboard,
 };
 
 /// JS module specifier passed to `nativeModule("vibevalley/rich")` and `Registry::ui_set`.

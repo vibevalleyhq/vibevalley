@@ -16,11 +16,14 @@ required-features = ["scenarios"]
 [dependencies]
 vibevalley-i18n = { version = "0.1.0", path = "../i18n" }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
+base64 = { workspace = true }
 htmlize = { version = "1.1.0", features = ["unescape"] }
 jiff = { workspace = true }
 lol_html = "3.0.3"
+loro = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+thiserror = { workspace = true }
 url = { workspace = true }

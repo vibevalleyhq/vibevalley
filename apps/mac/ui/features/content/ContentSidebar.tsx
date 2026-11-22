@@ -2,7 +2,7 @@ import { Scroll, Text, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { ArtifactType, LibraryFileKind, PkmPageSummary } from "@vibevalley/protocol";
+import type { ArtifactType, LibraryFileKind } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -10,17 +10,12 @@ import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import type { IconName } from "../../design/icons";
 import { ActiveBar, SidebarSection } from "../../design/layout";
-import { motionClass } from "../../design/motion";
-import { CountPill } from "../../design/Tag";
-import { Bubble } from "../../design/Tip";
 import { ready, useQuery, useQueryClient } from "../../infra/query";
-import { Link, useLocation, useRouter } from "../../infra/router";
+import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { defineStored } from "../../infra/state/stored";
 import { artifactTypeIcon, useArtifacts } from "../artifact";
 import { libraryQuery } from "../media/listing";
-import { dayKey, titleFor } from "../pkm/days";
-import { pkmHref, usePkmVault } from "../pkm/vault";
 import { artifactFacetOf, type ContentBucket, contentBrowseBucket, mediaKindOf, openContentSearch, openTemplatePicker, pinnedKeys } from "./navigation";
 import { createQuickBlankNote } from "./templates";
 
@@ -30,6 +25,7 @@ const mediaSectionOpen = defineStored("content.sidebar.media", z.boolean(), true
 type ArtifactFacet = ArtifactType | "html";
 
 const artifactFacets: readonly { readonly type: ArtifactFacet; readonly icon: IconName; readonly label: () => string }[] = [
+  { type: "outline", icon: artifactTypeIcon.outline, label: () => t("web.library.content.artifactType.outline") },
   { type: "whiteboard", icon: artifactTypeIcon.whiteboard, label: () => t("web.library.content.artifactType.whiteboard") },
   { type: "docs", icon: artifactTypeIcon.docs, label: () => t("web.library.content.artifactType.docs") },
   { type: "slides", icon: artifactTypeIcon.slides, label: () => t("web.library.content.artifactType.slides") },
@@ -56,38 +52,19 @@ const rowClass = (active: boolean, indent = false) =>
     active ? "bg-selected" : "hover:bg-hover",
   ].join(" ");
 
-function activePkmSlugOf(pathname: string): string | undefined {
-  if (!pathname.startsWith("/pkm/")) return undefined;
-  const raw = pathname.slice("/pkm/".length);
-  return raw ? decodeURIComponent(raw) : undefined;
-}
-
-function sortNotes(pages: readonly PkmPageSummary[]): PkmPageSummary[] {
-  const today = dayKey(Date.now());
-  return pages.toSorted((a, b) => {
-    const aToday = a.day === today ? 1 : 0;
-    const bToday = b.day === today ? 1 : 0;
-    if (aToday !== bToday) return bToday - aToday;
-    return b.updated - a.updated;
-  });
-}
-
 export function ContentSidebar() {
   const router = useRouter();
   const location = useLocation();
   const queries = useQueryClient();
   const act = createAct();
 
-  const vault = usePkmVault();
   const artifacts = useArtifacts(() => ({}));
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
 
-  const notes = createMemo(() => sortNotes(ready(vault, undefined)?.pages ?? []));
   const allArtifacts = () => ready(artifacts, undefined) ?? [];
   const allMedia = () => ready(media, undefined) ?? [];
 
   const inBrowse = () => location().pathname === "/library" || location().pathname.startsWith("/library/");
-  const activeSlug = () => activePkmSlugOf(location().pathname);
   const bucket = () => contentBrowseBucket();
   const allArtifactsActive = () => {
     const b = bucket();
@@ -98,11 +75,10 @@ export function ContentSidebar() {
     return inBrowse() && b.kind === "media" && b.fileKind === undefined;
   };
 
-  const totalCount = () => notes().length + allArtifacts().length + allMedia().length;
+  const totalCount = () => allArtifacts().length + allMedia().length;
   const pinnedCount = createMemo(() => {
     const keys = new Set(pinnedKeys());
     let n = 0;
-    for (const p of notes()) if (keys.has(`note:${p.slug}`)) n += 1;
     for (const a of allArtifacts()) if (keys.has(`artifact:${a.id}`)) n += 1;
     for (const m of allMedia()) if (keys.has(`media:${m.attachment.id}`)) n += 1;
     return n;
@@ -133,7 +109,9 @@ export function ContentSidebar() {
 
   const newBlankNote = () => {
     if (act.busy()) return;
-    const existingNoteTitles = notes().map((p) => p.title);
+    const existingNoteTitles = allArtifacts()
+      .filter((a) => a.artifactType === "outline")
+      .map((a) => a.title);
     void act.run(() => createQuickBlankNote({ queries, router, existingNoteTitles }));
   };
 
@@ -176,25 +154,13 @@ export function ContentSidebar() {
           />
         </View>
 
-        <View class="gap-0.5">
-          <View class="h-7 flex-row items-center gap-1">
-            <View
-              role="button"
-              testID="content-nav-notes"
-              accessibilityLabel={t("web.library.content.notesAll")}
-              accessibilityState={{ selected: inBrowse() && bucket().kind === "notes" }}
-              tooltip={<Bubble text={t("web.library.content.notesAll")} />}
-              onPress={() => selectBucket({ kind: "notes" })}
-              class={`group relative h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md px-2 focus-visible:outline-2 focus-visible:outline-focus ${
-                inBrowse() && bucket().kind === "notes" ? "bg-selected" : "hover:bg-hover"
-              }`}
-            >
-              <If when={inBrowse() && bucket().kind === "notes"}>
-                <ActiveBar />
-              </If>
-              <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-muted group-hover:text-ink">{t("web.library.content.notes")}</Text>
-              <CountPill count={notes().length} hoverBright />
-            </View>
+        <SidebarSection
+          testID="content-nav-artifacts-section"
+          title={t("web.library.content.artifacts")}
+          count={allArtifacts().length}
+          open={artifactsSectionOpen.get()}
+          onToggle={() => artifactsSectionOpen.update((on) => !on)}
+          action={
             <IconButton
               icon="add"
               size={12}
@@ -203,46 +169,7 @@ export function ContentSidebar() {
               disabled={act.busy()}
               onClick={newBlankNote}
             />
-          </View>
-          <View testID="pkm-list" class="gap-0.5">
-            <Each of={notes()} key={(p) => p.slug}>
-              {(p) => {
-                const active = () => activeSlug() === p().slug;
-                const displayTitle = () => titleFor(p().title, p().day);
-                return (
-                  <Link
-                    href={pkmHref(p().slug)}
-                    testID="pkm-row"
-                    accessibilityLabel={displayTitle()}
-                    accessibilityState={{ selected: active() }}
-                    class={rowClass(active())}
-                  >
-                    <If when={active()}>
-                      <ActiveBar />
-                    </If>
-                    <Icon name={p().day ? "calendar" : "notes"} size={14} tone={active() ? "ink" : "muted"} />
-                    <Text class={`min-w-0 flex-1 truncate text-sm ${active() ? "font-semibold text-ink" : "font-medium text-ink"}`}>{displayTitle()}</Text>
-                    <If when={p().open > 0}>
-                      <Text
-                        class="shrink-0 font-mono text-2xs font-medium text-faint tabular-nums"
-                        accessibilityHint={t("web.library.content.notesTodoCount", { n: p().open })}
-                      >
-                        {String(p().open)}
-                      </Text>
-                    </If>
-                  </Link>
-                );
-              }}
-            </Each>
-          </View>
-        </View>
-
-        <SidebarSection
-          testID="content-nav-artifacts-section"
-          title={t("web.library.content.artifacts")}
-          count={allArtifacts().length}
-          open={artifactsSectionOpen.get()}
-          onToggle={() => artifactsSectionOpen.update((on) => !on)}
+          }
           listClass="gap-0.5"
         >
           <NavRow
@@ -309,16 +236,6 @@ export function ContentSidebar() {
               );
             }}
           </Each>
-          <View
-            role="button"
-            testID="content-nav-ai-generate"
-            accessibilityLabel={t("web.library.content.aiGenerate")}
-            onPress={() => openTemplatePicker("ai")}
-            class={`mt-1 h-7 flex-row items-center gap-1.5 rounded-md border border-dashed border-line-strong px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-ok-soft active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
-          >
-            <Icon name="generate" size={14} tone="accent" />
-            <Text class="min-w-0 flex-1 truncate text-xs font-medium text-accent">{t("web.library.content.aiGenerate")}</Text>
-          </View>
         </SidebarSection>
       </Scroll>
     </View>

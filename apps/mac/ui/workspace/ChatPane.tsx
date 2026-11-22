@@ -1,10 +1,10 @@
-import { effect, host, Image, keymap, Scroll, signal, Text, untracked, View } from "nsh";
+import { effect, host, keymap, Scroll, signal, Text, untracked, View } from "nsh";
 import { Input, Menu, MenuItem, MenuSeparator, TextView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
 import { Button } from "../design/Button";
-import { Select, TextInput } from "../design/Field";
+import { TextInput } from "../design/Field";
 import { Icon } from "../design/Icon";
 import { actionIcon, type IconName } from "../design/icons";
 import { motionClass, popupTransition } from "../design/motion";
@@ -45,13 +45,6 @@ import {
 } from "./chatSession";
 import { menuPopupClass, menuSeparatorClass, ShellIconButton } from "./chrome";
 import { SwarmPanel } from "./SwarmPanel";
-
-const KNOWN_RUNTIME_LOGOS = new Set(["claude", "codex", "opencode", "cursor", "kimi", "pi", "dsh", "grok", "antigravity"]);
-
-function runtimeLogoName(runtime: string): string | undefined {
-  const key = runtime.toLowerCase().replace(/^acp:/u, "");
-  return KNOWN_RUNTIME_LOGOS.has(key) ? `logo-${key}` : undefined;
-}
 
 function actionIconFor(action: SessionEvent["action"]): IconName {
   if (action !== undefined && action in actionIcon) return actionIcon[action];
@@ -418,7 +411,6 @@ export function WorkspaceChatPane() {
   const initialRuntime = typeof host.params.runtime === "string" && host.params.runtime.length > 0 ? host.params.runtime : "antigravity";
   const initialTitle = typeof host.params.title === "string" && host.params.title.trim().length > 0 ? host.params.title.trim() : undefined;
 
-  const pixelDir = signal<string | undefined>(typeof host.params.pixelDir === "string" ? host.params.pixelDir : undefined);
   const runtimes = signal<readonly WorkspaceRuntimeOption[]>([]);
   const sessionId = signal<string>(initialSessionId);
   const sessionTitle = signal<string | undefined>(initialTitle);
@@ -455,18 +447,8 @@ export function WorkspaceChatPane() {
   const resolvedTitle = () => deriveChatTitle(sessionTitle(), swarm()?.title, firstUserMessage());
   const shownSteps = () => visibleChatSteps(steps());
   const telemetry = () => computeTelemetry(steps(), latestTokens());
-  const logoSrc = () => {
-    const dir = pixelDir();
-    const logo = runtimeLogoName(runtime());
-    return dir && logo ? `file://${encodeURI(`${dir}/${logo}.png`)}` : undefined;
-  };
 
   if (host.available()) {
-    if (!pixelDir()) {
-      void hostApi.pixelDir().then((env) => {
-        if (env.bizCode === 0 && env.data?.path) pixelDir.set(env.data.path);
-      });
-    }
     void fetchWorkspaceRuntimes().then((list) => {
       runtimes.set(list);
       const active = list.find((r) => r.id === untracked(runtime));
@@ -729,23 +711,12 @@ export function WorkspaceChatPane() {
   const composerMenuClass = `${menuPopupClass} ${motionClass("transition-opacity duration-120 ease-out")}`;
   const composerMenuItemClass = "h-7 flex-row items-center justify-between gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
 
+  const permissionLabel = () => permissionOptions.find((o) => o.value === permissionMode())?.label ?? permissionMode();
+
   return (
     <View testID="workspace-chat-pane" class="min-h-0 flex-1 bg-page">
-      <View testID="chat-header" class="h-9 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3">
+      <View testID="chat-header" class="h-8 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3">
         <View class="min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden">
-          <View class="size-4 shrink-0 items-center justify-center">
-            <If when={logoSrc()} else={<Icon name="runtimes" size={14} tone="muted" />}>
-              {(src) => <Image src={src()} class="size-4 object-contain" />}
-            </If>
-          </View>
-          <View
-            class="min-w-0 shrink overflow-hidden"
-            tooltip={resolvedTitle() ? <Bubble text={`${runtimeDisplayName(runtime())} · ${resolvedTitle()}`} /> : undefined}
-          >
-            <Text testID="chat-header-title" class="min-w-0 truncate text-xs font-semibold text-ink">
-              {resolvedTitle() ?? runtimeDisplayName(runtime())}
-            </Text>
-          </View>
           <View class="h-5 shrink-0 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5">
             <Dot tone={phaseTone(effectivePhase())} size={6} ring={false} />
             <Text testID="chat-phase-label" class="text-2xs font-medium text-muted">
@@ -756,7 +727,7 @@ export function WorkspaceChatPane() {
             <View
               testID="chat-cwd-chip"
               tooltip={<Bubble text={cwd} />}
-              class="min-w-0 max-w-28 shrink flex-row items-center gap-1 overflow-hidden rounded-sm border border-line bg-side px-1.5 py-0.5"
+              class="h-5 min-w-0 max-w-36 shrink flex-row items-center gap-1 overflow-hidden rounded-sm border border-line bg-side px-1.5"
             >
               <View class="shrink-0">
                 <Icon name="folder" size={12} tone="faint" />
@@ -764,8 +735,6 @@ export function WorkspaceChatPane() {
               <Text class="min-w-0 shrink truncate font-mono text-2xs text-muted">{basenameOf(cwd)}</Text>
             </View>
           </If>
-        </View>
-        <View class="shrink-0 flex-row items-center gap-1.5">
           <If when={swarm()}>
             {(sw) => (
               <View
@@ -786,22 +755,56 @@ export function WorkspaceChatPane() {
               </View>
             )}
           </If>
-          <Select
-            value={permissionMode()}
-            options={permissionOptions}
-            label={t("web.shell.chat.permissionMode")}
-            testid="chat-permission-mode"
-            size="control"
-            text="xs"
-            quiet
-            class="w-28 shrink-0"
-            onChange={(v) => {
-              permissionMode.set(v);
-              void applyConfig({ permissionMode: v });
-            }}
-          />
+        </View>
+        <View class="shrink-0 flex-row items-center gap-1">
+          <Menu
+            placement="bottom"
+            align="end"
+            offset={4}
+            popupClass={composerMenuClass}
+            popupStartingClass={popupTransition("opacity-0")}
+            popupEndingClass={popupTransition("opacity-0")}
+            trigger={
+              <View
+                testID="chat-permission-mode"
+                accessibilityLabel={t("web.shell.chat.permissionMode")}
+                tooltip={<Bubble text={t("web.shell.chat.permissionMode")} />}
+                class="h-6 shrink-0 flex-row items-center gap-1 rounded-md px-1.5 hover:bg-hover aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
+              >
+                <Text class="text-xs font-medium text-muted">{permissionLabel()}</Text>
+                <View class="shrink-0" style={{ transform: [{ rotate: "90deg" }] }}>
+                  <Icon name="expand" size={9} tone="faint" />
+                </View>
+              </View>
+            }
+          >
+            <Each of={permissionOptions} key={(opt) => opt.value}>
+              {(opt) => (
+                <MenuItem
+                  testID={`chat-permission-mode-${opt().value}`}
+                  onSelect={() => {
+                    const next = opt().value;
+                    permissionMode.set(next);
+                    void applyConfig({ permissionMode: next });
+                  }}
+                  class={composerMenuItemClass}
+                >
+                  <Text class="text-xs text-ink">{opt().label}</Text>
+                  <If when={permissionMode() === opt().value}>
+                    <Icon name="check" size={12} tone="accent" />
+                  </If>
+                </MenuItem>
+              )}
+            </Each>
+          </Menu>
           <If when={cwd.length > 0}>
-            <ShellIconButton icon="terminal" size={14} label={t("web.shell.chat.openTerminal")} onPress={() => act({ type: "new_terminal_at", path: cwd })} />
+            <ShellIconButton
+              compact
+              icon="terminal"
+              size={13}
+              label={t("web.shell.chat.openTerminal")}
+              onPress={() => act({ type: "new_terminal_at", path: cwd })}
+            />
           </If>
         </View>
       </View>

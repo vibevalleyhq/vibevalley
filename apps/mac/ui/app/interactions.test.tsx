@@ -1,7 +1,7 @@
 import "../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
-import type { ChatMessage, OrchestratorApproval } from "@vibevalley/protocol";
+import type { Artifact, ArtifactHistoryEntry, ArtifactId, BlockId, ChatMessage, OrchestratorApproval, Suggestion, SuggestionId } from "@vibevalley/protocol";
 
 import { sampleChanges } from "../features/issue/model/issue.samples";
 import { responses as artifactResponses } from "../fixtures/artifacts";
@@ -197,50 +197,99 @@ test("orchestrator trajectory: polled approval can be granted", async () => {
   });
 });
 
-test("pkm: opens notes workspace, lists pages, and switches notes cleanly", async () => {
-  const { app, fake } = await mountApp("/pkm");
-  expect(app.count("id:pkm")).toBe(1);
-  expect(app.count("id:content-sidebar")).toBe(1);
-  expect(app.count("id:pkm-list")).toBe(1);
-  expect(app.count("id:pkm-row")).toBeGreaterThan(0);
-  expect(app.count("id:pkm-nav")).toBe(0);
-  expect(app.count("id:pkm-calendar")).toBe(0);
-
-  await app.press("id:pkm-row >> nth=0");
-  await fake.pump(app);
+test("pkm: deep links remain readable while bare /pkm redirects to newest outline artifact when present", async () => {
+  const outlineArt: Artifact = {
+    id: "art-outline-1" as ArtifactId,
+    title: "每周复盘大纲",
+    body: "blocks",
+    artifactType: "outline",
+    isDefault: false,
+    by: "user",
+    byName: "用户",
+    version: 0,
+    seq: 1,
+    versions: [],
+    at: SCENARIO_NOW - 10_000,
+    updated: SCENARIO_NOW - 5_000,
+  };
+  const { app, fake } = await mountApp("/pkm/2026-10-14", (f) => {
+    for (const [op, handler] of Object.entries(artifactResponses)) {
+      f.respond(op, handler);
+    }
+    f.respond("artifact.list", (p: { artifactType?: string }) => (p?.artifactType === "outline" ? [outlineArt] : [outlineArt]));
+    f.respond("artifact.get", (p: { id?: string }) => (p?.id === "art-outline-1" ? outlineArt : { bizCode: 100004, message: "not found" }));
+    f.respond("artifact.block.list", () => ({ artifact: outlineArt, blocks: [] }));
+  });
   expect(app.count("id:pkm-page")).toBe(1);
-  expect(app.count("id:pkm-tier-select")).toBe(0);
-  expect(app.count("id:pkm-contents")).toBe(0);
+  expect(app.count("id:content-sidebar")).toBe(1);
+  expect(app.count("id:content-nav-notes")).toBe(0);
+  expect(app.count("id:content-nav-ai-generate")).toBe(0);
+  expect(app.count("id:content-nav-artifact-outline")).toBe(1);
+
+  await app.host.send("route", "/pkm");
+  await fake.pumpUntil(app, () => app.count("id:artifacts") === 1 && app.count("id:artifact-blocks") === 1);
+  expect(app.count("id:artifact-header")).toBe(1);
+  expect(app.value("id:artifact-title")).toBe("每周复盘大纲");
 });
 
-test("content hub: template picker, sidebar switching, and context memory across places", async () => {
+test("content hub: binary sidebar, outline template creation via artifact.create, and context memory across places", async () => {
+  const created: Artifact[] = [];
   const { app, fake } = await mountApp("/library", (f) => {
     for (const [op, handler] of Object.entries(artifactResponses)) {
       f.respond(op, handler);
     }
+    f.respond("artifact.create", (p: { title?: string; kind?: string; artifactType?: Artifact["artifactType"]; content?: string }) => {
+      const made: Artifact = {
+        id: `art-outline-created-${created.length + 1}` as ArtifactId,
+        title: p.title ?? "未命名",
+        body: p.kind === "store" ? "store" : p.kind === "html" ? "html" : "blocks",
+        ...(p.artifactType ? { artifactType: p.artifactType } : {}),
+        isDefault: false,
+        by: "user",
+        byName: "用户",
+        version: 0,
+        seq: 1,
+        versions: [],
+        at: SCENARIO_NOW,
+        updated: SCENARIO_NOW,
+      };
+      created.push(made);
+      return made;
+    });
+    f.respond("artifact.get", (p: { id?: string }) => {
+      const hit = created.find((a) => a.id === p?.id);
+      if (hit) return hit;
+      const fn = artifactResponses["artifact.get"] as (arg: unknown) => unknown;
+      return fn(p);
+    });
+    f.respond("artifact.block.list", (p: { id?: string }) => {
+      const hit = created.find((a) => a.id === p?.id);
+      if (hit) return { artifact: hit, blocks: [] };
+      const fn = artifactResponses["artifact.block.list"] as (arg: unknown) => unknown;
+      return fn(p);
+    });
   });
 
   expect(app.count("id:library-page")).toBe(1);
   expect(app.count("id:content-sidebar")).toBe(1);
+  expect(app.count("id:content-nav-notes")).toBe(0);
+  expect(app.count("id:content-nav-ai-generate")).toBe(0);
+  expect(app.count("id:content-nav-artifact-outline")).toBe(1);
 
+  fake.clearCalls();
   await app.press("id:content-new-btn");
   await fake.pump(app);
   expect(app.count("id:content-template-modal")).toBe(1);
-  await app.keyboard.press("escape");
-  await fake.pump(app);
-  expect(app.count("id:content-template-modal")).toBe(0);
+  await app.press("id:content-template-tpl-note-tech");
+  await fake.pumpUntil(app, () => app.count("id:artifacts") === 1 && app.count("id:artifact-blocks") === 1);
+  const createCall = fake.calls.find((c) => c.op === "artifact.create");
+  expect(createCall?.payload).toMatchObject({ kind: "markdown", artifactType: "outline" });
+  expect(fake.calls.some((c) => c.op === "pkm.page.save")).toBe(false);
 
-  await app.press("id:pkm-row >> nth=0");
-  await fake.pump(app);
-  expect(app.count("id:pkm-page")).toBe(1);
-
-  await app.press("id:place-issues");
-  await fake.pump(app);
-  expect(app.count("id:issues-page")).toBe(1);
-
-  await app.press("id:place-content");
-  await fake.pump(app);
-  expect(app.count("id:pkm-page")).toBe(1);
+  fake.clearCalls();
+  await app.press("id:content-new-note-btn");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.create"));
+  expect(fake.calls.find((c) => c.op === "artifact.create")?.payload).toMatchObject({ kind: "markdown", artifactType: "outline" });
 
   await app.press("id:content-nav-artifacts-all");
   await fake.pump(app);
@@ -260,6 +309,169 @@ test("content hub: template picker, sidebar switching, and context memory across
   await fake.pump(app);
   expect(app.count("id:artifacts")).toBe(1);
   expect(app.count("id:artifact-header")).toBe(1);
+});
+
+test("presence & durable-cursor suggestions: BlocksView renders live peer pills and accepts/rejects via Tab/Esc", async () => {
+  const aid = "art-mine" as ArtifactId;
+  const snapFn = artifactResponses["artifact.block.list"] as (p: { id: string }) => { blocks: Array<{ id: BlockId }> };
+  const blockId1 = snapFn({ id: aid }).blocks[0]?.id ?? ("art-mine-b11" as BlockId);
+  let resolved: { op: string; id: string } | undefined;
+  const openSuggestion: Suggestion = {
+    id: "sug-durable-1" as SuggestionId,
+    artifactId: aid,
+    blockId: blockId1,
+    author: "w1",
+    baseRev: 0, // Stale baseRev, but anchored with Loro durable cursors so still acceptable!
+    change: { text: [{ t: "发版前（已修订）", marks: {} }] },
+    status: "open",
+    createdAt: SCENARIO_NOW,
+    cursorStart: "c:start",
+    cursorEnd: "c:end",
+    startOffset: 0,
+    endOffset: 2,
+  };
+
+  const { app, fake } = await mountApp("/artifacts/art-mine", (f) => {
+    for (const [op, handler] of Object.entries(artifactResponses)) {
+      f.respond(op, handler);
+    }
+    f.respond("artifact.suggestion.accept", (p: { suggestion: string }) => {
+      resolved = { op: "accept", id: p.suggestion };
+      return { ...openSuggestion, status: "accepted" };
+    });
+    f.respond("artifact.suggestion.reject", (p: { suggestion: string }) => {
+      resolved = { op: "reject", id: p.suggestion };
+      return { ...openSuggestion, status: "rejected" };
+    });
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:artifact-blocks") === 1 && app.count("id:artifact-block") > 0);
+
+  await fake.emit(app, "artifact.presence.follow", {
+    _tag: "Snapshot",
+    peers: [{ id: "session:w1", name: "老周", color: "coral", kind: "block_cursor", blockId: blockId1, offset: 1, status: "润色中", updatedAt: SCENARIO_NOW }],
+  });
+  await fake.pump(app);
+  expect(app.count("id:artifact-presence-pill")).toBe(1);
+  expect(app.texts().some((s) => s.includes("老周"))).toBe(true);
+
+  await fake.emit(app, "artifact.presence.follow", { _tag: "Remove", peerId: "session:w1" });
+  await fake.pump(app);
+  expect(app.count("id:artifact-presence-pill")).toBe(0);
+
+  await fake.emit(app, "artifact.suggestion.follow", {
+    _tag: "Suggestions",
+    suggestions: [openSuggestion],
+  });
+  await fake.pumpUntil(app, () => app.count("id:artifact-inline-suggestion") === 1);
+  expect(app.enabled("id:inline-suggestion-accept")).toBe(true);
+
+  await app.keyboard.press("tab");
+  await fake.pumpUntil(app, () => resolved?.op === "accept");
+  expect(resolved).toEqual({ op: "accept", id: "sug-durable-1" });
+
+  resolved = undefined;
+  const secondSuggestion: Suggestion = { ...openSuggestion, id: "sug-durable-2" as SuggestionId };
+  await fake.emit(app, "artifact.suggestion.follow", {
+    _tag: "Suggestions",
+    suggestions: [secondSuggestion],
+  });
+  await fake.pumpUntil(app, () => app.count("id:artifact-inline-suggestion") === 1);
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => resolved?.op === "reject");
+  expect(resolved).toEqual({ op: "reject", id: "sug-durable-2" });
+});
+
+test("whiteboard presence: consumes artifact.presence.follow, publishes via artifact.presence.update, never writes presence/* to batch", async () => {
+  const { app, fake } = await mountApp("/artifacts/art-launch-board", (f) => {
+    for (const [op, handler] of Object.entries(artifactResponses)) {
+      f.respond(op, handler);
+    }
+  });
+  await fake.pumpUntil(app, () => app.count("id:whiteboard-view") === 1 && !app.texts().includes("0 个元素"));
+
+  await fake.emit(app, "artifact.presence.follow", {
+    _tag: "Upsert",
+    peer: { id: "session:helper", name: "老周", color: "teal", kind: "cursor", x: 320, y: 180, status: "连线中", updatedAt: SCENARIO_NOW },
+  });
+  await fake.pump(app);
+  expect(app.count("id:wb-presence-peer")).toBeGreaterThanOrEqual(1);
+  expect(app.texts()).toContain("老周 · 连线中");
+
+  await fake.emit(app, "artifact.presence.follow", { _tag: "Remove", peerId: "session:helper" });
+  await fake.pump(app);
+  expect(app.texts()).not.toContain("老周 · 连线中");
+
+  fake.clearCalls();
+  await app.press("id:wb-inspector-toggle");
+  await app.press("id:wb-inspector-item-c-1");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.presence.update"));
+  expect(fake.calls.some((c) => c.op === "artifact.presence.update")).toBe(true);
+  const batchWrites = fake.calls
+    .filter((c) => c.op === "artifact.entry.batch")
+    .flatMap((c) => ((c.payload as { writes?: Array<{ path: string }> })?.writes ?? []).map((w) => w.path));
+  expect(batchWrites.some((p) => p.startsWith("presence/"))).toBe(false);
+});
+
+test("timeline: scrubs history preview and executes restore, fork, and selective undoOrigin", async () => {
+  const aid = "art-mine" as ArtifactId;
+  const historyEntries: ArtifactHistoryEntry[] = [
+    { frontiers: "f-latest", author: "w1", agent: "w1", turn: 2, origin: "session:w1:turn:2", summary: "补充落点线", at: SCENARIO_NOW - 60_000 },
+    { frontiers: "f-initial", author: "user", origin: "user", summary: "初始草案", at: SCENARIO_NOW - 300_000 },
+  ];
+  const { app, fake } = await mountApp("/artifacts/art-mine", (f) => {
+    for (const [op, handler] of Object.entries(artifactResponses)) {
+      f.respond(op, handler);
+    }
+    f.respond("artifact.history.list", () => historyEntries);
+    f.respond("artifact.history.preview", (p: { frontiers: string }) => ({
+      artifactId: aid,
+      body: "blocks",
+      frontiers: p.frontiers,
+      entry: historyEntries.find((e) => e.frontiers === p.frontiers),
+      blocks: [
+        {
+          id: "b-prev" as BlockId,
+          orderKey: "a0001",
+          type: "heading",
+          attrs: { level: 2 },
+          text: [{ t: "历史快照内容", marks: {} }],
+          artifactId: aid,
+          rev: 1,
+          updatedBy: "user",
+          updated: SCENARIO_NOW - 300_000,
+        },
+      ],
+    }));
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:artifact-timeline-toggle") === 1);
+  await app.press("id:artifact-timeline-toggle");
+  await fake.pumpUntil(app, () => app.count("id:artifact-timeline-bar") === 1 && app.count("id:timeline-node-0") === 1);
+
+  fake.clearCalls();
+  await app.press("id:timeline-node-0");
+  await fake.pumpUntil(app, () => app.count("id:artifact-history-preview") === 1);
+  expect(fake.calls.find((c) => c.op === "artifact.history.preview")?.payload).toEqual({ id: aid, frontiers: "f-initial" });
+  expect(app.texts()).toContain("历史快照内容");
+
+  fake.clearCalls();
+  await app.press("id:timeline-restore");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.restore"));
+  expect(fake.calls.find((c) => c.op === "artifact.history.restore")?.payload).toMatchObject({ id: aid, frontiers: "f-initial" });
+
+  await fake.pumpUntil(app, () => app.count("id:timeline-node-1") === 1);
+  await app.press("id:timeline-node-1");
+  await fake.pump(app);
+  fake.clearCalls();
+  await app.press("id:timeline-undo-origin");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.undoOrigin"));
+  expect(fake.calls.find((c) => c.op === "artifact.history.undoOrigin")?.payload).toEqual({ id: aid, origin: "session:w1:turn:2" });
+
+  fake.clearCalls();
+  await app.press("id:timeline-fork");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.fork"));
+  expect(fake.calls.find((c) => c.op === "artifact.history.fork")?.payload).toMatchObject({ id: aid, frontiers: "f-latest" });
 });
 
 test("whiteboard: renders launch timeline elements, adds/undoes nodes, edits inspector, exports SVG, and asks assistant", async () => {
@@ -441,8 +653,7 @@ test("regression: whiteboard ChannelSidePane survives artifact polling, remount 
   expect(sendPayload?.sendKey).toBeTruthy();
   expect(app.count("id:pending-line-sending")).toBe(1);
 
-  // Push a fresh StateFrame while the send intent holds a second listener on `followed`
-  // (reproducing the exact owner-disposal race that previously detached `host.on("sub:<id>")`).
+  // A fresh StateFrame must not detach the send intent's second `followed` listener.
   await fake.setState(app, { ...fixture.state });
 
   const sampleMsg = (fixture.responses["channel.message.list"] as ChatMessage[] | undefined)?.[0];

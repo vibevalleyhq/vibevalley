@@ -24,7 +24,6 @@ export function showsNotesInBucket(bucket: ContentBucket): boolean {
   switch (bucket.kind) {
     case "recent":
     case "pinned":
-    case "notes":
       return true;
     case "artifacts":
     case "media":
@@ -38,7 +37,6 @@ export function showsArtifactsInBucket(bucket: ContentBucket): boolean {
     case "pinned":
     case "artifacts":
       return true;
-    case "notes":
     case "media":
       return false;
   }
@@ -50,7 +48,6 @@ export function showsMediaInBucket(bucket: ContentBucket): boolean {
     case "pinned":
     case "media":
       return true;
-    case "notes":
     case "artifacts":
       return false;
   }

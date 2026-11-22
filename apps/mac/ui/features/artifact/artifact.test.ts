@@ -1,9 +1,11 @@
 import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
+import { userId } from "@vibevalley/protocol";
+
 import { codePointOffset, editSpans, markdownShortcut } from "./blocks";
 import { artifactSuffixOf, inferArtifactFromName, inferDisplayFromContent } from "./html";
-import { selectionOf, shellMessageOf } from "./shell";
+import { presenceHighlightCommand, selectionOf, shellMessageOf } from "./shell";
 import { storeMessageOf } from "./viewers";
 
 test("handles editor span shortcuts and UTF-16 code-point offsets", () => {
@@ -48,6 +50,7 @@ test("infers compound artifact extensions and formats canonical suffixes", () =>
   expect(inferArtifactFromName("intro.motion.html")).toEqual({ title: "intro", kind: "html", display: "motion", artifactType: "motion" });
   expect(inferArtifactFromName("pipeline.whiteboard")).toEqual({ title: "pipeline", kind: "html", display: "page", artifactType: "whiteboard" });
   expect(inferArtifactFromName("brand.tokens.json")).toEqual({ title: "brand", kind: "html", display: "page", artifactType: "design-system" });
+  expect(inferArtifactFromName("weekly.outline.md")).toEqual({ title: "weekly", kind: "markdown", artifactType: "outline" });
   expect(inferArtifactFromName("notes.doc.md")).toEqual({ title: "notes", kind: "markdown", artifactType: "docs" });
   expect(inferArtifactFromName("plain.html", "<script>vv.timeline(5, () => {})</script>")).toEqual({
     title: "plain",
@@ -58,6 +61,7 @@ test("infers compound artifact extensions and formats canonical suffixes", () =>
   expect(inferDisplayFromContent("<p>Just a page</p>")).toBeUndefined();
 
   expect(artifactSuffixOf({ body: "blocks" })).toBe(".doc.md");
+  expect(artifactSuffixOf({ body: "blocks", artifactType: "outline" })).toBe(".outline.md");
   expect(artifactSuffixOf({ body: "store", artifactType: "docs" })).toBe(".doc.md");
   expect(artifactSuffixOf({ body: "store", artifactType: "slides" })).toBe(".slide.html");
   expect(artifactSuffixOf({ body: "store", artifactType: "dashboard" })).toBe(".dashboard.html");
@@ -68,4 +72,23 @@ test("infers compound artifact extensions and formats canonical suffixes", () =>
   expect(artifactSuffixOf({ body: "html", display: "page" })).toBe(".html");
   expect(artifactSuffixOf({ body: "html", display: "slides" })).toBe(".slide.html");
   expect(artifactSuffixOf({ body: "html", display: "motion" })).toBe(".motion.html");
+});
+
+test("presenceHighlightCommand filters local user, scopes by path, and normalizes highlight colors", () => {
+  const cmd = presenceHighlightCommand(
+    [
+      { id: userId, name: "Me", kind: "highlight", selector: "#local", updatedAt: 1 },
+      { id: "session:1", name: "老周", color: "coral", kind: "highlight", selector: ".kpi-card", status: "核对指标", path: "slides/01.html", updatedAt: 2 },
+      { id: "session:2", name: "小美", color: "#2f9d8f", kind: "cursor", x: 120, y: 80, w: 64, h: 32, path: "slides/02.html", updatedAt: 3 },
+      { id: "session:3", name: "助手", color: "teal", kind: "selection", x: 10, y: 20, updatedAt: 4 },
+    ],
+    { path: "slides/01.html" },
+  );
+  expect(cmd).toEqual({
+    vibevalley: "presence-highlight",
+    items: [
+      { id: "session:1", name: "老周", color: "#d9774f", selector: ".kpi-card", status: "核对指标" },
+      { id: "session:3", name: "助手", color: "#2f9d8f", x: 10, y: 20 },
+    ],
+  });
 });

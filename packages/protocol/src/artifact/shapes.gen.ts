@@ -1,11 +1,11 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
-import type { ArtifactId, BlockId, IssueId, SuggestionId } from "../common/shapes.gen";
+import type { ArtifactId, BlockId, IssueId, SessionId, SuggestionId } from "../common/shapes.gen";
 
 export const ArtifactBodyValues = ["blocks", "html", "store"] as const;
 export type ArtifactBody = (typeof ArtifactBodyValues)[number];
 
-export const ArtifactTypeValues = ["docs", "slides", "dashboard", "motion", "whiteboard", "design", "design-system"] as const;
+export const ArtifactTypeValues = ["docs", "outline", "slides", "dashboard", "motion", "whiteboard", "design", "design-system"] as const;
 export type ArtifactType = (typeof ArtifactTypeValues)[number];
 
 export const ArtifactEntryKindValues = ["text", "json", "asset"] as const;
@@ -217,7 +217,7 @@ export type SuggestionStatus = (typeof SuggestionStatusValues)[number];
  */
 export type SuggestionChange = { text?: Array<TextSpan>, type?: BlockType, attrs?: BlockAttrs, unset?: Array<string>, delete?: boolean, };
 
-export type Suggestion = { id: SuggestionId, artifactId: ArtifactId, blockId: BlockId, author: string, baseRev: number, change: SuggestionChange, status: SuggestionStatus, createdAt: number, resolvedAt?: number, resolvedBy?: string, };
+export type Suggestion = { id: SuggestionId, artifactId: ArtifactId, blockId: BlockId, author: string, baseRev: number, change: SuggestionChange, status: SuggestionStatus, createdAt: number, resolvedAt?: number, resolvedBy?: string, cursorStart?: string, cursorEnd?: string, startOffset?: number, endOffset?: number, };
 
 export type SuggestionCreate = { block: BlockId, baseRev: number, change: SuggestionChange, };
 
@@ -249,6 +249,46 @@ export type ArtifactSuggestionAcceptInput = { id: ArtifactId, suggestion: Sugges
 export type ArtifactMarkdownGetInput = { id: ArtifactId, };
 
 export type ArtifactDemoInput = { id: ArtifactId, };
+
+export const ArtifactPresenceKindValues = ["cursor", "block_cursor", "selection", "highlight", "viewport"] as const;
+export type ArtifactPresenceKind = (typeof ArtifactPresenceKindValues)[number];
+
+export type ViewportRect = { x: number, y: number, w: number, h: number, zoom?: number, };
+
+export type ArtifactPresence = {
+/**
+ * Stable actor/peer identifier (e.g. "user" or "session:<id>").
+ */
+id: string, name: string, color?: string, kind: ArtifactPresenceKind, x?: number, y?: number, w?: number, h?: number, status?: string, blockId?: BlockId, offset?: number, endOffset?: number, selector?: string, path?: string, viewport?: ViewportRect, sessionId?: SessionId, updatedAt: number, };
+
+/**
+ * Omit `presence` to remove the caller's live presence entry immediately.
+ */
+export type ArtifactPresenceUpdateRequest = { id: ArtifactId, presence?: ArtifactPresence, peerId?: string, };
+
+export type ArtifactPresenceFollowRequest = { id: ArtifactId, };
+
+export type ArtifactPresenceEvent = { "_tag": "Snapshot", peers: Array<ArtifactPresence>, } | { "_tag": "Upsert", peer: ArtifactPresence, } | { "_tag": "Remove", peerId: string, };
+
+export type ArtifactHistoryEntry = {
+/**
+ * Encoded Loro frontiers identifying this commit snapshot.
+ */
+frontiers: string, author: string, agent?: string, sessionId?: SessionId, turn?: number, origin: string, summary?: string, at: number, };
+
+export type ArtifactHistoryListRequest = { id: ArtifactId, limit?: number, };
+
+export type ArtifactHistoryPreviewRequest = { id: ArtifactId, frontiers: string, };
+
+export type ArtifactHistoryPreviewResult = { artifactId: ArtifactId, body: ArtifactBody, artifactType?: ArtifactType, frontiers: string, entry?: ArtifactHistoryEntry, blocks?: Array<Block>, entries?: Array<ArtifactEntry>, html?: string, markdown?: string, };
+
+export type ArtifactHistoryRestoreRequest = { id: ArtifactId, frontiers: string, note?: string, };
+
+export type ArtifactHistoryForkRequest = { id: ArtifactId, frontiers: string, title?: string, channel?: string, };
+
+export type ArtifactHistoryUndoOriginRequest = { id: ArtifactId, origin: string, };
+
+export type ArtifactHistoryCompactRequest = { id: ArtifactId, };
 
 export type ShellCount = number;
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { Codec } from "../codec";
-import { ArtifactId, BlockId, IssueId, SuggestionId } from "../common/schema";
+import { ArtifactId, BlockId, IssueId, SessionId, SuggestionId } from "../common/schema";
 import * as T from "./shapes.gen";
 
 const ArtifactBody = z.enum(T.ArtifactBodyValues) satisfies Codec<T.ArtifactBody>;
@@ -468,6 +468,10 @@ export const Suggestion = z.object({
   createdAt: z.number(),
   resolvedAt: z.exactOptional(z.number()),
   resolvedBy: z.exactOptional(z.string()),
+  cursorStart: z.exactOptional(z.string()),
+  cursorEnd: z.exactOptional(z.string()),
+  startOffset: z.exactOptional(z.number().int().min(0)),
+  endOffset: z.exactOptional(z.number().int().min(0)),
 }) satisfies Codec<T.Suggestion>;
 
 export const SuggestionCreate = z.object({
@@ -477,3 +481,104 @@ export const SuggestionCreate = z.object({
 }) satisfies Codec<T.SuggestionCreate>;
 
 export const SuggestionEvent = z.object({ _tag: z.literal("Suggestions"), suggestions: z.array(Suggestion) }) satisfies Codec<T.SuggestionEvent>;
+
+export const ArtifactPresenceKind = z.enum(T.ArtifactPresenceKindValues) satisfies Codec<T.ArtifactPresenceKind>;
+
+export const ViewportRect = z.object({
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+  zoom: z.exactOptional(z.number()),
+}) satisfies Codec<T.ViewportRect>;
+
+export const ArtifactPresence = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.exactOptional(z.string()),
+  kind: ArtifactPresenceKind,
+  x: z.exactOptional(z.number()),
+  y: z.exactOptional(z.number()),
+  w: z.exactOptional(z.number()),
+  h: z.exactOptional(z.number()),
+  status: z.exactOptional(z.string()),
+  blockId: z.exactOptional(BlockId),
+  offset: z.exactOptional(z.number().int().min(0)),
+  endOffset: z.exactOptional(z.number().int().min(0)),
+  selector: z.exactOptional(z.string()),
+  path: z.exactOptional(z.string()),
+  viewport: z.exactOptional(ViewportRect),
+  sessionId: z.exactOptional(SessionId),
+  updatedAt: z.number(),
+}) satisfies Codec<T.ArtifactPresence>;
+
+export const ArtifactPresenceUpdateRequest = z.object({
+  id: ArtifactId,
+  presence: z.exactOptional(ArtifactPresence),
+  peerId: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactPresenceUpdateRequest>;
+
+export const ArtifactPresenceFollowRequest = z.object({
+  id: ArtifactId,
+}) satisfies Codec<T.ArtifactPresenceFollowRequest>;
+
+export const ArtifactPresenceEvent = z.discriminatedUnion("_tag", [
+  z.object({ _tag: z.literal("Snapshot"), peers: z.array(ArtifactPresence) }),
+  z.object({ _tag: z.literal("Upsert"), peer: ArtifactPresence }),
+  z.object({ _tag: z.literal("Remove"), peerId: z.string() }),
+]) satisfies Codec<T.ArtifactPresenceEvent>;
+
+export const ArtifactHistoryEntry = z.object({
+  frontiers: z.string(),
+  author: z.string(),
+  agent: z.exactOptional(z.string()),
+  sessionId: z.exactOptional(SessionId),
+  turn: z.exactOptional(z.number()),
+  origin: z.string(),
+  summary: z.exactOptional(z.string()),
+  at: z.number(),
+}) satisfies Codec<T.ArtifactHistoryEntry>;
+
+export const ArtifactHistoryListRequest = z.object({
+  id: ArtifactId,
+  limit: z.exactOptional(z.number().int().min(1)),
+}) satisfies Codec<T.ArtifactHistoryListRequest>;
+
+export const ArtifactHistoryPreviewRequest = z.object({
+  id: ArtifactId,
+  frontiers: z.string(),
+}) satisfies Codec<T.ArtifactHistoryPreviewRequest>;
+
+export const ArtifactHistoryPreviewResult = z.object({
+  artifactId: ArtifactId,
+  body: ArtifactBody,
+  artifactType: z.exactOptional(ArtifactType),
+  frontiers: z.string(),
+  entry: z.exactOptional(ArtifactHistoryEntry),
+  blocks: z.exactOptional(z.array(Block)),
+  entries: z.exactOptional(z.array(ArtifactEntry)),
+  html: z.exactOptional(z.string()),
+  markdown: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactHistoryPreviewResult>;
+
+export const ArtifactHistoryRestoreRequest = z.object({
+  id: ArtifactId,
+  frontiers: z.string(),
+  note: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactHistoryRestoreRequest>;
+
+export const ArtifactHistoryForkRequest = z.object({
+  id: ArtifactId,
+  frontiers: z.string(),
+  title: z.exactOptional(z.string()),
+  channel: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactHistoryForkRequest>;
+
+export const ArtifactHistoryUndoOriginRequest = z.object({
+  id: ArtifactId,
+  origin: z.string(),
+}) satisfies Codec<T.ArtifactHistoryUndoOriginRequest>;
+
+export const ArtifactHistoryCompactRequest = z.object({
+  id: ArtifactId,
+}) satisfies Codec<T.ArtifactHistoryCompactRequest>;

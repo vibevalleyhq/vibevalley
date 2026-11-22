@@ -9,7 +9,7 @@
 | 媒体任务去重、排队、生成与下载的独立状态、重启恢复，以及最近任务的核心状态投影 | 连接与密钥（[AI 服务](docs/subsystems/provider.md)、[设置和配置](docs/subsystems/setting.md)） |
 | 本机输入暂存、配额回收，以及下载地址、公网目标、时间、字节和媒体格式校验 | 文件的字节、名字和类型存储（[附件](docs/subsystems/attachment.md)） |
 | 素材库（`media_library_item`）：每个附件至多一条，记首次来路（任务生成、上传或聊天发出、帮工/助手交来），以及帮工网址公网下载 | 发到频道的消息存储与广播（[频道](docs/subsystems/channel.md)） |
-| `/library` 页面：依托统一内容中心 `ContentShell` 的可折叠侧栏与单行筛选工具条，展示笔记卡、作品卡、按比例媒体缩略图、原生媒体详情栏、拖拽上传、键盘导航与生成对话框 | |
+| `/library` 页面：依托统一二元内容中心 `ContentShell` 的可折叠侧栏与单行筛选工具条，展示作品卡（含一等 `outline` 大纲笔记）、按比例媒体缩略图、原生媒体详情栏、拖拽上传、键盘导航与生成对话框 | |
 
 没有图片编辑、局部重绘或视频生成。素材库不收录音、摄像头和屏幕的画面、头像、Artifact（有自己的页面）以及帮工改的代码。
 
@@ -30,7 +30,7 @@
 | `crates/server/src/modules/team/tool/notes.rs` | 助手与帮工的 `media_*`、`library_item_*` 工具 |
 | `crates/server/src/offline.rs` | 测试用的离线 MOSS 与下载 |
 | `crates/protocol/src/contract/media.rs`、`packages/protocol/src/media/` | 媒体任务、输入与素材库的形状和接口（Rust 为源，TS 形状由它生成） |
-| `apps/mac/ui/features/media/` | `/library` 浏览与媒体详情：单行筛选工具条（来源 `SourceFilter`、排序、缩略图档位、上传）、笔记/作品/媒体卡片（`Tiles.tsx`）、原生文件详情栏（`Inspector.tsx`）与「生成」对话框；排法、计数、筛选与键盘落点在 `items.ts`、`libraryView.ts` 纯函数 |
+| `apps/mac/ui/features/media/` | `/library` 浏览与媒体详情：单行筛选工具条（来源 `SourceFilter`、排序、缩略图档位、上传）、作品（含大纲笔记）/媒体卡片（`Tiles.tsx`）、原生文件详情栏（`Inspector.tsx`）与「生成」对话框；排法、计数、筛选与键盘落点在 `items.ts`、`libraryView.ts` 纯函数 |
 
 接口权限见[接口清单](docs/reference/capabilities.md)（`media.*`、`library.*`）。生图、语音及任务读取对 `user` 与 `orchestrator` 开放，帮工没有生成权限；助手只有承接用户输入的一轮才能生成，自主巡查不能生成。
 
@@ -103,7 +103,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 
 ## 素材库
 
-素材库（`crates/server/src/modules/content/library/mod.rs`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。在工作台里，`/library` 嵌套在统一内容中心 `ContentShell` 中，与大纲笔记和作品共用左侧可折叠 `ContentSidebar`（含「全部最近」「置顶收藏」「大纲笔记」「作品（8 种精确类型）」「素材（4 种文件类型）」与 AI 生成入口），中间按当前桶展示笔记卡（`NoteTiles`）、作品卡（`ArtifactTiles`，单击直达）和按比例排布的媒体网格（`Tiles`、`MakingTiles`），右侧为媒体详情栏（`Inspector`），生成的表单收在 `/library?make=…` 对话框里。
+素材库（`crates/server/src/modules/content/library/mod.rs`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。在工作台里，`/library` 嵌套在统一二元内容中心 `ContentShell` 中，与作品共用左侧可折叠 `ContentSidebar`——侧栏收敛为顶部「全部最近」「置顶收藏」加 **「作品」（含置首的 `outline` 大纲笔记筛选与快捷新建及全部 8 种作品类型）+ 「素材」（4 种文件类型）** 二元结构，移除独立分裂的顶级「大纲笔记」大类以及底部与 `+ 新建` 重复的 `AI 生成素材` 按钮（侧栏展开时 `<Desk>` 顶栏也隐藏重复搜索/新建入口）。中间按当前桶展示作品卡（`ArtifactTiles`，单击直达 `/artifacts/:id`）和按比例排布的媒体网格（`Tiles`、`MakingTiles`），右侧为媒体详情栏（`Inspector`），生成的表单收在 `/library?make=…` 对话框里。
 
 - **一份文件一张卡**：主键是附件的 id（内容的 SHA-256）。同一份字节再来只更新 `last_at`，来路照第一次的；生成的那条的时间不再变。
 - **来路是封闭的联合**（`LibraryOrigin`，按 `kind`）：
@@ -113,7 +113,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 - **谁能给什么**：`library.item.add` 只收一种来源。经 HTTP 来的是用户，只能给已上传的附件；助手的工具只给网址，帮工的给网址或路径。网址只走公网 https（`infra/http.rs`），最大 `attachmentMax`（25 MB），60 秒；路径解析了符号链接以后仍要在工作目录里。
 - **拿掉只删这一条**：`library.item.delete` 不删附件，发过它的消息照样能打开。
 - **进行中任务实时对齐**：在做的生成任务读核心状态的 `media`，排在最前（麦色的虚线格）；完成的任务数一变，页面重读列表。
-- **搜排在服务端与统一弹窗，桶与来源筛选在页面**：`library.item.list` 按 `sort`（`recent`、`name`、`size`）列出素材，跨笔记、作品和素材的检索由 `ContentSearchModal` 承接；页面内单行 `min-h-11` 工具条按正交 `SourceFilter`（全部 / 执行会话交付 / 我创建的）、排序与缩略图档位（`S/M/L`，媒体可见时显示）过滤当前桶（`items.ts`、`libraryView.ts`）。
+- **搜排在服务端与统一弹窗，桶与来源筛选在页面**：`library.item.list` 按 `sort`（`recent`、`name`、`size`）列出素材，跨作品（含 `outline` 大纲笔记）与素材（兼容历史 `pkm` 兜底）的统一检索由 `ContentSearchModal` 承接；页面内单行 `min-h-11` 工具条按正交 `SourceFilter`（全部 / 执行会话交付 / 我创建的）、排序与缩略图档位（`S/M/L`，媒体可见时显示）过滤当前桶（`items.ts`、`libraryView.ts`）。
 - **原生媒体详情栏**（`Inspector.tsx`）：选中媒体时展开右侧面板，提供系统打开（`openAttachment`）、另存为（`saveFile`）、复制路径、在访达中显示（`hostApi.reveal`）、置顶/取消置顶、音频播放/停止切换（`playAudio` / `hostApi.stopAudio`），以及发到频道、AI 理解和原地确认删除。
 - **缩略图按比例排满一行**（`justify`）：每行缩放到正好占满宽度，最后一行保持目标高度；比例夹在 1:2 到 3:1。缩略图的高度每个看的人自己记（`prefs` 的 `libraryTile`，96–280px）。每格按附件 id 绝对定位，排法变了格子不重建，图不会重载。图、视频的比例和像素、音频和视频的时长在它们加载后从元素上读。
 - **选和键盘**：点一下选一个，⌘/Ctrl 点加减，Shift 点选一段；← → 按顺序走，↑ ↓ 去上下一行中间最近的那格（`neighbor`）；空格全屏看（`Lightbox`，← → 翻）；Delete 在详情栏里原地问一遍再拿掉；Esc 不选。文件拖到页面上即可上传，带作品复合后缀的文件自动建为 Artifact。

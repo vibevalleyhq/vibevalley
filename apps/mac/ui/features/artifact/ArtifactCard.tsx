@@ -37,6 +37,7 @@ const displayLabel: Record<ArtifactDisplay, string> = {
 
 const artifactTypeLabel: Record<ArtifactType, string> = {
   docs: t("web.artifact.types.docs"),
+  outline: t("web.artifact.types.outline"),
   slides: t("web.artifact.types.slides"),
   dashboard: t("web.artifact.types.dashboard"),
   motion: t("web.artifact.types.motion"),
@@ -47,6 +48,7 @@ const artifactTypeLabel: Record<ArtifactType, string> = {
 
 export const artifactTypeIcon: Record<ArtifactType, IconName> = {
   docs: "artifacts",
+  outline: "notes",
   slides: "present",
   dashboard: "catalog",
   motion: "video",
@@ -57,6 +59,7 @@ export const artifactTypeIcon: Record<ArtifactType, IconName> = {
 
 const artifactTypeSuffix: Record<ArtifactType, string> = {
   docs: ".doc.md",
+  outline: ".outline.md",
   slides: ".slide.html",
   dashboard: ".dashboard.html",
   motion: ".motion.html",

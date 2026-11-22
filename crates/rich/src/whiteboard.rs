@@ -7,21 +7,22 @@
 
 use std::cell::RefCell;
 use std::collections::BTreeSet;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
+use std::time::{Duration, Instant};
 
 use nsh_core::canvas::render::{ImageFormat, RenderOptions};
 use nsh_core::element::{ImageSrc, input};
 use nsh_core::keymap::Modifiers;
 use nsh_core::prelude::*;
-use serde::Deserialize;
 use vibevalley_i18n::t_in;
 use vibevalley_protocol::ArtifactEntry;
 
 use crate::engine::whiteboard::{
     AlignOp, ArrowCurve, BoardAction, BoardCommand, BoardDoc, DistributeAxis, ElementId, ElementKind, GridStyle, LayerPaintInput, Modifiers as WbModifiers,
-    Point2, PointerButton as WbPointerButton, PointerInput, Presence, PresenceColor, STICKERS, ShapeKind, StickerCategory, StrokeStyle, TemplateKind,
-    WhiteboardController, ZOrderDir, apply_command, build_export_painter, decode_board_entries, encode_element_json, export_json, export_json_canvas,
-    export_svg, measure_text_span, paint_minimap_painter, paint_overlay_layer_painter_filtered, paint_static_layer_painter,
+    Point2, PointerButton as WbPointerButton, PointerInput, Presence, PresenceColor, Rect2, STICKERS, ShapeKind, StickerCategory, StrokeStyle, TemplateKind,
+    WhiteboardController, ZOrderDir, apply_command, build_export_painter, decode_board_entries, decode_presences_json, encode_element_json, export_json,
+    export_json_canvas, export_svg, measure_text_span, merge_live_presences, paint_minimap_painter, paint_overlay_layer_painter_filtered,
+    paint_static_layer_painter,
 };
 use crate::theme::AdaptiveUi;
 
@@ -83,6 +84,40 @@ pub struct VvWhiteboardExportEvent {
     pub content: SharedString,
 }
 
+/// Payload emitted (throttled) when the local pointer moves in whiteboard world coordinates.
+#[derive(Debug, Clone, Default, PartialEq, JsObject)]
+pub struct VvWhiteboardCursorEvent {
+    /// Local pointer X coordinate in world space.
+    pub x: f64,
+    /// Local pointer Y coordinate in world space.
+    pub y: f64,
+    /// Visible world viewport left X coordinate.
+    pub viewport_x: f64,
+    /// Visible world viewport top Y coordinate.
+    pub viewport_y: f64,
+    /// Visible world viewport width.
+    pub viewport_w: f64,
+    /// Visible world viewport height.
+    pub viewport_h: f64,
+    /// Current camera zoom factor (`1.0` = 100%).
+    pub zoom: f64,
+}
+
+/// Payload emitted (throttled) when the local whiteboard camera viewport changes.
+#[derive(Debug, Clone, Default, PartialEq, JsObject)]
+pub struct VvWhiteboardViewportEvent {
+    /// Visible world viewport left X coordinate.
+    pub x: f64,
+    /// Visible world viewport top Y coordinate.
+    pub y: f64,
+    /// Visible world viewport width.
+    pub w: f64,
+    /// Visible world viewport height.
+    pub h: f64,
+    /// Current camera zoom factor (`1.0` = 100%).
+    pub zoom: f64,
+}
+
 /// Events emitted by [`VvWhiteboard`].
 #[derive(Debug, Clone, PartialEq, Event)]
 pub enum VvWhiteboardEvent {
@@ -98,17 +133,32 @@ pub enum VvWhiteboardEvent {
     /// User triggered SVG, 2x retina PNG, structured JSON, or JSON Canvas export.
     #[args(event)]
     Export(VvWhiteboardExportEvent),
+    /// Local pointer moved over the canvas (throttled for live presence reporting).
+    #[args(event)]
+    CursorMove(VvWhiteboardCursorEvent),
+    /// Local whiteboard camera viewport changed (throttled during pan/zoom, immediate on settle).
+    #[args(event)]
+    ViewportChange(VvWhiteboardViewportEvent),
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ExtraPresenceWire {
-    id: String,
-    name: String,
-    color: Option<String>,
-    x: Option<f64>,
-    y: Option<f64>,
-    status: Option<String>,
+#[derive(Default)]
+struct PresenceEmitThrottle {
+    last_cursor_at: Option<Instant>,
+    last_cursor_world: Option<Point2>,
+    last_viewport_at: Option<Instant>,
+    last_viewport: Option<(Rect2, f64)>,
+}
+
+const PRESENCE_EMIT_MIN_INTERVAL: Duration = Duration::from_millis(80);
+const ANIM_FRAME_INTERVAL: Duration = Duration::from_millis(16);
+
+fn animations_disabled() -> bool {
+    if reduce_motion() {
+        return true;
+    }
+    std::env::var("VIBEVALLEY_NO_ANIMATION")
+        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+        .unwrap_or(false)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -256,7 +306,20 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
 
     let ui_snap = signal(WhiteboardUiSnapshot::default());
     let last_sync = Rc::new(RefCell::new((SharedString::default(), SharedString::default(), i64::MIN)));
+    let store_presences: Rc<RefCell<Vec<Presence>>> = Rc::new(RefCell::new(Vec::new()));
+    let emit_throttle: Rc<RefCell<PresenceEmitThrottle>> = Rc::new(RefCell::new(PresenceEmitThrottle::default()));
+    let anim_timer: Rc<RefCell<Option<Spawned<()>>>> = Rc::new(RefCell::new(None));
+    let anim_last_tick: Rc<RefCell<Option<Instant>>> = Rc::new(RefCell::new(None));
     let hidden_ids = Rc::new(BTreeSet::<ElementId>::new());
+
+    {
+        let anim_timer = Rc::clone(&anim_timer);
+        cleanup(move || {
+            if let Some(handle) = anim_timer.borrow_mut().take() {
+                handle.cancel();
+            }
+        });
+    }
 
     let loc_str = move || {
         let l = props.locale.get();
@@ -265,6 +328,89 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
     let tr = move |key: &str| {
         let l = loc_str();
         t_in(l.as_str(), key, &[])
+    };
+
+    let maybe_emit_viewport = {
+        let controller = Rc::clone(&controller);
+        let emit_throttle = Rc::clone(&emit_throttle);
+        move |force: bool| {
+            let (vp, zoom) = {
+                let ctrl = controller.borrow();
+                let vw_vh = viewport_size.get_untracked();
+                (ctrl.camera.visible_world_rect(f64::from(vw_vh.0), f64::from(vw_vh.1)), ctrl.camera.zoom)
+            };
+            let should_emit = {
+                let mut st = emit_throttle.borrow_mut();
+                let changed = st.last_viewport.is_none_or(|(prev, prev_z)| {
+                    (prev.x - vp.x).abs() >= 1.0
+                        || (prev.y - vp.y).abs() >= 1.0
+                        || (prev.w - vp.w).abs() >= 1.0
+                        || (prev.h - vp.h).abs() >= 1.0
+                        || (prev_z - zoom).abs() >= 0.005
+                });
+                let now = Instant::now();
+                let due = force || st.last_viewport_at.is_none_or(|t| now.duration_since(t) >= PRESENCE_EMIT_MIN_INTERVAL);
+                if changed && due {
+                    st.last_viewport_at = Some(now);
+                    st.last_viewport = Some((vp, zoom));
+                    true
+                } else {
+                    false
+                }
+            };
+            if should_emit {
+                cx.emit(VvWhiteboardEvent::ViewportChange(VvWhiteboardViewportEvent {
+                    x: vp.x,
+                    y: vp.y,
+                    w: vp.w,
+                    h: vp.h,
+                    zoom,
+                }));
+            }
+        }
+    };
+
+    let maybe_emit_cursor = {
+        let controller = Rc::clone(&controller);
+        let emit_throttle = Rc::clone(&emit_throttle);
+        move |screen_pos: Point2| {
+            let (world_pt, vp, zoom) = {
+                let ctrl = controller.borrow();
+                let vw_vh = viewport_size.get_untracked();
+                (
+                    ctrl.camera.screen_to_world(screen_pos),
+                    ctrl.camera.visible_world_rect(f64::from(vw_vh.0), f64::from(vw_vh.1)),
+                    ctrl.camera.zoom,
+                )
+            };
+            if !world_pt.x.is_finite() || !world_pt.y.is_finite() {
+                return;
+            }
+            let should_emit = {
+                let mut st = emit_throttle.borrow_mut();
+                let moved = st.last_cursor_world.is_none_or(|prev| prev.distance_sq(world_pt) >= 4.0);
+                let now = Instant::now();
+                let due = st.last_cursor_at.is_none_or(|t| now.duration_since(t) >= PRESENCE_EMIT_MIN_INTERVAL);
+                if moved && due {
+                    st.last_cursor_at = Some(now);
+                    st.last_cursor_world = Some(world_pt);
+                    true
+                } else {
+                    false
+                }
+            };
+            if should_emit {
+                cx.emit(VvWhiteboardEvent::CursorMove(VvWhiteboardCursorEvent {
+                    x: world_pt.x,
+                    y: world_pt.y,
+                    viewport_x: vp.x,
+                    viewport_y: vp.y,
+                    viewport_w: vp.w,
+                    viewport_h: vp.h,
+                    zoom,
+                }));
+            }
+        }
     };
 
     let sync_ui_snapshot = {
@@ -301,9 +447,77 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         }
     };
 
+    let schedule_anim_frame: Rc<dyn Fn()> = {
+        let controller = Rc::clone(&controller);
+        let anim_timer = Rc::clone(&anim_timer);
+        let anim_last_tick = Rc::clone(&anim_last_tick);
+        let sync_ui_snapshot = sync_ui_snapshot.clone();
+        let maybe_emit_viewport = maybe_emit_viewport.clone();
+        let slot: Rc<RefCell<Weak<dyn Fn()>>> = Rc::new(RefCell::new(Weak::<fn()>::new()));
+        let slot_for_cb = Rc::clone(&slot);
+        let trigger: Rc<dyn Fn()> = Rc::new(move || {
+            let instant = animations_disabled();
+            if instant {
+                let step = controller.borrow_mut().step_animations(0.016, true);
+                if step.camera_moved {
+                    static_tick.set(static_tick.get_untracked().wrapping_add(1));
+                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                    sync_ui_snapshot();
+                    maybe_emit_viewport(true);
+                } else if step.presence_moved {
+                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                }
+                anim_last_tick.borrow_mut().take();
+                return;
+            }
+            if !controller.borrow().needs_animation() || anim_timer.borrow().is_some() {
+                return;
+            }
+            let now = Instant::now();
+            if anim_last_tick.borrow().is_none() {
+                *anim_last_tick.borrow_mut() = Some(now);
+            }
+            let controller = Rc::clone(&controller);
+            let anim_timer_inner = Rc::clone(&anim_timer);
+            let anim_last_tick_inner = Rc::clone(&anim_last_tick);
+            let sync_ui_snapshot = sync_ui_snapshot.clone();
+            let maybe_emit_viewport = maybe_emit_viewport.clone();
+            let slot_next = Rc::clone(&slot_for_cb);
+            let handle = set_timeout(ANIM_FRAME_INTERVAL, move || {
+                anim_timer_inner.borrow_mut().take();
+                let now = Instant::now();
+                let dt = anim_last_tick_inner
+                    .borrow_mut()
+                    .replace(now)
+                    .map_or(0.016, |prev| now.duration_since(prev).as_secs_f64().clamp(0.004, 0.05));
+                let step = controller.borrow_mut().step_animations(dt, animations_disabled());
+                if step.camera_moved {
+                    static_tick.set(static_tick.get_untracked().wrapping_add(1));
+                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                    sync_ui_snapshot();
+                    maybe_emit_viewport(!step.still_animating);
+                } else if step.presence_moved {
+                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                }
+                if step.still_animating {
+                    if let Some(again) = slot_next.borrow().upgrade() {
+                        again();
+                    }
+                } else {
+                    anim_last_tick_inner.borrow_mut().take();
+                }
+            });
+            *anim_timer.borrow_mut() = Some(handle);
+        });
+        *slot.borrow_mut() = Rc::downgrade(&trigger);
+        trigger
+    };
+
     let dispatch_effects = {
         let controller = Rc::clone(&controller);
         let sync_ui_snapshot = sync_ui_snapshot.clone();
+        let maybe_emit_viewport = maybe_emit_viewport.clone();
+        let schedule_anim_frame = Rc::clone(&schedule_anim_frame);
         move |effects: Vec<crate::engine::whiteboard::ControllerEffect>, doc_mutated: bool| {
             let mut flush_writes = None;
             let mut sel_changed = None;
@@ -325,7 +539,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         sel_changed = Some(ids);
                         rebuild_ui = true;
                     }
-                    E::ToolChanged(_) | E::GridChanged(_) | E::HistoryChanged { .. } => {
+                    E::ToolChanged(_) | E::GridChanged(_) | E::HistoryChanged { .. } | E::FollowChanged(_) => {
                         rebuild_ui = true;
                     }
                     E::ViewportChanged { .. } => {
@@ -378,6 +592,10 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             }
 
             // Emit external events strictly after all controller borrows are released.
+            if viewport_bumped {
+                let is_panning = matches!(controller.borrow().mode, crate::engine::whiteboard::InteractionMode::Panning { .. });
+                maybe_emit_viewport(!is_panning);
+            }
             if let Some(ids) = sel_changed {
                 let count = ids.len() as u32;
                 let id_strs: Vec<&str> = ids.iter().map(|i| i.as_str()).collect();
@@ -406,6 +624,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 let is_dark = dark();
                 emit_export_request(cx, fmt, doc_snap, base, is_dark);
             }
+            schedule_anim_frame();
         }
     };
 
@@ -414,45 +633,57 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         let controller = Rc::clone(&controller);
         let dispatch_effects = dispatch_effects.clone();
         let sync_ui_snapshot = sync_ui_snapshot.clone();
+        let store_presences = Rc::clone(&store_presences);
+        let schedule_anim_frame = Rc::clone(&schedule_anim_frame);
         effect(move || {
             let entries_raw = props.entries_json.get();
             let presences_raw = props.presences_json.get();
             let seq = props.seq.get();
+            let smooth = !animations_disabled();
 
-            {
+            let (entries_changed, presences_changed) = {
                 let mut prev = last_sync.borrow_mut();
-                if prev.0 == entries_raw && prev.1 == presences_raw && prev.2 == seq {
+                let ec = prev.0 != entries_raw || prev.2 != seq;
+                let pc = prev.1 != presences_raw;
+                if !ec && !pc {
                     return;
                 }
                 *prev = (entries_raw.clone(), presences_raw.clone(), seq);
+                (ec, pc)
+            };
+
+            let live_presences = decode_presences_json(presences_raw.as_str());
+            if !entries_changed && presences_changed {
+                let effs = {
+                    let mut ctrl = controller.borrow_mut();
+                    ctrl.smooth_animations = smooth;
+                    ctrl.apply_live_presences(&store_presences.borrow(), live_presences)
+                };
+                if effs.is_empty() {
+                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                    sync_ui_snapshot();
+                    schedule_anim_frame();
+                } else {
+                    dispatch_effects(effs, false);
+                }
+                return;
             }
 
             let parsed_entries: Vec<ArtifactEntry> = serde_json::from_str(entries_raw.as_str()).unwrap_or_default();
             let mut next_doc = decode_board_entries(&parsed_entries, seq);
-            if !presences_raw.is_empty()
-                && let Ok(extra_list) = serde_json::from_str::<Vec<ExtraPresenceWire>>(presences_raw.as_str())
-            {
-                for ep in extra_list {
-                    if !next_doc.presences.iter().any(|p| p.id == ep.id) {
-                        next_doc.presences.push(Presence {
-                            id: ep.id,
-                            name: ep.name,
-                            color: PresenceColor::from_wire(ep.color.as_deref().unwrap_or("coral")),
-                            x: ep.x.unwrap_or(120.0),
-                            y: ep.y.unwrap_or(120.0),
-                            status: ep.status,
-                            selected_ids: Vec::new(),
-                            rev: 0,
-                        });
-                    }
-                }
-            }
+            *store_presences.borrow_mut() = next_doc.presences.clone();
+            merge_live_presences(&mut next_doc, live_presences);
 
-            let effs = controller.borrow_mut().apply_remote_snapshot(next_doc);
+            let effs = {
+                let mut ctrl = controller.borrow_mut();
+                ctrl.smooth_animations = smooth;
+                ctrl.apply_remote_snapshot(next_doc)
+            };
             if effs.is_empty() {
                 static_tick.set(static_tick.get_untracked().wrapping_add(1));
                 overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
                 sync_ui_snapshot();
+                schedule_anim_frame();
             } else {
                 dispatch_effects(effs, true);
             }
@@ -471,8 +702,13 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             if props.read_only.get_untracked() && is_mutating_action(&action) {
                 return;
             }
-            let effs = controller.borrow_mut().run_action(action);
-            dispatch_effects(effs, true);
+            let doc_mutated = is_mutating_action(&action);
+            let effs = {
+                let mut ctrl = controller.borrow_mut();
+                ctrl.smooth_animations = !animations_disabled();
+                ctrl.run_action(action)
+            };
+            dispatch_effects(effs, doc_mutated);
         }
     };
 
@@ -532,6 +768,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         .inset(px(0.0))
         .on_layout({
             let controller = Rc::clone(&controller);
+            let maybe_emit_viewport = maybe_emit_viewport.clone();
             move |b: &nsh_core::prelude::Bounds<nsh_core::prelude::Points>| {
                 let w = b.size.width.0.max(120.0);
                 let h = b.size.height.0.max(120.0);
@@ -542,6 +779,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     static_tick.set(static_tick.get_untracked().wrapping_add(1));
                     overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
                     sync_ui_snapshot();
+                    maybe_emit_viewport(true);
                 }
             }
         })
@@ -593,7 +831,8 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                             return None;
                         }
                         let msg = p.status.as_deref().map(str::trim).filter(|t| t.chars().count() > 14)?;
-                        let tip = ctrl.camera.world_to_screen(Point2::new(p.x, p.y));
+                        let pose = ctrl.displayed_pose(p);
+                        let tip = ctrl.camera.world_to_screen(Point2::new(pose.x, pose.y));
                         let pill_w = (measure_text_span(msg, 12.5, false) + 52.0).clamp(160.0, 580.0);
                         let close_cx = tip.x + 10.0 + pill_w - 17.0;
                         let close_cy = tip.y + 26.0;
@@ -629,13 +868,16 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         .on_mouse_move({
             let controller = Rc::clone(&controller);
             let dispatch_effects = dispatch_effects.clone();
+            let maybe_emit_cursor = maybe_emit_cursor.clone();
+            let maybe_emit_viewport = maybe_emit_viewport.clone();
             move |e: &MouseEvent| {
                 let mut pressure = e.pressure;
                 if pressure <= 0.01 {
                     pressure = 0.55;
                 }
+                let screen_pos = Point2::new(f64::from(e.position.x.0), f64::from(e.position.y.0));
                 let input = PointerInput {
-                    screen_pos: Point2::new(f64::from(e.position.x.0), f64::from(e.position.y.0)),
+                    screen_pos,
                     clicks: 1,
                     button: map_mouse_btn(e.pressed_button),
                     modifiers: map_mods(&e.modifiers, space_held.get_untracked()),
@@ -648,6 +890,10 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 let effs = controller.borrow_mut().handle_pointer_move(input);
                 let is_panning = matches!(controller.borrow().mode, crate::engine::whiteboard::InteractionMode::Panning { .. });
                 dispatch_effects(effs, was_mutating || is_panning);
+                if is_panning {
+                    maybe_emit_viewport(false);
+                }
+                maybe_emit_cursor(screen_pos);
             }
         })
         .on_mouse_up({
@@ -819,34 +1065,51 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             let is_en = l.starts_with("en");
             let mut row = floating_pill();
 
-            // Live collaborator presence pills (deduplicated, capped at 2 for narrow viewports).
+            // Live collaborator presence pills (deduplicated, capped at 3 for narrow viewports).
             if !snap.presences.is_empty() {
                 let mut unique: Vec<&Presence> = Vec::with_capacity(snap.presences.len());
                 for p in &snap.presences {
-                    if !unique.iter().any(|u| u.id == p.id && u.name == p.name) {
+                    if !unique.iter().any(|u| u.id == p.id) {
                         unique.push(p);
                     }
                 }
-                let shown_limit = 2usize;
+                let shown_limit = 3usize;
                 for p in unique.iter().take(shown_limit) {
                     let following = snap.follow_actor.as_deref() == Some(p.id.as_str());
                     let pid = p.id.clone();
                     let label = if following { format!("✓ {}", p.name) } else { p.name.clone() };
-                    let dot_color = presence_adaptive_color(p.color);
+                    let dot_color = presence_adaptive_color_for(p);
+                    let a11y_label = if following {
+                        if is_en {
+                            format!("Stop following {}", p.name)
+                        } else {
+                            format!("停止跟随 {}", p.name)
+                        }
+                    } else if is_en {
+                        format!("Follow {}", p.name)
+                    } else {
+                        format!("跟随 {}", p.name)
+                    };
                     row = row.child(
                         view()
                             .test_id(&format!("wb-presence-{}", p.id))
                             .role(AccessibilityRole::Button)
+                            .label(SharedString::from(a11y_label))
+                            .accessibility_state(AccessibilityState {
+                                selected: following,
+                                ..AccessibilityState::default()
+                            })
                             .flex_row()
                             .items_center()
                             .gap(px(4.0))
                             .rounded(px(999.0))
-                            .px(px(6.0))
+                            .px(px(7.0))
                             .py(px(3.0))
                             .bg(if following { AdaptiveUi::SELECTED } else { AdaptiveUi::SIDE })
                             .border(px(1.0))
-                            .border_color(if following { AdaptiveUi::ACCENT } else { AdaptiveUi::LINE })
+                            .border_color(if following { dot_color } else { AdaptiveUi::LINE })
                             .cursor_pointer()
+                            .hover(|s| s.bg(AdaptiveUi::HOVER))
                             .on_press({
                                 let run = run_action.clone();
                                 move |_: &PressEvent| {
@@ -854,8 +1117,13 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                                     run(BoardAction::FollowActor(next));
                                 }
                             })
-                            .child(view().size(px(6.0)).rounded(px(999.0)).bg(dot_color))
-                            .child(text(label).text_size(px(11.0)).font_weight(FontWeight::MEDIUM).text_color(AdaptiveUi::INK)),
+                            .child(view().size(px(6.5)).rounded(px(999.0)).bg(dot_color))
+                            .child(
+                                text(label)
+                                    .text_size(px(11.0))
+                                    .font_weight(if following { FontWeight::SEMIBOLD } else { FontWeight::MEDIUM })
+                                    .text_color(AdaptiveUi::INK),
+                            ),
                     );
                 }
                 if unique.len() > shown_limit {
@@ -933,6 +1201,62 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
 
             let _ = is_en;
             view().absolute().top(px(12.0)).right(px(12.0)).child(row).into_element()
+        })
+    };
+
+    // Active Follow mode indicator banner (top-center, click anywhere on banner to exit Follow).
+    let follow_banner = {
+        let run_action = run_action.clone();
+        dynamic(move || {
+            let snap = ui_snap.get();
+            let Some(actor_id) = snap.follow_actor.as_deref() else {
+                return view().into_element();
+            };
+            let followed = snap.presences.iter().find(|p| p.id == actor_id || p.name == actor_id);
+            let display_name = followed.map_or(actor_id, |p| p.name.as_str());
+            let dot_color = followed.map_or(AdaptiveUi::ACCENT, presence_adaptive_color_for);
+            let is_en = loc_str().starts_with("en");
+            let banner_text = if is_en {
+                format!("Following {display_name} · Click to exit")
+            } else {
+                format!("正在跟随 {display_name} · 点击退出")
+            };
+            let pill = view()
+                .test_id("wb-follow-banner")
+                .role(AccessibilityRole::Button)
+                .label(SharedString::from(banner_text.clone()))
+                .flex_row()
+                .items_center()
+                .gap(px(6.0))
+                .rounded(px(999.0))
+                .border(px(1.5))
+                .border_color(dot_color)
+                .bg(AdaptiveUi::PAGE)
+                .px(px(12.0))
+                .py(px(5.0))
+                .shadow_md()
+                .cursor_pointer()
+                .hover(|s| s.bg(AdaptiveUi::HOVER))
+                .on_press({
+                    let run = run_action.clone();
+                    move |_: &PressEvent| run(BoardAction::FollowActor(None))
+                })
+                .child(view().size(px(7.0)).rounded(px(999.0)).bg(dot_color))
+                .child(
+                    text(banner_text)
+                        .text_size(px(11.5))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(AdaptiveUi::INK),
+                );
+            view()
+                .absolute()
+                .top(px(12.0))
+                .left(px(12.0))
+                .right(px(12.0))
+                .items_center()
+                .pointer_events(PointerEvents::BoxNone)
+                .child(pill)
+                .into_element()
         })
     };
 
@@ -1514,7 +1838,9 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 move |e: &PressEvent| {
                     let effs = {
                         let mut ctrl = controller.borrow_mut();
+                        let mut out = Vec::new();
                         ctrl.mark_user_moved_camera();
+                        ctrl.cancel_follow(&mut out);
                         let vw_vh = viewport_size.get_untracked();
                         let world_view = ctrl.camera.visible_world_rect(f64::from(vw_vh.0), f64::from(vw_vh.1));
                         let bounds = ctrl.doc.content_bounds().map_or(world_view, |c| c.union(world_view)).expand(60.0);
@@ -1527,7 +1853,8 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         let wy = (f64::from(e.position.y.0) - oy) / s;
                         ctrl.camera.pan_x = f64::from(vw_vh.0) * 0.5 - wx * ctrl.camera.zoom;
                         ctrl.camera.pan_y = f64::from(vw_vh.1) * 0.5 - wy * ctrl.camera.zoom;
-                        vec![crate::engine::whiteboard::ControllerEffect::ViewportChanged { zoom: ctrl.camera.zoom }]
+                        out.push(crate::engine::whiteboard::ControllerEffect::ViewportChanged { zoom: ctrl.camera.zoom });
+                        out
                     };
                     dispatch_effects(effs, false);
                 }
@@ -1931,6 +2258,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         .overflow_hidden()
         .child(stage)
         .child(top_left_hud)
+        .child(follow_banner)
         .child(top_right_hud)
         .child(minimap_and_zoom)
         .child(timer_popover)
@@ -2498,8 +2826,13 @@ fn sanitize_filename(raw: &str) -> String {
     if cleaned.is_empty() { "whiteboard".to_owned() } else { cleaned }
 }
 
-fn presence_adaptive_color(c: PresenceColor) -> nsh_core::prelude::AdaptiveColor {
-    let hex_l = match c {
+fn presence_adaptive_color_for(p: &Presence) -> nsh_core::prelude::AdaptiveColor {
+    if let Some(hex) = p.custom_color.as_deref()
+        && let Some(hsla) = crate::engine::whiteboard::paint::parse_hex_hsla(hex)
+    {
+        return nsh_core::prelude::AdaptiveColor { light: hsla, dark: hsla };
+    }
+    let hex_l = match p.color {
         PresenceColor::Coral => "#dd6f57",
         PresenceColor::Teal => "#1a7f74",
         PresenceColor::Blue => "#2c6aa3",

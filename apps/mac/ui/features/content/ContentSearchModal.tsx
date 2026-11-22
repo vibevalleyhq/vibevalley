@@ -175,10 +175,10 @@ function SearchBody() {
       });
 
     if (!q) {
-      return [...noteHits, ...artifactHits, ...mediaHits].toSorted((a, b) => b.updated - a.updated).slice(0, 14);
+      return [...artifactHits, ...mediaHits, ...noteHits].toSorted((a, b) => b.updated - a.updated).slice(0, 14);
     }
 
-    return [...noteHits.slice(0, 8), ...blockHits, ...artifactHits.slice(0, 8), ...mediaHits.slice(0, 8)].slice(0, 24);
+    return [...artifactHits.slice(0, 10), ...mediaHits.slice(0, 8), ...noteHits.slice(0, 6), ...blockHits].slice(0, 24);
   });
 
   const openHit = (hit: SearchHit) => {

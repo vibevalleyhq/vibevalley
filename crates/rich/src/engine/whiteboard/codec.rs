@@ -7,7 +7,8 @@ use vibevalley_protocol::{ArtifactEntry, ArtifactEntryKind, ArtifactEntryOp, Art
 use crate::engine::canvas::{Canvas, CanvasColor, End, Node as CanvasNode, PresetColor, Side};
 use crate::engine::whiteboard::model::{
     AnchorSide, ArrowCurve, ArrowEndpoint, ArrowHead, BoardDoc, BoardMeta, ElementId, ElementKind, ElementRecord, ExtraFields, GridStyle, InkMode,
-    MilestoneKind, Point2, Presence, PresenceColor, Rect2, ShapeKind, StrokePoint, StrokeStyle, TextAlign, TextVariant, TimelineMilestone, WbFill,
+    MilestoneKind, Point2, Presence, PresenceColor, PresenceKind, PresenceViewport, Rect2, ShapeKind, StrokePoint, StrokeStyle, TextAlign, TextVariant,
+    TimelineMilestone, WbFill,
 };
 
 #[derive(Debug, Clone, thiserror::Error)]
@@ -41,11 +42,16 @@ struct WirePresence {
     id: Option<String>,
     name: Option<String>,
     color: Option<String>,
+    kind: Option<String>,
     x: Option<f64>,
     y: Option<f64>,
+    w: Option<f64>,
+    h: Option<f64>,
     status: Option<String>,
     #[serde(default)]
     selected_ids: Vec<String>,
+    viewport: Option<PresenceViewport>,
+    updated_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -182,19 +188,128 @@ pub fn decode_meta(raw: &str) -> Result<BoardMeta, CodecError> {
     })
 }
 
-pub fn decode_presence(fallback_id: &str, rev: i64, raw: &str) -> Result<Presence, CodecError> {
-    let wire: WirePresence = serde_json::from_str(raw).map_err(|e| CodecError::Json(e.to_string()))?;
-    let id = wire.id.filter(|s| !s.is_empty()).unwrap_or_else(|| fallback_id.to_owned());
-    Ok(Presence {
-        name: wire.name.filter(|s| !s.is_empty()).unwrap_or_else(|| id.clone()),
+fn sanitize_viewport(raw: Option<PresenceViewport>) -> Option<PresenceViewport> {
+    let vp = raw?;
+    if !vp.x.is_finite() || !vp.y.is_finite() || !vp.w.is_finite() || !vp.h.is_finite() || vp.w <= 1.0 || vp.h <= 1.0 {
+        return None;
+    }
+    Some(PresenceViewport {
+        x: vp.x,
+        y: vp.y,
+        w: vp.w,
+        h: vp.h,
+        zoom: vp.zoom.filter(|z| z.is_finite() && *z > 0.0),
+    })
+}
+
+fn is_valid_hex_color(raw: &str) -> bool {
+    let Some(hex) = raw.trim().strip_prefix('#') else {
+        return false;
+    };
+    matches!(hex.len(), 3 | 6 | 8) && hex.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+fn presence_from_wire(fallback_id: &str, rev: i64, wire: WirePresence, default_xy: (f64, f64)) -> Option<Presence> {
+    let id = wire.id.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| fallback_id.to_owned());
+    if id.trim().is_empty() {
+        return None;
+    }
+    let name = wire.name.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| id.clone());
+    let kind = wire.kind.as_deref().map_or(PresenceKind::Cursor, PresenceKind::from_wire);
+    let raw_x = wire.x.filter(|v| v.is_finite());
+    let raw_y = wire.y.filter(|v| v.is_finite());
+    let raw_w = wire.w.filter(|v| v.is_finite() && *v > 1.0);
+    let raw_h = wire.h.filter(|v| v.is_finite() && *v > 1.0);
+
+    let mut viewport = sanitize_viewport(wire.viewport);
+    if kind == PresenceKind::Viewport
+        && viewport.is_none()
+        && let (Some(x), Some(y), Some(w), Some(h)) = (raw_x, raw_y, raw_w, raw_h)
+    {
+        viewport = Some(PresenceViewport { x, y, w, h, zoom: None });
+    }
+
+    let (x, y) = match (raw_x, raw_y) {
+        (Some(x), Some(y)) => (x, y),
+        (x_opt, y_opt) => {
+            if let Some(vp) = viewport {
+                let c = vp.center();
+                (x_opt.unwrap_or(c.x), y_opt.unwrap_or(c.y))
+            } else {
+                (x_opt.unwrap_or(default_xy.0), y_opt.unwrap_or(default_xy.1))
+            }
+        }
+    };
+
+    let has_cursor = (raw_x.is_some() && raw_y.is_some()) || (kind != PresenceKind::Viewport && viewport.is_none());
+    let custom_color = wire.color.as_deref().filter(|c| is_valid_hex_color(c)).map(|c| c.trim().to_owned());
+    let color = PresenceColor::from_wire(wire.color.as_deref().unwrap_or("coral"));
+
+    Some(Presence {
         id,
-        color: PresenceColor::from_wire(wire.color.as_deref().unwrap_or("coral")),
-        x: wire.x.unwrap_or(0.0),
-        y: wire.y.unwrap_or(0.0),
-        status: wire.status,
+        name,
+        color,
+        custom_color,
+        kind,
+        x,
+        y,
+        w: raw_w,
+        h: raw_h,
+        status: wire.status.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()),
         selected_ids: wire.selected_ids.into_iter().map(ElementId::from).collect(),
+        viewport,
+        updated_at: wire.updated_at,
+        has_cursor,
         rev,
     })
+}
+
+pub fn decode_presence(fallback_id: &str, rev: i64, raw: &str) -> Result<Presence, CodecError> {
+    let wire: WirePresence = serde_json::from_str(raw).map_err(|e| CodecError::Json(e.to_string()))?;
+    presence_from_wire(fallback_id, rev, wire, (0.0, 0.0)).ok_or_else(|| CodecError::MissingId(fallback_id.to_owned()))
+}
+
+/// Decodes a JSON array of live collaborator presences (`ArtifactPresence`, `PresencePayload`,
+/// or simplified `{id, name, color, x, y, status}` records), deduplicating by `id`.
+pub fn decode_presences_json(raw: &str) -> Vec<Presence> {
+    if raw.trim().is_empty() {
+        return Vec::new();
+    }
+    let Ok(items) = serde_json::from_str::<Vec<WirePresence>>(raw) else {
+        return Vec::new();
+    };
+    let mut out: Vec<Presence> = Vec::with_capacity(items.len());
+    for wire in items {
+        let Some(p) = presence_from_wire("", 0, wire, (120.0, 120.0)) else {
+            continue;
+        };
+        if let Some(existing) = out.iter_mut().find(|e| e.id == p.id) {
+            let incoming_newer = match (existing.updated_at, p.updated_at) {
+                (Some(old_ts), Some(new_ts)) => new_ts >= old_ts,
+                _ => true,
+            };
+            if incoming_newer {
+                *existing = p;
+            }
+        } else {
+            out.push(p);
+        }
+    }
+    out
+}
+
+/// Merges live Loro presence updates into `doc.presences`, letting live records override matching IDs.
+pub fn merge_live_presences(doc: &mut BoardDoc, live: Vec<Presence>) {
+    for mut p in live {
+        if let Some(existing) = doc.presences.iter_mut().find(|e| e.id == p.id) {
+            if p.selected_ids.is_empty() && !existing.selected_ids.is_empty() {
+                p.selected_ids = existing.selected_ids.clone();
+            }
+            *existing = p;
+        } else {
+            doc.presences.push(p);
+        }
+    }
 }
 
 pub fn decode_element(fallback_id: &str, rev: i64, raw: &str) -> Result<ElementRecord, CodecError> {
@@ -788,11 +903,16 @@ pub fn encode_presence_write(presence: &Presence) -> ArtifactEntryWriteInput {
     let wire = WirePresence {
         id: Some(presence.id.clone()),
         name: Some(presence.name.clone()),
-        color: Some(presence.color.as_str().to_owned()),
+        color: Some(presence.custom_color.clone().unwrap_or_else(|| presence.color.as_str().to_owned())),
+        kind: (presence.kind != PresenceKind::Cursor).then(|| presence.kind.as_str().to_owned()),
         x: Some(presence.x),
         y: Some(presence.y),
+        w: presence.w,
+        h: presence.h,
         status: presence.status.clone(),
         selected_ids: presence.selected_ids.iter().map(|i| i.0.clone()).collect(),
+        viewport: presence.viewport,
+        updated_at: presence.updated_at,
     };
     ArtifactEntryWriteInput {
         op: ArtifactEntryOp::Set,

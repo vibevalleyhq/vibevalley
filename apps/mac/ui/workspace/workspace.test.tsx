@@ -498,7 +498,8 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   expect(host.acts.some((a) => a.type === "update_chat_tab" && a.tab_id === 42 && a.session_id === "sess-ws-1" && a.title === "Upgrade Antigravity ACP")).toBe(
     true,
   );
-  expect(app.texts()).toContain("Upgrade Antigravity ACP");
+  expect(app.count("id:chat-header-title")).toBe(0);
+  expect(app.count("id:chat-permission-mode")).toBe(1);
 
   host.clearActs();
   await app.press("id:chat-tool-open-file-3");

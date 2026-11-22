@@ -38,15 +38,6 @@
     "toIssue": "转为任务",
     "issueMade": "已创建任务"
   },
-  "props": {
-    "deadline": "截止 {day}",
-    "left": "截止 {day} · 还剩 {n} 天",
-    "dueToday": "截止 {day} · 今天到期",
-    "overdue": "截止 {day} · 过了 {n} 天",
-    "area": "领域",
-    "more": "还有 {n} 项属性",
-    "fewer": "收起属性"
-  },
   "marker": {
     "TODO": "待办",
     "DOING": "在做",

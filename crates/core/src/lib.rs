@@ -5,6 +5,7 @@
 pub mod artifact;
 pub mod brief;
 pub mod channel;
+pub mod collab;
 pub mod core;
 pub mod cron;
 pub mod deps;

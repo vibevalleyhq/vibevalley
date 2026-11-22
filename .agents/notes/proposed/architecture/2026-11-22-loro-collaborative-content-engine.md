@@ -2,6 +2,11 @@
 
 Status: proposed
 
+> [!NOTE]
+> **Wave 2 落地状态（核心 Phase A / B / C 已落地并沉淀至 [Artifact 子系统](docs/subsystems/artifact.md)）**
+> - **已落地**：`crates/core/src/collab/` Loro 1.18.0 内容平面内核（纯内存 `PresenceHub`、`CollabDoc`、`CommitMeta`、持久 `Cursor` 建议锚点与同 `origin` 折叠、时间旅行 `checkout`/分叉、浅快照压缩、按 `origin` 选择性撤销）；服务端 `crates/server/src/modules/content/artifact/collab.rs` 与 `artifact_collab` 表（零 `presence/*` 落库、`artifact.presence.{update,follow}`、`artifact.history.*`）；原生 `VvWhiteboard` 平滑插值光标/占位框/一键 Follow 与 `onCursorMove`/`onViewportChange`；工作台 `WhiteboardView`、`BlocksView`、`HtmlFrame` 严 CSP 沙箱高亮与 `TimelineBar.tsx`。
+> - **尚未落地 / 待定余项**：远端浏览器 / 跨设备 `loro-crdt` WASM/JS 双向同步协议与断线 Version Vector 差量同步；执行会话逐 token 流式写入时的微批事务合批窗口优化；`VvWhiteboard` 进程内本地 Loro 副本直写（当前经进程内桥提交服务端 CRDT Proxy）。
+
 ## Problem
 
 当前作品（`Artifact`，见 [Artifact 子系统](docs/subsystems/artifact.md)）的三种存储形态均采用服务端中心化的粗粒度并发控制，在人类与多个执行会话同时编辑时存在四类结构性缺口：

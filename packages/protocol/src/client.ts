@@ -409,7 +409,6 @@ export class VibeValleyApi {
     list: (a: { agent?: string }, options?: { signal?: AbortSignal }): Promise<T.Session[]> =>
       this.call<T.Session[]>("session.list", "/api/v1/session/list", a, options),
     get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Session> => this.call<T.Session>("session.get", "/api/v1/session/get", a, options),
-    /** Opens or resumes a direct workspace chat session in a directory with no issue. */
     openWorkspace: (a: T.SessionOpenWorkspaceInput, options?: { signal?: AbortSignal }): Promise<T.SessionWorkspace> =>
       this.call<T.SessionWorkspace>("session.openWorkspace", "/api/v1/session/openWorkspace", a, options),
     /** Starts a turn when idle; steers the current turn when working. */
@@ -520,6 +519,31 @@ export class VibeValleyApi {
       /** An atomic batch of set, patch, delete or copy writes on a store artifact with per-entry optimistic concurrency. */
       batch: (a: T.ArtifactEntryBatchRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactEntryBatchResult> =>
         this.call<T.ArtifactEntryBatchResult>("artifact.entry.batch", "/api/v1/artifact/entry/batch", a, options),
+    },
+    presence: {
+      /** Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite. */
+      update: (a: T.ArtifactPresenceUpdateRequest, options?: { signal?: AbortSignal }): Promise<void> =>
+        this.call<void>("artifact.presence.update", "/api/v1/artifact/presence/update", a, options),
+    },
+    history: {
+      /** Newest first. */
+      list: (a: T.ArtifactHistoryListRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactHistoryEntry[]> =>
+        this.call<T.ArtifactHistoryEntry[]>("artifact.history.list", "/api/v1/artifact/history/list", a, options),
+      /** Read-only snapshot projection at the requested Loro frontiers. */
+      preview: (a: T.ArtifactHistoryPreviewRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactHistoryPreviewResult> =>
+        this.call<T.ArtifactHistoryPreviewResult>("artifact.history.preview", "/api/v1/artifact/history/preview", a, options),
+      /** Restore an artifact to the snapshot at the requested Loro frontiers as a new commit. */
+      restore: (a: T.ArtifactHistoryRestoreRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
+        this.call<T.Artifact>("artifact.history.restore", "/api/v1/artifact/history/restore", a, options),
+      /** Fork a new artifact starting from the snapshot at the requested Loro frontiers. */
+      fork: (a: T.ArtifactHistoryForkRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
+        this.call<T.Artifact>("artifact.history.fork", "/api/v1/artifact/history/fork", a, options),
+      /** Selectively undo commits matching one origin while preserving concurrent edits from other actors. */
+      undoOrigin: (a: T.ArtifactHistoryUndoOriginRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
+        this.call<T.Artifact>("artifact.history.undoOrigin", "/api/v1/artifact/history/undoOrigin", a, options),
+      /** Compact old operation history into a shallow snapshot while keeping current state intact. */
+      compact: (a: T.ArtifactHistoryCompactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
+        this.call<T.Artifact>("artifact.history.compact", "/api/v1/artifact/history/compact", a, options),
     },
   };
 

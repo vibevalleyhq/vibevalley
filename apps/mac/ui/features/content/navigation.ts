@@ -9,7 +9,6 @@ import { defineStored } from "../../infra/state/stored";
 export type ContentBucket =
   | { readonly kind: "recent" }
   | { readonly kind: "pinned" }
-  | { readonly kind: "notes" }
   | { readonly kind: "artifacts"; readonly artifactType?: ArtifactType | "html" | undefined }
   | { readonly kind: "media"; readonly fileKind?: LibraryFileKind | undefined };
 

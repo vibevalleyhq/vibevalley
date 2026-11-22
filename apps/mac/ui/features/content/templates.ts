@@ -7,7 +7,6 @@ import type { QueryClient } from "../../infra/query";
 import type { RouterController } from "../../infra/router/context";
 import { artifactTypeIcon, createTypedArtifact } from "../artifact";
 import { artifactHref } from "../artifact/ArtifactCard";
-import { pkmHref, refreshVault } from "../pkm/vault";
 import type { TemplateCategory } from "./navigation";
 
 type NoteTemplateVariant = "blank" | "tech" | "meeting" | "daily";
@@ -153,7 +152,7 @@ function uniqueNoteTitle(base: string, existingTitles: readonly string[]): strin
 function noteStarterMarkdown(variant: NoteTemplateVariant): string {
   switch (variant) {
     case "blank":
-      return "-\n";
+      return "- \n";
     case "tech":
       return t("web.library.content.templates.seed.noteTech");
     case "meeting":
@@ -421,9 +420,9 @@ export async function createQuickBlankNote(deps: {
 }): Promise<void> {
   const baseTitle = t("web.library.content.templates.items.noteBlank.name");
   const title = uniqueNoteTitle(baseTitle, deps.existingNoteTitles);
-  const page = await api.pkm.page.save({ title, tier: "inbox", markdown: "-\n" });
-  await refreshVault(deps.queries);
-  deps.router.navigate(pkmHref(page.slug));
+  const made = await createTypedArtifact("outline", title, { content: noteStarterMarkdown("blank") });
+  await deps.queries.invalidate({ prefix: ["artifacts"] });
+  deps.router.navigate(artifactHref(made.id));
 }
 
 export async function createFromTemplate(
@@ -438,9 +437,9 @@ export async function createFromTemplate(
   switch (tpl.kind) {
     case "note": {
       const title = uniqueNoteTitle(baseTitle, deps.existingNoteTitles);
-      const page = await api.pkm.page.save({ title, tier: "inbox", markdown: noteStarterMarkdown(tpl.variant) });
-      await refreshVault(deps.queries);
-      deps.router.navigate(pkmHref(page.slug));
+      const made = await createTypedArtifact("outline", title, { content: noteStarterMarkdown(tpl.variant) });
+      await deps.queries.invalidate({ prefix: ["artifacts"] });
+      deps.router.navigate(artifactHref(made.id));
       return;
     }
     case "whiteboard": {

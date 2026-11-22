@@ -2,6 +2,11 @@
 
 Status: proposed
 
+> [!NOTE]
+> **Wave 2 落地状态（已部分沉淀至子系统文档）**
+> - **已落地**：全局 `<Desk>` 单行 `h-9 items-center` 居中、`Tabs` `pills` 去换行与 `h-6` 收紧、团队分隔线、移除 `<Hint>`（`ⓘ`）、`desk-status` 迁入全局 `Rail` 底部 `rail-runs-status`、`sidebar` 面板图标、侧栏展开防重复搜索/新建/返回；工作区 `ChatPane` `h-8` 动作条/`h-5` `chat-cwd-chip`/紧凑 `<Menu>` 权限选择器、`ChannelSidebar` 去重、`IssuesPage`/`AgentsPage` 节奏与按钮权重收敛、旧 `PageView.tsx` 去 `pkm-notes-hint`/`<Props>` 与零反向链接；**Option A（`ArtifactType::Outline`）** 全栈落地（契约、Rust 引擎、服务端 SQLite + Loro `LoroTree`/`LoroText`、CLI 与工作台「作品 + 素材」二元侧栏）。详见 [客户端](docs/subsystems/app.md)、[Artifact](docs/subsystems/artifact.md) 与 [媒体与素材库](docs/subsystems/media.md)。
+> - **尚未落地 / 待定余项**：对话页（`ChatPage.tsx`）宽屏次级标签并入 `channel-head` 的评估；历史本地 `pkm` Markdown 笔记的一次性批量导入命令与最终退役节奏（当前 `/pkm/:slug` 与搜索仍保留兼容兜底）；素材按项目/规划组织方式待定。
+
 ## Problem
 
 Wave 1B 将工作台各主模块的顶栏高度统一到与工作区（`仓库与终端`）一致的 `36px`（`h-9`），但在真实 macOS GPUI 窗口的逐页走查中，暴露出四类影响心智清晰度与视觉整洁度的结构性问题：

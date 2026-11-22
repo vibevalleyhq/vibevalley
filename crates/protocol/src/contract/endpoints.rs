@@ -1465,6 +1465,69 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: None,
     },
     Endpoint {
+        op: "artifact.presence.update",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("ArtifactPresenceUpdateRequest"),
+        result: None,
+    },
+    Endpoint {
+        op: "artifact.history.list",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryListRequest"),
+        result: Some("Vec<ArtifactHistoryEntry>"),
+    },
+    Endpoint {
+        op: "artifact.history.preview",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryPreviewRequest"),
+        result: Some("ArtifactHistoryPreviewResult"),
+    },
+    Endpoint {
+        op: "artifact.history.restore",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryRestoreRequest"),
+        result: Some("Artifact"),
+    },
+    Endpoint {
+        op: "artifact.history.fork",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryForkRequest"),
+        result: Some("Artifact"),
+    },
+    Endpoint {
+        op: "artifact.history.undoOrigin",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryUndoOriginRequest"),
+        result: Some("Artifact"),
+    },
+    Endpoint {
+        op: "artifact.history.compact",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryCompactRequest"),
+        result: Some("Artifact"),
+    },
+    Endpoint {
         op: "pkm.page.list",
         module: "pkm",
         about: &[],
@@ -2830,6 +2893,55 @@ pub mod ops {
         type Input = t::ArtifactDemoInput;
         type Result = ();
     }
+    /// Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite.
+    pub struct ArtifactPresenceUpdate;
+    impl Op for ArtifactPresenceUpdate {
+        const NAME: &'static str = "artifact.presence.update";
+        type Input = t::ArtifactPresenceUpdateRequest;
+        type Result = ();
+    }
+    /// Commit history timeline for a collaborative artifact, newest first.
+    pub struct ArtifactHistoryList;
+    impl Op for ArtifactHistoryList {
+        const NAME: &'static str = "artifact.history.list";
+        type Input = t::ArtifactHistoryListRequest;
+        type Result = Vec<t::ArtifactHistoryEntry>;
+    }
+    /// Read-only snapshot projection at the requested Loro frontiers.
+    pub struct ArtifactHistoryPreview;
+    impl Op for ArtifactHistoryPreview {
+        const NAME: &'static str = "artifact.history.preview";
+        type Input = t::ArtifactHistoryPreviewRequest;
+        type Result = t::ArtifactHistoryPreviewResult;
+    }
+    /// Restore an artifact to the snapshot at the requested Loro frontiers as a new commit.
+    pub struct ArtifactHistoryRestore;
+    impl Op for ArtifactHistoryRestore {
+        const NAME: &'static str = "artifact.history.restore";
+        type Input = t::ArtifactHistoryRestoreRequest;
+        type Result = t::Artifact;
+    }
+    /// Fork a new artifact starting from the snapshot at the requested Loro frontiers.
+    pub struct ArtifactHistoryFork;
+    impl Op for ArtifactHistoryFork {
+        const NAME: &'static str = "artifact.history.fork";
+        type Input = t::ArtifactHistoryForkRequest;
+        type Result = t::Artifact;
+    }
+    /// Selectively undo commits matching one origin while preserving concurrent edits from other actors.
+    pub struct ArtifactHistoryUndoOrigin;
+    impl Op for ArtifactHistoryUndoOrigin {
+        const NAME: &'static str = "artifact.history.undoOrigin";
+        type Input = t::ArtifactHistoryUndoOriginRequest;
+        type Result = t::Artifact;
+    }
+    /// Compact old operation history into a shallow snapshot while keeping current state intact.
+    pub struct ArtifactHistoryCompact;
+    impl Op for ArtifactHistoryCompact {
+        const NAME: &'static str = "artifact.history.compact";
+        type Input = t::ArtifactHistoryCompactRequest;
+        type Result = t::Artifact;
+    }
     /// Every page in the vault, newest first; files changed on disk are read again first.
     pub struct PkmPageList;
     impl Op for PkmPageList {
@@ -3093,6 +3205,12 @@ pub mod subscriptions {
         const NAME: &'static str = "artifact.suggestion.follow";
         type Payload = t::ArtifactSuggestionFollowPayload;
         type Event = t::SuggestionEvent;
+    }
+    pub struct ArtifactPresenceFollow;
+    impl Subscription for ArtifactPresenceFollow {
+        const NAME: &'static str = "artifact.presence.follow";
+        type Payload = t::ArtifactPresenceFollowRequest;
+        type Event = t::ArtifactPresenceEvent;
     }
     pub struct SessionWatch;
     impl Subscription for SessionWatch {

@@ -867,16 +867,140 @@ impl PresenceColor {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PresenceKind {
+    #[default]
+    Cursor,
+    BlockCursor,
+    Selection,
+    Highlight,
+    Claim,
+    Viewport,
+}
+
+impl PresenceKind {
+    pub fn from_wire(raw: &str) -> Self {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "block_cursor" | "blockcursor" => Self::BlockCursor,
+            "selection" => Self::Selection,
+            "highlight" => Self::Highlight,
+            "claim" => Self::Claim,
+            "viewport" => Self::Viewport,
+            _ => Self::Cursor,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Cursor => "cursor",
+            Self::BlockCursor => "block_cursor",
+            Self::Selection => "selection",
+            Self::Highlight => "highlight",
+            Self::Claim => "claim",
+            Self::Viewport => "viewport",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresenceViewport {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zoom: Option<f64>,
+}
+
+impl PresenceViewport {
+    pub fn rect(self) -> Option<Rect2> {
+        if self.x.is_finite() && self.y.is_finite() && self.w.is_finite() && self.h.is_finite() && self.w > 1.0 && self.h > 1.0 {
+            Some(Rect2::new(self.x, self.y, self.w, self.h))
+        } else {
+            None
+        }
+    }
+
+    pub fn center(self) -> Point2 {
+        Point2::new(self.x + self.w * 0.5, self.y + self.h * 0.5)
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Presence {
     pub id: String,
     pub name: String,
     pub color: PresenceColor,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_color: Option<String>,
+    #[serde(default)]
+    pub kind: PresenceKind,
     pub x: f64,
     pub y: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub w: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub h: Option<f64>,
     pub status: Option<String>,
     pub selected_ids: Vec<ElementId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewport: Option<PresenceViewport>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<i64>,
+    #[serde(default = "default_true")]
+    pub has_cursor: bool,
     pub rev: i64,
+}
+
+impl Default for Presence {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            color: PresenceColor::Coral,
+            custom_color: None,
+            kind: PresenceKind::Cursor,
+            x: 0.0,
+            y: 0.0,
+            w: None,
+            h: None,
+            status: None,
+            selected_ids: Vec::new(),
+            viewport: None,
+            updated_at: None,
+            has_cursor: true,
+            rev: 0,
+        }
+    }
+}
+
+impl Presence {
+    pub fn region_rect(&self) -> Option<Rect2> {
+        let w = self.w.filter(|v| v.is_finite() && *v > 1.0)?;
+        let h = self.h.filter(|v| v.is_finite() && *v > 1.0)?;
+        if !self.x.is_finite() || !self.y.is_finite() || self.kind == PresenceKind::Viewport {
+            return None;
+        }
+        Some(Rect2::new(self.x, self.y, w, h))
+    }
+
+    pub fn focus_point(&self) -> Point2 {
+        if let Some(vp) = self.viewport
+            && let Some(rect) = vp.rect()
+        {
+            return rect.center();
+        }
+        if let Some(rect) = self.region_rect() {
+            return rect.center();
+        }
+        Point2::new(self.x, self.y)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

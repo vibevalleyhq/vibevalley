@@ -1,15 +1,16 @@
 ---
 name: artifacts
-description: 用户要看板（dashboard）、动态图形短片（motion）、无限白板（whiteboard）、多画板界面稿（design）、设计令牌体系（design-system）、结构化幻灯片（slides）或协作长文（docs）时用。按需调 artifact_type_read 读对应类型的规范与参考分册。
+description: 用户要看板（dashboard）、动态图形短片（motion）、无限白板（whiteboard）、多画板界面稿（design）、设计令牌体系（design-system）、结构化幻灯片（slides）、树状大纲（outline）或协作长文（docs）时用。按需调 artifact_type_read 读对应类型的规范与参考分册。
 ---
 
 # 结构化 Artifact 类型体系
 
-除了单页 HTML 和普通 Markdown，工作台内置 7 种结构化 `ArtifactType`，每种都有专用查看器、双向结构化编辑和渐进式规范分册：
+除了单页 HTML 和普通 Markdown，工作台内置 8 种结构化 `ArtifactType`，每种都有专用查看器、双向结构化编辑和渐进式规范分册：
 
 | `artifactType` | 用途 | 核心条目 |
 |---|---|---|
 | `docs` | 多人/多帮工块级协作文档、修订建议、导出 Markdown | 块树（`artifact_block_*`） |
+| `outline` | 轻量单栏无限缩进树状大纲、折叠聚焦、会议要点与结构拆解 | 块树（`artifact_block_*`） |
 | `slides` | 16:9 / 4:3 多文件演示稿、`.fragment` 分步揭示、演讲者视图、PDF 导出 | `"project/deck.json"`、`"project/deck.css"`、`project/slides/*.html` |
 | `dashboard` | 结构化数据集 + 图表看板、`[data-source]` 数字溯源核验、筛选器持久化、CSV 导出 | `datasets/<id>`、`dash/params`、`files/index.html` |
 | `motion` | 纯时间函数 `window.CUT` 动态图形短片、逐帧拖动、章节跳转、WebM 视频导出进素材库 | `film/meta`、`"modules/scenes.json"`、`film/script` |

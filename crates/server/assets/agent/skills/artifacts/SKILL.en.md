@@ -1,9 +1,9 @@
 ---
 name: Structured Artifacts
-description: When building dashboards, motion films, whiteboards, multi-artboard UI designs, design systems, or collaborative docs: read the type guide with artifact_type_read and edit entries with artifact_entry_batch.
+description: When building dashboards, motion films, whiteboards, multi-artboard UI designs, design systems, tree outlines, or collaborative docs: read the type guide with artifact_type_read and edit incrementally with artifact_block_* or artifact_entry_batch.
 ---
 
-The workbench supports 7 structured `ArtifactType`s: `docs`, `slides`, `dashboard`, `motion`, `whiteboard`, `design`, and `design-system`.
+The workbench supports 8 structured `ArtifactType`s: `docs`, `outline`, `slides`, `dashboard`, `motion`, `whiteboard`, `design`, and `design-system`.
 
 1. **Read the guide before writing**: Call `artifact_type_read` with `type` to inspect the entry layout, sandbox runtime globals, and quality checks; pass `reference` when you need a deeper chapter.
 2. **Keep structure and presentation clean**:

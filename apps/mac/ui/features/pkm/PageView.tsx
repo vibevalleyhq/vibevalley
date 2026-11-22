@@ -10,7 +10,6 @@ import { Icon } from "../../design/Icon";
 import { Empty } from "../../design/layout";
 import { type MoreItem, MoreMenu } from "../../design/MoreMenu";
 import { motionClass, motionDuration, motionOff } from "../../design/motion";
-import { Dot, type DotTone } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { mix } from "../../design/tone";
@@ -21,7 +20,7 @@ import { createSignal } from "../../infra/solid";
 import { useLatest } from "../../infra/state/atom";
 import { isPinned, togglePinned } from "../content/navigation";
 import { Body } from "./Body";
-import { daysUntil, dayKey, titleFor } from "./days";
+import { titleFor } from "./days";
 import { wordDiff } from "./outline";
 import { Outline } from "./OutlineView";
 import { pkmHref, refreshPkm as refreshQueries, usePkmPage } from "./vault";
@@ -103,11 +102,11 @@ function FreshPage(props: { slug: string; pages: readonly PkmPageSummary[] }) {
           />
         </View>
       </View>
-      <View testID="pkm-backlinks" class="mt-4 gap-2 border-t border-line pt-4">
-        <Text role="header" class="text-xs font-semibold text-muted">
-          {t("web.pkm.backlinks.title", { n: hits().length })}
-        </Text>
-        <If when={hits().length > 0} else={<Text class="text-xs text-faint">{t("web.pkm.backlinks.none")}</Text>}>
+      <If when={hits().length > 0}>
+        <View testID="pkm-backlinks" class="mt-4 gap-2 border-t border-line pt-4">
+          <Text role="header" class="text-xs font-semibold text-muted">
+            {t("web.pkm.backlinks.title", { n: hits().length })}
+          </Text>
           <Each of={hits()} key={(h) => h.block}>
             {(h) => (
               <BacklinkRow
@@ -117,8 +116,8 @@ function FreshPage(props: { slug: string; pages: readonly PkmPageSummary[] }) {
               />
             )}
           </Each>
-        </If>
-      </View>
+        </View>
+      </If>
     </View>
   );
 }
@@ -133,6 +132,10 @@ function Shown(props: {
   const page = () => props.view.page;
   const [commentsOpen, setCommentsOpen] = createSignal(false);
   const hasComments = () => props.view.comments.length > 0;
+  const backlinkCount = () => {
+    const b = props.view.backlinks;
+    return b.projects.length + b.journals.length + b.areas.length + b.archives.length;
+  };
   return (
     <View testID="pkm-page" accessibilityLabel={page().slug} class="mx-auto w-full max-w-3xl min-w-0 gap-4 px-5 py-5">
       <Header view={props.view} summary={props.summary} commentsOpen={commentsOpen()} onToggleComments={() => setCommentsOpen((open) => !open)} />
@@ -142,9 +145,11 @@ function Shown(props: {
         </View>
       </If>
       <Outline view={props.view} pages={props.pages} point={props.point} onEditing={props.onEditing} />
-      <View class="mt-4 border-t border-line pt-4">
-        <Backlinks view={props.view} pages={props.pages} />
-      </View>
+      <If when={backlinkCount() > 0}>
+        <View class="mt-4 border-t border-line pt-4">
+          <Backlinks view={props.view} pages={props.pages} count={backlinkCount()} />
+        </View>
+      </If>
     </View>
   );
 }
@@ -292,112 +297,10 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined;
         </If>
         <MoreMenu label={t("web.pkm.page.more")} testid="pkm-more" items={more()} />
       </View>
-      <Text testID="pkm-notes-hint" class="text-xs text-faint">
-        {t("web.library.content.notesHint")}
-      </Text>
-      <Props view={props.view} />
       <If when={page().tldr}>
         <Text class="text-sm text-muted">{page().tldr}</Text>
       </If>
     </View>
-  );
-}
-
-/** The properties that say how the page stands, said in a line; the rest folded under a count. */
-const leading = new Set(["status", "deadline", "area", "areas", "tags"]);
-const hidden = new Set(["title", "tldr", "alias", "para"]);
-
-const statusTone = (status: string): DotTone => {
-  const s = status.trim().toLowerCase();
-  if (["active", "doing", "now", "in-progress"].includes(s)) return "leaf";
-  if (["waiting", "paused", "blocked", "someday"].includes(s)) return "wheat";
-  if (["done", "completed", "archived"].includes(s)) return "faint";
-  return "idle";
-};
-
-function Props(props: { view: PkmPageView }) {
-  const [all, setAll] = createSignal(false);
-  const entries = () => Object.entries(props.view.page.props).filter(([k]) => !hidden.has(k));
-  const rest = () => entries().filter(([k]) => !leading.has(k));
-  const value = (k: string) => props.view.page.props[k];
-  const deadline = () => {
-    const d = value("deadline");
-    const left = d === undefined ? undefined : daysUntil(d, dayKey(Date.now()));
-    return d === undefined ? undefined : { day: d, left };
-  };
-  const deadlineText = (d: { day: string; left: number | undefined }) =>
-    d.left === undefined
-      ? t("web.pkm.props.deadline", { day: d.day })
-      : d.left < 0
-        ? t("web.pkm.props.overdue", { day: d.day, n: -d.left })
-        : d.left === 0
-          ? t("web.pkm.props.dueToday", { day: d.day })
-          : t("web.pkm.props.left", { day: d.day, n: d.left });
-  const tags = () =>
-    (value("tags") ?? "")
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean);
-  return (
-    <If when={entries().length > 0}>
-      <View testID="pkm-props" class="gap-1.5">
-        <View class="flex-row flex-wrap items-center gap-x-3 gap-y-1">
-          <If when={value("status")}>
-            {(s) => (
-              <View testID="pkm-prop-status" class="flex-row items-center gap-1.5">
-                <Dot tone={statusTone(s())} />
-                <Text class="text-sm text-ink">{s()}</Text>
-              </View>
-            )}
-          </If>
-          <If when={deadline()}>
-            {(d) => (
-              <Text testID="pkm-prop-deadline" class={`text-sm ${(d().left ?? 1) < 0 ? "text-berry" : (d().left ?? 99) <= 3 ? "text-warn-ink" : "text-muted"}`}>
-                {deadlineText(d())}
-              </Text>
-            )}
-          </If>
-          <Each of={["area", "areas"].filter((k) => value(k))}>
-            {(k) => (
-              <View testID={`pkm-prop-${k()}`} class="flex-row items-center gap-1">
-                <Text class="text-sm text-muted">{t("web.pkm.props.area")}</Text>
-                <Body text={value(k()) ?? ""} refs={props.view.transclusions} class="text-sm text-muted" />
-              </View>
-            )}
-          </Each>
-          <Each of={tags()}>
-            {(tag) => (
-              <View testID="pkm-prop-tag" class="rounded-full bg-hover px-2 py-0.5">
-                <Body
-                  text={tag().startsWith("#") || tag().startsWith("[[") ? tag() : `[[${tag()}]]`}
-                  refs={props.view.transclusions}
-                  class="text-xs text-ink"
-                />
-              </View>
-            )}
-          </Each>
-          <If when={rest().length > 0}>
-            <View role="button" testID="pkm-props-more" onPress={() => setAll((a) => !a)} class="group rounded-sm px-1.5 py-0.5 hover:bg-hover">
-              <Text class="text-xs text-muted group-hover:text-ink">{all() ? t("web.pkm.props.fewer") : t("web.pkm.props.more", { n: rest().length })}</Text>
-            </View>
-          </If>
-        </View>
-        <If when={all()}>
-          <View class="gap-1 rounded-md bg-side px-2.5 py-2">
-            <Each of={rest()} key={([k]) => k}>
-              {(entry) => (
-                <View class="flex-row gap-3">
-                  <Text class="w-20 shrink-0 text-xs font-medium text-muted">{entry()[0]}</Text>
-                  <View testID={`pkm-prop-${entry()[0]}`} class="min-w-0 flex-1">
-                    <Body text={entry()[1]} refs={props.view.transclusions} class="text-xs text-ink" />
-                  </View>
-                </View>
-              )}
-            </Each>
-          </View>
-        </If>
-      </View>
-    </If>
   );
 }
 
@@ -471,11 +374,7 @@ function CommentCard(props: { comment: PkmComment; body: string; slug: string })
 
 const backlinkGroups = ["projects", "journals", "areas", "archives"] as const;
 
-function Backlinks(props: { view: PkmPageView; pages: readonly PkmPageSummary[] }) {
-  const count = () => {
-    const b = props.view.backlinks;
-    return b.projects.length + b.journals.length + b.areas.length + b.archives.length;
-  };
+function Backlinks(props: { view: PkmPageView; pages: readonly PkmPageSummary[]; count: number }) {
   const [open, setOpen] = createSignal(false);
   return (
     <View testID="pkm-backlinks" class="gap-2">
@@ -496,22 +395,20 @@ function Backlinks(props: { view: PkmPageView; pages: readonly PkmPageSummary[] 
           <Icon name="expand" size={10} tone="muted" />
         </View>
         <Text role="header" class="text-xs font-semibold text-muted group-hover:text-ink">
-          {t("web.pkm.backlinks.title", { n: count() })}
+          {t("web.pkm.backlinks.title", { n: props.count })}
         </Text>
       </View>
       <If when={open()}>
-        <If when={count() > 0} else={<Text class="px-1 text-xs text-faint">{t("web.pkm.backlinks.none")}</Text>}>
-          <Each of={backlinkGroups.filter((g) => props.view.backlinks[g].length > 0)}>
-            {(g) => (
-              <View class="gap-0.5">
-                <Text class="text-2xs text-faint">{t(`web.pkm.backlinks.${g()}`)}</Text>
-                <Each of={props.view.backlinks[g()]} key={(l) => l.block}>
-                  {(l) => <BacklinkRow link={l()} refs={props.view.transclusions} day={props.pages.find((p) => p.slug === l().page)?.day} />}
-                </Each>
-              </View>
-            )}
-          </Each>
-        </If>
+        <Each of={backlinkGroups.filter((g) => props.view.backlinks[g].length > 0)}>
+          {(g) => (
+            <View class="gap-0.5">
+              <Text class="text-2xs text-faint">{t(`web.pkm.backlinks.${g()}`)}</Text>
+              <Each of={props.view.backlinks[g()]} key={(l) => l.block}>
+                {(l) => <BacklinkRow link={l()} refs={props.view.transclusions} day={props.pages.find((p) => p.slug === l().page)?.day} />}
+              </Each>
+            </View>
+          )}
+        </Each>
       </If>
     </View>
   );

@@ -8,6 +8,7 @@
 //! message carries, and VibeValley's `artifact.page` / `artifact.view`.
 
 mod blocks;
+mod collab;
 mod db;
 mod entries;
 mod types;
@@ -21,12 +22,13 @@ use sqlx::{Connection, SqliteConnection};
 use vibevalley_core::artifact::{
     artifact_headers, artifact_problem, html_check, html_edit, html_problem, infer_artifact_from_name, shell_theme_of, starter_entries_for_type, with_shell,
 };
+use vibevalley_core::collab::{CommitMeta, PresenceHub};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Artifact as Wire, ArtifactBody, ArtifactCard, ArtifactContent, ArtifactDisplay, ArtifactEntryBatchRequest, ArtifactEntryGetRequest,
     ArtifactEntryKind, ArtifactEntryOp, ArtifactEntryWriteInput, ArtifactHtmlEdit, ArtifactKind, ArtifactListRequest, ArtifactMarkdown, ArtifactPage,
-    ArtifactPageInput, ArtifactRequest, ArtifactSaid, ArtifactType, ArtifactUpdateRequest, ArtifactVersion, ArtifactVersionRequest, BizCode, BlockAck,
-    BlockCreate, BlockDelete, BlockRef, BlockSnapshot, BlockUpdate, Preview, QuotedBlock, USER_ID, native_ops, ops, subscriptions,
+    ArtifactPageInput, ArtifactPresenceEvent, ArtifactRequest, ArtifactSaid, ArtifactType, ArtifactUpdateRequest, ArtifactVersion, ArtifactVersionRequest,
+    BizCode, BlockAck, BlockCreate, BlockDelete, BlockRef, BlockSnapshot, BlockUpdate, Preview, QuotedBlock, USER_ID, native_ops, ops, subscriptions,
 };
 
 pub use blocks::spans_of;
@@ -94,6 +96,7 @@ struct Change {
 }
 
 type SuggestionsNow = (String, Vec<vibevalley_protocol::Suggestion>);
+type PresenceExtra = HashMap<(String, String), (Option<String>, Option<String>)>;
 
 pub struct Artifacts {
     db: Mutex<SqliteConnection>,
@@ -109,6 +112,10 @@ pub struct Artifacts {
     changes: Mutex<Vec<flume::Sender<Change>>>,
     entry_changes: Mutex<Vec<flume::Sender<EntryChange>>>,
     suggestion_changes: Mutex<Vec<flume::Sender<SuggestionsNow>>>,
+    /// Pure in-memory Loro EphemeralStore presence hubs keyed by artifact_id (never written to SQLite).
+    presences: Mutex<HashMap<String, PresenceHub>>,
+    presence_extra: Mutex<PresenceExtra>,
+    presence_changes: Mutex<Vec<flume::Sender<(String, ArtifactPresenceEvent)>>>,
     demo_on: AtomicBool,
     closed: AtomicBool,
     stop: Mutex<Option<flume::Sender<()>>>,
@@ -134,6 +141,9 @@ impl Artifacts {
             changes: Mutex::default(),
             entry_changes: Mutex::default(),
             suggestion_changes: Mutex::default(),
+            presences: Mutex::default(),
+            presence_extra: Mutex::default(),
+            presence_changes: Mutex::default(),
             demo_on: AtomicBool::new(false),
             closed: AtomicBool::new(false),
             stop: Mutex::new(Some(stop_tx)),
@@ -348,16 +358,16 @@ impl Artifacts {
             return Err(refused(t("server.artifact.defaultDesignSystemOnly", &[])));
         }
 
-        let wants_store = artifact_type.is_some_and(|ty| ty != ArtifactType::Docs)
+        let wants_store = artifact_type.is_some_and(|ty| ty.body() == ArtifactBody::Store)
             || req.kind == Some(ArtifactKind::Store)
             || (req.entries.is_some() && req.content.is_none() && req.kind != Some(ArtifactKind::Html) && req.kind != Some(ArtifactKind::Markdown));
 
         if wants_store {
-            let store_type = artifact_type.filter(|&ty| ty != ArtifactType::Docs);
+            let store_type = artifact_type.filter(|ty| ty.body() == ArtifactBody::Store);
             return self.create_store(maker, req, &effective_title, store_type);
         }
 
-        let docs_type = (artifact_type == Some(ArtifactType::Docs)).then_some(ArtifactType::Docs);
+        let docs_type = artifact_type.filter(|ty| ty.body() == ArtifactBody::Blocks);
         let Some(content) = &req.content else {
             let problem = artifact_problem(Some(&effective_title), None, None);
             if !problem.is_empty() {
@@ -454,8 +464,15 @@ impl Artifacts {
                     )
                     .map_err(q)?;
                     db::version_announced(db, &id, 1, &said.id).map_err(q)?;
+                    let meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
+                    self.sync_html_to_collab(db, &id, None, content, &meta)?;
                 }
-                initial = if html { None } else { self.fill(db, &id, content, &maker.by)? };
+                let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
+                initial = if html {
+                    None
+                } else {
+                    self.fill_with_meta(db, &id, content, &maker.by, &fill_meta)?
+                };
                 Ok(())
             },
         )?;
@@ -606,11 +623,25 @@ impl Artifacts {
     /// An html one's next version; a blocks or store one is refused.
     pub fn version(&self, maker: &Maker, req: &ArtifactVersionRequest) -> Result<Wire, ApiError> {
         let _rows = lock(&self.rows);
-        self.version_locked(maker, req)
+        self.version_locked(maker, req, None)
     }
 
-    fn version_locked(&self, maker: &Maker, req: &ArtifactVersionRequest) -> Result<Wire, ApiError> {
-        let row = self.found(&mut self.db(), &req.id)?;
+    pub fn version_with_meta(&self, maker: &Maker, req: &ArtifactVersionRequest, meta: &CommitMeta) -> Result<Wire, ApiError> {
+        let _rows = lock(&self.rows);
+        self.version_locked(maker, req, Some(meta))
+    }
+
+    fn version_locked(&self, maker: &Maker, req: &ArtifactVersionRequest, explicit_meta: Option<&CommitMeta>) -> Result<Wire, ApiError> {
+        let (row, prior_html) = {
+            let mut db = self.db();
+            let row = self.found(&mut db, &req.id)?;
+            let prior = if row.body == "html" && row.version > 0 {
+                db::version(&mut db, &row.id, row.version).map_err(q)?.and_then(|v| self.page_of(&row, &v).ok())
+            } else {
+                None
+            };
+            (row, prior)
+        };
         if row.body != "html" {
             return Err(refused(t("server.artifact.notHtml", &[("title", row.title.as_str().into())])));
         }
@@ -664,6 +695,10 @@ impl Artifacts {
                 .map_err(q)?;
                 db::version_announced(db, &row.id, next, &said.id).map_err(q)?;
                 db::artifact_versioned(db, &row.id, next, at).map_err(q)?;
+                let meta = explicit_meta
+                    .cloned()
+                    .unwrap_or_else(|| collab::commit_meta_for_maker(maker, note.map(str::to_owned), at));
+                self.sync_html_to_collab(db, &row.id, prior_html.as_deref(), &req.content, &meta)?;
                 Ok(())
             },
         )?;
@@ -730,6 +765,7 @@ impl Artifacts {
                 content: edited,
                 note: Some(note),
             },
+            None,
         )
     }
 
@@ -798,7 +834,9 @@ impl Artifacts {
         let _rows = lock(&self.rows);
         let mut db = self.db();
         self.found(&mut db, id)?;
-        db::delete_artifact(&mut db, id).map_err(q)
+        db::delete_artifact(&mut db, id).map_err(q)?;
+        self.drop_presence_state(id);
+        Ok(())
     }
 
     pub fn snapshot(&self, id: &str) -> Result<BlockSnapshot, ApiError> {
@@ -854,8 +892,9 @@ impl Artifacts {
         let (page, _) = self.content(&req.id, Some(req.version))?;
         let shown = self.get_now(&req.id)?;
         let theme = shell_theme_of(req.theme.as_deref());
+        let wrapped = with_shell(&page.content, shown.display.unwrap_or(ArtifactDisplay::Page), theme);
         Ok(ArtifactPage {
-            content: with_shell(&page.content, shown.display.unwrap_or(ArtifactDisplay::Page), theme),
+            content: self.inject_presence_highlights(&req.id, wrapped, false),
             headers,
         })
     }
@@ -1064,6 +1103,34 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board:
         let a = a.clone();
         move |_, r| a.demo(&r.id, &agents.profiles.agents())
     });
+    hub.on::<ops::ArtifactPresenceUpdate>({
+        let a = a.clone();
+        move |_, r| a.update_presence(USER_ID, &r)
+    });
+    hub.on::<ops::ArtifactHistoryList>({
+        let a = a.clone();
+        move |_, r| a.history_list(&r)
+    });
+    hub.on::<ops::ArtifactHistoryPreview>({
+        let a = a.clone();
+        move |_, r| a.history_preview(&r)
+    });
+    hub.on::<ops::ArtifactHistoryRestore>({
+        let a = a.clone();
+        move |_, r| a.history_restore(&r)
+    });
+    hub.on::<ops::ArtifactHistoryFork>({
+        let a = a.clone();
+        move |_, r| a.history_fork(&r)
+    });
+    hub.on::<ops::ArtifactHistoryUndoOrigin>({
+        let a = a.clone();
+        move |_, r| a.history_undo_origin(&r)
+    });
+    hub.on::<ops::ArtifactHistoryCompact>({
+        let a = a.clone();
+        move |_, r| a.history_compact(&r)
+    });
     hub.on::<native_ops::ArtifactPage>({
         let a = a.clone();
         move |_, r| a.page(&r)
@@ -1085,5 +1152,9 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board:
         let a = a.clone();
         move |_, p, sink| a.follow_entries(&p.id, p.after, sink)
     });
-    hub.on_subscription::<subscriptions::ArtifactSuggestionFollow>(move |_, p, sink| a.follow_suggestions(&p.id, sink));
+    hub.on_subscription::<subscriptions::ArtifactSuggestionFollow>({
+        let a = a.clone();
+        move |_, p, sink| a.follow_suggestions(&p.id, sink)
+    });
+    hub.on_subscription::<subscriptions::ArtifactPresenceFollow>(move |_, p, sink| a.follow_presence(&p.id, sink));
 }

@@ -23,7 +23,7 @@ fn set_entry(path: &str, kind: ArtifactEntryKind, value: String) -> ArtifactEntr
 pub fn starter_entries_for_type(artifact_type: ArtifactType, title: &str) -> Vec<ArtifactEntryWriteInput> {
     let escaped = esc(title);
     match artifact_type {
-        ArtifactType::Docs => vec![],
+        ArtifactType::Docs | ArtifactType::Outline => vec![],
         ArtifactType::Slides => vec![
             set_entry(
                 "project/deck.json",

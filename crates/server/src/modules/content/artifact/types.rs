@@ -3,7 +3,7 @@
 
 use include_dir::{Dir, include_dir};
 use vibevalley_i18n::{list, t};
-use vibevalley_protocol::{ApiError, ArtifactBody, ArtifactType, ArtifactTypeGuide, ArtifactTypeInfo, ArtifactTypeReadRequest};
+use vibevalley_protocol::{ApiError, ArtifactType, ArtifactTypeGuide, ArtifactTypeInfo, ArtifactTypeReadRequest};
 
 use super::{Artifacts, db, q, refused};
 
@@ -23,6 +23,7 @@ fn strip_frontmatter(raw: &str) -> String {
 fn type_words(ty: ArtifactType) -> (String, String) {
     match ty {
         ArtifactType::Docs => (t("server.artifact.types.docs.title", &[]), t("server.artifact.types.docs.summary", &[])),
+        ArtifactType::Outline => (t("server.artifact.types.outline.title", &[]), t("server.artifact.types.outline.summary", &[])),
         ArtifactType::Slides => (t("server.artifact.types.slides.title", &[]), t("server.artifact.types.slides.summary", &[])),
         ArtifactType::Dashboard => (
             t("server.artifact.types.dashboard.title", &[]),
@@ -72,11 +73,7 @@ impl Artifacts {
             let (title, summary) = type_words(ty);
             out.push(ArtifactTypeInfo {
                 r#type: ty,
-                body: if ty == ArtifactType::Docs {
-                    ArtifactBody::Blocks
-                } else {
-                    ArtifactBody::Store
-                },
+                body: ty.body(),
                 title,
                 summary,
                 references: list_references(ty),

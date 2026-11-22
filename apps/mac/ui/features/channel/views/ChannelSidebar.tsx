@@ -101,7 +101,6 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
             <Count n={totalUnread()} />
           </View>
         </If>
-        <BarButton icon="search" size={16} testid="farm-search-open" label={t("web.channel.farmSearch.open")} onPress={() => props.onSearch()} />
       </View>
       <Scroll class="flex-1" contentClass="px-3 py-3">
         <View

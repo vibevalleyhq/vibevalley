@@ -100,6 +100,8 @@ function base64ToUtf8(b64: string): string {
 function artifactTypeTitle(type: ArtifactTypeFilter | undefined): string {
   if (type === undefined) return t("web.library.content.artifactType.all");
   switch (type) {
+    case "outline":
+      return t("web.library.content.artifactType.outline");
     case "whiteboard":
       return t("web.library.content.artifactType.whiteboard");
     case "docs":
@@ -125,8 +127,6 @@ function titleOfBucket(bucket: ContentBucket): string {
       return t("web.library.content.recent");
     case "pinned":
       return t("web.library.content.pinned");
-    case "notes":
-      return t("web.library.content.notes");
     case "artifacts":
       return artifactTypeTitle(bucket.artifactType);
     case "media":

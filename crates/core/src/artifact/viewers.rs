@@ -1168,7 +1168,7 @@ pub fn render_store_artifact_html(artifact_type: Option<ArtifactType>, entries_l
         Some(ArtifactType::Slides) => render_slides_store_html(entries_list, &map, options),
         Some(ArtifactType::Dashboard) => render_dashboard_store_html(entries_list, &map, options),
         Some(ArtifactType::Motion) => render_motion_store_html(entries_list, &map, options),
-        Some(ArtifactType::Design | ArtifactType::DesignSystem | ArtifactType::Docs | ArtifactType::Whiteboard) | None => {
+        Some(ArtifactType::Design | ArtifactType::DesignSystem | ArtifactType::Docs | ArtifactType::Outline | ArtifactType::Whiteboard) | None => {
             render_design_artboard_html(entries_list, &map, options)
         }
     }

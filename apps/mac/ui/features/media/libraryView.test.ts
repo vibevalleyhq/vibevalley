@@ -75,10 +75,11 @@ test("bucket helpers report visible content categories and clear incompatible me
   expect(showsMediaInBucket(pinned)).toBe(true);
   expect(isPinnedBucket(pinned)).toBe(true);
 
-  const notes: ContentBucket = { kind: "notes" };
-  expect(showsNotesInBucket(notes)).toBe(true);
-  expect(showsArtifactsInBucket(notes)).toBe(false);
-  expect(showsMediaInBucket(notes)).toBe(false);
+  const outline: ContentBucket = { kind: "artifacts", artifactType: "outline" };
+  expect(showsNotesInBucket(outline)).toBe(false);
+  expect(showsArtifactsInBucket(outline)).toBe(true);
+  expect(showsMediaInBucket(outline)).toBe(false);
+  expect(bucketArtifactType(outline)).toBe("outline");
 
   const whiteboard: ContentBucket = { kind: "artifacts", artifactType: "whiteboard" };
   expect(showsNotesInBucket(whiteboard)).toBe(false);
@@ -95,13 +96,14 @@ test("bucket helpers report visible content categories and clear incompatible me
   expect(bucketArtifactType(audio)).toBeUndefined();
 
   const withAsking = askRemove(focusFile("f1"));
-  expect(selectBucketSelection(withAsking, notes)).toEqual({ kind: "none" });
+  expect(selectBucketSelection(withAsking, outline)).toEqual({ kind: "none" });
   expect(selectBucketSelection(withAsking, whiteboard)).toEqual({ kind: "none" });
   expect(selectBucketSelection(withAsking, audio)).toEqual({ kind: "files", ids: ["f1"], anchor: "f1", asking: false });
   expect(selectBucketSelection(openLightbox(withAsking, 0, 2), whiteboard)).toEqual({ kind: "none" });
 });
 
-test("artifactMatchesType matches all 8 exact artifact types and legacy body/display fallbacks", () => {
+test("artifactMatchesType matches all 9 exact artifact types and legacy body/display fallbacks", () => {
+  const outline = makeArtifact({ id: "a-out", title: "Outline", body: "blocks", artifactType: "outline" });
   const wb = makeArtifact({ id: "a-wb", title: "Board", body: "store", artifactType: "whiteboard" });
   const docs = makeArtifact({ id: "a-docs", title: "Doc", body: "blocks", artifactType: "docs" });
   const legacyBlocks = makeArtifact({ id: "a-blocks", title: "Legacy Doc", body: "blocks" });
@@ -114,6 +116,8 @@ test("artifactMatchesType matches all 8 exact artifact types and legacy body/dis
   const legacyMotion = makeArtifact({ id: "a-lmot", title: "Legacy Anim", body: "html", display: "motion" });
   const html = makeArtifact({ id: "a-html", title: "Page", body: "html", display: "page" });
 
+  expect(artifactMatchesType(outline, "outline")).toBe(true);
+  expect(artifactMatchesType(outline, "docs")).toBe(false);
   expect(artifactMatchesType(wb, "whiteboard")).toBe(true);
   expect(artifactMatchesType(wb, "design")).toBe(false);
   expect(artifactMatchesType(docs, "docs")).toBe(true);

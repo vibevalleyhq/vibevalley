@@ -312,12 +312,33 @@ export const catalogs = {
         setDefault: "设为默认设计体系",
         unsetDefault: "取消默认",
         docs: "协作文档",
+        outline: "大纲笔记",
         slides: "幻灯片",
         dashboard: "数据看板",
         motion: "动态短片",
         whiteboard: "无限白板",
         design: "界面画板",
         designSystem: "设计体系",
+      },
+      timeline: {
+        toggle: "时间轴历史",
+        title: "时间轴",
+        loading: "正在载入历史…",
+        empty: "还没有可回放的提交",
+        prev: "上一个提交",
+        next: "下一个提交",
+        backToLive: "回到最新",
+        previewBanner: "历史只读预览 · {summary}",
+        turn: "第 {n} 轮",
+        restore: "恢复到此版本",
+        restored: "已恢复到所选版本",
+        fork: "分叉为新作品",
+        forkTitle: "{title}（分支）",
+        forked: "已分叉为「{title}」",
+        undoTurn: "撤销此轮改动",
+        undoneOrigin: "已撤销该来源的改动",
+        compact: "压缩历史",
+        compacted: "已压缩历史快照",
       },
       motion: {
         play: "播放",
@@ -573,7 +594,6 @@ export const catalogs = {
       farmShort: "农场",
       update: "更新",
       working: "运行中 · {n} 个执行会话",
-      off: "未启动",
       runsHint: "查看执行会话、主助手审批与轨迹",
       chips: { drop: "去掉 {v}", valueOf: "{k} 的值", removeKey: "删除 {k}", remove: "删除", name: "变量名", value: "变量的值", valueHint: "值", add: "添加" },
       toasts: "提示",
@@ -930,7 +950,6 @@ export const catalogs = {
         searchNotes: "在笔记里搜「{q}」",
       },
       farmSearch: {
-        open: "全部搜索",
         title: "全部搜索",
         hint: "找消息…",
         filters: "from:用户  in:#频道  has:file / image / link  before: / after:2026-10-01",
@@ -1665,13 +1684,10 @@ export const catalogs = {
         pinnedToast: "已置顶收藏",
         unpinnedToast: "已取消置顶",
         notes: "大纲笔记",
-        notesAll: "全部大纲笔记",
         newNote: "新建大纲笔记",
         artifacts: "作品",
         media: "素材",
-        aiGenerate: "AI 生成素材",
         notesTodoCount: "{n} 项待办",
-        notesHint: "Tab 缩进 · Enter 换行 · / 命令 · [[ 双链",
         sendArtifact: "发到频道",
         exportArtifact: "导出",
         turnIntoIssue: "转为任务",
@@ -1680,6 +1696,7 @@ export const catalogs = {
         source: { all: "全部来源", agent: "执行会话交付", user: "我创建的" },
         artifactType: {
           all: "全部作品",
+          outline: "大纲笔记",
           whiteboard: "无限白板",
           docs: "协作文档",
           slides: "幻灯片",
@@ -1724,11 +1741,9 @@ export const catalogs = {
             aiAudio: { name: "音频工作台", desc: "多人对白、音色设计、克隆与转写" },
           },
           seed: {
-            noteTech:
-              "- ## 背景与目标\n  - 说明要解决的核心问题与收益边界\n- ## 核心设计\n  - 梳理模块边界与数据流\n- ## 实施拆解\n  - TODO 拆分任务步骤并补全验收测试",
-            noteMeeting: "- ## 讨论焦点\n  - 记录本次沟通的核心议题\n- ## 关键结论\n  - 写下已达成一致的决定\n- ## 后续待办\n  - TODO 跟进确认后的行动项",
-            noteDaily:
-              "- ## 今日主线\n  - TODO 列出今天优先推进的事项\n- ## 阻塞与风险\n  - 记录需要协作解开的卡点\n- ## 交接摘要\n  - 今日完成的结果与后续衔接点",
+            noteTech: "## 背景与目标\n- 说明要解决的核心问题与收益边界\n## 核心设计\n- 梳理模块边界与数据流\n## 实施拆解\n- [ ] 拆分任务步骤并补全验收测试",
+            noteMeeting: "## 讨论焦点\n- 记录本次沟通的核心议题\n## 关键结论\n- 写下已达成一致的决定\n## 后续待办\n- [ ] 跟进确认后的行动项",
+            noteDaily: "## 今日主线\n- [ ] 列出今天优先推进的事项\n## 阻塞与风险\n- 记录需要协作解开的卡点\n## 交接摘要\n- 今日完成的结果与后续衔接点",
             wbBlankTitle: "中心主题",
             wbBlankBody: "从工具栏添加卡片、便签与连线",
             wbArchN1Title: "接入层 · UI",
@@ -1975,15 +1990,6 @@ export const catalogs = {
         copiedRef: "块引用复制好了",
         toIssue: "转为任务",
         issueMade: "已创建任务",
-      },
-      props: {
-        deadline: "截止 {day}",
-        left: "截止 {day} · 还剩 {n} 天",
-        dueToday: "截止 {day} · 今天到期",
-        overdue: "截止 {day} · 过了 {n} 天",
-        area: "领域",
-        more: "还有 {n} 项属性",
-        fewer: "收起属性",
       },
       marker: { TODO: "待办", DOING: "在做", DONE: "做完了", NOW: "现在做", LATER: "以后做", WAITING: "在等", CANCELED: "不做了" },
       command: {
@@ -3236,12 +3242,33 @@ export const catalogs = {
         setDefault: "Set as default design system",
         unsetDefault: "Unset default",
         docs: "Document",
+        outline: "Outline Note",
         slides: "Slide Deck",
         dashboard: "Dashboard",
         motion: "Motion Film",
         whiteboard: "Whiteboard",
         design: "Design Canvas",
         designSystem: "Design System",
+      },
+      timeline: {
+        toggle: "History timeline",
+        title: "Timeline",
+        loading: "Loading history…",
+        empty: "No history commits yet",
+        prev: "Previous commit",
+        next: "Next commit",
+        backToLive: "Back to live",
+        previewBanner: "Read-only history preview · {summary}",
+        turn: "Turn {n}",
+        restore: "Restore",
+        restored: "Restored to selected commit",
+        fork: "Fork",
+        forkTitle: "{title} (Fork)",
+        forked: "Forked as “{title}”",
+        undoTurn: "Undo this turn",
+        undoneOrigin: "Undid edits from this origin",
+        compact: "Compact",
+        compacted: "Compacted history snapshot",
       },
       motion: {
         play: "Play",
@@ -3498,7 +3525,6 @@ export const catalogs = {
       farmShort: "Farm",
       update: "Update",
       working: "Open · {n} working",
-      off: "Not open",
       runsHint: "View active runs, assistant approvals, and trajectories",
       chips: {
         drop: "Remove {v}",
@@ -3873,7 +3899,6 @@ export const catalogs = {
         searchNotes: "Search notes for “{q}”",
       },
       farmSearch: {
-        open: "Search everything",
         title: "Search everything",
         hint: "Find messages…",
         filters: "from:user  in:#channel  has:file / image / link  before: / after:2026-10-01",
@@ -4659,13 +4684,10 @@ export const catalogs = {
         pinnedToast: "Pinned",
         unpinnedToast: "Unpinned",
         notes: "Outline notes",
-        notesAll: "All outline notes",
         newNote: "New outline note",
         artifacts: "Artifacts",
         media: "Media",
-        aiGenerate: "AI generate media",
         notesTodoCount: "{n, plural, one {# todo} other {# todos}}",
-        notesHint: "Tab indent · Enter new line · / commands · [[ wikilink",
         sendArtifact: "Send to channel",
         exportArtifact: "Export",
         turnIntoIssue: "Turn into ticket",
@@ -4674,6 +4696,7 @@ export const catalogs = {
         source: { all: "All sources", agent: "From helpers", user: "Created by me" },
         artifactType: {
           all: "All artifacts",
+          outline: "Outline notes",
           whiteboard: "Whiteboard",
           docs: "Docs",
           slides: "Slides",
@@ -4719,11 +4742,11 @@ export const catalogs = {
           },
           seed: {
             noteTech:
-              "- ## Context & Goals\n  - Core problem statement and expected impact\n- ## Core Design\n  - Module boundaries and data flow\n- ## Implementation Plan\n  - TODO Break down steps and add verification checks",
+              "## Context & Goals\n- Core problem statement and expected impact\n## Core Design\n- Module boundaries and data flow\n## Implementation Checklist\n- [ ] Break down steps and add verification checks",
             noteMeeting:
-              "- ## Discussion Focus\n  - Key agenda topics for this session\n- ## Key Decisions\n  - Record agreed conclusions and trade-offs\n- ## Follow-ups\n  - TODO Track confirmed action items",
+              "## Discussion Focus\n- Key agenda topics for this session\n## Key Decisions\n- Record agreed conclusions and trade-offs\n## Follow-ups\n- [ ] Track confirmed action items",
             noteDaily:
-              "- ## Today's Focus\n  - TODO List today's top priorities\n- ## Blockers & Risks\n  - Note items awaiting collaboration\n- ## Handoff Summary\n  - Outcomes shipped and next steps",
+              "## Today's Focus\n- [ ] List today's top priorities\n## Blockers & Risks\n- Note items awaiting collaboration\n## Handoff Summary\n- Outcomes shipped and next steps",
             wbBlankTitle: "Central Topic",
             wbBlankBody: "Add cards, stickies, and arrows from the toolbar",
             wbArchN1Title: "Client / UI",
@@ -4989,15 +5012,6 @@ export const catalogs = {
         copiedRef: "Block ref copied",
         toIssue: "Turn into issue",
         issueMade: "Issue created",
-      },
-      props: {
-        deadline: "Due {day}",
-        left: "Due {day} · {n} days left",
-        dueToday: "Due {day} · today",
-        overdue: "Due {day} · {n} days ago",
-        area: "Area",
-        more: "{n} more properties",
-        fewer: "Fewer properties",
       },
       marker: { TODO: "To do", DOING: "Doing", DONE: "Done", NOW: "Now", LATER: "Later", WAITING: "Waiting", CANCELED: "Canceled" },
       command: {
@@ -6374,12 +6388,31 @@ export interface Messages {
   "web.artifact.suggestions.types.paragraph": undefined;
   "web.artifact.suggestions.types.quote": undefined;
   "web.artifact.suggestions.types.todo": undefined;
+  "web.artifact.timeline.backToLive": undefined;
+  "web.artifact.timeline.compact": undefined;
+  "web.artifact.timeline.compacted": undefined;
+  "web.artifact.timeline.empty": undefined;
+  "web.artifact.timeline.fork": undefined;
+  "web.artifact.timeline.forkTitle": { readonly title: string | number };
+  "web.artifact.timeline.forked": { readonly title: string | number };
+  "web.artifact.timeline.loading": undefined;
+  "web.artifact.timeline.next": undefined;
+  "web.artifact.timeline.prev": undefined;
+  "web.artifact.timeline.previewBanner": { readonly summary: string | number };
+  "web.artifact.timeline.restore": undefined;
+  "web.artifact.timeline.restored": undefined;
+  "web.artifact.timeline.title": undefined;
+  "web.artifact.timeline.toggle": undefined;
+  "web.artifact.timeline.turn": { readonly n: string | number };
+  "web.artifact.timeline.undoTurn": undefined;
+  "web.artifact.timeline.undoneOrigin": undefined;
   "web.artifact.types.dashboard": undefined;
   "web.artifact.types.defaultBadge": undefined;
   "web.artifact.types.design": undefined;
   "web.artifact.types.designSystem": undefined;
   "web.artifact.types.docs": undefined;
   "web.artifact.types.motion": undefined;
+  "web.artifact.types.outline": undefined;
   "web.artifact.types.setDefault": undefined;
   "web.artifact.types.slides": undefined;
   "web.artifact.types.unsetDefault": undefined;
@@ -6583,7 +6616,6 @@ export interface Messages {
   "web.base.money.about": { readonly yuan: string | number };
   "web.base.money.spent": { readonly yuan: string | number };
   "web.base.money.underCent": undefined;
-  "web.base.off": undefined;
   "web.base.openTerminal": undefined;
   "web.base.orchestrator": undefined;
   "web.base.pickTooLarge": { readonly name: string | number };
@@ -6860,7 +6892,6 @@ export interface Messages {
   "web.channel.farmSearch.filters": undefined;
   "web.channel.farmSearch.hint": undefined;
   "web.channel.farmSearch.none": undefined;
-  "web.channel.farmSearch.open": undefined;
   "web.channel.farmSearch.searching": undefined;
   "web.channel.farmSearch.title": undefined;
   "web.channel.find": undefined;
@@ -7638,7 +7669,6 @@ export interface Messages {
   "web.issue.trigger.missed": undefined;
   "web.issue.trigger.refine": undefined;
   "web.issue.trigger.runtime": undefined;
-  "web.library.content.aiGenerate": undefined;
   "web.library.content.artifactType.all": undefined;
   "web.library.content.artifactType.dashboard": undefined;
   "web.library.content.artifactType.design": undefined;
@@ -7646,6 +7676,7 @@ export interface Messages {
   "web.library.content.artifactType.docs": undefined;
   "web.library.content.artifactType.html": undefined;
   "web.library.content.artifactType.motion": undefined;
+  "web.library.content.artifactType.outline": undefined;
   "web.library.content.artifactType.slides": undefined;
   "web.library.content.artifactType.whiteboard": undefined;
   "web.library.content.artifacts": undefined;
@@ -7662,8 +7693,6 @@ export interface Messages {
   "web.library.content.new": undefined;
   "web.library.content.newNote": undefined;
   "web.library.content.notes": undefined;
-  "web.library.content.notesAll": undefined;
-  "web.library.content.notesHint": undefined;
   "web.library.content.notesTodoCount": { readonly n: number };
   "web.library.content.pin": undefined;
   "web.library.content.pinned": undefined;
@@ -8048,13 +8077,6 @@ export interface Messages {
   "web.pkm.page.undo": undefined;
   "web.pkm.page.undone": { readonly what: string | number };
   "web.pkm.place.label": undefined;
-  "web.pkm.props.area": undefined;
-  "web.pkm.props.deadline": { readonly day: string | number };
-  "web.pkm.props.dueToday": { readonly day: string | number };
-  "web.pkm.props.fewer": undefined;
-  "web.pkm.props.left": { readonly day: string | number; readonly n: string | number };
-  "web.pkm.props.more": { readonly n: string | number };
-  "web.pkm.props.overdue": { readonly day: string | number; readonly n: string | number };
   "web.pkm.search.all": undefined;
   "web.pkm.search.filters": undefined;
   "web.pkm.search.linked": undefined;

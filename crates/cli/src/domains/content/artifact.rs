@@ -13,6 +13,7 @@ use crate::output::{issue_ref, line, read_json_input, read_text_input};
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ArtifactTypeArg {
     Docs,
+    Outline,
     Slides,
     Dashboard,
     Motion,
@@ -26,6 +27,7 @@ impl From<ArtifactTypeArg> for ArtifactType {
     fn from(value: ArtifactTypeArg) -> Self {
         match value {
             ArtifactTypeArg::Docs => ArtifactType::Docs,
+            ArtifactTypeArg::Outline => ArtifactType::Outline,
             ArtifactTypeArg::Slides => ArtifactType::Slides,
             ArtifactTypeArg::Dashboard => ArtifactType::Dashboard,
             ArtifactTypeArg::Motion => ArtifactType::Motion,

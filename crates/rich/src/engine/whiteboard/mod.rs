@@ -16,8 +16,8 @@ pub mod stickers;
 pub mod templates;
 
 pub use codec::{
-    CodecError, decode_board_entries, decode_element, decode_meta, decode_presence, encode_element_delete, encode_element_json, encode_element_patch,
-    encode_element_write, encode_meta_write, encode_presence_write, import_json_canvas,
+    CodecError, decode_board_entries, decode_element, decode_meta, decode_presence, decode_presences_json, encode_element_delete, encode_element_json,
+    encode_element_patch, encode_element_write, encode_meta_write, encode_presence_write, import_json_canvas, merge_live_presences,
 };
 pub use export::{build_export_painter, export_json, export_json_canvas, export_svg};
 pub use geometry::{
@@ -31,13 +31,14 @@ pub use hit::{
 };
 pub use ink::{build_ink_outline, simplify_stroke_points, strokes_hit_by_eraser};
 pub use interaction::{
-    BoardAction, ControllerEffect, ExportFormat, InlineEditTarget, InteractionMode, Modifiers, PointerButton, PointerInput, Tool, WhiteboardController,
-    live_anchor_point,
+    AnimatedPresencePose, AnimationStepResult, BoardAction, ControllerEffect, ExportFormat, InlineEditTarget, InteractionMode, Modifiers, PointerButton,
+    PointerInput, Tool, WhiteboardController, live_anchor_point,
 };
 pub use layout::{CardTextLayout, HighlightSpan, TableLayout, layout_card, layout_table, locate_highlight_span, measure_text_span, wrap_text};
 pub use model::{
     AnchorSide, ArrowCurve, ArrowEndpoint, ArrowHead, BoardDoc, BoardMeta, ElementId, ElementKind, ElementRecord, ExtraFields, GridStyle, InkMode,
-    MilestoneKind, Point2, Presence, PresenceColor, Rect2, ShapeKind, StrokePoint, StrokeStyle, TextAlign, TextVariant, TimelineMilestone, Vec2, WbFill,
+    MilestoneKind, Point2, Presence, PresenceColor, PresenceKind, PresenceViewport, Rect2, ShapeKind, StrokePoint, StrokeStyle, TextAlign, TextVariant,
+    TimelineMilestone, Vec2, WbFill,
 };
 pub use ops::{
     ApplyResult, BoardCommand, DEFAULT_HISTORY_LIMIT, ElementDelta, HistoryEntry, UndoHistory, ZOrderDir, apply_command, apply_history_step,

@@ -42,6 +42,8 @@ fn registry_exports_all_components_and_documents_every_export() {
         "onWikilinkPress?: (event: VvWikilinkPressEvent) => void;",
         "onBlockRefPress?: (event: VvBlockRefPressEvent) => void;",
         "onGenUiAction?: (event: VvGenUiActionEvent) => void;",
+        "onCursorMove?: (event: VvWhiteboardCursorEvent) => void;",
+        "onViewportChange?: (event: VvWhiteboardViewportEvent) => void;",
     ] {
         assert!(dts.contains(expected), "generated declarations missing `{expected}`");
     }

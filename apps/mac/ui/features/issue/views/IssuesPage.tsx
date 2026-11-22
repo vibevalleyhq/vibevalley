@@ -390,7 +390,7 @@ function Toolbar(props: {
   const repos = () => [...new Set(props.cards.map(cardRepo).filter((p): p is string => !!p))].toSorted();
   const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
   return (
-    <View class="flex-row flex-wrap items-center gap-2 px-3 pt-3 pb-2.5">
+    <View class="flex-row flex-wrap items-center gap-2 px-3.5 py-2">
       <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
         <SearchField
           testid="issue-search"
@@ -459,7 +459,7 @@ function Toolbar(props: {
 function IssuesOnboarding(props: { onNavigate: (path: string) => void; onNew: () => void }) {
   return (
     <Scroll testID="issues-empty-onboarding" class="min-h-0 flex-1">
-      <View class="mx-auto my-8 w-full max-w-160 px-6">
+      <View class="mx-auto my-6 w-full max-w-160 px-6">
         <View class="rounded-xl border border-line bg-page p-6">
           <Text role="header" class="text-lg font-semibold text-ink">
             {t("web.issue.onboarding.title")}

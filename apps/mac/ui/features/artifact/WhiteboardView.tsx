@@ -2,7 +2,7 @@ import { computed, effect, Scroll, signal, Text, untracked, View, type Accessor 
 import { z } from "zod";
 
 import { currentLocale, t } from "@vibevalley/i18n";
-import type { ArtifactEntry, ArtifactEntryWriteInput } from "@vibevalley/protocol";
+import { type ArtifactEntry, type ArtifactEntryWriteInput, type ArtifactPresenceKind, userId, type ViewportRect } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -10,8 +10,15 @@ import { TextInput } from "../../design/Field";
 import { IconButton } from "../../design/IconButton";
 import { toast } from "../../design/toasts";
 import { useCore } from "../../infra/frame";
-import { richNative, type VvWhiteboardBatchEvent, type VvWhiteboardExportEvent, type VvWhiteboardSelectionEvent } from "../../infra/rich";
-import { saveBase64File, saveTextFile, type StoreEntryClient, useReportViewContext, useStoreEntries } from "./store";
+import {
+  richNative,
+  type VvWhiteboardBatchEvent,
+  type VvWhiteboardCursorEvent,
+  type VvWhiteboardExportEvent,
+  type VvWhiteboardSelectionEvent,
+  type VvWhiteboardViewportEvent,
+} from "../../infra/rich";
+import { saveBase64File, saveTextFile, type StoreEntryClient, useArtifactPresence, useReportViewContext, useStoreEntries } from "./store";
 import type { StoreViewerProps } from "./StoreArtifactView";
 
 const WhiteboardWriteSchema = z.object({
@@ -22,15 +29,6 @@ const WhiteboardWriteSchema = z.object({
   from: z.exactOptional(z.string()),
   mime: z.exactOptional(z.string()),
   ifRev: z.exactOptional(z.number().int().min(0)),
-});
-
-const WhiteboardPresenceWireSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  color: z.optional(z.string()),
-  x: z.optional(z.number()),
-  y: z.optional(z.number()),
-  status: z.optional(z.string()),
 });
 
 const FallbackElementSchema = z
@@ -54,9 +52,15 @@ interface PresenceWire {
   readonly id: string;
   readonly name: string;
   readonly color?: string | undefined;
+  readonly kind?: ArtifactPresenceKind | undefined;
   readonly x?: number | undefined;
   readonly y?: number | undefined;
+  readonly w?: number | undefined;
+  readonly h?: number | undefined;
   readonly status?: string | undefined;
+  readonly selector?: string | undefined;
+  readonly viewport?: ViewportRect | undefined;
+  readonly updatedAt?: number | undefined;
 }
 
 function parseJsonSafe(raw: string): unknown {
@@ -90,32 +94,44 @@ function buildHeadlessSvg(title: string, items: readonly FallbackElement[]): str
 
 export function WhiteboardView(props: StoreViewerProps) {
   const { client, snapshot } = useStoreEntries(() => props.artifact.id);
+  const presence = useArtifactPresence(() => props.artifact.id);
   const core = useCore();
   const act = createAct();
   const selectedIds = signal<readonly string[]>([]);
 
   const seq = () => (snapshot().seq > 0 ? snapshot().seq : props.artifact.seq);
 
-  const entriesList = computed((): readonly ArtifactEntry[] => [...snapshot().entries.values()]);
+  const entriesList = computed((): readonly ArtifactEntry[] => [...snapshot().entries.values()].filter((entry) => !entry.path.startsWith("presence/")));
 
   const presences = computed((): PresenceWire[] => {
     const out: PresenceWire[] = [];
     const seen = new Set<string>();
     const claims: FallbackElement[] = [];
 
+    for (const peer of presence.peers()) {
+      if (peer.id === userId) continue;
+      out.push({
+        id: peer.id,
+        name: peer.name,
+        color: peer.color,
+        kind: peer.kind,
+        x: peer.x,
+        y: peer.y,
+        w: peer.w,
+        h: peer.h,
+        status: peer.status,
+        selector: peer.selector,
+        viewport: peer.viewport,
+        updatedAt: peer.updatedAt,
+      });
+      seen.add(peer.id);
+    }
+
     for (const [path, entry] of snapshot().entries) {
-      if (!entry.value) continue;
-      if (path.startsWith("presence/")) {
-        const parsed = WhiteboardPresenceWireSchema.safeParse(parseJsonSafe(entry.value));
-        if (parsed.success) {
-          out.push(parsed.data);
-          seen.add(parsed.data.id);
-        }
-      } else if (path.startsWith("elements/")) {
-        const parsed = FallbackElementSchema.safeParse(parseJsonSafe(entry.value));
-        if (parsed.success && parsed.data.type === "claim") {
-          claims.push({ ...parsed.data, rev: entry.rev });
-        }
+      if (!entry.value || !path.startsWith("elements/")) continue;
+      const parsed = FallbackElementSchema.safeParse(parseJsonSafe(entry.value));
+      if (parsed.success && parsed.data.type === "claim") {
+        claims.push({ ...parsed.data, rev: entry.rev });
       }
     }
 
@@ -127,12 +143,35 @@ export function WhiteboardView(props: StoreViewerProps) {
         id: sess.agent,
         name: sess.name,
         color: "coral",
+        kind: "cursor",
         x: ownClaim ? (ownClaim.x ?? 80) + (ownClaim.w ?? 200) - 18 : 120,
         y: ownClaim ? (ownClaim.y ?? 80) + (ownClaim.h ?? 100) - 12 : 120,
       });
     }
     return out;
   });
+
+  const publishSelectionPresence = (ids: readonly string[]) => {
+    const firstId = ids[0];
+    if (!firstId) {
+      presence.clear(userId);
+      return;
+    }
+    const raw = snapshot().entries.get(`elements/${firstId}`)?.value;
+    const parsed = raw ? FallbackElementSchema.safeParse(parseJsonSafe(raw)) : undefined;
+    const el = parsed?.success === true ? parsed.data : undefined;
+    presence.publish({
+      id: userId,
+      name: t("web.artifact.blocks.user"),
+      color: "blue",
+      kind: "selection",
+      selector: firstId,
+      ...(el?.x !== undefined ? { x: el.x } : {}),
+      ...(el?.y !== undefined ? { y: el.y } : {}),
+      ...(el?.w !== undefined ? { w: el.w } : {}),
+      ...(el?.h !== undefined ? { h: el.h } : {}),
+    });
+  };
 
   useReportViewContext(
     () => props.artifact.id,
@@ -150,10 +189,12 @@ export function WhiteboardView(props: StoreViewerProps) {
     const entriesJson = computed(() => JSON.stringify(entriesList()));
     const presencesJson = computed(() => JSON.stringify(presences()));
 
+    // Presence is strictly ephemeral via `artifact.presence.update`; never persist `presence/*` entries.
     const handleNativeBatch = (ev: VvWhiteboardBatchEvent) => {
       const parsed = z.array(WhiteboardWriteSchema).safeParse(parseJsonSafe(ev.writesJson));
-      if (!parsed.success || parsed.data.length === 0) return;
-      const writes: ArtifactEntryWriteInput[] = parsed.data;
+      if (!parsed.success) return;
+      const writes: ArtifactEntryWriteInput[] = parsed.data.filter((w) => !w.path.startsWith("presence/"));
+      if (writes.length === 0) return;
       void act.run(async () => {
         await client.batch(writes);
       });
@@ -161,7 +202,32 @@ export function WhiteboardView(props: StoreViewerProps) {
 
     const handleNativeSelection = (ev: VvWhiteboardSelectionEvent) => {
       const parsed = z.array(z.string()).safeParse(parseJsonSafe(ev.idsJson));
-      if (parsed.success) selectedIds.set(parsed.data);
+      if (parsed.success) {
+        selectedIds.set(parsed.data);
+        publishSelectionPresence(parsed.data);
+      }
+    };
+
+    const handleNativeCursorMove = (ev: VvWhiteboardCursorEvent) => {
+      presence.publish({
+        id: userId,
+        name: t("web.artifact.blocks.user"),
+        color: "blue",
+        kind: "cursor",
+        x: ev.x,
+        y: ev.y,
+        viewport: { x: ev.viewportX, y: ev.viewportY, w: ev.viewportW, h: ev.viewportH, zoom: ev.zoom },
+      });
+    };
+
+    const handleNativeViewportChange = (ev: VvWhiteboardViewportEvent) => {
+      presence.publish({
+        id: userId,
+        name: t("web.artifact.blocks.user"),
+        color: "blue",
+        kind: "viewport",
+        viewport: { x: ev.x, y: ev.y, w: ev.w, h: ev.h, zoom: ev.zoom },
+      });
     };
 
     const handleNativeExport = (ev: VvWhiteboardExportEvent) => {
@@ -193,6 +259,8 @@ export function WhiteboardView(props: StoreViewerProps) {
           locale={currentLocale()}
           onBatch={handleNativeBatch}
           onSelectionChange={handleNativeSelection}
+          onCursorMove={handleNativeCursorMove}
+          onViewportChange={handleNativeViewportChange}
           onOpenChat={() => props.onOpenChat?.()}
           onExport={handleNativeExport}
           class={`min-h-0 min-w-0 flex-1 ${props.frameClass ?? ""}`}
@@ -202,18 +270,31 @@ export function WhiteboardView(props: StoreViewerProps) {
   }
 
   return (
-    <WhiteboardHeadlessFallback title={props.artifact.title} entries={entriesList} client={client} selectedIds={selectedIds} onOpenChat={props.onOpenChat} />
+    <WhiteboardHeadlessFallback
+      title={props.artifact.title}
+      entries={entriesList}
+      presences={presences}
+      client={client}
+      selectedIds={selectedIds}
+      onSelectIds={(ids) => {
+        selectedIds.set(ids);
+        publishSelectionPresence(ids);
+      }}
+      onOpenChat={props.onOpenChat}
+    />
   );
 }
 
 interface HeadlessProps {
   readonly title: string;
   readonly entries: Accessor<readonly ArtifactEntry[]>;
+  readonly presences: Accessor<readonly PresenceWire[]>;
   readonly client: StoreEntryClient;
   readonly selectedIds: {
     (): readonly string[];
     set: (next: readonly string[]) => void;
   };
+  readonly onSelectIds: (ids: readonly string[]) => void;
   readonly onOpenChat?: (() => void) | undefined;
 }
 
@@ -310,6 +391,18 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
           onClick={runUndo}
         />
         <View class="ml-auto flex-row items-center gap-1">
+          <If when={props.presences().length > 0}>
+            <View testID="wb-presence-peers" class="flex-row items-center gap-1 pr-1">
+              <Each of={props.presences()} key={(p) => p.id}>
+                {(peer) => (
+                  <View testID="wb-presence-peer" class="h-5 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5">
+                    <View class="size-1.5 shrink-0 rounded-full bg-accent" />
+                    <Text class="max-w-28 truncate text-2xs font-medium text-ink">{peer().status ? `${peer().name} · ${peer().status}` : peer().name}</Text>
+                  </View>
+                )}
+              </Each>
+            </View>
+          </If>
           <Text testID="wb-count" class="pr-1 font-mono text-xs text-muted tabular-nums">
             {t("web.artifact.whiteboard.elements", { n: elements().length })}
           </Text>
@@ -345,7 +438,7 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
                         <View
                           role="button"
                           testID={`wb-inspector-item-${el().id}`}
-                          onPress={() => props.selectedIds.set([el().id])}
+                          onPress={() => props.onSelectIds([el().id])}
                           class="h-8 flex-row items-center justify-between gap-2 rounded-md border border-line bg-side px-2.5"
                         >
                           <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{labelOfFallback(el()) || el().id}</Text>

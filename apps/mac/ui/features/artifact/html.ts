@@ -11,6 +11,8 @@ export function artifactSuffixOf(a: {
     switch (a.artifactType) {
       case "docs":
         return ".doc.md";
+      case "outline":
+        return ".outline.md";
       case "slides":
         return ".slide.html";
       case "dashboard":
@@ -67,6 +69,7 @@ export function inferArtifactFromName(name: string, content?: string): InferredA
     { re: /^(.+?)\.whiteboard(?:\.json|\.html)?$/iu, kind: "html", display: "page", artifactType: "whiteboard" },
     { re: /^(.+?)\.(?:design-system|tokens)\.json$/iu, kind: "html", display: "page", artifactType: "design-system" },
     { re: /^(.+?)\.(?:page\.html|html|htm)$/iu, kind: "html", display: "infer" },
+    { re: /^(.+?)\.outline\.md$/iu, kind: "markdown", artifactType: "outline" },
     { re: /^(.+?)\.(?:doc\.md|md|markdown)$/iu, kind: "markdown", artifactType: "docs" },
   ];
   for (const r of rules) {

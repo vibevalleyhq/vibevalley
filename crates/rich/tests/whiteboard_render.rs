@@ -12,11 +12,11 @@ use vibevalley_protocol::{ArtifactEntry, ArtifactEntryKind};
 use vibevalley_rich::engine::canvas::Canvas;
 use vibevalley_rich::engine::whiteboard::{
     BoardAction, BoardDoc, ElementId, ElementKind, ElementRecord, InkMode, LayerPaintInput, Modifiers, Point2, PointerButton, PointerInput, Presence,
-    PresenceColor, Rect2, ShapeKind, SnapAxis, SnapGuide, StrokePoint, StrokeStyle, TemplateCopy, TemplateKind, TextAlign, Tool, WbFill, WhiteboardController,
-    build_export_painter, build_template_doc, encode_element_json, export_json, export_json_canvas, export_svg, import_json_canvas, paint_minimap,
-    paint_overlay_layer, paint_static_layer,
+    PresenceColor, PresenceKind, PresenceViewport, Rect2, ShapeKind, SnapAxis, SnapGuide, StrokePoint, StrokeStyle, TemplateCopy, TemplateKind, TextAlign,
+    Tool, WbFill, WhiteboardController, build_export_painter, build_template_doc, encode_element_json, export_json, export_json_canvas, export_svg,
+    import_json_canvas, paint_minimap, paint_overlay_layer, paint_static_layer,
 };
-use vibevalley_rich::{VvWhiteboardChatEvent, VvWhiteboardExportEvent, vv_whiteboard};
+use vibevalley_rich::{VvWhiteboardChatEvent, VvWhiteboardCursorEvent, VvWhiteboardExportEvent, VvWhiteboardViewportEvent, vv_whiteboard};
 
 static SYSTEM_FONTS: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| {
     let mut db = usvg::fontdb::Database::new();
@@ -300,6 +300,29 @@ fn svg_export_and_raster_all_templates_and_all_primitives_light_and_dark() {
         status: None,
         selected_ids: vec![ElementId::new("tbl-1")],
         rev: 1,
+        ..Presence::default()
+    });
+    shapes_doc.presences.push(Presence {
+        id: "agent-hl".to_owned(),
+        name: "Planner".to_owned(),
+        color: PresenceColor::Blue,
+        custom_color: Some("#3b82f6".to_owned()),
+        kind: PresenceKind::Highlight,
+        x: 520.0,
+        y: 270.0,
+        w: Some(220.0),
+        h: Some(130.0),
+        status: Some("排版中".to_owned()),
+        viewport: Some(PresenceViewport {
+            x: 40.0,
+            y: 40.0,
+            w: 720.0,
+            h: 420.0,
+            zoom: Some(1.0),
+        }),
+        updated_at: Some(1_732_000_000_000),
+        has_cursor: true,
+        ..Presence::default()
     });
     let shapes_svg = export_svg(&shapes_doc, false);
     let (_, _, s_colors, _) = render_svg_to_pixmap(&shapes_svg, 1.0);
@@ -349,18 +372,23 @@ fn json_and_json_canvas_export_validate_and_roundtrip() {
 struct RecordedWbEvents {
     exports: Vec<VvWhiteboardExportEvent>,
     chats: Vec<String>,
+    cursors: Vec<VvWhiteboardCursorEvent>,
+    viewports: Vec<VvWhiteboardViewportEvent>,
 }
 
 thread_local! {
     static WB_EVENTS: RefCell<RecordedWbEvents> = RefCell::new(RecordedWbEvents::default());
     static WB_SEED_JSON: RefCell<String> = const { RefCell::new(String::new()) };
+    static WB_PRESENCES_JSON: RefCell<String> = const { RefCell::new(String::new()) };
 }
 
 #[component]
 fn WhiteboardTestRoot() -> impl IntoElement {
     let entries_json = WB_SEED_JSON.with(|s| s.borrow().clone());
+    let presences_json = WB_PRESENCES_JSON.with(|s| s.borrow().clone());
     vv_whiteboard()
         .entries_json(entries_json)
+        .presences_json(presences_json)
         .title("产品发布时间线")
         .locale("zh")
         .on_export(|ev: &VvWhiteboardExportEvent| {
@@ -368,6 +396,12 @@ fn WhiteboardTestRoot() -> impl IntoElement {
         })
         .on_open_chat(|ev: &VvWhiteboardChatEvent| {
             WB_EVENTS.with(|r| r.borrow_mut().chats.push(ev.selected_ids_json.to_string()));
+        })
+        .on_cursor_move(|ev: &VvWhiteboardCursorEvent| {
+            WB_EVENTS.with(|r| r.borrow_mut().cursors.push(ev.clone()));
+        })
+        .on_viewport_change(|ev: &VvWhiteboardViewportEvent| {
+            WB_EVENTS.with(|r| r.borrow_mut().viewports.push(ev.clone()));
         })
 }
 
@@ -412,6 +446,7 @@ fn vv_whiteboard_component_mounts_and_emits_export_and_chat_events() {
     let entries_json = serde_json::to_string(&entries).expect("serialize entries");
     WB_EVENTS.with(|r| *r.borrow_mut() = RecordedWbEvents::default());
     WB_SEED_JSON.with(|s| *s.borrow_mut() = entries_json);
+    WB_PRESENCES_JSON.with(|s| s.borrow_mut().clear());
 
     let mut harness = TestHarness::mount(Root::of::<WhiteboardTestRoot>());
     assert!(harness.find_test_id("wb-canvas").is_some(), "wb-canvas should mount");
@@ -434,5 +469,73 @@ fn vv_whiteboard_component_mounts_and_emits_export_and_chat_events() {
         assert!(recorded.exports[0].content.contains("<svg"));
         assert!(recorded.exports[0].content.contains("产品发布时间线"));
         assert_eq!(recorded.chats.len(), 1);
+    });
+}
+
+#[test]
+fn vv_whiteboard_presence_follow_banner_and_viewport_callbacks() {
+    let entries_json = "[]".to_owned();
+    let presences_json = r##"[
+        {"id":"session-planner","name":"Planner","color":"#3b82f6","kind":"highlight","x":320,"y":180,"w":280,"h":160,"status":"排版中","viewport":{"x":120,"y":80,"w":800,"h":500,"zoom":1.35},"updatedAt":1732000001000},
+        {"id":"session-coder","name":"Coder","color":"teal","kind":"cursor","x":640,"y":420,"status":"连线中","updatedAt":1732000002000}
+    ]"##
+    .to_owned();
+
+    WB_EVENTS.with(|r| *r.borrow_mut() = RecordedWbEvents::default());
+    WB_SEED_JSON.with(|s| *s.borrow_mut() = entries_json);
+    WB_PRESENCES_JSON.with(|s| *s.borrow_mut() = presences_json);
+
+    let mut harness = TestHarness::mount(Root::of::<WhiteboardTestRoot>());
+    let planner_pill = harness
+        .find_test_id("wb-presence-session-planner")
+        .expect("live collaborator presence pill should mount");
+    assert!(harness.find_test_id("wb-presence-session-coder").is_some());
+    assert!(harness.find_test_id("wb-follow-banner").is_none(), "follow banner hidden initially");
+
+    // Click collaborator pill -> enters Follow mode and shows banner.
+    assert!(harness.press(planner_pill));
+    let banner = harness
+        .find_test_id("wb-follow-banner")
+        .expect("follow banner should appear when following collaborator");
+    assert!(
+        harness.contains_text("正在跟随 Planner · 点击退出"),
+        "follow banner should display collaborator name and exit hint"
+    );
+
+    // Clicking the banner immediately exits Follow mode.
+    assert!(harness.press(banner));
+    assert!(harness.find_test_id("wb-follow-banner").is_none(), "clicking follow banner exits follow");
+
+    // Re-enter Follow mode, then click Reset View (wb-zoom-reset) -> exits Follow AND reports viewport change.
+    let planner_pill = harness.find_test_id("wb-presence-session-planner").expect("pill present");
+    assert!(harness.press(planner_pill));
+    assert!(harness.find_test_id("wb-follow-banner").is_some());
+
+    let zoom_in = harness.find_test_id("wb-zoom-in").expect("wb-zoom-in present");
+    assert!(harness.press(zoom_in));
+    assert!(harness.find_test_id("wb-follow-banner").is_none(), "zoom button exits follow");
+
+    let planner_pill = harness.find_test_id("wb-presence-session-planner").expect("pill present");
+    assert!(harness.press(planner_pill));
+    assert!(harness.find_test_id("wb-follow-banner").is_some());
+
+    let reset_zoom = harness.find_test_id("wb-zoom-reset").expect("wb-zoom-reset present");
+    assert!(harness.press(reset_zoom));
+    assert!(harness.find_test_id("wb-follow-banner").is_none(), "reset view exits follow immediately");
+
+    // Re-enter Follow mode and click the same collaborator pill again to toggle off.
+    let planner_pill = harness.find_test_id("wb-presence-session-planner").expect("pill present");
+    assert!(harness.press(planner_pill));
+    assert!(harness.find_test_id("wb-follow-banner").is_some());
+    let planner_pill_again = harness.find_test_id("wb-presence-session-planner").expect("pill present");
+    assert!(harness.press(planner_pill_again));
+    assert!(harness.find_test_id("wb-follow-banner").is_none(), "re-clicking pill exits follow");
+
+    WB_EVENTS.with(|r| {
+        let recorded = r.borrow();
+        assert!(!recorded.viewports.is_empty(), "onViewportChange should fire on zoom/reset");
+        let last = recorded.viewports.last().unwrap();
+        assert!((last.zoom - 1.0).abs() < 1e-4, "final viewport zoom after reset should be 1.0");
+        assert!(last.w > 0.0 && last.h > 0.0);
     });
 }

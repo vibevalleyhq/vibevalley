@@ -59,13 +59,15 @@ test("empty scenario keeps every major route stable across themes and narrow wid
 
   expect(app.count("id:issues-page")).toBe(1);
   expect(app.count("id:issue-card")).toBe(0);
-  expect(app.shows("id:desk-status >> text:未启动")).toBe(true);
+  expect(app.count("id:desk-status")).toBe(0);
+  expect(app.count("id:rail-runs-status")).toBe(1);
+  expect(app.shows("id:rail-runs-status >> text:未启动")).toBe(false);
   row.stepsPassed++;
 
   await fake.setState(app, { ...fixture.state, state: { ...fixture.state.state, call: "live" } });
-  expect(app.shows("id:desk-status >> text:运行中 · 0 个执行会话")).toBe(true);
+  expect(app.count("id:rail-runs-status")).toBe(1);
   await fake.setState(app, fixture.state);
-  expect(app.shows("id:desk-status >> text:未启动")).toBe(true);
+  expect(app.shows("id:rail-runs-status >> text:未启动")).toBe(false);
 
   await visit(app, fake, "/chat", row, () => {
     expect(app.count("id:chat-page")).toBe(1);
@@ -543,7 +545,7 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.count("id:runs-page")).toBe(1);
     expect(app.count("id:run-row-orchestrator")).toBe(1);
     expect(app.count("id:run-row-w-edge-fam4")).toBe(1);
-    expect(app.shows("id:desk-status >> text:运行中 · 3 个执行会话")).toBe(true);
+    expect(app.shows("id:rail-runs-status >> text:3")).toBe(true);
   });
 
   const seenConnectorStates = new Set<ConnectorState>();

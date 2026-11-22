@@ -38,15 +38,6 @@
     "toIssue": "Turn into issue",
     "issueMade": "Issue created"
   },
-  "props": {
-    "deadline": "Due {day}",
-    "left": "Due {day} · {n} days left",
-    "dueToday": "Due {day} · today",
-    "overdue": "Due {day} · {n} days ago",
-    "area": "Area",
-    "more": "{n} more properties",
-    "fewer": "Fewer properties"
-  },
   "marker": {
     "TODO": "To do",
     "DOING": "Doing",

@@ -227,6 +227,13 @@
 | `artifact.entry.get` | 读取结构化作品的一个条目与当前版本号 | `/api/v1/artifact/entry/get` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.entry.batch` | 原子批量增改、合并或删除结构化作品的条目（带版本号校验） | `/api/v1/artifact/entry/batch` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.demo` | 开演示：几个执行会话一起写一篇作品，不花模型的钱 | `/api/v1/artifact/demo` | ✓ |   |   |   |
+| `artifact.presence.update` | 更新实时在场状态（光标、选区、高亮区域或视口），仅驻留内存不落库 | `/api/v1/artifact/presence/update` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.history.list` | 列出作品的协作提交时间线，最新的在前 | `/api/v1/artifact/history/list` | ✓ | ✓ |   |   |
+| `artifact.history.preview` | 只读预览指定历史前沿上的作品快照 | `/api/v1/artifact/history/preview` | ✓ | ✓ |   |   |
+| `artifact.history.restore` | 把作品恢复到指定历史前沿并记为一次新提交 | `/api/v1/artifact/history/restore` | ✓ | ✓ |   |   |
+| `artifact.history.fork` | 从指定的历史前沿分叉出一篇新作品 | `/api/v1/artifact/history/fork` | ✓ | ✓ |   |   |
+| `artifact.history.undoOrigin` | 按提交来源选择性撤销某一轮的改动，保留其他人的并发编辑 | `/api/v1/artifact/history/undoOrigin` | ✓ | ✓ |   |   |
+| `artifact.history.compact` | 把较早的操作历史压缩成浅快照，当前内容保持不变 | `/api/v1/artifact/history/compact` | ✓ | ✓ |   |   |
 
 ## game
 

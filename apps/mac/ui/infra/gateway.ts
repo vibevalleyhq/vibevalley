@@ -6,7 +6,7 @@
 // after reconnectDelayMs, as there. The fetcher parameter is gone (no HTTP).
 import { z } from "zod";
 
-import type { ArtifactEntryEvent, ArtifactEvent, ChannelEvent, SuggestionEvent } from "@vibevalley/protocol";
+import type { ArtifactEntryEvent, ArtifactEvent, ArtifactId, ArtifactPresenceEvent, ChannelEvent, SuggestionEvent } from "@vibevalley/protocol";
 import { type SubscriptionName, subscriptions } from "@vibevalley/protocol/rpc";
 
 import { transport } from "./transport";
@@ -76,6 +76,10 @@ export const followArtifactEntries = (id: string, after: number, on: (e: Artifac
 /** An artifact's suggestions as they now are, then the whole list after each change. */
 export const followSuggestions = (id: string, on: (e: SuggestionEvent) => void, ended?: () => void) =>
   subscribe("artifact.suggestion.follow", { id }, subscriptions["artifact.suggestion.follow"].event, on, ended);
+
+/** An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. */
+export const followArtifactPresence = (id: ArtifactId, on: (e: ArtifactPresenceEvent) => void, ended?: () => void) =>
+  subscribe("artifact.presence.follow", { id }, subscriptions["artifact.presence.follow"].event, on, ended);
 
 const ArtifactPageSchema = z.object({
   content: z.string(),

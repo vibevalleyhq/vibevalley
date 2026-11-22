@@ -216,6 +216,12 @@ fn export_bounds(doc: &BoardDoc) -> Rect2 {
         }
     }
     for p in &doc.presences {
+        if let Some(r) = p.region_rect() {
+            out = out.union(r.expand(18.0));
+        }
+        if !p.has_cursor {
+            continue;
+        }
         let status_msg = p.status.as_deref().map(str::trim).filter(|s| !s.is_empty());
         let pill_w = match status_msg {
             Some(msg) if msg.chars().count() > 14 => (measure_text_span(msg, 12.5, false) + 56.0).clamp(160.0, 580.0),
@@ -1106,13 +1112,55 @@ fn write_svg_head(out: &mut String, shape: HeadShape, color: &str) {
 }
 
 fn write_svg_presences(out: &mut String, presences: &[crate::engine::whiteboard::model::Presence], colors: &SvgColors, dark: bool) {
+    use crate::engine::whiteboard::model::PresenceKind;
     for p in presences {
-        let color = presence_hex(p.color, dark);
+        let color = p.custom_color.as_deref().unwrap_or_else(|| presence_hex(p.color, dark));
         let status_opt = p.status.as_deref().map(str::trim).filter(|s| !s.is_empty());
+
+        if let Some(r) = p.region_rect() {
+            let _ = writeln!(
+                out,
+                r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="12" fill="{}" fill-opacity="0.09" stroke="{}" stroke-width="1.6" stroke-dasharray="6 4"/>"#,
+                r.x,
+                r.y,
+                r.w,
+                r.h,
+                esc_attr(color),
+                esc_attr(color)
+            );
+            let badge = match status_opt {
+                Some(st) => format!("{} · {st}", p.name),
+                None => p.name.clone(),
+            };
+            let bw = (measure_text_span(&badge, 11.0, true) + 18.0).max(48.0);
+            let _ = writeln!(
+                out,
+                r#"<rect x="{:.1}" y="{:.1}" width="{bw:.1}" height="22" rx="11" fill="{}"/>"#,
+                r.x + 10.0,
+                r.y - 11.0,
+                esc_attr(color)
+            );
+            let _ = writeln!(
+                out,
+                r#"<text x="{:.1}" y="{:.1}" text-anchor="middle" dominant-baseline="central" font-family="{DIAGRAM_FONT_SANS}" font-size="11" font-weight="600" fill="{}">{}</text>"#,
+                r.x + 10.0 + bw * 0.5,
+                r.y,
+                colors.pill_ink,
+                esc_text(&badge)
+            );
+            if matches!(p.kind, PresenceKind::Highlight | PresenceKind::Claim) {
+                continue;
+            }
+        }
+
+        if !p.has_cursor {
+            continue;
+        }
         let _ = writeln!(out, r#"<g transform="translate({:.1} {:.1})">"#, p.x, p.y);
         let _ = writeln!(
             out,
-            r#"<polygon points="0,0 11,5.5 6,7.2 4.2,12.2" fill="{color}" stroke="{}" stroke-width="1.2"/>"#,
+            r#"<polygon points="0,0 11,5.5 6,7.2 4.2,12.2" fill="{}" stroke="{}" stroke-width="1.2"/>"#,
+            esc_attr(color),
             colors.page
         );
         if let Some(msg) = status_opt

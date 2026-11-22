@@ -13,7 +13,7 @@ import { mix } from "../../design/tone";
 import { spelled } from "../../infra/base/search";
 import { ready, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
-import { usePkmVault } from "../pkm/vault";
+import { useArtifacts } from "../artifact";
 import { closeTemplatePicker, type TemplateCategory, templatePickerState } from "./navigation";
 import { CONTENT_TEMPLATES, type ContentTemplate, createFromTemplate, TEMPLATE_CATEGORIES, templateDesc, templateName } from "./templates";
 
@@ -29,7 +29,7 @@ export function TemplateModal() {
 function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
   const queries = useQueryClient();
   const router = useRouter();
-  const vault = usePkmVault();
+  const artifacts = useArtifacts(() => ({}));
   const act = createAct();
   const category = signal<TemplateCategory>(untracked(() => props.initialCategory));
   const query = signal("");
@@ -46,7 +46,7 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
 
   const pick = (tpl: ContentTemplate) => {
     if (act.busy()) return;
-    const existingNoteTitles = (ready(vault, undefined)?.pages ?? []).map((p) => p.title);
+    const existingNoteTitles = (ready(artifacts, undefined) ?? []).filter((a) => a.artifactType === "outline").map((a) => a.title);
     closeTemplatePicker();
     void act.run(() => createFromTemplate(tpl, { queries, router, existingNoteTitles }));
   };

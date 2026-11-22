@@ -9,11 +9,11 @@ use crate::engine::whiteboard::geometry::{
 };
 use crate::engine::whiteboard::hit::{ResizeHandle8, anchor_port_pos, can_host_anchor_port, container_header_rect, rotate_handle_pos};
 use crate::engine::whiteboard::ink::build_ink_outline;
-use crate::engine::whiteboard::interaction::{InteractionMode, WhiteboardController, live_anchor_point};
+use crate::engine::whiteboard::interaction::{AnimatedPresencePose, InteractionMode, WhiteboardController, live_anchor_point};
 use crate::engine::whiteboard::layout::{layout_card, layout_table, locate_highlight_span, measure_text_span, wrap_text};
 use crate::engine::whiteboard::model::{
-    BoardDoc, ElementId, ElementKind, ElementRecord, GridStyle, InkMode, MilestoneKind, Point2, PresenceColor, Rect2, ShapeKind, StrokeStyle, TextAlign,
-    TextVariant, WbFill,
+    BoardDoc, ElementId, ElementKind, ElementRecord, GridStyle, InkMode, MilestoneKind, Point2, Presence, PresenceColor, PresenceKind, Rect2, ShapeKind,
+    StrokeStyle, TextAlign, TextVariant, WbFill,
 };
 use crate::engine::whiteboard::snap::{SnapAxis, SnapGuide};
 use crate::engine::whiteboard::spatial::SpatialIndex;
@@ -399,6 +399,13 @@ impl WhiteboardPalette {
             PresenceColor::Wheat => self.presence_wheat,
             PresenceColor::Lavender => self.presence_lavender,
         }
+    }
+
+    pub fn resolve_presence_color(&self, p: &Presence) -> Hsla {
+        p.custom_color
+            .as_deref()
+            .and_then(parse_hex_hsla)
+            .unwrap_or_else(|| self.presence_color(p.color))
     }
 }
 
@@ -1776,9 +1783,22 @@ pub fn paint_overlay_layer_painter_filtered(
         .translate(controller.camera.pan_x as f32, controller.camera.pan_y as f32)
         .scale(zoom as f32, zoom as f32);
 
-    // Remote collaborator element claim outlines.
+    // Remote collaborator viewport outlines, highlight/claim boxes, and element claim outlines.
     for p in &controller.doc.presences {
-        let p_color = pal.presence_color(p.color);
+        let p_color = pal.resolve_presence_color(p);
+        let pose = controller.displayed_pose(p);
+        let is_followed = controller.follow_actor.as_deref() == Some(p.id.as_str());
+
+        if let Some(vp) = pose.viewport
+            && let Some(r) = vp.rect()
+        {
+            painter = paint_presence_viewport(painter, r, p, p_color, zoom as f32, is_followed, &pal);
+        }
+
+        if let Some(r) = pose.region_rect(p.kind) {
+            painter = paint_presence_region(painter, r, p, p_color, zoom as f32, &pal);
+        }
+
         for sel_id in &p.selected_ids {
             if let Some(r) = controller.lookup.get(sel_id) {
                 let b = Bounds::new(point(px(r.x as f32), px(r.y as f32)), size(px(r.w as f32), px(r.h as f32)));
@@ -2098,8 +2118,8 @@ pub fn paint_overlay_layer_painter_filtered(
         }
     }
 
-    // Collaborator cursors.
-    painter = paint_presences_into_painter(painter, &controller.doc, &pal, zoom as f32, dismissed_notes);
+    // Collaborator cursors (using smoothly interpolated poses).
+    painter = paint_presences_for_controller(painter, controller, &pal, zoom as f32, dismissed_notes);
 
     painter = painter.restore();
 
@@ -2110,97 +2130,226 @@ pub fn paint_overlay_layer_painter_filtered(
     painter
 }
 
-pub fn paint_presences_into_painter(mut painter: Painter, doc: &BoardDoc, pal: &WhiteboardPalette, zoom: f32, dismissed_notes: &BTreeSet<String>) -> Painter {
-    let inv_scale = 1.0 / zoom.max(0.25);
-    for p in &doc.presences {
-        let color = pal.presence_color(p.color);
-        let px_x = p.x as f32;
-        let px_y = p.y as f32;
-        let s = inv_scale;
+fn paint_presence_viewport(mut painter: Painter, rect: Rect2, p: &Presence, color: Hsla, zoom: f32, is_followed: bool, pal: &WhiteboardPalette) -> Painter {
+    let inv = 1.0 / zoom.max(0.25);
+    let b = Bounds::new(point(px(rect.x as f32), px(rect.y as f32)), size(px(rect.w as f32), px(rect.h as f32)));
+    let fill_alpha = if is_followed { 0.045 } else { 0.018 };
+    let stroke_alpha = if is_followed { 0.56 } else { 0.28 };
+    let stroke_w = (if is_followed { 1.8 } else { 1.25 }) * inv;
+    let radius = 8.0 * inv;
+    painter = painter
+        .save()
+        .begin_path()
+        .fill_color(Hsla { a: fill_alpha, ..color })
+        .round_rect(b, px(radius))
+        .fill()
+        .stroke_color(Hsla { a: stroke_alpha, ..color })
+        .line_width(stroke_w)
+        .line_dash(&[px(8.0 * inv), px(6.0 * inv)])
+        .begin_path()
+        .round_rect(b, px(radius))
+        .stroke()
+        .restore();
 
-        // Crisp vector cursor pointer.
+    let tag_text = match (p.kind == PresenceKind::Viewport, p.status.as_deref().map(str::trim).filter(|s| !s.is_empty())) {
+        (true, Some(st)) => format!("{} · {st}", p.name),
+        _ => p.name.clone(),
+    };
+    let pill_w = (measure_text_span(&tag_text, 10.5, true) + 14.0).max(36.0) as f32;
+    let pill_h = 18.0_f32;
+    let chip = Bounds::new(point(px(6.0), px(-pill_h - 4.0)), size(px(pill_w), px(pill_h)));
+    painter
+        .save()
+        .translate(rect.x as f32, rect.y as f32)
+        .scale(inv, inv)
+        .global_alpha(if is_followed { 0.92 } else { 0.68 })
+        .begin_path()
+        .fill_color(color)
+        .round_rect(chip, px(9.0))
+        .fill()
+        .fill_color(pal.pill_ink)
+        .font("600 10.5px 'PingFang SC', system-ui, sans-serif")
+        .text_align(CanvasTextAlign::Center)
+        .text_baseline(CanvasTextBaseline::Middle)
+        .fill_text(&tag_text, 6.0 + pill_w * 0.5, -pill_h * 0.5 - 4.0)
+        .restore()
+}
+
+fn paint_presence_region(mut painter: Painter, rect: Rect2, p: &Presence, color: Hsla, zoom: f32, pal: &WhiteboardPalette) -> Painter {
+    let inv = 1.0 / zoom.max(0.25);
+    let b = Bounds::new(point(px(rect.x as f32), px(rect.y as f32)), size(px(rect.w as f32), px(rect.h as f32)));
+    let tint = Hsla { a: 0.09, ..color };
+    painter = painter
+        .save()
+        .begin_path()
+        .fill_color(tint)
+        .round_rect(b, px(12.0))
+        .fill()
+        .stroke_color(color)
+        .line_width(1.8 * inv)
+        .line_dash(&[px(6.0 * inv), px(4.0 * inv)])
+        .begin_path()
+        .round_rect(b, px(12.0))
+        .stroke()
+        .restore();
+
+    let status_opt = p.status.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let badge = match status_opt {
+        Some(st) => format!("{} · {st}", p.name),
+        None => p.name.clone(),
+    };
+    let bw = (measure_text_span(&badge, 11.0, true) + 18.0).max(48.0) as f32;
+    let bh = 22.0_f32;
+    let chip = Bounds::new(point(px(10.0), px(-bh * 0.5)), size(px(bw), px(bh)));
+    painter
+        .save()
+        .translate(rect.x as f32, rect.y as f32)
+        .scale(inv, inv)
+        .shadow(pal.card_shadow, px(4.0), point(px(0.0), px(1.5)))
+        .begin_path()
+        .fill_color(color)
+        .round_rect(chip, px(11.0))
+        .fill()
+        .fill_color(pal.pill_ink)
+        .font("600 11px 'PingFang SC', system-ui, sans-serif")
+        .text_align(CanvasTextAlign::Center)
+        .text_baseline(CanvasTextBaseline::Middle)
+        .fill_text(&badge, 10.0 + bw * 0.5, 0.0)
+        .restore()
+}
+
+fn paint_presences_for_controller(
+    mut painter: Painter,
+    controller: &WhiteboardController,
+    pal: &WhiteboardPalette,
+    zoom: f32,
+    dismissed_notes: &BTreeSet<String>,
+) -> Painter {
+    for p in &controller.doc.presences {
+        let pose = controller.displayed_pose(p);
+        painter = paint_presence_cursor(painter, p, pose, pal, zoom, dismissed_notes);
+    }
+    painter
+}
+
+pub fn paint_presences_into_painter(mut painter: Painter, doc: &BoardDoc, pal: &WhiteboardPalette, zoom: f32, dismissed_notes: &BTreeSet<String>) -> Painter {
+    for p in &doc.presences {
+        let color = pal.resolve_presence_color(p);
+        let pose = AnimatedPresencePose::from_presence(p);
+        if let Some(vp) = pose.viewport
+            && let Some(r) = vp.rect()
+        {
+            painter = paint_presence_viewport(painter, r, p, color, zoom, false, pal);
+        }
+        if let Some(r) = pose.region_rect(p.kind) {
+            painter = paint_presence_region(painter, r, p, color, zoom, pal);
+        }
+        painter = paint_presence_cursor(painter, p, pose, pal, zoom, dismissed_notes);
+    }
+    painter
+}
+
+fn paint_presence_cursor(
+    mut painter: Painter,
+    p: &Presence,
+    pose: AnimatedPresencePose,
+    pal: &WhiteboardPalette,
+    zoom: f32,
+    dismissed_notes: &BTreeSet<String>,
+) -> Painter {
+    // Viewport-only presences or highlight/claim regions with an explicit box already render their own badge.
+    if !p.has_cursor || (matches!(p.kind, PresenceKind::Highlight | PresenceKind::Claim) && pose.region_rect(p.kind).is_some()) {
+        return painter;
+    }
+
+    let inv_scale = 1.0 / zoom.max(0.25);
+    let color = pal.resolve_presence_color(p);
+    let px_x = pose.x as f32;
+    let px_y = pose.y as f32;
+    let s = inv_scale;
+
+    // Crisp vector cursor pointer.
+    painter = painter
+        .save()
+        .translate(px_x, px_y)
+        .scale(s, s)
+        .begin_path()
+        .fill_color(color)
+        .move_to(0.0, 0.0)
+        .line_to(11.0, 5.5)
+        .line_to(6.0, 7.2)
+        .line_to(4.2, 12.2)
+        .close_path()
+        .fill()
+        .stroke_color(pal.page)
+        .line_width(1.2)
+        .begin_path()
+        .move_to(0.0, 0.0)
+        .line_to(11.0, 5.5)
+        .line_to(6.0, 7.2)
+        .line_to(4.2, 12.2)
+        .close_path()
+        .stroke();
+
+    let status_opt = (!dismissed_notes.contains(&p.id))
+        .then_some(p.status.as_deref())
+        .flatten()
+        .map(str::trim)
+        .filter(|t| !t.is_empty());
+
+    if let Some(msg) = status_opt
+        && msg.chars().count() > 14
+    {
+        // Full conversational proposal speech bubble with inline dismiss × mark.
+        let pill_w = (measure_text_span(msg, 12.5, false) + 52.0).clamp(160.0, 580.0) as f32;
+        let pill_h = 32.0_f32;
+        let pb = Bounds::new(point(px(10.0), px(10.0)), size(px(pill_w), px(pill_h)));
+        let close_cx = 10.0 + pill_w - 17.0;
+        let close_cy = 10.0 + pill_h * 0.5;
         painter = painter
             .save()
-            .translate(px_x, px_y)
-            .scale(s, s)
+            .shadow(pal.card_shadow, px(7.0), point(px(0.0), px(2.0)))
             .begin_path()
             .fill_color(color)
-            .move_to(0.0, 0.0)
-            .line_to(11.0, 5.5)
-            .line_to(6.0, 7.2)
-            .line_to(4.2, 12.2)
-            .close_path()
+            .round_rect(pb, px(10.0))
             .fill()
-            .stroke_color(pal.page)
-            .line_width(1.2)
+            .restore()
+            .fill_color(pal.pill_ink)
+            .font("500 12.5px 'PingFang SC', system-ui, sans-serif")
+            .text_align(CanvasTextAlign::Left)
+            .text_baseline(CanvasTextBaseline::Middle)
+            .fill_text(msg, 24.0, close_cy)
+            .stroke_color(Hsla { a: 0.85, ..pal.pill_ink })
+            .line_width(1.4)
             .begin_path()
-            .move_to(0.0, 0.0)
-            .line_to(11.0, 5.5)
-            .line_to(6.0, 7.2)
-            .line_to(4.2, 12.2)
-            .close_path()
-            .stroke();
-
-        let status_opt = (!dismissed_notes.contains(&p.id))
-            .then_some(p.status.as_deref())
-            .flatten()
-            .map(str::trim)
-            .filter(|t| !t.is_empty());
-
-        if let Some(msg) = status_opt
-            && msg.chars().count() > 14
-        {
-            // Full conversational proposal speech bubble with inline dismiss × mark.
-            let pill_w = (measure_text_span(msg, 12.5, false) + 52.0).clamp(160.0, 580.0) as f32;
-            let pill_h = 32.0_f32;
-            let pb = Bounds::new(point(px(10.0), px(10.0)), size(px(pill_w), px(pill_h)));
-            let close_cx = 10.0 + pill_w - 17.0;
-            let close_cy = 10.0 + pill_h * 0.5;
-            painter = painter
-                .save()
-                .shadow(pal.card_shadow, px(7.0), point(px(0.0), px(2.0)))
-                .begin_path()
-                .fill_color(color)
-                .round_rect(pb, px(10.0))
-                .fill()
-                .restore()
-                .fill_color(pal.pill_ink)
-                .font("500 12.5px 'PingFang SC', system-ui, sans-serif")
-                .text_align(CanvasTextAlign::Left)
-                .text_baseline(CanvasTextBaseline::Middle)
-                .fill_text(msg, 24.0, close_cy)
-                .stroke_color(Hsla { a: 0.85, ..pal.pill_ink })
-                .line_width(1.4)
-                .begin_path()
-                .move_to(close_cx - 3.5, close_cy - 3.5)
-                .line_to(close_cx + 3.5, close_cy + 3.5)
-                .move_to(close_cx + 3.5, close_cy - 3.5)
-                .line_to(close_cx - 3.5, close_cy + 3.5)
-                .stroke()
-                .restore();
-        } else {
-            let label = match status_opt {
-                Some(st) => format!("{} · {st}", p.name),
-                None => p.name.clone(),
-            };
-            let pill_w = (measure_text_span(&label, 11.5, true) + 18.0).max(40.0) as f32;
-            let pill_h = 22.0_f32;
-            let pb = Bounds::new(point(px(10.0), px(10.0)), size(px(pill_w), px(pill_h)));
-            painter = painter
-                .save()
-                .shadow(pal.card_shadow, px(5.0), point(px(0.0), px(2.0)))
-                .begin_path()
-                .fill_color(color)
-                .round_rect(pb, px(11.0))
-                .fill()
-                .restore()
-                .fill_color(pal.pill_ink)
-                .font("600 11.5px 'PingFang SC', system-ui, sans-serif")
-                .text_align(CanvasTextAlign::Center)
-                .text_baseline(CanvasTextBaseline::Middle)
-                .fill_text(&label, 10.0 + pill_w * 0.5, 10.0 + pill_h * 0.5)
-                .restore();
-        }
+            .move_to(close_cx - 3.5, close_cy - 3.5)
+            .line_to(close_cx + 3.5, close_cy + 3.5)
+            .move_to(close_cx + 3.5, close_cy - 3.5)
+            .line_to(close_cx - 3.5, close_cy + 3.5)
+            .stroke()
+            .restore();
+    } else {
+        let label = match status_opt {
+            Some(st) => format!("{} · {st}", p.name),
+            None => p.name.clone(),
+        };
+        let pill_w = (measure_text_span(&label, 11.5, true) + 18.0).max(40.0) as f32;
+        let pill_h = 22.0_f32;
+        let pb = Bounds::new(point(px(10.0), px(10.0)), size(px(pill_w), px(pill_h)));
+        painter = painter
+            .save()
+            .shadow(pal.card_shadow, px(5.0), point(px(0.0), px(2.0)))
+            .begin_path()
+            .fill_color(color)
+            .round_rect(pb, px(11.0))
+            .fill()
+            .restore()
+            .fill_color(pal.pill_ink)
+            .font("600 11.5px 'PingFang SC', system-ui, sans-serif")
+            .text_align(CanvasTextAlign::Center)
+            .text_baseline(CanvasTextBaseline::Middle)
+            .fill_text(&label, 10.0 + pill_w * 0.5, 10.0 + pill_h * 0.5)
+            .restore();
     }
     painter
 }

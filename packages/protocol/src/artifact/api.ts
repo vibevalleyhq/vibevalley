@@ -58,6 +58,20 @@ export interface ArtifactHandlers {
   /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
    * one already running is refused. */
   readonly "artifact.demo": (a: { readonly id: T.ArtifactId }) => Promise<void>;
+  /** Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite. */
+  readonly "artifact.presence.update": (a: T.ArtifactPresenceUpdateRequest) => Promise<void>;
+  /** Newest first. */
+  readonly "artifact.history.list": (a: T.ArtifactHistoryListRequest) => Promise<T.ArtifactHistoryEntry[]>;
+  /** Read-only snapshot projection at the requested Loro frontiers. */
+  readonly "artifact.history.preview": (a: T.ArtifactHistoryPreviewRequest) => Promise<T.ArtifactHistoryPreviewResult>;
+  /** Restore an artifact to the snapshot at the requested Loro frontiers as a new commit. */
+  readonly "artifact.history.restore": (a: T.ArtifactHistoryRestoreRequest) => Promise<T.Artifact>;
+  /** Fork a new artifact starting from the snapshot at the requested Loro frontiers. */
+  readonly "artifact.history.fork": (a: T.ArtifactHistoryForkRequest) => Promise<T.Artifact>;
+  /** Selectively undo commits matching one origin while preserving concurrent edits from other actors. */
+  readonly "artifact.history.undoOrigin": (a: T.ArtifactHistoryUndoOriginRequest) => Promise<T.Artifact>;
+  /** Compact old operation history into a shallow snapshot while keeping current state intact. */
+  readonly "artifact.history.compact": (a: T.ArtifactHistoryCompactRequest) => Promise<T.Artifact>;
 }
 
 export const artifactEndpoints: readonly Endpoint[] = [
@@ -244,5 +258,54 @@ export const artifactEndpoints: readonly Endpoint[] = [
     input: input({ id: S.ArtifactId }),
     result: undefined,
     can: ["user"],
+  },
+  {
+    op: "artifact.presence.update",
+    about: ["id"],
+    input: S.ArtifactPresenceUpdateRequest,
+    result: undefined,
+    can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.history.list",
+    about: ["id"],
+    input: S.ArtifactHistoryListRequest,
+    result: z.array(S.ArtifactHistoryEntry),
+    can: ["user", "remote"],
+  },
+  {
+    op: "artifact.history.preview",
+    about: ["id"],
+    input: S.ArtifactHistoryPreviewRequest,
+    result: S.ArtifactHistoryPreviewResult,
+    can: ["user", "remote"],
+  },
+  {
+    op: "artifact.history.restore",
+    about: ["id"],
+    input: S.ArtifactHistoryRestoreRequest,
+    result: S.Artifact,
+    can: ["user", "remote"],
+  },
+  {
+    op: "artifact.history.fork",
+    about: ["id"],
+    input: S.ArtifactHistoryForkRequest,
+    result: S.Artifact,
+    can: ["user", "remote"],
+  },
+  {
+    op: "artifact.history.undoOrigin",
+    about: ["id"],
+    input: S.ArtifactHistoryUndoOriginRequest,
+    result: S.Artifact,
+    can: ["user", "remote"],
+  },
+  {
+    op: "artifact.history.compact",
+    about: ["id"],
+    input: S.ArtifactHistoryCompactRequest,
+    result: S.Artifact,
+    can: ["user", "remote"],
   },
 ];
