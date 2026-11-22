@@ -5,7 +5,12 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "node": "./src/node.ts",
       "default": "./src/index.ts"
+    },
+    "./catalogs": {
+      "types": "./dist/catalog-translator.d.ts",
+      "default": "./src/catalog-translator.ts"
     },
     "./format": {
       "types": "./dist/format.d.ts",

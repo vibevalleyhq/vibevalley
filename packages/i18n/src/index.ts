@@ -1,4 +1,4 @@
-import { catalogs, type Messages } from "./catalogs";
+import type { Messages } from "./catalogs";
 import { format, type Params } from "./format";
 import { currentLocale, type Locale } from "./locale";
 
@@ -10,31 +10,17 @@ export type MessageKey = keyof Messages;
 /** A key's params: none for a message without placeholders, every one of them for a message with some. */
 export type MessageArgs<K extends MessageKey> = Messages[K] extends Params ? [params: Messages[K]] : [];
 
-interface Nested {
-  readonly [k: string]: string | Nested;
-}
+export type Translator = (locale: Locale, key: string, params?: Params) => string;
 
-const tables = new Map<Locale, ReadonlyMap<string, string>>();
+let translator: Translator = (_locale, key, params) => (params ? format(key, params) : key);
 
-/** A language's messages by full key, flattened once. */
-function table(locale: Locale): ReadonlyMap<string, string> {
-  let flat = tables.get(locale);
-  if (flat) return flat;
-  const out = new Map<string, string>();
-  const walk = (prefix: string, v: string | Nested) => {
-    if (typeof v === "string") out.set(prefix, v);
-    else for (const [k, x] of Object.entries(v)) walk(prefix + "." + k, x);
-  };
-  for (const [ns, v] of Object.entries(catalogs[locale])) walk(ns, v);
-  flat = out;
-  tables.set(locale, flat);
-  return flat;
+export function setTranslator(fn: Translator): void {
+  translator = fn;
 }
 
 /** The message for `key` in the language in use, its placeholders filled. */
 export function t<K extends MessageKey>(key: K, ...args: MessageArgs<K>): string {
-  const text = table(currentLocale()).get(key) ?? table("zh").get(key) ?? key;
-  return args[0] ? format(text, args[0]) : text;
+  return translator(currentLocale(), key, args[0]);
 }
 
 /** Items as the language lists them in a sentence. */

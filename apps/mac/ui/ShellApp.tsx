@@ -1,11 +1,10 @@
 import "./infra/polyfill";
+import "./infra/i18nBoot";
 import { host, mount, Text, View, type Component } from "nsh";
 
 import { setLocale } from "@vibevalley/i18n";
 
 import { applyMotion } from "./design/motion";
-import { FarmForm } from "./farm/FarmForm";
-import { FarmPhone } from "./farm/FarmPhone";
 import { viewName } from "./infra/bridge";
 import { BridgeProbe } from "./workspace/BridgeProbe";
 import { WorkspaceChatPane } from "./workspace/ChatPane";
@@ -22,8 +21,6 @@ function Unknown() {
 }
 
 const views: Record<string, Component> = {
-  "farm-form": FarmForm,
-  "farm-phone": FarmPhone,
   sidebar: Sidebar,
   palette: Palette,
   markdown: MarkdownPane,
@@ -31,7 +28,6 @@ const views: Record<string, Component> = {
   probe: BridgeProbe,
 };
 
-setLocale(host.params.locale === "en" ? "en" : "zh");
 host.on("locale", (loc) => {
   if (loc === "en" || loc === "zh") setLocale(loc);
 });

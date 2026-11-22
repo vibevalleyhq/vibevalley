@@ -161,7 +161,7 @@ const SHELL_BUNDLE_NSHC: &[u8] = &[];
 const SHELL_CAPABILITIES: &str = include_str!(concat!(env!("OUT_DIR"), "/ui-shell/capabilities.json"));
 
 fn is_workbench_view(view: &str) -> bool {
-    matches!(view, "vv" | "vibevalley")
+    matches!(view, "vv" | "vibevalley" | "farm-form" | "farm-phone")
 }
 
 fn dir_has_bundle(dir: &std::path::Path) -> bool {
@@ -596,10 +596,11 @@ mod tests {
     }
 
     #[test]
-    fn is_workbench_view_routes_only_vv_and_vibevalley() {
-        assert!(is_workbench_view("vv"));
-        assert!(is_workbench_view("vibevalley"));
-        for view in ["sidebar", "palette", "markdown", "workspace-chat", "farm-form", "farm-phone", "probe"] {
+    fn is_workbench_view_routes_workbench_and_farm_views() {
+        for view in ["vv", "vibevalley", "farm-form", "farm-phone"] {
+            assert!(is_workbench_view(view), "{view} should use the full workbench bundle");
+        }
+        for view in ["sidebar", "palette", "markdown", "workspace-chat", "probe"] {
             assert!(!is_workbench_view(view), "{view} should use the lightweight shell bundle");
         }
     }

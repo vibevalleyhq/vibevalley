@@ -57,8 +57,10 @@ function parse(text: string): Part[] {
   return parts("");
 }
 
-const plural = new Intl.PluralRules("en");
-const ordinal = new Intl.PluralRules("en", { type: "ordinal" });
+let plural: Intl.PluralRules | undefined;
+let ordinal: Intl.PluralRules | undefined;
+const rulesOf = (kind: "plural" | "selectordinal"): Intl.PluralRules =>
+  kind === "selectordinal" ? (ordinal ??= new Intl.PluralRules("en", { type: "ordinal" })) : (plural ??= new Intl.PluralRules("en"));
 
 function render(parts: readonly Part[], params: Params, count?: number): string {
   let out = "";
@@ -69,8 +71,7 @@ function render(parts: readonly Part[], params: Params, count?: number): string 
       const v = params[p.name];
       const cases = p.cases ?? {};
       const counted = p.kind === "plural" || p.kind === "selectordinal";
-      const rules = p.kind === "selectordinal" ? ordinal : plural;
-      const key = counted ? (typeof v === "number" && cases[`=${v}`] ? `=${v}` : rules.select(Number(v))) : String(v);
+      const key = counted ? (typeof v === "number" && cases[`=${v}`] ? `=${v}` : rulesOf(p.kind).select(Number(v))) : String(v);
       const chosen = cases[key] ?? cases.other ?? [];
       out += render(chosen, params, counted ? Number(v) : count);
     }

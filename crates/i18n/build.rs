@@ -3,6 +3,8 @@ use std::fmt::Write;
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_WEB");
+    let include_all_web = std::env::var_os("CARGO_FEATURE_WEB").is_some();
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
     let mut out = String::from("pub(crate) static CATALOGS: &[(&str, &str, &str)] = &[\n");
     let mut entries = vec![];
@@ -16,6 +18,7 @@ fn main() {
                     || stem == "desktop"
                     || stem == "server"
                     || stem.starts_with("server.")
+                    || (include_all_web && stem.starts_with("web."))
                     || stem == "web.base"
                     || stem == "web.artifact"
                     || stem == "web.pkm"

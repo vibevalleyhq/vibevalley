@@ -1,6 +1,7 @@
 // Entry of every hosted view. Rust sets `host.params.view` before the
 // bundle loads; one bundle serves all surfaces.
 import "./infra/polyfill";
+import "./infra/i18nBoot";
 import { host, mount, Text, View, type Component } from "nsh";
 
 import { setLocale } from "@vibevalley/i18n";
@@ -37,7 +38,6 @@ const views: Record<string, Component> = {
   vibevalley: VibeValley,
 };
 
-setLocale(host.params.locale === "en" ? "en" : "zh");
 host.on("locale", (loc) => {
   if (loc === "en" || loc === "zh") setLocale(loc);
 });

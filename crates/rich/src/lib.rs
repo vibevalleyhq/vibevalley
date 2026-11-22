@@ -25,6 +25,7 @@ pub mod genui;
 pub mod grammars;
 pub mod highlight;
 pub mod hooks;
+pub mod i18n;
 pub mod icon;
 pub mod markdown;
 mod math;
@@ -58,6 +59,7 @@ pub use hooks::{
     ChartRenderer, ChartRendererContext, GenUiAction, GenUiActionSink, GenUiRenderer, GenUiRendererContext, RenderedSvg, active_chart_renderer,
     active_genui_renderer, clear_chart_renderer, clear_genui_renderer, register_chart_renderer, register_genui_renderer,
 };
+pub use i18n::{VvI18n, translate_json};
 pub use icon::{DEFAULT_ICON_SIZE, ICON_NAMES, IconShape, VvIcon, VvIconElement, VvIconProps, icon_shapes, paint_icon, resolve_icon_color, vv_icon};
 pub use markdown::{
     BlockRefPayload, CustomNodeKind, PATTERN_BLOCK_REF, PATTERN_EMBED, PATTERN_ISSUE, PATTERN_MENTION, PATTERN_REMARK, PATTERN_TAG, PATTERN_WIKILINK,
@@ -93,6 +95,7 @@ pub fn registry() -> Registry {
         .register::<VvGenUi>()
         .register::<VvIcon>()
         .register::<VvWhiteboard>()
+        .module::<VvI18n>()
         .module::<VvPinyin>();
     set
 }

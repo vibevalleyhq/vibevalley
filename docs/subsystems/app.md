@@ -25,10 +25,10 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | `apps/mac/src/terminal/`、`viewer.rs`、`diff.rs` | 终端（`apps/mac/crates/terminal`）、文件查看（经 `vibevalley-rich` 按 TextMate 作用域高亮）、diff；加载均带 150 毫秒防闪烁与骨架条 |
 | `apps/mac/src/pixel/` | 像素场景（引擎在 `apps/mac/crates/pixel`）：农场、地图、记忆树、开场、图鉴；进程级缓存 `Atlas` 与 `VillageWorld`（[农场的皮](docs/subsystems/farm.md)） |
 | `apps/mac/crates/` | 桌面端独占支撑 crate：`pixel`、`terminal`、`workspace`（项目、布局含 `PaneKind::Chat`、终端与宿主 `state.db` 持久化） |
-| `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版与相对图片解析、`VvIcon`（`crates/rich/src/icon.rs`，承载 97 枚工作台 reicon 线性图标并以无锁 `OnceLock<Vec<Path>>` 零拷贝共享解析路径；前端 `apps/mac/ui/design/icons.ts` 只保留纯类型 `IconName`）、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`、`VvGenUi`、`VvWhiteboard`（含 Loro Phase A 实时在场光标/占位框/一键跟随视口与 `onCursorMove`/`onViewportChange` 回调）、`VvPinyin`）与内部渲染引擎 `engine/` |
+| `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版与相对图片解析、`VvIcon`（`crates/rich/src/icon.rs`，承载 97 枚工作台 reicon 线性图标并以无锁 `OnceLock<Vec<Path>>` 零拷贝共享解析路径；前端 `apps/mac/ui/design/icons.ts` 只保留纯类型 `IconName`）、`VvI18n`（`"vibevalley/rich"` 导出 `.translate(...)`，由 `installNativeI18n()` 接管 `@vibevalley/i18n`，使生产 UI 包不含 `packages/i18n` JS 词典）、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`、`VvGenUi`、`VvWhiteboard`（含 Loro Phase A 实时在场光标/占位框/一键跟随视口与 `onCursorMove`/`onViewportChange` 回调）、`VvPinyin`）与内部渲染引擎 `engine/` |
 | `apps/mac/src/theme.rs`、`apps/mac/src/theme_tokens.rs` | 外壳的主题、动画幅度（`Settings.motion`）与字号设置；令牌从 `design/tokens.json` 同步生成 |
 | `apps/mac/src/debug.rs` | 不看屏幕检查应用的两个入口：状态转储和脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） |
-| `apps/mac/ui/App.tsx`、`ShellApp.tsx`、`workspace/` | 双入口 TSX 包：`App.tsx` 供全量工作台（`vv` / `vibevalley`），`ShellApp.tsx` 供轻量壳窗格（侧栏 `Sidebar.tsx`、命令面板 `Palette.tsx`、Markdown 预览 `MarkdownPane.tsx`、直连对话 `ChatPane.tsx` 与 Swarm 抽屉 `SwarmPanel.tsx`、农场表单/手机等），按 `host.params.view` 挑视图 |
+| `apps/mac/ui/App.tsx`、`ShellApp.tsx`、`workspace/` | 双入口 TSX 包：`App.tsx` 供全量工作台（`vv` / `vibevalley`）与复用缓存工作台包的农场视图（`farm-form` / `farm-phone`），`ShellApp.tsx` 专供轻量工作区壳窗格（`sidebar`、`palette`、`markdown`、`workspace-chat`、`probe`），两份入口启动时均调 `installNativeI18n()` 走原生 `VvI18n`，按 `host.params.view` 挑视图 |
 | `apps/mac/ui/{app,features,design,infra}/` | 工作台共 6 个顶级目录：入口外壳 `app/`（路由表 `Workbench.tsx`、6 项一级导航 `places.ts`、外框 `Shell.tsx`）、领域切片 `features/<概念>/`（含二元统一内容中心壳 `content/`、5 栏设置页、Artifact 引擎含 `TimelineBar.tsx` 时间旅行与 `outline` 大纲笔记、素材库及历史 `pkm` 兜底）、共享原语与表面 `design/`（含动效出口 `motion.ts` 与防闪烁骨架原语 `Skeleton.tsx`）、底层运行时与状态 `infra/`（`bridge.ts`、`solid.ts`、`polyfill.ts`、`state/`），另加 `workspace/` 与 `farm/` |
 | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)） |
 | `crates/server/src/transport/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
@@ -116,13 +116,13 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 **构建 TSX 包**
 
-1. `apps/mac/build.rs` 用 nsh 的命令行（`NSH_BIN`、仓库的 `.tools/bin/nsh` 或 `PATH` 里的）按双入口分别打包：全量工作台 `apps/mac/ui/App.tsx`（`ui/build`）与轻量壳窗格 `apps/mac/ui/ShellApp.tsx`（`ui/build-shell`），运行时由 `hosted/mod.rs` 按 `is_workbench_view` 分别缓存与惰性装载。
+1. `apps/mac/build.rs` 用 nsh 的命令行（`NSH_BIN`、仓库的 `.tools/bin/nsh` 或 `PATH` 里的）按双入口分别打包：全量工作台与农场视图 `apps/mac/ui/App.tsx`（`ui/build`，承接 `vv`、`vibevalley`、`farm-form`、`farm-phone`）与轻量工作区壳窗格 `apps/mac/ui/ShellApp.tsx`（`ui/build-shell`，仅含 `sidebar`、`palette`、`markdown`、`workspace-chat`、`probe`），运行时由 `hosted/mod.rs` 按 `is_workbench_view` 分别缓存与惰性装载；两份入口均经 `installNativeI18n()` 接入原生 `VvI18n`（`"vibevalley/rich"` `.translate(...)`），生产包不再打入 `packages/i18n` JS 词典目录。
 2. 调试构建从磁盘读 `apps/mac/ui/build/` 与 `apps/mac/ui/build-shell/`，改 TSX 不用重新编译 Rust；发布构建（或设了 `VIBEVALLEY_EMBED_UI`）开启 `nsh build --release`，仅单份静态嵌入剥离调试信息的 `bundle.nshc` 字节码（`bundle.js` 置 0 字节 sentinel 避免双嵌）。
 3. 没有 nsh 时调试构建仍可通过，应用里的视图报缺包；发布构建直接失败。
 
 ### 打包和更新
 
-`scripts/release/package.ts` 将应用（`vibevalley-mac`）、命令行（`vibevalley`）和灵动岛放进 `.app/Contents/MacOS`，静态素材（`assets`）与图标放进 `Contents/Resources`（两份 `--release` 字节码已直接嵌入 `vibevalley-mac` 二进制，不再向 `Contents/Resources/ui` 复制开发页面包）。应用从自身包定位资源，不依赖构建仓库的位置；`release.json` 记录版本、架构、ZIP 文件名、字节数和 SHA-512。
+`scripts/release/package.ts` 将应用（`vibevalley-mac`）、命令行（`vibevalley`）和灵动岛放进 `.app/Contents/MacOS`，静态素材（`assets`，经 `scripts/release/package-assets.ts` 的 `shouldPackageAsset` 过滤仅官网使用的 `assets/title/` 与 `assets/pixel/title-*.jpg`）与图标放进 `Contents/Resources`（两份 `--release` 字节码已直接嵌入 `vibevalley-mac` 二进制，不再向 `Contents/Resources/ui` 复制开发页面包）。应用从自身包定位资源，不依赖构建仓库的位置；`release.json` 记录版本、架构、ZIP 文件名、字节数和 SHA-512。
 
 `apps/mac/src/update` 只在打包版本上启动更新检查，启动时和每四小时各检查一次。稳定版读最新正式版，alpha、beta 各读同阶段最新版本；仓库运行和 `0.0.0` 不自动检查。`VIBEVALLEY_UPDATE_FEED=off` 关闭检查，指定清单 URL 可验证本地更新。
 

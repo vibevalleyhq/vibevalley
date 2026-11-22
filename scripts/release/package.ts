@@ -1,9 +1,10 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import { shouldPackageAsset } from "./package-assets.ts";
 import { channelIconFile, minimumMacOS, packageArchitecture, requireDeveloperId, verifyMacExecutable } from "./package-platform.ts";
 
 const root = resolve(import.meta.dirname, "../..");
@@ -67,7 +68,12 @@ mkdirSync(resources, { recursive: true });
 cpSync(join(target, "vibevalley-mac"), join(macos, "vibevalley-mac"));
 cpSync(join(target, "vibevalley"), join(macos, "vibevalley"));
 cpSync(join(root, "apps/island/.build/release/VibeValleyIsland"), join(macos, "VibeValleyIsland"));
-cpSync(join(root, "assets"), join(resources, "assets"), { recursive: true, dereference: true });
+const assetsRoot = join(root, "assets");
+cpSync(assetsRoot, join(resources, "assets"), {
+  recursive: true,
+  dereference: true,
+  filter: (src) => shouldPackageAsset(relative(assetsRoot, src)),
+});
 cpSync(icon, join(resources, "icon.icns"));
 const sign = (path: string, microphone = false) =>
   run("codesign", [

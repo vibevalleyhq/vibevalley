@@ -80,6 +80,30 @@ fn presence_hub_syncs_incrementally_evicts_ttl_and_projects_sandbox_highlight() 
 }
 
 #[test]
+fn regression_same_millisecond_upsert_update_and_remove_propagate() {
+    let hub_a = PresenceHub::with_default_ttl();
+    let hub_b = PresenceHub::with_default_ttl();
+
+    for i in 0..5 {
+        let mut p1 = sample_presence("rapid:1", "Alice", 20_000 + i * 2);
+        p1.x = Some(10.0 + i as f64);
+        let d1 = hub_a.upsert(p1.clone()).unwrap();
+        hub_b.apply(&d1).unwrap();
+        assert_eq!(hub_b.get("rapid:1"), Some(p1));
+
+        let mut p2 = sample_presence("rapid:1", "Alice", 20_001 + i * 2);
+        p2.x = Some(200.0 + i as f64);
+        let d2 = hub_a.upsert(p2.clone()).unwrap();
+        hub_b.apply(&d2).unwrap();
+        assert_eq!(hub_b.get("rapid:1"), Some(p2));
+
+        let tombstone = hub_a.remove("rapid:1");
+        hub_b.apply(&tombstone).unwrap();
+        assert!(hub_b.is_empty());
+    }
+}
+
+#[test]
 fn concurrent_two_sessions_and_human_converge_across_text_map_list_and_tree() {
     // Seed shared base document (human peer 1).
     let base = CollabDoc::with_peer_id(1).unwrap();

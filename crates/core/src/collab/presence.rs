@@ -3,6 +3,10 @@
 //! Never writes to SQLite and never bumps `artifact.seq`. Supports configurable
 //! TTL eviction (default 30 s) and binary incremental `encode` / `apply` sync.
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
 use loro::LoroValue;
 use loro::awareness::EphemeralStore;
 use serde::{Deserialize, Serialize};
@@ -68,6 +72,7 @@ pub struct PresencePayload {
 pub struct PresenceHub {
     store: EphemeralStore,
     ttl_ms: i64,
+    last_write_ms: Arc<Mutex<HashMap<String, u128>>>,
 }
 
 impl PresenceHub {
@@ -76,6 +81,7 @@ impl PresenceHub {
         Self {
             store: EphemeralStore::new(clamped),
             ttl_ms: clamped,
+            last_write_ms: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -92,14 +98,41 @@ impl PresenceHub {
     pub fn upsert(&self, payload: PresencePayload) -> Result<Vec<u8>, CollabError> {
         let key = payload.id.clone();
         let encoded = serde_json::to_string(&payload)?;
-        self.store.set(&key, encoded);
-        Ok(self.store.encode(&key))
+        self.with_monotonic_key_clock(&key, || {
+            self.store.set(&key, encoded);
+            self.store.encode(&key)
+        })
     }
 
     /// Removes a participant's presence and returns the encoded tombstone update.
     pub fn remove(&self, id: &str) -> Vec<u8> {
-        self.store.delete(id);
-        self.store.encode(id)
+        self.with_monotonic_key_clock(id, || {
+            self.store.delete(id);
+            self.store.encode(id)
+        })
+        .unwrap_or_default()
+    }
+
+    /// Loro's `EphemeralStore` stamps local mutations with wall-clock milliseconds and
+    /// ignores incoming frames whose timestamp is `<=` the peer's stored timestamp.
+    /// Wait for the millisecond boundary (at most 2 ms) only on same-millisecond
+    /// consecutive writes to the same key so rapid upserts/tombstones always propagate.
+    fn with_monotonic_key_clock<T>(&self, key: &str, op: impl FnOnce() -> T) -> Result<T, CollabError> {
+        let mut last_writes = self.last_write_ms.lock().unwrap_or_else(|p| p.into_inner());
+        let mut now = unix_now_ms();
+        if let Some(&prev_ms) = last_writes.get(key)
+            && now == prev_ms
+        {
+            let deadline = Instant::now() + Duration::from_millis(2);
+            while now == prev_ms && Instant::now() < deadline {
+                let remain_us = 1_000u64.saturating_sub(unix_sub_ms_micros()).max(50);
+                std::thread::sleep(Duration::from_micros(remain_us));
+                now = unix_now_ms();
+            }
+        }
+        let out = op();
+        last_writes.insert(key.to_owned(), unix_now_ms().max(now));
+        Ok(out)
     }
 
     /// Encodes the latest state for a single participant (empty if missing or expired).
@@ -128,6 +161,8 @@ impl PresenceHub {
         let after = self.store.keys();
         let mut evicted: Vec<String> = before.into_iter().filter(|k| !after.contains(k)).collect();
         evicted.sort();
+        let cutoff = unix_now_ms().saturating_sub(self.ttl_ms.max(0) as u128);
+        self.last_write_ms.lock().unwrap_or_else(|p| p.into_inner()).retain(|_, ts| *ts >= cutoff);
         evicted
     }
 
@@ -139,7 +174,7 @@ impl PresenceHub {
         for (key, value) in states {
             let expired_by_payload = decode_payload(&value).is_none_or(|p| p.updated_at > 0 && now_ms.saturating_sub(p.updated_at) > self.ttl_ms);
             if expired_by_payload {
-                self.store.delete(&key);
+                let _ = self.with_monotonic_key_clock(&key, || self.store.delete(&key));
                 if !evicted.contains(&key) {
                     evicted.push(key);
                 }
@@ -181,4 +216,12 @@ impl Default for PresenceHub {
 fn decode_payload(value: &LoroValue) -> Option<PresencePayload> {
     let LoroValue::String(raw) = value else { return None };
     serde_json::from_str::<PresencePayload>(raw.as_str()).ok()
+}
+
+fn unix_now_ms() -> u128 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis())
+}
+
+fn unix_sub_ms_micros() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| (d.subsec_micros() % 1_000) as u64)
 }

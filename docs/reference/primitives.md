@@ -155,6 +155,7 @@
 | `ready` | `query/solid.tsx` |  |
 | `fixOf` | `readiness.ts` | What a feature lacks, in words, and the settings page that fixes it (SettingsStatus.readiness says what lacks). |
 | `richNative` | `rich.ts` |  |
+| `installNativeI18n` | `rich.ts` | Routes `@vibevalley/i18n` through native Rust `VvI18n` when the host registers it. |
 | `appHistory` | `router/context.tsx` | The one history of the app's page, for code outside the tree (the host's "open this route"). |
 | `useRouter` | `router/context.tsx` |  |
 | `Router` | `router/context.tsx` |  |

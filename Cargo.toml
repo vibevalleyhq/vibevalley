@@ -74,4 +74,7 @@ opt-level = 2
 opt-level = 3
 
 [profile.release]
+# Keep default unwinding (`panic = "unwind"`): nsh-core's SVG engine relies on catch_unwind.
+lto = "thin"
+codegen-units = 1
 strip = "symbols"

@@ -4,6 +4,8 @@
 import { nativeModule, type ComponentHostProps, type JSX, type Modifiers } from "nsh";
 import type { TextViewClasses, TextViewLinks, TextViewStyles } from "nsh/base";
 
+import { setTranslator } from "@vibevalley/i18n";
+
 export interface BlockRefPayload {
   block: string;
   body?: string | null;
@@ -180,6 +182,7 @@ export interface VvRichModule {
   VvMarkdown: (props: VvMarkdownProps) => JSX.Element;
   VvWhiteboard: (props: VvWhiteboardProps) => JSX.Element;
   matchPinyin: (text: string, query: string) => boolean;
+  translate?: (locale: string, key: string, paramsJson?: string) => string;
 }
 
 let cached: VvRichModule | null | undefined;
@@ -192,4 +195,11 @@ export function richNative(): VvRichModule | undefined {
     cached = null;
   }
   return cached ?? undefined;
+}
+
+/** Routes `@vibevalley/i18n` through native Rust `VvI18n` when the host registers it. */
+export function installNativeI18n(): void {
+  const translate = richNative()?.translate;
+  if (!translate) return;
+  setTranslator((locale, key, params) => (params ? translate(locale, key, JSON.stringify(params)) : translate(locale, key)));
 }

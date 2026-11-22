@@ -18,7 +18,12 @@ import type {
   SessionWatchEvent,
   SessionWorkspace,
 } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
+import { RuntimeInfo as RuntimeInfoSchema } from "@vibevalley/protocol/runtime/schema";
+import {
+  SessionChildTranscript as SessionChildTranscriptSchema,
+  SessionWatchEvent as SessionWatchEventSchema,
+  SessionWorkspace as SessionWorkspaceSchema,
+} from "@vibevalley/protocol/session/schema";
 
 import { call, subscribe } from "../infra/bridge";
 
@@ -115,7 +120,7 @@ const FALLBACK_RUNTIMES: readonly WorkspaceRuntimeOption[] = [
   { id: "codex", name: "Codex", available: true, models: [], supportsSteer: true, supportsConfig: true },
 ];
 
-const runtimeListSchema = z.array(S.RuntimeInfo);
+const runtimeListSchema = z.array(RuntimeInfoSchema);
 
 function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOption {
   const models: RuntimeModelOption[] = (rt.models ?? []).map((m) => {
@@ -359,7 +364,7 @@ export async function openWorkspaceSession(params: OpenWorkspaceParams): Promise
   if (params.title) payload.title = params.title;
   const env = await call("session.openWorkspace", payload);
   if (env.bizCode !== 0) return { ok: false, reason: env.message };
-  const parsed = S.SessionWorkspace.safeParse(env.data);
+  const parsed = SessionWorkspaceSchema.safeParse(env.data);
   if (!parsed.success) return { ok: false, reason: "invalid session.openWorkspace response" };
   return { ok: true, workspace: parsed.data };
 }
@@ -400,7 +405,7 @@ export async function fetchChildTranscript(
 ): Promise<{ ok: true; steps: SessionChildStep[] } | { ok: false; reason: string }> {
   const env = await call("session.childTranscript", { id, conversationId, limit });
   if (env.bizCode !== 0) return { ok: false, reason: env.message };
-  const parsed = S.SessionChildTranscript.safeParse(env.data);
+  const parsed = SessionChildTranscriptSchema.safeParse(env.data);
   if (!parsed.success) return { ok: false, reason: "invalid session.childTranscript response" };
   return { ok: true, steps: parsed.data.steps };
 }
@@ -438,7 +443,7 @@ export async function setWorkspaceConfig(
   if (config.permissionMode !== undefined) payload.permissionMode = config.permissionMode;
   const env = await call("session.setConfig", payload);
   if (env.bizCode !== 0) return { ok: false, reason: env.message };
-  const parsed = S.SessionWorkspace.safeParse(env.data);
+  const parsed = SessionWorkspaceSchema.safeParse(env.data);
   return parsed.success ? { ok: true, workspace: parsed.data } : { ok: true };
 }
 
@@ -478,7 +483,7 @@ export function watchWorkspaceSession(id: string, onEvent: (event: SessionWatchE
     "session.watch",
     payload,
     (raw) => {
-      const parsed = S.SessionWatchEvent.safeParse(raw);
+      const parsed = SessionWatchEventSchema.safeParse(raw);
       if (parsed.success) onEvent(parsed.data);
     },
     () => onEnd?.(),

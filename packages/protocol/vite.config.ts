@@ -6,7 +6,7 @@ export default defineConfig({
   test: { include: ["src/**/*.test.ts"], env: { TZ: "Asia/Shanghai" } },
   // The types other packages check against (package.json's exports.
   pack: {
-    entry: ["src/index.ts", "src/rules/index.ts", "src/schema.ts", "src/api.ts", "src/rpc.ts", "src/host.ts"],
+    entry: ["src/index.ts", "src/rules/index.ts", "src/schema.ts", "src/session/schema.ts", "src/runtime/schema.ts", "src/api.ts", "src/rpc.ts", "src/host.ts"],
     outDir: "dist",
     clean: true,
     fixedExtension: false,

@@ -28,7 +28,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 
 - **三阶段**：`alpha` 自用，功能可变、数据可能重建；`beta` 冻结功能只修缺陷，修复先进 `main` 再 cherry-pick 到 `release/x.y`；`final` 与最后一个 beta 使用同一份代码。
 - **发布脚本**（`scripts/release/release.ts`）校验工作区干净、分支与 origin 一致，由已有 tag 推算下一版本号。beta 与正式版先在 Mac 上运行 `vp run release:verify`，确认后打 tag 推送。GitHub 对每个发布标签重新执行 CI，通过后才打包并创建草稿。
-- **打包**：`vp run package:mac` 构建原生应用、命令行、灵动岛和页面，写出 `apps/mac/dist` 下的 `.app`、`.dmg`、`.zip` 和 `release.json`。本地默认 ad-hoc 签名；`--sign <Developer ID>` 指定签名身份，`--notary-profile <配置名>` 提交公证并装订票据。`--version` 指定版本，未指定时取当前版本标签，无标签是 `0.0.0`。两个包的更新验收见[应用验收](.agents/skills/vv-acceptance/references/app.md#打包和更新)。
+- **打包**：`vp run package:mac` 构建原生应用、命令行、灵动岛和页面，写出 `apps/mac/dist` 下的 `.app`、`.dmg`、`.zip` 和 `release.json`。Rust 发布配置（`Cargo.toml` `[profile.release]`）启用 `strip = "symbols"`、`lto = "thin"` 与 `codegen-units = 1`（保留默认 `panic = "unwind"`，因为 `nsh-core` SVG 引擎依赖 `catch_unwind`）；`scripts/release/package.ts` 复制 `assets/` 时通过 `scripts/release/package-assets.ts` 的 `shouldPackageAsset` 过滤仅官网使用的 `assets/title/` 与 `assets/pixel/title-*.jpg`，两份 `--release` 字节码已单份嵌入 `vibevalley-mac`，不再向 `Contents/Resources/ui` 复制开发页面包。本地默认 ad-hoc 签名；`--sign <Developer ID>` 指定签名身份，`--notary-profile <配置名>` 提交公证并装订票据。`--version` 指定版本，未指定时取当前版本标签，无标签是 `0.0.0`。两个包的更新验收见[应用验收](.agents/skills/vv-acceptance/references/app.md#打包和更新)。
 - **公开发布**。发布任务使用 Apple 芯片 runner。打包脚本检查应用、CLI 和灵动岛的 Mach-O 架构和最低系统版本。Info.plist 的最低版本为 macOS 14.0。Developer ID 打包还应有应用分发证书及私钥。公证需要当前 runner 钥匙串中可用的 notarytool profile。GitHub 仓库变量仅提供名称。当前托管 runner 的工作流还需接入签名材料及公证凭据的装配步骤。只有当前提交有同名版本标签时，更新清单才给出该版本的 GitHub 发布页。
 
 
