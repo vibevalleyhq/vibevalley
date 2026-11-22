@@ -1,7 +1,7 @@
 import { effect, Image, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Artifact, LibraryItem, MediaJob } from "@vibevalley/protocol";
+import type { Artifact, LibraryItem, MediaJob, PkmPageSummary } from "@vibevalley/protocol";
 
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
@@ -10,6 +10,7 @@ import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { artifactIcon, artifactSuffix, kindLabel } from "../artifact";
+import { titleFor } from "../pkm/days";
 import { durationText, extOf, justify, kindOf, type Placed } from "./items";
 
 export interface Seen {
@@ -43,6 +44,27 @@ export const ratioOf = ({ item, seen }: { readonly item: LibraryItem; readonly s
       return 0.8;
   }
 };
+
+function CardPinButton(props: { testid: string; pinned: boolean; onToggle: () => void }) {
+  const label = () => (props.pinned ? t("web.library.content.unpin") : t("web.library.content.pin"));
+  return (
+    <View
+      role="button"
+      testID={props.testid}
+      accessibilityLabel={label()}
+      accessibilityState={{ selected: props.pinned }}
+      tooltip={<Bubble text={label()} />}
+      onPress={() => props.onToggle()}
+      class={`size-6 shrink-0 items-center justify-center rounded-sm border focus-visible:outline-2 focus-visible:outline-focus ${
+        props.pinned
+          ? "border-line bg-warn-soft opacity-100"
+          : "border-transparent bg-transparent opacity-0 group-hover:opacity-100 hover:bg-selected focus:opacity-100"
+      }`}
+    >
+      <Icon name="pin" size={12} tone={props.pinned ? "warn-ink" : "muted"} />
+    </View>
+  );
+}
 
 export function MakingTiles(props: { jobs: readonly MediaJob[]; width: number; height: number; label: (job: MediaJob) => string }) {
   const rows = () => justify({ ratios: props.jobs.map(() => 1), width: props.width, height: props.height, gap: tileGap });
@@ -94,6 +116,7 @@ export function Tiles(props: {
   rows: readonly Placed[][];
   picked: readonly string[];
   active: string | undefined;
+  isPinned?: ((id: string) => boolean) | undefined;
   seen: (id: string) => Seen | undefined;
   onSeen: (id: string, seen: Seen) => void;
   onPick: (id: string, how: { readonly add: boolean; readonly range: boolean }) => void;
@@ -114,6 +137,7 @@ export function Tiles(props: {
                 height={p().height}
                 picked={props.picked.includes(item().attachment.id)}
                 active={props.active === item().attachment.id}
+                pinned={props.isPinned?.(item().attachment.id) === true}
                 seen={props.seen(item().attachment.id)}
                 onSeen={(s) => props.onSeen(item().attachment.id, s)}
                 onPick={(how) => props.onPick(item().attachment.id, how)}
@@ -135,6 +159,7 @@ function Tile(props: {
   height: number;
   picked: boolean;
   active: boolean;
+  pinned: boolean;
   seen: Seen | undefined;
   onSeen: (seen: Seen) => void;
   onPick: (how: { readonly add: boolean; readonly range: boolean }) => void;
@@ -164,12 +189,18 @@ function Tile(props: {
       testID="library-item"
       accessibilityLabel={file().name}
       tooltip={<Bubble text={file().name} />}
-      onPress={() => props.onPick({ add: false, range: false })}
+      onPress={(e) => {
+        if (kind() === "image" && e.clickCount >= 2) {
+          props.onLook();
+          return;
+        }
+        props.onPick({ add: e.modifiers.platform || e.modifiers.control, range: e.modifiers.shift });
+      }}
       class="absolute shrink-0 min-w-0"
       style={{ left: props.x, top: props.y, width: props.width, height: props.height + captionPx }}
     >
       <View
-        class={`relative flex-1 min-h-0 items-center justify-center overflow-hidden rounded-md border bg-side transition duration-120 ease-out ${
+        class={`relative flex-1 min-h-0 items-center justify-center overflow-hidden rounded-md border bg-side ${
           props.active || props.picked ? "border-accent" : "border-line hover:border-faint"
         }`}
       >
@@ -185,52 +216,100 @@ function Tile(props: {
         >
           {(src) => <Image src={src()} style={{ width: props.width, height: props.height, objectFit: "cover" }} />}
         </If>
+        <If when={props.pinned}>
+          <View class="pointer-events-none absolute top-1.5 right-1.5 size-5 items-center justify-center rounded-sm border border-line bg-warn-soft">
+            <Icon name="pin" size={10} tone="warn-ink" />
+          </View>
+        </If>
         <If when={props.active || props.picked}>
           <View class="pointer-events-none absolute inset-0 rounded-sm border border-accent" />
         </If>
       </View>
-      <Text class={`pt-1.5 truncate text-xs ${props.picked ? "font-medium text-ink" : "text-muted"}`}>{file().name}</Text>
+      <Text class={`pt-1.5 truncate text-xs font-medium ${props.picked ? "text-ink" : "text-muted"}`}>{file().name}</Text>
     </View>
   );
 }
 
-/** Lightweight native deliverable cards (no WebView grid): icon, type badge, compound suffix, title, and updated time. */
+export function NoteTiles(props: {
+  notes: readonly PkmPageSummary[];
+  onOpen: (slug: string) => void;
+  isPinned: (slug: string) => boolean;
+  onTogglePin: (slug: string) => void;
+}) {
+  const now = useNow();
+  return (
+    <View testID="library-notes" class="flex-row flex-wrap gap-3">
+      <Each of={props.notes} key={(n) => n.slug}>
+        {(n) => {
+          const pinned = () => props.isPinned(n().slug);
+          const displayTitle = () => titleFor(n().title, n().day);
+          return (
+            <View
+              role="button"
+              testID={`library-note-${n().slug}`}
+              accessibilityLabel={displayTitle()}
+              tooltip={<Bubble text={displayTitle()} />}
+              onPress={() => props.onOpen(n().slug)}
+              class="group relative w-56 shrink-0 gap-2.5 rounded-lg border border-line bg-page p-3 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+            >
+              <View class="flex-row items-start gap-2.5">
+                <View class="size-8 shrink-0 items-center justify-center rounded-md bg-side">
+                  <Icon name={n().day ? "calendar" : "notes"} size={16} tone="muted" />
+                </View>
+                <View class="min-w-0 flex-1 gap-0.5">
+                  <View class="h-5 items-center justify-center self-start rounded-sm bg-side px-1.5">
+                    <Text class="text-2xs font-medium text-ink">{t("web.library.content.notes")}</Text>
+                  </View>
+                  <If when={n().day}>{(day) => <Text class="truncate font-mono text-2xs text-faint">{day()}</Text>}</If>
+                </View>
+                <CardPinButton testid={`library-note-pin-${n().slug}`} pinned={pinned()} onToggle={() => props.onTogglePin(n().slug)} />
+              </View>
+              <View class="gap-1">
+                <Text class="truncate text-sm font-semibold text-ink">{displayTitle()}</Text>
+                <If when={n().tldr.trim() !== ""}>
+                  <Text class="truncate text-xs text-muted">{n().tldr.trim()}</Text>
+                </If>
+              </View>
+              <View class="flex-row items-center justify-between gap-2">
+                <Text class="min-w-0 flex-1 truncate text-xs text-faint">{ago(n().updated, now())}</Text>
+                <If when={n().open > 0}>
+                  <View testID={`library-note-todo-${n().slug}`} class="h-5 shrink-0 items-center justify-center rounded-sm bg-warn-soft px-1.5">
+                    <Text class="text-2xs font-medium text-warn-ink tabular-nums">{t("web.library.content.notesTodoCount", { n: n().open })}</Text>
+                  </View>
+                </If>
+              </View>
+            </View>
+          );
+        }}
+      </Each>
+    </View>
+  );
+}
+
 export function ArtifactTiles(props: {
   artifacts: readonly Artifact[];
-  selectedId: string | undefined;
-  onSelect: (id: string) => void;
   onOpen: (id: string) => void;
+  isPinned: (id: string) => boolean;
+  onTogglePin: (id: string) => void;
 }) {
   const now = useNow();
   return (
     <View testID="library-artifacts" class="flex-row flex-wrap gap-3">
       <Each of={props.artifacts} key={(a) => a.id}>
         {(a) => {
-          const picked = () => props.selectedId === a().id;
-          let lastPress = 0;
+          const pinned = () => props.isPinned(a().id);
           return (
             <View
               role="button"
               testID={`library-artifact-${a().id}`}
               accessibilityLabel={a().title}
-              accessibilityState={{ selected: picked() }}
               tooltip={<Bubble text={a().title} />}
-              onPress={() => {
-                const ts = Date.now();
-                if (ts - lastPress < 350 && picked()) {
-                  props.onOpen(a().id);
-                } else {
-                  props.onSelect(a().id);
-                }
-                lastPress = ts;
-              }}
-              class={`relative w-56 shrink-0 gap-2.5 rounded-lg border p-3 transition duration-120 ease-out ${
-                picked() ? "border-accent bg-selected shadow-raise" : "border-line bg-page hover:border-faint hover:bg-hover"
-              }`}
+              onPress={() => props.onOpen(a().id)}
+              class="group relative w-56 shrink-0 gap-2.5 rounded-lg border border-line bg-page p-3 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <View class="flex-row items-center gap-2.5">
+              <View class="flex-row items-start gap-2.5">
                 <View class="size-8 shrink-0 items-center justify-center rounded-md bg-side">
-                  <Icon name={artifactIcon(a())} size={16} tone={picked() ? "ink" : "muted"} />
+                  <Icon name={artifactIcon(a())} size={16} tone="muted" />
                 </View>
                 <View class="min-w-0 flex-1 gap-0.5">
                   <View class="flex-row flex-wrap items-center gap-1">
@@ -245,26 +324,15 @@ export function ArtifactTiles(props: {
                   </View>
                   <Text class="truncate font-mono text-2xs text-faint">{artifactSuffix(a())}</Text>
                 </View>
+                <CardPinButton testid={`library-artifact-pin-${a().id}`} pinned={pinned()} onToggle={() => props.onTogglePin(a().id)} />
               </View>
               <Text class="truncate text-sm font-semibold text-ink">{a().title}</Text>
               <View class="flex-row items-center justify-between gap-2">
                 <Text class="min-w-0 flex-1 truncate text-xs text-muted">
                   {[...(a().body === "html" ? [t("web.library.inspector.versionBadge", { version: a().version })] : []), ago(a().updated, now())].join(" · ")}
                 </Text>
-                <View
-                  role="button"
-                  testID={`library-artifact-open-${a().id}`}
-                  accessibilityLabel={t("web.library.inspector.openWorkbench")}
-                  tooltip={<Bubble text={t("web.library.inspector.openWorkbench")} />}
-                  onPress={() => props.onOpen(a().id)}
-                  class="size-6 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-selected"
-                >
-                  <Icon name="open" size={12} tone="muted" />
-                </View>
+                <Icon name="open" size={12} tone="faint" />
               </View>
-              <If when={picked()}>
-                <View class="pointer-events-none absolute inset-0 rounded-md border border-accent" />
-              </If>
             </View>
           );
         }}

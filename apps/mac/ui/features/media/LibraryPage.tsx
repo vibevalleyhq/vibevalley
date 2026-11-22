@@ -1,17 +1,15 @@
 import { effect, keymap, Picker, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type Artifact, type ArtifactType, type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob } from "@vibevalley/protocol";
-import { artifactId } from "@vibevalley/protocol/schema";
+import { type Artifact, type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob, type PkmPageSummary } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Dialog } from "../../design/Dialog";
-import { SearchField, Select } from "../../design/Field";
+import { Select } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Empty, Quiet } from "../../design/layout";
 import { Lightbox, type Picture } from "../../design/Lightbox";
-import { type MoreItem, MoreMenu } from "../../design/MoreMenu";
 import { readFiles } from "../../design/picked";
 import { Segmented } from "../../design/Segmented";
 import { CountPill } from "../../design/Tag";
@@ -19,50 +17,69 @@ import { toast } from "../../design/toasts";
 import { api } from "../../infra/api";
 import { attachmentData } from "../../infra/attachment";
 import { fileUrl, useAttachmentFile } from "../../infra/attachmentFile";
-import { createSettled } from "../../infra/base/dom";
 import { hostApi } from "../../infra/bridge";
 import { useCore } from "../../infra/frame";
 import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
 import { useRouter, useSearchParams } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
-import { artifactTypeIcon, createTypedArtifact, useArtifacts } from "../artifact";
+import { useArtifacts } from "../artifact";
 import { inferArtifactFromName } from "../artifact/html";
+import {
+  type ContentBucket,
+  contentBrowseBucket,
+  contentFocusMediaId,
+  contentSidebarOpen,
+  isPinned,
+  openTemplatePicker,
+  pinnedKeys,
+  togglePinned,
+} from "../content";
+import { pkmHref, usePkmVault } from "../pkm";
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
 import { Inspector } from "./Inspector";
-import { artifactCountsOf, countsOf, justify, kindOf, making, type Names, neighbor, shown, shownArtifacts, understoodText, type Where } from "./items";
+import {
+  type ArtifactTypeFilter,
+  justify,
+  kindOf,
+  making,
+  type Names,
+  neighbor,
+  shownArtifacts,
+  shownMedia,
+  shownNotes,
+  type SourceFilter,
+  sourceFilters,
+  understoodText,
+} from "./items";
 import {
   activeFileId,
   askRemove,
+  bucketArtifactType,
+  bucketFileKind,
   cancelRemove,
   clearSelection,
   closeLightbox,
-  initialLibraryScope,
+  focusFile,
   initialLibrarySelection,
   isAskingRemove,
-  type LibraryScope,
+  isPinnedBucket,
   type LibrarySelection,
   lightboxIndex,
   openLightbox,
-  pickArtifact as selectArtifact,
   pickFile,
   reconcileSelection,
-  scopeArtifactKind,
-  scopeForArtifactKind,
-  scopeForKind,
-  scopeKindFilter,
-  selectedArtifactId,
+  selectBucketSelection,
   selectedFileIds,
-  selectScope,
-  showsArtifactsInScope,
-  showsMediaInScope,
+  showsArtifactsInBucket,
+  showsMediaInBucket,
+  showsNotesInBucket,
 } from "./libraryView";
 import { libraryQuery } from "./listing";
 import { publicationKey } from "./publication";
-import { Rail } from "./Rail";
 import { SpeechPanel } from "./SpeechPanel";
-import { ArtifactTiles, knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles } from "./Tiles";
+import { ArtifactTiles, knows, MakingTiles, NoteTiles, ratioOf, type Seen, tileGap, Tiles } from "./Tiles";
 import { UnderstandingPanel } from "./UnderstandingPanel";
 
 type Make = "image" | "speech" | "audio";
@@ -80,88 +97,125 @@ function base64ToUtf8(b64: string): string {
   return new TextDecoder().decode(bytes);
 }
 
+function artifactTypeTitle(type: ArtifactTypeFilter | undefined): string {
+  if (type === undefined) return t("web.library.content.artifactType.all");
+  switch (type) {
+    case "whiteboard":
+      return t("web.library.content.artifactType.whiteboard");
+    case "docs":
+      return t("web.library.content.artifactType.docs");
+    case "slides":
+      return t("web.library.content.artifactType.slides");
+    case "dashboard":
+      return t("web.library.content.artifactType.dashboard");
+    case "design":
+      return t("web.library.content.artifactType.design");
+    case "design-system":
+      return t("web.library.content.artifactType.designSystem");
+    case "motion":
+      return t("web.library.content.artifactType.motion");
+    case "html":
+      return t("web.library.content.artifactType.html");
+  }
+}
+
+function titleOfBucket(bucket: ContentBucket): string {
+  switch (bucket.kind) {
+    case "recent":
+      return t("web.library.content.recent");
+    case "pinned":
+      return t("web.library.content.pinned");
+    case "notes":
+      return t("web.library.content.notes");
+    case "artifacts":
+      return artifactTypeTitle(bucket.artifactType);
+    case "media":
+      return bucket.fileKind === undefined ? t("web.library.content.media") : t(`web.library.kind.${bucket.fileKind}`);
+  }
+}
+
 export function LibraryPage() {
   const core = useCore();
   const agents = useAgents();
   const router = useRouter();
   const queries = useQueryClient();
   const [search, setSearch] = useSearchParams();
-  const text = signal("");
-  const typed = createSettled(text, 250);
   const sort = signal<LibrarySort>("recent");
-  const items = useQuery(() => libraryQuery({ text: typed().trim(), sort: sort() }), { interval: () => 10_000, keepPrevious: true });
+  const source = signal<SourceFilter>("all");
+  const items = useQuery(() => libraryQuery({ text: "", sort: sort() }), { interval: () => 10_000, keepPrevious: true });
   const artifactsQuery = useArtifacts(() => ({}));
-  const where = signal<Where>({ by: "all" });
-  const scope = signal<LibraryScope>(initialLibraryScope);
+  const vaultQuery = usePkmVault();
   const selection = signal<LibrarySelection>(initialLibrarySelection);
   const dragging = signal(false);
   const seen = signal<ReadonlyMap<string, Seen>>(new Map());
   const act = createAct();
 
-  const applyScope = (nextScope: LibraryScope) => {
-    const next = selectScope({ scope: untracked(scope), selection: untracked(selection) }, nextScope);
-    scope.set(next.scope);
-    selection.set(next.selection);
-  };
-
+  const bucket = () => contentBrowseBucket();
   const tile = () => Math.min(tileMax, Math.max(tileMin, prefsNow().libraryTile));
-  const all = (): readonly LibraryItem[] => ready(items, undefined) ?? [];
+  const allMedia = (): readonly LibraryItem[] => ready(items, undefined) ?? [];
   const allArtifacts = (): readonly Artifact[] => ready(artifactsQuery, undefined) ?? [];
+  const allNotes = (): readonly PkmPageSummary[] => ready(vaultQuery, undefined)?.pages ?? [];
   const jobs = (): readonly MediaJob[] => core()?.media ?? [];
   const mediaSummary = () => core()?.mediaSummary;
   const working = () => making(jobs(), mediaSummary());
   const activeMediaCount = () => mediaSummary()?.activeCount ?? working().length;
-  const list = createMemo(() => {
-    const current = scope();
-    return showsMediaInScope(current) ? shown({ items: all(), where: where(), kind: scopeKindFilter(current) }) : [];
-  });
-  const visibleArtifacts = createMemo(() => {
-    const current = scope();
-    return showsArtifactsInScope(current)
-      ? shownArtifacts(allArtifacts(), { where: where(), artifactKind: scopeArtifactKind(current), search: typed().trim(), sort: sort() })
-      : [];
-  });
-  const ids = createMemo(() => list().map((item) => item.attachment.id));
-  const imageItems = createMemo(() => list().filter((item) => kindOf(item.attachment.type) === "image"));
-  const counts = createMemo(() =>
-    countsOf({
-      items: all(),
-      artifacts: allArtifacts(),
-      where: where(),
-      kind: scopeKindFilter(scope()),
-      artifactKind: scopeArtifactKind(scope()),
-      search: typed().trim(),
-    }),
+
+  const pinnedSet = createMemo(() => new Set(pinnedKeys()));
+  const pinnedOnly = () => isPinnedBucket(bucket());
+
+  const visibleNotes = createMemo(() =>
+    showsNotesInBucket(bucket()) ? shownNotes(allNotes(), { source: source(), sort: sort(), pinnedOnly: pinnedOnly(), pinned: pinnedSet() }) : [],
   );
-  const artifactCounts = createMemo(() => artifactCountsOf(allArtifacts(), { where: where(), search: typed().trim() }));
+  const visibleArtifacts = createMemo(() =>
+    showsArtifactsInBucket(bucket())
+      ? shownArtifacts(allArtifacts(), {
+          source: source(),
+          artifactType: bucketArtifactType(bucket()),
+          sort: sort(),
+          pinnedOnly: pinnedOnly(),
+          pinned: pinnedSet(),
+        })
+      : [],
+  );
+  const visibleMedia = createMemo(() =>
+    showsMediaInBucket(bucket())
+      ? shownMedia(allMedia(), {
+          source: source(),
+          fileKind: bucketFileKind(bucket()),
+          pinnedOnly: pinnedOnly(),
+          pinned: pinnedSet(),
+        })
+      : [],
+  );
+
+  const totalCount = () => visibleNotes().length + visibleArtifacts().length + visibleMedia().length;
+  const sectionCount = () => (visibleNotes().length > 0 ? 1 : 0) + (visibleArtifacts().length > 0 ? 1 : 0) + (visibleMedia().length > 0 ? 1 : 0);
+  const ids = createMemo(() => visibleMedia().map((item) => item.attachment.id));
+  const imageItems = createMemo(() => visibleMedia().filter((item) => kindOf(item.attachment.type) === "image"));
 
   const picked = () => selectedFileIds(selection());
-  const pickedArtifact = () => selectedArtifactId(selection());
   const active = () => activeFileId(selection());
   const looking = () => lightboxIndex(selection());
   const asking = () => isAskingRemove(selection());
 
   const chosen = createMemo(() => {
     const on = new Set(picked());
-    return all().filter((item) => on.has(item.attachment.id));
+    return allMedia().filter((item) => on.has(item.attachment.id));
   });
-  const chosenArtifact = createMemo(() => {
-    const id = pickedArtifact();
-    return id !== undefined ? allArtifacts().find((a) => a.id === id) : undefined;
-  });
-  const inspectorOpen = () => chosen().length > 0 || chosenArtifact() !== undefined;
+  const inspectorOpen = () => chosen().length > 0;
 
   const inner = () => {
     const w = windowSize().width;
-    const railW = w < 640 ? 56 : 76 + 224;
+    const appRailW = w < 640 ? 56 : 68;
+    const sideW = contentSidebarOpen.get() ? 232 : 0;
     const inspW = inspectorOpen() && w >= 640 ? 304 : 0;
-    return Math.max(220, w - railW - inspW - 32);
+    return Math.max(220, w - appRailW - sideW - inspW - 32);
   };
 
   const rows = createMemo(() => {
     const known = seen();
     return justify({
-      ratios: list().map((item) => ratioOf({ item, seen: known.get(item.attachment.id) })),
+      ratios: visibleMedia().map((item) => ratioOf({ item, seen: known.get(item.attachment.id) })),
       width: inner(),
       height: tile(),
       gap: tileGap,
@@ -183,10 +237,41 @@ export function LibraryPage() {
     lastReadyCount = n;
   });
 
+  let prevBucket: ContentBucket | undefined;
+  effect(() => {
+    const current = bucket();
+    if (prevBucket !== undefined && prevBucket !== current) {
+      selection.set(selectBucketSelection(untracked(selection), current));
+    }
+    prevBucket = current;
+  });
+
+  effect(() => {
+    const targetId = contentFocusMediaId();
+    if (!targetId) return;
+    const currentBucket = untracked(contentBrowseBucket);
+    if (!showsMediaInBucket(currentBucket) || isPinnedBucket(currentBucket)) {
+      contentBrowseBucket.set({ kind: "media" });
+    }
+    if (untracked(source) !== "all") {
+      source.set("all");
+    }
+    const mediaList = allMedia();
+    const target = mediaList.find((item) => item.attachment.id === targetId);
+    if (target === undefined && ready(items, undefined) === undefined) return;
+    if (target !== undefined) {
+      const currentKind = bucketFileKind(untracked(contentBrowseBucket));
+      if (currentKind !== undefined && kindOf(target.attachment.type) !== currentKind) {
+        contentBrowseBucket.set({ kind: "media" });
+      }
+      selection.set(focusFile(targetId));
+    }
+    contentFocusMediaId.set(undefined);
+  });
+
   effect(() => {
     const next = reconcileSelection(untracked(selection), {
       fileIds: ids(),
-      artifactIds: visibleArtifacts().map((a) => a.id),
       imageCount: imageItems().length,
     });
     selection.set(next);
@@ -199,31 +284,16 @@ export function LibraryPage() {
   const understanding = () => {
     const id = search().get("understand");
     if (id === null || id === "") return undefined;
-    return all().find((item) => item.attachment.id === id)?.attachment ?? { id, name: id, type: "", size: 0 };
+    return allMedia().find((item) => item.attachment.id === id)?.attachment ?? { id, name: id, type: "", size: 0 };
   };
 
-  const createNewArtifact = (choice: ArtifactType | "html") =>
-    act.run(async () => {
-      const made = await createTypedArtifact(choice, t("web.artifact.page.untitled"));
-      await queries.invalidate({ prefix: ["artifacts"] });
-      router.navigate(`/artifacts/${encodeURIComponent(made.id)}`);
-    });
+  const openNote = (slug: string) => router.navigate(pkmHref(slug));
+  const openArtifact = (id: string) => router.navigate(`/artifacts/${encodeURIComponent(id)}`);
 
-  const newArtifactItems = (): MoreItem[] => [
-    { key: "docs", label: t("web.artifact.types.docs"), icon: artifactTypeIcon.docs, onSelect: () => void createNewArtifact("docs") },
-    { key: "slides", label: t("web.artifact.types.slides"), icon: artifactTypeIcon.slides, onSelect: () => void createNewArtifact("slides") },
-    { key: "dashboard", label: t("web.artifact.types.dashboard"), icon: artifactTypeIcon.dashboard, onSelect: () => void createNewArtifact("dashboard") },
-    { key: "motion", label: t("web.artifact.types.motion"), icon: artifactTypeIcon.motion, onSelect: () => void createNewArtifact("motion") },
-    { key: "whiteboard", label: t("web.artifact.types.whiteboard"), icon: artifactTypeIcon.whiteboard, onSelect: () => void createNewArtifact("whiteboard") },
-    { key: "design", label: t("web.artifact.types.design"), icon: artifactTypeIcon.design, onSelect: () => void createNewArtifact("design") },
-    {
-      key: "design-system",
-      label: t("web.artifact.types.designSystem"),
-      icon: artifactTypeIcon["design-system"],
-      onSelect: () => void createNewArtifact("design-system"),
-    },
-    { key: "html", label: t("web.artifact.types.html"), icon: "web", onSelect: () => void createNewArtifact("html") },
-  ];
+  const handleTogglePin = (key: string) => {
+    const nowPinned = togglePinned(key);
+    toast(nowPinned ? t("web.library.content.pinnedToast") : t("web.library.content.unpinnedToast"));
+  };
 
   const uploadEntries = (entries: readonly { name: string; type: string; data: Promise<string> }[]) =>
     entries.length === 0
@@ -255,11 +325,11 @@ export function LibraryPage() {
           }
           if (lastArtifact !== undefined) {
             await queries.invalidate({ prefix: ["artifacts"] });
-            selection.set(selectArtifact(lastArtifact.id));
+            if (lastMedia === undefined) openArtifact(lastArtifact.id);
           }
           if (lastMedia !== undefined) {
             void items.refetch();
-            selection.set(pickFile(untracked(selection), lastMedia.attachment.id, { add: false, range: false }, ids()));
+            selection.set(focusFile(lastMedia.attachment.id));
           }
         });
 
@@ -277,12 +347,6 @@ export function LibraryPage() {
   const pick = (id: string, how: { readonly add: boolean; readonly range: boolean }) => {
     selection.set(pickFile(untracked(selection), id, how, ids()));
   };
-
-  const pickArtifact = (id: string) => {
-    selection.set(selectArtifact(id));
-  };
-
-  const openArtifact = (id: string) => router.navigate(`/artifacts/${encodeURIComponent(id)}`);
 
   const look = (id: string | undefined) => {
     const images = imageItems();
@@ -309,16 +373,6 @@ export function LibraryPage() {
         void items.refetch();
       }),
     );
-  };
-
-  const removeArtifact = (id: string) => {
-    const target = allArtifacts().find((a) => a.id === id);
-    return act.run(async () => {
-      await api.artifact.delete({ id: artifactId(id) });
-      selection.set(clearSelection());
-      if (target) toast(t("web.artifact.page.deleted", { title: target.title }));
-      await queries.invalidate({ prefix: ["artifacts"] });
-    });
   };
 
   const stepKey = (way: "left" | "right" | "up" | "down") => {
@@ -352,13 +406,14 @@ export function LibraryPage() {
     { when: "notEditing", passThrough: true },
   );
 
-  const empty = () => all().length === 0 && allArtifacts().length === 0 && activeMediaCount() === 0 && typed().trim() === "";
-  const nothingShown = () => list().length === 0 && visibleArtifacts().length === 0;
+  const empty = () => allNotes().length === 0 && allArtifacts().length === 0 && allMedia().length === 0 && activeMediaCount() === 0;
+  const nothingShown = () => totalCount() === 0;
+  const bucketTitle = () => titleOfBucket(bucket());
 
   return (
     <View
       testID="library-page"
-      class="relative h-full min-h-0 min-w-0 flex-1 flex-col sm:flex-row"
+      class="relative h-full min-h-0 min-w-0 flex-1"
       onFileDragEnter={() => dragging.set(true)}
       onFileDragLeave={() => dragging.set(false)}
       onFileDrop={(e) => {
@@ -366,47 +421,41 @@ export function LibraryPage() {
         void dropUris(e.uris);
       }}
     >
-      <Rail
-        counts={counts()}
-        names={names}
-        where={where()}
-        kind={scopeKindFilter(scope())}
-        artifactKind={scopeArtifactKind(scope())}
-        artifactCounts={artifactCounts()}
-        onWhere={(w) => {
-          where.set(w);
-          selection.set(cancelRemove(untracked(selection)));
-        }}
-        onKind={(k) => applyScope(scopeForKind(k))}
-        onArtifactKind={(ak) => {
-          if (ak !== undefined) applyScope(scopeForArtifactKind(ak));
-        }}
-      />
-      <View class="min-h-0 min-w-0 flex-1">
-        <View
-          role="toolbar"
-          accessibilityLabel={t("web.library.title")}
-          class="min-h-14 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line px-4 py-2.5"
-        >
-          <SearchField
-            testid="library-search"
-            clearTestid="library-search-clear"
-            value={text()}
-            onInput={(v) => text.set(v)}
-            placeholder={t("web.library.search")}
-            label={t("web.library.search")}
-            class="w-56 min-w-40"
-          />
-          <Select
-            label={t("web.library.sortLabel")}
-            testid="library-sort"
-            size="control"
-            quiet
-            value={sort()}
-            onChange={(v) => sort.set(v)}
-            options={LibrarySortValues.map((value) => ({ value, label: t(`web.library.sort.${value}`) }))}
-          />
-          <View class="flex-1" />
+      <View
+        role="toolbar"
+        accessibilityLabel={bucketTitle()}
+        class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-4 py-1.5"
+      >
+        <View class="min-w-0 flex-row items-center gap-2">
+          <Text testID="library-bucket-title" class="truncate text-sm font-semibold text-ink">
+            {bucketTitle()}
+          </Text>
+          <CountPill count={totalCount()} />
+        </View>
+        <Segmented
+          label={t("web.library.content.source.all")}
+          testid="library-source"
+          value={source()}
+          onChange={(v) => {
+            source.set(v);
+            selection.set(cancelRemove(untracked(selection)));
+          }}
+          options={sourceFilters.map((value) => ({
+            value,
+            label: t(`web.library.content.source.${value}`),
+          }))}
+        />
+        <View class="min-w-0 flex-1" />
+        <Select
+          label={t("web.library.sortLabel")}
+          testid="library-sort"
+          size="control"
+          quiet
+          value={sort()}
+          onChange={(v) => sort.set(v)}
+          options={LibrarySortValues.map((value) => ({ value, label: t(`web.library.sort.${value}`) }))}
+        />
+        <If when={showsMediaInBucket(bucket())}>
           <Segmented
             label={t("web.library.tileSize")}
             testid="library-tile-size"
@@ -418,123 +467,130 @@ export function LibraryPage() {
               { value: "lg", label: "L" },
             ]}
           />
-          <Button testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
-            {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
-          </Button>
-          <View class="flex-row items-center gap-1">
-            <Button testID="library-new-artifact" icon="add" disabled={act.busy()} onPress={() => void createNewArtifact("docs")}>
-              {t("web.library.newArtifact")}
-            </Button>
-            <MoreMenu icon="choose" label={t("web.artifact.types.pick")} testid="new-artifact-type" items={newArtifactItems()} />
-          </View>
-          <Button testID="library-make" tone="primary" icon="generate" onPress={() => setSearch({ make: "image" })}>
-            {t("web.library.make")}
-          </Button>
-        </View>
+        </If>
+        <Button testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
+          {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
+        </Button>
+      </View>
 
-        <View class="min-h-0 min-w-0 flex-1 flex-row">
-          <Scroll testID="library-grid" class="min-h-0 flex-1" contentClass="gap-4 p-4">
-            <If
-              when={!empty()}
-              else={
-                <Empty
-                  icon="media"
-                  testid="library-empty"
-                  action={
-                    <View class="items-center gap-3">
-                      <Text class="max-w-96 text-center text-sm text-muted">{t("web.library.emptyHow")}</Text>
-                      <View class="flex-row justify-center gap-2">
-                        <Button icon="upload" onPress={() => void pickFiles()}>
-                          {t("web.library.upload")}
-                        </Button>
-                        <Button icon="add" onPress={() => void createNewArtifact("docs")}>
-                          {t("web.library.newArtifact")}
-                        </Button>
-                        <Button tone="primary" icon="generate" onPress={() => setSearch({ make: "image" })}>
-                          {t("web.library.make")}
-                        </Button>
-                      </View>
+      <View class="min-h-0 min-w-0 flex-1 flex-row">
+        <Scroll testID="library-grid" class="min-h-0 flex-1" contentClass="gap-5 p-4">
+          <If
+            when={!empty()}
+            else={
+              <Empty
+                icon="media"
+                testid="library-empty"
+                action={
+                  <View class="items-center gap-3">
+                    <Text class="max-w-96 text-center text-sm text-muted">{t("web.library.emptyHow")}</Text>
+                    <View class="flex-row justify-center gap-2">
+                      <Button icon="upload" onPress={() => void pickFiles()}>
+                        {t("web.library.upload")}
+                      </Button>
+                      <Button tone="primary" icon="add" onPress={() => openTemplatePicker()}>
+                        {t("web.library.content.new")}
+                      </Button>
+                      <Button icon="generate" onPress={() => setSearch({ make: "image" })}>
+                        {t("web.library.make")}
+                      </Button>
                     </View>
-                  }
-                >
-                  {t("web.library.empty")}
-                </Empty>
-              }
-            >
-              <If when={activeMediaCount() > 0 && working().length > 0}>
-                <MakingTiles jobs={working()} width={inner()} height={tile()} label={(job) => t(`web.library.job.${job.kind}`)} />
+                  </View>
+                }
+              >
+                {t("web.library.empty")}
+              </Empty>
+            }
+          >
+            <If when={showsMediaInBucket(bucket()) && !pinnedOnly() && activeMediaCount() > 0 && working().length > 0}>
+              <MakingTiles jobs={working()} width={inner()} height={tile()} label={(job) => t(`web.library.job.${job.kind}`)} />
+            </If>
+            <If when={!nothingShown()} else={<Quiet>{t("web.library.nothingShown")}</Quiet>}>
+              <If when={visibleNotes().length > 0}>
+                <View class="gap-2.5">
+                  <If when={sectionCount() > 1}>
+                    <View class="flex-row items-center gap-1.5">
+                      <Text class="text-xs font-semibold text-muted">{t("web.library.content.notes")}</Text>
+                      <CountPill count={visibleNotes().length} hoverBright />
+                    </View>
+                  </If>
+                  <NoteTiles
+                    notes={visibleNotes()}
+                    onOpen={(slug) => openNote(slug)}
+                    isPinned={(slug) => isPinned(`note:${slug}`)}
+                    onTogglePin={(slug) => handleTogglePin(`note:${slug}`)}
+                  />
+                </View>
               </If>
-              <If when={!nothingShown()} else={<Quiet>{t("web.library.nothingShown")}</Quiet>}>
-                <If when={visibleArtifacts().length > 0}>
-                  <View class="gap-2.5">
-                    <If when={list().length > 0}>
-                      <View class="flex-row items-center gap-1.5">
-                        <Text class="text-xs font-semibold text-muted">{t("web.library.rail.artifacts")}</Text>
-                        <CountPill count={visibleArtifacts().length} hoverBright />
-                      </View>
-                    </If>
-                    <ArtifactTiles
-                      artifacts={visibleArtifacts()}
-                      selectedId={pickedArtifact()}
-                      onSelect={(id) => pickArtifact(id)}
-                      onOpen={(id) => openArtifact(id)}
-                    />
-                  </View>
-                </If>
-                <If when={list().length > 0}>
-                  <View class="gap-2.5">
-                    <If when={visibleArtifacts().length > 0}>
-                      <View class="flex-row items-center gap-1.5">
-                        <Text class="text-xs font-semibold text-muted">{t("web.library.rail.kind")}</Text>
-                        <CountPill count={list().length} hoverBright />
-                      </View>
-                    </If>
-                    <Tiles
-                      items={list()}
-                      rows={rows()}
-                      picked={picked()}
-                      active={active()}
-                      seen={(id) => seen().get(id)}
-                      onSeen={(id, s) => {
-                        const was = seen();
-                        const had = was.get(id);
-                        if (had !== undefined && knows({ had, learnt: s })) return;
-                        const next = new Map(was);
-                        next.set(id, { ...had, ...s });
-                        seen.set(next);
-                      }}
-                      onPick={(id, how) => pick(id, how)}
-                      onLook={(id) => look(id)}
-                    />
-                  </View>
-                </If>
+              <If when={visibleArtifacts().length > 0}>
+                <View class="gap-2.5">
+                  <If when={sectionCount() > 1}>
+                    <View class="flex-row items-center gap-1.5">
+                      <Text class="text-xs font-semibold text-muted">{t("web.library.content.artifacts")}</Text>
+                      <CountPill count={visibleArtifacts().length} hoverBright />
+                    </View>
+                  </If>
+                  <ArtifactTiles
+                    artifacts={visibleArtifacts()}
+                    onOpen={(id) => openArtifact(id)}
+                    isPinned={(id) => isPinned(`artifact:${id}`)}
+                    onTogglePin={(id) => handleTogglePin(`artifact:${id}`)}
+                  />
+                </View>
+              </If>
+              <If when={visibleMedia().length > 0}>
+                <View class="gap-2.5">
+                  <If when={sectionCount() > 1}>
+                    <View class="flex-row items-center gap-1.5">
+                      <Text class="text-xs font-semibold text-muted">{t("web.library.content.media")}</Text>
+                      <CountPill count={visibleMedia().length} hoverBright />
+                    </View>
+                  </If>
+                  <Tiles
+                    items={visibleMedia()}
+                    rows={rows()}
+                    picked={picked()}
+                    active={active()}
+                    isPinned={(id) => isPinned(`media:${id}`)}
+                    seen={(id) => seen().get(id)}
+                    onSeen={(id, s) => {
+                      const was = seen();
+                      const had = was.get(id);
+                      if (had !== undefined && knows({ had, learnt: s })) return;
+                      const next = new Map(was);
+                      next.set(id, { ...had, ...s });
+                      seen.set(next);
+                    }}
+                    onPick={(id, how) => pick(id, how)}
+                    onLook={(id) => look(id)}
+                  />
+                </View>
               </If>
             </If>
-          </Scroll>
-
-          <If when={inspectorOpen()}>
-            <Inspector
-              items={chosen()}
-              artifact={chosenArtifact()}
-              seen={chosen().length === 1 ? seen().get(chosen()[0]?.attachment.id ?? "") : undefined}
-              understood={chosen().length === 1 ? understoodText(chosen()[0]?.attachment.id ?? "")(jobs()) : undefined}
-              names={names}
-              asking={asking()}
-              act={{
-                channels: core()?.chat?.channels ?? [],
-                send: (channel) => void send(channel),
-                understand: () => setSearch({ understand: chosen()[0]?.attachment.id }),
-                look: () => look(chosen()[0]?.attachment.id),
-                ask: () => selection.set(askRemove(untracked(selection))),
-                remove: () => void remove(),
-                keep: () => selection.set(cancelRemove(untracked(selection))),
-                clear: () => selection.set(clearSelection()),
-                openArtifact,
-                removeArtifact: (id) => void removeArtifact(id),
-              }}
-            />
           </If>
-        </View>
+        </Scroll>
+
+        <If when={inspectorOpen()}>
+          <Inspector
+            items={chosen()}
+            pinned={chosen().length === 1 && isPinned(`media:${chosen()[0]?.attachment.id ?? ""}`)}
+            seen={chosen().length === 1 ? seen().get(chosen()[0]?.attachment.id ?? "") : undefined}
+            understood={chosen().length === 1 ? understoodText(chosen()[0]?.attachment.id ?? "")(jobs()) : undefined}
+            names={names}
+            asking={asking()}
+            act={{
+              channels: core()?.chat?.channels ?? [],
+              send: (channel) => void send(channel),
+              understand: () => setSearch({ understand: chosen()[0]?.attachment.id }),
+              look: () => look(chosen()[0]?.attachment.id),
+              togglePin: (id) => handleTogglePin(`media:${id}`),
+              ask: () => selection.set(askRemove(untracked(selection))),
+              remove: () => void remove(),
+              keep: () => selection.set(cancelRemove(untracked(selection))),
+              clear: () => selection.set(clearSelection()),
+            }}
+          />
+        </If>
       </View>
 
       <If when={dragging()}>

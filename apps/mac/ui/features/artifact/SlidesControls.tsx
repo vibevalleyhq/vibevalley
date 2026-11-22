@@ -62,7 +62,7 @@ export function SlidesControls(props: Controls) {
                     accessibilityLabel={t("web.artifact.slides.slide", { at: i() + 1, title: title(i()) })}
                     accessibilityState={{ selected: selected() }}
                     onPress={() => goto(i())}
-                    class={`relative h-18 w-32 shrink-0 overflow-hidden rounded-md border bg-side transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                    class={`relative h-18 w-32 shrink-0 overflow-hidden rounded-md border bg-side focus-visible:outline-2 focus-visible:outline-focus ${
                       selected() ? "border-accent shadow-raise" : "border-line hover:border-faint"
                     }`}
                   >

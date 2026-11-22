@@ -377,7 +377,7 @@ export function DesignSystemView(props: StoreViewerProps) {
                     testID="ds-component-item"
                     accessibilityState={{ selected: selected() }}
                     onPress={() => selectedComponent.set(comp().id)}
-                    class={`relative h-7 justify-center rounded-md px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                    class={`relative h-7 justify-center rounded-md px-2.5 focus-visible:outline-2 focus-visible:outline-focus ${
                       selected() ? "bg-selected" : "hover:bg-hover"
                     }`}
                   >

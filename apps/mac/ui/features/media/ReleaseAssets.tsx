@@ -7,6 +7,7 @@ import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
 import { Icon } from "../../design/Icon";
+import { motionClass } from "../../design/motion";
 import { CountPill, Dot } from "../../design/Tag";
 import { api } from "../../infra/api";
 import { Refusal } from "./JobFacts";
@@ -41,10 +42,10 @@ export function ReleaseAssets(props: { id: string }) {
               role="button"
               accessibilityState={{ expanded: open() }}
               onPress={() => open.set(!open())}
-              class="flex-row items-center gap-2 rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover"
+              class="flex-row items-center gap-2 rounded-sm px-1 py-0.5 hover:bg-hover"
             >
               <View
-                class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+                class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
                 style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
               >
                 <Icon name="expand" size={10} tone="muted" />

@@ -7,207 +7,126 @@ import {
   type LibraryFileKind,
   type LibraryItem,
   type LibraryOrigin,
-  type LibraryOriginKind,
   type LibrarySort,
   type MediaJob,
   type MediaSummary,
   type MediaUnderstandingJob,
+  type PkmPageSummary,
   userId,
 } from "@vibevalley/protocol";
 
-import { spelled } from "../../infra/base/search";
+export type SourceFilter = "all" | "agent" | "user";
+export const sourceFilters: readonly SourceFilter[] = ["all", "agent", "user"];
 
-export type KindFilter = LibraryFileKind | "all";
-
-export type ArtifactKindFilter = "all" | "canvas" | "slides" | "dashboard" | "whiteboard" | "page";
-
-export const artifactFilterKinds: readonly Exclude<ArtifactKindFilter, "all">[] = ["canvas", "slides", "dashboard", "whiteboard", "page"];
-
-export type Where =
-  | { readonly by: "all" }
-  | { readonly by: "origin"; readonly origin: LibraryOriginKind }
-  | { readonly by: "channel"; readonly channel: string }
-  | { readonly by: "agent"; readonly agent: string };
-
-export const whereKey = (where: Where): string => {
-  switch (where.by) {
-    case "all":
-      return "all";
-    case "origin":
-      return where.origin;
-    case "channel":
-      return `channel:${where.channel}`;
-    case "agent":
-      return `agent:${where.agent}`;
-  }
-};
+export type ArtifactTypeFilter = ArtifactType | "html";
 
 export const kindOf = (type: string): LibraryFileKind =>
   type.startsWith("image/") ? "image" : type.startsWith("audio/") ? "audio" : type.startsWith("video/") ? "video" : "other";
 
-const channelOf = (origin: LibraryOrigin) => (origin.kind === "uploaded" ? origin.channel : undefined);
-const agentOf = (origin: LibraryOrigin) => (origin.kind === "fetched" ? origin.agent : undefined);
-
-const pushUnique = (list: string[], value: string | undefined) => {
-  if (value !== undefined && !list.includes(value)) list.push(value);
-};
-
-const isIn = (where: Where) => (item: LibraryItem) => {
-  switch (where.by) {
+const isMediaFromSource = (item: LibraryItem, source: SourceFilter): boolean => {
+  switch (source) {
     case "all":
       return true;
-    case "origin":
-      return item.origin.kind === where.origin;
-    case "channel":
-      return channelOf(item.origin) === where.channel;
     case "agent":
-      return agentOf(item.origin) === where.agent;
+      return item.origin.kind === "generated" || item.origin.kind === "fetched";
+    case "user":
+      return item.origin.kind === "uploaded";
   }
 };
 
-const artifactAgentOf = (a: Artifact): string | undefined => (a.by && a.by !== userId ? a.by : undefined);
-
-const isArtifactIn = (where: Where) => (a: Artifact) => {
-  const agent = artifactAgentOf(a);
-  switch (where.by) {
+const isArtifactFromSource = (artifact: Artifact, source: SourceFilter): boolean => {
+  switch (source) {
     case "all":
       return true;
-    case "origin":
-      return where.origin === "generated" ? agent !== undefined : where.origin === "uploaded" ? agent === undefined : false;
-    case "channel":
-      return a.channel === where.channel;
     case "agent":
-      return agent === where.agent;
+      return artifact.by !== userId;
+    case "user":
+      return artifact.by === userId;
   }
 };
 
-const artifactMatchesSearch = (a: Artifact, search: string): boolean => {
-  const q = search.trim().toLowerCase();
-  return q === "" || spelled(a.title, q);
+const isNoteFromSource = (source: SourceFilter): boolean => {
+  switch (source) {
+    case "all":
+    case "user":
+      return true;
+    case "agent":
+      return false;
+  }
 };
 
-/** Maps PR #255's library deliverable facets onto PR #257's ArtifactType and legacy ArtifactDisplay. */
-const artifactMatchesKind = (
+function resolvedArtifactType(a: {
+  readonly body: ArtifactBody;
+  readonly display?: ArtifactDisplay | undefined;
+  readonly artifactType?: ArtifactType | undefined;
+}): ArtifactTypeFilter {
+  if (a.artifactType !== undefined) return a.artifactType;
+  switch (a.body) {
+    case "blocks":
+    case "store":
+      return "docs";
+    case "html":
+      if (a.display === "slides") return "slides";
+      if (a.display === "motion") return "motion";
+      return "html";
+  }
+}
+
+export const artifactMatchesType = (
   a: { readonly body: ArtifactBody; readonly display?: ArtifactDisplay | undefined; readonly artifactType?: ArtifactType | undefined },
-  kind: ArtifactKindFilter,
-): boolean => {
-  switch (kind) {
-    case "all":
-      return true;
-    case "canvas":
-      return a.artifactType === "design" || a.artifactType === "design-system";
-    case "slides":
-      return a.artifactType === "slides" || (a.body === "html" && a.display === "slides");
-    case "dashboard":
-      return a.artifactType === "dashboard";
-    case "whiteboard":
-      return a.artifactType === "whiteboard";
-    case "page":
-      return (
-        a.artifactType === "docs" ||
-        a.artifactType === "motion" ||
-        (a.artifactType === undefined && (a.body === "blocks" || (a.body === "html" && ((a.display ?? "page") === "page" || a.display === "motion"))))
-      );
-  }
-};
+  type: ArtifactTypeFilter | undefined,
+): boolean => type === undefined || resolvedArtifactType(a) === type;
 
-const isKind = (kind: KindFilter) => (item: LibraryItem) => kind === "all" || kindOf(item.attachment.type) === kind;
-
-export const shown = (given: { readonly items: readonly LibraryItem[]; readonly where: Where; readonly kind: KindFilter }): LibraryItem[] =>
-  given.items.filter((item) => isIn(given.where)(item) && isKind(given.kind)(item));
-
-export const shownArtifacts = (
-  all: readonly Artifact[],
+export const shownNotes = (
+  pages: readonly PkmPageSummary[],
   filter: {
-    readonly where?: Where | undefined;
-    readonly artifactKind?: ArtifactKindFilter | undefined;
-    readonly search: string;
+    readonly source: SourceFilter;
     readonly sort: LibrarySort;
+    readonly pinnedOnly?: boolean | undefined;
+    readonly pinned?: ReadonlySet<string> | undefined;
   },
-): Artifact[] => {
-  const kind = filter.artifactKind ?? "all";
-  const inWhere = isArtifactIn(filter.where ?? { by: "all" });
-  const filtered = all.filter((a) => inWhere(a) && artifactMatchesKind(a, kind) && artifactMatchesSearch(a, filter.search));
+): PkmPageSummary[] => {
+  if (!isNoteFromSource(filter.source)) return [];
+  const filtered = filter.pinnedOnly === true ? pages.filter((p) => filter.pinned?.has(`note:${p.slug}`) === true) : [...pages];
   if (filter.sort === "name") return filtered.toSorted((a, b) => a.title.localeCompare(b.title));
   return filtered.toSorted((a, b) => b.updated - a.updated);
 };
 
-export interface ArtifactCounts {
-  readonly all: number;
-  readonly byKind: Record<Exclude<ArtifactKindFilter, "all">, number>;
-}
-
-export const artifactCountsOf = (
+export const shownArtifacts = (
   all: readonly Artifact[],
-  filter?: { readonly where?: Where | undefined; readonly search?: string | undefined },
-): ArtifactCounts => {
-  const inWhere = isArtifactIn(filter?.where ?? { by: "all" });
-  const q = filter?.search ?? "";
-  const scoped = all.filter((a) => inWhere(a) && artifactMatchesSearch(a, q));
-  return {
-    all: scoped.length,
-    byKind: {
-      canvas: scoped.filter((a) => artifactMatchesKind(a, "canvas")).length,
-      slides: scoped.filter((a) => artifactMatchesKind(a, "slides")).length,
-      dashboard: scoped.filter((a) => artifactMatchesKind(a, "dashboard")).length,
-      whiteboard: scoped.filter((a) => artifactMatchesKind(a, "whiteboard")).length,
-      page: scoped.filter((a) => artifactMatchesKind(a, "page")).length,
-    },
-  };
+  filter: {
+    readonly source: SourceFilter;
+    readonly artifactType?: ArtifactTypeFilter | undefined;
+    readonly sort: LibrarySort;
+    readonly pinnedOnly?: boolean | undefined;
+    readonly pinned?: ReadonlySet<string> | undefined;
+  },
+): Artifact[] => {
+  const filtered = all.filter(
+    (a) =>
+      isArtifactFromSource(a, filter.source) &&
+      artifactMatchesType(a, filter.artifactType) &&
+      (filter.pinnedOnly !== true || filter.pinned?.has(`artifact:${a.id}`) === true),
+  );
+  if (filter.sort === "name") return filtered.toSorted((a, b) => a.title.localeCompare(b.title));
+  return filtered.toSorted((a, b) => b.updated - a.updated);
 };
 
-export interface Counts {
-  readonly where: ReadonlyMap<string, number>;
-  readonly kind: ReadonlyMap<KindFilter, number>;
-  readonly channels: readonly string[];
-  readonly agents: readonly string[];
-}
-
-/** Cross-filtered facet counts: each group applies the other group's active filter. */
-export const countsOf = (given: {
-  readonly items: readonly LibraryItem[];
-  readonly artifacts?: readonly Artifact[] | undefined;
-  readonly where: Where;
-  readonly kind: KindFilter;
-  readonly artifactKind?: ArtifactKindFilter | undefined;
-  readonly search?: string | undefined;
-}): Counts => {
-  const { items, where, kind, artifactKind } = given;
-  const search = given.search ?? "";
-  const byWhere = new Map<string, number>();
-  const byKind = new Map<KindFilter, number>();
-  const channels: string[] = [];
-  const agents: string[] = [];
-  const bump = <K>(m: Map<K, number>, k: K) => m.set(k, (m.get(k) ?? 0) + 1);
-  const recordWhere = (origin: LibraryOriginKind, channel: string | undefined, agent: string | undefined) => {
-    bump(byWhere, "all");
-    bump(byWhere, origin);
-    if (channel !== undefined) bump(byWhere, `channel:${channel}`);
-    if (agent !== undefined) bump(byWhere, `agent:${agent}`);
-  };
-  for (const item of items) {
-    const channel = channelOf(item.origin);
-    const agent = agentOf(item.origin);
-    pushUnique(channels, channel);
-    pushUnique(agents, agent);
-    if (artifactKind === undefined && isKind(kind)(item)) recordWhere(item.origin.kind, channel, agent);
-    if (isIn(where)(item)) {
-      bump(byKind, "all");
-      bump(byKind, kindOf(item.attachment.type));
-    }
-  }
-  const inWhere = isArtifactIn(where);
-  for (const artifact of given.artifacts ?? []) {
-    if (!artifactMatchesSearch(artifact, search)) continue;
-    const agent = artifactAgentOf(artifact);
-    pushUnique(channels, artifact.channel);
-    pushUnique(agents, agent);
-    const matchesRight = artifactKind !== undefined ? artifactMatchesKind(artifact, artifactKind) : kind === "all";
-    if (matchesRight) recordWhere(agent !== undefined ? "generated" : "uploaded", artifact.channel, agent);
-    if (inWhere(artifact)) bump(byKind, "all");
-  }
-  return { where: byWhere, kind: byKind, channels, agents };
-};
+export const shownMedia = (
+  items: readonly LibraryItem[],
+  filter: {
+    readonly source: SourceFilter;
+    readonly fileKind?: LibraryFileKind | undefined;
+    readonly pinnedOnly?: boolean | undefined;
+    readonly pinned?: ReadonlySet<string> | undefined;
+  },
+): LibraryItem[] =>
+  items.filter(
+    (item) =>
+      isMediaFromSource(item, filter.source) &&
+      (filter.fileKind === undefined || kindOf(item.attachment.type) === filter.fileKind) &&
+      (filter.pinnedOnly !== true || filter.pinned?.has(`media:${item.attachment.id}`) === true),
+  );
 
 /** Excludes understanding jobs, which produce no file; consumes Rust `MediaSummary.activeIds` when present. */
 export const making = (jobs: readonly MediaJob[], summary?: MediaSummary): MediaJob[] => {

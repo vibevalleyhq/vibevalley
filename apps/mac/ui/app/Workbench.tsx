@@ -8,6 +8,7 @@ import { AgentsRoute } from "../features/agent";
 import { ArtifactsPage, PresenterPage } from "../features/artifact";
 import { CatalogPage } from "../features/catalog";
 import { ChannelSidePane, ChatPage } from "../features/channel";
+import { ContentShell, safeLastContentPath } from "../features/content";
 import { Follow } from "../features/inbox";
 import { issueSearch } from "../features/issue/model/navigation";
 import { IssuesPage } from "../features/issue/views/IssuesPage";
@@ -146,10 +147,19 @@ const routes: readonly RouteDefinition[] = [
       page("/runtimes", "team", (rest) => <RuntimesPage rest={rest()} />),
       page("/repos", "workspace", (rest) => <ReposPage rest={rest()} />),
       page("/catalog", "catalog", (rest) => <CatalogPage rest={rest()} />),
-      { path: "/content", component: () => <Navigate href="/library" /> },
-      page("/library", "content", () => <LibraryPage />),
-      page("/artifacts", "content", (rest) => <ArtifactsPage rest={rest()} chat={(p) => <ChannelSidePane {...p} />} />),
-      page("/pkm", "content", (rest) => <PkmPage rest={rest()} />),
+      { path: "/content", component: () => <Navigate href={safeLastContentPath()} /> },
+      {
+        layout: () => (
+          <ContentShell>
+            <Outlet />
+          </ContentShell>
+        ),
+        children: [
+          page("/library", "content", () => <LibraryPage />),
+          page("/artifacts", "content", (rest) => <ArtifactsPage rest={rest()} chat={ChannelSidePane} />),
+          page("/pkm", "content", (rest) => <PkmPage rest={rest()} />),
+        ],
+      },
     ],
   },
 ];

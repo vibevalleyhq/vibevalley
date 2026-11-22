@@ -2,15 +2,19 @@ import { colorScheme, effect, host, keymap, Scroll, Text, View, windowSize, type
 
 import { t } from "@vibevalley/i18n";
 
+import { Button } from "../design/Button";
 import { OrchestratorFace } from "../design/domain/Face";
 import { Icon } from "../design/Icon";
+import { IconButton } from "../design/IconButton";
 import type { IconName } from "../design/icons";
+import { motionClass } from "../design/motion";
 import { usePixelDir } from "../design/pixel/atlas";
 import { ShortcutSheet } from "../design/ShortcutSheet";
 import { Tabs } from "../design/Tabs";
 import { Bubble, Hint } from "../design/Tip";
 import { mix } from "../design/tone";
 import { QuickSwitcher, switcher } from "../features/channel";
+import { contentSidebarOpen, openContentSearch, openTemplatePicker, safeLastContentPath } from "../features/content";
 import { waitingOnUser } from "../features/inbox";
 import { NotesSearch } from "../features/pkm";
 import { Keyed, variant } from "../infra/base/dom";
@@ -41,7 +45,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       accessibilityLabel={props.label}
       tooltip={<Bubble text={props.label} placement="right" />}
       class={[
-        "relative items-center justify-center gap-0.5 rounded-lg px-0.5 transition duration-120 ease-out",
+        "relative items-center justify-center gap-0.5 rounded-lg px-0.5",
         hero() ? (small() ? "h-12 w-12" : compactTall() ? "h-15.5 w-16" : "h-16 w-16") : small() ? "h-11 w-11" : compactTall() ? "h-11.5 w-16" : "h-12.5 w-16",
         current() ? "" : "hover:bg-hover",
       ].join(" ")}
@@ -152,7 +156,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
                 </If>
                 <Each of={places.filter((p) => p.group === group() && p.id !== "settings")}>
                   {(p) => {
-                    const to = () => (p().id === "workspace" && globalShell ? "/workspace" : p().path);
+                    const to = () => (p().id === "workspace" && globalShell ? "/workspace" : p().id === "content" ? safeLastContentPath() : p().path);
                     const isCurrent = () => (p().id === "workspace" ? location().pathname === "/workspace" || p() === props.here : p() === props.here);
                     return (
                       <Slot
@@ -261,12 +265,6 @@ function Desk(props: { place?: Place | undefined }) {
     const bg = view().haloBg();
     return bg !== undefined ? { backgroundColor: bg } : undefined;
   };
-  const contentTab = () => {
-    const p = location().pathname;
-    if (p.startsWith("/artifacts")) return "content-artifacts";
-    if (p.startsWith("/pkm")) return "content-pkm";
-    return "content-library";
-  };
   const teamTab = () => {
     const p = location().pathname;
     if (p.startsWith("/runtimes")) return "team-runtimes";
@@ -275,31 +273,29 @@ function Desk(props: { place?: Place | undefined }) {
     return "team-roles";
   };
   return (
-    <View testID="desk" class="min-h-16.5 shrink-0 flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-2">
+    <View testID="desk" class="min-h-12 shrink-0 flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-line px-4 py-1.5">
       <If when={props.place} else={<View class="flex-1" />}>
         {(place) => (
           <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
-            <View class="min-w-0 flex-row items-center gap-2.5">
-              <Keyed key={place().icon}>{() => <Icon name={place().icon} size={20} />}</Keyed>
+            <View class="min-w-0 flex-row items-center gap-2">
+              <If when={place().id === "content"}>
+                <IconButton
+                  icon={contentSidebarOpen.get() ? "previous" : "next"}
+                  size={14}
+                  label={t("web.library.content.sidebarToggle")}
+                  testid="content-sidebar-toggle"
+                  pressed={contentSidebarOpen.get()}
+                  onClick={() => contentSidebarOpen.update((open) => !open)}
+                />
+              </If>
+              <Keyed key={place().icon}>{() => <Icon name={place().icon} size={18} />}</Keyed>
               <View class="min-w-0 flex-row items-center gap-1.5">
-                <Text role="header" class="truncate text-lg font-semibold text-ink">
+                <Text role="header" class="truncate text-base font-semibold text-ink">
                   {place().label}
                 </Text>
                 <Hint text={place().hint} />
               </View>
             </View>
-            <If when={place().id === "content"}>
-              <Tabs
-                look="pills"
-                label={place().label}
-                value={contentTab()}
-                items={[
-                  { value: "content-library", label: t("web.base.tab.library"), icon: "media", href: "/library" },
-                  { value: "content-artifacts", label: t("web.base.tab.artifacts"), icon: "artifacts", href: "/artifacts" },
-                  { value: "content-pkm", label: t("web.base.tab.pkm"), icon: "notes", href: "/pkm" },
-                ]}
-              />
-            </If>
             <If when={place().id === "team"}>
               <Tabs
                 look="pills"
@@ -316,20 +312,30 @@ function Desk(props: { place?: Place | undefined }) {
           </View>
         )}
       </If>
-      <A
-        href="/runs"
-        accessibilityLabel={view().label}
-        testID="desk-status"
-        tooltip={<Bubble text={t("web.base.runsHint")} placement="bottom" />}
-        class={`h-7 shrink-0 flex-row items-center gap-2 rounded-full border px-3 transition duration-120 ease-out active:translate-y-px ${view().pillClass(onRuns())}`}
-        style={view().pillStyle(onRuns())}
-        hoverStyle={view().pillHoverStyle(onRuns())}
-      >
-        <View class="size-3.5 shrink-0 items-center justify-center rounded-full" style={haloStyle()}>
-          <View class={`size-2 rounded-full ${view().dotClass}`} />
-        </View>
-        <Text class={`text-xs ${view().textClass}`}>{view().label}</Text>
-      </A>
+      <View class="shrink-0 flex-row items-center gap-2">
+        <If when={props.place?.id === "content"}>
+          <View class="flex-row items-center gap-1.5">
+            <IconButton icon="search" size={14} label={t("web.library.content.searchAll")} testid="desk-content-search" onClick={() => openContentSearch()} />
+            <Button tone="primary" icon="add" testID="desk-content-new" onPress={() => openTemplatePicker()}>
+              {t("web.library.content.new")}
+            </Button>
+          </View>
+        </If>
+        <A
+          href="/runs"
+          accessibilityLabel={view().label}
+          testID="desk-status"
+          tooltip={<Bubble text={t("web.base.runsHint")} placement="bottom" />}
+          class={`h-7 shrink-0 flex-row items-center gap-2 rounded-full border px-3 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${view().pillClass(onRuns())}`}
+          style={view().pillStyle(onRuns())}
+          hoverStyle={view().pillHoverStyle(onRuns())}
+        >
+          <View class="size-3.5 shrink-0 items-center justify-center rounded-full" style={haloStyle()}>
+            <View class={`size-2 rounded-full ${view().dotClass}`} />
+          </View>
+          <Text class={`text-xs ${view().textClass}`}>{view().label}</Text>
+        </A>
+      </View>
     </View>
   );
 }

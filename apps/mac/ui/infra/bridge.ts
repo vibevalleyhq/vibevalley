@@ -12,7 +12,7 @@
 // act({ type, ... }) for intent back.
 import { host, signal, type Signal } from "nsh";
 
-import type { CommandLineState } from "@vibevalley/protocol/host";
+import type { CommandLineState, MotionChoice } from "@vibevalley/protocol/host";
 
 export type Next = { say: string; run?: readonly string[] };
 export type ErrorDetail = { next?: readonly Next[]; settings?: string };
@@ -44,6 +44,32 @@ function isSubMessage(value: unknown): value is { event?: unknown; end?: Envelop
   return typeof value === "object" && value !== null;
 }
 
+/**
+ * Registers a `host.on` listener outside any active nsh reactive owner.
+ *
+ * nsh attaches `host.on` cleanup to the current component or `effect` owner
+ * (`undo_with_owner`), which would silently drop RPC replies, frame streams,
+ * or live subscriptions whenever that transient owner re-runs or disposes.
+ * Deferring to a microtask runs unowned; nsh's HostInbox buffers any event
+ * sent before the listener attaches and delivers it once registered.
+ */
+function listenDetached(event: string, listener: (payload: unknown) => void): () => void {
+  let active = true;
+  let off: (() => void) | undefined;
+  queueMicrotask(() => {
+    if (!active) return;
+    off = host.on(event, (payload) => {
+      if (active) listener(payload);
+    });
+  });
+  return () => {
+    if (!active) return;
+    active = false;
+    off?.();
+    off = undefined;
+  };
+}
+
 /** One endpoint by name. Never rejects: failures are envelopes with a non-zero bizCode. */
 export function call<T = unknown>(op: string, payload: unknown = null, options?: { timeoutMs?: number }): Promise<Envelope<T>> {
   return new Promise((resolve) => {
@@ -53,7 +79,7 @@ export function call<T = unknown>(op: string, payload: unknown = null, options?:
     }
     const id = nextId();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const stop = host.on(`reply:${id}`, (envelope) => {
+    const stop = listenDetached(`reply:${id}`, (envelope) => {
       stop();
       if (timer !== undefined) clearTimeout(timer);
       if (isEnvelope(envelope)) {
@@ -75,46 +101,54 @@ export function call<T = unknown>(op: string, payload: unknown = null, options?:
 
 export type FrameEnvelope<T> = { rev: number; data: T };
 
-const topics = new Map<string, Signal<FrameEnvelope<unknown> | null>>();
+interface TopicEntry {
+  readonly store: Signal<FrameEnvelope<unknown> | null>;
+  readonly listeners: Set<(data: unknown) => void>;
+}
+
+const topics = new Map<string, TopicEntry>();
 /** Topics the server streams; the view asks for them once, on first use. */
 const serverTopics = new Set(["state", "live"]);
 
-function topic(name: string): Signal<FrameEnvelope<unknown> | null> {
-  let s = topics.get(name);
-  if (s) return s;
+function topic(name: string): TopicEntry {
+  let entry = topics.get(name);
+  if (entry) return entry;
   const store = signal<FrameEnvelope<unknown> | null>(null);
-  topics.set(name, store);
-  s = store;
-  host.on(`frame:${name}`, (payload) => {
+  const listeners = new Set<(data: unknown) => void>();
+  entry = { store, listeners };
+  topics.set(name, entry);
+  listenDetached(`frame:${name}`, (payload) => {
     if (!isFrameEnvelope(payload)) return;
     store.set(payload);
     // A state receipt releases the next workbench snapshot. Other non-live receipts feed the debug dump.
     if (name !== "live") host.post("action", { type: "applied", topic: name, rev: payload.rev });
+    for (const listener of [...listeners]) listener(payload.data);
   });
   if (serverTopics.has(name) && host.available()) host.post("action", { type: "watch", topic: name });
-  return s;
+  return entry;
 }
 
 /** The latest frame of `name` (reactive), `null` until the first one. `frame("state")` is the StateFrame. */
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- each topic pushes its own contract shape from Rust
 export function frame<T = unknown>(name: string): () => T | null {
-  const s = topic(name);
+  const { store } = topic(name);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Rust pushes each topic in its own contract shape
-  return () => (s()?.data as T | undefined) ?? null;
+  return () => (store()?.data as T | undefined) ?? null;
 }
 
 /** The frame's revision (reactive): goes up by one per frame this view received. */
 export function frameRev(name: string): () => number {
-  const s = topic(name);
-  return () => s()?.rev ?? 0;
+  const { store } = topic(name);
+  return () => store()?.rev ?? 0;
 }
 
 /** Subscribes to each incoming frame payload on `name` (validating the FrameEnvelope wrapper). */
 export function onFrame(name: string, listener: (data: unknown) => void): () => void {
-  topic(name);
-  return host.on(`frame:${name}`, (payload) => {
-    if (isFrameEnvelope(payload)) listener(payload.data);
-  });
+  const { listeners } = topic(name);
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /** Every LiveEvent from now on. Returns how to stop listening. */
@@ -127,8 +161,8 @@ export function onLive(listener: (event: unknown) => void): () => void {
 export function subscribe(name: string, payload: unknown, on: (event: unknown) => void, ended?: (why: Envelope | null) => void): () => void {
   const id = nextId();
   let open = true;
-  const off = host.on(`sub:${id}`, (message) => {
-    if (!isSubMessage(message)) return;
+  const off = listenDetached(`sub:${id}`, (message) => {
+    if (!open || !isSubMessage(message)) return;
     if ("end" in message) {
       open = false;
       off();
@@ -158,6 +192,7 @@ export const hostApi = {
       monoFonts?: string[];
       terminalFontSize?: number;
       uiFontSize?: number;
+      motion?: MotionChoice;
       capabilities: string[];
     }>("host.info"),
   updateState: () => call("host.updateState", null, { timeoutMs: 5_000 }),
@@ -170,6 +205,7 @@ export const hostApi = {
   locale: (locale: string) => call<void>("host.locale", locale),
   reveal: (path: string) => call<void>("host.reveal", path),
   theme: (theme: "light" | "dark" | "system") => call<void>("host.theme", theme),
+  motion: (choice: MotionChoice) => call<void>("host.motion", choice),
   opening: (opening: { phase: string; progress: number }) => call<void>("host.opening", opening),
   /** A terminal pane at `cwd` (a worktree, repo, session's or issue's directory), optionally running `command`. */
   openTerminal: (at: { cwd: string; title?: string; command?: string }) => call<{ terminalId: string }>("host.openTerminal", at),

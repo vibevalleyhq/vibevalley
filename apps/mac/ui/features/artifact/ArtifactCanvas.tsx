@@ -49,7 +49,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
             href={pageHref()}
             testID="artifact-canvas-page"
             tooltip={<Bubble text={t("web.artifact.canvas.openPage")} />}
-            class="group h-7 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+            class="group h-7 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
           >
             <Icon name="open" size={12} tone="muted" />
             <Text class="text-xs font-medium text-muted group-hover:text-ink">{t("web.artifact.canvas.openPage")}</Text>

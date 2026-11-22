@@ -189,7 +189,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
                     setSelectedId(ab().id);
                     setMode("focus");
                   }}
-                  class={`h-7 flex-row items-center rounded-md border px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                  class={`h-7 flex-row items-center rounded-md border px-2.5 focus-visible:outline-2 focus-visible:outline-focus ${
                     active() ? "border-accent bg-selected" : "border-line bg-page hover:border-faint hover:bg-hover"
                   }`}
                 >

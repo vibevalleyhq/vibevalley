@@ -1,16 +1,15 @@
 import { Clipboard, effect, keymap, Text, View } from "nsh";
 import { Input } from "nsh/base";
-import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { PkmBacklink, PkmComment, PkmPageSummary, PkmPageView, PkmSearchHit, PkmTier } from "@vibevalley/protocol";
+import type { PkmBacklink, PkmComment, PkmPageSummary, PkmPageView, PkmSearchHit } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
-import { Select } from "../../design/Field";
-import { IconButton } from "../../design/IconButton";
+import { Icon } from "../../design/Icon";
 import { Empty } from "../../design/layout";
 import { type MoreItem, MoreMenu } from "../../design/MoreMenu";
+import { motionClass, motionDuration, motionOff } from "../../design/motion";
 import { Dot, type DotTone } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
@@ -20,25 +19,16 @@ import { ready, useQueryClient } from "../../infra/query";
 import { Link, useRouter } from "../../infra/router";
 import { createSignal } from "../../infra/solid";
 import { useLatest } from "../../infra/state/atom";
-import { defineStored } from "../../infra/state/stored";
+import { isPinned, togglePinned } from "../content/navigation";
 import { Body } from "./Body";
-import { Calendar } from "./Calendar";
 import { daysUntil, dayKey, titleFor } from "./days";
-import { tierOrder, wordDiff } from "./outline";
+import { wordDiff } from "./outline";
 import { Outline } from "./OutlineView";
 import { pkmHref, refreshPkm as refreshQueries, usePkmPage } from "./vault";
 
-/** A tier as a group of pages (the sidebar's heads): Projects. */
-export const tierLabel = (tier: PkmTier) => t(`web.pkm.tier.${tier}`);
-/** A tier as where one page is: Project. */
-const tierOfOne = (tier: PkmTier) => t(`web.pkm.tierOne.${tier}`);
-
-const rail = defineStored("pkm.rail", z.boolean(), true);
-
 const titleFromSlug = (slug: string) => slug.replace(/__/gu, "/").replace(/-/gu, " ");
 
-/** compact: in the stream of days, the column alone, its title a link to the day's own page. */
-export function Opened(props: { slug: string; pages: readonly PkmPageSummary[]; point?: string | undefined; compact?: boolean }) {
+export function Opened(props: { slug: string; pages: readonly PkmPageSummary[]; point?: string | undefined }) {
   const [editing, setEditing] = createSignal(false);
   const found = usePkmPage(() => props.slug, editing);
   const notFound = () => found.status() === "error" && faultOf(found.error()).tag === "Missing";
@@ -47,21 +37,14 @@ export function Opened(props: { slug: string; pages: readonly PkmPageSummary[]; 
       when={ready(found, undefined)}
       else={
         <If when={found.status() === "error"}>
-          <If when={props.compact !== true && notFound()} else={<Empty icon="file">{t("web.pkm.gone")}</Empty>}>
+          <If when={notFound()} else={<Empty icon="file">{t("web.pkm.gone")}</Empty>}>
             <FreshPage slug={props.slug} pages={props.pages} />
           </If>
         </If>
       }
     >
       {(view) => (
-        <Shown
-          view={view()}
-          summary={props.pages.find((p) => p.slug === props.slug)}
-          pages={props.pages}
-          point={props.point}
-          compact={props.compact === true}
-          onEditing={setEditing}
-        />
+        <Shown view={view()} summary={props.pages.find((p) => p.slug === props.slug)} pages={props.pages} point={props.point} onEditing={setEditing} />
       )}
     </If>
   );
@@ -92,7 +75,7 @@ function FreshPage(props: { slug: string; pages: readonly PkmPageSummary[] }) {
     });
   };
   return (
-    <View testID="pkm-fresh" accessibilityLabel={props.slug} class="mx-auto w-full max-w-3xl min-w-0 gap-4 px-4 py-4">
+    <View testID="pkm-fresh" accessibilityLabel={props.slug} class="mx-auto w-full max-w-3xl min-w-0 gap-4 px-5 py-5">
       <View class="gap-2">
         <View class="flex-row items-center gap-2">
           <Text role="header" testID="pkm-title" class="min-w-0 flex-1 truncate text-xl font-semibold text-ink">
@@ -145,50 +128,28 @@ function Shown(props: {
   summary: PkmPageSummary | undefined;
   pages: readonly PkmPageSummary[];
   point: string | undefined;
-  compact: boolean;
   onEditing: (on: boolean) => void;
 }) {
   const page = () => props.view.page;
-  const outline = () => <Outline view={props.view} pages={props.pages} point={props.point} onEditing={props.onEditing} />;
+  const [commentsOpen, setCommentsOpen] = createSignal(false);
+  const hasComments = () => props.view.comments.length > 0;
   return (
-    <If
-      when={!props.compact}
-      else={
-        <View testID="pkm-day" accessibilityLabel={page().slug} class="gap-2">
-          <Link href={pkmHref(page().slug)} class="group self-start">
-            <Text role="header" class="text-lg font-semibold text-ink group-hover:underline">
-              {titleFor(page().title, props.summary?.day)}
-            </Text>
-          </Link>
-          {outline()}
+    <View testID="pkm-page" accessibilityLabel={page().slug} class="mx-auto w-full max-w-3xl min-w-0 gap-4 px-5 py-5">
+      <Header view={props.view} summary={props.summary} commentsOpen={commentsOpen()} onToggleComments={() => setCommentsOpen((open) => !open)} />
+      <If when={hasComments() && commentsOpen()}>
+        <View testID="pkm-comments-panel" class="rounded-lg border border-line bg-side p-3">
+          <Comments view={props.view} />
         </View>
-      }
-    >
-      <View testID="pkm-page" accessibilityLabel={page().slug} class="min-h-full xl:flex-row xl:items-stretch">
-        <View class="mx-auto w-full max-w-3xl min-w-0 gap-4 px-5 py-5 xl:flex-1">
-          <Header view={props.view} summary={props.summary} />
-          {outline()}
-          <View class="mt-4 border-t border-line pt-4">
-            <Backlinks view={props.view} pages={props.pages} />
-          </View>
-        </View>
-        <If when={rail.get()}>
-          <View
-            accessibilityLabel={t("web.pkm.rail.label")}
-            testID="pkm-rail"
-            class="mx-auto w-full max-w-3xl shrink-0 gap-5 border-t border-line bg-side px-4 py-4 xl:mx-0 xl:w-72 xl:border-t-0 xl:border-l"
-          >
-            <Calendar pages={props.pages} open={props.summary?.day} />
-            <Comments view={props.view} />
-            <Contents view={props.view} />
-          </View>
-        </If>
+      </If>
+      <Outline view={props.view} pages={props.pages} point={props.point} onEditing={props.onEditing} />
+      <View class="mt-4 border-t border-line pt-4">
+        <Backlinks view={props.view} pages={props.pages} />
       </View>
-    </If>
+    </View>
   );
 }
 
-function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined }) {
+function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined; commentsOpen: boolean; onToggleComments: () => void }) {
   const client = useQueryClient();
   const refreshPkm = () => refreshQueries(client);
   const router = useRouter();
@@ -225,15 +186,14 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
     if (!renaming()) return;
     return keymap.bind("escape", cancelRename, { when: "always" });
   });
-  const move = (tier: PkmTier) => {
-    const { slug, tier: was } = page();
-    if (tier === was) return undefined;
-    return act.run(async () => {
-      await api.pkm.page.move({ page: slug, tier });
-      toast(t("web.pkm.page.moved", { tier: tierOfOne(tier) }));
-      void refreshPkm();
-    });
+
+  const pinKey = () => `note:${page().slug}`;
+  const pinned = () => isPinned(pinKey());
+  const onTogglePin = () => {
+    const next = togglePinned(pinKey());
+    toast(next ? t("web.library.content.pinnedToast") : t("web.library.content.unpinnedToast"));
   };
+
   const exportIt = () => {
     const { slug } = page();
     return act.run(async () => {
@@ -262,12 +222,7 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
     { key: "undo", label: t("web.pkm.page.undo"), icon: "undo", onSelect: () => void undo() },
   ];
   return (
-    <View class="gap-2">
-      <View class="items-start lg:hidden">
-        <Button icon="back" onPress={() => router.navigate("/pkm")}>
-          {t("web.pkm.list.today")}
-        </Button>
-      </View>
+    <View class="gap-2 border-b border-line pb-3">
       <View class="flex-row items-center gap-2">
         <If
           when={renaming()}
@@ -284,7 +239,7 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
                 role="button"
                 tooltip={<Bubble text={t("web.pkm.page.rename")} />}
                 onPress={startRename}
-                class="-mx-1 min-w-0 flex-1 rounded-sm px-1 transition duration-120 ease-out hover:bg-hover"
+                class="-mx-1 min-w-0 flex-1 rounded-sm px-1 hover:bg-hover"
               >
                 <Text role="header" testID="pkm-title" class="truncate text-xl font-semibold text-ink">
                   {titleFor(page().title, props.summary?.day)}
@@ -304,23 +259,42 @@ function Header(props: { view: PkmPageView; summary: PkmPageSummary | undefined 
             class="-mx-1 min-w-0 flex-1 rounded-sm border border-focus bg-page px-1.5 text-xl font-semibold text-ink"
           />
         </If>
-        <Select
-          testid="pkm-tier-select"
-          label={t("web.pkm.page.tier")}
-          size="control"
-          value={page().tier}
-          options={tierOrder.map((tier) => ({ value: tier, label: tierOfOne(tier) }))}
-          onChange={(tier) => void move(tier)}
-        />
-        <IconButton
-          icon="thread"
-          label={rail.get() ? t("web.pkm.rail.hide") : t("web.pkm.rail.show")}
-          testid="pkm-rail-toggle"
-          pressed={rail.get()}
-          onClick={() => rail.update((open) => !open)}
-        />
+        <View
+          role="button"
+          testID="pkm-pin"
+          accessibilityLabel={pinned() ? t("web.library.content.unpin") : t("web.library.content.pin")}
+          accessibilityState={{ selected: pinned() }}
+          tooltip={<Bubble text={pinned() ? t("web.library.content.unpin") : t("web.library.content.pin")} />}
+          onPress={onTogglePin}
+          class={`size-7 shrink-0 items-center justify-center rounded-md ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus ${
+            pinned() ? "bg-selected" : "hover:bg-hover"
+          }`}
+        >
+          <Icon name="pin" size={16} tone={pinned() ? "wheat" : "muted"} />
+        </View>
+        <If when={props.view.comments.length > 0}>
+          <View
+            role="button"
+            testID="pkm-comments-toggle"
+            accessibilityLabel={t("web.pkm.comments.count", { n: props.view.comments.length })}
+            accessibilityState={{ expanded: props.commentsOpen }}
+            tooltip={<Bubble text={t("web.pkm.comments.count", { n: props.view.comments.length })} />}
+            onPress={() => props.onToggleComments()}
+            class={`h-7 shrink-0 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus ${
+              props.commentsOpen ? "bg-selected" : "hover:bg-hover"
+            }`}
+          >
+            <Icon name="thread" size={14} tone={props.commentsOpen ? "ink" : "muted"} />
+            <Text class={`font-mono text-xs tabular-nums ${props.commentsOpen ? "font-medium text-ink" : "text-muted"}`}>
+              {String(props.view.comments.length)}
+            </Text>
+          </View>
+        </If>
         <MoreMenu label={t("web.pkm.page.more")} testid="pkm-more" items={more()} />
       </View>
+      <Text testID="pkm-notes-hint" class="text-xs text-faint">
+        {t("web.library.content.notesHint")}
+      </Text>
       <Props view={props.view} />
       <If when={page().tldr}>
         <Text class="text-sm text-muted">{page().tldr}</Text>
@@ -403,12 +377,7 @@ function Props(props: { view: PkmPageView }) {
             )}
           </Each>
           <If when={rest().length > 0}>
-            <View
-              role="button"
-              testID="pkm-props-more"
-              onPress={() => setAll((a) => !a)}
-              class="group rounded-sm px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover"
-            >
+            <View role="button" testID="pkm-props-more" onPress={() => setAll((a) => !a)} class="group rounded-sm px-1.5 py-0.5 hover:bg-hover">
               <Text class="text-xs text-muted group-hover:text-ink">{all() ? t("web.pkm.props.fewer") : t("web.pkm.props.more", { n: rest().length })}</Text>
             </View>
           </If>
@@ -507,22 +476,42 @@ function Backlinks(props: { view: PkmPageView; pages: readonly PkmPageSummary[] 
     const b = props.view.backlinks;
     return b.projects.length + b.journals.length + b.areas.length + b.archives.length;
   };
+  const [open, setOpen] = createSignal(false);
   return (
     <View testID="pkm-backlinks" class="gap-2">
-      <Text role="header" class="text-xs font-semibold text-muted">
-        {t("web.pkm.backlinks.title", { n: count() })}
-      </Text>
-      <If when={count() > 0} else={<Text class="text-xs text-faint">{t("web.pkm.backlinks.none")}</Text>}>
-        <Each of={backlinkGroups.filter((g) => props.view.backlinks[g].length > 0)}>
-          {(g) => (
-            <View class="gap-0.5">
-              <Text class="text-2xs text-faint">{t(`web.pkm.backlinks.${g()}`)}</Text>
-              <Each of={props.view.backlinks[g()]} key={(l) => l.block}>
-                {(l) => <BacklinkRow link={l()} refs={props.view.transclusions} day={props.pages.find((p) => p.slug === l().page)?.day} />}
-              </Each>
-            </View>
-          )}
-        </Each>
+      <View
+        role="button"
+        testID="pkm-backlinks-toggle"
+        accessibilityState={{ expanded: open() }}
+        onPress={() => setOpen((was) => !was)}
+        class="group -mx-1.5 h-7 flex-row items-center gap-1.5 self-start rounded-md px-1.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+      >
+        <View
+          class="w-3.5 shrink-0 items-center justify-center"
+          style={{
+            transform: [{ rotate: open() ? "90deg" : "0deg" }],
+            ...(motionOff() ? {} : { transitionProperty: "transform", transitionDuration: motionDuration(120) }),
+          }}
+        >
+          <Icon name="expand" size={10} tone="muted" />
+        </View>
+        <Text role="header" class="text-xs font-semibold text-muted group-hover:text-ink">
+          {t("web.pkm.backlinks.title", { n: count() })}
+        </Text>
+      </View>
+      <If when={open()}>
+        <If when={count() > 0} else={<Text class="px-1 text-xs text-faint">{t("web.pkm.backlinks.none")}</Text>}>
+          <Each of={backlinkGroups.filter((g) => props.view.backlinks[g].length > 0)}>
+            {(g) => (
+              <View class="gap-0.5">
+                <Text class="text-2xs text-faint">{t(`web.pkm.backlinks.${g()}`)}</Text>
+                <Each of={props.view.backlinks[g()]} key={(l) => l.block}>
+                  {(l) => <BacklinkRow link={l()} refs={props.view.transclusions} day={props.pages.find((p) => p.slug === l().page)?.day} />}
+                </Each>
+              </View>
+            )}
+          </Each>
+        </If>
       </If>
     </View>
   );
@@ -539,33 +528,5 @@ function BacklinkRow(props: { link: PkmBacklink; refs: PkmPageView["transclusion
       </Link>
       <Body text={props.link.body} refs={props.refs} />
     </View>
-  );
-}
-
-function Contents(props: { view: PkmPageView }) {
-  const router = useRouter();
-  const tops = () => props.view.page.blocks.filter((b) => b.depth === 0 && b.body.trim() !== "");
-  return (
-    <If when={tops().length >= 3}>
-      <View testID="pkm-contents" class="gap-1">
-        <Text role="header" class="text-xs font-semibold text-muted">
-          {t("web.pkm.rail.contents")}
-        </Text>
-        <View class="gap-0.5">
-          <Each of={tops()} key={(b) => b.id}>
-            {(b) => (
-              <View
-                role="link"
-                onPress={() => router.navigate(pkmHref(props.view.page.slug, b().id), { replace: true })}
-                class="-mx-2 rounded-md px-2 py-1 transition duration-120 ease-out hover:bg-hover"
-              >
-                {/* A heading's #s come off: the list is one size. */}
-                <Body text={(b().body.split("\n")[0] ?? "").replace(/^#+\s*/u, "")} refs={props.view.transclusions} class="truncate text-xs text-muted" />
-              </View>
-            )}
-          </Each>
-        </View>
-      </View>
-    </If>
   );
 }

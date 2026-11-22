@@ -12,6 +12,7 @@ import { hexColor, swatches } from "../../design/domain/cast";
 import { AgentFace } from "../../design/domain/Face";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
+import { motionClass } from "../../design/motion";
 import { CountPill } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { tone } from "../../design/tone";
@@ -409,7 +410,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
         testID="artifact-author-bar"
         tooltip={<Bubble text={authorTip()} />}
         accessibilityLabel={r().writing ? t("web.artifact.blocks.writing", { who: writer() }) : undefined}
-        class={`mt-0.5 mr-2.5 shrink-0 rounded-sm transition duration-120 ease-out ${r().writing ? "w-1 animate-pulse" : "w-0.75"}`}
+        class={`mt-0.5 mr-2.5 shrink-0 rounded-sm ${r().writing ? `w-1 ${motionClass("animate-pulse")}` : "w-0.75"}`}
         style={{ height: barHeight(r().type), backgroundColor: authorColor(r().updatedBy, props.agent) }}
       />
       <View class="shrink-0" style={{ width: 20 * r().depth }} />
@@ -454,7 +455,7 @@ function BlockRow(props: { editor: BlockEditor; row: Row; agent?: Agent | undefi
           accessibilityLabel={t("web.artifact.canvas.quote")}
           tooltip={<Bubble text={t("web.artifact.canvas.quote")} />}
           onPress={() => props.onQuote?.({ id: r().block.id, rev: r().block.rev, type: r().type, text: r().text })}
-          class="mt-0.5 ml-1 size-6 shrink-0 items-center justify-center rounded-md opacity-0 transition duration-120 ease-out group-hover:opacity-100 hover:bg-hover focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
+          class={`mt-0.5 ml-1 size-6 shrink-0 items-center justify-center rounded-md opacity-0 ${motionClass("transition-opacity duration-120 ease-out")} group-hover:opacity-100 hover:bg-hover focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus`}
         >
           <Icon name="chat" size={14} tone="muted" />
         </View>

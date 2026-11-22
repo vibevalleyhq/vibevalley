@@ -1,11 +1,7 @@
 import type { LibraryFileKind } from "@vibevalley/protocol";
 
-import { type ArtifactKindFilter, between, type KindFilter } from "./items";
-
-export type LibraryScope =
-  | { readonly kind: "all" }
-  | { readonly kind: "media"; readonly fileKind: LibraryFileKind }
-  | { readonly kind: "artifact"; readonly artifactKind: ArtifactKindFilter };
+import type { ContentBucket } from "../content";
+import { type ArtifactTypeFilter, between } from "./items";
 
 export interface PriorFileSelection {
   readonly ids: readonly string[];
@@ -15,67 +11,70 @@ export interface PriorFileSelection {
 export type LibrarySelection =
   | { readonly kind: "none" }
   | { readonly kind: "files"; readonly ids: readonly string[]; readonly anchor?: string; readonly asking: boolean }
-  | { readonly kind: "artifact"; readonly id: string; readonly asking: boolean }
   | { readonly kind: "lightbox"; readonly index: number; readonly prior?: PriorFileSelection };
-
-export interface LibraryViewState {
-  readonly scope: LibraryScope;
-  readonly selection: LibrarySelection;
-}
 
 export interface PickMode {
   readonly add: boolean;
   readonly range: boolean;
 }
 
-export const initialLibraryScope: LibraryScope = { kind: "all" };
 export const initialLibrarySelection: LibrarySelection = { kind: "none" };
-export const initialLibraryView: LibraryViewState = { scope: initialLibraryScope, selection: initialLibrarySelection };
 
-export function scopeForKind(kind: KindFilter): LibraryScope {
-  return kind === "all" ? { kind: "all" } : { kind: "media", fileKind: kind };
-}
-
-export function scopeForArtifactKind(artifactKind: ArtifactKindFilter | undefined): LibraryScope {
-  return artifactKind === undefined ? { kind: "all" } : { kind: "artifact", artifactKind };
-}
-
-function sameScope(a: LibraryScope, b: LibraryScope): boolean {
-  switch (a.kind) {
-    case "all":
-      return b.kind === "all";
+export function showsNotesInBucket(bucket: ContentBucket): boolean {
+  switch (bucket.kind) {
+    case "recent":
+    case "pinned":
+    case "notes":
+      return true;
+    case "artifacts":
     case "media":
-      return b.kind === "media" && a.fileKind === b.fileKind;
-    case "artifact":
-      return b.kind === "artifact" && a.artifactKind === b.artifactKind;
+      return false;
   }
 }
 
-export function selectScope(view: LibraryViewState, nextScope: LibraryScope): LibraryViewState {
-  const scope = sameScope(view.scope, nextScope) ? view.scope : nextScope;
-  switch (nextScope.kind) {
-    case "all":
-      return { scope, selection: cancelRemove(view.selection) };
+export function showsArtifactsInBucket(bucket: ContentBucket): boolean {
+  switch (bucket.kind) {
+    case "recent":
+    case "pinned":
+    case "artifacts":
+      return true;
+    case "notes":
     case "media":
-      switch (view.selection.kind) {
-        case "artifact":
-          return { scope, selection: { kind: "none" } };
-        case "none":
-        case "files":
-        case "lightbox":
-          return { scope, selection: cancelRemove(view.selection) };
-      }
-      break;
-    case "artifact":
-      switch (view.selection.kind) {
-        case "files":
-        case "lightbox":
-          return { scope, selection: { kind: "none" } };
-        case "none":
-        case "artifact":
-          return { scope, selection: cancelRemove(view.selection) };
-      }
+      return false;
   }
+}
+
+export function showsMediaInBucket(bucket: ContentBucket): boolean {
+  switch (bucket.kind) {
+    case "recent":
+    case "pinned":
+    case "media":
+      return true;
+    case "notes":
+    case "artifacts":
+      return false;
+  }
+}
+
+export function bucketArtifactType(bucket: ContentBucket): ArtifactTypeFilter | undefined {
+  return bucket.kind === "artifacts" ? bucket.artifactType : undefined;
+}
+
+export function bucketFileKind(bucket: ContentBucket): LibraryFileKind | undefined {
+  return bucket.kind === "media" ? bucket.fileKind : undefined;
+}
+
+export function isPinnedBucket(bucket: ContentBucket): boolean {
+  return bucket.kind === "pinned";
+}
+
+export function selectBucketSelection(selection: LibrarySelection, bucket: ContentBucket): LibrarySelection {
+  if (!showsMediaInBucket(bucket)) return { kind: "none" };
+  return cancelRemove(selection);
+}
+
+export function focusFile(id: string): LibrarySelection {
+  return { kind: "files", ids: [id], anchor: id, asking: false };
 }
 
 export function pickFile(selection: LibrarySelection, id: string, how: PickMode, visibleIds: readonly string[]): LibrarySelection {
@@ -94,10 +93,6 @@ export function pickFile(selection: LibrarySelection, id: string, how: PickMode,
   return { kind: "files", ids: [id], anchor: id, asking: false };
 }
 
-export function pickArtifact(id: string): LibrarySelection {
-  return { kind: "artifact", id, asking: false };
-}
-
 export function openLightbox(selection: LibrarySelection, index: number, imageCount?: number): LibrarySelection {
   if (index < 0 || (imageCount !== undefined && index >= imageCount)) return selection;
   switch (selection.kind) {
@@ -109,7 +104,6 @@ export function openLightbox(selection: LibrarySelection, index: number, imageCo
       if (selection.index === index) return selection;
       return selection.prior !== undefined ? { kind: "lightbox", index, prior: selection.prior } : { kind: "lightbox", index };
     case "none":
-    case "artifact":
       return { kind: "lightbox", index };
   }
 }
@@ -125,7 +119,6 @@ export function closeLightbox(selection: LibrarySelection): LibrarySelection {
       return { kind: "none" };
     case "none":
     case "files":
-    case "artifact":
       return selection;
   }
 }
@@ -138,8 +131,6 @@ export function askRemove(selection: LibrarySelection): LibrarySelection {
   switch (selection.kind) {
     case "files":
       return selection.asking ? selection : { ...selection, asking: true };
-    case "artifact":
-      return selection.asking ? selection : { ...selection, asking: true };
     case "none":
     case "lightbox":
       return selection;
@@ -150,8 +141,6 @@ export function cancelRemove(selection: LibrarySelection): LibrarySelection {
   switch (selection.kind) {
     case "files":
       return selection.asking ? { ...selection, asking: false } : selection;
-    case "artifact":
-      return selection.asking ? { ...selection, asking: false } : selection;
     case "none":
     case "lightbox":
       return selection;
@@ -160,7 +149,7 @@ export function cancelRemove(selection: LibrarySelection): LibrarySelection {
 
 export function reconcileSelection(
   selection: LibrarySelection,
-  visible: { readonly fileIds: readonly string[]; readonly artifactIds: readonly string[]; readonly imageCount: number },
+  visible: { readonly fileIds: readonly string[]; readonly imageCount: number },
 ): LibrarySelection {
   switch (selection.kind) {
     case "none":
@@ -173,8 +162,6 @@ export function reconcileSelection(
       if (kept.length === selection.ids.length && anchor === selection.anchor) return selection;
       return anchor !== undefined ? { kind: "files", ids: kept, anchor, asking: false } : { kind: "files", ids: kept, asking: false };
     }
-    case "artifact":
-      return visible.artifactIds.includes(selection.id) ? selection : { kind: "none" };
     case "lightbox": {
       if (visible.imageCount <= 0) return { kind: "none" };
       const index = Math.min(selection.index, visible.imageCount - 1);
@@ -190,46 +177,6 @@ export function reconcileSelection(
   }
 }
 
-export function scopeKindFilter(scope: LibraryScope): KindFilter {
-  switch (scope.kind) {
-    case "all":
-    case "artifact":
-      return "all";
-    case "media":
-      return scope.fileKind;
-  }
-}
-
-export function scopeArtifactKind(scope: LibraryScope): ArtifactKindFilter | undefined {
-  switch (scope.kind) {
-    case "all":
-    case "media":
-      return undefined;
-    case "artifact":
-      return scope.artifactKind;
-  }
-}
-
-export function showsMediaInScope(scope: LibraryScope): boolean {
-  switch (scope.kind) {
-    case "all":
-    case "media":
-      return true;
-    case "artifact":
-      return false;
-  }
-}
-
-export function showsArtifactsInScope(scope: LibraryScope): boolean {
-  switch (scope.kind) {
-    case "all":
-    case "artifact":
-      return true;
-    case "media":
-      return false;
-  }
-}
-
 const emptyIds: readonly string[] = [];
 
 export function selectedFileIds(selection: LibrarySelection): readonly string[] {
@@ -237,20 +184,8 @@ export function selectedFileIds(selection: LibrarySelection): readonly string[] 
     case "files":
       return selection.ids;
     case "none":
-    case "artifact":
     case "lightbox":
       return emptyIds;
-  }
-}
-
-export function selectedArtifactId(selection: LibrarySelection): string | undefined {
-  switch (selection.kind) {
-    case "artifact":
-      return selection.id;
-    case "none":
-    case "files":
-    case "lightbox":
-      return undefined;
   }
 }
 
@@ -259,7 +194,6 @@ export function activeFileId(selection: LibrarySelection): string | undefined {
     case "files":
       return selection.anchor ?? selection.ids.at(-1);
     case "none":
-    case "artifact":
     case "lightbox":
       return undefined;
   }
@@ -271,7 +205,6 @@ export function lightboxIndex(selection: LibrarySelection): number | undefined {
       return selection.index;
     case "none":
     case "files":
-    case "artifact":
       return undefined;
   }
 }
@@ -279,7 +212,6 @@ export function lightboxIndex(selection: LibrarySelection): number | undefined {
 export function isAskingRemove(selection: LibrarySelection): boolean {
   switch (selection.kind) {
     case "files":
-    case "artifact":
       return selection.asking;
     case "none":
     case "lightbox":

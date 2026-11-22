@@ -10,6 +10,7 @@ import { ConfirmButton } from "../../design/ConfirmButton";
 import { Field, Select, TextArea, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Card, Quiet } from "../../design/layout";
+import { motionClass } from "../../design/motion";
 import { api } from "../../infra/api";
 import { openAttachment, useAttachmentUrl } from "../../infra/attachmentFile";
 import { useCore } from "../../infra/frame";
@@ -99,7 +100,7 @@ export function ImagePanel() {
                         width.set(preset().width);
                         height.set(preset().height);
                       }}
-                      class={`h-6 flex-row items-center gap-1 rounded-sm border px-2 transition duration-120 ease-out active:translate-y-px ${
+                      class={`h-6 flex-row items-center gap-1 rounded-sm border px-2 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${
                         active() ? "border-accent bg-ok-soft" : "border-line bg-page hover:bg-hover"
                       }`}
                     >
@@ -162,10 +163,10 @@ export function ImagePanel() {
             testID="media-advanced"
             accessibilityState={{ expanded: advanced() }}
             onPress={() => advanced.set(!advanced())}
-            class="h-7 flex-row items-center gap-1.5 self-start rounded-md px-2 transition duration-120 ease-out hover:bg-hover"
+            class="h-7 flex-row items-center gap-1.5 self-start rounded-md px-2 hover:bg-hover"
           >
             <View
-              class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+              class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
               style={{ transform: [{ rotate: advanced() ? "90deg" : "0deg" }] }}
             >
               <Icon name="expand" size={10} tone="muted" />

@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 import type { PkmBlock, PkmBlockOp, PkmPageSummary, PkmPageView } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
+import { motionClass } from "../../design/motion";
 import { toast } from "../../design/toasts";
 import { mix } from "../../design/tone";
 import { api, newSendKey } from "../../infra/api";
@@ -300,7 +301,7 @@ export function Outline(props: { view: PkmPageView; pages: readonly PkmPageSumma
         role="button"
         testID="pkm-append"
         onPress={writeOn}
-        class={`flex-row items-start gap-1 rounded-sm py-px transition duration-120 ease-out hover:bg-hover ${blocks().length !== 0 ? "opacity-0 group-hover:opacity-100" : ""}`}
+        class={`flex-row items-start gap-1 rounded-sm py-px ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-hover ${blocks().length !== 0 ? "opacity-0 group-hover:opacity-100" : ""}`}
       >
         <View class="mt-1 h-4 w-4 shrink-0 items-center justify-center">
           <View class="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: mix("faint", 0.4) }} />

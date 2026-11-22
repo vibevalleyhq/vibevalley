@@ -905,7 +905,7 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
                   <View testID="audio-timeline" class="min-w-0 gap-1">
                     <Each of={result().segments}>
                       {(segment) => (
-                        <View class="flex-row items-start gap-2.5 rounded-md px-2 py-1.5 transition duration-120 ease-out hover:bg-hover">
+                        <View class="flex-row items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-hover">
                           <View
                             role="button"
                             testID={`audio-seek-${segment().start}`}
@@ -916,7 +916,7 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
                               const input = props.job.input;
                               if (input) void act.run(() => playInput(input.id, segment().start));
                             }}
-                            class={`mt-0.5 h-6 shrink-0 flex-row items-center gap-1 rounded-sm border border-line bg-page px-1.5 transition duration-120 ease-out ${
+                            class={`mt-0.5 h-6 shrink-0 flex-row items-center gap-1 rounded-sm border border-line bg-page px-1.5 ${
                               !props.job.input ? "opacity-50" : "hover:bg-selected active:translate-y-px"
                             }`}
                           >
