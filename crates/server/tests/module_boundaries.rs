@@ -64,3 +64,43 @@ fn server_modules_respect_layer_and_skin_boundaries() {
 
     assert!(violations.is_empty(), "server module boundary violations:\n{}", violations.join("\n"));
 }
+
+#[test]
+fn server_db_generated_queries_are_private_to_their_owning_module() {
+    let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    let generated_dir = src_dir.join("db/generated");
+    let mut violations = Vec::new();
+
+    for path in rs_files(&src_dir) {
+        if path.starts_with(&generated_dir) {
+            continue;
+        }
+        let rel = path.strip_prefix(&src_dir).unwrap().to_string_lossy().replace('\\', "/");
+        let text = std::fs::read_to_string(&path).unwrap();
+        let owner = rel
+            .strip_prefix("modules/")
+            .and_then(|rest| {
+                let mut parts = rest.split('/');
+                Some((parts.next()?, parts.next()?))
+            })
+            .map(|(domain, module)| format!("{domain}_{module}"));
+
+        for (line_no, line) in prod_lines(&text) {
+            let mut rest = line;
+            while let Some(idx) = rest.find("db::generated::") {
+                rest = &rest[idx + "db::generated::".len()..];
+                let target: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+                if target.is_empty() {
+                    violations.push(format!("{rel}:{line_no} references `db::generated::` without a specific module"));
+                } else if owner.as_deref() != Some(target.as_str()) {
+                    violations.push(format!(
+                        "{rel}:{line_no} accesses `db::generated::{target}` outside its owning module `modules/{}`",
+                        target.replace('_', "/")
+                    ));
+                }
+            }
+        }
+    }
+
+    assert!(violations.is_empty(), "server db::generated privacy violations:\n{}", violations.join("\n"));
+}

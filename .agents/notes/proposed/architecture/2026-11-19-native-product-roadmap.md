@@ -70,9 +70,9 @@ sqlc 1.31.1 的内置 JSON 生成器支持 `gen.json.out: ir`。执行 `sqlc gen
 
 12 组查询共 258 条，其中单行查询 61 条、多行查询 59 条、执行语句 131 条、返回影响行数的语句 7 条。在隔离目录读取真实插件输入并重新生成，12 份 Rust 源文件与工作树逐字节一致。[正式配置](sqlc.yaml) · [生成规则](docs/subsystems/foundation.md#契约规则和数据库)
 
-SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均与 sqlc 对上。对于 sqlc 标为非空的结果列，SQLx 将 60 处标为可空，另有 1 处无法推断。在普通 SQLite 表中，直接写 SQL 可向未声明 `NOT NULL` 的 `TEXT PRIMARY KEY` 写入空值。生产写入入口要求字符串主键。会话左连接的关联记录缺失时，生成函数读回 `None`。增加关联再回滚后，读数恢复为 `None`。[会话查询](crates/server/src/modules/work/session/sql/queries.sql) · [SQLite 主键约束](https://www.sqlite.org/lang_createtable.html#the_primary_key)
+SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均与 sqlc 对上。对于 sqlc 标为非空的结果列，SQLx 将 60 处标为可空，另有 1 处无法推断。在普通 SQLite 表中，直接写 SQL 可向未声明 `NOT NULL` 的 `TEXT PRIMARY KEY` 写入空值。生产写入入口要求字符串主键。会话左连接的关联记录缺失时，生成函数读回 `None`。增加关联再回滚后，读数恢复为 `None`。[会话查询](crates/server/src/db/queries/work_session.sql) · [SQLite 主键约束](https://www.sqlite.org/lang_createtable.html#the_primary_key)
 
-素材库排序曾在 `ORDER BY CASE` 中引用 `sqlc.arg(sort)`。sqlc 1.31.1 会将这个参数原样留在 SQL 中。正式查询在公用表表达式中绑定排序参数。CI 用 SQLite 对导出的 SQL 执行 `EXPLAIN`，按 IR 的参数个数绑定空值，旧写法会在此处失败。[素材库查询](crates/server/src/modules/content/library/sql/queries.sql) · [CI 检查](scripts/release/verify-native-schema.py)
+素材库排序曾在 `ORDER BY CASE` 中引用 `sqlc.arg(sort)`。sqlc 1.31.1 会将这个参数原样留在 SQL 中。正式查询在公用表表达式中绑定排序参数。CI 用 SQLite 对导出的 SQL 执行 `EXPLAIN`，按 IR 的参数个数绑定空值，旧写法会在此处失败。[素材库查询](crates/server/src/db/queries/content_library.sql) · [CI 检查](scripts/release/verify-native-schema.py)
 
 社区插件 `sqlc-gen-rust` 0.1.12 生成的 SQLx 0.8.6 代码在 0.9.1 下出现类型与生命周期错误。项目采用自有插件，沿用 sqlc 的 SQL 分析器。维护者只需维护本项目使用的 SQLite 类型和查询返回方式。[生成器](scripts/gen/sqlc-rust/generate.ts) · [社区插件](https://github.com/tunamaguro/sqlc-gen-rust/tree/v0.1.12)
 

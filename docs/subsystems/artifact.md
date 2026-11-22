@@ -27,7 +27,7 @@ Artifact（`Artifact`）是用户、助手和帮工共创或交付的文档、�
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*`、`GET /api/v1/artifact/<id>/<version>` 与 `GET /api/v1/artifact/<id>/view`）。
 
-Artifact 使用 SQLx 访问 SQLite。sqlc 从 Artifact 与频道的正式表结构生成命名查询。频道消息不存在时，左连接返回空引用；工单删除时 `artifact.issue` 由外键自动置空（`on delete set null`）。版本与 `asset` 条目的文件内容由附件库保管（[查询](crates/server/src/modules/content/artifact/sql/queries.sql)）。
+Artifact 使用 SQLx 访问 SQLite。sqlc 从 Artifact 与频道的正式表结构生成命名查询。频道消息不存在时，左连接返回空引用；工单删除时 `artifact.issue` 由外键自动置空（`on delete set null`）。版本与 `asset` 条目的文件内容由附件库保管（[查询](crates/server/src/db/queries/content_artifact.sql)）。
 
 频道中的 Artifact 卡片、版本号和消息引用由 `Chat::post_with` 在同一连接上提交。版本写入失败时，频道回滚消息和事件，恢复内存镜像。订阅者只收到已提交的卡片。
 

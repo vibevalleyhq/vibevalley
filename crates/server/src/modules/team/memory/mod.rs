@@ -28,9 +28,7 @@ mod rules;
 use rules as m;
 pub(crate) use rules::terms_list;
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
+use crate::db::generated::team_memory as queries;
 
 /// Fading marks the ones that would go if this many more were kept.
 const FADING_SOON: usize = 10;

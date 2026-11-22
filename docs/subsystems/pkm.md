@@ -16,7 +16,7 @@
 | 位置 | 职责 |
 |---|---|
 | `apps/mac/ui/features/pkm/` | 客户端大纲编辑器与单栏笔记页：块操作与树折叠（`tree.ts`）、行内切片与大纲视图模型（`outline.ts`）、键盘编辑与补全（`editing.ts`）、多块框选与拖拽（`selection.ts`）、日期格式（`days.ts`、`localDay.ts`）、乐观写入队列（`writer.ts`）与 `PkmPage`/`PageView`/`OutlineView`/`OutlineEditor`；访问 `/pkm` 直接打开今日笔记（`pkm.journal.open`），页头提供原地改名、置顶、快捷键提示、仅在存在批注时显示的批注折叠开关与可折叠反链区，扁平笔记列表由 `features/content/ContentSidebar.tsx` 统一承载 |
-| [笔记服务](crates/server/src/modules/content/pkm/mod.rs)、[数据库查询](crates/server/src/modules/content/pkm/sql/queries.sql) | 笔记服务读写并监听 Markdown 文件。sqlc 为批注、全文索引和撤销记录生成 SQLx 查询。 |
+| [笔记服务](crates/server/src/modules/content/pkm/mod.rs)、[数据库查询](crates/server/src/db/queries/content_pkm.sql) | 笔记服务读写并监听 Markdown 文件。sqlc 为批注、全文索引和撤销记录生成 SQLx 查询。 |
 | `crates/core/src/pkm/` | 服务端大纲引擎与单一真相源：Markdown 解析与打印、PARA 目录映射、双链反链与块引用图谱（`graph.rs`）；维护 `crates/core/golden/pkm` 回归测例 |
 | `crates/cli/src/domains/content/pkm.rs` | `vibevalley pkm ...` |
 | `packages/protocol/src/pkm/`、`apps/mac/ui/features/pkm/tree.ts` | 笔记契约与客户端共用的 `applyBlockOps`、`flatBlocks`、`slugOf` |

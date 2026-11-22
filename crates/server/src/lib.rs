@@ -27,6 +27,7 @@ pub use crate::transport::api::{Server, refusal};
 
 pub mod base;
 mod chord_space;
+pub(crate) mod db;
 pub mod event_bus;
 mod frame_feed;
 pub use vibevalley_protocol::home;

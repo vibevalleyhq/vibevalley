@@ -6,9 +6,7 @@ use sqlx::{Connection, SqliteConnection};
 use std::collections::HashMap;
 use vibevalley_protocol::{PkmComment, PkmCommentStatus};
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
+use crate::db::generated::content_pkm as queries;
 pub(super) use queries::{AddChangeParams as NewChange, AddSuggestionParams as Suggestion, KeepRemarkParams as Remark};
 pub const SCHEMA: &str = include_str!("sql/schema.sql");
 

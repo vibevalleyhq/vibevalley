@@ -10,9 +10,7 @@
 
 pub mod db;
 pub mod dispatch;
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
+pub(in crate::modules::collab::channel) use crate::db::generated::collab_channel as queries;
 mod messages;
 pub mod model;
 mod rooms;

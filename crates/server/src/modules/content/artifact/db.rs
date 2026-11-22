@@ -5,9 +5,7 @@ use pollster::block_on;
 use sqlx::{Result as Q, SqliteConnection};
 use vibevalley_protocol::{Block, BlockOpResult, Suggestion, TextSpan};
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
+use crate::db::generated::content_artifact as queries;
 pub use queries::{
     AddArtifactParams as NewArtifact, AddVersionParams as NewVersion, ArtifactEntriesRow as EntryRow, ArtifactRow, UpsertArtifactEntryParams as UpsertEntry,
     VersionRow,

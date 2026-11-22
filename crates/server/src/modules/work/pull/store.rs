@@ -12,9 +12,7 @@ use crate::base::{internal, open_sqlx_db};
 use crate::lock;
 use crate::modules::infra::column::{read_word, word};
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
+use crate::db::generated::work_pull as queries;
 
 pub const SCHEMA: &str = include_str!("sql/schema.sql");
 

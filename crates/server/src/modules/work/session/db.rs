@@ -4,9 +4,7 @@ use std::collections::HashMap;
 use vibevalley_protocol::{Run, Session, SessionSubagents};
 use vibevalley_runtime::agent::durable::Sqlite;
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
+use crate::db::generated::work_session as queries;
 
 pub const SCHEMA: &str = include_str!("sql/schema.sql");
 

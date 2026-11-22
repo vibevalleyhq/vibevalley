@@ -14,7 +14,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| [附件查询](crates/server/src/modules/content/attachment/sql/queries.sql) | sqlc 为 SQLx 生成按哈希读取和首次写入元数据的接口。相同哈希保留首次记录的名字和类型。 |
+| [附件查询](crates/server/src/db/queries/content_attachment.sql) | sqlc 为 SQLx 生成按哈希读取和首次写入元数据的接口。相同哈希保留首次记录的名字和类型。 |
 | `crates/server/src/modules/content/attachment/mod.rs` | `Attachments`：`attach`（上传）、`keep`（这里做出来的字节）、`keep_staged`（媒体输入写在暂存目录、已算好哈希的大文件）、`of`（一组 id 的附件，缺一个就拒绝）、`file`、`path_of`；`open_sqlx_db` 打开各模块共用的 `server.db` |
 | `crates/server/src/transport/http/media.rs`、`crates/server/src/transport/http/mod.rs` | `GET /api/v1/attachment/<id>`（经 `attachment.file` 取路径）；`attachment.create` 走通用的命令入口 |
 | `crates/protocol/src/contract/attachment.rs`、`packages/protocol/src/attachment/` | `Attachment`、`AttachmentUpload`、`attachmentPath`、`attachmentMax`（Rust 为源，TS 形状由它生成） |

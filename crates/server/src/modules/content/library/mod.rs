@@ -18,9 +18,7 @@ use vibevalley_protocol::{
     MediaAudioJob, MediaJob, MediaPhase, MessageKind, Preview, ops,
 };
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod q;
+use crate::db::generated::content_library as q;
 
 use crate::base::{LookIn, ModuleDb, missing};
 use crate::modules::content::attachment::{ATTACHMENT_MAX, Attachments};

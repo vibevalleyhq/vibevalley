@@ -3,9 +3,7 @@ use crate::modules::infra::column::{json, optional, read_json, read_word, word};
 use vibevalley_protocol::{Issue, Millis};
 use vibevalley_runtime::agent::durable::Sqlite;
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
+use crate::db::generated::work_issue as queries;
 
 pub const SCHEMA: &str = include_str!("sql/schema.sql");
 

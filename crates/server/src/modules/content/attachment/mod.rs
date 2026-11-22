@@ -13,9 +13,7 @@ use sqlx::SqliteConnection;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentUpload, BizCode, native_ops, ops};
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
+use crate::db::generated::content_attachment as queries;
 
 use crate::base::{internal, open_sqlx_db};
 use crate::{Hub, now};
