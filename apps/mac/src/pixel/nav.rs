@@ -8,6 +8,7 @@ use super::level::{Point, pt};
 
 const SQRT2: f32 = std::f32::consts::SQRT_2;
 
+#[derive(Clone)]
 pub struct NavMap {
     cols: usize,
     rows: usize,

@@ -102,6 +102,7 @@ struct RawField {
     __value: Value,
 }
 
+#[derive(Clone)]
 pub struct Level {
     pub width: f32,
     pub height: f32,

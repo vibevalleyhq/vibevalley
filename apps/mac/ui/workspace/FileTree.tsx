@@ -7,10 +7,11 @@ import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../design/Icon";
 import { motionClass } from "../design/motion";
+import { SkeletonBar, SkeletonLines, useDelayedBusy } from "../design/Skeleton";
 import { act, hostApi } from "../infra/bridge";
 import { gitToneIconTone, gitToneTextClass, menuItemClass, menuPopupClass, menuSeparatorClass, PanelEmpty, SectionHead, ShellIconButton } from "./chrome";
 
-export type FileItem = TreeItem & { tone?: string; hidden?: boolean; children?: FileItem[] };
+export type FileItem = TreeItem & { tone?: string; hidden?: boolean; loading?: boolean; children?: FileItem[] };
 export type FilesFrame = { root?: string; name?: string; items: FileItem[]; expanded?: string[]; selected?: string | null; loading?: boolean };
 
 function index(items: FileItem[], into: Map<string, FileItem>) {
@@ -23,6 +24,8 @@ function index(items: FileItem[], into: Map<string, FileItem>) {
 
 export function FileTree(props: { frame: FilesFrame | null }) {
   const byId = () => index(props.frame?.items ?? [], new Map());
+  const isLoadingTree = () => !props.frame || (props.frame.items.length === 0 && props.frame.loading === true);
+  const showLoading = useDelayedBusy(isLoadingTree);
   const relPath = (abs: string) => {
     const root = props.frame?.root?.replace(/\/+$/u, "");
     return root && abs.startsWith(`${root}/`) ? abs.slice(root.length + 1) : abs;
@@ -52,7 +55,22 @@ export function FileTree(props: { frame: FilesFrame | null }) {
         }
       />
       {!props.frame || props.frame.items.length === 0 ? (
-        <PanelEmpty text={props.frame?.loading === true || !props.frame ? t("web.shell.fileTree.loading") : t("web.shell.fileTree.empty")} />
+        isLoadingTree() ? (
+          showLoading() ? (
+            <SkeletonLines
+              testID="file-tree-skeleton"
+              accessibilityLabel={t("web.shell.fileTree.loading")}
+              surface="side"
+              rows={["58%", "74%", "64%", "48%", "70%"]}
+              indent={[0, 14, 14, 28, 0]}
+              class="px-3 py-2.5"
+            />
+          ) : (
+            <View class="flex-1" />
+          )
+        ) : (
+          <PanelEmpty text={t("web.shell.fileTree.empty")} />
+        )
       ) : (
         <Tree
           items={props.frame.items}
@@ -66,15 +84,16 @@ export function FileTree(props: { frame: FilesFrame | null }) {
           onCollapse={({ id }) => act({ type: "collapse_dir", path: id })}
           onSelectedChange={({ selected }) => {
             const item = byId().get(selected);
-            if (item && !item.children && item.tone !== "placeholder") act({ type: "open_file", path: selected });
+            if (item && !item.children && item.tone !== "placeholder" && item.loading !== true) act({ type: "open_file", path: selected });
           }}
           onAction={({ id }) => {
             const item = byId().get(id);
-            if (item && !item.children) act({ type: "open_file", path: id });
+            if (item && !item.children && item.tone !== "placeholder" && item.loading !== true) act({ type: "open_file", path: id });
           }}
           renderItem={(entry) => {
             const item = () => byId().get(entry.id);
             const isPlaceholder = () => item()?.tone === "placeholder";
+            const isLoadingRow = () => item()?.loading === true || (isPlaceholder() && entry.id.endsWith("/__loading"));
             const labelClass = () => {
               const cur = item();
               if (cur?.tone === "placeholder") return "text-xs italic text-faint";
@@ -103,16 +122,20 @@ export function FileTree(props: { frame: FilesFrame | null }) {
                     </View>
                   ) : null}
                 </View>
-                {!isPlaceholder() ? (
+                {!isPlaceholder() && !isLoadingRow() ? (
                   <View class="size-3.5 shrink-0 items-center justify-center">
                     <Icon name={entry.folder ? "folder" : "file"} size={13} tone={iconTone()} />
                   </View>
                 ) : null}
-                <Text class={`min-w-0 flex-1 truncate ${labelClass()}`}>{entry.label}</Text>
+                {isLoadingRow() ? (
+                  <SkeletonBar testID="file-tree-row-skeleton" surface="side" class="h-3 w-24" />
+                ) : (
+                  <Text class={`min-w-0 flex-1 truncate ${labelClass()}`}>{entry.label}</Text>
+                )}
                 {entry.folder && item()?.tone === "dirty" ? <View class="size-1.5 shrink-0 rounded-full bg-wheat" /> : null}
               </View>
             );
-            if (isPlaceholder()) return row;
+            if (isPlaceholder() || isLoadingRow()) return row;
             return (
               <ContextMenu trigger={row} popupClass={menuPopupClass}>
                 <MenuItem onSelect={() => void Clipboard.writeText(relPath(entry.id))} class={menuItemClass}>

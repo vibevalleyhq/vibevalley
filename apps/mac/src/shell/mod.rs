@@ -83,6 +83,12 @@ pub struct PixelSlot {
     pub(super) _sub: Subscription,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ChatTabStatus {
+    pub status: String,
+    pub attention: bool,
+}
+
 pub struct Shell {
     pub store: Option<Arc<Store>>,
     pub(super) project_open: Option<gpui::Task<()>>,
@@ -101,6 +107,8 @@ pub struct Shell {
     pub terminals: HashMap<String, TerminalSlot>,
     pub(crate) terminal_notice: Option<String>,
     pub panes: HashMap<(ProjectId, TabId), PaneSlot>,
+    pub chat_statuses: HashMap<(ProjectId, TabId), ChatTabStatus>,
+    pub chat_menu_group: Option<vibevalley_workspace::GroupId>,
     pub sidebar: Entity<HostedView>,
     pub inspector: Entity<HostedView>,
     pub workbench: Entity<HostedView>,
@@ -181,6 +189,7 @@ impl Shell {
             this.projects.clear();
             this.terminals.clear();
             this.panes.clear();
+            this.chat_statuses.clear();
             let store = this.store.take();
             async move {
                 let done = std::thread::spawn(move || {
@@ -227,6 +236,8 @@ impl Shell {
             terminal_notice: None,
             terminals: HashMap::new(),
             panes: HashMap::new(),
+            chat_statuses: HashMap::new(),
+            chat_menu_group: None,
             sidebar,
             inspector,
             workbench,

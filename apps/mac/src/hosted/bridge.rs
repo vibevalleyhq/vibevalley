@@ -142,6 +142,34 @@ pub enum Action {
     NewTerminalAt {
         path: PathBuf,
     },
+    NewChatAt {
+        path: PathBuf,
+        #[serde(default)]
+        runtime: Option<String>,
+    },
+    OpenFileAdjacent {
+        path: PathBuf,
+        #[serde(default)]
+        line: Option<u32>,
+    },
+    OpenDiffAdjacent {
+        path: Option<PathBuf>,
+        #[serde(default)]
+        staged: bool,
+    },
+    UpdateChatTab {
+        tab_id: u64,
+        #[serde(default)]
+        session_id: Option<String>,
+        #[serde(default)]
+        runtime: Option<String>,
+        #[serde(default)]
+        title: Option<String>,
+        #[serde(default)]
+        status: Option<String>,
+        #[serde(default)]
+        attention: Option<bool>,
+    },
     AddProject,
     CloseProject {
         id: i64,
@@ -285,6 +313,38 @@ mod tests {
         assert_eq!(
             parse_action(&json!({"type": "show_panel", "panel": "git"})).unwrap(),
             Action::ShowPanel { panel: Panel::Git }
+        );
+        assert_eq!(
+            parse_action(&json!({"type": "new_chat_at", "path": "/tmp/repo", "runtime": "antigravity"})).unwrap(),
+            Action::NewChatAt {
+                path: "/tmp/repo".into(),
+                runtime: Some("antigravity".into()),
+            }
+        );
+        assert_eq!(
+            parse_action(&json!({"type": "open_file_adjacent", "path": "src/lib.rs", "line": 42})).unwrap(),
+            Action::OpenFileAdjacent {
+                path: "src/lib.rs".into(),
+                line: Some(42),
+            }
+        );
+        assert_eq!(
+            parse_action(&json!({"type": "open_diff_adjacent", "path": "src/lib.rs", "staged": true})).unwrap(),
+            Action::OpenDiffAdjacent {
+                path: Some("src/lib.rs".into()),
+                staged: true,
+            }
+        );
+        assert_eq!(
+            parse_action(&json!({"type": "update_chat_tab", "tab_id": 7, "session_id": "s1", "status": "working", "attention": true})).unwrap(),
+            Action::UpdateChatTab {
+                tab_id: 7,
+                session_id: Some("s1".into()),
+                runtime: None,
+                title: None,
+                status: Some("working".into()),
+                attention: Some(true),
+            }
         );
         assert!(parse_action(&json!({"type": "show_panel", "panel": "unknown"})).is_err());
     }

@@ -11,6 +11,7 @@ import { FarmForm } from "./farm/FarmForm";
 import { FarmPhone } from "./farm/FarmPhone";
 import { viewName } from "./infra/bridge";
 import { BridgeProbe } from "./workspace/BridgeProbe";
+import { WorkspaceChatPane } from "./workspace/ChatPane";
 import { MarkdownPane } from "./workspace/MarkdownPane";
 import { Palette } from "./workspace/Palette";
 import { Sidebar } from "./workspace/Sidebar";
@@ -29,6 +30,7 @@ const views: Record<string, Component> = {
   sidebar: Sidebar,
   palette: Palette,
   markdown: MarkdownPane,
+  "workspace-chat": WorkspaceChatPane,
   probe: BridgeProbe,
   // The shell opens it as `vv`; `vibevalley` is the name the views use.
   vv: VibeValley,

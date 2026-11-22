@@ -2,7 +2,9 @@
 //! (morning 5–10, day 10–18, night), the brand, a loading bar with the
 //! running sprite whose mood follows the phase, and the phase's words.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use image::RgbaImage;
 
@@ -63,14 +65,40 @@ fn local_hour() -> u32 {
     out.and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse().ok()).unwrap_or(12)
 }
 
+#[derive(Clone)]
+struct OpeningArt {
+    scene: Option<Arc<RgbaImage>>,
+    frames: Vec<Arc<RgbaImage>>,
+    fade: Arc<RgbaImage>,
+}
+
+fn opening_art_cache() -> &'static Mutex<HashMap<(PathBuf, &'static str), OpeningArt>> {
+    static CACHE: OnceLock<Mutex<HashMap<(PathBuf, &'static str), OpeningArt>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 impl OpeningScene {
-    /// Blocking: decodes the pictures.
+    /// Blocking on cold miss: decodes the pictures and caches them process-wide.
     pub fn load(which: Option<&'static str>) -> OpeningScene {
         let which = which.unwrap_or_else(|| scene_of_hour(local_hour()));
         let dir = super::assets_dir().join("brand");
+        let key = (dir.clone(), which);
+        if let Some(art) = opening_art_cache().lock().ok().and_then(|map| map.get(&key).cloned()) {
+            return OpeningScene {
+                fade: art.fade,
+                scene: art.scene,
+                frames: art.frames,
+                which,
+                phase: Phase::Starting,
+                progress: 0.0,
+                shown: 0.0,
+                t: 0.0,
+                demo: false,
+            };
+        }
         let scene = super::atlas::decode(&dir.join(format!("opening-{which}.webp"))).map(Arc::new);
         // The sprite sheet holds five moods side by side; the bar shows a 80×96 window of each, centred.
-        let frames = super::atlas::decode(&dir.join("opening-sprite.webp"))
+        let frames: Vec<Arc<RgbaImage>> = super::atlas::decode(&dir.join("opening-sprite.webp"))
             .map(|sheet| {
                 let fw = sheet.width() / 5;
                 let fh = (fw as f32 * 96.0 / 80.0) as u32;
@@ -90,6 +118,16 @@ impl OpeningScene {
             };
             image::Rgba([0x15, 0x14, 0x13, a as u8])
         }));
+        if let Ok(mut map) = opening_art_cache().lock() {
+            map.insert(
+                key,
+                OpeningArt {
+                    scene: scene.clone(),
+                    frames: frames.clone(),
+                    fade: fade.clone(),
+                },
+            );
+        }
         OpeningScene {
             fade,
             scene,

@@ -25,8 +25,15 @@
     "zoomOut": "Zoom Out",
     "fullScreen": "Toggle Full Screen",
     "window": "Window",
+    "newChat": "New Chat",
     "close": "Close Window",
     "closeTab": "Close Tab"
+  },
+  "workspace": {
+    "newChat": "New Chat",
+    "newTerminal": "New Terminal",
+    "newChatWith": "New {runtime} chat",
+    "chooseRuntime": "Choose chat runtime"
   },
   "terminal": {
     "noProject": "Open a project to start a terminal.",

@@ -2548,6 +2548,7 @@ export const catalogs = {
         attentionCount: "{n} 需要关注",
         closeTab: "关闭 {title}",
         newTerminal: "新终端：{name}",
+        newChat: "新对话：{name}",
         closeFolder: "关闭文件夹：{name}",
         mainWorktree: "{label} · 主目录",
         mainLabel: "主目录",
@@ -2556,6 +2557,8 @@ export const catalogs = {
         collapseItem: "折叠 {name}",
         expandItem: "展开 {name}",
         newTerminalHere: "在此新建终端",
+        newChatHere: "在此新建对话",
+        chatWaiting: "等待确认回复",
         revealInFinder: "在 Finder 中显示",
         copyPath: "复制路径",
         removeWorktree: "删除工作树",
@@ -2644,6 +2647,74 @@ export const catalogs = {
         empty: { commands: "没有匹配的命令。", files: "没有匹配的文件。", search: "没有匹配结果。" },
         footer: { select: "选择", run: "执行", close: "关闭" },
       },
+      chat: {
+        title: "工作区对话",
+        runtime: "编码引擎",
+        model: "模型",
+        thoughtLevel: "思考深度",
+        thoughtLow: "低",
+        thoughtMedium: "中",
+        thoughtHigh: "高",
+        thoughtMax: "极深",
+        permissionMode: "权限模式",
+        modeAsk: "逐次确认",
+        modeAcceptEdits: "放行编辑",
+        modeBypass: "自动放行",
+        modeReadOnly: "只读模式",
+        openTerminal: "在此目录打开终端",
+        statusStarting: "连接引擎中…",
+        statusReady: "就绪",
+        statusWorking: "执行中",
+        statusWaiting: "等待确认",
+        statusError: "会话异常",
+        emptyTitle: "在当前工作区直接对话",
+        emptyHint: "选择引擎后直接提问，工具调用结果可一键在右侧分栏打开源码或 Diff。",
+        you: "你",
+        steerTag: "轮中引导",
+        thinking: "思考过程",
+        toolOpenFile: "打开文件",
+        toolOpenDiff: "查看 Diff",
+        toolRunning: "执行中",
+        toolOk: "完成",
+        toolFailed: "失败",
+        toolPending: "等待输出…",
+        toolNoOutput: "无输出",
+        interactionBadge: "需要你确认 · 不会自动批准",
+        interactionAnswered: "已回复",
+        interactionDeclined: "已拒绝",
+        interactionCustomPlaceholder: "或输入自定义回复…",
+        interactionConfirm: "确认并继续",
+        interactionDecline: "拒绝",
+        permissionBadge: "工具权限请求",
+        permissionAllowOnce: "仅允许本次",
+        permissionAllowSession: "本会话始终允许",
+        permissionDeny: "拒绝",
+        composerPlaceholder: "向 {runtime} 提问或下达改动任务… (Enter 发送，Shift+Enter 换行)",
+        steerPlaceholder: "会话运行中，输入指令即插入轮中引导 (Steer)…",
+        steeringBanner: "回合进行中 · 发送将经 session.send 插入轮中引导，不中断上下文",
+        send: "发送",
+        steer: "插入引导",
+        stop: "停止",
+        telemetryContext: "上下文 {pct}%",
+        telemetryCache: "缓存 {pct}%",
+        telemetryTurns: "{turns} 轮 · {tools} 工具",
+        telemetryQuota: "配额 {pct}%",
+        telemetryDetails: "遥测详情",
+        telemetryHide: "收起遥测",
+        telemetryContextTitle: "上下文窗口",
+        telemetryCacheTitle: "Prompt Cache 与工具",
+        telemetryQuotaTitle: "引擎配额",
+        telemetryCached: "缓存读取",
+        telemetryUncached: "新增输入",
+        telemetryOutput: "输出",
+        telemetryReasoning: "思考",
+        telemetryQuotaUnavailable: "当前引擎未上报配额窗口。",
+        sendFailed: "发送失败：{why}",
+        configFailed: "切换配置失败：{why}",
+        respondFailed: "提交回复失败：{why}",
+        stopFailed: "中断会话失败：{why}",
+      },
+      markdown: { source: "源码", openSource: "打开源码", loadingPreview: "正在加载预览" },
     },
     "web.tree": { sky: "农场的记忆星空" },
     "web.ui.pixel": {
@@ -5495,6 +5566,7 @@ export const catalogs = {
         attentionCount: "{n} attention",
         closeTab: "Close {title}",
         newTerminal: "New terminal: {name}",
+        newChat: "New chat: {name}",
         closeFolder: "Close folder: {name}",
         mainWorktree: "{label} · main",
         mainLabel: "main",
@@ -5503,6 +5575,8 @@ export const catalogs = {
         collapseItem: "Collapse {name}",
         expandItem: "Expand {name}",
         newTerminalHere: "New terminal here",
+        newChatHere: "New chat here",
+        chatWaiting: "Waiting for confirmation",
         revealInFinder: "Reveal in Finder",
         copyPath: "Copy path",
         removeWorktree: "Delete worktree",
@@ -5591,6 +5665,74 @@ export const catalogs = {
         empty: { commands: "No matching commands.", files: "No matching files.", search: "No matching results." },
         footer: { select: "Select", run: "Run", close: "Close" },
       },
+      chat: {
+        title: "Workspace Chat",
+        runtime: "Runtime",
+        model: "Model",
+        thoughtLevel: "Thinking",
+        thoughtLow: "Low",
+        thoughtMedium: "Med",
+        thoughtHigh: "High",
+        thoughtMax: "Max",
+        permissionMode: "Permissions",
+        modeAsk: "Ask",
+        modeAcceptEdits: "Accept edits",
+        modeBypass: "Bypass",
+        modeReadOnly: "Read-only",
+        openTerminal: "Open terminal here",
+        statusStarting: "Connecting…",
+        statusReady: "Ready",
+        statusWorking: "Working",
+        statusWaiting: "Needs reply",
+        statusError: "Error",
+        emptyTitle: "Direct coding chat in this workspace",
+        emptyHint: "Pick a runtime and start chatting. Tool call cards open files and diffs directly in an adjacent split pane.",
+        you: "You",
+        steerTag: "Steer",
+        thinking: "Thinking",
+        toolOpenFile: "Open file",
+        toolOpenDiff: "View diff",
+        toolRunning: "Running",
+        toolOk: "Done",
+        toolFailed: "Failed",
+        toolPending: "Waiting for output…",
+        toolNoOutput: "No output",
+        interactionBadge: "Needs your confirmation · never auto-approved",
+        interactionAnswered: "Answered",
+        interactionDeclined: "Declined",
+        interactionCustomPlaceholder: "Or type a custom reply…",
+        interactionConfirm: "Confirm & continue",
+        interactionDecline: "Decline",
+        permissionBadge: "Tool permission request",
+        permissionAllowOnce: "Allow once",
+        permissionAllowSession: "Allow for session",
+        permissionDeny: "Deny",
+        composerPlaceholder: "Ask {runtime} or describe a change… (Enter to send, Shift+Enter for newline)",
+        steerPlaceholder: "Turn running — type to steer mid-turn…",
+        steeringBanner: "Turn active · sending steers mid-turn via session.send without cancelling context",
+        send: "Send",
+        steer: "Steer",
+        stop: "Stop",
+        telemetryContext: "Context {pct}%",
+        telemetryCache: "Cache {pct}%",
+        telemetryTurns: "{turns} turns · {tools} tools",
+        telemetryQuota: "Quota {pct}%",
+        telemetryDetails: "Telemetry",
+        telemetryHide: "Hide telemetry",
+        telemetryContextTitle: "Context window",
+        telemetryCacheTitle: "Prompt cache & tools",
+        telemetryQuotaTitle: "Runtime quota",
+        telemetryCached: "Cached",
+        telemetryUncached: "Uncached",
+        telemetryOutput: "Output",
+        telemetryReasoning: "Reasoning",
+        telemetryQuotaUnavailable: "Quota window not reported by this runtime.",
+        sendFailed: "Send failed: {why}",
+        configFailed: "Failed to update config: {why}",
+        respondFailed: "Failed to submit reply: {why}",
+        stopFailed: "Failed to stop session: {why}",
+      },
+      markdown: { source: "Source", openSource: "Open source", loadingPreview: "Loading preview" },
     },
     "web.tree": { sky: "The farm's sky of memories" },
     "web.ui.pixel": {
@@ -8375,6 +8517,71 @@ export interface Messages {
   "web.setting.words.general": undefined;
   "web.setting.words.models": undefined;
   "web.setting.words.voice": undefined;
+  "web.shell.chat.composerPlaceholder": { readonly runtime: string | number };
+  "web.shell.chat.configFailed": { readonly why: string | number };
+  "web.shell.chat.emptyHint": undefined;
+  "web.shell.chat.emptyTitle": undefined;
+  "web.shell.chat.interactionAnswered": undefined;
+  "web.shell.chat.interactionBadge": undefined;
+  "web.shell.chat.interactionConfirm": undefined;
+  "web.shell.chat.interactionCustomPlaceholder": undefined;
+  "web.shell.chat.interactionDecline": undefined;
+  "web.shell.chat.interactionDeclined": undefined;
+  "web.shell.chat.modeAcceptEdits": undefined;
+  "web.shell.chat.modeAsk": undefined;
+  "web.shell.chat.modeBypass": undefined;
+  "web.shell.chat.modeReadOnly": undefined;
+  "web.shell.chat.model": undefined;
+  "web.shell.chat.openTerminal": undefined;
+  "web.shell.chat.permissionAllowOnce": undefined;
+  "web.shell.chat.permissionAllowSession": undefined;
+  "web.shell.chat.permissionBadge": undefined;
+  "web.shell.chat.permissionDeny": undefined;
+  "web.shell.chat.permissionMode": undefined;
+  "web.shell.chat.respondFailed": { readonly why: string | number };
+  "web.shell.chat.runtime": undefined;
+  "web.shell.chat.send": undefined;
+  "web.shell.chat.sendFailed": { readonly why: string | number };
+  "web.shell.chat.statusError": undefined;
+  "web.shell.chat.statusReady": undefined;
+  "web.shell.chat.statusStarting": undefined;
+  "web.shell.chat.statusWaiting": undefined;
+  "web.shell.chat.statusWorking": undefined;
+  "web.shell.chat.steer": undefined;
+  "web.shell.chat.steerPlaceholder": undefined;
+  "web.shell.chat.steerTag": undefined;
+  "web.shell.chat.steeringBanner": undefined;
+  "web.shell.chat.stop": undefined;
+  "web.shell.chat.stopFailed": { readonly why: string | number };
+  "web.shell.chat.telemetryCache": { readonly pct: string | number };
+  "web.shell.chat.telemetryCacheTitle": undefined;
+  "web.shell.chat.telemetryCached": undefined;
+  "web.shell.chat.telemetryContext": { readonly pct: string | number };
+  "web.shell.chat.telemetryContextTitle": undefined;
+  "web.shell.chat.telemetryDetails": undefined;
+  "web.shell.chat.telemetryHide": undefined;
+  "web.shell.chat.telemetryOutput": undefined;
+  "web.shell.chat.telemetryQuota": { readonly pct: string | number };
+  "web.shell.chat.telemetryQuotaTitle": undefined;
+  "web.shell.chat.telemetryQuotaUnavailable": undefined;
+  "web.shell.chat.telemetryReasoning": undefined;
+  "web.shell.chat.telemetryTurns": { readonly tools: string | number; readonly turns: string | number };
+  "web.shell.chat.telemetryUncached": undefined;
+  "web.shell.chat.thinking": undefined;
+  "web.shell.chat.thoughtHigh": undefined;
+  "web.shell.chat.thoughtLevel": undefined;
+  "web.shell.chat.thoughtLow": undefined;
+  "web.shell.chat.thoughtMax": undefined;
+  "web.shell.chat.thoughtMedium": undefined;
+  "web.shell.chat.title": undefined;
+  "web.shell.chat.toolFailed": undefined;
+  "web.shell.chat.toolNoOutput": undefined;
+  "web.shell.chat.toolOk": undefined;
+  "web.shell.chat.toolOpenDiff": undefined;
+  "web.shell.chat.toolOpenFile": undefined;
+  "web.shell.chat.toolPending": undefined;
+  "web.shell.chat.toolRunning": undefined;
+  "web.shell.chat.you": undefined;
   "web.shell.fileTree.collapseAllDirs": undefined;
   "web.shell.fileTree.copyAbsPath": undefined;
   "web.shell.fileTree.copyRelPath": undefined;
@@ -8441,6 +8648,9 @@ export interface Messages {
   "web.shell.git.wtForceDelete": undefined;
   "web.shell.git.wtRemoveMenu": undefined;
   "web.shell.git.wtRunning": undefined;
+  "web.shell.markdown.loadingPreview": undefined;
+  "web.shell.markdown.openSource": undefined;
+  "web.shell.markdown.source": undefined;
   "web.shell.palette.a11y.commands": undefined;
   "web.shell.palette.a11y.files": undefined;
   "web.shell.palette.a11y.search": undefined;
@@ -8463,6 +8673,7 @@ export interface Messages {
   "web.shell.sidebar.addRepoButton": undefined;
   "web.shell.sidebar.addRepoTooltip": undefined;
   "web.shell.sidebar.attentionCount": { readonly n: string | number };
+  "web.shell.sidebar.chatWaiting": undefined;
   "web.shell.sidebar.closeFolder": { readonly name: string | number };
   "web.shell.sidebar.closeTab": { readonly title: string | number };
   "web.shell.sidebar.collapseAll": undefined;
@@ -8482,6 +8693,8 @@ export interface Messages {
   "web.shell.sidebar.mainWorktree": { readonly label: string | number };
   "web.shell.sidebar.manageRepos": undefined;
   "web.shell.sidebar.needsAttention": undefined;
+  "web.shell.sidebar.newChat": { readonly name: string | number };
+  "web.shell.sidebar.newChatHere": undefined;
   "web.shell.sidebar.newTerminal": { readonly name: string | number };
   "web.shell.sidebar.newTerminalHere": undefined;
   "web.shell.sidebar.ready": undefined;

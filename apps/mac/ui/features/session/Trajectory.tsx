@@ -65,7 +65,12 @@ function tagToneOf(step: SessionEvent): TagTone {
     case "assistant/thinking":
       return { bgClass: "bg-hover", text: "text-muted" };
     case "llm/retry":
+    case "permission/request":
+    case "interaction/request":
       return { bgClass: "bg-warn-soft", text: "text-warn-ink" };
+    case "permission/resolved":
+    case "interaction/resolved":
+      return { bgClass: "bg-ok-soft", text: "text-ok-ink" };
     case "llm/usage":
       return { bgClass: "bg-hover", text: "text-faint" };
     case "run/error":

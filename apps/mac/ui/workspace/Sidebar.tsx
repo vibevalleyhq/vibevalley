@@ -237,7 +237,7 @@ function ChevronSlot(props: { expandable: boolean; expanded: boolean; label: str
 function formatTabTooltip(tab: RailTab, group: WorktreeGroup): string {
   const state = tabRunningState(tab);
   const parts: string[] = [tab.title];
-  if (tab.kind === "terminal") {
+  if (tab.kind === "terminal" || tab.kind === "chat") {
     const label =
       tab.runningLabel && tab.runningLabel !== tab.title ? tab.runningLabel : tab.runningAgent && tab.runningAgent !== "cmd" ? tab.runningAgent : null;
     if (state === "working") {
@@ -245,7 +245,7 @@ function formatTabTooltip(tab: RailTab, group: WorktreeGroup): string {
     } else if (state === "ready") {
       parts.push(label ? t("web.shell.sidebar.readyAgent", { agent: label }) : t("web.shell.sidebar.ready"));
     }
-    if (tab.attention === true) parts.push(t("web.shell.sidebar.needsAttention"));
+    if (tab.attention === true) parts.push(tab.kind === "chat" ? t("web.shell.sidebar.chatWaiting") : t("web.shell.sidebar.needsAttention"));
   }
   parts.push(group.path);
   return parts.join(" · ");
@@ -576,6 +576,15 @@ export function Sidebar() {
       <MenuItem
         onSelect={() => {
           setFold(groupFoldKey(group), true);
+          act({ type: "new_chat_at", path: group.path });
+        }}
+        class={menuItemClass}
+      >
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.newChatHere")}</Text>
+      </MenuItem>
+      <MenuItem
+        onSelect={() => {
+          setFold(groupFoldKey(group), true);
           act({ type: "new_terminal_at", path: group.path });
         }}
         class={menuItemClass}
@@ -603,12 +612,13 @@ export function Sidebar() {
     const rowKey = `tab:${group.path}:${tab.id}`;
     const isSelected = group.active && tab.active;
     const isHovered = () => hoveredKey() === rowKey;
-    // Each terminal tab displays strictly its own PTY status (never polluted by group.sessionRunning).
-    const state = tab.kind === "terminal" ? tabRunningState(tab) : "idle";
-    const ownAgent = tab.kind === "terminal" ? tab.runningAgent : undefined;
+    // Each terminal/chat tab displays strictly its own status (never polluted by group.sessionRunning).
+    const state = tab.kind === "terminal" || tab.kind === "chat" ? tabRunningState(tab) : "idle";
+    const ownAgent = tab.kind === "terminal" || tab.kind === "chat" ? tab.runningAgent : undefined;
     const logoSrc = spriteSrc(runtimeLogoOf(ownAgent ?? undefined));
-    const canClose = tab.kind === "terminal" || group.tabs.length > 1;
+    const canClose = tab.kind === "terminal" || tab.kind === "chat" || group.tabs.length > 1;
     const tabIconTone = () => (state === "working" ? "leaf" : isSelected ? "ink" : "muted");
+    const fallbackIcon = tab.kind === "chat" ? "chat" : tab.kind === "diff" ? "diff" : tab.kind === "file" ? "file" : "terminal";
 
     return (
       <View
@@ -628,11 +638,7 @@ export function Sidebar() {
           class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
         >
           <View class="size-4 shrink-0 items-center justify-center">
-            {logoSrc ? (
-              <Image src={logoSrc} class="size-4 object-contain" />
-            ) : (
-              <Icon name={tab.kind === "diff" ? "diff" : tab.kind === "file" ? "file" : "terminal"} size={14} tone={tabIconTone()} />
-            )}
+            {logoSrc ? <Image src={logoSrc} class="size-4 object-contain" /> : <Icon name={fallbackIcon} size={14} tone={tabIconTone()} />}
           </View>
           <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{tab.title}</Text>
         </Button>
@@ -704,6 +710,16 @@ export function Sidebar() {
               {isHovered() ? (
                 <>
                   {expandable && !expanded ? <CollapsedSummary summary={summary} /> : group.sessionRunning ? <StatusDots state="working" /> : null}
+                  <ShellIconButton
+                    compact
+                    icon="chat"
+                    size={12}
+                    label={t("web.shell.sidebar.newChat", { name: group.label })}
+                    onPress={() => {
+                      setFold(groupFoldKey(group), true);
+                      act({ type: "new_chat_at", path: group.path });
+                    }}
+                  />
                   <ShellIconButton
                     compact
                     icon="add"
@@ -779,6 +795,16 @@ export function Sidebar() {
         <View class="shrink-0 flex-row items-center gap-0.5">
           {isHovered() ? (
             <>
+              <ShellIconButton
+                compact
+                icon="chat"
+                size={12}
+                label={t("web.shell.sidebar.newChat", { name: repo.name })}
+                onPress={() => {
+                  setFold(repoFoldKey(repo), true);
+                  act({ type: "new_chat_at", path: repo.path });
+                }}
+              />
               <ShellIconButton
                 compact
                 icon="add"

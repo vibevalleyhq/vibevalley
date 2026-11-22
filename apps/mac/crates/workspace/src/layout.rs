@@ -48,6 +48,14 @@ pub enum PaneKind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         link: Option<TerminalLink>,
     },
+    /// Direct OAR/ACP coding chat session bound to a project or worktree directory.
+    Chat {
+        session_id: String,
+        runtime: String,
+        cwd: PathBuf,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+    },
     File {
         path: PathBuf,
     },
@@ -230,6 +238,37 @@ impl Layout {
                 _ => None,
             })
             .collect()
+    }
+
+    pub fn chat_session_ids(&self) -> Vec<String> {
+        self.tabs()
+            .filter_map(|t| match &t.kind {
+                PaneKind::Chat { session_id, .. } if !session_id.is_empty() => Some(session_id.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Opens `kind` in an adjacent group (or splits horizontally to the right when only one group
+    /// exists) so the currently active tab stays visible side-by-side.
+    pub fn open_adjacent(&mut self, kind: PaneKind) -> TabId {
+        if let Some(existing) = self.find(&kind)
+            && self.locate(existing).is_some_and(|(g, _)| g != self.focused)
+        {
+            self.activate(existing);
+            return existing;
+        }
+        let groups: Vec<GroupId> = self.groups().iter().map(|g| g.id).collect();
+        let focused = self.focused_group().id;
+        let adjacent = groups
+            .iter()
+            .position(|&g| g == focused)
+            .and_then(|at| groups.get(at + 1).copied())
+            .or_else(|| groups.iter().copied().find(|&g| g != focused));
+        if let Some(target) = adjacent {
+            return self.add_tab(Some(target), kind);
+        }
+        self.split(focused, Axis::Horizontal, kind).expect("focused group exists").1
     }
 
     /// Appends a tab to `group` (default: the focused group) and activates it.
@@ -715,5 +754,85 @@ mod tests {
         assert_eq!(l.focused, 3);
         assert!(l.add_tab(None, term("b")) > 8);
         assert!(Layout::from_json(&serde_json::json!({"nope": 1})).is_none());
+    }
+
+    #[test]
+    fn chat_pane_json_round_trip() {
+        let mut l = Layout::new();
+        let t1 = l.add_tab(None, term("a"));
+        let t2 = l.add_tab(
+            None,
+            PaneKind::Chat {
+                session_id: "sess-123".into(),
+                runtime: "antigravity".into(),
+                cwd: "/work/repo".into(),
+                title: Some("ACP refactor".into()),
+            },
+        );
+        let t3 = l.add_tab(
+            None,
+            PaneKind::Chat {
+                session_id: String::new(),
+                runtime: "claude".into(),
+                cwd: "/work/repo".into(),
+                title: None,
+            },
+        );
+        assert_eq!(l.chat_session_ids(), vec!["sess-123".to_string()]);
+        let restored = Layout::from_json(&l.to_json()).unwrap();
+        assert_eq!(restored, l);
+        assert!(matches!(restored.tab(t1).unwrap().kind, PaneKind::Terminal { .. }));
+        assert_eq!(
+            restored.tab(t2).unwrap().kind,
+            PaneKind::Chat {
+                session_id: "sess-123".into(),
+                runtime: "antigravity".into(),
+                cwd: "/work/repo".into(),
+                title: Some("ACP refactor".into()),
+            }
+        );
+        assert_eq!(
+            restored.tab(t3).unwrap().kind,
+            PaneKind::Chat {
+                session_id: String::new(),
+                runtime: "claude".into(),
+                cwd: "/work/repo".into(),
+                title: None,
+            }
+        );
+    }
+
+    #[test]
+    fn open_adjacent_splits_when_single_group_and_reuses_adjacent_group() {
+        let mut l = Layout::new();
+        let chat_tab = l.add_tab(
+            None,
+            PaneKind::Chat {
+                session_id: "sess-1".into(),
+                runtime: "antigravity".into(),
+                cwd: "/work/repo".into(),
+                title: None,
+            },
+        );
+        let left_group = l.focused;
+
+        // Single group: opening a file adjacent creates a horizontal right split, keeping Chat active on the left.
+        let file1 = l.open_adjacent(file("src/a.rs"));
+        assert_eq!(l.groups().len(), 2);
+        assert_eq!(l.group(left_group).unwrap().active_tab().unwrap().id, chat_tab);
+        let right_group = l.locate(file1).unwrap().0;
+        assert_ne!(right_group, left_group);
+
+        // Refocus left group and open a second file adjacent: reuses existing right group rather than splitting a 3rd time.
+        l.focus_group(left_group);
+        let file2 = l.open_adjacent(file("src/b.rs"));
+        assert_eq!(l.groups().len(), 2);
+        assert_eq!(l.locate(file2).unwrap().0, right_group);
+
+        // Re-opening file1 from the left group activates the existing right-group tab without duplicating it.
+        l.focus_group(left_group);
+        let file1_again = l.open_adjacent(file("src/a.rs"));
+        assert_eq!(file1_again, file1);
+        assert_eq!(l.group(right_group).unwrap().tabs.len(), 2);
     }
 }

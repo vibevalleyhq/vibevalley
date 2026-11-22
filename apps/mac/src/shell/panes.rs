@@ -87,15 +87,188 @@ impl Shell {
 
     fn next_terminal_directory(&self, cx: &gpui::App) -> Option<PathBuf> {
         let project = self.ws.active()?;
-        if let Some(PaneKind::Terminal { terminal_id, .. }) = project.layout.active_tab().map(|t| &t.kind)
-            && let Some(slot) = self.terminals.get(terminal_id)
-        {
-            let cwd = slot.view.read(cx).directory();
-            if cwd.is_dir() {
-                return Some(cwd);
+        match project.layout.active_tab().map(|t| &t.kind) {
+            Some(PaneKind::Terminal { terminal_id, .. }) => {
+                if let Some(slot) = self.terminals.get(terminal_id) {
+                    let cwd = slot.view.read(cx).directory();
+                    if cwd.is_dir() {
+                        return Some(cwd);
+                    }
+                }
             }
+            Some(PaneKind::Chat { cwd, .. }) if cwd.is_dir() => {
+                return Some(cwd.clone());
+            }
+            _ => {}
         }
         Some(project.root().to_path_buf())
+    }
+
+    pub fn new_chat(&mut self, runtime: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+        self.chat_menu_group = None;
+        self.show_workspace(cx);
+        self.with_workspace_project(window, cx, move |s, id, window, cx| {
+            let Ok(id) = id else { return };
+            let cwd = s.next_terminal_directory(cx).or_else(|| s.ws.project(id).map(|p| p.root().to_path_buf()));
+            let Some(cwd) = cwd else { return };
+            let Some(project) = s.ws.project_mut(id) else { return };
+            let runtime = runtime.as_deref().map(str::trim).filter(|r| !r.is_empty()).unwrap_or("antigravity").to_string();
+            project.layout.add_tab(
+                None,
+                PaneKind::Chat {
+                    session_id: String::new(),
+                    runtime,
+                    cwd,
+                    title: None,
+                },
+            );
+            s.layout_changed(window, cx);
+        });
+    }
+
+    pub(super) fn open_chat_at(&mut self, cwd: PathBuf, runtime: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+        self.chat_menu_group = None;
+        if cwd.as_os_str().is_empty() {
+            return self.new_chat(runtime, window, cx);
+        }
+        let Some(directory) = cwd.canonicalize().ok().filter(|p| p.is_dir()) else {
+            let reason = format!("{} {}", vibevalley_i18n::t("desktop.terminal.missingFolder", &[]), cwd.display());
+            self.terminal_notice = Some(reason);
+            cx.notify();
+            return;
+        };
+        let repo = Repo::discover(&directory).ok().flatten();
+        let root = repo.as_ref().map(|r| r.root()).unwrap_or(&directory);
+        let target = self
+            .ws
+            .projects()
+            .iter()
+            .filter_map(|p| {
+                let path = p.root().canonicalize().ok()?;
+                (path == root || (repo.is_none() && directory.starts_with(&path))).then(|| (path.components().count(), p.root().to_owned()))
+            })
+            .max_by_key(|(depth, _)| *depth)
+            .map(|(_, path)| path)
+            .unwrap_or_else(|| root.to_owned());
+        self.with_project_at(target, window, cx, move |s, id, window, cx| {
+            let Ok(id) = id else { return };
+            s.ws.activate(id);
+            s.show_workspace(cx);
+            let Some(project) = s.ws.project_mut(id) else { return };
+            let runtime = runtime.as_deref().map(str::trim).filter(|r| !r.is_empty()).unwrap_or("antigravity").to_string();
+            project.layout.add_tab(
+                None,
+                PaneKind::Chat {
+                    session_id: String::new(),
+                    runtime,
+                    cwd: directory,
+                    title: None,
+                },
+            );
+            s.layout_changed(window, cx);
+        });
+    }
+
+    pub fn open_file_adjacent(&mut self, path: PathBuf, line: Option<u32>, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_workspace(cx);
+        self.with_workspace_project(window, cx, move |s, id, window, cx| {
+            let Ok(pid) = id else { return };
+            let Some(project) = s.ws.project_mut(pid) else { return };
+            let resolved = if path.is_absolute() { path } else { project.root().join(path) };
+            let tab = project.layout.open_adjacent(PaneKind::File { path: resolved.clone() });
+            if let Some(pv) = s.projects.get_mut(&pid) {
+                pv.tree.selected = Some(resolved);
+            }
+            s.ensure_panes(window, cx);
+            if let (Some(line), Some(PaneEntity::File(v))) = (line, s.panes.get(&(pid, tab)).map(|slot| &slot.entity)) {
+                v.update(cx, |v, cx| v.scroll_to_line(line, cx));
+            }
+            s.push_sidebar(cx);
+            s.layout_changed(window, cx);
+        });
+    }
+
+    pub fn open_diff_adjacent(&mut self, path: Option<PathBuf>, staged: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_workspace(cx);
+        self.with_workspace_project(window, cx, move |s, id, window, cx| {
+            let Ok(pid) = id else { return };
+            let Some(project) = s.ws.project_mut(pid) else { return };
+            let root = project.root().to_path_buf();
+            let rel = path.map(|p| p.strip_prefix(&root).map(Path::to_path_buf).unwrap_or(p));
+            let spec = if staged {
+                vibevalley_workspace::DiffSpec::Staged
+            } else {
+                vibevalley_workspace::DiffSpec::Unstaged
+            };
+            project.layout.open_adjacent(PaneKind::Diff { spec, path: rel, repo: None });
+            s.layout_changed(window, cx);
+        });
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn update_chat_tab(
+        &mut self,
+        tab_id: TabId,
+        session_id: Option<String>,
+        runtime: Option<String>,
+        title: Option<String>,
+        status: Option<String>,
+        attention: Option<bool>,
+        cx: &mut Context<Self>,
+    ) {
+        let mut target_pid = None;
+        let mut layout_dirty = false;
+        let ids: Vec<ProjectId> = self.ws.projects().iter().map(|p| p.id()).collect();
+        for pid in ids {
+            let Some(project) = self.ws.project_mut(pid) else { continue };
+            let Some(vibevalley_workspace::Tab {
+                kind:
+                    PaneKind::Chat {
+                        session_id: cur_sid,
+                        runtime: cur_rt,
+                        title: cur_title,
+                        ..
+                    },
+                ..
+            }) = project.layout.tab_mut(tab_id)
+            else {
+                continue;
+            };
+            target_pid = Some(pid);
+            if let Some(sid) = session_id.filter(|s| !s.is_empty())
+                && *cur_sid != sid
+            {
+                *cur_sid = sid;
+                layout_dirty = true;
+            }
+            if let Some(rt) = runtime.filter(|r| !r.is_empty())
+                && *cur_rt != rt
+            {
+                *cur_rt = rt;
+                layout_dirty = true;
+            }
+            if let Some(t) = title.map(|t| t.trim().to_owned()).filter(|t| !t.is_empty())
+                && cur_title.as_deref() != Some(t.as_str())
+            {
+                *cur_title = Some(t);
+                layout_dirty = true;
+            }
+            break;
+        }
+        if let Some(pid) = target_pid {
+            let entry = self.chat_statuses.entry((pid, tab_id)).or_default();
+            if let Some(st) = status {
+                entry.status = st;
+            }
+            if let Some(att) = attention {
+                entry.attention = att;
+            }
+            if layout_dirty {
+                self.schedule_save(cx);
+            }
+            self.push_sidebar(cx);
+            cx.notify();
+        }
     }
 
     pub fn new_terminal(&mut self, spec: Option<SpawnSpec>, window: &mut Window, cx: &mut Context<Self>) {
@@ -291,6 +464,7 @@ impl Shell {
             self.terminals.remove(&terminal_id);
         }
         self.panes.remove(&(pid, tab));
+        self.chat_statuses.remove(&(pid, tab));
         if self.ws.active().is_some_and(|p| p.layout.tabs().next().is_none()) {
             self.new_terminal(None, window, cx);
             return;
@@ -358,7 +532,7 @@ impl Shell {
                     if self.panes.contains_key(&(pid, tab)) {
                         continue;
                     }
-                    let pane = self.make_pane(pid, &root, kind, window, cx);
+                    let pane = self.make_pane(pid, tab, &root, kind, window, cx);
                     self.panes.insert((pid, tab), pane);
                 }
             }
@@ -482,9 +656,33 @@ impl Shell {
         }
     }
 
-    fn make_pane(&mut self, pid: ProjectId, root: &Path, kind: PaneKind, window: &mut Window, cx: &mut Context<Self>) -> PaneSlot {
+    fn make_pane(&mut self, pid: ProjectId, tab: TabId, root: &Path, kind: PaneKind, window: &mut Window, cx: &mut Context<Self>) -> PaneSlot {
         let dark = Ui::get(cx).colors.dark;
         match kind {
+            PaneKind::Chat {
+                session_id,
+                runtime,
+                cwd,
+                title,
+            } => {
+                let mut params = serde_json::Map::new();
+                params.insert("tabId".into(), json!(tab));
+                params.insert("sessionId".into(), json!(session_id));
+                params.insert("runtime".into(), json!(runtime));
+                params.insert("cwd".into(), json!(cwd));
+                if let Some(repo) = root.file_name().and_then(|n| n.to_str()) {
+                    params.insert("repo".into(), json!(repo));
+                }
+                if let Some(title) = title {
+                    params.insert("title".into(), json!(title));
+                }
+                let view = cx.new(|cx| HostedView::new("workspace-chat", params, dark, window, cx));
+                let sub = self.subscribe_hosted(&view, None, window, cx);
+                PaneSlot {
+                    entity: PaneEntity::Hosted(view),
+                    _sub: sub,
+                }
+            }
             PaneKind::File { path } => {
                 let view = cx.new(|cx| FileViewer::new(path, cx));
                 let sub = cx.subscribe_in(&view, window, |this, view, event: &crate::viewer::ViewerEvent, window, cx| match event {
@@ -529,10 +727,7 @@ impl Shell {
                 params.insert("module".into(), json!(module));
                 let doc = (module == "markdown").then(|| props["path"].as_str().map(PathBuf::from)).flatten();
                 let view = cx.new(|cx| HostedView::new(&module, params, dark, window, cx));
-                let sub = self.subscribe_hosted(&view, doc.clone(), window, cx);
-                if let Some(path) = doc {
-                    self.push_doc(&view, path, cx);
-                }
+                let sub = self.subscribe_hosted(&view, doc, window, cx);
                 PaneSlot {
                     entity: PaneEntity::Hosted(view),
                     _sub: sub,

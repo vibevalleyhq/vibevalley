@@ -63,6 +63,24 @@ fn regression_overlapping_helpers_draw_and_hit_in_arrival_order_at_the_same_anim
 }
 
 #[test]
+fn pixel_asset_caches_return_shared_atlas_and_instant_village_hit() {
+    if !assets_dir().join("village.ldtk").exists() {
+        return;
+    }
+    let a1 = load_atlas().unwrap();
+    let a2 = load_atlas().unwrap();
+    assert!(Arc::ptr_eq(&a1, &a2), "load_atlas should return the same cached Arc");
+    let cached_atlas = try_cached_atlas().expect("atlas cached after load");
+    assert!(Arc::ptr_eq(&a1, &cached_atlas));
+
+    let (w1, v_atlas1) = load_village().unwrap();
+    let (w2, v_atlas2) = try_cached_village().expect("village cached after load");
+    assert!(Arc::ptr_eq(&a1, &v_atlas1));
+    assert!(Arc::ptr_eq(&v_atlas1, &v_atlas2));
+    assert_eq!((w1.level.width, w1.level.height), (w2.level.width, w2.level.height));
+}
+
+#[test]
 fn farm_walks_helpers_to_their_work() {
     if !assets_dir().join("village.ldtk").exists() {
         eprintln!("skipped: no assets");

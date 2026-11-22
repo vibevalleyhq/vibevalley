@@ -1,4 +1,7 @@
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::sync::OnceLock;
 
 use gpui::{AppContext as _, Context, Entity, PathPromptOptions, Subscription, Window};
 use serde_json::{Value, json};
@@ -66,6 +69,25 @@ impl Shell {
             Action::CloseTabAt { path, tab_id } => self.activate_path(path, window, cx, move |s, window, cx| s.close_tab(tab_id, window, cx)),
             Action::NewTerminalAt { path } => {
                 self.open_terminal_at(path, None, None, window, cx, |_| {});
+            }
+            Action::NewChatAt { path, runtime } => {
+                self.open_chat_at(path, runtime, window, cx);
+            }
+            Action::OpenFileAdjacent { path, line } => {
+                self.open_file_adjacent(path, line, window, cx);
+            }
+            Action::OpenDiffAdjacent { path, staged } => {
+                self.open_diff_adjacent(path, staged, window, cx);
+            }
+            Action::UpdateChatTab {
+                tab_id,
+                session_id,
+                runtime,
+                title,
+                status,
+                attention,
+            } => {
+                self.update_chat_tab(tab_id, session_id, runtime, title, status, attention, cx);
             }
             Action::AddProject => self.add_project(window, cx),
             Action::CloseProject { id } => self.close_project(id, cx),
@@ -183,27 +205,31 @@ impl Shell {
         let envelope = match op {
             "host.info" => {
                 let settings = &Ui::get(cx).settings;
-                let mut fonts: Vec<String> = window
-                    .text_system()
-                    .all_font_names()
-                    .into_iter()
-                    .filter(|name| {
-                        let lower = name.to_lowercase();
-                        lower.contains("nerd")
-                            || lower.contains(" nf")
-                            || lower.contains("-nf")
-                            || lower.contains("mono")
-                            || lower.contains("menlo")
-                            || lower.contains("monaco")
-                            || lower.contains("consolas")
-                            || lower.contains("courier")
-                            || lower.contains("fira code")
-                            || lower.contains("sarasa")
-                            || lower.contains("maple")
-                    })
-                    .collect();
-                fonts.sort();
-                fonts.dedup();
+                static MONO_FONTS: OnceLock<Vec<String>> = OnceLock::new();
+                let fonts = MONO_FONTS.get_or_init(|| {
+                    let mut fonts: Vec<String> = window
+                        .text_system()
+                        .all_font_names()
+                        .into_iter()
+                        .filter(|name| {
+                            let lower = name.to_lowercase();
+                            lower.contains("nerd")
+                                || lower.contains(" nf")
+                                || lower.contains("-nf")
+                                || lower.contains("mono")
+                                || lower.contains("menlo")
+                                || lower.contains("monaco")
+                                || lower.contains("consolas")
+                                || lower.contains("courier")
+                                || lower.contains("fira code")
+                                || lower.contains("sarasa")
+                                || lower.contains("maple")
+                        })
+                        .collect();
+                    fonts.sort();
+                    fonts.dedup();
+                    fonts
+                });
                 Envelope::ok(json!({
                     "name": "desktop",
                     "version": crate::update::version(),
@@ -385,18 +411,27 @@ impl Shell {
             }
             // Opens a file in the system's default app (a PDF, a picture).
             "host.openFile" => match payload["path"].as_str() {
-                Some(path) if path.starts_with('/') && Path::new(path).exists() => {
+                Some(path) if path.starts_with('/') => {
                     let path = PathBuf::from(path);
                     Self::bg(
                         cx,
-                        move || crate::host::open(&path),
-                        |_, r, _| {
-                            if let Err(e) = r {
+                        move || {
+                            if !path.exists() {
+                                return Err(false);
+                            }
+                            if let Err(e) = crate::host::open(&path) {
                                 eprintln!("open: {e}");
                             }
+                            Ok(())
+                        },
+                        move |_, result, _| {
+                            reply.send(match result {
+                                Ok(()) => Envelope::void(),
+                                Err(_) => refusal(BizCode::InvalidInput, "openFile takes the absolute path of an existing file"),
+                            });
                         },
                     );
-                    Envelope::void()
+                    return;
                 }
                 _ => refusal(BizCode::InvalidInput, "openFile takes the absolute path of an existing file"),
             },
@@ -427,17 +462,26 @@ impl Shell {
             }
             "host.saveFile" => {
                 let source = PathBuf::from(text("path"));
-                if !source.is_absolute() || !source.is_file() {
+                if !source.is_absolute() {
                     reply.send(refusal(BizCode::InvalidInput, "saveFile requires an absolute path to a regular file"));
                     return;
                 }
-                let name = payload["name"]
+                let requested_name = payload["name"]
                     .as_str()
                     .filter(|n| !n.is_empty() && !n.contains('/') && !n.contains('\\'))
-                    .or_else(|| source.file_name().and_then(|s| s.to_str()));
-                let directory = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-                let chosen = cx.prompt_for_new_path(&directory, name);
+                    .map(str::to_string);
                 cx.spawn(async move |_, cx| {
+                    let probe = source.clone();
+                    let is_file = cx.background_spawn(async move { probe.is_file() }).await;
+                    if !is_file {
+                        reply.send(refusal(BizCode::InvalidInput, "saveFile requires an absolute path to a regular file"));
+                        return;
+                    }
+                    let directory = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+                    let chosen = cx.update(|cx| {
+                        let name = requested_name.as_deref().or_else(|| source.file_name().and_then(|s| s.to_str()));
+                        cx.prompt_for_new_path(&directory, name)
+                    });
                     let result = match chosen.await {
                         Ok(Ok(Some(target))) => cx.background_spawn(async move { crate::host::copy_file(&source, &target).map(|_| true) }).await,
                         Ok(Ok(None)) => Ok(false),
@@ -453,16 +497,36 @@ impl Shell {
                 return;
             }
             "host.speechState" => Envelope::ok(json!(crate::speech_audio::state(&text("id")))),
-            "host.speechStart" => match crate::serving::speech().and_then(|speech| crate::speech_audio::start(speech, &text("id"))) {
-                Ok(state) => Envelope::ok(json!(state)),
-                Err(error) => refusal(BizCode::Refused, error),
-            },
+            "host.speechStart" => {
+                let id = text("id");
+                Self::bg(
+                    cx,
+                    move || crate::serving::speech().and_then(|speech| crate::speech_audio::start(speech, &id)),
+                    move |_, result, _| {
+                        reply.send(match result {
+                            Ok(state) => Envelope::ok(json!(state)),
+                            Err(error) => refusal(BizCode::Refused, error),
+                        });
+                    },
+                );
+                return;
+            }
             "host.speechStop" => Envelope::ok(json!(crate::speech_audio::stop(Some(&text("id"))))),
             "host.voiceState" => Envelope::ok(json!(crate::live_voice::state(&text("id")))),
-            "host.voiceStart" => match crate::serving::voice().and_then(|voice| crate::live_voice::start(voice, text("id"))) {
-                Ok(state) => Envelope::ok(json!(state)),
-                Err(error) => refusal(BizCode::Refused, error),
-            },
+            "host.voiceStart" => {
+                let id = text("id");
+                Self::bg(
+                    cx,
+                    move || crate::serving::voice().and_then(|voice| crate::live_voice::start(voice, id)),
+                    move |_, result, _| {
+                        reply.send(match result {
+                            Ok(state) => Envelope::ok(json!(state)),
+                            Err(error) => refusal(BizCode::Refused, error),
+                        });
+                    },
+                );
+                return;
+            }
             "host.voiceStop" => Envelope::ok(json!(crate::live_voice::stop(Some(&text("id"))))),
             "host.voiceMute" => match payload["muted"].as_bool() {
                 Some(muted) => Envelope::ok(json!(crate::live_voice::mute(&text("id"), muted))),
@@ -542,12 +606,20 @@ impl Shell {
             }
             // VibeValley's built pixel art: sprites.json and its PNGs.
             "host.pixelDir" => {
-                let dir = crate::pixel::assets_dir().join("pixel");
-                if dir.join("sprites.json").is_file() {
-                    Envelope::ok(json!({ "path": dir }))
-                } else {
-                    refusal(BizCode::NotFound, "the pixel art is not installed")
-                }
+                Self::bg(
+                    cx,
+                    || {
+                        let dir = crate::pixel::assets_dir().join("pixel");
+                        dir.join("sprites.json").is_file().then_some(dir)
+                    },
+                    move |_, found, _| {
+                        reply.send(match found {
+                            Some(dir) => Envelope::ok(json!({ "path": dir })),
+                            None => refusal(BizCode::NotFound, "the pixel art is not installed"),
+                        });
+                    },
+                );
+                return;
             }
             other => match crate::host::handle_stateless_op(other, &payload) {
                 Some(env) => env,
@@ -558,18 +630,33 @@ impl Shell {
     }
 
     pub(super) fn subscribe_hosted(&mut self, view: &Entity<HostedView>, doc: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) -> Subscription {
+        // Overlap reading a markdown file with `HostedView` boot, then reuse the
+        // loaded frame on `Ready` so the file is never read from disk twice.
+        let cached_doc: Rc<RefCell<DocLoad>> = Rc::new(RefCell::new(if doc.is_some() { DocLoad::InFlight } else { DocLoad::None }));
+        if let Some(path) = doc.clone() {
+            self.push_doc_cached(view, path, cached_doc.clone(), cx);
+        }
+        let doc_cache = cached_doc;
         cx.subscribe_in(view, window, move |this, view, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(a) => this.on_action(a.clone(), window, cx),
             HostedEvent::HostCall { op, payload, reply } => this.host_call(op, payload.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => {
                 if let Some(path) = &doc {
-                    this.push_doc(view, path.clone(), cx);
+                    let state = doc_cache.borrow().clone();
+                    match state {
+                        DocLoad::Loaded(frame) => view.update(cx, |v, cx| v.push("doc", frame, cx)),
+                        DocLoad::InFlight => {}
+                        DocLoad::None => {
+                            *doc_cache.borrow_mut() = DocLoad::InFlight;
+                            this.push_doc_cached(view, path.clone(), doc_cache.clone(), cx);
+                        }
+                    }
                 }
             }
         })
     }
 
-    pub(super) fn push_doc(&mut self, view: &Entity<HostedView>, path: PathBuf, cx: &mut Context<Self>) {
+    fn push_doc_cached(&mut self, view: &Entity<HostedView>, path: PathBuf, cache: Rc<RefCell<DocLoad>>, cx: &mut Context<Self>) {
         let view = view.clone();
         Self::bg(
             cx,
@@ -579,8 +666,16 @@ impl Shell {
                     Ok(text) => json!({ "path": path, "markdown": text }),
                     Err(e) => json!({ "path": path, "error": e.to_string() }),
                 };
+                *cache.borrow_mut() = DocLoad::Loaded(frame.clone());
                 view.update(cx, |v, cx| v.push("doc", frame, cx));
             },
         );
     }
+}
+
+#[derive(Clone)]
+enum DocLoad {
+    None,
+    InFlight,
+    Loaded(Value),
 }

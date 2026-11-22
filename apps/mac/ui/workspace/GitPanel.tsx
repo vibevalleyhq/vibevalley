@@ -11,6 +11,7 @@ import { Button as DesignButton } from "../design/Button";
 import { Icon } from "../design/Icon";
 import { ActiveBar } from "../design/layout";
 import { motionClass } from "../design/motion";
+import { SkeletonBar, SkeletonLines, useDelayedBusy } from "../design/Skeleton";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { act, frame, hostApi } from "../infra/bridge";
@@ -489,12 +490,26 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     </View>
   );
 
+  const isLoadingGit = () => !f() || (f()?.repo !== true && f()?.busy === true);
+  const showGitSkeleton = useDelayedBusy(isLoadingGit);
+
   return (
     <View class="flex-1">
       {f()?.repo !== true ? (
         <View class="flex-1">
           <SectionHead title={t("web.shell.git.title")} borderBottom />
-          <PanelEmpty text={f()?.busy === true || !f() ? t("web.shell.git.loading") : (f()?.error ?? t("web.shell.git.notRepo"))} />
+          {isLoadingGit() ? (
+            showGitSkeleton() ? (
+              <View testID="git-panel-skeleton" accessibilityLabel={t("web.shell.git.loading")} accessibilityState={{ busy: true }} class="gap-2.5 px-3 py-3">
+                <SkeletonBar surface="side" class="h-7 w-full rounded-md" />
+                <SkeletonLines surface="side" rows={["52%", "76%", "64%", "44%"]} />
+              </View>
+            ) : (
+              <View class="flex-1" />
+            )
+          ) : (
+            <PanelEmpty text={f()?.error ?? t("web.shell.git.notRepo")} />
+          )}
         </View>
       ) : (
         <View class="flex-1">

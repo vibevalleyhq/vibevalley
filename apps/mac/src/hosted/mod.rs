@@ -142,9 +142,27 @@ fn capabilities_from(raw: &str) -> String {
 
 #[cfg(not(debug_assertions))]
 const BUNDLE_JS: &str = include_str!(concat!(env!("OUT_DIR"), "/ui/bundle.js"));
+#[cfg(not(debug_assertions))]
+const BUNDLE_NSHC: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ui/bundle.nshc"));
 #[cfg(debug_assertions)]
 const BUNDLE_JS: &str = "throw new Error('VibeValley UI bundle missing on disk: run vp run mac:check.');\n";
+#[cfg(debug_assertions)]
+const BUNDLE_NSHC: &[u8] = &[];
 const CAPABILITIES: &str = include_str!(concat!(env!("OUT_DIR"), "/ui/capabilities.json"));
+
+fn build_embedded_bundle(bytecode: &[u8], js: &str, caps_json: &str) -> Bundle {
+    if !bytecode.is_empty() {
+        // SAFETY: bytecode emitted by `nsh build` in `build.rs` during this build.
+        let b = unsafe { Bundle::bytecode(bytecode.to_vec()) };
+        if let Ok(b) = b.with_app_id(Some("dev.vibevalley.ui")).with_capabilities_json(Some(caps_json)) {
+            return b;
+        }
+    }
+    Bundle::source(js.to_string())
+        .with_app_id(Some("dev.vibevalley.ui"))
+        .with_capabilities_json(Some(caps_json))
+        .expect("capabilities.json written by nsh build")
+}
 
 fn dev_ui_build_dir() -> Option<std::path::PathBuf> {
     if let Some(dir) = std::env::var_os("VIBEVALLEY_UI_BUNDLE") {
@@ -162,23 +180,22 @@ fn dev_ui_build_dir() -> Option<std::path::PathBuf> {
 /// The bundle every hosted view runs: `VIBEVALLEY_UI_BUNDLE` (or `ui/build` in
 /// debug builds) when present on disk, else the one embedded at build time.
 /// Cached process-wide so multiple hosted views share one disk read, and prefers
-/// the precompiled `bundle.nshc` bytecode when present to skip parsing 4+ MB JS.
+/// the precompiled `bundle.nshc` bytecode in both dev and release builds to skip
+/// re-parsing 4+ MB JS on every `HostedView` open.
 fn bundle() -> Bundle {
     static CACHED: std::sync::OnceLock<Bundle> = std::sync::OnceLock::new();
     CACHED
         .get_or_init(|| {
             if let Some(dir) = dev_ui_build_dir() {
                 let raw_caps = std::fs::read_to_string(dir.join("capabilities.json")).unwrap_or_else(|_| CAPABILITIES.to_string());
+                let caps_json = capabilities_from(&raw_caps);
                 let nshc = dir.join("bundle.nshc");
                 if nshc.is_file()
                     && let Ok(bytes) = std::fs::read(&nshc)
                 {
                     // SAFETY: local `nsh build` output under the workspace's own `ui/build/`.
                     let b = unsafe { Bundle::bytecode(bytes) };
-                    if let Ok(b) = b
-                        .with_app_id(Some("dev.vibevalley.ui"))
-                        .with_capabilities_json(Some(&capabilities_from(&raw_caps)))
-                    {
+                    if let Ok(b) = b.with_app_id(Some("dev.vibevalley.ui")).with_capabilities_json(Some(&caps_json)) {
                         return b;
                     }
                 }
@@ -186,7 +203,7 @@ fn bundle() -> Bundle {
                     Ok(js) => {
                         if let Ok(b) = Bundle::source(js)
                             .with_app_id(Some("dev.vibevalley.ui"))
-                            .with_capabilities_json(Some(&capabilities_from(&raw_caps)))
+                            .with_capabilities_json(Some(&caps_json))
                         {
                             return b;
                         }
@@ -194,10 +211,8 @@ fn bundle() -> Bundle {
                     Err(e) => eprintln!("ui bundle at {}: {e}; using the embedded bundle", dir.display()),
                 }
             }
-            Bundle::source(BUNDLE_JS.to_string())
-                .with_app_id(Some("dev.vibevalley.ui"))
-                .with_capabilities_json(Some(&capabilities_from(CAPABILITIES)))
-                .expect("capabilities.json written by nsh build")
+            let caps_json = capabilities_from(CAPABILITIES);
+            build_embedded_bundle(BUNDLE_NSHC, BUNDLE_JS, &caps_json)
         })
         .clone()
 }
@@ -358,6 +373,10 @@ impl HostedView {
             Ok(action) => cx.emit(HostedEvent::Action(action)),
             Err(e) => eprintln!("hosted view {}: {e}", self.view),
         }
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.ready
     }
 
     /// Sends `data` as the frame of `topic` unless the view already has it.
@@ -530,5 +549,11 @@ mod tests {
         let explicit_err = bind_preferred_or_ephemeral(PortPreference::Explicit(busy_port), TcpListener::bind)
             .expect_err("explicit VIBEVALLEY_PORT must not silently fall back on AddrInUse");
         assert_eq!(explicit_err.kind(), ErrorKind::AddrInUse);
+    }
+
+    #[test]
+    fn embedded_bundle_falls_back_to_source_when_bytecode_is_empty() {
+        let caps = capabilities_from(r#"{"host":["action"]}"#);
+        let _bundle = build_embedded_bundle(&[], "export default function() {}", &caps);
     }
 }

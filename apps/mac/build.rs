@@ -37,6 +37,10 @@ fn main() {
         let result = Command::new(&nsh).arg("build").arg(ui.join("App.tsx")).arg("-o").arg(target_dir).output();
         match result {
             Ok(o) if o.status.success() => {
+                if release && !out.join("bundle.nshc").is_file() {
+                    // Sentinel so release `include_bytes!` always succeeds and falls back to `bundle.js`.
+                    std::fs::write(out.join("bundle.nshc"), []).unwrap();
+                }
                 if !release {
                     let _ = std::fs::copy(target_dir.join("capabilities.json"), out.join("capabilities.json"));
                 }

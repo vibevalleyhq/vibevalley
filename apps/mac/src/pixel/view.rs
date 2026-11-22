@@ -3,11 +3,11 @@
 use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use gpui::{
-    App, AppContext as _, Bounds, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent, MouseButton,
-    MouseDownEvent, MouseMoveEvent, ParentElement as _, Pixels, Point, Render, Styled as _, Subscription, Window, canvas, div, px,
+    AnyElement, App, AppContext as _, Bounds, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, KeyDownEvent,
+    MouseButton, MouseDownEvent, MouseMoveEvent, ParentElement as _, Pixels, Point, Render, Styled as _, Subscription, Window, canvas, div, px,
 };
 use serde_json::{Value, json};
 
@@ -98,6 +98,8 @@ pub struct PixelView {
     sheet: Option<(Entity<HostedView>, Subscription)>,
     pending_phase: Option<(super::opening::Phase, f32)>,
     command_pending: bool,
+    /// Only reveals the cold-load indicator after 150ms so fast loads never flash.
+    show_loading: bool,
 }
 
 impl EventEmitter<PixelEvent> for PixelView {}
@@ -120,41 +122,12 @@ impl PixelView {
             }
         })
         .detach();
-        let load_kind = kind.to_string();
-        let task = cx.background_executor().spawn(async move { load(&load_kind) });
-        cx.spawn(async move |this, cx| {
-            let scene = task.await;
-            let _ = this.update(cx, |v, cx| {
-                v.scene = scene;
-                if let (Scene::Opening(o), Some((phase, progress))) = (&mut v.scene, v.pending_phase) {
-                    o.phase = phase;
-                    o.progress = progress;
-                }
-                let frame = v.frame.clone();
-                v.on_frame(frame, cx);
-                if let (Scene::Farm(f), Some(repo)) = (&mut v.scene, v.props["repo"].as_str()) {
-                    f.repo = Some(repo.to_string());
-                }
-                if matches!(v.scene, Scene::Farm(_) | Scene::Map(_)) {
-                    v.fetch_agents(cx);
-                }
-                if matches!(v.scene, Scene::Farm(_)) {
-                    v.fetch_runtimes(cx);
-                }
-                if matches!(v.scene, Scene::Map(_)) {
-                    v.fetch_repos(cx);
-                }
-                if matches!(v.scene, Scene::Tree(_)) {
-                    v.fetch_memories(cx);
-                }
-                cx.notify();
-            });
-        })
-        .detach();
-        PixelView {
+        let cached = try_load_cached(kind);
+        let is_cached = cached.is_some();
+        let mut view = PixelView {
             kind: kind.to_string(),
             props,
-            scene: Scene::Loading,
+            scene: cached.unwrap_or(Scene::Loading),
             frame: Value::Null,
             focus: cx.focus_handle(),
             cache: SpriteCache::default(),
@@ -169,6 +142,58 @@ impl PixelView {
             sheet_request: None,
             sheet: None,
             command_pending: false,
+            show_loading: false,
+        };
+        if is_cached {
+            view.on_scene_ready(cx);
+        } else {
+            let load_kind = kind.to_string();
+            let task = cx.background_executor().spawn(async move { load(&load_kind) });
+            cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(Duration::from_millis(150)).await;
+                let _ = this.update(cx, |v, cx| {
+                    if matches!(v.scene, Scene::Loading) {
+                        v.show_loading = true;
+                        cx.notify();
+                    }
+                });
+            })
+            .detach();
+            cx.spawn(async move |this, cx| {
+                let scene = task.await;
+                let _ = this.update(cx, |v, cx| {
+                    v.scene = scene;
+                    v.show_loading = false;
+                    v.on_scene_ready(cx);
+                    cx.notify();
+                });
+            })
+            .detach();
+        }
+        view
+    }
+
+    fn on_scene_ready(&mut self, cx: &mut Context<Self>) {
+        if let (Scene::Opening(o), Some((phase, progress))) = (&mut self.scene, self.pending_phase) {
+            o.phase = phase;
+            o.progress = progress;
+        }
+        let frame = self.frame.clone();
+        self.on_frame(frame, cx);
+        if let (Scene::Farm(f), Some(repo)) = (&mut self.scene, self.props["repo"].as_str()) {
+            f.repo = Some(repo.to_string());
+        }
+        if matches!(self.scene, Scene::Farm(_) | Scene::Map(_)) {
+            self.fetch_agents(cx);
+        }
+        if matches!(self.scene, Scene::Farm(_)) {
+            self.fetch_runtimes(cx);
+        }
+        if matches!(self.scene, Scene::Map(_)) {
+            self.fetch_repos(cx);
+        }
+        if matches!(self.scene, Scene::Tree(_)) {
+            self.fetch_memories(cx);
         }
     }
 
@@ -722,6 +747,16 @@ impl PixelView {
     }
 }
 
+fn try_load_cached(kind: &str) -> Option<Scene> {
+    match kind {
+        "farm" => super::try_cached_village().map(|(world, atlas)| Scene::Farm(Box::new(FarmScene::new(world, atlas)))),
+        "map" => super::try_cached_atlas().map(|atlas| Scene::Map(Box::new(MapScene::new(atlas)))),
+        "tree" => super::try_cached_atlas().map(|atlas| Scene::Tree(Box::new(TreeScene::new(atlas)))),
+        "catalog" => super::try_cached_atlas().map(|atlas| Scene::Catalog(Box::new(CatalogScene::new(atlas)))),
+        _ => None,
+    }
+}
+
 fn load(kind: &str) -> Scene {
     match kind {
         "farm" => match super::load_village() {
@@ -760,8 +795,8 @@ impl Render for PixelView {
             }
         }
         self.last_list = list.clone();
-        let message = match &self.scene {
-            Scene::Loading => Some(t("web.farm.native.loading", &[])),
+        let loading_overlay = matches!(self.scene, Scene::Loading) && self.show_loading;
+        let failed_message = match &self.scene {
             Scene::Failed(e) => Some(e.clone()),
             _ => None,
         };
@@ -894,7 +929,8 @@ impl Render for PixelView {
                     }
                 }),
             )
-            .children(message.map(|m| div().p_4().text_color(gpui::rgb(0xfdf6e3)).child(m)))
+            .children(loading_overlay.then(pixel_loading_overlay))
+            .children(failed_message.map(|m| div().p_4().text_color(gpui::rgb(0xfdf6e3)).child(m)))
             .children(list.map(|list| {
                 canvas(
                     move |bounds, _, _| bounds,
@@ -930,4 +966,45 @@ impl Render for PixelView {
                 .child(div().w(px(540.0)).max_w_full().h(px(430.0)).max_h_full().child(view))
         }))
     }
+}
+
+/// Subtle sprout emblem + slim progress track shown only when cold asset
+/// decoding exceeds 150ms.
+fn pixel_loading_overlay() -> AnyElement {
+    let leaf_hi = gpui::rgb(0x9ec867);
+    let leaf_lo = gpui::rgb(0x6e9c3c);
+    let stem = gpui::rgb(0x527a2d);
+    let soil = gpui::rgb(0x5c4430);
+    let sprout = div()
+        .w(px(28.0))
+        .h(px(24.0))
+        .relative()
+        .child(div().absolute().left(px(4.0)).top(px(4.0)).w(px(8.0)).h(px(5.0)).rounded(px(2.0)).bg(leaf_hi))
+        .child(div().absolute().left(px(16.0)).top(px(2.0)).w(px(8.0)).h(px(5.0)).rounded(px(2.0)).bg(leaf_lo))
+        .child(div().absolute().left(px(12.0)).top(px(7.0)).w(px(4.0)).h(px(11.0)).rounded(px(1.5)).bg(stem))
+        .child(div().absolute().left(px(6.0)).top(px(18.0)).w(px(16.0)).h(px(4.0)).rounded(px(2.0)).bg(soil));
+    div()
+        .size_full()
+        .flex()
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .gap(px(10.0))
+        .child(sprout)
+        .child(
+            div()
+                .w(px(120.0))
+                .h(px(4.0))
+                .rounded_full()
+                .bg(gpui::rgba(0xfdf6e31f))
+                .overflow_hidden()
+                .child(div().w(px(52.0)).h_full().rounded_full().bg(leaf_hi)),
+        )
+        .child(
+            div()
+                .text_size(px(11.5))
+                .text_color(gpui::rgba(0xfdf6e399))
+                .child(t("web.farm.native.loading", &[])),
+        )
+        .into_any_element()
 }

@@ -201,12 +201,6 @@ impl Shell {
         let Some(root) = self.ws.project(id).map(|p| p.root().to_path_buf()) else {
             return;
         };
-        let tx = self.fs_tx.clone();
-        let watcher = Watcher::new(&root, move |changes| {
-            let _ = tx.send((id, changes));
-        })
-        .map_err(|e| eprintln!("watch {}: {e}", root.display()))
-        .ok();
         self.projects.insert(
             id,
             ProjectView {
@@ -221,7 +215,26 @@ impl Shell {
                 git_error: None,
                 git_busy: false,
                 index: None,
-                _watcher: watcher,
+                _watcher: None,
+            },
+        );
+        let tx = self.fs_tx.clone();
+        let watch_root = root.clone();
+        Self::bg(
+            cx,
+            move || {
+                Watcher::new(&watch_root, move |changes| {
+                    let _ = tx.send((id, changes));
+                })
+                .map_err(|e| format!("watch {}: {e}", watch_root.display()))
+            },
+            move |s, watcher, _| match watcher {
+                Ok(watcher) => {
+                    if let Some(pv) = s.projects.get_mut(&id) {
+                        pv._watcher = Some(watcher);
+                    }
+                }
+                Err(e) => eprintln!("{e}"),
             },
         );
         self.load_dirs(id, cx);
@@ -442,6 +455,11 @@ impl Shell {
     }
 
     pub fn push_sidebar(&mut self, cx: &mut Context<Self>) {
+        let sidebar_ready = self.sidebar.read(cx).is_ready();
+        let inspector_ready = self.inspector_open && self.inspector.read(cx).is_ready();
+        if !sidebar_ready && !inspector_ready {
+            return;
+        }
         let rail_items: Vec<RailProject> = self
             .ws
             .projects()
@@ -451,7 +469,7 @@ impl Shell {
                 name: &p.info.name,
                 path: p.root(),
                 active: Some(p.id()) == self.ws.active_id(),
-                attention: p.needs_attention(),
+                attention: p.needs_attention() || self.chat_statuses.iter().any(|((pid, _), st)| *pid == p.id() && st.attention),
                 terminals: p.live_terminals(),
             })
             .collect();
@@ -503,6 +521,12 @@ impl Shell {
                                     att,
                                 )
                             }
+                            PaneKind::Chat { runtime, .. } => {
+                                let st = self.chat_statuses.get(&(p.id(), t.id));
+                                let state = st.map(|s| s.status.as_str()).filter(|s| !s.is_empty()).unwrap_or("ready");
+                                let att = st.is_some_and(|s| s.attention);
+                                ("chat", state == "working", state, Some(runtime.clone()), None, att)
+                            }
                             PaneKind::File { .. } => ("file", false, "idle", None, None, false),
                             PaneKind::Diff { .. } => ("diff", false, "idle", None, None, false),
                             PaneKind::Hosted { .. } => ("hosted", false, "idle", None, None, false),
@@ -540,16 +564,20 @@ impl Shell {
             ),
             None => (json!({ "items": [], "loading": !self.loaded }), json!({ "repo": false, "busy": !self.loaded })),
         };
-        self.sidebar.update(cx, |v, cx| {
-            v.push("rail", rail.clone(), cx);
-            v.push("files", files.clone(), cx);
-            v.push("git", git.clone(), cx);
-        });
-        self.inspector.update(cx, |v, cx| {
-            v.push("rail", rail, cx);
-            v.push("files", files, cx);
-            v.push("git", git, cx);
-        });
+        if sidebar_ready {
+            self.sidebar.update(cx, |v, cx| {
+                v.push("rail", rail.clone(), cx);
+                v.push("files", files.clone(), cx);
+                v.push("git", git.clone(), cx);
+            });
+        }
+        if inspector_ready {
+            self.inspector.update(cx, |v, cx| {
+                v.push("rail", rail, cx);
+                v.push("files", files, cx);
+                v.push("git", git, cx);
+            });
+        }
     }
 
     pub(super) fn add_worktree(&mut self, branch: String, window: &mut Window, cx: &mut Context<Self>) {

@@ -11,6 +11,7 @@ import { IconButton } from "../../design/IconButton";
 import { Empty } from "../../design/layout";
 import { type MoreItem, MoreMenu } from "../../design/MoreMenu";
 import { motionClass } from "../../design/motion";
+import { SkeletonBar, SkeletonLines, useDelayedBusy } from "../../design/Skeleton";
 import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { api, newSendKey, reasonOf } from "../../infra/api";
@@ -51,6 +52,25 @@ async function exportArtifactFile(artifact: Artifact, activeVersion?: number): P
   return saveTextFile(`${safeName}.json`, "application/json;charset=utf-8", JSON.stringify(snap.entries, null, 2));
 }
 
+function ArtifactSkeleton() {
+  return (
+    <View testID="artifact-skeleton" accessibilityState={{ busy: true }} class="min-h-0 flex-1 bg-page">
+      <View class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+        <SkeletonBar class="h-6 w-16 rounded-md" />
+        <SkeletonBar class="h-5 w-44 rounded-sm" />
+        <SkeletonBar class="h-5 w-14 rounded-sm" />
+        <View class="flex-1" />
+        <SkeletonBar class="size-7 rounded-md" />
+        <SkeletonBar class="size-7 rounded-md" />
+      </View>
+      <View class="mx-auto w-full max-w-3xl gap-4 px-6 py-7">
+        <SkeletonBar class="h-7 w-64 rounded-md" />
+        <SkeletonLines rows={["92%", "78%", "85%", "60%", "88%", "45%"]} gap="md" />
+      </View>
+    </View>
+  );
+}
+
 /** `rest` is the path after /artifacts/. */
 export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
   const all = useArtifacts(() => ({}));
@@ -60,6 +80,7 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
     return rest ? decodeURIComponent(rest) : undefined;
   };
   const open = () => id() ?? list()[0]?.id;
+  const showListSkeleton = useDelayedBusy(() => open() === undefined && all.status() !== "error" && all.status() !== "success");
   cleanup(() => contentPresenting.set(false));
 
   return (
@@ -70,7 +91,14 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
           <If
             when={all.status() === "error"}
             else={
-              <If when={all.status() === "success"}>
+              <If
+                when={all.status() === "success"}
+                else={
+                  <If when={showListSkeleton()}>
+                    <ArtifactSkeleton />
+                  </If>
+                }
+              >
                 <Empty
                   icon="artifacts"
                   action={
@@ -96,11 +124,19 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
 
 function Opened(props: { id: string; chat: ArtifactChat }) {
   const found = useArtifact(() => props.id);
+  const showSkeleton = useDelayedBusy(() => ready(found, undefined) === undefined && found.status() !== "error");
   return (
     <If
       when={ready(found, undefined)}
       else={
-        <If when={found.status() === "error"}>
+        <If
+          when={found.status() === "error"}
+          else={
+            <If when={showSkeleton()}>
+              <ArtifactSkeleton />
+            </If>
+          }
+        >
           <Empty icon="artifacts">{t("web.artifact.page.gone")}</Empty>
         </If>
       }

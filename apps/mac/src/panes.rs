@@ -82,10 +82,12 @@ fn find_split(node: &Node, id: u64) -> Option<&vibevalley_workspace::Split> {
 pub fn render_main(shell: &mut Shell, window: &mut Window, cx: &mut Context<Shell>) -> AnyElement {
     let colors = Ui::get(cx).colors.clone();
     let Some(project) = shell.ws.active() else {
-        let text = match (&shell.load_error, shell.loaded) {
-            (Some(e), _) => format!("Could not open the project store: {e}"),
-            (None, false) => "Loading projects…".to_string(),
-            (None, true) => "No project open. Add one with ⇧⌘P → Add Project.".to_string(),
+        if shell.load_error.is_none() && !shell.loaded {
+            return div().size_full().bg(colors.bg).into_any_element();
+        }
+        let text = match &shell.load_error {
+            Some(e) => format!("Could not open the project store: {e}"),
+            None => vibevalley_i18n::t("desktop.terminal.noProject", &[]),
         };
         return div()
             .size_full()
@@ -226,6 +228,16 @@ fn shell_name() -> String {
         .unwrap_or_else(|| "shell".into())
 }
 
+fn chat_runtime_label(runtime: &str) -> &str {
+    match runtime {
+        "antigravity" => "Antigravity",
+        "claude" => "Claude",
+        "codex" => "Codex",
+        other if !other.is_empty() => other,
+        _ => "Chat",
+    }
+}
+
 pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
     match &tab.kind {
         PaneKind::Terminal { link: Some(link), .. } => link.title.clone(),
@@ -234,6 +246,12 @@ pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
             .get(terminal_id)
             .map(|t| terminal_name(t.view.read(cx)))
             .unwrap_or_else(shell_name),
+        PaneKind::Chat { runtime, title, .. } => title
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .unwrap_or_else(|| chat_runtime_label(runtime).to_string()),
         PaneKind::File { path } => path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
         PaneKind::Diff { spec, path, .. } => {
             let what = match spec {
@@ -312,12 +330,19 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         let active = i == g.active;
         let tab_id = tab.id;
         let title = names.get(&tab.id).cloned().unwrap_or_else(|| tab_title(shell, tab, cx));
-        let attention = match &tab.kind {
-            PaneKind::Terminal { terminal_id, .. } => shell.ws.active().and_then(|p| p.terminal(terminal_id)).is_some_and(|t| t.attention),
-            _ => false,
+        let (attention, chat_working) = match &tab.kind {
+            PaneKind::Terminal { terminal_id, .. } => (shell.ws.active().and_then(|p| p.terminal(terminal_id)).is_some_and(|t| t.attention), false),
+            PaneKind::Chat { .. } => shell
+                .chat_statuses
+                .get(&(pid, tab.id))
+                .map(|s| (s.attention, s.status == "working"))
+                .unwrap_or((false, false)),
+            _ => (false, false),
         };
         let indicator = if attention {
             Some(div().size(px(6.0)).flex_none().rounded_full().bg(colors.warning))
+        } else if chat_working {
+            Some(div().size(px(6.0)).flex_none().rounded_full().bg(colors.accent))
         } else {
             None
         };
@@ -395,28 +420,38 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 ),
         );
     }
-    tabs_row = tabs_row.child(
-        div()
-            .id(("new-tab", group_id as usize))
-            .size(px(26.0))
-            .flex_none()
-            .flex()
-            .items_center()
-            .justify_center()
-            .rounded(px(6.0))
-            .border_1()
+    let menu_open = shell.chat_menu_group == Some(group_id);
+    let new_btn = div()
+        .id(("new-tab", group_id as usize))
+        .size(px(26.0))
+        .ml(px(4.0))
+        .mr(px(if is_last_group { 2.0 } else { 6.0 }))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(6.0))
+        .border_1()
+        .cursor_pointer()
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |shell, _, _, cx| {
+                cx.stop_propagation();
+                // Use render-time `menu_open`: `on_mouse_down_out` already cleared
+                // `chat_menu_group` during capture when clicking `+` to toggle off.
+                shell.chat_menu_group = if menu_open { None } else { Some(group_id) };
+                cx.notify();
+            }),
+        );
+    let new_btn = if menu_open {
+        new_btn.bg(colors.elevated).border_color(colors.border).child(plus_icon(colors.text))
+    } else {
+        new_btn
+            .bg(transparent())
             .border_color(transparent())
-            .cursor_pointer()
             .hover(move |s| s.bg(hover_bg))
             .child(plus_icon(colors.muted))
-            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-            .on_click(cx.listener(move |shell, _, window, cx| {
-                if let Some(p) = shell.ws.active_mut() {
-                    p.layout.focus_group(group_id);
-                }
-                shell.new_terminal(None, window, cx);
-            })),
-    );
+    };
 
     let mut bar = div()
         .h(px(36.0))
@@ -427,7 +462,8 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         .bg(colors.surface)
         .border_b_1()
         .border_color(colors.border)
-        .child(tabs_row);
+        .child(tabs_row)
+        .child(new_btn);
 
     if is_last_group {
         let inspector_btn = div()
@@ -471,24 +507,144 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         },
         None => div().into_any_element(),
     };
+    let chat_menu = menu_open.then(|| {
+        let choices = [("antigravity", "Antigravity"), ("claude", "Claude Code"), ("codex", "Codex")];
+        let mut panel = div()
+            .id(("chat-runtime-menu", group_id as usize))
+            .absolute()
+            .top(px(38.0))
+            .right(px(if is_last_group { 38.0 } else { 8.0 }))
+            .w(px(216.0))
+            .p(px(4.0))
+            .rounded(px(8.0))
+            .border_1()
+            .border_color(colors.border)
+            .bg(colors.elevated)
+            .shadow_md()
+            .flex()
+            .flex_col()
+            .gap(px(2.0))
+            .occlude()
+            .on_mouse_down_out(cx.listener(|shell, _, _, cx| {
+                if shell.chat_menu_group.take().is_some() {
+                    cx.notify();
+                }
+            }))
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
+            .child(
+                div()
+                    .id(("new-terminal-item", group_id as usize))
+                    .h(px(28.0))
+                    .px(px(8.0))
+                    .rounded(px(6.0))
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(8.0))
+                    .text_size(px(12.5))
+                    .text_color(colors.text)
+                    .cursor_pointer()
+                    .hover(move |s| s.bg(hover_bg))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(px(8.0))
+                            .child(div().size(px(6.0)).rounded(px(1.5)).bg(colors.muted))
+                            .child(vibevalley_i18n::t("desktop.workspace.newTerminal", &[])),
+                    )
+                    .child(div().text_size(px(11.0)).text_color(colors.faint).child("⌘T"))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |shell, _, window, cx| {
+                        shell.chat_menu_group = None;
+                        if let Some(p) = shell.ws.active_mut() {
+                            p.layout.focus_group(group_id);
+                        }
+                        shell.new_terminal(None, window, cx);
+                    })),
+            )
+            .child(div().my(px(2.0)).mx(px(4.0)).h(px(1.0)).bg(colors.border))
+            .child(
+                div()
+                    .px(px(8.0))
+                    .py(px(3.0))
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(8.0))
+                    .text_size(px(11.0))
+                    .text_color(colors.faint)
+                    .child(vibevalley_i18n::t("desktop.workspace.newChat", &[]))
+                    .child(vibevalley_i18n::t("desktop.workspace.chooseRuntime", &[])),
+            );
+        for (idx, (rt_id, rt_label)) in choices.iter().enumerate() {
+            let rt_owned = (*rt_id).to_string();
+            panel = panel.child(
+                div()
+                    .id(("chat-runtime", (group_id as usize) * 8 + idx))
+                    .h(px(28.0))
+                    .px(px(8.0))
+                    .rounded(px(6.0))
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(8.0))
+                    .text_size(px(12.5))
+                    .text_color(colors.text)
+                    .cursor_pointer()
+                    .hover(move |s| s.bg(hover_bg))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(px(8.0))
+                            .child(div().size(px(6.0)).rounded_full().bg(colors.accent))
+                            .child(vibevalley_i18n::t("desktop.workspace.newChatWith", &[("runtime", (*rt_label).into())])),
+                    )
+                    .children((idx == 0).then(|| div().text_size(px(11.0)).text_color(colors.faint).child("⇧⌘T")))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |shell, _, window, cx| {
+                        shell.chat_menu_group = None;
+                        if let Some(p) = shell.ws.active_mut() {
+                            p.layout.focus_group(group_id);
+                        }
+                        shell.new_chat(Some(rt_owned.clone()), window, cx);
+                    })),
+            );
+        }
+        panel
+    });
+
     div()
         .id(("group", group_id as usize))
+        .relative()
         .size_full()
         .flex()
         .flex_col()
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |shell, _, _, cx| {
+                let mut changed = shell.chat_menu_group.take().is_some();
                 if let Some(p) = shell.ws.active_mut()
                     && p.layout.focused != group_id
                 {
                     p.layout.focus_group(group_id);
+                    changed = true;
+                }
+                if changed {
                     cx.notify();
                 }
             }),
         )
         .child(bar)
         .child(div().flex_1().min_h_0().child(content))
+        .children(chat_menu)
         .into_any_element()
 }
 

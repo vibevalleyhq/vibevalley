@@ -159,6 +159,7 @@ fn tree_items(state: &TreeState, dir: &Path, tones: &HashMap<PathBuf, &'static s
                         "id": format!("{id}/\u{0}placeholder"),
                         "label": if loaded { "Empty" } else { "Loading…" },
                         "tone": "placeholder",
+                        "loading": !loaded,
                         "disabled": true,
                     })]
                 } else {
@@ -437,10 +438,15 @@ mod tests {
         assert_eq!(items[0]["children"][0]["label"], "main.rs");
         assert_eq!(items[0]["children"][0]["tone"], "modified");
         assert_eq!(items[1]["children"][0]["label"], "Loading…");
+        assert_eq!(items[1]["children"][0]["loading"], true);
         assert!(items[2].get("children").is_none());
         assert_eq!(v["expanded"][0], "/r/src");
         s.expanded.insert(root.join("lib"));
         assert_eq!(s.wanted(), vec![root.join("lib")]);
+        s.children.insert(root.join("lib"), Vec::new());
+        let v_empty = file_tree(&s, &tones);
+        assert_eq!(v_empty["items"][1]["children"][0]["label"], "Empty");
+        assert_eq!(v_empty["items"][1]["children"][0]["loading"], false);
         s.invalidate(&root.join("src/main.rs"));
         assert!(s.wanted().contains(&root.join("src")));
     }
