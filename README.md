@@ -102,7 +102,8 @@ docs/ · .agents/   文档（docs/README.md）、架构提案（Agent Notes）�
 
 ## 致谢
 
-[oar](https://github.com/botiverse/oar)（Apache-2.0，含 Raft 频道参考）· [pi-durable / pi-ai](https://github.com/earendil-works/pi)（持久执行参考）· [GPUI](https://www.gpui.rs/) · [Zod](https://zod.dev/) · [SQLite](https://sqlite.org/) · [Solid](https://www.solidjs.com/) · [Tailwind CSS](https://tailwindcss.com/) · [DeepSeek](https://www.deepseek.com/) · [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL）· [Hugeicons](https://hugeicons.com/) / [LobeHub Icons](https://github.com/lobehub/lobe-icons)（MIT）· [openclaw-weixin](https://www.npmjs.com/package/@tencent-weixin/openclaw-weixin) / [botpy](https://github.com/tencent-connect/botpy)（MIT）· [LDtk](https://ldtk.io/)
+- **核心技术**：[oar](https://github.com/botiverse/oar)（Apache-2.0，多引擎运行时模型）· [pi](https://github.com/earendil-works/pi)（持久执行参考）· [GPUI](https://www.gpui.rs/)（Zed / [gpui-fast](https://github.com/longbridge/gpui-fast)）· [nsh](https://github.com/longbridge/nsh)（原生 TSX 视图运行时）· [Ghostty](https://ghostty.org/)（[libghostty-vt](https://github.com/uzaaft/libghostty-rs) 终端引擎）· [Loro](https://loro.dev/)（CRDT 协同内容引擎）
+- **字体与像素素材**：[Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL 1.1）· [Hugeicons](https://hugeicons.com/) / [LobeHub Icons](https://github.com/lobehub/lobe-icons)（MIT）
 
 ## 许可证
 

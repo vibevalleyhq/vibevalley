@@ -5,49 +5,44 @@ Licensed under the Apache License, Version 2.0 (LICENSE).
 
 This product includes software from other projects:
 
+- oar (https://github.com/botiverse/oar), Apache License 2.0.
+  crates/runtime/src/oar/ (see crates/runtime/src/oar/mod.rs) implements the oar
+  (Open Agent Runtime) interface and session event model in Rust.
+
 - agent-quickstart-nextjs
   (https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs),
-  MIT License. packages/provider/src/agora/server.ts and apps/server/src/gateway/voice/agora.ts
-  adapt its token, invite and stop routes. Its notice:
-
-    MIT License
-
-    Copyright (c) 2025 Agora Community
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+  MIT License. crates/server/src/modules/collab/voice/agora.rs adapts its token,
+  invite and stop routes.
+  Copyright (c) 2025 Agora Community
 
 - Fusion Pixel Font (https://github.com/TakWolf/fusion-pixel-font),
   SIL Open Font License 1.1; assets/fonts/fusion-pixel-OFL.txt.
 
 - gse (https://github.com/go-ego/gse, v1.1.0), Apache License 2.0.
-  apps/server/src/modules/memory/gse.ts cuts Chinese as it does; apps/server/src/modules/memory/data/zh_s.txt.gz
-  is its data/dict/zh/s_1.txt, compressed. That dictionary comes from jieba
-  (https://github.com/fxsjy/jieba), MIT License, Copyright (c) 2013 Sun Junyi; the MIT
-  terms are below.
+  crates/server/src/modules/team/memory/gse.rs cuts Chinese as it does;
+  crates/server/src/modules/team/memory/data/zh_s.txt.gz is its data/dict/zh/s_1.txt,
+  compressed. That dictionary comes from jieba (https://github.com/fxsjy/jieba),
+  MIT License.
+  Copyright (c) 2013 Sun Junyi
 
 - openclaw-weixin (@tencent-weixin/openclaw-weixin 2.4.10), MIT License.
-  apps/server/src/gateway/connector/weixin.ts is written from it (iLink bot login, getupdates, sendmessage).
+  crates/server/src/modules/collab/connector/weixin.rs is written from it
+  (iLink bot login, getupdates, sendmessage).
   Copyright (C) 2026 Tencent. All rights reserved.
 
 - botpy (https://github.com/tencent-connect/botpy), MIT License.
-  apps/server/src/gateway/connector/qq.ts is written from it (the QQ bot's token, gateway and C2C replies).
+  crates/server/src/modules/collab/connector/qq.rs is written from it
+  (the QQ bot's token, gateway and C2C replies).
   Copyright (c) 2021 Tencent
+
+- reicon (https://reicon.dev, reicon 1.2.5), MIT License.
+  apps/mac/ui/design/icons.ts embeds SVG path data from its outline icon set.
+  Copyright (c) 2025 Dev Chauhan
+
+- pinyin-pro (https://github.com/zh-lx/pinyin-pro, 3.29.5), MIT License.
+  crates/rich/src/engine/pinyin/table.rs compiles single-character reading lookup
+  tables from its dict1 dataset.
+  Copyright (c) 2022-present zh-lx
 
 - Hugeicons (https://hugeicons.com, @hugeicons/core-free-icons 4.3.5), MIT License.
   design/pixel/icons holds its SVGs; the pixel button glyphs in assets/pixel are
@@ -59,7 +54,17 @@ This product includes software from other projects:
   logos in assets/pixel are redrawn from them.
   Copyright (c) 2023 LobeHub
 
-The four above are under the MIT License, whose terms are:
+- vscode-textmate (https://github.com/microsoft/vscode-textmate), first-mate
+  (https://github.com/atom/first-mate), and Shiki (https://github.com/shikijs/shiki),
+  MIT License. crates/engines/shiki/tests/fixtures/ includes committed TextMate
+  grammar/theme test suites and Shiki grammar/theme fixtures for tokenizer and
+  syntax-highlighting verification.
+  Copyright (c) Microsoft Corporation
+  Copyright (c) GitHub Inc.
+  Copyright (c) 2021 Pine Wu
+  Copyright (c) 2023 Anthony Fu
+
+The MIT-licensed components listed above are governed by the following terms:
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
