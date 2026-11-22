@@ -61,7 +61,7 @@ export default defineConfig({
       "sql:check": { command: "sqlc diff && python3 scripts/release/verify-native-schema.py --queries-only", cache: false },
       "mac:check": {
         command:
-          "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build && cd ../../.. && vp lint --deny-warnings apps/mac/ui && vpx scripts/audit/mac-tests.ts",
+          "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build && ../../../.tools/bin/nsh build ShellApp.tsx -o build-shell && cd ../../.. && vp lint --deny-warnings apps/mac/ui && vpx scripts/audit/mac-tests.ts",
         cache: false,
       },
       "release:verify": {
@@ -78,7 +78,17 @@ export default defineConfig({
   fmt: {
     printWidth: 160,
     // Generated files and data keep their source format; docs keep their compact tables.
-    ignorePatterns: ["**/*.md", "**/*.gen.ts", "**/testdata/**", "assets/**", ".agents/**", "design/**", "crates/**", "apps/mac/ui/build/**"],
+    ignorePatterns: [
+      "**/*.md",
+      "**/*.gen.ts",
+      "**/testdata/**",
+      "assets/**",
+      ".agents/**",
+      "design/**",
+      "crates/**",
+      "apps/mac/ui/build/**",
+      "apps/mac/ui/build-shell/**",
+    ],
     // Imports from farthest to nearest: Node, packages, the workspace's own, this app's #/, then the same folder.
     sortImports: {
       customGroups: [{ groupName: "workspace", elementNamePattern: ["@vibevalley/**"] }],
@@ -86,7 +96,7 @@ export default defineConfig({
     },
   },
   lint: {
-    ignorePatterns: hasNshTypes ? ["crates/**", "apps/mac/ui/.nsh/**", "apps/mac/ui/build/**"] : ["crates/**", "apps/mac/ui/**"],
+    ignorePatterns: hasNshTypes ? ["crates/**", "apps/mac/ui/.nsh/**", "apps/mac/ui/build/**", "apps/mac/ui/build-shell/**"] : ["crates/**", "apps/mac/ui/**"],
     // oxlint's defaults and import for no-cycle; listing plugins replaces the defaults.
     plugins: ["eslint", "typescript", "unicorn", "oxc", "import"],
     jsPlugins: [
@@ -264,6 +274,7 @@ export default defineConfig({
         files: [
           "apps/site/src/**",
           "apps/mac/ui/App.tsx",
+          "apps/mac/ui/ShellApp.tsx",
           "apps/mac/ui/app/**",
           "apps/mac/ui/features/**",
           "apps/mac/ui/farm/**",

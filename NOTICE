@@ -36,7 +36,7 @@ This product includes software from other projects:
   Copyright (c) 2021 Tencent
 
 - reicon (https://reicon.dev, reicon 1.2.5), MIT License.
-  apps/mac/ui/design/icons.ts embeds SVG path data from its outline icon set.
+  crates/rich/src/icon.rs embeds SVG path data from its outline icon set.
   Copyright (c) 2025 Dev Chauhan
 
 - pinyin-pro (https://github.com/zh-lx/pinyin-pro, 3.29.5), MIT License.

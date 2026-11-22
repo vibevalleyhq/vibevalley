@@ -98,7 +98,7 @@ const sources = () =>
           /^apps\/[^/]+\/vite\.config\.ts$/u.test(f) ||
           // The Rust server and the native app say theirs from the same catalogs.
           /^(crates\/[^/]+\/src\/.*|apps\/mac\/src\/.*)\.rs$/u.test(f) ||
-          /^apps\/mac\/ui\/(?!build\/).*\.tsx?$/u.test(f)) &&
+          /^apps\/mac\/ui\/(?!build(?:-shell)?\/).*\.tsx?$/u.test(f)) &&
         !f.endsWith("packages/i18n/src/catalogs.ts") &&
         existsSync(join(root, f)),
     );

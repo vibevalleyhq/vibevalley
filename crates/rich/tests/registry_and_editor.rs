@@ -5,8 +5,8 @@ use nsh_base::editor::{EditorHighlighter, EditorTextEdit, EditorToken, editor};
 use nsh_core::element::{Registry, Root};
 use nsh_core::prelude::*;
 use vibevalley_rich::{
-    BUNDLED_GRAMMARS, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, SPECIFIER, ShikiEditorHighlighter, highlight_code, loaded_languages, register_grammar_json,
-    registry, tokenize_scopes,
+    BUNDLED_GRAMMARS, ICON_NAMES, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, SPECIFIER, ShikiEditorHighlighter, highlight_code, icon_shapes, loaded_languages,
+    register_grammar_json, registry, tokenize_scopes, vv_icon,
 };
 
 use support::TestHarness;
@@ -20,7 +20,16 @@ fn registry_exports_all_components_and_documents_every_export() {
     let names: Vec<String> = set.specs().into_iter().map(|s| s.export.clone()).collect();
     assert_eq!(
         names,
-        vec!["VvCanvas", "VvChart", "VvCodeBlock", "VvDiagram", "VvGenUi", "VvMarkdown", "VvWhiteboard"]
+        vec![
+            "VvCanvas",
+            "VvChart",
+            "VvCodeBlock",
+            "VvDiagram",
+            "VvGenUi",
+            "VvIcon",
+            "VvMarkdown",
+            "VvWhiteboard"
+        ]
     );
 
     let undocumented = set.undocumented();
@@ -37,6 +46,7 @@ fn registry_exports_all_components_and_documents_every_export() {
         "export declare const VvCanvas:",
         "export declare const VvChart:",
         "export declare const VvGenUi:",
+        "export declare const VvIcon:",
         "export declare const VvWhiteboard:",
         "onIssuePress?: (event: VvIssuePressEvent) => void;",
         "onWikilinkPress?: (event: VvWikilinkPressEvent) => void;",
@@ -223,4 +233,53 @@ fn registry_setup_mounts_editor_and_diff_view_without_nsh_base_highlight_feature
         diff_highlighted,
         "DiffView with custom `mermaid` language should highlight via registered ShikiEditorHighlighter"
     );
+}
+
+#[component]
+fn IconGalleryHarness() -> impl IntoElement {
+    let mut row = view().flex_row().flex_wrap().gap(px(4.0));
+    // Mount every registered icon alongside labeled, theme-default, and unknown edge cases.
+    for &name in ICON_NAMES {
+        row = row.child(vv_icon().name(SharedString::from(name)).size(16.0).color(SharedString::from("#1c1917")));
+    }
+    row.child(
+        vv_icon()
+            .name(SharedString::from("close"))
+            .size(20.0)
+            .color(SharedString::from("#a83a2c"))
+            .label(Some(SharedString::from("Close dialog"))),
+    )
+    .child(
+        vv_icon()
+            .name(SharedString::from("sidebar"))
+            .size(24.0)
+            .label(Some(SharedString::from("Theme sidebar"))),
+    )
+    .child(vv_icon().name(SharedString::from("unknown-icon")).size(16.0))
+}
+
+#[test]
+fn vv_icon_mounts_all_97_icons_and_exposes_accessible_label() {
+    assert_eq!(ICON_NAMES.len(), 97);
+    assert!(icon_shapes("chat").is_some());
+    assert!(icon_shapes("sidebar").is_some());
+
+    let mut harness = TestHarness::mount(Root::of::<IconGalleryHarness>());
+    // 97 catalog icons + 3 edge-case icons = 100 mounted canvas views; only the 99 valid icons emit non-empty drawings.
+    let canvas_views = harness.kinds.values().filter(|&&k| k == nsh_core::ViewKind::Canvas).count();
+    assert_eq!(canvas_views, 100);
+    assert_eq!(harness.canvases.len(), 99);
+    assert!(harness.canvases.values().all(|d| !d.ops.is_empty()));
+
+    let labeled = harness.find_label("Close dialog").expect("labeled VvIcon should be discoverable");
+    let frame = harness.frames.get(&labeled).expect("labeled VvIcon should have layout bounds");
+    assert!((frame.size.width.0 - 20.0).abs() < 0.5);
+    assert!((frame.size.height.0 - 20.0).abs() < 0.5);
+
+    // Theme switch repaints the default-color icon with the dark ink color.
+    let sidebar_id = harness.find_label("Theme sidebar").expect("theme sidebar VvIcon");
+    let light_ops = harness.canvases.get(&sidebar_id).expect("light drawing").ops.clone();
+    harness.set_dark(true);
+    let dark_ops = harness.canvases.get(&sidebar_id).expect("dark drawing").ops.clone();
+    assert_ne!(light_ops, dark_ops, "default-color VvIcon should repaint when light/dark mode flips");
 }

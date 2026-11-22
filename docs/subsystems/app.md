@@ -18,17 +18,17 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | 位置 | 职责 |
 |---|---|
 | `apps/mac/src/main.rs`、`shell/` | 开窗口；根视图 `Shell` 拆为 8 个职责文件（`mod.rs`、`projects.rs`、`panes.rs`、`render.rs`、`menus.rs`、`palette.rs`、`settings.rs`、`host_bridge.rs`）：项目、分栏布局、侧栏、命令面板、快捷键（`bind_keys`）与宿主接口 |
-| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，跑同一份 TSX 包；`bridge.rs` 是页面发回来的动作（`Action`），`frames.rs` 是外壳推给侧栏和面板的帧，`late.rs` 让服务端在后台线程起来 |
+| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，按 `is_workbench_view` 分别缓存与惰性装载双入口包（重型工作台 `App.tsx` → `ui/build`；轻量壳窗格 `ShellApp.tsx` → `ui/build-shell`）；`bridge.rs` 是页面发回来的动作（`Action`），`frames.rs` 是外壳推给侧栏和面板的帧，`late.rs` 让服务端在后台线程起来 |
 | `apps/mac/src/host.rs` | 宿主能力的原生一半：系统通知、Finder 里显示、`open`、本地文件选择与另存、读文件 |
 | `apps/mac/src/audio.rs`、`audio.m` | AVFoundation 文件播放、跳播与有界 PCM 队列；宿主音频命令按桥的接收顺序执行 |
 | `apps/mac/src/command_line.rs`、`tray.rs`、`island.rs` | 命令行符号链接、菜单栏摘要、灵动岛进程与工单摘要 |
 | `apps/mac/src/terminal/`、`viewer.rs`、`diff.rs` | 终端（`apps/mac/crates/terminal`）、文件查看（经 `vibevalley-rich` 按 TextMate 作用域高亮）、diff；加载均带 150 毫秒防闪烁与骨架条 |
 | `apps/mac/src/pixel/` | 像素场景（引擎在 `apps/mac/crates/pixel`）：农场、地图、记忆树、开场、图鉴；进程级缓存 `Atlas` 与 `VillageWorld`（[农场的皮](docs/subsystems/farm.md)） |
 | `apps/mac/crates/` | 桌面端独占支撑 crate：`pixel`、`terminal`、`workspace`（项目、布局含 `PaneKind::Chat`、终端与宿主 `state.db` 持久化） |
-| `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版与相对图片解析、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`、`VvGenUi`、`VvWhiteboard`（含 Loro Phase A 实时在场光标/占位框/一键跟随视口与 `onCursorMove`/`onViewportChange` 回调）、`VvPinyin`）与内部渲染引擎 `engine/` |
+| `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版与相对图片解析、`VvIcon`（`crates/rich/src/icon.rs`，承载 97 枚工作台 reicon 线性图标并以无锁 `OnceLock<Vec<Path>>` 零拷贝共享解析路径；前端 `apps/mac/ui/design/icons.ts` 只保留纯类型 `IconName`）、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`、`VvGenUi`、`VvWhiteboard`（含 Loro Phase A 实时在场光标/占位框/一键跟随视口与 `onCursorMove`/`onViewportChange` 回调）、`VvPinyin`）与内部渲染引擎 `engine/` |
 | `apps/mac/src/theme.rs`、`apps/mac/src/theme_tokens.rs` | 外壳的主题、动画幅度（`Settings.motion`）与字号设置；令牌从 `design/tokens.json` 同步生成 |
 | `apps/mac/src/debug.rs` | 不看屏幕检查应用的两个入口：状态转储和脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） |
-| `apps/mac/ui/App.tsx`、`workspace/` | TSX 包入口（按 `host.params.view` 挑视图）与外壳工作区（侧栏 `Sidebar.tsx`、文件树、Git、命令面板、直连对话 `ChatPane.tsx` 与 Swarm 抽屉 `SwarmPanel.tsx`、Markdown 预览 `MarkdownPane.tsx`） |
+| `apps/mac/ui/App.tsx`、`ShellApp.tsx`、`workspace/` | 双入口 TSX 包：`App.tsx` 供全量工作台（`vv` / `vibevalley`），`ShellApp.tsx` 供轻量壳窗格（侧栏 `Sidebar.tsx`、命令面板 `Palette.tsx`、Markdown 预览 `MarkdownPane.tsx`、直连对话 `ChatPane.tsx` 与 Swarm 抽屉 `SwarmPanel.tsx`、农场表单/手机等），按 `host.params.view` 挑视图 |
 | `apps/mac/ui/{app,features,design,infra}/` | 工作台共 6 个顶级目录：入口外壳 `app/`（路由表 `Workbench.tsx`、6 项一级导航 `places.ts`、外框 `Shell.tsx`）、领域切片 `features/<概念>/`（含二元统一内容中心壳 `content/`、5 栏设置页、Artifact 引擎含 `TimelineBar.tsx` 时间旅行与 `outline` 大纲笔记、素材库及历史 `pkm` 兜底）、共享原语与表面 `design/`（含动效出口 `motion.ts` 与防闪烁骨架原语 `Skeleton.tsx`）、底层运行时与状态 `infra/`（`bridge.ts`、`solid.ts`、`polyfill.ts`、`state/`），另加 `workspace/` 与 `farm/` |
 | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)） |
 | `crates/server/src/transport/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
@@ -116,13 +116,13 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 **构建 TSX 包**
 
-1. `apps/mac/build.rs` 用 nsh 的命令行（`NSH_BIN`、仓库的 `.tools/bin/nsh` 或 `PATH` 里的）把 `apps/mac/ui/App.tsx` 打成一个包。
-2. 调试构建从磁盘读 `apps/mac/ui/build/`，改 TSX 不用重新编译 Rust；发布构建（或设了 `VIBEVALLEY_EMBED_UI`）把包嵌进二进制。
+1. `apps/mac/build.rs` 用 nsh 的命令行（`NSH_BIN`、仓库的 `.tools/bin/nsh` 或 `PATH` 里的）按双入口分别打包：全量工作台 `apps/mac/ui/App.tsx`（`ui/build`）与轻量壳窗格 `apps/mac/ui/ShellApp.tsx`（`ui/build-shell`），运行时由 `hosted/mod.rs` 按 `is_workbench_view` 分别缓存与惰性装载。
+2. 调试构建从磁盘读 `apps/mac/ui/build/` 与 `apps/mac/ui/build-shell/`，改 TSX 不用重新编译 Rust；发布构建（或设了 `VIBEVALLEY_EMBED_UI`）开启 `nsh build --release`，仅单份静态嵌入剥离调试信息的 `bundle.nshc` 字节码（`bundle.js` 置 0 字节 sentinel 避免双嵌）。
 3. 没有 nsh 时调试构建仍可通过，应用里的视图报缺包；发布构建直接失败。
 
 ### 打包和更新
 
-`scripts/release/package.ts` 将应用（`vibevalley-mac`）、命令行（`vibevalley`）和灵动岛放进 `.app/Contents/MacOS`，素材与页面包放进 `Contents/Resources`。应用从自身包定位资源，不依赖构建仓库的位置；`release.json` 记录版本、架构、ZIP 文件名、字节数和 SHA-512。
+`scripts/release/package.ts` 将应用（`vibevalley-mac`）、命令行（`vibevalley`）和灵动岛放进 `.app/Contents/MacOS`，静态素材（`assets`）与图标放进 `Contents/Resources`（两份 `--release` 字节码已直接嵌入 `vibevalley-mac` 二进制，不再向 `Contents/Resources/ui` 复制开发页面包）。应用从自身包定位资源，不依赖构建仓库的位置；`release.json` 记录版本、架构、ZIP 文件名、字节数和 SHA-512。
 
 `apps/mac/src/update` 只在打包版本上启动更新检查，启动时和每四小时各检查一次。稳定版读最新正式版，alpha、beta 各读同阶段最新版本；仓库运行和 `0.0.0` 不自动检查。`VIBEVALLEY_UPDATE_FEED=off` 关闭检查，指定清单 URL 可验证本地更新。
 
@@ -130,8 +130,8 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 ## 和谁打交道
 
-- **服务端（`crates/server`）**：进程内经 `Server` 调接口、读帧和事件；同一个 `Hub` 也挂在 `transport/http` 门上。
-- **命令行（`crates/cli`）**：经 `server.json` 找到应用里的服务端。
+- **服务端与运行时（`crates/server`、`crates/runtime`）**：进程内经 `Server` 调接口、读帧和事件；同一个 `Hub` 也挂在 `transport/http` 门上。`crates/runtime` 的 `ureq` 通过 `rustls-no-provider` + `platform-verifier`（`rustls-platform-verifier`）复用系统根证书，避免额外拉入重复 `webpki-roots`。
+- **命令行（`crates/cli`）**：经 `server.json` 找到应用里的服务端；`crates/core` 的 Loro 内容协同引擎收到可选特性 `collab` 下，纯 HTTP `vibevalley-cli` 关闭该特性从而彻底脱钩 Loro。
 
 ## 为什么这样
 

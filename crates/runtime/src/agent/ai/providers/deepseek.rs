@@ -1,4 +1,5 @@
 use std::io::BufReader;
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Deserializer, Serialize};
@@ -63,7 +64,14 @@ impl OpenAiClient {
     }
 
     pub fn new(base_url: impl Into<String>, key: impl Fn() -> Option<String> + Send + Sync + 'static) -> OpenAiClient {
+        // Explicit ring provider + OS platform verifier avoids ureq's default webpki-roots bundle
+        // while preserving HTTPS for production endpoints like https://api.deepseek.com.
+        let tls = ureq::tls::TlsConfig::builder()
+            .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+            .unversioned_rustls_crypto_provider(Arc::new(rustls::crypto::ring::default_provider()))
+            .build();
         let agent: ureq::Agent = ureq::Agent::config_builder()
+            .tls_config(tls)
             .timeout_global(Some(Duration::from_secs(600)))
             .http_status_as_error(false)
             .build()

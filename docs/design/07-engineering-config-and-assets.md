@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | **Solid 2 响应式兼容层** | `apps/mac/ui/infra/solid.ts` | 由于 `nsh` 打包器拒绝直接打入 `solid-js`，`solid.ts` 直接基于 `nsh` 原生 `signal` / `computed` / `effect` / `context` 实现工作台所依赖的 `createSignal`、`createMemo`、`createEffect`（支持 Solid 2 的拆段副作用与 `{ defer: true }` 跳过首次执行）、`onSettled`、`createContext` 与 `useContext`；针对全量 `StateFrame` 更新，`equals: false` 选项通过外包 `{ v }` 盒对象绕过 `nsh` 默认的 `Object.is` 拦截，确保每次新帧推送必然触发下游依赖重算 |
 | **宿主补丁与运行时垫片** | `apps/mac/ui/infra/polyfill.ts` | 为 `nsh` JavaScript 环境补充标准 Web 运行时能力缺口（如路径/正则/全局垫片），在页面与农庄手机入口顶部首个加载 |
-| **条件热读取与打包嵌入** | `apps/mac/build.rs` | 自动寻址 `.tools/bin/nsh`（或 `NSH_BIN` / `PATH`），调用 `nsh build apps/mac/ui/App.tsx` 编译产生成品 JS 包与白名单文件 `capabilities.json`；在 **Debug** 构建中若 `ui/build/` 已存在产物则直接从磁盘热读取（修改 TSX 无需重新编译 Rust 壳），而在 **Release** 构建或设置 `VIBEVALLEY_EMBED_UI` 时强制全量编译并静态嵌入 Rust 二进制 |
+| **条件热读取与双入口打包嵌入** | `apps/mac/build.rs` | 自动寻址 `.tools/bin/nsh`（或 `NSH_BIN` / `PATH`），按双入口分别构建全量工作台 `App.tsx`（`ui/build`）与轻量壳窗格 `ShellApp.tsx`（`ui/build-shell`）及其 `capabilities.json`；在 **Debug** 构建中若产物已存在则直接从磁盘热读取（修改 TSX 无需重新编译 Rust 壳），而在 **Release** 构建或设置 `VIBEVALLEY_EMBED_UI` 时开启 `nsh build --release`，仅单份静态嵌入剥离调试信息的 `bundle.nshc` 字节码（`bundle.js` 置 0 字节 sentinel），运行时由 `apps/mac/src/hosted/mod.rs` 按 `is_workbench_view` 分别缓存与惰性装载 |
 
 ## 7.2 桌面桥接协议与宿主能力
 
@@ -33,7 +33,7 @@ VibeValley 的全部像素图与矢量图标在独立工程目录下管理并输
 | --- | --- | --- |
 | **2D 像素精绘、切图与提示词** | `design/pixel/`（`prompts/`、`process.py`、`straighten.py`、`title_layers.py`、`hd_batch.sh`）与 `design/assets/`、`design/art.sh` | 经纠偏、去杂与网格规整后沉淀到 `assets/pixel/`（配 `sprites.json` 记录逻辑宽高 `w/h`、足底锚点 `ax/ay` 与 `yard` 框）与 `assets/cursors/`（配 `cursors.json`）；工作台通过 `apps/mac/ui/infra/pixelManifests.ts` 直接引入 JSON 清单并从 `host.pixelDir` 加载 PNG |
 | **像素字体** | `assets/fonts/`（`fusion-pixel-12px-proportional-zh_hans.otf` 与开源授权文本 `fusion-pixel-OFL.txt`） | 注册给 `nsh` 与 GPUI 的像素文字体名 `Fusion Pixel 12px Prop zh-Hans`，保证中英混排在整倍缩放下笔划锐利清晰 |
-| **工作台线条图标与农机 Logo** | `apps/mac/ui/design/icons.ts`、`design/pixel/icons/`、`design/pixel/logos/` | `icons.ts` 内置 `reicon` SVG 路径集合（`<Icon name>`）；农机品牌与工具图标同时在像素目录维护静态切片供 `RuntimeIcon` 与像素农具栏消费 |
+| **工作台线条图标与农机 Logo** | `crates/rich/src/icon.rs`、`apps/mac/ui/design/icons.ts`、`design/pixel/icons/`、`design/pixel/logos/` | 97 枚 `reicon` SVG 路径静态下沉至原生 `crates/rich/src/icon.rs`（`VvIcon`，以无锁 `OnceLock<Vec<Path>>` 零拷贝缓存解析路径）；TS 侧 `icons.ts` 仅保留纯类型 `IconName` 与 `actionIcon` 映射供 `<Icon name>` 调用；农机品牌与工具图标同时在像素目录维护静态切片供 `RuntimeIcon` 与像素农具栏消费 |
 | **多端设计令牌生成与护栏** | `design/tokens.json`、`scripts/gen/tokens.ts`、`scripts/audit/ui-tokens.ts` | 从单源 `tokens.json` 生成并校验 `theme.json`、`nsh.json`、`theme_tokens.rs` 及 `global.css` 缓动曲线；`ui-tokens.ts` 对工作台与工作区外壳 `apps/mac/ui/{app,features,design,workspace}` 做 AST 扫描拦截硬编码色值、任意 Tailwind 类与裸控件 |
 
 ## 7.4 多密级测试场景与自动化验收报告管线

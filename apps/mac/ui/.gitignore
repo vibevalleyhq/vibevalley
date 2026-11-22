@@ -1,3 +1,4 @@
 .nsh/
 build/
+build-shell/
 node_modules/

@@ -1,7 +1,7 @@
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { cp, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
@@ -199,7 +199,6 @@ try {
     !dump.workbench.applied.some((frame) => frame.topic === "state")
   )
     throw new Error("The updated workspace did not apply a state frame without errors");
-  await stat(join(app, "Contents/Resources/ui/bundle.js"));
   await writeFile(
     join(dir, "result.json"),
     JSON.stringify(

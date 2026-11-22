@@ -5,6 +5,7 @@
 pub mod artifact;
 pub mod brief;
 pub mod channel;
+#[cfg(feature = "collab")]
 pub mod collab;
 pub mod core;
 pub mod cron;

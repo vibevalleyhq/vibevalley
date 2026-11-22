@@ -150,6 +150,55 @@ const BUNDLE_JS: &str = "throw new Error('VibeValley UI bundle missing on disk: 
 const BUNDLE_NSHC: &[u8] = &[];
 const CAPABILITIES: &str = include_str!(concat!(env!("OUT_DIR"), "/ui/capabilities.json"));
 
+#[cfg(not(debug_assertions))]
+const SHELL_BUNDLE_JS: &str = include_str!(concat!(env!("OUT_DIR"), "/ui-shell/bundle.js"));
+#[cfg(not(debug_assertions))]
+const SHELL_BUNDLE_NSHC: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ui-shell/bundle.nshc"));
+#[cfg(debug_assertions)]
+const SHELL_BUNDLE_JS: &str = "throw new Error('VibeValley shell UI bundle missing on disk: run vp run mac:check.');\n";
+#[cfg(debug_assertions)]
+const SHELL_BUNDLE_NSHC: &[u8] = &[];
+const SHELL_CAPABILITIES: &str = include_str!(concat!(env!("OUT_DIR"), "/ui-shell/capabilities.json"));
+
+fn is_workbench_view(view: &str) -> bool {
+    matches!(view, "vv" | "vibevalley")
+}
+
+fn dir_has_bundle(dir: &std::path::Path) -> bool {
+    dir.join("bundle.nshc").is_file() || dir.join("bundle.js").is_file()
+}
+
+fn resolve_bundle_dir_from(override_dir: Option<&std::path::Path>, ui_root: &std::path::Path, workbench: bool) -> Option<std::path::PathBuf> {
+    if let Some(dir) = override_dir {
+        if !workbench {
+            let nested = dir.join("build-shell");
+            if dir_has_bundle(&nested) {
+                return Some(nested);
+            }
+            if dir.file_name().is_some_and(|n| n == "build") {
+                let sibling = dir.with_file_name("build-shell");
+                if dir_has_bundle(&sibling) {
+                    return Some(sibling);
+                }
+            }
+        }
+        return Some(dir.to_path_buf());
+    }
+    if cfg!(debug_assertions) {
+        if !workbench {
+            let shell = ui_root.join("build-shell");
+            if dir_has_bundle(&shell) {
+                return Some(shell);
+            }
+        }
+        let full = ui_root.join("build");
+        if dir_has_bundle(&full) {
+            return Some(full);
+        }
+    }
+    None
+}
+
 fn build_embedded_bundle(bytecode: &[u8], js: &str, caps_json: &str) -> Bundle {
     if !bytecode.is_empty() {
         // SAFETY: bytecode emitted by `nsh build` in `build.rs` during this build.
@@ -164,57 +213,52 @@ fn build_embedded_bundle(bytecode: &[u8], js: &str, caps_json: &str) -> Bundle {
         .expect("capabilities.json written by nsh build")
 }
 
-fn dev_ui_build_dir() -> Option<std::path::PathBuf> {
-    if let Some(dir) = std::env::var_os("VIBEVALLEY_UI_BUNDLE") {
-        return Some(std::path::PathBuf::from(dir));
-    }
-    if cfg!(debug_assertions) {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/build");
-        if dir.join("bundle.js").is_file() {
-            return Some(dir);
+fn load_bundle_slot(workbench: bool, bytecode: &[u8], js: &str, fallback_caps: &str) -> Bundle {
+    let override_dir = std::env::var_os("VIBEVALLEY_UI_BUNDLE").map(std::path::PathBuf::from);
+    let ui_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui");
+    if let Some(dir) = resolve_bundle_dir_from(override_dir.as_deref(), &ui_root, workbench) {
+        let raw_caps = std::fs::read_to_string(dir.join("capabilities.json")).unwrap_or_else(|_| fallback_caps.to_string());
+        let caps_json = capabilities_from(&raw_caps);
+        let nshc = dir.join("bundle.nshc");
+        if nshc.is_file()
+            && let Ok(bytes) = std::fs::read(&nshc)
+            && !bytes.is_empty()
+        {
+            // SAFETY: local `nsh build` output under the workspace's own `ui/build*`.
+            let b = unsafe { Bundle::bytecode(bytes) };
+            if let Ok(b) = b.with_app_id(Some("dev.vibevalley.ui")).with_capabilities_json(Some(&caps_json)) {
+                return b;
+            }
         }
-    }
-    None
-}
-
-/// The bundle every hosted view runs: `VIBEVALLEY_UI_BUNDLE` (or `ui/build` in
-/// debug builds) when present on disk, else the one embedded at build time.
-/// Cached process-wide so multiple hosted views share one disk read, and prefers
-/// the precompiled `bundle.nshc` bytecode in both dev and release builds to skip
-/// re-parsing 4+ MB JS on every `HostedView` open.
-fn bundle() -> Bundle {
-    static CACHED: std::sync::OnceLock<Bundle> = std::sync::OnceLock::new();
-    CACHED
-        .get_or_init(|| {
-            if let Some(dir) = dev_ui_build_dir() {
-                let raw_caps = std::fs::read_to_string(dir.join("capabilities.json")).unwrap_or_else(|_| CAPABILITIES.to_string());
-                let caps_json = capabilities_from(&raw_caps);
-                let nshc = dir.join("bundle.nshc");
-                if nshc.is_file()
-                    && let Ok(bytes) = std::fs::read(&nshc)
+        match std::fs::read_to_string(dir.join("bundle.js")) {
+            Ok(source) if !source.is_empty() => {
+                if let Ok(b) = Bundle::source(source)
+                    .with_app_id(Some("dev.vibevalley.ui"))
+                    .with_capabilities_json(Some(&caps_json))
                 {
-                    // SAFETY: local `nsh build` output under the workspace's own `ui/build/`.
-                    let b = unsafe { Bundle::bytecode(bytes) };
-                    if let Ok(b) = b.with_app_id(Some("dev.vibevalley.ui")).with_capabilities_json(Some(&caps_json)) {
-                        return b;
-                    }
-                }
-                match std::fs::read_to_string(dir.join("bundle.js")) {
-                    Ok(js) => {
-                        if let Ok(b) = Bundle::source(js)
-                            .with_app_id(Some("dev.vibevalley.ui"))
-                            .with_capabilities_json(Some(&caps_json))
-                        {
-                            return b;
-                        }
-                    }
-                    Err(e) => eprintln!("ui bundle at {}: {e}; using the embedded bundle", dir.display()),
+                    return b;
                 }
             }
-            let caps_json = capabilities_from(CAPABILITIES);
-            build_embedded_bundle(BUNDLE_NSHC, BUNDLE_JS, &caps_json)
-        })
-        .clone()
+            Ok(_) => {}
+            Err(e) => eprintln!("ui bundle at {}: {e}; using the embedded bundle", dir.display()),
+        }
+    }
+    let caps_json = capabilities_from(fallback_caps);
+    build_embedded_bundle(bytecode, js, &caps_json)
+}
+
+/// Full workbench bundle for `"vv"`/`"vibevalley"`, lightweight shell bundle for
+/// all other hosted surfaces, cached process-wide so views share one load.
+fn bundle_for(view: &str) -> Bundle {
+    if is_workbench_view(view) {
+        static WORKBENCH: std::sync::OnceLock<Bundle> = std::sync::OnceLock::new();
+        WORKBENCH.get_or_init(|| load_bundle_slot(true, BUNDLE_NSHC, BUNDLE_JS, CAPABILITIES)).clone()
+    } else {
+        static SHELL: std::sync::OnceLock<Bundle> = std::sync::OnceLock::new();
+        SHELL
+            .get_or_init(|| load_bundle_slot(false, SHELL_BUNDLE_NSHC, SHELL_BUNDLE_JS, SHELL_CAPABILITIES))
+            .clone()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -322,7 +366,7 @@ impl HostedView {
                 eprintln!("hosted view {label}: {message}");
                 let _ = err_tx.send(message.to_string());
             });
-            load(&app, cx);
+            load(&app, &name, cx);
             app
         });
         cx.spawn(async move |this, cx| {
@@ -451,14 +495,14 @@ fn route_to_bridge(bridge: &vibevalley_server::transport::bridge::Client, v: &Va
     true
 }
 
-fn load(app: &AppView, cx: &mut Context<AppView>) {
+fn load(app: &AppView, view: &str, cx: &mut Context<AppView>) {
     #[cfg(feature = "nsh-dev")]
     if let Ok(url) = std::env::var("VIBEVALLEY_UI_DEV") {
         app.connect_dev_server(url, cx);
         return;
     }
     let _ = cx;
-    app.load(NshApp::Js(bundle()));
+    app.load(NshApp::Js(bundle_for(view)));
 }
 
 impl EventEmitter<HostedEvent> for HostedView {}
@@ -552,8 +596,43 @@ mod tests {
     }
 
     #[test]
+    fn is_workbench_view_routes_only_vv_and_vibevalley() {
+        assert!(is_workbench_view("vv"));
+        assert!(is_workbench_view("vibevalley"));
+        for view in ["sidebar", "palette", "markdown", "workspace-chat", "farm-form", "farm-phone", "probe"] {
+            assert!(!is_workbench_view(view), "{view} should use the lightweight shell bundle");
+        }
+    }
+
+    #[test]
+    fn resolve_bundle_dir_prefers_build_shell_and_falls_back_gracefully() {
+        let tmp = std::env::temp_dir().join(format!("vv-bundle-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let build = tmp.join("build");
+        let build_shell = tmp.join("build-shell");
+        std::fs::create_dir_all(&build).unwrap();
+        std::fs::write(build.join("bundle.js"), "/* full */").unwrap();
+
+        assert_eq!(resolve_bundle_dir_from(Some(&build), &tmp, true), Some(build.clone()));
+        assert_eq!(resolve_bundle_dir_from(Some(&build), &tmp, false), Some(build.clone()));
+
+        std::fs::create_dir_all(&build_shell).unwrap();
+        std::fs::write(build_shell.join("bundle.nshc"), [1u8, 2, 3]).unwrap();
+        assert_eq!(resolve_bundle_dir_from(Some(&build), &tmp, false), Some(build_shell.clone()));
+        assert_eq!(resolve_bundle_dir_from(Some(&build), &tmp, true), Some(build.clone()));
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn embedded_bundle_falls_back_to_source_when_bytecode_is_empty() {
         let caps = capabilities_from(r#"{"host":["action"]}"#);
         let _bundle = build_embedded_bundle(&[], "export default function() {}", &caps);
+    }
+
+    #[test]
+    fn embedded_bundle_accepts_non_empty_bytecode_with_empty_source() {
+        let caps = capabilities_from(r#"{"host":["action"]}"#);
+        let _bundle = build_embedded_bundle(&[1u8, 2, 3, 4], "", &caps);
     }
 }

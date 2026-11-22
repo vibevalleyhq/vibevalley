@@ -87,6 +87,13 @@ export interface VvGenUiProps extends ComponentHostProps {
   onAction?: (event: VvGenUiActionEvent) => void;
 }
 
+export interface VvIconProps extends ComponentHostProps {
+  name: string;
+  size?: number;
+  color?: string;
+  label?: string | null;
+}
+
 export interface VvMarkdownProps extends ComponentHostProps {
   text: string;
   size?: VvMarkdownSize;
@@ -169,6 +176,7 @@ export interface VvRichModule {
   VvCodeBlock: (props: VvCodeBlockProps) => JSX.Element;
   VvDiagram: (props: VvDiagramProps) => JSX.Element;
   VvGenUi: (props: VvGenUiProps) => JSX.Element;
+  VvIcon: (props: VvIconProps) => JSX.Element;
   VvMarkdown: (props: VvMarkdownProps) => JSX.Element;
   VvWhiteboard: (props: VvWhiteboardProps) => JSX.Element;
   matchPinyin: (text: string, query: string) => boolean;

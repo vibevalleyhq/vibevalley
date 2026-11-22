@@ -10,6 +10,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use vibevalley_protocol::ArtifactDisplay;
 
+#[cfg(feature = "collab")]
 use crate::collab::PresencePayload;
 
 static BUNDLE: LazyLock<HashMap<String, String>> =
@@ -89,6 +90,7 @@ pub fn presence_highlight_command(items: Vec<PresenceHighlight>) -> PresenceHigh
     }
 }
 
+#[cfg(feature = "collab")]
 pub fn presence_highlight_from_payloads<'a>(payloads: impl IntoIterator<Item = &'a PresencePayload>) -> PresenceHighlightCommand {
     let items = payloads
         .into_iter()

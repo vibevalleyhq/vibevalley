@@ -98,7 +98,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **处理函数要薄**：HTTP 门、桥和页面组件只做转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。
 - **执行会话没有权限确认**：服务端只听 `127.0.0.1`，执行会话只在工作区开工（[执行会话](docs/subsystems/session.md)）。
 - **包之间只经包名**：TS 跨包只经 `package.json` 的 `exports` 写 `@vibevalley/*`（`no-cross-package-path` 查）；Rust 跨 crate 只经 `Cargo.toml` 的依赖。
-- **图标分两套**：工作台用 `apps/mac/ui/design/icons.ts` 注册的 reicon 线条图标（`<Icon name>`），像素皮与头像、引擎 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
+- **图标分两套**：工作台用 `crates/rich/src/icon.rs` 原生 `VvIcon` 渲染的 97 枚 reicon 线条图标（TS 侧由 `apps/mac/ui/design/icons.ts` 声明 `IconName`，经 `<Icon name>` 使用），像素皮与头像、引擎 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
 - **界面照田间工作台**：工作台、工作区外壳和原生壳面的颜色、圆角、字号、阴影和缓动一律走 `design/tokens.json`（由 `vp run tokens:gen` 同步写出 `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` 与 `apps/mac/src/theme_tokens.rs`）；照 [设计系统](docs/design/README.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)，class 写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
 - **密钥**：家目录的 `settings.json` 不进仓库；日志、快照和文档里不出现真实密钥。
 - **话放在哪**：对用户的话进 `crates/i18n/locales/{zh,en}/<宿主.模块>.json`，Rust 调 `vibevalley_i18n::t`，TS 调 `t("key")`（`vpx scripts/gen/i18n.ts check` 查漏翻）；对模型的话用中文写进 `crates/server/assets`（[话放在哪](docs/subsystems/foundation.md)）。

@@ -54,13 +54,7 @@ if (!values["skip-build"]) {
 }
 const arch = packageArchitecture(process.arch);
 const icon = join(root, channelIconFile(version));
-for (const file of [
-  join(target, "vibevalley-mac"),
-  join(target, "vibevalley"),
-  join(root, "apps/mac/ui/build/bundle.js"),
-  join(root, "apps/island/.build/release/VibeValleyIsland"),
-  icon,
-]) {
+for (const file of [join(target, "vibevalley-mac"), join(target, "vibevalley"), join(root, "apps/island/.build/release/VibeValleyIsland"), icon]) {
   if (!existsSync(file)) throw new Error(`Missing package input: ${file}. Build it before --skip-build`);
 }
 for (const binary of [join(target, "vibevalley-mac"), join(target, "vibevalley"), join(root, "apps/island/.build/release/VibeValleyIsland")]) {
@@ -74,7 +68,6 @@ cpSync(join(target, "vibevalley-mac"), join(macos, "vibevalley-mac"));
 cpSync(join(target, "vibevalley"), join(macos, "vibevalley"));
 cpSync(join(root, "apps/island/.build/release/VibeValleyIsland"), join(macos, "VibeValleyIsland"));
 cpSync(join(root, "assets"), join(resources, "assets"), { recursive: true, dereference: true });
-cpSync(join(root, "apps/mac/ui/build"), join(resources, "ui"), { recursive: true });
 cpSync(icon, join(resources, "icon.icns"));
 const sign = (path: string, microphone = false) =>
   run("codesign", [

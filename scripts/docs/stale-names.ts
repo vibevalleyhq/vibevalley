@@ -504,7 +504,14 @@ export function staleNamesIn(source: string, text: string): string[] {
 if (import.meta.main) {
   const catalogs = globSync("crates/i18n/locales/*/*.json", { cwd: root }).toSorted();
   const files = [
-    ...new Set(DIRS.flatMap((dir) => globSync(`${dir}/**/*.{ts,tsx,rs}`, { cwd: root, exclude: (f) => f.includes("node_modules") || f.endsWith("/build") }))),
+    ...new Set(
+      DIRS.flatMap((dir) =>
+        globSync(`${dir}/**/*.{ts,tsx,rs}`, {
+          cwd: root,
+          exclude: (f) => f.includes("node_modules") || f.endsWith("/build") || f.endsWith("/build-shell"),
+        }),
+      ),
+    ),
   ].toSorted();
   const hits = [...files, ...catalogs].flatMap((source) => staleNamesIn(source, readFileSync(resolve(root, source), "utf8")));
   for (const hit of hits) console.error(`stale names: ${hit}`);

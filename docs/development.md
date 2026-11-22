@@ -15,7 +15,7 @@ cargo run -p vibevalley-cli -- doctor        # 命令行，对着运行中的服
 ```
 
 - **通道、端口与目录**：端口、家目录与宿主库按发布通道隔离（`release` `8787` / `~/.vibevalley` / `VibeValley`，`beta` `8788` / `~/.vibevalley-beta` / `VibeValley-beta`，`alpha` `8789` / `~/.vibevalley-alpha` / `VibeValley-alpha`，未打包的 `dev` `8790` / `~/.vibevalley-dev` / `VibeValley-dev`），可用 `VIBEVALLEY_CHANNEL`、`VIBEVALLEY_PORT`、`VIBEVALLEY_HOME`、`VIBEVALLEY_STORE` 覆盖；原生应用与单独跑的服务端都让帮工默认在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活，仓库在 `repos/`，worktree 在 `worktrees/`（[客户端](docs/subsystems/app.md#进程和服务端)、[设置和配置](docs/subsystems/setting.md#发布通道默认端口与数据目录)）。
-- **重载**：服务端不自动重载，修改 `crates/` 需重新构建、重启。调试构建的应用从磁盘读 `apps/mac/ui/build/` 的页面包：改了 TSX 跑 `vp run mac:check` 重新打包，再重开应用，不用重新编译 Rust。
+- **重载**：服务端不自动重载，修改 `crates/` 需重新构建、重启。调试构建的应用从磁盘读 `apps/mac/ui/build/`（工作台 `App.tsx`）与 `apps/mac/ui/build-shell/`（轻量壳窗格 `ShellApp.tsx`）的页面包：改了 TSX 跑 `vp run mac:check` 重新打包，再重开应用，不用重新编译 Rust。
 - **不看屏幕检查应用**：`VIBEVALLEY_DEBUG_DUMP=<文件>` 每秒把外壳的状态写成 JSON，`VIBEVALLEY_DEBUG_SCRIPT=<文件>` 一行一步地驱动应用，带 `--features shot` 构建时能截图（[验收的应用分册](.agents/skills/vv-acceptance/references/app.md)）。
 
 ## 发版

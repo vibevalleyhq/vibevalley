@@ -27,9 +27,9 @@ const config: KnipConfig = {
       ignoreDependencies: ["tailwindcss"],
     },
     "apps/mac/ui": {
-      // nsh loads App.tsx, and its tests open the app and story entry points by filename.
-      entry: ["App.tsx", "**/*.{test,story,stories}.{ts,tsx}", "**/main.tsx", "**/story.tsx"],
-      project: ["**/*.{ts,tsx}", "!.nsh/**", "!build/**"],
+      // nsh loads App.tsx (workbench) and ShellApp.tsx (lightweight panes), and tests open entry points by filename.
+      entry: ["App.tsx", "ShellApp.tsx", "**/*.{test,story,stories}.{ts,tsx}", "**/main.tsx", "**/story.tsx"],
+      project: ["**/*.{ts,tsx}", "!.nsh/**", "!build/**", "!build-shell/**"],
       // nsh provides these modules inside its runtime, without npm packages.
       ignoreDependencies: ["nsh", "nsh/*"],
     },

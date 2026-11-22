@@ -31,7 +31,7 @@
 
 ## 9.4 矢量图标收口清单
 
-工作台与工作区外壳全部矢量图标均已收口至 `apps/mac/ui/design/icons.ts`（经 `<Icon name>` 统一渲染，工作区所需的 `minus`、`branch`、`diff`、`collapseAll`、`expandAll`、`lock` 也已合并入主表），不再存在独立的 Canvas 手绘图标集。
+工作台与工作区外壳全部 97 枚矢量图标路径已下沉收口至原生 Rust `crates/rich/src/icon.rs`（`VvIcon` 无锁 `OnceLock` 路径缓存），前端 `apps/mac/ui/design/icons.ts` 仅保留纯类型 `IconName` 与 `actionIcon` 映射（经 `<Icon name>` 统一渲染，工作区所需的 `minus`、`branch`、`diff`、`collapseAll`、`expandAll`、`lock` 与内容侧栏 `sidebar` 均已纳入主表），不再存在 JS 侧 SVG 路径负载或独立的 Canvas 手绘图标集。
 
 ## 9.5 静态检查覆盖边界
 
