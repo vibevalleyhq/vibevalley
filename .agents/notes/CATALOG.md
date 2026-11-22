@@ -16,9 +16,9 @@
 
 ### architecture
 
-- 2026-11-22 [OAR Antigravity ACP 集成（仅 agy 1.5+）与工作区直连对话标签页](.agents/notes/proposed/architecture/2026-11-22-oar-antigravity-and-workspace-chat.md)
 - 2026-11-22 [Pure-Rust native collaborative whiteboard (`VvWhiteboard`)](.agents/notes/proposed/architecture/2026-11-22-native-rust-whiteboard.md)
 - 2026-11-22 [Loro 协作内容引擎：四平面边界、实时感知、块内共编与时间旅行](.agents/notes/proposed/architecture/2026-11-22-loro-collaborative-content-engine.md)
+- 2026-11-22 [VibeValley DevTools 与跨边界强类型协议准则](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)
 - 2026-11-21 [工作台 UI 状态机与 Rust 领域投影收口架构](.agents/notes/proposed/architecture/2026-11-21-ui-state-machine-consolidation.md)
 - 2026-11-19 [原生工作台长期计划：从派出第一单到放心管理多份工作](.agents/notes/proposed/architecture/2026-11-19-native-product-roadmap.md)
 - 2026-11-18 [在原生版复刻 Chord、持久执行、oar 和 Web 农场](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)
