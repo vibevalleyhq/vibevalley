@@ -512,12 +512,20 @@ impl Shell {
                             PaneKind::Terminal { terminal_id, .. } => {
                                 let status = self.terminals.get(terminal_id).map(|v| v.view.read(cx).terminal_status()).unwrap_or_default();
                                 let att = p.terminal(terminal_id).is_some_and(|e| e.attention);
+                                let running_label = if status.is_coding_agent() {
+                                    status
+                                        .agent
+                                        .as_deref()
+                                        .map(|agent| crate::terminal::agent_display_name(agent, status.label.as_deref().unwrap_or(agent)))
+                                } else {
+                                    status.label
+                                };
                                 (
                                     "terminal",
                                     status.state == crate::terminal::RunningState::Working,
                                     status.state.as_str(),
                                     status.agent,
-                                    status.label,
+                                    running_label,
                                     att,
                                 )
                             }

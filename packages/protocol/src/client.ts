@@ -421,6 +421,8 @@ export class VibeValleyApi {
       this.call<void>("session.respondInteraction", "/api/v1/session/respondInteraction", a, options),
     setConfig: (a: T.SessionSetConfigInput, options?: { signal?: AbortSignal }): Promise<T.SessionWorkspace> =>
       this.call<T.SessionWorkspace>("session.setConfig", "/api/v1/session/setConfig", a, options),
+    childTranscript: (a: T.SessionChildTranscriptInput, options?: { signal?: AbortSignal }): Promise<T.SessionChildTranscript> =>
+      this.call<T.SessionChildTranscript>("session.childTranscript", "/api/v1/session/childTranscript", a, options),
     event: {
       /** Its log, oldest first. run gives one run's only. */
       list: (a: { id: string; run?: string }, options?: { signal?: AbortSignal }): Promise<T.SessionEvent[]> =>

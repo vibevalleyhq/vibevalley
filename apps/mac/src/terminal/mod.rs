@@ -392,6 +392,14 @@ impl TerminalView {
         self.spec.title.as_deref().filter(|title| !title.trim().is_empty())
     }
 
+    pub fn osc_title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    pub fn running_command(&self) -> Option<&str> {
+        self.running_command.as_deref()
+    }
+
     pub fn title(&self) -> Option<&str> {
         self.link_title().or(self.title.as_deref())
     }
@@ -440,16 +448,6 @@ impl TerminalView {
             is_idle_prompt,
             recent_output,
         )
-    }
-
-    /// Detects whether an agent (`antigravity`, `codex`, `claude`, `opencode`, ...) or
-    /// command is present in this terminal: returns `(agent_id, display_label)`.
-    pub fn running_status(&self) -> Option<(String, String)> {
-        let status = self.terminal_status();
-        match status.state {
-            RunningState::Idle => None,
-            RunningState::Working | RunningState::Ready => Some((status.agent?, status.label?)),
-        }
     }
 
     fn ensure_settle_timer(&mut self, cx: &mut Context<Self>) {
@@ -1083,7 +1081,7 @@ impl Focusable for TerminalView {
     }
 }
 
-fn first_command_token(cmd: &str) -> Option<&str> {
+pub(crate) fn first_command_token(cmd: &str) -> Option<&str> {
     cmd.split_whitespace()
         .find(|tok| !tok.contains('=') && *tok != "sudo" && *tok != "env" && *tok != "npx")
         .map(|tok| tok.rsplit('/').next().unwrap_or(tok))

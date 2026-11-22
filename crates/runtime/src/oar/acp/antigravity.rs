@@ -1,14 +1,14 @@
 //! Antigravity CLI (`agy >= 1.5.0`) ACP protocol policy, payload normalization,
 //! interaction routing, and background-continuation tracking.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use regex::Regex;
 use serde_json::{Map, Value, json};
 
-use crate::oar::{Installation, InteractionOption, PermissionMode, SessionOptions};
+use crate::oar::{EventKind, Installation, InteractionOption, PermissionMode, SessionOptions, SubagentStatus};
 
 pub(crate) const MIN_VERSION: (u64, u64, u64) = (1, 5, 0);
 pub(crate) const FIELD_TEXT_LIMIT: usize = 8 * 1024;
@@ -597,6 +597,259 @@ impl BackgroundTracker {
     }
 }
 
+// ---- Swarm & subagent ACP tool-call → `EventKind::Subagent*` tracker --------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChildTool {
+    Swarm,
+    InvokeSubagent,
+    SwarmWait,
+    PostMessage,
+    PassiveSignal,
+}
+
+struct ChildCallState {
+    tool: ChildTool,
+    input: Value,
+    emitted_start: bool,
+    emitted_end: bool,
+}
+
+/// Maps Antigravity ACP `tool_call` / `tool_call_update` frames for `/swarm` and
+/// `invoke_subagent` tools into structured `EventKind::Subagent*` events.
+#[derive(Default)]
+pub(crate) struct ChildActivityTracker {
+    calls: HashMap<String, ChildCallState>,
+}
+
+fn classify_child_tool(title: &str) -> Option<ChildTool> {
+    let trimmed = title.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let after_colon = trimmed.rsplit_once(':').map_or(trimmed, |(_, r)| r);
+    let bare = after_colon.rsplit_once('.').map_or(after_colon, |(_, r)| r).trim().to_ascii_lowercase();
+    match bare.as_str() {
+        "swarm" => Some(ChildTool::Swarm),
+        "invoke_subagent" | "start_subagent" => Some(ChildTool::InvokeSubagent),
+        "swarm_wait" => Some(ChildTool::SwarmWait),
+        "post_message" => Some(ChildTool::PostMessage),
+        "read_board" | "define_subagent" => Some(ChildTool::PassiveSignal),
+        _ => None,
+    }
+}
+
+fn first_str<'a>(input: &'a Value, keys: &[&str]) -> Option<&'a str> {
+    keys.iter()
+        .find_map(|k| input.get(*k).and_then(Value::as_str))
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+}
+
+fn output_summary(update: &Value) -> Option<String> {
+    if let Some(arr) = update.get("content").and_then(Value::as_array) {
+        let texts: Vec<&str> = arr
+            .iter()
+            .filter_map(|item| {
+                item.get("text")
+                    .or_else(|| item.pointer("/content/text"))
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+            })
+            .collect();
+        if !texts.is_empty() {
+            return Some(truncate_utf8_head(&strip_inline_data_images(&texts.join("\n")), 512));
+        }
+    }
+    match update.get("rawOutput") {
+        Some(Value::String(s)) if !s.trim().is_empty() => Some(truncate_utf8_head(&strip_inline_data_images(s.trim()), 512)),
+        Some(Value::Object(map)) => map
+            .get("output")
+            .or_else(|| map.get("message"))
+            .or_else(|| map.get("summary"))
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| truncate_utf8_head(&strip_inline_data_images(s), 512)),
+        _ => None,
+    }
+}
+
+impl ChildActivityTracker {
+    /// Absorbs one `tool_call` / `tool_call_update` frame. Returns `(matched_child_tool, events)`.
+    pub(crate) fn on_tool_update(&mut self, parent_session_id: &str, update: &Value) -> (bool, Vec<EventKind>) {
+        let Some(call_id) = update.get("toolCallId").and_then(Value::as_str).filter(|s| !s.is_empty()) else {
+            return (false, Vec::new());
+        };
+        let title = update.get("title").and_then(Value::as_str).unwrap_or_default();
+        if !self.calls.contains_key(call_id) {
+            let Some(tool) = classify_child_tool(title) else {
+                return (false, Vec::new());
+            };
+            self.calls.insert(
+                call_id.to_string(),
+                ChildCallState {
+                    tool,
+                    input: Value::Null,
+                    emitted_start: false,
+                    emitted_end: false,
+                },
+            );
+        }
+        let Some(state) = self.calls.get_mut(call_id) else {
+            return (false, Vec::new());
+        };
+        if let Some(raw_input) = update.get("rawInput")
+            && !matches!(raw_input, Value::Null)
+            && !raw_input.as_object().is_some_and(Map::is_empty)
+        {
+            state.input = raw_input.clone();
+        }
+
+        let status = update.get("status").and_then(Value::as_str).unwrap_or_default();
+        let terminal = matches!(status, "completed" | "failed" | "cancelled");
+        let mut events = Vec::new();
+
+        match state.tool {
+            ChildTool::Swarm => {
+                let action = first_str(&state.input, &["action"]);
+                if !state.emitted_start
+                    && let Some(action) = action
+                {
+                    state.emitted_start = true;
+                    match action {
+                        "add" => {
+                            let base_name = first_str(&state.input, &["name"]).unwrap_or(call_id);
+                            let brief = first_str(&state.input, &["brief"]).map(|s| truncate_utf8_head(&strip_inline_data_images(s), 1024));
+                            let tasks = state.input.get("tasks").and_then(Value::as_array);
+                            let count = state.input.get("n").and_then(Value::as_u64).unwrap_or(1) as usize;
+                            let spawned: Vec<(String, Option<String>)> = if let Some(items) = tasks.filter(|a| !a.is_empty()) {
+                                items
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(idx, item)| {
+                                        let worker = format!("{base_name}-{}", idx + 1);
+                                        let slice_task = item.as_str().map(str::trim).filter(|s| !s.is_empty());
+                                        let task = match (slice_task, brief.as_deref()) {
+                                            (Some(t), Some(b)) => Some(truncate_utf8_head(&format!("{t}: {b}"), 1024)),
+                                            (Some(t), None) => Some(t.to_string()),
+                                            (None, Some(b)) => Some(b.to_string()),
+                                            (None, None) => None,
+                                        };
+                                        (worker, task)
+                                    })
+                                    .collect()
+                            } else if count > 1 {
+                                (1..=count.min(16)).map(|i| (format!("{base_name}-{i}"), brief.clone())).collect()
+                            } else {
+                                vec![(base_name.to_string(), brief)]
+                            };
+                            for (worker, task) in spawned {
+                                events.push(EventKind::SubagentSpawned {
+                                    parent_thread_id: parent_session_id.to_string(),
+                                    thread_id: worker.clone(),
+                                    task,
+                                    agent_name: Some(worker.clone()),
+                                });
+                                events.push(EventKind::SubagentStatusChanged {
+                                    thread_id: worker,
+                                    turn_id: None,
+                                    status: SubagentStatus::Running,
+                                    message: None,
+                                });
+                            }
+                        }
+                        "kill" => {
+                            if let Some(target) = first_str(&state.input, &["name"]) {
+                                events.push(EventKind::SubagentStatusChanged {
+                                    thread_id: target.to_string(),
+                                    turn_id: None,
+                                    status: SubagentStatus::Shutdown,
+                                    message: None,
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            ChildTool::InvokeSubagent => {
+                let has_input = !state.input.is_null();
+                if !state.emitted_start && (has_input || status == "in_progress" || terminal) {
+                    state.emitted_start = true;
+                    let agent_name = first_str(&state.input, &["agent_type", "agentType", "role", "name", "subagent_type"]).map(str::to_string);
+                    let task = first_str(&state.input, &["prompt", "task", "instructions", "description"])
+                        .map(|s| truncate_utf8_head(&strip_inline_data_images(s), 1024));
+                    events.push(EventKind::SubagentSpawned {
+                        parent_thread_id: parent_session_id.to_string(),
+                        thread_id: call_id.to_string(),
+                        task,
+                        agent_name,
+                    });
+                    events.push(EventKind::SubagentStatusChanged {
+                        thread_id: call_id.to_string(),
+                        turn_id: None,
+                        status: SubagentStatus::Running,
+                        message: None,
+                    });
+                }
+                if terminal && !state.emitted_end {
+                    state.emitted_end = true;
+                    let final_status = match status {
+                        "completed" => SubagentStatus::Completed,
+                        "cancelled" => SubagentStatus::Interrupted,
+                        _ => SubagentStatus::Errored,
+                    };
+                    events.push(EventKind::SubagentStatusChanged {
+                        thread_id: call_id.to_string(),
+                        turn_id: None,
+                        status: final_status,
+                        message: output_summary(update),
+                    });
+                }
+            }
+            ChildTool::SwarmWait => {
+                if !terminal && !state.emitted_start {
+                    state.emitted_start = true;
+                    events.push(EventKind::SubagentWait {
+                        thread_id: parent_session_id.to_string(),
+                        call_id: call_id.to_string(),
+                        targets: vec!["board".to_string()],
+                        waiting: true,
+                    });
+                } else if terminal && !state.emitted_end {
+                    state.emitted_end = true;
+                    events.push(EventKind::SubagentWait {
+                        thread_id: parent_session_id.to_string(),
+                        call_id: call_id.to_string(),
+                        targets: vec!["board".to_string()],
+                        waiting: false,
+                    });
+                }
+            }
+            ChildTool::PostMessage => {
+                if !state.emitted_start
+                    && let Some(text) = first_str(&state.input, &["text", "message"])
+                {
+                    state.emitted_start = true;
+                    events.push(EventKind::SubagentMessage {
+                        thread_id: "swarm-board".to_string(),
+                        turn_id: call_id.to_string(),
+                        text: truncate_utf8_head(&strip_inline_data_images(text), 1024),
+                    });
+                }
+            }
+            ChildTool::PassiveSignal => {}
+        }
+
+        if terminal {
+            self.calls.remove(call_id);
+        }
+        (true, events)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -748,5 +1001,119 @@ mod tests {
             pick_auth_method(&agy_init, &[("AGY_ACP_AUTH_METHOD".into(), "agent-platform".into())], Some(&empty_base)),
             Some("agent-platform".into())
         );
+    }
+
+    #[test]
+    fn child_activity_tracker_maps_swarm_and_subagent_tool_calls() {
+        let mut tracker = ChildActivityTracker::default();
+
+        // 1. swarm(action: "add") emits SubagentSpawned + Running.
+        let (matched, evs) = tracker.on_tool_update(
+            "root-1",
+            &json!({
+                "toolCallId": "tc-add",
+                "title": "swarm",
+                "status": "in_progress",
+                "rawInput": {"action": "add", "name": "verifier", "brief": "Run acceptance checks"}
+            }),
+        );
+        assert!(matched);
+        assert_eq!(
+            evs,
+            vec![
+                EventKind::SubagentSpawned {
+                    parent_thread_id: "root-1".into(),
+                    thread_id: "verifier".into(),
+                    task: Some("Run acceptance checks".into()),
+                    agent_name: Some("verifier".into()),
+                },
+                EventKind::SubagentStatusChanged {
+                    thread_id: "verifier".into(),
+                    turn_id: None,
+                    status: SubagentStatus::Running,
+                    message: None,
+                },
+            ]
+        );
+        // Completion update must not duplicate spawn events.
+        let (matched_done, evs_done) = tracker.on_tool_update("root-1", &json!({"toolCallId": "tc-add", "status": "completed"}));
+        assert!(matched_done);
+        assert!(evs_done.is_empty());
+
+        // 2. swarm(action: "kill") emits Shutdown.
+        let (_, evs_kill) = tracker.on_tool_update(
+            "root-1",
+            &json!({"toolCallId": "tc-kill", "title": "default_api:swarm", "status": "completed", "rawInput": {"action": "kill", "name": "verifier"}}),
+        );
+        assert_eq!(
+            evs_kill,
+            vec![EventKind::SubagentStatusChanged {
+                thread_id: "verifier".into(),
+                turn_id: None,
+                status: SubagentStatus::Shutdown,
+                message: None,
+            }]
+        );
+
+        // 3. invoke_subagent emits Spawned+Running then Completed.
+        let (_, evs_sub_start) = tracker.on_tool_update(
+            "root-1",
+            &json!({"toolCallId": "tc-sub", "title": "invoke_subagent", "status": "in_progress", "rawInput": {"agent_type": "explore", "prompt": "Scan repo"}}),
+        );
+        assert_eq!(evs_sub_start.len(), 2);
+        let (_, evs_sub_end) = tracker.on_tool_update(
+            "root-1",
+            &json!({"toolCallId": "tc-sub", "status": "completed", "rawOutput": {"summary": "Found 3 files"}}),
+        );
+        assert_eq!(
+            evs_sub_end,
+            vec![EventKind::SubagentStatusChanged {
+                thread_id: "tc-sub".into(),
+                turn_id: None,
+                status: SubagentStatus::Completed,
+                message: Some("Found 3 files".into()),
+            }]
+        );
+
+        // 4. swarm_wait toggles waiting true -> false.
+        let (_, w1) = tracker.on_tool_update("root-1", &json!({"toolCallId": "tc-wait", "title": "swarm_wait", "status": "in_progress"}));
+        let (_, w2) = tracker.on_tool_update("root-1", &json!({"toolCallId": "tc-wait", "status": "completed"}));
+        assert_eq!(
+            w1,
+            vec![EventKind::SubagentWait {
+                thread_id: "root-1".into(),
+                call_id: "tc-wait".into(),
+                targets: vec!["board".into()],
+                waiting: true,
+            }]
+        );
+        assert_eq!(
+            w2,
+            vec![EventKind::SubagentWait {
+                thread_id: "root-1".into(),
+                call_id: "tc-wait".into(),
+                targets: vec!["board".into()],
+                waiting: false,
+            }]
+        );
+
+        // 5. post_message emits SubagentMessage on swarm-board.
+        let (_, pm) = tracker.on_tool_update(
+            "root-1",
+            &json!({"toolCallId": "tc-post", "title": "post_message", "status": "completed", "rawInput": {"text": "@all ready"}}),
+        );
+        assert_eq!(
+            pm,
+            vec![EventKind::SubagentMessage {
+                thread_id: "swarm-board".into(),
+                turn_id: "tc-post".into(),
+                text: "@all ready".into(),
+            }]
+        );
+
+        // 6. Unrelated tool returns matched=false.
+        let (other_matched, other_evs) = tracker.on_tool_update("root-1", &json!({"toolCallId": "tc-other", "title": "read_file", "status": "completed"}));
+        assert!(!other_matched);
+        assert!(other_evs.is_empty());
     }
 }

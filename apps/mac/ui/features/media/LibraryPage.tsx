@@ -424,7 +424,7 @@ export function LibraryPage() {
       <View
         role="toolbar"
         accessibilityLabel={bucketTitle()}
-        class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-4 py-1.5"
+        class="min-h-9 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3.5 py-0.5"
       >
         <View class="min-w-0 flex-row items-center gap-2">
           <Text testID="library-bucket-title" class="truncate text-sm font-semibold text-ink">

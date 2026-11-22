@@ -3,11 +3,18 @@ import { z } from "zod";
 import type {
   EventTokens,
   RuntimeInfo as ProtocolRuntimeInfo,
+  SessionChildStep,
   SessionEvent,
   SessionInteractionRequest,
   SessionPermissionDecision,
   SessionPermissionMode,
   SessionPermissionRequest,
+  SessionSwarmMember,
+  SessionSwarmMemberState,
+  SessionSwarmMessage,
+  SessionSwarmOverview,
+  SessionSwarmState,
+  SessionSwarmThread,
   SessionWatchEvent,
   SessionWorkspace,
 } from "@vibevalley/protocol";
@@ -17,14 +24,32 @@ import { call, subscribe } from "../infra/bridge";
 
 export type {
   EventTokens,
+  SessionChildStep,
   SessionEvent,
   SessionInteractionRequest,
   SessionPermissionDecision,
   SessionPermissionMode,
   SessionPermissionRequest,
+  SessionSwarmMember,
+  SessionSwarmMemberState,
+  SessionSwarmMessage,
+  SessionSwarmOverview,
+  SessionSwarmState,
+  SessionSwarmThread,
   SessionWatchEvent,
   SessionWorkspace,
 };
+
+export interface ComposerFile {
+  readonly path: string;
+  readonly name: string;
+  readonly mime: string;
+}
+
+export interface BoardTextToken {
+  readonly kind: "text" | "mention" | "seq" | "tag";
+  readonly value: string;
+}
 
 export type ThoughtLevel = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 export type ChatPhase = "starting" | "ready" | "working" | "waiting" | "error";
@@ -140,6 +165,22 @@ export function runtimeDisplayName(runtime: string): string {
     default:
       return runtime || "Chat";
   }
+}
+
+export function deriveChatTitle(sessionTitle: string | undefined, swarmTitle: string | undefined, firstUserMessage: string | undefined): string | undefined {
+  const realTitle = sessionTitle?.trim();
+  if (realTitle) return realTitle;
+  const swarm = swarmTitle?.trim();
+  if (swarm) return swarm;
+  if (firstUserMessage !== undefined) {
+    for (const rawLine of firstUserMessage.split(/\r?\n/u)) {
+      const cleaned = rawLine.trim().replace(/\s+/gu, " ");
+      if (cleaned.length > 0) {
+        return cleaned.length > 36 ? `${cleaned.slice(0, 35)}…` : cleaned;
+      }
+    }
+  }
+  return undefined;
 }
 
 export function mergeChatSteps(existing: readonly SessionEvent[], incoming: readonly SessionEvent[]): SessionEvent[] {
@@ -323,9 +364,63 @@ export async function openWorkspaceSession(params: OpenWorkspaceParams): Promise
   return { ok: true, workspace: parsed.data };
 }
 
-export async function sendWorkspaceMessage(id: string, text: string): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const env = await call("session.send", { id, text });
+const localPickedFileSchema = z
+  .object({
+    path: z.string().min(1),
+    name: z.string().min(1),
+    type: z.string(),
+  })
+  .nullable();
+
+export async function pickWorkspaceFile(): Promise<ComposerFile | undefined> {
+  const env = await call("host.pickFile", {});
+  if (env.bizCode !== 0) return undefined;
+  const parsed = localPickedFileSchema.safeParse(env.data);
+  if (!parsed.success || parsed.data === null) return undefined;
+  return { path: parsed.data.path, name: parsed.data.name, mime: parsed.data.type };
+}
+
+export async function sendWorkspaceMessage(
+  id: string,
+  text: string,
+  contextFiles?: readonly { readonly path: string }[],
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const payload: Record<string, unknown> = { id, text };
+  if (contextFiles !== undefined && contextFiles.length > 0) {
+    payload.contextFiles = contextFiles.map((f) => ({ path: f.path }));
+  }
+  const env = await call("session.send", payload);
   return env.bizCode === 0 ? { ok: true } : { ok: false, reason: env.message };
+}
+
+export async function fetchChildTranscript(
+  id: string,
+  conversationId: string,
+  limit = 25,
+): Promise<{ ok: true; steps: SessionChildStep[] } | { ok: false; reason: string }> {
+  const env = await call("session.childTranscript", { id, conversationId, limit });
+  if (env.bizCode !== 0) return { ok: false, reason: env.message };
+  const parsed = S.SessionChildTranscript.safeParse(env.data);
+  if (!parsed.success) return { ok: false, reason: "invalid session.childTranscript response" };
+  return { ok: true, steps: parsed.data.steps };
+}
+
+const BOARD_TOKEN_RE = /(@[a-zA-Z0-9_-]+|#[0-9]+|\[(?:done|stall)\])/gu;
+
+export function parseBoardTokens(text: string): BoardTextToken[] {
+  const tokens: BoardTextToken[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(BOARD_TOKEN_RE)) {
+    const idx = match.index;
+    const hit = match[0];
+    if (idx > cursor) tokens.push({ kind: "text", value: text.slice(cursor, idx) });
+    if (hit.startsWith("@")) tokens.push({ kind: "mention", value: hit });
+    else if (hit.startsWith("#")) tokens.push({ kind: "seq", value: hit });
+    else tokens.push({ kind: "tag", value: hit });
+    cursor = idx + hit.length;
+  }
+  if (cursor < text.length) tokens.push({ kind: "text", value: text.slice(cursor) });
+  return tokens.length > 0 ? tokens : [{ kind: "text", value: text }];
 }
 
 export async function stopWorkspaceSession(id: string): Promise<{ ok: true } | { ok: false; reason: string }> {

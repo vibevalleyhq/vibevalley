@@ -193,6 +193,7 @@
 | `session.respondPermission` | 答复会话的工具权限请求 | `/api/v1/session/respondPermission` | ✓ | ✓ |   |   |
 | `session.respondInteraction` | 回复会话的交互式提问 | `/api/v1/session/respondInteraction` | ✓ | ✓ |   |   |
 | `session.setConfig` | 调整工作区会话的模型、推理强度或权限模式 | `/api/v1/session/setConfig` | ✓ | ✓ |   |   |
+| `session.childTranscript` | 读取子代理或协作组员最近的轨迹步骤 | `/api/v1/session/childTranscript` | ✓ | ✓ |   |   |
 
 ## artifact
 

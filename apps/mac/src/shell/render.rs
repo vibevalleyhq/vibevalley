@@ -61,8 +61,20 @@ impl Render for Shell {
                     if s.chat_menu_group.take().is_some() {
                         cx.notify();
                     }
-                    if e.click_count == 2 && f32::from(e.position.y) <= 36.0 {
-                        window.zoom_window();
+                    if s.palette.as_ref().is_none_or(|p| !p.open)
+                        && s.launch.is_none()
+                        && !e.modifiers.control
+                        && !e.modifiers.platform
+                        && crate::panes::is_titlebar_hit(f32::from(e.position.y))
+                    {
+                        if e.click_count >= 2 {
+                            s.window_drag_origin = None;
+                            if !window.is_fullscreen() {
+                                window.titlebar_double_click();
+                            }
+                        } else {
+                            s.window_drag_origin = Some((f32::from(e.position.x), f32::from(e.position.y)));
+                        }
                     }
                 }),
             )
@@ -170,7 +182,14 @@ impl Render for Shell {
                             .flex_none()
                             .bg(colors.border)
                             .cursor_col_resize()
-                            .on_mouse_down(MouseButton::Left, cx.listener(|s, _, _, _| s.resizing_sidebar = true))
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|s, _, _, cx| {
+                                    cx.stop_propagation();
+                                    s.window_drag_origin = None;
+                                    s.resizing_sidebar = true;
+                                }),
+                            )
                     }))
                     .child(div().flex_1().h_full().min_w_0().child(main))
                     .children((self.inspector_open && f32::from(window.viewport_size().width) >= 1040.0).then(|| {
@@ -181,7 +200,14 @@ impl Render for Shell {
                             .flex_none()
                             .bg(colors.border)
                             .cursor_col_resize()
-                            .on_mouse_down(MouseButton::Left, cx.listener(|s, _, _, _| s.resizing_inspector = true))
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|s, _, _, cx| {
+                                    cx.stop_propagation();
+                                    s.window_drag_origin = None;
+                                    s.resizing_inspector = true;
+                                }),
+                            )
                     }))
                     .children(
                         (self.inspector_open && f32::from(window.viewport_size().width) >= 1040.0)

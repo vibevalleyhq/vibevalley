@@ -24,16 +24,16 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
   const pageHref = () => `/artifacts/${encodeURIComponent(props.id)}${(pageVersion() ?? 0) > 0 ? `?v=${pageVersion()}` : ""}`;
   return (
     <View accessibilityLabel={t("web.artifact.canvas.label")} testID="artifact-canvas" class="min-h-0 min-w-0 flex-1 border-l border-line bg-page">
-      <View class="h-14 shrink-0 flex-row items-center gap-2.5 border-b border-line bg-page px-3.5">
+      <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
         <If when={shown()}>
           {(a) => (
             <>
-              <View class="size-8 shrink-0 items-center justify-center rounded-md bg-side">
-                <Icon name={artifactIcon(a())} size={16} tone="muted" />
+              <View class="size-6 shrink-0 items-center justify-center rounded-md bg-side">
+                <Icon name={artifactIcon(a())} size={14} tone="muted" />
               </View>
-              <View class="min-w-0 flex-1 gap-0.5">
-                <Text class="truncate text-sm font-semibold text-ink">{a().title}</Text>
-                <Text class="truncate text-xs text-muted tabular-nums">
+              <View class="min-w-0 flex-1 flex-row items-center gap-2 overflow-hidden">
+                <Text class="min-w-0 shrink truncate text-sm font-semibold text-ink">{a().title}</Text>
+                <Text class="shrink-0 truncate text-xs text-muted tabular-nums">
                   {[
                     kindLabel(a()),
                     ...(a().isDefault ? [t("web.artifact.types.defaultBadge")] : []),
@@ -49,7 +49,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
             href={pageHref()}
             testID="artifact-canvas-page"
             tooltip={<Bubble text={t("web.artifact.canvas.openPage")} />}
-            class="group h-7 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+            class="group h-6 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
           >
             <Icon name="open" size={12} tone="muted" />
             <Text class="text-xs font-medium text-muted group-hover:text-ink">{t("web.artifact.canvas.openPage")}</Text>

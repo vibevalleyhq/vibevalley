@@ -9,8 +9,9 @@ import type { GitFrame } from "./GitPanel";
 
 type App = Awaited<ReturnType<typeof open>>;
 
-function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<string, unknown> = {}) {
+function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<string, unknown> = {}, deferOps: readonly string[] = []) {
   const queue: [string, unknown][] = [];
+  const heldReplies: [string, unknown][] = [];
   const acts: { type: string; [key: string]: unknown }[] = [];
   const calls: { op: string; payload: unknown }[] = [];
   const subscriptions = new Map<string, { name: string; payload: unknown }>();
@@ -29,7 +30,9 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
       calls.push({ op, payload: a.payload });
       const answer = op in responses ? responses[op] : null;
       const body = typeof answer === "function" ? (answer as (p: unknown) => unknown)(a.payload) : answer;
-      queue.push([`reply:${a.id}`, { bizCode: 0, message: "ok", data: body }]);
+      const reply: [string, unknown] = [`reply:${a.id}`, { bizCode: 0, message: "ok", data: body }];
+      if (deferOps.includes(op)) heldReplies.push(reply);
+      else queue.push(reply);
     } else if (a.type === "subscribe" && a.id !== undefined) {
       subscriptions.set(a.id, { name: a.name ?? "", payload: a.payload });
     } else if (a.type === "unsubscribe" && a.id !== undefined) {
@@ -44,6 +47,11 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
     for (let round = 0; round < 30 && queue.length > 0; round++) {
       for (const [name, data] of queue.splice(0)) await app.host.send(name, data);
     }
+  };
+
+  const releaseDeferred = async (app: App) => {
+    queue.push(...heldReplies.splice(0));
+    await pump(app);
   };
 
   const pushFrame = async (app: App, topic: string, data: unknown) => {
@@ -70,6 +78,7 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
       calls.length = 0;
     },
     pump,
+    releaseDeferred,
     pushFrame,
     emitSub,
   };
@@ -103,6 +112,7 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
           { id: 101, title: "zsh", active: true, kind: "terminal", running: true, runningState: "working", runningAgent: "codex" },
           { id: 102, title: "README.md", active: false, kind: "file" },
           { id: 103, title: "Antigravity", active: false, kind: "chat", running: true, runningState: "working", runningAgent: "antigravity", attention: true },
+          { id: 104, title: "Claude Code", active: false, kind: "chat", running: false, runningState: "ready", runningAgent: "claude" },
         ],
       },
       {
@@ -147,8 +157,21 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   await app.press(`label:${t("web.shell.sidebar.addRepo")}`);
   expect(host.acts).toContainEqual({ type: "add_project" });
 
+  expect(app.count("id:sidebar-tab-working-101")).toBe(1);
+  expect(app.count("id:sidebar-tab-working-103")).toBe(1);
+  expect(app.count("id:sidebar-tab-attention-103")).toBe(1);
+  expect(app.count("id:sidebar-tab-ready-104")).toBe(1);
+  expect(app.count("id:sidebar-tab-more-102")).toBe(0);
+
   await app.hover("text:README.md");
-  await app.press(`label:${t("web.shell.sidebar.closeTab", { title: "README.md" })}`);
+  expect(app.count(`label:${t("web.shell.sidebar.closeTab")}`)).toBe(0);
+  expect(app.count("id:sidebar-tab-more-102")).toBe(1);
+  host.clearActs();
+  await app.press("id:sidebar-tab-more-102");
+  expect(app.count("id:sidebar-tab-menu-chat-102")).toBe(1);
+  expect(app.count("id:sidebar-tab-menu-term-102")).toBe(1);
+  expect(app.count("id:sidebar-tab-menu-close-102")).toBe(1);
+  await app.press("id:sidebar-tab-menu-close-102");
   expect(host.acts).toContainEqual({ type: "close_tab_at", path: "/work/vibevalley", tab_id: 102 });
 
   await app.press(`label:${t("web.shell.sidebar.collapseAll")}`);
@@ -408,6 +431,7 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
       "session.respondInteraction": null,
       "session.respondPermission": null,
       "session.stop": null,
+      "host.pickFile": { path: "/work/vibevalley/src/main.rs", name: "main.rs", type: "text/plain", size: 1200 },
     },
   );
 
@@ -423,12 +447,14 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
 
   expect(host.calls.some((c) => c.op === "session.openWorkspace")).toBe(true);
   expect(host.calls.some((c) => c.op === "session.send")).toBe(true);
-  expect(host.acts.some((a) => a.type === "update_chat_tab" && a.tab_id === 42 && a.session_id === "sess-ws-1")).toBe(true);
+  expect(host.acts.some((a) => a.type === "update_chat_tab" && a.tab_id === 42 && a.session_id === "sess-ws-1" && a.title === "Inspect acp.rs")).toBe(true);
   expect([...host.subscriptions.values()].some((s) => s.name === "session.watch")).toBe(true);
 
+  host.clearActs();
   await host.emitSub(app, "session.watch", {
     kind: "state",
     session: baseSession,
+    title: "Upgrade Antigravity ACP",
     model: "gemini-4-neon",
     effort: "high",
     permissionMode: "acceptEdits",
@@ -469,6 +495,11 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   });
   await host.pump(app);
 
+  expect(host.acts.some((a) => a.type === "update_chat_tab" && a.tab_id === 42 && a.session_id === "sess-ws-1" && a.title === "Upgrade Antigravity ACP")).toBe(
+    true,
+  );
+  expect(app.texts()).toContain("Upgrade Antigravity ACP");
+
   host.clearActs();
   await app.press("id:chat-tool-open-file-3");
   await app.press("id:chat-tool-open-diff-3");
@@ -496,16 +527,28 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   expect(app.count("id:chat-interaction-interaction_01")).toBe(0);
 
   expect(app.count("id:chat-steering-banner")).toBe(1);
-  expect(app.count("id:chat-thought-level-xhigh")).toBe(1);
+  expect(app.count("id:chat-composer-card")).toBe(1);
+  expect(app.count("id:chat-composer-attachments")).toBe(0);
   host.clearCalls();
+  await app.press("id:chat-thought-level");
+  expect(app.count("id:chat-thought-level-xhigh")).toBe(1);
   await app.press("id:chat-thought-level-xhigh");
   await host.pump(app);
   expect(host.calls).toContainEqual({ op: "session.setConfig", payload: { id: "sess-ws-1", effort: "xhigh" } });
 
+  await app.press("id:chat-attach-file");
+  await host.pump(app);
+  expect(app.count("id:chat-composer-attachments")).toBe(1);
+  expect(app.count("id:chat-attachment-main.rs")).toBe(1);
+
   await app.type("id:chat-composer-input", "Keep diff minimal");
   await app.press("id:chat-send");
   await host.pump(app);
-  expect(host.calls).toContainEqual({ op: "session.send", payload: { id: "sess-ws-1", text: "Keep diff minimal" } });
+  expect(host.calls).toContainEqual({
+    op: "session.send",
+    payload: { id: "sess-ws-1", text: "Keep diff minimal", contextFiles: [{ path: "/work/vibevalley/src/main.rs" }] },
+  });
+  expect(app.count("id:chat-composer-attachments")).toBe(0);
 
   expect(app.count("id:chat-telemetry-drawer")).toBe(0);
   expect(app.count("id:chat-telemetry-toggle")).toBe(1);
@@ -522,7 +565,150 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   const freshApp = await open("../App.tsx", { width: 400, height: 760, colorScheme: "light", platform: "macos", host: freshHost.options });
   await freshHost.pump(freshApp);
   expect(freshApp.count("id:chat-telemetry-toggle")).toBe(0);
+  expect(freshApp.count("id:chat-swarm-pill")).toBe(0);
   expect(freshApp.count("id:chat-cwd-chip")).toBe(1);
+});
+
+test("workspace SwarmPanel hides pill when absent, switches Overview/Roster/Board tabs, filters board, and loads child transcripts", async () => {
+  const baseSession = {
+    id: "sess-swarm-1",
+    role: "worker",
+    name: "Antigravity",
+    agent: "antigravity",
+    runtime: "antigravity",
+    brief: "Swarm run",
+    repo: "vibevalley",
+    worktree: "/work/vibevalley",
+    hiredAt: 1_700_000_000_000,
+    runs: 1,
+    refining: false,
+    phase: { _tag: "working", since: 1_700_000_000_000, doing: { action: "thinking", label: "Coordinating" } },
+  };
+  const host = workspaceHost(
+    { view: "workspace-chat", tabId: 50, sessionId: "sess-swarm-1", runtime: "antigravity", cwd: "/work/vibevalley" },
+    {
+      "runtime.list": [],
+      "session.childTranscript": {
+        conversationId: "conv-worker-1",
+        steps: [
+          {
+            stepIndex: 1,
+            source: "transcript",
+            kind: "planner",
+            model: "gemini-4-neon",
+            thinking: "Reading swarm files",
+            content: "Implemented antigravity_swarm.rs reader.",
+            toolCalls: [{ name: "edit_file", args: "antigravity_swarm.rs" }],
+            inputTokens: 4_200,
+            outputTokens: 640,
+          },
+        ],
+      },
+    },
+    ["session.childTranscript"],
+  );
+
+  const app = await open("../App.tsx", {
+    width: 820,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: 1_700_000_000_000 },
+    host: host.options,
+  });
+  const clock = app.clock;
+  if (!clock) throw new Error("SwarmPanel test requires a manual virtual clock");
+  await host.pump(app);
+
+  await host.emitSub(app, "session.watch", {
+    kind: "state",
+    session: baseSession,
+    permissionMode: "acceptEdits",
+    pendingPermissions: [],
+    pendingInteractions: [],
+  });
+  expect(app.count("id:chat-swarm-pill")).toBe(0);
+
+  await host.emitSub(app, "session.watch", {
+    kind: "state",
+    session: baseSession,
+    permissionMode: "acceptEdits",
+    pendingPermissions: [],
+    pendingInteractions: [],
+    swarm: {
+      swarmId: "swarm-1",
+      title: "Antigravity Swarm V1",
+      workingCount: 1,
+      activeCount: 3,
+      members: [
+        {
+          name: "coordinator",
+          conversationId: "conv-coord",
+          role: "coordinator",
+          state: "waiting",
+          wakeMode: "mentions",
+          waitSince: 2,
+          model: "gemini-4-neon",
+        },
+        {
+          name: "content-hub",
+          conversationId: "conv-worker-1",
+          role: "worker",
+          state: "working",
+          model: "gemini-4-neon",
+          workspaceMode: "inherit",
+          task: "Build antigravity_swarm.rs",
+        },
+        { name: "verifier", conversationId: "conv-worker-2", role: "worker", state: "stopped", model: "gemini-4-neon" },
+      ],
+      overview: {
+        goalTitle: "Ship Antigravity Swarm V1",
+        goalLine: "OAR + Protocol + Workspace ChatUI",
+        threads: [{ id: "t1", title: "Runtime & UI", goal: "Read-only swarm state", members: ["content-hub", "verifier"] }],
+        tasks: { "content-hub": "Implement bounded sidecar reader", verifier: "Live GPUI verification" },
+      },
+      messages: [
+        { seq: 1, agent: "coordinator", text: "@content-hub Implement sidecar reader for #171", time: "2026-11-22 13:50:00", kind: "brief" },
+        { seq: 2, agent: "content-hub", text: "@coordinator [done] Reader ready per @all", time: "2026-11-22 13:51:00" },
+      ],
+      totalMessages: 2,
+    },
+  });
+
+  expect(app.count("id:chat-swarm-pill")).toBe(1);
+  expect(app.texts()).toContain("Swarm · 1/3");
+  expect(app.count("id:chat-swarm-panel")).toBe(0);
+
+  await app.press("id:chat-swarm-pill");
+  expect(app.count("id:chat-swarm-panel")).toBe(1);
+  expect(app.count("id:swarm-overview")).toBe(1);
+  expect(app.texts()).toContain("Ship Antigravity Swarm V1");
+  expect(app.count("id:swarm-thread-t1")).toBe(1);
+
+  await app.press("id:swarm-tab-board");
+  expect(app.count("id:swarm-board")).toBe(1);
+  expect(app.count("id:swarm-msg-1")).toBe(1);
+  expect(app.count("id:swarm-msg-2")).toBe(1);
+
+  await app.press("id:swarm-board-filter-content-hub");
+  expect(app.count("id:swarm-msg-1")).toBe(0);
+  expect(app.count("id:swarm-msg-2")).toBe(1);
+
+  await app.press("id:swarm-msg-agent-2");
+  expect(app.count("id:swarm-roster")).toBe(1);
+  expect(host.calls).toContainEqual({
+    op: "session.childTranscript",
+    payload: { id: "sess-swarm-1", conversationId: "conv-worker-1", limit: 25 },
+  });
+  expect(app.count("id:swarm-transcript-skeleton")).toBe(0);
+  await clock.fastForward(160);
+  await host.pump(app);
+  expect(app.count("id:swarm-transcript-skeleton")).toBe(1);
+
+  await host.releaseDeferred(app);
+  expect(app.count("id:swarm-transcript-skeleton")).toBe(0);
+  expect(app.count("id:swarm-transcript-step-1")).toBe(1);
+  expect(app.texts()).toContain("Implemented antigravity_swarm.rs reader.");
 });
 
 test("workspace skeletons: 150ms anti-flash gate suppresses fast loads and renders delayed FileTree, GitPanel, and Palette skeletons", async () => {

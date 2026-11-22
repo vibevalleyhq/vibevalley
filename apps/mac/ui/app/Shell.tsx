@@ -111,7 +111,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
       style={globalShell ? { width: width() } : undefined}
     >
       <If when={globalShell}>
-        <View class="h-7 shrink-0" />
+        <View class="h-7 shrink-0" desktop={{ windowDrag: true }} />
       </If>
       <View class={`shrink-0 items-center ${globalShell ? "pt-1 pb-2" : compactTall() ? "pt-1.5 pb-2" : "pt-2 pb-2"}`}>
         <Slot
@@ -273,10 +273,14 @@ function Desk(props: { place?: Place | undefined }) {
     return "team-roles";
   };
   return (
-    <View testID="desk" class="min-h-12 shrink-0 flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-line px-4 py-1.5">
+    <View
+      testID="desk"
+      desktop={{ windowDrag: true }}
+      class="min-h-9 shrink-0 flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-3.5 py-0.5"
+    >
       <If when={props.place} else={<View class="flex-1" />}>
         {(place) => (
-          <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
+          <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-3 gap-y-1">
             <View class="min-w-0 flex-row items-center gap-2">
               <If when={place().id === "content"}>
                 <IconButton
@@ -288,9 +292,9 @@ function Desk(props: { place?: Place | undefined }) {
                   onClick={() => contentSidebarOpen.update((open) => !open)}
                 />
               </If>
-              <Keyed key={place().icon}>{() => <Icon name={place().icon} size={18} />}</Keyed>
+              <Keyed key={place().icon}>{() => <Icon name={place().icon} size={16} />}</Keyed>
               <View class="min-w-0 flex-row items-center gap-1.5">
-                <Text role="header" class="truncate text-base font-semibold text-ink">
+                <Text role="header" class="truncate text-sm font-semibold text-ink">
                   {place().label}
                 </Text>
                 <Hint text={place().hint} />
@@ -316,7 +320,7 @@ function Desk(props: { place?: Place | undefined }) {
         <If when={props.place?.id === "content"}>
           <View class="flex-row items-center gap-1.5">
             <IconButton icon="search" size={14} label={t("web.library.content.searchAll")} testid="desk-content-search" onClick={() => openContentSearch()} />
-            <Button tone="primary" icon="add" testID="desk-content-new" onPress={() => openTemplatePicker()}>
+            <Button tone="primary" size="compact" icon="add" testID="desk-content-new" onPress={() => openTemplatePicker()}>
               {t("web.library.content.new")}
             </Button>
           </View>
@@ -326,12 +330,12 @@ function Desk(props: { place?: Place | undefined }) {
           accessibilityLabel={view().label}
           testID="desk-status"
           tooltip={<Bubble text={t("web.base.runsHint")} placement="bottom" />}
-          class={`h-7 shrink-0 flex-row items-center gap-2 rounded-full border px-3 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${view().pillClass(onRuns())}`}
+          class={`h-6 shrink-0 flex-row items-center gap-1.5 rounded-full border px-2.5 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${view().pillClass(onRuns())}`}
           style={view().pillStyle(onRuns())}
           hoverStyle={view().pillHoverStyle(onRuns())}
         >
-          <View class="size-3.5 shrink-0 items-center justify-center rounded-full" style={haloStyle()}>
-            <View class={`size-2 rounded-full ${view().dotClass}`} />
+          <View class="size-3 shrink-0 items-center justify-center rounded-full" style={haloStyle()}>
+            <View class={`size-1.5 rounded-full ${view().dotClass}`} />
           </View>
           <Text class={`text-xs ${view().textClass}`}>{view().label}</Text>
         </A>

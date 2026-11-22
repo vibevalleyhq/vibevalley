@@ -944,6 +944,7 @@ pub struct SessionWorkspace {
     #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
     pub id: SessionId,
     pub session: Session,
+    pub title: Option<String>,
     pub model: Option<String>,
     pub effort: Option<String>,
     pub permission_mode: SessionPermissionMode,
@@ -998,6 +999,175 @@ pub struct SessionSetConfigInput {
     pub permission_mode: Option<SessionPermissionMode>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum SessionSwarmRole {
+    Coordinator,
+    Worker,
+}
+
+impl SessionSwarmRole {
+    pub const ALL: [SessionSwarmRole; 2] = [SessionSwarmRole::Coordinator, SessionSwarmRole::Worker];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SessionSwarmRole::Coordinator => "coordinator",
+            SessionSwarmRole::Worker => "worker",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum SessionSwarmMemberState {
+    Working,
+    Waiting,
+    Stopped,
+    Killed,
+}
+
+impl SessionSwarmMemberState {
+    pub const ALL: [SessionSwarmMemberState; 4] = [
+        SessionSwarmMemberState::Working,
+        SessionSwarmMemberState::Waiting,
+        SessionSwarmMemberState::Stopped,
+        SessionSwarmMemberState::Killed,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SessionSwarmMemberState::Working => "working",
+            SessionSwarmMemberState::Waiting => "waiting",
+            SessionSwarmMemberState::Stopped => "stopped",
+            SessionSwarmMemberState::Killed => "killed",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSwarmMember {
+    pub name: String,
+    pub conversation_id: String,
+    pub role: SessionSwarmRole,
+    pub state: SessionSwarmMemberState,
+    pub wake_mode: Option<String>,
+    pub wait_since: Option<i64>,
+    pub model: Option<String>,
+    pub workspace_mode: Option<String>,
+    pub task: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSwarmThread {
+    pub id: String,
+    pub title: String,
+    pub goal: Option<String>,
+    pub members: Vec<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSwarmOverview {
+    pub goal_title: Option<String>,
+    pub goal_line: Option<String>,
+    pub threads: Vec<SessionSwarmThread>,
+    pub tasks: std::collections::BTreeMap<String, String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSwarmMessage {
+    pub seq: i64,
+    pub agent: String,
+    pub text: String,
+    pub time: String,
+    pub kind: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSwarmState {
+    pub swarm_id: String,
+    pub title: Option<String>,
+    pub working_count: i64,
+    pub active_count: i64,
+    pub members: Vec<SessionSwarmMember>,
+    pub overview: Option<SessionSwarmOverview>,
+    pub messages: Vec<SessionSwarmMessage>,
+    pub total_messages: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChildToolCall {
+    pub name: String,
+    pub args: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChildStep {
+    pub step_index: i64,
+    pub source: String,
+    pub kind: String,
+    pub status: Option<String>,
+    pub created_at: Option<String>,
+    pub model: Option<String>,
+    pub thinking: Option<String>,
+    pub content: Option<String>,
+    pub error: Option<String>,
+    pub tool_calls: Vec<SessionChildToolCall>,
+    pub input_tokens: Option<i64>,
+    pub cache_read_tokens: Option<i64>,
+    pub output_tokens: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChildTranscriptInput {
+    pub id: String,
+    pub conversation_id: String,
+    pub limit: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChildTranscript {
+    pub conversation_id: String,
+    pub steps: Vec<SessionChildStep>,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -1017,12 +1187,14 @@ pub enum SessionWatchEvent {
     #[serde(rename_all = "camelCase")]
     State {
         session: Session,
+        title: Option<String>,
         model: Option<String>,
         effort: Option<String>,
         permission_mode: SessionPermissionMode,
         pending_permissions: Vec<SessionPermissionRequest>,
         pending_interactions: Vec<SessionInteractionRequest>,
         tokens: Option<EventTokens>,
+        swarm: Option<SessionSwarmState>,
     },
     #[serde(rename_all = "camelCase")]
     History {
@@ -1103,6 +1275,17 @@ crate::typescript::module! {
     SessionRespondPermissionInput,
     SessionRespondInteractionInput,
     SessionSetConfigInput,
+    SessionSwarmRole,
+    SessionSwarmMemberState,
+    SessionSwarmMember,
+    SessionSwarmThread,
+    SessionSwarmOverview,
+    SessionSwarmMessage,
+    SessionSwarmState,
+    SessionChildToolCall,
+    SessionChildStep,
+    SessionChildTranscriptInput,
+    SessionChildTranscript,
     SessionWatchPayload,
     SessionWatchEvent];
     aliases: [];

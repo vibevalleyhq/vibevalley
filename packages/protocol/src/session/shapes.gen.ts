@@ -162,7 +162,7 @@ export type SessionContextFile = { path: string, startLine?: number, endLine?: n
 
 export type SessionOpenWorkspaceInput = { sessionId?: string, runtime: string, cwd: string, repo?: string, model?: string, effort?: string, permissionMode?: SessionPermissionMode, title?: string, };
 
-export type SessionWorkspace = { id: SessionId, session: Session, model?: string, effort?: string, permissionMode: SessionPermissionMode, };
+export type SessionWorkspace = { id: SessionId, session: Session, title?: string, model?: string, effort?: string, permissionMode: SessionPermissionMode, };
 
 export type SessionSendInput = { id: string, text: string, attachments?: Array<string>, contextFiles?: Array<SessionContextFile>, };
 
@@ -172,6 +172,30 @@ export type SessionRespondInteractionInput = { id: string, requestId: string, op
 
 export type SessionSetConfigInput = { id: string, model?: string, effort?: string, permissionMode?: SessionPermissionMode, };
 
+export const SessionSwarmRoleValues = ["coordinator", "worker"] as const;
+export type SessionSwarmRole = (typeof SessionSwarmRoleValues)[number];
+
+export const SessionSwarmMemberStateValues = ["working", "waiting", "stopped", "killed"] as const;
+export type SessionSwarmMemberState = (typeof SessionSwarmMemberStateValues)[number];
+
+export type SessionSwarmMember = { name: string, conversationId: string, role: SessionSwarmRole, state: SessionSwarmMemberState, wakeMode?: string, waitSince?: number, model?: string, workspaceMode?: string, task?: string, };
+
+export type SessionSwarmThread = { id: string, title: string, goal?: string, members: Array<string>, };
+
+export type SessionSwarmOverview = { goalTitle?: string, goalLine?: string, threads: Array<SessionSwarmThread>, tasks: { [key in string]: string }, };
+
+export type SessionSwarmMessage = { seq: number, agent: string, text: string, time: string, kind?: string, };
+
+export type SessionSwarmState = { swarmId: string, title?: string, workingCount: number, activeCount: number, members: Array<SessionSwarmMember>, overview?: SessionSwarmOverview, messages: Array<SessionSwarmMessage>, totalMessages: number, };
+
+export type SessionChildToolCall = { name: string, args?: string, };
+
+export type SessionChildStep = { stepIndex: number, source: string, kind: string, status?: string, createdAt?: string, model?: string, thinking?: string, content?: string, error?: string, toolCalls: Array<SessionChildToolCall>, inputTokens?: number, cacheReadTokens?: number, outputTokens?: number, };
+
+export type SessionChildTranscriptInput = { id: string, conversationId: string, limit?: number, };
+
+export type SessionChildTranscript = { conversationId: string, steps: Array<SessionChildStep>, };
+
 export type SessionWatchPayload = { id: string, afterSeq?: number, };
 
-export type SessionWatchEvent = { "kind": "state", session: Session, model?: string, effort?: string, permissionMode: SessionPermissionMode, pendingPermissions: Array<SessionPermissionRequest>, pendingInteractions: Array<SessionInteractionRequest>, tokens?: EventTokens, } | { "kind": "history", session: SessionId, events: Array<SessionEvent>, } | { "kind": "event", session: SessionId, event: SessionEvent, } | { "kind": "missing", session: SessionId, };
+export type SessionWatchEvent = { "kind": "state", session: Session, title?: string, model?: string, effort?: string, permissionMode: SessionPermissionMode, pendingPermissions: Array<SessionPermissionRequest>, pendingInteractions: Array<SessionInteractionRequest>, tokens?: EventTokens, swarm?: SessionSwarmState, } | { "kind": "history", session: SessionId, events: Array<SessionEvent>, } | { "kind": "event", session: SessionId, event: SessionEvent, } | { "kind": "missing", session: SessionId, };

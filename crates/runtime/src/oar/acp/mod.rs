@@ -10,6 +10,7 @@
 
 pub(crate) mod antigravity;
 pub(crate) mod antigravity_db;
+pub(crate) mod antigravity_swarm;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -30,8 +31,9 @@ use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text,
 use crate::oar::process::{LineChild, Spawn, find_binary, run_capture};
 use crate::oar::record::{self, Recorder};
 use crate::oar::{
-    AgentError, Capabilities, ContentBlock, EventKind, FileChangeKind, Installation, InteractionDecision, InteractionOption, ModelInfo, PermissionDecision,
-    PermissionMode, Result, Runtime, Session, SessionOptions, StopReason, Usage,
+    AgentError, Capabilities, ChildTranscriptStep, ContentBlock, EventKind, FileChangeKind, Installation, InteractionDecision, InteractionOption, ModelInfo,
+    PermissionDecision, PermissionMode, Result, Runtime, Session, SessionOptions, StopReason, SubagentSnapshot, SubagentStatus, SwarmMemberState,
+    SwarmSnapshot, Usage,
 };
 
 const OPEN_TIMEOUT: Duration = Duration::from_secs(120);
@@ -518,6 +520,7 @@ enum Command {
 struct Opened {
     session_id: String,
     model: Option<String>,
+    title: Option<String>,
     image_input: bool,
     /// The agent's `session/new` answer, for `list_models`.
     session: Value,
@@ -533,6 +536,8 @@ struct Shared {
     child: OnceLock<Arc<LineChild>>,
     core: OnceLock<Arc<SessionCore>>,
     acp_session: OnceLock<String>,
+    session_title: Mutex<Option<String>>,
+    base_dir: OnceLock<PathBuf>,
     db_path: OnceLock<PathBuf>,
     auth_notice: OnceLock<String>,
     projector: Mutex<Projector>,
@@ -550,6 +555,9 @@ struct Shared {
     image_input: AtomicBool,
     in_flight_prompts: AtomicU64,
     background: Mutex<antigravity::BackgroundTracker>,
+    has_child_activity: AtomicBool,
+    child_activity: Mutex<antigravity::ChildActivityTracker>,
+    swarm_reader: Mutex<Option<antigravity_swarm::SwarmReader>>,
     detached_continuation: AtomicBool,
     turn_start_step_idx: Mutex<Option<i64>>,
     children: Mutex<HashMap<String, Vec<String>>>,
@@ -593,6 +601,13 @@ impl Shared {
         let line = lock(&self.updates)
             .pop_front()
             .unwrap_or_else(|| json!({"jsonrpc":"2.0","method":"session/update","params":params}).to_string());
+        if let Some(update) = params.get("update")
+            && str_of(update, "sessionUpdate") == Some("session_info_update")
+            && str_of(params, "sessionId").is_none_or(|id| self.acp_session.get().is_none_or(|root| root == id))
+            && let Some(title) = str_of(update, "title").map(str::trim).filter(|t| !t.is_empty())
+        {
+            *lock(&self.session_title) = Some(title.to_string());
+        }
         if self.replaying.load(Ordering::SeqCst) {
             return;
         }
@@ -600,6 +615,7 @@ impl Shared {
         let Some(update) = params.get("update") else { return };
         let path = self.agent_path(params);
         let update_kind = str_of(update, "sessionUpdate").unwrap_or_default();
+        let mut child_events = Vec::new();
         if self.flavor == AcpFlavor::Antigravity
             && path.is_empty()
             && matches!(update_kind, "tool_call" | "tool_call_update")
@@ -609,11 +625,17 @@ impl Shared {
             let kind = str_of(update, "kind").unwrap_or_default();
             let status = str_of(update, "status").unwrap_or_default();
             lock(&self.background).on_tool_update(tool_id, title, kind, update.get("rawInput"), status);
+            let parent_id = self.acp_session.get().map(String::as_str).unwrap_or_default();
+            let (matched, mapped) = lock(&self.child_activity).on_tool_update(parent_id, update);
+            if matched {
+                self.has_child_activity.store(true, Ordering::SeqCst);
+                child_events = mapped;
+            }
         }
         let frame_type = format!("session/update/{update_kind}");
         let _frame = core.record_raw(&frame_type, path.clone(), &line, params);
         let events = lock(&self.projector).update(update);
-        for kind in events {
+        for kind in events.into_iter().chain(child_events) {
             core.emit(path.clone(), kind);
         }
         if self.flavor == AcpFlavor::Antigravity
@@ -765,6 +787,101 @@ impl Shared {
             return (StopReason::Error, Some(silent.message));
         }
         (reason, error)
+    }
+
+    fn swarm_snapshot(&self) -> Option<SwarmSnapshot> {
+        if self.flavor != AcpFlavor::Antigravity {
+            return None;
+        }
+        let mut guard = lock(&self.swarm_reader);
+        let reader = guard.as_mut()?;
+        // Avoid parsing swarm files on single-agent chats until either a swarm/subagent
+        // tool fires or `swarm.json` appears on disk (e.g. `/swarm` or resumed session).
+        if !self.has_child_activity.load(Ordering::SeqCst) {
+            if !reader.has_swarm_file() {
+                return None;
+            }
+            self.has_child_activity.store(true, Ordering::SeqCst);
+        }
+        reader.poll_snapshot()
+    }
+
+    fn read_child_transcript(&self, conversation_id: &str, limit: usize) -> Vec<ChildTranscriptStep> {
+        if self.flavor != AcpFlavor::Antigravity {
+            return Vec::new();
+        }
+        let Some(base) = self.base_dir.get() else {
+            return Vec::new();
+        };
+        antigravity_swarm::read_child_transcript(base, conversation_id, limit)
+    }
+
+    fn read_subagent(&self, thread_id: &str, _turn_id: Option<&str>) -> Result<SubagentSnapshot> {
+        if self.flavor != AcpFlavor::Antigravity {
+            return Err(AgentError::Unsupported {
+                option: "read_subagent".into(),
+                reason: "runtime cannot read a saved child thread".into(),
+            });
+        }
+        let parent_thread_id = self.acp_session.get().cloned();
+        let last_message = |conv_id: &str| -> (Option<String>, Option<SubagentStatus>) {
+            let steps = self.read_child_transcript(conv_id, 5);
+            let msg = steps.iter().rev().find_map(|s| s.error.clone().or_else(|| s.content.clone()));
+            let derived = steps.last().map(|s| {
+                if s.error.is_some() || s.kind == "ERROR_MESSAGE" {
+                    SubagentStatus::Errored
+                } else if s.status.as_deref().is_some_and(|st| st.eq_ignore_ascii_case("RUNNING")) {
+                    SubagentStatus::Running
+                } else {
+                    SubagentStatus::Completed
+                }
+            });
+            (msg, derived)
+        };
+
+        if let Some(swarm) = self.swarm_snapshot()
+            && let Some(member) = swarm.members.iter().find(|m| m.name == thread_id || m.conversation_id == thread_id)
+        {
+            let status = match member.state {
+                SwarmMemberState::Working | SwarmMemberState::Waiting => SubagentStatus::Running,
+                SwarmMemberState::Stopped => SubagentStatus::Interrupted,
+                SwarmMemberState::Killed => SubagentStatus::Shutdown,
+            };
+            let (message, _) = last_message(&member.conversation_id);
+            return Ok(SubagentSnapshot {
+                parent_thread_id,
+                agent_name: Some(member.name.clone()),
+                status: Some(status),
+                message,
+            });
+        }
+
+        if let Some(db_path) = self.db_path.get() {
+            let children = antigravity_db::list_invoked_subagents(db_path, antigravity_db::MAX_CHILDREN);
+            if let Some(child) = children
+                .into_iter()
+                .find(|c| c.conversation_id.as_deref() == Some(thread_id) || c.role.as_deref() == Some(thread_id))
+            {
+                let (message, status) = child
+                    .conversation_id
+                    .as_deref()
+                    .map(last_message)
+                    .unwrap_or((None, Some(SubagentStatus::Running)));
+                return Ok(SubagentSnapshot {
+                    parent_thread_id,
+                    agent_name: child.role,
+                    status: status.or(Some(SubagentStatus::Running)),
+                    message,
+                });
+            }
+        }
+
+        Ok(SubagentSnapshot {
+            parent_thread_id,
+            agent_name: None,
+            status: Some(SubagentStatus::NotFound),
+            message: None,
+        })
     }
 
     fn turn_finished(&self, reason: StopReason, error: Option<String>) {
@@ -987,8 +1104,13 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
             if let Some(prompt) = system_prompt {
                 request = request.system_prompt(prompt);
             }
-            let reply = cx.send_request(request).block_task().await.map_err(|e| open_error("session/new", e))?;
-            (reply.session_id.to_string(), serde_json::to_value(&reply).unwrap_or(Value::Null))
+            let params = serde_json::to_value(&request).map_err(|e| AgentError::Protocol(format!("session/new: {e}")))?;
+            let msg = UntypedMessage::new("session/new", params).map_err(|e| AgentError::Protocol(acp_error("session/new", &e)))?;
+            let reply = cx.send_request(msg).block_task().await.map_err(|e| open_error("session/new", e))?;
+            let id = str_of(&reply, "sessionId")
+                .map(str::to_string)
+                .ok_or_else(|| AgentError::Protocol("session/new returned no sessionId".into()))?;
+            (id, reply)
         }
         Some(id) if session_capability("resume") => {
             let mut request = ResumeSessionRequest::new(id.clone(), &opts.cwd).mcp_servers(mcp_servers.clone());
@@ -998,8 +1120,10 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
             if let Some(prompt) = system_prompt {
                 request = request.system_prompt(prompt);
             }
-            let reply = cx.send_request(request).block_task().await.map_err(|e| open_error("session/resume", e))?;
-            (id.clone(), serde_json::to_value(&reply).unwrap_or(Value::Null))
+            let params = serde_json::to_value(&request).map_err(|e| AgentError::Protocol(format!("session/resume: {e}")))?;
+            let msg = UntypedMessage::new("session/resume", params).map_err(|e| AgentError::Protocol(acp_error("session/resume", &e)))?;
+            let reply = cx.send_request(msg).block_task().await.map_err(|e| open_error("session/resume", e))?;
+            (id.clone(), reply)
         }
         Some(id) if capabilities.get("loadSession").and_then(Value::as_bool) == Some(true) || session_capability("load") => {
             let mut request = LoadSessionRequest::new(id.clone(), &opts.cwd).mcp_servers(mcp_servers.clone());
@@ -1009,11 +1133,13 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
             if let Some(prompt) = system_prompt {
                 request = request.system_prompt(prompt);
             }
+            let params = serde_json::to_value(&request).map_err(|e| AgentError::Protocol(format!("session/load: {e}")))?;
+            let msg = UntypedMessage::new("session/load", params).map_err(|e| AgentError::Protocol(acp_error("session/load", &e)))?;
             shared.replaying.store(true, Ordering::SeqCst);
-            let reply = cx.send_request(request).block_task().await;
+            let reply = cx.send_request(msg).block_task().await;
             shared.replaying.store(false, Ordering::SeqCst);
             let reply = reply.map_err(|e| open_error("session/load", e))?;
-            (id.clone(), serde_json::to_value(&reply).unwrap_or(Value::Null))
+            (id.clone(), reply)
         }
         Some(_) => return Err(unsupported("resume", format!("{name} can neither resume nor load a session"))),
     };
@@ -1147,9 +1273,12 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
         }
     }
 
+    let title = str_of(&session, "title").map(str::trim).filter(|t| !t.is_empty()).map(str::to_string);
+
     Ok(Opened {
         session_id,
         model,
+        title,
         image_input,
         session,
         probed_models,
@@ -1352,6 +1481,12 @@ async fn serve(
     };
     let session_id = opened.session_id.clone();
     let _ = shared.acp_session.set(session_id.clone());
+    if let Some(title) = opened.title.clone() {
+        let mut slot = lock(&shared.session_title);
+        if slot.is_none() {
+            *slot = Some(title);
+        }
+    }
     *lock(&shared.available_modes) = opened.available_modes.clone();
     *lock(&shared.config_options) = opened.config_options.clone();
     shared.image_input.store(opened.image_input, Ordering::SeqCst);
@@ -1521,6 +1656,22 @@ impl AcpDriver {
 }
 
 impl Driver for AcpDriver {
+    fn read_subagent(&self, thread_id: &str, turn_id: Option<&str>) -> Result<SubagentSnapshot> {
+        self.shared.read_subagent(thread_id, turn_id)
+    }
+
+    fn swarm_snapshot(&self) -> Option<SwarmSnapshot> {
+        self.shared.swarm_snapshot()
+    }
+
+    fn read_child_transcript(&self, conversation_id: &str, limit: usize) -> Vec<ChildTranscriptStep> {
+        self.shared.read_child_transcript(conversation_id, limit)
+    }
+
+    fn session_title(&self) -> Option<String> {
+        lock(&self.shared.session_title).clone()
+    }
+
     fn check_content(&self, content: &[ContentBlock]) -> Result<()> {
         self.blocks(content).map(|_| ())
     }
@@ -1684,6 +1835,8 @@ impl AcpRuntime {
             child: OnceLock::new(),
             core: OnceLock::new(),
             acp_session: OnceLock::new(),
+            session_title: Mutex::new(None),
+            base_dir: OnceLock::new(),
             db_path: OnceLock::new(),
             auth_notice: OnceLock::new(),
             projector: Mutex::new(Projector::for_flavor(flavor)),
@@ -1700,6 +1853,9 @@ impl AcpRuntime {
             image_input: AtomicBool::new(false),
             in_flight_prompts: AtomicU64::new(0),
             background: Mutex::new(antigravity::BackgroundTracker::default()),
+            has_child_activity: AtomicBool::new(false),
+            child_activity: Mutex::new(antigravity::ChildActivityTracker::default()),
+            swarm_reader: Mutex::new(None),
             detached_continuation: AtomicBool::new(false),
             turn_start_step_idx: Mutex::new(None),
             children: Default::default(),
@@ -1767,9 +1923,18 @@ impl AcpRuntime {
             Ok(Ok(opened)) => {
                 if flavor == AcpFlavor::Antigravity
                     && let Some((gemini_dir, app_data_dir)) = antigravity::resolve_db_dirs(&spawn_args, &spawn_env, opts.base_env.as_deref())
-                    && let Some(path) = antigravity_db::conversation_db_path(&opened.session_id, &gemini_dir, &app_data_dir)
                 {
-                    let _ = shared.db_path.set(path);
+                    if let Some(base) = antigravity_db::base_data_dir(&gemini_dir, &app_data_dir) {
+                        let reader = antigravity_swarm::SwarmReader::new(base.clone(), opened.session_id.clone());
+                        if reader.has_swarm_file() {
+                            shared.has_child_activity.store(true, Ordering::SeqCst);
+                        }
+                        *lock(&shared.swarm_reader) = Some(reader);
+                        let _ = shared.base_dir.set(base);
+                    }
+                    if let Some(path) = antigravity_db::conversation_db_path(&opened.session_id, &gemini_dir, &app_data_dir) {
+                        let _ = shared.db_path.set(path);
+                    }
                 }
                 Ok(Connected { shared, opened })
             }
@@ -1805,7 +1970,7 @@ impl Runtime for AcpRuntime {
                 queue: true,
                 permission_requests: true,
                 model_selection: true,
-                subagents: false,
+                subagents: true,
                 usage: true,
                 config_options: true,
             },

@@ -9,6 +9,7 @@
 //! CONTRACT: the items in this file are the public API other crates compile
 //! against. The owner may add items; do not rename or remove existing ones.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -479,6 +480,126 @@ impl SubagentSnapshot {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SwarmMemberState {
+    Working,
+    Waiting,
+    Stopped,
+    Killed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmMember {
+    pub name: String,
+    pub conversation_id: String,
+    pub role: String,
+    pub state: SwarmMemberState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wake_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wait_since: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_read_seq: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmPlanThread {
+    pub id: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal: Option<String>,
+    #[serde(default)]
+    pub tasks: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmPlan {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_line: Option<String>,
+    #[serde(default)]
+    pub tasks: BTreeMap<String, String>,
+    #[serde(default)]
+    pub threads: Vec<SwarmPlanThread>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmMessage {
+    pub seq: u64,
+    pub agent: String,
+    pub text: String,
+    pub time: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmSnapshot {
+    pub swarm_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    pub members: Vec<SwarmMember>,
+    pub working_count: u32,
+    pub waiting_count: u32,
+    pub stopped_count: u32,
+    pub killed_count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<SwarmPlan>,
+    pub messages: Vec<SwarmMessage>,
+    pub total_messages: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChildToolCall {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChildTranscriptStep {
+    pub step_index: u64,
+    pub source: String,
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(default)]
+    pub tool_calls: Vec<ChildToolCall>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolAction {
     RunCommand,
@@ -708,6 +829,20 @@ pub trait Session: Send + Sync {
     /// only thread identity is recoverable.
     fn read_subagent(&self, _thread_id: &str, _turn_id: Option<&str>) -> Result<SubagentSnapshot> {
         Err(SubagentSnapshot::unsupported())
+    }
+    /// Snapshot of an active native swarm sidecar (e.g. Antigravity `/swarm`),
+    /// or `None` when the session has no swarm.
+    fn swarm_snapshot(&self) -> Option<SwarmSnapshot> {
+        None
+    }
+    /// Bounded recent steps from a child agent or swarm member's transcript.
+    fn read_child_transcript(&self, _conversation_id: &str, _limit: usize) -> Vec<ChildTranscriptStep> {
+        Vec::new()
+    }
+    /// Real session title reported by the runtime (e.g. ACP `session_info_update`
+    /// or Codex `thread/name/updated`), when available.
+    fn session_title(&self) -> Option<String> {
+        None
     }
     fn runtime_id(&self) -> &str;
     fn status(&self) -> SessionStatus;

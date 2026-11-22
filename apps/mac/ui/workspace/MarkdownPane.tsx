@@ -115,7 +115,7 @@ export function MarkdownPane() {
   return (
     <View testID="markdown-pane" class="min-h-0 flex-1 bg-page">
       {pathInfo() ? (
-        <View testID="markdown-pane-header" class="h-8.5 shrink-0 flex-row items-center justify-between gap-3 border-b border-line bg-side px-3">
+        <View testID="markdown-pane-header" class="h-9 shrink-0 flex-row items-center justify-between gap-3 border-b border-line bg-side px-3">
           <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
             <Icon name="file" size={13} tone="muted" />
             <Text class="shrink-0 text-xs font-semibold text-ink">{pathInfo()!.fileName}</Text>

@@ -18,6 +18,7 @@ export interface SessionHandlers {
   readonly "session.respondPermission": (a: T.SessionRespondPermissionInput) => Promise<void>;
   readonly "session.respondInteraction": (a: T.SessionRespondInteractionInput) => Promise<void>;
   readonly "session.setConfig": (a: T.SessionSetConfigInput) => Promise<T.SessionWorkspace>;
+  readonly "session.childTranscript": (a: T.SessionChildTranscriptInput) => Promise<T.SessionChildTranscript>;
 }
 
 export const sessionEndpoints: readonly Endpoint[] = [
@@ -112,6 +113,17 @@ export const sessionEndpoints: readonly Endpoint[] = [
       permissionMode: z.exactOptional(S.SessionPermissionMode),
     }),
     result: S.SessionWorkspace,
+    can: ["user", "remote"],
+  },
+  {
+    op: "session.childTranscript",
+    about: ["id"],
+    input: input({
+      id: z.string(),
+      conversationId: z.string(),
+      limit: z.exactOptional(z.number()),
+    }),
+    result: S.SessionChildTranscript,
     can: ["user", "remote"],
   },
 ];

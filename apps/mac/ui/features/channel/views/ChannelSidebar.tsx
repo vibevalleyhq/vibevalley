@@ -92,8 +92,8 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
   const row = (c: Channel) => <ChannelRow channel={c} here={c.id === props.channel?.id} unread={unreadOf(c)} onClick={() => go(c)} reorder={reorder} />;
   return (
     <View accessibilityLabel={t("web.channel.side")} testID="channels-side" class="w-full flex-1 border-r border-line bg-side">
-      <View class="h-12 shrink-0 flex-row items-center gap-2 border-b border-line px-4">
-        <Text role="header" class="min-w-0 flex-1 truncate text-base font-semibold text-ink">
+      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
+        <Text role="header" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
           {t("web.channel.tab.chat")}
         </Text>
         <If when={totalUnread() > 0}>

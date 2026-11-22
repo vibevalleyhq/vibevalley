@@ -403,6 +403,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("SessionWorkspace"),
     },
     Endpoint {
+        op: "session.childTranscript",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionChildTranscriptInput"),
+        result: Some("SessionChildTranscript"),
+    },
+    Endpoint {
         op: "issue.conversation.get",
         module: "issue",
         about: &["id"],
@@ -2054,6 +2063,13 @@ pub mod ops {
         const NAME: &'static str = "session.setConfig";
         type Input = t::SessionSetConfigInput;
         type Result = t::SessionWorkspace;
+    }
+    /// Reads bounded recent transcript steps for a child agent or swarm member.
+    pub struct SessionChildTranscript;
+    impl Op for SessionChildTranscript {
+        const NAME: &'static str = "session.childTranscript";
+        type Input = t::SessionChildTranscriptInput;
+        type Result = t::SessionChildTranscript;
     }
     pub struct IssueConversationGet;
     impl Op for IssueConversationGet {

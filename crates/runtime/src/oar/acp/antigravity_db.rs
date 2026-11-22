@@ -18,7 +18,11 @@ use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{ConnectOptions, Row, SqliteConnection};
 
 pub(crate) const STEP_TYPE_ERROR_MESSAGE: i64 = 17;
+pub(crate) const STEP_TYPE_INVOKE_SUBAGENT: i64 = 127;
+pub(crate) const MAX_CHILDREN: usize = 16;
 const PAYLOAD_SCAN_LIMIT: usize = 16 * 1024;
+const SUBAGENT_PAYLOAD_LIMIT: usize = 32 * 1024;
+const SUBAGENT_TEXT_CAP: usize = 4_000;
 const BUSY_TIMEOUT: Duration = Duration::from_millis(100);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,28 +34,67 @@ pub(crate) struct SilentError {
     pub invalid_thinking_signature: bool,
 }
 
-/// Resolves `<gemini_dir>/<app_data_dir>/conversations/<session_id>.db`,
-/// rejecting path traversal or control characters in `session_id` / `app_data_dir`.
-pub(crate) fn conversation_db_path(session_id: &str, gemini_dir: &Path, app_data_dir: &str) -> Option<PathBuf> {
-    if session_id.is_empty()
-        || session_id.contains('/')
-        || session_id.contains('\\')
-        || session_id.contains('\0')
-        || session_id.contains("..")
-        || app_data_dir.is_empty()
-        || app_data_dir.contains('\0')
-    {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct InvokedSubagent {
+    pub step_idx: i64,
+    pub status: i64,
+    pub role: Option<String>,
+    pub prompt: Option<String>,
+    pub conversation_id: Option<String>,
+    pub log_uri: Option<String>,
+}
+
+pub(crate) fn is_safe_segment(segment: &str) -> bool {
+    !segment.is_empty() && segment != "." && !segment.contains('/') && !segment.contains('\\') && !segment.contains('\0') && !segment.contains("..")
+}
+
+pub(crate) fn base_data_dir(gemini_dir: &Path, app_data_dir: &str) -> Option<PathBuf> {
+    if app_data_dir.is_empty() || app_data_dir.contains('\0') {
         return None;
     }
     let app_path = Path::new(app_data_dir);
     if app_path.components().any(|c| matches!(c, Component::ParentDir)) {
         return None;
     }
-    let base = if app_path.is_absolute() {
+    Some(if app_path.is_absolute() {
         app_path.to_path_buf()
     } else {
         gemini_dir.join(app_path)
-    };
+    })
+}
+
+/// Walks every path segment under `base`, verifying each segment is traversal-safe
+/// and is a real non-symlink filesystem entry via `symlink_metadata`.
+pub(crate) fn check_non_symlink_chain(base: &Path, segments: &[&str], expect_file: bool) -> Option<PathBuf> {
+    let mut current = base.to_path_buf();
+    for (idx, seg) in segments.iter().enumerate() {
+        if !is_safe_segment(seg) {
+            return None;
+        }
+        current.push(seg);
+        let meta = std::fs::symlink_metadata(&current).ok()?;
+        if meta.file_type().is_symlink() {
+            return None;
+        }
+        let is_last = idx + 1 == segments.len();
+        if is_last && expect_file {
+            if !meta.is_file() {
+                return None;
+            }
+        } else if !meta.is_dir() {
+            return None;
+        }
+    }
+    Some(current)
+}
+
+/// Resolves `<gemini_dir>/<app_data_dir>/conversations/<session_id>.db`,
+/// rejecting path traversal or control characters in `session_id` / `app_data_dir`.
+pub(crate) fn conversation_db_path(session_id: &str, gemini_dir: &Path, app_data_dir: &str) -> Option<PathBuf> {
+    if !is_safe_segment(session_id) {
+        return None;
+    }
+    let base = base_data_dir(gemini_dir, app_data_dir)?;
     Some(base.join("conversations").join(format!("{session_id}.db")))
 }
 
@@ -235,6 +278,280 @@ pub(crate) fn parse_error_payload(bytes: &[u8]) -> SilentError {
     }
 }
 
+// ---- `step_type = 127` (`INVOKE_SUBAGENT`) sidecar inspection ---------------
+
+fn decode_varint(data: &[u8], pos: &mut usize) -> Option<u64> {
+    let mut out = 0u64;
+    let mut shift = 0u32;
+    while *pos < data.len() && shift < 64 {
+        let byte = data[*pos];
+        *pos += 1;
+        out |= u64::from(byte & 0x7f) << shift;
+        if (byte & 0x80) == 0 {
+            return Some(out);
+        }
+        shift += 7;
+    }
+    None
+}
+
+fn parse_wire_fields(data: &[u8]) -> Option<Vec<(u32, &[u8])>> {
+    let mut pos = 0usize;
+    let mut len_fields = Vec::new();
+    while pos < data.len() {
+        let tag = decode_varint(data, &mut pos)?;
+        let field_number = u32::try_from(tag >> 3).ok()?;
+        let wire_type = (tag & 0x07) as u8;
+        if field_number == 0 {
+            return None;
+        }
+        match wire_type {
+            0 => {
+                decode_varint(data, &mut pos)?;
+            }
+            1 => {
+                if pos.checked_add(8)? > data.len() {
+                    return None;
+                }
+                pos += 8;
+            }
+            2 => {
+                let len = usize::try_from(decode_varint(data, &mut pos)?).ok()?;
+                let end = pos.checked_add(len)?;
+                if end > data.len() {
+                    return None;
+                }
+                len_fields.push((field_number, &data[pos..end]));
+                pos = end;
+            }
+            5 => {
+                if pos.checked_add(4)? > data.len() {
+                    return None;
+                }
+                pos += 4;
+            }
+            _ => return None,
+        }
+    }
+    Some(len_fields)
+}
+
+fn is_printable_utf8(bytes: &[u8]) -> Option<&str> {
+    if bytes.is_empty() {
+        return None;
+    }
+    let text = std::str::from_utf8(bytes).ok()?;
+    if text.chars().all(|c| !c.is_control() || matches!(c, '\n' | '\r' | '\t')) {
+        Some(text)
+    } else {
+        None
+    }
+}
+
+fn collect_proto_strings(data: &[u8], depth: usize, out: &mut Vec<(u32, String)>, nodes: &mut usize) -> bool {
+    if depth > 4 || *nodes >= 256 {
+        return false;
+    }
+    let Some(fields) = parse_wire_fields(data) else {
+        return false;
+    };
+    let start_len = out.len();
+    for (field_number, slice) in fields {
+        if *nodes >= 256 {
+            break;
+        }
+        *nodes += 1;
+        if slice.is_empty() {
+            continue;
+        }
+        // Nested protobuf submessages often begin with tag 0x0a (`\n`) or contain
+        // non-printable length varints; recurse before treating bytes as plain text.
+        if depth < 4 && (slice[0] == 0x0a || is_printable_utf8(slice).is_none()) {
+            let before = out.len();
+            if collect_proto_strings(slice, depth + 1, out, nodes) && out.len() > before {
+                continue;
+            }
+            out.truncate(before);
+        }
+        if let Some(text) = is_printable_utf8(slice) {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                out.push((field_number, trimmed.to_string()));
+            }
+        }
+    }
+    out.len() > start_len
+}
+
+fn looks_like_uuid(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    if bytes.len() != 36 {
+        return false;
+    }
+    for (i, &b) in bytes.iter().enumerate() {
+        if matches!(i, 8 | 13 | 18 | 23) {
+            if b != b'-' {
+                return false;
+            }
+        } else if !b.is_ascii_hexdigit() {
+            return false;
+        }
+    }
+    true
+}
+
+fn looks_like_log_uri(s: &str) -> bool {
+    s.contains("/.system_generated/logs/") || s.ends_with("/transcript.jsonl") || s.ends_with("transcript.jsonl")
+}
+
+fn conversation_id_from_log_uri(uri: &str) -> Option<String> {
+    let cleaned = uri.strip_prefix("file://").unwrap_or(uri);
+    let after_brain = cleaned.split("/brain/").nth(1)?;
+    let id = after_brain.split('/').next()?;
+    is_safe_segment(id).then(|| id.to_string())
+}
+
+fn clamp_chars(s: &str, max_chars: usize) -> String {
+    let mut chars = s.chars();
+    let head: String = chars.by_ref().take(max_chars).collect();
+    if chars.next().is_some() { format!("{head}…") } else { head }
+}
+
+pub(crate) fn parse_subagent_payload(step_idx: i64, status: i64, payload: &[u8]) -> Option<InvokedSubagent> {
+    let slice = &payload[..payload.len().min(SUBAGENT_PAYLOAD_LIMIT)];
+    if slice.is_empty() {
+        return None;
+    }
+    // JSON fallback in case a payload is stored in JSON format.
+    if let Ok(json) = serde_json::from_slice::<serde_json::Value>(slice)
+        && json.is_object()
+    {
+        let pick = |keys: &[&str]| -> Option<String> {
+            keys.iter()
+                .find_map(|k| json.get(*k).and_then(serde_json::Value::as_str))
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+        };
+        let log_uri = pick(&["logUri", "log_uri", "transcriptPath", "transcript_path"]);
+        let conversation_id = pick(&["conversationId", "conversation_id", "sessionId", "session_id"])
+            .filter(|id| is_safe_segment(id))
+            .or_else(|| log_uri.as_deref().and_then(conversation_id_from_log_uri));
+        let role = pick(&["role", "agentType", "agent_type", "name", "subagentType"]);
+        let prompt = pick(&["prompt", "task", "instructions", "description"]).map(|s| clamp_chars(&s, SUBAGENT_TEXT_CAP));
+        if role.is_none() && prompt.is_none() && conversation_id.is_none() && log_uri.is_none() {
+            return None;
+        }
+        return Some(InvokedSubagent {
+            step_idx,
+            status,
+            role,
+            prompt,
+            conversation_id,
+            log_uri,
+        });
+    }
+
+    let mut strings = Vec::new();
+    let mut nodes = 0usize;
+    if !collect_proto_strings(slice, 0, &mut strings, &mut nodes) {
+        return None;
+    }
+
+    let mut log_uri: Option<String> = None;
+    let mut conversation_id: Option<String> = None;
+    let mut candidates: Vec<(u32, String)> = Vec::new();
+
+    for (field_no, text) in strings {
+        if log_uri.is_none() && looks_like_log_uri(&text) {
+            log_uri = Some(text);
+        } else if conversation_id.is_none() && looks_like_uuid(&text) {
+            conversation_id = Some(text);
+        } else if !text.starts_with("file://") && !text.starts_with('/') {
+            candidates.push((field_no, text));
+        }
+    }
+    if conversation_id.is_none()
+        && let Some(uri) = log_uri.as_deref()
+    {
+        conversation_id = conversation_id_from_log_uri(uri);
+    }
+
+    let mut role: Option<String> = None;
+    let mut prompt: Option<String> = None;
+    if candidates.len() >= 2 {
+        // Prefer a short single-line identifier as role and the longest distinct text as prompt.
+        let role_idx = candidates
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, s))| !s.contains('\n') && s.chars().count() <= 80)
+            .min_by_key(|(_, (_, s))| s.chars().count())
+            .map(|(i, _)| i);
+        if let Some(idx) = role_idx {
+            role = Some(candidates[idx].1.clone());
+        }
+        let prompt_idx = candidates
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| Some(*i) != role_idx)
+            .max_by_key(|(_, (_, s))| s.chars().count())
+            .map(|(i, _)| i);
+        if let Some(idx) = prompt_idx {
+            prompt = Some(clamp_chars(&candidates[idx].1, SUBAGENT_TEXT_CAP));
+        }
+    } else if let Some((_, single)) = candidates.into_iter().next() {
+        if !single.contains('\n') && !single.contains(' ') && single.chars().count() <= 64 {
+            role = Some(single);
+        } else {
+            prompt = Some(clamp_chars(&single, SUBAGENT_TEXT_CAP));
+        }
+    }
+
+    if role.is_none() && prompt.is_none() && conversation_id.is_none() && log_uri.is_none() {
+        return None;
+    }
+    Some(InvokedSubagent {
+        step_idx,
+        status,
+        role,
+        prompt,
+        conversation_id,
+        log_uri,
+    })
+}
+
+/// Reads recent `step_type = 127` (`INVOKE_SUBAGENT`) entries from a conversation
+/// DB read-only. Silently returns an empty list on missing DB, symlink, lock,
+/// or schema drift.
+pub(crate) fn list_invoked_subagents(path: &Path, limit: usize) -> Vec<InvokedSubagent> {
+    let cap = if limit == 0 { MAX_CHILDREN } else { limit.min(MAX_CHILDREN) } as i64;
+    let Some((mut conn, identity)) = open_readonly(path) else {
+        return Vec::new();
+    };
+    let rows = match block_on(
+        sqlx::query("SELECT idx, status, step_payload FROM steps WHERE step_type = ?1 ORDER BY idx DESC LIMIT ?2")
+            .bind(STEP_TYPE_INVOKE_SUBAGENT)
+            .bind(cap)
+            .fetch_all(&mut conn),
+    ) {
+        Ok(rows) => rows,
+        Err(_) => return Vec::new(),
+    };
+    if safe_db_identity(path) != Some(identity) {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for row in rows {
+        let Ok(idx) = row.try_get::<i64, _>("idx") else { continue };
+        let status = row.try_get::<i64, _>("status").unwrap_or(0);
+        let Some(payload) = read_blob_or_text(&row, "step_payload") else { continue };
+        if let Some(entry) = parse_subagent_payload(idx, status, &payload) {
+            out.push(entry);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -362,5 +679,77 @@ mod tests {
         assert_eq!(latest_step_index(&link_db), None);
         assert_eq!(detect_silent_error(&link_db, 0), None);
         assert_eq!(detect_silent_error(&conv.join("missing.db"), 0), None);
+        assert!(list_invoked_subagents(&link_db, 16).is_empty());
+    }
+
+    fn encode_varint(mut v: u64, out: &mut Vec<u8>) {
+        loop {
+            let mut b = (v & 0x7f) as u8;
+            v >>= 7;
+            if v != 0 {
+                b |= 0x80;
+            }
+            out.push(b);
+            if v == 0 {
+                break;
+            }
+        }
+    }
+
+    fn encode_len_field(field_no: u32, payload: &[u8], out: &mut Vec<u8>) {
+        encode_varint((u64::from(field_no) << 3) | 2, out);
+        encode_varint(payload.len() as u64, out);
+        out.extend_from_slice(payload);
+    }
+
+    #[test]
+    fn lists_invoked_subagents_from_protobuf_payload_and_tolerates_schema_drift() {
+        let dir = tempfile::tempdir().unwrap();
+        let conv = dir.path().join("conversations");
+        std::fs::create_dir_all(&conv).unwrap();
+        let db = conv.join("sess-sub.db");
+        create_steps_db(&db);
+
+        // Nested CortexStep(field 127) -> InvokeSubagent(role, prompt, conv_id, log_uri).
+        let mut inner = Vec::new();
+        encode_len_field(1, b"explore", &mut inner);
+        encode_len_field(2, b"Find all OAR session adapters in crates/runtime", &mut inner);
+        encode_len_field(3, b"5d4f594b-ca4a-4e3c-a081-171ddb1d2d1d", &mut inner);
+        encode_len_field(
+            4,
+            b"file:///Users/test/.gemini/antigravity-cli/brain/5d4f594b-ca4a-4e3c-a081-171ddb1d2d1d/.system_generated/logs/transcript.jsonl",
+            &mut inner,
+        );
+        let mut wrapper = Vec::new();
+        encode_len_field(127, &inner, &mut wrapper);
+
+        insert_step(&db, 10, STEP_TYPE_INVOKE_SUBAGENT, Some(&wrapper), None);
+        // Corrupted / unknown binary bytes on another step should fail silently without breaking valid rows.
+        insert_step(&db, 11, STEP_TYPE_INVOKE_SUBAGENT, Some(b"\xff\xff\xff\x07\x04"), None);
+        // Second valid subagent whose conversation_id is only in log_uri.
+        let mut inner2 = Vec::new();
+        encode_len_field(1, b"verifier", &mut inner2);
+        encode_len_field(2, b"Run cargo test across the runtime crate", &mut inner2);
+        encode_len_field(4, b"/tmp/base/brain/worker-conv-99/.system_generated/logs/transcript.jsonl", &mut inner2);
+        insert_step(&db, 12, STEP_TYPE_INVOKE_SUBAGENT, Some(&inner2), None);
+
+        let found = list_invoked_subagents(&db, 16);
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].step_idx, 12);
+        assert_eq!(found[0].role.as_deref(), Some("verifier"));
+        assert_eq!(found[0].prompt.as_deref(), Some("Run cargo test across the runtime crate"));
+        assert_eq!(found[0].conversation_id.as_deref(), Some("worker-conv-99"));
+
+        assert_eq!(found[1].step_idx, 10);
+        assert_eq!(found[1].role.as_deref(), Some("explore"));
+        assert_eq!(found[1].prompt.as_deref(), Some("Find all OAR session adapters in crates/runtime"));
+        assert_eq!(found[1].conversation_id.as_deref(), Some("5d4f594b-ca4a-4e3c-a081-171ddb1d2d1d"));
+
+        // Schema drift: DB without `steps` table returns empty silently.
+        let drift_db = conv.join("drift.db");
+        let options = SqliteConnectOptions::new().filename(&drift_db).create_if_missing(true);
+        let mut conn = block_on(options.connect()).unwrap();
+        block_on(conn.execute("CREATE TABLE other_table (id integer PRIMARY KEY);")).unwrap();
+        assert!(list_invoked_subagents(&drift_db, 16).is_empty());
     }
 }

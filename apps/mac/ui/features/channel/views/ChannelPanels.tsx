@@ -193,15 +193,15 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
   };
   return (
     <View testID="thread-pane" accessibilityLabel={t("web.channel.thread")} class="min-w-0 flex-1">
-      <View class="h-12 shrink-0 flex-row items-center gap-2.5 border-b border-line px-4">
-        <View class="h-8 w-8 shrink-0 items-center justify-center rounded-md bg-side">
-          <If when={session()} else={<Icon name="thread" size={16} tone="muted" />}>
-            {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={32} />}
+      <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
+        <View class="h-6 w-6 shrink-0 items-center justify-center rounded-md bg-side">
+          <If when={session()} else={<Icon name="thread" size={14} tone="muted" />}>
+            {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={24} />}
           </If>
         </View>
-        <View class="min-w-0 flex-1 gap-0.5">
-          <Text class="truncate text-sm font-semibold text-ink">{threadTitle(props.thread, core()?.issues, sessions())}</Text>
-          <View class="flex-row items-center gap-1.5">
+        <View class="min-w-0 flex-1 flex-row items-center gap-2 overflow-hidden">
+          <Text class="max-w-44 shrink-0 truncate text-sm font-semibold text-ink">{threadTitle(props.thread, core()?.issues, sessions())}</Text>
+          <View class="min-w-0 flex-1 flex-row items-center gap-1">
             <If when={session()}>{(s) => <PhaseGlyph phase={s().phase} size={12} />}</If>
             <Text class="min-w-0 flex-1 truncate text-xs text-muted">{status()}</Text>
           </View>

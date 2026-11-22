@@ -2,7 +2,7 @@
 //! `session.respondPermission`, `session.respondInteraction`,
 //! `session.setConfig`, `session.stop`, and `session.watch` end-to-end.
 
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -12,8 +12,9 @@ use base64::Engine;
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller};
 use vibevalley_runtime::oar::{
-    Capabilities, ContentBlock, ControlAction, ControlOutcome, ControlStatus, Event, EventKind, Installation, InteractionDecision, InteractionOption,
-    ModelInfo, PermissionDecision, PermissionMode, Registry, Runtime, Session, SessionOptions, SessionStatus, StopReason, Usage, voyage,
+    Capabilities, ChildToolCall, ChildTranscriptStep, ContentBlock, ControlAction, ControlOutcome, ControlStatus, Event, EventKind, Installation,
+    InteractionDecision, InteractionOption, ModelInfo, PermissionDecision, PermissionMode, Registry, Runtime, Session, SessionOptions, SessionStatus,
+    StopReason, SwarmMember, SwarmMemberState, SwarmMessage, SwarmPlan, SwarmPlanThread, SwarmSnapshot, Usage, voyage,
 };
 use vibevalley_server::{Server, ServerConfig, Started};
 
@@ -42,6 +43,9 @@ struct MockRuntime {
     id: String,
     turns: Arc<Mutex<VecDeque<MockTurn>>>,
     log: Arc<Mutex<MockLog>>,
+    title: Arc<Mutex<Option<String>>>,
+    swarm: Arc<Mutex<Option<SwarmSnapshot>>>,
+    transcripts: Arc<Mutex<HashMap<String, Vec<ChildTranscriptStep>>>>,
 }
 
 impl MockRuntime {
@@ -51,6 +55,9 @@ impl MockRuntime {
             id: id.into(),
             turns: Arc::new(Mutex::new(turns.into())),
             log: log.clone(),
+            title: Arc::new(Mutex::new(None)),
+            swarm: Arc::new(Mutex::new(None)),
+            transcripts: Arc::new(Mutex::new(HashMap::new())),
         });
         (rt, log)
     }
@@ -109,6 +116,9 @@ impl Runtime for MockRuntime {
             perm_waiter: Mutex::new(None),
             inter_waiter: Mutex::new(None),
             abort_waiter: Mutex::new(None),
+            title: self.title.clone(),
+            swarm: self.swarm.clone(),
+            transcripts: self.transcripts.clone(),
             disposed: AtomicBool::new(false),
         });
         sess.emit(EventKind::SessionStarted {
@@ -130,6 +140,9 @@ struct MockSession {
     perm_waiter: Mutex<Option<(String, flume::Sender<PermissionDecision>)>>,
     inter_waiter: Mutex<Option<(String, flume::Sender<InteractionDecision>)>>,
     abort_waiter: Mutex<Option<flume::Sender<()>>>,
+    title: Arc<Mutex<Option<String>>>,
+    swarm: Arc<Mutex<Option<SwarmSnapshot>>>,
+    transcripts: Arc<Mutex<HashMap<String, Vec<ChildTranscriptStep>>>>,
     disposed: AtomicBool,
 }
 
@@ -149,6 +162,21 @@ impl MockSession {
 impl Session for MockSession {
     fn id(&self) -> String {
         self.id.clone()
+    }
+
+    fn session_title(&self) -> Option<String> {
+        self.title.lock().unwrap().clone()
+    }
+
+    fn swarm_snapshot(&self) -> Option<SwarmSnapshot> {
+        self.swarm.lock().unwrap().clone()
+    }
+
+    fn read_child_transcript(&self, conversation_id: &str, limit: usize) -> Vec<ChildTranscriptStep> {
+        let map = self.transcripts.lock().unwrap();
+        let Some(steps) = map.get(conversation_id) else { return vec![] };
+        let start = steps.len().saturating_sub(limit);
+        steps[start..].to_vec()
     }
 
     fn control(&self, action: ControlAction, _arg: &str, input_id: &str, span_id: &str) -> vibevalley_runtime::oar::Result<ControlOutcome> {
@@ -836,4 +864,265 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
 
     server.hub.unsubscribe(sub);
     server.close();
+}
+
+#[test]
+fn workspace_session_swarm_watch_deltas_dedup_and_child_transcript() {
+    vibevalley_i18n::set_locale("zh");
+    let home = tempfile::tempdir().unwrap();
+    let repo_dir = home.path().join("swarm-repo");
+    std::fs::create_dir_all(&repo_dir).unwrap();
+    let cwd = repo_dir.to_string_lossy().into_owned();
+
+    let (rt, _log) = MockRuntime::new("antigravity", vec![]);
+    let swarm_handle = rt.swarm.clone();
+    let transcripts_handle = rt.transcripts.clone();
+    let server = start_with(home.path(), rt);
+    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+
+    let opened = call("session.openWorkspace", json!({ "runtime": "antigravity", "cwd": cwd })).data.unwrap();
+    let sid = opened["id"].as_str().unwrap().to_string();
+
+    let (sub, rx) = server.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let _hist = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    let initial_state = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert_eq!(initial_state["kind"], "state");
+    assert!(initial_state.get("swarm").is_none(), "non-swarm session omits swarm field: {initial_state}");
+
+    // Activate swarm snapshot and verify 500 ms watch tick pushes the delta cleanly.
+    let mut tasks = BTreeMap::new();
+    tasks.insert("worker-a".into(), "Implement protocol".into());
+    let snap1 = SwarmSnapshot {
+        swarm_id: "sw-1".into(),
+        title: Some("Swarm V1".into()),
+        created_at: Some("2026-11-22T05:00:00Z".into()),
+        members: vec![
+            SwarmMember {
+                name: "coordinator".into(),
+                conversation_id: "coord-1".into(),
+                role: "coordinator".into(),
+                state: SwarmMemberState::Waiting,
+                wake_mode: Some("mentions".into()),
+                wait_since: Some(1),
+                last_read_seq: Some(1),
+                model: Some("gemini-4-neon".into()),
+                workspace_mode: Some("inherit".into()),
+                task: None,
+            },
+            SwarmMember {
+                name: "worker-a".into(),
+                conversation_id: "child-1".into(),
+                role: "worker".into(),
+                state: SwarmMemberState::Working,
+                wake_mode: Some("working".into()),
+                wait_since: None,
+                last_read_seq: Some(1),
+                model: Some("gemini-4-neon".into()),
+                workspace_mode: Some("inherit".into()),
+                task: Some("Implement protocol".into()),
+            },
+            SwarmMember {
+                name: "retired".into(),
+                conversation_id: "child-old".into(),
+                role: "worker".into(),
+                state: SwarmMemberState::Killed,
+                wake_mode: None,
+                wait_since: None,
+                last_read_seq: None,
+                model: None,
+                workspace_mode: None,
+                task: None,
+            },
+        ],
+        working_count: 1,
+        waiting_count: 1,
+        stopped_count: 0,
+        killed_count: 1,
+        plan: Some(SwarmPlan {
+            goal_title: Some("Ship Swarm V1".into()),
+            goal_line: Some("Inspect live board and member transcripts".into()),
+            tasks,
+            threads: vec![SwarmPlanThread {
+                id: "t1".into(),
+                title: "Backend".into(),
+                goal: Some("Protocol & server".into()),
+                tasks: vec!["worker-a".into()],
+            }],
+        }),
+        messages: vec![SwarmMessage {
+            seq: 1,
+            agent: "coordinator".into(),
+            text: "@worker-a start protocol".into(),
+            time: "2026-11-22 13:50:00".into(),
+            kind: Some("brief".into()),
+        }],
+        total_messages: 1,
+    };
+    *swarm_handle.lock().unwrap() = Some(snap1.clone());
+
+    let pushed1 = recv_until(&rx, "swarm snapshot pushed", |v| v["kind"] == "state" && v["swarm"]["swarmId"] == "sw-1");
+    assert_eq!(pushed1["swarm"]["workingCount"], 1);
+    assert_eq!(pushed1["swarm"]["activeCount"], 2);
+    assert_eq!(pushed1["swarm"]["overview"]["goalTitle"], "Ship Swarm V1");
+    assert_eq!(pushed1["swarm"]["overview"]["threads"][0]["members"], json!(["worker-a"]));
+    assert_eq!(pushed1["swarm"]["messages"][0]["seq"], 1);
+    assert_eq!(pushed1["swarm"]["totalMessages"], 1);
+
+    // Unchanged ticks must NOT push duplicate state events.
+    assert!(
+        rx.recv_timeout(Duration::from_millis(700)).is_err(),
+        "unchanged swarm snapshot should be deduplicated"
+    );
+
+    // Updating swarm state pushes the next delta.
+    let mut snap2 = snap1;
+    snap2.working_count = 0;
+    snap2.waiting_count = 2;
+    snap2.members[1].state = SwarmMemberState::Waiting;
+    snap2.messages.push(SwarmMessage {
+        seq: 2,
+        agent: "worker-a".into(),
+        text: "@coordinator [done] landed".into(),
+        time: "2026-11-22 13:52:00".into(),
+        kind: None,
+    });
+    snap2.total_messages = 2;
+    *swarm_handle.lock().unwrap() = Some(snap2);
+
+    let pushed2 = recv_until(&rx, "updated swarm delta", |v| v["kind"] == "state" && v["swarm"]["totalMessages"] == 2);
+    assert_eq!(pushed2["swarm"]["workingCount"], 0);
+    assert_eq!(pushed2["swarm"]["members"][1]["state"], "waiting");
+
+    // Child transcript drill-down: bounded steps + traversal & missing-session rejection.
+    transcripts_handle.lock().unwrap().insert(
+        "child-1".into(),
+        vec![
+            ChildTranscriptStep {
+                step_index: 1,
+                source: "USER".into(),
+                kind: "USER_INPUT".into(),
+                status: Some("DONE".into()),
+                created_at: Some("2026-11-22T05:50:00Z".into()),
+                model: None,
+                input_tokens: None,
+                cache_read_tokens: None,
+                output_tokens: None,
+                thinking: None,
+                content: Some("Start".into()),
+                error: None,
+                tool_calls: vec![],
+            },
+            ChildTranscriptStep {
+                step_index: 2,
+                source: "MODEL".into(),
+                kind: "PLANNER_RESPONSE".into(),
+                status: Some("DONE".into()),
+                created_at: Some("2026-11-22T05:50:05Z".into()),
+                model: Some("gemini-4-neon".into()),
+                input_tokens: Some(4200),
+                cache_read_tokens: Some(3000),
+                output_tokens: Some(180),
+                thinking: Some("Checking files".into()),
+                content: Some("Edited contract".into()),
+                error: None,
+                tool_calls: vec![ChildToolCall {
+                    name: "edit_file".into(),
+                    summary: Some("session.rs".into()),
+                }],
+            },
+            ChildTranscriptStep {
+                step_index: 3,
+                source: "MODEL".into(),
+                kind: "PLANNER_RESPONSE".into(),
+                status: Some("DONE".into()),
+                created_at: Some("2026-11-22T05:50:10Z".into()),
+                model: Some("gemini-4-neon".into()),
+                input_tokens: Some(5000),
+                cache_read_tokens: Some(4100),
+                output_tokens: Some(90),
+                thinking: None,
+                content: Some("All tests green".into()),
+                error: None,
+                tool_calls: vec![],
+            },
+        ],
+    );
+
+    let transcript = call("session.childTranscript", json!({ "id": sid, "conversationId": "child-1", "limit": 2 }));
+    assert_eq!(transcript.biz_code, 0, "{}", transcript.message);
+    let data = transcript.data.unwrap();
+    assert_eq!(data["conversationId"], "child-1");
+    let steps = data["steps"].as_array().unwrap();
+    assert_eq!(steps.len(), 2);
+    assert_eq!(steps[0]["stepIndex"], 2);
+    assert_eq!(steps[0]["thinking"], "Checking files");
+    assert_eq!(steps[0]["toolCalls"][0]["name"], "edit_file");
+    assert_eq!(steps[0]["toolCalls"][0]["args"], "session.rs");
+    assert_eq!(steps[0]["inputTokens"], 4200);
+    assert_eq!(steps[0]["cacheReadTokens"], 3000);
+    assert_eq!(steps[0]["outputTokens"], 180);
+    assert_eq!(steps[1]["stepIndex"], 3);
+
+    let bad_conv = call("session.childTranscript", json!({ "id": sid, "conversationId": "../etc/passwd" }));
+    assert_eq!(bad_conv.biz_code, BizCode::InvalidInput.code());
+
+    let missing_sess = call("session.childTranscript", json!({ "id": "w404", "conversationId": "child-1" }));
+    assert_eq!(missing_sess.biz_code, BizCode::SessionNotFound.code());
+
+    server.hub.unsubscribe(sub);
+    server.close();
+}
+
+#[test]
+fn workspace_session_title_updates_dedup_and_persists_across_restart() {
+    vibevalley_i18n::set_locale("zh");
+    let home = tempfile::tempdir().unwrap();
+    let repo_dir = home.path().join("title-repo");
+    std::fs::create_dir_all(&repo_dir).unwrap();
+    let cwd = repo_dir.to_string_lossy().into_owned();
+
+    let (rt, _log) = MockRuntime::new("antigravity", vec![]);
+    let title_handle = rt.title.clone();
+    *title_handle.lock().unwrap() = Some("Initial Runtime Title".into());
+    let server = start_with(home.path(), rt);
+    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+
+    let opened = call("session.openWorkspace", json!({ "runtime": "antigravity", "cwd": cwd })).data.unwrap();
+    let sid = opened["id"].as_str().unwrap().to_string();
+    assert_eq!(opened["title"], "Initial Runtime Title");
+
+    let (sub, rx) = server.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let _hist = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    let initial_state = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert_eq!(initial_state["kind"], "state");
+    assert_eq!(initial_state["title"], "Initial Runtime Title");
+
+    // Live title update pushes on the 500 ms watch tick.
+    *title_handle.lock().unwrap() = Some("  Refactor Workspace Titles  ".into());
+    let pushed = recv_until(&rx, "updated session title", |v| {
+        v["kind"] == "state" && v["title"] == "Refactor Workspace Titles"
+    });
+    assert_eq!(pushed["title"], "Refactor Workspace Titles");
+
+    // Blank/whitespace titles keep the previous title and unchanged ticks deduplicate.
+    *title_handle.lock().unwrap() = Some("   ".into());
+    assert!(
+        rx.recv_timeout(Duration::from_millis(700)).is_err(),
+        "unchanged or blank session title should be deduplicated"
+    );
+
+    server.hub.unsubscribe(sub);
+    server.close();
+    drop(server);
+
+    // Persisted title survives restart before the runtime is reopened.
+    let (rt2, _log2) = MockRuntime::new("antigravity", vec![]);
+    let reopened = start_with(home.path(), rt2);
+    let (sub2, rx2) = reopened.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let _hist2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
+    let state2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert_eq!(state2["kind"], "state");
+    assert_eq!(state2["title"], "Refactor Workspace Titles");
+    reopened.hub.unsubscribe(sub2);
+    reopened.close();
 }

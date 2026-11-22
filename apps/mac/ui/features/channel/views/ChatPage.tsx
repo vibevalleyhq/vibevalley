@@ -197,21 +197,21 @@ function ChannelMain(props: {
     [props.channel?.description, props.channel?.repo ? t("web.channel.defaultRepo", { repo: props.channel.repo }) : ""].filter(Boolean).join(" · ");
   return (
     <View accessibilityLabel={channelLabel(props.channel)} testID="channel-main" class="min-w-0 flex-1">
-      <View testID="channel-head" class="h-12 shrink-0 flex-row items-center gap-3 border-b border-line px-4">
+      <View testID="channel-head" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
         <If when={!md()}>
           <BarButton icon="chat" size={16} label={t("web.channel.channels")} testid="channels-drawer" onPress={() => props.onDrawer()} />
         </If>
-        <View class="h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line bg-side">
-          <Text class="font-mono text-base font-semibold text-muted">{markOf(props.channel)}</Text>
+        <View class="h-6 w-6 shrink-0 items-center justify-center rounded-md border border-line bg-side">
+          <Text class="font-mono text-xs font-semibold text-muted">{markOf(props.channel)}</Text>
         </View>
-        <View class="min-w-0 flex-1 gap-0.5">
-          <View tooltip={props.channel?.default === true ? <Bubble text={t("web.channel.defaultHint")} /> : undefined}>
-            <Text role="header" class="truncate text-base font-semibold text-ink">
+        <View class="min-w-0 flex-1 flex-row items-center gap-2 overflow-hidden">
+          <View class="shrink-0" tooltip={props.channel?.default === true ? <Bubble text={t("web.channel.defaultHint")} /> : undefined}>
+            <Text role="header" class="truncate text-sm font-semibold text-ink">
               {name()}
             </Text>
           </View>
           <If when={about()}>
-            <Text class="truncate text-xs text-muted">{about()}</Text>
+            <Text class="min-w-0 flex-1 truncate text-xs text-muted">{about()}</Text>
           </If>
         </View>
         <View class="shrink-0 flex-row items-center gap-1">

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use gpui::{Context, MouseMoveEvent, Window};
+use gpui::{Context, MouseButton, MouseMoveEvent, Window};
 
 use crate::panes::PaneEntity;
 use crate::theme::{MotionChoice, ThemeChoice, Ui};
@@ -213,10 +213,20 @@ impl Shell {
         {
             project.layout.resize(split, index, fraction);
             cx.notify();
+        } else if let Some(origin) = self.window_drag_origin {
+            if e.pressed_button != Some(MouseButton::Left) {
+                self.window_drag_origin = None;
+            } else if crate::panes::exceeded_window_drag_slop(origin, (f32::from(e.position.x), f32::from(e.position.y))) {
+                self.window_drag_origin = None;
+                if !window.is_fullscreen() {
+                    window.start_window_move();
+                }
+            }
         }
     }
 
     pub(super) fn on_mouse_up(&mut self, cx: &mut Context<Self>) {
+        self.window_drag_origin = None;
         if self.resizing_sidebar {
             self.resizing_sidebar = false;
             self.save_settings(cx);

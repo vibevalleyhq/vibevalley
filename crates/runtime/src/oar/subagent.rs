@@ -140,6 +140,12 @@ impl Session for Child {
     fn read_subagent(&self, thread_id: &str, turn_id: Option<&str>) -> Result<crate::oar::SubagentSnapshot> {
         self.inner.read_subagent(thread_id, turn_id)
     }
+    fn swarm_snapshot(&self) -> Option<crate::oar::SwarmSnapshot> {
+        self.inner.swarm_snapshot()
+    }
+    fn read_child_transcript(&self, conversation_id: &str, limit: usize) -> Vec<crate::oar::ChildTranscriptStep> {
+        self.inner.read_child_transcript(conversation_id, limit)
+    }
     fn runtime_id(&self) -> &str {
         self.inner.runtime_id()
     }

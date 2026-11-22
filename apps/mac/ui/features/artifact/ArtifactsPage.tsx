@@ -55,13 +55,13 @@ async function exportArtifactFile(artifact: Artifact, activeVersion?: number): P
 function ArtifactSkeleton() {
   return (
     <View testID="artifact-skeleton" accessibilityState={{ busy: true }} class="min-h-0 flex-1 bg-page">
-      <View class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+      <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
         <SkeletonBar class="h-6 w-16 rounded-md" />
         <SkeletonBar class="h-5 w-44 rounded-sm" />
         <SkeletonBar class="h-5 w-14 rounded-sm" />
         <View class="flex-1" />
-        <SkeletonBar class="size-7 rounded-md" />
-        <SkeletonBar class="size-7 rounded-md" />
+        <SkeletonBar class="size-6 rounded-md" />
+        <SkeletonBar class="size-6 rounded-md" />
       </View>
       <View class="mx-auto w-full max-w-3xl gap-4 px-6 py-7">
         <SkeletonBar class="h-7 w-64 rounded-md" />
@@ -316,12 +316,12 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
         </If>
 
         <If when={!presenting()}>
-          <View testID="artifact-header" class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+          <View testID="artifact-header" class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
             <A
               href="/library"
               testID="artifact-back-library"
               tooltip={<Bubble text={t("web.library.content.back")} />}
-              class={`h-7 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+              class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
             >
               <Icon name="back" size={14} tone="muted" />
               <Text class="text-xs font-medium text-muted">{t("web.library.content.back")}</Text>

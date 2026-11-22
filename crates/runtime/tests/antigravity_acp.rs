@@ -905,6 +905,106 @@ fn antigravity_silent_db_error_upgrades_end_turn_and_marks_unresumable() {
     session.dispose();
 }
 
+#[test]
+fn antigravity_session_info_update_sets_and_updates_session_title_ignoring_blank_and_child() {
+    let dir = tempfile::tempdir().unwrap();
+    let script = write_executable(
+        dir.path(),
+        "mock-agy-title",
+        r#"#!/usr/bin/env python3
+import json, sys
+
+session_id = "sess-title-1"
+turn = 0
+
+def send(obj):
+    sys.stdout.write(json.dumps(obj) + "\n")
+    sys.stdout.flush()
+
+for raw in sys.stdin:
+    raw = raw.strip()
+    if not raw:
+        continue
+    msg = json.loads(raw)
+    method = msg.get("method")
+    req_id = msg.get("id")
+    if method == "initialize":
+        send({
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "result": {
+                "protocolVersion": 2,
+                "agentCapabilities": {"sessionCapabilities": {"resume": {}}},
+            },
+        })
+    elif method == "session/new":
+        send({
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "result": {"sessionId": session_id, "title": "  Initial ACP Title  "},
+        })
+    elif method == "session/prompt":
+        turn += 1
+        if turn == 1:
+            send({
+                "jsonrpc": "2.0",
+                "method": "session/update",
+                "params": {
+                    "sessionId": session_id,
+                    "update": {"sessionUpdate": "session_info_update", "title": "  Fix terminal titles  "},
+                },
+            })
+            # Blank title and child session update must NOT overwrite root title.
+            send({
+                "jsonrpc": "2.0",
+                "method": "session/update",
+                "params": {
+                    "sessionId": session_id,
+                    "update": {"sessionUpdate": "session_info_update", "title": "   "},
+                },
+            })
+            send({
+                "jsonrpc": "2.0",
+                "method": "session/update",
+                "params": {
+                    "sessionId": "child-sub-9",
+                    "update": {"sessionUpdate": "session_info_update", "title": "Child Worker Title"},
+                },
+            })
+        else:
+            send({
+                "jsonrpc": "2.0",
+                "method": "session/update",
+                "params": {
+                    "sessionId": session_id,
+                    "update": {"sessionUpdate": "session_info_update", "title": "Swarm Title Polish"},
+                },
+            })
+        send({"jsonrpc": "2.0", "id": req_id, "result": {"stopReason": "end_turn"}})
+"#,
+    );
+
+    let rt = AcpRuntime::new(AcpAgentSpec::new("antigravity", "Antigravity CLI", script.to_string_lossy(), ["acp"]));
+    let session = rt
+        .open(SessionOptions {
+            cwd: dir.path().to_path_buf(),
+            bin_path: Some(script),
+            ..Default::default()
+        })
+        .expect("open title session");
+    assert_eq!(session.session_title().as_deref(), Some("Initial ACP Title"));
+
+    let rx = session.events();
+    session.prompt(vec![ContentBlock::Text("first".into())]).unwrap();
+    recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    assert_eq!(session.session_title().as_deref(), Some("Fix terminal titles"));
+
+    session.prompt(vec![ContentBlock::Text("second".into())]).unwrap();
+    recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    assert_eq!(session.session_title().as_deref(), Some("Swarm Title Polish"));
+    session.dispose();
+}
+
 // ---- Opt-in real local `agy 1.5+` smoke test --------------------------------
 
 #[test]

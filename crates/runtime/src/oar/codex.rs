@@ -597,6 +597,7 @@ struct SessionState {
     core: Arc<SessionCore>,
     projector: Mutex<Projector>,
     thread_id: String,
+    session_title: Mutex<Option<String>>,
     turn_id: Mutex<Option<String>>,
     abort_wanted: AtomicBool,
     abort_killed: AtomicBool,
@@ -715,6 +716,16 @@ impl Shared {
             (projected, path)
         };
         let root = path.is_empty();
+        if root {
+            let next_title = match method {
+                "thread/name/updated" => str_of(params, "threadName").or_else(|| str_of(params, "name")),
+                "thread/started" => params.pointer("/thread/name").and_then(Value::as_str),
+                _ => None,
+            };
+            if let Some(title) = next_title.map(str::trim).filter(|t| !t.is_empty()) {
+                *lock(&session.session_title) = Some(title.to_string());
+            }
+        }
         let _frame = session.core.record_raw(method, path, line, params);
         let Some(events) = projected else { return };
         if root && method == "turn/started" {
@@ -864,6 +875,10 @@ impl Driver for CodexDriver {
             .shared
             .call("thread/read", json!({"threadId":thread_id,"includeTurns":turn_id.is_some()}))?;
         subagents::read_snapshot(&reply, thread_id, turn_id)
+    }
+
+    fn session_title(&self) -> Option<String> {
+        lock(&self.session().session_title).clone()
     }
 
     fn check_content(&self, content: &[ContentBlock]) -> Result<()> {
@@ -1157,10 +1172,17 @@ impl Runtime for CodexRuntime {
             session_id: thread_id.clone(),
             model,
         });
+        let initial_title = reply
+            .pointer("/thread/name")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+            .map(str::to_string);
         let _ = shared.session.set(SessionState {
             core: core.clone(),
             projector: Mutex::new(Projector::new(&thread_id)),
             thread_id,
+            session_title: Mutex::new(initial_title),
             turn_id: Mutex::new(None),
             abort_wanted: AtomicBool::new(false),
             abort_killed: AtomicBool::new(false),

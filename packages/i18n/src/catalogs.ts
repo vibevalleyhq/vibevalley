@@ -2546,7 +2546,8 @@ export const catalogs = {
         workingCount: "{n} 运行中",
         readyCount: "{n} 待命",
         attentionCount: "{n} 需要关注",
-        closeTab: "关闭 {title}",
+        closeTab: "关闭标签",
+        tabMore: "更多操作",
         newTerminal: "新终端：{name}",
         newChat: "新对话：{name}",
         closeFolder: "关闭文件夹：{name}",
@@ -2713,6 +2714,38 @@ export const catalogs = {
         configFailed: "切换配置失败：{why}",
         respondFailed: "提交回复失败：{why}",
         stopFailed: "中断会话失败：{why}",
+        attachFile: "添加文件",
+        removeFile: "移除 {name}",
+        chooseModel: "切换引擎与模型",
+      },
+      swarm: {
+        pill: "Swarm · {working}/{active}",
+        openDrawer: "打开 Swarm 协作面板",
+        closeDrawer: "收起 Swarm 协作面板",
+        tabOverview: "总览",
+        tabRoster: "成员",
+        tabBoard: "黑板",
+        overviewEmpty: "当前暂无协作线程总览。",
+        roleCoordinator: "协调者",
+        roleWorker: "成员",
+        stateWorking: "工作中",
+        stateWaiting: "等待中",
+        stateWaitingMentions: "等待 @提及 #{seq}",
+        stateWaitingAll: "等待全部 #{seq}",
+        stateStopped: "已停止",
+        stateKilled: "已结束",
+        rosterSelectHint: "点击左侧成员查看近期轨迹步骤。",
+        transcriptTitle: "近期轨迹",
+        transcriptRefresh: "刷新轨迹",
+        transcriptEmpty: "暂无可读轨迹步骤。",
+        transcriptFailed: "加载轨迹失败：{why}",
+        transcriptThinking: "思考",
+        boardAll: "全部",
+        boardFilterPlaceholder: "过滤黑板消息…",
+        boardEmpty: "黑板暂无消息。",
+        boardBrief: "任务简报",
+        boardJumpLatest: "跳到最新",
+        boardCount: "{shown}/{total} 条",
       },
       markdown: { source: "源码", openSource: "打开源码", loadingPreview: "正在加载预览" },
     },
@@ -5564,7 +5597,8 @@ export const catalogs = {
         workingCount: "{n} running",
         readyCount: "{n} ready",
         attentionCount: "{n} attention",
-        closeTab: "Close {title}",
+        closeTab: "Close tab",
+        tabMore: "More actions",
         newTerminal: "New terminal: {name}",
         newChat: "New chat: {name}",
         closeFolder: "Close folder: {name}",
@@ -5731,6 +5765,38 @@ export const catalogs = {
         configFailed: "Failed to update config: {why}",
         respondFailed: "Failed to submit reply: {why}",
         stopFailed: "Failed to stop session: {why}",
+        attachFile: "Attach file",
+        removeFile: "Remove {name}",
+        chooseModel: "Switch runtime & model",
+      },
+      swarm: {
+        pill: "Swarm · {working}/{active}",
+        openDrawer: "Open Swarm panel",
+        closeDrawer: "Close Swarm panel",
+        tabOverview: "Overview",
+        tabRoster: "Roster",
+        tabBoard: "Board",
+        overviewEmpty: "No threads recorded yet.",
+        roleCoordinator: "Coordinator",
+        roleWorker: "Member",
+        stateWorking: "Working",
+        stateWaiting: "Waiting",
+        stateWaitingMentions: "Waiting @mention #{seq}",
+        stateWaitingAll: "Waiting all #{seq}",
+        stateStopped: "Stopped",
+        stateKilled: "Ended",
+        rosterSelectHint: "Select a member to inspect recent transcript steps.",
+        transcriptTitle: "Recent transcript",
+        transcriptRefresh: "Refresh transcript",
+        transcriptEmpty: "No transcript steps yet.",
+        transcriptFailed: "Failed to load transcript: {why}",
+        transcriptThinking: "Thinking",
+        boardAll: "All",
+        boardFilterPlaceholder: "Filter board messages…",
+        boardEmpty: "No board messages yet.",
+        boardBrief: "Brief",
+        boardJumpLatest: "Latest",
+        boardCount: "{shown}/{total}",
       },
       markdown: { source: "Source", openSource: "Open source", loadingPreview: "Loading preview" },
     },
@@ -8517,6 +8583,8 @@ export interface Messages {
   "web.setting.words.general": undefined;
   "web.setting.words.models": undefined;
   "web.setting.words.voice": undefined;
+  "web.shell.chat.attachFile": undefined;
+  "web.shell.chat.chooseModel": undefined;
   "web.shell.chat.composerPlaceholder": { readonly runtime: string | number };
   "web.shell.chat.configFailed": { readonly why: string | number };
   "web.shell.chat.emptyHint": undefined;
@@ -8538,6 +8606,7 @@ export interface Messages {
   "web.shell.chat.permissionBadge": undefined;
   "web.shell.chat.permissionDeny": undefined;
   "web.shell.chat.permissionMode": undefined;
+  "web.shell.chat.removeFile": { readonly name: string | number };
   "web.shell.chat.respondFailed": { readonly why: string | number };
   "web.shell.chat.runtime": undefined;
   "web.shell.chat.send": undefined;
@@ -8675,7 +8744,7 @@ export interface Messages {
   "web.shell.sidebar.attentionCount": { readonly n: string | number };
   "web.shell.sidebar.chatWaiting": undefined;
   "web.shell.sidebar.closeFolder": { readonly name: string | number };
-  "web.shell.sidebar.closeTab": { readonly title: string | number };
+  "web.shell.sidebar.closeTab": undefined;
   "web.shell.sidebar.collapseAll": undefined;
   "web.shell.sidebar.collapseItem": { readonly name: string | number };
   "web.shell.sidebar.copyPath": undefined;
@@ -8704,9 +8773,37 @@ export interface Messages {
   "web.shell.sidebar.revealInFinder": undefined;
   "web.shell.sidebar.running": undefined;
   "web.shell.sidebar.runningAgent": { readonly agent: string | number };
+  "web.shell.sidebar.tabMore": undefined;
   "web.shell.sidebar.terminalCount": { readonly n: string | number };
   "web.shell.sidebar.title": undefined;
   "web.shell.sidebar.workingCount": { readonly n: string | number };
+  "web.shell.swarm.boardAll": undefined;
+  "web.shell.swarm.boardBrief": undefined;
+  "web.shell.swarm.boardCount": { readonly shown: string | number; readonly total: string | number };
+  "web.shell.swarm.boardEmpty": undefined;
+  "web.shell.swarm.boardFilterPlaceholder": undefined;
+  "web.shell.swarm.boardJumpLatest": undefined;
+  "web.shell.swarm.closeDrawer": undefined;
+  "web.shell.swarm.openDrawer": undefined;
+  "web.shell.swarm.overviewEmpty": undefined;
+  "web.shell.swarm.pill": { readonly active: string | number; readonly working: string | number };
+  "web.shell.swarm.roleCoordinator": undefined;
+  "web.shell.swarm.roleWorker": undefined;
+  "web.shell.swarm.rosterSelectHint": undefined;
+  "web.shell.swarm.stateKilled": undefined;
+  "web.shell.swarm.stateStopped": undefined;
+  "web.shell.swarm.stateWaiting": undefined;
+  "web.shell.swarm.stateWaitingAll": { readonly seq: string | number };
+  "web.shell.swarm.stateWaitingMentions": { readonly seq: string | number };
+  "web.shell.swarm.stateWorking": undefined;
+  "web.shell.swarm.tabBoard": undefined;
+  "web.shell.swarm.tabOverview": undefined;
+  "web.shell.swarm.tabRoster": undefined;
+  "web.shell.swarm.transcriptEmpty": undefined;
+  "web.shell.swarm.transcriptFailed": { readonly why: string | number };
+  "web.shell.swarm.transcriptRefresh": undefined;
+  "web.shell.swarm.transcriptThinking": undefined;
+  "web.shell.swarm.transcriptTitle": undefined;
   "web.tree.sky": undefined;
   "web.ui.pixel.sound.group.field": undefined;
   "web.ui.pixel.sound.group.reward": undefined;

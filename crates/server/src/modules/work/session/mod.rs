@@ -100,6 +100,8 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
     hub.on::<ops::SessionRespondInteraction>(move |_, input| b.sessions().respond_interaction(input).map_err(session_error));
     let b = board.clone();
     hub.on::<ops::SessionSetConfig>(move |_, input| b.sessions().set_workspace_config(input).map_err(session_error));
+    let b = board.clone();
+    hub.on::<ops::SessionChildTranscript>(move |_, input| b.sessions().read_child_transcript(input).map_err(session_error));
 
     let b = board.clone();
     let tr = trajectories.clone();
@@ -156,15 +158,19 @@ pub(crate) fn stop(board: &Board, id: &str) -> Result<(), ApiError> {
 }
 
 fn workspace_state_event(session: Session, sessions: &Sessions) -> SessionWatchEvent {
+    let title = sessions.session_title(&session.id);
     let snap = sessions.workspace_snapshot(&session.id);
+    let swarm = sessions.swarm_snapshot(&session.id);
     SessionWatchEvent::State {
         session,
+        title,
         model: snap.model,
         effort: snap.effort,
         permission_mode: snap.permission_mode,
         pending_permissions: snap.pending_permissions,
         pending_interactions: snap.pending_interactions,
         tokens: snap.tokens,
+        swarm,
     }
 }
 
@@ -223,7 +229,8 @@ fn watch_session(
         let got = match next {
             Ok(Some(got)) => got,
             Ok(None) => return,
-            Err(_) => continue,
+            // Poll mtime-cached swarm snapshots on the 500 ms tick; identical states are skipped.
+            Err(_) => Msg::State,
         };
         match got {
             Msg::Live(ev) => {

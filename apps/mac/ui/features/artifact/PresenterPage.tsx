@@ -80,7 +80,7 @@ function Presenter(props: { id: string; version: number }) {
   const notes = () => frame.shown().ready?.notes?.[at()] ?? "";
   return (
     <View testID="presenter" accessibilityValue={{ now: at(), max: pages() }} class="h-full min-h-0 flex-1 bg-side">
-      <View class="h-12 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-4">
+      <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3.5">
         <IconButton icon="back" label={t("web.artifact.page.all")} testid="presenter-back" onClick={goBack} />
         <View class="h-4 w-px bg-line" />
         <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{title()}</Text>
@@ -102,10 +102,10 @@ function Presenter(props: { id: string; version: number }) {
         </View>
         <View class="mx-1 h-4 w-px bg-line" />
         <View class="flex-row items-center gap-2">
-          <Text testID="presenter-clock" accessibilityLabel={t("web.artifact.presenter.clock")} class="font-mono text-base font-semibold text-ink tabular-nums">
+          <Text testID="presenter-clock" accessibilityLabel={t("web.artifact.presenter.clock")} class="font-mono text-sm font-semibold text-ink tabular-nums">
             {elapsedText(now() - started())}
           </Text>
-          <Button tone="quiet" icon="refresh" onPress={() => started.set(now())}>
+          <Button tone="quiet" size="compact" icon="refresh" onPress={() => started.set(now())}>
             {t("web.artifact.presenter.restart")}
           </Button>
         </View>

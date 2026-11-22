@@ -10,11 +10,14 @@ use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, BizCode, EventTokens, Fact, FactSessionPhaseChanged, FactSessionReported, Outcome, Phase, PhaseFailed, PhaseResting, Session, SessionAction,
-    SessionInteractionOption, SessionInteractionRequest, SessionOpenWorkspaceInput, SessionPermissionDecision, SessionPermissionMode, SessionPermissionRequest,
-    SessionRespondInteractionInput, SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionWorkspace, Spent,
+    SessionChildStep, SessionChildToolCall, SessionChildTranscript, SessionChildTranscriptInput, SessionInteractionOption, SessionInteractionRequest,
+    SessionOpenWorkspaceInput, SessionPermissionDecision, SessionPermissionMode, SessionPermissionRequest, SessionRespondInteractionInput,
+    SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionSwarmMember, SessionSwarmMemberState, SessionSwarmMessage,
+    SessionSwarmOverview, SessionSwarmRole, SessionSwarmState, SessionSwarmThread, SessionWorkspace, Spent,
 };
 use vibevalley_runtime::oar::{
-    AgentError, ContentBlock, InteractionDecision, InteractionOption, PermissionDecision, PermissionMode, RefusableOption, SessionOptions, StopReason, Usage,
+    AgentError, ContentBlock, InteractionDecision, InteractionOption, PermissionDecision, PermissionMode, RefusableOption, SessionOptions, StopReason,
+    SwarmMemberState, Usage,
 };
 
 use super::sessions::Sessions;
@@ -63,6 +66,8 @@ pub(super) fn clip_json_input(input: &serde_json::Value) -> Option<String> {
 #[serde(rename_all = "camelCase")]
 pub(super) struct WorkspaceMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
@@ -73,6 +78,7 @@ pub(super) struct WorkspaceMeta {
 impl Default for WorkspaceMeta {
     fn default() -> Self {
         Self {
+            title: None,
             model: None,
             effort: None,
             permission_mode: SessionPermissionMode::AcceptEdits,
@@ -91,6 +97,7 @@ pub(super) struct WorkspaceState {
 
 #[derive(Debug, Clone)]
 pub struct WorkspaceSnapshot {
+    pub title: Option<String>,
     pub model: Option<String>,
     pub effort: Option<String>,
     pub permission_mode: SessionPermissionMode,
@@ -170,6 +177,7 @@ impl Sessions {
         let mut map = lock(&self.0.workspaces);
         let ws = self.ensure_workspace_entry(&mut map, session_id);
         WorkspaceSnapshot {
+            title: ws.meta.title.clone(),
             model: ws.meta.model.clone(),
             effort: ws.meta.effort.clone(),
             permission_mode: ws.meta.permission_mode,
@@ -179,11 +187,156 @@ impl Sessions {
         }
     }
 
+    /// Reads the live session's mtime-cached native swarm sidecar snapshot, if any.
+    pub fn swarm_snapshot(&self, session_id: &str) -> Option<SessionSwarmState> {
+        let agent = self.live_agent(session_id)?;
+        let snap = agent.swarm_snapshot()?;
+        let active_count = i64::from(snap.working_count) + i64::from(snap.waiting_count) + i64::from(snap.stopped_count);
+        let members = snap
+            .members
+            .into_iter()
+            .map(|m| SessionSwarmMember {
+                name: m.name,
+                conversation_id: m.conversation_id,
+                role: if m.role == "coordinator" {
+                    SessionSwarmRole::Coordinator
+                } else {
+                    SessionSwarmRole::Worker
+                },
+                state: match m.state {
+                    SwarmMemberState::Working => SessionSwarmMemberState::Working,
+                    SwarmMemberState::Waiting => SessionSwarmMemberState::Waiting,
+                    SwarmMemberState::Stopped => SessionSwarmMemberState::Stopped,
+                    SwarmMemberState::Killed => SessionSwarmMemberState::Killed,
+                },
+                wake_mode: m.wake_mode,
+                wait_since: m.wait_since.and_then(|v| i64::try_from(v).ok()),
+                model: m.model,
+                workspace_mode: m.workspace_mode,
+                task: m.task,
+            })
+            .collect();
+        let overview = snap.plan.map(|p| SessionSwarmOverview {
+            goal_title: p.goal_title,
+            goal_line: p.goal_line,
+            threads: p
+                .threads
+                .into_iter()
+                .map(|t| SessionSwarmThread {
+                    id: t.id,
+                    title: t.title,
+                    goal: t.goal,
+                    members: t.tasks,
+                })
+                .collect(),
+            tasks: p.tasks,
+        });
+        let messages = snap
+            .messages
+            .into_iter()
+            .map(|m| SessionSwarmMessage {
+                seq: i64::try_from(m.seq).unwrap_or(i64::MAX),
+                agent: m.agent,
+                text: m.text,
+                time: m.time,
+                kind: m.kind,
+            })
+            .collect();
+        Some(SessionSwarmState {
+            swarm_id: snap.swarm_id,
+            title: snap.title,
+            working_count: i64::from(snap.working_count),
+            active_count,
+            members,
+            overview,
+            messages,
+            total_messages: i64::try_from(snap.total_messages).unwrap_or(i64::MAX),
+        })
+    }
+
+    /// Reads bounded recent transcript steps for a child agent or swarm member.
+    pub fn read_child_transcript(&self, input: SessionChildTranscriptInput) -> Result<SessionChildTranscript> {
+        let session = self.session(&input.id).ok_or_else(|| missing_session(&input.id))?;
+        let conversation_id = input.conversation_id.trim();
+        if conversation_id.is_empty()
+            || conversation_id.contains("..")
+            || conversation_id.contains('/')
+            || conversation_id.contains('\\')
+            || conversation_id.contains('\0')
+        {
+            return Err(invalid_input("invalid conversationId".into()));
+        }
+        let limit = input.limit.unwrap_or(30).clamp(1, 30) as usize;
+        let steps = match self.live_agent(&session.id) {
+            Some(agent) => agent
+                .read_child_transcript(conversation_id, limit)
+                .into_iter()
+                .map(|s| SessionChildStep {
+                    step_index: i64::try_from(s.step_index).unwrap_or(0),
+                    source: s.source,
+                    kind: s.kind,
+                    status: s.status,
+                    created_at: s.created_at,
+                    model: s.model,
+                    thinking: s.thinking,
+                    content: s.content,
+                    error: s.error,
+                    tool_calls: s
+                        .tool_calls
+                        .into_iter()
+                        .map(|tc| SessionChildToolCall {
+                            name: tc.name,
+                            args: tc.summary,
+                        })
+                        .collect(),
+                    input_tokens: s.input_tokens.and_then(|n| i64::try_from(n).ok()),
+                    cache_read_tokens: s.cache_read_tokens.and_then(|n| i64::try_from(n).ok()),
+                    output_tokens: s.output_tokens.and_then(|n| i64::try_from(n).ok()),
+                })
+                .collect(),
+            None => Vec::new(),
+        };
+        Ok(SessionChildTranscript {
+            conversation_id: conversation_id.to_string(),
+            steps,
+        })
+    }
+
+    /// Reads the live runtime session title (persisting changes to workspace meta),
+    /// falling back to the persisted workspace title.
+    pub fn session_title(&self, session_id: &str) -> Option<String> {
+        let live = self
+            .live_agent(session_id)
+            .and_then(|agent| agent.session_title())
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty());
+        let mut updated = None;
+        let resolved = {
+            let mut map = lock(&self.0.workspaces);
+            let ws = self.ensure_workspace_entry(&mut map, session_id);
+            if let Some(title) = live {
+                if ws.meta.title.as_deref() != Some(title.as_str()) {
+                    ws.meta.title = Some(title.clone());
+                    updated = Some(ws.meta.clone());
+                }
+                Some(title)
+            } else {
+                ws.meta.title.clone()
+            }
+        };
+        if let Some(meta) = updated {
+            self.save_workspace_meta(session_id, &meta);
+        }
+        resolved
+    }
+
     fn workspace_reply(&self, session: Session) -> SessionWorkspace {
+        let title = self.session_title(&session.id);
         let snap = self.workspace_snapshot(&session.id);
         SessionWorkspace {
             id: session.id.clone(),
             session,
+            title,
             model: snap.model,
             effort: snap.effort,
             permission_mode: snap.permission_mode,
@@ -212,6 +365,7 @@ impl Sessions {
                 meta.permission_mode = p;
             }
             if let Some(title) = input.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+                meta.title = Some(title.to_string());
                 session.name = title.to_string();
                 if session.brief.is_empty() {
                     session.brief = title.to_string();
@@ -225,6 +379,7 @@ impl Sessions {
                     }
                 }
                 let next_meta = WorkspaceMeta {
+                    title: meta.title,
                     model: meta.model,
                     effort: meta.effort,
                     permission_mode: meta.permission_mode,
@@ -244,6 +399,7 @@ impl Sessions {
                 session.repo = Some(repo);
             }
             let next_meta = WorkspaceMeta {
+                title: meta.title,
                 model: meta.model,
                 effort: meta.effort,
                 permission_mode: meta.permission_mode,
@@ -268,12 +424,13 @@ impl Sessions {
         let mut session = Session::worker(&id, title.clone().unwrap_or_else(|| drive.name.clone()), now());
         session.agent = drive.agent.clone();
         session.runtime = drive.runtime_id.clone();
-        session.brief = title.unwrap_or_default();
+        session.brief = title.clone().unwrap_or_default();
         session.repo = input.repo.filter(|r| !r.trim().is_empty());
         session.worktree = Some(cwd.clone());
         session.phase = Phase::Resting(PhaseResting {});
 
         let meta = WorkspaceMeta {
+            title,
             model: drive.model.clone(),
             effort: effective_effort.clone(),
             permission_mode,
@@ -394,6 +551,7 @@ impl Sessions {
             None => {
                 let snap = self.workspace_snapshot(&session.id);
                 let meta = WorkspaceMeta {
+                    title: snap.title,
                     model: snap.model,
                     effort: snap.effort,
                     permission_mode: snap.permission_mode,
@@ -485,6 +643,7 @@ impl Sessions {
         }
         let snap = self.workspace_snapshot(&session.id);
         let mut next = WorkspaceMeta {
+            title: snap.title,
             model: snap.model,
             effort: snap.effort,
             permission_mode: snap.permission_mode,

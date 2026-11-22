@@ -164,7 +164,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
 
   return (
     <View testID="design-canvas-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side">
-      <View class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3 py-2">
+      <View class="min-h-9 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3 py-0.5">
         <Segmented
           label={t("web.artifact.design.canvas")}
           testid="design-mode"

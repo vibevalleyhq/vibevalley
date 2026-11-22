@@ -18,8 +18,8 @@
 | 运行时 | 进程协议 | 恢复时怎样算用量 |
 | --- | --- | --- |
 | Claude Code | 双向 stream-json，工具调用 ID 串起子 agent 路径。MCP 配置放在权限为 `0600` 的临时文件里。 | 开轮前通过 `get_usage` 读取基线，对照模型累计量计算本次增量。读不到基线则记录未知原因。 |
-| Codex | app-server 的 `thread/start`、`turn/start`、`turn/steer` 和 `thread/compact/start`；通知标出线程、工具和轮次。 | 从恢复响应或开轮前的 token 通知取基线；子线程用量独立归属。 |
-| Antigravity（`agy >= 1.5.0`） | ACP v1+v2 握手（关闭 `fs.readTextFile` / `fs.writeTextFile` / `terminal`），前置过滤 stdout 认证链接，`session/new` 与 `session/resume` 均透传 `_meta.antigravity.systemPrompt.append`；永不发 `yolo`/`auto_edit`，客户端按权限模式裁决并将 `interaction_*` 分流为独立提问；轮中直接发 `session/prompt` 引导，跟踪后台命令/定时脱离尾流；轮末只读查本地 `conversations/<sessionId>.db` 的 `step_type = 17` 升级静默错误。 | 按轮上报，采用 Gemini 加法语义（`input + cachedRead`、`output + thought`）并上报 `cacheRead`/`cacheWrite`/`reasoning` 及上下文窗口占用；恢复会话同样保留每轮用量。 |
+| Codex | app-server 的 `thread/start`、`turn/start`、`turn/steer` 和 `thread/compact/start`；通知标出线程、工具、轮次，并捕获根线程标题（`thread/started`、`thread/name/updated`）。 | 从恢复响应或开轮前的 token 通知取基线；子线程用量独立归属。 |
+| Antigravity（`agy >= 1.5.0`） | ACP v1+v2 握手（关闭 `fs.readTextFile` / `fs.writeTextFile` / `terminal`），前置过滤 stdout 认证链接，`session/new` 与 `session/resume` 均透传 `_meta.antigravity.systemPrompt.append`；从 `session/{new,resume,load}` 与 `session_info_update` 捕获真实会话标题；永不发 `yolo`/`auto_edit`，客户端按权限模式裁决并将 `interaction_*` 分流为独立提问；轮中直接发 `session/prompt` 引导，跟踪后台命令/定时脱离尾流；轮末只读查本地 `conversations/<sessionId>.db` 的 `step_type = 17` 升级静默错误，并经 [antigravity_swarm.rs](crates/runtime/src/oar/acp/antigravity_swarm.rs) 只读观测 Swarm 旁路状态（总览/成员/黑板）及 `step_type = 127` 子代理的有界 `session.childTranscript` 下钻。 | 按轮上报，采用 Gemini 加法语义（`input + cachedRead`、`output + thought`）并上报 `cacheRead`/`cacheWrite`/`reasoning` 及上下文窗口占用；恢复会话同样保留每轮用量。 |
 | OpenCode、Grok、Kimi、CodeBuddy | ACP 协商会话、模型、推理强度和工具。OpenCode、Grok 支持中途插话；Kimi 和 CodeBuddy 的工作规则随首条输入发送。 | 新会话累计已报告用量；恢复会话缺少可查的历史基线，标记未知。 |
 | Qwen Code、Qoder | SDK stream-json。Qwen 首个输入帧是 `initialize`，Qoder 的提示和 MCP 配置经私有文件传入。厂商 ID 到达后写回业务会话，供下一轮续接。 | 平面用量按轮累加；Qoder 缺少用量字段时保留未知。 |
 
@@ -44,12 +44,12 @@
 | `crates/server/src/modules/work/session/sessions.rs` | `Sessions`：雇帮工（`hire`）、下一轮（`next_round`）、插话（`steer`，在干活的经 oar `steer` 插进这一轮）、叫停（`stop`）、放走（`dismiss`，worktree 交给 `Workplace` 收拾）、把农机的事件读成事实、结算一轮、静默检测、帮工的 `/mcp` 钥匙；重启时把在干活的会话记成打断；并发上限在 `BoardConfig`（`ledger.rs`：`space_limit` 6、`per_repo` 3、`quiet_after` 240 秒），由工单板数 |
 | `crates/server/src/modules/work/session/report.rs`、`runs.rs` | 一轮末尾的结构化汇报；每张工单的各轮 |
 | `crates/server/src/modules/work/session/talk.rs` | 私聊帮工：没有工单的会话，在自己的目录里一轮一轮答，答的话由观察层贴进私聊 |
-| `crates/server/src/modules/work/session/workspace.rs` | 工作区直连对话会话（`open_workspace`、`send_workspace`、`respond_permission`、`respond_interaction`、`set_workspace_config`）；配置原子落盘 `<数据目录>/workspace/<id>.json`，不占工单板并发上限、不进 `#general` 观察层 |
+| `crates/server/src/modules/work/session/workspace.rs` | 工作区直连对话会话（`open_workspace`、`send_workspace`、`respond_permission`、`respond_interaction`、`set_workspace_config`、`swarm_snapshot`、`read_child_transcript`、`session_title`）；配置与 `title` 原子落盘 `<数据目录>/workspace/<id>.json`，不占工单板并发上限、不进 `#general` 观察层 |
 | `crates/server/src/modules/work/session/drivers.rs`、`crates/server/src/modules/team/agent/drive.rs` | 把工单指派的档案变成农机和启动参数（规矩、人设、记性、MCP） |
 | `crates/server/src/modules/work/session/journal.rs` | 轨迹：每个会话的步骤存 `<家目录>/events/<id>.json`，变化时每 300 毫秒推一次、每 1.5 秒落盘；权限、交互提问与用量步骤立即刷盘 |
-| `crates/server/src/modules/work/session/mod.rs` | `session.*` 端点（含 `openWorkspace`、`send`、`respondPermission`、`respondInteraction`、`setConfig`）和 `issue.watch` / `session.watch` 订阅流 |
+| `crates/server/src/modules/work/session/mod.rs` | `session.*` 端点（含 `openWorkspace`、`send`、`respondPermission`、`respondInteraction`、`setConfig`、`childTranscript`）和 `issue.watch` / `session.watch` 订阅流（按 500 毫秒节拍去重同步 `title` 与 `swarm` 增量） |
 | `crates/server/src/modules/team/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
-| `crates/runtime/src/oar/` | 驱动各家农机：`claude.rs`、`codex/`、`acp/`（`mod.rs`、`antigravity.rs`、`antigravity_db.rs`）、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 JSONL 记录流（内置农机在 `crates/runtime/src/agent/runtime/mod.rs`） |
+| `crates/runtime/src/oar/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp/`（`mod.rs`、`antigravity.rs`、`antigravity_db.rs`、`antigravity_swarm.rs`）、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 JSONL 记录流（内置农机在 `crates/runtime/src/agent/runtime/mod.rs`） |
 
 ## 模型和不变量
 
@@ -59,7 +59,7 @@
 - **带话**：会话在干活时插进当前一轮；歇着时开下一轮；对排队工单说的话随它一起交给帮工。没有 TS 版的持久信箱、投递状态机和四档紧急度：观察层排着的投递在内存里，随下一次叫醒带上。
 - **并发上限**：全农场最多 6 个在干活的会话，单仓库默认 3 个；满了工单留在 `todo`（`stage: queued`），空出来按看板顺序补派。
 - **无沙箱与无逐条权限确认（工单帮工）**：工单帮工在 worktree 里直接执行命令，农机的权限请求一律放行（`PermissionMode::Bypass`）；安全边界是服务端只听 `127.0.0.1`。
-- **工作区直连对话与独立交互提问通道**：工作区直连会话（`issue: None`、`channel: None`、挂在工作区路径上）复用同一套 `oar::Session`、`Trajectories` 与 `voyage` 流，不占工单板 `space_limit` / `per_repo` 并发配额，也不进 `#general` 观察层派活；会话内可切换模型、思考深度与权限模式（`Ask` / `AcceptEdits` / `Bypass` / `ReadOnly`），其中 `InteractionRequested`（如 Antigravity 的 `interaction_*` 提问）进入 `WaitingReply`，**即使在 `Bypass` 模式下也绝不自动放行**。
+- **工作区直连对话、Swarm 旁路与独立交互提问通道**：工作区直连会话（`issue: None`、`channel: None`、挂在工作区路径上）复用同一套 `oar::Session`、`Trajectories` 与 `voyage` 流，不占工单板 `space_limit` / `per_repo` 并发配额，也不进 `#general` 观察层派活；会话内可切换模型、思考深度与权限模式（`Ask` / `AcceptEdits` / `Bypass` / `ReadOnly`），真实会话标题经 `SessionWorkspace.title` 与 `watch_session` 实时同步，Antigravity Swarm 与子代理通过只读旁路（mtime 缓存 + `256 KiB` 尾部裁剪 + 防符号链接/路径穿越）按需暴露 `swarm` 状态与 `session.childTranscript`，不新增数据库表；其中 `InteractionRequested`（如 Antigravity 的 `interaction_*` 提问）进入 `WaitingReply`，**即使在 `Bypass` 模式下也绝不自动放行**。
 - **会话向外发消息**：`Sessions::on_news` 订阅步骤与汇报中的记性；启动时在恢复中断轮之前挂上订阅，轨迹写入与记性落盘各自接收，会话不调用轨迹或记性服务。订阅同步完成，保持同一会话的步骤顺序。
 - **会话按列落盘**：`session`、`session_extra`、`session_run` 与计数器在 `server.db`，枚举和嵌套字段在读库边界解码，坏值使读取失败。
 - **轨迹单存文件**：按序记录每一步，流式草稿按 `revision` 原地增长，不进 `SpaceState`。
@@ -89,4 +89,4 @@
 - `crates/server/tests/issue_board.rs`：开工、提问、失败、打断与续上、排队与上限、重启、静默、权限放行。
 - `crates/server/tests/session.rs`、`crates/server/tests/session/workspace.rs`：轨迹的流式步骤、子 agent 的步骤、落盘读回、`issue.watch` / `session.watch` 与工作区直连会话全链路（权限、交互提问、在线改配、重启续接、与工单板并发隔离）。
 - `crates/server/tests/mcp.rs`：`/mcp` 帮工门。
-- `crates/runtime/src/oar/tests.rs`、`crates/runtime/tests/antigravity_acp.rs`、`crates/runtime/tests/live.rs`：各家农机与 Antigravity ACP（离线单元、模拟 stdio 协议测试及 `#[ignore]` 实机冒烟）。
+- `crates/runtime/src/oar/tests.rs`、`crates/runtime/tests/antigravity_acp.rs`、`crates/runtime/tests/antigravity_swarm.rs`、`crates/runtime/tests/live.rs`：各家农机、Antigravity ACP 与 Swarm 旁路（离线单元、模拟 stdio 协议测试、只读旁路边界测试及 `#[ignore]` 实机冒烟）。

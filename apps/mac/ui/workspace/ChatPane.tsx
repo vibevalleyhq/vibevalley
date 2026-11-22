@@ -1,14 +1,13 @@
-import { effect, host, Image, Scroll, signal, Text, untracked, View } from "nsh";
-import { TextView } from "nsh/base";
+import { effect, host, Image, keymap, Scroll, signal, Text, untracked, View } from "nsh";
+import { Input, Menu, MenuItem, MenuSeparator, TextView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
 import { Button } from "../design/Button";
-import { Select, TextArea, TextInput } from "../design/Field";
+import { Select, TextInput } from "../design/Field";
 import { Icon } from "../design/Icon";
 import { actionIcon, type IconName } from "../design/icons";
-import { motionClass } from "../design/motion";
-import { Segmented } from "../design/Segmented";
+import { motionClass, popupTransition } from "../design/motion";
 import { Dot } from "../design/Tag";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
@@ -17,11 +16,13 @@ import { richNative } from "../infra/rich";
 import {
   asThoughtLevel,
   computeTelemetry,
+  deriveChatTitle,
   extractToolTarget,
   fetchWorkspaceRuntimes,
   formatTokens,
   mergeChatSteps,
   openWorkspaceSession,
+  pickWorkspaceFile,
   respondWorkspaceInteraction,
   respondWorkspacePermission,
   runtimeDisplayName,
@@ -31,16 +32,19 @@ import {
   visibleChatSteps,
   watchWorkspaceSession,
   type ChatPhase,
+  type ComposerFile,
   type EventTokens,
   type SessionEvent,
   type SessionInteractionRequest,
   type SessionPermissionDecision,
   type SessionPermissionMode,
   type SessionPermissionRequest,
+  type SessionSwarmState,
   type ThoughtLevel,
   type WorkspaceRuntimeOption,
 } from "./chatSession";
-import { ShellIconButton } from "./chrome";
+import { menuPopupClass, menuSeparatorClass, ShellIconButton } from "./chrome";
+import { SwarmPanel } from "./SwarmPanel";
 
 const KNOWN_RUNTIME_LOGOS = new Set(["claude", "codex", "opencode", "cursor", "kimi", "pi", "dsh", "grok", "antigravity"]);
 
@@ -412,10 +416,12 @@ export function WorkspaceChatPane() {
   const repo = typeof host.params.repo === "string" ? host.params.repo : undefined;
   const initialSessionId = typeof host.params.sessionId === "string" ? host.params.sessionId : "";
   const initialRuntime = typeof host.params.runtime === "string" && host.params.runtime.length > 0 ? host.params.runtime : "antigravity";
+  const initialTitle = typeof host.params.title === "string" && host.params.title.trim().length > 0 ? host.params.title.trim() : undefined;
 
   const pixelDir = signal<string | undefined>(typeof host.params.pixelDir === "string" ? host.params.pixelDir : undefined);
   const runtimes = signal<readonly WorkspaceRuntimeOption[]>([]);
   const sessionId = signal<string>(initialSessionId);
+  const sessionTitle = signal<string | undefined>(initialTitle);
   const runtime = signal<string>(initialRuntime);
   const model = signal<string>("");
   const thoughtLevel = signal<ThoughtLevel>("medium");
@@ -427,18 +433,26 @@ export function WorkspaceChatPane() {
   const pendingInteractions = signal<SessionInteractionRequest[]>([]);
   const pendingPermissions = signal<SessionPermissionRequest[]>([]);
   const draft = signal("");
+  const attachedFiles = signal<readonly ComposerFile[]>([]);
+  const composerFocused = signal(false);
+  const swarm = signal<SessionSwarmState | undefined>(undefined);
+  const swarmOpen = signal(false);
   const sending = signal(false);
   const responding = signal(false);
   const errorText = signal<string | undefined>(undefined);
   const telemetryOpen = signal(false);
   let localSeq = 0;
 
+  const canSend = () => !sending() && (draft().trim().length > 0 || attachedFiles().length > 0);
   const currentRuntime = () => runtimes().find((r) => r.id === runtime());
   const currentModels = () => currentRuntime()?.models ?? [];
   const currentModelInfo = () => currentModels().find((m) => m.id === model());
+  const modelTriggerLabel = () => currentModelInfo()?.label ?? runtimeDisplayName(runtime());
   const effortOptions = (): readonly ThoughtLevel[] => currentModelInfo()?.effortLevels ?? ["low", "medium", "high"];
   const hasAttention = () => pendingInteractions().length > 0 || pendingPermissions().length > 0;
   const effectivePhase = (): ChatPhase => (hasAttention() ? "waiting" : phase());
+  const firstUserMessage = () => steps().find((s) => s.type === "user/message" && s.under === undefined)?.text;
+  const resolvedTitle = () => deriveChatTitle(sessionTitle(), swarm()?.title, firstUserMessage());
   const shownSteps = () => visibleChatSteps(steps());
   const telemetry = () => computeTelemetry(steps(), latestTokens());
   const logoSrc = () => {
@@ -470,10 +484,7 @@ export function WorkspaceChatPane() {
     const rt = runtime();
     const st = effectivePhase();
     const att = hasAttention();
-    const firstUser = steps()
-      .find((s) => s.type === "user/message" && s.under === undefined)
-      ?.text.trim();
-    const title = firstUser ? `${runtimeDisplayName(rt)} · ${firstUser.slice(0, 20)}` : undefined;
+    const title = resolvedTitle();
     act({
       type: "update_chat_tab",
       tab_id: tabId,
@@ -492,6 +503,7 @@ export function WorkspaceChatPane() {
       switch (ev.kind) {
         case "state": {
           phase.set(phaseFromSessionTag(ev.session.phase._tag));
+          if (ev.title !== undefined) sessionTitle.set(ev.title.trim() || undefined);
           if (ev.model !== undefined) model.set(ev.model);
           const nextEffort = asThoughtLevel(ev.effort);
           if (nextEffort !== undefined) thoughtLevel.set(nextEffort);
@@ -499,6 +511,8 @@ export function WorkspaceChatPane() {
           pendingPermissions.set(ev.pendingPermissions);
           pendingInteractions.set(ev.pendingInteractions);
           if (ev.tokens !== undefined) latestTokens.set(ev.tokens);
+          swarm.set(ev.swarm);
+          if (ev.swarm === undefined) swarmOpen.set(false);
           break;
         }
         case "history": {
@@ -531,6 +545,9 @@ export function WorkspaceChatPane() {
         }
         case "missing": {
           sessionId.set("");
+          sessionTitle.set(undefined);
+          swarm.set(undefined);
+          swarmOpen.set(false);
           phase.set("ready");
           break;
         }
@@ -556,6 +573,7 @@ export function WorkspaceChatPane() {
       return undefined;
     }
     const ws = res.workspace;
+    if (ws.title !== undefined) sessionTitle.set(ws.title.trim() || undefined);
     if (ws.model !== undefined) model.set(ws.model);
     const wsEffort = asThoughtLevel(ws.effort);
     if (wsEffort !== undefined) thoughtLevel.set(wsEffort);
@@ -564,9 +582,18 @@ export function WorkspaceChatPane() {
     return ws.id;
   };
 
+  const pickAttachment = async () => {
+    const picked = await pickWorkspaceFile();
+    if (!picked) return;
+    const prev = untracked(attachedFiles);
+    if (prev.some((f) => f.path === picked.path)) return;
+    attachedFiles.set([...prev, picked]);
+  };
+
   const send = async () => {
     const text = untracked(draft).trim();
-    if (!text || untracked(sending)) return;
+    const files = untracked(attachedFiles);
+    if ((text.length === 0 && files.length === 0) || untracked(sending)) return;
     errorText.set(undefined);
     sending.set(true);
     const isSteer = untracked(effectivePhase) === "working";
@@ -574,12 +601,14 @@ export function WorkspaceChatPane() {
       const sid = await ensureSession();
       if (!sid) return;
       draft.set("");
+      attachedFiles.set([]);
       const seq = --localSeq;
       if (isSteer) {
         const next = new Set(untracked(steeredSeqs));
         next.add(seq);
         steeredSeqs.set(next);
       }
+      const displayText = text.length > 0 ? text : `[${files.map((f) => f.name).join(", ")}]`;
       steps.set(
         mergeChatSteps(untracked(steps), [
           {
@@ -587,12 +616,16 @@ export function WorkspaceChatPane() {
             revision: 1,
             time: Date.now(),
             type: "user/message",
-            text,
+            text: displayText,
           },
         ]),
       );
       phase.set("working");
-      const res = await sendWorkspaceMessage(sid, text);
+      const res = await sendWorkspaceMessage(
+        sid,
+        text,
+        files.map((f) => ({ path: f.path })),
+      );
       if (!res.ok) {
         errorText.set(t("web.shell.chat.sendFailed", { why: res.reason }));
         if (!isSteer) phase.set("error");
@@ -653,7 +686,7 @@ export function WorkspaceChatPane() {
     }
   };
 
-  const runtimeOptions = () => {
+  const runtimeOptions = (): readonly { value: string; label: string; disabled?: boolean }[] => {
     const list = runtimes();
     if (list.length === 0) {
       return [
@@ -688,6 +721,14 @@ export function WorkspaceChatPane() {
     return Math.min(100 - cachedBarPercent(), Math.round((tel.uncachedInput / tel.contextWindow) * 100));
   };
 
+  effect(() => {
+    if (!swarmOpen()) return;
+    return keymap.bind("escape", () => swarmOpen.set(false), { when: "always" });
+  });
+
+  const composerMenuClass = `${menuPopupClass} ${motionClass("transition-opacity duration-120 ease-out")}`;
+  const composerMenuItemClass = "h-7 flex-row items-center justify-between gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
+
   return (
     <View testID="workspace-chat-pane" class="min-h-0 flex-1 bg-page">
       <View testID="chat-header" class="h-9 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3">
@@ -697,7 +738,14 @@ export function WorkspaceChatPane() {
               {(src) => <Image src={src()} class="size-4 object-contain" />}
             </If>
           </View>
-          <Text class="shrink-0 text-xs font-semibold text-ink">{runtimeDisplayName(runtime())}</Text>
+          <View
+            class="min-w-0 shrink overflow-hidden"
+            tooltip={resolvedTitle() ? <Bubble text={`${runtimeDisplayName(runtime())} · ${resolvedTitle()}`} /> : undefined}
+          >
+            <Text testID="chat-header-title" class="min-w-0 truncate text-xs font-semibold text-ink">
+              {resolvedTitle() ?? runtimeDisplayName(runtime())}
+            </Text>
+          </View>
           <View class="h-5 shrink-0 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5">
             <Dot tone={phaseTone(effectivePhase())} size={6} ring={false} />
             <Text testID="chat-phase-label" class="text-2xs font-medium text-muted">
@@ -718,6 +766,26 @@ export function WorkspaceChatPane() {
           </If>
         </View>
         <View class="shrink-0 flex-row items-center gap-1.5">
+          <If when={swarm()}>
+            {(sw) => (
+              <View
+                role="button"
+                testID="chat-swarm-pill"
+                accessibilityLabel={swarmOpen() ? t("web.shell.swarm.closeDrawer") : t("web.shell.swarm.openDrawer")}
+                accessibilityState={{ expanded: swarmOpen() }}
+                tooltip={<Bubble text={sw().title ?? t("web.shell.swarm.openDrawer")} />}
+                onPress={() => swarmOpen.set(!swarmOpen())}
+                class={`h-5 shrink-0 flex-row items-center gap-1 rounded-sm border border-line px-1.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
+                  swarmOpen() ? "bg-selected" : "bg-side"
+                }`}
+              >
+                <Dot tone={sw().workingCount > 0 ? "leaf" : "idle"} size={6} ring={false} />
+                <Text class="font-mono text-2xs font-medium text-ink tabular-nums">
+                  {t("web.shell.swarm.pill", { working: sw().workingCount, active: sw().activeCount })}
+                </Text>
+              </View>
+            )}
+          </If>
           <Select
             value={permissionMode()}
             options={permissionOptions}
@@ -737,6 +805,10 @@ export function WorkspaceChatPane() {
           </If>
         </View>
       </View>
+
+      <If when={swarmOpen() && swarm() !== undefined}>
+        <SwarmPanel sessionId={sessionId()} swarm={swarm()!} onClose={() => swarmOpen.set(false)} />
+      </If>
 
       <Scroll testID="chat-stream" class="min-h-0 flex-1" contentClass="gap-3 px-4 py-4">
         <If when={shownSteps().length === 0 && pendingInteractions().length === 0 && pendingPermissions().length === 0}>
@@ -901,103 +973,238 @@ export function WorkspaceChatPane() {
           </View>
         </If>
 
-        <TextArea
-          testID="chat-composer-input"
-          value={draft()}
-          onInput={(v) => draft.set(v)}
-          onSubmit={() => void send()}
-          submit
-          rows={2}
-          placeholder={
-            effectivePhase() === "working"
-              ? t("web.shell.chat.steerPlaceholder")
-              : t("web.shell.chat.composerPlaceholder", { runtime: runtimeDisplayName(runtime()) })
-          }
-          accessibilityLabel={t("web.shell.chat.title")}
-        />
-
-        <View class="flex-row flex-wrap items-center gap-1.5">
-          <Select
-            value={runtime()}
-            options={runtimeOptions()}
-            label={t("web.shell.chat.runtime")}
-            testid="chat-runtime-select"
-            size="control"
-            text="xs"
-            disabled={sessionId().length > 0}
-            class="w-32 shrink-0"
-            onChange={(nextRt) => {
-              runtime.set(nextRt);
-              const found = runtimes().find((r) => r.id === nextRt);
-              model.set(found?.models[0]?.id ?? "");
-              if (found?.models[0]?.defaultEffort) thoughtLevel.set(found.models[0].defaultEffort);
-            }}
-          />
-
-          <If when={modelOptions().length > 0}>
-            <Select
-              value={model()}
-              options={modelOptions()}
-              label={t("web.shell.chat.model")}
-              testid="chat-model-select"
-              size="control"
-              text="xs"
-              class="w-40 shrink-0"
-              onChange={(nextModel) => {
-                model.set(nextModel);
-                const info = currentModels().find((m) => m.id === nextModel);
-                if (info?.defaultEffort) thoughtLevel.set(info.defaultEffort);
-                void applyConfig({ model: nextModel });
-              }}
-            />
-          </If>
-
-          <Segmented
-            value={thoughtLevel()}
-            label={t("web.shell.chat.thoughtLevel")}
-            testid="chat-thought-level"
-            options={effortOptions().map((lvl) => ({ value: lvl, label: thoughtLabel(lvl) }))}
-            onChange={(lvl) => {
-              thoughtLevel.set(lvl);
-              void applyConfig({ effort: lvl });
-            }}
-          />
-
-          <View class="flex-1" />
-
-          <If when={hasTelemetry()}>
-            <View
-              role="button"
-              testID="chat-telemetry-toggle"
-              tooltip={<Bubble text={t("web.shell.chat.telemetryContext", { pct: telemetry().contextPct })} />}
-              accessibilityLabel={telemetryOpen() ? t("web.shell.chat.telemetryHide") : t("web.shell.chat.telemetryDetails")}
-              accessibilityState={{ expanded: telemetryOpen() }}
-              onPress={() => telemetryOpen.set(!telemetryOpen())}
-              class={`h-6 shrink-0 flex-row items-center gap-1.5 rounded-md px-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
-                telemetryOpen() ? "bg-selected" : ""
-              }`}
-            >
-              <View class="h-1.5 w-6 shrink-0 flex-row overflow-hidden rounded-full bg-selected">
-                <If when={cachedBarPercent() > 0}>
-                  <View class="h-full bg-leaf" style={{ width: `${cachedBarPercent()}%` }} />
-                </If>
-                <If when={uncachedBarPercent() > 0}>
-                  <View class="h-full bg-water" style={{ width: `${uncachedBarPercent()}%` }} />
-                </If>
-              </View>
-              <Text class={`font-mono text-2xs tabular-nums ${telemetryWarn() ? "text-warn-ink" : "text-faint"}`}>{`${telemetry().contextPct}%`}</Text>
+        <View testID="chat-composer-card" class={`rounded-xl border bg-page ${composerFocused() ? "border-focus" : "border-line"}`}>
+          <If when={attachedFiles().length > 0}>
+            <View testID="chat-composer-attachments" class="flex-row flex-wrap items-center gap-1.5 border-b border-line px-3 pt-2.5 pb-2">
+              <Each of={attachedFiles()} key={(f) => f.path}>
+                {(file) => (
+                  <View
+                    testID={`chat-attachment-${file().name}`}
+                    tooltip={<Bubble text={file().path} />}
+                    class="h-6 max-w-44 flex-row items-center gap-1.5 rounded-md border border-line bg-side pr-1 pl-2"
+                  >
+                    <View class="shrink-0">
+                      <Icon name={file().mime.startsWith("image/") ? "media" : "file"} size={12} tone="muted" />
+                    </View>
+                    <Text class="min-w-0 shrink truncate font-mono text-2xs text-ink">{file().name}</Text>
+                    <View
+                      role="button"
+                      testID={`chat-attachment-remove-${file().name}`}
+                      accessibilityLabel={t("web.shell.chat.removeFile", { name: file().name })}
+                      onPress={() => attachedFiles.set(attachedFiles().filter((item) => item.path !== file().path))}
+                      class="size-4 shrink-0 items-center justify-center rounded-sm hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+                    >
+                      <Icon name="close" size={10} tone="muted" />
+                    </View>
+                  </View>
+                )}
+              </Each>
             </View>
           </If>
 
-          <If when={effectivePhase() === "working"}>
-            <Button tone="danger" icon="stop" testID="chat-stop" onPress={() => void stop()}>
-              {t("web.shell.chat.stop")}
-            </Button>
-          </If>
+          <Input
+            multiline
+            submitBehavior="submit"
+            pasteBehavior="insert"
+            testID="chat-composer-input"
+            accessibilityLabel={t("web.shell.chat.title")}
+            placeholder={
+              effectivePhase() === "working"
+                ? t("web.shell.chat.steerPlaceholder")
+                : t("web.shell.chat.composerPlaceholder", { runtime: runtimeDisplayName(runtime()) })
+            }
+            value={draft()}
+            onChange={(e) => draft.set(e.value)}
+            onSubmit={() => void send()}
+            onFocus={() => composerFocused.set(true)}
+            onBlur={() => composerFocused.set(false)}
+            class="max-h-36 min-h-12 w-full px-3 pt-2.5 pb-1 text-sm text-ink placeholder:text-faint"
+          />
 
-          <Button tone="primary" icon="send" testID="chat-send" disabled={sending() || draft().trim().length === 0} onPress={() => void send()}>
-            {effectivePhase() === "working" ? t("web.shell.chat.steer") : t("web.shell.chat.send")}
-          </Button>
+          <View class="h-9 flex-row items-center gap-1 px-2 pb-1.5">
+            <View class="min-w-0 flex-1 flex-row items-center gap-1 overflow-hidden">
+              <View
+                role="button"
+                testID="chat-attach-file"
+                accessibilityLabel={t("web.shell.chat.attachFile")}
+                tooltip={<Bubble text={t("web.shell.chat.attachFile")} />}
+                onPress={() => void pickAttachment()}
+                class={`h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-hover ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+              >
+                <Icon name="attach" size={15} tone="muted" />
+              </View>
+
+              <Menu
+                placement="top"
+                align="start"
+                offset={6}
+                popupClass={composerMenuClass}
+                popupStartingClass={popupTransition("opacity-0")}
+                popupEndingClass={popupTransition("opacity-0")}
+                trigger={
+                  <View
+                    testID="chat-model-select"
+                    accessibilityLabel={t("web.shell.chat.chooseModel")}
+                    tooltip={<Bubble text={t("web.shell.chat.chooseModel")} />}
+                    class="h-7 min-w-0 max-w-44 shrink flex-row items-center gap-1 overflow-hidden rounded-md px-2 hover:bg-hover aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
+                  >
+                    <Text class="min-w-0 shrink truncate text-xs font-medium text-muted">{modelTriggerLabel()}</Text>
+                    <View class="shrink-0" style={{ transform: [{ rotate: "90deg" }] }}>
+                      <Icon name="expand" size={9} tone="faint" />
+                    </View>
+                  </View>
+                }
+              >
+                <If when={sessionId().length === 0}>
+                  <Text class="px-2 pt-1 pb-0.5 text-2xs font-semibold text-faint">{t("web.shell.chat.runtime")}</Text>
+                  <Each of={runtimeOptions()} key={(opt) => opt.value}>
+                    {(opt) => (
+                      <MenuItem
+                        testID={`chat-runtime-option-${opt().value}`}
+                        disabled={opt().disabled === true}
+                        onSelect={() => {
+                          const nextRt = opt().value;
+                          runtime.set(nextRt);
+                          const found = runtimes().find((r) => r.id === nextRt);
+                          model.set(found?.models[0]?.id ?? "");
+                          if (found?.models[0]?.defaultEffort) thoughtLevel.set(found.models[0].defaultEffort);
+                        }}
+                        class={composerMenuItemClass}
+                      >
+                        <Text class="min-w-0 flex-1 truncate text-xs text-ink">{opt().label}</Text>
+                        <If when={runtime() === opt().value}>
+                          <Icon name="check" size={12} tone="accent" />
+                        </If>
+                      </MenuItem>
+                    )}
+                  </Each>
+                </If>
+                <If when={modelOptions().length > 0}>
+                  <If when={sessionId().length === 0}>
+                    <MenuSeparator class={menuSeparatorClass} />
+                  </If>
+                  <Text class="px-2 pt-1 pb-0.5 text-2xs font-semibold text-faint">{t("web.shell.chat.model")}</Text>
+                  <Each of={modelOptions()} key={(opt) => opt.value}>
+                    {(opt) => (
+                      <MenuItem
+                        testID={`chat-model-option-${opt().value}`}
+                        onSelect={() => {
+                          const nextModel = opt().value;
+                          model.set(nextModel);
+                          const info = currentModels().find((m) => m.id === nextModel);
+                          if (info?.defaultEffort) thoughtLevel.set(info.defaultEffort);
+                          void applyConfig({ model: nextModel });
+                        }}
+                        class={composerMenuItemClass}
+                      >
+                        <Text class="min-w-0 flex-1 truncate text-xs text-ink">{opt().label}</Text>
+                        <If when={model() === opt().value}>
+                          <Icon name="check" size={12} tone="accent" />
+                        </If>
+                      </MenuItem>
+                    )}
+                  </Each>
+                </If>
+              </Menu>
+
+              <Menu
+                placement="top"
+                align="start"
+                offset={6}
+                popupClass={composerMenuClass}
+                popupStartingClass={popupTransition("opacity-0")}
+                popupEndingClass={popupTransition("opacity-0")}
+                trigger={
+                  <View
+                    testID="chat-thought-level"
+                    accessibilityLabel={t("web.shell.chat.thoughtLevel")}
+                    tooltip={<Bubble text={t("web.shell.chat.thoughtLevel")} />}
+                    class="h-7 shrink-0 flex-row items-center gap-1 rounded-md px-2 hover:bg-hover aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
+                  >
+                    <Icon name="idea" size={12} tone="faint" />
+                    <Text class="text-xs font-medium text-muted">{thoughtLabel(thoughtLevel())}</Text>
+                    <View class="shrink-0" style={{ transform: [{ rotate: "90deg" }] }}>
+                      <Icon name="expand" size={9} tone="faint" />
+                    </View>
+                  </View>
+                }
+              >
+                <Each of={effortOptions()} key={(lvl) => lvl}>
+                  {(lvl) => (
+                    <MenuItem
+                      testID={`chat-thought-level-${lvl()}`}
+                      onSelect={() => {
+                        const next = lvl();
+                        thoughtLevel.set(next);
+                        void applyConfig({ effort: next });
+                      }}
+                      class={composerMenuItemClass}
+                    >
+                      <Text class="text-xs text-ink">{thoughtLabel(lvl())}</Text>
+                      <If when={thoughtLevel() === lvl()}>
+                        <Icon name="check" size={12} tone="accent" />
+                      </If>
+                    </MenuItem>
+                  )}
+                </Each>
+              </Menu>
+            </View>
+
+            <View class="shrink-0 flex-row items-center gap-1">
+              <If when={hasTelemetry()}>
+                <View
+                  role="button"
+                  testID="chat-telemetry-toggle"
+                  tooltip={<Bubble text={t("web.shell.chat.telemetryContext", { pct: telemetry().contextPct })} />}
+                  accessibilityLabel={telemetryOpen() ? t("web.shell.chat.telemetryHide") : t("web.shell.chat.telemetryDetails")}
+                  accessibilityState={{ expanded: telemetryOpen() }}
+                  onPress={() => telemetryOpen.set(!telemetryOpen())}
+                  class={`h-6 shrink-0 flex-row items-center gap-1.5 rounded-md px-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
+                    telemetryOpen() ? "bg-selected" : ""
+                  }`}
+                >
+                  <View class="h-1.5 w-6 shrink-0 flex-row overflow-hidden rounded-full bg-selected">
+                    <If when={cachedBarPercent() > 0}>
+                      <View class="h-full bg-leaf" style={{ width: `${cachedBarPercent()}%` }} />
+                    </If>
+                    <If when={uncachedBarPercent() > 0}>
+                      <View class="h-full bg-water" style={{ width: `${uncachedBarPercent()}%` }} />
+                    </If>
+                  </View>
+                  <Text class={`font-mono text-2xs tabular-nums ${telemetryWarn() ? "text-warn-ink" : "text-faint"}`}>{`${telemetry().contextPct}%`}</Text>
+                </View>
+              </If>
+
+              <If when={effectivePhase() === "working"}>
+                <View
+                  role="button"
+                  testID="chat-stop"
+                  accessibilityLabel={t("web.shell.chat.stop")}
+                  tooltip={<Bubble text={t("web.shell.chat.stop")} />}
+                  onPress={() => void stop()}
+                  class={`h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line hover:bg-bad-soft ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+                >
+                  <Icon name="stop" size={14} tone="berry" />
+                </View>
+              </If>
+
+              <View
+                role="button"
+                testID="chat-send"
+                accessibilityLabel={effectivePhase() === "working" ? t("web.shell.chat.steer") : t("web.shell.chat.send")}
+                tooltip={<Bubble text={effectivePhase() === "working" ? t("web.shell.chat.steer") : t("web.shell.chat.send")} />}
+                disabled={!canSend()}
+                onPress={() => void send()}
+                class={`h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
+                  canSend()
+                    ? `border-accent bg-accent hover:bg-accent-hover ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px`
+                    : "border-transparent bg-hover opacity-50"
+                } focus-visible:outline-2 focus-visible:outline-focus`}
+              >
+                <Icon name="send" size={14} tone={canSend() ? "page" : "muted"} />
+              </View>
+            </View>
+          </View>
         </View>
       </View>
     </View>

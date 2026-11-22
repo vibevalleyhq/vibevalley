@@ -687,6 +687,15 @@ pub trait Driver: Send + Sync + 'static {
     fn read_subagent(&self, _thread_id: &str, _turn_id: Option<&str>) -> Result<crate::oar::SubagentSnapshot> {
         Err(crate::oar::SubagentSnapshot::unsupported())
     }
+    fn swarm_snapshot(&self) -> Option<crate::oar::SwarmSnapshot> {
+        None
+    }
+    fn read_child_transcript(&self, _conversation_id: &str, _limit: usize) -> Vec<crate::oar::ChildTranscriptStep> {
+        Vec::new()
+    }
+    fn session_title(&self) -> Option<String> {
+        None
+    }
     /// Refuses content the runtime cannot take, before the turn is recorded.
     fn check_content(&self, _content: &[ContentBlock]) -> Result<()> {
         Ok(())
@@ -979,6 +988,15 @@ impl<D: Driver> Session for CoreSession<D> {
 
     fn read_subagent(&self, thread_id: &str, turn_id: Option<&str>) -> Result<crate::oar::SubagentSnapshot> {
         self.driver.read_subagent(thread_id, turn_id)
+    }
+    fn swarm_snapshot(&self) -> Option<crate::oar::SwarmSnapshot> {
+        self.driver.swarm_snapshot()
+    }
+    fn read_child_transcript(&self, conversation_id: &str, limit: usize) -> Vec<crate::oar::ChildTranscriptStep> {
+        self.driver.read_child_transcript(conversation_id, limit)
+    }
+    fn session_title(&self) -> Option<String> {
+        self.driver.session_title()
     }
     fn runtime_id(&self) -> &str {
         self.core.runtime_id()

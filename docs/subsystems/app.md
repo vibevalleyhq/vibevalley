@@ -28,7 +28,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版与相对图片解析、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`、`VvGenUi`、`VvWhiteboard`、`VvPinyin`）与内部渲染引擎 `engine/` |
 | `apps/mac/src/theme.rs`、`apps/mac/src/theme_tokens.rs` | 外壳的主题、动画幅度（`Settings.motion`）与字号设置；令牌从 `design/tokens.json` 同步生成 |
 | `apps/mac/src/debug.rs` | 不看屏幕检查应用的两个入口：状态转储和脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） |
-| `apps/mac/ui/App.tsx`、`workspace/` | TSX 包入口（按 `host.params.view` 挑视图）与外壳工作区（侧栏、文件树、Git、命令面板、直连对话 `ChatPane.tsx`、Markdown 预览 `MarkdownPane.tsx`） |
+| `apps/mac/ui/App.tsx`、`workspace/` | TSX 包入口（按 `host.params.view` 挑视图）与外壳工作区（侧栏 `Sidebar.tsx`、文件树、Git、命令面板、直连对话 `ChatPane.tsx` 与 Swarm 抽屉 `SwarmPanel.tsx`、Markdown 预览 `MarkdownPane.tsx`） |
 | `apps/mac/ui/{app,features,design,infra}/` | 工作台共 6 个顶级目录：入口外壳 `app/`（路由表 `Workbench.tsx`、6 项一级导航 `places.ts`、外框 `Shell.tsx`）、领域切片 `features/<概念>/`（含统一内容中心壳 `content/`、5 栏设置页、笔记、素材与 Artifact 纯逻辑引擎）、共享原语与表面 `design/`（含动效出口 `motion.ts` 与防闪烁骨架原语 `Skeleton.tsx`）、底层运行时与状态 `infra/`（`bridge.ts`、`solid.ts`、`polyfill.ts`、`state/`），另加 `workspace/` 与 `farm/` |
 | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)） |
 | `crates/server/src/transport/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
@@ -60,10 +60,12 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 终端标签内运行编码 agent（Claude Code、Codex、Cursor、OpenCode、Kimi、Pi、Antigravity、dsh、Grok）时，`AgentTurnTracker` 忽略 300 毫秒内的本地按键回显，并在响铃、3 秒输出静默（`Working → Ready`）或命令退出时发出一次 `TerminalEvent::AgentTurnFinished`（普通命令不触发）。该标签不在当前视图时标记 `attention`；若应用处于后台（`!host::is_app_active()`），外壳以项目目录名为标题通过 `host::notify` 发送 macOS 系统通知。[分栏与通知](apps/mac/src/shell/panes.rs)
 
-### 工作区直连对话、Markdown 预览与防闪烁加载
+### 工作区直连对话、Markdown 预览与统一顶栏交互
 
-- **工作区直连对话（`PaneKind::Chat`）**：与 `Terminal`、`File`、`Diff` 同级存入项目 `Layout` JSON（[layout.rs](apps/mac/crates/workspace/src/layout.rs)），不新增独立数据库表；重启后按需惰性挂载 `HostedView("workspace-chat")` 并续接原 `session_id`。标签栏提供 `+ 新对话 ▾` / `+ 新终端` 与快捷键 `⇧⌘T`，[ChatPane.tsx](apps/mac/ui/workspace/ChatPane.tsx) 经 `session.watch` 呈现流式 Markdown、思考折叠块、工具卡片、永不自动批准的 `interaction_*` 确认卡片、轮中引导（Steer）、引擎/模型/思考深度/权限模式切换及底部遥测条；点击工具卡片经 `OpenFileAdjacent` / `OpenDiffAdjacent` 在相邻分栏打开对应文件行或 diff（单栏时自动向右分屏），侧栏实时显示运行中状态与待回复提醒。
-- **独立 Markdown 预览**：[MarkdownPane.tsx](apps/mac/ui/workspace/MarkdownPane.tsx) 以居中 `820px` 阅读列与 34px 顶栏（文件名、截断父路径与 `Source` 切换）展示文档，向 `VvMarkdown` 传入 `size="doc"` 与文档目录 `baseDir`。`crates/rich/src/markdown.rs` 将相对图片路径解析为规范绝对路径并同步读取本地栅格图尺寸按比例缩放（缺失时展示显式占位徽章），相对文档链接按 `baseDir` 经 `open_file` 在工作区打开，外链走 `hostApi.openUrl`。
+- **工作区直连对话（`PaneKind::Chat`）与 Swarm 观测**：与 `Terminal`、`File`、`Diff` 同级存入项目 `Layout` JSON（[layout.rs](apps/mac/crates/workspace/src/layout.rs)），不新增独立数据库表；重启后按需惰性挂载 `HostedView("workspace-chat")` 并续接原 `session_id`。标签栏收敛为单个 `+` 下拉菜单（新建终端及 Antigravity / Claude / Codex 直连对话，保留 `⌘T` 与 `⇧⌘T`，支持点击外部与 `Esc` 关闭）；[ChatPane.tsx](apps/mac/ui/workspace/ChatPane.tsx) 经 `session.watch` 呈现流式 Markdown、思考折叠块、工具卡片、永不自动批准的 `interaction_*` 确认卡片、轮中引导（Steer）与按需展开的内联遥测胶囊，输入区收敛为三行单卡 Composer（顶部按需展示经 `host.pickFile` 挂载的文件标签、中间无边框两行输入、底部单行集成引擎/模型/思考深度/遥测/发送）。会话触发 Antigravity Swarm 时，顶栏展示 `Swarm · N/M` 胶囊并可展开三标签抽屉 [SwarmPanel.tsx](apps/mac/ui/workspace/SwarmPanel.tsx)（总览、成员与 `session.childTranscript` 下钻、黑板 `@mention` 与成员筛选）；点击工具卡片经 `OpenFileAdjacent` / `OpenDiffAdjacent` 在相邻分栏打开对应文件行或 diff（单栏时自动向右分屏）。
+- **真实会话标题与工作区侧栏状态**：直连对话将真实运行时标题（优先 `ev.title`，其次 Swarm 标题，最后截断首条用户输入）经 `update_chat_tab` 同步到标签栏、侧栏与 `chat-header`；终端标签在 [panes.rs](apps/mac/src/panes.rs) 经 `resolve_terminal_name` 与 `clean_osc_session_title` 清洗旋转指示符与冗余前缀后显示真实标题或编码引擎名。工作区侧栏（[Sidebar.tsx](apps/mac/ui/workspace/Sidebar.tsx)）标签行悬停时显示 `⋯` 菜单（新建对话/终端、在 Finder 中显示、复制路径、关闭标签）替代裸 `×` 按钮，运行中状态收拢到左侧图标下方跑马灯条与角标点。
+- **全工作台统一 `36px`（`h-9`）顶栏与原生标题栏拖拽**：工作台各模块顶栏（`<Desk>`、对话、工单、内容、作品、团队、设置、Markdown 预览与工作区标签栏/侧栏）统一对齐到 `36px`（`h-9`）基线。[main.rs](apps/mac/src/main.rs) 启用 `app_owns_titlebar_drag: true`，GPUI 原生顶栏空白处（`render.rs` / `settings.rs`）与 TSX 托管顶栏（`desktop={{ windowDrag: true }}`）共同支持 macOS 原生窗口拖拽（`start_window_move`）与双击放大（`titlebar_double_click`）。
+- **独立 Markdown 预览**：[MarkdownPane.tsx](apps/mac/ui/workspace/MarkdownPane.tsx) 以居中 `820px` 阅读列与 `36px` 顶栏（文件名、截断父路径与本地化「源码」切换）展示文档，向 `VvMarkdown` 传入 `size="doc"` 与文档目录 `baseDir`。`crates/rich/src/markdown.rs` 将相对图片路径解析为规范绝对路径并同步读取本地栅格图尺寸按比例缩放（缺失时展示显式占位徽章），相对文档链接按 `baseDir` 经 `open_file` 在工作区打开，外链走 `hostApi.openUrl`。
 - **150 毫秒防闪烁与统一加载态**：原生 `FileViewer`、`DiffView`、`PixelView`（含进程级 `Atlas` / `VillageWorld` 缓存，二次切回 0 毫秒命中）与 TSX 侧的 `useDelayedBusy` / `SkeletonBar` / `SkeletonLines`（[Skeleton.tsx](apps/mac/ui/design/Skeleton.tsx)）统一在 150 毫秒内不闪烁加载占位，超时后展示柔和骨架条，覆盖文件树、Git 面板、命令面板、Markdown 预览、笔记与作品冷加载。
 
 ### 桥
@@ -80,7 +82,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 - **`call` 不抛**：失败是 `bizCode` 非 0 的信封；没有宿主或超时回 `ServiceUnavailable`。
 - **工作台按 6 个一级入口与 5 栏设置组织**：左侧导航主栏（`places.ts`）固定收敛为对话（`/chat`）、工单（`/issues`）、代码仓库与工作区（`/repos`）、内容（`/library`）、团队（`/agents`）与设置（`/settings`）6 项一级位置；运行中心（`/runs`）作为次级入口随工单/团队下钻可达；设置页收拢为「通用 / 模型 / 语音 / 连接 / 关于」5 栏，所有面向用户的菜单与设置沿用日常中文词汇（如模型、成员、设置），避免内部工程缩写或农场隐喻外溢。
-- **统一内容中心与上下文记忆**：`/library`、`/artifacts/*` 与 `/pkm/*` 共用嵌套布局 `ContentShell`（`apps/mac/ui/features/content/`），提供可折叠统一侧栏 `ContentSidebar`（`⌘\` 切换，全屏演示 `contentPresenting` 时自动收起）、跨笔记/作品/素材统一搜索 `ContentSearchModal` 与 19 套双语模板库 `TemplateModal`（`⌘N` 打开）。48px 顶栏 `<Desk>` 不再重复显示 3 个内容子标签，改为放侧栏开关、统一搜索与 `+ 新建`；`ContentShell` 持续记录当前内容路径（剥离 `?make=`/`?nav`/`?understand` 瞬态参数），离开再点左栏「内容」或访问 `/content` 时经 `safeLastContentPath()` 恢复上次打开的笔记、作品或筛选视图。
+- **统一内容中心与上下文记忆**：`/library`、`/artifacts/*` 与 `/pkm/*` 共用嵌套布局 `ContentShell`（`apps/mac/ui/features/content/`），提供可折叠统一侧栏 `ContentSidebar`（`⌘\` 切换，全屏演示 `contentPresenting` 时自动收起）、跨笔记/作品/素材统一搜索 `ContentSearchModal` 与 19 套双语模板库 `TemplateModal`（`⌘N` 打开）。36px 顶栏 `<Desk>` 不再重复显示 3 个内容子标签，改为放侧栏开关、统一搜索与 `+ 新建`；`ContentShell` 持续记录当前内容路径（剥离 `?make=`/`?nav`/`?understand` 瞬态参数），离开再点左栏「内容」或访问 `/content` 时经 `safeLastContentPath()` 恢复上次打开的笔记、作品或筛选视图。
 - **工作台的请求只经 `Transport`**（`apps/mac/ui/infra/transport.ts`）：`VibeValleyApi.over` 直接在契约信封上收发，不绕合成的 HTTP `Request`/`Response`；应用里是桥（`bridged.ts` 的 `useBridge()`），测试和故事换成自己的（`infra/fixtures.ts`）；页面的代码不直接碰 `host`。
 
 ### 页面状态与数据流

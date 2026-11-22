@@ -101,7 +101,7 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
       <If when={!wide() && drawerOpen()}>
         <View testID="issue-inspector-backdrop" class="absolute inset-0 z-20 bg-scrim" onPress={() => chrome?.closeDrawer()} />
         <View testID="issue-inspector" class="absolute top-0 right-0 bottom-0 z-30 w-72 max-w-full border-l border-line bg-side shadow-float">
-          <View class="h-10 shrink-0 flex-row items-center justify-between border-b border-line px-4">
+          <View class="h-9 shrink-0 flex-row items-center justify-between border-b border-line px-3.5">
             <Text class="text-xs font-semibold text-muted">{t("web.issue.detail.properties")}</Text>
             <IconButton icon="close" size={14} label={t("web.issue.sheet.less")} onClick={() => chrome?.closeDrawer()} />
           </View>

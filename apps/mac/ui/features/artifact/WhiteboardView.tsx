@@ -298,7 +298,7 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
 
   return (
     <View testID="whiteboard-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side">
-      <View class="min-h-11 shrink-0 flex-row items-center gap-1 border-b border-line bg-page px-2.5 py-1.5">
+      <View class="min-h-9 shrink-0 flex-row items-center gap-1 border-b border-line bg-page px-2.5 py-0.5">
         <Button icon="add" testID="wb-add-node" disabled={act.busy()} onPress={addNode}>
           {t("web.artifact.whiteboard.sticky")}
         </Button>

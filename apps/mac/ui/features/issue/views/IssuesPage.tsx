@@ -344,7 +344,7 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
   return (
     <IssueChromeContext.Provider value={chrome}>
       <View testID="issue" class="min-h-0 flex-1">
-        <View class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4">
+        <View class="h-9 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3.5">
           <View
             role="button"
             testID="issue-close"

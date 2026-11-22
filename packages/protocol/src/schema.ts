@@ -45,6 +45,7 @@ export {
   Run,
   RunTrigger,
   Session,
+  SessionChildTranscript,
   SessionContextFile,
   SessionEvent,
   SessionInteractionOption,

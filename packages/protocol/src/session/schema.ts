@@ -190,21 +190,99 @@ export const SessionContextFile = z.object({
 export const SessionWorkspace = z.object({
   id: SessionId,
   session: Session,
+  title: z.exactOptional(z.string()),
   model: z.exactOptional(z.string()),
   effort: z.exactOptional(z.string()),
   permissionMode: SessionPermissionMode,
 }) satisfies Codec<T.SessionWorkspace>;
 
+const SessionSwarmRole = z.enum(T.SessionSwarmRoleValues) satisfies Codec<T.SessionSwarmRole>;
+
+const SessionSwarmMemberState = z.enum(T.SessionSwarmMemberStateValues) satisfies Codec<T.SessionSwarmMemberState>;
+
+const SessionSwarmMember = z.object({
+  name: z.string(),
+  conversationId: z.string(),
+  role: SessionSwarmRole,
+  state: SessionSwarmMemberState,
+  wakeMode: z.exactOptional(z.string()),
+  waitSince: z.exactOptional(z.number()),
+  model: z.exactOptional(z.string()),
+  workspaceMode: z.exactOptional(z.string()),
+  task: z.exactOptional(z.string()),
+}) satisfies Codec<T.SessionSwarmMember>;
+
+const SessionSwarmThread = z.object({
+  id: z.string(),
+  title: z.string(),
+  goal: z.exactOptional(z.string()),
+  members: z.array(z.string()),
+}) satisfies Codec<T.SessionSwarmThread>;
+
+const SessionSwarmOverview = z.object({
+  goalTitle: z.exactOptional(z.string()),
+  goalLine: z.exactOptional(z.string()),
+  threads: z.array(SessionSwarmThread),
+  tasks: z.record(z.string(), z.string()),
+}) satisfies Codec<T.SessionSwarmOverview>;
+
+const SessionSwarmMessage = z.object({
+  seq: z.number(),
+  agent: z.string(),
+  text: z.string(),
+  time: z.string(),
+  kind: z.exactOptional(z.string()),
+}) satisfies Codec<T.SessionSwarmMessage>;
+
+const SessionSwarmState = z.object({
+  swarmId: z.string(),
+  title: z.exactOptional(z.string()),
+  workingCount: z.number(),
+  activeCount: z.number(),
+  members: z.array(SessionSwarmMember),
+  overview: z.exactOptional(SessionSwarmOverview),
+  messages: z.array(SessionSwarmMessage),
+  totalMessages: z.number(),
+}) satisfies Codec<T.SessionSwarmState>;
+
+const SessionChildToolCall = z.object({
+  name: z.string(),
+  args: z.exactOptional(z.string()),
+}) satisfies Codec<T.SessionChildToolCall>;
+
+const SessionChildStep = z.object({
+  stepIndex: z.number(),
+  source: z.string(),
+  kind: z.string(),
+  status: z.exactOptional(z.string()),
+  createdAt: z.exactOptional(z.string()),
+  model: z.exactOptional(z.string()),
+  thinking: z.exactOptional(z.string()),
+  content: z.exactOptional(z.string()),
+  error: z.exactOptional(z.string()),
+  toolCalls: z.array(SessionChildToolCall),
+  inputTokens: z.exactOptional(z.number()),
+  cacheReadTokens: z.exactOptional(z.number()),
+  outputTokens: z.exactOptional(z.number()),
+}) satisfies Codec<T.SessionChildStep>;
+
+export const SessionChildTranscript = z.object({
+  conversationId: z.string(),
+  steps: z.array(SessionChildStep),
+}) satisfies Codec<T.SessionChildTranscript>;
+
 export const SessionWatchEvent = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("state"),
     session: Session,
+    title: z.exactOptional(z.string()),
     model: z.exactOptional(z.string()),
     effort: z.exactOptional(z.string()),
     permissionMode: SessionPermissionMode,
     pendingPermissions: z.array(SessionPermissionRequest),
     pendingInteractions: z.array(SessionInteractionRequest),
     tokens: z.exactOptional(EventTokens),
+    swarm: z.exactOptional(SessionSwarmState),
   }),
   z.object({
     kind: z.literal("history"),
