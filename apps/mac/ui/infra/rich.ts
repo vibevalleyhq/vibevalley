@@ -109,6 +109,39 @@ export interface VvMarkdownProps extends ComponentHostProps {
   onGenUiAction?: (event: VvGenUiActionEvent) => void;
 }
 
+export interface VvWhiteboardBatchEvent {
+  writesJson: string;
+}
+
+export interface VvWhiteboardSelectionEvent {
+  idsJson: string;
+  count: number;
+}
+
+export interface VvWhiteboardChatEvent {
+  selectedIdsJson: string;
+}
+
+export interface VvWhiteboardExportEvent {
+  format: string;
+  filename: string;
+  mime: string;
+  content: string;
+}
+
+export interface VvWhiteboardProps extends ComponentHostProps {
+  entriesJson: string;
+  presencesJson?: string;
+  seq?: number;
+  title?: string;
+  readOnly?: boolean;
+  locale?: string;
+  onBatch?: (event: VvWhiteboardBatchEvent) => void;
+  onSelectionChange?: (event: VvWhiteboardSelectionEvent) => void;
+  onOpenChat?: (event: VvWhiteboardChatEvent) => void;
+  onExport?: (event: VvWhiteboardExportEvent) => void;
+}
+
 export interface VvRichModule {
   VvCanvas: (props: VvCanvasProps) => JSX.Element;
   VvChart: (props: VvChartProps) => JSX.Element;
@@ -116,6 +149,7 @@ export interface VvRichModule {
   VvDiagram: (props: VvDiagramProps) => JSX.Element;
   VvGenUi: (props: VvGenUiProps) => JSX.Element;
   VvMarkdown: (props: VvMarkdownProps) => JSX.Element;
+  VvWhiteboard: (props: VvWhiteboardProps) => JSX.Element;
   matchPinyin: (text: string, query: string) => boolean;
 }
 

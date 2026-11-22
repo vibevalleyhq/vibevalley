@@ -28,6 +28,7 @@ pub mod markdown;
 mod math;
 pub mod pinyin;
 pub mod theme;
+pub mod whiteboard;
 
 use nsh_core::element::Registry;
 
@@ -66,6 +67,10 @@ pub use theme::{
     AdaptiveUi, CODE_FONT_MONO, DIAGRAM_FONT_SANS, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, UiPalette, vv_canvas_palette, vv_chart_palette, vv_pele_palette,
     vv_shiki_dark_theme, vv_shiki_light_theme,
 };
+pub use whiteboard::{
+    VvWhiteboard, VvWhiteboardBatchEvent, VvWhiteboardChatEvent, VvWhiteboardElement, VvWhiteboardEvent, VvWhiteboardExportEvent, VvWhiteboardProps,
+    VvWhiteboardSelectionEvent, vv_whiteboard,
+};
 
 /// JS module specifier passed to `nativeModule("vibevalley/rich")` and `Registry::ui_set`.
 pub const SPECIFIER: &str = "vibevalley/rich";
@@ -83,6 +88,7 @@ pub fn registry() -> Registry {
         .register::<VvCanvas>()
         .register::<VvChart>()
         .register::<VvGenUi>()
+        .register::<VvWhiteboard>()
         .module::<VvPinyin>();
     set
 }

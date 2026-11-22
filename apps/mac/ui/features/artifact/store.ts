@@ -395,14 +395,18 @@ function utf8ToBase64(text: string): string {
   return btoa(pieces.join(""));
 }
 
-/** Saves UTF-8 text via a temporary attachment + native host.saveFile dialog (no browser `<a download>`). */
-export async function saveTextFile(filename: string, mime: string, text: string): Promise<boolean> {
-  const att = await api.attachment.create({ name: filename, type: mime, data: utf8ToBase64(text) });
+// Native save dialog via temp attachment; nsh has no browser download.
+export async function saveBase64File(filename: string, mime: string, base64: string): Promise<boolean> {
+  const att = await api.attachment.create({ name: filename, type: mime, data: base64 });
   const env = await transport().call("attachment.file", { id: att.id });
   if (env.bizCode !== 0) throw new Error(env.message);
   const file = AttachmentPathData.parse(env.data);
   const res = await saveFile(file.path, filename);
   return res.saved;
+}
+
+export async function saveTextFile(filename: string, mime: string, text: string): Promise<boolean> {
+  return saveBase64File(filename, mime, utf8ToBase64(text));
 }
 
 export async function exportMarkdownFile(id: ArtifactId, title: string): Promise<boolean> {

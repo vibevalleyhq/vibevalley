@@ -18,7 +18,10 @@ fn registry_exports_all_components_and_documents_every_export() {
     assert_eq!(SPECIFIER, "vibevalley/rich");
 
     let names: Vec<String> = set.specs().into_iter().map(|s| s.export.clone()).collect();
-    assert_eq!(names, vec!["VvCanvas", "VvChart", "VvCodeBlock", "VvDiagram", "VvGenUi", "VvMarkdown",]);
+    assert_eq!(
+        names,
+        vec!["VvCanvas", "VvChart", "VvCodeBlock", "VvDiagram", "VvGenUi", "VvMarkdown", "VvWhiteboard"]
+    );
 
     let undocumented = set.undocumented();
     assert!(
@@ -34,6 +37,7 @@ fn registry_exports_all_components_and_documents_every_export() {
         "export declare const VvCanvas:",
         "export declare const VvChart:",
         "export declare const VvGenUi:",
+        "export declare const VvWhiteboard:",
         "onIssuePress?: (event: VvIssuePressEvent) => void;",
         "onWikilinkPress?: (event: VvWikilinkPressEvent) => void;",
         "onBlockRefPress?: (event: VvBlockRefPressEvent) => void;",

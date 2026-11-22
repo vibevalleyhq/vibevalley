@@ -377,6 +377,7 @@ section.vv-deck-slide > .slide{{width:100%;height:100%;box-sizing:border-box;dis
 section.vv-deck-slide aside.notes,section.vv-deck-slide aside[data-notes]{{display:none}}
 section.vv-deck-slide .fragment{{opacity:0;transform:translateY(14px);transition:opacity 180ms ease,transform 180ms ease}}
 section.vv-deck-slide .fragment.visible{{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){{section.vv-deck-slide .fragment{{transition:none}}}}
 section.vv-deck-slide :where(h1){{margin:0;font-size:84px;line-height:1.08;font-weight:700;letter-spacing:-0.02em}}
 section.vv-deck-slide :where(h2){{margin:0;font-size:56px;line-height:1.14;font-weight:650}}
 section.vv-deck-slide :where(h3){{margin:0;font-size:36px;line-height:1.25;font-weight:600;color:var(--color-muted,var(--vv-muted))}}
