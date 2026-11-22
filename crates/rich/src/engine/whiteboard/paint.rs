@@ -444,6 +444,112 @@ pub struct LayerPaintInput<'a> {
     pub anim_hidden_ids: &'a BTreeSet<ElementId>,
 }
 
+pub struct FramePaintInput<'a> {
+    pub controller: &'a WhiteboardController,
+    pub viewport_size: (f32, f32),
+    pub editing_id: Option<&'a ElementId>,
+    pub editing_milestone: Option<usize>,
+    pub dark: bool,
+    pub anim_hidden_ids: &'a BTreeSet<ElementId>,
+    pub dismissed_notes: &'a BTreeSet<String>,
+    pub fast_shadows: bool,
+}
+
+fn fast_shadow_color(pal: &WhiteboardPalette) -> Hsla {
+    Hsla { a: 0.08, ..pal.card_shadow }
+}
+
+fn collect_visible_indices(doc: &BoardDoc, index: &SpatialIndex, lookup: &HashMap<ElementId, Rect2>, camera: Camera, vw: f32, vh: f32) -> BTreeSet<usize> {
+    let world_view = camera.visible_world_rect(f64::from(vw), f64::from(vh));
+    let mut visible: BTreeSet<usize> = index.query_rect(world_view.expand(120.0)).into_iter().collect();
+    for (idx, el) in doc.elements.iter().enumerate() {
+        if (el.is_arrow() || matches!(el.kind, ElementKind::Timeline { .. })) && el.visual_bbox(lookup).intersects(world_view.expand(180.0)) {
+            visible.insert(idx);
+        }
+    }
+    visible
+}
+
+fn emit_accessibility_nodes(
+    mut painter: Painter,
+    doc: &BoardDoc,
+    lookup: &HashMap<ElementId, Rect2>,
+    camera: Camera,
+    visible: &BTreeSet<usize>,
+    selection: &[ElementId],
+    anim_hidden_ids: &BTreeSet<ElementId>,
+) -> Painter {
+    let sel_set: BTreeSet<&ElementId> = selection.iter().collect();
+    for &idx in visible {
+        let Some(el) = doc.elements.get(idx) else {
+            continue;
+        };
+        if anim_hidden_ids.contains(&el.id) {
+            continue;
+        }
+        let world_r = el.bbox(lookup);
+        let tl = camera.world_to_screen(Point2::new(world_r.x, world_r.y));
+        let br = camera.world_to_screen(Point2::new(world_r.right(), world_r.bottom()));
+        let sw = (br.x - tl.x).max(8.0) as f32;
+        let sh = (br.y - tl.y).max(8.0) as f32;
+        let bounds = Bounds::new(point(px(tl.x as f32), px(tl.y as f32)), size(px(sw), px(sh)));
+        painter = painter.node(
+            CanvasNode::new(bounds, AccessibilityRole::Button, el.primary_label())
+                .test_id(format!("wb-el-{}", el.id))
+                .selected(sel_set.contains(&el.id)),
+        );
+    }
+    painter
+}
+
+/// Paints the entire whiteboard frame (background, grid, world elements, live overlays,
+/// and accessibility nodes) atomically from one `Camera` snapshot.
+pub fn paint_board_frame(input: &FramePaintInput<'_>) -> Drawing {
+    paint_board_frame_painter(input).finish()
+}
+
+/// Builds a single atomic [`Painter`] for one whiteboard frame so shapes, selection chrome,
+/// guides, and collaborator presences share the exact same camera transform.
+pub fn paint_board_frame_painter(input: &FramePaintInput<'_>) -> Painter {
+    let ctrl = input.controller;
+    let camera = ctrl.camera;
+    let pal = WhiteboardPalette::for_mode(input.dark);
+    let vw = input.viewport_size.0.max(1.0);
+    let vh = input.viewport_size.1.max(1.0);
+
+    let bg = ctrl.doc.meta.background.as_deref().and_then(parse_hex_hsla).unwrap_or(pal.page);
+    let mut painter = Painter::new()
+        .begin_path()
+        .fill_color(bg)
+        .rect(Bounds::new(point(px(0.0), px(0.0)), size(px(vw), px(vh))))
+        .fill();
+
+    painter = paint_grid(painter, ctrl.doc.meta.grid, camera, vw, vh, &pal);
+
+    let visible = collect_visible_indices(&ctrl.doc, &ctrl.spatial, &ctrl.lookup, camera, vw, vh);
+
+    painter = painter
+        .save()
+        .translate(camera.pan_x as f32, camera.pan_y as f32)
+        .scale(camera.zoom as f32, camera.zoom as f32);
+
+    painter = paint_board_into_painter_ex(
+        painter,
+        &ctrl.doc,
+        &ctrl.lookup,
+        &pal,
+        Some(&visible),
+        input.editing_id,
+        input.editing_milestone,
+        input.anim_hidden_ids,
+        input.fast_shadows,
+    );
+    painter = paint_overlay_world_contents(painter, ctrl, &pal, camera.zoom, input.dismissed_notes, input.fast_shadows);
+    painter = painter.restore();
+
+    emit_accessibility_nodes(painter, &ctrl.doc, &ctrl.lookup, camera, &visible, &ctrl.selection, input.anim_hidden_ids)
+}
+
 pub fn paint_static_layer(input: &LayerPaintInput<'_>) -> Drawing {
     paint_static_layer_painter(input).finish()
 }
@@ -463,13 +569,7 @@ pub fn paint_static_layer_painter(input: &LayerPaintInput<'_>) -> Painter {
 
     painter = paint_grid(painter, input.doc.meta.grid, input.camera, vw, vh, &pal);
 
-    let world_view = input.camera.visible_world_rect(f64::from(vw), f64::from(vh));
-    let mut visible: BTreeSet<usize> = input.index.query_rect(world_view.expand(120.0)).into_iter().collect();
-    for (idx, el) in input.doc.elements.iter().enumerate() {
-        if (el.is_arrow() || matches!(el.kind, ElementKind::Timeline { .. })) && el.visual_bbox(input.lookup).intersects(world_view.expand(180.0)) {
-            visible.insert(idx);
-        }
-    }
+    let visible = collect_visible_indices(input.doc, input.index, input.lookup, input.camera, vw, vh);
 
     painter = painter
         .save()
@@ -480,29 +580,7 @@ pub fn paint_static_layer_painter(input: &LayerPaintInput<'_>) -> Painter {
 
     painter = painter.restore();
 
-    // Emit accessibility/hit-testing nodes in viewport coordinates.
-    let sel_set: BTreeSet<&ElementId> = input.selection.iter().collect();
-    for &idx in &visible {
-        let Some(el) = input.doc.elements.get(idx) else {
-            continue;
-        };
-        if input.anim_hidden_ids.contains(&el.id) {
-            continue;
-        }
-        let world_r = el.bbox(input.lookup);
-        let tl = input.camera.world_to_screen(Point2::new(world_r.x, world_r.y));
-        let br = input.camera.world_to_screen(Point2::new(world_r.right(), world_r.bottom()));
-        let sw = (br.x - tl.x).max(8.0) as f32;
-        let sh = (br.y - tl.y).max(8.0) as f32;
-        let bounds = Bounds::new(point(px(tl.x as f32), px(tl.y as f32)), size(px(sw), px(sh)));
-        painter = painter.node(
-            CanvasNode::new(bounds, AccessibilityRole::Button, el.primary_label())
-                .test_id(format!("wb-el-{}", el.id))
-                .selected(sel_set.contains(&el.id)),
-        );
-    }
-
-    painter
+    emit_accessibility_nodes(painter, input.doc, input.lookup, input.camera, &visible, input.selection, input.anim_hidden_ids)
 }
 
 pub fn paint_grid(mut painter: Painter, style: GridStyle, camera: Camera, vw: f32, vh: f32, pal: &WhiteboardPalette) -> Painter {
@@ -523,13 +601,15 @@ pub fn paint_grid(mut painter: Painter, style: GridStyle, camera: Camera, vw: f3
     match style {
         GridStyle::Architectural => {
             let major = step_world * 5.0;
-            // Minor grid lines.
-            painter = painter.stroke_color(pal.grid_minor).line_width(1.0);
+            // Batch all minor vertical + horizontal lines into one path & stroke.
+            painter = painter.stroke_color(pal.grid_minor).line_width(1.0).begin_path();
+            let mut has_minor = false;
             let mut wx = start_wx;
             while wx <= world_view.right() {
                 if (wx / major).fract().abs() > 0.05 {
                     let sx = (wx * zoom + camera.pan_x) as f32;
-                    painter = painter.begin_path().move_to(sx, 0.0).line_to(sx, vh).stroke();
+                    painter = painter.move_to(sx, 0.0).line_to(sx, vh);
+                    has_minor = true;
                 }
                 wx += step_world;
             }
@@ -537,48 +617,61 @@ pub fn paint_grid(mut painter: Painter, style: GridStyle, camera: Camera, vw: f3
             while wy <= world_view.bottom() {
                 if (wy / major).fract().abs() > 0.05 {
                     let sy = (wy * zoom + camera.pan_y) as f32;
-                    painter = painter.begin_path().move_to(0.0, sy).line_to(vw, sy).stroke();
+                    painter = painter.move_to(0.0, sy).line_to(vw, sy);
+                    has_minor = true;
                 }
                 wy += step_world;
             }
-            // Major grid lines.
-            painter = painter.stroke_color(pal.grid_major).line_width(1.0);
+            if has_minor {
+                painter = painter.stroke();
+            }
+            // Batch all major vertical + horizontal lines into one path & stroke.
+            painter = painter.stroke_color(pal.grid_major).line_width(1.0).begin_path();
+            let mut has_major = false;
             let mut mwx = (world_view.x / major).floor() * major;
             while mwx <= world_view.right() {
                 let sx = (mwx * zoom + camera.pan_x) as f32;
-                painter = painter.begin_path().move_to(sx, 0.0).line_to(sx, vh).stroke();
+                painter = painter.move_to(sx, 0.0).line_to(sx, vh);
+                has_major = true;
                 mwx += major;
             }
             let mut mwy = (world_view.y / major).floor() * major;
             while mwy <= world_view.bottom() {
                 let sy = (mwy * zoom + camera.pan_y) as f32;
-                painter = painter.begin_path().move_to(0.0, sy).line_to(vw, sy).stroke();
+                painter = painter.move_to(0.0, sy).line_to(vw, sy);
+                has_major = true;
                 mwy += major;
+            }
+            if has_major {
+                painter = painter.stroke();
             }
         }
         GridStyle::Dots => {
             let dot_r = (1.15 * zoom.sqrt()).clamp(0.8, 2.0) as f32;
-            painter = painter.fill_color(pal.grid_dot);
+            painter = painter.fill_color(pal.grid_dot).begin_path();
+            let mut has_dots = false;
             let mut wx = start_wx;
             while wx <= world_view.right() {
                 let sx = (wx * zoom + camera.pan_x) as f32;
                 let mut wy = start_wy;
                 while wy <= world_view.bottom() {
                     let sy = (wy * zoom + camera.pan_y) as f32;
-                    painter = painter
-                        .begin_path()
-                        .ellipse(
-                            point(px(sx), px(sy)),
-                            size(px(dot_r), px(dot_r)),
-                            radians(0.0),
-                            radians(0.0),
-                            radians(std::f32::consts::TAU),
-                            false,
-                        )
-                        .fill();
+                    // Move to each circle's angle-0 point so tiny-skia starts a disconnected subpath per dot.
+                    painter = painter.move_to(sx + dot_r, sy).ellipse(
+                        point(px(sx), px(sy)),
+                        size(px(dot_r), px(dot_r)),
+                        radians(0.0),
+                        radians(0.0),
+                        radians(std::f32::consts::TAU),
+                        false,
+                    );
+                    has_dots = true;
                     wy += step_world;
                 }
                 wx += step_world;
+            }
+            if has_dots {
+                painter = painter.fill();
             }
         }
         GridStyle::None => {}
@@ -588,13 +681,28 @@ pub fn paint_grid(mut painter: Painter, style: GridStyle, camera: Camera, vw: f3
 }
 
 pub fn paint_board_into_painter(
-    mut painter: Painter,
+    painter: Painter,
     doc: &BoardDoc,
     lookup: &HashMap<ElementId, Rect2>,
     pal: &WhiteboardPalette,
     visible_indices: Option<&BTreeSet<usize>>,
     editing_id: Option<&ElementId>,
     anim_hidden_ids: &BTreeSet<ElementId>,
+) -> Painter {
+    paint_board_into_painter_ex(painter, doc, lookup, pal, visible_indices, editing_id, None, anim_hidden_ids, false)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn paint_board_into_painter_ex(
+    mut painter: Painter,
+    doc: &BoardDoc,
+    lookup: &HashMap<ElementId, Rect2>,
+    pal: &WhiteboardPalette,
+    visible_indices: Option<&BTreeSet<usize>>,
+    editing_id: Option<&ElementId>,
+    editing_milestone: Option<usize>,
+    anim_hidden_ids: &BTreeSet<ElementId>,
+    fast_shadows: bool,
 ) -> Painter {
     let should_draw = |idx: usize, el: &ElementRecord| -> bool {
         if anim_hidden_ids.contains(&el.id) {
@@ -610,7 +718,7 @@ pub fn paint_board_into_painter(
         }
         if matches!(el.kind, ElementKind::Container { .. } | ElementKind::Claim { .. }) {
             let hide_text = editing_id == Some(&el.id);
-            painter = paint_element(painter, el, lookup, pal, hide_text);
+            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows);
         }
     }
 
@@ -621,7 +729,7 @@ pub fn paint_board_into_painter(
         }
         if matches!(el.kind, ElementKind::Arrow { .. }) {
             let hide_text = editing_id == Some(&el.id);
-            painter = paint_element(painter, el, lookup, pal, hide_text);
+            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows);
         }
     }
 
@@ -631,8 +739,9 @@ pub fn paint_board_into_painter(
             continue;
         }
         if matches!(el.kind, ElementKind::Timeline { .. }) {
-            let hide_text = editing_id == Some(&el.id);
-            painter = paint_element(painter, el, lookup, pal, hide_text);
+            let is_editing = editing_id == Some(&el.id);
+            let hide_ms = if is_editing { editing_milestone } else { None };
+            painter = paint_element(painter, el, lookup, pal, is_editing && editing_milestone.is_none(), hide_ms, fast_shadows);
         }
     }
 
@@ -646,7 +755,7 @@ pub fn paint_board_into_painter(
             ElementKind::Shape { .. } | ElementKind::Table { .. } | ElementKind::Image { .. } | ElementKind::HtmlEmbed { .. }
         ) {
             let hide_text = editing_id == Some(&el.id);
-            painter = paint_element(painter, el, lookup, pal, hide_text);
+            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows);
         }
     }
 
@@ -657,7 +766,7 @@ pub fn paint_board_into_painter(
         }
         if matches!(el.kind, ElementKind::Text { .. }) {
             let hide_text = editing_id == Some(&el.id);
-            painter = paint_element(painter, el, lookup, pal, hide_text);
+            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows);
         }
     }
 
@@ -667,7 +776,7 @@ pub fn paint_board_into_painter(
             continue;
         }
         if matches!(el.kind, ElementKind::Sticker { .. } | ElementKind::Svg { .. }) {
-            painter = paint_element(painter, el, lookup, pal, false);
+            painter = paint_element(painter, el, lookup, pal, false, None, fast_shadows);
         }
     }
 
@@ -677,14 +786,22 @@ pub fn paint_board_into_painter(
             continue;
         }
         if matches!(el.kind, ElementKind::Path { .. }) {
-            painter = paint_element(painter, el, lookup, pal, false);
+            painter = paint_element(painter, el, lookup, pal, false, None, fast_shadows);
         }
     }
 
     painter
 }
 
-fn paint_element(mut painter: Painter, el: &ElementRecord, lookup: &HashMap<ElementId, Rect2>, pal: &WhiteboardPalette, hide_text: bool) -> Painter {
+fn paint_element(
+    mut painter: Painter,
+    el: &ElementRecord,
+    lookup: &HashMap<ElementId, Rect2>,
+    pal: &WhiteboardPalette,
+    hide_text: bool,
+    hide_milestone: Option<usize>,
+    fast_shadows: bool,
+) -> Painter {
     let has_rot = el.rotation_deg.abs() > 1e-4 && !el.is_arrow();
     let has_alpha = el.opacity < 0.995;
     let center = el.bbox(lookup).center();
@@ -767,7 +884,16 @@ fn paint_element(mut painter: Painter, el: &ElementRecord, lookup: &HashMap<Elem
             fill: _,
             points,
             milestones,
-        } => paint_timeline(painter, Rect2::new(*x, *y, *w, *h), points, milestones, pal, hide_text),
+        } => paint_timeline(
+            painter,
+            Rect2::new(*x, *y, *w, *h),
+            points,
+            milestones,
+            pal,
+            hide_text,
+            hide_milestone,
+            fast_shadows,
+        ),
         ElementKind::Shape {
             x,
             y,
@@ -800,6 +926,7 @@ fn paint_element(mut painter: Painter, el: &ElementRecord, lookup: &HashMap<Elem
             *align,
             pal,
             hide_text,
+            fast_shadows,
         ),
         ElementKind::Table {
             x,
@@ -809,7 +936,7 @@ fn paint_element(mut painter: Painter, el: &ElementRecord, lookup: &HashMap<Elem
             headers,
             rows,
             fill,
-        } => paint_table(painter, Rect2::new(*x, *y, *w, *h), headers, rows, fill, pal),
+        } => paint_table(painter, Rect2::new(*x, *y, *w, *h), headers, rows, fill, pal, fast_shadows),
         ElementKind::Image { x, y, w, h, alt, uri, .. } => paint_image_card(painter, Rect2::new(*x, *y, *w, *h), alt.as_deref(), uri, pal),
         ElementKind::HtmlEmbed { x, y, w, h, title, .. } => paint_html_card(painter, Rect2::new(*x, *y, *w, *h), title.as_deref(), pal),
         ElementKind::Text {
@@ -825,25 +952,20 @@ fn paint_element(mut painter: Painter, el: &ElementRecord, lookup: &HashMap<Elem
             font_size,
             fill,
             color,
-        } => {
-            if hide_text {
-                painter
-            } else {
-                paint_text(
-                    painter,
-                    Rect2::new(*x, *y, *w, *h),
-                    *variant,
-                    label,
-                    highlight.as_deref(),
-                    icon.as_deref(),
-                    *align,
-                    *font_size,
-                    fill.as_ref(),
-                    color.as_deref(),
-                    pal,
-                )
-            }
-        }
+        } => paint_text(
+            painter,
+            Rect2::new(*x, *y, *w, *h),
+            *variant,
+            label,
+            highlight.as_deref(),
+            icon.as_deref(),
+            *align,
+            *font_size,
+            fill.as_ref(),
+            color.as_deref(),
+            pal,
+            hide_text,
+        ),
         ElementKind::Sticker { x, y, w, h, sticker, svg, .. } => {
             if let Some(svg_src) = resolve_sticker_svg(Some(sticker.as_str()), svg.as_deref()) {
                 paint_embedded_svg(painter, *x, *y, *w, *h, svg_src, pal.ink)
@@ -1066,6 +1188,7 @@ fn paint_head_shape(mut painter: Painter, shape: HeadShape, color: Hsla) -> Pain
     painter.fill()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn paint_timeline(
     mut painter: Painter,
     rect: Rect2,
@@ -1073,6 +1196,8 @@ fn paint_timeline(
     milestones: &[crate::engine::whiteboard::model::TimelineMilestone],
     pal: &WhiteboardPalette,
     hide_text: bool,
+    hide_milestone: Option<usize>,
+    fast_shadows: bool,
 ) -> Painter {
     let ribbon_pts: Vec<Point2> = if points.len() >= 2 {
         points.to_vec()
@@ -1116,6 +1241,7 @@ fn paint_timeline(
     // Milestone badges drawn strictly on top of ribbon (and arrows).
     let total = milestones.len().max(1);
     for (idx, m) in milestones.iter().enumerate() {
+        let hide_this = hide_milestone.map_or(hide_text, |target| target == idx);
         let pt = m
             .pos
             .unwrap_or_else(|| sample_polyline(&ribbon_pts, m.t.unwrap_or((idx + 1) as f64 / (total + 1) as f64)));
@@ -1148,7 +1274,7 @@ fn paint_timeline(
                     )
                     .stroke();
 
-                if !hide_text && !m.label.is_empty() {
+                if !hide_this && !m.label.is_empty() {
                     painter = painter
                         .fill_color(pal.muted)
                         .font("600 10.5px 'PingFang SC', system-ui, sans-serif")
@@ -1166,16 +1292,32 @@ fn paint_timeline(
                     size(px(pw as f32), px(ph as f32)),
                 );
                 let fill_color = m.tone.as_deref().and_then(parse_hex_hsla).unwrap_or(pal.pill_bg);
-                painter = painter
-                    .save()
-                    .shadow(pal.card_shadow, px(6.0), point(px(0.0), px(2.0)))
-                    .begin_path()
-                    .fill_color(fill_color)
-                    .round_rect(pill, px(13.0))
-                    .fill()
-                    .restore();
+                if fast_shadows {
+                    let shadow_pill = Bounds::new(
+                        point(px((pt.x - pw * 0.5) as f32), px((pt.y - ph * 0.5 + 2.0) as f32)),
+                        size(px(pw as f32), px(ph as f32)),
+                    );
+                    painter = painter
+                        .begin_path()
+                        .fill_color(fast_shadow_color(pal))
+                        .round_rect(shadow_pill, px(13.0))
+                        .fill()
+                        .begin_path()
+                        .fill_color(fill_color)
+                        .round_rect(pill, px(13.0))
+                        .fill();
+                } else {
+                    painter = painter
+                        .save()
+                        .shadow(pal.card_shadow, px(6.0), point(px(0.0), px(2.0)))
+                        .begin_path()
+                        .fill_color(fill_color)
+                        .round_rect(pill, px(13.0))
+                        .fill()
+                        .restore();
+                }
 
-                if !hide_text && !m.label.is_empty() {
+                if !hide_this && !m.label.is_empty() {
                     painter = painter
                         .fill_color(pal.pill_ink)
                         .font("600 12px 'PingFang SC', system-ui, sans-serif")
@@ -1186,7 +1328,7 @@ fn paint_timeline(
             }
         }
 
-        if !hide_text
+        if !hide_this
             && let Some(caption) = &m.caption
             && !caption.trim().is_empty()
         {
@@ -1219,6 +1361,7 @@ fn paint_shape(
     align: TextAlign,
     pal: &WhiteboardPalette,
     hide_text: bool,
+    fast_shadows: bool,
 ) -> Painter {
     let tone = pal.shape_tone(shape, fill);
     let border = stroke.and_then(parse_hex_hsla).unwrap_or(tone.border);
@@ -1230,13 +1373,25 @@ fn paint_shape(
         _ => 10.0,
     });
 
-    // 1. Fill shape (with soft warm drop shadow on Cards & Stickies).
+    // 1. Fill shape (with soft warm drop shadow on Cards & Stickies; zero-blur silhouette while navigating).
     let use_shadow = matches!(shape, ShapeKind::Card | ShapeKind::Sticky);
-    painter = painter.save().fill_color(tone.fill);
-    if use_shadow {
-        painter = painter.shadow(pal.card_shadow, px(12.0), point(px(0.0), px(3.0)));
+    if use_shadow && fast_shadows {
+        let shadow_rect = Rect2::new(rect.x, rect.y + 3.0, rect.w, rect.h);
+        let shadow_bounds = Bounds::new(
+            point(px(shadow_rect.x as f32), px(shadow_rect.y as f32)),
+            size(px(shadow_rect.w as f32), px(shadow_rect.h as f32)),
+        );
+        painter = painter.fill_color(fast_shadow_color(pal));
+        painter = trace_shape_path(painter.begin_path(), shadow_rect, shadow_bounds, shape, r).fill();
+        painter = painter.fill_color(tone.fill);
+        painter = trace_shape_path(painter.begin_path(), rect, bounds, shape, r).fill();
+    } else {
+        painter = painter.save().fill_color(tone.fill);
+        if use_shadow {
+            painter = painter.shadow(pal.card_shadow, px(12.0), point(px(0.0), px(3.0)));
+        }
+        painter = trace_shape_path(painter.begin_path(), rect, bounds, shape, r).fill().restore();
     }
-    painter = trace_shape_path(painter.begin_path(), rect, bounds, shape, r).fill().restore();
 
     // 2. Stroke outline.
     painter = painter.save().stroke_color(border).line_width(1.2);
@@ -1405,6 +1560,7 @@ fn paint_text(
     fill: Option<&WbFill>,
     color: Option<&str>,
     pal: &WhiteboardPalette,
+    hide_text: bool,
 ) -> Painter {
     if let Some(bg_fill) = fill {
         let tone = pal.tone(bg_fill);
@@ -1428,6 +1584,9 @@ fn paint_text(
 
     match variant {
         TextVariant::Title => {
+            if hide_text {
+                return painter;
+            }
             let fs = font_size.unwrap_or(30.0);
             let font_str = format!("400 {fs}px Georgia, Songti SC, STSong, Times New Roman, serif");
             let x = match align {
@@ -1448,6 +1607,9 @@ fn paint_text(
                 .fill_text(label, x, (rect.y + 4.0) as f32)
         }
         TextVariant::Subtitle => {
+            if hide_text {
+                return painter;
+            }
             let fs = font_size.unwrap_or(13.5);
             let font_str = format!("400 {fs}px 'PingFang SC', system-ui, sans-serif");
             if let Some(hl) = highlight
@@ -1497,7 +1659,7 @@ fn paint_text(
             }
         }
         TextVariant::Callout => {
-            // Crisp warning triangle badge + wrapped two-line text beside it.
+            // Crisp warning triangle badge stays visible during inline editing; only the body text hides.
             let ix = (rect.x + 12.0) as f32;
             let iy = (rect.y + 15.0) as f32;
             painter = painter
@@ -1522,18 +1684,23 @@ fn paint_text(
                 .text_baseline(CanvasTextBaseline::Middle)
                 .fill_text("!", ix, iy + 1.5);
 
-            let lines = wrap_text(label, (rect.w - 34.0).max(60.0), 12.0, false, 3);
-            painter = painter
-                .fill_color(pal.ink)
-                .font("500 12px 'PingFang SC', system-ui, sans-serif")
-                .text_align(CanvasTextAlign::Left)
-                .text_baseline(CanvasTextBaseline::Top);
-            for (i, line) in lines.iter().enumerate() {
-                painter = painter.fill_text(line, (rect.x + 28.0) as f32, (rect.y + 6.0 + i as f64 * 16.0) as f32);
+            if !hide_text {
+                let lines = wrap_text(label, (rect.w - 34.0).max(60.0), 12.0, false, 3);
+                painter = painter
+                    .fill_color(pal.ink)
+                    .font("500 12px 'PingFang SC', system-ui, sans-serif")
+                    .text_align(CanvasTextAlign::Left)
+                    .text_baseline(CanvasTextBaseline::Top);
+                for (i, line) in lines.iter().enumerate() {
+                    painter = painter.fill_text(line, (rect.x + 28.0) as f32, (rect.y + 6.0 + i as f64 * 16.0) as f32);
+                }
             }
             painter
         }
         TextVariant::Body => {
+            if hide_text {
+                return painter;
+            }
             let fs = font_size.unwrap_or(13.0);
             let lines = wrap_text(label, (rect.w - 16.0).max(48.0), f64::from(fs), false, 6);
             let font_str = format!("400 {fs}px 'PingFang SC', system-ui, sans-serif");
@@ -1551,19 +1718,40 @@ fn paint_text(
     }
 }
 
-fn paint_table(mut painter: Painter, rect: Rect2, headers: &[String], rows: &[Vec<String>], fill: &WbFill, pal: &WhiteboardPalette) -> Painter {
+fn paint_table(
+    mut painter: Painter,
+    rect: Rect2,
+    headers: &[String],
+    rows: &[Vec<String>],
+    fill: &WbFill,
+    pal: &WhiteboardPalette,
+    fast_shadows: bool,
+) -> Painter {
     let tone = pal.tone(fill);
     let layout = layout_table(rect, headers, rows);
     let table_bounds = Bounds::new(point(px(rect.x as f32), px(rect.y as f32)), size(px(rect.w as f32), px(rect.h as f32)));
 
-    painter = painter
-        .save()
-        .shadow(pal.card_shadow, px(8.0), point(px(0.0), px(2.0)))
-        .begin_path()
-        .fill_color(tone.fill)
-        .round_rect(table_bounds, px(8.0))
-        .fill()
-        .restore();
+    if fast_shadows {
+        let shadow_bounds = Bounds::new(point(px(rect.x as f32), px((rect.y + 2.0) as f32)), size(px(rect.w as f32), px(rect.h as f32)));
+        painter = painter
+            .begin_path()
+            .fill_color(fast_shadow_color(pal))
+            .round_rect(shadow_bounds, px(8.0))
+            .fill()
+            .begin_path()
+            .fill_color(tone.fill)
+            .round_rect(table_bounds, px(8.0))
+            .fill();
+    } else {
+        painter = painter
+            .save()
+            .shadow(pal.card_shadow, px(8.0), point(px(0.0), px(2.0)))
+            .begin_path()
+            .fill_color(tone.fill)
+            .round_rect(table_bounds, px(8.0))
+            .fill()
+            .restore();
+    }
 
     if layout.header_height > 0.0 {
         let hb = Bounds::new(
@@ -1774,15 +1962,26 @@ pub fn paint_overlay_layer_painter_filtered(
     dismissed_notes: &BTreeSet<String>,
 ) -> Painter {
     let pal = WhiteboardPalette::for_mode(dark);
-    let mut painter = Painter::new();
     let zoom = controller.camera.zoom;
-
-    // 1. Live world-space interactive overlays & previews.
-    painter = painter
+    let painter = Painter::new()
         .save()
         .translate(controller.camera.pan_x as f32, controller.camera.pan_y as f32)
         .scale(zoom as f32, zoom as f32);
+    let painter = paint_overlay_world_contents(painter, controller, &pal, zoom, dismissed_notes, false).restore();
+    let _ = viewport_size;
+    painter
+}
 
+/// Paints world-space interactive chrome (presence viewports/regions/cursors, drag previews,
+/// anchor ports, selection handles, and snap guides) into a painter already transformed to world space.
+fn paint_overlay_world_contents(
+    mut painter: Painter,
+    controller: &WhiteboardController,
+    pal: &WhiteboardPalette,
+    zoom: f64,
+    dismissed_notes: &BTreeSet<String>,
+    fast_shadows: bool,
+) -> Painter {
     // Remote collaborator viewport outlines, highlight/claim boxes, and element claim outlines.
     for p in &controller.doc.presences {
         let p_color = pal.resolve_presence_color(p);
@@ -1792,11 +1991,11 @@ pub fn paint_overlay_layer_painter_filtered(
         if let Some(vp) = pose.viewport
             && let Some(r) = vp.rect()
         {
-            painter = paint_presence_viewport(painter, r, p, p_color, zoom as f32, is_followed, &pal);
+            painter = paint_presence_viewport(painter, r, p, p_color, zoom as f32, is_followed, pal);
         }
 
         if let Some(r) = pose.region_rect(p.kind) {
-            painter = paint_presence_region(painter, r, p, p_color, zoom as f32, &pal);
+            painter = paint_presence_region(painter, r, p, p_color, zoom as f32, pal, fast_shadows);
         }
 
         for sel_id in &p.selected_ids {
@@ -1842,7 +2041,7 @@ pub fn paint_overlay_layer_painter_filtered(
             } else {
                 controller.active_ink_color.as_str()
             };
-            painter = paint_ink_stroke(painter, points, stroke, width, *mode, &pal);
+            painter = paint_ink_stroke(painter, points, stroke, width, *mode, pal);
         }
         InteractionMode::ConnectingArrow { from, cur_world, snap_target } => {
             if let Some(start) = live_anchor_point(from, &controller.lookup) {
@@ -2119,14 +2318,11 @@ pub fn paint_overlay_layer_painter_filtered(
     }
 
     // Collaborator cursors (using smoothly interpolated poses).
-    painter = paint_presences_for_controller(painter, controller, &pal, zoom as f32, dismissed_notes);
-
-    painter = painter.restore();
+    painter = paint_presences_for_controller(painter, controller, pal, zoom as f32, dismissed_notes, fast_shadows);
 
     let _ = container_header_rect;
     let _ = Size::<nsh_core::prelude::Points>::default();
     let _ = anchor_point;
-    let _ = viewport_size;
     painter
 }
 
@@ -2175,7 +2371,7 @@ fn paint_presence_viewport(mut painter: Painter, rect: Rect2, p: &Presence, colo
         .restore()
 }
 
-fn paint_presence_region(mut painter: Painter, rect: Rect2, p: &Presence, color: Hsla, zoom: f32, pal: &WhiteboardPalette) -> Painter {
+fn paint_presence_region(mut painter: Painter, rect: Rect2, p: &Presence, color: Hsla, zoom: f32, pal: &WhiteboardPalette, fast_shadows: bool) -> Painter {
     let inv = 1.0 / zoom.max(0.25);
     let b = Bounds::new(point(px(rect.x as f32), px(rect.y as f32)), size(px(rect.w as f32), px(rect.h as f32)));
     let tint = Hsla { a: 0.09, ..color };
@@ -2201,15 +2397,29 @@ fn paint_presence_region(mut painter: Painter, rect: Rect2, p: &Presence, color:
     let bw = (measure_text_span(&badge, 11.0, true) + 18.0).max(48.0) as f32;
     let bh = 22.0_f32;
     let chip = Bounds::new(point(px(10.0), px(-bh * 0.5)), size(px(bw), px(bh)));
+    painter = painter.save().translate(rect.x as f32, rect.y as f32).scale(inv, inv);
+    if fast_shadows {
+        let shadow_chip = Bounds::new(point(px(10.0), px(-bh * 0.5 + 1.5)), size(px(bw), px(bh)));
+        painter = painter
+            .begin_path()
+            .fill_color(fast_shadow_color(pal))
+            .round_rect(shadow_chip, px(11.0))
+            .fill()
+            .begin_path()
+            .fill_color(color)
+            .round_rect(chip, px(11.0))
+            .fill();
+    } else {
+        painter = painter
+            .save()
+            .shadow(pal.card_shadow, px(4.0), point(px(0.0), px(1.5)))
+            .begin_path()
+            .fill_color(color)
+            .round_rect(chip, px(11.0))
+            .fill()
+            .restore();
+    }
     painter
-        .save()
-        .translate(rect.x as f32, rect.y as f32)
-        .scale(inv, inv)
-        .shadow(pal.card_shadow, px(4.0), point(px(0.0), px(1.5)))
-        .begin_path()
-        .fill_color(color)
-        .round_rect(chip, px(11.0))
-        .fill()
         .fill_color(pal.pill_ink)
         .font("600 11px 'PingFang SC', system-ui, sans-serif")
         .text_align(CanvasTextAlign::Center)
@@ -2224,10 +2434,11 @@ fn paint_presences_for_controller(
     pal: &WhiteboardPalette,
     zoom: f32,
     dismissed_notes: &BTreeSet<String>,
+    fast_shadows: bool,
 ) -> Painter {
     for p in &controller.doc.presences {
         let pose = controller.displayed_pose(p);
-        painter = paint_presence_cursor(painter, p, pose, pal, zoom, dismissed_notes);
+        painter = paint_presence_cursor(painter, p, pose, pal, zoom, dismissed_notes, fast_shadows);
     }
     painter
 }
@@ -2242,9 +2453,9 @@ pub fn paint_presences_into_painter(mut painter: Painter, doc: &BoardDoc, pal: &
             painter = paint_presence_viewport(painter, r, p, color, zoom, false, pal);
         }
         if let Some(r) = pose.region_rect(p.kind) {
-            painter = paint_presence_region(painter, r, p, color, zoom, pal);
+            painter = paint_presence_region(painter, r, p, color, zoom, pal, false);
         }
-        painter = paint_presence_cursor(painter, p, pose, pal, zoom, dismissed_notes);
+        painter = paint_presence_cursor(painter, p, pose, pal, zoom, dismissed_notes, false);
     }
     painter
 }
@@ -2256,6 +2467,7 @@ fn paint_presence_cursor(
     pal: &WhiteboardPalette,
     zoom: f32,
     dismissed_notes: &BTreeSet<String>,
+    fast_shadows: bool,
 ) -> Painter {
     // Viewport-only presences or highlight/claim regions with an explicit box already render their own badge.
     if !p.has_cursor || (matches!(p.kind, PresenceKind::Highlight | PresenceKind::Claim) && pose.region_rect(p.kind).is_some()) {
@@ -2306,14 +2518,28 @@ fn paint_presence_cursor(
         let pb = Bounds::new(point(px(10.0), px(10.0)), size(px(pill_w), px(pill_h)));
         let close_cx = 10.0 + pill_w - 17.0;
         let close_cy = 10.0 + pill_h * 0.5;
+        if fast_shadows {
+            let shadow_pb = Bounds::new(point(px(10.0), px(12.0)), size(px(pill_w), px(pill_h)));
+            painter = painter
+                .begin_path()
+                .fill_color(fast_shadow_color(pal))
+                .round_rect(shadow_pb, px(10.0))
+                .fill()
+                .begin_path()
+                .fill_color(color)
+                .round_rect(pb, px(10.0))
+                .fill();
+        } else {
+            painter = painter
+                .save()
+                .shadow(pal.card_shadow, px(7.0), point(px(0.0), px(2.0)))
+                .begin_path()
+                .fill_color(color)
+                .round_rect(pb, px(10.0))
+                .fill()
+                .restore();
+        }
         painter = painter
-            .save()
-            .shadow(pal.card_shadow, px(7.0), point(px(0.0), px(2.0)))
-            .begin_path()
-            .fill_color(color)
-            .round_rect(pb, px(10.0))
-            .fill()
-            .restore()
             .fill_color(pal.pill_ink)
             .font("500 12.5px 'PingFang SC', system-ui, sans-serif")
             .text_align(CanvasTextAlign::Left)
@@ -2336,14 +2562,28 @@ fn paint_presence_cursor(
         let pill_w = (measure_text_span(&label, 11.5, true) + 18.0).max(40.0) as f32;
         let pill_h = 22.0_f32;
         let pb = Bounds::new(point(px(10.0), px(10.0)), size(px(pill_w), px(pill_h)));
+        if fast_shadows {
+            let shadow_pb = Bounds::new(point(px(10.0), px(12.0)), size(px(pill_w), px(pill_h)));
+            painter = painter
+                .begin_path()
+                .fill_color(fast_shadow_color(pal))
+                .round_rect(shadow_pb, px(11.0))
+                .fill()
+                .begin_path()
+                .fill_color(color)
+                .round_rect(pb, px(11.0))
+                .fill();
+        } else {
+            painter = painter
+                .save()
+                .shadow(pal.card_shadow, px(5.0), point(px(0.0), px(2.0)))
+                .begin_path()
+                .fill_color(color)
+                .round_rect(pb, px(11.0))
+                .fill()
+                .restore();
+        }
         painter = painter
-            .save()
-            .shadow(pal.card_shadow, px(5.0), point(px(0.0), px(2.0)))
-            .begin_path()
-            .fill_color(color)
-            .round_rect(pb, px(11.0))
-            .fill()
-            .restore()
             .fill_color(pal.pill_ink)
             .font("600 11.5px 'PingFang SC', system-ui, sans-serif")
             .text_align(CanvasTextAlign::Center)

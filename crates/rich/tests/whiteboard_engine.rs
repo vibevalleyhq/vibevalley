@@ -1025,3 +1025,87 @@ fn presence_decode_smooth_interpolation_follow_viewport_and_manual_exit() {
     assert!(ctrl.follow_actor.is_none());
     assert!(gone_effs.contains(&ControllerEffect::FollowChanged(None)));
 }
+
+#[test]
+fn wheel_zoom_scales_line_deltas_and_ignores_zero_deltas() {
+    let mut ctrl = WhiteboardController::new(build_template_doc(TemplateKind::Architecture, &TemplateCopy::en()));
+    ctrl.set_viewport_size(1200.0, 760.0);
+    ctrl.follow_actor = Some("peer-1".to_owned());
+    let initial_cam = ctrl.camera;
+
+    // Zero wheel delta is a complete no-op (no effects, no camera drift, follow stays intact).
+    let zero_wheel = ctrl.handle_wheel(
+        Point2::new(600.0, 380.0),
+        0.0,
+        0.0,
+        true,
+        Modifiers {
+            accel: true,
+            ..Modifiers::default()
+        },
+    );
+    assert!(zero_wheel.is_empty());
+    assert_eq!(ctrl.camera, initial_cam);
+    assert_eq!(ctrl.follow_actor.as_deref(), Some("peer-1"));
+
+    // Zero pinch delta is also a complete no-op.
+    let zero_pinch = ctrl.handle_pinch(Point2::new(600.0, 380.0), 0.0);
+    assert!(zero_pinch.is_empty());
+    assert_eq!(ctrl.camera, initial_cam);
+    assert_eq!(ctrl.follow_actor.as_deref(), Some("peer-1"));
+
+    // Non-precise (mouse wheel line-delta) Cmd/Ctrl+scroll scales delta_y by 22x to match precise trackpad zoom.
+    let cursor = Point2::new(500.0, 320.0);
+    let mut precise_ctrl = WhiteboardController::new(build_template_doc(TemplateKind::Architecture, &TemplateCopy::en()));
+    precise_ctrl.set_viewport_size(1200.0, 760.0);
+    let accel = Modifiers {
+        accel: true,
+        ..Modifiers::default()
+    };
+    let line_effs = ctrl.handle_wheel(cursor, 0.0, -3.0, false, accel);
+    let precise_effs = precise_ctrl.handle_wheel(cursor, 0.0, -66.0, true, accel);
+    assert!(line_effs.iter().any(|e| matches!(e, ControllerEffect::ViewportChanged { .. })));
+    assert!(precise_effs.iter().any(|e| matches!(e, ControllerEffect::ViewportChanged { .. })));
+    assert!(ctrl.camera.zoom > initial_cam.zoom * 1.25, "line-delta wheel zoom should zoom visibly");
+    assert!(
+        (ctrl.camera.zoom - precise_ctrl.camera.zoom).abs() < 1e-6,
+        "line-delta (-3.0) must match precise (-66.0) zoom factor"
+    );
+}
+
+#[test]
+fn regression_creating_text_card_sticky_or_callout_emits_open_inline_editor() {
+    let mut ctrl = WhiteboardController::new(BoardDoc::new("Create Inline"));
+    ctrl.set_viewport_size(1200.0, 760.0);
+
+    let click = |x: f64, y: f64| PointerInput {
+        screen_pos: Point2::new(x, y),
+        clicks: 1,
+        button: PointerButton::Primary,
+        modifiers: Modifiers::default(),
+        pressure: 0.6,
+    };
+
+    for (idx, tool) in [Tool::Card, Tool::Text, Tool::Sticky, Tool::Callout].into_iter().enumerate() {
+        ctrl.set_tool(tool.clone());
+        let pos = click(200.0 + idx as f64 * 120.0, 240.0);
+        let _ = ctrl.handle_pointer_down(pos);
+        let up_effs = ctrl.handle_pointer_up(pos);
+        assert_eq!(ctrl.tool, Tool::Select, "finish_create should still reset tool to Select for {tool:?}");
+        let opened = up_effs.iter().find_map(|e| match e {
+            ControllerEffect::OpenInlineEditor(target) => Some(target),
+            _ => None,
+        });
+        let target = opened.unwrap_or_else(|| panic!("creating {tool:?} must emit OpenInlineEditor"));
+        assert!(ctrl.doc.element(&target.id).is_some(), "inline target must reference the newly created element");
+    }
+
+    // Non-text tools (e.g., plain Rect) keep creating without auto-opening the inline editor.
+    ctrl.set_tool(Tool::Shape(ShapeKind::Rect));
+    let _ = ctrl.handle_pointer_down(click(400.0, 420.0));
+    let rect_effs = ctrl.handle_pointer_up(click(520.0, 500.0));
+    assert!(
+        !rect_effs.iter().any(|e| matches!(e, ControllerEffect::OpenInlineEditor(_))),
+        "plain Rect creation should not auto-open inline editor"
+    );
+}

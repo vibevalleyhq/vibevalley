@@ -93,13 +93,22 @@ impl Runtime for MockRuntime {
     }
 
     fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
-        Ok(vec![ModelInfo {
-            id: "gemini-4-neon".into(),
-            display_name: "Gemini 4 Neon".into(),
-            effort_levels: vec!["low".into(), "medium".into(), "high".into()],
-            default_effort: Some("high".into()),
-            is_default: true,
-        }])
+        Ok(vec![
+            ModelInfo {
+                id: "gemini-4-neon".into(),
+                display_name: "Gemini 4 Neon".into(),
+                effort_levels: vec!["low".into(), "medium".into(), "high".into()],
+                default_effort: Some("high".into()),
+                is_default: true,
+            },
+            ModelInfo {
+                id: "gemini-pro-orchestrator-neon".into(),
+                display_name: "Orchestrator (Neon)".into(),
+                effort_levels: vec![],
+                default_effort: None,
+                is_default: false,
+            },
+        ])
     }
 
     fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn Session>> {
@@ -1123,6 +1132,123 @@ fn workspace_session_title_updates_dedup_and_persists_across_restart() {
     let state2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(state2["kind"], "state");
     assert_eq!(state2["title"], "Refactor Workspace Titles");
+    reopened.hub.unsubscribe(sub2);
+    reopened.close();
+}
+
+#[test]
+fn workspace_session_omits_effort_for_models_without_effort_levels_and_clears_on_model_switch() {
+    vibevalley_i18n::set_locale("zh");
+    let home = tempfile::tempdir().unwrap();
+    let repo_dir = home.path().join("effort-repo");
+    std::fs::create_dir_all(&repo_dir).unwrap();
+    let cwd = repo_dir.to_string_lossy().into_owned();
+
+    let (rt, log) = MockRuntime::new("antigravity", vec![]);
+    let server = start_with(home.path(), rt);
+    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+
+    // Populate cached runtime models and set a runtime-wide default effort.
+    let refreshed = call("runtime.refresh", json!({ "id": "antigravity" }));
+    assert_eq!(refreshed.biz_code, 0, "{}", refreshed.message);
+    let updated = call(
+        "runtime.setting.update",
+        json!({
+            "id": "antigravity",
+            "enabled": true,
+            "binPath": "",
+            "defaultModel": "",
+            "defaultEffort": "medium",
+            "env": {}
+        }),
+    );
+    assert_eq!(updated.biz_code, 0, "{}", updated.message);
+
+    // 1. Opening a model with empty `effort_levels` omits inherited runtime default effort.
+    let opened_default = call(
+        "session.openWorkspace",
+        json!({
+            "runtime": "antigravity",
+            "cwd": cwd,
+            "model": "gemini-pro-orchestrator-neon"
+        }),
+    );
+    assert_eq!(opened_default.biz_code, 0, "{}", opened_default.message);
+    let ws_default = opened_default.data.unwrap();
+    assert_eq!(ws_default["model"], "gemini-pro-orchestrator-neon");
+    assert!(ws_default["effort"].is_null(), "expected null effort: {ws_default}");
+    assert_eq!(log.lock().unwrap().opened.last().unwrap().effort, None);
+
+    // 2. Passing a stale effort for a model with empty `effort_levels` also resolves to None.
+    let opened_stale = call(
+        "session.openWorkspace",
+        json!({
+            "runtime": "antigravity",
+            "cwd": cwd,
+            "model": "gemini-pro-orchestrator-neon",
+            "effort": "high"
+        }),
+    );
+    assert_eq!(opened_stale.biz_code, 0, "{}", opened_stale.message);
+    let ws_stale = opened_stale.data.unwrap();
+    assert_eq!(ws_stale["model"], "gemini-pro-orchestrator-neon");
+    assert!(ws_stale["effort"].is_null(), "expected null effort: {ws_stale}");
+    assert_eq!(log.lock().unwrap().opened.last().unwrap().effort, None);
+
+    // 3. Opening a model that supports the runtime default keeps it, and switching models
+    // via `session.setConfig` without passing `effort` clears the stale effort.
+    let opened_neon = call(
+        "session.openWorkspace",
+        json!({
+            "runtime": "antigravity",
+            "cwd": cwd,
+            "model": "gemini-4-neon"
+        }),
+    );
+    assert_eq!(opened_neon.biz_code, 0, "{}", opened_neon.message);
+    let ws_neon = opened_neon.data.unwrap();
+    let sid = ws_neon["id"].as_str().unwrap().to_string();
+    assert_eq!(ws_neon["effort"], "medium");
+    assert_eq!(log.lock().unwrap().opened.last().unwrap().effort.as_deref(), Some("medium"));
+
+    let (sub, rx) = server.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let _hist = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    let initial_state = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert_eq!(initial_state["effort"], "medium");
+
+    // Updating only permissionMode keeps the current effort.
+    let perm_only = call("session.setConfig", json!({ "id": sid, "permissionMode": "bypass" }));
+    assert_eq!(perm_only.biz_code, 0, "{}", perm_only.message);
+    assert_eq!(perm_only.data.unwrap()["effort"], "medium");
+
+    // Switching model without passing `effort` clears effort in reply, watch state, and persisted meta.
+    let switched = call("session.setConfig", json!({ "id": sid, "model": "gemini-pro-orchestrator-neon" }));
+    assert_eq!(switched.biz_code, 0, "{}", switched.message);
+    let switched_data = switched.data.unwrap();
+    assert_eq!(switched_data["model"], "gemini-pro-orchestrator-neon");
+    assert!(switched_data["effort"].is_null(), "expected null effort after model switch: {switched_data}");
+    assert_eq!(
+        log.lock().unwrap().configs.last(),
+        Some(&(Some("gemini-pro-orchestrator-neon".into()), None, None))
+    );
+    let switched_state = recv_until(&rx, "model switch clears effort", |v| {
+        v["kind"] == "state" && v["model"] == "gemini-pro-orchestrator-neon"
+    });
+    assert!(switched_state["effort"].is_null(), "watch state retained stale effort: {switched_state}");
+
+    server.hub.unsubscribe(sub);
+    server.close();
+    drop(server);
+
+    // Persisted workspace meta retains the cleared effort across restart.
+    let (rt2, _log2) = MockRuntime::new("antigravity", vec![]);
+    let reopened = start_with(home.path(), rt2);
+    let (sub2, rx2) = reopened.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let _hist2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
+    let state2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert_eq!(state2["kind"], "state");
+    assert_eq!(state2["model"], "gemini-pro-orchestrator-neon");
+    assert!(state2["effort"].is_null(), "persisted state retained stale effort: {state2}");
     reopened.hub.unsubscribe(sub2);
     reopened.close();
 }

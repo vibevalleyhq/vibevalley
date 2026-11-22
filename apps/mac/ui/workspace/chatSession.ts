@@ -64,6 +64,7 @@ export interface RuntimeModelOption {
   readonly label: string;
   readonly effortLevels: readonly ThoughtLevel[];
   readonly defaultEffort?: ThoughtLevel | undefined;
+  readonly isDefault?: boolean | undefined;
 }
 
 export interface WorkspaceRuntimeOption {
@@ -71,6 +72,7 @@ export interface WorkspaceRuntimeOption {
   readonly name: string;
   readonly available: boolean;
   readonly models: readonly RuntimeModelOption[];
+  readonly defaultModel?: string | undefined;
   readonly quotaPct?: number | undefined;
   readonly quotaText?: string | undefined;
   readonly supportsSteer: boolean;
@@ -122,14 +124,21 @@ const FALLBACK_RUNTIMES: readonly WorkspaceRuntimeOption[] = [
 
 const runtimeListSchema = z.array(RuntimeInfoSchema);
 
-function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOption {
-  const models: RuntimeModelOption[] = (rt.models ?? []).map((m) => {
-    const levels = m.effortLevels.map(asThoughtLevel).filter((v): v is ThoughtLevel => v !== undefined);
+export function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOption {
+  const refusedEffort = rt.support.refused.effort !== undefined;
+  const rawModels = rt.models ?? [];
+  const hasPerModelEfforts = rawModels.some((m) => m.effortLevels.some((l) => asThoughtLevel(l) !== undefined));
+  const models: RuntimeModelOption[] = rawModels.map((m) => {
+    const levels = refusedEffort ? [] : m.effortLevels.map(asThoughtLevel).filter((v): v is ThoughtLevel => v !== undefined);
+    const effortLevels: readonly ThoughtLevel[] = levels.length > 0 ? levels : !hasPerModelEfforts && !refusedEffort ? DEFAULT_EFFORTS : [];
+    const parsedDefault = asThoughtLevel(m.defaultEffort);
+    const defaultEffort = parsedDefault !== undefined && effortLevels.includes(parsedDefault) ? parsedDefault : undefined;
     return {
       id: m.id,
       label: m.name || m.id,
-      effortLevels: levels.length > 0 ? levels : DEFAULT_EFFORTS,
-      defaultEffort: asThoughtLevel(m.defaultEffort),
+      effortLevels,
+      defaultEffort,
+      isDefault: m.isDefault,
     };
   });
   const firstWindow = rt.usage?.status === "ok" ? rt.usage.windows[0] : undefined;
@@ -144,11 +153,29 @@ function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOption {
     name: rt.preset.label || runtimeDisplayName(rt.id),
     available: rt.installation.status === "available",
     models,
+    defaultModel: rt.settings.defaultModel.trim() || undefined,
     quotaPct,
     quotaText: rt.quota?.text ?? firstWindow?.label,
     supportsSteer: rt.support.steer,
     supportsConfig: rt.support.inSessionConfig ?? true,
   };
+}
+
+export function preferredModelFor(rt: WorkspaceRuntimeOption | undefined): RuntimeModelOption | undefined {
+  if (!rt) return undefined;
+  return rt.models.find((m) => m.id === rt.defaultModel) ?? rt.models.find((m) => m.isDefault === true) ?? rt.models[0];
+}
+
+export function defaultThoughtLevelFor(model: RuntimeModelOption | undefined): ThoughtLevel | undefined {
+  if (!model || model.effortLevels.length === 0) return undefined;
+  if (model.defaultEffort !== undefined && model.effortLevels.includes(model.defaultEffort)) return model.defaultEffort;
+  return model.effortLevels[0];
+}
+
+export function clampThoughtLevel(model: RuntimeModelOption | undefined, current: ThoughtLevel | undefined): ThoughtLevel | undefined {
+  if (!model || model.effortLevels.length === 0) return undefined;
+  if (current !== undefined && model.effortLevels.includes(current)) return current;
+  return defaultThoughtLevelFor(model);
 }
 
 export async function fetchWorkspaceRuntimes(): Promise<readonly WorkspaceRuntimeOption[]> {

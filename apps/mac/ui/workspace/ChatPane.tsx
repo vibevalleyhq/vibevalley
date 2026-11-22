@@ -15,7 +15,9 @@ import { act, hostApi } from "../infra/bridge";
 import { richNative } from "../infra/rich";
 import {
   asThoughtLevel,
+  clampThoughtLevel,
   computeTelemetry,
+  defaultThoughtLevelFor,
   deriveChatTitle,
   extractToolTarget,
   fetchWorkspaceRuntimes,
@@ -23,6 +25,7 @@ import {
   mergeChatSteps,
   openWorkspaceSession,
   pickWorkspaceFile,
+  preferredModelFor,
   respondWorkspaceInteraction,
   respondWorkspacePermission,
   runtimeDisplayName,
@@ -416,7 +419,7 @@ export function WorkspaceChatPane() {
   const sessionTitle = signal<string | undefined>(initialTitle);
   const runtime = signal<string>(initialRuntime);
   const model = signal<string>("");
-  const thoughtLevel = signal<ThoughtLevel>("medium");
+  const thoughtLevel = signal<ThoughtLevel | undefined>(undefined);
   const permissionMode = signal<SessionPermissionMode>("acceptEdits");
   const phase = signal<ChatPhase>(initialSessionId ? "starting" : "ready");
   const steps = signal<SessionEvent[]>([]);
@@ -440,7 +443,8 @@ export function WorkspaceChatPane() {
   const currentModels = () => currentRuntime()?.models ?? [];
   const currentModelInfo = () => currentModels().find((m) => m.id === model());
   const modelTriggerLabel = () => currentModelInfo()?.label ?? runtimeDisplayName(runtime());
-  const effortOptions = (): readonly ThoughtLevel[] => currentModelInfo()?.effortLevels ?? ["low", "medium", "high"];
+  const effortOptions = (): readonly ThoughtLevel[] => currentModelInfo()?.effortLevels ?? [];
+  const effectiveThoughtLevel = (): ThoughtLevel | undefined => clampThoughtLevel(currentModelInfo(), thoughtLevel());
   const hasAttention = () => pendingInteractions().length > 0 || pendingPermissions().length > 0;
   const effectivePhase = (): ChatPhase => (hasAttention() ? "waiting" : phase());
   const firstUserMessage = () => steps().find((s) => s.type === "user/message" && s.under === undefined)?.text;
@@ -452,10 +456,16 @@ export function WorkspaceChatPane() {
     void fetchWorkspaceRuntimes().then((list) => {
       runtimes.set(list);
       const active = list.find((r) => r.id === untracked(runtime));
-      const firstModel = active?.models[0];
-      if (firstModel !== undefined && untracked(model) === "") {
-        model.set(firstModel.id);
-        if (firstModel.defaultEffort !== undefined) thoughtLevel.set(firstModel.defaultEffort);
+      const curModel = untracked(model);
+      if (curModel === "") {
+        const chosen = preferredModelFor(active);
+        if (chosen !== undefined) {
+          model.set(chosen.id);
+          thoughtLevel.set(defaultThoughtLevelFor(chosen));
+        }
+      } else {
+        const chosen = active?.models.find((m) => m.id === curModel);
+        thoughtLevel.set(clampThoughtLevel(chosen, untracked(thoughtLevel)));
       }
     });
   }
@@ -487,8 +497,14 @@ export function WorkspaceChatPane() {
           phase.set(phaseFromSessionTag(ev.session.phase._tag));
           if (ev.title !== undefined) sessionTitle.set(ev.title.trim() || undefined);
           if (ev.model !== undefined) model.set(ev.model);
+          const activeModelId = ev.model ?? untracked(model);
+          const info = untracked(currentModels).find((m) => m.id === activeModelId);
           const nextEffort = asThoughtLevel(ev.effort);
-          if (nextEffort !== undefined) thoughtLevel.set(nextEffort);
+          if (nextEffort !== undefined) {
+            thoughtLevel.set(info !== undefined ? clampThoughtLevel(info, nextEffort) : nextEffort);
+          } else if (ev.effort === undefined || (info !== undefined && info.effortLevels.length === 0)) {
+            thoughtLevel.set(undefined);
+          }
           permissionMode.set(ev.permissionMode);
           pendingPermissions.set(ev.pendingPermissions);
           pendingInteractions.set(ev.pendingInteractions);
@@ -541,12 +557,13 @@ export function WorkspaceChatPane() {
     const existing = untracked(sessionId);
     if (existing) return existing;
     phase.set("starting");
+    const effort = untracked(effectiveThoughtLevel);
     const res = await openWorkspaceSession({
       cwd,
       repo,
       runtime: untracked(runtime),
       model: untracked(model) || undefined,
-      effort: untracked(thoughtLevel),
+      ...(effort !== undefined ? { effort } : {}),
       permissionMode: untracked(permissionMode),
     });
     if (!res.ok) {
@@ -557,8 +574,14 @@ export function WorkspaceChatPane() {
     const ws = res.workspace;
     if (ws.title !== undefined) sessionTitle.set(ws.title.trim() || undefined);
     if (ws.model !== undefined) model.set(ws.model);
+    const activeModelId = ws.model ?? untracked(model);
+    const info = untracked(currentModels).find((m) => m.id === activeModelId);
     const wsEffort = asThoughtLevel(ws.effort);
-    if (wsEffort !== undefined) thoughtLevel.set(wsEffort);
+    if (wsEffort !== undefined) {
+      thoughtLevel.set(info !== undefined ? clampThoughtLevel(info, wsEffort) : wsEffort);
+    } else if (info !== undefined && info.effortLevels.length === 0) {
+      thoughtLevel.set(undefined);
+    }
     permissionMode.set(ws.permissionMode);
     sessionId.set(ws.id);
     return ws.id;
@@ -1069,8 +1092,9 @@ export function WorkspaceChatPane() {
                           const nextRt = opt().value;
                           runtime.set(nextRt);
                           const found = runtimes().find((r) => r.id === nextRt);
-                          model.set(found?.models[0]?.id ?? "");
-                          if (found?.models[0]?.defaultEffort) thoughtLevel.set(found.models[0].defaultEffort);
+                          const nextModel = preferredModelFor(found);
+                          model.set(nextModel?.id ?? "");
+                          thoughtLevel.set(defaultThoughtLevelFor(nextModel));
                         }}
                         class={composerMenuItemClass}
                       >
@@ -1095,7 +1119,7 @@ export function WorkspaceChatPane() {
                           const nextModel = opt().value;
                           model.set(nextModel);
                           const info = currentModels().find((m) => m.id === nextModel);
-                          if (info?.defaultEffort) thoughtLevel.set(info.defaultEffort);
+                          thoughtLevel.set(defaultThoughtLevelFor(info));
                           void applyConfig({ model: nextModel });
                         }}
                         class={composerMenuItemClass}
@@ -1110,47 +1134,49 @@ export function WorkspaceChatPane() {
                 </If>
               </Menu>
 
-              <Menu
-                placement="top"
-                align="start"
-                offset={6}
-                popupClass={composerMenuClass}
-                popupStartingClass={popupTransition("opacity-0")}
-                popupEndingClass={popupTransition("opacity-0")}
-                trigger={
-                  <View
-                    testID="chat-thought-level"
-                    accessibilityLabel={t("web.shell.chat.thoughtLevel")}
-                    tooltip={<Bubble text={t("web.shell.chat.thoughtLevel")} />}
-                    class="h-7 shrink-0 flex-row items-center gap-1 rounded-md px-2 hover:bg-hover aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
-                  >
-                    <Icon name="idea" size={12} tone="faint" />
-                    <Text class="text-xs font-medium text-muted">{thoughtLabel(thoughtLevel())}</Text>
-                    <View class="shrink-0" style={{ transform: [{ rotate: "90deg" }] }}>
-                      <Icon name="expand" size={9} tone="faint" />
-                    </View>
-                  </View>
-                }
-              >
-                <Each of={effortOptions()} key={(lvl) => lvl}>
-                  {(lvl) => (
-                    <MenuItem
-                      testID={`chat-thought-level-${lvl()}`}
-                      onSelect={() => {
-                        const next = lvl();
-                        thoughtLevel.set(next);
-                        void applyConfig({ effort: next });
-                      }}
-                      class={composerMenuItemClass}
+              <If when={effortOptions().length > 0}>
+                <Menu
+                  placement="top"
+                  align="start"
+                  offset={6}
+                  popupClass={composerMenuClass}
+                  popupStartingClass={popupTransition("opacity-0")}
+                  popupEndingClass={popupTransition("opacity-0")}
+                  trigger={
+                    <View
+                      testID="chat-thought-level"
+                      accessibilityLabel={t("web.shell.chat.thoughtLevel")}
+                      tooltip={<Bubble text={t("web.shell.chat.thoughtLevel")} />}
+                      class="h-7 shrink-0 flex-row items-center gap-1 rounded-md px-2 hover:bg-hover aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
                     >
-                      <Text class="text-xs text-ink">{thoughtLabel(lvl())}</Text>
-                      <If when={thoughtLevel() === lvl()}>
-                        <Icon name="check" size={12} tone="accent" />
-                      </If>
-                    </MenuItem>
-                  )}
-                </Each>
-              </Menu>
+                      <Icon name="idea" size={12} tone="faint" />
+                      <Text class="text-xs font-medium text-muted">{thoughtLabel(effectiveThoughtLevel() ?? effortOptions()[0] ?? "medium")}</Text>
+                      <View class="shrink-0" style={{ transform: [{ rotate: "90deg" }] }}>
+                        <Icon name="expand" size={9} tone="faint" />
+                      </View>
+                    </View>
+                  }
+                >
+                  <Each of={effortOptions()} key={(lvl) => lvl}>
+                    {(lvl) => (
+                      <MenuItem
+                        testID={`chat-thought-level-${lvl()}`}
+                        onSelect={() => {
+                          const next = lvl();
+                          thoughtLevel.set(next);
+                          void applyConfig({ effort: next });
+                        }}
+                        class={composerMenuItemClass}
+                      >
+                        <Text class="text-xs text-ink">{thoughtLabel(lvl())}</Text>
+                        <If when={effectiveThoughtLevel() === lvl()}>
+                          <Icon name="check" size={12} tone="accent" />
+                        </If>
+                      </MenuItem>
+                    )}
+                  </Each>
+                </Menu>
+              </If>
             </View>
 
             <View class="shrink-0 flex-row items-center gap-1">
