@@ -1,6 +1,7 @@
 import { colorScheme, effect, host, keymap, Scroll, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
+import { isFreeUserSession } from "@vibevalley/protocol/rules";
 
 import { Button } from "../design/Button";
 import { OrchestratorFace } from "../design/domain/Face";
@@ -19,6 +20,7 @@ import { waitingOnUser } from "../features/inbox";
 import { NotesSearch } from "../features/pkm";
 import { Keyed, variant } from "../infra/base/dom";
 import { useCore, useFrames } from "../infra/frame";
+import { readHostParams } from "../infra/hostParams";
 import { NavLink, useLocation, useMatches } from "../infra/router";
 import { useUpdates } from "../infra/settings";
 import { catalogPlace, type Place, places, runsPlace, settingsPlace } from "./places";
@@ -96,12 +98,12 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
     return s ? variant(s, "_tag", "ready") : undefined;
   };
   const waiting = () => waitingOnUser(frames.frame?.inbox ?? []);
-  const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
+  const working = () => core()?.sessions.filter((s) => !isFreeUserSession(s) && s.phase._tag === "working").length ?? 0;
   const onRuns = () => props.here === runsPlace;
   const settings = settingsPlace;
   const atSettings = () => props.here === settings;
   const location = useLocation();
-  const globalShell = host.params.globalShell === true;
+  const globalShell = readHostParams().globalShell;
   const width = () => (globalShell ? (small() ? 68 : 76) : props.farm ? (small() ? 56 : 72) : small() ? 68 : 76);
   if (globalShell) {
     effect(() => host.post("action", { type: "global_rail", rail_width: width() }));

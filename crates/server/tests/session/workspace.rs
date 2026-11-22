@@ -609,9 +609,9 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
 
     // Verify `afterSeq` filtering on a second `session.watch` subscription.
     server.trajectories.flush(true);
-    let all_events = call("session.event.list", json!({ "id": sid })).data.unwrap();
-    let all_arr = all_events.as_array().unwrap();
-    assert!(all_arr.len() >= 3, "{all_events}");
+    let all_page = call("session.event.list", json!({ "id": sid })).data.unwrap();
+    let all_arr = all_page["events"].as_array().unwrap();
+    assert!(all_arr.len() >= 3, "{all_page}");
     let cutoff = all_arr[1]["seq"].as_i64().unwrap();
     let (sub2, rx2) = server.hub.subscribe("session.watch", json!({ "id": sid, "afterSeq": cutoff })).unwrap();
     let filtered = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
@@ -852,7 +852,7 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
     let worker_sess = until("issue session starts alongside workspace session", || {
         server
             .board
-            .read(|s| s.sessions.iter().find(|x| x.issue.as_deref() == Some(issue_id.as_str())).cloned())
+            .read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(issue_id.as_str())).cloned())
     });
 
     // Opening an issue session as a workspace chat is refused cleanly.
@@ -1250,5 +1250,76 @@ fn workspace_session_omits_effort_for_models_without_effort_levels_and_clears_on
     assert_eq!(state2["model"], "gemini-pro-orchestrator-neon");
     assert!(state2["effort"].is_null(), "persisted state retained stale effort: {state2}");
     reopened.hub.unsubscribe(sub2);
+    reopened.close();
+}
+
+#[test]
+fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
+    let home = tempfile::tempdir().unwrap();
+    let repo_dir = home.path().join("demo");
+    std::fs::create_dir_all(&repo_dir).unwrap();
+    let cwd = repo_dir.to_string_lossy().into_owned();
+
+    let (rt, _log) = MockRuntime::new(
+        "antigravity",
+        vec![MockTurn::EchoUsage(Usage {
+            input_tokens: Some(12),
+            output_tokens: Some(4),
+            ..Default::default()
+        })],
+    );
+    let server = start_with(home.path(), rt);
+    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+
+    assert_eq!(call("repo.create", json!({ "name": "demo" })).biz_code, 0);
+    let opened = call("session.openWorkspace", json!({ "runtime": "antigravity", "cwd": cwd, "repo": "demo" }));
+    assert_eq!(opened.biz_code, 0, "{}", opened.message);
+    let sid = opened.data.unwrap()["id"].as_str().unwrap().to_string();
+
+    assert_eq!(call("session.send", json!({ "id": sid, "text": "hello" })).biz_code, 0);
+    until("workspace turn finishes", || {
+        server.board.session(&sid).filter(|s| s.runs >= 1 && !s.phase.is_working())
+    });
+
+    // F1 leak isolation: 0-binding User session never enters board slots, inbox, FarmView plays/agents, memories, or issue_chat.
+    let frame = server.board.frame();
+    let room = server.board.read(|s| vibevalley_core::rules::room_left(&s.sessions, "demo", 6, 4, ""));
+    assert_eq!(room.farm, 6);
+    assert_eq!(room.repo, Some(4));
+    assert!(frame.inbox.is_empty());
+    assert!(!frame.view.plays.contains_key(&sid));
+    assert!(frame.view.plots.is_empty());
+    assert!(frame.state.progress.as_ref().is_none_or(|p| p.agents.is_empty()));
+    assert!(server.memories.list("antigravity").unwrap().is_empty());
+    let general = server.chat.default_channel();
+    let msgs = call("channel.message.list", json!({ "id": general })).data.unwrap();
+    assert!(msgs.as_array().unwrap().iter().all(|m| m["kind"] != "dispatch"));
+
+    // Create an issue and attach a ContextRef::Issue dynamically to the User session.
+    let issue = call("issue.create", json!({ "title": "attach me", "repo": "demo" })).data.unwrap();
+    let issue_id = issue["id"].as_str().unwrap().to_string();
+    let attached = call("session.binding.attach", json!({ "id": sid, "binding": { "kind": "issue", "id": issue_id } }));
+    assert_eq!(attached.biz_code, 0, "{}", attached.message);
+    let attached_data = attached.data.unwrap();
+    assert_eq!(attached_data["controller"], "user");
+    assert_eq!(attached_data["bindings"], json!([{ "kind": "issue", "id": issue_id }]));
+    assert!(server.board.session(&sid).unwrap().is_board_worker());
+    assert_eq!(server.board.session(&sid).unwrap().issue_id(), Some(issue_id.as_str()));
+
+    // Binding persists across server restart; detaching removes it cleanly.
+    server.close();
+    drop(server);
+    let (rt2, _log2) = MockRuntime::new("antigravity", vec![]);
+    let reopened = start_with(home.path(), rt2);
+    let persisted = reopened.board.session(&sid).unwrap();
+    assert_eq!(persisted.issue_id(), Some(issue_id.as_str()));
+    let detached = reopened.hub.call_as(
+        Caller::User,
+        "session.binding.detach",
+        json!({ "id": sid, "binding": { "kind": "issue", "id": issue_id } }),
+    );
+    assert_eq!(detached.biz_code, 0, "{}", detached.message);
+    assert_eq!(detached.data.unwrap()["bindings"], json!([]));
+    assert!(!reopened.board.session(&sid).unwrap().is_board_worker());
     reopened.close();
 }

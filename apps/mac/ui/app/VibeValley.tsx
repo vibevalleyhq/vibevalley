@@ -9,21 +9,23 @@ import { setLocale } from "@vibevalley/i18n";
 import { applyMotion } from "../design/motion";
 import { SOUNDS, playSound, type SoundName } from "../design/pixel/sound";
 import { useBridge } from "../infra/bridged";
+import { readHostParams } from "../infra/hostParams";
 import { appHistory } from "../infra/router";
 import { App } from "./Workbench";
 
 const isSoundName = (name: string): name is SoundName => Object.hasOwn(SOUNDS, name);
 
 export function VibeValley() {
-  setLocale(host.params.locale === "en" ? "en" : "zh");
-  applyMotion(host.params.motion);
+  const params = readHostParams();
+  setLocale(params.locale);
+  applyMotion(params.motion);
   useBridge();
-  const route = host.params.route;
-  if (typeof route === "string" && route !== "/") appHistory.navigate(route, { replace: true });
+  const route = params.route;
+  if (route !== undefined && route !== "/") appHistory.navigate(route, { replace: true });
   cleanup(host.on("route", (to) => typeof to === "string" && appHistory.navigate(to)));
   cleanup(host.on("locale", (loc) => (loc === "en" || loc === "zh") && setLocale(loc)));
   cleanup(host.on("motion", applyMotion));
-  if (host.params.globalShell === true) {
+  if (params.globalShell) {
     cleanup(
       host.on("farm-sound", (name) => {
         if (typeof name === "string" && isSoundName(name)) playSound(name);

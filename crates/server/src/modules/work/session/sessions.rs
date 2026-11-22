@@ -257,16 +257,26 @@ impl Sessions {
     pub fn hire(&self, h: Hire) -> Result<String> {
         let number = self.0.ledger.next("session", 0)?;
         let id = format!("w{number}");
-        let mut session = Session::worker(&id, h.name, now());
-        session.agent = h.drive.agent.clone();
-        session.runtime = h.drive.runtime_id.clone();
+        let policy = match h.issue.repo.clone() {
+            Some(repo) => vibevalley_protocol::ExecutionPolicy::ManagedWorktree { repo, branch: h.branch },
+            None => vibevalley_protocol::ExecutionPolicy::SandboxDir,
+        };
+        let mut session = Session::new(
+            &id,
+            vibevalley_protocol::SessionController::IssueBoard,
+            h.name,
+            h.drive.runtime_id.clone(),
+            policy,
+            now(),
+        );
+        session.profile = (!h.drive.agent.is_empty()).then(|| h.drive.agent.clone());
         session.brief = h.brief;
-        session.repo = h.issue.repo.clone();
-        session.branch = h.branch;
         self.set_extra(&id, |e| e.base = h.base)?;
-        session.worktree = Some(h.cwd.to_string_lossy().into_owned());
-        session.issue = Some(h.issue.id.clone());
-        session.refining = h.drafting;
+        session.cwd = Some(h.cwd.to_string_lossy().into_owned());
+        session.attach_binding(vibevalley_protocol::ContextRef::Issue {
+            id: h.issue.id.clone(),
+            refining: h.drafting.then_some(true),
+        });
         self.start(h.drive, session, h.issue, h.prompt, false, h.trigger)
     }
 
@@ -278,7 +288,7 @@ impl Sessions {
         session.phase = Phase::working(now(), SessionAction::Thinking, "");
         let started = IssueChange::Started {
             session: session.id.clone(),
-            worker: !session.refining,
+            worker: !session.is_refining(),
         };
         self.go_live(agent.clone(), session.clone(), Some((issue.id.as_str(), started)))?;
         let run = self.begin_run(&session.id, &issue.id, trigger)?;
@@ -309,8 +319,7 @@ impl Sessions {
     fn restore_generation(&self, id: &str) -> Result<()> {
         let session = self.session(id).ok_or_else(|| BoardError::Other(format!("missing session {id}")))?;
         let issue = session
-            .issue
-            .as_ref()
+            .issue_id()
             .and_then(|i| self.0.ledger.issue(i))
             .ok_or_else(|| BoardError::Other(format!("missing issue for {id}")))?;
         let extra = self.extra(id);
@@ -323,7 +332,7 @@ impl Sessions {
             .read(|tx| tx.submission_by_request(&conv, &format!("work:{run}")))?
             .ok_or_else(|| BoardError::Other(format!("missing generation for {run}")))?;
         let task = self.0.durable.read(|tx| tx.task(&format!("gen-{}", sub.id)))?;
-        let drive = self.0.drivers.drive(Some(&session.agent), &issue)?;
+        let drive = self.0.drivers.drive(session.profile_id(), &issue)?;
         let (agent, _) = self.open_for(drive, &session, &issue, String::new(), true)?;
         self.go_live(agent.clone(), session, None)?;
         if task.status == vibevalley_runtime::agent::durable::TaskStatus::Terminal {
@@ -340,14 +349,14 @@ impl Sessions {
         prompt: String,
         resume: bool,
     ) -> Result<(Arc<dyn vibevalley_runtime::oar::Session>, String)> {
-        let cwd = PathBuf::from(session.worktree.clone().unwrap_or_default());
-        let instructions = if session.refining {
+        let cwd = PathBuf::from(session.cwd.clone().unwrap_or_default());
+        let instructions = if session.is_refining() {
             "You are drafting an issue for VibeValley's board. Do not change or commit files.".to_string()
         } else {
             let place = HelperPlace {
-                repo: session.repo.clone().unwrap_or_default(),
-                branch: session.branch.clone(),
-                cwd: session.worktree.clone().unwrap_or_default(),
+                repo: session.repo_name().unwrap_or("").to_string(),
+                branch: session.worktree_branch().map(String::from),
+                cwd: session.cwd.clone().unwrap_or_default(),
                 id: session.id.clone(),
                 pull_request: issue.deliver == Deliverable::PullRequest,
                 house: self.0.workplaces.house_rules(),
@@ -436,10 +445,8 @@ impl Sessions {
 
     /// `withRecall`: what the agent remembers, set apart before the input.
     pub(super) fn with_recall(&self, session: &Session, input: String) -> String {
-        let block = self
-            .0
-            .drivers
-            .recall(&session.agent, &session.id, session.repo.as_deref().unwrap_or(""), &input);
+        let Some(profile) = session.profile_id() else { return input };
+        let block = self.0.drivers.recall(profile, &session.id, session.repo_name().unwrap_or(""), &input);
         if block.is_empty() { input } else { format!("{block}\n\n---\n\n{input}") }
     }
 
@@ -463,7 +470,7 @@ impl Sessions {
                 Ok(session.id.clone())
             }
             None => {
-                let drive = self.0.drivers.drive(Some(session.agent.as_str()).filter(|a| !a.is_empty()), issue)?;
+                let drive = self.0.drivers.drive(session.profile_id().filter(|a| !a.is_empty()), issue)?;
                 let resume = drive.runtime.capabilities().resume && self.extra(&session.id).agent_session.is_some();
                 let prompt = if resume { words } else { again(&words) };
                 self.start(drive, session.clone(), issue, prompt, resume, trigger)
@@ -494,6 +501,34 @@ impl Sessions {
         Ok(())
     }
 
+    /// Attaches a context reference to an existing session.
+    pub fn attach_binding(&self, input: vibevalley_protocol::SessionBindingInput) -> Result<Session> {
+        let mut session = self.session(&input.id).ok_or_else(|| {
+            BoardError::Api(crate::base::missing(
+                vibevalley_i18n::t("server.helperRef", &[("id", input.id.clone().into())]),
+                crate::base::LookIn::Session,
+            ))
+        })?;
+        if session.attach_binding(input.binding) {
+            self.0.ledger.apply(vec![Fact::session_changed(now(), session.clone())])?;
+        }
+        Ok(self.session(&session.id).unwrap_or(session))
+    }
+
+    /// Detaches a context reference from an existing session.
+    pub fn detach_binding(&self, input: vibevalley_protocol::SessionBindingInput) -> Result<Session> {
+        let mut session = self.session(&input.id).ok_or_else(|| {
+            BoardError::Api(crate::base::missing(
+                vibevalley_i18n::t("server.helperRef", &[("id", input.id.clone().into())]),
+                crate::base::LookIn::Session,
+            ))
+        })?;
+        if session.detach_binding(&input.binding) {
+            self.0.ledger.apply(vec![Fact::session_changed(now(), session.clone())])?;
+        }
+        Ok(self.session(&session.id).unwrap_or(session))
+    }
+
     /// Lets a session go: its agent stops, its open round ends, its
     /// workplace is left as `leave` says, and it leaves the board.
     pub fn dismiss(&self, session_id: &str, leave: Leave) -> Result<()> {
@@ -507,7 +542,7 @@ impl Sessions {
             self.end_run(session_id, Outcome::Interrupted, "", None)?;
         }
         if let Some(s) = &session
-            && let (Some(repo), Some(worktree), Some(branch)) = (&s.repo, &s.worktree, &s.branch)
+            && let (Some(repo), Some(worktree), Some(branch)) = (s.repo_name(), s.cwd.as_deref(), s.worktree_branch())
         {
             let leaving = Leaving {
                 repo,
@@ -515,7 +550,7 @@ impl Sessions {
                 branch,
                 base: self.extra(&s.id).base,
                 name: &s.name,
-                drafting: s.refining,
+                drafting: s.is_refining(),
             };
             self.0.workplaces.release(&leaving, leave)?;
         }
@@ -608,7 +643,10 @@ impl Sessions {
                     input,
                     summary,
                 } => {
-                    if self.session(session_id).is_some_and(|s| super::workspace::is_workspace(&s)) {
+                    if self
+                        .session(session_id)
+                        .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User)
+                    {
                         self.on_workspace_permission_requested(session_id, request_id, tool, input, summary);
                     } else if self.0.config.permission == PermissionMode::Bypass {
                         let agent = lock(&self.0.live).get(session_id).map(|l| l.agent.clone());
@@ -626,7 +664,10 @@ impl Sessions {
                     options,
                     allow_custom,
                 } => {
-                    if self.session(session_id).is_some_and(|s| super::workspace::is_workspace(&s)) {
+                    if self
+                        .session(session_id)
+                        .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User)
+                    {
                         self.on_workspace_interaction_requested(session_id, request_id, question, options, allow_custom);
                     } else if root {
                         asked.push(Question {
@@ -641,12 +682,14 @@ impl Sessions {
                 EventKind::Error { message } if root => failure = Some(message),
                 EventKind::TurnFinished { reason, usage } if root => {
                     observed_run = None;
-                    let is_ws = self.session(session_id).is_some_and(|s| super::workspace::is_workspace(&s));
-                    if is_ws {
+                    let is_user = self
+                        .session(session_id)
+                        .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User);
+                    if is_user {
                         self.on_workspace_turn_finished(session_id, &usage);
                     }
                     self.finish(session_id, reason, reported_spent(&usage), &said, &asked, failure.as_deref());
-                    if !is_ws && let Some(rounds) = self.0.rounds.get() {
+                    if !is_user && let Some(rounds) = self.0.rounds.get() {
                         rounds.after();
                     }
                 }
@@ -679,7 +722,7 @@ impl Sessions {
     /// the channel, and an absent one would clear it.
     pub(super) fn phase_changed(&self, id: impl Into<String>, phase: Phase) -> Fact {
         let id = id.into();
-        let channel = self.session(&id).and_then(|s| s.channel);
+        let channel = self.session(&id).and_then(|s| s.channel_id().map(str::to_string));
         Fact::session_phase_changed(now(), id, phase, channel)
     }
 
@@ -711,7 +754,7 @@ impl Sessions {
         };
         let Some(session) = self.session(&run.session) else { return Ok(None) };
         let extra = self.extra(&run.session);
-        if session.refining
+        if session.is_refining()
             || run.outcome.is_some()
             || session.runtime != vibevalley_runtime::agent::runtime::ID
             || extra.run.as_deref() != Some(run_id)
@@ -745,18 +788,21 @@ impl Sessions {
     /// work round's report onto its issue.
     fn finish(&self, session_id: &str, reason: StopReason, spent: Option<Spent>, said: &str, asked: &[Question], failure: Option<&str>) {
         let Some(session) = self.session(session_id) else { return };
-        if super::workspace::is_workspace(&session) {
+        if session.controller == vibevalley_protocol::SessionController::User && !session.is_board_worker() {
             self.finish_workspace(&session, reason, spent, said, failure);
             return;
         }
-        if session.issue.is_none() && session.channel.is_some() {
+        if session.is_direct_talker() && session.issue_id().is_none() {
             self.finish_talk(&session, reason, said, spent);
             return;
         }
-        let Some(issue) = session.issue.as_deref().and_then(|i| self.0.ledger.issue(i)) else {
+        let Some(issue) = session.issue_id().and_then(|i| self.0.ledger.issue(i)) else {
+            if session.controller == vibevalley_protocol::SessionController::User {
+                self.finish_workspace(&session, reason, spent, said, failure);
+            }
             return;
         };
-        if session.refining {
+        if session.is_refining() {
             if let Some(rounds) = self.0.rounds.get() {
                 rounds.drafted(DraftEnd {
                     spent,
@@ -834,11 +880,13 @@ impl Sessions {
             }
             self.record(session_id, Step::RunEnded { run: id, outcome });
         }
-        if let Some(r) = report.as_ref().filter(|r| !r.remember.is_empty()) {
+        if let Some(r) = report.as_ref().filter(|r| !r.remember.is_empty())
+            && let Some(agent) = session.profile.clone()
+        {
             self.announce(super::News::Remember {
-                agent: session.agent.clone(),
+                agent,
                 session: session_id.to_string(),
-                repo: session.repo.clone().unwrap_or_default(),
+                repo: session.repo_name().unwrap_or_default().to_string(),
                 memories: r.remember.clone(),
             });
         }

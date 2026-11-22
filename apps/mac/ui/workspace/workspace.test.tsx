@@ -96,6 +96,9 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   await host.pump(app);
 
   await host.pushFrame(app, "state", { seq: 1, state: { sessions: [], issues: [] } });
+  const repoListCallsAfterFirstState = host.calls.filter((c) => c.op === "repo.list").length;
+  await host.pushFrame(app, "state", { seq: 2, state: { sessions: [], issues: [] } });
+  expect(host.calls.filter((c) => c.op === "repo.list").length).toBe(repoListCallsAfterFirstState);
   await host.pushFrame(app, "rail", {
     panel: "files",
     projects: [
@@ -377,17 +380,16 @@ test("workspace MarkdownPane renders delayed skeleton, pushed markdown documents
 test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open, interaction_*, mid-turn steer, and telemetry", async () => {
   const baseSession = {
     id: "sess-ws-1",
-    role: "worker",
+    controller: "user" as const,
     name: "Antigravity",
-    agent: "antigravity",
     runtime: "antigravity",
     brief: "Workspace chat",
-    repo: "vibevalley",
-    worktree: "/work/vibevalley",
+    cwd: "/work/vibevalley",
+    policy: { kind: "directCwd" as const, repo: "vibevalley", permissionMode: "acceptEdits" as const },
+    bindings: [],
     hiredAt: 1_700_000_000_000,
     runs: 1,
-    refining: false,
-    phase: { _tag: "working", since: 1_700_000_000_000, doing: { action: "thinking", label: "Analyzing" } },
+    phase: { _tag: "working" as const, since: 1_700_000_000_000, doing: { action: "thinking" as const, label: "Analyzing" } },
   };
   const host = workspaceHost(
     { view: "workspace-chat", tabId: 42, runtime: "antigravity", cwd: "/work/vibevalley", repo: "vibevalley" },
@@ -448,7 +450,7 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
 
   expect(host.calls.some((c) => c.op === "session.openWorkspace")).toBe(true);
   expect(host.calls.some((c) => c.op === "session.send")).toBe(true);
-  expect(host.acts.some((a) => a.type === "update_chat_tab" && a.tab_id === 42 && a.session_id === "sess-ws-1" && a.title === "Inspect acp.rs")).toBe(true);
+  expect(host.acts.some((a) => a.type === "bind_chat_session" && a.tab_id === 42 && a.session_id === "sess-ws-1")).toBe(true);
   expect([...host.subscriptions.values()].some((s) => s.name === "session.watch")).toBe(true);
 
   host.clearActs();
@@ -496,9 +498,7 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   });
   await host.pump(app);
 
-  expect(host.acts.some((a) => a.type === "update_chat_tab" && a.tab_id === 42 && a.session_id === "sess-ws-1" && a.title === "Upgrade Antigravity ACP")).toBe(
-    true,
-  );
+  expect(host.acts.some((a) => a.type === "update_chat_tab")).toBe(false);
   expect(app.count("id:chat-header-title")).toBe(0);
   expect(app.count("id:chat-permission-mode")).toBe(1);
 
@@ -574,17 +574,16 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
 test("workspace SwarmPanel hides pill when absent, switches Overview/Roster/Board tabs, filters board, and loads child transcripts", async () => {
   const baseSession = {
     id: "sess-swarm-1",
-    role: "worker",
+    controller: "user" as const,
     name: "Antigravity",
-    agent: "antigravity",
     runtime: "antigravity",
     brief: "Swarm run",
-    repo: "vibevalley",
-    worktree: "/work/vibevalley",
+    cwd: "/work/vibevalley",
+    policy: { kind: "directCwd" as const, repo: "vibevalley", permissionMode: "acceptEdits" as const },
+    bindings: [],
     hiredAt: 1_700_000_000_000,
     runs: 1,
-    refining: false,
-    phase: { _tag: "working", since: 1_700_000_000_000, doing: { action: "thinking", label: "Coordinating" } },
+    phase: { _tag: "working" as const, since: 1_700_000_000_000, doing: { action: "thinking" as const, label: "Coordinating" } },
   };
   const host = workspaceHost(
     { view: "workspace-chat", tabId: 50, sessionId: "sess-swarm-1", runtime: "antigravity", cwd: "/work/vibevalley" },
@@ -804,17 +803,16 @@ test("workspace skeletons: 150ms anti-flash gate suppresses fast loads and rende
 test("regression: ChatPane hides thought level and omits effort for Orchestrator (Neon) with empty effortLevels", async () => {
   const baseSession = {
     id: "sess-orch-1",
-    role: "worker",
+    controller: "user" as const,
     name: "Antigravity",
-    agent: "antigravity",
     runtime: "antigravity",
     brief: "Orchestrator chat",
-    repo: "vibevalley",
-    worktree: "/work/vibevalley",
+    cwd: "/work/vibevalley",
+    policy: { kind: "directCwd" as const, repo: "vibevalley", permissionMode: "acceptEdits" as const },
+    bindings: [],
     hiredAt: 1_700_000_000_000,
     runs: 1,
-    refining: false,
-    phase: { _tag: "resting" },
+    phase: { _tag: "resting" as const },
   };
   const host = workspaceHost(
     { view: "workspace-chat", tabId: 44, runtime: "antigravity", cwd: "/work/vibevalley", repo: "vibevalley" },

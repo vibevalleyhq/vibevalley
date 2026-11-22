@@ -2,7 +2,7 @@ import { Clipboard, keymap, signal, Text, View, type ViewRef } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
 import { DeliverableValues, type Issue, type IssueAct, PriorityValues, type Session, type SessionView } from "@vibevalley/protocol";
-import { closedText, plainText } from "@vibevalley/protocol/rules";
+import { closedText, plainText, sessionBranch, sessionProfile, sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -70,7 +70,7 @@ export function IssueDetail(props: {
   const setLabel = (label: Omit<Parameters<typeof sendLabel>[1], "id">) => void sendLabel(sets, { id: props.issue.id, ...label });
   const doAct = acts.send;
   const sayAct = acts.say;
-  const agent = useAgent(() => head().agent);
+  const agent = useAgent(() => sessionProfile(head()));
   const showSteps = signal(false);
   const steps = createSessionEvents(() => head().id, showSteps);
   const changesQuery = useIssueChanges(
@@ -213,7 +213,7 @@ export function IssueDetail(props: {
                 when={live().conflict}
                 else={<If when={ask().line}>{(line) => <Text class="mt-1 line-clamp-4 text-sm text-ink">{plainText(line())}</Text>}</If>}
               >
-                {(conflict) => <ConflictFiles files={conflict().files} worktree={head().worktree} />}
+                {(conflict) => <ConflictFiles files={conflict().files} worktree={sessionWorktree(head())} />}
               </If>
               <If when={s().stage.state === "asking"}>
                 <Each of={props.issue.questions}>
@@ -466,10 +466,12 @@ export function IssueDetail(props: {
       <Property label={t("web.issue.detail.repo")}>{s().repo || t("web.issue.detail.noRepo")}</Property>
       <Property label={t("web.issue.detail.helper")}>{s().whoLine}</Property>
       <If when={agent()?.model}>{(model) => <Property label={t("web.issue.detail.model")}>{model()}</Property>}</If>
-      <If when={sideActs().length > 0 || head().worktree}>
+      <If when={sideActs().length > 0 || sessionWorktree(head())}>
         <View class="mt-3 flex-row flex-wrap items-center gap-2">
           <Each of={sideActs()}>{(a) => button(a(), () => !s().ask && a() === s().lead)}</Each>
-          <If when={head().worktree}>{(worktree) => <OpenTerminal cwd={worktree()} title={`#${props.issue.number}`} testid="issue-open-workspace" />}</If>
+          <If when={sessionWorktree(head())}>
+            {(worktree) => <OpenTerminal cwd={worktree()} title={`#${props.issue.number}`} testid="issue-open-workspace" />}
+          </If>
         </View>
       </If>
       <SheetLabel divider>{t("web.issue.detail.time")}</SheetLabel>
@@ -533,7 +535,7 @@ export function IssueDetail(props: {
           <Property label={t("web.issue.detail.crew")}>{s().crewLine}</Property>
         </If>
         <If when={distinctProfile()}>{(profile) => <Property label={t("web.issue.detail.profile")}>{profile()}</Property>}</If>
-        <If when={head().branch}>
+        <If when={sessionBranch(head())}>
           {(branch) => (
             <Property align="start" label={t("web.issue.detail.branch")}>
               <View class="flex-row items-start gap-1">
@@ -543,7 +545,7 @@ export function IssueDetail(props: {
             </Property>
           )}
         </If>
-        <If when={head().worktree}>
+        <If when={sessionWorktree(head())}>
           {(worktree) => (
             <Property align="start" label="worktree">
               <View class="flex-row items-start gap-1">

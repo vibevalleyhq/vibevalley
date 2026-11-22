@@ -35,7 +35,7 @@ impl Sessions {
     }
 
     pub(super) fn record(&self, session: &str, step: Step) {
-        let cwd = self.session(session).and_then(|s| s.worktree).unwrap_or_default();
+        let cwd = self.session(session).and_then(|s| s.cwd).unwrap_or_default();
         self.announce(News::Step {
             session: session.into(),
             cwd,

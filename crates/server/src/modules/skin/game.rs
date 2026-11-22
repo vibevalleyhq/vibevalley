@@ -7,17 +7,15 @@
 //! session reports (`count`, `refresh`; `Game::count_commits`). Not yet:
 //! the voice entry.
 
-use std::borrow::Cow;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, Weak};
 
 use vibevalley_core::Transition;
 use vibevalley_core::progress::{Folded, catch_up, entries_for, progress_fold, progress_step};
-use vibevalley_protocol::{Fact, FactProgressChanged, FactProgressChangedStation, LedgerEntry, LedgerEntryTitled, SpaceState, ops};
+use vibevalley_protocol::{Fact, FactProgressChanged, FactProgressChangedStation, LedgerEntry, LedgerEntryTitled, ops};
 
 use crate::event_bus::Subscription;
-use crate::modules::work::session::is_workspace;
 use crate::{Hub, lock, now};
 
 const COUNT_EVERY: std::time::Duration = std::time::Duration::from_secs(120);
@@ -38,17 +36,13 @@ pub struct Game {
     asked: std::sync::atomic::AtomicU64,
 }
 
-fn strip_workspace_sessions(state: &SpaceState) -> Cow<'_, SpaceState> {
-    if !state.sessions.iter().any(is_workspace) {
-        return Cow::Borrowed(state);
-    }
-    let mut filtered = state.clone();
-    filtered.sessions.retain(|s| !is_workspace(s));
-    Cow::Owned(filtered)
-}
-
-fn session_is_workspace(t: &Transition, id: &str) -> bool {
-    t.after.sessions.iter().chain(&t.before.sessions).find(|s| s.id == id).is_some_and(is_workspace)
+fn session_is_farm_worker(t: &Transition, id: &str) -> bool {
+    t.after
+        .sessions
+        .iter()
+        .chain(&t.before.sessions)
+        .find(|s| s.id == id)
+        .is_some_and(vibevalley_core::status::is_farm_worker)
 }
 
 /// The ledger's entries that still read as a `LedgerEntry`.
@@ -96,14 +90,14 @@ impl Game {
     fn on_transition(&self, hub: &Arc<Hub>, t: &Transition) {
         match &t.fact {
             Fact::ProgressChanged(f) if f.commits.is_none() && f.station.is_none() => return,
-            Fact::SessionChanged(f) if is_workspace(&f.session) => return,
-            Fact::SessionReported(f) if session_is_workspace(t, &f.id) => return,
-            Fact::SessionPhaseChanged(f) if session_is_workspace(t, &f.id) => return,
-            Fact::SessionLeft(f) if session_is_workspace(t, &f.id) => return,
+            Fact::SessionChanged(f) if !vibevalley_core::status::is_farm_worker(&f.session) => return,
+            Fact::SessionReported(f) if !session_is_farm_worker(t, &f.id) => return,
+            Fact::SessionPhaseChanged(f) if !session_is_farm_worker(t, &f.id) => return,
+            Fact::SessionLeft(f) if !session_is_farm_worker(t, &f.id) => return,
             _ => {}
         }
         if let Fact::SessionChanged(f) = &t.fact
-            && vibevalley_core::status::is_hired(f.session.role)
+            && vibevalley_core::status::is_hired(&f.session)
         {
             let wish = lock(&self.wanted).take();
             if let Some((station, until)) = wish
@@ -124,9 +118,7 @@ impl Game {
         if matches!(t.fact, Fact::SessionReported(_)) {
             self.count_soon();
         }
-        let before = strip_workspace_sessions(&t.before);
-        let after = strip_workspace_sessions(&t.after);
-        for e in entries_for(before.as_ref(), &t.fact, after.as_ref()) {
+        for e in entries_for(&t.before, &t.fact, &t.after) {
             self.record(e);
         }
     }
@@ -285,7 +277,8 @@ mod tests {
 
     use vibevalley_core::empty_space_state;
     use vibevalley_protocol::{
-        Doing, FactSessionChanged, FactSessionPhaseChanged, FactSessionReported, LedgerEntryHarvested, Outcome, Phase, PhaseWorking, Session, SessionAction,
+        ContextRef, Doing, ExecutionPolicy, FactSessionChanged, FactSessionPhaseChanged, FactSessionReported, LedgerEntryHarvested, Outcome, Phase,
+        PhaseWorking, Session, SessionAction, SessionController, SessionPermissionMode,
     };
 
     use super::*;
@@ -314,9 +307,18 @@ mod tests {
     }
 
     fn workspace_session(id: &str, working: bool) -> Session {
-        let mut s = Session::worker(id, format!("chat-{id}"), 1);
-        s.agent = "antigravity".into();
-        s.runtime = "antigravity".into();
+        let mut s = Session::new(
+            id,
+            SessionController::User,
+            format!("chat-{id}"),
+            "antigravity",
+            ExecutionPolicy::DirectCwd {
+                repo: None,
+                permission_mode: SessionPermissionMode::AcceptEdits,
+            },
+            1,
+        );
+        s.profile = Some("antigravity".into());
         if working {
             s.phase = working_phase(1);
         }
@@ -324,11 +326,22 @@ mod tests {
     }
 
     fn issue_worker(id: &str, issue: &str, working: bool) -> Session {
-        let mut s = Session::worker(id, format!("worker-{id}"), 1);
-        s.agent = "backend".into();
-        s.runtime = "scripted".into();
-        s.issue = Some(issue.into());
-        s.repo = Some("demo".into());
+        let mut s = Session::new(
+            id,
+            SessionController::IssueBoard,
+            format!("worker-{id}"),
+            "scripted",
+            ExecutionPolicy::ManagedWorktree {
+                repo: "demo".into(),
+                branch: None,
+            },
+            1,
+        );
+        s.profile = Some("backend".into());
+        s.attach_binding(ContextRef::Issue {
+            id: issue.into(),
+            refining: None,
+        });
         if working {
             s.phase = working_phase(1);
         }

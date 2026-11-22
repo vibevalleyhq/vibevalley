@@ -3,6 +3,7 @@ import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { type Channel, defaultOrchestrator, type SessionView } from "@vibevalley/protocol";
+import { isFreeUserSession, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { OrchestratorFace } from "../../../design/domain/Face";
@@ -72,7 +73,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
   const channels = () => topsOf(chat());
   const directs = () => directsOf(chat());
   const archived = () => archivedOf(chat());
-  const sessions = () => core()?.sessions ?? [];
+  const sessions = () => (core()?.sessions ?? []).filter((h) => !isFreeUserSession(h));
   const picking = signal(false);
   const go = (c: Channel) => {
     router.navigate(chatPath(c));
@@ -380,7 +381,7 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
       </If>
       <View class="min-w-0 flex-1 flex-row items-center gap-2">
         <View class="relative shrink-0">
-          <HelperFace agent={props.h.agent} runtime={props.h.runtime} size={22} />
+          <HelperFace agent={sessionProfile(props.h) ?? ""} runtime={props.h.runtime} size={22} />
           <View class="absolute -right-0.5 -bottom-0.5">
             <Dot tone={phaseDot(props.h.phase)} size={6} />
           </View>

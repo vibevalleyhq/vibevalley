@@ -1,7 +1,9 @@
-import { Clipboard, effect, host, Image, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
+import { Clipboard, computed, effect, host, Image, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 import { Button, ContextMenu, Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
+import type { Issue, SessionView } from "@vibevalley/protocol";
+import { isFreeUserSession, isOrchestratorSession, sessionBranch, sessionIssueId, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
@@ -9,7 +11,8 @@ import { ActiveBar } from "../design/layout";
 import { motionClass, motionOff, popupTransition } from "../design/motion";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
-import { act, call, frame, frameRev, hostApi } from "../infra/bridge";
+import { act, call, frame, hostApi } from "../infra/bridge";
+import { readHostParams } from "../infra/hostParams";
 import { menuDangerItemClass, menuItemClass, menuPopupClass, menuSeparatorClass, ShellIconButton } from "./chrome";
 import { FileTree, type FilesFrame } from "./FileTree";
 import { GitPanel, type GitFrame, type GitTab } from "./GitPanel";
@@ -52,24 +55,11 @@ type RailProject = {
 type RailFrame = { projects: RailProject[]; panel: string; inspectorOpen?: boolean };
 
 type VvRepo = { name: string; path: string; git?: boolean; last?: number };
-type VvSession = {
-  id: string;
-  name: string;
-  brief: string;
-  runtime?: string;
-  repo?: string;
-  branch?: string;
-  worktree?: string;
-  issue?: string;
-  phase: { _tag: string; doing?: { action?: string } };
-  phaseText?: string;
-};
-type VvIssue = { id: string; number: number; title: string; repo?: string };
 type VvStateFrame = {
   seq: number;
   state?: {
-    sessions?: VvSession[];
-    issues?: VvIssue[];
+    sessions?: SessionView[];
+    issues?: Issue[];
   };
 };
 
@@ -310,13 +300,27 @@ export function Sidebar() {
   const files = frame<FilesFrame>("files");
   const git = frame<GitFrame>("git");
   const vvState = frame<VvStateFrame>("state");
-  const vvRev = frameRev("state");
   const vvRepos = signal<VvRepo[]>([]);
-  const pixelDir = signal<string | undefined>(typeof host.params.pixelDir === "string" ? host.params.pixelDir : undefined);
+  const hostParams = readHostParams();
+  const pixelDir = signal<string | undefined>(hostParams.pixelDir);
   const foldOverrides = signal<Record<string, boolean>>({});
   const hoveredKey = signal<string | null>(null);
   const openMenuKey = signal<string | null>(null);
   const sweepPhase = signal(false);
+
+  const sessions = () => vvState()?.state?.sessions ?? [];
+  const issues = () => vvState()?.state?.issues ?? [];
+  const repoNamesKey = computed(() => {
+    const names = new Set<string>();
+    for (const s of sessions()) {
+      const repo = sessionRepo(s);
+      if (repo) names.add(repo);
+    }
+    for (const i of issues()) {
+      if (i.repo) names.add(i.repo);
+    }
+    return [...names].toSorted().join("\0");
+  });
 
   const hasWorkingTab = () => {
     for (const proj of rail()?.projects ?? []) {
@@ -342,9 +346,9 @@ export function Sidebar() {
         if (env.bizCode === 0 && env.data?.path) pixelDir.set(env.data.path);
       });
     }
-    if (host.params.role !== "inspector") {
+    if (hostParams.role !== "inspector") {
       effect(() => {
-        void vvRev();
+        void repoNamesKey();
         void call<VvRepo[]>("repo.list", {}).then((env) => {
           if (env.bizCode === 0 && Array.isArray(env.data)) {
             vvRepos.set(env.data);
@@ -364,7 +368,7 @@ export function Sidebar() {
   };
 
   const gitTab = signal<GitTab>("changes");
-  if (host.params.role === "inspector") {
+  if (hostParams.role === "inspector") {
     const conflictCount = () => git()?.conflicts?.length ?? 0;
     const gitCount = () => (git()?.staged?.length ?? 0) + (git()?.changes?.length ?? 0) + conflictCount();
     const currentView = () => (panel() === "git" ? `git:${gitTab()}` : panel());
@@ -436,8 +440,6 @@ export function Sidebar() {
   }
 
   const activePath = () => normPath(rail()?.projects.find((proj) => proj.active)?.path ?? files()?.root);
-  const sessions = () => vvState()?.state?.sessions ?? [];
-  const issues = () => vvState()?.state?.issues ?? [];
 
   const repoTree = (): RepoNode[] => {
     const projects = rail()?.projects ?? [];
@@ -448,7 +450,8 @@ export function Sidebar() {
 
     const worktreePaths = new Set<string>();
     for (const s of sessions()) {
-      if (s.worktree) worktreePaths.add(normPath(s.worktree));
+      const wt = sessionWorktree(s);
+      if (wt) worktreePaths.add(normPath(wt));
     }
     for (const proj of projects) {
       for (const w of proj.worktrees ?? []) {
@@ -484,7 +487,12 @@ export function Sidebar() {
 
     return roots.map((root) => {
       const mainProj = byPath.get(root.path);
-      const mainSession = sessions().find((s) => s.repo === root.name && (!s.worktree || normPath(s.worktree) === root.path) && s.phase._tag !== "closed");
+      const mainSession = sessions().find((s) => {
+        if (isFreeUserSession(s) || isOrchestratorSession(s) || s.phase._tag === "closed") return false;
+        if (sessionRepo(s) !== root.name) return false;
+        const wt = sessionWorktree(s);
+        return !wt || normPath(wt) === root.path;
+      });
       const defaultTabs: RailTab[] = mainProj?.tabs ?? [];
       const defaultGroup: WorktreeGroup = {
         id: `main:${root.path}`,
@@ -502,18 +510,22 @@ export function Sidebar() {
       const seenGroupPaths = new Set<string>([root.path]);
 
       for (const s of sessions()) {
-        if (s.repo !== root.name || s.phase._tag === "closed" || !s.worktree) continue;
-        const wp = normPath(s.worktree);
+        if (s.phase._tag === "closed" || sessionRepo(s) !== root.name) continue;
+        const wt = sessionWorktree(s);
+        if (!wt) continue;
+        const wp = normPath(wt);
         if (!wp || seenGroupPaths.has(wp)) continue;
         seenGroupPaths.add(wp);
         const wtProj = byPath.get(wp);
-        const issue = s.issue ? issueMap.get(s.issue) : undefined;
-        const label = issue ? `#${issue.number} ${issue.title}` : s.branch || s.brief || s.name;
+        const iid = sessionIssueId(s);
+        const issue = iid ? issueMap.get(iid) : undefined;
+        const branch = sessionBranch(s);
+        const label = issue ? `#${issue.number} ${issue.title}` : branch || s.brief || s.name;
         const tabs: RailTab[] = wtProj?.tabs ?? [];
         extraGroups.push({
           id: `session:${s.id}`,
           label,
-          branch: s.branch,
+          branch,
           path: wp,
           isMain: false,
           active: curPath === wp,

@@ -3,7 +3,7 @@ import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, userId } from "@vibevalley/protocol";
-import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
+import { channelOf, defaultOf, isFreeUserSession, sessionChannelId, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { Dialog } from "../../../design/Dialog";
@@ -106,7 +106,7 @@ export function Members(props: { channel: Channel }) {
   const helpers = () => {
     if (props.channel.type === "direct") return [];
     const fallback = defaultOf(core()?.chat)?.id;
-    return (core()?.sessions ?? []).filter((h) => h.role === "worker" && (h.channel ?? fallback) === props.channel.id);
+    return (core()?.sessions ?? []).filter((h) => h.role === "worker" && !isFreeUserSession(h) && (sessionChannelId(h) ?? fallback) === props.channel.id);
   };
   const totalCount = () => 1 + inside().length + helpers().length;
   return (
@@ -145,7 +145,7 @@ export function Members(props: { channel: Channel }) {
         {(h) => (
           <View testID={`member-${h().id}`} class="flex-row items-center gap-2 rounded-md px-1.5 py-1.5 hover:bg-hover">
             <View class="relative shrink-0">
-              <HelperFace agent={h().agent} runtime={h().runtime} size={28} />
+              <HelperFace agent={sessionProfile(h()) ?? ""} runtime={h().runtime} size={28} />
               <View class="absolute -right-0.5 -bottom-0.5">
                 <Dot tone={phaseDot(h().phase)} size={6} />
               </View>
@@ -163,8 +163,8 @@ export function Members(props: { channel: Channel }) {
               compact
               label={t("web.channel.direct.open", { name: h().name })}
               onPress={() => {
-                const agent = h().agent;
-                void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
+                const agent = sessionProfile(h());
+                if (agent) void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
               }}
             />
           </View>
@@ -196,7 +196,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
       <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
         <View class="h-6 w-6 shrink-0 items-center justify-center rounded-md bg-side">
           <If when={session()} else={<Icon name="thread" size={14} tone="muted" />}>
-            {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={24} />}
+            {(s) => <HelperFace agent={sessionProfile(s()) ?? ""} runtime={s().runtime} size={24} />}
           </If>
         </View>
         <View class="min-w-0 flex-1 flex-row items-center gap-2 overflow-hidden">

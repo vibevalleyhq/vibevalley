@@ -2,7 +2,7 @@ import { computed, List, signal, Text, untracked, View, type JSX, type ListRef }
 
 import { t } from "@vibevalley/i18n";
 import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, userId } from "@vibevalley/protocol";
-import { actorRoleOf, channelOf, plainText } from "@vibevalley/protocol/rules";
+import { actorRoleOf, channelOf, plainText, sessionIssueId } from "@vibevalley/protocol/rules";
 
 import { OrchestratorFace, UserFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
@@ -409,7 +409,10 @@ function Frame(props: {
 function Dispatch(props: { m: ChatMessage }) {
   const open = signal(false);
   const sent = useSession(() => props.m.session);
-  const issue = useIssue(() => sent()?.issue);
+  const issue = useIssue(() => {
+    const s = sent();
+    return s ? sessionIssueId(s) : undefined;
+  });
   return (
     <View testID="dispatch" class="flex-row items-start gap-1.5">
       <View class="min-w-0 flex-1">

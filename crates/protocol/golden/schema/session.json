@@ -1,16 +1,22 @@
 {
- "SessionAction": [
-  "run_command",
-  "read_file",
-  "edit_file",
-  "search",
-  "web",
-  "mcp",
-  "wait",
-  "other",
-  "thinking",
-  "speaking_text",
-  "none"
+ "ContextRef": [
+  {
+   "id": "i1",
+   "kind": "issue",
+   "refining": true
+  },
+  {
+   "id": "c1",
+   "kind": "channel"
+  },
+  {
+   "id": "a1",
+   "kind": "artifact"
+  },
+  {
+   "kind": "pkm",
+   "path": "notes/test.md"
+  }
  ],
  "Doing": [
   {
@@ -25,42 +31,133 @@
  "DoingView": [
   {
    "action": "run_command",
-   "label": "s699",
-   "actionText": "s700"
+   "actionText": "s700",
+   "label": "s699"
   },
   {
    "action": "run_command",
-   "label": "s701",
-   "actionText": "s702"
+   "actionText": "s702",
+   "label": "s701"
   }
  ],
- "SessionClose": [
-  "merged",
-  "completed",
-  "dismissed",
-  "lost"
+ "EventTokens": [
+  {
+   "cacheRead": 831,
+   "input": 830,
+   "output": 832
+  },
+  {
+   "cacheRead": 834,
+   "input": 833,
+   "output": 835
+  }
+ ],
+ "ExecutionPolicy": [
+  {
+   "kind": "directCwd",
+   "permissionMode": "acceptEdits",
+   "repo": "demo"
+  },
+  {
+   "branch": "main",
+   "kind": "managedWorktree",
+   "repo": "demo"
+  },
+  {
+   "kind": "sandboxDir"
+  }
+ ],
+ "IssueAnswer": [
+  {
+   "conclusion": "s723",
+   "evidence": [
+    "s724"
+   ],
+   "next": [
+    "s726"
+   ],
+   "unsure": [
+    "s725"
+   ]
+  },
+  {
+   "conclusion": "s727",
+   "evidence": [
+    "s728"
+   ],
+   "next": [
+    "s730"
+   ],
+   "unsure": [
+    "s729"
+   ]
+  }
+ ],
+ "LastRun": [
+  {
+   "answer": {
+    "conclusion": "s735",
+    "evidence": [
+     "s736"
+    ],
+    "next": [
+     "s738"
+    ],
+    "unsure": [
+     "s737"
+    ]
+   },
+   "at": 732,
+   "outcome": "completed",
+   "spent": {
+    "cny": 734,
+    "tokens": 733
+   },
+   "summary": "s731"
+  },
+  {
+   "at": 740,
+   "outcome": "completed",
+   "summary": "s739"
+  }
+ ],
+ "Machine": [
+  {
+   "here": false,
+   "id": "s879",
+   "joinedAt": 883,
+   "name": "s880",
+   "online": true
+  },
+  {
+   "here": true,
+   "id": "s884",
+   "joinedAt": 888,
+   "name": "s885",
+   "online": false
+  }
  ],
  "Phase": [
   {
    "_tag": "working",
-   "since": 703,
+   "doing": {
+    "action": "run_command",
+    "label": "s707"
+   },
    "quietSince": 704,
    "retry": {
     "attempt": 705,
     "of": 706
    },
-   "doing": {
-    "action": "run_command",
-    "label": "s707"
-   }
+   "since": 703
   },
   {
    "_tag": "working",
-   "since": 708,
    "doing": {
     "action": "run_command",
     "label": "s709"
-   }
+   },
+   "since": 708
   },
   {
    "_tag": "done"
@@ -82,29 +179,34 @@
    "closed": "merged"
   }
  ],
+ "PhaseRestingOnly": [
+  {
+   "_tag": "resting"
+  }
+ ],
  "PhaseView": [
   {
    "_tag": "working",
-   "since": 712,
+   "doing": {
+    "action": "run_command",
+    "actionText": "s717",
+    "label": "s716"
+   },
    "quietSince": 713,
    "retry": {
     "attempt": 714,
     "of": 715
    },
-   "doing": {
-    "action": "run_command",
-    "label": "s716",
-    "actionText": "s717"
-   }
+   "since": 712
   },
   {
    "_tag": "working",
-   "since": 718,
    "doing": {
     "action": "run_command",
-    "label": "s719",
-    "actionText": "s720"
-   }
+    "actionText": "s720",
+    "label": "s719"
+   },
+   "since": 718
   },
   {
    "_tag": "done"
@@ -126,246 +228,260 @@
    "closed": "merged"
   }
  ],
- "IssueAnswer": [
+ "Run": [
   {
-   "conclusion": "s723",
-   "evidence": [
-    "s724"
+   "endedAt": 870,
+   "heard": [
+    "s868"
    ],
-   "unsure": [
-    "s725"
-   ],
-   "next": [
-    "s726"
-   ]
-  },
-  {
-   "conclusion": "s727",
-   "evidence": [
-    "s728"
-   ],
-   "unsure": [
-    "s729"
-   ],
-   "next": [
-    "s730"
-   ]
-  }
- ],
- "LastRun": [
-  {
+   "id": "s861",
+   "issue": "s863",
    "outcome": "completed",
-   "summary": "s731",
-   "at": 732,
+   "session": "s862",
    "spent": {
-    "tokens": 733,
-    "cny": 734
+    "cny": 873,
+    "tokens": 872
    },
-   "answer": {
-    "conclusion": "s735",
-    "evidence": [
-     "s736"
-    ],
-    "unsure": [
-     "s737"
-    ],
-    "next": [
-     "s738"
-    ]
+   "startedAt": 869,
+   "summary": "s871",
+   "triggeredBy": {
+    "channel": "s865",
+    "cron": "s866",
+    "kind": "issue",
+    "message": "s864",
+    "missed": false
    }
   },
   {
-   "outcome": "completed",
-   "summary": "s739",
-   "at": 740
+   "heard": [
+    "s876"
+   ],
+   "id": "s874",
+   "session": "s875",
+   "startedAt": 877,
+   "summary": "s878",
+   "triggeredBy": {
+    "kind": "issue"
+   }
   }
  ],
- "ToolConnection": [
+ "RunTrigger": [
   {
-   "server": "s741",
-   "status": "unknown",
-   "reason": "s742"
+   "channel": "s858",
+   "cron": "s859",
+   "kind": "issue",
+   "message": "s857",
+   "missed": true
   },
   {
-   "server": "s743",
-   "status": "unknown"
+   "kind": "issue"
   }
  ],
- "ToolConnectionStatus": [
-  "unknown",
-  "starting",
-  "ready",
-  "failed",
-  "cancelled"
+ "RunTriggerKind": [
+  "issue",
+  "comment",
+  "cron",
+  "refine",
+  "runtime"
  ],
  "Session": [
   {
-   "id": "s744",
-   "role": "orchestrator",
-   "name": "s745",
-   "agent": "s746",
-   "runtime": "s747",
-   "brief": "s748",
-   "repo": "s749",
-   "branch": "s750",
-   "worktree": "s751",
-   "hiredAt": 752,
-   "runs": 753,
-   "lastRun": {
-    "outcome": "completed",
-    "summary": "s754",
-    "at": 755,
-    "spent": {
-     "tokens": 756,
-     "cny": 757
+   "bindings": [
+    {
+     "id": "s765",
+     "kind": "issue",
+     "refining": true
     },
+    {
+     "id": "s764",
+     "kind": "channel"
+    }
+   ],
+   "brief": "s748",
+   "controller": "orchestrator",
+   "cwd": "s751",
+   "hiredAt": 752,
+   "id": "s744",
+   "lastRun": {
     "answer": {
      "conclusion": "s758",
      "evidence": [
       "s759"
      ],
-     "unsure": [
-      "s760"
-     ],
      "next": [
       "s761"
+     ],
+     "unsure": [
+      "s760"
      ]
-    }
+    },
+    "at": 755,
+    "outcome": "completed",
+    "spent": {
+     "cny": 757,
+     "tokens": 756
+    },
+    "summary": "s754"
    },
-   "spent": {
-    "tokens": 762,
-    "cny": 763
-   },
-   "channel": "s764",
-   "issue": "s765",
-   "refining": true,
-   "toolConnections": [
-    {
-     "server": "s767",
-     "status": "unknown",
-     "reason": "s768"
-    }
-   ],
    "machine": "s769",
+   "name": "s745",
    "phase": {
     "_tag": "working",
-    "since": 770,
+    "doing": {
+     "action": "run_command",
+     "label": "s774"
+    },
     "quietSince": 771,
     "retry": {
      "attempt": 772,
      "of": 773
     },
-    "doing": {
-     "action": "run_command",
-     "label": "s774"
+    "since": 770
+   },
+   "policy": {
+    "branch": "s750",
+    "kind": "managedWorktree",
+    "repo": "s749"
+   },
+   "profile": "s746",
+   "role": "orchestrator",
+   "runs": 753,
+   "runtime": "s747",
+   "spent": {
+    "cny": 763,
+    "tokens": 762
+   },
+   "toolConnections": [
+    {
+     "reason": "s768",
+     "server": "s767",
+     "status": "unknown"
     }
-   }
+   ]
   },
   {
-   "id": "s775",
-   "role": "orchestrator",
-   "name": "s776",
-   "agent": "s777",
-   "runtime": "s778",
+   "bindings": [],
    "brief": "s779",
+   "controller": "orchestrator",
    "hiredAt": 780,
-   "runs": 781,
-   "refining": true,
+   "id": "s775",
+   "name": "s776",
    "phase": {
     "_tag": "working",
-    "since": 783,
     "doing": {
      "action": "run_command",
      "label": "s784"
-    }
-   }
+    },
+    "since": 783
+   },
+   "policy": {
+    "kind": "sandboxDir"
+   },
+   "profile": "s777",
+   "role": "orchestrator",
+   "runs": 781,
+   "runtime": "s778"
   }
  ],
- "SessionView": [
+ "SessionAction": [
+  "run_command",
+  "read_file",
+  "edit_file",
+  "search",
+  "web",
+  "mcp",
+  "wait",
+  "other",
+  "thinking",
+  "speaking_text",
+  "none"
+ ],
+ "SessionBindingInput": [
   {
-   "id": "s785",
-   "role": "orchestrator",
-   "name": "s786",
-   "agent": "s787",
-   "runtime": "s788",
-   "brief": "s789",
-   "repo": "s790",
-   "branch": "s791",
-   "worktree": "s792",
-   "hiredAt": 793,
-   "runs": 794,
-   "lastRun": {
-    "outcome": "completed",
-    "summary": "s795",
-    "at": 796,
-    "spent": {
-     "tokens": 797,
-     "cny": 798
-    },
-    "answer": {
-     "conclusion": "s799",
-     "evidence": [
-      "s800"
-     ],
-     "unsure": [
-      "s801"
-     ],
-     "next": [
-      "s802"
-     ]
-    }
+   "binding": {
+    "id": "i1",
+    "kind": "issue",
+    "refining": false
    },
-   "spent": {
-    "tokens": 803,
-    "cny": 804
-   },
-   "channel": "s805",
-   "issue": "s806",
-   "refining": false,
-   "toolConnections": [
-    {
-     "server": "s808",
-     "status": "unknown",
-     "reason": "s809"
-    }
-   ],
-   "machine": "s810",
-   "phase": {
-    "_tag": "working",
-    "since": 811,
-    "quietSince": 812,
-    "retry": {
-     "attempt": 813,
-     "of": 814
-    },
-    "doing": {
-     "action": "run_command",
-     "label": "s815",
-     "actionText": "s816"
-    }
-   },
-   "phaseText": "s817"
+   "id": "w1"
   },
   {
-   "id": "s818",
-   "role": "orchestrator",
-   "name": "s819",
-   "agent": "s820",
-   "runtime": "s821",
-   "brief": "s822",
-   "hiredAt": 823,
-   "runs": 824,
-   "refining": false,
-   "phase": {
-    "_tag": "working",
-    "since": 826,
-    "doing": {
-     "action": "run_command",
-     "label": "s827",
-     "actionText": "s828"
-    }
+   "binding": {
+    "id": "c1",
+    "kind": "channel"
    },
-   "phaseText": "s829"
+   "id": "w2"
+  }
+ ],
+ "SessionClose": [
+  "merged",
+  "completed",
+  "dismissed",
+  "lost"
+ ],
+ "SessionController": [
+  "user",
+  "issueBoard",
+  "channel",
+  "orchestrator"
+ ],
+ "SessionEvent": [
+  {
+   "action": "run_command",
+   "actionText": "s843",
+   "call": 840,
+   "connection": {
+    "reason": "s852",
+    "server": "s851",
+    "status": "unknown"
+   },
+   "input": "s845",
+   "ok": false,
+   "output": "s846",
+   "revision": 837,
+   "run": "s839",
+   "seq": 836,
+   "text": "s842",
+   "time": 838,
+   "tokens": {
+    "cacheRead": 849,
+    "input": 848,
+    "output": 850
+   },
+   "tool": "s844",
+   "type": "run/start",
+   "under": 841
+  },
+  {
+   "revision": 854,
+   "seq": 853,
+   "text": "s856",
+   "time": 855,
+   "type": "run/start"
+  }
+ ],
+ "SessionEventListInput": [
+  {
+   "afterSeq": 1,
+   "beforeSeq": 10,
+   "id": "s6978",
+   "limit": 50,
+   "run": "s6979"
+  },
+  {
+   "id": "s6980"
+  }
+ ],
+ "SessionEventPage": [
+  {
+   "events": [],
+   "hasMore": false
+  },
+  {
+   "events": [],
+   "hasMore": true,
+   "newestSeq": 20,
+   "oldestSeq": 1
   }
  ],
  "SessionEventType": [
@@ -381,6 +497,131 @@
   "run/error",
   "run/end"
  ],
+ "SessionGetInput": [
+  {
+   "id": "s6976"
+  },
+  {
+   "id": "s6977"
+  }
+ ],
+ "SessionListInput": [
+  {
+   "controller": "user",
+   "profile": "s6975"
+  },
+  {}
+ ],
+ "SessionStopInput": [
+  {
+   "id": "s6973"
+  },
+  {
+   "id": "s6974"
+  }
+ ],
+ "SessionView": [
+  {
+   "bindings": [
+    {
+     "id": "s806",
+     "kind": "issue"
+    },
+    {
+     "id": "s805",
+     "kind": "channel"
+    }
+   ],
+   "brief": "s789",
+   "controller": "orchestrator",
+   "cwd": "s792",
+   "hiredAt": 793,
+   "id": "s785",
+   "lastRun": {
+    "answer": {
+     "conclusion": "s799",
+     "evidence": [
+      "s800"
+     ],
+     "next": [
+      "s802"
+     ],
+     "unsure": [
+      "s801"
+     ]
+    },
+    "at": 796,
+    "outcome": "completed",
+    "spent": {
+     "cny": 798,
+     "tokens": 797
+    },
+    "summary": "s795"
+   },
+   "machine": "s810",
+   "name": "s786",
+   "phase": {
+    "_tag": "working",
+    "doing": {
+     "action": "run_command",
+     "actionText": "s816",
+     "label": "s815"
+    },
+    "quietSince": 812,
+    "retry": {
+     "attempt": 813,
+     "of": 814
+    },
+    "since": 811
+   },
+   "phaseText": "s817",
+   "policy": {
+    "branch": "s791",
+    "kind": "managedWorktree",
+    "repo": "s790"
+   },
+   "profile": "s787",
+   "role": "orchestrator",
+   "runs": 794,
+   "runtime": "s788",
+   "spent": {
+    "cny": 804,
+    "tokens": 803
+   },
+   "toolConnections": [
+    {
+     "reason": "s809",
+     "server": "s808",
+     "status": "unknown"
+    }
+   ]
+  },
+  {
+   "bindings": [],
+   "brief": "s822",
+   "controller": "orchestrator",
+   "hiredAt": 823,
+   "id": "s818",
+   "name": "s819",
+   "phase": {
+    "_tag": "working",
+    "doing": {
+     "action": "run_command",
+     "actionText": "s828",
+     "label": "s827"
+    },
+    "since": 826
+   },
+   "phaseText": "s829",
+   "policy": {
+    "kind": "sandboxDir"
+   },
+   "profile": "s820",
+   "role": "orchestrator",
+   "runs": 824,
+   "runtime": "s821"
+  }
+ ],
  "ToolAction": [
   "run_command",
   "read_file",
@@ -391,159 +632,22 @@
   "wait",
   "other"
  ],
- "EventTokens": [
+ "ToolConnection": [
   {
-   "input": 830,
-   "cacheRead": 831,
-   "output": 832
+   "reason": "s742",
+   "server": "s741",
+   "status": "unknown"
   },
   {
-   "input": 833,
-   "cacheRead": 834,
-   "output": 835
+   "server": "s743",
+   "status": "unknown"
   }
  ],
- "SessionEvent": [
-  {
-   "seq": 836,
-   "revision": 837,
-   "time": 838,
-   "type": "run/start",
-   "run": "s839",
-   "call": 840,
-   "under": 841,
-   "text": "s842",
-   "action": "run_command",
-   "actionText": "s843",
-   "tool": "s844",
-   "input": "s845",
-   "output": "s846",
-   "ok": false,
-   "tokens": {
-    "input": 848,
-    "cacheRead": 849,
-    "output": 850
-   },
-   "connection": {
-    "server": "s851",
-    "status": "unknown",
-    "reason": "s852"
-   }
-  },
-  {
-   "seq": 853,
-   "revision": 854,
-   "time": 855,
-   "type": "run/start",
-   "text": "s856"
-  }
- ],
- "RunTriggerKind": [
-  "issue",
-  "comment",
-  "cron",
-  "refine",
-  "runtime"
- ],
- "RunTrigger": [
-  {
-   "kind": "issue",
-   "message": "s857",
-   "channel": "s858",
-   "cron": "s859",
-   "missed": true
-  },
-  {
-   "kind": "issue"
-  }
- ],
- "Run": [
-  {
-   "id": "s861",
-   "session": "s862",
-   "issue": "s863",
-   "triggeredBy": {
-    "kind": "issue",
-    "message": "s864",
-    "channel": "s865",
-    "cron": "s866",
-    "missed": false
-   },
-   "heard": [
-    "s868"
-   ],
-   "startedAt": 869,
-   "endedAt": 870,
-   "outcome": "completed",
-   "summary": "s871",
-   "spent": {
-    "tokens": 872,
-    "cny": 873
-   }
-  },
-  {
-   "id": "s874",
-   "session": "s875",
-   "triggeredBy": {
-    "kind": "issue"
-   },
-   "heard": [
-    "s876"
-   ],
-   "startedAt": 877,
-   "summary": "s878"
-  }
- ],
- "Machine": [
-  {
-   "id": "s879",
-   "name": "s880",
-   "here": false,
-   "online": true,
-   "joinedAt": 883
-  },
-  {
-   "id": "s884",
-   "name": "s885",
-   "here": true,
-   "online": false,
-   "joinedAt": 888
-  }
- ],
- "SessionStopInput": [
-  {
-   "id": "s6973"
-  },
-  {
-   "id": "s6974"
-  }
- ],
- "SessionListInput": [
-  {
-   "agent": "s6975"
-  },
-  {}
- ],
- "SessionGetInput": [
-  {
-   "id": "s6976"
-  },
-  {
-   "id": "s6977"
-  }
- ],
- "SessionEventListInput": [
-  {
-   "id": "s6978",
-   "run": "s6979"
-  },
-  {
-   "id": "s6980"
-  }
- ],
- "PhaseRestingOnly": [
-  {
-   "_tag": "resting"
-  }
+ "ToolConnectionStatus": [
+  "unknown",
+  "starting",
+  "ready",
+  "failed",
+  "cancelled"
  ]
 }

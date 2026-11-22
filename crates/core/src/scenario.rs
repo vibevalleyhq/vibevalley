@@ -109,9 +109,7 @@ pub fn preset(density: Density) -> StateFrame {
         }
         Density::Minimal => {
             let mut s = worker("w1", "老周", "laozhou", "claude", b.now() - 8 * MIN_MS);
-            s.issue = Some("i1".into());
-            s.repo = Some("~/vibevalley".into());
-            s.branch = Some("issue-1-init".into());
+            bind_worker_issue(&mut s, "i1", Some("~/vibevalley"), Some("issue-1-init"), None, false);
             s.phase = Phase::working(b.now() - 2 * MIN_MS, SessionAction::EditFile, "session.ts");
             s.spent = Some(spent(42_000, 0.08));
 
@@ -246,10 +244,14 @@ fn build_typical(b: &mut ScenarioBuilder) {
 
     // Sessions covering Working, Resting, Done, Failed, and Refining.
     let mut w_work = worker("w1", "老周", "laozhou", "codex", now - 20 * MIN_MS);
-    w_work.issue = Some("i18".into());
-    w_work.repo = Some("vibevalley".into());
-    w_work.branch = Some("issue-18-login".into());
-    w_work.worktree = Some("/tmp/vibevalley/.worktrees/i18".into());
+    bind_worker_issue(
+        &mut w_work,
+        "i18",
+        Some("vibevalley"),
+        Some("issue-18-login"),
+        Some("/tmp/vibevalley/.worktrees/i18"),
+        false,
+    );
     w_work.runs = 2;
     w_work.spent = Some(spent(182_400, 0.42));
     w_work.phase = Phase::working(now - 3 * MIN_MS, SessionAction::EditFile, "session.ts");
@@ -305,9 +307,7 @@ fn build_typical(b: &mut ScenarioBuilder) {
     }]);
 
     let mut w_ask = worker("w2", "小林", "xiaolin", "claude", now - 40 * MIN_MS);
-    w_ask.issue = Some("i33".into());
-    w_ask.repo = Some("vibevalley".into());
-    w_ask.branch = Some("issue-33-shell".into());
+    bind_worker_issue(&mut w_ask, "i33", Some("vibevalley"), Some("issue-33-shell"), None, false);
     w_ask.runs = 1;
     w_ask.phase = Phase::resting();
     w_ask.last_run = Some(LastRun {
@@ -320,9 +320,7 @@ fn build_typical(b: &mut ScenarioBuilder) {
     });
 
     let mut w_review = worker("w3", "老周", "laozhou", "claude", now - 2 * HOUR_MS);
-    w_review.issue = Some("i31".into());
-    w_review.repo = Some("vibevalley".into());
-    w_review.branch = Some("issue-31-board".into());
+    bind_worker_issue(&mut w_review, "i31", Some("vibevalley"), Some("issue-31-board"), None, false);
     w_review.runs = 2;
     w_review.phase = Phase::done();
     w_review.last_run = Some(LastRun {
@@ -335,8 +333,7 @@ fn build_typical(b: &mut ScenarioBuilder) {
     });
 
     let mut w_fail = worker("w4", "阿杰", "ajie", "claude", now - 90 * MIN_MS);
-    w_fail.issue = Some("i34".into());
-    w_fail.repo = Some("vibevalley".into());
+    bind_worker_issue(&mut w_fail, "i34", Some("vibevalley"), None, None, false);
     w_fail.runs = 1;
     w_fail.phase = Phase::failed();
     w_fail.last_run = Some(LastRun {
@@ -349,8 +346,7 @@ fn build_typical(b: &mut ScenarioBuilder) {
     });
 
     let mut w_refine = worker("w5", "起草员", "laozhou", "claude", now - 10 * MIN_MS);
-    w_refine.issue = Some("i21".into());
-    w_refine.refining = true;
+    bind_worker_issue(&mut w_refine, "i21", None, None, None, true);
     w_refine.phase = Phase::working(now - 4 * MIN_MS, SessionAction::ReadFile, "App.tsx");
 
     for s in [w_work, w_ask, w_review, w_fail, w_refine] {
@@ -551,8 +547,7 @@ fn build_dense(b: &mut ScenarioBuilder) {
             "claude",
             now - idx as i64 * MIN_MS,
         );
-        s.issue = Some(issue_id);
-        s.repo = Some("vibevalley".into());
+        bind_worker_issue(&mut s, issue_id, Some("vibevalley"), None, None, false);
         s.phase = if idx <= 9 {
             Phase::working(now - idx as i64 * MIN_MS, SessionAction::RunCommand, format!("cargo test module_{idx}"))
         } else {
@@ -631,9 +626,14 @@ fn build_extreme(b: &mut ScenarioBuilder) {
 
     // Conflict + urgent + long CJK/EN/URL title.
     let mut w_conf = worker("w-ext-1", "冲突排查者", "laozhou", "codex", now - 30 * MIN_MS);
-    w_conf.issue = Some("i-ext-conflict".into());
-    w_conf.repo = Some("vibevalley".into());
-    w_conf.worktree = Some("/tmp/vibevalley/.worktrees/i-ext-conflict".into());
+    bind_worker_issue(
+        &mut w_conf,
+        "i-ext-conflict",
+        Some("vibevalley"),
+        None,
+        Some("/tmp/vibevalley/.worktrees/i-ext-conflict"),
+        false,
+    );
     w_conf.phase = Phase::done();
     w_conf.last_run = Some(LastRun {
         needs_reconciliation: false,
@@ -783,12 +783,17 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
     }));
 
     // Standing orchestrator session + issue (exercises IssueCardKind::Orchestrator and verifies running_slots excludes orchestrators).
-    let mut s_orch = Session::worker("orch-1", "助手", now - 2 * HOUR_MS);
-    s_orch.role = AgentRole::Orchestrator;
-    s_orch.agent = DEFAULT_ORCHESTRATOR.into();
-    s_orch.runtime = ORCHESTRATOR_RUNTIME.into();
+    let mut s_orch = Session::new(
+        "orch-1",
+        SessionController::Orchestrator,
+        "助手",
+        ORCHESTRATOR_RUNTIME,
+        ExecutionPolicy::SandboxDir,
+        now - 2 * HOUR_MS,
+    );
+    s_orch.profile = Some(DEFAULT_ORCHESTRATOR.into());
     s_orch.phase = Phase::working(now - MIN_MS, SessionAction::Search, "issue_list");
-    s_orch.channel = Some("general".into());
+    s_orch.attach_binding(ContextRef::Channel { id: "general".into() });
     facts.push(Fact::SessionChanged(FactSessionChanged { at: now, session: s_orch }));
 
     let mut i_orch = issue("i-edge-orch", 810, "助手汇总本周期发布风险清单", Priority::Medium, now - 30 * MIN_MS);
@@ -813,8 +818,7 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
 
     // 1. Asking -> IssuePromptKind::Asking + InboxKind::Ask
     let mut w_ask = worker("w-edge-ask", "小林", "xiaolin", "claude", now - 45 * MIN_MS);
-    w_ask.issue = Some("i-edge-ask".into());
-    w_ask.repo = Some("vibevalley".into());
+    bind_worker_issue(&mut w_ask, "i-edge-ask", Some("vibevalley"), None, None, false);
     w_ask.phase = Phase::resting();
     w_ask.last_run = Some(LastRun {
         needs_reconciliation: false,
@@ -834,10 +838,14 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
 
     // 2. Open PR + failed check + huge ¥1,234.56 spent + long unbroken SHA/URL -> ReviewAfterFailedCheck + Deliverable::PullRequest
     let mut w_pr = worker("w-edge-pr", "老周", "laozhou", "codex", now - 3 * HOUR_MS);
-    w_pr.issue = Some("i-edge-pr-open".into());
-    w_pr.repo = Some("vibevalley".into());
-    w_pr.branch = Some("issue-812-pr-check".into());
-    w_pr.worktree = Some("/tmp/vibevalley/.worktrees/i-edge-pr-open".into());
+    bind_worker_issue(
+        &mut w_pr,
+        "i-edge-pr-open",
+        Some("vibevalley"),
+        Some("issue-812-pr-check"),
+        Some("/tmp/vibevalley/.worktrees/i-edge-pr-open"),
+        false,
+    );
     w_pr.runs = 7;
     w_pr.phase = Phase::done();
     w_pr.spent = Some(spent(48_500_000, 1234.56));
@@ -882,8 +890,7 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
 
     // 3. Reviewed + Deliverable::Branch -> IssuePromptKind::Reviewed
     let mut w_rev = worker("w-edge-rev", "老周", "laozhou", "claude", now - 90 * MIN_MS);
-    w_rev.issue = Some("i-edge-reviewed".into());
-    w_rev.repo = Some("vibevalley".into());
+    bind_worker_issue(&mut w_rev, "i-edge-reviewed", Some("vibevalley"), None, None, false);
     w_rev.phase = Phase::done();
     w_rev.last_run = Some(LastRun {
         needs_reconciliation: false,
@@ -907,8 +914,7 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
         next: vec![],
     };
     let mut w_hand = worker("w-edge-hand", "小林", "xiaolin", "claude", now - 70 * MIN_MS);
-    w_hand.issue = Some("i-edge-handed".into());
-    w_hand.repo = Some("vibevalley".into());
+    bind_worker_issue(&mut w_hand, "i-edge-handed", Some("vibevalley"), None, None, false);
     w_hand.phase = Phase::done();
     w_hand.last_run = Some(LastRun {
         needs_reconciliation: false,
@@ -926,8 +932,7 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
 
     // 5. StuckConflict -> StuckReason::Conflict + IssuePromptKind::StuckConflict + InboxKind::Conflict
     let mut w_conf = worker("w-edge-conf", "阿杰", "ajie", "codex", now - 60 * MIN_MS);
-    w_conf.issue = Some("i-edge-conflict".into());
-    w_conf.repo = Some("vibevalley".into());
+    bind_worker_issue(&mut w_conf, "i-edge-conflict", Some("vibevalley"), None, None, false);
     w_conf.phase = Phase::done();
     w_conf.last_run = Some(LastRun {
         needs_reconciliation: false,
@@ -947,8 +952,7 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
 
     // 6. StuckFailed -> StuckReason::Failed + IssuePromptKind::StuckFailed + InboxKind::Fix
     let mut w_fail = worker("w-edge-fail", "阿杰", "ajie", "claude", now - 55 * MIN_MS);
-    w_fail.issue = Some("i-edge-failed".into());
-    w_fail.repo = Some("vibevalley".into());
+    bind_worker_issue(&mut w_fail, "i-edge-failed", Some("vibevalley"), None, None, false);
     w_fail.phase = Phase::failed();
     w_fail.last_run = Some(LastRun {
         needs_reconciliation: false,
@@ -964,9 +968,14 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
 
     // 7. StuckInterrupted + needs_reconciliation -> StuckReason::Interrupted + IssuePromptKind::StuckInterrupted + needs_worktree_check + InboxKind::Interrupted
     let mut w_int = worker("w-edge-int", "老周", "laozhou", "claude", now - 50 * MIN_MS);
-    w_int.issue = Some("i-edge-interrupted".into());
-    w_int.repo = Some("vibevalley".into());
-    w_int.worktree = Some("/tmp/vibevalley/.worktrees/i-edge-interrupted".into());
+    bind_worker_issue(
+        &mut w_int,
+        "i-edge-interrupted",
+        Some("vibevalley"),
+        None,
+        Some("/tmp/vibevalley/.worktrees/i-edge-interrupted"),
+        false,
+    );
     w_int.phase = Phase::resting();
     w_int.last_run = Some(LastRun {
         needs_reconciliation: true,
@@ -982,8 +991,7 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
 
     // 8. StuckQuiet -> StuckReason::Quiet + IssuePromptKind::StuckQuiet + InboxKind::Quiet
     let mut w_quiet = worker("w-edge-quiet", "小林", "xiaolin", "codex", now - 40 * MIN_MS);
-    w_quiet.issue = Some("i-edge-quiet".into());
-    w_quiet.repo = Some("vibevalley".into());
+    bind_worker_issue(&mut w_quiet, "i-edge-quiet", Some("vibevalley"), None, None, false);
     w_quiet.phase = Phase::Working(PhaseWorking {
         since: now - 35 * MIN_MS,
         quiet_since: Some(now - 25 * MIN_MS),
@@ -999,8 +1007,7 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
 
     // 9. Defensive StuckUnknown issue (stage.stuck cleared right before frame_of)
     let mut w_unk = worker("w-edge-unk", "阿杰", "ajie", "claude", now - 38 * MIN_MS);
-    w_unk.issue = Some("i-edge-stuck-unknown".into());
-    w_unk.repo = Some("vibevalley".into());
+    bind_worker_issue(&mut w_unk, "i-edge-stuck-unknown", Some("vibevalley"), None, None, false);
     w_unk.phase = Phase::failed();
     w_unk.last_run = Some(LastRun {
         needs_reconciliation: false,
@@ -1039,8 +1046,7 @@ fn build_edge(b: &mut ScenarioBuilder) -> StateFrame {
     f3.closed_at = Some(now - 2 * HOUR_MS);
 
     let mut w_fam4 = worker("w-edge-fam4", "老周", "laozhou", "codex", now - 20 * MIN_MS);
-    w_fam4.issue = Some("i-edge-fam-4".into());
-    w_fam4.repo = Some("vibevalley".into());
+    bind_worker_issue(&mut w_fam4, "i-edge-fam-4", Some("vibevalley"), None, None, false);
     w_fam4.phase = Phase::working(now - 10 * MIN_MS, SessionAction::EditFile, "status.rs");
 
     let mut f4 = issue("i-edge-fam-4", 804, "子工单 4：面板计数统一", Priority::High, now - 5 * HOUR_MS + 3 * MIN_MS);
@@ -1271,11 +1277,36 @@ fn issue(id: &str, number: i64, title: &str, priority: Priority, created_at: Mil
 }
 
 fn worker(id: &str, name: &str, agent: &str, runtime: &str, hired_at: Millis) -> Session {
-    let mut s = Session::worker(id, name, hired_at);
-    s.agent = agent.into();
-    s.runtime = runtime.into();
+    let mut s = Session::new(
+        id,
+        SessionController::IssueBoard,
+        name,
+        runtime,
+        ExecutionPolicy::ManagedWorktree {
+            repo: "vibevalley".into(),
+            branch: None,
+        },
+        hired_at,
+    );
+    s.profile = (!agent.is_empty()).then(|| agent.into());
     s.runs = 1;
     s
+}
+
+fn bind_worker_issue(s: &mut Session, issue_id: impl Into<IssueId>, repo: Option<&str>, branch: Option<&str>, cwd: Option<&str>, refining: bool) {
+    s.attach_binding(ContextRef::Issue {
+        id: issue_id.into(),
+        refining: refining.then_some(true),
+    });
+    if let Some(cwd) = cwd {
+        s.cwd = Some(cwd.into());
+    }
+    if let Some(repo) = repo {
+        s.policy = ExecutionPolicy::ManagedWorktree {
+            repo: repo.into(),
+            branch: branch.map(String::from),
+        };
+    }
 }
 
 fn assign(t: &mut Issue, agent: &str, session: &str, at: Millis) {
@@ -1759,8 +1790,7 @@ mod tests {
 
         b.advance_ms(MIN_MS);
         let mut sess = worker("w-step", "老周", "laozhou", "claude", b.now());
-        sess.issue = Some("i-step".into());
-        sess.repo = Some("vibevalley".into());
+        bind_worker_issue(&mut sess, "i-step", Some("vibevalley"), None, None, false);
         sess.phase = Phase::working(b.now(), SessionAction::EditFile, "lib.rs");
         assign(&mut item, "laozhou", "w-step", b.now());
         b.apply(vec![

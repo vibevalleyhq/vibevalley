@@ -3,6 +3,7 @@
 // the issues and helpers of VibeValley's Board story (issue.samples.ts),
 // as a StateFrame and the answers of the reads the pages make.
 import type { Agent, IssueHistory, StateFrame } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
 
 import { min, now, sampleIssue as issue, sampleSession as session, working } from "../features/issue/model/issue.samples";
 import { responses as agentsResponses } from "./agents";
@@ -15,14 +16,34 @@ import { responses as pixelResponses } from "./pixel";
 import { responses as pkmResponses } from "./pkm";
 import { connectors, responses as settingsResponses } from "./settings";
 
-const w = session("w1", "laozhou", working(now - 3 * min), { name: "老周", spent: { tokens: 182_400, cny: 0.42 } });
+const w = session("w1", "laozhou", working(now - 3 * min), {
+  name: "老周",
+  policy: { kind: "managedWorktree", repo: "vibevalley" },
+  bindings: [{ kind: "issue", id: issueId("i18") }],
+  spent: { tokens: 182_400, cny: 0.42 },
+});
 const r = session(
   "w2",
   "xiaolin",
   { _tag: "resting" },
-  { name: "小林", lastRun: { outcome: "completed", summary: "登录过期回到登录页，加了两条测试。", at: now - 8 * min } },
+  {
+    name: "小林",
+    policy: { kind: "managedWorktree", repo: "vibevalley" },
+    bindings: [{ kind: "issue", id: issueId("i17") }],
+    lastRun: { outcome: "completed", summary: "登录过期回到登录页，加了两条测试。", at: now - 8 * min },
+  },
 );
-const d = session("w3", "laozhou", { _tag: "done" }, { name: "老周", hiredAt: now - 300 * min });
+const d = session(
+  "w3",
+  "laozhou",
+  { _tag: "done" },
+  {
+    name: "老周",
+    policy: { kind: "managedWorktree", repo: "vibevalley" },
+    bindings: [{ kind: "issue", id: issueId("i12") }],
+    hiredAt: now - 300 * min,
+  },
+);
 
 const issues = [
   issue(21, "写一句话就能起草工单", "backlog", "medium"),

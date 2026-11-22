@@ -17,7 +17,6 @@ use crate::event_bus::Subscription;
 use crate::modules::collab::channel::{
     Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Saying, Seat, ThreadSubject, actor_of, meta_of,
 };
-use crate::modules::work::session::is_workspace;
 use crate::{Hub, lock};
 
 const HANDED_EMOJI: &str = "👀";
@@ -203,7 +202,7 @@ impl IssueChat {
         let channel = item.latest_session_id().and_then(|s| {
             self.hub
                 .upgrade()?
-                .read(|st| st.sessions.iter().find(|x| &x.id == s).and_then(|x| x.channel.clone()))
+                .read(|st| st.sessions.iter().find(|x| &x.id == s).and_then(|x| x.channel_id().map(str::to_string)))
         });
         let thread = self.chat.issue_thread(&item.id, &item.title, channel.as_deref())?;
         self.chat.say(Saying {
@@ -217,7 +216,7 @@ impl IssueChat {
 
     /// Ensures an issue session has its thread opened and seat recorded.
     pub(crate) fn ensure_session_thread(&self, h: &Session) {
-        if h.role != AgentRole::Worker || is_workspace(h) || h.issue.is_none() {
+        if !h.is_board_worker() || h.issue_id().is_none() {
             return;
         }
         let _guard = lock(&self.opening);
@@ -234,10 +233,7 @@ impl IssueChat {
         }
         match &tr.fact {
             Fact::SessionChanged(f)
-                if f.session.role == AgentRole::Worker
-                    && !is_workspace(&f.session)
-                    && f.session.issue.is_some()
-                    && !tr.before.sessions.iter().any(|s| s.id == f.session.id) =>
+                if f.session.is_board_worker() && f.session.issue_id().is_some() && !tr.before.sessions.iter().any(|s| s.id == f.session.id) =>
             {
                 let _guard = lock(&self.opening);
                 if let Err(e) = self.open_thread_locked(&f.session) {
@@ -250,7 +246,7 @@ impl IssueChat {
                     .sessions
                     .iter()
                     .chain(&tr.before.sessions)
-                    .find(|s| s.id == f.id && s.role == AgentRole::Worker && !is_workspace(s) && s.issue.is_some())
+                    .find(|s| s.id == f.id && s.is_board_worker() && s.issue_id().is_some())
                 else {
                     return;
                 };
@@ -265,22 +261,14 @@ impl IssueChat {
     fn issue_sessions(&self) -> Vec<Session> {
         self.hub
             .upgrade()
-            .map(|h| {
-                h.read(|s| {
-                    s.sessions
-                        .iter()
-                        .filter(|x| x.role == AgentRole::Worker && !is_workspace(x) && x.issue.is_some())
-                        .cloned()
-                        .collect()
-                })
-            })
+            .map(|h| h.read(|s| s.sessions.iter().filter(|x| x.is_board_worker() && x.issue_id().is_some()).cloned().collect()))
             .unwrap_or_default()
     }
 
     fn on_issue(&self, issue: &str) -> Option<Session> {
         self.issue_sessions()
             .into_iter()
-            .filter(|h| h.issue.as_deref() == Some(issue))
+            .filter(|h| h.issue_id() == Some(issue))
             .max_by_key(|h| h.hired_at)
     }
 
@@ -289,14 +277,14 @@ impl IssueChat {
             h.read(|s| {
                 s.sessions
                     .iter()
-                    .find(|x| x.id == session_id && x.role == AgentRole::Worker && !is_workspace(x))
-                    .and_then(|x| x.issue.clone())
+                    .find(|x| x.id == session_id && x.is_board_worker())
+                    .and_then(|x| x.issue_id().map(str::to_string))
             })
         })
     }
 
     fn channel_of_session(&self, h: &Session) -> String {
-        match h.channel.as_deref().and_then(|c| self.chat.place(c)) {
+        match h.channel_id().and_then(|c| self.chat.place(c)) {
             Some(p) if p.r#type != ChannelType::Thread && p.name.is_some() => p.id,
             _ => self.chat.default_channel(),
         }
@@ -312,19 +300,18 @@ impl IssueChat {
     }
 
     fn open_thread_locked(&self, h: &Session) -> Result<(), ApiError> {
-        let Some(issue) = h.issue.as_deref() else { return Ok(()) };
+        let Some(issue) = h.issue_id() else { return Ok(()) };
         if let Some(thread) = self.chat.thread_about(SubjectKind::Issue, issue) {
             return self.handed_on(h, &thread);
         }
         let channel = self.channel_of_session(h);
-        let what = if h.refining {
+        let what = if h.is_refining() {
             t("server.channel.dispatch.draft", &[])
         } else {
             head(&h.brief.split_whitespace().collect::<Vec<_>>().join(" "), 80)
         };
         let repo = h
-            .repo
-            .as_deref()
+            .repo_name()
             .map(|r| {
                 std::path::Path::new(r)
                     .file_name()
@@ -359,7 +346,7 @@ impl IssueChat {
             seat: Some(Seat {
                 id: h.id.clone(),
                 name: h.name.clone(),
-                agent: Some(h.agent.clone()),
+                agent: h.profile.clone(),
                 home: None,
             }),
         })?;
@@ -370,7 +357,7 @@ impl IssueChat {
         self.chat.seat(&Seat {
             id: h.id.clone(),
             name: h.name.clone(),
-            agent: Some(h.agent.clone()),
+            agent: h.profile.clone(),
             home: Some(thread.to_string()),
         })?;
         if self.chat.members_of(thread).contains(&h.id) {
@@ -379,7 +366,7 @@ impl IssueChat {
         let channel = self.channel_of_session(h);
         self.chat.read_up_to(&h.id, &channel, self.chat.latest(&channel)?)?;
         let nth = self.chat.dispatch_count(thread)? + 2;
-        let text = if h.refining {
+        let text = if h.is_refining() {
             t(
                 "server.channel.dispatch.redraft",
                 &[("id", h.id.clone().into()), ("name", h.name.clone().into())],
@@ -457,8 +444,8 @@ impl IssueChat {
     }
 
     fn post_report(&self, h: &Session, f: &FactSessionReported) -> Result<(), ApiError> {
-        if h.refining {
-            let Some(thread) = h.issue.as_deref().and_then(|i| self.chat.issue_thread_id(i)) else {
+        if h.is_refining() {
+            let Some(thread) = h.issue_id().and_then(|i| self.chat.issue_thread_id(i)) else {
                 return Ok(());
             };
             self.chat.notice(Noticing {
@@ -472,11 +459,7 @@ impl IssueChat {
         if f.outcome == Outcome::Interrupted {
             return Ok(());
         }
-        let Some(thread) = self
-            .chat
-            .home_of(&h.id)
-            .or_else(|| h.issue.as_deref().and_then(|i| self.chat.issue_thread_id(i)))
-        else {
+        let Some(thread) = self.chat.home_of(&h.id).or_else(|| h.issue_id().and_then(|i| self.chat.issue_thread_id(i))) else {
             return Ok(());
         };
         let meta = Meta {

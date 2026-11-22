@@ -21,8 +21,8 @@ use std::sync::{Arc, Condvar, Mutex, Weak};
 
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Actor, AgentRole, ApiError, BizCode, ChannelType, Doing, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel, ORCHESTRATOR_RUNTIME,
-    OrchestratorEval, Outcome, Phase, PhaseResting, PhaseWorking, Session, SessionAction, SessionEventType, ops,
+    Actor, AgentRole, ApiError, BizCode, ChannelType, Doing, ExecutionPolicy, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel,
+    ORCHESTRATOR_RUNTIME, OrchestratorEval, Outcome, Phase, PhaseResting, PhaseWorking, Session, SessionAction, SessionController, SessionEventType, ops,
 };
 use vibevalley_runtime::agent::extensions::governance::Permissions;
 use vibevalley_runtime::agent::extensions::memory::{MemoryPort, Remember, RewriteMemory};
@@ -243,28 +243,19 @@ impl Orchestrator {
         let at = now();
         let session = match kept {
             Some(k) => Session { name, ..k },
-            None => Session {
-                id: a.id.clone(),
-                role: AgentRole::Orchestrator,
-                name,
-                agent: a.id.clone(),
-                runtime: ORCHESTRATOR_RUNTIME.into(),
-                brief: a.duty.clone(),
-                repo: None,
-                branch: None,
-                worktree: None,
-                hired_at: at,
-                runs: 0,
-                last_run: None,
-                spent: None,
-                channel: None,
-                issue: None,
-                refining: false,
-                subagents: None,
-                tool_connections: None,
-                machine: None,
-                phase: Phase::Resting(PhaseResting {}),
-            },
+            None => {
+                let mut s = Session::new(
+                    &a.id,
+                    SessionController::Orchestrator,
+                    name,
+                    ORCHESTRATOR_RUNTIME,
+                    ExecutionPolicy::SandboxDir,
+                    at,
+                );
+                s.profile = Some(a.id.clone());
+                s.brief = a.duty.clone();
+                s
+            }
         };
         hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at, session })]);
     }
@@ -742,7 +733,7 @@ impl Orchestrator {
             .map(|c| {
                 let theirs: Vec<String> = roster
                     .iter()
-                    .filter(|h| h.channel.clone().unwrap_or_else(|| default.clone()) == c.id)
+                    .filter(|h| h.channel_id().unwrap_or(default.as_str()) == c.id)
                     .map(|h| f.session_line(h))
                     .collect();
                 let head = words::channel_line(&c.name, c.default, &c.description, &c.repo);

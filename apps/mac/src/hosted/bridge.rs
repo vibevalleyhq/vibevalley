@@ -157,18 +157,11 @@ pub enum Action {
         #[serde(default)]
         staged: bool,
     },
-    UpdateChatTab {
+    BindChatSession {
         tab_id: u64,
-        #[serde(default)]
-        session_id: Option<String>,
+        session_id: String,
         #[serde(default)]
         runtime: Option<String>,
-        #[serde(default)]
-        title: Option<String>,
-        #[serde(default)]
-        status: Option<String>,
-        #[serde(default)]
-        attention: Option<bool>,
     },
     AddProject,
     CloseProject {
@@ -336,14 +329,11 @@ mod tests {
             }
         );
         assert_eq!(
-            parse_action(&json!({"type": "update_chat_tab", "tab_id": 7, "session_id": "s1", "status": "working", "attention": true})).unwrap(),
-            Action::UpdateChatTab {
+            parse_action(&json!({"type": "bind_chat_session", "tab_id": 7, "session_id": "s1", "runtime": "claude"})).unwrap(),
+            Action::BindChatSession {
                 tab_id: 7,
-                session_id: Some("s1".into()),
-                runtime: None,
-                title: None,
-                status: Some("working".into()),
-                attention: Some(true),
+                session_id: "s1".into(),
+                runtime: Some("claude".into()),
             }
         );
         assert!(parse_action(&json!({"type": "show_panel", "panel": "unknown"})).is_err());

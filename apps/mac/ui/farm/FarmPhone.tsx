@@ -11,11 +11,12 @@ import { api, newSendKey, reasonOf } from "../infra/api";
 import { frame, call } from "../infra/bridge";
 import { useBridge } from "../infra/bridged";
 import { useCore } from "../infra/frame";
+import { readFarmPhoneParams, readHostLocale, type FarmCalls } from "../infra/hostParams";
 import { Root } from "../infra/Root";
 import { GameIcon, GamePad, PhoneGame, type GameId } from "./PhoneGames";
 
 type Screen = "home" | "missed" | "log" | "orchestrator" | "games" | GameId;
-type Calls = { open: boolean; narrow: boolean; ringing: InboxItem | null; missed: InboxItem[]; log: { call: InboxItem; answered: boolean }[] };
+type Calls = FarmCalls;
 type Voice = { phase: "idle" | "connecting" | "live" | "stopping"; problem: string | null; heard: string; said: string };
 const games = ["blocks", "sokoban", "dino", "bugs", "merge"] as const;
 const isGame = (screen: Screen): screen is GameId => games.some((g) => g === screen);
@@ -136,7 +137,7 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
 
 function Handset(props: { calls: () => Calls }) {
   const app = signal<Screen>("home");
-  const unfolded = signal(host.params.unfolded === true);
+  const unfolded = signal(readFarmPhoneParams().unfolded);
   const large = signal(false);
   const activeCall = signal<Voice>({ phase: "idle", problem: null, heard: "", said: "" });
   const voiceId = crypto.randomUUID();
@@ -373,27 +374,10 @@ function Handset(props: { calls: () => Calls }) {
   );
 }
 
-const emptyCalls: Calls = { open: false, narrow: false, ringing: null, missed: [], log: [] };
-
-function isCalls(value: unknown): value is Calls {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "open" in value &&
-    typeof value.open === "boolean" &&
-    "narrow" in value &&
-    typeof value.narrow === "boolean" &&
-    "missed" in value &&
-    Array.isArray(value.missed) &&
-    "log" in value &&
-    Array.isArray(value.log)
-  );
-}
-
 export function FarmPhone() {
-  setLocale(host.params.locale === "en" ? "en" : "zh");
+  setLocale(readHostLocale());
   useBridge();
-  const initial = isCalls(host.params.calls) ? host.params.calls : emptyCalls;
+  const initial = readFarmPhoneParams().calls;
   const updates = frame<Calls>("calls");
   const calls = () => updates() ?? initial;
   return (

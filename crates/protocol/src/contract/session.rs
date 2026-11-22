@@ -356,6 +356,77 @@ pub struct SessionSubagents {
     pub waits: Vec<SubagentWait>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum SessionController {
+    User,
+    IssueBoard,
+    Channel,
+    Orchestrator,
+}
+
+impl SessionController {
+    pub const ALL: [SessionController; 4] = [
+        SessionController::User,
+        SessionController::IssueBoard,
+        SessionController::Channel,
+        SessionController::Orchestrator,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SessionController::User => "user",
+            SessionController::IssueBoard => "issueBoard",
+            SessionController::Channel => "channel",
+            SessionController::Orchestrator => "orchestrator",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ExecutionPolicy {
+    #[serde(rename_all = "camelCase")]
+    DirectCwd {
+        repo: Option<String>,
+        permission_mode: SessionPermissionMode,
+    },
+    #[serde(rename_all = "camelCase")]
+    ManagedWorktree {
+        repo: String,
+        branch: Option<String>,
+    },
+    SandboxDir,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ContextRef {
+    #[serde(rename_all = "camelCase")]
+    Issue {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+        id: IssueId,
+        refining: Option<bool>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Channel { id: String },
+    #[serde(rename_all = "camelCase")]
+    Artifact {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+        id: ArtifactId,
+    },
+    #[serde(rename_all = "camelCase")]
+    Pkm { path: String },
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -364,22 +435,19 @@ pub struct SessionSubagents {
 pub struct Session {
     #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
     pub id: SessionId,
-    pub role: AgentRole,
+    pub controller: SessionController,
+    pub role: Option<AgentRole>,
     pub name: String,
-    pub agent: String,
+    pub profile: Option<String>,
     pub runtime: String,
     pub brief: String,
-    pub repo: Option<String>,
-    pub branch: Option<String>,
-    pub worktree: Option<String>,
+    pub cwd: Option<String>,
+    pub policy: ExecutionPolicy,
+    pub bindings: Vec<ContextRef>,
     pub hired_at: i64,
     pub runs: i64,
     pub last_run: Option<LastRun>,
     pub spent: Option<Spent>,
-    pub channel: Option<String>,
-    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
-    pub issue: Option<IssueId>,
-    pub refining: bool,
     pub subagents: Option<SessionSubagents>,
     pub tool_connections: Option<Vec<ToolConnection>>,
     /// The machine it works on; none for an agent hosted in the server's process.
@@ -396,22 +464,19 @@ pub struct Session {
 pub struct SessionView {
     #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
     pub id: SessionId,
-    pub role: AgentRole,
+    pub controller: SessionController,
+    pub role: Option<AgentRole>,
     pub name: String,
-    pub agent: String,
+    pub profile: Option<String>,
     pub runtime: String,
     pub brief: String,
-    pub repo: Option<String>,
-    pub branch: Option<String>,
-    pub worktree: Option<String>,
+    pub cwd: Option<String>,
+    pub policy: ExecutionPolicy,
+    pub bindings: Vec<ContextRef>,
     pub hired_at: i64,
     pub runs: i64,
     pub last_run: Option<LastRun>,
     pub spent: Option<Spent>,
-    pub channel: Option<String>,
-    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
-    pub issue: Option<IssueId>,
-    pub refining: bool,
     pub subagents: Option<SessionSubagents>,
     pub tool_connections: Option<Vec<ToolConnection>>,
     pub machine: Option<String>,
@@ -886,7 +951,8 @@ pub struct SessionStopInput {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct SessionListInput {
-    pub agent: Option<String>,
+    pub profile: Option<String>,
+    pub controller: Option<SessionController>,
 }
 
 #[skip_serializing_none]
@@ -906,6 +972,31 @@ pub struct SessionGetInput {
 pub struct SessionEventListInput {
     pub id: String,
     pub run: Option<String>,
+    pub before_seq: Option<i64>,
+    pub after_seq: Option<i64>,
+    pub limit: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionEventPage {
+    pub events: Vec<SessionEvent>,
+    pub has_more: bool,
+    pub oldest_seq: Option<i64>,
+    pub newest_seq: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionBindingInput {
+    pub id: String,
+    pub binding: ContextRef,
 }
 
 #[skip_serializing_none]
@@ -1219,6 +1310,9 @@ pub enum SessionWatchEvent {
 crate::typescript::module! {
     "session";
     types: [SessionAction,
+    SessionController,
+    ExecutionPolicy,
+    ContextRef,
     Doing,
     DoingView,
     PhaseWorking,
@@ -1268,6 +1362,8 @@ crate::typescript::module! {
     SessionListInput,
     SessionGetInput,
     SessionEventListInput,
+    SessionEventPage,
+    SessionBindingInput,
     SessionContextFile,
     SessionOpenWorkspaceInput,
     SessionWorkspace,

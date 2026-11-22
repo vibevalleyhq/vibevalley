@@ -627,16 +627,17 @@ pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
         let Fact::SessionReported(r) = &tr.fact else { return };
         let Some(store) = s.upgrade() else { return };
         let Some(h) = tr.after.sessions.iter().find(|h| h.id == r.id) else { return };
-        if h.role != vibevalley_protocol::AgentRole::Worker || crate::modules::work::session::is_workspace(h) {
+        if !(h.is_board_worker() || h.is_direct_talker()) {
             return;
         }
+        let Some(agent) = h.profile.clone() else { return };
         let summary = h.last_run.as_ref().map(|l| l.summary.clone()).unwrap_or_default();
         let outcome = h.last_run.as_ref().map(|l| l.outcome).unwrap_or(Outcome::Completed);
         let run = FinishedRun {
-            agent: h.agent.clone(),
+            agent,
             session: h.id.clone(),
-            issue: h.issue.clone(),
-            repo: h.repo.clone().unwrap_or_default(),
+            issue: h.issue_id().map(String::from),
+            repo: h.repo_name().unwrap_or_default().to_string(),
             brief: h.brief.clone(),
             outcome,
             summary,
@@ -666,9 +667,17 @@ mod tests {
         install(&hub, memories.clone());
 
         // Workspace chat session reports: must be skipped cleanly.
-        let mut ws = Session::worker("ws1", "Direct Chat", 1);
-        ws.agent = "antigravity".into();
-        ws.runtime = "antigravity".into();
+        let mut ws = Session::new(
+            "ws1",
+            vibevalley_protocol::SessionController::User,
+            "Direct Chat",
+            "antigravity",
+            vibevalley_protocol::ExecutionPolicy::DirectCwd {
+                repo: None,
+                permission_mode: vibevalley_protocol::SessionPermissionMode::AcceptEdits,
+            },
+            1,
+        );
         ws.brief = "workspace chat".into();
         hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: 1, session: ws })]);
         hub.apply(vec![Fact::SessionReported(FactSessionReported {
@@ -686,11 +695,22 @@ mod tests {
         })]);
 
         // Issue worker reports: kept directly on the async bus thread.
-        let mut worker = Session::worker("w1", "Backend", 3);
-        worker.agent = "backend".into();
-        worker.runtime = "scripted".into();
-        worker.issue = Some("i1".into());
-        worker.repo = Some("farm".into());
+        let mut worker = Session::new(
+            "w1",
+            vibevalley_protocol::SessionController::IssueBoard,
+            "Backend",
+            "scripted",
+            vibevalley_protocol::ExecutionPolicy::ManagedWorktree {
+                repo: "farm".into(),
+                branch: None,
+            },
+            3,
+        );
+        worker.profile = Some("backend".into());
+        worker.attach_binding(vibevalley_protocol::ContextRef::Issue {
+            id: "i1".into(),
+            refining: None,
+        });
         worker.brief = "fix bug".into();
         hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: 3, session: worker })]);
         hub.apply(vec![Fact::SessionReported(FactSessionReported {

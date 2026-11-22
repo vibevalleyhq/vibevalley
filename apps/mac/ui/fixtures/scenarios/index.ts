@@ -1,4 +1,4 @@
-import type { ChatMessage, IssueHistory, SessionEvent, StateFrame } from "@vibevalley/protocol";
+import type { ChatMessage, IssueHistory, SessionEvent, SessionEventPage, StateFrame } from "@vibevalley/protocol";
 import { StateFrame as StateFrameSchema } from "@vibevalley/protocol/schema";
 
 import workbenchResponsesJson from "../workbench/responses.json";
@@ -119,6 +119,17 @@ function buildMessages(density: ScenarioDensity, now: number): ChatMessage[] {
   return [...anchored, ...extra];
 }
 
+function eventPage(events: SessionEvent[]): SessionEventPage {
+  const oldestSeq = events[0]?.seq;
+  const newestSeq = events.at(-1)?.seq;
+  return {
+    events,
+    hasMore: false,
+    ...(oldestSeq !== undefined ? { oldestSeq } : {}),
+    ...(newestSeq !== undefined ? { newestSeq } : {}),
+  };
+}
+
 function responsesFor(density: ScenarioDensity, frame: StateFrame): Record<string, unknown> {
   const pixelDir = { path: decodeURI(new URL("../../../../../assets/pixel", import.meta.url).pathname) };
   const baseSettings = (baseResponses["setting.get"] as Record<string, unknown> | undefined) ?? {};
@@ -147,7 +158,7 @@ function responsesFor(density: ScenarioDensity, frame: StateFrame): Record<strin
       "channel.pin.list": [],
       "channel.message.search": [],
       "session.list": [],
-      "session.event.list": [],
+      "session.event.list": eventPage([]),
       "artifact.list": [],
       "artifact.suggestion.list": [],
       "library.item.list": [],
@@ -178,7 +189,7 @@ function responsesFor(density: ScenarioDensity, frame: StateFrame): Record<strin
     "channel.message.list": messages,
     "channel.pin.list": messages.filter((m) => m.pinned !== undefined),
     "session.list": frame.state.sessions,
-    "session.event.list": buildSessionEvents(SCENARIO_NOW, density !== "minimal", density === "dense"),
+    "session.event.list": eventPage(buildSessionEvents(SCENARIO_NOW, density !== "minimal", density === "dense")),
     "library.item.list": [
       {
         attachment: { id: "lib-poster", name: "海报.png", type: "image/png", size: 482_113 },

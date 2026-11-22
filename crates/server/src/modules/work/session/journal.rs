@@ -1,9 +1,9 @@
 //! Each session's work log (`journal.ts`): the steps it took as
-//! `SessionEvent`s, kept at `<home>/events/<id>.json`, pushed live every
-//! 300 ms and written out every 1.5 s while they change.
+//! `SessionEvent`s, pushed live every 300 ms and written out to SQLite
+//! (`session_event`) every 1.5 s while they change.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex, Weak};
 use std::time::{Duration, Instant};
 
@@ -116,6 +116,8 @@ pub struct Journal {
     started: HashMap<String, i64>,
     draft: Draft,
     dirty: Vec<i64>,
+    dirty_store: Vec<i64>,
+    evicted_dirty: HashMap<i64, SessionEvent>,
     pushing: Option<Instant>,
     saving: Option<Instant>,
     urgent: bool,
@@ -133,6 +135,8 @@ impl Journal {
             started: HashMap::new(),
             draft: Draft::None,
             dirty: vec![],
+            dirty_store: vec![],
+            evicted_dirty: HashMap::new(),
             pushing: None,
             saving: None,
             urgent: false,
@@ -159,6 +163,9 @@ impl Journal {
         if !self.dirty.contains(&n) {
             self.dirty.push(n);
         }
+        if !self.dirty_store.contains(&n) {
+            self.dirty_store.push(n);
+        }
         self.pushing.get_or_insert_with(Instant::now);
         self.saving.get_or_insert_with(Instant::now);
     }
@@ -182,19 +189,37 @@ impl Journal {
                     .find(|s| s.seq == n)
                     .cloned()
                     .or_else(|| draft.clone().filter(|d| d.seq == n))
+                    .or_else(|| self.evicted_dirty.get(&n).cloned())
             })
             .collect()
     }
 
-    /// Whether the file is due to be written (1.5 s after a change).
-    pub fn save_due(&mut self, all: bool) -> bool {
-        match self.saving {
-            Some(at) if all || at.elapsed() >= SAVE_AFTER => {
-                self.saving = None;
-                true
+    /// Collects events modified since the last SQLite flush (respecting `SAVE_AFTER` when `only_if_due` is set).
+    pub fn take_dirty_for_save(&mut self, only_if_due: bool) -> Vec<SessionEvent> {
+        if only_if_due {
+            match self.saving {
+                Some(at) if at.elapsed() >= SAVE_AFTER => {}
+                _ => return vec![],
             }
-            _ => false,
         }
+        self.saving = None;
+        let dirty = std::mem::take(&mut self.dirty_store);
+        if dirty.is_empty() {
+            return vec![];
+        }
+        let draft = self.current_draft().cloned();
+        dirty
+            .into_iter()
+            .filter_map(|n| {
+                self.steps
+                    .iter()
+                    .rev()
+                    .find(|s| s.seq == n)
+                    .cloned()
+                    .or_else(|| draft.clone().filter(|d| d.seq == n))
+                    .or_else(|| self.evicted_dirty.get(&n).cloned())
+            })
+            .collect()
     }
 
     fn next_deadline(&self) -> Option<Instant> {
@@ -241,7 +266,11 @@ impl Journal {
         self.steps.push(step);
         if self.steps.len() > self.keep {
             let drop = self.steps.len() - self.keep;
-            self.steps.drain(..drop);
+            for ev in self.steps.drain(..drop) {
+                if self.dirty_store.contains(&ev.seq) {
+                    self.evicted_dirty.insert(ev.seq, ev);
+                }
+            }
         }
         self.changed(n);
     }
@@ -502,10 +531,10 @@ fn known_id(id: &str) -> bool {
     !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
-/// Every session's log (`makeTrajectories`): the ones being written in
-/// memory, the others on disk.
+/// Every session's log (`Trajectories`): hot drafts in memory, full durable
+/// history in SQLite `session_event` with cursor pagination.
 pub struct Trajectories {
-    dir: PathBuf,
+    db: crate::base::ModuleDb,
     open: Mutex<HashMap<String, Journal>>,
     hub: Weak<Hub>,
     wake: flume::Sender<()>,
@@ -513,34 +542,15 @@ pub struct Trajectories {
     thread: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
-fn write_out(file: &Path, body: String) {
-    let tmp = file.with_extension("json.tmp");
-    if std::fs::write(&tmp, body).is_ok() {
-        let _ = std::fs::rename(&tmp, file);
-    }
-}
-
-fn read_journal(file: &Path) -> Option<Vec<SessionEvent>> {
-    let body = std::fs::read_to_string(file).ok()?;
-    match serde_json::from_str(&body) {
-        Ok(events) => Some(events),
-        Err(_) => {
-            let _ = std::fs::remove_file(file);
-            None
-        }
-    }
-}
-
 impl Trajectories {
-    /// The logs under `<home>/events`; a thread pushes and writes them out
-    /// until the hub is gone.
+    /// Opens SQLite `session_event` under `home` and starts the event-driven pusher/flusher thread.
     pub fn open(home: &Path, hub: &Arc<Hub>) -> Arc<Trajectories> {
-        let dir = home.join("events");
-        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::create_dir_all(home);
+        let db = crate::base::ModuleDb::open(home, super::db::SCHEMA).expect("trajectories db");
         let (stop_tx, stop_rx) = flume::bounded::<()>(0);
         let (wake_tx, wake_rx) = flume::bounded::<()>(1);
         let t = Arc::new(Trajectories {
-            dir,
+            db,
             open: Mutex::default(),
             hub: Arc::downgrade(hub),
             wake: wake_tx,
@@ -604,11 +614,39 @@ impl Trajectories {
         let _ = self.wake.try_send(());
     }
 
-    fn file_of(&self, id: &str) -> PathBuf {
-        self.dir.join(format!("{id}.json"))
+    fn load_tail(&self, id: &str) -> Vec<SessionEvent> {
+        self.db
+            .run(async |c| super::db::list_events_tail(c, id, "", KEEP_EVENTS as i64).await)
+            .unwrap_or_default()
     }
 
-    /// Pushes what is due and writes out the files that are.
+    fn persist_dirty(&self, writes: Vec<(String, Vec<SessionEvent>)>) {
+        if writes.is_empty() {
+            return;
+        }
+        if let Err(e) = self.db.run(async |c| {
+            use sqlx::Connection as _;
+            let mut tx = c.begin().await?;
+            for (id, events) in writes {
+                super::db::upsert_events(&mut tx, &id, &events).await?;
+            }
+            tx.commit().await
+        }) {
+            eprintln!("vibevalley: persisting session events: {e}");
+        }
+    }
+
+    fn flush_session(&self, id: &str) {
+        let dirty = {
+            let mut open = lock(&self.open);
+            open.get_mut(id).map(|j| j.take_dirty_for_save(false)).unwrap_or_default()
+        };
+        if !dirty.is_empty() {
+            self.persist_dirty(vec![(id.to_string(), dirty)]);
+        }
+    }
+
+    /// Pushes what is due and writes out changed events to SQLite.
     pub fn flush(&self, all: bool) {
         let mut pushes = Vec::new();
         let mut writes = Vec::new();
@@ -618,8 +656,9 @@ impl Trajectories {
                 for e in j.due(all) {
                     pushes.push((id.clone(), e));
                 }
-                if j.save_due(all) {
-                    writes.push((self.file_of(id), j.body()));
+                let dirty = j.take_dirty_for_save(!all);
+                if !dirty.is_empty() {
+                    writes.push((id.clone(), dirty));
                 }
             }
         }
@@ -628,20 +667,17 @@ impl Trajectories {
                 hub.session_event(&id, e);
             }
         }
-        for (file, body) in writes {
-            write_out(&file, body);
-        }
+        self.persist_dirty(writes);
     }
 
     fn with<R>(&self, id: &str, f: impl FnOnce(&mut Journal) -> R) -> Option<R> {
         if !known_id(id) {
             return None;
         }
+        let existing_tail = if lock(&self.open).contains_key(id) { None } else { Some(self.load_tail(id)) };
         let (out, dirty) = {
             let mut open = lock(&self.open);
-            let j = open
-                .entry(id.to_string())
-                .or_insert_with(|| Journal::new(read_journal(&self.file_of(id)).unwrap_or_default()));
+            let j = open.entry(id.to_string()).or_insert_with(|| Journal::new(existing_tail.unwrap_or_default()));
             let out = f(j);
             (out, j.next_deadline().is_some())
         };
@@ -656,27 +692,77 @@ impl Trajectories {
         if !known_id(id) {
             return None;
         }
-        let all = match lock(&self.open).get(id) {
-            Some(j) => Some(j.events()),
-            None => read_journal(&self.file_of(id)),
-        }?;
-        Some(match run.filter(|r| !r.is_empty()) {
-            Some(r) => all.into_iter().filter(|e| e.run.as_deref() == Some(r)).collect(),
-            None => all,
+        self.flush_session(id);
+        let is_open = lock(&self.open).contains_key(id);
+        let run_id = run.filter(|r| !r.is_empty()).unwrap_or("");
+        let (has_any, events) = self
+            .db
+            .run(async |c| {
+                let max_seq = super::db::max_event_seq(c, id).await?;
+                if max_seq < 0 && !is_open {
+                    return Ok((false, vec![]));
+                }
+                let rows = super::db::list_events_tail(c, id, run_id, 1_000_000).await?;
+                Ok((true, rows))
+            })
+            .ok()?;
+        has_any.then_some(events)
+    }
+
+    /// Cursor-paged events for `session.event.list`.
+    pub fn events_page(&self, input: &vibevalley_protocol::SessionEventListInput) -> Option<vibevalley_protocol::SessionEventPage> {
+        if !known_id(&input.id) {
+            return None;
+        }
+        self.flush_session(&input.id);
+        let limit = input.limit.unwrap_or(200).clamp(1, 1000);
+        let run_id = input.run.as_deref().unwrap_or("");
+        let fetch = limit + 1;
+        let mut events = self
+            .db
+            .run(async |c| {
+                if let Some(after) = input.after_seq {
+                    super::db::list_events_after(c, &input.id, run_id, after, fetch).await
+                } else if let Some(before) = input.before_seq {
+                    super::db::list_events_before(c, &input.id, run_id, before, fetch).await
+                } else {
+                    super::db::list_events_tail(c, &input.id, run_id, fetch).await
+                }
+            })
+            .unwrap_or_default();
+        let has_more = events.len() > limit as usize;
+        if has_more {
+            if input.after_seq.is_some() {
+                events.truncate(limit as usize);
+            } else {
+                // Backward/tail queries returned ascending after `.reverse()`, so index 0 is the oldest extra item.
+                events.drain(0..events.len() - limit as usize);
+            }
+        }
+        let oldest_seq = events.first().map(|e| e.seq);
+        let newest_seq = events.last().map(|e| e.seq);
+        Some(vibevalley_protocol::SessionEventPage {
+            events,
+            has_more,
+            oldest_seq,
+            newest_seq,
         })
     }
 
-    /// Writes a session's log out and lets it go; it stays on disk.
+    /// Seals and flushes a session's open log to SQLite.
     pub fn finish(&self, id: &str) {
         let Some(mut j) = lock(&self.open).remove(id) else { return };
         j.close();
         let pushes = j.due(true);
+        let dirty = j.take_dirty_for_save(false);
         if let Some(hub) = self.hub.upgrade() {
             for e in pushes {
                 hub.session_event(id, e);
             }
         }
-        write_out(&self.file_of(id), j.body());
+        if !dirty.is_empty() {
+            self.persist_dirty(vec![(id.to_string(), dirty)]);
+        }
     }
 
     fn finish_all(&self) {
@@ -686,7 +772,7 @@ impl Trajectories {
         }
     }
 
-    /// Seals and writes out every log still open.
+    /// Seals and flushes every open log.
     pub fn close(&self) {
         let _ = lock(&self.stop).take();
         if let Some(handle) = lock(&self.thread).take()
@@ -697,7 +783,7 @@ impl Trajectories {
         self.finish_all();
     }
 
-    /// The open log of `id` (taken up from disk), for writing to it.
+    /// The open log of `id`, for writing to it.
     pub fn with_log<R>(&self, id: &str, f: impl FnOnce(&mut Journal) -> R) -> Option<R> {
         self.with(id, f)
     }
@@ -708,7 +794,7 @@ impl Trajectories {
             return;
         }
         lock(&self.open).remove(id);
-        let _ = std::fs::remove_file(self.file_of(id));
+        let _ = self.db.run(async |c| super::db::delete_events(c, id).await);
     }
 
     /// Takes one of the board's steps for session `id` working in `cwd`.
@@ -893,6 +979,62 @@ mod tests {
         }
         assert!(saw_push, "event-driven journal worker should flush pending push at PUSH_AFTER");
         tr.close();
-        assert!(home.path().join("events/w1.json").is_file());
+        assert!(home.path().join("server.db").is_file());
+        assert!(!home.path().join("events").exists());
+
+        // Cursor pagination beyond the hot RAM window (KEEP_EVENTS = 240).
+        let tr2 = Trajectories::open(home.path(), &hub);
+        for i in 1..=260 {
+            tr2.step("w-long", "", Step::Asked { text: format!("step-{i}") });
+        }
+        let page1 = tr2
+            .events_page(&vibevalley_protocol::SessionEventListInput {
+                id: "w-long".into(),
+                run: None,
+                before_seq: None,
+                after_seq: None,
+                limit: Some(100),
+            })
+            .unwrap();
+        assert_eq!(page1.events.len(), 100);
+        assert!(page1.has_more);
+        assert_eq!(page1.oldest_seq, Some(160));
+        assert_eq!(page1.newest_seq, Some(259));
+
+        let page2 = tr2
+            .events_page(&vibevalley_protocol::SessionEventListInput {
+                id: "w-long".into(),
+                run: None,
+                before_seq: page1.oldest_seq,
+                after_seq: None,
+                limit: Some(200),
+            })
+            .unwrap();
+        assert_eq!(page2.events.len(), 160);
+        assert!(!page2.has_more);
+        assert_eq!(page2.oldest_seq, Some(0));
+        assert_eq!(page2.newest_seq, Some(159));
+        tr2.close();
+
+        // Evicted burst (>240 steps closed directly without prior flush) still persists completely to SQLite.
+        let tr3 = Trajectories::open(home.path(), &hub);
+        for i in 0..265 {
+            tr3.step("w-burst", "", Step::Asked { text: format!("burst-{i}") });
+        }
+        tr3.close();
+        let tr4 = Trajectories::open(home.path(), &hub);
+        let burst = tr4
+            .events_page(&vibevalley_protocol::SessionEventListInput {
+                id: "w-burst".into(),
+                run: None,
+                before_seq: None,
+                after_seq: None,
+                limit: Some(500),
+            })
+            .unwrap();
+        assert_eq!(burst.events.len(), 265);
+        assert_eq!(burst.oldest_seq, Some(0));
+        assert_eq!(burst.newest_seq, Some(264));
+        tr4.close();
     }
 }

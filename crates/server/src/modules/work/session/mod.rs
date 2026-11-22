@@ -12,8 +12,8 @@ use vibevalley_core::Transition;
 use vibevalley_core::rules::{session_ids_of, stage_wants_user};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    AgentRole, ApiError, BizCode, ChannelType, Fact, FactSessionReported, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, MessageKind, Outcome,
-    Session, SessionId, SessionWatchEvent, Subscription, ops, subscriptions,
+    ApiError, BizCode, ChannelType, Fact, FactSessionReported, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, MessageKind, Outcome, Session,
+    SessionId, SessionWatchEvent, Subscription, ops, subscriptions,
 };
 
 use crate::base::{LookIn, missing};
@@ -43,11 +43,11 @@ mod workspace;
 
 pub use drivers::{Drive, Drivers, HelperPlace, Persona, RuntimeDrivers};
 pub use journal::{Journal, Trajectories};
+pub mod mailbox;
 pub use report::{ANSWER_ONLY, Report, ReportQuestion, ReportStatus};
 pub use runs::trigger_of;
 pub use sessions::{DraftEnd, Hire, Rounds, Sessions};
 pub use workspace::WorkspaceSnapshot;
-pub(crate) use workspace::is_workspace;
 
 fn helper_ref(id: &str) -> ApiError {
     missing(t("server.helperRef", &[("id", id.into())]), LookIn::Session)
@@ -81,10 +81,15 @@ impl Subscription for IssueWatchStream {
 
 pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, attachments: Option<Arc<Attachments>>) {
     hub.on::<ops::SessionList>(move |ctx, input| {
-        let agent = input.agent.unwrap_or_default();
-        let mut out: Vec<_> = ctx
-            .hub
-            .read(|s| s.sessions.iter().filter(|x| agent.is_empty() || x.agent == agent).cloned().collect());
+        let profile = input.profile.unwrap_or_default();
+        let controller = input.controller;
+        let mut out: Vec<_> = ctx.hub.read(|s| {
+            s.sessions
+                .iter()
+                .filter(|x| (profile.is_empty() || x.profile_id() == Some(profile.as_str())) && controller.is_none_or(|c| x.controller == c))
+                .cloned()
+                .collect()
+        });
         out.sort_by_key(|s| std::cmp::Reverse(s.hired_at));
         Ok(out)
     });
@@ -94,7 +99,7 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
             .ok_or_else(|| helper_ref(&input.id))
     });
     let tr = trajectories.clone();
-    hub.on::<ops::SessionEventList>(move |_, input| Ok(tr.events(&input.id, input.run.as_deref()).unwrap_or_default()));
+    hub.on::<ops::SessionEventList>(move |_, input| Ok(tr.events_page(&input).unwrap_or_default()));
     let b = board.clone();
     hub.on::<ops::SessionStop>(move |_, input| stop(&b, &input.id));
 
@@ -111,6 +116,10 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
     hub.on::<ops::SessionSetConfig>(move |_, input| b.sessions().set_workspace_config(input).map_err(session_error));
     let b = board.clone();
     hub.on::<ops::SessionChildTranscript>(move |_, input| b.sessions().read_child_transcript(input).map_err(session_error));
+    let b = board.clone();
+    hub.on::<ops::SessionBindingAttach>(move |_, input| b.sessions().attach_binding(input).map_err(session_error));
+    let b = board.clone();
+    hub.on::<ops::SessionBindingDetach>(move |_, input| b.sessions().detach_binding(input).map_err(session_error));
 
     let b = board.clone();
     let tr = trajectories.clone();
@@ -156,7 +165,7 @@ pub(crate) fn stop(board: &Board, id: &str) -> Result<(), ApiError> {
         return Err(helper_ref(id));
     };
     if session.phase.is_working() {
-        if let Some(issue) = &session.issue {
+        if let Some(issue) = session.issue_id() {
             // A stop that is not taken is not a refusal.
             let _ = board.stop(issue);
         } else {
@@ -451,9 +460,13 @@ impl SessionChat {
         {
             let h = Arc::downgrade(hub);
             chat.guard_removal(move |id| {
-                let there = h
-                    .upgrade()
-                    .is_some_and(|h| h.read(|s| s.sessions.iter().any(|x| !is_workspace(x) && x.channel.as_deref() == Some(id))));
+                let there = h.upgrade().is_some_and(|h| {
+                    h.read(|s| {
+                        s.sessions
+                            .iter()
+                            .any(|x| (x.is_board_worker() || x.is_direct_talker()) && x.channel_id() == Some(id))
+                    })
+                });
                 if there { vec![t("server.channel.helpersThere", &[])] } else { vec![] }
             });
         }
@@ -469,12 +482,12 @@ impl SessionChat {
                 let Some(session) = hub.read(|s| {
                     s.sessions
                         .iter()
-                        .find(|x| x.id == who && x.role == AgentRole::Worker && !is_workspace(x))
+                        .find(|x| x.id == who && (x.is_board_worker() || x.is_direct_talker()))
                         .cloned()
                 }) else {
                     return;
                 };
-                if session.issue.is_some() {
+                if session.issue_id().is_some() {
                     ensure_issue_thread(&session);
                 } else {
                     seat_direct_session(&c, &session);
@@ -535,13 +548,7 @@ impl SessionChat {
 
     fn boot(self: &Arc<Self>) {
         if let Some(hub) = self.hub.upgrade() {
-            let talks: Vec<Session> = hub.read(|s| {
-                s.sessions
-                    .iter()
-                    .filter(|x| x.role == AgentRole::Worker && !is_workspace(x) && x.issue.is_none())
-                    .cloned()
-                    .collect()
-            });
+            let talks: Vec<Session> = hub.read(|s| s.sessions.iter().filter(|x| x.is_direct_talker() && x.issue_id().is_none()).cloned().collect());
             for h in &talks {
                 seat_direct_session(&self.chat, h);
             }
@@ -559,11 +566,14 @@ impl SessionChat {
             return;
         }
         match &tr.fact {
+            Fact::MessageChanged(f) if f.message.deleted.is_some() => {
+                for agent in self.agents.profiles.all() {
+                    let key = direct_mail_key(&agent.id, &f.message.id);
+                    let _ = self.board.sessions().withdraw_mailbox(&key);
+                }
+            }
             Fact::SessionChanged(f)
-                if f.session.role == AgentRole::Worker
-                    && !is_workspace(&f.session)
-                    && f.session.issue.is_none()
-                    && !tr.before.sessions.iter().any(|s| s.id == f.session.id) =>
+                if f.session.is_direct_talker() && f.session.issue_id().is_none() && !tr.before.sessions.iter().any(|s| s.id == f.session.id) =>
             {
                 seat_direct_session(&self.chat, &f.session);
             }
@@ -579,7 +589,7 @@ impl SessionChat {
                     .sessions
                     .iter()
                     .chain(&tr.before.sessions)
-                    .find(|s| s.id == f.id && s.role == AgentRole::Worker && !is_workspace(s) && s.issue.is_none())
+                    .find(|s| s.id == f.id && s.is_direct_talker() && s.issue_id().is_none())
                 else {
                     return;
                 };
@@ -590,8 +600,15 @@ impl SessionChat {
     }
 
     fn route_dispatched(self: &Arc<Self>, dispatched: ChannelDispatched) {
+        let sessions = self.board.sessions();
         for d in dispatched.deliveries {
             if d.recipient_kind == DeliveryTargetKind::Direct {
+                let mailbox_owner = sessions
+                    .talker(&d.recipient_id, &d.channel_id)
+                    .map(|s| s.id)
+                    .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
+                let key = direct_mail_key(&d.recipient_id, &d.message_id);
+                let _ = sessions.enqueue_mailbox(&mailbox_owner, &key, mailbox::MailboxSource::ChannelDirect, &dispatched.committed.row.body);
                 self.enqueue_lane(
                     d.recipient_id.clone(),
                     DirectWake {
@@ -653,14 +670,42 @@ impl SessionChat {
 
     fn on_direct(&self, wake: DirectWake) {
         let d = wake.delivery;
+        let mail_key = direct_mail_key(&d.recipient_id, &d.message_id);
+        let sessions = self.board.sessions();
         if !self.chat.delivery_is_pending(d.id).unwrap_or(false) {
+            let _ = sessions.withdraw_mailbox(&mail_key);
             return;
         }
         let Some(c) = wake.committed.or_else(|| self.chat.committed_of(&d.message_id).ok().flatten().map(Arc::new)) else {
+            let _ = sessions.withdraw_mailbox(&mail_key);
             let _ = self.chat.withdraw_delivery(d.id);
             return;
         };
-        let words = match meta_of(c.row.meta.as_deref()).view_context.filter(|_| c.row.deleted_at.is_none()) {
+        if c.row.deleted_at.is_some() {
+            let _ = sessions.withdraw_mailbox(&mail_key);
+            let _ = self.chat.withdraw_delivery(d.id);
+            return;
+        }
+        let mailbox_owner = sessions
+            .talker(&d.recipient_id, &d.channel_id)
+            .map(|s| s.id)
+            .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
+        let mail_entry = sessions
+            .enqueue_mailbox(&mailbox_owner, &mail_key, mailbox::MailboxSource::ChannelDirect, &c.row.body)
+            .ok();
+        let claimed = sessions.claim_mailbox_by_key(&mail_key).unwrap_or(false);
+        if !claimed
+            && mail_entry.as_ref().is_some_and(|e| {
+                matches!(
+                    e.status,
+                    mailbox::MailboxStatus::Withdrawn | mailbox::MailboxStatus::Done | mailbox::MailboxStatus::Claimed
+                )
+            })
+        {
+            return;
+        }
+        let settle_id = mail_entry.as_ref().map(|e| e.id);
+        let words = match meta_of(c.row.meta.as_deref()).view_context {
             Some(vc) => format!(
                 "{}\n{}",
                 crate::modules::team::orchestrator::words::format_artifact_view_context(&vc),
@@ -670,14 +715,20 @@ impl SessionChat {
         };
         let why = match self.agents.profiles.agent(&d.recipient_id) {
             Some(a) if !a.enabled => t("server.channel.profileDisabled", &[("name", a.name.into())]),
-            _ => match self.board.sessions().talk(&d.recipient_id, &d.channel_id, &words) {
-                Ok(_) => {
+            _ => match sessions.talk(&d.recipient_id, &d.channel_id, &words) {
+                Ok(sid) => {
+                    if let Some(id) = settle_id {
+                        let _ = sessions.settle_mailbox(id, true, Some(&sid));
+                    }
                     let _ = self.chat.settle_delivery(d.id, true);
                     return;
                 }
                 Err(e) => e.to_string(),
             },
         };
+        if let Some(id) = settle_id {
+            let _ = sessions.settle_mailbox(id, false, Some(&why));
+        }
         let _ = self.chat.settle_delivery(d.id, false);
         self.chat.notice(Noticing {
             channel: d.channel_id,
@@ -688,9 +739,14 @@ impl SessionChat {
     }
 }
 
+fn direct_mail_key(agent_id: &str, message_id: &str) -> String {
+    format!("direct:{agent_id}:{message_id}")
+}
+
 fn direct_of_session(chat: &Chat, h: &Session) -> Option<String> {
-    let place = chat.place(h.channel.as_deref()?)?;
-    (h.issue.is_none() && place.r#type == ChannelType::Direct && place.peer == Some(profile_id(&h.agent))).then_some(place.id)
+    let place = chat.place(h.channel_id()?)?;
+    let profile = h.profile_id()?;
+    (h.is_direct_talker() && h.issue_id().is_none() && place.r#type == ChannelType::Direct && place.peer == Some(profile_id(profile))).then_some(place.id)
 }
 
 fn seat_direct_session(chat: &Chat, h: &Session) {
@@ -698,7 +754,7 @@ fn seat_direct_session(chat: &Chat, h: &Session) {
     if let Err(e) = chat.seat(&Seat {
         id: h.id.clone(),
         name: h.name.clone(),
-        agent: Some(h.agent.clone()),
+        agent: h.profile.clone(),
         home: Some(direct.clone()),
     }) {
         eprintln!("vibevalley-server: session-chat: seat {}: {}", h.id, e.message);
@@ -715,7 +771,7 @@ fn sessions_left(hub: &Hub, chat: &Chat) {
     let on: Vec<String> = hub.read(|s| {
         s.sessions
             .iter()
-            .filter(|h| h.role == AgentRole::Worker && !is_workspace(h))
+            .filter(|h| h.is_board_worker() || h.is_direct_talker())
             .map(|h| h.id.clone())
             .collect()
     });

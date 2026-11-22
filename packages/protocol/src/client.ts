@@ -406,7 +406,7 @@ export class VibeValleyApi {
   readonly session = {
     /** Stops a session's turn; it stays, and a comment starts the next. */
     stop: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("session.stop", "/api/v1/session/stop", a, options),
-    list: (a: { agent?: string }, options?: { signal?: AbortSignal }): Promise<T.Session[]> =>
+    list: (a: T.SessionListInput, options?: { signal?: AbortSignal }): Promise<T.Session[]> =>
       this.call<T.Session[]>("session.list", "/api/v1/session/list", a, options),
     get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Session> => this.call<T.Session>("session.get", "/api/v1/session/get", a, options),
     openWorkspace: (a: T.SessionOpenWorkspaceInput, options?: { signal?: AbortSignal }): Promise<T.SessionWorkspace> =>
@@ -423,9 +423,17 @@ export class VibeValleyApi {
     childTranscript: (a: T.SessionChildTranscriptInput, options?: { signal?: AbortSignal }): Promise<T.SessionChildTranscript> =>
       this.call<T.SessionChildTranscript>("session.childTranscript", "/api/v1/session/childTranscript", a, options),
     event: {
-      /** Its log, oldest first. run gives one run's only. */
-      list: (a: { id: string; run?: string }, options?: { signal?: AbortSignal }): Promise<T.SessionEvent[]> =>
-        this.call<T.SessionEvent[]>("session.event.list", "/api/v1/session/event/list", a, options),
+      /** Its log, oldest first. `run` narrows to one run; cursor fields page history. */
+      list: (a: T.SessionEventListInput, options?: { signal?: AbortSignal }): Promise<T.SessionEventPage> =>
+        this.call<T.SessionEventPage>("session.event.list", "/api/v1/session/event/list", a, options),
+    },
+    binding: {
+      /** Attaches a context reference to an existing session. */
+      attach: (a: T.SessionBindingInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
+        this.call<T.Session>("session.binding.attach", "/api/v1/session/binding/attach", a, options),
+      /** Detaches a context reference from an existing session. */
+      detach: (a: T.SessionBindingInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
+        this.call<T.Session>("session.binding.detach", "/api/v1/session/binding/detach", a, options),
     },
   };
 

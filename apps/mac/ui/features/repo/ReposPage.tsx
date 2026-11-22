@@ -1,4 +1,4 @@
-import { Clipboard, host, Scroll, signal, Text, View } from "nsh";
+import { Clipboard, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
@@ -15,6 +15,7 @@ import { toast } from "../../design/toasts";
 import { mix } from "../../design/tone";
 import { api } from "../../infra/api";
 import { Keyed, useNow } from "../../infra/base/dom";
+import { readHostParams } from "../../infra/hostParams";
 import { defineQuery, ready, retryRead, useQuery, useRepos } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { createMemo, untrack } from "../../infra/solid";
@@ -94,7 +95,7 @@ export function ReposPage(props: { rest: string }) {
           testid="repos"
           action={
             <View class="flex-row items-center gap-1.5">
-              <If when={host.params.globalShell === true}>
+              <If when={readHostParams().globalShell}>
                 <ButtonLink href="/workspace" icon="terminal" size="compact" testID="open-workspace">
                   {t("web.repo.openWorkspace")}
                 </ButtonLink>

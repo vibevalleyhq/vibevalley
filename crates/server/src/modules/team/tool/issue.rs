@@ -82,7 +82,7 @@ pub fn get(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
     let mut lines = vec![words::issue_detail(&item, &f.who_of(&item), timeline.as_ref(), at)];
     if let Some(w) = f.worker_of(&item) {
         lines.push(words::session_line(&w, at, Some(item.number)));
-        lines.push(format!("目录：{}", w.worktree.clone().unwrap_or_default()));
+        lines.push(format!("目录：{}", w.cwd.clone().unwrap_or_default()));
         let last = w.last_run.as_ref().map(|r| r.summary.clone()).filter(|t| !t.is_empty());
         lines.push(format!(
             "上一轮完整汇报（结尾部分）：\n{}",
@@ -325,7 +325,7 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
     }
     let here = match who {
         Who::Orchestrator(r) => r.channel.clone(),
-        Who::Helper(h) => h.channel.clone().unwrap_or_default(),
+        Who::Helper(h) => h.channel_id().unwrap_or("").to_string(),
     };
     let mut channel = f.chat.top_of(&here);
     if let Some(name) = given(&a.channel) {
@@ -418,7 +418,7 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
             h.name,
             h.id,
             now_item.repo.clone().unwrap_or_default(),
-            h.branch.as_deref().map(|b| format!("，分支 {b}")).unwrap_or_default()
+            h.worktree_branch().map(|b| format!("，分支 {b}")).unwrap_or_default()
         ),
         None => format!("{noted}，在 #{} 排进待办：有空位就开工", channel.name),
     })
@@ -429,10 +429,10 @@ fn helper_issue(f: &Farm, who: &Who) -> Result<(vibevalley_protocol::Session, Is
     let Who::Helper(me) = who else {
         return Err("这个工具只给帮工用".into());
     };
-    let id = me.issue.as_ref().ok_or("当前不是正在处理工单的帮工会话")?;
+    let id = me.issue_id().ok_or("当前不是正在处理工单的帮工会话")?;
     let issue = f
         .board
-        .read(|s| s.issues.iter().find(|i| &i.id == id).cloned())
+        .read(|s| s.issues.iter().find(|i| i.id == id).cloned())
         .ok_or("当前不是正在处理工单的帮工会话")?;
     Ok(((**me).clone(), issue))
 }
@@ -544,7 +544,7 @@ fn submit(f: &Farm, who: &Who, summary: Option<&str>) -> Result<String, String> 
     if issue.mandate.strength != MandateStrength::Explicit || !issue.mandate.auto_submit_pr {
         return Err(t("server.issue.prSubmitNotAllowed", &[]));
     }
-    let (Deliverable::PullRequest, Some(cwd), Some(branch)) = (issue.deliver, me.worktree.clone(), me.branch.clone()) else {
+    let (Deliverable::PullRequest, Some(cwd), Some(branch)) = (issue.deliver, me.cwd.clone(), me.worktree_branch().map(String::from)) else {
         return Err(t("server.issue.prSubmitUnavailable", &[]));
     };
     let git = |args: &[&str]| -> Result<String, String> {

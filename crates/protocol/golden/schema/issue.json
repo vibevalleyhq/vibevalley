@@ -1,241 +1,217 @@
 {
- "Landing": [
-  "merged",
-  "merged_into_parent",
-  "pull_request",
-  "submitted",
-  "kept",
-  "none"
- ],
- "IssueCanceled": [
-  "dismissed",
-  "lost"
- ],
- "Priority": [
-  "urgent",
-  "high",
-  "medium",
-  "low"
- ],
- "IssueStatus": [
-  "backlog",
-  "todo",
-  "in_progress",
-  "in_review",
-  "done",
-  "canceled"
- ],
- "PullRequestState": [
-  "open",
-  "merged",
-  "closed"
- ],
- "PullRequest": [
-  {
-   "url": "s889",
-   "number": 890,
-   "state": "open"
-  },
-  {
-   "url": "s891",
-   "number": 892,
-   "state": "open"
-  }
- ],
- "Finding": [
-  {
-   "id": "s893",
-   "text": "s894",
-   "at": 895,
-   "resolved": true
-  },
-  {
-   "id": "s897",
-   "text": "s898",
-   "at": 899,
-   "resolved": true
-  }
- ],
- "IssueRefining": [
-  {
-   "session": "s901",
-   "name": "s902"
-  },
-  {
-   "session": "s903",
-   "name": "s904"
-  }
- ],
- "Question": [
-  {
-   "question": "s905",
-   "options": [
-    "s906"
-   ]
-  },
-  {
-   "question": "s907",
-   "options": [
-    "s908"
-   ]
-  }
- ],
- "CheckResult": [
-  "met",
-  "unmet",
-  "unsure"
- ],
- "CriterionCheck": [
-  {
-   "criterion": 909,
-   "result": "met",
-   "proof": "s910"
-  },
-  {
-   "criterion": 911,
-   "result": "met",
-   "proof": "s912"
-  }
- ],
- "IssueStageKind": [
-  "draft",
-  "queued",
-  "working",
-  "asking",
-  "reviewing",
-  "stuck",
-  "done",
-  "canceled"
- ],
- "StuckReason": [
-  "failed",
-  "conflict",
-  "interrupted",
-  "quiet"
- ],
- "IssueAct": [
-  "start",
-  "answer",
-  "reject",
-  "complete",
-  "acknowledge",
-  "resolve",
-  "resume",
-  "cure",
-  "tell",
-  "stop",
-  "close",
-  "reopen"
- ],
  "ActWords": [
   "none",
   "optional",
   "required"
  ],
- "IssueAction": [
+ "AppliedIssue": [
   {
-   "act": "start",
-   "does": "move",
-   "status": "backlog",
-   "words": "none"
-  },
-  {
-   "act": "answer",
-   "does": "say"
-  },
-  {
-   "act": "reject",
-   "does": "stop"
-  }
- ],
- "IssueStage": [
-  {
-   "state": "draft",
-   "since": 913,
-   "stuck": "failed",
-   "lead": "start",
-   "acts": [
+   "answer": {
+    "conclusion": "s1098",
+    "evidence": [
+     "s1099"
+    ],
+    "next": [
+     "s1101"
+    ],
+    "unsure": [
+     "s1100"
+    ]
+   },
+   "assignments": [
     {
-     "act": "start",
-     "does": "move",
-     "status": "backlog",
-     "words": "none"
-    }
-   ]
-  },
-  {
-   "state": "draft",
-   "acts": [
-    {
-     "act": "start",
-     "does": "move",
-     "status": "backlog",
-     "words": "none"
-    }
-   ]
-  }
- ],
- "MilestoneKind": [
-  "opened",
-  "refined",
-  "started",
-  "reported",
-  "asked",
-  "told",
-  "failed",
-  "stopped",
-  "rejected",
-  "accepted",
-  "closed"
- ],
- "Milestone": [
-  {
-   "at": 914,
-   "kind": "opened",
-   "who": "s915",
-   "text": "s916"
-  },
-  {
-   "at": 917,
-   "kind": "opened",
-   "text": "s918"
-  }
- ],
- "IssueTimeline": [
-  {
-   "milestones": [
-    {
-     "at": 919,
-     "kind": "opened",
-     "who": "s920",
-     "text": "s921"
+     "agent": "s1070",
+     "assignedAt": 1071,
+     "endedAt": 1072,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "s1073",
+       "startedAt": 1074
+      }
+     ],
+     "id": "s1068",
+     "issue": "s1069"
     }
    ],
-   "spent": {
-    "tokens": 922,
-    "cny": 923
-   }
+   "blockedBy": [
+    "s1080"
+   ],
+   "canceled": "dismissed",
+   "checks": [
+    {
+     "criterion": 1092,
+     "proof": "s1093",
+     "result": "met"
+    }
+   ],
+   "closedAt": 1078,
+   "conflict": {
+    "base": "s1065",
+    "files": [
+     "s1066"
+    ]
+   },
+   "constraints": {
+    "acceptance": true,
+    "check": "s1054",
+    "frozen": [
+     "s1057"
+    ],
+    "scope": [
+     "s1055"
+    ]
+   },
+   "createdAt": 1076,
+   "criteria": [
+    "s1091"
+   ],
+   "cron": "s1081",
+   "deliver": "change",
+   "delivered": "merged",
+   "description": "s1061",
+   "findings": [
+    {
+     "at": 1087,
+     "id": "s1085",
+     "resolved": true,
+     "text": "s1086"
+    }
+   ],
+   "id": "s1058",
+   "lastRun": {
+    "endedAt": 1097,
+    "outcome": "completed",
+    "startedAt": 1096
+   },
+   "mandate": {
+    "autoSubmitPr": true,
+    "maxBotReviewRounds": 1063,
+    "originTriggerId": "s1062",
+    "strength": "explicit"
+   },
+   "moves": [
+    "backlog"
+   ],
+   "number": 1059,
+   "parent": "s1079",
+   "priority": "urgent",
+   "pullRequest": {
+    "number": 1083,
+    "state": "open",
+    "url": "s1082"
+   },
+   "questions": [
+    {
+     "options": [
+      "s1090"
+     ],
+     "question": "s1089"
+    }
+   ],
+   "queuedAt": 1077,
+   "rank": 1075,
+   "refining": {
+    "name": "s1095",
+    "session": "s1094"
+   },
+   "repo": "s1067",
+   "reviewedAt": 1084,
+   "seq": 1103,
+   "stage": {
+    "acts": [
+     {
+      "act": "start",
+      "does": "move",
+      "status": "backlog",
+      "words": "none"
+     }
+    ],
+    "lead": "start",
+    "since": 1102,
+    "state": "draft",
+    "stuck": "failed"
+   },
+   "status": "backlog",
+   "title": "s1060"
   },
   {
-   "milestones": [
+   "assignments": [
     {
-     "at": 924,
-     "kind": "opened",
-     "text": "s925"
+     "agent": "s1112",
+     "assignedAt": 1113,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "s1114",
+       "startedAt": 1115
+      }
+     ],
+     "id": "s1110",
+     "issue": "s1111"
     }
-   ]
+   ],
+   "blockedBy": [
+    "s1117"
+   ],
+   "checks": [
+    {
+     "criterion": 1125,
+     "proof": "s1126",
+     "result": "met"
+    }
+   ],
+   "createdAt": 1116,
+   "criteria": [
+    "s1124"
+   ],
+   "deliver": "change",
+   "description": "s1107",
+   "findings": [
+    {
+     "at": 1120,
+     "id": "s1118",
+     "resolved": false,
+     "text": "s1119"
+    }
+   ],
+   "id": "s1104",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 1108,
+    "strength": "explicit"
+   },
+   "moves": [
+    "backlog"
+   ],
+   "number": 1105,
+   "priority": "urgent",
+   "questions": [
+    {
+     "options": [
+      "s1123"
+     ],
+     "question": "s1122"
+    }
+   ],
+   "seq": 1127,
+   "stage": {
+    "acts": [
+     {
+      "act": "start",
+      "does": "move",
+      "status": "backlog",
+      "words": "none"
+     }
+    ],
+    "state": "draft"
+   },
+   "status": "backlog",
+   "title": "s1106"
   }
- ],
- "Deliverable": [
-  "change",
-  "branch",
-  "answer",
-  "pull_request"
  ],
  "Assignment": [
   {
-   "id": "s926",
-   "issue": "s927",
    "agent": "s928",
    "assignedAt": 929,
    "endedAt": 930,
@@ -245,11 +221,11 @@
      "session": "s931",
      "startedAt": 932
     }
-   ]
+   ],
+   "id": "s926",
+   "issue": "s927"
   },
   {
-   "id": "s933",
-   "issue": "s934",
    "agent": "s935",
    "assignedAt": 936,
    "executions": [
@@ -258,8 +234,42 @@
      "session": "s937",
      "startedAt": 938
     }
-   ]
+   ],
+   "id": "s933",
+   "issue": "s934"
   }
+ ],
+ "CheckResult": [
+  "met",
+  "unmet",
+  "unsure"
+ ],
+ "CommentRequest": [
+  {
+   "sendKey": "s1265",
+   "text": "s1264"
+  },
+  {
+   "text": "s1266"
+  }
+ ],
+ "CriterionCheck": [
+  {
+   "criterion": 909,
+   "proof": "s910",
+   "result": "met"
+  },
+  {
+   "criterion": 911,
+   "proof": "s912",
+   "result": "met"
+  }
+ ],
+ "Deliverable": [
+  "change",
+  "branch",
+  "answer",
+  "pull_request"
  ],
  "Execution": [
   {
@@ -283,155 +293,36 @@
    "startedAt": 946
   }
  ],
- "MandateStrength": [
-  "explicit",
-  "inferred"
- ],
- "IssueMandate": [
+ "Finding": [
   {
-   "originTriggerId": "s947",
-   "strength": "explicit",
-   "maxBotReviewRounds": 948,
-   "autoSubmitPr": false
+   "at": 895,
+   "id": "s893",
+   "resolved": true,
+   "text": "s894"
   },
   {
-   "strength": "explicit",
-   "maxBotReviewRounds": 950,
-   "autoSubmitPr": false
-  }
- ],
- "IssueReportMemory": [
-  {
-   "text": "s952",
-   "scope": "repo"
-  },
-  {
-   "text": "s953",
-   "scope": "repo"
-  }
- ],
- "IssueReportMemoryScope": [
-  "repo",
-  "all"
- ],
- "IssueReport": [
-  {
-   "summary": "s954",
-   "questions": [
-    {
-     "question": "s955",
-     "options": [
-      "s956"
-     ]
-    }
-   ],
-   "checks": [
-    {
-     "criterion": 957,
-     "result": "met",
-     "proof": "s958"
-    }
-   ],
-   "remember": [
-    {
-     "text": "s959",
-     "scope": "repo"
-    }
-   ],
-   "prSubmit": true,
-   "answer": {
-    "conclusion": "s961",
-    "evidence": [
-     "s962"
-    ],
-    "unsure": [
-     "s963"
-    ],
-    "next": [
-     "s964"
-    ]
-   }
-  },
-  {
-   "summary": "s965",
-   "questions": [
-    {
-     "question": "s966",
-     "options": [
-      "s967"
-     ]
-    }
-   ],
-   "checks": [
-    {
-     "criterion": 968,
-     "result": "met",
-     "proof": "s969"
-    }
-   ],
-   "remember": [
-    {
-     "text": "s970",
-     "scope": "repo"
-    }
-   ],
-   "prSubmit": false
-  }
- ],
- "IssueConstraints": [
-  {
-   "check": "s972",
-   "scope": [
-    "s973"
-   ],
-   "acceptance": true,
-   "frozen": [
-    "s975"
-   ]
-  },
-  {
-   "scope": [
-    "s976"
-   ],
-   "acceptance": false,
-   "frozen": [
-    "s978"
-   ]
+   "at": 899,
+   "id": "s897",
+   "resolved": true,
+   "text": "s898"
   }
  ],
  "Issue": [
   {
-   "constraints": {
-    "check": "s979",
-    "scope": [
-     "s980"
+   "answer": {
+    "conclusion": "s1023",
+    "evidence": [
+     "s1024"
     ],
-    "acceptance": false,
-    "frozen": [
-     "s982"
+    "next": [
+     "s1026"
+    ],
+    "unsure": [
+     "s1025"
     ]
    },
-   "id": "s983",
-   "number": 984,
-   "title": "s985",
-   "description": "s986",
-   "mandate": {
-    "originTriggerId": "s987",
-    "strength": "explicit",
-    "maxBotReviewRounds": 988,
-    "autoSubmitPr": false
-   },
-   "conflict": {
-    "base": "s990",
-    "files": [
-     "s991"
-    ]
-   },
-   "repo": "s992",
    "assignments": [
     {
-     "id": "s993",
-     "issue": "s994",
      "agent": "s995",
      "assignedAt": 996,
      "endedAt": 997,
@@ -441,84 +332,95 @@
        "session": "s998",
        "startedAt": 999
       }
-     ]
+     ],
+     "id": "s993",
+     "issue": "s994"
     }
    ],
-   "priority": "urgent",
-   "rank": 1000,
-   "createdAt": 1001,
-   "queuedAt": 1002,
-   "closedAt": 1003,
-   "delivered": "merged",
-   "canceled": "dismissed",
-   "parent": "s1004",
    "blockedBy": [
     "s1005"
    ],
-   "cron": "s1006",
-   "status": "backlog",
-   "moves": [
-    "backlog"
-   ],
-   "pullRequest": {
-    "url": "s1007",
-    "number": 1008,
-    "state": "open"
-   },
-   "deliver": "change",
-   "reviewedAt": 1009,
-   "findings": [
-    {
-     "id": "s1010",
-     "text": "s1011",
-     "at": 1012,
-     "resolved": false
-    }
-   ],
-   "questions": [
-    {
-     "question": "s1014",
-     "options": [
-      "s1015"
-     ]
-    }
-   ],
-   "criteria": [
-    "s1016"
-   ],
+   "canceled": "dismissed",
    "checks": [
     {
      "criterion": 1017,
-     "result": "met",
-     "proof": "s1018"
+     "proof": "s1018",
+     "result": "met"
     }
    ],
-   "refining": {
-    "session": "s1019",
-    "name": "s1020"
-   },
-   "lastRun": {
-    "startedAt": 1021,
-    "endedAt": 1022,
-    "outcome": "completed"
-   },
-   "answer": {
-    "conclusion": "s1023",
-    "evidence": [
-     "s1024"
-    ],
-    "unsure": [
-     "s1025"
-    ],
-    "next": [
-     "s1026"
+   "closedAt": 1003,
+   "conflict": {
+    "base": "s990",
+    "files": [
+     "s991"
     ]
    },
+   "constraints": {
+    "acceptance": false,
+    "check": "s979",
+    "frozen": [
+     "s982"
+    ],
+    "scope": [
+     "s980"
+    ]
+   },
+   "createdAt": 1001,
+   "criteria": [
+    "s1016"
+   ],
+   "cron": "s1006",
+   "deliver": "change",
+   "delivered": "merged",
+   "description": "s986",
+   "findings": [
+    {
+     "at": 1012,
+     "id": "s1010",
+     "resolved": false,
+     "text": "s1011"
+    }
+   ],
+   "id": "s983",
+   "lastRun": {
+    "endedAt": 1022,
+    "outcome": "completed",
+    "startedAt": 1021
+   },
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 988,
+    "originTriggerId": "s987",
+    "strength": "explicit"
+   },
+   "moves": [
+    "backlog"
+   ],
+   "number": 984,
+   "parent": "s1004",
+   "priority": "urgent",
+   "pullRequest": {
+    "number": 1008,
+    "state": "open",
+    "url": "s1007"
+   },
+   "questions": [
+    {
+     "options": [
+      "s1015"
+     ],
+     "question": "s1014"
+    }
+   ],
+   "queuedAt": 1002,
+   "rank": 1000,
+   "refining": {
+    "name": "s1020",
+    "session": "s1019"
+   },
+   "repo": "s992",
+   "reviewedAt": 1009,
    "stage": {
-    "state": "draft",
-    "since": 1027,
-    "stuck": "failed",
-    "lead": "start",
     "acts": [
      {
       "act": "start",
@@ -526,23 +428,18 @@
       "status": "backlog",
       "words": "none"
      }
-    ]
-   }
+    ],
+    "lead": "start",
+    "since": 1027,
+    "state": "draft",
+    "stuck": "failed"
+   },
+   "status": "backlog",
+   "title": "s985"
   },
   {
-   "id": "s1028",
-   "number": 1029,
-   "title": "s1030",
-   "description": "s1031",
-   "mandate": {
-    "strength": "explicit",
-    "maxBotReviewRounds": 1032,
-    "autoSubmitPr": false
-   },
    "assignments": [
     {
-     "id": "s1034",
-     "issue": "s1035",
      "agent": "s1036",
      "assignedAt": 1037,
      "executions": [
@@ -551,188 +448,55 @@
        "session": "s1038",
        "startedAt": 1039
       }
-     ]
+     ],
+     "id": "s1034",
+     "issue": "s1035"
     }
    ],
-   "priority": "urgent",
-   "createdAt": 1040,
    "blockedBy": [
     "s1041"
-   ],
-   "status": "backlog",
-   "moves": [
-    "backlog"
-   ],
-   "deliver": "change",
-   "findings": [
-    {
-     "id": "s1042",
-     "text": "s1043",
-     "at": 1044,
-     "resolved": false
-    }
-   ],
-   "questions": [
-    {
-     "question": "s1046",
-     "options": [
-      "s1047"
-     ]
-    }
-   ],
-   "criteria": [
-    "s1048"
    ],
    "checks": [
     {
      "criterion": 1049,
-     "result": "met",
-     "proof": "s1050"
+     "proof": "s1050",
+     "result": "met"
     }
    ],
-   "stage": {
-    "state": "draft",
-    "acts": [
-     {
-      "act": "start",
-      "does": "move",
-      "status": "backlog",
-      "words": "none"
-     }
-    ]
-   }
-  }
- ],
- "IssueLastRun": [
-  {
-   "startedAt": 1051,
-   "endedAt": 1052,
-   "outcome": "completed"
-  },
-  {
-   "startedAt": 1053
-  }
- ],
- "AppliedIssue": [
-  {
-   "constraints": {
-    "check": "s1054",
-    "scope": [
-     "s1055"
-    ],
-    "acceptance": true,
-    "frozen": [
-     "s1057"
-    ]
-   },
-   "id": "s1058",
-   "number": 1059,
-   "title": "s1060",
-   "description": "s1061",
-   "mandate": {
-    "originTriggerId": "s1062",
-    "strength": "explicit",
-    "maxBotReviewRounds": 1063,
-    "autoSubmitPr": true
-   },
-   "conflict": {
-    "base": "s1065",
-    "files": [
-     "s1066"
-    ]
-   },
-   "repo": "s1067",
-   "assignments": [
+   "createdAt": 1040,
+   "criteria": [
+    "s1048"
+   ],
+   "deliver": "change",
+   "description": "s1031",
+   "findings": [
     {
-     "id": "s1068",
-     "issue": "s1069",
-     "agent": "s1070",
-     "assignedAt": 1071,
-     "endedAt": 1072,
-     "executions": [
-      {
-       "kind": "worker",
-       "session": "s1073",
-       "startedAt": 1074
-      }
-     ]
+     "at": 1044,
+     "id": "s1042",
+     "resolved": false,
+     "text": "s1043"
     }
    ],
-   "priority": "urgent",
-   "rank": 1075,
-   "createdAt": 1076,
-   "queuedAt": 1077,
-   "closedAt": 1078,
-   "delivered": "merged",
-   "canceled": "dismissed",
-   "parent": "s1079",
-   "blockedBy": [
-    "s1080"
-   ],
-   "cron": "s1081",
-   "status": "backlog",
+   "id": "s1028",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 1032,
+    "strength": "explicit"
+   },
    "moves": [
     "backlog"
    ],
-   "pullRequest": {
-    "url": "s1082",
-    "number": 1083,
-    "state": "open"
-   },
-   "deliver": "change",
-   "reviewedAt": 1084,
-   "findings": [
-    {
-     "id": "s1085",
-     "text": "s1086",
-     "at": 1087,
-     "resolved": true
-    }
-   ],
+   "number": 1029,
+   "priority": "urgent",
    "questions": [
     {
-     "question": "s1089",
      "options": [
-      "s1090"
-     ]
+      "s1047"
+     ],
+     "question": "s1046"
     }
    ],
-   "criteria": [
-    "s1091"
-   ],
-   "checks": [
-    {
-     "criterion": 1092,
-     "result": "met",
-     "proof": "s1093"
-    }
-   ],
-   "refining": {
-    "session": "s1094",
-    "name": "s1095"
-   },
-   "lastRun": {
-    "startedAt": 1096,
-    "endedAt": 1097,
-    "outcome": "completed"
-   },
-   "answer": {
-    "conclusion": "s1098",
-    "evidence": [
-     "s1099"
-    ],
-    "unsure": [
-     "s1100"
-    ],
-    "next": [
-     "s1101"
-    ]
-   },
    "stage": {
-    "state": "draft",
-    "since": 1102,
-    "stuck": "failed",
-    "lead": "start",
     "acts": [
      {
       "act": "start",
@@ -740,923 +504,97 @@
       "status": "backlog",
       "words": "none"
      }
-    ]
+    ],
+    "state": "draft"
    },
-   "seq": 1103
-  },
-  {
-   "id": "s1104",
-   "number": 1105,
-   "title": "s1106",
-   "description": "s1107",
-   "mandate": {
-    "strength": "explicit",
-    "maxBotReviewRounds": 1108,
-    "autoSubmitPr": false
-   },
-   "assignments": [
-    {
-     "id": "s1110",
-     "issue": "s1111",
-     "agent": "s1112",
-     "assignedAt": 1113,
-     "executions": [
-      {
-       "kind": "worker",
-       "session": "s1114",
-       "startedAt": 1115
-      }
-     ]
-    }
-   ],
-   "priority": "urgent",
-   "createdAt": 1116,
-   "blockedBy": [
-    "s1117"
-   ],
    "status": "backlog",
-   "moves": [
-    "backlog"
-   ],
-   "deliver": "change",
-   "findings": [
-    {
-     "id": "s1118",
-     "text": "s1119",
-     "at": 1120,
-     "resolved": false
-    }
-   ],
-   "questions": [
-    {
-     "question": "s1122",
-     "options": [
-      "s1123"
-     ]
-    }
-   ],
-   "criteria": [
-    "s1124"
-   ],
-   "checks": [
-    {
-     "criterion": 1125,
-     "result": "met",
-     "proof": "s1126"
-    }
-   ],
-   "stage": {
-    "state": "draft",
-    "acts": [
-     {
-      "act": "start",
-      "does": "move",
-      "status": "backlog",
-      "words": "none"
-     }
-    ]
-   },
-   "seq": 1127
+   "title": "s1030"
   }
  ],
- "IssueUpdate": [
-  {
-   "title": "s1128",
-   "description": "s1129",
-   "repo": "s1130",
-   "agent": "s1131",
-   "priority": "urgent",
-   "criteria": [
-    "s1132"
-   ],
-   "deliver": "change",
-   "before": "s1133"
-  },
-  {}
+ "IssueAct": [
+  "start",
+  "answer",
+  "reject",
+  "complete",
+  "acknowledge",
+  "resolve",
+  "resume",
+  "cure",
+  "tell",
+  "stop",
+  "close",
+  "reopen"
  ],
- "IssueHistory": [
+ "IssueAction": [
   {
-   "issue": {
-    "constraints": {
-     "check": "s1134",
-     "scope": [
-      "s1135"
-     ],
-     "acceptance": true,
-     "frozen": [
-      "s1137"
-     ]
-    },
-    "id": "s1138",
-    "number": 1139,
-    "title": "s1140",
-    "description": "s1141",
-    "mandate": {
-     "originTriggerId": "s1142",
-     "strength": "explicit",
-     "maxBotReviewRounds": 1143,
-     "autoSubmitPr": true
-    },
-    "conflict": {
-     "base": "s1145",
-     "files": [
-      "s1146"
-     ]
-    },
-    "repo": "s1147",
-    "assignments": [
-     {
-      "id": "s1148",
-      "issue": "s1149",
-      "agent": "s1150",
-      "assignedAt": 1151,
-      "endedAt": 1152,
-      "executions": [
-       {
-        "kind": "worker",
-        "session": "s1153",
-        "startedAt": 1154
-       }
-      ]
-     }
-    ],
-    "priority": "urgent",
-    "rank": 1155,
-    "createdAt": 1156,
-    "queuedAt": 1157,
-    "closedAt": 1158,
-    "delivered": "merged",
-    "canceled": "dismissed",
-    "parent": "s1159",
-    "blockedBy": [
-     "s1160"
-    ],
-    "cron": "s1161",
-    "status": "backlog",
-    "moves": [
-     "backlog"
-    ],
-    "pullRequest": {
-     "url": "s1162",
-     "number": 1163,
-     "state": "open"
-    },
-    "deliver": "change",
-    "reviewedAt": 1164,
-    "findings": [
-     {
-      "id": "s1165",
-      "text": "s1166",
-      "at": 1167,
-      "resolved": true
-     }
-    ],
-    "questions": [
-     {
-      "question": "s1169",
-      "options": [
-       "s1170"
-      ]
-     }
-    ],
-    "criteria": [
-     "s1171"
-    ],
-    "checks": [
-     {
-      "criterion": 1172,
-      "result": "met",
-      "proof": "s1173"
-     }
-    ],
-    "refining": {
-     "session": "s1174",
-     "name": "s1175"
-    },
-    "lastRun": {
-     "startedAt": 1176,
-     "endedAt": 1177,
-     "outcome": "completed"
-    },
-    "answer": {
-     "conclusion": "s1178",
-     "evidence": [
-      "s1179"
-     ],
-     "unsure": [
-      "s1180"
-     ],
-     "next": [
-      "s1181"
-     ]
-    },
-    "stage": {
-     "state": "draft",
-     "since": 1182,
-     "stuck": "failed",
-     "lead": "start",
-     "acts": [
-      {
-       "act": "start",
-       "does": "move",
-       "status": "backlog",
-       "words": "none"
-      }
-     ]
-    }
-   },
-   "sessions": [
-    {
-     "id": "s1183",
-     "role": "orchestrator",
-     "name": "s1184",
-     "agent": "s1185",
-     "runtime": "s1186",
-     "brief": "s1187",
-     "repo": "s1188",
-     "branch": "s1189",
-     "worktree": "s1190",
-     "hiredAt": 1191,
-     "runs": 1192,
-     "lastRun": {
-      "outcome": "completed",
-      "summary": "s1193",
-      "at": 1194,
-      "spent": {
-       "tokens": 1195
-      },
-      "answer": {
-       "conclusion": "s1196",
-       "evidence": [],
-       "unsure": [],
-       "next": []
-      }
-     },
-     "spent": {
-      "tokens": 1197,
-      "cny": 1198
-     },
-     "channel": "s1199",
-     "issue": "s1200",
-     "refining": false,
-     "toolConnections": [
-      {
-       "server": "s1202",
-       "status": "unknown"
-      }
-     ],
-     "machine": "s1203",
-     "phase": {
-      "_tag": "working",
-      "since": 1204,
-      "quietSince": 1205,
-      "retry": {
-       "attempt": 1206
-      },
-      "doing": {
-       "action": "run_command",
-       "label": "s1207"
-      }
-     }
-    }
-   ],
-   "missingSessions": [
-    "s1208"
-   ]
-  },
-  {
-   "issue": {
-    "id": "s1209",
-    "number": 1210,
-    "title": "s1211",
-    "description": "s1212",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 1213,
-     "autoSubmitPr": true
-    },
-    "assignments": [
-     {
-      "id": "s1215",
-      "issue": "s1216",
-      "agent": "s1217",
-      "assignedAt": 1218,
-      "executions": [
-       {
-        "kind": "worker",
-        "session": "s1219",
-        "startedAt": 1220
-       }
-      ]
-     }
-    ],
-    "priority": "urgent",
-    "createdAt": 1221,
-    "blockedBy": [
-     "s1222"
-    ],
-    "status": "backlog",
-    "moves": [
-     "backlog"
-    ],
-    "deliver": "change",
-    "findings": [
-     {
-      "id": "s1223",
-      "text": "s1224",
-      "at": 1225,
-      "resolved": true
-     }
-    ],
-    "questions": [
-     {
-      "question": "s1227",
-      "options": [
-       "s1228"
-      ]
-     }
-    ],
-    "criteria": [
-     "s1229"
-    ],
-    "checks": [
-     {
-      "criterion": 1230,
-      "result": "met",
-      "proof": "s1231"
-     }
-    ],
-    "stage": {
-     "state": "draft",
-     "acts": [
-      {
-       "act": "start",
-       "does": "move",
-       "status": "backlog",
-       "words": "none"
-      }
-     ]
-    }
-   },
-   "sessions": [
-    {
-     "id": "s1232",
-     "role": "orchestrator",
-     "name": "s1233",
-     "agent": "s1234",
-     "runtime": "s1235",
-     "brief": "s1236",
-     "hiredAt": 1237,
-     "runs": 1238,
-     "refining": false,
-     "phase": {
-      "_tag": "working",
-      "since": 1240,
-      "doing": {
-       "action": "run_command",
-       "label": "s1241"
-      }
-     }
-    }
-   ],
-   "missingSessions": [
-    "s1242"
-   ]
-  }
- ],
- "IssueRefineRequest": [
-  {
-   "text": "s1243",
-   "edit": {
-    "title": "s1244",
-    "description": "s1245",
-    "repo": "s1246",
-    "agent": "s1247",
-    "priority": "urgent",
-    "criteria": [
-     "s1248"
-    ],
-    "deliver": "change",
-    "before": "s1249"
-   }
-  },
-  {}
- ],
- "IssueRequest": [
-  {
-   "constraints": {
-    "check": "s1250",
-    "scope": [
-     "s1251"
-    ],
-    "acceptance": true,
-    "frozen": [
-     "s1253"
-    ]
-   },
-   "title": "s1254",
-   "parent": "s1255",
-   "blockedBy": [
-    "s1256"
-   ],
-   "description": "s1257",
-   "repo": "s1258",
-   "agent": "s1259",
-   "priority": "urgent",
-   "deliver": "change",
-   "autoSubmitPr": true,
-   "criteria": [
-    "s1261"
-   ],
-   "requestKey": "s1262"
-  },
-  {
-   "title": "s1263"
-  }
- ],
- "CommentRequest": [
-  {
-   "text": "s1264",
-   "sendKey": "s1265"
-  },
-  {
-   "text": "s1266"
-  }
- ],
- "IssueReviewRequest": [
-  {
-   "pass": false,
-   "findings": [
-    "s1268"
-   ],
-   "text": "s1269"
-  },
-  {
-   "pass": true
-  }
- ],
- "IssueFilter": [
-  {
+   "act": "start",
+   "does": "move",
    "status": "backlog",
-   "text": "s1271",
-   "repo": "s1272",
-   "limit": 1273,
-   "closed": true,
-   "wantsUser": false
+   "words": "none"
   },
-  {}
+  {
+   "act": "answer",
+   "does": "say"
+  },
+  {
+   "act": "reject",
+   "does": "stop"
+  }
+ ],
+ "IssueCanceled": [
+  "dismissed",
+  "lost"
  ],
  "IssueChildDraft": [
   {
-   "id": "s1276",
-   "title": "s1277",
+   "acceptance": false,
+   "agent": "s1280",
    "brief": "s1278",
+   "check": "s1281",
+   "id": "s1276",
    "needs": [
     "s1279"
    ],
-   "agent": "s1280",
-   "check": "s1281",
    "scope": [
     "s1282"
    ],
-   "acceptance": false
+   "title": "s1277"
   },
   {
-   "id": "s1284",
-   "brief": "s1285"
+   "brief": "s1285",
+   "id": "s1284"
   }
  ],
- "IssueSplitRequest": [
+ "IssueCommentCreateInput": [
   {
-   "title": "s1286",
-   "tasks": [
-    {
-     "id": "s1287",
-     "title": "s1288",
-     "brief": "s1289",
-     "needs": [
-      "s1290"
-     ],
-     "agent": "s1291",
-     "check": "s1292",
-     "scope": [
-      "s1293"
-     ],
-     "acceptance": true
-    }
-   ]
+   "id": "s6983",
+   "sendKey": "s6985",
+   "text": "s6984"
   },
   {
-   "tasks": [
-    {
-     "id": "s1295",
-     "brief": "s1296"
-    }
-   ]
+   "id": "s6986",
+   "text": "s6987"
   }
  ],
- "IssueStatusRequest": [
+ "IssueConstraints": [
   {
-   "status": "backlog",
-   "text": "s1297",
-   "agent": "s1298",
-   "edit": {
-    "title": "s1299",
-    "description": "s1300",
-    "repo": "s1301",
-    "agent": "s1302",
-    "priority": "urgent",
-    "criteria": [
-     "s1303"
-    ],
-    "deliver": "change",
-    "before": "s1304"
-   },
-   "requestKey": "s1305"
-  },
-  {
-   "status": "backlog"
-  }
- ],
- "IssueWatch": [
-  {
-   "kind": "history",
-   "session": "s1306",
-   "events": [
-    {
-     "seq": 1307,
-     "revision": 1308,
-     "time": 1309,
-     "type": "run/start",
-     "run": "s1310",
-     "call": 1311,
-     "under": 1312,
-     "text": "s1313",
-     "action": "run_command",
-     "actionText": "s1314",
-     "tool": "s1315",
-     "input": "s1316",
-     "output": "s1317",
-     "ok": true,
-     "tokens": {
-      "input": 1319,
-      "cacheRead": 1320,
-      "output": 1321
-     },
-     "connection": {
-      "server": "s1322",
-      "status": "unknown",
-      "reason": "s1323"
-     }
-    }
+   "acceptance": true,
+   "check": "s972",
+   "frozen": [
+    "s975"
+   ],
+   "scope": [
+    "s973"
    ]
   },
   {
-   "kind": "history",
-   "session": "s1324",
-   "events": [
-    {
-     "seq": 1325,
-     "revision": 1326,
-     "time": 1327,
-     "type": "run/start",
-     "text": "s1328"
-    }
+   "acceptance": false,
+   "frozen": [
+    "s978"
+   ],
+   "scope": [
+    "s976"
    ]
-  },
-  {
-   "kind": "state",
-   "issue": {
-    "constraints": {
-     "check": "s1329",
-     "scope": [
-      "s1330"
-     ],
-     "acceptance": false,
-     "frozen": [
-      "s1332"
-     ]
-    },
-    "id": "s1333",
-    "number": 1334,
-    "title": "s1335",
-    "description": "s1336",
-    "mandate": {
-     "originTriggerId": "s1337",
-     "strength": "inferred",
-     "maxBotReviewRounds": 1338,
-     "autoSubmitPr": false
-    },
-    "conflict": {
-     "base": "s1340",
-     "files": [
-      "s1341"
-     ]
-    },
-    "repo": "s1342",
-    "assignments": [
-     {
-      "id": "s1343",
-      "issue": "s1344",
-      "agent": "s1345",
-      "assignedAt": 1346,
-      "endedAt": 1347,
-      "executions": [
-       {
-        "kind": "orchestrator",
-        "session": "s1348",
-        "startedAt": 1349
-       }
-      ]
-     }
-    ],
-    "priority": "high",
-    "rank": 1350,
-    "createdAt": 1351,
-    "queuedAt": 1352,
-    "closedAt": 1353,
-    "delivered": "merged_into_parent",
-    "canceled": "lost",
-    "parent": "s1354",
-    "blockedBy": [
-     "s1355"
-    ],
-    "cron": "s1356",
-    "status": "todo",
-    "moves": [
-     "todo"
-    ],
-    "pullRequest": {
-     "url": "s1357",
-     "number": 1358,
-     "state": "merged"
-    },
-    "deliver": "branch",
-    "reviewedAt": 1359,
-    "findings": [
-     {
-      "id": "s1360",
-      "text": "s1361",
-      "at": 1362,
-      "resolved": false
-     }
-    ],
-    "questions": [
-     {
-      "question": "s1364",
-      "options": [
-       "s1365"
-      ]
-     }
-    ],
-    "criteria": [
-     "s1366"
-    ],
-    "checks": [
-     {
-      "criterion": 1367,
-      "result": "unmet",
-      "proof": "s1368"
-     }
-    ],
-    "refining": {
-     "session": "s1369",
-     "name": "s1370"
-    },
-    "lastRun": {
-     "startedAt": 1371,
-     "endedAt": 1372,
-     "outcome": "failed"
-    },
-    "answer": {
-     "conclusion": "s1373",
-     "evidence": [
-      "s1374"
-     ],
-     "unsure": [
-      "s1375"
-     ],
-     "next": [
-      "s1376"
-     ]
-    },
-    "stage": {
-     "state": "queued",
-     "since": 1377,
-     "stuck": "conflict",
-     "lead": "answer",
-     "acts": [
-      {
-       "act": "answer",
-       "does": "say"
-      }
-     ]
-    }
-   },
-   "sessions": [
-    {
-     "id": "s1378",
-     "role": "worker",
-     "name": "s1379",
-     "agent": "s1380",
-     "runtime": "s1381",
-     "brief": "s1382",
-     "repo": "s1383",
-     "branch": "s1384",
-     "worktree": "s1385",
-     "hiredAt": 1386,
-     "runs": 1387,
-     "lastRun": {
-      "outcome": "failed",
-      "summary": "s1388",
-      "at": 1389,
-      "spent": {
-       "tokens": 1390
-      },
-      "answer": {
-       "conclusion": "s1391",
-       "evidence": [],
-       "unsure": [],
-       "next": []
-      }
-     },
-     "spent": {
-      "tokens": 1392,
-      "cny": 1393
-     },
-     "channel": "s1394",
-     "issue": "s1395",
-     "refining": true,
-     "toolConnections": [
-      {
-       "server": "s1397",
-       "status": "starting"
-      }
-     ],
-     "machine": "s1398",
-     "phase": {
-      "_tag": "done"
-     }
-    }
-   ],
-   "sessionIds": [
-    "s1399"
-   ],
-   "settled": true,
-   "omittedSessions": 1401
-  },
-  {
-   "kind": "state",
-   "issue": {
-    "id": "s1402",
-    "number": 1403,
-    "title": "s1404",
-    "description": "s1405",
-    "mandate": {
-     "strength": "inferred",
-     "maxBotReviewRounds": 1406,
-     "autoSubmitPr": false
-    },
-    "assignments": [
-     {
-      "id": "s1408",
-      "issue": "s1409",
-      "agent": "s1410",
-      "assignedAt": 1411,
-      "executions": [
-       {
-        "kind": "orchestrator",
-        "session": "s1412",
-        "startedAt": 1413
-       }
-      ]
-     }
-    ],
-    "priority": "high",
-    "createdAt": 1414,
-    "blockedBy": [
-     "s1415"
-    ],
-    "status": "todo",
-    "moves": [
-     "todo"
-    ],
-    "deliver": "branch",
-    "findings": [
-     {
-      "id": "s1416",
-      "text": "s1417",
-      "at": 1418,
-      "resolved": false
-     }
-    ],
-    "questions": [
-     {
-      "question": "s1420",
-      "options": [
-       "s1421"
-      ]
-     }
-    ],
-    "criteria": [
-     "s1422"
-    ],
-    "checks": [
-     {
-      "criterion": 1423,
-      "result": "unmet",
-      "proof": "s1424"
-     }
-    ],
-    "stage": {
-     "state": "queued",
-     "acts": [
-      {
-       "act": "answer",
-       "does": "say"
-      }
-     ]
-    }
-   },
-   "sessions": [
-    {
-     "id": "s1425",
-     "role": "worker",
-     "name": "s1426",
-     "agent": "s1427",
-     "runtime": "s1428",
-     "brief": "s1429",
-     "hiredAt": 1430,
-     "runs": 1431,
-     "refining": true,
-     "phase": {
-      "_tag": "done"
-     }
-    }
-   ],
-   "sessionIds": [
-    "s1433"
-   ],
-   "settled": true,
-   "omittedSessions": 1435
-  },
-  {
-   "kind": "event",
-   "session": "s1436",
-   "event": {
-    "seq": 1437,
-    "revision": 1438,
-    "time": 1439,
-    "type": "memory/recalled",
-    "run": "s1440",
-    "call": 1441,
-    "under": 1442,
-    "text": "s1443",
-    "action": "edit_file",
-    "actionText": "s1444",
-    "tool": "s1445",
-    "input": "s1446",
-    "output": "s1447",
-    "ok": true,
-    "tokens": {
-     "input": 1449,
-     "cacheRead": 1450,
-     "output": 1451
-    },
-    "connection": {
-     "server": "s1452",
-     "status": "ready",
-     "reason": "s1453"
-    }
-   }
-  },
-  {
-   "kind": "event",
-   "session": "s1454",
-   "event": {
-    "seq": 1455,
-    "revision": 1456,
-    "time": 1457,
-    "type": "memory/recalled",
-    "text": "s1458"
-   }
-  },
-  {
-   "kind": "gap",
-   "session": "s1459",
-   "before": 1460
-  },
-  {
-   "kind": "gap",
-   "session": "s1461"
-  },
-  {
-   "kind": "missing",
-   "issue": "s1462"
-  },
-  {
-   "kind": "missing",
-   "issue": "s1463"
   }
  ],
  "IssueConversationGetInput": [
@@ -1667,15 +605,12 @@
    "id": "s6982"
   }
  ],
- "IssueCommentCreateInput": [
+ "IssueDeleteInput": [
   {
-   "id": "s6983",
-   "text": "s6984",
-   "sendKey": "s6985"
+   "id": "s7023"
   },
   {
-   "id": "s6986",
-   "text": "s6987"
+   "id": "s7024"
   }
  ],
  "IssueDiffGetInput": [
@@ -1686,50 +621,16 @@
    "id": "s6989"
   }
  ],
- "IssueReviewInput": [
+ "IssueFilter": [
   {
-   "id": "s6990",
-   "pass": false,
-   "findings": [
-    "s6992"
-   ],
-   "text": "s6993"
+   "closed": true,
+   "limit": 1273,
+   "repo": "s1272",
+   "status": "backlog",
+   "text": "s1271",
+   "wantsUser": false
   },
-  {
-   "id": "s6994",
-   "pass": false
-  }
- ],
- "IssueSplitInput": [
-  {
-   "id": "s6996",
-   "title": "s6997",
-   "tasks": [
-    {
-     "id": "s6998",
-     "title": "s6999",
-     "brief": "s7000",
-     "needs": [
-      "s7001"
-     ],
-     "agent": "s7002",
-     "check": "s7003",
-     "scope": [
-      "s7004"
-     ],
-     "acceptance": false
-    }
-   ]
-  },
-  {
-   "id": "s7006",
-   "tasks": [
-    {
-     "id": "s7007",
-     "brief": "s7008"
-    }
-   ]
-  }
+  {}
  ],
  "IssueGetInput": [
   {
@@ -1737,6 +638,519 @@
   },
   {
    "id": "s7010"
+  }
+ ],
+ "IssueHistory": [
+  {
+   "issue": {
+    "answer": {
+     "conclusion": "s1178",
+     "evidence": [
+      "s1179"
+     ],
+     "next": [
+      "s1181"
+     ],
+     "unsure": [
+      "s1180"
+     ]
+    },
+    "assignments": [
+     {
+      "agent": "s1150",
+      "assignedAt": 1151,
+      "endedAt": 1152,
+      "executions": [
+       {
+        "kind": "worker",
+        "session": "s1153",
+        "startedAt": 1154
+       }
+      ],
+      "id": "s1148",
+      "issue": "s1149"
+     }
+    ],
+    "blockedBy": [
+     "s1160"
+    ],
+    "canceled": "dismissed",
+    "checks": [
+     {
+      "criterion": 1172,
+      "proof": "s1173",
+      "result": "met"
+     }
+    ],
+    "closedAt": 1158,
+    "conflict": {
+     "base": "s1145",
+     "files": [
+      "s1146"
+     ]
+    },
+    "constraints": {
+     "acceptance": true,
+     "check": "s1134",
+     "frozen": [
+      "s1137"
+     ],
+     "scope": [
+      "s1135"
+     ]
+    },
+    "createdAt": 1156,
+    "criteria": [
+     "s1171"
+    ],
+    "cron": "s1161",
+    "deliver": "change",
+    "delivered": "merged",
+    "description": "s1141",
+    "findings": [
+     {
+      "at": 1167,
+      "id": "s1165",
+      "resolved": true,
+      "text": "s1166"
+     }
+    ],
+    "id": "s1138",
+    "lastRun": {
+     "endedAt": 1177,
+     "outcome": "completed",
+     "startedAt": 1176
+    },
+    "mandate": {
+     "autoSubmitPr": true,
+     "maxBotReviewRounds": 1143,
+     "originTriggerId": "s1142",
+     "strength": "explicit"
+    },
+    "moves": [
+     "backlog"
+    ],
+    "number": 1139,
+    "parent": "s1159",
+    "priority": "urgent",
+    "pullRequest": {
+     "number": 1163,
+     "state": "open",
+     "url": "s1162"
+    },
+    "questions": [
+     {
+      "options": [
+       "s1170"
+      ],
+      "question": "s1169"
+     }
+    ],
+    "queuedAt": 1157,
+    "rank": 1155,
+    "refining": {
+     "name": "s1175",
+     "session": "s1174"
+    },
+    "repo": "s1147",
+    "reviewedAt": 1164,
+    "stage": {
+     "acts": [
+      {
+       "act": "start",
+       "does": "move",
+       "status": "backlog",
+       "words": "none"
+      }
+     ],
+     "lead": "start",
+     "since": 1182,
+     "state": "draft",
+     "stuck": "failed"
+    },
+    "status": "backlog",
+    "title": "s1140"
+   },
+   "missingSessions": [
+    "s1208"
+   ],
+   "sessions": [
+    {
+     "bindings": [
+      {
+       "id": "s1200",
+       "kind": "issue"
+      },
+      {
+       "id": "s1199",
+       "kind": "channel"
+      }
+     ],
+     "brief": "s1187",
+     "controller": "orchestrator",
+     "cwd": "s1190",
+     "hiredAt": 1191,
+     "id": "s1183",
+     "lastRun": {
+      "answer": {
+       "conclusion": "s1196",
+       "evidence": [],
+       "next": [],
+       "unsure": []
+      },
+      "at": 1194,
+      "outcome": "completed",
+      "spent": {
+       "tokens": 1195
+      },
+      "summary": "s1193"
+     },
+     "machine": "s1203",
+     "name": "s1184",
+     "phase": {
+      "_tag": "working",
+      "doing": {
+       "action": "run_command",
+       "label": "s1207"
+      },
+      "quietSince": 1205,
+      "retry": {
+       "attempt": 1206
+      },
+      "since": 1204
+     },
+     "policy": {
+      "branch": "s1189",
+      "kind": "managedWorktree",
+      "repo": "s1188"
+     },
+     "profile": "s1185",
+     "role": "orchestrator",
+     "runs": 1192,
+     "runtime": "s1186",
+     "spent": {
+      "cny": 1198,
+      "tokens": 1197
+     },
+     "toolConnections": [
+      {
+       "server": "s1202",
+       "status": "unknown"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "issue": {
+    "assignments": [
+     {
+      "agent": "s1217",
+      "assignedAt": 1218,
+      "executions": [
+       {
+        "kind": "worker",
+        "session": "s1219",
+        "startedAt": 1220
+       }
+      ],
+      "id": "s1215",
+      "issue": "s1216"
+     }
+    ],
+    "blockedBy": [
+     "s1222"
+    ],
+    "checks": [
+     {
+      "criterion": 1230,
+      "proof": "s1231",
+      "result": "met"
+     }
+    ],
+    "createdAt": 1221,
+    "criteria": [
+     "s1229"
+    ],
+    "deliver": "change",
+    "description": "s1212",
+    "findings": [
+     {
+      "at": 1225,
+      "id": "s1223",
+      "resolved": true,
+      "text": "s1224"
+     }
+    ],
+    "id": "s1209",
+    "mandate": {
+     "autoSubmitPr": true,
+     "maxBotReviewRounds": 1213,
+     "strength": "explicit"
+    },
+    "moves": [
+     "backlog"
+    ],
+    "number": 1210,
+    "priority": "urgent",
+    "questions": [
+     {
+      "options": [
+       "s1228"
+      ],
+      "question": "s1227"
+     }
+    ],
+    "stage": {
+     "acts": [
+      {
+       "act": "start",
+       "does": "move",
+       "status": "backlog",
+       "words": "none"
+      }
+     ],
+     "state": "draft"
+    },
+    "status": "backlog",
+    "title": "s1211"
+   },
+   "missingSessions": [
+    "s1242"
+   ],
+   "sessions": [
+    {
+     "bindings": [],
+     "brief": "s1236",
+     "controller": "orchestrator",
+     "hiredAt": 1237,
+     "id": "s1232",
+     "name": "s1233",
+     "phase": {
+      "_tag": "working",
+      "doing": {
+       "action": "run_command",
+       "label": "s1241"
+      },
+      "since": 1240
+     },
+     "policy": {
+      "kind": "sandboxDir"
+     },
+     "profile": "s1234",
+     "role": "orchestrator",
+     "runs": 1238,
+     "runtime": "s1235"
+    }
+   ]
+  }
+ ],
+ "IssueLastRun": [
+  {
+   "endedAt": 1052,
+   "outcome": "completed",
+   "startedAt": 1051
+  },
+  {
+   "startedAt": 1053
+  }
+ ],
+ "IssueMandate": [
+  {
+   "autoSubmitPr": false,
+   "maxBotReviewRounds": 948,
+   "originTriggerId": "s947",
+   "strength": "explicit"
+  },
+  {
+   "autoSubmitPr": false,
+   "maxBotReviewRounds": 950,
+   "strength": "explicit"
+  }
+ ],
+ "IssueRefineInput": [
+  {
+   "edit": {
+    "agent": "s7041",
+    "before": "s7043",
+    "criteria": [
+     "s7042"
+    ],
+    "deliver": "change",
+    "description": "s7039",
+    "priority": "urgent",
+    "repo": "s7040",
+    "title": "s7038"
+   },
+   "id": "s7036",
+   "text": "s7037"
+  },
+  {
+   "id": "s7044"
+  }
+ ],
+ "IssueRefineRequest": [
+  {
+   "edit": {
+    "agent": "s1247",
+    "before": "s1249",
+    "criteria": [
+     "s1248"
+    ],
+    "deliver": "change",
+    "description": "s1245",
+    "priority": "urgent",
+    "repo": "s1246",
+    "title": "s1244"
+   },
+   "text": "s1243"
+  },
+  {}
+ ],
+ "IssueRefining": [
+  {
+   "name": "s902",
+   "session": "s901"
+  },
+  {
+   "name": "s904",
+   "session": "s903"
+  }
+ ],
+ "IssueReport": [
+  {
+   "answer": {
+    "conclusion": "s961",
+    "evidence": [
+     "s962"
+    ],
+    "next": [
+     "s964"
+    ],
+    "unsure": [
+     "s963"
+    ]
+   },
+   "checks": [
+    {
+     "criterion": 957,
+     "proof": "s958",
+     "result": "met"
+    }
+   ],
+   "prSubmit": true,
+   "questions": [
+    {
+     "options": [
+      "s956"
+     ],
+     "question": "s955"
+    }
+   ],
+   "remember": [
+    {
+     "scope": "repo",
+     "text": "s959"
+    }
+   ],
+   "summary": "s954"
+  },
+  {
+   "checks": [
+    {
+     "criterion": 968,
+     "proof": "s969",
+     "result": "met"
+    }
+   ],
+   "prSubmit": false,
+   "questions": [
+    {
+     "options": [
+      "s967"
+     ],
+     "question": "s966"
+    }
+   ],
+   "remember": [
+    {
+     "scope": "repo",
+     "text": "s970"
+    }
+   ],
+   "summary": "s965"
+  }
+ ],
+ "IssueReportMemory": [
+  {
+   "scope": "repo",
+   "text": "s952"
+  },
+  {
+   "scope": "repo",
+   "text": "s953"
+  }
+ ],
+ "IssueReportMemoryScope": [
+  "repo",
+  "all"
+ ],
+ "IssueRequest": [
+  {
+   "agent": "s1259",
+   "autoSubmitPr": true,
+   "blockedBy": [
+    "s1256"
+   ],
+   "constraints": {
+    "acceptance": true,
+    "check": "s1250",
+    "frozen": [
+     "s1253"
+    ],
+    "scope": [
+     "s1251"
+    ]
+   },
+   "criteria": [
+    "s1261"
+   ],
+   "deliver": "change",
+   "description": "s1257",
+   "parent": "s1255",
+   "priority": "urgent",
+   "repo": "s1258",
+   "requestKey": "s1262",
+   "title": "s1254"
+  },
+  {
+   "title": "s1263"
+  }
+ ],
+ "IssueReviewInput": [
+  {
+   "findings": [
+    "s6992"
+   ],
+   "id": "s6990",
+   "pass": false,
+   "text": "s6993"
+  },
+  {
+   "id": "s6994",
+   "pass": false
+  }
+ ],
+ "IssueReviewRequest": [
+  {
+   "findings": [
+    "s1268"
+   ],
+   "pass": false,
+   "text": "s1269"
+  },
+  {
+   "pass": true
   }
  ],
  "IssueRunListInput": [
@@ -1747,6 +1161,184 @@
    "id": "s7012"
   }
  ],
+ "IssueSplitInput": [
+  {
+   "id": "s6996",
+   "tasks": [
+    {
+     "acceptance": false,
+     "agent": "s7002",
+     "brief": "s7000",
+     "check": "s7003",
+     "id": "s6998",
+     "needs": [
+      "s7001"
+     ],
+     "scope": [
+      "s7004"
+     ],
+     "title": "s6999"
+    }
+   ],
+   "title": "s6997"
+  },
+  {
+   "id": "s7006",
+   "tasks": [
+    {
+     "brief": "s7008",
+     "id": "s7007"
+    }
+   ]
+  }
+ ],
+ "IssueSplitRequest": [
+  {
+   "tasks": [
+    {
+     "acceptance": true,
+     "agent": "s1291",
+     "brief": "s1289",
+     "check": "s1292",
+     "id": "s1287",
+     "needs": [
+      "s1290"
+     ],
+     "scope": [
+      "s1293"
+     ],
+     "title": "s1288"
+    }
+   ],
+   "title": "s1286"
+  },
+  {
+   "tasks": [
+    {
+     "brief": "s1296",
+     "id": "s1295"
+    }
+   ]
+  }
+ ],
+ "IssueStage": [
+  {
+   "acts": [
+    {
+     "act": "start",
+     "does": "move",
+     "status": "backlog",
+     "words": "none"
+    }
+   ],
+   "lead": "start",
+   "since": 913,
+   "state": "draft",
+   "stuck": "failed"
+  },
+  {
+   "acts": [
+    {
+     "act": "start",
+     "does": "move",
+     "status": "backlog",
+     "words": "none"
+    }
+   ],
+   "state": "draft"
+  }
+ ],
+ "IssueStageKind": [
+  "draft",
+  "queued",
+  "working",
+  "asking",
+  "reviewing",
+  "stuck",
+  "done",
+  "canceled"
+ ],
+ "IssueStatus": [
+  "backlog",
+  "todo",
+  "in_progress",
+  "in_review",
+  "done",
+  "canceled"
+ ],
+ "IssueStatusRequest": [
+  {
+   "agent": "s1298",
+   "edit": {
+    "agent": "s1302",
+    "before": "s1304",
+    "criteria": [
+     "s1303"
+    ],
+    "deliver": "change",
+    "description": "s1300",
+    "priority": "urgent",
+    "repo": "s1301",
+    "title": "s1299"
+   },
+   "requestKey": "s1305",
+   "status": "backlog",
+   "text": "s1297"
+  },
+  {
+   "status": "backlog"
+  }
+ ],
+ "IssueStatusUpdateInput": [
+  {
+   "agent": "s7027",
+   "edit": {
+    "agent": "s7031",
+    "before": "s7033",
+    "criteria": [
+     "s7032"
+    ],
+    "deliver": "change",
+    "description": "s7029",
+    "priority": "urgent",
+    "repo": "s7030",
+    "title": "s7028"
+   },
+   "id": "s7025",
+   "requestKey": "s7034",
+   "status": "backlog",
+   "text": "s7026"
+  },
+  {
+   "id": "s7035",
+   "status": "backlog"
+  }
+ ],
+ "IssueTimeline": [
+  {
+   "milestones": [
+    {
+     "at": 919,
+     "kind": "opened",
+     "text": "s921",
+     "who": "s920"
+    }
+   ],
+   "spent": {
+    "cny": 923,
+    "tokens": 922
+   }
+  },
+  {
+   "milestones": [
+    {
+     "at": 924,
+     "kind": "opened",
+     "text": "s925"
+    }
+   ]
+  }
+ ],
  "IssueTimelineGetInput": [
   {
    "id": "s7013"
@@ -1755,76 +1347,515 @@
    "id": "s7014"
   }
  ],
+ "IssueUpdate": [
+  {
+   "agent": "s1131",
+   "before": "s1133",
+   "criteria": [
+    "s1132"
+   ],
+   "deliver": "change",
+   "description": "s1129",
+   "priority": "urgent",
+   "repo": "s1130",
+   "title": "s1128"
+  },
+  {}
+ ],
  "IssueUpdateInput": [
   {
-   "id": "s7015",
-   "title": "s7016",
-   "description": "s7017",
-   "repo": "s7018",
    "agent": "s7019",
-   "priority": "urgent",
+   "before": "s7021",
    "criteria": [
     "s7020"
    ],
    "deliver": "change",
-   "before": "s7021"
+   "description": "s7017",
+   "id": "s7015",
+   "priority": "urgent",
+   "repo": "s7018",
+   "title": "s7016"
   },
   {
    "id": "s7022"
   }
  ],
- "IssueDeleteInput": [
+ "IssueWatch": [
   {
-   "id": "s7023"
+   "events": [
+    {
+     "action": "run_command",
+     "actionText": "s1314",
+     "call": 1311,
+     "connection": {
+      "reason": "s1323",
+      "server": "s1322",
+      "status": "unknown"
+     },
+     "input": "s1316",
+     "ok": true,
+     "output": "s1317",
+     "revision": 1308,
+     "run": "s1310",
+     "seq": 1307,
+     "text": "s1313",
+     "time": 1309,
+     "tokens": {
+      "cacheRead": 1320,
+      "input": 1319,
+      "output": 1321
+     },
+     "tool": "s1315",
+     "type": "run/start",
+     "under": 1312
+    }
+   ],
+   "kind": "history",
+   "session": "s1306"
   },
   {
-   "id": "s7024"
-  }
- ],
- "IssueStatusUpdateInput": [
+   "events": [
+    {
+     "revision": 1326,
+     "seq": 1325,
+     "text": "s1328",
+     "time": 1327,
+     "type": "run/start"
+    }
+   ],
+   "kind": "history",
+   "session": "s1324"
+  },
   {
-   "id": "s7025",
-   "status": "backlog",
-   "text": "s7026",
-   "agent": "s7027",
-   "edit": {
-    "title": "s7028",
-    "description": "s7029",
-    "repo": "s7030",
-    "agent": "s7031",
-    "priority": "urgent",
-    "criteria": [
-     "s7032"
+   "issue": {
+    "answer": {
+     "conclusion": "s1373",
+     "evidence": [
+      "s1374"
+     ],
+     "next": [
+      "s1376"
+     ],
+     "unsure": [
+      "s1375"
+     ]
+    },
+    "assignments": [
+     {
+      "agent": "s1345",
+      "assignedAt": 1346,
+      "endedAt": 1347,
+      "executions": [
+       {
+        "kind": "orchestrator",
+        "session": "s1348",
+        "startedAt": 1349
+       }
+      ],
+      "id": "s1343",
+      "issue": "s1344"
+     }
     ],
-    "deliver": "change",
-    "before": "s7033"
+    "blockedBy": [
+     "s1355"
+    ],
+    "canceled": "lost",
+    "checks": [
+     {
+      "criterion": 1367,
+      "proof": "s1368",
+      "result": "unmet"
+     }
+    ],
+    "closedAt": 1353,
+    "conflict": {
+     "base": "s1340",
+     "files": [
+      "s1341"
+     ]
+    },
+    "constraints": {
+     "acceptance": false,
+     "check": "s1329",
+     "frozen": [
+      "s1332"
+     ],
+     "scope": [
+      "s1330"
+     ]
+    },
+    "createdAt": 1351,
+    "criteria": [
+     "s1366"
+    ],
+    "cron": "s1356",
+    "deliver": "branch",
+    "delivered": "merged_into_parent",
+    "description": "s1336",
+    "findings": [
+     {
+      "at": 1362,
+      "id": "s1360",
+      "resolved": false,
+      "text": "s1361"
+     }
+    ],
+    "id": "s1333",
+    "lastRun": {
+     "endedAt": 1372,
+     "outcome": "failed",
+     "startedAt": 1371
+    },
+    "mandate": {
+     "autoSubmitPr": false,
+     "maxBotReviewRounds": 1338,
+     "originTriggerId": "s1337",
+     "strength": "inferred"
+    },
+    "moves": [
+     "todo"
+    ],
+    "number": 1334,
+    "parent": "s1354",
+    "priority": "high",
+    "pullRequest": {
+     "number": 1358,
+     "state": "merged",
+     "url": "s1357"
+    },
+    "questions": [
+     {
+      "options": [
+       "s1365"
+      ],
+      "question": "s1364"
+     }
+    ],
+    "queuedAt": 1352,
+    "rank": 1350,
+    "refining": {
+     "name": "s1370",
+     "session": "s1369"
+    },
+    "repo": "s1342",
+    "reviewedAt": 1359,
+    "stage": {
+     "acts": [
+      {
+       "act": "answer",
+       "does": "say"
+      }
+     ],
+     "lead": "answer",
+     "since": 1377,
+     "state": "queued",
+     "stuck": "conflict"
+    },
+    "status": "todo",
+    "title": "s1335"
    },
-   "requestKey": "s7034"
+   "kind": "state",
+   "omittedSessions": 1401,
+   "sessionIds": [
+    "s1399"
+   ],
+   "sessions": [
+    {
+     "bindings": [
+      {
+       "id": "s1395",
+       "kind": "issue",
+       "refining": true
+      },
+      {
+       "id": "s1394",
+       "kind": "channel"
+      }
+     ],
+     "brief": "s1382",
+     "controller": "issueBoard",
+     "cwd": "s1385",
+     "hiredAt": 1386,
+     "id": "s1378",
+     "lastRun": {
+      "answer": {
+       "conclusion": "s1391",
+       "evidence": [],
+       "next": [],
+       "unsure": []
+      },
+      "at": 1389,
+      "outcome": "failed",
+      "spent": {
+       "tokens": 1390
+      },
+      "summary": "s1388"
+     },
+     "machine": "s1398",
+     "name": "s1379",
+     "phase": {
+      "_tag": "done"
+     },
+     "policy": {
+      "branch": "s1384",
+      "kind": "managedWorktree",
+      "repo": "s1383"
+     },
+     "profile": "s1380",
+     "role": "worker",
+     "runs": 1387,
+     "runtime": "s1381",
+     "spent": {
+      "cny": 1393,
+      "tokens": 1392
+     },
+     "toolConnections": [
+      {
+       "server": "s1397",
+       "status": "starting"
+      }
+     ]
+    }
+   ],
+   "settled": true
   },
   {
-   "id": "s7035",
-   "status": "backlog"
+   "issue": {
+    "assignments": [
+     {
+      "agent": "s1410",
+      "assignedAt": 1411,
+      "executions": [
+       {
+        "kind": "orchestrator",
+        "session": "s1412",
+        "startedAt": 1413
+       }
+      ],
+      "id": "s1408",
+      "issue": "s1409"
+     }
+    ],
+    "blockedBy": [
+     "s1415"
+    ],
+    "checks": [
+     {
+      "criterion": 1423,
+      "proof": "s1424",
+      "result": "unmet"
+     }
+    ],
+    "createdAt": 1414,
+    "criteria": [
+     "s1422"
+    ],
+    "deliver": "branch",
+    "description": "s1405",
+    "findings": [
+     {
+      "at": 1418,
+      "id": "s1416",
+      "resolved": false,
+      "text": "s1417"
+     }
+    ],
+    "id": "s1402",
+    "mandate": {
+     "autoSubmitPr": false,
+     "maxBotReviewRounds": 1406,
+     "strength": "inferred"
+    },
+    "moves": [
+     "todo"
+    ],
+    "number": 1403,
+    "priority": "high",
+    "questions": [
+     {
+      "options": [
+       "s1421"
+      ],
+      "question": "s1420"
+     }
+    ],
+    "stage": {
+     "acts": [
+      {
+       "act": "answer",
+       "does": "say"
+      }
+     ],
+     "state": "queued"
+    },
+    "status": "todo",
+    "title": "s1404"
+   },
+   "kind": "state",
+   "omittedSessions": 1435,
+   "sessionIds": [
+    "s1433"
+   ],
+   "sessions": [
+    {
+     "bindings": [],
+     "brief": "s1429",
+     "controller": "issueBoard",
+     "hiredAt": 1430,
+     "id": "s1425",
+     "name": "s1426",
+     "phase": {
+      "_tag": "done"
+     },
+     "policy": {
+      "kind": "sandboxDir"
+     },
+     "profile": "s1427",
+     "role": "worker",
+     "runs": 1431,
+     "runtime": "s1428"
+    }
+   ],
+   "settled": true
+  },
+  {
+   "event": {
+    "action": "edit_file",
+    "actionText": "s1444",
+    "call": 1441,
+    "connection": {
+     "reason": "s1453",
+     "server": "s1452",
+     "status": "ready"
+    },
+    "input": "s1446",
+    "ok": true,
+    "output": "s1447",
+    "revision": 1438,
+    "run": "s1440",
+    "seq": 1437,
+    "text": "s1443",
+    "time": 1439,
+    "tokens": {
+     "cacheRead": 1450,
+     "input": 1449,
+     "output": 1451
+    },
+    "tool": "s1445",
+    "type": "memory/recalled",
+    "under": 1442
+   },
+   "kind": "event",
+   "session": "s1436"
+  },
+  {
+   "event": {
+    "revision": 1456,
+    "seq": 1455,
+    "text": "s1458",
+    "time": 1457,
+    "type": "memory/recalled"
+   },
+   "kind": "event",
+   "session": "s1454"
+  },
+  {
+   "before": 1460,
+   "kind": "gap",
+   "session": "s1459"
+  },
+  {
+   "kind": "gap",
+   "session": "s1461"
+  },
+  {
+   "issue": "s1462",
+   "kind": "missing"
+  },
+  {
+   "issue": "s1463",
+   "kind": "missing"
   }
  ],
- "IssueRefineInput": [
+ "Landing": [
+  "merged",
+  "merged_into_parent",
+  "pull_request",
+  "submitted",
+  "kept",
+  "none"
+ ],
+ "MandateStrength": [
+  "explicit",
+  "inferred"
+ ],
+ "Milestone": [
   {
-   "id": "s7036",
-   "text": "s7037",
-   "edit": {
-    "title": "s7038",
-    "description": "s7039",
-    "repo": "s7040",
-    "agent": "s7041",
-    "priority": "urgent",
-    "criteria": [
-     "s7042"
-    ],
-    "deliver": "change",
-    "before": "s7043"
-   }
+   "at": 914,
+   "kind": "opened",
+   "text": "s916",
+   "who": "s915"
   },
   {
-   "id": "s7044"
+   "at": 917,
+   "kind": "opened",
+   "text": "s918"
   }
+ ],
+ "MilestoneKind": [
+  "opened",
+  "refined",
+  "started",
+  "reported",
+  "asked",
+  "told",
+  "failed",
+  "stopped",
+  "rejected",
+  "accepted",
+  "closed"
+ ],
+ "Priority": [
+  "urgent",
+  "high",
+  "medium",
+  "low"
+ ],
+ "PullRequest": [
+  {
+   "number": 890,
+   "state": "open",
+   "url": "s889"
+  },
+  {
+   "number": 892,
+   "state": "open",
+   "url": "s891"
+  }
+ ],
+ "PullRequestState": [
+  "open",
+  "merged",
+  "closed"
+ ],
+ "Question": [
+  {
+   "options": [
+    "s906"
+   ],
+   "question": "s905"
+  },
+  {
+   "options": [
+    "s908"
+   ],
+   "question": "s907"
+  }
+ ],
+ "StuckReason": [
+  "failed",
+  "conflict",
+  "interrupted",
+  "quiet"
  ]
 }

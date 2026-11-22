@@ -57,9 +57,9 @@ fn an_issue_goes_from_backlog_to_merged() {
     let session = w.board.session(reviewing.latest_session_id().unwrap()).unwrap();
     assert_eq!(session.phase, Phase::done());
     assert_eq!(session.last_run.as_ref().unwrap().summary, "Added feature.txt");
-    assert_eq!(session.branch.as_deref(), Some("vibevalley/issue-1"));
+    assert_eq!(session.worktree_branch(), Some("vibevalley/issue-1"));
     assert_eq!(w.board.sessions().base_branch(&session.id).as_deref(), Some("main"));
-    let worktree = session.worktree.clone().unwrap();
+    let worktree = session.cwd.clone().unwrap();
     assert!(worktree.ends_with("worktrees/app.1"), "{worktree}");
     assert!(prompts.lock().unwrap()[0].starts_with("Add the feature"));
     assert!(prompts.lock().unwrap()[0].contains("1. it is there"));
@@ -217,7 +217,7 @@ fn canceling_lets_the_session_go_and_keeps_a_branch_with_work() {
     w.board.create(new("Doomed", Some(&main))).unwrap();
     w.board.move_to("1", IssueStatus::Todo, None).unwrap();
     let working = wait_stage(&w.board, "1", StageKind::Working);
-    let worktree = w.board.session(working.latest_session_id().unwrap()).unwrap().worktree.unwrap();
+    let worktree = w.board.session(working.latest_session_id().unwrap()).unwrap().cwd.unwrap();
     w.board.tell("1", "x").unwrap();
     std::fs::write(Path::new(&worktree).join("loose.txt"), "uncommitted").unwrap();
     assert_eq!(w.board.move_to("1", IssueStatus::Canceled, None).unwrap(), Move::Cancel);
@@ -358,7 +358,7 @@ fn a_lost_worktree_cancels_its_issue_on_open() {
     w.board.create(new("Lost", Some(&main))).unwrap();
     w.board.move_to("1", IssueStatus::Todo, None).unwrap();
     let issue = wait_stage(&w.board, "1", StageKind::Reviewing);
-    let worktree = w.board.session(issue.latest_session_id().unwrap()).unwrap().worktree.unwrap();
+    let worktree = w.board.session(issue.latest_session_id().unwrap()).unwrap().cwd.unwrap();
     w.board.close();
     std::fs::remove_dir_all(&worktree).unwrap();
     let board = Board::open(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
@@ -560,7 +560,7 @@ fn regression_project_check_runs_on_the_combined_tree_before_delivery() {
     w.board.move_to("1", IssueStatus::Todo, None).unwrap();
     let reviewing = wait_stage(&w.board, "1", StageKind::Reviewing);
     let session = w.board.session(reviewing.latest_session_id().unwrap()).unwrap();
-    let worktree = Path::new(session.worktree.as_ref().unwrap());
+    let worktree = Path::new(session.cwd.as_ref().unwrap());
     std::fs::write(main.join("limit"), "1").unwrap();
     git(&main, &["commit", "-qam", "decrease capacity"]);
     let target = git(&main, &["rev-parse", "HEAD"]);

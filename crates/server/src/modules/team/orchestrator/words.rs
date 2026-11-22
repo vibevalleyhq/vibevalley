@@ -282,8 +282,8 @@ pub fn session_line(h: &Session, now: i64, number: Option<i64>) -> String {
         .as_ref()
         .map(|r| format!("；上一轮{}：{}", t(&format!("shared.outcome.{}", wire(&r.outcome)), &[]), head(&r.summary, 80)))
         .unwrap_or_default();
-    let repo = h.repo.clone().unwrap_or_default();
-    let place = match &h.branch {
+    let repo = h.repo_name().unwrap_or_default();
+    let place = match h.worktree_branch() {
         Some(b) => format!("在 {repo} 的 {b}"),
         None => format!("在 {repo}"),
     };

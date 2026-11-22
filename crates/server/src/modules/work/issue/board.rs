@@ -454,8 +454,17 @@ impl Board {
             vibevalley_runtime::agent::durable::SubmissionStatus::Unanswered => return Err(BoardError::Other(sub.result.to_string())),
             vibevalley_runtime::agent::durable::SubmissionStatus::Queued => (),
         }
+        let mail_owner = self.on_board(&issue).map(|s| s.id).unwrap_or_else(|| format!("issue:{}", issue.id));
+        let mail_key = format!("issue:{}:{key}", issue.id);
+        let mail_entry = sessions.enqueue_mailbox(
+            &mail_owner,
+            &mail_key,
+            crate::modules::work::session::mailbox::MailboxSource::IssueComment,
+            words,
+        )?;
         if issue.status.is_closed() {
             let e = BoardError::Refused(if issue.was_sent() { Refusal::Reopen } else { Refusal::Revive });
+            let _ = sessions.settle_mailbox(mail_entry.id, false, Some(&e.to_string()));
             sessions.settle_words(&sub.id, false, &serde_json::json!({"error":e.to_string()}))?;
             return Err(e);
         }
@@ -464,9 +473,11 @@ impl Board {
             && sessions.is_live(&session.id)
             && sessions.bind_to_active_run(&session.id, &sub)?
         {
+            let _ = sessions.claim_mailbox_by_key(&mail_key);
             let result = sessions
                 .steer(&session, words)
                 .unwrap_or_else(|| Err(BoardError::Other("the active run ended during handoff".into())));
+            let _ = sessions.settle_mailbox(mail_entry.id, result.is_ok(), result.as_ref().err().map(|e| e.to_string()).as_deref());
             if let Err(e) = &result {
                 sessions.settle_words(&sub.id, false, &serde_json::json!({"error":e.to_string()}))?;
             }
@@ -475,7 +486,10 @@ impl Board {
         if matches!(issue.status, IssueStatus::Backlog | IssueStatus::Todo) {
             return Ok(());
         }
-        self.dispatch_replies(&issue)
+        let _ = sessions.claim_mailbox_by_key(&mail_key);
+        let res = self.dispatch_replies(&issue);
+        let _ = sessions.settle_mailbox(mail_entry.id, res.is_ok(), res.as_ref().err().map(|e| e.to_string()).as_deref());
+        res
     }
 
     fn dispatch_replies(&self, issue: &Issue) -> Result<()> {
@@ -561,7 +575,7 @@ impl Board {
     /// Direct workspace chat sessions do not count toward issue board concurrency limits.
     pub(super) fn room(&self, issue: &Issue, except: &str) -> (usize, usize) {
         let room = self.read(|s| {
-            let board_sessions: Vec<Session> = s.sessions.iter().filter(|h| !crate::modules::work::session::is_workspace(h)).cloned().collect();
+            let board_sessions: Vec<Session> = s.sessions.iter().filter(|h| h.is_board_worker()).cloned().collect();
             vibevalley_core::rules::room_left(
                 &board_sessions,
                 issue.repo.as_deref().unwrap_or(""),
@@ -750,10 +764,10 @@ impl Board {
                 return false;
             }
             let session = issue.latest_session_id().and_then(|id| state.sessions.iter().find(|s| s.id == *id));
-            if let Some(wt) = session.and_then(|s| s.worktree.as_deref()) {
+            if let Some(wt) = session.and_then(|s| s.cwd.as_deref()) {
                 let wt_canon = std::fs::canonicalize(wt).ok();
                 if (wt == cwd || (wt_canon.is_some() && wt_canon == cwd_canon))
-                    && (session.and_then(|s| s.branch.as_deref()) == Some(branch) || crate::modules::work::workplace::issue_branch(issue.number) == branch)
+                    && (session.and_then(|s| s.worktree_branch()) == Some(branch) || crate::modules::work::workplace::issue_branch(issue.number) == branch)
                 {
                     return true;
                 }
@@ -802,7 +816,7 @@ impl Board {
             return Workplace::published_changes(&main, issue.number, revision, receipt, since_tree);
         }
         let base = self.session_base(&issue, &main)?;
-        let worktree = self.on_board(&issue).and_then(|s| s.worktree);
+        let worktree = self.on_board(&issue).and_then(|s| s.cwd);
         let at = OnDisk {
             number: issue.number,
             title: &issue.title,
@@ -863,7 +877,7 @@ impl Board {
             return self.hold_delivery(&issue.id, &last.candidate_commit);
         };
         let session = self.on_board(issue);
-        let worktree = session.as_ref().and_then(|s| s.worktree.as_deref());
+        let worktree = session.as_ref().and_then(|s| s.cwd.as_deref());
         let tree = self
             .0
             .workplaces
@@ -904,7 +918,7 @@ impl Board {
             None => vibevalley_protocol::Landing::None,
             Some(main) => {
                 let has_children = self.state().issues.iter().any(|t| t.parent.as_ref() == Some(&issue.id));
-                let worktree = session.as_ref().and_then(|s| s.worktree.clone());
+                let worktree = session.as_ref().and_then(|s| s.cwd.clone());
                 let at = OnDisk {
                     number: issue.number,
                     title: &issue.title,

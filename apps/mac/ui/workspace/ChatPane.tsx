@@ -12,13 +12,13 @@ import { Dot } from "../design/Tag";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { act, hostApi } from "../infra/bridge";
+import { readChatPaneParams } from "../infra/hostParams";
 import { richNative } from "../infra/rich";
 import {
   asThoughtLevel,
   clampThoughtLevel,
   computeTelemetry,
   defaultThoughtLevelFor,
-  deriveChatTitle,
   extractToolTarget,
   fetchWorkspaceRuntimes,
   formatTokens,
@@ -407,16 +407,10 @@ function PermissionCard(props: { permission: SessionPermissionRequest; busy: boo
 }
 
 export function WorkspaceChatPane() {
-  const tabId = typeof host.params.tabId === "number" ? host.params.tabId : 0;
-  const cwd = typeof host.params.cwd === "string" ? host.params.cwd : "";
-  const repo = typeof host.params.repo === "string" ? host.params.repo : undefined;
-  const initialSessionId = typeof host.params.sessionId === "string" ? host.params.sessionId : "";
-  const initialRuntime = typeof host.params.runtime === "string" && host.params.runtime.length > 0 ? host.params.runtime : "antigravity";
-  const initialTitle = typeof host.params.title === "string" && host.params.title.trim().length > 0 ? host.params.title.trim() : undefined;
+  const { tabId, cwd, repo, sessionId: initialSessionId, runtime: initialRuntime } = readChatPaneParams();
 
   const runtimes = signal<readonly WorkspaceRuntimeOption[]>([]);
   const sessionId = signal<string>(initialSessionId);
-  const sessionTitle = signal<string | undefined>(initialTitle);
   const runtime = signal<string>(initialRuntime);
   const model = signal<string>("");
   const thoughtLevel = signal<ThoughtLevel | undefined>(undefined);
@@ -447,8 +441,6 @@ export function WorkspaceChatPane() {
   const effectiveThoughtLevel = (): ThoughtLevel | undefined => clampThoughtLevel(currentModelInfo(), thoughtLevel());
   const hasAttention = () => pendingInteractions().length > 0 || pendingPermissions().length > 0;
   const effectivePhase = (): ChatPhase => (hasAttention() ? "waiting" : phase());
-  const firstUserMessage = () => steps().find((s) => s.type === "user/message" && s.under === undefined)?.text;
-  const resolvedTitle = () => deriveChatTitle(sessionTitle(), swarm()?.title, firstUserMessage());
   const shownSteps = () => visibleChatSteps(steps());
   const telemetry = () => computeTelemetry(steps(), latestTokens());
 
@@ -471,31 +463,12 @@ export function WorkspaceChatPane() {
   }
 
   effect(() => {
-    if (!host.available() || tabId <= 0) return;
-    const sid = sessionId();
-    const rt = runtime();
-    const st = effectivePhase();
-    const att = hasAttention();
-    const title = resolvedTitle();
-    act({
-      type: "update_chat_tab",
-      tab_id: tabId,
-      ...(sid ? { session_id: sid } : {}),
-      runtime: rt,
-      ...(title ? { title } : {}),
-      status: st === "working" ? "working" : "ready",
-      attention: att,
-    });
-  });
-
-  effect(() => {
     const sid = sessionId();
     if (!sid || !host.available()) return;
     return watchWorkspaceSession(sid, (ev) => {
       switch (ev.kind) {
         case "state": {
           phase.set(phaseFromSessionTag(ev.session.phase._tag));
-          if (ev.title !== undefined) sessionTitle.set(ev.title.trim() || undefined);
           if (ev.model !== undefined) model.set(ev.model);
           const activeModelId = ev.model ?? untracked(model);
           const info = untracked(currentModels).find((m) => m.id === activeModelId);
@@ -543,10 +516,12 @@ export function WorkspaceChatPane() {
         }
         case "missing": {
           sessionId.set("");
-          sessionTitle.set(undefined);
           swarm.set(undefined);
           swarmOpen.set(false);
           phase.set("ready");
+          if (host.available() && tabId > 0) {
+            act({ type: "bind_chat_session", tab_id: tabId, session_id: "", runtime: untracked(runtime) });
+          }
           break;
         }
       }
@@ -572,7 +547,6 @@ export function WorkspaceChatPane() {
       return undefined;
     }
     const ws = res.workspace;
-    if (ws.title !== undefined) sessionTitle.set(ws.title.trim() || undefined);
     if (ws.model !== undefined) model.set(ws.model);
     const activeModelId = ws.model ?? untracked(model);
     const info = untracked(currentModels).find((m) => m.id === activeModelId);
@@ -584,6 +558,9 @@ export function WorkspaceChatPane() {
     }
     permissionMode.set(ws.permissionMode);
     sessionId.set(ws.id);
+    if (host.available() && tabId > 0) {
+      act({ type: "bind_chat_session", tab_id: tabId, session_id: ws.id, runtime: ws.session.runtime });
+    }
     return ws.id;
   };
 
@@ -1095,6 +1072,9 @@ export function WorkspaceChatPane() {
                           const nextModel = preferredModelFor(found);
                           model.set(nextModel?.id ?? "");
                           thoughtLevel.set(defaultThoughtLevelFor(nextModel));
+                          if (host.available() && tabId > 0) {
+                            act({ type: "bind_chat_session", tab_id: tabId, session_id: untracked(sessionId), runtime: nextRt });
+                          }
                         }}
                         class={composerMenuItemClass}
                       >

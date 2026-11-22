@@ -194,6 +194,8 @@
 | `session.respondInteraction` | 回复会话的交互式提问 | `/api/v1/session/respondInteraction` | ✓ | ✓ |   |   |
 | `session.setConfig` | 调整工作区会话的模型、推理强度或权限模式 | `/api/v1/session/setConfig` | ✓ | ✓ |   |   |
 | `session.childTranscript` | 读取子代理或协作组员最近的轨迹步骤 | `/api/v1/session/childTranscript` | ✓ | ✓ |   |   |
+| `session.binding.attach` | cap.op.session.binding.attach | `/api/v1/session/binding/attach` | ✓ | ✓ | ✓ |   |
+| `session.binding.detach` | cap.op.session.binding.detach | `/api/v1/session/binding/detach` | ✓ | ✓ | ✓ |   |
 
 ## artifact
 

@@ -39,15 +39,20 @@ export {
   SubmitBranch,
 } from "./repo/schema";
 export {
+  ContextRef,
+  ExecutionPolicy,
   IssueAnswer,
   LastRun,
   Phase,
   Run,
   RunTrigger,
   Session,
+  SessionBindingInput,
   SessionChildTranscript,
   SessionContextFile,
+  SessionController,
   SessionEvent,
+  SessionEventPage,
   SessionInteractionOption,
   SessionInteractionRequest,
   SessionInteractionResolution,
@@ -200,6 +205,7 @@ export {
   OrchestratorEval,
   OrchestratorEvalRequest,
 } from "./orchestrator/schema";
+export { InboxItem } from "./inbox/schema";
 export { Achievement, AchievementCategory, ChooseTitleRequest, LedgerEntry } from "./game/schema";
 export { Attachment, AttachmentUpload } from "./attachment/schema";
 export { ConnectorLogin, ConnectorsChannelRequest, ConnectorStatus, VerifyRequest } from "./connector/schema";

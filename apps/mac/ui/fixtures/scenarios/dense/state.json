@@ -3412,22 +3412,30 @@
     "sessions": [
       {
         "id": "w1",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "老周",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "codex",
         "brief": "",
-        "repo": "vibevalley",
-        "branch": "issue-18-login",
-        "worktree": "/tmp/vibevalley/.worktrees/i18",
+        "cwd": "/tmp/vibevalley/.worktrees/i18",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "issue-18-login"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i18"
+          }
+        ],
         "hiredAt": 1795193243624,
         "runs": 2,
         "spent": {
           "tokens": 182400,
           "cny": 0.42
         },
-        "issue": "i18",
-        "refining": false,
         "subagents": {
           "run": "run-2",
           "rootThreadId": "main",
@@ -3490,13 +3498,23 @@
       },
       {
         "id": "w2",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "小林",
-        "agent": "xiaolin",
+        "profile": "xiaolin",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
-        "branch": "issue-33-shell",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "issue-33-shell"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i33"
+          }
+        ],
         "hiredAt": 1795192043624,
         "runs": 1,
         "lastRun": {
@@ -3508,8 +3526,6 @@
             "cny": 0.14
           }
         },
-        "issue": "i33",
-        "refining": false,
         "phase": {
           "_tag": "resting"
         },
@@ -3517,13 +3533,23 @@
       },
       {
         "id": "w3",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "老周",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
-        "branch": "issue-31-board",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "issue-31-board"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i31"
+          }
+        ],
         "hiredAt": 1795187243624,
         "runs": 2,
         "lastRun": {
@@ -3535,8 +3561,6 @@
             "cny": 0.29
           }
         },
-        "issue": "i31",
-        "refining": false,
         "phase": {
           "_tag": "done"
         },
@@ -3544,12 +3568,22 @@
       },
       {
         "id": "w4",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "阿杰",
-        "agent": "ajie",
+        "profile": "ajie",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i34"
+          }
+        ],
         "hiredAt": 1795189043624,
         "runs": 1,
         "lastRun": {
@@ -3561,8 +3595,6 @@
             "cny": 0.06
           }
         },
-        "issue": "i34",
-        "refining": false,
         "phase": {
           "_tag": "failed"
         },
@@ -3570,15 +3602,25 @@
       },
       {
         "id": "w5",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "起草员",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "claude",
         "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i21",
+            "refining": true
+          }
+        ],
         "hiredAt": 1795193843624,
         "runs": 1,
-        "issue": "i21",
-        "refining": true,
         "phase": {
           "_tag": "working",
           "since": 1795194203624,
@@ -3592,16 +3634,24 @@
       },
       {
         "id": "w6",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "帮工6",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d6"
+          }
+        ],
         "hiredAt": 1795194083624,
         "runs": 1,
-        "issue": "i-d6",
-        "refining": false,
         "phase": {
           "_tag": "working",
           "since": 1795194083624,
@@ -3615,16 +3665,24 @@
       },
       {
         "id": "w7",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "帮工7",
-        "agent": "xiaolin",
+        "profile": "xiaolin",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d7"
+          }
+        ],
         "hiredAt": 1795194023624,
         "runs": 1,
-        "issue": "i-d7",
-        "refining": false,
         "phase": {
           "_tag": "working",
           "since": 1795194023624,
@@ -3638,16 +3696,24 @@
       },
       {
         "id": "w8",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "帮工8",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d8"
+          }
+        ],
         "hiredAt": 1795193963624,
         "runs": 1,
-        "issue": "i-d8",
-        "refining": false,
         "phase": {
           "_tag": "working",
           "since": 1795193963624,
@@ -3661,16 +3727,24 @@
       },
       {
         "id": "w9",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "帮工9",
-        "agent": "xiaolin",
+        "profile": "xiaolin",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d9"
+          }
+        ],
         "hiredAt": 1795193903624,
         "runs": 1,
-        "issue": "i-d9",
-        "refining": false,
         "phase": {
           "_tag": "working",
           "since": 1795193903624,
@@ -3684,12 +3758,22 @@
       },
       {
         "id": "w10",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "帮工10",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d10"
+          }
+        ],
         "hiredAt": 1795193843624,
         "runs": 1,
         "lastRun": {
@@ -3701,8 +3785,6 @@
             "cny": 0.05
           }
         },
-        "issue": "i-d10",
-        "refining": false,
         "phase": {
           "_tag": "done"
         },
@@ -3710,12 +3792,22 @@
       },
       {
         "id": "w11",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "帮工11",
-        "agent": "xiaolin",
+        "profile": "xiaolin",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d11"
+          }
+        ],
         "hiredAt": 1795193783624,
         "runs": 1,
         "lastRun": {
@@ -3727,8 +3819,6 @@
             "cny": 0.05
           }
         },
-        "issue": "i-d11",
-        "refining": false,
         "phase": {
           "_tag": "done"
         },
@@ -3736,12 +3826,22 @@
       },
       {
         "id": "w12",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "帮工12",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d12"
+          }
+        ],
         "hiredAt": 1795193723624,
         "runs": 1,
         "lastRun": {
@@ -3753,8 +3853,6 @@
             "cny": 0.05
           }
         },
-        "issue": "i-d12",
-        "refining": false,
         "phase": {
           "_tag": "done"
         },
@@ -4751,14 +4849,6 @@
         "history": []
       },
       "w5": {
-        "station": 0,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w6": {
         "station": 4,
         "toolsThisRun": 0,
         "counts": {},
@@ -4766,8 +4856,16 @@
         "commands": [],
         "history": []
       },
-      "w7": {
+      "w6": {
         "station": 5,
+        "toolsThisRun": 0,
+        "counts": {},
+        "files": [],
+        "commands": [],
+        "history": []
+      },
+      "w7": {
+        "station": -1,
         "toolsThisRun": 0,
         "counts": {},
         "files": [],

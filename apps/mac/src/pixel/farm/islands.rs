@@ -54,10 +54,10 @@ pub fn islands_of(repos: &[RepoSummary], frame: &Frame) -> Vec<Island> {
     let sessions: Vec<&Session> = frame.state.sessions.iter().filter(|s| s.is_worker()).collect();
     let mut names: Vec<String> = repos.iter().map(|r| r.name.clone()).collect();
     for s in &sessions {
-        if let Some(r) = &s.repo
-            && !names.contains(r)
+        if let Some(r) = s.repo_name()
+            && !names.iter().any(|x| x == r)
         {
-            names.push(r.clone());
+            names.push(r.to_string());
         }
     }
     let busy_all = sessions.iter().filter(|s| is_busy(s)).count() as i64;
@@ -65,7 +65,7 @@ pub fn islands_of(repos: &[RepoSummary], frame: &Frame) -> Vec<Island> {
         .into_iter()
         .map(|name| {
             let summary = repos.iter().find(|r| r.name == name).cloned();
-            let mut mine: Vec<&Session> = sessions.iter().copied().filter(|s| s.repo.as_deref() == Some(&name)).collect();
+            let mut mine: Vec<&Session> = sessions.iter().copied().filter(|s| s.repo_name() == Some(&name)).collect();
             mine.sort_by(|a, b| a.hired_at.total_cmp(&b.hired_at));
             let working = mine.iter().filter(|s| is_busy(s)).count() as i64;
             let max_sessions = summary.as_ref().map(|s| s.max_sessions.round() as i64).unwrap_or(working);
@@ -80,7 +80,7 @@ pub fn islands_of(repos: &[RepoSummary], frame: &Frame) -> Vec<Island> {
                     pose: map_pose(
                         s,
                         frame.state.issues.iter().any(|i| {
-                            Some(&i.id) == s.issue.as_ref()
+                            Some(i.id.as_str()) == s.issue_id()
                                 && i.stage.as_ref().and_then(|stage| stage.stuck) == Some(vibevalley_protocol::StuckReason::Conflict)
                         }),
                     ),
@@ -353,8 +353,9 @@ impl MapScene {
                 match spot {
                     Spot::Taken { session, plot, pose } => {
                         list.sprite(&atlas, &format!("plot-{}", plot.crop.name()), foot.x, foot.y, false, 1.0);
-                        let configured = self.agent_looks.get(&session.agent).map(|(sp, outfit)| (sp.as_str(), outfit.as_str()));
-                        let look = cast_prefix(configured, &session.agent, &atlas);
+                        let agent = session.profile_id().unwrap_or("");
+                        let configured = self.agent_looks.get(agent).map(|(sp, outfit)| (sp.as_str(), outfit.as_str()));
+                        let look = cast_prefix(configured, agent, &atlas);
                         let pose = format!("{look}-{pose}");
                         let pose = if atlas.has(&pose) { pose } else { format!("{look}-down") };
                         list.sprite(&atlas, &pose, foot.x, foot.y - 10.0, false, 1.0);
@@ -366,9 +367,9 @@ impl MapScene {
                                 y1: foot.y,
                             },
                             MapHit::Plot {
-                                agent: session.agent.clone(),
-                                worktree: session.worktree.clone(),
-                                issue: session.issue.clone(),
+                                agent: agent.to_string(),
+                                worktree: session.cwd.clone(),
+                                issue: session.issue_id().map(String::from),
                             },
                         ));
                     }

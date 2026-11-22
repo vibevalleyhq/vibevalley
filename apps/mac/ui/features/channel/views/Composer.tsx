@@ -5,6 +5,7 @@ import { z } from "zod";
 import { t } from "@vibevalley/i18n";
 import { userId } from "@vibevalley/protocol";
 import type { ArtifactViewContext, BlockRef, Channel } from "@vibevalley/protocol";
+import { sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { AttachmentTile } from "../../../design/domain/AttachmentTile";
@@ -252,7 +253,7 @@ export function Composer(props: {
                     </If>
                   }
                 >
-                  {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={20} />}
+                  {(s) => <HelperFace agent={sessionProfile(s()) ?? ""} runtime={s().runtime} size={20} />}
                 </If>
                 <Text class="font-mono text-xs text-ink">
                   {n().token}

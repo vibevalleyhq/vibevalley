@@ -131,7 +131,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     });
     let session = first.latest_session_id().unwrap().clone();
     let worker = server.board.session(&session).unwrap();
-    assert!(Path::new(worker.worktree.as_ref().unwrap()).starts_with(dir.path().join("worktrees")));
+    assert!(Path::new(worker.cwd.as_ref().unwrap()).starts_with(dir.path().join("worktrees")));
     let thread = until(&server, "issue thread", || server.chat.issue_thread_id(&id));
     until(&server, "report in issue thread", || {
         server
@@ -145,7 +145,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     until(&server, "report memory stored", || {
         server
             .memories
-            .list(&worker.agent)
+            .list(worker.profile.as_deref().unwrap())
             .unwrap()
             .iter()
             .any(|m| m.text == "The mainline uses real git")
@@ -256,7 +256,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     assert!(
         reopened
             .memories
-            .list(&worker.agent)
+            .list(worker.profile.as_deref().unwrap())
             .unwrap()
             .iter()
             .any(|m| m.text == "The mainline uses real git")

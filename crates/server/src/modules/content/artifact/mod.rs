@@ -943,7 +943,7 @@ fn issue_id(board: &crate::modules::work::issue::Board, reference: &str) -> Resu
             .map(|i| i.id)
             .ok_or_else(|| missing(t("server.issue.issueNumbered", &[("n", number.into())]), LookIn::Issue));
     }
-    if let Some(issue) = board.session(r).and_then(|s| s.issue) {
+    if let Some(issue) = board.session(r).and_then(|s| s.issue_id().map(String::from)) {
         return Ok(issue);
     }
     Ok(r.to_string())

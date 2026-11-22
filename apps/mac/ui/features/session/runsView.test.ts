@@ -43,19 +43,20 @@ function makeAgent(id: string, role: Agent["role"], name: string, duty = ""): Ag
   };
 }
 
-function makeSession(overrides: Omit<Partial<Session>, "id" | "issue"> & { id: string; agent: string; name: string; issue?: string }): Session {
-  const { id, issue, ...rest } = overrides;
+function makeSession(overrides: Omit<Partial<Session>, "id"> & { id: string; name: string }): Session {
+  const { id, ...rest } = overrides;
   return {
+    controller: "issueBoard",
     role: "worker",
     runtime: "claude",
     brief: "",
+    policy: { kind: "sandboxDir" },
+    bindings: [],
     hiredAt: 1_000,
     runs: 1,
-    refining: false,
     phase: { _tag: "resting" },
     ...rest,
     id: sid(id),
-    ...(issue !== undefined ? { issue: iid(issue) } : {}),
   };
 }
 
@@ -115,8 +116,9 @@ test("buildRunEntries deduplicates orchestrator sessions, sorts active runs firs
   const liveOrchSession = makeLive(
     makeSession({
       id: "orch-1",
+      controller: "orchestrator",
       role: "orchestrator",
-      agent: defaultOrchestrator,
+      profile: defaultOrchestrator,
       name: "老村长",
       hiredAt: 2_000,
       phase: { _tag: "working", since: 9_000, doing: { action: "thinking", label: "" } },
@@ -125,25 +127,25 @@ test("buildRunEntries deduplicates orchestrator sessions, sorts active runs firs
 
   const activeWorker = makeSession({
     id: "w-active",
-    agent: "laozhou",
+    profile: "laozhou",
     name: "老周",
-    issue: "i18",
-    repo: "vibevalley",
+    policy: { kind: "managedWorktree", repo: "vibevalley" },
+    bindings: [{ kind: "issue", id: iid("i18") }],
     hiredAt: 5_000,
     phase: { _tag: "working", since: 8_000, doing: { action: "edit_file", label: "app.ts" } },
   });
   const restingWorker = makeSession({
     id: "w-rest",
-    agent: "xiaolin",
+    profile: "xiaolin",
     name: "小林",
-    issue: "i33",
+    bindings: [{ kind: "issue", id: iid("i33") }],
     hiredAt: 4_000,
     lastRun: { outcome: "completed", summary: "ok", at: 7_000 },
     phase: { _tag: "resting" },
   });
   const closedWorker = makeSession({
     id: "w-closed",
-    agent: "laozhou",
+    profile: "laozhou",
     name: "老周",
     hiredAt: 3_000,
     phase: { _tag: "closed", at: 7_500, closed: "merged" },
@@ -152,7 +154,7 @@ test("buildRunEntries deduplicates orchestrator sessions, sorts active runs firs
   const entries = buildRunEntries({
     orchestrators: [sideOrch, mainOrch],
     sessions: [
-      makeSession({ id: "orch-1", role: "orchestrator", agent: defaultOrchestrator, name: "老村长", hiredAt: 2_000 }),
+      makeSession({ id: "orch-1", controller: "orchestrator", role: "orchestrator", profile: defaultOrchestrator, name: "老村长", hiredAt: 2_000 }),
       closedWorker,
       restingWorker,
       activeWorker,
@@ -188,8 +190,9 @@ test("runStatusOf maps every RunEntry phase and outcome deterministically", () =
       live: makeLive(
         makeSession({
           id: "orch-1",
+          controller: "orchestrator",
           role: "orchestrator",
-          agent: orch.id,
+          profile: orch.id,
           name: orch.name,
           phase: { _tag: "working", since: 100, doing: { action: "thinking", label: "" } },
         }),
@@ -204,7 +207,7 @@ test("runStatusOf maps every RunEntry phase and outcome deterministically", () =
       id: "w",
       session: makeSession({
         id: "w",
-        agent: "laozhou",
+        profile: "laozhou",
         name: "老周",
         phase,
         ...(outcome ? { lastRun: { outcome, summary: "", at: 10 } } : {}),
@@ -226,27 +229,28 @@ test("filterRunEntries and resolveSelectedRun handle scope, agentId, issueId, qu
   const liveOrch = makeLive(
     makeSession({
       id: "orch-live",
+      controller: "orchestrator",
       role: "orchestrator",
-      agent: defaultOrchestrator,
+      profile: defaultOrchestrator,
       name: "老村长",
       phase: { _tag: "resting" },
     }),
   );
   const w1 = makeSession({
     id: "w1",
-    agent: "laozhou",
+    profile: "laozhou",
     name: "老周",
-    issue: "i18",
-    repo: "vibevalley",
+    policy: { kind: "managedWorktree", repo: "vibevalley" },
+    bindings: [{ kind: "issue", id: iid("i18") }],
     brief: "登录鉴权修复",
     phase: { _tag: "working", since: 5_000, doing: { action: "run_command", label: "cargo test" } },
   });
   const w2 = makeSession({
     id: "w2",
-    agent: "xiaolin",
+    profile: "xiaolin",
     name: "小林",
-    issue: "i33",
-    repo: "site",
+    policy: { kind: "managedWorktree", repo: "site" },
+    bindings: [{ kind: "issue", id: iid("i33") }],
     brief: "调整暗色样式",
     phase: { _tag: "done" },
   });

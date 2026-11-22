@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
 import type { BoardSummary, DoingView, Issue, IssuePromptKind, IssueStage, IssueStageKind, Session, SessionEvent, SessionView } from "@vibevalley/protocol";
-import { shortTitle } from "@vibevalley/protocol/rules";
+import { sessionProfile, sessionRepo, sessionWorktree, shortTitle } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { spanText, tookText } from "../../../infra/base/format";
@@ -119,15 +119,16 @@ function userQuestion(stage: IssueStage, issue: Issue, head: Session, boardSumma
 
 const emptySession = (issue: Issue): Session => ({
   id: sessionId(issue.id),
+  controller: "issueBoard",
   role: "worker",
   name: "",
-  agent: "",
   runtime: "",
+  policy: { kind: "sandboxDir" },
+  bindings: [],
   phase: { _tag: "resting" },
   hiredAt: issue.createdAt,
   brief: issue.title,
   runs: 0,
-  refining: false,
 });
 
 /** `sessions` oldest first; `session` the one on the farm now, if any. */
@@ -139,8 +140,8 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
   const current = session ? doingOf(session) : nothing;
   const rows = criteriaRows(issue);
   // Each helper once, the first time it worked the issue.
-  const crew = sessions.filter((s, i) => !sessions.slice(0, i).some((x) => x.agent === s.agent));
-  const hand = head.worktree !== undefined ? session : undefined;
+  const crew = sessions.filter((s, i) => !sessions.slice(0, i).some((x) => (sessionProfile(x) ?? x.id) === (sessionProfile(s) ?? s.id)));
+  const hand = sessionWorktree(head) !== undefined ? session : undefined;
   const fullTitle = issueTitle(issue, issues);
   const title = shortTitle(fullTitle);
 
@@ -171,7 +172,7 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     title,
     /** The whole of a title too long for the page's first line goes with the description. */
     description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
-    repo: issue.repo ?? head.repo,
+    repo: issue.repo ?? sessionRepo(head),
     parentText: parent?.title ?? issue.parent ?? "",
     ask: userQuestion(stage, issue, head, boardSummary),
     needsWorktreeCheck:

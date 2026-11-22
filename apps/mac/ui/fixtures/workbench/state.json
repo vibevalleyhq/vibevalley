@@ -6,23 +6,33 @@
     "sessions": [
       {
         "id": "w1",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "老周",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "hiredAt": 1795273010133,
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i18"
+          }
+        ],
+        "hiredAt": 1795358573693,
         "runs": 2,
         "phase": {
           "_tag": "working",
-          "since": 1795275350133,
+          "since": 1795360913693,
           "doing": {
             "action": "edit_file",
             "label": "改 session.ts",
             "actionText": "改文件"
           }
         },
-        "refining": false,
         "phaseText": "",
         "spent": {
           "tokens": 182400,
@@ -31,37 +41,57 @@
       },
       {
         "id": "w2",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "小林",
-        "agent": "xiaolin",
+        "profile": "xiaolin",
         "runtime": "claude",
         "brief": "",
-        "hiredAt": 1795273010133,
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i17"
+          }
+        ],
+        "hiredAt": 1795358573693,
         "runs": 2,
         "phase": {
           "_tag": "resting"
         },
-        "refining": false,
         "phaseText": "",
         "lastRun": {
           "outcome": "completed",
           "summary": "登录过期回到登录页，加了两条测试。",
-          "at": 1795275050133
+          "at": 1795360613693
         }
       },
       {
         "id": "w3",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "老周",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "hiredAt": 1795257530133,
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i12"
+          }
+        ],
+        "hiredAt": 1795343093693,
         "runs": 2,
         "phase": {
           "_tag": "done"
         },
-        "refining": false,
         "phaseText": ""
       }
     ],
@@ -72,7 +102,7 @@
         "title": "写一句话就能起草工单",
         "priority": "medium",
         "status": "backlog",
-        "createdAt": 1795228910133,
+        "createdAt": 1795314473693,
         "assignments": [],
         "mandate": {
           "strength": "explicit",
@@ -98,13 +128,13 @@
         "title": "看板拖拽的手感",
         "priority": "high",
         "status": "todo",
-        "createdAt": 1795226690133,
+        "createdAt": 1795312253693,
         "assignments": [
           {
             "id": "a22",
             "issue": "i22",
             "agent": "laozhou",
-            "assignedAt": 1795226690133,
+            "assignedAt": 1795312253693,
             "executions": []
           }
         ],
@@ -126,7 +156,7 @@
           "acts": []
         },
         "repo": "vibevalley",
-        "queuedAt": 1795275230133
+        "queuedAt": 1795360793693
       },
       {
         "id": "i23",
@@ -134,7 +164,7 @@
         "title": "灵动岛的动画",
         "priority": "low",
         "status": "todo",
-        "createdAt": 1795224470133,
+        "createdAt": 1795310033693,
         "assignments": [],
         "mandate": {
           "strength": "explicit",
@@ -160,13 +190,13 @@
         "title": "首页的加载条",
         "priority": "medium",
         "status": "todo",
-        "createdAt": 1795222250133,
+        "createdAt": 1795307813693,
         "assignments": [
           {
             "id": "a24",
             "issue": "i24",
             "agent": "xiaolin",
-            "assignedAt": 1795222250133,
+            "assignedAt": 1795307813693,
             "executions": []
           }
         ],
@@ -195,18 +225,18 @@
         "title": "修好登录",
         "priority": "urgent",
         "status": "in_progress",
-        "createdAt": 1795235570133,
+        "createdAt": 1795321133693,
         "assignments": [
           {
             "id": "a18",
             "issue": "i18",
             "agent": "laozhou",
-            "assignedAt": 1795235570133,
+            "assignedAt": 1795321133693,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w1",
-                "startedAt": 1795274330133
+                "startedAt": 1795359893693
               }
             ]
           }
@@ -236,18 +266,18 @@
         "title": "补齐看板的测试",
         "priority": "medium",
         "status": "in_review",
-        "createdAt": 1795237790133,
+        "createdAt": 1795323353693,
         "assignments": [
           {
             "id": "a17",
             "issue": "i17",
             "agent": "xiaolin",
-            "assignedAt": 1795237790133,
+            "assignedAt": 1795323353693,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w2",
-                "startedAt": 1795274330133
+                "startedAt": 1795359893693
               }
             ]
           }
@@ -277,18 +307,18 @@
         "title": "设置按用途分组",
         "priority": "medium",
         "status": "done",
-        "createdAt": 1795248890133,
+        "createdAt": 1795334453693,
         "assignments": [
           {
             "id": "a12",
             "issue": "i12",
             "agent": "laozhou",
-            "assignedAt": 1795248890133,
+            "assignedAt": 1795334453693,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w3",
-                "startedAt": 1795274330133
+                "startedAt": 1795359893693
               }
             ]
           }
@@ -311,7 +341,7 @@
           "acts": []
         },
         "repo": "vibevalley",
-        "closedAt": 1795268330133,
+        "closedAt": 1795353893693,
         "delivered": "merged"
       }
     ],
@@ -327,8 +357,8 @@
         },
         "tz": "Asia/Shanghai",
         "enabled": true,
-        "created": 1794670730134,
-        "lastRun": 1795189130134,
+        "created": 1794756293693,
+        "lastRun": 1795274693693,
         "by": "user",
         "pending": false,
         "whenText": "每天 09:30",
@@ -348,7 +378,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "general",
-          "at": 1795271930134,
+          "at": 1795357493693,
           "repo": "vibevalley",
           "lastNumber": 11,
           "read": 8,
@@ -357,7 +387,7 @@
             "from": "orchestrator",
             "name": "助手",
             "text": "记下了：周五之前。",
-            "at": 1795273730134
+            "at": 1795359293693
           }
         },
         {
@@ -371,7 +401,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "设计",
-          "at": 1795271930134,
+          "at": 1795357493693,
           "unread": 2,
           "lastNumber": 4,
           "read": 2
@@ -387,7 +417,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "发版",
-          "at": 1795271930134
+          "at": 1795357493693
         },
         {
           "id": "t-login",
@@ -400,7 +430,7 @@
           "subjectKind": "issue",
           "replies": 4,
           "title": "修好登录",
-          "at": 1795271930134,
+          "at": 1795357493693,
           "parent": "general",
           "root": "m2",
           "rootNumber": 2,
@@ -411,7 +441,7 @@
             "from": "w1",
             "name": "老周",
             "text": "先看 session.ts。",
-            "at": 1795274930134
+            "at": 1795360493693
           }
         },
         {
@@ -425,7 +455,7 @@
           "subjectKind": null,
           "replies": 0,
           "title": "小林",
-          "at": 1795271930134,
+          "at": 1795357493693,
           "peer": "xiaolin"
         }
       ],
@@ -439,8 +469,8 @@
         "pairCode": "",
         "user": "用户",
         "channel": "general",
-        "since": 1795016330135,
-        "lastInbound": 1795274810135,
+        "since": 1795101893694,
+        "lastInbound": 1795360373694,
         "pending": 2,
         "error": ""
       },
@@ -480,8 +510,8 @@
         },
         "canCancel": false,
         "canRetryDownload": false,
-        "createdAt": 1795273730134,
-        "updatedAt": 1795273750134
+        "createdAt": 1795359293694,
+        "updatedAt": 1795359313694
       },
       {
         "kind": "image",
@@ -500,8 +530,8 @@
         "problem": "",
         "canCancel": true,
         "canRetryDownload": false,
-        "createdAt": 1795275470134,
-        "updatedAt": 1795275490134
+        "createdAt": 1795361033694,
+        "updatedAt": 1795361053694
       },
       {
         "kind": "speech",
@@ -540,8 +570,8 @@
         "resultInput": null,
         "canCancel": false,
         "canRetryDownload": false,
-        "createdAt": 1795274810134,
-        "updatedAt": 1795274830134
+        "createdAt": 1795360373694,
+        "updatedAt": 1795360393694
       },
       {
         "model": "moss-speakers",
@@ -593,8 +623,8 @@
           ],
           "format": "mp3"
         },
-        "createdAt": 1795274330134,
-        "updatedAt": 1795274350134
+        "createdAt": 1795359893694,
+        "updatedAt": 1795359913694
       },
       {
         "model": "moss-transcribe-diarize-pro",
@@ -655,8 +685,8 @@
           "allowUpload": true,
           "diarize": true
         },
-        "createdAt": 1795272830134,
-        "updatedAt": 1795272850134
+        "createdAt": 1795358393694,
+        "updatedAt": 1795358413694
       },
       {
         "kind": "understanding",
@@ -698,8 +728,8 @@
         "canCancel": false,
         "canCleanup": false,
         "canRetryDownload": false,
-        "createdAt": 1795274030134,
-        "updatedAt": 1795274050134
+        "createdAt": 1795359593694,
+        "updatedAt": 1795359613694
       }
     ],
     "machines": []

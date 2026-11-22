@@ -1,1167 +1,1215 @@
 {
- "seq": 7,
- "state": {
-  "call": "idle",
-  "callReason": "",
-  "issues": [
-   {
-    "id": "i11",
-    "number": 11,
-    "title": "Issue 11",
-    "description": "",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
-    },
-    "assignments": [
-     {
-      "id": "a11",
-      "issue": "i11",
-      "agent": "lab",
-      "assignedAt": 1794499340000,
-      "executions": []
-     }
-    ],
-    "priority": "high",
-    "createdAt": 1794475580000,
-    "blockedBy": [],
-    "status": "in_review",
-    "moves": [
-     "todo",
-     "done",
-     "canceled"
-    ],
-    "deliver": "change",
-    "findings": [],
-    "questions": [],
-    "criteria": [],
-    "checks": [],
-    "lastRun": {
-     "startedAt": 1794500000000,
-     "endedAt": 1794500060000,
-     "outcome": "completed"
-    },
-    "stage": {
-     "state": "reviewing",
-     "since": 1794500060000,
-     "lead": "complete",
-     "acts": [
-      {
-       "act": "complete",
-       "does": "move",
-       "status": "done",
-       "words": "none"
+  "effects": [],
+  "inbox": [
+    {
+      "at": 1794500300000,
+      "from": {
+        "agent": "lab",
+        "id": "w5",
+        "kind": "session",
+        "name": "Helper w5"
       },
-      {
-       "act": "close",
-       "does": "move",
-       "status": "canceled",
-       "words": "none"
+      "id": "w5:quiet:1794500300000",
+      "kind": "quiet",
+      "target": {
+        "id": "w5",
+        "kind": "session"
+      },
+      "text": "work on i5",
+      "who": "Helper w5",
+      "words": {
+        "body": "可能在跑很久的命令，也可能卡住了：看看它的轨迹。",
+        "label": "好久没动静",
+        "title": "Helper w5 好一阵没动静了",
+        "tray": "Helper w5 好一阵没动静"
       }
-     ]
-    }
-   },
-   {
-    "id": "i10",
-    "number": 10,
-    "title": "Issue 10",
-    "description": "",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
     },
-    "assignments": [
-     {
-      "id": "a10",
-      "issue": "i10",
-      "agent": "lab",
-      "assignedAt": 1794499400000,
-      "executions": []
-     }
-    ],
-    "priority": "medium",
-    "createdAt": 1794477800000,
-    "closedAt": 1794500000000,
-    "canceled": "dismissed",
-    "blockedBy": [],
-    "status": "canceled",
-    "moves": [
-     "backlog"
-    ],
-    "deliver": "change",
-    "findings": [],
-    "questions": [],
-    "criteria": [],
-    "checks": [],
-    "stage": {
-     "state": "canceled",
-     "since": 1794500000000,
-     "lead": "reopen",
-     "acts": [
-      {
-       "act": "reopen",
-       "does": "move",
-       "status": "backlog",
-       "words": "none"
+    {
+      "at": 1794500300000,
+      "from": {
+        "agent": "lab",
+        "id": "w6",
+        "kind": "session",
+        "name": "Helper w6"
+      },
+      "id": "w6:fix:1",
+      "kind": "fix",
+      "target": {
+        "id": "w6",
+        "kind": "session"
+      },
+      "text": "Build broke",
+      "who": "Helper w6",
+      "words": {
+        "body": "Build broke",
+        "label": "活没做成",
+        "title": "Helper w6 没做成",
+        "tray": "Helper w6 没做成"
       }
-     ]
-    }
-   },
-   {
-    "id": "i9",
-    "number": 9,
-    "title": "Issue 9",
-    "description": "",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
     },
-    "assignments": [
-     {
-      "id": "a9",
-      "issue": "i9",
-      "agent": "lab",
-      "assignedAt": 1794499460000,
-      "executions": []
-     }
-    ],
-    "priority": "high",
-    "createdAt": 1794480020000,
-    "closedAt": 1794500000000,
-    "delivered": "merged",
-    "blockedBy": [],
-    "status": "done",
-    "moves": [
-     "backlog"
-    ],
-    "deliver": "change",
-    "findings": [],
-    "questions": [],
-    "criteria": [],
-    "checks": [],
-    "stage": {
-     "state": "done",
-     "since": 1794500000000,
-     "acts": [
-      {
-       "act": "reopen",
-       "does": "move",
-       "status": "backlog",
-       "words": "none"
+    {
+      "at": 1794500240000,
+      "from": {
+        "agent": "lab",
+        "id": "w4",
+        "kind": "session",
+        "name": "Helper w4"
+      },
+      "id": "w4:review:2",
+      "kind": "review",
+      "target": {
+        "id": "w4",
+        "kind": "session"
+      },
+      "text": "Found it",
+      "who": "Helper w4",
+      "words": {
+        "body": "Found it",
+        "label": "等你看",
+        "title": "Helper w4 做完了",
+        "tray": "Helper w4 做完了，等你看"
       }
-     ]
-    }
-   },
-   {
-    "id": "i8",
-    "number": 8,
-    "title": "Issue 8",
-    "description": "",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
     },
-    "assignments": [
-     {
-      "id": "a8",
-      "issue": "i8",
-      "agent": "lab",
-      "assignedAt": 1794499520000,
-      "executions": []
-     }
-    ],
-    "priority": "medium",
-    "createdAt": 1794482240000,
-    "queuedAt": 1794500000000,
-    "blockedBy": [],
-    "status": "todo",
-    "moves": [
-     "backlog",
-     "canceled"
-    ],
-    "deliver": "change",
-    "findings": [],
-    "questions": [],
-    "criteria": [],
-    "checks": [],
-    "stage": {
-     "state": "queued",
-     "since": 1794500000000,
-     "acts": [
-      {
-       "act": "close",
-       "does": "move",
-       "status": "canceled",
-       "words": "none"
+    {
+      "at": 1794500180000,
+      "from": {
+        "agent": "lab",
+        "id": "w3",
+        "kind": "session",
+        "name": "Helper w3"
+      },
+      "id": "w3:conflict:1",
+      "kind": "conflict",
+      "target": {
+        "id": "w3",
+        "kind": "session"
+      },
+      "text": "1 个文件和主分支冲突",
+      "who": "Helper w3",
+      "words": {
+        "body": "1 个文件和主分支冲突",
+        "label": "合不进去",
+        "title": "Helper w3 的活合进主分支会冲突",
+        "tray": "Helper w3 的活会冲突"
       }
-     ]
-    }
-   },
-   {
-    "id": "i7",
-    "number": 7,
-    "title": "Issue 7",
-    "description": "",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
     },
-    "assignments": [
-     {
-      "id": "a7",
-      "issue": "i7",
-      "agent": "lab",
-      "assignedAt": 1794499580000,
-      "executions": []
-     }
-    ],
-    "priority": "high",
-    "rank": 1024,
-    "createdAt": 1794484460000,
-    "blockedBy": [],
-    "status": "backlog",
-    "moves": [
-     "todo",
-     "canceled"
-    ],
-    "deliver": "change",
-    "findings": [],
-    "questions": [],
-    "criteria": [],
-    "checks": [],
-    "stage": {
-     "state": "draft",
-     "since": 1794484460000,
-     "lead": "start",
-     "acts": [
-      {
-       "act": "start",
-       "does": "move",
-       "status": "todo",
-       "words": "none"
+    {
+      "at": 1794500120000,
+      "from": {
+        "agent": "lab",
+        "id": "w2",
+        "kind": "session",
+        "name": "Helper w2"
       },
-      {
-       "act": "close",
-       "does": "move",
-       "status": "canceled",
-       "words": "none"
+      "id": "w2:ask:1",
+      "kind": "ask",
+      "target": {
+        "id": "w2",
+        "kind": "session"
+      },
+      "text": "Which port?",
+      "who": "Helper w2",
+      "words": {
+        "body": "Which port?",
+        "label": "有问题问你",
+        "title": "Helper w2 有问题问你",
+        "tray": ""
       }
-     ]
     }
-   },
-   {
-    "id": "i1",
-    "number": 1,
-    "title": "Issue 1",
-    "description": "Fix the login",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
-    },
-    "assignments": [
-     {
-      "id": "a1",
-      "issue": "i1",
-      "agent": "lab",
-      "assignedAt": 1794499940000,
-      "executions": [
-       {
-        "kind": "worker",
-        "session": "w1",
-        "startedAt": 1794500000000
-       }
-      ]
-     }
-    ],
-    "priority": "high",
-    "createdAt": 1794497780000,
-    "blockedBy": [],
-    "status": "in_progress",
-    "moves": [
-     "canceled"
-    ],
-    "deliver": "change",
-    "findings": [],
-    "questions": [],
-    "criteria": [
-     "logs in"
-    ],
-    "checks": [],
-    "stage": {
-     "state": "working",
-     "since": 1794500000000,
-     "acts": [
-      {
-       "act": "tell",
-       "does": "say"
-      },
-      {
-       "act": "stop",
-       "does": "stop"
-      },
-      {
-       "act": "close",
-       "does": "move",
-       "status": "canceled",
-       "words": "none"
-      }
-     ]
-    }
-   },
-   {
-    "id": "i2",
-    "number": 2,
-    "title": "Issue 2",
-    "description": "",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
-    },
-    "assignments": [
-     {
-      "id": "a2",
-      "issue": "i2",
-      "agent": "lab",
-      "assignedAt": 1794499880000,
-      "executions": [
-       {
-        "kind": "worker",
-        "session": "w2",
-        "startedAt": 1794500000000
-       }
-      ]
-     }
-    ],
-    "priority": "medium",
-    "createdAt": 1794495560000,
-    "blockedBy": [],
-    "status": "in_progress",
-    "moves": [
-     "todo",
-     "canceled"
-    ],
-    "deliver": "change",
-    "findings": [],
-    "questions": [
-     {
-      "question": "Which port?",
-      "options": [
-       "8080",
-       "9090"
-      ]
-     }
-    ],
-    "criteria": [],
-    "checks": [],
-    "stage": {
-     "state": "asking",
-     "since": 1794500120000,
-     "lead": "answer",
-     "acts": [
-      {
-       "act": "answer",
-       "does": "say"
-      },
-      {
-       "act": "close",
-       "does": "move",
-       "status": "canceled",
-       "words": "none"
-      }
-     ]
-    }
-   },
-   {
-    "id": "i3",
-    "number": 3,
-    "title": "Issue 3",
-    "description": "",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
-    },
-    "conflict": {
-     "base": "main",
-     "files": [
-      "a.ts"
-     ]
-    },
-    "assignments": [
-     {
-      "id": "a3",
-      "issue": "i3",
-      "agent": "lab",
-      "assignedAt": 1794499820000,
-      "executions": [
-       {
-        "kind": "worker",
-        "session": "w3",
-        "startedAt": 1794500000000
-       }
-      ]
-     }
-    ],
-    "priority": "high",
-    "createdAt": 1794493340000,
-    "blockedBy": [],
-    "status": "in_review",
-    "moves": [
-     "todo",
-     "done",
-     "canceled"
-    ],
-    "deliver": "change",
-    "findings": [],
-    "questions": [],
-    "criteria": [],
-    "checks": [],
-    "stage": {
-     "state": "stuck",
-     "since": 1794500180000,
-     "stuck": "conflict",
-     "lead": "resolve",
-     "acts": [
-      {
-       "act": "resolve",
-       "does": "move",
-       "status": "todo",
-       "words": "none"
-      },
-      {
-       "act": "tell",
-       "does": "say"
-      },
-      {
-       "act": "close",
-       "does": "move",
-       "status": "canceled",
-       "words": "none"
-      }
-     ]
-    }
-   },
-   {
-    "id": "i4",
-    "number": 4,
-    "title": "Issue 4",
-    "description": "",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
-    },
-    "assignments": [
-     {
-      "id": "a4",
-      "issue": "i4",
-      "agent": "lab",
-      "assignedAt": 1794499760000,
-      "executions": [
-       {
-        "kind": "worker",
-        "session": "w4",
-        "startedAt": 1794500000000
-       }
-      ]
-     }
-    ],
-    "priority": "medium",
-    "createdAt": 1794491120000,
-    "blockedBy": [],
-    "status": "in_review",
-    "moves": [
-     "todo",
-     "done",
-     "canceled"
-    ],
-    "deliver": "answer",
-    "findings": [],
-    "questions": [],
-    "criteria": [],
-    "checks": [],
-    "stage": {
-     "state": "reviewing",
-     "since": 1794500240000,
-     "lead": "acknowledge",
-     "acts": [
-      {
-       "act": "acknowledge",
-       "does": "move",
-       "status": "done",
-       "words": "none"
-      },
-      {
-       "act": "reject",
-       "does": "move",
-       "status": "todo",
-       "words": "required"
-      },
-      {
-       "act": "tell",
-       "does": "say"
-      },
-      {
-       "act": "close",
-       "does": "move",
-       "status": "canceled",
-       "words": "none"
-      }
-     ]
-    }
-   },
-   {
-    "id": "i5",
-    "number": 5,
-    "title": "Issue 5",
-    "description": "",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
-    },
-    "repo": "demo",
-    "assignments": [
-     {
-      "id": "a5",
-      "issue": "i5",
-      "agent": "lab",
-      "assignedAt": 1794499700000,
-      "executions": [
-       {
-        "kind": "worker",
-        "session": "w5",
-        "startedAt": 1794500000000
-       }
-      ]
-     }
-    ],
-    "priority": "high",
-    "createdAt": 1794488900000,
-    "blockedBy": [],
-    "status": "in_progress",
-    "moves": [
-     "canceled"
-    ],
-    "deliver": "change",
-    "findings": [],
-    "questions": [],
-    "criteria": [],
-    "checks": [],
-    "stage": {
-     "state": "stuck",
-     "since": 1794500300000,
-     "stuck": "quiet",
-     "lead": "stop",
-     "acts": [
-      {
-       "act": "stop",
-       "does": "stop"
-      },
-      {
-       "act": "tell",
-       "does": "say"
-      },
-      {
-       "act": "close",
-       "does": "move",
-       "status": "canceled",
-       "words": "none"
-      }
-     ]
-    }
-   },
-   {
-    "constraints": {
-     "check": "sh check.sh",
-     "scope": [
-      "check.sh"
-     ],
-     "acceptance": true,
-     "frozen": []
-    },
-    "id": "i6",
-    "number": 6,
-    "title": "Issue 6",
-    "description": "",
-    "mandate": {
-     "strength": "explicit",
-     "maxBotReviewRounds": 3,
-     "autoSubmitPr": false
-    },
-    "assignments": [
-     {
-      "id": "a6",
-      "issue": "i6",
-      "agent": "lab",
-      "assignedAt": 1794499640000,
-      "executions": [
-       {
-        "kind": "worker",
-        "session": "w6",
-        "startedAt": 1794500000000
-       }
-      ]
-     }
-    ],
-    "priority": "medium",
-    "createdAt": 1794486680000,
-    "blockedBy": [],
-    "status": "in_progress",
-    "moves": [
-     "todo",
-     "canceled"
-    ],
-    "deliver": "change",
-    "findings": [],
-    "questions": [],
-    "criteria": [],
-    "checks": [],
-    "stage": {
-     "state": "stuck",
-     "since": 1794500300000,
-     "stuck": "failed",
-     "lead": "cure",
-     "acts": [
-      {
-       "act": "cure",
-       "does": "move",
-       "status": "todo",
-       "words": "none"
-      },
-      {
-       "act": "tell",
-       "does": "say"
-      },
-      {
-       "act": "close",
-       "does": "move",
-       "status": "canceled",
-       "words": "none"
-      }
-     ]
-    }
-   }
   ],
-  "connectors": [],
-  "machines": [],
-  "sessions": [
-   {
-    "id": "w1",
-    "role": "worker",
-    "name": "Helper w1",
-    "agent": "lab",
-    "runtime": "claude",
-    "brief": "work on i1",
-    "repo": "demo",
-    "branch": "vibevalley/issue-1",
-    "worktree": "/tmp/worktrees/demo.1",
-    "hiredAt": 1794500000000,
-    "runs": 0,
-    "issue": "i1",
-    "refining": false,
-    "phase": {
-     "_tag": "working",
-     "since": 1794500000000,
-     "doing": {
-      "action": "run_command",
-      "label": "vp test",
-      "actionText": "跑命令"
-     }
-    },
-    "phaseText": "在跑命令：vp test"
-   },
-   {
-    "id": "w2",
-    "role": "worker",
-    "name": "Helper w2",
-    "agent": "lab",
-    "runtime": "claude",
-    "brief": "work on i2",
-    "repo": "demo",
-    "branch": "vibevalley/issue-2",
-    "worktree": "/tmp/worktrees/demo.2",
-    "hiredAt": 1794500000000,
-    "runs": 1,
-    "lastRun": {
-     "outcome": "completed",
-     "summary": "Asked about the port",
-     "at": 1794500120000
-    },
-    "issue": "i2",
-    "refining": false,
-    "phase": {
-     "_tag": "done"
-    },
-    "phaseText": "这一轮做完了，等你看"
-   },
-   {
-    "id": "w3",
-    "role": "worker",
-    "name": "Helper w3",
-    "agent": "lab",
-    "runtime": "claude",
-    "brief": "work on i3",
-    "repo": "demo",
-    "branch": "vibevalley/issue-3",
-    "worktree": "/tmp/worktrees/demo.3",
-    "hiredAt": 1794500000000,
-    "runs": 1,
-    "lastRun": {
-     "outcome": "completed",
-     "summary": "Done; conflicts",
-     "at": 1794500180000
-    },
-    "issue": "i3",
-    "refining": false,
-    "phase": {
-     "_tag": "done"
-    },
-    "phaseText": "这一轮做完了，等你看，合进 main 会冲突（a.ts）"
-   },
-   {
-    "id": "w4",
-    "role": "worker",
-    "name": "Helper w4",
-    "agent": "lab",
-    "runtime": "claude",
-    "brief": "work on i4",
-    "repo": "demo",
-    "branch": "vibevalley/issue-4",
-    "worktree": "/tmp/worktrees/demo.4",
-    "hiredAt": 1794500000000,
-    "runs": 2,
-    "lastRun": {
-     "outcome": "completed",
-     "summary": "Found it",
-     "at": 1794500240000,
-     "spent": {
-      "tokens": 1200,
-      "cny": 0.37
-     },
-     "answer": {
-      "conclusion": "It is 42.",
-      "evidence": [
-       "a.ts:1"
-      ],
-      "unsure": [],
-      "next": [
-       "ship"
-      ]
-     }
-    },
-    "issue": "i4",
-    "refining": false,
-    "phase": {
-     "_tag": "done"
-    },
-    "phaseText": "这一轮做完了，等你看"
-   },
-   {
-    "id": "w5",
-    "role": "worker",
-    "name": "Helper w5",
-    "agent": "lab",
-    "runtime": "claude",
-    "brief": "work on i5",
-    "repo": "demo",
-    "branch": "vibevalley/issue-5",
-    "worktree": "/tmp/worktrees/demo.5",
-    "hiredAt": 1794500000000,
-    "runs": 0,
-    "issue": "i5",
-    "refining": false,
-    "phase": {
-     "_tag": "working",
-     "since": 1794500000000,
-     "quietSince": 1794500300000,
-     "retry": {
-      "attempt": 1,
-      "of": 3
-     },
-     "doing": {
-      "action": "run_command",
-      "label": "vp test",
-      "actionText": "跑命令"
-     }
-    },
-    "phaseText": "在跑命令：vp test（已经 {span}没动静了）"
-   },
-   {
-    "id": "w6",
-    "role": "worker",
-    "name": "Helper w6",
-    "agent": "lab",
-    "runtime": "claude",
-    "brief": "work on i6",
-    "repo": "demo",
-    "branch": "vibevalley/issue-6",
-    "worktree": "/tmp/worktrees/demo.6",
-    "hiredAt": 1794500000000,
-    "runs": 1,
-    "lastRun": {
-     "outcome": "failed",
-     "summary": "Build broke",
-     "at": 1794500300000
-    },
-    "issue": "i6",
-    "refining": false,
-    "phase": {
-     "_tag": "failed"
-    },
-    "phaseText": "这一轮没做成"
-   }
-  ],
-  "crons": []
- },
- "inbox": [
-  {
-   "id": "w5:quiet:1794500300000",
-   "kind": "quiet",
-   "from": {
-    "kind": "session",
-    "id": "w5",
-    "name": "Helper w5",
-    "agent": "lab"
-   },
-   "who": "Helper w5",
-   "text": "work on i5",
-   "at": 1794500300000,
-   "target": {
-    "kind": "session",
-    "id": "w5"
-   },
-   "words": {
-    "label": "好久没动静",
-    "title": "Helper w5 好一阵没动静了",
-    "body": "可能在跑很久的命令，也可能卡住了：看看它的轨迹。",
-    "tray": "Helper w5 好一阵没动静"
-   }
+  "seq": 7,
+  "state": {
+    "call": "idle",
+    "callReason": "",
+    "connectors": [],
+    "crons": [],
+    "issues": [
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499340000,
+            "executions": [],
+            "id": "a11",
+            "issue": "i11"
+          }
+        ],
+        "blockedBy": [],
+        "checks": [],
+        "createdAt": 1794475580000,
+        "criteria": [],
+        "deliver": "change",
+        "description": "",
+        "findings": [],
+        "id": "i11",
+        "lastRun": {
+          "endedAt": 1794500060000,
+          "outcome": "completed",
+          "startedAt": 1794500000000
+        },
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "todo",
+          "done",
+          "canceled"
+        ],
+        "number": 11,
+        "priority": "high",
+        "questions": [],
+        "stage": {
+          "acts": [
+            {
+              "act": "complete",
+              "does": "move",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ],
+          "lead": "complete",
+          "since": 1794500060000,
+          "state": "reviewing"
+        },
+        "status": "in_review",
+        "title": "Issue 11"
+      },
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499400000,
+            "executions": [],
+            "id": "a10",
+            "issue": "i10"
+          }
+        ],
+        "blockedBy": [],
+        "canceled": "dismissed",
+        "checks": [],
+        "closedAt": 1794500000000,
+        "createdAt": 1794477800000,
+        "criteria": [],
+        "deliver": "change",
+        "description": "",
+        "findings": [],
+        "id": "i10",
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "backlog"
+        ],
+        "number": 10,
+        "priority": "medium",
+        "questions": [],
+        "stage": {
+          "acts": [
+            {
+              "act": "reopen",
+              "does": "move",
+              "status": "backlog",
+              "words": "none"
+            }
+          ],
+          "lead": "reopen",
+          "since": 1794500000000,
+          "state": "canceled"
+        },
+        "status": "canceled",
+        "title": "Issue 10"
+      },
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499460000,
+            "executions": [],
+            "id": "a9",
+            "issue": "i9"
+          }
+        ],
+        "blockedBy": [],
+        "checks": [],
+        "closedAt": 1794500000000,
+        "createdAt": 1794480020000,
+        "criteria": [],
+        "deliver": "change",
+        "delivered": "merged",
+        "description": "",
+        "findings": [],
+        "id": "i9",
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "backlog"
+        ],
+        "number": 9,
+        "priority": "high",
+        "questions": [],
+        "stage": {
+          "acts": [
+            {
+              "act": "reopen",
+              "does": "move",
+              "status": "backlog",
+              "words": "none"
+            }
+          ],
+          "since": 1794500000000,
+          "state": "done"
+        },
+        "status": "done",
+        "title": "Issue 9"
+      },
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499520000,
+            "executions": [],
+            "id": "a8",
+            "issue": "i8"
+          }
+        ],
+        "blockedBy": [],
+        "checks": [],
+        "createdAt": 1794482240000,
+        "criteria": [],
+        "deliver": "change",
+        "description": "",
+        "findings": [],
+        "id": "i8",
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "backlog",
+          "canceled"
+        ],
+        "number": 8,
+        "priority": "medium",
+        "questions": [],
+        "queuedAt": 1794500000000,
+        "stage": {
+          "acts": [
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ],
+          "since": 1794500000000,
+          "state": "queued"
+        },
+        "status": "todo",
+        "title": "Issue 8"
+      },
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499580000,
+            "executions": [],
+            "id": "a7",
+            "issue": "i7"
+          }
+        ],
+        "blockedBy": [],
+        "checks": [],
+        "createdAt": 1794484460000,
+        "criteria": [],
+        "deliver": "change",
+        "description": "",
+        "findings": [],
+        "id": "i7",
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "todo",
+          "canceled"
+        ],
+        "number": 7,
+        "priority": "high",
+        "questions": [],
+        "rank": 1024,
+        "stage": {
+          "acts": [
+            {
+              "act": "start",
+              "does": "move",
+              "status": "todo",
+              "words": "none"
+            },
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ],
+          "lead": "start",
+          "since": 1794484460000,
+          "state": "draft"
+        },
+        "status": "backlog",
+        "title": "Issue 7"
+      },
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499940000,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w1",
+                "startedAt": 1794500000000
+              }
+            ],
+            "id": "a1",
+            "issue": "i1"
+          }
+        ],
+        "blockedBy": [],
+        "checks": [],
+        "createdAt": 1794497780000,
+        "criteria": [
+          "logs in"
+        ],
+        "deliver": "change",
+        "description": "Fix the login",
+        "findings": [],
+        "id": "i1",
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "canceled"
+        ],
+        "number": 1,
+        "priority": "high",
+        "questions": [],
+        "stage": {
+          "acts": [
+            {
+              "act": "tell",
+              "does": "say"
+            },
+            {
+              "act": "stop",
+              "does": "stop"
+            },
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ],
+          "since": 1794500000000,
+          "state": "working"
+        },
+        "status": "in_progress",
+        "title": "Issue 1"
+      },
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499880000,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w2",
+                "startedAt": 1794500000000
+              }
+            ],
+            "id": "a2",
+            "issue": "i2"
+          }
+        ],
+        "blockedBy": [],
+        "checks": [],
+        "createdAt": 1794495560000,
+        "criteria": [],
+        "deliver": "change",
+        "description": "",
+        "findings": [],
+        "id": "i2",
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "todo",
+          "canceled"
+        ],
+        "number": 2,
+        "priority": "medium",
+        "questions": [
+          {
+            "options": [
+              "8080",
+              "9090"
+            ],
+            "question": "Which port?"
+          }
+        ],
+        "stage": {
+          "acts": [
+            {
+              "act": "answer",
+              "does": "say"
+            },
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ],
+          "lead": "answer",
+          "since": 1794500120000,
+          "state": "asking"
+        },
+        "status": "in_progress",
+        "title": "Issue 2"
+      },
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499820000,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w3",
+                "startedAt": 1794500000000
+              }
+            ],
+            "id": "a3",
+            "issue": "i3"
+          }
+        ],
+        "blockedBy": [],
+        "checks": [],
+        "conflict": {
+          "base": "main",
+          "files": [
+            "a.ts"
+          ]
+        },
+        "createdAt": 1794493340000,
+        "criteria": [],
+        "deliver": "change",
+        "description": "",
+        "findings": [],
+        "id": "i3",
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "todo",
+          "done",
+          "canceled"
+        ],
+        "number": 3,
+        "priority": "high",
+        "questions": [],
+        "stage": {
+          "acts": [
+            {
+              "act": "resolve",
+              "does": "move",
+              "status": "todo",
+              "words": "none"
+            },
+            {
+              "act": "tell",
+              "does": "say"
+            },
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ],
+          "lead": "resolve",
+          "since": 1794500180000,
+          "state": "stuck",
+          "stuck": "conflict"
+        },
+        "status": "in_review",
+        "title": "Issue 3"
+      },
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499760000,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w4",
+                "startedAt": 1794500000000
+              }
+            ],
+            "id": "a4",
+            "issue": "i4"
+          }
+        ],
+        "blockedBy": [],
+        "checks": [],
+        "createdAt": 1794491120000,
+        "criteria": [],
+        "deliver": "answer",
+        "description": "",
+        "findings": [],
+        "id": "i4",
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "todo",
+          "done",
+          "canceled"
+        ],
+        "number": 4,
+        "priority": "medium",
+        "questions": [],
+        "stage": {
+          "acts": [
+            {
+              "act": "acknowledge",
+              "does": "move",
+              "status": "done",
+              "words": "none"
+            },
+            {
+              "act": "reject",
+              "does": "move",
+              "status": "todo",
+              "words": "required"
+            },
+            {
+              "act": "tell",
+              "does": "say"
+            },
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ],
+          "lead": "acknowledge",
+          "since": 1794500240000,
+          "state": "reviewing"
+        },
+        "status": "in_review",
+        "title": "Issue 4"
+      },
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499700000,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w5",
+                "startedAt": 1794500000000
+              }
+            ],
+            "id": "a5",
+            "issue": "i5"
+          }
+        ],
+        "blockedBy": [],
+        "checks": [],
+        "createdAt": 1794488900000,
+        "criteria": [],
+        "deliver": "change",
+        "description": "",
+        "findings": [],
+        "id": "i5",
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "canceled"
+        ],
+        "number": 5,
+        "priority": "high",
+        "questions": [],
+        "repo": "demo",
+        "stage": {
+          "acts": [
+            {
+              "act": "stop",
+              "does": "stop"
+            },
+            {
+              "act": "tell",
+              "does": "say"
+            },
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ],
+          "lead": "stop",
+          "since": 1794500300000,
+          "state": "stuck",
+          "stuck": "quiet"
+        },
+        "status": "in_progress",
+        "title": "Issue 5"
+      },
+      {
+        "assignments": [
+          {
+            "agent": "lab",
+            "assignedAt": 1794499640000,
+            "executions": [
+              {
+                "kind": "worker",
+                "session": "w6",
+                "startedAt": 1794500000000
+              }
+            ],
+            "id": "a6",
+            "issue": "i6"
+          }
+        ],
+        "blockedBy": [],
+        "checks": [],
+        "constraints": {
+          "acceptance": true,
+          "check": "sh check.sh",
+          "frozen": [],
+          "scope": [
+            "check.sh"
+          ]
+        },
+        "createdAt": 1794486680000,
+        "criteria": [],
+        "deliver": "change",
+        "description": "",
+        "findings": [],
+        "id": "i6",
+        "mandate": {
+          "autoSubmitPr": false,
+          "maxBotReviewRounds": 3,
+          "strength": "explicit"
+        },
+        "moves": [
+          "todo",
+          "canceled"
+        ],
+        "number": 6,
+        "priority": "medium",
+        "questions": [],
+        "stage": {
+          "acts": [
+            {
+              "act": "cure",
+              "does": "move",
+              "status": "todo",
+              "words": "none"
+            },
+            {
+              "act": "tell",
+              "does": "say"
+            },
+            {
+              "act": "close",
+              "does": "move",
+              "status": "canceled",
+              "words": "none"
+            }
+          ],
+          "lead": "cure",
+          "since": 1794500300000,
+          "state": "stuck",
+          "stuck": "failed"
+        },
+        "status": "in_progress",
+        "title": "Issue 6"
+      }
+    ],
+    "machines": [],
+    "sessions": [
+      {
+        "bindings": [
+          {
+            "id": "i1",
+            "kind": "issue"
+          }
+        ],
+        "brief": "work on i1",
+        "controller": "issueBoard",
+        "cwd": "/tmp/worktrees/demo.1",
+        "hiredAt": 1794500000000,
+        "id": "w1",
+        "name": "Helper w1",
+        "phase": {
+          "_tag": "working",
+          "doing": {
+            "action": "run_command",
+            "actionText": "跑命令",
+            "label": "vp test"
+          },
+          "since": 1794500000000
+        },
+        "phaseText": "在跑命令：vp test",
+        "policy": {
+          "branch": "vibevalley/issue-1",
+          "kind": "managedWorktree",
+          "repo": "demo"
+        },
+        "profile": "lab",
+        "role": "worker",
+        "runs": 0,
+        "runtime": "claude"
+      },
+      {
+        "bindings": [
+          {
+            "id": "i2",
+            "kind": "issue"
+          }
+        ],
+        "brief": "work on i2",
+        "controller": "issueBoard",
+        "cwd": "/tmp/worktrees/demo.2",
+        "hiredAt": 1794500000000,
+        "id": "w2",
+        "lastRun": {
+          "at": 1794500120000,
+          "outcome": "completed",
+          "summary": "Asked about the port"
+        },
+        "name": "Helper w2",
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看",
+        "policy": {
+          "branch": "vibevalley/issue-2",
+          "kind": "managedWorktree",
+          "repo": "demo"
+        },
+        "profile": "lab",
+        "role": "worker",
+        "runs": 1,
+        "runtime": "claude"
+      },
+      {
+        "bindings": [
+          {
+            "id": "i3",
+            "kind": "issue"
+          }
+        ],
+        "brief": "work on i3",
+        "controller": "issueBoard",
+        "cwd": "/tmp/worktrees/demo.3",
+        "hiredAt": 1794500000000,
+        "id": "w3",
+        "lastRun": {
+          "at": 1794500180000,
+          "outcome": "completed",
+          "summary": "Done; conflicts"
+        },
+        "name": "Helper w3",
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看，合进 main 会冲突（a.ts）",
+        "policy": {
+          "branch": "vibevalley/issue-3",
+          "kind": "managedWorktree",
+          "repo": "demo"
+        },
+        "profile": "lab",
+        "role": "worker",
+        "runs": 1,
+        "runtime": "claude"
+      },
+      {
+        "bindings": [
+          {
+            "id": "i4",
+            "kind": "issue"
+          }
+        ],
+        "brief": "work on i4",
+        "controller": "issueBoard",
+        "cwd": "/tmp/worktrees/demo.4",
+        "hiredAt": 1794500000000,
+        "id": "w4",
+        "lastRun": {
+          "answer": {
+            "conclusion": "It is 42.",
+            "evidence": [
+              "a.ts:1"
+            ],
+            "next": [
+              "ship"
+            ],
+            "unsure": []
+          },
+          "at": 1794500240000,
+          "outcome": "completed",
+          "spent": {
+            "cny": 0.37,
+            "tokens": 1200
+          },
+          "summary": "Found it"
+        },
+        "name": "Helper w4",
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看",
+        "policy": {
+          "branch": "vibevalley/issue-4",
+          "kind": "managedWorktree",
+          "repo": "demo"
+        },
+        "profile": "lab",
+        "role": "worker",
+        "runs": 2,
+        "runtime": "claude"
+      },
+      {
+        "bindings": [
+          {
+            "id": "i5",
+            "kind": "issue"
+          }
+        ],
+        "brief": "work on i5",
+        "controller": "issueBoard",
+        "cwd": "/tmp/worktrees/demo.5",
+        "hiredAt": 1794500000000,
+        "id": "w5",
+        "name": "Helper w5",
+        "phase": {
+          "_tag": "working",
+          "doing": {
+            "action": "run_command",
+            "actionText": "跑命令",
+            "label": "vp test"
+          },
+          "quietSince": 1794500300000,
+          "retry": {
+            "attempt": 1,
+            "of": 3
+          },
+          "since": 1794500000000
+        },
+        "phaseText": "在跑命令：vp test（已经 {span}没动静了）",
+        "policy": {
+          "branch": "vibevalley/issue-5",
+          "kind": "managedWorktree",
+          "repo": "demo"
+        },
+        "profile": "lab",
+        "role": "worker",
+        "runs": 0,
+        "runtime": "claude"
+      },
+      {
+        "bindings": [
+          {
+            "id": "i6",
+            "kind": "issue"
+          }
+        ],
+        "brief": "work on i6",
+        "controller": "issueBoard",
+        "cwd": "/tmp/worktrees/demo.6",
+        "hiredAt": 1794500000000,
+        "id": "w6",
+        "lastRun": {
+          "at": 1794500300000,
+          "outcome": "failed",
+          "summary": "Build broke"
+        },
+        "name": "Helper w6",
+        "phase": {
+          "_tag": "failed"
+        },
+        "phaseText": "这一轮没做成",
+        "policy": {
+          "branch": "vibevalley/issue-6",
+          "kind": "managedWorktree",
+          "repo": "demo"
+        },
+        "profile": "lab",
+        "role": "worker",
+        "runs": 1,
+        "runtime": "claude"
+      }
+    ]
   },
-  {
-   "id": "w6:fix:1",
-   "kind": "fix",
-   "from": {
-    "kind": "session",
-    "id": "w6",
-    "name": "Helper w6",
-    "agent": "lab"
-   },
-   "who": "Helper w6",
-   "text": "Build broke",
-   "at": 1794500300000,
-   "target": {
-    "kind": "session",
-    "id": "w6"
-   },
-   "words": {
-    "label": "活没做成",
-    "title": "Helper w6 没做成",
-    "body": "Build broke",
-    "tray": "Helper w6 没做成"
-   }
-  },
-  {
-   "id": "w4:review:2",
-   "kind": "review",
-   "from": {
-    "kind": "session",
-    "id": "w4",
-    "name": "Helper w4",
-    "agent": "lab"
-   },
-   "who": "Helper w4",
-   "text": "Found it",
-   "at": 1794500240000,
-   "target": {
-    "kind": "session",
-    "id": "w4"
-   },
-   "words": {
-    "label": "等你看",
-    "title": "Helper w4 做完了",
-    "body": "Found it",
-    "tray": "Helper w4 做完了，等你看"
-   }
-  },
-  {
-   "id": "w3:conflict:1",
-   "kind": "conflict",
-   "from": {
-    "kind": "session",
-    "id": "w3",
-    "name": "Helper w3",
-    "agent": "lab"
-   },
-   "who": "Helper w3",
-   "text": "1 个文件和主分支冲突",
-   "at": 1794500180000,
-   "target": {
-    "kind": "session",
-    "id": "w3"
-   },
-   "words": {
-    "label": "合不进去",
-    "title": "Helper w3 的活合进主分支会冲突",
-    "body": "1 个文件和主分支冲突",
-    "tray": "Helper w3 的活会冲突"
-   }
-  },
-  {
-   "id": "w2:ask:1",
-   "kind": "ask",
-   "from": {
-    "kind": "session",
-    "id": "w2",
-    "name": "Helper w2",
-    "agent": "lab"
-   },
-   "who": "Helper w2",
-   "text": "Which port?",
-   "at": 1794500120000,
-   "target": {
-    "kind": "session",
-    "id": "w2"
-   },
-   "words": {
-    "label": "有问题问你",
-    "title": "Helper w2 有问题问你",
-    "body": "Which port?",
-    "tray": ""
-   }
+  "view": {
+    "achievements": [
+      {
+        "count": 0,
+        "id": "s_open",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "s_hire",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "s_tell",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "s_review",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "s_voice",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "s_split",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "s_call",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "harvests",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "first_try",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "big_graph",
+        "next": 3,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "farm_level",
+        "next": 5,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "steady",
+        "next": 5,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "untangle",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "comeback",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "thrifty",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "every_machine",
+        "next": 2,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "handoff",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "parallel_graph",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "night_owl",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "weekend",
+        "next": 1,
+        "tier": 0
+      },
+      {
+        "count": 0,
+        "id": "full_house",
+        "next": 1,
+        "tier": 0
+      }
+    ],
+    "level": {
+      "level": 1,
+      "need": 10,
+      "xp": 0
+    },
+    "plays": {
+      "w1": {
+        "commands": [],
+        "counts": {},
+        "files": [],
+        "history": [],
+        "station": 0,
+        "toolsThisRun": 0
+      },
+      "w2": {
+        "commands": [],
+        "counts": {},
+        "files": [],
+        "history": [],
+        "station": 1,
+        "toolsThisRun": 0
+      },
+      "w3": {
+        "commands": [],
+        "counts": {},
+        "files": [],
+        "history": [],
+        "station": 2,
+        "toolsThisRun": 0
+      },
+      "w4": {
+        "commands": [],
+        "counts": {},
+        "files": [],
+        "history": [],
+        "station": 3,
+        "toolsThisRun": 0
+      },
+      "w5": {
+        "commands": [],
+        "counts": {},
+        "files": [],
+        "history": [],
+        "station": 4,
+        "toolsThisRun": 0
+      },
+      "w6": {
+        "commands": [],
+        "counts": {},
+        "files": [],
+        "history": [],
+        "station": 5,
+        "toolsThisRun": 0
+      }
+    },
+    "plots": {
+      "i1": {
+        "crop": "sprout"
+      },
+      "i2": {
+        "badge": {
+          "text": "等你回答",
+          "tone": "wait"
+        },
+        "crop": "dry"
+      },
+      "i3": {
+        "badge": {
+          "text": "有冲突",
+          "tone": "bug"
+        },
+        "crop": "withered"
+      },
+      "i4": {
+        "badge": {
+          "text": "等你验收",
+          "tone": "wait"
+        },
+        "crop": "flowering"
+      },
+      "i5": {
+        "badge": {
+          "text": "没动静",
+          "tone": "stuck"
+        },
+        "crop": "dry"
+      },
+      "i6": {
+        "badge": {
+          "text": "有虫",
+          "tone": "bug"
+        },
+        "crop": "withered"
+      }
+    }
   }
- ],
- "view": {
-  "level": {
-   "level": 1,
-   "xp": 0,
-   "need": 10
-  },
-  "plots": {
-   "i1": {
-    "crop": "sprout"
-   },
-   "i2": {
-    "crop": "dry",
-    "badge": {
-     "text": "等你回答",
-     "tone": "wait"
-    }
-   },
-   "i3": {
-    "crop": "withered",
-    "badge": {
-     "text": "有冲突",
-     "tone": "bug"
-    }
-   },
-   "i4": {
-    "crop": "flowering",
-    "badge": {
-     "text": "等你验收",
-     "tone": "wait"
-    }
-   },
-   "i5": {
-    "crop": "dry",
-    "badge": {
-     "text": "没动静",
-     "tone": "stuck"
-    }
-   },
-   "i6": {
-    "crop": "withered",
-    "badge": {
-     "text": "有虫",
-     "tone": "bug"
-    }
-   }
-  },
-  "plays": {
-   "w1": {
-    "station": 0,
-    "toolsThisRun": 0,
-    "counts": {},
-    "files": [],
-    "commands": [],
-    "history": []
-   },
-   "w2": {
-    "station": 1,
-    "toolsThisRun": 0,
-    "counts": {},
-    "files": [],
-    "commands": [],
-    "history": []
-   },
-   "w3": {
-    "station": 2,
-    "toolsThisRun": 0,
-    "counts": {},
-    "files": [],
-    "commands": [],
-    "history": []
-   },
-   "w4": {
-    "station": 3,
-    "toolsThisRun": 0,
-    "counts": {},
-    "files": [],
-    "commands": [],
-    "history": []
-   },
-   "w5": {
-    "station": 4,
-    "toolsThisRun": 0,
-    "counts": {},
-    "files": [],
-    "commands": [],
-    "history": []
-   },
-   "w6": {
-    "station": 5,
-    "toolsThisRun": 0,
-    "counts": {},
-    "files": [],
-    "commands": [],
-    "history": []
-   }
-  },
-  "achievements": [
-   {
-    "id": "s_open",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "s_hire",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "s_tell",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "s_review",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "s_voice",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "s_split",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "s_call",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "harvests",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "first_try",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "big_graph",
-    "tier": 0,
-    "count": 0,
-    "next": 3
-   },
-   {
-    "id": "farm_level",
-    "tier": 0,
-    "count": 0,
-    "next": 5
-   },
-   {
-    "id": "steady",
-    "tier": 0,
-    "count": 0,
-    "next": 5
-   },
-   {
-    "id": "untangle",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "comeback",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "thrifty",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "every_machine",
-    "tier": 0,
-    "count": 0,
-    "next": 2
-   },
-   {
-    "id": "handoff",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "parallel_graph",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "night_owl",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "weekend",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   },
-   {
-    "id": "full_house",
-    "tier": 0,
-    "count": 0,
-    "next": 1
-   }
-  ]
- },
- "effects": []
 }

@@ -2,11 +2,10 @@
 // page is a hosted view, and the host's calls go
 // through the bridge (ui/bridge.ts hostApi). Without a host (headless
 // tests and stories) it is the plain browser host.
-import { host } from "nsh";
-
 import { CommandLineState, type Host, UpdateState } from "@vibevalley/protocol/host";
 
 import { hostApi, type Envelope } from "./bridge";
+import { hasHostView } from "./hostParams";
 
 const done = async (pending: Promise<Envelope>) => {
   const e = await pending;
@@ -59,5 +58,5 @@ const desktop: Host = {
 const browser: Host = { name: "browser" };
 
 export function currentHost(): Host {
-  return host.available() && host.params.view !== undefined ? desktop : browser;
+  return hasHostView() ? desktop : browser;
 }

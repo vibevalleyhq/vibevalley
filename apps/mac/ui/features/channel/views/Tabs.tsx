@@ -2,6 +2,7 @@ import { effect, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Channel, CronView } from "@vibevalley/protocol";
+import { isFreeUserSession, sessionBranch, sessionChannelId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -19,7 +20,12 @@ export function Sessions(props: { channel: Channel }) {
   const core = useCore();
   const router = useRouter();
   const now = useNow();
-  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : props.channel.default));
+  const sessions = () =>
+    (core()?.sessions ?? []).filter((h) => {
+      if (isFreeUserSession(h)) return false;
+      const channelId = sessionChannelId(h);
+      return channelId ? channelId === props.channel.id : props.channel.default;
+    });
   return (
     <If
       when={sessions().length > 0}
@@ -33,11 +39,11 @@ export function Sessions(props: { channel: Channel }) {
         <Each of={sessions()} key={(h) => h.id}>
           {(h) => {
             const thread = () => sessionThreadOf(core()?.chat, h());
-            const meta = () => [`@${h().id}`, h().repo, h().branch].filter(Boolean).join(" · ");
+            const meta = () => [`@${h().id}`, sessionRepo(h()), sessionBranch(h())].filter(Boolean).join(" · ");
             return (
               <View testID={`channel-session-${h().id}`} class="flex-row items-center gap-3 rounded-lg border border-line bg-page px-3.5 py-3 hover:bg-hover">
                 <View class="relative shrink-0">
-                  <HelperFace agent={h().agent} runtime={h().runtime} size={36} />
+                  <HelperFace agent={sessionProfile(h()) ?? ""} runtime={h().runtime} size={36} />
                   <View class="absolute -right-0.5 -bottom-0.5">
                     <Dot tone={phaseDot(h().phase)} size={7} />
                   </View>

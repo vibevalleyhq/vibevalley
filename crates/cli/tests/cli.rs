@@ -616,7 +616,7 @@ fn issue_watch_and_worker_round_trip() {
         .unwrap()
         .to_string();
     assert!(!srv.run(&["session", "events", &sid]).out.is_empty());
-    assert!(!srv.run(&["session", "events", &sid, "--json"]).json().as_array().unwrap().is_empty());
+    assert!(!srv.run(&["session", "events", &sid, "--json"]).json()["events"].as_array().unwrap().is_empty());
 
     assert_eq!(srv.run(&["issue", "review", &n, "--pass"]).code, 0);
     assert!(srv.run(&["issue", "status", &n, "done"]).out.starts_with(&format!("#{n}  done")));

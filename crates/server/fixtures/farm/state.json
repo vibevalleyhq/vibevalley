@@ -6,13 +6,23 @@
     "sessions": [
       {
         "id": "s-read",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "owl",
-        "agent": "agent-owl",
+        "profile": "agent-owl",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-101",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-101"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-101"
+          }
+        ],
         "hiredAt": 1794499940000,
         "runs": 1,
         "phase": {
@@ -24,19 +34,27 @@
           },
           "since": 1794499940000
         },
-        "issue": "i-101",
-        "refining": false,
         "phaseText": "正在干活"
       },
       {
         "id": "s-cmd",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "bear",
-        "agent": "agent-bear",
+        "profile": "agent-bear",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-102",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-102"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-102"
+          }
+        ],
         "hiredAt": 1794499880000,
         "runs": 1,
         "phase": {
@@ -48,19 +66,27 @@
           },
           "since": 1794499880000
         },
-        "issue": "i-102",
-        "refining": false,
         "phaseText": "正在干活"
       },
       {
         "id": "s-edit",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "fox",
-        "agent": "agent-fox",
+        "profile": "agent-fox",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-103",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-103"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-103"
+          }
+        ],
         "hiredAt": 1794499820000,
         "runs": 1,
         "phase": {
@@ -72,19 +98,27 @@
           },
           "since": 1794499820000
         },
-        "issue": "i-103",
-        "refining": false,
         "phaseText": "正在干活"
       },
       {
         "id": "s-ask",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "cat",
-        "agent": "agent-cat",
+        "profile": "agent-cat",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-104",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-104"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-104"
+          }
+        ],
         "hiredAt": 1794499760000,
         "runs": 1,
         "phase": {
@@ -96,26 +130,32 @@
           },
           "since": 1794499760000
         },
-        "issue": "i-104",
-        "refining": false,
         "phaseText": "正在干活"
       },
       {
         "id": "s-ripe",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "rabbit",
-        "agent": "agent-rabbit",
+        "profile": "agent-rabbit",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-105",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-105"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-105"
+          }
+        ],
         "hiredAt": 1794499700000,
         "runs": 1,
         "phase": {
           "_tag": "done"
         },
-        "issue": "i-105",
-        "refining": false,
         "phaseText": "交回了",
         "lastRun": {
           "outcome": "completed",
@@ -125,20 +165,28 @@
       },
       {
         "id": "s-stuck",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "raccoon",
-        "agent": "agent-raccoon",
+        "profile": "agent-raccoon",
         "runtime": "claude",
         "brief": "",
-        "repo": "notes",
-        "branch": "vv/i-106",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "notes",
+          "branch": "vv/i-106"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-106"
+          }
+        ],
         "hiredAt": 1794499640000,
         "runs": 1,
         "phase": {
           "_tag": "failed"
         },
-        "issue": "i-106",
-        "refining": false,
         "phaseText": "卡住了",
         "lastRun": {
           "outcome": "failed",
@@ -148,13 +196,23 @@
       },
       {
         "id": "s-queue",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "hedgehog",
-        "agent": "agent-hedgehog",
+        "profile": "agent-hedgehog",
         "runtime": "claude",
         "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-107",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-107"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-107"
+          }
+        ],
         "hiredAt": 1794499580000,
         "runs": 1,
         "phase": {
@@ -166,8 +224,6 @@
           },
           "since": 1794499580000
         },
-        "issue": "i-107",
-        "refining": false,
         "phaseText": "正在干活"
       }
     ],

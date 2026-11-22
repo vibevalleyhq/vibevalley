@@ -317,7 +317,7 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
         if issue.status == vibevalley_protocol::IssueStatus::InReview {
             let sid = issue.latest_session_id().unwrap();
             let session = state.sessions.iter().find(|s| s.id == *sid).unwrap();
-            break PathBuf::from(session.worktree.clone().unwrap());
+            break PathBuf::from(session.cwd.clone().unwrap());
         }
         assert!(Instant::now() < deadline, "timed out waiting for InReview");
         std::thread::sleep(Duration::from_millis(20));

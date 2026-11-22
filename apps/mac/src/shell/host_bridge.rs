@@ -79,15 +79,8 @@ impl Shell {
             Action::OpenDiffAdjacent { path, staged } => {
                 self.open_diff_adjacent(path, staged, window, cx);
             }
-            Action::UpdateChatTab {
-                tab_id,
-                session_id,
-                runtime,
-                title,
-                status,
-                attention,
-            } => {
-                self.update_chat_tab(tab_id, session_id, runtime, title, status, attention, cx);
+            Action::BindChatSession { tab_id, session_id, runtime } => {
+                self.bind_chat_session(tab_id, session_id, runtime, cx);
             }
             Action::AddProject => self.add_project(window, cx),
             Action::CloseProject { id } => self.close_project(id, cx),

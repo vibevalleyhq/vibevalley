@@ -12,7 +12,7 @@ use vibevalley_protocol::{
 
 use crate::deps::{DagNode, dag_layers};
 use crate::game::{AchievementDef, achievements, level_for_commits};
-use crate::status::{is_hired, is_on_duty, session_on_issue};
+use crate::status::{is_hired, session_on_issue};
 
 const CHEAP_CNY: f64 = 0.05;
 const FULL_HOUSE: usize = 6;
@@ -268,7 +268,7 @@ fn session_of<'a>(state: &'a SpaceState, id: &str) -> Option<&'a Session> {
 }
 
 fn working(state: &SpaceState) -> usize {
-    state.sessions.iter().filter(|h| is_hired(h.role) && h.phase.is_working()).count()
+    state.sessions.iter().filter(|h| is_hired(h) && h.phase.is_working()).count()
 }
 
 fn family_entry(id: &str, children: &[&Issue]) -> LedgerEntry {
@@ -301,11 +301,11 @@ pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<
     match fact {
         Fact::SessionReported(f) => {
             let h = session_of(after, &f.id).or_else(|| session_of(before, &f.id));
-            if !h.is_some_and(|h| is_on_duty(h.role)) && f.outcome == Outcome::Failed {
+            if h.is_some_and(is_hired) && f.outcome == Outcome::Failed {
                 out.push(LedgerEntry::Failed(LedgerEntryFailed {
                     at: 0,
                     session: f.id.clone(),
-                    agent: h.map(|h| h.agent.clone()).filter(|a| !a.is_empty()),
+                    agent: h.and_then(|h| h.profile.clone()).filter(|a| !a.is_empty()),
                 }));
             }
         }
@@ -315,11 +315,11 @@ pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<
             }
         }
         Fact::SessionChanged(f) => {
-            if is_hired(f.session.role) {
+            if is_hired(&f.session) {
                 out.push(LedgerEntry::Hired(LedgerEntryHired {
                     at: 0,
                     session: f.session.id.clone(),
-                    agent: (!f.session.agent.is_empty()).then(|| f.session.agent.clone()),
+                    agent: f.session.profile.clone().filter(|a| !a.is_empty()),
                 }));
             }
         }
@@ -349,14 +349,15 @@ pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<
         }
         Fact::SessionLeft(f) => {
             if let Some(h) = session_of(before, &f.id)
+                && is_hired(h)
                 && f.closed == Some(SessionClose::Merged)
                 && let Some(commits) = f.merged.filter(|m| *m > 0)
             {
                 out.push(LedgerEntry::Harvested(LedgerEntryHarvested {
                     at: 0,
                     session: f.id.clone(),
-                    agent: (!h.agent.is_empty()).then(|| h.agent.clone()),
-                    repo: h.repo.clone().unwrap_or_default(),
+                    agent: h.profile.clone().filter(|a| !a.is_empty()),
+                    repo: h.repo_name().unwrap_or_default().to_string(),
                     runtime: h.runtime.clone(),
                     commits,
                     cny: h.spent.as_ref().and_then(|s| s.cny),

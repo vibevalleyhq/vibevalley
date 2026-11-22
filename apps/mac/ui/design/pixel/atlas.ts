@@ -4,9 +4,9 @@
 // stand-ins. The PNGs are read as file: URLs (nsh.json capabilities.fs.read).
 // The manifest comes with the views (manifests.ts). SpriteAtlas (the farm's)
 // is not ported: the farm is the app's.
-import { host } from "nsh";
 import { z } from "zod";
 
+import { readHostParams } from "../../infra/hostParams";
 import { defineQuery, ready, useQuery } from "../../infra/query";
 import { transport } from "../../infra/transport";
 
@@ -28,7 +28,7 @@ const pixelDirQuery = defineQuery({
 /** The folder that holds the sprites' PNGs, undefined until the host said (and when it has none). */
 export function usePixelDir(): () => string | undefined {
   const query = useQuery(pixelDirQuery);
-  const paramDir = typeof host.params.pixelDir === "string" ? host.params.pixelDir : undefined;
+  const paramDir = readHostParams().pixelDir;
   return () => ready(query, undefined)?.path ?? paramDir;
 }
 

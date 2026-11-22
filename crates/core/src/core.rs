@@ -11,7 +11,7 @@ use crate::channel::{with_channel, with_message, with_user_mentions};
 use crate::game::{effects_of, empty_play, free_station, play_of, played_doing, played_run, stationed, view_of};
 use crate::inbox::inbox;
 use crate::rules::{farm_of, phase_words};
-use crate::status::{board_summary, is_on_duty, session_of, with_issue, with_issue_statuses};
+use crate::status::{board_summary, is_farm_worker, session_of, with_issue, with_issue_statuses};
 
 /// `emptySpaceState`.
 pub fn empty_space_state() -> SpaceState {
@@ -120,16 +120,24 @@ fn fold(state: &mut SpaceState, f: &Fact) -> (bool, bool) {
         Fact::SessionPhaseChanged(f) => {
             let Some(session) = session_of(state, &f.id) else { return (false, false) };
             if session.phase == f.phase
-                && session.channel == f.channel
+                && session.channel_id() == f.channel.as_deref()
                 && f.spent.as_ref().is_none_or(|s| session.spent.as_ref() == Some(s))
                 && f.brief.as_ref().is_none_or(|b| *b == session.brief)
             {
                 return (false, false);
             }
             let was_working = session.phase.is_working();
+            let track_play = is_farm_worker(session);
             with_session(state, &f.id, |h| {
                 h.phase = f.phase.clone();
-                h.channel = f.channel.clone();
+                match &f.channel {
+                    Some(ch) => {
+                        h.attach_binding(ContextRef::Channel { id: ch.clone() });
+                    }
+                    None => {
+                        h.bindings.retain(|b| !matches!(b, ContextRef::Channel { .. }));
+                    }
+                }
                 if let Some(b) = &f.brief {
                     h.brief = b.clone();
                 }
@@ -137,14 +145,16 @@ fn fold(state: &mut SpaceState, f: &Fact) -> (bool, bool) {
                     h.spent = Some(s.clone());
                 }
             });
-            let plays = state.plays.get_or_insert_with(BTreeMap::new);
-            let before = play_of(Some(plays), &f.id);
-            let play = match &f.phase {
-                Phase::Working(p) if was_working => played_doing(&before, f.at, p.doing.action, &p.doing.label),
-                Phase::Working(_) => played_run(&before, f.at),
-                _ => before,
-            };
-            plays.insert(f.id.clone(), play);
+            if track_play {
+                let plays = state.plays.get_or_insert_with(BTreeMap::new);
+                let before = play_of(Some(plays), &f.id);
+                let play = match &f.phase {
+                    Phase::Working(p) if was_working => played_doing(&before, f.at, p.doing.action, &p.doing.label),
+                    Phase::Working(_) => played_run(&before, f.at),
+                    _ => before,
+                };
+                plays.insert(f.id.clone(), play);
+            }
             (true, true)
         }
         Fact::MessageChanged(f) => changed_only(with_message(&mut state.chat, &f.message)),
@@ -175,7 +185,7 @@ fn fold(state: &mut SpaceState, f: &Fact) -> (bool, bool) {
         Fact::SessionChanged(f) => {
             let was = session_of(state, &f.session.id).is_some();
             state.sessions.retain(|h| h.id != f.session.id);
-            if !is_on_duty(f.session.role) {
+            if is_farm_worker(&f.session) {
                 let play = if was {
                     play_of(state.plays.as_ref(), &f.session.id)
                 } else {
@@ -192,8 +202,8 @@ fn fold(state: &mut SpaceState, f: &Fact) -> (bool, bool) {
             if session_of(state, &f.id).is_none() {
                 return (false, false);
             }
-            let open_pr = |issue: &Option<IssueId>, issues: &[Issue]| {
-                issue.as_ref().is_some_and(|i| {
+            let open_pr = |issue: Option<&str>, issues: &[Issue]| {
+                issue.is_some_and(|i| {
                     issues
                         .iter()
                         .any(|x| x.id == *i && x.pull_request.as_ref().is_some_and(|p| p.state == PullRequestState::Open))
@@ -202,7 +212,7 @@ fn fold(state: &mut SpaceState, f: &Fact) -> (bool, bool) {
             let issues = state.issues.clone();
             with_session(state, &f.id, |x| {
                 x.runs = f.runs;
-                x.phase = if f.outcome == Outcome::Completed && f.phase.is_some() && open_pr(&x.issue, &issues) {
+                x.phase = if f.outcome == Outcome::Completed && f.phase.is_some() && open_pr(x.issue_id(), &issues) {
                     Phase::Resting(PhaseResting {})
                 } else {
                     ended(f.outcome)
@@ -326,22 +336,20 @@ pub fn session_view(h: &Session, conflict: Option<&Conflict>) -> SessionView {
     };
     SessionView {
         id: h.id.clone(),
+        controller: h.controller,
         role: h.role,
         name: h.name.clone(),
-        agent: h.agent.clone(),
+        profile: h.profile.clone(),
         runtime: h.runtime.clone(),
         brief: h.brief.clone(),
-        repo: h.repo.clone(),
-        branch: h.branch.clone(),
-        worktree: h.worktree.clone(),
+        cwd: h.cwd.clone(),
+        policy: h.policy.clone(),
+        bindings: h.bindings.clone(),
         hired_at: h.hired_at,
         runs: h.runs,
         phase,
         last_run: h.last_run.clone(),
         spent: h.spent.clone(),
-        channel: h.channel.clone(),
-        issue: h.issue.clone(),
-        refining: h.refining,
         subagents: h.subagents.clone(),
         tool_connections: h.tool_connections.clone(),
         machine: h.machine.clone(),
@@ -526,7 +534,7 @@ fn with_words(state: &SpaceState) -> SpaceView {
         sessions: state
             .sessions
             .iter()
-            .map(|h| session_view(h, h.issue.as_deref().and_then(|i| conflicts.get(i).copied().flatten())))
+            .map(|h| session_view(h, h.issue_id().and_then(|i| conflicts.get(i).copied().flatten())))
             .collect(),
         crons: state.crons.iter().map(cron_view).collect(),
         board_summary: Some(board_summary(state)),

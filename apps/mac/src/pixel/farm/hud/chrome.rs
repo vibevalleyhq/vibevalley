@@ -117,7 +117,7 @@ fn friend_activity(f: &FarmScene) -> (usize, Option<Color>) {
     let mut busy = 0;
     let mut stage = None;
     for agent in f.profiles.iter().filter(|a| a.role == AgentRole::Worker) {
-        let mine = f.frame.state.sessions.iter().filter(|s| s.agent == agent.id);
+        let mine = f.frame.state.sessions.iter().filter(|s| s.profile_id() == Some(agent.id.as_str()));
         let crops = mine.clone().filter_map(|s| f.frame.plot_of(s)).map(|p| p.crop);
         if crops.clone().any(|crop| crop == Crop::Withered) {
             stage = Some(rgba(0xc84a3a, 1.));
@@ -496,8 +496,8 @@ fn hover_action(
         );
     }
     let stage = session
-        .and_then(|s| s.issue.as_ref())
-        .and_then(|id| f.frame.state.issues.iter().find(|i| &i.id == id))
+        .and_then(|s| s.issue_id())
+        .and_then(|id| f.frame.state.issues.iter().find(|i| i.id == id))
         .and_then(|i| i.stage.as_ref());
     let action = stage.and_then(|s| f.tool.action(s));
     let (ok, key) = match (f.tool, session, action) {
@@ -544,7 +544,7 @@ fn draw_plot_hover(f: &FarmScene, list: &mut DrawList, fr: Framing) {
         .state
         .sessions
         .iter()
-        .find(|s| s.is_worker() && (f.repo.is_none() || s.repo == f.repo) && bed.station >= 0 && f.frame.station_of(s) == bed.station);
+        .find(|s| s.is_worker() && f.repo.as_deref().is_none_or(|r| s.repo_name() == Some(r)) && bed.station >= 0 && f.frame.station_of(s) == bed.station);
     let crop = f.crop_of_bed(bed, false);
     let name = if bed.unlock_level.is_some() {
         translate(if crop == Crop::Locked {
@@ -565,7 +565,7 @@ fn draw_plot_hover(f: &FarmScene, list: &mut DrawList, fr: Framing) {
         action
     };
     let mut rows = vec![(name.as_str(), INK)];
-    if let Some(repo) = session.and_then(|s| s.repo.as_deref()) {
+    if let Some(repo) = session.and_then(|s| s.repo_name()) {
         rows.push((repo, MUTED));
     }
     rows.push((&action, if ok { rgba(0x3f6b2a, 1.) } else { MUTED }));
@@ -647,12 +647,10 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
         }
         let p = f.world.plot_at(bed.index);
         let (x, y) = at(p.x, p.y - PLOT_H / 2.0);
-        let session = f
-            .frame
-            .state
-            .sessions
-            .iter()
-            .find(|s| s.is_worker() && (f.repo.is_none() || s.repo == f.repo) && bed.station >= 0 && f.frame.station_of(s) == bed.station);
+        let session =
+            f.frame.state.sessions.iter().find(|s| {
+                s.is_worker() && f.repo.as_deref().is_none_or(|r| s.repo_name() == Some(r)) && bed.station >= 0 && f.frame.station_of(s) == bed.station
+            });
         if let Some(s) = session {
             let badge = f.frame.plot_of(s).and_then(|p| p.badge.as_ref());
             if let Some(b) = badge {
@@ -665,14 +663,14 @@ pub(super) fn draw_overlay(f: &FarmScene, list: &mut DrawList, fr: Framing) {
                     _ => 0xf3e2b8,
                 };
                 let mut rows = vec![b.text.as_str()];
-                rows.extend(s.repo.as_deref());
+                rows.extend(s.repo_name());
                 let ink = if matches!(b.tone.as_str(), "bug" | "stuck") {
                     rgba(0xfff3dc, 1.0)
                 } else {
                     INK
                 };
                 text_pin(list, (x, at(p.x, p.y - PLOT_H + 5.0).1 - 2.0), 1.0, &rows, (6.0, 3.0), rgba(paper, 1.0), ink);
-            } else if let Some(repo) = &s.repo {
+            } else if let Some(repo) = s.repo_name() {
                 text_pin(list, (x, at(p.x, p.y - PLOT_H + 5.0).1 - 2.0), 1.0, &[repo], (3.0, 0.0), PAPER, MUTED);
             }
         } else if let Some(level) = bed.unlock_level

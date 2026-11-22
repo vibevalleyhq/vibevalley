@@ -46,6 +46,8 @@ export const servedEndpoints = [
   { op: "session.respondInteraction", can: ["user", "remote"], about: ["id"] },
   { op: "session.setConfig", can: ["user", "remote"], about: ["id"] },
   { op: "session.childTranscript", can: ["user", "remote"], about: ["id"] },
+  { op: "session.binding.attach", can: ["user", "orchestrator", "remote"], about: ["id"] },
+  { op: "session.binding.detach", can: ["user", "orchestrator", "remote"], about: ["id"] },
   { op: "issue.conversation.get", can: ["user", "remote"], about: ["id"] },
   { op: "issue.comment.create", can: ["user", "remote", "orchestrator"], about: ["id"] },
   { op: "issue.diff.get", can: ["user", "remote", "orchestrator"], about: ["id"] },

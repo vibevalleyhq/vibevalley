@@ -62,33 +62,78 @@ pub struct SpaceView {
     pub chat: vibevalley_protocol::Chat,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Session {
     pub id: String,
-    pub role: String,
+    pub controller: vibevalley_protocol::SessionController,
+    pub role: Option<vibevalley_protocol::AgentRole>,
     pub name: String,
-    pub agent: String,
-    pub repo: Option<String>,
-    pub branch: Option<String>,
-    pub worktree: Option<String>,
-    pub issue: Option<String>,
+    pub profile: Option<String>,
+    pub cwd: Option<String>,
+    pub policy: vibevalley_protocol::ExecutionPolicy,
+    pub bindings: Vec<vibevalley_protocol::ContextRef>,
     pub hired_at: f64,
     pub runs: i64,
     pub phase: Phase,
 }
 
+impl Default for Session {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            controller: vibevalley_protocol::SessionController::User,
+            role: None,
+            name: String::new(),
+            profile: None,
+            cwd: None,
+            policy: vibevalley_protocol::ExecutionPolicy::SandboxDir,
+            bindings: Vec::new(),
+            hired_at: 0.0,
+            runs: 0,
+            phase: Phase::default(),
+        }
+    }
+}
+
 impl Session {
+    pub fn issue_id(&self) -> Option<&str> {
+        self.bindings.iter().find_map(|b| match b {
+            vibevalley_protocol::ContextRef::Issue { id, .. } => Some(id.as_str()),
+            _ => None,
+        })
+    }
+
+    pub fn repo_name(&self) -> Option<&str> {
+        match &self.policy {
+            vibevalley_protocol::ExecutionPolicy::DirectCwd { repo, .. } => repo.as_deref(),
+            vibevalley_protocol::ExecutionPolicy::ManagedWorktree { repo, .. } => Some(repo.as_str()),
+            vibevalley_protocol::ExecutionPolicy::SandboxDir => None,
+        }
+    }
+
+    pub fn profile_id(&self) -> Option<&str> {
+        self.profile.as_deref()
+    }
+
     /// The farm's plot key: the issue it works, else itself.
     pub fn plot_key(&self) -> &str {
-        self.issue.as_deref().unwrap_or(&self.id)
+        self.issue_id().unwrap_or(&self.id)
     }
+
     /// The action of a working session.
     pub fn doing(&self) -> Option<&str> {
         (self.phase.tag == "working").then(|| self.phase.doing.as_ref().map(|d| d.action.as_str()).unwrap_or("none"))
     }
+
     pub fn is_worker(&self) -> bool {
-        self.role == "worker"
+        self.controller == vibevalley_protocol::SessionController::IssueBoard
+            || self.controller == vibevalley_protocol::SessionController::Channel
+            || self.issue_id().is_some()
+    }
+
+    pub fn is_orchestrator(&self) -> bool {
+        self.controller == vibevalley_protocol::SessionController::Orchestrator && self.role == Some(vibevalley_protocol::AgentRole::Orchestrator)
     }
 }
 
@@ -209,7 +254,8 @@ mod tests {
         assert!(f.state.sessions.is_empty());
         let f = Frame::parse(&json!({
             "seq": 1,
-            "state": { "sessions": [{ "id": "s1", "role": "worker", "agent": "a", "issue": "i1",
+            "state": { "sessions": [{ "id": "s1", "controller": "issueBoard", "role": "worker", "profile": "a",
+                "bindings": [{ "kind": "issue", "id": "i1" }],
                 "phase": { "_tag": "working", "doing": { "action": "read_file", "label": "x" } } }] },
             "view": { "level": { "level": 3, "xp": 4, "need": 30 }, "plots": { "i1": { "crop": "leafy" } },
                 "plays": { "s1": { "station": 2 } } }

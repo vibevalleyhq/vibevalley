@@ -108,6 +108,7 @@ pub struct Shell {
     pub(crate) terminal_notice: Option<String>,
     pub panes: HashMap<(ProjectId, TabId), PaneSlot>,
     pub chat_statuses: HashMap<(ProjectId, TabId), ChatTabStatus>,
+    pub(super) chat_watches: HashMap<String, (u64, gpui::Task<()>)>,
     pub chat_menu_group: Option<vibevalley_workspace::GroupId>,
     pub sidebar: Entity<HostedView>,
     pub inspector: Entity<HostedView>,
@@ -180,7 +181,7 @@ impl Shell {
             }
         })
         .detach();
-        let quit = cx.on_app_quit(|this: &mut Shell, _| {
+        let quit = cx.on_app_quit(|this: &mut Shell, cx| {
             this.island = None;
             crate::live_voice::stop(None);
             crate::speech_audio::stop(None);
@@ -191,6 +192,13 @@ impl Shell {
             this.terminals.clear();
             this.panes.clear();
             this.chat_statuses.clear();
+            let watches = std::mem::take(&mut this.chat_watches);
+            if let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>() {
+                let server = bridge.0.server();
+                for (_, (sub_id, _task)) in watches {
+                    server.unsubscribe(sub_id);
+                }
+            }
             let store = this.store.take();
             async move {
                 let done = std::thread::spawn(move || {
@@ -238,6 +246,7 @@ impl Shell {
             terminals: HashMap::new(),
             panes: HashMap::new(),
             chat_statuses: HashMap::new(),
+            chat_watches: HashMap::new(),
             chat_menu_group: None,
             sidebar,
             inspector,
@@ -281,6 +290,7 @@ impl Shell {
                     match result {
                         Ok(()) => {
                             shell.server_ready = true;
+                            shell.sync_chat_watches(cx);
                             shell.finish_opening(true, cx);
                         }
                         Err(error) => {
@@ -440,6 +450,7 @@ impl Shell {
                         this.ensure_project_view(id, cx);
                     }
                     this.refresh_summaries(cx);
+                    this.sync_chat_watches(cx);
                     this.push_sidebar(cx);
                     this.finish_opening(true, cx);
                     cx.notify();

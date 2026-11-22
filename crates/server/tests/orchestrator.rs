@@ -157,17 +157,17 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
     assert_eq!(result, "记下了：#1「在 demo 里写 README」，在备选里，没开工");
 
     // The trajectory has the turn.
-    let events = user("session.event.list", json!({ "id": "orchestrator" }));
-    assert!(events.to_string().contains("issue_create"), "{events}");
+    let page = user("session.event.list", json!({ "id": "orchestrator" }));
+    assert!(page.to_string().contains("issue_create"), "{page}");
 
     // The user marks that answer wrong: the turn is kept as a case to replay.
-    let asked = events
+    let asked = page["events"]
         .as_array()
         .unwrap()
         .iter()
         .find(|e| e["type"] == "user/message")
-        .unwrap_or_else(|| panic!("{events}"));
-    let said = events.as_array().unwrap().iter().find(|e| e["type"] != "user/message").unwrap();
+        .unwrap_or_else(|| panic!("{page}"));
+    let said = page["events"].as_array().unwrap().iter().find(|e| e["type"] != "user/message").unwrap();
     let marked = user("orchestrator.eval.create", json!({ "on": asked["seq"], "want": " 应该先看一眼地里 " }));
     let file = std::path::PathBuf::from(marked["file"].as_str().unwrap());
     assert_eq!(file, dir.path().join("evals").join(format!("{}.json", marked["id"].as_str().unwrap())));
@@ -378,7 +378,7 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
     });
     let session = start.board.session(issue.latest_session_id().unwrap()).unwrap();
     assert_eq!(
-        std::fs::read(std::path::Path::new(session.worktree.as_deref().unwrap()).join("durable-count.txt")).unwrap(),
+        std::fs::read(std::path::Path::new(session.cwd.as_deref().unwrap()).join("durable-count.txt")).unwrap(),
         b"x"
     );
     let runs = start.board.runs(&issue.id).unwrap();

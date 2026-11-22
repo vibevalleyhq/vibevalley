@@ -27,6 +27,14 @@
 | `plainText` | `plain.ts` |  |
 | `githubRepository` | `repo.ts` | Only repository home URLs: never credentials, other git transports or command-line options. |
 | `same` | `same.ts` |  |
+| `sessionIssueId` | `session.ts` |  |
+| `sessionChannelId` | `session.ts` |  |
+| `sessionRepo` | `session.ts` |  |
+| `sessionBranch` | `session.ts` |  |
+| `sessionWorktree` | `session.ts` |  |
+| `sessionProfile` | `session.ts` |  |
+| `isOrchestratorSession` | `session.ts` |  |
+| `isFreeUserSession` | `session.ts` |  |
 | `stageWantsUser` | `stage.ts` | Questions the user for something: the page leads with it, the board flags it. |
 
 ## `apps/mac/ui/infra`
@@ -129,6 +137,14 @@
 | `followArtifactPresence` | `gateway.ts` | An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. |
 | `fetchArtifactView` | `gateway.ts` | Fetches a store artifact's rendered HTML viewer document through the native `artifact.view` op. |
 | `currentHost` | `host.ts` |  |
+| `readHostParams` | `hostParams.ts` |  |
+| `readHostLocale` | `hostParams.ts` |  |
+| `readHostMotion` | `hostParams.ts` |  |
+| `readHostViewName` | `hostParams.ts` |  |
+| `hasHostView` | `hostParams.ts` |  |
+| `readChatPaneParams` | `hostParams.ts` |  |
+| `readFarmFormParams` | `hostParams.ts` |  |
+| `readFarmPhoneParams` | `hostParams.ts` |  |
 | `loadSpriteManifest` | `pixelManifests.ts` | Lazily fetches `sprites.json` from Rust on first `useSprites()` call instead of inlining 105 KB into `bundle.js`. |
 | `cursorManifest` | `pixelManifests.ts` |  |
 | `retryRead` | `query.ts` |  |

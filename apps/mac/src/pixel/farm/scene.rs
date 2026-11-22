@@ -350,7 +350,7 @@ impl FarmScene {
             .state
             .sessions
             .iter()
-            .filter(|s| s.is_worker() && (self.repo.is_none() || s.repo == self.repo))
+            .filter(|s| s.is_worker() && (self.repo.is_none() || s.repo_name() == self.repo.as_deref()))
             .cloned()
             .collect();
         v.sort_by(|a, b| a.id.cmp(&b.id));
@@ -441,8 +441,9 @@ impl FarmScene {
             } else {
                 0
             };
-            let configured_look = self.agent_looks.get(&s.agent).map(|(sp, out)| (sp.as_str(), out.as_str()));
-            let look = cast_prefix(configured_look, &s.agent, &self.atlas);
+            let agent = s.profile_id().unwrap_or("");
+            let configured_look = self.agent_looks.get(agent).map(|(sp, out)| (sp.as_str(), out.as_str()));
+            let look = cast_prefix(configured_look, agent, &self.atlas);
             let place_want = Self::place_for(s, crop);
             let spots = spots_for(s, crop, pose);
             let working = s.phase.tag == "working";
@@ -645,7 +646,7 @@ impl FarmScene {
         FarmTap::Plot {
             bed,
             session: s.as_ref().map(|s| s.id.clone()),
-            issue: s.and_then(|s| s.issue),
+            issue: s.and_then(|s| s.issue_id().map(String::from)),
         }
     }
 
@@ -654,7 +655,7 @@ impl FarmScene {
     }
 
     fn manager_picture(&self, list: &mut DrawList, id: &str, at: Point) {
-        let pose = self.frame.state.sessions.iter().find(|s| s.role == "orchestrator" && s.agent == id);
+        let pose = self.frame.state.sessions.iter().find(|s| s.is_orchestrator() && s.profile_id() == Some(id));
         let speaking = pose.is_some_and(|s| s.doing() == Some("speaking_text"));
         let listening = pose.is_some_and(|s| !matches!(s.phase.tag.as_str(), "working" | "closed"));
         let look = self

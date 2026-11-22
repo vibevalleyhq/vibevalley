@@ -355,7 +355,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
         input: Some("SessionEventListInput"),
-        result: Some("Vec<SessionEvent>"),
+        result: Some("SessionEventPage"),
     },
     Endpoint {
         op: "session.openWorkspace",
@@ -410,6 +410,24 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: Some("SessionChildTranscriptInput"),
         result: Some("SessionChildTranscript"),
+    },
+    Endpoint {
+        op: "session.binding.attach",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Orchestrator, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionBindingInput"),
+        result: Some("Session"),
+    },
+    Endpoint {
+        op: "session.binding.detach",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Orchestrator, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionBindingInput"),
+        result: Some("Session"),
     },
     Endpoint {
         op: "issue.conversation.get",
@@ -2085,12 +2103,12 @@ pub mod ops {
         type Input = t::SessionGetInput;
         type Result = t::Session;
     }
-    /// Its log, oldest first. run gives one run's only.
+    /// Its log, oldest first. `run` narrows to one run; cursor fields page history.
     pub struct SessionEventList;
     impl Op for SessionEventList {
         const NAME: &'static str = "session.event.list";
         type Input = t::SessionEventListInput;
-        type Result = Vec<t::SessionEvent>;
+        type Result = t::SessionEventPage;
     }
     /// Opens or resumes a direct workspace chat session in a directory with no issue.
     pub struct SessionOpenWorkspace;
@@ -2133,6 +2151,20 @@ pub mod ops {
         const NAME: &'static str = "session.childTranscript";
         type Input = t::SessionChildTranscriptInput;
         type Result = t::SessionChildTranscript;
+    }
+    /// Attaches a context reference to an existing session.
+    pub struct SessionBindingAttach;
+    impl Op for SessionBindingAttach {
+        const NAME: &'static str = "session.binding.attach";
+        type Input = t::SessionBindingInput;
+        type Result = t::Session;
+    }
+    /// Detaches a context reference from an existing session.
+    pub struct SessionBindingDetach;
+    impl Op for SessionBindingDetach {
+        const NAME: &'static str = "session.binding.detach";
+        type Input = t::SessionBindingInput;
+        type Result = t::Session;
     }
     pub struct IssueConversationGet;
     impl Op for IssueConversationGet {

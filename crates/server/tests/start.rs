@@ -64,9 +64,9 @@ fn a_repo_is_made_by_name_and_an_issue_names_it() {
     assert!(sent.data.is_some(), "{}", sent.message);
     let session = started
         .board
-        .read(|s| s.sessions.iter().find(|s| s.issue.as_deref() == Some(id.as_str())).cloned())
+        .read(|s| s.sessions.iter().find(|s| s.issue_id() == Some(id.as_str())).cloned())
         .unwrap();
-    assert_eq!((session.agent.as_str(), session.runtime.as_str()), (helper.id.as_str(), "scripted"));
+    assert_eq!((session.profile.as_deref(), session.runtime.as_str()), (Some(helper.id.as_str()), "scripted"));
     assert!(session.name.starts_with("小帮手"), "{}", session.name);
     // The user looking at a live session's changes is a `reviewed` entry, once per session.
     let mut diff = call("issue.diff.get", json!({ "id": id }));
@@ -178,11 +178,7 @@ fn every_contract_endpoint_and_subscription_is_registered_and_hub_drops_cleanly(
 
     let opened = started.hub.call_as(Caller::User, "orchestrator.open", json!({}));
     assert_eq!(opened.biz_code, 0, "{}", opened.message);
-    assert!(
-        started
-            .hub
-            .read(|s| s.sessions.iter().any(|h| h.role == vibevalley_protocol::AgentRole::Orchestrator))
-    );
+    assert!(started.hub.read(|s| s.sessions.iter().any(|h| h.is_orchestrator())));
 
     let weak = Arc::downgrade(&started.hub);
     started.close();

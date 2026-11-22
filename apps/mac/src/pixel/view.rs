@@ -495,7 +495,7 @@ impl PixelView {
         match tap {
             FarmTap::Plot { session: Some(id), issue, .. } if secondary => {
                 let s = f.frame.state.sessions.iter().find(|s| s.id == id);
-                let cwd = s.and_then(|s| s.worktree.clone()).or_else(|| self.props["cwd"].as_str().map(String::from));
+                let cwd = s.and_then(|s| s.cwd.clone()).or_else(|| self.props["cwd"].as_str().map(String::from));
                 if let Some(cwd) = cwd {
                     cx.emit(PixelEvent::Terminal {
                         cwd,

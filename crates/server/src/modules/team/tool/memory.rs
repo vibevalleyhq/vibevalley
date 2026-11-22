@@ -22,9 +22,9 @@ fn scope(f: &Farm, who: &Who, a: &Args, needed: bool) -> Result<(String, String)
         Who::Helper(me) => {
             let repo = match &a.repo {
                 Some(r) => r.trim().to_string(),
-                None => me.repo.clone().unwrap_or_default(),
+                None => me.repo_name().unwrap_or_default().to_string(),
             };
-            Ok((me.agent.clone(), repo))
+            Ok((me.profile.clone().unwrap_or_default(), repo))
         }
         Who::Orchestrator(_) => {
             let repo = a.repo.as_deref().unwrap_or("").trim().to_string();

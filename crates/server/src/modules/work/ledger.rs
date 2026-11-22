@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
 use vibevalley_core::{Applied, Core, Refusal};
 use vibevalley_protocol::{
-    Assignment, Conflict, CriterionCheck, Execution, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome, Phase, PullRequest,
-    Question, Session, SpaceState, StateFrame as Frame,
+    Assignment, Conflict, CriterionCheck, Execution, ExecutionPolicy, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome,
+    Phase, PullRequest, Question, Session, SpaceState, StateFrame as Frame,
 };
 use vibevalley_runtime::agent::durable::Sqlite;
 use vibevalley_runtime::oar::PermissionMode;
@@ -440,13 +440,13 @@ impl Ledger {
         let mut sessions = Vec::new();
         let mut opened = Opened::default();
         for mut session in stored {
-            let lost = session.worktree.as_deref().is_some_and(|w| !Path::new(w).exists());
-            if !lost && session.refining {
+            let lost = matches!(session.policy, ExecutionPolicy::ManagedWorktree { .. }) && session.cwd.as_deref().is_some_and(|w| !Path::new(w).exists());
+            if !lost && session.is_refining() {
                 opened.drafts.push(session.id.clone());
             }
             if session.phase.is_working()
                 && !lost
-                && !session.refining
+                && !session.is_refining()
                 && session.runtime == vibevalley_runtime::agent::runtime::ID
                 && let Some(extra) = extras.get(&session.id)
                 && let (Some(run), Some(vendor)) = (extra.run.as_deref(), extra.agent_session.as_deref())
@@ -486,7 +486,7 @@ impl Ledger {
                 session_db::put(&db, &session, true)?;
             }
             if lost {
-                opened.lost.extend(session.issue);
+                opened.lost.extend(session.issue_id().map(String::from));
             } else {
                 sessions.push(session);
             }

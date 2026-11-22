@@ -15,12 +15,12 @@ pub struct SessionCmd {
 
 #[derive(Debug, Subcommand)]
 pub enum SessionAction {
-    /// List worker and orchestrator sessions
-    #[command(after_help = "Examples:\n  vibevalley session list\n  vibevalley session list --agent docs")]
+    /// List sessions
+    #[command(after_help = "Examples:\n  vibevalley session list\n  vibevalley session list --profile docs")]
     List {
         /// Filter by agent profile id
         #[arg(long)]
-        agent: Option<String>,
+        profile: Option<String>,
     },
     /// Show details for a single session
     #[command(after_help = "Examples:\n  vibevalley session show w3")]
@@ -36,7 +36,13 @@ pub enum SessionAction {
         /// Filter to a specific run id
         #[arg(long)]
         run: Option<String>,
-        /// Show only the last N events
+        /// Fetch events strictly before this sequence number
+        #[arg(long)]
+        before: Option<i64>,
+        /// Fetch events strictly after this sequence number
+        #[arg(long)]
+        after: Option<i64>,
+        /// Maximum number of events to return
         #[arg(long)]
         limit: Option<i64>,
     },
@@ -59,16 +65,10 @@ fn phase_tag(phase: &Phase) -> &'static str {
 }
 
 fn session_line(session: &Session) -> String {
-    let issue = session.issue.as_ref().map(|i| format!("issue {i}")).unwrap_or_default();
-    let repo = session.repo.as_ref().map(|r| format!("[{r}]")).unwrap_or_default();
-    line(&[
-        &session.id,
-        &session.name,
-        &format!("@{}", session.agent),
-        phase_tag(&session.phase),
-        &issue,
-        &repo,
-    ])
+    let issue = session.issue_id().map(|i| format!("issue {i}")).unwrap_or_default();
+    let repo = session.repo_name().map(|r| format!("[{r}]")).unwrap_or_default();
+    let who = session.profile_id().unwrap_or(&session.runtime);
+    line(&[&session.id, &session.name, &format!("@{who}"), phase_tag(&session.phase), &issue, &repo])
 }
 
 fn event_line(event: &SessionEvent) -> String {
@@ -88,8 +88,8 @@ fn event_line(event: &SessionEvent) -> String {
 
 pub fn run(client: &Client, cmd: SessionCmd) -> Done {
     match cmd.action {
-        SessionAction::List { agent } => {
-            let sessions = client.ask::<ops::SessionList>(&SessionListInput { agent })?;
+        SessionAction::List { profile } => {
+            let sessions = client.ask::<ops::SessionList>(&SessionListInput { profile, controller: None })?;
             client.output.show(&sessions, |ss| ss.iter().map(session_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
@@ -99,7 +99,7 @@ pub fn run(client: &Client, cmd: SessionCmd) -> Done {
                 [
                     session_line(s),
                     s.brief.lines().next().unwrap_or("").to_string(),
-                    s.worktree.clone().unwrap_or_default(),
+                    s.cwd.clone().unwrap_or_default(),
                 ]
                 .into_iter()
                 .filter(|l| !l.is_empty())
@@ -108,15 +108,29 @@ pub fn run(client: &Client, cmd: SessionCmd) -> Done {
             });
             Ok(())
         }
-        SessionAction::Events { session, run, limit } => {
-            let mut events = client.ask::<ops::SessionEventList>(&SessionEventListInput { id: session, run })?;
-            if let Some(max) = limit.map(|n| n.max(0) as usize)
-                && events.len() > max
-            {
-                let start = events.len() - max;
-                events.drain(..start);
-            }
-            client.output.show(&events, |es| es.iter().map(event_line).collect::<Vec<_>>().join("\n"));
+        SessionAction::Events {
+            session,
+            run,
+            before,
+            after,
+            limit,
+        } => {
+            let page = client.ask::<ops::SessionEventList>(&SessionEventListInput {
+                id: session,
+                run,
+                before_seq: before,
+                after_seq: after,
+                limit,
+            })?;
+            client.output.show(&page, |p| {
+                let mut lines: Vec<String> = p.events.iter().map(event_line).collect();
+                if p.has_more
+                    && let Some(oldest) = p.oldest_seq
+                {
+                    lines.push(format!("more available: pass --before {oldest}"));
+                }
+                lines.join("\n")
+            });
             Ok(())
         }
         SessionAction::Stop { session } => {

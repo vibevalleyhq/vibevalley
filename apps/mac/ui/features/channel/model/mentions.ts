@@ -1,6 +1,6 @@
 import { t } from "@vibevalley/i18n";
 import { type Agent, everyone, defaultOrchestrator, userId, type Session, type SessionView } from "@vibevalley/protocol";
-import { mentionLead } from "@vibevalley/protocol/rules";
+import { isFreeUserSession, mentionLead } from "@vibevalley/protocol/rules";
 
 import { spelled } from "../../../infra/base/search";
 import { phaseText } from "../views/presence";
@@ -25,21 +25,24 @@ const menuMax = 6;
 
 /** The place's orchestrator (here) is @the orchestrator, every other orchestrator its @<profile id>; everyone only when there is
  * more than one helper. */
-export const nameables = (sessions: SessionView[], orchestrators: readonly Agent[], here: string, now: number): Nameable[] => [
-  ...sessions.filter((h) => h.role === "worker").map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
-  {
-    token: mentionOf[defaultOrchestrator] ?? "@orchestrator",
-    name: orchestrators.find((a) => a.id === here)?.name || t("web.base.orchestrator"),
-    note: t("web.channel.names.orchestratorNote"),
-    orchestrator: here,
-  },
-  ...orchestrators
-    .filter((a) => a.id !== here)
-    .map((a) => ({ token: `@${a.id}`, name: a.name, note: a.duty || t("web.channel.names.orchestratorNote"), orchestrator: a.id })),
-  ...(sessions.length > 1
-    ? [{ token: mentionOf[everyone] ?? "@everyone", name: t("web.channel.names.everyone"), note: t("web.channel.names.everyoneNote") }]
-    : []),
-];
+export const nameables = (sessions: SessionView[], orchestrators: readonly Agent[], here: string, now: number): Nameable[] => {
+  const active = sessions.filter((h) => !isFreeUserSession(h));
+  return [
+    ...active.filter((h) => h.role === "worker").map((h) => ({ token: `@${h.id}`, name: h.name, note: phaseText(h, now), session: h })),
+    {
+      token: mentionOf[defaultOrchestrator] ?? "@orchestrator",
+      name: orchestrators.find((a) => a.id === here)?.name || t("web.base.orchestrator"),
+      note: t("web.channel.names.orchestratorNote"),
+      orchestrator: here,
+    },
+    ...orchestrators
+      .filter((a) => a.id !== here)
+      .map((a) => ({ token: `@${a.id}`, name: a.name, note: a.duty || t("web.channel.names.orchestratorNote"), orchestrator: a.id })),
+    ...(active.length > 1
+      ? [{ token: mentionOf[everyone] ?? "@everyone", name: t("web.channel.names.everyone"), note: t("web.channel.names.everyoneNote") }]
+      : []),
+  ];
+};
 
 const typed = new RegExp(String.raw`${mentionLead}@([\p{L}\p{N}_]*)$`, "u");
 

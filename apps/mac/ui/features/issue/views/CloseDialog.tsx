@@ -3,6 +3,7 @@ import { DiffView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { type ChangedFile, type Changes, type Issue, type IssueAct, type Session, VibeValleyApiError } from "@vibevalley/protocol";
+import { sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -252,7 +253,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
                     </View>
                     <View class="min-w-0 flex-1">
                       <Text class="text-sm font-semibold text-berry">{t("web.issue.changes.conflict", { base: c().base })}</Text>
-                      <ConflictFiles files={c().conflicts} worktree={props.session?.worktree} />
+                      <ConflictFiles files={c().conflicts} worktree={props.session ? sessionWorktree(props.session) : undefined} />
                       <Text class="mt-2 text-xs leading-relaxed text-muted">{t("web.issue.changes.resolveHow", { base: c().base })}</Text>
                     </View>
                   </View>

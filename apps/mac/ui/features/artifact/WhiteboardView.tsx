@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { currentLocale, t } from "@vibevalley/i18n";
 import { type ArtifactEntry, type ArtifactEntryWriteInput, type ArtifactPresenceKind, userId, type ViewportRect } from "@vibevalley/protocol";
+import { isFreeUserSession, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -137,16 +138,19 @@ export function WhiteboardView(props: StoreViewerProps) {
 
     const sessions = core()?.sessions ?? [];
     for (const sess of sessions) {
-      if (sess.phase._tag !== "working" || seen.has(sess.agent)) continue;
-      const ownClaim = claims.find((c) => c.id.includes(sess.agent) || labelOfFallback(c).includes(sess.name));
+      if (isFreeUserSession(sess) || sess.phase._tag !== "working") continue;
+      const id = sessionProfile(sess) ?? sess.id;
+      if (seen.has(id)) continue;
+      const ownClaim = claims.find((c) => c.id.includes(id) || labelOfFallback(c).includes(sess.name));
       out.push({
-        id: sess.agent,
+        id,
         name: sess.name,
         color: "coral",
         kind: "cursor",
         x: ownClaim ? (ownClaim.x ?? 80) + (ownClaim.w ?? 200) - 18 : 120,
         y: ownClaim ? (ownClaim.y ?? 80) + (ownClaim.h ?? 100) - 12 : 120,
       });
+      seen.add(id);
     }
     return out;
   });

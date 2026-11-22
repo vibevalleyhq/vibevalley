@@ -269,7 +269,7 @@ fn regression_replies_and_reports_across_process_exit() {
     assert_eq!(confirmed.spent.as_ref().map(|s| s.tokens), Some(16));
     assert!(runs[2].spent.is_none(), "interrupted before its receipt");
     let session = server.board.session(&runs[2].session).unwrap();
-    let worktree = Path::new(session.worktree.as_deref().unwrap());
+    let worktree = Path::new(session.cwd.as_deref().unwrap());
     assert_eq!(
         std::fs::read_to_string(worktree.join("delivery.txt")).unwrap(),
         format!("initial\n{FOLLOW_UP}\n{UNKNOWN}\n")

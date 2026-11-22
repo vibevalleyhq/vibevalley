@@ -296,8 +296,11 @@ fn a_summary_is_the_last_paragraphs() {
 
 fn asking(at: Millis) -> SpaceState {
     let mut state = empty_space_state();
-    let mut h = Session::worker("w1", "Helper", at);
-    h.issue = Some("t1".into());
+    let mut h = Session::new("w1", SessionController::IssueBoard, "Helper", "", ExecutionPolicy::SandboxDir, at);
+    h.attach_binding(ContextRef::Issue {
+        id: "t1".into(),
+        refining: None,
+    });
     h.phase = Phase::resting();
     h.last_run = Some(LastRun {
         needs_reconciliation: false,

@@ -179,31 +179,145 @@ impl Issue {
     }
 }
 
+fn issue_binding(bindings: &[ContextRef]) -> Option<(&str, bool)> {
+    bindings.iter().find_map(|b| match b {
+        ContextRef::Issue { id, refining } => Some((id.as_str(), refining.unwrap_or(false))),
+        ContextRef::Channel { .. } | ContextRef::Artifact { .. } | ContextRef::Pkm { .. } => None,
+    })
+}
+
+fn channel_binding(bindings: &[ContextRef]) -> Option<&str> {
+    bindings.iter().find_map(|b| match b {
+        ContextRef::Channel { id } => Some(id.as_str()),
+        ContextRef::Issue { .. } | ContextRef::Artifact { .. } | ContextRef::Pkm { .. } => None,
+    })
+}
+
+fn policy_repo(policy: &ExecutionPolicy) -> Option<&str> {
+    match policy {
+        ExecutionPolicy::DirectCwd { repo, .. } => repo.as_deref(),
+        ExecutionPolicy::ManagedWorktree { repo, .. } => Some(repo.as_str()),
+        ExecutionPolicy::SandboxDir => None,
+    }
+}
+
+fn policy_branch(policy: &ExecutionPolicy) -> Option<&str> {
+    match policy {
+        ExecutionPolicy::ManagedWorktree { branch, .. } => branch.as_deref(),
+        ExecutionPolicy::DirectCwd { .. } | ExecutionPolicy::SandboxDir => None,
+    }
+}
+
+fn same_binding_key(a: &ContextRef, b: &ContextRef) -> bool {
+    match (a, b) {
+        (ContextRef::Issue { id: x, .. }, ContextRef::Issue { id: y, .. }) => x == y,
+        (ContextRef::Channel { id: x }, ContextRef::Channel { id: y }) => x == y,
+        (ContextRef::Artifact { id: x }, ContextRef::Artifact { id: y }) => x == y,
+        (ContextRef::Pkm { path: x }, ContextRef::Pkm { path: y }) => x == y,
+        _ => false,
+    }
+}
+
+macro_rules! impl_session_readers {
+    ($ty:ty) => {
+        impl $ty {
+            pub fn issue_id(&self) -> Option<&str> {
+                issue_binding(&self.bindings).map(|(id, _)| id)
+            }
+
+            pub fn is_refining(&self) -> bool {
+                issue_binding(&self.bindings).is_some_and(|(_, refining)| refining)
+            }
+
+            pub fn channel_id(&self) -> Option<&str> {
+                channel_binding(&self.bindings)
+            }
+
+            pub fn repo_name(&self) -> Option<&str> {
+                policy_repo(&self.policy)
+            }
+
+            pub fn worktree_branch(&self) -> Option<&str> {
+                policy_branch(&self.policy)
+            }
+
+            pub fn profile_id(&self) -> Option<&str> {
+                self.profile.as_deref()
+            }
+
+            pub fn is_board_worker(&self) -> bool {
+                self.controller == SessionController::IssueBoard || self.issue_id().is_some()
+            }
+
+            pub fn is_direct_talker(&self) -> bool {
+                self.controller == SessionController::Channel
+            }
+
+            pub fn is_orchestrator(&self) -> bool {
+                self.controller == SessionController::Orchestrator && self.role == Some(AgentRole::Orchestrator)
+            }
+
+            pub fn is_free_user(&self) -> bool {
+                self.controller == SessionController::User && self.bindings.is_empty()
+            }
+        }
+    };
+}
+
+impl_session_readers!(Session);
+impl_session_readers!(SessionView);
+
 impl Session {
-    /// A helper's session, resting, on no issue.
-    pub fn worker(id: impl Into<SessionId>, name: impl Into<String>, hired_at: Millis) -> Session {
+    /// A newly created resting session without initial bindings or profile.
+    pub fn new(
+        id: impl Into<SessionId>,
+        controller: SessionController,
+        name: impl Into<String>,
+        runtime: impl Into<String>,
+        policy: ExecutionPolicy,
+        hired_at: Millis,
+    ) -> Session {
         Session {
             id: id.into(),
-            role: AgentRole::Worker,
+            controller,
+            role: match controller {
+                SessionController::Orchestrator => Some(AgentRole::Orchestrator),
+                SessionController::IssueBoard | SessionController::Channel => Some(AgentRole::Worker),
+                SessionController::User => None,
+            },
             name: name.into(),
-            agent: String::new(),
-            runtime: String::new(),
+            profile: None,
+            runtime: runtime.into(),
             brief: String::new(),
-            repo: None,
-            branch: None,
-            worktree: None,
+            cwd: None,
+            policy,
+            bindings: vec![],
             hired_at,
             runs: 0,
-            phase: Phase::resting(),
             last_run: None,
             spent: None,
-            channel: None,
-            issue: None,
-            refining: false,
             subagents: None,
             tool_connections: None,
             machine: None,
+            phase: Phase::resting(),
         }
+    }
+
+    /// Attaches or updates a context binding; returns true if `self.bindings` changed.
+    pub fn attach_binding(&mut self, binding: ContextRef) -> bool {
+        if self.bindings.contains(&binding) {
+            return false;
+        }
+        self.bindings.retain(|existing| !same_binding_key(existing, &binding));
+        self.bindings.push(binding);
+        true
+    }
+
+    /// Removes any context binding sharing the target identity; returns true if removed.
+    pub fn detach_binding(&mut self, binding: &ContextRef) -> bool {
+        let before = self.bindings.len();
+        self.bindings.retain(|existing| !same_binding_key(existing, binding));
+        self.bindings.len() != before
     }
 }
 

@@ -89,21 +89,29 @@
     "sessions": [
       {
         "id": "w1",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "老周",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "repo": "~/vibevalley",
-        "branch": "issue-1-init",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "~/vibevalley",
+          "branch": "issue-1-init"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i1"
+          }
+        ],
         "hiredAt": 1795193963624,
         "runs": 1,
         "spent": {
           "tokens": 42000,
           "cny": 0.08
         },
-        "issue": "i1",
-        "refining": false,
         "phase": {
           "_tag": "working",
           "since": 1795194323624,

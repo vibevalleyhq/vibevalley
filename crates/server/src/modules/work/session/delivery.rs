@@ -123,12 +123,12 @@ pub(crate) fn interrupt_on_reopen(
             run.ended_at = Some(at);
             run.outcome = Some(Outcome::Interrupted);
             run.summary = summary.into();
-            if !session.refining && session.runtime != vibevalley_runtime::agent::runtime::ID && run.issue.is_some() {
+            if !session.is_refining() && session.runtime != vibevalley_runtime::agent::runtime::ID && run.issue.is_some() {
                 tx.put_document(
                     "run",
                     &id,
                     "workspace.reconciliation",
-                    &json!({"worktree":session.worktree,"branch":session.branch}),
+                    &json!({"worktree":session.cwd,"branch":session.worktree_branch()}),
                 )?;
                 run.needs_reconciliation = true;
             }

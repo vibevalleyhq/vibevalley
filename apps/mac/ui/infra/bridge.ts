@@ -14,6 +14,8 @@ import { host, signal, type Signal } from "nsh";
 
 import type { CommandLineState, MotionChoice } from "@vibevalley/protocol/host";
 
+import { readHostViewName } from "./hostParams";
+
 export type Next = { say: string; run?: readonly string[] };
 export type ErrorDetail = { next?: readonly Next[]; settings?: string };
 /** VibeValley's response envelope. `bizCode` 0 is success. */
@@ -249,5 +251,5 @@ export function act(action: Action): void {
 
 /** Which surface this view shows (set by Rust before the bundle loads). */
 export function viewName(): string {
-  return typeof host.params.view === "string" ? host.params.view : "stories";
+  return readHostViewName();
 }

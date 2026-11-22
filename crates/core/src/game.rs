@@ -9,7 +9,7 @@ use vibevalley_i18n::t;
 use vibevalley_protocol::*;
 
 use crate::rules::{Need, farm_of, need_of, plot_key_of};
-use crate::status::{is_hired, is_on_duty, open_findings, session_of};
+use crate::status::{is_farm_worker, is_hired, open_findings, session_of};
 
 const HISTORY_LIMIT: usize = 30;
 const FILE_LIMIT: usize = 24;
@@ -290,7 +290,7 @@ pub fn effects_of(before: &SpaceState, fact: &Fact) -> Vec<GameEffect> {
             out
         }
         Fact::SessionReported(f) => match session_of(before, &f.id) {
-            Some(reporter) if f.outcome == Outcome::Failed && is_hired(reporter.role) => {
+            Some(reporter) if f.outcome == Outcome::Failed && is_hired(reporter) => {
                 vec![GameEffect::Penalty(GameEffectPenalty { session_id: f.id.clone() })]
             }
             _ => vec![],
@@ -304,7 +304,7 @@ pub fn effects_of(before: &SpaceState, fact: &Fact) -> Vec<GameEffect> {
 pub fn view_of(state: &SpaceState) -> FarmView {
     let mut latest: HashMap<&str, &Session> = HashMap::new();
     for h in &state.sessions {
-        if is_on_duty(h.role) {
+        if !is_farm_worker(h) {
             continue;
         }
         let key = plot_key_of(h);
@@ -317,13 +317,14 @@ pub fn view_of(state: &SpaceState) -> FarmView {
     let plots = latest
         .into_iter()
         .map(|(key, h)| {
-            let issue = h.issue.as_deref().and_then(|i| issues.get(i).copied());
+            let issue = h.issue_id().and_then(|i| issues.get(i).copied());
             (key.to_string(), plot_of(h, issue, &play_of(plays, &h.id)))
         })
         .collect();
     let played = state
         .sessions
         .iter()
+        .filter(|h| is_farm_worker(h))
         .map(|h| {
             let play = play_of(plays, &h.id);
             let history = play

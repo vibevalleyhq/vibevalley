@@ -97,6 +97,7 @@ impl Shell {
                         }
                         let id = shell.ws.open(loaded.unwrap_or_else(|| shell.transient_project(&path)));
                         shell.ensure_project_view(id, cx);
+                        shell.sync_chat_watches(cx);
                         id
                     });
                     then(shell, id, window, cx);
@@ -172,6 +173,8 @@ impl Shell {
         let Some(job) = self.ws.close(id) else { return };
         self.projects.remove(&id);
         self.panes.retain(|(p, _), _| *p != id);
+        self.chat_statuses.retain(|(p, _), _| *p != id);
+        self.sync_chat_watches(cx);
         let live: std::collections::BTreeSet<String> = self.ws.projects().iter().flat_map(|p| p.layout.terminal_ids()).collect();
         self.terminals.retain(|tid, _| live.contains(tid));
         if let Some(store) = self.store.clone() {

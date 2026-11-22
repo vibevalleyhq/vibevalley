@@ -14,6 +14,7 @@ import {
   type SpaceState,
   type SpaceView,
 } from "@vibevalley/protocol";
+import { isOrchestratorSession, sessionIssueId, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createContext, useContext } from "./solid";
 import { onTransportChange, transport } from "./transport";
@@ -99,7 +100,8 @@ export function createFrames(source: FramesSource = frames): Frames {
         const byIssue = new Map<string, SessionView>();
         for (const s of list) {
           byId.set(s.id, s);
-          if (s.issue !== undefined) byIssue.set(s.issue, s);
+          const issueId = sessionIssueId(s);
+          if (issueId !== undefined) byIssue.set(issueId, s);
         }
         sessionsById = byId;
         sessionsByIssue = byIssue;
@@ -200,7 +202,7 @@ export function useThreadOwner(thread: Accessor<Channel>): Accessor<SessionView 
       return idx ? idx.sessionsById().get(c.subjectId) : f.frame?.state.sessions.find((s) => s.id === c.subjectId);
     }
     if (c.subjectKind === "issue") {
-      return idx ? idx.sessionsByIssue().get(c.subjectId) : f.frame?.state.sessions.findLast((s) => s.issue === c.subjectId);
+      return idx ? idx.sessionsByIssue().get(c.subjectId) : f.frame?.state.sessions.findLast((s) => sessionIssueId(s) === c.subjectId);
     }
     return undefined;
   };
@@ -209,7 +211,7 @@ export function useThreadOwner(thread: Accessor<Channel>): Accessor<SessionView 
 export type OrchestratorMood = "idle" | "listening" | "thinking" | "speaking";
 
 export const orchestratorSession = (state: SpaceState | undefined, agent = defaultOrchestrator) =>
-  state?.sessions.find((session) => session.role === "orchestrator" && session.agent === agent);
+  state?.sessions.find((session) => isOrchestratorSession(session) && sessionProfile(session) === agent);
 
 export function orchestratorMood(state: SpaceState | undefined, agent = defaultOrchestrator): OrchestratorMood {
   const phase = orchestratorSession(state, agent)?.phase;

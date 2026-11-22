@@ -74,9 +74,7 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
     let id = issue["id"].as_str().unwrap().to_string();
     ok("issue.status.update", json!({ "id": id, "status": "todo" }));
     let session = until("the session", || {
-        started
-            .board
-            .read(|s| s.sessions.iter().find(|x| x.issue.as_deref() == Some(id.as_str())).cloned())
+        started.board.read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())
     });
     let asked = until("the first words", || {
         let events = ok("session.event.list", json!({ "id": session.id }));

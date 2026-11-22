@@ -14,6 +14,7 @@ import { useWorkAgents } from "../infra/agents";
 import { api, newSendKey, reasonOf } from "../infra/api";
 import { useBridge } from "../infra/bridged";
 import { useCore } from "../infra/frame";
+import { readFarmFormParams, readHostLocale } from "../infra/hostParams";
 import { ready, useRepos } from "../infra/query";
 import { Root } from "../infra/Root";
 
@@ -64,8 +65,7 @@ function Shell(props: { title: string; icon: string; children: JSX.Element }) {
 }
 
 function Sow() {
-  const repo = typeof host.params.repo === "string" ? host.params.repo : "";
-  const station = Number(host.params.station);
+  const { repo, station } = readFarmFormParams();
   const agents = useWorkAgents(true);
   const repos = useRepos();
   const who = signal("");
@@ -193,8 +193,9 @@ function Work(props: { kind: string; issue: () => Issue }) {
   const busy = signal(false);
   const error = signal("");
   const core = useCore();
-  const slot = () => core()?.sessions.find((s) => s.id === host.params.session);
-  const target = () => core()?.issues.find((i) => i.id === host.params.issue);
+  const { session: targetSession, issue: targetIssue } = readFarmFormParams();
+  const slot = () => core()?.sessions.find((s) => s.id === targetSession);
+  const target = () => core()?.issues.find((i) => i.id === targetIssue);
   const sinceTree = signal<string | undefined>(undefined);
   const changes = useIssueChanges(
     () => props.issue().id,
@@ -326,8 +327,8 @@ function Work(props: { kind: string; issue: () => Issue }) {
 
 function Content() {
   const core = useCore();
-  const issue = () => core()?.issues.find((i) => i.id === host.params.issue);
-  const kind = typeof host.params.kind === "string" ? host.params.kind : "";
+  const { issue: issueId, kind } = readFarmFormParams();
+  const issue = () => core()?.issues.find((i) => i.id === issueId);
   if (kind === "sow") return <Sow />;
   return (
     <If
@@ -344,7 +345,7 @@ function Content() {
 }
 
 export function FarmForm() {
-  setLocale(host.params.locale === "en" ? "en" : "zh");
+  setLocale(readHostLocale());
   useBridge();
   keymap.bind("escape", close, { when: "always" });
   return (

@@ -29,10 +29,10 @@ fn regression_overlapping_helpers_draw_and_hit_in_arrival_order_at_the_same_anim
     let mut frame = Frame::parse(&fixture("state.json"));
     let mut first = frame.state.sessions.iter().find(|s| s.id == "s-ripe").unwrap().clone();
     first.id = "z-first".into();
-    first.agent = "owl".into();
+    first.profile = Some("owl".into());
     let mut last = first.clone();
     last.id = "a-last".into();
-    last.agent = "fox".into();
+    last.profile = Some("fox".into());
     for species in ["owl", "fox"] {
         scene.agent_looks.insert(species.into(), (species.into(), "farmer".into()));
     }
@@ -307,7 +307,8 @@ fn regression_helper_outfits_change_on_the_next_frame() {
     let mut scene = FarmScene::new(world, atlas);
     scene.frame = Frame::parse(&fixture("state.json"));
     let worker = scene.frame.state.sessions.iter().find(|s| s.is_worker()).unwrap().clone();
-    scene.agent_looks.insert(worker.agent.clone(), ("fox".into(), "farmer".into()));
+    let agent = worker.profile_id().unwrap_or("").to_string();
+    scene.agent_looks.insert(agent.clone(), ("fox".into(), "farmer".into()));
     scene.tick(0.1);
     let list = scene.draw(2.0);
     assert!(
@@ -315,7 +316,7 @@ fn regression_helper_outfits_change_on_the_next_frame() {
             .iter()
             .any(|op| matches!(op, draw::Op::Sprite { name, .. } if name.starts_with("fox-farmer")))
     );
-    scene.agent_looks.insert(worker.agent, ("rabbit".into(), "farmer".into()));
+    scene.agent_looks.insert(agent, ("rabbit".into(), "farmer".into()));
     scene.tick(0.1);
     assert!(
         scene
